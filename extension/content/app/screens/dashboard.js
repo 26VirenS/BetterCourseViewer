@@ -71,15 +71,33 @@
     }
 
     // ---- stats -------------------------------------------------------------------
+    // Each counter opens a sheet listing exactly the items it counted.
+    const byDate = (a, b) => a.date - b.date;
+    const dueRow = (it) => {
+      const c = it.course;
+      const pal = c ? c.palette : U.palette('#8e8e93', dark);
+      const when = U.sameDay(it.date, now) ? `due ${U.fmtTime(it.date)}` : `${U.DAYS[it.date.getDay()]} ${U.fmtTime(it.date)}`;
+      return { title: it.title, meta: [it.kind, it.points !== null ? `${store.fmtPts(it.points)} pts` : null, when].filter(Boolean).join(' · '), course: c?.shortName || it.courseName || '—', color: pal.text, tint: pal.tint, url: it.url };
+    };
+    const courseCount = (items) => new Set(items.map((it) => it.courseId || it.courseName)).size;
+
     function statsBlock() {
       const cards = [];
       if (planner) {
         const pts = dueToday.reduce((s, it) => s + (Number(it.points) || 0), 0);
-        cards.push(stat('Due today', String(dueToday.length), `${store.fmtPts(pts)} points total`, IC.clock, '#ff453a'));
-        const wc = new Set(dueWeek.map((it) => it.courseId));
-        cards.push(stat('Due this week', String(dueWeek.length), `Across ${U.plural(wc.size, 'course')}`, IC.cal, '#34c759'));
+        cards.push(stat('Due today', String(dueToday.length), `${store.fmtPts(pts)} points total`, IC.clock, '#ff453a', () => openSheet({
+          label: 'Due today', value: String(dueToday.length), icon: IC.clock, color: '#ff453a',
+          note: `${store.fmtPts(pts)} points across ${U.plural(courseCount(dueToday), 'course')} · ${U.DAYS_LONG[now.getDay()]}, ${U.MONTHS_LONG[now.getMonth()]} ${now.getDate()}`,
+          items: [...dueToday].sort(byDate).map(dueRow), empty: 'Nothing is due today.',
+        })));
+        cards.push(stat('Due this week', String(dueWeek.length), `Across ${U.plural(courseCount(dueWeek), 'course')}`, IC.cal, '#34c759', () => openSheet({
+          label: 'Due this week', value: String(dueWeek.length), icon: IC.cal, color: '#34c759',
+          note: `Week of ${U.fmtShort(weekStart)} · ${U.plural(courseCount(dueWeek), 'course')}`,
+          items: [...dueWeek].sort(byDate).map(dueRow), empty: 'Nothing is due this week.',
+        })));
       }
-      const unreadCard = U.card(U.el('bcv-stat', [U.el('bcv-stat__head', [U.svg(IC.bell, { size: 14, stroke: '#ff9500', width: 1.9 }), U.text('bcv-label bcv-label--inline', 'Unread announcements', 'span')]), U.el('bcv-stat__value', '…'), U.el('bcv-stat__note', '')]), 'bcv-stat-card');
+      let unreadSheet = { label: 'Unread announcements', value: '…', icon: IC.bell, color: '#ff9500', note: 'Loading…', items: [] };
+      const unreadCard = stat('Unread announcements', '…', '', IC.bell, '#ff9500', () => openSheet(unreadSheet));
       cards.push(unreadCard);
       Promise.all([store.activitySummary().catch(() => null), store.activity().catch(() => [])]).then(([summary, stream]) => {
         if (!ctx.alive()) return;
@@ -88,27 +106,66 @@
           unreadCard.remove();
           return;
         }
-        const unreadByCourse = new Map();
-        for (const a of stream || []) {
-          if (a.type === 'Announcement' && a.read_state === false) {
-            const name = courseMap.get(String(a.course_id))?.name || a.context_name || '';
-            unreadByCourse.set(name, (unreadByCourse.get(name) || 0) + 1);
-          }
-        }
+        const count = Number(ann.unread_count) || 0;
+        const unread = (stream || []).filter((a) => a.type === 'Announcement' && a.read_state === false)
+          .sort((a, b) => (U.parse(b.updated_at || b.created_at) || 0) - (U.parse(a.updated_at || a.created_at) || 0));
+        const nameOf = (a) => courseMap.get(String(a.course_id))?.shortName || courseMap.get(String(a.course_id))?.name || a.context_name || '';
+        const perCourse = new Map();
+        for (const a of unread) perCourse.set(nameOf(a), (perCourse.get(nameOf(a)) || 0) + 1);
         let top = '';
         let n = 0;
-        for (const [k, v] of unreadByCourse) if (v > n) { top = k; n = v; }
-        unreadCard.querySelector('.bcv-stat__value').textContent = String(ann.unread_count ?? 0);
-        unreadCard.querySelector('.bcv-stat__note').textContent = top || (ann.unread_count ? `${U.plural(ann.count || 0, 'announcement')} recently` : 'All caught up');
+        for (const [k, v] of perCourse) if (v > n) { top = k; n = v; }
+        unreadCard.querySelector('.bcv-stat__value').textContent = String(count);
+        unreadCard.querySelector('.bcv-stat__note').textContent = top || (count ? `${U.plural(ann.count || 0, 'announcement')} recently` : 'All caught up');
+        const items = unread.map((a) => {
+          const c = courseMap.get(String(a.course_id));
+          const pal = c ? c.palette : U.palette('#5856d6', dark);
+          return { title: a.title || 'Announcement', meta: `Posted ${U.fmtShort(a.updated_at || a.created_at)} · unread`, course: nameOf(a) || '—', color: pal.text, tint: pal.tint, url: activityUrl(a) };
+        });
+        unreadSheet = {
+          label: 'Unread announcements', value: String(count), icon: IC.bell, color: '#ff9500', items, empty: 'All caught up.',
+          note: !count ? 'Nothing unread' : perCourse.size === 1 ? `${unread.length === 2 ? 'Both' : unread.length === 1 ? 'One' : 'All'} from ${top}` : `From ${U.plural(perCourse.size, 'course')}`,
+          more: count > items.length ? `${U.plural(count - items.length, 'more is', 'more are')} not in the recent activity stream` : '',
+        };
       });
       return U.el('bcv-stats', cards);
     }
-    function stat(lbl, value, note, icon, color) {
-      return U.card(U.el('bcv-stat', [
+    function stat(lbl, value, note, icon, color, onOpen) {
+      return h('button', { type: 'button', class: 'bcv-card bcv-stat', onclick: onOpen }, [
         U.el('bcv-stat__head', [U.svg(icon, { size: 14, stroke: color, width: 1.9 }), U.text('bcv-label bcv-label--inline', lbl, 'span')]),
         U.el('bcv-stat__value', value),
-        U.el('bcv-stat__note', note),
-      ]), 'bcv-stat-card');
+        U.el('bcv-stat__noterow', [U.text('bcv-stat__note', note, 'span'), U.svg(IC.chevron, { size: 13, stroke: 'var(--bcv-ink3)', width: 2, cls: 'bcv-stat__chev' })]),
+      ]);
+    }
+
+    /** The detail sheet behind a counter: header with the number, then one row per item. */
+    function openSheet(def) {
+      document.querySelector('.bcv-sheet-ov')?.remove();
+      const ov = U.el('bcv-sheet-ov', null, { role: 'dialog', 'aria-label': def.label });
+      const close = () => ov.remove();
+      ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
+      ov.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+      ov.append(U.el('bcv-sheet', [
+        U.el('bcv-sheet__head', [
+          h('span', { class: 'bcv-sheet__tile' }, U.svg(def.icon, { size: 19, stroke: def.color, width: 1.9 })),
+          U.el('bcv-sheet__titles', [
+            U.el('bcv-sheet__line', [U.text('bcv-sheet__value', def.value, 'span'), U.text('bcv-sheet__label', def.label, 'span')]),
+            U.text('bcv-sheet__note bcv-pretty', def.note),
+          ]),
+          h('button', { type: 'button', class: 'bcv-sheet__close', 'aria-label': 'Close', onclick: close }, U.svg(IC.close, { size: 13, stroke: 'var(--bcv-ink2)', width: 2.3 })),
+        ]),
+        U.el('bcv-sheet__list', [
+          ...(def.items.length ? def.items.map((i) => h('a', { class: 'bcv-sheet__row', href: i.url, onclick: (e) => { e.preventDefault(); app.go(i.url); } }, [
+            h('span', { class: 'bcv-sheet__dot', style: { background: i.color } }),
+            U.el('bcv-sheet__body', [U.text('bcv-sheet__title bcv-pretty', i.title), U.text('bcv-sheet__meta', i.meta)]),
+            h('span', { class: 'bcv-sheet__course bcv-ellip', style: { background: i.tint, color: i.color }, text: i.course }),
+          ])) : [U.empty(def.empty || 'Nothing here.')]),
+          def.more ? U.text('bcv-sheet__more', def.more) : null,
+        ]),
+      ]));
+      document.body.append(ov);
+      ov.tabIndex = -1;
+      ov.focus();
     }
 
     // ---- workload ------------------------------------------------------------------

@@ -2,7 +2,7 @@
 
 A Mac app that installs a Safari extension giving **Canvas** a new interface, drawn to a single design: rounded cards on a soft grey ground, one sidebar, segmented controls, an iOS-style dark appearance, and a discreet **smart panel** that reads the page you are on using your own Claude or ChatGPT key.
 
-Nothing is decorated; every screen is redrawn from the Canvas API with your own data, on top of the real Canvas page for that URL. A switch at the top-left of every page turns the new look off and on, and turning it off always reveals exactly the page you were on.
+Nothing is decorated; every screen is redrawn from the Canvas API with your own data, on top of the real Canvas page for that URL. The look is switched off and on from the toolbar popup or the settings, and turning it off always reveals exactly the page you were on.
 
 | Dashboard (list view) | Course grades with nested rings |
 | --- | --- |
@@ -25,6 +25,8 @@ Nothing is decorated; every screen is redrawn from the Canvas API with your own 
 **Dashboard** – three counters (due today with points, due this week across N courses, unread announcements), a per-course workload bar for the week (submitted ÷ assigned; courses with nothing assigned fold away under a disclosure), and the same three views Canvas has: **Cards** (with a submitted-items progress bar, quick links and a "2 due today" badge), **List** (by day, with a circle to mark items done) and **Recent activity**. The view you pick is saved to your Canvas profile, as Canvas does.
 
 **Courses** – your dashboard courses as cards with term, role, progress and what is due next; every other course grouped by term (groups can be reordered with the arrows, and the order is remembered) with a star to add it to your dashboard; All / Past / Future and search.
+
+The three counters at the top of the dashboard (due today, due this week, unread announcements) each open a sheet listing exactly the items they counted, with points, times and the course, so a number is never a dead end.
 
 **To Do** – everything from today through the next seven days, by date or by course. It knows what is *actually* due: assignments, quizzes and graded discussions carry a due date; pages, events and ungraded discussions with only a to-do date are labelled as such. Tick an item to mark it done in your Canvas planner (and untick it later); dismiss hides it without touching the work; a switch shows completed and dismissed items so they can be restored.
 
@@ -87,8 +89,8 @@ The extension is on automatically for every `*.instructure.com` site. If your sc
 
 ## Turning the look off
 
-- The **Skin** switch at the top-left of every Canvas page turns the new interface off; a small switch stays there so you can turn it back on.
-- The toolbar popup and Settings → Appearance have the same switch, plus Light / Dark / Match the system.
+- The toolbar popup and Settings → Appearance have the **BetterCourseViewer look** switch, plus Light / Dark / Match the system. Nothing sits on the page itself.
+- Pages Canvas draws itself have an **Open in stock Canvas** button that flips the same switch.
 
 ## The smart panel and your keys
 
@@ -124,7 +126,7 @@ extension/
   content/app/icons.js         icon paths
   content/app/ui.js            components, date formatting, colour math
   content/app/store.js         every Canvas API loader + the grade model
-  content/app/app.js           shell (sidebar), router, skin switch, hybrid pages
+  content/app/app.js           shell (sidebar), router, punch-through for Canvas-drawn pages
   content/app/smart.js         the smart panel
   content/app/screens/         dashboard, courses, todo, groups, calendar, inbox,
                                course (shell + tabs), course-detail, grades, native

@@ -78,7 +78,7 @@ try {
   await page.waitForSelector('#bcv-app .bcv-nav__item', { timeout: 10000 });
   check(await visible('#bcv-app'), 'app shell visible');
   check(!(await visible('#application')), 'stock Canvas hidden');
-  check(await page.$('#bcv-skin.is-on'), 'skin switch at the top-left is on');
+  check(!(await page.$('#bcv-skin')), 'no switch floats on the page (the look is toggled from the popup and settings)');
   await waitText('.bcv-brand__sub', /Example University · Fall 2026/);
   check((await texts('.bcv-brand__name'))[0] === 'Localhost', `brand row: ${(await texts('.bcv-brand'))[0]}`);
   check(await page.$('.bcv-brand__tile img'), 'brand tile shows the school logo from Canvas');
@@ -96,6 +96,28 @@ try {
   const stats = await texts('.bcv-stat');
   check(stats.length === 3 && /Due today\s*4\s*35 points total/i.test(stats[0]) && /Due this week/i.test(stats[1]) && /Unread announcements/i.test(stats[2]), `stat cards: ${stats.join(' | ')}`);
   await waitText('.bcv-stats > :nth-child(3) .bcv-stat__value', /^3$/);
+  // each counter opens a sheet with the items it counted
+  await page.click('.bcv-stats .bcv-stat:first-child');
+  await page.waitForSelector('.bcv-sheet', { timeout: 5000 });
+  const sheetRows = await texts('.bcv-sheet__row');
+  check((await texts('.bcv-sheet__line'))[0] === '4 Due today' && /^35 points across \d courses? · \w+day, \w+ \d+$/.test((await texts('.bcv-sheet__note'))[0]) && sheetRows.length === 4 && sheetRows.some((t) => /^Dis01 Discussion · graded · 10 pts · due 11:59 PM F26-MATH 021 20$/.test(t) || /^Dis01 Assignment · 10 pts · due 11:59 PM F26-MATH 021 20$/.test(t)), `Due today opens its sheet: ${(await texts('.bcv-sheet__note'))[0]} | ${sheetRows.join(' | ')}`);
+  await shot(page, '01b-dashboard-sheet');
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !document.querySelector('.bcv-sheet'), null, { timeout: 3000 });
+  await page.click('.bcv-stats .bcv-stat:nth-child(2)');
+  await page.waitForSelector('.bcv-sheet', { timeout: 5000 });
+  check(/^\d+ Due this week$/.test((await texts('.bcv-sheet__line'))[0]) && /^Week of \w+ \d+ · \d courses?$/.test((await texts('.bcv-sheet__note'))[0]) && (await texts('.bcv-sheet__row')).some((t) => /Lec06-PreQuiz Quiz · 17 pts · \w{3} 10:30 AM/.test(t)), `Due this week sheet: ${(await texts('.bcv-sheet__note'))[0]}`);
+  await page.click('.bcv-sheet-ov', { position: { x: 5, y: 5 } });
+  await page.waitForFunction(() => !document.querySelector('.bcv-sheet'), null, { timeout: 3000 });
+  await page.click('.bcv-stats .bcv-stat:nth-child(3)');
+  await page.waitForSelector('.bcv-sheet', { timeout: 5000 });
+  const annRows = await texts('.bcv-sheet__row');
+  check((await texts('.bcv-sheet__line'))[0] === '3 Unread announcements' && annRows.length === 2 && /^Field site sign-ups Posted \w+ \d+ · unread F26-SPRK 010 103$/.test(annRows[0]) && /^1 more is not in the recent activity stream$/.test((await texts('.bcv-sheet__more'))[0] || ''), `Unread announcements sheet: ${annRows.join(' | ')}`);
+  await page.click('.bcv-sheet__row');
+  await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
+  check(page.url().endsWith('/courses/104/announcements/8005'), 'a sheet row opens the item');
+  await page.goto(`${BASE}/`);
+  await page.waitForSelector('.bcv-day .bcv-row', { timeout: 10000 });
   const work = await texts('.bcv-work__row');
   check(work.length === 5 && /F26-MATH 021 20/.test(work[0]) && /\d+ \/ \d+/.test(work[0]), `workload rows: ${work[0]}`);
   check(!(await page.$('.bcv-work__more')), 'no disclosure when every course has work this week');
@@ -648,28 +670,29 @@ try {
   await page.click('#bcv-theme-btn');
   await page.waitForFunction(() => document.documentElement.getAttribute('data-bcv-theme') === 'light', null, { timeout: 5000 });
 
-  // ---- skin switch ----------------------------------------------------------------------------------
-  console.log('skin switch');
+  // ---- the look switched off from settings (popup / options) -------------------------------------------
+  console.log('look off from settings');
   await page.goto(`${BASE}/courses/101/external_tools/9`);
   await page.waitForSelector('html.bcv-punch #content', { timeout: 10000 });
-  await page.click('#bcv-skin');
+  await page.click('.bcv-native__bar .bcv-btn');
   await page.waitForFunction(() => !document.documentElement.classList.contains('bcv-on'), null, { timeout: 5000 });
-  check(await visible('#application') && !(await visible('#bcv-app')), 'skin off: stock Canvas is back');
-  check(!(await page.$('html.bcv-punch')) && (await visible('#header')) && (await page.$eval('#content', (el) => el.getBoundingClientRect().left < 200)), 'skin off ends the punch-through: Canvas lays its page out itself again');
-  check((await texts('#bcv-skin'))[0] === 'Skin off' && !(await page.$('#bcv-fab')), 'switch shows off state, smart button hidden');
+  check(await visible('#application') && !(await visible('#bcv-app')), '"Open in stock Canvas" turns the look off: stock Canvas is back');
+  check(!(await page.$('html.bcv-punch')) && (await visible('#header')) && (await page.$eval('#content', (el) => el.getBoundingClientRect().left < 200)), 'turning the look off ends the punch-through: Canvas lays its page out itself again');
+  check(!(await page.$('#bcv-fab')) && !(await page.$('#bcv-skin')), 'smart button hidden, nothing of ours left on the page');
   await shot(page, '28-skin-off');
   await page.goto(`${BASE}/`);
-  await page.waitForSelector('#bcv-skin', { timeout: 10000 });
-  check(!(await page.$('#bcv-app')) || !(await visible('#bcv-app')), 'skin stays off on the next page load');
-  await page.click('#bcv-skin');
+  await page.waitForSelector('#application', { timeout: 10000 });
+  await page.waitForTimeout(400);
+  check(!(await page.$('#bcv-app')) || !(await visible('#bcv-app')), 'the look stays off on the next page load');
+  await setSettings({ appearance: { skin: true } });
   await page.waitForSelector('#bcv-app .bcv-nav__item', { timeout: 10000 });
-  check(await visible('#bcv-app'), 'skin switched back on in place');
+  check(await visible('#bcv-app'), 'switching the look back on from settings applies in place');
   await nav('courses');
   await page.waitForSelector('.bcv-ccard__hero--term', { timeout: 10000 });
-  await page.click('#bcv-skin');
+  await setSettings({ appearance: { skin: false } });
   await page.waitForFunction(() => !document.documentElement.classList.contains('bcv-on'), null, { timeout: 5000 });
-  check(page.url() === `${BASE}/courses` && (await visible('#application')) && (await page.title()).includes('courses'), 'skin off after navigating shows the same page in stock Canvas (it was underneath all along)');
-  await page.click('#bcv-skin');
+  check(page.url() === `${BASE}/courses` && (await visible('#application')) && (await page.title()).includes('courses'), 'look off after navigating shows the same page in stock Canvas (it was underneath all along)');
+  await setSettings({ appearance: { skin: true } });
   await page.waitForSelector('#bcv-app .bcv-nav__item', { timeout: 10000 });
 
   // ---- extension pages ---------------------------------------------------------------------------------

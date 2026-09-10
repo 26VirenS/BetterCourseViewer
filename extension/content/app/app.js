@@ -367,33 +367,11 @@
     for (const v of ['--bcv-hole-top', '--bcv-hole-left', '--bcv-hole-width']) html.style.removeProperty(v);
   }
 
-  // ---- skin switch (top-left) --------------------------------------------------------------
-  let skinEl;
-  function mountSkinSwitch() {
-    if (skinEl) return;
-    skinEl = h('button', { type: 'button', class: 'bcv-skin', id: 'bcv-skin', title: 'Turn the BetterCourseViewer look on or off' }, [
-      h('span', { class: 'bcv-skin__sw' }, h('span', { class: 'bcv-skin__knob' })),
-      h('span', { class: 'bcv-skin__label', text: 'Skin' }),
-    ]);
-    skinEl.addEventListener('click', async () => {
-      const on = !html.classList.contains('bcv-on');
-      await S.update({ appearance: { skin: on } });
-    });
-    document.body.append(skinEl);
-    syncSkinSwitch();
-  }
-  function syncSkinSwitch() {
-    if (!skinEl) return;
-    const on = html.classList.contains('bcv-on');
-    skinEl.classList.toggle('is-on', on);
-    skinEl.setAttribute('aria-pressed', on ? 'true' : 'false');
-    skinEl.querySelector('.bcv-skin__label').textContent = on ? 'Skin' : 'Skin off';
-  }
-
   // ---- boot ---------------------------------------------------------------------------------------
+  // The look is switched on and off from the toolbar popup and Settings → Appearance
+  // (and "Open in stock Canvas" on Canvas-drawn pages); nothing sits on the page itself.
   let started = false;
   async function applySkin(on) {
-    syncSkinSwitch();
     if (on) {
       mount();
       if (!started) {
@@ -420,7 +398,6 @@
       html.classList.remove('bcv-on');
       return;
     }
-    mountSkinSwitch();
     await applySkin(state.settings.appearance.skin !== false);
     BCV.early?.onChange((st, settings) => {
       const wasDark = state.dark;
