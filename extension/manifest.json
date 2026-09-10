@@ -57,7 +57,7 @@
         "content/early.js"
       ],
       "css": [
-        "styles/app.css"
+        "content/styles/app.css"
       ]
     },
     {
@@ -70,21 +70,21 @@
         "lib/markdown.js",
         "lib/canvas-api.js",
         "lib/smart-client.js",
-        "app/icons.js",
-        "app/ui.js",
-        "app/store.js",
-        "app/screens/native.js",
-        "app/screens/dashboard.js",
-        "app/screens/courses.js",
-        "app/screens/todo.js",
-        "app/screens/groups.js",
-        "app/screens/calendar.js",
-        "app/screens/inbox.js",
-        "app/screens/course.js",
-        "app/screens/course-detail.js",
-        "app/screens/grades.js",
-        "app/smart.js",
-        "app/app.js"
+        "content/app/icons.js",
+        "content/app/ui.js",
+        "content/app/store.js",
+        "content/app/screens/native.js",
+        "content/app/screens/dashboard.js",
+        "content/app/screens/courses.js",
+        "content/app/screens/todo.js",
+        "content/app/screens/groups.js",
+        "content/app/screens/calendar.js",
+        "content/app/screens/inbox.js",
+        "content/app/screens/course.js",
+        "content/app/screens/course-detail.js",
+        "content/app/screens/grades.js",
+        "content/app/smart.js",
+        "content/app/app.js"
       ]
     }
   ]

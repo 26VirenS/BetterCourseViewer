@@ -64,7 +64,7 @@ Safari extensions ship inside a Mac app, so the app is built with Xcode. The scr
 5. If you built without an Apple developer team, turn on **Safari → Settings → Developer → Allow unsigned extensions** (enable the Developer tab under Settings → Advanced if it is hidden).
 6. Click the BetterCourseViewer toolbar icon → **Settings**, and paste your Claude and/or ChatGPT key. Press **Test** to check it.
 
-Updating: `git pull`, then Product → Run in Xcode again (the project references the files in `extension/` directly). Delete the `macos/` folder to regenerate the project from scratch.
+Updating: `git pull`, then in Xcode Product → Clean Build Folder (⇧⌘K) and Product → Run (⌘R), then quit and reopen Safari. The project references the files in `extension/` directly, so a rebuild is all that is needed. If Safari still shows stock Canvas, delete the `macos/` folder and regenerate the project from scratch.
 
 To build from the command line instead of Xcode:
 
@@ -115,26 +115,28 @@ The `extension/` folder is a standard Manifest V3 web extension and also loads i
 
 ```
 extension/
-  manifest.json            Manifest V3 (Safari, Chrome, Firefox)
-  background.js            streaming proxy to Claude/ChatGPT, key tests, custom sites
-  content/early.js         document_start: applies skin + appearance before first paint
-  styles/app.css           the whole design system (light/dark variables, every component)
-  lib/                     settings, providers (raw fetch + SSE), Canvas REST helper, markdown, utils
-  app/icons.js             icon paths
-  app/ui.js                components, date formatting, colour math
-  app/store.js             every Canvas API loader + the grade model
-  app/app.js               shell (sidebar), router, skin switch, hybrid pages
-  app/smart.js             the smart panel
-  app/screens/             dashboard, courses, todo, groups, calendar, inbox,
-                           course (shell + tabs), course-detail, grades, native
-  popup/, options/         toolbar popup and the settings page
+  manifest.json                Manifest V3 (Safari, Chrome, Firefox)
+  background.js                streaming proxy to Claude/ChatGPT, key tests, custom sites
+  lib/                         settings, providers (raw fetch + SSE), Canvas REST helper, markdown, utils
+  content/early.js             document_start: applies skin + appearance before first paint
+  content/styles/app.css       the whole design system (light/dark variables, every component)
+  content/app/icons.js         icon paths
+  content/app/ui.js            components, date formatting, colour math
+  content/app/store.js         every Canvas API loader + the grade model
+  content/app/app.js           shell (sidebar), router, skin switch, hybrid pages
+  content/app/smart.js         the smart panel
+  content/app/screens/         dashboard, courses, todo, groups, calendar, inbox,
+                               course (shell + tabs), course-detail, grades, native
+  popup/, options/             toolbar popup and the settings page
 scripts/
-  build-mac-app.sh         generates the Xcode project / builds the .app
-  package.sh               zips the extension
-  make-icons.mjs           regenerates the PNG icons
-  dev/mock-canvas.mjs      a fake Canvas (pages + the API endpoints the app reads)
-  dev/smoke-test.mjs       walks every screen in headless Chromium against the mock
+  build-mac-app.sh             generates the Xcode project / builds the .app
+  package.sh                   zips the extension
+  make-icons.mjs               regenerates the PNG icons
+  dev/mock-canvas.mjs          a fake Canvas (pages + the API endpoints the app reads)
+  dev/smoke-test.mjs           walks every screen in headless Chromium against the mock
 ```
+
+The generated Xcode project copies the extension's top-level folders (`content/`, `lib/`, `popup/`, `options/`, `icons/`) into the app as folder references, so new files inside them are picked up by the next build. A **new top-level folder** is not: keep new code under an existing folder, or delete `macos/` and regenerate the project.
 
 ```bash
 node scripts/dev/mock-canvas.mjs        # http://localhost:8787
