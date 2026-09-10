@@ -23,7 +23,6 @@
     unread: null,
     account: null,
     nativePath: location.pathname + location.search, // the URL Canvas actually rendered
-    nativeHome: null, // where #content came from
     renderId: 0,
     smartCtx: null,
     dark: false,
@@ -275,6 +274,7 @@
     const alive = () => id === state.renderId;
     state.quizOpen = false;
     html.classList.remove('bcv-quiz'); // the quiz screen puts it back while an attempt is on screen
+    punchOut(); // a native screen punches back in while it builds
     renderSide();
     const ctx = { app: BCV.app, route: r, alive, dark: state.dark, setSmart: (c) => setSmartContext(c, id) };
     state.smartCtx = null;
@@ -331,23 +331,40 @@
     renderSide();
   }
 
-  // ---- native content (hybrid pages) -------------------------------------------------------
-  function takeNative() {
-    const content = document.getElementById('content') || document.querySelector('#not_right_side') || document.querySelector('.ic-Layout-contentMain');
-    if (!content) return null;
-    if (!state.nativeHome) state.nativeHome = { parent: content.parentNode, next: content.nextSibling };
-    return content;
+  // ---- punch-through (pages Canvas draws itself) --------------------------------------------
+  // Canvas's page stays exactly where it is in the DOM, so tool launches, Box and
+  // other embeds, and Canvas's own scripts keep working. Our shell becomes a fixed
+  // overlay that only catches clicks on the sidebar, header and rail; Canvas's
+  // #main is laid out into the hole our screen leaves for it (measured live).
+  let punchHole = null;
+  let punchRO = null;
+  function punchMeasure() {
+    if (!punchHole || !punchHole.isConnected) return;
+    const r = punchHole.getBoundingClientRect();
+    if (!r.width) return;
+    html.style.setProperty('--bcv-hole-top', `${Math.round(r.top)}px`);
+    html.style.setProperty('--bcv-hole-left', `${Math.round(r.left)}px`);
+    html.style.setProperty('--bcv-hole-width', `${Math.round(r.width)}px`);
   }
-  function returnNative() {
-    const content = document.getElementById('content');
-    const home = state.nativeHome;
-    if (!content || !home || !home.parent || home.parent.contains(content)) return;
-    try {
-      home.parent.insertBefore(content, home.next && home.next.parentNode === home.parent ? home.next : null);
-    } catch {
-      home.parent.append(content);
-    }
-    html.classList.remove('bcv-native-mode');
+  function punchIn(hole) {
+    punchHole = hole;
+    html.classList.add('bcv-punch');
+    const side = document.getElementById('right-side');
+    html.classList.toggle('bcv-punch--noside', !(side && side.textContent.trim()));
+    if (!punchRO && typeof ResizeObserver !== 'undefined') punchRO = new ResizeObserver(punchMeasure);
+    punchRO?.observe(hole);
+    if (root) punchRO?.observe(root);
+    window.addEventListener('resize', punchMeasure);
+    punchMeasure();
+    setTimeout(punchMeasure, 60);
+    setTimeout(punchMeasure, 500);
+  }
+  function punchOut() {
+    punchHole = null;
+    punchRO?.disconnect();
+    window.removeEventListener('resize', punchMeasure);
+    html.classList.remove('bcv-punch', 'bcv-punch--noside');
+    for (const v of ['--bcv-hole-top', '--bcv-hole-left', '--bcv-hole-width']) html.style.removeProperty(v);
   }
 
   // ---- skin switch (top-left) --------------------------------------------------------------
@@ -386,7 +403,7 @@
         await render();
       }
     } else {
-      returnNative();
+      punchOut();
       BCV.smart?.hide?.();
       if (state.originalTitle) document.title = state.originalTitle;
       // Canvas only rendered the page that was loaded; if we navigated since, load this one.
@@ -418,7 +435,7 @@
   }
 
   BCV.app = {
-    state, go, render, parseRoute, refreshCounts, loadShellData, takeNative, returnNative, siteName,
+    state, go, render, parseRoute, refreshCounts, loadShellData, punchIn, punchOut, siteName,
     isDark: () => state.dark,
     smartContext: () => state.smartCtx,
     main: () => main,

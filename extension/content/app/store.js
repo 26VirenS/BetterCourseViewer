@@ -366,44 +366,91 @@
     for (const g of gs || []) list.push({ code: `group_${g.id}`, name: g.name, color: '#6b5f7a', kind: 'group' });
     return list;
   }
+  /** Which calendars to show: our own saved choice, else the selection the
+   *  user made in Canvas's calendar, else the first ten. An empty or stale
+   *  list falls back too, so the calendar is never blank for lack of a pick. */
   async function selectedContexts(all) {
     const e = env();
-    const stored = await pref('calendarContexts');
-    let selected = stored || (Array.isArray(e.SELECTED_CONTEXT_CODES) ? e.SELECTED_CONTEXT_CODES : null);
-    if (!selected) selected = all.slice(0, 10).map((c) => c.code);
     const codes = new Set(all.map((c) => c.code));
-    return selected.filter((c) => codes.has(c));
+    const stored = await pref('calendarContexts');
+    const fromCanvas = Array.isArray(e.SELECTED_CONTEXT_CODES) ? e.SELECTED_CONTEXT_CODES : null;
+    for (const cand of [stored, fromCanvas]) {
+      if (!Array.isArray(cand) || !cand.length) continue;
+      const kept = cand.filter((c) => codes.has(c));
+      if (kept.length) return kept;
+    }
+    return all.slice(0, 10).map((c) => c.code);
   }
   async function setSelectedContexts(codes) {
     await setPref('calendarContexts', codes);
   }
+  const isoDay = (d) => U.startOfDay(d).toISOString().replace(/\.\d{3}Z$/, 'Z');
+  const REFUSED = new Set([401, 403, 404]);
+  /** Events for a date range and a set of context codes. Canvas takes at most
+   *  ten codes per request and refuses the whole request when one of them is
+   *  off-limits (a concluded or restricted course), so a chunk that fails is
+   *  retried one context at a time and the refused codes are reported back
+   *  rather than blanking the calendar. Returns { events, refused }. */
   function calendarEvents(start, end, codes, { force = false } = {}) {
-    const s = U.startOfDay(start).toISOString();
-    const e = U.addDays(U.startOfDay(end), 1).toISOString();
+    const s = isoDay(start);
+    const e = isoDay(U.addDays(U.startOfDay(end), 1));
     const key = `cal:${s.slice(0, 10)}:${e.slice(0, 10)}:${codes.join(',')}`;
     return C.cached(key, 5 * MIN, async () => {
-      if (!codes.length) return [];
-      // Canvas accepts at most 10 context codes per request: fan out in chunks.
+      const events = [];
+      const refused = [];
+      const seen = new Set();
+      const add = (list) => {
+        for (const ev of list || []) {
+          const k = String(ev.id);
+          if (seen.has(k)) continue;
+          seen.add(k);
+          events.push(ev);
+        }
+      };
+      const fetchCodes = async (chunk) => {
+        const params = { start_date: s, end_date: e, 'context_codes[]': chunk, per_page: 100 };
+        const [ev, as] = await Promise.all([
+          C.get('/api/v1/calendar_events', { params: { ...params, type: 'event' }, all: true, maxPages: 5 }),
+          C.get('/api/v1/calendar_events', { params: { ...params, type: 'assignment' }, all: true, maxPages: 5 }),
+        ]);
+        return [...(ev || []), ...(as || [])];
+      };
       const chunks = [];
       for (let i = 0; i < codes.length; i += 10) chunks.push(codes.slice(i, i + 10));
-      const calls = [];
-      for (const chunk of chunks) {
-        const params = { start_date: s, end_date: e, 'context_codes[]': chunk, per_page: 100 };
-        calls.push(C.get('/api/v1/calendar_events', { params: { ...params, type: 'event' }, all: true, maxPages: 5 }));
-        calls.push(C.get('/api/v1/calendar_events', { params: { ...params, type: 'assignment' }, all: true, maxPages: 5 }));
-      }
-      const results = await Promise.allSettled(calls);
-      const ok = results.filter((r) => r.status === 'fulfilled');
-      if (!ok.length) throw new Error(results[0]?.reason?.message || 'Calendar request failed');
-      const seen = new Set();
-      const out = [];
-      for (const r of ok) for (const ev of r.value || []) {
-        const k = String(ev.id);
-        if (seen.has(k)) continue;
-        seen.add(k);
-        out.push(ev);
-      }
-      return out;
+      await Promise.all(chunks.map(async (chunk) => {
+        try {
+          add(await fetchCodes(chunk));
+        } catch (err) {
+          if (!REFUSED.has(err.status)) throw err;
+          if (chunk.length === 1) {
+            refused.push(chunk[0]);
+            return;
+          }
+          for (const code of chunk) {
+            try {
+              add(await fetchCodes([code]));
+            } catch (err2) {
+              if (!REFUSED.has(err2.status)) throw err2;
+              refused.push(code);
+            }
+          }
+        }
+      }));
+      return { events, refused };
+    }, { force });
+  }
+  /** Planner items for any range: the calendar's stand-in when Canvas will
+   *  not answer calendar_events at all (the dashboard reads the same API). */
+  function plannerRange(start, end, { force = false } = {}) {
+    const s = isoDay(start);
+    const e = isoDay(U.addDays(U.startOfDay(end), 1));
+    return C.cached(`planner:range:${s.slice(0, 10)}:${e.slice(0, 10)}`, 5 * MIN, async () => {
+      const [items, cs] = await Promise.all([
+        C.get('/api/v1/planner/items', { params: { start_date: s, end_date: e, per_page: 100 }, all: true, maxPages: 8 }),
+        courses().catch(() => []),
+      ]);
+      const map = new Map(cs.map((c) => [c.id, c]));
+      return (items || []).map((it) => classify(it, map)).filter((it) => it.date);
     }, { force });
   }
 
@@ -764,7 +811,7 @@
   BCV.store = {
     env, pref, setPref, me, account, colors, courses, favorites, cards, setFavorite, currentTerm, dashboardView, setDashboardView,
     planner, classify, todo, todoWindow, setComplete, dismiss, restore, invalidatePlanner, activity, activitySummary, unreadCount, groups, group,
-    calendarContexts, selectedContexts, setSelectedContexts, calendarEvents,
+    calendarContexts, selectedContexts, setSelectedContexts, calendarEvents, plannerRange,
     conversations, conversation, markRead, setStarred, replyTo, compose, searchRecipients, invalidateInbox,
     course, tabs, frontPage, syllabus, courseTodo, ignoreTodo, courseStream, assignments, assignment, submission, assignmentGroups, progress,
     announcements, discussions, discussion, discussionView, postEntry, markTopicRead, people, sections, courseGroups, pages, page,

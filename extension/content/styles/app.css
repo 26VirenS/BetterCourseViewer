@@ -28,7 +28,6 @@ html.bcv-on { background: var(--bcv-bg) !important; }
 html.bcv-on body { margin: 0 !important; padding: 0 !important; background: var(--bcv-bg) !important; overflow: auto !important; min-height: 100vh; }
 html.bcv-on #application, html.bcv-on body > .ic-app, html.bcv-on #flash_message_holder, html.bcv-on #flash_screenreader_holder, html.bcv-on #immersive_reader_mount_point, html.bcv-on #nav-tray-portal, html.bcv-on #header, html.bcv-on #wrapper { display: none !important; }
 html.bcv-on #bcv-app { display: flex; }
-html.bcv-on.bcv-native-mode #application { display: none !important; }
 
 #bcv-app { display: none; min-height: 100vh; align-items: stretch; background: var(--bcv-bg); color: var(--bcv-ink); font-family: var(--bcv-font); -webkit-font-smoothing: antialiased; font-size: 14px; line-height: 1.4; box-sizing: border-box; }
 #bcv-app *, #bcv-app *::before, #bcv-app *::after { box-sizing: border-box; }
@@ -340,6 +339,10 @@ html[data-bcv-theme="dark"] .bcv-badge--orange { color: #ffb44d; }
 .bcv-switch.is-on { background: var(--bcv-green); justify-content: flex-end; }
 .bcv-switch__knob { width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.25); display: block; }
 .bcv-calrow__name { flex: 1; min-width: 0; font: 500 13.5px/1.35 var(--bcv-font); }
+.bcv-calrow--refused .bcv-calrow__name { color: var(--bcv-ink3); }
+.bcv-cal__notice { margin-bottom: 12px; padding: 10px 14px; border-radius: 12px; background: var(--bcv-fill2); font: 400 12.5px/1.45 var(--bcv-font); color: var(--bcv-ink2); text-wrap: pretty; }
+.bcv-cal__notice--warn { background: rgba(255,149,0,.14); color: #8a5200; }
+html[data-bcv-theme="dark"] .bcv-cal__notice--warn { color: #ffb44d; }
 
 /* ---- inbox --------------------------------------------------------------- */
 .bcv-inbox__list { flex: 1 1 320px; min-width: 0; }
@@ -499,8 +502,7 @@ html[data-bcv-theme="dark"] .bcv-badge--orange { color: #ffb44d; }
 .bcv-frame--doc { min-height: 78vh; }
 
 /* ---- grades ---------------------------------------------------------------- */
-.bcv-grades__main { flex: 1 1 440px; min-width: 0; display: flex; flex-direction: column; gap: 18px; }
-.bcv-grades__side { flex: 1 1 280px; min-width: 0; }
+.bcv-grades__main { flex: 1 1 440px; min-width: 0; max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
 /* the grade card (mockup): rings + total, by group, how the grade is weighted */
 .bcv-gr { padding: 18px 20px; display: flex; flex-direction: column; gap: 14px; }
 .bcv-gr__top { display: flex; align-items: center; gap: 16px; }
@@ -549,8 +551,6 @@ html[data-bcv-theme="dark"] .bcv-badge--orange { color: #ffb44d; }
 .bcv-banner { flex: 1 1 100%; background: rgba(255,69,58,.14); border: 1.5px solid var(--bcv-red); border-radius: 20px; padding: 16px 20px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
 .bcv-banner__title { font: 700 19px/1.25 var(--bcv-display); color: var(--bcv-red); letter-spacing: -.015em; }
 .bcv-banner__sub { margin-top: 3px; font: 500 13px/1.4 var(--bcv-font); color: var(--bcv-red); }
-.bcv-weights__name { flex: 1; min-width: 0; font: 500 14px/1.35 var(--bcv-font); }
-.bcv-weights__pct { flex: none; font: 600 14px/1.2 var(--bcv-font); }
 
 /* ---- smart panel ---------------------------------------------------------- */
 .bcv-fab { position: fixed; right: 18px; bottom: 18px; z-index: 20; width: 30px; height: 30px; border: 0; border-radius: 15px; background: var(--bcv-fill); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); display: flex; align-items: center; justify-content: center; cursor: pointer; opacity: .62; padding: 0; }
@@ -599,19 +599,34 @@ html[data-bcv-theme="dark"] .bcv-badge--orange { color: #ffb44d; }
 html:not(.bcv-on) .bcv-skin { opacity: .92; }
 
 /* ---- native (hybrid) pages ------------------------------------------------- */
-.bcv-native { background: var(--bcv-card); border-radius: 22px; box-shadow: var(--bcv-shadow); padding: 22px 26px; overflow: auto; font-family: var(--bcv-font); color: var(--bcv-ink); }
-.bcv-native h1, .bcv-native h2, .bcv-native h3 { font-family: var(--bcv-display); letter-spacing: -.02em; }
-.bcv-native a { color: var(--bcv-blue); }
-.bcv-native input[type="text"], .bcv-native input[type="search"], .bcv-native textarea, .bcv-native select { border: 0; background: var(--bcv-fill); border-radius: 10px; padding: 6px 10px; font: inherit; color: inherit; }
-.bcv-native .btn, .bcv-native button.Button, .bcv-native .Button { border: 0; border-radius: 15px; padding: 6px 14px; background: var(--bcv-fill); color: var(--bcv-ink2); font: 600 13px/1 var(--bcv-font); }
-.bcv-native .btn-primary, .bcv-native .Button--primary { background: var(--bcv-blue); color: #fff; }
-.bcv-native table { border-collapse: collapse; }
-.bcv-native td, .bcv-native th { border-color: var(--bcv-sep) !important; }
-.bcv-native iframe { max-width: 100%; border-radius: 12px; border: 1px solid var(--bcv-edge); }
-html[data-bcv-theme="dark"] .bcv-native--invert { filter: invert(.92) hue-rotate(180deg); background: #fff; color: #111; }
-html[data-bcv-theme="dark"] .bcv-native--invert img, html[data-bcv-theme="dark"] .bcv-native--invert video, html[data-bcv-theme="dark"] .bcv-native--invert iframe, html[data-bcv-theme="dark"] .bcv-native--invert [style*="background-image"] { filter: invert(1) hue-rotate(180deg); }
+.bcv-native { display: flex; flex-direction: column; gap: 14px; }
+.bcv-native__hole { flex: 1; min-height: 40vh; }
 .bcv-native__bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .bcv-native__note { font: 400 12.5px/1.4 var(--bcv-font); color: var(--bcv-ink3); }
+
+/* ---- punch-through: Canvas's page stays put, our shell floats over it ------- */
+/* The overlay only catches clicks on the sidebar, header, rail and note bar; the
+   hole's position is measured by app.punchIn and Canvas's #main is laid out into it. */
+html.bcv-on.bcv-punch #application, html.bcv-on.bcv-punch #wrapper { display: block !important; }
+html.bcv-on.bcv-punch body { background: var(--bcv-bg) !important; }
+html.bcv-punch #bcv-app { position: fixed; inset: 0; z-index: 10; min-height: 0; overflow: hidden; background: transparent; pointer-events: none; }
+html.bcv-punch .bcv-side, html.bcv-punch .bcv-head, html.bcv-punch .bcv-rail, html.bcv-punch .bcv-native__bar, html.bcv-punch .bcv-native__tabs { pointer-events: auto; }
+html.bcv-punch .bcv-main { overflow: hidden; }
+html.bcv-punch #header, html.bcv-punch #left-side, html.bcv-punch #footer, html.bcv-punch .ic-app-nav-toggle-and-crumbs, html.bcv-punch #breadcrumbs, html.bcv-punch #mobile-header, html.bcv-punch .ic-app-course-menu, html.bcv-punch #skip_navigation_link, html.bcv-punch #global_nav_tray_container, html.bcv-punch .ic-app-header__secondary-navigation { display: none !important; }
+html.bcv-punch #application, html.bcv-punch #wrapper, html.bcv-punch #not_right_side { margin: 0 !important; padding: 0 !important; width: auto !important; max-width: none !important; min-height: 0 !important; display: block !important; position: static !important; float: none !important; }
+html.bcv-punch #main { box-sizing: border-box; position: static !important; margin: var(--bcv-hole-top, 120px) 0 48px var(--bcv-hole-left, 480px) !important; width: var(--bcv-hole-width, auto) !important; max-width: none !important; min-height: 0 !important; padding: 0 !important; display: flex !important; align-items: flex-start; gap: 20px; }
+html.bcv-punch #not_right_side { flex: 1 1 0 !important; min-width: 0; }
+html.bcv-punch #content { box-sizing: border-box; margin: 0 !important; max-width: none !important; padding: 22px 26px !important; background: #fff; color: #2d3b45; border-radius: 22px; box-shadow: var(--bcv-shadow); overflow-wrap: anywhere; }
+html.bcv-punch #content iframe { max-width: 100%; }
+html.bcv-punch #right-side-wrapper { flex: 0 0 280px !important; width: 280px !important; max-width: 280px !important; margin: 0 !important; padding: 0 !important; position: static !important; display: block !important; }
+html.bcv-punch #right-side { box-sizing: border-box; margin: 0 !important; padding: 18px 20px !important; background: #fff; color: #2d3b45; border-radius: 22px; box-shadow: var(--bcv-shadow); }
+html.bcv-punch.bcv-punch--noside #right-side-wrapper { display: none !important; }
+html[data-bcv-theme="dark"].bcv-punch #content, html[data-bcv-theme="dark"].bcv-punch #right-side { filter: invert(.92) hue-rotate(180deg); }
+html[data-bcv-theme="dark"].bcv-punch #content img, html[data-bcv-theme="dark"].bcv-punch #content video, html[data-bcv-theme="dark"].bcv-punch #content iframe, html[data-bcv-theme="dark"].bcv-punch #content [style*="background-image"], html[data-bcv-theme="dark"].bcv-punch #right-side img { filter: invert(1) hue-rotate(180deg); }
+@media (max-width: 1100px) {
+  html.bcv-punch #main { flex-direction: column; }
+  html.bcv-punch #right-side-wrapper { flex: none !important; width: auto !important; max-width: none !important; }
+}
 
 /* ---- quiz taking (mockup): chrome hidden, one column ----------------------- */
 html.bcv-quiz .bcv-side, html.bcv-quiz .bcv-fab, html.bcv-quiz #bcv-smart { display: none !important; }

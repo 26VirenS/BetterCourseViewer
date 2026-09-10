@@ -324,9 +324,15 @@ on('GET', /^\/api\/v1\/groups\/(\w+)\/pages$/, () => [{ url: 'group-notes', titl
 on('GET', /^\/api\/v1\/groups\/(\w+)\/pages\/([^/]+)$/, () => ({ url: 'group-notes', title: 'Group notes', body: '<p>Meeting Tuesday.</p>', created_at: ago(5 * D), updated_at: ago(D) }));
 on('GET', /^\/api\/v1\/groups\/(\w+)\/folders\/root$/, (url, m) => ({ id: `rg${m[1]}`, name: 'group files', full_name: 'group files', context_id: m[1] }));
 on('GET', /^\/api\/v1\/groups\/(\w+)$/, (url, m) => { const g = groupList.find((x) => x.id === m[1]); return g ? { ...g, avatar_url: null } : null; });
+// test-only switches: POST /__mock/config {"calendarFail": true}
+const mockConfig = { calendarFail: false };
+on('POST', /^\/__mock\/config$/, (url, m, body) => Object.assign(mockConfig, body));
 on('GET', /^\/api\/v1\/calendar_events$/, (url) => {
   const codes = url.searchParams.getAll('context_codes[]');
   const type = url.searchParams.get('type') || 'event';
+  if (mockConfig.calendarFail) return { __status: 500, errors: [{ message: 'calendar is having a moment' }] };
+  // like Canvas: one off-limits context (a restricted course) refuses the whole request
+  if (codes.includes('course_202')) return { __status: 401, errors: [{ message: 'user not authorized to perform that action' }] };
   let out = [];
   if (type === 'assignment') {
     for (const c of courses) if (codes.includes(`course_${c.id}`)) for (const a of allAssignments(c.id)) out.push({ id: `assignment_${a.id}`, title: a.name, start_at: a.due_at, end_at: a.due_at, all_day: false, context_code: `course_${c.id}`, context_name: c.name, type: 'assignment', html_url: a.html_url, assignment: { ...a, submission: a.submission } });
@@ -420,6 +426,7 @@ const server = http.createServer((req, res) => {
       if (!m) continue;
       const data = handler(url, m, body);
       if (data === null) return json(res, { errors: [{ message: 'not found' }] }, 404);
+      if (data && data.__status) return json(res, { errors: data.errors || [] }, data.__status);
       return json(res, data);
     }
     if (path.startsWith('/api/') || path === '/dashboard/view') return json(res, { errors: [{ message: 'not found' }] }, 404);

@@ -1,7 +1,8 @@
-/* Fallback screen: shows the page Canvas itself rendered (its #content
- * region, plus the page's own sub-navigation and sidebar) inside our shell,
- * for anything that has no screen of its own — quiz taking, external tools,
- * file previews, profile and settings pages… */
+/* Fallback screen for anything that has no screen of its own — external
+ * tools, file previews, profile and settings pages, Canvas's own quiz page…
+ * The page Canvas rendered is left untouched in the DOM (moving it would
+ * reload tool launches and embeds); our shell floats over it and leaves a
+ * hole that Canvas's content is laid out into (see app.punchIn). */
 (function () {
   const BCV = (self.BCV = self.BCV || {});
   const { h } = BCV.utils;
@@ -26,28 +27,20 @@
     }));
   }
 
-  /** Builds the native block; `inCourse` skips the page header and sub-nav (the course shell has its own). */
+  /** Builds the native block: a note bar, the page's sub-nav (outside a
+   *  course shell) and the hole Canvas's page shows through. `inCourse`
+   *  skips the sub-nav (the course shell has its own rail). */
   function block(ctx, { inCourse = false } = {}) {
     const app = ctx.app;
-    const content = app.takeNative();
-    const wrap = U.el('bcv-native bcv-native--invert');
-    if (content) {
-      wrap.append(content);
-      document.documentElement.classList.add('bcv-native-mode');
-    } else {
-      wrap.append(U.empty('Canvas did not render anything for this page.'));
-    }
-    const side = document.getElementById('right-side');
-    const sideHasContent = side && side.textContent.trim().length > 0;
+    const hasContent = !!(document.getElementById('content') || document.getElementById('main'));
     const note = U.el('bcv-native__bar', [
       U.text('bcv-native__note', 'This page is shown as Canvas drew it, inside the new look.'),
       h('span', { class: 'bcv-ml-auto' }),
       U.btn('Open in stock Canvas', { icon: IC.external, kind: 'xs', onClick: async () => BCV.settings.update({ appearance: { skin: false } }) }),
     ]);
-    const main = U.el('bcv-col', [note, subNav(app, { inCourse }), wrap], { style: { flex: '1 1 560px', minWidth: '0' } });
-    if (!sideHasContent) return main;
-    const sideWrap = U.el('bcv-native bcv-native--invert', side);
-    return U.el('bcv-body--cols', [main, h('div', { class: 'bcv-col', style: { flex: '1 1 260px' } }, sideWrap)], { style: { padding: '0', display: 'flex', flexWrap: 'wrap', gap: '20px', alignItems: 'flex-start' } });
+    const hole = U.el('bcv-native__hole', hasContent ? null : U.emptyCard('Canvas did not render anything for this page.'));
+    if (hasContent) app.punchIn(hole);
+    return U.el('bcv-native', [note, subNav(app, { inCourse }), hole]);
   }
 
   async function render(ctx) {

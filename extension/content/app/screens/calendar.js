@@ -53,6 +53,8 @@
     const ctxMap = new Map(contexts.map((c) => [c.code, c]));
     let events = [];
     let loadedRange = null;
+    let refused = new Set(); // calendars Canvas would not return (401/403)
+    let notice = null; // { kind: 'error' | 'warn' | 'hint', text }
 
     function shift(dir) {
       if (view === 'month') anchor = new Date(anchor.getFullYear(), anchor.getMonth() + dir, 1);
@@ -107,6 +109,25 @@
       return out.sort((x, y) => x.date - y.date);
     }
 
+    /** Planner items shaped like calendar events, for the selected calendars. */
+    function fromPlanner(items) {
+      const out = [];
+      for (const it of items) {
+        const r = it.raw || {};
+        const code = it.courseId ? `course_${it.courseId}` : r.group_id ? `group_${r.group_id}` : r.user_id ? `user_${r.user_id}` : null;
+        if (code && !selected.includes(code)) continue;
+        const cc = code ? ctxMap.get(code) : null;
+        const isAssignment = it.isDue;
+        const pal = U.palette(cc?.color || '#8e8e93', dark);
+        out.push({
+          id: `planner:${it.id}`, title: it.title, date: it.date, end: U.parse(r.plannable?.end_at), allDay: !!r.plannable?.all_day && !isAssignment,
+          isAssignment, icon: it.type === 'calendar_event' ? IC.book : it.icon, done: it.submitted || it.complete || it.date < now, submitted: it.submitted,
+          contextCode: code, contextName: cc?.name || it.courseName, color: pal.text, tint: pal.tint, url: it.url, points: it.points,
+        });
+      }
+      return out.sort((x, y) => x.date - y.date);
+    }
+
     async function load() {
       titleEl.textContent = title();
       segWrap.replaceChildren(U.seg([['week', 'Week'], ['month', 'Month'], ['agenda', 'Agenda']], view, (v) => { view = v; store.setPref('calView', v); load(); }));
@@ -114,12 +135,34 @@
       const key = `${s.getTime()}:${e.getTime()}:${selected.join(',')}`;
       if (loadedRange !== key) {
         if (!events.length) mainCol.replaceChildren(U.loading());
-        const raw = await store.calendarEvents(s, e, selected).catch(() => null);
+        let res;
+        try {
+          res = await store.calendarEvents(s, e, selected);
+        } catch (err) {
+          res = { error: err };
+        }
         if (!ctx.alive()) return;
-        if (raw === null) {
-          mainCol.replaceChildren(U.errorBox('Calendar events could not be loaded.'));
-          events = [];
-        } else events = normalize(raw);
+        notice = null;
+        refused = new Set();
+        if (res.error) {
+          // Canvas would not answer the calendar API at all: the planner covers the same
+          // courses (it is what the dashboard reads), minus plain course events.
+          const items = await store.plannerRange(s, e).catch(() => null);
+          if (!ctx.alive()) return;
+          if (items) {
+            events = fromPlanner(items);
+            notice = { kind: 'warn', text: `Canvas would not return calendar events (${res.error.message}). Showing what the planner knows for the selected calendars instead; plain course events may be missing.` };
+          } else {
+            events = [];
+            notice = { kind: 'error', text: `Calendar events could not be loaded: ${res.error.message}` };
+          }
+        } else {
+          const raw = Array.isArray(res) ? res : (res.events || []);
+          refused = new Set(Array.isArray(res) ? [] : (res.refused || []));
+          events = normalize(raw);
+          if (!selected.length) notice = { kind: 'hint', text: 'No calendars are selected. Turn one on under Calendars.' };
+          else if (refused.size) notice = { kind: 'hint', text: `Canvas would not share ${refused.size === 1 ? 'one calendar' : `${refused.size} calendars`} (${[...refused].map((c) => ctxMap.get(c)?.name || c).join(', ')}); the rest are shown.` };
+        }
         loadedRange = key;
       }
       draw();
@@ -267,8 +310,9 @@
         U.card(contexts.map((c) => U.row([
           U.dot(c.color, 'bcv-dot--sq'),
           U.text('bcv-calrow__name bcv-pretty', c.name, 'span'),
+          refused.has(c.code) ? h('span', { class: 'bcv-badge bcv-badge--xs', title: 'Canvas refused this calendar (a restricted or concluded course)', text: 'Not shared' }) : null,
           U.switchEl(selected.includes(c.code), (on) => toggleContext(c.code, on), `Show ${c.name}`),
-        ], { mod: 'bcv-row--p12-16' })), 'bcv-card--list'),
+        ], { mod: `bcv-row--p12-16 ${refused.has(c.code) ? 'bcv-calrow--refused' : ''}` })), 'bcv-card--list'),
       ]);
     }
     async function toggleContext(code, on) {
@@ -285,7 +329,8 @@
     }
 
     function draw() {
-      mainCol.replaceChildren(view === 'week' ? weekGrid() : view === 'agenda' ? agendaList() : monthGrid());
+      const noticeEl = !notice ? null : notice.kind === 'error' ? U.errorBox(notice.text) : U.el(`bcv-cal__notice bcv-cal__notice--${notice.kind}`, notice.text);
+      mainCol.replaceChildren(...[noticeEl, view === 'week' ? weekGrid() : view === 'agenda' ? agendaList() : monthGrid()].filter(Boolean));
       sideCol.replaceChildren(...[
         view === 'agenda' ? miniCalendar() : null,
         calendarsCard(),

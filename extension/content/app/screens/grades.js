@@ -1,8 +1,8 @@
 /* Grades tab, drawn to the mockup: one card with the nested rings (outer =
  * total, one ring per assignment group with graded work, 0%-weight rings
- * stippled) beside the total, a By-group legend, the weight bar, then the
- * assignment list and the group weights card. What-if mode recolours it all
- * gray and never leaves the browser. */
+ * stippled) beside the total, a By-group legend and the weight bar, then
+ * the assignment list. What-if mode recolours it all gray and never leaves
+ * the browser. */
 (function () {
   const BCV = (self.BCV = self.BCV || {});
   const { h } = BCV.utils;
@@ -140,16 +140,8 @@
         rows.length ? U.card(rows, 'bcv-card--list') : U.emptyCard('No assignments in this course.'),
       ]);
 
-      // ---- group weights (right column) ------------------------------------------
-      const weightsCard = h('div', {}, [
-        U.label('Assignment group weights'),
-        U.card([
-          ...gm.weights.map((w) => U.el('bcv-row bcv-row--p12-16', [U.text('bcv-weights__name bcv-pretty', w.name, 'span'), h('span', { class: 'bcv-weights__pct', style: { color: w.zero || w.pct === '—' ? 'var(--bcv-ink3)' : 'var(--bcv-ink)' }, text: w.pct })])),
-          U.el('bcv-row bcv-row--p12-16', [U.text('bcv-weights__name', 'Total', 'span'), h('span', { class: 'bcv-weights__pct', style: { color: 'var(--bcv-blue)' }, text: gm.weighted ? `${gm.weightSum}%` : (gm.total === null ? '—' : `${gm.total}%`) })]),
-        ], 'bcv-card--list'),
-      ]);
-
-      b.replaceChildren(...parts, U.el('bcv-grades__main', [ringsCard, tableCard]), U.el('bcv-grades__side', weightsCard));
+      // The weights live in the grade card's "How the grade is weighted" section; no separate card.
+      b.replaceChildren(...parts, U.el('bcv-grades__main', [ringsCard, tableCard]));
       if (focusId) {
         const el = b.querySelector(`[data-wf="${CSS.escape(focusId)}"]`);
         if (el) { el.focus(); el.select(); }

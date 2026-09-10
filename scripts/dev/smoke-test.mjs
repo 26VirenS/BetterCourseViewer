@@ -209,6 +209,7 @@ try {
   check(await page.$('.bcv-ev__label.bcv-strike'), 'submitted/past events are struck through');
   const cals = await texts('.bcv-calrow__name');
   check(cals.length === 11 && cals[0] === 'Sam Student' && (await page.$$('.bcv-switch.is-on')).length === 10, `calendars list with switches: ${cals.length} (10 on, Canvas's limit)`);
+  check((await texts('.bcv-calrow--refused .bcv-calrow__name'))[0] === 'Placement Exam: Chemistry' && /would not share one calendar \(Placement Exam: Chemistry\)/.test((await texts('.bcv-cal__notice'))[0]) && !evs.some((t) => /Chemistry placement/.test(t)), 'a calendar Canvas refuses (401) is retried alone, marked "Not shared", and the rest still load');
   await shot(page, '06-calendar-month');
   await (await page.$$('.bcv-switch'))[0].click();
   await page.waitForTimeout(400);
@@ -231,6 +232,16 @@ try {
   await (await page.$$('.bcv-mini__day:not(.bcv-mini__day--off)'))[5].click();
   await page.waitForTimeout(300);
   check((await texts('.bcv-mini__range-label'))[0].includes(' – '), `picked range: ${(await texts('.bcv-mini__range-label'))[0]}`);
+  // the calendar API failing outright: planner items fill in, with a note
+  const mockConfig = (cfg) => sw.evaluate(async (c) => (await fetch('http://localhost:8787/__mock/config', { method: 'POST', body: JSON.stringify(c) })).ok, cfg);
+  await mockConfig({ calendarFail: true });
+  await page.click('.bcv-seg__btn[data-value="month"]');
+  await page.click('.bcv-cal__nav .bcv-iconbtn:nth-child(2)');
+  await page.waitForSelector('.bcv-cal__notice--warn', { timeout: 10000 });
+  check(/Canvas would not return calendar events \(calendar is having a moment\)\. Showing what the planner knows/.test((await texts('.bcv-cal__notice--warn'))[0]) && (await page.$$('.bcv-cal__day')).length === 42, 'when the calendar API fails, the planner fills the calendar in and says so');
+  await mockConfig({ calendarFail: false });
+  await page.click('.bcv-cal__nav .bcv-roundbtn');
+  await page.waitForFunction(() => !document.querySelector('.bcv-cal__notice--warn'), null, { timeout: 10000 });
 
   // ---- inbox --------------------------------------------------------------------------------
   console.log('inbox');
@@ -381,8 +392,7 @@ try {
   const gradeRows = await texts('.bcv-grades__main .bcv-row');
   check(gradeRows.length === 17 && /Lec01-PreQuiz.*Effort · due .* by 10:30am · submitted .*13 \/ 16/.test(gradeRows[0]), `grade rows: ${gradeRows[0]}`);
   check(gradeRows.some((t) => /Skills_Check.*Not counted toward final grade/.test(t)) && gradeRows.some((t) => /Transformation.*Late/.test(t)), 'late / not-counted badges');
-  const weights = await texts('.bcv-grades__side .bcv-row');
-  check(weights.length === 7 && weights[0] === 'Discussion Quizzes 18%' && weights[6] === 'Total 100%', `weights card: ${weights.join(', ')}`);
+  check(!(await page.$('.bcv-grades__side')) && !(await texts('.bcv-label')).some((t) => /assignment group weights/i.test(t)), 'no separate group-weights card: the weights live in the grade card');
   await shot(page, '16-course-grades');
   await page.click('.bcv-whatif-btn');
   await page.waitForSelector('.bcv-banner', { timeout: 5000 });
@@ -473,8 +483,9 @@ try {
   // ---- quiz in progress: focus mode ---------------------------------------------------------------
   console.log('quiz focus');
   await page.goto(`${BASE}/courses/101/quizzes/9011/take`);
-  await page.waitForSelector('.bcv-native #submit_quiz_form', { timeout: 10000 });
+  await page.waitForSelector('html.bcv-punch #submit_quiz_form', { timeout: 10000 });
   check(await page.$('#bcv-app.bcv-focus') && !(await visible('.bcv-nav')) && (await texts('.bcv-focus__title'))[0] === 'Quiz in progress', 'quiz page hides navigation');
+  check((await visible('#right-side-wrapper')) && (await texts('#right-side'))[0].includes("Canvas's own sidebar"), "Canvas's own right column (question list, timer) stays beside the quiz");
   page.once('dialog', (d) => d.dismiss());
   await page.click('.bcv-focus__card .bcv-btn');
   await page.waitForTimeout(300);
@@ -565,13 +576,29 @@ try {
   // ---- hybrid (native) page inside the shell ----------------------------------------------------
   console.log('native pages');
   await page.goto(`${BASE}/courses/101/external_tools/9`);
-  await page.waitForSelector('.bcv-native #content', { timeout: 10000 });
+  await page.waitForSelector('html.bcv-punch #content', { timeout: 10000 });
+  await page.waitForFunction(() => document.getElementById('content').getBoundingClientRect().left > 400, null, { timeout: 5000 });
   check((await page.$$eval('.bcv-rail__ext.is-active', (els) => els.map((e) => e.textContent.trim())))[0] === 'Resources & Policy', 'external tool link active in the rail');
-  check(await page.$('.bcv-native #tool_content'), 'Canvas page content (tool iframe) shown inside the course shell');
+  const punch = await page.evaluate(() => {
+    const c = document.getElementById('content').getBoundingClientRect();
+    const rail = document.querySelector('.bcv-rail').getBoundingClientRect();
+    const head = document.querySelector('.bcv-screen--ctx .bcv-head').getBoundingClientRect();
+    return { parent: document.getElementById('content').parentElement.id, left: c.left, railRight: rail.right, top: c.top, headBottom: head.bottom, width: c.width, tool: !!document.querySelector('#content #tool_content'), app: getComputedStyle(document.getElementById('bcv-app')).position };
+  });
+  check(punch.parent === 'not_right_side' && punch.tool && punch.app === 'fixed', `Canvas's page stays in its own DOM (tool iframe never re-parented): ${JSON.stringify(punch)}`);
+  check(punch.left >= punch.railRight && punch.top >= punch.headBottom - 1 && punch.width > 400, `Canvas content is laid out into the hole beside the rail and under the header: ${JSON.stringify(punch)}`);
+  let clickable = true;
+  try { await page.click('#content h2', { timeout: 3000 }); } catch { clickable = false; }
+  check(clickable, 'clicks reach Canvas\'s content through the overlay');
+  await page.click('.bcv-rail__toggle');
+  await page.waitForFunction(() => document.getElementById('content').getBoundingClientRect().left < 400, null, { timeout: 5000 });
+  check(true, 'collapsing the rail re-measures the hole and Canvas content moves over');
+  await page.click('.bcv-rail__toggle');
+  await page.waitForFunction(() => document.getElementById('content').getBoundingClientRect().left > 400, null, { timeout: 5000 });
   await shot(page, '23-native-tool');
   await page.goto(`${BASE}/profile`);
-  await page.waitForSelector('.bcv-native #content', { timeout: 10000 });
-  check((await texts('.bcv-head h1'))[0] === 'Sam Student', 'unknown page: Canvas content inside the global shell');
+  await page.waitForSelector('html.bcv-punch #content', { timeout: 10000 });
+  check((await texts('.bcv-head h1'))[0] === 'Sam Student' && (await visible('#content')) && !(await visible('#header')), 'unknown page: Canvas content inside the global shell, Canvas chrome hidden');
 
   await page.goto(`${BASE}/courses/104/assignments/4003`);
   await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
@@ -624,11 +651,11 @@ try {
   // ---- skin switch ----------------------------------------------------------------------------------
   console.log('skin switch');
   await page.goto(`${BASE}/courses/101/external_tools/9`);
-  await page.waitForSelector('.bcv-native #content', { timeout: 10000 });
+  await page.waitForSelector('html.bcv-punch #content', { timeout: 10000 });
   await page.click('#bcv-skin');
   await page.waitForFunction(() => !document.documentElement.classList.contains('bcv-on'), null, { timeout: 5000 });
   check(await visible('#application') && !(await visible('#bcv-app')), 'skin off: stock Canvas is back');
-  check(await page.$eval('#application #content', (el) => !!el), 'native content returned to Canvas when the skin is off');
+  check(!(await page.$('html.bcv-punch')) && (await visible('#header')) && (await page.$eval('#content', (el) => el.getBoundingClientRect().left < 200)), 'skin off ends the punch-through: Canvas lays its page out itself again');
   check((await texts('#bcv-skin'))[0] === 'Skin off' && !(await page.$('#bcv-fab')), 'switch shows off state, smart button hidden');
   await shot(page, '28-skin-off');
   await page.goto(`${BASE}/`);
