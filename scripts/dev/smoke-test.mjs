@@ -325,16 +325,38 @@ try {
   console.log('grades panel');
   await nav('gpa');
   await page.waitForSelector('.bcv-gpa__value', { timeout: 10000 });
-  check(page.url() === `${BASE}/grades` && (await texts('.bcv-h1'))[0] === 'Grades' && (await texts('.bcv-head__sub'))[0] === 'Fall 2026 · 4 courses this term · every course counts equally', `grades panel header: ${(await texts('.bcv-head__sub'))[0]}`);
+  check(page.url() === `${BASE}/grades` && (await texts('.bcv-h1'))[0] === 'Grades' && (await texts('.bcv-head__sub'))[0] === 'Fall 2026 · 8 courses · 4 with grades so far', `grades panel header: ${(await texts('.bcv-head__sub'))[0]}`);
   check(/^3\.4[23]$/.test((await texts('.bcv-gpa__value'))[0]) && (await page.$('.bcv-gpa__banner')) && /needs your past record/.test((await texts('.bcv-gpa__hero'))[0]) && /No history yet/.test((await texts('.bcv-gpa__trend'))[0]), 'term GPA is the plain 4.0 average of the four scored courses; cumulative and trend wait for setup');
   const gpaStats = await texts('.bcv-gpa__stat');
   check(gpaStats.length === 3 && /^Momentum.*Turn on tracking to compare snapshots$/i.test(gpaStats[0]) && /On-time submissions \d+% \d+ of \d+ submitted before the due time/i.test(gpaStats[1]) && (await page.$$('.bcv-gpa__chip')).length === 4 && /Highest .* at \d+% · lowest .* at \d+%/.test(gpaStats[2]), `stats: ${gpaStats.join(' | ')}`);
-  const gpaRows = await texts('.bcv-gpa__row');
-  check(gpaRows.length === 8 && /^F26-MATH 021 20 .*pts earned so far.*(Needs \d+% of the remaining [\d.]+ pts|Target already secured|Not reachable).*92\.4% A− · 3\.7 − A− · 90% \+$/.test(gpaRows[0]) && gpaRows.filter((t) => /No score yet/.test(t)).length === 4, `course rows: ${gpaRows[0]}`);
-  await page.click('.bcv-gpa__row .bcv-gpa__step:last-child');
-  await waitText('.bcv-gpa__row .bcv-gpa__target-pill', /^A · 93%$/);
-  check(true, 'a target grade steps up and the needed % follows');
+  const gpaCards = await texts('.bcv-gpa__card');
+  check(gpaCards.length === 8 && /^A− F26-MATH 021 20 MATH-021-20 92\.4% 3\.7 pts Needs \d+% of the remaining 507 pts 93 pts earned so far Target A− Details$/.test(gpaCards[0]) && gpaCards.filter((t) => /^N\/A .*N\/A — pts Nothing graded yet — no score to project from .*No grade yet Details$/.test(t)).length === 4, `course cards: ${gpaCards[0]} || ${gpaCards[7]}`);
+  // hovering the ring alone opens the group breakdown in place; the card keeps its size
+  const cardHeight = await page.$eval('.bcv-gpa__card', (el) => el.getBoundingClientRect().height);
+  await page.hover('.bcv-gpa__card .bcv-gpa__ringbox');
+  await waitText('.bcv-gpa__card', /By group/); // waitText reads textContent (source case) and keeps no regex flags
+  const hoverCard = (await texts('.bcv-gpa__card'))[0];
+  check(/^by group 92\.4% .*Discussion Quizzes \d+%/i.test(hoverCard) && (await page.$$('.bcv-gpa__card.is-hover .bcv-gpa__ringsvg circle')).length >= 6 && Math.abs((await page.$eval('.bcv-gpa__card', (el) => el.getBoundingClientRect().height)) - cardHeight) < 1, `hovering the ring shows the group rings + breakdown without resizing the card: ${hoverCard}`);
+  await page.mouse.move(5, 5);
+  await page.waitForFunction(() => !document.querySelector('.bcv-gpa__card.is-hover'), null, { timeout: 5000 });
   await shot(page, '09d-grades-panel');
+  // Details: the course's grade page in a sheet, with the target stepper
+  await page.click('.bcv-gpa__card .bcv-gpa__details');
+  await page.waitForSelector('.bcv-gpa-detail', { timeout: 5000 });
+  const detail = (await texts('.bcv-gpa-detail'))[0];
+  check(/^F26-MATH 021 20 MATH-021-20 92\.4% A− Target − A− · 90% \+ by group/i.test(detail) && /how the grade is weighted 100% of final grade/i.test(detail) && /Midterms 57% · nothing graded/.test(detail) && (await page.$$('.bcv-gpa-detail__arow')).length === 17 && (await page.$$('.bcv-gpa-detail .bcv-wbar__seg--ungraded')).length === 2, `details sheet: ${detail.slice(0, 200)}`);
+  await page.click('.bcv-gpa-detail__step:last-child');
+  await waitText('.bcv-gpa-detail__tval', /^A · 93%$/);
+  check(/Needs 9\d% of the remaining 507 pts .*Target A Details$/.test((await texts('.bcv-gpa__card'))[0]), `a target stepped in the sheet updates the card behind it: ${(await texts('.bcv-gpa__card'))[0]}`);
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !document.querySelector('.bcv-sheet-ov'), null, { timeout: 5000 });
+  // hiding a course drops it from the GPA, reversibly, and the page says so
+  await page.click('.bcv-gpa__card .bcv-gpa__hide');
+  await page.waitForSelector('.bcv-gpa__tray', { timeout: 5000 });
+  check((await texts('.bcv-gpa__value'))[0] === '3.33' && (await texts('.bcv-head__sub'))[0] === 'Fall 2026 · 7 courses · 3 with grades so far' && /hidden · not counted in gpa/i.test((await texts('.bcv-gpa__tray'))[0]) && (await texts('.bcv-gpa__traychip'))[0] === 'F26-MATH 021 20 Show' && (await page.$$('.bcv-gpa__card')).length === 7, `a hidden course leaves the GPA and waits in the tray: ${(await texts('.bcv-gpa__value'))[0]} · ${(await texts('.bcv-head__sub'))[0]}`);
+  await page.click('.bcv-gpa__traychip');
+  await waitText('.bcv-gpa__value', /^3\.4[23]$/);
+  check(!(await page.$('.bcv-gpa__tray')) && (await page.$$('.bcv-gpa__card')).length === 8, 'Show returns it to the overview and the GPA');
   await page.click('.bcv-gpa__banner .bcv-btn');
   await page.waitForSelector('.bcv-gpa-set', { timeout: 5000 });
   await page.fill('#bcv-gpa-prior', '3.42');
@@ -447,7 +469,8 @@ try {
   check(page.url() === `${BASE}/courses/101`, 'favourite opens the course page');
   const tabs = await texts('.bcv-rail__item');
   check(tabs.length === 10 && tabs[0] === 'Home' && tabs[6] === 'Modules' && (await texts('.bcv-rail__title')).join(',').toLowerCase() === 'course,materials,people,campus tools', `course rail groups the tabs from the API: ${tabs.join(', ')}`);
-  check(await page.$eval('.bcv-screen--ctx .bcv-head__in', (el) => el.getBoundingClientRect().width === 1040), 'course screens are 1040px wide as in the mockup');
+  // dense screens fill the column up to 1180 (mockup 7 layout notes): 1400 viewport − 242 sidebar − 80 padding = 1078 here
+  check(await page.$eval('.bcv-screen--ctx .bcv-head__in', (el) => Math.round(el.getBoundingClientRect().width) === 1078), `course screens fill the column (capped at 1180): ${await page.$eval('.bcv-screen--ctx .bcv-head__in', (el) => Math.round(el.getBoundingClientRect().width))}px`);
   check((await texts('.bcv-rail__ext')).join(',') === 'Resources & Policy', 'external tools are plain links under Campus tools');
   check(await page.$('.bcv-rail__item[data-tab="home"].is-active') && (await page.$eval('.bcv-rail__item.is-active .bcv-rail__tile', (el) => getComputedStyle(el).backgroundColor === 'rgb(23, 112, 171)')), 'active item takes the course colour (the one picked earlier)');
   check(await page.$('.bcv-head .bcv-colorbtn'), 'the colour square in the course header opens the palette');

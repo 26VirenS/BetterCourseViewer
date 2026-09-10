@@ -1,9 +1,11 @@
 /* Grades (sidebar): every current course's Canvas score on one page, a term
  * GPA on the plain 4.0 scale (every course counts equally — Canvas publishes
  * no credit weighting), an optional cumulative GPA and a daily history the
- * page keeps itself once tracking is on, target grades with the arithmetic
- * behind them, and a few honest stats. None of it is the registrar's GPA,
- * and the page says where every number came from. */
+ * page keeps itself once tracking is on, one card per course whose ring
+ * opens into the group breakdown, a Details sheet with the course's own
+ * grade page, target grades with the arithmetic behind them, and a few
+ * honest stats. None of it is the registrar's GPA, and the page says where
+ * every number came from. */
 (function () {
   const BCV = (self.BCV = self.BCV || {});
   const { h } = BCV.utils;
@@ -24,8 +26,22 @@
   const GEAR = 'M12 15a3 3 0 100-6 3 3 0 000 6zM19.4 15a1.7 1.7 0 00.3 1.9l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-2.9 1.2v.2a2 2 0 11-4 0v-.1a1.7 1.7 0 00-2.9-1.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00-1.2-2.9H3a2 2 0 110-4h.2a1.7 1.7 0 001.2-2.9l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 002.9-1.2V3a2 2 0 114 0v.2a1.7 1.7 0 002.9 1.2l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 001.2 2.9H21a2 2 0 110 4h-.2a1.7 1.7 0 00-1.4 1z';
   const TREND = 'M4 17l5-6 4 3 6-8';
   const BARS = 'M4 19h16M7 16V9M12 16V5M17 16v-4';
+  const EYE_OFF = 'M3 12s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6zM4 4l16 16';
   const MIN_Y = 2.4, MAX_Y = 4.0;
   const LOWER_BY = 10; // the "if ungraded work lands lower" what-if: every remaining score 10 points under today's
+  const NS = 'http://www.w3.org/2000/svg';
+  const RING_R = 22; // the 56px course ring
+  const CAT_R = [16, 10.5, 5]; // nested group rings inside it
+  const svgEl = (tag, attrs) => {
+    const el = document.createElementNS(NS, tag);
+    for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, String(v));
+    return el;
+  };
+  const dashFor = (pct, r) => {
+    const c = 2 * Math.PI * r;
+    const f = (clamp(pct, 0, 100) / 100) * c;
+    return `${f.toFixed(1)} ${(c - f).toFixed(1)}`;
+  };
 
   /** Points earned and still to come in a course, and what the remaining work
    *  must average to land a target. Counts only work that moves the final
@@ -54,16 +70,16 @@
   }
 
   async function render(ctx) {
-    // the mockup's page fills its column (900px of a 938px column); on a Mac window that means the whole main area, capped for very wide screens
-    const screen = U.el('bcv-screen bcv-screen--gpa', null, { style: { '--w': '1280px' } });
+    // a dense screen: fills the column up to the 1180px cap (mockup 7's layout notes)
+    const screen = U.el('bcv-screen bcv-screen--gpa', null, { style: { '--w': '1180px' } });
     const sub = U.text('bcv-head__sub', 'Loading…');
     const body = U.el('bcv-body bcv-body--16');
     screen.append(U.el('bcv-head', U.el('bcv-head__in', U.el('bcv-head__row', h('div', {}, [h('h1', { class: 'bcv-h1', text: 'Grades' }), sub])))), body);
     body.append(U.loading());
 
-    const [all, term, trackingPref, goalPref, targetsPref, snapsPref] = await Promise.all([
+    const [all, term, trackingPref, goalPref, targetsPref, snapsPref, hiddenPref] = await Promise.all([
       store.courses().catch(() => null), store.currentTerm().catch(() => ''),
-      store.pref('gpaTracking'), store.pref('gpaGoal'), store.pref('gradeTargets'), store.pref('gpaSnapshots'),
+      store.pref('gpaTracking'), store.pref('gpaGoal'), store.pref('gradeTargets'), store.pref('gpaSnapshots'), store.pref('gpaHidden'),
     ]);
     if (!ctx.alive()) return screen;
     if (!all) {
@@ -79,12 +95,21 @@
     let goal = Number.isFinite(goalPref) ? goalPref : 3.7;
     const targets = targetsPref && typeof targetsPref === 'object' ? { ...targetsPref } : {};
     let snaps = Array.isArray(snapsPref) ? snapsPref : [];
+    const hidden = new Set(Array.isArray(hiddenPref) ? hiddenPref.map(String) : []); // dropped from the overview and the GPA, reversible
     let infoOpen = null;
+    let current = null; // the latest model, shared with the sheets
+    const gmCache = new Map();
+    /** The course's own grade model (rings, groups, weights, assignment rows), once per course. */
+    const gmFor = (c) => {
+      if (!gmCache.has(c.id)) gmCache.set(c.id, store.gradeModel(groupsBy.get(c.id) || [], c, {}, false, ctx.dark));
+      return gmCache.get(c.id);
+    };
 
     // ---- the model: every number from a Canvas field or from user input ----------------
     function model() {
-      const scored = courses.filter((c) => c.score !== null && c.score !== undefined);
-      const unscored = courses.filter((c) => c.score === null || c.score === undefined);
+      const shown = courses.filter((c) => !hidden.has(String(c.id)));
+      const scored = shown.filter((c) => c.score !== null && c.score !== undefined);
+      const unscored = shown.filter((c) => c.score === null || c.score === undefined);
       const rows = scored.map((c) => {
         const pct = Number(c.score);
         const letter = c.grade ? String(c.grade).replace(/-/g, '−') : letterFor(pct)[0];
@@ -103,9 +128,9 @@
       const termGpa = n ? rows.reduce((s, r) => s + r.pts, 0) / n : null;
       const lowGpa = n ? rows.reduce((s, r) => s + pointsFor(null, Math.max(0, r.pct - LOWER_BY)), 0) / n : null;
       const cum = tracking && termGpa !== null ? (tracking.priorGpa * tracking.priorCourses + termGpa * n) / (tracking.priorCourses + n) : null;
-      // on-time: every submitted, dated assignment across these courses; Canvas's own `late` flag decides
+      // on-time: every submitted, dated assignment across the shown courses; Canvas's own `late` flag decides
       let submitted = 0, onTime = 0;
-      for (const c of courses) for (const g of groupsBy.get(c.id) || []) for (const a of g.assignments || []) {
+      for (const c of shown) for (const g of groupsBy.get(c.id) || []) for (const a of g.assignments || []) {
         const s = a.submission;
         if (!s?.submitted_at || !a.due_at) continue;
         submitted++;
@@ -113,8 +138,15 @@
       }
       const today = dayKey();
       const prev = [...snaps].reverse().find((s) => s.date !== today) || null;
-      return { rows, unscored, n, termGpa, lowGpa, cum, submitted, onTime, prev };
+      return { rows, unscored, n, shownCount: shown.length, hiddenList: courses.filter((c) => hidden.has(String(c.id))), termGpa, lowGpa, cum, submitted, onTime, prev };
     }
+    const courseLabel = (m) => `${U.plural(m.shownCount, 'course')} · ${m.n} with grades so far`;
+    const needText = (r) => (!r.m.known ? 'Target maths needs the course’s assignment list'
+      : r.met ? 'Target already secured'
+        : r.needed === null ? 'Not reachable — nothing left to grade'
+          : r.reachable ? `Needs ${Math.max(0, Math.round(r.needed))}% of the remaining ${store.fmtPts(r.m.remaining)} pts`
+            : `Not reachable — would need ${Math.round(r.needed)}%`);
+    const needClass = (r) => (r.met ? 'bcv-gpa__need--met' : !r.reachable ? 'bcv-gpa__need--no' : '');
 
     /** One snapshot a day while tracking is on; today's is kept current. */
     async function snapshot(m) {
@@ -131,6 +163,7 @@
     }
 
     const save = () => Promise.all([store.setPref('gpaTracking', tracking), store.setPref('gpaGoal', goal), store.setPref('gradeTargets', targets)]).catch(() => {});
+    const saveHidden = () => store.setPref('gpaHidden', [...hidden]);
 
     // ---- pieces ----------------------------------------------------------------------------
     function hero(m) {
@@ -142,7 +175,7 @@
           h('button', { type: 'button', class: 'bcv-gpa__gear', title: 'GPA settings', 'aria-label': 'GPA settings', onclick: () => openSettings(m) }, U.svg(GEAR, { size: 15, stroke: '#fff', width: 1.9 })),
         ]),
         U.el('bcv-gpa__big', [U.text('bcv-gpa__value', gpa2(m.termGpa), 'span'), U.text('bcv-gpa__of', 'of 4.00', 'span')]),
-        U.text('bcv-gpa__hero-note', m.n ? `${U.plural(m.n, 'course')} this term · computed from your Canvas scores` : 'No course has a Canvas score yet'),
+        U.text('bcv-gpa__hero-note', m.shownCount ? `${courseLabel(m)} · computed from your Canvas scores` : 'No current course to score'),
         U.el('bcv-gpa__hero-foot', [
           tracking
             ? h('div', {}, [
@@ -169,15 +202,11 @@
       let chart = null;
       if (enough) {
         const coords = pts.map((s, i) => ({ x: 7 + i * (86 / (pts.length - 1)), y: yAt(s.gpa), s }));
-        const ns = 'http://www.w3.org/2000/svg';
-        const svg = document.createElementNS(ns, 'svg');
-        svg.setAttribute('viewBox', '0 0 100 100');
-        svg.setAttribute('preserveAspectRatio', 'none');
-        const goalLine = document.createElementNS(ns, 'line');
-        for (const [k, v] of Object.entries({ x1: '0', y1: yAt(goal).toFixed(2), x2: '100', y2: yAt(goal).toFixed(2), stroke: '#5856d6', 'stroke-width': '1.5', 'stroke-dasharray': '4 4', 'vector-effect': 'non-scaling-stroke', opacity: '.8' })) goalLine.setAttribute(k, v);
-        const line = document.createElementNS(ns, 'polyline');
-        for (const [k, v] of Object.entries({ points: coords.map((p) => `${p.x.toFixed(2)},${p.y.toFixed(2)}`).join(' '), fill: 'none', stroke: '#0a84ff', 'stroke-width': '3', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'vector-effect': 'non-scaling-stroke' })) line.setAttribute(k, v);
-        svg.append(goalLine, line);
+        const svg = svgEl('svg', { viewBox: '0 0 100 100', preserveAspectRatio: 'none' });
+        svg.append(
+          svgEl('line', { x1: '0', y1: yAt(goal).toFixed(2), x2: '100', y2: yAt(goal).toFixed(2), stroke: '#5856d6', 'stroke-width': '1.5', 'stroke-dasharray': '4 4', 'vector-effect': 'non-scaling-stroke', opacity: '.8' }),
+          svgEl('polyline', { points: coords.map((p) => `${p.x.toFixed(2)},${p.y.toFixed(2)}`).join(' '), fill: 'none', stroke: '#0a84ff', 'stroke-width': '3', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'vector-effect': 'non-scaling-stroke' }),
+        );
         const label = (s) => (s.date === dayKey() ? 'Today' : U.fmtShort(`${s.date}T12:00:00`));
         chart = [
           U.el('bcv-gpa__chart', [svg, ...coords.map((p) => h('span', { class: 'bcv-gpa__pt', style: { left: `${p.x.toFixed(2)}%`, top: `${p.y.toFixed(2)}%` } }))]),
@@ -226,39 +255,203 @@
       ]);
     }
 
-    function courseList(m) {
-      const rowFor = (r) => {
-        const need = !r.m.known ? 'Target maths needs the course’s assignment list'
-          : r.met ? 'Target already secured'
-            : r.needed === null ? 'Not reachable — nothing left to grade'
-              : r.reachable ? `Needs ${Math.max(0, Math.round(r.needed))}% of the remaining ${store.fmtPts(r.m.remaining)} pts`
-                : `Not reachable — would need ${Math.round(r.needed)}%`;
-        const bump = (delta) => { targets[r.c.id] = clamp(r.idx + delta, 0, SCALE.length - 1); save(); draw(); };
-        return U.el('bcv-gpa__row', [
-          U.dot(r.c.color, 'bcv-dot--10'),
-          U.el('bcv-gpa__row-body', [
-            U.text('bcv-gpa__row-code', r.c.shortName || r.c.name),
-            U.text('bcv-gpa__row-sub', `${r.c.nickname ? r.c.originalName : (r.c.code || r.c.name)} · ${r.m.known ? `${store.fmtPts(r.m.earned)} pts earned so far · ${store.fmtPts(r.m.remaining)} pts still to come` : 'score as Canvas reports it'}`),
-            U.el('bcv-gpa__row-bar', h('div', { class: 'bcv-gpa__row-fill', style: { width: `${clamp(r.pct, 0, 100)}%`, background: r.c.color } })),
-            U.text(`bcv-gpa__need bcv-pretty ${r.met ? 'bcv-gpa__need--met' : !r.reachable ? 'bcv-gpa__need--no' : ''}`, need),
+    // ---- course cards ------------------------------------------------------------------------
+    const ringTrack = () => (ctx.dark ? 'rgba(255,255,255,.1)' : 'rgba(120,120,128,.16)');
+    /** One thin ring per graded group (three at most), nested inside the course ring. */
+    function catCircles(cats) {
+      const out = [];
+      cats.slice(0, CAT_R.length).forEach((ct, k) => {
+        out.push(svgEl('circle', { cx: 28, cy: 28, r: CAT_R[k], fill: 'none', stroke: ringTrack(), 'stroke-width': 4.5 }));
+        if (ct.pct !== null) out.push(svgEl('circle', { cx: 28, cy: 28, r: CAT_R[k], fill: 'none', stroke: ct.color, 'stroke-width': 4.5, 'stroke-linecap': 'round', 'stroke-dasharray': dashFor(ct.pct, CAT_R[k]) }));
+      });
+      return out;
+    }
+    /** The 56px ring: the course total, plus the group rings when expanded. */
+    function ringSvg(c, pct, cats, expanded) {
+      const svg = svgEl('svg', { viewBox: '0 0 56 56', class: 'bcv-gpa__ringsvg' });
+      svg.append(svgEl('circle', { cx: 28, cy: 28, r: RING_R, fill: 'none', stroke: ringTrack(), 'stroke-width': 6 }));
+      if (pct !== null) svg.append(svgEl('circle', { cx: 28, cy: 28, r: RING_R, fill: 'none', stroke: c.color, 'stroke-width': 6, 'stroke-linecap': 'round', 'stroke-dasharray': dashFor(pct, RING_R) }));
+      if (expanded) svg.append(...catCircles(cats));
+      return svg;
+    }
+    const catRow = (ct) => U.el('bcv-gpa__cat', [h('span', { class: 'bcv-gpa__catdot', style: { background: ct.color } }), U.text('bcv-gpa__catname bcv-ellip', ct.label, 'span'), U.text('bcv-gpa__catpct', ct.value, 'span')]);
+
+    /** One card per course. Hovering the ring alone (not the card) opens the group
+     *  breakdown in place; the ring column is a fixed box so nothing shifts. The
+     *  ring is built once and only its group circles come and go, so the node under
+     *  the pointer is never removed and mouseleave always fires. */
+    function courseCard(r) {
+      const c = r.c;
+      const ungraded = !!r.ungraded;
+      const pct = ungraded ? null : r.pct;
+      const cats = gmFor(c).legend; // groups with graded work, in Canvas's order (weighted first)
+      let hover = false;
+      const card = U.el('bcv-gpa__card', null, { dataset: { course: c.id } });
+      const svg = ringSvg(c, pct, [], false);
+      const catsG = svgEl('g', { class: 'bcv-gpa__cats' });
+      svg.append(catsG);
+      const letter = h('span', { class: 'bcv-gpa__ringletter', style: { color: ungraded ? 'var(--bcv-ink3)' : c.palette.text }, text: ungraded ? 'N/A' : r.letter });
+      const ringWrap = h('div', { class: 'bcv-gpa__ringwrap' }, [svg, letter]);
+      const ringBox = h('div', { class: 'bcv-gpa__ringbox', title: cats.length ? 'Hover for the group breakdown' : null }, ringWrap);
+      const info = h('div', { class: 'bcv-gpa__cinfo' });
+      const hideSlot = h('div', { class: 'bcv-gpa__hideslot' }, h('button', { type: 'button', class: 'bcv-gpa__hide', title: 'Hide this course', 'aria-label': `Hide ${c.shortName || c.name} from the GPA`, onclick: () => hideCourse(c) }, U.svg(EYE_OFF, { size: 14, stroke: 'currentColor', width: 1.9 })));
+      const targetChip = ungraded
+        ? h('span', { class: 'bcv-gpa__cchip bcv-gpa__cchip--na', text: 'No grade yet' })
+        : h('span', { class: 'bcv-gpa__cchip', style: { background: c.palette.tint, color: c.palette.text }, text: `Target ${r.target[0]}` });
+      ringBox.addEventListener('mouseenter', () => { if (!hover && cats.length) { hover = true; paint(); } });
+      ringBox.addEventListener('mouseleave', () => { if (hover) { hover = false; paint(); } });
+      card.append(
+        U.el('bcv-gpa__ctop', [ringBox, info, hideSlot]),
+        h('div', {}, [
+          U.el('bcv-gpa__cbar', [
+            h('div', { class: 'bcv-gpa__cfill', style: { width: `${ungraded ? 0 : clamp(pct, 0, 100)}%`, background: c.color } }),
+            ungraded ? null : h('span', { class: 'bcv-gpa__tick', title: `Target ${r.target[0]}`, style: { left: `${Math.min(100, r.target[1])}%` } }),
           ]),
-          U.el('bcv-gpa__row-score', [U.text('bcv-gpa__row-pct', `${store.fmtPts(r.pct)}%`), U.text('bcv-gpa__row-letter', `${r.letter} · ${r.pts.toFixed(1)}`)]),
-          U.el('bcv-gpa__target', [
-            h('button', { type: 'button', class: 'bcv-gpa__step', text: '−', title: 'Lower the target', 'aria-label': 'Lower the target', disabled: r.idx >= SCALE.length - 1 || null, onclick: () => bump(1) }),
-            U.text('bcv-gpa__target-pill', `${r.target[0]} · ${r.target[1]}%`, 'span'),
-            h('button', { type: 'button', class: 'bcv-gpa__step', text: '+', title: 'Raise the target', 'aria-label': 'Raise the target', disabled: r.idx <= 0 || null, onclick: () => bump(-1) }),
-          ]),
-        ]);
-      };
-      const unscoredRow = (c) => U.el('bcv-gpa__row bcv-gpa__row--unscored', [
-        U.dot(c.color, 'bcv-dot--10'),
-        U.el('bcv-gpa__row-body', [U.text('bcv-gpa__row-code', c.shortName || c.name), U.text('bcv-gpa__row-sub', 'No score yet · Canvas has not computed one, so it is left out of the GPA')]),
-        U.el('bcv-gpa__row-score', [U.text('bcv-gpa__row-pct', '—'), U.text('bcv-gpa__row-letter', 'no score')]),
-      ]);
+          U.text(`bcv-gpa__need bcv-pretty ${ungraded ? '' : needClass(r)}`, ungraded ? 'Nothing graded yet — no score to project from' : needText(r)),
+          U.text('bcv-gpa__cnote', ungraded ? 'Canvas has not computed a score, so it counts for nothing here' : r.m.known ? `${store.fmtPts(r.m.earned)} pts earned so far` : 'Score as Canvas reports it'),
+        ]),
+        U.el('bcv-gpa__cfoot', [
+          targetChip,
+          h('button', { type: 'button', class: 'bcv-gpa__details', onclick: () => openDetail(c) }, ['Details', U.svg(IC.chevron, { size: 13, stroke: 'var(--bcv-blue)', width: 2.1 })]),
+        ]),
+      );
+      function paint() {
+        card.classList.toggle('is-hover', hover);
+        ringWrap.classList.toggle('is-big', hover);
+        letter.hidden = hover;
+        catsG.replaceChildren(...(hover ? catCircles(cats) : []));
+        info.replaceChildren(hover
+          ? U.el('bcv-gpa__bygroup', [
+            U.el('bcv-gpa__bygroup-head', [U.text('bcv-gpa__kicker2', 'By group', 'span'), U.text('bcv-gpa__bygroup-pct', `${store.fmtPts(pct)}%`, 'span')]),
+            ...cats.slice(0, 4).map(catRow),
+          ])
+          : U.el('bcv-gpa__cbody', [
+            U.text('bcv-gpa__ccode bcv-ellip', c.shortName || c.name),
+            U.text('bcv-gpa__cname bcv-ellip', c.nickname ? c.originalName : (c.code || c.name)),
+            U.el('bcv-gpa__cscore', [U.text('bcv-gpa__cpct', ungraded ? 'N/A' : `${store.fmtPts(pct)}%`, 'span'), U.text('bcv-gpa__cpts', ungraded ? '— pts' : `${r.pts.toFixed(1)} pts`, 'span')]),
+          ]));
+        hideSlot.hidden = hover;
+        targetChip.hidden = hover && !ungraded;
+      }
+      paint();
+      return card;
+    }
+    function courseGrid(m) {
+      const cards = [...m.rows, ...m.unscored.map((c) => ({ c, ungraded: true }))];
       return h('div', {}, [
-        U.el('bcv-group__head', [U.h2('All courses'), U.text('bcv-group__sub bcv-ml-auto', 'Tap −/+ to set a target grade', 'span')]),
-        m.rows.length || m.unscored.length ? U.card([...m.rows.map(rowFor), ...m.unscored.map(unscoredRow)], 'bcv-card--list') : U.emptyCard('No current courses.'),
+        U.el('bcv-group__head', [U.h2('All courses'), U.text('bcv-group__sub bcv-ml-auto', 'Hover a ring for the group breakdown', 'span')]),
+        cards.length ? U.el('bcv-gpa__grid', cards.map(courseCard)) : U.emptyCard(m.hiddenList.length ? 'Every course is hidden.' : 'No current courses.'),
       ]);
+    }
+    function hiddenTray(m) {
+      if (!m.hiddenList.length) return null;
+      return U.el('bcv-gpa__tray', [
+        U.text('bcv-gpa__kicker2', 'Hidden · not counted in GPA', 'span'),
+        ...m.hiddenList.map((c) => h('button', { type: 'button', class: 'bcv-gpa__traychip', title: `Show ${c.shortName || c.name} again`, onclick: () => showCourse(c) }, [
+          h('span', { class: 'bcv-gpa__traydot', style: { background: c.color } }),
+          h('span', { text: c.shortName || c.name }),
+          h('span', { class: 'bcv-gpa__trayshow', text: 'Show' }),
+        ])),
+      ]);
+    }
+    async function hideCourse(c) {
+      hidden.add(String(c.id));
+      await saveHidden();
+      await refresh();
+      U.toast(`${c.shortName || c.name} is hidden and not counted in the GPA. Show it again from the tray below.`);
+    }
+    async function showCourse(c) {
+      hidden.delete(String(c.id));
+      await saveHidden();
+      await refresh();
+    }
+
+    // ---- details sheet: the course's own grade page, without leaving the overview ----------
+    function openDetail(c) {
+      document.querySelector('.bcv-sheet-ov')?.remove();
+      const ov = U.el('bcv-sheet-ov', null, { role: 'dialog', 'aria-label': `${c.shortName || c.name} grade details` });
+      const close = () => ov.remove();
+      ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
+      ov.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+      const sheet = U.el('bcv-sheet bcv-gpa-detail');
+      ov.append(sheet);
+      function bump(r, delta) {
+        targets[c.id] = clamp(r.idx + delta, 0, SCALE.length - 1);
+        save();
+        current = model();
+        draw();
+        paint();
+        ov.focus(); // the stepper that had focus was just redrawn; keep Escape working
+      }
+      function paint() {
+        const m = current || model();
+        const r = m.rows.find((x) => x.c.id === c.id) || null; // null: no Canvas score yet
+        const gm = gmFor(c);
+        const cats = gm.legend;
+        const head = U.el('bcv-sheet__head bcv-gpa-detail__head', [
+          h('div', { class: 'bcv-gpa-detail__ring' }, ringSvg(c, r ? r.pct : null, cats, true)),
+          U.el('bcv-sheet__titles', [
+            U.text('bcv-gpa-detail__title bcv-ellip', c.shortName || c.name),
+            U.text('bcv-gpa-detail__name', c.nickname ? c.originalName : (c.code || c.name)),
+            U.el('bcv-gpa-detail__line', [
+              U.text('bcv-gpa-detail__pct', r ? `${store.fmtPts(r.pct)}%` : 'N/A', 'span'),
+              h('span', { class: 'bcv-gpa-detail__letter', style: r ? { background: c.palette.tint, color: c.palette.text } : null, text: r ? r.letter : 'No grade yet' }),
+              r ? U.el('bcv-gpa-detail__target', [
+                U.text('bcv-gpa-detail__tlabel', 'Target', 'span'),
+                h('button', { type: 'button', class: 'bcv-gpa-detail__step', text: '−', 'aria-label': 'Lower the target', disabled: r.idx >= SCALE.length - 1 || null, onclick: () => bump(r, 1) }),
+                h('span', { class: 'bcv-gpa-detail__tval', style: { background: c.palette.tint, color: c.palette.text }, text: `${r.target[0]} · ${r.target[1]}%` }),
+                h('button', { type: 'button', class: 'bcv-gpa-detail__step', text: '+', 'aria-label': 'Raise the target', disabled: r.idx <= 0 || null, onclick: () => bump(r, -1) }),
+              ]) : null,
+            ]),
+          ]),
+          h('button', { type: 'button', class: 'bcv-sheet__close', 'aria-label': 'Close', onclick: close }, U.svg(IC.close, { size: 13, stroke: 'var(--bcv-ink2)', width: 2.3 })),
+        ]);
+        const groupRows = cats.map((ct) => U.el('bcv-gpa-detail__grow', [
+          h('span', { class: 'bcv-gpa__catdot bcv-gpa__catdot--9', style: { background: ct.color } }),
+          U.text('bcv-gpa-detail__gname bcv-pretty', ct.label, 'span'),
+          h('span', { class: 'bcv-gpa-detail__gbar' }, h('span', { style: { width: `${clamp(ct.pct ?? 0, 0, 100)}%`, background: ct.color } })),
+          U.text('bcv-gpa-detail__gweight', ct.weightText, 'span'),
+          U.text('bcv-gpa-detail__gpct', ct.value, 'span'),
+        ]));
+        const ungradedRows = gm.ungraded.map((u) => U.el('bcv-gpa-detail__grow bcv-gpa-detail__grow--ungraded', [
+          h('span', { class: 'bcv-gpa__catdot bcv-gpa__catdot--9 bcv-gpa__catdot--empty' }),
+          U.text('bcv-gpa-detail__gname bcv-pretty', u.name, 'span'),
+          h('span', { class: 'bcv-gpa-detail__gbar' }),
+          U.text('bcv-gpa-detail__gweight', u.weightText ? `${u.weightText} of grade · nothing graded` : 'nothing graded', 'span'),
+          U.text('bcv-gpa-detail__gpct', '—', 'span'),
+        ]));
+        const byGroup = U.el('bcv-gpa-detail__sec', [
+          U.text('bcv-gpa__kicker2', 'By group', 'span'),
+          ...groupRows, ...ungradedRows,
+          groupRows.length || ungradedRows.length ? null : U.text('bcv-gpa-detail__note', 'No assignment groups in this course.'),
+          U.text(`bcv-gpa-detail__need bcv-pretty ${r ? needClass(r) : ''}`, r ? needText(r) : 'Nothing graded yet — no score to project from'),
+        ]);
+        const weights = gm.weighted
+          ? U.el('bcv-gpa-detail__sec bcv-gpa-detail__sec--line', [
+            U.el('bcv-gpa-detail__hrow', [U.text('bcv-gpa__kicker2', 'How the grade is weighted', 'span'), U.text('bcv-gpa-detail__hsub', `${gm.weightSum}% of final grade`, 'span')]),
+            gm.weightBar.length ? U.el('bcv-wbar', gm.weightBar.map((w) => h('div', { class: `bcv-wbar__seg ${w.graded ? '' : 'bcv-wbar__seg--ungraded'}`, style: { flex: `${w.weight} 1 0`, background: w.color || '' }, title: `${w.name} · ${w.weight}%` }))) : U.text('bcv-gpa-detail__note', 'No assignment group carries weight yet.'),
+            U.el('bcv-gpa-detail__legend', gm.weightBar.map((w) => U.el('bcv-gpa-detail__lg', [h('span', { class: `bcv-wbar__dot ${w.graded ? '' : 'bcv-wbar__dot--ungraded'}`, style: { background: w.color || '' } }), U.text('bcv-gpa-detail__lgtext', `${w.name} ${w.weight}% · ${w.graded ? 'graded' : 'nothing graded'}`, 'span')]))),
+            gm.weightNote ? U.text('bcv-gpa-detail__note bcv-pretty', gm.weightNote) : null,
+          ])
+          : U.el('bcv-gpa-detail__sec bcv-gpa-detail__sec--line', [
+            U.text('bcv-gpa__kicker2', 'How the grade is weighted', 'span'),
+            U.text('bcv-gpa-detail__note bcv-pretty', 'This course does not weight its groups — the total is points earned over points possible.'),
+          ]);
+        const list = U.el('bcv-gpa-detail__sec bcv-gpa-detail__sec--line', [
+          U.el('bcv-gpa-detail__hrow', [U.text('bcv-gpa__kicker2', 'Assignments', 'span'), U.text('bcv-gpa-detail__hsub', 'Blue dot means graded', 'span')]),
+          gm.rows.length ? U.el('bcv-gpa-detail__list', gm.rows.map((g) => U.el('bcv-gpa-detail__arow', [
+            h('span', { class: 'bcv-gpa__catdot', style: { background: g.earned !== null ? '#0a84ff' : 'transparent' } }),
+            U.el('bcv-gpa-detail__abody', [U.text('bcv-gpa-detail__aname bcv-pretty', g.name), U.text('bcv-gpa-detail__agroup', `${g.group}${g.badge ? ` · ${g.badge}` : ''}`)]),
+            U.text('bcv-gpa-detail__ascore', `${g.earned === null ? '—' : store.fmtPts(g.earned)} / ${store.fmtPts(g.possible)}`, 'span'),
+          ]))) : U.text('bcv-gpa-detail__note', 'No assignments in this course.'),
+          h('a', { class: 'bcv-gpa-detail__link', href: `${c.url}/grades`, text: 'Open the course Grades page' }),
+        ]);
+        sheet.replaceChildren(head, U.el('bcv-sheet__list bcv-gpa-detail__body', [byGroup, weights, list]));
+      }
+      paint();
+      document.body.append(ov);
+      ov.tabIndex = -1;
+      ov.focus();
     }
 
     // ---- settings sheet ----------------------------------------------------------------------
@@ -321,7 +514,7 @@
           ]),
         ]),
         U.el('bcv-gpa-set__foot', [
-          h('span', { text: m.n ? `${U.plural(m.n, 'course')} this term · every course counts equally` : 'No scored courses yet' }),
+          h('span', { text: m.shownCount ? `${courseLabel(m)} · every course counts equally` : 'No current course to score' }),
           U.btn('Done', { kind: 'primary', cls: 'bcv-btn--fill36', onClick: done }),
         ]),
       ]));
@@ -339,7 +532,6 @@
     }
 
     // ---- draw --------------------------------------------------------------------------------
-    let current = null;
     async function refresh() {
       current = model();
       await snapshot(current);
@@ -347,7 +539,7 @@
     }
     function draw() {
       const m = current || model();
-      sub.textContent = `${term ? `${term} · ` : ''}${m.n ? `${U.plural(m.n, 'course')} this term · every course counts equally` : 'no scored courses yet'}`;
+      sub.textContent = `${term ? `${term} · ` : ''}${m.shownCount ? courseLabel(m) : 'no current courses'}`;
       body.replaceChildren(...[
         tracking ? null : U.el('bcv-gpa__banner', [
           U.svg(BARS, { size: 19, stroke: 'var(--bcv-blue)', width: 1.9, style: { flex: 'none' } }),
@@ -356,7 +548,8 @@
         ]),
         U.el('bcv-gpa__top', [hero(m), trend()]),
         stats(m),
-        courseList(m),
+        courseGrid(m),
+        hiddenTray(m),
         U.el('bcv-gpa__foot', [
           h('p', { class: 'bcv-pretty', text: tracking
             ? 'Course scores come straight from Canvas. GPA, targets and history are computed here from the standard 4.0 scale and the prior record you entered — your school’s official GPA may differ.'
@@ -370,7 +563,12 @@
           { label: 'Explain my GPA', note: m.termGpa === null ? 'No scores yet' : `${gpa2(m.termGpa)} this term`, icon: IC.chart, prompt: 'Explain how my term GPA is built from my course scores and letter grades, and which course moves it most.' },
           { label: 'Reach my goal', note: `Goal ${gpa2(goal)}`, icon: IC.bolt, prompt: 'Given each course’s score, target and the points still to come, what do I need in each course to reach my GPA goal? Keep the arithmetic brief.' },
         ],
-        context: () => [`Term GPA ${gpa2(m.termGpa)} (goal ${gpa2(goal)}), ${m.n} scored courses, every course weighted equally.`, ...m.rows.map((r) => `- ${r.c.name}: ${r.pct}% (${r.letter}, ${r.pts.toFixed(1)}); target ${r.target[0]} ${r.target[1]}%; ${r.m.known ? `${store.fmtPts(r.m.earned)} pts earned, ${store.fmtPts(r.m.remaining)} pts remaining; needs ${r.needed === null ? 'n/a' : `${Math.round(r.needed)}%`} of the rest` : 'assignment list unavailable'}`), ...m.unscored.map((c) => `- ${c.name}: no score yet`)].join('\n'),
+        context: () => [
+          `Term GPA ${gpa2(m.termGpa)} (goal ${gpa2(goal)}), ${m.n} scored courses of ${m.shownCount} shown, every course weighted equally.`,
+          ...m.rows.map((r) => `- ${r.c.name}: ${r.pct}% (${r.letter}, ${r.pts.toFixed(1)}); target ${r.target[0]} ${r.target[1]}%; ${r.m.known ? `${store.fmtPts(r.m.earned)} pts earned, ${store.fmtPts(r.m.remaining)} pts remaining; needs ${r.needed === null ? 'n/a' : `${Math.round(r.needed)}%`} of the rest` : 'assignment list unavailable'}; groups: ${gmFor(r.c).legend.map((l) => `${l.label} ${l.value}`).join(', ') || 'none graded'}`),
+          ...m.unscored.map((c) => `- ${c.name}: no score yet (not counted)`),
+          m.hiddenList.length ? `Hidden by the student, not counted: ${m.hiddenList.map((c) => c.name).join(', ')}` : '',
+        ].join('\n'),
       });
     }
 
