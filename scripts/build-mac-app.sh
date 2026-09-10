@@ -10,7 +10,9 @@
 #   ./scripts/build-mac-app.sh --open     # …and open the project in Xcode
 #
 # Environment overrides:
-#   BUNDLE_ID   default: com.bettercourseviewer.app
+#   BUNDLE_ID   default: com.bettercourseviewer.app (pick your own, e.g.
+#               com.yourname.bettercourseviewer, if Xcode says the default
+#               cannot be registered to your team)
 #   APP_NAME    default: BetterCourseViewer
 #   OUT_DIR     default: macos
 set -euo pipefail
@@ -63,6 +65,20 @@ else
     --no-prompt \
     --no-open \
     --force
+fi
+
+# Xcode refuses to embed the extension unless its bundle identifier is the
+# app's identifier plus ".Extension". Normalise both so a stray edit or a
+# converter quirk cannot break the build.
+PBXPROJ="$PROJECT/project.pbxproj"
+if [[ -f "$PBXPROJ" ]]; then
+  sed -i.bak -E \
+    -e "/PRODUCT_BUNDLE_IDENTIFIER = [^;]*[Ee]xtension[^;]*;/s/PRODUCT_BUNDLE_IDENTIFIER = [^;]+;/PRODUCT_BUNDLE_IDENTIFIER = ${BUNDLE_ID}.Extension;/" \
+    -e "/PRODUCT_BUNDLE_IDENTIFIER = [^;]*[Ee]xtension[^;]*;/!s/PRODUCT_BUNDLE_IDENTIFIER = [^;]+;/PRODUCT_BUNDLE_IDENTIFIER = ${BUNDLE_ID};/" \
+    "$PBXPROJ"
+  rm -f "$PBXPROJ.bak"
+  echo "▶ Bundle identifiers:"
+  grep -o 'PRODUCT_BUNDLE_IDENTIFIER = [^;]*' "$PBXPROJ" | sort -u | sed 's/^/    /'
 fi
 
 if [[ "$BUILD" == "1" ]]; then

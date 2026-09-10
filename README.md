@@ -49,6 +49,11 @@ To build from the command line instead of Xcode:
 
 The generated project references the files in `extension/` directly, so edits show up on the next build. Delete the `macos/` folder to regenerate the project from scratch.
 
+### Build errors
+
+- **"Embedded binary's bundle identifier is not prefixed with the parent app's bundle identifier"** – the two targets' identifiers drifted apart. In Xcode, select the project, then the **BetterCourseViewer** target → Signing & Capabilities and note its Bundle Identifier; then select the **BetterCourseViewer Extension** target and set its Bundle Identifier to that value plus `.Extension`. Give both targets the same Team, then Product → Clean Build Folder and run again. Regenerating with `rm -rf macos && ./scripts/build-mac-app.sh --open` also fixes it, since the script now normalises both identifiers.
+- **"Failed to register bundle identifier"** (personal/free teams) – pick your own identifier: `BUNDLE_ID=com.yourname.bettercourseviewer ./scripts/build-mac-app.sh --open` (after deleting `macos/`).
+
 ### School with its own Canvas address?
 
 The extension is on automatically for every `*.instructure.com` site. If your school uses a custom address such as `canvas.myschool.edu`:
