@@ -144,7 +144,17 @@
     const head = U.el('bcv-head bcv-head--course', U.el('bcv-head__in', [
       h('button', { type: 'button', class: 'bcv-linkbtn', onclick: () => app.go(backHref) }, [U.svg(IC.back, { size: 14, stroke: 'var(--bcv-blue)', width: 2.1 }), backLabel]),
       U.el('bcv-course__title-row', [
-        h('span', { class: 'bcv-dot bcv-dot--sq', style: { background: c.color } }),
+        shell.kind === 'courses'
+          ? h('button', { type: 'button', class: 'bcv-dot bcv-dot--sq bcv-colorbtn', title: 'Change course colour', 'aria-label': 'Change course colour', style: { background: c.color }, onclick: (e) => U.colorMenu(e.currentTarget, c.color, async (hex) => {
+            try {
+              await store.setColor(c.id, hex);
+              app.loadShellData({ force: true });
+              app.render();
+            } catch (err) {
+              U.toast(`Could not change the colour: ${err.message}`, { error: true });
+            }
+          }) })
+          : h('span', { class: 'bcv-dot bcv-dot--sq', style: { background: c.color } }),
         h('h1', { class: 'bcv-h1 bcv-h1--30', text: c.name }),
         ...pills.filter(Boolean),
         U.btn('Immersive Reader', { icon: IC.reader, kind: 'card', iconColor: 'var(--bcv-blue)', cls: 'bcv-ml-auto', onClick: () => {
@@ -412,22 +422,30 @@
   };
 
   T.streamBlock = async (ctx, shell) => {
+    const { app } = ctx;
     const c = shell.course;
-    const stream = await store.courseStream(c.id, { kind: shell.kind }).catch(() => null);
+    const [stream, seen] = await Promise.all([store.courseStream(c.id, { kind: shell.kind }).catch(() => null), store.streamSeen().catch(() => new Set())]);
     if (!stream) return U.emptyCard('The course stream could not be loaded.');
     if (!stream.length) return U.emptyCard('No recent activity in this course.');
     const KIND = { Announcement: [IC.bell, 'Announcement'], DiscussionTopic: [IC.disc, 'Discussion'], Submission: [IC.chart, 'Grade posted'], Message: [IC.doc, 'Notification'], Conversation: [IC.mail, 'Message'] };
     return U.card(stream.slice(0, 30).map((a) => {
       const [icon, kind] = KIND[a.type] || [IC.doc, a.type];
-      return U.row([
-        U.dot(a.read_state === false ? '#0a84ff' : 'transparent', 'bcv-act__dot'),
+      const url = a.html_url || c.url;
+      const rowEl = U.row([
+        U.dot(a.read_state === false && !seen.has(String(a.id)) ? '#0a84ff' : 'transparent', 'bcv-act__dot'),
         U.tile(icon, { color: c.palette.text, tint: c.palette.tint, size: 32, iconSize: 16 }),
         U.el('bcv-row__body', [
           U.el('bcv-row__head', [U.text('bcv-act__title bcv-pretty', a.title || kind, 'span'), U.text('bcv-row__when', U.fmtShort(a.updated_at || a.created_at), 'span')]),
           U.text('bcv-act__kind', kind),
           U.text('bcv-row__preview bcv-row__preview--13 bcv-pretty', htmlToText(a.message || '', 160).replace(/\s+/g, ' ')),
         ]),
-      ], { mod: 'bcv-row--p15 bcv-row--top', href: a.html_url || c.url });
+      ], { mod: 'bcv-row--p15 bcv-row--top', href: url });
+      rowEl.addEventListener('click', (e) => {
+        if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+        e.preventDefault();
+        store.markStreamSeen(a.id).catch(() => {}).then(() => app.go(url));
+      });
+      return rowEl;
     }), 'bcv-card--list');
   };
   T.stream = async (ctx, shell) => {

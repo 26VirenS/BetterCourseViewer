@@ -240,7 +240,8 @@ const conversations = [
 
 // ---- HTML pages -------------------------------------------------------------------------------
 function page({ title, path = '', courseId, body }) {
-  const env = { current_user_id: '7', current_user: { display_name: 'Sam Student', avatar_image_url: null }, COURSE_ID: courseId || null, context_asset_string: courseId ? `course_${courseId}` : 'user_7', TIMEZONE: 'America/Los_Angeles', DOMAIN_ROOT_ACCOUNT_ID: '1', PREFERENCES: { dashboard_view: 'planner' } };
+  // like Canvas, the page's ENV carries the dashboard view the user last saved
+  const env = { current_user_id: '7', current_user: { display_name: 'Sam Student', avatar_image_url: null }, COURSE_ID: courseId || null, context_asset_string: courseId ? `course_${courseId}` : 'user_7', TIMEZONE: 'America/Los_Angeles', DOMAIN_ROOT_ACCOUNT_ID: '1', PREFERENCES: { dashboard_view: dashboardView } };
   return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>${title}</title>
 <meta name="csrf-token" content="mock-csrf">
 <script>INST = {"environment":"development"}; ENV = ${JSON.stringify(env)}; BRANDS = {};</script>
@@ -298,12 +299,20 @@ on('POST', /^\/api\/v1\/planner\/overrides$/, (url, m, body) => { const ov = { i
 on('PUT', /^\/api\/v1\/planner\/overrides\/(\w+)$/, (url, m, body) => { for (const ov of overrides.values()) if (ov.id === m[1]) { Object.assign(ov, body); return ov; } return {}; });
 on('GET', /^\/api\/v1\/users\/self\/activity_stream\/summary$/, () => [{ type: 'Announcement', unread_count: 3, count: 5 }, { type: 'Conversation', unread_count: 1, count: 2 }, { type: 'DiscussionTopic', unread_count: 4, count: 6 }]);
 on('GET', /^\/api\/v1\/users\/self\/activity_stream$/, () => [
-  { id: 'a1', type: 'Announcement', title: 'Prerequisite Skills Test', message: '<p>Good morning everyone, the results from the Skills_Check test have been posted…</p>', course_id: '101', context_type: 'Course', read_state: false, updated_at: ago(6 * D), html_url: '/courses/101/announcements/8001' },
-  { id: 'a2', type: 'DiscussionTopic', title: 'Is there any discussion happening this week?', message: '<p>Last post by Alan Aguilar.</p>', course_id: '101', context_type: 'Course', read_state: false, updated_at: ago(18 * H), total_root_discussion_entries: 23, html_url: '/courses/101/discussion_topics/7003' },
+  { id: 'a1', type: 'Announcement', announcement_id: '8001', title: 'Prerequisite Skills Test', message: '<p>Good morning everyone, the results from the Skills_Check test have been posted…</p>', course_id: '101', context_type: 'Course', read_state: false, updated_at: ago(6 * D), html_url: '/courses/101/announcements/8001' },
+  { id: 'a2', type: 'DiscussionTopic', discussion_topic_id: '7003', title: 'Is there any discussion happening this week?', message: '<p>Last post by Alan Aguilar.</p>', course_id: '101', context_type: 'Course', read_state: false, updated_at: ago(18 * H), total_root_discussion_entries: 23, html_url: '/courses/101/discussion_topics/7003' },
   { id: 'a3', type: 'Submission', title: 'Lec05-PreQuiz graded — 19 / 19', message: '<p>Effort group.</p>', course_id: '101', context_type: 'Course', read_state: true, updated_at: ago(D), html_url: '/courses/101/assignments/1007' },
   { id: 'a4', type: 'Conversation', title: 'No submission for Acknowledge the UC Merced Student Attestation', message: '<p>Hello Bobcat! You are receiving this message because our records show…</p>', conversation_id: 'c1', read_state: false, updated_at: ago(9 * D), html_url: '/conversations?id=c1' },
-  { id: 'a5', type: 'Announcement', title: 'Field site sign-ups', message: '<p>Sign up for a field site by Friday.</p>', course_id: '104', context_type: 'Course', read_state: false, updated_at: ago(D), html_url: '/courses/104/announcements/8005' },
+  { id: 'a5', type: 'Announcement', announcement_id: '8005', title: 'Field site sign-ups', message: '<p>Sign up for a field site by Friday.</p>', course_id: '104', context_type: 'Course', read_state: false, updated_at: ago(D), html_url: '/courses/104/announcements/8005' },
 ]);
+// the Announcements API: every announcement across the given courses, with its read state
+on('GET', /^\/api\/v1\/announcements$/, (url) => {
+  const codes = url.searchParams.getAll('context_codes[]');
+  const out = [];
+  for (const [cid, list] of Object.entries(announcements)) if (codes.includes(`course_${cid}`)) for (const t of list) out.push({ ...t, context_code: `course_${cid}`, html_url: `/courses/${cid}/announcements/${t.id}` });
+  return out.sort((a, b) => new Date(b.posted_at) - new Date(a.posted_at));
+});
+on('PUT', /^\/api\/v1\/users\/self\/colors\/course_(\w+)$/, (url, m, body) => { const c = courseById(m[1]); if (!c || !body.hexcode) return null; c.color = body.hexcode.startsWith('#') ? body.hexcode : `#${body.hexcode}`; return { hexcode: c.color }; });
 on('GET', /^\/api\/v1\/conversations\/unread_count$/, () => ({ unread_count: String(conversations.filter((c) => c.workflow_state === 'unread').length) }));
 on('GET', /^\/api\/v1\/conversations$/, (url) => { const scope = url.searchParams.get('scope'); const f = url.searchParams.getAll('filter[]')[0]; return conversations.filter((c) => (!scope || (scope === 'unread' ? c.workflow_state === 'unread' : scope === 'starred' ? c.starred : true)) && (!f || c.context_code === f)).map(({ messages, ...c }) => c); });
 on('GET', /^\/api\/v1\/conversations\/(\w+)$/, (url, m) => conversations.find((c) => c.id === m[1]) || null);
@@ -356,7 +365,10 @@ on('GET', /^\/api\/v1\/courses\/(\w+)\/assignment_groups$/, (url, m) => assignme
 on('GET', /^\/api\/v1\/courses\/(\w+)\/discussion_topics\/(\w+)\/view$/, (url, m) => viewFor(m[2]));
 on('POST', /^\/api\/v1\/courses\/(\w+)\/discussion_topics\/(\w+)\/entries$/, (url, m, body) => { const e = { id: `e${Date.now()}`, user_id: '7', created_at: new Date().toISOString(), message: body.message, replies: [] }; entries.set(m[2], [...(entries.get(m[2]) || []), e]); return e; });
 on('POST', /^\/api\/v1\/courses\/(\w+)\/discussion_topics\/(\w+)\/entries\/(\w+)\/replies$/, (url, m, body) => ({ id: `e${Date.now()}`, user_id: '7', created_at: new Date().toISOString(), message: body.message }));
-on('PUT', /^\/api\/v1\/courses\/(\w+)\/discussion_topics\/(\w+)\/read_all$/, () => ({ ok: true }));
+on('PUT', /^\/api\/v1\/courses\/(\w+)\/discussion_topics\/(\w+)\/read_all$/, (url, m) => {
+  for (const t of [...(announcements[m[1]] || []), ...(discussions[m[1]] || [])]) if (t.id === m[2]) { t.read_state = 'read'; t.unread_count = 0; }
+  return { ok: true };
+});
 on('GET', /^\/api\/v1\/courses\/(\w+)\/discussion_topics\/(\w+)$/, (url, m) => topicFull(m[1], m[2]));
 on('GET', /^\/api\/v1\/courses\/(\w+)\/discussion_topics$/, (url, m) => (url.searchParams.get('only_announcements') === 'true' ? (announcements[m[1]] || []) : (discussions[m[1]] || [])).map((t) => ({ ...t, html_url: `/courses/${m[1]}/discussion_topics/${t.id}` })));
 on('GET', /^\/api\/v1\/courses\/(\w+)\/users$/, (url, m) => people(m[1]));

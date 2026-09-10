@@ -168,6 +168,30 @@
   function closeMenus() {
     document.querySelectorAll('.bcv-menu').forEach((m) => m.remove());
   }
+  /** Canvas's own course colour palette (the picker on its dashboard cards), plus a custom colour. */
+  const COURSE_COLORS = [['#BD3C14', 'Brick'], ['#FF2717', 'Red'], ['#E71F63', 'Magenta'], ['#8F3E97', 'Purple'], ['#65499D', 'Deep purple'], ['#4554A4', 'Indigo'], ['#1770AB', 'Blue'], ['#0B9BE3', 'Light blue'], ['#06A3B7', 'Cyan'], ['#009688', 'Teal'], ['#009606', 'Green'], ['#8D9900', 'Olive'], ['#D97900', 'Pumpkin'], ['#FD5D10', 'Orange'], ['#F06291', 'Pink']];
+  function colorMenu(anchor, current, onPick) {
+    closeMenus();
+    const cur = String(current || '').toLowerCase();
+    const custom = h('input', { type: 'color', class: 'bcv-swatch__input', value: /^#[0-9a-f]{6}$/i.test(cur) ? cur : '#8e8e93', 'aria-label': 'Custom colour' });
+    custom.addEventListener('change', () => { closeMenus(); onPick(custom.value.toUpperCase()); });
+    const m = el('bcv-menu bcv-menu--colors', [
+      text('bcv-menu__title', 'Course colour'),
+      el('bcv-swatches', [
+        ...COURSE_COLORS.map(([hex, name]) => h('button', {
+          type: 'button', class: `bcv-swatch ${hex.toLowerCase() === cur ? 'is-current' : ''}`, title: name, 'aria-label': name, dataset: { color: hex }, style: { background: hex },
+          onclick: () => { closeMenus(); onPick(hex); },
+        }, hex.toLowerCase() === cur ? svg('M20 6L9 17l-5-5', { size: 12, stroke: '#fff', width: 2.6 }) : null)),
+        h('label', { class: 'bcv-swatch bcv-swatch--custom', title: 'Custom colour' }, custom),
+      ]),
+    ]);
+    m.addEventListener('click', (e) => e.stopPropagation());
+    const r = anchor.getBoundingClientRect();
+    Object.assign(m.style, { position: 'fixed', top: `${r.bottom + 6}px`, left: `${Math.max(8, Math.min(r.left, window.innerWidth - 230))}px` });
+    document.body.append(m);
+    setTimeout(() => document.addEventListener('click', closeMenus, { once: true }), 0);
+    return m;
+  }
 
   // ---- dates in the mockup's style ----------------------------------------------
   const DAY = 864e5;
@@ -342,7 +366,7 @@
 
   BCV.ui = {
     svg, star, chev, el, text, tile, dot, card, row, label, h2, groupHead, badge, seg, search, switchEl, btn, iconbtn, chip, pill,
-    empty, emptyCard, loading, errorBox, hint, avatar, toast, menu, closeMenus,
+    empty, emptyCard, loading, errorBox, hint, avatar, toast, menu, closeMenus, colorMenu, COURSE_COLORS,
     DAY, startOfDay, addDays, sameDay, dayDiff, startOfWeek, parse, MONTHS, MONTHS_LONG, DAYS, DAYS_LONG,
     fmtTime, fmtTimeLower, fmtShort, fmtLong, fmtDateComma, fmtAt, fmtAtUpper, fmtBy, dayTitle, fmtDow, fmtRecent, whenShort, plural,
     hexToRgb, rgba, palette, FALLBACK_COLORS, initials,

@@ -32,13 +32,16 @@
       renderBody();
     };
 
-    const [planner, favs, courses] = await Promise.all([
+    const [planner, favs, courses, feed, seen] = await Promise.all([
       store.planner().catch(() => null),
       store.favorites().catch(() => []),
       store.courses().catch(() => []),
+      store.announcementsFeed().catch(() => null), // announcements with their read state
+      store.streamSeen().catch(() => new Set()), // stream items opened from here
     ]);
     if (!ctx.alive()) return screen;
     const courseMap = new Map(courses.map((c) => [c.id, c]));
+    const feedById = feed ? new Map(feed.map((a) => [String(a.id), a])) : null;
     const now = new Date();
     const todayStart = U.startOfDay(now);
     const weekStart = U.startOfWeek(now);
@@ -99,35 +102,45 @@
       let unreadSheet = { label: 'Unread announcements', value: '…', icon: IC.bell, color: '#ff9500', note: 'Loading…', items: [] };
       const unreadCard = stat('Unread announcements', '…', '', IC.bell, '#ff9500', () => openSheet(unreadSheet));
       cards.push(unreadCard);
-      Promise.all([store.activitySummary().catch(() => null), store.activity().catch(() => [])]).then(([summary, stream]) => {
-        if (!ctx.alive()) return;
-        const ann = (summary || []).find((s) => s.type === 'Announcement');
-        if (!ann) {
-          unreadCard.remove();
-          return;
-        }
-        const count = Number(ann.unread_count) || 0;
-        const unread = (stream || []).filter((a) => a.type === 'Announcement' && a.read_state === false)
-          .sort((a, b) => (U.parse(b.updated_at || b.created_at) || 0) - (U.parse(a.updated_at || a.created_at) || 0));
-        const nameOf = (a) => courseMap.get(String(a.course_id))?.shortName || courseMap.get(String(a.course_id))?.name || a.context_name || '';
+      // unread = [{ title, when, courseId, courseName, url }]; count is what the number shows
+      const nameOf = (u) => courseMap.get(String(u.courseId))?.shortName || courseMap.get(String(u.courseId))?.name || u.courseName || '';
+      const finish = (unread, count, more = '') => {
         const perCourse = new Map();
-        for (const a of unread) perCourse.set(nameOf(a), (perCourse.get(nameOf(a)) || 0) + 1);
+        for (const u of unread) perCourse.set(nameOf(u), (perCourse.get(nameOf(u)) || 0) + 1);
         let top = '';
         let n = 0;
         for (const [k, v] of perCourse) if (v > n) { top = k; n = v; }
         unreadCard.querySelector('.bcv-stat__value').textContent = String(count);
-        unreadCard.querySelector('.bcv-stat__note').textContent = top || (count ? `${U.plural(ann.count || 0, 'announcement')} recently` : 'All caught up');
-        const items = unread.map((a) => {
-          const c = courseMap.get(String(a.course_id));
+        unreadCard.querySelector('.bcv-stat__note').textContent = top || (count ? 'Not all listed' : 'All caught up');
+        const items = unread.map((u) => {
+          const c = courseMap.get(String(u.courseId));
           const pal = c ? c.palette : U.palette('#5856d6', dark);
-          return { title: a.title || 'Announcement', meta: `Posted ${U.fmtShort(a.updated_at || a.created_at)} · unread`, course: nameOf(a) || '—', color: pal.text, tint: pal.tint, url: activityUrl(a) };
+          return { title: u.title || 'Announcement', meta: `Posted ${U.fmtShort(u.when)} · unread`, course: nameOf(u) || '—', color: pal.text, tint: pal.tint, url: u.url };
         });
         unreadSheet = {
-          label: 'Unread announcements', value: String(count), icon: IC.bell, color: '#ff9500', items, empty: 'All caught up.',
+          label: 'Unread announcements', value: String(count), icon: IC.bell, color: '#ff9500', items, empty: 'All caught up.', more,
           note: !count ? 'Nothing unread' : perCourse.size === 1 ? `${unread.length === 2 ? 'Both' : unread.length === 1 ? 'One' : 'All'} from ${top}` : `From ${U.plural(perCourse.size, 'course')}`,
-          more: count > items.length ? `${U.plural(count - items.length, 'more is', 'more are')} not in the recent activity stream` : '',
         };
-      });
+      };
+      if (feed) {
+        // the Announcements API knows every announcement and whether you have read it
+        const unread = feed.filter((a) => a.read_state === 'unread').map((a) => ({ title: a.title, when: a.posted_at, courseId: String(a.context_code || '').replace(/^course_/, ''), courseName: a.context_name || '', url: a.html_url }));
+        finish(unread, unread.length);
+      } else {
+        // fallback: the activity stream's summary count and whatever unread announcements the stream still carries
+        Promise.all([store.activitySummary().catch(() => null), store.activity().catch(() => [])]).then(([summary, stream]) => {
+          if (!ctx.alive()) return;
+          const ann = (summary || []).find((s) => s.type === 'Announcement');
+          if (!ann) {
+            unreadCard.remove();
+            return;
+          }
+          const count = Number(ann.unread_count) || 0;
+          const unread = (stream || []).filter((a) => a.type === 'Announcement' && a.read_state === false && !seen.has(String(a.id)))
+            .map((a) => ({ title: a.title, when: a.updated_at || a.created_at, courseId: String(a.course_id || ''), courseName: a.context_name || '', url: activityUrl(a) }));
+          finish(unread, count, count > unread.length ? `${U.plural(count - unread.length, 'more is', 'more are')} not in the recent activity stream` : '');
+        });
+      }
       return U.el('bcv-stats', cards);
     }
     function stat(lbl, value, note, icon, color, onOpen) {
@@ -255,11 +268,43 @@
     }
     function courseMenu(anchor, c) {
       U.menu(anchor, [
-        { label: c.favorite ? 'Remove from dashboard' : 'Add to dashboard', onSelect: async () => { await store.setFavorite(c.id, !c.favorite); app.loadShellData({ force: true }); render(ctx).then((el) => app.main().replaceChildren(el)); } },
+        // deferred so the click that picked this item does not close the palette it opens
+        { label: 'Change colour', onSelect: () => setTimeout(() => U.colorMenu(anchor, c.color, (hex) => recolor(c, hex)), 0) },
+        { label: c.favorite ? 'Remove from dashboard' : 'Add to dashboard', onSelect: () => toggleDashboard(c) },
         { label: 'Announcements', onSelect: () => app.go(`${c.url}/announcements`) },
         { label: 'Grades', onSelect: () => app.go(`${c.url}/grades`) },
         { label: 'Files', onSelect: () => app.go(`${c.url}/files`) },
       ]);
+    }
+    function applyColor(c, hex) {
+      c.color = hex;
+      c.palette = U.palette(hex, dark);
+      const cm = courseMap.get(c.id);
+      if (cm && cm !== c) { cm.color = hex; cm.palette = c.palette; }
+    }
+    /** Optimistic: recolour now, tell Canvas, roll back if it refuses. */
+    function recolor(c, hex) {
+      const prev = c.color;
+      applyColor(c, hex);
+      renderBody();
+      store.setColor(c.id, hex).then(() => app.loadShellData({ force: true })).catch((e) => {
+        applyColor(c, prev);
+        renderBody();
+        U.toast(`Could not change the colour: ${e.message}`, { error: true });
+      });
+    }
+    /** Optimistic: the card moves now, Canvas is told in the background. */
+    function toggleDashboard(c) {
+      const on = !c.favorite;
+      const i = favs.indexOf(c);
+      if (!on && i >= 0) favs.splice(i, 1);
+      else if (on && i < 0) favs.push(c);
+      c.favorite = on;
+      renderBody();
+      store.setFavorite(c.id, on).then(() => app.loadShellData({ force: true })).catch((e) => {
+        U.toast(`Could not update favourites: ${e.message}`, { error: true });
+        render(ctx).then((el) => { if (ctx.alive()) app.main().replaceChildren(el); });
+      });
     }
 
     // ---- list view -----------------------------------------------------------------------
@@ -336,21 +381,38 @@
       if (!ctx.alive()) return wrap;
       if (!stream) return U.emptyCard('Recent activity could not be loaded.');
       if (!stream.length) return U.emptyCard('No recent activity.');
+      // Unread: the announcement's own read state when we know it, else the stream's
+      // flag; either way an item opened from here loses its dot.
+      const isUnread = (a) => {
+        if (seen.has(String(a.id))) return false;
+        if (a.type === 'Announcement' && feedById && a.announcement_id !== undefined) {
+          const f = feedById.get(String(a.announcement_id));
+          if (f) return f.read_state === 'unread';
+        }
+        return a.read_state === false;
+      };
       wrap.replaceChildren(...stream.slice(0, 30).map((a) => {
         const course = courseMap.get(String(a.course_id));
         const pal = course ? course.palette : U.palette('#5856d6', dark);
         const kind = ACTIVITY_KIND[a.type] || a.type;
         const extra = a.type === 'DiscussionTopic' && a.total_root_discussion_entries ? ` · ${a.total_root_discussion_entries} replies` : '';
         const preview = BCV.utils.htmlToText(a.message || a.latest_messages?.[0]?.message || '', 160).replace(/\s+/g, ' ');
-        return U.row([
-          U.dot(a.read_state === false ? '#0a84ff' : 'transparent', 'bcv-act__dot'),
+        const url = activityUrl(a);
+        const rowEl = U.row([
+          U.dot(isUnread(a) ? '#0a84ff' : 'transparent', 'bcv-act__dot'),
           U.tile(ACTIVITY_ICON[a.type] || IC.doc, { color: pal.text, tint: pal.tint, size: 32, iconSize: 16 }),
           U.el('bcv-row__body', [
             U.el('bcv-row__head', [U.text('bcv-act__title bcv-pretty', a.title || kind, 'span'), U.text('bcv-row__when', U.fmtShort(a.updated_at || a.created_at), 'span')]),
             U.text('bcv-act__kind', `${kind}${extra} · ${course?.name || a.context_name || (a.type === 'Conversation' ? 'Inbox' : '')}`),
             preview ? U.text('bcv-row__preview bcv-row__preview--13 bcv-pretty', preview) : null,
           ]),
-        ], { mod: 'bcv-row--p15 bcv-row--top', href: activityUrl(a) });
+        ], { mod: 'bcv-row--p15 bcv-row--top', href: url });
+        rowEl.addEventListener('click', (e) => {
+          if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return; // new-tab clicks stay native
+          e.preventDefault();
+          store.markStreamSeen(a.id).catch(() => {}).then(() => app.go(url));
+        });
+        return rowEl;
       }));
       return wrap;
     }

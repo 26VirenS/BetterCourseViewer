@@ -70,6 +70,14 @@ try {
     await page.waitForSelector('#bcv-main > *:not([data-old])', { timeout: 10000 });
   };
   const tab = (id) => clickScreen(`.bcv-rail [data-tab="${id}"]`);
+  const eventually = async (fn, ms = 6000) => {
+    const t = Date.now();
+    while (Date.now() - t < ms) {
+      if (await fn()) return true;
+      await new Promise((r) => setTimeout(r, 150));
+    }
+    return false;
+  };
   const nav = (id) => clickScreen(`.bcv-nav__item[data-nav="${id}"]`);
 
   // ---- dashboard --------------------------------------------------------------------
@@ -112,12 +120,14 @@ try {
   await page.click('.bcv-stats .bcv-stat:nth-child(3)');
   await page.waitForSelector('.bcv-sheet', { timeout: 5000 });
   const annRows = await texts('.bcv-sheet__row');
-  check((await texts('.bcv-sheet__line'))[0] === '3 Unread announcements' && annRows.length === 2 && /^Field site sign-ups Posted \w+ \d+ · unread F26-SPRK 010 103$/.test(annRows[0]) && /^1 more is not in the recent activity stream$/.test((await texts('.bcv-sheet__more'))[0] || ''), `Unread announcements sheet: ${annRows.join(' | ')}`);
+  check((await texts('.bcv-sheet__line'))[0] === '3 Unread announcements' && annRows.length === 3 && /^Field site sign-ups Posted \w+ \d+ · unread F26-SPRK 010 103$/.test(annRows[0]) && !(await page.$('.bcv-sheet__more')), `the number and the rows come from the same list (Announcements API): ${annRows.join(' | ')}`);
   await page.click('.bcv-sheet__row');
   await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
   check(page.url().endsWith('/courses/104/announcements/8005'), 'a sheet row opens the item');
   await page.goto(`${BASE}/`);
   await page.waitForSelector('.bcv-day .bcv-row', { timeout: 10000 });
+  await waitText('.bcv-stats > :nth-child(3) .bcv-stat__value', /^2$/);
+  check(true, 'reading an announcement takes it off the count');
   const work = await texts('.bcv-work__row');
   check(work.length === 5 && /F26-MATH 021 20/.test(work[0]) && /\d+ \/ \d+/.test(work[0]), `workload rows: ${work[0]}`);
   check(!(await page.$('.bcv-work__more')), 'no disclosure when every course has work this week');
@@ -146,12 +156,28 @@ try {
   check(cards.length === 5 && /F26-MATH 021 20/.test(cards[0]) && /of \d+ items submitted/.test(cards[0]) && /due today/.test(cards[0]), `course cards: ${cards[0]}`);
   check((await page.$$('.bcv-ccard__quick')).length === 20, 'quick links on every card');
   await shot(page, '02-dashboard-cards');
+  // course colour from the card menu
+  await page.click('.bcv-ccard .bcv-ccard__more');
+  await page.click('.bcv-menu__item:has-text("Change colour")');
+  await page.waitForSelector('.bcv-swatch', { timeout: 3000 });
+  check((await page.$$('.bcv-swatch')).length === 16 && (await page.$('.bcv-swatch__input')), 'colour palette: Canvas\'s 15 colours plus a custom one');
+  await shot(page, '02b-course-colour');
+  await page.click('.bcv-swatch[data-color="#1770AB"]');
+  await page.waitForFunction(() => getComputedStyle(document.querySelector('.bcv-ccard__hero')).backgroundColor === 'rgb(23, 112, 171)' && getComputedStyle(document.querySelector('.bcv-fav__dot')).backgroundColor === 'rgb(23, 112, 171)', null, { timeout: 5000 });
+  check(await eventually(() => sw.evaluate(async () => (await (await fetch('http://localhost:8787/api/v1/users/self/colors')).text()).includes('"course_101":"#1770AB"'))), 'picking a colour recolours the card and the sidebar at once and saves it to Canvas');
   await page.click('.bcv-seg__btn[data-value="activity"]');
   await page.waitForSelector('.bcv-act__title', { timeout: 5000 });
   const acts = await texts('.bcv-act__kind');
   check(acts.length === 5 && /Announcement · F26-MATH 021 20/.test(acts[0]) && /Discussion · 23 replies/.test(acts[1]), `recent activity: ${acts.slice(0, 2).join(' | ')}`);
+  const dots = () => page.$$eval('.bcv-act__dot', (els) => els.filter((e) => getComputedStyle(e).backgroundColor === 'rgb(10, 132, 255)').length);
+  check((await dots()) === 3, `unread dots: ${await dots()} (the announcement read a moment ago has none)`);
   await shot(page, '03-dashboard-activity');
   check(await sw.evaluate(async () => (await fetch('http://localhost:8787/dashboard/view').then((r) => r.text())).includes('activity')), 'dashboard view persisted to Canvas');
+  await (await page.$$('.bcv-body .bcv-row--top'))[1].click();
+  await page.waitForSelector('.bcv-entry', { timeout: 10000 });
+  await page.goto(`${BASE}/`);
+  await page.waitForSelector('.bcv-act__title', { timeout: 10000 });
+  check((await dots()) === 2, `opening a stream item clears its dot: ${await dots()} left`);
   await page.click('.bcv-seg__btn[data-value="list"]');
 
   // ---- courses ----------------------------------------------------------------------------
@@ -186,7 +212,7 @@ try {
   await page.waitForFunction(() => document.querySelectorAll('.bcv-ccard').length === 6, null, { timeout: 5000 });
   check(true, 'starring a course adds it to the dashboard (favourites API)');
   await page.waitForFunction(() => document.querySelectorAll('.bcv-fav').length === 6, null, { timeout: 5000 });
-  check(await sw.evaluate(async () => (await (await fetch('http://localhost:8787/api/v1/courses')).text()).includes('"is_favorite":true')), 'favourite saved to Canvas (POST with the CSRF token)');
+  check(await eventually(() => sw.evaluate(async () => (await (await fetch('http://localhost:8787/api/v1/courses')).text()).includes('"is_favorite":true'))), 'the card moved at once; the favourite is saved to Canvas in the background');
   await (await page.$$('.bcv-ccard .bcv-ccard__star'))[5].click();
   await page.waitForFunction(() => document.querySelectorAll('.bcv-ccard').length === 5, null, { timeout: 5000 });
 
@@ -326,7 +352,8 @@ try {
   check(tabs.length === 10 && tabs[0] === 'Home' && tabs[6] === 'Modules' && (await texts('.bcv-rail__title')).join(',').toLowerCase() === 'course,materials,people,campus tools', `course rail groups the tabs from the API: ${tabs.join(', ')}`);
   check(await page.$eval('.bcv-screen--ctx .bcv-head__in', (el) => el.getBoundingClientRect().width === 1040), 'course screens are 1040px wide as in the mockup');
   check((await texts('.bcv-rail__ext')).join(',') === 'Resources & Policy', 'external tools are plain links under Campus tools');
-  check(await page.$('.bcv-rail__item[data-tab="home"].is-active') && (await page.$eval('.bcv-rail__item.is-active .bcv-rail__tile', (el) => getComputedStyle(el).backgroundColor === 'rgb(52, 199, 89)')), 'active item takes the course colour');
+  check(await page.$('.bcv-rail__item[data-tab="home"].is-active') && (await page.$eval('.bcv-rail__item.is-active .bcv-rail__tile', (el) => getComputedStyle(el).backgroundColor === 'rgb(23, 112, 171)')), 'active item takes the course colour (the one picked earlier)');
+  check(await page.$('.bcv-head .bcv-colorbtn'), 'the colour square in the course header opens the palette');
   check(!(await page.$('.bcv-head .bcv-tab')), 'no tab pills under the course title');
   await waitText('.bcv-rail__item[data-tab="announcements"] .bcv-rail__count', /^2$/);
   const gradedCount = Number((await texts('.bcv-rail__item[data-tab="grades"] .bcv-rail__count'))[0]);
@@ -390,7 +417,8 @@ try {
   await tab('discussions');
   await page.waitForSelector('.bcv-body .bcv-row', { timeout: 10000 });
   const drows = await texts('.bcv-body .bcv-row');
-  check(drows.length === 4 && /Is there any discussion happening this week\?.*Last post.*23 unread.*23 replies/.test(drows[1]), `discussions: ${drows[1].slice(0, 80)}`);
+  // 7003 was opened from the dashboard stream earlier in this run, so Canvas now reports it read
+  check(drows.length === 4 && /Is there any discussion happening this week\?.*Last post.*23 replies/.test(drows[1]) && !/23 unread/.test(drows[1]) && drows.some((t) => /Discussion Quiz for this week.*1 unread/.test(t)), `discussions (read state from Canvas): ${drows[1].slice(0, 80)}`);
   await shot(page, '15-course-discussions');
   await page.click('.bcv-body .bcv-row');
   await page.waitForSelector('.bcv-entry', { timeout: 10000 });

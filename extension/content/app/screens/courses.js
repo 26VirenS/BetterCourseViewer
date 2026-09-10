@@ -51,19 +51,35 @@
       return { text: `${it.title} · ${when}`, color: diff <= 0 ? '#ff453a' : diff < 3 ? '#ff9500' : '#8e8e93' };
     }
 
-    async function toggleFav(c, on) {
-      try {
-        await store.setFavorite(c.id, on);
-        courses = await store.courses({ force: true });
-        favList = await store.favorites({ force: true }).catch(() => []);
-        favOrder = favList.map((x) => x.id);
-        favIds = new Set(favOrder);
+    /** Optimistic: the card moves the moment you tap the star; Canvas is told in
+     *  the background and the page is only redrawn again if its answer differs. */
+    function toggleFav(c, on) {
+      const prevOrder = favOrder;
+      favOrder = on ? [...favOrder.filter((id) => id !== c.id), c.id] : favOrder.filter((id) => id !== c.id);
+      favIds = new Set(favOrder);
+      c.favorite = on;
+      draw();
+      store.setFavorite(c.id, on).then(async () => {
+        const [cs, fl] = await Promise.all([store.courses({ force: true }).catch(() => null), store.favorites({ force: true }).catch(() => null)]);
         app.loadShellData({ force: true });
-        draw();
-        U.toast(on ? `${c.name} added to your dashboard` : `${c.name} removed from your dashboard`);
-      } catch (e) {
+        if (!ctx.alive()) return;
+        if (cs) courses = cs;
+        if (fl) {
+          favList = fl;
+          const serverOrder = favList.map((x) => x.id);
+          if (serverOrder.join() !== favOrder.join()) {
+            favOrder = serverOrder;
+            favIds = new Set(favOrder);
+            draw();
+          }
+        }
+      }).catch((e) => {
+        favOrder = prevOrder;
+        favIds = new Set(favOrder);
+        c.favorite = !on;
+        if (ctx.alive()) draw();
         U.toast(`Could not update favourites: ${e.message}`, { error: true });
-      }
+      });
     }
 
     function matches(c) {

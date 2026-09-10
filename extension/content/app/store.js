@@ -128,6 +128,9 @@
   }
 
   const now = () => new Date();
+  const isoDay = (d) => U.startOfDay(d).toISOString().replace(/\.\d{3}Z$/, 'Z');
+  // Canvas answers these when one of the contexts in a request is off-limits
+  const REFUSED = new Set([401, 403, 404]);
   function courseState(c, t = now()) {
     const term = c.term || {};
     const enr = (c.enrollments || [])[0] || {};
@@ -350,6 +353,49 @@
   function activitySummary({ force = false } = {}) {
     return C.cached('activity:summary', 3 * MIN, () => C.get('/api/v1/users/self/activity_stream/summary', { params: { only_active_courses: true } }), { force });
   }
+  /** Announcements across the current courses (the Announcements API), newest
+   *  first, each with its read state. Canvas refuses the whole request when one
+   *  course is off-limits, so a refused chunk is retried one course at a time. */
+  function announcementsFeed({ force = false } = {}) {
+    return C.cached('annfeed', 3 * MIN, async () => {
+      const cs = (await courses()).filter((c) => c.state === 'current');
+      if (!cs.length) return [];
+      const params = { start_date: isoDay(U.addDays(now(), -60)), end_date: isoDay(U.addDays(now(), 2)), active_only: true, per_page: 50 };
+      const fetchCodes = (codes) => C.get('/api/v1/announcements', { params: { ...params, 'context_codes[]': codes }, all: true, maxPages: 3 });
+      const out = [];
+      for (let i = 0; i < cs.length; i += 10) {
+        const codes = cs.slice(i, i + 10).map((c) => `course_${c.id}`);
+        try {
+          out.push(...((await fetchCodes(codes)) || []));
+        } catch (err) {
+          if (!REFUSED.has(err.status)) throw err;
+          for (const code of codes) {
+            try {
+              out.push(...((await fetchCodes([code])) || []));
+            } catch (err2) {
+              if (!REFUSED.has(err2.status)) throw err2;
+            }
+          }
+        }
+      }
+      return out.sort((a, b) => (U.parse(b.posted_at) || 0) - (U.parse(a.posted_at) || 0));
+    }, { force });
+  }
+  /** Stream items opened from here. Canvas has no API to mark a stream item
+   *  read, so the blue dots are also cleared locally once an item is opened. */
+  async function streamSeen() {
+    return new Set(((await pref('seenStream')) || []).map(String));
+  }
+  async function markStreamSeen(id) {
+    const list = ((await pref('seenStream')) || []).map(String).filter((x) => x !== String(id));
+    list.push(String(id));
+    await setPref('seenStream', list.slice(-400));
+  }
+  /** A course colour, saved to the user's Canvas colours (the same ones Canvas uses). */
+  async function setColor(courseId, hex) {
+    await C.put(`/api/v1/users/self/colors/course_${courseId}`, { hexcode: hex });
+    await C.invalidate('colors');
+  }
   function unreadCount({ force = false } = {}) {
     return C.cached('unread', 2 * MIN, async () => {
       try {
@@ -392,8 +438,6 @@
   async function setSelectedContexts(codes) {
     await setPref('calendarContexts', codes);
   }
-  const isoDay = (d) => U.startOfDay(d).toISOString().replace(/\.\d{3}Z$/, 'Z');
-  const REFUSED = new Set([401, 403, 404]);
   /** Events for a date range and a set of context codes. Canvas takes at most
    *  ten codes per request and refuses the whole request when one of them is
    *  off-limits (a concluded or restricted course), so a chunk that fails is
@@ -608,7 +652,7 @@
   async function markTopicRead(id, tid, { kind = 'courses' } = {}) {
     try {
       await C.put(`/api/v1/${kind}/${id}/discussion_topics/${tid}/read_all`, {});
-      await Promise.all([C.invalidate(`disc:${kind}:${id}`), C.invalidate(`ann:${kind}:${id}`)]);
+      await Promise.all([C.invalidate(`disc:${kind}:${id}`), C.invalidate(`ann:${kind}:${id}`), C.invalidate('annfeed'), C.invalidate('activity'), C.invalidate('activity:summary'), C.invalidate(`cstream:${kind}:${id}`)]);
     } catch {
       /* ignore */
     }
@@ -819,6 +863,7 @@
   BCV.store = {
     env, pref, setPref, me, account, colors, courses, favorites, cards, setFavorite, currentTerm, dashboardView, setDashboardView,
     planner, classify, todo, todoWindow, setComplete, dismiss, restore, invalidatePlanner, activity, activitySummary, unreadCount, groups, group,
+    announcementsFeed, streamSeen, markStreamSeen, setColor,
     calendarContexts, selectedContexts, setSelectedContexts, calendarEvents, plannerRange,
     conversations, conversation, markRead, setStarred, replyTo, compose, searchRecipients, invalidateInbox,
     course, tabs, frontPage, syllabus, courseTodo, ignoreTodo, courseStream, assignments, assignment, submission, assignmentGroups, progress,
