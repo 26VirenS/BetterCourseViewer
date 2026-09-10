@@ -51,6 +51,7 @@
       showCanvasItems: true,
       hideCompleted: true,
       filter: 'all',              // 'all' | 'assignment' | 'quiz' | 'discussion' | 'other'
+      groupBy: 'date',            // 'date' | 'course'
     },
     keyboard: {
       enabled: true,

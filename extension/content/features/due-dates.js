@@ -139,6 +139,32 @@
     return state.items.filter((i) => i.isDue && i.due && !i.done && i.due - now <= hours * HOUR && i.due - now > -7 * DAY);
   }
 
+  /** Per-course progress for the next `days` days: done/pending counts and pending items. */
+  function courseStats(days = 7, { includeScheduled = false } = {}) {
+    const now = Date.now();
+    const groups = new Map();
+    for (const it of state.items) {
+      if (!it.due || !it.courseId) continue;
+      if (!(it.isDue || includeScheduled)) continue;
+      if (it.due > now + days * DAY || it.due < now - 7 * DAY) continue;
+      if (it.done && it.due < now - DAY) continue; // old finished work is not part of "this week"
+      let g = groups.get(it.courseId);
+      if (!g) {
+        g = { courseId: it.courseId, name: it.course, color: colorFor(it.courseId), done: 0, pending: [], overdue: 0 };
+        groups.set(it.courseId, g);
+      }
+      if (it.done) g.done++;
+      else {
+        g.pending.push(it);
+        if (it.isDue && it.due < now) g.overdue++;
+      }
+    }
+    const out = [...groups.values()].filter((g) => g.pending.length || g.done);
+    for (const g of out) g.pending.sort((a, b) => (b.isDue - a.isDue) || (a.due - b.due));
+    out.sort((a, b) => (b.overdue - a.overdue) || (b.pending.length - a.pending.length) || a.name.localeCompare(b.name));
+    return out;
+  }
+
   /** Everything with a date in the window, due items and scheduled items alike. */
   function upcoming(days = state.settings?.dueDates.lookaheadDays || 14) {
     const now = Date.now();
@@ -208,6 +234,11 @@
   function renderStrip() {
     if (!state.settings?.dueDates.dashboardPanel) return;
     if (BCV.page.kind !== 'dashboard') return;
+    // The redesigned dashboard renders its own to-do column instead.
+    if (document.documentElement.classList.contains('bcv-skin')) {
+      document.getElementById('bcv-due-strip')?.remove();
+      return;
+    }
     const existing = document.getElementById('bcv-due-strip');
     const all = upcoming().filter((i) => !i.done);
     const due = all.filter((i) => i.isDue).slice(0, 12);
@@ -319,7 +350,7 @@
   BCV.dueData = {
     get items() { return state.items; },
     get loaded() { return state.loaded; },
-    load, dueSoon, upcoming, colorFor, markDone, iconFor, classify,
+    load, dueSoon, upcoming, courseStats, colorFor, markDone, iconFor, classify,
     TYPE_LABELS,
     onChange: (cb) => { state.listeners.add(cb); return () => state.listeners.delete(cb); },
   };

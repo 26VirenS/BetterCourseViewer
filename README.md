@@ -2,7 +2,7 @@
 
 A Mac app that installs a Safari extension to make **Canvas** cleaner, faster, and smarter.
 
-- **Redesigned** – Canvas itself is restyled: a soft neutral page with white rounded cards, hairline separators, a light sidebar, pill-shaped course navigation, rounded buttons, inputs, tables and images, and a dashboard with a greeting and "next up" on every course card. Inspired by Better Canvas, drawn like a Mac app. One switch turns it off if you prefer stock Canvas.
+- **A new interface** – Canvas's chrome is replaced, not decorated. Our own sidebar (global navigation, your courses, and the current course's sections fetched from the Canvas API), a top bar with breadcrumbs and search, and a reading-first page style: one white page, strong titles, hairline-separated rows, pill buttons, filled inputs. The dashboard and the course home are rendered from the API in a layout of our own: greeting and metric rings (this week, today, grade average), course tiles with a grade ring and next-up items, a to-do column grouped by course with progress rings, recent announcements, and a course overview with grade, up-next, module progress and announcements. Think Wikiwand for Canvas. One switch turns it off if you prefer stock Canvas.
 - **Cleaner** – dark mode, themes (presets or your own colours), minimal mode, compact density, and switches to hide the dashboard sidebar, footer, card clutter, and nav items you never use.
 - **Faster** – keyboard navigation (`g a` for assignments, `j`/`k` through lists, `1`–`9` for courses), a `⌘K` command palette that jumps to any course, section, or upcoming item, and an **Open in new tab** button on embedded assignments, tool launches, and file previews.
 - **On top of things** – countdown badges next to everything with a due date, a "Due soon" strip on the dashboard, reminder pop-ups, a toolbar badge, and a **To Do** panel that combines Canvas items (checking them off syncs back to Canvas) with your own tasks. It knows what is *actually* due: assignments, quizzes and graded discussions count as due; ungraded discussions, pages, events and notes that only carry an instructor "to-do date" are shown separately as scheduled, never as due, and the To Do panel can filter by type.
@@ -12,17 +12,17 @@ Everything runs in your browser. Canvas data comes from your own logged-in sessi
 
 ## Screenshots
 
-| Redesigned dashboard: greeting, "Due soon", next up on each card | To Do panel filtered to discussions |
+| Home: greeting, metric rings, course tiles, to-do by course | Dark mode with the sidebar collapsed |
 | --- | --- |
-| ![Dashboard](docs/screenshots/dashboard.png) | ![To Do](docs/screenshots/todo.png) |
+| ![Home](docs/screenshots/dashboard.png) | ![Dark mode](docs/screenshots/dark-minimal.png) |
 
-| Dark mode | Modules page |
+| Course overview | Modules page |
 | --- | --- |
-| ![Dark mode](docs/screenshots/dark-minimal.png) | ![Modules](docs/screenshots/modules.png) |
+| ![Course overview](docs/screenshots/course-home.png) | ![Modules](docs/screenshots/modules.png) |
 
-| Grades | Smart Assistant on an assignment |
+| To Do panel grouped by course | Smart Assistant on an assignment |
 | --- | --- |
-| ![Grades](docs/screenshots/grades.png) | ![Smart Assistant](docs/screenshots/smart-assistant.png) |
+| ![To Do](docs/screenshots/todo.png) | ![Smart Assistant](docs/screenshots/smart-assistant.png) |
 
 (Taken against the bundled mock Canvas, so the course content is fake.)
 
@@ -70,9 +70,11 @@ The extension is on automatically for every `*.instructure.com` site. If your sc
 
 | Where | What you get |
 | --- | --- |
-| Canvas navigation | Two new items: **To Do** and **Smart**. Each opens a side panel. |
-| Toolbar icon | Quick toggles for dark mode, theme, minimal mode, sidebar, reminders; buttons for To Do, Smart Assistant, the command palette and shortcuts. A red badge shows how many items are due soon. |
-| Dashboard | A greeting with this week's count, a "Due soon" strip (graded work only, with a separate "also scheduled" row), and up to three next-up items on every course card. Sidebar, footer and card clutter hidden by default (all optional). |
+| Sidebar | Home, Courses, Calendar, Inbox (with unread count), your courses with their colour, and, inside a course, its sections exactly as Canvas exposes them (including external tools). Collapses to an icon rail. |
+| Top bar | Course crumb and page title, a search box that opens the command palette, and the **To Do** and **Smart** buttons that open the side panels. |
+| Home | Greeting with this week's count; three rings (this week done/total, due today, grade average); a tile per course with its grade ring, next three items and quick links; a to-do column grouped by course with a progress ring each and one-tap check-off; recent announcements. |
+| Course home | An overview above the instructor's content: course title, term and instructors, grade ring, up-next items, module progress rings and the latest announcements. |
+| Toolbar icon | Quick toggles for dark mode, theme, the redesigned look, minimal mode, reminders; buttons for To Do, Smart Assistant, the command palette and shortcuts. A red badge shows how many items are due soon. |
 | Assignment, module and syllabus lists | Countdown badges (`Due in 3h`, `Overdue`, `Submitted`, `To-do in 2d`) next to every dated item, with rows tinted when something is due today or overdue. |
 | Embedded content | An **Open in new tab** button on LTI tool launches, file previews and other embeds. |
 | Smart Assistant | Quick actions that change with the page: *Summarize*, *Make a checklist*, *Explain my feedback*, *Rubric breakdown*, *Draft a reply*, *Reply to selected post*, *Practice questions*, *Key dates*, *Plan my week*, and free-form questions. Replies stream in; drafts can be copied or inserted straight into the discussion reply box. |
@@ -121,8 +123,10 @@ extension/
                            page/route detection + context extraction, markdown, colour math
   content/early.js         document_start: applies dark/theme classes before first paint
   content/ui.js            toasts, side panels, nav items
-  content/features/        theme, declutter, due-dates, dashboard, todo, keyboard, embeds, smart-sidebar
-  content/styles/          ui.css, dark.css, clean.css, duedates.css, skin.css (the redesign)
+  content/features/        theme, declutter, shell (sidebar + top bar), due-dates, dashboard (Home),
+                           course-home (overview), todo, keyboard, embeds, smart-sidebar
+  content/styles/          ui.css, dark.css, clean.css, duedates.css, skin.css (page typography),
+                           shell.css (layout, dashboard, course overview)
   popup/, options/         toolbar popup and the settings page
 scripts/
   build-mac-app.sh         generates the Xcode project / builds the .app

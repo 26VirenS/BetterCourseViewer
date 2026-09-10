@@ -63,7 +63,8 @@
         "content/styles/dark.css",
         "content/styles/clean.css",
         "content/styles/duedates.css",
-        "content/styles/skin.css"
+        "content/styles/skin.css",
+        "content/styles/shell.css"
       ]
     },
     {
@@ -80,8 +81,10 @@
         "content/ui.js",
         "content/features/theme.js",
         "content/features/declutter.js",
+        "content/features/shell.js",
         "content/features/due-dates.js",
         "content/features/dashboard.js",
+        "content/features/course-home.js",
         "content/features/todo.js",
         "content/features/keyboard.js",
         "content/features/embeds.js",

@@ -44,6 +44,7 @@
 
   // ---- list focus (j / k / enter) -------------------------------------------------
   const LIST_SELECTORS = [
+    '#bcv-dash .bcv-course__name',
     '.ic-DashboardCard .ic-DashboardCard__link',
     '#my_courses_table a.course-list-course-title-link, #my_courses_table tr a[href^="/courses/"]',
     '#content li.assignment a.ig-title, #content li.context_module_item a.ig-title, #content .ig-row a.ig-title',

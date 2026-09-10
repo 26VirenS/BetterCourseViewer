@@ -103,9 +103,19 @@
 
   function addNavItem({ id, label, icon, onClick, title }) {
     const menu = document.getElementById('menu');
+    const topActions = document.getElementById('bcv-top-actions');
     let el;
     const badge = h('span', { class: 'bcv-nav-badge', hidden: true });
-    if (menu) {
+    if (topActions) {
+      // Redesigned shell: buttons live in our top bar.
+      badge.classList.add('bcv-top__count');
+      el = h('button', { type: 'button', class: 'bcv-top__btn', id: `bcv-nav-${id}`, title: title || label, 'aria-label': label, onClick }, [
+        h('span', { class: 'bcv-top__btn-icon', html: icon }),
+        h('span', { class: 'bcv-top__btn-label', text: label }),
+        badge,
+      ]);
+      topActions.append(el);
+    } else if (menu) {
       const btn = h('button', {
         type: 'button',
         class: 'ic-app-header__menu-list-link bcv-nav-link',
@@ -148,5 +158,34 @@
     return h('button', { type: 'button', class: `bcv-iconbtn ${extraClass}`.trim(), title, 'aria-label': title, html: icon, onClick });
   }
 
-  BCV.ui = { root, toast, registerPanel, openPanel, closePanel, togglePanel, isPanelOpen, closeAllPanels, addNavItem, setNavBadge, panelHeader, iconButton };
+  /** A colour for something we draw ourselves: pre-transformed when the dark filter is on. */
+  function paint(hex) {
+    if (!hex || !/^#/.test(hex)) return hex;
+    return document.documentElement.classList.contains('bcv-dark') ? BCV.color.preDarkFilter(hex) : hex;
+  }
+
+  /** Circular progress ring with a centred label. `value` is 0..1. */
+  function ring({ size = 52, stroke = 5, value = 0, color = 'var(--bcv-accent)', track = 'var(--bcv-bg-3)', label = '', title = '', extraClass = '' } = {}) {
+    const r = (size - stroke) / 2;
+    const c = 2 * Math.PI * r;
+    const v = Math.max(0, Math.min(1, Number(value) || 0));
+    const el = h('div', { class: `bcv-ring ${extraClass}`.trim(), style: { width: `${size}px`, height: `${size}px` }, title, role: 'img', 'aria-label': title || label });
+    el.innerHTML =
+      `<svg viewBox="0 0 ${size} ${size}" width="${size}" height="${size}" aria-hidden="true">` +
+      `<circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" style="stroke:${track}" stroke-width="${stroke}"/>` +
+      `<circle class="bcv-ring__value" cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" style="stroke:${color}" stroke-width="${stroke}" stroke-linecap="round" stroke-dasharray="${c.toFixed(2)}" stroke-dashoffset="${(c * (1 - v)).toFixed(2)}" transform="rotate(-90 ${size / 2} ${size / 2})"/>` +
+      `</svg><div class="bcv-ring__label">${BCV.utils.escapeHtml(label)}</div>`;
+    return el;
+  }
+
+  /** Colour for a score ring: green / accent / amber / red. */
+  function scoreColor(score) {
+    if (score == null || isNaN(score)) return 'var(--bcv-fg-2)';
+    if (score >= 90) return 'var(--bcv-ok)';
+    if (score >= 80) return 'var(--bcv-accent)';
+    if (score >= 70) return 'var(--bcv-warn)';
+    return 'var(--bcv-danger)';
+  }
+
+  BCV.ui = { root, toast, registerPanel, openPanel, closePanel, togglePanel, isPanelOpen, closeAllPanels, addNavItem, setNavBadge, panelHeader, iconButton, paint, ring, scoreColor };
 })();

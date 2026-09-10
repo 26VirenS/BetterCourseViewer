@@ -5,18 +5,21 @@
   const S = BCV.settings;
   const $ = (id) => document.getElementById(id);
 
+  // Promise-only messaging (Safari rejects callback arguments on these APIs).
   const send = (msg) => new Promise((resolve) => {
     try {
-      const p = api.runtime.sendMessage(msg, (r) => resolve(r));
+      const p = api.runtime.sendMessage(msg);
       if (p && typeof p.then === 'function') p.then(resolve, () => resolve(null));
+      else resolve(p ?? null);
     } catch {
       resolve(null);
     }
   });
   const sendToTab = (tabId, msg) => new Promise((resolve) => {
     try {
-      const p = api.tabs.sendMessage(tabId, msg, (r) => resolve(r));
+      const p = api.tabs.sendMessage(tabId, msg);
       if (p && typeof p.then === 'function') p.then(resolve, () => resolve(null));
+      else resolve(p ?? null);
     } catch {
       resolve(null);
     }
@@ -82,12 +85,27 @@
   } catch {
     host = '';
   }
+  let enabledHere = onCanvas;
+  if (!enabledHere && tab?.url) {
+    // The content script may simply not be running yet (page still loading);
+    // treat a granted host permission or a saved domain as "enabled".
+    try {
+      const origin = new URL(tab.url).origin;
+      enabledHere = settings.domains.includes(origin) || /\.instructure\.com$/.test(host) ||
+        (await api.permissions.contains({ origins: [`${origin}/*`] }).catch(() => false));
+    } catch {
+      enabledHere = false;
+    }
+  }
   if (onCanvas) {
     status.textContent = `Active on ${host}`;
-  } else {
-    status.textContent = host ? `Not active on ${host}` : 'Open Canvas in a tab to use page tools';
+  } else if (enabledHere) {
+    status.textContent = `Enabled on ${host}. Reload the tab if nothing shows.`;
     actions.hidden = true;
-    if (tab?.url && /^https?:/.test(tab.url) && host && !/instructure\.com$/.test(host)) {
+  } else {
+    status.textContent = host ? `Not enabled on ${host}` : 'Open Canvas in a tab to use page tools';
+    actions.hidden = true;
+    if (tab?.url && /^https?:/.test(tab.url) && host) {
       $('enable-card').hidden = false;
       $('enable-host').textContent = host;
     }

@@ -24,14 +24,14 @@
     pageBg: '#f5f5f7', card: '#ffffff', surface2: '#f2f2f7', separator: '#e5e5ea',
     text: '#1d1d1f', text2: '#6e6e73', text3: '#86868b', primary: '#0071e3', link: '#0066cc',
     success: '#1f8f3f', warning: '#c77700', danger: '#d70015',
-    navBg: '#fbfbfd', navFg: '#3a3a3c',
+    navBg: '#fbfbfd', navFg: '#3a3a3c', sideBg: '#f6f6f7',
     shadow: '0 1px 2px rgba(0,0,0,.04), 0 8px 24px rgba(0,0,0,.05)',
   };
   const SKIN_DARK = {
     pageBg: '#0f0f10', card: '#1c1c1e', surface2: '#2a2a2d', separator: '#323236',
     text: '#f5f5f7', text2: '#a1a1a6', text3: '#8e8e93', primary: '#0a84ff', link: '#2997ff',
     success: '#30d158', warning: '#ffd60a', danger: '#ff453a',
-    navBg: '#161618', navFg: '#d1d1d6',
+    navBg: '#161618', navFg: '#d1d1d6', sideBg: '#151517',
     shadow: '0 1px 2px rgba(255,255,255,.05), 0 8px 24px rgba(255,255,255,.06)',
   };
 
@@ -125,6 +125,23 @@
       };
       for (const [k, v] of Object.entries(skinVars)) lines.push(`${k}: ${page(v)};`);
       lines.push(`--bcv-shadow-card: ${sk.shadow};`);
+      // Shell (our own sidebar + top bar) lives inside the filtered page, so
+      // its colours are pre-transformed like other content. A theme's nav
+      // colour is honoured; otherwise a quiet neutral rail.
+      const sideBg = t.nav && C.parseHex(t.nav) ? t.nav : sk.sideBg;
+      const sideLight = C.isLight(sideBg);
+      const sideFg = t.nav && C.parseHex(t.nav) ? (t.navText && C.parseHex(t.navText) ? t.navText : (sideLight ? '#1d1d1f' : '#f5f5f7')) : sk.text;
+      const shellVars = {
+        '--bcv-side-bg': sideBg,
+        '--bcv-side-fg': sideFg,
+        '--bcv-side-fg-2': C.mix(sideFg, sideBg, 0.45),
+        '--bcv-side-border': sideLight ? C.darken(sideBg, 0.07) : C.lighten(sideBg, 0.09),
+        '--bcv-side-hover': sideLight ? C.darken(sideBg, 0.045) : C.lighten(sideBg, 0.06),
+        '--bcv-side-active-bg': sideLight ? '#ffffff' : C.lighten(sideBg, 0.12),
+        '--bcv-side-active-fg': sideLight ? primary : C.lighten(primary, 0.3),
+        '--bcv-top-bg': sk.card,
+      };
+      for (const [k, v] of Object.entries(shellVars)) lines.push(`${k}: ${page(v)};`);
     }
 
     // Extension UI palette.

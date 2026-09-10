@@ -81,7 +81,8 @@ const submission = {
 };
 
 function page({ title, path = '', courseId, body }) {
-  const env = { current_user_id: '7', current_user: { display_name: 'Sam Student' }, COURSE_ID: courseId || null, context_asset_string: courseId ? `course_${courseId}` : 'user_7', TIMEZONE: 'America/New_York' };
+  const avatar = 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><circle cx="32" cy="32" r="32" fill="#7c3aed"/><text x="32" y="41" text-anchor="middle" font-family="sans-serif" font-size="26" fill="#fff">S</text></svg>');
+  const env = { current_user_id: '7', current_user: { display_name: 'Sam Student', avatar_image_url: avatar }, COURSE_ID: courseId || null, context_asset_string: courseId ? `course_${courseId}` : 'user_7', TIMEZONE: 'America/New_York' };
   return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>${title}</title>
 <meta name="csrf-token" content="mock-csrf">
 <script>
@@ -222,8 +223,48 @@ const pages = {
   }),
 };
 
+const scores = { 101: 92.4, 202: 81, 303: null };
+const teachers = { 101: 'Dr. Rivera', 202: 'Prof. Adler', 303: 'Dr. Chen' };
+const fullCourse = (c) => ({
+  id: c.id, name: c.name, course_code: c.code, term: { name: 'Fall 2026' },
+  teachers: [{ display_name: teachers[c.id] }],
+  enrollments: [{ type: 'student', computed_current_score: scores[c.id], computed_current_grade: scores[c.id] == null ? null : (scores[c.id] >= 90 ? 'A-' : 'B-') }],
+  syllabus_body: '<p>Syllabus body</p>',
+});
+const tabsFor = (id) => [
+  ['home', 'Home', ''], ['announcements', 'Announcements', '/announcements'], ['assignments', 'Assignments', '/assignments'],
+  ['discussions', 'Discussions', '/discussion_topics'], ['grades', 'Grades', '/grades'], ['modules', 'Modules', '/modules'],
+  ['pages', 'Pages', '/pages'], ['files', 'Files', '/files'], ['quizzes', 'Quizzes', '/quizzes'], ['people', 'People', '/users'],
+  ['context_external_tool_9', 'Zoom', '/external_tools/9'],
+].map(([tid, label, seg], i) => ({ id: tid, label, html_url: `/courses/${id}${seg}`, type: tid.startsWith('context_external') ? 'external' : 'internal', position: i + 1, visibility: 'public' }));
+const modulesFor = (id) => id === '303' ? [
+  { id: '1', name: 'Week 1: Complexity', state: 'started', items: [
+    { id: 'a', type: 'Page', title: 'Big-O notes', html_url: '/courses/303/pages/big-o-notes', completion_requirement: { type: 'must_view', completed: true } },
+    { id: 'b', type: 'Quiz', title: 'Quiz 2: Sorting', html_url: '/courses/303/quizzes/2', completion_requirement: { type: 'must_submit', completed: false } },
+    { id: 'c', type: 'Assignment', title: 'Project proposal', html_url: '/courses/303/assignments/4', completion_requirement: { type: 'must_submit', completed: false } },
+  ] },
+  { id: '2', name: 'Week 2: Sorting', state: 'unlocked', items: [{ id: 'd', type: 'Page', title: 'Merge sort', html_url: '/courses/303/pages/merge-sort' }] },
+  { id: '3', name: 'Week 3: Graphs', state: 'locked', items: [] },
+] : [
+  { id: '11', name: 'Unit 1', state: 'completed', items: [{ id: 'x', type: 'Page', title: 'Intro', completion_requirement: { type: 'must_view', completed: true } }] },
+  { id: '12', name: 'Unit 2', state: 'started', items: [{ id: 'y', type: 'Assignment', title: 'Essay', completion_requirement: { type: 'must_submit', completed: false } }, { id: 'z', type: 'Page', title: 'Reading', completion_requirement: { type: 'must_view', completed: true } }] },
+];
+const announcementsAll = [
+  { id: 'n1', context_code: 'course_101', title: 'Office hours moved to Thursday', message: '<p>This week only, office hours are Thursday 2–4pm in the math lounge.</p>', posted_at: iso(-5 * H), html_url: '/courses/101/discussion_topics/901' },
+  { id: 'n2', context_code: 'course_303', title: 'Project proposal template posted', message: '<p>Use the template in Files. Proposals are due next Wednesday.</p>', posted_at: iso(-30 * H), html_url: '/courses/303/discussion_topics/902' },
+  { id: 'n3', context_code: 'course_202', title: 'Reading for Week 6', message: '<p>Please read chapters 7 and 8 before Tuesday.</p>', posted_at: iso(-3 * 24 * H), html_url: '/courses/202/discussion_topics/903' },
+];
+
 const apiRoutes = [
   [/^\/api\/v1\/planner\/items/, () => planner],
+  [/^\/api\/v1\/courses\/(\d+)\/tabs/, (url, m) => tabsFor(m[1])],
+  [/^\/api\/v1\/courses\/(\d+)\/modules/, (url, m) => modulesFor(m[1])],
+  [/^\/api\/v1\/announcements/, (url) => {
+    const codes = url.searchParams.getAll('context_codes[]');
+    return announcementsAll.filter((a) => !codes.length || codes.includes(a.context_code));
+  }],
+  [/^\/api\/v1\/conversations\/unread_count/, () => ({ unread_count: '2' })],
+  [/^\/api\/v1\/courses\/?$/, () => courses.map(fullCourse)],
   [/^\/api\/v1\/dashboard\/dashboard_cards/, () => courses.map((c) => ({ id: c.id, shortName: c.shortName, originalName: c.name, courseCode: c.code, href: `/courses/${c.id}`, term: 'Fall 2026' }))],
   [/^\/api\/v1\/users\/self\/colors/, () => ({ custom_colors: Object.fromEntries(courses.map((c) => [`course_${c.id}`, c.color])) })],
   [/^\/api\/v1\/courses\/101\/assignments\/1\/submissions\/self/, () => submission],
@@ -231,6 +272,7 @@ const apiRoutes = [
   [/^\/api\/v1\/courses\/202\/discussion_topics\/3\/view/, () => ({ participants: [{ id: '8', display_name: 'Priya' }], view: [{ id: '1', user_id: '8', created_at: iso(-5 * H), message: '<p>Factory work pulled children out of the home, which changed who raised them.</p>', replies: [] }] })],
   [/^\/api\/v1\/courses\/202\/discussion_topics\/3/, () => ({ id: '3', title: 'Week 5 discussion: Industrialization', message: '<p>How did industrialization change family life in 19th-century Europe? Respond in 200 words and reply to two classmates.</p>', posted_at: iso(-3 * 24 * H), author: { display_name: 'Prof. Adler' }, assignment: { due_at: iso(2 * 24 * H), points_possible: 5 } })],
   [/^\/api\/v1\/courses\/\d+\/enrollments/, () => [{ grades: { current_score: 87.5, current_grade: 'B+', final_score: 80 } }]],
+  [/^\/api\/v1\/courses\/(\d+)\/?$/, (url, m) => fullCourse(courses.find((c) => c.id === m[1]) || courses[0])],
 ];
 
 const server = http.createServer((req, res) => {
@@ -250,9 +292,10 @@ const server = http.createServer((req, res) => {
       return;
     }
     for (const [re, handler] of apiRoutes) {
-      if (re.test(path)) {
+      const m = path.match(re);
+      if (m) {
         res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' });
-        res.end('while(1);' + JSON.stringify(handler(url)));
+        res.end('while(1);' + JSON.stringify(handler(url, m)));
         return;
       }
     }

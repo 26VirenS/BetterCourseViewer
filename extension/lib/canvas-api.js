@@ -20,6 +20,7 @@
       for (const [k, v] of Object.entries(params)) {
         if (v === undefined || v === null) continue;
         if (Array.isArray(v)) v.forEach((x) => url.searchParams.append(k.endsWith('[]') ? k : `${k}[]`, x));
+        else if (k.endsWith('[]')) url.searchParams.append(k, v);
         else url.searchParams.set(k, v);
       }
     }
@@ -176,6 +177,54 @@
     }, { force });
   }
 
+  /** Active courses with current scores and term, cached 15 minutes. */
+  function coursesWithScores({ force = false } = {}) {
+    return cached('courses-scores', 15 * MIN, () =>
+      get('/api/v1/courses', {
+        params: { enrollment_state: 'active', per_page: 100, include: ['total_scores', 'term', 'favorites', 'teachers', 'course_image'] },
+        all: true,
+      }), { force });
+  }
+
+  /** Navigation tabs the user can see in a course, cached 30 minutes. */
+  function courseTabs(courseId, { force = false } = {}) {
+    return cached(`tabs:${courseId}`, 30 * MIN, () => get(`/api/v1/courses/${courseId}/tabs`), { force });
+  }
+
+  /** One course with teachers, term, scores and syllabus, cached 15 minutes. */
+  function course(courseId, { force = false } = {}) {
+    return cached(`course:${courseId}`, 15 * MIN, () =>
+      get(`/api/v1/courses/${courseId}`, { params: { include: ['teachers', 'term', 'total_scores', 'syllabus_body', 'course_image'] } }), { force });
+  }
+
+  /** Modules with items (for progress), cached 10 minutes. */
+  function courseModules(courseId, { force = false } = {}) {
+    return cached(`modules:${courseId}`, 10 * MIN, () =>
+      get(`/api/v1/courses/${courseId}/modules`, { params: { include: ['items'], per_page: 50 }, all: true, maxPages: 3 }), { force });
+  }
+
+  /** Recent announcements across the given courses (last 21 days), cached 10 minutes. */
+  function announcements(courseIds, { force = false } = {}) {
+    const ids = (courseIds || []).slice(0, 20);
+    if (!ids.length) return Promise.resolve([]);
+    return cached(`announcements:${ids.join(',')}`, 10 * MIN, () =>
+      get('/api/v1/announcements', {
+        params: { 'context_codes[]': ids.map((id) => `course_${id}`), start_date: isoDaysFromNow(-21), end_date: isoDaysFromNow(1), per_page: 30 },
+      }), { force });
+  }
+
+  /** Unread inbox count, cached 2 minutes. */
+  function unreadCount({ force = false } = {}) {
+    return cached('unread', 2 * MIN, async () => {
+      try {
+        const r = await get('/api/v1/conversations/unread_count');
+        return Number(r?.unread_count) || 0;
+      } catch {
+        return 0;
+      }
+    }, { force });
+  }
+
   /** Mark a planner item complete/incomplete (syncs with Canvas's own To Do). */
   async function setPlannerComplete(item, complete) {
     const type = item.plannable_type;
@@ -194,5 +243,6 @@
   BCV.canvas = {
     get, post, put, del, cached, invalidate, csrfToken, CanvasError,
     plannerItems, dashboardCards, activeCourses, courseColors, setPlannerComplete,
+    coursesWithScores, courseTabs, course, courseModules, announcements, unreadCount,
   };
 })();

@@ -7,7 +7,7 @@
   BCV.features = BCV.features || [];
 
   const STORE_KEY = 'todo.items';
-  const state = { settings: null, custom: [], courses: [], hideCompleted: true, filter: 'all', panel: null, body: null, showMore: false, seg: null };
+  const state = { settings: null, custom: [], courses: [], hideCompleted: true, filter: 'all', groupBy: 'date', panel: null, body: null, showMore: false, seg: null, groupBtns: null };
 
   const FILTERS = [
     ['all', 'All'],
@@ -89,6 +89,36 @@
     ['done', 'Done'],
   ];
 
+  function renderByCourse(items) {
+    const frag = document.createDocumentFragment();
+    let total = 0;
+    const stats = BCV.dueData?.courseStats(state.settings.dueDates.lookaheadDays, { includeScheduled: true }) || [];
+    for (const s of stats) {
+      const list = s.pending.filter(matchesFilter).map((i) => ({ ...i, source: 'canvas' }));
+      if (!list.length) continue;
+      total += list.length;
+      const done = s.done;
+      const all = done + list.length;
+      frag.append(h('section', { class: 'bcv-todo__group bcv-todo__group--course', style: { '--c': BCV.ui.paint(s.color) } }, [
+        h('div', { class: 'bcv-todo__group-title bcv-todo__group-title--course' }, [
+          BCV.ui.ring({ size: 26, stroke: 3.5, value: all ? done / all : 0, color: BCV.ui.paint(s.color), title: `${done} of ${all} done` }),
+          h('span', { class: 'bcv-todo__group-name', text: s.name }),
+          h('span', { text: `${list.length} left` }),
+        ]),
+        ...list.map(renderItem),
+      ]));
+    }
+    const custom = items.filter((i) => i.source === 'custom' && (!i.done || !state.hideCompleted));
+    if (custom.length) {
+      total += custom.length;
+      frag.append(h('section', { class: 'bcv-todo__group bcv-todo__group--anytime' }, [
+        h('div', { class: 'bcv-todo__group-title' }, [h('span', { text: 'My tasks' }), h('span', { text: String(custom.length) })]),
+        ...custom.map(renderItem),
+      ]));
+    }
+    return { frag, total };
+  }
+
   function render() {
     if (!state.body) return;
     const now = new Date();
@@ -96,6 +126,17 @@
     const groups = new Map(GROUPS.map(([k]) => [k, []]));
     if (state.seg) {
       for (const btn of state.seg.querySelectorAll('button')) btn.classList.toggle('is-active', btn.dataset.filter === state.filter);
+    }
+    if (state.groupBtns) {
+      for (const btn of state.groupBtns.querySelectorAll('button')) btn.classList.toggle('is-active', btn.dataset.group === state.groupBy);
+    }
+    if (state.groupBy === 'course') {
+      const { frag, total } = renderByCourse(items);
+      if (!total) {
+        frag.append(h('div', { class: 'bcv-empty' }, [h('strong', { text: 'All clear' }), 'Nothing left in this window.']));
+      }
+      state.body.replaceChildren(frag);
+      return;
     }
     for (const it of items) groups.get(groupOf(it, now)).push(it);
     for (const list of groups.values()) list.sort((a, b) => (a.due?.getTime() || Infinity) - (b.due?.getTime() || Infinity));
@@ -245,6 +286,18 @@
       await saveCustom();
       render();
     } });
+    state.groupBtns = h('div', { class: 'bcv-seg bcv-seg--inline', role: 'group', 'aria-label': 'Group by' }, [['date', 'By date'], ['course', 'By course']].map(([key, label]) =>
+      h('button', {
+        type: 'button',
+        class: `bcv-seg__btn${state.groupBy === key ? ' is-active' : ''}`,
+        dataset: { group: key },
+        text: label,
+        onClick: async () => {
+          state.groupBy = key;
+          render();
+          await BCV.settings.update({ todo: { groupBy: key } });
+        },
+      })));
 
     const panel = h('aside', { id: 'bcv-todo', 'aria-label': 'To do' }, [
       BCV.ui.panelHeader('To Do', ICONS.check, [
@@ -258,7 +311,7 @@
       more,
       state.seg,
       body,
-      h('div', { class: 'bcv-todo__foot' }, [h('label', {}, [hideDone, 'Hide completed']), clearDone]),
+      h('div', { class: 'bcv-todo__foot' }, [state.groupBtns, h('label', {}, [hideDone, 'Hide completed']), clearDone]),
     ]);
     const resize = h('div', { class: 'bcv-panel__resize', title: 'Drag to resize' });
     panel.append(resize);
@@ -320,6 +373,7 @@
       if (!ctx.settings.todo.enabled) return;
       state.hideCompleted = ctx.settings.todo.hideCompleted;
       state.filter = FILTERS.some(([k]) => k === ctx.settings.todo.filter) ? ctx.settings.todo.filter : 'all';
+      state.groupBy = ctx.settings.todo.groupBy === 'course' ? 'course' : 'date';
       await loadCustom();
       buildPanel();
       BCV.ui.addNavItem({ id: 'todo', label: 'To Do', icon: ICONS.check, title: 'To Do (t)', onClick: () => BCV.ui.togglePanel('todo') });

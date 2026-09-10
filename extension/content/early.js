@@ -21,12 +21,15 @@
     return 'bcv-page-other';
   }
 
-  // Classes owned by features at runtime, not derived from settings.
-  const PRESERVE = new Set(['bcv-has-greeting', 'bcv-panel-open']);
+  // Only the classes derived from settings are managed here; features own the
+  // rest (bcv-shell, bcv-dash-custom, bcv-panel-open, bcv-page-*, …).
+  const isManaged = (c) =>
+    c === 'bcv-dark' || c === 'bcv-skin' || c === 'bcv-minimal' || c === 'bcv-compact' || c === 'bcv-compact-cards' ||
+    c.startsWith('bcv-font-') || c.startsWith('bcv-width-') || c.startsWith('bcv-hide-') || c.startsWith('bcv-cards-');
 
   function applyClasses(classes) {
     for (const c of Array.from(html.classList)) {
-      if (c.startsWith('bcv-') && !c.startsWith('bcv-page-') && !PRESERVE.has(c)) html.classList.remove(c);
+      if (isManaged(c)) html.classList.remove(c);
     }
     html.classList.add(...classes);
     if (!Array.from(html.classList).some((c) => c.startsWith('bcv-page-'))) html.classList.add(pageClass());

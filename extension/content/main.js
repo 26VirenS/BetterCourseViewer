@@ -11,17 +11,24 @@
     if (!page.isCanvas) return; // login pages, error pages, non-Canvas hosts
     const settings = await BCV.settings.get();
     const ctx = { settings, page };
-    const order = ['theme', 'declutter', 'due-dates', 'dashboard', 'todo', 'keyboard', 'embeds', 'smart'];
+    const order = ['theme', 'declutter', 'shell', 'due-dates', 'dashboard', 'course-home', 'todo', 'keyboard', 'embeds', 'smart'];
     const features = [...(BCV.features || [])].sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
-    // Features are independent; start them all so a slow Canvas API call in
-    // one does not delay the others (e.g. keyboard shortcuts).
-    await Promise.allSettled(features.map(async (f) => {
+    const run = async (f) => {
       try {
         await f.init(ctx);
       } catch (e) {
         console.warn('[BetterCourseViewer] feature failed:', f.id, e);
       }
-    }));
+    };
+    // The shell mounts the top bar that other features attach buttons to, so it
+    // starts first (its own network calls happen after mounting). Everything
+    // else runs concurrently so one slow Canvas API call does not delay the rest.
+    const shell = features.find((f) => f.id === 'shell');
+    if (shell) {
+      const p = run(shell);
+      await Promise.race([p, new Promise((r) => setTimeout(r, 50))]);
+    }
+    await Promise.allSettled(features.filter((f) => f !== shell).map(run));
     BCV.settings.onChange((next) => {
       ctx.settings = next;
       for (const f of features) {

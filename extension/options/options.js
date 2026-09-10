@@ -7,8 +7,9 @@
 
   const send = (msg) => new Promise((resolve) => {
     try {
-      const p = api.runtime.sendMessage(msg, (r) => resolve(r));
+      const p = api.runtime.sendMessage(msg);
       if (p && typeof p.then === 'function') p.then(resolve, () => resolve(null));
+      else resolve(p ?? null);
     } catch {
       resolve(null);
     }

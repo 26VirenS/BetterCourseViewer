@@ -200,7 +200,8 @@
       state.els.textarea.disabled = true;
       state.els.send.disabled = true;
     } else {
-      chip.textContent = `${s.label} · ${s.model}`;
+      chip.textContent = s.label;
+      chip.title = `${s.label} · ${s.model} — change in Settings`;
       state.els.setup.hidden = true;
       state.els.textarea.disabled = false;
       state.els.send.disabled = false;

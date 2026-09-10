@@ -209,11 +209,15 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  flex: 1;
+  min-width: 0;
   font-size: 15px;
   font-weight: 700;
   white-space: nowrap;
-  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
+.bcv-panel__actions { flex: none; }
 .bcv-panel__actions .bcv-chip {
   max-width: 150px;
   overflow: hidden;
@@ -327,6 +331,11 @@
 }
 .bcv-seg__btn:hover { background: var(--bcv-bg-2, #f4f5f7); color: var(--bcv-fg, #111827); }
 .bcv-seg__btn.is-active { background: var(--bcv-accent-soft); color: var(--bcv-accent, #4f46e5); }
+.bcv-seg--inline { padding: 0; border: 0; gap: 0; }
+.bcv-seg--inline .bcv-seg__btn { padding: 3px 8px; font-size: 11.5px; }
+.bcv-todo__group-title--course { gap: 8px; text-transform: none; letter-spacing: 0; font-size: 13px; color: var(--bcv-fg, #111827); padding-top: 12px; }
+.bcv-todo__group-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bcv-todo__group-title--course > span:last-child { font-weight: 500; color: var(--bcv-fg-2, #6b7280); }
 .bcv-todo__type {
   display: inline-flex;
   align-items: center;

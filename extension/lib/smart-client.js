@@ -59,11 +59,14 @@
     return { promise, abort };
   }
 
+  /** Promise-only messaging: Safari, Firefox and Chrome MV3 all return a
+   *  promise when no callback is passed (Safari rejects a callback argument). */
   function send(message) {
     return new Promise((resolve) => {
       try {
-        const p = api.runtime.sendMessage(message, (r) => resolve(r));
+        const p = api.runtime.sendMessage(message);
         if (p && typeof p.then === 'function') p.then(resolve, () => resolve(null));
+        else resolve(p ?? null);
       } catch {
         resolve(null);
       }
