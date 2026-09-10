@@ -677,63 +677,83 @@
       }
     }
     rows.sort((a, b) => (U.parse(a.due)?.getTime() || Infinity) - (U.parse(b.due)?.getTime() || Infinity));
-    const groupStats = groups.map((g) => {
+    // Groups that carry weight come first (in Canvas's order), then the 0% ones.
+    const ordered = [...groups].sort((a, b) => (weighted ? Number(b.weight > 0) - Number(a.weight > 0) : 0) || (a.position || 0) - (b.position || 0));
+    const GROUP_COLORS = ['#0a84ff', '#5856d6', '#ff2d55', '#ff9500', '#30b0c7', '#af52de', '#ff6b22', '#c8901c'];
+    const groupStats = ordered.map((g, i) => {
       const items = rows.filter((r) => r.groupId === g.id && r.counted && r.possible > 0 && r.effective !== null);
+      const omitted = rows.filter((r) => r.groupId === g.id && !r.counted).map((r) => r.name);
       const earned = items.reduce((s, r) => s + r.effective, 0);
       const possible = items.reduce((s, r) => s + r.possible, 0);
-      return { ...g, graded: items.length > 0, earned, possible, pct: possible > 0 ? Math.round((earned / possible) * 100) : null, hypothetical: items.some((r) => r.hypothetical) };
+      return {
+        ...g, color: GROUP_COLORS[i % GROUP_COLORS.length], graded: items.length > 0, earned, possible, omitted,
+        pct: possible > 0 ? Math.round((earned / possible) * 100) : null, hypothetical: items.some((r) => r.hypothetical), zero: weighted && g.weight === 0,
+      };
     });
     const scored = groupStats.filter((g) => g.graded);
     let total = null;
-    let totalDetail = '';
+    let note = '';
     if (weighted) {
       const denom = scored.reduce((s, g) => s + g.weight, 0);
       total = denom > 0 ? Math.round(scored.reduce((s, g) => s + g.weight * g.pct, 0) / denom) : null;
-      totalDetail = denom > 0 ? 'weighted across scored groups' : 'no weighted group scored yet';
+      note = denom > 0 ? 'Weighted across the groups that have graded work.' : 'No weighted group has graded work yet.';
     } else {
       const earned = scored.reduce((s, g) => s + g.earned, 0);
       const possible = scored.reduce((s, g) => s + g.possible, 0);
       total = possible > 0 ? Math.round((earned / possible) * 100) : null;
-      totalDetail = possible > 0 ? `${fmtPts(earned)} / ${fmtPts(possible)} pts · unweighted` : 'nothing graded yet';
+      note = possible > 0 ? `${fmtPts(earned)} / ${fmtPts(possible)} pts, graded work only.` : 'Nothing graded yet.';
     }
+    if (whatIfOn) note = `What-if ${note.charAt(0).toLowerCase()}${note.slice(1)}`;
     const canvasTotal = courseInfo.score !== null && courseInfo.score !== undefined ? Math.round(Number(courseInfo.score)) : null;
     if (!whatIfOn && canvasTotal !== null) {
       total = canvasTotal;
-      totalDetail = `as shown in Canvas${courseInfo.grade ? ` · ${courseInfo.grade}` : ''}`;
+      note = `As shown in Canvas${courseInfo.grade ? ` · ${courseInfo.grade}` : ''}. ${weighted ? 'Weighted across the groups that have graded work.' : 'Graded work only.'}`;
     }
-    const GROUP_COLORS = ['#0a84ff', '#5856d6', '#ff2d55', '#ff9500', '#30b0c7', '#af52de', '#ff6b22'];
     const gray = dark ? ['#8e8e93', '#7c7c82', '#6b6b71', '#5a5a60', '#96969c'] : ['#8e8e93', '#a0a0a6', '#b0b0b6', '#78787e', '#c0c0c6'];
-    const ringSrc = [{ name: 'Total', weight: null, pct: total, color: '#34c759', detail: totalDetail }]
-      .concat(scored.map((g, i) => ({
-        name: g.name, weight: weighted ? g.weight : null, pct: g.pct, color: GROUP_COLORS[i % GROUP_COLORS.length],
-        detail: `${fmtPts(g.earned)} / ${fmtPts(g.possible)} pts${g.hypothetical ? ' · includes what-if' : ''}${g.rules?.drop_lowest ? ` · Canvas drops lowest ${g.rules.drop_lowest}` : ''}`,
-      })));
+    const colorOf = (i, color) => (whatIfOn ? gray[Math.min(i, gray.length - 1)] : color);
+    // rings: outer = total, then one per group with graded work (five at most; the rest are legend only)
     const radii = [72, 56, 40, 24, 10];
     const widths = [12, 12, 12, 11, 7];
-    const colorOf = (i, r) => (whatIfOn ? gray[Math.min(i, gray.length - 1)] : r.color);
-    const legend = ringSrc.map((r, i) => ({
-      label: r.name,
-      weight: r.weight === null ? (r.name === 'Total' ? (whatIfOn ? 'what-if' : 'graded only') : '—') : `${r.weight}%`,
-      value: r.pct === null ? '—' : `${r.pct}%`,
-      detail: i < radii.length ? r.detail : `${r.detail} · legend only`,
-      color: colorOf(i, r), ringed: i < radii.length,
-    }));
+    const ringSrc = [{ pct: total, color: '#34c759', zero: false }].concat(scored.map((g) => ({ pct: g.pct, color: g.color, zero: g.zero })));
     const rings = ringSrc.slice(0, radii.length).map((r, i) => {
       const rad = radii[i];
       const c = 2 * Math.PI * rad;
       const pct = r.pct === null ? 0 : Math.min(r.pct, 100);
       const filled = (pct / 100) * c;
-      const col = colorOf(i, r);
+      const col = colorOf(i, r.color);
+      const patternId = `bcv-stipple-${courseInfo.id}-${i}`;
       return {
-        r: rad, w: widths[i], color: col,
+        r: rad, w: widths[i], color: col, zero: r.zero, patternId,
         track: dark ? 'rgba(255,255,255,.1)' : 'rgba(120,120,128,.16)',
         dash: `${filled.toFixed(1)} ${(c - filled).toFixed(1)}`,
-        cap: pct > 0 ? 'round' : 'butt', arc: pct > 0 ? col : 'transparent',
+        cap: pct > 0 ? 'round' : 'butt', arc: pct > 0 ? (r.zero ? `url(#${patternId})` : col) : 'transparent',
       };
     });
+    const weightText = (g) => (weighted ? (g.weight === 0 ? 'not weighted' : `${g.weight}% of grade`) : 'by points');
+    const legend = scored.map((g, i) => {
+      const ringed = i + 1 < radii.length;
+      const bits = [`${fmtPts(g.earned)} / ${fmtPts(g.possible)} pts`];
+      if (g.hypothetical) bits.push('includes what-if');
+      if (g.omitted.length === 1) bits.push(`${g.omitted[0]} excluded`);
+      else if (g.omitted.length > 1) bits.push(`${g.omitted.length} not counted`);
+      if (g.rules?.drop_lowest) bits.push(`Canvas drops lowest ${g.rules.drop_lowest}`);
+      if (!ringed) bits.push('legend only');
+      return { id: g.id, label: g.name, detail: bits.join(' · '), weightText: weightText(g), value: g.pct === null ? '—' : `${g.pct}%`, color: colorOf(i + 1, g.color), ringed, zero: g.zero };
+    });
+    const ungraded = groupStats.filter((g) => !g.graded).map((g) => ({ name: g.name, weightText: weighted ? `${g.weight}%` : '' }));
+    const bearing = groupStats.filter((g) => g.weight > 0);
+    const weightBar = weighted ? bearing.map((g) => ({ name: g.name, weight: g.weight, graded: g.graded, color: g.graded ? (whatIfOn ? gray[0] : g.color) : null, scoreLabel: g.graded ? `${g.pct}%` : 'ungraded' })) : [];
+    const zeros = weighted ? groupStats.filter((g) => g.weight === 0) : [];
+    const listNames = (arr) => (arr.length <= 1 ? arr.join('') : `${arr.slice(0, -1).join(', ')} and ${arr[arr.length - 1]}`);
+    const one = zeros.length === 1;
+    const weightNote = zeros.length
+      ? `${listNames(zeros.map((g) => g.name))} ${one ? 'carries' : 'carry'} 0% weight — ${zeros.some((g) => g.graded) ? (one ? 'it shows as a ring but never moves' : 'they show as rings but never move') : (one ? 'it never moves' : 'they never move')} the total.`
+      : '';
     return {
-      rows, total, rings, legend, weighted,
-      ungraded: groupStats.filter((g) => !g.graded).map((g) => ({ name: g.name, weight: weighted ? `${g.weight}%` : null })),
+      rows, total, weighted, rings, legend, ungraded, weightBar, weightNote,
+      stipples: rings.filter((r) => r.zero).map((r) => ({ id: r.patternId, color: r.color })),
+      center: { label: whatIfOn ? 'What-if total' : 'Total', value: total === null ? '—' : `${total}%`, color: whatIfOn ? gray[0] : '#34c759', note },
+      weightSum: bearing.reduce((s, g) => s + g.weight, 0),
       weights: groups.map((g) => ({ name: g.name, pct: weighted ? `${g.weight}%` : '—', zero: weighted && g.weight === 0 })),
     };
   }
