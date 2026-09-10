@@ -69,7 +69,7 @@ try {
     await page.click(sel);
     await page.waitForSelector('#bcv-main > *:not([data-old])', { timeout: 10000 });
   };
-  const tab = (id) => clickScreen(`.bcv-tab[data-tab="${id}"]`);
+  const tab = (id) => clickScreen(`.bcv-cside__item[data-tab="${id}"]`);
   const nav = (id) => clickScreen(`.bcv-nav__item[data-nav="${id}"]`);
 
   // ---- dashboard --------------------------------------------------------------------
@@ -81,6 +81,7 @@ try {
   check(await page.$('#bcv-skin.is-on'), 'skin switch at the top-left is on');
   await waitText('.bcv-brand__sub', /Example University · Fall 2026/);
   check((await texts('.bcv-brand__name'))[0] === 'Localhost', `brand row: ${(await texts('.bcv-brand'))[0]}`);
+  check(await page.$('.bcv-brand__tile img'), 'brand tile shows the school logo from Canvas');
   const navItems = await texts('.bcv-nav__item');
   check(navItems.length === 6 && navItems[0].startsWith('Dashboard') && navItems[5].startsWith('Inbox'), `sidebar nav: ${navItems.join(' | ')}`);
   await waitText('.bcv-nav__item[data-nav="todo"] .bcv-nav__count', /\d/);
@@ -106,8 +107,14 @@ try {
   // mark one done
   const rowsBefore = (await page.$$('.bcv-day .bcv-row')).length;
   await page.click('.bcv-day .bcv-row .bcv-circle');
-  await page.waitForFunction((n) => document.querySelectorAll('.bcv-day .bcv-row').length === n - 1, rowsBefore, { timeout: 5000 });
-  check(true, 'marking an item done removes it (planner override)');
+  await page.waitForSelector('.bcv-day .bcv-row.bcv-row--done', { timeout: 5000 });
+  await page.waitForFunction((n) => Number(document.querySelector('.bcv-nav__item[data-nav="todo"] .bcv-nav__count').textContent) === n - 1, todoCount, { timeout: 5000 });
+  check((await page.$$('.bcv-day .bcv-row')).length === rowsBefore, 'marking an item done keeps it in the list, ticked (planner override)');
+  await page.click('.bcv-day .bcv-row.bcv-row--done .bcv-circle');
+  await page.waitForFunction(() => !document.querySelector('.bcv-day .bcv-row--done'), null, { timeout: 5000 });
+  check(true, 'ticking again marks it not done');
+  await page.click('.bcv-day .bcv-row .bcv-circle');
+  await page.waitForSelector('.bcv-day .bcv-row.bcv-row--done', { timeout: 5000 });
   // cards view
   await page.click('.bcv-seg__btn[data-value="cards"]');
   await page.waitForSelector('.bcv-ccard', { timeout: 5000 });
@@ -163,10 +170,22 @@ try {
   check(todoGroups[0].startsWith('Today') && todoGroups[1].startsWith('Tomorrow') && todoGroups[2].startsWith('Next 7 days'), `to do groups: ${todoGroups.join(' | ')}`);
   check((await texts('.bcv-body .bcv-row')).some((t) => /Qz01.*F26-MATH 021 20 · Quiz · 10 pts.*11:59 PM/.test(t)), 'to do rows show course · kind · pts and time');
   await shot(page, '05-todo');
-  const todoRows = (await page.$$('.bcv-body .bcv-row')).length;
+  const todoRows = (await page.$$('.bcv-body .bcv-card--list .bcv-row:not(.bcv-row--first)')).length;
   await page.click('.bcv-body .bcv-row .bcv-iconbtn');
-  await page.waitForFunction((n) => document.querySelectorAll('.bcv-body .bcv-row').length === n - 1, todoRows, { timeout: 5000 });
+  await page.waitForFunction((n) => document.querySelectorAll('.bcv-body .bcv-card--list .bcv-row:not(.bcv-row--first)').length === n - 1, todoRows, { timeout: 5000 });
   check(true, 'dismissing removes the item (planner override dismissed)');
+  await page.click('.bcv-body .bcv-row .bcv-circle');
+  await page.waitForFunction((n) => document.querySelectorAll('.bcv-body .bcv-card--list .bcv-row:not(.bcv-row--first)').length === n - 2, todoRows, { timeout: 5000 });
+  check(true, 'ticking the circle marks an item complete');
+  await page.click('.bcv-body .bcv-row--first .bcv-switch');
+  await page.waitForSelector('.bcv-body .bcv-row--done', { timeout: 5000 });
+  const doneRows = await texts('.bcv-body .bcv-row--done');
+  check(doneRows.length >= 3 && doneRows.some((t) => /Dismissed.*Restore/.test(t)), `show completed reveals ${doneRows.length} done/dismissed rows with Restore`);
+  await page.click('.bcv-body .bcv-row--done .bcv-circle');
+  await page.waitForFunction((n) => document.querySelectorAll('.bcv-body .bcv-row--done').length === n - 1, doneRows.length, { timeout: 5000 });
+  check(true, 'unticking a completed item reopens it');
+  await page.click('.bcv-body .bcv-row--first .bcv-switch');
+  await page.waitForFunction(() => !document.querySelector('.bcv-body .bcv-row--done'), null, { timeout: 5000 });
   await page.click('.bcv-seg__btn[data-value="course"]');
   check((await texts('.bcv-group__head')).some((t) => /F26-MATH 021 20/.test(t)), 'grouped by course');
   await page.click('.bcv-seg__btn[data-value="date"]');
@@ -242,14 +261,33 @@ try {
   check(gr.length === 2 && /Attestation Fall 2026 1.*Academic Success.*Collaboration team/.test(gr[0]) && /Study group B/.test(gr[1]), `groups: ${gr.join(' | ')}`);
   check((await texts('.bcv-body > div > .bcv-label')).join(',').toLowerCase() === 'current groups,previous groups', 'current / previous sections');
   await shot(page, '10-groups');
+  await clickScreen('.bcv-body .bcv-row');
+  await page.waitForSelector('.bcv-cside__item', { timeout: 10000 });
+  check(page.url() === `${BASE}/groups/66729` && (await texts('.bcv-head h1'))[0] === 'Attestation Fall 2026 1', 'group opens in its own shell');
+  check((await texts('.bcv-cside__item')).length === 8 && (await texts('.bcv-pill--term')).join(',').includes('4 members'), `group sidebar tabs: ${(await texts('.bcv-cside__item')).join(', ')}`);
+  await page.waitForSelector('.bcv-act__title', { timeout: 10000 });
+  check((await texts('.bcv-act__title'))[0] === 'Attestation due Friday' && (await texts('.bcv-body .bcv-label')).some((t) => /about/i.test(t)), 'group home: stream + About card');
+  await shot(page, '10b-group-home');
+  await tab('announcements');
+  await page.waitForSelector('.bcv-body .bcv-row', { timeout: 10000 });
+  check((await texts('.bcv-body .bcv-row'))[0].includes('Attestation due Friday'), 'group announcements come from /api/v1/groups');
+  await tab('people');
+  await page.waitForSelector('.bcv-body .bcv-row', { timeout: 10000 });
+  check((await texts('.bcv-body .bcv-row')).length === 2 && (await texts('.bcv-badge')).includes('Member'), 'group people');
 
   // ---- course home ---------------------------------------------------------------------------
   console.log('course');
   await clickScreen('.bcv-fav');
-  await page.waitForSelector('.bcv-tabs .bcv-tab', { timeout: 10000 });
+  await page.waitForSelector('.bcv-cside__item', { timeout: 10000 });
   check(page.url() === `${BASE}/courses/101`, 'favourite opens the course via pushState');
-  const tabs = await texts('.bcv-tab');
-  check(tabs.length === 11 && tabs[0] === 'Home' && tabs[10] === 'Resources & Policy', `course tabs from the API: ${tabs.join(', ')}`);
+  const tabs = await texts('.bcv-cside__item');
+  check(tabs.length === 11 && tabs[0] === 'Home' && tabs[10] === 'Resources & Policy', `course sidebar tabs from the API: ${tabs.join(', ')}`);
+  check(!(await page.$('.bcv-head .bcv-tab')), 'no tab pills under the course title');
+  await page.click('.bcv-cside__toggle');
+  check(await page.$('.bcv-cside.is-collapsed') && (await page.$eval('.bcv-cside', (el) => el.getBoundingClientRect().width < 90)), 'course sidebar collapses to an icon rail');
+  await shot(page, '11c-course-sidebar-collapsed');
+  await page.click('.bcv-cside__toggle');
+  await page.waitForFunction(() => !document.querySelector('.bcv-cside.is-collapsed'), null, { timeout: 3000 });
   check((await texts('.bcv-head h1'))[0] === 'F26-MATH 021 20' && (await texts('.bcv-pill--term'))[0] === 'Fall 2026', 'course header');
   await page.waitForSelector('.bcv-front', { timeout: 10000 });
   check(/^front page · course information$/i.test((await texts('.bcv-front .bcv-label'))[0]), 'front page card');
@@ -416,12 +454,18 @@ try {
   console.log('native pages');
   await page.goto(`${BASE}/courses/101/external_tools/9`);
   await page.waitForSelector('.bcv-native #content', { timeout: 10000 });
-  check((await page.$$eval('.bcv-tab.is-active', (els) => els.map((e) => e.textContent.trim())))[0] === 'Resources & Policy', 'external tool tab active');
+  check((await page.$$eval('.bcv-cside__item.is-active', (els) => els.map((e) => e.textContent.trim())))[0] === 'Resources & Policy', 'external tool tab active');
   check(await page.$('.bcv-native #tool_content'), 'Canvas page content (tool iframe) shown inside the course shell');
   await shot(page, '23-native-tool');
   await page.goto(`${BASE}/profile`);
   await page.waitForSelector('.bcv-native #content', { timeout: 10000 });
   check((await texts('.bcv-head h1'))[0] === 'Sam Student', 'unknown page: Canvas content inside the global shell');
+
+  await page.goto(`${BASE}/courses/104/assignments/4003`);
+  await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
+  check(await page.$eval('.bcv-frame', (f) => /external_tools\/retrieve\?assignment_id=4003/.test(f.getAttribute('src'))), 'external-tool assignment embeds the tool launch');
+  check(!(await texts('.bcv-btn--primary')).includes('Submit in Canvas'), 'no submit button for tool assignments');
+  await shot(page, '14b-assignment-tool');
 
   // ---- smart panel --------------------------------------------------------------------------------
   console.log('smart panel');
@@ -481,6 +525,13 @@ try {
   await page.click('#bcv-skin');
   await page.waitForSelector('#bcv-app .bcv-nav__item', { timeout: 10000 });
   check(await visible('#bcv-app'), 'skin switched back on in place');
+  await nav('courses');
+  await page.waitForSelector('.bcv-ccard__hero--term', { timeout: 10000 });
+  await Promise.all([page.waitForNavigation({ timeout: 10000 }), page.click('#bcv-skin')]);
+  await page.waitForSelector('#application', { timeout: 10000 });
+  check(page.url() === `${BASE}/courses` && (await visible('#application')) && (await page.title()).includes('courses'), 'skin off after in-app navigation reloads the same page in stock Canvas');
+  await page.click('#bcv-skin');
+  await page.waitForSelector('#bcv-app .bcv-nav__item', { timeout: 10000 });
 
   // ---- extension pages ---------------------------------------------------------------------------------
   console.log('extension pages');

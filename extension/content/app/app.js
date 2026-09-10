@@ -65,11 +65,11 @@
     else if (path === '/conversations') r.screen = 'inbox';
     else if (path === '/todo') r.screen = 'todo';
     else {
-      const m = path.match(/^\/courses\/(\d+)(\/.*)?$/);
+      const m = path.match(/^\/(courses|groups)\/(\d+)(\/.*)?$/);
       if (m) {
-        r.courseId = m[1];
-        const rest = m[2] || '';
-        r.screen = 'course';
+        r.courseId = m[2];
+        const rest = m[3] || '';
+        r.screen = m[1] === 'groups' ? 'group' : 'course';
         if (!rest) r.tab = params.get('view') === 'feed' ? 'stream' : 'home';
         else {
           let found = null;
@@ -92,7 +92,11 @@
   }
 
   /** Routes whose content is Canvas's own page (needs a real page load). */
-  const needsNative = (r) => r.screen === 'native' || (r.screen === 'course' && (r.tab === 'native' || r.tab === 'tool' || r.tab === 'file'));
+  const GROUP_TABS = new Set(['home', 'stream', 'announcements', 'announcement', 'discussions', 'discussion', 'people', 'pages', 'page', 'files', 'folder']);
+  const needsNative = (r) => r.screen === 'native'
+    || (r.screen === 'course' && (r.tab === 'native' || r.tab === 'tool' || r.tab === 'file'))
+    || (r.screen === 'group' && !GROUP_TABS.has(r.tab))
+    || r.params.get('bcv') === 'native';
   const isRoutable = (r) => !needsNative(r);
 
   function go(href, { replace = false } = {}) {
@@ -183,6 +187,40 @@
     return label.charAt(0).toUpperCase() + label.slice(1);
   }
 
+  /** The institution's own logo, as Canvas shows it in its global navigation. */
+  function schoolLogo() {
+    if (state.logo !== undefined) return state.logo;
+    let url = null;
+    let bg = null;
+    try {
+      const cs = getComputedStyle(html);
+      const v = cs.getPropertyValue('--ic-brand-header-image').trim();
+      const m = v.match(/url\((['"]?)(.*?)\1\)/);
+      if (m && m[2]) url = m[2];
+      const nav = cs.getPropertyValue('--ic-brand-global-nav-bgd').trim();
+      if (nav) bg = nav;
+      if (!url) {
+        const mark = document.querySelector('.ic-app-header__logomark, #header .ic-app-header__logomark-container a');
+        const bgi = mark ? getComputedStyle(mark).backgroundImage : '';
+        const mm = bgi.match(/url\((['"]?)(.*?)\1\)/);
+        if (mm && mm[2]) url = mm[2];
+      }
+      if (!url) {
+        const img = document.querySelector('#header img.ic-app-header__logomark-img, .ic-app-header__logomark img, .ic-app-header__logomark-container img');
+        if (img?.src) url = img.src;
+      }
+    } catch {
+      url = null;
+    }
+    state.logo = url && !/canvas-logomark|default-logo|instructure/i.test(url) ? { url, bg } : null;
+    return state.logo;
+  }
+  function brandTile(name) {
+    const logo = schoolLogo();
+    if (!logo) return U.el('bcv-brand__tile', name.charAt(0).toUpperCase());
+    return h('div', { class: 'bcv-brand__tile', style: logo.bg ? { background: logo.bg } : {} }, h('img', { src: logo.url, alt: '' }));
+  }
+
   function renderSide() {
     if (!side) return;
     const r = state.route || parseRoute();
@@ -190,12 +228,12 @@
     const inst = state.account?.name || location.hostname.replace(/^(canvas|www)\./, '');
     side.replaceChildren(
       U.el('bcv-brand', [
-        U.el('bcv-brand__tile', name.charAt(0).toUpperCase()),
+        brandTile(name),
         h('div', {}, [U.text('bcv-brand__name', name), U.text('bcv-brand__sub', [inst, state.term].filter(Boolean).join(' · '))]),
       ]),
       h('nav', { class: 'bcv-nav' }, navDef().map(([key, label, icon, tileColor, href, count]) => h('button', {
         type: 'button',
-        class: `bcv-nav__item ${r.screen === key ? 'is-active' : ''}`,
+        class: `bcv-nav__item ${r.screen === key || (key === 'groups' && r.screen === 'group') ? 'is-active' : ''}`,
         dataset: { nav: key },
         onclick: () => go(href),
       }, [
@@ -242,7 +280,9 @@
     state.smartCtx = null;
     let el;
     try {
-      if (r.screen === 'course') el = await screens.course.render(ctx);
+      if (r.params.get('bcv') === 'native') el = await screens.native.render(ctx);
+      else if (r.screen === 'course') el = await screens.course.render(ctx);
+      else if (r.screen === 'group') el = await screens.group.render(ctx);
       else if (screens[r.screen] && r.screen !== 'native') el = await screens[r.screen].render(ctx);
       else el = await screens.native.render(ctx);
     } catch (e) {
@@ -348,6 +388,8 @@
     } else {
       returnNative();
       BCV.smart?.hide?.();
+      // Canvas only rendered the page that was loaded; if we navigated since, load this one.
+      if (started && state.nativePath !== location.pathname + location.search) location.reload();
     }
   }
 

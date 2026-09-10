@@ -193,7 +193,8 @@
     // ---- list view -----------------------------------------------------------------------
     function listBlock() {
       if (!planner) return U.emptyCard('Your planner could not be loaded.');
-      const upcoming = live.filter((it) => it.date >= todayStart && !it.submitted).sort((a, b) => a.date - b.date);
+      // Completed and submitted items stay in the list, ticked, so they can be unticked.
+      const upcoming = (planner || []).filter((it) => !it.dismissed && it.type !== 'announcement' && it.date >= todayStart).sort((a, b) => a.date - b.date);
       if (!upcoming.length) return U.emptyCard('Nothing coming up in the next three weeks.');
       const days = new Map();
       for (const it of upcoming) {
@@ -216,24 +217,34 @@
     function plannerRow(it) {
       const pal = it.course ? it.course.palette : U.palette(null, dark);
       let rowEl;
-      const circle = h('button', { type: 'button', class: 'bcv-circle', title: 'Mark done', 'aria-label': `Mark ${it.title} done`, onclick: async (e) => {
+      const isDone = () => it.complete || it.submitted;
+      let paint = () => {};
+      const circle = h('button', { type: 'button', class: 'bcv-circle', onclick: async (e) => {
         e.preventDefault();
         e.stopPropagation();
-        circle.classList.add('is-done');
+        const next = !it.complete;
+        paint(next || it.submitted);
         try {
-          await store.setComplete(it, true);
-          rowEl.remove();
+          await store.setComplete(it, next);
+          paint(isDone());
           app.refreshCounts();
         } catch (err) {
-          circle.classList.remove('is-done');
-          U.toast(`Could not mark it done: ${err.message}`, { error: true });
+          paint(isDone());
+          U.toast(`Could not update it: ${err.message}`, { error: true });
         }
       } });
+      paint = (done) => {
+        circle.classList.toggle('is-done', done);
+        circle.replaceChildren(...(done ? [U.svg('M6 12l4 4 8-8', { size: 12, stroke: '#fff', width: 2.4 })] : []));
+        circle.title = done ? 'Mark not done' : 'Mark done';
+        circle.setAttribute('aria-label', `${done ? 'Mark not done' : 'Mark done'}: ${it.title}`);
+        rowEl?.classList.toggle('bcv-row--done', done);
+      };
       rowEl = U.row([
         circle,
         U.tile(it.icon, { color: pal.text, tint: pal.tint }),
         U.el('bcv-row__body', [
-          U.text('bcv-row__over', `${it.courseName} · ${it.kind}${it.isDue ? '' : ' · to-do date'}`),
+          U.text('bcv-row__over', `${it.courseName} · ${it.kind}${it.isDue ? '' : ' · to-do date'}${it.submitted ? ' · submitted' : ''}`),
           U.text('bcv-row__title bcv-ellip', it.title),
         ]),
         U.el('bcv-row__right', [
@@ -242,6 +253,7 @@
         ]),
         U.chev(),
       ], { mod: 'bcv-row--p14', href: it.url });
+      paint(isDone());
       return rowEl;
     }
 

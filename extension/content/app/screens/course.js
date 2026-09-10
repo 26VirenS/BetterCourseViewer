@@ -30,7 +30,11 @@
       }
     });
     doc.querySelectorAll('iframe').forEach((f) => {
-      f.setAttribute('loading', 'lazy');
+      // Safari stalls lazy iframes that start off-screen; let embeds load normally.
+      f.removeAttribute('loading');
+      if (!f.getAttribute('src') && f.dataset.src) f.setAttribute('src', f.dataset.src);
+      f.setAttribute('allowfullscreen', '');
+      if (!f.getAttribute('allow')) f.setAttribute('allow', 'fullscreen; microphone; camera; display-capture; autoplay; clipboard-write');
       const src = f.getAttribute('src') || '';
       const open = h('a', { class: 'bcv-chip bcv-embed-open', href: src || '#', target: '_blank', rel: 'noopener', text: 'Open in new tab' });
       f.after(open);
@@ -103,24 +107,74 @@
     ov.focus();
   }
 
+  /** Header (back link, colour, title, pills, Immersive Reader) plus a
+   *  collapsible sidebar of the context's tabs, for courses and groups. */
+  async function contextShell(ctx, shell, { backLabel, backHref, tabs, activeId, pills = [] }) {
+    const { app } = ctx;
+    const c = shell.course;
+    const collapsed = !!(await store.pref('courseSideCollapsed', false));
+    const screen = U.el('bcv-screen bcv-screen--ctx', null, { style: { '--w': '1040px' } });
+    const head = U.el('bcv-head bcv-head--course', U.el('bcv-head__in', [
+      h('button', { type: 'button', class: 'bcv-linkbtn', onclick: () => app.go(backHref) }, [U.svg(IC.back, { size: 14, stroke: 'var(--bcv-blue)', width: 2.1 }), backLabel]),
+      U.el('bcv-course__title-row', [
+        h('span', { class: 'bcv-dot bcv-dot--sq', style: { background: c.color } }),
+        h('h1', { class: 'bcv-h1 bcv-h1--30', text: c.name }),
+        ...pills.filter(Boolean),
+        U.btn('Immersive Reader', { icon: IC.reader, kind: 'card', iconColor: 'var(--bcv-blue)', cls: 'bcv-ml-auto', onClick: () => {
+          if (shell.reader) openReader(shell.reader.title, shell.reader.html);
+          else U.toast('Nothing to read on this tab yet.');
+        } }),
+      ]),
+    ]));
+    const cside = U.el(`bcv-cside ${collapsed ? 'is-collapsed' : ''}`);
+    let syncToggle = () => {};
+    const toggle = h('button', { type: 'button', class: 'bcv-cside__toggle', onclick: () => {
+      const on = cside.classList.toggle('is-collapsed');
+      store.setPref('courseSideCollapsed', on);
+      syncToggle();
+    } });
+    syncToggle = () => {
+      const on = cside.classList.contains('is-collapsed');
+      toggle.title = on ? 'Expand course menu' : 'Collapse course menu';
+      toggle.setAttribute('aria-label', toggle.title);
+      toggle.setAttribute('aria-expanded', on ? 'false' : 'true');
+      toggle.replaceChildren(U.svg(on ? IC.chevron : IC.back, { size: 13, stroke: 'var(--bcv-ink3)', width: 2.1 }));
+    };
+    syncToggle();
+    const nav = h('nav', { class: 'bcv-cside__nav', 'aria-label': `${c.name} menu` }, tabs.map((t) => h('button', {
+      type: 'button',
+      class: `bcv-cside__item ${t.id === activeId ? 'is-active' : ''}`,
+      dataset: { tab: t.id },
+      title: t.label,
+      onclick: () => app.go(t.href),
+    }, [h('span', { class: 'bcv-cside__ic' }, U.svg(t.icon, { size: 14, width: 1.9 })), h('span', { class: 'bcv-cside__label bcv-ellip', text: t.label })])));
+    cside.append(toggle, nav);
+    const cmain = U.el('bcv-cmain');
+    screen.append(head, U.el('bcv-cwrap', [cside, cmain]));
+    // keep the sidebar just below the sticky header, whatever height the title wraps to
+    const measure = () => screen.style.setProperty('--bcv-chead', `${head.offsetHeight}px`);
+    if (typeof ResizeObserver !== 'undefined') new ResizeObserver(measure).observe(head);
+    setTimeout(measure, 0);
+    return { screen, content: cmain, head };
+  }
+
   async function render(ctx) {
     const { app, route } = ctx;
     const id = route.courseId;
     const dark = app.isDark();
     const screen = U.el('bcv-screen', null, { style: { '--w': '1040px' } });
     const head = U.el('bcv-head bcv-head--course');
-    const content = h('div');
-    screen.append(head, content);
+    screen.append(head, U.el('bcv-body', U.loading()));
     head.append(U.el('bcv-head__in', U.loading()));
 
     const [course, tabsRaw] = await Promise.all([store.course(id).catch(() => null), store.tabs(id).catch(() => [])]);
     if (!ctx.alive()) return screen;
     if (!course) {
       head.replaceChildren(U.el('bcv-head__in', h('h1', { class: 'bcv-h1 bcv-h1--30', text: 'Course' })));
-      content.append(U.el('bcv-body', U.errorBox('This course could not be loaded. You may not have access to it.')));
+      screen.lastChild.replaceChildren(U.errorBox('This course could not be loaded. You may not have access to it.'));
       return screen;
     }
-    const shell = { course, reader: null, dark };
+    const shell = { course, reader: null, dark, kind: 'courses' };
     const tabs = (tabsRaw || []).filter((t) => !t.hidden && t.id !== 'settings').map((t) => {
       const external = t.type === 'external' || String(t.id).startsWith('context_external_tool');
       const path = (() => {
@@ -141,21 +195,12 @@
       return tabs.find((x) => x.href !== `/courses/${id}` && route.path.startsWith(x.href))?.id || (route.tab === 'native' ? null : 'home');
     })();
 
-    head.replaceChildren(U.el('bcv-head__in', [
-      h('button', { type: 'button', class: 'bcv-linkbtn', onclick: () => app.go('/courses') }, [U.svg(IC.back, { size: 14, stroke: 'var(--bcv-blue)', width: 2.1 }), 'All Courses']),
-      U.el('bcv-course__title-row', [
-        h('span', { class: 'bcv-dot bcv-dot--sq', style: { background: course.color } }),
-        h('h1', { class: 'bcv-h1 bcv-h1--30', text: course.name }),
-        course.term ? h('span', { class: 'bcv-pill bcv-pill--term', text: course.term }) : null,
-        U.btn('Immersive Reader', { icon: IC.reader, kind: 'card', iconColor: 'var(--bcv-blue)', cls: 'bcv-ml-auto', onClick: () => {
-          if (shell.reader) openReader(shell.reader.title, shell.reader.html);
-          else U.toast('Nothing to read on this tab yet.');
-        } }),
-      ]),
-      U.el('bcv-tabs', tabs.map((t) => h('button', { type: 'button', class: `bcv-tab ${t.id === activeId ? 'is-active' : ''}`, dataset: { tab: t.id }, onclick: () => app.go(t.href) }, [
-        U.svg(t.icon, { size: 13, stroke: t.id === activeId ? '#fff' : 'var(--bcv-ink2)', width: 1.9 }), t.label,
-      ]))),
-    ]));
+    const { screen: shellEl, content: cmain } = await contextShell(ctx, shell, { backLabel: 'All Courses', backHref: '/courses', tabs, activeId, pills: [course.term ? h('span', { class: 'bcv-pill bcv-pill--term', text: course.term }) : null] });
+    if (!ctx.alive()) return screen;
+    screen.replaceChildren(...shellEl.childNodes);
+    screen.className = shellEl.className;
+    screen.style.cssText = shellEl.style.cssText;
+    const content = cmain;
 
     const B = BCV.screens.courseTabs;
     const D = BCV.screens.courseDetail;
@@ -261,7 +306,7 @@
     } else if (view === 'feed') {
       left.replaceChildren(await T.streamBlock(ctx, shell));
     } else {
-      const fp = await store.frontPage(c.id).catch(() => null);
+      const fp = await store.frontPage(c.id, { kind: shell.kind }).catch(() => null);
       if (!ctx.alive()) return b;
       if (fp && fp.body !== undefined) {
         shell.reader = { title: fp.title, html: fp.body };
@@ -291,7 +336,7 @@
 
   T.streamBlock = async (ctx, shell) => {
     const c = shell.course;
-    const stream = await store.courseStream(c.id).catch(() => null);
+    const stream = await store.courseStream(c.id, { kind: shell.kind }).catch(() => null);
     if (!stream) return U.emptyCard('The course stream could not be loaded.');
     if (!stream.length) return U.emptyCard('No recent activity in this course.');
     const KIND = { Announcement: [IC.bell, 'Announcement'], DiscussionTopic: [IC.disc, 'Discussion'], Submission: [IC.chart, 'Grade posted'], Message: [IC.doc, 'Notification'], Conversation: [IC.mail, 'Message'] };
@@ -325,7 +370,7 @@
     b.append(U.el('bcv-head__tools', [U.search('Search announcements', (q) => { query = q.toLowerCase(); draw(); }, 'bcv-search--200'), U.seg([['all', 'All'], ['unread', 'Unread']], filter, (v) => { filter = v; draw(); })]), listWrap);
     b.querySelector('.bcv-head__tools').style.marginTop = '0';
     listWrap.append(U.loading());
-    const list = await store.announcements(c.id).catch(() => null);
+    const list = await store.announcements(c.id, { kind: shell.kind }).catch(() => null);
     if (!ctx.alive()) return b;
     function draw() {
       if (!list) return listWrap.replaceChildren(U.errorBox('Announcements could not be loaded.'));
@@ -433,7 +478,7 @@
     b.append(U.el('bcv-head__tools', [U.search('Search by title or author', (q) => { query = q.toLowerCase(); draw(); }, 'bcv-search--200'), U.text('bcv-group__sub', 'Ordered by recent activity', 'span')]), wrap);
     b.querySelector('.bcv-head__tools').style.marginTop = '0';
     wrap.append(U.loading());
-    const list = await store.discussions(c.id).catch(() => null);
+    const list = await store.discussions(c.id, { kind: shell.kind }).catch(() => null);
     if (!ctx.alive()) return b;
     function draw() {
       if (!list) return wrap.replaceChildren(U.errorBox('Discussions could not be loaded.'));
@@ -476,10 +521,12 @@
     const rolePill = U.pill('All roles', (e) => U.menu(e.currentTarget, [['all', 'All roles'], ['StudentEnrollment', 'Students'], ['TeacherEnrollment', 'Teachers'], ['TaEnrollment', 'TAs'], ['ObserverEnrollment', 'Observers'], ['DesignerEnrollment', 'Designers']].map(([k, l]) => ({ label: l, active: role === k, onSelect: () => { role = k; rolePill.textContent = l; draw(); } }))));
     const wrap = h('div');
     const segEl = U.seg([['everyone', 'Everyone'], ['groups', 'Groups']], sub, (v) => { sub = v; draw(); }, { wide: true });
-    b.append(U.el('bcv-head__tools', [segEl, U.search('Search people', (q) => { query = q.toLowerCase(); draw(); }, 'bcv-search--180'), rolePill]), wrap);
+    const isGroupCtx = shell.kind === 'groups';
+    b.append(U.el('bcv-head__tools', [isGroupCtx ? null : segEl, U.search('Search people', (q) => { query = q.toLowerCase(); draw(); }, 'bcv-search--180'), isGroupCtx ? null : rolePill]), wrap);
     b.querySelector('.bcv-head__tools').style.marginTop = '0';
     wrap.append(U.loading());
-    const [users, sections, groups] = await Promise.all([store.people(c.id).catch(() => null), store.sections(c.id).catch(() => []), store.courseGroups(c.id).catch(() => [])]);
+    const isGroup = shell.kind === 'groups';
+    const [users, sections, groups] = await Promise.all([store.people(c.id, { kind: shell.kind }).catch(() => null), isGroup ? [] : store.sections(c.id).catch(() => []), isGroup ? [] : store.courseGroups(c.id).catch(() => [])]);
     if (!ctx.alive()) return b;
     const secName = new Map((sections || []).map((s) => [String(s.id), s.name]));
     const roleOf = (u) => {
@@ -504,8 +551,8 @@
         U.avatar(u.avatar_url, u.name, 38),
         U.el('bcv-row__body', [U.text('bcv-row__title bcv-row__title--145 bcv-ellip', u.name || u.sortable_name), U.text('bcv-row__sub', u.pronouns || '—')]),
         U.text('bcv-people__sections', [...new Set((u.enrollments || []).map((e) => secName.get(String(e.course_section_id))).filter(Boolean))].join(' · '), 'span'),
-        U.badge(roleOf(u)),
-      ], { mod: 'bcv-row--p12', href: `/courses/${c.id}/users/${u.id}` })), 'bcv-card--list'));
+        U.badge(isGroup ? 'Member' : roleOf(u)),
+      ], { mod: 'bcv-row--p12', href: `${c.url}/users/${u.id}` })), 'bcv-card--list'));
     }
     draw();
     ctx.setSmart({ label: `${c.name} · People`, actions: [], context: () => `${U.plural((users || []).length, 'person')} in ${c.name}. Teachers: ${c.teachers.join(', ')}` });
@@ -517,7 +564,7 @@
     const c = shell.course;
     const b = body();
     b.append(U.loading());
-    const list = await store.pages(c.id).catch(() => null);
+    const list = await store.pages(c.id, { kind: shell.kind }).catch(() => null);
     if (!ctx.alive()) return b;
     if (!list) return b.replaceChildren(U.errorBox('Pages could not be loaded.')) || b;
     const sorted = [...list].sort((x, y) => (y.front_page ? 1 : 0) - (x.front_page ? 1 : 0) || String(x.title).localeCompare(String(y.title)));
@@ -554,7 +601,7 @@
     wrap.append(U.loading());
     let folder;
     try {
-      folder = route.tab === 'folder' && route.arg ? await store.folderByPath(c.id, route.arg) : await store.rootFolder(c.id);
+      folder = route.tab === 'folder' && route.arg ? await store.folderByPath(c.id, route.arg, { kind: shell.kind }) : await store.rootFolder(c.id, { kind: shell.kind });
       if (Array.isArray(folder)) folder = folder[folder.length - 1];
     } catch {
       folder = null;
@@ -678,6 +725,6 @@
     return b;
   };
 
-  BCV.screens.course = { render, prose, linksFrom, typeIcon, ptsLabel, statusBadge, openReader };
+  BCV.screens.course = { render, prose, linksFrom, typeIcon, ptsLabel, statusBadge, openReader, contextShell };
   BCV.screens.courseTabs = T;
 })();

@@ -304,26 +304,33 @@
     return (items || []).map((it) => classify(it, map)).filter((it) => it.date);
   }
 
-  /** Items on the To Do list: not done, not dismissed, from today through the next 7 days. */
-  async function todo(opts = {}) {
+  /** Everything in the To Do window (today through the next 7 days), including
+   *  items already completed, submitted or dismissed; the screen decides what to show. */
+  async function todoWindow(opts = {}) {
     const items = await planner(opts);
     const t = now();
     const end = U.addDays(U.startOfDay(t), 8);
-    return items.filter((it) => !it.complete && !it.dismissed && !it.submitted && it.date >= U.startOfDay(t) && it.date < end && it.type !== 'announcement');
+    return items.filter((it) => it.date >= U.startOfDay(t) && it.date < end && it.type !== 'announcement');
+  }
+  /** Items still open on the To Do list: not done, not dismissed. */
+  async function todo(opts = {}) {
+    return (await todoWindow(opts)).filter((it) => !it.complete && !it.dismissed && !it.submitted);
   }
 
-  async function setComplete(item, complete) {
+  async function override(item, patch) {
     const ov = item.raw.planner_override;
-    if (ov?.id) await C.put(`/api/v1/planner/overrides/${ov.id}`, { marked_complete: complete });
-    else await C.post('/api/v1/planner/overrides', { plannable_type: item.type, plannable_id: item.raw.plannable_id, marked_complete: complete });
+    const result = ov?.id
+      ? await C.put(`/api/v1/planner/overrides/${ov.id}`, patch)
+      : await C.post('/api/v1/planner/overrides', { plannable_type: item.type, plannable_id: item.raw.plannable_id, ...patch });
+    item.raw.planner_override = result && result.id ? result : { ...(ov || {}), ...patch };
+    item.complete = !!item.raw.planner_override.marked_complete;
+    item.dismissed = !!item.raw.planner_override.dismissed;
     await invalidatePlanner();
+    return result;
   }
-  async function dismiss(item) {
-    const ov = item.raw.planner_override;
-    if (ov?.id) await C.put(`/api/v1/planner/overrides/${ov.id}`, { dismissed: true });
-    else await C.post('/api/v1/planner/overrides', { plannable_type: item.type, plannable_id: item.raw.plannable_id, dismissed: true });
-    await invalidatePlanner();
-  }
+  const setComplete = (item, complete) => override(item, { marked_complete: complete });
+  const dismiss = (item) => override(item, { dismissed: true });
+  const restore = (item) => override(item, { dismissed: false, marked_complete: false });
   async function invalidatePlanner() {
     await Promise.all([C.invalidate('planner:21'), C.invalidate('planner:14'), C.invalidate('planner:60')]);
   }
@@ -376,21 +383,39 @@
     const key = `cal:${s.slice(0, 10)}:${e.slice(0, 10)}:${codes.join(',')}`;
     return C.cached(key, 5 * MIN, async () => {
       if (!codes.length) return [];
-      const params = { start_date: s, end_date: e, 'context_codes[]': codes, per_page: 100, include: ['submission'] };
-      const [ev, as] = await Promise.all([
-        C.get('/api/v1/calendar_events', { params: { ...params, type: 'event' }, all: true, maxPages: 5 }).catch(() => []),
-        C.get('/api/v1/calendar_events', { params: { ...params, type: 'assignment' }, all: true, maxPages: 5 }).catch(() => []),
-      ]);
-      return [...(ev || []), ...(as || [])];
+      // Canvas accepts at most 10 context codes per request: fan out in chunks.
+      const chunks = [];
+      for (let i = 0; i < codes.length; i += 10) chunks.push(codes.slice(i, i + 10));
+      const calls = [];
+      for (const chunk of chunks) {
+        const params = { start_date: s, end_date: e, 'context_codes[]': chunk, per_page: 100 };
+        calls.push(C.get('/api/v1/calendar_events', { params: { ...params, type: 'event' }, all: true, maxPages: 5 }));
+        calls.push(C.get('/api/v1/calendar_events', { params: { ...params, type: 'assignment' }, all: true, maxPages: 5 }));
+      }
+      const results = await Promise.allSettled(calls);
+      const ok = results.filter((r) => r.status === 'fulfilled');
+      if (!ok.length) throw new Error(results[0]?.reason?.message || 'Calendar request failed');
+      const seen = new Set();
+      const out = [];
+      for (const r of ok) for (const ev of r.value || []) {
+        const k = String(ev.id);
+        if (seen.has(k)) continue;
+        seen.add(k);
+        out.push(ev);
+      }
+      return out;
     }, { force });
   }
 
   // ---- inbox ----------------------------------------------------------------------------------
   function conversations({ scope = 'inbox', filter = null, force = false } = {}) {
-    const params = { per_page: 50, include_all_conversation_ids: false };
+    const params = { per_page: 50 };
     if (scope && scope !== 'inbox') params.scope = scope;
     if (filter) params['filter[]'] = filter;
-    return C.cached(`conv:${scope}:${filter || ''}`, 2 * MIN, () => C.get('/api/v1/conversations', { params }), { force });
+    return C.cached(`conv:${scope}:${filter || ''}`, 2 * MIN, async () => {
+      const r = await C.get('/api/v1/conversations', { params });
+      return Array.isArray(r) ? r : (r?.conversations || []);
+    }, { force });
   }
   function conversation(id, { force = true } = {}) {
     return C.cached(`conv:${id}`, MIN, () => C.get(`/api/v1/conversations/${id}`), { force });
@@ -442,11 +467,24 @@
       color, palette: U.palette(color, BCV.early?.isDark?.() ?? false), url: `/courses/${id}`,
     };
   }
-  function tabs(id, { force = false } = {}) {
-    return C.cached(`tabs:${id}`, 30 * MIN, () => C.get(`/api/v1/courses/${id}/tabs`), { force });
+  // `kind` is 'courses' or 'groups': the same endpoints exist under both.
+  function tabs(id, { force = false, kind = 'courses' } = {}) {
+    return C.cached(`tabs:${kind}:${id}`, 30 * MIN, () => C.get(`/api/v1/${kind}/${id}/tabs`), { force });
   }
-  function frontPage(id, { force = false } = {}) {
-    return C.cached(`front:${id}`, 10 * MIN, () => C.get(`/api/v1/courses/${id}/front_page`).catch(() => null), { force });
+  function frontPage(id, { force = false, kind = 'courses' } = {}) {
+    return C.cached(`front:${kind}:${id}`, 10 * MIN, () => C.get(`/api/v1/${kind}/${id}/front_page`).catch(() => null), { force });
+  }
+  /** One group, shaped like a course so the course tab builders can draw it. */
+  async function group(id, { force = false } = {}) {
+    const g = await C.cached(`group:${id}`, 15 * MIN, () => C.get(`/api/v1/groups/${id}`, { params: { include: ['group_category', 'users'] } }), { force });
+    const cs = await courses().catch(() => []);
+    const course = g.course_id ? cs.find((c) => c.id === String(g.course_id)) : null;
+    const color = course?.color || '#5856d6';
+    return {
+      id: String(g.id), raw: g, name: g.name, originalName: g.name, nickname: null, code: g.name, term: course?.term || (g.context_type === 'Account' ? 'Account group' : ''), favorite: false,
+      state: course?.state || 'current', role: 'Member', score: null, grade: null, teachers: [], sections: [], image: g.avatar_url || null, defaultView: 'feed', weighted: false,
+      color, palette: U.palette(color, BCV.early?.isDark?.() ?? false), url: `/groups/${id}`, kind: 'groups', course, membersCount: g.members_count ?? null, description: g.description || '',
+    };
   }
   function syllabus(id, { force = false } = {}) {
     return C.cached(`syllabus:${id}`, 10 * MIN, () => C.get(`/api/v1/courses/${id}`, { params: { include: ['syllabus_body'] } }).then((c) => c?.syllabus_body || ''), { force });
@@ -461,8 +499,8 @@
     await C.del(path);
     await C.invalidate(`ctodo:${courseId}`);
   }
-  function courseStream(id, { force = false } = {}) {
-    return C.cached(`cstream:${id}`, 3 * MIN, () => C.get(`/api/v1/courses/${id}/activity_stream`, { params: { per_page: 40 } }), { force });
+  function courseStream(id, { force = false, kind = 'courses' } = {}) {
+    return C.cached(`cstream:${kind}:${id}`, 3 * MIN, () => C.get(`/api/v1/${kind}/${id}/activity_stream`, { params: { per_page: 40 } }), { force });
   }
   function assignments(id, { force = false } = {}) {
     return C.cached(`assignments:${id}`, 10 * MIN, () =>
@@ -491,38 +529,38 @@
       return { done: 0, total: 0 };
     }
   }
-  function announcements(id, { force = false } = {}) {
-    return C.cached(`ann:${id}`, 5 * MIN, () =>
-      C.get(`/api/v1/courses/${id}/discussion_topics`, { params: { only_announcements: true, per_page: 50 }, all: true, maxPages: 2 }), { force });
+  function announcements(id, { force = false, kind = 'courses' } = {}) {
+    return C.cached(`ann:${kind}:${id}`, 5 * MIN, () =>
+      C.get(`/api/v1/${kind}/${id}/discussion_topics`, { params: { only_announcements: true, per_page: 50 }, all: true, maxPages: 2 }), { force });
   }
-  function discussions(id, { force = false } = {}) {
-    return C.cached(`disc:${id}`, 5 * MIN, () =>
-      C.get(`/api/v1/courses/${id}/discussion_topics`, { params: { per_page: 50, order_by: 'recent_activity', include: ['all_dates'] }, all: true, maxPages: 3 }), { force });
+  function discussions(id, { force = false, kind = 'courses' } = {}) {
+    return C.cached(`disc:${kind}:${id}`, 5 * MIN, () =>
+      C.get(`/api/v1/${kind}/${id}/discussion_topics`, { params: { per_page: 50, order_by: 'recent_activity', include: ['all_dates'] }, all: true, maxPages: 3 }), { force });
   }
-  function discussion(id, tid, { force = false } = {}) {
-    return C.cached(`disc:${id}:${tid}`, 3 * MIN, () => C.get(`/api/v1/courses/${id}/discussion_topics/${tid}`, { params: { include: ['all_dates'] } }), { force });
+  function discussion(id, tid, { force = false, kind = 'courses' } = {}) {
+    return C.cached(`disc:${kind}:${id}:${tid}`, 3 * MIN, () => C.get(`/api/v1/${kind}/${id}/discussion_topics/${tid}`, { params: { include: ['all_dates'] } }), { force });
   }
-  function discussionView(id, tid, { force = true } = {}) {
-    return C.cached(`discview:${id}:${tid}`, MIN, () => C.get(`/api/v1/courses/${id}/discussion_topics/${tid}/view`).catch(() => null), { force });
+  function discussionView(id, tid, { force = true, kind = 'courses' } = {}) {
+    return C.cached(`discview:${kind}:${id}:${tid}`, MIN, () => C.get(`/api/v1/${kind}/${id}/discussion_topics/${tid}/view`).catch(() => null), { force });
   }
-  async function postEntry(id, tid, message, parentId = null) {
+  async function postEntry(id, tid, message, parentId = null, { kind = 'courses' } = {}) {
     const r = parentId
-      ? await C.post(`/api/v1/courses/${id}/discussion_topics/${tid}/entries/${parentId}/replies`, { message })
-      : await C.post(`/api/v1/courses/${id}/discussion_topics/${tid}/entries`, { message });
-    await Promise.all([C.invalidate(`discview:${id}:${tid}`), C.invalidate(`disc:${id}`), C.invalidate(`disc:${id}:${tid}`)]);
+      ? await C.post(`/api/v1/${kind}/${id}/discussion_topics/${tid}/entries/${parentId}/replies`, { message })
+      : await C.post(`/api/v1/${kind}/${id}/discussion_topics/${tid}/entries`, { message });
+    await Promise.all([C.invalidate(`discview:${kind}:${id}:${tid}`), C.invalidate(`disc:${kind}:${id}`), C.invalidate(`disc:${kind}:${id}:${tid}`)]);
     return r;
   }
-  async function markTopicRead(id, tid) {
+  async function markTopicRead(id, tid, { kind = 'courses' } = {}) {
     try {
-      await C.put(`/api/v1/courses/${id}/discussion_topics/${tid}/read_all`, {});
-      await Promise.all([C.invalidate(`disc:${id}`), C.invalidate(`ann:${id}`)]);
+      await C.put(`/api/v1/${kind}/${id}/discussion_topics/${tid}/read_all`, {});
+      await Promise.all([C.invalidate(`disc:${kind}:${id}`), C.invalidate(`ann:${kind}:${id}`)]);
     } catch {
       /* ignore */
     }
   }
-  function people(id, { force = false } = {}) {
-    return C.cached(`people:${id}`, 15 * MIN, () =>
-      C.get(`/api/v1/courses/${id}/users`, { params: { per_page: 100, include: ['enrollments', 'avatar_url', 'pronouns'], sort: 'username' }, all: true, maxPages: 5 }), { force });
+  function people(id, { force = false, kind = 'courses' } = {}) {
+    return C.cached(`people:${kind}:${id}`, 15 * MIN, () =>
+      C.get(`/api/v1/${kind}/${id}/users`, { params: { per_page: 100, include: kind === 'groups' ? ['avatar_url'] : ['enrollments', 'avatar_url', 'pronouns'], sort: 'username' }, all: true, maxPages: 5 }), { force });
   }
   function sections(id, { force = false } = {}) {
     return C.cached(`sections:${id}`, 30 * MIN, () => C.get(`/api/v1/courses/${id}/sections`, { params: { per_page: 100 } }).catch(() => []), { force });
@@ -530,15 +568,15 @@
   function courseGroups(id, { force = false } = {}) {
     return C.cached(`cgroups:${id}`, 15 * MIN, () => C.get(`/api/v1/courses/${id}/groups`, { params: { per_page: 100, include: ['group_category'] } }).catch(() => []), { force });
   }
-  function pages(id, { force = false } = {}) {
-    return C.cached(`pages:${id}`, 10 * MIN, () =>
-      C.get(`/api/v1/courses/${id}/pages`, { params: { per_page: 100, sort: 'title', published: true }, all: true, maxPages: 3 }), { force });
+  function pages(id, { force = false, kind = 'courses' } = {}) {
+    return C.cached(`pages:${kind}:${id}`, 10 * MIN, () =>
+      C.get(`/api/v1/${kind}/${id}/pages`, { params: { per_page: 100, sort: 'title', published: true }, all: true, maxPages: 3 }), { force });
   }
-  function page(id, slug, { force = false } = {}) {
-    return C.cached(`page:${id}:${slug}`, 10 * MIN, () => C.get(`/api/v1/courses/${id}/pages/${encodeURIComponent(slug)}`), { force });
+  function page(id, slug, { force = false, kind = 'courses' } = {}) {
+    return C.cached(`page:${kind}:${id}:${slug}`, 10 * MIN, () => C.get(`/api/v1/${kind}/${id}/pages/${encodeURIComponent(slug)}`), { force });
   }
-  function rootFolder(id, { force = false } = {}) {
-    return C.cached(`folder:root:${id}`, 15 * MIN, () => C.get(`/api/v1/courses/${id}/folders/root`), { force });
+  function rootFolder(id, { force = false, kind = 'courses' } = {}) {
+    return C.cached(`folder:root:${kind}:${id}`, 15 * MIN, () => C.get(`/api/v1/${kind}/${id}/folders/root`), { force });
   }
   function folderContents(folderId, { force = false } = {}) {
     return C.cached(`folder:${folderId}`, 10 * MIN, async () => {
@@ -549,9 +587,9 @@
       return { folders: folders || [], files: files || [] };
     }, { force });
   }
-  function folderByPath(id, path, { force = false } = {}) {
-    return C.cached(`folder:path:${id}:${path}`, 10 * MIN, () =>
-      C.get(`/api/v1/courses/${id}/folders/by_path/${path.split('/').map(encodeURIComponent).join('/')}`), { force });
+  function folderByPath(id, path, { force = false, kind = 'courses' } = {}) {
+    return C.cached(`folder:path:${kind}:${id}:${path}`, 10 * MIN, () =>
+      C.get(`/api/v1/${kind}/${id}/folders/by_path/${path.split('/').map(encodeURIComponent).join('/')}`), { force });
   }
   function file(fileId, { force = false } = {}) {
     return C.cached(`file:${fileId}`, 10 * MIN, () => C.get(`/api/v1/files/${fileId}`), { force });
@@ -659,7 +697,7 @@
 
   BCV.store = {
     env, pref, setPref, me, account, colors, courses, favorites, cards, setFavorite, currentTerm, dashboardView, setDashboardView,
-    planner, classify, todo, setComplete, dismiss, invalidatePlanner, activity, activitySummary, unreadCount, groups,
+    planner, classify, todo, todoWindow, setComplete, dismiss, restore, invalidatePlanner, activity, activitySummary, unreadCount, groups, group,
     calendarContexts, selectedContexts, setSelectedContexts, calendarEvents,
     conversations, conversation, markRead, setStarred, replyTo, compose, searchRecipients, invalidateInbox,
     course, tabs, frontPage, syllabus, courseTodo, ignoreTodo, courseStream, assignments, assignment, submission, assignmentGroups, progress,

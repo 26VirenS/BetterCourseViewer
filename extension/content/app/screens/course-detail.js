@@ -31,18 +31,30 @@
     const s = sub || a.submission || {};
     const types = (a.submission_types || []).map((t) => ({ online_upload: 'a file upload', online_text_entry: 'a text entry', online_url: 'a website URL', media_recording: 'a media recording', discussion_topic: 'a discussion post', online_quiz: 'a quiz', external_tool: 'an external tool', on_paper: 'on paper', none: 'nothing to submit', student_annotation: 'an annotation' }[t] || t)).join(', ');
     shell.reader = { title: a.name, html: a.description || '' };
+    const isTool = (a.submission_types || []).includes('external_tool');
+    const toolAttrs = a.external_tool_tag_attributes || {};
+    const toolNewTab = !!toolAttrs.new_tab;
+    // Canvas's own launch route for an assignment's tool (same URL its assignment page embeds).
+    const toolLaunch = toolAttrs.url ? `${c.url}/external_tools/retrieve?assignment_id=${a.id}&display=borderless&url=${encodeURIComponent(toolAttrs.url)}` : `${c.url}/assignments/${a.id}`;
     main.replaceChildren(
       backBtn(app, `${c.url}/assignments`, 'Assignments'),
       U.card(U.el('bcv-detail', [
         h('h2', { class: 'bcv-detail__title bcv-pretty', text: a.name }),
         meta([['Due', a.due_at ? U.fmtAt(a.due_at) : 'No due date'], ['Points', a.points_possible ?? '—'], ['Submitting', types], ['Available until', a.lock_at ? U.fmtAt(a.lock_at) : null], ['Attempts', a.allowed_attempts && a.allowed_attempts > 0 ? `${s.attempt || 0} of ${a.allowed_attempts}` : null]]),
         U.el('bcv-detail__actions', [
-          (a.submission_types || []).some((t) => !['none', 'on_paper', 'not_graded'].includes(t)) ? U.btn(s.submitted_at ? 'Resubmit in Canvas' : 'Submit in Canvas', { kind: 'primary', icon: IC.external, iconColor: '#fff', onClick: () => app.go(nativeHref(`${c.url}/assignments/${a.id}`)) }) : null,
+          isTool ? (toolNewTab ? U.btn('Open the tool', { kind: 'primary', icon: IC.external, iconColor: '#fff', onClick: () => window.open(toolLaunch, '_blank', 'noopener') }) : null)
+            : (a.submission_types || []).some((t) => !['none', 'on_paper', 'not_graded'].includes(t)) ? U.btn(s.submitted_at ? 'Resubmit in Canvas' : 'Submit in Canvas', { kind: 'primary', icon: IC.external, iconColor: '#fff', onClick: () => app.go(nativeHref(`${c.url}/assignments/${a.id}`)) }) : null,
           a.quiz_id ? U.btn('Open quiz', { icon: IC.bolt, onClick: () => app.go(`${c.url}/quizzes/${a.quiz_id}`) }) : null,
           a.discussion_topic?.id ? U.btn('Open discussion', { icon: IC.disc, onClick: () => app.go(`${c.url}/discussion_topics/${a.discussion_topic.id}`) }) : null,
+          isTool && !toolNewTab ? U.btn('Open in Canvas', { icon: IC.external, onClick: () => app.go(nativeHref(`${c.url}/assignments/${a.id}`)) }) : null,
         ]),
-        a.description ? CS().prose(a.description) : U.text('bcv-hint', 'No description.'),
+        a.description ? CS().prose(a.description) : (isTool ? null : U.text('bcv-hint', 'No description.')),
       ]), 'bcv-card--22'),
+      // External-tool assignments (Knewton, Gradescope, …) are done inside the tool: embed the launch.
+      isTool && !toolNewTab ? U.card(U.el('bcv-detail', [
+        U.el('bcv-row__head', [U.text('bcv-label bcv-label--inline', 'External tool', 'span'), h('span', { class: 'bcv-ml-auto' }), h('a', { class: 'bcv-chip', href: toolLaunch, target: '_blank', rel: 'noopener', text: 'Open in new tab' })]),
+        h('iframe', { class: 'bcv-frame bcv-frame--doc', src: toolLaunch, title: a.name, allowfullscreen: '', allow: 'fullscreen; microphone; camera; display-capture; autoplay; clipboard-write' }),
+      ]), 'bcv-card--22') : null,
     );
     // side: submission + rubric
     const status = s.excused ? 'Excused' : s.workflow_state === 'graded' ? 'Graded' : s.submitted_at ? (s.late ? 'Submitted late' : 'Submitted') : s.missing ? 'Missing' : 'Not submitted';
@@ -82,10 +94,11 @@
     const main = mainCol(), side = sideCol();
     b.append(main, side);
     main.append(U.loading());
-    const [t, view] = await Promise.all([store.discussion(c.id, route.arg).catch(() => null), store.discussionView(c.id, route.arg).catch(() => null)]);
+    const K = { kind: shell.kind };
+    const [t, view] = await Promise.all([store.discussion(c.id, route.arg, K).catch(() => null), store.discussionView(c.id, route.arg, K).catch(() => null)]);
     if (!ctx.alive()) return b;
     if (!t) return main.replaceChildren(U.errorBox('This discussion could not be loaded.')) || b;
-    store.markTopicRead(c.id, t.id);
+    store.markTopicRead(c.id, t.id, K);
     shell.reader = { title: t.title, html: t.message || '' };
     const people = new Map((view?.participants || []).map((p) => [String(p.id), p]));
     let replyTo = null;
@@ -96,7 +109,7 @@
       if (!text) return;
       post.disabled = true;
       try {
-        await store.postEntry(c.id, t.id, text.split(/\n{2,}/).map((p) => `<p>${BCV.markdown.escape(p).replace(/\n/g, '<br>')}</p>`).join(''), replyTo?.id || null);
+        await store.postEntry(c.id, t.id, text.split(/\n{2,}/).map((p) => `<p>${BCV.markdown.escape(p).replace(/\n/g, '<br>')}</p>`).join(''), replyTo?.id || null, K);
         replyBox.value = '';
         replyTo = null;
         U.toast('Reply posted');
@@ -160,7 +173,7 @@
     const main = mainCol(), side = sideCol();
     b.append(main, side);
     main.append(U.loading());
-    const p = await store.page(c.id, route.arg).catch(() => null);
+    const p = await store.page(c.id, route.arg, { kind: shell.kind }).catch(() => null);
     if (!ctx.alive()) return b;
     if (!p) return main.replaceChildren(U.errorBox('This page could not be loaded.')) || b;
     shell.reader = { title: p.title, html: p.body || '' };

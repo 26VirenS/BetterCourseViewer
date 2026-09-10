@@ -26,15 +26,15 @@ Nothing is decorated; every screen is redrawn from the Canvas API with your own 
 
 **Courses** – favourites as cards with term, role, progress and what is due next; every other course grouped by term with a star to add it to your dashboard; All / Past / Future and search.
 
-**To Do** – everything from today through the next seven days, by date or by course. It knows what is *actually* due: assignments, quizzes and graded discussions carry a due date; pages, events and ungraded discussions with only a to-do date are labelled as such. Dismiss hides an item without touching the work.
+**To Do** – everything from today through the next seven days, by date or by course. It knows what is *actually* due: assignments, quizzes and graded discussions carry a due date; pages, events and ungraded discussions with only a to-do date are labelled as such. Tick an item to mark it done in your Canvas planner (and untick it later); dismiss hides it without touching the work; a switch shows completed and dismissed items so they can be restored.
 
 **Calendar** – Week, Month and Agenda views over your Canvas calendars, an agenda **range picker** (tap a start and an end day), calendar switches (Canvas's ten-calendar limit is enforced with a message), and struck-through text for submitted or past items.
 
 **Inbox** – conversations with course and scope filters, a reader with reply, and compose with recipient search. Stars, read state and sending all go through the Canvas API.
 
-**Groups** – current and previous groups.
+**Groups** – current and previous groups, each with its own screen: activity, announcements, discussions, pages, people and files.
 
-**Courses** – a header with the course colour, term and an **Immersive Reader** button (a clean large-type reading view of the page), tab pills straight from the course's own navigation, and:
+**Courses** – a header with the course colour, term and an **Immersive Reader** button (a clean large-type reading view of the page), a collapsible course sidebar built from the course's own navigation, and:
 - **Home** – the front page (or modules / syllabus / assignments / stream, whichever the instructor chose) with link chips, plus course links and the course To Do.
 - **Announcements**, **Assignments** (by date or by type, with status badges), **Discussions** (unread and reply counts), **People** (roles, sections, pronouns), **Pages**, **Files** (folders, selection, download), **Quizzes**, **Modules** (requirements and completion).
 - **Grades** – nested rings: the outer ring is your total as Canvas reports it; one inner ring per assignment group that has graded work; groups with nothing graded are listed instead of drawn. Weights, "not counted" and late badges, and a **what-if mode**: edit any score to see the outcome. Nothing is saved or sent anywhere.

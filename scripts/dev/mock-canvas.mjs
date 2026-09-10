@@ -73,6 +73,7 @@ const A = {
   104: [
     ['4001', 'Week 1 reflection', 'Assignments', 10, 10, -6, 23.98, -7, {}],
     ['4002', 'Week 2 Post Class Assignment: GC articles', 'Assignments', 10, null, 0, 23.98, null, {}],
+    ['4003', 'Knewton Alta: Unit 2', 'Assignments', 20, null, 5, 23.98, null, { tool: 'https://tool.example.com/launch' }],
   ],
   105: [
     ['5001', 'Journal #1', 'Journals', 5, 5, -6, 23.98, -6, {}],
@@ -103,7 +104,8 @@ function assignmentObj(courseId, row) {
   return {
     id, name, description: `<p>Complete <strong>${name}</strong> as described in lecture. Show all work and submit a single PDF.</p><ul><li>Use the chain rule where appropriate.</li><li>Label each step.</li></ul>${extra.rubric ? '<p>See the rubric for how points are awarded.</p>' : ''}`,
     due_at: due, lock_at: null, unlock_at: null, points_possible: possible, grading_type: 'points', published: true, html_url: `/courses/${courseId}/assignments/${id}`,
-    submission_types: extra.quiz ? ['online_quiz'] : ['online_upload', 'online_text_entry'], is_quiz_assignment: !!extra.quiz, quiz_id: extra.quiz ? String(Number(id) + 8000) : undefined,
+    submission_types: extra.quiz ? ['online_quiz'] : extra.tool ? ['external_tool'] : ['online_upload', 'online_text_entry'], is_quiz_assignment: !!extra.quiz, quiz_id: extra.quiz ? String(Number(id) + 8000) : undefined,
+    external_tool_tag_attributes: extra.tool ? { url: extra.tool, new_tab: false, resource_link_id: 'rl1' } : undefined,
     assignment_group_id: `g${courseId}-${Math.max(gIdx, 0)}`, omit_from_final_grade: !!extra.omit, allowed_attempts: 2, rubric: extra.rubric ? rubric : undefined, rubric_settings: extra.rubric ? { title: 'Dis01 rubric' } : undefined,
     submission,
   };
@@ -224,7 +226,9 @@ function page({ title, path = '', courseId, body }) {
 <meta name="csrf-token" content="mock-csrf">
 <script>INST = {"environment":"development"}; ENV = ${JSON.stringify(env)}; BRANDS = {};</script>
 <style>
+  :root{--ic-brand-global-nav-bgd:#0b2b52;--ic-brand-header-image:url("data:image/svg+xml;utf8,${encodeURIComponent('<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 40 40\'><path d=\'M6 32V8l14 14L34 8v24h-7V22l-7 7-7-7v10z\' fill=\'#f0b429\'/></svg>')}")}
   body{margin:0;font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:#2d3b45;background:#fff}
+  .ic-app-header__logomark{display:block;height:60px;background:var(--ic-brand-header-image) center/contain no-repeat}
   #header{position:fixed;left:0;top:0;bottom:0;width:84px;background:#394B58;color:#fff}
   #menu{list-style:none;margin:0;padding:0}.ic-app-header__menu-list-link{display:block;padding:12px 4px;color:#fff;text-decoration:none;font-size:11px;text-align:center}
   .ic-Layout-wrapper{margin-left:84px}#main{display:flex}#not_right_side{flex:1;padding:0 24px}#right-side-wrapper{width:300px;padding:24px}
@@ -232,7 +236,7 @@ function page({ title, path = '', courseId, body }) {
 </style></head>
 <body>
 <div id="application" class="ic-app">
-<header id="header" class="ic-app-header no-print"><ul id="menu"><li><a id="global_nav_dashboard_link" href="/" class="ic-app-header__menu-list-link">Dashboard</a></li><li><a id="global_nav_courses_link" href="/courses" class="ic-app-header__menu-list-link">Courses</a></li></ul></header>
+<header id="header" class="ic-app-header no-print"><div class="ic-app-header__logomark-container"><a href="/" class="ic-app-header__logomark"></a></div><ul id="menu"><li><a id="global_nav_dashboard_link" href="/" class="ic-app-header__menu-list-link">Dashboard</a></li><li><a id="global_nav_courses_link" href="/courses" class="ic-app-header__menu-list-link">Courses</a></li></ul></header>
 <div id="wrapper" class="ic-Layout-wrapper">
   <div id="main" class="ic-Layout-columns">
     <div id="not_right_side" class="ic-app-main-content"><div id="content" class="ic-Layout-contentMain">${body}</div></div>
@@ -287,7 +291,19 @@ on('PUT', /^\/api\/v1\/conversations\/(\w+)$/, (url, m, body) => { const c = con
 on('POST', /^\/api\/v1\/conversations\/(\w+)\/add_message$/, (url, m, body) => { const c = conversations.find((x) => x.id === m[1]); c.messages.unshift({ id: `m${Date.now()}`, author_id: '7', created_at: new Date().toISOString(), body: body.body }); c.last_message = body.body; c.last_message_at = new Date().toISOString(); return c; });
 on('POST', /^\/api\/v1\/conversations$/, (url, m, body) => { const c = { id: `c${conversations.length + 1}`, subject: body.subject || '(no subject)', workflow_state: 'read', last_message: body.body, last_message_at: new Date().toISOString(), starred: false, context_code: body.context_code, participants: [{ id: '7', name: 'Sam Student' }, ...(body.recipients || []).map((r) => ({ id: r, name: `User ${r}` }))], messages: [{ id: 'mx', author_id: '7', created_at: new Date().toISOString(), body: body.body }] }; conversations.unshift(c); return [c]; });
 on('GET', /^\/api\/v1\/search\/recipients$/, (url) => { const q = (url.searchParams.get('search') || '').toLowerCase(); return [{ id: 't101', name: 'Yue Lei', common_courses: {} }, { id: 'u2', name: 'Alan Aguilar' }, { id: 'course_101', name: 'F26-MATH 021 20', user_count: 120 }].filter((r) => r.name.toLowerCase().includes(q)); });
-on('GET', /^\/api\/v1\/users\/self\/groups$/, () => [{ id: 'g1', name: 'Attestation Fall 2026 1', course_id: '201', members_count: 4, group_category: { name: 'Attestation' } }, { id: 'g2', name: 'Study group B', course_id: '301', members_count: 5 }]);
+const groupList = [{ id: '66729', name: 'Attestation Fall 2026 1', course_id: '201', members_count: 4, group_category: { name: 'Attestation' }, description: '<p>Complete the student attestation with your group.</p>', context_type: 'Course' }, { id: '66730', name: 'Study group B', course_id: '301', members_count: 5, context_type: 'Course' }];
+on('GET', /^\/api\/v1\/users\/self\/groups$/, () => groupList);
+on('GET', /^\/api\/v1\/groups\/(\w+)\/tabs$/, (url, m) => [['home', 'Home', ''], ['announcements', 'Announcements', '/announcements'], ['pages', 'Pages', '/pages'], ['people', 'People', '/users'], ['discussions', 'Discussions', '/discussion_topics'], ['files', 'Files', '/files'], ['conferences', 'BigBlueButton', '/conferences'], ['collaborations', 'Collaborations', '/collaborations']].map(([id, label, seg], i) => ({ id, label, html_url: `/groups/${m[1]}${seg}`, type: 'internal', position: i + 1, visibility: 'public' })));
+on('GET', /^\/api\/v1\/groups\/(\w+)\/activity_stream$/, (url, m) => [{ id: 'ga1', type: 'Announcement', title: 'Attestation due Friday', message: '<p>Please complete it by Friday.</p>', read_state: false, updated_at: ago(2 * D), html_url: `/groups/${m[1]}/announcements/8801` }]);
+on('GET', /^\/api\/v1\/groups\/(\w+)\/front_page$/, () => ({ errors: [{ message: 'No front page' }] }));
+on('GET', /^\/api\/v1\/groups\/(\w+)\/discussion_topics$/, (url, m) => (url.searchParams.get('only_announcements') === 'true' ? [{ id: '8801', title: 'Attestation due Friday', posted_at: ago(2 * D), read_state: 'unread', author: { display_name: 'Halley Smith' }, message: '<p>Please complete it by Friday.</p>' }] : [{ id: '8802', title: 'Introductions', posted_at: ago(3 * D), last_reply_at: ago(D), unread_count: 2, discussion_subentry_count: 3, read_state: 'unread', message: '<p>Say hi to your group.</p>' }]).map((t) => ({ ...t, html_url: `/groups/${m[1]}/discussion_topics/${t.id}` })));
+on('GET', /^\/api\/v1\/groups\/(\w+)\/discussion_topics\/(\w+)\/view$/, () => viewFor('none'));
+on('GET', /^\/api\/v1\/groups\/(\w+)\/discussion_topics\/(\w+)$/, (url, m) => ({ id: m[2], title: m[2] === '8801' ? 'Attestation due Friday' : 'Introductions', posted_at: ago(2 * D), author: { display_name: 'Halley Smith' }, message: '<p>Say hi to your group.</p>', html_url: `/groups/${m[1]}/discussion_topics/${m[2]}`, locked: false, attachments: [] }));
+on('GET', /^\/api\/v1\/groups\/(\w+)\/users$/, () => [{ id: 'u2', name: 'Alan Aguilar', sortable_name: 'Aguilar, Alan', avatar_url: null }, { id: '7', name: 'Sam Student', sortable_name: 'Student, Sam', avatar_url: null }]);
+on('GET', /^\/api\/v1\/groups\/(\w+)\/pages$/, () => [{ url: 'group-notes', title: 'Group notes', front_page: false, created_at: ago(5 * D), updated_at: ago(D) }]);
+on('GET', /^\/api\/v1\/groups\/(\w+)\/pages\/([^/]+)$/, () => ({ url: 'group-notes', title: 'Group notes', body: '<p>Meeting Tuesday.</p>', created_at: ago(5 * D), updated_at: ago(D) }));
+on('GET', /^\/api\/v1\/groups\/(\w+)\/folders\/root$/, (url, m) => ({ id: `rg${m[1]}`, name: 'group files', full_name: 'group files', context_id: m[1] }));
+on('GET', /^\/api\/v1\/groups\/(\w+)$/, (url, m) => { const g = groupList.find((x) => x.id === m[1]); return g ? { ...g, avatar_url: null } : null; });
 on('GET', /^\/api\/v1\/calendar_events$/, (url) => {
   const codes = url.searchParams.getAll('context_codes[]');
   const type = url.searchParams.get('type') || 'event';
