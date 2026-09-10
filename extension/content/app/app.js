@@ -369,7 +369,7 @@
     punchHole = null;
     punchRO?.disconnect();
     window.removeEventListener('resize', punchMeasure);
-    html.classList.remove('bcv-punch', 'bcv-punch--noside');
+    html.classList.remove('bcv-punch', 'bcv-punch--noside', 'bcv-punch-light');
     for (const v of ['--bcv-hole-top', '--bcv-hole-left', '--bcv-hole-width']) html.style.removeProperty(v);
   }
 

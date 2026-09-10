@@ -816,6 +816,23 @@ try {
   await page.goto(`${BASE}/courses/101`);
   await page.waitForSelector('.bcv-front', { timeout: 10000 });
   await shot(page, '27-dark-course-home');
+  // punch-through pages: the hole is darkened by a filter unless "View in light mode" is on
+  await page.goto(`${BASE}/courses/101/external_tools/9`);
+  await page.waitForSelector('html.bcv-punch #content', { timeout: 10000 });
+  await page.waitForSelector('.bcv-native__light', { timeout: 5000 });
+  check((await page.$eval('#content', (el) => getComputedStyle(el).filter)) !== 'none' && (await texts('.bcv-native__light'))[0] === 'View in light mode', 'dark appearance darkens the Canvas-drawn page and offers light mode at the top right of the hole');
+  await page.click('.bcv-native__light');
+  await page.waitForFunction(() => document.documentElement.classList.contains('bcv-punch-light'), null, { timeout: 5000 });
+  check((await page.$eval('#content', (el) => getComputedStyle(el).filter)) === 'none' && (await texts('.bcv-native__light'))[0] === 'Back to dark', '"View in light mode" shows the hole as Canvas drew it');
+  await shot(page, '27b-dark-punch-light');
+  await page.reload();
+  await page.waitForSelector('html.bcv-punch.bcv-punch-light #content', { timeout: 10000 });
+  check((await texts('.bcv-native__light'))[0] === 'Back to dark', 'the light-mode choice is remembered for the site');
+  await page.click('.bcv-native__light');
+  await page.waitForFunction(() => !document.documentElement.classList.contains('bcv-punch-light'), null, { timeout: 5000 });
+  check((await page.$eval('#content', (el) => getComputedStyle(el).filter)) !== 'none', '"Back to dark" darkens it again');
+  await page.goto(`${BASE}/courses/101`);
+  await page.waitForSelector('.bcv-front', { timeout: 10000 });
   await page.click('#bcv-theme-btn');
   await page.waitForFunction(() => document.documentElement.getAttribute('data-bcv-theme') === 'light', null, { timeout: 5000 });
 
@@ -823,7 +840,7 @@ try {
   console.log('look off from settings');
   await page.goto(`${BASE}/courses/101/external_tools/9`);
   await page.waitForSelector('html.bcv-punch #content', { timeout: 10000 });
-  await page.click('.bcv-native__bar .bcv-btn');
+  await page.click('.bcv-native__stock');
   await page.waitForFunction(() => !document.documentElement.classList.contains('bcv-on'), null, { timeout: 5000 });
   check(await visible('#application') && !(await visible('#bcv-app')), '"Open in stock Canvas" turns the look off: stock Canvas is back');
   check(!(await page.$('html.bcv-punch')) && (await visible('#header')) && (await page.$eval('#content', (el) => el.getBoundingClientRect().left < 200)), 'turning the look off ends the punch-through: Canvas lays its page out itself again');

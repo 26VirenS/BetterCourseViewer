@@ -899,8 +899,10 @@ html.bcv-punch #content iframe { max-width: 100%; }
 html.bcv-punch #right-side-wrapper { flex: 0 0 280px !important; width: 280px !important; max-width: 280px !important; margin: 0 !important; padding: 0 !important; position: static !important; display: block !important; }
 html.bcv-punch #right-side { box-sizing: border-box; margin: 0 !important; padding: 18px 20px !important; background: #fff; color: #2d3b45; border-radius: 22px; box-shadow: var(--bcv-shadow); }
 html.bcv-punch.bcv-punch--noside #right-side-wrapper { display: none !important; }
-html[data-bcv-theme="dark"].bcv-punch #content, html[data-bcv-theme="dark"].bcv-punch #right-side { filter: invert(.92) hue-rotate(180deg); }
-html[data-bcv-theme="dark"].bcv-punch #content img, html[data-bcv-theme="dark"].bcv-punch #content video, html[data-bcv-theme="dark"].bcv-punch #content iframe, html[data-bcv-theme="dark"].bcv-punch #content [style*="background-image"], html[data-bcv-theme="dark"].bcv-punch #right-side img { filter: invert(1) hue-rotate(180deg); }
+/* the dark appearance darkens the hole with a filter unless "View in light mode" is on (html.bcv-punch-light) */
+html[data-bcv-theme="dark"].bcv-punch:not(.bcv-punch-light) #content, html[data-bcv-theme="dark"].bcv-punch:not(.bcv-punch-light) #right-side { filter: invert(.92) hue-rotate(180deg); }
+html[data-bcv-theme="dark"].bcv-punch:not(.bcv-punch-light) #content img, html[data-bcv-theme="dark"].bcv-punch:not(.bcv-punch-light) #content video, html[data-bcv-theme="dark"].bcv-punch:not(.bcv-punch-light) #content iframe, html[data-bcv-theme="dark"].bcv-punch:not(.bcv-punch-light) #content [style*="background-image"], html[data-bcv-theme="dark"].bcv-punch:not(.bcv-punch-light) #right-side img { filter: invert(1) hue-rotate(180deg); }
+.bcv-native__light { gap: 6px; }
 @media (max-width: 1100px) {
   html.bcv-punch #main { flex-direction: column; }
   html.bcv-punch #right-side-wrapper { flex: none !important; width: auto !important; max-width: none !important; }

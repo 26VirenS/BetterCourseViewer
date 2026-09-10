@@ -27,6 +27,39 @@
     }));
   }
 
+  // In the dark appearance the Canvas content in the hole is darkened with a
+  // filter; some embeds (viewers, tool pickers) read badly that way, so the bar
+  // offers to show the hole as Canvas drew it. The choice is kept per site.
+  let lightPref = null; // null until read
+  const html = document.documentElement;
+  const applyLight = (on) => html.classList.toggle('bcv-punch-light', !!on);
+  function lightButton(ctx) {
+    if (!ctx.dark) return null;
+    const btn = U.btn('', { icon: IC.sun, kind: 'xs', cls: 'bcv-native__light', title: 'Show this Canvas page in light mode' });
+    const label = () => {
+      const on = html.classList.contains('bcv-punch-light');
+      btn.replaceChildren(U.svg(on ? IC.moon : IC.sun, { size: 14, stroke: 'currentColor', width: 1.8 }), on ? 'Back to dark' : 'View in light mode');
+      btn.title = on ? 'Darken this Canvas page again' : 'Show this Canvas page as Canvas drew it, in light mode';
+    };
+    btn.addEventListener('click', async () => {
+      const on = !html.classList.contains('bcv-punch-light');
+      applyLight(on);
+      lightPref = on;
+      label();
+      await BCV.store.setPref('punchLight', on);
+    });
+    if (lightPref === null) {
+      BCV.store.pref('punchLight', false).then((v) => {
+        lightPref = !!v;
+        if (!ctx.alive()) return;
+        applyLight(lightPref);
+        label();
+      });
+    } else applyLight(lightPref);
+    label();
+    return btn;
+  }
+
   /** Builds the native block: a note bar, the page's sub-nav (outside a
    *  course shell) and the hole Canvas's page shows through. `inCourse`
    *  skips the sub-nav (the course shell has its own rail). */
@@ -36,7 +69,8 @@
     const note = U.el('bcv-native__bar', [
       U.text('bcv-native__note', 'This page is shown as Canvas drew it, inside the new look.'),
       h('span', { class: 'bcv-ml-auto' }),
-      U.btn('Open in stock Canvas', { icon: IC.external, kind: 'xs', onClick: async () => BCV.settings.update({ appearance: { skin: false } }) }),
+      lightButton(ctx),
+      U.btn('Open in stock Canvas', { icon: IC.external, kind: 'xs', cls: 'bcv-native__stock', onClick: async () => BCV.settings.update({ appearance: { skin: false } }) }),
     ]);
     const hole = U.el('bcv-native__hole', hasContent ? null : U.emptyCard('Canvas did not render anything for this page.'));
     if (hasContent) app.punchIn(hole);
