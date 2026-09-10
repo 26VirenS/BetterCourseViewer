@@ -198,7 +198,25 @@ const files = {
   f101b: [{ id: 'f4', display_name: 'Dis01 worksheet.pdf', filename: 'dis01.pdf', 'content-type': 'application/pdf', size: 80000, updated_at: ago(3 * D), url: '/files/f4/download' }],
   f101c: [],
 };
-const quizzes = (courseId) => allAssignments(courseId).filter((a) => a.is_quiz_assignment).map((a, i) => ({ id: a.quiz_id, title: a.name, due_at: a.due_at, points_possible: a.points_possible, question_count: 4, quiz_type: a.name === 'Skills_Check' ? 'practice_quiz' : 'assignment', time_limit: 20, allowed_attempts: 1, description: `<p>${a.name}: four questions on the pre-lecture reading.</p>`, html_url: `/courses/${courseId}/quizzes/${a.quiz_id}`, locked_for_user: false, assignment_id: a.id }));
+const quizzes = (courseId) => allAssignments(courseId).filter((a) => a.is_quiz_assignment).map((a, i) => ({ id: a.quiz_id, title: a.name, due_at: a.due_at, points_possible: a.points_possible, question_count: 4, quiz_type: a.name === 'Skills_Check' ? 'practice_quiz' : 'assignment', time_limit: 20, allowed_attempts: 1, description: `<p>${a.name}: four questions on the pre-lecture reading.</p>`, html_url: `/courses/${courseId}/quizzes/${a.quiz_id}`, locked_for_user: false, assignment_id: a.id, one_question_at_a_time: a.name === 'Lec07-PreQuiz', cant_go_back: a.name === 'Lec07-PreQuiz', hide_results: null, shuffle_answers: false }));
+
+// ---- quiz attempts (stateful, like Canvas's quiz submission API) --------------------------
+const quizSubs = new Map([['9001', [{ id: 'qs1', quiz_id: '9001', attempt: 1, score: 13, kept_score: 13, started_at: at(-14, 15, 30), finished_at: at(-14, 15, 52), workflow_state: 'complete', validation_token: 'tok-1', state: {} }]]]);
+const quizQuestionBank = (quizId) => {
+  const mc = (n, text, opts) => ({ id: `${quizId}${n}`, position: n, question_name: `Question ${n}`, question_type: 'multiple_choice_question', question_text: `<p>${text}</p>`, points_possible: 4, answers: opts.map((t, i) => ({ id: Number(`${quizId}${n}${i + 1}`), text: t, html: '', weight: i === 0 ? 100 : 0 })) });
+  return [
+    mc(1, 'What is the velocity at t = 5?', ['-3.15 m/s', '-2 m/s', '0 m/s', '1.37 m/s', 'None of the above']),
+    mc(2, 'What is the displacement between t = 0 and t = 5?', ['-3.15 m', '-2 m', '0 m', '17.68 m', 'None of the above']),
+    { id: `${quizId}3`, position: 3, question_name: 'Question 3', question_type: 'multiple_answers_question', question_text: '<p>Which of these are vector quantities?</p>', points_possible: 4, answers: [{ id: Number(`${quizId}31`), text: 'Velocity', weight: 100 }, { id: Number(`${quizId}32`), text: 'Speed', weight: 0 }, { id: Number(`${quizId}33`), text: 'Acceleration', weight: 100 }] },
+    { id: `${quizId}4`, position: 4, question_name: 'Question 4', question_type: 'numerical_question', question_text: '<p>At what time (in seconds) is the object momentarily at rest? See the <a href="/courses/101/pages/chapter-4-notes">chapter 4 notes</a>.</p>', points_possible: 5, answers: [{ id: Number(`${quizId}41`), text: '3.15', weight: 100, exact: 3.15 }] },
+  ];
+};
+const pubSub = ({ state, ...s }) => s;
+const findSub = (id) => [...quizSubs.values()].flat().find((s) => s.id === id) || null;
+const subQuestions = (s) => ({
+  quiz_submission_questions: quizQuestionBank(s.quiz_id).map((q) => ({ id: q.id, position: q.position, flagged: !!s.state[q.id]?.flagged, answer: s.state[q.id]?.answer ?? null })),
+  quiz_questions: quizQuestionBank(s.quiz_id),
+});
 const modules = {
   102: [
     { id: 'm1', name: 'Week 1: Kinematics', state: 'completed', items: [{ id: 'i1', type: 'Page', title: 'Big picture', html_url: '/courses/102/pages/big-picture', completion_requirement: { type: 'must_view', completed: true } }, { id: 'i2', type: 'Assignment', title: 'Lab 1 report', html_url: '/courses/102/assignments/2001', content_details: { due_at: at(-7, 23, 59), points_possible: 20 }, completion_requirement: { type: 'must_submit', completed: true } }] },
@@ -344,7 +362,41 @@ on('GET', /^\/api\/v1\/courses\/(\w+)\/folders\/root$/, (url, m) => folders[`r${
 on('GET', /^\/api\/v1\/courses\/(\w+)\/folders\/by_path\/(.+)$/, (url, m) => { const path = `course files/${decodeURIComponent(m[2])}`; const f = Object.values(folders).find((x) => x.full_name === path); return f ? [folders[`r${m[1]}`], f] : { errors: [{ message: 'not found' }] }; });
 on('GET', /^\/api\/v1\/folders\/(\w+)\/folders$/, (url, m) => Object.values(folders).filter((f) => f.parent_folder_id === m[1]));
 on('GET', /^\/api\/v1\/folders\/(\w+)\/files$/, (url, m) => files[m[1]] || []);
-on('GET', /^\/api\/v1\/courses\/(\w+)\/quizzes\/(\w+)\/submissions$/, (url, m) => ({ quiz_submissions: m[2] === '9001' ? [{ id: 'qs1', attempt: 1, score: 13, kept_score: 13, finished_at: at(-14, 15, 52), workflow_state: 'complete' }] : [] }));
+on('GET', /^\/api\/v1\/courses\/(\w+)\/quizzes\/(\w+)\/submissions$/, (url, m) => ({ quiz_submissions: (quizSubs.get(m[2]) || []).map(pubSub) }));
+on('POST', /^\/api\/v1\/courses\/(\w+)\/quizzes\/(\w+)\/submissions$/, (url, m) => {
+  const list = quizSubs.get(m[2]) || [];
+  const q = quizzes(m[1]).find((x) => x.id === m[2]);
+  if (!q) return null;
+  const s = { id: `qs${m[2]}-${list.length + 1}`, quiz_id: m[2], user_id: '7', attempt: list.length + 1, started_at: new Date().toISOString(), end_at: q.time_limit ? new Date(Date.now() + q.time_limit * 60e3).toISOString() : null, finished_at: null, workflow_state: 'untaken', validation_token: `tok-${m[2]}-${list.length + 1}`, score: null, kept_score: null, state: {} };
+  list.push(s);
+  quizSubs.set(m[2], list);
+  return { quiz_submissions: [pubSub(s)] };
+});
+on('GET', /^\/api\/v1\/quiz_submissions\/([\w-]+)\/questions$/, (url, m) => { const s = findSub(m[1]); return s ? subQuestions(s) : null; });
+on('POST', /^\/api\/v1\/quiz_submissions\/([\w-]+)\/questions$/, (url, m, body) => {
+  const s = findSub(m[1]);
+  if (!s || body.validation_token !== s.validation_token) return null;
+  for (const q of body.quiz_questions || []) s.state[String(q.id)] = { ...(s.state[String(q.id)] || {}), answer: q.answer };
+  return subQuestions(s);
+});
+on('PUT', /^\/api\/v1\/quiz_submissions\/([\w-]+)\/questions\/(\w+)\/(flag|unflag)$/, (url, m) => { const s = findSub(m[1]); if (!s) return null; s.state[m[2]] = { ...(s.state[m[2]] || {}), flagged: m[3] === 'flag' }; return subQuestions(s); });
+on('GET', /^\/api\/v1\/courses\/(\w+)\/quizzes\/(\w+)\/submissions\/([\w-]+)\/time$/, (url, m) => { const s = findSub(m[3]); return s ? { end_at: s.end_at, time_left: s.end_at ? Math.round((new Date(s.end_at) - Date.now()) / 1000) : null } : null; });
+on('POST', /^\/api\/v1\/courses\/(\w+)\/quizzes\/(\w+)\/submissions\/([\w-]+)\/complete$/, (url, m) => {
+  const s = findSub(m[3]);
+  if (!s) return null;
+  s.workflow_state = 'complete';
+  s.finished_at = new Date().toISOString();
+  s.score = quizQuestionBank(s.quiz_id).reduce((sum, q) => {
+    const a = s.state[q.id]?.answer;
+    const right = q.answers.filter((x) => x.weight === 100).map((x) => String(x.id));
+    if (a === null || a === undefined || a === '') return sum;
+    if (q.question_type === 'numerical_question') return sum + (Number(a) === q.answers[0].exact ? q.points_possible : 0);
+    const picked = (Array.isArray(a) ? a : [a]).map(String).sort();
+    return sum + (picked.join() === right.sort().join() ? q.points_possible : 0);
+  }, 0);
+  s.kept_score = s.score;
+  return { quiz_submissions: [pubSub(s)] };
+});
 on('GET', /^\/api\/v1\/courses\/(\w+)\/quizzes\/(\w+)$/, (url, m) => quizzes(m[1]).find((q) => q.id === m[2]) || null);
 on('GET', /^\/api\/v1\/courses\/(\w+)\/quizzes$/, (url, m) => quizzes(m[1]));
 on('GET', /^\/api\/v1\/courses\/(\w+)\/modules$/, (url, m) => modules[m[1]] || []);

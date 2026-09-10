@@ -36,7 +36,7 @@
           return group.url;
         }
       })();
-      return { id: t.id, label: t.label, href: path, icon: external ? IC.shield : (TAB_ICONS[t.id] || IC.page) };
+      return { id: t.id, label: t.label, href: path, external, icon: external ? IC.shield : (TAB_ICONS[t.id] || IC.page) };
     });
     if (!tabs.some((t) => t.id === 'home')) tabs.unshift({ id: 'home', label: 'Home', href: group.url, icon: IC.book });
     const ROUTE_TAB = { announcement: 'announcements', discussion: 'discussions', page: 'pages', folder: 'files', file: 'files' };

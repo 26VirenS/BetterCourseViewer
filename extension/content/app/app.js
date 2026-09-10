@@ -27,6 +27,7 @@
     renderId: 0,
     smartCtx: null,
     dark: false,
+    quizOpen: false, // our quiz flow has an attempt on screen
   };
 
   // ---- routing ----------------------------------------------------------------------------
@@ -91,15 +92,16 @@
     return r;
   }
 
-  /** Routes whose content is Canvas's own page (needs a real page load). */
-  /** A quiz attempt is open on this page (Canvas's take-quiz page). */
-  const inQuiz = () => /\/quizzes\/\d+\/take\b/.test(location.pathname) || !!document.querySelector('#submit_quiz_form, #quiz_taking_form, form.take_quiz_form');
+  /** A quiz attempt is open on this page: our own quiz flow (state.quizOpen)
+   *  or Canvas's take-quiz page underneath. */
+  const inQuiz = () => !!state.quizOpen || /\/quizzes\/\d+\/take\b/.test(location.pathname) || !!document.querySelector('#submit_quiz_form, #quiz_taking_form, form.take_quiz_form');
   const confirmLeave = () => window.confirm('You are in the middle of a quiz. Leave it anyway?\n\nCanvas keeps your answers so far, but a timer keeps running and some quizzes allow only one attempt.');
 
   /** Navigate. Every screen sits on the real Canvas page for its URL, so
    *  navigation is a real page load (only a hash change stays in place):
-   *  turning the skin off then always reveals exactly the page you are on. */
-  function go(href, { replace = false } = {}) {
+   *  turning the skin off then always reveals exactly the page you are on.
+   *  `confirmed`: the quiz screen already asked (or is leaving on purpose). */
+  function go(href, { replace = false, confirmed = false } = {}) {
     let url;
     try {
       url = new URL(href, location.href);
@@ -110,7 +112,8 @@
       window.open(url.href, '_blank', 'noopener');
       return;
     }
-    if (inQuiz() && url.pathname !== location.pathname && !confirmLeave()) return;
+    if (!confirmed && inQuiz() && url.pathname !== location.pathname && !confirmLeave()) return;
+    state.quizOpen = false; // leaving on purpose: no second prompt from the unload guard
     const samePage = url.pathname === location.pathname && url.search === location.search;
     if (samePage && (url.hash || location.hash)) {
       if (replace) history.replaceState({ bcv: true }, '', url.pathname + url.search + url.hash);
@@ -208,7 +211,7 @@
     const r = state.route || parseRoute();
     const name = siteName();
     const inst = state.account?.name || location.hostname.replace(/^(canvas|www)\./, '');
-    const focus = inQuiz();
+    const focus = inQuiz() && !state.quizOpen; // our own quiz flow hides the sidebar entirely
     root?.classList.toggle('bcv-focus', focus);
     if (focus) {
       side.replaceChildren(
@@ -270,6 +273,8 @@
     state.route = r;
     const id = ++state.renderId;
     const alive = () => id === state.renderId;
+    state.quizOpen = false;
+    html.classList.remove('bcv-quiz'); // the quiz screen puts it back while an attempt is on screen
     renderSide();
     const ctx = { app: BCV.app, route: r, alive, dark: state.dark, setSmart: (c) => setSmartContext(c, id) };
     state.smartCtx = null;

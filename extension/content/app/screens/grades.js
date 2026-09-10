@@ -40,12 +40,12 @@
       svg.setAttribute('width', '150');
       svg.setAttribute('height', '150');
       svg.setAttribute('class', 'bcv-rings__svg');
-      for (const r of gm.rings) svg.append(circle(r.r, r.track, null, null));
-      for (const r of gm.rings) svg.append(circle(r.r, r.arc, r.cap, r.dash));
+      for (const r of gm.rings) svg.append(circle(r.r, r.track, null, null, r.w));
+      for (const r of gm.rings) svg.append(circle(r.r, r.arc, r.cap, r.dash, r.w));
       const legend = U.el('bcv-rings__legend', [
         U.text('bcv-label bcv-label--inline', 'By group'),
-        ...gm.rings.map((r) => U.el('bcv-legend__row', [
-          h('span', { class: 'bcv-legend__dot', style: { background: r.color } }),
+        ...gm.legend.map((r) => U.el('bcv-legend__row', [
+          h('span', { class: 'bcv-legend__dot', style: r.ringed ? { background: r.color } : { background: 'transparent', border: `1.5px solid ${r.color}` } }),
           U.el('bcv-legend__body', [
             U.el('bcv-legend__line', [U.text('bcv-legend__label', r.label, 'span'), U.text('bcv-legend__weight', r.weight, 'span'), U.text('bcv-legend__value', r.value, 'span')]),
             U.text('bcv-legend__detail', r.detail, 'span'),
@@ -109,14 +109,14 @@
         context: () => [`Course: ${c.name}. Current total ${gm.total === null ? 'not available' : `${gm.total}%`}${c.grade ? ` (${c.grade})` : ''}. ${gm.weighted ? 'Weighted groups.' : 'Not weighted.'}`, 'Groups: ' + gm.weights.map((w) => `${w.name} ${w.pct}`).join('; '), 'Assignments:', ...gm.rows.map((g) => `- ${g.name} [${g.group}] ${g.earned === null ? 'ungraded' : `${g.earned}`} / ${g.possible}${g.badge ? ` · ${g.badge}` : ''}${g.due ? ` · due ${U.fmtBy(g.due)}` : ''}`)].join('\n'),
       });
     }
-    function circle(r, stroke, cap, dash) {
+    function circle(r, stroke, cap, dash, width = 12) {
       const el = document.createElementNS(NS, 'circle');
       el.setAttribute('cx', '80');
       el.setAttribute('cy', '80');
       el.setAttribute('r', r);
       el.setAttribute('fill', 'none');
       el.setAttribute('stroke', stroke);
-      el.setAttribute('stroke-width', '12');
+      el.setAttribute('stroke-width', String(width));
       if (cap) el.setAttribute('stroke-linecap', cap);
       if (dash) el.setAttribute('stroke-dasharray', dash);
       return el;

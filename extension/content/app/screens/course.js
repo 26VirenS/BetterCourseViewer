@@ -107,13 +107,40 @@
     ov.focus();
   }
 
-  /** Header (back link, colour, title, pills, Immersive Reader) plus a
-   *  collapsible sidebar of the context's tabs, for courses and groups. */
+  // The rail groups the context's own tabs the way the mockup does. Anything
+  // internal that is not listed lands under Materials; external tools are
+  // plain links under Campus tools.
+  const RAIL_GROUPS = [
+    ['Course', ['home', 'announcements', 'assignments', 'discussions', 'quizzes', 'grades', 'modules']],
+    ['Materials', ['pages', 'files', 'syllabus', 'rubrics', 'outcomes']],
+    ['People', ['people', 'groups', 'collaborations', 'conferences', 'chat']],
+  ];
+  const EXT_ARROW = 'M9 6h9v9M18 6L7 17';
+
+  /** Counts for the rail pills, each from one API field: unread
+   *  announcements, and grades posted in the last seven days. */
+  async function railCounts(shell) {
+    const c = shell.course;
+    const out = {};
+    const [anns, asg] = await Promise.all([
+      store.announcements(c.id, { kind: shell.kind }).catch(() => null),
+      shell.kind === 'courses' ? store.assignments(c.id).catch(() => null) : null,
+    ]);
+    if (anns) out.announcements = anns.filter((a) => a.read_state === 'unread').length;
+    if (asg) {
+      const since = Date.now() - 7 * U.DAY;
+      out.grades = asg.filter((a) => a.submission?.workflow_state === 'graded' && U.parse(a.submission.graded_at) > since && !a.submission.excused).length;
+    }
+    return out;
+  }
+
+  /** Header (back link, colour, title, pills, Immersive Reader) plus the
+   *  grouped rail of the context's tabs, for courses and groups. */
   async function contextShell(ctx, shell, { backLabel, backHref, tabs, activeId, pills = [] }) {
     const { app } = ctx;
     const c = shell.course;
-    const collapsed = !!(await store.pref('courseSideCollapsed', false));
-    const screen = U.el('bcv-screen bcv-screen--ctx', null, { style: { '--w': '1040px' } });
+    const narrow = !!(await store.pref('courseSideCollapsed', false));
+    const screen = U.el('bcv-screen bcv-screen--ctx', null, { style: { '--w': '1040px', '--bcv-rail-color': c.color, '--bcv-rail-tint': c.palette.tint, '--bcv-rail-text': c.palette.text } });
     const head = U.el('bcv-head bcv-head--course', U.el('bcv-head__in', [
       h('button', { type: 'button', class: 'bcv-linkbtn', onclick: () => app.go(backHref) }, [U.svg(IC.back, { size: 14, stroke: 'var(--bcv-blue)', width: 2.1 }), backLabel]),
       U.el('bcv-course__title-row', [
@@ -126,32 +153,79 @@
         } }),
       ]),
     ]));
-    const cside = U.el(`bcv-cside ${collapsed ? 'is-collapsed' : ''}`);
+
+    // ---- rail --------------------------------------------------------------------
+    const internal = tabs.filter((t) => !t.external);
+    const external = tabs.filter((t) => t.external);
+    const placed = new Set();
+    const groups = RAIL_GROUPS.map(([title, ids]) => {
+      const items = ids.map((id) => internal.find((t) => t.id === id)).filter(Boolean);
+      items.forEach((t) => placed.add(t.id));
+      return { title, items };
+    });
+    const rest = internal.filter((t) => !placed.has(t.id));
+    if (rest.length) groups[1].items.push(...rest);
+    const countEls = {};
+    const item = (t) => {
+      const active = t.id === activeId;
+      const count = h('span', { class: 'bcv-rail__count' });
+      countEls[t.id] = count;
+      return h('button', {
+        type: 'button',
+        class: `bcv-rail__item ${active ? 'is-active' : ''}`,
+        dataset: { tab: t.id },
+        title: t.label,
+        onclick: () => app.go(t.href),
+      }, [
+        h('span', { class: 'bcv-rail__tile' }, U.svg(t.icon, { size: 14, width: 1.9 })),
+        h('span', { class: 'bcv-rail__label', text: t.label }),
+        count,
+      ]);
+    };
+    const rail = h('nav', { class: `bcv-rail ${narrow ? 'is-narrow' : ''}`, 'aria-label': `${c.name} menu` }, [
+      ...groups.filter((g) => g.items.length).map((g) => U.el('bcv-rail__group', [U.text('bcv-rail__title', g.title), U.el('bcv-rail__list', g.items.map(item))])),
+      external.length ? U.el('bcv-rail__group bcv-rail__group--ext', [
+        U.text('bcv-rail__title', 'Campus tools'),
+        U.el('bcv-rail__list', external.map((t) => h('button', {
+          type: 'button',
+          class: `bcv-rail__ext ${t.id === activeId ? 'is-active' : ''}`,
+          dataset: { tab: t.id },
+          title: t.label,
+          onclick: () => app.go(t.href),
+        }, [h('span', { class: 'bcv-rail__label', text: t.label }), U.svg(EXT_ARROW, { size: 12, width: 2, style: { flex: 'none' } })]))),
+      ]) : null,
+    ]);
     let syncToggle = () => {};
-    const toggle = h('button', { type: 'button', class: 'bcv-cside__toggle', onclick: () => {
-      const on = cside.classList.toggle('is-collapsed');
+    const toggle = h('button', { type: 'button', class: 'bcv-rail__toggle', onclick: () => {
+      const on = rail.classList.toggle('is-narrow');
       store.setPref('courseSideCollapsed', on);
       syncToggle();
     } });
     syncToggle = () => {
-      const on = cside.classList.contains('is-collapsed');
+      const on = rail.classList.contains('is-narrow');
       toggle.title = on ? 'Expand course menu' : 'Collapse course menu';
       toggle.setAttribute('aria-label', toggle.title);
       toggle.setAttribute('aria-expanded', on ? 'false' : 'true');
-      toggle.replaceChildren(U.svg(on ? IC.chevron : IC.back, { size: 13, stroke: 'var(--bcv-ink3)', width: 2.1 }));
+      toggle.replaceChildren(
+        h('span', { class: 'bcv-rail__tile' }, U.svg(on ? IC.chevron : IC.back, { size: 13, width: 2.1 })),
+        h('span', { class: 'bcv-rail__label', text: on ? 'Expand' : 'Collapse' }),
+      );
     };
     syncToggle();
-    const nav = h('nav', { class: 'bcv-cside__nav', 'aria-label': `${c.name} menu` }, tabs.map((t) => h('button', {
-      type: 'button',
-      class: `bcv-cside__item ${t.id === activeId ? 'is-active' : ''}`,
-      dataset: { tab: t.id },
-      title: t.label,
-      onclick: () => app.go(t.href),
-    }, [h('span', { class: 'bcv-cside__ic' }, U.svg(t.icon, { size: 14, width: 1.9 })), h('span', { class: 'bcv-cside__label bcv-ellip', text: t.label })])));
-    cside.append(toggle, nav);
+    rail.append(toggle);
+    railCounts(shell).then((counts) => {
+      if (!ctx.alive()) return;
+      for (const [id, n] of Object.entries(counts)) {
+        const el = countEls[id];
+        if (!el || !n) continue;
+        el.textContent = String(n);
+        el.closest('.bcv-rail__item')?.classList.add('has-count');
+      }
+    });
+
     const cmain = U.el('bcv-cmain');
-    screen.append(head, U.el('bcv-cwrap', [cside, cmain]));
-    // keep the sidebar just below the sticky header, whatever height the title wraps to
+    screen.append(head, U.el('bcv-cwrap', [rail, cmain]));
+    // keep the rail just below the sticky header, whatever height the title wraps to
     const measure = () => screen.style.setProperty('--bcv-chead', `${head.offsetHeight}px`);
     if (typeof ResizeObserver !== 'undefined') new ResizeObserver(measure).observe(head);
     setTimeout(measure, 0);
@@ -174,6 +248,9 @@
       screen.lastChild.replaceChildren(U.errorBox('This course could not be loaded. You may not have access to it.'));
       return screen;
     }
+    // Taking a quiz: the whole main column is the quiz, no course chrome.
+    if (route.tab === 'quiz' && route.params.get('bcv') === 'take') return BCV.screens.quiz.render(ctx, course);
+
     const shell = { course, reader: null, dark, kind: 'courses' };
     const tabs = (tabsRaw || []).filter((t) => !t.hidden && t.id !== 'settings').map((t) => {
       const external = t.type === 'external' || String(t.id).startsWith('context_external_tool');

@@ -69,7 +69,7 @@ try {
     await page.click(sel);
     await page.waitForSelector('#bcv-main > *:not([data-old])', { timeout: 10000 });
   };
-  const tab = (id) => clickScreen(`.bcv-cside__item[data-tab="${id}"]`);
+  const tab = (id) => clickScreen(`.bcv-rail [data-tab="${id}"]`);
   const nav = (id) => clickScreen(`.bcv-nav__item[data-nav="${id}"]`);
 
   // ---- dashboard --------------------------------------------------------------------
@@ -270,9 +270,9 @@ try {
   check((await texts('.bcv-body > div > .bcv-label')).join(',').toLowerCase() === 'current groups,previous groups', 'current / previous sections');
   await shot(page, '10-groups');
   await clickScreen('.bcv-body .bcv-row');
-  await page.waitForSelector('.bcv-cside__item', { timeout: 10000 });
+  await page.waitForSelector('.bcv-rail__item', { timeout: 10000 });
   check(page.url() === `${BASE}/groups/66729` && (await texts('.bcv-head h1'))[0] === 'Attestation Fall 2026 1', 'group opens in its own shell');
-  check((await texts('.bcv-cside__item')).length === 8 && (await texts('.bcv-pill--term')).join(',').includes('4 members'), `group sidebar tabs: ${(await texts('.bcv-cside__item')).join(', ')}`);
+  check((await texts('.bcv-rail__item')).length === 8 && (await texts('.bcv-rail__title')).join(',').toLowerCase() === 'course,materials,people' && (await texts('.bcv-pill--term')).join(',').includes('4 members'), `group rail tabs: ${(await texts('.bcv-rail__item')).join(', ')}`);
   await page.waitForSelector('.bcv-act__title', { timeout: 10000 });
   check((await texts('.bcv-act__title'))[0] === 'Attestation due Friday' && (await texts('.bcv-body .bcv-label')).some((t) => /about/i.test(t)), 'group home: stream + About card');
   await shot(page, '10b-group-home');
@@ -286,16 +286,23 @@ try {
   // ---- course home ---------------------------------------------------------------------------
   console.log('course');
   await clickScreen('.bcv-fav');
-  await page.waitForSelector('.bcv-cside__item', { timeout: 10000 });
+  await page.waitForSelector('.bcv-rail__item', { timeout: 10000 });
   check(page.url() === `${BASE}/courses/101`, 'favourite opens the course page');
-  const tabs = await texts('.bcv-cside__item');
-  check(tabs.length === 11 && tabs[0] === 'Home' && tabs[10] === 'Resources & Policy', `course sidebar tabs from the API: ${tabs.join(', ')}`);
+  const tabs = await texts('.bcv-rail__item');
+  check(tabs.length === 10 && tabs[0] === 'Home' && tabs[6] === 'Modules' && (await texts('.bcv-rail__title')).join(',').toLowerCase() === 'course,materials,people,campus tools', `course rail groups the tabs from the API: ${tabs.join(', ')}`);
+  check(await page.$eval('.bcv-screen--ctx .bcv-head__in', (el) => el.getBoundingClientRect().width === 1040), 'course screens are 1040px wide as in the mockup');
+  check((await texts('.bcv-rail__ext')).join(',') === 'Resources & Policy', 'external tools are plain links under Campus tools');
+  check(await page.$('.bcv-rail__item[data-tab="home"].is-active') && (await page.$eval('.bcv-rail__item.is-active .bcv-rail__tile', (el) => getComputedStyle(el).backgroundColor === 'rgb(52, 199, 89)')), 'active item takes the course colour');
   check(!(await page.$('.bcv-head .bcv-tab')), 'no tab pills under the course title');
-  await page.click('.bcv-cside__toggle');
-  check(await page.$('.bcv-cside.is-collapsed') && (await page.$eval('.bcv-cside', (el) => el.getBoundingClientRect().width < 90)), 'course sidebar collapses to an icon rail');
-  await shot(page, '11c-course-sidebar-collapsed');
-  await page.click('.bcv-cside__toggle');
-  await page.waitForFunction(() => !document.querySelector('.bcv-cside.is-collapsed'), null, { timeout: 3000 });
+  await waitText('.bcv-rail__item[data-tab="announcements"] .bcv-rail__count', /^2$/);
+  const gradedCount = Number((await texts('.bcv-rail__item[data-tab="grades"] .bcv-rail__count'))[0]);
+  check(gradedCount >= 3, `rail counts: 2 unread announcements, ${gradedCount} grades posted this week`);
+  await page.click('.bcv-rail__toggle');
+  check(await page.$('.bcv-rail.is-narrow') && (await page.$eval('.bcv-rail', (el) => el.getBoundingClientRect().width < 90)) && !(await visible('.bcv-rail__title')), 'rail collapses to tiles only');
+  await shot(page, '11c-course-rail-narrow');
+  await page.click('.bcv-rail__toggle');
+  await page.waitForFunction(() => !document.querySelector('.bcv-rail.is-narrow'), null, { timeout: 3000 });
+  check((await texts('.bcv-rail__toggle'))[0] === 'Collapse', 'toggle label follows the state');
   check((await texts('.bcv-head h1'))[0] === 'F26-MATH 021 20' && (await texts('.bcv-pill--term'))[0] === 'Fall 2026', 'course header');
   await page.waitForSelector('.bcv-front', { timeout: 10000 });
   check(/^front page · course information$/i.test((await texts('.bcv-front .bcv-label'))[0]), 'front page card');
@@ -469,11 +476,92 @@ try {
   check(page.url().endsWith('/quizzes/9011/take'), 'leaving a quiz asks first; cancelling stays');
   await shot(page, '22b-quiz-focus');
 
+  // ---- quiz flow (mockup): intro → questions → review → submitted -----------------------------
+  console.log('quiz flow');
+  await page.goto(`${BASE}/courses/101/quizzes/9011`);
+  await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
+  await page.click('.bcv-detail__actions .bcv-btn--primary');
+  await page.waitForSelector('.bcv-qz__begin', { timeout: 10000 });
+  check(page.url().endsWith('/quizzes/9011?bcv=take') && !(await visible('.bcv-side')) && !(await visible('#bcv-fab')), 'quiz flow opens with the sidebar and smart button hidden');
+  check((await texts('.bcv-qz__h1'))[0] === 'Lec06-PreQuiz' && (await texts('.bcv-qz__bullet')).some((t) => /Time limit: 20 minutes/.test(t)) && (await texts('.bcv-qz__begin'))[0] === 'Begin attempt', 'intro card lists the quiz settings');
+  check((await texts('.bcv-qz__clock'))[0] === '20 min', 'timer pill shows the limit before the attempt starts');
+  await shot(page, '22c-quiz-intro');
+  await page.click('.bcv-qz__begin');
+  await page.waitForSelector('.bcv-qz__opt', { timeout: 10000 });
+  check((await page.$$('.bcv-qz__pill')).length === 4 && (await page.$('.bcv-qz__pill:first-child.is-current')) && (await texts('.bcv-qz__qnum'))[0] === 'Question 1', 'attempt started through the API: progress pills and question 1');
+  check(/^(19|20):\d\d$/.test((await texts('.bcv-qz__clock'))[0]), `timer counts down from the attempt's end_at: ${(await texts('.bcv-qz__clock'))[0]}`);
+  check((await page.$$('.bcv-qz__letter')).length === 5 && (await texts('.bcv-qz__letter')).join('') === 'ABCDE', 'lettered options');
+  await page.click('.bcv-qz__opt');
+  await page.waitForSelector('.bcv-qz__opt.is-selected', { timeout: 5000 });
+  await waitText('.bcv-qz__answered', /1 of 4 answered · Saved/);
+  check((await page.$$('.bcv-qz__pill.is-answered')).length === 1, 'picking an option saves the answer (quiz submission questions API)');
+  await page.click('.bcv-qz__flag');
+  await page.waitForSelector('.bcv-qz__flag.is-on', { timeout: 5000 });
+  check(await page.$('.bcv-qz__pill:first-child.is-flagged'), 'flag for review marks the pill');
+  await shot(page, '22d-quiz-question');
+  await page.click('.bcv-qz__btn--next');
+  await waitText('.bcv-qz__qnum', /Question 2/);
+  check(await page.$('.bcv-qz__pill:nth-child(2).is-current'), 'Next moves to question 2');
+  await page.click('.bcv-qz__pill:first-child');
+  await waitText('.bcv-qz__qnum', /Question 1/);
+  check(await page.$('.bcv-qz__opt.is-selected'), 'pills jump between questions and answers are kept');
+  // scroll-all mode
+  await page.click('.bcv-qz__mode:nth-child(2)');
+  await page.waitForSelector('.bcv-qz__page--all', { timeout: 5000 });
+  check((await page.$$('.bcv-qz__q')).length === 4 && (await page.$$('.bcv-qz__progress--all .bcv-qz__pill')).length === 4, 'scroll mode shows every question on one page');
+  await page.click('#bcv-q1 .bcv-qz__opt:nth-child(2)');
+  await waitText('.bcv-qz__answered', /2 of 4 answered/);
+  await page.fill('#bcv-q3 input', '3.15');
+  await waitText('.bcv-qz__answered', /3 of 4 answered · Saved/);
+  await shot(page, '22e-quiz-scroll');
+  // an in-page link would leave the attempt: the browser asks, cancelling stays
+  page.once('dialog', (d) => d.dismiss());
+  await page.click('#bcv-q3 .bcv-qz__qtext a');
+  await page.waitForTimeout(400);
+  check(page.url().endsWith('/quizzes/9011?bcv=take') && (await page.$('.bcv-qz__page--all')), 'leaving mid-attempt asks first; cancelling stays');
+  await page.click('.bcv-qz__foot .bcv-qz__btn--primary');
+  await page.waitForSelector('.bcv-qz__sum', { timeout: 5000 });
+  const sums = await texts('.bcv-qz__sum');
+  check(sums.length === 4 && /^Q1.*-3\.15 m\/s$/.test(sums[0]) && /Q3.*Not answered/.test(sums[2]) && /^Q4.*3\.15$/.test(sums[3]) && /3 of 4 answered · 1 left blank/.test((await texts('.bcv-qz__lead'))[0]), `review lists every answer: ${sums.join(' | ')}`);
+  await shot(page, '22f-quiz-review');
+  await page.click('.bcv-qz__sum:nth-child(3)');
+  await page.waitForSelector('.bcv-qz__page--all', { timeout: 5000 });
+  check(await page.$('.bcv-qz__progress--all .bcv-qz__pill:nth-child(3).is-current'), 'tapping a review row goes back to that question');
+  await page.click('#bcv-q2 .bcv-qz__opt:nth-child(1)');
+  await page.click('#bcv-q2 .bcv-qz__opt:nth-child(3)');
+  await waitText('.bcv-qz__answered', /4 of 4 answered · Saved/);
+  check((await page.$$('#bcv-q2 .bcv-qz__opt.is-selected')).length === 2, 'multiple-answer questions keep every pick');
+  await page.click('.bcv-qz__foot .bcv-qz__btn--primary');
+  await page.waitForSelector('.bcv-qz__big--primary', { timeout: 5000 });
+  page.once('dialog', (d) => d.accept());
+  await page.click('.bcv-qz__big--primary');
+  await page.waitForSelector('.bcv-qz__done', { timeout: 10000 });
+  const doneCards = await texts('.bcv-qz__donecard');
+  // Q2 was answered wrong on purpose (-2 m): 4 + 0 + 4 + 5 of 17
+  check((await texts('.bcv-qz__h1'))[0] === 'Attempt submitted' && /Questions answered 4 of 4 answered/.test(doneCards[0]) && /Score 13 \/ 17/.test(doneCards[1] || ''), `submitted screen shows the score Canvas returned: ${doneCards.join(' | ')}`);
+  await shot(page, '22g-quiz-done');
+  await page.click('.bcv-qz__donebtns .bcv-qz__big--primary');
+  await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
+  check(page.url() === `${BASE}/courses/101/quizzes/9011` && (await texts('.bcv-grades__side, .bcv-col .bcv-row')).some((t) => /Attempt 1/.test(t)), 'back to the quiz page, which now lists the attempt');
+  // one question at a time + no going back
+  await page.goto(`${BASE}/courses/101/quizzes/9014?bcv=take`);
+  await page.waitForSelector('.bcv-qz__begin', { timeout: 10000 });
+  check((await texts('.bcv-qz__bullet')).some((t) => /cannot go back/.test(t)), 'one-at-a-time / no-going-back quizzes say so up front');
+  await page.click('.bcv-qz__begin');
+  await page.waitForSelector('.bcv-qz__opt', { timeout: 10000 });
+  check(!(await visible('.bcv-qz__modes')) && (await texts('.bcv-qz__foot .bcv-qz__btn')).join(',') === 'Next', 'no mode switch and no Back button when the quiz forbids it');
+  await page.click('.bcv-qz__btn--next');
+  await waitText('.bcv-qz__qnum', /Question 2/);
+  check(await page.$('.bcv-qz__pill:first-child:disabled'), 'earlier questions lock when the quiz says no going back');
+  await page.click('.bcv-qz__exit');
+  await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
+  check(page.url() === `${BASE}/courses/101/quizzes/9014` && (await texts('.bcv-detail__actions .bcv-btn--primary'))[0] === 'Resume attempt', 'Save and exit keeps the attempt open: the quiz page offers to resume it');
+
   // ---- hybrid (native) page inside the shell ----------------------------------------------------
   console.log('native pages');
   await page.goto(`${BASE}/courses/101/external_tools/9`);
   await page.waitForSelector('.bcv-native #content', { timeout: 10000 });
-  check((await page.$$eval('.bcv-cside__item.is-active', (els) => els.map((e) => e.textContent.trim())))[0] === 'Resources & Policy', 'external tool tab active');
+  check((await page.$$eval('.bcv-rail__ext.is-active', (els) => els.map((e) => e.textContent.trim())))[0] === 'Resources & Policy', 'external tool link active in the rail');
   check(await page.$('.bcv-native #tool_content'), 'Canvas page content (tool iframe) shown inside the course shell');
   await shot(page, '23-native-tool');
   await page.goto(`${BASE}/profile`);

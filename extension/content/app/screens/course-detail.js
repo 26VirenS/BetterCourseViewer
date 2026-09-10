@@ -215,7 +215,11 @@
       U.card(U.el('bcv-detail', [
         h('h2', { class: 'bcv-detail__title bcv-pretty', text: q.title }),
         meta([['Due', q.due_at ? U.fmtAt(q.due_at) : 'No due date'], ['Points', q.points_possible ?? '—'], ['Questions', q.question_count ?? '—'], ['Time limit', q.time_limit ? `${q.time_limit} minutes` : 'None'], ['Attempts', q.allowed_attempts === -1 ? 'Unlimited' : q.allowed_attempts || 1], ['Type', TYPE[q.quiz_type] || q.quiz_type], ['Available until', q.lock_at ? U.fmtAt(q.lock_at) : null]]),
-        U.el('bcv-detail__actions', [q.locked_for_user ? U.badge(q.lock_explanation ? htmlToText(q.lock_explanation, 120) : 'Locked', 'orange') : U.btn('Take the quiz in Canvas', { kind: 'primary', icon: IC.bolt, iconColor: '#fff', onClick: () => app.go(nativeHref(`${c.url}/quizzes/${q.id}`)) })]),
+        U.el('bcv-detail__actions', [
+          q.locked_for_user ? U.badge(q.lock_explanation ? htmlToText(q.lock_explanation, 120) : 'Locked', 'orange')
+            : U.btn((subs || []).some((s) => s.workflow_state === 'untaken') ? 'Resume attempt' : 'Take the quiz', { kind: 'primary', icon: IC.bolt, iconColor: '#fff', onClick: () => app.go(`${c.url}/quizzes/${q.id}?bcv=take`) }),
+          q.locked_for_user ? null : U.btn('Open in Canvas', { icon: IC.external, onClick: () => app.go(nativeHref(`${c.url}/quizzes/${q.id}`)) }),
+        ]),
         q.description ? CS().prose(q.description) : U.text('bcv-hint', 'No instructions.'),
       ]), 'bcv-card--22'),
     );
