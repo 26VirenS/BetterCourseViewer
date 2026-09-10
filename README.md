@@ -56,8 +56,8 @@ Anything without a screen of its own – external tools and their embeds (Box, Y
 
 ## Requirements
 
-- macOS 13 Ventura or later, Safari 16.4 or later
-- Xcode 15 or later (free, from the Mac App Store) to build the Mac app
+- Safari: macOS 13 Ventura or later, Safari 16.4 or later, and Xcode 15 or later (free, from the Mac App Store) to build the Mac app
+- Or Chrome / Edge on any platform – see [Chrome (and Edge)](#chrome-and-edge) below; no build needed
 - Optional: a [Claude API key](https://console.anthropic.com/settings/keys) and/or a [ChatGPT API key](https://platform.openai.com/api-keys) for the smart panel
 
 ## Install (build the Mac app)
@@ -114,13 +114,17 @@ The extension is on automatically for every `*.instructure.com` site. If your sc
 - Course colours, nicknames, favourites and the dashboard view all come from your Canvas settings.
 - The Grades page computes its GPA from the scores Canvas returns for your current courses on a plain 4.0 scale with every course weighted equally, because Canvas exposes neither a GPA nor credit hours; it is labelled as computed, not official. Your prior GPA, course count, goal, target grades and the daily snapshots are stored only in the extension on this Mac and never sent to Canvas or anywhere else.
 
-## Other browsers
+## Chrome (and Edge)
 
-The `extension/` folder is a standard Manifest V3 web extension and also loads in Chrome, Edge and Firefox:
+The same extension runs in Chrome as a Manifest V3 extension; the Chrome build is the `extension/` folder with the manifest trimmed to the keys Chrome accepts. Three ways to get it:
 
-- Chrome/Edge: `chrome://extensions` → Developer mode → **Load unpacked** → choose `extension/`.
-- Firefox: `about:debugging` → **Load Temporary Add-on** → choose `extension/manifest.json`.
-- `./scripts/package.sh` produces `dist/bettercourseviewer-<version>.zip`.
+1. **From the Chrome Web Store** – once the listing is live, install it from there and updates arrive on their own. Publishing is described step by step in [`docs/chrome-web-store.md`](docs/chrome-web-store.md).
+2. **The zip** – GitHub → **Actions** → the latest **Package** run → **Artifacts** → `bettercourseviewer-chrome` (a version tag also attaches it to a GitHub Release). Unzip it, open `chrome://extensions`, turn on **Developer mode**, click **Load unpacked** and choose the unzipped folder. Chrome keeps it installed across restarts; to update, download the new zip and click the reload arrow on the extension's card.
+3. **From a checkout** – `./scripts/package.sh` writes `dist/bettercourseviewer-chrome-<version>.zip` (and the generic `dist/bettercourseviewer-<version>.zip`), or load `extension/` directly with **Load unpacked** – Chrome only warns about the two Safari/Firefox background keys, it does not need them.
+
+Then click the toolbar icon → **Settings** for the smart-panel keys, and on a school with its own Canvas address use **Enable on this site** in the popup. Edge takes the same zip at `edge://extensions`. Firefox loads `extension/manifest.json` from `about:debugging` → **Load Temporary Add-on**.
+
+The privacy policy the store listing points to is [`PRIVACY.md`](PRIVACY.md).
 
 ## Development
 
@@ -141,10 +145,15 @@ extension/
   popup/, options/             toolbar popup and the settings page
 scripts/
   build-mac-app.sh             generates the Xcode project / builds the .app
-  package.sh                   zips the extension
+  package.sh                   zips the extension (generic + Chrome Web Store build)
   make-icons.mjs               regenerates the PNG icons
   dev/mock-canvas.mjs          a fake Canvas (pages + the API endpoints the app reads)
   dev/smoke-test.mjs           walks every screen in headless Chromium against the mock
+  dev/store-shots.mjs          renders the Chrome Web Store screenshots and promo tiles into docs/store/
+docs/chrome-web-store.md       how to publish: listing text, permission justifications, release automation
+docs/store/                    the store's screenshots and promo tiles
+PRIVACY.md                     the privacy policy the store listing links to
+.github/workflows/package.yml  builds the zips on every push; a v* tag makes a GitHub Release and publishes to the store
 ```
 
 The generated Xcode project copies the extension's top-level folders (`content/`, `lib/`, `popup/`, `options/`, `icons/`) into the app as folder references, so new files inside them are picked up by the next build. A **new top-level folder** is not: keep new code under an existing folder, or delete `macos/` and regenerate the project.

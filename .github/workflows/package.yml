@@ -1,0 +1,68 @@
+# Builds the extension zips on every push (download them from the run's Artifacts),
+# and on a version tag (v2.1.0, …) also publishes a GitHub Release with the zips and,
+# once the four Chrome Web Store secrets are set, uploads the Chrome build to the store
+# and publishes it. See docs/chrome-web-store.md for the one-time setup.
+name: Package
+
+on:
+  push:
+    branches: ['**']
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the zips
+        run: ./scripts/package.sh
+      - name: Check the version tag matches the manifest
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          MANIFEST="$(python3 -c "import json;print(json.load(open('extension/manifest.json'))['version'])")"
+          [ "v$MANIFEST" = "$GITHUB_REF_NAME" ] || { echo "tag $GITHUB_REF_NAME does not match manifest version $MANIFEST"; exit 1; }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bettercourseviewer-chrome
+          path: dist/bettercourseviewer-chrome-*.zip
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bettercourseviewer-extension
+          path: dist/bettercourseviewer-[0-9]*.zip
+          if-no-files-found: error
+      - name: GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" dist/*.zip --title "BetterCourseViewer ${GITHUB_REF_NAME#v}" --generate-notes
+
+  chrome-web-store:
+    needs: package
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: bettercourseviewer-chrome
+          path: dist
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Upload to the Chrome Web Store and publish
+        env:
+          EXTENSION_ID: ${{ secrets.CWS_EXTENSION_ID }}
+          CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
+          REFRESH_TOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
+        run: |
+          if [ -z "${EXTENSION_ID:-}" ] || [ -z "${CLIENT_ID:-}" ] || [ -z "${CLIENT_SECRET:-}" ] || [ -z "${REFRESH_TOKEN:-}" ]; then
+            echo "Chrome Web Store secrets are not set; skipping the store upload (docs/chrome-web-store.md explains the setup)."
+            exit 0
+          fi
+          ZIP="$(ls dist/bettercourseviewer-chrome-*.zip)"
+          npx --yes chrome-webstore-upload-cli@3 upload --source "$ZIP" --auto-publish

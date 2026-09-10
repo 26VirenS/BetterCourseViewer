@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "BetterCourseViewer",
-  "version": "2.0.0",
-  "description": "A new interface for Canvas: dashboard, courses, to do, calendar, inbox and every course tab redrawn, with a dark appearance and a smart panel powered by your own Claude or ChatGPT key.",
+  "version": "2.1.0",
+  "description": "A new interface for Canvas: dashboard, courses, To Do, grades, calendar and inbox redrawn, with dark mode and a smart panel.",
   "author": "BetterCourseViewer contributors",
   "icons": {
     "48": "icons/icon-48.png",
