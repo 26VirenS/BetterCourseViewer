@@ -20,7 +20,7 @@ Nothing is decorated; every screen is redrawn from the Canvas API with your own 
 
 ## What you get
 
-**Sidebar** – site name and term, Dashboard / Courses / Groups / To Do (with a count) / Calendar / Inbox (with unread count) / Grades, your favourite courses with their Canvas colours, a Dark/Light appearance switch and your account.
+**Sidebar** – your school's own mark from Canvas's theme (its app icon, favicon or header logo; Canvas's default assets never count, and Settings can point at another image), the site name and term, Dashboard / Courses / Groups / To Do (with a count) / Calendar / Inbox (with unread count) / Grades, your favourite courses with their Canvas colours, a Dark/Light appearance switch and your account.
 
 **Dashboard** – three counters (due today with points, due this week across N courses, unread announcements), a per-course workload bar for the week (submitted ÷ assigned; courses with nothing assigned fold away under a disclosure), and the same three views Canvas has: **Cards** (with a submitted-items progress bar, quick links and a "2 due today" badge), **List** (by day, with a circle to mark items done) and **Recent activity**. The view you pick is saved to your Canvas profile, as Canvas does.
 

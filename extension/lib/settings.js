@@ -12,6 +12,7 @@
       skin: true,                 // the redesigned interface; off = stock Canvas
       darkMode: 'system',         // 'off' | 'on' | 'system'
       siteName: '',               // shown in the sidebar brand row; blank = derived from the host
+      logoUrl: '',                // sidebar tile image; blank = the school's own mark from Canvas's theme
     },
     smart: {
       enabled: true,

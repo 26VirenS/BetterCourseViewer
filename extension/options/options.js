@@ -59,6 +59,7 @@
     ['skin', 'appearance.skin', 'check'],
     ['darkMode', 'appearance.darkMode', 'select'],
     ['siteName', 'appearance.siteName', 'text'],
+    ['logoUrl', 'appearance.logoUrl', 'text'],
   ];
   const getPath = (obj, path) => path.split('.').reduce((o, k) => (o == null ? undefined : o[k]), obj);
   const patchFor = (path, value) => path.split('.').reverse().reduce((acc, k) => ({ [k]: acc }), value);

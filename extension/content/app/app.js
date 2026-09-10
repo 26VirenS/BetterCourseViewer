@@ -177,38 +177,60 @@
     return label.charAt(0).toUpperCase() + label.slice(1);
   }
 
-  /** The institution's own logo, as Canvas shows it in its global navigation. */
+  /** The institution's own logo, in this order: a logo URL set in Settings; the school's
+   *  square mark from Canvas's theme (the apple-touch icon, the Windows tile, then the
+   *  largest favicon) — the actual logo, shown filling the tile; then the wide header image
+   *  from the global navigation (usually a wordmark), contained on the nav colour. Canvas's
+   *  own default assets never count, so an unbranded site gets the initial instead. */
   function schoolLogo() {
     if (state.logo !== undefined) return state.logo;
-    let url = null;
-    let bg = null;
+    // Canvas ships its defaults under /dist/images/; a school's uploads live elsewhere (instructure-uploads, cloudfront…)
+    const isDefault = (u) => !u || /\/dist\/images\/|canvas-logomark|default-logo/i.test(u);
+    const cssUrl = (v) => {
+      const m = String(v || '').match(/url\((['"]?)(.*?)\1\)/);
+      return m && m[2] ? m[2] : null;
+    };
+    const sizeOf = (link) => {
+      const s = (link.getAttribute('sizes') || '').toLowerCase();
+      return s === 'any' ? 10000 : Number(s.split('x')[0]) || 0;
+    };
+    let logo = null;
     try {
+      const custom = state.settings?.appearance?.logoUrl?.trim();
+      if (custom) logo = { url: custom, square: true, bg: null };
       const cs = getComputedStyle(html);
-      const v = cs.getPropertyValue('--ic-brand-header-image').trim();
-      const m = v.match(/url\((['"]?)(.*?)\1\)/);
-      if (m && m[2]) url = m[2];
-      const nav = cs.getPropertyValue('--ic-brand-global-nav-bgd').trim();
-      if (nav) bg = nav;
-      if (!url) {
-        const mark = document.querySelector('.ic-app-header__logomark, #header .ic-app-header__logomark-container a');
-        const bgi = mark ? getComputedStyle(mark).backgroundImage : '';
-        const mm = bgi.match(/url\((['"]?)(.*?)\1\)/);
-        if (mm && mm[2]) url = mm[2];
+      if (!logo) {
+        const squares = [
+          ...Array.from(document.querySelectorAll('link[rel="apple-touch-icon"], link[rel="apple-touch-icon-precomposed"]')).map((l) => l.href),
+          cssUrl(cs.getPropertyValue('--ic-brand-apple-touch-icon')),
+          cssUrl(cs.getPropertyValue('--ic-brand-msapplication-tile-square')),
+          ...Array.from(document.querySelectorAll('link[rel~="icon"]')).sort((a, b) => sizeOf(b) - sizeOf(a)).map((l) => l.href),
+          cssUrl(cs.getPropertyValue('--ic-brand-favicon')),
+        ].filter((u) => u && !isDefault(u));
+        if (squares.length) logo = { url: squares[0], square: true, bg: null };
       }
-      if (!url) {
+      if (!logo) {
+        const mark = document.querySelector('.ic-app-header__logomark, #header .ic-app-header__logomark-container a');
         const img = document.querySelector('#header img.ic-app-header__logomark-img, .ic-app-header__logomark img, .ic-app-header__logomark-container img');
-        if (img?.src) url = img.src;
+        const wide = cssUrl(cs.getPropertyValue('--ic-brand-header-image')) || (mark ? cssUrl(getComputedStyle(mark).backgroundImage) : null) || img?.src || null;
+        if (wide && !isDefault(wide)) logo = { url: wide, square: false, bg: cs.getPropertyValue('--ic-brand-global-nav-bgd').trim() || null };
       }
     } catch {
-      url = null;
+      logo = null;
     }
-    state.logo = url && !/canvas-logomark|default-logo|instructure/i.test(url) ? { url, bg } : null;
-    return state.logo;
+    state.logo = logo;
+    return logo;
   }
   function brandTile(name) {
     const logo = schoolLogo();
     if (!logo) return U.el('bcv-brand__tile', name.charAt(0).toUpperCase());
-    return h('div', { class: 'bcv-brand__tile', style: logo.bg ? { background: logo.bg } : {} }, h('img', { src: logo.url, alt: '' }));
+    const img = h('img', { src: logo.url, alt: '' });
+    const tile = h('div', { class: `bcv-brand__tile ${logo.square ? 'bcv-brand__tile--icon' : ''}`, style: !logo.square && logo.bg ? { background: logo.bg } : {} }, img);
+    img.addEventListener('error', () => { // a dead URL falls back to the initial rather than a broken image
+      state.logo = null;
+      tile.replaceWith(U.el('bcv-brand__tile', name.charAt(0).toUpperCase()));
+    });
+    return tile;
   }
 
   function renderSide() {
@@ -435,6 +457,7 @@
     BCV.early?.onChange((st, settings) => {
       const wasDark = state.dark;
       state.settings = settings;
+      state.logo = undefined; // a logo URL changed in Settings applies on the next sidebar draw
       state.dark = st.dark;
       applySkin(st.skin);
       if (st.skin && wasDark !== st.dark) {

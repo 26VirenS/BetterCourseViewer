@@ -247,6 +247,8 @@ function page({ title, path = '', courseId, body }) {
   const env = { current_user_id: '7', current_user: { display_name: 'Sam Student', avatar_image_url: null }, COURSE_ID: courseId || null, context_asset_string: courseId ? `course_${courseId}` : 'user_7', TIMEZONE: 'America/Los_Angeles', DOMAIN_ROOT_ACCOUNT_ID: '1', PREFERENCES: { dashboard_view: dashboardView } };
   return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>${title}</title>
 <meta name="csrf-token" content="mock-csrf">
+<link rel="apple-touch-icon" href="data:image/svg+xml;utf8,${encodeURIComponent('<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 180 180\'><rect width=\'180\' height=\'180\' fill=\'#0b2b52\'/><path d=\'M30 140V40l60 60 60-60v100h-30V95l-30 30-30-30v45z\' fill=\'#f0b429\'/></svg>')}">
+<link rel="icon" href="/dist/images/favicon-abc123.ico">
 <script>INST = {"environment":"development"}; ENV = ${JSON.stringify(env)}; BRANDS = {};</script>
 <style>
   :root{--ic-brand-global-nav-bgd:#0b2b52;--ic-brand-header-image:url("data:image/svg+xml;utf8,${encodeURIComponent('<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 40 40\'><path d=\'M6 32V8l14 14L34 8v24h-7V22l-7 7-7-7v10z\' fill=\'#f0b429\'/></svg>')}")}

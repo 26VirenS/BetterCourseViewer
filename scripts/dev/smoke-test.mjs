@@ -89,7 +89,7 @@ try {
   check(!(await page.$('#bcv-skin')), 'no switch floats on the page (the look is toggled from the popup and settings)');
   await waitText('.bcv-brand__sub', /Example University · Fall 2026/);
   check((await texts('.bcv-brand__name'))[0] === 'Localhost', `brand row: ${(await texts('.bcv-brand'))[0]}`);
-  check(await page.$('.bcv-brand__tile img'), 'brand tile shows the school logo from Canvas');
+  check(await page.$('.bcv-brand__tile--icon img[src^="data:image/svg"]'), 'brand tile shows the school\'s own square mark (Canvas\'s apple-touch icon), not its default favicon or the wordmark');
   const navItems = await texts('.bcv-nav__item');
   check(navItems.length === 7 && navItems[0].startsWith('Dashboard') && navItems[5].startsWith('Inbox') && navItems[6] === 'Grades', `sidebar nav: ${navItems.join(' | ')}`);
   await waitText('.bcv-nav__item[data-nav="todo"] .bcv-nav__count', /\d/);
