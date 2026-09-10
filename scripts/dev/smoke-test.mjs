@@ -91,7 +91,7 @@ try {
   check((await texts('.bcv-brand__name'))[0] === 'Localhost', `brand row: ${(await texts('.bcv-brand'))[0]}`);
   check(await page.$('.bcv-brand__tile img'), 'brand tile shows the school logo from Canvas');
   const navItems = await texts('.bcv-nav__item');
-  check(navItems.length === 6 && navItems[0].startsWith('Dashboard') && navItems[5].startsWith('Inbox'), `sidebar nav: ${navItems.join(' | ')}`);
+  check(navItems.length === 7 && navItems[0].startsWith('Dashboard') && navItems[5].startsWith('Inbox') && navItems[6] === 'Grades', `sidebar nav: ${navItems.join(' | ')}`);
   await waitText('.bcv-nav__item[data-nav="todo"] .bcv-nav__count', /\d/);
   const todoCount = Number((await texts('.bcv-nav__item[data-nav="todo"] .bcv-nav__count'))[0]);
   check(todoCount >= 8, `To Do count in nav = ${todoCount}`);
@@ -320,6 +320,39 @@ try {
   await page.click('.bcv-compose .bcv-btn--primary');
   await page.waitForFunction(() => document.querySelectorAll('.bcv-inbox__list .bcv-row').length === 3, null, { timeout: 5000 });
   check(true, 'compose sends a new conversation');
+
+  // ---- grades panel (sidebar Grades) --------------------------------------------------------
+  console.log('grades panel');
+  await nav('gpa');
+  await page.waitForSelector('.bcv-gpa__value', { timeout: 10000 });
+  check(page.url() === `${BASE}/grades` && (await texts('.bcv-h1'))[0] === 'Grades' && (await texts('.bcv-head__sub'))[0] === 'Fall 2026 · 4 courses this term · every course counts equally', `grades panel header: ${(await texts('.bcv-head__sub'))[0]}`);
+  check(/^3\.4[23]$/.test((await texts('.bcv-gpa__value'))[0]) && (await page.$('.bcv-gpa__banner')) && /needs your past record/.test((await texts('.bcv-gpa__hero'))[0]) && /No history yet/.test((await texts('.bcv-gpa__trend'))[0]), 'term GPA is the plain 4.0 average of the four scored courses; cumulative and trend wait for setup');
+  const gpaStats = await texts('.bcv-gpa__stat');
+  check(gpaStats.length === 3 && /^Momentum.*Turn on tracking to compare snapshots$/i.test(gpaStats[0]) && /On-time submissions \d+% \d+ of \d+ submitted before the due time/i.test(gpaStats[1]) && (await page.$$('.bcv-gpa__chip')).length === 4 && /Highest .* at \d+% · lowest .* at \d+%/.test(gpaStats[2]), `stats: ${gpaStats.join(' | ')}`);
+  const gpaRows = await texts('.bcv-gpa__row');
+  check(gpaRows.length === 8 && /^F26-MATH 021 20 .*pts earned so far.*(Needs \d+% of the remaining [\d.]+ pts|Target already secured|Not reachable).*92\.4% A− · 3\.7 − A− · 90% \+$/.test(gpaRows[0]) && gpaRows.filter((t) => /No score yet/.test(t)).length === 4, `course rows: ${gpaRows[0]}`);
+  await page.click('.bcv-gpa__row .bcv-gpa__step:last-child');
+  await waitText('.bcv-gpa__row .bcv-gpa__target-pill', /^A · 93%$/);
+  check(true, 'a target grade steps up and the needed % follows');
+  await shot(page, '09d-grades-panel');
+  await page.click('.bcv-gpa__banner .bcv-btn');
+  await page.waitForSelector('.bcv-gpa-set', { timeout: 5000 });
+  await page.fill('#bcv-gpa-prior', '3.42');
+  await page.fill('#bcv-gpa-prior-n', '8');
+  await page.click('.bcv-gpa-set__ctl .bcv-gpa-set__step:last-child');
+  check((await texts('.bcv-gpa-set__val'))[0] === '3.75', 'goal steps by 0.05 in the settings sheet');
+  await page.click('.bcv-gpa-set__foot .bcv-btn');
+  await page.waitForFunction(() => !document.querySelector('.bcv-gpa__banner'), null, { timeout: 5000 });
+  const hero = (await texts('.bcv-gpa__hero'))[0];
+  check(/Cumulative 3\.4[23]/.test(hero) && /3\.42 across 8 courses before this term/.test(hero) && /Goal 3\.75/.test(hero) && /One snapshot so far/.test((await texts('.bcv-gpa__trend'))[0]) && (await texts('.bcv-gpa__stat'))[0].includes('Needs a second snapshot'), `tracking on: ${hero.slice(0, 120)}`);
+  // prefs live in chrome.storage.local under `prefs:<canvas host>`; the first snapshot lands the day tracking starts
+  const readPrefs = () => sw.evaluate(async () => Object.entries(await chrome.storage.local.get(null)).find(([k]) => k.startsWith('prefs:'))?.[1] || null);
+  check(await eventually(async () => { const p = await readPrefs(); return Array.isArray(p?.gpaSnapshots) && p.gpaSnapshots.length === 1 && typeof p.gpaSnapshots[0].gpa === 'number' && /^\d{4}-\d{2}-\d{2}$/.test(p.gpaSnapshots[0].date) && p.gpaTracking?.priorCourses === 8 && p.gpaGoal === 3.75; }), `a first snapshot is recorded the day tracking starts: ${JSON.stringify((await readPrefs())?.gpaSnapshots)}`);
+  await shot(page, '09e-grades-panel-tracking');
+  page.once('dialog', (d) => d.accept());
+  await page.click('.bcv-gpa__linkbtn');
+  await page.waitForSelector('.bcv-gpa__banner', { timeout: 5000 });
+  check(await eventually(async () => { const p = await readPrefs(); return p?.gpaTracking === null && Array.isArray(p?.gpaSnapshots) && p.gpaSnapshots.length === 0 && p.gpaGoal === 3.75; }) && /needs your past record/.test((await texts('.bcv-gpa__hero'))[0]), 'Reset setup forgets the prior record and snapshots but keeps the goal');
 
   // ---- groups -----------------------------------------------------------------------------
   console.log('groups');

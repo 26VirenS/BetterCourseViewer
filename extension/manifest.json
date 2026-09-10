@@ -85,6 +85,7 @@
         "content/app/screens/course.js",
         "content/app/screens/course-detail.js",
         "content/app/screens/grades.js",
+        "content/app/screens/gpa.js",
         "content/app/smart.js",
         "content/app/app.js"
       ]

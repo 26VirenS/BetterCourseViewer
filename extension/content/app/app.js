@@ -63,6 +63,7 @@
     else if (path === '/groups') r.screen = 'groups';
     else if (path === '/calendar' || path === '/calendar2') r.screen = 'calendar';
     else if (path === '/conversations') r.screen = 'inbox';
+    else if (path === '/grades') r.screen = 'gpa'; // Canvas's own "Grades" page for all courses
     else if (path === '/todo') r.screen = 'todo';
     else {
       const m = path.match(/^\/(courses|groups)\/(\d+)(\/.*)?$/);
@@ -158,6 +159,7 @@
     ['todo', 'To Do', IC.check, '#34c759', '/#todo', state.todoCount ? String(state.todoCount) : ''],
     ['calendar', 'Calendar', IC.cal, '#5856d6', '/calendar', ''],
     ['inbox', 'Inbox', IC.mail, '#8e8e93', '/conversations', state.unread ? String(state.unread) : ''],
+    ['gpa', 'Grades', IC.chart, '#5856d6', '/grades', ''],
   ];
 
   function siteName() {
@@ -296,7 +298,7 @@
   }
 
   function titleFor(r) {
-    const base = { dashboard: 'Dashboard', courses: 'Courses', groups: 'Groups', todo: 'To Do', calendar: 'Calendar', inbox: 'Inbox' }[r.screen];
+    const base = { dashboard: 'Dashboard', courses: 'Courses', groups: 'Groups', todo: 'To Do', calendar: 'Calendar', inbox: 'Inbox', gpa: 'Grades' }[r.screen];
     return base ? `${base} · ${siteName()}` : document.title;
   }
 

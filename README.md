@@ -20,7 +20,7 @@ Nothing is decorated; every screen is redrawn from the Canvas API with your own 
 
 ## What you get
 
-**Sidebar** – site name and term, Dashboard / Courses / Groups / To Do (with a count) / Calendar / Inbox (with unread count), your favourite courses with their Canvas colours, a Dark/Light appearance switch and your account.
+**Sidebar** – site name and term, Dashboard / Courses / Groups / To Do (with a count) / Calendar / Inbox (with unread count) / Grades, your favourite courses with their Canvas colours, a Dark/Light appearance switch and your account.
 
 **Dashboard** – three counters (due today with points, due this week across N courses, unread announcements), a per-course workload bar for the week (submitted ÷ assigned; courses with nothing assigned fold away under a disclosure), and the same three views Canvas has: **Cards** (with a submitted-items progress bar, quick links and a "2 due today" badge), **List** (by day, with a circle to mark items done) and **Recent activity**. The view you pick is saved to your Canvas profile, as Canvas does.
 
@@ -35,6 +35,8 @@ The three counters at the top of the dashboard (due today, due this week, unread
 **Inbox** – conversations with course and scope filters, a reader with reply, and compose with recipient search. Stars, read state and sending all go through the Canvas API.
 
 **Groups** – current and previous groups, each with its own screen: activity, announcements, discussions, pages, people and files.
+
+**Grades** – one page for the whole term. A **term GPA** card turns every current course's Canvas score into a letter and its 4.0 points (A 4.0, A− 3.7 … the usual 93/90/87 cut-offs) and averages them with every course counting equally; underneath, the range your GPA lands in if all ungraded work comes in ten points lower, and how far you are from your goal. Canvas stores no GPA and no history, so **tracking** is opt-in: enter the GPA you had before this term and how many courses it covers, and the page shows a *cumulative* figure and saves one snapshot a day from then on (nothing is back-filled), drawing a **trend** line against a dashed goal line once it has two. Three stat cards: **Momentum** (this snapshot against the previous one), **On-time submissions** (submitted before the due time, from the `late` flag on your submissions) and **Grade mix** (a chip per course letter, highest and lowest named). Then **every course** with its score, letter, points and a **target grade** you set with −/+: the row says what percentage of the still-unscored points you need to reach it, when it is already secured and when it is out of reach, using the same group weights as the course's own grade card. The gear opens the GPA settings sheet (goal in 0.05 steps, the tracking switch and its two inputs); *Reset setup* at the bottom forgets the prior record and the snapshots. The GPA is a reading of your Canvas scores, not the figure on your transcript, and the page says so.
 
 **Courses** – a header with the course colour, term and an **Immersive Reader** button (a clean large-type reading view of the page), a course rail built from the course's own navigation and grouped as *Course* / *Materials* / *People* / *Campus tools* (external tools become plain links), with counts for unread announcements and grades posted this week, the active item in the course colour, and a Collapse control that shrinks it to tiles. Then:
 - **Home** – the front page (or modules / syllabus / assignments / stream, whichever the instructor chose) with link chips, plus course links and the course To Do.
@@ -105,6 +107,7 @@ The extension is on automatically for every `*.instructure.com` site. If your sc
 - No control does anything the Canvas student API cannot do: marking done and dismissing are planner overrides, stars are favourites, replies and messages go through the same endpoints Canvas uses, and the dashboard view is stored on your Canvas profile.
 - Every number on screen comes from an API response. The grade rings use your assignment groups and submissions; the total is the score Canvas reports until you enter what-if values. If a request fails the card is hidden rather than showing a false zero.
 - Course colours, nicknames, favourites and the dashboard view all come from your Canvas settings.
+- The Grades page computes its GPA from the scores Canvas returns for your current courses on a plain 4.0 scale with every course weighted equally, because Canvas exposes neither a GPA nor credit hours; it is labelled as computed, not official. Your prior GPA, course count, goal, target grades and the daily snapshots are stored only in the extension on this Mac and never sent to Canvas or anywhere else.
 
 ## Other browsers
 
@@ -128,8 +131,8 @@ extension/
   content/app/store.js         every Canvas API loader + the grade model
   content/app/app.js           shell (sidebar), router, punch-through for Canvas-drawn pages
   content/app/smart.js         the smart panel
-  content/app/screens/         dashboard, courses, todo, groups, calendar, inbox,
-                               course (shell + tabs), course-detail, grades, native
+  content/app/screens/         dashboard, courses, todo, groups, calendar, inbox, gpa (the Grades page),
+                               course (shell + tabs), course-detail, grades (course grade card), quiz, native
   popup/, options/             toolbar popup and the settings page
 scripts/
   build-mac-app.sh             generates the Xcode project / builds the .app
