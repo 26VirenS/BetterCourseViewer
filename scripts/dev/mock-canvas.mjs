@@ -73,7 +73,8 @@ const A = {
   ],
   104: [
     ['4001', 'Week 1 reflection', 'Assignments', 10, 10, -6, 23.98, -7, {}],
-    ['4002', 'Week 2 Post Class Assignment: GC articles', 'Assignments', 10, null, 0, 23.98, null, {}],
+    // the mockup's example: file or text or link, four file types, open for a week, unlimited attempts
+    ['4002', 'Week 2 Post Class Assignment: GC articles', 'Assignments', 10, null, 0, 23.98, null, { types: ['online_upload', 'online_text_entry', 'online_url'], ext: ['pdf', 'docx', 'png', 'jpg'], window: true, attempts: -1, description: '<p>Submit the Grand Challenge you chose with an explanation of why it matters, plus three scientific papers or news articles in APA or MLA format.</p>' }],
     ['4003', 'Knewton Alta: Unit 2', 'Assignments', 20, null, 5, 23.98, null, { tool: 'https://tool.example.com/launch' }],
   ],
   105: [
@@ -103,12 +104,13 @@ function assignmentObj(courseId, row) {
     rubric_assessment: extra.rubric && earned !== null ? { c1: { points: 4, rating_id: 'r2', comments: 'Sign error in part b.' }, c2: { points: 4, rating_id: 'r3' } } : undefined,
   };
   return {
-    id, name, description: `<p>Complete <strong>${name}</strong> as described in lecture. Show all work and submit a single PDF.</p><ul><li>Use the chain rule where appropriate.</li><li>Label each step.</li></ul>${extra.rubric ? '<p>See the rubric for how points are awarded.</p>' : ''}`,
-    due_at: due, lock_at: null, unlock_at: null, points_possible: possible, grading_type: 'points', published: true, html_url: `/courses/${courseId}/assignments/${id}`,
-    submission_types: extra.quiz ? ['online_quiz'] : extra.tool ? ['external_tool'] : ['online_upload', 'online_text_entry'], is_quiz_assignment: !!extra.quiz, quiz_id: extra.quiz ? String(Number(id) + 8000) : undefined,
+    id, name, description: extra.description || `<p>Complete <strong>${name}</strong> as described in lecture. Show all work and submit a single PDF.</p><ul><li>Use the chain rule where appropriate.</li><li>Label each step.</li></ul>${extra.rubric ? '<p>See the rubric for how points are awarded.</p>' : ''}`,
+    due_at: due, lock_at: extra.window ? at(dueDay, 23, 59) : null, unlock_at: extra.window ? at(dueDay - 7, 0, 0) : null, points_possible: possible, grading_type: 'points', published: true, html_url: `/courses/${courseId}/assignments/${id}`,
+    submission_types: extra.quiz ? ['online_quiz'] : extra.tool ? ['external_tool'] : extra.types || ['online_upload', 'online_text_entry'], is_quiz_assignment: !!extra.quiz, quiz_id: extra.quiz ? String(Number(id) + 8000) : undefined,
+    allowed_extensions: extra.ext || [], locked_for_user: false,
     external_tool_tag_attributes: extra.tool ? { url: extra.tool, new_tab: false, resource_link_id: 'rl1' } : undefined,
-    assignment_group_id: `g${courseId}-${Math.max(gIdx, 0)}`, omit_from_final_grade: !!extra.omit, allowed_attempts: 2, rubric: extra.rubric ? rubric : undefined, rubric_settings: extra.rubric ? { title: 'Dis01 rubric' } : undefined,
-    submission,
+    assignment_group_id: `g${courseId}-${Math.max(gIdx, 0)}`, omit_from_final_grade: !!extra.omit, allowed_attempts: extra.attempts ?? 2, rubric: extra.rubric ? rubric : undefined, rubric_settings: extra.rubric ? { title: 'Dis01 rubric' } : undefined,
+    submission: apiSubmissions.get(id) || submission, // a submission made through the API replaces the seeded one
   };
 }
 function groupNames(courseId) {
@@ -121,6 +123,7 @@ function assignmentGroups(courseId) {
   return defs.map(([name, weight], i) => ({ id: `g${courseId}-${i}`, name, position: i + 1, group_weight: weight, rules: {}, assignments: (A[courseId] || []).filter((r) => r[2] === name).map((r) => assignmentObj(courseId, r)) }));
 }
 const allAssignments = (courseId) => (A[courseId] || []).map((r) => assignmentObj(courseId, r));
+const apiSubmissions = new Map(); // assignment id -> the submission made through the API
 
 // ---- planner ------------------------------------------------------------------------------
 const overrides = new Map();
@@ -269,6 +272,9 @@ const htmlPages = {
   '/': () => page({ title: 'Dashboard', body: '<h1 class="ic-Dashboard-header__title">Dashboard</h1><div id="dashboard">stock dashboard</div>' }),
   '/courses/101/external_tools/9': () => page({ title: 'Resources & Policy', courseId: '101', body: '<h2>Resources & Policy</h2><iframe id="tool_content" src="/courses/101/external_tools/retrieve?url=x" width="600" height="300" title="Tool"></iframe>' }),
   '/profile': () => page({ title: 'User Profile', body: '<h1>Sam Student</h1><p class="profile">Profile page rendered by Canvas.</p>' }),
+  // a homework-submission tool's own picker, framed by the assignment page exactly as Canvas frames it;
+  // when a file is chosen the return page posts externalContentReady to the window that framed it
+  '/courses/104/external_tools/t1/resource_selection': () => `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Box</title></head><body style="font-family:sans-serif;padding:24px"><h2 id="tool-title">Box picker (the tool's own page)</h2><p>The tool owns everything here. Choosing a file hands it back to the assignment page.</p><button id="pick" onclick="window.parent.postMessage({ subject: 'externalContentReady', service: 'external_tool_dialog', contents: [{ '@type': 'FileItem', url: 'http://localhost:${port}/files/box1/download', text: 'GC-articles-Sharma.pdf', mediaType: 'application/pdf' }] }, '*')">Use GC-articles-Sharma.pdf</button></body></html>`,
   '/courses/101/quizzes/9011/take': () => page({ title: 'Lec06-PreQuiz', courseId: '101', body: '<h1>Lec06-PreQuiz</h1><form id="submit_quiz_form"><p>Question 1 of 4</p><label><input type="radio" name="q1"> A</label> <label><input type="radio" name="q1"> B</label><p><button type="button" class="btn">Submit Quiz</button></p></form>' }),
 };
 
@@ -418,6 +424,66 @@ on('POST', /^\/api\/v1\/courses\/(\w+)\/quizzes\/(\w+)\/submissions\/([\w-]+)\/c
 on('GET', /^\/api\/v1\/courses\/(\w+)\/quizzes\/(\w+)$/, (url, m) => quizzes(m[1]).find((q) => q.id === m[2]) || null);
 on('GET', /^\/api\/v1\/courses\/(\w+)\/quizzes$/, (url, m) => quizzes(m[1]));
 on('GET', /^\/api\/v1\/courses\/(\w+)\/modules$/, (url, m) => modules[m[1]] || []);
+
+// ---- handing work in ------------------------------------------------------------------------
+const pendingUploads = new Map(); // upload token -> preflight
+const storedFiles = new Map(); // file id -> file json
+const progresses = new Map();
+let fileSeq = 0;
+const homeworkTools = {
+  104: [
+    { id: 't1', name: 'Box', description: 'Pick a file from your Box drive', homework_submission: { enabled: true, text: 'Box', url: 'https://box.example.com/lti' } },
+    { id: 't2', name: 'Office 365', description: 'Attach a Word or PowerPoint file', homework_submission: { enabled: true, text: 'Office 365', url: 'https://o365.example.com/lti' } },
+  ],
+};
+on('GET', /^\/api\/v1\/courses\/(\w+)\/external_tools$/, (url, m) => (url.searchParams.get('placement') === 'homework_submission' ? homeworkTools[m[1]] || [] : []));
+on('POST', /^\/api\/v1\/courses\/(\w+)\/assignments\/(\w+)\/submissions\/self\/files$/, (url, m, body) => {
+  const a = allAssignments(m[1]).find((x) => x.id === m[2]);
+  if (!a) return null;
+  if (body.url) { // upload via URL: Canvas fetches the file itself and reports through a Progress
+    const id = `uf${++fileSeq}`;
+    storedFiles.set(id, { id, display_name: body.name || 'file', filename: body.name || 'file', size: 421888, 'content-type': body.content_type || 'application/pdf', url: `/files/${id}/download`, from_url: body.url });
+    progresses.set(`p${id}`, { id: `p${id}`, workflow_state: 'completed', tag: 'upload_via_url', results: { id } });
+    return { progress: { id: `p${id}`, workflow_state: 'queued', tag: 'upload_via_url' } };
+  }
+  const token = `tok${++fileSeq}`;
+  pendingUploads.set(token, { name: body.name, size: body.size, content_type: body.content_type });
+  return { upload_url: `http://localhost:${port}/__upload/${token}`, upload_params: { key: `submissions/${token}`, acl: 'private', success_action_status: '201' }, file_param: 'file' };
+});
+// the storage step: a multipart POST with no CSRF token, like S3 or inst-fs; the file is the last field
+on('POST', /^\/__upload\/(\w+)$/, (url, m, body, raw) => {
+  const pre = pendingUploads.get(m[1]);
+  if (!pre) return null;
+  const boundary = raw.slice(0, raw.indexOf('\r\n'));
+  const part = raw.split(boundary).find((p) => /filename="/.test(p)) || '';
+  const fname = (part.match(/filename="([^"]*)"/) || [])[1] || pre.name;
+  const bytes = part.slice(part.indexOf('\r\n\r\n') + 4).replace(/\r\n$/, '');
+  const id = `uf${++fileSeq}`;
+  storedFiles.set(id, { id, display_name: fname, filename: fname, size: bytes.length, 'content-type': pre.content_type || 'application/octet-stream', url: `/files/${id}/download` });
+  pendingUploads.delete(m[1]);
+  return storedFiles.get(id);
+});
+on('GET', /^\/api\/v1\/progress\/(\w+)$/, (url, m) => progresses.get(m[1]) || null);
+on('POST', /^\/api\/v1\/courses\/(\w+)\/assignments\/(\w+)\/submissions$/, (url, m, body) => {
+  const a = allAssignments(m[1]).find((x) => x.id === m[2]);
+  if (!a) return null;
+  const s = body.submission || {};
+  const type = s.submission_type === 'basic_lti_launch' ? 'online_url' : s.submission_type;
+  if (!a.submission_types.includes(type)) return { __status: 400, errors: [{ message: `this assignment does not accept ${s.submission_type}` }] };
+  if (type === 'online_upload' && (!Array.isArray(s.file_ids) || !s.file_ids.length || !s.file_ids.every((id) => storedFiles.has(String(id))))) return { __status: 400, errors: [{ message: 'no such file' }] };
+  if (type === 'online_upload' && a.allowed_extensions.length && !s.file_ids.every((id) => a.allowed_extensions.includes(String(storedFiles.get(String(id)).display_name).split('.').pop().toLowerCase()))) return { __status: 400, errors: [{ message: 'file type not allowed' }] };
+  if (type === 'online_text_entry' && !s.body) return { __status: 400, errors: [{ message: 'body is required' }] };
+  if (type === 'online_url' && !s.url) return { __status: 400, errors: [{ message: 'url is required' }] };
+  if (a.allowed_attempts > 0 && (a.submission.attempt || 0) >= a.allowed_attempts) return { __status: 400, errors: [{ message: 'no attempts left' }] };
+  const when = new Date();
+  const sub = {
+    ...a.submission, workflow_state: 'submitted', submitted_at: when.toISOString(), attempt: (a.submission.attempt || 0) + 1, submission_type: s.submission_type,
+    body: s.body || null, url: s.url || null, attachments: (s.file_ids || []).map((id) => storedFiles.get(String(id))), late: when > new Date(a.due_at), score: null, grade: null, graded_at: null,
+    submission_comments: [...(a.submission.submission_comments || []), ...(body.comment?.text_comment ? [{ author_name: 'Sam Student', created_at: when.toISOString(), comment: body.comment.text_comment }] : [])],
+  };
+  apiSubmissions.set(a.id, sub);
+  return sub;
+});
 on('GET', /^\/api\/v1\/courses\/(\w+)$/, (url, m) => { const c = courseById(m[1]); return c ? { ...fullCourse(c), syllabus_body: '<h2>Syllabus</h2><p>Lectures MWF 10:30. Midterm 1 in week 5, Midterm 2 in week 9, final in finals week. Late work loses 10% per day.</p>' } : null; });
 
 const server = http.createServer((req, res) => {
@@ -432,13 +498,13 @@ const server = http.createServer((req, res) => {
     } catch {
       body = {};
     }
-    // like Canvas: every write needs the page's CSRF token, body or not
-    if (req.method !== 'GET' && !path.startsWith('/__mock/') && req.headers['x-csrf-token'] !== 'mock-csrf') return json(res, { errors: [{ message: 'invalid authenticity token' }] }, 422);
+    // like Canvas: every write needs the page's CSRF token, body or not (file storage is a separate service and has none)
+    if (req.method !== 'GET' && !path.startsWith('/__mock/') && !path.startsWith('/__upload/') && req.headers['x-csrf-token'] !== 'mock-csrf') return json(res, { errors: [{ message: 'invalid authenticity token' }] }, 422);
     for (const [method, re, handler] of routes) {
       if (method !== req.method) continue;
       const m = path.match(re);
       if (!m) continue;
-      const data = handler(url, m, body);
+      const data = handler(url, m, body, raw);
       if (data === null) return json(res, { errors: [{ message: 'not found' }] }, 404);
       if (data && data.__status) return json(res, { errors: data.errors || [] }, data.__status);
       return json(res, data);

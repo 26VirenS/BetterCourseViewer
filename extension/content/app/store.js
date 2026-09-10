@@ -617,6 +617,83 @@
     return C.cached(`agroups:${id}`, 10 * MIN, () =>
       C.get(`/api/v1/courses/${id}/assignment_groups`, { params: { per_page: 50, include: ['assignments', 'submission'], exclude_assignment_submission_types: ['wiki_page'] }, all: true, maxPages: 3 }), { force });
   }
+  // ---- handing work in ------------------------------------------------------------------------
+  /** Tools the instructor enabled for handing work in (Box, Office 365, …): Canvas draws one
+   *  tab per tool with a homework_submission placement; the submit screen draws one row. */
+  function homeworkTools(id, { force = false } = {}) {
+    return C.cached(`hwtools:${id}`, 30 * MIN, () =>
+      C.get(`/api/v1/courses/${id}/external_tools`, { params: { placement: 'homework_submission', include_parents: true, per_page: 50 }, all: true, maxPages: 2 }), { force });
+  }
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const attachmentId = (o) => o?.id ?? o?.attachment?.id ?? o?.attachment_id ?? null;
+  const progressFileId = (p) => p?.results?.id ?? p?.results?.attachment_id ?? p?.results?.attachment?.id ?? null;
+  const preflightPath = (cid, aid) => `/api/v1/courses/${cid}/assignments/${aid}/submissions/self/files`;
+
+  /** Canvas's three-step upload for a submission file: preflight for the storage URL,
+   *  POST the bytes there (progress reaches the row), then confirm when storage
+   *  answers with a location instead of the file. Returns the file id. */
+  async function uploadSubmissionFile(cid, aid, file, onProgress) {
+    const pre = await C.post(preflightPath(cid, aid), { name: file.name, size: file.size, content_type: file.type || undefined, on_duplicate: 'rename' });
+    if (!pre?.upload_url) throw new Error('Canvas did not return an upload URL');
+    const form = new FormData();
+    for (const [k, v] of Object.entries(pre.upload_params || {})) form.append(k, v);
+    form.append(pre.file_param || 'file', file, file.name); // the file must be the last field
+    let done = await C.upload(pre.upload_url, form, { onProgress });
+    // inst-fs (and S3 without a redirect) answer with the confirm URL; Canvas's own storage with the file
+    if (done?.location) done = await C.get(done.location);
+    const id = attachmentId(done);
+    if (!id) throw new Error('the upload did not finish');
+    return String(id);
+  }
+
+  /** A file a tool handed back (Box, Office 365, …): Canvas fetches it from the tool's URL
+   *  itself and reports through a Progress; poll until the file exists. Returns the file id. */
+  async function uploadSubmissionFileFromUrl(cid, aid, { url, name, contentType }) {
+    const pre = await C.post(preflightPath(cid, aid), { url, name: name || undefined, content_type: contentType || undefined, on_duplicate: 'rename' });
+    const deadline = Date.now() + 90e3;
+    if (pre?.progress?.id) {
+      let p = pre.progress;
+      while (p.workflow_state !== 'completed') {
+        if (p.workflow_state === 'failed') throw new Error(p.message || 'Canvas could not fetch the file from the tool');
+        if (Date.now() > deadline) throw new Error('Canvas is still fetching the file from the tool — try again in a moment');
+        await sleep(1000);
+        p = await C.get(`/api/v1/progress/${p.id}`);
+      }
+      const id = progressFileId(p) || attachmentId(pre);
+      if (!id) throw new Error('Canvas did not say which file it saved');
+      return String(id);
+    }
+    if (pre?.status_url && pre.upload_status) { // older Canvas: the file exists already, poll until it is ready
+      let s = pre;
+      while (s.upload_status === 'pending') {
+        if (Date.now() > deadline) throw new Error('Canvas is still fetching the file from the tool — try again in a moment');
+        await sleep(1000);
+        s = await C.get(pre.status_url);
+      }
+      if (s.upload_status === 'errored') throw new Error(s.message || 'Canvas could not fetch the file from the tool');
+      return String(attachmentId(s) || pre.id);
+    }
+    const id = attachmentId(pre);
+    if (!id) throw new Error('Canvas did not accept the file');
+    return String(id);
+  }
+
+  /** Hand the work in: one POST with exactly what Canvas's own form sends. */
+  async function submitAssignment(cid, aid, { type, fileIds = [], body = '', url = '', comment = '' }) {
+    const submission = { submission_type: type };
+    if (type === 'online_upload') submission.file_ids = fileIds;
+    else if (type === 'online_text_entry') submission.body = body;
+    else submission.url = url; // online_url and basic_lti_launch
+    const payload = { submission };
+    if (comment) payload.comment = { text_comment: comment };
+    const result = await C.post(`/api/v1/courses/${cid}/assignments/${aid}/submissions`, payload);
+    await invalidateAssignment(cid, aid);
+    return result;
+  }
+  async function invalidateAssignment(cid, aid) {
+    await Promise.all([C.invalidate(`assignment:${cid}:${aid}`), C.invalidate(`submission:${cid}:${aid}`), C.invalidate(`assignments:${cid}`), C.invalidate(`agroups:${cid}`), C.invalidate(`ctodo:${cid}`), invalidatePlanner()]);
+  }
+
   /** Submitted ÷ total assignments for the progress bars. */
   async function progress(id) {
     try {
@@ -869,5 +946,6 @@
     course, tabs, frontPage, syllabus, courseTodo, ignoreTodo, courseStream, assignments, assignment, submission, assignmentGroups, progress,
     announcements, discussions, discussion, discussionView, postEntry, markTopicRead, people, sections, courseGroups, pages, page,
     rootFolder, folderContents, folderByPath, file, quizzes, quiz, quizSubmissions, quizApi, modules, gradeModel, fmtPts,
+    homeworkTools, uploadSubmissionFile, uploadSubmissionFileFromUrl, submitAssignment, invalidateAssignment,
   };
 })();

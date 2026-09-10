@@ -27,6 +27,7 @@
     smartCtx: null,
     dark: false,
     quizOpen: false, // our quiz flow has an attempt on screen
+    submitOpen: false, // our submission flow has unsent files or text on screen
   };
 
   // ---- routing ----------------------------------------------------------------------------
@@ -113,7 +114,9 @@
       return;
     }
     if (!confirmed && inQuiz() && url.pathname !== location.pathname && !confirmLeave()) return;
+    if (!confirmed && state.submitOpen && (url.pathname !== location.pathname || url.search !== location.search) && !window.confirm('Your submission has not been sent yet. Leave anyway?\n\nAttached files are dropped; a text entry stays as a draft on this device.')) return;
     state.quizOpen = false; // leaving on purpose: no second prompt from the unload guard
+    state.submitOpen = false;
     const samePage = url.pathname === location.pathname && url.search === location.search;
     if (samePage && (url.hash || location.hash)) {
       if (replace) history.replaceState({ bcv: true }, '', url.pathname + url.search + url.hash);
@@ -275,6 +278,7 @@
     const id = ++state.renderId;
     const alive = () => id === state.renderId;
     state.quizOpen = false;
+    state.submitOpen = false;
     html.classList.remove('bcv-quiz'); // the quiz screen puts it back while an attempt is on screen
     punchOut(); // a native screen punches back in while it builds
     renderSide();
@@ -392,6 +396,7 @@
   }
 
   async function boot() {
+    if (window.self !== window.top) return; // framed Canvas pages (tool pickers, previews) are left alone
     state.originalTitle = document.title;
     state.settings = BCV.early ? (await BCV.early.ready, BCV.early.settings()) : await S.get();
     state.dark = BCV.early?.isDark?.() ?? S.isDark(state.settings, false);

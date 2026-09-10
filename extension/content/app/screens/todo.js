@@ -72,6 +72,8 @@
           U.text('bcv-row__sub bcv-row__sub--3', `${it.courseName} · ${meta}`),
         ]),
         it.dismissed ? U.badge('Dismissed') : U.badge(U.whenShort(it.date)),
+        // plain assignments hand in from here; the submit screen says so if Canvas's page is needed instead
+        it.type === 'assignment' && !done && !it.dismissed && /\/assignments\/\d+$/.test(it.url) ? U.btn('Submit', { kind: 'xs', onClick: () => app.go(`${it.url}?bcv=submit&from=todo`) }) : null,
         it.dismissed
           ? U.btn('Restore', { kind: 'xs', onClick: () => change(it, () => store.restore(it), rowEl) })
           : U.iconbtn(IC.close, { size: 24, title: 'Dismiss', onClick: () => change(it, () => store.dismiss(it), rowEl) }),

@@ -3,6 +3,9 @@
  * chrome never flashes. The authoritative values come from extension
  * storage; a per-origin localStorage copy is applied instantly. */
 (function () {
+  // Canvas pages loaded inside a frame (a tool's file picker, a file preview,
+  // an LTI return page) are someone else's UI: leave them exactly as they are.
+  if (window.self !== window.top) return;
   const BCV = self.BCV;
   const S = BCV.settings;
   const html = document.documentElement;

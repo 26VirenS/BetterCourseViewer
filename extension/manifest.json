@@ -82,6 +82,7 @@
         "content/app/screens/inbox.js",
         "content/app/screens/group.js",
         "content/app/screens/quiz.js",
+        "content/app/screens/submit.js",
         "content/app/screens/course.js",
         "content/app/screens/course-detail.js",
         "content/app/screens/grades.js",

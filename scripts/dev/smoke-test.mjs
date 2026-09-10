@@ -354,6 +354,70 @@ try {
   await page.waitForSelector('.bcv-gpa__banner', { timeout: 5000 });
   check(await eventually(async () => { const p = await readPrefs(); return p?.gpaTracking === null && Array.isArray(p?.gpaSnapshots) && p.gpaSnapshots.length === 0 && p.gpaGoal === 3.75; }) && /needs your past record/.test((await texts('.bcv-gpa__hero'))[0]), 'Reset setup forgets the prior record and snapshots but keeps the goal');
 
+  // ---- handing work in (assignment submission flow) -------------------------------------
+  console.log('submission');
+  const readSub = (cid, aid) => fetch(`${BASE}/api/v1/courses/${cid}/assignments/${aid}/submissions/self`).then((r) => r.text()).then((t) => JSON.parse(t.replace(/^while\(1\);/, '')));
+  await page.goto(`${BASE}/courses/104/assignments/4002`);
+  await page.waitForSelector('.bcv-detail__actions .bcv-btn--primary', { timeout: 10000 });
+  check((await texts('.bcv-detail__actions .bcv-btn--primary'))[0] === 'Submit assignment', 'the assignment page offers our own submit flow');
+  await page.click('.bcv-detail__actions .bcv-btn--primary');
+  await page.waitForSelector('.bcv-sb__foot', { timeout: 10000 });
+  check(page.url() === `${BASE}/courses/104/assignments/4002?bcv=submit` && (await texts('.bcv-sb__h1'))[0] === 'Week 2 Post Class Assignment: GC articles' && (await visible('#bcv-side')), 'the submit screen opens in the main column with the sidebar kept');
+  const subChips = await texts('.bcv-sb__chip');
+  check(subChips.length === 4 && /^[A-Z][a-z]+ by 11:59 PM$/.test(subChips[0]) && subChips[1] === '10 points' && subChips[2] === 'F26-SPRK 010 103' && subChips[3] === 'Attempt 1 of unlimited', `header chips: ${subChips.join(' | ')}`);
+  check(/^Open [A-Z][a-z]{2} \d+ – [A-Z][a-z]{2} \d+ · accepts a file upload, a text entry or a website URL$/.test((await texts('.bcv-sb__note'))[0]), `availability + accepted types: ${(await texts('.bcv-sb__note'))[0]}`);
+  check((await texts('.bcv-sb__dropsub'))[0] === 'PDF, DOCX, PNG or JPG only · as many files as you need' && (await page.getAttribute('.bcv-sb__pane input[type=file]', 'accept')) === '.pdf,.docx,.png,.jpg', 'allowed file types are read from the assignment and set the picker\'s accept');
+  check((await texts('.bcv-sb__footnote'))[0] === 'Attach at least one file to submit.' && !!(await page.$('.bcv-sb__btn--primary[disabled]')), 'submit stays blocked until a file is attached');
+  await page.setInputFiles('.bcv-sb__pane input[type=file]', { name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('hello') });
+  await waitText('.bcv-toast', /notes\.txt.*isn't an accepted type.*PDF, DOCX, PNG or JPG/);
+  check(/^nothing attached yet$/i.test((await texts('.bcv-sb__count'))[0]), `a forbidden type is refused before any upload, with the reason: ${(await texts('.bcv-sb__count'))[0]}`); // innerText carries the CSS uppercase
+  await page.setInputFiles('.bcv-sb__pane input[type=file]', { name: 'grand-challenge-notes.docx', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', buffer: Buffer.alloc(38912, 'a') });
+  await waitText('.bcv-sb__count', /^1 file attached$/);
+  check((await texts('.bcv-sb__file'))[0].replace(/\s+/g, ' ') === 'DOCX grand-challenge-notes.docx 38 KB · ready to submit', `file row: ${(await texts('.bcv-sb__file'))[0].replace(/\s+/g, ' ')}`);
+  check(/anything after 11:59 PM is marked late/.test((await texts('.bcv-sb__footnote'))[0]) && !(await page.$('.bcv-sb__btn--primary[disabled]')), 'submit unlocks with a file and the note says when late starts');
+  // Other: the tool's own picker, punched through in a sheet; what it hands back joins the list
+  await page.click('.bcv-sb__tab[data-tab=other]');
+  check((await texts('.bcv-sb__toolname')).join(' | ') === 'Box | Office 365 | Website URL', `Other rows: ${(await texts('.bcv-sb__toolname')).join(' | ')}`);
+  await page.click('.bcv-sb__tool');
+  await page.waitForSelector('.bcv-sheet--tool .bcv-sb__frame', { timeout: 5000 });
+  check((await page.frameLocator('.bcv-sb__frame').locator('#tool-title').innerText()) === "Box picker (the tool's own page)" && !(await page.frameLocator('.bcv-sb__frame').locator('#bcv-app').count()), 'the tool\'s page is framed untouched (no skin inside the frame)');
+  await page.frameLocator('.bcv-sb__frame').locator('#pick').click();
+  await waitText('.bcv-sb__count', /^2 files attached$/);
+  check(!(await page.$('.bcv-sheet--tool')) && (await texts('.bcv-sb__file'))[1].replace(/\s+/g, ' ') === 'PDF GC-articles-Sharma.pdf from Box · ready to submit', `the file the tool handed back joins the list: ${(await texts('.bcv-sb__file'))[1].replace(/\s+/g, ' ')}`);
+  await page.fill('.bcv-sb__comment', 'Three sources, APA.');
+  await page.click('.bcv-sb__btn--primary');
+  await page.waitForSelector('.bcv-sb__done', { timeout: 15000 });
+  const receipt = (await texts('.bcv-sb__rrow')).map((t) => t.replace(/\s+/g, ' '));
+  check(/^Submitted [A-Z][a-z]{2} \d+ at \d+:\d\d [AP]M$/.test(receipt[0]) && receipt[1] === 'Submission grand-challenge-notes.docx, GC-articles-Sharma.pdf' && /^Turned in \d+ (minutes?|hours?) before the deadline$/.test(receipt[2]) && receipt[3] === 'Attempt 1' && receipt[4] === 'Grade Not graded yet', `receipt: ${receipt.join(' | ')}`);
+  const sub1 = await readSub('104', '4002');
+  check(sub1.workflow_state === 'submitted' && sub1.attempt === 1 && sub1.submission_type === 'online_upload' && sub1.attachments.length === 2 && sub1.attachments[0].display_name === 'grand-challenge-notes.docx' && sub1.attachments[0].size === 38912 && sub1.attachments[1].from_url === `${BASE}/files/box1/download` && sub1.submission_comments.some((c) => c.comment === 'Three sources, APA.'), `Canvas holds the upload, the tool's file and the comment: ${JSON.stringify(sub1.attachments.map((f) => [f.display_name, f.size]))}`);
+  // resubmit as a text entry; the draft lives on this device until it is sent
+  await page.click('.bcv-sb__donebtns .bcv-sb__btn:not(.bcv-sb__btn--primary)');
+  await page.waitForSelector('.bcv-sb__tabs', { timeout: 5000 });
+  check((await texts('.bcv-sb__chip'))[3] === 'Attempt 2 of unlimited' && /^nothing attached yet$/i.test((await texts('.bcv-sb__count'))[0]), `Resubmit starts the next attempt with an empty list: ${(await texts('.bcv-sb__chip'))[3]} · ${(await texts('.bcv-sb__count'))[0]}`);
+  await page.click('.bcv-sb__tab[data-tab=text]');
+  await page.fill('.bcv-sb__ta', 'Clean water for all.\n\nThree sources follow.');
+  await page.waitForTimeout(700);
+  await page.reload();
+  await page.waitForSelector('.bcv-sb__foot', { timeout: 10000 });
+  await page.click('.bcv-sb__tab[data-tab=text]');
+  check((await page.inputValue('.bcv-sb__ta')) === 'Clean water for all.\n\nThree sources follow.' && /Draft restored/.test((await texts('.bcv-sb__note'))[1]), 'the text entry survives a reload as a draft on this device');
+  await page.click('.bcv-sb__btn--primary');
+  await page.waitForSelector('.bcv-sb__done', { timeout: 15000 });
+  const sub2 = await readSub('104', '4002');
+  check(sub2.attempt === 2 && sub2.submission_type === 'online_text_entry' && sub2.body === '<p>Clean water for all.</p><p>Three sources follow.</p>' && (await texts('.bcv-sb__rrow'))[1].replace(/\s+/g, ' ') === 'Submission Text entry', `the text entry is recorded as HTML paragraphs: ${sub2.body}`);
+  await shot(page, '09f-submitted');
+  await page.click('.bcv-sb__donebtns .bcv-sb__btn--primary');
+  await page.waitForSelector('.bcv-detail__actions .bcv-btn--primary', { timeout: 10000 });
+  check(page.url() === `${BASE}/courses/104/assignments/4002` && (await texts('.bcv-detail__actions .bcv-btn--primary'))[0] === 'Resubmit' && (await texts('.bcv-badge')).includes('Submitted'), 'back on the assignment page: status Submitted, button Resubmit');
+  // To Do rows hand in directly and the back link returns there
+  await nav('todo');
+  await page.waitForSelector('.bcv-row', { timeout: 10000 });
+  await page.locator('.bcv-row', { hasText: 'Research Day Activity' }).first().locator('.bcv-btn--xs', { hasText: 'Submit' }).click();
+  await page.waitForSelector('.bcv-sb__foot', { timeout: 10000 });
+  check(page.url() === `${BASE}/courses/105/assignments/5002?bcv=submit&from=todo` && (await texts('.bcv-sb__headin .bcv-linkbtn'))[0].trim() === 'To Do' && (await texts('.bcv-sb__dropsub'))[0].startsWith('Any file type') && (await texts('.bcv-sb__tab')).join(' | ') === 'File upload | Text entry', 'a To Do row opens the submit screen with To Do as the way back; no Other tab when the course has no tools');
+  await shot(page, '09g-submit-from-todo');
+
   // ---- groups -----------------------------------------------------------------------------
   console.log('groups');
   await nav('groups');
@@ -443,7 +507,7 @@ try {
   for (const r of dis01) if (/Dis01/.test(await r.textContent())) { await r.click(); break; }
   await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
   check((await texts('.bcv-detail__title'))[0] === 'Dis01' && (await texts('.bcv-detail__meta'))[0].includes('Points 10') && (await page.$$('.bcv-rubric__row')).length === 2, 'assignment detail with rubric');
-  check((await texts('.bcv-btn--primary'))[0] === 'Submit in Canvas', 'submit button hands off to Canvas');
+  check((await texts('.bcv-btn--primary'))[0] === 'Submit assignment', 'submit button opens our own submission flow');
   await shot(page, '14-assignment');
 
   // discussions

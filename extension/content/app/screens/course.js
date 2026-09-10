@@ -260,6 +260,8 @@
     }
     // Taking a quiz: the whole main column is the quiz, no course chrome.
     if (route.tab === 'quiz' && route.params.get('bcv') === 'take') return BCV.screens.quiz.render(ctx, course);
+    // Handing work in: the submission flow takes the main column (the sidebar stays, as in the mockup).
+    if (route.tab === 'assignment' && route.arg && route.params.get('bcv') === 'submit') return BCV.screens.submit.render(ctx, course);
 
     const shell = { course, reader: null, dark, kind: 'courses' };
     const tabs = (tabsRaw || []).filter((t) => !t.hidden && t.id !== 'settings').map((t) => {

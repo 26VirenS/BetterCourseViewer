@@ -92,6 +92,38 @@
   const put = (path, body, opts) => request('PUT', path, { ...opts, body });
   const del = (path, opts) => request('DELETE', path, opts);
 
+  /** Step 2 of a Canvas file upload: POST the multipart form to the storage
+   *  URL the preflight returned (Canvas itself, inst-fs or S3). XHR so the
+   *  progress events reach the row. Redirects are followed by the browser;
+   *  a JSON body with `id` is the finished file, `location` is the confirm
+   *  URL to GET (step 3). */
+  function upload(url, form, { onProgress = null } = {}) {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', url);
+      let sameOrigin = false;
+      try {
+        sameOrigin = new URL(url, location.origin).origin === location.origin;
+      } catch {
+        /* ignore */
+      }
+      xhr.withCredentials = sameOrigin; // S3 / inst-fs answer with a wildcard CORS header, which forbids credentials
+      xhr.setRequestHeader('accept', 'application/json');
+      if (xhr.upload && onProgress) xhr.upload.addEventListener('progress', (e) => { if (e.lengthComputable) onProgress(e.loaded / e.total); });
+      xhr.addEventListener('load', () => {
+        if (xhr.status < 200 || xhr.status >= 400) return reject(new CanvasError(`Upload failed (${xhr.status})`, xhr.status));
+        try {
+          resolve(parseBody(xhr.responseText || ''));
+        } catch {
+          resolve(null);
+        }
+      });
+      xhr.addEventListener('error', () => reject(new CanvasError('Upload failed: the connection dropped', 0)));
+      xhr.addEventListener('abort', () => reject(new CanvasError('Upload cancelled', 0)));
+      xhr.send(form);
+    });
+  }
+
   // ---- cache -------------------------------------------------------------
   const memory = new Map();
   const cacheKey = (key) => `cache:${location.host}:${key}`;
@@ -243,7 +275,7 @@
   }
 
   BCV.canvas = {
-    get, post, put, del, cached, invalidate, csrfToken, CanvasError,
+    get, post, put, del, upload, cached, invalidate, csrfToken, CanvasError,
     plannerItems, dashboardCards, activeCourses, courseColors, setPlannerComplete,
     coursesWithScores, courseTabs, course, courseModules, announcements, unreadCount,
   };
