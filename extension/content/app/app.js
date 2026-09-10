@@ -163,7 +163,7 @@
     ['todo', 'To Do', IC.check, '#34c759', '/#todo', state.todoCount ? String(state.todoCount) : ''],
     ['calendar', 'Calendar', IC.cal, '#5856d6', '/calendar', ''],
     ['inbox', 'Inbox', IC.mail, '#8e8e93', '/conversations', state.unread ? String(state.unread) : ''],
-    ['gpa', 'Grades', IC.chart, '#5856d6', '/grades', ''],
+    ['gpa', 'Grades', IC.chart, '#af52de', '/grades', ''], // purple: Calendar already has the indigo
   ];
 
   function siteName() {
