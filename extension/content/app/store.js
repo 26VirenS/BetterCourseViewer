@@ -103,13 +103,16 @@
   }
 
   // ---- courses ------------------------------------------------------------------------
+  /** The user's course colours, exactly as Canvas paints its dashboard cards. Every Canvas
+   *  page already carries them (ENV.PREFERENCES.custom_colors); the API confirms them. */
   function colors({ force = false } = {}) {
     return C.cached('colors', 60 * MIN, async () => {
+      const fromPage = env().PREFERENCES?.custom_colors || {};
       try {
         const r = await C.get('/api/v1/users/self/colors');
-        return r?.custom_colors || {};
+        return { ...fromPage, ...(r?.custom_colors || {}) };
       } catch {
-        return {};
+        return fromPage;
       }
     }, { force });
   }

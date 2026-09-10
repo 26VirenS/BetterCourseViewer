@@ -221,28 +221,30 @@
     state.logo = logo;
     return logo;
   }
-  function brandTile(name) {
+  /** The brand row is the school's logo alone, whole and unclipped; only a site with
+   *  no logo at all shows its initial and name instead. No site name, address or term. */
+  function brandRow(name) {
+    const fallback = () => U.el('bcv-brand', [U.el('bcv-brand__tile', name.charAt(0).toUpperCase()), U.text('bcv-brand__name', name)]);
     const logo = schoolLogo();
-    if (!logo) return U.el('bcv-brand__tile', name.charAt(0).toUpperCase());
-    const img = h('img', { src: logo.url, alt: '' });
-    const tile = h('div', { class: `bcv-brand__tile ${logo.square ? 'bcv-brand__tile--icon' : ''}`, style: !logo.square && logo.bg ? { background: logo.bg } : {} }, img);
+    if (!logo) return fallback();
+    const img = h('img', { src: logo.url, alt: name });
+    const row = U.el('bcv-brand bcv-brand--logo', h('div', { class: 'bcv-brand__logo' }, img));
     img.addEventListener('error', () => { // a dead URL falls back to the initial rather than a broken image
       state.logo = null;
-      tile.replaceWith(U.el('bcv-brand__tile', name.charAt(0).toUpperCase()));
+      row.replaceWith(fallback());
     });
-    return tile;
+    return row;
   }
 
   function renderSide() {
     if (!side) return;
     const r = state.route || parseRoute();
     const name = siteName();
-    const inst = state.account?.name || location.hostname.replace(/^(canvas|www)\./, '');
     const focus = inQuiz() && !state.quizOpen; // our own quiz flow hides the sidebar entirely
     root?.classList.toggle('bcv-focus', focus);
     if (focus) {
       side.replaceChildren(
-        U.el('bcv-brand', [brandTile(name), h('div', {}, [U.text('bcv-brand__name', name), U.text('bcv-brand__sub', [inst, state.term].filter(Boolean).join(' · '))])]),
+        brandRow(name),
         U.el('bcv-focus__card', [
           U.text('bcv-focus__title', 'Quiz in progress'),
           U.text('bcv-focus__sub', 'Navigation is hidden so nothing takes you out of the quiz by accident. Submit the quiz to return, or leave on purpose below.'),
@@ -252,10 +254,7 @@
       return;
     }
     side.replaceChildren(
-      U.el('bcv-brand', [
-        brandTile(name),
-        h('div', {}, [U.text('bcv-brand__name', name), U.text('bcv-brand__sub', [inst, state.term].filter(Boolean).join(' · '))]),
-      ]),
+      brandRow(name),
       h('nav', { class: 'bcv-nav' }, navDef().map(([key, label, icon, tileColor, href, count]) => h('button', {
         type: 'button',
         class: `bcv-nav__item ${r.screen === key || (key === 'groups' && r.screen === 'group') ? 'is-active' : ''}`,

@@ -87,9 +87,15 @@ try {
   check(await visible('#bcv-app'), 'app shell visible');
   check(!(await visible('#application')), 'stock Canvas hidden');
   check(!(await page.$('#bcv-skin')), 'no switch floats on the page (the look is toggled from the popup and settings)');
-  await waitText('.bcv-brand__sub', /Example University · Fall 2026/);
-  check((await texts('.bcv-brand__name'))[0] === 'Localhost', `brand row: ${(await texts('.bcv-brand'))[0]}`);
-  check(await page.$('.bcv-brand__tile--icon img[src^="data:image/svg"]'), 'brand tile shows the school\'s own square mark (Canvas\'s apple-touch icon), not its default favicon or the wordmark');
+  await page.waitForSelector('.bcv-nav__item', { timeout: 10000 });
+  const brand = await page.evaluate(() => {
+    const img = document.querySelector('.bcv-brand__logo img');
+    const cs = img ? getComputedStyle(img) : {};
+    return { src: img?.getAttribute('src')?.slice(0, 18), radius: cs.borderRadius, fit: cs.objectFit, height: img?.getBoundingClientRect().height, text: document.querySelector('.bcv-brand')?.textContent.trim(), name: !!document.querySelector('.bcv-brand__name, .bcv-brand__sub') };
+  });
+  check(brand.src === 'data:image/svg+xml' && brand.radius === '0px' && brand.fit === 'contain' && Math.round(brand.height) === 46 && brand.text === '' && !brand.name, `brand row is the school's own mark alone, whole and unrounded, with no site name or term: ${JSON.stringify(brand)}`);
+  const favDots = await page.$$eval('.bcv-fav__dot', (els) => els.map((e) => getComputedStyle(e).backgroundColor));
+  check(favDots.length === 5 && new Set(favDots).size === 5 && favDots[0] === 'rgb(52, 199, 89)', `favourite dots carry the user's own course colours from Canvas: ${favDots.join(' | ')}`);
   const navItems = await texts('.bcv-nav__item');
   check(navItems.length === 7 && navItems[0].startsWith('Dashboard') && navItems[5].startsWith('Inbox') && navItems[6] === 'Grades', `sidebar nav: ${navItems.join(' | ')}`);
   await waitText('.bcv-nav__item[data-nav="todo"] .bcv-nav__count', /\d/);

@@ -94,10 +94,10 @@ html.bcv-on #bcv-app { display: flex; }
 .bcv-side { flex: none; width: 242px; padding: 50px 12px 14px; background: var(--bcv-chrome); -webkit-backdrop-filter: var(--bcv-blur-chrome); backdrop-filter: var(--bcv-blur-chrome); border-right: 1px solid var(--bcv-edge); display: flex; flex-direction: column; gap: 18px; position: sticky; top: 0; height: 100vh; overflow: auto; }
 .bcv-brand { display: flex; align-items: center; gap: 10px; padding: 6px 8px 2px; }
 .bcv-brand__tile { width: 30px; height: 30px; border-radius: 9px; background: linear-gradient(160deg, #1b3f76, #12305c); display: flex; align-items: center; justify-content: center; font: 700 14px/1 var(--bcv-font); color: #f0b429; flex: none; overflow: hidden; }
-.bcv-brand__tile img { width: 24px; height: 24px; object-fit: contain; display: block; }
-/* the school's own square mark fills the tile; a wide wordmark stays contained on the nav colour */
-.bcv-brand__tile--icon { background: transparent; }
-.bcv-brand__tile--icon img { width: 30px; height: 30px; object-fit: cover; border-radius: 9px; }
+/* the school's logo, whole: never cropped, no rounded corners, no name or term beside it */
+.bcv-brand--logo { padding: 4px 8px 2px; }
+.bcv-brand__logo { display: block; max-width: 100%; }
+.bcv-brand__logo img { display: block; height: 46px; width: auto; max-width: 100%; object-fit: contain; border-radius: 0; }
 .bcv-brand__name { font: 600 13.5px/1.2 var(--bcv-font); letter-spacing: -.01em; }
 .bcv-brand__sub { font: 400 11px/1.2 var(--bcv-font); color: var(--bcv-ink3); }
 .bcv-nav { display: flex; flex-direction: column; gap: 2px; }
