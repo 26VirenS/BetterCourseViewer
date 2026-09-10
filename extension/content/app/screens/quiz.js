@@ -36,7 +36,8 @@
     const html = document.documentElement;
     html.classList.add('bcv-quiz'); // hides the sidebar and the smart button; app.js clears it on the next render
 
-    const st = { stage: 'intro', idx: 0, mode: 'one', quiz: null, sub: null, questions: [], flags: {}, saving: 0, savedAt: 0, timer: null, warned: {}, done: null, code: '' };
+    // fbSub: the finished attempt the feedback stage shows; fbFrom: 'done' when it was opened from the receipt
+    const st = { stage: 'intro', idx: 0, mode: 'one', quiz: null, sub: null, questions: [], flags: {}, saving: 0, savedAt: 0, timer: null, warned: {}, done: null, code: '', fbSub: null, fbFrom: null, fb: null };
     const screen = U.el('bcv-qz');
     screen.append(U.loading('Loading the quiz…'));
 
@@ -52,7 +53,15 @@
     const forcedOne = !!quiz.one_question_at_a_time;
     const noBack = !!quiz.cant_go_back;
     const timed = !!quiz.time_limit;
-    const attemptsLeft = quiz.allowed_attempts && quiz.allowed_attempts > 0 ? quiz.allowed_attempts - (subs || []).filter((s) => s.workflow_state !== 'untaken').length : null;
+    // Attempts come from Canvas's own count on the submission (plus any extra the instructor
+    // granted); allowed === null means unlimited. The store refuses to start one past the limit too.
+    const limit = store.quizAttemptLimit(quiz, subs);
+    const attemptsLeft = limit.left;
+    const allowed = limit.allowed;
+    if (route.params.get('bcv') === 'feedback') {
+      st.fbSub = pickFeedbackSub(route.params.get('sub'));
+      st.stage = 'feedback';
+    }
 
     // ---- leave guard ---------------------------------------------------------------
     // app.go() asks before leaving while quizOpen is set (and clears it once you
@@ -169,9 +178,12 @@
       if (st.stage === 'intro') body.replaceChildren(intro());
       else if (st.stage === 'take') body.replaceChildren(st.mode === 'all' ? takeAll() : takeOne());
       else if (st.stage === 'review') body.replaceChildren(review());
+      else if (st.stage === 'feedback') body.replaceChildren(feedback());
       else body.replaceChildren(done());
+      screen.classList.toggle('is-feedback', st.stage === 'feedback');
+      html.classList.toggle('bcv-quiz-fb', st.stage === 'feedback'); // the smart panel is back for feedback (app.js clears it with bcv-quiz)
       setOpen(st.stage === 'take' || st.stage === 'review');
-      ctx.setSmart({
+      ctx.setSmart(st.stage === 'feedback' ? feedbackSmart() : {
         label: `${quiz.title} · quiz`,
         actions: [],
         context: () => `Quiz: ${quiz.title} (${course.name}). ${st.questions.length} questions. This is an open attempt; the smart panel must not answer quiz questions for the student.`,
@@ -214,12 +226,16 @@
         ['#34c759', CHECK, 'Answers save as you pick them. You can leave and come back.'],
         timed ? ['#ff9500', IC.warn, `Time limit: ${quiz.time_limit} minutes. The clock starts when you begin and keeps running if you leave.`] : null,
         forcedOne ? ['var(--bcv-ink3)', MODE_ONE, noBack ? 'One question at a time, and you cannot go back to a previous question.' : 'One question at a time.'] : null,
-        attemptsLeft !== null ? ['var(--bcv-ink3)', IC.bolt, attemptsLeft > 0 ? `${U.plural(attemptsLeft, 'attempt')} left of ${quiz.allowed_attempts}.` : 'No attempts left.'] : ['var(--bcv-ink3)', IC.bolt, 'Unlimited attempts.'],
+        attemptsLeft !== null ? ['var(--bcv-ink3)', IC.bolt, attemptsLeft > 0 ? `${U.plural(attemptsLeft, 'attempt')} left of ${allowed}.` : `No attempts left — this quiz allows ${U.plural(allowed, 'attempt')}.`] : ['var(--bcv-ink3)', IC.bolt, 'Unlimited attempts.'],
         quiz.lock_at ? ['var(--bcv-ink3)', IC.lock, `Available until ${U.fmtAt(quiz.lock_at)}.`] : null,
       ].filter(Boolean);
       const codeInput = quiz.access_code || quiz.has_access_code ? h('input', { class: 'bcv-input', type: 'text', placeholder: 'Access code', autocomplete: 'off', oninput: (e) => { st.code = e.target.value; } }) : null;
-      const canStart = !quiz.locked_for_user && (attemptsLeft === null || attemptsLeft > 0 || st.sub);
-      const startBtn = h('button', { type: 'button', class: 'bcv-qz__begin', text: st.sub ? 'Continue attempt' : 'Begin attempt', disabled: !canStart || null, onclick: begin });
+      const canStart = !quiz.locked_for_user && (attemptsLeft === null || attemptsLeft > 0 || !!st.sub);
+      const lastDone = canStart ? null : latestFinished();
+      // out of attempts: the primary action becomes the feedback for the last one (when released)
+      const startBtn = !canStart && lastDone && !resultsHidden(lastDone)
+        ? h('button', { type: 'button', class: 'bcv-qz__begin', text: 'See your feedback', onclick: () => openFeedback(lastDone, 'intro') })
+        : h('button', { type: 'button', class: 'bcv-qz__begin', text: st.sub ? 'Continue attempt' : (canStart ? 'Begin attempt' : 'No attempts left'), disabled: !canStart || null, onclick: begin });
       return U.el('bcv-qz__intro', [
         h('div', {}, [
           h('h1', { class: 'bcv-qz__h1 bcv-pretty', text: quiz.title }),
@@ -233,7 +249,7 @@
           quiz.locked_for_user ? U.text('bcv-error', quiz.lock_explanation ? htmlToText(quiz.lock_explanation, 200) : 'This quiz is locked.') : null,
         ]), 'bcv-card--22'),
         startBtn,
-        h('p', { class: 'bcv-qz__note', text: st.sub ? `Started ${U.fmtTime(st.sub.started_at)} · attempt ${st.sub.attempt}` : (attemptsLeft !== null ? `Attempt ${quiz.allowed_attempts - attemptsLeft + 1} of ${quiz.allowed_attempts}` : 'Take your time — nothing is submitted until you say so.') }),
+        h('p', { class: 'bcv-qz__note', text: st.sub ? `Started ${U.fmtTime(st.sub.started_at)} · attempt ${st.sub.attempt}` : (attemptsLeft !== null ? (attemptsLeft > 0 ? `Attempt ${limit.used + 1} of ${allowed}` : `${U.plural(limit.used, 'attempt')} used of ${allowed}`) : 'Take your time — nothing is submitted until you say so.') }),
       ]);
     }
 
@@ -420,10 +436,216 @@
         U.el('bcv-qz__donecard', [h('span', { class: 'bcv-qz__donek', text: 'Questions answered' }), h('span', { class: 'bcv-qz__donev', text: answeredLabel() })]),
         scoreVisible ? U.el('bcv-qz__donecard', [h('span', { class: 'bcv-qz__donek', text: 'Score' }), h('span', { class: 'bcv-qz__donev', text: `${store.fmtPts(d.kept_score ?? d.score)} / ${store.fmtPts(quiz.points_possible || 0)}` })]) : null,
         U.el('bcv-qz__donebtns', [
-          h('button', { type: 'button', class: 'bcv-qz__big bcv-qz__big--primary', text: `Back to ${course.name}`, onclick: leave }),
-          h('button', { type: 'button', class: 'bcv-qz__big', text: 'Quiz page', onclick: () => { setOpen(false); app.go(quizUrl, { confirmed: true }); } }),
+          // feedback only once Canvas has released it (hide_results); the receipt says so otherwise
+          scoreVisible && d.id && !resultsHidden(d) ? h('button', { type: 'button', class: 'bcv-qz__big bcv-qz__big--primary', text: 'See feedback', onclick: () => openFeedback(d, 'done') }) : null,
+          h('button', { type: 'button', class: `bcv-qz__big ${scoreVisible && d.id && !resultsHidden(d) ? '' : 'bcv-qz__big--primary'}`, text: `Back to ${course.name}`, onclick: () => exitTo(course.url) }),
+          h('button', { type: 'button', class: 'bcv-qz__big', text: 'Quiz page', onclick: () => exitTo(quizUrl) }),
         ]),
       ]);
+    }
+
+    // ---- feedback (mockup 9) ---------------------------------------------------------
+    // A finished attempt, question by question: your answer, the correct one when the
+    // quiz's settings allow it, the instructor's worked solution and a smart-panel entry
+    // point scoped to that question. Everything comes from the attempt's own question data
+    // and the assignment submission's comments; nothing is fetched beyond that.
+    const CS = () => BCV.screens.course;
+    const SPARK = 'M12 3l1.9 4.1L18 9l-4.1 1.9L12 15l-1.9-4.1L6 9l4.1-1.9zM18 15l.9 2.1L21 18l-2.1.9L18 21l-.9-2.1L15 18l2.1-.9z';
+    const CROSS = 'M6 6l12 12M18 6L6 18';
+    function finished(s) {
+      return !!s && (s.workflow_state === 'complete' || s.workflow_state === 'pending_review');
+    }
+    function latestFinished() {
+      return [...(subs || []), ...(st.done && finished(st.done) ? [st.done] : [])]
+        .filter(finished)
+        .sort((a, b) => (Number(b.attempt) || 0) - (Number(a.attempt) || 0))[0] || null;
+    }
+    function pickFeedbackSub(wantId) {
+      const list = (subs || []).filter(finished);
+      return (wantId && list.find((s) => String(s.id) === String(wantId))) || latestFinished();
+    }
+    function exitTo(href) {
+      setOpen(false);
+      clearInterval(st.timer);
+      app.go(href, { confirmed: true });
+    }
+    function openFeedback(sub, from) {
+      st.fbSub = sub;
+      st.fbFrom = from;
+      st.fb = null;
+      st.stage = 'feedback';
+      draw();
+      window.scrollTo(0, 0);
+    }
+    /** Why results are withheld (a sentence), or null when Canvas shows them. */
+    function resultsHidden(sub) {
+      if (quiz.hide_results === 'always') return 'Your instructor has hidden the results for this quiz.';
+      if (quiz.hide_results === 'until_after_last_attempt' && allowed !== null && attemptsLeft > 0) return `Results show after your last attempt — ${U.plural(attemptsLeft, 'attempt')} left.`;
+      if (sub && sub.workflow_state === 'untaken') return 'This attempt is still open.';
+      return null;
+    }
+    /** Whether the quiz's show_correct_answers window is open right now. */
+    function correctVisible() {
+      if (!quiz.show_correct_answers) return false;
+      const now = Date.now();
+      if (quiz.show_correct_answers_at && U.parse(quiz.show_correct_answers_at) > now) return false;
+      if (quiz.hide_correct_answers_at && U.parse(quiz.hide_correct_answers_at) < now) return false;
+      if (quiz.show_correct_answers_last_attempt && allowed !== null && attemptsLeft > 0) return false;
+      return true;
+    }
+    const parseCorrect = (v) => (v === true || v === 'true' ? true : v === false || v === 'false' ? false : v === 'partial' ? 'partial' : null);
+    /** The correct answer(s) as text: the answers Canvas weights 100 (absent when censored). */
+    function fbRight(q) {
+      const one = (a) => {
+        if (a.text) return a.text;
+        if (a.html) return htmlToText(a.html, 80);
+        if (a.numerical_answer_type === 'range_answer' && a.start !== undefined) return `${a.start} – ${a.end}`;
+        if (a.exact !== undefined && a.exact !== null) return Number(a.margin) ? `${a.exact} ± ${a.margin}` : String(a.exact);
+        if (a.approximate !== undefined && a.approximate !== null) return String(a.approximate);
+        if (a.left && a.right) return `${a.left} → ${a.right}`;
+        return null;
+      };
+      const parts = (q.answers || []).filter((a) => Number(a.weight) === 100).map(one).filter(Boolean);
+      return parts.length ? parts.join(', ') : null;
+    }
+    /** Solution html from the question data: the neutral comment, else the one for this outcome. */
+    function fbSolution(q, ok) {
+      const html = q.neutral_comments_html || (ok ? q.correct_comments_html : q.incorrect_comments_html);
+      if (html && String(html).trim()) return { html };
+      const text = q.neutral_comments || (ok ? q.correct_comments : q.incorrect_comments);
+      return text && String(text).trim() ? { text: String(text).trim() } : null;
+    }
+    async function loadFeedback(sub) {
+      const [qs, asub] = await Promise.all([
+        store.quizApi.questions(sub),
+        quiz.assignment_id ? store.submission(cid, quiz.assignment_id, { force: true }).catch(() => null) : Promise.resolve(null),
+      ]);
+      const me = String(store.env().current_user_id || '');
+      const comments = (asub?.submission_comments || []).filter((c) => !me || String(c.author_id ?? '') !== me);
+      // per-question points, when the assignment submission's history carries this attempt's grading
+      const hist = (asub?.submission_history || []).find((x) => Number(x.attempt) === Number(sub.attempt)) || null;
+      const graded = new Map((hist?.submission_data || []).map((d) => [String(d.question_id), d]));
+      const rows = qs.map((q, k) => {
+        const d = graded.get(String(q.id)) || null;
+        const correct = parseCorrect(q.correct) ?? (d ? parseCorrect(d.correct) : null);
+        const possible = Number(q.points_possible) || 0;
+        const earned = d && d.points !== undefined && d.points !== null ? Number(d.points) : correct === true ? possible : correct === false ? 0 : null;
+        return { q, k, correct, possible, earned, text: htmlToText(q.question_text || q.question_name || '', 400).replace(/\s+/g, ' ').trim(), yours: answerText(q), right: fbRight(q), sol: fbSolution(q, correct === true), info: INFO.has(q.question_type) };
+      }).filter((r) => !r.info);
+      const released = rows.some((r) => r.correct !== null);
+      const possible = Number(quiz.points_possible) || rows.reduce((s, r) => s + r.possible, 0);
+      const score = sub.kept_score ?? sub.score;
+      return { sub, rows, released, comments, possible, score: score === null || score === undefined ? null : Number(score), gradedAt: asub?.graded_at || sub.finished_at };
+    }
+    function feedbackSmart() {
+      const fb = st.fb;
+      const sub = st.fbSub;
+      return {
+        label: `${quiz.title} · feedback`,
+        actions: fb && fb.released ? [
+          { label: 'What should I review?', note: `${fb.rows.filter((r) => r.correct !== true).length} to look at`, icon: IC.book, prompt: 'From this feedback, which topics should I review first and why? Keep it to the questions I lost points on.' },
+          { label: 'Quiz me on the misses', note: 'New questions, same ideas', icon: IC.bolt, prompt: 'Write three practice questions (with brief answers) on the concepts behind the questions I got wrong.' },
+        ] : [],
+        context: () => `Quiz feedback: ${quiz.title} (${course.name}).\nScore: ${fb && fb.score !== null ? `${store.fmtPts(fb.score)} / ${store.fmtPts(fb.possible)}` : 'not posted'}${sub ? ` · attempt ${sub.attempt}` : ''}.\n${fb ? fb.rows.map((r) => `- Q${r.k + 1} (${r.correct === true ? 'correct' : r.correct === false ? 'wrong' : r.correct === 'partial' ? 'partial credit' : 'not graded yet'}): ${r.text}\n  Your answer: ${r.yours ?? 'no answer'}${r.right && r.correct !== true && correctVisible() ? ` · Correct: ${r.right}` : ''}`).join('\n') : ''}\n\nThis is a study aid, not a regrade: the score cannot change here.`,
+      };
+    }
+    function askAbout(r) {
+      const ok = r.correct === true;
+      const solText = r.sol ? (r.sol.text || htmlToText(r.sol.html, 2000)) : '';
+      const showRight = !ok && correctVisible() && r.right;
+      app.setSmartTopic({
+        label: `Question ${r.k + 1} · ${r.text.slice(0, 80)}${r.text.length > 80 ? '…' : ''}`,
+        actions: [
+          { label: 'Walk me through this step by step', note: 'From the question to the answer', icon: IC.book, prompt: 'Walk me through this question step by step, using the worked solution where there is one. Do not change or dispute the score.' },
+          ok
+            ? { label: 'Why is this right?', note: 'The idea behind the answer', icon: IC.check, prompt: 'Explain why my answer is right, and what would have made it wrong.' }
+            : { label: 'Why was my answer wrong?', note: 'Compare my answer with the worked solution', icon: IC.check, prompt: 'Compare my answer with the correct one and explain where my reasoning went wrong.' },
+          { label: 'Give me a similar practice problem', note: 'Same idea, new numbers', icon: IC.bolt, prompt: 'Give me one similar practice problem on the same concept, then the worked answer after a line break.' },
+          { label: 'Find where this was covered', note: `In ${course.name}`, icon: IC.search, prompt: 'Where in this course was this concept covered? Point me to the module, page, reading or lecture, based on the course materials.' },
+        ],
+        context: () => `Quiz: ${quiz.title} (${course.name}, course id ${cid}${quiz.assignment_id ? `, assignment id ${quiz.assignment_id}` : ''})\nQuestion ${r.k + 1}: ${r.text}\nStudent's answer: ${r.yours ?? 'no answer'}\nCorrect answer: ${showRight ? r.right : ok ? (r.yours ?? '—') : 'not shown by the instructor'}\nOutcome: ${ok ? 'correct' : r.correct === 'partial' ? 'partial credit' : 'wrong'}${r.earned !== null ? ` · ${store.fmtPts(r.earned)} / ${store.fmtPts(r.possible)} points` : ''}\nWorked solution from the instructor: ${solText || 'none given'}\n\nThis is a study aid, not a regrade: the score cannot change here.`,
+      });
+      BCV.smart?.open?.();
+    }
+    function fbCard(r, i) {
+      const dark = app.isDark();
+      const ok = r.correct === true, part = r.correct === 'partial', bad = r.correct === false;
+      const [ink, tint] = ok ? (dark ? ['#5ddb7d', 'rgba(52,199,89,.2)'] : ['#1e7a37', 'rgba(52,199,89,.14)'])
+        : bad ? (dark ? ['#ff8098', 'rgba(255,45,85,.2)'] : ['#c01d43', 'rgba(255,45,85,.12)'])
+          : part ? ['#ff9500', 'rgba(255,149,0,.16)'] : ['var(--bcv-ink3)', 'var(--bcv-fill)'];
+      const mark = ok ? CHECK : bad ? CROSS : part ? 'M5 12h14' : 'M12 17h.01M9.5 9.5a2.5 2.5 0 015 0c0 1.6-2.5 2-2.5 4';
+      const scoreLbl = r.earned !== null ? `${store.fmtPts(r.earned)} / ${store.fmtPts(r.possible)}` : part ? `Partial · ${store.fmtPts(r.possible)} pts` : `${store.fmtPts(r.possible)} pts`;
+      const showRight = !ok && r.correct !== null && correctVisible() && r.right;
+      const sol = r.sol;
+      return U.enter(U.el('bcv-fb__q', [
+        U.el('bcv-fb__qhead', [
+          h('span', { class: 'bcv-fb__mark', style: { background: tint } }, U.svg(mark, { size: 13, stroke: ink, width: 2.8 })),
+          h('span', { class: 'bcv-fb__qn', text: `Question ${r.k + 1}` }),
+          h('span', { class: 'bcv-fb__score', style: { color: ink }, text: scoreLbl }),
+          r.correct === null ? null : h('button', { type: 'button', class: 'bcv-fb__ask', 'aria-label': `${ok ? 'Explain' : 'Why was this wrong?'} — question ${r.k + 1}`, onclick: () => askAbout(r) }, [U.svg(SPARK, { size: 13, stroke: 'var(--bcv-blue)', width: 1.9 }), h('span', { text: ok ? 'Explain' : 'Why was this wrong?' })]),
+        ]),
+        CS().prose(r.q.question_text || r.q.question_name || '', { cls: 'bcv-fb__qtext' }),
+        U.el('bcv-fb__chips', [
+          h('span', { class: 'bcv-fb__chip', style: { background: tint, color: ink }, text: `You: ${r.yours ?? 'no answer'}` }),
+          showRight ? h('span', { class: 'bcv-fb__chip bcv-fb__chip--right', text: `Correct: ${r.right}` }) : null,
+        ]),
+        U.el('bcv-fb__sol', [
+          U.text('bcv-fb__kicker', 'Worked solution', 'span'),
+          sol ? (sol.html ? CS().prose(sol.html, { cls: 'bcv-fb__solbody' }) : h('p', { class: 'bcv-fb__solbody', text: sol.text })) : U.text('bcv-fb__none', 'Your instructor left no worked solution for this question.'),
+        ]),
+      ]), i, 45);
+    }
+    function feedbackParts(fb) {
+      const { sub, rows } = fb;
+      const pct = fb.possible > 0 && fb.score !== null ? Math.round((fb.score / fb.possible) * 100) : null;
+      const nRight = rows.filter((r) => r.correct === true).length;
+      const when = sub.workflow_state === 'pending_review' ? 'awaiting your instructor’s review' : `graded ${U.fmtAtUpper(fb.gradedAt)}`;
+      const scoreCard = U.el('bcv-fb__scorecard', [
+        U.el('bcv-fb__scoreline', [
+          h('span', { class: 'bcv-fb__big', text: `${fb.score !== null ? store.fmtPts(fb.score) : '—'} / ${store.fmtPts(fb.possible)}` }),
+          pct !== null ? h('span', { class: 'bcv-fb__pct', text: `${pct}%` }) : null,
+          h('span', { class: 'bcv-fb__summary', text: `${fb.released ? `${nRight} of ${rows.length} correct · ` : ''}${when}` }),
+        ]),
+        U.el('bcv-fb__bar', h('div', { class: 'bcv-fb__fill', style: { width: `${pct ?? 0}%` } })),
+        ...fb.comments.map((c) => U.el('bcv-fb__comment', [
+          h('span', { class: 'bcv-fb__avatar', text: U.initials(c.author_name || c.author?.display_name || '') || '·' }),
+          U.el('bcv-fb__cbody', [U.text('bcv-fb__ctitle', `Instructor comment${c.author_name ? ` · ${c.author_name}` : ''}`), h('p', { class: 'bcv-fb__ctext', text: c.comment || '' })]),
+        ])),
+      ]);
+      const notice = fb.released ? null : U.hint('Canvas has not released the question results for this attempt yet — your score and the questions are shown as they stand.', 'bcv-hint--narrow');
+      return [U.enter(scoreCard, 0, 45), notice, ...rows.map((r, i) => fbCard(r, i + 1))].filter(Boolean);
+    }
+    function feedback() {
+      const sub = st.fbSub;
+      const wrap = U.el('bcv-fb');
+      const btns = () => U.el('bcv-fb__btns', [
+        st.fbFrom === 'done' ? h('button', { type: 'button', class: 'bcv-qz__big', text: 'Back to receipt', onclick: () => { st.stage = 'done'; draw(); window.scrollTo(0, 0); } }) : null,
+        st.fbFrom === 'intro' ? h('button', { type: 'button', class: 'bcv-qz__big', text: 'Quiz overview', onclick: () => { st.stage = 'intro'; draw(); window.scrollTo(0, 0); } }) : null,
+        h('button', { type: 'button', class: 'bcv-qz__big bcv-qz__big--primary', text: `Back to ${course.name}`, onclick: () => exitTo(course.url) }),
+      ]);
+      if (!sub) {
+        wrap.append(U.emptyCard('No finished attempts yet — feedback appears here once one is submitted.'), btns());
+        return wrap;
+      }
+      const hidden = resultsHidden(sub);
+      if (hidden) {
+        wrap.append(U.card(U.el('bcv-detail', [h('h2', { class: 'bcv-detail__title', text: 'Results not released' }), U.text('bcv-hint', hidden)]), 'bcv-card--22'), btns());
+        return wrap;
+      }
+      if (st.fb && st.fb.sub === sub) {
+        wrap.append(...feedbackParts(st.fb), btns());
+        return wrap;
+      }
+      wrap.append(U.loading('rows', 4));
+      loadFeedback(sub).then((fb) => {
+        if (!ctx.alive() || st.stage !== 'feedback' || st.fbSub !== sub) return;
+        st.fb = fb;
+        wrap.replaceChildren(...feedbackParts(fb), btns());
+        ctx.setSmart(feedbackSmart());
+      }).catch((e) => {
+        if (ctx.alive()) wrap.replaceChildren(U.errorBox(`The feedback could not be loaded: ${e.message}`), btns());
+      });
+      return wrap;
     }
 
     draw();

@@ -100,8 +100,12 @@ function assignmentObj(courseId, row) {
     id: `s${id}`, assignment_id: id, workflow_state: earned !== null ? 'graded' : submitted ? 'submitted' : 'unsubmitted', score: earned, grade: earned === null ? null : String(earned),
     submitted_at: subDay !== null ? at(subDay, 15, 52) : (earned !== null ? at(dueDay - 1, 16, 1) : null), graded_at: earned !== null ? at(dueDay, 8, 0) : null,
     late: !!extra.late, missing: false, excused: false, attempt: submitted ? 1 : null,
-    submission_comments: extra.rubric ? [] : (earned !== null && id === '1002' ? [{ author_name: c.teacher, created_at: at(dueDay + 1, 9, 0), comment: 'Check the domain restrictions in question 3 — the rest was solid.' }] : []),
+    submission_comments: extra.rubric ? [] : id === '1001'
+      ? [{ author_id: `t${courseId}`, author_name: c.teacher, created_at: at(dueDay + 1, 9, 0), comment: 'Nice work on the derivative questions. Watch the difference between an instantaneous reading and an interval total — that cost you question 2.' }, { author_id: '7', author_name: 'Sam Student', created_at: at(dueDay + 1, 10, 0), comment: 'Thanks, I see it now.' }]
+      : (earned !== null && id === '1002' ? [{ author_name: c.teacher, created_at: at(dueDay + 1, 9, 0), comment: 'Check the domain restrictions in question 3 — the rest was solid.' }] : []),
     rubric_assessment: extra.rubric && earned !== null ? { c1: { points: 4, rating_id: 'r2', comments: 'Sign error in part b.' }, c2: { points: 4, rating_id: 'r3' } } : undefined,
+    // quiz assignments: Canvas keeps each attempt's per-question grading in submission_history
+    submission_history: extra.quiz ? (quizSubs.get(String(Number(id) + 8000)) || []).filter((s) => s.workflow_state === 'complete').map((s) => ({ attempt: s.attempt, score: s.score, submission_data: quizQuestionBank(s.quiz_id).map((q) => ({ question_id: q.id, correct: gradeQuestion(q, s.state[q.id]?.answer), points: gradeQuestion(q, s.state[q.id]?.answer) ? q.points_possible : 0 })) })) : undefined,
   };
   return {
     id, name, description: extra.description || `<p>Complete <strong>${name}</strong> as described in lecture. Show all work and submit a single PDF.</p><ul><li>Use the chain rule where appropriate.</li><li>Label each step.</li></ul>${extra.rubric ? '<p>See the rubric for how points are awarded.</p>' : ''}`,
@@ -201,25 +205,39 @@ const files = {
   f101b: [{ id: 'f4', display_name: 'Dis01 worksheet.pdf', filename: 'dis01.pdf', 'content-type': 'application/pdf', size: 80000, updated_at: ago(3 * D), url: '/files/f4/download' }],
   f101c: [],
 };
-const quizzes = (courseId) => allAssignments(courseId).filter((a) => a.is_quiz_assignment).map((a, i) => ({ id: a.quiz_id, title: a.name, due_at: a.due_at, points_possible: a.points_possible, question_count: 4, quiz_type: a.name === 'Skills_Check' ? 'practice_quiz' : 'assignment', time_limit: 20, allowed_attempts: 1, description: `<p>${a.name}: four questions on the pre-lecture reading.</p>`, html_url: `/courses/${courseId}/quizzes/${a.quiz_id}`, locked_for_user: false, assignment_id: a.id, one_question_at_a_time: a.name === 'Lec07-PreQuiz', cant_go_back: a.name === 'Lec07-PreQuiz', hide_results: null, shuffle_answers: false }));
+const quizzes = (courseId) => allAssignments(courseId).filter((a) => a.is_quiz_assignment).map((a, i) => ({ id: a.quiz_id, title: a.name, due_at: a.due_at, points_possible: a.points_possible, question_count: 4, quiz_type: a.name === 'Skills_Check' ? 'practice_quiz' : 'assignment', time_limit: 20, allowed_attempts: 1, description: `<p>${a.name}: four questions on the pre-lecture reading.</p>`, html_url: `/courses/${courseId}/quizzes/${a.quiz_id}`, locked_for_user: false, assignment_id: a.id, one_question_at_a_time: a.name === 'Lec07-PreQuiz', cant_go_back: a.name === 'Lec07-PreQuiz', hide_results: null, show_correct_answers: true, shuffle_answers: false }));
 
 // ---- quiz attempts (stateful, like Canvas's quiz submission API) --------------------------
-const quizSubs = new Map([['9001', [{ id: 'qs1', quiz_id: '9001', attempt: 1, score: 13, kept_score: 13, started_at: at(-14, 15, 30), finished_at: at(-14, 15, 52), workflow_state: 'complete', validation_token: 'tok-1', state: {} }]]]);
+// quiz 9001 was taken once: q1 right, q2 wrong (17.68 m), q3 right, q4 right = 13 of 16
+const quizSubs = new Map([['9001', [{ id: 'qs1', quiz_id: '9001', attempt: 1, score: 13, kept_score: 13, started_at: at(-14, 15, 30), finished_at: at(-14, 15, 52), workflow_state: 'complete', validation_token: 'tok-1', state: { 90011: { answer: 900111 }, 90012: { answer: 900124 }, 90013: { answer: [900131, 900133] }, 90014: { answer: 3.15 } } }]]]);
 const quizQuestionBank = (quizId) => {
-  const mc = (n, text, opts) => ({ id: `${quizId}${n}`, position: n, question_name: `Question ${n}`, question_type: 'multiple_choice_question', question_text: `<p>${text}</p>`, points_possible: 4, answers: opts.map((t, i) => ({ id: Number(`${quizId}${n}${i + 1}`), text: t, html: '', weight: i === 0 ? 100 : 0 })) });
+  const mc = (n, text, opts, extra = {}) => ({ id: `${quizId}${n}`, position: n, question_name: `Question ${n}`, question_type: 'multiple_choice_question', question_text: `<p>${text}</p>`, points_possible: 4, answers: opts.map((t, i) => ({ id: Number(`${quizId}${n}${i + 1}`), text: t, html: '', weight: i === 0 ? 100 : 0 })), ...extra });
   return [
-    mc(1, 'What is the velocity at t = 5?', ['-3.15 m/s', '-2 m/s', '0 m/s', '1.37 m/s', 'None of the above']),
-    mc(2, 'What is the displacement between t = 0 and t = 5?', ['-3.15 m', '-2 m', '0 m', '17.68 m', 'None of the above']),
+    // instructor feedback the way Canvas stores it: neutral (always), or one comment per outcome; equations are Canvas's own images
+    mc(1, 'What is the velocity at t = 5?', ['-3.15 m/s', '-2 m/s', '0 m/s', '1.37 m/s', 'None of the above'], { neutral_comments_html: '<p><img class="equation_image" title="v(5)=\\frac{dx}{dt}=0" src="/equation_images/v(5)%3D%5Cfrac%7Bdx%7D%7Bdt%7D%3D0" alt="v(5)=\\frac{dx}{dt}=0"> The position curve is flat at t = 5, so the slope — and the velocity — is zero.</p>' }),
+    mc(2, 'What is the displacement between t = 0 and t = 5?', ['-3.15 m', '-2 m', '0 m', '17.68 m', 'None of the above'], { correct_comments_html: '<p>Area under the velocity curve over the first five seconds.</p>', incorrect_comments_html: '<p>17.68 m is the position reading at t = 5, not the change. Displacement is the area under the velocity curve over the interval.</p>' }),
     { id: `${quizId}3`, position: 3, question_name: 'Question 3', question_type: 'multiple_answers_question', question_text: '<p>Which of these are vector quantities?</p>', points_possible: 4, answers: [{ id: Number(`${quizId}31`), text: 'Velocity', weight: 100 }, { id: Number(`${quizId}32`), text: 'Speed', weight: 0 }, { id: Number(`${quizId}33`), text: 'Acceleration', weight: 100 }] },
-    { id: `${quizId}4`, position: 4, question_name: 'Question 4', question_type: 'numerical_question', question_text: '<p>At what time (in seconds) is the object momentarily at rest? See the <a href="/courses/101/pages/chapter-4-notes">chapter 4 notes</a>.</p>', points_possible: 5, answers: [{ id: Number(`${quizId}41`), text: '3.15', weight: 100, exact: 3.15 }] },
+    { id: `${quizId}4`, position: 4, question_name: 'Question 4', question_type: 'numerical_question', question_text: '<p>At what time (in seconds) is the object momentarily at rest? See the <a href="/courses/101/pages/chapter-4-notes">chapter 4 notes</a>.</p>', points_possible: 5, answers: [{ id: Number(`${quizId}41`), text: '3.15', weight: 100, exact: 3.15 }], neutral_comments: 'Only one root in the interval: v(t) = 0 at t = 3.15 s.' },
   ];
+};
+const gradeQuestion = (q, a) => {
+  if (a === null || a === undefined || a === '') return false;
+  if (q.question_type === 'numerical_question') return Number(a) === q.answers[0].exact;
+  const right = q.answers.filter((x) => x.weight === 100).map((x) => String(x.id)).sort();
+  const picked = (Array.isArray(a) ? a : [a]).map(String).sort();
+  return picked.join() === right.join();
 };
 const pubSub = ({ state, ...s }) => s;
 const findSub = (id) => [...quizSubs.values()].flat().find((s) => s.id === id) || null;
-const subQuestions = (s) => ({
-  quiz_submission_questions: quizQuestionBank(s.quiz_id).map((q) => ({ id: q.id, position: q.position, flagged: !!s.state[q.id]?.flagged, answer: s.state[q.id]?.answer ?? null })),
-  quiz_questions: quizQuestionBank(s.quiz_id),
-});
+const subQuestions = (s) => {
+  const done = s.workflow_state === 'complete';
+  const bank = quizQuestionBank(s.quiz_id);
+  return {
+    // like Canvas: `correct`, answer weights and the question comments only appear once the attempt is complete
+    quiz_submission_questions: bank.map((q) => ({ id: q.id, position: q.position, flagged: !!s.state[q.id]?.flagged, answer: s.state[q.id]?.answer ?? null, ...(done ? { correct: gradeQuestion(q, s.state[q.id]?.answer) } : {}) })),
+    quiz_questions: bank.map((q) => (done ? q : { ...q, neutral_comments_html: undefined, correct_comments_html: undefined, incorrect_comments_html: undefined, neutral_comments: undefined, answers: q.answers.map(({ weight, ...a }) => a) })),
+  };
+};
 const modules = {
   102: [
     { id: 'm1', name: 'Week 1: Kinematics', state: 'completed', items: [{ id: 'i1', type: 'Page', title: 'Big picture', html_url: '/courses/102/pages/big-picture', completion_requirement: { type: 'must_view', completed: true } }, { id: 'i2', type: 'Assignment', title: 'Lab 1 report', html_url: '/courses/102/assignments/2001', content_details: { due_at: at(-7, 23, 59), points_possible: 20 }, completion_requirement: { type: 'must_submit', completed: true } }] },
@@ -412,14 +430,7 @@ on('POST', /^\/api\/v1\/courses\/(\w+)\/quizzes\/(\w+)\/submissions\/([\w-]+)\/c
   if (!s) return null;
   s.workflow_state = 'complete';
   s.finished_at = new Date().toISOString();
-  s.score = quizQuestionBank(s.quiz_id).reduce((sum, q) => {
-    const a = s.state[q.id]?.answer;
-    const right = q.answers.filter((x) => x.weight === 100).map((x) => String(x.id));
-    if (a === null || a === undefined || a === '') return sum;
-    if (q.question_type === 'numerical_question') return sum + (Number(a) === q.answers[0].exact ? q.points_possible : 0);
-    const picked = (Array.isArray(a) ? a : [a]).map(String).sort();
-    return sum + (picked.join() === right.sort().join() ? q.points_possible : 0);
-  }, 0);
+  s.score = quizQuestionBank(s.quiz_id).reduce((sum, q) => sum + (gradeQuestion(q, s.state[q.id]?.answer) ? q.points_possible : 0), 0);
   s.kept_score = s.score;
   return { quiz_submissions: [pubSub(s)] };
 });
@@ -519,6 +530,10 @@ const server = http.createServer((req, res) => {
     if (path.startsWith('/files/')) {
       res.writeHead(200, { 'content-type': 'application/pdf' });
       return res.end('%PDF-1.4 mock');
+    }
+    if (path.startsWith('/equation_images/')) { // Canvas renders LaTeX in question feedback as images
+      res.writeHead(200, { 'content-type': 'image/svg+xml' });
+      return res.end('<svg xmlns="http://www.w3.org/2000/svg" width="130" height="28"><text x="0" y="20" font-size="16" font-family="serif">v(5) = dx/dt = 0</text></svg>');
     }
     const handler = htmlPages[path];
     res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });

@@ -614,7 +614,8 @@
   }
   function submission(id, aid, { force = false } = {}) {
     return C.cached(`submission:${id}:${aid}`, 5 * MIN, () =>
-      C.get(`/api/v1/courses/${id}/assignments/${aid}/submissions/self`, { params: { include: ['submission_comments', 'rubric_assessment'] } }).catch(() => null), { force });
+      // submission_history carries per-question points for quiz attempts (the feedback screen reads it)
+      C.get(`/api/v1/courses/${id}/assignments/${aid}/submissions/self`, { params: { include: ['submission_comments', 'rubric_assessment', 'submission_history'] } }).catch(() => null), { force });
   }
   function assignmentGroups(id, { force = false } = {}) {
     return C.cached(`agroups:${id}`, 10 * MIN, () =>
@@ -783,12 +784,28 @@
     return C.cached(`quizsubs:${id}:${qid}`, 3 * MIN, () => C.get(`/api/v1/courses/${id}/quizzes/${qid}/submissions`).then((r) => r?.quiz_submissions || []).catch(() => []), { force });
   }
   /** Quiz attempt API: everything the quiz screen needs, uncached. */
+  /** Attempts used and allowed for a quiz, from its submissions: Canvas returns the latest
+   *  submission whose `attempt` counts all so far (an open one counts once it is finished);
+   *  `extra_attempts` on it are ones the instructor granted. allowed null = unlimited. */
+  function quizAttemptLimit(q, subs) {
+    const list = subs || [];
+    const used = list.reduce((m, s) => Math.max(m, s.workflow_state === 'untaken' ? Math.max(0, (Number(s.attempt) || 1) - 1) : (Number(s.attempt) || 0)), 0);
+    const extra = list.reduce((m, s) => Math.max(m, Number(s.extra_attempts) || 0), 0);
+    const allowed = q && Number(q.allowed_attempts) > 0 ? Number(q.allowed_attempts) + extra : null;
+    return { used, allowed, left: allowed === null ? null : Math.max(0, allowed - used), open: list.some((s) => s.workflow_state === 'untaken') };
+  }
+
   const quizApi = {
     /** Start an attempt, or return the open one. */
     async start(courseId, quizId, accessCode) {
       const existing = await C.get(`/api/v1/courses/${courseId}/quizzes/${quizId}/submissions`).then((r) => r?.quiz_submissions || []).catch(() => []);
       const open = existing.find((s) => s.workflow_state === 'untaken');
       if (open) return open;
+      // Never open an attempt past the quiz's limit: Canvas returns one submission per user whose
+      // `attempt` is the count so far, plus any extra attempts the instructor granted.
+      const q = await quiz(courseId, quizId).catch(() => null);
+      const limit = quizAttemptLimit(q, existing);
+      if (limit.allowed !== null && limit.used >= limit.allowed) throw new Error(`No attempts left — this quiz allows ${U.plural(limit.allowed, 'attempt')}.`);
       const body = {};
       if (accessCode) body.access_code = accessCode;
       const r = await C.post(`/api/v1/courses/${courseId}/quizzes/${quizId}/submissions`, body);
@@ -949,6 +966,6 @@
     course, tabs, frontPage, syllabus, courseTodo, ignoreTodo, courseStream, assignments, assignment, submission, assignmentGroups, progress,
     announcements, discussions, discussion, discussionView, postEntry, markTopicRead, people, sections, courseGroups, pages, page,
     rootFolder, folderContents, folderByPath, file, quizzes, quiz, quizSubmissions, quizApi, modules, gradeModel, fmtPts,
-    homeworkTools, uploadSubmissionFile, uploadSubmissionFileFromUrl, submitAssignment, invalidateAssignment,
+    homeworkTools, uploadSubmissionFile, uploadSubmissionFileFromUrl, submitAssignment, invalidateAssignment, quizAttemptLimit,
   };
 })();

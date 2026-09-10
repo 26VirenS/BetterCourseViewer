@@ -99,7 +99,7 @@
         for (const [, list] of byCourse) {
           list.sort((a, b) => a.date - b.date);
           const c = list[0].course;
-          parts.push(h('div', {}, [U.groupHead(c?.name || list[0].courseName || 'Other', U.plural(list.filter(isOpen).length, 'open item'), 'bcv-group__head--10'), U.card(list.map(itemRow), 'bcv-card--list')]));
+          parts.push(U.enter(h('div', {}, [U.groupHead(c?.name || list[0].courseName || 'Other', U.plural(list.filter(isOpen).length, 'open item'), 'bcv-group__head--10'), U.card(list.map(itemRow), 'bcv-card--list')]), parts.length, 70, 420));
         }
       } else {
         const now = new Date();
@@ -109,11 +109,12 @@
           (d <= 0 ? today : d === 1 ? tomorrow : later).push(it);
         }
         const sorted = (l) => l.sort((a, b) => a.date - b.date);
-        if (today.length) parts.push(h('div', {}, [U.groupHead('Today', U.fmtLong(now)), U.card(sorted(today).map(itemRow), 'bcv-card--list')]));
-        if (tomorrow.length) parts.push(h('div', {}, [U.groupHead('Tomorrow', U.fmtLong(U.addDays(now, 1))), U.card(sorted(tomorrow).map(itemRow), 'bcv-card--list')]));
+        // groups arrive on a 70ms stagger
+        if (today.length) parts.push(U.enter(h('div', {}, [U.groupHead('Today', U.fmtLong(now)), U.card(sorted(today).map(itemRow), 'bcv-card--list')]), parts.length, 70, 420));
+        if (tomorrow.length) parts.push(U.enter(h('div', {}, [U.groupHead('Tomorrow', U.fmtLong(U.addDays(now, 1))), U.card(sorted(tomorrow).map(itemRow), 'bcv-card--list')]), parts.length, 70, 420));
         if (later.length) {
           sorted(later);
-          parts.push(h('div', {}, [U.groupHead('Next 7 days', `${U.fmtLong(later[0].date)} – ${U.fmtLong(later[later.length - 1].date)}`), U.card(later.map(itemRow), 'bcv-card--list')]));
+          parts.push(U.enter(h('div', {}, [U.groupHead('Next 7 days', `${U.fmtLong(later[0].date)} – ${U.fmtLong(later[later.length - 1].date)}`), U.card(later.map(itemRow), 'bcv-card--list')]), parts.length, 70, 420));
         }
       }
       const doneCount = items.filter((it) => !isOpen(it)).length;

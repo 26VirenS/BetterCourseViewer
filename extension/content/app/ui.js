@@ -377,6 +377,16 @@
   }
   const FALLBACK_COLORS = ['#34c759', '#30b0c7', '#ff2d55', '#ff9500', '#c8901c', '#5856d6', '#0a84ff', '#6b5f7a', '#af52de', '#ff6b22'];
 
+  /** Staggered entry (mockup 8/9): the element rises in after index × step ms, capped at
+   *  420ms so a long list never crawls. A keyframe with a both fill; reduced motion drops it. */
+  function enter(node, i = 0, step = 55, dur = 380) {
+    if (!node) return node;
+    node.classList.add('bcv-enter');
+    node.style.setProperty('--bcv-delay', `${Math.min((i || 0) * step, 420)}ms`);
+    if (dur !== 380) node.style.setProperty('--bcv-dur', `${dur}ms`);
+    return node;
+  }
+
   const initials = (name) => String(name || '').trim().split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() || '').join('');
 
   BCV.ui = {
@@ -384,6 +394,6 @@
     empty, emptyCard, loading, errorBox, hint, avatar, toast, menu, closeMenus, colorMenu, COURSE_COLORS,
     DAY, startOfDay, addDays, sameDay, dayDiff, startOfWeek, parse, MONTHS, MONTHS_LONG, DAYS, DAYS_LONG,
     fmtTime, fmtTimeLower, fmtShort, fmtLong, fmtDateComma, fmtAt, fmtAtUpper, fmtBy, dayTitle, fmtDow, fmtRecent, whenShort, plural,
-    hexToRgb, rgba, palette, FALLBACK_COLORS, initials,
+    hexToRgb, rgba, palette, FALLBACK_COLORS, initials, enter,
   };
 })();

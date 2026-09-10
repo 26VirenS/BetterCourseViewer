@@ -733,9 +733,46 @@ try {
   // Q2 was answered wrong on purpose (-2 m): 4 + 0 + 4 + 5 of 17
   check((await texts('.bcv-qz__h1'))[0] === 'Attempt submitted' && /Questions answered 4 of 4 answered/.test(doneCards[0]) && /Score 13 \/ 17/.test(doneCards[1] || ''), `submitted screen shows the score Canvas returned: ${doneCards.join(' | ')}`);
   await shot(page, '22g-quiz-done');
+  // ---- quiz feedback (mockup 9): the receipt leads to the attempt's results ------------------------
+  console.log('quiz feedback');
+  check((await texts('.bcv-qz__donebtns .bcv-qz__big')).join('|') === 'See feedback|Back to F26-MATH 021 20|Quiz page', `receipt offers the feedback once Canvas releases results: ${(await texts('.bcv-qz__donebtns .bcv-qz__big')).join('|')}`);
   await page.click('.bcv-qz__donebtns .bcv-qz__big--primary');
+  await page.waitForSelector('.bcv-fb__q', { timeout: 10000 });
+  const fbLine = (await texts('.bcv-fb__scoreline'))[0];
+  check(/^13 \/ 17 76% 3 of 4 correct · graded /.test(fbLine) && (await page.$$('.bcv-fb__q')).length === 4 && !(await page.$('.bcv-fb__comment')), `score card from the attempt's own numbers: ${fbLine}`);
+  const fbCards = await texts('.bcv-fb__q');
+  check(/^Question 1 4 \/ 4 Explain What is the velocity at t = 5\? You: -3\.15 m\/s worked solution/i.test(fbCards[0]) && !/Correct:/.test(fbCards[0]) && (await page.$('.bcv-fb__q:nth-of-type(2) img.equation_image')), `a correct question: points, Explain, your answer, the instructor's solution with Canvas's equation image: ${fbCards[0]}`);
+  check(/^Question 2 0 \/ 4 Why was this wrong\? .*You: -2 m Correct: -3\.15 m worked solution 17\.68 m is the position reading/i.test(fbCards[1]), `a wrong question shows the correct answer (show_correct_answers) and the incorrect-answer comment: ${fbCards[1]}`);
+  check(/Question 3 4 \/ 4 .*Your instructor left no worked solution/i.test(fbCards[2]) && /Question 4 5 \/ 5 .*You: 3\.15 .*Only one root/i.test(fbCards[3]), `no solution says so; plain-text comments render too: ${fbCards[2]} | ${fbCards[3]}`);
+  check((await page.$$eval('.bcv-fb > .bcv-enter', (els) => els.map((e) => e.style.getPropertyValue('--bcv-delay')))).join(',') === '0ms,45ms,90ms,135ms,180ms', 'feedback cards arrive on a 45ms stagger');
+  await shot(page, '22h-quiz-feedback');
+  // per-question smart topic: the panel re-titles to the question and swaps its suggestions; closing clears it
+  await (await page.$$('.bcv-fb__ask'))[1].click();
+  await page.waitForSelector('#bcv-smart', { timeout: 5000 });
+  check((await texts('.bcv-smart__ctx'))[0] === 'Reading: Question 2 · What is the displacement between t = 0 and t = 5?', `smart panel scoped to the question: ${(await texts('.bcv-smart__ctx'))[0]}`);
+  check((await texts('.bcv-smart__action-label')).join(',') === 'Walk me through this step by step,Why was my answer wrong?,Give me a similar practice problem,Find where this was covered', `question-level suggestions: ${(await texts('.bcv-smart__action-label')).join(',')}`);
+  await shot(page, '22i-quiz-feedback-smart');
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !document.querySelector('#bcv-smart'), null, { timeout: 5000 });
+  await page.click('#bcv-fab');
+  await page.waitForSelector('#bcv-smart', { timeout: 5000 });
+  check((await texts('.bcv-smart__ctx'))[0] === 'Reading: Lec06-PreQuiz · feedback' && (await texts('.bcv-smart__action-label')).join(',') === 'What should I review?,Quiz me on the misses', `closing the panel brings the page-level suggestions back: ${(await texts('.bcv-smart__ctx'))[0]}`);
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !document.querySelector('#bcv-smart'), null, { timeout: 5000 });
+  await page.click('.bcv-fb__btns .bcv-qz__big:first-child');
+  await page.waitForSelector('.bcv-qz__done', { timeout: 5000 });
+  check((await texts('.bcv-qz__h1'))[0] === 'Attempt submitted', 'Back to receipt returns to the submitted screen');
+  await page.click('.bcv-qz__donebtns .bcv-qz__big:last-child');
   await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
   check(page.url() === `${BASE}/courses/101/quizzes/9011` && (await texts('.bcv-grades__side, .bcv-col .bcv-row')).some((t) => /Attempt 1/.test(t)), 'back to the quiz page, which now lists the attempt');
+  // attempt limits: one attempt allowed and one used → no Take button anywhere, feedback instead
+  check((await texts('.bcv-detail__actions .bcv-badge'))[0] === 'No attempts left · 1 attempt allowed' && (await texts('.bcv-detail__actions .bcv-btn')).join(',') === 'See feedback,Open in Canvas' && /Attempts 1 of 1 used/.test((await texts('.bcv-detail'))[0]), `the quiz page refuses a second attempt: ${(await texts('.bcv-detail__actions'))[0]}`);
+  await page.goto(`${BASE}/courses/101/quizzes/9011?bcv=take`);
+  await page.waitForSelector('.bcv-qz__begin', { timeout: 10000 });
+  check((await texts('.bcv-qz__begin'))[0] === 'See your feedback' && (await texts('.bcv-qz__bullet')).some((t) => /No attempts left — this quiz allows 1 attempt\./.test(t)) && (await texts('.bcv-qz__note'))[0] === '1 attempt used of 1', 'the intro cannot start another attempt either; it offers the feedback');
+  await page.click('.bcv-qz__begin');
+  await page.waitForSelector('.bcv-fb__q', { timeout: 10000 });
+  check((await texts('.bcv-fb__btns .bcv-qz__big')).join('|') === 'Quiz overview|Back to F26-MATH 021 20', 'feedback opened from the intro links back to it');
   // one question at a time + no going back
   await page.goto(`${BASE}/courses/101/quizzes/9014?bcv=take`);
   await page.waitForSelector('.bcv-qz__begin', { timeout: 10000 });
@@ -749,6 +786,17 @@ try {
   await page.click('.bcv-qz__exit');
   await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
   check(page.url() === `${BASE}/courses/101/quizzes/9014` && (await texts('.bcv-detail__actions .bcv-btn--primary'))[0] === 'Resume attempt', 'Save and exit keeps the attempt open: the quiz page offers to resume it');
+  // a quiz graded before today (seeded): its attempt row opens the feedback, with the instructor's comment
+  await page.goto(`${BASE}/courses/101/quizzes/9001`);
+  await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
+  check((await texts('.bcv-detail__actions .bcv-btn--primary'))[0] === 'See feedback' && (await texts('.bcv-detail__actions .bcv-badge'))[0] === 'No attempts left · 1 attempt allowed' && (await page.$eval('.bcv-col .bcv-row[href]', (a) => a.getAttribute('href'))) === '/courses/101/quizzes/9001?bcv=feedback&sub=qs1', 'a used-up quiz leads to its feedback from the button and the attempt row');
+  await page.click('.bcv-col .bcv-row[href]');
+  await page.waitForSelector('.bcv-fb__q', { timeout: 10000 });
+  const fbLine2 = (await texts('.bcv-fb__scoreline'))[0];
+  const fbComments = await texts('.bcv-fb__ctext');
+  check(/^13 \/ 16 81% 3 of 4 correct · graded /.test(fbLine2) && fbComments.length === 1 && /^Nice work on the derivative questions/.test(fbComments[0]) && (await texts('.bcv-fb__avatar'))[0] === 'YL' && (await texts('.bcv-fb__btns .bcv-qz__big')).join('|') === 'Back to F26-MATH 021 20', `feedback from the quiz page: the instructor's comment (never your own reply): ${fbLine2} · ${fbComments.join(' | ')}`);
+  check(/Question 2 0 \/ 4 .*You: 17\.68 m Correct: -3\.15 m/i.test((await texts('.bcv-fb__q'))[1]), `the seeded wrong answer with the correct one beside it: ${(await texts('.bcv-fb__q'))[1]}`);
+  await shot(page, '22j-quiz-feedback-seeded');
 
   // ---- hybrid (native) page inside the shell ----------------------------------------------------
   console.log('native pages');
@@ -818,9 +866,11 @@ try {
   await shot(page, '25-dark-dashboard');
   await page.goto(`${BASE}/courses/101/grades`);
   await page.waitForSelector('.bcv-rings__svg', { timeout: 10000 });
+  check((await page.$('.bcv-reader-btn')) && !(await visible('.bcv-reader-btn')), 'Immersive Reader button is left out where there is nothing to read (Grades)');
   await shot(page, '26-dark-grades');
   await page.goto(`${BASE}/courses/101`);
   await page.waitForSelector('.bcv-front', { timeout: 10000 });
+  check(await visible('.bcv-reader-btn'), 'Immersive Reader button is there on the course front page');
   await shot(page, '27-dark-course-home');
   // punch-through pages: the hole is darkened by a filter unless "View in light mode" is on
   await page.goto(`${BASE}/courses/101/external_tools/9`);
@@ -854,6 +904,18 @@ try {
     barAria: document.getElementById('bcv-progress').getAttribute('aria-hidden'),
   }));
   check(motion.screen === 'bcv-fade-up' && motion.bar === 'bcv-bar' && motion.barHidden && motion.barAria === 'true', `screens rise in by keyframe; the navigation bar sweeps while loading and hides once the screen is drawn: ${JSON.stringify(motion)}`);
+  // mockup 9: blocks follow the screen on a stagger from one helper (delay = index × step, capped at 420ms)
+  const stagger = await page.evaluate(() => [...document.querySelectorAll('.bcv-stat.bcv-enter')].map((e) => `${getComputedStyle(e).animationName}@${getComputedStyle(e).animationDelay}`));
+  check(stagger.slice(0, 3).join(',') === 'bcv-fade-up@0s,bcv-fade-up@0.05s,bcv-fade-up@0.1s', `stat cards arrive on a 50ms stagger: ${stagger.join(',')}`);
+  await nav('gpa');
+  await page.waitForSelector('.bcv-gpa__card', { timeout: 10000 });
+  const gpaStagger = await page.evaluate(() => ({
+    top: [...document.querySelectorAll('.bcv-gpa__top > .bcv-enter')].map((e) => e.style.getPropertyValue('--bcv-delay')),
+    cards: [...document.querySelectorAll('.bcv-gpa__card.bcv-enter')].map((e) => e.style.getPropertyValue('--bcv-delay')),
+  }));
+  check(gpaStagger.top.join(',') === '40ms,110ms' && gpaStagger.cards[0] === '0ms' && gpaStagger.cards[1] === '55ms' && Math.max(...gpaStagger.cards.map(parseFloat)) <= 420, `Grades: hero, then trend, then cards on 55ms, capped at 420ms: ${JSON.stringify(gpaStagger)}`);
+  await page.goto(`${BASE}/`);
+  await page.waitForSelector('.bcv-stat', { timeout: 10000 });
   await page.click('.bcv-stat');
   await page.waitForSelector('.bcv-sheet', { timeout: 5000 });
   const sheetAnim = await page.evaluate(() => [getComputedStyle(document.querySelector('.bcv-sheet-ov')).animationName, getComputedStyle(document.querySelector('.bcv-sheet')).animationName, getComputedStyle(document.querySelector('.bcv-sheet')).animationDuration]);
@@ -878,8 +940,8 @@ try {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.reload();
   await page.waitForSelector('.bcv-stat', { timeout: 10000 });
-  const reduced = await page.evaluate(() => [getComputedStyle(document.querySelector('.bcv-main > .bcv-screen')).animationName, getComputedStyle(document.querySelector('.bcv-progress__bar')).animationName]);
-  check(reduced[0] === 'none' && reduced[1] === 'bcv-bar', `reduced motion drops the entrances but keeps the loading indicators: ${reduced.join(' / ')}`);
+  const reduced = await page.evaluate(() => [getComputedStyle(document.querySelector('.bcv-main > .bcv-screen')).animationName, getComputedStyle(document.querySelector('.bcv-progress__bar')).animationName, getComputedStyle(document.querySelector('.bcv-stat.bcv-enter')).animationName]);
+  check(reduced[0] === 'none' && reduced[1] === 'bcv-bar' && reduced[2] === 'none', `reduced motion drops the entrances (and the stagger) but keeps the loading indicators: ${reduced.join(' / ')}`);
   await page.emulateMedia({ reducedMotion: 'no-preference' });
 
   // ---- the look switched off from settings (popup / options) -------------------------------------------
@@ -922,9 +984,11 @@ try {
   await options.fill('#openaiKey', '');
   await options.dispatchEvent('#openaiKey', 'change');
   await options.screenshot({ path: join(out, '29-options.png'), fullPage: true });
+  check(/^v\d+\.\d+/.test(await options.$eval('#version', (el) => el.textContent)), `settings show the version: ${await options.$eval('#version', (el) => el.textContent)}`);
   const popupPage = await context.newPage();
   await popupPage.goto(`chrome-extension://${extId}/popup/popup.html`);
   await popupPage.waitForTimeout(500);
+  check(/^v\d+\.\d+/.test(await popupPage.$eval('#version', (el) => el.textContent)), `popup shows the version: ${await popupPage.$eval('#version', (el) => el.textContent)}`);
   await popupPage.screenshot({ path: join(out, '30-popup.png') });
 } catch (e) {
   console.error('smoke test crashed:', e);

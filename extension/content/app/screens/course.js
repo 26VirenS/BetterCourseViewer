@@ -157,12 +157,18 @@
           : h('span', { class: 'bcv-dot bcv-dot--sq', style: { background: c.color } }),
         h('h1', { class: 'bcv-h1 bcv-h1--30', text: c.name }),
         ...pills.filter(Boolean),
-        U.btn('Immersive Reader', { icon: IC.reader, kind: 'card', iconColor: 'var(--bcv-blue)', cls: 'bcv-ml-auto', onClick: () => {
+        U.btn('Immersive Reader', { icon: IC.reader, kind: 'card', iconColor: 'var(--bcv-blue)', cls: 'bcv-ml-auto bcv-reader-btn', onClick: () => {
           if (shell.reader) openReader(shell.reader.title, shell.reader.html);
-          else U.toast('Nothing to read on this tab yet.');
         } }),
       ]),
     ]));
+    // The reader button exists only where there is a body to read (a front page, a page, an
+    // assignment or announcement description, the syllabus); a tab without one closes the row up.
+    const readerBtn = head.querySelector('.bcv-reader-btn');
+    let readerVal = shell.reader || null;
+    const syncReader = () => { readerBtn.hidden = !(readerVal && String(readerVal.html || '').trim()); };
+    Object.defineProperty(shell, 'reader', { configurable: true, enumerable: true, get: () => readerVal, set: (v) => { readerVal = v; syncReader(); } });
+    syncReader();
 
     // ---- rail --------------------------------------------------------------------
     const internal = tabs.filter((t) => !t.external);
@@ -193,8 +199,8 @@
       ]);
     };
     const rail = h('nav', { class: `bcv-rail ${narrow ? 'is-narrow' : ''}`, 'aria-label': `${c.name} menu` }, [
-      ...groups.filter((g) => g.items.length).map((g) => U.el('bcv-rail__group', [U.text('bcv-rail__title', g.title), U.el('bcv-rail__list', g.items.map(item))])),
-      external.length ? U.el('bcv-rail__group bcv-rail__group--ext', [
+      ...groups.filter((g) => g.items.length).map((g, i) => U.enter(U.el('bcv-rail__group', [U.text('bcv-rail__title', g.title), U.el('bcv-rail__list', g.items.map(item))]), i, 60)),
+      external.length ? U.enter(U.el('bcv-rail__group bcv-rail__group--ext', [
         U.text('bcv-rail__title', 'Campus tools'),
         U.el('bcv-rail__list', external.map((t) => h('button', {
           type: 'button',
@@ -203,7 +209,7 @@
           title: t.label,
           onclick: () => app.go(t.href),
         }, [h('span', { class: 'bcv-rail__label', text: t.label }), U.svg(EXT_ARROW, { size: 12, width: 2, style: { flex: 'none' } })]))),
-      ]) : null,
+      ]), groups.filter((g) => g.items.length).length, 60) : null,
     ]);
     let syncToggle = () => {};
     const toggle = h('button', { type: 'button', class: 'bcv-rail__toggle', onclick: () => {
@@ -259,7 +265,7 @@
       return screen;
     }
     // Taking a quiz: the whole main column is the quiz, no course chrome.
-    if (route.tab === 'quiz' && route.params.get('bcv') === 'take') return BCV.screens.quiz.render(ctx, course);
+    if (route.tab === 'quiz' && ['take', 'feedback'].includes(route.params.get('bcv'))) return BCV.screens.quiz.render(ctx, course);
     // Handing work in: the submission flow takes the main column (the sidebar stays, as in the mockup).
     if (route.tab === 'assignment' && route.arg && route.params.get('bcv') === 'submit') return BCV.screens.submit.render(ctx, course);
 
@@ -335,8 +341,8 @@
     const { app } = ctx;
     const c = shell.course;
     const b = body('bcv-body--course-cols');
-    const left = h('div', { class: 'bcv-col', style: { flex: '1 1 440px' } });
-    const right = h('div', { class: 'bcv-col bcv-col--16', style: { flex: '1 1 300px' } });
+    const left = U.enter(h('div', { class: 'bcv-col', style: { flex: '1 1 440px' } }), 1, 60, 400); // the front-page card follows the rail
+    const right = U.enter(h('div', { class: 'bcv-col bcv-col--16', style: { flex: '1 1 300px' } }), 2, 70, 400); // then the side column
     b.append(left, right);
     left.append(U.loading());
 

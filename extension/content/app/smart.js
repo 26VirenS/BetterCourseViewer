@@ -49,6 +49,7 @@ Rules: be concise and concrete; use the student's own data from the context and 
     } else {
       panel?.remove();
       if (fab) fab.hidden = false;
+      app?.setSmartTopic?.(null); // closing clears a question-level topic so the page's suggestions come back
     }
   }
 

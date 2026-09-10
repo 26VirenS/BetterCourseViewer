@@ -143,12 +143,13 @@
       }
       return U.el('bcv-stats', cards);
     }
+    let statIndex = 0;
     function stat(lbl, value, note, icon, color, onOpen) {
-      return h('button', { type: 'button', class: 'bcv-card bcv-stat', onclick: onOpen }, [
+      return U.enter(h('button', { type: 'button', class: 'bcv-card bcv-stat', onclick: onOpen }, [
         U.el('bcv-stat__head', [U.svg(icon, { size: 14, stroke: color, width: 1.9 }), U.text('bcv-label bcv-label--inline', lbl, 'span')]),
         U.el('bcv-stat__value', value),
         U.el('bcv-stat__noterow', [U.text('bcv-stat__note', note, 'span'), U.svg(IC.chevron, { size: 13, stroke: 'var(--bcv-ink3)', width: 2, cls: 'bcv-stat__chev' })]),
-      ]);
+      ]), statIndex++, 50);
     }
 
     /** The detail sheet behind a counter: header with the number, then one row per item. */
@@ -324,10 +325,10 @@
       for (const [k, items] of days) {
         if (shown++ >= 8) break;
         const d = new Date(k);
-        out.push(U.el('bcv-day', [
+        out.push(U.enter(U.el('bcv-day', [
           U.el('bcv-day__head', [U.h2(U.dayTitle(d), 'bcv-h2--19'), U.text('bcv-day__date', U.fmtLong(d), 'span')]),
           U.card(items.map((it) => plannerRow(it)), 'bcv-card--list'),
-        ]));
+        ]), out.length, 70, 420)); // day groups follow the stat cards
       }
       return U.el('bcv-col', out, { style: { gap: '26px' } });
     }

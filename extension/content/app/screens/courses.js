@@ -89,10 +89,11 @@
       return c.state !== 'past' && c.state !== 'future';
     }
 
-    function cardFor(c) {
+    function cardFor(c, i = 0) {
       const next = nextFor(c);
       const progress = U.el('bcv-ccard__progress');
-      const el = h('div', { class: 'bcv-ccard', role: 'link', tabindex: '0', onclick: () => app.go(c.url), onkeydown: (e) => { if (e.key === 'Enter') app.go(c.url); } }, [
+      // staggered entry: 55ms per card, capped at 420ms
+      const el = h('div', { class: 'bcv-ccard bcv-enter', style: { '--bcv-delay': `${Math.min(i * 55, 420)}ms` }, role: 'link', tabindex: '0', onclick: () => app.go(c.url), onkeydown: (e) => { if (e.key === 'Enter') app.go(c.url); } }, [
         h('div', { class: 'bcv-ccard__hero bcv-ccard__hero--term', style: { background: c.color } }, [
           U.text('bcv-ccard__term', c.term || 'No term', 'span'),
           h('button', { type: 'button', class: 'bcv-ccard__star', title: 'Remove from dashboard', 'aria-label': 'Remove from dashboard', onclick: (e) => { e.stopPropagation(); toggleFav(c, false); } }, U.star(true)),

@@ -2,6 +2,11 @@
 (async function () {
   const BCV = self.BCV;
   const api = BCV.api;
+  try {
+    document.getElementById('version').textContent = `v${api.runtime.getManifest().version}`;
+  } catch {
+    /* ignore */
+  }
   const S = BCV.settings;
   const $ = (id) => document.getElementById(id);
 

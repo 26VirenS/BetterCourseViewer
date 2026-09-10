@@ -252,7 +252,7 @@
             h('span', { class: 'bcv-gpa__chip-l', style: { background: r.c.palette.tint, color: r.c.palette.text }, text: r.letter }),
             U.text('bcv-gpa__chip-p', `${r.pct}%`, 'span'),
           ]))) : null),
-      ]);
+      ].map((el, i) => U.enter(el, i, 50)));
     }
 
     // ---- course cards ------------------------------------------------------------------------
@@ -340,7 +340,7 @@
       const cards = [...m.rows, ...m.unscored.map((c) => ({ c, ungraded: true }))];
       return h('div', {}, [
         U.el('bcv-group__head', [U.h2('All courses'), U.text('bcv-group__sub bcv-ml-auto', 'Hover a ring for the group breakdown', 'span')]),
-        cards.length ? U.el('bcv-gpa__grid', cards.map(courseCard)) : U.emptyCard(m.hiddenList.length ? 'Every course is hidden.' : 'No current courses.'),
+        cards.length ? U.el('bcv-gpa__grid', cards.map((r, i) => U.enter(courseCard(r), i, 55))) : U.emptyCard(m.hiddenList.length ? 'Every course is hidden.' : 'No current courses.'),
       ]);
     }
     function hiddenTray(m) {
@@ -546,7 +546,7 @@
           U.el('bcv-gpa__banner-body', [U.text('bcv-gpa__banner-title', 'Track GPA over time?'), U.text('bcv-gpa__banner-sub bcv-pretty', 'Canvas stores no GPA and no history. Add your GPA before this term and how many courses it covers, and this page keeps its own daily record.')]),
           U.btn('Turn on tracking', { kind: 'primary', cls: 'bcv-btn--fill36', onClick: () => openSettings(m, { wantTracking: true }) }),
         ]),
-        U.el('bcv-gpa__top', [hero(m), trend()]),
+        U.el('bcv-gpa__top', [U.enter(hero(m), 1, 40, 400), U.enter(trend(), 1, 110, 400)]), // hero, then trend
         stats(m),
         courseGrid(m),
         hiddenTray(m),

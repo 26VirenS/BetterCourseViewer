@@ -220,14 +220,23 @@
     if (!q) return main.replaceChildren(U.errorBox('This quiz could not be loaded.')) || b;
     shell.reader = { title: q.title, html: q.description || '' };
     const TYPE = { assignment: 'Graded quiz', practice_quiz: 'Practice quiz', graded_survey: 'Graded survey', survey: 'Survey' };
+    // attempts used/allowed from Canvas's own count on the submission; the Take button goes away at the limit
+    const limit = store.quizAttemptLimit(q, subs);
+    const open = (subs || []).some((s) => s.workflow_state === 'untaken');
+    const noneLeft = limit.allowed !== null && limit.left <= 0 && !open;
+    const finished = (subs || []).filter((s) => s.workflow_state === 'complete' || s.workflow_state === 'pending_review');
+    const latest = finished.slice().sort((a, b) => (Number(b.attempt) || 0) - (Number(a.attempt) || 0))[0] || null;
+    const feedbackHref = (s) => `${c.url}/quizzes/${q.id}?bcv=feedback&sub=${encodeURIComponent(s.id)}`;
     main.replaceChildren(
       backBtn(app, `${c.url}/quizzes`, 'Quizzes'),
       U.card(U.el('bcv-detail', [
         h('h2', { class: 'bcv-detail__title bcv-pretty', text: q.title }),
-        meta([['Due', q.due_at ? U.fmtAt(q.due_at) : 'No due date'], ['Points', q.points_possible ?? '—'], ['Questions', q.question_count ?? '—'], ['Time limit', q.time_limit ? `${q.time_limit} minutes` : 'None'], ['Attempts', q.allowed_attempts === -1 ? 'Unlimited' : q.allowed_attempts || 1], ['Type', TYPE[q.quiz_type] || q.quiz_type], ['Available until', q.lock_at ? U.fmtAt(q.lock_at) : null]]),
+        meta([['Due', q.due_at ? U.fmtAt(q.due_at) : 'No due date'], ['Points', q.points_possible ?? '—'], ['Questions', q.question_count ?? '—'], ['Time limit', q.time_limit ? `${q.time_limit} minutes` : 'None'], ['Attempts', limit.allowed === null ? `${limit.used} used · unlimited` : `${limit.used} of ${limit.allowed} used`], ['Type', TYPE[q.quiz_type] || q.quiz_type], ['Available until', q.lock_at ? U.fmtAt(q.lock_at) : null]]),
         U.el('bcv-detail__actions', [
           q.locked_for_user ? U.badge(q.lock_explanation ? htmlToText(q.lock_explanation, 120) : 'Locked', 'orange')
-            : U.btn((subs || []).some((s) => s.workflow_state === 'untaken') ? 'Resume attempt' : 'Take the quiz', { kind: 'primary', icon: IC.bolt, iconColor: '#fff', onClick: () => app.go(`${c.url}/quizzes/${q.id}?bcv=take`) }),
+            : noneLeft ? U.badge(`No attempts left · ${U.plural(limit.allowed, 'attempt')} allowed`, 'orange')
+              : U.btn(open ? 'Resume attempt' : 'Take the quiz', { kind: 'primary', icon: IC.bolt, iconColor: '#fff', onClick: () => app.go(`${c.url}/quizzes/${q.id}?bcv=take`) }),
+          latest && q.hide_results !== 'always' ? U.btn('See feedback', { kind: noneLeft && !q.locked_for_user ? 'primary' : '', icon: IC.check, iconColor: noneLeft && !q.locked_for_user ? '#fff' : undefined, onClick: () => app.go(feedbackHref(latest)) }) : null,
           q.locked_for_user ? null : U.btn('Open in Canvas', { icon: IC.external, onClick: () => app.go(nativeHref(`${c.url}/quizzes/${q.id}`)) }),
         ]),
         q.description ? CS().prose(q.description) : U.text('bcv-hint', 'No instructions.'),
@@ -237,7 +246,8 @@
       U.tile(IC.bolt, { color: '#7d7bef', tint: 'rgba(88,86,214,.16)' }),
       U.el('bcv-row__body', [U.text('bcv-row__title bcv-row__title--145', `Attempt ${s.attempt}`), U.text('bcv-row__sub', s.finished_at ? `Finished ${U.fmtAt(s.finished_at)}` : 'In progress')]),
       U.badge(s.kept_score !== null && s.kept_score !== undefined ? `${store.fmtPts(s.kept_score)} / ${q.points_possible}` : (s.score !== null && s.score !== undefined ? `${store.fmtPts(s.score)} / ${q.points_possible}` : '—'), s.workflow_state === 'complete' ? 'green' : ''),
-    ], { mod: 'bcv-row--p12', href: `${c.url}/quizzes/${q.id}/history?quiz_submission_id=${s.id}&version=${s.attempt}` })), 'bcv-card--list') : U.emptyCard('No attempts yet.')]));
+      // a finished attempt opens its feedback; an open one resumes
+    ], { mod: 'bcv-row--p12', href: s.workflow_state === 'untaken' ? `${c.url}/quizzes/${q.id}?bcv=take` : feedbackHref(s) })), 'bcv-card--list') : U.emptyCard('No attempts yet.')]));
     ctx.setSmart({
       label: `${c.name} · ${q.title}`,
       actions: [{ label: 'What does this quiz cover?', note: `${U.plural(q.question_count || 0, 'question')} · ${q.points_possible} pts`, icon: IC.bolt, prompt: 'From the instructions, what does this quiz cover and how should I prepare? Do not guess at the questions.' }],

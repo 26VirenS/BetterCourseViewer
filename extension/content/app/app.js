@@ -28,6 +28,7 @@
     dark: false,
     quizOpen: false, // our quiz flow has an attempt on screen
     submitOpen: false, // our submission flow has unsent files or text on screen
+    smartTopic: null, // a question-level topic the smart panel is scoped to (quiz feedback); cleared on close and on navigation
   };
 
   // ---- routing ----------------------------------------------------------------------------
@@ -318,11 +319,12 @@
     progress(true);
     state.quizOpen = false;
     state.submitOpen = false;
-    html.classList.remove('bcv-quiz'); // the quiz screen puts it back while an attempt is on screen
+    html.classList.remove('bcv-quiz', 'bcv-quiz-fb'); // the quiz screen puts them back while an attempt or its feedback is on screen
     punchOut(); // a native screen punches back in while it builds
     renderSide();
     const ctx = { app: BCV.app, route: r, alive, dark: state.dark, setSmart: (c) => setSmartContext(c, id) };
     state.smartCtx = null;
+    state.smartTopic = null;
     // Screens build off-DOM and land whole. A screen still fetching after 150ms gets a
     // skeleton in its place, shaped like its content (course cards on Grades, list rows
     // elsewhere); a cached screen lands before that and never flashes it.
@@ -469,7 +471,12 @@
   BCV.app = {
     state, go, render, parseRoute, refreshCounts, loadShellData, punchIn, punchOut, siteName,
     isDark: () => state.dark,
-    smartContext: () => state.smartCtx,
+    smartContext: () => state.smartTopic || state.smartCtx,
+    /** Scope the smart panel to one item (a quiz question) until it is closed; null restores the page's suggestions. */
+    setSmartTopic: (topic) => {
+      state.smartTopic = topic || null;
+      BCV.smart?.refresh?.();
+    },
     main: () => main,
   };
 
