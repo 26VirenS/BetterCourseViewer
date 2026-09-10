@@ -2,7 +2,7 @@
 
 A Mac app that installs a Safari extension giving **Canvas** a new interface, drawn to a single design: rounded cards on a soft grey ground, one sidebar, segmented controls, an iOS-style dark appearance, and a discreet **smart panel** that reads the page you are on using your own Claude or ChatGPT key.
 
-Nothing is decorated; every screen is redrawn from the Canvas API with your own data. A switch at the top-left of every page turns the new look off and on.
+Nothing is decorated; every screen is redrawn from the Canvas API with your own data, on top of the real Canvas page for that URL. A switch at the top-left of every page turns the new look off and on, and turning it off always reveals exactly the page you were on.
 
 | Dashboard (list view) | Course grades with nested rings |
 | --- | --- |
@@ -22,9 +22,9 @@ Nothing is decorated; every screen is redrawn from the Canvas API with your own 
 
 **Sidebar** – site name and term, Dashboard / Courses / Groups / To Do (with a count) / Calendar / Inbox (with unread count), your favourite courses with their Canvas colours, a Dark/Light appearance switch and your account.
 
-**Dashboard** – three counters (due today with points, due this week across N courses, unread announcements), a per-course workload bar for the week (submitted ÷ assigned), and the same three views Canvas has: **Cards** (with a submitted-items progress bar, quick links and a "2 due today" badge), **List** (by day, with a circle to mark items done) and **Recent activity**. The view you pick is saved to your Canvas profile, as Canvas does.
+**Dashboard** – three counters (due today with points, due this week across N courses, unread announcements), a per-course workload bar for the week (submitted ÷ assigned; courses with nothing assigned fold away under a disclosure), and the same three views Canvas has: **Cards** (with a submitted-items progress bar, quick links and a "2 due today" badge), **List** (by day, with a circle to mark items done) and **Recent activity**. The view you pick is saved to your Canvas profile, as Canvas does.
 
-**Courses** – favourites as cards with term, role, progress and what is due next; every other course grouped by term with a star to add it to your dashboard; All / Past / Future and search.
+**Courses** – your dashboard courses as cards with term, role, progress and what is due next; every other course grouped by term (groups can be reordered with the arrows, and the order is remembered) with a star to add it to your dashboard; All / Past / Future and search.
 
 **To Do** – everything from today through the next seven days, by date or by course. It knows what is *actually* due: assignments, quizzes and graded discussions carry a due date; pages, events and ungraded discussions with only a to-do date are labelled as such. Tick an item to mark it done in your Canvas planner (and untick it later); dismiss hides it without touching the work; a switch shows completed and dismissed items so they can be restored.
 
@@ -40,7 +40,7 @@ Nothing is decorated; every screen is redrawn from the Canvas API with your own 
 - **Grades** – nested rings: the outer ring is your total as Canvas reports it; one inner ring per assignment group that has graded work; groups with nothing graded are listed instead of drawn. Weights, "not counted" and late badges, and a **what-if mode**: edit any score to see the outcome. Nothing is saved or sent anywhere.
 - Item views for assignments (rubric, submission, comments), discussion threads (nested replies, reply box), pages, quizzes and the syllabus.
 
-Anything without a screen of its own – taking a quiz, submitting, external tools, file previews, profile pages – is shown as Canvas drew it, inside the same shell, with a link back to stock Canvas.
+Anything without a screen of its own – taking a quiz, submitting, external tools, file previews, profile pages – is shown as Canvas drew it, inside the same shell, with a link back to stock Canvas. While a quiz attempt is open, navigation is hidden and leaving asks for confirmation.
 
 **Smart panel** – the small button at the bottom-right. It reads the current page and suggests actions that fit it: summarize what's due, plan the week, summarize an assignment or make a checklist, draft a discussion reply, condense a page, explain rubric feedback or a grade. Replies stream in; drafts can be copied or inserted into the reply box for you to edit. The word "AI" never appears; it is the smart panel.
 

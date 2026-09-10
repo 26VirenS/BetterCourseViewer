@@ -25,6 +25,7 @@ const courses = [
   { id: '103', name: 'F26-PHYS 008HL 01/PHYS 008L 01', code: 'PHYS-008HL', color: '#ff2d55', score: null, grade: null, teacher: 'Dana Okafor', section: 'Section 01', weighted: false, default_view: 'wiki' },
   { id: '104', name: 'F26-SPRK 010 103', code: 'SPRK-010-103', color: '#ff9500', score: 88, grade: 'B+', teacher: 'Ana Ruiz', section: 'Section 103', weighted: false, default_view: 'syllabus' },
   { id: '105', name: 'F26-WRI 010 20', code: 'WRI-010-20', color: '#c8901c', score: 95, grade: 'A', teacher: 'Marcus Bell', section: 'Section 20', weighted: false, default_view: 'assignments' },
+  { id: '106', name: 'F26-CHEM 002 01', code: 'CHEM-002-01', color: '#af52de', score: null, grade: null, teacher: 'Lin Zhao', section: 'Lecture-01', favorite: false },
   { id: '201', name: 'Academic Success Resource Site (2026-27)', code: 'ASRS', color: '#1e7a37', score: null, grade: null, teacher: 'Student Success', section: 'All', favorite: false, term: { id: '9', name: 'Collaboration team' } },
   { id: '202', name: 'Placement Exam: Chemistry', code: 'PLACE-CHEM', color: '#5856d6', score: null, grade: null, teacher: 'Placement Office', section: 'All', favorite: false, term: { id: '9', name: 'Collaboration team' } },
   { id: '301', name: 'S26-CSE 022 01', code: 'CSE-022-01', color: '#0a84ff', score: 97, grade: 'A', teacher: 'Priya Nair', section: 'Lecture-01', favorite: false, past: true, term: { id: '0', name: 'Spring 2026', start_at: ago(220 * D), end_at: ago(100 * D) } },
@@ -80,7 +81,7 @@ const A = {
     ['5002', 'Research Day Activity: Choosing a Field Site', 'Activities', 5, null, 0, 23.98, null, {}],
     ['5003', 'Journal #2', 'Journals', 5, null, 1, 23.98, null, {}],
   ],
-  201: [], 202: [], 301: [['9001', 'Final project', 'Projects', 100, 97, -110, 23.98, -111, {}]],
+  106: [], 201: [], 202: [], 301: [['9001', 'Final project', 'Projects', 100, 97, -110, 23.98, -111, {}]],
 };
 const GROUPS = { 101: [['Discussion Quizzes', 18], ['Midterms', 57], ['Final', 25], ['Effort', 0], ['Collaboration', 0], ['Coursework (Knewton Alta)', 0]] };
 const rubric = [
@@ -249,6 +250,7 @@ const htmlPages = {
   '/': () => page({ title: 'Dashboard', body: '<h1 class="ic-Dashboard-header__title">Dashboard</h1><div id="dashboard">stock dashboard</div>' }),
   '/courses/101/external_tools/9': () => page({ title: 'Resources & Policy', courseId: '101', body: '<h2>Resources & Policy</h2><iframe id="tool_content" src="/courses/101/external_tools/retrieve?url=x" width="600" height="300" title="Tool"></iframe>' }),
   '/profile': () => page({ title: 'User Profile', body: '<h1>Sam Student</h1><p class="profile">Profile page rendered by Canvas.</p>' }),
+  '/courses/101/quizzes/9011/take': () => page({ title: 'Lec06-PreQuiz', courseId: '101', body: '<h1>Lec06-PreQuiz</h1><form id="submit_quiz_form"><p>Question 1 of 4</p><label><input type="radio" name="q1"> A</label> <label><input type="radio" name="q1"> B</label><p><button type="button" class="btn">Submit Quiz</button></p></form>' }),
 };
 
 // ---- API routing ------------------------------------------------------------------------------

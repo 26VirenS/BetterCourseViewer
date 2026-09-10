@@ -98,6 +98,7 @@ try {
   await waitText('.bcv-stats > :nth-child(3) .bcv-stat__value', /^3$/);
   const work = await texts('.bcv-work__row');
   check(work.length === 5 && /F26-MATH 021 20/.test(work[0]) && /\d+ \/ \d+/.test(work[0]), `workload rows: ${work[0]}`);
+  check(!(await page.$('.bcv-work__more')), 'no disclosure when every course has work this week');
   const dayHeads = await texts('.bcv-day__head');
   check(dayHeads[0].startsWith('Today') && dayHeads[1].startsWith('Tomorrow'), `list view day groups: ${dayHeads.slice(0, 3).join(' | ')}`);
   const listRows = await texts('.bcv-day .bcv-row');
@@ -135,12 +136,19 @@ try {
   console.log('courses');
   await nav('courses');
   await page.waitForSelector('.bcv-ccard__hero--term', { timeout: 10000 });
-  check(page.url() === `${BASE}/courses`, 'sidebar navigation uses pushState');
+  check(page.url() === `${BASE}/courses`, 'sidebar navigation loads the real Canvas page');
   const termCards = await texts('.bcv-ccard');
   check(termCards.length === 5 && /Fall 2026/.test(termCards[0]) && /Enrolled as Student/.test(termCards[0]), `favourite course cards: ${termCards.length}`);
-  const groupLabels = await texts('.bcv-body > div > .bcv-label');
+  const groupLabels = await texts('.bcv-body .bcv-group__head--reorder .bcv-label');
   check(groupLabels.some((l) => /collaboration team/i.test(l)), `term groups: ${groupLabels.join(', ')}`);
+  const terms = await page.$$eval('[data-term]', (els) => els.map((e) => e.dataset.term));
+  await page.click(`[data-term="${terms[0]}"] .bcv-reorder__down`);
+  await page.waitForFunction((first) => document.querySelector('[data-term]').dataset.term !== first, terms[0], { timeout: 5000 });
+  check((await page.$$eval('[data-term]', (els) => els.map((e) => e.dataset.term)))[1] === terms[0], 'term groups can be moved down (order saved)');
+  await page.click(`[data-term="${terms[0]}"] .bcv-reorder__up`);
+  await page.waitForFunction((first) => document.querySelector('[data-term]').dataset.term === first, terms[0], { timeout: 5000 });
   check((await texts('.bcv-body .bcv-row')).some((t) => /Placement Exam: Chemistry.*No nickname.*Student/.test(t)), 'non-favourite rows with role badge');
+  check((await page.$$eval('[data-term]', (els) => els.map((e) => e.dataset.term)))[0] === 'Fall 2026', 'the current term (most dashboard courses) is listed first');
   await shot(page, '04-courses');
   await page.click('.bcv-seg__btn[data-value="past"]');
   check((await texts('.bcv-body .bcv-row')).some((t) => /S26-CSE 022 01/.test(t)), 'Past filter shows the completed course');
@@ -200,7 +208,7 @@ try {
   check(evs.length >= 10 && evs.some((t) => /Dis01/.test(t)), `month view events: ${evs.length}`);
   check(await page.$('.bcv-ev__label.bcv-strike'), 'submitted/past events are struck through');
   const cals = await texts('.bcv-calrow__name');
-  check(cals.length === 10 && cals[0] === 'Sam Student' && (await page.$$('.bcv-switch.is-on')).length === 10, `calendars list with switches: ${cals.length}`);
+  check(cals.length === 11 && cals[0] === 'Sam Student' && (await page.$$('.bcv-switch.is-on')).length === 10, `calendars list with switches: ${cals.length} (10 on, Canvas's limit)`);
   await shot(page, '06-calendar-month');
   await (await page.$$('.bcv-switch'))[0].click();
   await page.waitForTimeout(400);
@@ -279,7 +287,7 @@ try {
   console.log('course');
   await clickScreen('.bcv-fav');
   await page.waitForSelector('.bcv-cside__item', { timeout: 10000 });
-  check(page.url() === `${BASE}/courses/101`, 'favourite opens the course via pushState');
+  check(page.url() === `${BASE}/courses/101`, 'favourite opens the course page');
   const tabs = await texts('.bcv-cside__item');
   check(tabs.length === 11 && tabs[0] === 'Home' && tabs[10] === 'Resources & Policy', `course sidebar tabs from the API: ${tabs.join(', ')}`);
   check(!(await page.$('.bcv-head .bcv-tab')), 'no tab pills under the course title');
@@ -450,6 +458,17 @@ try {
   await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
   check((await texts('.bcv-grades__side .bcv-row, .bcv-col .bcv-row')).length >= 10, 'syllabus page lists dated assignments');
 
+  // ---- quiz in progress: focus mode ---------------------------------------------------------------
+  console.log('quiz focus');
+  await page.goto(`${BASE}/courses/101/quizzes/9011/take`);
+  await page.waitForSelector('.bcv-native #submit_quiz_form', { timeout: 10000 });
+  check(await page.$('#bcv-app.bcv-focus') && !(await visible('.bcv-nav')) && (await texts('.bcv-focus__title'))[0] === 'Quiz in progress', 'quiz page hides navigation');
+  page.once('dialog', (d) => d.dismiss());
+  await page.click('.bcv-focus__card .bcv-btn');
+  await page.waitForTimeout(300);
+  check(page.url().endsWith('/quizzes/9011/take'), 'leaving a quiz asks first; cancelling stays');
+  await shot(page, '22b-quiz-focus');
+
   // ---- hybrid (native) page inside the shell ----------------------------------------------------
   console.log('native pages');
   await page.goto(`${BASE}/courses/101/external_tools/9`);
@@ -527,9 +546,9 @@ try {
   check(await visible('#bcv-app'), 'skin switched back on in place');
   await nav('courses');
   await page.waitForSelector('.bcv-ccard__hero--term', { timeout: 10000 });
-  await Promise.all([page.waitForNavigation({ timeout: 10000 }), page.click('#bcv-skin')]);
-  await page.waitForSelector('#application', { timeout: 10000 });
-  check(page.url() === `${BASE}/courses` && (await visible('#application')) && (await page.title()).includes('courses'), 'skin off after in-app navigation reloads the same page in stock Canvas');
+  await page.click('#bcv-skin');
+  await page.waitForFunction(() => !document.documentElement.classList.contains('bcv-on'), null, { timeout: 5000 });
+  check(page.url() === `${BASE}/courses` && (await visible('#application')) && (await page.title()).includes('courses'), 'skin off after navigating shows the same page in stock Canvas (it was underneath all along)');
   await page.click('#bcv-skin');
   await page.waitForSelector('#bcv-app .bcv-nav__item', { timeout: 10000 });
 

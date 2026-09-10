@@ -114,8 +114,7 @@
     // ---- workload ------------------------------------------------------------------
     function workloadBlock() {
       if (!planner || !favs.length) return null;
-      const rows = favs.map((c) => {
-        const mine = weekAll.filter((it) => it.courseId === c.id);
+      const row = (c, mine) => {
         const done = mine.filter((it) => it.submitted).length;
         const pct = mine.length ? Math.round((done / mine.length) * 100) : 0;
         return U.el('bcv-work__row', [
@@ -124,10 +123,26 @@
           h('span', { class: 'bcv-work__bar' }, h('span', { class: 'bcv-work__fill', style: { width: `${pct}%`, background: c.color } })),
           U.text('bcv-work__count', `${done} / ${mine.length}`, 'span'),
         ]);
-      });
+      };
+      const active = [], idle = [];
+      for (const c of favs) {
+        const mine = weekAll.filter((it) => it.courseId === c.id);
+        (mine.length ? active : idle).push(row(c, mine));
+      }
+      // Courses with nothing assigned this week fold away under a disclosure.
+      const idleWrap = U.el('bcv-work__idle', idle);
+      idleWrap.hidden = true;
+      const toggle = idle.length ? h('button', { type: 'button', class: 'bcv-work__more', 'aria-expanded': 'false', onclick: () => {
+        idleWrap.hidden = !idleWrap.hidden;
+        toggle.setAttribute('aria-expanded', idleWrap.hidden ? 'false' : 'true');
+        toggle.classList.toggle('is-open', !idleWrap.hidden);
+      } }, [U.svg(IC.chevron, { size: 12, stroke: 'var(--bcv-ink3)', width: 2.2, cls: 'bcv-work__more-ic' }), `${U.plural(idle.length, 'course')} with nothing assigned this week`]) : null;
       return U.card(U.el('bcv-work', [
         U.el('bcv-work__head', [U.text('bcv-label bcv-label--inline', `Week of ${U.fmtShort(weekStart)} · workload`, 'span'), U.text('bcv-work__hint', 'Submitted / assigned this week', 'span')]),
-        ...rows,
+        ...active,
+        active.length ? null : U.text('bcv-hint', 'Nothing assigned this week.'),
+        toggle,
+        idleWrap,
       ]), 'bcv-work-card');
     }
 

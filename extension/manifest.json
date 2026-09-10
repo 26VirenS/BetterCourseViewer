@@ -64,7 +64,7 @@
       "matches": [
         "*://*.instructure.com/*"
       ],
-      "run_at": "document_idle",
+      "run_at": "document_end",
       "js": [
         "lib/utils.js",
         "lib/markdown.js",

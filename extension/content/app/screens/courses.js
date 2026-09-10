@@ -29,7 +29,12 @@
       body.replaceChildren(U.errorBox('Your courses could not be loaded.'));
       return screen;
     }
-    const favOrder = (await store.favorites().catch(() => [])).map((c) => c.id);
+    // "Favourites" as Canvas shows them: the dashboard's courses. When nobody has
+    // starred anything Canvas shows every active course there and marks none as a favourite.
+    let favList = await store.favorites().catch(() => []);
+    let favOrder = favList.map((c) => c.id);
+    let favIds = new Set(favOrder);
+    let termOrder = (await store.pref('termOrder', [])) || [];
     ctx.setSmart({
       label: 'All Courses',
       actions: [{ label: 'Compare my courses', note: `${U.plural(courses.filter((c) => c.state === 'current').length, 'current course')}`, icon: IC.chart, prompt: 'Give me a one-line status per current course: current score if known, what is next, and anything overdue.' }],
@@ -50,6 +55,9 @@
       try {
         await store.setFavorite(c.id, on);
         courses = await store.courses({ force: true });
+        favList = await store.favorites({ force: true }).catch(() => []);
+        favOrder = favList.map((x) => x.id);
+        favIds = new Set(favOrder);
         app.loadShellData({ force: true });
         draw();
         U.toast(on ? `${c.name} added to your dashboard` : `${c.name} removed from your dashboard`);
@@ -99,9 +107,42 @@
       ], { mod: 'bcv-row--p14', onClick: () => app.go(c.url) });
     }
 
+    function orderedGroups(groups) {
+      // Saved order first (as the user arranged it), then the term with most dashboard courses, then newest term.
+      const keys = [...groups.keys()];
+      const rank = (k) => {
+        const i = termOrder.indexOf(k);
+        return i === -1 ? Infinity : i;
+      };
+      // the term your dashboard courses belong to counts as the current one
+      const weight = (k) => favList.filter((c) => (c.term || 'No term') === k).length;
+      const newest = (k) => Math.max(...groups.get(k).map((c) => Number(c.termId) || 0));
+      return keys.sort((a, b) => rank(a) - rank(b) || weight(b) - weight(a) || newest(b) - newest(a) || a.localeCompare(b));
+    }
+    function moveGroup(keys, k, dir) {
+      const i = keys.indexOf(k);
+      const j = i + dir;
+      if (j < 0 || j >= keys.length) return;
+      const next = keys.slice();
+      [next[i], next[j]] = [next[j], next[i]];
+      termOrder = next;
+      store.setPref('termOrder', next);
+      draw();
+    }
+    function groupHead(term, keys) {
+      const i = keys.indexOf(term);
+      const arrow = (dir, lbl) => h('button', {
+        type: 'button', class: `bcv-iconbtn bcv-iconbtn--22 bcv-reorder__${dir < 0 ? 'up' : 'down'}`, title: lbl, 'aria-label': `${lbl}: ${term}`,
+        disabled: (dir < 0 ? i === 0 : i === keys.length - 1) || null, onclick: () => moveGroup(keys, term, dir),
+      }, U.svg(IC.chevron, { size: 11, stroke: 'var(--bcv-ink3)', width: 2.2 }));
+      return U.el('bcv-group__head bcv-group__head--reorder', [
+        U.label(term, 'bcv-label--inline'),
+        h('span', { class: 'bcv-ml-auto bcv-reorder' }, [arrow(-1, 'Move up'), arrow(1, 'Move down')]),
+      ]);
+    }
     function draw() {
       const list = courses.filter(matches);
-      const favs = filter === 'all' ? list.filter((c) => c.favorite).sort((a, b) => favOrder.indexOf(a.id) - favOrder.indexOf(b.id)) : [];
+      const favs = filter === 'all' ? list.filter((c) => favIds.has(c.id)).sort((a, b) => favOrder.indexOf(a.id) - favOrder.indexOf(b.id)) : [];
       const rest = list.filter((c) => !favs.includes(c));
       const groups = new Map();
       for (const c of rest) {
@@ -111,8 +152,9 @@
       }
       const parts = [];
       if (favs.length) parts.push(U.el('bcv-cards bcv-cards--268', favs.map(cardFor)));
-      for (const [term, items] of groups) {
-        parts.push(h('div', {}, [U.label(term), U.card(items.map(rowFor), 'bcv-card--list')]));
+      const keys = orderedGroups(groups);
+      for (const term of keys) {
+        parts.push(h('div', { dataset: { term } }, [groupHead(term, keys), U.card(groups.get(term).map(rowFor), 'bcv-card--list')]));
       }
       if (!parts.length) parts.push(U.emptyCard(query ? 'No courses match your search.' : filter === 'past' ? 'No past courses.' : filter === 'future' ? 'No future courses.' : 'No courses yet.'));
       body.replaceChildren(...parts);

@@ -92,13 +92,13 @@
   }
 
   /** Routes whose content is Canvas's own page (needs a real page load). */
-  const GROUP_TABS = new Set(['home', 'stream', 'announcements', 'announcement', 'discussions', 'discussion', 'people', 'pages', 'page', 'files', 'folder']);
-  const needsNative = (r) => r.screen === 'native'
-    || (r.screen === 'course' && (r.tab === 'native' || r.tab === 'tool' || r.tab === 'file'))
-    || (r.screen === 'group' && !GROUP_TABS.has(r.tab))
-    || r.params.get('bcv') === 'native';
-  const isRoutable = (r) => !needsNative(r);
+  /** A quiz attempt is open on this page (Canvas's take-quiz page). */
+  const inQuiz = () => /\/quizzes\/\d+\/take\b/.test(location.pathname) || !!document.querySelector('#submit_quiz_form, #quiz_taking_form, form.take_quiz_form');
+  const confirmLeave = () => window.confirm('You are in the middle of a quiz. Leave it anyway?\n\nCanvas keeps your answers so far, but a timer keeps running and some quizzes allow only one attempt.');
 
+  /** Navigate. Every screen sits on the real Canvas page for its URL, so
+   *  navigation is a real page load (only a hash change stays in place):
+   *  turning the skin off then always reveals exactly the page you are on. */
   function go(href, { replace = false } = {}) {
     let url;
     try {
@@ -110,23 +110,25 @@
       window.open(url.href, '_blank', 'noopener');
       return;
     }
-    const r = parseRoute(url.href);
-    if (!isRoutable(r)) {
-      location.assign(url.href);
+    if (inQuiz() && url.pathname !== location.pathname && !confirmLeave()) return;
+    const samePage = url.pathname === location.pathname && url.search === location.search;
+    if (samePage && (url.hash || location.hash)) {
+      if (replace) history.replaceState({ bcv: true }, '', url.pathname + url.search + url.hash);
+      else location.hash = url.hash;
+      window.scrollTo(0, 0);
+      render();
       return;
     }
-    const target = url.pathname + url.search + url.hash;
-    if (target !== location.pathname + location.search + location.hash) {
-      if (replace) history.replaceState({ bcv: true }, '', target);
-      else history.pushState({ bcv: true }, '', target);
+    if (samePage) {
+      location.reload();
+      return;
     }
-    window.scrollTo(0, 0);
-    render();
+    if (replace) location.replace(url.href);
+    else location.assign(url.href);
   }
 
   window.addEventListener('popstate', () => {
-    const r = parseRoute();
-    if (needsNative(r) && state.nativePath !== r.path + location.search) {
+    if (state.nativePath !== location.pathname + location.search) {
       location.reload();
       return;
     }
@@ -142,29 +144,9 @@
     main = h('main', { class: 'bcv-main', id: 'bcv-main' });
     root.append(side, main);
     document.body.prepend(root);
-    root.addEventListener('click', onLinkClick);
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') U.closeMenus();
     });
-  }
-
-  function onLinkClick(e) {
-    const a = e.target.closest('a[href]');
-    if (!a || e.defaultPrevented || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
-    if (a.target === '_blank' || a.hasAttribute('download') || a.dataset.native !== undefined) return;
-    let url;
-    try {
-      url = new URL(a.getAttribute('href'), location.href);
-    } catch {
-      return;
-    }
-    if (url.origin !== location.origin) return;
-    if (url.pathname === location.pathname && url.search === location.search && a.getAttribute('href').startsWith('#')) return; // in-page anchor
-    if (/^\/(files|courses\/\d+\/files)\/\d+\/download/.test(url.pathname) || url.searchParams.has('download')) return;
-    const r = parseRoute(url.href);
-    if (!isRoutable(r)) return; // let the browser navigate (Canvas renders it; we wrap it)
-    e.preventDefault();
-    go(url.href);
   }
 
   const navDef = () => [
@@ -226,6 +208,19 @@
     const r = state.route || parseRoute();
     const name = siteName();
     const inst = state.account?.name || location.hostname.replace(/^(canvas|www)\./, '');
+    const focus = inQuiz();
+    root?.classList.toggle('bcv-focus', focus);
+    if (focus) {
+      side.replaceChildren(
+        U.el('bcv-brand', [brandTile(name), h('div', {}, [U.text('bcv-brand__name', name), U.text('bcv-brand__sub', [inst, state.term].filter(Boolean).join(' · '))])]),
+        U.el('bcv-focus__card', [
+          U.text('bcv-focus__title', 'Quiz in progress'),
+          U.text('bcv-focus__sub', 'Navigation is hidden so nothing takes you out of the quiz by accident. Submit the quiz to return, or leave on purpose below.'),
+          U.btn('Leave quiz…', { kind: 'xs', onClick: () => { if (confirmLeave()) location.assign('/'); } }),
+        ]),
+      );
+      return;
+    }
     side.replaceChildren(
       U.el('bcv-brand', [
         brandTile(name),
@@ -388,12 +383,14 @@
     } else {
       returnNative();
       BCV.smart?.hide?.();
+      if (state.originalTitle) document.title = state.originalTitle;
       // Canvas only rendered the page that was loaded; if we navigated since, load this one.
       if (started && state.nativePath !== location.pathname + location.search) location.reload();
     }
   }
 
   async function boot() {
+    state.originalTitle = document.title;
     state.settings = BCV.early ? (await BCV.early.ready, BCV.early.settings()) : await S.get();
     state.dark = BCV.early?.isDark?.() ?? S.isDark(state.settings, false);
     // Not signed in (login page, public course, error page): leave Canvas alone.
