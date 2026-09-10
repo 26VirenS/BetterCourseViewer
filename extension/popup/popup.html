@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BetterCourseViewer</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header class="head">
+    <img src="../icons/icon-48.png" width="28" height="28" alt="">
+    <div class="head__text">
+      <div class="head__title">BetterCourseViewer</div>
+      <div class="head__sub" id="status">Checking this tab…</div>
+    </div>
+    <button class="iconbtn" id="open-settings" title="Settings" aria-label="Settings">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+    </button>
+  </header>
+
+  <section class="card" id="enable-card" hidden>
+    <div class="card__title">Not enabled on this site</div>
+    <p class="muted">If this is your school's Canvas, turn BetterCourseViewer on for it.</p>
+    <button class="btn btn--primary" id="enable-site">Enable on <span id="enable-host"></span></button>
+    <p class="muted small" id="enable-msg"></p>
+  </section>
+
+  <section class="section">
+    <div class="row">
+      <label class="toggle">
+        <span class="toggle__label">Dark mode</span>
+        <select id="darkMode" class="select">
+          <option value="off">Off</option>
+          <option value="on">On</option>
+          <option value="system">Match system</option>
+        </select>
+      </label>
+    </div>
+    <div class="row">
+      <label class="toggle">
+        <span class="toggle__label">Theme</span>
+        <select id="theme" class="select"></select>
+      </label>
+    </div>
+    <div class="row row--switches">
+      <label class="switch"><input type="checkbox" id="minimal"><span>Minimal mode</span></label>
+      <label class="switch"><input type="checkbox" id="compact"><span>Compact</span></label>
+      <label class="switch"><input type="checkbox" id="hideRightSidebar"><span>Hide dashboard sidebar</span></label>
+      <label class="switch"><input type="checkbox" id="reminders"><span>Due-date reminders</span></label>
+    </div>
+  </section>
+
+  <section class="section actions" id="page-actions">
+    <button class="btn" id="open-todo">To Do <kbd>t</kbd></button>
+    <button class="btn" id="open-smart">Smart Assistant <kbd>s</kbd></button>
+    <button class="btn" id="open-palette">Jump to… <kbd>⌘K</kbd></button>
+    <button class="btn" id="open-help">Shortcuts <kbd>?</kbd></button>
+  </section>
+
+  <footer class="foot">
+    <span id="smart-status" class="muted">Smart features: …</span>
+    <a href="#" id="foot-settings">Settings</a>
+  </footer>
+
+  <script src="../lib/settings.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

@@ -1,0 +1,91 @@
+{
+  "manifest_version": 3,
+  "name": "BetterCourseViewer",
+  "version": "1.0.0",
+  "description": "A cleaner, faster, smarter Canvas: dark mode and themes, due-date reminders, a to-do list, keyboard navigation, and a smart assistant for your coursework.",
+  "author": "BetterCourseViewer contributors",
+  "icons": {
+    "48": "icons/icon-48.png",
+    "96": "icons/icon-96.png",
+    "128": "icons/icon-128.png",
+    "256": "icons/icon-256.png",
+    "512": "icons/icon-512.png"
+  },
+  "action": {
+    "default_title": "BetterCourseViewer",
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "48": "icons/icon-48.png",
+      "96": "icons/icon-96.png",
+      "128": "icons/icon-128.png"
+    }
+  },
+  "options_ui": {
+    "page": "options/options.html",
+    "open_in_tab": true
+  },
+  "background": {
+    "service_worker": "background.js",
+    "scripts": [
+      "lib/settings.js",
+      "lib/providers.js",
+      "background.js"
+    ],
+    "persistent": false
+  },
+  "permissions": [
+    "storage",
+    "scripting",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "*://*.instructure.com/*",
+    "https://api.anthropic.com/*",
+    "https://api.openai.com/*"
+  ],
+  "optional_host_permissions": [
+    "*://*/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "*://*.instructure.com/*"
+      ],
+      "run_at": "document_start",
+      "js": [
+        "lib/settings.js",
+        "lib/color.js",
+        "lib/theme-css.js",
+        "content/early.js"
+      ],
+      "css": [
+        "content/styles/ui.css",
+        "content/styles/dark.css",
+        "content/styles/clean.css",
+        "content/styles/duedates.css"
+      ]
+    },
+    {
+      "matches": [
+        "*://*.instructure.com/*"
+      ],
+      "run_at": "document_idle",
+      "js": [
+        "lib/utils.js",
+        "lib/markdown.js",
+        "lib/canvas-api.js",
+        "lib/page-context.js",
+        "lib/smart-client.js",
+        "content/ui.js",
+        "content/features/theme.js",
+        "content/features/declutter.js",
+        "content/features/due-dates.js",
+        "content/features/todo.js",
+        "content/features/keyboard.js",
+        "content/features/embeds.js",
+        "content/features/smart-sidebar.js",
+        "content/main.js"
+      ]
+    }
+  ]
+}

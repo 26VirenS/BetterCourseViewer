@@ -1,0 +1,113 @@
+/* BetterCourseViewer — due-date highlighting, dashboard strip. */
+
+.bcv-due-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font: 600 11.5px/18px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  vertical-align: middle;
+  background: var(--bcv-bg-3, #e9ebef);
+  color: var(--bcv-fg-2, #6b7280);
+  border: 1px solid transparent;
+}
+.bcv-due-badge--later { background: var(--bcv-bg-3, #e9ebef); color: var(--bcv-fg-2, #6b7280); }
+.bcv-due-badge--week { background: var(--bcv-accent-soft, #e0e7ff); color: var(--bcv-accent, #4f46e5); }
+.bcv-due-badge--soon { background: var(--bcv-warn-soft, #fef3c7); color: var(--bcv-warn, #b45309); }
+.bcv-due-badge--today { background: var(--bcv-danger-soft, #fee2e2); color: var(--bcv-danger, #b91c1c); }
+.bcv-due-badge--overdue { background: var(--bcv-danger, #dc2626); color: #fff; }
+.bcv-due-badge--done { background: var(--bcv-ok-soft, #dcfce7); color: var(--bcv-ok, #15803d); text-decoration: none; }
+.bcv-due-badge--overdue::before { content: "!"; font-weight: 800; }
+
+/* Row-level tint for list items that are due today / overdue. */
+.bcv-due-row--today > .ig-row,
+li.bcv-due-row--today > .ig-row {
+  box-shadow: inset 3px 0 0 var(--bcv-warn, #d97706);
+}
+.bcv-due-row--overdue > .ig-row,
+li.bcv-due-row--overdue > .ig-row {
+  box-shadow: inset 3px 0 0 var(--bcv-danger, #dc2626);
+}
+
+/* Dashboard "Due soon" strip */
+.bcv-due-strip {
+  margin: 0 0 18px;
+  padding: 12px 14px;
+  border: 1px solid var(--bcv-border, #e2e5ea);
+  border-radius: var(--bcv-radius, 12px);
+  background: var(--bcv-bg, #fff);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+.bcv-due-strip__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.bcv-due-strip__title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--bcv-fg, #111827);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.bcv-due-strip__count {
+  font-size: 12px;
+  color: var(--bcv-fg-2, #6b7280);
+}
+.bcv-due-strip__items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.bcv-due-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  padding: 6px 10px 6px 8px;
+  border-radius: 10px;
+  border: 1px solid var(--bcv-border, #e2e5ea);
+  background: var(--bcv-bg-2, #f4f5f7);
+  color: var(--bcv-fg, #111827);
+  text-decoration: none !important;
+  font-size: 13px;
+  line-height: 1.2;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.bcv-due-chip:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--bcv-shadow);
+  color: var(--bcv-fg, #111827);
+}
+.bcv-due-chip__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+  background: var(--bcv-fg-2, #9ca3af);
+}
+.bcv-due-chip__title {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 260px;
+}
+.bcv-due-chip__course {
+  color: var(--bcv-fg-2, #6b7280);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.bcv-due-chip--overdue { border-color: var(--bcv-danger, #dc2626); }
+.bcv-due-chip--today { border-color: var(--bcv-warn, #d97706); }
+.bcv-due-strip__empty {
+  font-size: 13px;
+  color: var(--bcv-fg-2, #6b7280);
+}

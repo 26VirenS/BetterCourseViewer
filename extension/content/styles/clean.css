@@ -1,0 +1,209 @@
+/* BetterCourseViewer — declutter, minimal mode, density, fonts, widths.
+ * Everything is gated on classes that early.js puts on <html>. */
+
+/* --- Right sidebar (dashboard To Do / Coming Up / Recent Feedback) --------- */
+html.bcv-hide-sidebar.bcv-page-dashboard #right-side-wrapper,
+html.bcv-hide-sidebar.bcv-page-course-home #right-side-wrapper,
+html.bcv-hide-sidebar.bcv-page-dashboard #right-side,
+html.bcv-hide-sidebar.bcv-page-course-home #right-side {
+  display: none !important;
+}
+html.bcv-hide-sidebar.bcv-page-dashboard #not_right_side,
+html.bcv-hide-sidebar.bcv-page-course-home #not_right_side,
+body.bcv-no-right-side #not_right_side {
+  margin-right: 0 !important;
+  max-width: none !important;
+  flex: 1 1 auto !important;
+}
+
+/* --- Footer ------------------------------------------------------------------ */
+html.bcv-hide-footer #footer,
+html.bcv-hide-footer .ic-app-footer,
+html.bcv-hide-footer #wrapper > footer,
+html.bcv-hide-footer .ic-Layout-wrapper > footer {
+  display: none !important;
+}
+
+/* --- Global nav items --------------------------------------------------------- */
+html.bcv-hide-help #menu li:has(> #global_nav_help_link),
+html.bcv-hide-help #global_nav_help_link {
+  display: none !important;
+}
+html.bcv-hide-tools #menu li:has(> a[href*="external_tools"]),
+html.bcv-hide-tools #menu li.globalNavExternalsMenu {
+  display: none !important;
+}
+html.bcv-hide-history #menu li:has(> #global_nav_history_link) {
+  display: none !important;
+}
+html.bcv-hide-groups #menu li:has(> #global_nav_groups_link) {
+  display: none !important;
+}
+
+/* --- Breadcrumbs / announcements banner ----------------------------------------- */
+html.bcv-hide-breadcrumbs #breadcrumbs {
+  display: none !important;
+}
+html.bcv-hide-announcements #dashboard .ic-notification,
+html.bcv-hide-announcements .ic-notification--announcement,
+html.bcv-hide-announcements #dashboard_header_container ~ .ic-notification,
+html.bcv-hide-announcements .ic-Dashboard-header + .ic-notification {
+  display: none !important;
+}
+
+/* --- Dashboard cards ------------------------------------------------------------ */
+html.bcv-compact-cards .ic-DashboardCard__header_hero {
+  height: 46px !important;
+  min-height: 0 !important;
+}
+html.bcv-compact-cards .ic-DashboardCard__header_content {
+  padding: 8px 12px 6px !important;
+}
+html.bcv-compact-cards .ic-DashboardCard__header-title {
+  font-size: 1rem !important;
+  line-height: 1.25 !important;
+}
+html.bcv-compact-cards .ic-DashboardCard__header-subtitle {
+  font-size: 0.8rem !important;
+  margin-top: 2px !important;
+}
+html.bcv-compact-cards .ic-DashboardCard {
+  border-radius: 10px !important;
+  overflow: hidden;
+}
+html.bcv-hide-card-images .ic-DashboardCard__header_image {
+  display: none !important;
+}
+html.bcv-hide-card-images .ic-DashboardCard__header_hero {
+  opacity: 1 !important;
+}
+html.bcv-hide-card-actions .ic-DashboardCard__action-container {
+  display: none !important;
+}
+html.bcv-hide-card-term .ic-DashboardCard__header-term {
+  display: none !important;
+}
+html.bcv-cards-3 .ic-DashboardCard__box__container,
+html.bcv-cards-4 .ic-DashboardCard__box__container,
+html.bcv-cards-5 .ic-DashboardCard__box__container {
+  display: grid !important;
+  gap: 16px;
+  margin: 0 !important;
+}
+html.bcv-cards-3 .ic-DashboardCard__box__container { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+html.bcv-cards-4 .ic-DashboardCard__box__container { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+html.bcv-cards-5 .ic-DashboardCard__box__container { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+html[class*="bcv-cards-"] .ic-DashboardCard__box__container .ic-DashboardCard {
+  width: auto !important;
+  margin: 0 !important;
+}
+
+/* --- Minimal mode -------------------------------------------------------------- */
+html.bcv-minimal #header.ic-app-header {
+  width: 54px !important;
+}
+html.bcv-minimal #header .menu-item__text {
+  display: none !important;
+}
+html.bcv-minimal #header .ic-app-header__menu-list-link,
+html.bcv-minimal #header .bcv-nav-link {
+  padding: 8px 0 !important;
+}
+html.bcv-minimal #header .menu-item-icon-container svg,
+html.bcv-minimal #header .ic-icon-svg {
+  width: 24px !important;
+  height: 24px !important;
+}
+html.bcv-minimal #header .ic-app-header__logomark {
+  height: 54px !important;
+}
+html.bcv-minimal .ic-app-header__secondary-navigation .ic-app-header__menu-list-link {
+  padding: 6px 0 !important;
+}
+html.bcv-minimal .ic-Layout-wrapper,
+html.bcv-minimal body:not(.no-headers) .ic-Layout-wrapper {
+  margin-left: 54px !important;
+}
+html.bcv-minimal #wrapper.ic-Layout-wrapper {
+  margin-left: 54px !important;
+}
+html.bcv-minimal #footer,
+html.bcv-minimal .ic-app-footer,
+html.bcv-minimal .ic-Dashboard-header__actions .ic-Dashboard-header__actions-link,
+html.bcv-minimal .ic-DashboardCard__action-container,
+html.bcv-minimal #dashboard_header_container .ic-Dashboard-header__actions > :not(:last-child) {
+  display: none !important;
+}
+html.bcv-minimal .ic-DashboardCard {
+  box-shadow: none !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+}
+html.bcv-minimal .ic-Layout-contentMain {
+  padding-top: 8px !important;
+}
+html.bcv-minimal #left-side {
+  border-right: 0 !important;
+}
+html.bcv-minimal #section-tabs .section a,
+html.bcv-minimal #section-tabs a {
+  padding: 5px 8px !important;
+  font-size: 0.9rem !important;
+}
+html.bcv-minimal .ic-app-nav-toggle-and-crumbs {
+  padding: 8px 0 !important;
+}
+
+/* --- Density ------------------------------------------------------------------ */
+html.bcv-compact .ig-row {
+  padding: 6px 8px !important;
+  min-height: 0 !important;
+}
+html.bcv-compact .ig-header {
+  padding: 8px 10px !important;
+}
+html.bcv-compact .ig-title {
+  font-size: 0.95rem !important;
+}
+html.bcv-compact .ic-DashboardCard__header_content {
+  padding: 6px 10px 4px !important;
+}
+html.bcv-compact #section-tabs a {
+  padding: 4px 8px !important;
+  line-height: 1.3 !important;
+}
+html.bcv-compact table.ic-Table td,
+html.bcv-compact table.ic-Table th,
+html.bcv-compact #grades_summary td,
+html.bcv-compact #grades_summary th {
+  padding: 4px 8px !important;
+}
+html.bcv-compact .ic-Layout-contentMain {
+  padding: 0 16px 16px !important;
+}
+
+/* --- Content width ------------------------------------------------------------- */
+html.bcv-width-narrow .ic-Layout-contentMain,
+html.bcv-width-narrow #content {
+  max-width: 1040px !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
+html.bcv-width-wide .ic-Layout-contentMain,
+html.bcv-width-wide #not_right_side {
+  max-width: none !important;
+}
+
+/* --- Fonts ----------------------------------------------------------------------- */
+html.bcv-font-rounded body,
+html.bcv-font-rounded button,
+html.bcv-font-rounded input,
+html.bcv-font-rounded textarea {
+  font-family: ui-rounded, "SF Pro Rounded", "Nunito", "Avenir Next", -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif !important;
+}
+html.bcv-font-serif body,
+html.bcv-font-serif .user_content {
+  font-family: "New York", "Iowan Old Style", "Charter", Georgia, "Times New Roman", serif !important;
+}
+html.bcv-font-mono body {
+  font-family: ui-monospace, "SF Mono", Menlo, "JetBrains Mono", Consolas, monospace !important;
+}

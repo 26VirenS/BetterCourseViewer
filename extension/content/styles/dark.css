@@ -1,0 +1,70 @@
+/* BetterCourseViewer — dark mode.
+ * Canvas has no first-party dark theme and most of its UI is generated with
+ * hashed class names, so we invert the whole document and hue-rotate it back
+ * (brand colours keep their hue), then re-invert media so photos, videos
+ * and embeds look normal. The extension's own panels get pre-transformed
+ * colours from theme-css.js so they render exactly as designed. */
+
+html.bcv-dark {
+  filter: invert(1) hue-rotate(180deg);
+  background: #ffffff !important;
+  min-height: 100%;
+}
+
+/* Media and embeds: undo the inversion. */
+html.bcv-dark img,
+html.bcv-dark picture,
+html.bcv-dark video,
+html.bcv-dark canvas,
+html.bcv-dark embed,
+html.bcv-dark object,
+html.bcv-dark iframe:not(.tox-edit-area__iframe),
+html.bcv-dark [style*="background-image"]:not(.bcv-ui):not(.bcv-ui *),
+html.bcv-dark .ic-DashboardCard__header_image,
+html.bcv-dark .ic-app-header__logomark,
+html.bcv-dark .emoji {
+  filter: invert(1) hue-rotate(180deg);
+}
+
+/* The global nav is dark by design; flip it back so it stays dark. */
+html.bcv-dark #header.ic-app-header,
+html.bcv-dark #mobile-header {
+  filter: invert(1) hue-rotate(180deg);
+}
+html.bcv-dark #header img,
+html.bcv-dark #header .ic-app-header__logomark,
+html.bcv-dark #mobile-header img {
+  filter: none;
+}
+
+/* Soften pure white surfaces a touch before inversion (renders #101010-ish). */
+html.bcv-dark body,
+html.bcv-dark .ic-Layout-wrapper,
+html.bcv-dark #main,
+html.bcv-dark .ic-app-main-content {
+  background-color: #f6f6f6 !important;
+}
+html.bcv-dark #content,
+html.bcv-dark .ic-Layout-contentMain,
+html.bcv-dark .ic-DashboardCard,
+html.bcv-dark .ic-DashboardCard__box {
+  background-color: #ffffff !important;
+}
+
+/* Keep dashboard card hero colours vivid and their colour-picker swatches sane. */
+html.bcv-dark .ic-DashboardCard__header_hero,
+html.bcv-dark .ColorPicker__ColorPreview,
+html.bcv-dark .ColorPicker__ColorBlock {
+  filter: invert(1) hue-rotate(180deg);
+}
+
+/* Our own overlays are drawn with pre-transformed colours; images inside them
+ * (course avatars etc.) should look normal. */
+html.bcv-dark .bcv-ui img {
+  filter: invert(1) hue-rotate(180deg);
+}
+
+/* Scrollbars and native controls follow the inverted page. */
+html.bcv-dark {
+  color-scheme: light;
+}

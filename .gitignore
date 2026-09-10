@@ -1,0 +1,21 @@
+# macOS
+.DS_Store
+
+# Generated Xcode project / app (run scripts/build-mac-app.sh to regenerate)
+macos/
+build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+
+# Packaged extension archives
+dist/
+
+# Smoke-test output
+scripts/dev/out/
+
+# Editors / tooling
+.idea/
+.vscode/
+node_modules/
+npm-debug.log*
