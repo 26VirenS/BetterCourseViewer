@@ -201,8 +201,16 @@
   }
 
   async function setFavorite(courseId, on) {
-    if (on) await C.post(`/api/v1/users/self/favorites/courses/${courseId}`, {});
-    else await C.del(`/api/v1/users/self/favorites/courses/${courseId}`);
+    if (on) {
+      // Until you star something, Canvas shows every current course on the dashboard.
+      // Starring the first one would leave it alone up there, so star what is shown too.
+      const all = await courses().catch(() => []);
+      if (all.length && !all.some((c) => c.favorite)) {
+        const shown = await cards().catch(() => []);
+        for (const k of shown || []) if (String(k.id) !== String(courseId)) await C.post(`/api/v1/users/self/favorites/courses/${k.id}`, {}).catch(() => {});
+      }
+      await C.post(`/api/v1/users/self/favorites/courses/${courseId}`, {});
+    } else await C.del(`/api/v1/users/self/favorites/courses/${courseId}`);
     await Promise.all([C.invalidate('courses:all'), C.invalidate('cards')]);
   }
 

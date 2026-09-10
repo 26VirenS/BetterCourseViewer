@@ -420,6 +420,8 @@ const server = http.createServer((req, res) => {
     } catch {
       body = {};
     }
+    // like Canvas: every write needs the page's CSRF token, body or not
+    if (req.method !== 'GET' && !path.startsWith('/__mock/') && req.headers['x-csrf-token'] !== 'mock-csrf') return json(res, { errors: [{ message: 'invalid authenticity token' }] }, 422);
     for (const [method, re, handler] of routes) {
       if (method !== req.method) continue;
       const m = path.match(re);

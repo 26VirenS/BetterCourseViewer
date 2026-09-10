@@ -54,12 +54,14 @@
     const results = [];
     let pages = 0;
     while (url && pages < maxPages) {
+      // Canvas refuses any non-GET request without the CSRF token, body or not (a DELETE has none).
       const res = await fetch(url, {
         method,
         credentials: 'same-origin',
         headers: {
           accept: ACCEPT,
-          ...(body ? { 'content-type': 'application/json', 'x-csrf-token': csrfToken() } : {}),
+          ...(method !== 'GET' ? { 'x-csrf-token': csrfToken() } : {}),
+          ...(body ? { 'content-type': 'application/json' } : {}),
           'x-requested-with': 'XMLHttpRequest',
         },
         body: body ? JSON.stringify(body) : undefined,

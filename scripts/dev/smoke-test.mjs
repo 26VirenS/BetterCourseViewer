@@ -186,6 +186,7 @@ try {
   await page.waitForFunction(() => document.querySelectorAll('.bcv-ccard').length === 6, null, { timeout: 5000 });
   check(true, 'starring a course adds it to the dashboard (favourites API)');
   await page.waitForFunction(() => document.querySelectorAll('.bcv-fav').length === 6, null, { timeout: 5000 });
+  check(await sw.evaluate(async () => (await (await fetch('http://localhost:8787/api/v1/courses')).text()).includes('"is_favorite":true')), 'favourite saved to Canvas (POST with the CSRF token)');
   await (await page.$$('.bcv-ccard .bcv-ccard__star'))[5].click();
   await page.waitForFunction(() => document.querySelectorAll('.bcv-ccard').length === 5, null, { timeout: 5000 });
 
