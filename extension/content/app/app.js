@@ -125,6 +125,7 @@
       render();
       return;
     }
+    progress(true); // the bar runs from the tap until the next page has drawn its screen
     if (samePage) {
       location.reload();
       return;
@@ -271,12 +272,29 @@
     await S.update({ appearance: { darkMode: next } });
   }
 
+  // ---- the navigation bar (mockup 8) ----------------------------------------------------------
+  // early.js shows it while the page loads; render() keeps it up while a screen fetches
+  // its data and hides it once the screen is drawn. A cached screen (under 150ms) never
+  // flashes it, and a failed screen still ends it — the error card is the signal then.
+  let progressTimer = null;
+  function progress(on) {
+    clearTimeout(progressTimer);
+    let bar = document.getElementById('bcv-progress');
+    if (!bar) {
+      bar = h('div', { id: 'bcv-progress', hidden: true, 'aria-hidden': 'true' }, h('div', { class: 'bcv-progress__bar' }));
+      html.append(bar);
+    }
+    if (on) progressTimer = setTimeout(() => { bar.hidden = false; }, 150);
+    else bar.hidden = true;
+  }
+
   // ---- screens --------------------------------------------------------------------------------
   async function render() {
     const r = parseRoute();
     state.route = r;
     const id = ++state.renderId;
     const alive = () => id === state.renderId;
+    progress(true);
     state.quizOpen = false;
     state.submitOpen = false;
     html.classList.remove('bcv-quiz'); // the quiz screen puts it back while an attempt is on screen
@@ -284,6 +302,12 @@
     renderSide();
     const ctx = { app: BCV.app, route: r, alive, dark: state.dark, setSmart: (c) => setSmartContext(c, id) };
     state.smartCtx = null;
+    // Screens build off-DOM and land whole. A screen still fetching after 150ms gets a
+    // skeleton in its place, shaped like its content (course cards on Grades, list rows
+    // elsewhere); a cached screen lands before that and never flashes it.
+    const skeleton = setTimeout(() => {
+      if (alive()) main.replaceChildren(U.el('bcv-screen bcv-screen--skel', U.el('bcv-body', U.loading(r.screen === 'gpa' ? 'cards' : 'rows', 6))));
+    }, 150);
     let el;
     try {
       if (r.params.get('bcv') === 'native') el = await screens.native.render(ctx);
@@ -295,8 +319,10 @@
       console.error('[BetterCourseViewer] screen failed', e);
       el = U.el('bcv-screen', U.el('bcv-body', U.errorBox(`This page could not be drawn: ${e?.message || e}`)));
     }
+    clearTimeout(skeleton);
     if (!alive()) return;
     main.replaceChildren(el);
+    progress(false);
     document.title = titleFor(r);
     BCV.smart?.refresh?.();
   }

@@ -20,7 +20,7 @@
       U.el('bcv-head', U.el('bcv-head__in', U.el('bcv-head__row', [h('h1', { class: 'bcv-h1', text: 'Dashboard' }), segWrap]))),
       body,
     );
-    body.append(U.loading());
+    body.append(U.loading('rows', 6)); // list-row skeletons hold the place until the planner lands
 
     let view = await store.dashboardView();
     const draw = () => {
@@ -376,7 +376,7 @@
 
     // ---- recent activity -------------------------------------------------------------------
     async function activityBlock() {
-      const wrap = U.card(U.loading(), 'bcv-card--list');
+      const wrap = U.card(U.loading('inset', 3), 'bcv-card--list');
       const stream = await store.activity().catch(() => null);
       if (!ctx.alive()) return wrap;
       if (!stream) return U.emptyCard('Recent activity could not be loaded.');

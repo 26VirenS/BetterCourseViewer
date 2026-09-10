@@ -75,7 +75,7 @@
     const sub = U.text('bcv-head__sub', 'Loading…');
     const body = U.el('bcv-body bcv-body--16');
     screen.append(U.el('bcv-head', U.el('bcv-head__in', U.el('bcv-head__row', h('div', {}, [h('h1', { class: 'bcv-h1', text: 'Grades' }), sub])))), body);
-    body.append(U.loading());
+    body.append(U.loading('cards', 6)); // course-card skeletons: the layout does not jump when the data lands
 
     const [all, term, trackingPref, goalPref, targetsPref, snapsPref, hiddenPref] = await Promise.all([
       store.courses().catch(() => null), store.currentTerm().catch(() => ''),

@@ -121,7 +121,22 @@
   const pill = (lbl, onClick, mod = '') => h('button', { type: 'button', class: `bcv-pill ${mod}`, onclick: onClick, text: lbl });
   const empty = (str) => el('bcv-empty', str);
   const emptyCard = (str) => card(str, 'bcv-card--empty');
-  const loading = (str = 'Loading…') => el('bcv-loading', str);
+  /** Loading state (mockup 8): skeleton blocks shaped like the content they replace,
+   *  so the layout does not jump when the data lands. `kind`: 'rows' (list rows,
+   *  the default), 'cards' (course cards) or 'inset' (rows inside a card). Hidden
+   *  from screen readers; a load faster than 150ms never shows them (CSS delay). */
+  function loading(kind = 'rows', n = kind === 'cards' ? 6 : 3) {
+    if (typeof kind !== 'string' || !['rows', 'cards', 'inset'].includes(kind)) kind = 'rows';
+    const widths = ['72%', '58%', '84%', '64%', '76%', '52%'];
+    const b = (cls, style = null) => h('span', { class: `bcv-skel__b ${cls}`, style });
+    const items = Array.from({ length: n }, (_, i) => (kind === 'cards'
+      ? el('bcv-skel__card', [
+        el('bcv-skel__ctop', [b('bcv-skel__ring'), el('bcv-skel__lines', [b('bcv-skel__l1', { width: widths[i % 6] }), b('bcv-skel__l2', { width: '46%' }), b('bcv-skel__l3')])]),
+        b('bcv-skel__bar'), b('bcv-skel__btn'),
+      ])
+      : el('bcv-skel__row', [b('bcv-skel__tile'), el('bcv-skel__lines', [b('bcv-skel__l1', { width: widths[i % 6] }), b('bcv-skel__l2')]), b('bcv-skel__badge')])));
+    return el(`bcv-skel ${kind === 'cards' ? 'bcv-skel--cards' : kind === 'inset' ? 'bcv-skel--inset' : ''}`, items, { 'aria-hidden': 'true', role: 'presentation' });
+  }
   const errorBox = (str) => el('bcv-error', str);
   const hint = (str, mod = '') => h('p', { class: `bcv-hint ${mod}`, text: str });
 

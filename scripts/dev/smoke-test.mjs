@@ -836,6 +836,46 @@ try {
   await page.click('#bcv-theme-btn');
   await page.waitForFunction(() => document.documentElement.getAttribute('data-bcv-theme') === 'light', null, { timeout: 5000 });
 
+  // ---- motion (mockup 8): entrances by keyframes, a loading bar + skeletons, reduced motion ----
+  console.log('motion');
+  await page.goto(`${BASE}/`);
+  await page.waitForSelector('.bcv-stat', { timeout: 10000 });
+  await page.waitForSelector('#bcv-progress[hidden]', { state: 'attached', timeout: 5000 });
+  const motion = await page.evaluate(() => ({
+    screen: getComputedStyle(document.querySelector('.bcv-main > .bcv-screen')).animationName,
+    bar: getComputedStyle(document.querySelector('.bcv-progress__bar')).animationName,
+    barHidden: document.getElementById('bcv-progress').hidden,
+    barAria: document.getElementById('bcv-progress').getAttribute('aria-hidden'),
+  }));
+  check(motion.screen === 'bcv-fade-up' && motion.bar === 'bcv-bar' && motion.barHidden && motion.barAria === 'true', `screens rise in by keyframe; the navigation bar sweeps while loading and hides once the screen is drawn: ${JSON.stringify(motion)}`);
+  await page.click('.bcv-stat');
+  await page.waitForSelector('.bcv-sheet', { timeout: 5000 });
+  const sheetAnim = await page.evaluate(() => [getComputedStyle(document.querySelector('.bcv-sheet-ov')).animationName, getComputedStyle(document.querySelector('.bcv-sheet')).animationName, getComputedStyle(document.querySelector('.bcv-sheet')).animationDuration]);
+  check(sheetAnim[0] === 'bcv-fade-in' && sheetAnim[1] === 'bcv-sheet' && sheetAnim[2] === '0.26s', `sheets rise over a fading scrim: ${sheetAnim.join(' / ')}`);
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !document.querySelector('.bcv-sheet-ov'), null, { timeout: 5000 });
+  // a slow response: the bar keeps sweeping and skeleton rows hold the place; both leave when the data lands
+  const slow = /\/api\/v1\/courses\/104\/assignments\/4002(\?|$)/;
+  await page.route(slow, async (route) => { await new Promise((r) => setTimeout(r, 900)); await route.continue().catch(() => {}); }); // a request still waiting when the route is removed just goes through
+  await page.goto(`${BASE}/courses/104/assignments/4002?bcv=submit`);
+  await page.waitForSelector('.bcv-skel', { timeout: 10000 });
+  const skel = await page.evaluate(() => {
+    const s = document.querySelector('.bcv-skel');
+    return { aria: s.getAttribute('aria-hidden'), rows: s.querySelectorAll('.bcv-skel__row').length, shimmer: getComputedStyle(s.querySelector('.bcv-skel__b')).animationName, delay: getComputedStyle(s).animationDelay, barShown: !document.getElementById('bcv-progress').hidden };
+  });
+  check(skel.aria === 'true' && skel.rows === 6 && skel.shimmer === 'bcv-shimmer' && skel.delay === '0.15s' && skel.barShown, `while a response is slow the bar sweeps and skeleton rows shimmer, hidden from screen readers: ${JSON.stringify(skel)}`);
+  await page.unroute(slow);
+  await page.waitForSelector('.bcv-sb__foot', { timeout: 15000 });
+  check(!(await page.$('.bcv-skel')) && (await page.$eval('#bcv-progress', (el) => el.hidden)), 'the skeleton and the bar leave when the content lands');
+  await page.goto(`${BASE}/`);
+  await page.waitForSelector('.bcv-stat', { timeout: 10000 });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.reload();
+  await page.waitForSelector('.bcv-stat', { timeout: 10000 });
+  const reduced = await page.evaluate(() => [getComputedStyle(document.querySelector('.bcv-main > .bcv-screen')).animationName, getComputedStyle(document.querySelector('.bcv-progress__bar')).animationName]);
+  check(reduced[0] === 'none' && reduced[1] === 'bcv-bar', `reduced motion drops the entrances but keeps the loading indicators: ${reduced.join(' / ')}`);
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+
   // ---- the look switched off from settings (popup / options) -------------------------------------------
   console.log('look off from settings');
   await page.goto(`${BASE}/courses/101/external_tools/9`);

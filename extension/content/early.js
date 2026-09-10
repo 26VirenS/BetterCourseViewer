@@ -50,6 +50,16 @@
   }
   const ready = sync();
   S.onChange((s) => sync(s));
+  // The navigation bar (mockup 8): a 2.5px sweep at the top while this page
+  // loads; app.js hides it once the screen is drawn. It only shows with the look on.
+  if (!document.getElementById('bcv-progress')) {
+    const bar = document.createElement('div');
+    bar.id = 'bcv-progress';
+    bar.setAttribute('aria-hidden', 'true');
+    bar.append(document.createElement('div'));
+    bar.firstChild.className = 'bcv-progress__bar';
+    html.append(bar);
+  }
   // Safety net: if the interface never mounts (script error, blocked page),
   // give the page back to Canvas rather than leaving it blank.
   setTimeout(() => {
