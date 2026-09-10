@@ -63,6 +63,14 @@ try {
   const texts = (sel) => page.$$eval(sel, (els) => els.map((e) => (e.innerText || e.textContent).replace(/\s+/g, ' ').trim()));
   const visible = (sel) => page.$eval(sel, (el) => getComputedStyle(el).display !== 'none').catch(() => false);
   const waitText = (sel, re) => page.waitForFunction(([s, r]) => [...document.querySelectorAll(s)].some((e) => new RegExp(r).test(e.textContent)), [sel, re.source], { timeout: 10000 });
+  // click something that re-renders the main screen, and wait until the old screen element is gone
+  const clickScreen = async (sel) => {
+    await page.evaluate(() => { const m = document.querySelector('#bcv-main > *'); if (m) m.dataset.old = '1'; });
+    await page.click(sel);
+    await page.waitForSelector('#bcv-main > *:not([data-old])', { timeout: 10000 });
+  };
+  const tab = (id) => clickScreen(`.bcv-tab[data-tab="${id}"]`);
+  const nav = (id) => clickScreen(`.bcv-nav__item[data-nav="${id}"]`);
 
   // ---- dashboard --------------------------------------------------------------------
   console.log('dashboard');
@@ -73,8 +81,8 @@ try {
   check(await page.$('#bcv-skin.is-on'), 'skin switch at the top-left is on');
   await waitText('.bcv-brand__sub', /Example University · Fall 2026/);
   check((await texts('.bcv-brand__name'))[0] === 'Localhost', `brand row: ${(await texts('.bcv-brand'))[0]}`);
-  const nav = await texts('.bcv-nav__item');
-  check(nav.length === 6 && nav[0].startsWith('Dashboard') && nav[5].startsWith('Inbox'), `sidebar nav: ${nav.join(' | ')}`);
+  const navItems = await texts('.bcv-nav__item');
+  check(navItems.length === 6 && navItems[0].startsWith('Dashboard') && navItems[5].startsWith('Inbox'), `sidebar nav: ${navItems.join(' | ')}`);
   await waitText('.bcv-nav__item[data-nav="todo"] .bcv-nav__count', /\d/);
   const todoCount = Number((await texts('.bcv-nav__item[data-nav="todo"] .bcv-nav__count'))[0]);
   check(todoCount >= 8, `To Do count in nav = ${todoCount}`);
@@ -118,7 +126,7 @@ try {
 
   // ---- courses ----------------------------------------------------------------------------
   console.log('courses');
-  await page.click('.bcv-nav__item[data-nav="courses"]');
+  await nav('courses');
   await page.waitForSelector('.bcv-ccard__hero--term', { timeout: 10000 });
   check(page.url() === `${BASE}/courses`, 'sidebar navigation uses pushState');
   const termCards = await texts('.bcv-ccard');
@@ -146,7 +154,7 @@ try {
 
   // ---- to do -------------------------------------------------------------------------------
   console.log('to do');
-  await page.click('.bcv-nav__item[data-nav="todo"]');
+  await nav('todo');
   await page.waitForSelector('.bcv-head__sub', { timeout: 10000 });
   await waitText('.bcv-head__sub', /items across/);
   const todoSub = (await texts('.bcv-head__sub'))[0];
@@ -165,7 +173,7 @@ try {
 
   // ---- calendar --------------------------------------------------------------------------
   console.log('calendar');
-  await page.click('.bcv-nav__item[data-nav="calendar"]');
+  await nav('calendar');
   await page.waitForSelector('.bcv-cal__grid', { timeout: 10000 });
   check((await page.$$('.bcv-cal__day')).length === 42 && (await page.$('.bcv-cal__day--today')), 'month grid with today highlighted');
   await page.waitForSelector('.bcv-ev', { timeout: 10000 });
@@ -199,7 +207,7 @@ try {
 
   // ---- inbox --------------------------------------------------------------------------------
   console.log('inbox');
-  await page.click('.bcv-nav__item[data-nav="inbox"]');
+  await nav('inbox');
   await page.waitForSelector('.bcv-inbox__list .bcv-row', { timeout: 10000 });
   const msgs = await texts('.bcv-inbox__list .bcv-row');
   check(msgs.length === 2 && /Halley Smith, Sam Student.*No submission for Acknowledge/.test(msgs[0]), `inbox rows: ${msgs[0].slice(0, 60)}`);
@@ -228,7 +236,7 @@ try {
 
   // ---- groups -----------------------------------------------------------------------------
   console.log('groups');
-  await page.click('.bcv-nav__item[data-nav="groups"]');
+  await nav('groups');
   await page.waitForSelector('.bcv-body .bcv-row', { timeout: 10000 });
   const gr = await texts('.bcv-body .bcv-row');
   check(gr.length === 2 && /Attestation Fall 2026 1.*Academic Success.*Collaboration team/.test(gr[0]) && /Study group B/.test(gr[1]), `groups: ${gr.join(' | ')}`);
@@ -237,7 +245,7 @@ try {
 
   // ---- course home ---------------------------------------------------------------------------
   console.log('course');
-  await page.click('.bcv-fav');
+  await clickScreen('.bcv-fav');
   await page.waitForSelector('.bcv-tabs .bcv-tab', { timeout: 10000 });
   check(page.url() === `${BASE}/courses/101`, 'favourite opens the course via pushState');
   const tabs = await texts('.bcv-tab');
@@ -260,7 +268,7 @@ try {
   if (await page.$('.bcv-reader-ov')) await page.click('.bcv-reader-ov .bcv-iconbtn');
 
   // announcements
-  await page.click('.bcv-tab[data-tab="announcements"]');
+  await tab('announcements');
   await page.waitForSelector('.bcv-body .bcv-row', { timeout: 10000 });
   const anns = await texts('.bcv-body .bcv-row');
   check(anns.length === 4 && /Prerequisite Skills Test.*Yue Lei · All sections/.test(anns[0]), `announcements: ${anns[0].slice(0, 70)}`);
@@ -272,7 +280,7 @@ try {
   check((await texts('.bcv-detail__title'))[0] === 'Prerequisite Skills Test' && (await page.$$('.bcv-entry')).length === 2, 'announcement opens as a thread');
 
   // assignments
-  await page.click('.bcv-tab[data-tab="assignments"]');
+  await tab('assignments');
   await page.waitForSelector('.bcv-group__head', { timeout: 10000 });
   const agroups = await texts('.bcv-group__head');
   check(agroups[0].startsWith('Upcoming Assignments') && agroups.some((t) => /Past Assignments \d+ graded/.test(t)), `assignment groups: ${agroups.join(' | ')}`);
@@ -292,7 +300,7 @@ try {
   await shot(page, '14-assignment');
 
   // discussions
-  await page.click('.bcv-tab[data-tab="discussions"]');
+  await tab('discussions');
   await page.waitForSelector('.bcv-body .bcv-row', { timeout: 10000 });
   const drows = await texts('.bcv-body .bcv-row');
   check(drows.length === 4 && /Is there any discussion happening this week\?.*Last post.*23 unread.*23 replies/.test(drows[1]), `discussions: ${drows[1].slice(0, 80)}`);
@@ -307,7 +315,7 @@ try {
   await shot(page, '15b-discussion-thread');
 
   // grades
-  await page.click('.bcv-tab[data-tab="grades"]');
+  await tab('grades');
   await page.waitForSelector('.bcv-rings__svg', { timeout: 10000 });
   check((await page.$$('.bcv-rings__svg circle')).length === 8, 'four rings (total + 3 graded groups)');
   const legend = await texts('.bcv-legend__row');
@@ -337,7 +345,7 @@ try {
   await page.waitForFunction(() => !document.querySelector('.bcv-banner'), null, { timeout: 5000 });
 
   // people
-  await page.click('.bcv-tab[data-tab="people"]');
+  await tab('people');
   await page.waitForSelector('.bcv-body .bcv-row', { timeout: 10000 });
   const prow = await texts('.bcv-body .bcv-row');
   check(prow.length === 7 && /Alan Aguilar He\/Him\/His Discussion-24D · Lecture-20 Student/.test(prow[1]) && /Yue Lei.*Teacher/.test(prow[6]), `people: ${prow[1]}`);
@@ -348,7 +356,7 @@ try {
   await shot(page, '18-course-people');
 
   // pages
-  await page.click('.bcv-tab[data-tab="pages"]');
+  await tab('pages');
   await page.waitForSelector('.bcv-body .bcv-row', { timeout: 10000 });
   const pg = await texts('.bcv-body .bcv-row');
   check(pg.length === 2 && /Course Information Front page Created .* · last edited .* by Yue Lei/.test(pg[0]), `pages: ${pg[0]}`);
@@ -359,7 +367,7 @@ try {
   check((await texts('.bcv-detail__title'))[0] === 'Chapter 4 notes' && (await page.$('.bcv-prose h2')), 'page view renders the body');
 
   // files
-  await page.click('.bcv-tab[data-tab="files"]');
+  await tab('files');
   await page.waitForSelector('.bcv-body .bcv-row', { timeout: 10000 });
   const frows = await texts('.bcv-body .bcv-row');
   check(frows.length === 5 && /Course Information Folder · modified/.test(frows[0]) && /Course Syllabus.pdf PDF · modified .* 212 KB/.test(frows[4]), `files: ${frows[4]}`);
@@ -372,7 +380,7 @@ try {
   check(page.url().endsWith('/files/folder/Course%20Information') && (await texts('.bcv-body .bcv-row'))[0].includes('Resources_Policy.pdf'), 'folder navigation by path');
 
   // quizzes
-  await page.click('.bcv-tab[data-tab="quizzes"]');
+  await tab('quizzes');
   await page.waitForSelector('.bcv-body .bcv-row', { timeout: 10000 });
   const qlabels = await texts('.bcv-body .bcv-label');
   check(qlabels.join(',').toLowerCase() === 'assignment quizzes,practice quizzes', `quiz groups: ${qlabels.join(', ')}`);
@@ -383,7 +391,7 @@ try {
   check((await texts('.bcv-detail__meta'))[0].includes('Time limit 20 minutes') && (await texts('.bcv-grades__side, .bcv-col .bcv-row')).some((t) => /Attempt 1/.test(t)), 'quiz detail with attempts');
 
   // modules
-  await page.click('.bcv-tab[data-tab="modules"]');
+  await tab('modules');
   await page.waitForSelector('.bcv-module', { timeout: 10000 });
   check((await page.$$('.bcv-module')).length === 1 && (await texts('.bcv-module__item')).length === 2, 'modules list');
   await page.goto(`${BASE}/courses/102/modules`);

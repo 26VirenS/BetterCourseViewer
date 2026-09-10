@@ -69,6 +69,12 @@
   }
   if (granted) {
     status.textContent = `On for ${url.hostname}`;
+    // Self-heal: a saved custom site re-registers its scripts from the
+    // current build every time the popup opens (cheap, idempotent).
+    if (!builtIn) {
+      const r = await send({ type: 'registerDomain', origin });
+      if (r && r.ok === false) status.textContent = `Saved for ${url.hostname}, but: ${r.message}`;
+    }
     return;
   }
   status.textContent = `Not enabled on ${url.hostname}`;

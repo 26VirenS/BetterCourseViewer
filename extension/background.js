@@ -188,12 +188,13 @@ if (typeof importScripts === 'function' && !self.BCV?.providers) {
     }
     const scripts = scriptsFor(origin);
     try {
-      const existing = await api.scripting.getRegisteredContentScripts({ ids: scripts.map((s) => s.id) }).catch(() => []);
-      const existingIds = new Set((existing || []).map((s) => s.id));
-      const toRegister = scripts.filter((s) => !existingIds.has(s.id));
-      const toUpdate = scripts.filter((s) => existingIds.has(s.id));
-      if (toRegister.length) await api.scripting.registerContentScripts(toRegister);
-      if (toUpdate.length && api.scripting.updateContentScripts) await api.scripting.updateContentScripts(toUpdate);
+      // Registrations persist across sessions with the file list they were
+      // made with, so always drop the old ones (any id we ever used for this
+      // origin) and register fresh from the current manifest.
+      const all = await api.scripting.getRegisteredContentScripts().catch(() => []);
+      const stale = (all || []).map((s) => s.id).filter((id) => id.startsWith(`${scriptIdFor(origin)}-`));
+      if (stale.length) await api.scripting.unregisterContentScripts({ ids: stale }).catch(() => {});
+      await api.scripting.registerContentScripts(scripts);
     } catch (e) {
       return { ok: false, message: `Could not enable on ${origin}: ${e?.message || e}` };
     }
@@ -232,14 +233,35 @@ if (typeof importScripts === 'function' && !self.BCV?.providers) {
     }
   }
 
-  /** Re-register scripts for saved domains (in case registrations were lost). */
-  async function ensureDomains() {
+  /** Identifies the content-script set of this build; changes whenever the
+   *  manifest's script list or the version changes. */
+  function manifestStamp() {
+    const m = api.runtime.getManifest();
+    return `${m.version}:${JSON.stringify((m.content_scripts || []).map((cs) => [cs.js, cs.css, cs.run_at]))}`;
+  }
+  const STAMP_KEY = 'scriptsStamp';
+
+  /** Re-register scripts for saved domains whenever this build's script set
+   *  differs from the one they were registered with (or when forced). */
+  async function ensureDomains({ force = false } = {}) {
     try {
       const settings = await S.get();
-      for (const origin of settings.domains || []) {
+      if (!settings.domains?.length) return;
+      const stamp = manifestStamp();
+      const stored = (await api.storage.local.get(STAMP_KEY))[STAMP_KEY];
+      let registered = [];
+      try {
+        registered = (await api.scripting.getRegisteredContentScripts()) || [];
+      } catch {
+        registered = [];
+      }
+      for (const origin of settings.domains) {
+        const has = registered.some((s) => s.id.startsWith(`${scriptIdFor(origin)}-`));
+        if (!force && stored === stamp && has) continue;
         const ok = await api.permissions.contains({ origins: [`${origin}/*`] }).catch(() => true);
         if (ok) await registerDomain(origin);
       }
+      await api.storage.local.set({ [STAMP_KEY]: stamp });
     } catch {
       /* ignore */
     }
@@ -247,7 +269,7 @@ if (typeof importScripts === 'function' && !self.BCV?.providers) {
 
   // ---- lifecycle ----------------------------------------------------------
   api.runtime.onInstalled.addListener(async (details) => {
-    await ensureDomains();
+    await ensureDomains({ force: true });
     if (details.reason === 'install') {
       try {
         await api.runtime.openOptionsPage();
@@ -256,5 +278,8 @@ if (typeof importScripts === 'function' && !self.BCV?.providers) {
       }
     }
   });
-  if (api.runtime.onStartup) api.runtime.onStartup.addListener(ensureDomains);
+  if (api.runtime.onStartup) api.runtime.onStartup.addListener(() => ensureDomains());
+  // Every time the background wakes: cheap check, repairs stale registrations
+  // even when onInstalled/onStartup never fired (Safari rebuilds, reloads).
+  ensureDomains();
 })();
