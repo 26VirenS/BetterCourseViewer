@@ -54,7 +54,8 @@
   }
 
   async function render(ctx) {
-    const screen = U.el('bcv-screen', null, { style: { '--w': '900px' } });
+    // the mockup's page fills its column (900px of a 938px column); on a Mac window that means the whole main area, capped for very wide screens
+    const screen = U.el('bcv-screen bcv-screen--gpa', null, { style: { '--w': '1280px' } });
     const sub = U.text('bcv-head__sub', 'Loading…');
     const body = U.el('bcv-body bcv-body--16');
     screen.append(U.el('bcv-head', U.el('bcv-head__in', U.el('bcv-head__row', h('div', {}, [h('h1', { class: 'bcv-h1', text: 'Grades' }), sub])))), body);
