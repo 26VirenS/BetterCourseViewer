@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// Loads the extension into headless Chromium against the mock Canvas server
-// and exercises the main features, saving screenshots to scripts/dev/out/.
-// Requires Playwright (project or global install).
+// Loads the extension into headless Chromium against the mock Canvas server,
+// walks every screen of the redesigned interface and saves screenshots to
+// scripts/dev/out/. Requires Playwright (project or global install).
 import { createRequire } from 'node:module';
 import { spawn, execSync } from 'node:child_process';
 import { mkdirSync, cpSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
@@ -41,6 +41,7 @@ const check = (cond, label) => {
   console.log(`${cond ? '  ✓' : '  ✗'} ${label}`);
   if (!cond) failures.push(label);
 };
+const shot = (page, name) => page.screenshot({ path: join(out, `${name}.png`) });
 
 const userDataDir = join(tmpdir(), `bcv-profile-${Date.now()}`);
 const context = await chromium.launchPersistentContext(userDataDir, {
@@ -57,262 +58,441 @@ try {
   const setSettings = (patch) => sw.evaluate(async (p) => self.BCV.settings.update(p), patch);
 
   const page = await context.newPage();
-  const apiCalls = [];
-  page.on('request', (r) => { if (r.url().includes('/api/v1/')) apiCalls.push(r.url()); });
   page.on('pageerror', (e) => console.log('  page error:', e.message));
-  page.on('console', (m) => { if (m.type() === 'error' || m.type() === 'warning') console.log('  console:', m.type(), m.text()); });
+  page.on('console', (m) => { if (m.type() === 'error') console.log('  console:', m.text()); });
+  const texts = (sel) => page.$$eval(sel, (els) => els.map((e) => (e.innerText || e.textContent).replace(/\s+/g, ' ').trim()));
+  const visible = (sel) => page.$eval(sel, (el) => getComputedStyle(el).display !== 'none').catch(() => false);
+  const waitText = (sel, re) => page.waitForFunction(([s, r]) => [...document.querySelectorAll(s)].some((e) => new RegExp(r).test(e.textContent)), [sel, re.source], { timeout: 10000 });
 
-  // --- dashboard --------------------------------------------------------------
+  // ---- dashboard --------------------------------------------------------------------
   console.log('dashboard');
   await page.goto(`${BASE}/`);
-  await page.waitForSelector('#bcv-nav-todo', { timeout: 10000 });
-  await page.waitForSelector('#bcv-nav-smart', { timeout: 10000 });
-  check(await page.$('#bcv-nav-smart'), 'Smart nav item injected');
-  // --- shell + custom dashboard ---------------------------------------------------
-  check(await page.$eval('html', (h) => h.classList.contains('bcv-skin') && h.classList.contains('bcv-shell')), 'shell + skin classes applied');
-  await page.waitForSelector('#bcv-side .bcv-side__course', { timeout: 10000 });
-  check(await page.$eval('#header', (el) => getComputedStyle(el).display === 'none'), 'Canvas global nav hidden');
-  const sideCourses = await page.$$eval('#bcv-side .bcv-side__course', (els) => els.map((e) => e.textContent.trim()));
-  check(sideCourses.length === 3, `sidebar lists ${sideCourses.length} courses`);
-  check(await page.$eval('#bcv-side .bcv-side__item.is-active', (el) => el.textContent.trim() === 'Home'), 'Home active in sidebar');
-  check(await page.$$eval('#bcv-side .bcv-side__badge', (els) => els.some((e) => e.textContent.trim() === '2')), 'inbox unread badge in sidebar');
-  check(await page.$('#bcv-side .bcv-side__avatar'), 'avatar rendered in sidebar');
-  check(await page.$eval('#bcv-top .bcv-top__title', (el) => el.textContent.trim() === 'Home'), 'top bar title');
-  check(await page.$('#bcv-top #bcv-nav-todo') && await page.$('#bcv-top #bcv-nav-smart'), 'To Do / Smart buttons live in the top bar');
-  await page.waitForSelector('#bcv-dash .bcv-course', { timeout: 10000 });
-  await page.waitForFunction(() => document.querySelectorAll('#bcv-dash .bcv-cg').length >= 3, null, { timeout: 10000 });
-  check(await page.$eval('#dashboard', (el) => getComputedStyle(el).display === 'none'), 'Canvas dashboard hidden');
-  const title = await page.$eval('#bcv-dash .bcv-dash__title', (el) => el.textContent);
-  check(/^Good (morning|afternoon|evening|night), Sam/.test(title), `greeting: ${title}`);
-  const metrics = await page.$$eval('#bcv-dash .bcv-metric', (els) => els.map((e) => e.textContent.replace(/\s+/g, ' ').trim()));
-  check(metrics.length === 3 && /This week/.test(metrics[0]) && /Due today/.test(metrics[1]) && /87%/.test(metrics[2]), `metric rings: ${metrics.join(' | ')}`);
-  const tiles = await page.$$eval('#bcv-dash .bcv-course', (els) => els.map((e) => ({ name: e.querySelector('.bcv-course__name').textContent, ring: e.querySelector('.bcv-course__ring .bcv-ring__label').textContent, rows: e.querySelectorAll('.bcv-next').length })));
-  check(tiles.length === 3 && tiles[0].ring === '92%' && tiles[1].ring === '81%', `course tiles with grade rings: ${tiles.map((t) => `${t.name}=${t.ring}/${t.rows}`).join(', ')}`);
-  check(tiles.every((t) => t.rows >= 1), 'next-up rows on every tile');
-  const groups = await page.$$eval('#bcv-dash .bcv-cg', (els) => els.map((e) => ({ name: e.querySelector('.bcv-cg__name').textContent, tasks: [...e.querySelectorAll('.bcv-task__title')].map((t) => t.textContent) })));
-  check(groups.length === 3, `to-do column grouped by ${groups.length} courses`);
-  const allTasks = groups.flatMap((g) => g.tasks);
-  check(allTasks.length === 5 && !allTasks.some((t) => /ungraded|Chapter 4|Guest lecture/.test(t)), `to-do column lists ${allTasks.length} graded due items only`);
-  check(await page.$$eval('#bcv-dash .bcv-cg .bcv-ring', (els) => els.length === 3), 'progress ring on each course group');
-  await page.click('#bcv-dash .bcv-todo-side__toggle input');
-  await page.waitForTimeout(200);
-  check(await page.$$eval('#bcv-dash .bcv-task', (els) => els.length === 8), 'toggle adds to-do-date/event items');
-  await page.click('#bcv-dash .bcv-todo-side__toggle input');
-  await page.waitForFunction(() => document.querySelectorAll('#bcv-dash .bcv-ann').length >= 3, null, { timeout: 10000 });
-  check(await page.$$eval('#bcv-dash .bcv-ann', (els) => els.length === 3), 'announcements listed');
-  check(await page.$eval('#right-side-wrapper', (el) => getComputedStyle(el).display === 'none'), 'Canvas dashboard sidebar hidden');
-  check(await page.$eval('#footer', (el) => getComputedStyle(el).display === 'none'), 'footer hidden');
-  const badge = await page.$eval('#bcv-nav-todo .bcv-nav-badge', (el) => ({ hidden: el.hidden, text: el.textContent }));
-  check(!badge.hidden && Number(badge.text) >= 1, `to-do nav badge = ${badge.text}`);
-  await page.waitForSelector('.bcv-toast', { timeout: 5000 }).catch(() => null);
-  check(await page.$('.bcv-toast'), 'reminder toast shown');
-  await page.screenshot({ path: join(out, '01-dashboard-light.png') });
+  await page.waitForSelector('#bcv-app .bcv-nav__item', { timeout: 10000 });
+  check(await visible('#bcv-app'), 'app shell visible');
+  check(!(await visible('#application')), 'stock Canvas hidden');
+  check(await page.$('#bcv-skin.is-on'), 'skin switch at the top-left is on');
+  await waitText('.bcv-brand__sub', /Example University · Fall 2026/);
+  check((await texts('.bcv-brand__name'))[0] === 'Localhost', `brand row: ${(await texts('.bcv-brand'))[0]}`);
+  const nav = await texts('.bcv-nav__item');
+  check(nav.length === 6 && nav[0].startsWith('Dashboard') && nav[5].startsWith('Inbox'), `sidebar nav: ${nav.join(' | ')}`);
+  await waitText('.bcv-nav__item[data-nav="todo"] .bcv-nav__count', /\d/);
+  const todoCount = Number((await texts('.bcv-nav__item[data-nav="todo"] .bcv-nav__count'))[0]);
+  check(todoCount >= 8, `To Do count in nav = ${todoCount}`);
+  check((await texts('.bcv-nav__item[data-nav="inbox"] .bcv-nav__count'))[0] === '1', 'Inbox unread count in nav');
+  await page.waitForFunction(() => document.querySelectorAll('.bcv-fav').length === 5, null, { timeout: 10000 });
+  check((await texts('.bcv-fav')).length === 5, 'five favourite courses in the sidebar');
+  check((await texts('.bcv-account__name'))[0] === 'Sam Student', 'account card shows the user');
+  await page.waitForSelector('.bcv-stat', { timeout: 10000 });
+  await waitText('.bcv-stat__value', /^\d+$/);
+  const stats = await texts('.bcv-stat');
+  check(stats.length === 3 && /Due today\s*4\s*35 points total/i.test(stats[0]) && /Due this week/i.test(stats[1]) && /Unread announcements/i.test(stats[2]), `stat cards: ${stats.join(' | ')}`);
+  await waitText('.bcv-stats > :nth-child(3) .bcv-stat__value', /^3$/);
+  const work = await texts('.bcv-work__row');
+  check(work.length === 5 && /F26-MATH 021 20/.test(work[0]) && /\d+ \/ \d+/.test(work[0]), `workload rows: ${work[0]}`);
+  const dayHeads = await texts('.bcv-day__head');
+  check(dayHeads[0].startsWith('Today') && dayHeads[1].startsWith('Tomorrow'), `list view day groups: ${dayHeads.slice(0, 3).join(' | ')}`);
+  const listRows = await texts('.bcv-day .bcv-row');
+  check(listRows.some((t) => /Dis01.*10 pts.*Due 11:59 PM/.test(t)) && listRows.some((t) => /Quiz.*Qz01/.test(t)), 'list rows show course · kind, points and due time');
+  check(listRows.some((t) => /to-do date/.test(t)), 'to-do-dated items are labelled, not shown as due');
+  await shot(page, '01-dashboard-list');
+  // mark one done
+  const rowsBefore = (await page.$$('.bcv-day .bcv-row')).length;
+  await page.click('.bcv-day .bcv-row .bcv-circle');
+  await page.waitForFunction((n) => document.querySelectorAll('.bcv-day .bcv-row').length === n - 1, rowsBefore, { timeout: 5000 });
+  check(true, 'marking an item done removes it (planner override)');
+  // cards view
+  await page.click('.bcv-seg__btn[data-value="cards"]');
+  await page.waitForSelector('.bcv-ccard', { timeout: 5000 });
+  await page.waitForFunction(() => document.querySelectorAll('.bcv-ccard .bcv-bar').length >= 5, null, { timeout: 10000 });
+  const cards = await texts('.bcv-ccard');
+  check(cards.length === 5 && /F26-MATH 021 20/.test(cards[0]) && /of \d+ items submitted/.test(cards[0]) && /due today/.test(cards[0]), `course cards: ${cards[0]}`);
+  check((await page.$$('.bcv-ccard__quick')).length === 20, 'quick links on every card');
+  await shot(page, '02-dashboard-cards');
+  await page.click('.bcv-seg__btn[data-value="activity"]');
+  await page.waitForSelector('.bcv-act__title', { timeout: 5000 });
+  const acts = await texts('.bcv-act__kind');
+  check(acts.length === 5 && /Announcement · F26-MATH 021 20/.test(acts[0]) && /Discussion · 23 replies/.test(acts[1]), `recent activity: ${acts.slice(0, 2).join(' | ')}`);
+  await shot(page, '03-dashboard-activity');
+  check(await sw.evaluate(async () => (await fetch('http://localhost:8787/dashboard/view').then((r) => r.text())).includes('activity')), 'dashboard view persisted to Canvas');
+  await page.click('.bcv-seg__btn[data-value="list"]');
 
-  // to-do panel
-  await page.keyboard.press('t');
-  await page.waitForSelector('#bcv-todo.is-open', { timeout: 5000 });
-  const todoItems = await page.$$eval('#bcv-todo .bcv-todo__item', (els) => els.length);
-  check(todoItems >= 7, `to-do panel lists ${todoItems} items`);
-  const types = await page.$$eval('#bcv-todo .bcv-todo__type', (els) => els.map((e) => e.textContent.trim()));
-  check(types.includes('Assignment') && types.includes('Quiz') && types.includes('Graded discussion') && types.includes('Discussion') && types.includes('Page') && types.includes('Event'), `type labels: ${[...new Set(types)].join(', ')}`);
-  const badgeTexts = await page.$$eval('#bcv-todo .bcv-due-badge', (els) => els.map((e) => e.textContent.trim()));
-  check(badgeTexts.some((t) => t.startsWith('To-do')) && badgeTexts.some((t) => t.startsWith('Due')), 'to-do panel distinguishes "Due" from "To-do" dates');
-  await page.click('#bcv-todo .bcv-seg__btn[data-filter="discussion"]');
-  await page.waitForTimeout(200);
-  const discTypes = await page.$$eval('#bcv-todo .bcv-todo__type', (els) => els.map((e) => e.textContent.trim()));
-  check(discTypes.length === 2 && discTypes.every((t) => /discussion/i.test(t)), `discussion filter shows ${discTypes.length} discussions only (${discTypes.join(', ')})`);
-  await page.screenshot({ path: join(out, '02b-todo-filter-discussions.png') });
-  await page.click('#bcv-todo .bcv-seg__btn[data-filter="all"]');
+  // ---- courses ----------------------------------------------------------------------------
+  console.log('courses');
+  await page.click('.bcv-nav__item[data-nav="courses"]');
+  await page.waitForSelector('.bcv-ccard__hero--term', { timeout: 10000 });
+  check(page.url() === `${BASE}/courses`, 'sidebar navigation uses pushState');
+  const termCards = await texts('.bcv-ccard');
+  check(termCards.length === 5 && /Fall 2026/.test(termCards[0]) && /Enrolled as Student/.test(termCards[0]), `favourite course cards: ${termCards.length}`);
+  const groupLabels = await texts('.bcv-body > div > .bcv-label');
+  check(groupLabels.some((l) => /collaboration team/i.test(l)), `term groups: ${groupLabels.join(', ')}`);
+  check((await texts('.bcv-body .bcv-row')).some((t) => /Placement Exam: Chemistry.*No nickname.*Student/.test(t)), 'non-favourite rows with role badge');
+  await shot(page, '04-courses');
+  await page.click('.bcv-seg__btn[data-value="past"]');
+  check((await texts('.bcv-body .bcv-row')).some((t) => /S26-CSE 022 01/.test(t)), 'Past filter shows the completed course');
+  await page.click('.bcv-seg__btn[data-value="all"]');
+  await page.fill('.bcv-search input', 'phys');
+  await page.waitForTimeout(100);
+  check((await page.$$('.bcv-ccard')).length === 2, 'search filters courses');
+  // star a course
+  await page.fill('.bcv-search input', '');
+  await page.waitForTimeout(100);
+  const starRow = (await page.$$('.bcv-body .bcv-row')).find(async () => true);
+  await starRow.$eval('.bcv-ccard__star', (b) => b.click());
+  await page.waitForFunction(() => document.querySelectorAll('.bcv-ccard').length === 6, null, { timeout: 5000 });
+  check(true, 'starring a course adds it to the dashboard (favourites API)');
+  await page.waitForFunction(() => document.querySelectorAll('.bcv-fav').length === 6, null, { timeout: 5000 });
+  await (await page.$$('.bcv-ccard .bcv-ccard__star'))[5].click();
+  await page.waitForFunction(() => document.querySelectorAll('.bcv-ccard').length === 5, null, { timeout: 5000 });
+
+  // ---- to do -------------------------------------------------------------------------------
+  console.log('to do');
+  await page.click('.bcv-nav__item[data-nav="todo"]');
+  await page.waitForSelector('.bcv-head__sub', { timeout: 10000 });
+  await waitText('.bcv-head__sub', /items across/);
+  const todoSub = (await texts('.bcv-head__sub'))[0];
+  check(/^\d+ items across \d+ courses$/.test(todoSub), `to do header: ${todoSub}`);
+  const todoGroups = await texts('.bcv-group__head');
+  check(todoGroups[0].startsWith('Today') && todoGroups[1].startsWith('Tomorrow') && todoGroups[2].startsWith('Next 7 days'), `to do groups: ${todoGroups.join(' | ')}`);
+  check((await texts('.bcv-body .bcv-row')).some((t) => /Qz01.*F26-MATH 021 20 · Quiz · 10 pts.*11:59 PM/.test(t)), 'to do rows show course · kind · pts and time');
+  await shot(page, '05-todo');
+  const todoRows = (await page.$$('.bcv-body .bcv-row')).length;
+  await page.click('.bcv-body .bcv-row .bcv-iconbtn');
+  await page.waitForFunction((n) => document.querySelectorAll('.bcv-body .bcv-row').length === n - 1, todoRows, { timeout: 5000 });
+  check(true, 'dismissing removes the item (planner override dismissed)');
+  await page.click('.bcv-seg__btn[data-value="course"]');
+  check((await texts('.bcv-group__head')).some((t) => /F26-MATH 021 20/.test(t)), 'grouped by course');
+  await page.click('.bcv-seg__btn[data-value="date"]');
+
+  // ---- calendar --------------------------------------------------------------------------
+  console.log('calendar');
+  await page.click('.bcv-nav__item[data-nav="calendar"]');
+  await page.waitForSelector('.bcv-cal__grid', { timeout: 10000 });
+  check((await page.$$('.bcv-cal__day')).length === 42 && (await page.$('.bcv-cal__day--today')), 'month grid with today highlighted');
+  await page.waitForSelector('.bcv-ev', { timeout: 10000 });
+  const evs = await texts('.bcv-ev');
+  check(evs.length >= 10 && evs.some((t) => /Dis01/.test(t)), `month view events: ${evs.length}`);
+  check(await page.$('.bcv-ev__label.bcv-strike'), 'submitted/past events are struck through');
+  const cals = await texts('.bcv-calrow__name');
+  check(cals.length === 10 && cals[0] === 'Sam Student' && (await page.$$('.bcv-switch.is-on')).length === 10, `calendars list with switches: ${cals.length}`);
+  await shot(page, '06-calendar-month');
+  await (await page.$$('.bcv-switch'))[0].click();
   await page.waitForTimeout(400);
-  check(await page.$eval('#dashboard', (el) => getComputedStyle(el).display === 'none'), 'custom dashboard survives a settings change');
-  await page.click('#bcv-todo .bcv-seg__btn[data-group="course"]');
+  check((await texts('.bcv-ev')).length < evs.length, 'switching a calendar off hides its events');
+  await page.click('.bcv-seg__btn[data-value="week"]');
+  await page.waitForSelector('.bcv-week__grid', { timeout: 5000 });
+  check((await page.$$('.bcv-week__hour')).length === 16 && (await page.$('.bcv-week__col--today')), 'week view: 8a–11p rows, today column');
+  check((await texts('.bcv-wev')).some((t) => /11:59p.*Dis01/.test(t)), 'week view events with times');
+  await shot(page, '07-calendar-week');
+  await page.click('.bcv-seg__btn[data-value="agenda"]');
+  await page.waitForSelector('.bcv-agenda', { timeout: 5000 });
+  check((await texts('.bcv-h1'))[0].includes(' – '), `agenda title: ${(await texts('.bcv-h1'))[0]}`);
+  check((await page.$$('.bcv-mini__day')).length === 42 && (await page.$('.bcv-mini__day--start')) && (await page.$('.bcv-mini__day--end')), 'agenda range picker mini calendar');
+  const agendaHeads = await texts('.bcv-agenda .bcv-group__head');
+  check(agendaHeads[0].includes('Today ·') && /\d items?/.test(agendaHeads[0]), `agenda day heads: ${agendaHeads[0]}`);
+  await shot(page, '08-calendar-agenda');
+  // pick a range
+  await (await page.$$('.bcv-mini__day:not(.bcv-mini__day--off)'))[2].click();
   await page.waitForTimeout(300);
-  const courseGroups = await page.$$eval('#bcv-todo .bcv-todo__group--course', (els) => els.map((e) => e.querySelector('.bcv-todo__group-name').textContent));
-  check(courseGroups.length === 3 && !!(await page.$('#bcv-todo .bcv-todo__group--course .bcv-ring')), `panel grouped by course with rings: ${courseGroups.join(', ')}`);
-  await page.screenshot({ path: join(out, '02c-todo-by-course.png') });
-  await page.click('#bcv-todo .bcv-seg__btn[data-group="date"]');
+  await (await page.$$('.bcv-mini__day:not(.bcv-mini__day--off)'))[5].click();
   await page.waitForTimeout(300);
-  await page.fill('#bcv-todo input[type="text"]', 'Email professor about extension');
-  await page.press('#bcv-todo input[type="text"]', 'Enter');
-  await page.waitForTimeout(300);
-  check(await page.$$eval('#bcv-todo .bcv-todo__item', (els) => els.some((e) => e.textContent.includes('Email professor'))), 'custom task added');
-  let rows = await page.$$('#bcv-todo .bcv-todo__item');
-  for (const row of rows) {
-    if ((await row.textContent()).includes('Email professor')) {
-      await (await row.$('.bcv-todo__check')).click();
-      break;
-    }
-  }
-  await page.waitForTimeout(400);
-  check(await page.$$eval('#bcv-todo .bcv-todo__item', (els) => !els.some((e) => e.textContent.includes('Email professor'))), 'completed custom task hidden (hide completed on)');
-  // check off a Canvas item too (syncs to the planner override API)
-  rows = await page.$$('#bcv-todo .bcv-todo__item');
-  for (const row of rows) {
-    if ((await row.textContent()).includes('Quiz 2')) {
-      await (await row.$('.bcv-todo__check')).click();
-      break;
-    }
-  }
-  await page.waitForTimeout(800);
-  check(await page.$$eval('#bcv-todo .bcv-todo__item', (els) => !els.some((e) => e.textContent.includes('Quiz 2'))), 'Canvas item checked off via planner override');
-  await page.screenshot({ path: join(out, '02-todo-panel.png') });
+  check((await texts('.bcv-mini__range-label'))[0].includes(' – '), `picked range: ${(await texts('.bcv-mini__range-label'))[0]}`);
+
+  // ---- inbox --------------------------------------------------------------------------------
+  console.log('inbox');
+  await page.click('.bcv-nav__item[data-nav="inbox"]');
+  await page.waitForSelector('.bcv-inbox__list .bcv-row', { timeout: 10000 });
+  const msgs = await texts('.bcv-inbox__list .bcv-row');
+  check(msgs.length === 2 && /Halley Smith, Sam Student.*No submission for Acknowledge/.test(msgs[0]), `inbox rows: ${msgs[0].slice(0, 60)}`);
+  check((await texts('.bcv-inbox__reader'))[0].includes('No conversation selected'), 'empty reader state');
+  await shot(page, '09-inbox');
+  await page.click('.bcv-inbox__list .bcv-row');
+  await page.waitForSelector('.bcv-reader__msg', { timeout: 5000 });
+  check((await texts('.bcv-reader__subject'))[0].startsWith('No submission') && (await texts('.bcv-reader__body'))[0].includes('Hello Bobcat'), 'reader shows the conversation');
+  await page.fill('.bcv-reader__reply textarea', 'Thanks, done!');
+  await page.click('.bcv-reader__reply .bcv-btn--primary');
+  await page.waitForFunction(() => document.querySelectorAll('.bcv-reader__msg').length === 2, null, { timeout: 5000 });
+  check(true, 'reply posted through the conversations API');
+  await shot(page, '09b-inbox-reader');
+  await page.click('.bcv-head .bcv-btn--primary');
+  await page.waitForSelector('.bcv-compose', { timeout: 5000 });
+  await page.fill('.bcv-recips input', 'yue');
+  await page.waitForSelector('.bcv-compose .bcv-menu__item', { timeout: 5000 });
+  await page.click('.bcv-compose .bcv-menu__item');
+  check((await texts('.bcv-recip'))[0] === 'Yue Lei', 'recipient search adds a chip');
+  await page.fill('.bcv-compose .bcv-input', 'Question about Dis01');
+  await page.fill('.bcv-compose textarea', 'Could you clarify part b?');
+  await shot(page, '09c-inbox-compose');
+  await page.click('.bcv-compose .bcv-btn--primary');
+  await page.waitForFunction(() => document.querySelectorAll('.bcv-inbox__list .bcv-row').length === 3, null, { timeout: 5000 });
+  check(true, 'compose sends a new conversation');
+
+  // ---- groups -----------------------------------------------------------------------------
+  console.log('groups');
+  await page.click('.bcv-nav__item[data-nav="groups"]');
+  await page.waitForSelector('.bcv-body .bcv-row', { timeout: 10000 });
+  const gr = await texts('.bcv-body .bcv-row');
+  check(gr.length === 2 && /Attestation Fall 2026 1.*Academic Success.*Collaboration team/.test(gr[0]) && /Study group B/.test(gr[1]), `groups: ${gr.join(' | ')}`);
+  check((await texts('.bcv-body > div > .bcv-label')).join(',').toLowerCase() === 'current groups,previous groups', 'current / previous sections');
+  await shot(page, '10-groups');
+
+  // ---- course home ---------------------------------------------------------------------------
+  console.log('course');
+  await page.click('.bcv-fav');
+  await page.waitForSelector('.bcv-tabs .bcv-tab', { timeout: 10000 });
+  check(page.url() === `${BASE}/courses/101`, 'favourite opens the course via pushState');
+  const tabs = await texts('.bcv-tab');
+  check(tabs.length === 11 && tabs[0] === 'Home' && tabs[10] === 'Resources & Policy', `course tabs from the API: ${tabs.join(', ')}`);
+  check((await texts('.bcv-head h1'))[0] === 'F26-MATH 021 20' && (await texts('.bcv-pill--term'))[0] === 'Fall 2026', 'course header');
+  await page.waitForSelector('.bcv-front', { timeout: 10000 });
+  check(/^front page · course information$/i.test((await texts('.bcv-front .bcv-label'))[0]), 'front page card');
+  const chips = await texts('.bcv-front .bcv-chip');
+  check(chips.length >= 3 && chips.includes('Course Syllabus'), `link chips from the front page: ${chips.join(', ')}`);
+  check((await texts('.bcv-course-link')).join(',') === 'View Course Stream,View Course Calendar,View Course Notifications', 'course links');
+  await page.waitForFunction(() => document.querySelectorAll('.bcv-row--p12-16 .bcv-row__title').length >= 3, null, { timeout: 10000 });
+  check((await texts('.bcv-row--p12-16 .bcv-row__title')).some((t) => /Dis01/.test(t)), 'course To Do card');
+  await shot(page, '11-course-home');
+  await page.click('.bcv-head .bcv-btn--card');
+  await page.waitForSelector('.bcv-reader-ov', { timeout: 5000 });
+  check((await texts('.bcv-reader-ov h1'))[0] === 'Course Information', 'Immersive Reader overlay opens the front page');
+  await shot(page, '11b-immersive-reader');
   await page.keyboard.press('Escape');
+  await page.waitForTimeout(100);
+  if (await page.$('.bcv-reader-ov')) await page.click('.bcv-reader-ov .bcv-iconbtn');
 
-  // palette
-  await page.keyboard.press('Control+k');
-  await page.waitForSelector('.bcv-palette__input', { timeout: 3000 });
-  await page.type('.bcv-palette__input', 'cs grades');
-  await page.waitForTimeout(200);
-  const first = await page.$eval('.bcv-palette__item.is-active .bcv-palette__label', (el) => el.textContent);
-  check(/CS 303 · Grades/.test(first), `palette top match: ${first}`);
-  await page.screenshot({ path: join(out, '03-palette.png') });
-  await page.keyboard.press('Escape');
+  // announcements
+  await page.click('.bcv-tab[data-tab="announcements"]');
+  await page.waitForSelector('.bcv-body .bcv-row', { timeout: 10000 });
+  const anns = await texts('.bcv-body .bcv-row');
+  check(anns.length === 4 && /Prerequisite Skills Test.*Yue Lei · All sections/.test(anns[0]), `announcements: ${anns[0].slice(0, 70)}`);
+  await page.click('.bcv-seg__btn[data-value="unread"]');
+  check((await page.$$('.bcv-body .bcv-row')).length === 2, 'unread filter');
+  await shot(page, '12-course-announcements');
+  await page.click('.bcv-body .bcv-row');
+  await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
+  check((await texts('.bcv-detail__title'))[0] === 'Prerequisite Skills Test' && (await page.$$('.bcv-entry')).length === 2, 'announcement opens as a thread');
 
-  // help
-  await page.keyboard.press('?');
-  await page.waitForSelector('.bcv-help', { timeout: 3000 });
-  await page.screenshot({ path: join(out, '04-help.png') });
-  await page.keyboard.press('Escape');
+  // assignments
+  await page.click('.bcv-tab[data-tab="assignments"]');
+  await page.waitForSelector('.bcv-group__head', { timeout: 10000 });
+  const agroups = await texts('.bcv-group__head');
+  check(agroups[0].startsWith('Upcoming Assignments') && agroups.some((t) => /Past Assignments \d+ graded/.test(t)), `assignment groups: ${agroups.join(' | ')}`);
+  const arows = await texts('.bcv-body .bcv-row');
+  check(arows.some((t) => /Qz01.*Due .* at 11:59pm · –\/10 pts.*Not submitted/.test(t)) && arows.some((t) => /Lec05-PreQuiz.*19\/19 pts.*Graded/.test(t)), 'assignment rows: due, points, status badge');
+  await shot(page, '13-course-assignments');
+  await page.click('.bcv-seg__btn[data-value="type"]');
+  await page.waitForFunction(() => [...document.querySelectorAll('.bcv-group__head')].some((e) => /Discussion Quizzes/.test(e.textContent)), null, { timeout: 5000 });
+  check((await texts('.bcv-group__head')).some((t) => /Midterms 57% of grade/.test(t)), 'show by type uses assignment groups + weights');
+  await page.click('.bcv-seg__btn[data-value="date"]');
+  await page.waitForSelector('.bcv-group__head', { timeout: 5000 });
+  const dis01 = (await page.$$('.bcv-body .bcv-row')).filter(async () => true);
+  for (const r of dis01) if (/Dis01/.test(await r.textContent())) { await r.click(); break; }
+  await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
+  check((await texts('.bcv-detail__title'))[0] === 'Dis01' && (await texts('.bcv-detail__meta'))[0].includes('Points 10') && (await page.$$('.bcv-rubric__row')).length === 2, 'assignment detail with rubric');
+  check((await texts('.bcv-btn--primary'))[0] === 'Submit in Canvas', 'submit button hands off to Canvas');
+  await shot(page, '14-assignment');
 
-  // j/k and number keys
-  await page.keyboard.press('j');
-  check(await page.$('.bcv-course__name.bcv-focus'), 'j focuses first course tile');
-  await page.keyboard.press('2');
-  await page.waitForURL(`${BASE}/courses/202`, { timeout: 5000 });
-  check(page.url().endsWith('/courses/202'), 'number key opens 2nd course');
+  // discussions
+  await page.click('.bcv-tab[data-tab="discussions"]');
+  await page.waitForSelector('.bcv-body .bcv-row', { timeout: 10000 });
+  const drows = await texts('.bcv-body .bcv-row');
+  check(drows.length === 4 && /Is there any discussion happening this week\?.*Last post.*23 unread.*23 replies/.test(drows[1]), `discussions: ${drows[1].slice(0, 80)}`);
+  await shot(page, '15-course-discussions');
+  await page.click('.bcv-body .bcv-row');
+  await page.waitForSelector('.bcv-entry', { timeout: 10000 });
+  check((await page.$$('.bcv-entry')).length === 2 && (await page.$('.bcv-entry--reply')), 'thread with nested replies');
+  await page.fill('.bcv-reply textarea', 'My question is about removable discontinuities.');
+  await page.click('.bcv-reply .bcv-btn--primary');
+  await page.waitForFunction(() => document.querySelectorAll('.bcv-entry').length === 3, null, { timeout: 10000 });
+  check(true, 'reply posted to the discussion entries API');
+  await shot(page, '15b-discussion-thread');
 
-  // g chord
-  await page.waitForSelector('#bcv-nav-todo', { timeout: 10000 });
-  await page.keyboard.press('g');
-  await page.keyboard.press('a');
-  await page.waitForURL(`${BASE}/courses/202/assignments`, { timeout: 5000 });
-  check(page.url().endsWith('/courses/202/assignments'), 'g a goes to assignments');
+  // grades
+  await page.click('.bcv-tab[data-tab="grades"]');
+  await page.waitForSelector('.bcv-rings__svg', { timeout: 10000 });
+  check((await page.$$('.bcv-rings__svg circle')).length === 8, 'four rings (total + 3 graded groups)');
+  const legend = await texts('.bcv-legend__row');
+  check(/Total.*graded only.*92%.*as shown in Canvas/.test(legend[0]) && /Discussion Quizzes 18% 100%/.test(legend[1]) && /Effort 0%/.test(legend.join(' ')), `legend: ${legend.slice(0, 2).join(' | ')}`);
+  check((await texts('.bcv-ungraded__name')).join(',') === 'Midterms,Final,Coursework (Knewton Alta)', 'ungraded groups listed without a ring');
+  const gradeRows = await texts('.bcv-grades__main .bcv-row');
+  check(gradeRows.length === 17 && /Lec01-PreQuiz.*Effort · due .* by 10:30am · submitted .*13 \/ 16/.test(gradeRows[0]), `grade rows: ${gradeRows[0]}`);
+  check(gradeRows.some((t) => /Skills_Check.*Not counted toward final grade/.test(t)) && gradeRows.some((t) => /Transformation.*Late/.test(t)), 'late / not-counted badges');
+  const weights = await texts('.bcv-grades__side .bcv-row');
+  check(weights.length === 7 && weights[0] === 'Discussion Quizzes 18%' && weights[6] === 'Total 100%', `weights card: ${weights.join(', ')}`);
+  await shot(page, '16-course-grades');
+  await page.click('.bcv-whatif-btn');
+  await page.waitForSelector('.bcv-banner', { timeout: 5000 });
+  check((await texts('.bcv-banner__title'))[0] === 'This is not your actual score.', 'what-if banner');
+  const inputs = await page.$$('.bcv-whatif__input');
+  check(inputs.length === 17, 'what-if inputs for every row');
+  const midterm = (await page.$$('.bcv-grades__main .bcv-row')).find(async () => true);
+  void midterm;
+  const rows = await page.$$('.bcv-grades__main .bcv-row');
+  for (const r of rows) if (/Midterm 1/.test(await r.textContent())) { const inp = await r.$('.bcv-whatif__input'); await inp.fill('80'); await inp.press('Enter'); break; }
+  await page.waitForFunction(() => document.querySelector('.bcv-whatif__input.is-hyp'), null, { timeout: 5000 });
+  const legend2 = await texts('.bcv-legend__row');
+  check(/Total what-if/.test(legend2[0]) && legend2.some((t) => /Midterms 57% 80%.*includes what-if/.test(t)), `what-if recomputes: ${legend2[0]} | ${legend2.find((t) => /Midterms/.test(t))}`);
+  await shot(page, '17-grades-whatif');
+  await page.click('.bcv-banner .bcv-btn');
+  await page.click('.bcv-whatif-btn');
+  await page.waitForFunction(() => !document.querySelector('.bcv-banner'), null, { timeout: 5000 });
 
-  // --- dark mode + theme ------------------------------------------------------------
-  console.log('dark mode');
-  await setSettings({ appearance: { darkMode: 'on', theme: 'midnight', minimal: true } });
-  await page.goto(`${BASE}/`);
-  await page.waitForSelector('#bcv-dash .bcv-course', { timeout: 10000 });
-  check(await page.$eval('html', (h) => h.classList.contains('bcv-dark') && h.classList.contains('bcv-side-collapsed')), 'dark mode + collapsed sidebar classes applied');
-  check(await page.$eval('html', (h) => getComputedStyle(h).filter.includes('invert')), 'root invert filter active');
-  check(await page.$eval('#bcv-side', (el) => el.getBoundingClientRect().width < 100), 'sidebar collapsed to a rail');
-  await page.screenshot({ path: join(out, '05-dashboard-dark-minimal.png') });
-  await page.keyboard.press('t');
-  await page.waitForSelector('#bcv-todo.is-open');
-  await page.screenshot({ path: join(out, '06-todo-dark.png') });
-  await page.keyboard.press('Escape');
-  await setSettings({ appearance: { darkMode: 'on', theme: 'default', minimal: false } });
-  await page.goto(`${BASE}/courses/303/modules`);
-  await page.waitForSelector('.bcv-due-badge', { timeout: 10000 });
-  await page.screenshot({ path: join(out, '06b-modules-dark.png') });
-  await setSettings({ appearance: { darkMode: 'off', theme: 'default', minimal: false } });
+  // people
+  await page.click('.bcv-tab[data-tab="people"]');
+  await page.waitForSelector('.bcv-body .bcv-row', { timeout: 10000 });
+  const prow = await texts('.bcv-body .bcv-row');
+  check(prow.length === 7 && /Alan Aguilar He\/Him\/His Discussion-24D · Lecture-20 Student/.test(prow[1]) && /Yue Lei.*Teacher/.test(prow[6]), `people: ${prow[1]}`);
+  await page.click('.bcv-pill:not(.bcv-pill--term)');
+  await page.click('.bcv-menu__item:nth-child(3)');
+  await page.waitForFunction(() => document.querySelectorAll('.bcv-body .bcv-row').length === 1, null, { timeout: 5000 });
+  check(true, 'role filter');
+  await shot(page, '18-course-people');
 
-  // --- redesigned course pages ---------------------------------------------------------
-  console.log('course pages');
-  await page.goto(`${BASE}/courses/202`);
-  await page.waitForSelector('#bcv-course-hero', { timeout: 10000 });
-  await page.waitForSelector('#bcv-side .bcv-side__tab', { timeout: 10000 });
-  check(await page.$eval('#left-side', (el) => getComputedStyle(el).display === 'none'), 'Canvas course menu hidden');
-  const tabs = await page.$$eval('#bcv-side .bcv-side__tab', (els) => els.map((e) => ({ label: e.textContent.trim(), active: e.classList.contains('is-active') })));
-  check(tabs.length === 11 && tabs.find((t) => t.active)?.label === 'Home' && tabs.some((t) => t.label === 'Zoom'), `course tabs from API in sidebar (${tabs.length}, active=${tabs.find((t) => t.active)?.label})`);
-  const hero = await page.$eval('#bcv-course-hero', (el) => ({ title: el.querySelector('.bcv-ch__title').textContent, grade: el.querySelector('.bcv-ch__grade .bcv-ring__label').textContent, next: el.querySelectorAll('.bcv-next').length, mods: el.querySelectorAll('.bcv-mod').length, anns: el.querySelectorAll('.bcv-ann').length }));
-  check(hero.title === 'HIST 202: Modern Europe' && hero.grade === '81%' && hero.next >= 1 && hero.mods === 2 && hero.anns === 1, `course overview: ${JSON.stringify(hero)}`);
-  check(await page.$eval('#bcv-top .bcv-top__crumb', (el) => /HIST 202/.test(el.textContent)), 'top bar shows course crumb');
-  await page.screenshot({ path: join(out, '13-course-home-skin.png') });
-  await page.goto(`${BASE}/courses/303/modules`);
-  await page.waitForSelector('.bcv-due-badge', { timeout: 10000 });
-  const modBadges = await page.$$eval('.bcv-due-badge', (els) => els.map((e) => e.textContent.trim()));
-  check(modBadges.some((b) => /^To-do/.test(b)), `modules: ungraded discussion shows a to-do badge (${modBadges.join(' | ')})`);
-  check(modBadges.some((b) => /^Due|^Done/.test(b)), 'modules: graded items show due/done badges');
-  await page.screenshot({ path: join(out, '14-modules-skin.png') });
-  check(await page.$eval('#bcv-side .bcv-side__tab.is-active', (el) => el.textContent.trim() === 'Modules'), 'Modules tab active in sidebar');
-  await page.goto(`${BASE}/courses/101/grades`);
-  await page.waitForSelector('#bcv-nav-todo', { timeout: 10000 });
-  check(await page.$eval('#grades_summary thead th', (el) => getComputedStyle(el).textTransform === 'uppercase'), 'grades table restyled');
-  await page.screenshot({ path: join(out, '15-grades-skin.png') });
+  // pages
+  await page.click('.bcv-tab[data-tab="pages"]');
+  await page.waitForSelector('.bcv-body .bcv-row', { timeout: 10000 });
+  const pg = await texts('.bcv-body .bcv-row');
+  check(pg.length === 2 && /Course Information Front page Created .* · last edited .* by Yue Lei/.test(pg[0]), `pages: ${pg[0]}`);
+  check((await texts('.bcv-hint'))[0].startsWith('This course has 2 published pages.'), 'pages hint');
+  await shot(page, '19-course-pages');
+  await (await page.$$('.bcv-body .bcv-row'))[1].click();
+  await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
+  check((await texts('.bcv-detail__title'))[0] === 'Chapter 4 notes' && (await page.$('.bcv-prose h2')), 'page view renders the body');
 
-  // --- assignment list badges --------------------------------------------------------
-  console.log('assignments');
-  await page.goto(`${BASE}/courses/101/assignments`);
-  await page.waitForSelector('.bcv-due-badge', { timeout: 10000 });
-  const badges = await page.$$eval('.bcv-due-badge', (els) => els.map((e) => e.textContent.trim()));
-  check(badges.some((b) => /Due in \d+h/.test(b)), `countdown badge: ${badges.join(' | ')}`);
-  check(badges.some((b) => /Overdue/.test(b)), 'overdue badge present');
-  await page.screenshot({ path: join(out, '07-assignments-badges.png') });
+  // files
+  await page.click('.bcv-tab[data-tab="files"]');
+  await page.waitForSelector('.bcv-body .bcv-row', { timeout: 10000 });
+  const frows = await texts('.bcv-body .bcv-row');
+  check(frows.length === 5 && /Course Information Folder · modified/.test(frows[0]) && /Course Syllabus.pdf PDF · modified .* 212 KB/.test(frows[4]), `files: ${frows[4]}`);
+  check(await page.$eval('.bcv-btn--fill36', (b) => b.disabled), 'Download disabled until a file is selected');
+  await (await page.$$('.bcv-body .bcv-row'))[4].click();
+  check(await page.$eval('.bcv-btn--fill36', (b) => !b.disabled) && (await page.$('.bcv-row.is-selected')), 'selecting a file enables Download');
+  await shot(page, '20-course-files');
+  await page.click('.bcv-body .bcv-row');
+  await page.waitForSelector('.bcv-crumbs', { timeout: 10000 });
+  check(page.url().endsWith('/files/folder/Course%20Information') && (await texts('.bcv-body .bcv-row'))[0].includes('Resources_Policy.pdf'), 'folder navigation by path');
 
-  // --- assignment page: embeds + smart sidebar -----------------------------------------
-  console.log('assignment page');
-  await page.goto(`${BASE}/courses/101/assignments/1`);
-  await page.waitForSelector('.bcv-embed-btn', { timeout: 10000 });
-  const embedBtns = await page.$$('.bcv-embed-btn');
-  check(embedBtns.length === 2, `embed buttons: ${embedBtns.length} (src iframe + LTI form)`);
-  const [popup] = await Promise.all([context.waitForEvent('page', { timeout: 5000 }), embedBtns[0].click()]);
-  check(/external_tools\/retrieve/.test(popup.url()), `opened embed in new tab: ${popup.url()}`);
-  await popup.close();
+  // quizzes
+  await page.click('.bcv-tab[data-tab="quizzes"]');
+  await page.waitForSelector('.bcv-body .bcv-row', { timeout: 10000 });
+  const qlabels = await texts('.bcv-body .bcv-label');
+  check(qlabels.join(',').toLowerCase() === 'assignment quizzes,practice quizzes', `quiz groups: ${qlabels.join(', ')}`);
+  check((await texts('.bcv-body .bcv-row')).some((t) => /Lec06-PreQuiz Due .* at 10:30am · 17 pts · 4 questions/.test(t)), 'quiz rows');
+  await shot(page, '21-course-quizzes');
+  await page.click('.bcv-body .bcv-row');
+  await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
+  check((await texts('.bcv-detail__meta'))[0].includes('Time limit 20 minutes') && (await texts('.bcv-grades__side, .bcv-col .bcv-row')).some((t) => /Attempt 1/.test(t)), 'quiz detail with attempts');
 
-  await page.keyboard.press('s');
-  await page.waitForSelector('#bcv-smart.is-open', { timeout: 5000 });
-  await page.waitForFunction(() => document.querySelector('.bcv-smart__context-label')?.textContent.startsWith('Using:'), null, { timeout: 10000 });
-  const ctxLabel = await page.$eval('.bcv-smart__context-label', (el) => el.textContent);
-  check(/Problem Set 3/.test(ctxLabel), `context label: ${ctxLabel}`);
-  const actions = await page.$$eval('.bcv-smart__action', (els) => els.map((e) => e.textContent));
-  check(actions.includes('Explain my feedback'), `quick actions: ${actions.join(', ')}`);
-  check(!(await page.$eval('.bcv-smart__setup', (el) => el.hidden)), 'setup card shown when no key configured');
-  await page.screenshot({ path: join(out, '08-smart-sidebar-setup.png') });
+  // modules
+  await page.click('.bcv-tab[data-tab="modules"]');
+  await page.waitForSelector('.bcv-module', { timeout: 10000 });
+  check((await page.$$('.bcv-module')).length === 1 && (await texts('.bcv-module__item')).length === 2, 'modules list');
+  await page.goto(`${BASE}/courses/102/modules`);
+  await page.waitForSelector('.bcv-module', { timeout: 10000 });
+  const mods = await texts('.bcv-module__head');
+  check(mods.length === 3 && /Week 1: Kinematics 2 of 2 requirements done/.test(mods[0]) && /Week 3: Energy Locked until/.test(mods[2]), `modules: ${mods.join(' | ')}`);
+  check((await page.$$('.bcv-circle.is-done')).length === 3 && (await page.$('.bcv-indent-1')), 'completion marks and indents');
+  await shot(page, '22-course-modules');
 
-  // with a (fake) key configured the composer is enabled and a request is attempted
-  await setSettings({ smart: { claudeKey: 'sk-ant-test-not-real' } });
-  await page.waitForFunction(() => document.querySelector('.bcv-smart__setup')?.hidden === true, null, { timeout: 5000 });
-  await page.fill('#bcv-smart textarea', 'What is this assignment about?');
+  // course home with modules as the default view + syllabus home
+  await page.goto(`${BASE}/courses/102`);
+  await page.waitForSelector('.bcv-module', { timeout: 10000 });
+  check(true, 'home shows modules when the course uses that view');
+  await page.goto(`${BASE}/courses/104`);
+  await page.waitForSelector('.bcv-front', { timeout: 10000 });
+  check(/^syllabus$/i.test((await texts('.bcv-front .bcv-label'))[0]), 'home shows the syllabus when the course uses that view');
+  await page.goto(`${BASE}/courses/101/assignments/syllabus`);
+  await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
+  check((await texts('.bcv-grades__side .bcv-row, .bcv-col .bcv-row')).length >= 10, 'syllabus page lists dated assignments');
+
+  // ---- hybrid (native) page inside the shell ----------------------------------------------------
+  console.log('native pages');
+  await page.goto(`${BASE}/courses/101/external_tools/9`);
+  await page.waitForSelector('.bcv-native #content', { timeout: 10000 });
+  check((await page.$$eval('.bcv-tab.is-active', (els) => els.map((e) => e.textContent.trim())))[0] === 'Resources & Policy', 'external tool tab active');
+  check(await page.$('.bcv-native #tool_content'), 'Canvas page content (tool iframe) shown inside the course shell');
+  await shot(page, '23-native-tool');
+  await page.goto(`${BASE}/profile`);
+  await page.waitForSelector('.bcv-native #content', { timeout: 10000 });
+  check((await texts('.bcv-head h1'))[0] === 'Sam Student', 'unknown page: Canvas content inside the global shell');
+
+  // ---- smart panel --------------------------------------------------------------------------------
+  console.log('smart panel');
+  await page.goto(`${BASE}/courses/101/assignments/1009`);
+  await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
+  await page.click('#bcv-fab');
+  await page.waitForSelector('#bcv-smart', { timeout: 5000 });
+  check((await texts('.bcv-smart__ctx'))[0] === 'Reading: F26-MATH 021 20 · Dis01', `smart context: ${(await texts('.bcv-smart__ctx'))[0]}`);
+  const actions = await texts('.bcv-smart__action-label');
+  check(actions.join(',') === 'Summarize this assignment,Make a checklist', `suggested actions: ${actions.join(', ')}`);
+  check(!(await page.content()).match(/\bAI\b/), 'the interface never says "AI"');
+  await shot(page, '24-smart-panel');
+  await page.fill('#bcv-smart textarea', 'What is this about?');
   await page.press('#bcv-smart textarea', 'Enter');
-  await page.waitForSelector('.bcv-msg--user', { timeout: 5000 });
-  await page.waitForSelector('.bcv-msg--error, .bcv-msg--assistant:not(.is-streaming)', { timeout: 30000 });
-  const errText = await page.$eval('.bcv-msg--error, .bcv-msg--assistant', (el) => el.textContent);
-  check(/Claude/.test(errText), `provider error surfaced in chat: ${errText.slice(0, 80)}`);
-  await page.screenshot({ path: join(out, '09-smart-sidebar-chat.png') });
+  await page.waitForSelector('.bcv-bubble--error', { timeout: 10000 });
+  check(/Add a Claude or ChatGPT key/.test((await texts('.bcv-bubble--error'))[0]) && (await page.$('.bcv-bubble--error .bcv-btn')), 'no key → setup message with a Settings button');
+  await setSettings({ smart: { claudeKey: 'sk-ant-test-not-real' } });
+  await page.click('.bcv-smart__action');
+  await page.waitForFunction(() => document.querySelectorAll('.bcv-bubble--error').length === 2, null, { timeout: 30000 });
+  check(/Claude/.test((await texts('.bcv-bubble--error'))[1]), `provider error surfaced: ${(await texts('.bcv-bubble--error'))[1].slice(0, 60)}`);
   await setSettings({ smart: { claudeKey: '' } });
+  await page.click('#bcv-smart .bcv-iconbtn');
+  await page.waitForFunction(() => !document.querySelector('#bcv-smart'), null, { timeout: 5000 });
 
-  // the page context sent to the model (content-script world is not reachable from
-  // page.evaluate, so verify via the API calls it makes and the label it renders)
-  check(apiCalls.some((u) => /\/api\/v1\/courses\/101\/assignments\/1\/submissions\/self/.test(u)), 'assignment context fetched submission (rubric + comments)');
+  // ---- dark appearance -------------------------------------------------------------------------------
+  console.log('appearance');
+  await page.goto(`${BASE}/`);
+  await page.waitForSelector('#bcv-theme-btn', { timeout: 10000 });
+  await page.click('#bcv-theme-btn');
+  await page.waitForFunction(() => document.documentElement.getAttribute('data-bcv-theme') === 'dark', null, { timeout: 5000 });
+  await page.waitForSelector('.bcv-stat', { timeout: 10000 });
+  check((await texts('#bcv-theme-btn'))[0] === 'Light appearance', 'dark appearance toggled from the sidebar');
+  check(await page.$eval('#bcv-app', (el) => getComputedStyle(el).backgroundColor === 'rgb(0, 0, 0)'), 'dark background');
+  await shot(page, '25-dark-dashboard');
+  await page.goto(`${BASE}/courses/101/grades`);
+  await page.waitForSelector('.bcv-rings__svg', { timeout: 10000 });
+  await shot(page, '26-dark-grades');
+  await page.goto(`${BASE}/courses/101`);
+  await page.waitForSelector('.bcv-front', { timeout: 10000 });
+  await shot(page, '27-dark-course-home');
+  await page.click('#bcv-theme-btn');
+  await page.waitForFunction(() => document.documentElement.getAttribute('data-bcv-theme') === 'light', null, { timeout: 5000 });
 
-  // --- discussion page: insert draft ---------------------------------------------------
-  console.log('discussion');
-  await page.goto(`${BASE}/courses/202/discussion_topics/3`);
-  await page.waitForSelector('#bcv-nav-smart', { timeout: 10000 });
-  await page.keyboard.press('s');
-  await page.waitForSelector('#bcv-smart.is-open');
-  await page.waitForFunction(() => document.querySelector('.bcv-smart__context-label')?.textContent.startsWith('Using:'), null, { timeout: 10000 });
-  check(/Industrialization/.test(await page.$eval('.bcv-smart__context-label', (el) => el.textContent)), 'discussion context loaded from the API');
-  check(apiCalls.some((u) => /discussion_topics\/3\/view/.test(u)), 'discussion context fetched replies');
-  const dactions = await page.$$eval('.bcv-smart__action', (els) => els.map((e) => e.textContent));
-  check(dactions.includes('Draft a reply'), `discussion actions: ${dactions.join(', ')}`);
+  // ---- skin switch ----------------------------------------------------------------------------------
+  console.log('skin switch');
+  await page.goto(`${BASE}/courses/101/external_tools/9`);
+  await page.waitForSelector('.bcv-native #content', { timeout: 10000 });
+  await page.click('#bcv-skin');
+  await page.waitForFunction(() => !document.documentElement.classList.contains('bcv-on'), null, { timeout: 5000 });
+  check(await visible('#application') && !(await visible('#bcv-app')), 'skin off: stock Canvas is back');
+  check(await page.$eval('#application #content', (el) => !!el), 'native content returned to Canvas when the skin is off');
+  check((await texts('#bcv-skin'))[0] === 'Skin off' && !(await page.$('#bcv-fab')), 'switch shows off state, smart button hidden');
+  await shot(page, '28-skin-off');
+  await page.goto(`${BASE}/`);
+  await page.waitForSelector('#bcv-skin', { timeout: 10000 });
+  check(!(await page.$('#bcv-app')) || !(await visible('#bcv-app')), 'skin stays off on the next page load');
+  await page.click('#bcv-skin');
+  await page.waitForSelector('#bcv-app .bcv-nav__item', { timeout: 10000 });
+  check(await visible('#bcv-app'), 'skin switched back on in place');
 
-  // --- extension pages ----------------------------------------------------------------
+  // ---- extension pages ---------------------------------------------------------------------------------
   console.log('extension pages');
   const options = await context.newPage();
   await options.goto(`chrome-extension://${extId}/options/options.html`);
   await options.waitForSelector('#claudeKey', { timeout: 5000 });
-  await options.waitForFunction(() => document.querySelectorAll('#themes .theme').length > 0, null, { timeout: 5000 });
   await options.fill('#openaiKey', 'sk-test');
   await options.dispatchEvent('#openaiKey', 'change');
   await options.waitForTimeout(300);
-  const status = await options.$eval('#smartStatus', (el) => el.textContent);
-  check(/ChatGPT/.test(status), `options status reflects key: ${status}`);
+  check(/ChatGPT/.test(await options.$eval('#smartStatus', (el) => el.textContent)), 'options status reflects the key');
   await options.click('#testOpenAI');
-  await options.waitForFunction(() => /rejected|Could not|works/.test(document.querySelector('#openaiResult').textContent), null, { timeout: 20000 });
+  await options.waitForFunction(() => /rejected|Could not|works|Unauthorized|invalid/i.test(document.querySelector('#openaiResult').textContent), null, { timeout: 20000 });
   console.log('   key test result:', await options.$eval('#openaiResult', (el) => el.textContent));
   await options.fill('#openaiKey', '');
   await options.dispatchEvent('#openaiKey', 'change');
-  await options.screenshot({ path: join(out, '10-options.png'), fullPage: true });
-  await options.click('.navlink[data-section="appearance"]');
-  await options.screenshot({ path: join(out, '11-options-appearance.png'), fullPage: true });
-
+  await options.screenshot({ path: join(out, '29-options.png'), fullPage: true });
   const popupPage = await context.newPage();
   await popupPage.goto(`chrome-extension://${extId}/popup/popup.html`);
-  await popupPage.waitForFunction(() => document.querySelectorAll('#theme option').length > 0, null, { timeout: 5000 });
   await popupPage.waitForTimeout(500);
-  await popupPage.screenshot({ path: join(out, '12-popup.png') });
+  await popupPage.screenshot({ path: join(out, '30-popup.png') });
 } catch (e) {
   console.error('smoke test crashed:', e);
   failures.push('crash: ' + e.message);

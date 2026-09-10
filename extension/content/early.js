@@ -1,90 +1,73 @@
-/* Runs at document_start: applies the html classes (dark mode, declutter,
- * minimal…) and cached theme CSS before Canvas paints, then reconciles
- * with extension storage. */
+/* Runs at document_start: decides before first paint whether the redesigned
+ * interface is on and which appearance (light/dark) to use, so Canvas's own
+ * chrome never flashes. The authoritative values come from extension
+ * storage; a per-origin localStorage copy is applied instantly. */
 (function () {
   const BCV = self.BCV;
   const S = BCV.settings;
   const html = document.documentElement;
-  const CLASS_KEY = 'bcv:classes';
-  const CSS_KEY = 'bcv:theme-css';
+  const CACHE_KEY = 'bcv:early';
 
   const systemDark = () => !!window.matchMedia?.('(prefers-color-scheme: dark)').matches;
 
-  function pageClass() {
-    const p = location.pathname.replace(/\/+$/, '') || '/';
-    if (p === '/' || p.startsWith('/dashboard')) return 'bcv-page-dashboard';
-    if (/^\/courses\/\d+$/.test(p)) return 'bcv-page-course-home';
-    if (/^\/courses\/\d+\/assignments\/\d+/.test(p)) return 'bcv-page-assignment';
-    if (/^\/courses\/\d+\/modules/.test(p)) return 'bcv-page-modules';
-    if (/^\/courses\/\d+\/grades/.test(p)) return 'bcv-page-grades';
-    if (p === '/courses') return 'bcv-page-courses';
-    return 'bcv-page-other';
-  }
-
-  // Only the classes derived from settings are managed here; features own the
-  // rest (bcv-shell, bcv-dash-custom, bcv-panel-open, bcv-page-*, …).
-  const isManaged = (c) =>
-    c === 'bcv-dark' || c === 'bcv-skin' || c === 'bcv-minimal' || c === 'bcv-compact' || c === 'bcv-compact-cards' ||
-    c.startsWith('bcv-font-') || c.startsWith('bcv-width-') || c.startsWith('bcv-hide-') || c.startsWith('bcv-cards-');
-
-  function applyClasses(classes) {
-    for (const c of Array.from(html.classList)) {
-      if (isManaged(c)) html.classList.remove(c);
-    }
-    html.classList.add(...classes);
-    if (!Array.from(html.classList).some((c) => c.startsWith('bcv-page-'))) html.classList.add(pageClass());
-  }
-
-  function styleEl() {
-    let el = document.getElementById('bcv-theme');
-    if (!el) {
-      el = document.createElement('style');
-      el.id = 'bcv-theme';
-      (document.head || html).append(el);
-    }
-    return el;
+  function apply({ skin, dark }) {
+    html.classList.toggle('bcv-on', skin !== false);
+    html.setAttribute('data-bcv-theme', dark ? 'dark' : 'light');
   }
 
   // 1. Instant: cached values from the page origin's localStorage.
   try {
-    const cached = localStorage.getItem(CLASS_KEY);
-    if (cached) applyClasses(JSON.parse(cached));
-    const css = localStorage.getItem(CSS_KEY);
-    if (css) styleEl().textContent = css;
+    const cached = localStorage.getItem(CACHE_KEY);
+    if (cached) apply(JSON.parse(cached));
+    else apply({ skin: true, dark: systemDark() });
   } catch {
-    /* localStorage may be unavailable */
+    apply({ skin: true, dark: systemDark() });
   }
-  if (!Array.from(html.classList).some((c) => c.startsWith('bcv-page-'))) html.classList.add(pageClass());
 
   // 2. Authoritative: extension storage.
   let current = null;
+  const listeners = new Set();
   async function sync(settings) {
     current = settings || (await S.get());
-    const dark = current.appearance.darkMode === 'on' || (current.appearance.darkMode === 'system' && systemDark());
-    const classes = S.classesFor(current, systemDark());
-    applyClasses(classes);
-    let css = '';
+    const state = { skin: current.appearance.skin !== false, dark: S.isDark(current, systemDark()) };
+    apply(state);
     try {
-      css = BCV.themeCss.build(current, dark);
-      styleEl().textContent = css;
+      localStorage.setItem(CACHE_KEY, JSON.stringify(state));
     } catch {
       /* ignore */
     }
-    try {
-      localStorage.setItem(CLASS_KEY, JSON.stringify(classes));
-      localStorage.setItem(CSS_KEY, css);
-    } catch {
-      /* ignore */
+    for (const fn of listeners) {
+      try {
+        fn(state, current);
+      } catch {
+        /* ignore */
+      }
     }
-    return { classes, dark };
+    return state;
   }
-  sync();
+  const ready = sync();
   S.onChange((s) => sync(s));
+  // Safety net: if the interface never mounts (script error, blocked page),
+  // give the page back to Canvas rather than leaving it blank.
+  setTimeout(() => {
+    if (html.classList.contains('bcv-on') && !document.getElementById('bcv-app')) html.classList.remove('bcv-on');
+  }, 8000);
   try {
     window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => sync(current));
   } catch {
     /* ignore */
   }
 
-  BCV.early = { sync, systemDark, isDark: () => html.classList.contains('bcv-dark') };
+  BCV.early = {
+    ready,
+    sync,
+    systemDark,
+    settings: () => current,
+    isDark: () => html.getAttribute('data-bcv-theme') === 'dark',
+    isOn: () => html.classList.contains('bcv-on'),
+    onChange: (fn) => {
+      listeners.add(fn);
+      return () => listeners.delete(fn);
+    },
+  };
 })();

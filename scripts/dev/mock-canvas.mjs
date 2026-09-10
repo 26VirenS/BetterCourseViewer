@@ -1,321 +1,370 @@
 #!/usr/bin/env node
-// A tiny fake Canvas for local testing: a few HTML pages with Canvas-like
-// markup and the handful of API endpoints the extension calls.
+// A fake Canvas for local testing: Canvas-like HTML pages plus the REST
+// endpoints the redesigned interface reads. Dates are relative to "now" so
+// the dashboard always has something due today.
 // Usage: node scripts/dev/mock-canvas.mjs [port]
 import http from 'node:http';
 
 const port = Number(process.argv[2] || process.env.PORT || 8787);
-const now = Date.now();
+const now = new Date();
 const H = 3600e3;
-const iso = (ms) => new Date(now + ms).toISOString();
+const D = 24 * H;
+const at = (dayOffset, hour = 23, minute = 59) => {
+  const d = new Date(now);
+  d.setDate(d.getDate() + dayOffset);
+  d.setHours(hour, minute, 0, 0);
+  return d.toISOString();
+};
+const ago = (ms) => new Date(now.getTime() - ms).toISOString();
 
+// ---- courses ----------------------------------------------------------------------
+const term = { id: '1', name: 'Fall 2026', start_at: ago(20 * D), end_at: at(100) };
 const courses = [
-  { id: '101', name: 'MATH 101: Calculus', shortName: 'MATH 101', code: 'MATH-101', color: '#BF32A4' },
-  { id: '202', name: 'HIST 202: Modern Europe', shortName: 'HIST 202', code: 'HIST-202', color: '#0B874B' },
-  { id: '303', name: 'CS 303: Algorithms', shortName: 'CS 303', code: 'CS-303', color: '#2D3B45' },
+  { id: '101', name: 'F26-MATH 021 20', code: 'MATH-021-20', color: '#34c759', score: 92.4, grade: 'A-', teacher: 'Yue Lei', section: 'Lecture-20', weighted: true, default_view: 'wiki' },
+  { id: '102', name: 'F26-PHYS 008 01', code: 'PHYS-008-01', color: '#30b0c7', score: 81, grade: 'B-', teacher: 'Dana Okafor', section: 'Lecture-01', weighted: false, default_view: 'modules' },
+  { id: '103', name: 'F26-PHYS 008HL 01/PHYS 008L 01', code: 'PHYS-008HL', color: '#ff2d55', score: null, grade: null, teacher: 'Dana Okafor', section: 'Section 01', weighted: false, default_view: 'wiki' },
+  { id: '104', name: 'F26-SPRK 010 103', code: 'SPRK-010-103', color: '#ff9500', score: 88, grade: 'B+', teacher: 'Ana Ruiz', section: 'Section 103', weighted: false, default_view: 'syllabus' },
+  { id: '105', name: 'F26-WRI 010 20', code: 'WRI-010-20', color: '#c8901c', score: 95, grade: 'A', teacher: 'Marcus Bell', section: 'Section 20', weighted: false, default_view: 'assignments' },
+  { id: '201', name: 'Academic Success Resource Site (2026-27)', code: 'ASRS', color: '#1e7a37', score: null, grade: null, teacher: 'Student Success', section: 'All', favorite: false, term: { id: '9', name: 'Collaboration team' } },
+  { id: '202', name: 'Placement Exam: Chemistry', code: 'PLACE-CHEM', color: '#5856d6', score: null, grade: null, teacher: 'Placement Office', section: 'All', favorite: false, term: { id: '9', name: 'Collaboration team' } },
+  { id: '301', name: 'S26-CSE 022 01', code: 'CSE-022-01', color: '#0a84ff', score: 97, grade: 'A', teacher: 'Priya Nair', section: 'Lecture-01', favorite: false, past: true, term: { id: '0', name: 'Spring 2026', start_at: ago(220 * D), end_at: ago(100 * D) } },
 ];
+const favorites = new Set(['101', '102', '103', '104', '105']);
+const courseById = (id) => courses.find((c) => c.id === String(id));
+const fullCourse = (c) => ({
+  id: c.id, name: c.name, course_code: c.code, original_name: undefined, term: c.term || term, is_favorite: favorites.has(c.id), default_view: c.default_view || 'wiki',
+  workflow_state: c.past ? 'completed' : 'available', start_at: null, end_at: null, apply_assignment_group_weights: !!c.weighted,
+  enrollments: [{ type: 'student', role: 'StudentEnrollment', enrollment_state: c.past ? 'completed' : 'active', computed_current_score: c.score, computed_current_grade: c.grade, computed_final_score: c.score }],
+  teachers: [{ id: `t${c.id}`, display_name: c.teacher }], sections: [{ id: `s${c.id}`, name: c.section }], image_download_url: null,
+});
 
-const planner = [
-  item('assignment', '1', '101', 'Problem Set 3', 3 * H, 20),
-  item('quiz', '2', '303', 'Quiz 2: Sorting', 20 * H, 10),
-  item('discussion_topic', '3', '202', 'Week 5 discussion: Industrialization', 2 * 24 * H, 5),
-  item('assignment', '4', '303', 'Project proposal', 6 * 24 * H, 50),
-  item('assignment', '5', '101', 'Problem Set 2', -30 * H, 20, { missing: true }),
-  item('assignment', '6', '202', 'Reading response 4', -2 * 24 * H, 10, { submitted: true, graded: true }),
-  // Not graded: an ungraded discussion and a page with instructor to-do dates, and an event.
-  scheduled('discussion_topic', '7', '303', 'Intro thread: say hello (ungraded)', 26 * H),
-  scheduled('wiki_page', '8', '101', 'Read: Chapter 4 notes', 3 * 24 * H),
-  scheduled('calendar_event', '9', '202', 'Guest lecture: Dr. Okafor', 4 * 24 * H),
-];
-
-function item(type, id, courseId, title, dueIn, points, sub = {}) {
-  const course = courses.find((c) => c.id === courseId);
-  const seg = type === 'quiz' ? 'quizzes' : type === 'discussion_topic' ? 'discussion_topics' : 'assignments';
-  return {
-    context_type: 'Course',
-    course_id: courseId,
-    context_name: course.shortName,
-    plannable_id: id,
-    plannable_type: type,
-    plannable_date: iso(dueIn),
-    plannable: { id, title, due_at: iso(dueIn), points_possible: points },
-    planner_override: null,
-    submissions: { submitted: !!sub.submitted, graded: !!sub.graded, missing: !!sub.missing, late: false, excused: false, needs_grading: false, has_feedback: !!sub.graded },
-    html_url: `/courses/${courseId}/${seg}/${id}`,
-  };
-}
-
-function scheduled(type, id, courseId, title, at) {
-  const course = courses.find((c) => c.id === courseId);
-  const seg = type === 'discussion_topic' ? 'discussion_topics' : type === 'wiki_page' ? 'pages' : 'calendar_events';
-  const plannable = { id, title };
-  if (type === 'calendar_event') plannable.start_at = iso(at);
-  else plannable.todo_date = iso(at);
-  return {
-    context_type: 'Course',
-    course_id: courseId,
-    context_name: course.shortName,
-    plannable_id: id,
-    plannable_type: type,
-    plannable_date: iso(at),
-    plannable,
-    planner_override: null,
-    submissions: false,
-    html_url: `/courses/${courseId}/${seg}/${id}`,
-  };
-}
-
-const assignment = {
-  id: '1', name: 'Problem Set 3', due_at: iso(3 * H), points_possible: 20, grading_type: 'points',
-  submission_types: ['online_upload', 'online_text_entry'], allowed_attempts: 2,
-  description: '<p>Complete problems <strong>3.1–3.8</strong> from the textbook. Show all work.</p><ul><li>Use the chain rule where appropriate.</li><li>Submit a single PDF.</li></ul>',
-  rubric: [
-    { id: 'c1', description: 'Correctness', long_description: 'Answers are correct.', points: 12, ratings: [{ id: 'r1', description: 'Full', points: 12 }, { id: 'r2', description: 'Partial', points: 6 }] },
-    { id: 'c2', description: 'Work shown', long_description: 'Steps are legible and complete.', points: 8, ratings: [{ id: 'r3', description: 'Full', points: 8 }, { id: 'r4', description: 'Partial', points: 4 }] },
+// ---- assignments per course --------------------------------------------------------
+// [id, name, group, possible, earned, dueOffsetDays, dueHour, submittedOffset|null, extra]
+const A = {
+  101: [
+    ['1001', 'Lec01-PreQuiz', 'Effort', 16, 13, -13, 10.5, -14, { quiz: true }],
+    ['1002', 'Lec02-PreQuiz', 'Effort', 17, 11, -10, 10.5, -12, { quiz: true }],
+    ['1003', 'Dis00', 'Collaboration', 10, 10, -7, 23.98, null, {}],
+    ['1004', 'Qz00', 'Discussion Quizzes', 10, 10, -7, 23.98, null, { quiz: true }],
+    ['1005', 'Skills_Check', 'Discussion Quizzes', 14, 8, -7, 23.98, null, { quiz: true, omit: true }],
+    ['1006', 'Functions and Their Representations', 'Effort', 30, 30, -6, 23.98, -12, {}],
+    ['1007', 'Lec05-PreQuiz', 'Effort', 19, 19, -1, 10.5, -2, { quiz: true }],
+    ['1008', 'Transformation of Functions and Sinusoidal Functions', 'Effort', 30, 0, -1, 23.98, 0, { late: true }],
+    ['1009', 'Dis01', 'Collaboration', 10, null, 0, 23.98, null, { rubric: true }],
+    ['1010', 'Qz01', 'Discussion Quizzes', 10, null, 0, 23.98, null, { quiz: true }],
+    ['1011', 'Lec06-PreQuiz', 'Effort', 17, null, 1, 10.5, null, { quiz: true }],
+    ['1012', 'Composition of Functions', 'Effort', 30, null, 1, 23.98, null, {}],
+    ['1013', 'project01', 'Collaboration', 20, null, 3, 23.98, null, {}],
+    ['1014', 'Lec07-PreQuiz', 'Effort', 20, null, 4, 10.5, null, { quiz: true }],
+    ['1015', 'Midterm 1', 'Midterms', 100, null, 15, 10.5, null, {}],
+    ['1016', 'Midterm 2', 'Midterms', 100, null, 43, 10.5, null, {}],
+    ['1017', 'Final Exam', 'Final', 200, null, 92, 11.5, null, {}],
   ],
+  102: [
+    ['2001', 'Lab 1 report', 'Labs', 20, 18, -7, 23.98, -8, {}],
+    ['2002', 'W2 HW', 'Homework', 15, null, -1, 23.98, null, {}],
+    ['2003', 'Lab 2', 'Labs', 20, null, 2, 23.98, null, {}],
+    ['2004', 'W3 HW', 'Homework', 15, null, 6, 23.98, null, {}],
+  ],
+  103: [
+    ['3001', 'Prelab 2', 'Prelabs', 15, 15, -4, 23.98, -5, {}],
+    ['3002', 'Prelab 3', 'Prelabs', 15, null, 3, 23.98, null, {}],
+  ],
+  104: [
+    ['4001', 'Week 1 reflection', 'Assignments', 10, 10, -6, 23.98, -7, {}],
+    ['4002', 'Week 2 Post Class Assignment: GC articles', 'Assignments', 10, null, 0, 23.98, null, {}],
+  ],
+  105: [
+    ['5001', 'Journal #1', 'Journals', 5, 5, -6, 23.98, -6, {}],
+    ['5002', 'Research Day Activity: Choosing a Field Site', 'Activities', 5, null, 0, 23.98, null, {}],
+    ['5003', 'Journal #2', 'Journals', 5, null, 1, 23.98, null, {}],
+  ],
+  201: [], 202: [], 301: [['9001', 'Final project', 'Projects', 100, 97, -110, 23.98, -111, {}]],
 };
-const submission = {
-  workflow_state: 'graded', submitted_at: iso(-3 * 24 * H), score: 14, grade: '14', attempt: 1, late: false, missing: false, excused: false,
-  rubric_assessment: { c1: { points: 8, rating_id: 'r2', comments: 'Sign error in 3.4 and 3.6.' }, c2: { points: 6, rating_id: 'r4', comments: '' } },
-  submission_comments: [{ author_name: 'Dr. Rivera', created_at: iso(-2 * 24 * H), comment: 'Good effort. Watch your signs when differentiating composite functions, and label each step.' }],
-};
+const GROUPS = { 101: [['Discussion Quizzes', 18], ['Midterms', 57], ['Final', 25], ['Effort', 0], ['Collaboration', 0], ['Coursework (Knewton Alta)', 0]] };
+const rubric = [
+  { id: 'c1', description: 'Correctness', long_description: 'Answers are correct.', points: 6, ratings: [{ id: 'r1', description: 'Full', points: 6 }, { id: 'r2', description: 'Partial', points: 3 }] },
+  { id: 'c2', description: 'Work shown', long_description: 'Steps are legible and complete.', points: 4, ratings: [{ id: 'r3', description: 'Full', points: 4 }, { id: 'r4', description: 'Partial', points: 2 }] },
+];
+function assignmentObj(courseId, row) {
+  const [id, name, group, possible, earned, dueDay, dueHour, subDay, extra] = row;
+  const c = courseById(courseId);
+  const groups = (GROUPS[courseId] || [[Object.keys(groupNames(courseId))[0], 0]]);
+  const gIdx = groups.findIndex(([g]) => g === group);
+  const due = at(dueDay, Math.floor(dueHour), Math.round((dueHour % 1) * 60));
+  const submitted = subDay !== null || earned !== null;
+  const submission = {
+    id: `s${id}`, assignment_id: id, workflow_state: earned !== null ? 'graded' : submitted ? 'submitted' : 'unsubmitted', score: earned, grade: earned === null ? null : String(earned),
+    submitted_at: subDay !== null ? at(subDay, 15, 52) : (earned !== null ? at(dueDay - 1, 16, 1) : null), graded_at: earned !== null ? at(dueDay, 8, 0) : null,
+    late: !!extra.late, missing: false, excused: false, attempt: submitted ? 1 : null,
+    submission_comments: extra.rubric ? [] : (earned !== null && id === '1002' ? [{ author_name: c.teacher, created_at: at(dueDay + 1, 9, 0), comment: 'Check the domain restrictions in question 3 — the rest was solid.' }] : []),
+    rubric_assessment: extra.rubric && earned !== null ? { c1: { points: 4, rating_id: 'r2', comments: 'Sign error in part b.' }, c2: { points: 4, rating_id: 'r3' } } : undefined,
+  };
+  return {
+    id, name, description: `<p>Complete <strong>${name}</strong> as described in lecture. Show all work and submit a single PDF.</p><ul><li>Use the chain rule where appropriate.</li><li>Label each step.</li></ul>${extra.rubric ? '<p>See the rubric for how points are awarded.</p>' : ''}`,
+    due_at: due, lock_at: null, unlock_at: null, points_possible: possible, grading_type: 'points', published: true, html_url: `/courses/${courseId}/assignments/${id}`,
+    submission_types: extra.quiz ? ['online_quiz'] : ['online_upload', 'online_text_entry'], is_quiz_assignment: !!extra.quiz, quiz_id: extra.quiz ? String(Number(id) + 8000) : undefined,
+    assignment_group_id: `g${courseId}-${Math.max(gIdx, 0)}`, omit_from_final_grade: !!extra.omit, allowed_attempts: 2, rubric: extra.rubric ? rubric : undefined, rubric_settings: extra.rubric ? { title: 'Dis01 rubric' } : undefined,
+    submission,
+  };
+}
+function groupNames(courseId) {
+  const out = {};
+  for (const r of A[courseId] || []) out[r[2]] = true;
+  return out;
+}
+function assignmentGroups(courseId) {
+  const defs = GROUPS[courseId] || Object.keys(groupNames(courseId)).map((g) => [g, 0]);
+  return defs.map(([name, weight], i) => ({ id: `g${courseId}-${i}`, name, position: i + 1, group_weight: weight, rules: {}, assignments: (A[courseId] || []).filter((r) => r[2] === name).map((r) => assignmentObj(courseId, r)) }));
+}
+const allAssignments = (courseId) => (A[courseId] || []).map((r) => assignmentObj(courseId, r));
 
+// ---- planner ------------------------------------------------------------------------------
+const overrides = new Map();
+function plannerItems() {
+  const items = [];
+  for (const c of courses) {
+    if (c.past) continue;
+    for (const a of allAssignments(c.id)) {
+      const due = new Date(a.due_at);
+      if (due < new Date(now.getTime() - 7 * D) || due > new Date(now.getTime() + 21 * D)) continue;
+      const key = `${a.is_quiz_assignment ? 'quiz' : 'assignment'}:${a.is_quiz_assignment ? a.quiz_id : a.id}`;
+      items.push({
+        context_type: 'Course', course_id: c.id, context_name: c.name, plannable_id: a.is_quiz_assignment ? a.quiz_id : a.id, plannable_type: a.is_quiz_assignment ? 'quiz' : 'assignment', plannable_date: a.due_at,
+        plannable: { id: a.id, title: a.name, due_at: a.due_at, points_possible: a.points_possible }, planner_override: overrides.get(key) || null,
+        submissions: { submitted: !!a.submission.submitted_at, graded: a.submission.workflow_state === 'graded', missing: false, late: a.submission.late, excused: false, needs_grading: false },
+        html_url: a.html_url,
+      });
+    }
+  }
+  // graded discussion, ungraded discussion (to-do date), page and event
+  items.push({ context_type: 'Course', course_id: '101', context_name: 'F26-MATH 021 20', plannable_id: '7001', plannable_type: 'discussion_topic', plannable_date: at(5, 23, 59), plannable: { id: '7001', title: 'Discussion Quiz for this week', assignment_id: '7001a', due_at: at(5, 23, 59), points_possible: 5 }, planner_override: overrides.get('discussion_topic:7001') || null, submissions: { submitted: false, graded: false }, html_url: '/courses/101/discussion_topics/7001' });
+  items.push({ context_type: 'Course', course_id: '102', context_name: 'F26-PHYS 008 01', plannable_id: '7002', plannable_type: 'discussion_topic', plannable_date: at(1, 9, 0), plannable: { id: '7002', title: 'Intro thread: say hello (ungraded)', todo_date: at(1, 9, 0) }, planner_override: overrides.get('discussion_topic:7002') || null, submissions: false, html_url: '/courses/102/discussion_topics/7002' });
+  items.push({ context_type: 'Course', course_id: '101', context_name: 'F26-MATH 021 20', plannable_id: 'p1', plannable_type: 'wiki_page', plannable_date: at(2, 8, 0), plannable: { id: 'p1', title: 'Read: Chapter 4 notes', todo_date: at(2, 8, 0) }, planner_override: null, submissions: false, html_url: '/courses/101/pages/chapter-4-notes' });
+  items.push({ context_type: 'Course', course_id: '202', context_name: 'Placement Exam: Chemistry', plannable_id: 'e1', plannable_type: 'calendar_event', plannable_date: at(6, 23, 59), plannable: { id: 'e1', title: 'Chemistry placement closes', start_at: at(6, 23, 59) }, planner_override: null, submissions: false, html_url: '/calendar?event_id=e1' });
+  return items.sort((x, y) => new Date(x.plannable_date) - new Date(y.plannable_date));
+}
+
+// ---- discussions, announcements, pages, files, quizzes, modules, people --------------------
+const discussions = {
+  101: [
+    { id: '7001', title: 'Discussion Quiz for this week', posted_at: ago(2 * D), last_reply_at: ago(20 * H), unread_count: 1, discussion_subentry_count: 1, read_state: 'unread', assignment: { id: '7001a', points_possible: 5, due_at: at(5, 23, 59) }, lock_at: at(6, 23, 59), message: '<p>Post one question you still have about continuity, then reply to a classmate.</p>' },
+    { id: '7003', title: 'Is there any discussion happening this week?', posted_at: ago(3 * D), last_reply_at: ago(18 * H), unread_count: 23, discussion_subentry_count: 23, read_state: 'unread', message: '<p>Is there a discussion section this week or is it cancelled?</p>' },
+    { id: '7004', title: 'Discussion and Quiz', posted_at: ago(4 * D), last_reply_at: ago(2 * D), unread_count: 0, discussion_subentry_count: 1, read_state: 'read', message: '<p>Where do I find the quiz for Dis01?</p>' },
+    { id: '7005', title: 'Knewton Alta Lecture Discrepancy (Continuity, Symmetry, and One to One Functions)', posted_at: ago(5 * D), last_reply_at: ago(3 * D), unread_count: 0, discussion_subentry_count: 1, read_state: 'read', message: '<p>The Knewton section on symmetry uses a different definition than lecture.</p>', pinned: false },
+  ],
+  102: [{ id: '7002', title: 'Intro thread: say hello (ungraded)', posted_at: ago(6 * D), last_reply_at: ago(D), unread_count: 4, discussion_subentry_count: 12, read_state: 'unread', todo_date: at(1, 9, 0), message: '<p>Say hello and tell us why you are taking physics.</p>' }],
+};
+const announcements = {
+  101: [
+    { id: '8001', title: 'Prerequisite Skills Test', posted_at: ago(6 * D), read_state: 'unread', author: { display_name: 'Yue Lei' }, message: '<p>Good morning everyone, the results from the Skills_Check test have been posted. Please review them before Friday.</p>' },
+    { id: '8002', title: 'Awesome opportunity for first-year students', posted_at: ago(15 * D), read_state: 'unread', author: { display_name: 'Yue Lei' }, message: '<p>Good morning everyone, I just learned about a wonderful opportunity for first-year students interested in research.</p>' },
+    { id: '8003', title: 'Important: University Store Inclusive ACCESS Instructions', posted_at: ago(15 * D + 2 * H), read_state: 'read', author: { display_name: 'Campus Store' }, message: '<p>Dear students, at your instructor\'s request this course is participating in Inclusive ACCESS.</p>' },
+    { id: '8004', title: 'Welcome to MATH 021', posted_at: ago(18 * D), read_state: 'read', author: { display_name: 'Yue Lei' }, message: '<p>Please read the Course Syllabus before our first lecture.</p>' },
+  ],
+  104: [{ id: '8005', title: 'Field site sign-ups', posted_at: ago(D), read_state: 'unread', author: { display_name: 'Ana Ruiz' }, message: '<p>Sign up for a field site by Friday.</p>' }],
+};
+const topicFull = (courseId, id) => {
+  const t = [...(discussions[courseId] || []), ...(announcements[courseId] || [])].find((x) => x.id === String(id));
+  return t ? { ...t, html_url: `/courses/${courseId}/discussion_topics/${t.id}`, locked: false, require_initial_post: false, attachments: [] } : null;
+};
+const entries = new Map();
+const viewFor = (topicId) => ({
+  participants: [{ id: '8', display_name: 'Alan Aguilar', avatar_image_url: null }, { id: '9', display_name: 'Wail Ahmed', avatar_image_url: null }, { id: '7', display_name: 'Sam Student', avatar_image_url: null }],
+  view: [{ id: 'e1', user_id: '8', created_at: ago(20 * H), message: '<p>Factory work pulled children out of the home, which changed who raised them.</p>', replies: [{ id: 'e2', user_id: '9', created_at: ago(10 * H), message: '<p>Agreed, and schooling laws followed.</p>', replies: [] }] }, ...(entries.get(topicId) || [])],
+});
+const pages = {
+  101: [
+    { url: 'course-information', title: 'Course Information', front_page: true, created_at: ago(18 * D), updated_at: ago(15 * D), last_edited_by: { display_name: 'Yue Lei' }, body: '<p><strong>Ask any question:</strong> use the <a href="/courses/101/discussion_topics">Discussions</a> page — please do not use “Ask your instructor a question.”</p><p><strong>Please read</strong> the <a href="/courses/101/files/f1">Course Syllabus</a> in Files → Course Information for all course policies, structure, materials and exam dates. A tentative schedule of lecture topics is in <a href="/courses/101/files/f2">Lecture schedule</a>.</p><p>Slides and worksheets used in lectures and discussion sections are under <a href="/courses/101/files">Files</a>. The textbook is a free online book on OpenStax, <em>Calculus Volume 1</em>. See <a href="https://example.edu/store">Knewton Alta</a> for access.</p>' },
+    { url: 'chapter-4-notes', title: 'Chapter 4 notes', front_page: false, created_at: ago(5 * D), updated_at: ago(2 * D), last_edited_by: { display_name: 'Yue Lei' }, body: '<h2>Continuity</h2><p>A function is continuous at a point when the limit equals the value.</p><ul><li>Removable discontinuity</li><li>Jump discontinuity</li></ul>' },
+  ],
+  103: [{ url: 'lab-safety', title: 'Lab safety', front_page: true, created_at: ago(20 * D), updated_at: ago(19 * D), body: '<p>Goggles on at all times.</p>' }],
+};
+const folders = {
+  'r101': { id: 'r101', name: 'course files', full_name: 'course files', context_id: '101', parent_folder_id: null, updated_at: ago(15 * D) },
+  'f101a': { id: 'f101a', name: 'Course Information', full_name: 'course files/Course Information', context_id: '101', parent_folder_id: 'r101', updated_at: ago(15 * D) },
+  'f101b': { id: 'f101b', name: 'Discussion Worksheets', full_name: 'course files/Discussion Worksheets', context_id: '101', parent_folder_id: 'r101', updated_at: ago(3 * D) },
+  'f101c': { id: 'f101c', name: 'Group Projects', full_name: 'course files/Group Projects', context_id: '101', parent_folder_id: 'r101', updated_at: ago(9 * D), created_at: ago(9 * D) },
+};
+const files = {
+  r101: [
+    { id: 'f2', display_name: 'math21-F26 planned lecture schedule.xlsx', filename: 'schedule.xlsx', 'content-type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', size: 49152, updated_at: ago(15 * D), url: '/files/f2/download' },
+    { id: 'f1', display_name: 'Course Syllabus.pdf', filename: 'syllabus.pdf', 'content-type': 'application/pdf', size: 217088, updated_at: ago(18 * D), url: '/files/f1/download' },
+  ],
+  f101a: [{ id: 'f3', display_name: 'Resources_Policy.pdf', filename: 'Resources_Policy.pdf', 'content-type': 'application/pdf', size: 130000, updated_at: ago(16 * D), url: '/files/f3/download' }],
+  f101b: [{ id: 'f4', display_name: 'Dis01 worksheet.pdf', filename: 'dis01.pdf', 'content-type': 'application/pdf', size: 80000, updated_at: ago(3 * D), url: '/files/f4/download' }],
+  f101c: [],
+};
+const quizzes = (courseId) => allAssignments(courseId).filter((a) => a.is_quiz_assignment).map((a, i) => ({ id: a.quiz_id, title: a.name, due_at: a.due_at, points_possible: a.points_possible, question_count: 4, quiz_type: a.name === 'Skills_Check' ? 'practice_quiz' : 'assignment', time_limit: 20, allowed_attempts: 1, description: `<p>${a.name}: four questions on the pre-lecture reading.</p>`, html_url: `/courses/${courseId}/quizzes/${a.quiz_id}`, locked_for_user: false, assignment_id: a.id }));
+const modules = {
+  102: [
+    { id: 'm1', name: 'Week 1: Kinematics', state: 'completed', items: [{ id: 'i1', type: 'Page', title: 'Big picture', html_url: '/courses/102/pages/big-picture', completion_requirement: { type: 'must_view', completed: true } }, { id: 'i2', type: 'Assignment', title: 'Lab 1 report', html_url: '/courses/102/assignments/2001', content_details: { due_at: at(-7, 23, 59), points_possible: 20 }, completion_requirement: { type: 'must_submit', completed: true } }] },
+    { id: 'm2', name: 'Week 2: Forces', state: 'started', items: [{ id: 'i3', type: 'SubHeader', title: 'Before class' }, { id: 'i4', type: 'Page', title: 'Newton’s laws', html_url: '/courses/102/pages/newtons-laws', indent: 1, completion_requirement: { type: 'must_view', completed: true } }, { id: 'i5', type: 'Assignment', title: 'W2 HW', html_url: '/courses/102/assignments/2002', indent: 1, content_details: { due_at: at(-1, 23, 59), points_possible: 15 }, completion_requirement: { type: 'must_submit', completed: false } }, { id: 'i6', type: 'ExternalUrl', title: 'PhET simulation', external_url: 'https://phet.colorado.edu', html_url: 'https://phet.colorado.edu' }] },
+    { id: 'm3', name: 'Week 3: Energy', state: 'locked', unlock_at: at(5, 8, 0), items: [] },
+  ],
+  101: [{ id: 'm11', name: 'Unit 1: Functions', state: 'started', items: [{ id: 'i11', type: 'Page', title: 'Course Information', html_url: '/courses/101/pages/course-information' }, { id: 'i12', type: 'Quiz', title: 'Lec06-PreQuiz', html_url: '/courses/101/quizzes/9011', content_details: { due_at: at(1, 10, 30), points_possible: 17 } }] }],
+};
+const people = (courseId) => [
+  ['u1', 'Victor Adinna', null, 'Discussion-32D · Lecture-30', 'StudentEnrollment'], ['u2', 'Alan Aguilar', 'He/Him/His', 'Discussion-24D · Lecture-20', 'StudentEnrollment'], ['u3', 'Wail Ahmed', null, 'Discussion-22D · Lecture-20', 'StudentEnrollment'],
+  ['u4', 'Alejandro Alarcon', 'He/Him/His', 'Discussion-32D · Lecture-30', 'StudentEnrollment'], ['u5', 'alyssa/landon alvarado', 'She/They', 'Discussion-33D · Lecture-30', 'StudentEnrollment'], ['u6', 'Salvador Alvarez Madriz', null, 'Discussion-21D · Lecture-20', 'StudentEnrollment'],
+  [`t${courseId}`, courseById(courseId).teacher, null, 'Lecture-20 · Lecture-30', 'TeacherEnrollment'],
+].map(([id, name, pronouns, secs, type]) => ({ id, name, sortable_name: name, pronouns, avatar_url: null, enrollments: secs.split(' · ').map((s, i) => ({ type, course_section_id: `sec-${courseId}-${s}`, enrollment_state: 'active', id: `${id}-${i}` })) }));
+const sections = (courseId) => [...new Set(people(courseId).flatMap((u) => u.enrollments.map((e) => e.course_section_id)))].map((id) => ({ id, name: id.replace(`sec-${courseId}-`, '') }));
+
+// ---- inbox ----------------------------------------------------------------------------------
+const conversations = [
+  { id: 'c1', subject: 'No submission for Acknowledge the UC Merced Student Attestation', workflow_state: 'unread', last_message: 'Hello Bobcat! You are receiving this message because our records show no submission yet.', last_message_at: ago(9 * D), starred: false, context_name: 'Student Rights & Responsibilities', context_code: 'course_201', participants: [{ id: '20', name: 'Halley Smith' }, { id: '7', name: 'Sam Student' }], messages: [{ id: 'm1', author_id: '20', created_at: ago(9 * D), body: 'Hello Bobcat!\n\nYou are receiving this message because our records show no submission for the Student Attestation. Please complete it by Friday.' }] },
+  { id: 'c2', subject: 'Office hours this week', workflow_state: 'read', last_message: 'Office hours move to Thursday 2–4pm this week only.', last_message_at: ago(2 * D), starred: true, context_name: 'F26-MATH 021 20', context_code: 'course_101', participants: [{ id: 't101', name: 'Yue Lei' }, { id: '7', name: 'Sam Student' }], messages: [{ id: 'm2', author_id: 't101', created_at: ago(2 * D), body: 'Office hours move to Thursday 2–4pm this week only.' }] },
+];
+
+// ---- HTML pages -------------------------------------------------------------------------------
 function page({ title, path = '', courseId, body }) {
-  const avatar = 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><circle cx="32" cy="32" r="32" fill="#7c3aed"/><text x="32" y="41" text-anchor="middle" font-family="sans-serif" font-size="26" fill="#fff">S</text></svg>');
-  const env = { current_user_id: '7', current_user: { display_name: 'Sam Student', avatar_image_url: avatar }, COURSE_ID: courseId || null, context_asset_string: courseId ? `course_${courseId}` : 'user_7', TIMEZONE: 'America/New_York' };
+  const env = { current_user_id: '7', current_user: { display_name: 'Sam Student', avatar_image_url: null }, COURSE_ID: courseId || null, context_asset_string: courseId ? `course_${courseId}` : 'user_7', TIMEZONE: 'America/Los_Angeles', DOMAIN_ROOT_ACCOUNT_ID: '1', PREFERENCES: { dashboard_view: 'planner' } };
   return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>${title}</title>
 <meta name="csrf-token" content="mock-csrf">
-<script>
-  INST = {"environment":"development"};
-  ENV = ${JSON.stringify(env)};
-  BRANDS = {};
-</script>
+<script>INST = {"environment":"development"}; ENV = ${JSON.stringify(env)}; BRANDS = {};</script>
 <style>
-  :root{--ic-brand-primary:#0374B5;--ic-link-color:#0374B5;--ic-brand-global-nav-bgd:#394B58;--ic-brand-global-nav-ic-icon-svg-fill:#fff;--ic-brand-global-nav-menu-item__text-color:#fff}
   body{margin:0;font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:#2d3b45;background:#fff}
-  #header{position:fixed;left:0;top:0;bottom:0;width:84px;background:var(--ic-brand-global-nav-bgd);color:#fff}
-  #menu{list-style:none;margin:0;padding:0}
-  .ic-app-header__menu-list-item{text-align:center}
-  .ic-app-header__menu-list-link{display:block;padding:12px 4px;color:#fff;text-decoration:none;font-size:11px}
-  .menu-item-icon-container svg{width:26px;height:26px;fill:#fff}
-  .ic-Layout-wrapper{margin-left:84px}
-  .ic-app-nav-toggle-and-crumbs{padding:12px 24px;border-bottom:1px solid #c7cdd1}
-  #main{display:flex}
-  #not_right_side{flex:1;padding:0 24px}
-  #right-side-wrapper{width:300px;padding:24px;border-left:1px solid #eee}
-  .ic-Dashboard-header{display:flex;justify-content:space-between;align-items:center;padding:16px 0}
-  .ic-DashboardCard__box__container{display:flex;flex-wrap:wrap;gap:24px}
-  .ic-DashboardCard{width:262px;border-radius:4px;box-shadow:0 2px 4px rgba(0,0,0,.2);overflow:hidden}
-  .ic-DashboardCard__header_hero{height:146px}
-  .ic-DashboardCard__header_content{padding:12px}
-  .ic-DashboardCard__header-title{font-weight:700;font-size:16px}
-  .ic-DashboardCard__header-subtitle,.ic-DashboardCard__header-term{font-size:12px;color:#6b7780}
-  .ic-DashboardCard__link{color:inherit;text-decoration:none;display:block}
-  .ic-DashboardCard__action-container{display:flex;gap:16px;padding:8px 12px;border-top:1px solid #eee}
-  .ig-list{list-style:none;padding:0;margin:0}
-  .ig-row{display:flex;gap:12px;padding:14px 16px;border:1px solid #c7cdd1;border-top:0}
-  .ig-info{flex:1}
-  .ig-title{font-weight:700;color:var(--ic-link-color);text-decoration:none}
-  .ig-details{font-size:12px;color:#6b7780}
-  .ig-header{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:#f5f5f5;border:1px solid #c7cdd1}
-  .ig-header-title{margin:0;font-size:16px}
-  #left-side{width:200px;flex:none;border-right:1px solid #c7cdd1;padding:12px 0}
-  #section-tabs{list-style:none;margin:0;padding:0}
-  #section-tabs a{display:block;padding:8px 16px;color:#2d3b45;text-decoration:none;border-left:3px solid transparent}
-  #section-tabs a.active{border-left-color:#0374B5;font-weight:700;background:#fff}
-  .header-bar{display:flex;gap:8px;align-items:center;padding:12px 0;border-bottom:1px solid #c7cdd1;margin-bottom:12px}
-  .header-bar input{padding:6px 8px;border:1px solid #c7cdd1;flex:1}
-  .btn{padding:6px 12px;border:1px solid #c7cdd1;background:#f5f5f5;border-radius:3px;font:inherit;cursor:pointer;text-decoration:none;color:#2d3b45}
-  .ic-flash-success{padding:12px 16px;background:#00ac18;color:#fff;margin-bottom:12px}
-  table.ic-Table{width:100%;border-collapse:collapse}
-  table.ic-Table th,table.ic-Table td{border:1px solid #c7cdd1;padding:8px;text-align:left}
-  .student-assignment-overview{list-style:none;padding:0;display:flex;gap:24px}
-  .student-assignment-overview .title{font-weight:700;margin-right:6px}
-  .user_content{max-width:760px;line-height:1.6}
-  .btn-primary{background:var(--ic-brand-primary);color:#fff;padding:8px 14px;border-radius:4px;border:0}
-  #footer{padding:40px 24px;color:#6b7780;font-size:12px}
-  iframe{border:1px solid #ccc}
-  .embed-box{width:640px}
+  #header{position:fixed;left:0;top:0;bottom:0;width:84px;background:#394B58;color:#fff}
+  #menu{list-style:none;margin:0;padding:0}.ic-app-header__menu-list-link{display:block;padding:12px 4px;color:#fff;text-decoration:none;font-size:11px;text-align:center}
+  .ic-Layout-wrapper{margin-left:84px}#main{display:flex}#not_right_side{flex:1;padding:0 24px}#right-side-wrapper{width:300px;padding:24px}
+  .btn{padding:6px 12px;border:1px solid #c7cdd1;background:#f5f5f5;border-radius:3px}
 </style></head>
-<body class="with-right-side">
+<body>
 <div id="application" class="ic-app">
-<header id="header" class="ic-app-header no-print">
-  <ul id="menu" class="ic-app-header__menu-list">
-    <li class="menu-item ic-app-header__menu-list-item"><a id="global_nav_dashboard_link" href="/" class="ic-app-header__menu-list-link"><div class="menu-item-icon-container"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8"/><rect x="13" y="3" width="8" height="8"/><rect x="3" y="13" width="8" height="8"/><rect x="13" y="13" width="8" height="8"/></svg></div><div class="menu-item__text">Dashboard</div></a></li>
-    <li class="menu-item ic-app-header__menu-list-item"><a id="global_nav_courses_link" href="/courses" class="ic-app-header__menu-list-link"><div class="menu-item-icon-container"><svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18"/></svg></div><div class="menu-item__text">Courses</div></a></li>
-    <li class="menu-item ic-app-header__menu-list-item"><a id="global_nav_calendar_link" href="/calendar" class="ic-app-header__menu-list-link"><div class="menu-item-icon-container"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16"/></svg></div><div class="menu-item__text">Calendar</div></a></li>
-    <li class="menu-item ic-app-header__menu-list-item"><a href="/accounts/1/external_tools/9?launch_type=global_navigation" class="ic-app-header__menu-list-link"><div class="menu-item-icon-container"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/></svg></div><div class="menu-item__text">Studio</div></a></li>
-    <li class="menu-item ic-app-header__menu-list-item"><a id="global_nav_help_link" href="#" class="ic-app-header__menu-list-link"><div class="menu-item-icon-container"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/></svg></div><div class="menu-item__text">Help</div></a></li>
-  </ul>
-</header>
+<header id="header" class="ic-app-header no-print"><ul id="menu"><li><a id="global_nav_dashboard_link" href="/" class="ic-app-header__menu-list-link">Dashboard</a></li><li><a id="global_nav_courses_link" href="/courses" class="ic-app-header__menu-list-link">Courses</a></li></ul></header>
 <div id="wrapper" class="ic-Layout-wrapper">
-  <div class="ic-app-nav-toggle-and-crumbs"><nav id="breadcrumbs"><ul style="list-style:none;display:flex;gap:8px;margin:0;padding:0"><li><a href="/">Home</a></li>${courseId ? `<li><a href="/courses/${courseId}"><span>${courses.find((c) => c.id === courseId).name}</span></a></li>` : ''}<li>${title}</li></ul></nav></div>
   <div id="main" class="ic-Layout-columns">
-    ${courseId ? `<div id="left-side" class="ic-app-course-menu ic-sticky-on list-view"><div id="sticky-container" class="ic-sticky-frame"><ul id="section-tabs">
-      ${[['', 'Home'], ['/announcements', 'Announcements'], ['/assignments', 'Assignments'], ['/discussion_topics', 'Discussions'], ['/grades', 'Grades'], ['/modules', 'Modules'], ['/pages', 'Pages'], ['/files', 'Files'], ['/quizzes', 'Quizzes'], ['/users', 'People']]
-        .map(([seg, label]) => `<li class="section"><a href="/courses/${courseId}${seg}" class="${label.toLowerCase()}${path === `/courses/${courseId}${seg}` ? ' active' : ''}"${path === `/courses/${courseId}${seg}` ? ' aria-current="page"' : ''}>${label}</a></li>`).join('')}
-    </ul></div></div>` : ''}
     <div id="not_right_side" class="ic-app-main-content"><div id="content" class="ic-Layout-contentMain">${body}</div></div>
-    <aside id="right-side-wrapper" class="ic-app-main-content__secondary"><div id="right-side"><h2>To Do</h2><p>Canvas's own sidebar</p></div></aside>
+    <aside id="right-side-wrapper"><div id="right-side"><h2>To Do</h2><p>Canvas's own sidebar</p></div></aside>
   </div>
-  <footer id="footer" class="ic-app-footer">Canvas footer · Privacy · Terms</footer>
-</div>
-</div>
-</body></html>`;
+  <footer id="footer">Canvas footer</footer>
+</div></div></body></html>`;
 }
-
-const pages = {
-  '/': () => page({
-    title: 'Dashboard',
-    body: `<div id="dashboard_header_container"><div class="ic-Dashboard-header"><div class="ic-Dashboard-header__layout"><h1 class="ic-Dashboard-header__title"><span class="hidden-phone">Dashboard</span></h1><div class="ic-Dashboard-header__actions"><button class="Button">⋮</button></div></div></div></div><div id="dashboard">
-      <div id="DashboardCard_Container"><div class="ic-DashboardCard__box"><div class="ic-DashboardCard__box__container">
-      ${courses.map((c) => `<div class="ic-DashboardCard"><a class="ic-DashboardCard__link" href="/courses/${c.id}"><div class="ic-DashboardCard__header_hero" style="background:${c.color}"></div><div class="ic-DashboardCard__header_content"><h3 class="ic-DashboardCard__header-title">${c.shortName}</h3><div class="ic-DashboardCard__header-subtitle">${c.code}</div><div class="ic-DashboardCard__header-term">Fall 2026</div></div></a><div class="ic-DashboardCard__action-container"><span>📣</span><span>📝</span><span>💬</span></div></div>`).join('')}
-      </div></div></div></div>`,
-  }),
-  '/courses/202': () => page({
-    title: 'HIST 202: Modern Europe', courseId: '202', path: '/courses/202',
-    body: `<div id="course_home_content"><h1>HIST 202: Modern Europe</h1><div class="user_content"><p>Welcome to Modern Europe. This week: <strong>industrialization</strong> and its effects on family life.</p><p><img src="data:image/svg+xml;utf8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="480" height="180"><rect width="480" height="180" fill="#dbe4ee"/><text x="20" y="100" font-family="sans-serif" font-size="24" fill="#2d3b45">Course banner image</text></svg>')}" width="480" height="180" alt=""></p></div>
-      <div class="header-bar"><input type="text" placeholder="Search course…" aria-label="Search"><button class="btn">Filter</button><button class="btn btn-primary">New</button></div></div>`,
-  }),
-  '/courses/303/modules': () => page({
-    title: 'Modules', courseId: '303', path: '/courses/303/modules',
-    body: `<h1>Modules</h1><div id="context_modules" class="ig-list">
-      <div class="item-group-condensed context_module" id="context_module_1"><div class="ig-header header"><h2 class="ig-header-title"><span class="name">Week 1: Complexity</span></h2><button class="btn btn-small">Collapse</button></div><div class="content"><ul class="ig-list items context_module_items">
-        <li class="context_module_item indent_0"><div class="ig-row ig-published"><div class="ig-info"><a class="ig-title" href="/courses/303/pages/big-o-notes">Big-O notes</a><div class="ig-details"><span class="ig-details__item">Page</span></div></div></div></li>
-        <li class="context_module_item indent_1"><div class="ig-row ig-published"><div class="ig-info"><a class="ig-title" href="/courses/303/quizzes/2">Quiz 2: Sorting</a><div class="ig-details"><span class="ig-details__item">10 pts</span></div></div></div></li>
-        <li class="context_module_item indent_0"><div class="ig-row ig-published"><div class="ig-info"><a class="ig-title" href="/courses/303/assignments/4">Project proposal</a><div class="ig-details"><span class="ig-details__item">50 pts</span></div></div></div></li>
-        <li class="context_module_item indent_0"><div class="ig-row ig-published"><div class="ig-info"><a class="ig-title" href="/courses/303/discussion_topics/7">Intro thread: say hello (ungraded)</a><div class="ig-details"><span class="ig-details__item">Discussion</span></div></div></div></li>
-      </ul></div></div>
-      <div class="item-group-condensed context_module" id="context_module_2"><div class="ig-header header"><h2 class="ig-header-title"><span class="name">Week 2: Sorting</span></h2></div><div class="content"><ul class="ig-list items context_module_items">
-        <li class="context_module_item indent_0"><div class="ig-row ig-published"><div class="ig-info"><a class="ig-title" href="/courses/303/pages/merge-sort">Merge sort</a><div class="ig-details"><span class="ig-details__item">Page</span></div></div></div></li>
-      </ul></div></div></div>`,
-  }),
-  '/courses/101/grades': () => page({
-    title: 'Grades', courseId: '101', path: '/courses/101/grades',
-    body: `<h1>Grades for Sam Student</h1><div class="ic-flash-success">Grades were updated.</div><table id="grades_summary" class="ic-Table ic-Table--hover-row"><thead><tr><th>Name</th><th>Due</th><th>Status</th><th>Score</th><th>Out of</th></tr></thead><tbody>
-      <tr class="student_assignment assignment_graded"><th class="title"><a href="/courses/101/assignments/6">Reading response 4</a><div class="context">Homework</div></th><td class="due">Sep 8</td><td class="status">—</td><td class="assignment_score"><span class="grade">9</span></td><td>10</td></tr>
-      <tr class="student_assignment"><th class="title"><a href="/courses/101/assignments/5">Problem Set 2</a><div class="context">Homework</div></th><td class="due">Sep 9</td><td class="status">missing</td><td class="assignment_score"><span class="grade">–</span></td><td>20</td></tr>
-      <tr class="student_assignment"><th class="title"><a href="/courses/101/assignments/1">Problem Set 3</a><div class="context">Homework</div></th><td class="due">Sep 10</td><td class="status"></td><td class="assignment_score"><span class="grade">–</span></td><td>20</td></tr>
-      <tr class="group_total"><th class="title">Homework</th><td></td><td></td><td class="assignment_score">90%</td><td></td></tr>
-      <tr class="final_grade"><th class="title">Total</th><td></td><td></td><td class="assignment_score">87.5%</td><td></td></tr>
-      </tbody></table>`,
-  }),
-  '/courses/101/assignments': () => page({
-    title: 'Assignments', courseId: '101', path: '/courses/101/assignments',
-    body: `<h1>Assignments</h1><div class="header-bar"><input type="search" placeholder="Search for assignment" aria-label="Search"><button class="btn">Show by type</button></div><ul class="ig-list">
-      <li class="assignment"><div class="ig-row"><div class="ig-info"><a class="ig-title" href="/courses/101/assignments/1">Problem Set 3</a><div class="ig-details"><span class="ig-details__item">Due Sep 10 at 11:59pm</span> · 20 pts</div></div></div></li>
-      <li class="assignment"><div class="ig-row"><div class="ig-info"><a class="ig-title" href="/courses/101/assignments/5">Problem Set 2</a><div class="ig-details">20 pts</div></div></div></li>
-      <li class="assignment"><div class="ig-row"><div class="ig-info"><a class="ig-title" href="/courses/101/assignments/9">Problem Set 4 (no date yet)</a><div class="ig-details">20 pts</div></div></div></li>
-    </ul>`,
-  }),
-  '/courses/101/assignments/1': () => page({
-    title: 'Problem Set 3', courseId: '101', path: '/courses/101/assignments/1',
-    body: `<div id="assignment_show"><h1 class="title">Problem Set 3</h1><ul class="student-assignment-overview"><li><span class="title">Due</span><span class="value">${new Date(now + 3 * H).toLocaleString()}</span></li><li><span class="title">Points</span><span class="value">20</span></li><li><span class="title">Submitting</span><span class="value">a file upload</span></li></ul>
-      <div class="description user_content">${assignment.description}</div>
-      <div class="embed-box"><iframe id="tool_content" name="tool_content" src="/courses/101/external_tools/retrieve?url=https%3A%2F%2Ftool.example.com%2Flaunch" width="640" height="320" title="Embedded tool"></iframe></div>
-      <p><iframe src="about:blank" name="lti_launch_frame" width="640" height="200" title="LTI 1.3"></iframe><form action="/courses/101/external_tools/55/launch" method="post" target="lti_launch_frame"><input type="hidden" name="id_token" value="x"></form></p>
-      <button class="btn-primary">Start Assignment</button></div>`,
-  }),
-  '/courses/202/discussion_topics/3': () => page({
-    title: 'Week 5 discussion: Industrialization', courseId: '202', path: '/courses/202/discussion_topics/3',
-    body: `<h1>Week 5 discussion: Industrialization</h1><div class="user_content"><p>How did industrialization change family life in 19th-century Europe? Respond in 200 words and reply to two classmates.</p></div>
-      <div><h2>Reply</h2><textarea id="discussion_reply" rows="4" style="width:600px"></textarea></div>`,
-  }),
+const htmlPages = {
+  '/': () => page({ title: 'Dashboard', body: '<h1 class="ic-Dashboard-header__title">Dashboard</h1><div id="dashboard">stock dashboard</div>' }),
+  '/courses/101/external_tools/9': () => page({ title: 'Resources & Policy', courseId: '101', body: '<h2>Resources & Policy</h2><iframe id="tool_content" src="/courses/101/external_tools/retrieve?url=x" width="600" height="300" title="Tool"></iframe>' }),
+  '/profile': () => page({ title: 'User Profile', body: '<h1>Sam Student</h1><p class="profile">Profile page rendered by Canvas.</p>' }),
 };
 
-const scores = { 101: 92.4, 202: 81, 303: null };
-const teachers = { 101: 'Dr. Rivera', 202: 'Prof. Adler', 303: 'Dr. Chen' };
-const fullCourse = (c) => ({
-  id: c.id, name: c.name, course_code: c.code, term: { name: 'Fall 2026' },
-  teachers: [{ display_name: teachers[c.id] }],
-  enrollments: [{ type: 'student', computed_current_score: scores[c.id], computed_current_grade: scores[c.id] == null ? null : (scores[c.id] >= 90 ? 'A-' : 'B-') }],
-  syllabus_body: '<p>Syllabus body</p>',
-});
-const tabsFor = (id) => [
-  ['home', 'Home', ''], ['announcements', 'Announcements', '/announcements'], ['assignments', 'Assignments', '/assignments'],
-  ['discussions', 'Discussions', '/discussion_topics'], ['grades', 'Grades', '/grades'], ['modules', 'Modules', '/modules'],
-  ['pages', 'Pages', '/pages'], ['files', 'Files', '/files'], ['quizzes', 'Quizzes', '/quizzes'], ['people', 'People', '/users'],
-  ['context_external_tool_9', 'Zoom', '/external_tools/9'],
-].map(([tid, label, seg], i) => ({ id: tid, label, html_url: `/courses/${id}${seg}`, type: tid.startsWith('context_external') ? 'external' : 'internal', position: i + 1, visibility: 'public' }));
-const modulesFor = (id) => id === '303' ? [
-  { id: '1', name: 'Week 1: Complexity', state: 'started', items: [
-    { id: 'a', type: 'Page', title: 'Big-O notes', html_url: '/courses/303/pages/big-o-notes', completion_requirement: { type: 'must_view', completed: true } },
-    { id: 'b', type: 'Quiz', title: 'Quiz 2: Sorting', html_url: '/courses/303/quizzes/2', completion_requirement: { type: 'must_submit', completed: false } },
-    { id: 'c', type: 'Assignment', title: 'Project proposal', html_url: '/courses/303/assignments/4', completion_requirement: { type: 'must_submit', completed: false } },
-  ] },
-  { id: '2', name: 'Week 2: Sorting', state: 'unlocked', items: [{ id: 'd', type: 'Page', title: 'Merge sort', html_url: '/courses/303/pages/merge-sort' }] },
-  { id: '3', name: 'Week 3: Graphs', state: 'locked', items: [] },
-] : [
-  { id: '11', name: 'Unit 1', state: 'completed', items: [{ id: 'x', type: 'Page', title: 'Intro', completion_requirement: { type: 'must_view', completed: true } }] },
-  { id: '12', name: 'Unit 2', state: 'started', items: [{ id: 'y', type: 'Assignment', title: 'Essay', completion_requirement: { type: 'must_submit', completed: false } }, { id: 'z', type: 'Page', title: 'Reading', completion_requirement: { type: 'must_view', completed: true } }] },
-];
-const announcementsAll = [
-  { id: 'n1', context_code: 'course_101', title: 'Office hours moved to Thursday', message: '<p>This week only, office hours are Thursday 2–4pm in the math lounge.</p>', posted_at: iso(-5 * H), html_url: '/courses/101/discussion_topics/901' },
-  { id: 'n2', context_code: 'course_303', title: 'Project proposal template posted', message: '<p>Use the template in Files. Proposals are due next Wednesday.</p>', posted_at: iso(-30 * H), html_url: '/courses/303/discussion_topics/902' },
-  { id: 'n3', context_code: 'course_202', title: 'Reading for Week 6', message: '<p>Please read chapters 7 and 8 before Tuesday.</p>', posted_at: iso(-3 * 24 * H), html_url: '/courses/202/discussion_topics/903' },
-];
+// ---- API routing ------------------------------------------------------------------------------
+const routes = [];
+const on = (method, re, handler) => routes.push([method, re, handler]);
+const json = (res, data, status = 200) => {
+  res.writeHead(status, { 'content-type': 'application/json; charset=utf-8' });
+  res.end('while(1);' + JSON.stringify(data));
+};
+const filterDates = (list, url, field) => {
+  const s = url.searchParams.get('start_date'), e = url.searchParams.get('end_date');
+  return list.filter((x) => (!s || new Date(x[field]) >= new Date(s)) && (!e || new Date(x[field]) <= new Date(e)));
+};
 
-const apiRoutes = [
-  [/^\/api\/v1\/planner\/items/, () => planner],
-  [/^\/api\/v1\/courses\/(\d+)\/tabs/, (url, m) => tabsFor(m[1])],
-  [/^\/api\/v1\/courses\/(\d+)\/modules/, (url, m) => modulesFor(m[1])],
-  [/^\/api\/v1\/announcements/, (url) => {
-    const codes = url.searchParams.getAll('context_codes[]');
-    return announcementsAll.filter((a) => !codes.length || codes.includes(a.context_code));
-  }],
-  [/^\/api\/v1\/conversations\/unread_count/, () => ({ unread_count: '2' })],
-  [/^\/api\/v1\/courses\/?$/, () => courses.map(fullCourse)],
-  [/^\/api\/v1\/dashboard\/dashboard_cards/, () => courses.map((c) => ({ id: c.id, shortName: c.shortName, originalName: c.name, courseCode: c.code, href: `/courses/${c.id}`, term: 'Fall 2026' }))],
-  [/^\/api\/v1\/users\/self\/colors/, () => ({ custom_colors: Object.fromEntries(courses.map((c) => [`course_${c.id}`, c.color])) })],
-  [/^\/api\/v1\/courses\/101\/assignments\/1\/submissions\/self/, () => submission],
-  [/^\/api\/v1\/courses\/101\/assignments\/1/, () => assignment],
-  [/^\/api\/v1\/courses\/202\/discussion_topics\/3\/view/, () => ({ participants: [{ id: '8', display_name: 'Priya' }], view: [{ id: '1', user_id: '8', created_at: iso(-5 * H), message: '<p>Factory work pulled children out of the home, which changed who raised them.</p>', replies: [] }] })],
-  [/^\/api\/v1\/courses\/202\/discussion_topics\/3/, () => ({ id: '3', title: 'Week 5 discussion: Industrialization', message: '<p>How did industrialization change family life in 19th-century Europe? Respond in 200 words and reply to two classmates.</p>', posted_at: iso(-3 * 24 * H), author: { display_name: 'Prof. Adler' }, assignment: { due_at: iso(2 * 24 * H), points_possible: 5 } })],
-  [/^\/api\/v1\/courses\/\d+\/enrollments/, () => [{ grades: { current_score: 87.5, current_grade: 'B+', final_score: 80 } }]],
-  [/^\/api\/v1\/courses\/(\d+)\/?$/, (url, m) => fullCourse(courses.find((c) => c.id === m[1]) || courses[0])],
-];
+on('GET', /^\/api\/v1\/users\/self$/, () => ({ id: '7', name: 'Sam Student', short_name: 'Sam', avatar_url: null }));
+on('GET', /^\/api\/v1\/accounts\/1$/, () => ({ id: '1', name: 'Example University' }));
+let dashboardView = 'planner';
+on('GET', /^\/dashboard\/view$/, () => ({ dashboard_view: dashboardView }));
+on('PUT', /^\/dashboard\/view$/, (url, m, body) => { dashboardView = body.dashboard_view || dashboardView; return { dashboard_view: dashboardView }; });
+on('GET', /^\/api\/v1\/courses$/, () => courses.map(fullCourse));
+on('GET', /^\/api\/v1\/dashboard\/dashboard_cards$/, () => courses.filter((c) => favorites.has(c.id)).map((c) => ({ id: c.id, shortName: c.name, originalName: c.name, courseCode: c.code, href: `/courses/${c.id}`, term: 'Fall 2026', subtitle: c.section, links: [{ css_class: 'announcements', label: 'Announcements', path: `/courses/${c.id}/announcements` }, { css_class: 'assignments', label: 'Assignments', path: `/courses/${c.id}/assignments` }, { css_class: 'discussions', label: 'Discussions', path: `/courses/${c.id}/discussion_topics` }, { css_class: 'files', label: 'Files', path: `/courses/${c.id}/files` }] })));
+on('GET', /^\/api\/v1\/users\/self\/colors$/, () => ({ custom_colors: Object.fromEntries(courses.map((c) => [`course_${c.id}`, c.color])) }));
+on('POST', /^\/api\/v1\/users\/self\/favorites\/courses\/(\w+)$/, (url, m) => { favorites.add(m[1]); return { context_id: m[1], context_type: 'Course' }; });
+on('DELETE', /^\/api\/v1\/users\/self\/favorites\/courses\/(\w+)$/, (url, m) => { favorites.delete(m[1]); return { context_id: m[1] }; });
+on('GET', /^\/api\/v1\/planner\/items$/, (url) => filterDates(plannerItems(), url, 'plannable_date'));
+on('POST', /^\/api\/v1\/planner\/overrides$/, (url, m, body) => { const ov = { id: `ov${overrides.size + 1}`, plannable_type: body.plannable_type, plannable_id: body.plannable_id, marked_complete: !!body.marked_complete, dismissed: !!body.dismissed }; overrides.set(`${body.plannable_type}:${body.plannable_id}`, ov); return ov; });
+on('PUT', /^\/api\/v1\/planner\/overrides\/(\w+)$/, (url, m, body) => { for (const ov of overrides.values()) if (ov.id === m[1]) { Object.assign(ov, body); return ov; } return {}; });
+on('GET', /^\/api\/v1\/users\/self\/activity_stream\/summary$/, () => [{ type: 'Announcement', unread_count: 3, count: 5 }, { type: 'Conversation', unread_count: 1, count: 2 }, { type: 'DiscussionTopic', unread_count: 4, count: 6 }]);
+on('GET', /^\/api\/v1\/users\/self\/activity_stream$/, () => [
+  { id: 'a1', type: 'Announcement', title: 'Prerequisite Skills Test', message: '<p>Good morning everyone, the results from the Skills_Check test have been posted…</p>', course_id: '101', context_type: 'Course', read_state: false, updated_at: ago(6 * D), html_url: '/courses/101/announcements/8001' },
+  { id: 'a2', type: 'DiscussionTopic', title: 'Is there any discussion happening this week?', message: '<p>Last post by Alan Aguilar.</p>', course_id: '101', context_type: 'Course', read_state: false, updated_at: ago(18 * H), total_root_discussion_entries: 23, html_url: '/courses/101/discussion_topics/7003' },
+  { id: 'a3', type: 'Submission', title: 'Lec05-PreQuiz graded — 19 / 19', message: '<p>Effort group.</p>', course_id: '101', context_type: 'Course', read_state: true, updated_at: ago(D), html_url: '/courses/101/assignments/1007' },
+  { id: 'a4', type: 'Conversation', title: 'No submission for Acknowledge the UC Merced Student Attestation', message: '<p>Hello Bobcat! You are receiving this message because our records show…</p>', conversation_id: 'c1', read_state: false, updated_at: ago(9 * D), html_url: '/conversations?id=c1' },
+  { id: 'a5', type: 'Announcement', title: 'Field site sign-ups', message: '<p>Sign up for a field site by Friday.</p>', course_id: '104', context_type: 'Course', read_state: false, updated_at: ago(D), html_url: '/courses/104/announcements/8005' },
+]);
+on('GET', /^\/api\/v1\/conversations\/unread_count$/, () => ({ unread_count: String(conversations.filter((c) => c.workflow_state === 'unread').length) }));
+on('GET', /^\/api\/v1\/conversations$/, (url) => { const scope = url.searchParams.get('scope'); const f = url.searchParams.getAll('filter[]')[0]; return conversations.filter((c) => (!scope || (scope === 'unread' ? c.workflow_state === 'unread' : scope === 'starred' ? c.starred : true)) && (!f || c.context_code === f)).map(({ messages, ...c }) => c); });
+on('GET', /^\/api\/v1\/conversations\/(\w+)$/, (url, m) => conversations.find((c) => c.id === m[1]) || null);
+on('PUT', /^\/api\/v1\/conversations\/(\w+)$/, (url, m, body) => { const c = conversations.find((x) => x.id === m[1]); if (c && body.conversation) Object.assign(c, body.conversation); return c; });
+on('POST', /^\/api\/v1\/conversations\/(\w+)\/add_message$/, (url, m, body) => { const c = conversations.find((x) => x.id === m[1]); c.messages.unshift({ id: `m${Date.now()}`, author_id: '7', created_at: new Date().toISOString(), body: body.body }); c.last_message = body.body; c.last_message_at = new Date().toISOString(); return c; });
+on('POST', /^\/api\/v1\/conversations$/, (url, m, body) => { const c = { id: `c${conversations.length + 1}`, subject: body.subject || '(no subject)', workflow_state: 'read', last_message: body.body, last_message_at: new Date().toISOString(), starred: false, context_code: body.context_code, participants: [{ id: '7', name: 'Sam Student' }, ...(body.recipients || []).map((r) => ({ id: r, name: `User ${r}` }))], messages: [{ id: 'mx', author_id: '7', created_at: new Date().toISOString(), body: body.body }] }; conversations.unshift(c); return [c]; });
+on('GET', /^\/api\/v1\/search\/recipients$/, (url) => { const q = (url.searchParams.get('search') || '').toLowerCase(); return [{ id: 't101', name: 'Yue Lei', common_courses: {} }, { id: 'u2', name: 'Alan Aguilar' }, { id: 'course_101', name: 'F26-MATH 021 20', user_count: 120 }].filter((r) => r.name.toLowerCase().includes(q)); });
+on('GET', /^\/api\/v1\/users\/self\/groups$/, () => [{ id: 'g1', name: 'Attestation Fall 2026 1', course_id: '201', members_count: 4, group_category: { name: 'Attestation' } }, { id: 'g2', name: 'Study group B', course_id: '301', members_count: 5 }]);
+on('GET', /^\/api\/v1\/calendar_events$/, (url) => {
+  const codes = url.searchParams.getAll('context_codes[]');
+  const type = url.searchParams.get('type') || 'event';
+  let out = [];
+  if (type === 'assignment') {
+    for (const c of courses) if (codes.includes(`course_${c.id}`)) for (const a of allAssignments(c.id)) out.push({ id: `assignment_${a.id}`, title: a.name, start_at: a.due_at, end_at: a.due_at, all_day: false, context_code: `course_${c.id}`, context_name: c.name, type: 'assignment', html_url: a.html_url, assignment: { ...a, submission: a.submission } });
+  } else {
+    if (codes.includes('course_101')) { out.push({ id: 'ev1', title: 'Lec05 lecture', start_at: at(-1, 10, 30), end_at: at(-1, 11, 45), all_day: false, context_code: 'course_101', context_name: 'F26-MATH 021 20', type: 'event', html_url: '/calendar?event_id=ev1' }); out.push({ id: 'ev2', title: 'Midterm 1 review', start_at: at(13, 10, 30), end_at: at(13, 11, 45), all_day: false, context_code: 'course_101', context_name: 'F26-MATH 021 20', type: 'event', html_url: '/calendar?event_id=ev2' }); }
+    if (codes.includes('course_102')) out.push({ id: 'ev3', title: 'Week 2 lab', start_at: at(-2, 10, 30), end_at: at(-2, 13, 0), all_day: false, context_code: 'course_102', context_name: 'F26-PHYS 008 01', type: 'event', html_url: '/calendar?event_id=ev3' });
+    if (codes.includes('course_202')) out.push({ id: 'e1', title: 'Chemistry placement closes', start_at: at(6, 0, 0), end_at: at(6, 23, 59), all_day: true, context_code: 'course_202', context_name: 'Placement Exam: Chemistry', type: 'event', html_url: '/calendar?event_id=e1' });
+    if (codes.includes('user_7')) out.push({ id: 'ev4', title: 'Dentist', start_at: at(2, 15, 0), end_at: at(2, 16, 0), all_day: false, context_code: 'user_7', context_name: 'Sam Student', type: 'event', html_url: '/calendar?event_id=ev4' });
+  }
+  return filterDates(out, url, 'start_at');
+});
+on('GET', /^\/api\/v1\/courses\/(\w+)\/tabs$/, (url, m) => [['home', 'Home', ''], ['announcements', 'Announcements', '/announcements'], ['assignments', 'Assignments', '/assignments'], ['discussions', 'Discussions', '/discussion_topics'], ['grades', 'Grades', '/grades'], ['people', 'People', '/users'], ['pages', 'Pages', '/pages'], ['files', 'Files', '/files'], ['quizzes', 'Quizzes', '/quizzes'], ['modules', 'Modules', '/modules'], ['context_external_tool_9', 'Resources & Policy', '/external_tools/9']].map(([id, label, seg], i) => ({ id, label, html_url: `/courses/${m[1]}${seg}`, type: id.startsWith('context_external') ? 'external' : 'internal', position: i + 1, visibility: 'public' })));
+on('GET', /^\/api\/v1\/courses\/(\w+)\/front_page$/, (url, m) => { const p = (pages[m[1]] || []).find((x) => x.front_page); return p ? { ...p, html_url: `/courses/${m[1]}/pages/${p.url}` } : { errors: [{ message: 'No front page' }] }; }, );
+on('GET', /^\/api\/v1\/courses\/(\w+)\/todo$/, (url, m) => allAssignments(m[1]).filter((a) => !a.submission.submitted_at && new Date(a.due_at) > now).slice(0, 5).map((a) => ({ type: 'submitting', assignment: { id: a.id, name: a.name, due_at: a.due_at, html_url: a.html_url, points_possible: a.points_possible }, ignore: `/api/v1/users/self/todo/assignment_${a.id}/submitting?permanent=0`, ignore_permanently: `/api/v1/users/self/todo/assignment_${a.id}/submitting?permanent=1`, html_url: a.html_url, context_type: 'Course', course_id: m[1] })));
+on('DELETE', /^\/api\/v1\/users\/self\/todo\//, () => ({ ok: true }));
+on('GET', /^\/api\/v1\/courses\/(\w+)\/activity_stream$/, (url, m) => [{ id: 'ca1', type: 'Announcement', title: 'Prerequisite Skills Test', message: '<p>Results posted.</p>', course_id: m[1], read_state: false, updated_at: ago(6 * D), html_url: `/courses/${m[1]}/announcements/8001` }]);
+on('GET', /^\/api\/v1\/courses\/(\w+)\/assignments\/(\w+)\/submissions\/self$/, (url, m) => (allAssignments(m[1]).find((a) => a.id === m[2]) || {}).submission || null);
+on('GET', /^\/api\/v1\/courses\/(\w+)\/assignments\/(\w+)$/, (url, m) => allAssignments(m[1]).find((a) => a.id === m[2]) || null);
+on('GET', /^\/api\/v1\/courses\/(\w+)\/assignments$/, (url, m) => allAssignments(m[1]));
+on('GET', /^\/api\/v1\/courses\/(\w+)\/assignment_groups$/, (url, m) => assignmentGroups(m[1]));
+on('GET', /^\/api\/v1\/courses\/(\w+)\/discussion_topics\/(\w+)\/view$/, (url, m) => viewFor(m[2]));
+on('POST', /^\/api\/v1\/courses\/(\w+)\/discussion_topics\/(\w+)\/entries$/, (url, m, body) => { const e = { id: `e${Date.now()}`, user_id: '7', created_at: new Date().toISOString(), message: body.message, replies: [] }; entries.set(m[2], [...(entries.get(m[2]) || []), e]); return e; });
+on('POST', /^\/api\/v1\/courses\/(\w+)\/discussion_topics\/(\w+)\/entries\/(\w+)\/replies$/, (url, m, body) => ({ id: `e${Date.now()}`, user_id: '7', created_at: new Date().toISOString(), message: body.message }));
+on('PUT', /^\/api\/v1\/courses\/(\w+)\/discussion_topics\/(\w+)\/read_all$/, () => ({ ok: true }));
+on('GET', /^\/api\/v1\/courses\/(\w+)\/discussion_topics\/(\w+)$/, (url, m) => topicFull(m[1], m[2]));
+on('GET', /^\/api\/v1\/courses\/(\w+)\/discussion_topics$/, (url, m) => (url.searchParams.get('only_announcements') === 'true' ? (announcements[m[1]] || []) : (discussions[m[1]] || [])).map((t) => ({ ...t, html_url: `/courses/${m[1]}/discussion_topics/${t.id}` })));
+on('GET', /^\/api\/v1\/courses\/(\w+)\/users$/, (url, m) => people(m[1]));
+on('GET', /^\/api\/v1\/courses\/(\w+)\/sections$/, (url, m) => sections(m[1]));
+on('GET', /^\/api\/v1\/courses\/(\w+)\/groups$/, (url, m) => (m[1] === '101' ? [{ id: 'cg1', name: 'Project group 3', members_count: 4, group_category: { name: 'project01' } }] : []));
+on('GET', /^\/api\/v1\/courses\/(\w+)\/pages\/([^/]+)$/, (url, m) => (pages[m[1]] || []).find((p) => p.url === decodeURIComponent(m[2])) || null);
+on('GET', /^\/api\/v1\/courses\/(\w+)\/pages$/, (url, m) => (pages[m[1]] || []).map(({ body, ...p }) => p));
+on('GET', /^\/api\/v1\/courses\/(\w+)\/folders\/root$/, (url, m) => folders[`r${m[1]}`] || { id: `r${m[1]}`, name: 'course files', full_name: 'course files', context_id: m[1] });
+on('GET', /^\/api\/v1\/courses\/(\w+)\/folders\/by_path\/(.+)$/, (url, m) => { const path = `course files/${decodeURIComponent(m[2])}`; const f = Object.values(folders).find((x) => x.full_name === path); return f ? [folders[`r${m[1]}`], f] : { errors: [{ message: 'not found' }] }; });
+on('GET', /^\/api\/v1\/folders\/(\w+)\/folders$/, (url, m) => Object.values(folders).filter((f) => f.parent_folder_id === m[1]));
+on('GET', /^\/api\/v1\/folders\/(\w+)\/files$/, (url, m) => files[m[1]] || []);
+on('GET', /^\/api\/v1\/courses\/(\w+)\/quizzes\/(\w+)\/submissions$/, (url, m) => ({ quiz_submissions: m[2] === '9001' ? [{ id: 'qs1', attempt: 1, score: 13, kept_score: 13, finished_at: at(-14, 15, 52), workflow_state: 'complete' }] : [] }));
+on('GET', /^\/api\/v1\/courses\/(\w+)\/quizzes\/(\w+)$/, (url, m) => quizzes(m[1]).find((q) => q.id === m[2]) || null);
+on('GET', /^\/api\/v1\/courses\/(\w+)\/quizzes$/, (url, m) => quizzes(m[1]));
+on('GET', /^\/api\/v1\/courses\/(\w+)\/modules$/, (url, m) => modules[m[1]] || []);
+on('GET', /^\/api\/v1\/courses\/(\w+)$/, (url, m) => { const c = courseById(m[1]); return c ? { ...fullCourse(c), syllabus_body: '<h2>Syllabus</h2><p>Lectures MWF 10:30. Midterm 1 in week 5, Midterm 2 in week 9, final in finals week. Late work loses 10% per day.</p>' } : null; });
 
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, `http://localhost:${port}`);
   const path = url.pathname.replace(/\/+$/, '') || '/';
-  if (path.startsWith('/api/')) {
-    if (req.method === 'POST' && path === '/api/v1/planner/overrides') {
-      let body = '';
-      req.on('data', (c) => (body += c));
-      req.on('end', () => {
-        const b = JSON.parse(body || '{}');
-        const it = planner.find((p) => p.plannable_type === b.plannable_type && String(p.plannable_id) === String(b.plannable_id));
-        if (it) it.planner_override = { id: 'ov' + it.plannable_id, marked_complete: !!b.marked_complete };
-        res.writeHead(200, { 'content-type': 'application/json' });
-        res.end('while(1);' + JSON.stringify(it?.planner_override || {}));
-      });
-      return;
+  let raw = '';
+  req.on('data', (c) => (raw += c));
+  req.on('end', () => {
+    let body = {};
+    try {
+      body = raw ? JSON.parse(raw) : {};
+    } catch {
+      body = {};
     }
-    for (const [re, handler] of apiRoutes) {
+    for (const [method, re, handler] of routes) {
+      if (method !== req.method) continue;
       const m = path.match(re);
-      if (m) {
-        res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' });
-        res.end('while(1);' + JSON.stringify(handler(url, m)));
-        return;
-      }
+      if (!m) continue;
+      const data = handler(url, m, body);
+      if (data === null) return json(res, { errors: [{ message: 'not found' }] }, 404);
+      return json(res, data);
     }
-    res.writeHead(404, { 'content-type': 'application/json' });
-    res.end('while(1);' + JSON.stringify({ errors: [{ message: 'not found' }] }));
-    return;
-  }
-  if (path.startsWith('/courses/101/external_tools')) {
-    res.writeHead(200, { 'content-type': 'text/html' });
-    res.end('<html><body style="font-family:sans-serif;padding:20px">Embedded tool content</body></html>');
-    return;
-  }
-  const handler = pages[path];
-  if (!handler) {
-    res.writeHead(200, { 'content-type': 'text/html' });
-    res.end(page({ title: path, body: `<h1>${path}</h1><p>Mock page.</p>` }));
-    return;
-  }
-  res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
-  res.end(handler());
+    if (path.startsWith('/api/') || path === '/dashboard/view') return json(res, { errors: [{ message: 'not found' }] }, 404);
+    if (path.startsWith('/courses/101/external_tools/retrieve')) {
+      res.writeHead(200, { 'content-type': 'text/html' });
+      return res.end('<html><body style="font-family:sans-serif;padding:20px">Embedded tool content</body></html>');
+    }
+    if (path.startsWith('/files/')) {
+      res.writeHead(200, { 'content-type': 'application/pdf' });
+      return res.end('%PDF-1.4 mock');
+    }
+    const handler = htmlPages[path];
+    res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+    res.end(handler ? handler() : page({ title: path.split('/').pop() || 'Canvas', courseId: (path.match(/^\/courses\/(\d+)/) || [])[1], body: `<h1>${path}</h1><p>Mock page rendered by Canvas.</p>` }));
+  });
 });
 
 server.listen(port, () => console.log(`Mock Canvas listening on http://localhost:${port}`));

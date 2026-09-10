@@ -1,4 +1,4 @@
-/* Toolbar popup: quick toggles, panel shortcuts, enable-on-this-site. */
+/* Toolbar popup: skin + appearance switches, enable-on-this-site. */
 (async function () {
   const BCV = self.BCV;
   const api = BCV.api;
@@ -15,39 +15,15 @@
       resolve(null);
     }
   });
-  const sendToTab = (tabId, msg) => new Promise((resolve) => {
-    try {
-      const p = api.tabs.sendMessage(tabId, msg);
-      if (p && typeof p.then === 'function') p.then(resolve, () => resolve(null));
-      else resolve(p ?? null);
-    } catch {
-      resolve(null);
-    }
-  });
-
-  // Theme options
-  const themeSel = $('theme');
-  for (const [id, t] of Object.entries(S.THEMES)) themeSel.append(new Option(t.label, id));
 
   let settings = await S.get();
   const bind = () => {
-    $('darkMode').value = settings.appearance.darkMode;
-    themeSel.value = settings.appearance.theme;
     $('skin').checked = settings.appearance.skin !== false;
-    $('minimal').checked = settings.appearance.minimal;
-    $('compact').checked = settings.appearance.density === 'compact';
-    $('hideRightSidebar').checked = settings.clean.hideRightSidebar;
-    $('reminders').checked = settings.dueDates.reminders;
+    $('darkMode').value = settings.appearance.darkMode;
   };
   bind();
-
-  $('darkMode').addEventListener('change', (e) => S.update({ appearance: { darkMode: e.target.value } }));
-  themeSel.addEventListener('change', (e) => S.update({ appearance: { theme: e.target.value } }));
   $('skin').addEventListener('change', (e) => S.update({ appearance: { skin: e.target.checked } }));
-  $('minimal').addEventListener('change', (e) => S.update({ appearance: { minimal: e.target.checked } }));
-  $('compact').addEventListener('change', (e) => S.update({ appearance: { density: e.target.checked ? 'compact' : 'comfortable' } }));
-  $('hideRightSidebar').addEventListener('change', (e) => S.update({ clean: { hideRightSidebar: e.target.checked } }));
-  $('reminders').addEventListener('change', (e) => S.update({ dueDates: { reminders: e.target.checked } }));
+  $('darkMode').addEventListener('change', (e) => S.update({ appearance: { darkMode: e.target.value } }));
   S.onChange((s) => {
     settings = s;
     bind();
@@ -61,96 +37,66 @@
   $('open-settings').addEventListener('click', openOptions);
   $('foot-settings').addEventListener('click', openOptions);
 
-  // Smart status
-  const st = await send({ type: 'providerStatus' });
-  $('smart-status').textContent = st?.configured ? `Smart features: ${st.label} · ${st.model}` : 'Smart features: add a key in Settings';
+  // smart status
+  send({ type: 'providerStatus' }).then((s) => {
+    $('smart-status').textContent = s?.configured ? `Smart panel: ${s.label}` : 'Smart panel: add a key in Settings';
+  });
 
-  // Current tab
+  // which tab are we on?
   let tab = null;
   try {
-    [tab] = await api.tabs.query({ active: true, currentWindow: true });
+    const tabs = await api.tabs.query({ active: true, currentWindow: true });
+    tab = tabs?.[0] || null;
   } catch {
-    tab = null;
+    /* ignore */
   }
+  const url = tab?.url ? new URL(tab.url) : null;
   const status = $('status');
-  const actions = $('page-actions');
-  let onCanvas = false;
-  if (tab?.id) {
-    const pong = await sendToTab(tab.id, { type: 'ping' });
-    onCanvas = !!pong?.ok && !!pong.canvas;
+  if (!url || !/^https?:$/.test(url.protocol)) {
+    status.textContent = 'Open a Canvas page to use it.';
+    return;
   }
-  let host = '';
-  try {
-    host = tab?.url ? new URL(tab.url).host : '';
-  } catch {
-    host = '';
-  }
-  let enabledHere = onCanvas;
-  if (!enabledHere && tab?.url) {
-    // The content script may simply not be running yet (page still loading);
-    // treat a granted host permission or a saved domain as "enabled".
+  const origin = url.origin;
+  const builtIn = /\.instructure\.com$/i.test(url.hostname);
+  const saved = (settings.domains || []).includes(origin);
+  let granted = builtIn || saved;
+  if (!granted) {
     try {
-      const origin = new URL(tab.url).origin;
-      enabledHere = settings.domains.includes(origin) || /\.instructure\.com$/.test(host) ||
-        (await api.permissions.contains({ origins: [`${origin}/*`] }).catch(() => false));
+      granted = await api.permissions.contains({ origins: [`${origin}/*`] });
     } catch {
-      enabledHere = false;
+      granted = false;
     }
   }
-  if (onCanvas) {
-    status.textContent = `Active on ${host}`;
-  } else if (enabledHere) {
-    status.textContent = `Enabled on ${host}. Reload the tab if nothing shows.`;
-    actions.hidden = true;
-  } else {
-    status.textContent = host ? `Not enabled on ${host}` : 'Open Canvas in a tab to use page tools';
-    actions.hidden = true;
-    if (tab?.url && /^https?:/.test(tab.url) && host) {
-      $('enable-card').hidden = false;
-      $('enable-host').textContent = host;
-    }
+  if (granted) {
+    status.textContent = `On for ${url.hostname}`;
+    return;
   }
-
-  const panel = (name) => async () => {
-    if (!tab?.id) return;
-    await sendToTab(tab.id, name === 'palette' ? { type: 'openPalette' } : name === 'help' ? { type: 'openHelp' } : { type: 'togglePanel', panel: name });
-    window.close();
-  };
-  $('open-todo').addEventListener('click', panel('todo'));
-  $('open-smart').addEventListener('click', panel('smart'));
-  $('open-palette').addEventListener('click', panel('palette'));
-  $('open-help').addEventListener('click', panel('help'));
-
+  status.textContent = `Not enabled on ${url.hostname}`;
+  $('enable-card').hidden = false;
+  $('enable-host').textContent = url.hostname;
   $('enable-site').addEventListener('click', async () => {
     const msg = $('enable-msg');
-    let origin;
+    msg.textContent = 'Asking for permission…';
+    let ok = false;
     try {
-      origin = new URL(tab.url).origin;
-    } catch {
-      return;
-    }
-    let granted = false;
-    try {
-      granted = await api.permissions.request({ origins: [`${origin}/*`] });
+      ok = await api.permissions.request({ origins: [`${origin}/*`] });
     } catch (e) {
-      msg.textContent = `Could not request permission: ${e.message}`;
+      msg.textContent = `Permission request failed: ${e?.message || e}`;
       return;
     }
-    if (!granted) {
+    if (!ok) {
       msg.textContent = 'Permission was not granted.';
       return;
     }
     const r = await send({ type: 'registerDomain', origin });
     if (r?.ok) {
-      msg.textContent = 'Enabled. Reloading the tab…';
+      msg.textContent = 'Enabled. Reloading the page…';
       try {
         await api.tabs.reload(tab.id);
       } catch {
         /* ignore */
       }
-      setTimeout(() => window.close(), 400);
-    } else {
-      msg.textContent = r?.message || 'Could not enable on this site.';
-    }
+      setTimeout(() => window.close(), 600);
+    } else msg.textContent = r?.message || 'Could not enable this site.';
   });
 })();

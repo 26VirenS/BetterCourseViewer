@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "BetterCourseViewer",
-  "version": "1.0.0",
-  "description": "A cleaner, faster, smarter Canvas: dark mode and themes, due-date reminders, a to-do list, keyboard navigation, and a smart assistant for your coursework.",
+  "version": "2.0.0",
+  "description": "A new interface for Canvas: dashboard, courses, to do, calendar, inbox and every course tab redrawn, with a dark appearance and a smart panel powered by your own Claude or ChatGPT key.",
   "author": "BetterCourseViewer contributors",
   "icons": {
     "48": "icons/icon-48.png",
@@ -54,17 +54,10 @@
       "run_at": "document_start",
       "js": [
         "lib/settings.js",
-        "lib/color.js",
-        "lib/theme-css.js",
         "content/early.js"
       ],
       "css": [
-        "content/styles/ui.css",
-        "content/styles/dark.css",
-        "content/styles/clean.css",
-        "content/styles/duedates.css",
-        "content/styles/skin.css",
-        "content/styles/shell.css"
+        "styles/app.css"
       ]
     },
     {
@@ -76,20 +69,22 @@
         "lib/utils.js",
         "lib/markdown.js",
         "lib/canvas-api.js",
-        "lib/page-context.js",
         "lib/smart-client.js",
-        "content/ui.js",
-        "content/features/theme.js",
-        "content/features/declutter.js",
-        "content/features/shell.js",
-        "content/features/due-dates.js",
-        "content/features/dashboard.js",
-        "content/features/course-home.js",
-        "content/features/todo.js",
-        "content/features/keyboard.js",
-        "content/features/embeds.js",
-        "content/features/smart-sidebar.js",
-        "content/main.js"
+        "app/icons.js",
+        "app/ui.js",
+        "app/store.js",
+        "app/screens/native.js",
+        "app/screens/dashboard.js",
+        "app/screens/courses.js",
+        "app/screens/todo.js",
+        "app/screens/groups.js",
+        "app/screens/calendar.js",
+        "app/screens/inbox.js",
+        "app/screens/course.js",
+        "app/screens/course-detail.js",
+        "app/screens/grades.js",
+        "app/smart.js",
+        "app/app.js"
       ]
     }
   ]

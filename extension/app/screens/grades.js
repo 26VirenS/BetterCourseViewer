@@ -1,0 +1,130 @@
+/* Grades tab: nested rings (outer = total, one ring per assignment group
+ * with graded work), the graded-only legend, a what-if mode that never
+ * leaves the browser, the assignment list and the group weights card. */
+(function () {
+  const BCV = (self.BCV = self.BCV || {});
+  const { h } = BCV.utils;
+  const U = BCV.ui;
+  const IC = BCV.IC;
+  const store = BCV.store;
+  const NS = 'http://www.w3.org/2000/svg';
+
+  const whatIfState = new Map(); // courseId -> { on, values }
+
+  async function render(ctx, shell) {
+    const { app } = ctx;
+    const c = shell.course;
+    const dark = shell.dark;
+    const b = U.el('bcv-body bcv-body--course-cols');
+    b.append(U.loading());
+    const groups = await store.assignmentGroups(c.id).catch(() => null);
+    if (!ctx.alive()) return b;
+    if (!groups) return b.replaceChildren(U.errorBox('Grades could not be loaded.')) || b;
+    const st = whatIfState.get(c.id) || { on: false, values: {} };
+    whatIfState.set(c.id, st);
+    let focusId = null;
+
+    function draw() {
+      const gm = store.gradeModel(groups, c, st.values, st.on, dark);
+      const parts = [];
+      if (st.on) {
+        parts.push(U.el('bcv-banner', [
+          U.svg(IC.warn, { size: 24, stroke: 'var(--bcv-red)', width: 2, style: { flex: 'none' } }),
+          h('div', { style: { flex: '1', minWidth: '200px' } }, [U.text('bcv-banner__title', 'This is not your actual score.'), U.text('bcv-banner__sub', 'What-if mode — your real scores are loaded in; edit any of them to test outcomes. Nothing is saved or sent to your instructor.')]),
+          U.btn('Clear all what-if scores', { kind: 'danger', onClick: () => { st.values = {}; draw(); } }),
+        ]));
+      }
+      // rings
+      const svg = document.createElementNS(NS, 'svg');
+      svg.setAttribute('viewBox', '0 0 160 160');
+      svg.setAttribute('width', '150');
+      svg.setAttribute('height', '150');
+      svg.setAttribute('class', 'bcv-rings__svg');
+      for (const r of gm.rings) svg.append(circle(r.r, r.track, null, null));
+      for (const r of gm.rings) svg.append(circle(r.r, r.arc, r.cap, r.dash));
+      const legend = U.el('bcv-rings__legend', [
+        U.text('bcv-label bcv-label--inline', 'By group'),
+        ...gm.rings.map((r) => U.el('bcv-legend__row', [
+          h('span', { class: 'bcv-legend__dot', style: { background: r.color } }),
+          U.el('bcv-legend__body', [
+            U.el('bcv-legend__line', [U.text('bcv-legend__label', r.label, 'span'), U.text('bcv-legend__weight', r.weight, 'span'), U.text('bcv-legend__value', r.value, 'span')]),
+            U.text('bcv-legend__detail', r.detail, 'span'),
+          ]),
+        ])),
+        U.btn(st.on ? 'Exit what-if mode' : 'Try what-if scores', { kind: st.on ? 'dangerSolid' : 'sm', cls: `bcv-whatif-btn ${st.on ? 'bcv-btn--sm' : ''}`, onClick: () => { st.on = !st.on; draw(); } }),
+        gm.ungraded.length ? U.el('bcv-ungraded', [
+          U.text('bcv-label bcv-label--inline bcv-label--105', 'No ring yet — nothing graded'),
+          ...gm.ungraded.map((u) => U.el('bcv-ungraded__row', [h('span', { class: 'bcv-legend__dot bcv-legend__dot--dashed' }), U.text('bcv-ungraded__name', u.name, 'span'), U.text('bcv-ungraded__w', u.weight ? `${u.weight} of grade` : 'not weighted', 'span')])),
+        ]) : null,
+      ]);
+      const ringsCard = U.card(U.el('bcv-rings', [svg, legend]), 'bcv-card--22');
+
+      // table
+      const rows = gm.rows.map((g) => {
+        const dotEl = h('span', { class: 'bcv-dot bcv-dot--7', style: { background: g.earned !== null ? '#0a84ff' : 'transparent' } });
+        let scoreEl;
+        if (!st.on) {
+          scoreEl = h('span', { class: 'bcv-grade__score', title: 'Double-click to test a what-if score', text: `${g.earned === null ? '—' : store.fmtPts(g.earned)} / ${store.fmtPts(g.possible)}` });
+          scoreEl.addEventListener('dblclick', () => { st.on = true; focusId = g.id; draw(); });
+        } else {
+          const input = h('input', { type: 'text', inputmode: 'decimal', placeholder: '—', class: `bcv-whatif__input ${g.hypothetical ? 'is-hyp' : ''}`, dataset: { wf: g.id }, value: st.values[g.id] === undefined ? (g.earned === null ? '' : String(g.earned)) : st.values[g.id] });
+          input.addEventListener('focus', () => input.select());
+          input.addEventListener('change', () => { st.values[g.id] = input.value.replace(/[^0-9.]/g, ''); focusId = null; draw(); });
+          input.addEventListener('keydown', (e) => { if (e.key === 'Enter') input.blur(); });
+          scoreEl = U.el('bcv-whatif', [input, U.text('bcv-whatif__possible', `/ ${store.fmtPts(g.possible)}`, 'span')]);
+        }
+        return U.row([
+          U.el('bcv-row__body', [
+            h('div', { style: { display: 'flex', alignItems: 'baseline', gap: '8px', flexWrap: 'wrap' } }, [h('a', { class: 'bcv-grade__name bcv-pretty', href: g.url || `${c.url}/grades`, style: { color: 'inherit' }, text: g.name }), g.badge ? U.badge(g.badge, g.badge === 'Late' ? 'orange' : g.badge === 'Missing' ? 'red' : '', 'bcv-badge--xs') : null]),
+            U.text('bcv-row__sub', `${g.group} · due ${g.due ? U.fmtBy(g.due) : '—'} · submitted ${g.submitted ? U.fmtAt(g.submitted) : '—'}`),
+          ]),
+          dotEl,
+          scoreEl,
+        ]);
+      });
+      const tableCard = h('div', {}, [
+        U.el('bcv-group__head bcv-group__head--10', [U.h2('Assignments'), U.text('bcv-group__sub bcv-ml-auto', 'Arranged by due date', 'span')]),
+        rows.length ? U.card(rows, 'bcv-card--list') : U.emptyCard('No assignments in this course.'),
+      ]);
+      const weightsCard = h('div', {}, [
+        U.label('Assignment group weights'),
+        U.card([
+          ...gm.weights.map((w) => U.el('bcv-row bcv-row--p12-16', [U.text('bcv-weights__name bcv-pretty', w.name, 'span'), h('span', { class: 'bcv-weights__pct', style: { color: w.zero || w.pct === '—' ? 'var(--bcv-ink3)' : 'var(--bcv-ink)' }, text: w.pct })])),
+          U.el('bcv-row bcv-row--p12-16', [U.text('bcv-weights__name', 'Total', 'span'), h('span', { class: 'bcv-weights__pct', style: { color: 'var(--bcv-blue)' }, text: gm.weighted ? '100%' : (gm.total === null ? '—' : `${gm.total}%`) })]),
+        ], 'bcv-card--list'),
+        gm.weighted ? null : U.hint('This course does not weight assignment groups; the total is points earned over points possible.', 'bcv-hint--narrow'),
+      ]);
+      b.replaceChildren(...parts, U.el('bcv-grades__main', [ringsCard, tableCard]), U.el('bcv-grades__side', weightsCard));
+      if (focusId) {
+        const el = b.querySelector(`[data-wf="${CSS.escape(focusId)}"]`);
+        if (el) { el.focus(); el.select(); }
+        focusId = null;
+      }
+      ctx.setSmart({
+        label: `${c.name} · Grades`,
+        actions: [
+          { label: 'Explain my grade', note: gm.total === null ? 'Nothing graded yet' : `${gm.total}% so far`, icon: IC.chart, prompt: 'Explain how my current grade in this course is built from the groups and weights, and which items matter most from here.' },
+          { label: 'What do I need on the final?', note: gm.weighted ? 'Uses the group weights' : 'Uses points', icon: IC.bolt, prompt: 'Using the weights and what is graded so far, what scores do I need on the remaining items to reach an A, a B and a C? Show the arithmetic briefly.' },
+        ],
+        context: () => [`Course: ${c.name}. Current total ${gm.total === null ? 'not available' : `${gm.total}%`}${c.grade ? ` (${c.grade})` : ''}. ${gm.weighted ? 'Weighted groups.' : 'Not weighted.'}`, 'Groups: ' + gm.weights.map((w) => `${w.name} ${w.pct}`).join('; '), 'Assignments:', ...gm.rows.map((g) => `- ${g.name} [${g.group}] ${g.earned === null ? 'ungraded' : `${g.earned}`} / ${g.possible}${g.badge ? ` · ${g.badge}` : ''}${g.due ? ` · due ${U.fmtBy(g.due)}` : ''}`)].join('\n'),
+      });
+    }
+    function circle(r, stroke, cap, dash) {
+      const el = document.createElementNS(NS, 'circle');
+      el.setAttribute('cx', '80');
+      el.setAttribute('cy', '80');
+      el.setAttribute('r', r);
+      el.setAttribute('fill', 'none');
+      el.setAttribute('stroke', stroke);
+      el.setAttribute('stroke-width', '12');
+      if (cap) el.setAttribute('stroke-linecap', cap);
+      if (dash) el.setAttribute('stroke-dasharray', dash);
+      return el;
+    }
+    draw();
+    void app;
+    return b;
+  }
+
+  BCV.screens.grades = { render };
+})();

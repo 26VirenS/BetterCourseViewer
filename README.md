@@ -1,40 +1,58 @@
 # BetterCourseViewer
 
-A Mac app that installs a Safari extension to make **Canvas** cleaner, faster, and smarter.
+A Mac app that installs a Safari extension giving **Canvas** a new interface, drawn to a single design: rounded cards on a soft grey ground, one sidebar, segmented controls, an iOS-style dark appearance, and a discreet **smart panel** that reads the page you are on using your own Claude or ChatGPT key.
 
-- **A new interface** – Canvas's chrome is replaced, not decorated. Our own sidebar (global navigation, your courses, and the current course's sections fetched from the Canvas API), a top bar with breadcrumbs and search, and a reading-first page style: one white page, strong titles, hairline-separated rows, pill buttons, filled inputs. The dashboard and the course home are rendered from the API in a layout of our own: greeting and metric rings (this week, today, grade average), course tiles with a grade ring and next-up items, a to-do column grouped by course with progress rings, recent announcements, and a course overview with grade, up-next, module progress and announcements. Think Wikiwand for Canvas. One switch turns it off if you prefer stock Canvas.
-- **Cleaner** – dark mode, themes (presets or your own colours), minimal mode, compact density, and switches to hide the dashboard sidebar, footer, card clutter, and nav items you never use.
-- **Faster** – keyboard navigation (`g a` for assignments, `j`/`k` through lists, `1`–`9` for courses), a `⌘K` command palette that jumps to any course, section, or upcoming item, and an **Open in new tab** button on embedded assignments, tool launches, and file previews.
-- **On top of things** – countdown badges next to everything with a due date, a "Due soon" strip on the dashboard, reminder pop-ups, a toolbar badge, and a **To Do** panel that combines Canvas items (checking them off syncs back to Canvas) with your own tasks. It knows what is *actually* due: assignments, quizzes and graded discussions count as due; ungraded discussions, pages, events and notes that only carry an instructor "to-do date" are shown separately as scheduled, never as due, and the To Do panel can filter by type.
-- **Smarter** – a **Smart Assistant** sidebar powered by your own Claude or ChatGPT key: ask questions about the current page, summarize readings and assignments, turn an assignment into a checklist, draft discussion replies, get plain-language explanations of grades and rubric feedback, extract key dates from a syllabus, or plan your week from the dashboard.
+Nothing is decorated; every screen is redrawn from the Canvas API with your own data. A switch at the top-left of every page turns the new look off and on.
 
-Everything runs in your browser. Canvas data comes from your own logged-in session, and page content is sent to Claude or ChatGPT only when you use a smart feature.
-
-## Screenshots
-
-| Home: greeting, metric rings, course tiles, to-do by course | Dark mode with the sidebar collapsed |
+| Dashboard (list view) | Course grades with nested rings |
 | --- | --- |
-| ![Home](docs/screenshots/dashboard.png) | ![Dark mode](docs/screenshots/dark-minimal.png) |
+| ![Dashboard](docs/screenshots/dashboard.png) | ![Grades](docs/screenshots/grades.png) |
 
-| Course overview | Modules page |
+| Calendar (month) | Course home |
 | --- | --- |
-| ![Course overview](docs/screenshots/course-home.png) | ![Modules](docs/screenshots/modules.png) |
+| ![Calendar](docs/screenshots/calendar.png) | ![Course home](docs/screenshots/course-home.png) |
 
-| To Do panel grouped by course | Smart Assistant on an assignment |
+| Dark appearance | Smart panel on an assignment |
 | --- | --- |
-| ![To Do](docs/screenshots/todo.png) | ![Smart Assistant](docs/screenshots/smart-assistant.png) |
+| ![Dark](docs/screenshots/dark.png) | ![Smart panel](docs/screenshots/smart-panel.png) |
 
 (Taken against the bundled mock Canvas, so the course content is fake.)
+
+## What you get
+
+**Sidebar** – site name and term, Dashboard / Courses / Groups / To Do (with a count) / Calendar / Inbox (with unread count), your favourite courses with their Canvas colours, a Dark/Light appearance switch and your account.
+
+**Dashboard** – three counters (due today with points, due this week across N courses, unread announcements), a per-course workload bar for the week (submitted ÷ assigned), and the same three views Canvas has: **Cards** (with a submitted-items progress bar, quick links and a "2 due today" badge), **List** (by day, with a circle to mark items done) and **Recent activity**. The view you pick is saved to your Canvas profile, as Canvas does.
+
+**Courses** – favourites as cards with term, role, progress and what is due next; every other course grouped by term with a star to add it to your dashboard; All / Past / Future and search.
+
+**To Do** – everything from today through the next seven days, by date or by course. It knows what is *actually* due: assignments, quizzes and graded discussions carry a due date; pages, events and ungraded discussions with only a to-do date are labelled as such. Dismiss hides an item without touching the work.
+
+**Calendar** – Week, Month and Agenda views over your Canvas calendars, an agenda **range picker** (tap a start and an end day), calendar switches (Canvas's ten-calendar limit is enforced with a message), and struck-through text for submitted or past items.
+
+**Inbox** – conversations with course and scope filters, a reader with reply, and compose with recipient search. Stars, read state and sending all go through the Canvas API.
+
+**Groups** – current and previous groups.
+
+**Courses** – a header with the course colour, term and an **Immersive Reader** button (a clean large-type reading view of the page), tab pills straight from the course's own navigation, and:
+- **Home** – the front page (or modules / syllabus / assignments / stream, whichever the instructor chose) with link chips, plus course links and the course To Do.
+- **Announcements**, **Assignments** (by date or by type, with status badges), **Discussions** (unread and reply counts), **People** (roles, sections, pronouns), **Pages**, **Files** (folders, selection, download), **Quizzes**, **Modules** (requirements and completion).
+- **Grades** – nested rings: the outer ring is your total as Canvas reports it; one inner ring per assignment group that has graded work; groups with nothing graded are listed instead of drawn. Weights, "not counted" and late badges, and a **what-if mode**: edit any score to see the outcome. Nothing is saved or sent anywhere.
+- Item views for assignments (rubric, submission, comments), discussion threads (nested replies, reply box), pages, quizzes and the syllabus.
+
+Anything without a screen of its own – taking a quiz, submitting, external tools, file previews, profile pages – is shown as Canvas drew it, inside the same shell, with a link back to stock Canvas.
+
+**Smart panel** – the small button at the bottom-right. It reads the current page and suggests actions that fit it: summarize what's due, plan the week, summarize an assignment or make a checklist, draft a discussion reply, condense a page, explain rubric feedback or a grade. Replies stream in; drafts can be copied or inserted into the reply box for you to edit. The word "AI" never appears; it is the smart panel.
 
 ## Requirements
 
 - macOS 13 Ventura or later, Safari 16.4 or later
 - Xcode 15 or later (free, from the Mac App Store) to build the Mac app
-- Optional: a [Claude API key](https://console.anthropic.com/settings/keys) and/or a [ChatGPT API key](https://platform.openai.com/api-keys) for the smart features
+- Optional: a [Claude API key](https://console.anthropic.com/settings/keys) and/or a [ChatGPT API key](https://platform.openai.com/api-keys) for the smart panel
 
 ## Install (build the Mac app)
 
-Safari extensions are shipped inside a Mac app, so the app is built with Xcode. The script below uses Apple's own converter to generate the Xcode project from the `extension/` folder.
+Safari extensions ship inside a Mac app, so the app is built with Xcode. The script uses Apple's converter to generate the Xcode project from the `extension/` folder.
 
 1. Clone the repo and open a Terminal in it.
 2. Generate the Xcode project and open it:
@@ -46,64 +64,44 @@ Safari extensions are shipped inside a Mac app, so the app is built with Xcode. 
 5. If you built without an Apple developer team, turn on **Safari → Settings → Developer → Allow unsigned extensions** (enable the Developer tab under Settings → Advanced if it is hidden).
 6. Click the BetterCourseViewer toolbar icon → **Settings**, and paste your Claude and/or ChatGPT key. Press **Test** to check it.
 
+Updating: `git pull`, then Product → Run in Xcode again (the project references the files in `extension/` directly). Delete the `macos/` folder to regenerate the project from scratch.
+
 To build from the command line instead of Xcode:
 
 ```bash
 ./scripts/build-mac-app.sh --build     # produces macos/build/BetterCourseViewer.app
 ```
 
-The generated project references the files in `extension/` directly, so edits show up on the next build. Delete the `macos/` folder to regenerate the project from scratch.
-
 ### Build errors
 
-- **"Embedded binary's bundle identifier is not prefixed with the parent app's bundle identifier"** – the two targets' identifiers drifted apart. In Xcode, select the project, then the **BetterCourseViewer** target → Signing & Capabilities and note its Bundle Identifier; then select the **BetterCourseViewer Extension** target and set its Bundle Identifier to that value plus `.Extension`. Give both targets the same Team, then Product → Clean Build Folder and run again. Regenerating with `rm -rf macos && ./scripts/build-mac-app.sh --open` also fixes it, since the script now normalises both identifiers.
-- **"Failed to register bundle identifier"** (personal/free teams) – pick your own identifier: `BUNDLE_ID=com.yourname.bettercourseviewer ./scripts/build-mac-app.sh --open` (after deleting `macos/`).
+- **"Embedded binary's bundle identifier is not prefixed with the parent app's bundle identifier"** – the two targets' identifiers drifted apart. Select the project, then the **BetterCourseViewer** target → Signing & Capabilities and note its Bundle Identifier; then select the **BetterCourseViewer Extension** target and set its Bundle Identifier to that value plus `.Extension`. Give both targets the same Team, then Product → Clean Build Folder and run again. `rm -rf macos && ./scripts/build-mac-app.sh --open` also fixes it.
+- **"Failed to register bundle identifier"** (personal/free teams) – pick your own: `BUNDLE_ID=com.yourname.bettercourseviewer ./scripts/build-mac-app.sh --open` (after deleting `macos/`).
 
 ### School with its own Canvas address?
 
-The extension is on automatically for every `*.instructure.com` site. If your school uses a custom address such as `canvas.myschool.edu`:
+The extension is on automatically for every `*.instructure.com` site. If your school uses a custom address such as `catcourses.ucmerced.edu`:
 
 1. Open that site in Safari.
-2. Click the BetterCourseViewer toolbar icon → **Enable on canvas.myschool.edu**, or add it under **Settings → Canvas sites**.
+2. Click the BetterCourseViewer toolbar icon → **Enable on catcourses.ucmerced.edu**, or add it under **Settings → Canvas sites**.
 
-## Using it
+## Turning the look off
 
-| Where | What you get |
-| --- | --- |
-| Sidebar | Home, Courses, Calendar, Inbox (with unread count), your courses with their colour, and, inside a course, its sections exactly as Canvas exposes them (including external tools). Collapses to an icon rail. |
-| Top bar | Course crumb and page title, a search box that opens the command palette, and the **To Do** and **Smart** buttons that open the side panels. |
-| Home | Greeting with this week's count; three rings (this week done/total, due today, grade average); a tile per course with its grade ring, next three items and quick links; a to-do column grouped by course with a progress ring each and one-tap check-off; recent announcements. |
-| Course home | An overview above the instructor's content: course title, term and instructors, grade ring, up-next items, module progress rings and the latest announcements. |
-| Toolbar icon | Quick toggles for dark mode, theme, the redesigned look, minimal mode, reminders; buttons for To Do, Smart Assistant, the command palette and shortcuts. A red badge shows how many items are due soon. |
-| Assignment, module and syllabus lists | Countdown badges (`Due in 3h`, `Overdue`, `Submitted`, `To-do in 2d`) next to every dated item, with rows tinted when something is due today or overdue. |
-| Embedded content | An **Open in new tab** button on LTI tool launches, file previews and other embeds. |
-| Smart Assistant | Quick actions that change with the page: *Summarize*, *Make a checklist*, *Explain my feedback*, *Rubric breakdown*, *Draft a reply*, *Reply to selected post*, *Practice questions*, *Key dates*, *Plan my week*, and free-form questions. Replies stream in; drafts can be copied or inserted straight into the discussion reply box. |
+- The **Skin** switch at the top-left of every Canvas page turns the new interface off; a small switch stays there so you can turn it back on.
+- The toolbar popup and Settings → Appearance have the same switch, plus Light / Dark / Match the system.
 
-### Keyboard shortcuts
+## The smart panel and your keys
 
-Press `?` on any Canvas page for the full list.
-
-| Keys | Action |
-| --- | --- |
-| `⌘K` | Command palette: jump to any course, section, upcoming item or action |
-| `g` then `d` / `c` / `i` / `k` | Dashboard / Courses / Inbox / Calendar |
-| `g` then `h` / `a` / `m` / `g` | Course home / Assignments / Modules / Grades |
-| `g` then `n` / `u` / `f` / `s` / `p` / `q` | Announcements / Discussions / Files / Syllabus / People / Quizzes |
-| `1`–`9` | Open the nth course on your dashboard |
-| `j` / `k`, then `o` or `↵` | Move through lists, open the focused item |
-| `[` / `]` | Previous / next module item |
-| `/` | Focus the page's search box |
-| `t` / `s` | To Do / Smart Assistant |
-| `⇧D` / `⇧M` | Toggle dark mode / minimal mode |
-| `esc` | Close panels |
-
-### Smart features and your keys
-
-- Add one or both keys under **Settings → Smart features**. If both are set, the one you mark as preferred is used (Claude by default); otherwise whichever key exists is used.
-- Default models are `claude-opus-5` and `gpt-5`; both are editable.
-- **Response depth** trades speed and cost for more thorough answers.
+- Add one or both keys under **Settings → Smart panel**. If both are set, the one you mark as preferred is used (Claude by default); otherwise whichever key exists is used.
+- Default models are `claude-opus-5` and `gpt-5`; both are editable. **Response depth** trades speed and cost for more thorough answers.
 - Keys are stored only in the extension's local storage on your Mac and are never included in settings exports.
+- Requests go straight from your browser to `api.anthropic.com` or `api.openai.com` with your key and include only the page you are reading (this can be turned off under Settings).
 - The Claude integration turns on Anthropic's server-side refusal fallbacks, so a request the safety classifier declines is retried on Anthropic's recommended substitute model automatically.
+
+## How it stays honest
+
+- No control does anything the Canvas student API cannot do: marking done and dismissing are planner overrides, stars are favourites, replies and messages go through the same endpoints Canvas uses, and the dashboard view is stored on your Canvas profile.
+- Every number on screen comes from an API response. The grade rings use your assignment groups and submissions; the total is the score Canvas reports until you enter what-if values. If a request fails the card is hidden rather than showing a false zero.
+- Course colours, nicknames, favourites and the dashboard view all come from your Canvas settings.
 
 ## Other browsers
 
@@ -111,32 +109,32 @@ The `extension/` folder is a standard Manifest V3 web extension and also loads i
 
 - Chrome/Edge: `chrome://extensions` → Developer mode → **Load unpacked** → choose `extension/`.
 - Firefox: `about:debugging` → **Load Temporary Add-on** → choose `extension/manifest.json`.
-- `./scripts/package.sh` produces `dist/bettercourseviewer-<version>.zip` for distribution.
+- `./scripts/package.sh` produces `dist/bettercourseviewer-<version>.zip`.
 
 ## Development
 
 ```
 extension/
   manifest.json            Manifest V3 (Safari, Chrome, Firefox)
-  background.js            streaming proxy to Claude/ChatGPT, key tests, badge, custom sites
-  lib/                     settings, providers (raw fetch + SSE), Canvas REST helper,
-                           page/route detection + context extraction, markdown, colour math
-  content/early.js         document_start: applies dark/theme classes before first paint
-  content/ui.js            toasts, side panels, nav items
-  content/features/        theme, declutter, shell (sidebar + top bar), due-dates, dashboard (Home),
-                           course-home (overview), todo, keyboard, embeds, smart-sidebar
-  content/styles/          ui.css, dark.css, clean.css, duedates.css, skin.css (page typography),
-                           shell.css (layout, dashboard, course overview)
+  background.js            streaming proxy to Claude/ChatGPT, key tests, custom sites
+  content/early.js         document_start: applies skin + appearance before first paint
+  styles/app.css           the whole design system (light/dark variables, every component)
+  lib/                     settings, providers (raw fetch + SSE), Canvas REST helper, markdown, utils
+  app/icons.js             icon paths
+  app/ui.js                components, date formatting, colour math
+  app/store.js             every Canvas API loader + the grade model
+  app/app.js               shell (sidebar), router, skin switch, hybrid pages
+  app/smart.js             the smart panel
+  app/screens/             dashboard, courses, todo, groups, calendar, inbox,
+                           course (shell + tabs), course-detail, grades, native
   popup/, options/         toolbar popup and the settings page
 scripts/
   build-mac-app.sh         generates the Xcode project / builds the .app
   package.sh               zips the extension
-  make-icons.mjs           regenerates the PNG icons from the inline SVG
-  dev/mock-canvas.mjs      a tiny fake Canvas (pages + API) for local testing
-  dev/smoke-test.mjs       loads the extension in headless Chromium against the mock
+  make-icons.mjs           regenerates the PNG icons
+  dev/mock-canvas.mjs      a fake Canvas (pages + the API endpoints the app reads)
+  dev/smoke-test.mjs       walks every screen in headless Chromium against the mock
 ```
-
-Run the mock Canvas and the smoke test (needs Node 18+ and Playwright's Chromium):
 
 ```bash
 node scripts/dev/mock-canvas.mjs        # http://localhost:8787
@@ -146,8 +144,8 @@ node scripts/dev/smoke-test.mjs         # screenshots in scripts/dev/out/
 ## Privacy
 
 - No analytics, no accounts, no servers of its own.
-- Canvas requests go to your Canvas site with your existing session cookie.
-- Smart requests go directly from your browser to `api.anthropic.com` or `api.openai.com` with your key, and only include the page content the sidebar shows as "Using: …" (you can turn "Include page" off per chat).
+- Canvas requests go to your Canvas site with your existing session cookie and are cached briefly on your Mac.
+- Smart requests go directly from your browser to the provider with your key.
 
 ## License
 

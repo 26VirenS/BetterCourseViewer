@@ -3,233 +3,111 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>BetterCourseViewer Settings</title>
+  <title>BetterCourseViewer settings</title>
   <link rel="stylesheet" href="options.css">
 </head>
 <body>
-  <div class="layout">
-    <nav class="sidenav" aria-label="Settings sections">
+  <div class="page">
+    <aside class="side">
       <div class="brand">
-        <img src="../icons/icon-96.png" width="36" height="36" alt="">
-        <div>
-          <div class="brand__name">BetterCourseViewer</div>
-          <div class="brand__ver" id="version"></div>
-        </div>
+        <img src="../icons/icon-48.png" width="30" height="30" alt="">
+        <div><div class="brand__name">BetterCourseViewer</div><div class="brand__ver" id="version"></div></div>
       </div>
-      <a href="#smart" class="navlink is-active" data-section="smart">Smart features</a>
-      <a href="#appearance" class="navlink" data-section="appearance">Appearance</a>
-      <a href="#declutter" class="navlink" data-section="declutter">Declutter</a>
-      <a href="#duedates" class="navlink" data-section="duedates">Due dates &amp; to-do</a>
-      <a href="#keyboard" class="navlink" data-section="keyboard">Keyboard</a>
-      <a href="#sites" class="navlink" data-section="sites">Canvas sites</a>
-      <a href="#about" class="navlink" data-section="about">About</a>
-    </nav>
+      <nav class="nav">
+        <a class="navlink is-active" data-section="smart" href="#smart">Smart panel</a>
+        <a class="navlink" data-section="appearance" href="#appearance">Appearance</a>
+        <a class="navlink" data-section="sites" href="#sites">Canvas sites</a>
+        <a class="navlink" data-section="about" href="#about">Data &amp; about</a>
+      </nav>
+    </aside>
 
-    <main class="content">
-      <!-- SMART -->
+    <main class="main">
       <section class="section is-active" id="smart">
-        <h1>Smart features</h1>
-        <p class="lead">Add a Claude or ChatGPT key to turn on the Smart Assistant: chat about any Canvas page, summarize readings and assignments, draft discussion replies, and get plain-language explanations of grades and rubric feedback. Keys are stored only in this extension on your Mac.</p>
+        <h1>Smart panel</h1>
+        <p class="lead">Add a Claude key, a ChatGPT key, or both. Requests go straight from your browser to the provider with your key; nothing passes through any other server.</p>
 
         <div class="card">
+          <h2>Claude</h2>
           <div class="field">
-            <label for="claudeKey">Claude API key</label>
-            <div class="keyrow">
+            <label for="claudeKey">API key</label>
+            <div class="row">
               <input type="password" id="claudeKey" class="input" placeholder="sk-ant-…" autocomplete="off" spellcheck="false">
-              <button class="btn btn--ghost" data-reveal="claudeKey" type="button">Show</button>
+              <button class="btn" type="button" data-reveal="claudeKey">Show</button>
               <button class="btn" id="testClaude" type="button">Test</button>
             </div>
             <div class="hint">Get one at <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>. <span class="result" id="claudeResult"></span></div>
           </div>
           <div class="field">
-            <label for="claudeModel">Claude model</label>
+            <label for="claudeModel">Model</label>
             <input type="text" id="claudeModel" class="input input--short" placeholder="claude-opus-5" spellcheck="false">
-            <div class="hint">Default <code>claude-opus-5</code>. Any current Claude model name works.</div>
           </div>
         </div>
 
         <div class="card">
+          <h2>ChatGPT</h2>
           <div class="field">
-            <label for="openaiKey">ChatGPT API key</label>
-            <div class="keyrow">
+            <label for="openaiKey">API key</label>
+            <div class="row">
               <input type="password" id="openaiKey" class="input" placeholder="sk-…" autocomplete="off" spellcheck="false">
-              <button class="btn btn--ghost" data-reveal="openaiKey" type="button">Show</button>
+              <button class="btn" type="button" data-reveal="openaiKey">Show</button>
               <button class="btn" id="testOpenAI" type="button">Test</button>
             </div>
             <div class="hint">Get one at <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener">platform.openai.com</a>. <span class="result" id="openaiResult"></span></div>
           </div>
           <div class="field">
-            <label for="openaiModel">ChatGPT model</label>
+            <label for="openaiModel">Model</label>
             <input type="text" id="openaiModel" class="input input--short" placeholder="gpt-5" spellcheck="false">
-            <div class="hint">Default <code>gpt-5</code>.</div>
           </div>
         </div>
 
         <div class="card">
+          <h2>Behaviour</h2>
           <div class="field field--row">
-            <div>
-              <label for="preferred">If both keys are set, use</label>
-              <div class="hint">Otherwise whichever key is configured is used automatically.</div>
-            </div>
+            <label for="preferred">When both keys are set, use</label>
             <select id="preferred" class="select">
               <option value="claude">Claude</option>
               <option value="openai">ChatGPT</option>
             </select>
           </div>
           <div class="field field--row">
-            <div>
-              <label for="depth">Response depth</label>
-              <div class="hint">Quick is fastest and cheapest; thorough thinks longer.</div>
-            </div>
+            <label for="depth">Response depth</label>
             <select id="depth" class="select">
-              <option value="quick">Quick</option>
+              <option value="quick">Quick — fastest, cheapest</option>
               <option value="balanced">Balanced</option>
-              <option value="thorough">Thorough</option>
+              <option value="thorough">Thorough — slower, more careful</option>
             </select>
           </div>
-          <label class="check"><input type="checkbox" id="includePageContext"> Share the current page with the assistant by default (you can toggle this per chat)</label>
-          <label class="check"><input type="checkbox" id="persistChat"> Keep the conversation when moving between Canvas pages</label>
-          <label class="check"><input type="checkbox" id="smartEnabled"> Show the Smart button in the Canvas navigation</label>
+          <label class="check"><input type="checkbox" id="includePageContext"> Read the page you are on (what is due, the assignment text, the discussion, your grades…)</label>
+          <label class="check"><input type="checkbox" id="persistChat"> Remember the conversation per page</label>
           <div class="status" id="smartStatus"></div>
         </div>
       </section>
 
-      <!-- APPEARANCE -->
       <section class="section" id="appearance">
         <h1>Appearance</h1>
         <div class="card">
-          <label class="check"><input type="checkbox" id="skin"> <strong>Redesigned interface</strong> — restyles Canvas with rounded corners, a soft neutral palette, a light sidebar, pill-shaped course navigation and a cleaner dashboard (greeting, "next up" on every course card)</label>
+          <label class="check"><input type="checkbox" id="skin"> <strong>BetterCourseViewer look</strong> — the redesigned Canvas. The switch at the top-left of every Canvas page does the same thing.</label>
           <div class="field field--row">
-            <div><label for="darkMode">Dark mode</label><div class="hint">Inverts Canvas with brand colours preserved; photos and videos stay normal.</div></div>
+            <label for="darkMode">Appearance</label>
             <select id="darkMode" class="select">
-              <option value="off">Off</option>
-              <option value="on">On</option>
-              <option value="system">Match system</option>
+              <option value="system">Match the system</option>
+              <option value="off">Light</option>
+              <option value="on">Dark</option>
             </select>
           </div>
-        </div>
-        <div class="card">
-          <label>Theme</label>
-          <div class="themes" id="themes"></div>
-          <div class="custom" id="customTheme">
-            <div class="field field--row"><label for="c-accent">Accent</label><input type="color" id="c-accent"></div>
-            <div class="field field--row"><label for="c-link">Links</label><input type="color" id="c-link"></div>
-            <div class="field field--row"><label for="c-nav">Navigation bar</label><input type="color" id="c-nav"></div>
-            <div class="field field--row"><label for="c-navText">Navigation text</label><input type="color" id="c-navText"></div>
+          <div class="field">
+            <label for="siteName">Site name in the sidebar</label>
+            <input type="text" id="siteName" class="input input--short" placeholder="e.g. CatCourses" spellcheck="false">
+            <div class="hint">Leave blank to use the first part of your Canvas address.</div>
           </div>
-        </div>
-        <div class="card">
-          <div class="field field--row">
-            <div><label for="font">Font</label></div>
-            <select id="font" class="select">
-              <option value="system">System (San Francisco)</option>
-              <option value="rounded">Rounded</option>
-              <option value="serif">Serif</option>
-              <option value="mono">Monospace</option>
-            </select>
-          </div>
-          <div class="field field--row">
-            <div><label for="density">Density</label></div>
-            <select id="density" class="select"><option value="comfortable">Comfortable</option><option value="compact">Compact</option></select>
-          </div>
-          <div class="field field--row">
-            <div><label for="contentWidth">Content width</label></div>
-            <select id="contentWidth" class="select"><option value="default">Canvas default</option><option value="narrow">Narrow (easier reading)</option><option value="wide">Wide</option></select>
-          </div>
-          <label class="check"><input type="checkbox" id="minimal"> <strong>Minimal mode</strong> — slim icon-only navigation, no footer, flatter cards, tighter spacing</label>
         </div>
       </section>
 
-      <!-- DECLUTTER -->
-      <section class="section" id="declutter">
-        <h1>Declutter</h1>
-        <div class="card">
-          <h2>Dashboard</h2>
-          <label class="check"><input type="checkbox" id="hideRightSidebar"> Hide the right sidebar (To Do / Coming Up / Recent Feedback) on the dashboard and course home</label>
-          <label class="check"><input type="checkbox" id="compactCards"> Compact course cards</label>
-          <label class="check"><input type="checkbox" id="hideCardImages"> Hide course card images (keep the colour)</label>
-          <label class="check"><input type="checkbox" id="hideCardActions"> Hide the announcement/assignment/discussion icons under each card</label>
-          <label class="check"><input type="checkbox" id="hideCardTerm"> Hide term names on cards</label>
-          <label class="check"><input type="checkbox" id="hideAnnouncementsBanner"> Hide global announcement banners</label>
-          <div class="field field--row"><div><label for="cardColumns">Cards per row</label></div>
-            <select id="cardColumns" class="select"><option value="auto">Canvas default</option><option value="3">3</option><option value="4">4</option><option value="5">5</option></select></div>
-        </div>
-        <div class="card">
-          <h2>Everywhere</h2>
-          <label class="check"><input type="checkbox" id="hideFooter"> Hide the footer</label>
-          <label class="check"><input type="checkbox" id="hideBreadcrumbs"> Hide breadcrumbs</label>
-          <label class="check"><input type="checkbox" id="hideHelpNav"> Hide "Help" in the navigation</label>
-          <label class="check"><input type="checkbox" id="hideHistoryNav"> Hide "History" in the navigation</label>
-          <label class="check"><input type="checkbox" id="hideGroupsNav"> Hide "Groups" in the navigation</label>
-          <label class="check"><input type="checkbox" id="hideToolNav"> Hide third-party tool links in the navigation (Studio, Commons, …)</label>
-        </div>
-      </section>
-
-      <!-- DUE DATES -->
-      <section class="section" id="duedates">
-        <h1>Due dates &amp; to-do</h1>
-        <div class="card">
-          <label class="check"><input type="checkbox" id="highlight"> Show countdown badges next to assignments, quizzes and discussions</label>
-          <label class="check"><input type="checkbox" id="dashboardPanel"> Show a "Due soon" strip at the top of the dashboard</label>
-          <label class="check"><input type="checkbox" id="badge"> Show the number of items due soon on the toolbar icon</label>
-          <label class="check"><input type="checkbox" id="remindersOn"> Reminder pop-ups for items due soon</label>
-          <div class="field field--row">
-            <div><label for="reminderWindowHours">Remind me when something is due within</label></div>
-            <select id="reminderWindowHours" class="select">
-              <option value="6">6 hours</option><option value="12">12 hours</option><option value="24">24 hours</option><option value="48">2 days</option><option value="72">3 days</option>
-            </select>
-          </div>
-          <div class="field field--row">
-            <div><label for="lookaheadDays">Look ahead</label></div>
-            <select id="lookaheadDays" class="select"><option value="7">7 days</option><option value="14">14 days</option><option value="21">21 days</option><option value="30">30 days</option></select>
-          </div>
-        </div>
-        <div class="card">
-          <h2>To Do panel</h2>
-          <label class="check"><input type="checkbox" id="todoEnabled"> Show the To Do button in the Canvas navigation</label>
-          <label class="check"><input type="checkbox" id="showCanvasItems"> Include Canvas assignments in the list (checking them off syncs with Canvas)</label>
-        </div>
-      </section>
-
-      <!-- KEYBOARD -->
-      <section class="section" id="keyboard">
-        <h1>Keyboard</h1>
-        <div class="card">
-          <label class="check"><input type="checkbox" id="keyboardEnabled"> Enable keyboard shortcuts on Canvas pages</label>
-          <label class="check"><input type="checkbox" id="palette"> Enable the command palette (⌘K)</label>
-        </div>
-        <div class="card">
-          <table class="keys">
-            <tr><th colspan="2">Navigate</th></tr>
-            <tr><td><kbd>⌘</kbd> <kbd>K</kbd></td><td>Command palette: jump to any course, section, upcoming item, or action</td></tr>
-            <tr><td><kbd>g</kbd> then <kbd>d</kbd> / <kbd>c</kbd> / <kbd>i</kbd> / <kbd>k</kbd></td><td>Dashboard / Courses / Inbox / Calendar</td></tr>
-            <tr><td><kbd>g</kbd> then <kbd>h</kbd> / <kbd>a</kbd> / <kbd>m</kbd> / <kbd>g</kbd></td><td>Course home / Assignments / Modules / Grades</td></tr>
-            <tr><td><kbd>g</kbd> then <kbd>n</kbd> / <kbd>u</kbd> / <kbd>f</kbd> / <kbd>s</kbd> / <kbd>p</kbd> / <kbd>q</kbd></td><td>Announcements / Discussions / Files / Syllabus / People / Quizzes</td></tr>
-            <tr><td><kbd>1</kbd>–<kbd>9</kbd></td><td>Open the nth course from your dashboard</td></tr>
-            <tr><td><kbd>[</kbd> / <kbd>]</kbd></td><td>Previous / next module item</td></tr>
-            <tr><th colspan="2">Lists</th></tr>
-            <tr><td><kbd>j</kbd> / <kbd>k</kbd></td><td>Move down / up through cards, assignments, modules, files</td></tr>
-            <tr><td><kbd>o</kbd> or <kbd>↵</kbd></td><td>Open the focused item</td></tr>
-            <tr><td><kbd>/</kbd></td><td>Focus the search box on the page</td></tr>
-            <tr><th colspan="2">Panels &amp; appearance</th></tr>
-            <tr><td><kbd>t</kbd></td><td>To Do</td></tr>
-            <tr><td><kbd>s</kbd></td><td>Smart Assistant</td></tr>
-            <tr><td><kbd>⇧</kbd> <kbd>D</kbd> / <kbd>⇧</kbd> <kbd>M</kbd></td><td>Toggle dark mode / minimal mode</td></tr>
-            <tr><td><kbd>?</kbd></td><td>Show shortcuts on any page</td></tr>
-            <tr><td><kbd>esc</kbd></td><td>Close panels</td></tr>
-          </table>
-        </div>
-        <div class="card">
-          <label class="check"><input type="checkbox" id="openInNewTabButton"> Add an "Open in new tab" button to embedded assignments, tool launches and file previews</label>
-        </div>
-      </section>
-
-      <!-- SITES -->
       <section class="section" id="sites">
         <h1>Canvas sites</h1>
-        <p class="lead">BetterCourseViewer works on every <code>*.instructure.com</code> address out of the box. If your school uses its own address (for example <code>canvas.myschool.edu</code>), add it here.</p>
+        <p class="lead">Every <code>*.instructure.com</code> site is on automatically. Add your school's own Canvas address here, or use the toolbar button while you are on it.</p>
         <div class="card">
-          <div class="keyrow">
+          <div class="row">
             <input type="url" id="newDomain" class="input" placeholder="https://canvas.myschool.edu" spellcheck="false">
             <button class="btn btn--primary" id="addDomain" type="button">Add site</button>
           </div>
@@ -238,19 +116,17 @@
         </div>
       </section>
 
-      <!-- ABOUT -->
       <section class="section" id="about">
-        <h1>About</h1>
+        <h1>Data &amp; about</h1>
         <div class="card">
-          <p><strong>BetterCourseViewer</strong> is a Safari extension that makes Canvas cleaner, faster, and smarter. It runs entirely in your browser: Canvas data is read from your own logged-in session, and page content is only sent to Claude or ChatGPT when you use a smart feature, using the key you provide.</p>
-          <p>Safari asks for permission the first time the extension runs on a site. Choose <em>Always Allow on This Website</em> so it keeps working.</p>
-          <div class="keyrow">
+          <p>Canvas data is read with your own logged-in session and cached briefly on this Mac. Keys stay in the extension's storage and are never exported.</p>
+          <div class="row">
+            <button class="btn" id="clearCache" type="button">Clear cached Canvas data</button>
             <button class="btn" id="exportSettings" type="button">Export settings</button>
             <button class="btn" id="importSettings" type="button">Import settings</button>
             <button class="btn btn--danger" id="resetSettings" type="button">Reset to defaults</button>
             <input type="file" id="importFile" accept="application/json" hidden>
           </div>
-          <div class="hint">Exports never include your API keys.</div>
         </div>
       </section>
     </main>
@@ -258,7 +134,6 @@
   <div class="toast" id="toast" hidden>Saved</div>
 
   <script src="../lib/settings.js"></script>
-  <script src="../lib/color.js"></script>
   <script src="options.js"></script>
 </body>
 </html>
