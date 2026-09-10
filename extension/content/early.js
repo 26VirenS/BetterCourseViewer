@@ -21,8 +21,13 @@
     return 'bcv-page-other';
   }
 
+  // Classes owned by features at runtime, not derived from settings.
+  const PRESERVE = new Set(['bcv-has-greeting', 'bcv-panel-open']);
+
   function applyClasses(classes) {
-    for (const c of Array.from(html.classList)) if (c.startsWith('bcv-') && !c.startsWith('bcv-page-')) html.classList.remove(c);
+    for (const c of Array.from(html.classList)) {
+      if (c.startsWith('bcv-') && !c.startsWith('bcv-page-') && !PRESERVE.has(c)) html.classList.remove(c);
+    }
     html.classList.add(...classes);
     if (!Array.from(html.classList).some((c) => c.startsWith('bcv-page-'))) html.classList.add(pageClass());
   }

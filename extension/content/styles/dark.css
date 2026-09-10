@@ -7,7 +7,7 @@
 
 html.bcv-dark {
   filter: invert(1) hue-rotate(180deg);
-  background: #ffffff !important;
+  background: #ffffff;
   min-height: 100%;
 }
 
@@ -37,17 +37,18 @@ html.bcv-dark #mobile-header img {
   filter: none;
 }
 
-/* Soften pure white surfaces a touch before inversion (renders #101010-ish). */
-html.bcv-dark body,
-html.bcv-dark .ic-Layout-wrapper,
-html.bcv-dark #main,
-html.bcv-dark .ic-app-main-content {
+/* Soften pure white surfaces a touch before inversion (renders #101010-ish).
+ * The redesigned interface sets its own surfaces via variables, so skip it there. */
+html.bcv-dark:not(.bcv-skin) body,
+html.bcv-dark:not(.bcv-skin) .ic-Layout-wrapper,
+html.bcv-dark:not(.bcv-skin) #main,
+html.bcv-dark:not(.bcv-skin) .ic-app-main-content {
   background-color: #f6f6f6 !important;
 }
-html.bcv-dark #content,
-html.bcv-dark .ic-Layout-contentMain,
-html.bcv-dark .ic-DashboardCard,
-html.bcv-dark .ic-DashboardCard__box {
+html.bcv-dark:not(.bcv-skin) #content,
+html.bcv-dark:not(.bcv-skin) .ic-Layout-contentMain,
+html.bcv-dark:not(.bcv-skin) .ic-DashboardCard,
+html.bcv-dark:not(.bcv-skin) .ic-DashboardCard__box {
   background-color: #ffffff !important;
 }
 

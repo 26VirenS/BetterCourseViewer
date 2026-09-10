@@ -2,22 +2,27 @@
 
 A Mac app that installs a Safari extension to make **Canvas** cleaner, faster, and smarter.
 
+- **Redesigned** – Canvas itself is restyled: a soft neutral page with white rounded cards, hairline separators, a light sidebar, pill-shaped course navigation, rounded buttons, inputs, tables and images, and a dashboard with a greeting and "next up" on every course card. Inspired by Better Canvas, drawn like a Mac app. One switch turns it off if you prefer stock Canvas.
 - **Cleaner** – dark mode, themes (presets or your own colours), minimal mode, compact density, and switches to hide the dashboard sidebar, footer, card clutter, and nav items you never use.
 - **Faster** – keyboard navigation (`g a` for assignments, `j`/`k` through lists, `1`–`9` for courses), a `⌘K` command palette that jumps to any course, section, or upcoming item, and an **Open in new tab** button on embedded assignments, tool launches, and file previews.
-- **On top of things** – countdown badges next to everything with a due date, a "Due soon" strip on the dashboard, reminder pop-ups, a toolbar badge, and a **To Do** panel that combines Canvas items (checking them off syncs back to Canvas) with your own tasks.
+- **On top of things** – countdown badges next to everything with a due date, a "Due soon" strip on the dashboard, reminder pop-ups, a toolbar badge, and a **To Do** panel that combines Canvas items (checking them off syncs back to Canvas) with your own tasks. It knows what is *actually* due: assignments, quizzes and graded discussions count as due; ungraded discussions, pages, events and notes that only carry an instructor "to-do date" are shown separately as scheduled, never as due, and the To Do panel can filter by type.
 - **Smarter** – a **Smart Assistant** sidebar powered by your own Claude or ChatGPT key: ask questions about the current page, summarize readings and assignments, turn an assignment into a checklist, draft discussion replies, get plain-language explanations of grades and rubric feedback, extract key dates from a syllabus, or plan your week from the dashboard.
 
 Everything runs in your browser. Canvas data comes from your own logged-in session, and page content is sent to Claude or ChatGPT only when you use a smart feature.
 
 ## Screenshots
 
-| Dashboard with the "Due soon" strip and reminders | To Do panel |
+| Redesigned dashboard: greeting, "Due soon", next up on each card | To Do panel filtered to discussions |
 | --- | --- |
 | ![Dashboard](docs/screenshots/dashboard.png) | ![To Do](docs/screenshots/todo.png) |
 
-| Dark mode + minimal mode + Midnight theme | Smart Assistant on an assignment |
+| Dark mode | Modules page |
 | --- | --- |
-| ![Dark mode](docs/screenshots/dark-minimal.png) | ![Smart Assistant](docs/screenshots/smart-assistant.png) |
+| ![Dark mode](docs/screenshots/dark-minimal.png) | ![Modules](docs/screenshots/modules.png) |
+
+| Grades | Smart Assistant on an assignment |
+| --- | --- |
+| ![Grades](docs/screenshots/grades.png) | ![Smart Assistant](docs/screenshots/smart-assistant.png) |
 
 (Taken against the bundled mock Canvas, so the course content is fake.)
 
@@ -67,8 +72,8 @@ The extension is on automatically for every `*.instructure.com` site. If your sc
 | --- | --- |
 | Canvas navigation | Two new items: **To Do** and **Smart**. Each opens a side panel. |
 | Toolbar icon | Quick toggles for dark mode, theme, minimal mode, sidebar, reminders; buttons for To Do, Smart Assistant, the command palette and shortcuts. A red badge shows how many items are due soon. |
-| Dashboard | A "Due soon" strip with colour-coded chips. Sidebar, footer and card clutter hidden by default (all optional). |
-| Assignment, module and syllabus lists | Countdown badges (`Due in 3h`, `Overdue`, `Submitted`) next to every dated item. |
+| Dashboard | A greeting with this week's count, a "Due soon" strip (graded work only, with a separate "also scheduled" row), and up to three next-up items on every course card. Sidebar, footer and card clutter hidden by default (all optional). |
+| Assignment, module and syllabus lists | Countdown badges (`Due in 3h`, `Overdue`, `Submitted`, `To-do in 2d`) next to every dated item, with rows tinted when something is due today or overdue. |
 | Embedded content | An **Open in new tab** button on LTI tool launches, file previews and other embeds. |
 | Smart Assistant | Quick actions that change with the page: *Summarize*, *Make a checklist*, *Explain my feedback*, *Rubric breakdown*, *Draft a reply*, *Reply to selected post*, *Practice questions*, *Key dates*, *Plan my week*, and free-form questions. Replies stream in; drafts can be copied or inserted straight into the discussion reply box. |
 
@@ -116,8 +121,8 @@ extension/
                            page/route detection + context extraction, markdown, colour math
   content/early.js         document_start: applies dark/theme classes before first paint
   content/ui.js            toasts, side panels, nav items
-  content/features/        theme, declutter, due-dates, todo, keyboard, embeds, smart-sidebar
-  content/styles/          ui.css, dark.css, clean.css, duedates.css
+  content/features/        theme, declutter, due-dates, dashboard, todo, keyboard, embeds, smart-sidebar
+  content/styles/          ui.css, dark.css, clean.css, duedates.css, skin.css (the redesign)
   popup/, options/         toolbar popup and the settings page
 scripts/
   build-mac-app.sh         generates the Xcode project / builds the .app

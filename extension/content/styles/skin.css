@@ -1,0 +1,925 @@
+/* BetterCourseViewer — redesigned interface ("skin").
+ * Restyles Canvas's own layout with an Apple-like look: soft neutral page,
+ * white rounded cards, hairline separators, a light sidebar, pill-shaped
+ * course navigation, rounded buttons/inputs/tables/images. Everything is
+ * gated on html.bcv-skin and driven by the --bcv-* variables that
+ * theme-css.js sets (so themes and dark mode still apply). */
+
+/* --- Base: page, fonts, colours ------------------------------------------- */
+html.bcv-skin {
+  background: var(--bcv-page-bg, #f5f5f7) !important;
+}
+html.bcv-skin body,
+html.bcv-skin #application,
+html.bcv-skin .ic-Layout-wrapper,
+html.bcv-skin #main,
+html.bcv-skin .ic-app-main-content,
+html.bcv-skin .ic-Layout-contentWrapper,
+html.bcv-skin #not_right_side {
+  background: var(--bcv-page-bg, #f5f5f7) !important;
+  color: var(--bcv-text, #1d1d1f);
+}
+html.bcv-skin body,
+html.bcv-skin button:not([class*="icon-"]),
+html.bcv-skin input,
+html.bcv-skin select,
+html.bcv-skin textarea,
+html.bcv-skin h1, html.bcv-skin h2, html.bcv-skin h3, html.bcv-skin h4,
+html.bcv-skin .ic-DashboardCard,
+html.bcv-skin [class^="css-"]:not([class*="icon"]),
+html.bcv-skin [data-cid] {
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", "Segoe UI", Roboto, sans-serif !important;
+  -webkit-font-smoothing: antialiased;
+}
+html.bcv-skin h1, html.bcv-skin h2, html.bcv-skin h3 {
+  letter-spacing: -0.015em;
+  font-weight: 700;
+  color: var(--bcv-text, #1d1d1f);
+}
+html.bcv-skin #content h1,
+html.bcv-skin .ic-Dashboard-header__title,
+html.bcv-skin .assignment-title h1,
+html.bcv-skin .page-title,
+html.bcv-skin h1.title {
+  font-size: 28px;
+  line-height: 1.2;
+  margin: 4px 0 16px;
+}
+html.bcv-skin #content h2 { font-size: 20px; }
+html.bcv-skin #content h3 { font-size: 16px; }
+html.bcv-skin #content a:not(.btn):not(.Button):not(.bcv-ui):not(.ic-DashboardCard__link),
+html.bcv-skin .user_content a {
+  color: var(--bcv-link, #0066cc);
+}
+html.bcv-skin ::selection {
+  background: var(--bcv-primary-soft, #e0ecfb);
+}
+
+/* --- Global navigation (left rail) ------------------------------------------ */
+html.bcv-skin #header.ic-app-header {
+  background: var(--bcv-nav-bg, #fbfbfd) !important;
+  border-right: 1px solid var(--bcv-nav-border, #e5e5ea);
+  box-shadow: none !important;
+}
+html.bcv-skin .ic-app-header__logomark-container {
+  background: transparent !important;
+  padding: 10px 12px 2px;
+}
+html.bcv-skin .ic-app-header__logomark {
+  height: 52px !important;
+  border-radius: 16px;
+  background-color: var(--ic-brand-global-nav-logo-bgd, #1d1d1f) !important;
+  background-size: 70% auto !important;
+}
+html.bcv-skin #menu,
+html.bcv-skin .ic-app-header__secondary-navigation .ic-app-header__menu-list {
+  padding: 4px 8px;
+}
+html.bcv-skin .ic-app-header__menu-list-link,
+html.bcv-skin .bcv-nav-link {
+  border-radius: 14px !important;
+  padding: 9px 2px 7px !important;
+  margin: 2px 0 !important;
+  color: var(--bcv-nav-fg, #3a3a3c) !important;
+  transition: background 0.12s ease;
+}
+html.bcv-skin .ic-app-header__menu-list-link:hover,
+html.bcv-skin .ic-app-header__menu-list-link:focus,
+html.bcv-skin .bcv-nav-link:hover {
+  background: var(--bcv-nav-hover, #eeeef2) !important;
+  color: var(--bcv-nav-fg, #3a3a3c) !important;
+}
+html.bcv-skin .ic-app-header__menu-list-item--active .ic-app-header__menu-list-link,
+html.bcv-skin .ic-app-header__menu-list-link[aria-current="page"] {
+  background: var(--bcv-nav-active-bg, #e2ecfb) !important;
+}
+html.bcv-skin .ic-app-header__menu-list-item--active .ic-app-header__menu-list-link .menu-item__text,
+html.bcv-skin .ic-app-header__menu-list-item--active .ic-app-header__menu-list-link .ic-icon-svg {
+  color: var(--bcv-nav-active-fg, #0071e3) !important;
+  fill: var(--bcv-nav-active-fg, #0071e3) !important;
+}
+html.bcv-skin .ic-app-header__menu-list-link .ic-icon-svg,
+html.bcv-skin .ic-app-header__menu-list-link .menu-item-icon-container svg {
+  width: 24px !important;
+  height: 24px !important;
+}
+html.bcv-skin .menu-item__text {
+  font-size: 11px !important;
+  font-weight: 500 !important;
+  letter-spacing: 0;
+  margin-top: 2px;
+}
+html.bcv-skin .ic-app-header__menu-list-item .ic-avatar {
+  border: 2px solid var(--ic-brand-global-nav-avatar-border, #e5e5ea) !important;
+}
+html.bcv-skin .menu-item__badge {
+  border-radius: 999px !important;
+  font-weight: 700 !important;
+}
+html.bcv-skin #primaryNavToggle .ic-icon-svg {
+  fill: var(--bcv-nav-fg, #3a3a3c) !important;
+}
+
+/* --- Breadcrumb bar ------------------------------------------------------------- */
+html.bcv-skin .ic-app-nav-toggle-and-crumbs {
+  border: 0 !important;
+  padding: 14px 24px 6px !important;
+  background: transparent !important;
+}
+html.bcv-skin #breadcrumbs ul {
+  font-size: 13px;
+}
+html.bcv-skin #breadcrumbs li {
+  color: var(--bcv-text-2, #6e6e73);
+}
+html.bcv-skin #breadcrumbs li::before {
+  content: "\203A" !important;
+  color: var(--bcv-text-3, #86868b) !important;
+  padding: 0 8px !important;
+  font-weight: 400;
+}
+html.bcv-skin #breadcrumbs li:first-child::before {
+  content: none !important;
+}
+html.bcv-skin #breadcrumbs a {
+  color: var(--bcv-text-2, #6e6e73) !important;
+  text-decoration: none !important;
+  border-radius: 6px;
+  padding: 2px 4px;
+}
+html.bcv-skin #breadcrumbs a:hover {
+  background: var(--bcv-surface-2, #f2f2f7);
+  color: var(--bcv-text, #1d1d1f) !important;
+}
+html.bcv-skin #breadcrumbs li:last-child {
+  color: var(--bcv-text, #1d1d1f);
+  font-weight: 600;
+}
+html.bcv-skin #courseMenuToggle {
+  color: var(--bcv-text-2, #6e6e73) !important;
+  border-radius: 10px;
+}
+html.bcv-skin .right-of-crumbs .btn,
+html.bcv-skin .right-of-crumbs .Button {
+  font-size: 13px;
+}
+
+/* --- Course navigation (left column) ------------------------------------------ */
+html.bcv-skin #left-side {
+  background: transparent !important;
+  border-right: 0 !important;
+  padding-top: 8px;
+}
+html.bcv-skin #section-tabs {
+  padding: 0 10px 0 16px;
+}
+html.bcv-skin #section-tabs li.section {
+  margin: 0 0 2px;
+}
+html.bcv-skin #section-tabs a,
+html.bcv-skin #section-tabs li.section a {
+  border: 0 !important;
+  border-radius: 10px !important;
+  padding: 7px 12px !important;
+  margin: 0 !important;
+  font-size: 14px !important;
+  font-weight: 500;
+  color: var(--bcv-text, #1d1d1f) !important;
+  background: transparent !important;
+  line-height: 1.35 !important;
+  transition: background 0.12s ease;
+}
+html.bcv-skin #section-tabs a:hover {
+  background: var(--bcv-surface-2, #f2f2f7) !important;
+  text-decoration: none !important;
+}
+html.bcv-skin #section-tabs a.active,
+html.bcv-skin #section-tabs a[aria-current="page"] {
+  background: var(--bcv-primary-soft, #e0ecfb) !important;
+  color: var(--bcv-primary, #0071e3) !important;
+  font-weight: 600 !important;
+}
+html.bcv-skin #section-tabs .section-hidden a,
+html.bcv-skin #section-tabs .section-tab-hidden a {
+  color: var(--bcv-text-3, #86868b) !important;
+}
+html.bcv-skin #section-tabs a .nav-icon {
+  color: var(--bcv-text-3, #86868b);
+}
+
+/* --- Main content card ----------------------------------------------------------- */
+html.bcv-skin #content.ic-Layout-contentMain {
+  background: var(--bcv-card, #fff) !important;
+  border: 1px solid var(--bcv-separator, #e5e5ea);
+  border-radius: 20px;
+  box-shadow: var(--bcv-shadow-card);
+  margin: 6px 24px 32px 8px;
+  padding: 26px 32px 32px !important;
+}
+html.bcv-skin.bcv-page-dashboard #content.ic-Layout-contentMain,
+html.bcv-skin.bcv-page-calendar #content.ic-Layout-contentMain,
+html.bcv-skin.bcv-page-inbox #content.ic-Layout-contentMain,
+html.bcv-skin.bcv-page-files #content.ic-Layout-contentMain,
+html.bcv-skin.bcv-page-other #content.ic-Layout-contentMain,
+html.bcv-skin.bcv-page-external-tool #content.ic-Layout-contentMain {
+  background: transparent !important;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  margin: 0;
+  padding: 0 24px 24px !important;
+}
+html.bcv-skin body.no-headers #content.ic-Layout-contentMain {
+  margin: 16px;
+}
+html.bcv-skin #right-side-wrapper {
+  background: transparent !important;
+  border: 0 !important;
+}
+html.bcv-skin #right-side {
+  padding: 6px 24px 24px 8px;
+}
+html.bcv-skin #right-side > div,
+html.bcv-skin #right-side .events_list,
+html.bcv-skin #right-side .to-do-list,
+html.bcv-skin #right-side .coming_up,
+html.bcv-skin #right-side .recent_feedback,
+html.bcv-skin #right-side .ic-sidebar-container {
+  background: var(--bcv-card, #fff);
+  border: 1px solid var(--bcv-separator, #e5e5ea);
+  border-radius: 16px;
+  padding: 14px 16px;
+  margin-bottom: 14px;
+  box-shadow: none;
+}
+html.bcv-skin #right-side h2,
+html.bcv-skin #right-side .h2 {
+  font-size: 13px !important;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--bcv-text-2, #6e6e73) !important;
+  border: 0 !important;
+  margin: 0 0 8px !important;
+}
+
+/* --- Dashboard --------------------------------------------------------------- */
+html.bcv-skin .ic-Dashboard-header {
+  padding: 4px 0 8px !important;
+  border: 0 !important;
+}
+html.bcv-skin.bcv-has-greeting .ic-Dashboard-header__title {
+  display: none !important;
+}
+/* Tuck the dashboard's view-options menu beside the greeting. */
+html.bcv-skin.bcv-has-greeting .bcv-greeting {
+  padding-right: 60px;
+}
+html.bcv-skin.bcv-has-greeting #dashboard_header_container {
+  position: relative;
+  height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: visible;
+}
+html.bcv-skin.bcv-has-greeting #dashboard_header_container .ic-Dashboard-header {
+  padding: 0 !important;
+  min-height: 0 !important;
+}
+html.bcv-skin.bcv-has-greeting .ic-Dashboard-header__actions {
+  position: absolute;
+  right: 0;
+  top: -78px;
+  margin: 0 !important;
+}
+html.bcv-skin .ic-Dashboard-header__actions .Button,
+html.bcv-skin .ic-Dashboard-header__actions button {
+  border-radius: 10px !important;
+}
+html.bcv-skin #dashboard_header_container {
+  background: transparent !important;
+  border: 0 !important;
+}
+.bcv-greeting {
+  padding: 10px 0 14px;
+}
+.bcv-greeting__title {
+  font-size: 34px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  margin: 0 0 4px;
+  color: var(--bcv-text, #1d1d1f);
+}
+.bcv-greeting__sub {
+  margin: 0;
+  font-size: 15px;
+  color: var(--bcv-text-2, #6e6e73);
+}
+.bcv-greeting__sub strong {
+  color: var(--bcv-text, #1d1d1f);
+  font-weight: 600;
+}
+html.bcv-skin .ic-DashboardCard__box {
+  padding: 0 !important;
+}
+html.bcv-skin .ic-DashboardCard__box__container {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 18px;
+  margin: 0 !important;
+}
+html.bcv-skin.bcv-cards-3 .ic-DashboardCard__box__container { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+html.bcv-skin.bcv-cards-4 .ic-DashboardCard__box__container { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+html.bcv-skin.bcv-cards-5 .ic-DashboardCard__box__container { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+html.bcv-skin .ic-DashboardCard {
+  width: auto !important;
+  margin: 0 !important;
+  border-radius: 20px !important;
+  border: 1px solid var(--bcv-separator, #e5e5ea);
+  background: var(--bcv-card, #fff) !important;
+  box-shadow: var(--bcv-shadow-card) !important;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+html.bcv-skin .ic-DashboardCard:hover {
+  transform: translateY(-2px);
+}
+html.bcv-skin .ic-DashboardCard__header_hero {
+  height: 8px !important;
+  min-height: 0 !important;
+  opacity: 1 !important;
+  border-radius: 0 !important;
+}
+html.bcv-skin .ic-DashboardCard__header_image {
+  display: none !important;
+}
+html.bcv-skin .ic-DashboardCard__header_content {
+  padding: 16px 18px 8px !important;
+}
+html.bcv-skin .ic-DashboardCard__header-title {
+  font-size: 17px !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.01em;
+  line-height: 1.25 !important;
+  color: var(--bcv-text, #1d1d1f) !important;
+}
+html.bcv-skin .ic-DashboardCard__header-title span {
+  color: inherit !important;
+}
+html.bcv-skin .ic-DashboardCard__header-subtitle,
+html.bcv-skin .ic-DashboardCard__header-term {
+  font-size: 13px !important;
+  color: var(--bcv-text-2, #6e6e73) !important;
+  margin-top: 2px !important;
+}
+html.bcv-skin .ic-DashboardCard__header-button {
+  border-radius: 10px !important;
+}
+html.bcv-skin .ic-DashboardCard__action-container {
+  border-top: 1px solid var(--bcv-separator, #e5e5ea) !important;
+  padding: 6px 10px !important;
+  margin-top: auto;
+}
+html.bcv-skin .ic-DashboardCard__action {
+  border-radius: 10px !important;
+}
+.bcv-card-next {
+  padding: 4px 18px 14px;
+  margin-top: auto;
+}
+.bcv-card-next__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 0;
+  border-top: 1px solid var(--bcv-separator, #e5e5ea);
+  font-size: 13px;
+  color: var(--bcv-text, #1d1d1f);
+  text-decoration: none !important;
+}
+.bcv-card-next__row:hover .bcv-card-next__title {
+  color: var(--bcv-primary, #0071e3);
+}
+.bcv-card-next__icon {
+  display: inline-flex;
+  color: var(--bcv-text-3, #86868b);
+  flex: none;
+}
+.bcv-card-next__icon svg { width: 14px; height: 14px; }
+.bcv-card-next__title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+.bcv-card-next__empty {
+  padding: 8px 0 2px;
+  border-top: 1px solid var(--bcv-separator, #e5e5ea);
+  font-size: 12.5px;
+  color: var(--bcv-text-3, #86868b);
+}
+html.bcv-skin .bcv-due-strip {
+  border-radius: 20px;
+  padding: 16px 20px;
+  border-color: var(--bcv-separator, #e5e5ea);
+  box-shadow: var(--bcv-shadow-card);
+  margin-bottom: 22px;
+}
+html.bcv-skin .bcv-due-chip {
+  border-radius: 12px;
+  background: var(--bcv-surface-2, #f2f2f7);
+  border-color: transparent;
+}
+
+/* --- Lists: assignments, modules, discussions, files ---------------------------- */
+html.bcv-skin .item-group-condensed,
+html.bcv-skin .ig-list > .item-group-condensed,
+html.bcv-skin .context_module {
+  background: var(--bcv-card, #fff) !important;
+  border: 1px solid var(--bcv-separator, #e5e5ea) !important;
+  border-radius: 16px !important;
+  overflow: hidden;
+  margin: 0 0 16px !important;
+  box-shadow: none !important;
+}
+html.bcv-skin .ig-header,
+html.bcv-skin .context_module .ig-header {
+  background: var(--bcv-surface-2, #f2f2f7) !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--bcv-separator, #e5e5ea) !important;
+  padding: 12px 16px !important;
+  border-radius: 0 !important;
+}
+html.bcv-skin .ig-header-title,
+html.bcv-skin .ig-header .name {
+  font-size: 15px !important;
+  font-weight: 600 !important;
+  color: var(--bcv-text, #1d1d1f) !important;
+}
+html.bcv-skin .ig-row {
+  border: 0 !important;
+  border-top: 1px solid var(--bcv-separator, #e5e5ea) !important;
+  padding: 11px 16px !important;
+  background: transparent !important;
+  transition: background 0.1s ease;
+}
+html.bcv-skin .ig-list > li:first-child > .ig-row,
+html.bcv-skin .ig-header + .content .ig-list > li:first-child > .ig-row {
+  border-top: 0 !important;
+}
+html.bcv-skin .ig-row:hover {
+  background: var(--bcv-surface-2, #f2f2f7) !important;
+}
+html.bcv-skin .ig-row.ig-published,
+html.bcv-skin .ig-row.ig-unpublished {
+  box-shadow: none !important;
+}
+html.bcv-skin .ig-title {
+  font-weight: 600 !important;
+  color: var(--bcv-text, #1d1d1f) !important;
+  font-size: 14.5px !important;
+}
+html.bcv-skin .ig-title:hover {
+  color: var(--bcv-primary, #0071e3) !important;
+  text-decoration: none !important;
+}
+html.bcv-skin .ig-details,
+html.bcv-skin .ig-details__item {
+  color: var(--bcv-text-2, #6e6e73) !important;
+  font-size: 12.5px !important;
+}
+html.bcv-skin .ig-type-icon,
+html.bcv-skin .type_icon {
+  color: var(--bcv-text-3, #86868b) !important;
+}
+html.bcv-skin .context_module_item.indent_1 .ig-row { padding-left: 36px !important; }
+html.bcv-skin .context_module_item.indent_2 .ig-row { padding-left: 56px !important; }
+html.bcv-skin .module-sequence-footer {
+  border: 0 !important;
+  background: transparent !important;
+}
+html.bcv-skin .module-sequence-footer-button--previous a,
+html.bcv-skin .module-sequence-footer-button--next a {
+  border-radius: 999px !important;
+}
+html.bcv-skin .ef-directory,
+html.bcv-skin .ef-item-row {
+  border-color: var(--bcv-separator, #e5e5ea) !important;
+}
+html.bcv-skin .ef-item-row:hover {
+  background: var(--bcv-surface-2, #f2f2f7) !important;
+}
+html.bcv-skin .discussion-entry,
+html.bcv-skin .entry-content,
+html.bcv-skin [data-testid="discussion-entry-container"],
+html.bcv-skin [data-testid="discussion-topic-container"] {
+  border-radius: 16px !important;
+}
+html.bcv-skin .ic-item-row,
+html.bcv-skin .ic-announcement-row,
+html.bcv-skin .ic-discussion-row {
+  border-radius: 12px !important;
+  border-color: var(--bcv-separator, #e5e5ea) !important;
+}
+
+/* --- Tables ---------------------------------------------------------------------- */
+html.bcv-skin #content table.ic-Table,
+html.bcv-skin #content table#grades_summary,
+html.bcv-skin #content table.roster,
+html.bcv-skin #content table#syllabus,
+html.bcv-skin #content table.course-list-table,
+html.bcv-skin #my_courses_table {
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
+  border: 1px solid var(--bcv-separator, #e5e5ea) !important;
+  border-radius: 14px !important;
+  overflow: hidden;
+  width: 100%;
+}
+html.bcv-skin #content table.ic-Table th,
+html.bcv-skin #content table#grades_summary th,
+html.bcv-skin #content table.roster th,
+html.bcv-skin #content table#syllabus th,
+html.bcv-skin #my_courses_table th {
+  background: var(--bcv-surface-2, #f2f2f7) !important;
+  color: var(--bcv-text-2, #6e6e73) !important;
+  font-size: 11.5px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  border: 0 !important;
+  border-bottom: 1px solid var(--bcv-separator, #e5e5ea) !important;
+  padding: 10px 14px !important;
+}
+html.bcv-skin #content table.ic-Table td,
+html.bcv-skin #content table#grades_summary td,
+html.bcv-skin #content table#grades_summary th.title,
+html.bcv-skin #content table.roster td,
+html.bcv-skin #content table#syllabus td,
+html.bcv-skin #my_courses_table td {
+  border: 0 !important;
+  border-top: 1px solid var(--bcv-separator, #e5e5ea) !important;
+  padding: 10px 14px !important;
+  background: transparent !important;
+  vertical-align: middle;
+}
+html.bcv-skin #content table#grades_summary th.title {
+  background: transparent !important;
+  color: var(--bcv-text, #1d1d1f) !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0;
+  text-transform: none;
+  text-align: left;
+}
+html.bcv-skin #content table#grades_summary th.title .context {
+  color: var(--bcv-text-3, #86868b);
+  font-size: 12px;
+  font-weight: 500;
+}
+html.bcv-skin #content table.ic-Table tbody tr:hover td,
+html.bcv-skin #content table#grades_summary tr.student_assignment:hover td,
+html.bcv-skin #content table#grades_summary tr.student_assignment:hover th {
+  background: var(--bcv-surface-2, #f2f2f7) !important;
+}
+html.bcv-skin #grades_summary tr.group_total td,
+html.bcv-skin #grades_summary tr.final_grade td,
+html.bcv-skin #grades_summary tr.group_total th,
+html.bcv-skin #grades_summary tr.final_grade th {
+  background: var(--bcv-surface-2, #f2f2f7) !important;
+  font-weight: 700;
+}
+html.bcv-skin #grades_summary .assignment_score .grade {
+  font-weight: 600;
+}
+
+/* --- Buttons ---------------------------------------------------------------------- */
+html.bcv-skin .btn,
+html.bcv-skin .Button,
+html.bcv-skin .ui-button,
+html.bcv-skin button.btn {
+  border-radius: 10px !important;
+  border: 1px solid var(--bcv-separator, #e5e5ea) !important;
+  background: var(--bcv-card, #fff) !important;
+  color: var(--bcv-text, #1d1d1f) !important;
+  font-weight: 600 !important;
+  font-size: 13.5px;
+  padding: 7px 14px;
+  box-shadow: none !important;
+  text-shadow: none !important;
+  background-image: none !important;
+  transition: background 0.12s ease, transform 0.08s ease;
+}
+html.bcv-skin .btn:hover,
+html.bcv-skin .Button:hover,
+html.bcv-skin .ui-button:hover {
+  background: var(--bcv-surface-2, #f2f2f7) !important;
+  color: var(--bcv-text, #1d1d1f) !important;
+}
+html.bcv-skin .btn:active,
+html.bcv-skin .Button:active {
+  transform: translateY(1px);
+}
+html.bcv-skin .btn-primary,
+html.bcv-skin .Button--primary,
+html.bcv-skin .btn.btn-primary,
+html.bcv-skin .submit_assignment_link,
+html.bcv-skin .btn-success,
+html.bcv-skin .Button--success {
+  background: var(--bcv-primary, #0071e3) !important;
+  border-color: var(--bcv-primary, #0071e3) !important;
+  color: var(--bcv-primary-fg, #fff) !important;
+}
+html.bcv-skin .btn-primary:hover,
+html.bcv-skin .Button--primary:hover,
+html.bcv-skin .btn-success:hover,
+html.bcv-skin .Button--success:hover {
+  filter: brightness(1.08);
+  color: var(--bcv-primary-fg, #fff) !important;
+}
+html.bcv-skin .btn-danger,
+html.bcv-skin .Button--danger {
+  background: var(--bcv-danger-2, #d70015) !important;
+  border-color: var(--bcv-danger-2, #d70015) !important;
+  color: #fff !important;
+}
+html.bcv-skin .Button--link,
+html.bcv-skin .btn-link {
+  background: transparent !important;
+  border-color: transparent !important;
+  color: var(--bcv-link, #0066cc) !important;
+}
+html.bcv-skin .btn-small,
+html.bcv-skin .Button--small {
+  padding: 4px 10px;
+  font-size: 12.5px;
+}
+html.bcv-skin [data-cid~="BaseButton"],
+html.bcv-skin [class*="baseButton__content"],
+html.bcv-skin [class*="-baseButton"] {
+  border-radius: 10px !important;
+}
+html.bcv-skin [data-cid~="IconButton"],
+html.bcv-skin [data-cid~="IconButton"] [class*="baseButton__content"] {
+  border-radius: 10px !important;
+}
+
+/* --- Inputs -------------------------------------------------------------------------- */
+html.bcv-skin #content input[type="text"],
+html.bcv-skin #content input[type="search"],
+html.bcv-skin #content input[type="email"],
+html.bcv-skin #content input[type="password"],
+html.bcv-skin #content input[type="number"],
+html.bcv-skin #content input[type="url"],
+html.bcv-skin #content textarea,
+html.bcv-skin #content select,
+html.bcv-skin .ic-Input,
+html.bcv-skin .ic-Form-control input {
+  border-radius: 10px !important;
+  border: 1px solid var(--bcv-separator, #e5e5ea) !important;
+  background: var(--bcv-card, #fff) !important;
+  color: var(--bcv-text, #1d1d1f) !important;
+  box-shadow: none !important;
+  padding: 7px 11px;
+}
+html.bcv-skin #content input:focus,
+html.bcv-skin #content textarea:focus,
+html.bcv-skin #content select:focus {
+  outline: none !important;
+  border-color: var(--bcv-primary, #0071e3) !important;
+  box-shadow: 0 0 0 3px var(--bcv-primary-soft, #e0ecfb) !important;
+}
+html.bcv-skin [data-cid~="TextInput"] [class*="textInput__facade"],
+html.bcv-skin [class*="-textInput__facade"],
+html.bcv-skin [class*="-textArea"],
+html.bcv-skin [class*="-select__inputLayout"],
+html.bcv-skin [class*="-selectInput"] {
+  border-radius: 10px !important;
+}
+
+/* --- Alerts, flash messages, pills ----------------------------------------------- */
+html.bcv-skin .ic-flash-success,
+html.bcv-skin .ic-flash-error,
+html.bcv-skin .ic-flash-warning,
+html.bcv-skin .ic-flash-info,
+html.bcv-skin .ic-flash-static,
+html.bcv-skin .alert {
+  border-radius: 14px !important;
+  box-shadow: var(--bcv-shadow-card) !important;
+  border: 1px solid var(--bcv-separator, #e5e5ea) !important;
+}
+html.bcv-skin .ic-notification,
+html.bcv-skin .ic-notification__content {
+  border-radius: 14px !important;
+}
+html.bcv-skin .pill,
+html.bcv-skin .label,
+html.bcv-skin .badge,
+html.bcv-skin [data-cid~="Pill"],
+html.bcv-skin [class*="-pill"] {
+  border-radius: 999px !important;
+}
+
+/* --- Assignment / quiz / page content ------------------------------------------------ */
+html.bcv-skin .student-assignment-overview {
+  display: flex !important;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0 0 20px !important;
+  padding: 0 !important;
+  border: 0 !important;
+}
+html.bcv-skin .student-assignment-overview li {
+  list-style: none;
+  background: var(--bcv-surface-2, #f2f2f7);
+  border-radius: 12px;
+  padding: 10px 14px !important;
+  margin: 0 !important;
+  min-width: 120px;
+  border: 0 !important;
+}
+html.bcv-skin .student-assignment-overview .title {
+  display: block;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--bcv-text-2, #6e6e73);
+  margin-bottom: 2px;
+}
+html.bcv-skin .student-assignment-overview .value {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--bcv-text, #1d1d1f);
+}
+html.bcv-skin .assignment-buttons,
+html.bcv-skin .assignment-actions {
+  gap: 8px;
+}
+html.bcv-skin .user_content,
+html.bcv-skin .show-content,
+html.bcv-skin .description {
+  font-size: 16px;
+  line-height: 1.65;
+  color: var(--bcv-text, #1d1d1f);
+}
+html.bcv-skin .user_content img,
+html.bcv-skin .user_content video,
+html.bcv-skin .user_content iframe,
+html.bcv-skin #content iframe,
+html.bcv-skin .user_content pre,
+html.bcv-skin .user_content table,
+html.bcv-skin .user_content blockquote {
+  border-radius: 12px;
+}
+html.bcv-skin .user_content table {
+  border: 1px solid var(--bcv-separator, #e5e5ea);
+  border-collapse: separate;
+  border-spacing: 0;
+  overflow: hidden;
+}
+html.bcv-skin .user_content pre,
+html.bcv-skin .user_content code {
+  background: var(--bcv-surface-2, #f2f2f7);
+  border: 0;
+}
+html.bcv-skin .user_content pre {
+  padding: 14px 16px;
+}
+html.bcv-skin .user_content blockquote {
+  border-left: 3px solid var(--bcv-separator, #e5e5ea);
+  background: var(--bcv-surface-2, #f2f2f7);
+  padding: 10px 16px;
+  margin-left: 0;
+}
+html.bcv-skin #assignment_show .description,
+html.bcv-skin .wiki-page-content {
+  border: 0 !important;
+  padding: 0 !important;
+}
+html.bcv-skin .header-bar,
+html.bcv-skin .header-bar-outer-container,
+html.bcv-skin .wiki-page-header,
+html.bcv-skin .page-toolbar {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+html.bcv-skin .ui-widget-content,
+html.bcv-skin .ui-dialog,
+html.bcv-skin .ui-menu {
+  border-radius: 16px !important;
+  border-color: var(--bcv-separator, #e5e5ea) !important;
+  box-shadow: var(--bcv-shadow-card) !important;
+}
+html.bcv-skin .ui-dialog .ui-dialog-titlebar {
+  border-radius: 16px 16px 0 0 !important;
+  background: var(--bcv-surface-2, #f2f2f7) !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--bcv-separator, #e5e5ea) !important;
+}
+html.bcv-skin .well,
+html.bcv-skin .box-shadow,
+html.bcv-skin .rubric_container,
+html.bcv-skin .rubric,
+html.bcv-skin .content-box,
+html.bcv-skin .ic-Layout-contentMain .form-horizontal,
+html.bcv-skin .ic-Form-group {
+  border-radius: 14px !important;
+  border-color: var(--bcv-separator, #e5e5ea) !important;
+  box-shadow: none !important;
+}
+html.bcv-skin table.rubric_table {
+  border-collapse: separate !important;
+  border-spacing: 0;
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+/* --- InstUI surfaces: modals, trays, menus, popovers ----------------------------------- */
+html.bcv-skin [class*="-modal__content"],
+html.bcv-skin [role="dialog"][class*="modal"],
+html.bcv-skin [data-cid~="Modal"] [role="dialog"] {
+  border-radius: 18px !important;
+  overflow: hidden;
+}
+html.bcv-skin [class*="-tray__content"],
+html.bcv-skin [data-cid~="Tray"] [role="dialog"] {
+  border-radius: 0 18px 18px 0 !important;
+}
+html.bcv-skin [class*="-popover__content"],
+html.bcv-skin [class*="-menu__"],
+html.bcv-skin [role="menu"],
+html.bcv-skin [class*="-positionContent"] > [class*="-view"] {
+  border-radius: 14px !important;
+}
+html.bcv-skin [class*="-alert"] {
+  border-radius: 14px !important;
+}
+html.bcv-skin [data-cid~="Avatar"],
+html.bcv-skin .ic-avatar,
+html.bcv-skin .avatar {
+  border-radius: 50% !important;
+}
+html.bcv-skin [class*="-view"][class*="borderRadius"],
+html.bcv-skin [data-cid~="Billboard"] {
+  border-radius: 16px !important;
+}
+html.bcv-skin [data-cid~="Tabs"] [role="tab"] {
+  border-radius: 10px 10px 0 0 !important;
+}
+html.bcv-skin [data-cid~="ProgressBar"] [class*="progressBar__"],
+html.bcv-skin progress {
+  border-radius: 999px !important;
+}
+
+/* --- Calendar --------------------------------------------------------------------------- */
+html.bcv-skin #calendar-app .fc-view-container,
+html.bcv-skin #calendar-app .fc-view {
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--bcv-card, #fff);
+  border: 1px solid var(--bcv-separator, #e5e5ea);
+}
+html.bcv-skin .fc-event,
+html.bcv-skin .fc-day-grid-event {
+  border-radius: 8px !important;
+}
+html.bcv-skin #calendar-app .fc-toolbar .fc-button {
+  border-radius: 10px !important;
+}
+html.bcv-skin #right-side .calendar_sidebar,
+html.bcv-skin #calendar-app .calendar_sidebar {
+  background: transparent;
+}
+
+/* --- Miscellaneous distractions ----------------------------------------------------------- */
+html.bcv-skin #footer,
+html.bcv-skin .ic-app-footer,
+html.bcv-skin .ic-Layout-watermark,
+html.bcv-skin #skip_navigation_link:not(:focus) {
+  display: none !important;
+}
+html.bcv-skin hr {
+  border-color: var(--bcv-separator, #e5e5ea);
+}
+html.bcv-skin .ic-app-course-nav-toggle,
+html.bcv-skin #courseMenuToggle {
+  opacity: 0.7;
+}
+html.bcv-skin .bcv-panel {
+  border-radius: 24px 0 0 24px;
+  border-left: 1px solid var(--bcv-separator, #e5e5ea);
+}
+html.bcv-skin .bcv-toast {
+  border-radius: 16px;
+}
+html.bcv-skin .bcv-dialog {
+  border-radius: 20px;
+}

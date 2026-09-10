@@ -305,6 +305,37 @@
   border-bottom: 1px solid var(--bcv-border, #e2e5ea);
 }
 .bcv-todo__add-more[hidden] { display: none; }
+.bcv-seg {
+  display: flex;
+  gap: 2px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--bcv-border, #e2e5ea);
+  overflow-x: auto;
+}
+.bcv-seg__btn {
+  appearance: none;
+  flex: none;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--bcv-fg-2, #6b7280);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.bcv-seg__btn:hover { background: var(--bcv-bg-2, #f4f5f7); color: var(--bcv-fg, #111827); }
+.bcv-seg__btn.is-active { background: var(--bcv-accent-soft); color: var(--bcv-accent, #4f46e5); }
+.bcv-todo__type {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--bcv-fg-2, #6b7280);
+  font-weight: 600;
+}
+.bcv-todo__type-icon { display: inline-flex; }
+.bcv-todo__type-icon svg { width: 13px; height: 13px; }
 .bcv-todo__group {
   padding: 6px 0 2px;
 }

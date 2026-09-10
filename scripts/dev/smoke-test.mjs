@@ -69,8 +69,22 @@ try {
   await page.waitForSelector('#bcv-nav-smart', { timeout: 10000 });
   check(await page.$('#bcv-nav-smart'), 'Smart nav item injected');
   await page.waitForSelector('#bcv-due-strip .bcv-due-chip', { timeout: 10000 });
-  const chips = await page.$$eval('#bcv-due-strip .bcv-due-chip', (els) => els.map((e) => e.textContent.trim()));
-  check(chips.length >= 4, `due strip shows ${chips.length} chips`);
+  const chips = await page.$$eval('#bcv-due-strip .bcv-due-strip__items:not(.bcv-due-strip__items--muted) .bcv-due-chip', (els) => els.map((e) => e.textContent.trim()));
+  check(chips.length === 5, `due strip shows ${chips.length} graded due items (expected 5)`);
+  check(!chips.some((c) => /ungraded|Chapter 4|Guest lecture/.test(c)), 'ungraded discussion / page / event are not listed as due');
+  const scheduledChips = await page.$$eval('#bcv-due-strip .bcv-due-strip__items--muted .bcv-due-chip', (els) => els.map((e) => e.textContent.trim()));
+  check(scheduledChips.length === 3, `scheduled row lists ${scheduledChips.length} to-do/event items (expected 3)`);
+  // redesigned dashboard
+  check(await page.$eval('html', (h) => h.classList.contains('bcv-skin')), 'redesigned interface class applied');
+  await page.waitForSelector('#bcv-greeting', { timeout: 5000 });
+  const greeting = await page.$eval('#bcv-greeting', (el) => el.textContent);
+  check(/^Good (morning|afternoon|evening|night), Sam/.test(greeting) && /due this week/.test(greeting), `greeting: ${greeting.slice(0, 60)}`);
+  check(await page.$eval('.ic-Dashboard-header__title', (el) => getComputedStyle(el).display === 'none'), 'original "Dashboard" title hidden');
+  await page.waitForSelector('.ic-DashboardCard .bcv-card-next', { timeout: 5000 });
+  const nextUp = await page.$$eval('.ic-DashboardCard', (cards) => cards.map((c) => ({ title: c.querySelector('.ic-DashboardCard__header-title')?.textContent.trim(), rows: [...c.querySelectorAll('.bcv-card-next__row')].map((r) => r.textContent.trim()) })));
+  check(nextUp.every((c) => c.rows.length >= 1), `next-up rows on every card: ${nextUp.map((c) => `${c.title}=${c.rows.length}`).join(', ')}`);
+  check(await page.$eval('.ic-DashboardCard', (el) => parseFloat(getComputedStyle(el).borderTopLeftRadius) >= 16), 'cards have rounded corners');
+  check(await page.$eval('#header', (el) => getComputedStyle(el).backgroundColor === 'rgb(251, 251, 253)'), 'light sidebar applied');
   check(await page.$eval('html', (h) => h.classList.contains('bcv-hide-sidebar')), 'declutter classes applied');
   check(await page.$eval('#right-side-wrapper', (el) => getComputedStyle(el).display === 'none'), 'dashboard sidebar hidden');
   check(await page.$eval('#footer', (el) => getComputedStyle(el).display === 'none'), 'footer hidden');
@@ -84,7 +98,19 @@ try {
   await page.keyboard.press('t');
   await page.waitForSelector('#bcv-todo.is-open', { timeout: 5000 });
   const todoItems = await page.$$eval('#bcv-todo .bcv-todo__item', (els) => els.length);
-  check(todoItems >= 4, `to-do panel lists ${todoItems} items`);
+  check(todoItems >= 7, `to-do panel lists ${todoItems} items`);
+  const types = await page.$$eval('#bcv-todo .bcv-todo__type', (els) => els.map((e) => e.textContent.trim()));
+  check(types.includes('Assignment') && types.includes('Quiz') && types.includes('Graded discussion') && types.includes('Discussion') && types.includes('Page') && types.includes('Event'), `type labels: ${[...new Set(types)].join(', ')}`);
+  const badgeTexts = await page.$$eval('#bcv-todo .bcv-due-badge', (els) => els.map((e) => e.textContent.trim()));
+  check(badgeTexts.some((t) => t.startsWith('To-do')) && badgeTexts.some((t) => t.startsWith('Due')), 'to-do panel distinguishes "Due" from "To-do" dates');
+  await page.click('#bcv-todo .bcv-seg__btn[data-filter="discussion"]');
+  await page.waitForTimeout(200);
+  const discTypes = await page.$$eval('#bcv-todo .bcv-todo__type', (els) => els.map((e) => e.textContent.trim()));
+  check(discTypes.length === 2 && discTypes.every((t) => /discussion/i.test(t)), `discussion filter shows ${discTypes.length} discussions only (${discTypes.join(', ')})`);
+  await page.screenshot({ path: join(out, '02b-todo-filter-discussions.png') });
+  await page.click('#bcv-todo .bcv-seg__btn[data-filter="all"]');
+  await page.waitForTimeout(400);
+  check(await page.$eval('.ic-Dashboard-header__title', (el) => getComputedStyle(el).display === 'none'), 'greeting survives a settings change');
   await page.fill('#bcv-todo input[type="text"]', 'Email professor about extension');
   await page.press('#bcv-todo input[type="text"]', 'Enter');
   await page.waitForTimeout(300);
@@ -154,7 +180,29 @@ try {
   await page.waitForSelector('#bcv-todo.is-open');
   await page.screenshot({ path: join(out, '06-todo-dark.png') });
   await page.keyboard.press('Escape');
+  await setSettings({ appearance: { darkMode: 'on', theme: 'default', minimal: false } });
+  await page.goto(`${BASE}/courses/303/modules`);
+  await page.waitForSelector('.bcv-due-badge', { timeout: 10000 });
+  await page.screenshot({ path: join(out, '06b-modules-dark.png') });
   await setSettings({ appearance: { darkMode: 'off', theme: 'default', minimal: false } });
+
+  // --- redesigned course pages ---------------------------------------------------------
+  console.log('course pages');
+  await page.goto(`${BASE}/courses/202`);
+  await page.waitForSelector('#bcv-nav-todo', { timeout: 10000 });
+  check(await page.$eval('#section-tabs a.active', (el) => parseFloat(getComputedStyle(el).borderRadius) >= 8), 'course nav pills styled');
+  check(await page.$eval('#content', (el) => parseFloat(getComputedStyle(el).borderTopLeftRadius) >= 16 && getComputedStyle(el).backgroundColor === 'rgb(255, 255, 255)'), 'content rendered as a rounded card');
+  await page.screenshot({ path: join(out, '13-course-home-skin.png') });
+  await page.goto(`${BASE}/courses/303/modules`);
+  await page.waitForSelector('.bcv-due-badge', { timeout: 10000 });
+  const modBadges = await page.$$eval('.bcv-due-badge', (els) => els.map((e) => e.textContent.trim()));
+  check(modBadges.some((b) => /^To-do/.test(b)), `modules: ungraded discussion shows a to-do badge (${modBadges.join(' | ')})`);
+  check(modBadges.some((b) => /^Due|^Done/.test(b)), 'modules: graded items show due/done badges');
+  await page.screenshot({ path: join(out, '14-modules-skin.png') });
+  await page.goto(`${BASE}/courses/101/grades`);
+  await page.waitForSelector('#bcv-nav-todo', { timeout: 10000 });
+  check(await page.$eval('#grades_summary', (el) => parseFloat(getComputedStyle(el).borderTopLeftRadius) >= 10), 'grades table rounded');
+  await page.screenshot({ path: join(out, '15-grades-skin.png') });
 
   // --- assignment list badges --------------------------------------------------------
   console.log('assignments');

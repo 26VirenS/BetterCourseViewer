@@ -17,6 +17,24 @@
     accentFg: '#ffffff',
   };
 
+  // Redesigned-interface palettes (Apple-like neutrals). Dark values are the
+  // colours we want on screen; build() pre-transforms content colours so the
+  // page's invert filter lands on them exactly.
+  const SKIN_LIGHT = {
+    pageBg: '#f5f5f7', card: '#ffffff', surface2: '#f2f2f7', separator: '#e5e5ea',
+    text: '#1d1d1f', text2: '#6e6e73', text3: '#86868b', primary: '#0071e3', link: '#0066cc',
+    success: '#1f8f3f', warning: '#c77700', danger: '#d70015',
+    navBg: '#fbfbfd', navFg: '#3a3a3c',
+    shadow: '0 1px 2px rgba(0,0,0,.04), 0 8px 24px rgba(0,0,0,.05)',
+  };
+  const SKIN_DARK = {
+    pageBg: '#0f0f10', card: '#1c1c1e', surface2: '#2a2a2d', separator: '#323236',
+    text: '#f5f5f7', text2: '#a1a1a6', text3: '#8e8e93', primary: '#0a84ff', link: '#2997ff',
+    success: '#30d158', warning: '#ffd60a', danger: '#ff453a',
+    navBg: '#161618', navFg: '#d1d1d6',
+    shadow: '0 1px 2px rgba(255,255,255,.05), 0 8px 24px rgba(255,255,255,.06)',
+  };
+
   function build(settings, dark) {
     const S = BCV.settings;
     const C = BCV.color;
@@ -50,28 +68,68 @@
       };
       for (const [k, v] of Object.entries(vars)) lines.push(`${k}: ${page(v)} !important;`);
     }
-    if (t.nav && C.parseHex(t.nav)) {
-      const nav = t.nav;
-      const navText = t.navText && C.parseHex(t.navText) ? t.navText : (C.isLight(nav) ? '#111827' : '#ffffff');
-      const active = t.accent && C.parseHex(t.accent) ? t.accent : nav;
-      const activeText = C.isLight(active) ? '#111827' : '#ffffff';
+    const skin = a.skin !== false;
+    // Global nav colours render as written (the nav is counter-filtered in dark
+    // mode), so these are final colours. A theme's nav colour wins; otherwise the
+    // redesigned interface uses a light (or, in dark mode, graphite) sidebar.
+    let nav = t.nav && C.parseHex(t.nav) ? t.nav : null;
+    let navText = t.navText && C.parseHex(t.navText) ? t.navText : null;
+    if (!nav && skin) {
+      nav = dark ? SKIN_DARK.navBg : SKIN_LIGHT.navBg;
+      navText = dark ? SKIN_DARK.navFg : SKIN_LIGHT.navFg;
+    }
+    if (nav) {
+      const navLight = C.isLight(nav);
+      navText = navText || (navLight ? '#111827' : '#ffffff');
+      const accentFinal = t.accent && C.parseHex(t.accent) ? t.accent : (skin ? (dark ? SKIN_DARK.primary : SKIN_LIGHT.primary) : nav);
+      const activeFg = navLight ? C.darken(accentFinal, 0.05) : C.lighten(accentFinal, 0.35);
       const vars = {
         '--ic-brand-global-nav-bgd': nav,
-        '--ic-brand-global-nav-logo-bgd': C.darken(nav, 0.25),
+        '--ic-brand-global-nav-logo-bgd': navLight ? '#1d1d1f' : C.darken(nav, 0.25),
         '--ic-brand-global-nav-ic-icon-svg-fill': navText,
         '--ic-brand-global-nav-menu-item__text-color': navText,
-        '--ic-brand-global-nav-avatar-border': navText,
-        '--ic-brand-global-nav-menu-item__badge-bgd': active,
-        '--ic-brand-global-nav-menu-item__badge-text': activeText,
-        '--ic-brand-global-nav-ic-icon-svg-fill--active': C.isLight(nav) ? C.darken(active, 0.1) : C.lighten(active, 0.35),
-        '--ic-brand-global-nav-menu-item__text-color--active': C.isLight(nav) ? C.darken(active, 0.1) : C.lighten(active, 0.35),
+        '--ic-brand-global-nav-avatar-border': navLight ? '#e5e5ea' : navText,
+        '--ic-brand-global-nav-menu-item__badge-bgd': accentFinal,
+        '--ic-brand-global-nav-menu-item__badge-text': C.isLight(accentFinal) ? '#111827' : '#ffffff',
+        '--ic-brand-global-nav-ic-icon-svg-fill--active': activeFg,
+        '--ic-brand-global-nav-menu-item__text-color--active': activeFg,
+        '--bcv-nav-bg': nav,
+        '--bcv-nav-fg': navText,
+        '--bcv-nav-border': navLight ? C.darken(nav, 0.08) : C.lighten(nav, 0.08),
+        '--bcv-nav-hover': navLight ? C.darken(nav, 0.05) : C.lighten(nav, 0.07),
+        '--bcv-nav-active-bg': navLight ? C.mix(accentFinal, nav, 0.88) : C.mix(accentFinal, nav, 0.78),
+        '--bcv-nav-active-fg': activeFg,
       };
       for (const [k, v] of Object.entries(vars)) lines.push(`${k}: ${v} !important;`);
     }
 
+    // Redesigned interface palette (page content: pre-transformed in dark mode).
+    if (skin) {
+      const sk = dark ? SKIN_DARK : SKIN_LIGHT;
+      const primary = t.accent && C.parseHex(t.accent) ? t.accent : sk.primary;
+      const skinVars = {
+        '--bcv-page-bg': sk.pageBg,
+        '--bcv-card': sk.card,
+        '--bcv-surface-2': sk.surface2,
+        '--bcv-separator': sk.separator,
+        '--bcv-text': sk.text,
+        '--bcv-text-2': sk.text2,
+        '--bcv-text-3': sk.text3,
+        '--bcv-primary': primary,
+        '--bcv-primary-fg': C.isLight(primary) ? '#111827' : '#ffffff',
+        '--bcv-primary-soft': C.mix(primary, sk.card, dark ? 0.78 : 0.88),
+        '--bcv-link': t.link && C.parseHex(t.link) ? t.link : (t.accent && C.parseHex(t.accent) ? t.accent : sk.link),
+        '--bcv-success': sk.success,
+        '--bcv-warning': sk.warning,
+        '--bcv-danger-2': sk.danger,
+      };
+      for (const [k, v] of Object.entries(skinVars)) lines.push(`${k}: ${page(v)};`);
+      lines.push(`--bcv-shadow-card: ${sk.shadow};`);
+    }
+
     // Extension UI palette.
     const pal = dark ? DARK : LIGHT;
-    const accent = (t.accent && C.parseHex(t.accent)) ? t.accent : (dark ? '#818cf8' : '#4f46e5');
+    const accent = (t.accent && C.parseHex(t.accent)) ? t.accent : skin ? (dark ? SKIN_DARK.primary : SKIN_LIGHT.primary) : (dark ? '#818cf8' : '#4f46e5');
     const ui = {
       '--bcv-bg': page(pal.bg),
       '--bcv-bg-2': page(pal.bg2),
@@ -98,5 +156,5 @@
     return `html { ${lines.join(' ')} }`;
   }
 
-  BCV.themeCss = { build, LIGHT, DARK };
+  BCV.themeCss = { build, LIGHT, DARK, SKIN_LIGHT, SKIN_DARK };
 })();

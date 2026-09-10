@@ -11,7 +11,7 @@
     if (!page.isCanvas) return; // login pages, error pages, non-Canvas hosts
     const settings = await BCV.settings.get();
     const ctx = { settings, page };
-    const order = ['theme', 'declutter', 'due-dates', 'todo', 'keyboard', 'embeds', 'smart'];
+    const order = ['theme', 'declutter', 'due-dates', 'dashboard', 'todo', 'keyboard', 'embeds', 'smart'];
     const features = [...(BCV.features || [])].sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
     // Features are independent; start them all so a slow Canvas API call in
     // one does not delay the others (e.g. keyboard shortcuts).

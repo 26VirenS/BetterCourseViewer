@@ -21,7 +21,14 @@
 .bcv-due-badge--today { background: var(--bcv-danger-soft, #fee2e2); color: var(--bcv-danger, #b91c1c); }
 .bcv-due-badge--overdue { background: var(--bcv-danger, #dc2626); color: #fff; }
 .bcv-due-badge--done { background: var(--bcv-ok-soft, #dcfce7); color: var(--bcv-ok, #15803d); text-decoration: none; }
+.bcv-due-badge--scheduled { background: transparent; color: var(--bcv-fg-2, #6b7280); border-color: var(--bcv-border, #e2e5ea); font-weight: 500; }
 .bcv-due-badge--overdue::before { content: "!"; font-weight: 800; }
+.bcv-due-chip__icon { display: inline-flex; color: var(--bcv-fg-2, #6b7280); flex: none; }
+.bcv-due-chip__icon svg { width: 14px; height: 14px; }
+.bcv-due-strip__secondary { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--bcv-border, #e2e5ea); }
+.bcv-due-strip__subtitle { font-size: 11.5px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--bcv-fg-2, #6b7280); margin-bottom: 6px; }
+.bcv-due-strip__items--muted .bcv-due-chip { opacity: 0.85; }
+.bcv-due-chip--scheduled { border-style: dashed; }
 
 /* Row-level tint for list items that are due today / overdue. */
 .bcv-due-row--today > .ig-row,

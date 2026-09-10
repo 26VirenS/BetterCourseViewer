@@ -30,6 +30,7 @@
   const bind = () => {
     $('darkMode').value = settings.appearance.darkMode;
     themeSel.value = settings.appearance.theme;
+    $('skin').checked = settings.appearance.skin !== false;
     $('minimal').checked = settings.appearance.minimal;
     $('compact').checked = settings.appearance.density === 'compact';
     $('hideRightSidebar').checked = settings.clean.hideRightSidebar;
@@ -39,6 +40,7 @@
 
   $('darkMode').addEventListener('change', (e) => S.update({ appearance: { darkMode: e.target.value } }));
   themeSel.addEventListener('change', (e) => S.update({ appearance: { theme: e.target.value } }));
+  $('skin').addEventListener('change', (e) => S.update({ appearance: { skin: e.target.checked } }));
   $('minimal').addEventListener('change', (e) => S.update({ appearance: { minimal: e.target.checked } }));
   $('compact').addEventListener('change', (e) => S.update({ appearance: { density: e.target.checked ? 'compact' : 'comfortable' } }));
   $('hideRightSidebar').addEventListener('change', (e) => S.update({ clean: { hideRightSidebar: e.target.checked } }));

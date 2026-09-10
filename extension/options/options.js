@@ -59,6 +59,7 @@
     ['includePageContext', 'smart.includePageContext', 'check'],
     ['persistChat', 'smart.persistChat', 'check'],
     ['smartEnabled', 'smart.enabled', 'check'],
+    ['skin', 'appearance.skin', 'check'],
     ['darkMode', 'appearance.darkMode', 'select'],
     ['font', 'appearance.font', 'select'],
     ['density', 'appearance.density', 'select'],

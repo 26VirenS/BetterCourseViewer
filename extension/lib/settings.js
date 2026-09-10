@@ -9,6 +9,7 @@
   const DEFAULTS = {
     version: 1,
     appearance: {
+      skin: true,                 // redesigned interface (rounded, minimal)
       darkMode: 'off',            // 'off' | 'on' | 'system'
       theme: 'default',           // preset id or 'custom'
       custom: {
@@ -49,6 +50,7 @@
       enabled: true,
       showCanvasItems: true,
       hideCompleted: true,
+      filter: 'all',              // 'all' | 'assignment' | 'quiz' | 'discussion' | 'other'
     },
     keyboard: {
       enabled: true,
@@ -171,6 +173,7 @@
     const classes = [];
     const dark = a.darkMode === 'on' || (a.darkMode === 'system' && systemDark);
     if (dark) classes.push('bcv-dark');
+    if (a.skin !== false) classes.push('bcv-skin');
     if (a.minimal) classes.push('bcv-minimal');
     if (a.density === 'compact') classes.push('bcv-compact');
     if (a.font && a.font !== 'system') classes.push('bcv-font-' + a.font);

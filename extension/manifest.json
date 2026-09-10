@@ -62,7 +62,8 @@
         "content/styles/ui.css",
         "content/styles/dark.css",
         "content/styles/clean.css",
-        "content/styles/duedates.css"
+        "content/styles/duedates.css",
+        "content/styles/skin.css"
       ]
     },
     {
@@ -80,6 +81,7 @@
         "content/features/theme.js",
         "content/features/declutter.js",
         "content/features/due-dates.js",
+        "content/features/dashboard.js",
         "content/features/todo.js",
         "content/features/keyboard.js",
         "content/features/embeds.js",

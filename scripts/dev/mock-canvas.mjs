@@ -22,6 +22,10 @@ const planner = [
   item('assignment', '4', '303', 'Project proposal', 6 * 24 * H, 50),
   item('assignment', '5', '101', 'Problem Set 2', -30 * H, 20, { missing: true }),
   item('assignment', '6', '202', 'Reading response 4', -2 * 24 * H, 10, { submitted: true, graded: true }),
+  // Not graded: an ungraded discussion and a page with instructor to-do dates, and an event.
+  scheduled('discussion_topic', '7', '303', 'Intro thread: say hello (ungraded)', 26 * H),
+  scheduled('wiki_page', '8', '101', 'Read: Chapter 4 notes', 3 * 24 * H),
+  scheduled('calendar_event', '9', '202', 'Guest lecture: Dr. Okafor', 4 * 24 * H),
 ];
 
 function item(type, id, courseId, title, dueIn, points, sub = {}) {
@@ -41,6 +45,26 @@ function item(type, id, courseId, title, dueIn, points, sub = {}) {
   };
 }
 
+function scheduled(type, id, courseId, title, at) {
+  const course = courses.find((c) => c.id === courseId);
+  const seg = type === 'discussion_topic' ? 'discussion_topics' : type === 'wiki_page' ? 'pages' : 'calendar_events';
+  const plannable = { id, title };
+  if (type === 'calendar_event') plannable.start_at = iso(at);
+  else plannable.todo_date = iso(at);
+  return {
+    context_type: 'Course',
+    course_id: courseId,
+    context_name: course.shortName,
+    plannable_id: id,
+    plannable_type: type,
+    plannable_date: iso(at),
+    plannable,
+    planner_override: null,
+    submissions: false,
+    html_url: `/courses/${courseId}/${seg}/${id}`,
+  };
+}
+
 const assignment = {
   id: '1', name: 'Problem Set 3', due_at: iso(3 * H), points_possible: 20, grading_type: 'points',
   submission_types: ['online_upload', 'online_text_entry'], allowed_attempts: 2,
@@ -56,7 +80,7 @@ const submission = {
   submission_comments: [{ author_name: 'Dr. Rivera', created_at: iso(-2 * 24 * H), comment: 'Good effort. Watch your signs when differentiating composite functions, and label each step.' }],
 };
 
-function page({ title, path, courseId, body }) {
+function page({ title, path = '', courseId, body }) {
   const env = { current_user_id: '7', current_user: { display_name: 'Sam Student' }, COURSE_ID: courseId || null, context_asset_string: courseId ? `course_${courseId}` : 'user_7', TIMEZONE: 'America/New_York' };
   return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>${title}</title>
 <meta name="csrf-token" content="mock-csrf">
@@ -92,6 +116,20 @@ function page({ title, path, courseId, body }) {
   .ig-info{flex:1}
   .ig-title{font-weight:700;color:var(--ic-link-color);text-decoration:none}
   .ig-details{font-size:12px;color:#6b7780}
+  .ig-header{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:#f5f5f5;border:1px solid #c7cdd1}
+  .ig-header-title{margin:0;font-size:16px}
+  #left-side{width:200px;flex:none;border-right:1px solid #c7cdd1;padding:12px 0}
+  #section-tabs{list-style:none;margin:0;padding:0}
+  #section-tabs a{display:block;padding:8px 16px;color:#2d3b45;text-decoration:none;border-left:3px solid transparent}
+  #section-tabs a.active{border-left-color:#0374B5;font-weight:700;background:#fff}
+  .header-bar{display:flex;gap:8px;align-items:center;padding:12px 0;border-bottom:1px solid #c7cdd1;margin-bottom:12px}
+  .header-bar input{padding:6px 8px;border:1px solid #c7cdd1;flex:1}
+  .btn{padding:6px 12px;border:1px solid #c7cdd1;background:#f5f5f5;border-radius:3px;font:inherit;cursor:pointer;text-decoration:none;color:#2d3b45}
+  .ic-flash-success{padding:12px 16px;background:#00ac18;color:#fff;margin-bottom:12px}
+  table.ic-Table{width:100%;border-collapse:collapse}
+  table.ic-Table th,table.ic-Table td{border:1px solid #c7cdd1;padding:8px;text-align:left}
+  .student-assignment-overview{list-style:none;padding:0;display:flex;gap:24px}
+  .student-assignment-overview .title{font-weight:700;margin-right:6px}
   .user_content{max-width:760px;line-height:1.6}
   .btn-primary{background:var(--ic-brand-primary);color:#fff;padding:8px 14px;border-radius:4px;border:0}
   #footer{padding:40px 24px;color:#6b7780;font-size:12px}
@@ -112,6 +150,10 @@ function page({ title, path, courseId, body }) {
 <div id="wrapper" class="ic-Layout-wrapper">
   <div class="ic-app-nav-toggle-and-crumbs"><nav id="breadcrumbs"><ul style="list-style:none;display:flex;gap:8px;margin:0;padding:0"><li><a href="/">Home</a></li>${courseId ? `<li><a href="/courses/${courseId}"><span>${courses.find((c) => c.id === courseId).name}</span></a></li>` : ''}<li>${title}</li></ul></nav></div>
   <div id="main" class="ic-Layout-columns">
+    ${courseId ? `<div id="left-side" class="ic-app-course-menu ic-sticky-on list-view"><div id="sticky-container" class="ic-sticky-frame"><ul id="section-tabs">
+      ${[['', 'Home'], ['/announcements', 'Announcements'], ['/assignments', 'Assignments'], ['/discussion_topics', 'Discussions'], ['/grades', 'Grades'], ['/modules', 'Modules'], ['/pages', 'Pages'], ['/files', 'Files'], ['/quizzes', 'Quizzes'], ['/users', 'People']]
+        .map(([seg, label]) => `<li class="section"><a href="/courses/${courseId}${seg}" class="${label.toLowerCase()}${path === `/courses/${courseId}${seg}` ? ' active' : ''}"${path === `/courses/${courseId}${seg}` ? ' aria-current="page"' : ''}>${label}</a></li>`).join('')}
+    </ul></div></div>` : ''}
     <div id="not_right_side" class="ic-app-main-content"><div id="content" class="ic-Layout-contentMain">${body}</div></div>
     <aside id="right-side-wrapper" class="ic-app-main-content__secondary"><div id="right-side"><h2>To Do</h2><p>Canvas's own sidebar</p></div></aside>
   </div>
@@ -124,29 +166,57 @@ function page({ title, path, courseId, body }) {
 const pages = {
   '/': () => page({
     title: 'Dashboard',
-    body: `<div id="dashboard"><div class="ic-Dashboard-header"><h1>Dashboard</h1><div class="ic-Dashboard-header__actions"><button>⋮</button></div></div>
+    body: `<div id="dashboard_header_container"><div class="ic-Dashboard-header"><div class="ic-Dashboard-header__layout"><h1 class="ic-Dashboard-header__title"><span class="hidden-phone">Dashboard</span></h1><div class="ic-Dashboard-header__actions"><button class="Button">⋮</button></div></div></div></div><div id="dashboard">
       <div id="DashboardCard_Container"><div class="ic-DashboardCard__box"><div class="ic-DashboardCard__box__container">
       ${courses.map((c) => `<div class="ic-DashboardCard"><a class="ic-DashboardCard__link" href="/courses/${c.id}"><div class="ic-DashboardCard__header_hero" style="background:${c.color}"></div><div class="ic-DashboardCard__header_content"><h3 class="ic-DashboardCard__header-title">${c.shortName}</h3><div class="ic-DashboardCard__header-subtitle">${c.code}</div><div class="ic-DashboardCard__header-term">Fall 2026</div></div></a><div class="ic-DashboardCard__action-container"><span>📣</span><span>📝</span><span>💬</span></div></div>`).join('')}
       </div></div></div></div>`,
   }),
+  '/courses/202': () => page({
+    title: 'HIST 202: Modern Europe', courseId: '202', path: '/courses/202',
+    body: `<div id="course_home_content"><h1>HIST 202: Modern Europe</h1><div class="user_content"><p>Welcome to Modern Europe. This week: <strong>industrialization</strong> and its effects on family life.</p><p><img src="data:image/svg+xml;utf8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="480" height="180"><rect width="480" height="180" fill="#dbe4ee"/><text x="20" y="100" font-family="sans-serif" font-size="24" fill="#2d3b45">Course banner image</text></svg>')}" width="480" height="180" alt=""></p></div>
+      <div class="header-bar"><input type="text" placeholder="Search course…" aria-label="Search"><button class="btn">Filter</button><button class="btn btn-primary">New</button></div></div>`,
+  }),
+  '/courses/303/modules': () => page({
+    title: 'Modules', courseId: '303', path: '/courses/303/modules',
+    body: `<h1>Modules</h1><div id="context_modules" class="ig-list">
+      <div class="item-group-condensed context_module" id="context_module_1"><div class="ig-header header"><h2 class="ig-header-title"><span class="name">Week 1: Complexity</span></h2><button class="btn btn-small">Collapse</button></div><div class="content"><ul class="ig-list items context_module_items">
+        <li class="context_module_item indent_0"><div class="ig-row ig-published"><div class="ig-info"><a class="ig-title" href="/courses/303/pages/big-o-notes">Big-O notes</a><div class="ig-details"><span class="ig-details__item">Page</span></div></div></div></li>
+        <li class="context_module_item indent_1"><div class="ig-row ig-published"><div class="ig-info"><a class="ig-title" href="/courses/303/quizzes/2">Quiz 2: Sorting</a><div class="ig-details"><span class="ig-details__item">10 pts</span></div></div></div></li>
+        <li class="context_module_item indent_0"><div class="ig-row ig-published"><div class="ig-info"><a class="ig-title" href="/courses/303/assignments/4">Project proposal</a><div class="ig-details"><span class="ig-details__item">50 pts</span></div></div></div></li>
+        <li class="context_module_item indent_0"><div class="ig-row ig-published"><div class="ig-info"><a class="ig-title" href="/courses/303/discussion_topics/7">Intro thread: say hello (ungraded)</a><div class="ig-details"><span class="ig-details__item">Discussion</span></div></div></div></li>
+      </ul></div></div>
+      <div class="item-group-condensed context_module" id="context_module_2"><div class="ig-header header"><h2 class="ig-header-title"><span class="name">Week 2: Sorting</span></h2></div><div class="content"><ul class="ig-list items context_module_items">
+        <li class="context_module_item indent_0"><div class="ig-row ig-published"><div class="ig-info"><a class="ig-title" href="/courses/303/pages/merge-sort">Merge sort</a><div class="ig-details"><span class="ig-details__item">Page</span></div></div></div></li>
+      </ul></div></div></div>`,
+  }),
+  '/courses/101/grades': () => page({
+    title: 'Grades', courseId: '101', path: '/courses/101/grades',
+    body: `<h1>Grades for Sam Student</h1><div class="ic-flash-success">Grades were updated.</div><table id="grades_summary" class="ic-Table ic-Table--hover-row"><thead><tr><th>Name</th><th>Due</th><th>Status</th><th>Score</th><th>Out of</th></tr></thead><tbody>
+      <tr class="student_assignment assignment_graded"><th class="title"><a href="/courses/101/assignments/6">Reading response 4</a><div class="context">Homework</div></th><td class="due">Sep 8</td><td class="status">—</td><td class="assignment_score"><span class="grade">9</span></td><td>10</td></tr>
+      <tr class="student_assignment"><th class="title"><a href="/courses/101/assignments/5">Problem Set 2</a><div class="context">Homework</div></th><td class="due">Sep 9</td><td class="status">missing</td><td class="assignment_score"><span class="grade">–</span></td><td>20</td></tr>
+      <tr class="student_assignment"><th class="title"><a href="/courses/101/assignments/1">Problem Set 3</a><div class="context">Homework</div></th><td class="due">Sep 10</td><td class="status"></td><td class="assignment_score"><span class="grade">–</span></td><td>20</td></tr>
+      <tr class="group_total"><th class="title">Homework</th><td></td><td></td><td class="assignment_score">90%</td><td></td></tr>
+      <tr class="final_grade"><th class="title">Total</th><td></td><td></td><td class="assignment_score">87.5%</td><td></td></tr>
+      </tbody></table>`,
+  }),
   '/courses/101/assignments': () => page({
-    title: 'Assignments', courseId: '101',
-    body: `<h1>Assignments</h1><ul class="ig-list">
+    title: 'Assignments', courseId: '101', path: '/courses/101/assignments',
+    body: `<h1>Assignments</h1><div class="header-bar"><input type="search" placeholder="Search for assignment" aria-label="Search"><button class="btn">Show by type</button></div><ul class="ig-list">
       <li class="assignment"><div class="ig-row"><div class="ig-info"><a class="ig-title" href="/courses/101/assignments/1">Problem Set 3</a><div class="ig-details"><span class="ig-details__item">Due Sep 10 at 11:59pm</span> · 20 pts</div></div></div></li>
       <li class="assignment"><div class="ig-row"><div class="ig-info"><a class="ig-title" href="/courses/101/assignments/5">Problem Set 2</a><div class="ig-details">20 pts</div></div></div></li>
       <li class="assignment"><div class="ig-row"><div class="ig-info"><a class="ig-title" href="/courses/101/assignments/9">Problem Set 4 (no date yet)</a><div class="ig-details">20 pts</div></div></div></li>
     </ul>`,
   }),
   '/courses/101/assignments/1': () => page({
-    title: 'Problem Set 3', courseId: '101',
-    body: `<div id="assignment_show"><h1 class="title">Problem Set 3</h1><div class="due-date-description">Due ${new Date(now + 3 * H).toLocaleString()}</div>
+    title: 'Problem Set 3', courseId: '101', path: '/courses/101/assignments/1',
+    body: `<div id="assignment_show"><h1 class="title">Problem Set 3</h1><ul class="student-assignment-overview"><li><span class="title">Due</span><span class="value">${new Date(now + 3 * H).toLocaleString()}</span></li><li><span class="title">Points</span><span class="value">20</span></li><li><span class="title">Submitting</span><span class="value">a file upload</span></li></ul>
       <div class="description user_content">${assignment.description}</div>
       <div class="embed-box"><iframe id="tool_content" name="tool_content" src="/courses/101/external_tools/retrieve?url=https%3A%2F%2Ftool.example.com%2Flaunch" width="640" height="320" title="Embedded tool"></iframe></div>
       <p><iframe src="about:blank" name="lti_launch_frame" width="640" height="200" title="LTI 1.3"></iframe><form action="/courses/101/external_tools/55/launch" method="post" target="lti_launch_frame"><input type="hidden" name="id_token" value="x"></form></p>
       <button class="btn-primary">Start Assignment</button></div>`,
   }),
   '/courses/202/discussion_topics/3': () => page({
-    title: 'Week 5 discussion: Industrialization', courseId: '202',
+    title: 'Week 5 discussion: Industrialization', courseId: '202', path: '/courses/202/discussion_topics/3',
     body: `<h1>Week 5 discussion: Industrialization</h1><div class="user_content"><p>How did industrialization change family life in 19th-century Europe? Respond in 200 words and reply to two classmates.</p></div>
       <div><h2>Reply</h2><textarea id="discussion_reply" rows="4" style="width:600px"></textarea></div>`,
   }),

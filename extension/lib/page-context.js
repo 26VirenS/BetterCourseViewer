@@ -325,11 +325,13 @@
     const [items, cards] = await Promise.all([C.plannerItems(21).catch(() => []), C.dashboardCards().catch(() => [])]);
     const lines = ['My courses:'];
     for (const c of cards || []) lines.push(`- ${c.shortName || c.originalName} (${c.courseCode || ''})`);
-    lines.push('', 'Upcoming and recent items (from the Canvas planner):');
+    lines.push('', 'Upcoming and recent items from the Canvas planner. "due" means graded work with a real due date; "to-do date" means an instructor-scheduled item (ungraded discussion, page, note) or event that is not graded:');
     for (const it of items || []) {
-      const due = it.plannable?.due_at || it.plannable_date;
+      const c = BCV.dueData?.classify ? BCV.dueData.classify(it) : null;
+      const type = c ? c.typeLabel : it.plannable_type;
+      const when = c ? (c.isDue ? `due ${fmt(c.due)}` : `to-do date ${fmt(c.due)}`) : `date ${fmt(it.plannable?.due_at || it.plannable_date)}`;
       const done = it.planner_override?.marked_complete || it.submissions?.submitted || it.submissions?.graded;
-      lines.push(`- ${it.context_name || ''}: ${it.plannable?.title || it.plannable_type} — ${it.plannable_type}, due ${fmt(due)}${it.plannable?.points_possible != null ? `, ${it.plannable.points_possible} pts` : ''}${done ? ' [done]' : ''}${it.submissions?.missing ? ' [missing]' : ''}`);
+      lines.push(`- ${it.context_name || ''}: ${it.plannable?.title || it.plannable_type} — ${type}, ${when}${it.plannable?.points_possible != null ? `, ${it.plannable.points_possible} pts` : ''}${done ? ' [done]' : ''}${it.submissions?.missing ? ' [missing]' : ''}`);
     }
     return { label: 'Dashboard', text: lines.join('\n') };
   }
