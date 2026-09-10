@@ -140,7 +140,7 @@
     const { app } = ctx;
     const c = shell.course;
     const narrow = !!(await store.pref('courseSideCollapsed', false));
-    const screen = U.el('bcv-screen bcv-screen--ctx', null, { style: { '--w': '1040px', '--bcv-rail-color': c.color, '--bcv-rail-tint': c.palette.tint, '--bcv-rail-text': c.palette.text } });
+    const screen = U.el('bcv-screen bcv-screen--ctx', null, { style: { '--w': '1180px', '--bcv-rail-color': c.color, '--bcv-rail-tint': c.palette.tint, '--bcv-rail-text': c.palette.text } });
     const head = U.el('bcv-head bcv-head--course', U.el('bcv-head__in', [
       h('button', { type: 'button', class: 'bcv-linkbtn', onclick: () => app.go(backHref) }, [U.svg(IC.back, { size: 14, stroke: 'var(--bcv-blue)', width: 2.1 }), backLabel]),
       U.el('bcv-course__title-row', [
@@ -246,7 +246,7 @@
     const { app, route } = ctx;
     const id = route.courseId;
     const dark = app.isDark();
-    const screen = U.el('bcv-screen', null, { style: { '--w': '1040px' } });
+    const screen = U.el('bcv-screen', null, { style: { '--w': '1180px' } });
     const head = U.el('bcv-head bcv-head--course');
     screen.append(head, U.el('bcv-body', U.loading()));
     head.append(U.el('bcv-head__in', U.loading()));

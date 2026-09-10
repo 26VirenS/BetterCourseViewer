@@ -14,7 +14,7 @@
     const { app, route } = ctx;
     const id = route.courseId;
     const dark = app.isDark();
-    const screen = U.el('bcv-screen', null, { style: { '--w': '1040px' } });
+    const screen = U.el('bcv-screen', null, { style: { '--w': '1180px' } });
     const head = U.el('bcv-head bcv-head--course');
     screen.append(head, U.el('bcv-body', U.loading()));
     head.append(U.el('bcv-head__in', U.loading()));

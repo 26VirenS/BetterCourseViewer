@@ -44,7 +44,7 @@
   }
 
   async function render(ctx) {
-    const screen = U.el('bcv-screen', null, { style: { '--w': '1040px' } });
+    const screen = U.el('bcv-screen', null, { style: { '--w': '1180px' } });
     screen.append(
       U.el('bcv-head bcv-head--tight', U.el('bcv-head__in', h('h1', { class: 'bcv-h1 bcv-h1--30', text: titleFromPage() }))),
       U.el('bcv-body bcv-body--24', block(ctx)),
