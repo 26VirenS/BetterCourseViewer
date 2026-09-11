@@ -1,0 +1,401 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		1493CEA55006B1052441BB27 /* FetchProxy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49A8756AB2C5DCF70B3D3EDD /* FetchProxy.swift */; };
+		1C925D881554BE71A9B14321 /* CookieJar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11F8ABC65325789350307D00 /* CookieJar.swift */; };
+		29FA9BD8912FDACD3BE2B9F8 /* BridgeStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 619AE3110ACAD8FA07A13897 /* BridgeStore.swift */; };
+		2C9206E01EDAD1D07FC3380C /* WebController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A29721466E551DA05644A62 /* WebController.swift */; };
+		35E709E2F61A88D2152FAE2B /* bridge.js in Resources */ = {isa = PBXBuildFile; fileRef = 3A0FECBE6AB83372178D20E8 /* bridge.js */; };
+		5B59F23116F3AF8F361D0845 /* SimplCoursesApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBF42ACCF0BBDED54E491CDC /* SimplCoursesApp.swift */; };
+		68E42811B89CEFBF8283CD4A /* Bridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2968A5926C7D553DA70A3F7D /* Bridge.swift */; };
+		92ABE8D1FFE350B81187ABFF /* CanvasWebView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60417CC937A16F34325C247F /* CanvasWebView.swift */; };
+		A8A43C5820C0DD477310B3D3 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 641EF96E2EE0228604CB7D48 /* Assets.xcassets */; };
+		B68EF346FFCD7A3DE8A61AA3 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED81608DE49931C034014216 /* ContentView.swift */; };
+		B8B34354634831729F66F965 /* BrowserScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33F9BBF8AC209FF1AAE47318 /* BrowserScreen.swift */; };
+		BB26A260BED650E07132CA16 /* SettingsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F942AF3601A741AF03F417E /* SettingsSheet.swift */; };
+		CE782850F95C710FAC0E113F /* ScriptBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A1C06CE6062D5F89A393051 /* ScriptBundle.swift */; };
+		E87481CD4B0A70BF5422DBB7 /* SchoolPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BCA8AD6A8AC5D5A3011403B /* SchoolPickerView.swift */; };
+		F47B1E6E27EAF7D283656E0A /* ContentRules.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB97C35721F98A64BF310C10 /* ContentRules.swift */; };
+		F71DC0F6D3D792DB868CE252 /* extension in Resources */ = {isa = PBXBuildFile; fileRef = FB4A2C1298F3B2CA812F00D1 /* extension */; };
+		FD77368B9A36B8395841BF13 /* AppSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = F75ADFA2F06322C7C85640A0 /* AppSession.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		11F8ABC65325789350307D00 /* CookieJar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CookieJar.swift; sourceTree = "<group>"; };
+		2968A5926C7D553DA70A3F7D /* Bridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Bridge.swift; sourceTree = "<group>"; };
+		2A1C06CE6062D5F89A393051 /* ScriptBundle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScriptBundle.swift; sourceTree = "<group>"; };
+		2F942AF3601A741AF03F417E /* SettingsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsSheet.swift; sourceTree = "<group>"; };
+		33F9BBF8AC209FF1AAE47318 /* BrowserScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserScreen.swift; sourceTree = "<group>"; };
+		3A0FECBE6AB83372178D20E8 /* bridge.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = bridge.js; sourceTree = "<group>"; };
+		49A8756AB2C5DCF70B3D3EDD /* FetchProxy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FetchProxy.swift; sourceTree = "<group>"; };
+		5BCA8AD6A8AC5D5A3011403B /* SchoolPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SchoolPickerView.swift; sourceTree = "<group>"; };
+		60417CC937A16F34325C247F /* CanvasWebView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasWebView.swift; sourceTree = "<group>"; };
+		619AE3110ACAD8FA07A13897 /* BridgeStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BridgeStore.swift; sourceTree = "<group>"; };
+		641EF96E2EE0228604CB7D48 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		7A29721466E551DA05644A62 /* WebController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebController.swift; sourceTree = "<group>"; };
+		A7818DFF5DF19044080F0A6B /* SimplCourses.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = SimplCourses.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		BBF42ACCF0BBDED54E491CDC /* SimplCoursesApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimplCoursesApp.swift; sourceTree = "<group>"; };
+		CB97C35721F98A64BF310C10 /* ContentRules.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentRules.swift; sourceTree = "<group>"; };
+		ED81608DE49931C034014216 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		F75ADFA2F06322C7C85640A0 /* AppSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSession.swift; sourceTree = "<group>"; };
+		FB4A2C1298F3B2CA812F00D1 /* extension */ = {isa = PBXFileReference; lastKnownFileType = folder; name = extension; path = ../extension; sourceTree = SOURCE_ROOT; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		016FEAAC20B478980D5865E1 /* BetterCourseViewer */ = {
+			isa = PBXGroup;
+			children = (
+				FB4A2C1298F3B2CA812F00D1 /* extension */,
+			);
+			name = BetterCourseViewer;
+			path = ..;
+			sourceTree = "<group>";
+		};
+		07FBD2A4A7D5AF419E62350F /* SimplCourses */ = {
+			isa = PBXGroup;
+			children = (
+				2D62216FDBE5246B7A2D14DA /* App */,
+				B34B17DF83C652606E99B175 /* Resources */,
+				96982B358650411695437B58 /* Web */,
+			);
+			path = SimplCourses;
+			sourceTree = "<group>";
+		};
+		2D62216FDBE5246B7A2D14DA /* App */ = {
+			isa = PBXGroup;
+			children = (
+				F75ADFA2F06322C7C85640A0 /* AppSession.swift */,
+				33F9BBF8AC209FF1AAE47318 /* BrowserScreen.swift */,
+				ED81608DE49931C034014216 /* ContentView.swift */,
+				5BCA8AD6A8AC5D5A3011403B /* SchoolPickerView.swift */,
+				2F942AF3601A741AF03F417E /* SettingsSheet.swift */,
+				BBF42ACCF0BBDED54E491CDC /* SimplCoursesApp.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		5C52BFD4CC64EE9E250A9E33 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				A7818DFF5DF19044080F0A6B /* SimplCourses.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		5FCC433C74B86A9FAB8D4385 = {
+			isa = PBXGroup;
+			children = (
+				016FEAAC20B478980D5865E1 /* BetterCourseViewer */,
+				07FBD2A4A7D5AF419E62350F /* SimplCourses */,
+				5C52BFD4CC64EE9E250A9E33 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		96982B358650411695437B58 /* Web */ = {
+			isa = PBXGroup;
+			children = (
+				3A0FECBE6AB83372178D20E8 /* bridge.js */,
+				2968A5926C7D553DA70A3F7D /* Bridge.swift */,
+				619AE3110ACAD8FA07A13897 /* BridgeStore.swift */,
+				60417CC937A16F34325C247F /* CanvasWebView.swift */,
+				CB97C35721F98A64BF310C10 /* ContentRules.swift */,
+				11F8ABC65325789350307D00 /* CookieJar.swift */,
+				49A8756AB2C5DCF70B3D3EDD /* FetchProxy.swift */,
+				2A1C06CE6062D5F89A393051 /* ScriptBundle.swift */,
+				7A29721466E551DA05644A62 /* WebController.swift */,
+			);
+			path = Web;
+			sourceTree = "<group>";
+		};
+		B34B17DF83C652606E99B175 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				641EF96E2EE0228604CB7D48 /* Assets.xcassets */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		26F3924A7C1C3690879088AF /* SimplCourses */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A7A98F3DA92E3B994BC1C628 /* Build configuration list for PBXNativeTarget "SimplCourses" */;
+			buildPhases = (
+				C33ADEBBFACB26FBB8432E48 /* Sources */,
+				8C7D3B39D55BA176D6D00734 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = SimplCourses;
+			packageProductDependencies = (
+			);
+			productName = SimplCourses;
+			productReference = A7818DFF5DF19044080F0A6B /* SimplCourses.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		6A2E471440D899B435ACCDD2 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					26F3924A7C1C3690879088AF = {
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = AF3483020792FABE80053D20 /* Build configuration list for PBXProject "SimplCourses" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 5FCC433C74B86A9FAB8D4385;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 5C52BFD4CC64EE9E250A9E33 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				26F3924A7C1C3690879088AF /* SimplCourses */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		8C7D3B39D55BA176D6D00734 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A8A43C5820C0DD477310B3D3 /* Assets.xcassets in Resources */,
+				35E709E2F61A88D2152FAE2B /* bridge.js in Resources */,
+				F71DC0F6D3D792DB868CE252 /* extension in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		C33ADEBBFACB26FBB8432E48 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				FD77368B9A36B8395841BF13 /* AppSession.swift in Sources */,
+				68E42811B89CEFBF8283CD4A /* Bridge.swift in Sources */,
+				29FA9BD8912FDACD3BE2B9F8 /* BridgeStore.swift in Sources */,
+				B8B34354634831729F66F965 /* BrowserScreen.swift in Sources */,
+				92ABE8D1FFE350B81187ABFF /* CanvasWebView.swift in Sources */,
+				F47B1E6E27EAF7D283656E0A /* ContentRules.swift in Sources */,
+				B68EF346FFCD7A3DE8A61AA3 /* ContentView.swift in Sources */,
+				1C925D881554BE71A9B14321 /* CookieJar.swift in Sources */,
+				1493CEA55006B1052441BB27 /* FetchProxy.swift in Sources */,
+				E87481CD4B0A70BF5422DBB7 /* SchoolPickerView.swift in Sources */,
+				CE782850F95C710FAC0E113F /* ScriptBundle.swift in Sources */,
+				BB26A260BED650E07132CA16 /* SettingsSheet.swift in Sources */,
+				5B59F23116F3AF8F361D0845 /* SimplCoursesApp.swift in Sources */,
+				2C9206E01EDAD1D07FC3380C /* WebController.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		6FE6864354D2FCF35542E513 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				MARKETING_VERSION = 2.1.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.9;
+			};
+			name = Debug;
+		};
+		7E025C6893F21F0A54CD6454 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = SimplCourses/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.simplcourses.app;
+				PRODUCT_NAME = "Simpl Courses";
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		DD6B5ED946E9756BF622304E /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = SimplCourses/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.simplcourses.app;
+				PRODUCT_NAME = "Simpl Courses";
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		FEED5B383A73265B208F2FC7 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				MARKETING_VERSION = 2.1.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.9;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		A7A98F3DA92E3B994BC1C628 /* Build configuration list for PBXNativeTarget "SimplCourses" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				7E025C6893F21F0A54CD6454 /* Debug */,
+				DD6B5ED946E9756BF622304E /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		AF3483020792FABE80053D20 /* Build configuration list for PBXProject "SimplCourses" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				6FE6864354D2FCF35542E513 /* Debug */,
+				FEED5B383A73265B208F2FC7 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 6A2E471440D899B435ACCDD2 /* Project object */;
+}
