@@ -26,11 +26,7 @@
   const setupDone = async () => {
     try {
       const flag = await api.storage.local.get('setup:done');
-      if (flag && flag['setup:done']) return true;
-      const all = await api.storage.local.get(null);
-      const done = Object.keys(all || {}).some((k) => k.startsWith('prefs:') && all[k]?.setupDone);
-      if (done) await api.storage.local.set({ 'setup:done': true });
-      return done;
+      return !!(flag && flag['setup:done']); // written only by this setup flow (the card, or its Skip)
     } catch {
       return true; // storage unreadable: never hide the switches over it
     }
@@ -166,12 +162,12 @@
 
   const status = $('status');
   // Until the guided setup has run (or been skipped on purpose) the popup shows nothing but the
-  // Set up button. Installs that finished the older in-page setup count as done too.
+  // Set up button.
   if (!(await setupDone())) {
     document.body.classList.add('is-fresh');
     status.textContent = onWeb ? `Not set up yet · ${url.hostname}` : 'Not set up yet';
     $('setup-card').hidden = false;
-    $('setup-hint').textContent = onWeb ? (granted ? 'Set up runs right here, over this page.' : 'Set up asks to run on this site, then continues here.') : 'Open your Canvas courses page first.';
+    $('setup-hint').textContent = onWeb ? (granted ? 'Already allowed on this site: Set up runs right here, over this page.' : 'Set up asks to run on this site, then continues here.') : 'Open your Canvas courses page first.';
     return;
   }
 

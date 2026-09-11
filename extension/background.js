@@ -267,10 +267,24 @@ if (typeof importScripts === 'function' && !self.BCV?.providers) {
     }
   }
 
-  /** The guided setup page, once: on install, and on the first run of a build that never offered it
-   *  (an update over a build without it, Safari enabling the extension without an install event). */
+  /** Which setup flow this build carries. A build that changes the flow bumps it, and the flags
+   *  from the older flow ("offered", "done") are cleared once, so the new flow is seen once. */
+  const SETUP_FLOW = 2;
+  async function migrateSetup() {
+    try {
+      const cur = await api.storage.local.get('setup:flow');
+      if (cur && cur['setup:flow'] === SETUP_FLOW) return;
+      await api.storage.local.remove(['setup:offered', 'setup:done', 'setup:plan']);
+      await api.storage.local.set({ 'setup:flow': SETUP_FLOW });
+    } catch {
+      /* ignore */
+    }
+  }
+  /** The page that says how to start, once: on install, and on the first run of a build whose
+   *  setup flow never showed it (an update, Safari enabling the extension without an install event). */
   async function offerSetup() {
     try {
+      await migrateSetup();
       const flag = await api.storage.local.get('setup:offered');
       if (flag && flag['setup:offered']) return;
       await api.storage.local.set({ 'setup:offered': true });

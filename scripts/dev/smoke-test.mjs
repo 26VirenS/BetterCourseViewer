@@ -72,6 +72,7 @@ try {
   const setupTab = context.pages().find((p) => p.url().endsWith('/setup/setup.html')) || await context.waitForEvent('page', { timeout: 8000 }).catch(() => null);
   check(!!setupTab && setupTab.url().endsWith('/setup/setup.html'), 'installing the extension opens the guided setup page');
   if (setupTab) await setupTab.close();
+  check((await sw.evaluate(async () => (await self.BCV.api.storage.local.get('setup:flow'))['setup:flow'])) === 2, 'the build records its setup flow, so an update from an older flow offers the page once more');
   await sw.evaluate(() => self.BCV.api.storage.local.set({ 'setup:offered': true }));
 
   const page = await context.newPage();
@@ -1223,12 +1224,17 @@ try {
   await popupPage.click('#start-setup');
   await popupPage.waitForTimeout(300);
   check((await popupPage.$eval('#setup-msg', (e) => e.textContent)) === 'Open your Canvas courses page first, then press Set up.' && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('setup:done'))['setup:done'])) === undefined, 'off a Canvas tab, Set up says where to go and nothing is marked done');
-  // an install that finished the older in-page setup counts as set up
+  // only this flow's own flag counts: preferences from the older in-page setup do not
   await sw.evaluate(async () => { const k = 'prefs:localhost:8787'; const all = await self.BCV.api.storage.local.get(k); await self.BCV.api.storage.local.set({ [k]: { ...(all[k] || {}), setupDone: true } }); });
   popupPage = await context.newPage();
   await popupPage.goto(`chrome-extension://${extId}/popup/popup.html`);
+  await popupPage.waitForTimeout(400);
+  check(!(await popupPage.$eval('#setup-card', (el) => el.hidden)), 'an older setup mark alone does not count: the popup still asks');
+  await sw.evaluate(() => self.BCV.api.storage.local.set({ 'setup:done': true }));
+  popupPage = await context.newPage();
+  await popupPage.goto(`chrome-extension://${extId}/popup/popup.html`);
   await popupPage.waitForTimeout(500);
-  check((await popupPage.$eval('#setup-card', (el) => el.hidden)) && !(await hiddenIn('.section')) && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('setup:done'))['setup:done'])) === true, 'after setup the popup shows the switches again');
+  check((await popupPage.$eval('#setup-card', (el) => el.hidden)) && !(await hiddenIn('.section')), 'after setup the popup shows the switches again');
   check(/^v\d+\.\d+/.test(await popupPage.$eval('#version', (el) => el.textContent)), `popup shows the version: ${await popupPage.$eval('#version', (el) => el.textContent)}`);
   check((await popupPage.$eval('#foot-setup', (el) => el.textContent)) === 'Guided setup', 'the popup links to the guided setup');
   await popupPage.screenshot({ path: join(out, '30-popup.png') });
