@@ -91,6 +91,7 @@ To build from the command line instead of Xcode:
 ### Build errors
 
 - **"Embedded binary's bundle identifier is not prefixed with the parent app's bundle identifier"** – the two targets' identifiers drifted apart. Select the project, then the **Simpl Courses** target → Signing & Capabilities and note its Bundle Identifier; then select the **Simpl Courses Extension** target and set its Bundle Identifier to that value plus `.Extension`. Give both targets the same Team, then Product → Clean Build Folder and run again. `rm -rf macos && ./scripts/build-mac-app.sh --open` also fixes it.
+- **"You have macOS X. The application requires macOS Y or later"** on another Mac – the build script pins the minimum macOS to 13 (Ventura) on every run, so rebuild with it after pulling; `MACOS_MIN=14.0 ./scripts/build-mac-app.sh --build` raises it if you want.
 - **"Failed to register bundle identifier"** (personal/free teams) – pick your own: `BUNDLE_ID=com.yourname.simplcourses ./scripts/build-mac-app.sh --open` (after deleting `macos/`).
 
 ### School with its own Canvas address?

@@ -71,14 +71,20 @@ fi
 # app's identifier plus ".Extension". Normalise both so a stray edit or a
 # converter quirk cannot break the build.
 PBXPROJ="$PROJECT/project.pbxproj"
+# The converter pins the minimum macOS to the machine that generated the project, so an app
+# built on a new macOS would refuse to open on older ones. Pin it low instead (MACOS_MIN to
+# override): the extension needs Safari 16.4 or later, which Ventura carries.
+MACOS_MIN="${MACOS_MIN:-13.0}"
 if [[ -f "$PBXPROJ" ]]; then
   sed -i.bak -E \
     -e "/PRODUCT_BUNDLE_IDENTIFIER = [^;]*[Ee]xtension[^;]*;/s/PRODUCT_BUNDLE_IDENTIFIER = [^;]+;/PRODUCT_BUNDLE_IDENTIFIER = ${BUNDLE_ID}.Extension;/" \
     -e "/PRODUCT_BUNDLE_IDENTIFIER = [^;]*[Ee]xtension[^;]*;/!s/PRODUCT_BUNDLE_IDENTIFIER = [^;]+;/PRODUCT_BUNDLE_IDENTIFIER = ${BUNDLE_ID};/" \
+    -e "s/MACOSX_DEPLOYMENT_TARGET = [^;]+;/MACOSX_DEPLOYMENT_TARGET = ${MACOS_MIN};/" \
     "$PBXPROJ"
   rm -f "$PBXPROJ.bak"
   echo "▶ Bundle identifiers:"
   grep -o 'PRODUCT_BUNDLE_IDENTIFIER = [^;]*' "$PBXPROJ" | sort -u | sed 's/^/    /'
+  echo "▶ Minimum macOS: $MACOS_MIN (MACOS_MIN=… to change)"
 fi
 
 if [[ "$BUILD" == "1" ]]; then
@@ -92,6 +98,7 @@ if [[ "$BUILD" == "1" ]]; then
     CODE_SIGN_IDENTITY="-" \
     CODE_SIGNING_REQUIRED=NO \
     CODE_SIGNING_ALLOWED=NO \
+    MACOSX_DEPLOYMENT_TARGET="$MACOS_MIN" \
     build | tail -n 5
   APP_PATH="$DERIVED/Build/Products/Release/$APP_NAME.app"
   if [[ -d "$APP_PATH" ]]; then
