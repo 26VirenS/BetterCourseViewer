@@ -20,7 +20,7 @@ struct BrowserScreen: View {
                 SettingsSheet()
             }
             .onAppear {
-                if web.currentURL == nil { web.load() }
+                web.loadIfNeeded()
             }
             .onReceive(NotificationCenter.default.publisher(for: .simplSignedOut)) { _ in
                 web.load() // back to the login page

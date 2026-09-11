@@ -24,7 +24,7 @@ struct SettingsSheet: View {
                             .ignoresSafeArea(edges: .bottom)
                             .navigationTitle("Settings")
                             .navigationBarTitleDisplayMode(.inline)
-                            .onAppear { if web.currentURL == nil { web.load() } }
+                            .onAppear { web.loadIfNeeded() }
                     }
                     LabeledContent("Version", value: AppSession.version)
                 }

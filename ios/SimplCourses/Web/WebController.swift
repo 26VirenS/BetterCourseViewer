@@ -53,8 +53,17 @@ final class WebController: NSObject, ObservableObject, WKNavigationDelegate, WKU
     }
 
     var currentURL: URL? { webView.url }
+    private var loadStarted = false
+
+    /// The first load, once. SwiftUI can call onAppear more than once for the same view, and a second
+    /// load while the first is still being policy-checked fails the first with "Frame load interrupted".
+    func loadIfNeeded() {
+        guard !loadStarted else { return }
+        load()
+    }
 
     func load() {
+        loadStarted = true
         switch mode {
         case .canvas(let host):
             if let url = URL(string: "https://\(host)/") { webView.load(URLRequest(url: url)) }
@@ -108,8 +117,19 @@ final class WebController: NSObject, ObservableObject, WKNavigationDelegate, WKU
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
         isLoading = false
         webView.scrollView.refreshControl?.endRefreshing()
-        if (error as NSError).code == NSURLErrorCancelled { return }
+        let e = error as NSError
+        // Not failures: a navigation that was cancelled or superseded (-999), and WebKit's "Frame load
+        // interrupted" (WebKitErrorDomain 102), which it raises when a navigation is replaced by another
+        // during its policy check, or when a response is cancelled so a download can open elsewhere.
+        if e.code == NSURLErrorCancelled || (e.domain == "WebKitErrorDomain" && e.code == 102) { return }
+        // Something else is already loading (a redirect, a retry): let it land rather than covering it.
+        if webView.isLoading { return }
         showUnreachable(error)
+    }
+
+    /// WebKit killed the page's process (memory pressure, a crash): bring the page back rather than leaving a blank view.
+    func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+        if webView.url != nil { webView.reload() } else { load() }
     }
 
     private func showUnreachable(_ error: Error) {
