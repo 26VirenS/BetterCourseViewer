@@ -8,7 +8,7 @@
 
   async function render(ctx) {
     const { app } = ctx;
-    const screen = U.el('bcv-screen', null, { style: { '--w': '900px' } }); // a reading screen: 700–900
+    const screen = U.el('bcv-screen'); // the same column as the Dashboard
     const body = U.el('bcv-body bcv-body--24');
     screen.append(U.el('bcv-head', U.el('bcv-head__in', h('h1', { class: 'bcv-h1', text: 'Groups' }))), body);
     body.append(U.loading());

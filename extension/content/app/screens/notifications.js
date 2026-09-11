@@ -37,7 +37,7 @@
     const { app } = ctx;
     const dark = app.isDark();
     const meta = META(dark);
-    const screen = U.el('bcv-screen', null, { style: { '--w': '840px' } });
+    const screen = U.el('bcv-screen'); // the same column as the Dashboard
     const sub = U.el('bcv-head__sub', '…');
     const tools = U.el('bcv-nf__tools');
     const chips = U.el('bcv-nf__chips');

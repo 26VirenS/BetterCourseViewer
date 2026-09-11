@@ -12,7 +12,7 @@
   async function render(ctx) {
     const { app } = ctx;
     const dark = app.isDark();
-    const screen = U.el('bcv-screen', null, { style: { '--w': '900px' } }); // a reading screen: 700–900
+    const screen = U.el('bcv-screen'); // the same column as the Dashboard, so the list lines up with the title and every other screen
     let group = await store.pref('todoGroup', 'date');
     let showDone = !!(await store.pref('todoShowDone', false));
     const sub = U.el('bcv-head__sub', '…');
