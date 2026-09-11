@@ -58,6 +58,7 @@ try {
   let [sw] = context.serviceWorkers();
   if (!sw) sw = await context.waitForEvent('serviceworker', { timeout: 15000 });
   const setSettings = (patch) => sw.evaluate(async (p) => self.BCV.settings.update(p), patch);
+  await sw.evaluate(() => self.BCV.api.storage.local.set({ 'setup:offered': true })); // the first-run setup is exercised on its own below
 
   const page = await context.newPage();
   const errors = [];

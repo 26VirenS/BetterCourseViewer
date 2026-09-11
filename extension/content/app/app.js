@@ -487,6 +487,20 @@
     }), 2500);
   }
 
+  /** True once, on the first signed-in Canvas page since the extension was installed. */
+  async function firstRun() {
+    const r = parseRoute();
+    if (r.params.get('bcv') === 'setup' || inQuiz()) return false;
+    try {
+      const flag = await BCV.api.storage.local.get('setup:offered');
+      if (flag && flag['setup:offered']) return false;
+      await BCV.api.storage.local.set({ 'setup:offered': true });
+      return !(await store.pref('setupDone', false));
+    } catch {
+      return false;
+    }
+  }
+
   async function boot() {
     if (window.self !== window.top) return; // framed Canvas pages (tool pickers, previews) are left alone
     state.originalTitle = document.title;
@@ -495,6 +509,12 @@
     // Not signed in (login page, public course, error page): leave Canvas alone.
     if (!store.env().current_user_id && !document.querySelector('meta[name="csrf-token"]')) {
       html.classList.remove('bcv-on');
+      return;
+    }
+    // The first Canvas page with the interface on opens the guided setup, once (a flag in the
+    // extension's storage, shared by every site), unless the setup was already finished.
+    if (state.settings.appearance.skin !== false && await firstRun()) {
+      go('/?bcv=setup', { replace: true });
       return;
     }
     await applySkin(state.settings.appearance.skin !== false);

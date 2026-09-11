@@ -56,6 +56,7 @@ try {
   const extId = new URL(sw.url()).host;
   console.log('extension id', extId);
   const setSettings = (patch) => sw.evaluate(async (p) => self.BCV.settings.update(p), patch);
+  await sw.evaluate(() => self.BCV.api.storage.local.set({ 'setup:offered': true })); // the first-run setup is exercised on its own below
 
   const page = await context.newPage();
   page.on('pageerror', (e) => console.log('  page error:', e.message));
@@ -997,6 +998,10 @@ try {
   const toStep = async (n) => { await page.click('.bcv-su__btn.is-primary'); await page.waitForFunction((k) => document.querySelector('.bcv-su__stepno')?.textContent.startsWith(`Step ${k} `), n, { timeout: 15000 }); };
   // a fresh student: the Grades checks above left a goal and a record behind
   await sw.evaluate(async () => { const k = 'prefs:localhost:8787'; const all = await self.BCV.api.storage.local.get(k); const p = all[k] || {}; for (const key of ['gpaGoal', 'gpaTracking', 'gradeTargets', 'setupDone', 'tour']) delete p[key]; await self.BCV.api.storage.local.set({ [k]: p }); });
+  await sw.evaluate(() => self.BCV.api.storage.local.remove('setup:offered'));
+  await page.goto(`${BASE}/courses`);
+  await page.waitForSelector('.bcv-su__card', { timeout: 15000 });
+  check(page.url() === `${BASE}/?bcv=setup` && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('setup:offered'))['setup:offered'])) === true, 'the first Canvas page after install opens the guided setup, once');
   await page.goto(`${BASE}/?bcv=setup`);
   await page.waitForSelector('.bcv-su__card', { timeout: 10000 });
   check((await texts('.bcv-su__title'))[0] === 'Welcome to Simpl Courses' && (await page.$('#bcv-app.bcv-focus')) !== null && (await texts('.bcv-focus__title'))[0] === 'Guided setup' && (await page.$$('.bcv-su__item')).length === 5, 'setup opens on a welcome card, the sidebar in focus mode, five steps listed');

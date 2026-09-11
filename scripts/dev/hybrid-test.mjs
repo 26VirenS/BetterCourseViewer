@@ -69,6 +69,7 @@ const check = (cond, label) => {
 };
 const browser = await chromium.launch({ channel: 'chromium' });
 const context = await browser.newContext({ viewport: { width: 1200, height: 800 } });
+await context.addInitScript(() => { try { if (!localStorage.getItem('bcv:storage')) localStorage.setItem('bcv:storage', JSON.stringify({ 'setup:offered': true })); } catch { /* ignore */ } }); // a fresh profile would open the guided setup first
 await context.addInitScript(initScript);
 try {
   const page = await context.newPage();
