@@ -94,9 +94,9 @@ try {
   const icon = `data:image/png;base64,${readFileSync(join(root, 'extension', 'icons', 'icon-256.png')).toString('base64')}`;
   const dash = `data:image/png;base64,${readFileSync(join(out, '01-dashboard.png')).toString('base64')}`;
   const base = (w, h) => `html,body{margin:0;width:${w}px;height:${h}px;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;color:#fff}
-    .bg{position:absolute;inset:0;background:linear-gradient(135deg,#0b2b52 0%,#153e7a 55%,#0a84ff 100%)}
+    .bg{position:absolute;inset:0;background:linear-gradient(158deg,#0A84FF 0%,#0A4FD6 100%)}
     .shot{position:absolute;border-radius:10px;box-shadow:0 20px 60px rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.18)}
-    .icon{border-radius:13px;box-shadow:0 8px 24px rgba(0,0,0,.35)}`;
+    .icon{border-radius:23.5%;box-shadow:0 8px 24px rgba(0,0,0,.35)}`;
   // small tile: name row on top, the dashboard rising from the bottom edge
   const tileSmall = () => `<!doctype html><html><head><meta charset="utf-8"><style>${base(440, 280)}
     .row{position:absolute;left:24px;top:24px;right:24px;display:flex;align-items:center;gap:12px}
@@ -105,8 +105,8 @@ try {
     .sub{position:absolute;left:24px;top:78px;right:24px;font-weight:500;font-size:13px;line-height:1.35;opacity:.92}
     .shot{left:24px;top:118px;width:620px}
   </style></head><body><div class="bg"></div>
-  <div class="row"><img class="icon" src="${icon}"><div class="name">BetterCourseViewer</div></div>
-  <div class="sub">A new interface for Canvas — dashboard, courses, grades, quizzes and a smart panel.</div>
+  <div class="row"><img class="icon" src="${icon}"><div class="name">Simpl Courses</div></div>
+  <div class="sub">Canvas, quietly rebuilt — dashboard, courses, grades, quizzes and a smart panel.</div>
   <img class="shot" src="${dash}"></body></html>`;
   const tileMarquee = () => `<!doctype html><html><head><meta charset="utf-8"><style>${base(1400, 560)}
     .txt{position:absolute;left:64px;top:128px;width:520px}
@@ -115,7 +115,7 @@ try {
     .sub{font-weight:500;font-size:20px;line-height:1.35;opacity:.92}
     .shot{right:-40px;top:70px;width:820px;border-radius:16px}
   </style></head><body><div class="bg"></div>
-  <div class="txt"><img class="icon" src="${icon}"><div class="name">BetterCourseViewer</div><div class="sub">A new interface for Canvas — dashboard, courses, grades, quizzes and a smart panel, drawn from your own Canvas data</div></div>
+  <div class="txt"><img class="icon" src="${icon}"><div class="name">Simpl Courses</div><div class="sub">Canvas, quietly rebuilt — dashboard, courses, grades, quizzes and a smart panel, drawn from your own Canvas data</div></div>
   <img class="shot" src="${dash}"></body></html>`;
   const promo = await context.newPage();
   await promo.setViewportSize({ width: 440, height: 280 });

@@ -1,4 +1,4 @@
-/* BetterCourseViewer — shared settings module.
+/* Simpl Courses — shared settings module.
  * Classic script (no modules) so it can be loaded in the background
  * (service worker or event page), content scripts, popup and options.
  * Attaches to `self.BCV`. */

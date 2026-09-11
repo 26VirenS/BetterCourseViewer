@@ -1,4 +1,4 @@
-# Publishing BetterCourseViewer on the Chrome Web Store
+# Publishing Simpl Courses on the Chrome Web Store
 
 Everything the listing needs is in this repository. The first submission is done by hand in Google's developer dashboard (it needs your Google account, a one-time fee and a human review); every release after that can go out from a git tag.
 
@@ -6,7 +6,7 @@ Everything the listing needs is in this repository. The first submission is done
 
 1. A Google account with **2-step verification** turned on (the dashboard requires it).
 2. A **Chrome Web Store developer account**: open https://chrome.google.com/webstore/devconsole, sign in, accept the developer agreement and pay the one-time **US$5** registration fee. Verify the contact email it asks for (Account → Contact email) — items cannot be published until the email is verified.
-3. The Chrome build zip: `dist/bettercourseviewer-chrome-<version>.zip`. Get it either by running `./scripts/package.sh` in a checkout, or from GitHub → **Actions** → the latest **Package** run → **Artifacts** → `bettercourseviewer-chrome` (on a version tag it is also attached to the GitHub Release).
+3. The Chrome build zip: `dist/simpl-courses-chrome-<version>.zip`. Get it either by running `./scripts/package.sh` in a checkout, or from GitHub → **Actions** → the latest **Package** run → **Artifacts** → `simpl-courses-chrome` (on a version tag it is also attached to the GitHub Release).
 
 ## 1. Create the item
 
@@ -17,7 +17,7 @@ Everything the listing needs is in this repository. The first submission is done
 
 Copy these in. The summary comes from the manifest and cannot be edited here.
 
-**Title:** BetterCourseViewer
+**Title:** Simpl Courses
 
 **Category:** Education
 

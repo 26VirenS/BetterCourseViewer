@@ -1,8 +1,8 @@
-# BetterCourseViewer privacy policy
+# Simpl Courses privacy policy
 
 _Last updated: 10 September 2026_
 
-BetterCourseViewer is a browser extension that redraws the Canvas learning-management system in your browser. It has no servers, no accounts and no analytics. This page describes exactly what the extension touches and where that data goes.
+Simpl Courses is a browser extension that redraws the Canvas learning-management system in your browser. It has no servers, no accounts and no analytics. This page describes exactly what the extension touches and where that data goes.
 
 ## What the extension reads
 

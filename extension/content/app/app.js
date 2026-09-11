@@ -339,7 +339,7 @@
       else if (screens[r.screen] && r.screen !== 'native') el = await screens[r.screen].render(ctx);
       else el = await screens.native.render(ctx);
     } catch (e) {
-      console.error('[BetterCourseViewer] screen failed', e);
+      console.error('[Simpl Courses] screen failed', e);
       el = U.el('bcv-screen', U.el('bcv-body', U.errorBox(`This page could not be drawn: ${e?.message || e}`)));
     }
     clearTimeout(skeleton);

@@ -1,27 +1,27 @@
 #!/usr/bin/env bash
-# Builds the BetterCourseViewer macOS app (a Safari Web Extension host app).
+# Builds the Simpl Courses macOS app (a Safari Web Extension host app).
 #
 # Requires Xcode (with the Command Line Tools selected) on macOS. Uses
 # Apple's safari-web-extension-converter to generate an Xcode project from
 # the extension/ folder, then optionally builds it with xcodebuild.
 #
-#   ./scripts/build-mac-app.sh            # generate macos/BetterCourseViewer.xcodeproj
+#   ./scripts/build-mac-app.sh            # generate macos/Simpl Courses.xcodeproj
 #   ./scripts/build-mac-app.sh --build    # …and build the .app (Release)
 #   ./scripts/build-mac-app.sh --open     # …and open the project in Xcode
 #
 # Environment overrides:
-#   BUNDLE_ID   default: com.bettercourseviewer.app (pick your own, e.g.
-#               com.yourname.bettercourseviewer, if Xcode says the default
+#   BUNDLE_ID   default: com.simplcourses.app (pick your own, e.g.
+#               com.yourname.simplcourses, if Xcode says the default
 #               cannot be registered to your team)
-#   APP_NAME    default: BetterCourseViewer
+#   APP_NAME    default: Simpl Courses
 #   OUT_DIR     default: macos
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 EXT_DIR="$ROOT/extension"
 OUT_DIR="${OUT_DIR:-$ROOT/macos}"
-APP_NAME="${APP_NAME:-BetterCourseViewer}"
-BUNDLE_ID="${BUNDLE_ID:-com.bettercourseviewer.app}"
+APP_NAME="${APP_NAME:-Simpl Courses}"
+BUNDLE_ID="${BUNDLE_ID:-com.simplcourses.app}"
 
 BUILD=0
 OPEN=0
@@ -100,7 +100,7 @@ if [[ "$BUILD" == "1" ]]; then
     cp -R "$APP_PATH" "$OUT_DIR/build/"
     echo
     echo "✅ Built: $OUT_DIR/build/$APP_NAME.app"
-    echo "   Next: open the app once, then enable BetterCourseViewer in Safari → Settings → Extensions."
+    echo "   Next: open the app once, then enable Simpl Courses in Safari → Settings → Extensions."
     echo "   Unsigned builds also need: Safari → Settings → Developer → Allow unsigned extensions."
   else
     echo "Build finished but the app was not found at $APP_PATH" >&2

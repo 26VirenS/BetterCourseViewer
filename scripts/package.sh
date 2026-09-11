@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Packages the web extension. Two zips land in dist/:
 #
-#   bettercourseviewer-<version>.zip         the extension/ folder as-is (what the Safari
+#   simpl-courses-<version>.zip         the extension/ folder as-is (what the Safari
 #                                            converter reads; also loads in Firefox)
-#   bettercourseviewer-chrome-<version>.zip  the Chrome / Edge build: the same files with the
+#   simpl-courses-chrome-<version>.zip  the Chrome / Edge build: the same files with the
 #                                            manifest trimmed to what Chrome's Manifest V3
 #                                            accepts (a service worker only, no Firefox/Safari
 #                                            keys). This is the file the Chrome Web Store
@@ -14,8 +14,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VERSION="$(python3 -c "import json;print(json.load(open('$ROOT/extension/manifest.json'))['version'])")"
 mkdir -p "$ROOT/dist"
-GENERIC="$ROOT/dist/bettercourseviewer-$VERSION.zip"
-CHROME="$ROOT/dist/bettercourseviewer-chrome-$VERSION.zip"
+GENERIC="$ROOT/dist/simpl-courses-$VERSION.zip"
+CHROME="$ROOT/dist/simpl-courses-chrome-$VERSION.zip"
 rm -f "$GENERIC" "$CHROME"
 
 # 1. as-is
@@ -34,6 +34,9 @@ bg.pop('scripts', None)      # Firefox / older-Safari background page; Chrome MV
 bg.pop('persistent', None)
 m['background'] = bg
 m.pop('author', None)        # not a Chrome key (it would only produce an "unrecognized key" warning)
+# Safari draws the toolbar button from the icon's alpha channel, so the source manifest points it at the
+# mark-only glyphs; Chrome shows the toolbar icon in colour, so the Chrome build uses the blue tile there.
+m.setdefault('action', {})['default_icon'] = {s: f'icons/icon-{s}.png' for s in ('48', '96', '128')}
 assert len(m['description']) <= 132, 'the Chrome Web Store uses the manifest description as the summary (132 characters max)'
 with open(path, 'w') as f:
     json.dump(m, f, indent=2)

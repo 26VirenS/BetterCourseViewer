@@ -1,6 +1,8 @@
-# BetterCourseViewer
+<img src="docs/brand/icon-1024.png" width="96" height="96" alt="Simpl Courses">
 
-A Mac app that installs a Safari extension giving **Canvas** a new interface, drawn to a single design: rounded cards on a soft grey ground, one sidebar, segmented controls, an iOS-style dark appearance, and a discreet **smart panel** that reads the page you are on using your own Claude or ChatGPT key.
+# Simpl Courses
+
+**Canvas, quietly rebuilt.** A Safari extension (shipped as a Mac app) and a Chrome extension giving **Canvas** a new interface, drawn to a single design: rounded cards on a soft grey ground, one sidebar, segmented controls, an iOS-style dark appearance, and a discreet **smart panel** that reads the page you are on using your own Claude or ChatGPT key.
 
 Nothing is decorated; every screen is redrawn from the Canvas API with your own data, on top of the real Canvas page for that URL. The look is switched off and on from the toolbar popup or the settings, and turning it off always reveals exactly the page you were on.
 
@@ -69,34 +71,34 @@ Safari extensions ship inside a Mac app, so the app is built with Xcode. The scr
    ```bash
    ./scripts/build-mac-app.sh --open
    ```
-3. In Xcode press **⌘R** (Product → Run). The BetterCourseViewer app opens and tells you the extension is ready.
-4. In Safari go to **Settings → Extensions**, tick **BetterCourseViewer**, and click **Always Allow on Every Website** (or allow it on your school's Canvas site when Safari asks).
+3. In Xcode press **⌘R** (Product → Run). The Simpl Courses app opens and tells you the extension is ready.
+4. In Safari go to **Settings → Extensions**, tick **Simpl Courses**, and click **Always Allow on Every Website** (or allow it on your school's Canvas site when Safari asks).
 5. If you built without an Apple developer team, turn on **Safari → Settings → Developer → Allow unsigned extensions** (enable the Developer tab under Settings → Advanced if it is hidden).
-6. Click the BetterCourseViewer toolbar icon → **Settings**, and paste your Claude and/or ChatGPT key. Press **Test** to check it.
+6. Click the Simpl Courses toolbar icon → **Settings**, and paste your Claude and/or ChatGPT key. Press **Test** to check it.
 
 Updating: `git pull`, then in Xcode Product → Clean Build Folder (⇧⌘K) and Product → Run (⌘R), then quit and reopen Safari. The project references the files in `extension/` directly, so a rebuild is all that is needed. If Safari still shows stock Canvas, delete the `macos/` folder and regenerate the project from scratch.
 
 To build from the command line instead of Xcode:
 
 ```bash
-./scripts/build-mac-app.sh --build     # produces macos/build/BetterCourseViewer.app
+./scripts/build-mac-app.sh --build     # produces macos/build/Simpl Courses.app
 ```
 
 ### Build errors
 
-- **"Embedded binary's bundle identifier is not prefixed with the parent app's bundle identifier"** – the two targets' identifiers drifted apart. Select the project, then the **BetterCourseViewer** target → Signing & Capabilities and note its Bundle Identifier; then select the **BetterCourseViewer Extension** target and set its Bundle Identifier to that value plus `.Extension`. Give both targets the same Team, then Product → Clean Build Folder and run again. `rm -rf macos && ./scripts/build-mac-app.sh --open` also fixes it.
-- **"Failed to register bundle identifier"** (personal/free teams) – pick your own: `BUNDLE_ID=com.yourname.bettercourseviewer ./scripts/build-mac-app.sh --open` (after deleting `macos/`).
+- **"Embedded binary's bundle identifier is not prefixed with the parent app's bundle identifier"** – the two targets' identifiers drifted apart. Select the project, then the **Simpl Courses** target → Signing & Capabilities and note its Bundle Identifier; then select the **Simpl Courses Extension** target and set its Bundle Identifier to that value plus `.Extension`. Give both targets the same Team, then Product → Clean Build Folder and run again. `rm -rf macos && ./scripts/build-mac-app.sh --open` also fixes it.
+- **"Failed to register bundle identifier"** (personal/free teams) – pick your own: `BUNDLE_ID=com.yourname.simplcourses ./scripts/build-mac-app.sh --open` (after deleting `macos/`).
 
 ### School with its own Canvas address?
 
 The extension is on automatically for every `*.instructure.com` site. If your school uses a custom address such as `catcourses.ucmerced.edu`:
 
 1. Open that site in Safari.
-2. Click the BetterCourseViewer toolbar icon → **Enable on catcourses.ucmerced.edu**, or add it under **Settings → Canvas sites**.
+2. Click the Simpl Courses toolbar icon → **Enable on catcourses.ucmerced.edu**, or add it under **Settings → Canvas sites**.
 
 ## Turning the look off
 
-- The toolbar popup and Settings → Appearance have the **BetterCourseViewer look** switch, plus Light / Dark / Match the system. Nothing sits on the page itself. Both show the installed version number (the popup's footer, the Settings header).
+- The toolbar popup and Settings → Appearance have the **Simpl Courses look** switch, plus Light / Dark / Match the system. Nothing sits on the page itself. Both show the installed version number (the popup's footer, the Settings header).
 - Pages Canvas draws itself have an **Open in stock Canvas** button that flips the same switch.
 
 ## The smart panel and your keys
@@ -119,8 +121,8 @@ The extension is on automatically for every `*.instructure.com` site. If your sc
 The same extension runs in Chrome as a Manifest V3 extension; the Chrome build is the `extension/` folder with the manifest trimmed to the keys Chrome accepts. Three ways to get it:
 
 1. **From the Chrome Web Store** – once the listing is live, install it from there and updates arrive on their own. Publishing is described step by step in [`docs/chrome-web-store.md`](docs/chrome-web-store.md).
-2. **The zip** – GitHub → **Actions** → the latest **Package** run → **Artifacts** → `bettercourseviewer-chrome` (a version tag also attaches it to a GitHub Release). Unzip it, open `chrome://extensions`, turn on **Developer mode**, click **Load unpacked** and choose the unzipped folder. Chrome keeps it installed across restarts; to update, download the new zip and click the reload arrow on the extension's card.
-3. **From a checkout** – `./scripts/package.sh` writes `dist/bettercourseviewer-chrome-<version>.zip` (and the generic `dist/bettercourseviewer-<version>.zip`), or load `extension/` directly with **Load unpacked** – Chrome only warns about the two Safari/Firefox background keys, it does not need them.
+2. **The zip** – GitHub → **Actions** → the latest **Package** run → **Artifacts** → `simpl-courses-chrome` (a version tag also attaches it to a GitHub Release). Unzip it, open `chrome://extensions`, turn on **Developer mode**, click **Load unpacked** and choose the unzipped folder. Chrome keeps it installed across restarts; to update, download the new zip and click the reload arrow on the extension's card.
+3. **From a checkout** – `./scripts/package.sh` writes `dist/simpl-courses-chrome-<version>.zip` (and the generic `dist/simpl-courses-<version>.zip`), or load `extension/` directly with **Load unpacked** – Chrome only warns about the two Safari/Firefox background keys, it does not need them.
 
 Then click the toolbar icon → **Settings** for the smart-panel keys, and on a school with its own Canvas address use **Enable on this site** in the popup. Edge takes the same zip at `edge://extensions`. Firefox loads `extension/manifest.json` from `about:debugging` → **Load Temporary Add-on**.
 

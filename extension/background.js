@@ -1,4 +1,4 @@
-/* BetterCourseViewer background script.
+/* Simpl Courses background script.
  * Runs as a service worker (Safari 16.4+, Chrome) or a non-persistent
  * background page (older Safari, Firefox). Responsibilities:
  *  - stream smart-assistant replies to content scripts over a port
