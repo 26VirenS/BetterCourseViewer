@@ -25,5 +25,8 @@ struct BrowserScreen: View {
             .onReceive(NotificationCenter.default.publisher(for: .simplSignedOut)) { _ in
                 web.load() // back to the login page
             }
+            .onReceive(NotificationCenter.default.publisher(for: .simplInterfaceToggled)) { _ in
+                web.reload() // Canvas's own bundles are allowed or blocked per page; a fresh load applies it
+            }
     }
 }

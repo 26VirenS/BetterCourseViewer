@@ -94,6 +94,7 @@ try {
     return { src: img?.getAttribute('src')?.slice(0, 18), radius: cs.borderRadius, fit: cs.objectFit, height: img?.getBoundingClientRect().height, text: document.querySelector('.bcv-brand')?.textContent.trim(), name: !!document.querySelector('.bcv-brand__name, .bcv-brand__sub') };
   });
   check(brand.src === 'data:image/svg+xml' && brand.radius === '0px' && brand.fit === 'contain' && Math.round(brand.height) === 46 && brand.text === '' && !brand.name, `brand row is the school's own mark alone, whole and unrounded, with no site name or term: ${JSON.stringify(brand)}`);
+  await page.waitForFunction(() => document.querySelectorAll('.bcv-fav__dot').length >= 5, null, { timeout: 10000 }).catch(() => {});
   const favDots = await page.$$eval('.bcv-fav__dot', (els) => els.map((e) => getComputedStyle(e).backgroundColor));
   check(favDots.length === 5 && new Set(favDots).size === 5 && favDots[0] === 'rgb(52, 199, 89)', `favourite dots carry the user's own course colours from Canvas: ${favDots.join(' | ')}`);
   const navItems = await texts('.bcv-nav__item');

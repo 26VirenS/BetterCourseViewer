@@ -12,6 +12,9 @@ extension Notification.Name {
     static let simplSignedOut = Notification.Name("SimplCourses.signedOut")
     /// Posted by the bridge whenever the extension's settings are written; userInfo is the settings object.
     static let simplSettingsChanged = Notification.Name("SimplCourses.settingsChanged")
+    /// Posted when the interface was switched on or off in Settings: the page reloads with Canvas's
+    /// bundles allowed or blocked accordingly (see ContentRules).
+    static let simplInterfaceToggled = Notification.Name("SimplCourses.interfaceToggled")
 }
 
 /// App-level state: which Canvas host the student uses, the settings sheet, and the appearance the
@@ -22,6 +25,7 @@ final class AppSession: ObservableObject {
     @Published private(set) var host: String? = UserDefaults.standard.string(forKey: AppSession.hostKey)
     @Published var showSettings = false
     @Published private(set) var colorScheme: ColorScheme?
+    private var interfaceOn = Bridge.shared.interfaceOn
     private var bag = Set<AnyCancellable>()
 
     init() {
@@ -36,7 +40,16 @@ final class AppSession: ObservableObject {
             .store(in: &bag)
         NotificationCenter.default.publisher(for: .simplSettingsChanged)
             .receive(on: RunLoop.main)
-            .sink { [weak self] note in self?.colorScheme = AppSession.scheme(from: note.userInfo as? [String: Any] ?? [:]) }
+            .sink { [weak self] note in
+                guard let self = self else { return }
+                let settings = note.userInfo as? [String: Any] ?? [:]
+                self.colorScheme = AppSession.scheme(from: settings)
+                let on = Bridge.interfaceOn(settings)
+                if on != self.interfaceOn {
+                    self.interfaceOn = on
+                    NotificationCenter.default.post(name: .simplInterfaceToggled, object: nil)
+                }
+            }
             .store(in: &bag)
     }
 
@@ -74,6 +87,7 @@ final class AppSession: ObservableObject {
 
     /// Clears the Canvas session (cookies and site data), like signing out of a browser.
     func signOut(completion: @escaping () -> Void = {}) {
+        CookieJar.shared.clear()
         WKWebsiteDataStore.default().removeData(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), modifiedSince: .distantPast) {
             completion()
             NotificationCenter.default.post(name: .simplSignedOut, object: nil)

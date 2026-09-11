@@ -42,6 +42,7 @@ final class WebController: NSObject, ObservableObject, WKNavigationDelegate, WKU
         webView.scrollView.contentInsetAdjustmentBehavior = .never
         Bridge.shared.register(webView, world: world)
         if case .canvas = mode {
+            CookieJar.shared.watch(webView.configuration.websiteDataStore.httpCookieStore) // the session outlives the app
             let refresh = UIRefreshControl()
             refresh.addTarget(self, action: #selector(pullToRefresh(_:)), for: .valueChanged)
             webView.scrollView.refreshControl = refresh
@@ -66,11 +67,29 @@ final class WebController: NSObject, ObservableObject, WKNavigationDelegate, WKU
         loadStarted = true
         switch mode {
         case .canvas(let host):
-            if let url = URL(string: "https://\(host)/") { webView.load(URLRequest(url: url)) }
+            guard let url = URL(string: "https://\(host)/") else { return }
+            prepare(host: host) { [weak self] in self?.webView.load(URLRequest(url: url)) }
         case .settings:
             let page = ScriptBundle.extensionDir.appendingPathComponent("options/options.html")
             webView.loadFileURL(page, allowingReadAccessTo: ScriptBundle.extensionDir)
         }
+    }
+
+    private var prepared = false
+    /// Before the first Canvas load: the saved cookies go back into the cookie store (so the session
+    /// survives a relaunch) and the content rules are ready (so the first page is already fast).
+    private func prepare(host: String, then: @escaping () -> Void) {
+        if prepared {
+            then()
+            return
+        }
+        prepared = true
+        let group = DispatchGroup()
+        group.enter()
+        CookieJar.shared.restore(into: webView.configuration.websiteDataStore.httpCookieStore) { group.leave() }
+        group.enter()
+        ContentRules.prepare(host: host) { group.leave() }
+        group.notify(queue: .main, execute: then)
     }
 
     func reload() {
@@ -86,6 +105,10 @@ final class WebController: NSObject, ObservableObject, WKNavigationDelegate, WKU
             UIApplication.shared.open(url) // mailto:, tel:, another app
             decisionHandler(.cancel)
             return
+        }
+        if case .canvas(let host) = mode, navigationAction.targetFrame?.isMainFrame ?? true {
+            // Canvas's own bundles load only where Canvas draws the page (see ContentRules)
+            ContentRules.apply(to: webView.configuration.userContentController, blockCanvasBundles: RenderedRoutes.isRendered(url, host: host, interfaceOn: Bridge.shared.interfaceOn))
         }
         decisionHandler(.allow) // single sign-on hops between hosts stay inside the app
     }

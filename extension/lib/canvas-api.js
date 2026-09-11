@@ -126,6 +126,7 @@
 
   // ---- cache -------------------------------------------------------------
   const memory = new Map();
+  const inflight = new Map(); // one request per key at a time: callers that arrive while it runs share it
   const cacheKey = (key) => `cache:${location.host}:${key}`;
 
   async function cached(key, ttlMs, loader, { force = false } = {}) {
@@ -134,6 +135,7 @@
     if (!force) {
       const mem = memory.get(k);
       if (mem && mem.expires > now) return mem.value;
+      if (inflight.has(k)) return inflight.get(k);
       try {
         const stored = await api.storage.local.get(k);
         const hit = stored[k];
@@ -144,16 +146,25 @@
       } catch {
         /* ignore */
       }
+      if (inflight.has(k)) return inflight.get(k);
     }
-    const value = await loader();
-    const entry = { value, expires: now + ttlMs };
-    memory.set(k, entry);
+    const run = (async () => {
+      const value = await loader();
+      const entry = { value, expires: Date.now() + ttlMs };
+      memory.set(k, entry);
+      try {
+        await api.storage.local.set({ [k]: entry });
+      } catch {
+        /* ignore quota errors */
+      }
+      return value;
+    })();
+    inflight.set(k, run);
     try {
-      await api.storage.local.set({ [k]: entry });
-    } catch {
-      /* ignore quota errors */
+      return await run;
+    } finally {
+      if (inflight.get(k) === run) inflight.delete(k);
     }
-    return value;
   }
 
   async function invalidate(key) {

@@ -21,6 +21,12 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
         store.get("settings")["settings"] as? [String: Any] ?? [:]
     }
 
+    /// appearance.skin: the redesigned interface is on (the default) or the student chose stock Canvas.
+    var interfaceOn: Bool { Bridge.interfaceOn(settings) }
+    static func interfaceOn(_ settings: [String: Any]) -> Bool {
+        ((settings["appearance"] as? [String: Any])?["skin"] as? Bool) ?? true
+    }
+
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage, replyHandler: @escaping (Any?, String?) -> Void) {
         guard let body = message.body as? [String: Any], let op = body["op"] as? String else {
             replyHandler(nil, "Simpl Courses: malformed bridge message")

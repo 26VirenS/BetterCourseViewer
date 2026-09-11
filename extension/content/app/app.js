@@ -447,6 +447,7 @@
         loadShellData();
         BCV.smart?.mount?.(BCV.app);
         await render();
+        prefetch();
       }
     } else {
       punchOut();
@@ -455,6 +456,23 @@
       // Canvas only rendered the page that was loaded; if we navigated since, load this one.
       if (started && state.nativePath !== location.pathname + location.search) location.reload();
     }
+  }
+
+  /** Once this screen has drawn and the page is idle, warm what the other root screens read
+   *  (courses, the term, favourites, the planner, announcements, calendars), so the next tab
+   *  lands from the cache. Each call is one that screen would make itself. */
+  function prefetch() {
+    // after the screen's own requests have had the network to themselves, then when idle
+    const idle = window.requestIdleCallback ? (fn) => window.requestIdleCallback(fn, { timeout: 4000 }) : (fn) => setTimeout(fn, 500);
+    setTimeout(() => idle(() => {
+      for (const fn of [store.courses, store.currentTerm, store.favorites, store.planner, store.announcementsFeed, store.calendarContexts]) {
+        try {
+          fn().catch(() => {});
+        } catch {
+          /* ignore */
+        }
+      }
+    }), 2500);
   }
 
   async function boot() {
