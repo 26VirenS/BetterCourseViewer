@@ -11,13 +11,15 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.9"
-    MARKETING_VERSION: "2.2.18"
+    MARKETING_VERSION: "2.2.19"
     CURRENT_PROJECT_VERSION: "1"
     CODE_SIGN_STYLE: Automatic
 targets:
   SimplCourses:
     type: application
     platform: iOS
+    scheme: # a shared scheme (xcshareddata), which is what Xcode Cloud lists and builds
+      gatherCoverageData: false
     sources:
       - path: SimplCourses
         excludes:
