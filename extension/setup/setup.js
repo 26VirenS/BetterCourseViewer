@@ -250,12 +250,12 @@
       nextBtn.classList.remove('is-busy');
       nextBtn.disabled = disabled;
     });
-    foot.append(
+    foot.append(...[
       back ? h('button', { type: 'button', class: 'btn btn--ghost', id: 'back', text: 'Back', onclick: () => go(st.step - 1, -1) }) : null,
       h('span', { class: 'foot__spacer' }),
       notNow ? h('button', { type: 'button', class: 'btn btn--quiet', id: 'notNow', text: notNow.label, onclick: notNow.onSelect }) : null,
       nextBtn,
-    );
+    ].filter(Boolean)); // append() would print a null as text
     return nextBtn;
   }
 
