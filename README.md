@@ -85,7 +85,8 @@ Updating: `git pull`, then in Xcode Product → Clean Build Folder (⇧⌘K) and
 To build from the command line instead of Xcode:
 
 ```bash
-./scripts/build-mac-app.sh --build     # produces macos/build/Simpl Courses.app
+./scripts/build-mac-app.sh --build     # produces macos/build/Simpl Courses.app (ad-hoc signed)
+./scripts/build-mac-app.sh --zip       # …and drops SimplCourses-mac-<version>.zip in ~/Downloads, ready to copy to another Mac
 ```
 
 ### Build errors

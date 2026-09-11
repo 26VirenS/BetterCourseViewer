@@ -6,7 +6,8 @@
 # the extension/ folder, then optionally builds it with xcodebuild.
 #
 #   ./scripts/build-mac-app.sh            # generate macos/Simpl Courses.xcodeproj
-#   ./scripts/build-mac-app.sh --build    # …and build the .app (Release)
+#   ./scripts/build-mac-app.sh --build    # …and build the .app (Release, ad-hoc signed)
+#   ./scripts/build-mac-app.sh --zip      # …build, and drop SimplCourses-mac-<version>.zip in ~/Downloads
 #   ./scripts/build-mac-app.sh --open     # …and open the project in Xcode
 #
 # Environment overrides:
@@ -25,9 +26,11 @@ BUNDLE_ID="${BUNDLE_ID:-com.simplcourses.app}"
 
 BUILD=0
 OPEN=0
+ZIP=0
 for arg in "$@"; do
   case "$arg" in
     --build) BUILD=1 ;;
+    --zip) BUILD=1; ZIP=1 ;;
     --open) OPEN=1 ;;
     -h|--help) sed -n '2,16p' "$0"; exit 0 ;;
     *) echo "Unknown option: $arg" >&2; exit 1 ;;
@@ -115,6 +118,14 @@ if [[ "$BUILD" == "1" ]]; then
     echo "   Unsigned builds also need: Safari → Settings → Developer → Allow unsigned extensions."
     echo "   On another Mac: unzip, move to Applications, then System Settings → Privacy & Security → Open Anyway"
     echo "   (or: xattr -dr com.apple.quarantine \"/Applications/$APP_NAME.app\")."
+    if [[ "$ZIP" == "1" ]]; then
+      VERSION="$(python3 -c "import json;print(json.load(open('$EXT_DIR/manifest.json'))['version'])" 2>/dev/null || echo dev)"
+      ZIP_PATH="$HOME/Downloads/SimplCourses-mac-$VERSION.zip"
+      rm -f "$ZIP_PATH"
+      ditto -c -k --keepParent "$OUT_DIR/build/$APP_NAME.app" "$ZIP_PATH"
+      echo
+      echo "📦 Zip: $ZIP_PATH"
+    fi
   else
     echo "Build finished but the app was not found at $APP_PATH" >&2
     exit 1
