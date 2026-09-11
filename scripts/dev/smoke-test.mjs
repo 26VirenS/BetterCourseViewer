@@ -97,7 +97,26 @@ try {
   await page.waitForFunction(() => document.querySelectorAll('.bcv-fav__dot').length >= 5, null, { timeout: 10000 }).catch(() => {});
   const favDots = await page.$$eval('.bcv-fav__dot', (els) => els.map((e) => getComputedStyle(e).backgroundColor));
   check(favDots.length === 5 && new Set(favDots).size === 5 && favDots[0] === 'rgb(52, 199, 89)', `favourite dots carry the user's own course colours from Canvas: ${favDots.join(' | ')}`);
-  const navItems = await texts('.bcv-nav__item');
+  // what the school added to Canvas's own nav (read from the page's #menu): tools, History, Help
+  check((await texts('.bcv-nav__item--more')).join(',') === 'History,My Materials,Help' && (await page.$('.bcv-nav__item--more[data-extra="tool"] .bcv-nav__tile img')) !== null, `"More from Canvas" carries the school's own nav entries with the tool's icon: ${(await texts('.bcv-nav__item--more')).join(', ')}`);
+  await page.click('.bcv-nav__item--more[data-extra="history"]');
+  await page.waitForSelector('.bcv-sheet-ov .bcv-xrow', { timeout: 10000 });
+  check((await texts('.bcv-xrow__t')).join(',') === 'Composition of Functions,Lec06-PreQuiz,Week 2 Post Class Assignment: GC articles' && /F26-MATH 021 20 · Assignment · /.test((await texts('.bcv-xrow__s'))[0]), `History opens Canvas's recently-visited list as a sheet: ${(await texts('.bcv-xrow__s'))[0]}`);
+  await page.click('.bcv-xrow');
+  await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
+  check(page.url() === `${BASE}/courses/101/assignments/1002`, 'a history row opens the item (an absolute visited_url becomes a path)');
+  await page.goto(`${BASE}/`);
+  await page.waitForSelector('.bcv-nav__item--more[data-extra="help"]', { timeout: 10000 });
+  await page.click('.bcv-nav__item--more[data-extra="help"]');
+  await page.waitForSelector('.bcv-sheet-ov .bcv-xrow', { timeout: 10000 });
+  check((await texts('.bcv-xrow__t')).join(',') === 'Search the Canvas Guides,IT Help Desk' && /Reporting a problem/.test((await texts('.bcv-sheet__foot'))[0]), `Help lists the school's help links, leaving Canvas-only forms to Canvas: ${(await texts('.bcv-xrow__t')).join(', ')}`);
+  await page.keyboard.press('Escape');
+  await page.click('.bcv-nav__item--more[data-extra="tool"]');
+  await page.waitForSelector('html.bcv-punch #account-tool', { timeout: 10000 });
+  check(page.url() === `${BASE}/accounts/1/external_tools/77?launch_type=global_navigation` && (await visible('#bcv-side')), 'an account tool opens Canvas\'s own page for it, with the shell kept over it');
+  await page.goto(`${BASE}/`);
+  await page.waitForSelector('#bcv-app .bcv-nav__item', { timeout: 10000 });
+  const navItems = await texts('.bcv-nav .bcv-nav__item');
   check(navItems.length === 7 && navItems[0].startsWith('Dashboard') && navItems[5].startsWith('Inbox') && navItems[6] === 'Grades', `sidebar nav: ${navItems.join(' | ')}`);
   await waitText('.bcv-nav__item[data-nav="todo"] .bcv-nav__count', /\d/);
   const todoCount = Number((await texts('.bcv-nav__item[data-nav="todo"] .bcv-nav__count'))[0]);

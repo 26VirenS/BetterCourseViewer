@@ -134,11 +134,11 @@ try {
   await page.click('.bcv-ph-avatar');
   await sheet();
   const acct = await texts('.bcv-ph-srow__label');
-  check(acct.join(',') === 'Inbox,Groups,Dark appearance,Settings,Guided setup,Profile', `account sheet rows: ${acct.join(', ')} (no Sign out outside the app)`);
+  check(acct.join(',') === 'Inbox,Groups,History,My Materials,Help,Dark appearance,Settings,Guided setup,Profile', `account sheet rows, with the school's own nav entries: ${acct.join(', ')} (no Sign out outside the app)`);
   check((await texts('.bcv-ph-srow__note'))[0] === 'No unread messages' || /unread message/.test((await texts('.bcv-ph-srow__note'))[0]), `Inbox row carries the unread count: ${(await texts('.bcv-ph-srow__note'))[0]}`);
   await shot('01c-account-sheet');
   await page.evaluate(() => { window.__bcvMarker = 1; });
-  await page.click('.bcv-ph-srow:nth-child(3)');
+  await page.click('.bcv-ph-srow:has-text("Dark appearance")');
   await page.waitForFunction(() => document.documentElement.getAttribute('data-bcv-theme') === 'dark' && window.__bcvMarker === undefined && document.querySelector('.bcv-ph-stat'), null, { timeout: 15000 });
   check(true, 'Dark appearance switches the theme and reloads the page (the web versions reload on an appearance change)');
   await ready();
@@ -146,7 +146,7 @@ try {
   await shot('01d-today-dark');
   await page.click('.bcv-ph-avatar');
   await sheet();
-  check((await texts('.bcv-ph-srow__label'))[2] === 'Light appearance', 'the sheet offers the way back');
+  check((await texts('.bcv-ph-srow__label')).includes('Light appearance'), 'the sheet offers the way back');
   await closeSheet();
   await page.evaluate(() => { window.__bcvMarker = 1; });
   await setSettings({ appearance: { darkMode: 'off' } });

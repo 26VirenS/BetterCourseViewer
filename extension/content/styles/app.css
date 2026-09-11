@@ -1476,3 +1476,14 @@ html.bcv-phone .bcv-tour--pill { padding-bottom: calc(var(--bcv-ph-bottom, 0px) 
 .bcv-tour__pill { pointer-events: auto; display: flex; align-items: center; gap: 8px; padding: 6px 8px 6px 14px; border-radius: 22px; background: var(--bcv-glass); -webkit-backdrop-filter: var(--bcv-blur-glass); backdrop-filter: var(--bcv-blur-glass); box-shadow: var(--bcv-shadow-hi); animation: bcv-fade-up .3s cubic-bezier(.32,.72,0,1) both; }
 .bcv-tour .bcv-tour__pill-go { border: 0; background: transparent; padding: 6px 2px; font: 600 13px/1.2 var(--bcv-font); color: var(--bcv-ink); cursor: pointer; }
 .bcv-su__fields[hidden], .bcv-su__courses[hidden] { display: none; }
+
+/* ---- "More from Canvas": what the school added to Canvas's own nav ---- */
+.bcv-side__group--more { margin-top: 2px; }
+.bcv-nav__tile--more { background: var(--bcv-fill); }
+.bcv-nav__tile--tool { background: #2d3b45; } /* tool icons are drawn for Canvas's dark nav */
+.bcv-nav__tile img { width: 16px; height: 16px; object-fit: contain; display: block; }
+.bcv-nav__ext { margin-left: auto; flex: none; }
+.bcv-xrow__t { font: 600 14px/1.3 var(--bcv-font); color: var(--bcv-ink); }
+.bcv-xrow__s { font: 400 12.5px/1.35 var(--bcv-font); color: var(--bcv-ink3); }
+.bcv-xrow__empty { padding: 18px; font: 400 13px/1.4 var(--bcv-font); color: var(--bcv-ink3); }
+.bcv-sheet__foot { padding: 8px 18px 14px; font: 400 12px/1.45 var(--bcv-font); color: var(--bcv-ink3); border-top: 1px solid var(--bcv-sep); }

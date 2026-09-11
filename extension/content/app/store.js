@@ -359,6 +359,14 @@
   /** Announcements across the current courses (the Announcements API), newest
    *  first, each with its read state. Canvas refuses the whole request when one
    *  course is off-limits, so a refused chunk is retried one course at a time. */
+  /** Canvas's own recently-visited list (what the History tray shows). */
+  function history({ force = false } = {}) {
+    return C.cached('history', 2 * MIN, () => C.get('/api/v1/users/self/history', { params: { per_page: 40 } }), { force });
+  }
+  /** The account's help links (the Help tray reads the same list). */
+  function helpLinks({ force = false } = {}) {
+    return C.cached('helplinks', 60 * MIN, () => C.get('/help_links'), { force });
+  }
   function announcementsFeed({ force = false } = {}) {
     return C.cached('annfeed', 3 * MIN, async () => {
       const cs = (await courses()).filter((c) => c.state === 'current');
@@ -960,7 +968,7 @@
   BCV.store = {
     env, pref, setPref, me, account, colors, courses, favorites, cards, setFavorite, currentTerm, dashboardView, setDashboardView,
     planner, classify, todo, todoWindow, setComplete, dismiss, restore, invalidatePlanner, activity, activitySummary, unreadCount, groups, group,
-    announcementsFeed, streamSeen, markStreamSeen, setColor,
+    announcementsFeed, streamSeen, markStreamSeen, setColor, history, helpLinks,
     calendarContexts, selectedContexts, setSelectedContexts, calendarEvents, plannerRange,
     conversations, conversation, markRead, setStarred, replyTo, compose, searchRecipients, invalidateInbox,
     course, tabs, frontPage, syllabus, courseTodo, ignoreTodo, courseStream, assignments, assignment, submission, assignmentGroups, progress,

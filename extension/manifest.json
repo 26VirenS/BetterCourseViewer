@@ -92,6 +92,7 @@
         "content/app/screens/gpa.js",
         "content/app/screens/setup.js",
         "content/app/tour.js",
+        "content/app/extras.js",
         "content/app/phone.js",
         "content/app/smart.js",
         "content/app/app.js"

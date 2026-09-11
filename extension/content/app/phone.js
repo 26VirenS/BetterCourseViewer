@@ -146,6 +146,7 @@
       rows: [
         { icon: IC.mail, label: 'Inbox', note: app.state.unread ? U.plural(app.state.unread, 'unread message') : 'No unread messages', badge: app.state.unread || null, href: '/conversations' },
         { icon: IC.people, label: 'Groups', href: '/groups' },
+        ...(BCV.extras?.phoneRows?.(app) || []), // what the school added to Canvas's own nav
         { icon: dark ? IC.sun : IC.moon, label: dark ? 'Light appearance' : 'Dark appearance', onSelect: () => app.toggleTheme() },
         { icon: IC.settings, label: 'Settings', note: 'Look, appearance and the smart panel', onSelect: () => BCV.smartClient?.openOptions?.() },
         { icon: IC.sparkle, label: 'Guided setup', note: 'Courses, grades, the smart panel, a tour', href: '/?bcv=setup' },

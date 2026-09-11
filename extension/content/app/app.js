@@ -293,6 +293,7 @@
         }, [h('span', { class: 'bcv-fav__dot', style: { background: c.color } }), h('span', { class: 'bcv-ellip', text: c.shortName || c.name })])),
         state.favs.length ? null : U.text('bcv-hint', 'Star a course under Courses to pin it here.'),
       ]),
+      BCV.extras?.sideGroup?.(BCV.app), // what the school added to Canvas's own nav (tools, History, Help)
       U.el('bcv-side__bottom', [
         h('button', { type: 'button', class: 'bcv-theme-btn', id: 'bcv-theme-btn', onclick: toggleTheme }, [
           h('span', { class: 'bcv-theme-btn__ic' }, U.svg(state.dark ? IC.sun : IC.moon, { size: 14, width: 1.8 })),
@@ -497,6 +498,7 @@
       return;
     }
     await applySkin(state.settings.appearance.skin !== false);
+    BCV.extras?.prime?.(BCV.app);
     BCV.early?.onChange((st, settings) => {
       const wasDark = state.dark;
       state.settings = settings;
@@ -519,7 +521,7 @@
   }
 
   BCV.app = {
-    state, go, render, parseRoute, refreshCounts, loadShellData, punchIn, punchOut, siteName, toggleTheme,
+    state, go, render, renderSide, parseRoute, refreshCounts, loadShellData, punchIn, punchOut, siteName, toggleTheme,
     isDark: () => state.dark,
     smartContext: () => state.smartTopic || state.smartCtx,
     /** Scope the smart panel to one item (a quiz question) until it is closed; null restores the page's suggestions. */

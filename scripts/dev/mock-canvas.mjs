@@ -280,7 +280,7 @@ function page({ title, path = '', courseId, body }) {
 </style></head>
 <body>
 <div id="application" class="ic-app">
-<header id="header" class="ic-app-header no-print"><div class="ic-app-header__logomark-container"><a href="/" class="ic-app-header__logomark"></a></div><ul id="menu"><li><a id="global_nav_dashboard_link" href="/" class="ic-app-header__menu-list-link">Dashboard</a></li><li><a id="global_nav_courses_link" href="/courses" class="ic-app-header__menu-list-link">Courses</a></li></ul></header>
+<header id="header" class="ic-app-header no-print"><div class="ic-app-header__logomark-container"><a href="/" class="ic-app-header__logomark"></a></div><ul id="menu"><li class="menu-item"><a id="global_nav_dashboard_link" href="/" class="ic-app-header__menu-list-link"><span class="menu-item__text">Dashboard</span></a></li><li class="menu-item"><a id="global_nav_courses_link" href="/courses" class="ic-app-header__menu-list-link"><span class="menu-item__text">Courses</span></a></li><li class="menu-item"><a id="global_nav_calendar_link" href="/calendar" class="ic-app-header__menu-list-link"><span class="menu-item__text">Calendar</span></a></li><li class="menu-item"><button id="global_nav_history_link" class="ic-app-header__menu-list-link" type="button"><span class="menu-item__text">History</span></button></li><li class="menu-item ic-app-header__menu-list-item"><a class="ic-app-header__menu-list-link" href="/accounts/1/external_tools/77?launch_type=global_navigation"><img class="ic-icon-svg ic-icon-svg--lti" src="/images/tool-icon.svg" alt=""><span class="menu-item__text">My Materials</span></a></li><li class="menu-item"><a id="global_nav_help_link" href="#" class="ic-app-header__menu-list-link"><span class="menu-item__text">Help</span></a></li></ul></header>
 <div id="wrapper" class="ic-Layout-wrapper">
   <div id="main" class="ic-Layout-columns">
     <div id="not_right_side" class="ic-app-main-content"><div id="content" class="ic-Layout-contentMain">${body}</div></div>
@@ -293,6 +293,7 @@ const htmlPages = {
   '/': () => page({ title: 'Dashboard', body: '<h1 class="ic-Dashboard-header__title">Dashboard</h1><div id="dashboard">stock dashboard</div>' }),
   '/courses/101/external_tools/9': () => page({ title: 'Resources & Policy', courseId: '101', body: '<h2>Resources & Policy</h2><iframe id="tool_content" src="/courses/101/external_tools/retrieve?url=x" width="600" height="300" title="Tool"></iframe>' }),
   '/profile': () => page({ title: 'User Profile', body: '<h1>Sam Student</h1><p class="profile">Profile page rendered by Canvas.</p>' }),
+  '/accounts/1/external_tools/77': () => page({ title: 'My Materials', body: '<h2 id="account-tool">My Materials (an account-level tool, launched by Canvas)</h2><iframe id="tool_content" title="My Materials" src="/courses/104/external_tools/t1/resource_selection"></iframe>' }),
   // a homework-submission tool's own picker, framed by the assignment page exactly as Canvas frames it;
   // when a file is chosen the return page posts externalContentReady to the window that framed it
   '/courses/104/external_tools/t1/resource_selection': () => `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Box</title></head><body style="font-family:sans-serif;padding:24px"><h2 id="tool-title">Box picker (the tool's own page)</h2><p>The tool owns everything here. Choosing a file hands it back to the assignment page.</p><button id="pick" onclick="window.parent.postMessage({ subject: 'externalContentReady', service: 'external_tool_dialog', contents: [{ '@type': 'FileItem', url: 'http://localhost:${port}/files/box1/download', text: 'GC-articles-Sharma.pdf', mediaType: 'application/pdf' }] }, '*')">Use GC-articles-Sharma.pdf</button></body></html>`,
@@ -320,6 +321,17 @@ on('GET', /^\/api\/v1\/courses$/, () => courses.map(fullCourse));
 on('GET', /^\/api\/v1\/dashboard\/dashboard_cards$/, () => courses.filter((c) => favorites.has(c.id)).map((c) => ({ id: c.id, shortName: c.name, originalName: c.name, courseCode: c.code, href: `/courses/${c.id}`, term: 'Fall 2026', subtitle: c.section, links: [{ css_class: 'announcements', label: 'Announcements', path: `/courses/${c.id}/announcements` }, { css_class: 'assignments', label: 'Assignments', path: `/courses/${c.id}/assignments` }, { css_class: 'discussions', label: 'Discussions', path: `/courses/${c.id}/discussion_topics` }, { css_class: 'files', label: 'Files', path: `/courses/${c.id}/files` }] })));
 on('GET', /^\/api\/v1\/users\/self\/colors$/, () => ({ custom_colors: Object.fromEntries(courses.map((c) => [`course_${c.id}`, c.color])) }));
 on('POST', /^\/api\/v1\/users\/self\/favorites\/courses\/(\w+)$/, (url, m) => { favorites.add(m[1]); return { context_id: m[1], context_type: 'Course' }; });
+const hoursAgo = (h) => new Date(Date.now() - h * 3600e3).toISOString();
+on('GET', /^\/api\/v1\/users\/self\/history$/, () => [
+  { asset_name: 'Composition of Functions', asset_readable_category: 'Assignment', asset_icon: 'icon-assignment', context_name: 'F26-MATH 021 20', visited_url: `http://localhost:${port}/courses/101/assignments/1002`, visited_at: hoursAgo(2) },
+  { asset_name: 'Lec06-PreQuiz', asset_readable_category: 'Quiz', asset_icon: 'icon-quiz', context_name: 'F26-MATH 021 20', visited_url: '/courses/101/quizzes/9011', visited_at: hoursAgo(5) },
+  { asset_name: 'Week 2 Post Class Assignment: GC articles', asset_readable_category: 'Assignment', asset_icon: 'icon-assignment', context_name: 'F26-SPRK 010 103', visited_url: '/courses/104/assignments/4002', visited_at: hoursAgo(30) },
+]);
+on('GET', /^\/help_links$/, () => [
+  { id: 'search_the_canvas_guides', text: 'Search the Canvas Guides', subtext: 'Find answers to common questions', url: 'https://community.canvaslms.com/t5/Canvas/ct-p/canvas', type: 'default', available_to: ['user', 'student'] },
+  { id: 'report_a_problem', text: 'Report a Problem', subtext: 'If Canvas misbehaves, tell us about it', url: '#create_ticket', type: 'default', available_to: ['user', 'student'] },
+  { id: 'it_help', text: 'IT Help Desk', subtext: 'Campus technology support', url: 'https://it.example.edu/help', type: 'custom', available_to: ['student'] },
+]);
 on('DELETE', /^\/api\/v1\/users\/self\/favorites\/courses\/(\w+)$/, (url, m) => { favorites.delete(m[1]); return { context_id: m[1] }; });
 on('GET', /^\/api\/v1\/planner\/items$/, (url) => filterDates(plannerItems(), url, 'plannable_date'));
 on('POST', /^\/api\/v1\/planner\/overrides$/, (url, m, body) => { const ov = { id: `ov${overrides.size + 1}`, plannable_type: body.plannable_type, plannable_id: body.plannable_id, marked_complete: !!body.marked_complete, dismissed: !!body.dismissed }; overrides.set(`${body.plannable_type}:${body.plannable_id}`, ov); return ov; });
