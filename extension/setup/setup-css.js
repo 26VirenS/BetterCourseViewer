@@ -183,9 +183,9 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
 .target { display: flex; align-items: center; gap: 12px; padding: 11px 15px; border-radius: 16px; background: var(--card); border: 1px solid var(--edge); animation: fadeUp .38s var(--ease) both; }
 .target + .target { margin-top: 7px; }
 .target__code { flex: 1; min-width: 0; font: 600 14px/1.3 var(--font); color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.seg { flex: none; display: flex; padding: 2px; border-radius: 11px; background: var(--fill); gap: 2px; }
+.seg { flex: none; display: flex; padding: 2px; border-radius: 11px; background: var(--fill); border: 1px solid var(--edge); gap: 2px; }
 .seg button { border: 0; cursor: pointer; min-width: 33px; height: 27px; border-radius: 9px; font: 600 12.5px/1 var(--font); background: transparent; color: var(--ink3); transition: background .2s ease, color .2s ease, transform .2s var(--spring); }
-.seg button.is-on { background: var(--seg-on); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.14); }
+.seg button.is-on { background: var(--blue); color: #fff; box-shadow: 0 1px 3px rgba(10,132,255,.35); }
 .seg button:active { transform: scale(.94); }
 
 .provs { margin-top: 18px; display: flex; gap: 8px; }

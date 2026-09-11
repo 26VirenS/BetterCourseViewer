@@ -1191,6 +1191,24 @@ try {
   await page.click('#bcv-nf-unread');
   check((await texts('.bcv-nf__empty'))[0] === 'Nothing unread here.', 'Unread only with nothing unread says so');
   await page.click('#bcv-nf-unread');
+  // a narrow window (or a zoomed one): the column's own scale narrows the padding and the title, rows wrap
+  await page.setViewportSize({ width: 760, height: 900 });
+  await page.goto(`${BASE}/#notifications`);
+  await page.waitForSelector('.bcv-nf__row', { timeout: 15000 });
+  await page.waitForTimeout(400);
+  const narrow = await page.evaluate(() => {
+    const head = document.querySelector('.bcv-head');
+    const row = document.querySelector('.bcv-nf__row');
+    const title = row.querySelector('.bcv-nf__title').getBoundingClientRect();
+    const pill = row.querySelector('.bcv-nf__course')?.getBoundingClientRect();
+    const main = document.querySelector('.bcv-main').getBoundingClientRect();
+    return { overflow: document.documentElement.scrollWidth > window.innerWidth + 1, padLeft: getComputedStyle(head).paddingLeft, h1: getComputedStyle(document.querySelector('.bcv-h1')).fontSize, wrapped: !!pill && pill.top > title.bottom - 2, rowRight: row.getBoundingClientRect().right <= main.right + 1, mainWidth: Math.round(main.width) };
+  });
+  check(!narrow.overflow && narrow.padLeft === '20px' && narrow.h1 === '28px' && narrow.wrapped && narrow.rowRight, `at 760px the column scales itself: 20px sides, a 28px title, rows wrap and nothing overflows (${JSON.stringify(narrow)})`);
+  await shot(page, '33b-notifications-narrow');
+  await page.setViewportSize({ width: 1400, height: 900 });
+  await page.goto(`${BASE}/#notifications`);
+  await page.waitForSelector('.bcv-nf__row', { timeout: 15000 });
   await Promise.all([page.waitForNavigation({ timeout: 15000 }), page.click('.bcv-nf__row[data-cat="graded"] .bcv-nf__act')]);
   check(page.url() === `${BASE}/courses/101/assignments/1007`, `the action opens the item in Canvas: ${page.url()}`);
 

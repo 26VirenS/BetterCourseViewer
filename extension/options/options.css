@@ -111,9 +111,9 @@ h1 { margin: 0; font: 700 30px/1.15 var(--display); letter-spacing: -.03em; }
 .stepper button { width: 30px; height: 28px; border: 0; border-radius: 9px; background: transparent; cursor: pointer; font: 600 16px/1 var(--font); color: var(--ink2); }
 .stepper button:hover { background: var(--card); }
 .stepper__val { min-width: 46px; text-align: center; font: 600 15px/1 var(--mono); color: var(--ink); }
-.seg { flex: none; display: flex; padding: 2px; border-radius: 11px; background: var(--fill); gap: 2px; }
+.seg { flex: none; display: flex; padding: 2px; border-radius: 11px; background: var(--fill); border: 1px solid var(--edge); gap: 2px; }
 .seg button { border: 0; cursor: pointer; padding: 0 13px; height: 27px; border-radius: 9px; font: 600 12px/1 var(--font); background: transparent; color: var(--ink3); transition: background .2s ease, color .2s ease; }
-.seg button.is-on { background: var(--seg-on); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.14); }
+.seg button.is-on { background: var(--blue); color: #fff; box-shadow: 0 1px 3px rgba(10,132,255,.35); }
 .seg--letters button { min-width: 32px; padding: 0 6px; }
 .field { display: flex; align-items: center; gap: 9px; padding: 11px 13px; border-radius: 14px; background: var(--fill); }
 .field--card { flex: 1; min-width: 0; padding: 12px 14px; border-radius: 15px; background: var(--card); border: 1px solid var(--edge); }

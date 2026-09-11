@@ -126,28 +126,34 @@ html.bcv-on #bcv-app { display: flex; }
 .bcv-account__sub { font: 400 11px/1.25 var(--bcv-font); color: var(--bcv-ink3); }
 
 /* ---- main + screen chrome ---------------------------------------------- */
-.bcv-main { flex: 1; min-width: 0; padding: 0 0 64px; }
+.bcv-main { flex: 1; min-width: 0; padding: 0 0 64px; container-type: inline-size; container-name: bcv-main; }
+/* the column's own scale: side padding, the page title, row gaps. Set on the screen (a container
+   cannot size itself) and narrowed by the column's width, whatever the window or the zoom. */
+.bcv-screen { --bcv-px: 40px; --bcv-py: 24px; --bcv-h1: 34px; --bcv-gap: 26px; }
+@container bcv-main (max-width: 960px) { .bcv-screen { --bcv-px: 28px; --bcv-h1: 31px; --bcv-gap: 22px; } }
+@container bcv-main (max-width: 720px) { .bcv-screen { --bcv-px: 20px; --bcv-py: 18px; --bcv-h1: 28px; --bcv-gap: 18px; } }
+@container bcv-main (max-width: 520px) { .bcv-screen { --bcv-px: 14px; --bcv-py: 14px; --bcv-h1: 25px; --bcv-gap: 16px; } }
 /* dense screens cap at 1180 and fill the column below that (mockup 7); reading screens set their own 700–900 */
 .bcv-screen { --w: 1180px; }
-.bcv-head { position: sticky; top: 0; z-index: 5; background: var(--bcv-chrome); -webkit-backdrop-filter: var(--bcv-blur-chrome); backdrop-filter: var(--bcv-blur-chrome); border-bottom: 1px solid var(--bcv-edge); padding: 26px 40px 16px; }
-.bcv-head--tight { padding: 24px 40px 14px; }
-.bcv-head--course { padding: 18px 40px 12px; }
+.bcv-head { position: sticky; top: 0; z-index: 5; background: var(--bcv-chrome); -webkit-backdrop-filter: var(--bcv-blur-chrome); backdrop-filter: var(--bcv-blur-chrome); border-bottom: 1px solid var(--bcv-edge); padding: calc(var(--bcv-py) + 2px) var(--bcv-px) 16px; }
+.bcv-head--tight { padding: var(--bcv-py) var(--bcv-px) 14px; }
+.bcv-head--course { padding: 18px var(--bcv-px) 12px; }
 .bcv-head__in { max-width: var(--w); margin: 0 auto; }
 .bcv-head__row { display: flex; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
 .bcv-head__row--center { align-items: center; gap: 14px; }
 .bcv-head__row--inbox { align-items: center; gap: 12px; }
-.bcv-h1 { margin: 0; font: 700 34px/1.1 var(--bcv-display); letter-spacing: -.025em; }
+.bcv-h1 { margin: 0; font: 700 var(--bcv-h1)/1.1 var(--bcv-display); letter-spacing: -.025em; }
 .bcv-h1--30 { font-size: 30px; }
 .bcv-h1--28 { font-size: 28px; line-height: 1.15; }
 .bcv-head__sub { margin-top: 4px; font: 400 13.5px/1.2 var(--bcv-font); color: var(--bcv-ink3); }
 .bcv-head__tools { margin-top: 14px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
-.bcv-body { max-width: var(--w); margin: 0 auto; padding: 24px 40px 0; display: flex; flex-direction: column; gap: 26px; }
+.bcv-body { max-width: var(--w); margin: 0 auto; padding: var(--bcv-py) var(--bcv-px) 0; display: flex; flex-direction: column; gap: var(--bcv-gap); }
 .bcv-body--24 { gap: 24px; }
 .bcv-body--22 { gap: 22px; }
 .bcv-body--18 { gap: 18px; }
 .bcv-body--16 { gap: 16px; }
-.bcv-body--cols { padding: 22px 40px 0; flex-direction: row; flex-wrap: wrap; gap: 20px; align-items: flex-start; }
-.bcv-body--course-cols { padding: 24px 40px 0; flex-direction: row; flex-wrap: wrap; gap: 20px; align-items: flex-start; }
+.bcv-body--cols { padding: calc(var(--bcv-py) - 2px) var(--bcv-px) 0; flex-direction: row; flex-wrap: wrap; gap: 20px; align-items: flex-start; }
+.bcv-body--course-cols { padding: var(--bcv-py) var(--bcv-px) 0; flex-direction: row; flex-wrap: wrap; gap: 20px; align-items: flex-start; }
 .bcv-col { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
 .bcv-col--16 { gap: 16px; }
 .bcv-col--18 { gap: 18px; }
@@ -1111,8 +1117,6 @@ html[data-bcv-theme="dark"] .bcv-qz__opt.is-selected { background: rgba(10,132,2
   .bcv-rail { width: 72px; }
   .bcv-rail .bcv-rail__title, .bcv-rail .bcv-rail__label, .bcv-rail .bcv-rail__count, .bcv-rail .bcv-rail__group--ext { display: none; }
   .bcv-rail .bcv-rail__item, .bcv-rail .bcv-rail__toggle { justify-content: center; }
-  .bcv-head, .bcv-head--tight, .bcv-head--course { padding-left: 20px; padding-right: 20px; }
-  .bcv-body, .bcv-body--cols, .bcv-body--course-cols { padding-left: 20px; padding-right: 20px; }
 }
 @media (max-width: 640px) {
   #bcv-app { flex-direction: column; }
@@ -1458,3 +1462,20 @@ html.bcv-phone .bcv-nf__body { flex-basis: calc(100% - 20px); }
 html.bcv-phone .bcv-nf__course { margin-left: 20px; }
 html.bcv-phone .bcv-nf__act { margin-left: auto; }
 @media (prefers-reduced-motion: reduce) { .bcv-nf__enter { animation: none; } }
+
+/* ---- narrow columns: rows wrap their trailing controls rather than squeeze or clip ---- */
+@container bcv-main (max-width: 720px) {
+  .bcv-head__row { align-items: flex-start; gap: 12px; }
+  .bcv-nf__row { flex-wrap: wrap; gap: 10px 12px; }
+  .bcv-nf__body { flex-basis: calc(100% - 21px); }
+  .bcv-nf__course { margin-left: 21px; max-width: 180px; }
+  .bcv-nf__act { margin-left: auto; }
+  .bcv-nf__tools { gap: 6px; }
+  #bcv-app .bcv-nf__tool { height: 30px; padding: 0 12px; font-size: 12px; }
+  .bcv-nf__chips { margin-top: 10px; }
+  .bcv-card { border-radius: 16px; }
+}
+@container bcv-main (max-width: 520px) {
+  .bcv-row { flex-wrap: wrap; gap: 8px 12px; padding: 12px 14px; }
+  .bcv-nf__row { padding: 12px 14px; }
+}
