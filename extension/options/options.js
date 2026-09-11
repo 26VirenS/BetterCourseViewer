@@ -183,21 +183,12 @@
       $('newDomain').value = '';
     }
   });
-  // the guided setup: enable the site, then continue on it (the rest of the steps run on the Canvas page)
-  $('setupGo').addEventListener('click', async () => {
-    const raw = $('setupSite').value.trim();
-    const msg = $('setupMsg');
-    if (!raw) {
-      msg.textContent = 'Enter your Canvas address first.';
-      return;
-    }
-    const origin = await enableSite(raw, msg);
-    if (!origin) return;
-    msg.textContent = `Opening ${origin}…`;
+  // the guided setup runs in its own page
+  $('openSetup').addEventListener('click', async () => {
     try {
-      await api.tabs.create({ url: `${origin}/?bcv=setup` });
+      await api.tabs.create({ url: api.runtime.getURL('setup/setup.html') });
     } catch {
-      msg.textContent = `Open ${origin}/?bcv=setup in a new tab to continue.`;
+      location.href = api.runtime.getURL('setup/setup.html');
     }
   });
 

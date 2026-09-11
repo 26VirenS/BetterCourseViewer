@@ -121,3 +121,8 @@ Nothing about the listing (text, screenshots, privacy answers) changes on an upd
 ## Edge
 
 The same Chrome zip loads in Microsoft Edge and can be submitted to Edge Add-ons at https://partner.microsoft.com/dashboard/microsoftedge with the same listing text (no registration fee).
+
+
+## First run
+
+Installing opens `setup/setup.html`, the guided setup, in a new tab. It asks for the school's Canvas address and requests permission for that origin alone (from the Continue click), so the listing's justification for optional host permissions can point at it.

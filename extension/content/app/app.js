@@ -487,10 +487,10 @@
     }), 2500);
   }
 
-  /** True once, on the first signed-in Canvas page since the extension was installed. */
+  /** True once, on the first signed-in Canvas page in the app (browsers open the setup page instead). */
   async function firstRun() {
     const r = parseRoute();
-    if (r.params.get('bcv') === 'setup' || inQuiz()) return false;
+    if (!self.BCVBridge?.native || r.params.get('bcv') === 'setup' || inQuiz()) return false;
     try {
       const flag = await BCV.api.storage.local.get('setup:offered');
       if (flag && flag['setup:offered']) return false;
@@ -499,6 +499,31 @@
     } catch {
       return false;
     }
+  }
+
+  /** What the setup page decided for this host: the favourites, written through Canvas here (the
+   *  page has the session and the CSRF token), then the tour. The plan is cleared first, so a
+   *  reload mid-way never repeats it. */
+  async function applyPlan() {
+    let plan;
+    try {
+      plan = (await BCV.api.storage.local.get('setup:plan'))['setup:plan'];
+      if (!plan || plan.host !== location.host) return;
+      await BCV.api.storage.local.remove('setup:plan');
+    } catch {
+      return;
+    }
+    if (Array.isArray(plan.favorites)) {
+      const want = new Set(plan.favorites.map(String));
+      const all = await store.courses().catch(() => []);
+      const changes = all.filter((c) => c.state === 'current' && c.favorite !== want.has(c.id));
+      for (const c of changes) await store.setFavorite(c.id, want.has(c.id)).catch(() => {});
+      if (changes.length) {
+        loadShellData({ force: true });
+        await render();
+      }
+    }
+    if (plan.tour && BCV.tour) await BCV.tour.start(BCV.app);
   }
 
   async function boot() {
@@ -519,6 +544,7 @@
     }
     await applySkin(state.settings.appearance.skin !== false);
     BCV.extras?.prime?.(BCV.app);
+    applyPlan();
     BCV.early?.onChange((st, settings) => {
       const wasDark = state.dark;
       state.settings = settings;

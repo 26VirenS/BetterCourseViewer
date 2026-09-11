@@ -91,8 +91,14 @@
     await Promise.all(courses.map(async (c) => groupsBy.set(c.id, await store.assignmentGroups(c.id).catch(() => null))));
     if (!ctx.alive()) return screen;
 
-    let tracking = trackingPref && typeof trackingPref === 'object' && Number.isFinite(trackingPref.priorGpa) ? trackingPref : null;
+    // tracking is on with or without a record from before this term (the setup asks for none:
+    // cumulative GPA fills in as snapshots accumulate); a goal of 0 means no goal was set
+    let tracking = trackingPref && typeof trackingPref === 'object' && (trackingPref.since || Number.isFinite(trackingPref.priorGpa))
+      ? { ...trackingPref, priorGpa: Number.isFinite(trackingPref.priorGpa) ? trackingPref.priorGpa : null, priorCourses: Number.isFinite(trackingPref.priorCourses) ? trackingPref.priorCourses : 0 }
+      : null;
     let goal = Number.isFinite(goalPref) ? goalPref : 3.7;
+    const hasGoal = () => goal > 0;
+    const hasPrior = () => !!tracking && Number.isFinite(tracking.priorGpa) && tracking.priorCourses > 0;
     const targets = targetsPref && typeof targetsPref === 'object' ? { ...targetsPref } : {};
     let snaps = Array.isArray(snapsPref) ? snapsPref : [];
     const hidden = new Set(Array.isArray(hiddenPref) ? hiddenPref.map(String) : []); // dropped from the overview and the GPA, reversible
@@ -127,7 +133,7 @@
       const n = rows.length;
       const termGpa = n ? rows.reduce((s, r) => s + r.pts, 0) / n : null;
       const lowGpa = n ? rows.reduce((s, r) => s + pointsFor(null, Math.max(0, r.pct - LOWER_BY)), 0) / n : null;
-      const cum = tracking && termGpa !== null ? (tracking.priorGpa * tracking.priorCourses + termGpa * n) / (tracking.priorCourses + n) : null;
+      const cum = hasPrior() && termGpa !== null ? (tracking.priorGpa * tracking.priorCourses + termGpa * n) / (tracking.priorCourses + n) : null;
       // on-time: every submitted, dated assignment across the shown courses; Canvas's own `late` flag decides
       let submitted = 0, onTime = 0;
       for (const c of shown) for (const g of groupsBy.get(c.id) || []) for (const a of g.assignments || []) {
@@ -167,8 +173,8 @@
 
     // ---- pieces ----------------------------------------------------------------------------
     function hero(m) {
-      const goalMet = m.termGpa !== null && m.termGpa >= goal;
-      const gap = m.termGpa === null ? null : Math.abs(m.termGpa - goal);
+      const goalMet = hasGoal() && m.termGpa !== null && m.termGpa >= goal;
+      const gap = !hasGoal() || m.termGpa === null ? null : Math.abs(m.termGpa - goal);
       return U.el('bcv-gpa__hero', [
         U.el('bcv-gpa__hero-head', [
           U.text('bcv-gpa__kicker', `Term GPA${term ? ` · ${term}` : ''}`, 'span'),
@@ -179,16 +185,16 @@
         U.el('bcv-gpa__hero-foot', [
           tracking
             ? h('div', {}, [
-              U.el('bcv-gpa__line', [U.text('bcv-gpa__line-k', 'Cumulative', 'span'), U.text('bcv-gpa__line-v', gpa2(m.cum), 'span')]),
-              U.text('bcv-gpa__hero-sub', `${gpa2(tracking.priorGpa)} across ${U.plural(tracking.priorCourses, 'course')} before this term`),
+              U.el('bcv-gpa__line', [U.text('bcv-gpa__line-k', 'Cumulative', 'span'), U.text('bcv-gpa__line-v', hasPrior() ? gpa2(m.cum) : (m.termGpa === null ? '—' : gpa2(m.termGpa)), 'span')]),
+              U.text('bcv-gpa__hero-sub', hasPrior() ? `${gpa2(tracking.priorGpa)} across ${U.plural(tracking.priorCourses, 'course')} before this term` : 'This term so far; add your record before this term in settings'),
             ])
             : U.text('bcv-gpa__hero-hint bcv-pretty', 'Cumulative GPA needs your past record — turn on tracking above.'),
           U.el('bcv-gpa__line', [U.text('bcv-gpa__line-k bcv-gpa__line-k--sm', `If ungraded work lands ${LOWER_BY} pts lower`, 'span'), U.text('bcv-gpa__line-v bcv-gpa__line-v--sm', m.termGpa === null ? '—' : `${gpa2(m.lowGpa)} – ${gpa2(m.termGpa)}`, 'span')]),
           U.el('bcv-gpa__goal', [
             U.svg(goalMet ? 'M5 13l4 4L19 7' : 'M12 5v14M6 13l6 6 6-6', { size: 16, stroke: '#fff', width: 2.1, style: { flex: 'none' } }),
             h('div', { style: { flex: '1', minWidth: '0' } }, [
-              U.text('bcv-gpa__goal-h', gap === null ? 'No score to compare yet' : goalMet ? `+${gpa2(gap)} above your goal` : `${gpa2(gap)} below your goal`),
-              U.text('bcv-gpa__goal-s', `Goal ${gpa2(goal)} · set it in settings`),
+              U.text('bcv-gpa__goal-h', !hasGoal() ? 'No goal set' : gap === null ? 'No score to compare yet' : goalMet ? `+${gpa2(gap)} above your goal` : `${gpa2(gap)} below your goal`),
+              U.text('bcv-gpa__goal-s', hasGoal() ? `Goal ${gpa2(goal)} · set it in settings` : 'Set one in settings'),
             ]),
           ]),
         ]),
@@ -203,8 +209,8 @@
       if (enough) {
         const coords = pts.map((s, i) => ({ x: 7 + i * (86 / (pts.length - 1)), y: yAt(s.gpa), s }));
         const svg = svgEl('svg', { viewBox: '0 0 100 100', preserveAspectRatio: 'none' });
+        if (hasGoal()) svg.append(svgEl('line', { x1: '0', y1: yAt(goal).toFixed(2), x2: '100', y2: yAt(goal).toFixed(2), stroke: '#5856d6', 'stroke-width': '1.5', 'stroke-dasharray': '4 4', 'vector-effect': 'non-scaling-stroke', opacity: '.8' }));
         svg.append(
-          svgEl('line', { x1: '0', y1: yAt(goal).toFixed(2), x2: '100', y2: yAt(goal).toFixed(2), stroke: '#5856d6', 'stroke-width': '1.5', 'stroke-dasharray': '4 4', 'vector-effect': 'non-scaling-stroke', opacity: '.8' }),
           svgEl('polyline', { points: coords.map((p) => `${p.x.toFixed(2)},${p.y.toFixed(2)}`).join(' '), fill: 'none', stroke: '#0a84ff', 'stroke-width': '3', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'vector-effect': 'non-scaling-stroke' }),
         );
         const label = (s) => (s.date === dayKey() ? 'Today' : U.fmtShort(`${s.date}T12:00:00`));
@@ -220,7 +226,7 @@
         ])];
       }
       return U.el('bcv-gpa__trend', [
-        U.el('bcv-gpa__trend-head', [U.text('bcv-gpa__stat-label', 'Trend', 'span'), U.text('bcv-gpa__trend-range', `${gpa2(MIN_Y)} – ${gpa2(MAX_Y)} · dashed line is your goal`, 'span')]),
+        U.el('bcv-gpa__trend-head', [U.text('bcv-gpa__stat-label', 'Trend', 'span'), U.text('bcv-gpa__trend-range', `${gpa2(MIN_Y)} – ${gpa2(MAX_Y)}${hasGoal() ? ' · dashed line is your goal' : ''}`, 'span')]),
         ...chart,
       ]);
     }
@@ -460,8 +466,8 @@
       const ov = U.el('bcv-sheet-ov', null, { role: 'dialog', 'aria-label': 'GPA settings' });
       let pendingGoal = goal;
       let on = !!tracking || wantTracking;
-      const priorGpa = h('input', { class: 'bcv-input bcv-gpa-set__input', id: 'bcv-gpa-prior', type: 'number', min: '0', max: '4', step: '0.01', placeholder: '3.42', value: tracking ? String(tracking.priorGpa) : '' });
-      const priorN = h('input', { class: 'bcv-input bcv-gpa-set__input', id: 'bcv-gpa-prior-n', type: 'number', min: '1', max: '200', step: '1', placeholder: '8', value: tracking ? String(tracking.priorCourses) : '' });
+      const priorGpa = h('input', { class: 'bcv-input bcv-gpa-set__input', id: 'bcv-gpa-prior', type: 'number', min: '0', max: '4', step: '0.01', placeholder: '3.42', value: hasPrior() ? String(tracking.priorGpa) : '' });
+      const priorN = h('input', { class: 'bcv-input bcv-gpa-set__input', id: 'bcv-gpa-prior-n', type: 'number', min: '1', max: '200', step: '1', placeholder: '8', value: hasPrior() ? String(tracking.priorCourses) : '' });
       const goalVal = U.text('bcv-gpa-set__val', gpa2(pendingGoal), 'span');
       const goalGap = U.text('bcv-gpa-set__s bcv-pretty', '');
       const syncGoal = () => {
@@ -479,13 +485,15 @@
       const done = async () => {
         goal = clamp(pendingGoal, 0, 4);
         if (on) {
+          // the record before this term is optional: without it, cumulative fills in from snapshots
+          const blank = !priorGpa.value.trim() && !priorN.value.trim();
           const g = Number(priorGpa.value), n = Math.round(Number(priorN.value));
-          if (!Number.isFinite(g) || g < 0 || g > 4 || !(n >= 1)) {
-            U.toast('Enter your GPA before this term (0–4) and how many courses it covers.', { error: true });
+          if (!blank && (!Number.isFinite(g) || g < 0 || g > 4 || !(n >= 1))) {
+            U.toast('Enter your GPA before this term (0–4) and how many courses it covers, or leave both blank.', { error: true });
             priorGpa.focus();
             return;
           }
-          tracking = { priorGpa: g, priorCourses: n, since: tracking?.since || dayKey() };
+          tracking = blank ? { priorGpa: null, priorCourses: 0, since: tracking?.since || dayKey() } : { priorGpa: g, priorCourses: n, since: tracking?.since || dayKey() };
         } else tracking = null;
         await save();
         close();
@@ -561,10 +569,10 @@
         label: 'Grades',
         actions: [
           { label: 'Explain my GPA', note: m.termGpa === null ? 'No scores yet' : `${gpa2(m.termGpa)} this term`, icon: IC.chart, prompt: 'Explain how my term GPA is built from my course scores and letter grades, and which course moves it most.' },
-          { label: 'Reach my goal', note: `Goal ${gpa2(goal)}`, icon: IC.bolt, prompt: 'Given each course’s score, target and the points still to come, what do I need in each course to reach my GPA goal? Keep the arithmetic brief.' },
+          { label: 'Reach my goal', note: hasGoal() ? `Goal ${gpa2(goal)}` : 'No goal set', icon: IC.bolt, prompt: 'Given each course’s score, target and the points still to come, what do I need in each course to reach my GPA goal? Keep the arithmetic brief.' },
         ],
         context: () => [
-          `Term GPA ${gpa2(m.termGpa)} (goal ${gpa2(goal)}), ${m.n} scored courses of ${m.shownCount} shown, every course weighted equally.`,
+          `Term GPA ${gpa2(m.termGpa)} (${hasGoal() ? `goal ${gpa2(goal)}` : 'no goal set'}), ${m.n} scored courses of ${m.shownCount} shown, every course weighted equally.`,
           ...m.rows.map((r) => `- ${r.c.name}: ${r.pct}% (${r.letter}, ${r.pts.toFixed(1)}); target ${r.target[0]} ${r.target[1]}%; ${r.m.known ? `${store.fmtPts(r.m.earned)} pts earned, ${store.fmtPts(r.m.remaining)} pts remaining; needs ${r.needed === null ? 'n/a' : `${Math.round(r.needed)}%`} of the rest` : 'assignment list unavailable'}; groups: ${gmFor(r.c).legend.map((l) => `${l.label} ${l.value}`).join(', ') || 'none graded'}`),
           ...m.unscored.map((c) => `- ${c.name}: no score yet (not counted)`),
           m.hiddenList.length ? `Hidden by the student, not counted: ${m.hiddenList.map((c) => c.name).join(', ')}` : '',

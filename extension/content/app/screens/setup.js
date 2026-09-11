@@ -176,7 +176,7 @@
       if (!ctx.alive()) return;
       state.courses = all;
       if (Number.isFinite(goalPref)) state.goal = goalPref;
-      if (trackingPref && typeof trackingPref === 'object' && Number.isFinite(trackingPref.priorGpa)) state.tracking = trackingPref;
+      if (trackingPref && typeof trackingPref === 'object' && (trackingPref.since || Number.isFinite(trackingPref.priorGpa))) state.tracking = trackingPref;
       if (targetsPref && typeof targetsPref === 'object') state.targets = { ...targetsPref };
       const chosen = (all || []).filter((c) => c.state === 'current' && (state.chosen ? state.chosen.has(c.id) : c.favorite || !all.some((x) => x.favorite)));
       const scored = chosen.filter((c) => c.score !== null && c.score !== undefined);
@@ -203,8 +203,8 @@
 
       // tracking
       let on = !!state.tracking;
-      const priorGpa = h('input', { class: 'bcv-input bcv-su__input', id: 'bcv-su-prior', type: 'number', min: '0', max: '4', step: '0.01', placeholder: '3.42', inputmode: 'decimal', value: state.tracking ? String(state.tracking.priorGpa) : '' });
-      const priorN = h('input', { class: 'bcv-input bcv-su__input', id: 'bcv-su-prior-n', type: 'number', min: '1', max: '200', step: '1', placeholder: '8', inputmode: 'numeric', value: state.tracking ? String(state.tracking.priorCourses) : '' });
+      const priorGpa = h('input', { class: 'bcv-input bcv-su__input', id: 'bcv-su-prior', type: 'number', min: '0', max: '4', step: '0.01', placeholder: '3.42', inputmode: 'decimal', value: Number.isFinite(state.tracking?.priorGpa) ? String(state.tracking.priorGpa) : '' });
+      const priorN = h('input', { class: 'bcv-input bcv-su__input', id: 'bcv-su-prior-n', type: 'number', min: '1', max: '200', step: '1', placeholder: '8', inputmode: 'numeric', value: state.tracking?.priorCourses > 0 ? String(state.tracking.priorCourses) : '' });
       const fields = U.el('bcv-su__fields', [
         h('label', { class: 'bcv-su__field' }, [h('span', { text: 'GPA before this term' }), priorGpa]),
         h('label', { class: 'bcv-su__field' }, [h('span', { text: 'Courses it covers' }), priorN]),
@@ -212,7 +212,7 @@
       fields.hidden = !on;
       const trackRow = U.el('bcv-su__block', [
         U.el('bcv-su__switchrow', [
-          h('div', { style: { flex: '1', minWidth: '0' } }, [U.text('bcv-su__k', 'Track my GPA over time'), U.text('bcv-su__course-s bcv-pretty', 'Canvas stores no GPA and no history. With your record before this term, the Grades page shows a cumulative GPA and keeps one snapshot a day.')]),
+          h('div', { style: { flex: '1', minWidth: '0' } }, [U.text('bcv-su__k', 'Track my GPA over time'), U.text('bcv-su__course-s bcv-pretty', 'Canvas stores no GPA and no history. The Grades page keeps one snapshot a day from now on; your record before this term is optional.')]),
           U.switchEl(on, (v) => { on = v; fields.hidden = !v; if (v) priorGpa.focus(); }, 'Track my GPA over time'),
         ]),
         fields,
@@ -247,13 +247,15 @@
           onNext: async () => {
             let tracking = null;
             if (on) {
+              const blank = !priorGpa.value.trim() && !priorN.value.trim();
               const g = Number(priorGpa.value), n = Math.round(Number(priorN.value));
-              if (!(g >= 0 && g <= 4) || !(n >= 1)) {
-                U.toast('Enter your GPA before this term and how many courses it covers, or turn tracking off.', { error: true });
+              if (!blank && (!(g >= 0 && g <= 4) || !(n >= 1))) {
+                U.toast('Enter your GPA before this term and how many courses it covers, or leave both blank.', { error: true });
                 priorGpa.focus();
                 return false;
               }
-              tracking = { priorGpa: g, priorCourses: n, since: state.tracking?.since || new Date().toISOString().slice(0, 10) };
+              const since = state.tracking?.since || new Date().toISOString().slice(0, 10);
+              tracking = blank ? { priorGpa: null, priorCourses: 0, since } : { priorGpa: g, priorCourses: n, since };
             }
             state.goal = goal;
             state.tracking = tracking;

@@ -56,7 +56,10 @@ try {
   const extId = new URL(sw.url()).host;
   console.log('extension id', extId);
   const setSettings = (patch) => sw.evaluate(async (p) => self.BCV.settings.update(p), patch);
-  await sw.evaluate(() => self.BCV.api.storage.local.set({ 'setup:offered': true })); // the first-run setup is exercised on its own below
+  const setupTab = context.pages().find((p) => p.url().endsWith('/setup/setup.html')) || await context.waitForEvent('page', { timeout: 8000 }).catch(() => null);
+  check(!!setupTab && setupTab.url().endsWith('/setup/setup.html'), 'installing the extension opens the guided setup page');
+  if (setupTab) await setupTab.close();
+  await sw.evaluate(() => self.BCV.api.storage.local.set({ 'setup:offered': true }));
 
   const page = await context.newPage();
   page.on('pageerror', (e) => console.log('  page error:', e.message));
@@ -998,10 +1001,6 @@ try {
   const toStep = async (n) => { await page.click('.bcv-su__btn.is-primary'); await page.waitForFunction((k) => document.querySelector('.bcv-su__stepno')?.textContent.startsWith(`Step ${k} `), n, { timeout: 15000 }); };
   // a fresh student: the Grades checks above left a goal and a record behind
   await sw.evaluate(async () => { const k = 'prefs:localhost:8787'; const all = await self.BCV.api.storage.local.get(k); const p = all[k] || {}; for (const key of ['gpaGoal', 'gpaTracking', 'gradeTargets', 'setupDone', 'tour']) delete p[key]; await self.BCV.api.storage.local.set({ [k]: p }); });
-  await sw.evaluate(() => self.BCV.api.storage.local.remove('setup:offered'));
-  await page.goto(`${BASE}/courses`);
-  await page.waitForSelector('.bcv-su__card', { timeout: 15000 });
-  check(page.url() === `${BASE}/?bcv=setup` && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('setup:offered'))['setup:offered'])) === true, 'the first Canvas page after install opens the guided setup, once');
   await page.goto(`${BASE}/?bcv=setup`);
   await page.waitForSelector('.bcv-su__card', { timeout: 10000 });
   check((await texts('.bcv-su__title'))[0] === 'Welcome to Simpl Courses' && (await page.$('#bcv-app.bcv-focus')) !== null && (await texts('.bcv-focus__title'))[0] === 'Guided setup' && (await page.$$('.bcv-su__item')).length === 5, 'setup opens on a welcome card, the sidebar in focus mode, five steps listed');
@@ -1100,6 +1099,74 @@ try {
   await page.waitForFunction(() => !document.querySelector('.bcv-tour'), null, { timeout: 5000 });
   check((await prefsOf()).tour === null && !(await page.$('html.bcv-touring')), 'Done ends the tour and clears its state');
 
+  // ---- the setup page (after install) --------------------------------------------------------------------
+  console.log('setup page');
+  await sw.evaluate(() => self.BCV.api.storage.local.remove(['setup:plan']));
+  const setup = await context.newPage();
+  const sTexts = (sel) => setup.$$eval(sel, (els) => els.map((e) => (e.innerText || e.textContent).replace(/\s+/g, ' ').trim()));
+  const sStep = () => setup.$eval('#stepLabel', (e) => e.textContent.trim()).catch(() => '');
+  const sNext = async (waitFor) => { await setup.click('#next'); await setup.waitForSelector(waitFor, { timeout: 15000 }); await setup.waitForTimeout(450); };
+  await setup.goto(`chrome-extension://${extId}/setup/setup.html`);
+  await setup.waitForSelector('.welcome .h1', { timeout: 10000 });
+  check((await sTexts('.welcome .h1'))[0] === 'Simpl Courses' && (await sTexts('.welcome .lead'))[0] === 'A calmer layer over Canvas. Four quick questions.' && (await setup.$$('.blob')).length === 4 && (await sTexts('#next'))[0] === 'Get started', 'the setup page: welcome card over the drifting colour');
+  await setup.screenshot({ path: join(out, '32-setup-welcome.png') });
+  await sNext('#host');
+  check((await sStep()) === '1 of 4' && (await setup.$$('.progress .is-current')).length === 1 && (await setup.$eval('#next', (b) => b.disabled)) && (await sTexts('.line')).join(' | ') === 'Reads Canvas pages on this domain | Settings stay in this browser | No other sites, no servers', 'step 1 asks for the address, Continue held until it parses');
+  await setup.fill('#host', 'http://localhost:8787');
+  check(!(await setup.$eval('#next', (b) => b.disabled)) && (await setup.$eval('.field', (f) => f.classList.contains('is-ok'))), 'a valid address enables Continue with a green tick');
+  await setup.screenshot({ path: join(out, '32b-setup-address.png') });
+  await setup.click('#next');
+  await setup.waitForSelector('.row', { timeout: 20000 });
+  await setup.waitForTimeout(500);
+  const scanned = await sTexts('.row__code');
+  check((await sStep()) === '2 of 4' && (await sTexts('.h1'))[0] === 'Which are you in?' && scanned.length >= 8 && (await setup.$$('.row.is-on')).length === 5 && (await sTexts('.listhead span'))[0] === '5 selected', `step 2 read the enrolments: ${scanned.length} active courses, the 5 favourites checked`);
+  const firstOn = await setup.$('.row.is-on');
+  const firstOff = await setup.$('.row:not(.is-on)');
+  const offCode = await firstOn.$eval('.row__code', (e) => e.textContent.trim());
+  const onCode = await firstOff.$eval('.row__code', (e) => e.textContent.trim());
+  await firstOn.click();
+  await firstOff.click();
+  check((await sTexts('.listhead span'))[0] === '5 selected' && (await setup.$$('.row.is-on')).length === 5, 'rows toggle with the count');
+  await setup.screenshot({ path: join(out, '32c-setup-courses.png') });
+  await sNext('#track');
+  check((await sStep()) === '3 of 4' && (await setup.$eval('#track', (e) => e.classList.contains('is-on'))) && (await sTexts('#goal'))[0] === '3.50' && (await setup.$$('.target')).length === 5 && (await setup.$$('.seg button.is-on')).length === 5, 'step 3: tracking on, a 3.50 goal, a target row per chosen course (A by default)');
+  await setup.click('.stepper button:last-child');
+  await setup.click('.stepper button:last-child');
+  await setup.click('.target:first-child .seg button:nth-child(3)');
+  check((await sTexts('#goal'))[0] === '3.60' && (await setup.$eval('.target:first-child .seg button.is-on', (b) => b.textContent)) === 'B+', 'the goal stepper and a target pick');
+  await setup.screenshot({ path: join(out, '32d-setup-grades.png') });
+  await sNext('.prov');
+  const sProvs = await sTexts('.prov');
+  check((await sStep()) === '4 of 4' && sProvs.length === 3 && /Gemini\s*Coming soon/.test(sProvs[2]) && (await setup.$eval('.prov.is-soon', (b) => b.getAttribute('aria-disabled'))) === 'true' && /console\.anthropic\.com/.test((await sTexts('.keystep'))[0]) && !(await setup.$eval('#notNow', (b) => b.hidden)), `step 4: ${sProvs.join(' | ')}; Not now offered while no key is typed`);
+  await setup.click('.prov[data-provider="openai"]');
+  check(/platform\.openai\.com/.test((await sTexts('.keystep'))[0]), 'ChatGPT swaps the key steps');
+  await setup.fill('#key', 'sk-test-setup');
+  check(await setup.$eval('#notNow', (b) => b.hidden), 'typing a key hides Not now');
+  await setup.click('#next');
+  await setup.waitForFunction(() => /rejected|Could not|works|Unauthorized|invalid|checked/i.test(document.querySelector('#keyResult').textContent), null, { timeout: 20000 });
+  check((await setup.$eval('#keyResult', (e) => e.classList.contains('is-err'))) && (await sStep()) === '4 of 4', `a key that does not validate stays on the step: ${await setup.$eval('#keyResult', (e) => e.textContent)}`);
+  await setup.fill('#key', '');
+  await setup.screenshot({ path: join(out, '32e-setup-smart.png') });
+  await setup.click('#notNow');
+  await setup.waitForSelector('.done', { timeout: 10000 });
+  await setup.waitForTimeout(500);
+  const summary = await sTexts('.summary__row');
+  check((await sStep()) === 'Done' && (await sTexts('.done .h1'))[0] === 'All set' && summary.join(' | ') === 'Canvas localhost:8787 | Courses 5 selected | Tracking Goal 3.60 | Smart panel Off' && (await sTexts('#next'))[0] === 'Open Canvas', `the summary: ${summary.join(' | ')}`);
+  await setup.screenshot({ path: join(out, '32f-setup-done.png') });
+  const [canvasTab] = await Promise.all([context.waitForEvent('page', { timeout: 15000 }), setup.click('#next')]);
+  await canvasTab.waitForSelector('.bcv-tour__card', { timeout: 20000 });
+  check(canvasTab.url() === `${BASE}/` && (await canvasTab.$eval('.bcv-tour__title', (e) => e.textContent.trim())) === 'Your day at a glance', 'Open Canvas opens the site and the tour starts on arrival');
+  const favAfter = (await apiGet('/api/v1/courses?per_page=100')).filter((c) => c.is_favorite).map((c) => c.course_code || c.name);
+  check(!favAfter.includes(offCode) && favAfter.includes(onCode) && favAfter.length === 5, `the chosen courses became the Canvas favourites: −${offCode} +${onCode}`);
+  const savedPrefs = await prefsOf();
+  check(savedPrefs.gpaGoal === 3.6 && savedPrefs.gpaTracking?.since && savedPrefs.gpaTracking.priorGpa === null && Object.values(savedPrefs.gradeTargets || {}).includes(2) && savedPrefs.setupDone === true && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('setup:plan'))['setup:plan'])) === undefined, `the grade choices landed where the Grades page reads them, and the plan was cleared before the tour: ${JSON.stringify({ goal: savedPrefs.gpaGoal, tracking: savedPrefs.gpaTracking, targets: savedPrefs.gradeTargets })}`);
+  await canvasTab.click('.bcv-tour__x');
+  await canvasTab.goto(`${BASE}/grades`);
+  await canvasTab.waitForSelector('.bcv-gpa__hero', { timeout: 15000 });
+  check((await canvasTab.$$eval('.bcv-gpa__hero-sub', (els) => els.map((e) => e.textContent)))[0]?.includes('This term so far') && (await canvasTab.$$eval('.bcv-gpa__goal-s', (els) => els.map((e) => e.textContent)))[0] === 'Goal 3.60 · set it in settings', 'the Grades page tracks without a record from before this term');
+  await canvasTab.close();
+  await setup.close().catch(() => {});
+
   // ---- extension pages ---------------------------------------------------------------------------------
   console.log('extension pages');
   const options = await context.newPage();
@@ -1117,12 +1184,7 @@ try {
   await options.screenshot({ path: join(out, '29-options.png'), fullPage: true });
   check(/^v\d+\.\d+/.test(await options.$eval('#version', (el) => el.textContent)), `settings show the version: ${await options.$eval('#version', (el) => el.textContent)}`);
   await options.click('.navlink[data-section="setup"]');
-  check((await options.$eval('#setup.is-active h1', (el) => el.textContent)) === 'Guided setup' && (await options.$('#setupSite')) !== null && (await options.$$('#setup .steps li')).length === 4, 'the settings page opens the guided setup: the site first, then the four on-site steps');
-  await options.fill('#setupSite', 'school.instructure.com');
-  await options.click('#setupGo');
-  await options.waitForFunction(() => /built in|Opening/.test(document.querySelector('#setupMsg').textContent), null, { timeout: 5000 });
-  check(/is on already/.test(await options.$eval('#setupMsg', (el) => el.textContent)) || /Opening/.test(await options.$eval('#setupMsg', (el) => el.textContent)), `an instructure address needs no permission: ${await options.$eval('#setupMsg', (el) => el.textContent)}`);
-  for (const p of context.pages()) if (/school\.instructure\.com/.test(p.url())) await p.close().catch(() => {});
+  check((await options.$eval('#setup.is-active h1', (el) => el.textContent)) === 'Guided setup' && (await options.$('#openSetup')) !== null, 'the settings page links to the guided setup page');
   const popupPage = await context.newPage();
   await popupPage.goto(`chrome-extension://${extId}/popup/popup.html`);
   await popupPage.waitForTimeout(500);

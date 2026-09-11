@@ -267,24 +267,27 @@ if (typeof importScripts === 'function' && !self.BCV?.providers) {
     }
   }
 
+  /** The guided setup page, once: on install, and on the first run of a build that never offered it
+   *  (an update over a build without it, Safari enabling the extension without an install event). */
+  async function offerSetup() {
+    try {
+      const flag = await api.storage.local.get('setup:offered');
+      if (flag && flag['setup:offered']) return;
+      await api.storage.local.set({ 'setup:offered': true });
+      await api.tabs.create({ url: api.runtime.getURL('setup/setup.html') });
+    } catch {
+      /* ignore */
+    }
+  }
+
   // ---- lifecycle ----------------------------------------------------------
   api.runtime.onInstalled.addListener(async (details) => {
     await ensureDomains({ force: true });
-    if (details.reason === 'install') {
-      // the guided setup starts on the settings page (it asks for the Canvas site), then continues on the site
-      try {
-        await api.tabs.create({ url: api.runtime.getURL('options/options.html#setup') });
-      } catch {
-        try {
-          await api.runtime.openOptionsPage();
-        } catch {
-          /* ignore */
-        }
-      }
-    }
+    if (details.reason === 'install') await offerSetup();
   });
   if (api.runtime.onStartup) api.runtime.onStartup.addListener(() => ensureDomains());
   // Every time the background wakes: cheap check, repairs stale registrations
   // even when onInstalled/onStartup never fired (Safari rebuilds, reloads).
   ensureDomains();
+  offerSetup();
 })();
