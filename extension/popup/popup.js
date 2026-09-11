@@ -76,16 +76,21 @@
   }
 
   /** Permission for this site (from the click), its scripts registered, then the setup over the page. */
-  const askSite = async (msg) => {
+  const askSite = async (msg, next) => {
     if (!granted) {
       msg.textContent = 'Asking for permission…';
+      // Chrome closes this popup when its permission dialog opens, so the background finishes the
+      // job from this note once the permission lands (see continuePending in background.js).
+      await api.storage.local.set({ 'setup:pending': { origin, tabId: tab?.id ?? null, next, at: Date.now() } }).catch(() => {});
       let ok = false;
       try {
         ok = await api.permissions.request({ origins: [`${origin}/*`] });
       } catch (e) {
+        await api.storage.local.remove('setup:pending').catch(() => {});
         msg.textContent = `Permission request failed: ${e?.message || e}`;
         return false;
       }
+      await api.storage.local.remove('setup:pending').catch(() => {}); // still here: this popup finishes it
       if (!ok) {
         msg.textContent = 'Permission was not granted. Simpl Courses can only run on a site you allow.';
         return false;
@@ -133,7 +138,7 @@
       msg.textContent = 'Open your Canvas courses page first, then press Set up.';
       return;
     }
-    if (!(await askSite(msg))) return;
+    if (!(await askSite(msg, 'setup'))) return;
     if (!(await canvasHere(msg))) return;
     msg.textContent = 'Opening the setup…';
     await S.update({ appearance: { skin: true } });
@@ -195,7 +200,7 @@
   $('enable-host').textContent = url.hostname;
   $('enable-site').addEventListener('click', async () => {
     const msg = $('enable-msg');
-    if (!(await askSite(msg))) return;
+    if (!(await askSite(msg, 'reload'))) return;
     msg.textContent = 'Enabled. Reloading the page…';
     try {
       await api.tabs.reload(tab.id);

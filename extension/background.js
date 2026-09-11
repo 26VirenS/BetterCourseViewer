@@ -294,6 +294,30 @@ if (typeof importScripts === 'function' && !self.BCV?.providers) {
     }
   }
 
+  /** Chrome closes the toolbar popup the moment its permission dialog opens, so the popup cannot
+   *  finish what Set up (or Enable on this site) started. The popup leaves a note first; when the
+   *  permission lands, the rest happens here: the site registered, then the setup over that tab
+   *  (or the tab reloaded). The note expires, and the popup clears it itself when it survives. */
+  async function continuePending(added) {
+    try {
+      const all = await api.storage.local.get('setup:pending');
+      const p = all && all['setup:pending'];
+      if (!p || !p.origin || Date.now() - (p.at || 0) > 3 * 60 * 1000) return;
+      const origins = (added && added.origins) || [];
+      if (origins.length && !origins.some((o) => o.startsWith(p.origin))) return;
+      await api.storage.local.remove('setup:pending');
+      const r = await registerDomain(p.origin);
+      if (r && r.ok === false) return;
+      if (p.next === 'setup') {
+        await S.update({ appearance: { skin: true } });
+        await api.tabs.update(p.tabId, { url: `${p.origin}/?bcv=setup` });
+      } else if (p.tabId != null) await api.tabs.reload(p.tabId);
+    } catch {
+      /* the popup may still be alive and finish it itself */
+    }
+  }
+  if (api.permissions && api.permissions.onAdded) api.permissions.onAdded.addListener(continuePending);
+
   // ---- lifecycle ----------------------------------------------------------
   api.runtime.onInstalled.addListener(async (details) => {
     await ensureDomains({ force: true });
