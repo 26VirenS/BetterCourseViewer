@@ -169,6 +169,13 @@
     const syncReader = () => { readerBtn.hidden = !(readerVal && String(readerVal.html || '').trim()); };
     Object.defineProperty(shell, 'reader', { configurable: true, enumerable: true, get: () => readerVal, set: (v) => { readerVal = v; syncReader(); } });
     syncReader();
+    // on a phone the rail folds into a chip row under the title (the mockup's course header),
+    // with one line of detail between them: the course code (or its real name), the term, the section
+    if (BCV.phone?.active()) {
+      const detail = [c.nickname ? c.originalName : (c.code && c.code !== c.name ? c.code : null), c.term, ...(c.sections || [])].filter(Boolean).join(' · ');
+      if (detail) head.querySelector('.bcv-course__title-row').after(U.text('bcv-ph-head__sub bcv-ellip', detail));
+      head.querySelector('.bcv-head__in').append(BCV.phone.courseChips(app, tabs, activeId));
+    }
 
     // ---- rail --------------------------------------------------------------------
     const internal = tabs.filter((t) => !t.external);
@@ -290,6 +297,8 @@
       return tabs.find((x) => x.href !== `/courses/${id}` && route.path.startsWith(x.href))?.id || (route.tab === 'native' ? null : 'home');
     })();
 
+    shell.tabs = tabs;
+    shell.activeId = activeId;
     const { screen: shellEl, content: cmain } = await contextShell(ctx, shell, { backLabel: 'All Courses', backHref: '/courses', tabs, activeId, pills: [course.term ? h('span', { class: 'bcv-pill bcv-pill--term', text: course.term }) : null] });
     if (!ctx.alive()) return screen;
     screen.replaceChildren(...shellEl.childNodes);
@@ -338,6 +347,7 @@
   };
 
   T.home = async (ctx, shell) => {
+    if (BCV.phone?.active()) return BCV.phone.courseHome(ctx, shell); // next up, open work, turned in, the rest as a list
     const { app } = ctx;
     const c = shell.course;
     const b = body('bcv-body--course-cols');

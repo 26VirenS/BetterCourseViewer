@@ -179,6 +179,8 @@
     return out;
   };
   const BCVBridge = {
+    /** What only the app can do (null in a browser or the test harness): the account sheet's "Sign out". */
+    native: native ? { signOut: () => call({ op: 'signOut' }).then(noop) } : null,
     storageChanged: (changes) => emitChanged(changes),
     fetchHead(id, status, statusText, headers) {
       const job = pending.get(id);

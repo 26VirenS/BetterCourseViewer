@@ -16,6 +16,11 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
         views[ObjectIdentifier(webView)] = (WeakBox(webView), world)
     }
 
+    /// The extension's saved settings (the appearance, among others), for the app's own chrome.
+    var settings: [String: Any] {
+        store.get("settings")["settings"] as? [String: Any] ?? [:]
+    }
+
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage, replyHandler: @escaping (Any?, String?) -> Void) {
         guard let body = message.body as? [String: Any], let op = body["op"] as? String else {
             replyHandler(nil, "Simpl Courses: malformed bridge message")
@@ -25,9 +30,14 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
         case "storage.get":
             replyHandler(store.get(body["keys"]), nil)
         case "storage.set":
-            let changes = store.set(body["items"] as? [String: Any] ?? [:])
+            let items = body["items"] as? [String: Any] ?? [:]
+            let changes = store.set(items)
             replyHandler(nil, nil)
             broadcast(changes)
+            if let settings = items["settings"] as? [String: Any] { NotificationCenter.default.post(name: .simplSettingsChanged, object: nil, userInfo: settings) }
+        case "signOut":
+            NotificationCenter.default.post(name: .simplSignOutRequested, object: nil)
+            replyHandler(["ok": true], nil)
         case "storage.remove":
             let changes = store.remove(body["keys"] as? [String] ?? [])
             replyHandler(nil, nil)

@@ -37,6 +37,9 @@ final class WebController: NSObject, ObservableObject, WKNavigationDelegate, WKU
         webView.allowsBackForwardNavigationGestures = true
         webView.isOpaque = false
         webView.backgroundColor = .systemBackground
+        // The page lays itself out under the status bar and the home indicator using the safe-area
+        // insets it reads from CSS (ScriptBundle sets viewport-fit=cover), so WebKit must not add its own.
+        webView.scrollView.contentInsetAdjustmentBehavior = .never
         Bridge.shared.register(webView, world: world)
         if case .canvas = mode {
             let refresh = UIRefreshControl()

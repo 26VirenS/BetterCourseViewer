@@ -1,27 +1,53 @@
 import Combine
 import Foundation
+import SwiftUI
 import WebKit
 
 extension Notification.Name {
     /// Posted by the bridge when a page asks for the settings (the smart panel's "add a key" button).
     static let simplOpenSettings = Notification.Name("SimplCourses.openSettings")
+    /// Posted by the bridge when the page asks to sign out (the account sheet).
+    static let simplSignOutRequested = Notification.Name("SimplCourses.signOutRequested")
     /// Posted after the Canvas session was cleared, so the browser reloads to the login page.
     static let simplSignedOut = Notification.Name("SimplCourses.signedOut")
+    /// Posted by the bridge whenever the extension's settings are written; userInfo is the settings object.
+    static let simplSettingsChanged = Notification.Name("SimplCourses.settingsChanged")
 }
 
-/// App-level state: which Canvas host the student uses, and the settings sheet.
+/// App-level state: which Canvas host the student uses, the settings sheet, and the appearance the
+/// web interface chose (so the status bar matches it).
 final class AppSession: ObservableObject {
     private static let hostKey = "canvasHost"
 
     @Published private(set) var host: String? = UserDefaults.standard.string(forKey: AppSession.hostKey)
     @Published var showSettings = false
+    @Published private(set) var colorScheme: ColorScheme?
     private var bag = Set<AnyCancellable>()
 
     init() {
+        colorScheme = AppSession.scheme(from: Bridge.shared.settings)
         NotificationCenter.default.publisher(for: .simplOpenSettings)
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in self?.showSettings = true }
             .store(in: &bag)
+        NotificationCenter.default.publisher(for: .simplSignOutRequested)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.signOut() }
+            .store(in: &bag)
+        NotificationCenter.default.publisher(for: .simplSettingsChanged)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] note in self?.colorScheme = AppSession.scheme(from: note.userInfo as? [String: Any] ?? [:]) }
+            .store(in: &bag)
+    }
+
+    /// The extension's appearance.darkMode: "on" / "off" pin the scheme; "system" follows the device.
+    static func scheme(from settings: [String: Any]) -> ColorScheme? {
+        let mode = (settings["appearance"] as? [String: Any])?["darkMode"] as? String
+        switch mode {
+        case "on": return .dark
+        case "off": return .light
+        default: return nil
+        }
     }
 
     /// "catcourses.ucmerced.edu", "https://school.instructure.com/login" … → the bare host.

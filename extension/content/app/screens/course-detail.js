@@ -42,6 +42,19 @@
     const nativeSubmit = (a.submission_types || []).some((t) => ['online_upload', 'online_text_entry', 'online_url'].includes(t));
     const canvasOnly = !nativeSubmit && (a.submission_types || []).some((t) => ['media_recording', 'student_annotation'].includes(t));
     const attemptsLeft = !(a.allowed_attempts > 0) || (s.attempt || 0) < a.allowed_attempts;
+    const status = s.excused ? 'Excused' : s.workflow_state === 'graded' ? 'Graded' : s.submitted_at ? (s.late ? 'Submitted late' : 'Submitted') : s.missing ? 'Missing' : 'Not submitted';
+    const feedback = (s.submission_comments || []).length || Object.keys(s.rubric_assessment || {}).length;
+    const smart = {
+      label: `${c.name} · ${a.name}`,
+      actions: [
+        { label: 'Summarize this assignment', note: `${a.points_possible ?? '?'} pts · ${a.due_at ? `due ${U.fmtShort(a.due_at)}` : 'no due date'}`, icon: IC.doc, prompt: 'Summarize what this assignment asks for, the deliverable, and how it is graded.' },
+        { label: 'Make a checklist', note: 'Steps to finish it, in order', icon: IC.check, prompt: 'Turn this assignment into a step-by-step checklist I can work through, with a rough time estimate per step.' },
+        feedback ? { label: 'Explain rubric feedback', note: s.score !== undefined && s.score !== null ? `${store.fmtPts(s.score)} / ${a.points_possible}` : 'Comments and rubric', icon: IC.chart, prompt: 'Explain my grade and feedback in plain language: where I lost points, what the comments mean, and what to do differently next time.' } : null,
+      ].filter(Boolean),
+      context: () => [`Assignment: ${a.name}`, `Course: ${c.name}`, `Due: ${a.due_at ? U.fmtAt(a.due_at) : 'none'} · Points: ${a.points_possible}`, `Submission types: ${types}`, '', 'Description:', htmlToText(a.description || '', 10000), '', a.rubric?.length ? `Rubric:\n${a.rubric.map((cr) => `- ${cr.description} (${cr.points} pts): ${cr.long_description || ''}${s.rubric_assessment?.[cr.id] ? ` → got ${s.rubric_assessment[cr.id].points}${s.rubric_assessment[cr.id].comments ? `, "${s.rubric_assessment[cr.id].comments}"` : ''}` : ''}`).join('\n')}` : '', `Submission: ${status}${s.score != null ? `, score ${s.score}` : ''}`, (s.submission_comments || []).map((cm) => `Comment from ${cm.author_name}: ${cm.comment}`).join('\n')].join('\n'),
+    };
+    // the phone draws the item page its own way (the iPhone mockup)
+    if (BCV.phone?.active()) return BCV.phone.assignment(ctx, shell, { a, s, types, isTool, toolNewTab, toolLaunch, nativeSubmit, canvasOnly, attemptsLeft, status, smart });
     // replaceChildren() would print a literal "null" for a missing block, so drop them first
     main.replaceChildren(...[
       backBtn(app, `${c.url}/assignments`, 'Assignments'),
@@ -67,7 +80,6 @@
       ]), 'bcv-card--22') : null,
     ].filter(Boolean));
     // side: submission + rubric
-    const status = s.excused ? 'Excused' : s.workflow_state === 'graded' ? 'Graded' : s.submitted_at ? (s.late ? 'Submitted late' : 'Submitted') : s.missing ? 'Missing' : 'Not submitted';
     side.append(h('div', {}, [U.label('Submission'), U.card(U.el('bcv-detail', [
       h('div', { style: { display: 'flex', alignItems: 'baseline', gap: '10px', flexWrap: 'wrap' } }, [h('span', { class: 'bcv-stat__value', text: s.workflow_state === 'graded' && s.score !== null && s.score !== undefined ? `${store.fmtPts(s.score)} / ${a.points_possible ?? '—'}` : '—' }), U.badge(status, status === 'Graded' ? 'green' : /Missing|Not/.test(status) ? 'red' : /late/.test(status) ? 'orange' : '')]),
       meta([['Submitted', s.submitted_at ? U.fmtAt(s.submitted_at) : null], ['Grade', s.grade && String(s.grade) !== String(s.score) ? s.grade : null], ['Graded', s.graded_at ? U.fmtAt(s.graded_at) : null], ['Attempt', s.attempt || null]]),
@@ -84,16 +96,7 @@
         ]);
       }))), 'bcv-card--22')]));
     }
-    const feedback = (s.submission_comments || []).length || Object.keys(s.rubric_assessment || {}).length;
-    ctx.setSmart({
-      label: `${c.name} · ${a.name}`,
-      actions: [
-        { label: 'Summarize this assignment', note: `${a.points_possible ?? '?'} pts · ${a.due_at ? `due ${U.fmtShort(a.due_at)}` : 'no due date'}`, icon: IC.doc, prompt: 'Summarize what this assignment asks for, the deliverable, and how it is graded.' },
-        { label: 'Make a checklist', note: 'Steps to finish it, in order', icon: IC.check, prompt: 'Turn this assignment into a step-by-step checklist I can work through, with a rough time estimate per step.' },
-        feedback ? { label: 'Explain rubric feedback', note: s.score !== undefined && s.score !== null ? `${store.fmtPts(s.score)} / ${a.points_possible}` : 'Comments and rubric', icon: IC.chart, prompt: 'Explain my grade and feedback in plain language: where I lost points, what the comments mean, and what to do differently next time.' } : null,
-      ].filter(Boolean),
-      context: () => [`Assignment: ${a.name}`, `Course: ${c.name}`, `Due: ${a.due_at ? U.fmtAt(a.due_at) : 'none'} · Points: ${a.points_possible}`, `Submission types: ${types}`, '', 'Description:', htmlToText(a.description || '', 10000), '', a.rubric?.length ? `Rubric:\n${a.rubric.map((cr) => `- ${cr.description} (${cr.points} pts): ${cr.long_description || ''}${s.rubric_assessment?.[cr.id] ? ` → got ${s.rubric_assessment[cr.id].points}${s.rubric_assessment[cr.id].comments ? `, "${s.rubric_assessment[cr.id].comments}"` : ''}` : ''}`).join('\n')}` : '', `Submission: ${status}${s.score != null ? `, score ${s.score}` : ''}`, (s.submission_comments || []).map((cm) => `Comment from ${cm.author_name}: ${cm.comment}`).join('\n')].join('\n'),
-    });
+    ctx.setSmart(smart);
     return b;
   };
 

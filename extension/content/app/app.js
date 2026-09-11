@@ -145,12 +145,19 @@
 
   // ---- shell ------------------------------------------------------------------------------
   let root, side, main;
+  const phone = () => !!BCV.phone?.active();
   function mount() {
     if (root) return;
     root = h('div', { id: 'bcv-app' });
-    side = h('aside', { class: 'bcv-side', id: 'bcv-side' });
     main = h('main', { class: 'bcv-main', id: 'bcv-main' });
-    root.append(side, main);
+    if (phone()) {
+      // the iPhone layout: a back bar above, the five-item tab bar below, no sidebar
+      root.classList.add('bcv-app--phone');
+      root.append(BCV.phone.topbar(), main, BCV.phone.tabbar(BCV.app));
+    } else {
+      side = h('aside', { class: 'bcv-side', id: 'bcv-side' });
+      root.append(side, main);
+    }
     document.body.prepend(root);
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') U.closeMenus();
@@ -238,6 +245,10 @@
   }
 
   function renderSide() {
+    if (phone()) {
+      if (root) BCV.phone.paintChrome(BCV.app, { focus: inQuiz() && !state.quizOpen });
+      return;
+    }
     if (!side) return;
     const r = state.route || parseRoute();
     const name = siteName();
@@ -336,6 +347,7 @@
       if (r.params.get('bcv') === 'native') el = await screens.native.render(ctx);
       else if (r.screen === 'course') el = await screens.course.render(ctx);
       else if (r.screen === 'group') el = await screens.group.render(ctx);
+      else if (phone() && BCV.phone.screens[r.screen]) el = await BCV.phone.screens[r.screen](ctx); // the phone version of a root screen
       else if (screens[r.screen] && r.screen !== 'native') el = await screens[r.screen].render(ctx);
       else el = await screens.native.render(ctx);
     } catch (e) {
@@ -347,6 +359,7 @@
     main.replaceChildren(el);
     progress(false);
     document.title = titleFor(r);
+    if (phone()) BCV.phone.afterRender(BCV.app, r, el);
     BCV.smart?.refresh?.();
   }
 
@@ -460,6 +473,14 @@
       state.settings = settings;
       state.logo = undefined; // a logo URL changed in Settings applies on the next sidebar draw
       state.dark = st.dark;
+      if (st.skin && wasDark !== st.dark && !self.BCVBridge?.native) {
+        // In a browser the appearance is a fresh load: Canvas's own page (punched-through
+        // pages, embedded tools, the quiz frames) is drawn for one appearance only.
+        // The app's web view keeps the page and repaints in place instead.
+        progress(true);
+        location.reload();
+        return;
+      }
       applySkin(st.skin);
       if (st.skin && wasDark !== st.dark) {
         renderSide();
@@ -469,7 +490,7 @@
   }
 
   BCV.app = {
-    state, go, render, parseRoute, refreshCounts, loadShellData, punchIn, punchOut, siteName,
+    state, go, render, parseRoute, refreshCounts, loadShellData, punchIn, punchOut, siteName, toggleTheme,
     isDark: () => state.dark,
     smartContext: () => state.smartTopic || state.smartCtx,
     /** Scope the smart panel to one item (a quiz question) until it is closed; null restores the page's suggestions. */

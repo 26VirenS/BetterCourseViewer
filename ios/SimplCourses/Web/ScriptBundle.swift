@@ -51,6 +51,9 @@ enum ScriptBundle {
 
         switch mode {
         case .canvas:
+            // the phone layout reads the safe-area insets from CSS; that needs viewport-fit=cover on the page
+            scripts.insert(WKUserScript(source: "(function(){\(guardJS)var m=document.querySelector('meta[name=viewport]');if(!m){m=document.createElement('meta');m.name='viewport';(document.head||document.documentElement).appendChild(m);}m.content='width=device-width, initial-scale=1, viewport-fit=cover';})();", injectionTime: .atDocumentStart, forMainFrameOnly: true, in: world), at: 1)
+            scripts.append(WKUserScript(source: "(function(){\(guardJS)var m=document.querySelector('meta[name=viewport]');if(m)m.content='width=device-width, initial-scale=1, viewport-fit=cover';})();", injectionTime: .atDocumentEnd, forMainFrameOnly: true, in: world))
             // 3. the manifest's content scripts and stylesheet
             var css: [String] = []
             for entry in manifest["content_scripts"] as? [[String: Any]] ?? [] {

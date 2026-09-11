@@ -12,9 +12,13 @@
   const CACHE_KEY = 'bcv:early';
 
   const systemDark = () => !!window.matchMedia?.('(prefers-color-scheme: dark)').matches;
+  // The phone layout (the iPhone mockup) for narrow viewports, decided before first paint and
+  // kept for the page's life so a screen never re-flows into the other layout mid-way.
+  const phone = () => !!window.matchMedia?.('(max-width: 700px)').matches;
 
   function apply({ skin, dark }) {
     html.classList.toggle('bcv-on', skin !== false);
+    html.classList.toggle('bcv-phone', phone());
     html.setAttribute('data-bcv-theme', dark ? 'dark' : 'light');
   }
 

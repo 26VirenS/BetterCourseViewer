@@ -155,6 +155,7 @@ scripts/
   make-icons.mjs               regenerates the PNG icons
   dev/mock-canvas.mjs          a fake Canvas (pages + the API endpoints the app reads)
   dev/smoke-test.mjs           walks every screen in headless Chromium against the mock
+  dev/phone-test.mjs           the same at an iPhone viewport: the phone layout (tab bar, sheets, course, item, quiz)
   dev/store-shots.mjs          renders the Chrome Web Store screenshots and promo tiles into docs/store/
 docs/chrome-web-store.md       how to publish: listing text, permission justifications, release automation
 docs/store/                    the store's screenshots and promo tiles
@@ -167,6 +168,7 @@ The generated Xcode project copies the extension's top-level folders (`content/`
 ```bash
 node scripts/dev/mock-canvas.mjs        # http://localhost:8787
 node scripts/dev/smoke-test.mjs         # screenshots in scripts/dev/out/
+node scripts/dev/phone-test.mjs         # the phone layout; screenshots in scripts/dev/out/phone-*.png
 ```
 
 ## Privacy

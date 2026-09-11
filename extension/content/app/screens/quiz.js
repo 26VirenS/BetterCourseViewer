@@ -49,8 +49,10 @@
     }
     st.quiz = quiz;
     st.sub = (subs || []).find((s) => s.workflow_state === 'untaken') || null;
-    st.mode = quiz.one_question_at_a_time ? 'one' : (await store.pref('quizMode', 'one'));
-    const forcedOne = !!quiz.one_question_at_a_time;
+    // a phone shows one question per screen (the mockup); the scroll-through mode is a desktop choice
+    const phone = !!BCV.phone?.active();
+    st.mode = quiz.one_question_at_a_time || phone ? 'one' : (await store.pref('quizMode', 'one'));
+    const forcedOne = !!quiz.one_question_at_a_time || phone;
     const noBack = !!quiz.cant_go_back;
     const timed = !!quiz.time_limit;
     // Attempts come from Canvas's own count on the submission (plus any extra the instructor

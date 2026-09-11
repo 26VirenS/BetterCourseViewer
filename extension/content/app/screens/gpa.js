@@ -576,5 +576,5 @@
     return screen;
   }
 
-  BCV.screens.gpa = { render, courseMath, SCALE };
+  BCV.screens.gpa = { render, courseMath, SCALE, letterFor, pointsFor };
 })();
