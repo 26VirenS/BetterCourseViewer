@@ -404,6 +404,9 @@ html[data-bcv-theme="dark"] .bcv-badge--orange { color: #ffb44d; }
 .bcv-todo__cancel { background: transparent; color: var(--bcv-ink3); }
 .bcv-todo__addbtn:disabled { background: var(--bcv-fill); color: var(--bcv-ink3); opacity: 1; }
 .bcv-todo__del:hover { background: rgba(255,69,58,.16); }
+.bcv-todo__tools { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.bcv-todo__done { height: 30px; border-radius: 15px; padding: 0 12px; font-size: 12px; }
+.bcv-todo__done.is-on { background: var(--bcv-blue-soft); color: var(--bcv-blue); }
 .bcv-day { }
 .bcv-day__head { display: flex; align-items: baseline; gap: 10px; padding: 0 4px 8px; }
 .bcv-day__date { font: 400 13px/1.2 var(--bcv-font); color: var(--bcv-ink3); }

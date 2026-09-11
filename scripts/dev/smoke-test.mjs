@@ -349,14 +349,16 @@ try {
   await page.waitForFunction((n) => Number(document.querySelector('.bcv-nav__item[data-nav="todo"] .bcv-nav__count').textContent) === n, badgeBefore, { timeout: 5000 });
   check((await fetch(`${BASE}/api/v1/planner_notes`).then((r) => r.text()).then((t) => JSON.parse(t.replace(/^while\(1\);/, '')))).length === 0 && !(await page.$('.bcv-todo__del')), 'Delete removes the planner note from Canvas; the list and the badge agree again');
   check(true, 'ticking the circle marks an item complete');
-  await page.click('.bcv-body .bcv-row--first .bcv-switch');
+  check((await page.$eval('.bcv-body > :first-child', (e) => e.className)).includes('bcv-todo__add') && /^Show completed · \d+$/.test((await texts('.bcv-todo__done'))[0]), `Add your own task leads the page; a small header button shows completed items with their count: ${(await texts('.bcv-todo__done'))[0]}`);
+  await page.click('.bcv-todo__done');
   await page.waitForSelector('.bcv-body .bcv-row--done', { timeout: 5000 });
+  check((await texts('.bcv-todo__done'))[0] === 'Hide completed', 'the button flips to Hide completed');
   const doneRows = await texts('.bcv-body .bcv-row--done');
   check(doneRows.length >= 3 && doneRows.some((t) => /Dismissed.*Restore/.test(t)), `show completed reveals ${doneRows.length} done/dismissed rows with Restore`);
   await page.click('.bcv-body .bcv-row--done .bcv-circle');
   await page.waitForFunction((n) => document.querySelectorAll('.bcv-body .bcv-row--done').length === n - 1, doneRows.length, { timeout: 5000 });
   check(true, 'unticking a completed item reopens it');
-  await page.click('.bcv-body .bcv-row--first .bcv-switch');
+  await page.click('.bcv-todo__done');
   await page.waitForFunction(() => !document.querySelector('.bcv-body .bcv-row--done'), null, { timeout: 5000 });
   await page.click('.bcv-seg__btn[data-value="course"]');
   check((await texts('.bcv-group__head')).some((t) => /F26-MATH 021 20/.test(t)), 'grouped by course');

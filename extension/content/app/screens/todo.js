@@ -40,7 +40,7 @@
     const priPref = await store.pref('todoPriority', {});
     const pri = priPref && typeof priPref === 'object' ? { ...priPref } : {}; // item id → 0..3
     const sub = U.el('bcv-head__sub', '…');
-    const segWrap = h('div', { class: 'bcv-ml-auto' });
+    const segWrap = h('div', { class: 'bcv-ml-auto bcv-todo__tools' });
     const body = U.el('bcv-body bcv-body--24');
     screen.append(
       U.el('bcv-head', U.el('bcv-head__in', U.el('bcv-head__row', [h('div', {}, [h('h1', { class: 'bcv-h1', text: 'To Do' }), sub]), segWrap]))),
@@ -59,7 +59,14 @@
       store.setPref('todoPriority', pri);
       draw();
     };
-    const setSeg = () => segWrap.replaceChildren(U.seg([['date', 'By date'], ['priority', 'By priority'], ['course', 'By course']], group, (v) => { group = v; store.setPref('todoGroup', v); setSeg(); draw(); }));
+    // the header's tools: a small button that shows completed and dismissed items, then the sort
+    const setSeg = () => {
+      const doneCount = (items || []).filter((it) => !isOpen(it)).length;
+      segWrap.replaceChildren(
+        U.btn(showDone ? 'Hide completed' : `Show completed${doneCount ? ` · ${doneCount}` : ''}`, { kind: 'xs', icon: IC.check, cls: `bcv-todo__done ${showDone ? 'is-on' : ''}`, title: 'Completed and dismissed items in the next seven days', onClick: () => { showDone = !showDone; store.setPref('todoShowDone', showDone); setSeg(); draw(); } }),
+        U.seg([['date', 'By date'], ['priority', 'By priority'], ['course', 'By course']], group, (v) => { group = v; store.setPref('todoGroup', v); setSeg(); draw(); }),
+      );
+    };
 
     function updateSmart() {
       const list = (items || []).filter(isOpen);
@@ -82,6 +89,7 @@
         await fn();
         app.refreshCounts();
         updateSmart();
+        setSeg(); // the completed count on the header button
         draw();
       } catch (e) {
         rowEl.style.opacity = '';
@@ -94,6 +102,7 @@
       if (!ctx.alive()) return;
       app.refreshCounts();
       updateSmart();
+      setSeg();
       draw();
     }
 
@@ -242,7 +251,7 @@
       const shown = items.filter((it) => showDone || isOpen(it));
       const mine = shown.filter((it) => it.custom).sort((a, b) => a.date - b.date);
       const work = shown.filter((it) => !it.custom);
-      const parts = [];
+      const parts = [composer()]; // adding a task comes first
       const push = (el) => parts.push(U.enter(el, parts.length, 70, 420)); // groups arrive on a 70ms stagger
       const openIn = (list) => U.plural(list.filter(isOpen).length, 'open item');
       if (!shown.length) parts.push(U.emptyCard(showDone ? 'Nothing in the next seven days.' : 'Nothing to do in the next seven days.'));
@@ -282,12 +291,6 @@
           push(groupCard('Next 7 days', `${U.fmtLong(later[0].date)} – ${U.fmtLong(later[later.length - 1].date)}`, later));
         }
       }
-      parts.push(composer());
-      const doneCount = items.filter((it) => !isOpen(it)).length;
-      parts.push(U.card(U.row([
-        U.el('bcv-row__body', [U.text('bcv-row__title bcv-row__title--14', 'Show completed and dismissed'), U.text('bcv-row__sub bcv-row__sub--115', doneCount ? `${U.plural(doneCount, 'item')} in the next seven days` : 'Nothing completed or dismissed yet')]),
-        U.switchEl(showDone, (on) => { showDone = on; store.setPref('todoShowDone', on); draw(); }, 'Show completed and dismissed'),
-      ], { mod: 'bcv-row--p12-16 bcv-row--first' }), 'bcv-card--list'));
       parts.push(U.hint('Ticking an item marks it done in your Canvas planner. Dismissing removes it from your To Do list only — neither submits or completes the work. Priority is yours alone and is never sent to Canvas.', 'bcv-hint--narrow'));
       body.replaceChildren(...parts);
     }
