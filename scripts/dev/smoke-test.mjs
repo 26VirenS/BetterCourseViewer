@@ -1155,6 +1155,34 @@ try {
   console.log(`   grades from cache: ${gradesMs}ms · calendar from cache: ${calMs}ms`);
   check(gradesMs < 6000 && calMs < 6000, `warm pages draw quickly: grades ${gradesMs}ms, calendar ${calMs}ms`);
 
+  // ---- never a broken card; draw from the cache first -----------------------------------------------------
+  console.log('resilience');
+  await mockConfig({ groupsFail: true });
+  await sw.evaluate(async () => { const all = await self.BCV.api.storage.local.get(null); await self.BCV.api.storage.local.remove(Object.keys(all).filter((k) => /:groups$/.test(k))); });
+  await page.goto(`${BASE}/groups`);
+  await page.waitForSelector('html.bcv-punch, .bcv-error', { timeout: 20000 });
+  await page.waitForTimeout(400);
+  check((await page.$('html.bcv-punch')) !== null && (await page.$('.bcv-body > .bcv-error')) === null && /Showing Canvas's own page/.test((await texts('.bcv-toast')).join(' ')), `a screen that cannot load gives way to Canvas's own page, with a note: ${(await texts('.bcv-toast')).join(' | ')}`);
+  await mockConfig({ groupsFail: false });
+  await page.goto(`${BASE}/groups`);
+  await page.waitForSelector('.bcv-body .bcv-row', { timeout: 15000 });
+  // a stale cache entry draws at once, then the fresh answer replaces it in place
+  await sw.evaluate(async () => {
+    const all = await self.BCV.api.storage.local.get(null);
+    const k = Object.keys(all).find((x) => /:groups$/.test(x));
+    const entry = all[k];
+    entry.value = entry.value.map((g, i) => (i === 0 ? { ...g, name: 'Stale group from the cache' } : g));
+    entry.expires = Date.now() - 60e3;
+    await self.BCV.api.storage.local.set({ [k]: entry });
+  });
+  const t2 = Date.now();
+  await page.goto(`${BASE}/groups`);
+  await page.waitForFunction(() => document.querySelector('.bcv-body .bcv-row'), null, { timeout: 15000 });
+  const firstPaint = await texts('.bcv-body .bcv-row');
+  const staleShown = firstPaint.some((t) => /Stale group from the cache/.test(t));
+  const replaced = await eventually(async () => !(await texts('.bcv-body .bcv-row')).some((t) => /Stale group from the cache/.test(t)) && (await texts('.bcv-body .bcv-row')).some((t) => /Attestation Fall 2026 1/.test(t)), 10000);
+  check(staleShown && replaced, `an expired entry draws at once (${Date.now() - t2}ms) and the fresh answer replaces it quietly`);
+
   // ---- notifications ------------------------------------------------------------------------------------
   console.log('notifications');
   await page.goto(`${BASE}/#notifications`);

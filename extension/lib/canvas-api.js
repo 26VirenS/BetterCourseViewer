@@ -129,36 +129,58 @@
   const inflight = new Map(); // one request per key at a time: callers that arrive while it runs share it
   const cacheKey = (key) => `cache:${location.host}:${key}`;
 
-  async function cached(key, ttlMs, loader, { force = false } = {}) {
+  // An entry past its time but younger than this is handed back at once and refreshed behind
+  // the page; when the fresh answer differs, the refresh listeners hear about it (the app
+  // redraws the screen quietly). Older than this, the page waits for a fresh answer.
+  const STALE_GRACE = 45 * 60e3;
+  const refreshListeners = new Set();
+  function onRefresh(fn) {
+    refreshListeners.add(fn);
+    return () => refreshListeners.delete(fn);
+  }
+  function store(k, value, ttlMs) {
+    const entry = { value, expires: Date.now() + ttlMs };
+    memory.set(k, entry);
+    api.storage.local.set({ [k]: entry }).catch(() => { /* ignore quota errors */ });
+    return value;
+  }
+  function revalidate(k, key, stale, loader, ttlMs) {
+    if (inflight.has(k)) return;
+    const run = (async () => {
+      const value = await loader();
+      store(k, value, ttlMs);
+      if (JSON.stringify(value) !== JSON.stringify(stale)) for (const fn of refreshListeners) { try { fn(key); } catch { /* a listener's own problem */ } }
+      return value;
+    })();
+    inflight.set(k, run);
+    run.catch(() => {}).finally(() => { if (inflight.get(k) === run) inflight.delete(k); });
+  }
+
+  async function cached(key, ttlMs, loader, { force = false, fresh = false } = {}) {
     const k = cacheKey(key);
     const now = Date.now();
     if (!force) {
       const mem = memory.get(k);
       if (mem && mem.expires > now) return mem.value;
       if (inflight.has(k)) return inflight.get(k);
+      let hit = null;
       try {
-        const stored = await api.storage.local.get(k);
-        const hit = stored[k];
-        if (hit && hit.expires > now) {
-          memory.set(k, hit);
-          return hit.value;
-        }
+        hit = (await api.storage.local.get(k))[k] || null;
       } catch {
         /* ignore */
       }
-      if (inflight.has(k)) return inflight.get(k);
-    }
-    const run = (async () => {
-      const value = await loader();
-      const entry = { value, expires: Date.now() + ttlMs };
-      memory.set(k, entry);
-      try {
-        await api.storage.local.set({ [k]: entry });
-      } catch {
-        /* ignore quota errors */
+      if (hit && hit.expires > now) {
+        memory.set(k, hit);
+        return hit.value;
       }
-      return value;
-    })();
+      if (inflight.has(k)) return inflight.get(k);
+      if (hit && !fresh && hit.expires > now - STALE_GRACE) {
+        // stale but recent: the page draws from it now, the fresh answer lands behind it
+        revalidate(k, key, hit.value, loader, ttlMs);
+        return hit.value;
+      }
+    }
+    const run = (async () => store(k, await loader(), ttlMs))();
     inflight.set(k, run);
     try {
       return await run;
@@ -286,7 +308,7 @@
   }
 
   BCV.canvas = {
-    get, post, put, del, upload, cached, invalidate, csrfToken, CanvasError,
+    get, post, put, del, upload, cached, invalidate, onRefresh, csrfToken, CanvasError,
     plannerItems, dashboardCards, activeCourses, courseColors, setPlannerComplete,
     coursesWithScores, courseTabs, course, courseModules, announcements, unreadCount,
   };

@@ -325,12 +325,13 @@
   }
 
   // ---- screens --------------------------------------------------------------------------------
-  async function render() {
+  const SCREEN_PATIENCE = 15000; // a screen still not drawn after this gives way to Canvas's own page
+  async function render({ quiet = false } = {}) {
     const r = parseRoute();
     state.route = r;
     const id = ++state.renderId;
     const alive = () => id === state.renderId;
-    progress(true);
+    if (!quiet) progress(true);
     state.quizOpen = false;
     state.submitOpen = false;
     html.classList.remove('bcv-quiz', 'bcv-quiz-fb'); // the quiz screen puts them back while an attempt or its feedback is on screen
@@ -343,19 +344,39 @@
     // skeleton in its place, shaped like its content (course cards on Grades, list rows
     // elsewhere); a cached screen lands before that and never flashes it.
     const skeleton = setTimeout(() => {
-      if (alive()) main.replaceChildren(U.el('bcv-screen bcv-screen--skel', U.el('bcv-body', U.loading(r.screen === 'gpa' ? 'cards' : 'rows', 6))));
+      if (alive() && !quiet) main.replaceChildren(U.el('bcv-screen bcv-screen--skel', U.el('bcv-body', U.loading(r.screen === 'gpa' ? 'cards' : 'rows', 6))));
     }, 150);
-    let el;
+    const nativeWanted = r.params.get('bcv') === 'native' || (!screens[r.screen] && !(phone() && BCV.phone.screens[r.screen])) || r.screen === 'native';
+    const draw = async () => {
+      if (nativeWanted) return screens.native.render(ctx);
+      if (r.screen === 'course') return screens.course.render(ctx);
+      if (r.screen === 'group') return screens.group.render(ctx);
+      if (phone() && BCV.phone.screens[r.screen]) return BCV.phone.screens[r.screen](ctx); // the phone version of a root screen
+      return screens[r.screen].render(ctx);
+    };
+    // Never a broken card: a screen that throws, that lands nothing but an error, or that has not
+    // drawn after SCREEN_PATIENCE gives way to Canvas's own page for this URL, with a note.
+    let el = null;
+    let gaveWay = null;
     try {
-      if (r.params.get('bcv') === 'native') el = await screens.native.render(ctx);
-      else if (r.screen === 'course') el = await screens.course.render(ctx);
-      else if (r.screen === 'group') el = await screens.group.render(ctx);
-      else if (phone() && BCV.phone.screens[r.screen]) el = await BCV.phone.screens[r.screen](ctx); // the phone version of a root screen
-      else if (screens[r.screen] && r.screen !== 'native') el = await screens[r.screen].render(ctx);
-      else el = await screens.native.render(ctx);
+      const res = await (nativeWanted ? draw() : Promise.race([draw(), new Promise((resolve) => setTimeout(() => resolve('__slow__'), SCREEN_PATIENCE))]));
+      if (res === '__slow__') gaveWay = 'it took too long';
+      else el = res;
     } catch (e) {
       console.error('[Simpl Courses] screen failed', e);
-      el = U.el('bcv-screen', U.el('bcv-body', U.errorBox(`This page could not be drawn: ${e?.message || e}`)));
+      gaveWay = e?.message || String(e);
+    }
+    if (!gaveWay && !nativeWanted && el) {
+      const only = el.querySelector('.bcv-body > .bcv-error:only-child, .bcv-body > .bcv-error:first-child:last-child');
+      if (only) gaveWay = only.textContent.trim();
+    }
+    if (gaveWay && alive()) {
+      try {
+        el = await screens.native.render(ctx);
+      } catch (e2) {
+        el = U.el('bcv-screen', U.el('bcv-body', U.errorBox(`This page could not be drawn: ${e2?.message || e2}`)));
+      }
+      if (alive()) U.toast(`Showing Canvas's own page: ${gaveWay}`, { error: true, ms: 6000 });
     }
     clearTimeout(skeleton);
     if (!alive()) return;
@@ -579,6 +600,21 @@
       } else if (st.skin) renderSide();
     });
   }
+
+  /** A cache refresh landed newer data for something on this page: redraw it in place, keeping the
+   *  scroll, unless the student is mid-way through something (a sheet, a quiz, typing). */
+  let quietTimer = null;
+  BCV.canvas?.onRefresh?.(() => {
+    clearTimeout(quietTimer);
+    quietTimer = setTimeout(() => {
+      if (!started || state.settings?.appearance?.skin === false || state.quizOpen || state.submitOpen || inQuiz()) return;
+      if (document.querySelector('.bcv-sheet-ov, .bcv-reader-ov, #bcv-setup, .bcv-tour, .bcv-sb-ov, [class*="bcv-menu"]')) return;
+      const a = document.activeElement;
+      if (a && (/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) || a.isContentEditable)) return;
+      const y = window.scrollY;
+      render({ quiet: true }).then(() => window.scrollTo(0, y)).catch(() => {});
+    }, 600);
+  });
 
   BCV.app = {
     state, go, render, renderSide, parseRoute, refreshCounts, loadShellData, punchIn, punchOut, siteName, toggleTheme, preload,
