@@ -128,6 +128,10 @@ Then click the toolbar icon → **Settings** for the smart-panel keys, and on a 
 
 The privacy policy the store listing points to is [`PRIVACY.md`](PRIVACY.md).
 
+## iOS
+
+The same extension runs inside an iOS app: a full-screen web view of your school's Canvas where you sign in on Canvas's own login page, with the scripts and stylesheet injected into every page and a small bridge standing in for the extension APIs. `./scripts/build-ios-app.sh --open` generates the Xcode project; [`docs/ios.md`](docs/ios.md) explains the pieces, the build, and what does not work yet.
+
 ## Development
 
 ```

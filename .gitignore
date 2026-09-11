@@ -8,6 +8,10 @@ DerivedData/
 *.xcuserstate
 xcuserdata/
 
+# Generated iOS Xcode project (run scripts/build-ios-app.sh to regenerate)
+ios/*.xcodeproj
+ios/SimplCourses/Info.plist
+
 # Packaged extension archives
 dist/
 

@@ -59,13 +59,13 @@ const RX = (120 * 0.235).toFixed(1); // 23.5% corner radius
 // 1024 artwork: the mark spans 52% of the tile's width, centred, with the stroke at 4.8% of the tile).
 const MARK_ON_TILE = 'translate(60 60) scale(0.72) translate(-59.5 -60)';
 
-/** The blue tile. `weight`: stroke width (8 large, 9 small). */
-const tileSvg = (weight = 8, { size = 120, fill = 'gradient', ink = '#fff' } = {}) => `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 120 120">
+/** The blue tile. `weight`: stroke width (8 large, 9 small). `square`: no rounded corners (iOS masks its own). */
+const tileSvg = (weight = 8, { size = 120, fill = 'gradient', ink = '#fff', square = false } = {}) => `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 120 120">
   <defs>
     ${fill === 'gradient' ? tileGradient('tile', '#0A84FF', '#0A4FD6') : ''}
     ${sheetFade('sheet', ink)}
   </defs>
-  <rect width="120" height="120" rx="${RX}" fill="${fill === 'gradient' ? 'url(#tile)' : fill}"/>
+  <rect width="120" height="120" rx="${square ? 0 : RX}" fill="${fill === 'gradient' ? 'url(#tile)' : fill}"/>
   <g transform="${MARK_ON_TILE}">
     ${sheet('sheet')}
     ${strokes(weight, ink)}
@@ -94,6 +94,10 @@ async function render(svg, size, file) {
 for (const size of [48, 96, 128, 256, 512]) await render(tileSvg(size <= 64 ? 9 : 8, { size }), size, join(iconsDir, `icon-${size}.png`));
 for (const size of [16, 19, 32, 38, 48, 64]) await render(markSvg(size <= 38 ? 9 : 8, { size }), size, join(iconsDir, `toolbar-${size}.png`));
 await render(tileSvg(8, { size: 1024 }), 1024, join(brandDir, 'icon-1024.png'));
+// the iOS app icon: an opaque square (iOS applies the corner mask itself)
+const iosIcon = join(root, 'ios', 'SimplCourses', 'Resources', 'Assets.xcassets', 'AppIcon.appiconset');
+mkdirSync(iosIcon, { recursive: true });
+await render(tileSvg(8, { size: 1024, square: true }), 1024, join(iosIcon, 'icon-1024.png'));
 await render(tileSvg(8, { size: 512, fill: '#1c1c1e', ink: '#fff' }), 512, join(brandDir, 'one-colour-dark.png'));
 await render(tileSvg(8, { size: 512, fill: '#e5e5ea', ink: '#000' }), 512, join(brandDir, 'one-colour-light.png'));
 await browser.close();

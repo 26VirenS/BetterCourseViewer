@@ -1,0 +1,56 @@
+# XcodeGen spec for the iOS app. `scripts/build-ios-app.sh` turns it into SimplCourses.xcodeproj.
+# The app is a full-screen web view of the student's own Canvas site with the extension injected into
+# it (see docs/ios.md); the extension/ folder is bundled as a folder reference so the same files ship.
+name: SimplCourses
+options:
+  bundleIdPrefix: com.simplcourses
+  deploymentTarget:
+    iOS: "16.0"
+  createIntermediateGroups: true
+  generateEmptyDirectories: true
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    MARKETING_VERSION: "2.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    CODE_SIGN_STYLE: Automatic
+targets:
+  SimplCourses:
+    type: application
+    platform: iOS
+    sources:
+      - path: SimplCourses
+        excludes:
+          - "Info.plist"
+          - "Web/bridge.js"
+      - path: SimplCourses/Web/bridge.js
+        buildPhase: resources # copied into the bundle as-is; ScriptBundle reads it at run time
+      - path: ../extension
+        type: folder
+        buildPhase: resources
+    info:
+      path: SimplCourses/Info.plist
+      properties:
+        CFBundleDisplayName: Simpl Courses
+        CFBundleName: Simpl Courses
+        LSRequiresIPhoneOS: true
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        NSCameraUsageDescription: Lets you take a photo when an assignment asks for a file.
+        NSPhotoLibraryUsageDescription: Lets you attach a photo or video to an assignment.
+        ITSAppUsesNonExemptEncryption: false
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.simplcourses.ios
+        PRODUCT_NAME: Simpl Courses
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        TARGETED_DEVICE_FAMILY: "1,2"
+        GENERATE_INFOPLIST_FILE: false
