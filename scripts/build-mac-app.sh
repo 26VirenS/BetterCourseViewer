@@ -105,10 +105,16 @@ if [[ "$BUILD" == "1" ]]; then
     mkdir -p "$OUT_DIR/build"
     rm -rf "$OUT_DIR/build/$APP_NAME.app"
     cp -R "$APP_PATH" "$OUT_DIR/build/"
+    # Ad-hoc sign the app and the extension inside it. An unsigned app cannot run at all on
+    # Apple silicon (macOS reports it as "damaged"); an ad-hoc-signed one runs after Gatekeeper's
+    # one-time "Open Anyway" on a Mac it was copied to.
+    codesign --force --deep --sign - "$OUT_DIR/build/$APP_NAME.app"
     echo
-    echo "✅ Built: $OUT_DIR/build/$APP_NAME.app"
+    echo "✅ Built: $OUT_DIR/build/$APP_NAME.app (ad-hoc signed)"
     echo "   Next: open the app once, then enable Simpl Courses in Safari → Settings → Extensions."
     echo "   Unsigned builds also need: Safari → Settings → Developer → Allow unsigned extensions."
+    echo "   On another Mac: unzip, move to Applications, then System Settings → Privacy & Security → Open Anyway"
+    echo "   (or: xattr -dr com.apple.quarantine \"/Applications/$APP_NAME.app\")."
   else
     echo "Build finished but the app was not found at $APP_PATH" >&2
     exit 1
