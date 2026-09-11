@@ -58,5 +58,8 @@
     filter: 'M4 5h16l-6 8v5l-4 2v-7z',
     pencil: 'M4 20h4l11-11-4-4L4 16zM14 5l4 4',
     text: 'M5 6h14M12 6v14M9 20h6',
+    // mockup 12: To Do priority flag and the student's own tasks
+    flag: 'M6 4v16M6 4h11l-2 4 2 4H6',
+    task: 'M9 11l3 3 5-6M5 5h14v14H5z',
   };
 })();

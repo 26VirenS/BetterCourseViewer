@@ -293,6 +293,61 @@ try {
   check(true, 'dismissing removes the item (planner override dismissed)');
   await page.click('.bcv-body .bcv-row .bcv-circle');
   await page.waitForFunction((n) => document.querySelectorAll('.bcv-body .bcv-card--list .bcv-row:not(.bcv-row--first)').length === n - 2, todoRows, { timeout: 5000 });
+  // ---- mockup 12: a task of your own (a Canvas planner note), priority on every row, By priority ----
+  console.log('to do: own tasks + priority');
+  const badgeBefore = Number((await texts('.bcv-nav__item[data-nav="todo"] .bcv-nav__count'))[0]);
+  const subBefore = (await texts('.bcv-head__sub'))[0];
+  check(!!(await page.$('.bcv-todo__add')) && !(await page.$('.bcv-todo__del')), 'an "Add your own task" row sits under the list; Canvas rows have no delete button');
+  await page.click('.bcv-todo__add');
+  await page.waitForSelector('.bcv-todo__composer', { timeout: 5000 });
+  check(!!(await page.$('.bcv-todo__addbtn[disabled]')) && (await texts('.bcv-todo__ctl .bcv-seg__btn')).join(' | ') === 'Today | This week | Pick a date' && !(await visible('.bcv-todo__date')), 'the composer: Add is blocked while the title is empty; Today / This week / Pick a date; no date field yet');
+  await page.fill('.bcv-todo__title', 'Email Prof. Lei about office hours');
+  await page.click('.bcv-todo__ctl .bcv-seg__btn:nth-child(3)');
+  check((await visible('.bcv-todo__date')) && !!(await page.$('.bcv-todo__addbtn[disabled]')), 'Pick a date reveals a real date field and blocks Add until one is chosen');
+  await page.click('.bcv-todo__ctl .bcv-seg__btn:nth-child(1)');
+  check(!(await page.$('.bcv-todo__addbtn[disabled]')) && (await texts('.bcv-pri--draft'))[0] === 'Medium', 'back on Today, Add unlocks; the draft priority starts at Medium');
+  await page.click('.bcv-pri--draft');
+  await page.waitForSelector('.bcv-menu', { timeout: 3000 });
+  check((await texts('.bcv-menu__item')).join(',') === 'High,Medium,Low,None' && (await page.$$('.bcv-menu .bcv-dot')).length === 4, `the priority menu lists the four levels with a dot each: ${(await texts('.bcv-menu__item')).join(',')}`);
+  await page.click('.bcv-menu__item:first-child');
+  await page.waitForFunction(() => !document.querySelector('.bcv-menu'), null, { timeout: 3000 });
+  check((await texts('.bcv-pri--draft'))[0] === 'High', 'picking High sets the draft chip');
+  await page.click('.bcv-todo__addbtn');
+  await page.waitForFunction(() => [...document.querySelectorAll('.bcv-group__head')].some((e) => /^My tasks/.test(e.textContent)), null, { timeout: 10000 });
+  const noteRow = page.locator('.bcv-row', { hasText: 'Email Prof. Lei about office hours' }).first();
+  const noteText = (await noteRow.innerText()).replace(/\s+/g, ' ');
+  const notes = await fetch(`${BASE}/api/v1/planner_notes`).then((r) => r.text()).then((t) => JSON.parse(t.replace(/^while\(1\);/, '')));
+  check(notes.length === 1 && notes[0].title === 'Email Prof. Lei about office hours' && /T\d\d:\d\d/.test(notes[0].todo_date) && !('priority' in notes[0]), `the task is a Canvas planner note with today as its todo_date, and no priority ever reaches Canvas: ${JSON.stringify(notes[0])}`);
+  check(/My task/.test(noteText) && /High/.test(noteText) && /11:59 PM|Today/.test(noteText) && (await noteRow.locator('.bcv-todo__del').count()) === 1 && (await page.$$('.bcv-todo__del')).length === 1 && !(await noteRow.locator('.bcv-btn--xs').count()), `the row: My task, High, due today, the only row with a delete button and no Submit: ${noteText}`);
+  const subAfter = (await texts('.bcv-head__sub'))[0];
+  await page.waitForFunction((n) => Number(document.querySelector('.bcv-nav__item[data-nav="todo"] .bcv-nav__count').textContent) === n + 1, badgeBefore, { timeout: 5000 });
+  const subM = subBefore.match(/^(\d+) items across (\d+) courses$/);
+  check(!!subM && subAfter === `${Number(subM[1]) + 1} items across ${subM[2]} courses · one of your own`, `the header counts the task but not as a course, and the badge follows the same list: ${subBefore} → ${subAfter}`);
+  // a Canvas assignment gets a priority too; it survives a reload, keyed by the item's id
+  const firstWork = page.locator('.bcv-row', { hasNot: page.locator('.bcv-todo__del') }).filter({ has: page.locator('.bcv-pri') }).first();
+  const workId = await firstWork.getAttribute('data-item');
+  await firstWork.locator('.bcv-pri').click();
+  await page.waitForSelector('.bcv-menu', { timeout: 3000 });
+  await page.click('.bcv-menu__item:nth-child(3)'); // Low
+  await page.waitForFunction((id) => document.querySelector(`.bcv-row[data-item="${id}"] .bcv-pri`)?.textContent.trim() === 'Low', workId, { timeout: 5000 });
+  await page.reload();
+  await page.waitForSelector('.bcv-row[data-item] .bcv-pri', { timeout: 10000 });
+  check((await page.$eval(`.bcv-row[data-item="${workId}"] .bcv-pri`, (e) => e.textContent.trim())) === 'Low' && /^(assignment|quiz|discussion_topic|wiki_page|calendar_event):/.test(workId), `a Canvas item's priority is kept by its stable id and survives a reload: ${workId} → Low`);
+  const prefPri = (await sw.evaluate(async () => Object.entries(await chrome.storage.local.get(null)).find(([k]) => k.startsWith('prefs:'))?.[1]?.todoPriority));
+  check(prefPri && prefPri[workId] === 1 && Object.values(prefPri).includes(3), `priority lives in the site's preferences, never in Canvas: ${JSON.stringify(prefPri)}`);
+  // By priority buckets High → Low → Unprioritised and drops the empty Medium bucket
+  await page.click('.bcv-head .bcv-seg__btn:nth-child(2)');
+  await page.waitForFunction(() => /^High priority/.test(document.querySelector('.bcv-group__head')?.textContent || ''), null, { timeout: 5000 });
+  const priHeads = (await texts('.bcv-group__head')).map((t) => (t.match(/^(High priority|Medium priority|Low priority|Unprioritised)/) || ['?'])[0]);
+  check(priHeads.join(' | ') === 'High priority | Low priority | Unprioritised', `By priority: ${priHeads.join(' | ')}`);
+  await page.click('.bcv-head .bcv-seg__btn:nth-child(1)');
+  await page.waitForFunction(() => /^My tasks/.test(document.querySelector('.bcv-group__head')?.textContent || ''), null, { timeout: 5000 });
+  // delete: only a task of your own, after a confirmation; the note leaves Canvas and the badge drops back
+  page.once('dialog', (d) => d.accept());
+  await page.click('.bcv-todo__del');
+  await page.waitForFunction(() => ![...document.querySelectorAll('.bcv-group__head')].some((e) => /^My tasks/.test(e.textContent)), null, { timeout: 10000 });
+  await page.waitForFunction((n) => Number(document.querySelector('.bcv-nav__item[data-nav="todo"] .bcv-nav__count').textContent) === n, badgeBefore, { timeout: 5000 });
+  check((await fetch(`${BASE}/api/v1/planner_notes`).then((r) => r.text()).then((t) => JSON.parse(t.replace(/^while\(1\);/, '')))).length === 0 && !(await page.$('.bcv-todo__del')), 'Delete removes the planner note from Canvas; the list and the badge agree again');
   check(true, 'ticking the circle marks an item complete');
   await page.click('.bcv-body .bcv-row--first .bcv-switch');
   await page.waitForSelector('.bcv-body .bcv-row--done', { timeout: 5000 });

@@ -280,7 +280,7 @@
       isDue = graded;
     } else if (type === 'wiki_page') { kind = 'Page'; icon = IC.page; isDue = false; }
     else if (type === 'calendar_event') { kind = 'Event'; icon = IC.cal; isDue = false; }
-    else if (type === 'planner_note') { kind = 'Note'; icon = IC.doc; isDue = false; }
+    else if (type === 'planner_note') { kind = 'My task'; icon = IC.task; isDue = false; } // a task the student added (a Canvas planner note)
     else if (type === 'announcement') { kind = 'Announcement'; icon = IC.bell; isDue = false; }
     else if (type === 'assessment_request') { kind = 'Peer review'; icon = IC.people; }
     else if (type === 'assignment') { isDue = !!(p.due_at || item.plannable_date); }
@@ -288,18 +288,20 @@
     const date = U.parse(p.due_at || p.todo_date || p.start_at || item.plannable_date);
     const courseId = item.course_id ? String(item.course_id) : null;
     const course = courseId && courseMap ? courseMap.get(courseId) : null;
+    const custom = type === 'planner_note';
     return {
-      id: `${type}:${item.plannable_id}`,
+      id: `${type}:${item.plannable_id}`, // stable: what priority and other student metadata key on
       raw: item,
       type,
       kind,
       icon,
       isDue,
       date,
+      custom, // not a course: excluded from every course count, and the only rows that can be deleted
       title: p.title || p.name || 'Untitled',
       points: p.points_possible ?? null,
       courseId,
-      courseName: course?.name || item.context_name || '',
+      courseName: course?.name || item.context_name || (custom ? 'My task' : ''),
       course,
       submitted: !!(subs.submitted || subs.graded),
       graded: !!subs.graded,
@@ -308,8 +310,22 @@
       excused: !!subs.excused,
       complete: !!item.planner_override?.marked_complete,
       dismissed: !!item.planner_override?.dismissed,
-      url: item.html_url || (courseId ? `/courses/${courseId}` : '/'),
+      url: item.html_url || (custom ? '/#todo' : courseId ? `/courses/${courseId}` : '/'),
     };
+  }
+
+  /** A task of the student's own: a Canvas planner note (mockup 12), so it lives in the same
+   *  planner list as everything else and on every device. `todoDate` is an ISO datetime or null
+   *  (a task the student left undated stays undated — nothing invents a due date). */
+  async function createNote({ title, todoDate = null, courseId = null }) {
+    const body = { title, todo_date: todoDate, course_id: courseId || undefined };
+    const note = await C.post('/api/v1/planner_notes', body);
+    await invalidatePlanner();
+    return note;
+  }
+  async function deleteNote(id) {
+    await C.del(`/api/v1/planner_notes/${encodeURIComponent(id)}`);
+    await invalidatePlanner();
   }
 
   async function planner({ force = false, refresh = false, days = 21 } = {}) {
@@ -1043,7 +1059,7 @@
 
   BCV.store = {
     env, pref, setPref, me, account, colors, courses, favorites, cards, setFavorite, currentTerm, dashboardView, setDashboardView,
-    planner, classify, todo, todoWindow, setComplete, dismiss, restore, invalidatePlanner, activity, activitySummary, unreadCount, groups, group,
+    planner, classify, todo, todoWindow, setComplete, dismiss, restore, invalidatePlanner, createNote, deleteNote, activity, activitySummary, unreadCount, groups, group,
     announcementsFeed, streamSeen, markStreamSeen, setColor, history, helpLinks,
     calendarContexts, selectedContexts, setSelectedContexts, calendarEvents, plannerRange,
     conversations, conversation, markRead, setStarred, replyTo, compose, searchRecipients, invalidateInbox,

@@ -131,8 +131,13 @@ const apiSubmissions = new Map(); // assignment id -> the submission made throug
 
 // ---- planner ------------------------------------------------------------------------------
 const overrides = new Map();
+const notes = []; // planner notes the student created through the API (mockup 12)
+let noteSeq = 0;
 function plannerItems() {
   const items = [];
+  for (const n of notes) {
+    items.push({ context_type: n.course_id ? 'Course' : null, course_id: n.course_id || null, context_name: n.course_id ? courses.find((c) => c.id === n.course_id)?.name || null : null, plannable_id: n.id, plannable_type: 'planner_note', plannable_date: n.todo_date, plannable: { id: n.id, title: n.title, todo_date: n.todo_date, details: n.details || '' }, planner_override: overrides.get(`planner_note:${n.id}`) || null, submissions: false, html_url: null });
+  }
   for (const c of courses) {
     if (c.past) continue;
     for (const a of allAssignments(c.id)) {
@@ -334,6 +339,9 @@ on('GET', /^\/help_links$/, () => [
 ]);
 on('DELETE', /^\/api\/v1\/users\/self\/favorites\/courses\/(\w+)$/, (url, m) => { favorites.delete(m[1]); return { context_id: m[1] }; });
 on('GET', /^\/api\/v1\/planner\/items$/, (url) => filterDates(plannerItems(), url, 'plannable_date'));
+on('GET', /^\/api\/v1\/planner_notes$/, () => notes.slice());
+on('POST', /^\/api\/v1\/planner_notes$/, (url, m, body) => { const n = { id: `note${++noteSeq}`, title: String(body.title || ''), todo_date: body.todo_date || null, course_id: body.course_id || null, details: body.details || '', workflow_state: 'active', user_id: 'self' }; notes.push(n); return n; });
+on('DELETE', /^\/api\/v1\/planner_notes\/(\w+)$/, (url, m) => { const i = notes.findIndex((n) => n.id === m[1]); if (i < 0) return {}; const [n] = notes.splice(i, 1); return n; });
 on('POST', /^\/api\/v1\/planner\/overrides$/, (url, m, body) => { const ov = { id: `ov${overrides.size + 1}`, plannable_type: body.plannable_type, plannable_id: body.plannable_id, marked_complete: !!body.marked_complete, dismissed: !!body.dismissed }; overrides.set(`${body.plannable_type}:${body.plannable_id}`, ov); return ov; });
 on('PUT', /^\/api\/v1\/planner\/overrides\/(\w+)$/, (url, m, body) => { for (const ov of overrides.values()) if (ov.id === m[1]) { Object.assign(ov, body); return ov; } return {}; });
 on('GET', /^\/api\/v1\/users\/self\/activity_stream\/summary$/, () => [{ type: 'Announcement', unread_count: 3, count: 5 }, { type: 'Conversation', unread_count: 1, count: 2 }, { type: 'DiscussionTopic', unread_count: 4, count: 6 }]);

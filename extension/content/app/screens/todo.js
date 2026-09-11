@@ -1,7 +1,14 @@
 /* To Do: planner items from today through the next seven days, grouped by
- * date or by course. The circle marks an item done (a planner override,
- * like Canvas's own list); dismissing hides it from the list only. A switch
- * at the bottom shows completed and dismissed items so they can be undone. */
+ * date, by priority or by course. The circle marks an item done (a planner
+ * override, like Canvas's own list); dismissing hides it from the list only. A
+ * switch at the bottom shows completed and dismissed items so they can be undone.
+ *
+ * Mockup 12: the student can add tasks of their own (Canvas planner notes, so
+ * they live in the same list on every device) — they sit in a "My tasks" group,
+ * never count as a course, and are the only rows with a delete button. Every
+ * row, Canvas work included, carries a priority chip (High / Medium / Low /
+ * None) for triage; priority is the student's own metadata, kept in the site's
+ * preferences by the item's stable id and never written to Canvas. */
 (function () {
   const BCV = (self.BCV = self.BCV || {});
   const { h } = BCV.utils;
@@ -9,12 +16,29 @@
   const IC = BCV.IC;
   const store = BCV.store;
 
+  // the app's semantic set: red / amber / teal / grey (text on the tint, per appearance)
+  const PRI = [
+    { lv: 0, label: 'None', short: '—', light: '#8e8e93', dark: '#8e8e93', tintLight: 'rgba(118,118,128,.12)', tintDark: 'rgba(118,118,128,.22)' },
+    { lv: 1, label: 'Low', short: 'Low', light: '#1c6b7a', dark: '#6fd6e8', tintLight: 'rgba(48,176,199,.14)', tintDark: 'rgba(48,176,199,.22)' },
+    { lv: 2, label: 'Medium', short: 'Med', light: '#8a5200', dark: '#ffb44d', tintLight: 'rgba(255,149,0,.18)', tintDark: 'rgba(255,149,0,.18)' },
+    { lv: 3, label: 'High', short: 'High', light: '#c01d43', dark: '#ff8098', tintLight: 'rgba(255,45,85,.12)', tintDark: 'rgba(255,45,85,.22)' },
+  ];
+  const priMeta = (lv, dark) => {
+    const p = PRI[lv] || PRI[0];
+    return { ...p, color: dark ? p.dark : p.light, tint: dark ? p.tintDark : p.tintLight };
+  };
+  const TASK_PAL = (dark) => ({ text: dark ? '#a9a7f5' : '#3f3ea8', tint: dark ? 'rgba(88,86,214,.24)' : 'rgba(88,86,214,.13)' });
+  const endOfDay = (d) => { const x = new Date(d); x.setHours(23, 59, 0, 0); return x; };
+
   async function render(ctx) {
     const { app } = ctx;
     const dark = app.isDark();
     const screen = U.el('bcv-screen'); // the same column as the Dashboard, so the list lines up with the title and every other screen
     let group = await store.pref('todoGroup', 'date');
+    if (!['date', 'priority', 'course'].includes(group)) group = 'date';
     let showDone = !!(await store.pref('todoShowDone', false));
+    const priPref = await store.pref('todoPriority', {});
+    const pri = priPref && typeof priPref === 'object' ? { ...priPref } : {}; // item id → 0..3
     const sub = U.el('bcv-head__sub', '…');
     const segWrap = h('div', { class: 'bcv-ml-auto' });
     const body = U.el('bcv-body bcv-body--24');
@@ -29,19 +53,26 @@
 
     const isOpen = (it) => !it.complete && !it.dismissed && !it.submitted;
     const isDone = (it) => it.complete || it.submitted;
-    const setSeg = () => segWrap.replaceChildren(U.seg([['date', 'By date'], ['course', 'By course']], group, (v) => { group = v; store.setPref('todoGroup', v); setSeg(); draw(); }));
+    const priOf = (it) => Number(pri[it.id]) || 0;
+    const setPri = (it, lv) => {
+      if (lv) pri[it.id] = lv; else delete pri[it.id];
+      store.setPref('todoPriority', pri);
+      draw();
+    };
+    const setSeg = () => segWrap.replaceChildren(U.seg([['date', 'By date'], ['priority', 'By priority'], ['course', 'By course']], group, (v) => { group = v; store.setPref('todoGroup', v); setSeg(); draw(); }));
 
     function updateSmart() {
       const list = (items || []).filter(isOpen);
-      const courses = new Set(list.map((i) => i.courseId));
-      sub.textContent = list.length ? `${U.plural(list.length, 'item')} across ${U.plural(courses.size, 'course')}` : 'Nothing on your list';
+      const courses = new Set(list.filter((i) => !i.custom).map((i) => i.courseId)); // a task of your own is not a course
+      const mine = list.filter((i) => i.custom).length;
+      sub.textContent = list.length ? `${U.plural(list.length, 'item')} across ${U.plural(courses.size, 'course')}${mine ? ` · ${mine === 1 ? 'one' : mine} of your own` : ''}` : 'Nothing on your list';
       ctx.setSmart({
         label: 'To Do',
         actions: [
           { label: 'Summarize what’s due', note: `${U.plural(list.filter((i) => i.isDue).length, 'item')} actually due`, icon: IC.check, prompt: 'Summarize this list: what is actually due (with points and times) versus what is only scheduled. Order by urgency.' },
           { label: 'Plan the next 7 days', note: `${U.plural(list.length, 'item')} on the list`, icon: IC.cal, prompt: 'Turn this list into a realistic day-by-day plan for the next seven days.' },
         ],
-        context: () => list.map((it) => `- ${U.fmtAt(it.date)} · ${it.courseName} · ${it.kind} · ${it.title}${it.points !== null ? ` · ${it.points} pts` : ''}${it.isDue ? '' : ' · (to-do date, not a due date)'}`).join('\n'),
+        context: () => list.map((it) => `- ${U.fmtAt(it.date)} · ${it.courseName} · ${it.kind} · ${it.title}${it.points !== null ? ` · ${it.points} pts` : ''}${priOf(it) ? ` · priority ${priMeta(priOf(it)).label.toLowerCase()}` : ''}${it.isDue ? '' : it.custom ? '' : ' · (to-do date, not a due date)'}`).join('\n'),
       });
     }
 
@@ -57,41 +88,175 @@
         U.toast(`Could not update it: ${e.message}`, { error: true });
       }
     }
+    /** The list is read again from Canvas after a task is added or deleted: the badge and the page come from one list. */
+    async function reload() {
+      items = await store.todoWindow({ force: true }).catch(() => items);
+      if (!ctx.alive()) return;
+      app.refreshCounts();
+      updateSmart();
+      draw();
+    }
 
-    function itemRow(it) {
-      const pal = it.course ? it.course.palette : U.palette(null, dark);
-      const meta = `${it.kind}${it.points !== null && it.points !== undefined ? ` · ${store.fmtPts(it.points)} pts` : ''}${it.submitted ? ' · submitted' : ''}`;
+    /** The flag chip: the short form on the row, a menu of the four levels with a dot each. Only one menu is ever open (U.menu closes the rest). */
+    function priChip(it, { draft = false, onPick = null } = {}) {
+      const cur = draft ? it : priOf(it);
+      const m = priMeta(cur, dark);
+      const chip = h('button', { type: 'button', class: `bcv-pri ${draft ? 'bcv-pri--draft' : ''}`, title: `Priority: ${m.label}`, 'aria-label': `Priority: ${m.label}`, style: { background: m.tint, color: m.color } }, [
+        U.svg(IC.flag, { size: 11, stroke: m.color, width: 2.2 }),
+        h('span', { text: draft ? m.label : m.short }),
+        U.svg(IC.chevron, { size: 9, stroke: m.color, width: 2.8, style: { transform: 'rotate(90deg)' } }),
+      ]);
+      chip.addEventListener('click', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        U.menu(chip, [3, 2, 1, 0].map((lv) => {
+          const pm = priMeta(lv, dark);
+          return { label: pm.label, color: pm.color, active: cur === lv, onSelect: () => (onPick ? onPick(lv) : setPri(it, lv)) };
+        }));
+      });
+      return chip;
+    }
+
+    function itemRow(it, { withCourse = false } = {}) {
+      const pal = it.custom ? TASK_PAL(dark) : it.course ? it.course.palette : U.palette(null, dark);
+      const meta = it.custom ? 'My task' : `${it.kind}${it.points !== null && it.points !== undefined ? ` · ${store.fmtPts(it.points)} pts` : ''}${it.submitted ? ' · submitted' : ''}`;
       const done = isDone(it);
       let rowEl;
       const circle = h('button', { type: 'button', class: `bcv-circle ${done ? 'is-done' : ''}`, title: done ? 'Mark not done' : 'Mark done', 'aria-label': `${done ? 'Mark not done' : 'Mark done'}: ${it.title}`, onclick: () => change(it, () => store.setComplete(it, !it.complete), rowEl) }, done ? U.svg('M6 12l4 4 8-8', { size: 12, stroke: '#fff', width: 2.4 }) : null);
+      const subText = it.custom ? meta : withCourse ? `${it.courseName} · ${meta}` : `${it.courseName} · ${meta}`;
+      const bodyEl = it.custom
+        ? h('div', { class: 'bcv-row__body' }, [U.text('bcv-row__title bcv-ellip', it.title), U.text('bcv-row__sub bcv-row__sub--3', subText)])
+        : h('a', { class: 'bcv-row__body', href: it.url, style: { color: 'inherit' } }, [U.text('bcv-row__title bcv-ellip', it.title), U.text('bcv-row__sub bcv-row__sub--3', subText)]);
       rowEl = U.row([
         circle,
         U.tile(it.icon, { color: pal.text, tint: pal.tint }),
-        h('a', { class: 'bcv-row__body', href: it.url, style: { color: 'inherit' } }, [
-          U.text('bcv-row__title bcv-ellip', it.title),
-          U.text('bcv-row__sub bcv-row__sub--3', `${it.courseName} · ${meta}`),
-        ]),
+        bodyEl,
+        priChip(it),
         it.dismissed ? U.badge('Dismissed') : U.badge(U.whenShort(it.date)),
-        // plain assignments hand in from here; the submit screen says so if Canvas's page is needed instead
+        // plain assignments hand in from here; the assignment page hosts the block
         it.type === 'assignment' && !done && !it.dismissed && /\/assignments\/\d+$/.test(it.url) ? U.btn('Submit', { kind: 'xs', onClick: () => app.go(`${it.url}?bcv=submit&from=todo`) }) : null,
-        it.dismissed
-          ? U.btn('Restore', { kind: 'xs', onClick: () => change(it, () => store.restore(it), rowEl) })
-          : U.iconbtn(IC.close, { size: 24, title: 'Dismiss', onClick: () => change(it, () => store.dismiss(it), rowEl) }),
+        it.custom
+          ? h('button', { type: 'button', class: 'bcv-iconbtn bcv-iconbtn--24 bcv-todo__del', title: 'Delete task', 'aria-label': `Delete task: ${it.title}`, onclick: () => removeTask(it, rowEl) }, U.svg(IC.close, { size: 12, stroke: 'var(--bcv-ink3)', width: 2.2 }))
+          : it.dismissed
+            ? U.btn('Restore', { kind: 'xs', onClick: () => change(it, () => store.restore(it), rowEl) })
+            : U.iconbtn(IC.close, { size: 24, title: 'Dismiss', onClick: () => change(it, () => store.dismiss(it), rowEl) }),
       ], { mod: done || it.dismissed ? 'bcv-row--done' : '' });
+      rowEl.dataset.item = it.id;
       return rowEl;
     }
+    /** Canvas work can never be deleted from here; a task of your own can, after a confirmation. */
+    async function removeTask(it, rowEl) {
+      if (!window.confirm(`Delete “${it.title}”? This removes the task from your Canvas planner.`)) return;
+      rowEl.style.opacity = '.4';
+      try {
+        await store.deleteNote(it.raw.plannable_id);
+        delete pri[it.id];
+        store.setPref('todoPriority', pri);
+        await reload();
+      } catch (e) {
+        rowEl.style.opacity = '';
+        U.toast(`Could not delete it: ${e.message}`, { error: true });
+      }
+    }
 
+    // ---- adding a task of your own -------------------------------------------------------------
+    const draft = { open: false, title: '', when: 'today', date: '', pri: 2, busy: false };
+    const draftDate = () => {
+      const now = new Date();
+      if (draft.when === 'today') return endOfDay(now);
+      if (draft.when === 'week') { // by the end of this week; today when the week is already over
+        const end = endOfDay(U.addDays(U.startOfWeek(now), 6));
+        return end < now ? endOfDay(now) : end;
+      }
+      if (!draft.date) return null;
+      const [y, mo, d] = draft.date.split('-').map(Number);
+      return endOfDay(new Date(y, mo - 1, d));
+    };
+    const canAdd = () => !!draft.title.trim() && (draft.when !== 'pick' || !!draft.date) && !draft.busy;
+    function composer() {
+      if (!draft.open) {
+        return h('button', { type: 'button', class: 'bcv-todo__add', onclick: () => { draft.open = true; draw(); setTimeout(() => body.querySelector('.bcv-todo__title')?.focus(), 30); } }, [
+          h('span', { class: 'bcv-todo__addic' }, U.svg(IC.plus, { size: 14, stroke: 'var(--bcv-blue)', width: 2.4 })),
+          h('span', { class: 'bcv-todo__addlabel', text: 'Add your own task' }),
+        ]);
+      }
+      let addBtn;
+      const syncAdd = () => { addBtn.disabled = !canAdd(); addBtn.textContent = draft.busy ? 'Adding…' : 'Add task'; };
+      const title = h('input', { class: 'bcv-todo__title', type: 'text', placeholder: 'What do you need to do?', 'aria-label': 'Task', value: draft.title, oninput: () => { draft.title = title.value; syncAdd(); }, onkeydown: (e) => { if (e.key === 'Enter' && canAdd()) addTask(); if (e.key === 'Escape') closeComposer(); } });
+      const dateInput = h('input', { class: 'bcv-input bcv-todo__date', type: 'date', 'aria-label': 'Due date', value: draft.date, onchange: () => { draft.date = dateInput.value; syncAdd(); } });
+      dateInput.hidden = draft.when !== 'pick';
+      const whenSeg = U.seg([['today', 'Today'], ['week', 'This week'], ['pick', 'Pick a date']], draft.when, (v) => {
+        draft.when = v;
+        dateInput.hidden = v !== 'pick';
+        if (v === 'pick') setTimeout(() => dateInput.focus(), 0);
+        syncAdd();
+      });
+      addBtn = U.btn('Add task', { kind: 'primary', cls: 'bcv-todo__addbtn', onClick: addTask });
+      const card = U.el('bcv-todo__composer', [
+        title,
+        U.el('bcv-todo__ctl', [
+          whenSeg,
+          dateInput,
+          priChip(draft.pri, { draft: true, onPick: (lv) => { draft.pri = lv; draw(); } }),
+          h('span', { class: 'bcv-todo__spacer' }),
+          h('button', { type: 'button', class: 'bcv-btn bcv-todo__cancel', text: 'Cancel', onclick: closeComposer }),
+          addBtn,
+        ]),
+      ]);
+      syncAdd();
+      return card;
+    }
+    function closeComposer() {
+      Object.assign(draft, { open: false, title: '', date: '', when: 'today', pri: 2, busy: false });
+      draw();
+    }
+    async function addTask() {
+      if (!canAdd()) return;
+      const when = draftDate();
+      if (!when) return; // Pick a date without a date chosen: nothing is invented
+      draft.busy = true;
+      draw();
+      try {
+        const note = await store.createNote({ title: draft.title.trim(), todoDate: when.toISOString() });
+        if (note && note.id && draft.pri) { // the draft's priority follows the new task
+          pri[`planner_note:${note.id}`] = draft.pri;
+          await store.setPref('todoPriority', pri);
+        }
+        Object.assign(draft, { open: false, title: '', date: '', when: 'today', pri: 2, busy: false });
+        await reload();
+        U.toast('Added to your Canvas planner.');
+      } catch (e) {
+        draft.busy = false;
+        draw();
+        U.toast(`Could not add the task: ${e.message}`, { error: true });
+      }
+    }
+
+    // ---- draw ---------------------------------------------------------------------------------------
+    const groupCard = (title, subText, list, opts) => h('div', {}, [U.groupHead(title, subText, 'bcv-group__head--10'), U.card(list.map((it) => itemRow(it, opts)), 'bcv-card--list')]);
     function draw() {
       if (!items) {
         body.replaceChildren(U.errorBox('Your planner could not be loaded.'));
         return;
       }
       const shown = items.filter((it) => showDone || isOpen(it));
+      const mine = shown.filter((it) => it.custom).sort((a, b) => a.date - b.date);
+      const work = shown.filter((it) => !it.custom);
       const parts = [];
+      const push = (el) => parts.push(U.enter(el, parts.length, 70, 420)); // groups arrive on a 70ms stagger
+      const openIn = (list) => U.plural(list.filter(isOpen).length, 'open item');
       if (!shown.length) parts.push(U.emptyCard(showDone ? 'Nothing in the next seven days.' : 'Nothing to do in the next seven days.'));
-      else if (group === 'course') {
+      else if (group === 'priority') {
+        // High → Medium → Low → Unprioritised, empty buckets dropped, tasks of your own in with the rest
+        for (const lv of [3, 2, 1, 0]) {
+          const list = shown.filter((it) => priOf(it) === lv).sort((a, b) => a.date - b.date);
+          if (!list.length) continue;
+          push(groupCard(lv ? `${priMeta(lv).label} priority` : 'Unprioritised', `${U.plural(list.length, 'item')} · ${openIn(list)}`, list, { withCourse: true }));
+        }
+      } else if (group === 'course') {
+        if (mine.length) push(groupCard('My tasks', openIn(mine), mine));
         const byCourse = new Map();
-        for (const it of shown) {
+        for (const it of work) {
           const k = it.courseId || '_';
           if (!byCourse.has(k)) byCourse.set(k, []);
           byCourse.get(k).push(it);
@@ -99,30 +264,31 @@
         for (const [, list] of byCourse) {
           list.sort((a, b) => a.date - b.date);
           const c = list[0].course;
-          parts.push(U.enter(h('div', {}, [U.groupHead(c?.name || list[0].courseName || 'Other', U.plural(list.filter(isOpen).length, 'open item'), 'bcv-group__head--10'), U.card(list.map(itemRow), 'bcv-card--list')]), parts.length, 70, 420));
+          push(groupCard(c?.name || list[0].courseName || 'Other', openIn(list), list));
         }
       } else {
         const now = new Date();
+        if (mine.length) push(groupCard('My tasks', openIn(mine), mine));
         const today = [], tomorrow = [], later = [];
-        for (const it of shown) {
+        for (const it of work) {
           const d = U.dayDiff(it.date, now);
           (d <= 0 ? today : d === 1 ? tomorrow : later).push(it);
         }
         const sorted = (l) => l.sort((a, b) => a.date - b.date);
-        // groups arrive on a 70ms stagger
-        if (today.length) parts.push(U.enter(h('div', {}, [U.groupHead('Today', U.fmtLong(now)), U.card(sorted(today).map(itemRow), 'bcv-card--list')]), parts.length, 70, 420));
-        if (tomorrow.length) parts.push(U.enter(h('div', {}, [U.groupHead('Tomorrow', U.fmtLong(U.addDays(now, 1))), U.card(sorted(tomorrow).map(itemRow), 'bcv-card--list')]), parts.length, 70, 420));
+        if (today.length) push(groupCard('Today', U.fmtLong(now), sorted(today)));
+        if (tomorrow.length) push(groupCard('Tomorrow', U.fmtLong(U.addDays(now, 1)), sorted(tomorrow)));
         if (later.length) {
           sorted(later);
-          parts.push(U.enter(h('div', {}, [U.groupHead('Next 7 days', `${U.fmtLong(later[0].date)} – ${U.fmtLong(later[later.length - 1].date)}`), U.card(later.map(itemRow), 'bcv-card--list')]), parts.length, 70, 420));
+          push(groupCard('Next 7 days', `${U.fmtLong(later[0].date)} – ${U.fmtLong(later[later.length - 1].date)}`, later));
         }
       }
+      parts.push(composer());
       const doneCount = items.filter((it) => !isOpen(it)).length;
       parts.push(U.card(U.row([
         U.el('bcv-row__body', [U.text('bcv-row__title bcv-row__title--14', 'Show completed and dismissed'), U.text('bcv-row__sub bcv-row__sub--115', doneCount ? `${U.plural(doneCount, 'item')} in the next seven days` : 'Nothing completed or dismissed yet')]),
         U.switchEl(showDone, (on) => { showDone = on; store.setPref('todoShowDone', on); draw(); }, 'Show completed and dismissed'),
       ], { mod: 'bcv-row--p12-16 bcv-row--first' }), 'bcv-card--list'));
-      parts.push(U.hint('Ticking an item marks it done in your Canvas planner. Dismissing removes it from your To Do list only — neither submits or completes the work.', 'bcv-hint--narrow'));
+      parts.push(U.hint('Ticking an item marks it done in your Canvas planner. Dismissing removes it from your To Do list only — neither submits or completes the work. Priority is yours alone and is never sent to Canvas.', 'bcv-hint--narrow'));
       body.replaceChildren(...parts);
     }
 
