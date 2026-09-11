@@ -252,18 +252,12 @@
     if (!side) return;
     const r = state.route || parseRoute();
     const name = siteName();
-    const focus = (inQuiz() && !state.quizOpen) || state.setupOpen; // our own quiz flow and the guided setup hide the sidebar entirely
+    const focus = inQuiz() && !state.quizOpen; // our own quiz flow hides the sidebar entirely
     root?.classList.toggle('bcv-focus', focus);
     if (focus) {
       side.replaceChildren(
         brandRow(name),
-        state.setupOpen
-          ? U.el('bcv-focus__card', [
-            U.text('bcv-focus__title', 'Guided setup'),
-            U.text('bcv-focus__sub', 'A few short steps: your site, your courses, your grades, the smart panel and a tour. Everything can be changed later in Settings.'),
-            U.btn('Skip setup', { kind: 'xs', onClick: async () => { await store.setPref('setupDone', true); await BCV.api.storage.local.set({ 'setup:done': true }).catch(() => {}); go('/'); } }),
-          ])
-          : U.el('bcv-focus__card', [
+        U.el('bcv-focus__card', [
             U.text('bcv-focus__title', 'Quiz in progress'),
             U.text('bcv-focus__sub', 'Navigation is hidden so nothing takes you out of the quiz by accident. Submit the quiz to return, or leave on purpose below.'),
             U.btn('Leave quiz…', { kind: 'xs', onClick: () => { if (confirmLeave()) location.assign('/'); } }),
@@ -337,9 +331,7 @@
     progress(true);
     state.quizOpen = false;
     state.submitOpen = false;
-    state.setupOpen = r.params.get('bcv') === 'setup';
     html.classList.remove('bcv-quiz', 'bcv-quiz-fb'); // the quiz screen puts them back while an attempt or its feedback is on screen
-    html.classList.toggle('bcv-setup', state.setupOpen);
     punchOut(); // a native screen punches back in while it builds
     renderSide();
     const ctx = { app: BCV.app, route: r, alive, dark: state.dark, setSmart: (c) => setSmartContext(c, id) };
@@ -353,8 +345,7 @@
     }, 150);
     let el;
     try {
-      if (state.setupOpen && screens.setup) el = await screens.setup.render(ctx);
-      else if (r.params.get('bcv') === 'native') el = await screens.native.render(ctx);
+      if (r.params.get('bcv') === 'native') el = await screens.native.render(ctx);
       else if (r.screen === 'course') el = await screens.course.render(ctx);
       else if (r.screen === 'group') el = await screens.group.render(ctx);
       else if (phone() && BCV.phone.screens[r.screen]) el = await BCV.phone.screens[r.screen](ctx); // the phone version of a root screen
@@ -371,11 +362,13 @@
     document.title = titleFor(r);
     if (phone()) BCV.phone.afterRender(BCV.app, r, el);
     BCV.smart?.refresh?.();
-    BCV.tour?.resume?.(BCV.app, r);
+    // ?bcv=setup (the popup's Set up button, the account sheet, the app's first launch): the guided
+    // setup over this page, which drops the parameter and starts the tour when it is done
+    if (r.params.get('bcv') === 'setup' && BCV.setup && !BCV.setup.active()) BCV.setup.open(BCV.app);
+    else BCV.tour?.resume?.(BCV.app, r);
   }
 
   function titleFor(r) {
-    if (state.setupOpen) return `Guided setup · ${siteName()}`;
     const base = { dashboard: 'Dashboard', courses: 'Courses', groups: 'Groups', todo: 'To Do', calendar: 'Calendar', inbox: 'Inbox', gpa: 'Grades' }[r.screen];
     return base ? `${base} · ${siteName()}` : document.title;
   }
@@ -501,31 +494,6 @@
     }
   }
 
-  /** What the setup page decided for this host: the favourites, written through Canvas here (the
-   *  page has the session and the CSRF token), then the tour. The plan is cleared first, so a
-   *  reload mid-way never repeats it. */
-  async function applyPlan() {
-    let plan;
-    try {
-      plan = (await BCV.api.storage.local.get('setup:plan'))['setup:plan'];
-      if (!plan || plan.host !== location.host) return;
-      await BCV.api.storage.local.remove('setup:plan');
-    } catch {
-      return;
-    }
-    if (Array.isArray(plan.favorites)) {
-      const want = new Set(plan.favorites.map(String));
-      const all = await store.courses().catch(() => []);
-      const changes = all.filter((c) => c.state === 'current' && c.favorite !== want.has(c.id));
-      for (const c of changes) await store.setFavorite(c.id, want.has(c.id)).catch(() => {});
-      if (changes.length) {
-        loadShellData({ force: true });
-        await render();
-      }
-    }
-    if (plan.tour && BCV.tour) await BCV.tour.start(BCV.app);
-  }
-
   async function boot() {
     if (window.self !== window.top) return; // framed Canvas pages (tool pickers, previews) are left alone
     state.originalTitle = document.title;
@@ -544,7 +512,6 @@
     }
     await applySkin(state.settings.appearance.skin !== false);
     BCV.extras?.prime?.(BCV.app);
-    applyPlan();
     BCV.early?.onChange((st, settings) => {
       const wasDark = state.dark;
       state.settings = settings;

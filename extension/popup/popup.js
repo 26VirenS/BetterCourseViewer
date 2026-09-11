@@ -1,4 +1,6 @@
-/* Toolbar popup: skin + appearance switches, enable-on-this-site. */
+/* Toolbar popup: skin + appearance switches, enable-on-this-site. Before the guided setup has run
+ * it is nothing but a Set up button, which asks for the site (from the click) and opens the setup
+ * over the Canvas page in the current tab. */
 (async function () {
   const BCV = self.BCV;
   const api = BCV.api;
@@ -54,32 +56,6 @@
   };
   $('open-settings').addEventListener('click', openOptions);
   $('foot-settings').addEventListener('click', openOptions);
-  // the guided setup has its own page
-  const openSetup = async (e) => {
-    e?.preventDefault();
-    try {
-      await api.tabs.create({ url: api.runtime.getURL('setup/setup.html') });
-    } catch {
-      /* ignore */
-    }
-    window.close();
-  };
-  $('foot-setup').addEventListener('click', openSetup);
-  $('start-setup').addEventListener('click', openSetup);
-
-  // Until the guided setup has run (or been skipped on purpose) the popup shows nothing but
-  // the setup button. Installs that finished the older in-page setup count as done too.
-  if (!(await setupDone())) {
-    document.body.classList.add('is-fresh');
-    $('status').textContent = 'Not set up yet';
-    $('setup-card').hidden = false;
-    return;
-  }
-
-  // smart status
-  send({ type: 'providerStatus' }).then((s) => {
-    $('smart-status').textContent = s?.configured ? `Smart panel: ${s.label}` : 'Smart panel: add a key in Settings';
-  });
 
   // which tab are we on?
   let tab = null;
@@ -90,21 +66,123 @@
     /* ignore */
   }
   const url = tab?.url ? new URL(tab.url) : null;
-  const status = $('status');
-  if (!url || !/^https?:$/.test(url.protocol)) {
-    status.textContent = 'Open a Canvas page to use it.';
-    return;
-  }
-  const origin = url.origin;
-  const builtIn = /\.instructure\.com$/i.test(url.hostname);
-  const saved = (settings.domains || []).includes(origin);
+  const onWeb = !!url && /^https?:$/.test(url.protocol);
+  const origin = onWeb ? url.origin : '';
+  const builtIn = onWeb && /\.instructure\.com$/i.test(url.hostname);
+  const saved = onWeb && (settings.domains || []).includes(origin);
   let granted = builtIn || saved;
-  if (!granted) {
+  if (onWeb && !granted) {
     try {
       granted = await api.permissions.contains({ origins: [`${origin}/*`] });
     } catch {
       granted = false;
     }
+  }
+
+  /** Permission for this site (from the click), its scripts registered, then the setup over the page. */
+  const askSite = async (msg) => {
+    if (!granted) {
+      msg.textContent = 'Asking for permission…';
+      let ok = false;
+      try {
+        ok = await api.permissions.request({ origins: [`${origin}/*`] });
+      } catch (e) {
+        msg.textContent = `Permission request failed: ${e?.message || e}`;
+        return false;
+      }
+      if (!ok) {
+        msg.textContent = 'Permission was not granted. Simpl Courses can only run on a site you allow.';
+        return false;
+      }
+      granted = true;
+    }
+    if (!builtIn) {
+      const r = await send({ type: 'registerDomain', origin });
+      if (r && r.ok === false) {
+        msg.textContent = r.message || 'Could not enable this site.';
+        return false;
+      }
+    }
+    return true;
+  };
+  /** Does this tab answer like Canvas, signed in? Only a definite "no" stops the setup. */
+  const canvasHere = async (msg) => {
+    msg.textContent = 'Checking Canvas…';
+    let r;
+    try {
+      r = await fetch(`${origin}/api/v1/users/self`, { credentials: 'include', headers: { Accept: 'application/json' } });
+    } catch {
+      return true; // unreachable from here (Safari keeps some fetches to the page): let the page decide
+    }
+    if (r.status === 401 || r.status === 403) {
+      msg.textContent = 'Sign in to Canvas on this tab first, then press Set up again.';
+      return false;
+    }
+    if (!r.ok) {
+      msg.textContent = 'This does not look like a Canvas page. Open your Canvas courses page and try again.';
+      return false;
+    }
+    try {
+      JSON.parse((await r.text()).replace(/^while\(1\);/, ''));
+    } catch {
+      msg.textContent = 'This does not look like a Canvas page. Open your Canvas courses page and try again.';
+      return false;
+    }
+    return true;
+  };
+  /** The guided setup over the Canvas page in this tab (the interface on), else the page that says how. */
+  const openSetup = async (msg) => {
+    msg.hidden = false;
+    if (!onWeb) {
+      msg.textContent = 'Open your Canvas courses page first, then press Set up.';
+      return;
+    }
+    if (!(await askSite(msg))) return;
+    if (!(await canvasHere(msg))) return;
+    msg.textContent = 'Opening the setup…';
+    await S.update({ appearance: { skin: true } });
+    try {
+      await api.tabs.update(tab.id, { url: `${origin}/?bcv=setup` });
+    } catch {
+      msg.textContent = 'The tab could not be opened. Add ?bcv=setup to your Canvas address to start.';
+      return;
+    }
+    setTimeout(() => window.close(), 300);
+  };
+  $('start-setup').addEventListener('click', () => openSetup($('setup-msg')));
+  $('foot-setup').addEventListener('click', async (e) => {
+    e.preventDefault();
+    if (onWeb && granted) {
+      await openSetup($('foot-msg'));
+      return;
+    }
+    try {
+      await api.tabs.create({ url: api.runtime.getURL('setup/setup.html') });
+    } catch {
+      /* ignore */
+    }
+    window.close();
+  });
+
+  const status = $('status');
+  // Until the guided setup has run (or been skipped on purpose) the popup shows nothing but the
+  // Set up button. Installs that finished the older in-page setup count as done too.
+  if (!(await setupDone())) {
+    document.body.classList.add('is-fresh');
+    status.textContent = onWeb ? `Not set up yet · ${url.hostname}` : 'Not set up yet';
+    $('setup-card').hidden = false;
+    $('setup-hint').textContent = onWeb ? (granted ? 'Set up runs right here, over this page.' : 'Set up asks to run on this site, then continues here.') : 'Open your Canvas courses page first.';
+    return;
+  }
+
+  // smart status
+  send({ type: 'providerStatus' }).then((s) => {
+    $('smart-status').textContent = s?.configured ? `Smart panel: ${s.label}` : 'Smart panel: add a key in Settings';
+  });
+
+  if (!onWeb) {
+    status.textContent = 'Open a Canvas page to use it.';
+    return;
   }
   if (granted) {
     status.textContent = `On for ${url.hostname}`;
@@ -121,27 +199,13 @@
   $('enable-host').textContent = url.hostname;
   $('enable-site').addEventListener('click', async () => {
     const msg = $('enable-msg');
-    msg.textContent = 'Asking for permission…';
-    let ok = false;
+    if (!(await askSite(msg))) return;
+    msg.textContent = 'Enabled. Reloading the page…';
     try {
-      ok = await api.permissions.request({ origins: [`${origin}/*`] });
-    } catch (e) {
-      msg.textContent = `Permission request failed: ${e?.message || e}`;
-      return;
+      await api.tabs.reload(tab.id);
+    } catch {
+      /* ignore */
     }
-    if (!ok) {
-      msg.textContent = 'Permission was not granted.';
-      return;
-    }
-    const r = await send({ type: 'registerDomain', origin });
-    if (r?.ok) {
-      msg.textContent = 'Enabled. Reloading the page…';
-      try {
-        await api.tabs.reload(tab.id);
-      } catch {
-        /* ignore */
-      }
-      setTimeout(() => window.close(), 600);
-    } else msg.textContent = r?.message || 'Could not enable this site.';
+    setTimeout(() => window.close(), 600);
   });
 })();

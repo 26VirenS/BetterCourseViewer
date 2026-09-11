@@ -125,4 +125,4 @@ The same Chrome zip loads in Microsoft Edge and can be submitted to Edge Add-ons
 
 ## First run
 
-Installing opens `setup/setup.html`, the guided setup, in a new tab. It asks for the school's Canvas address and requests permission for that origin alone (from the Continue click), so the listing's justification for optional host permissions can point at it.
+Installing opens `setup/setup.html` in a new tab: a short page that says how to start (open your Canvas, press the toolbar button, press Set up). The toolbar popup's **Set up** button requests permission for the current tab's origin alone (from the click), then opens the guided setup as a card over that Canvas page, so the listing's justification for optional host permissions can point at it.

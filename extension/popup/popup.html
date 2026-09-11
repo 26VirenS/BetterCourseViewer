@@ -20,8 +20,10 @@
 
   <section class="card card--setup" id="setup-card" hidden>
     <div class="card__title">Set it up first</div>
-    <p class="muted">A few short steps: your Canvas address, the courses you want to see, your grades, the smart panel, and a tour.</p>
-    <button class="btn btn--primary btn--wide" id="start-setup">Start setup</button>
+    <p class="muted">Three short steps over your Canvas page: your courses, your grades and the smart panel, then a tour.</p>
+    <button class="btn btn--primary btn--wide" id="start-setup">Set up</button>
+    <p class="muted small" id="setup-hint"></p>
+    <p class="muted small" id="setup-msg"></p>
   </section>
 
   <section class="card" id="enable-card" hidden>
@@ -48,6 +50,7 @@
 
   <footer class="foot">
     <div class="foot__status muted" id="smart-status">Smart panel: …</div>
+    <div class="foot__status muted" id="foot-msg" hidden></div>
     <div class="foot__row">
       <span id="version" class="muted" title="Simpl Courses version"></span>
       <span class="foot__links">

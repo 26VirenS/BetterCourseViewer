@@ -1,7 +1,10 @@
+/* The guided setup's stylesheet, as a string: the page after install links it in, and the content
+ * script drops it into the overlay's shadow root (a content script cannot link a stylesheet). */
+self.BCV_SETUP_CSS = String.raw`
 /* The guided setup page (the "Simpl Courses Setup" mockup): a glass card over drifting colour,
  * one question per step, every transition eased. Colours follow the appearance the extension
  * chose (data-theme on <html>), else the system. */
-:root {
+:root, :host {
   --bg: #ececf1; --ink: #1c1c1e; --ink2: #3c3c43; --ink3: #6c6c70;
   --card: rgba(255,255,255,.6); --glass: rgba(255,255,255,.7); --fill: rgba(118,118,128,.13);
   --sep: rgba(60,60,67,.08); --edge: rgba(60,60,67,.09); --shadow-a: .12; --blob-a: .34; --blob-b: .26;
@@ -12,7 +15,7 @@
   --ease: cubic-bezier(.32,.72,0,1);
   --spring: cubic-bezier(.34,1.3,.42,1);
 }
-html[data-theme="dark"] {
+html[data-theme="dark"], :host([data-theme="dark"]) {
   --bg: #000; --ink: #f2f2f7; --ink2: #c7c7cc; --ink3: #8e8e93;
   --card: rgba(44,44,46,.5); --glass: rgba(28,28,30,.7); --fill: rgba(118,118,128,.28);
   --sep: rgba(255,255,255,.08); --edge: rgba(255,255,255,.1); --shadow-a: .5; --blob-a: .24; --blob-b: .18;
@@ -46,6 +49,13 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
 .blob--b { bottom: -240px; right: -160px; width: 620px; height: 620px; background: #5856d6; opacity: var(--blob-a); animation: driftB 31s ease-in-out infinite; filter: blur(110px); }
 .blob--c { top: 28%; right: 12%; width: 400px; height: 400px; background: #30b0c7; opacity: var(--blob-b); animation: driftC 37s ease-in-out infinite; }
 .blob--d { bottom: 8%; left: 14%; width: 360px; height: 360px; background: #0a84ff; opacity: var(--blob-b); animation: driftD 33s ease-in-out infinite; }
+
+/* ---- the overlay (the same card, drawn over the Canvas page from the content script) ---- */
+.overlay { position: fixed; inset: 0; z-index: 2147482500; overflow: auto; overscroll-behavior: contain; background: rgba(30,30,34,.36); -webkit-backdrop-filter: blur(14px) saturate(1.1); backdrop-filter: blur(14px) saturate(1.1); color: var(--ink); font: 14px/1.45 var(--font); -webkit-font-smoothing: antialiased; animation: fadeIn .35s ease both; transition: opacity .28s ease; }
+:host([data-theme="dark"]) .overlay { background: rgba(0,0,0,.5); }
+.overlay.is-closing { opacity: 0; }
+.overlay .page { min-height: 100%; }
+.overlay .bg .blob { opacity: calc(var(--blob-a) * .7); }
 
 /* ---- layout ---- */
 .page { position: relative; z-index: 1; min-height: 100vh; padding: 32px 24px 52px; display: flex; flex-direction: column; align-items: center; gap: 22px; }
@@ -115,6 +125,17 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
 .notice__t { font-weight: 600; }
 .notice__row { display: flex; gap: 8px; flex-wrap: wrap; }
 .btn--sm { height: 34px; padding: 0 14px; font-size: 13px; border-radius: 17px; }
+.notice--red { background: rgba(255,69,58,.11); border: 1px solid rgba(255,69,58,.28); color: #e5372b; font-weight: 500; }
+:host([data-theme="dark"]) .notice--red, html[data-theme="dark"] .notice--red { color: #ff6961; }
+
+/* ---- the page after install: how to start ---- */
+.how { margin-top: 22px; display: flex; flex-direction: column; gap: 9px; }
+.how__step { display: flex; align-items: flex-start; gap: 14px; padding: 14px 16px; border-radius: 16px; background: var(--card); border: 1px solid var(--edge); animation: fadeUp .42s var(--ease) both; }
+.how__n { flex: none; width: 26px; height: 26px; border-radius: 13px; background: var(--blue); color: #fff; font: 600 13px/26px var(--font); text-align: center; }
+.how__t { display: block; font: 600 14.5px/1.3 var(--font); color: var(--ink); }
+.how__s { display: block; margin-top: 3px; font: 400 12.5px/1.45 var(--font); color: var(--ink3); text-wrap: pretty; }
+.how__s b { font-weight: 600; color: var(--ink2); }
+.how__icon { display: inline-flex; vertical-align: -3px; width: 16px; height: 16px; border-radius: 4px; background: linear-gradient(158deg, #0a84ff, #0a4fd6); margin: 0 2px; }
 
 .ghosts { margin-top: 22px; display: flex; flex-direction: column; gap: 8px; }
 .ghost { height: 58px; border-radius: 16px; background: var(--fill); animation: pulse 1.3s ease-in-out infinite; }
@@ -203,3 +224,4 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
   .mark--lg .arc, .done__check .arc { stroke-dashoffset: 0; }
   .card__body.is-entering { opacity: 1; transform: none; }
 }
+`;
