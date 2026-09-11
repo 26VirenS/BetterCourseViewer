@@ -166,15 +166,15 @@
     // assignment or announcement description, the syllabus); a tab without one closes the row up.
     const readerBtn = head.querySelector('.bcv-reader-btn');
     let readerVal = shell.reader || null;
-    const syncReader = () => { readerBtn.hidden = !(readerVal && String(readerVal.html || '').trim()); };
+    const syncReader = () => { readerBtn.hidden = !(readerVal && String(readerVal.html || '').trim()) || !!BCV.phone?.active(); }; // no Immersive Reader on the phone
     Object.defineProperty(shell, 'reader', { configurable: true, enumerable: true, get: () => readerVal, set: (v) => { readerVal = v; syncReader(); } });
     syncReader();
-    // on a phone the rail folds into a chip row under the title (the mockup's course header),
-    // with one line of detail between them: the course code (or its real name), the term, the section
+    // on a phone the rail folds into a chip row under the title on the tabs below Home (Home lists
+    // them instead), with one line of detail: the course code (or its real name), the term, the section
     if (BCV.phone?.active()) {
       const detail = [c.nickname ? c.originalName : (c.code && c.code !== c.name ? c.code : null), c.term, ...(c.sections || [])].filter(Boolean).join(' · ');
       if (detail) head.querySelector('.bcv-course__title-row').after(U.text('bcv-ph-head__sub bcv-ellip', detail));
-      head.querySelector('.bcv-head__in').append(BCV.phone.courseChips(app, tabs, activeId));
+      if (activeId !== 'home') head.querySelector('.bcv-head__in').append(BCV.phone.courseChips(app, tabs, activeId));
     }
 
     // ---- rail --------------------------------------------------------------------

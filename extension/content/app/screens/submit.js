@@ -42,7 +42,7 @@
   /** The flow on its own (the phone), or — `embed` — the block the assignment page hosts at the
    *  end of its own scroll (mockup 11): the assignment already on the page is reused, never
    *  refetched, the instructions stay above, and the mode chosen is remembered per assignment. */
-  async function render(ctx, course, { embed = false, a: aGiven = null, sub: subGiven = null, back: backGiven = null, onSmart = null } = {}) {
+  async function render(ctx, course, { embed = false, a: aGiven = null, sub: subGiven = null, back: backGiven = null, onSmart = null, title: kicker = 'Hand in' } = {}) {
     const { app, route } = ctx;
     const cid = course.id, aid = route.arg;
     const fromTodo = route.params.get('from') === 'todo';
@@ -112,15 +112,15 @@
 
     // ---- header -------------------------------------------------------------------
     const chips = h('div', { class: 'bcv-sb__chips' });
-    const paintChips = () => chips.replaceChildren(
+    const paintChips = () => chips.replaceChildren(...[
       h('span', { class: 'bcv-sb__chip bcv-sb__chip--due', text: dueChip() }),
       h('span', { class: 'bcv-sb__chip', text: a.points_possible !== null && a.points_possible !== undefined ? `${store.fmtPts(a.points_possible)} ${Number(a.points_possible) === 1 ? 'point' : 'points'}` : 'No points' }),
       embed ? null : h('span', { class: 'bcv-sb__chip', text: course.name }), // the page already says which course
       h('span', { class: 'bcv-sb__chip', text: st.stage === 'done' ? `Attempt ${st.attempt}${unlimited ? '' : ` of ${a.allowed_attempts}`}` : `Attempt ${st.attempt + 1} of ${unlimited ? 'unlimited' : a.allowed_attempts}` }),
-    );
+    ].filter(Boolean));
     const rulesNote = () => U.text('bcv-sb__note', [windowLine, acceptsLine].filter(Boolean).join(' · ').replace(/^accepts/, 'Accepts'));
     const head = embed
-      ? U.el('bcv-sb__head', U.el('bcv-sb__headin', [U.el('bcv-sb__hrow', [U.text('bcv-sb__kicker', 'Hand in', 'span'), chips]), rulesNote()]))
+      ? U.el('bcv-sb__head', U.el('bcv-sb__headin', [U.el('bcv-sb__hrow', [U.text('bcv-sb__kicker', kicker, 'span'), chips]), rulesNote()]))
       : U.el('bcv-sb__head', U.el('bcv-sb__headin', [
         h('button', { type: 'button', class: 'bcv-linkbtn', onclick: () => app.go(back.href) }, [U.svg(IC.back, { size: 14, stroke: 'var(--bcv-blue)', width: 2.1 }), back.label]),
         h('h1', { class: 'bcv-sb__h1 bcv-pretty', text: a.name }),

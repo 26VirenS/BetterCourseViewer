@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // The phone layout (the iPhone mockup): loads the extension into headless Chromium at a phone
-// viewport against the mock Canvas server, walks the five tabs, a course, an item, the submit
-// and quiz screens and the sheets, and saves screenshots to scripts/dev/out/phone-*.png.
+// viewport against the mock Canvas server, walks the five tabs, Notifications, a course, an item
+// (with the submit block on the same page), a quiz, the sheets, the swipe actions and the edge
+// swipe, and saves screenshots to scripts/dev/out/phone-*.png.
 // Requires Playwright (project or global install).
 import { createRequire } from 'node:module';
 import { spawn, execSync } from 'node:child_process';
@@ -61,10 +62,13 @@ try {
   await sw.evaluate(() => self.BCV.api.storage.local.set({ 'setup:offered': true })); // the first-run setup is exercised on its own below
 
   const page = await context.newPage();
-  // a page is ready to poke once it is drawn and nothing painted from the cache is still waiting on Canvas
+  // a page is ready to poke once it is drawn, nothing painted from the cache is still waiting on
+  // Canvas, and no counter is still rolling to its value
+  const settled = () => page.waitForFunction(() => { const c = document.documentElement.classList; return !c.contains('bcv-on') || c.contains('bcv-settled'); }, null, { timeout: 20000 }).catch(() => {});
+  const rolled = () => page.waitForFunction(() => !document.querySelector('[data-rolling]'), null, { timeout: 6000 }).catch(() => {});
   const __goto = page.goto.bind(page);
   page.gotoRaw = __goto;
-  page.goto = async (...a) => { const r = await __goto(...a); await page.waitForFunction(() => { const c = document.documentElement.classList; return !c.contains('bcv-on') || c.contains('bcv-settled'); }, null, { timeout: 20000 }).catch(() => {}); return r; };
+  page.goto = async (...a) => { const r = await __goto(...a); await settled(); await rolled(); return r; };
   const errors = [];
   page.on('pageerror', (e) => { errors.push(e.message); console.log('  page error:', e.message); });
   // the mock answers one calendar context with 401 on purpose (the retry path); a failed resource load is not a script error
@@ -87,17 +91,27 @@ try {
     await page.evaluate(() => { const m = document.querySelector('#bcv-main > *'); if (m) m.dataset.old = '1'; });
     await page.click(sel);
     await page.waitForSelector('#bcv-main > *:not([data-old])', { timeout: 10000 });
-    await page.waitForFunction(() => { const c = document.documentElement.classList; return !c.contains('bcv-on') || c.contains('bcv-settled'); }, null, { timeout: 20000 }).catch(() => {});
+    await settled();
+    await rolled();
   };
   const tab = (id) => tapScreen(`.bcv-tabbar__item[data-tab="${id}"]`);
   const ready = () => page.waitForSelector('#bcv-app .bcv-tabbar__item', { timeout: 15000 });
   const sheet = () => page.waitForSelector('.bcv-sheet-ov .bcv-ph-sheet', { timeout: 5000 });
   const closeSheet = async () => { await page.keyboard.press('Escape'); await eventually(async () => !(await page.$('.bcv-sheet-ov'))); };
   const noOverflow = () => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1);
+  // a finger dragging a row left: 1:1 during the drag, latching open past half the tray
+  const swipeLeft = async (sel, dx = 110) => {
+    const box = await page.$eval(sel, (el) => { const r = el.getBoundingClientRect(); return { x: r.left + r.width * 0.6, y: r.top + r.height / 2 }; });
+    await page.mouse.move(box.x, box.y);
+    await page.mouse.down();
+    await page.mouse.move(box.x - dx, box.y, { steps: 8 });
+    await page.mouse.up();
+  };
   const layout = () => page.evaluate(() => ({
     phone: document.documentElement.classList.contains('bcv-phone'),
     root: document.documentElement.classList.contains('bcv-ph-root'),
     tabbar: getComputedStyle(document.getElementById('bcv-tabbar')).position,
+    glass: /blur/.test(getComputedStyle(document.getElementById('bcv-tabbar')).backdropFilter || getComputedStyle(document.getElementById('bcv-tabbar')).webkitBackdropFilter || ''),
     topbarHidden: document.getElementById('bcv-topbar')?.hidden,
     side: !!document.querySelector('#bcv-side'),
     rail: !!document.querySelector('.bcv-rail') && getComputedStyle(document.querySelector('.bcv-rail')).display !== 'none',
@@ -108,23 +122,35 @@ try {
   await page.goto(`${BASE}/`);
   await ready();
   await page.waitForSelector('.bcv-ph-stat', { timeout: 15000 });
+  await rolled();
   let l = await layout();
-  check(l.phone && l.root && l.tabbar === 'fixed' && l.topbarHidden === true && !l.side, `phone layout: html.bcv-phone, root screen, fixed tab bar, no top bar, no sidebar (${JSON.stringify(l)})`);
+  check(l.phone && l.root && l.tabbar === 'fixed' && l.glass && l.topbarHidden === true && !l.side, `phone layout: html.bcv-phone, root screen, a fixed glass tab bar, no top bar, no sidebar (${JSON.stringify(l)})`);
   check((await texts('.bcv-tabbar__item')).join(',') === 'Today,Courses,To Do,Grades,Calendar', `five tabs: ${(await texts('.bcv-tabbar__item')).join(', ')}`);
   check((await page.$eval('.bcv-tabbar__item.is-active', (e) => e.dataset.tab)) === 'dashboard', 'Today is the active tab');
   check((await texts('.bcv-ph-h1'))[0] === 'Today' && /^(Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday), \w+ \d+$/.test((await texts('.bcv-ph-title__sub'))[0]), `large title with the date line: ${(await texts('.bcv-ph-title__sub'))[0]}`);
   const stats = await texts('.bcv-ph-stat');
-  check(stats.length === 3 && /^Due today \d+$/.test(stats[0]) && /^This week \d+$/.test(stats[1]) && /^Unread \d+$/.test(stats[2]), `three counters: ${stats.join(' | ')}`);
+  check(stats.length === 3 && /^Due today \d+$/.test(stats[0]) && /^This week \d+$/.test(stats[1]) && /^Unread \d+$/.test(stats[2]), `three counters, rolled to their values: ${stats.join(' | ')}`);
   check((await texts('.bcv-ph-ghead__t')).some((t) => /^(Today|Tonight|Next up)$/.test(t)) && (await page.$$('.bcv-ph-row')).length > 0, `the day's list: ${(await texts('.bcv-ph-ghead__t')).join(', ')}`);
   check((await raw('.bcv-ph-kicker')).includes('Week load') && (await page.$$('.bcv-ph-load__row')).length > 0, 'week load card with per-course bars');
-  check(await visible('#bcv-fab'), 'the smart button floats above the tab bar');
+  check(await visible('.bcv-ph-bell') && await visible('.bcv-ph-avatar') && !(await page.$('.bcv-reader-btn:not([hidden])')), 'the bell and the avatar on the title row; no reader button anywhere on the phone');
+  const fab = await page.$eval('#bcv-fab', (e) => { const r = e.getBoundingClientRect(); return { w: Math.round(r.width), h: Math.round(r.height), above: Math.round(document.getElementById('bcv-tabbar').getBoundingClientRect().top - r.bottom) }; });
+  check(await visible('#bcv-fab') && fab.w >= 48 && fab.h >= 48 && fab.above >= 0, `the smart button (≥48px) floats above the tab bar (${JSON.stringify(fab)})`);
   check(await noOverflow(), 'no horizontal overflow');
   await shot('01-today');
 
   await page.click('.bcv-ph-stat:nth-child(2)');
   await sheet();
-  check((await texts('.bcv-ph-sheet__title'))[0] === 'Due this week' && (await page.$$('.bcv-ph-srow')).length > 0, 'a counter opens its list as a bottom sheet');
+  check((await texts('.bcv-ph-sheet__title'))[0] === 'Due this week' && (await page.$$('.bcv-ph-srow')).length > 0 && await visible('.bcv-ph-sheet__handle'), 'a counter opens its list as a bottom sheet with a grab handle');
   await shot('01b-today-sheet');
+  // dragging the handle down past 110px dismisses; a short drag springs back
+  const handle = await page.$eval('.bcv-ph-sheet__handle', (el) => { const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
+  await page.mouse.move(handle.x, handle.y); await page.mouse.down(); await page.mouse.move(handle.x, handle.y + 40, { steps: 4 }); await page.mouse.up();
+  await new Promise((r) => setTimeout(r, 350));
+  check(!!(await page.$('.bcv-sheet-ov')), 'a short drag on the handle springs the sheet back');
+  await page.mouse.move(handle.x, handle.y); await page.mouse.down(); await page.mouse.move(handle.x, handle.y + 160, { steps: 6 }); await page.mouse.up();
+  check(await eventually(async () => !(await page.$('.bcv-sheet-ov'))), 'a drag past 110px dismisses it');
+  await page.click('.bcv-ph-stat:nth-child(2)');
+  await sheet();
   await closeSheet();
   check(!(await page.$('.bcv-sheet-ov')), 'Escape closes the sheet');
 
@@ -135,12 +161,45 @@ try {
   await page.click('.bcv-ph-row .bcv-ph-circle');
   await eventually(() => page.$eval('.bcv-ph-row', (e) => !e.classList.contains('is-done')));
 
+  // ---- Notifications (from the bell) ------------------------------------------------------------
+  console.log('Notifications');
+  const bellBadge = (await texts('.bcv-ph-bell__badge'))[0] || '';
+  await tapScreen('.bcv-ph-bell');
+  await page.waitForSelector('.bcv-ph-nfchip', { timeout: 15000 });
+  l = await layout();
+  check(!l.root && l.topbarHidden === false && (await texts('.bcv-topbar__back'))[0] === 'Today' && (await texts('.bcv-topbar__title'))[0] === 'Notifications', `the bell pushes Notifications under a back bar: ‹ ${(await texts('.bcv-topbar__back'))[0]} · ${(await texts('.bcv-topbar__title'))[0]}`);
+  const chips = await texts('.bcv-ph-nfchip');
+  check(chips.length > 1 && /^All \d+$/.test(chips[0]) && (await page.$eval('.bcv-ph-nfchip.is-on', (e) => e.dataset.cat)) === 'all', `category chips with counts: ${chips.join(' · ')}`);
+  const nfCount = (await texts('.bcv-ph-nfcount__t'))[0];
+  check(/^\d+ notifications? · \d+ unread$/.test(nfCount) && (await page.$$('.bcv-ph-nfrow')).length > 0 && (await texts('.bcv-ph-nfgroup__t')).length > 0, `count line, rows grouped by day: ${nfCount} · ${(await texts('.bcv-ph-nfgroup__t')).join(', ')}`);
+  check(bellBadge === '' || nfCount.endsWith(`${bellBadge} unread`), `the bell's badge (${bellBadge || 'none'}) matches the unread count`);
+  await shot('01e-notifications');
+  await page.click('.bcv-ph-nfchip:nth-child(2)');
+  const cat = await page.$eval('.bcv-ph-nfchip.is-on', (e) => e.dataset.cat);
+  check(cat !== 'all' && await eventually(() => page.$$eval('.bcv-ph-nfrow', (els, c) => els.length > 0 && els.every((e) => e.dataset.cat === c), cat)), `a chip filters to its category (${cat})`);
+  await page.click('.bcv-ph-nfchip[data-cat="all"]');
+  await eventually(async () => (await page.$$('.bcv-ph-nfrow')).length > 1);
+  // swipe left reveals Read / Clear; Read marks it read
+  const rowId = await page.$eval('.bcv-ph-nfrow:not(.is-read)', (e) => e.dataset.id);
+  await swipeLeft(`.bcv-ph-nfrow[data-id="${rowId}"]`);
+  check(await eventually(() => page.$eval(`.bcv-ph-nfrow[data-id="${rowId}"]`, (e) => e.closest('.bcv-ph-swipe').classList.contains('is-open'))) && (await texts('.bcv-ph-swipe.is-open .bcv-ph-swipe__act')).join(',') === 'Read,Clear', 'swiping a notification left latches its Read / Clear actions open');
+  await shot('01f-notification-swipe');
+  await page.click('.bcv-ph-swipe.is-open .bcv-ph-swipe__act:first-child');
+  check(await eventually(() => page.$eval(`.bcv-ph-nfrow[data-id="${rowId}"]`, (e) => e.classList.contains('is-read'))), 'Read marks the row read');
+  const unreadBefore = Number((await texts('.bcv-ph-nfcount__t'))[0].match(/(\d+) unread/)[1]);
+  await page.click('#bcv-nf-readall');
+  check(await eventually(async () => /· 0 unread$/.test((await texts('.bcv-ph-nfcount__t'))[0])), `Read all clears the unread count (${unreadBefore} → 0)`);
+  await page.click('.bcv-topbar__back');
+  await page.waitForSelector('.bcv-ph-stat', { timeout: 15000 });
+  await rolled();
+  check((await page.$eval('.bcv-ph-bell__badge', (e) => e.hidden)) === true, 'back on Today the bell has no badge left');
+
   // ---- account sheet + appearance -------------------------------------------------------------
   console.log('account sheet');
   await page.click('.bcv-ph-avatar');
   await sheet();
   const acct = await texts('.bcv-ph-srow__label');
-  check(acct.join(',') === 'Inbox,Notifications,Groups,History,My Materials,Help,Dark appearance,Settings,Guided setup,Profile,All Canvas settings,Log out', `account sheet rows, with the school's own nav entries: ${acct.join(', ')} (no Sign out outside the app)`);
+  check(acct.join(',') === 'Inbox,Groups,History,My Materials,Help,Dark appearance,Settings,Guided setup,Profile,All Canvas settings,Log out', `account sheet rows, with the school's own nav entries: ${acct.join(', ')} (no Sign out outside the app)`);
   check((await texts('.bcv-ph-srow__note'))[0] === 'No unread messages' || /unread message/.test((await texts('.bcv-ph-srow__note'))[0]), `Inbox row carries the unread count: ${(await texts('.bcv-ph-srow__note'))[0]}`);
   await shot('01c-account-sheet');
   await page.evaluate(() => { window.__bcvMarker = 1; });
@@ -149,6 +208,7 @@ try {
   check(true, 'Dark appearance switches the theme and reloads the page (the web versions reload on an appearance change)');
   await ready();
   await page.waitForSelector('.bcv-ph-stat', { timeout: 15000 });
+  await rolled();
   await shot('01d-today-dark');
   await page.click('.bcv-ph-avatar');
   await sheet();
@@ -165,15 +225,11 @@ try {
   await tab('courses');
   await page.waitForSelector('.bcv-ph-crow', { timeout: 15000 });
   check((await page.$eval('.bcv-tabbar__item.is-active', (e) => e.dataset.tab)) === 'courses' && (await texts('.bcv-ph-h1'))[0] === 'Courses', 'Courses tab lands with its large title');
-  check(/\d+ courses? enrolled/.test((await texts('.bcv-ph-title__sub'))[0]), `subtitle counts the enrolment: ${(await texts('.bcv-ph-title__sub'))[0]}`);
+  check(/(\d+ enrolled|\d+ of \d+ selected)$/.test((await texts('.bcv-ph-title__sub'))[0]), `subtitle counts the selection: ${(await texts('.bcv-ph-title__sub'))[0]}`);
+  const selN = Number(((await texts('.bcv-ph-title__sub'))[0].match(/(\d+) (enrolled|of)/) || [])[1]);
+  check(selN > 0 && (await page.$$('.bcv-ph-crow')).length === selN, `only the selected courses are listed (${(await page.$$('.bcv-ph-crow')).length} rows for ${selN} selected)`);
   check(await eventually(async () => (await texts('.bcv-ph-crow__sub')).some((t) => /\d+ of \d+ submitted/.test(t))), 'rows show submitted ÷ assigned');
   check((await texts('.bcv-ph-crow__pct')).every((t) => /^(\d+(\.\d+)?%|N\/A)$/.test(t)), `every row carries its current score or N/A: ${(await texts('.bcv-ph-crow__pct')).join(', ')}`);
-  const disclose = await page.$('.bcv-ph-disclose');
-  if (disclose) {
-    check(!(await visible('.bcv-ph-clist:nth-of-type(2)')), 'past courses fold away');
-    await disclose.click();
-    check(await eventually(() => page.$eval('.bcv-ph-disclose', (e) => e.getAttribute('aria-expanded') === 'true')), 'the disclosure opens them');
-  }
   await shot('02-courses');
 
   // ---- To Do -------------------------------------------------------------------------------------
@@ -181,39 +237,98 @@ try {
   await tab('todo');
   await page.waitForSelector('.bcv-ph-progress', { timeout: 15000 });
   check((await page.$eval('.bcv-tabbar__item.is-active', (e) => e.dataset.tab)) === 'todo' && (await texts('.bcv-ph-h1'))[0] === 'To Do', 'To Do tab lands (a hash route, no page load)');
-  check(/^\d+%$/.test((await texts('.bcv-ph-progress__pct'))[0]) && /\d+ of \d+ done this week/.test((await texts('.bcv-ph-progress__note'))[0]), `progress card: ${(await texts('.bcv-ph-progress__line'))[0]}`);
-  check((await texts('.bcv-seg__btn, .bcv-seg button')).join(',') === 'By date,By course', 'group switch');
-  check((await texts('.bcv-ph-ghead__t')).some((t) => /^(Today|Tomorrow|Next 7 days)$/.test(t)) && (await texts('.bcv-ph-row__time')).length > 0, `grouped by date with times: ${(await texts('.bcv-ph-ghead__t')).join(', ')}`);
+  check(/^\d+%$/.test((await texts('.bcv-ph-progress__pct'))[0]) && /\d+ of \d+ done/.test((await texts('.bcv-ph-progress__note'))[0]), `progress card: ${(await texts('.bcv-ph-progress__line'))[0]}`);
+  check((await texts('.bcv-seg__btn, .bcv-seg button')).join(',') === 'Date,Priority,Course', 'group switch: Date / Priority / Course');
+  check((await texts('.bcv-ph-switchrow__t'))[0] === 'Completed hidden' && (await texts('.bcv-ph-todo__add'))[0] === 'Add your own task', 'the completed switch and the "Add your own task" row above the list');
+  check((await texts('.bcv-ph-ghead__t')).some((t) => /^(Today|Tomorrow|Next 7 days|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)$/.test(t)) && (await texts('.bcv-ph-row__time')).length > 0, `grouped by date with times: ${(await texts('.bcv-ph-ghead__t')).join(', ')}`);
   await shot('03-todo');
+  // a tap opens the task sheet; a priority chosen there shows on the row
+  const taskId = await page.$eval('.bcv-ph-trow', (e) => e.dataset.item);
+  const taskTitle = (await texts(`.bcv-ph-trow[data-item="${taskId}"] .bcv-ph-row__title`))[0];
+  await page.click(`.bcv-ph-trow[data-item="${taskId}"] .bcv-ph-row__body`);
+  await sheet();
+  check((await texts('.bcv-ph-tsheet__title'))[0] === taskTitle && (await texts('.bcv-ph-tsheet__pri')).join(',') === 'High,Medium,Low,None' && (await texts('.bcv-ph-sheet__actions .bcv-ph-bigbtn')).join(',').startsWith('Mark done,'), `the task sheet: "${taskTitle}", priority chips, Mark done / Open`);
+  await shot('03b-todo-task');
+  await page.click('.bcv-ph-tsheet__pri[data-pri="3"]');
+  check(await eventually(async () => !(await page.$('.bcv-sheet-ov')) && (await texts(`.bcv-ph-trow[data-item="${taskId}"] .bcv-ph-pri`))[0] === 'High'), 'High closes the sheet and flags the row');
   await page.click('.bcv-seg button:nth-child(2)');
-  check(await eventually(async () => (await texts('.bcv-ph-ghead__t')).every((t) => !/^(Today|Tomorrow|Next 7 days)$/.test(t)) && (await texts('.bcv-ph-ghead__n')).some((t) => /open item/.test(t))), `By course groups by course: ${(await texts('.bcv-ph-ghead__t')).join(', ')}`);
+  check(await eventually(async () => (await texts('.bcv-ph-ghead__t'))[0] === 'High priority'), `Priority groups the flagged task first: ${(await texts('.bcv-ph-ghead__t')).join(', ')}`);
+  await page.click('.bcv-seg button:nth-child(3)');
+  check(await eventually(async () => (await texts('.bcv-ph-ghead__t')).every((t) => !/^(Today|Tomorrow|High priority)$/.test(t)) && (await texts('.bcv-ph-ghead__n')).some((t) => /item/.test(t))), `Course groups by course: ${(await texts('.bcv-ph-ghead__t')).join(', ')}`);
   await page.click('.bcv-seg button:nth-child(1)');
-  check((await texts('.bcv-ph-switchrow .bcv-ph-row__title'))[0] === 'Show completed', 'Show completed switch at the end');
+  await eventually(async () => (await page.$$(`.bcv-ph-trow[data-item="${taskId}"]`)).length === 1);
+  // swipe left: Priority / Done; Done marks it and the row leaves the open list
+  await swipeLeft(`.bcv-ph-trow[data-item="${taskId}"]`);
+  check(await eventually(() => page.$eval(`.bcv-ph-trow[data-item="${taskId}"]`, (e) => e.closest('.bcv-ph-swipe').classList.contains('is-open'))) && (await texts('.bcv-ph-swipe.is-open .bcv-ph-swipe__act')).join(',') === 'Priority,Done', 'swiping a task left reveals Priority / Done');
+  await shot('03c-todo-swipe');
+  await page.click('.bcv-ph-swipe.is-open .bcv-ph-swipe__act:last-child');
+  check(await eventually(async () => !(await page.$(`.bcv-ph-trow[data-item="${taskId}"]`))), 'Done marks the task complete and it leaves the open list');
+  await page.click('.bcv-ph-switchrow .bcv-switch');
+  check(await eventually(async () => (await texts('.bcv-ph-switchrow__t'))[0] === 'Showing completed' && (await page.$eval(`.bcv-ph-trow[data-item="${taskId}"]`, (e) => e.classList.contains('is-done')).catch(() => false))), 'Showing completed brings it back, done');
+  await page.click(`.bcv-ph-trow[data-item="${taskId}"] .bcv-ph-circle`);
+  await eventually(() => page.$eval(`.bcv-ph-trow[data-item="${taskId}"]`, (e) => !e.classList.contains('is-done')).catch(() => false));
+  await page.click('.bcv-ph-switchrow .bcv-switch');
+  await eventually(async () => (await texts('.bcv-ph-switchrow__t'))[0] === 'Completed hidden');
+  await page.click(`.bcv-ph-trow[data-item="${taskId}"] .bcv-ph-row__body`);
+  await sheet();
+  await page.click('.bcv-ph-tsheet__pri[data-pri="0"]');
+  await eventually(async () => !(await page.$('.bcv-sheet-ov')));
+  // a task of your own: the composer, then the row, then its sheet's Delete
+  await page.click('.bcv-ph-todo__add');
+  await page.waitForSelector('.bcv-ph-composer', { timeout: 5000 });
+  check((await page.$eval('.bcv-ph-composer__add', (e) => e.disabled)) === true && (await texts('.bcv-ph-composer__pri')).join(',') === 'High,Medium,Low,None', 'the composer opens with Add disabled until a title is typed');
+  await page.fill('.bcv-ph-composer__title', 'Return the library books');
+  await page.click('.bcv-ph-composer__pri[data-pri="1"]');
+  await page.click('.bcv-ph-composer__add');
+  check(await eventually(async () => (await texts('.bcv-ph-trow .bcv-ph-row__title')).includes('Return the library books') && !(await page.$('.bcv-ph-composer'))), 'Add task creates a planner note that lands in the list');
+  check((await texts('.bcv-ph-trow:has-text("Return the library books") .bcv-ph-row__sub'))[0] === 'My task · Personal' && (await texts('.bcv-ph-trow:has-text("Return the library books") .bcv-ph-pri'))[0] === 'Low', 'the row says My task · Personal with its Low flag');
+  await shot('03d-todo-own-task');
+  await page.click('.bcv-ph-trow:has-text("Return the library books") .bcv-ph-row__body');
+  await sheet();
+  check((await texts('.bcv-ph-sheet__actions .bcv-ph-bigbtn')).join(',') === 'Mark done,Delete task', 'a task of your own offers Delete instead of Open');
+  page.once('dialog', (d) => d.accept());
+  await page.click('.bcv-ph-sheet__actions .bcv-ph-bigbtn.is-danger');
+  check(await eventually(async () => !(await texts('.bcv-ph-trow .bcv-ph-row__title')).includes('Return the library books')), 'Delete task removes it from the planner');
 
   // ---- Grades ------------------------------------------------------------------------------------
   console.log('Grades');
   await tab('gpa');
   await page.waitForSelector('.bcv-ph-hero', { timeout: 15000 });
+  await rolled();
   check((await page.$eval('.bcv-tabbar__item.is-active', (e) => e.dataset.tab)) === 'gpa' && (await texts('.bcv-ph-h1'))[0] === 'Grades', 'Grades tab lands');
-  check(/^\d\.\d\d$/.test((await texts('.bcv-ph-hero__gpa'))[0]) && /goal/.test((await texts('.bcv-ph-hero__note'))[0]) && (await page.$eval('.bcv-ph-hero__gpa', (e) => getComputedStyle(e).color)) === 'rgb(255, 255, 255)', `GPA hero, white on indigo: ${(await texts('.bcv-ph-hero'))[0]}`);
+  check(/^\d\.\d\d$/.test((await texts('.bcv-ph-hero__gpa'))[0]) && /^goal \d\.\d\d$/.test((await texts('.bcv-ph-hero__goalnote'))[0]) && /(above|below) goal/.test((await texts('.bcv-ph-hero__diff'))[0]) && (await page.$eval('.bcv-ph-hero__gpa', (e) => getComputedStyle(e).color)) === 'rgb(255, 255, 255)', `GPA hero, white on indigo: ${(await texts('.bcv-ph-hero'))[0]}`);
   const cards = await page.$$('.bcv-ph-gcard');
-  check(cards.length > 0 && (await page.$$('.bcv-ph-gcard .bcv-ph-ring svg circle')).length === cards.length * 2, `${cards.length} course cards with rings`);
+  const ringFills = await page.$$eval('.bcv-ph-gcard', (els) => els.map((e) => e.querySelectorAll('.bcv-ph-ring svg circle').length));
+  const scoredN = (await texts('.bcv-ph-gcard__pct')).filter((t) => /%$/.test(t)).length;
+  check(cards.length > 0 && ringFills.every((n) => n >= 1) && ringFills.filter((n) => n === 2).length === scoredN && (await page.$$('.bcv-ph-gcard.is-open')).length === 0, `${cards.length} course cards with rings (a fill on the ${scoredN} scored), all folded`);
   check((await texts('.bcv-ph-gcard__sub')).every((t) => /\d+ of \d+ graded|nothing graded/.test(t)) && (await texts('.bcv-ph-gcard__letter')).some((t) => /^[A-F][+−]?$/.test(t)), `cards show graded counts and letters: ${(await texts('.bcv-ph-gcard__letter')).join(', ')}`);
   await shot('04-grades');
-  await page.click('.bcv-ph-hero');
-  await sheet();
-  const before = (await texts('.bcv-ph-goal__val'))[0];
-  await page.click('.bcv-ph-goal__step:last-child');
-  const after = (await texts('.bcv-ph-goal__val'))[0];
-  check(/^\d\.\d\d$/.test(before) && Math.abs(Number(after) - Number(before) - 0.05) < 0.001, `goal stepper: ${before} → ${after}`);
-  await shot('04b-grades-goal');
-  await page.click('.bcv-ph-bigbtn.is-primary');
-  check(await eventually(async () => !(await page.$('.bcv-sheet-ov')) && new RegExp(after.replace('.', '\\.')).test((await texts('.bcv-ph-hero__note'))[0])), `Done saves the goal into the hero: ${(await texts('.bcv-ph-hero__note'))[0]}`);
-  await page.click('.bcv-ph-hero');
-  await sheet();
-  await page.click('.bcv-ph-goal__step:first-child');
-  await page.click('.bcv-ph-bigbtn.is-primary');
-  await eventually(async () => !(await page.$('.bcv-sheet-ov')));
+  // the goal stepper in the hero saves as it goes
+  const before = (await texts('.bcv-ph-hero__goalv'))[0];
+  await page.click('.bcv-ph-hero__step:last-child');
+  const after = (await texts('.bcv-ph-hero__goalv'))[0];
+  check(/^\d\.\d\d$/.test(before) && Math.abs(Number(after) - Number(before) - 0.05) < 0.001 && (await texts('.bcv-ph-hero__goalnote'))[0] === `goal ${after}`, `goal stepper: ${before} → ${after}, the note follows`);
+  await page.click('.bcv-ph-hero__step:first-child');
+  await eventually(async () => (await texts('.bcv-ph-hero__goalv'))[0] === before);
+  // a ring expands on a tap, one at a time
+  await page.click('.bcv-ph-gcard:nth-child(1) .bcv-ph-gcard__hd');
+  check(await eventually(async () => (await page.$$('.bcv-ph-gcard.is-open')).length === 1 && (await page.$$('.bcv-ph-gcard.is-open .bcv-ph-ring__cat')).length > 0 && (await page.$$('.bcv-ph-gcard.is-open .bcv-ph-cat')).length > 0 && (await page.$$('.bcv-ph-gcard.is-open .bcv-ph-target__btn')).length > 3), 'tapping a card opens its category rings, the breakdown and the target picker');
+  await shot('04b-grades-open');
+  await page.click('.bcv-ph-gcard:nth-child(2) .bcv-ph-gcard__hd');
+  check(await eventually(async () => (await page.$$('.bcv-ph-gcard.is-open')).length === 1 && (await page.$eval('.bcv-ph-gcard:nth-child(2)', (e) => e.classList.contains('is-open')))), 'opening another card folds the first (one open at a time)');
+  const targetBefore = await page.$eval('.bcv-ph-gcard.is-open .bcv-ph-target__btn.is-on', (e) => e.textContent).catch(() => null);
+  await page.click('.bcv-ph-gcard.is-open .bcv-ph-target__btn:first-child');
+  check(await eventually(() => page.$eval('.bcv-ph-gcard.is-open .bcv-ph-target__btn.is-on', (e) => e.textContent === 'A+')), `the target picker saves a target (${targetBefore} → A+)`);
+  // what-if: the switch shows the banner and a score field on the open card; nothing is saved
+  await page.click('.bcv-ph-whatif .bcv-switch');
+  check(await eventually(async () => await visible('.bcv-ph-warn') && !!(await page.$('.bcv-ph-gcard.is-open .bcv-ph-whatif__in'))), 'What-if shows the "not your actual score" banner and a score field on the open card');
+  const gpaBefore = (await texts('.bcv-ph-hero__gpa'))[0];
+  await page.fill('.bcv-ph-gcard.is-open .bcv-ph-whatif__in', '100');
+  await page.press('.bcv-ph-gcard.is-open .bcv-ph-whatif__in', 'Tab');
+  check(await eventually(async () => (await texts('.bcv-ph-gcard.is-open .bcv-ph-gcard__pct'))[0] === '100%' && !!(await page.$('.bcv-ph-gcard.is-open .bcv-ph-gcard__tried')) && /what-if/.test((await texts('.bcv-ph-hero__goalnote'))[0])), `a what-if score re-figures the card and the hero (${gpaBefore} → ${(await texts('.bcv-ph-hero__gpa'))[0]})`);
+  await shot('04c-grades-whatif');
+  await page.click('.bcv-ph-whatif .bcv-switch');
+  check(await eventually(async () => !(await visible('.bcv-ph-warn')) && (await texts('.bcv-ph-hero__gpa'))[0] === gpaBefore), 'switching what-if off restores the real numbers');
 
   // ---- Calendar ----------------------------------------------------------------------------------
   console.log('Calendar');
@@ -246,47 +361,46 @@ try {
   await ready();
   await page.waitForSelector('.bcv-ph-body--course .bcv-ph-card', { timeout: 15000 });
   l = await layout();
-  check(!l.root && l.topbarHidden === false && !l.rail, `a pushed screen: top bar shown, the rail hidden (${JSON.stringify(l)})`);
-  check(/^MATH-021-20 · Fall 2026/.test((await texts('.bcv-ph-head__sub'))[0]) && !(await visible('.bcv-head .bcv-reader-btn')) && !(await visible('.bcv-pill--term')), `course header: dot, name, one detail line, chips (${(await texts('.bcv-ph-head__sub'))[0]})`);
-  check((await texts('.bcv-topbar__title'))[0] === '' && (await page.$('.bcv-topbar__btn[title="Immersive Reader"]')) !== null, 'the back bar carries no title under a large title, and the reader button');
+  check(!l.root && l.topbarHidden === false && l.glass && !l.rail, `a pushed screen: glass top bar shown, the rail hidden (${JSON.stringify(l)})`);
+  check(/^MATH-021-20 · Fall 2026/.test((await texts('.bcv-ph-head__sub'))[0]) && !(await visible('.bcv-head .bcv-reader-btn')) && !(await visible('.bcv-pill--term')), `course header: dot, name, one detail line (${(await texts('.bcv-ph-head__sub'))[0]})`);
+  check((await texts('.bcv-topbar__title'))[0] === '' && (await page.$('.bcv-topbar__btn')) === null, 'the back bar carries no title under a large title, and no reader button');
   check((await texts('.bcv-topbar__back'))[0] === 'Courses', `back bar: ‹ ${(await texts('.bcv-topbar__back'))[0]}`);
-  const chips = await texts('.bcv-ph-tab');
-  check(chips.length > 3 && chips[0] === 'Home' && (await page.$eval('.bcv-ph-tab.is-active', (e) => e.dataset.tab)) === 'home', `tab chips: ${chips.join(' · ')}`);
-  check((await texts('.bcv-ph-next .bcv-ph-next__title'))[0]?.length > 0 && (await texts('.bcv-ph-next__btns .bcv-ph-btn')).includes('Open'), `Next up card: ${(await texts('.bcv-ph-next__title'))[0]}`);
+  check((await page.$$('.bcv-ph-tab')).length === 0, 'Home carries no chip row: the course\'s tabs are the list below');
   const heads = await texts('.bcv-ph-body--course .bcv-ph-ghead__t');
   check(heads.includes('Open work') && heads.includes('Turned in'), `groups: ${heads.join(', ')}`);
   check((await texts('.bcv-ph-row--link .bcv-ph-row__title')).includes('Grades') && (await texts('.bcv-ph-row--link .bcv-ph-row__right')).some((t) => /%$/.test(t)), 'the course links list, Grades with the score');
-  check((await raw('.bcv-ph-front .bcv-ph-kicker'))[0] === 'Front page' && (await texts('.bcv-ph-front .bcv-ph-btn'))[0] === 'Read', 'the front page folded with a Read button');
+  check((await raw('.bcv-ph-front .bcv-ph-kicker'))[0] === 'Front page' && (await texts('.bcv-ph-front .bcv-ph-btn'))[0] === 'Open', 'the front page folded with an Open button');
   check(await noOverflow(), 'no horizontal overflow on the course screen');
   await shot('06-course');
-  await page.click('.bcv-ph-front .bcv-ph-btn');
-  check(await eventually(async () => !!(await page.$('.bcv-reader-ov'))), 'Read opens the reader');
-  await shot('06b-course-reader');
-  await page.evaluate(() => document.querySelector('.bcv-reader-ov')?.remove());
-  await page.click('.bcv-topbar__btn[title="Immersive Reader"]');
-  check(await eventually(async () => !!(await page.$('.bcv-reader-ov'))), 'so does the reader button in the back bar');
-  await page.evaluate(() => document.querySelector('.bcv-reader-ov')?.remove());
-  await tapScreen('.bcv-ph-tab[data-tab="assignments"]');
-  check((await page.$eval('.bcv-ph-tab.is-active', (e) => e.dataset.tab)) === 'assignments' && (await texts('.bcv-topbar__back'))[0] === 'Back', 'a chip opens that tab with the chip row kept');
+  await tapScreen('.bcv-ph-front .bcv-ph-btn');
+  check(/\/courses\/101\/(pages\/|wiki|assignments\/syllabus)/.test(page.url()) && !(await page.$('.bcv-reader-ov')), `Open goes to the page itself, not a reader (${page.url().replace(BASE, '')})`);
+  await page.goto(`${BASE}/courses/101`);
+  await ready();
+  await page.waitForSelector('.bcv-ph-row--link[data-tab="assignments"]', { timeout: 15000 });
+  await tapScreen('.bcv-ph-row--link[data-tab="assignments"]');
+  check((await page.$eval('.bcv-ph-tab.is-active', (e) => e.dataset.tab)) === 'assignments' && (await texts('.bcv-topbar__back'))[0] === 'Back' && (await texts('.bcv-ph-tab'))[0] === 'Home', 'a link opens that tab, with the chip row for the rest');
   await shot('06c-course-assignments');
+  // the edge swipe pops the stack like Back
+  await page.mouse.move(8, 500); await page.mouse.down(); await page.mouse.move(140, 505, { steps: 8 }); await page.mouse.up();
+  check(await eventually(async () => page.url() === `${BASE}/courses/101` && !!(await page.$('.bcv-ph-body--course'))), 'an edge swipe from the left pops back to the course');
 
-  // ---- an item + submit -------------------------------------------------------------------------
+  // ---- an item with the submit block on the same page --------------------------------------------
   console.log('item');
   await page.goto(`${BASE}/courses/104/assignments/4002`);
   await ready();
   await page.waitForSelector('.bcv-ph-item__title', { timeout: 15000 });
   check((await texts('.bcv-ph-item__title'))[0] === 'Week 2 Post Class Assignment: GC articles' && (await texts('.bcv-topbar__title'))[0] === 'Week 2 Post Class Assignment: GC articles', 'item title and the back bar title');
   check(/Due .* · \d+ points/.test((await texts('.bcv-ph-item__meta'))[0]) && (await raw('.bcv-ph-instr .bcv-ph-kicker'))[0] === 'Instructions', `meta line and Instructions card: ${(await texts('.bcv-ph-item__meta'))[0]}`);
-  check((await texts('.bcv-ph-bigbtn.is-primary'))[0] === 'Submit assignment' && (await page.$eval('.bcv-ph-bigbtn.is-primary', (e) => getComputedStyle(e).color)) === 'rgb(255, 255, 255)', 'the big primary button, white on blue');
   check(!(await page.$('.bcv-head--course')) && (await texts('.bcv-ph-chip--course'))[0] === 'F26-SPRK 010 103', 'an item page drops the course header; its course chip says where it is');
+  check(!(await page.$('.bcv-ph-bigbtn.is-primary')) && !!(await page.$('.bcv-ph-body--item .bcv-sb--embed')) && (await raw('.bcv-sb--embed .bcv-sb__kicker'))[0] === 'Submit work', 'handing in lives on the same page: the submit block at the end, no separate Submit screen');
+  check(/^[\w ]+ 11:59 PM 10 points Attempt 1 of unlimited$/.test((await texts('.bcv-sb--embed .bcv-sb__chips'))[0]), `the block's chips: ${(await texts('.bcv-sb--embed .bcv-sb__chips'))[0]} (no course chip, nothing stray)`);
+  check((await page.$eval('.bcv-sb--embed .bcv-sb__btn--primary', (e) => e.disabled && e.textContent.trim() === 'Submit assignment' && e.getBoundingClientRect().height >= 48)), 'the full-width submit button waits until there is something to hand in');
+  check(await noOverflow(), 'no horizontal overflow on the item page');
   await shot('07-item');
-  await tapScreen('.bcv-ph-bigbtn.is-primary');
-  check(page.url() === `${BASE}/courses/104/assignments/4002?bcv=submit` && (await texts('.bcv-sb__h1'))[0] === 'Week 2 Post Class Assignment: GC articles', 'Submit opens the submit screen');
-  check(await noOverflow(), 'no horizontal overflow on the submit screen');
-  await shot('08-submit');
+  await page.evaluate(() => document.querySelector('.bcv-sb--embed').scrollIntoView());
+  await shot('08-item-submit');
   await page.click('.bcv-topbar__back');
-  await page.waitForSelector('.bcv-ph-item__title', { timeout: 15000 });
-  check(page.url() === `${BASE}/courses/104/assignments/4002`, 'the back bar returns to the item');
+  check(await eventually(async () => page.url() === `${BASE}/courses/104`), 'the back bar returns to the course');
 
   // ---- a quiz ------------------------------------------------------------------------------------
   console.log('quiz');
@@ -297,6 +411,10 @@ try {
   await page.click('.bcv-qz__begin');
   await page.waitForSelector('.bcv-qz__opt', { timeout: 15000 });
   check((await page.$$('.bcv-qz__page--one, .bcv-qz__q')).length > 0 && await noOverflow(), 'one question at a time on a phone, no overflow');
+  const urlBefore = page.url();
+  await page.mouse.move(8, 500); await page.mouse.down(); await page.mouse.move(140, 505, { steps: 8 }); await page.mouse.up();
+  await new Promise((r) => setTimeout(r, 400));
+  check(page.url() === urlBefore && !!(await page.$('.bcv-qz__opt')), 'the edge swipe is off during a quiz');
   await shot('09b-quiz-question');
 
   // ---- the smart panel --------------------------------------------------------------------------
@@ -331,7 +449,7 @@ try {
   check((await texts('.bcv-tour__title'))[0] === 'Your day at a glance' && overStats, 'the tour spotlights the phone counters');
   await page.click('.bcv-tour__btn.is-primary');
   await page.waitForFunction(() => document.querySelector('.bcv-tour__title')?.textContent.trim() === 'Everything in one place', null, { timeout: 10000 });
-  check(/Inbox, Groups/.test((await texts('.bcv-tour__text'))[0]), 'the phone stop explains the tab bar and the avatar');
+  check(/bell opens Notifications/.test((await texts('.bcv-tour__text'))[0]) && /Inbox, Groups/.test((await texts('.bcv-tour__text'))[0]), 'the phone stop explains the tab bar, the bell and the avatar');
   await shot('12-tour');
   await page.click('.bcv-tour__x');
   await page.waitForFunction(() => !document.querySelector('.bcv-tour'), null, { timeout: 5000 });
