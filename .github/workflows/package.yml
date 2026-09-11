@@ -35,11 +35,21 @@ jobs:
           name: simpl-courses-extension
           path: dist/simpl-courses-[0-9]*.zip
           if-no-files-found: error
+      # A version tag publishes a Release. Run the workflow by hand (Actions → Package → Run
+      # workflow) and it publishes the same Release for the manifest's version, creating the tag
+      # itself, so a build is downloadable from a fixed link without pushing a tag.
       - name: GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" dist/*.zip --title "Simpl Courses ${GITHUB_REF_NAME#v}" --generate-notes
+        run: |
+          VERSION="$(python3 -c "import json;print(json.load(open('extension/manifest.json'))['version'])")"
+          TAG="v$VERSION"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/*.zip --clobber
+          else
+            gh release create "$TAG" dist/*.zip --target "$GITHUB_SHA" --title "Simpl Courses $VERSION" --generate-notes
+          fi
 
   chrome-web-store:
     needs: package
