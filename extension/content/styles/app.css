@@ -398,9 +398,27 @@ html[data-bcv-theme="dark"] .bcv-badge--orange { color: #ffb44d; }
 .bcv-todo__title::placeholder { color: var(--bcv-ink3); }
 .bcv-todo__ctl { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .bcv-todo__ctl .bcv-seg__btn { padding: 6px 12px; font-size: 12.5px; font-weight: 600; }
-.bcv-todo__date { width: auto; height: 30px; padding: 0 10px; border-radius: 9px; font-size: 12.5px; font-weight: 500; }
-.bcv-todo__date[hidden] { display: none; }
 .bcv-todo__spacer { flex: 1; }
+/* the composer's date: a field that opens a calendar of the app's own (never the browser's picker) */
+.bcv-date { display: inline-flex; align-items: center; gap: 7px; height: 30px; padding: 0 9px 0 10px; border: 0; border-radius: 9px; background: var(--bcv-fill); font: 500 12.5px/1 var(--bcv-font); color: var(--bcv-ink); cursor: pointer; max-width: 100%; box-sizing: border-box; transition: background .18s ease; }
+.bcv-date:hover { background: var(--bcv-fill2); }
+.bcv-date__label { min-width: 0; }
+.bcv-date__chev { flex: none; }
+.bcv-menu.bcv-datepop { width: 296px; max-height: none; overflow: visible; padding: 10px; box-sizing: border-box; }
+.bcv-datepop__head { display: flex; align-items: center; justify-content: space-between; padding: 2px 2px 8px; }
+.bcv-datepop__month { font: 600 13.5px/1.2 var(--bcv-font); color: var(--bcv-ink); }
+.bcv-datepop__nav { width: 28px; height: 28px; border: 0; border-radius: 8px; background: var(--bcv-fill); color: var(--bcv-blue); display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; }
+.bcv-datepop__nav:hover { background: var(--bcv-fill2); }
+.bcv-datepop__dows, .bcv-datepop__grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.bcv-datepop__dow { text-align: center; font: 600 10.5px/1 var(--bcv-font); color: var(--bcv-ink3); padding: 4px 0 6px; }
+.bcv-datepop__day { height: 34px; border: 0; border-radius: 9px; background: transparent; font: 500 13px/1 var(--bcv-font); color: var(--bcv-ink); cursor: pointer; padding: 0; transition: background .15s ease; }
+.bcv-datepop__day:hover { background: var(--bcv-fill2); }
+.bcv-datepop__day.is-off { color: var(--bcv-ink3); opacity: .55; }
+.bcv-datepop__day.is-today { color: var(--bcv-blue); font-weight: 700; box-shadow: inset 0 0 0 1.5px var(--bcv-blue-soft); }
+.bcv-datepop__day.is-on, .bcv-datepop__day.is-on:hover { background: var(--bcv-blue); color: #fff; font-weight: 700; opacity: 1; box-shadow: none; }
+.bcv-datepop__quick { display: flex; gap: 6px; padding: 8px 0 0; border-top: 1px solid var(--bcv-sep); margin-top: 6px; }
+.bcv-datepop__q { flex: 1; border: 0; border-radius: 8px; padding: 8px 0; background: var(--bcv-fill); font: 600 12px/1 var(--bcv-font); color: var(--bcv-blue); cursor: pointer; white-space: nowrap; }
+.bcv-datepop__q:hover { background: var(--bcv-blue-soft); }
 .bcv-todo__cancel { background: transparent; color: var(--bcv-ink3); }
 .bcv-todo__addbtn:disabled { background: var(--bcv-fill); color: var(--bcv-ink3); opacity: 1; }
 .bcv-todo__del:hover { background: rgba(255,69,58,.16); }
@@ -1358,8 +1376,11 @@ html[data-bcv-theme="dark"] .bcv-ph-circle { border-color: rgba(255,255,255,.28)
 .bcv-ph-composer__title { width: 100%; box-sizing: border-box; border: 0 !important; outline: none; background: transparent !important; box-shadow: none; margin: 0; padding: 0; font: 600 15.5px/1.35 var(--bcv-font); color: var(--bcv-ink) !important; }
 .bcv-ph-composer__title::placeholder { color: var(--bcv-ink3); }
 .bcv-ph-composer .bcv-seg__btn { padding: 7px 0; font-size: 12px; font-weight: 600; }
-.bcv-ph-composer__date { height: 38px; border-radius: 11px; font-size: 13.5px; font-weight: 500; }
-.bcv-ph-composer__date[hidden] { display: none; }
+.bcv-ph-composer__date { width: 100%; height: 40px; border-radius: 11px; font-size: 13.5px; justify-content: flex-start; padding: 0 12px; }
+.bcv-ph-composer__date .bcv-date__chev { margin-left: auto; }
+html.bcv-phone .bcv-menu.bcv-datepop { width: auto; padding: 12px; background: var(--bcv-card); } /* solid over the composer it rises from */
+html.bcv-phone .bcv-datepop__day { height: 42px; font-size: 14.5px; }
+html.bcv-phone .bcv-datepop__q { padding: 11px 0; font-size: 13px; }
 .bcv-ph-composer__pris { display: flex; gap: 6px; }
 .bcv-ph-composer__pri { flex: 1; border: 0; cursor: pointer; padding: 8px 0; border-radius: 10px; font: 500 12px/1 var(--bcv-font); background: transparent; color: var(--bcv-ink3); transition: background .22s ease, color .22s ease; }
 .bcv-ph-composer__pri.is-on { font-weight: 600; }

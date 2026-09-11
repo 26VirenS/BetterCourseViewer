@@ -276,8 +276,16 @@ try {
   // a task of your own: the composer, then the row, then its sheet's Delete
   await page.click('.bcv-ph-todo__add');
   await page.waitForSelector('.bcv-ph-composer', { timeout: 5000 });
-  check((await page.$eval('.bcv-ph-composer__add', (e) => e.disabled)) === true && (await texts('.bcv-ph-composer__pri')).join(',') === 'High,Medium,Low,None', 'the composer opens with Add disabled until a title is typed');
+  check((await page.$eval('.bcv-ph-composer__add', (e) => e.disabled)) === true && (await texts('.bcv-ph-composer__pri')).join(',') === 'High,Medium,Low,None' && /^Today · /.test((await texts('.bcv-ph-composer__date'))[0]) && !(await page.$('.bcv-ph-composer .bcv-seg')) && !(await page.$('input[type="date"]')), `the composer opens with Add disabled until a title is typed; the date field starts at today (${(await texts('.bcv-ph-composer__date'))[0]})`);
   await page.fill('.bcv-ph-composer__title', 'Return the library books');
+  await page.click('.bcv-ph-composer__date');
+  await page.waitForSelector('.bcv-datepop', { timeout: 3000 });
+  const popBox = await page.$eval('.bcv-datepop', (e) => { const r = e.getBoundingClientRect(); return { l: Math.round(r.left), r: Math.round(window.innerWidth - r.right), b: Math.round(window.innerHeight - r.bottom), day: Math.round(e.querySelector('.bcv-datepop__day').getBoundingClientRect().height), clipped: e.scrollHeight > e.clientHeight + 1 }; });
+  check((await page.$$('.bcv-datepop__day')).length === 42 && popBox.l === popBox.r && popBox.l >= 12 && popBox.l <= 24 && popBox.b > 60 && popBox.day >= 40 && !popBox.clipped && (await texts('.bcv-datepop__q')).join(',') === 'Today,Tomorrow,Next Monday', `the calendar rises above the tab bar, full width, with touch-sized days and the shortcuts in view (${JSON.stringify(popBox)})`);
+  await shot('03e-todo-calendar');
+  await page.click('.bcv-datepop__q:nth-child(2)'); // Tomorrow
+  await page.waitForFunction(() => !document.querySelector('.bcv-datepop'), null, { timeout: 3000 });
+  check(/^Tomorrow · /.test((await texts('.bcv-ph-composer__date'))[0]), `Tomorrow closes it and the field follows: ${(await texts('.bcv-ph-composer__date'))[0]}`);
   await page.click('.bcv-ph-composer__pri[data-pri="1"]');
   await page.click('.bcv-ph-composer__add');
   check(await eventually(async () => (await texts('.bcv-ph-trow .bcv-ph-row__title')).includes('Return the library books') && !(await page.$('.bcv-ph-composer'))), 'Add task creates a planner note that lands in the list');

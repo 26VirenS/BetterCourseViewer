@@ -673,15 +673,10 @@
     }
 
     // ---- adding a task of your own (a Canvas planner note) ----
-    const draft = { open: false, title: '', when: 'today', date: '', pri: 2, busy: false };
-    const draftDate = () => {
-      if (draft.when === 'today') return endOfDay(now);
-      if (draft.when === 'week') { const end = endOfDay(U.addDays(U.startOfWeek(now), 6)); return end < now ? endOfDay(now) : end; }
-      if (!draft.date) return null;
-      const [y, mo, d] = draft.date.split('-').map(Number);
-      return endOfDay(new Date(y, mo - 1, d));
-    };
-    const canAdd = () => !!draft.title.trim() && (draft.when !== 'pick' || !!draft.date) && !draft.busy;
+    // the date starts at today and is picked on a calendar; the task is due by the end of that day
+    const draft = { open: false, title: '', date: null, pri: 2, busy: false };
+    const draftDate = () => endOfDay(draft.date || now);
+    const canAdd = () => !!draft.title.trim() && !draft.busy;
     function composer() {
       if (!draft.open) {
         return h('button', { type: 'button', class: 'bcv-ph-todo__add', onclick: () => { draft.open = true; draw(); setTimeout(() => body.querySelector('.bcv-ph-composer__title')?.focus(), 30); } }, [
@@ -692,9 +687,7 @@
       let addBtn;
       const syncAdd = () => { addBtn.disabled = !canAdd(); addBtn.textContent = draft.busy ? 'Adding…' : 'Add task'; };
       const title = h('input', { class: 'bcv-ph-composer__title', type: 'text', placeholder: 'What do you need to do?', 'aria-label': 'Task', value: draft.title, oninput: () => { draft.title = title.value; syncAdd(); }, onkeydown: (e) => { if (e.key === 'Enter' && canAdd()) addTask(); } });
-      const dateInput = h('input', { class: 'bcv-input bcv-ph-composer__date', type: 'date', 'aria-label': 'Due date', value: draft.date, onchange: () => { draft.date = dateInput.value; syncAdd(); } });
-      dateInput.hidden = draft.when !== 'pick';
-      const whens = U.seg([['today', 'Today'], ['week', 'This week'], ['pick', 'Pick a date']], draft.when, (v) => { draft.when = v; dateInput.hidden = v !== 'pick'; syncAdd(); });
+      const dateField = U.dateField(draft.date || now, (d) => { draft.date = d; }, { cls: 'bcv-ph-composer__date' });
       const pris = U.el('bcv-ph-composer__pris', [3, 2, 1, 0].map((lv) => {
         const m = priMeta(lv, dark);
         const on = draft.pri === lv;
@@ -702,8 +695,8 @@
       }));
       addBtn = h('button', { type: 'button', class: 'bcv-ph-composer__add', text: 'Add task', onclick: addTask });
       const card = U.el('bcv-ph-composer', [
-        title, whens, dateInput, pris,
-        U.el('bcv-ph-composer__btns', [h('button', { type: 'button', class: 'bcv-ph-composer__cancel', text: 'Cancel', onclick: () => { Object.assign(draft, { open: false, title: '', date: '', when: 'today', pri: 2 }); draw(); } }), addBtn]),
+        title, dateField, pris,
+        U.el('bcv-ph-composer__btns', [h('button', { type: 'button', class: 'bcv-ph-composer__cancel', text: 'Cancel', onclick: () => { Object.assign(draft, { open: false, title: '', date: null, pri: 2 }); draw(); } }), addBtn]),
       ]);
       syncAdd();
       return card;
@@ -711,13 +704,12 @@
     async function addTask() {
       if (!canAdd()) return;
       const when = draftDate();
-      if (!when) return; // Pick a date without a date: nothing is invented
       draft.busy = true;
       draw();
       try {
         const note = await store.createNote({ title: draft.title.trim(), todoDate: when.toISOString() });
         if (note && note.id && draft.pri) { pri[`planner_note:${note.id}`] = draft.pri; await store.setPref('todoPriority', pri); }
-        Object.assign(draft, { open: false, title: '', date: '', when: 'today', pri: 2, busy: false });
+        Object.assign(draft, { open: false, title: '', date: null, pri: 2, busy: false });
         await reload();
         U.toast('Added to your Canvas planner.');
       } catch (e) {

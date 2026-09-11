@@ -183,6 +183,7 @@
   function closeMenus() {
     document.querySelectorAll('.bcv-menu').forEach((m) => m.remove());
   }
+
   /** Canvas's own course colour palette (the picker on its dashboard cards), plus a custom colour. */
   const COURSE_COLORS = [['#BD3C14', 'Brick'], ['#FF2717', 'Red'], ['#E71F63', 'Magenta'], ['#8F3E97', 'Purple'], ['#65499D', 'Deep purple'], ['#4554A4', 'Indigo'], ['#1770AB', 'Blue'], ['#0B9BE3', 'Light blue'], ['#06A3B7', 'Cyan'], ['#009688', 'Teal'], ['#009606', 'Green'], ['#8D9900', 'Olive'], ['#D97900', 'Pumpkin'], ['#FD5D10', 'Orange'], ['#F06291', 'Pink']];
   function colorMenu(anchor, current, onPick) {
@@ -456,9 +457,81 @@
     return sheet;
   }
 
+  // ---- a date field and its calendar (after the date helpers it uses) ----
+  /** A day the way people say it: "Today · Fri, Sep 11", "Tomorrow · Sat, Sep 12", "Fri, Sep 18", "Fri, Jan 8, 2027". */
+  function fmtDay(v, now = new Date()) {
+    const d = parse(v);
+    if (!d) return 'No date';
+    const diff = dayDiff(d, now);
+    if (diff === 0) return `Today · ${fmtDow(d)}`;
+    if (diff === 1) return `Tomorrow · ${fmtDow(d)}`;
+    if (d.getFullYear() !== now.getFullYear()) return `${DAYS[d.getDay()]}, ${fmtDateComma(d)}`;
+    return fmtDow(d);
+  }
+  /** A calendar popover under `anchor`: a month grid (today marked, the chosen day filled), ‹ › for
+   *  the months, Today / Tomorrow / Next Monday shortcuts. Picking a day closes it and calls onPick(date). */
+  function datePop(anchor, value, onPick) {
+    closeMenus();
+    const now = new Date();
+    const sel = parse(value) ? startOfDay(parse(value)) : null;
+    let month = new Date((sel || now).getFullYear(), (sel || now).getMonth(), 1);
+    const m = el('bcv-menu bcv-datepop', null, { role: 'dialog', 'aria-label': 'Pick a date' });
+    m.addEventListener('click', (e) => e.stopPropagation()); // moving months keeps it open
+    const pick = (d) => { closeMenus(); onPick(startOfDay(d)); };
+    const nextMonday = addDays(now, ((8 - now.getDay()) % 7) || 7);
+    function draw() {
+      const start = addDays(month, -month.getDay());
+      const cells = [];
+      for (let i = 0; i < 42; i++) {
+        const d = addDays(start, i);
+        const off = d.getMonth() !== month.getMonth();
+        const today = sameDay(d, now);
+        const on = !!sel && sameDay(d, sel);
+        cells.push(h('button', { type: 'button', class: `bcv-datepop__day ${off ? 'is-off' : ''} ${today ? 'is-today' : ''} ${on ? 'is-on' : ''}`, text: String(d.getDate()), 'aria-label': `${DAYS_LONG[d.getDay()]}, ${fmtLong(d)}`, 'aria-pressed': on ? 'true' : 'false', onclick: () => pick(d) }));
+      }
+      m.replaceChildren(
+        el('bcv-datepop__head', [
+          h('button', { type: 'button', class: 'bcv-datepop__nav', 'aria-label': 'Previous month', onclick: () => { month = new Date(month.getFullYear(), month.getMonth() - 1, 1); draw(); } }, svg('M15 5l-7 7 7 7', { size: 14, width: 2.2 })),
+          text('bcv-datepop__month', `${MONTHS_LONG[month.getMonth()]}${month.getFullYear() !== now.getFullYear() ? ` ${month.getFullYear()}` : ''}`, 'span'),
+          h('button', { type: 'button', class: 'bcv-datepop__nav', 'aria-label': 'Next month', onclick: () => { month = new Date(month.getFullYear(), month.getMonth() + 1, 1); draw(); } }, svg('M9 6l6 6-6 6', { size: 14, width: 2.2 })),
+        ]),
+        el('bcv-datepop__dows', DAYS.map((x) => text('bcv-datepop__dow', x[0], 'span'))),
+        el('bcv-datepop__grid', cells),
+        el('bcv-datepop__quick', [
+          h('button', { type: 'button', class: 'bcv-datepop__q', text: 'Today', onclick: () => pick(now) }),
+          h('button', { type: 'button', class: 'bcv-datepop__q', text: 'Tomorrow', onclick: () => pick(addDays(now, 1)) }),
+          h('button', { type: 'button', class: 'bcv-datepop__q', text: 'Next Monday', onclick: () => pick(nextMonday) }),
+        ]),
+      );
+    }
+    draw();
+    const r = anchor.getBoundingClientRect();
+    Object.assign(m.style, { position: 'fixed', top: `${r.bottom + 6}px`, left: `${Math.max(8, Math.min(r.left, window.innerWidth - 304))}px` });
+    document.body.append(m);
+    const mr = m.getBoundingClientRect(); // above the field when there is no room below
+    if (mr.bottom > window.innerHeight - 8 && r.top - mr.height - 6 > 8) m.style.top = `${r.top - mr.height - 6}px`;
+    setTimeout(() => document.addEventListener('click', closeMenus, { once: true }), 0);
+    m.querySelector('.bcv-datepop__day.is-on, .bcv-datepop__day.is-today')?.focus();
+    return m;
+  }
+  /** A date field: a calendar glyph, the day as people say it, a chevron; a tap opens the calendar. */
+  function dateField(value, onChange, { cls = '', label = 'Due date' } = {}) {
+    let cur = parse(value) ? startOfDay(parse(value)) : null;
+    const lbl = text('bcv-date__label bcv-ellip', fmtDay(cur), 'span');
+    const b = h('button', { type: 'button', class: `bcv-date ${cls}`, 'aria-label': label, 'aria-haspopup': 'dialog' }, [
+      svg(IC.cal, { size: 14, stroke: 'var(--bcv-blue)', width: 1.9 }),
+      lbl,
+      svg('M6 9l6 6 6-6', { size: 12, stroke: 'var(--bcv-ink3)', width: 2.2, cls: 'bcv-date__chev' }),
+    ]);
+    b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      datePop(b, cur, (d) => { cur = d; lbl.textContent = fmtDay(d); onChange(d); });
+    });
+    return b;
+  }
   BCV.ui = {
     svg, star, chev, el, text, tile, dot, card, row, label, h2, groupHead, badge, seg, search, switchEl, btn, iconbtn, chip, pill,
-    empty, emptyCard, loading, errorBox, hint, avatar, toast, menu, closeMenus, colorMenu, COURSE_COLORS,
+    empty, emptyCard, loading, errorBox, hint, avatar, toast, menu, closeMenus, colorMenu, COURSE_COLORS, fmtDay, datePop, dateField,
     DAY, startOfDay, addDays, sameDay, dayDiff, startOfWeek, parse, MONTHS, MONTHS_LONG, DAYS, DAYS_LONG,
     fmtTime, fmtTimeLower, fmtShort, fmtLong, fmtDateComma, fmtAt, fmtAtUpper, fmtBy, dayTitle, fmtDow, fmtRecent, whenShort, plural,
     hexToRgb, rgba, palette, FALLBACK_COLORS, initials, enter, roll, morphFrom, reducedMotion,

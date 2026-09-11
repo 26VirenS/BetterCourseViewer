@@ -300,12 +300,23 @@ try {
   check(!!(await page.$('.bcv-todo__add')) && !(await page.$('.bcv-todo__del')), 'an "Add your own task" row sits under the list; Canvas rows have no delete button');
   await page.click('.bcv-todo__add');
   await page.waitForSelector('.bcv-todo__composer', { timeout: 5000 });
-  check(!!(await page.$('.bcv-todo__addbtn[disabled]')) && (await texts('.bcv-todo__ctl .bcv-seg__btn')).join(' | ') === 'Today | This week | Pick a date' && !(await visible('.bcv-todo__date')), 'the composer: Add is blocked while the title is empty; Today / This week / Pick a date; no date field yet');
+  check(!!(await page.$('.bcv-todo__addbtn[disabled]')) && /^Today · (Sun|Mon|Tue|Wed|Thu|Fri|Sat), \w{3} \d+$/.test((await texts('.bcv-todo__date'))[0]) && !(await page.$('.bcv-todo__ctl .bcv-seg')) && !(await page.$('input[type="date"]')), `the composer: Add is blocked while the title is empty; the date field starts at today (${(await texts('.bcv-todo__date'))[0]}), no segment, no browser date input`);
   await page.fill('.bcv-todo__title', 'Email Prof. Lei about office hours');
-  await page.click('.bcv-todo__ctl .bcv-seg__btn:nth-child(3)');
-  check((await visible('.bcv-todo__date')) && !!(await page.$('.bcv-todo__addbtn[disabled]')), 'Pick a date reveals a real date field and blocks Add until one is chosen');
-  await page.click('.bcv-todo__ctl .bcv-seg__btn:nth-child(1)');
-  check(!(await page.$('.bcv-todo__addbtn[disabled]')) && (await texts('.bcv-pri--draft'))[0] === 'Medium', 'back on Today, Add unlocks; the draft priority starts at Medium');
+  await page.click('.bcv-todo__date');
+  await page.waitForSelector('.bcv-datepop', { timeout: 3000 });
+  const popMonth = (await texts('.bcv-datepop__month'))[0];
+  check((await page.$$('.bcv-datepop__day')).length === 42 && (await page.$eval('.bcv-datepop', (e) => e.scrollHeight <= e.clientHeight + 1)) && (await page.$$('.bcv-datepop__day.is-today')).length === 1 && (await page.$$('.bcv-datepop__day.is-on.is-today')).length === 1 && (await texts('.bcv-datepop__q')).join(',') === 'Today,Tomorrow,Next Monday' && new Date().toLocaleString('en-US', { month: 'long' }) === popMonth, `the field opens the app's own calendar on this month (${popMonth}): six weeks, today marked and chosen, Today / Tomorrow / Next Monday shortcuts`);
+  await page.click('.bcv-datepop__nav[aria-label="Next month"]');
+  check(!!(await page.$('.bcv-datepop')) && (await texts('.bcv-datepop__month'))[0] !== popMonth && (await page.$$('.bcv-datepop__day.is-today')).length === 0, `› moves a month on without closing the calendar (${(await texts('.bcv-datepop__month'))[0]})`);
+  await page.click('.bcv-datepop__q:nth-child(2)'); // Tomorrow
+  await page.waitForFunction(() => !document.querySelector('.bcv-datepop'), null, { timeout: 3000 });
+  check(/^Tomorrow · /.test((await texts('.bcv-todo__date'))[0]), `picking a day closes the calendar and the field says it the way people do: ${(await texts('.bcv-todo__date'))[0]}`);
+  await page.click('.bcv-todo__date');
+  await page.waitForSelector('.bcv-datepop', { timeout: 3000 });
+  check((await page.$$('.bcv-datepop__day.is-on')).length === 1 && (await page.$eval('.bcv-datepop__day.is-on', (e) => !e.classList.contains('is-today'))), 'reopened, the calendar shows the chosen day filled');
+  await page.click('.bcv-datepop__q:nth-child(1)'); // back to Today
+  await page.waitForFunction(() => !document.querySelector('.bcv-datepop'), null, { timeout: 3000 });
+  check(!(await page.$('.bcv-todo__addbtn[disabled]')) && (await texts('.bcv-pri--draft'))[0] === 'Medium', 'with a title Add unlocks; the draft priority starts at Medium');
   await page.click('.bcv-pri--draft');
   await page.waitForSelector('.bcv-menu', { timeout: 3000 });
   check((await texts('.bcv-menu__item')).join(',') === 'High,Medium,Low,None' && (await page.$$('.bcv-menu .bcv-dot')).length === 4, `the priority menu lists the four levels with a dot each: ${(await texts('.bcv-menu__item')).join(',')}`);
