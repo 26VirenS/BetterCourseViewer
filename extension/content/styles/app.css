@@ -98,9 +98,10 @@ html.bcv-on #bcv-app { display: flex; }
 .bcv-brand { display: flex; align-items: center; gap: 10px; padding: 6px 8px 2px; }
 .bcv-brand__tile { width: 30px; height: 30px; border-radius: 9px; background: linear-gradient(160deg, #1b3f76, #12305c); display: flex; align-items: center; justify-content: center; font: 700 14px/1 var(--bcv-font); color: #f0b429; flex: none; overflow: hidden; }
 /* the school's logo, whole: never cropped, no rounded corners, no name or term beside it */
-.bcv-brand--logo { padding: 4px 8px 2px; }
-.bcv-brand__logo { display: block; max-width: 100%; }
-.bcv-brand__logo img { display: block; height: 46px; width: auto; max-width: 100%; object-fit: contain; border-radius: 0; }
+.bcv-brand--logo { padding: 4px 8px 2px; gap: 10px; }
+.bcv-brand__logo { flex: none; width: 40px; height: 40px; border-radius: 11px; background: var(--bcv-card); box-shadow: var(--bcv-shadow); padding: 5px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; }
+.bcv-brand__logo img { display: block; width: 100%; height: 100%; object-fit: contain; border-radius: 0; }
+.bcv-brand__text { min-width: 0; }
 .bcv-brand__name { font: 600 13.5px/1.2 var(--bcv-font); letter-spacing: -.01em; }
 .bcv-brand__sub { font: 400 11px/1.2 var(--bcv-font); color: var(--bcv-ink3); }
 .bcv-nav { display: flex; flex-direction: column; gap: 2px; }

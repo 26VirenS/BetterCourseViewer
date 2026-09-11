@@ -238,7 +238,7 @@
     const logo = schoolLogo();
     if (!logo) return fallback();
     const img = h('img', { src: logo.url, alt: name });
-    const row = U.el('bcv-brand bcv-brand--logo', h('div', { class: 'bcv-brand__logo' }, img));
+    const row = U.el('bcv-brand bcv-brand--logo', [h('div', { class: 'bcv-brand__logo' }, img), h('div', { class: 'bcv-brand__text' }, U.text('bcv-brand__name bcv-ellip', name))]);
     img.addEventListener('error', () => { // a dead URL falls back to the initial rather than a broken image
       state.logo = null;
       row.replaceWith(fallback());
@@ -478,21 +478,50 @@
     }
   }
 
-  /** Once this screen has drawn and the page is idle, warm what the other root screens read
-   *  (courses, the term, favourites, the planner, announcements, calendars), so the next tab
-   *  lands from the cache. Each call is one that screen would make itself. */
+  /** Once this screen has drawn and the page is idle, warm what every other root screen reads
+   *  (Dashboard, Courses, Groups, To Do, Calendar, Notifications, Inbox, Grades and the course
+   *  cards), each call being the one that screen makes itself, so the next page lands from the
+   *  shared cache instead of the network. Then keep it warm: again every two minutes while the tab
+   *  is visible (the caches live three to ten), and when the tab comes back into view. Two calls
+   *  at a time, so the page's own requests keep the network. */
+  let preloading = false;
+  async function preload() {
+    if (preloading || document.visibilityState === 'hidden') return;
+    preloading = true;
+    const jobs = [
+      () => store.courses(), () => store.favorites(), () => store.currentTerm(),
+      () => store.planner(), () => store.todo(), () => store.announcementsFeed(),
+      () => store.activity(), () => store.activitySummary(), () => store.unreadCount(),
+      () => store.groups(), () => store.conversations({ scope: 'inbox' }), () => store.notifications(),
+      () => BCV.screens.calendar?.prefetch?.(),
+      async () => { for (const c of (await store.favorites()).slice(0, 10)) await store.progress(c.id).catch(() => {}); },
+      async () => { for (const c of (await store.favorites()).slice(0, 10)) await store.assignmentGroups(c.id).catch(() => {}); },
+    ];
+    let i = 0;
+    const worker = async () => {
+      while (i < jobs.length) {
+        const job = jobs[i++];
+        try {
+          await job();
+        } catch {
+          /* the screen that needs it reports its own error */
+        }
+      }
+    };
+    try {
+      await Promise.all([worker(), worker()]);
+    } finally {
+      preloading = false;
+    }
+  }
+  let preloadTimer = null;
   function prefetch() {
     // after the screen's own requests have had the network to themselves, then when idle
     const idle = window.requestIdleCallback ? (fn) => window.requestIdleCallback(fn, { timeout: 4000 }) : (fn) => setTimeout(fn, 500);
-    setTimeout(() => idle(() => {
-      for (const fn of [store.courses, store.currentTerm, store.favorites, store.planner, store.announcementsFeed, store.calendarContexts]) {
-        try {
-          fn().catch(() => {});
-        } catch {
-          /* ignore */
-        }
-      }
-    }), 2500);
+    setTimeout(() => idle(() => preload()), 2500);
+    clearInterval(preloadTimer);
+    preloadTimer = setInterval(() => preload(), 2 * 60e3);
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') preload(); });
   }
 
   /** True once, on the first signed-in Canvas page in the app (browsers open the setup page instead). */
@@ -552,7 +581,7 @@
   }
 
   BCV.app = {
-    state, go, render, renderSide, parseRoute, refreshCounts, loadShellData, punchIn, punchOut, siteName, toggleTheme,
+    state, go, render, renderSide, parseRoute, refreshCounts, loadShellData, punchIn, punchOut, siteName, toggleTheme, preload,
     isDark: () => state.dark,
     smartContext: () => state.smartTopic || state.smartCtx,
     /** Scope the smart panel to one item (a quiz question) until it is closed; null restores the page's suggestions. */

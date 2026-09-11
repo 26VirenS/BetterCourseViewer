@@ -111,7 +111,8 @@ try {
     const cs = img ? getComputedStyle(img) : {};
     return { src: img?.getAttribute('src')?.slice(0, 18), radius: cs.borderRadius, fit: cs.objectFit, height: img?.getBoundingClientRect().height, text: document.querySelector('.bcv-brand')?.textContent.trim(), name: !!document.querySelector('.bcv-brand__name, .bcv-brand__sub') };
   });
-  check(brand.src === 'data:image/svg+xml' && brand.radius === '0px' && brand.fit === 'contain' && Math.round(brand.height) === 46 && brand.text === '' && !brand.name, `brand row is the school's own mark alone, whole and unrounded, with no site name or term: ${JSON.stringify(brand)}`);
+  const tile = await page.$eval('.bcv-brand__logo', (el) => { const r = el.getBoundingClientRect(); return { w: Math.round(r.width), h: Math.round(r.height), radius: getComputedStyle(el).borderRadius }; });
+  check(brand.src === 'data:image/svg+xml' && brand.radius === '0px' && brand.fit === 'contain' && brand.height <= 30 && tile.w === 40 && tile.h === 40 && tile.radius === '11px' && brand.name && brand.text.length > 0, `brand row: the school's mark whole inside a 40px rounded tile, the site name beside it: ${JSON.stringify({ ...brand, tile })}`);
   await page.waitForFunction(() => document.querySelectorAll('.bcv-fav__dot').length >= 5, null, { timeout: 10000 }).catch(() => {});
   const favDots = await page.$$eval('.bcv-fav__dot', (els) => els.map((e) => getComputedStyle(e).backgroundColor));
   check(favDots.length === 5 && new Set(favDots).size === 5 && favDots[0] === 'rgb(52, 199, 89)', `favourite dots carry the user's own course colours from Canvas: ${favDots.join(' | ')}`);
@@ -1132,6 +1133,27 @@ try {
   check(page.url() === `${BASE}/grades` && (await page.$('.bcv-tour')) === null && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('setup:done'))['setup:done'])) === true && (await apiGet('/api/v1/courses?per_page=100')).filter((c) => c.is_favorite).length === favBefore, 'Skip closes the card where it was opened, marks the setup done, writes nothing and starts no tour');
   await page.waitForSelector('.bcv-gpa__hero', { timeout: 15000 });
   check((await texts('.bcv-gpa__hero-sub'))[0]?.includes('This term so far') && (await texts('.bcv-gpa__goal-s'))[0] === 'Goal 3.60 · set it in settings', 'the Grades page tracks without a record from the setup, with the goal it set');
+
+  // ---- preload: the other root screens land from the cache -----------------------------------------------
+  console.log('preload');
+  await page.goto(`${BASE}/`);
+  await page.waitForSelector('.bcv-stat', { timeout: 15000 });
+  // the preload starts 2.5s after the screen draws, once the page is idle, and fetches two at a time
+  const cacheKeys = () => sw.evaluate(async () => Object.keys(await self.BCV.api.storage.local.get(null)).filter((k) => k.startsWith('cache:')));
+  const wanted = [/:activity$/, /:annfeed$/, /:planner:/, /:cal:/, /:agroups:/, /:assignments:/, /:groups$/, /:conv:inbox/, /:notif|:activity:summary/];
+  const warmed = await eventually(async () => { const ks = await cacheKeys(); return wanted.every((re) => ks.some((k) => re.test(k))); }, 25000);
+  const warmKeys = await cacheKeys();
+  check(warmed, `after the dashboard settles, the caches for Recent activity, announcements, the planner, the calendar month, grade groups, assignments, groups and the inbox are warm (${warmKeys.length} entries; missing: ${wanted.filter((re) => !warmKeys.some((k) => re.test(k))).map(String).join(' ')})`);
+  const t0 = Date.now();
+  await page.goto(`${BASE}/grades`);
+  await page.waitForSelector('.bcv-gpa__value', { timeout: 15000 });
+  const gradesMs = Date.now() - t0;
+  const t1 = Date.now();
+  await page.goto(`${BASE}/calendar`);
+  await page.waitForSelector('.bcv-cal__day, .bcv-cal__cell, .bcv-cal', { timeout: 15000 });
+  const calMs = Date.now() - t1;
+  console.log(`   grades from cache: ${gradesMs}ms · calendar from cache: ${calMs}ms`);
+  check(gradesMs < 6000 && calMs < 6000, `warm pages draw quickly: grades ${gradesMs}ms, calendar ${calMs}ms`);
 
   // ---- notifications ------------------------------------------------------------------------------------
   console.log('notifications');

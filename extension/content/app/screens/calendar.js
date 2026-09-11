@@ -355,5 +355,16 @@
     return screen;
   }
 
-  BCV.screens.calendar = { render };
+  /** Warm what the calendar shows first: the saved view's range for today, over the selected calendars. */
+  async function prefetch() {
+    const view = await store.pref('calView', 'month');
+    const contexts = await store.calendarContexts();
+    const selected = await store.selectedContexts(contexts);
+    const today = new Date();
+    let s, e;
+    if (view === 'week') { s = sundayStart(today); e = U.addDays(s, 7); } else { s = sundayStart(new Date(today.getFullYear(), today.getMonth(), 1)); e = U.addDays(s, 42); }
+    await store.calendarEvents(s, e, selected);
+    await store.planner();
+  }
+  BCV.screens.calendar = { render, prefetch };
 })();
