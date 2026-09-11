@@ -140,6 +140,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
 .how__s { display: block; margin-top: 3px; font: 400 12.5px/1.45 var(--font); color: var(--ink3); text-wrap: pretty; }
 .how__s b { font-weight: 600; color: var(--ink2); }
 .how__icon { display: inline-flex; vertical-align: -3px; width: 16px; height: 16px; border-radius: 4px; background: linear-gradient(158deg, #0a84ff, #0a4fd6); margin: 0 2px; }
+.how__puzzle { display: inline-flex; align-items: center; justify-content: center; vertical-align: -4px; width: 20px; height: 20px; border-radius: 6px; background: var(--fill); color: var(--ink2); margin: 0 2px; }
+.how__puzzle svg { display: block; }
 
 .ghosts { margin-top: 22px; display: flex; flex-direction: column; gap: 8px; }
 .ghost { height: 58px; border-radius: 16px; background: var(--fill); animation: pulse 1.3s ease-in-out infinite; }

@@ -1117,7 +1117,7 @@ try {
   await setup.goto(`chrome-extension://${extId}/setup/setup.html`);
   await setup.waitForSelector('.welcome .h1', { timeout: 10000 });
   const how = await sTexts('.how__t');
-  check((await sTexts('.welcome .h1'))[0] === 'Simpl Courses is installed' && (await setup.$$('.blob')).length === 4 && how.join(' | ') === 'Open your Canvas | Press the Simpl Courses button | Press Set up' && (await sTexts('#next'))[0] === 'Got it' && (await setup.$('#host')) === null && (await setup.$('.progress')) === null, `the page after install says how to start, and asks nothing: ${how.join(' | ')}`);
+  check((await sTexts('.welcome .h1'))[0] === 'Simpl Courses is installed' && (await setup.$$('.blob')).length === 4 && how.join(' | ') === 'Open your Canvas | Press the puzzle piece, then Simpl Courses | Press Set up' && (await setup.$('.how__puzzle svg')) !== null && /puzzle piece at the right of the toolbar and choose Simpl Courses/.test((await sTexts('.how__s'))[1]) && (await sTexts('#next'))[0] === 'Got it' && (await setup.$('#host')) === null && (await setup.$('.progress')) === null, `the page after install says how to start, and asks nothing: ${how.join(' | ')}`);
   await setup.screenshot({ path: join(out, '32-setup-welcome.png') });
   await setup.close().catch(() => {});
   // Skip on the card: the done flags, no favourites written, no tour
