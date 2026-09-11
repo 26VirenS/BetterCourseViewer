@@ -271,10 +271,15 @@ if (typeof importScripts === 'function' && !self.BCV?.providers) {
   api.runtime.onInstalled.addListener(async (details) => {
     await ensureDomains({ force: true });
     if (details.reason === 'install') {
+      // the guided setup starts on the settings page (it asks for the Canvas site), then continues on the site
       try {
-        await api.runtime.openOptionsPage();
+        await api.tabs.create({ url: api.runtime.getURL('options/options.html#setup') });
       } catch {
-        /* ignore */
+        try {
+          await api.runtime.openOptionsPage();
+        } catch {
+          /* ignore */
+        }
       }
     }
   });

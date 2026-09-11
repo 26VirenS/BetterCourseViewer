@@ -69,7 +69,7 @@
   }
   /** After a screen lands: the top bar for pushed screens, the active tab. */
   function afterRender(app, r, el) {
-    const isRoot = ROOT.has(r.screen) && r.params.get('bcv') !== 'native';
+    const isRoot = (ROOT.has(r.screen) && r.params.get('bcv') !== 'native') || r.params.get('bcv') === 'setup';
     html.classList.toggle('bcv-ph-root', isRoot);
     paintTabs(app);
     if (!topbarEl) return;
@@ -148,6 +148,7 @@
         { icon: IC.people, label: 'Groups', href: '/groups' },
         { icon: dark ? IC.sun : IC.moon, label: dark ? 'Light appearance' : 'Dark appearance', onSelect: () => app.toggleTheme() },
         { icon: IC.settings, label: 'Settings', note: 'Look, appearance and the smart panel', onSelect: () => BCV.smartClient?.openOptions?.() },
+        { icon: IC.sparkle, label: 'Guided setup', note: 'Courses, grades, the smart panel, a tour', href: '/?bcv=setup' },
         { icon: IC.people, label: 'Profile', note: 'Your Canvas profile', href: '/profile' },
         native()?.signOut ? { icon: IC.external, label: 'Sign out', note: 'Clears the Canvas session on this device', danger: true, onSelect: () => native().signOut() } : null,
       ],

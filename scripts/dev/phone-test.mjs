@@ -134,7 +134,7 @@ try {
   await page.click('.bcv-ph-avatar');
   await sheet();
   const acct = await texts('.bcv-ph-srow__label');
-  check(acct.join(',') === 'Inbox,Groups,Dark appearance,Settings,Profile', `account sheet rows: ${acct.join(', ')} (no Sign out outside the app)`);
+  check(acct.join(',') === 'Inbox,Groups,Dark appearance,Settings,Guided setup,Profile', `account sheet rows: ${acct.join(', ')} (no Sign out outside the app)`);
   check((await texts('.bcv-ph-srow__note'))[0] === 'No unread messages' || /unread message/.test((await texts('.bcv-ph-srow__note'))[0]), `Inbox row carries the unread count: ${(await texts('.bcv-ph-srow__note'))[0]}`);
   await shot('01c-account-sheet');
   await page.evaluate(() => { window.__bcvMarker = 1; });
@@ -304,6 +304,35 @@ try {
   check(smartBox.w >= 380 && smartBox.l <= 12, `the smart panel fills the width as a sheet (${JSON.stringify(smartBox)})`);
   await shot('10-smart');
   await page.keyboard.press('Escape');
+
+  // ---- guided setup + the tour on a phone -------------------------------------------------------
+  console.log('guided setup');
+  await page.goto(`${BASE}/?bcv=setup`);
+  await page.waitForSelector('.bcv-su__card', { timeout: 15000 });
+  check((await texts('.bcv-su__title'))[0] === 'Welcome to Simpl Courses' && !(await visible('#bcv-tabbar')) && !(await visible('#bcv-topbar')) && await noOverflow(), 'the setup fills the phone screen without the bars');
+  await shot('11-setup');
+  await page.click('.bcv-su__btn.is-primary');
+  await page.waitForFunction(() => document.querySelector('.bcv-su__stepno')?.textContent.startsWith('Step 2 '), null, { timeout: 10000 });
+  await page.click('.bcv-su__btn.is-primary');
+  await page.waitForSelector('.bcv-su__course .bcv-switch', { timeout: 15000 });
+  check((await page.$$('.bcv-su__course .bcv-switch.is-on')).length === 5 && await noOverflow(), 'the courses step lists the favourites with switches');
+  await shot('11b-setup-courses');
+  await page.goto(`${BASE}/?bcv=setup&step=5`);
+  await page.waitForSelector('.bcv-su__btn.is-primary', { timeout: 15000 });
+  await page.click('.bcv-su__btn.is-primary');
+  await page.waitForSelector('.bcv-tour__card', { timeout: 15000 });
+  const overStats = await eventually(() => page.evaluate(() => { const r = document.querySelector('.bcv-tour__ring').getBoundingClientRect(); const t = document.querySelector('.bcv-ph-stats').getBoundingClientRect(); return r.width > 0 && r.left <= t.left + 1 && r.top <= t.top + 1 && r.right >= t.right - 1 && r.bottom >= t.bottom - 1; }).catch(() => false), 3000);
+  check((await texts('.bcv-tour__title'))[0] === 'Your day at a glance' && overStats, 'the tour spotlights the phone counters');
+  await page.click('.bcv-tour__btn.is-primary');
+  await page.waitForFunction(() => document.querySelector('.bcv-tour__title')?.textContent.trim() === 'Everything in one place', null, { timeout: 10000 });
+  check(/Inbox, Groups/.test((await texts('.bcv-tour__text'))[0]), 'the phone stop explains the tab bar and the avatar');
+  await shot('12-tour');
+  await page.click('.bcv-tour__x');
+  await page.waitForFunction(() => !document.querySelector('.bcv-tour'), null, { timeout: 5000 });
+  await page.click('.bcv-ph-avatar');
+  await sheet();
+  check((await texts('.bcv-ph-srow__label')).includes('Guided setup'), 'the account sheet offers the guided setup');
+  await closeSheet();
 
   check(errors.length === 0, `no page errors${errors.length ? `: ${errors.slice(0, 3).join(' | ')}` : ''}`);
 } catch (e) {

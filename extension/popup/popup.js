@@ -41,6 +41,19 @@
   };
   $('open-settings').addEventListener('click', openOptions);
   $('foot-settings').addEventListener('click', openOptions);
+  // the guided setup runs on the Canvas page itself; from elsewhere the settings page asks for the site first
+  let setupOrigin = null;
+  let setupTab = null;
+  $('foot-setup').addEventListener('click', async (e) => {
+    e.preventDefault();
+    try {
+      if (setupOrigin && setupTab?.id !== undefined) await api.tabs.update(setupTab.id, { url: `${setupOrigin}/?bcv=setup` });
+      else await api.tabs.create({ url: api.runtime.getURL('options/options.html#setup') });
+    } catch {
+      /* ignore */
+    }
+    window.close();
+  });
 
   // smart status
   send({ type: 'providerStatus' }).then((s) => {
@@ -74,6 +87,8 @@
   }
   if (granted) {
     status.textContent = `On for ${url.hostname}`;
+    setupOrigin = origin; // Guided setup opens on this very page
+    setupTab = tab;
     // Self-heal: a saved custom site re-registers its scripts from the
     // current build every time the popup opens (cheap, idempotent).
     if (!builtIn) {

@@ -252,16 +252,22 @@
     if (!side) return;
     const r = state.route || parseRoute();
     const name = siteName();
-    const focus = inQuiz() && !state.quizOpen; // our own quiz flow hides the sidebar entirely
+    const focus = (inQuiz() && !state.quizOpen) || state.setupOpen; // our own quiz flow and the guided setup hide the sidebar entirely
     root?.classList.toggle('bcv-focus', focus);
     if (focus) {
       side.replaceChildren(
         brandRow(name),
-        U.el('bcv-focus__card', [
-          U.text('bcv-focus__title', 'Quiz in progress'),
-          U.text('bcv-focus__sub', 'Navigation is hidden so nothing takes you out of the quiz by accident. Submit the quiz to return, or leave on purpose below.'),
-          U.btn('Leave quiz…', { kind: 'xs', onClick: () => { if (confirmLeave()) location.assign('/'); } }),
-        ]),
+        state.setupOpen
+          ? U.el('bcv-focus__card', [
+            U.text('bcv-focus__title', 'Guided setup'),
+            U.text('bcv-focus__sub', 'A few short steps: your site, your courses, your grades, the smart panel and a tour. Everything can be changed later in Settings.'),
+            U.btn('Skip setup', { kind: 'xs', onClick: async () => { await store.setPref('setupDone', true); go('/'); } }),
+          ])
+          : U.el('bcv-focus__card', [
+            U.text('bcv-focus__title', 'Quiz in progress'),
+            U.text('bcv-focus__sub', 'Navigation is hidden so nothing takes you out of the quiz by accident. Submit the quiz to return, or leave on purpose below.'),
+            U.btn('Leave quiz…', { kind: 'xs', onClick: () => { if (confirmLeave()) location.assign('/'); } }),
+          ]),
       );
       return;
     }
@@ -330,7 +336,9 @@
     progress(true);
     state.quizOpen = false;
     state.submitOpen = false;
+    state.setupOpen = r.params.get('bcv') === 'setup';
     html.classList.remove('bcv-quiz', 'bcv-quiz-fb'); // the quiz screen puts them back while an attempt or its feedback is on screen
+    html.classList.toggle('bcv-setup', state.setupOpen);
     punchOut(); // a native screen punches back in while it builds
     renderSide();
     const ctx = { app: BCV.app, route: r, alive, dark: state.dark, setSmart: (c) => setSmartContext(c, id) };
@@ -344,7 +352,8 @@
     }, 150);
     let el;
     try {
-      if (r.params.get('bcv') === 'native') el = await screens.native.render(ctx);
+      if (state.setupOpen && screens.setup) el = await screens.setup.render(ctx);
+      else if (r.params.get('bcv') === 'native') el = await screens.native.render(ctx);
       else if (r.screen === 'course') el = await screens.course.render(ctx);
       else if (r.screen === 'group') el = await screens.group.render(ctx);
       else if (phone() && BCV.phone.screens[r.screen]) el = await BCV.phone.screens[r.screen](ctx); // the phone version of a root screen
@@ -361,9 +370,11 @@
     document.title = titleFor(r);
     if (phone()) BCV.phone.afterRender(BCV.app, r, el);
     BCV.smart?.refresh?.();
+    BCV.tour?.resume?.(BCV.app, r);
   }
 
   function titleFor(r) {
+    if (state.setupOpen) return `Guided setup · ${siteName()}`;
     const base = { dashboard: 'Dashboard', courses: 'Courses', groups: 'Groups', todo: 'To Do', calendar: 'Calendar', inbox: 'Inbox', gpa: 'Grades' }[r.screen];
     return base ? `${base} · ${siteName()}` : document.title;
   }

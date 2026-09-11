@@ -69,8 +69,9 @@ enum ScriptBundle {
                 scripts.append(WKUserScript(source: "(function(){var s=document.getElementById('bcv-css');if(s&&document.body)document.body.appendChild(s);})();", injectionTime: .atDocumentEnd, forMainFrameOnly: true, in: world))
             }
         case .settings:
-            // the settings page's "Sites" section does not apply: the school is chosen natively
-            scripts.append(WKUserScript(source: "(function(){var s=document.createElement('style');s.textContent='#sites,.navlink[data-section=\"sites\"]{display:none!important}';document.documentElement.appendChild(s);})();", injectionTime: .atDocumentEnd, forMainFrameOnly: true, in: world))
+            // the settings page's "Sites" section does not apply (the school is chosen natively), nor its
+            // guided-setup opener (the setup runs on the Canvas page; the account sheet opens it)
+            scripts.append(WKUserScript(source: "(function(){var s=document.createElement('style');s.textContent='#sites,.navlink[data-section=\"sites\"],#setup,.navlink[data-section=\"setup\"]{display:none!important}';document.documentElement.appendChild(s);})();", injectionTime: .atDocumentEnd, forMainFrameOnly: true, in: world))
         }
         return scripts
     }

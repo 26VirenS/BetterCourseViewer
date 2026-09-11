@@ -67,8 +67,13 @@ final class WebController: NSObject, ObservableObject, WKNavigationDelegate, WKU
         loadStarted = true
         switch mode {
         case .canvas(let host):
-            guard let url = URL(string: "https://\(host)/") else { return }
-            prepare(host: host) { [weak self] in self?.webView.load(URLRequest(url: url)) }
+            // the first launch lands on the guided setup (after Canvas's sign-in, which returns to it)
+            let firstLaunch = !UserDefaults.standard.bool(forKey: "setupOpened")
+            guard let url = URL(string: "https://\(host)/\(firstLaunch ? "?bcv=setup" : "")") else { return }
+            prepare(host: host) { [weak self] in
+                self?.webView.load(URLRequest(url: url))
+                UserDefaults.standard.set(true, forKey: "setupOpened")
+            }
         case .settings:
             let page = ScriptBundle.extensionDir.appendingPathComponent("options/options.html")
             webView.loadFileURL(page, allowingReadAccessTo: ScriptBundle.extensionDir)

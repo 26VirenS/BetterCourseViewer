@@ -142,16 +142,19 @@
       ul.append(row);
     }
   }
-  $('addDomain').addEventListener('click', async () => {
-    const raw = $('newDomain').value.trim();
-    const msg = $('domainMsg');
-    if (!raw) return;
+  /** Turns Simpl Courses on for a Canvas address: built in for *.instructure.com, otherwise the
+   *  browser asks for the site once and its scripts are registered. Returns the origin, or null. */
+  async function enableSite(raw, msg) {
     let origin;
     try {
       origin = new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`).origin;
     } catch {
       msg.textContent = 'That does not look like a valid address.';
-      return;
+      return null;
+    }
+    if (/\.instructure\.com$/i.test(new URL(origin).hostname)) {
+      msg.textContent = `${new URL(origin).hostname} is on already: every *.instructure.com site is built in.`;
+      return origin;
     }
     msg.textContent = 'Asking for permission…';
     let granted = false;
@@ -159,17 +162,43 @@
       granted = await api.permissions.request({ origins: [`${origin}/*`] });
     } catch (e) {
       msg.textContent = `Permission request failed: ${e?.message || e}`;
-      return;
+      return null;
     }
     if (!granted) {
       msg.textContent = 'Permission was not granted.';
-      return;
+      return null;
     }
     const r = await send({ type: 'registerDomain', origin });
-    msg.textContent = r?.ok ? `Enabled on ${origin}. Reload that tab.` : (r?.message || 'Could not enable that site.');
+    msg.textContent = r?.ok ? `Enabled on ${origin}.` : (r?.message || 'Could not enable that site.');
     settings = await S.get();
-    $('newDomain').value = '';
     renderDomains();
+    return r?.ok ? origin : null;
+  }
+  $('addDomain').addEventListener('click', async () => {
+    const raw = $('newDomain').value.trim();
+    if (!raw) return;
+    const origin = await enableSite(raw, $('domainMsg'));
+    if (origin) {
+      $('domainMsg').textContent += ' Reload that tab.';
+      $('newDomain').value = '';
+    }
+  });
+  // the guided setup: enable the site, then continue on it (the rest of the steps run on the Canvas page)
+  $('setupGo').addEventListener('click', async () => {
+    const raw = $('setupSite').value.trim();
+    const msg = $('setupMsg');
+    if (!raw) {
+      msg.textContent = 'Enter your Canvas address first.';
+      return;
+    }
+    const origin = await enableSite(raw, msg);
+    if (!origin) return;
+    msg.textContent = `Opening ${origin}…`;
+    try {
+      await api.tabs.create({ url: `${origin}/?bcv=setup` });
+    } catch {
+      msg.textContent = `Open ${origin}/?bcv=setup in a new tab to continue.`;
+    }
   });
 
   // ---- data ------------------------------------------------------------------------
