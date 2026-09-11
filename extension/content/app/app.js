@@ -365,7 +365,17 @@
     // ?bcv=setup (the popup's Set up button, the account sheet, the app's first launch): the guided
     // setup over this page, which drops the parameter and starts the tour when it is done
     if (r.params.get('bcv') === 'setup' && BCV.setup && !BCV.setup.active()) BCV.setup.open(BCV.app);
+    else if (r.params.get('bcv') === 'tour' && BCV.tour) startTourHere();
     else BCV.tour?.resume?.(BCV.app, r);
+  }
+
+  /** ?bcv=tour (Settings → Run again): the parameter is dropped, then the tour starts on this page. */
+  function startTourHere() {
+    const url = new URL(location.href);
+    url.searchParams.delete('bcv');
+    history.replaceState({ bcv: true }, '', url.pathname + url.search + url.hash);
+    state.route = parseRoute();
+    BCV.tour.start(BCV.app);
   }
 
   function titleFor(r) {
@@ -512,15 +522,18 @@
     }
     await applySkin(state.settings.appearance.skin !== false);
     BCV.extras?.prime?.(BCV.app);
+    BCV.api.storage.local.set({ 'site:last': { host: location.host, origin: location.origin, at: Date.now() } }).catch(() => {}); // Settings reads this site
     BCV.early?.onChange((st, settings) => {
       const wasDark = state.dark;
+      const wasSkin = state.settings.appearance.skin !== false;
       state.settings = settings;
       state.logo = undefined; // a logo URL changed in Settings applies on the next sidebar draw
       state.dark = st.dark;
-      if (st.skin && wasDark !== st.dark && !self.BCVBridge?.native) {
-        // In a browser the appearance is a fresh load: Canvas's own page (punched-through
-        // pages, embedded tools, the quiz frames) is drawn for one appearance only.
-        // The app's web view keeps the page and repaints in place instead.
+      if (((st.skin && wasDark !== st.dark) || wasSkin !== st.skin) && !self.BCVBridge?.native) {
+        // In a browser the appearance and the look are a fresh load: Canvas's own page
+        // (punched-through pages, embedded tools, the quiz frames) is drawn for one appearance
+        // only, and stock Canvas comes back whole rather than patched. The app's web view keeps
+        // the page and repaints in place instead.
         progress(true);
         location.reload();
         return;

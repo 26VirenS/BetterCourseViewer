@@ -23,6 +23,8 @@
     if (!groups) return b.replaceChildren(U.errorBox('Grades could not be loaded.')) || b;
     const st = whatIfState.get(c.id) || { on: false, values: {} };
     whatIfState.set(c.id, st);
+    const whatIfAllowed = (await store.pref('whatIfScores', true)) !== false; // Settings → Grades → Show what-if scores
+    if (!whatIfAllowed) st.on = false;
     let focusId = null;
 
     function draw() {
@@ -64,7 +66,7 @@
         U.text('bcv-gr__label', gm.center.label),
         h('span', { class: 'bcv-gr__total', style: { color: gm.center.color }, text: gm.center.value }),
         U.text('bcv-gr__note bcv-pretty', gm.center.note),
-        h('button', { type: 'button', class: `bcv-whatif-btn ${st.on ? 'is-on' : ''}`, text: st.on ? 'Exit what-if mode' : 'Try what-if scores', onclick: () => { st.on = !st.on; draw(); } }),
+        whatIfAllowed ? h('button', { type: 'button', class: `bcv-whatif-btn ${st.on ? 'is-on' : ''}`, text: st.on ? 'Exit what-if mode' : 'Try what-if scores', onclick: () => { st.on = !st.on; draw(); } }) : null,
       ]);
 
       // ---- by group ------------------------------------------------------------------

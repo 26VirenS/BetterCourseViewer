@@ -10,147 +10,158 @@
   <div class="page">
     <aside class="side">
       <div class="brand">
-        <img src="../icons/icon-48.png" width="30" height="30" alt="">
-        <div><div class="brand__name">Simpl Courses</div><div class="brand__ver" id="version"></div></div>
+        <span class="mark" aria-hidden="true">
+          <svg viewBox="0 0 120 120" width="25" height="25"><defs><linearGradient id="setSheet" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#fff" stop-opacity=".9"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient></defs><rect x="16" y="18" width="53" height="84" rx="14" fill="url(#setSheet)"/><path d="M28 30 H69 A30 30 0 0 1 69 90 H28" fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><path d="M35 42 H69 A18 18 0 0 1 69 78 H35" fill="none" stroke="rgba(255,255,255,.72)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><path d="M42 54 H69 A6 6 0 0 1 69 66 H42" fill="none" stroke="rgba(255,255,255,.46)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </span>
+        <span class="brand__text"><span class="brand__name">Simpl Courses</span><span class="brand__ver" id="version"></span></span>
       </div>
-      <nav class="nav">
-        <a class="navlink" data-section="setup" href="#setup">Guided setup</a>
-        <a class="navlink is-active" data-section="smart" href="#smart">Smart panel</a>
-        <a class="navlink" data-section="appearance" href="#appearance">Appearance</a>
-        <a class="navlink" data-section="sites" href="#sites">Canvas sites</a>
-        <a class="navlink" data-section="about" href="#about">Data &amp; about</a>
-      </nav>
+
+      <label class="search">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M16 16l5 5"/></svg>
+        <input type="search" id="query" placeholder="Search settings" autocomplete="off" spellcheck="false" aria-label="Search settings">
+      </label>
+
+      <nav class="nav" id="nav"></nav>
+
+      <div class="status" id="status"><span class="status__dot"></span><span class="status__text" id="statusText"></span></div>
     </aside>
 
     <main class="main">
-      <section class="section" id="setup">
-        <h1>Guided setup</h1>
-        <p class="lead">Three short steps over your Canvas page: the courses you want to see everywhere, your grades and GPA goal, and the smart panel, then a tour of what changed on the real pages.</p>
+      <div class="head">
+        <div class="head__text">
+          <h1 id="title"></h1>
+          <p class="sub" id="subtitle"></p>
+        </div>
+        <span class="saved" id="saved" hidden><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg><span id="savedText">Saved</span></span>
+      </div>
+
+      <!-- General -->
+      <section class="section" id="general" data-title="General" data-sub="Behaviour on Canvas." data-words="look switch redesign stock canvas tour setup">
         <div class="card">
-          <div class="row">
-            <button class="btn btn--primary" id="openSetup" type="button">Open the guided setup</button>
+          <div class="row row--pad">
+            <span class="tile" aria-hidden="true"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h13v16H5zM5 17h13M9 8h5"/></svg></span>
+            <span class="row__body"><span class="row__t">Simpl Courses look</span><span class="row__s">Off shows stock Canvas.</span></span>
+            <button class="switch" id="skin" type="button" role="switch" aria-checked="true" aria-label="Simpl Courses look"><span class="switch__knob"></span></button>
           </div>
-          <p class="hint">Opens the page that says how to start: go to your Canvas page, press the toolbar button, press Set up. The toolbar button runs it again any time.</p>
+        </div>
+        <div class="card card--pad">
+          <div class="row"><span class="row__t row__t--grow">Guided tour</span><button class="btn btn--primary" id="runTour" type="button">Run again</button></div>
+          <p class="note">Walks the redesigned pages.</p>
+          <div class="row row--top"><span class="row__t row__t--grow">Setup</span><button class="btn" id="openSetup" type="button">Reopen</button></div>
+          <p class="note">Redo the three steps over your Canvas page.</p>
+          <p class="note note--msg" id="generalMsg" hidden></p>
         </div>
       </section>
 
-      <section class="section is-active" id="smart">
-        <h1>Smart panel</h1>
-        <p class="lead">Add a Claude key, a ChatGPT key, or both. Requests go straight from your browser to the provider with your key; nothing passes through any other server.</p>
+      <!-- Courses & targets -->
+      <section class="section" id="courses" data-title="Courses &amp; targets" data-sub="What shows, and what you are aiming for." data-words="courses hide show favourites target grade letter">
+        <div class="listhead"><span id="shownLabel">Reading your courses…</span><button class="linkbtn" id="selectAll" type="button" hidden>Show all</button></div>
+        <div class="card card--list" id="courseList"><div class="empty" id="coursesEmpty">Reading your courses…</div></div>
+        <p class="note note--out">Hidden courses disappear everywhere. The letter is your target.</p>
+      </section>
 
+      <!-- Grades -->
+      <section class="section" id="grades" data-title="Grades" data-sub="History and goals." data-words="grades gpa goal tracking history snapshot what-if csv export">
         <div class="card">
-          <h2>Claude</h2>
-          <div class="field">
-            <label for="claudeKey">API key</label>
-            <div class="row">
-              <input type="password" id="claudeKey" class="input" placeholder="sk-ant-…" autocomplete="off" spellcheck="false">
-              <button class="btn" type="button" data-reveal="claudeKey">Show</button>
-              <button class="btn" id="testClaude" type="button">Test</button>
-            </div>
-            <div class="hint">Get one at <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>. <span class="result" id="claudeResult"></span></div>
+          <div class="row row--pad">
+            <span class="row__body"><span class="row__t">Track grades over time</span><span class="row__s">One snapshot a day, stored locally.</span></span>
+            <button class="switch" id="tracking" type="button" role="switch" aria-checked="false" aria-label="Track grades over time"><span class="switch__knob"></span></button>
           </div>
-          <div class="field">
-            <label for="claudeModel">Model</label>
-            <input type="text" id="claudeModel" class="input input--short" placeholder="claude-opus-5" spellcheck="false">
+          <div class="row row--pad row--line">
+            <span class="row__t row__t--grow row__t--med">Term GPA goal</span>
+            <div class="stepper"><button type="button" id="goalDown" aria-label="Lower the goal">−</button><span class="stepper__val" id="gpaGoal">0.00</span><button type="button" id="goalUp" aria-label="Raise the goal">+</button></div>
+          </div>
+          <div class="row row--pad row--line">
+            <span class="row__t row__t--grow row__t--med">Show what-if scores</span>
+            <button class="switch" id="whatIf" type="button" role="switch" aria-checked="true" aria-label="Show what-if scores"><span class="switch__knob"></span></button>
           </div>
         </div>
-
-        <div class="card">
-          <h2>ChatGPT</h2>
-          <div class="field">
-            <label for="openaiKey">API key</label>
-            <div class="row">
-              <input type="password" id="openaiKey" class="input" placeholder="sk-…" autocomplete="off" spellcheck="false">
-              <button class="btn" type="button" data-reveal="openaiKey">Show</button>
-              <button class="btn" id="testOpenAI" type="button">Test</button>
-            </div>
-            <div class="hint">Get one at <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener">platform.openai.com</a>. <span class="result" id="openaiResult"></span></div>
-          </div>
-          <div class="field">
-            <label for="openaiModel">Model</label>
-            <input type="text" id="openaiModel" class="input input--short" placeholder="gpt-5" spellcheck="false">
-          </div>
-        </div>
-
-        <div class="card">
-          <h2>Behaviour</h2>
-          <div class="field field--row">
-            <label for="preferred">When both keys are set, use</label>
-            <select id="preferred" class="select">
-              <option value="claude">Claude</option>
-              <option value="openai">ChatGPT</option>
-            </select>
-          </div>
-          <div class="field field--row">
-            <label for="depth">Response depth</label>
-            <select id="depth" class="select">
-              <option value="quick">Quick — fastest, cheapest</option>
-              <option value="balanced">Balanced</option>
-              <option value="thorough">Thorough — slower, more careful</option>
-            </select>
-          </div>
-          <label class="check"><input type="checkbox" id="includePageContext"> Read the page you are on (what is due, the assignment text, the discussion, your grades…)</label>
-          <label class="check"><input type="checkbox" id="persistChat"> Remember the conversation per page</label>
-          <div class="status" id="smartStatus"></div>
+        <div class="card card--pad">
+          <div class="row"><span class="row__body"><span class="row__t" id="historyLabel">No history yet</span><span class="row__s" id="historyNote"></span></span><button class="btn btn--sm" id="exportCsv" type="button">Export CSV</button></div>
         </div>
       </section>
 
-      <section class="section" id="appearance">
-        <h1>Appearance</h1>
+      <!-- Smart panel -->
+      <section class="section" id="smart" data-title="Smart panel" data-sub="Your own key, sent straight to the provider." data-words="smart panel claude chatgpt gemini key model depth read page remember conversation">
+        <div class="card card--pad keycard" id="card-claude">
+          <div class="row"><span class="keycard__name">Claude</span><span class="pill" id="claudePill">No key</span></div>
+          <div class="field">
+            <input type="password" id="claudeKey" placeholder="sk-ant-…" autocomplete="off" spellcheck="false" aria-label="Claude API key">
+            <button class="btn btn--xs" type="button" data-reveal="claudeKey">Show</button>
+            <button class="btn btn--xs btn--blue" id="testClaude" type="button">Test</button>
+          </div>
+          <div class="row row--meta"><span class="note">Get one at <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a> <span class="result" id="claudeResult"></span></span><input type="text" class="model" id="claudeModel" placeholder="claude-opus-5" spellcheck="false" aria-label="Claude model"></div>
+        </div>
+        <div class="card card--pad keycard" id="card-openai">
+          <div class="row"><span class="keycard__name">ChatGPT</span><span class="pill" id="openaiPill">No key</span></div>
+          <div class="field">
+            <input type="password" id="openaiKey" placeholder="sk-…" autocomplete="off" spellcheck="false" aria-label="ChatGPT API key">
+            <button class="btn btn--xs" type="button" data-reveal="openaiKey">Show</button>
+            <button class="btn btn--xs btn--blue" id="testOpenAI" type="button">Test</button>
+          </div>
+          <div class="row row--meta"><span class="note">Get one at <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener">platform.openai.com</a> <span class="result" id="openaiResult"></span></span><input type="text" class="model" id="openaiModel" placeholder="gpt-5" spellcheck="false" aria-label="ChatGPT model"></div>
+        </div>
+        <div class="card card--pad keycard keycard--soon" aria-disabled="true">
+          <div class="row"><span class="keycard__name">Gemini</span><span class="pill">Coming soon</span></div>
+          <p class="note">Not wired up yet.</p>
+        </div>
         <div class="card">
-          <label class="check"><input type="checkbox" id="skin"> <strong>Simpl Courses look</strong> — the redesigned Canvas. Turn it off to see stock Canvas; the toolbar popup has the same switch.</label>
-          <div class="field field--row">
-            <label for="darkMode">Appearance</label>
-            <select id="darkMode" class="select">
-              <option value="system">Match the system</option>
-              <option value="off">Light</option>
-              <option value="on">Dark</option>
-            </select>
+          <div class="row row--pad"><span class="row__t row__t--grow row__t--med">Response depth</span><div class="seg" id="depth"><button type="button" data-value="quick">Brief</button><button type="button" data-value="balanced">Balanced</button><button type="button" data-value="thorough">Thorough</button></div></div>
+          <div class="row row--pad row--line"><span class="row__t row__t--grow row__t--med">When both keys are set, use</span><div class="seg" id="preferred"><button type="button" data-value="claude">Claude</button><button type="button" data-value="openai">ChatGPT</button></div></div>
+          <div class="row row--pad row--line"><span class="row__body"><span class="row__t row__t--med">Read the page you are on</span><span class="row__s">Assignments, discussions, due dates.</span></span><button class="switch" id="includePageContext" type="button" role="switch" aria-checked="true" aria-label="Read the page you are on"><span class="switch__knob"></span></button></div>
+          <div class="row row--pad row--line"><span class="row__t row__t--grow row__t--med">Remember conversation per page</span><button class="switch" id="persistChat" type="button" role="switch" aria-checked="true" aria-label="Remember conversation per page"><span class="switch__knob"></span></button></div>
+        </div>
+        <p class="note note--out" id="smartStatus"></p>
+      </section>
+
+      <!-- Appearance -->
+      <section class="section" id="appearance" data-title="Appearance" data-sub="Theme and school branding." data-words="appearance theme light dark system site name logo sidebar branding">
+        <div class="themes" id="themes">
+          <button type="button" class="theme" data-value="off"><span class="theme__pv theme__pv--light"><i class="theme__side"></i><i class="theme__bar"></i><i class="theme__card"></i></span><span class="theme__label">Light</span></button>
+          <button type="button" class="theme" data-value="on"><span class="theme__pv theme__pv--dark"><i class="theme__side"></i><i class="theme__bar"></i><i class="theme__card"></i></span><span class="theme__label">Dark</span></button>
+          <button type="button" class="theme" data-value="system"><span class="theme__pv theme__pv--system"><i class="theme__side"></i><i class="theme__bar"></i><i class="theme__card"></i></span><span class="theme__label">System</span></button>
+        </div>
+        <div class="card card--pad">
+          <div class="fieldblock">
+            <label class="kicker" for="siteName">Site name in the sidebar</label>
+            <div class="field"><input type="text" id="siteName" placeholder="CatCourses" spellcheck="false"></div>
+            <p class="note">Blank uses your Canvas address.</p>
           </div>
-          <div class="field">
-            <label for="siteName">Site name in the sidebar</label>
-            <input type="text" id="siteName" class="input input--short" placeholder="e.g. CatCourses" spellcheck="false">
-            <div class="hint">Leave blank to use the first part of your Canvas address.</div>
-          </div>
-          <div class="field">
-            <label for="logoUrl">Logo in the sidebar</label>
-            <input type="url" id="logoUrl" class="input input--short" placeholder="https://…/logo.png" spellcheck="false">
-            <div class="hint">Leave blank to use your school's own mark from Canvas's theme (its app icon, favicon or header logo). Paste an image address to use a different one.</div>
+          <div class="fieldblock fieldblock--line">
+            <label class="kicker" for="logoUrl">Logo in the sidebar</label>
+            <div class="field"><input type="url" id="logoUrl" class="mono" placeholder="https://…/logo.png" spellcheck="false"></div>
+            <p class="note">Blank uses your school's mark from Canvas's theme. Only https images are used.</p>
           </div>
         </div>
       </section>
 
-      <section class="section" id="sites">
-        <h1>Canvas sites</h1>
-        <p class="lead">Every <code>*.instructure.com</code> site is on automatically. Add your school's own Canvas address here, or use the toolbar button while you are on it.</p>
-        <div class="card">
-          <div class="row">
-            <input type="url" id="newDomain" class="input" placeholder="https://canvas.myschool.edu" spellcheck="false">
-            <button class="btn btn--primary" id="addDomain" type="button">Add site</button>
-          </div>
-          <div class="hint" id="domainMsg"></div>
-          <ul class="domains" id="domains"></ul>
+      <!-- Canvas sites -->
+      <section class="section" id="sites" data-title="Canvas sites" data-sub="Where it runs." data-words="canvas sites domain host instructure permission add remove">
+        <div class="addrow">
+          <div class="field field--card"><input type="text" id="newDomain" class="mono" placeholder="canvas.myschool.edu" spellcheck="false" autocomplete="off" aria-label="Canvas address"></div>
+          <button class="btn btn--add" id="addDomain" type="button" disabled>Add</button>
         </div>
+        <div class="card card--list" id="domains"></div>
+        <p class="note note--out" id="domainMsg">Add your school's own domain if it is not an instructure.com address.</p>
       </section>
 
-      <section class="section" id="about">
-        <h1>Data &amp; about</h1>
-        <div class="card">
-          <p>Canvas data is read with your own logged-in session and cached briefly on this Mac. Keys stay in the extension's storage and are never exported.</p>
-          <div class="row">
-            <button class="btn" id="clearCache" type="button">Clear cached Canvas data</button>
-            <button class="btn" id="exportSettings" type="button">Export settings</button>
-            <button class="btn" id="importSettings" type="button">Import settings</button>
-            <button class="btn btn--danger" id="resetSettings" type="button">Reset to defaults</button>
-            <input type="file" id="importFile" accept="application/json" hidden>
-          </div>
+      <!-- Data & about -->
+      <section class="section" id="data" data-title="Data &amp; about" data-sub="What is stored here." data-words="data about cache export import reset keys storage">
+        <div class="card card--list" id="dataStats"></div>
+        <div class="card card--list actions">
+          <button type="button" class="action" id="clearCache"><span class="row__body"><span class="row__t">Clear cached Canvas data</span><span class="row__s">Reloads next visit.</span></span><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
+          <button type="button" class="action" id="exportSettings"><span class="row__body"><span class="row__t">Export settings</span><span class="row__s">JSON, without keys.</span></span><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
+          <button type="button" class="action" id="importSettings"><span class="row__body"><span class="row__t">Import settings</span><span class="row__s">Replaces current preferences.</span></span><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
+          <button type="button" class="action action--danger" id="resetSettings"><span class="row__body"><span class="row__t">Reset everything</span><span class="row__s">Clears preferences, history and keys.</span></span><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
+          <input type="file" id="importFile" accept="application/json" hidden>
         </div>
+        <p class="note note--out">Read with your own Canvas session. Keys never leave this device.</p>
       </section>
     </main>
   </div>
-  <div class="toast" id="toast" hidden>Saved</div>
 
   <script src="../lib/settings.js"></script>
+  <script src="../lib/utils.js"></script>
   <script src="options.js"></script>
 </body>
 </html>

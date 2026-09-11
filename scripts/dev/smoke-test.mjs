@@ -1135,21 +1135,75 @@ try {
   // ---- extension pages ---------------------------------------------------------------------------------
   console.log('extension pages');
   const options = await context.newPage();
+  const oTexts = (sel) => options.$$eval(sel, (els) => els.map((e) => (e.innerText || e.textContent).replace(/\s+/g, ' ').trim()));
   await options.goto(`chrome-extension://${extId}/options/options.html`);
-  await options.waitForSelector('#claudeKey', { timeout: 5000 });
+  await options.waitForSelector('#skin', { timeout: 5000 });
+  const navLabels = await oTexts('.navlink__label');
+  check(navLabels.join(' | ') === 'General | Courses & targets | Grades | Smart panel | Appearance | Canvas sites | Data & about' && (await oTexts('#title'))[0] === 'General' && (await options.$eval('.navlink.is-active', (e) => e.dataset.section)) === 'general' && (await options.$eval('#skin', (e) => e.classList.contains('is-on'))) && !(await options.$eval('#dot-smart', (e) => e.hidden)), `settings open on General with the seven sections and an orange dot on Smart panel while no key is set: ${navLabels.join(' | ')}`);
+  check(/^Version \d+\.\d+/.test(await options.$eval('#version', (el) => el.textContent)) && /^1 site$/.test((await oTexts('#statusText'))[0]), `settings show the version and the site count: ${await options.$eval('#version', (el) => el.textContent)} · ${(await oTexts('#statusText'))[0]}`);
+  await options.screenshot({ path: join(out, '29-options-general.png') });
+  await options.click('.navlink[data-section="smart"]');
   await options.fill('#openaiKey', 'sk-test');
   await options.dispatchEvent('#openaiKey', 'change');
   await options.waitForTimeout(300);
-  check(/ChatGPT/.test(await options.$eval('#smartStatus', (el) => el.textContent)), 'options status reflects the key');
+  check(/ChatGPT/.test(await options.$eval('#smartStatus', (el) => el.textContent)) && (await oTexts('#openaiPill'))[0] === 'Connected' && !(await options.$eval('#saved', (e) => e.hidden)) && (await options.$eval('#dot-smart', (e) => e.hidden)) && /smart panel on/.test((await oTexts('#statusText'))[0]), 'a key saves on change: Saved pill, Connected pill, status pill and the nav dot follow');
   await options.click('#testOpenAI');
   await options.waitForFunction(() => /rejected|Could not|works|Unauthorized|invalid/i.test(document.querySelector('#openaiResult').textContent), null, { timeout: 20000 });
   console.log('   key test result:', await options.$eval('#openaiResult', (el) => el.textContent));
+  await options.click('#depth button[data-value="thorough"]');
+  await options.waitForTimeout(200);
+  check((await sw.evaluate(() => self.BCV.settings.get())).smart.depth === 'thorough' && (await options.$eval('#depth .is-on', (b) => b.textContent)) === 'Thorough' && (await oTexts('.keycard__name')).join(' | ') === 'Claude | ChatGPT | Gemini' && (await oTexts('.keycard--soon .pill'))[0] === 'Coming soon', 'the depth segment saves; Claude, ChatGPT and Gemini (coming soon) cards');
+  await options.screenshot({ path: join(out, '29-options-smart.png'), fullPage: true });
   await options.fill('#openaiKey', '');
   await options.dispatchEvent('#openaiKey', 'change');
-  await options.screenshot({ path: join(out, '29-options.png'), fullPage: true });
-  check(/^v\d+\.\d+/.test(await options.$eval('#version', (el) => el.textContent)), `settings show the version: ${await options.$eval('#version', (el) => el.textContent)}`);
-  await options.click('.navlink[data-section="setup"]');
-  check((await options.$eval('#setup.is-active h1', (el) => el.textContent)) === 'Guided setup' && (await options.$('#openSetup')) !== null, 'the settings page links to the guided setup page');
+  await options.click('#depth button[data-value="balanced"]');
+  // Courses & targets: read from the site the page last used, written through Canvas favourites
+  await options.click('.navlink[data-section="courses"]');
+  await options.waitForSelector('.course', { timeout: 15000 });
+  const favCount = (await apiGet('/api/v1/courses?per_page=100')).filter((c) => c.is_favorite).length;
+  check((await options.$$('.course')).length >= 8 && (await options.$$('.course .switch.is-on')).length === favCount && (await oTexts('#shownLabel'))[0] === `${favCount} of ${(await options.$$('.course')).length} courses shown`, `Courses & targets lists every active course with the ${favCount} favourites on`);
+  const offRow = await options.$('.course:not(.is-off)');
+  const offId = await offRow.evaluate((e) => e.dataset.course);
+  await (await offRow.$('.switch')).click();
+  await options.waitForFunction((id) => document.querySelector(`.course[data-course="${id}"]`)?.classList.contains('is-off'), offId, { timeout: 10000 });
+  check(!(await apiGet('/api/v1/courses?per_page=100')).find((c) => String(c.id) === offId).is_favorite, 'hiding a course removes it from the Canvas favourites');
+  await (await options.$(`.course[data-course="${offId}"] .switch`)).click();
+  await options.waitForFunction((id) => !document.querySelector(`.course[data-course="${id}"]`)?.classList.contains('is-off'), offId, { timeout: 10000 });
+  await options.click(`.course[data-course="${offId}"] .seg button[data-value="2"]`);
+  await options.waitForTimeout(300);
+  check((await apiGet('/api/v1/courses?per_page=100')).find((c) => String(c.id) === offId).is_favorite && (await prefsOf()).gradeTargets?.[offId] === 2, 'showing it again restores the favourite, and the letter writes the target the Grades page reads');
+  await options.screenshot({ path: join(out, '29-options-courses.png'), fullPage: true });
+  // Grades: the same preferences as the Grades page
+  await options.click('.navlink[data-section="grades"]');
+  check((await oTexts('#gpaGoal'))[0] === '3.60' && (await options.$eval('#tracking', (e) => e.classList.contains('is-on'))) && /recorded|from today/i.test((await oTexts('#historyLabel'))[0]), `Grades shows the goal and tracking the setup chose: ${(await oTexts('#historyLabel'))[0]}`);
+  await options.click('#whatIf');
+  await options.click('#goalUp');
+  await options.waitForTimeout(500);
+  const gp = await prefsOf();
+  check(gp.whatIfScores === false && gp.gpaGoal === 3.65, 'what-if off and the goal step save under the site');
+  await options.click('#whatIf');
+  await options.waitForTimeout(400);
+  // Appearance: theme tiles
+  await options.click('.navlink[data-section="appearance"]');
+  await options.click('.theme[data-value="on"]');
+  await options.waitForTimeout(250);
+  check((await sw.evaluate(() => self.BCV.settings.get())).appearance.darkMode === 'on' && (await options.$eval('html', (e) => e.dataset.theme)) === 'dark' && (await options.$eval('.theme.is-on', (b) => b.dataset.value)) === 'on', 'a theme tile saves and repaints the page');
+  await options.screenshot({ path: join(out, '29-options-dark.png') });
+  await options.click('.theme[data-value="system"]');
+  await options.waitForTimeout(250);
+  // Sites and data
+  await options.click('.navlink[data-section="sites"]');
+  check((await oTexts('.site__host'))[0] === '*.instructure.com' && (await options.$eval('#addDomain', (b) => b.disabled)), 'Canvas sites lists the built-in host; Add waits for an address');
+  await options.fill('#newDomain', 'canvas.school');
+  check(!(await options.$eval('#addDomain', (b) => b.disabled)), 'an address with a dot enables Add');
+  await options.click('.navlink[data-section="data"]');
+  await options.waitForSelector('.stat', { timeout: 5000 });
+  check((await oTexts('.stat')).length === 3 && /KB|MB|B$/.test((await oTexts('.stat b'))[0]) && (await oTexts('.action .row__t')).join(' | ') === 'Clear cached Canvas data | Export settings | Import settings | Reset everything', `Data & about: ${(await oTexts('.stat')).join(' | ')}`);
+  await options.fill('#query', 'logo');
+  check((await options.$$eval('.navlink', (els) => els.filter((e) => !e.hidden).map((e) => e.dataset.section))).join(',') === 'appearance' && (await oTexts('#title'))[0] === 'Appearance', 'search narrows the sections and opens the match');
+  await options.fill('#query', '');
+  await options.click('.navlink[data-section="general"]');
+  check((await options.$('#openSetup')) !== null && (await options.$('#runTour')) !== null, 'General offers Reopen setup and Run the tour again');
   // before the guided setup has run (or been skipped) the popup is nothing but a setup button
   await sw.evaluate(async () => {
     const k = 'prefs:localhost:8787';
@@ -1179,7 +1233,7 @@ try {
   check((await popupPage.$eval('#foot-setup', (el) => el.textContent)) === 'Guided setup', 'the popup links to the guided setup');
   await popupPage.screenshot({ path: join(out, '30-popup.png') });
 } catch (e) {
-  console.error('smoke test crashed:', e);
+  console.error('smoke test crashed:', e?.stack || e);
   failures.push('crash: ' + e.message);
 } finally {
   await context.close();

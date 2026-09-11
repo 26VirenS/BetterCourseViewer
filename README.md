@@ -104,7 +104,8 @@ The extension is on automatically for every `*.instructure.com` site. If your sc
 
 ## Turning the look off
 
-- The toolbar popup and Settings → Appearance have the **Simpl Courses look** switch, plus Light / Dark / Match the system. Nothing sits on the page itself. Both show the installed version number (the popup's footer, the Settings header). Until the guided setup has run (or been skipped on purpose) the popup shows nothing but a **Start setup** button.
+- The toolbar popup and Settings → General have the **Simpl Courses look** switch (turning it off or on reloads the page, so stock Canvas comes back whole); Settings → Appearance has Light / Dark / System as three preview tiles. Nothing sits on the page itself. Both show the installed version number (the popup's footer, the Settings sidebar). Until the guided setup has run (or been skipped on purpose) the popup shows nothing but a **Set up** button.
+- **Settings** is one section at a time from a sidebar with search and a status pill: General (the look, run the tour again, reopen the setup); Courses & targets (every active course with a show/hide switch that writes your Canvas favourites and a target letter per course); Grades (tracking, the GPA goal, what-if scores on or off, the recorded history with a CSV export); Smart panel (a card per provider with a Connected pill, Show and Test, the model, and Gemini marked coming soon, then response depth, the preferred provider and two switches); Appearance; Canvas sites (Add asks for the site's permission from the click, Remove gives it back); Data & about (what is stored, then clear, export, import and a red Reset everything that also gives up the added sites). Every control saves on change and flashes Saved once the write has landed.
 - Pages Canvas draws itself have an **Open in stock Canvas** button that flips the same switch.
 
 ## The smart panel and your keys
