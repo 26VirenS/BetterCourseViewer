@@ -392,6 +392,83 @@
       return out.sort((a, b) => (U.parse(b.posted_at) || 0) - (U.parse(a.posted_at) || 0));
     }, { force });
   }
+  // ---- notifications: what needs attention, from what Canvas already reports ----------------
+  const NOTIF_STATE = 'notifState'; // { read: { id: true }, gone: { id: true } }, local: Canvas cannot mark these
+  const stripHtml = (html) => String(html || '').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+  const localDay = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const pastText = (date, t) => {
+    const hrs = Math.max(1, Math.round((t - date) / 3600e3));
+    return hrs < 24 ? `${U.plural(hrs, 'hour')} past` : `${U.plural(Math.round(hrs / 24), 'day')} past`;
+  };
+  async function notifState() {
+    const st = (await pref(NOTIF_STATE)) || {};
+    return { read: st.read && typeof st.read === 'object' ? st.read : {}, gone: st.gone && typeof st.gone === 'object' ? st.gone : {} };
+  }
+  async function setNotifState(next) {
+    await setPref(NOTIF_STATE, { read: next.read || {}, gone: next.gone || {} });
+  }
+  /** Overdue and Due soon from the planner (due items with nothing submitted: the last 14 days, the
+   *  next 48 hours); Graded and Feedback from Submission items in the activity stream (a score, a
+   *  comment); Announcements from the unread ones; System from Canvas's notification messages and
+   *  the local grade snapshot. Each carries the URL Canvas gave it. */
+  async function notifications({ force = false } = {}) {
+    const t = now();
+    const [items, stream, anns, cs, snaps] = await Promise.all([
+      planner({ force }).catch(() => []),
+      activity({ force }).catch(() => []),
+      announcementsFeed({ force }).catch(() => []),
+      courses().catch(() => []),
+      pref('gpaSnapshots').catch(() => null),
+    ]);
+    const byId = new Map(cs.map((c) => [c.id, c]));
+    const courseOf = (id) => (id === null || id === undefined ? null : byId.get(String(id))) || null;
+    const H = 3600e3;
+    const out = [];
+    for (const it of items || []) {
+      if (!it.isDue || it.submitted || it.complete || it.dismissed || it.excused || !it.date) continue;
+      const ms = it.date - t;
+      const pts = it.points !== null && it.points !== undefined ? ` · ${it.points} pts` : '';
+      const base = { title: it.title, courseId: it.courseId, course: it.course?.shortName || it.courseName || '', color: it.course?.color || null, when: it.date, whenText: `Due ${U.fmtAt(it.date)}`, url: it.url, action: it.type === 'quiz' ? 'Start quiz' : 'Submit now' };
+      if (ms < 0 && ms > -14 * 24 * H) out.push({ ...base, id: `planner:${it.id}`, cat: 'overdue', note: `${it.missing ? 'Marked missing' : 'Nothing submitted'} · ${pastText(it.date, t)}${pts}` });
+      else if (ms >= 0 && ms < 48 * H) out.push({ ...base, id: `planner:${it.id}`, cat: 'soon', note: `${it.kind}${pts} · ${it.type === 'quiz' ? 'not started' : 'no submission'}` });
+    }
+    for (const a of stream || []) {
+      const when = U.parse(a.updated_at || a.created_at);
+      const c = courseOf(a.course_id);
+      const base = { courseId: c?.id || (a.course_id ? String(a.course_id) : null), course: c?.shortName || a.context_name || '', color: c?.color || null, when, url: a.html_url || (a.course_id ? `/courses/${a.course_id}` : '/') };
+      if (a.type === 'Submission') {
+        const scored = (a.score !== undefined && a.score !== null) || (a.grade !== undefined && a.grade !== null && a.grade !== '');
+        const comments = Array.isArray(a.submission_comments) ? a.submission_comments.filter((x) => x && x.comment) : [];
+        const name = a.assignment?.name || String(a.title || 'Submission').replace(/\s+graded\b.*$/i, '');
+        const possible = a.assignment?.points_possible;
+        if (scored) out.push({ ...base, id: `stream:${a.id}`, cat: 'graded', title: `${name} graded`, note: `${a.score ?? a.grade}${possible !== undefined && possible !== null ? ` / ${possible}` : ''}${a.grade && a.score !== undefined && a.score !== null && String(a.grade) !== String(a.score) ? ` · ${a.grade}` : ''}`, action: 'See grades' });
+        if (comments.length) {
+          const last = comments[comments.length - 1];
+          out.push({ ...base, id: `stream:${a.id}:comment`, cat: 'feedback', when: U.parse(last.created_at) || when, title: `${last.author_name || 'Your instructor'} left a comment on ${name}`, note: `“${stripHtml(last.comment).slice(0, 140)}”`, action: 'Read comment' });
+        }
+      } else if (a.type === 'Message') {
+        out.push({ ...base, id: `stream:${a.id}`, cat: 'system', title: a.title || a.notification_category || 'Notification', note: stripHtml(a.message).slice(0, 140) || a.notification_category || '', action: 'Open' });
+      }
+    }
+    for (const an of anns || []) {
+      if (an.read_state && an.read_state !== 'unread') continue;
+      const cid = String(an.context_code || '').replace(/^course_/, '') || (an.course_id ? String(an.course_id) : '');
+      const c = courseOf(cid);
+      out.push({ id: `ann:${an.id}`, cat: 'announce', title: an.title || 'Announcement', courseId: c?.id || cid || null, course: c?.shortName || c?.name || an.context_name || '', color: c?.color || null, when: U.parse(an.posted_at || an.created_at), note: an.author?.display_name ? `From ${an.author.display_name}` : 'Announcement', action: 'Read', url: an.html_url || (cid ? `/courses/${cid}/announcements/${an.id}` : '/') });
+    }
+    if (Array.isArray(snaps) && snaps.length) {
+      const last = snaps[snaps.length - 1];
+      if (last?.date === localDay(t)) out.push({ id: `local:snapshot:${last.date}`, cat: 'system', title: 'Grade snapshot recorded', courseId: null, course: 'Simpl Courses', color: '#8e8e93', when: U.startOfDay(t), whenText: 'Today', note: `${U.plural(snaps.length, 'day')} of history stored locally`, action: 'See trend', url: '/grades' });
+    }
+    const dir = (n) => (n.cat === 'soon' ? 1 : -1); // due soon: soonest first; everything else: newest first
+    return out.sort((a, b) => (a.cat === b.cat ? dir(a) * ((a.when?.getTime() || 0) - (b.when?.getTime() || 0)) : 0));
+  }
+  /** The badge on the sidebar: alerts neither read nor dismissed. */
+  async function notifUnread(opts = {}) {
+    const [feed, st] = await Promise.all([notifications(opts), notifState()]);
+    return feed.filter((n) => !st.gone[n.id] && !st.read[n.id]).length;
+  }
+
   /** Stream items opened from here. Canvas has no API to mark a stream item
    *  read, so the blue dots are also cleared locally once an item is opened. */
   async function streamSeen() {
@@ -974,6 +1051,7 @@
     course, tabs, frontPage, syllabus, courseTodo, ignoreTodo, courseStream, assignments, assignment, submission, assignmentGroups, progress,
     announcements, discussions, discussion, discussionView, postEntry, markTopicRead, people, sections, courseGroups, pages, page,
     rootFolder, folderContents, folderByPath, file, quizzes, quiz, quizSubmissions, quizApi, modules, gradeModel, fmtPts,
+    notifications, notifState, setNotifState, notifUnread,
     homeworkTools, uploadSubmissionFile, uploadSubmissionFileFromUrl, submitAssignment, invalidateAssignment, quizAttemptLimit,
   };
 })();

@@ -145,6 +145,7 @@
       body: U.el('bcv-ph-me', [U.avatar(me?.avatar, me?.name, 38), h('div', { style: { minWidth: '0' } }, [U.text('bcv-ph-me__name bcv-ellip', me?.name || 'Account'), U.text('bcv-ph-me__sub', app.siteName())])]),
       rows: [
         { icon: IC.mail, label: 'Inbox', note: app.state.unread ? U.plural(app.state.unread, 'unread message') : 'No unread messages', badge: app.state.unread || null, href: '/conversations' },
+        { icon: IC.bell, label: 'Notifications', note: app.state.notifCount ? U.plural(app.state.notifCount, 'unread alert') : 'Nothing new', badge: app.state.notifCount || null, href: '/#notifications' },
         { icon: IC.people, label: 'Groups', href: '/groups' },
         ...(BCV.extras?.phoneRows?.(app) || []), // what the school added to Canvas's own nav
         { icon: dark ? IC.sun : IC.moon, label: dark ? 'Light appearance' : 'Dark appearance', onSelect: () => app.toggleTheme() },

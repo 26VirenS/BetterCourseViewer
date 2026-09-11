@@ -26,7 +26,9 @@
     ['sites', 'Canvas sites', 'M12 3a9 9 0 100 18 9 9 0 000-18zM3 12h18M12 3a15 15 0 010 18a15 15 0 010-18'],
     ['data', 'Data & about', 'M4 7c0-1.7 3.6-3 8-3s8 1.3 8 3-3.6 3-8 3-8-1.3-8-3zM4 7v10c0 1.7 3.6 3 8 3s8-1.3 8-3V7'],
   ];
-  const LETTERS = [['A', 0], ['A-', 1], ['B+', 2], ['B', 3], ['C', 6]]; // letter → index on the Grades page's scale
+  const LETTERS = ['C', 'B', 'B+', 'A-', 'A', 'A+']; // target letters, lowest on the left (saved as the letter the Grades page reads)
+  const OLD_SCALE = ['A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-', 'D', 'F']; // targets saved before A+ existed were indices into this
+  const targetLetter = (t) => (Number.isInteger(t) ? OLD_SCALE[t] : typeof t === 'string' ? t.replace(/−/g, '-') : null) || 'A';
   const gpa2 = (n) => (Number.isFinite(n) ? n : 0).toFixed(2);
 
   let settings = await S.get();
@@ -247,10 +249,10 @@
     $('selectAll').textContent = all ? 'Hide all' : 'Show all';
     wrap.replaceChildren(...(list.length ? list.map((c, i) => {
       const on = courses.shown.has(c.id);
-      const idx = Number.isInteger(courses.targets[c.id]) ? courses.targets[c.id] : 0;
-      const seg = h('div', { class: 'seg seg--letters' }, LETTERS.map(([letter, li]) => h('button', { type: 'button', class: li === idx ? 'is-on' : '', dataset: { value: String(li) }, text: letter })));
+      const cur = targetLetter(courses.targets[c.id]);
+      const seg = h('div', { class: 'seg seg--letters' }, LETTERS.map((letter) => h('button', { type: 'button', class: letter === cur ? 'is-on' : '', dataset: { value: letter }, text: letter })));
       onSeg(seg, async (v) => {
-        courses.targets[c.id] = Number(v);
+        courses.targets[c.id] = v;
         setSeg(seg, v);
         await savePref('gradeTargets', courses.targets);
       });

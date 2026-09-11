@@ -21,6 +21,7 @@
     favs: [],
     todoCount: null,
     unread: null,
+    notifCount: null,
     account: null,
     nativePath: location.pathname + location.search, // the URL Canvas actually rendered
     renderId: 0,
@@ -60,7 +61,7 @@
     const params = url.searchParams;
     const hash = url.hash.replace(/^#/, '');
     const r = { url: url.pathname + url.search + url.hash, path, params, hash, screen: 'native', courseId: null, tab: null, arg: null, sub: null };
-    if (path === '/' || path === '/dashboard') r.screen = hash === 'todo' ? 'todo' : 'dashboard';
+    if (path === '/' || path === '/dashboard') r.screen = hash === 'todo' ? 'todo' : hash === 'notifications' ? 'notifications' : 'dashboard';
     else if (path === '/courses') r.screen = 'courses';
     else if (path === '/groups') r.screen = 'groups';
     else if (path === '/calendar' || path === '/calendar2') r.screen = 'calendar';
@@ -170,6 +171,7 @@
     ['groups', 'Groups', IC.people, '#30b0c7', '/groups', ''],
     ['todo', 'To Do', IC.check, '#34c759', '/#todo', state.todoCount ? String(state.todoCount) : ''],
     ['calendar', 'Calendar', IC.cal, '#5856d6', '/calendar', ''],
+    ['notifications', 'Notifications', IC.bell, '#ff453a', '/#notifications', state.notifCount ? String(state.notifCount) : ''],
     ['inbox', 'Inbox', IC.mail, '#8e8e93', '/conversations', state.unread ? String(state.unread) : ''],
     ['gpa', 'Grades', IC.chart, '#af52de', '/grades', ''], // purple: Calendar already has the indigo
   ];
@@ -379,7 +381,7 @@
   }
 
   function titleFor(r) {
-    const base = { dashboard: 'Dashboard', courses: 'Courses', groups: 'Groups', todo: 'To Do', calendar: 'Calendar', inbox: 'Inbox', gpa: 'Grades' }[r.screen];
+    const base = { dashboard: 'Dashboard', courses: 'Courses', groups: 'Groups', todo: 'To Do', calendar: 'Calendar', inbox: 'Inbox', gpa: 'Grades', notifications: 'Notifications' }[r.screen];
     return base ? `${base} · ${siteName()}` : document.title;
   }
 
@@ -390,13 +392,14 @@
   }
 
   async function loadShellData({ force = false } = {}) {
-    const [me, favs, term, todos, unread, account] = await Promise.all([
+    const [me, favs, term, todos, unread, account, notifs] = await Promise.all([
       store.me({ force }).catch(() => null),
       store.favorites({ force }).catch(() => []),
       store.currentTerm().catch(() => ''),
       store.todo({ force }).catch(() => null),
       store.unreadCount({ force }).catch(() => null),
       store.account().catch(() => null),
+      store.notifUnread({ force }).catch(() => null),
     ]);
     state.me = me;
     state.favs = favs;
@@ -404,13 +407,15 @@
     state.todoCount = todos ? todos.length : null;
     state.unread = unread;
     state.account = account;
+    state.notifCount = notifs;
     renderSide();
   }
 
   async function refreshCounts() {
-    const [todos, unread] = await Promise.all([store.todo().catch(() => null), store.unreadCount().catch(() => null)]);
+    const [todos, unread, notifs] = await Promise.all([store.todo().catch(() => null), store.unreadCount().catch(() => null), store.notifUnread().catch(() => null)]);
     state.todoCount = todos ? todos.length : null;
     state.unread = unread;
+    state.notifCount = notifs;
     renderSide();
   }
 

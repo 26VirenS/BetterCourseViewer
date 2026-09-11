@@ -135,7 +135,7 @@ try {
   await page.click('.bcv-ph-avatar');
   await sheet();
   const acct = await texts('.bcv-ph-srow__label');
-  check(acct.join(',') === 'Inbox,Groups,History,My Materials,Help,Dark appearance,Settings,Guided setup,Profile', `account sheet rows, with the school's own nav entries: ${acct.join(', ')} (no Sign out outside the app)`);
+  check(acct.join(',') === 'Inbox,Notifications,Groups,History,My Materials,Help,Dark appearance,Settings,Guided setup,Profile', `account sheet rows, with the school's own nav entries: ${acct.join(', ')} (no Sign out outside the app)`);
   check((await texts('.bcv-ph-srow__note'))[0] === 'No unread messages' || /unread message/.test((await texts('.bcv-ph-srow__note'))[0]), `Inbox row carries the unread count: ${(await texts('.bcv-ph-srow__note'))[0]}`);
   await shot('01c-account-sheet');
   await page.evaluate(() => { window.__bcvMarker = 1; });

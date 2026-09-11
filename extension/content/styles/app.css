@@ -165,7 +165,7 @@ html.bcv-on #bcv-app { display: flex; }
 .bcv-search--200 { min-width: 200px; }
 .bcv-search--180 { min-width: 180px; height: 34px; }
 .bcv-search--320 { flex: none; width: 320px; min-width: 0; }
-.bcv-search input { flex: 1; min-width: 0; border: 0 !important; background: transparent !important; padding: 0; margin: 0; height: auto; font: 400 14px/1 var(--bcv-font); color: var(--bcv-ink) !important; outline: none; box-shadow: none !important; border-radius: 0; -webkit-appearance: none; appearance: none; }
+.bcv-search input { flex: 1; min-width: 0; border: 0 !important; background: transparent !important; padding: 0 !important; margin: 0 !important; height: 100% !important; min-height: 0 !important; align-self: stretch; box-sizing: border-box; line-height: normal !important; vertical-align: middle; font: 400 14px/normal var(--bcv-font); color: var(--bcv-ink) !important; outline: none; box-shadow: none !important; border-radius: 0; -webkit-appearance: none; appearance: none; }
 .bcv-search input::-webkit-search-decoration, .bcv-search input::-webkit-search-cancel-button, .bcv-search input::-webkit-search-results-button { -webkit-appearance: none; display: none; }
 .bcv-search--180 input { font-size: 13.5px; }
 .bcv-search input::placeholder, .bcv-input::placeholder, .bcv-textarea::placeholder, .bcv-recips input::placeholder { color: var(--bcv-ink3) !important; opacity: 1; }
@@ -1415,3 +1415,45 @@ html.bcv-phone .bcv-tour--pill { padding-bottom: calc(var(--bcv-ph-bottom, 0px) 
 .bcv-xrow__s { font: 400 12.5px/1.35 var(--bcv-font); color: var(--bcv-ink3); }
 .bcv-xrow__empty { padding: 18px; font: 400 13px/1.4 var(--bcv-font); color: var(--bcv-ink3); }
 .bcv-sheet__foot { padding: 8px 18px 14px; font: 400 12px/1.45 var(--bcv-font); color: var(--bcv-ink3); border-top: 1px solid var(--bcv-sep); }
+
+/* the page's own input rules (a bottom margin, a fixed height) never reach ours */
+#bcv-app .bcv-search input, .bcv-sheet .bcv-search input { margin-bottom: 0 !important; }
+
+/* ---- notifications (/#notifications): alerts by kind, read and dismissed locally ---- */
+@keyframes bcvNfUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+.bcv-nf__enter { animation: bcvNfUp .36s cubic-bezier(.32,.72,0,1) both; }
+.bcv-nf__tools { display: flex; gap: 8px; flex-wrap: wrap; }
+#bcv-app .bcv-nf__tool { height: 32px; padding: 0 14px; border: 0; border-radius: 16px; cursor: pointer; font: 600 12.5px/1 var(--bcv-font); background: var(--bcv-fill); color: var(--bcv-ink2); transition: background .2s ease, color .2s ease; }
+#bcv-app .bcv-nf__tool.is-on { background: var(--bcv-blue); color: #fff; }
+.bcv-nf__chips { margin-top: 13px; display: flex; gap: 7px; flex-wrap: wrap; }
+#bcv-app .bcv-nf__chip { display: flex; align-items: center; gap: 7px; border: 1px solid var(--bcv-edge); border-radius: 15px; cursor: pointer; padding: 6px 12px; background: var(--bcv-card); color: var(--bcv-ink2); font: 600 12.5px/1.2 var(--bcv-font); transition: background .2s ease, border-color .2s ease; }
+#bcv-app .bcv-nf__chip.is-on { border: 1.5px solid var(--nf-color, var(--bcv-blue)); background: var(--nf-tint, var(--bcv-blue-soft)); color: var(--nf-ink, var(--bcv-blue)); padding: 5.5px 11.5px; }
+.bcv-nf__chip b { font: 600 11px/1.2 var(--bcv-mono); opacity: .65; }
+.bcv-nf__group-h { display: flex; align-items: center; gap: 9px; padding: 0 4px 9px; }
+.bcv-nf__group-i { flex: none; width: 24px; height: 24px; border-radius: 8px; background: var(--nf-tint); display: flex; align-items: center; justify-content: center; }
+.bcv-nf__group-t { font: 600 14.5px/1.2 var(--bcv-font); letter-spacing: -.02em; color: var(--nf-ink); }
+.bcv-nf__group-n { font: 500 12px/1.2 var(--bcv-font); color: var(--bcv-ink3); }
+.bcv-nf__list { overflow: hidden; }
+.bcv-nf__row { display: flex; align-items: center; gap: 13px; padding: 14px 18px; border-top: 1px solid var(--bcv-sep); cursor: pointer; transition: background .18s ease; }
+.bcv-nf__row:first-child { border-top: 0; }
+.bcv-nf__row:hover { background: var(--bcv-hover); }
+.bcv-nf__row:focus-visible { outline: 2px solid var(--bcv-blue); outline-offset: -2px; }
+.bcv-nf__dot { flex: none; width: 8px; height: 8px; border-radius: 4px; background: var(--bcv-blue); transition: opacity .2s ease; }
+.bcv-nf__row.is-read .bcv-nf__dot { opacity: 0; }
+.bcv-nf__body { flex: 1; min-width: 0; }
+.bcv-nf__title { display: block; font: 600 14px/1.3 var(--bcv-font); letter-spacing: -.01em; color: var(--bcv-ink); text-wrap: pretty; }
+.bcv-nf__row.is-read .bcv-nf__title { font-weight: 500; color: var(--bcv-ink2); }
+.bcv-nf__meta { display: block; margin-top: 3px; font: 400 12.5px/1.4 var(--bcv-font); color: var(--bcv-ink3); }
+.bcv-nf__course { flex: none; padding: 4px 9px; border-radius: 9px; background: var(--bcv-fill); font: 600 11px/1.3 var(--bcv-font); color: var(--bcv-ink2); max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#bcv-app .bcv-nf__act { flex: none; height: 28px; padding: 0 12px; border: 0; border-radius: 14px; background: var(--bcv-fill); color: var(--bcv-ink2); cursor: pointer; font: 600 12px/1 var(--bcv-font); }
+#bcv-app .bcv-nf__ib { flex: none; width: 28px; height: 28px; border: 0; border-radius: 14px; background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--bcv-ink3); transition: background .18s ease, color .18s ease; }
+#bcv-app .bcv-nf__ib:hover { background: var(--bcv-fill); }
+#bcv-app .bcv-nf__ib--x:hover { background: rgba(255,69,58,.14); color: #ff453a; }
+.bcv-nf__empty { padding: 44px 24px; text-align: center; font: 500 14px/1.4 var(--bcv-font); color: var(--bcv-ink2); }
+.bcv-nf__gone { display: flex; align-items: center; gap: 12px; padding: 13px 18px; border-radius: 16px; background: var(--bcv-card); box-shadow: var(--bcv-shadow); font: 500 13px/1.3 var(--bcv-font); color: var(--bcv-ink3); }
+.bcv-nf__gone span { flex: 1; min-width: 0; }
+html.bcv-phone .bcv-nf__row { flex-wrap: wrap; gap: 10px 12px; padding: 13px 16px; }
+html.bcv-phone .bcv-nf__body { flex-basis: calc(100% - 20px); }
+html.bcv-phone .bcv-nf__course { margin-left: 20px; }
+html.bcv-phone .bcv-nf__act { margin-left: auto; }
+@media (prefers-reduced-motion: reduce) { .bcv-nf__enter { animation: none; } }

@@ -13,9 +13,15 @@
   const IC = BCV.IC;
   const store = BCV.store;
 
-  const SCALE = [['A', 93, 4], ['A−', 90, 3.7], ['B+', 87, 3.3], ['B', 83, 3], ['B−', 80, 2.7], ['C+', 77, 2.3], ['C', 73, 2], ['C−', 70, 1.7], ['D', 60, 1], ['F', 0, 0]];
+  const SCALE = [['A+', 97, 4], ['A', 93, 4], ['A−', 90, 3.7], ['B+', 87, 3.3], ['B', 83, 3], ['B−', 80, 2.7], ['C+', 77, 2.3], ['C', 73, 2], ['C−', 70, 1.7], ['D', 60, 1], ['F', 0, 0]];
+  const OLD_SCALE = ['A', 'A−', 'B+', 'B', 'B−', 'C+', 'C', 'C−', 'D', 'F']; // targets saved before A+ existed were indices into this
   const POINTS = { 'A+': 4, A: 4, 'A-': 3.7, 'B+': 3.3, B: 3, 'B-': 2.7, 'C+': 2.3, C: 2, 'C-': 1.7, 'D+': 1.3, D: 1, 'D-': 0.7, F: 0 };
   const norm = (g) => String(g || '').replace(/−/g, '-').toUpperCase().trim();
+  /** A saved target (a letter, or an index into the scale before A+) → its index on SCALE, or -1. */
+  const targetIndex = (t) => {
+    const letter = Number.isInteger(t) ? OLD_SCALE[t] : typeof t === 'string' ? t : null;
+    return letter ? SCALE.findIndex((s) => norm(s[0]) === norm(letter)) : -1;
+  };
   const letterFor = (pct) => SCALE.find((s) => pct >= s[1]) || SCALE[SCALE.length - 1];
   // Canvas's own letter when the course publishes one, else the standard scale
   const pointsFor = (letter, pct) => (norm(letter) in POINTS ? POINTS[norm(letter)] : letterFor(pct)[2]);
@@ -123,7 +129,8 @@
         const m = courseMath(groupsBy.get(c.id), c.weighted);
         const found = SCALE.findIndex((s) => norm(s[0]) === norm(letter));
         const defaultIdx = found >= 0 ? found : SCALE.indexOf(letterFor(pct));
-        const idx = clamp(Number.isInteger(targets[c.id]) ? targets[c.id] : defaultIdx, 0, SCALE.length - 1);
+        const saved = targetIndex(targets[c.id]);
+        const idx = clamp(saved >= 0 ? saved : defaultIdx, 0, SCALE.length - 1);
         const target = SCALE[idx];
         const needed = m.known ? m.needed(target[1]) : null;
         const met = needed === null ? pct >= target[1] : needed <= 0;
@@ -382,7 +389,7 @@
       const sheet = U.el('bcv-sheet bcv-gpa-detail');
       ov.append(sheet);
       function bump(r, delta) {
-        targets[c.id] = clamp(r.idx + delta, 0, SCALE.length - 1);
+        targets[c.id] = SCALE[clamp(r.idx + delta, 0, SCALE.length - 1)][0].replace(/−/g, '-'); // saved as the letter
         save();
         current = model();
         draw();
@@ -584,5 +591,5 @@
     return screen;
   }
 
-  BCV.screens.gpa = { render, courseMath, SCALE, letterFor, pointsFor };
+  BCV.screens.gpa = { render, courseMath, SCALE, letterFor, pointsFor, targetIndex };
 })();

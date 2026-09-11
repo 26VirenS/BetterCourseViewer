@@ -14,7 +14,7 @@
   const html = document.documentElement;
 
   const CHECK = 'M20 6L9 17l-5-5';
-  const GRADES = [['A', 0], ['A-', 1], ['B+', 2], ['B', 3], ['C', 6]]; // letter → index on the Grades page's scale
+  const GRADES = ['C', 'B', 'B+', 'A-', 'A', 'A+']; // the target letters, lowest on the left (saved as the letter the Grades page reads)
   const PROVIDERS = [
     { key: 'claude', name: 'Claude', note: 'Available now', ready: true, settingsKey: 'claudeKey', placeholder: 'sk-ant-…', url: 'https://console.anthropic.com/settings/keys', host: 'console.anthropic.com', steps: ['API keys → Create key', 'Paste it above. It is shown only once.'] },
     { key: 'openai', name: 'ChatGPT', note: 'Available now', ready: true, settingsKey: 'openaiKey', placeholder: 'sk-…', url: 'https://platform.openai.com/api-keys', host: 'platform.openai.com', steps: ['API keys → Create new secret key', 'Paste it above. It is shown only once.'] },
@@ -312,7 +312,7 @@
     const targets = chosen.map((c) => h('div', { class: 'target', dataset: { course: c.id } }, [
       h('span', { class: 'row__dot', style: { background: c.color } }),
       h('span', { class: 'target__code', text: c.code }),
-      h('div', { class: 'seg' }, GRADES.map(([letter]) => h('button', { type: 'button', class: `seg__b ${(st.targets[c.id] || 'A') === letter ? 'is-on' : ''}`, text: letter, onclick: (e) => {
+      h('div', { class: 'seg' }, GRADES.map((letter) => h('button', { type: 'button', class: `seg__b ${(st.targets[c.id] || 'A') === letter ? 'is-on' : ''}`, text: letter, onclick: (e) => {
         st.targets[c.id] = letter;
         [...e.currentTarget.parentNode.children].forEach((b) => b.classList.toggle('is-on', b === e.currentTarget));
       } }))),
@@ -431,7 +431,7 @@
       if (!skipped) {
         const [targetsPref] = await Promise.all([store.pref('gradeTargets')]);
         const targets = { ...((targetsPref && typeof targetsPref === 'object') ? targetsPref : {}) };
-        for (const c of st.courses) if (st.favs.has(c.id)) targets[c.id] = (GRADES.find(([l]) => l === (st.targets[c.id] || 'A')) || GRADES[0])[1];
+        for (const c of st.courses) if (st.favs.has(c.id)) targets[c.id] = GRADES.includes(st.targets[c.id]) ? st.targets[c.id] : 'A';
         await Promise.all([
           store.setPref('gpaGoal', st.goal),
           store.setPref('gpaTracking', st.tracking ? { priorGpa: null, priorCourses: 0, since: new Date().toISOString().slice(0, 10) } : null),

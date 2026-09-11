@@ -135,7 +135,7 @@ try {
   await page.goto(`${BASE}/`);
   await page.waitForSelector('#bcv-app .bcv-nav__item', { timeout: 10000 });
   const navItems = await texts('.bcv-nav .bcv-nav__item');
-  check(navItems.length === 7 && navItems[0].startsWith('Dashboard') && navItems[5].startsWith('Inbox') && navItems[6] === 'Grades', `sidebar nav: ${navItems.join(' | ')}`);
+  check(navItems.length === 8 && navItems[0].startsWith('Dashboard') && /^Notifications( \d+)?$/.test(navItems[5]) && navItems[6].startsWith('Inbox') && navItems[7] === 'Grades', `sidebar nav: ${navItems.join(' | ')}`);
   await waitText('.bcv-nav__item[data-nav="todo"] .bcv-nav__count', /\d/);
   const todoCount = Number((await texts('.bcv-nav__item[data-nav="todo"] .bcv-nav__count'))[0]);
   check(todoCount >= 8, `To Do count in nav = ${todoCount}`);
@@ -212,7 +212,7 @@ try {
   await page.click('.bcv-seg__btn[data-value="activity"]');
   await page.waitForSelector('.bcv-act__title', { timeout: 5000 });
   const acts = await texts('.bcv-act__kind');
-  check(acts.length === 5 && /Announcement · F26-MATH 021 20/.test(acts[0]) && /Discussion · 23 replies/.test(acts[1]), `recent activity: ${acts.slice(0, 2).join(' | ')}`);
+  check(acts.length === 7 && /Announcement · F26-MATH 021 20/.test(acts[0]) && /Discussion · 23 replies/.test(acts[1]), `recent activity: ${acts.slice(0, 2).join(' | ')}`);
   const dots = () => page.$$eval('.bcv-act__dot', (els) => els.filter((e) => getComputedStyle(e).backgroundColor === 'rgb(10, 132, 255)').length);
   check((await dots()) === 3, `unread dots: ${await dots()} (the announcement read a moment ago has none)`);
   await shot(page, '03-dashboard-activity');
@@ -1032,7 +1032,7 @@ try {
   check((await texts(su('.listhead span')))[0] === '5 selected' && (await page.$$(su('.row.is-on'))).length === 5, 'rows toggle with the count');
   await shot(page, '32c-setup-courses');
   await sNext('#track');
-  check((await sStep()) === '2 of 3' && (await page.$eval(su('#track'), (e) => e.classList.contains('is-on'))) && (await texts(su('#goal')))[0] === '3.50' && (await page.$$(su('.target'))).length === 5 && (await page.$$(su('.seg button.is-on'))).length === 5, 'step 2: tracking on, a 3.50 goal, a target row per chosen course');
+  check((await sStep()) === '2 of 3' && (await page.$eval(su('#track'), (e) => e.classList.contains('is-on'))) && (await texts(su('#goal')))[0] === '3.50' && (await page.$$(su('.target'))).length === 5 && (await page.$$(su('.seg button.is-on'))).length === 5 && (await page.$$eval(su('.target:first-child .seg button'), (bs) => bs.map((b) => b.textContent))).join(' ') === 'C B B+ A- A A+', 'step 2: tracking on, a 3.50 goal, a target row per chosen course, letters low to high with A+ on the right');
   await page.click(su('.stepper button:last-child'));
   await page.click(su('.stepper button:last-child'));
   await page.click(su('.target:first-child .seg button:nth-child(3)'));
@@ -1062,7 +1062,7 @@ try {
   check(!favAfter.includes(offCode) && favAfter.includes(onCode) && favAfter.length === 5, `the chosen courses became the Canvas favourites: −${offCode} +${onCode}`);
   check((await texts('.bcv-fav')).length === 5, 'the sidebar follows the new favourites');
   const savedPrefs = await prefsOf();
-  check(savedPrefs.gpaGoal === 3.6 && savedPrefs.gpaTracking?.since && savedPrefs.gpaTracking.priorGpa === null && Object.values(savedPrefs.gradeTargets || {}).includes(2) && savedPrefs.setupDone === true && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('setup:done'))['setup:done'])) === true, `the grade choices landed where the Grades page reads them, and the done flags are set: ${JSON.stringify({ goal: savedPrefs.gpaGoal, tracking: savedPrefs.gpaTracking, targets: savedPrefs.gradeTargets })}`);
+  check(savedPrefs.gpaGoal === 3.6 && savedPrefs.gpaTracking?.since && savedPrefs.gpaTracking.priorGpa === null && Object.values(savedPrefs.gradeTargets || {}).includes('B+') && savedPrefs.setupDone === true && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('setup:done'))['setup:done'])) === true, `the grade choices landed where the Grades page reads them, and the done flags are set: ${JSON.stringify({ goal: savedPrefs.gpaGoal, tracking: savedPrefs.gpaTracking, targets: savedPrefs.gradeTargets })}`);
   const tourTitle = () => page.$eval('.bcv-tour__title', (e) => e.textContent.trim()).catch(() => '');
   // headless Chromium only advances CSS animations when it paints a frame: let the screen's entrance finish first
   // (a poll that paints a frame each time, so the entrance and the ring's own transition can play out)
@@ -1133,6 +1133,45 @@ try {
   await page.waitForSelector('.bcv-gpa__hero', { timeout: 15000 });
   check((await texts('.bcv-gpa__hero-sub'))[0]?.includes('This term so far') && (await texts('.bcv-gpa__goal-s'))[0] === 'Goal 3.60 · set it in settings', 'the Grades page tracks without a record from the setup, with the goal it set');
 
+  // ---- notifications ------------------------------------------------------------------------------------
+  console.log('notifications');
+  await page.goto(`${BASE}/#notifications`);
+  await page.waitForSelector('.bcv-nf__row', { timeout: 15000 });
+  const nfOrder = ['Overdue', 'Due soon', 'Graded', 'Feedback', 'Announcements', 'System'];
+  const nfGroups = await texts('.bcv-nf__group-t');
+  const nfTotal = (await page.$$('.bcv-nf__row')).length;
+  check(nfGroups.every((g, i) => i === 0 || nfOrder.indexOf(g) > nfOrder.indexOf(nfGroups[i - 1])) && ['Graded', 'Feedback', 'Announcements', 'System'].every((g) => nfGroups.includes(g)) && (await page.title()).startsWith('Notifications'), `notifications grouped by kind, in order: ${nfGroups.join(' | ')} (${nfTotal} rows)`);
+  check((await texts('.bcv-head__sub'))[0] === `${nfTotal} unread · ${nfTotal} total` && (await texts('.bcv-nav')).some((t) => new RegExp(`Notifications\\s*${nfTotal}\\b`).test(t)), `the subtitle and the sidebar badge count the unread alerts: ${(await texts('.bcv-head__sub'))[0]}`);
+  const graded = await texts('.bcv-nf__row[data-cat="graded"]');
+  const feedback = await texts('.bcv-nf__row[data-cat="feedback"]');
+  const system = await texts('.bcv-nf__row[data-cat="system"]');
+  const announce = await texts('.bcv-nf__row[data-cat="announce"]');
+  check(graded.some((t) => /Lec05-PreQuiz graded/.test(t) && /19 \/ 19/.test(t) && /See grades/.test(t)) && feedback.some((t) => /Joon left a comment on Dis00/.test(t) && /Good use of interval notation here/.test(t) && /Read comment/.test(t)) && system.some((t) => /Chemistry placement window closes Sep 16/.test(t) && /One attempt remaining/.test(t)) && announce.length >= 1 && announce.every((t) => /Read/.test(t)), `graded, feedback, system and announcement rows carry the Canvas facts: ${graded[0]} | ${feedback[0]} | system: ${system.join(' || ')} | announce (${announce.length}): ${announce[0]}`);
+  await shot(page, '33-notifications');
+  await page.click('.bcv-nf__chip[data-cat="graded"]');
+  check((await texts('.bcv-nf__group-t')).join(',') === 'Graded' && (await page.$eval('.bcv-nf__chip[data-cat="graded"]', (e) => e.classList.contains('is-on'))), 'a chip narrows the list to one kind');
+  await page.click('.bcv-nf__chip[data-cat="all"]');
+  await page.click('.bcv-nf__row[data-cat="graded"] .bcv-nf__ib--read');
+  await page.waitForFunction(() => document.querySelector('.bcv-nf__row[data-cat="graded"]')?.classList.contains('is-read'), null, { timeout: 5000 });
+  check((await texts('.bcv-head__sub'))[0] === `${nfTotal - 1} unread · ${nfTotal} total` && Object.keys((await prefsOf()).notifState?.read || {}).length === 1, 'the tick marks one read: the dot goes, the count follows, the state is saved under the site');
+  await page.click('#bcv-nf-unread');
+  check((await page.$$('.bcv-nf__row')).length === nfTotal - 1 && (await page.$eval('#bcv-nf-unread', (e) => e.classList.contains('is-on'))), 'Unread only hides the read one');
+  await page.click('#bcv-nf-unread');
+  await page.click('.bcv-nf__row[data-cat="feedback"] .bcv-nf__ib--x');
+  await page.waitForSelector('.bcv-nf__gone', { timeout: 5000 });
+  check((await page.$$('.bcv-nf__row')).length === nfTotal - 1 && (await texts('.bcv-nf__gone'))[0].startsWith('1 dismissed') && !(await texts('.bcv-nav')).some((t) => new RegExp(`Notifications\\s*${nfTotal}\\b`).test(t)), 'Dismiss removes a row, offers Restore, and the badge drops');
+  await page.click('#bcv-nf-restore');
+  await page.waitForFunction(() => !document.querySelector('.bcv-nf__gone'), null, { timeout: 5000 });
+  check((await page.$$('.bcv-nf__row')).length === nfTotal, 'Restore brings it back');
+  await page.click('#bcv-nf-readall');
+  await page.waitForFunction((n) => document.querySelector('.bcv-head__sub')?.textContent === `${n} alerts · all read`, nfTotal, { timeout: 5000 });
+  check(!(await texts('.bcv-nav')).some((t) => /Notifications\s*\d/.test(t)), 'Mark all read clears the sidebar badge');
+  await page.click('#bcv-nf-unread');
+  check((await texts('.bcv-nf__empty'))[0] === 'Nothing unread here.', 'Unread only with nothing unread says so');
+  await page.click('#bcv-nf-unread');
+  await Promise.all([page.waitForNavigation({ timeout: 15000 }), page.click('.bcv-nf__row[data-cat="graded"] .bcv-nf__act')]);
+  check(page.url() === `${BASE}/courses/101/assignments/1007`, `the action opens the item in Canvas: ${page.url()}`);
+
   // ---- extension pages ---------------------------------------------------------------------------------
   console.log('extension pages');
   const options = await context.newPage();
@@ -1170,9 +1209,9 @@ try {
   check(!(await apiGet('/api/v1/courses?per_page=100')).find((c) => String(c.id) === offId).is_favorite, 'hiding a course removes it from the Canvas favourites');
   await (await options.$(`.course[data-course="${offId}"] .switch`)).click();
   await options.waitForFunction((id) => !document.querySelector(`.course[data-course="${id}"]`)?.classList.contains('is-off'), offId, { timeout: 10000 });
-  await options.click(`.course[data-course="${offId}"] .seg button[data-value="2"]`);
+  await options.click(`.course[data-course="${offId}"] .seg button[data-value="B+"]`);
   await options.waitForTimeout(300);
-  check((await apiGet('/api/v1/courses?per_page=100')).find((c) => String(c.id) === offId).is_favorite && (await prefsOf()).gradeTargets?.[offId] === 2, 'showing it again restores the favourite, and the letter writes the target the Grades page reads');
+  check((await apiGet('/api/v1/courses?per_page=100')).find((c) => String(c.id) === offId).is_favorite && (await prefsOf()).gradeTargets?.[offId] === 'B+' && (await options.$$eval('.course:first-child .seg button', (bs) => bs.map((b) => b.textContent))).join(' ') === 'C B B+ A- A A+', 'showing it again restores the favourite, and the letter writes the target the Grades page reads; the letters run low to high with A+ on the right');
   await options.screenshot({ path: join(out, '29-options-courses.png'), fullPage: true });
   // Grades: the same preferences as the Grades page
   await options.click('.navlink[data-section="grades"]');
