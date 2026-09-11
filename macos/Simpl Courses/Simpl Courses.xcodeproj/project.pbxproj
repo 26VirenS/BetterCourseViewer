@@ -24,6 +24,7 @@
 		F7FED3DF3053804700DCC66B /* icons in Resources */ = {isa = PBXBuildFile; fileRef = F7FED3D83053804700DCC66B /* icons */; };
 		F7FED3E03053804700DCC66B /* manifest.json in Resources */ = {isa = PBXBuildFile; fileRef = F7FED3D93053804700DCC66B /* manifest.json */; };
 		F7FED3E13053804700DCC66B /* lib in Resources */ = {isa = PBXBuildFile; fileRef = F7FED3DA3053804700DCC66B /* lib */; };
+		F7FED3E33053804700DCC66C /* setup in Resources */ = {isa = PBXBuildFile; fileRef = F7FED3E23053804700DCC66C /* setup */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -69,6 +70,7 @@
 		F7FED3D83053804700DCC66B /* icons */ = {isa = PBXFileReference; lastKnownFileType = folder; name = icons; path = ../../../extension/icons; sourceTree = "<group>"; };
 		F7FED3D93053804700DCC66B /* manifest.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; name = manifest.json; path = ../../../extension/manifest.json; sourceTree = "<group>"; };
 		F7FED3DA3053804700DCC66B /* lib */ = {isa = PBXFileReference; lastKnownFileType = folder; name = lib; path = ../../../extension/lib; sourceTree = "<group>"; };
+		F7FED3E23053804700DCC66C /* setup */ = {isa = PBXFileReference; lastKnownFileType = folder; name = setup; path = ../../../extension/setup; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -147,6 +149,7 @@
 				F7FED3D83053804700DCC66B /* icons */,
 				F7FED3D93053804700DCC66B /* manifest.json */,
 				F7FED3DA3053804700DCC66B /* lib */,
+				F7FED3E23053804700DCC66C /* setup */,
 			);
 			name = Resources;
 			path = "Simpl Courses Extension";
@@ -249,6 +252,7 @@
 				F7FED3E13053804700DCC66B /* lib in Resources */,
 				F7FED3E03053804700DCC66B /* manifest.json in Resources */,
 				F7FED3DC3053804700DCC66B /* popup in Resources */,
+				F7FED3E33053804700DCC66C /* setup in Resources */,
 			);
 		};
 /* End PBXResourcesBuildPhase section */
@@ -434,7 +438,7 @@
 					"@executable_path/../../../../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				MARKETING_VERSION = 2.2.0;
+				MARKETING_VERSION = 2.2.1;
 				OTHER_LDFLAGS = (
 					"-framework",
 					SafariServices,
@@ -469,7 +473,7 @@
 					"@executable_path/../../../../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				MARKETING_VERSION = 2.2.0;
+				MARKETING_VERSION = 2.2.1;
 				OTHER_LDFLAGS = (
 					"-framework",
 					SafariServices,
@@ -508,7 +512,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 2.2.0;
+				MARKETING_VERSION = 2.2.1;
 				OTHER_LDFLAGS = (
 					"-framework",
 					SafariServices,
@@ -550,7 +554,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 2.2.0;
+				MARKETING_VERSION = 2.2.1;
 				OTHER_LDFLAGS = (
 					"-framework",
 					SafariServices,

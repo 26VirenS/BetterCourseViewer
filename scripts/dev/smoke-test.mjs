@@ -43,6 +43,19 @@ const check = (cond, label) => {
 };
 const shot = (page, name) => page.screenshot({ path: join(out, `${name}.png`) });
 
+// 3. the native projects ship every top-level entry of extension/ and carry the same version
+{
+  const { readdirSync } = await import('node:fs');
+  const pbx = readFileSync(join(root, 'macos', 'Simpl Courses', 'Simpl Courses.xcodeproj', 'project.pbxproj'), 'utf8');
+  const iosYml = readFileSync(join(root, 'ios', 'project.yml'), 'utf8');
+  console.log('\nbundles');
+  for (const entry of readdirSync(join(root, 'extension')).filter((n) => !n.startsWith('.'))) {
+    check(pbx.includes(`path = ../../../extension/${entry};`), `Mac app bundles extension/${entry}`);
+  }
+  check(pbx.split(`MARKETING_VERSION = ${manifest.version};`).length === 5, `Mac app version is ${manifest.version}`);
+  check(iosYml.includes(`MARKETING_VERSION: "${manifest.version}"`), `iOS app version is ${manifest.version}`);
+}
+
 const userDataDir = join(tmpdir(), `bcv-profile-${Date.now()}`);
 const context = await chromium.launchPersistentContext(userDataDir, {
   channel: 'chromium',
