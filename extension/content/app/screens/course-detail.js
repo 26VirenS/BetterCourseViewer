@@ -55,16 +55,26 @@
     };
     // the phone draws the item page its own way (the iPhone mockup)
     if (BCV.phone?.active()) return BCV.phone.assignment(ctx, shell, { a, s, types, isTool, toolNewTab, toolLaunch, nativeSubmit, canvasOnly, attemptsLeft, status, smart });
+    // Handing in lives inside the assignment (mockup 11): the block sits at the end of the same
+    // scroll as the instructions, built from the assignment already loaded for this page. The
+    // "Submit assignment" button and ?bcv=submit (a To Do row) just bring it into view.
+    const fromTodo = route.params.get('from') === 'todo';
+    const back = fromTodo ? { href: '/#todo', label: 'To Do' } : { href: `${c.url}/assignments`, label: 'Assignments' };
+    let extra = null; // the block's own smart suggestion joins the page's
+    const applySmart = () => ctx.setSmart(!extra ? smart : { ...smart, actions: [...smart.actions, extra.action], context: () => `${smart.context()}\n\n${extra.context()}` });
+    const block = nativeSubmit && !isTool ? await BCV.screens.submit.render(ctx, c, { embed: true, a, sub: s, back, onSmart: (x) => { extra = x; applySmart(); } }) : null;
+    if (!ctx.alive()) return b;
+    const toBlock = (behavior = 'smooth') => block?.scrollIntoView({ behavior, block: 'start' });
     // replaceChildren() would print a literal "null" for a missing block, so drop them first
     main.replaceChildren(...[
-      backBtn(app, `${c.url}/assignments`, 'Assignments'),
+      backBtn(app, back.href, back.label),
       U.card(U.el('bcv-detail', [
         h('h2', { class: 'bcv-detail__title bcv-pretty', text: a.name }),
         meta([['Due', a.due_at ? U.fmtAt(a.due_at) : 'No due date'], ['Points', a.points_possible ?? '—'], ['Submitting', types], ['Available', available], ['Attempts', a.allowed_attempts && a.allowed_attempts > 0 ? `${s.attempt || 0} of ${a.allowed_attempts}` : null]]),
         U.el('bcv-detail__actions', [
           isTool ? (toolNewTab ? U.btn('Open the tool', { kind: 'primary', icon: IC.external, iconColor: '#fff', onClick: () => window.open(toolLaunch, '_blank', 'noopener') }) : null)
             : nativeSubmit ? (a.locked_for_user ? U.badge(a.lock_explanation ? htmlToText(a.lock_explanation, 120) : 'Locked', 'orange')
-              : attemptsLeft ? U.btn(s.submitted_at ? 'Resubmit' : 'Submit assignment', { kind: 'primary', icon: IC.send, iconColor: '#fff', onClick: () => app.go(`${c.url}/assignments/${a.id}?bcv=submit`) })
+              : attemptsLeft ? U.btn(s.submitted_at ? 'Resubmit' : 'Submit assignment', { kind: 'primary', icon: IC.send, iconColor: '#fff', onClick: () => toBlock() })
                 : U.badge(`No attempts left · ${a.allowed_attempts} allowed`, 'orange'))
               : canvasOnly ? U.btn(s.submitted_at ? 'Resubmit in Canvas' : 'Submit in Canvas', { kind: 'primary', icon: IC.external, iconColor: '#fff', onClick: () => app.go(nativeHref(`${c.url}/assignments/${a.id}`)) }) : null,
           a.quiz_id ? U.btn('Open quiz', { icon: IC.bolt, onClick: () => app.go(`${c.url}/quizzes/${a.quiz_id}`) }) : null,
@@ -78,7 +88,9 @@
         U.el('bcv-row__head', [U.text('bcv-label bcv-label--inline', 'External tool', 'span'), h('span', { class: 'bcv-ml-auto' }), h('a', { class: 'bcv-chip', href: toolLaunch, target: '_blank', rel: 'noopener', text: 'Open in new tab' })]),
         h('iframe', { class: 'bcv-frame bcv-frame--doc', src: toolLaunch, title: a.name, allowfullscreen: '', allow: 'fullscreen; microphone; camera; display-capture; autoplay; clipboard-write' }),
       ]), 'bcv-card--22') : null,
+      block,
     ].filter(Boolean));
+    if (block && route.params.get('bcv') === 'submit') for (const ms of [80, 600]) setTimeout(() => toBlock('auto'), ms); // opened to hand in: land on the block (again once Canvas's own page has finished loading under us)
     // side: submission + rubric
     side.append(h('div', {}, [U.label('Submission'), U.card(U.el('bcv-detail', [
       h('div', { style: { display: 'flex', alignItems: 'baseline', gap: '10px', flexWrap: 'wrap' } }, [h('span', { class: 'bcv-stat__value', text: s.workflow_state === 'graded' && s.score !== null && s.score !== undefined ? `${store.fmtPts(s.score)} / ${a.points_possible ?? '—'}` : '—' }), U.badge(status, status === 'Graded' ? 'green' : /Missing|Not/.test(status) ? 'red' : /late/.test(status) ? 'orange' : '')]),
@@ -96,7 +108,7 @@
         ]);
       }))), 'bcv-card--22')]));
     }
-    ctx.setSmart(smart);
+    applySmart();
     return b;
   };
 

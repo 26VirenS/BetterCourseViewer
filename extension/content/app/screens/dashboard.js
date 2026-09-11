@@ -75,6 +75,10 @@
 
     // ---- stats -------------------------------------------------------------------
     // Each counter opens a sheet listing exactly the items it counted.
+    // Entry motion (mockup 11) plays once, on the first draw: counters roll to their value, workload
+    // bars wipe in. A redraw (view switch, a recolour) shows the final numbers at once.
+    let entered = false;
+    const t0 = Date.now();
     const byDate = (a, b) => a.date - b.date;
     const dueRow = (it) => {
       const c = it.course;
@@ -86,21 +90,22 @@
 
     function statsBlock() {
       const cards = [];
+      const first = !entered; // this draw is the entry: a count that lands a moment later still rolls in
       if (planner) {
         const pts = dueToday.reduce((s, it) => s + (Number(it.points) || 0), 0);
-        cards.push(stat('Due today', String(dueToday.length), `${store.fmtPts(pts)} points total`, IC.clock, '#ff453a', () => openSheet({
+        cards.push(stat('Due today', String(dueToday.length), `${store.fmtPts(pts)} points total`, IC.clock, '#ff453a', (from) => openSheet({
           label: 'Due today', value: String(dueToday.length), icon: IC.clock, color: '#ff453a',
           note: `${store.fmtPts(pts)} points across ${U.plural(courseCount(dueToday), 'course')} · ${U.DAYS_LONG[now.getDay()]}, ${U.MONTHS_LONG[now.getMonth()]} ${now.getDate()}`,
           items: [...dueToday].sort(byDate).map(dueRow), empty: 'Nothing is due today.',
-        })));
-        cards.push(stat('Due this week', String(dueWeek.length), `Across ${U.plural(courseCount(dueWeek), 'course')}`, IC.cal, '#34c759', () => openSheet({
+        }, from)));
+        cards.push(stat('Due this week', String(dueWeek.length), `Across ${U.plural(courseCount(dueWeek), 'course')}`, IC.cal, '#34c759', (from) => openSheet({
           label: 'Due this week', value: String(dueWeek.length), icon: IC.cal, color: '#34c759',
           note: `Week of ${U.fmtShort(weekStart)} · ${U.plural(courseCount(dueWeek), 'course')}`,
           items: [...dueWeek].sort(byDate).map(dueRow), empty: 'Nothing is due this week.',
-        })));
+        }, from)));
       }
       let unreadSheet = { label: 'Unread announcements', value: '…', icon: IC.bell, color: '#ff9500', note: 'Loading…', items: [] };
-      const unreadCard = stat('Unread announcements', '…', '', IC.bell, '#ff9500', () => openSheet(unreadSheet));
+      const unreadCard = stat('Unread announcements', '…', '', IC.bell, '#ff9500', (from) => openSheet(unreadSheet, from));
       cards.push(unreadCard);
       // unread = [{ title, when, courseId, courseName, url }]; count is what the number shows
       const nameOf = (u) => courseMap.get(String(u.courseId))?.shortName || courseMap.get(String(u.courseId))?.name || u.courseName || '';
@@ -110,7 +115,9 @@
         let top = '';
         let n = 0;
         for (const [k, v] of perCourse) if (v > n) { top = k; n = v; }
-        unreadCard.querySelector('.bcv-stat__value').textContent = String(count);
+        const valueEl = unreadCard.querySelector('.bcv-stat__value');
+        if (first && Date.now() - t0 < 2500) U.roll(valueEl, count, { seed: 4.6 });
+        else valueEl.textContent = String(count);
         unreadCard.querySelector('.bcv-stat__note').textContent = top || (count ? 'Not all listed' : 'All caught up');
         const items = unread.map((u) => {
           const c = courseMap.get(String(u.courseId));
@@ -145,15 +152,19 @@
     }
     let statIndex = 0;
     function stat(lbl, value, note, icon, color, onOpen) {
-      return U.enter(h('button', { type: 'button', class: 'bcv-card bcv-stat', onclick: onOpen }, [
+      const valueEl = U.el('bcv-stat__value', value);
+      const i = statIndex++;
+      if (!entered && /^\d+$/.test(value)) U.roll(valueEl, Number(value), { seed: i * 2.3 }); // the counter scrambles briefly, then lands on the real count
+      return U.enter(h('button', { type: 'button', class: 'bcv-card bcv-stat', onclick: (e) => onOpen(e.currentTarget) }, [
         U.el('bcv-stat__head', [U.svg(icon, { size: 14, stroke: color, width: 1.9 }), U.text('bcv-label bcv-label--inline', lbl, 'span')]),
-        U.el('bcv-stat__value', value),
+        valueEl,
         U.el('bcv-stat__noterow', [U.text('bcv-stat__note', note, 'span'), U.svg(IC.chevron, { size: 13, stroke: 'var(--bcv-ink3)', width: 2, cls: 'bcv-stat__chev' })]),
-      ]), statIndex++, 50);
+      ]), i, 50);
     }
 
-    /** The detail sheet behind a counter: header with the number, then one row per item. */
-    function openSheet(def) {
+    /** The detail sheet behind a counter: header with the number, then one row per item.
+     *  It grows out of the counter that opened it (`from`). */
+    function openSheet(def, from = null) {
       document.querySelector('.bcv-sheet-ov')?.remove();
       const ov = U.el('bcv-sheet-ov', null, { role: 'dialog', 'aria-label': def.label });
       const close = () => ov.remove();
@@ -178,6 +189,7 @@
         ]),
       ]));
       document.body.append(ov);
+      U.morphFrom(ov.firstElementChild, from);
       ov.tabIndex = -1;
       ov.focus();
     }
@@ -185,20 +197,23 @@
     // ---- workload ------------------------------------------------------------------
     function workloadBlock() {
       if (!planner || !favs.length) return null;
-      const row = (c, mine) => {
+      // on entry each row floats in and its bar wipes from the left, staggered down the list (mockup 11)
+      const row = (c, mine, i) => {
         const done = mine.filter((it) => it.submitted).length;
         const pct = mine.length ? Math.round((done / mine.length) * 100) : 0;
-        return U.el('bcv-work__row', [
+        const k = Math.min(i, 6);
+        const fill = h('span', { class: `bcv-work__fill ${!entered ? 'bcv-work__fill--grow' : ''}`, style: { width: `${pct}%`, background: c.color, '--bcv-delay': `${140 + k * 90}ms` } });
+        return U.el(`bcv-work__row ${!entered ? 'bcv-work__row--in' : ''}`, [
           U.dot(c.color, 'bcv-dot--9'),
           U.text('bcv-work__code bcv-ellip', c.shortName || c.name, 'span'),
-          h('span', { class: 'bcv-work__bar' }, h('span', { class: 'bcv-work__fill', style: { width: `${pct}%`, background: c.color } })),
+          h('span', { class: 'bcv-work__bar' }, fill),
           U.text('bcv-work__count', `${done} / ${mine.length}`, 'span'),
-        ]);
+        ], { style: { '--bcv-delay': `${90 + k * 70}ms` } });
       };
       const active = [], idle = [];
       for (const c of favs) {
         const mine = weekAll.filter((it) => it.courseId === c.id);
-        (mine.length ? active : idle).push(row(c, mine));
+        (mine.length ? active : idle).push(row(c, mine, mine.length ? active.length : idle.length));
       }
       // Courses with nothing assigned this week fold away under a disclosure.
       const idleWrap = U.el('bcv-work__idle', idle);
@@ -221,7 +236,8 @@
     function cardsBlock() {
       if (!favs.length) return U.emptyCard('No courses on your dashboard yet. Star some under Courses.');
       const grid = U.el('bcv-cards');
-      for (const c of favs) {
+      const first = !entered;
+      favs.forEach((c, i) => {
         const todayN = dueToday.filter((it) => it.courseId === c.id).length;
         const next = dueItems.filter((it) => it.courseId === c.id && !it.submitted && it.date >= todayStart).sort((a, b) => a.date - b.date)[0];
         const badgeEl = todayN ? U.badge(`${todayN} due today`, 'red', 'bcv-badge--sm') : (next ? U.badge(`${next.title} ${U.whenShort(next.date)}`, '', 'bcv-badge--sm') : U.badge('Nothing due', '', 'bcv-badge--sm'));
@@ -238,15 +254,15 @@
             U.el('bcv-ccard__foot', [...quick, badgeEl]),
           ]),
         ]);
-        grid.append(card);
+        grid.append(first ? U.enter(card, i, 55) : card); // the cards float in beneath the workload, once
         store.progress(c.id).then(({ done, total }) => {
           if (!total) return;
           progress.append(
-            U.el('bcv-bar', h('div', { class: 'bcv-bar__fill', style: { width: `${Math.round((done / total) * 100)}%`, background: c.color } })),
+            U.el('bcv-bar', h('div', { class: `bcv-bar__fill ${first && Date.now() - t0 < 2500 ? 'bcv-work__fill--grow' : ''}`, style: { width: `${Math.round((done / total) * 100)}%`, background: c.color } })),
             U.text('bcv-bar__note', `${done} of ${total} items submitted`),
           );
         });
-      }
+      });
       return grid;
     }
     function quickLinks(c) {
@@ -432,6 +448,7 @@
       else viewEl = listBlock();
       if (!ctx.alive()) return;
       body.replaceChildren(...[stats, work, viewEl].filter(Boolean));
+      entered = true;
     }
 
     draw();

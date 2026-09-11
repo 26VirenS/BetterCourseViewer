@@ -10,7 +10,7 @@ html[data-bcv-theme] {
   --bcv-blur-chrome: blur(14px) saturate(1.4); --bcv-blur-glass: blur(22px); --bcv-blur-scrim: blur(8px);
   --bcv-shadow-glass: 0 20px 50px rgba(0,0,0,.3);
   --bcv-blue: #0a6cff; --bcv-blue-soft: rgba(10,108,255,.1);
-  --bcv-shadow: 0 1px 2px rgba(0,0,0,.05); --bcv-shadow-hi: 0 6px 18px rgba(0,0,0,.09);
+  --bcv-shadow: 0 1px 2px rgba(0,0,0,.05); --bcv-shadow-hi: 0 6px 18px rgba(0,0,0,.09); --bcv-shadow-lift: 0 8px 20px rgba(0,0,0,.1);
   --bcv-red: #ff453a; --bcv-red-soft: rgba(255,69,58,.16); --bcv-red-text: #c1271d;
   --bcv-green: #34c759; --bcv-green-text: #1a6b30; --bcv-orange: #ff9500; --bcv-indigo: #5856d6; --bcv-dash: rgba(60,60,67,.28);
   --bcv-font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif;
@@ -22,7 +22,7 @@ html[data-bcv-theme="dark"] {
   --bcv-sep: rgba(255,255,255,.08); --bcv-edge: rgba(255,255,255,.1); --bcv-fill: rgba(118,118,128,.28); --bcv-fill2: rgba(118,118,128,.14);
   --bcv-hover: #2c2c2e; --bcv-chrome: rgba(0,0,0,.6); --bcv-panel: rgba(255,255,255,.05); --bcv-glass: rgba(28,28,30,.74); --bcv-scrim: rgba(0,0,0,.42);
   --bcv-blue: #0a84ff; --bcv-blue-soft: rgba(10,132,255,.18);
-  --bcv-shadow: 0 1px 2px rgba(0,0,0,.4); --bcv-shadow-hi: 0 6px 20px rgba(0,0,0,.5);
+  --bcv-shadow: 0 1px 2px rgba(0,0,0,.4); --bcv-shadow-hi: 0 6px 20px rgba(0,0,0,.5); --bcv-shadow-lift: 0 8px 20px rgba(0,0,0,.45);
   --bcv-red-text: #ff8a80; --bcv-green-text: #5ddb7d; --bcv-dash: rgba(255,255,255,.28);
 }
 
@@ -34,16 +34,39 @@ html[data-bcv-theme="dark"] {
 @keyframes bcv-shimmer { 0% { background-position: -320px 0; } 100% { background-position: 320px 0; } }
 @keyframes bcv-bar { 0% { transform: translateX(-100%) scaleX(.4); } 55% { transform: translateX(20%) scaleX(.7); } 100% { transform: translateX(100%) scaleX(.5); } }
 @keyframes bcv-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
-/* screens rise in; sheets rise over a fading scrim; popovers pop */
+/* mockup 11: a sheet grows out of the control that opened it (transform-origin set per sheet), the scrim blurs in */
+@keyframes bcv-morph { from { opacity: 0; transform: scale(.82); } 60% { opacity: 1; } to { opacity: 1; transform: scale(1); } }
+@keyframes bcv-scrim { from { opacity: 0; -webkit-backdrop-filter: blur(0); backdrop-filter: blur(0); } to { opacity: 1; -webkit-backdrop-filter: var(--bcv-blur-scrim); backdrop-filter: var(--bcv-blur-scrim); } }
+/* data arrives rather than appears: an arc sweeps from empty to its value (the `to` is the ring's own dasharray), a line strokes itself on */
+@keyframes bcv-ring-fill { from { stroke-dasharray: 0 999; } }
+@keyframes bcv-line-draw { from { stroke-dashoffset: 420; } to { stroke-dashoffset: 0; } }
+/* screens rise in; sheets grow over a blurring scrim; popovers pop */
 .bcv-main > .bcv-screen, .bcv-main > .bcv-qz, .bcv-main > .bcv-sb { animation: bcv-fade-up .34s cubic-bezier(.32,.72,0,1) both; }
 .bcv-main > .bcv-screen--skel { animation: none; } /* the placeholder does not rise; the real screen does when it lands */
-/* staggered entry: major blocks and list items follow the screen root, index × step, capped at 420ms (U.enter) */
-.bcv-enter { animation: bcv-fade-up var(--bcv-dur, 380ms) cubic-bezier(.32,.72,0,1) var(--bcv-delay, 0ms) both; }
+/* staggered entry: major blocks and list items follow the screen root, index × step, capped at 420ms (U.enter).
+   The fill is backwards only: the end state is the element's own, so a hover lift can move it once it has landed. */
+.bcv-enter { animation: bcv-fade-up var(--bcv-dur, 380ms) cubic-bezier(.32,.72,0,1) var(--bcv-delay, 0ms) backwards; }
 .bcv-reader-btn[hidden] { display: none; } /* the Immersive Reader button only exists where there is a body to read */
-.bcv-sheet-ov { animation: bcv-fade-in .2s ease both; }
-.bcv-sheet { animation: bcv-sheet .26s cubic-bezier(.32,.72,0,1) both; }
+.bcv-sheet-ov { animation: bcv-scrim .28s cubic-bezier(.32,.72,0,1) both; }
+.bcv-sheet { animation: bcv-morph .34s cubic-bezier(.32,.72,0,1) backwards; transform-origin: 50% 50%; }
+html.bcv-phone .bcv-sheet { animation: bcv-sheet .26s cubic-bezier(.32,.72,0,1) both; } /* the phone's bottom sheets keep their rise */
 .bcv-smart, .bcv-menu, .bcv-toast, .bcv-gpa__pop { animation: bcv-pop .2s cubic-bezier(.32,.72,0,1) both; }
 .bcv-reader-ov { animation: bcv-fade-in .2s ease both; }
+/* Dashboard entry: workload rows float in and their bars wipe from the left, staggered down the list */
+.bcv-work__row--in { animation: bcv-fade-up .42s cubic-bezier(.32,.72,0,1) var(--bcv-delay, 0ms) backwards; }
+.bcv-work__fill--grow { transform-origin: left; animation: bcv-grow .8s cubic-bezier(.32,.72,0,1) var(--bcv-delay, 0ms) both; }
+/* Grades entry: each course ring sweeps to its score 70ms down the grid; group rings fill in as they mount; the trend line draws left to right and its dots follow */
+.bcv-ring--fill { animation: bcv-ring-fill .9s cubic-bezier(.32,.72,0,1) var(--bcv-delay, 0ms) both; }
+.bcv-ring--fill-cat { animation-duration: .55s; }
+.bcv-gpa__line--draw { stroke-dasharray: 420; animation: bcv-line-draw 1.05s cubic-bezier(.32,.72,0,1) .2s both; }
+.bcv-gpa__pt--in { animation: bcv-pop .25s cubic-bezier(.32,.72,0,1) var(--bcv-delay, 0ms) backwards; }
+/* hover and press: cards lift, buttons give (transitions stay on pseudo-state only, mockup 8 rule) */
+.bcv-stat, .bcv-gpa__card, .bcv-ccard { transition: transform .22s cubic-bezier(.32,.72,0,1), box-shadow .22s ease, background .2s ease; }
+.bcv-stat:hover, .bcv-gpa__card:hover { transform: translateY(-2px); box-shadow: var(--bcv-shadow-lift); }
+.bcv-stat:active { transform: scale(.985); }
+.bcv-btn, .bcv-sb__btn, .bcv-qz__big, .bcv-gpa__details, .bcv-gpa__traychip { transition: transform .16s cubic-bezier(.32,.72,0,1), filter .16s ease, background .16s ease; }
+.bcv-btn:active:not(:disabled), .bcv-sb__btn:active:not(:disabled), .bcv-qz__big:active, .bcv-gpa__details:active { transform: scale(.97); }
+.bcv-row--link, .bcv-row--hover, .bcv-sheet__row, .bcv-nf__row, .bcv-menu__item, .bcv-nav__item, .bcv-rail__item, .bcv-rail__ext, .bcv-fav, .bcv-theme-btn { transition: background .18s ease; }
 /* the navigation bar: a 2.5px sweep pinned to the top of the viewport while a route loads (early.js shows it, app.js hides it once the screen is drawn) */
 #bcv-progress { position: fixed; top: 0; left: 0; right: 0; height: 2.5px; z-index: 60; overflow: hidden; background: transparent; pointer-events: none; }
 #bcv-progress[hidden], html:not(.bcv-on) #bcv-progress { display: none; }
@@ -70,8 +93,10 @@ html[data-bcv-theme="dark"] .bcv-skel { --bcv-skel: linear-gradient(90deg, rgba(
 .bcv-skel__bar { height: 6px; border-radius: 3px; }
 .bcv-skel__btn { height: 34px; border-radius: 17px; }
 @media (prefers-reduced-motion: reduce) {
-  /* entrances go; the loading indicators (bar, shimmer) stay */
-  .bcv-main > .bcv-screen, .bcv-main > .bcv-qz, .bcv-main > .bcv-sb, .bcv-sheet-ov, .bcv-sheet, .bcv-smart, .bcv-menu, .bcv-toast, .bcv-gpa__pop, .bcv-reader-ov, .bcv-skel, .bcv-enter, .bcv-fb__fill { animation: none; }
+  /* entrances go (data lands on its final value at once); the loading indicators (bar, shimmer) stay */
+  .bcv-main > .bcv-screen, .bcv-main > .bcv-qz, .bcv-main > .bcv-sb, .bcv-sheet-ov, .bcv-sheet, .bcv-smart, .bcv-menu, .bcv-toast, .bcv-gpa__pop, .bcv-reader-ov, .bcv-skel, .bcv-enter, .bcv-fb__fill,
+  .bcv-work__row--in, .bcv-work__fill--grow, .bcv-ring--fill, .bcv-gpa__line--draw, .bcv-gpa__pt--in { animation: none; }
+  .bcv-stat, .bcv-gpa__card, .bcv-ccard, .bcv-btn, .bcv-sb__btn { transition: none; }
 }
 
 /* ---- take over the page ------------------------------------------------ */
@@ -108,7 +133,10 @@ html.bcv-on #bcv-app { display: flex; }
 .bcv-nav__item { display: flex; align-items: center; gap: 11px; width: 100%; padding: 7px 10px; border: 0; border-radius: 10px; cursor: pointer; text-align: left; font: 600 14px/1.2 var(--bcv-font); color: var(--bcv-ink); background: transparent; box-shadow: none; }
 .bcv-nav__item:hover { background: var(--bcv-fill2); }
 .bcv-nav__item.is-active { background: var(--bcv-card); box-shadow: var(--bcv-shadow); }
-.bcv-nav__tile { width: 26px; height: 26px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex: none; }
+/* mockup 11: bare glyphs in their own colour — full strength on the active row, dimmed on the rest */
+.bcv-nav__ic { width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; flex: none; }
+.bcv-nav__ic svg { opacity: .62; transition: opacity .2s ease; }
+.bcv-nav__item.is-active .bcv-nav__ic svg { opacity: 1; }
 .bcv-nav__count { margin-left: auto; font: 600 11px/1 var(--bcv-font); color: var(--bcv-ink3); }
 .bcv-side__group { display: flex; flex-direction: column; gap: 2px; }
 .bcv-side__label { padding: 6px 10px; font: 600 11px/1.2 var(--bcv-font); color: var(--bcv-ink3); text-transform: uppercase; letter-spacing: .05em; }
@@ -494,8 +522,10 @@ html[data-bcv-theme="dark"] .bcv-cal__notice--warn { color: #ffb44d; }
 .bcv-rail__item { display: flex; align-items: center; gap: 10px; width: 100%; padding: 7px 9px; border: 0; border-radius: 12px; cursor: pointer; text-align: left; background: transparent; color: var(--bcv-ink); font: 500 13.5px/1.3 var(--bcv-font); letter-spacing: -.01em; }
 .bcv-rail__item:hover { background: var(--bcv-fill2); }
 .bcv-rail__item.is-active { background: var(--bcv-rail-tint); color: var(--bcv-rail-text); font-weight: 600; }
-.bcv-rail__tile { flex: none; width: 26px; height: 26px; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: var(--bcv-fill); color: var(--bcv-ink3); position: relative; }
-.bcv-rail__item.is-active .bcv-rail__tile { background: var(--bcv-rail-color); color: #fff; }
+/* mockup 11: the glyph in the course colour, no tile — full strength on the active row, dimmed on the rest */
+.bcv-rail__tile { flex: none; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; color: var(--bcv-rail-color); position: relative; }
+.bcv-rail__tile svg { opacity: .6; transition: opacity .2s ease; }
+.bcv-rail__item.is-active .bcv-rail__tile svg { opacity: 1; }
 .bcv-rail__label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bcv-rail__count { flex: none; min-width: 19px; height: 19px; padding: 0 6px; border-radius: 10px; background: var(--bcv-fill); font: 600 11px/19px var(--bcv-font); color: var(--bcv-ink2); text-align: center; }
 .bcv-rail__count:empty { display: none; }
@@ -506,6 +536,7 @@ html[data-bcv-theme="dark"] .bcv-cal__notice--warn { color: #ffb44d; }
 .bcv-rail__toggle { margin-top: auto; display: flex; align-items: center; gap: 9px; padding: 7px 9px; border: 0; border-radius: 12px; background: transparent; color: var(--bcv-ink3); cursor: pointer; font: 600 12.5px/1.2 var(--bcv-font); text-align: left; }
 .bcv-rail__toggle:hover { background: var(--bcv-fill2); }
 .bcv-rail__toggle .bcv-rail__tile { color: var(--bcv-ink3); }
+.bcv-rail__toggle .bcv-rail__tile svg { opacity: 1; }
 /* narrow rail: tiles only, counts become a dot on the tile */
 .bcv-rail.is-narrow { width: 72px; }
 .bcv-rail.is-narrow .bcv-rail__title, .bcv-rail.is-narrow .bcv-rail__label, .bcv-rail.is-narrow .bcv-rail__count, .bcv-rail.is-narrow .bcv-rail__group--ext { display: none; }
@@ -917,6 +948,15 @@ html[data-bcv-theme="dark"] .bcv-sb__chip--due { color: #ffb44d; }
 .bcv-sb__toolname { font: 600 14.5px/1.35 var(--bcv-font); }
 .bcv-sb__toolnote { margin-top: 2px; font: 400 12px/1.3 var(--bcv-font); color: var(--bcv-ink3); }
 .bcv-sb__foot { position: sticky; bottom: 0; z-index: 6; background: var(--bcv-chrome); -webkit-backdrop-filter: var(--bcv-blur-chrome); backdrop-filter: var(--bcv-blur-chrome); border-top: 1px solid var(--bcv-edge); }
+/* the block inside the assignment page (mockup 11): no sticky chrome — the submit control ends the same scroll as the instructions */
+.bcv-sb--embed { min-height: 0; background: transparent; gap: 16px; scroll-margin-top: 16px; }
+.bcv-sb--embed .bcv-sb__head, .bcv-sb--embed .bcv-sb__foot { position: static; z-index: auto; background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; border: 0; padding: 0; }
+.bcv-sb--embed .bcv-sb__headin, .bcv-sb--embed .bcv-sb__page, .bcv-sb--embed .bcv-sb__footin { max-width: none; margin: 0; padding: 0; }
+.bcv-sb--embed .bcv-sb__hrow { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.bcv-sb--embed .bcv-sb__chips { margin-top: 0; }
+.bcv-sb--embed .bcv-sb__head .bcv-sb__note { margin-top: 8px; }
+.bcv-sb--embed .bcv-sb__body { flex: none; }
+.bcv-sb--embed .bcv-sb__footin { padding: 4px 0 0; }
 .bcv-sb__footin { max-width: 720px; margin: 0 auto; padding: 14px 40px; display: flex; align-items: center; gap: 12px; }
 .bcv-sb__footnote { flex: 1; min-width: 0; font: 500 12.5px/1.35 var(--bcv-font); color: var(--bcv-ink3); }
 .bcv-sb__btn { flex: none; height: 44px; padding: 0 20px; border: 0; border-radius: 22px; background: var(--bcv-fill); color: var(--bcv-ink); cursor: pointer; font: 600 15px/1 var(--bcv-font); }
@@ -1412,9 +1452,9 @@ html.bcv-phone .bcv-tour--pill { padding-bottom: calc(var(--bcv-ph-bottom, 0px) 
 
 /* ---- "More from Canvas": what the school added to Canvas's own nav ---- */
 .bcv-side__group--more { margin-top: 2px; }
-.bcv-nav__tile--more { background: var(--bcv-fill); }
-.bcv-nav__tile--tool { background: #2d3b45; } /* tool icons are drawn for Canvas's dark nav */
-.bcv-nav__tile img { width: 16px; height: 16px; object-fit: contain; display: block; }
+.bcv-nav__ic--tool { border-radius: 7px; background: #2d3b45; } /* a tool's own icon is drawn for Canvas's dark nav, so it keeps a small dark tile */
+.bcv-nav__ic--tool svg { opacity: 1; }
+.bcv-nav__ic img { width: 15px; height: 15px; object-fit: contain; display: block; }
 .bcv-nav__ext { margin-left: auto; flex: none; }
 .bcv-xrow__t { font: 600 14px/1.3 var(--bcv-font); color: var(--bcv-ink); }
 .bcv-xrow__s { font: 400 12.5px/1.35 var(--bcv-font); color: var(--bcv-ink3); }

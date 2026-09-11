@@ -200,7 +200,7 @@
         title: t.label,
         onclick: () => app.go(t.href),
       }, [
-        h('span', { class: 'bcv-rail__tile' }, U.svg(t.icon, { size: 14, width: 1.9 })),
+        h('span', { class: 'bcv-rail__tile' }, U.svg(t.icon, { size: 20, width: 1.8 })), // the glyph in the course colour (mockup 11)
         h('span', { class: 'bcv-rail__label', text: t.label }),
         count,
       ]);
@@ -273,8 +273,9 @@
     }
     // Taking a quiz: the whole main column is the quiz, no course chrome.
     if (route.tab === 'quiz' && ['take', 'feedback'].includes(route.params.get('bcv'))) return BCV.screens.quiz.render(ctx, course);
-    // Handing work in: the submission flow takes the main column (the sidebar stays, as in the mockup).
-    if (route.tab === 'assignment' && route.arg && route.params.get('bcv') === 'submit') return BCV.screens.submit.render(ctx, course);
+    // Handing work in on the phone: the submission flow takes the main column. On the desktop the
+    // block lives inside the assignment page itself (mockup 11), so ?bcv=submit just scrolls to it.
+    if (route.tab === 'assignment' && route.arg && route.params.get('bcv') === 'submit' && BCV.phone?.active()) return BCV.screens.submit.render(ctx, course);
 
     const shell = { course, reader: null, dark, kind: 'courses' };
     const tabs = (tabsRaw || []).filter((t) => !t.hidden && t.id !== 'settings').map((t) => {

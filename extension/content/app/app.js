@@ -172,7 +172,7 @@
     ['todo', 'To Do', IC.check, '#34c759', '/#todo', state.todoCount ? String(state.todoCount) : ''],
     ['calendar', 'Calendar', IC.cal, '#5856d6', '/calendar', ''],
     ['notifications', 'Notifications', IC.bell, '#ff453a', '/#notifications', state.notifCount ? String(state.notifCount) : ''],
-    ['inbox', 'Inbox', IC.mail, '#8e8e93', '/conversations', state.unread ? String(state.unread) : ''],
+    ['inbox', 'Inbox', IC.mail, '#0a84ff', '/conversations', state.unread ? String(state.unread) : ''],
     ['gpa', 'Grades', IC.chart, '#af52de', '/grades', ''], // purple: Calendar already has the indigo
   ];
 
@@ -269,13 +269,14 @@
     }
     side.replaceChildren(
       brandRow(name),
-      h('nav', { class: 'bcv-nav' }, navDef().map(([key, label, icon, tileColor, href, count]) => h('button', {
+      // mockup 11: the glyph in its own colour, no tile behind it; full strength on the active row, dimmed elsewhere
+      h('nav', { class: 'bcv-nav' }, navDef().map(([key, label, icon, glyphColor, href, count]) => h('button', {
         type: 'button',
         class: `bcv-nav__item ${r.screen === key || (key === 'groups' && r.screen === 'group') ? 'is-active' : ''}`,
         dataset: { nav: key },
         onclick: () => go(href),
       }, [
-        h('span', { class: 'bcv-nav__tile', style: { background: tileColor } }, U.svg(icon, { size: 15, stroke: '#fff', width: 1.9 })),
+        h('span', { class: 'bcv-nav__ic' }, U.svg(icon, { size: 21, stroke: glyphColor, width: 1.8 })),
         h('span', { text: label }),
         h('span', { class: 'bcv-nav__count', text: count }),
       ]))),

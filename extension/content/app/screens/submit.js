@@ -1,5 +1,8 @@
-/* Handing work in, drawn to the mockup. The assignment's own rules come first
- * (due, points, attempts, availability, what it accepts and which file types),
+/* Handing work in, drawn to the mockup. On the desktop it is a block at the end
+ * of the assignment page itself (mockup 11: one screen per assignment, the
+ * submit control in the same scroll as the instructions); on the phone it is
+ * its own screen. The assignment's own rules come first (due, points,
+ * attempts, availability, what it accepts and which file types),
  * then File upload / Text entry / Other. Files go through Canvas's own
  * three-step upload; the text entry stays a draft on this device until it is
  * sent; "Other" lists exactly the tools the instructor enabled for handing work
@@ -36,23 +39,29 @@
   const textToHtml = (t) => t.trim().split(/\n{2,}/).map((p) => `<p>${escapeHtml(p).replace(/\n/g, '<br>')}</p>`).join('');
   let seq = 0;
 
-  async function render(ctx, course) {
+  /** The flow on its own (the phone), or — `embed` — the block the assignment page hosts at the
+   *  end of its own scroll (mockup 11): the assignment already on the page is reused, never
+   *  refetched, the instructions stay above, and the mode chosen is remembered per assignment. */
+  async function render(ctx, course, { embed = false, a: aGiven = null, sub: subGiven = null, back: backGiven = null, onSmart = null } = {}) {
     const { app, route } = ctx;
     const cid = course.id, aid = route.arg;
-    const back = route.params.get('from') === 'todo' ? { href: '/#todo', label: 'To Do' } : { href: `${course.url}/assignments/${aid}`, label: 'Assignment' };
-    const screen = U.el('bcv-sb');
+    const fromTodo = route.params.get('from') === 'todo';
+    const back = backGiven || (fromTodo ? { href: '/#todo', label: 'To Do' } : { href: `${course.url}/assignments/${aid}`, label: 'Assignment' });
+    const screen = embed ? U.el('bcv-sb bcv-sb--embed', null, { id: 'bcv-submit' }) : U.el('bcv-sb');
     screen.append(U.loading('Loading the assignment…'));
     const draftKey = `subDraft:${cid}:${aid}`;
-    // the assignment is read fresh every time: the instructor may have changed the allowed types since
-    const [a, sub, tools, draftPref] = await Promise.all([
-      store.assignment(cid, aid, { force: true }).catch(() => null),
-      store.submission(cid, aid, { force: true }).catch(() => null),
+    const modeKey = `subMode:${cid}:${aid}`; // the tab is remembered per assignment, never globally
+    // on its own the assignment is read fresh (the instructor may have changed the allowed types); embedded, the page's copy is used
+    const [a, sub, tools, draftPref, modePref] = await Promise.all([
+      aGiven ? aGiven : store.assignment(cid, aid, { force: true }).catch(() => null),
+      subGiven ? subGiven : store.submission(cid, aid, { force: true }).catch(() => null),
       store.homeworkTools(cid).catch(() => null),
       store.pref(draftKey, ''),
+      store.pref(modeKey, null),
     ]);
     if (!ctx.alive()) return screen;
     if (!a) {
-      screen.replaceChildren(U.el('bcv-sb__page', [U.errorBox('This assignment could not be loaded.'), h('div', {}, U.btn(`Back to ${back.label}`, { onClick: () => app.go(back.href) }))]));
+      screen.replaceChildren(U.el('bcv-sb__page', [U.errorBox('This assignment could not be loaded.'), embed ? null : h('div', {}, U.btn(`Back to ${back.label}`, { onClick: () => app.go(back.href) }))]));
       return screen;
     }
     const draft = typeof draftPref === 'string' ? draftPref : '';
@@ -71,7 +80,8 @@
     const nativeAny = can.file || can.text || can.url;
     const hasOther = toolRows.length > 0 || toolsFailed || can.url || can.media || can.annot;
 
-    const st = { stage: 'edit', tab: can.file ? 'file' : can.text ? 'text' : 'other', files: [], text: draft, link: null, urlOpen: false, comment: '', busy: false, attempt: Number(s0.attempt) || 0, done: null, sent: null };
+    const tabAllowed = (k) => ((k === 'file' && can.file) || (k === 'text' && can.text) || (k === 'other' && hasOther) ? k : null);
+    const st = { stage: 'edit', tab: tabAllowed(modePref) || (can.file ? 'file' : can.text ? 'text' : 'other'), files: [], text: draft, link: null, urlOpen: false, comment: '', busy: false, attempt: Number(s0.attempt) || 0, done: null, sent: null };
     const attemptsLeft = () => (unlimited ? Infinity : Math.max(0, a.allowed_attempts - st.attempt));
     const lockedText = () => (a.locked_for_user ? (a.lock_explanation ? htmlToText(a.lock_explanation, 220) : 'This assignment is locked.') : a.lock_at && U.parse(a.lock_at) < Date.now() ? `This assignment closed ${U.fmtAt(a.lock_at)}.` : null);
     const dueChip = () => {
@@ -105,26 +115,32 @@
     const paintChips = () => chips.replaceChildren(
       h('span', { class: 'bcv-sb__chip bcv-sb__chip--due', text: dueChip() }),
       h('span', { class: 'bcv-sb__chip', text: a.points_possible !== null && a.points_possible !== undefined ? `${store.fmtPts(a.points_possible)} ${Number(a.points_possible) === 1 ? 'point' : 'points'}` : 'No points' }),
-      h('span', { class: 'bcv-sb__chip', text: course.name }),
+      embed ? null : h('span', { class: 'bcv-sb__chip', text: course.name }), // the page already says which course
       h('span', { class: 'bcv-sb__chip', text: st.stage === 'done' ? `Attempt ${st.attempt}${unlimited ? '' : ` of ${a.allowed_attempts}`}` : `Attempt ${st.attempt + 1} of ${unlimited ? 'unlimited' : a.allowed_attempts}` }),
     );
-    const head = U.el('bcv-sb__head', U.el('bcv-sb__headin', [
-      h('button', { type: 'button', class: 'bcv-linkbtn', onclick: () => app.go(back.href) }, [U.svg(IC.back, { size: 14, stroke: 'var(--bcv-blue)', width: 2.1 }), back.label]),
-      h('h1', { class: 'bcv-sb__h1 bcv-pretty', text: a.name }),
-      chips,
-    ]));
+    const rulesNote = () => U.text('bcv-sb__note', [windowLine, acceptsLine].filter(Boolean).join(' · ').replace(/^accepts/, 'Accepts'));
+    const head = embed
+      ? U.el('bcv-sb__head', U.el('bcv-sb__headin', [U.el('bcv-sb__hrow', [U.text('bcv-sb__kicker', 'Hand in', 'span'), chips]), rulesNote()]))
+      : U.el('bcv-sb__head', U.el('bcv-sb__headin', [
+        h('button', { type: 'button', class: 'bcv-linkbtn', onclick: () => app.go(back.href) }, [U.svg(IC.back, { size: 14, stroke: 'var(--bcv-blue)', width: 2.1 }), back.label]),
+        h('h1', { class: 'bcv-sb__h1 bcv-pretty', text: a.name }),
+        chips,
+      ]));
     const body = U.el('bcv-sb__body');
     const foot = U.el('bcv-sb__foot');
     screen.replaceChildren(head, body, foot);
+    const toTop = () => (embed ? screen.scrollIntoView({ block: 'start', behavior: 'smooth' }) : window.scrollTo(0, 0));
 
     // ---- edit stage -----------------------------------------------------------------
     function edit() {
       const page = U.el('bcv-sb__page');
-      page.append(U.el('bcv-sb__card', [
-        U.text('bcv-sb__kicker', 'Instructions', 'span'),
-        a.description ? CS().prose(a.description, { cls: 'bcv-sb__prose' }) : U.text('bcv-hint', 'No instructions were given.'),
-        U.text('bcv-sb__note', [windowLine, acceptsLine].filter(Boolean).join(' · ').replace(/^accepts/, 'Accepts')),
-      ]));
+      if (!embed) { // embedded, the instructions are the page above the block
+        page.append(U.el('bcv-sb__card', [
+          U.text('bcv-sb__kicker', 'Instructions', 'span'),
+          a.description ? CS().prose(a.description, { cls: 'bcv-sb__prose' }) : U.text('bcv-hint', 'No instructions were given.'),
+          rulesNote(),
+        ]));
+      }
       const locked = lockedText();
       if (locked) {
         page.append(U.el('bcv-sb__card bcv-sb__card--warn', [U.text('bcv-sb__kicker', 'Locked', 'span'), U.text('bcv-sb__p', locked)]));
@@ -143,7 +159,7 @@
         return page;
       }
       const tabs = [can.file ? ['file', 'File upload'] : null, can.text ? ['text', 'Text entry'] : null, hasOther ? ['other', 'Other'] : null].filter(Boolean);
-      page.append(U.el('bcv-sb__tabs', tabs.map(([k, lbl]) => h('button', { type: 'button', class: `bcv-sb__tab ${st.tab === k ? 'is-active' : ''}`, dataset: { tab: k }, text: lbl, onclick: () => { st.tab = k; draw(); } }))));
+      page.append(U.el('bcv-sb__tabs', tabs.map(([k, lbl]) => h('button', { type: 'button', class: `bcv-sb__tab ${st.tab === k ? 'is-active' : ''}`, dataset: { tab: k }, text: lbl, onclick: () => { st.tab = k; store.setPref(modeKey, k); draw(); } }))));
       page.append(st.tab === 'file' ? filePane() : st.tab === 'text' ? textPane() : otherPane());
       page.append(commentCard());
       return page;
@@ -359,7 +375,7 @@
       const r = readiness();
       foot.replaceChildren(U.el('bcv-sb__footin', [
         U.text('bcv-sb__footnote bcv-pretty', st.busy ? 'Sending to Canvas…' : r.note, 'span'),
-        h('button', { type: 'button', class: 'bcv-sb__btn', text: 'Cancel', disabled: st.busy || null, onclick: () => app.go(back.href) }),
+        embed ? null : h('button', { type: 'button', class: 'bcv-sb__btn', text: 'Cancel', disabled: st.busy || null, onclick: () => app.go(back.href) }),
         h('button', { type: 'button', class: 'bcv-sb__btn bcv-sb__btn--primary', text: st.busy ? 'Submitting…' : 'Submit assignment', disabled: !r.ok || st.busy || null, onclick: submit }),
       ]));
     }
@@ -413,7 +429,7 @@
         st.link = null;
         app.refreshCounts?.();
         draw();
-        window.scrollTo(0, 0);
+        toTop();
       } catch (e) {
         U.toast(`Could not submit: ${e.message}`, { error: true, ms: 5000 });
       } finally {
@@ -443,14 +459,15 @@
           ['Grade', graded ? `${store.fmtPts(s.score)} / ${store.fmtPts(a.points_possible ?? 0)}` : 'Not graded yet'],
         ].map(([k, v]) => U.el('bcv-sb__rrow', [U.text('bcv-sb__rlabel', k, 'span'), U.text('bcv-sb__rvalue', v, 'span')]))),
         U.el('bcv-sb__donebtns', [
-          h('button', { type: 'button', class: 'bcv-sb__btn bcv-sb__btn--primary', text: `Back to ${back.label}`, onclick: () => app.go(back.href, { confirmed: true }) }),
+          // embedded with nowhere to go back to, Done reloads the assignment so its status and grade column catch up
+          h('button', { type: 'button', class: 'bcv-sb__btn bcv-sb__btn--primary', text: embed && !fromTodo ? 'Done' : `Back to ${back.label}`, onclick: () => app.go(embed && !fromTodo ? `${course.url}/assignments/${aid}` : back.href, { confirmed: true }) }),
           canAgain ? h('button', { type: 'button', class: 'bcv-sb__btn', text: 'Resubmit', onclick: () => {
             st.stage = 'edit';
             st.urlOpen = false;
             st.comment = '';
             st.done = null;
             draw();
-            window.scrollTo(0, 0);
+            toTop();
           } }) : null,
         ]),
       ]);
@@ -462,18 +479,23 @@
       paintChips();
       paintFoot();
       setOpen();
+      const checkAction = { label: 'Check what I am handing in', note: st.files.length ? U.plural(st.files.length, 'file') + ' attached' : st.tab === 'text' ? 'My text entry' : 'Nothing attached yet', icon: IC.check, prompt: 'From the instructions, list what should be handed in and compare it with what I have attached or written. Point out anything missing or in the wrong format. Do not write the work for me.' };
+      const attached = () => [`Attached: ${st.files.map((f) => f.name).join(', ') || 'nothing'}`, st.link ? `Link: ${st.link.url}` : '', st.tab === 'text' ? `Text entry so far:\n${st.text.slice(0, 6000)}` : ''].filter(Boolean).join('\n');
+      if (embed) { // the page keeps its own suggestions and adds this one
+        onSmart?.({ action: checkAction, context: attached });
+        return;
+      }
       ctx.setSmart({
         label: `${a.name} · handing in`,
         actions: [
           { label: 'Summarize this assignment', note: `${store.fmtPts(a.points_possible ?? 0)} pts · ${a.due_at ? `due ${U.fmtShort(a.due_at)}` : 'no due date'}`, icon: IC.doc, prompt: 'Summarize what this assignment asks for, the deliverable, and how it is graded.' },
-          { label: 'Check what I am handing in', note: st.files.length ? U.plural(st.files.length, 'file') + ' attached' : st.tab === 'text' ? 'My text entry' : 'Nothing attached yet', icon: IC.check, prompt: 'From the instructions, list what should be handed in and compare it with what I have attached or written. Point out anything missing or in the wrong format. Do not write the work for me.' },
+          checkAction,
         ],
         context: () => [
           `Assignment: ${a.name}`, `Course: ${course.name}`, `Due: ${a.due_at ? U.fmtAt(a.due_at) : 'none'} · Points: ${a.points_possible ?? '—'}`,
           `${acceptsLine.replace(/^accepts/, 'Accepts')} · ${allowedExt.length ? `file types ${extWords()}` : 'any file type'}`, '',
           'Instructions:', htmlToText(a.description || '', 8000), '',
-          `Attached: ${st.files.map((f) => f.name).join(', ') || 'nothing'}`, st.link ? `Link: ${st.link.url}` : '',
-          st.tab === 'text' ? `Text entry so far:\n${st.text.slice(0, 6000)}` : '',
+          attached(),
         ].join('\n'),
       });
     }

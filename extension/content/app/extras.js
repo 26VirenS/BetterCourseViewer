@@ -66,8 +66,9 @@
     else app.go(it.href);
   }
 
-  const tileIcon = (it) => (it.kind === 'history' ? U.svg(IC.clock, { size: 15, stroke: 'var(--bcv-ink2)', width: 1.9 })
-    : it.kind === 'help' ? U.svg(HELP, { size: 15, stroke: 'var(--bcv-ink2)', width: 1.9 })
+  // glyphs like our own nav rows (mockup 11); a tool's own icon keeps a small dark tile, as it is drawn for Canvas's dark nav
+  const tileIcon = (it) => (it.kind === 'history' ? U.svg(IC.clock, { size: 21, stroke: 'var(--bcv-ink2)', width: 1.8 })
+    : it.kind === 'help' ? U.svg(HELP, { size: 21, stroke: 'var(--bcv-ink2)', width: 1.8 })
       : it.icon ? h('img', { src: it.icon, alt: '', referrerpolicy: 'no-referrer' }) : U.svg(IC.external, { size: 14, stroke: '#fff', width: 1.9 }));
 
   /** The sidebar group under our navigation (desktop). */
@@ -77,7 +78,7 @@
     return U.el('bcv-side__group bcv-side__group--more', [
       U.text('bcv-side__label', 'More from Canvas'),
       ...list.map((it) => h('button', { type: 'button', class: 'bcv-nav__item bcv-nav__item--more', dataset: { extra: it.kind }, title: it.label, onclick: () => open(app, it) }, [
-        h('span', { class: `bcv-nav__tile ${it.kind === 'tool' || it.kind === 'link' ? 'bcv-nav__tile--tool' : 'bcv-nav__tile--more'}` }, tileIcon(it)),
+        h('span', { class: `bcv-nav__ic ${it.kind === 'tool' || it.kind === 'link' ? 'bcv-nav__ic--tool' : ''}` }, tileIcon(it)),
         h('span', { class: 'bcv-ellip', text: it.label }),
         it.kind === 'tool' || it.kind === 'link' ? U.svg(IC.external, { size: 11, stroke: 'var(--bcv-ink3)', width: 2, cls: 'bcv-nav__ext' }) : null,
       ])),

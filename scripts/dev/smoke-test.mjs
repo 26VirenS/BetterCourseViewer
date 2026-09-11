@@ -79,7 +79,9 @@ try {
   // a page is ready to poke once it is drawn and nothing painted from the cache is still waiting on Canvas
   const __goto = page.goto.bind(page);
   page.gotoRaw = __goto;
-  page.goto = async (...a) => { const r = await __goto(...a); await page.waitForFunction(() => { const c = document.documentElement.classList; return !c.contains('bcv-on') || c.contains('bcv-settled'); }, null, { timeout: 20000 }).catch(() => {}); return r; };
+  // …and no counter is still rolling to its value (mockup 11 entry motion, under a second)
+  const rolled = () => page.waitForFunction(() => !document.querySelector('[data-rolling]'), null, { timeout: 5000 }).catch(() => {});
+  page.goto = async (...a) => { const r = await __goto(...a); await page.waitForFunction(() => { const c = document.documentElement.classList; return !c.contains('bcv-on') || c.contains('bcv-settled'); }, null, { timeout: 20000 }).catch(() => {}); await rolled(); return r; };
   page.on('pageerror', (e) => console.log('  page error:', e.message));
   page.on('console', (m) => { if (m.type() === 'error') console.log('  console:', m.text()); });
   const texts = (sel) => page.$$eval(sel, (els) => els.map((e) => (e.innerText || e.textContent).replace(/\s+/g, ' ').trim()));
@@ -91,6 +93,7 @@ try {
     await page.click(sel);
     await page.waitForSelector('#bcv-main > *:not([data-old])', { timeout: 10000 });
     await page.waitForFunction(() => { const c = document.documentElement.classList; return !c.contains('bcv-on') || c.contains('bcv-settled'); }, null, { timeout: 20000 }).catch(() => {});
+    await rolled();
   };
   const tab = (id) => clickScreen(`.bcv-rail [data-tab="${id}"]`);
   const eventually = async (fn, ms = 6000) => {
@@ -122,7 +125,14 @@ try {
   const favDots = await page.$$eval('.bcv-fav__dot', (els) => els.map((e) => getComputedStyle(e).backgroundColor));
   check(favDots.length === 5 && new Set(favDots).size === 5 && favDots[0] === 'rgb(52, 199, 89)', `favourite dots carry the user's own course colours from Canvas: ${favDots.join(' | ')}`);
   // what the school added to Canvas's own nav (read from the page's #menu): tools, History, Help
-  check((await texts('.bcv-nav__item--more')).join(',') === 'History,My Materials,Help' && (await page.$('.bcv-nav__item--more[data-extra="tool"] .bcv-nav__tile img')) !== null, `"More from Canvas" carries the school's own nav entries with the tool's icon: ${(await texts('.bcv-nav__item--more')).join(', ')}`);
+  check((await texts('.bcv-nav__item--more')).join(',') === 'History,My Materials,Help' && (await page.$('.bcv-nav__item--more[data-extra="tool"] .bcv-nav__ic img')) !== null, `"More from Canvas" carries the school's own nav entries with the tool's icon: ${(await texts('.bcv-nav__item--more')).join(', ')}`);
+  // mockup 11: nav icons are bare glyphs in their own colour, full strength on the active row and dimmed elsewhere
+  const glyphs = await page.evaluate(() => {
+    const ic = (k) => document.querySelector(`.bcv-nav__item[data-nav="${k}"] .bcv-nav__ic`);
+    const svg = (k) => getComputedStyle(ic(k).querySelector('svg'));
+    return { tile: getComputedStyle(ic('dashboard')).backgroundColor, dash: svg('dashboard').stroke, dashOpacity: svg('dashboard').opacity, todo: svg('todo').stroke, todoOpacity: svg('todo').opacity, size: ic('todo').querySelector('svg').getAttribute('width') };
+  });
+  check(glyphs.tile === 'rgba(0, 0, 0, 0)' && glyphs.dash === 'rgb(10, 108, 255)' && glyphs.dashOpacity === '1' && glyphs.todo === 'rgb(52, 199, 89)' && glyphs.todoOpacity === '0.62' && glyphs.size === '21', `nav glyphs: no tile, own colour, active at full strength: ${JSON.stringify(glyphs)}`);
   await page.click('.bcv-nav__item--more[data-extra="history"]');
   await page.waitForSelector('.bcv-sheet-ov .bcv-xrow', { timeout: 10000 });
   check((await texts('.bcv-xrow__t')).join(',') === 'Composition of Functions,Lec06-PreQuiz,Week 2 Post Class Assignment: GC articles' && /F26-MATH 021 20 · Assignment · /.test((await texts('.bcv-xrow__s'))[0]), `History opens Canvas's recently-visited list as a sheet: ${(await texts('.bcv-xrow__s'))[0]}`);
@@ -432,11 +442,13 @@ try {
   await page.goto(`${BASE}/courses/104/assignments/4002`);
   await page.waitForSelector('.bcv-detail__actions .bcv-btn--primary', { timeout: 10000 });
   check((await texts('.bcv-detail__actions .bcv-btn--primary'))[0] === 'Submit assignment', 'the assignment page offers our own submit flow');
+  // mockup 11: the flow is a block at the end of the assignment page itself, not a destination of its own
+  const inView = (sel) => page.$eval(sel, (el) => { const r = el.getBoundingClientRect(); return r.top >= 0 && r.top < window.innerHeight; });
+  check(!!(await page.$('#bcv-main .bcv-detail + .bcv-sb--embed, #bcv-main .bcv-sb--embed')) && (await page.$$('.bcv-sb__foot')).length === 1 && !(await page.$('.bcv-sb__h1')) && (await page.$eval('.bcv-sb__foot', (el) => getComputedStyle(el).position)) === 'static', 'handing in is a block under the instructions in the same scroll, with a plain (not sticky) submit row');
   await page.click('.bcv-detail__actions .bcv-btn--primary');
-  await page.waitForSelector('.bcv-sb__foot', { timeout: 10000 });
-  check(page.url() === `${BASE}/courses/104/assignments/4002?bcv=submit` && (await texts('.bcv-sb__h1'))[0] === 'Week 2 Post Class Assignment: GC articles' && (await visible('#bcv-side')), 'the submit screen opens in the main column with the sidebar kept');
+  check(await eventually(() => inView('#bcv-submit')) && page.url() === `${BASE}/courses/104/assignments/4002` && (await texts('.bcv-detail__title'))[0] === 'Week 2 Post Class Assignment: GC articles' && (await visible('#bcv-side')), 'Submit assignment brings the block into view on the same page (sidebar kept, no navigation)');
   const subChips = await texts('.bcv-sb__chip');
-  check(subChips.length === 4 && /^[A-Z][a-z]+ by 11:59 PM$/.test(subChips[0]) && subChips[1] === '10 points' && subChips[2] === 'F26-SPRK 010 103' && subChips[3] === 'Attempt 1 of unlimited', `header chips: ${subChips.join(' | ')}`);
+  check(subChips.length === 3 && /^[A-Z][a-z]+ by 11:59 PM$/.test(subChips[0]) && subChips[1] === '10 points' && subChips[2] === 'Attempt 1 of unlimited' && (await texts('.bcv-sb__kicker'))[0].toLowerCase() === 'hand in', `block chips: ${subChips.join(' | ')}`);
   check(/^Open [A-Z][a-z]{2} \d+ – [A-Z][a-z]{2} \d+ · accepts a file upload, a text entry or a website URL$/.test((await texts('.bcv-sb__note'))[0]), `availability + accepted types: ${(await texts('.bcv-sb__note'))[0]}`);
   check((await texts('.bcv-sb__dropsub'))[0] === 'PDF, DOCX, PNG or JPG only · as many files as you need' && (await page.getAttribute('.bcv-sb__pane input[type=file]', 'accept')) === '.pdf,.docx,.png,.jpg', 'allowed file types are read from the assignment and set the picker\'s accept');
   check((await texts('.bcv-sb__footnote'))[0] === 'Attach at least one file to submit.' && !!(await page.$('.bcv-sb__btn--primary[disabled]')), 'submit stays blocked until a file is attached');
@@ -466,28 +478,31 @@ try {
   // resubmit as a text entry; the draft lives on this device until it is sent
   await page.click('.bcv-sb__donebtns .bcv-sb__btn:not(.bcv-sb__btn--primary)');
   await page.waitForSelector('.bcv-sb__tabs', { timeout: 5000 });
-  check((await texts('.bcv-sb__chip'))[3] === 'Attempt 2 of unlimited' && /^nothing attached yet$/i.test((await texts('.bcv-sb__count'))[0]), `Resubmit starts the next attempt with an empty list: ${(await texts('.bcv-sb__chip'))[3]} · ${(await texts('.bcv-sb__count'))[0]}`);
+  check((await texts('.bcv-sb__chip'))[2] === 'Attempt 2 of unlimited' && /^nothing attached yet$/i.test((await texts('.bcv-sb__count'))[0]), `Resubmit starts the next attempt with an empty list: ${(await texts('.bcv-sb__chip'))[2]} · ${(await texts('.bcv-sb__count'))[0]}`);
   await page.click('.bcv-sb__tab[data-tab=text]');
   await page.fill('.bcv-sb__ta', 'Clean water for all.\n\nThree sources follow.');
   await page.waitForTimeout(700);
   await page.reload();
   await page.waitForSelector('.bcv-sb__foot', { timeout: 10000 });
-  await page.click('.bcv-sb__tab[data-tab=text]');
+  check(!!(await page.$('.bcv-sb__tab[data-tab=text].is-active')) && !!(await page.$('.bcv-sb__ta')), 'the tab chosen is remembered for this assignment (a text-entry assignment never reopens on the file tab)');
   check((await page.inputValue('.bcv-sb__ta')) === 'Clean water for all.\n\nThree sources follow.' && /Draft restored/.test((await texts('.bcv-sb__note'))[1]), 'the text entry survives a reload as a draft on this device');
   await page.click('.bcv-sb__btn--primary');
   await page.waitForSelector('.bcv-sb__done', { timeout: 15000 });
   const sub2 = await readSub('104', '4002');
   check(sub2.attempt === 2 && sub2.submission_type === 'online_text_entry' && sub2.body === '<p>Clean water for all.</p><p>Three sources follow.</p>' && (await texts('.bcv-sb__rrow'))[1].replace(/\s+/g, ' ') === 'Submission Text entry', `the text entry is recorded as HTML paragraphs: ${sub2.body}`);
   await shot(page, '09f-submitted');
+  check((await texts('.bcv-sb__donebtns .bcv-sb__btn--primary'))[0] === 'Done', 'the receipt on the assignment page ends with Done (nowhere else to go back to)');
   await page.click('.bcv-sb__donebtns .bcv-sb__btn--primary');
+  await page.waitForFunction(() => !document.querySelector('.bcv-sb__done'), null, { timeout: 10000 });
   await page.waitForSelector('.bcv-detail__actions .bcv-btn--primary', { timeout: 10000 });
-  check(page.url() === `${BASE}/courses/104/assignments/4002` && (await texts('.bcv-detail__actions .bcv-btn--primary'))[0] === 'Resubmit' && (await texts('.bcv-badge')).includes('Submitted'), 'back on the assignment page: status Submitted, button Resubmit');
-  // To Do rows hand in directly and the back link returns there
+  check(page.url() === `${BASE}/courses/104/assignments/4002` && (await texts('.bcv-detail__actions .bcv-btn--primary'))[0] === 'Resubmit' && (await texts('.bcv-badge')).includes('Submitted'), 'Done reloads the assignment page: status Submitted, button Resubmit');
+  // To Do rows land on the block and the page's back link returns there
   await nav('todo');
   await page.waitForSelector('.bcv-row', { timeout: 10000 });
   await page.locator('.bcv-row', { hasText: 'Research Day Activity' }).first().locator('.bcv-btn--xs', { hasText: 'Submit' }).click();
   await page.waitForSelector('.bcv-sb__foot', { timeout: 10000 });
-  check(page.url() === `${BASE}/courses/105/assignments/5002?bcv=submit&from=todo` && (await texts('.bcv-sb__headin .bcv-linkbtn'))[0].trim() === 'To Do' && (await texts('.bcv-sb__dropsub'))[0].startsWith('Any file type') && (await texts('.bcv-sb__tab')).join(' | ') === 'File upload | Text entry', 'a To Do row opens the submit screen with To Do as the way back; no Other tab when the course has no tools');
+  const fromTodo = { url: page.url(), back: (await texts('.bcv-cmain .bcv-linkbtn'))[0]?.trim(), inView: await eventually(() => inView('#bcv-submit')), drop: (await texts('.bcv-sb__dropsub'))[0], tabs: (await texts('.bcv-sb__tab')).join(' | ') };
+  check(fromTodo.url === `${BASE}/courses/105/assignments/5002?bcv=submit&from=todo` && fromTodo.back === 'To Do' && fromTodo.inView && fromTodo.drop.startsWith('Any file type') && fromTodo.tabs === 'File upload | Text entry', `a To Do row opens the assignment scrolled to the block, with To Do as the way back; no Other tab when the course has no tools: ${JSON.stringify(fromTodo)}`);
   await shot(page, '09g-submit-from-todo');
 
   // ---- groups -----------------------------------------------------------------------------
@@ -522,7 +537,8 @@ try {
   // dense screens fill the column up to 1180 (mockup 7 layout notes): 1400 viewport − 242 sidebar − 80 padding = 1078 here
   check(await page.$eval('.bcv-screen--ctx .bcv-head__in', (el) => Math.round(el.getBoundingClientRect().width) === 1078), `course screens fill the column (capped at 1180): ${await page.$eval('.bcv-screen--ctx .bcv-head__in', (el) => Math.round(el.getBoundingClientRect().width))}px`);
   check((await texts('.bcv-rail__ext')).join(',') === 'Resources & Policy', 'external tools are plain links under Campus tools');
-  check(await page.$('.bcv-rail__item[data-tab="home"].is-active') && (await page.$eval('.bcv-rail__item.is-active .bcv-rail__tile', (el) => getComputedStyle(el).backgroundColor === 'rgb(23, 112, 171)')), 'active item takes the course colour (the one picked earlier)');
+  const railGlyph = await page.evaluate(() => ({ active: getComputedStyle(document.querySelector('.bcv-rail__item.is-active .bcv-rail__tile svg')), idle: getComputedStyle(document.querySelector('.bcv-rail__item:not(.is-active) .bcv-rail__tile svg')), tile: getComputedStyle(document.querySelector('.bcv-rail__item.is-active .bcv-rail__tile')).backgroundColor }));
+  check(await page.$('.bcv-rail__item[data-tab="home"].is-active') && railGlyph.active.stroke === 'rgb(23, 112, 171)' && railGlyph.active.opacity === '1' && railGlyph.idle.stroke === 'rgb(23, 112, 171)' && railGlyph.idle.opacity === '0.6' && railGlyph.tile === 'rgba(0, 0, 0, 0)', `rail glyphs take the course colour (the one picked earlier), no tile, dimmed unless active: ${railGlyph.active.stroke} / ${railGlyph.idle.opacity}`);
   check(await page.$('.bcv-head .bcv-colorbtn'), 'the colour square in the course header opens the palette');
   check(!(await page.$('.bcv-head .bcv-tab')), 'no tab pills under the course title');
   await waitText('.bcv-rail__item[data-tab="announcements"] .bcv-rail__count', /^2$/);
@@ -883,7 +899,7 @@ try {
   await page.waitForSelector('#bcv-smart', { timeout: 5000 });
   check((await texts('.bcv-smart__ctx'))[0] === 'Reading: F26-MATH 021 20 · Dis01', `smart context: ${(await texts('.bcv-smart__ctx'))[0]}`);
   const actions = await texts('.bcv-smart__action-label');
-  check(actions.join(',') === 'Summarize this assignment,Make a checklist', `suggested actions: ${actions.join(', ')}`);
+  check(actions.join(',') === 'Summarize this assignment,Make a checklist,Check what I am handing in', `suggested actions (the page's own, plus the hand-in block's): ${actions.join(', ')}`);
   check(!(await page.content()).match(/\bAI\b/), 'the interface never says "AI"');
   await shot(page, '24-smart-panel');
   await page.fill('#bcv-smart textarea', 'What is this about?');
@@ -951,19 +967,52 @@ try {
   // mockup 9: blocks follow the screen on a stagger from one helper (delay = index × step, capped at 420ms)
   const stagger = await page.evaluate(() => [...document.querySelectorAll('.bcv-stat.bcv-enter')].map((e) => `${getComputedStyle(e).animationName}@${getComputedStyle(e).animationDelay}`));
   check(stagger.slice(0, 3).join(',') === 'bcv-fade-up@0s,bcv-fade-up@0.05s,bcv-fade-up@0.1s', `stat cards arrive on a 50ms stagger: ${stagger.join(',')}`);
+  // mockup 11: data animates in — counters roll (and land exactly), workload bars wipe from the left, rows float in
+  const workAnim = await page.evaluate(() => ({
+    bars: [...document.querySelectorAll('.bcv-work__fill--grow')].map((e) => `${getComputedStyle(e).animationName}@${getComputedStyle(e).animationDelay}`),
+    rows: [...document.querySelectorAll('.bcv-work__row--in')].map((e) => `${getComputedStyle(e).animationName}@${getComputedStyle(e).animationDelay}`),
+    origin: getComputedStyle(document.querySelector('.bcv-work__fill--grow')).transformOrigin,
+  }));
+  check(workAnim.bars.slice(0, 2).join(',') === 'bcv-grow@0.14s,bcv-grow@0.23s' && workAnim.rows.slice(0, 2).join(',') === 'bcv-fade-up@0.09s,bcv-fade-up@0.16s' && /^0px/.test(workAnim.origin), `workload bars wipe from the left 90ms apart, rows float in 70ms apart: ${JSON.stringify(workAnim)}`);
+  const dueNow = (await texts('.bcv-stat__value'))[0]; // the real count at this point of the run (items were ticked earlier)
+  await page.gotoRaw(`${BASE}/`); // raw: the roll itself is what is being checked
+  await page.waitForSelector('.bcv-stat__value[data-rolling]', { timeout: 10000 });
+  const midRoll = await page.evaluate(() => [...document.querySelectorAll('.bcv-stat__value')].map((e) => e.textContent));
+  await page.waitForFunction(() => !document.querySelector('[data-rolling]'), null, { timeout: 5000 });
+  const landed = await texts('.bcv-stat__value');
+  check(midRoll.every((t) => /^\d+$/.test(t)) && landed[0] === dueNow && (await page.evaluate(() => !document.querySelector('.bcv-stat__value[data-rolling]'))), `counters run through plausible digits and land on the real count: ${midRoll.join(',')} → ${landed.join(',')} (Due today is ${dueNow})`);
+  // a view switch after entry redraws the counters without rolling them again
+  await page.click('.bcv-seg__btn:nth-child(2)');
+  await page.waitForSelector('.bcv-day', { timeout: 10000 });
+  check(!(await page.$('[data-rolling]')) && (await texts('.bcv-stat__value'))[0] === dueNow && !(await page.$('.bcv-work__fill--grow')), 'a number already on screen never rolls again (entry only)');
+  // cards lift under the pointer once they have landed (the entrance fill is backwards, so the hover transform takes)
+  await page.waitForTimeout(700);
+  await page.hover('.bcv-stat');
+  await page.waitForTimeout(300);
+  const lift = await page.evaluate(() => ({ t: getComputedStyle(document.querySelector('.bcv-stat')).transform, tr: getComputedStyle(document.querySelector('.bcv-stat')).transitionProperty }));
+  check(lift.t === 'matrix(1, 0, 0, 1, 0, -2)' && /transform/.test(lift.tr), `a stat card lifts 2px on hover: ${JSON.stringify(lift)}`);
+  await page.mouse.move(5, 5);
   await nav('gpa');
   await page.waitForSelector('.bcv-gpa__card', { timeout: 10000 });
   const gpaStagger = await page.evaluate(() => ({
     top: [...document.querySelectorAll('.bcv-gpa__top > .bcv-enter')].map((e) => e.style.getPropertyValue('--bcv-delay')),
     cards: [...document.querySelectorAll('.bcv-gpa__card.bcv-enter')].map((e) => e.style.getPropertyValue('--bcv-delay')),
+    rings: [...document.querySelectorAll('.bcv-gpa__card .bcv-ring--fill')].map((e) => `${getComputedStyle(e).animationName}@${getComputedStyle(e).animationDelay}`),
+    value: document.querySelector('.bcv-gpa__value').textContent,
   }));
   check(gpaStagger.top.join(',') === '40ms,110ms' && gpaStagger.cards[0] === '0ms' && gpaStagger.cards[1] === '55ms' && Math.max(...gpaStagger.cards.map(parseFloat)) <= 420, `Grades: hero, then trend, then cards on 55ms, capped at 420ms: ${JSON.stringify(gpaStagger)}`);
+  check(gpaStagger.rings.length === 4 && gpaStagger.rings.slice(0, 3).join(',') === 'bcv-ring-fill@0s,bcv-ring-fill@0.07s,bcv-ring-fill@0.14s' && /^3\.4[23]$/.test(gpaStagger.value), `course rings sweep to their score 70ms apart and the GPA has landed: ${gpaStagger.rings.join(',')} · ${gpaStagger.value}`);
+  await page.hover('.bcv-gpa__card .bcv-gpa__ringbox');
+  await waitText('.bcv-gpa__card', /By group/);
+  const cats = await page.evaluate(() => [...document.querySelectorAll('.bcv-gpa__card.is-hover .bcv-ring--fill-cat')].map((e) => `${getComputedStyle(e).animationName}@${getComputedStyle(e).animationDuration}@${getComputedStyle(e).animationDelay}`));
+  check(cats.length >= 1 && cats[0] === 'bcv-ring-fill@0.55s@0s' && (cats.length < 2 || cats[1] === 'bcv-ring-fill@0.55s@0.09s'), `group rings fill in as they mount, 90ms apart: ${cats.join(',')}`);
+  await page.mouse.move(5, 5);
   await page.goto(`${BASE}/`);
   await page.waitForSelector('.bcv-stat', { timeout: 10000 });
   await page.click('.bcv-stat');
   await page.waitForSelector('.bcv-sheet', { timeout: 5000 });
-  const sheetAnim = await page.evaluate(() => [getComputedStyle(document.querySelector('.bcv-sheet-ov')).animationName, getComputedStyle(document.querySelector('.bcv-sheet')).animationName, getComputedStyle(document.querySelector('.bcv-sheet')).animationDuration]);
-  check(sheetAnim[0] === 'bcv-fade-in' && sheetAnim[1] === 'bcv-sheet' && sheetAnim[2] === '0.26s', `sheets rise over a fading scrim: ${sheetAnim.join(' / ')}`);
+  const sheetAnim = await page.evaluate(() => [getComputedStyle(document.querySelector('.bcv-sheet-ov')).animationName, getComputedStyle(document.querySelector('.bcv-sheet')).animationName, getComputedStyle(document.querySelector('.bcv-sheet')).animationDuration, document.querySelector('.bcv-sheet').style.transformOrigin]);
+  check(sheetAnim[0] === 'bcv-scrim' && sheetAnim[1] === 'bcv-morph' && sheetAnim[2] === '0.34s' && /^-?\d+px -?\d+px$/.test(sheetAnim[3]), `a sheet grows out of the counter that opened it, over a scrim that blurs in: ${sheetAnim.join(' / ')}`);
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('.bcv-sheet-ov'), null, { timeout: 5000 });
   // a slow response: the bar keeps sweeping and skeleton rows hold the place; both leave when the data lands
@@ -984,8 +1033,8 @@ try {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.reload();
   await page.waitForSelector('.bcv-stat', { timeout: 10000 });
-  const reduced = await page.evaluate(() => [getComputedStyle(document.querySelector('.bcv-main > .bcv-screen')).animationName, getComputedStyle(document.querySelector('.bcv-progress__bar')).animationName, getComputedStyle(document.querySelector('.bcv-stat.bcv-enter')).animationName]);
-  check(reduced[0] === 'none' && reduced[1] === 'bcv-bar' && reduced[2] === 'none', `reduced motion drops the entrances (and the stagger) but keeps the loading indicators: ${reduced.join(' / ')}`);
+  const reduced = await page.evaluate(() => [getComputedStyle(document.querySelector('.bcv-main > .bcv-screen')).animationName, getComputedStyle(document.querySelector('.bcv-progress__bar')).animationName, getComputedStyle(document.querySelector('.bcv-stat.bcv-enter')).animationName, getComputedStyle(document.querySelector('.bcv-work__fill--grow')).animationName, document.querySelector('.bcv-stat__value').textContent]);
+  check(reduced[0] === 'none' && reduced[1] === 'bcv-bar' && reduced[2] === 'none' && reduced[3] === 'none' && reduced[4] === dueNow, `reduced motion drops the entrances (and the stagger, the bar wipe, the counter roll) but keeps the loading indicators: ${reduced.join(' / ')}`);
   await page.emulateMedia({ reducedMotion: 'no-preference' });
 
   // ---- the look switched off from settings (popup / options) -------------------------------------------

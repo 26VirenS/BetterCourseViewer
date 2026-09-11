@@ -389,11 +389,78 @@
 
   const initials = (name) => String(name || '').trim().split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() || '').join('');
 
+  const reducedMotion = () => {
+    try {
+      return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    } catch {
+      return false;
+    }
+  };
+
+  /** A number arrives rather than appears (mockup 11): 16 steps at 52ms — plausible digits
+   *  below step 9 (under half a second), convergence above it — and the last step is always
+   *  the exact value. Entry only: callers never roll a number the student is already reading.
+   *  Reduced motion jumps straight to the final step. */
+  const ROLL_STEPS = 16;
+  const ROLL_MS = 52;
+  function roll(node, target, { decimals = 0, seed = 0, format = null } = {}) {
+    const fmt = format || ((v) => (decimals ? v.toFixed(decimals) : String(Math.round(v))));
+    const finish = () => {
+      clearInterval(node._bcvRoll);
+      node._bcvRoll = null;
+      node.textContent = fmt(target);
+      delete node.dataset.rolling;
+    };
+    if (node._bcvRoll) clearInterval(node._bcvRoll);
+    if (!Number.isFinite(target) || reducedMotion()) {
+      finish();
+      return node;
+    }
+    const at = (n) => {
+      if (n < 9) return decimals ? Math.abs(Math.sin(n * 1.9 + seed)) * Math.max(target, 1) : 1 + Math.floor(Math.abs(Math.sin(n * 1.7 + seed)) * Math.max(target, 4));
+      const p = (n - 9) / (ROLL_STEPS - 9);
+      return decimals ? target * (0.65 + 0.35 * p) : Math.max(0, Math.round(target * (0.6 + 0.4 * p)));
+    };
+    let n = 0;
+    node.dataset.rolling = '1';
+    node.textContent = fmt(at(0));
+    node._bcvRoll = setInterval(() => {
+      n += 1;
+      if (n >= ROLL_STEPS || !node.isConnected) { // never a fabricated digit left behind: the last step is the real value
+        finish();
+        return;
+      }
+      node.textContent = fmt(at(n));
+    }, ROLL_MS);
+    return node;
+  }
+
+  /** A sheet grows out of the control that opened it (mockup 11): its transform origin is
+   *  the anchor's centre, measured against the sheet's laid-out box (transforms aside, so
+   *  the running animation does not skew the measurement). No anchor: from the centre. */
+  function morphFrom(sheet, from) {
+    if (!sheet) return sheet;
+    const anchor = from && from.currentTarget ? from.currentTarget : from;
+    let r = null;
+    try {
+      r = anchor && anchor.getBoundingClientRect ? anchor.getBoundingClientRect() : null;
+    } catch {
+      r = null;
+    }
+    if (!r || !r.width) return sheet;
+    const ov = sheet.offsetParent;
+    const box = ov ? ov.getBoundingClientRect() : { left: 0, top: 0 };
+    const x = r.left + r.width / 2 - (box.left + sheet.offsetLeft);
+    const y = r.top + r.height / 2 - (box.top + sheet.offsetTop);
+    sheet.style.transformOrigin = `${Math.round(x)}px ${Math.round(y)}px`;
+    return sheet;
+  }
+
   BCV.ui = {
     svg, star, chev, el, text, tile, dot, card, row, label, h2, groupHead, badge, seg, search, switchEl, btn, iconbtn, chip, pill,
     empty, emptyCard, loading, errorBox, hint, avatar, toast, menu, closeMenus, colorMenu, COURSE_COLORS,
     DAY, startOfDay, addDays, sameDay, dayDiff, startOfWeek, parse, MONTHS, MONTHS_LONG, DAYS, DAYS_LONG,
     fmtTime, fmtTimeLower, fmtShort, fmtLong, fmtDateComma, fmtAt, fmtAtUpper, fmtBy, dayTitle, fmtDow, fmtRecent, whenShort, plural,
-    hexToRgb, rgba, palette, FALLBACK_COLORS, initials, enter,
+    hexToRgb, rgba, palette, FALLBACK_COLORS, initials, enter, roll, morphFrom, reducedMotion,
   };
 })();
