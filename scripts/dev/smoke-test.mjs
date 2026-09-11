@@ -76,6 +76,10 @@ try {
   await sw.evaluate(() => self.BCV.api.storage.local.set({ 'setup:offered': true }));
 
   const page = await context.newPage();
+  // a page is ready to poke once it is drawn and nothing painted from the cache is still waiting on Canvas
+  const __goto = page.goto.bind(page);
+  page.gotoRaw = __goto;
+  page.goto = async (...a) => { const r = await __goto(...a); await page.waitForFunction(() => { const c = document.documentElement.classList; return !c.contains('bcv-on') || c.contains('bcv-settled'); }, null, { timeout: 20000 }).catch(() => {}); return r; };
   page.on('pageerror', (e) => console.log('  page error:', e.message));
   page.on('console', (m) => { if (m.type() === 'error') console.log('  console:', m.text()); });
   const texts = (sel) => page.$$eval(sel, (els) => els.map((e) => (e.innerText || e.textContent).replace(/\s+/g, ' ').trim()));
@@ -86,6 +90,7 @@ try {
     await page.evaluate(() => { const m = document.querySelector('#bcv-main > *'); if (m) m.dataset.old = '1'; });
     await page.click(sel);
     await page.waitForSelector('#bcv-main > *:not([data-old])', { timeout: 10000 });
+    await page.waitForFunction(() => { const c = document.documentElement.classList; return !c.contains('bcv-on') || c.contains('bcv-settled'); }, null, { timeout: 20000 }).catch(() => {});
   };
   const tab = (id) => clickScreen(`.bcv-rail [data-tab="${id}"]`);
   const eventually = async (fn, ms = 6000) => {
@@ -964,7 +969,7 @@ try {
   // a slow response: the bar keeps sweeping and skeleton rows hold the place; both leave when the data lands
   const slow = /\/api\/v1\/courses\/104\/assignments\/4002(\?|$)/;
   await page.route(slow, async (route) => { await new Promise((r) => setTimeout(r, 900)); await route.continue().catch(() => {}); }); // a request still waiting when the route is removed just goes through
-  await page.goto(`${BASE}/courses/104/assignments/4002?bcv=submit`);
+  await page.gotoRaw(`${BASE}/courses/104/assignments/4002?bcv=submit`); // raw: the skeleton is what is being checked
   await page.waitForSelector('.bcv-skel', { timeout: 10000 });
   const skel = await page.evaluate(() => {
     const s = document.querySelector('.bcv-skel');
@@ -1166,22 +1171,23 @@ try {
   await mockConfig({ groupsFail: false });
   await page.goto(`${BASE}/groups`);
   await page.waitForSelector('.bcv-body .bcv-row', { timeout: 15000 });
-  // a stale cache entry draws at once, then the fresh answer replaces it in place
+  // the cache paints, Canvas answers: a cached entry, even one still inside its time, draws at once and
+  // the fresh answer replaces it in place on every page load
   await sw.evaluate(async () => {
     const all = await self.BCV.api.storage.local.get(null);
     const k = Object.keys(all).find((x) => /:groups$/.test(x));
     const entry = all[k];
     entry.value = entry.value.map((g, i) => (i === 0 ? { ...g, name: 'Stale group from the cache' } : g));
-    entry.expires = Date.now() - 60e3;
+    entry.expires = Date.now() + 10 * 60e3;
     await self.BCV.api.storage.local.set({ [k]: entry });
   });
   const t2 = Date.now();
-  await page.goto(`${BASE}/groups`);
+  await page.gotoRaw(`${BASE}/groups`); // raw: the first paint is what is being checked
   await page.waitForFunction(() => document.querySelector('.bcv-body .bcv-row'), null, { timeout: 15000 });
   const firstPaint = await texts('.bcv-body .bcv-row');
   const staleShown = firstPaint.some((t) => /Stale group from the cache/.test(t));
   const replaced = await eventually(async () => !(await texts('.bcv-body .bcv-row')).some((t) => /Stale group from the cache/.test(t)) && (await texts('.bcv-body .bcv-row')).some((t) => /Attestation Fall 2026 1/.test(t)), 10000);
-  check(staleShown && replaced, `an expired entry draws at once (${Date.now() - t2}ms) and the fresh answer replaces it quietly`);
+  check(staleShown && replaced, `a cached entry draws at once (${Date.now() - t2}ms) and the fresh answer replaces it quietly, even inside its time`);
 
   // ---- notifications ------------------------------------------------------------------------------------
   console.log('notifications');

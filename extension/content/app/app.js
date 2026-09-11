@@ -325,12 +325,16 @@
   }
 
   // ---- screens --------------------------------------------------------------------------------
+  const ROOT_SCREENS = new Set(['dashboard', 'courses', 'groups', 'todo', 'calendar', 'inbox', 'gpa', 'notifications']);
+  const refreshing = new Set(); // cache keys painted on this page that Canvas has not answered yet
   const SCREEN_PATIENCE = 15000; // a screen still not drawn after this gives way to Canvas's own page
   async function render({ quiet = false } = {}) {
     const r = parseRoute();
     state.route = r;
     const id = ++state.renderId;
     const alive = () => id === state.renderId;
+    state.renderedAt = Date.now();
+    html.classList.remove('bcv-settled');
     if (!quiet) progress(true);
     state.quizOpen = false;
     state.submitOpen = false;
@@ -347,6 +351,9 @@
       if (alive() && !quiet) main.replaceChildren(U.el('bcv-screen bcv-screen--skel', U.el('bcv-body', U.loading(r.screen === 'gpa' ? 'cards' : 'rows', 6))));
     }, 150);
     const nativeWanted = r.params.get('bcv') === 'native' || (!screens[r.screen] && !(phone() && BCV.phone.screens[r.screen])) || r.screen === 'native';
+    // Root screens paint from the cache and are redrawn when Canvas answers; a course page, a quiz
+    // or a submission keeps its state and waits for the fresh answer instead.
+    BCV.canvas?.setPaint?.(ROOT_SCREENS.has(r.screen) && !nativeWanted);
     const draw = async () => {
       if (nativeWanted) return screens.native.render(ctx);
       if (r.screen === 'course') return screens.course.render(ctx);
@@ -382,6 +389,7 @@
     if (!alive()) return;
     main.replaceChildren(el);
     progress(false);
+    html.classList.toggle('bcv-settled', refreshing.size === 0);
     document.title = titleFor(r);
     if (phone()) BCV.phone.afterRender(BCV.app, r, el);
     BCV.smart?.refresh?.();
@@ -506,17 +514,18 @@
    *  is visible (the caches live three to ten), and when the tab comes back into view. Two calls
    *  at a time, so the page's own requests keep the network. */
   let preloading = false;
-  async function preload() {
+  async function preload({ refresh = false } = {}) {
     if (preloading || document.visibilityState === 'hidden') return;
     preloading = true;
+    const o = { refresh };
     const jobs = [
-      () => store.courses(), () => store.favorites(), () => store.currentTerm(),
-      () => store.planner(), () => store.todo(), () => store.announcementsFeed(),
-      () => store.activity(), () => store.activitySummary(), () => store.unreadCount(),
-      () => store.groups(), () => store.conversations({ scope: 'inbox' }), () => store.notifications(),
-      () => BCV.screens.calendar?.prefetch?.(),
+      () => store.courses(o), () => store.favorites(o), () => store.currentTerm(),
+      () => store.planner(o), () => store.todo(o), () => store.announcementsFeed(o),
+      () => store.activity(o), () => store.activitySummary(o), () => store.unreadCount(o),
+      () => store.groups(o), () => store.conversations({ scope: 'inbox', ...o }), () => store.notifications(o),
+      () => BCV.screens.calendar?.prefetch?.(o),
       async () => { for (const c of (await store.favorites()).slice(0, 10)) await store.progress(c.id).catch(() => {}); },
-      async () => { for (const c of (await store.favorites()).slice(0, 10)) await store.assignmentGroups(c.id).catch(() => {}); },
+      async () => { for (const c of (await store.favorites()).slice(0, 10)) await store.assignmentGroups(c.id, o).catch(() => {}); },
     ];
     let i = 0;
     const worker = async () => {
@@ -541,7 +550,7 @@
     const idle = window.requestIdleCallback ? (fn) => window.requestIdleCallback(fn, { timeout: 4000 }) : (fn) => setTimeout(fn, 500);
     setTimeout(() => idle(() => preload()), 2500);
     clearInterval(preloadTimer);
-    preloadTimer = setInterval(() => preload(), 2 * 60e3);
+    preloadTimer = setInterval(() => preload({ refresh: true }), 5 * 60e3);
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') preload(); });
   }
 
@@ -601,19 +610,41 @@
     });
   }
 
-  /** A cache refresh landed newer data for something on this page: redraw it in place, keeping the
-   *  scroll, unless the student is mid-way through something (a sheet, a quiz, typing). */
+  /** The cache paints; Canvas answers. While any key on this page is still being fetched fresh
+   *  the progress bar runs; when a fresh answer differs from what was painted the screen redraws
+   *  in place with the scroll kept, unless the student is mid-way through something (a sheet, a
+   *  quiz, typing); a refresh that fails says so once, so painted numbers are never mistaken for
+   *  fresh ones. */
   let quietTimer = null;
-  BCV.canvas?.onRefresh?.(() => {
+  let refreshWarned = false;
+  let lastTouch = 0; // the last click or key on the page: a redraw never lands under a hand
+  document.addEventListener('pointerdown', () => { lastTouch = Date.now(); }, true);
+  document.addEventListener('keydown', () => { lastTouch = Date.now(); }, true);
+  const quietRedraw = () => {
     clearTimeout(quietTimer);
+    html.classList.remove('bcv-settled'); // a redraw is pending: the page is not settled yet
+    const settle = () => html.classList.toggle('bcv-settled', started && refreshing.size === 0);
     quietTimer = setTimeout(() => {
-      if (!started || state.settings?.appearance?.skin === false || state.quizOpen || state.submitOpen || inQuiz()) return;
-      if (document.querySelector('.bcv-sheet-ov, .bcv-reader-ov, #bcv-setup, .bcv-tour, .bcv-sb-ov, [class*="bcv-menu"]')) return;
+      if (!started || state.settings?.appearance?.skin === false || state.quizOpen || state.submitOpen || inQuiz() || html.classList.contains('bcv-quiz')) { settle(); return; }
+      if (!ROOT_SCREENS.has(state.route?.screen)) { settle(); return; } // a course page keeps its state; its data was fetched fresh anyway
+      // untouched since it drew, or idle for half a minute: safe to redraw; otherwise the fresh data waits in the cache
+      if (lastTouch > state.renderedAt && Date.now() - lastTouch < 30000) { settle(); return; }
+      if (document.querySelector('.bcv-sheet-ov, .bcv-reader-ov, #bcv-setup, .bcv-tour, .bcv-sb-ov, [class*="bcv-menu"]')) { quietRedraw(); return; } // try again after
       const a = document.activeElement;
-      if (a && (/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) || a.isContentEditable)) return;
+      if (a && (/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) || a.isContentEditable)) { quietRedraw(); return; }
       const y = window.scrollY;
-      render({ quiet: true }).then(() => window.scrollTo(0, y)).catch(() => {});
+      render({ quiet: true }).then(() => window.scrollTo(0, y)).catch(() => settle());
     }, 600);
+  };
+  BCV.canvas?.onRefresh?.((key, phase, changed) => {
+    if (phase === 'start') refreshing.add(key); else refreshing.delete(key);
+    if (started) progress(refreshing.size > 0);
+    html.classList.toggle('bcv-settled', started && refreshing.size === 0); // nothing painted is still waiting on Canvas
+    if (phase === 'done' && changed) quietRedraw();
+    if (phase === 'error' && started && !refreshWarned) {
+      refreshWarned = true;
+      U.toast('Canvas did not answer, so this page shows what it had last time.', { error: true, ms: 6000 });
+    }
   });
 
   BCV.app = {

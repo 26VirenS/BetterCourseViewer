@@ -129,64 +129,66 @@
   const inflight = new Map(); // one request per key at a time: callers that arrive while it runs share it
   const cacheKey = (key) => `cache:${location.host}:${key}`;
 
-  // An entry past its time but younger than this is handed back at once and refreshed behind
-  // the page; when the fresh answer differs, the refresh listeners hear about it (the app
-  // redraws the screen quietly). Older than this, the page waits for a fresh answer.
-  const STALE_GRACE = 45 * 60e3;
+  // The cache is for painting, never for the numbers. Every page load fetches each key fresh
+  // from Canvas exactly once (writes force it again; the periodic refresh asks again). What the
+  // cache holds from the last visit, if younger than a day, is handed back first so the screen
+  // draws at once; the fresh answer lands behind it and the refresh listeners hear whether it
+  // differed (the app redraws the screen quietly), started, finished or failed.
+  const PAINT_GRACE = 24 * 3600e3;
+  let paintEnabled = true; // the app turns it off on screens that must not be redrawn under the student (a quiz, a course page)
+  const setPaint = (on) => { paintEnabled = !!on; };
+  const freshThisLoad = new Set(); // keys already fetched from Canvas during this page's life
   const refreshListeners = new Set();
   function onRefresh(fn) {
     refreshListeners.add(fn);
     return () => refreshListeners.delete(fn);
   }
+  const tell = (key, phase, changed = false) => { for (const fn of refreshListeners) { try { fn(key, phase, changed); } catch { /* a listener's own problem */ } } };
   function store(k, value, ttlMs) {
     const entry = { value, expires: Date.now() + ttlMs };
     memory.set(k, entry);
     api.storage.local.set({ [k]: entry }).catch(() => { /* ignore quota errors */ });
     return value;
   }
-  function revalidate(k, key, stale, loader, ttlMs) {
-    if (inflight.has(k)) return;
-    const run = (async () => {
-      const value = await loader();
-      store(k, value, ttlMs);
-      if (JSON.stringify(value) !== JSON.stringify(stale)) for (const fn of refreshListeners) { try { fn(key); } catch { /* a listener's own problem */ } }
-      return value;
-    })();
-    inflight.set(k, run);
-    run.catch(() => {}).finally(() => { if (inflight.get(k) === run) inflight.delete(k); });
-  }
 
-  async function cached(key, ttlMs, loader, { force = false, fresh = false } = {}) {
+  async function cached(key, ttlMs, loader, { force = false, refresh = false } = {}) {
     const k = cacheKey(key);
     const now = Date.now();
     if (!force) {
-      const mem = memory.get(k);
-      if (mem && mem.expires > now) return mem.value;
       if (inflight.has(k)) return inflight.get(k);
-      let hit = null;
+      const mem = memory.get(k);
+      if (mem && freshThisLoad.has(k) && !refresh) return mem.value; // fetched fresh on this page already
+    }
+    // what the last visit left, for the first paint
+    let hit = (!force && memory.get(k)) || null;
+    if (!hit && !force) {
       try {
         hit = (await api.storage.local.get(k))[k] || null;
       } catch {
-        /* ignore */
-      }
-      if (hit && hit.expires > now) {
-        memory.set(k, hit);
-        return hit.value;
+        hit = null;
       }
       if (inflight.has(k)) return inflight.get(k);
-      if (hit && !fresh && hit.expires > now - STALE_GRACE) {
-        // stale but recent: the page draws from it now, the fresh answer lands behind it
-        revalidate(k, key, hit.value, loader, ttlMs);
-        return hit.value;
+    }
+    const paintable = !force && paintEnabled && hit && hit.expires > now - PAINT_GRACE;
+    const run = (async () => {
+      try {
+        const value = await loader();
+        store(k, value, ttlMs);
+        freshThisLoad.add(k);
+        if (paintable) tell(key, 'done', JSON.stringify(value) !== JSON.stringify(hit.value));
+        return value;
+      } catch (e) {
+        if (paintable) tell(key, 'error');
+        throw e;
       }
-    }
-    const run = (async () => store(k, await loader(), ttlMs))();
+    })();
     inflight.set(k, run);
-    try {
-      return await run;
-    } finally {
-      if (inflight.get(k) === run) inflight.delete(k);
+    run.catch(() => {}).finally(() => { if (inflight.get(k) === run) inflight.delete(k); });
+    if (paintable) {
+      tell(key, 'start');
+      return hit.value; // the screen draws now; the fresh answer replaces it behind
     }
+    return run;
   }
 
   async function invalidate(key) {
@@ -308,7 +310,7 @@
   }
 
   BCV.canvas = {
-    get, post, put, del, upload, cached, invalidate, onRefresh, csrfToken, CanvasError,
+    get, post, put, del, upload, cached, invalidate, onRefresh, setPaint, csrfToken, CanvasError,
     plannerItems, dashboardCards, activeCourses, courseColors, setPlannerComplete,
     coursesWithScores, courseTabs, course, courseModules, announcements, unreadCount,
   };

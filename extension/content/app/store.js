@@ -76,7 +76,7 @@
   }
 
   // ---- user + site --------------------------------------------------------------
-  function me({ force = false } = {}) {
+  function me({ force = false, refresh = false } = {}) {
     return C.cached('me', 60 * MIN, async () => {
       try {
         const u = await C.get('/api/v1/users/self');
@@ -86,7 +86,7 @@
         const cu = e.current_user || {};
         return { id: String(e.current_user_id || ''), name: cu.display_name || 'Account', shortName: cu.display_name || 'Account', avatar: cu.avatar_image_url || null, pronouns: null };
       }
-    }, { force });
+    }, { force, refresh });
   }
 
   function account() {
@@ -105,7 +105,7 @@
   // ---- courses ------------------------------------------------------------------------
   /** The user's course colours, exactly as Canvas paints its dashboard cards. Every Canvas
    *  page already carries them (ENV.PREFERENCES.custom_colors); the API confirms them. */
-  function colors({ force = false } = {}) {
+  function colors({ force = false, refresh = false } = {}) {
     return C.cached('colors', 60 * MIN, async () => {
       const fromPage = env().PREFERENCES?.custom_colors || {};
       try {
@@ -114,20 +114,20 @@
       } catch {
         return fromPage;
       }
-    }, { force });
+    }, { force, refresh });
   }
 
-  function rawCourses({ force = false } = {}) {
+  function rawCourses({ force = false, refresh = false } = {}) {
     return C.cached('courses:all', 15 * MIN, () =>
       C.get('/api/v1/courses', {
         params: { per_page: 100, include: ['term', 'favorites', 'total_scores', 'teachers', 'sections', 'course_image'] },
         all: true,
         maxPages: 5,
-      }), { force });
+      }), { force, refresh });
   }
 
-  function cards({ force = false } = {}) {
-    return C.cached('cards', 15 * MIN, () => C.get('/api/v1/dashboard/dashboard_cards'), { force });
+  function cards({ force = false, refresh = false } = {}) {
+    return C.cached('cards', 15 * MIN, () => C.get('/api/v1/dashboard/dashboard_cards'), { force, refresh });
   }
 
   const now = () => new Date();
@@ -145,8 +145,8 @@
   }
 
   /** All courses, decorated with colour, palette, favourite flag and state. */
-  async function courses({ force = false } = {}) {
-    const [list, cols, dark] = await Promise.all([rawCourses({ force }), colors({ force }), Promise.resolve(BCV.early?.isDark?.() ?? false)]);
+  async function courses({ force = false, refresh = false } = {}) {
+    const [list, cols, dark] = await Promise.all([rawCourses({ force, refresh }), colors({ force, refresh }), Promise.resolve(BCV.early?.isDark?.() ?? false)]);
     const seen = new Set();
     const out = [];
     let fallbackIdx = 0;
@@ -194,8 +194,8 @@
   }
 
   /** Favourite courses in dashboard order (falls back to all current courses). */
-  async function favorites({ force = false } = {}) {
-    const [all, cardList] = await Promise.all([courses({ force }), cards({ force }).catch(() => [])]);
+  async function favorites({ force = false, refresh = false } = {}) {
+    const [all, cardList] = await Promise.all([courses({ force, refresh }), cards({ force, refresh }).catch(() => [])]);
     const byId = new Map(all.map((c) => [c.id, c]));
     const order = (cardList || []).map((k) => String(k.id));
     const favs = order.map((id) => byId.get(id)).filter(Boolean).map((c) => {
@@ -262,9 +262,9 @@
   function isoDays(n) {
     return U.addDays(U.startOfDay(now()), n).toISOString();
   }
-  function rawPlanner(days = 21, { force = false } = {}) {
+  function rawPlanner(days = 21, { force = false, refresh = false } = {}) {
     return C.cached(`planner:${days}`, 3 * MIN, () =>
-      C.get('/api/v1/planner/items', { params: { start_date: isoDays(-7), end_date: isoDays(days), per_page: 100 }, all: true, maxPages: 5 }), { force });
+      C.get('/api/v1/planner/items', { params: { start_date: isoDays(-7), end_date: isoDays(days), per_page: 100 }, all: true, maxPages: 5 }), { force, refresh });
   }
 
   /** Normalise a planner item: what it is, whether it is actually due, and its state. */
@@ -312,8 +312,8 @@
     };
   }
 
-  async function planner({ force = false, days = 21 } = {}) {
-    const [items, cs] = await Promise.all([rawPlanner(days, { force }), courses().catch(() => [])]);
+  async function planner({ force = false, refresh = false, days = 21 } = {}) {
+    const [items, cs] = await Promise.all([rawPlanner(days, { force, refresh }), courses().catch(() => [])]);
     const map = new Map(cs.map((c) => [c.id, c]));
     return (items || []).map((it) => classify(it, map)).filter((it) => it.date);
   }
@@ -350,24 +350,24 @@
   }
 
   // ---- activity + counts ------------------------------------------------------------------
-  function activity({ force = false } = {}) {
-    return C.cached('activity', 3 * MIN, () => C.get('/api/v1/users/self/activity_stream', { params: { per_page: 40, only_active_courses: true } }), { force });
+  function activity({ force = false, refresh = false } = {}) {
+    return C.cached('activity', 3 * MIN, () => C.get('/api/v1/users/self/activity_stream', { params: { per_page: 40, only_active_courses: true } }), { force, refresh });
   }
-  function activitySummary({ force = false } = {}) {
-    return C.cached('activity:summary', 3 * MIN, () => C.get('/api/v1/users/self/activity_stream/summary', { params: { only_active_courses: true } }), { force });
+  function activitySummary({ force = false, refresh = false } = {}) {
+    return C.cached('activity:summary', 3 * MIN, () => C.get('/api/v1/users/self/activity_stream/summary', { params: { only_active_courses: true } }), { force, refresh });
   }
   /** Announcements across the current courses (the Announcements API), newest
    *  first, each with its read state. Canvas refuses the whole request when one
    *  course is off-limits, so a refused chunk is retried one course at a time. */
   /** Canvas's own recently-visited list (what the History tray shows). */
-  function history({ force = false } = {}) {
-    return C.cached('history', 2 * MIN, () => C.get('/api/v1/users/self/history', { params: { per_page: 40 } }), { force });
+  function history({ force = false, refresh = false } = {}) {
+    return C.cached('history', 2 * MIN, () => C.get('/api/v1/users/self/history', { params: { per_page: 40 } }), { force, refresh });
   }
   /** The account's help links (the Help tray reads the same list). */
-  function helpLinks({ force = false } = {}) {
-    return C.cached('helplinks', 60 * MIN, () => C.get('/help_links'), { force });
+  function helpLinks({ force = false, refresh = false } = {}) {
+    return C.cached('helplinks', 60 * MIN, () => C.get('/help_links'), { force, refresh });
   }
-  function announcementsFeed({ force = false } = {}) {
+  function announcementsFeed({ force = false, refresh = false } = {}) {
     return C.cached('annfeed', 3 * MIN, async () => {
       const cs = (await courses()).filter((c) => c.state === 'current');
       if (!cs.length) return [];
@@ -390,7 +390,7 @@
         }
       }
       return out.sort((a, b) => (U.parse(b.posted_at) || 0) - (U.parse(a.posted_at) || 0));
-    }, { force });
+    }, { force, refresh });
   }
   // ---- notifications: what needs attention, from what Canvas already reports ----------------
   const NOTIF_STATE = 'notifState'; // { read: { id: true }, gone: { id: true } }, local: Canvas cannot mark these
@@ -411,12 +411,12 @@
    *  next 48 hours); Graded and Feedback from Submission items in the activity stream (a score, a
    *  comment); Announcements from the unread ones; System from Canvas's notification messages and
    *  the local grade snapshot. Each carries the URL Canvas gave it. */
-  async function notifications({ force = false } = {}) {
+  async function notifications({ force = false, refresh = false } = {}) {
     const t = now();
     const [items, stream, anns, cs, snaps] = await Promise.all([
-      planner({ force }).catch(() => []),
-      activity({ force }).catch(() => []),
-      announcementsFeed({ force }).catch(() => []),
+      planner({ force, refresh }).catch(() => []),
+      activity({ force, refresh }).catch(() => []),
+      announcementsFeed({ force, refresh }).catch(() => []),
       courses().catch(() => []),
       pref('gpaSnapshots').catch(() => null),
     ]);
@@ -484,7 +484,7 @@
     await C.put(`/api/v1/users/self/colors/course_${courseId}`, { hexcode: hex });
     await C.invalidate('colors');
   }
-  function unreadCount({ force = false } = {}) {
+  function unreadCount({ force = false, refresh = false } = {}) {
     return C.cached('unread', 2 * MIN, async () => {
       try {
         const r = await C.get('/api/v1/conversations/unread_count');
@@ -492,12 +492,12 @@
       } catch {
         return 0;
       }
-    }, { force });
+    }, { force, refresh });
   }
 
   // ---- groups ---------------------------------------------------------------------------------
-  function groups({ force = false } = {}) {
-    return C.cached('groups', 15 * MIN, () => C.get('/api/v1/users/self/groups', { params: { per_page: 50, include: ['group_category'] }, all: true }), { force });
+  function groups({ force = false, refresh = false } = {}) {
+    return C.cached('groups', 15 * MIN, () => C.get('/api/v1/users/self/groups', { params: { per_page: 50, include: ['group_category'] }, all: true }), { force, refresh });
   }
 
   // ---- calendar -------------------------------------------------------------------------------
@@ -531,7 +531,7 @@
    *  off-limits (a concluded or restricted course), so a chunk that fails is
    *  retried one context at a time and the refused codes are reported back
    *  rather than blanking the calendar. Returns { events, refused }. */
-  function calendarEvents(start, end, codes, { force = false } = {}) {
+  function calendarEvents(start, end, codes, { force = false, refresh = false } = {}) {
     const s = isoDay(start);
     const e = isoDay(U.addDays(U.startOfDay(end), 1));
     const key = `cal:${s.slice(0, 10)}:${e.slice(0, 10)}:${codes.join(',')}`;
@@ -577,11 +577,11 @@
         }
       }));
       return { events, refused };
-    }, { force });
+    }, { force, refresh });
   }
   /** Planner items for any range: the calendar's stand-in when Canvas will
    *  not answer calendar_events at all (the dashboard reads the same API). */
-  function plannerRange(start, end, { force = false } = {}) {
+  function plannerRange(start, end, { force = false, refresh = false } = {}) {
     const s = isoDay(start);
     const e = isoDay(U.addDays(U.startOfDay(end), 1));
     return C.cached(`planner:range:${s.slice(0, 10)}:${e.slice(0, 10)}`, 5 * MIN, async () => {
@@ -591,21 +591,21 @@
       ]);
       const map = new Map(cs.map((c) => [c.id, c]));
       return (items || []).map((it) => classify(it, map)).filter((it) => it.date);
-    }, { force });
+    }, { force, refresh });
   }
 
   // ---- inbox ----------------------------------------------------------------------------------
-  function conversations({ scope = 'inbox', filter = null, force = false } = {}) {
+  function conversations({ scope = 'inbox', filter = null, force = false, refresh = false } = {}) {
     const params = { per_page: 50 };
     if (scope && scope !== 'inbox') params.scope = scope;
     if (filter) params['filter[]'] = filter;
     return C.cached(`conv:${scope}:${filter || ''}`, 2 * MIN, async () => {
       const r = await C.get('/api/v1/conversations', { params });
       return Array.isArray(r) ? r : (r?.conversations || []);
-    }, { force });
+    }, { force, refresh });
   }
-  function conversation(id, { force = true } = {}) {
-    return C.cached(`conv:${id}`, MIN, () => C.get(`/api/v1/conversations/${id}`), { force });
+  function conversation(id, { force = true, refresh = false } = {}) {
+    return C.cached(`conv:${id}`, MIN, () => C.get(`/api/v1/conversations/${id}`), { force, refresh });
   }
   async function invalidateInbox() {
     const stored = await api.storage.local.get(null).catch(() => ({}));
@@ -639,11 +639,11 @@
   }
 
   // ---- course -------------------------------------------------------------------------------------
-  async function course(id, { force = false } = {}) {
-    const list = await courses({ force });
+  async function course(id, { force = false, refresh = false } = {}) {
+    const list = await courses({ force, refresh });
     const found = list.find((c) => c.id === String(id));
     if (found) return found;
-    const c = await C.cached(`course:${id}`, 15 * MIN, () => C.get(`/api/v1/courses/${id}`, { params: { include: ['term', 'teachers', 'total_scores', 'sections', 'course_image'] } }), { force });
+    const c = await C.cached(`course:${id}`, 15 * MIN, () => C.get(`/api/v1/courses/${id}`, { params: { include: ['term', 'teachers', 'total_scores', 'sections', 'course_image'] } }), { force, refresh });
     const cols = await colors();
     const color = cols[`course_${id}`] || U.FALLBACK_COLORS[0];
     const enr = (c.enrollments || [])[0] || {};
@@ -655,15 +655,15 @@
     };
   }
   // `kind` is 'courses' or 'groups': the same endpoints exist under both.
-  function tabs(id, { force = false, kind = 'courses' } = {}) {
-    return C.cached(`tabs:${kind}:${id}`, 30 * MIN, () => C.get(`/api/v1/${kind}/${id}/tabs`), { force });
+  function tabs(id, { force = false, refresh = false, kind = 'courses' } = {}) {
+    return C.cached(`tabs:${kind}:${id}`, 30 * MIN, () => C.get(`/api/v1/${kind}/${id}/tabs`), { force, refresh });
   }
-  function frontPage(id, { force = false, kind = 'courses' } = {}) {
-    return C.cached(`front:${kind}:${id}`, 10 * MIN, () => C.get(`/api/v1/${kind}/${id}/front_page`).catch(() => null), { force });
+  function frontPage(id, { force = false, refresh = false, kind = 'courses' } = {}) {
+    return C.cached(`front:${kind}:${id}`, 10 * MIN, () => C.get(`/api/v1/${kind}/${id}/front_page`).catch(() => null), { force, refresh });
   }
   /** One group, shaped like a course so the course tab builders can draw it. */
-  async function group(id, { force = false } = {}) {
-    const g = await C.cached(`group:${id}`, 15 * MIN, () => C.get(`/api/v1/groups/${id}`, { params: { include: ['group_category', 'users'] } }), { force });
+  async function group(id, { force = false, refresh = false } = {}) {
+    const g = await C.cached(`group:${id}`, 15 * MIN, () => C.get(`/api/v1/groups/${id}`, { params: { include: ['group_category', 'users'] } }), { force, refresh });
     const cs = await courses().catch(() => []);
     const course = g.course_id ? cs.find((c) => c.id === String(g.course_id)) : null;
     const color = course?.color || '#5856d6';
@@ -673,11 +673,11 @@
       color, palette: U.palette(color, BCV.early?.isDark?.() ?? false), url: `/groups/${id}`, kind: 'groups', course, membersCount: g.members_count ?? null, description: g.description || '',
     };
   }
-  function syllabus(id, { force = false } = {}) {
-    return C.cached(`syllabus:${id}`, 10 * MIN, () => C.get(`/api/v1/courses/${id}`, { params: { include: ['syllabus_body'] } }).then((c) => c?.syllabus_body || ''), { force });
+  function syllabus(id, { force = false, refresh = false } = {}) {
+    return C.cached(`syllabus:${id}`, 10 * MIN, () => C.get(`/api/v1/courses/${id}`, { params: { include: ['syllabus_body'] } }).then((c) => c?.syllabus_body || ''), { force, refresh });
   }
-  function courseTodo(id, { force = false } = {}) {
-    return C.cached(`ctodo:${id}`, 3 * MIN, () => C.get(`/api/v1/courses/${id}/todo`, { params: { per_page: 20 } }).catch(() => []), { force });
+  function courseTodo(id, { force = false, refresh = false } = {}) {
+    return C.cached(`ctodo:${id}`, 3 * MIN, () => C.get(`/api/v1/courses/${id}/todo`, { params: { per_page: 20 } }).catch(() => []), { force, refresh });
   }
   async function ignoreTodo(item, courseId) {
     const url = item.ignore || item.ignore_permanently;
@@ -686,32 +686,32 @@
     await C.del(path);
     await C.invalidate(`ctodo:${courseId}`);
   }
-  function courseStream(id, { force = false, kind = 'courses' } = {}) {
-    return C.cached(`cstream:${kind}:${id}`, 3 * MIN, () => C.get(`/api/v1/${kind}/${id}/activity_stream`, { params: { per_page: 40 } }), { force });
+  function courseStream(id, { force = false, refresh = false, kind = 'courses' } = {}) {
+    return C.cached(`cstream:${kind}:${id}`, 3 * MIN, () => C.get(`/api/v1/${kind}/${id}/activity_stream`, { params: { per_page: 40 } }), { force, refresh });
   }
-  function assignments(id, { force = false } = {}) {
+  function assignments(id, { force = false, refresh = false } = {}) {
     return C.cached(`assignments:${id}`, 10 * MIN, () =>
-      C.get(`/api/v1/courses/${id}/assignments`, { params: { per_page: 100, include: ['submission', 'all_dates'], order_by: 'due_at' }, all: true, maxPages: 4 }), { force });
+      C.get(`/api/v1/courses/${id}/assignments`, { params: { per_page: 100, include: ['submission', 'all_dates'], order_by: 'due_at' }, all: true, maxPages: 4 }), { force, refresh });
   }
-  function assignment(id, aid, { force = false } = {}) {
+  function assignment(id, aid, { force = false, refresh = false } = {}) {
     return C.cached(`assignment:${id}:${aid}`, 5 * MIN, () =>
-      C.get(`/api/v1/courses/${id}/assignments/${aid}`, { params: { include: ['submission', 'score_statistics', 'can_submit'] } }), { force });
+      C.get(`/api/v1/courses/${id}/assignments/${aid}`, { params: { include: ['submission', 'score_statistics', 'can_submit'] } }), { force, refresh });
   }
-  function submission(id, aid, { force = false } = {}) {
+  function submission(id, aid, { force = false, refresh = false } = {}) {
     return C.cached(`submission:${id}:${aid}`, 5 * MIN, () =>
       // submission_history carries per-question points for quiz attempts (the feedback screen reads it)
-      C.get(`/api/v1/courses/${id}/assignments/${aid}/submissions/self`, { params: { include: ['submission_comments', 'rubric_assessment', 'submission_history'] } }).catch(() => null), { force });
+      C.get(`/api/v1/courses/${id}/assignments/${aid}/submissions/self`, { params: { include: ['submission_comments', 'rubric_assessment', 'submission_history'] } }).catch(() => null), { force, refresh });
   }
-  function assignmentGroups(id, { force = false } = {}) {
+  function assignmentGroups(id, { force = false, refresh = false } = {}) {
     return C.cached(`agroups:${id}`, 10 * MIN, () =>
-      C.get(`/api/v1/courses/${id}/assignment_groups`, { params: { per_page: 50, include: ['assignments', 'submission'], exclude_assignment_submission_types: ['wiki_page'] }, all: true, maxPages: 3 }), { force });
+      C.get(`/api/v1/courses/${id}/assignment_groups`, { params: { per_page: 50, include: ['assignments', 'submission'], exclude_assignment_submission_types: ['wiki_page'] }, all: true, maxPages: 3 }), { force, refresh });
   }
   // ---- handing work in ------------------------------------------------------------------------
   /** Tools the instructor enabled for handing work in (Box, Office 365, …): Canvas draws one
    *  tab per tool with a homework_submission placement; the submit screen draws one row. */
-  function homeworkTools(id, { force = false } = {}) {
+  function homeworkTools(id, { force = false, refresh = false } = {}) {
     return C.cached(`hwtools:${id}`, 30 * MIN, () =>
-      C.get(`/api/v1/courses/${id}/external_tools`, { params: { placement: 'homework_submission', include_parents: true, per_page: 50 }, all: true, maxPages: 2 }), { force });
+      C.get(`/api/v1/courses/${id}/external_tools`, { params: { placement: 'homework_submission', include_parents: true, per_page: 50 }, all: true, maxPages: 2 }), { force, refresh });
   }
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const attachmentId = (o) => o?.id ?? o?.attachment?.id ?? o?.attachment_id ?? null;
@@ -794,19 +794,19 @@
       return { done: 0, total: 0 };
     }
   }
-  function announcements(id, { force = false, kind = 'courses' } = {}) {
+  function announcements(id, { force = false, refresh = false, kind = 'courses' } = {}) {
     return C.cached(`ann:${kind}:${id}`, 5 * MIN, () =>
-      C.get(`/api/v1/${kind}/${id}/discussion_topics`, { params: { only_announcements: true, per_page: 50 }, all: true, maxPages: 2 }), { force });
+      C.get(`/api/v1/${kind}/${id}/discussion_topics`, { params: { only_announcements: true, per_page: 50 }, all: true, maxPages: 2 }), { force, refresh });
   }
-  function discussions(id, { force = false, kind = 'courses' } = {}) {
+  function discussions(id, { force = false, refresh = false, kind = 'courses' } = {}) {
     return C.cached(`disc:${kind}:${id}`, 5 * MIN, () =>
-      C.get(`/api/v1/${kind}/${id}/discussion_topics`, { params: { per_page: 50, order_by: 'recent_activity', include: ['all_dates'] }, all: true, maxPages: 3 }), { force });
+      C.get(`/api/v1/${kind}/${id}/discussion_topics`, { params: { per_page: 50, order_by: 'recent_activity', include: ['all_dates'] }, all: true, maxPages: 3 }), { force, refresh });
   }
-  function discussion(id, tid, { force = false, kind = 'courses' } = {}) {
-    return C.cached(`disc:${kind}:${id}:${tid}`, 3 * MIN, () => C.get(`/api/v1/${kind}/${id}/discussion_topics/${tid}`, { params: { include: ['all_dates'] } }), { force });
+  function discussion(id, tid, { force = false, refresh = false, kind = 'courses' } = {}) {
+    return C.cached(`disc:${kind}:${id}:${tid}`, 3 * MIN, () => C.get(`/api/v1/${kind}/${id}/discussion_topics/${tid}`, { params: { include: ['all_dates'] } }), { force, refresh });
   }
-  function discussionView(id, tid, { force = true, kind = 'courses' } = {}) {
-    return C.cached(`discview:${kind}:${id}:${tid}`, MIN, () => C.get(`/api/v1/${kind}/${id}/discussion_topics/${tid}/view`).catch(() => null), { force });
+  function discussionView(id, tid, { force = true, refresh = false, kind = 'courses' } = {}) {
+    return C.cached(`discview:${kind}:${id}:${tid}`, MIN, () => C.get(`/api/v1/${kind}/${id}/discussion_topics/${tid}/view`).catch(() => null), { force, refresh });
   }
   async function postEntry(id, tid, message, parentId = null, { kind = 'courses' } = {}) {
     const r = parentId
@@ -823,50 +823,50 @@
       /* ignore */
     }
   }
-  function people(id, { force = false, kind = 'courses' } = {}) {
+  function people(id, { force = false, refresh = false, kind = 'courses' } = {}) {
     return C.cached(`people:${kind}:${id}`, 15 * MIN, () =>
-      C.get(`/api/v1/${kind}/${id}/users`, { params: { per_page: 100, include: kind === 'groups' ? ['avatar_url'] : ['enrollments', 'avatar_url', 'pronouns'], sort: 'username' }, all: true, maxPages: 5 }), { force });
+      C.get(`/api/v1/${kind}/${id}/users`, { params: { per_page: 100, include: kind === 'groups' ? ['avatar_url'] : ['enrollments', 'avatar_url', 'pronouns'], sort: 'username' }, all: true, maxPages: 5 }), { force, refresh });
   }
-  function sections(id, { force = false } = {}) {
-    return C.cached(`sections:${id}`, 30 * MIN, () => C.get(`/api/v1/courses/${id}/sections`, { params: { per_page: 100 } }).catch(() => []), { force });
+  function sections(id, { force = false, refresh = false } = {}) {
+    return C.cached(`sections:${id}`, 30 * MIN, () => C.get(`/api/v1/courses/${id}/sections`, { params: { per_page: 100 } }).catch(() => []), { force, refresh });
   }
-  function courseGroups(id, { force = false } = {}) {
-    return C.cached(`cgroups:${id}`, 15 * MIN, () => C.get(`/api/v1/courses/${id}/groups`, { params: { per_page: 100, include: ['group_category'] } }).catch(() => []), { force });
+  function courseGroups(id, { force = false, refresh = false } = {}) {
+    return C.cached(`cgroups:${id}`, 15 * MIN, () => C.get(`/api/v1/courses/${id}/groups`, { params: { per_page: 100, include: ['group_category'] } }).catch(() => []), { force, refresh });
   }
-  function pages(id, { force = false, kind = 'courses' } = {}) {
+  function pages(id, { force = false, refresh = false, kind = 'courses' } = {}) {
     return C.cached(`pages:${kind}:${id}`, 10 * MIN, () =>
-      C.get(`/api/v1/${kind}/${id}/pages`, { params: { per_page: 100, sort: 'title', published: true }, all: true, maxPages: 3 }), { force });
+      C.get(`/api/v1/${kind}/${id}/pages`, { params: { per_page: 100, sort: 'title', published: true }, all: true, maxPages: 3 }), { force, refresh });
   }
-  function page(id, slug, { force = false, kind = 'courses' } = {}) {
-    return C.cached(`page:${kind}:${id}:${slug}`, 10 * MIN, () => C.get(`/api/v1/${kind}/${id}/pages/${encodeURIComponent(slug)}`), { force });
+  function page(id, slug, { force = false, refresh = false, kind = 'courses' } = {}) {
+    return C.cached(`page:${kind}:${id}:${slug}`, 10 * MIN, () => C.get(`/api/v1/${kind}/${id}/pages/${encodeURIComponent(slug)}`), { force, refresh });
   }
-  function rootFolder(id, { force = false, kind = 'courses' } = {}) {
-    return C.cached(`folder:root:${kind}:${id}`, 15 * MIN, () => C.get(`/api/v1/${kind}/${id}/folders/root`), { force });
+  function rootFolder(id, { force = false, refresh = false, kind = 'courses' } = {}) {
+    return C.cached(`folder:root:${kind}:${id}`, 15 * MIN, () => C.get(`/api/v1/${kind}/${id}/folders/root`), { force, refresh });
   }
-  function folderContents(folderId, { force = false } = {}) {
+  function folderContents(folderId, { force = false, refresh = false } = {}) {
     return C.cached(`folder:${folderId}`, 10 * MIN, async () => {
       const [folders, files] = await Promise.all([
         C.get(`/api/v1/folders/${folderId}/folders`, { params: { per_page: 100 }, all: true, maxPages: 2 }).catch(() => []),
         C.get(`/api/v1/folders/${folderId}/files`, { params: { per_page: 100, include: ['user'] }, all: true, maxPages: 3 }).catch(() => []),
       ]);
       return { folders: folders || [], files: files || [] };
-    }, { force });
+    }, { force, refresh });
   }
-  function folderByPath(id, path, { force = false, kind = 'courses' } = {}) {
+  function folderByPath(id, path, { force = false, refresh = false, kind = 'courses' } = {}) {
     return C.cached(`folder:path:${kind}:${id}:${path}`, 10 * MIN, () =>
-      C.get(`/api/v1/${kind}/${id}/folders/by_path/${path.split('/').map(encodeURIComponent).join('/')}`), { force });
+      C.get(`/api/v1/${kind}/${id}/folders/by_path/${path.split('/').map(encodeURIComponent).join('/')}`), { force, refresh });
   }
-  function file(fileId, { force = false } = {}) {
-    return C.cached(`file:${fileId}`, 10 * MIN, () => C.get(`/api/v1/files/${fileId}`), { force });
+  function file(fileId, { force = false, refresh = false } = {}) {
+    return C.cached(`file:${fileId}`, 10 * MIN, () => C.get(`/api/v1/files/${fileId}`), { force, refresh });
   }
-  function quizzes(id, { force = false } = {}) {
-    return C.cached(`quizzes:${id}`, 10 * MIN, () => C.get(`/api/v1/courses/${id}/quizzes`, { params: { per_page: 100 }, all: true, maxPages: 3 }), { force });
+  function quizzes(id, { force = false, refresh = false } = {}) {
+    return C.cached(`quizzes:${id}`, 10 * MIN, () => C.get(`/api/v1/courses/${id}/quizzes`, { params: { per_page: 100 }, all: true, maxPages: 3 }), { force, refresh });
   }
-  function quiz(id, qid, { force = false } = {}) {
-    return C.cached(`quiz:${id}:${qid}`, 5 * MIN, () => C.get(`/api/v1/courses/${id}/quizzes/${qid}`), { force });
+  function quiz(id, qid, { force = false, refresh = false } = {}) {
+    return C.cached(`quiz:${id}:${qid}`, 5 * MIN, () => C.get(`/api/v1/courses/${id}/quizzes/${qid}`), { force, refresh });
   }
-  function quizSubmissions(id, qid, { force = false } = {}) {
-    return C.cached(`quizsubs:${id}:${qid}`, 3 * MIN, () => C.get(`/api/v1/courses/${id}/quizzes/${qid}/submissions`).then((r) => r?.quiz_submissions || []).catch(() => []), { force });
+  function quizSubmissions(id, qid, { force = false, refresh = false } = {}) {
+    return C.cached(`quizsubs:${id}:${qid}`, 3 * MIN, () => C.get(`/api/v1/courses/${id}/quizzes/${qid}/submissions`).then((r) => r?.quiz_submissions || []).catch(() => []), { force, refresh });
   }
   /** Quiz attempt API: everything the quiz screen needs, uncached. */
   /** Attempts used and allowed for a quiz, from its submissions: Canvas returns the latest
@@ -924,9 +924,9 @@
     },
   };
 
-  function modules(id, { force = false } = {}) {
+  function modules(id, { force = false, refresh = false } = {}) {
     return C.cached(`modules:${id}`, 10 * MIN, () =>
-      C.get(`/api/v1/courses/${id}/modules`, { params: { per_page: 50, include: ['items', 'content_details'] }, all: true, maxPages: 4 }), { force });
+      C.get(`/api/v1/courses/${id}/modules`, { params: { per_page: 50, include: ['items', 'content_details'] }, all: true, maxPages: 4 }), { force, refresh });
   }
 
   // ---- grades model -------------------------------------------------------------------------------

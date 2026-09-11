@@ -61,6 +61,10 @@ try {
   await sw.evaluate(() => self.BCV.api.storage.local.set({ 'setup:offered': true })); // the first-run setup is exercised on its own below
 
   const page = await context.newPage();
+  // a page is ready to poke once it is drawn and nothing painted from the cache is still waiting on Canvas
+  const __goto = page.goto.bind(page);
+  page.gotoRaw = __goto;
+  page.goto = async (...a) => { const r = await __goto(...a); await page.waitForFunction(() => { const c = document.documentElement.classList; return !c.contains('bcv-on') || c.contains('bcv-settled'); }, null, { timeout: 20000 }).catch(() => {}); return r; };
   const errors = [];
   page.on('pageerror', (e) => { errors.push(e.message); console.log('  page error:', e.message); });
   // the mock answers one calendar context with 401 on purpose (the retry path); a failed resource load is not a script error
@@ -83,6 +87,7 @@ try {
     await page.evaluate(() => { const m = document.querySelector('#bcv-main > *'); if (m) m.dataset.old = '1'; });
     await page.click(sel);
     await page.waitForSelector('#bcv-main > *:not([data-old])', { timeout: 10000 });
+    await page.waitForFunction(() => { const c = document.documentElement.classList; return !c.contains('bcv-on') || c.contains('bcv-settled'); }, null, { timeout: 20000 }).catch(() => {});
   };
   const tab = (id) => tapScreen(`.bcv-tabbar__item[data-tab="${id}"]`);
   const ready = () => page.waitForSelector('#bcv-app .bcv-tabbar__item', { timeout: 15000 });
@@ -337,7 +342,7 @@ try {
 
   check(errors.length === 0, `no page errors${errors.length ? `: ${errors.slice(0, 3).join(' | ')}` : ''}`);
 } catch (e) {
-  console.error('phone test crashed:', e);
+  console.error('phone test crashed:', e?.stack || e);
   failures.push(`crash: ${e.message}`);
 } finally {
   await context.close();
