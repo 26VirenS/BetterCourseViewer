@@ -95,6 +95,10 @@ if [[ -f "$PBXPROJ" ]]; then
   if [[ -f "$APP_PLIST" ]] && ! /usr/libexec/PlistBuddy -c "Print :LSApplicationCategoryType" "$APP_PLIST" >/dev/null 2>&1; then
     /usr/libexec/PlistBuddy -c "Add :LSApplicationCategoryType string public.app-category.education" "$APP_PLIST"
   fi
+  # export compliance answered up front (only HTTPS): a TestFlight build otherwise waits at "Missing Compliance"
+  if [[ -f "$APP_PLIST" ]] && ! /usr/libexec/PlistBuddy -c "Print :ITSAppUsesNonExemptEncryption" "$APP_PLIST" >/dev/null 2>&1; then
+    /usr/libexec/PlistBuddy -c "Add :ITSAppUsesNonExemptEncryption bool false" "$APP_PLIST"
+  fi
   # Xcode Cloud: number each cloud build from CI_BUILD_NUMBER, so every upload is newer than the last.
   CI_DIR="$(dirname "$PROJECT")/ci_scripts"
   mkdir -p "$CI_DIR"
