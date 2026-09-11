@@ -295,12 +295,54 @@
           h('span', { class: 'bcv-theme-btn__ic' }, U.svg(state.dark ? IC.sun : IC.moon, { size: 14, width: 1.8 })),
           h('span', { text: state.dark ? 'Light appearance' : 'Dark appearance' }),
         ]),
-        h('button', { type: 'button', class: 'bcv-account', onclick: () => go('/profile'), title: 'Account' }, [
+        h('button', { type: 'button', class: 'bcv-account', id: 'bcv-account', onclick: (e) => { e.stopPropagation(); accountMenu(e.currentTarget); }, title: 'Account', 'aria-haspopup': 'menu' }, [
           U.avatar(state.me?.avatar, state.me?.name, 30),
           h('div', { style: { minWidth: '0' } }, [U.text('bcv-account__name bcv-ellip', state.me?.name || 'Account'), U.text('bcv-account__sub', 'Account')]),
         ]),
       ]),
     );
+  }
+
+  /** Log out of Canvas: the app's own sign-out in the iOS app, else Canvas's logout form (a DELETE
+   *  with the page's token, exactly what its own menu submits). */
+  function logout() {
+    if (self.BCVBridge?.native?.signOut) { self.BCVBridge.native.signOut(); return; }
+    const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+    const form = h('form', { method: 'post', action: '/logout', style: { display: 'none' } }, [
+      h('input', { type: 'hidden', name: '_method', value: 'delete' }),
+      h('input', { type: 'hidden', name: 'authenticity_token', value: token }),
+    ]);
+    document.body.append(form);
+    form.submit();
+  }
+
+  /** The panel over the account row: quick settings, the guided setup and tour, Canvas's own
+   *  profile and settings pages, and Log out. */
+  function accountMenu(anchor) {
+    if (document.querySelector('.bcv-menu--account')) { U.closeMenus(); return; }
+    U.closeMenus();
+    const me = state.me;
+    const item = (icon, label, sub, onSelect, cls = '') => h('button', { type: 'button', class: `bcv-menu__item ${cls}`, onclick: () => { U.closeMenus(); onSelect(); } }, [
+      h('span', { class: 'bcv-menu__ic' }, U.svg(icon, { size: 14, width: 1.9 })),
+      h('span', { style: { flex: '1', minWidth: '0' } }, [h('span', { class: 'bcv-ellip', style: { display: 'block' }, text: label }), sub ? h('span', { class: 'bcv-menu__sub', text: sub }) : null]),
+    ]);
+    const m = U.el('bcv-menu bcv-menu--account', [
+      U.el('bcv-menu__head', [U.avatar(me?.avatar, me?.name, 34), h('div', { style: { minWidth: '0' } }, [U.text('bcv-menu__name bcv-ellip', me?.name || 'Account'), U.text('bcv-menu__sub bcv-ellip', me?.email || me?.login_id || siteName())])]),
+      item(state.dark ? IC.sun : IC.moon, state.dark ? 'Light appearance' : 'Dark appearance', null, toggleTheme),
+      item(IC.settings, 'Simpl Courses settings', 'Look, courses, grades, the smart panel', () => BCV.smartClient?.openOptions?.()),
+      item(IC.sparkle, 'Guided setup', 'Courses, grades, the smart panel', () => go('/?bcv=setup')),
+      item(IC.cal, 'Tour', 'What changed, on the real pages', () => go('/?bcv=tour')),
+      U.el('bcv-menu__sep'),
+      item(IC.people, 'Canvas profile', null, () => go('/profile')),
+      item(IC.external, 'All Canvas settings', 'Profile, notifications, integrations', () => go('/profile/settings')),
+      item(IC.bell, 'Notification preferences', null, () => go('/profile/communication')),
+      U.el('bcv-menu__sep'),
+      item(IC.external, 'Log out', null, logout, 'bcv-menu__item--danger'),
+    ]);
+    const r = anchor.getBoundingClientRect();
+    Object.assign(m.style, { position: 'fixed', left: `${Math.max(8, r.left)}px`, bottom: `${Math.max(8, window.innerHeight - r.top + 6)}px`, top: 'auto' });
+    document.body.append(m);
+    setTimeout(() => document.addEventListener('click', U.closeMenus, { once: true }), 0);
   }
 
   async function toggleTheme() {
@@ -325,8 +367,6 @@
   }
 
   // ---- screens --------------------------------------------------------------------------------
-  const ROOT_SCREENS = new Set(['dashboard', 'courses', 'groups', 'todo', 'calendar', 'inbox', 'gpa', 'notifications']);
-  const refreshing = new Set(); // cache keys painted on this page that Canvas has not answered yet
   const SCREEN_PATIENCE = 15000; // a screen still not drawn after this gives way to Canvas's own page
   async function render({ quiet = false } = {}) {
     const r = parseRoute();
@@ -351,9 +391,6 @@
       if (alive() && !quiet) main.replaceChildren(U.el('bcv-screen bcv-screen--skel', U.el('bcv-body', U.loading(r.screen === 'gpa' ? 'cards' : 'rows', 6))));
     }, 150);
     const nativeWanted = r.params.get('bcv') === 'native' || (!screens[r.screen] && !(phone() && BCV.phone.screens[r.screen])) || r.screen === 'native';
-    // Root screens paint from the cache and are redrawn when Canvas answers; a course page, a quiz
-    // or a submission keeps its state and waits for the fresh answer instead.
-    BCV.canvas?.setPaint?.(ROOT_SCREENS.has(r.screen) && !nativeWanted);
     const draw = async () => {
       if (nativeWanted) return screens.native.render(ctx);
       if (r.screen === 'course') return screens.course.render(ctx);
@@ -389,7 +426,7 @@
     if (!alive()) return;
     main.replaceChildren(el);
     progress(false);
-    html.classList.toggle('bcv-settled', refreshing.size === 0);
+    html.classList.add('bcv-settled'); // drawn, from Canvas's answer (the harness waits for this)
     document.title = titleFor(r);
     if (phone()) BCV.phone.afterRender(BCV.app, r, el);
     BCV.smart?.refresh?.();
@@ -496,7 +533,6 @@
         loadShellData();
         BCV.smart?.mount?.(BCV.app);
         await render();
-        prefetch();
       }
     } else {
       punchOut();
@@ -505,53 +541,6 @@
       // Canvas only rendered the page that was loaded; if we navigated since, load this one.
       if (started && state.nativePath !== location.pathname + location.search) location.reload();
     }
-  }
-
-  /** Once this screen has drawn and the page is idle, warm what every other root screen reads
-   *  (Dashboard, Courses, Groups, To Do, Calendar, Notifications, Inbox, Grades and the course
-   *  cards), each call being the one that screen makes itself, so the next page lands from the
-   *  shared cache instead of the network. Then keep it warm: again every two minutes while the tab
-   *  is visible (the caches live three to ten), and when the tab comes back into view. Two calls
-   *  at a time, so the page's own requests keep the network. */
-  let preloading = false;
-  async function preload({ refresh = false } = {}) {
-    if (preloading || document.visibilityState === 'hidden') return;
-    preloading = true;
-    const o = { refresh };
-    const jobs = [
-      () => store.courses(o), () => store.favorites(o), () => store.currentTerm(),
-      () => store.planner(o), () => store.todo(o), () => store.announcementsFeed(o),
-      () => store.activity(o), () => store.activitySummary(o), () => store.unreadCount(o),
-      () => store.groups(o), () => store.conversations({ scope: 'inbox', ...o }), () => store.notifications(o),
-      () => BCV.screens.calendar?.prefetch?.(o),
-      async () => { for (const c of (await store.favorites()).slice(0, 10)) await store.progress(c.id).catch(() => {}); },
-      async () => { for (const c of (await store.favorites()).slice(0, 10)) await store.assignmentGroups(c.id, o).catch(() => {}); },
-    ];
-    let i = 0;
-    const worker = async () => {
-      while (i < jobs.length) {
-        const job = jobs[i++];
-        try {
-          await job();
-        } catch {
-          /* the screen that needs it reports its own error */
-        }
-      }
-    };
-    try {
-      await Promise.all([worker(), worker()]);
-    } finally {
-      preloading = false;
-    }
-  }
-  let preloadTimer = null;
-  function prefetch() {
-    // after the screen's own requests have had the network to themselves, then when idle
-    const idle = window.requestIdleCallback ? (fn) => window.requestIdleCallback(fn, { timeout: 4000 }) : (fn) => setTimeout(fn, 500);
-    setTimeout(() => idle(() => preload()), 2500);
-    clearInterval(preloadTimer);
-    preloadTimer = setInterval(() => preload({ refresh: true }), 5 * 60e3);
-    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') preload(); });
   }
 
   /** True once, on the first signed-in Canvas page in the app (browsers open the setup page instead). */
@@ -610,45 +599,8 @@
     });
   }
 
-  /** The cache paints; Canvas answers. While any key on this page is still being fetched fresh
-   *  the progress bar runs; when a fresh answer differs from what was painted the screen redraws
-   *  in place with the scroll kept, unless the student is mid-way through something (a sheet, a
-   *  quiz, typing); a refresh that fails says so once, so painted numbers are never mistaken for
-   *  fresh ones. */
-  let quietTimer = null;
-  let refreshWarned = false;
-  let lastTouch = 0; // the last click or key on the page: a redraw never lands under a hand
-  document.addEventListener('pointerdown', () => { lastTouch = Date.now(); }, true);
-  document.addEventListener('keydown', () => { lastTouch = Date.now(); }, true);
-  const quietRedraw = () => {
-    clearTimeout(quietTimer);
-    html.classList.remove('bcv-settled'); // a redraw is pending: the page is not settled yet
-    const settle = () => html.classList.toggle('bcv-settled', started && refreshing.size === 0);
-    quietTimer = setTimeout(() => {
-      if (!started || state.settings?.appearance?.skin === false || state.quizOpen || state.submitOpen || inQuiz() || html.classList.contains('bcv-quiz')) { settle(); return; }
-      if (!ROOT_SCREENS.has(state.route?.screen)) { settle(); return; } // a course page keeps its state; its data was fetched fresh anyway
-      // untouched since it drew, or idle for half a minute: safe to redraw; otherwise the fresh data waits in the cache
-      if (lastTouch > state.renderedAt && Date.now() - lastTouch < 30000) { settle(); return; }
-      if (document.querySelector('.bcv-sheet-ov, .bcv-reader-ov, #bcv-setup, .bcv-tour, .bcv-sb-ov, [class*="bcv-menu"]')) { quietRedraw(); return; } // try again after
-      const a = document.activeElement;
-      if (a && (/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) || a.isContentEditable)) { quietRedraw(); return; }
-      const y = window.scrollY;
-      render({ quiet: true }).then(() => window.scrollTo(0, y)).catch(() => settle());
-    }, 600);
-  };
-  BCV.canvas?.onRefresh?.((key, phase, changed) => {
-    if (phase === 'start') refreshing.add(key); else refreshing.delete(key);
-    if (started) progress(refreshing.size > 0);
-    html.classList.toggle('bcv-settled', started && refreshing.size === 0); // nothing painted is still waiting on Canvas
-    if (phase === 'done' && changed) quietRedraw();
-    if (phase === 'error' && started && !refreshWarned) {
-      refreshWarned = true;
-      U.toast('Canvas did not answer, so this page shows what it had last time.', { error: true, ms: 6000 });
-    }
-  });
-
   BCV.app = {
-    state, go, render, renderSide, parseRoute, refreshCounts, loadShellData, punchIn, punchOut, siteName, toggleTheme, preload,
+    state, go, render, renderSide, parseRoute, refreshCounts, loadShellData, punchIn, punchOut, siteName, toggleTheme, logout,
     isDark: () => state.dark,
     smartContext: () => state.smartTopic || state.smartCtx,
     /** Scope the smart panel to one item (a quiz question) until it is closed; null restores the page's suggestions. */

@@ -6,7 +6,7 @@
   BCV.screens = BCV.screens || {}; // screens register here; app.js reads it last
 
   BCV.IC = {
-    dash: 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z',
+    dash: 'M4 6a2 2 0 012-2h12a2 2 0 012 2v3a2 2 0 01-2 2H6a2 2 0 01-2-2zM4 16a2 2 0 012-2h4a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2z',
     book: 'M5 4h13v16H5zM5 17h13M9 8h5',
     people: 'M9 11a3 3 0 100-6 3 3 0 000 6zM3 20c0-3 3-5 6-5s6 2 6 5M16 6a3 3 0 010 6M18 20c0-2-.7-3.4-2-4.3',
     check: 'M4 8l2.5 2.5L11 6M4 17l2.5 2.5L11 15M14 8h6M14 17h6',

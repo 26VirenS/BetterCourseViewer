@@ -608,9 +608,8 @@
     return C.cached(`conv:${id}`, MIN, () => C.get(`/api/v1/conversations/${id}`), { force, refresh });
   }
   async function invalidateInbox() {
-    const stored = await api.storage.local.get(null).catch(() => ({}));
-    const keys = Object.keys(stored).filter((k) => k.startsWith(`cache:${location.host}:conv:`) || k.endsWith(':unread'));
-    await Promise.all(keys.map((k) => C.invalidate(k.replace(`cache:${location.host}:`, ''))));
+    await C.invalidatePrefix('conv:');
+    await C.invalidate('unread');
   }
   async function markRead(id) {
     await C.put(`/api/v1/conversations/${id}`, { conversation: { workflow_state: 'read' } });

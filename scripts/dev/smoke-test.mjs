@@ -1139,28 +1139,23 @@ try {
   await page.waitForSelector('.bcv-gpa__hero', { timeout: 15000 });
   check((await texts('.bcv-gpa__hero-sub'))[0]?.includes('This term so far') && (await texts('.bcv-gpa__goal-s'))[0] === 'Goal 3.60 · set it in settings', 'the Grades page tracks without a record from the setup, with the goal it set');
 
-  // ---- preload: the other root screens land from the cache -----------------------------------------------
-  console.log('preload');
+  // ---- the account panel ----------------------------------------------------------------------------------
+  console.log('account panel');
   await page.goto(`${BASE}/`);
-  await page.waitForSelector('.bcv-stat', { timeout: 15000 });
-  // the preload starts 2.5s after the screen draws, once the page is idle, and fetches two at a time
-  const cacheKeys = () => sw.evaluate(async () => Object.keys(await self.BCV.api.storage.local.get(null)).filter((k) => k.startsWith('cache:')));
-  const wanted = [/:activity$/, /:annfeed$/, /:planner:/, /:cal:/, /:agroups:/, /:assignments:/, /:groups$/, /:conv:inbox/, /:notif|:activity:summary/];
-  const warmed = await eventually(async () => { const ks = await cacheKeys(); return wanted.every((re) => ks.some((k) => re.test(k))); }, 25000);
-  const warmKeys = await cacheKeys();
-  check(warmed, `after the dashboard settles, the caches for Recent activity, announcements, the planner, the calendar month, grade groups, assignments, groups and the inbox are warm (${warmKeys.length} entries; missing: ${wanted.filter((re) => !warmKeys.some((k) => re.test(k))).map(String).join(' ')})`);
-  const t0 = Date.now();
-  await page.goto(`${BASE}/grades`);
-  await page.waitForSelector('.bcv-gpa__value', { timeout: 15000 });
-  const gradesMs = Date.now() - t0;
-  const t1 = Date.now();
-  await page.goto(`${BASE}/calendar`);
-  await page.waitForSelector('.bcv-cal__day, .bcv-cal__cell, .bcv-cal', { timeout: 15000 });
-  const calMs = Date.now() - t1;
-  console.log(`   grades from cache: ${gradesMs}ms · calendar from cache: ${calMs}ms`);
-  check(gradesMs < 6000 && calMs < 6000, `warm pages draw quickly: grades ${gradesMs}ms, calendar ${calMs}ms`);
+  await page.waitForSelector('#bcv-account', { timeout: 15000 });
+  await page.click('#bcv-account');
+  await page.waitForSelector('.bcv-menu--account', { timeout: 5000 });
+  const acctItems = await texts('.bcv-menu--account .bcv-menu__item');
+  check(acctItems.map((t) => t.split('\n')[0].trim()).join(' | ') === 'Dark appearance | Simpl Courses settings Look, courses, grades, the smart panel | Guided setup Courses, grades, the smart panel | Tour What changed, on the real pages | Canvas profile | All Canvas settings Profile, notifications, integrations | Notification preferences | Log out' && (await page.$eval('.bcv-menu--account', (m) => m.getBoundingClientRect().bottom <= window.innerHeight)), `the profile row opens a panel above itself: ${acctItems.join(' | ')}`);
+  await shot(page, '34-account-panel');
+  await page.route('**/logout', (route) => route.fulfill({ status: 200, contentType: 'text/html', body: '<h1>Logged out</h1>' }));
+  const [logoutReq] = await Promise.all([page.waitForRequest((rq) => rq.url().endsWith('/logout') && rq.method() === 'POST', { timeout: 10000 }), page.click('.bcv-menu__item--danger')]);
+  const body = logoutReq.postData() || '';
+  check(/_method=delete/.test(body) && /authenticity_token=mock-csrf/.test(body), `Log out submits Canvas's own logout form with the page's token: ${body}`);
+  await page.waitForFunction(() => /Logged out/.test(document.body.textContent), null, { timeout: 10000 });
+  await page.unroute('**/logout');
 
-  // ---- never a broken card; draw from the cache first -----------------------------------------------------
+  // ---- never a broken card -----------------------------------------------------------------------------
   console.log('resilience');
   await mockConfig({ groupsFail: true });
   await sw.evaluate(async () => { const all = await self.BCV.api.storage.local.get(null); await self.BCV.api.storage.local.remove(Object.keys(all).filter((k) => /:groups$/.test(k))); });
@@ -1171,24 +1166,6 @@ try {
   await mockConfig({ groupsFail: false });
   await page.goto(`${BASE}/groups`);
   await page.waitForSelector('.bcv-body .bcv-row', { timeout: 15000 });
-  // the cache paints, Canvas answers: a cached entry, even one still inside its time, draws at once and
-  // the fresh answer replaces it in place on every page load
-  await sw.evaluate(async () => {
-    const all = await self.BCV.api.storage.local.get(null);
-    const k = Object.keys(all).find((x) => /:groups$/.test(x));
-    const entry = all[k];
-    entry.value = entry.value.map((g, i) => (i === 0 ? { ...g, name: 'Stale group from the cache' } : g));
-    entry.expires = Date.now() + 10 * 60e3;
-    await self.BCV.api.storage.local.set({ [k]: entry });
-  });
-  const t2 = Date.now();
-  await page.gotoRaw(`${BASE}/groups`); // raw: the first paint is what is being checked
-  await page.waitForFunction(() => document.querySelector('.bcv-body .bcv-row'), null, { timeout: 15000 });
-  const firstPaint = await texts('.bcv-body .bcv-row');
-  const staleShown = firstPaint.some((t) => /Stale group from the cache/.test(t));
-  const replaced = await eventually(async () => !(await texts('.bcv-body .bcv-row')).some((t) => /Stale group from the cache/.test(t)) && (await texts('.bcv-body .bcv-row')).some((t) => /Attestation Fall 2026 1/.test(t)), 10000);
-  check(staleShown && replaced, `a cached entry draws at once (${Date.now() - t2}ms) and the fresh answer replaces it quietly, even inside its time`);
-
   // ---- notifications ------------------------------------------------------------------------------------
   console.log('notifications');
   await page.goto(`${BASE}/#notifications`);
@@ -1312,7 +1289,7 @@ try {
   check(!(await options.$eval('#addDomain', (b) => b.disabled)), 'an address with a dot enables Add');
   await options.click('.navlink[data-section="data"]');
   await options.waitForSelector('.stat', { timeout: 5000 });
-  check((await oTexts('.stat')).length === 3 && /KB|MB|B$/.test((await oTexts('.stat b'))[0]) && (await oTexts('.action .row__t')).join(' | ') === 'Clear cached Canvas data | Export settings | Import settings | Reset everything', `Data & about: ${(await oTexts('.stat')).join(' | ')}`);
+  check((await oTexts('.stat')).length === 5 && (await oTexts('.stat b'))[0] === 'none' && (await oTexts('.action .row__t')).join(' | ') === 'Clear smart panel conversations | Export settings | Import settings | Reset everything', `Data & about: ${(await oTexts('.stat')).join(' | ')}`);
   await options.fill('#query', 'logo');
   check((await options.$$eval('.navlink', (els) => els.filter((e) => !e.hidden).map((e) => e.dataset.section))).join(',') === 'appearance' && (await oTexts('#title'))[0] === 'Appearance', 'search narrows the sections and opens the match');
   await options.fill('#query', '');

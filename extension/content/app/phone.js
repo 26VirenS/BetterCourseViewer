@@ -152,7 +152,8 @@
         { icon: IC.settings, label: 'Settings', note: 'Look, appearance and the smart panel', onSelect: () => BCV.smartClient?.openOptions?.() },
         { icon: IC.sparkle, label: 'Guided setup', note: 'Courses, grades, the smart panel, a tour', href: '/?bcv=setup' },
         { icon: IC.people, label: 'Profile', note: 'Your Canvas profile', href: '/profile' },
-        native()?.signOut ? { icon: IC.external, label: 'Sign out', note: 'Clears the Canvas session on this device', danger: true, onSelect: () => native().signOut() } : null,
+        { icon: IC.external, label: 'All Canvas settings', note: 'Profile, notifications, integrations', href: '/profile/settings' },
+        { icon: IC.external, label: native()?.signOut ? 'Sign out' : 'Log out', note: native()?.signOut ? 'Clears the Canvas session on this device' : 'Ends your Canvas session', danger: true, onSelect: () => app.logout() },
       ],
     });
   }

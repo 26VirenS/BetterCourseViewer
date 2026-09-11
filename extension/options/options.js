@@ -454,34 +454,33 @@
   }
 
   // ---- Data & about ----------------------------------------------------------------------------------
-  const fmtBytes = (n) => (n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : n >= 1024 ? `${Math.round(n / 1024)} KB` : `${n} B`);
   async function renderStats() {
-    let cached = 0;
     let snaps = 0;
+    let chats = 0;
+    let sites = 0;
     try {
       const all = await api.storage.local.get(null);
-      const cacheKeys = Object.keys(all).filter((k) => k.startsWith('cache:'));
-      try {
-        cached = await api.storage.local.getBytesInUse(cacheKeys);
-      } catch {
-        cached = cacheKeys.reduce((s, k) => s + JSON.stringify(all[k] ?? '').length, 0);
+      for (const k of Object.keys(all)) {
+        if (k.startsWith('prefs:')) { sites += 1; if (Array.isArray(all[k]?.gpaSnapshots)) snaps += all[k].gpaSnapshots.length; }
+        if (k.startsWith('smart:')) chats += 1;
       }
-      for (const k of Object.keys(all)) if (k.startsWith('prefs:') && Array.isArray(all[k]?.gpaSnapshots)) snaps += all[k].gpaSnapshots.length;
     } catch {
       /* ignore */
     }
     const keys = keyCount();
     $('dataStats').replaceChildren(
-      h('div', { class: 'stat' }, [h('span', { text: 'Cached Canvas data' }), h('b', { text: fmtBytes(cached) })]),
+      h('div', { class: 'stat' }, [h('span', { text: 'Canvas data kept here' }), h('b', { text: 'none' })]),
       h('div', { class: 'stat' }, [h('span', { text: 'Grade snapshots' }), h('b', { text: snaps ? `${snaps} ${snaps === 1 ? 'day' : 'days'}` : (grades.tracking ? 'from today' : 'none') })]),
+      h('div', { class: 'stat' }, [h('span', { text: 'Smart panel conversations' }), h('b', { text: chats ? String(chats) : 'none' })]),
       h('div', { class: 'stat' }, [h('span', { text: 'API keys stored' }), h('b', { text: keys ? `${keys} (local only)` : 'none' })]),
+      h('div', { class: 'stat' }, [h('span', { text: 'Sites with preferences' }), h('b', { text: String(sites) })]),
     );
   }
   $('clearCache').addEventListener('click', async () => {
     const all = await api.storage.local.get(null);
-    const keys = Object.keys(all).filter((k) => k.startsWith('cache:') || k.startsWith('smart:'));
+    const keys = Object.keys(all).filter((k) => k.startsWith('smart:') || k.startsWith('cache:'));
     await api.storage.local.remove(keys);
-    flash(`Cleared ${keys.length} cached entries`);
+    flash(`Cleared ${keys.length} ${keys.length === 1 ? 'conversation' : 'conversations'}`);
     renderStats();
   });
   $('exportSettings').addEventListener('click', () => {

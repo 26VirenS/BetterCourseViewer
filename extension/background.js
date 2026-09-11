@@ -270,7 +270,18 @@ if (typeof importScripts === 'function' && !self.BCV?.providers) {
   /** Which setup flow this build carries. A build that changes the flow bumps it, and the flags
    *  from the older flow ("offered", "done") are cleared once, so the new flow is seen once. */
   const SETUP_FLOW = 2;
+  /** Older builds kept Canvas answers in storage; nothing is kept between pages now. */
+  async function dropStoredCache() {
+    try {
+      const all = await api.storage.local.get(null);
+      const keys = Object.keys(all).filter((k) => k.startsWith('cache:'));
+      if (keys.length) await api.storage.local.remove(keys);
+    } catch {
+      /* ignore */
+    }
+  }
   async function migrateSetup() {
+    await dropStoredCache();
     try {
       const cur = await api.storage.local.get('setup:flow');
       if (cur && cur['setup:flow'] === SETUP_FLOW) return;

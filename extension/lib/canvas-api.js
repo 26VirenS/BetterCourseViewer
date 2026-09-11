@@ -3,7 +3,6 @@
  * follows Link-header pagination, and caches responses in storage.local. */
 (function () {
   const BCV = (self.BCV = self.BCV || {});
-  const api = BCV.api;
 
   const ACCEPT = 'application/json+canvas-string-ids';
 
@@ -124,82 +123,40 @@
     });
   }
 
-  // ---- cache -------------------------------------------------------------
+  // ---- per-page memo ---------------------------------------------------------------------
+  // Every page load asks Canvas afresh. Within one page a key is requested once and shared by
+  // every component that wants it (callers that arrive while it runs share the request).
+  // Nothing is kept between pages, so a page draws once, from Canvas's answer.
   const memory = new Map();
-  const inflight = new Map(); // one request per key at a time: callers that arrive while it runs share it
-  const cacheKey = (key) => `cache:${location.host}:${key}`;
-
-  // The cache is for painting, never for the numbers. Every page load fetches each key fresh
-  // from Canvas exactly once (writes force it again; the periodic refresh asks again). What the
-  // cache holds from the last visit, if younger than a day, is handed back first so the screen
-  // draws at once; the fresh answer lands behind it and the refresh listeners hear whether it
-  // differed (the app redraws the screen quietly), started, finished or failed.
-  const PAINT_GRACE = 24 * 3600e3;
-  let paintEnabled = true; // the app turns it off on screens that must not be redrawn under the student (a quiz, a course page)
-  const setPaint = (on) => { paintEnabled = !!on; };
-  const freshThisLoad = new Set(); // keys already fetched from Canvas during this page's life
-  const refreshListeners = new Set();
-  function onRefresh(fn) {
-    refreshListeners.add(fn);
-    return () => refreshListeners.delete(fn);
-  }
-  const tell = (key, phase, changed = false) => { for (const fn of refreshListeners) { try { fn(key, phase, changed); } catch { /* a listener's own problem */ } } };
-  function store(k, value, ttlMs) {
-    const entry = { value, expires: Date.now() + ttlMs };
-    memory.set(k, entry);
-    api.storage.local.set({ [k]: entry }).catch(() => { /* ignore quota errors */ });
-    return value;
-  }
-
+  const inflight = new Map();
+  const cacheKey = (key) => `${location.host}:${key}`;
   async function cached(key, ttlMs, loader, { force = false, refresh = false } = {}) {
     const k = cacheKey(key);
-    const now = Date.now();
-    if (!force) {
-      if (inflight.has(k)) return inflight.get(k);
-      const mem = memory.get(k);
-      if (mem && freshThisLoad.has(k) && !refresh) return mem.value; // fetched fresh on this page already
-    }
-    // what the last visit left, for the first paint
-    let hit = (!force && memory.get(k)) || null;
-    if (!hit && !force) {
-      try {
-        hit = (await api.storage.local.get(k))[k] || null;
-      } catch {
-        hit = null;
-      }
+    if (!force && !refresh) {
+      if (memory.has(k)) return memory.get(k);
       if (inflight.has(k)) return inflight.get(k);
     }
-    const paintable = !force && paintEnabled && hit && hit.expires > now - PAINT_GRACE;
     const run = (async () => {
-      try {
-        const value = await loader();
-        store(k, value, ttlMs);
-        freshThisLoad.add(k);
-        if (paintable) tell(key, 'done', JSON.stringify(value) !== JSON.stringify(hit.value));
-        return value;
-      } catch (e) {
-        if (paintable) tell(key, 'error');
-        throw e;
-      }
+      const value = await loader();
+      memory.set(k, value);
+      return value;
     })();
     inflight.set(k, run);
-    run.catch(() => {}).finally(() => { if (inflight.get(k) === run) inflight.delete(k); });
-    if (paintable) {
-      tell(key, 'start');
-      return hit.value; // the screen draws now; the fresh answer replaces it behind
+    try {
+      return await run;
+    } finally {
+      if (inflight.get(k) === run) inflight.delete(k);
     }
-    return run;
+  }
+  async function invalidate(key) {
+    memory.delete(cacheKey(key));
+  }
+  /** Forget every memoised key that starts with the prefix (after a write). */
+  async function invalidatePrefix(prefix) {
+    const p = cacheKey(prefix);
+    for (const k of [...memory.keys()]) if (k.startsWith(p)) memory.delete(k);
   }
 
-  async function invalidate(key) {
-    const k = cacheKey(key);
-    memory.delete(k);
-    try {
-      await api.storage.local.remove(k);
-    } catch {
-      /* ignore */
-    }
-  }
 
   // ---- higher-level helpers ---------------------------------------------
   const MIN = 60e3;
@@ -310,7 +267,7 @@
   }
 
   BCV.canvas = {
-    get, post, put, del, upload, cached, invalidate, onRefresh, setPaint, csrfToken, CanvasError,
+    get, post, put, del, upload, cached, invalidate, invalidatePrefix, csrfToken, CanvasError,
     plannerItems, dashboardCards, activeCourses, courseColors, setPlannerComplete,
     coursesWithScores, courseTabs, course, courseModules, announcements, unreadCount,
   };

@@ -1479,3 +1479,12 @@ html.bcv-phone .bcv-nf__act { margin-left: auto; }
   .bcv-row { flex-wrap: wrap; gap: 8px 12px; padding: 12px 14px; }
   .bcv-nf__row { padding: 12px 14px; }
 }
+
+/* ---- the account panel (over the profile row) ---- */
+.bcv-menu--account { width: 262px; max-height: none; padding: 8px; }
+.bcv-menu__head { display: flex; align-items: center; gap: 10px; padding: 8px 10px 10px; border-bottom: 1px solid var(--bcv-sep); margin-bottom: 6px; }
+.bcv-menu__name { font: 600 13.5px/1.25 var(--bcv-font); color: var(--bcv-ink); }
+.bcv-menu__ic { flex: none; width: 24px; height: 24px; border-radius: 7px; background: var(--bcv-fill); color: var(--bcv-ink2); display: flex; align-items: center; justify-content: center; }
+.bcv-menu__sep { height: 1px; background: var(--bcv-sep); margin: 6px 4px; }
+#bcv-app .bcv-menu__item--danger, .bcv-menu__item--danger { color: #ff453a; }
+.bcv-menu__item--danger .bcv-menu__ic { background: rgba(255,69,58,.14); color: #ff453a; }
