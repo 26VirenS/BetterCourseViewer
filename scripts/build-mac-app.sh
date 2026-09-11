@@ -85,6 +85,17 @@ if [[ -f "$PBXPROJ" ]]; then
     -e "s/MACOSX_DEPLOYMENT_TARGET = [^;]+;/MACOSX_DEPLOYMENT_TARGET = ${MACOS_MIN};/" \
     "$PBXPROJ"
   rm -f "$PBXPROJ.bak"
+  # Xcode Cloud: number each cloud build from CI_BUILD_NUMBER, so every upload is newer than the last.
+  CI_DIR="$(dirname "$PROJECT")/ci_scripts"
+  mkdir -p "$CI_DIR"
+  cat > "$CI_DIR/ci_pre_xcodebuild.sh" <<'CIEOF'
+#!/bin/sh
+# Xcode Cloud runs this before xcodebuild: stamp the build number so TestFlight accepts every upload.
+set -e
+cd "$CI_PRIMARY_REPOSITORY_PATH/macos/Simpl Courses"
+if [ -n "${CI_BUILD_NUMBER:-}" ]; then xcrun agvtool new-version -all "$CI_BUILD_NUMBER"; fi
+CIEOF
+  chmod +x "$CI_DIR/ci_pre_xcodebuild.sh"
   echo "▶ Bundle identifiers:"
   grep -o 'PRODUCT_BUNDLE_IDENTIFIER = [^;]*' "$PBXPROJ" | sort -u | sed 's/^/    /'
   echo "▶ Minimum macOS: $MACOS_MIN (MACOS_MIN=… to change)"

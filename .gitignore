@@ -2,7 +2,8 @@
 .DS_Store
 
 # Generated Xcode project / app (run scripts/build-mac-app.sh to regenerate)
-macos/
+macos/DerivedData/
+macos/build/
 build/
 DerivedData/
 *.xcuserstate
