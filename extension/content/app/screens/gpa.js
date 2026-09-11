@@ -92,7 +92,10 @@
       body.replaceChildren(U.errorBox('Your courses could not be loaded.'));
       return screen;
     }
-    const courses = all.filter((c) => c.state === 'current');
+    // the same list every screen follows: the favourites chosen in setup (every current course until one is starred)
+    const currentCourses = all.filter((c) => c.state === 'current');
+    const starredCourses = currentCourses.filter((c) => c.favorite);
+    const courses = starredCourses.length ? starredCourses : currentCourses;
     const groupsBy = new Map();
     await Promise.all(courses.map(async (c) => groupsBy.set(c.id, await store.assignmentGroups(c.id).catch(() => null))));
     if (!ctx.alive()) return screen;

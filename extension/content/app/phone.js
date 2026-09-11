@@ -433,7 +433,9 @@
     }
     titleEl.querySelector('.bcv-ph-title__sub').textContent = `${term ? `${term} · ` : ''}every course counts equally`;
     const hidden = new Set(Array.isArray(hiddenPref) ? hiddenPref.map(String) : []);
-    const courseList = all.filter((c) => c.state === 'current' && !hidden.has(String(c.id)));
+    const currentAll = all.filter((c) => c.state === 'current');
+    const starredAll = currentAll.filter((c) => c.favorite); // the favourites chosen in setup, like the Grades page
+    const courseList = (starredAll.length ? starredAll : currentAll).filter((c) => !hidden.has(String(c.id)));
     let goal = Number.isFinite(goalPref) ? goalPref : 3.7;
     const groups = new Map();
     await Promise.all(courseList.map(async (c) => groups.set(c.id, await store.assignmentGroups(c.id).catch(() => null))));
