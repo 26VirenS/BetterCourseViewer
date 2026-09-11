@@ -49,7 +49,7 @@ targets:
         ITSAppUsesNonExemptEncryption: false
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.simplcourses.ios
+        PRODUCT_BUNDLE_IDENTIFIER: com.simplcourses.app # the same record as the Mac app in App Store Connect (one app, two platforms)
         PRODUCT_NAME: Simpl Courses
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         TARGETED_DEVICE_FAMILY: "1,2"
