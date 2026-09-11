@@ -579,13 +579,14 @@
     await api.storage.local.set({
       [prefKey]: prefs,
       'setup:offered': true,
+      'setup:done': true,
       'setup:plan': { host: st.host, favorites: st.skipped ? null : [...st.favs], tour: !st.skipped, at: Date.now() },
     });
   }
 
   skipBtn.addEventListener('click', async () => {
     st.skipped = true;
-    await api.storage.local.set({ 'setup:offered': true });
+    await api.storage.local.set({ 'setup:offered': true, 'setup:done': true }); // skipped on purpose: the popup stops asking
     if (st.verified) go(5);
     else window.close();
   });

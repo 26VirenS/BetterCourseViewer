@@ -104,7 +104,7 @@ The extension is on automatically for every `*.instructure.com` site. If your sc
 
 ## Turning the look off
 
-- The toolbar popup and Settings → Appearance have the **Simpl Courses look** switch, plus Light / Dark / Match the system. Nothing sits on the page itself. Both show the installed version number (the popup's footer, the Settings header).
+- The toolbar popup and Settings → Appearance have the **Simpl Courses look** switch, plus Light / Dark / Match the system. Nothing sits on the page itself. Both show the installed version number (the popup's footer, the Settings header). Until the guided setup has run (or been skipped on purpose) the popup shows nothing but a **Start setup** button.
 - Pages Canvas draws itself have an **Open in stock Canvas** button that flips the same switch.
 
 ## The smart panel and your keys
@@ -169,7 +169,7 @@ PRIVACY.md                     the privacy policy the store listing links to
 .github/workflows/package.yml  builds the zips on every push; a v* tag makes a GitHub Release and publishes to the store
 ```
 
-The generated Xcode project copies the extension's top-level folders (`content/`, `lib/`, `popup/`, `options/`, `icons/`) into the app as folder references, so new files inside them are picked up by the next build. A **new top-level folder** is not: keep new code under an existing folder, or delete `macos/` and regenerate the project.
+The generated Xcode project copies the extension's top-level folders (`content/`, `lib/`, `popup/`, `options/`, `setup/`, `icons/`) into the app as folder references, so new files inside them are picked up by the next build. A **new top-level folder** is not: add it to `project.pbxproj` next to the others (the smoke test fails until every top-level entry of `extension/` is listed there), or delete `macos/` and regenerate the project.
 
 ```bash
 node scripts/dev/mock-canvas.mjs        # http://localhost:8787

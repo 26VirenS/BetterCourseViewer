@@ -1198,9 +1198,31 @@ try {
   check(/^v\d+\.\d+/.test(await options.$eval('#version', (el) => el.textContent)), `settings show the version: ${await options.$eval('#version', (el) => el.textContent)}`);
   await options.click('.navlink[data-section="setup"]');
   check((await options.$eval('#setup.is-active h1', (el) => el.textContent)) === 'Guided setup' && (await options.$('#openSetup')) !== null, 'the settings page links to the guided setup page');
-  const popupPage = await context.newPage();
+  // before the guided setup has run (or been skipped) the popup is nothing but a setup button
+  await sw.evaluate(async () => {
+    const k = 'prefs:localhost:8787';
+    const all = await self.BCV.api.storage.local.get(k);
+    const p = all[k] || {};
+    delete p.setupDone;
+    await self.BCV.api.storage.local.set({ [k]: p });
+    await self.BCV.api.storage.local.remove('setup:done');
+  });
+  let popupPage = await context.newPage();
   await popupPage.goto(`chrome-extension://${extId}/popup/popup.html`);
   await popupPage.waitForTimeout(500);
+  const hiddenIn = (sel) => popupPage.$eval(sel, (el) => getComputedStyle(el).display === 'none');
+  check(!(await popupPage.$eval('#setup-card', (el) => el.hidden)) && (await hiddenIn('.section')) && (await hiddenIn('.foot')) && (await hiddenIn('#open-settings')) && (await popupPage.$eval('#status', (el) => el.textContent)) === 'Not set up yet', 'before setup the popup shows only the setup button');
+  await popupPage.screenshot({ path: join(out, '30-popup-fresh.png') });
+  const [fromPopup] = await Promise.all([context.waitForEvent('page', { timeout: 5000 }).catch(() => null), popupPage.click('#start-setup')]);
+  check(!!fromPopup && fromPopup.url().endsWith('/setup/setup.html'), 'the popup setup button opens the guided setup page');
+  await fromPopup?.close();
+  check((await sw.evaluate(async () => (await self.BCV.api.storage.local.get('setup:done'))['setup:done'])) === undefined, 'opening the setup page does not count as finishing it');
+  // an install that finished the older in-page setup counts as set up
+  await sw.evaluate(async () => { const k = 'prefs:localhost:8787'; const all = await self.BCV.api.storage.local.get(k); await self.BCV.api.storage.local.set({ [k]: { ...(all[k] || {}), setupDone: true } }); });
+  popupPage = await context.newPage();
+  await popupPage.goto(`chrome-extension://${extId}/popup/popup.html`);
+  await popupPage.waitForTimeout(500);
+  check((await popupPage.$eval('#setup-card', (el) => el.hidden)) && !(await hiddenIn('.section')) && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('setup:done'))['setup:done'])) === true, 'after setup the popup shows the switches again');
   check(/^v\d+\.\d+/.test(await popupPage.$eval('#version', (el) => el.textContent)), `popup shows the version: ${await popupPage.$eval('#version', (el) => el.textContent)}`);
   check((await popupPage.$eval('#foot-setup', (el) => el.textContent)) === 'Guided setup', 'the popup links to the guided setup');
   await popupPage.screenshot({ path: join(out, '30-popup.png') });

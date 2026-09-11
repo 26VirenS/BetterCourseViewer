@@ -24,6 +24,10 @@ body { width: 320px; margin: 0; background: var(--bg); color: var(--ink); font: 
 .switch input:checked + .switch__track .switch__knob { transform: translateX(14px); }
 .btn { height: 32px; padding: 0 14px; border: 0; border-radius: 16px; background: var(--fill); color: var(--ink2); font: 600 12.5px/1 inherit; cursor: pointer; }
 .btn--primary { background: var(--blue); color: #fff; }
+.btn--wide { width: 100%; height: 36px; margin-top: 4px; }
+.card--setup { margin-bottom: 14px; }
+/* until the guided setup has run (or been skipped) the popup is just the setup button */
+.is-fresh .section, .is-fresh .foot, .is-fresh #open-settings { display: none; }
 .muted { color: var(--ink3); }
 .small { font-size: 11.5px; margin: 6px 0 0; }
 p { margin: 0 0 8px; }

@@ -261,7 +261,7 @@
           ? U.el('bcv-focus__card', [
             U.text('bcv-focus__title', 'Guided setup'),
             U.text('bcv-focus__sub', 'A few short steps: your site, your courses, your grades, the smart panel and a tour. Everything can be changed later in Settings.'),
-            U.btn('Skip setup', { kind: 'xs', onClick: async () => { await store.setPref('setupDone', true); go('/'); } }),
+            U.btn('Skip setup', { kind: 'xs', onClick: async () => { await store.setPref('setupDone', true); await BCV.api.storage.local.set({ 'setup:done': true }).catch(() => {}); go('/'); } }),
           ])
           : U.el('bcv-focus__card', [
             U.text('bcv-focus__title', 'Quiz in progress'),

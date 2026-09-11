@@ -21,6 +21,19 @@
     }
   });
 
+  const setupDone = async () => {
+    try {
+      const flag = await api.storage.local.get('setup:done');
+      if (flag && flag['setup:done']) return true;
+      const all = await api.storage.local.get(null);
+      const done = Object.keys(all || {}).some((k) => k.startsWith('prefs:') && all[k]?.setupDone);
+      if (done) await api.storage.local.set({ 'setup:done': true });
+      return done;
+    } catch {
+      return true; // storage unreadable: never hide the switches over it
+    }
+  };
+
   let settings = await S.get();
   const bind = () => {
     $('skin').checked = settings.appearance.skin !== false;
@@ -42,15 +55,26 @@
   $('open-settings').addEventListener('click', openOptions);
   $('foot-settings').addEventListener('click', openOptions);
   // the guided setup has its own page
-  $('foot-setup').addEventListener('click', async (e) => {
-    e.preventDefault();
+  const openSetup = async (e) => {
+    e?.preventDefault();
     try {
       await api.tabs.create({ url: api.runtime.getURL('setup/setup.html') });
     } catch {
       /* ignore */
     }
     window.close();
-  });
+  };
+  $('foot-setup').addEventListener('click', openSetup);
+  $('start-setup').addEventListener('click', openSetup);
+
+  // Until the guided setup has run (or been skipped on purpose) the popup shows nothing but
+  // the setup button. Installs that finished the older in-page setup count as done too.
+  if (!(await setupDone())) {
+    document.body.classList.add('is-fresh');
+    $('status').textContent = 'Not set up yet';
+    $('setup-card').hidden = false;
+    return;
+  }
 
   // smart status
   send({ type: 'providerStatus' }).then((s) => {

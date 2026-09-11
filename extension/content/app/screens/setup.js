@@ -35,7 +35,10 @@
 
     // what the steps share
     const state = { courses: null, favs: null, chosen: null, goal: 3.7, tracking: null, targets: {}, smartSaved: false };
-    const finish = async () => { await store.setPref('setupDone', true); };
+    const finish = async () => {
+      await store.setPref('setupDone', true);
+      await BCV.api.storage.local.set({ 'setup:done': true }).catch(() => {});
+    };
     const leave = async (href = '/') => { await finish(); app.go(href); };
 
     const progress = () => U.el('bcv-su__progress', [
