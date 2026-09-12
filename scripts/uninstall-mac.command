@@ -236,6 +236,10 @@ main() {
   say "extension kept inside your Canvas site's own website data. Reset everything in the extension's settings"
   say "clears it on any open Canvas tab; otherwise Safari → Settings → Privacy → Manage Website Data → your"
   say "school's Canvas site removes it along with the site's own data (which signs you out of Canvas there)."
+  say
+  say "Wanting it back one day: build and open the app again, then tick Simpl Courses under Safari →"
+  say "Settings → Extensions. A build without an Apple developer team also needs Safari → Settings →"
+  say "Developer → Allow unsigned extensions, which turns itself off every time Safari quits."
 }
 
 main "$@"

@@ -1,18 +1,15 @@
-function show(enabled, useSettingsInsteadOfPreferences) {
+// The window follows one state at a time: on, off, missing (Safari has never heard of the
+// extension) or unknown (the answer has not come back yet). ViewController.swift calls show().
+function show(state, useSettingsInsteadOfPreferences, detail) {
     if (useSettingsInsteadOfPreferences) {
         document.getElementsByClassName('state-on')[0].innerText = "Simpl Courses’s extension is currently on. You can turn it off in the Extensions section of Safari Settings.";
         document.getElementsByClassName('state-off')[0].innerText = "Simpl Courses’s extension is currently off. You can turn it on in the Extensions section of Safari Settings.";
-        document.getElementsByClassName('state-unknown')[0].innerText = "You can turn on Simpl Courses’s extension in the Extensions section of Safari Settings.";
         document.getElementsByClassName('open-preferences')[0].innerText = "Quit and Open Safari Settings…";
     }
 
-    if (typeof enabled === "boolean") {
-        document.body.classList.toggle(`state-on`, enabled);
-        document.body.classList.toggle(`state-off`, !enabled);
-    } else {
-        document.body.classList.remove(`state-on`);
-        document.body.classList.remove(`state-off`);
-    }
+    const known = ['on', 'off', 'missing'];
+    document.body.className = `state-${known.indexOf(state) === -1 ? 'unknown' : state}`;
+    document.querySelector('.detail').innerText = detail || '';
 }
 
 function openPreferences() {

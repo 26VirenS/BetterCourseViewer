@@ -28,16 +28,40 @@ body {
     text-align: center;
 }
 
-body:not(.state-on, .state-off) :is(.state-on, .state-off) {
+/* one state at a time: the body carries state-on, state-off, state-missing or state-unknown */
+:is(.state-on, .state-off, .state-missing, .state-unknown) {
     display: none;
 }
 
-body.state-on :is(.state-off, .state-unknown) {
+body.state-on .state-on,
+body.state-off .state-off,
+body.state-missing .state-missing,
+body.state-unknown .state-unknown {
+    display: revert;
+}
+
+.steps {
+    max-width: 32em;
+    margin: 0;
+    padding-left: 1.4em;
+    text-align: left;
+    line-height: 1.45;
+}
+
+.steps li + li {
+    margin-top: 0.6em;
+}
+
+body.state-missing .detail:empty { /* beats the rule above, which shows every state-missing element */
     display: none;
 }
 
-body.state-off :is(.state-on, .state-unknown) {
-    display: none;
+.detail {
+    max-width: 32em;
+    opacity: 0.55;
+    font-size: 0.85em;
+    -webkit-user-select: text;
+    cursor: text;
 }
 
 button {

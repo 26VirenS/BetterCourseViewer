@@ -88,6 +88,14 @@ Safari extensions ship inside a Mac app, so the app is built with Xcode. The scr
 
 Updating: `git pull`, then in Xcode Product → Clean Build Folder (⇧⌘K) and Product → Run (⌘R), then quit and reopen Safari. The project references the files in `extension/` directly, so a rebuild is all that is needed. If Safari still shows stock Canvas, delete the `macos/` folder and regenerate the project from scratch.
 
+**Safari does not list the extension.** It reads the extension out of the app, so:
+
+1. The app has to exist and have been opened once — from the Applications folder, or from Xcode's Run. An app in the Trash does not count.
+2. **Allow unsigned extensions** (Safari → Settings → Developer) is what lets a build without an Apple developer team be listed at all, and it turns itself off every time Safari quits. Turn it on again after each restart, then look under Settings → Extensions.
+3. A deleted or uninstalled copy can leave a stale record behind, so a fresh build is never looked at. `./scripts/build-mac-app.sh --build` re-registers what it builds; for a copy you moved by hand, run `/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "/Applications/Simpl Courses.app"` and reopen Safari.
+
+The app's own window says which of these is in the way: it shows the extension as on, off, or not known to Safari at all, and rereads the state whenever you come back to it.
+
 To build from the command line instead of Xcode:
 
 ```bash

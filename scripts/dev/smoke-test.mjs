@@ -1126,7 +1126,8 @@ try {
   const midRoll = await page.evaluate(() => [...document.querySelectorAll('.bcv-stat__value')].map((e) => e.textContent));
   await page.waitForFunction(() => !document.querySelector('[data-rolling]'), null, { timeout: 5000 });
   const landed = await texts('.bcv-stat__value');
-  check(midRoll.every((t) => /^\d+$/.test(t)) && landed[0] === dueNow && (await page.evaluate(() => !document.querySelector('.bcv-stat__value[data-rolling]'))), `counters run through plausible digits and land on the real count: ${midRoll.join(',')} → ${landed.join(',')} (Due today is ${dueNow})`);
+  // (a card whose own request is still out shows "…" rather than a number, and is not a counter yet)
+  check(midRoll.every((t) => /^\d+$/.test(t) || t === '…') && midRoll.some((t) => /^\d+$/.test(t)) && landed[0] === dueNow && (await page.evaluate(() => !document.querySelector('.bcv-stat__value[data-rolling]'))), `counters run through plausible digits and land on the real count: ${midRoll.join(',')} → ${landed.join(',')} (Due today is ${dueNow})`);
   // a view switch after entry redraws the counters without rolling them again
   await page.click('.bcv-seg__btn:nth-child(2)');
   await page.waitForSelector('.bcv-day', { timeout: 10000 });

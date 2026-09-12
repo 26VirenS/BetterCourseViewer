@@ -137,10 +137,16 @@ if [[ "$BUILD" == "1" ]]; then
     # Apple silicon (macOS reports it as "damaged"); an ad-hoc-signed one runs after Gatekeeper's
     # one-time "Open Anyway" on a Mac it was copied to.
     codesign --force --deep --sign - "$OUT_DIR/build/$APP_NAME.app"
+    # Safari finds the extension through LaunchServices' record of the app. A copy that was deleted
+    # (or uninstalled) can leave a stale record behind, and then a fresh build is simply not seen —
+    # so register this one by hand.
+    LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
+    [[ -x "$LSREGISTER" ]] && "$LSREGISTER" -f "$OUT_DIR/build/$APP_NAME.app" >/dev/null 2>&1
     echo
-    echo "✅ Built: $OUT_DIR/build/$APP_NAME.app (ad-hoc signed)"
+    echo "✅ Built: $OUT_DIR/build/$APP_NAME.app (ad-hoc signed, registered with LaunchServices)"
     echo "   Next: open the app once, then enable Simpl Courses in Safari → Settings → Extensions."
-    echo "   Unsigned builds also need: Safari → Settings → Developer → Allow unsigned extensions."
+    echo "   Unsigned builds also need: Safari → Settings → Developer → Allow unsigned extensions"
+    echo "   — that switch turns itself off every time Safari quits, so turn it on after each restart."
     echo "   On another Mac: unzip, move to Applications, then System Settings → Privacy & Security → Open Anyway"
     echo "   (or: xattr -dr com.apple.quarantine \"/Applications/$APP_NAME.app\")."
     if [[ "$ZIP" == "1" ]]; then
