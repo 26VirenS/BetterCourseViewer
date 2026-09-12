@@ -47,9 +47,10 @@ anyone sees, and `public/_headers` sets three safety headers.
 ## Editing
 
 The pages are plain HTML with inline styles. The links that leave the site are the two
-download buttons and the two support links: search for `github.com` to find them, and swap in
-the Chrome Web Store URL once the listing is live. The canonical and Open Graph tags name
-`simplcourses.com`; change those if the domain differs.
+download buttons, which point at the Chrome Web Store listing (search for
+`chromewebstore.google.com`), and the two support links, which point at the repository's
+issues (search for `github.com`). The canonical and Open Graph tags name `simplcourses.com`;
+change those if the domain differs.
 
 The pages were rendered from the design canvas (`Website.dc.html`, `Privacy.dc.html`) in the
 mockup archive: the loops and `{{ }}` bindings were expanded once, so what is here is the
