@@ -126,25 +126,27 @@
   }
 
   // ---- per-page memo ---------------------------------------------------------------------
-  // Every page load asks Canvas afresh. Within one page a key is requested once and shared by
-  // every component that wants it (callers that arrive while it runs share the request).
-  // Nothing is kept between pages, so a page draws once, from Canvas's answer.
+  // Every page load (or reload) starts with an empty memo and asks Canvas afresh. Within one page
+  // a key is requested once and shared by every component that wants it (callers that arrive
+  // while it runs share the request); the interface then navigates in place, so an answer lives
+  // for its TTL and is fetched again after that. Nothing is kept between pages.
   // A write invalidates a key; a request for that key that was already running when the write
   // happened answers its caller but never lands in the memo (it would put the stale list back).
-  const memory = new Map();
+  const memory = new Map(); // key → { value, until }
   const inflight = new Map();
   const generation = new Map();
   const cacheKey = (key) => `${location.host}:${key}`;
   async function cached(key, ttlMs, loader, { force = false, refresh = false } = {}) {
     const k = cacheKey(key);
     if (!force && !refresh) {
-      if (memory.has(k)) return memory.get(k);
+      const hit = memory.get(k);
+      if (hit && (!hit.until || hit.until > Date.now())) return hit.value;
       if (inflight.has(k)) return inflight.get(k);
     }
     const gen = generation.get(k) || 0;
     const run = (async () => {
       const value = await loader();
-      if ((generation.get(k) || 0) === gen) memory.set(k, value);
+      if ((generation.get(k) || 0) === gen) memory.set(k, { value, until: ttlMs > 0 ? Date.now() + ttlMs : 0 });
       return value;
     })();
     inflight.set(k, run);
@@ -165,6 +167,11 @@
   async function invalidatePrefix(prefix) {
     const p = cacheKey(prefix);
     for (const k of new Set([...memory.keys(), ...inflight.keys()])) if (k.startsWith(p)) forget(k);
+  }
+  /** Forget everything (a page brought back from the back/forward cache, a re-tap of the current
+   *  tab): the next draw asks Canvas afresh, exactly as a fresh page load does. */
+  function clearAll() {
+    for (const k of new Set([...memory.keys(), ...inflight.keys()])) forget(k);
   }
 
 
@@ -277,7 +284,7 @@
   }
 
   BCV.canvas = {
-    get, post, put, del, upload, cached, invalidate, invalidatePrefix, csrfToken, CanvasError,
+    get, post, put, del, upload, cached, invalidate, invalidatePrefix, clearAll, csrfToken, CanvasError,
     plannerItems, dashboardCards, activeCourses, courseColors, setPlannerComplete,
     coursesWithScores, courseTabs, course, courseModules, announcements, unreadCount,
   };

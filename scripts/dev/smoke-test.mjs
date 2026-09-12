@@ -269,9 +269,10 @@ try {
 
   // ---- courses ----------------------------------------------------------------------------
   console.log('courses');
+  await page.evaluate(() => { window.__bcvSpa = 1; }); // survives only if the page is not reloaded
   await nav('courses');
   await page.waitForSelector('.bcv-ccard__hero--term', { timeout: 10000 });
-  check(page.url() === `${BASE}/courses`, 'sidebar navigation loads the real Canvas page');
+  check(page.url() === `${BASE}/courses` && (await page.evaluate(() => window.__bcvSpa === 1)) && (await page.$eval('.bcv-nav__item[data-nav="courses"]', (e) => e.classList.contains('is-active'))), 'sidebar navigation moves the address and draws the screen in place, no reload; the sidebar follows');
   const termCards = await texts('.bcv-ccard');
   check(termCards.length === 5 && /Fall 2026/.test(termCards[0]) && /Enrolled as Student/.test(termCards[0]), `favourite course cards: ${termCards.length}`);
   const groupLabels = await texts('.bcv-body .bcv-group__head--reorder .bcv-label');
@@ -1437,8 +1438,8 @@ try {
   await page.setViewportSize({ width: 1400, height: 900 });
   await page.goto(`${BASE}/#notifications`);
   await page.waitForSelector('.bcv-nf__row', { timeout: 15000 });
-  await Promise.all([page.waitForNavigation({ timeout: 15000 }), page.click('.bcv-nf__row[data-cat="graded"] .bcv-nf__act')]);
-  check(page.url() === `${BASE}/courses/101/assignments/1007`, `the action opens the item in Canvas: ${page.url()}`);
+  await clickScreen('.bcv-nf__row[data-cat="graded"] .bcv-nf__act');
+  check(page.url() === `${BASE}/courses/101/assignments/1007` && !!(await page.$('.bcv-detail__title, .bcv-sb--embed')), `the action opens the item, in place: ${page.url()}`);
 
   // ---- extension pages ---------------------------------------------------------------------------------
   console.log('extension pages');

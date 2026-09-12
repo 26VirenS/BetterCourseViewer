@@ -100,25 +100,27 @@
   const inQuiz = () => !!state.quizOpen || /\/quizzes\/\d+\/take\b/.test(location.pathname) || !!document.querySelector('#submit_quiz_form, #quiz_taking_form, form.take_quiz_form');
   const confirmLeave = () => window.confirm('You are in the middle of a quiz. Leave it anyway?\n\nCanvas keeps your answers so far, but a timer keeps running and some quizzes allow only one attempt.');
 
-  /** Inside a course, a hop between tabs the app draws itself stays on the page: the header and
-   *  rail keep still and only the main column changes hands. Anything else (another course, a
-   *  Canvas-drawn tab, ?bcv=…, the phone) is a real page load. */
+  /** Navigation stays on the page whenever both ends are screens the interface draws itself: the
+   *  address moves (pushState), the screen is rendered in place, the sidebar, tab bar and a
+   *  course's rail keep still, and Canvas's own page underneath is left as it was. Canvas is
+   *  asked for a page again only when something needs that page — a Canvas-drawn tab or tool,
+   *  a quiz attempt, ?bcv=…, "Open in stock Canvas", the look switched off — and that is a real
+   *  load, which also starts the memo over. */
   const DRAWN_TABS = new Set(['home', 'stream', 'announcements', 'assignments', 'discussions', 'grades', 'people', 'pages', 'files', 'folder', 'quizzes', 'modules', 'announcement', 'discussion', 'assignment', 'syllabus', 'page', 'quiz']);
-  function inPlaceCourseHop(url) {
-    if (BCV.phone?.active()) return false;
-    const cur = state.route || parseRoute();
-    const next = parseRoute(url.href);
-    if (cur.screen !== 'course' || next.screen !== 'course' || cur.courseId !== next.courseId) return false;
-    if (next.params.get('bcv') || cur.params.get('bcv')) return false; // native, submit, take, setup: real loads
-    if (!DRAWN_TABS.has(next.tab) || !DRAWN_TABS.has(cur.tab)) return false;
-    if (html.classList.contains('bcv-punch')) return false; // Canvas's own page is showing underneath
-    return !!document.querySelector('#bcv-main > .bcv-screen--ctx[data-bcv-course]');
+  function drawnRoute(r) {
+    if (r.params.get('bcv')) return false; // native, submit, take, feedback, setup, tour: Canvas's own page is wanted
+    if (r.screen === 'course' || r.screen === 'group') return DRAWN_TABS.has(r.tab);
+    return r.screen !== 'native' && !!(screens[r.screen] || (BCV.phone?.active() && BCV.phone.screens[r.screen]));
+  }
+  function inPlaceHop(url) {
+    if (!document.getElementById('bcv-app') || state.settings?.appearance?.skin === false) return false; // the shell must be up
+
+    return drawnRoute(state.route || parseRoute()) && drawnRoute(parseRoute(url.href));
   }
 
-  /** Navigate. Every screen sits on the real Canvas page for its URL, so
-   *  navigation is a real page load (a hash change, and a hop between a
-   *  course's own tabs, stay in place): turning the skin off then reveals
-   *  the page you are on (a reload, when the address moved in place).
+  /** Navigate. A screen the interface draws lands in place (above); anything else is a real page
+   *  load of Canvas's own page for that address. Turning the skin off reveals the page you are
+   *  on (a reload, when the address moved in place).
    *  `confirmed`: the quiz screen already asked (or is leaving on purpose). */
   function go(href, { replace = false, confirmed = false } = {}) {
     let url;
@@ -144,11 +146,13 @@
       return;
     }
     if (samePage) {
+      // the screen you are on, asked for again: a fresh draw from Canvas (the memo starts over), in place
+      if (inPlaceHop(url)) { BCV.canvas.clearAll(); window.scrollTo(0, 0); render(); return; }
       progress(true, state.loadKey || loadKeyFor(parseRoute(url.href)));
       location.reload();
       return;
     }
-    if (!replace && inPlaceCourseHop(url)) { // the rail row that was pressed is the indicator here, never a sidebar row
+    if (!replace && inPlaceHop(url)) {
       history.pushState({ bcv: true }, '', url.pathname + url.search + url.hash);
       window.scrollTo(0, 0);
       render();
@@ -160,11 +164,18 @@
   }
 
   window.addEventListener('popstate', () => {
-    if (state.nativePath !== location.pathname + location.search && !inPlaceCourseHop(new URL(location.href))) {
+    if (state.nativePath !== location.pathname + location.search && !inPlaceHop(new URL(location.href))) {
       location.reload();
       return;
     }
     render();
+  });
+  // A page brought back from the back/forward cache starts over: the memo is emptied and the
+  // screen drawn again from Canvas, exactly as a fresh load would (nothing stale is shown).
+  window.addEventListener('pageshow', (e) => {
+    if (!e.persisted || !document.getElementById('bcv-app')) return;
+    BCV.canvas.clearAll();
+    render({ quiet: true });
   });
 
   // ---- shell ------------------------------------------------------------------------------
@@ -411,19 +422,22 @@
   // ---- screens --------------------------------------------------------------------------------
   const SCREEN_PATIENCE = 15000; // a screen still not drawn after this gives way to Canvas's own page
   async function render({ quiet = false } = {}) {
+    const prev = state.route;
     const r = parseRoute();
     state.route = r;
     const id = ++state.renderId;
     const alive = () => id === state.renderId;
     state.renderedAt = Date.now();
     html.classList.remove('bcv-settled');
-    // a fresh page lights the sidebar row for its route; a later in-place render lights only what was pressed
-    if (!quiet) progress(true, state.loadKey || (state.everRendered ? null : loadKeyFor(r)));
+    // the row that was pressed keeps its wash; otherwise the sidebar row for this route lights (a fresh
+    // page, a link into a screen), except within one course, where the rail row is the indicator
+    const withinCourse = !!prev && prev.screen === 'course' && r.screen === 'course' && prev.courseId === r.courseId;
+    if (!quiet) progress(true, state.loadKey || (withinCourse ? null : loadKeyFor(r)));
     state.quizOpen = false;
     state.submitOpen = false;
     html.classList.remove('bcv-quiz', 'bcv-quiz-fb'); // the quiz screen puts them back while an attempt or its feedback is on screen
     punchOut(); // a native screen punches back in while it builds
-    renderSide();
+    syncSide(); // the sidebar follows the route in place; it is rebuilt only when what it shows changes
     const ctx = { app: BCV.app, route: r, alive, dark: state.dark, setSmart: (c) => setSmartContext(c, id) };
     state.smartCtx = null;
     state.smartTopic = null;
@@ -473,7 +487,6 @@
     if (!alive()) return;
     if (el.parentNode !== main) main.replaceChildren(el); // a screen that kept its shell (a course's rail) stays put
     progress(false);
-    state.everRendered = true;
     html.classList.add('bcv-settled'); // drawn, from Canvas's answer (the harness waits for this)
     document.title = titleFor(r);
     if (phone()) BCV.phone.afterRender(BCV.app, r, el);
@@ -517,7 +530,7 @@
     ]);
     state.me = me;
     state.favs = favs;
-    if (!state.everRendered && !state.loadKey) progress(true, loadKeyFor(state.route || parseRoute())); // a course page's own favourite row, once the favourites are known
+    if (!state.loadKey && !html.classList.contains('bcv-settled')) progress(true, loadKeyFor(state.route || parseRoute())); // a course page's own favourite row, once the favourites are known
     state.term = term;
     state.todoCount = todos ? todos.length : null;
     state.unread = unread;
@@ -531,7 +544,27 @@
     state.todoCount = todos ? todos.length : null;
     state.unread = unread;
     state.notifCount = notifs;
-    renderSide();
+    paintCounts();
+  }
+  /** The badges, updated in place (a rebuilt nav would lose focus mid-keyboard-navigation). */
+  function paintCounts() {
+    if (phone() || !side || !side.querySelector('.bcv-nav')) { renderSide(); return; }
+    const counts = { todo: state.todoCount, notifications: state.notifCount, inbox: state.unread };
+    for (const [key, n] of Object.entries(counts)) {
+      const el = side.querySelector(`.bcv-nav__item[data-nav="${key}"] .bcv-nav__count`);
+      if (el) el.textContent = n ? String(n) : '';
+    }
+  }
+  /** The active row and the loading wash follow the route in place; the sidebar is rebuilt only
+   *  when it has never been drawn, or the quiz focus state changes. */
+  function syncSide() {
+    if (phone() || !side) { renderSide(); return; }
+    const focus = inQuiz() && !state.quizOpen;
+    if (focus || root.classList.contains('bcv-focus') || !side.querySelector('.bcv-nav')) { renderSide(); return; }
+    const r = state.route || parseRoute();
+    for (const b of side.querySelectorAll('.bcv-nav__item')) b.classList.toggle('is-active', r.screen === b.dataset.nav || (b.dataset.nav === 'groups' && r.screen === 'group'));
+    for (const b of side.querySelectorAll('.bcv-fav')) b.classList.toggle('is-active', !!r.courseId && r.screen === 'course' && b.dataset.load === `fav:${r.courseId}`);
+    paintLoad();
   }
 
   // ---- punch-through (pages Canvas draws itself) --------------------------------------------
