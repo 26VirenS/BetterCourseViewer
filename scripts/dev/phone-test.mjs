@@ -231,6 +231,23 @@ try {
   check(await eventually(async () => (await texts('.bcv-ph-crow__sub')).some((t) => /\d+ of \d+ submitted/.test(t))), 'rows show submitted ÷ assigned');
   check((await texts('.bcv-ph-crow__pct')).every((t) => /^(\d+(\.\d+)?%|N\/A)$/.test(t)), `every row carries its current score or N/A: ${(await texts('.bcv-ph-crow__pct')).join(', ')}`);
   await shot('02-courses');
+  // a nickname (Canvas's own): swipe a course row left for Nickname, a sheet with one field
+  const crowCode = (await texts('.bcv-ph-crow__code'))[0];
+  await swipeLeft('.bcv-ph-crow', 90);
+  check(await eventually(() => page.$eval('.bcv-ph-crow', (e) => e.closest('.bcv-ph-swipe').classList.contains('is-open'))) && (await texts('.bcv-ph-swipe.is-open .bcv-ph-swipe__act')).join(',') === 'Nickname' && page.url() === `${BASE}/courses`, 'swiping a course row left reveals Nickname (and does not open the course)');
+  await shot('02b-courses-swipe');
+  await page.click('.bcv-ph-swipe.is-open .bcv-ph-swipe__act');
+  await sheet();
+  check((await texts('.bcv-ph-sheet__title'))[0] === 'Nickname' && (await page.$eval('.bcv-ph-nick__input', (e) => e.placeholder)) === crowCode && !(await page.$('.bcv-ph-sheet__actions .is-danger')), 'the Nickname sheet: the real name as the placeholder, nothing to remove yet');
+  await page.fill('.bcv-ph-nick__input', 'Calc');
+  await page.click('.bcv-ph-sheet__actions .bcv-ph-bigbtn.is-primary');
+  check(await eventually(async () => !(await page.$('.bcv-sheet-ov')) && (await texts('.bcv-ph-crow__code'))[0] === 'Calc'), 'Save renames the row (the nickname is Canvas\'s own)');
+  await swipeLeft('.bcv-ph-crow', 90);
+  await eventually(() => page.$eval('.bcv-ph-crow', (e) => e.closest('.bcv-ph-swipe').classList.contains('is-open')));
+  await page.click('.bcv-ph-swipe.is-open .bcv-ph-swipe__act');
+  await sheet();
+  await page.click('.bcv-ph-sheet__actions .bcv-ph-bigbtn.is-danger');
+  check(await eventually(async () => !(await page.$('.bcv-sheet-ov')) && (await texts('.bcv-ph-crow__code'))[0] === crowCode), 'Remove nickname restores the real name');
 
   // ---- To Do -------------------------------------------------------------------------------------
   console.log('To Do');

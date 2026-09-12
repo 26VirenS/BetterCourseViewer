@@ -126,7 +126,8 @@ The extension is on automatically for every `*.instructure.com` site. If your sc
 
 - No control does anything the Canvas student API cannot do: marking done and dismissing are planner overrides, stars are favourites, replies and messages go through the same endpoints Canvas uses, and the dashboard view is stored on your Canvas profile. Handing work in is the same POST Canvas's own form sends, after the same file-upload steps; the submission tools are never re-implemented, only framed.
 - Every number on screen comes from an API response. The grade rings use your assignment groups and submissions; the total is the score Canvas reports until you enter what-if values. If a request fails the card is hidden rather than showing a false zero.
-- Course colours, nicknames, favourites and the dashboard view all come from your Canvas settings.
+- Course colours, nicknames, favourites and the dashboard view all come from your Canvas settings. A nickname is set on All Courses (the pencil on a card or row), in Settings → Courses & targets, or in the guided setup (a field on every course row); on a phone, swipe a course row left. It is Canvas's own nickname, so Canvas shows it too.
+- Inside a course, the tabs the interface draws itself change hands in place: the header and the rail stay put and only the main column changes (Back and Forward follow). Everything else is a real page load.
 - The Grades page computes its GPA from the scores Canvas returns for your current courses on a plain 4.0 scale with every course weighted equally, because Canvas exposes neither a GPA nor credit hours; it is labelled as computed, not official. Your prior GPA, course count, goal, target grades and the daily snapshots are stored only in the extension on this Mac and never sent to Canvas or anywhere else.
 
 ## Chrome (and Edge)

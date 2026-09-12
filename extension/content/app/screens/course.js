@@ -255,6 +255,7 @@
     return { screen, content: cmain, head };
   }
 
+  let liveShell = null; // { el, shell }: the course shell on screen, kept between the course's tabs
   async function render(ctx) {
     const { app, route } = ctx;
     const id = route.courseId;
@@ -277,7 +278,6 @@
     // block lives inside the assignment page itself (mockup 11), so ?bcv=submit just scrolls to it.
     if (route.tab === 'assignment' && route.arg && route.params.get('bcv') === 'submit' && BCV.phone?.active()) return BCV.screens.submit.render(ctx, course);
 
-    const shell = { course, reader: null, dark, kind: 'courses' };
     const tabs = (tabsRaw || []).filter((t) => !t.hidden && t.id !== 'settings').map((t) => {
       const external = t.type === 'external' || String(t.id).startsWith('context_external_tool');
       const path = (() => {
@@ -298,14 +298,29 @@
       return tabs.find((x) => x.href !== `/courses/${id}` && route.path.startsWith(x.href))?.id || (route.tab === 'native' ? null : 'home');
     })();
 
+    // Within one course the header and the rail stay put between its tabs: only the main column
+    // changes hands (the rail's entrance plays once; its collapse state and its counts carry over).
+    const kept = keptShell(id, course, dark);
+    const shell = kept ? liveShell.shell : { course, reader: null, dark, kind: 'courses' };
     shell.tabs = tabs;
     shell.activeId = activeId;
-    const { screen: shellEl, content: cmain } = await contextShell(ctx, shell, { backLabel: 'All Courses', backHref: '/courses', tabs, activeId, pills: [course.term ? h('span', { class: 'bcv-pill bcv-pill--term', text: course.term }) : null] });
-    if (!ctx.alive()) return screen;
-    screen.replaceChildren(...shellEl.childNodes);
-    screen.className = shellEl.className;
-    screen.style.cssText = shellEl.style.cssText;
-    const content = cmain;
+    shell.reader = null;
+    let content;
+    if (kept) {
+      syncShell(ctx, kept, shell, activeId);
+      content = kept.querySelector('.bcv-cmain');
+      content.classList.add('is-loading'); // the old column dims until the new one lands
+    } else {
+      const { screen: shellEl, content: cmain } = await contextShell(ctx, shell, { backLabel: 'All Courses', backHref: '/courses', tabs, activeId, pills: [course.term ? h('span', { class: 'bcv-pill bcv-pill--term', text: course.term }) : null] });
+      if (!ctx.alive()) return screen;
+      screen.replaceChildren(...shellEl.childNodes);
+      screen.className = shellEl.className;
+      screen.style.cssText = shellEl.style.cssText;
+      screen.dataset.bcvCourse = String(id);
+      liveShell = { el: screen, shell }; // (a reference of our own: an expando on the node does not survive the wrapper)
+      content = cmain;
+    }
+    const out = kept || screen;
 
     const B = BCV.screens.courseTabs;
     const D = BCV.screens.courseDetail;
@@ -330,10 +345,35 @@
       case 'quiz': el = await D.quiz(ctx, shell); break;
       default: el = B.native(ctx, shell);
     }
-    if (!ctx.alive()) return screen;
-    content.append(el);
+    if (!ctx.alive()) return out;
+    content.classList.remove('is-loading');
+    content.replaceChildren(el);
     document.title = `${course.name} · ${app.siteName()}`;
-    return screen;
+    return out;
+  }
+
+  /** The course shell already on screen, when it is this course's and still current (the same
+   *  appearance, colour and name); the phone's course screens are pushes of their own. */
+  function keptShell(id, course, dark) {
+    if (BCV.phone?.active() || !liveShell) return null;
+    const { el, shell } = liveShell;
+    if (!el.isConnected || el.parentNode?.id !== 'bcv-main' || el.dataset.bcvCourse !== String(id) || shell.dark !== dark) return null;
+    if (shell.course.color !== course.color || shell.course.name !== course.name) return null; // a new colour or nickname: the header is drawn again
+    return el;
+  }
+  /** A kept shell follows the route: the active rail item, and counts read again. */
+  function syncShell(ctx, screen, shell, activeId) {
+    for (const b of screen.querySelectorAll('.bcv-rail__item, .bcv-rail__ext')) b.classList.toggle('is-active', b.dataset.tab === activeId);
+    railCounts(shell).then((counts) => {
+      if (!ctx.alive()) return;
+      for (const b of screen.querySelectorAll('.bcv-rail__item')) {
+        const n = counts[b.dataset.tab];
+        const el = b.querySelector('.bcv-rail__count');
+        if (!el || n === undefined) continue;
+        el.textContent = n ? String(n) : '';
+        b.classList.toggle('has-count', !!n);
+      }
+    });
   }
 
   // ---- tabs ------------------------------------------------------------------------------------

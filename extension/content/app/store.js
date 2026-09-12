@@ -220,6 +220,15 @@
     await Promise.all([C.invalidate('courses:all'), C.invalidate('cards')]);
   }
 
+  /** A course nickname, Canvas's own: every course list then carries it as the name (the real
+   *  name stays as original_name). An empty name removes it. */
+  async function setNickname(courseId, name) {
+    const nick = String(name || '').trim();
+    if (nick) await C.put(`/api/v1/users/self/course_nicknames/${courseId}`, { nickname: nick });
+    else await C.del(`/api/v1/users/self/course_nicknames/${courseId}`);
+    await Promise.all([C.invalidate('courses:all'), C.invalidate('cards'), C.invalidate(`course:${courseId}`)]);
+  }
+
   /** Term to show under the site name: the term shared by most favourite courses. */
   async function currentTerm() {
     const favs = await favorites().catch(() => []);
@@ -663,7 +672,7 @@
     const color = cols[`course_${id}`] || U.FALLBACK_COLORS[0];
     const enr = (c.enrollments || [])[0] || {};
     return {
-      id: String(c.id), raw: c, name: c.name, originalName: c.original_name || c.name, nickname: null, code: c.course_code, term: c.term?.name || '', favorite: !!c.is_favorite,
+      id: String(c.id), raw: c, name: c.name, originalName: c.original_name || c.name, nickname: c.original_name ? c.name : null, code: c.course_code, term: c.term?.name || '', favorite: !!c.is_favorite,
       state: courseState(c), role: roleLabel(enr.type), score: enr.computed_current_score ?? null, grade: enr.computed_current_grade ?? null, teachers: (c.teachers || []).map((t) => t.display_name),
       sections: (c.sections || []).map((s) => s.name), image: c.image_download_url || null, defaultView: c.default_view || 'wiki', weighted: !!c.apply_assignment_group_weights,
       color, palette: U.palette(color, BCV.early?.isDark?.() ?? false), url: `/courses/${id}`,
@@ -1058,7 +1067,7 @@
   }
 
   BCV.store = {
-    env, pref, setPref, me, account, colors, courses, favorites, cards, setFavorite, currentTerm, dashboardView, setDashboardView,
+    env, pref, setPref, me, account, colors, courses, favorites, cards, setFavorite, setNickname, currentTerm, dashboardView, setDashboardView,
     planner, classify, todo, todoWindow, setComplete, dismiss, restore, invalidatePlanner, createNote, deleteNote, activity, activitySummary, unreadCount, groups, group,
     announcementsFeed, streamSeen, markStreamSeen, setColor, history, helpLinks,
     calendarContexts, selectedContexts, setSelectedContexts, calendarEvents, plannerRange,

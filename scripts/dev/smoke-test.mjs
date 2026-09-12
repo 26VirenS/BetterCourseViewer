@@ -88,10 +88,11 @@ try {
   const visible = (sel) => page.$eval(sel, (el) => getComputedStyle(el).display !== 'none').catch(() => false);
   const waitText = (sel, re) => page.waitForFunction(([s, r]) => [...document.querySelectorAll(s)].some((e) => new RegExp(r).test(e.textContent)), [sel, re.source], { timeout: 10000 });
   // click something that re-renders the main screen, and wait until the old screen element is gone
+  // (inside a course only the main column changes hands: the header and rail stay put)
   const clickScreen = async (sel) => {
-    await page.evaluate(() => { const m = document.querySelector('#bcv-main > *'); if (m) m.dataset.old = '1'; });
+    await page.evaluate(() => { for (const m of document.querySelectorAll('#bcv-main > *, #bcv-main .bcv-cmain > *')) m.dataset.old = '1'; });
     await page.click(sel);
-    await page.waitForSelector('#bcv-main > *:not([data-old])', { timeout: 10000 });
+    await page.waitForSelector('#bcv-main > *:not([data-old]), #bcv-main .bcv-cmain > *:not([data-old])', { timeout: 10000 });
     await page.waitForFunction(() => { const c = document.documentElement.classList; return !c.contains('bcv-on') || c.contains('bcv-settled'); }, null, { timeout: 20000 }).catch(() => {});
     await rolled();
   };
@@ -256,6 +257,26 @@ try {
   await page.click(`[data-term="${terms[0]}"] .bcv-reorder__up`);
   await page.waitForFunction((first) => document.querySelector('[data-term]').dataset.term === first, terms[0], { timeout: 5000 });
   check((await texts('.bcv-body .bcv-row')).some((t) => /Placement Exam: Chemistry.*No nickname.*Student/.test(t)), 'non-favourite rows with role badge');
+  // a nickname, Canvas's own: the pencil on a card opens a one-field sheet; the card, the sidebar and Canvas follow
+  const coursesJson = () => fetch(`${BASE}/api/v1/courses?per_page=100`).then((r) => r.text()).then((t) => JSON.parse(t.replace(/^while\(1\);/, '')));
+  const mathCard = page.locator('.bcv-ccard', { hasText: 'F26-MATH 021 20' }).first();
+  await mathCard.hover();
+  await mathCard.locator('.bcv-ccard__nick').click();
+  await page.waitForSelector('.bcv-sheet--prompt', { timeout: 5000 });
+  check((await texts('.bcv-sheet--prompt .bcv-sheet__title'))[0] === 'Nickname' && !(await page.$('.bcv-prompt__clear')) && (await page.$eval('.bcv-prompt__input', (e) => e.placeholder)) === 'F26-MATH 021 20', 'the pencil on a card opens the nickname sheet, the real name as the placeholder, nothing to remove yet');
+  await page.fill('.bcv-prompt__input', 'Calc');
+  await page.click('.bcv-prompt__save');
+  await page.waitForFunction(() => !document.querySelector('.bcv-sheet--prompt') && [...document.querySelectorAll('.bcv-ccard__code')].some((e) => e.textContent.trim() === 'Calc'), null, { timeout: 10000 });
+  const nicked = (await coursesJson()).find((c) => String(c.id) === '101');
+  check(nicked.name === 'Calc' && nicked.original_name === 'F26-MATH 021 20' && (await texts('.bcv-fav')).includes('Calc'), `Save writes the nickname to Canvas (name Calc, the real name kept as original_name) and the sidebar follows: ${(await texts('.bcv-fav')).join(', ')}`);
+  await shot(page, '04b-courses-nickname');
+  const calcCard = page.locator('.bcv-ccard', { hasText: 'Calc' }).first();
+  await calcCard.hover();
+  await calcCard.locator('.bcv-ccard__nick').click();
+  await page.waitForSelector('.bcv-prompt__clear', { timeout: 5000 });
+  await page.click('.bcv-prompt__clear');
+  await page.waitForFunction(() => !document.querySelector('.bcv-sheet--prompt') && [...document.querySelectorAll('.bcv-ccard__code')].some((e) => e.textContent.trim() === 'F26-MATH 021 20'), null, { timeout: 10000 });
+  check(!(await coursesJson()).find((c) => String(c.id) === '101').original_name && (await page.$$('.bcv-row .bcv-iconbtn')).length > 0, 'Remove nickname restores the real name in Canvas; the non-favourite rows carry a pencil too');
   check((await page.$$eval('[data-term]', (els) => els.map((e) => e.dataset.term)))[0] === 'Fall 2026', 'the current term (most dashboard courses) is listed first');
   await shot(page, '04-courses');
   await page.click('.bcv-seg__btn[data-value="past"]');
@@ -619,6 +640,12 @@ try {
   await page.waitForFunction(() => !document.querySelector('.bcv-rail.is-narrow'), null, { timeout: 3000 });
   check((await texts('.bcv-rail__toggle'))[0] === 'Collapse', 'toggle label follows the state');
   check((await texts('.bcv-head h1'))[0] === 'F26-MATH 021 20' && (await texts('.bcv-pill--term'))[0] === 'Fall 2026', 'course header');
+  // the header and rail stay put between the course's tabs: only the main column changes hands
+  await page.evaluate(() => { window.__bcvRail = document.querySelector('.bcv-rail'); window.__bcvHead = document.querySelector('.bcv-head--course'); });
+  await clickScreen('.bcv-rail__item[data-tab="assignments"]');
+  check(page.url() === `${BASE}/courses/101/assignments` && (await page.evaluate(() => document.querySelector('.bcv-rail') === window.__bcvRail && document.querySelector('.bcv-head--course') === window.__bcvHead)) && (await page.$eval('.bcv-rail__item.is-active', (e) => e.dataset.tab)) === 'assignments' && (await page.$$('.bcv-cmain > *')).length === 1, 'a rail tab swaps only the main column: the header and rail are the same elements, the active item moved');
+  await clickScreen('.bcv-rail__item[data-tab="home"]');
+  check((await page.evaluate(() => document.querySelector('.bcv-rail') === window.__bcvRail)) && (await page.$eval('.bcv-rail__item.is-active', (e) => e.dataset.tab)) === 'home' && (await texts('.bcv-rail__item[data-tab="announcements"] .bcv-rail__count'))[0] === '2', 'and back to Home: still the same rail, its counts intact');
   await page.waitForSelector('.bcv-front', { timeout: 10000 });
   check(/^front page · course information$/i.test((await texts('.bcv-front .bcv-label'))[0]), 'front page card');
   const chips = await texts('.bcv-front .bcv-chip');
@@ -1153,6 +1180,11 @@ try {
   await firstOn.click();
   await firstOff.click();
   check((await texts(su('.listhead span')))[0] === '5 selected' && (await page.$$(su('.row.is-on'))).length === 5, 'rows toggle with the count');
+  // a nickname typed on a row is saved with the rest (Canvas's own nickname)
+  const nickRow = page.locator(su('.row.is-on')).last();
+  const nickId = await nickRow.getAttribute('data-course');
+  await nickRow.locator('.row__nick').fill('Setup nick');
+  check((await page.$$(su('.row.is-on'))).length === 5 && (await page.$eval(su('.row__nick'), (e) => e.placeholder)) === 'Nickname', 'every row has a Nickname field; typing in one does not toggle the row');
   await shot(page, '32c-setup-courses');
   await sNext('#track');
   check((await sStep()) === '2 of 3' && (await page.$eval(su('#track'), (e) => e.classList.contains('is-on'))) && (await texts(su('#goal')))[0] === '3.50' && (await page.$$(su('.target'))).length === 5 && (await page.$$(su('.seg button.is-on'))).length === 5 && (await page.$$eval(su('.target:first-child .seg button'), (bs) => bs.map((b) => b.textContent))).join(' ') === 'C B B+ A- A A+', 'step 2: tracking on, a 3.50 goal, a target row per chosen course, letters low to high with A+ on the right');
@@ -1183,6 +1215,9 @@ try {
   check(page.url() === `${BASE}/` && (await page.$('#bcv-setup')) === null && !(await page.$('html.bcv-setup-open')) && (await page.$eval('.bcv-tour__title', (e) => e.textContent.trim())) === 'Your day at a glance', 'then the card closes and the tour starts on the same page');
   const favAfter = (await apiGet('/api/v1/courses?per_page=100')).filter((c) => c.is_favorite).map((c) => c.course_code || c.name);
   check(!favAfter.includes(offCode) && favAfter.includes(onCode) && favAfter.length === 5, `the chosen courses became the Canvas favourites: −${offCode} +${onCode}`);
+  const nickedInSetup = (await apiGet('/api/v1/courses?per_page=100')).find((c) => String(c.id) === nickId);
+  check(nickedInSetup.name === 'Setup nick' && !!nickedInSetup.original_name && (await texts('.bcv-fav')).includes('Setup nick'), `the nickname typed in setup reached Canvas and the sidebar: ${nickedInSetup.original_name} → ${nickedInSetup.name}`);
+  await fetch(`${BASE}/api/v1/users/self/course_nicknames/${nickId}`, { method: 'DELETE', headers: { 'x-csrf-token': 'mock+csrf/token=' } }); // back to the real name for what follows
   check((await texts('.bcv-fav')).length === 5, 'the sidebar follows the new favourites');
   const savedPrefs = await prefsOf();
   check(savedPrefs.gpaGoal === 3.6 && savedPrefs.gpaTracking?.since && savedPrefs.gpaTracking.priorGpa === null && Object.values(savedPrefs.gradeTargets || {}).includes('B+') && savedPrefs.setupDone === true && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('setup:done'))['setup:done'])) === true, `the grade choices landed where the Grades page reads them, and the done flags are set: ${JSON.stringify({ goal: savedPrefs.gpaGoal, tracking: savedPrefs.gpaTracking, targets: savedPrefs.gradeTargets })}`);
@@ -1265,12 +1300,14 @@ try {
   const acctItems = await texts('.bcv-menu--account .bcv-menu__item');
   check(acctItems.map((t) => t.split('\n')[0].trim()).join(' | ') === 'Dark appearance | Simpl Courses settings Look, courses, grades, the smart panel | Guided setup Courses, grades, the smart panel | Tour What changed, on the real pages | Canvas profile | All Canvas settings Profile, notifications, integrations | Notification preferences | Log out' && (await page.$eval('.bcv-menu--account', (m) => m.getBoundingClientRect().bottom <= window.innerHeight)), `the profile row opens a panel above itself: ${acctItems.join(' | ')}`);
   await shot(page, '34-account-panel');
-  await page.route('**/logout', (route) => route.fulfill({ status: 200, contentType: 'text/html', body: '<h1>Logged out</h1>' }));
+  // the mock keeps the token in the _csrf_token cookie only, like Canvas (no meta tag), and its /logout
+  // accepts a DELETE carrying exactly that token; anything else lands on Canvas's "Page Error"
+  check(!(await page.$('meta[name="csrf-token"]')) && /_csrf_token=/.test(await page.evaluate(() => document.cookie)), 'the page carries the CSRF token in the _csrf_token cookie, not a meta tag');
   const [logoutReq] = await Promise.all([page.waitForRequest((rq) => rq.url().endsWith('/logout') && rq.method() === 'POST', { timeout: 10000 }), page.click('.bcv-menu__item--danger')]);
-  const body = logoutReq.postData() || '';
-  check(/_method=delete/.test(body) && /authenticity_token=mock-csrf/.test(body), `Log out submits Canvas's own logout form with the page's token: ${body}`);
-  await page.waitForFunction(() => /Logged out/.test(document.body.textContent), null, { timeout: 10000 });
-  await page.unroute('**/logout');
+  const body = new URLSearchParams(logoutReq.postData() || '');
+  check(body.get('_method') === 'delete' && body.get('authenticity_token') === 'mock+csrf/token=', `Log out submits Canvas's own logout form with the session's token, decoded from the cookie: ${logoutReq.postData()}`);
+  await page.waitForFunction(() => /Logged out|Page Error/.test(document.body.textContent), null, { timeout: 10000 });
+  check(await page.evaluate(() => /Logged out/.test(document.body.textContent) && !/Page Error/.test(document.body.textContent)), 'Canvas accepts it and logs the session out (no "Page Error")');
 
   // ---- never a broken card -----------------------------------------------------------------------------
   console.log('resilience');
@@ -1380,6 +1417,17 @@ try {
   await options.click(`.course[data-course="${offId}"] .seg button[data-value="B+"]`);
   await options.waitForTimeout(300);
   check((await apiGet('/api/v1/courses?per_page=100')).find((c) => String(c.id) === offId).is_favorite && (await prefsOf()).gradeTargets?.[offId] === 'B+' && (await options.$$eval('.course:first-child .seg button', (bs) => bs.map((b) => b.textContent))).join(' ') === 'C B B+ A- A A+', 'showing it again restores the favourite, and the letter writes the target the Grades page reads; the letters run low to high with A+ on the right');
+  // a nickname typed here is written to Canvas with the token the Canvas page remembered for this page
+  const nickInput = options.locator(`.course[data-course="${offId}"] .course__nick`);
+  await nickInput.fill('Settings nick');
+  await nickInput.dispatchEvent('change');
+  await options.waitForFunction(() => !document.querySelector('#saved').hidden, null, { timeout: 5000 }).catch(() => {});
+  const viaSettings = (await apiGet('/api/v1/courses?per_page=100')).find((c) => String(c.id) === offId);
+  check(viaSettings.name === 'Settings nick' && !!viaSettings.original_name, `a nickname typed in Settings reaches Canvas: ${viaSettings.original_name} → ${viaSettings.name}`);
+  await nickInput.fill('');
+  await nickInput.dispatchEvent('change');
+  await options.waitForTimeout(400);
+  check(!(await apiGet('/api/v1/courses?per_page=100')).find((c) => String(c.id) === offId).original_name, 'clearing the field removes the nickname');
   await options.screenshot({ path: join(out, '29-options-courses.png'), fullPage: true });
   // Grades: the same preferences as the Grades page
   await options.click('.navlink[data-section="grades"]');

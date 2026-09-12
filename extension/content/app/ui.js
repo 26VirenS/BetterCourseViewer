@@ -529,9 +529,57 @@
     });
     return b;
   }
+  /** A small sheet with one text field: a title, a note, the field, Save (and an optional clear
+   *  action, which saves an empty value). onSave may throw: the sheet stays and says why. */
+  function promptSheet({ label = '', title, note = '', value = '', placeholder = '', maxLength = 120, saveLabel = 'Save', clearLabel = null, onSave, from = null }) {
+    document.querySelector('.bcv-sheet-ov')?.remove();
+    const ov = el('bcv-sheet-ov', null, { role: 'dialog', 'aria-label': label || title });
+    const close = () => ov.remove();
+    ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
+    ov.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+    const input = h('input', { class: 'bcv-input bcv-prompt__input', type: 'text', value, placeholder, maxlength: String(maxLength), 'aria-label': title });
+    let busy = false;
+    let saveBtn = null;
+    const save = async (v) => {
+      if (busy) return;
+      busy = true;
+      saveBtn.disabled = true;
+      try {
+        await onSave(v);
+        close();
+      } catch (e) {
+        busy = false;
+        saveBtn.disabled = false;
+        toast(`Could not save: ${e?.message || e}`, { error: true });
+      }
+    };
+    saveBtn = btn(saveLabel, { kind: 'primary', cls: 'bcv-prompt__save', onClick: () => save(input.value.trim()) });
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') save(input.value.trim()); });
+    ov.append(el('bcv-sheet bcv-sheet--prompt', [
+      el('bcv-sheet__head', [
+        el('bcv-sheet__titles', [text('bcv-sheet__title', title), note ? text('bcv-sheet__note bcv-pretty', note) : null]),
+        h('button', { type: 'button', class: 'bcv-sheet__close', 'aria-label': 'Close', onclick: close }, svg(IC.close, { size: 13, stroke: 'var(--bcv-ink2)', width: 2.3 })),
+      ]),
+      el('bcv-prompt', [
+        input,
+        el('bcv-prompt__btns', [
+          clearLabel ? btn(clearLabel, { kind: 'danger', cls: 'bcv-prompt__clear', onClick: () => save('') }) : null,
+          h('span', { style: { flex: '1' } }),
+          btn('Cancel', { onClick: close }),
+          saveBtn,
+        ]),
+      ]),
+    ]));
+    document.body.append(ov);
+    if (from) morphFrom(ov.firstElementChild, from);
+    ov.tabIndex = -1;
+    setTimeout(() => { input.focus(); input.select(); }, 30);
+    return { close, input };
+  }
+
   BCV.ui = {
     svg, star, chev, el, text, tile, dot, card, row, label, h2, groupHead, badge, seg, search, switchEl, btn, iconbtn, chip, pill,
-    empty, emptyCard, loading, errorBox, hint, avatar, toast, menu, closeMenus, colorMenu, COURSE_COLORS, fmtDay, datePop, dateField,
+    empty, emptyCard, loading, errorBox, hint, avatar, toast, menu, closeMenus, colorMenu, COURSE_COLORS, fmtDay, datePop, dateField, promptSheet,
     DAY, startOfDay, addDays, sameDay, dayDiff, startOfWeek, parse, MONTHS, MONTHS_LONG, DAYS, DAYS_LONG,
     fmtTime, fmtTimeLower, fmtShort, fmtLong, fmtDateComma, fmtAt, fmtAtUpper, fmtBy, dayTitle, fmtDow, fmtRecent, whenShort, plural,
     hexToRgb, rgba, palette, FALLBACK_COLORS, initials, enter, roll, morphFrom, reducedMotion,

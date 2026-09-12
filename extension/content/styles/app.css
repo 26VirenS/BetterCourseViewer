@@ -371,6 +371,18 @@ html[data-bcv-theme="dark"] .bcv-badge--orange { color: #ffb44d; }
 .bcv-ccard__more { width: 26px; height: 26px; border-radius: 13px; background: rgba(255,255,255,.22); display: flex; align-items: center; justify-content: center; border: 0; padding: 0; cursor: pointer; }
 .bcv-ccard__term { font: 700 12.5px/1.2 var(--bcv-font); color: rgba(255,255,255,.94); letter-spacing: .03em; }
 .bcv-ccard__star { border: 0; background: transparent; padding: 0; cursor: pointer; }
+.bcv-ccard__tools { display: flex; align-items: center; gap: 4px; }
+.bcv-ccard__nick { width: 26px; height: 26px; border: 0; border-radius: 13px; background: rgba(255,255,255,.18); display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; opacity: 0; transition: opacity .18s ease, background .18s ease; }
+.bcv-ccard:hover .bcv-ccard__nick, .bcv-ccard:focus-within .bcv-ccard__nick { opacity: 1; }
+.bcv-ccard__nick:hover { background: rgba(255,255,255,.3); }
+/* the one-field sheet (a course nickname) */
+.bcv-sheet--prompt { width: 440px; }
+.bcv-prompt { padding: 16px 22px 20px; display: flex; flex-direction: column; gap: 14px; }
+.bcv-prompt__input { height: 42px; font-size: 15px; border-radius: 12px; }
+.bcv-prompt__btns { display: flex; align-items: center; gap: 8px; }
+/* a course's main column dims while the next tab loads (the header and rail stay put) */
+.bcv-cmain { transition: opacity .2s ease; }
+.bcv-cmain.is-loading { opacity: .55; }
 .bcv-ccard__body { padding: 12px 16px 14px; display: flex; flex-direction: column; gap: 10px; flex: 1; }
 .bcv-ccard__body--term { padding: 14px 16px 16px; gap: 12px; }
 .bcv-ccard__code { font: 600 15px/1.3 var(--bcv-font); letter-spacing: -.01em; }
@@ -1344,6 +1356,10 @@ html[data-bcv-theme="dark"] .bcv-ph-circle { border-color: rgba(255,255,255,.28)
 .bcv-ph-swipe__front { position: relative; background: var(--bcv-card); touch-action: pan-y; will-change: transform; }
 /* courses */
 .bcv-ph-clist { display: flex; flex-direction: column; gap: 10px; }
+.bcv-ph-swipe--card { border-top: 0; border-radius: 18px; box-shadow: var(--bcv-shadow); }
+.bcv-ph-swipe--card .bcv-ph-crow { box-shadow: none; }
+.bcv-ph-nick { padding: 4px 18px 0; }
+.bcv-ph-nick__input { height: 46px; border-radius: 13px; font-size: 16px; }
 .bcv-ph-crow { display: flex; align-items: center; gap: 13px; width: 100%; box-sizing: border-box; padding: 15px 16px; min-height: 64px; border-radius: 18px; background: var(--bcv-card); box-shadow: var(--bcv-shadow); color: inherit !important; text-decoration: none; }
 .bcv-ph-crow__tile { flex: none; width: 40px; height: 40px; border-radius: 13px; display: flex; align-items: center; justify-content: center; }
 .bcv-ph-crow__dot { width: 13px; height: 13px; border-radius: 4px; }

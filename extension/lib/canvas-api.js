@@ -6,11 +6,13 @@
 
   const ACCEPT = 'application/json+canvas-string-ids';
 
+  /** The session's CSRF token, the way Canvas's own front end reads it: the _csrf_token cookie
+   *  (URL-encoded, refreshed by Canvas as it goes), with a csrf-token meta tag as the fallback. */
   function csrfToken() {
-    const meta = document.querySelector('meta[name="csrf-token"]');
-    if (meta?.content) return meta.content;
     const m = document.cookie.match(/(?:^|;\s*)_csrf_token=([^;]+)/);
-    return m ? decodeURIComponent(m[1]) : '';
+    if (m) return decodeURIComponent(m[1]);
+    const meta = document.querySelector('meta[name="csrf-token"]');
+    return meta?.content || '';
   }
 
   function buildUrl(path, params) {
@@ -127,8 +129,11 @@
   // Every page load asks Canvas afresh. Within one page a key is requested once and shared by
   // every component that wants it (callers that arrive while it runs share the request).
   // Nothing is kept between pages, so a page draws once, from Canvas's answer.
+  // A write invalidates a key; a request for that key that was already running when the write
+  // happened answers its caller but never lands in the memo (it would put the stale list back).
   const memory = new Map();
   const inflight = new Map();
+  const generation = new Map();
   const cacheKey = (key) => `${location.host}:${key}`;
   async function cached(key, ttlMs, loader, { force = false, refresh = false } = {}) {
     const k = cacheKey(key);
@@ -136,9 +141,10 @@
       if (memory.has(k)) return memory.get(k);
       if (inflight.has(k)) return inflight.get(k);
     }
+    const gen = generation.get(k) || 0;
     const run = (async () => {
       const value = await loader();
-      memory.set(k, value);
+      if ((generation.get(k) || 0) === gen) memory.set(k, value);
       return value;
     })();
     inflight.set(k, run);
@@ -148,13 +154,17 @@
       if (inflight.get(k) === run) inflight.delete(k);
     }
   }
+  const forget = (k) => {
+    memory.delete(k);
+    generation.set(k, (generation.get(k) || 0) + 1);
+  };
   async function invalidate(key) {
-    memory.delete(cacheKey(key));
+    forget(cacheKey(key));
   }
-  /** Forget every memoised key that starts with the prefix (after a write). */
+  /** Forget every memoised (or still loading) key that starts with the prefix (after a write). */
   async function invalidatePrefix(prefix) {
     const p = cacheKey(prefix);
-    for (const k of [...memory.keys()]) if (k.startsWith(p)) memory.delete(k);
+    for (const k of new Set([...memory.keys(), ...inflight.keys()])) if (k.startsWith(p)) forget(k);
   }
 
 

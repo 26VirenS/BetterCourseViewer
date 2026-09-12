@@ -96,7 +96,10 @@
       const el = h('div', { class: 'bcv-ccard bcv-enter', style: { '--bcv-delay': `${Math.min(i * 55, 420)}ms` }, role: 'link', tabindex: '0', onclick: () => app.go(c.url), onkeydown: (e) => { if (e.key === 'Enter') app.go(c.url); } }, [
         h('div', { class: 'bcv-ccard__hero bcv-ccard__hero--term', style: { background: c.color } }, [
           U.text('bcv-ccard__term', c.term || 'No term', 'span'),
-          h('button', { type: 'button', class: 'bcv-ccard__star', title: 'Remove from dashboard', 'aria-label': 'Remove from dashboard', onclick: (e) => { e.stopPropagation(); toggleFav(c, false); } }, U.star(true)),
+          U.el('bcv-ccard__tools', [
+            h('button', { type: 'button', class: 'bcv-ccard__nick', title: 'Nickname', 'aria-label': `Nickname for ${c.originalName}`, onclick: (e) => { e.stopPropagation(); nicknameSheet(c, e.currentTarget); } }, U.svg(IC.pencil, { size: 13, stroke: 'rgba(255,255,255,.94)', width: 2.1 })),
+            h('button', { type: 'button', class: 'bcv-ccard__star', title: 'Remove from dashboard', 'aria-label': 'Remove from dashboard', onclick: (e) => { e.stopPropagation(); toggleFav(c, false); } }, U.star(true)),
+          ]),
         ]),
         U.el('bcv-ccard__body bcv-ccard__body--term', [
           h('div', {}, [U.text('bcv-ccard__code bcv-ccard__code--term', c.name), U.text('bcv-ccard__section bcv-ccard__section--125', `Enrolled as ${c.role}`)]),
@@ -119,9 +122,34 @@
         h('button', { type: 'button', class: 'bcv-ccard__star', title: 'Add to dashboard', 'aria-label': 'Add to dashboard', onclick: (e) => { e.stopPropagation(); toggleFav(c, true); } }, U.star(false)),
         U.dot(c.color, 'bcv-dot--10'),
         U.el('bcv-row__body', [U.text('bcv-row__title bcv-ellip', c.name), U.text('bcv-course-row__nick', c.nickname ? `Nickname · ${c.originalName}` : 'No nickname')]),
+        U.iconbtn(IC.pencil, { title: 'Nickname', onClick: (e) => { e.stopPropagation(); nicknameSheet(c, e.currentTarget); } }),
         U.badge(c.role),
         U.chev(),
       ], { mod: 'bcv-row--p14', onClick: () => app.go(c.url) });
+    }
+
+    /** A course nickname (Canvas's own, so it shows in Canvas too): a small sheet with one field. */
+    function nicknameSheet(c, from) {
+      U.promptSheet({
+        label: 'Course nickname', title: 'Nickname', note: `Shown instead of “${c.originalName}” everywhere, in Canvas too. Leave it empty for the real name.`,
+        value: c.nickname || '', placeholder: c.originalName, maxLength: 60, clearLabel: c.nickname ? 'Remove nickname' : null, from,
+        onSave: async (v) => {
+          await store.setNickname(c.id, v);
+          await reloadLists();
+        },
+      });
+    }
+    async function reloadLists() {
+      const [cs, fl] = await Promise.all([store.courses({ force: true }).catch(() => null), store.favorites({ force: true }).catch(() => null)]);
+      app.loadShellData({ force: true });
+      if (!ctx.alive()) return;
+      if (cs) courses = cs;
+      if (fl) {
+        favList = fl;
+        favOrder = favList.map((x) => x.id);
+        favIds = new Set(favOrder);
+      }
+      draw();
     }
 
     function orderedGroups(groups) {

@@ -64,7 +64,7 @@
     const settings = await S.get();
     st = {
       app, settings, step: 0,
-      scanning: false, scanError: null, courses: [], favs: new Set(),
+      scanning: false, scanError: null, courses: [], favs: new Set(), nicks: {},
       tracking: true, goal: 3.5, targets: {},
       provider: settings.smart?.openaiKey && !settings.smart?.claudeKey ? 'openai' : 'claude', key: '', keyOk: false, keyMsg: '',
       closing: false,
@@ -201,7 +201,7 @@
     try {
       const [all, favs] = await Promise.all([store.courses({ force: true }), store.favorites({ force: true }).catch(() => [])]);
       const favIds = new Set((favs || []).map((c) => String(c.id)));
-      const list = (all || []).filter((c) => c.state === 'current').map((c) => ({ id: String(c.id), code: c.code || c.name, name: c.name, color: c.color, favorite: !!c.favorite || favIds.has(String(c.id)) }));
+      const list = (all || []).filter((c) => c.state === 'current').map((c) => ({ id: String(c.id), code: c.code || c.name, name: c.name, originalName: c.originalName || c.name, nickname: c.nickname || '', color: c.color, favorite: !!c.favorite || favIds.has(String(c.id)) }));
       st.courses = list;
       const starred = list.filter((c) => c.favorite).map((c) => c.id);
       st.favs = new Set(starred.length ? starred : list.map((c) => c.id)); // until something is starred, Canvas shows every course
@@ -239,22 +239,26 @@
       } });
       const rows = h('div', { class: 'rows' }, list.map((c) => {
         const on = st.favs.has(c.id);
-        return h('button', { type: 'button', class: `row ${on ? 'is-on' : ''}`, dataset: { course: c.id }, onclick: (e) => {
-          const el = e.currentTarget;
+        const toggle = (el) => {
           if (st.favs.has(c.id)) st.favs.delete(c.id); else st.favs.add(c.id);
           el.classList.toggle('is-on', st.favs.has(c.id));
+          el.setAttribute('aria-checked', st.favs.has(c.id) ? 'true' : 'false');
           count.textContent = `${st.favs.size} selected`;
           allBtn.textContent = st.favs.size === list.length ? 'Clear' : 'All';
           nextBtn.disabled = st.favs.size === 0;
-        } }, [
+        };
+        // a nickname is Canvas's own (it shows everywhere, in Canvas too); typed here, saved with the rest
+        const nick = h('input', { class: 'row__nick', type: 'text', placeholder: 'Nickname', maxlength: '60', 'aria-label': `Nickname for ${c.originalName}`, value: st.nicks[c.id] ?? c.nickname, oninput: (e) => { st.nicks[c.id] = e.target.value; }, onclick: (e) => e.stopPropagation(), onkeydown: (e) => e.stopPropagation() });
+        return h('div', { class: `row ${on ? 'is-on' : ''}`, dataset: { course: c.id }, role: 'checkbox', tabindex: '0', 'aria-checked': on ? 'true' : 'false', 'aria-label': c.originalName, onclick: (e) => toggle(e.currentTarget), onkeydown: (e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); toggle(e.currentTarget); } } }, [
           h('span', { class: 'row__dot', style: { background: c.color } }),
-          h('span', { class: 'row__body' }, [h('span', { class: 'row__code', text: c.code }), h('span', { class: 'row__name', text: c.name })]),
+          h('span', { class: 'row__body' }, [h('span', { class: 'row__code', text: c.code }), h('span', { class: 'row__name', text: c.originalName })]),
+          nick,
           h('span', { class: 'row__box' }, svg(CHECK, { size: 12, stroke: '#fff', width: 3 })),
         ]);
       }));
       stagger([...rows.children], 50);
       head.textContent = 'Which are you in?';
-      sub.textContent = 'Unchecked courses stay hidden everywhere.';
+      sub.textContent = 'Unchecked courses stay hidden everywhere. A nickname replaces the name everywhere, in Canvas too.';
       wrap.replaceChildren(h('div', { class: 'listhead' }, [count, allBtn]), rows);
       nextBtn.disabled = st.favs.size === 0;
       settleHeight();
@@ -439,7 +443,9 @@
         ]);
         const changes = st.courses.filter((c) => c.favorite !== st.favs.has(c.id));
         for (const c of changes) await store.setFavorite(c.id, st.favs.has(c.id)).catch(() => {});
-        favChanged = changes.length > 0;
+        const renamed = st.courses.filter((c) => c.id in st.nicks && String(st.nicks[c.id]).trim() !== (c.nickname || ''));
+        for (const c of renamed) await store.setNickname(c.id, st.nicks[c.id]).catch(() => {});
+        favChanged = changes.length > 0 || renamed.length > 0;
       }
       await BCV.api.storage.local.set({ 'setup:done': true, 'setup:offered': true });
     } catch (e) {

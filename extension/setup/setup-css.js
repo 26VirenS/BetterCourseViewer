@@ -158,6 +158,10 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
 .row__body { flex: 1; min-width: 0; }
 .row__code { display: block; font: 600 14.5px/1.25 var(--font); color: var(--ink); }
 .row__name { display: block; margin-top: 2px; font: 400 12px/1.3 var(--font); color: var(--ink3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row__nick { flex: 0 0 124px; min-width: 0; height: 32px; padding: 0 10px; border: 1px solid var(--edge); border-radius: 10px; background: var(--fill); font: 500 12.5px/1 var(--font); color: var(--ink); outline: none; cursor: text; }
+.row__nick:focus { border-color: var(--blue); }
+.row__nick::placeholder { color: var(--ink3); }
+@media (max-width: 480px) { .row { flex-wrap: wrap; } .row__nick { order: 9; flex: 1 1 100%; margin-left: 22px; } }
 .row__box { flex: none; width: 23px; height: 23px; border-radius: 12px; border: 1.6px solid var(--knob-edge); background: transparent; display: flex; align-items: center; justify-content: center; transition: background .2s ease, border-color .2s ease; }
 .row.is-on .row__box { background: var(--blue); border-color: var(--blue); }
 .row__box svg { opacity: 0; transform: scale(.5); transition: opacity .18s ease, transform .25s var(--spring); }

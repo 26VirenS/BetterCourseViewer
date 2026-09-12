@@ -16,6 +16,8 @@ const at = (dayOffset, hour = 23, minute = 59) => {
   return d.toISOString();
 };
 const ago = (ms) => new Date(now.getTime() - ms).toISOString();
+// the session's CSRF token, as Canvas keeps it: in the _csrf_token cookie, URL-encoded (base64 has + / =)
+const CSRF = 'mock+csrf/token=';
 
 // ---- courses ----------------------------------------------------------------------
 const term = { id: '1', name: 'Fall 2026', start_at: ago(20 * D), end_at: at(100) };
@@ -31,9 +33,10 @@ const courses = [
   { id: '301', name: 'S26-CSE 022 01', code: 'CSE-022-01', color: '#0a84ff', score: 97, grade: 'A', teacher: 'Priya Nair', section: 'Lecture-01', favorite: false, past: true, term: { id: '0', name: 'Spring 2026', start_at: ago(220 * D), end_at: ago(100 * D) } },
 ];
 const favorites = new Set(['101', '102', '103', '104', '105']);
+const nicknames = new Map(); // course id → the student's nickname; Canvas then serves it as the name, the real one as original_name
 const courseById = (id) => courses.find((c) => c.id === String(id));
 const fullCourse = (c) => ({
-  id: c.id, name: c.name, course_code: c.code, original_name: undefined, term: c.term || term, is_favorite: favorites.has(c.id), default_view: c.default_view || 'wiki',
+  id: c.id, name: nicknames.get(c.id) || c.name, course_code: c.code, original_name: nicknames.has(c.id) ? c.name : undefined, term: c.term || term, is_favorite: favorites.has(c.id), default_view: c.default_view || 'wiki',
   workflow_state: c.past ? 'completed' : 'available', start_at: null, end_at: null, apply_assignment_group_weights: !!c.weighted,
   enrollments: [{ type: 'student', role: 'StudentEnrollment', enrollment_state: c.past ? 'completed' : 'active', computed_current_score: c.score, computed_current_grade: c.grade, computed_final_score: c.score }],
   teachers: [{ id: `t${c.id}`, display_name: c.teacher }], sections: [{ id: `s${c.id}`, name: c.section }], image_download_url: null,
@@ -270,7 +273,6 @@ function page({ title, path = '', courseId, body }) {
   const env = { current_user_id: '7', current_user: { display_name: 'Sam Student', avatar_image_url: null }, COURSE_ID: courseId || null, context_asset_string: courseId ? `course_${courseId}` : 'user_7', TIMEZONE: 'America/Los_Angeles', DOMAIN_ROOT_ACCOUNT_ID: '1', PREFERENCES: { dashboard_view: dashboardView, custom_colors: Object.fromEntries(courses.map((c) => [`course_${c.id}`, c.color])) } };
   return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>${title}</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="csrf-token" content="mock-csrf">
 <link rel="apple-touch-icon" href="data:image/svg+xml;utf8,${encodeURIComponent('<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 180 180\'><rect width=\'180\' height=\'180\' fill=\'#0b2b52\'/><path d=\'M30 140V40l60 60 60-60v100h-30V95l-30 30-30-30v45z\' fill=\'#f0b429\'/></svg>')}">
 <link rel="icon" href="/dist/images/favicon-abc123.ico">
 <script>INST = {"environment":"development"}; ENV = ${JSON.stringify(env)}; BRANDS = {};</script>
@@ -323,7 +325,9 @@ let dashboardView = 'planner';
 on('GET', /^\/dashboard\/view$/, () => ({ dashboard_view: dashboardView }));
 on('PUT', /^\/dashboard\/view$/, (url, m, body) => { dashboardView = body.dashboard_view || dashboardView; return { dashboard_view: dashboardView }; });
 on('GET', /^\/api\/v1\/courses$/, () => courses.map(fullCourse));
-on('GET', /^\/api\/v1\/dashboard\/dashboard_cards$/, () => courses.filter((c) => favorites.has(c.id)).map((c) => ({ id: c.id, shortName: c.name, originalName: c.name, courseCode: c.code, href: `/courses/${c.id}`, term: 'Fall 2026', subtitle: c.section, links: [{ css_class: 'announcements', label: 'Announcements', path: `/courses/${c.id}/announcements` }, { css_class: 'assignments', label: 'Assignments', path: `/courses/${c.id}/assignments` }, { css_class: 'discussions', label: 'Discussions', path: `/courses/${c.id}/discussion_topics` }, { css_class: 'files', label: 'Files', path: `/courses/${c.id}/files` }] })));
+on('PUT', /^\/api\/v1\/users\/self\/course_nicknames\/(\w+)$/, (url, m, body) => { const c = courseById(m[1]); if (!c) return null; const nick = String(url.searchParams.get('nickname') ?? body.nickname ?? '').trim(); if (nick) nicknames.set(m[1], nick); else nicknames.delete(m[1]); return { course_id: m[1], name: c.name, nickname: nick || null }; });
+on('DELETE', /^\/api\/v1\/users\/self\/course_nicknames\/(\w+)$/, (url, m) => { nicknames.delete(m[1]); return { course_id: m[1], nickname: null }; });
+on('GET', /^\/api\/v1\/dashboard\/dashboard_cards$/, () => courses.filter((c) => favorites.has(c.id)).map((c) => ({ id: c.id, shortName: nicknames.get(c.id) || c.name, originalName: c.name, courseCode: c.code, href: `/courses/${c.id}`, term: 'Fall 2026', subtitle: c.section, links: [{ css_class: 'announcements', label: 'Announcements', path: `/courses/${c.id}/announcements` }, { css_class: 'assignments', label: 'Assignments', path: `/courses/${c.id}/assignments` }, { css_class: 'discussions', label: 'Discussions', path: `/courses/${c.id}/discussion_topics` }, { css_class: 'files', label: 'Files', path: `/courses/${c.id}/files` }] })));
 on('GET', /^\/api\/v1\/users\/self\/colors$/, () => ({ custom_colors: Object.fromEntries(courses.map((c) => [`course_${c.id}`, c.color])) }));
 on('POST', /^\/api\/v1\/users\/self\/favorites\/courses\/(\w+)$/, (url, m) => { favorites.add(m[1]); return { context_id: m[1], context_type: 'Course' }; });
 const hoursAgo = (h) => new Date(Date.now() - h * 3600e3).toISOString();
@@ -534,8 +538,9 @@ const server = http.createServer((req, res) => {
     } catch {
       body = {};
     }
-    // like Canvas: every write needs the page's CSRF token, body or not (file storage is a separate service and has none)
-    if (req.method !== 'GET' && !path.startsWith('/__mock/') && !path.startsWith('/__upload/') && req.headers['x-csrf-token'] !== 'mock-csrf') return json(res, { errors: [{ message: 'invalid authenticity token' }] }, 422);
+    // like Canvas: every write needs the session's CSRF token, body or not (file storage is a separate
+    // service and has none). The token lives in the _csrf_token cookie (URL-encoded), never in a meta tag.
+    if (req.method !== 'GET' && !path.startsWith('/__mock/') && !path.startsWith('/__upload/') && path !== '/logout' && req.headers['x-csrf-token'] !== CSRF) return json(res, { errors: [{ message: 'invalid authenticity token' }] }, 422);
     for (const [method, re, handler] of routes) {
       if (method !== req.method) continue;
       const m = path.match(re);
@@ -558,8 +563,17 @@ const server = http.createServer((req, res) => {
       res.writeHead(200, { 'content-type': 'image/svg+xml' });
       return res.end('<svg xmlns="http://www.w3.org/2000/svg" width="130" height="28"><text x="0" y="20" font-size="16" font-family="serif">v(5) = dx/dt = 0</text></svg>');
     }
+    if (path === '/logout') { // Canvas's logout: a DELETE (a POST with _method=delete) carrying the session's token
+      const params = new URLSearchParams(raw);
+      if (req.method === 'POST' && params.get('_method') === 'delete' && params.get('authenticity_token') === CSRF) {
+        res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+        return res.end('<html><body><h1>Logged out</h1><p>You are logged out.</p></body></html>');
+      }
+      res.writeHead(req.method === 'GET' ? 200 : 422, { 'content-type': 'text/html; charset=utf-8' });
+      return res.end(req.method === 'GET' ? '<html><body><h1>Log out?</h1><form method="post"><button>Log out</button></form></body></html>' : '<html><body><h1>Page Error</h1><p>There was a problem with your last request.</p></body></html>');
+    }
     const handler = htmlPages[path];
-    res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+    res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'set-cookie': `_csrf_token=${encodeURIComponent(CSRF)}; Path=/` });
     res.end(handler ? handler() : page({ title: path.split('/').pop() || 'Canvas', courseId: (path.match(/^\/courses\/(\d+)/) || [])[1], body: `<h1>${path}</h1><p>Mock page rendered by Canvas.</p>` }));
   });
 });

@@ -111,10 +111,19 @@
     return JSON.parse(text.replace(/^while\(1\);/, ''));
   });
   let csrf = null;
-  const csrfToken = async () => { // Canvas wants the page's token on every write
+  const csrfToken = async () => { // Canvas wants the session's token on every write; the Canvas page remembers it here (this page cannot read the cookie)
     if (csrf) return csrf;
-    const html = await fetch(`${site.origin}/`, { credentials: 'include' }).then((r) => r.text());
-    csrf = html.match(/<meta name="csrf-token" content="([^"]+)"/)?.[1] || '';
+    try {
+      const k = `csrf:${site.host}`;
+      const all = await api.storage.local.get(k);
+      csrf = (all && all[k]) || '';
+    } catch {
+      csrf = '';
+    }
+    if (!csrf) { // a Canvas that still prints the token into its pages
+      const html = await fetch(`${site.origin}/`, { credentials: 'include' }).then((r) => r.text()).catch(() => '');
+      csrf = html.match(/<meta name="csrf-token" content="([^"]+)"/)?.[1] || '';
+    }
     return csrf;
   };
   const canvasWrite = async (method, path) => {
@@ -221,7 +230,7 @@
         const end = c.term?.end_at || c.end_at;
         if (end && new Date(end).getTime() < now) continue;
         seen.add(id);
-        list.push({ id, code: c.course_code || c.name, name: c.name, color: colors[`course_${id}`] || fallback[list.length % fallback.length], favorite: !!c.is_favorite || favIds.has(id) });
+        list.push({ id, code: c.course_code || c.name, name: c.name, originalName: c.original_name || c.name, nickname: c.original_name ? c.name : '', color: colors[`course_${id}`] || fallback[list.length % fallback.length], favorite: !!c.is_favorite || favIds.has(id) });
       }
       courses.list = list;
       const starred = list.filter((c) => c.favorite).map((c) => c.id);
@@ -258,10 +267,25 @@
       });
       const sw = h('button', { type: 'button', class: `switch switch--sm ${on ? 'is-on' : ''}`, role: 'switch', 'aria-checked': on ? 'true' : 'false', 'aria-label': `Show ${c.name} everywhere` }, h('span', { class: 'switch__knob' }));
       onSwitch(sw, (v) => setShown(c, v));
+      // a nickname is Canvas's own (it shows everywhere, in Canvas too); an empty field removes it
+      const nick = h('input', { class: 'course__nick', type: 'text', placeholder: 'Nickname', value: c.nickname || '', maxlength: '60', 'aria-label': `Nickname for ${c.originalName}` });
+      nick.addEventListener('change', async () => {
+        const v = nick.value.trim();
+        if (v === (c.nickname || '')) return;
+        try {
+          await canvasWrite(v ? 'PUT' : 'DELETE', `/api/v1/users/self/course_nicknames/${c.id}${v ? `?nickname=${encodeURIComponent(v)}` : ''}`);
+          c.nickname = v;
+          c.name = v || c.originalName;
+          flash();
+        } catch (e) {
+          nick.value = c.nickname || '';
+          flash(`Not saved: ${e?.message || e}`, true);
+        }
+      });
       const row = h('div', { class: `course ${on ? '' : 'is-off'}`, dataset: { course: c.id }, style: { animationDelay: `${Math.min(i * 45, 300)}ms` } }, [
         h('span', { class: 'course__dot', style: { background: c.color } }),
-        h('span', { class: 'course__body' }, [h('span', { class: 'course__code', text: c.code }), h('span', { class: 'course__name', text: c.name })]),
-        seg, sw,
+        h('span', { class: 'course__body' }, [h('span', { class: 'course__code', text: c.code }), h('span', { class: 'course__name', text: c.originalName })]),
+        nick, seg, sw,
       ]);
       return row;
     }) : [h('div', { class: 'empty', text: 'No active courses. Between terms? Canvas lists nothing active right now.' })]));

@@ -150,6 +150,8 @@
     const W = actions.length * 76;
     const tray = U.el('bcv-ph-swipe__acts', actions.map((a) => h('button', { type: 'button', class: 'bcv-ph-swipe__act', style: { background: a.color }, 'aria-label': a.label, onclick: (e) => { e.stopPropagation(); closeSwipes(); a.onSelect(); } }, [a.icon ? U.svg(a.icon, { size: 15, stroke: '#fff', width: a.width || 2.2 }) : null, h('span', { text: a.label })])));
     front.classList.add('bcv-ph-swipe__front');
+    front.setAttribute('draggable', 'false'); // a link row must not start a native drag (which cancels the pointer)
+    front.addEventListener('dragstart', (e) => e.preventDefault());
     const wrap = U.el('bcv-ph-swipe', [tray, front]);
     let x0 = 0, y0 = 0, dx = 0, base = 0, dragging = false, moved = false;
     const set = (x, animate) => { front.style.transition = animate ? 'transform .22s cubic-bezier(.32,.72,0,1)' : 'none'; front.style.transform = `translateX(${x}px)`; };
@@ -180,7 +182,7 @@
     };
     front.addEventListener('pointerup', end);
     front.addEventListener('pointercancel', end);
-    front.addEventListener('click', (e) => { if (moved) { e.stopPropagation(); e.preventDefault(); moved = false; } }, true); // a drag is not a tap
+    front.addEventListener('click', (e) => { if (moved) { e.stopImmediatePropagation(); e.preventDefault(); moved = false; } }, true); // a drag is not a tap (the row's own handler must not run)
     return wrap;
   }
 
@@ -538,13 +540,41 @@
         progress.textContent = `${name} · ${done} of ${total} submitted`;
       }).catch(() => {});
       const n = unreadFor(c);
-      return enter(h('a', { class: 'bcv-ph-crow', href: c.url, onclick: (e) => { e.preventDefault(); app.go(c.url); } }, [
+      const front = h('a', { class: 'bcv-ph-crow', href: c.url, onclick: (e) => { e.preventDefault(); app.go(c.url); } }, [
         h('span', { class: 'bcv-ph-crow__tile', style: { background: c.palette.tint } }, h('span', { class: 'bcv-ph-crow__dot', style: { background: c.color } })),
         U.el('bcv-ph-crow__body', [U.text('bcv-ph-crow__code bcv-ellip', c.shortName || c.name), progress]),
         n ? h('span', { class: 'bcv-ph-badge', text: String(n), title: U.plural(n, 'unread announcement') }) : null,
         U.text('bcv-ph-crow__pct', c.score !== null && c.score !== undefined ? `${store.fmtPts(c.score)}%` : 'N/A', 'span'),
         chev(),
-      ]), i);
+      ]);
+      // swipe left: a nickname (Canvas's own, so it shows in Canvas too)
+      const wrap = swipeable(front, [{ label: 'Nickname', color: '#5856d6', icon: IC.pencil, onSelect: () => nicknameSheet(c) }]);
+      wrap.classList.add('bcv-ph-swipe--card');
+      return enter(wrap, i);
+    }
+    function nicknameSheet(c) {
+      const real = c.originalName || c.name;
+      const input = h('input', { class: 'bcv-input bcv-ph-nick__input', type: 'text', value: c.nickname || '', placeholder: real, maxlength: '60', 'aria-label': 'Nickname', autocapitalize: 'words' });
+      const save = async (v) => {
+        try {
+          await store.setNickname(c.id, v);
+          app.loadShellData({ force: true });
+          app.render();
+          U.toast(v ? 'Nickname saved.' : 'Nickname removed.');
+        } catch (e) {
+          U.toast(`Could not save it: ${e.message}`, { error: true });
+        }
+      };
+      const sh = openSheet({
+        title: 'Nickname', label: 'Course nickname', note: `Shown instead of “${real}” everywhere, in Canvas too.`,
+        body: U.el('bcv-ph-nick', input),
+        actions: [
+          { label: 'Save', primary: true, onSelect: () => save(input.value.trim()) },
+          c.nickname ? { label: 'Remove nickname', cls: 'is-danger', onSelect: () => save('') } : null,
+        ],
+      });
+      input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { sh.close(); save(input.value.trim()); } });
+      setTimeout(() => input.focus(), 60);
     }
     body.replaceChildren(
       U.el('bcv-ph-clist', list.length ? list.map(row) : [emptyRow('No courses selected. Choose them in the guided setup or Settings.')]),

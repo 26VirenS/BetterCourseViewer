@@ -100,9 +100,25 @@
   const inQuiz = () => !!state.quizOpen || /\/quizzes\/\d+\/take\b/.test(location.pathname) || !!document.querySelector('#submit_quiz_form, #quiz_taking_form, form.take_quiz_form');
   const confirmLeave = () => window.confirm('You are in the middle of a quiz. Leave it anyway?\n\nCanvas keeps your answers so far, but a timer keeps running and some quizzes allow only one attempt.');
 
+  /** Inside a course, a hop between tabs the app draws itself stays on the page: the header and
+   *  rail keep still and only the main column changes hands. Anything else (another course, a
+   *  Canvas-drawn tab, ?bcv=…, the phone) is a real page load. */
+  const DRAWN_TABS = new Set(['home', 'stream', 'announcements', 'assignments', 'discussions', 'grades', 'people', 'pages', 'files', 'folder', 'quizzes', 'modules', 'announcement', 'discussion', 'assignment', 'syllabus', 'page', 'quiz']);
+  function inPlaceCourseHop(url) {
+    if (BCV.phone?.active()) return false;
+    const cur = state.route || parseRoute();
+    const next = parseRoute(url.href);
+    if (cur.screen !== 'course' || next.screen !== 'course' || cur.courseId !== next.courseId) return false;
+    if (next.params.get('bcv') || cur.params.get('bcv')) return false; // native, submit, take, setup: real loads
+    if (!DRAWN_TABS.has(next.tab) || !DRAWN_TABS.has(cur.tab)) return false;
+    if (html.classList.contains('bcv-punch')) return false; // Canvas's own page is showing underneath
+    return !!document.querySelector('#bcv-main > .bcv-screen--ctx[data-bcv-course]');
+  }
+
   /** Navigate. Every screen sits on the real Canvas page for its URL, so
-   *  navigation is a real page load (only a hash change stays in place):
-   *  turning the skin off then always reveals exactly the page you are on.
+   *  navigation is a real page load (a hash change, and a hop between a
+   *  course's own tabs, stay in place): turning the skin off then reveals
+   *  the page you are on (a reload, when the address moved in place).
    *  `confirmed`: the quiz screen already asked (or is leaving on purpose). */
   function go(href, { replace = false, confirmed = false } = {}) {
     let url;
@@ -132,12 +148,18 @@
       location.reload();
       return;
     }
+    if (!replace && inPlaceCourseHop(url)) {
+      history.pushState({ bcv: true }, '', url.pathname + url.search + url.hash);
+      window.scrollTo(0, 0);
+      render();
+      return;
+    }
     if (replace) location.replace(url.href);
     else location.assign(url.href);
   }
 
   window.addEventListener('popstate', () => {
-    if (state.nativePath !== location.pathname + location.search) {
+    if (state.nativePath !== location.pathname + location.search && !inPlaceCourseHop(new URL(location.href))) {
       location.reload();
       return;
     }
@@ -305,10 +327,12 @@
   }
 
   /** Log out of Canvas: the app's own sign-out in the iOS app, else Canvas's logout form (a DELETE
-   *  with the page's token, exactly what its own menu submits). */
+   *  with the session's token, exactly what its own menu submits). Canvas keeps that token in the
+   *  _csrf_token cookie, not in a meta tag; an empty token lands on its "Page Error". */
   function logout() {
     if (self.BCVBridge?.native?.signOut) { self.BCVBridge.native.signOut(); return; }
-    const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+    const token = BCV.canvas.csrfToken();
+    if (!token) { go('/logout'); return; } // no token to be had: Canvas's own logout page asks for confirmation
     const form = h('form', { method: 'post', action: '/logout', style: { display: 'none' } }, [
       h('input', { type: 'hidden', name: '_method', value: 'delete' }),
       h('input', { type: 'hidden', name: 'authenticity_token', value: token }),
@@ -388,8 +412,10 @@
     // Screens build off-DOM and land whole. A screen still fetching after 150ms gets a
     // skeleton in its place, shaped like its content (course cards on Grades, list rows
     // elsewhere); a cached screen lands before that and never flashes it.
+    // a course keeps its header and rail between its own tabs: the skeleton must not wipe them
+    const keepsShell = () => r.screen === 'course' && main.firstElementChild?.dataset?.bcvCourse === String(r.courseId);
     const skeleton = setTimeout(() => {
-      if (alive() && !quiet) main.replaceChildren(U.el('bcv-screen bcv-screen--skel', U.el('bcv-body', U.loading(r.screen === 'gpa' ? 'cards' : 'rows', 6))));
+      if (alive() && !quiet && !keepsShell()) main.replaceChildren(U.el('bcv-screen bcv-screen--skel', U.el('bcv-body', U.loading(r.screen === 'gpa' ? 'cards' : 'rows', 6))));
     }, 150);
     const nativeWanted = r.params.get('bcv') === 'native' || (!screens[r.screen] && !(phone() && BCV.phone.screens[r.screen])) || r.screen === 'native';
     const draw = async () => {
@@ -416,6 +442,8 @@
       if (only) gaveWay = only.textContent.trim();
     }
     if (gaveWay && alive()) {
+      // Canvas's own page for this address is not the one underneath (the address moved in place): fetch it
+      if (state.nativePath !== location.pathname + location.search) { location.reload(); return; }
       try {
         el = await screens.native.render(ctx);
       } catch (e2) {
@@ -425,7 +453,7 @@
     }
     clearTimeout(skeleton);
     if (!alive()) return;
-    main.replaceChildren(el);
+    if (el.parentNode !== main) main.replaceChildren(el); // a screen that kept its shell (a course's rail) stays put
     progress(false);
     html.classList.add('bcv-settled'); // drawn, from Canvas's answer (the harness waits for this)
     document.title = titleFor(r);
@@ -576,7 +604,9 @@
     }
     await applySkin(state.settings.appearance.skin !== false);
     BCV.extras?.prime?.(BCV.app);
-    BCV.api.storage.local.set({ 'site:last': { host: location.host, origin: location.origin, at: Date.now() } }).catch(() => {}); // Settings reads this site
+    // Settings reads this site, and writes to Canvas with the session's token the page can see (Settings cannot read the cookie itself)
+    const token = BCV.canvas.csrfToken();
+    BCV.api.storage.local.set({ 'site:last': { host: location.host, origin: location.origin, at: Date.now() }, ...(token ? { [`csrf:${location.host}`]: token } : {}) }).catch(() => {});
     BCV.early?.onChange((st, settings) => {
       const wasDark = state.dark;
       const wasSkin = state.settings.appearance.skin !== false;
