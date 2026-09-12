@@ -18,6 +18,22 @@ html,body{min-height:100%}
 body{margin:0;background:#f2f2f6;-webkit-font-smoothing:antialiased;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",Helvetica,Arial,sans-serif;color:#1c1c1e}
 a{color:#0a5dc2;text-decoration:none}a:hover{opacity:.72}
 @keyframes omFadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+/* the mark draws itself in, the way it does on the extension's setup screen: the tile springs
+   up, the three arcs are stroked on one after the other, and the sheet behind them fades in */
+@keyframes omFade{from{opacity:0}to{opacity:1}}
+@keyframes omPop{0%{opacity:0;transform:scale(.6)}70%{transform:scale(1.08)}100%{opacity:1;transform:none}}
+@keyframes omDraw{to{stroke-dashoffset:0}}
+.om-mark{animation:omPop .6s cubic-bezier(.34,1.3,.42,1) both}
+.om-mark .om-sheet{animation:omFade .5s ease .45s both}
+.om-mark .om-arc{stroke-dashoffset:var(--len);animation:omDraw 1s cubic-bezier(.32,.72,0,1) both}
+.om-mark .om-arc--2{animation-duration:.9s;animation-delay:.14s}
+.om-mark .om-arc--3{animation-duration:.8s;animation-delay:.26s}
+/* nothing moves for anyone who has asked for that; the arcs have to be put back by hand,
+   because without their animation they would sit at their starting offset and stay invisible */
+@media (prefers-reduced-motion:reduce){
+  *{animation:none !important}
+  .om-mark .om-arc{stroke-dashoffset:0}
+}
 @keyframes omDriftA{0%{transform:translate(0,0) scale(1)}50%{transform:translate(70px,-40px) scale(1.12)}100%{transform:translate(0,0) scale(1)}}
 @keyframes omDriftB{0%{transform:translate(0,0) scale(1.06)}50%{transform:translate(-60px,50px) scale(.94)}100%{transform:translate(0,0) scale(1.06)}}
 @media (max-width:700px){
@@ -51,13 +67,13 @@ a{color:#0a5dc2;text-decoration:none}a:hover{opacity:.72}
   </header>
 
   <section style="position:relative;max-width:1080px;margin:0 auto;box-sizing:border-box;padding:40px 28px 44px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:20px;animation:omFadeUp .4s cubic-bezier(.32,.72,0,1) both">
-    <span style="width:100px;height:100px;border-radius:25px;background:linear-gradient(158deg,#0a84ff,#0a4fd6);box-shadow:0 14px 34px rgba(10,79,214,.3);display:flex;align-items:center;justify-content:center">
+    <span class="om-mark" style="width:100px;height:100px;border-radius:25px;background:linear-gradient(158deg,#0a84ff,#0a4fd6);box-shadow:0 14px 34px rgba(10,79,214,.3);display:flex;align-items:center;justify-content:center">
       <svg viewBox="0 0 120 120" width="80" height="80" style="display:block">
         <defs><linearGradient id="heroMk" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#fff" stop-opacity=".9"></stop><stop offset="1" stop-color="#fff" stop-opacity="0"></stop></linearGradient></defs>
-        <rect x="16" y="18" width="53" height="84" rx="14" fill="url(#heroMk)"></rect>
-        <path d="M28 30 H69 A30 30 0 0 1 69 90 H28" fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"></path>
-        <path d="M35 42 H69 A18 18 0 0 1 69 78 H35" fill="none" stroke="rgba(255,255,255,.72)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"></path>
-        <path d="M42 54 H69 A6 6 0 0 1 69 66 H42" fill="none" stroke="rgba(255,255,255,.46)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"></path>
+        <rect class="om-sheet" x="16" y="18" width="53" height="84" rx="14" fill="url(#heroMk)"></rect>
+        <path class="om-arc om-arc--1" style="--len:178" d="M28 30 H69 A30 30 0 0 1 69 90 H28" fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="178"></path>
+        <path class="om-arc om-arc--2" style="--len:126" d="M35 42 H69 A18 18 0 0 1 69 78 H35" fill="none" stroke="rgba(255,255,255,.72)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="126"></path>
+        <path class="om-arc om-arc--3" style="--len:74" d="M42 54 H69 A6 6 0 0 1 69 66 H42" fill="none" stroke="rgba(255,255,255,.46)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="74"></path>
       </svg>
     </span>
 
