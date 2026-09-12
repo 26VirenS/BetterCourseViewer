@@ -307,14 +307,17 @@ html[data-bcv-theme="dark"] .bcv-badge--orange { color: #ffb44d; }
 @keyframes bcv-pulse { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
 
 /* ---- dashboard ---------------------------------------------------------- */
-.bcv-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; }
-.bcv-stat { padding: 16px 18px; border: 0; display: block; width: 100%; text-align: left; color: var(--bcv-ink); cursor: pointer; font: inherit; }
+/* six summary cards in a fixed 2×3 grid (never auto-fit: it orphans the last card at narrow widths) */
+.bcv-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.bcv-stat { padding: 14px 15px; border: 0; display: block; width: 100%; min-width: 0; text-align: left; color: var(--bcv-ink); cursor: pointer; font: inherit; }
 .bcv-stat:hover { background: var(--bcv-hover); }
-.bcv-stat__head { display: flex; align-items: center; gap: 8px; min-height: 40px; }
-.bcv-stat__value { margin-left: auto; flex: none; font: 700 40px/1 var(--bcv-display); letter-spacing: -.03em; }
+.bcv-stat__head { display: flex; align-items: center; gap: 8px; min-height: 42px; }
+.bcv-stat__head > svg { flex: none; }
+.bcv-stat__head .bcv-label { flex: 1; min-width: 0; font-size: 10px; line-height: 1.25; letter-spacing: .015em; overflow-wrap: break-word; }
+.bcv-stat__value { flex: none; min-width: 30px; text-align: right; font: 700 42px/1 var(--bcv-display); font-variant-numeric: tabular-nums; letter-spacing: -.035em; }
 .bcv-stat__noterow { margin-top: 10px; display: flex; align-items: center; gap: 6px; }
-.bcv-stat__note { font: 400 12.5px/1.3 var(--bcv-font); color: var(--bcv-ink3); }
-.bcv-stat__chev { margin-left: auto; flex: none; opacity: .7; }
+.bcv-stat__note { flex: 1; min-width: 0; font: 400 12.5px/1.3 var(--bcv-font); color: var(--bcv-ink3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bcv-stat__chev { flex: none; opacity: .7; }
 /* the sheet behind a counter */
 .bcv-sheet-ov { position: fixed; inset: 0; z-index: 40; background: var(--bcv-scrim); -webkit-backdrop-filter: var(--bcv-blur-scrim); backdrop-filter: var(--bcv-blur-scrim); display: flex; align-items: center; justify-content: center; padding: 28px; box-sizing: border-box; outline: none; font-family: var(--bcv-font); -webkit-font-smoothing: antialiased; }
 .bcv-sheet-ov * { box-sizing: border-box; }

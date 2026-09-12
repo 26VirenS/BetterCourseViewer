@@ -82,7 +82,7 @@ try {
   await page.goto(`${BASE}/`);
   await page.waitForSelector('.bcv-stat', { timeout: 15000 });
   check(await page.$eval('html', (h) => h.classList.contains('bcv-on')) && (await page.$('#bcv-app')) !== null, 'the interface mounts from injected scripts (no extension runtime)');
-  check((await texts('.bcv-stat')).length === 3 && (await texts('.bcv-nav__item')).some((t) => /Dashboard/.test(t)), 'dashboard data loads through the page\'s own Canvas session');
+  check((await texts('.bcv-stat')).length === 6 && (await texts('.bcv-nav__item')).some((t) => /Dashboard/.test(t)), 'dashboard data loads through the page\'s own Canvas session');
   const api = await page.evaluate(async () => {
     const m = browser.runtime.getManifest();
     const status = await browser.runtime.sendMessage({ type: 'providerStatus' });

@@ -162,9 +162,35 @@ try {
   check((await texts('.bcv-account__name'))[0] === 'Sam Student', 'account card shows the user');
   await page.waitForSelector('.bcv-stat', { timeout: 10000 });
   await waitText('.bcv-stat__value', /^\d+$/);
+  await page.waitForFunction(() => [...document.querySelectorAll('.bcv-stat__value')].length === 6 && [...document.querySelectorAll('.bcv-stat__value')].every((e) => /^\d+$/.test(e.textContent) && !e.dataset.rolling), null, { timeout: 15000 });
   const stats = await texts('.bcv-stat');
-  check(stats.length === 3 && /Due today\s*4\s*35 points total/i.test(stats[0]) && /Due this week/i.test(stats[1]) && /Unread announcements/i.test(stats[2]), `stat cards: ${stats.join(' | ')}`);
+  check(stats.length === 6 && /Due today\s*4\s*35 points total/i.test(stats[0]) && /Due this week/i.test(stats[1]) && /Unread announcements/i.test(stats[2]) && /^Overdue/i.test(stats[3]) && /^Graded this week/i.test(stats[4]) && /^Classes today/i.test(stats[5]), `six stat cards (mockup 13): ${stats.join(' | ')}`);
+  check((await page.$eval('.bcv-stats', (e) => getComputedStyle(e).gridTemplateColumns.split(' ').length)) === 3 && (await page.$$eval('.bcv-stat', (els) => els.map((e) => Math.round(e.getBoundingClientRect().top)))).filter((t, i, a) => a.indexOf(t) === i).length === 2, 'a fixed 2×3 grid: three columns, two rows');
   await waitText('.bcv-stats > :nth-child(3) .bcv-stat__value', /^3$/);
+  // Overdue: past due with nothing in (Canvas's missing flag) plus late work still without a score; the number matches its sheet
+  check(/^Overdue\s*1\s*1 not submitted$/i.test(stats[3]), `Overdue counts work past its due date with nothing in (late work already scored is not overdue): ${stats[3]}`);
+  await page.click('.bcv-stats .bcv-stat:nth-child(4)');
+  await page.waitForSelector('.bcv-sheet', { timeout: 5000 });
+  const overdueRows = await texts('.bcv-sheet__row');
+  check((await texts('.bcv-sheet__line'))[0] === '1 Overdue' && /counts as 0 until graded$/.test((await texts('.bcv-sheet__note'))[0]) && overdueRows.length === 1 && /^W2 HW Assignment · 15 pts · due \w+ \d+ · not submitted F26-PHYS 008 01$/.test(overdueRows[0]), `the Overdue sheet lists exactly what it counted: ${overdueRows.join(' | ')}`);
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !document.querySelector('.bcv-sheet'), null, { timeout: 3000 });
+  // Graded this week: graded_at inside the week, points earned over points possible
+  check(/^Graded this week\s*\d+\s*(\d+(\.\d+)? \/ \d+(\.\d+)? points|No grades posted this week)$/i.test(stats[4]), `Graded this week with its points ratio: ${stats[4]}`);
+  await page.click('.bcv-stats .bcv-stat:nth-child(5)');
+  await page.waitForSelector('.bcv-sheet', { timeout: 5000 });
+  const gradedRows = await texts('.bcv-sheet__row');
+  check(/^\d+ Graded this week$/.test((await texts('.bcv-sheet__line'))[0]) && /week of \w+ \d+$/i.test((await texts('.bcv-sheet__note'))[0]) && gradedRows.length === Number((await texts('.bcv-sheet__value'))[0]) && gradedRows.every((t) => /(\d+(\.\d+)? \/ \d+(\.\d+)?|excused) · posted \w+ \d+/.test(t)), `the Graded sheet: score / possible and the posting day per row: ${gradedRows.slice(0, 2).join(' | ')}`);
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !document.querySelector('.bcv-sheet'), null, { timeout: 3000 });
+  // Classes today: calendar events (never assignments) on the selected courses' calendars
+  check(/^Classes today\s*1\s*(Next at 3:00 PM|Last ended 4:15 PM)$/i.test(stats[5]), `Classes today from the course calendars, with the next start or the last end: ${stats[5]}`);
+  await page.click('.bcv-stats .bcv-stat:nth-child(6)');
+  await page.waitForSelector('.bcv-sheet', { timeout: 5000 });
+  const classRows = await texts('.bcv-sheet__row');
+  check((await texts('.bcv-sheet__line'))[0] === '1 Classes today' && (await texts('.bcv-sheet__note'))[0] === 'First at 3:00 PM · last ends 4:15 PM' && classRows.length === 1 && /^SPRK 010 seminar Today · 3:00 PM – 4:15 PM F26-SPRK 010 103$/.test(classRows[0]), `the Classes sheet: the event with its hours and course: ${classRows.join(' | ')}`);
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !document.querySelector('.bcv-sheet'), null, { timeout: 3000 });
   // each counter opens a sheet with the items it counted
   await page.click('.bcv-stats .bcv-stat:first-child');
   await page.waitForSelector('.bcv-sheet', { timeout: 5000 });

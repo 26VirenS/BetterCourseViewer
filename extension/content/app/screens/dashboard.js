@@ -46,8 +46,17 @@
     const todayStart = U.startOfDay(now);
     const weekStart = U.startOfWeek(now);
     const weekEnd = U.addDays(weekStart, 7);
-    const live = (planner || []).filter((it) => !it.complete && !it.dismissed && it.type !== 'announcement');
+    // every count respects the course selection (the favourites), so the cards agree with the page below them
+    const favIds = new Set(favs.map((c) => String(c.id)));
+    const inSel = (it) => it.custom || !it.courseId || favIds.has(String(it.courseId));
+    const live = (planner || []).filter((it) => !it.complete && !it.dismissed && it.type !== 'announcement' && inSel(it));
     const dueItems = live.filter((it) => it.isDue);
+    // Overdue and Graded this week read each selected course's assignments (their submissions carry
+    // Canvas's own late / missing / graded_at flags); Classes today reads today's calendar events.
+    // A card whose fetch fails is dropped rather than shown as 0 (a false 0 on Overdue reads as "fine").
+    const assignmentsP = Promise.all(favs.map(async (c) => ({ c, list: await store.assignments(c.id) }))).catch(() => null);
+    const eventsP = (favs.length ? store.calendarEvents(todayStart, todayStart, favs.map((c) => `course_${c.id}`)) : Promise.resolve([]))
+      .then((res) => (res && res.error ? null : Array.isArray(res) ? res : res?.events || [])).catch(() => null);
     const dueToday = dueItems.filter((it) => U.sameDay(it.date, now) && !it.submitted);
     const dueWeek = dueItems.filter((it) => it.date >= weekStart && it.date < weekEnd && !it.submitted);
     const weekAll = (planner || []).filter((it) => it.isDue && it.date >= weekStart && it.date < weekEnd && (it.points === null || it.points > 0) && it.type !== 'announcement');
@@ -148,6 +157,98 @@
           finish(unread, count, count > unread.length ? `${U.plural(count - unread.length, 'more is', 'more are')} not in the recent activity stream` : '');
         });
       }
+
+      // ---- the second row: Overdue, Graded this week, Classes today (mockup 13) ----
+      const land = (card, count, note, seed) => {
+        const valueEl = card.querySelector('.bcv-stat__value');
+        if (first && Date.now() - t0 < 2500) U.roll(valueEl, count, { seed });
+        else valueEl.textContent = String(count);
+        card.querySelector('.bcv-stat__note').textContent = note;
+      };
+      const kindOf = (a) => (a.is_quiz_assignment || a.quiz_id || (a.submission_types || []).includes('online_quiz') ? 'Quiz' : (a.submission_types || []).includes('discussion_topic') ? 'Discussion' : 'Assignment');
+      const palOf = (c) => (c ? c.palette : U.palette('#8e8e93', dark));
+      let overdueSheet = { label: 'Overdue', value: '…', icon: IC.clock, color: '#ff453a', note: 'Loading…', items: [] };
+      let gradedSheet = { label: 'Graded this week', value: '…', icon: IC.chart, color: '#5856d6', note: 'Loading…', items: [] };
+      let classSheet = { label: 'Classes today', value: '…', icon: IC.book, color: '#30b0c7', note: 'Loading…', items: [] };
+      const overdueCard = stat('Overdue', '…', '', IC.clock, '#ff453a', (from) => openSheet(overdueSheet, from));
+      const gradedCard = stat('Graded this week', '…', '', IC.chart, '#5856d6', (from) => openSheet(gradedSheet, from));
+      const classCard = stat('Classes today', '…', '', IC.book, '#30b0c7', (from) => openSheet(classSheet, from));
+      cards.push(overdueCard, gradedCard, classCard);
+      assignmentsP.then((byCourse) => {
+        if (!ctx.alive()) return;
+        if (!byCourse || !planner) { overdueCard.remove(); gradedCard.remove(); return; }
+        // Overdue: past due with nothing submitted (Canvas's missing flag, or the due time passed), plus
+        // work handed in late that still has no score. It counts as 0 until it is graded.
+        const seen = new Set();
+        const overdue = [];
+        let missingN = 0, lateN = 0;
+        for (const it of live) {
+          if (!it.isDue || it.submitted || it.excused || !(it.missing || it.date < now)) continue;
+          seen.add(`${it.type}:${it.raw.plannable_id}`);
+          missingN++;
+          overdue.push({ title: it.title, meta: [it.kind, it.points !== null ? `${store.fmtPts(it.points)} pts` : null, `due ${U.fmtShort(it.date)}`, 'not submitted'].filter(Boolean).join(' · '), course: it.course?.shortName || it.courseName || '—', color: palOf(it.course).text, tint: palOf(it.course).tint, url: it.url, date: it.date });
+        }
+        for (const { c, list } of byCourse) {
+          for (const a of list || []) {
+            const s = a.submission;
+            if (!s || !s.late || s.excused || (s.score !== null && s.score !== undefined)) continue;
+            if (seen.has(`assignment:${a.id}`) || (a.quiz_id && seen.has(`quiz:${a.quiz_id}`))) continue;
+            seen.add(`assignment:${a.id}`);
+            lateN++;
+            overdue.push({ title: a.name, meta: [kindOf(a), a.points_possible !== null && a.points_possible !== undefined ? `${store.fmtPts(a.points_possible)} pts` : null, a.due_at ? `due ${U.fmtShort(a.due_at)}` : null, 'submitted late · ungraded'].filter(Boolean).join(' · '), course: c.shortName || c.name, color: c.palette.text, tint: c.palette.tint, url: a.html_url || `${c.url}/assignments/${a.id}`, date: U.parse(a.due_at) || now });
+          }
+        }
+        overdue.sort(byDate);
+        const parts = [missingN ? U.plural(missingN, 'not submitted', 'not submitted') : null, lateN ? `${lateN} late, still open` : null].filter(Boolean);
+        land(overdueCard, overdue.length, overdue.length ? parts.join(' · ') : 'Nothing overdue', 6.9);
+        overdueSheet = {
+          label: 'Overdue', value: String(overdue.length), icon: IC.clock, color: '#ff453a', items: overdue, empty: 'Nothing is overdue.',
+          note: overdue.length ? `${lateN ? 'Still accepting late work · ' : ''}counts as 0 until graded` : 'Nothing past its due date without a submission',
+        };
+        // Graded this week: submissions graded inside this week (graded_at, never due_at); excused
+        // ones count but carry no score, so they stay out of the points ratio
+        const graded = [];
+        let earned = 0, possible = 0;
+        for (const { c, list } of byCourse) {
+          for (const a of list || []) {
+            const s = a.submission;
+            const g = s && U.parse(s.graded_at);
+            if (!g || g < weekStart || g >= weekEnd) continue;
+            const scored = !s.excused && s.score !== null && s.score !== undefined;
+            if (!scored && !s.excused) continue;
+            if (scored) { earned += Number(s.score) || 0; possible += Number(a.points_possible) || 0; }
+            graded.push({ title: a.name, meta: `${kindOf(a)} · ${s.excused ? 'excused' : `${store.fmtPts(s.score)} / ${store.fmtPts(a.points_possible ?? 0)}`} · posted ${U.fmtShort(g)}`, course: c.shortName || c.name, color: c.palette.text, tint: c.palette.tint, url: a.html_url || `${c.url}/assignments/${a.id}`, date: g });
+          }
+        }
+        graded.sort((x, y) => y.date - x.date);
+        land(gradedCard, graded.length, graded.length ? `${store.fmtPts(earned)} / ${store.fmtPts(possible)} points` : 'No grades posted this week', 9.2);
+        gradedSheet = {
+          label: 'Graded this week', value: String(graded.length), icon: IC.chart, color: '#5856d6', items: graded, empty: 'Nothing has been graded this week.',
+          note: graded.length ? `${store.fmtPts(earned)} of ${store.fmtPts(possible)} points earned · week of ${U.fmtShort(weekStart)}` : `Week of ${U.fmtShort(weekStart)}`,
+        };
+      });
+      eventsP.then((events) => {
+        if (!ctx.alive()) return;
+        if (!events) { classCard.remove(); return; }
+        // calendar events only (never assignments: the calendar shows those separately), on the selected courses, today
+        const classes = events
+          .filter((e) => e.type === 'event' && !e.assignment && U.parse(e.start_at) && U.sameDay(U.parse(e.start_at), now))
+          .map((e) => {
+            const c = courseMap.get(String(e.context_code || '').replace(/^course_/, ''));
+            const start = U.parse(e.start_at);
+            const end = U.parse(e.end_at) || start;
+            return { title: e.title || 'Event', meta: e.all_day ? 'Today · all day' : `Today · ${U.fmtTime(start)} – ${U.fmtTime(end)}`, course: c?.shortName || e.context_name || '—', color: palOf(c).text, tint: palOf(c).tint, url: e.html_url || '/calendar', start, end, allDay: !!e.all_day };
+          })
+          .sort((x, y) => x.start - y.start);
+        const timed = classes.filter((e) => !e.allDay);
+        const next = timed.find((e) => e.start >= now);
+        const last = timed[timed.length - 1];
+        land(classCard, classes.length, !classes.length ? 'No classes today' : next ? `Next at ${U.fmtTime(next.start)}` : last ? `Last ended ${U.fmtTime(last.end)}` : 'All day', 11.5);
+        classSheet = {
+          label: 'Classes today', value: String(classes.length), icon: IC.book, color: '#30b0c7', items: classes, empty: 'Nothing on the course calendars today.',
+          note: timed.length ? `First at ${U.fmtTime(timed[0].start)} · last ends ${U.fmtTime(last.end)}` : `${U.DAYS_LONG[now.getDay()]}, ${U.MONTHS_LONG[now.getMonth()]} ${now.getDate()}`,
+        };
+      });
       return U.el('bcv-stats', cards);
     }
     let statIndex = 0;
