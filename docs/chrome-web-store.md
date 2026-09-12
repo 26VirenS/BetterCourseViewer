@@ -15,7 +15,7 @@ Everything the listing needs is in this repository. The first submission is done
 
 ## 2. Store listing tab
 
-Copy these in. The summary comes from the manifest and cannot be edited here.
+Copy these in. The summary is read from the manifest's `description` and cannot be edited in the dashboard — change it in `extension/manifest.json`, then upload a new package (132 characters is the store's limit, and `scripts/package.sh` refuses a longer one).
 
 **Title:** Simpl Courses
 
