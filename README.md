@@ -108,6 +108,16 @@ The extension is on automatically for every `*.instructure.com` site. If your sc
 1. Open that site in Safari.
 2. Click the Simpl Courses toolbar icon → **Enable on catcourses.ucmerced.edu**, or add it under **Settings → Canvas sites**.
 
+## Uninstall
+
+Settings → **Data & about** ends with the steps for the device you are on. In short:
+
+- **Mac (Safari).** Deleting the app on its own leaves the extension's storage behind inside Safari, so the app carries an uninstaller. Press **Reset everything** in Settings → Data & about (keys, history, sites and the note kept on open Canvas tabs go), quit Safari, then open the Simpl Courses app and choose **Simpl Courses → Uninstall Simpl Courses…**. The Terminal opens and shows each item as it removes it: the storage and caches Safari keeps for the extension, the app's own containers, preferences, caches and saved state, and the app itself (moved to the Trash). If the app is already gone, download `uninstall-simpl-courses-mac.command` from the [release page](https://github.com/26VirenS/BetterCourseViewer/releases/latest) and open it (right-click → Open the first time); it finds what Safari kept on its own. `--dry-run` lists without removing, `--keep-app` removes the data only. The source is `scripts/uninstall-mac.command`.
+- **Chrome / Edge / Firefox.** Reset everything, then remove the extension from `chrome://extensions` (`edge://extensions`, `about:addons`); the browser deletes an extension's storage with it.
+- **iPhone.** Delete the app from the Home Screen (touch and hold → Remove App → Delete App); iOS deletes the app's data with it. Sign out first in Settings if you want the saved Canvas session cleared as well.
+
+Your Canvas account, favourites and course nicknames live on Canvas and are never touched.
+
 ## Turning the look off
 
 - The toolbar popup and Settings → General have the **Simpl Courses look** switch (turning it off or on reloads the page, so stock Canvas comes back whole); Settings → Appearance has Light / Dark / System as three preview tiles. Nothing sits on the page itself. Both show the installed version number (the popup's footer, the Settings sidebar). Until the guided setup has run (or been skipped on purpose) the popup shows nothing but a **Set up** button.
@@ -166,7 +176,8 @@ extension/
   popup/, options/             toolbar popup and the settings page
 scripts/
   build-mac-app.sh             generates the Xcode project / builds the .app
-  package.sh                   zips the extension (generic + Chrome Web Store build)
+  package.sh                   zips the extension (generic + Chrome Web Store build) and copies the Mac uninstaller into dist/
+  uninstall-mac.command        the Mac uninstaller (bundled into the app; Simpl Courses → Uninstall Simpl Courses… runs it)
   make-icons.mjs               regenerates the PNG icons
   dev/mock-canvas.mjs          a fake Canvas (pages + the API endpoints the app reads)
   dev/smoke-test.mjs           walks every screen in headless Chromium against the mock

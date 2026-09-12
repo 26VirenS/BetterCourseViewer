@@ -11,6 +11,20 @@
   const html = document.documentElement;
   const CACHE_KEY = 'bcv:early';
 
+  // Reset everything (the settings page) reaches every open Canvas tab: the copy kept in this
+  // site's own storage goes too, so nothing of the extension's stays behind on the site. It is
+  // not written again for the rest of this page's life (the reset's own settings writes would).
+  let wiped = false;
+  try {
+    BCV.api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+      if (!msg || msg.type !== 'wipeSiteNote') return false;
+      wiped = true;
+      try { localStorage.removeItem(CACHE_KEY); } catch { /* ignore */ }
+      sendResponse({ ok: true });
+      return false;
+    });
+  } catch { /* no runtime here */ }
+
   const systemDark = () => !!window.matchMedia?.('(prefers-color-scheme: dark)').matches;
   // The phone layout (the iPhone mockup) for narrow viewports, decided before first paint and
   // kept for the page's life so a screen never re-flows into the other layout mid-way.
@@ -39,7 +53,7 @@
     const state = { skin: current.appearance.skin !== false, dark: S.isDark(current, systemDark()) };
     apply(state);
     try {
-      localStorage.setItem(CACHE_KEY, JSON.stringify(state));
+      if (!wiped) localStorage.setItem(CACHE_KEY, JSON.stringify(state));
     } catch {
       /* ignore */
     }

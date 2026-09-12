@@ -216,11 +216,13 @@
     ['dashboard', 'Dashboard', IC.dash, '#0a6cff', '/', ''],
     ['courses', 'Courses', IC.book, '#ff9500', '/courses', ''],
     ['groups', 'Groups', IC.people, '#30b0c7', '/groups', ''],
-    ['todo', 'To Do', IC.check, '#34c759', '/#todo', state.todoCount ? String(state.todoCount) : ''],
-    ['calendar', 'Calendar', IC.cal, '#5856d6', '/calendar', ''],
+    // the green, the indigo and the purple sit darker than the rest on black, so the dark appearance
+    // lifts them (the glyphs are drawn at 62% until their row is active) to the others' visibility
+    ['todo', 'To Do', IC.check, state.dark ? '#4cd964' : '#34c759', '/#todo', state.todoCount ? String(state.todoCount) : ''],
+    ['calendar', 'Calendar', IC.cal, state.dark ? '#8c8aff' : '#5856d6', '/calendar', ''],
     ['notifications', 'Notifications', IC.bell, '#ff453a', '/#notifications', state.notifCount ? String(state.notifCount) : ''],
     ['inbox', 'Inbox', IC.mail, '#0a84ff', '/conversations', state.unread ? String(state.unread) : ''],
-    ['gpa', 'Grades', IC.chart, '#af52de', '/grades', ''], // purple: Calendar already has the indigo
+    ['gpa', 'Grades', IC.chart, state.dark ? '#c874f5' : '#af52de', '/grades', ''], // purple: Calendar already has the indigo
   ];
 
   function siteName() {

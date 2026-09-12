@@ -18,7 +18,7 @@ struct SettingsSheet: View {
                     }
                     Button("Sign out", role: .destructive) { confirmSignOut = true }
                 }
-                Section("Simpl Courses") {
+                Section {
                     NavigationLink("Look, appearance and smart panel") {
                         CanvasWebView(controller: web)
                             .ignoresSafeArea(edges: .bottom)
@@ -27,6 +27,10 @@ struct SettingsSheet: View {
                             .onAppear { web.loadIfNeeded() }
                     }
                     LabeledContent("Version", value: AppSession.version)
+                } header: {
+                    Text("Simpl Courses")
+                } footer: {
+                    Text("To take Simpl Courses off this iPhone with everything it stored, delete the app from the Home Screen: touch and hold its icon, then Remove App → Delete App. iOS removes the app's data with it (settings, keys, grade history and the saved session); your Canvas account is not affected.")
                 }
             }
             .navigationTitle("Settings")

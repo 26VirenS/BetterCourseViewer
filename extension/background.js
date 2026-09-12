@@ -105,10 +105,29 @@ if (typeof importScripts === 'function' && !self.BCV?.providers) {
       case 'listDomains':
         reply(listRegistered());
         return true;
+      case 'wipeSiteNotes':
+        reply(wipeSiteNotes());
+        return true;
       default:
         return false;
     }
   });
+
+  /** Reset everything (the settings page): every open Canvas tab is told to drop the one-line note it
+   *  keeps in its own site storage (the look and the appearance, applied before first paint), so
+   *  nothing of the extension's stays on the site. Tabs without the content script just do not answer. */
+  async function wipeSiteNotes() {
+    let tabs = [];
+    try { tabs = await api.tabs.query({}); } catch { return { ok: false, cleared: 0 }; }
+    let cleared = 0;
+    await Promise.all(tabs.map(async (t) => {
+      try {
+        const res = await api.tabs.sendMessage(t.id, { type: 'wipeSiteNote' });
+        if (res?.ok) cleared += 1;
+      } catch { /* not a Canvas tab */ }
+    }));
+    return { ok: true, cleared };
+  }
 
   async function providerStatus() {
     const settings = await S.get();

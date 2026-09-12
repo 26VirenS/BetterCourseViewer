@@ -43,8 +43,13 @@ class ViewController: NSViewController, WKNavigationDelegate, WKScriptMessageHan
     }
 
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
-        if (message.body as! String != "open-preferences") {
-            return;
+        guard let body = message.body as? String else { return }
+        if body == "uninstall" {
+            Uninstaller.run()
+            return
+        }
+        if body != "open-preferences" {
+            return
         }
 
         SFSafariApplication.showPreferencesForExtension(withIdentifier: extensionBundleIdentifier) { error in

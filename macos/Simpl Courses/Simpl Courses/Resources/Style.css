@@ -43,3 +43,8 @@ body.state-off :is(.state-on, .state-unknown) {
 button {
     font-size: 1em;
 }
+
+button.uninstall {
+    font-size: 0.85em;
+    opacity: 0.7;
+}

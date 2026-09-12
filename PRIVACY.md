@@ -12,9 +12,9 @@ Simpl Courses is a browser extension that redraws the Canvas learning-management
 
 ## What the extension stores
 
-Everything below lives in the extension's local storage in your browser and is removed when the extension is uninstalled:
+Everything below lives in the extension's local storage in your browser. Chrome, Edge and Firefox delete it when the extension is removed, and iOS deletes it with the app; Safari on the Mac keeps it after the app is deleted, so the Mac app carries an uninstaller (Simpl Courses → Uninstall Simpl Courses…, also `uninstall-simpl-courses-mac.command` on every release) that removes it along with the app. **Reset everything** under Settings → Data & about clears all of it at any time, and Settings → Data & about lists the uninstall steps for the device you are on.
 
-- your settings (appearance, the sites you enabled it on, preferences such as list groupings);
+- your settings (appearance, the sites you enabled it on, preferences such as list groupings), plus a one-line copy of the look and the appearance in each Canvas site's own storage so a page never flashes stock Canvas before first paint (Reset everything clears it on every open Canvas tab);
 - your Claude and/or ChatGPT API key, if you added one — stored only locally, never included in settings exports, and sent only to that provider's API;
 - unsent drafts (a text-entry submission you have not sent yet);
 - the Grades page's optional inputs (a prior GPA, a goal, target grades) and its daily GPA snapshots, which are computed from the scores Canvas returns and never leave your browser.

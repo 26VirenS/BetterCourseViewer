@@ -178,6 +178,10 @@ h1 { margin: 0; font: 700 30px/1.15 var(--display); letter-spacing: -.03em; }
 .action .row__t { font-weight: 500; font-size: 14px; }
 .action--danger .row__t { color: var(--red); }
 .action svg { flex: none; opacity: .6; }
+.steps { margin: 0; padding: 0 0 0 22px; display: flex; flex-direction: column; gap: 9px; font: 400 13.5px/1.45 var(--font); color: var(--ink2); text-wrap: pretty; }
+.steps li::marker { font: 600 12.5px/1 var(--mono); color: var(--ink3); }
+.steps b { font-weight: 600; color: var(--ink); }
+.steps code { font: 500 12px/1.2 var(--mono); padding: 2px 6px; border-radius: 6px; background: var(--fill); color: var(--ink); white-space: nowrap; }
 
 /* developer notes */
 .docs { padding: 0 40px 70px; }

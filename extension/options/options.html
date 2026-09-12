@@ -146,7 +146,7 @@
       </section>
 
       <!-- Data & about -->
-      <section class="section" id="data" data-title="Data &amp; about" data-sub="What is stored here." data-words="data about cache export import reset keys storage">
+      <section class="section" id="data" data-title="Data &amp; about" data-sub="What is stored here." data-words="data about cache export import reset keys storage uninstall remove delete">
         <div class="card card--list" id="dataStats"></div>
         <div class="card card--list actions">
           <button type="button" class="action" id="clearCache"><span class="row__body"><span class="row__t">Clear smart panel conversations</span><span class="row__s">The chats remembered per page. Canvas data is never kept here: every page asks Canvas afresh.</span></span><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
@@ -154,6 +154,11 @@
           <button type="button" class="action" id="importSettings"><span class="row__body"><span class="row__t">Import settings</span><span class="row__s">Replaces current preferences.</span></span><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
           <button type="button" class="action action--danger" id="resetSettings"><span class="row__body"><span class="row__t">Reset everything</span><span class="row__s">Clears preferences, history and keys.</span></span><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
           <input type="file" id="importFile" accept="application/json" hidden>
+        </div>
+        <div class="card card--pad" id="uninstall">
+          <div class="row"><span class="row__body"><span class="row__t">Uninstalling</span><span class="row__s" id="uninstallSub">How to take Simpl Courses off this device with everything it stored.</span></span></div>
+          <ol class="steps" id="uninstallSteps"></ol>
+          <p class="note note--msg" id="uninstallNote"></p>
         </div>
         <p class="note note--out">Read with your own Canvas session. Keys never leave this device.</p>
       </section>

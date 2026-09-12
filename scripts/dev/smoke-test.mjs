@@ -1526,6 +1526,9 @@ try {
   await options.click('.navlink[data-section="data"]');
   await options.waitForSelector('.stat', { timeout: 5000 });
   check((await oTexts('.stat')).length === 5 && (await oTexts('.stat b'))[0] === 'none' && (await oTexts('.action .row__t')).join(' | ') === 'Clear smart panel conversations | Export settings | Import settings | Reset everything', `Data & about: ${(await oTexts('.stat')).join(' | ')}`);
+  // the section ends with the uninstall steps for the browser this page is open in (Chromium here)
+  const unSteps = await oTexts('#uninstallSteps li');
+  check((await oTexts('#uninstall .row__t'))[0] === 'Uninstalling' && unSteps.length === 2 && /^Press Reset everything above/.test(unSteps[0]) && /chrome:\/\/extensions/.test(unSteps[1]) && /Remove/.test(unSteps[1]) && /Canvas account, favourites and course nicknames live on Canvas/.test((await oTexts('#uninstallNote'))[0]), `Data & about explains uninstalling for this browser: ${unSteps.join(' | ').slice(0, 140)}`);
   await options.fill('#query', 'logo');
   check((await options.$$eval('.navlink', (els) => els.filter((e) => !e.hidden).map((e) => e.dataset.section))).join(',') === 'appearance' && (await oTexts('#title'))[0] === 'Appearance', 'search narrows the sections and opens the match');
   await options.fill('#query', '');
@@ -1564,6 +1567,19 @@ try {
   check(/^v\d+\.\d+/.test(await popupPage.$eval('#version', (el) => el.textContent)), `popup shows the version: ${await popupPage.$eval('#version', (el) => el.textContent)}`);
   check((await popupPage.$eval('#foot-setup', (el) => el.textContent)) === 'Guided setup', 'the popup links to the guided setup');
   await popupPage.screenshot({ path: join(out, '30-popup.png') });
+
+  // ---- Reset everything reaches the site: the one-line note a Canvas tab keeps in its own storage goes too ----
+  console.log('reset');
+  await page.goto(`${BASE}/`);
+  await page.waitForSelector('.bcv-stat', { timeout: 10000 });
+  check((await page.evaluate(() => localStorage.getItem('bcv:early'))) !== null, 'a Canvas tab keeps the early note (look + appearance) in its own site storage');
+  await options.bringToFront();
+  await options.click('.navlink[data-section="data"]');
+  options.once('dialog', (d) => d.accept());
+  await options.click('#resetSettings');
+  await page.waitForFunction(() => localStorage.getItem('bcv:early') === null, null, { timeout: 5000 }).catch(() => {});
+  const afterReset = await sw.evaluate(async () => Object.keys(await self.BCV.api.storage.local.get(null)));
+  check((await page.evaluate(() => localStorage.getItem('bcv:early'))) === null && !afterReset.some((k) => k.startsWith('prefs:') || k.startsWith('smart:')), `Reset everything clears the note on the open Canvas tab and the extension's own storage (left: ${afterReset.join(', ') || 'nothing'})`);
 } catch (e) {
   console.error('smoke test crashed:', e?.stack || e);
   failures.push('crash: ' + e.message);

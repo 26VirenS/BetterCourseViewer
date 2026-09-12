@@ -500,6 +500,42 @@
       h('div', { class: 'stat' }, [h('span', { text: 'Sites with preferences' }), h('b', { text: String(sites) })]),
     );
   }
+  // ---- Uninstalling: the steps for the browser this page is open in --------------------------------------
+  // Safari on the Mac keeps the extension's storage after the app is deleted, so the app carries an
+  // uninstaller (Simpl Courses → Uninstall Simpl Courses…); Chrome, Edge and Firefox delete an extension's
+  // storage when it is removed; iOS deletes the app's data with the app.
+  function paintUninstall() {
+    const proto = location.protocol;
+    const platform = proto === 'safari-web-extension:' ? 'safari' : proto === 'file:' ? 'ios' : proto === 'moz-extension:' ? 'firefox' : 'chrome';
+    const li = (parts) => h('li', {}, parts.map((p) => (typeof p === 'string' ? document.createTextNode(p) : p)));
+    const b = (t) => h('b', { text: t });
+    const code = (t) => h('code', { text: t });
+    const reset = li(['Press ', b('Reset everything'), ' above. It clears your preferences, grade history and keys, gives up the sites you added, and clears the one-line note kept on every open Canvas tab.']);
+    const steps = {
+      safari: [
+        reset,
+        li(['Quit Safari.']),
+        li(['Open the Simpl Courses app and choose ', b('Simpl Courses → Uninstall Simpl Courses…'), ' The Terminal opens and shows each item as it goes: the storage Safari keeps for the extension, the app’s own data and preferences, and the app itself, moved to the Trash.']),
+        li(['App already in the Trash? Download ', code('uninstall-simpl-courses-mac.command'), ' from the release page on GitHub and open it (right-click → Open the first time). It finds what Safari kept and removes it the same way.']),
+      ],
+      chrome: [
+        reset,
+        li(['Open ', code('chrome://extensions'), ' (Edge: ', code('edge://extensions'), '), find Simpl Courses and press ', b('Remove'), '. The browser deletes the extension’s storage with it.']),
+      ],
+      firefox: [
+        reset,
+        li(['Open ', code('about:addons'), ', find Simpl Courses and choose ', b('Remove'), '. Firefox deletes the extension’s storage with it.']),
+      ],
+      ios: [
+        li(['Want your Canvas session cleared as well? Press ', b('Sign out'), ' in Settings first.']),
+        li(['On the Home Screen touch and hold the Simpl Courses icon, then ', b('Remove App → Delete App'), '. iOS deletes the app’s data with it: settings, keys, grade history and the saved session.']),
+      ],
+    };
+    $('uninstallSub').textContent = platform === 'ios' ? 'How to take Simpl Courses off this iPhone with everything it stored.' : `How to take Simpl Courses off this ${platform === 'safari' ? 'Mac' : 'browser'} with everything it stored.`;
+    $('uninstallSteps').replaceChildren(...steps[platform]);
+    $('uninstallNote').textContent = 'Nothing else is kept anywhere: your Canvas account, favourites and course nicknames live on Canvas and stay as they are.';
+  }
+  paintUninstall();
   $('clearCache').addEventListener('click', async () => {
     const all = await api.storage.local.get(null);
     const keys = Object.keys(all).filter((k) => k.startsWith('smart:') || k.startsWith('cache:'));
@@ -530,13 +566,14 @@
     e.target.value = '';
   });
   $('resetSettings').addEventListener('click', async () => {
-    if (!confirm('Reset everything? Preferences, grade history, the sites you added and your API keys are cleared, and the extension gives up its access to those sites.')) return;
+    if (!confirm('Reset everything? Preferences, grade history, the sites you added and your API keys are cleared, the extension gives up its access to those sites, and the note it keeps on open Canvas tabs is cleared.')) return;
     for (const origin of settings.domains || []) {
       await send({ type: 'unregisterDomain', origin });
       try { await api.permissions.remove({ origins: [`${origin}/*`] }); } catch { /* not granted */ }
     }
     try { await api.storage.local.clear(); } catch { /* ignore */ }
     settings = await S.replace({});
+    await send({ type: 'wipeSiteNotes' }); // last: the copy each open Canvas tab keeps in its own site storage
     courses.list = null;
     site.host = '';
     site.origin = '';

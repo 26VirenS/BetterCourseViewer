@@ -20,3 +20,8 @@ function openPreferences() {
 }
 
 document.querySelector("button.open-preferences").addEventListener("click", openPreferences);
+
+// The app explains what goes and hands its bundled uninstaller to the Terminal (see AppDelegate.swift).
+document.querySelector("button.uninstall").addEventListener("click", () => {
+    webkit.messageHandlers.controller.postMessage("uninstall");
+});
