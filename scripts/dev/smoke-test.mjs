@@ -74,6 +74,22 @@ try {
   check(!!setupTab && setupTab.url().endsWith('/setup/setup.html'), 'installing the extension opens the guided setup page');
   if (setupTab) await setupTab.close();
   check((await sw.evaluate(async () => (await self.BCV.api.storage.local.get('setup:flow'))['setup:flow'])) === 2, 'the build records its setup flow, so an update from an older flow offers the page once more');
+  // Safari turns the extension on without an install event, so the page is offered again on a new
+  // browser session while setup is unfinished — and never again once it is done or skipped.
+  const setupPages = () => context.pages().filter((pg) => pg.url().endsWith('/setup/setup.html'));
+  const offerAgain = async () => {
+    for (const pg of setupPages()) await pg.close();
+    await sw.evaluate(async () => { await self.BCV.api.storage.session?.remove('setup:shown'); }); // a new browser session
+    await sw.evaluate(async () => { await self.BCV.background.offerSetup(); });
+    await new Promise((r) => setTimeout(r, 900));
+    const opened = setupPages();
+    for (const pg of opened) await pg.close();
+    return opened.length > 0;
+  };
+  check(await offerAgain(), 'the setup page opens again on a new browser session while setup is unfinished (Safari enables without installing)');
+  await sw.evaluate(() => self.BCV.api.storage.local.set({ 'setup:done': true }));
+  check(!(await offerAgain()), 'once setup is done or skipped it never opens again');
+  await sw.evaluate(() => self.BCV.api.storage.local.remove('setup:done'));
   await sw.evaluate(() => self.BCV.api.storage.local.set({ 'setup:offered': true }));
 
   page = await context.newPage();

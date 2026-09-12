@@ -44,11 +44,5 @@ with open(path, 'w') as f:
 PY
 (cd "$STAGE" && zip -qr "$CHROME" . -x '.DS_Store' '*/.DS_Store')
 
-# 3. the Mac uninstaller, for a Mac whose app is already in the Trash (the app itself carries a copy)
-UNINSTALL="$ROOT/dist/uninstall-simpl-courses-mac.command"
-cp "$ROOT/scripts/uninstall-mac.command" "$UNINSTALL"
-chmod +x "$UNINSTALL"
-
 echo "✅ $GENERIC"
 echo "✅ $CHROME  ← upload this one to the Chrome Web Store (or Edge Add-ons)"
-echo "✅ $UNINSTALL"

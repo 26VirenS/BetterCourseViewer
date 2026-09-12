@@ -69,8 +69,3 @@ body.state-missing .detail:empty { /* beats the rule above, which shows every st
 button {
     font-size: 1em;
 }
-
-button.uninstall {
-    font-size: 0.85em;
-    opacity: 0.7;
-}

@@ -12,7 +12,6 @@
 		F7FED3B13053804600DCC66B /* Icon.png in Resources */ = {isa = PBXBuildFile; fileRef = F7FED3B03053804600DCC66B /* Icon.png */; };
 		F7FED3B33053804600DCC66B /* Style.css in Resources */ = {isa = PBXBuildFile; fileRef = F7FED3B23053804600DCC66B /* Style.css */; };
 		F7FED3B53053804600DCC66B /* Script.js in Resources */ = {isa = PBXBuildFile; fileRef = F7FED3B43053804600DCC66B /* Script.js */; };
-		F7FED3B63053804600DCC66D /* uninstall-mac.command in Resources */ = {isa = PBXBuildFile; fileRef = F7FED3B73053804600DCC66D /* uninstall-mac.command */; };
 		F7FED3B73053804600DCC66B /* ViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7FED3B63053804600DCC66B /* ViewController.swift */; };
 		F7FED3BA3053804600DCC66B /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = F7FED3B83053804600DCC66B /* Main.storyboard */; };
 		F7FED3BC3053804700DCC66B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F7FED3BB3053804700DCC66B /* Assets.xcassets */; };
@@ -56,7 +55,6 @@
 		F7FED3AE3053804600DCC66B /* Base */ = {isa = PBXFileReference; lastKnownFileType = text.html; name = Base; path = Base.lproj/Main.html; sourceTree = "<group>"; };
 		F7FED3B03053804600DCC66B /* Icon.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = Icon.png; sourceTree = "<group>"; };
 		F7FED3B23053804600DCC66B /* Style.css */ = {isa = PBXFileReference; lastKnownFileType = text.css; path = Style.css; sourceTree = "<group>"; };
-		F7FED3B73053804600DCC66D /* uninstall-mac.command */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; name = "uninstall-mac.command"; path = "../../scripts/uninstall-mac.command"; sourceTree = SOURCE_ROOT; };
 		F7FED3B43053804600DCC66B /* Script.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = Script.js; sourceTree = "<group>"; };
 		F7FED3B63053804600DCC66B /* ViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewController.swift; sourceTree = "<group>"; };
 		F7FED3B93053804600DCC66B /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
@@ -127,7 +125,6 @@
 				F7FED3B03053804600DCC66B /* Icon.png */,
 				F7FED3B23053804600DCC66B /* Style.css */,
 				F7FED3B43053804600DCC66B /* Script.js */,
-				F7FED3B73053804600DCC66D /* uninstall-mac.command */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -243,7 +240,6 @@
 				F7FED3AF3053804600DCC66B /* Main.html in Resources */,
 				F7FED3BC3053804700DCC66B /* Assets.xcassets in Resources */,
 				F7FED3B33053804600DCC66B /* Style.css in Resources */,
-				F7FED3B63053804600DCC66D /* uninstall-mac.command in Resources */,
 			);
 		};
 		F7FED3C03053804700DCC66B /* Resources */ = {
@@ -442,7 +438,7 @@
 					"@executable_path/../../../../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				MARKETING_VERSION = 2.2.35;
+				MARKETING_VERSION = 2.2.36;
 				OTHER_LDFLAGS = (
 					"-framework",
 					SafariServices,
@@ -477,7 +473,7 @@
 					"@executable_path/../../../../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				MARKETING_VERSION = 2.2.35;
+				MARKETING_VERSION = 2.2.36;
 				OTHER_LDFLAGS = (
 					"-framework",
 					SafariServices,
@@ -516,7 +512,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 2.2.35;
+				MARKETING_VERSION = 2.2.36;
 				OTHER_LDFLAGS = (
 					"-framework",
 					SafariServices,
@@ -558,7 +554,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 2.2.35;
+				MARKETING_VERSION = 2.2.36;
 				OTHER_LDFLAGS = (
 					"-framework",
 					SafariServices,

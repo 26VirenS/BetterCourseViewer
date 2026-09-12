@@ -49,11 +49,12 @@ try {
   // Before Safari has answered: the window still has to be a window (this is what a hidden body broke)
   const first = await shown();
   check(await page.$eval('body', (el) => getComputedStyle(el).display !== 'none' && el.getBoundingClientRect().height > 0), 'the window is not blank before Safari answers');
-  check(first.includes('img') && first.includes('line-unknown') && first.includes('open-preferences') && first.includes('uninstall'), `it waits with the icon, a line and both buttons: ${first.join(', ')}`);
+  check(first.includes('img') && first.includes('line-unknown') && first.includes('open-preferences') && !first.includes('uninstall'), `it waits with the icon, a line and the one button: ${first.join(', ')}`);
 
   await page.evaluate(() => window.show('on', true, ''));
   const on = await shown();
   check(on.includes('line-on') && !on.includes('line-off') && !on.includes('line-missing') && !on.includes('steps'), `extension on: only that line (${on.join(', ')})`);
+  check(/setup page opens by itself/.test(await text('.state-on')), `on: it says the setup page opens by itself: ${await text('.state-on')}`);
   check(/Extensions section of Safari Settings/.test(await text('.state-on')) && (await text('button.open-preferences')) === 'Quit and Open Safari Settings…', 'macOS 13 and later: Settings, not Preferences');
 
   await page.reload();
@@ -70,10 +71,9 @@ try {
   await page.evaluate(() => window.show('on', true, ''));
   check(!(await shown()).includes('detail'), 'the message goes away once the extension is found');
 
-  // the buttons talk to the app
+  // the button talks to the app
   await page.click('button.open-preferences');
-  await page.click('button.uninstall');
-  check(posted.join(',') === 'open-preferences,uninstall', `both buttons reach the app: ${posted.join(',') || 'nothing'}`);
+  check(posted.join(',') === 'open-preferences', `the button reaches the app: ${posted.join(',') || 'nothing'}`);
 } catch (e) {
   console.error('mac window test crashed:', e?.stack || e);
   failures.push('crash: ' + e.message);

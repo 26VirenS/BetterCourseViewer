@@ -57,12 +57,7 @@ class ViewController: NSViewController, WKNavigationDelegate, WKScriptMessageHan
     }
 
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
-        guard let body = message.body as? String else { return }
-        if body == "uninstall" {
-            Uninstaller.run()
-            return
-        }
-        guard body == "open-preferences" else { return }
+        guard let body = message.body as? String, body == "open-preferences" else { return }
 
         SFSafariApplication.showPreferencesForExtension(withIdentifier: extensionBundleIdentifier) { error in
             DispatchQueue.main.async {

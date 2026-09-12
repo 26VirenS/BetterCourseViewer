@@ -501,9 +501,9 @@
     );
   }
   // ---- Uninstalling: the steps for the browser this page is open in --------------------------------------
-  // Safari on the Mac keeps the extension's storage after the app is deleted, so the app carries an
-  // uninstaller (Simpl Courses → Uninstall Simpl Courses…); Chrome, Edge and Firefox delete an extension's
-  // storage when it is removed; iOS deletes the app's data with the app.
+  // On a Mac the extension lives inside the app, so deleting the app removes it; Chrome, Edge and
+  // Firefox delete an extension's storage when it is removed; iOS deletes the app's data with the app.
+  // Reset everything above is what clears the settings, keys and history in every case.
   function paintUninstall() {
     const proto = location.protocol;
     const platform = proto === 'safari-web-extension:' ? 'safari' : proto === 'file:' ? 'ios' : proto === 'moz-extension:' ? 'firefox' : 'chrome';
@@ -514,9 +514,7 @@
     const steps = {
       safari: [
         reset,
-        li(['Open the Simpl Courses app and choose ', b('Simpl Courses → Uninstall Simpl Courses…'), ' It copies one line to the clipboard (the app cannot do the removing itself: Safari’s storage is out of its reach).']),
-        li(['Open the Terminal (press ', b('⌘Space'), ', type Terminal, press Return), paste with ', b('⌘V'), ' and press Return. It quits Safari, shows each item as it removes it — the storage Safari keeps for the extension, the app’s own data and preferences — and moves the app to the Trash.']),
-        li(['App already in the Trash? Download ', code('uninstall-simpl-courses-mac.command'), ' from the release page on GitHub, then in the Terminal run ', code('bash ~/Downloads/uninstall-simpl-courses-mac.command'), '. It finds what Safari kept and removes it the same way. (Double-clicking a downloaded script is refused by macOS as “damaged”; the Terminal runs it.)']),
+        li(['Quit Safari, then drag ', b('Simpl Courses'), ' from the Applications folder to the Trash. Safari reads the extension out of the app, so the extension goes with it and leaves the Extensions list on the next launch.']),
       ],
       chrome: [
         reset,

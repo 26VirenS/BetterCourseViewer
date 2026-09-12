@@ -310,17 +310,38 @@ if (typeof importScripts === 'function' && !self.BCV?.providers) {
       /* ignore */
     }
   }
-  /** The page that says how to start, once: on install, and on the first run of a build whose
-   *  setup flow never showed it (an update, Safari enabling the extension without an install event). */
+  /** The page that says how to start. It opens when the extension is switched on and setup has not
+   *  been done — once per browser session, so Safari turning the extension on (which is not an
+   *  install, and often follows a rebuild) still lands on it, and finishing setup ends it for good.
+   *  Without session storage there is nothing to tell one run from the next, so it opens once ever. */
   async function offerSetup() {
     try {
       await migrateSetup();
-      const flag = await api.storage.local.get('setup:offered');
-      if (flag && flag['setup:offered']) return;
+      const state = await api.storage.local.get(['setup:offered', 'setup:done']);
+      if (state['setup:done']) return; // set up already: never again
+      let thisSession = null;
+      if (api.storage.session) {
+        try {
+          const s = await api.storage.session.get('setup:shown');
+          thisSession = !!(s && s['setup:shown']);
+        } catch { /* no session storage after all */ }
+      }
+      if (thisSession === true) return; // shown once since this browser started
+      if (thisSession === null && state['setup:offered']) return;
       await api.storage.local.set({ 'setup:offered': true });
-      await api.tabs.create({ url: api.runtime.getURL('setup/setup.html') });
+      if (api.storage.session) await api.storage.session.set({ 'setup:shown': true }).catch(() => {});
+      await openSetupPage();
     } catch {
       /* ignore */
+    }
+  }
+  /** Safari starts the background page as it enables the extension, a moment when a new tab can be
+   *  refused; a couple of retries cover that rather than losing the page. */
+  async function openSetupPage(attempt = 0) {
+    try {
+      await api.tabs.create({ url: api.runtime.getURL('setup/setup.html') });
+    } catch (e) {
+      if (attempt < 3) setTimeout(() => openSetupPage(attempt + 1), 600 * (attempt + 1));
     }
   }
 
@@ -358,4 +379,5 @@ if (typeof importScripts === 'function' && !self.BCV?.providers) {
   // even when onInstalled/onStartup never fired (Safari rebuilds, reloads).
   ensureDomains();
   offerSetup();
+  BCV.background = { offerSetup, ensureDomains }; // the harness drives these directly
 })();

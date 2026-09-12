@@ -6,8 +6,8 @@ const STATES = ['on', 'off', 'missing'];
 
 function show(state, useSettingsInsteadOfPreferences, detail) {
     if (useSettingsInsteadOfPreferences) { // macOS 13 and later call them Settings
-        document.getElementById('line-on').innerText = "Simpl Courses’s extension is currently on. You can turn it off in the Extensions section of Safari Settings.";
-        document.getElementById('line-off').innerText = "Simpl Courses’s extension is currently off. You can turn it on in the Extensions section of Safari Settings.";
+        document.getElementById('line-on').innerText = "Simpl Courses is on. You can turn it off in the Extensions section of Safari Settings. Open your Canvas site — the setup page opens by itself the first time.";
+        document.getElementById('line-off').innerText = "Simpl Courses is off. Turn it on in the Extensions section of Safari Settings, and the setup page opens by itself.";
         document.getElementById('open-preferences').innerText = "Quit and Open Safari Settings…";
     }
 
@@ -20,8 +20,3 @@ function openPreferences() {
 }
 
 document.getElementById('open-preferences').addEventListener("click", openPreferences);
-
-// The app explains what goes and hands its bundled uninstaller to the Terminal (see AppDelegate.swift).
-document.getElementById('uninstall').addEventListener("click", () => {
-    webkit.messageHandlers.controller.postMessage("uninstall");
-});

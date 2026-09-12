@@ -35,11 +35,6 @@ jobs:
           name: simpl-courses-extension
           path: dist/simpl-courses-[0-9]*.zip
           if-no-files-found: error
-      - uses: actions/upload-artifact@v4
-        with:
-          name: uninstall-simpl-courses-mac
-          path: dist/uninstall-simpl-courses-mac.command
-          if-no-files-found: error
       # A version tag publishes a Release. Run the workflow by hand (Actions → Package → Run
       # workflow) and it publishes the same Release for the manifest's version, creating the tag
       # itself, so a build is downloadable from a fixed link without pushing a tag.
@@ -51,9 +46,9 @@ jobs:
           VERSION="$(python3 -c "import json;print(json.load(open('extension/manifest.json'))['version'])")"
           TAG="v$VERSION"
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" dist/*.zip dist/*.command --clobber
+            gh release upload "$TAG" dist/*.zip --clobber
           else
-            gh release create "$TAG" dist/*.zip dist/*.command --target "$GITHUB_SHA" --title "Simpl Courses $VERSION" --generate-notes
+            gh release create "$TAG" dist/*.zip --target "$GITHUB_SHA" --title "Simpl Courses $VERSION" --generate-notes
           fi
 
   chrome-web-store:
