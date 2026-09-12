@@ -431,11 +431,12 @@ try {
   console.log('quiz');
   await page.goto(`${BASE}/courses/101/quizzes/9011?bcv=take`);
   await page.waitForSelector('.bcv-qz__begin', { timeout: 15000 });
-  check(!(await visible('#bcv-tabbar')) && !(await visible('#bcv-topbar')) && !(await visible('#bcv-fab')), 'the quiz flow hides the tab bar, the top bar and the smart button');
+  check((await visible('#bcv-topbar')) && (await visible('#bcv-tabbar')) && !!(await page.$('.bcv-qz.is-embedded')), 'the quiz intro is a pushed course screen: the back bar and the tab bar stay');
   await shot('09-quiz-intro');
   await page.click('.bcv-qz__begin');
   await page.waitForSelector('.bcv-qz__opt', { timeout: 15000 });
   check((await page.$$('.bcv-qz__page--one, .bcv-qz__q')).length > 0 && await noOverflow(), 'one question at a time on a phone, no overflow');
+  check(await eventually(async () => !(await visible('#bcv-tabbar')) && !(await visible('#bcv-topbar')) && !(await visible('#bcv-fab'))), 'the attempt takes the whole screen: the tab bar, the back bar and the smart button go');
   const urlBefore = page.url();
   await page.mouse.move(8, 500); await page.mouse.down(); await page.mouse.move(140, 505, { steps: 8 }); await page.mouse.up();
   await new Promise((r) => setTimeout(r, 400));

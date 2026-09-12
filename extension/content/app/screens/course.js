@@ -286,8 +286,8 @@
       screen.lastChild.replaceChildren(U.errorBox('This course could not be loaded. You may not have access to it.'));
       return screen;
     }
-    // Taking a quiz: the whole main column is the quiz, no course chrome.
-    if (route.tab === 'quiz' && ['take', 'feedback'].includes(route.params.get('bcv'))) return BCV.screens.quiz.render(ctx, course);
+    // (The quiz flow lives in the course's column: its intro and feedback sit under the header beside
+    // the rail; an attempt folds the chrome away and takes the page — see the quiz screen.)
     // Handing work in on the phone: the submission flow takes the main column. On the desktop the
     // block lives inside the assignment page itself (mockup 11), so ?bcv=submit just scrolls to it.
     if (route.tab === 'assignment' && route.arg && route.params.get('bcv') === 'submit' && BCV.phone?.active()) return BCV.screens.submit.render(ctx, course);
@@ -357,7 +357,7 @@
       case 'assignment': el = await D.assignment(ctx, shell); break;
       case 'syllabus': el = await D.syllabus(ctx, shell); break;
       case 'page': el = await D.page(ctx, shell); break;
-      case 'quiz': el = await D.quiz(ctx, shell); break;
+      case 'quiz': el = ['take', 'feedback'].includes(route.params.get('bcv')) ? await BCV.screens.quiz.render(ctx, course) : await D.quiz(ctx, shell); break;
       default: el = B.native(ctx, shell);
     }
     if (!ctx.alive()) return out;
@@ -867,12 +867,22 @@
         const cd = it.content_details || {};
         const sub = [cd.due_at ? `Due ${U.fmtAt(cd.due_at)}` : null, cd.points_possible ? `${store.fmtPts(cd.points_possible)} pts` : null, it.type === 'ExternalUrl' ? 'Link' : it.type === 'ExternalTool' ? 'External tool' : it.type === 'File' ? 'File' : it.type === 'Page' ? 'Page' : null].filter(Boolean).join(' · ');
         const completed = it.completion_requirement?.completed;
+        // the item's own address (Canvas's html_url is a /modules/items/N redirect, which only a page load can follow)
+        const itemHref = (() => {
+          const id = it.content_id;
+          if (it.type === 'Assignment' && id) return `${c.url}/assignments/${id}`;
+          if (it.type === 'Quiz' && id) return `${c.url}/quizzes/${id}`;
+          if (it.type === 'Discussion' && id) return `${c.url}/discussion_topics/${id}`;
+          if (it.type === 'Page' && it.page_url) return `${c.url}/pages/${it.page_url}`;
+          if (it.type === 'File' && id) return `${c.url}/files/${id}`;
+          return it.html_url || it.external_url || c.url;
+        })();
         return U.row([
           U.tile(ITEM_ICON[it.type] || IC.doc, { color: c.palette.text, tint: c.palette.tint }),
           U.el('bcv-row__body', [U.text('bcv-row__title bcv-row__title--145 bcv-ellip', it.title), sub ? U.text('bcv-row__sub', sub) : null]),
           it.completion_requirement ? h('span', { class: `bcv-circle ${completed ? 'is-done' : ''}`, title: completed ? 'Done' : 'Not done', style: { cursor: 'default' } }, completed ? U.svg('M6 12l4 4 8-8', { size: 12, stroke: '#fff', width: 2.4 }) : null) : null,
           U.chev(),
-        ], { mod: `bcv-module__item bcv-indent-${Math.min(it.indent || 0, 3)}`, href: it.html_url || it.external_url || c.url });
+        ], { mod: `bcv-module__item bcv-indent-${Math.min(it.indent || 0, 3)}`, href: itemHref });
       }));
       const card = U.card([
         h('button', { type: 'button', class: 'bcv-module__head', onclick: () => { card.classList.toggle('bcv-module--open'); itemsEl.hidden = !card.classList.contains('bcv-module--open'); } }, [

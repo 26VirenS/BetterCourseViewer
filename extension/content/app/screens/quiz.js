@@ -34,7 +34,9 @@
     const qid = route.arg;
     const quizUrl = `${course.url}/quizzes/${qid}`;
     const html = document.documentElement;
-    html.classList.add('bcv-quiz'); // hides the sidebar and the smart button; app.js clears it on the next render
+    // The flow lives in the course's own column. The intro and the feedback sit there like any tab
+    // (the course header and rail stay); an attempt sets html.bcv-quiz, which folds the sidebar, the
+    // header and the rail away so the questions take the page. app.js clears it on the next render.
 
     // fbSub: the finished attempt the feedback stage shows; fbFrom: 'done' when it was opened from the receipt
     const st = { stage: 'intro', idx: 0, mode: 'one', quiz: null, sub: null, questions: [], flags: {}, saving: 0, savedAt: 0, timer: null, warned: {}, done: null, code: '', fbSub: null, fbFrom: null, fb: null };
@@ -183,7 +185,9 @@
       else if (st.stage === 'feedback') body.replaceChildren(feedback());
       else body.replaceChildren(done());
       screen.classList.toggle('is-feedback', st.stage === 'feedback');
-      html.classList.toggle('bcv-quiz-fb', st.stage === 'feedback'); // the smart panel is back for feedback (app.js clears it with bcv-quiz)
+      const embedded = st.stage === 'intro' || st.stage === 'feedback'; // in the column, under the course header
+      screen.classList.toggle('is-embedded', embedded);
+      html.classList.toggle('bcv-quiz', !embedded); // the attempt (and its receipt) takes the page
       setOpen(st.stage === 'take' || st.stage === 'review');
       ctx.setSmart(st.stage === 'feedback' ? feedbackSmart() : {
         label: `${quiz.title} · quiz`,

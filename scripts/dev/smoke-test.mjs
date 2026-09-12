@@ -63,6 +63,7 @@ const context = await chromium.launchPersistentContext(userDataDir, {
   viewport: { width: 1400, height: 900 },
   args: [`--disable-extensions-except=${extDir}`, `--load-extension=${extDir}`],
 });
+let page; // hoisted so a crash can say what the page was doing
 try {
   let [sw] = context.serviceWorkers();
   if (!sw) sw = await context.waitForEvent('serviceworker', { timeout: 15000 });
@@ -75,7 +76,7 @@ try {
   check((await sw.evaluate(async () => (await self.BCV.api.storage.local.get('setup:flow'))['setup:flow'])) === 2, 'the build records its setup flow, so an update from an older flow offers the page once more');
   await sw.evaluate(() => self.BCV.api.storage.local.set({ 'setup:offered': true }));
 
-  const page = await context.newPage();
+  page = await context.newPage();
   // a page is ready to poke once it is drawn and nothing painted from the cache is still waiting on Canvas
   const __goto = page.goto.bind(page);
   page.gotoRaw = __goto;
@@ -661,6 +662,7 @@ try {
   const gradedCount = Number((await texts('.bcv-rail__item[data-tab="grades"] .bcv-rail__count'))[0]);
   check(gradedCount >= 3, `rail counts: 2 unread announcements, ${gradedCount} grades posted this week`);
   await page.click('.bcv-rail__toggle');
+  await page.waitForFunction(() => document.querySelector('.bcv-rail.is-narrow') && document.querySelector('.bcv-rail').getBoundingClientRect().width < 90, null, { timeout: 3000 }).catch(() => {}); // the width eases over .45s
   check(await page.$('.bcv-rail.is-narrow') && (await page.$eval('.bcv-rail', (el) => el.getBoundingClientRect().width < 90)) && !(await visible('.bcv-rail__title')), 'rail collapses to tiles only');
   await shot(page, '11c-course-rail-narrow');
   await page.click('.bcv-rail__toggle');
@@ -857,13 +859,16 @@ try {
   await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
   await page.click('.bcv-detail__actions .bcv-btn--primary');
   await page.waitForSelector('.bcv-qz__begin', { timeout: 10000 });
-  check(page.url().endsWith('/quizzes/9011?bcv=take') && !(await visible('.bcv-side')) && !(await visible('#bcv-fab')), 'quiz flow opens with the sidebar and smart button hidden');
+  check(page.url().endsWith('/quizzes/9011?bcv=take') && (await visible('.bcv-side')) && (await visible('.bcv-rail')) && !!(await page.$('.bcv-cmain .bcv-qz.is-embedded')) && !(await page.$eval('html', (e) => e.classList.contains('bcv-quiz'))), 'the quiz intro sits in the course column, under the header beside the rail; nothing folds away yet');
   check((await texts('.bcv-qz__h1'))[0] === 'Lec06-PreQuiz' && (await texts('.bcv-qz__bullet')).some((t) => /Time limit: 20 minutes/.test(t)) && (await texts('.bcv-qz__begin'))[0] === 'Begin attempt', 'intro card lists the quiz settings');
   check((await texts('.bcv-qz__clock'))[0] === '20 min', 'timer pill shows the limit before the attempt starts');
   await shot(page, '22c-quiz-intro');
   await page.click('.bcv-qz__begin');
   await page.waitForSelector('.bcv-qz__opt', { timeout: 10000 });
   check((await page.$$('.bcv-qz__pill')).length === 4 && (await page.$('.bcv-qz__pill:first-child.is-current')) && (await texts('.bcv-qz__qnum'))[0] === 'Question 1', 'attempt started through the API: progress pills and question 1');
+  // Begin attempt folds the chrome away, smoothly: the sidebar, the course header and the rail slide to nothing
+  const folded = await page.waitForFunction(() => document.documentElement.classList.contains('bcv-quiz') && getComputedStyle(document.querySelector('.bcv-side')).width === '0px' && getComputedStyle(document.querySelector('.bcv-rail')).width === '0px' && getComputedStyle(document.querySelector('.bcv-head--course')).maxHeight === '0px', null, { timeout: 5000 }).then(() => true).catch(() => false);
+  check(folded && /width/.test(await page.$eval('.bcv-side', (e) => getComputedStyle(e).transitionProperty)) && !(await visible('#bcv-fab')), 'the attempt takes the page: the sidebar, header and rail fold away (a transition), the smart button steps out');
   check(/^(19|20):\d\d$/.test((await texts('.bcv-qz__clock'))[0]), `timer counts down from the attempt's end_at: ${(await texts('.bcv-qz__clock'))[0]}`);
   check((await page.$$('.bcv-qz__letter')).length === 5 && (await texts('.bcv-qz__letter')).join('') === 'ABCDE', 'lettered options');
   await page.click('.bcv-qz__opt');
@@ -920,6 +925,8 @@ try {
   check((await texts('.bcv-qz__donebtns .bcv-qz__big')).join('|') === 'See feedback|Back to F26-MATH 021 20|Quiz page', `receipt offers the feedback once Canvas releases results: ${(await texts('.bcv-qz__donebtns .bcv-qz__big')).join('|')}`);
   await page.click('.bcv-qz__donebtns .bcv-qz__big--primary');
   await page.waitForSelector('.bcv-fb__q', { timeout: 10000 });
+  const unfolded = await page.waitForFunction(() => !document.documentElement.classList.contains('bcv-quiz') && getComputedStyle(document.querySelector('.bcv-side')).width === '242px' && getComputedStyle(document.querySelector('.bcv-rail')).width !== '0px', null, { timeout: 5000 }).then(() => true).catch(() => false);
+  check(unfolded && !!(await page.$('.bcv-cmain .bcv-qz.is-embedded .bcv-fb')), 'the feedback sits back in the course column: the sidebar, header and rail return');
   const fbLine = (await texts('.bcv-fb__scoreline'))[0];
   check(/^13 \/ 17 76% 3 of 4 correct · graded /.test(fbLine) && (await page.$$('.bcv-fb__q')).length === 4 && !(await page.$('.bcv-fb__comment')), `score card from the attempt's own numbers: ${fbLine}`);
   const fbCards = await texts('.bcv-fb__q');
@@ -1560,6 +1567,9 @@ try {
 } catch (e) {
   console.error('smoke test crashed:', e?.stack || e);
   failures.push('crash: ' + e.message);
+  // what the page was doing when it crashed (a wait that timed out is easier to read with this)
+  const where = await page?.evaluate(() => ({ url: location.href, settled: document.documentElement.classList.contains('bcv-settled'), loads: document.querySelectorAll('.bcv-load').length, loadKey: window.BCV?.app?.state?.loadKey ?? null, route: window.BCV?.app?.state?.route?.screen ?? null, h1: document.querySelector('#bcv-main h1')?.textContent?.trim() ?? null, main: document.querySelector('#bcv-main > *')?.className ?? null, toasts: [...document.querySelectorAll('.bcv-toast')].map((t) => t.textContent.trim()) })).catch((e2) => ({ unreadable: e2.message }));
+  console.error('page state at the crash:', JSON.stringify(where));
 } finally {
   await context.close();
   server.kill();

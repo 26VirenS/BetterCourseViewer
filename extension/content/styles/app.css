@@ -101,7 +101,7 @@ html[data-bcv-theme="dark"] .bcv-skel { --bcv-skel: linear-gradient(90deg, rgba(
   /* entrances go (data lands on its final value at once); the loading indicators (the row wash, the shimmer) stay */
   .bcv-main > .bcv-screen, .bcv-main > .bcv-qz, .bcv-main > .bcv-sb, .bcv-sheet-ov, .bcv-sheet, .bcv-smart, .bcv-menu, .bcv-toast, .bcv-gpa__pop, .bcv-reader-ov, .bcv-skel, .bcv-enter, .bcv-fb__fill,
   .bcv-work__row--in, .bcv-work__fill--grow, .bcv-ring--fill, .bcv-gpa__line--draw, .bcv-gpa__pt--in { animation: none; }
-  .bcv-stat, .bcv-gpa__card, .bcv-ccard, .bcv-btn, .bcv-sb__btn { transition: none; }
+  .bcv-stat, .bcv-gpa__card, .bcv-ccard, .bcv-btn, .bcv-sb__btn, .bcv-side, .bcv-head--course, .bcv-rail { transition: none; }
 }
 
 /* ---- take over the page ------------------------------------------------ */
@@ -1102,8 +1102,19 @@ html[data-bcv-theme="dark"].bcv-punch:not(.bcv-punch-light) #content img, html[d
 }
 
 /* ---- quiz taking (mockup): chrome hidden, one column ----------------------- */
-/* an open attempt hides the sidebar and the smart panel; the feedback stage (bcv-quiz-fb) gets the panel back */
-html.bcv-quiz .bcv-side, html.bcv-quiz:not(.bcv-quiz-fb) .bcv-fab, html.bcv-quiz:not(.bcv-quiz-fb) #bcv-smart { display: none !important; }
+/* The quiz flow lives in the course's column: the intro and the feedback sit under the course header
+   beside the rail (is-embedded); an attempt (html.bcv-quiz) folds the sidebar, the header and the rail
+   away, smoothly, and takes the page; the smart panel steps out for the attempt. */
+.bcv-qz.is-embedded { min-height: 0; }
+.bcv-qz.is-embedded .bcv-qz__head { display: none; }
+.bcv-side { transition: width .45s cubic-bezier(.32,.72,0,1), padding .45s cubic-bezier(.32,.72,0,1), opacity .25s ease; }
+html.bcv-quiz .bcv-side { width: 0; padding-left: 0; padding-right: 0; opacity: 0; overflow: hidden; border-right-width: 0; pointer-events: none; }
+.bcv-head--course { max-height: 480px; transition: max-height .45s cubic-bezier(.32,.72,0,1), padding .45s cubic-bezier(.32,.72,0,1), opacity .2s ease; }
+html.bcv-quiz .bcv-screen--ctx .bcv-head--course { max-height: 0; padding-top: 0; padding-bottom: 0; opacity: 0; overflow: hidden; border-bottom-width: 0; pointer-events: none; }
+.bcv-rail { transition: width .45s cubic-bezier(.32,.72,0,1), padding .45s cubic-bezier(.32,.72,0,1), opacity .25s ease; }
+html.bcv-quiz .bcv-screen--ctx .bcv-rail { width: 0; padding-left: 0; padding-right: 0; opacity: 0; overflow: hidden; pointer-events: none; }
+html.bcv-quiz .bcv-screen--ctx .bcv-cmain { border-left: 0; }
+html.bcv-quiz .bcv-fab, html.bcv-quiz #bcv-smart { display: none !important; }
 .bcv-qz { min-height: 100vh; display: flex; flex-direction: column; background: var(--bcv-bg); }
 .bcv-qz__head { position: sticky; top: 0; z-index: 6; background: var(--bcv-chrome); -webkit-backdrop-filter: var(--bcv-blur-chrome); backdrop-filter: var(--bcv-blur-chrome); border-bottom: 1px solid var(--bcv-edge); }
 .bcv-qz__headrow { max-width: 760px; margin: 0 auto; padding: 14px 28px; display: flex; align-items: center; gap: 14px; }

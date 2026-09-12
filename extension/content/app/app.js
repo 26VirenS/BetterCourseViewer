@@ -108,7 +108,8 @@
    *  load, which also starts the memo over. */
   const DRAWN_TABS = new Set(['home', 'stream', 'announcements', 'assignments', 'discussions', 'grades', 'people', 'pages', 'files', 'folder', 'quizzes', 'modules', 'announcement', 'discussion', 'assignment', 'syllabus', 'page', 'quiz']);
   function drawnRoute(r) {
-    if (r.params.get('bcv')) return false; // native, submit, take, feedback, setup, tour: Canvas's own page is wanted
+    const bcv = r.params.get('bcv');
+    if (bcv && !(r.screen === 'course' && r.tab === 'quiz' && (bcv === 'take' || bcv === 'feedback'))) return false; // native, submit, setup, tour: Canvas's own page is wanted; the quiz flow is drawn
     if (r.screen === 'course' || r.screen === 'group') return DRAWN_TABS.has(r.tab);
     return r.screen !== 'native' && !!(screens[r.screen] || (BCV.phone?.active() && BCV.phone.screens[r.screen]));
   }
@@ -196,6 +197,18 @@
     document.body.prepend(root);
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') U.closeMenus();
+    });
+    // Every plain link inside a screen (a module item, a link in a page's prose, a row) navigates the
+    // way the sidebar does: in place when the interface draws that address, a real load otherwise.
+    main.addEventListener('click', (e) => {
+      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      const a = e.target.closest?.('a[href]');
+      if (!a || !main.contains(a) || a.target === '_blank' || a.hasAttribute('download') || a.getAttribute('href').startsWith('#')) return;
+      let url;
+      try { url = new URL(a.href, location.href); } catch { return; }
+      if (url.origin !== location.origin || !inPlaceHop(url)) return;
+      e.preventDefault();
+      go(url.href);
     });
   }
 
