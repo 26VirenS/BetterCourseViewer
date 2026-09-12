@@ -155,9 +155,9 @@
       const valueEl = U.el('bcv-stat__value', value);
       const i = statIndex++;
       if (!entered && /^\d+$/.test(value)) U.roll(valueEl, Number(value), { seed: i * 2.3 }); // the counter scrambles briefly, then lands on the real count
+      // the label and the number share the top row (the number on the right, large); the note and the chevron sit below
       return U.enter(h('button', { type: 'button', class: 'bcv-card bcv-stat', onclick: (e) => onOpen(e.currentTarget) }, [
-        U.el('bcv-stat__head', [U.svg(icon, { size: 14, stroke: color, width: 1.9 }), U.text('bcv-label bcv-label--inline', lbl, 'span')]),
-        valueEl,
+        U.el('bcv-stat__head', [U.svg(icon, { size: 14, stroke: color, width: 1.9 }), U.text('bcv-label bcv-label--inline', lbl, 'span'), valueEl]),
         U.el('bcv-stat__noterow', [U.text('bcv-stat__note', note, 'span'), U.svg(IC.chevron, { size: 13, stroke: 'var(--bcv-ink3)', width: 2, cls: 'bcv-stat__chev' })]),
       ]), i, 50);
     }

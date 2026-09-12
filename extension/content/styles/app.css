@@ -310,9 +310,9 @@ html[data-bcv-theme="dark"] .bcv-badge--orange { color: #ffb44d; }
 .bcv-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; }
 .bcv-stat { padding: 16px 18px; border: 0; display: block; width: 100%; text-align: left; color: var(--bcv-ink); cursor: pointer; font: inherit; }
 .bcv-stat:hover { background: var(--bcv-hover); }
-.bcv-stat__head { display: flex; align-items: center; gap: 8px; }
-.bcv-stat__value { margin-top: 8px; font: 700 30px/1 var(--bcv-display); letter-spacing: -.03em; }
-.bcv-stat__noterow { margin-top: 6px; display: flex; align-items: center; gap: 6px; }
+.bcv-stat__head { display: flex; align-items: center; gap: 8px; min-height: 40px; }
+.bcv-stat__value { margin-left: auto; flex: none; font: 700 40px/1 var(--bcv-display); letter-spacing: -.03em; }
+.bcv-stat__noterow { margin-top: 10px; display: flex; align-items: center; gap: 6px; }
 .bcv-stat__note { font: 400 12.5px/1.3 var(--bcv-font); color: var(--bcv-ink3); }
 .bcv-stat__chev { margin-left: auto; flex: none; opacity: .7; }
 /* the sheet behind a counter */
