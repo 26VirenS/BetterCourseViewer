@@ -314,7 +314,7 @@
 
     // Within one course the header and the rail stay put between its tabs: only the main column
     // changes hands (the rail's entrance plays once; its collapse state and its counts carry over).
-    const kept = keptShell(id, course, dark);
+    const kept = keptShell('courses', id, course, dark);
     const shell = kept ? liveShell.shell : { course, reader: null, dark, kind: 'courses' };
     shell.tabs = tabs;
     shell.activeId = activeId;
@@ -330,7 +330,7 @@
       screen.replaceChildren(...shellEl.childNodes);
       screen.className = shellEl.className;
       screen.style.cssText = shellEl.style.cssText;
-      screen.dataset.bcvCourse = String(id);
+      screen.dataset.bcvCtx = `courses:${id}`;
       liveShell = { el: screen, shell }; // (a reference of our own: an expando on the node does not survive the wrapper)
       content = cmain;
     }
@@ -368,15 +368,23 @@
     return out;
   }
 
-  /** The course shell already on screen, when it is this course's and still current (the same
+  /** The shell already on screen, when it is this course's or group's and still current (the same
    *  appearance, colour and name); the phone's course screens are pushes of their own. */
-  function keptShell(id, course, dark) {
+  function keptShell(kind, id, course, dark) {
     if (BCV.phone?.active() || !liveShell) return null;
     const { el, shell } = liveShell;
-    if (!el.isConnected || el.parentNode?.id !== 'bcv-main' || el.dataset.bcvCourse !== String(id) || shell.dark !== dark) return null;
+    if (!el.isConnected || el.parentNode?.id !== 'bcv-main' || el.dataset.bcvCtx !== `${kind}:${id}` || shell.dark !== dark) return null;
     if (shell.course.color !== course.color || shell.course.name !== course.name) return null; // a new colour or nickname: the header is drawn again
     return el;
   }
+  /** Remembers a freshly built shell as the one on screen, so the next tab within it is kept. */
+  function holdShell(kind, id, el, shell) {
+    el.dataset.bcvCtx = `${kind}:${id}`;
+    liveShell = { el, shell };
+  }
+  /** The state object behind the kept shell — an expando on the node would not survive the
+   *  wrapper, so it is held here. Only meaningful right after keptShell() has said yes. */
+  const heldShell = () => liveShell?.shell || null;
   /** A kept shell follows the route: the active rail item, and counts read again. */
   function syncShell(ctx, screen, shell, activeId) {
     for (const b of screen.querySelectorAll('.bcv-rail__item, .bcv-rail__ext')) b.classList.toggle('is-active', b.dataset.tab === activeId);
@@ -905,6 +913,6 @@
     return b;
   };
 
-  BCV.screens.course = { render, prose, linksFrom, typeIcon, ptsLabel, statusBadge, openReader, contextShell };
+  BCV.screens.course = { render, prose, linksFrom, typeIcon, ptsLabel, statusBadge, openReader, contextShell, keptShell, holdShell, heldShell, syncShell };
   BCV.screens.courseTabs = T;
 })();

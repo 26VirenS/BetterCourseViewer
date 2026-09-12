@@ -190,6 +190,7 @@ scripts/
   dev/smoke-test.mjs           walks every screen in headless Chromium against the mock
   dev/phone-test.mjs           the same at an iPhone viewport: the phone layout (tab bar, sheets, course, item, quiz)
   dev/mac-window-test.mjs      the Mac app's own window: its four states (on, off, not known to Safari, waiting) and its buttons
+  dev/group-late-test.mjs      a group drawn before its course list lands, and the course folded in afterwards
   dev/store-shots.mjs          renders the Chrome Web Store screenshots and promo tiles into docs/store/
 docs/chrome-web-store.md       how to publish: listing text, permission justifications, release automation
 docs/store/                    the store's screenshots and promo tiles

@@ -697,17 +697,28 @@
   function frontPage(id, { force = false, refresh = false, kind = 'courses' } = {}) {
     return C.cached(`front:${kind}:${id}`, 10 * MIN, () => C.get(`/api/v1/${kind}/${id}/front_page`).catch(() => null), { force, refresh });
   }
-  /** One group, shaped like a course so the course tab builders can draw it. */
+  /** One group, shaped like a course so the course tab builders can draw it.
+   *
+   *  The group's own call is the only one waited on. Its course is worth showing — the colour, the
+   *  term and a link back — but /api/v1/courses is the slowest call the app makes, and a group that
+   *  waited for it would sit blank for as long as the course list takes. So the course is folded in
+   *  if the list is already here, and otherwise arrives on `withCourse`, which the screen can take
+   *  up after it has drawn. */
   async function group(id, { force = false, refresh = false } = {}) {
     const g = await C.cached(`group:${id}`, 15 * MIN, () => C.get(`/api/v1/groups/${id}`, { params: { include: ['group_category', 'users'] } }), { force, refresh });
-    const cs = await courses().catch(() => []);
-    const course = g.course_id ? cs.find((c) => c.id === String(g.course_id)) : null;
-    const color = course?.color || '#5856d6';
-    return {
+    const shape = (course) => ({
       id: String(g.id), raw: g, name: g.name, originalName: g.name, nickname: null, code: g.name, term: course?.term || (g.context_type === 'Account' ? 'Account group' : ''), favorite: false,
       state: course?.state || 'current', role: 'Member', score: null, grade: null, teachers: [], sections: [], image: g.avatar_url || null, defaultView: 'feed', weighted: false,
-      color, palette: U.palette(color, BCV.early?.isDark?.() ?? false), url: `/groups/${id}`, kind: 'groups', course, membersCount: g.members_count ?? null, description: g.description || '',
-    };
+      color: course?.color || '#5856d6', palette: U.palette(course?.color || '#5856d6', BCV.early?.isDark?.() ?? false),
+      url: `/groups/${id}`, kind: 'groups', course, membersCount: g.members_count ?? null, description: g.description || '',
+    });
+    const find = (cs) => (g.course_id ? (cs || []).find((c) => c.id === String(g.course_id)) || null : null);
+    // both of the calls courses() is built from, or it would still wait on the one that is missing
+    const here = C.ready('courses:all') && C.ready('colors') ? await courses().catch(() => []) : null;
+    const out = shape(find(here));
+    // a group with no course of its own is already whole; so is one drawn from a list we had
+    out.withCourse = here || !g.course_id ? Promise.resolve(null) : courses().catch(() => []).then((cs) => find(cs));
+    return out;
   }
   function syllabus(id, { force = false, refresh = false } = {}) {
     return C.cached(`syllabus:${id}`, 10 * MIN, () => C.get(`/api/v1/courses/${id}`, { params: { include: ['syllabus_body'] } }).then((c) => c?.syllabus_body || ''), { force, refresh });

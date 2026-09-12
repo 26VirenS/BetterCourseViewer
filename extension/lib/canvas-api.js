@@ -156,6 +156,13 @@
       if (inflight.get(k) === run) inflight.delete(k);
     }
   }
+  /** What is already in the memo for this key, or undefined — never a request. For the parts of a
+   *  screen that are worth drawing with if the answer happens to be here, and not worth waiting for
+   *  if it is not (a course's name beside a group, say). */
+  function ready(key) {
+    const hit = memory.get(cacheKey(key));
+    return hit && (!hit.until || hit.until > Date.now()) ? hit.value : undefined;
+  }
   const forget = (k) => {
     memory.delete(k);
     generation.set(k, (generation.get(k) || 0) + 1);
@@ -284,7 +291,7 @@
   }
 
   BCV.canvas = {
-    get, post, put, del, upload, cached, invalidate, invalidatePrefix, clearAll, csrfToken, CanvasError,
+    get, post, put, del, upload, cached, ready, invalidate, invalidatePrefix, clearAll, csrfToken, CanvasError,
     plannerItems, dashboardCards, activeCourses, courseColors, setPlannerComplete,
     coursesWithScores, courseTabs, course, courseModules, announcements, unreadCount,
   };

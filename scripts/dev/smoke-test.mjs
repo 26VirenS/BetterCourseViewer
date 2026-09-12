@@ -660,9 +660,34 @@ try {
   await tab('announcements');
   await page.waitForSelector('.bcv-body .bcv-row', { timeout: 10000 });
   check((await texts('.bcv-body .bcv-row'))[0].includes('Attestation due Friday'), 'group announcements come from /api/v1/groups');
+  // Between a group's tabs the header and the rail stay put, as they do within a course: the same
+  // nodes are still there afterwards, so a tab is a redraw of one column, not of the whole screen.
+  await page.$eval('.bcv-head h1', (el) => { el.dataset.bcvKeepMark = 'yes'; });
+  await page.$eval('.bcv-rail__item[data-tab="people"]', (el) => { el.dataset.bcvKeepMark = 'yes'; });
   await tab('people');
   await page.waitForSelector('.bcv-body .bcv-row', { timeout: 10000 });
   check((await texts('.bcv-body .bcv-row')).length === 2 && (await texts('.bcv-badge')).includes('Member'), 'group people');
+  const keptMarks = await page.$$eval('[data-bcv-keep-mark]', (els) => els.map((e) => e.className));
+  check(keptMarks.length === 2 && (await page.$eval('.bcv-rail__item[data-tab="people"]', (el) => el.classList.contains('is-active'))), `a group's header and rail survive a tab, the new tab marked active: ${keptMarks.length} kept`);
+
+  // /api/v1/courses is the slowest call the app makes, and a group row wants its course only for a
+  // subtitle and a badge: the rows are drawn from /users/self/groups alone and the courses fold in
+  // behind them. Held back once here, so the gap is long enough to be caught in the act. A real
+  // page load, not an in-place hop, because that is what starts with an empty memo.
+  let holdCourses = true;
+  await page.route(/\/api\/v1\/courses\?/, async (route) => {
+    if (!holdCourses) { await route.continue().catch(() => {}); return; }
+    holdCourses = false; // steps aside on its own; unrouting would race the request it is holding
+    await new Promise((r) => setTimeout(r, 1500));
+    await route.continue().catch(() => {});
+  });
+  await page.goto(`${BASE}/groups`, { waitUntil: 'commit' });
+  await page.waitForSelector('.bcv-body .bcv-row', { timeout: 10000 });
+  const early = await texts('.bcv-body .bcv-row');
+  check(early.length >= 2 && /Attestation Fall 2026 1/.test(early[0]) && !/Academic Success/.test(early.join(' ')), `the groups are listed without waiting for the course list: ${early[0]}`);
+  await page.waitForFunction(() => /Academic Success/.test(document.querySelector('.bcv-body')?.textContent || ''), null, { timeout: 10000 });
+  const settled = (await texts('.bcv-body > div > .bcv-label')).join(',').toLowerCase();
+  check(settled === 'current groups,previous groups', `the courses fold in behind them, and Previous groups appears once a group's course can be called past: ${settled}`);
 
   // ---- course home ---------------------------------------------------------------------------
   console.log('course');

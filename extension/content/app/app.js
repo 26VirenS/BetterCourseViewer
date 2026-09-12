@@ -473,8 +473,9 @@
     // Screens build off-DOM and land whole. A screen still fetching after 150ms gets a
     // skeleton in its place, shaped like its content (course cards on Grades, list rows
     // elsewhere); a cached screen lands before that and never flashes it.
-    // a course keeps its header and rail between its own tabs: the skeleton must not wipe them
-    const keepsShell = () => r.screen === 'course' && main.firstElementChild?.dataset?.bcvCourse === String(r.courseId);
+    // a course or a group keeps its header and rail between its own tabs: the skeleton must not wipe them
+    const keepsShell = () => (r.screen === 'course' || r.screen === 'group')
+      && main.firstElementChild?.dataset?.bcvCtx === `${r.screen === 'group' ? 'groups' : 'courses'}:${r.courseId}`;
     const skeleton = setTimeout(() => {
       if (alive() && !quiet && !keepsShell()) main.replaceChildren(U.el('bcv-screen bcv-screen--skel', U.el('bcv-body', U.loading(r.screen === 'gpa' ? 'cards' : 'rows', 6))));
     }, 150);

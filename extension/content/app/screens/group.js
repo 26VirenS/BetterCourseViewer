@@ -10,6 +10,8 @@
 
   const TAB_ICONS = { home: IC.book, announcements: IC.bell, pages: IC.page, people: IC.people, discussions: IC.disc, files: IC.folder, conferences: IC.video, collaborations: IC.people };
 
+  const coursePill = (course) => h('a', { class: 'bcv-pill bcv-pill--term', 'data-bcv-ctx-pill': '1', href: course.url, text: course.name, style: { color: 'var(--bcv-ink3)' } });
+
   async function render(ctx) {
     const { app, route } = ctx;
     const id = route.courseId;
@@ -26,7 +28,6 @@
       screen.lastChild.replaceChildren(U.errorBox('This group could not be loaded. You may not be a member of it.'));
       return screen;
     }
-    const shell = { course: group, reader: null, dark, kind: 'groups' };
     const tabs = (tabsRaw || []).filter((t) => !t.hidden).map((t) => {
       const external = t.type === 'external' || String(t.id).startsWith('context_external_tool');
       const path = (() => {
@@ -46,15 +47,49 @@
       return tabs.find((x) => x.href !== group.url && route.path.startsWith(x.href))?.id || (route.tab === 'native' ? null : 'home');
     })();
 
+    // the first pill is the group's course, or its term when it has no course. It carries a mark of
+    // its own because a course arriving late replaces it, and without the mark that lookup would
+    // find the members pill instead whenever the group started out with neither.
     const pills = [
-      group.course ? h('a', { class: 'bcv-pill bcv-pill--term', href: group.course.url, text: group.course.name, style: { color: 'var(--bcv-ink3)' } }) : (group.term ? h('span', { class: 'bcv-pill bcv-pill--term', text: group.term }) : null),
+      // with neither it is an empty placeholder, held out of sight until the course lands in it
+      group.course ? coursePill(group.course) : h('span', { class: 'bcv-pill bcv-pill--term', 'data-bcv-ctx-pill': '1', text: group.term || '', style: group.term ? {} : { display: 'none' } }),
       group.membersCount !== null ? h('span', { class: 'bcv-pill bcv-pill--term', text: U.plural(group.membersCount, 'member') }) : null,
     ];
-    const { screen: shellEl, content } = await BCV.screens.course.contextShell(ctx, shell, { backLabel: 'Groups', backHref: '/groups', tabs, activeId, pills });
-    if (!ctx.alive()) return screen;
-    screen.replaceChildren(...shellEl.childNodes);
-    screen.className = shellEl.className;
-    screen.style.cssText = shellEl.style.cssText;
+    // Within one group the header and the rail stay put between its tabs, as they do within a
+    // course: only the main column changes hands, so a tab is a redraw of one column rather than
+    // of the whole screen.
+    const K = BCV.screens.course;
+    const kept = K.keptShell('groups', id, group, dark);
+    const shell = kept ? K.heldShell() : { course: group, reader: null, dark, kind: 'groups' };
+    shell.tabs = tabs;
+    shell.activeId = activeId;
+    shell.reader = null;
+    let content;
+    if (kept) {
+      shell.course = group;
+      K.syncShell(ctx, kept, shell, activeId);
+      content = kept.querySelector('.bcv-cmain');
+      content.classList.add('is-loading'); // the old column dims until the new one lands
+    } else {
+      const { screen: shellEl, content: cmain } = await K.contextShell(ctx, shell, { backLabel: 'Groups', backHref: '/groups', tabs, activeId, pills });
+      if (!ctx.alive()) return screen;
+      screen.replaceChildren(...shellEl.childNodes);
+      screen.className = shellEl.className;
+      screen.style.cssText = shellEl.style.cssText;
+      K.holdShell('groups', id, screen, shell);
+      content = cmain;
+    }
+    const out = kept || screen;
+    shell.markRail?.(activeId); // the row for this tab fills while its column is fetched
+    // The group's course carries its colour, the term and a link back to it. It arrives on its own
+    // when the course list was not already here, so the header takes it up after the fact rather
+    // than the screen waiting on the slowest call the app makes.
+    const adopt = () => { if (group.course) adoptCourse(out, shell, group.course); };
+    group.withCourse?.then((course) => {
+      if (!course || !ctx.alive()) return;
+      group.course = course;
+      adopt();
+    }).catch(() => {});
 
     const T = BCV.screens.courseTabs;
     const D = BCV.screens.courseDetail;
@@ -71,10 +106,41 @@
       case 'page': el = await D.page(ctx, shell); break;
       default: el = T.native(ctx, shell);
     }
-    if (!ctx.alive()) return screen;
-    content.append(el);
+    if (!ctx.alive()) return out;
+    content.classList.remove('is-loading');
+    content.replaceChildren(el);
+    // the column was built off-DOM, so a course that landed while it was building could not reach
+    // its About card; now that it is in place, anything still missing is filled in
+    adopt();
+    shell.markRail?.(null);
     document.title = `${group.name} · ${app.siteName()}`;
-    return screen;
+    return out;
+  }
+
+  /** The group's course, once it has been read: the colour the shell is painted in, the term, and
+   *  the link back to it in the header and in the About card. Everything else on screen was already
+   *  right without it. Safe to call more than once — the course can land before or after the column,
+   *  so this runs at both moments and each piece is only put in if it is not there yet. */
+  function adoptCourse(screenEl, shell, course) {
+    const g = shell.course;
+    g.term = course.term || g.term;
+    g.state = course.state || g.state;
+    if (g.color !== course.color) {
+      g.color = course.color;
+      g.palette = U.palette(course.color, shell.dark);
+      screenEl.style.setProperty('--bcv-rail-color', g.color);
+      screenEl.style.setProperty('--bcv-rail-tint', g.palette.tint);
+      screenEl.style.setProperty('--bcv-rail-text', g.palette.text);
+      screenEl.style.setProperty('--bcv-rail-wash', U.rgba(g.color, shell.dark ? 0.3 : 0.2));
+      const dot = screenEl.querySelector('.bcv-dot--sq');
+      if (dot) dot.style.background = g.color;
+    }
+    const pill = screenEl.querySelector('[data-bcv-ctx-pill]');
+    if (pill && pill.tagName !== 'A') pill.replaceWith(coursePill(course));
+    const about = screenEl.querySelector('.bcv-detail__meta');
+    if (about && !about.querySelector('[data-bcv-course-row]')) {
+      about.append(h('span', { class: 'bcv-detail__meta-item', 'data-bcv-course-row': '1' }, [h('b', { text: 'Course ' }), h('a', { href: course.url, text: course.name })]));
+    }
   }
 
   async function home(ctx, shell) {
@@ -90,7 +156,8 @@
       U.el('bcv-detail__meta', [
         g.membersCount !== null ? h('span', { class: 'bcv-detail__meta-item' }, [h('b', { text: 'Members ' }), String(g.membersCount)]) : null,
         g.raw.group_category?.name ? h('span', { class: 'bcv-detail__meta-item' }, [h('b', { text: 'Set ' }), g.raw.group_category.name]) : null,
-        g.course ? h('span', { class: 'bcv-detail__meta-item' }, [h('b', { text: 'Course ' }), h('a', { href: g.course.url, text: g.course.name })]) : null,
+        // the same mark the late-arriving course looks for, so a course known by now is not added twice
+        g.course ? h('span', { class: 'bcv-detail__meta-item', 'data-bcv-course-row': '1' }, [h('b', { text: 'Course ' }), h('a', { href: g.course.url, text: g.course.name })]) : null,
       ]),
     ]), 'bcv-card--22')]));
     right.append(U.card([
