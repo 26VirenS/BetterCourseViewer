@@ -1077,14 +1077,31 @@ try {
   console.log('motion');
   await page.goto(`${BASE}/`);
   await page.waitForSelector('.bcv-stat', { timeout: 10000 });
-  await page.waitForSelector('#bcv-progress[hidden]', { state: 'attached', timeout: 5000 });
+  await page.waitForFunction(() => document.documentElement.classList.contains('bcv-settled') && !document.querySelector('.bcv-load'), null, { timeout: 5000 });
   const motion = await page.evaluate(() => ({
     screen: getComputedStyle(document.querySelector('.bcv-main > .bcv-screen')).animationName,
-    bar: getComputedStyle(document.querySelector('.bcv-progress__bar')).animationName,
-    barHidden: document.getElementById('bcv-progress').hidden,
-    barAria: document.getElementById('bcv-progress').getAttribute('aria-hidden'),
+    noBar: !document.getElementById('bcv-progress') && !document.querySelector('.bcv-load'),
   }));
-  check(motion.screen === 'bcv-fade-up' && motion.bar === 'bcv-bar' && motion.barHidden && motion.barAria === 'true', `screens rise in by keyframe; the navigation bar sweeps while loading and hides once the screen is drawn: ${JSON.stringify(motion)}`);
+  check(motion.screen === 'bcv-fade-up' && motion.noBar, `screens rise in by keyframe; no page-top bar, and no row wash once the screen is drawn: ${JSON.stringify(motion)}`);
+  // mockup 14: the pressed control is the progress bar. A sidebar row that starts a load fills left to
+  // right with a flat wash in its own icon colour, under its label; a second press is a no-op.
+  const slowCal = /\/calendar(\?.*)?$/; // the next page's own document is held back, so the pressed row's wash can be watched
+  await page.route(slowCal, async (route) => { if (route.request().resourceType() !== 'document') { await route.continue().catch(() => {}); return; } await new Promise((r) => setTimeout(r, 900)); await route.continue().catch(() => {}); });
+  const wash = await page.evaluate(() => { // the press and the reading in one task: the wash is painted synchronously by the press
+    const row = document.querySelector('.bcv-nav__item[data-nav="calendar"]');
+    row.click();
+    const fill = row.querySelector('.bcv-load');
+    if (!fill) return { fill: false };
+    const cs = getComputedStyle(fill);
+    row.click(); // the row already loading: nothing queued, nothing restarted
+    return { anim: cs.animationName, origin: cs.transformOrigin, bg: cs.backgroundColor, loading: row.classList.contains('is-loading'), under: getComputedStyle(row.querySelector('.bcv-nav__ic')).position, clipped: getComputedStyle(row).overflow, others: document.querySelectorAll('.bcv-load').length, stillOne: row.querySelectorAll('.bcv-load').length };
+  }).catch((e) => ({ error: e.message }));
+  check(wash && wash.anim === 'bcv-load' && /^0px/.test(wash.origin) && wash.bg === 'rgba(88, 86, 214, 0.2)' && wash.loading && wash.under === 'relative' && wash.clipped === 'hidden' && wash.others === 1 && wash.stillOne === 1, `Calendar fills its own row with a 20% wash of its indigo, from the left, under the label; no other row lights and a second press changes nothing: ${JSON.stringify(wash)}`);
+  await page.unroute(slowCal);
+  await page.waitForFunction(() => location.pathname === '/calendar' && document.documentElement.classList.contains('bcv-settled') && !document.querySelector('.bcv-load'), null, { timeout: 15000 });
+  check(true, 'the wash leaves when the next page has drawn its screen');
+  await page.goto(`${BASE}/`);
+  await page.waitForSelector('.bcv-stat', { timeout: 10000 });
   // mockup 9: blocks follow the screen on a stagger from one helper (delay = index × step, capped at 420ms)
   const stagger = await page.evaluate(() => [...document.querySelectorAll('.bcv-stat.bcv-enter')].map((e) => `${getComputedStyle(e).animationName}@${getComputedStyle(e).animationDelay}`));
   check(stagger.slice(0, 3).join(',') === 'bcv-fade-up@0s,bcv-fade-up@0.05s,bcv-fade-up@0.1s', `stat cards arrive on a 50ms stagger: ${stagger.join(',')}`);
@@ -1143,19 +1160,39 @@ try {
   await page.waitForSelector('.bcv-skel', { timeout: 10000 });
   const skel = await page.evaluate(() => {
     const s = document.querySelector('.bcv-skel');
-    return { aria: s.getAttribute('aria-hidden'), rows: s.querySelectorAll('.bcv-skel__row').length, shimmer: getComputedStyle(s.querySelector('.bcv-skel__b')).animationName, delay: getComputedStyle(s).animationDelay, barShown: !document.getElementById('bcv-progress').hidden };
+    const fav = document.querySelector('.bcv-fav.is-loading .bcv-load');
+    return { aria: s.getAttribute('aria-hidden'), rows: s.querySelectorAll('.bcv-skel__row').length, shimmer: getComputedStyle(s.querySelector('.bcv-skel__b')).animationName, delay: getComputedStyle(s).animationDelay, favWash: fav ? getComputedStyle(fav).backgroundColor : null, favRow: document.querySelector('.bcv-fav.is-loading')?.textContent.trim() };
   });
-  check(skel.aria === 'true' && skel.rows === 6 && skel.shimmer === 'bcv-shimmer' && skel.delay === '0.15s' && skel.barShown, `while a response is slow the bar sweeps and skeleton rows shimmer, hidden from screen readers: ${JSON.stringify(skel)}`);
+  check(skel.aria === 'true' && skel.rows === 6 && skel.shimmer === 'bcv-shimmer' && skel.delay === '0.15s' && /^rgba\(\d+, \d+, \d+, 0\.2\)$/.test(skel.favWash) && skel.favRow === 'F26-SPRK 010 103', `while a response is slow the course's own sidebar row fills with its colour and skeleton rows shimmer, hidden from screen readers: ${JSON.stringify(skel)}`);
   await page.unroute(slow);
   await page.waitForSelector('.bcv-sb__foot', { timeout: 15000 });
-  check(!(await page.$('.bcv-skel')) && (await page.$eval('#bcv-progress', (el) => el.hidden)), 'the skeleton and the bar leave when the content lands');
+  check(!(await page.$('.bcv-skel')) && !(await page.$('.bcv-load')), 'the skeleton and the wash leave when the content lands');
+  // the course rail loads the same way, in the course colour, with its own key: only the pressed row
+  await page.goto(`${BASE}/courses/101`);
+  await page.waitForSelector('.bcv-rail__item', { timeout: 10000 });
+  await page.waitForFunction(() => document.documentElement.classList.contains('bcv-settled') && !document.querySelector('.bcv-load'), null, { timeout: 10000 });
+  const slowDisc = /\/api\/v1\/courses\/101\/discussion_topics(\?|$)/; // Discussions is not read by Home, so the tab really fetches
+  await page.route(slowDisc, async (route) => { await new Promise((r) => setTimeout(r, 900)); await route.continue().catch(() => {}); });
+  await page.evaluate(() => document.querySelector('.bcv-rail__item[data-tab="discussions"]').click());
+  await page.waitForSelector('.bcv-rail__item[data-tab="discussions"] .bcv-load--rail', { timeout: 3000 });
+  const railWash = await page.evaluate(() => ({ bg: getComputedStyle(document.querySelector('.bcv-rail__item[data-tab="discussions"] .bcv-load')).backgroundColor, lit: [...document.querySelectorAll('.bcv-load')].length, sidebar: !!document.querySelector('#bcv-side .bcv-load'), railColor: getComputedStyle(document.querySelector('.bcv-screen--ctx')).getPropertyValue('--bcv-rail-color').trim().toLowerCase() }));
+  check(railWash.lit === 1 && !railWash.sidebar && railWash.railColor === '#1770ab' && railWash.bg === 'rgba(23, 112, 171, 0.2)', `a rail row fills with the course colour at 20%, and the sidebar stays dark (its own key): ${JSON.stringify(railWash)}`);
+  await page.unroute(slowDisc);
+  await page.waitForFunction(() => location.pathname.endsWith('/discussion_topics') && document.documentElement.classList.contains('bcv-settled') && !document.querySelector('.bcv-load'), null, { timeout: 10000 });
+  check(true, 'the rail wash leaves when the column lands');
   await page.goto(`${BASE}/`);
   await page.waitForSelector('.bcv-stat', { timeout: 10000 });
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.reload();
   await page.waitForSelector('.bcv-stat', { timeout: 10000 });
-  const reduced = await page.evaluate(() => [getComputedStyle(document.querySelector('.bcv-main > .bcv-screen')).animationName, getComputedStyle(document.querySelector('.bcv-progress__bar')).animationName, getComputedStyle(document.querySelector('.bcv-stat.bcv-enter')).animationName, getComputedStyle(document.querySelector('.bcv-work__fill--grow')).animationName, document.querySelector('.bcv-stat__value').textContent]);
-  check(reduced[0] === 'none' && reduced[1] === 'bcv-bar' && reduced[2] === 'none' && reduced[3] === 'none' && reduced[4] === dueNow, `reduced motion drops the entrances (and the stagger, the bar wipe, the counter roll) but keeps the loading indicators: ${reduced.join(' / ')}`);
+  const reduced = await page.evaluate(() => {
+    const probe = document.createElement('span'); probe.className = 'bcv-load'; document.querySelector('.bcv-nav__item').append(probe); // a wash under reduced motion: a still, partial fill
+    const cs = getComputedStyle(probe);
+    const out = [getComputedStyle(document.querySelector('.bcv-main > .bcv-screen')).animationName, `${cs.animationName}/${cs.transform}`, getComputedStyle(document.querySelector('.bcv-stat.bcv-enter')).animationName, getComputedStyle(document.querySelector('.bcv-work__fill--grow')).animationName, document.querySelector('.bcv-stat__value').textContent];
+    probe.remove();
+    return out;
+  });
+  check(reduced[0] === 'none' && reduced[1] === 'none/matrix(0.6, 0, 0, 1, 0, 0)' && reduced[2] === 'none' && reduced[3] === 'none' && reduced[4] === dueNow, `reduced motion drops the entrances (and the stagger, the bar wipe, the counter roll); the row wash holds still part way: ${reduced.join(' / ')}`);
   await page.emulateMedia({ reducedMotion: 'no-preference' });
 
   // ---- the look switched off from settings (popup / options) -------------------------------------------

@@ -32,7 +32,7 @@ html[data-bcv-theme="dark"] {
 @keyframes bcv-pop { from { opacity: 0; transform: scale(.96); } to { opacity: 1; transform: none; } }
 @keyframes bcv-sheet { from { opacity: 0; transform: translateY(14px) scale(.985); } to { opacity: 1; transform: none; } }
 @keyframes bcv-shimmer { 0% { background-position: -320px 0; } 100% { background-position: 320px 0; } }
-@keyframes bcv-bar { 0% { transform: translateX(-100%) scaleX(.4); } 55% { transform: translateX(20%) scaleX(.7); } 100% { transform: translateX(100%) scaleX(.5); } }
+@keyframes bcv-load { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 @keyframes bcv-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 /* mockup 11: a sheet grows out of the control that opened it (transform-origin set per sheet), the scrim blurs in */
 @keyframes bcv-morph { from { opacity: 0; transform: scale(.82); } 60% { opacity: 1; } to { opacity: 1; transform: scale(1); } }
@@ -68,9 +68,14 @@ html.bcv-phone .bcv-sheet { animation: bcv-sheet .26s cubic-bezier(.32,.72,0,1) 
 .bcv-btn:active:not(:disabled), .bcv-sb__btn:active:not(:disabled), .bcv-qz__big:active, .bcv-gpa__details:active { transform: scale(.97); }
 .bcv-row--link, .bcv-row--hover, .bcv-sheet__row, .bcv-nf__row, .bcv-menu__item, .bcv-nav__item, .bcv-rail__item, .bcv-rail__ext, .bcv-fav, .bcv-theme-btn { transition: background .18s ease; }
 /* the navigation bar: a 2.5px sweep pinned to the top of the viewport while a route loads (early.js shows it, app.js hides it once the screen is drawn) */
-#bcv-progress { position: fixed; top: 0; left: 0; right: 0; height: 2.5px; z-index: 60; overflow: hidden; background: transparent; pointer-events: none; }
-#bcv-progress[hidden], html:not(.bcv-on) #bcv-progress { display: none; }
-.bcv-progress__bar { width: 100%; height: 2.5px; background: linear-gradient(90deg, transparent, var(--bcv-blue, #0a6cff), transparent); animation: bcv-bar .62s cubic-bezier(.4,0,.2,1) infinite; }
+/* the pressed control is the progress bar (mockup 14): a flat wash in the row's own icon colour (the
+   course colour on the course rail) fills the row left to right for the duration of the fetch, under
+   the label and icon; no page-top bar. Under reduced motion the fill holds still, part way. */
+.bcv-nav__item, .bcv-fav, .bcv-rail__item, .bcv-rail__ext { position: relative; overflow: hidden; }
+.bcv-nav__item > *, .bcv-fav > *, .bcv-rail__item > *, .bcv-rail__ext > * { position: relative; }
+.bcv-load { position: absolute; left: 0; top: 0; bottom: 0; width: 100%; border-radius: inherit; transform-origin: left; animation: bcv-load .62s cubic-bezier(.4,0,.2,1) both; pointer-events: none; }
+.bcv-load--rail { background: var(--bcv-rail-wash); }
+@media (prefers-reduced-motion: reduce) { .bcv-load { animation: none; transform: scaleX(.6); } }
 /* skeletons shaped like the content they replace; a load faster than 150ms never shows them */
 .bcv-skel { --bcv-skel: linear-gradient(90deg, rgba(120,120,128,.1) 0px, rgba(120,120,128,.18) 120px, rgba(120,120,128,.1) 240px); display: flex; flex-direction: column; gap: 10px; animation: bcv-fade-in .2s ease .15s both; }
 html[data-bcv-theme="dark"] .bcv-skel { --bcv-skel: linear-gradient(90deg, rgba(255,255,255,.05) 0px, rgba(255,255,255,.12) 120px, rgba(255,255,255,.05) 240px); }
@@ -93,7 +98,7 @@ html[data-bcv-theme="dark"] .bcv-skel { --bcv-skel: linear-gradient(90deg, rgba(
 .bcv-skel__bar { height: 6px; border-radius: 3px; }
 .bcv-skel__btn { height: 34px; border-radius: 17px; }
 @media (prefers-reduced-motion: reduce) {
-  /* entrances go (data lands on its final value at once); the loading indicators (bar, shimmer) stay */
+  /* entrances go (data lands on its final value at once); the loading indicators (the row wash, the shimmer) stay */
   .bcv-main > .bcv-screen, .bcv-main > .bcv-qz, .bcv-main > .bcv-sb, .bcv-sheet-ov, .bcv-sheet, .bcv-smart, .bcv-menu, .bcv-toast, .bcv-gpa__pop, .bcv-reader-ov, .bcv-skel, .bcv-enter, .bcv-fb__fill,
   .bcv-work__row--in, .bcv-work__fill--grow, .bcv-ring--fill, .bcv-gpa__line--draw, .bcv-gpa__pt--in { animation: none; }
   .bcv-stat, .bcv-gpa__card, .bcv-ccard, .bcv-btn, .bcv-sb__btn { transition: none; }

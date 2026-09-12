@@ -62,7 +62,7 @@ try {
 
   await page.goto(`${BASE}/`);
   await page.waitForSelector('.bcv-stat', { timeout: 15000 });
-  await page.waitForSelector('#bcv-progress[hidden]', { state: 'attached', timeout: 10000 });
+  await page.waitForFunction(() => document.documentElement.classList.contains('bcv-settled') && !document.querySelector('.bcv-load'), null, { timeout: 10000 });
   await settle(page);
   await shot('01-dashboard');
 

@@ -143,17 +143,18 @@
       render();
       return;
     }
-    progress(true); // the bar runs from the tap until the next page has drawn its screen
     if (samePage) {
+      progress(true, state.loadKey || loadKeyFor(parseRoute(url.href)));
       location.reload();
       return;
     }
-    if (!replace && inPlaceCourseHop(url)) {
+    if (!replace && inPlaceCourseHop(url)) { // the rail row that was pressed is the indicator here, never a sidebar row
       history.pushState({ bcv: true }, '', url.pathname + url.search + url.hash);
       window.scrollTo(0, 0);
       render();
       return;
     }
+    progress(true, state.loadKey || loadKeyFor(parseRoute(url.href))); // the pressed row (or the next page's own row) fills until that page has drawn its screen
     if (replace) location.replace(url.href);
     else location.assign(url.href);
   }
@@ -295,8 +296,8 @@
       h('nav', { class: 'bcv-nav' }, navDef().map(([key, label, icon, glyphColor, href, count]) => h('button', {
         type: 'button',
         class: `bcv-nav__item ${r.screen === key || (key === 'groups' && r.screen === 'group') ? 'is-active' : ''}`,
-        dataset: { nav: key },
-        onclick: () => go(href),
+        dataset: { nav: key, load: key, loadColor: glyphColor },
+        onclick: () => { if (state.loadKey === key) return; progress(true, key); go(href); }, // a second press on the loading row is a no-op
       }, [
         h('span', { class: 'bcv-nav__ic' }, U.svg(icon, { size: 21, stroke: glyphColor, width: 1.8 })),
         h('span', { text: label }),
@@ -307,7 +308,8 @@
         ...state.favs.map((c) => h('button', {
           type: 'button',
           class: `bcv-fav ${r.courseId === c.id ? 'is-active' : ''}`,
-          onclick: () => go(c.url),
+          dataset: { load: `fav:${c.id}`, loadColor: c.color },
+          onclick: () => { if (state.loadKey === `fav:${c.id}`) return; progress(true, `fav:${c.id}`); go(c.url); },
           title: c.name,
         }, [h('span', { class: 'bcv-fav__dot', style: { background: c.color } }), h('span', { class: 'bcv-ellip', text: c.shortName || c.name })])),
         state.favs.length ? null : U.text('bcv-hint', 'Star a course under Courses to pin it here.'),
@@ -324,6 +326,7 @@
         ]),
       ]),
     );
+    paintLoad(); // a row still loading keeps its wash across a redraw
   }
 
   /** Log out of Canvas: the app's own sign-out in the iOS app, else Canvas's logout form (a DELETE
@@ -375,20 +378,34 @@
     await S.update({ appearance: { darkMode: next } });
   }
 
-  // ---- the navigation bar (mockup 8) ----------------------------------------------------------
-  // early.js shows it while the page loads; render() keeps it up while a screen fetches
-  // its data and hides it once the screen is drawn. A cached screen (under 150ms) never
-  // flashes it, and a failed screen still ends it — the error card is the signal then.
-  let progressTimer = null;
-  function progress(on) {
-    clearTimeout(progressTimer);
-    let bar = document.getElementById('bcv-progress');
-    if (!bar) {
-      bar = h('div', { id: 'bcv-progress', hidden: true, 'aria-hidden': 'true' }, h('div', { class: 'bcv-progress__bar' }));
-      html.append(bar);
+  // ---- the pressed control is the progress bar (mockup 14) ---------------------------------------
+  // The sidebar row (or favourite) that started a load fills left to right with a flat wash in its
+  // own icon colour until the screen is drawn; a fresh page lights the row for its route as soon as
+  // the sidebar mounts. There is no separate bar: one indicator, attached to the thing that caused
+  // the wait. state.loadKey names WHICH control is loading (a boolean would light every row).
+  const NAV_KEY = { dashboard: 'dashboard', todo: 'todo', notifications: 'notifications', courses: 'courses', groups: 'groups', group: 'groups', calendar: 'calendar', inbox: 'inbox', gpa: 'gpa' };
+  function loadKeyFor(r) {
+    if (r.screen === 'course' && r.courseId) return state.favs.some((c) => String(c.id) === String(r.courseId)) ? `fav:${r.courseId}` : null;
+    return NAV_KEY[r.screen] || null;
+  }
+  function paintLoad() {
+    if (!side) return;
+    for (const el of side.querySelectorAll('[data-load]')) {
+      const on = !!state.loadKey && el.dataset.load === state.loadKey;
+      el.classList.toggle('is-loading', on);
+      const fill = el.querySelector('.bcv-load');
+      if (on && !fill) el.prepend(h('span', { class: 'bcv-load', 'aria-hidden': 'true', style: { background: U.rgba(el.dataset.loadColor, state.dark ? 0.3 : 0.2) } })); // 20% over white, 30% over black
+      else if (!on && fill) fill.remove();
     }
-    if (on) progressTimer = setTimeout(() => { bar.hidden = false; }, 150);
-    else bar.hidden = true;
+  }
+  /** progress(true, key) lights the control `key`; progress(true) lights the row for the current
+   *  route when nothing is lit; progress(false) clears whichever is. */
+  function progress(on, key) {
+    if (on) {
+      if (key !== undefined) state.loadKey = key;
+      else if (!state.loadKey) state.loadKey = loadKeyFor(state.route || parseRoute());
+    } else state.loadKey = null;
+    paintLoad();
   }
 
   // ---- screens --------------------------------------------------------------------------------
@@ -400,7 +417,8 @@
     const alive = () => id === state.renderId;
     state.renderedAt = Date.now();
     html.classList.remove('bcv-settled');
-    if (!quiet) progress(true);
+    // a fresh page lights the sidebar row for its route; a later in-place render lights only what was pressed
+    if (!quiet) progress(true, state.loadKey || (state.everRendered ? null : loadKeyFor(r)));
     state.quizOpen = false;
     state.submitOpen = false;
     html.classList.remove('bcv-quiz', 'bcv-quiz-fb'); // the quiz screen puts them back while an attempt or its feedback is on screen
@@ -455,6 +473,7 @@
     if (!alive()) return;
     if (el.parentNode !== main) main.replaceChildren(el); // a screen that kept its shell (a course's rail) stays put
     progress(false);
+    state.everRendered = true;
     html.classList.add('bcv-settled'); // drawn, from Canvas's answer (the harness waits for this)
     document.title = titleFor(r);
     if (phone()) BCV.phone.afterRender(BCV.app, r, el);
@@ -498,6 +517,7 @@
     ]);
     state.me = me;
     state.favs = favs;
+    if (!state.everRendered && !state.loadKey) progress(true, loadKeyFor(state.route || parseRoute())); // a course page's own favourite row, once the favourites are known
     state.term = term;
     state.todoCount = todos ? todos.length : null;
     state.unread = unread;

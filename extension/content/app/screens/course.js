@@ -140,7 +140,8 @@
     const { app } = ctx;
     const c = shell.course;
     const narrow = !!(await store.pref('courseSideCollapsed', false));
-    const screen = U.el('bcv-screen bcv-screen--ctx', null, { style: { '--w': '1180px', '--bcv-rail-color': c.color, '--bcv-rail-tint': c.palette.tint, '--bcv-rail-text': c.palette.text } });
+    // --bcv-rail-wash: the loading wash for a pressed rail row, the course colour at 20% (30% in dark), mockup 14
+    const screen = U.el('bcv-screen bcv-screen--ctx', null, { style: { '--w': '1180px', '--bcv-rail-color': c.color, '--bcv-rail-tint': c.palette.tint, '--bcv-rail-text': c.palette.text, '--bcv-rail-wash': U.rgba(c.color, shell.dark ? 0.3 : 0.2) } });
     const head = U.el('bcv-head bcv-head--course', U.el('bcv-head__in', [
       h('button', { type: 'button', class: 'bcv-linkbtn', onclick: () => app.go(backHref) }, [U.svg(IC.back, { size: 14, stroke: 'var(--bcv-blue)', width: 2.1 }), backLabel]),
       U.el('bcv-course__title-row', [
@@ -198,7 +199,7 @@
         class: `bcv-rail__item ${active ? 'is-active' : ''}`,
         dataset: { tab: t.id },
         title: t.label,
-        onclick: () => app.go(t.href),
+        onclick: () => { if (shell.railLoad === t.id) return; shell.markRail(t.id); app.go(t.href); }, // the pressed row fills until its column lands; a repeat press is a no-op
       }, [
         h('span', { class: 'bcv-rail__tile' }, U.svg(t.icon, { size: 20, width: 1.8 })), // the glyph in the course colour (mockup 11)
         h('span', { class: 'bcv-rail__label', text: t.label }),
@@ -214,10 +215,23 @@
           class: `bcv-rail__ext ${t.id === activeId ? 'is-active' : ''}`,
           dataset: { tab: t.id },
           title: t.label,
-          onclick: () => app.go(t.href),
+          onclick: () => { if (shell.railLoad === t.id) return; shell.markRail(t.id); app.go(t.href); },
         }, [h('span', { class: 'bcv-rail__label', text: t.label }), U.svg(EXT_ARROW, { size: 12, width: 2, style: { flex: 'none' } })]))),
       ]), groups.filter((g) => g.items.length).length, 60) : null,
     ]);
+    // the rail's own loading key (separate from the sidebar's): the row named fills with the course
+    // colour; null clears it. A row already filling keeps its fill (the animation never restarts).
+    shell.railLoad = null;
+    shell.markRail = (id) => {
+      shell.railLoad = id;
+      for (const b of rail.querySelectorAll('.bcv-rail__item, .bcv-rail__ext')) {
+        const on = !!id && b.dataset.tab === id;
+        b.classList.toggle('is-loading', on);
+        const fill = b.querySelector('.bcv-load');
+        if (on && !fill) b.prepend(h('span', { class: 'bcv-load bcv-load--rail', 'aria-hidden': 'true' }));
+        else if (!on && fill) fill.remove();
+      }
+    };
     let syncToggle = () => {};
     const toggle = h('button', { type: 'button', class: 'bcv-rail__toggle', onclick: () => {
       const on = rail.classList.toggle('is-narrow');
@@ -321,6 +335,7 @@
       content = cmain;
     }
     const out = kept || screen;
+    shell.markRail?.(activeId); // the row for this tab fills while its column is fetched
 
     const B = BCV.screens.courseTabs;
     const D = BCV.screens.courseDetail;
@@ -348,6 +363,7 @@
     if (!ctx.alive()) return out;
     content.classList.remove('is-loading');
     content.replaceChildren(el);
+    shell.markRail?.(null);
     document.title = `${course.name} · ${app.siteName()}`;
     return out;
   }
