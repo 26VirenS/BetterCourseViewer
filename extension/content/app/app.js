@@ -212,6 +212,18 @@
     });
   }
 
+  /** A screen that can start its own reading before it is asked for (the calendar's is several
+   *  requests deep) warms it when the pointer reaches its row. Once per page per screen, and
+   *  quietly: a failure here is nothing to report, the screen itself will say so. */
+  const warmed = new Set();
+  function warm(key) {
+    if (warmed.has(key)) return;
+    const screen = screens[key];
+    if (!screen?.prefetch) return;
+    warmed.add(key);
+    try { Promise.resolve(screen.prefetch()).catch(() => {}); } catch { /* nothing to do */ }
+  }
+
   const navDef = () => [
     ['dashboard', 'Dashboard', IC.dash, '#0a6cff', '/', ''],
     ['courses', 'Courses', IC.book, '#ff9500', '/courses', ''],
@@ -324,6 +336,8 @@
         class: `bcv-nav__item ${r.screen === key || (key === 'groups' && r.screen === 'group') ? 'is-active' : ''}`,
         dataset: { nav: key, load: key, loadColor: glyphColor },
         onclick: () => { if (state.loadKey === key) return; progress(true, key); go(href); }, // a second press on the loading row is a no-op
+        onpointerenter: () => warm(key), // the pointer arrives before the press: the screen's own data starts loading now
+        onfocus: () => warm(key),
       }, [
         h('span', { class: 'bcv-nav__ic' }, U.svg(icon, { size: 21, stroke: glyphColor, width: 1.8 })),
         h('span', { text: label }),

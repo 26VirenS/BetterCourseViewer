@@ -526,6 +526,9 @@
   }
 
   // ---- calendar -------------------------------------------------------------------------------
+  /** Calendars Canvas has already refused on this page (a concluded course, a restricted section).
+   *  Asking for them again only costs a round trip and gets the same answer. */
+  const knownRefused = new Set();
   async function calendarContexts() {
     const [u, cs, gs] = await Promise.all([me(), courses(), groups().catch(() => [])]);
     const list = [{ code: `user_${u.id}`, name: u.name, color: '#0a84ff', kind: 'user' }];
@@ -561,8 +564,12 @@
     const e = isoDay(U.addDays(U.startOfDay(end), 1));
     const key = `cal:${s.slice(0, 10)}:${e.slice(0, 10)}:${codes.join(',')}`;
     return C.cached(key, 5 * MIN, async () => {
+      if (force || refresh) knownRefused.clear(); // asked afresh: give every calendar another go
       const events = [];
-      const refused = [];
+      // a calendar already known to be off-limits is not asked again: the first month pays for
+      // finding out, the rest of the session does not
+      const refused = codes.filter((c) => knownRefused.has(c));
+      const live = codes.filter((c) => !knownRefused.has(c));
       const seen = new Set();
       const add = (list) => {
         for (const ev of list || []) {
@@ -581,7 +588,7 @@
         return [...(ev || []), ...(as || [])];
       };
       const chunks = [];
-      for (let i = 0; i < codes.length; i += 10) chunks.push(codes.slice(i, i + 10));
+      for (let i = 0; i < live.length; i += 10) chunks.push(live.slice(i, i + 10));
       await Promise.all(chunks.map(async (chunk) => {
         try {
           add(await fetchCodes(chunk));
@@ -589,16 +596,21 @@
           if (!REFUSED.has(err.status)) throw err;
           if (chunk.length === 1) {
             refused.push(chunk[0]);
+            knownRefused.add(chunk[0]);
             return;
           }
-          for (const code of chunk) {
+          // One calendar in the chunk is off-limits and Canvas refuses the lot, so each is asked
+          // for on its own — all at once, not one after another: this is the difference between
+          // one round trip and ten of them on a slow connection.
+          await Promise.all(chunk.map(async (code) => {
             try {
               add(await fetchCodes([code]));
             } catch (err2) {
               if (!REFUSED.has(err2.status)) throw err2;
               refused.push(code);
+              knownRefused.add(code);
             }
-          }
+          }));
         }
       }));
       return { events, refused };

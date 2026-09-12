@@ -45,9 +45,11 @@
     );
     mainCol.append(U.loading());
 
-    const [contexts, plannerItems] = await Promise.all([store.calendarContexts().catch(() => []), store.planner().catch(() => [])]);
-    // submission state per assignment/quiz, from the planner (calendar events do not carry it)
-    const submittedIds = new Set(plannerItems.filter((it) => it.submitted).map((it) => `${it.type}:${it.raw.plannable_id}`));
+    // Only the calendars are waited for: they say which events to ask Canvas for. The planner is a
+    // second multi-page read that nothing on screen needs to appear, so it arrives on its own and
+    // strikes through what is already submitted when it does.
+    const contexts = await store.calendarContexts().catch(() => []);
+    let submittedIds = new Set(); // assignment/quiz ids handed in (calendar events do not carry it)
     let selected = await store.selectedContexts(contexts);
     if (wantCourse && contexts.some((c) => c.code === wantCourse) && !selected.includes(wantCourse)) selected = [...selected.slice(0, 9), wantCourse];
     const ctxMap = new Map(contexts.map((c) => [c.code, c]));
@@ -55,6 +57,14 @@
     let loadedRange = null;
     let refused = new Set(); // calendars Canvas would not return (401/403)
     let notice = null; // { kind: 'error' | 'warn' | 'hint', text }
+    let loading = false; // the grid is up, its events are still on the way
+    const warmed = new Set();
+    store.planner().catch(() => []).then((items) => { // in its own time: the screen is drawn without it
+      const ids = new Set(items.filter((it) => it.submitted).map((it) => `${it.type}:${it.raw.plannable_id}`));
+      if (!ids.size || !ctx.alive()) return;
+      submittedIds = ids;
+      if (events.length) { events = markSubmitted(events); draw(); }
+    });
 
     function shift(dir) {
       if (view === 'month') anchor = new Date(anchor.getFullYear(), anchor.getMonth() + dir, 1);
@@ -95,18 +105,30 @@
         const types = a?.submission_types || [];
         const icon = isAssignment ? (types.includes('online_quiz') || a?.is_quiz_assignment ? IC.bolt : types.includes('discussion_topic') ? IC.disc : IC.doc) : IC.book;
         const sub = a?.submission;
+        // the keys the planner would use for this piece of work, kept so the strike-through can be
+        // re-applied when the planner lands (it is read after the events, not before them)
+        const keys = a ? [`assignment:${a.id}`, a.quiz_id ? `quiz:${a.quiz_id}` : null].filter(Boolean) : [];
         const submitted = !!(sub && (sub.submitted_at || sub.workflow_state === 'graded' || sub.workflow_state === 'submitted'))
-          || (a && (submittedIds.has(`assignment:${a.id}`) || (a.quiz_id && submittedIds.has(`quiz:${a.quiz_id}`))));
+          || keys.some((k) => submittedIds.has(k));
         const past = (isAssignment ? start : (end || start)) < now;
         const color = cc?.color || '#8e8e93';
         const pal = U.palette(color, dark);
         out.push({
           id: String(e.id), title: e.title || a?.name || 'Untitled', date: start, end, allDay: !!e.all_day && !isAssignment,
-          isAssignment, icon, done: submitted || past, submitted, contextCode: e.context_code, contextName: cc?.name || e.context_name || '',
+          isAssignment, icon, done: submitted || past, submitted, keys, contextCode: e.context_code, contextName: cc?.name || e.context_name || '',
           color: pal.text, tint: pal.tint, url: e.html_url || a?.html_url || '/calendar', points: a?.points_possible ?? null,
         });
       }
       return out.sort((x, y) => x.date - y.date);
+    }
+
+    /** The planner arrived after the events: strike through what it says is handed in. */
+    function markSubmitted(list) {
+      for (const ev of list) {
+        if (ev.submitted || !ev.keys?.length) continue;
+        if (ev.keys.some((k) => submittedIds.has(k))) { ev.submitted = true; ev.done = true; }
+      }
+      return list;
     }
 
     /** Planner items shaped like calendar events, for the selected calendars. */
@@ -134,7 +156,10 @@
       const [s, e] = visibleRange();
       const key = `${s.getTime()}:${e.getTime()}:${selected.join(',')}`;
       if (loadedRange !== key) {
-        if (!events.length) mainCol.replaceChildren(U.loading());
+        // The grid needs no data to be drawn: it goes up at once and the events land in it, rather
+        // than a spinner standing in for the whole month.
+        loading = true;
+        draw();
         let res;
         try {
           res = await store.calendarEvents(s, e, selected);
@@ -164,9 +189,11 @@
           else if (refused.size) notice = { kind: 'hint', text: `Canvas would not share ${refused.size === 1 ? 'one calendar' : `${refused.size} calendars`} (${[...refused].map((c) => ctxMap.get(c)?.name || c).join(', ')}); the rest are shown.` };
         }
         loadedRange = key;
+        loading = false;
       }
       draw();
       updateSmart();
+      warmNeighbours();
     }
 
     function title() {
@@ -329,13 +356,34 @@
     }
 
     function draw() {
-      const noticeEl = !notice ? null : notice.kind === 'error' ? U.errorBox(notice.text) : U.el(`bcv-cal__notice bcv-cal__notice--${notice.kind}`, notice.text);
+      const noticeEl = loading ? U.el('bcv-cal__notice bcv-cal__notice--hint', 'Loading events…')
+        : !notice ? null : notice.kind === 'error' ? U.errorBox(notice.text) : U.el(`bcv-cal__notice bcv-cal__notice--${notice.kind}`, notice.text);
       mainCol.replaceChildren(...[noticeEl, view === 'week' ? weekGrid() : view === 'agenda' ? agendaList() : monthGrid()].filter(Boolean));
       sideCol.replaceChildren(...[
         view === 'agenda' ? miniCalendar() : null,
         calendarsCard(),
         U.hint('Struck-through items are submitted or past. Toggling a calendar hides its events.'),
       ].filter(Boolean));
+    }
+
+    /** The neighbouring month or week, fetched quietly after this one is on screen: Previous and
+     *  Next then draw from the memo instead of waiting on Canvas. Agenda ranges are arbitrary, so
+     *  there is nothing to guess there. */
+    function warmNeighbours() {
+      if (loading || view === 'agenda' || !selected.length) return;
+      const when = self.requestIdleCallback || ((fn) => setTimeout(fn, 400));
+      when(() => {
+        if (!ctx.alive()) return;
+        for (const dir of [1, -1]) {
+          const a = view === 'month' ? new Date(anchor.getFullYear(), anchor.getMonth() + dir, 1) : U.addDays(anchor, 7 * dir);
+          const s = sundayStart(view === 'month' ? new Date(a.getFullYear(), a.getMonth(), 1) : a);
+          const end = U.addDays(s, view === 'month' ? 42 : 7);
+          const k = `${s.getTime()}:${end.getTime()}:${selected.join(',')}`;
+          if (warmed.has(k)) continue;
+          warmed.add(k);
+          store.calendarEvents(s, end, selected).catch(() => {});
+        }
+      });
     }
 
     function updateSmart() {
@@ -351,7 +399,9 @@
       });
     }
 
-    await load();
+    // The screen is handed over as soon as the grid can be drawn; the events land in it when Canvas
+    // answers. Waiting here would keep the whole month behind the slowest calendar request.
+    load().catch(() => {});
     return screen;
   }
 
@@ -363,8 +413,8 @@
     const today = new Date();
     let s, e;
     if (view === 'week') { s = sundayStart(today); e = U.addDays(s, 7); } else { s = sundayStart(new Date(today.getFullYear(), today.getMonth(), 1)); e = U.addDays(s, 42); }
+    store.planner(o).catch(() => {}); // alongside: the screen does not wait for it either
     await store.calendarEvents(s, e, selected, o);
-    await store.planner(o);
   }
   BCV.screens.calendar = { render, prefetch };
 })();

@@ -478,6 +478,10 @@ try {
   const mockConfig = (cfg) => sw.evaluate(async (c) => (await fetch('http://localhost:8787/__mock/config', { method: 'POST', body: JSON.stringify(c) })).ok, cfg);
   await mockConfig({ calendarFail: true });
   await page.click('.bcv-seg__btn[data-value="month"]');
+  // The month either side is already warmed and answers from the memo, so the first Next says
+  // nothing about a failing calendar API; the second lands on a month nothing could warm (its own
+  // warm failed too), which is the one that has to ask Canvas and be refused.
+  await page.click('.bcv-cal__nav .bcv-iconbtn:nth-child(2)');
   await page.click('.bcv-cal__nav .bcv-iconbtn:nth-child(2)');
   await page.waitForSelector('.bcv-cal__notice--warn', { timeout: 10000 });
   check(/Canvas would not return calendar events \(calendar is having a moment\)\. Showing what the planner knows/.test((await texts('.bcv-cal__notice--warn'))[0]) && (await page.$$('.bcv-cal__day')).length === 42, 'when the calendar API fails, the planner fills the calendar in and says so');
