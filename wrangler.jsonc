@@ -1,0 +1,13 @@
+{
+  // A Worker with no code: it serves the files in public/ and nothing else. This is what the
+  // dashboard's "Import a repository" flow deploys with `npx wrangler deploy`.
+  "name": "simpl-courses",
+  "compatibility_date": "2026-09-12",
+  "assets": {
+    "directory": "./public",
+    // /privacy serves privacy.html, so the policy has one clean address to give the stores
+    "html_handling": "auto-trailing-slash",
+    // anything else gets the 404 page rather than a bare Cloudflare error
+    "not_found_handling": "404-page"
+  }
+}
