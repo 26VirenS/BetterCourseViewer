@@ -307,12 +307,121 @@
     return row;
   }
 
+  // ---- the courses, on hover ---------------------------------------------------------------------
+  // With "On hover" chosen the favourite courses are not listed down the sidebar: the Courses row
+  // opens them in a panel beside it instead. The pointer has to cross the gap between the row and
+  // the panel, so closing waits a moment and any of the two staying under the pointer cancels it.
+  const hoverCourses = () => state.settings?.appearance?.sideCourses === 'hover';
+  let quickNav = null; // { el, key, anchor, closeTimer }
+  let quickNavDismissed = false; // Escape was pressed: hold it shut until the pointer or focus leaves the row
+
+  /** One favourite: the course's colour, its name, and the same press behaviour everywhere. */
+  function favRow(c, cls = 'bcv-fav') {
+    return h('button', {
+      type: 'button',
+      class: `${cls} ${state.route?.courseId === c.id && state.route?.screen === 'course' ? 'is-active' : ''}`,
+      dataset: { load: `fav:${c.id}`, loadColor: c.color },
+      // the wash marks what was pressed, and in hover mode the row pressed is no longer on the
+      // sidebar — the Courses row it came out of carries it instead
+      onclick: () => {
+        const key = `fav:${c.id}`;
+        if (state.loadKey === key) return;
+        const wash = hoverCourses() ? 'courses' : key;
+        closeQuickNav();
+        progress(true, wash);
+        go(c.url);
+      },
+      title: c.name,
+    }, [h('span', { class: 'bcv-fav__dot', style: { background: c.color } }), h('span', { class: 'bcv-ellip', text: c.shortName || c.name })]);
+  }
+
+  function closeQuickNav() {
+    if (!quickNav) return;
+    clearTimeout(quickNav.closeTimer);
+    quickNav.anchor.setAttribute('aria-expanded', 'false');
+    quickNav.el.remove();
+    quickNav = null;
+  }
+  const quickNavLeave = (key) => {
+    if (!quickNav || quickNav.key !== key) return;
+    clearTimeout(quickNav.closeTimer);
+    quickNav.closeTimer = setTimeout(closeQuickNav, 220); // long enough to reach the panel
+  };
+  /** The pointer or focus has actually left the row, so Escape's hold on it is spent. Kept apart
+   *  from quickNavLeave, which the panel's own focusout calls as it is being taken away. */
+  const quickNavRelease = (key) => { if (key === 'courses') quickNavDismissed = false; };
+  /** Escape shuts the panel and puts focus back on the row — and the row taking focus is itself
+   *  what would open it again, so the shut is held until the pointer or focus actually leaves. */
+  function dismissQuickNav(anchor) {
+    quickNavDismissed = true;
+    closeQuickNav();
+    anchor.focus();
+  }
+
+  /** Opens the panel beside the Courses row, or keeps an open one open. */
+  function quickNavHover(key, anchor) {
+    if (key !== 'courses' || quickNavDismissed || !hoverCourses() || BCV.phone?.active()) return;
+    if (quickNav) {
+      if (quickNav.key === key) { clearTimeout(quickNav.closeTimer); return; }
+      closeQuickNav();
+    }
+    const el = U.el('bcv-quicknav', [
+      U.text('bcv-quicknav__label', 'Favorite courses'),
+      ...state.favs.map((c) => favRow(c, 'bcv-fav bcv-fav--qn')),
+      state.favs.length ? null : U.text('bcv-hint', 'Star a course under Courses to pin it here.'),
+      U.el('bcv-quicknav__sep'),
+      h('button', { type: 'button', class: 'bcv-quicknav__all', onclick: () => { closeQuickNav(); progress(true, 'courses'); go('/courses'); } }, [
+        U.svg(IC.book, { size: 14, stroke: '#ff9500', width: 1.9 }), h('span', { text: 'All courses' }),
+      ]),
+    ]);
+    // the row blurs as focus moves in here, which schedules a close: arriving cancels it
+    el.addEventListener('pointerenter', () => { if (quickNav) clearTimeout(quickNav.closeTimer); });
+    el.addEventListener('focusin', () => { if (quickNav) clearTimeout(quickNav.closeTimer); });
+    el.addEventListener('pointerleave', () => quickNavLeave(key));
+    el.addEventListener('focusout', (e) => { if (!el.contains(e.relatedTarget) && e.relatedTarget !== anchor) quickNavLeave(key); });
+    // the panel is a sibling of the row, not a child, so keys pressed inside it never reach the
+    // row's own handler: Escape and the arrows are answered here
+    el.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') { dismissQuickNav(anchor); return; }
+      if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+      const items = [...el.querySelectorAll('button')];
+      const i = items.indexOf(document.activeElement);
+      if (i === -1) return;
+      e.preventDefault();
+      const next = i + (e.key === 'ArrowDown' ? 1 : -1);
+      if (next < 0) anchor.focus(); // back out of the top of the list onto the row it came from
+      else items[Math.min(next, items.length - 1)].focus();
+    });
+    // fixed to the row, and nudged up if the panel would run off the bottom of the window
+    const r = anchor.getBoundingClientRect();
+    Object.assign(el.style, { position: 'fixed', left: `${r.right + 8}px`, top: `${r.top}px`, visibility: 'hidden' });
+    document.body.append(el);
+    const over = el.getBoundingClientRect().bottom - (window.innerHeight - 12);
+    if (over > 0) el.style.top = `${Math.max(12, r.top - over)}px`;
+    el.style.visibility = '';
+    anchor.setAttribute('aria-expanded', 'true');
+    quickNav = { el, key, anchor, closeTimer: null };
+  }
+
+  /** Keyboard: the row opens the panel and hands it the first course; Escape closes it. */
+  function quickNavKey(e, key, anchor) {
+    if (key !== 'courses' || !hoverCourses()) return;
+    if (e.key === 'Escape' && quickNav) { dismissQuickNav(anchor); return; }
+    if (e.key !== 'ArrowRight' && e.key !== 'ArrowDown') return;
+    quickNavHover(key, anchor);
+    const first = quickNav?.el.querySelector('button');
+    if (!first) return;
+    e.preventDefault();
+    first.focus();
+  }
+
   function renderSide() {
     if (phone()) {
       if (root) BCV.phone.paintChrome(BCV.app, { focus: inQuiz() && !state.quizOpen });
       return;
     }
     if (!side) return;
+    closeQuickNav(); // the panel is anchored to a row this rebuild is about to replace
     const r = state.route || parseRoute();
     const name = siteName();
     const focus = inQuiz() && !state.quizOpen; // our own quiz flow hides the sidebar entirely
@@ -328,30 +437,31 @@
       );
       return;
     }
-    side.replaceChildren(
+    // (filtered: a null left by a section that is not drawn would land as the text "null")
+    side.replaceChildren(...[
       brandRow(name),
       // mockup 11: the glyph in its own colour, no tile behind it; full strength on the active row, dimmed elsewhere
       h('nav', { class: 'bcv-nav' }, navDef().map(([key, label, icon, glyphColor, href, count]) => h('button', {
         type: 'button',
         class: `bcv-nav__item ${r.screen === key || (key === 'groups' && r.screen === 'group') ? 'is-active' : ''}`,
         dataset: { nav: key, load: key, loadColor: glyphColor },
-        onclick: () => { if (state.loadKey === key) return; progress(true, key); go(href); }, // a second press on the loading row is a no-op
-        onpointerenter: () => warm(key), // the pointer arrives before the press: the screen's own data starts loading now
-        onfocus: () => warm(key),
+        ...(key === 'courses' && hoverCourses() ? { 'aria-haspopup': 'true', 'aria-expanded': 'false' } : {}),
+        onclick: () => { if (state.loadKey === key) return; closeQuickNav(); progress(true, key); go(href); }, // a second press on the loading row is a no-op
+        onpointerenter: (e) => { warm(key); quickNavHover(key, e.currentTarget); }, // the pointer arrives before the press: the screen's own data starts loading now
+        onpointerleave: () => { quickNavRelease(key); quickNavLeave(key); },
+        onfocus: (e) => { warm(key); quickNavHover(key, e.currentTarget); },
+        onblur: () => { quickNavRelease(key); quickNavLeave(key); },
+        onkeydown: (e) => quickNavKey(e, key, e.currentTarget),
       }, [
         h('span', { class: 'bcv-nav__ic' }, U.svg(icon, { size: 21, stroke: glyphColor, width: 1.8 })),
         h('span', { text: label }),
         h('span', { class: 'bcv-nav__count', text: count }),
       ]))),
-      U.el('bcv-side__group', [
+      // Listed here, or kept in a panel that opens off the Courses row (Settings → Appearance, and
+      // the last step of the guided setup). Either way it is the same list in the same order.
+      hoverCourses() ? null : U.el('bcv-side__group', [
         U.text('bcv-side__label', 'Favorite courses'),
-        ...state.favs.map((c) => h('button', {
-          type: 'button',
-          class: `bcv-fav ${r.courseId === c.id ? 'is-active' : ''}`,
-          dataset: { load: `fav:${c.id}`, loadColor: c.color },
-          onclick: () => { if (state.loadKey === `fav:${c.id}`) return; progress(true, `fav:${c.id}`); go(c.url); },
-          title: c.name,
-        }, [h('span', { class: 'bcv-fav__dot', style: { background: c.color } }), h('span', { class: 'bcv-ellip', text: c.shortName || c.name })])),
+        ...state.favs.map((c) => favRow(c)), // (not `.map(favRow)`: the index would land in favRow's second argument)
         state.favs.length ? null : U.text('bcv-hint', 'Star a course under Courses to pin it here.'),
       ]),
       BCV.extras?.sideGroup?.(BCV.app), // what the school added to Canvas's own nav (tools, History, Help)
@@ -365,7 +475,7 @@
           h('div', { style: { minWidth: '0' } }, [U.text('bcv-account__name bcv-ellip', state.me?.name || 'Account'), U.text('bcv-account__sub', 'Account')]),
         ]),
       ]),
-    );
+    ].filter(Boolean));
     paintLoad(); // a row still loading keeps its wash across a redraw
   }
 
@@ -466,6 +576,7 @@
     state.submitOpen = false;
     html.classList.remove('bcv-quiz', 'bcv-quiz-fb'); // the quiz screen puts them back while an attempt or its feedback is on screen
     punchOut(); // a native screen punches back in while it builds
+    closeQuickNav(); // the courses panel belongs to the row it came from, not to the next screen
     syncSide(); // the sidebar follows the route in place; it is rebuilt only when what it shows changes
     const ctx = { app: BCV.app, route: r, alive, dark: state.dark, setSmart: (c) => setSmartContext(c, id) };
     state.smartCtx = null;

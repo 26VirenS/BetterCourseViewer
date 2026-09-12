@@ -149,6 +149,15 @@ html.bcv-on #bcv-app { display: flex; }
 .bcv-fav:hover { background: var(--bcv-fill2); }
 .bcv-fav.is-active { background: var(--bcv-fill2); font-weight: 600; }
 .bcv-fav__dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+/* the courses in a panel beside the Courses row, when they are not listed down the sidebar */
+.bcv-quicknav { z-index: 30; width: 228px; max-height: min(70vh, 520px); overflow: auto; display: flex; flex-direction: column; gap: 2px; padding: 8px; background: var(--bcv-glass); -webkit-backdrop-filter: var(--bcv-blur-glass); backdrop-filter: var(--bcv-blur-glass); border: 1px solid var(--bcv-edge); border-radius: 16px; box-shadow: var(--bcv-shadow-hi); animation: bcv-qn-in .18s cubic-bezier(.32,.72,0,1) both; }
+@keyframes bcv-qn-in { from { opacity: 0; transform: translateX(-6px); } to { opacity: 1; transform: none; } }
+.bcv-quicknav__label { padding: 4px 8px 6px; font: 600 11px/1.2 var(--bcv-font); color: var(--bcv-ink3); text-transform: uppercase; letter-spacing: .05em; }
+.bcv-quicknav .bcv-hint { padding: 2px 8px 6px; }
+.bcv-quicknav__sep { height: 1px; margin: 6px 4px; background: var(--bcv-edge); }
+.bcv-quicknav__all { display: flex; align-items: center; gap: 10px; width: 100%; padding: 7px 10px; border: 0; border-radius: 10px; background: transparent; text-align: left; font: 600 13px/1.2 var(--bcv-font); color: var(--bcv-ink); cursor: pointer; }
+.bcv-quicknav__all:hover { background: var(--bcv-fill2); }
+@media (prefers-reduced-motion: reduce) { .bcv-quicknav { animation: none; } }
 .bcv-side__bottom { margin-top: auto; display: flex; flex-direction: column; gap: 8px; }
 .bcv-theme-btn { display: flex; align-items: center; gap: 11px; width: 100%; padding: 8px 10px; border: 0; border-radius: 12px; cursor: pointer; text-align: left; font: 600 13px/1.2 var(--bcv-font); color: var(--bcv-ink); background: var(--bcv-fill2); }
 .bcv-theme-btn:hover { background: var(--bcv-fill); }

@@ -1293,7 +1293,7 @@ try {
   await page.goto(`${BASE}/?bcv=setup`);
   await page.waitForSelector(su('.row'), { timeout: 20000 });
   await page.waitForTimeout(500);
-  check(page.url() === `${BASE}/` && (await page.$('.bcv-stat')) !== null && (await page.$$(su('.blob'))).length === 4 && (await sStep()) === '1 of 3' && (await page.$$(su('.progress span'))).length === 3 && (await page.$eval('html', (e) => getComputedStyle(e).overflow)) === 'hidden', 'the setup opens as a glass card over the dashboard: the address cleaned, three steps, the page held still');
+  check(page.url() === `${BASE}/` && (await page.$('.bcv-stat')) !== null && (await page.$$(su('.blob'))).length === 4 && (await sStep()) === '1 of 4' && (await page.$$(su('.progress span'))).length === 4 && (await page.$eval('html', (e) => getComputedStyle(e).overflow)) === 'hidden', 'the setup opens as a glass card over the dashboard: the address cleaned, four steps, the page held still');
   await shot(page, '32-setup-over-page');
   const scanned = await texts(su('.row__code'));
   check((await texts(su('.h1')))[0] === 'Which are you in?' && scanned.length >= 8 && (await page.$$(su('.row.is-on'))).length === 5 && (await texts(su('.listhead span')))[0] === '5 selected', `step 1 read the enrolments: ${scanned.length} active courses, the 5 favourites checked`);
@@ -1311,7 +1311,7 @@ try {
   check((await page.$$(su('.row.is-on'))).length === 5 && (await page.$eval(su('.row__nick'), (e) => e.placeholder)) === 'Nickname', 'every row has a Nickname field; typing in one does not toggle the row');
   await shot(page, '32c-setup-courses');
   await sNext('#track');
-  check((await sStep()) === '2 of 3' && (await page.$eval(su('#track'), (e) => e.classList.contains('is-on'))) && (await texts(su('#goal')))[0] === '3.50' && (await page.$$(su('.target'))).length === 5 && (await page.$$(su('.seg button.is-on'))).length === 5 && (await page.$$eval(su('.target:first-child .seg button'), (bs) => bs.map((b) => b.textContent))).join(' ') === 'C B B+ A- A A+', 'step 2: tracking on, a 3.50 goal, a target row per chosen course, letters low to high with A+ on the right');
+  check((await sStep()) === '2 of 4' && (await page.$eval(su('#track'), (e) => e.classList.contains('is-on'))) && (await texts(su('#goal')))[0] === '3.50' && (await page.$$(su('.target'))).length === 5 && (await page.$$(su('.seg button.is-on'))).length === 5 && (await page.$$eval(su('.target:first-child .seg button'), (bs) => bs.map((b) => b.textContent))).join(' ') === 'C B B+ A- A A+', 'step 2: tracking on, a 3.50 goal, a target row per chosen course, letters low to high with A+ on the right');
   await page.click(su('.stepper button:last-child'));
   await page.click(su('.stepper button:last-child'));
   await page.click(su('.target:first-child .seg button:nth-child(3)'));
@@ -1320,7 +1320,7 @@ try {
   await sNext('.prov');
   const sProvs = await texts(su('.prov'));
   const purpose = (await texts(su('#purpose')))[0];
-  check((await sStep()) === '3 of 3' && sProvs.length === 3 && /Gemini\s*Coming soon/.test(sProvs[2]) && (await page.$eval(su('.prov.is-soon'), (b) => b.getAttribute('aria-disabled'))) === 'true' && /console\.anthropic\.com/.test((await texts(su('.keystep')))[0]) && !(await page.$eval(su('#notNow'), (b) => b.hidden)), `step 3 offers Claude, ChatGPT and Gemini (coming soon) with the key steps: ${sProvs.join(' | ')}`);
+  check((await sStep()) === '3 of 4' && sProvs.length === 3 && /Gemini\s*Coming soon/.test(sProvs[2]) && (await page.$eval(su('.prov.is-soon'), (b) => b.getAttribute('aria-disabled'))) === 'true' && /console\.anthropic\.com/.test((await texts(su('.keystep')))[0]) && !(await page.$eval(su('#notNow'), (b) => b.hidden)), `step 3 offers Claude, ChatGPT and Gemini (coming soon) with the key steps: ${sProvs.join(' | ')}`);
   check(/^Smart Panel is intended to be a smart assistant that helps with learning\. It is not intended to help complete assignments, cheat on quizzes/.test(purpose) && /^rgb\(2(29|55), (55|105), (43|97)\)$/.test(await page.$eval(su('#purpose'), (e) => getComputedStyle(e).color)), `the purpose notice, in red: ${await page.$eval(su('#purpose'), (e) => getComputedStyle(e).color)}`);
   await page.click(su('.prov[data-provider="openai"]'));
   check(/platform\.openai\.com/.test((await texts(su('.keystep')))[0]), 'ChatGPT swaps the key steps');
@@ -1328,13 +1328,27 @@ try {
   check(await page.$eval(su('#notNow'), (b) => b.hidden), 'typing a key hides Not now');
   await page.click(su('#next'));
   await page.waitForFunction((s) => /rejected|Could not|works|Unauthorized|invalid|checked/i.test(document.querySelector(s).shadowRoot.querySelector('#keyResult').textContent), '#bcv-setup', { timeout: 20000 });
-  check((await page.$eval(su('#keyResult'), (e) => e.classList.contains('is-err'))) && (await sStep()) === '3 of 3', `a key that does not validate stays on the step: ${await page.$eval(su('#keyResult'), (e) => e.textContent)}`);
+  check((await page.$eval(su('#keyResult'), (e) => e.classList.contains('is-err'))) && (await sStep()) === '3 of 4', `a key that does not validate stays on the step: ${await page.$eval(su('#keyResult'), (e) => e.textContent)}`);
   await page.fill(su('#key'), '');
   await shot(page, '32e-setup-smart');
   await page.click(su('#notNow'));
+  // step 4: where the courses chosen in step 1 should sit
+  await page.waitForSelector(su('.row[data-value]'), { timeout: 10000 });
+  await page.waitForTimeout(450);
+  const sideOpts = await texts(su('.row[data-value] .row__code'));
+  check((await sStep()) === '4 of 4' && sideOpts.join(' | ') === 'Always on the sidebar | When I hover on Courses' && (await page.$eval(su('.row[data-value="always"]'), (e) => e.classList.contains('is-on'))) && (await page.$eval(su('#next'), (e) => e.textContent)) === 'Finish', `step 4 asks where the courses live, on the sidebar by default: ${sideOpts.join(' | ')}`);
+  await shot(page, '32f-setup-sidebar');
+  const pickSide = async (v) => {
+    await page.click(su(`.row[data-value="${v}"]`));
+    await page.waitForFunction((val) => document.querySelector('#bcv-setup').shadowRoot.querySelector(`.row[data-value="${val}"]`).classList.contains('is-on'), v, { timeout: 5000 });
+    return sw.evaluate(async () => (await self.BCV.settings.get()).appearance.sideCourses);
+  };
+  check((await pickSide('hover')) === 'hover', 'picking one writes it as it is chosen, no Finish needed');
+  check((await pickSide('always')) === 'always' && (await page.$$(su('.row[data-value].is-on'))).length === 1, 'and changing the pick moves the tick, one at a time'); // back to the default: the checks below read the sidebar list
+  await page.click(su('#next'));
   await page.waitForSelector(su('.done'), { timeout: 10000 });
   const doneCard = await page.evaluate(() => { const r = document.querySelector('#bcv-setup')?.shadowRoot; return r ? [r.querySelector('#stepLabel')?.textContent.trim(), r.querySelector('.done .h1')?.textContent.trim()] : null; });
-  check(doneCard && doneCard[0] === 'Done' && doneCard[1] === 'All set', `Not now finishes: a moment of All set (${JSON.stringify(doneCard)})`);
+  check(doneCard && doneCard[0] === 'Done' && doneCard[1] === 'All set', `Finish on the last step: a moment of All set (${JSON.stringify(doneCard)})`);
   await page.waitForSelector('.bcv-tour__card', { timeout: 20000 });
   check(page.url() === `${BASE}/` && (await page.$('#bcv-setup')) === null && !(await page.$('html.bcv-setup-open')) && (await page.$eval('.bcv-tour__title', (e) => e.textContent.trim())) === 'Your day at a glance', 'then the card closes and the tour starts on the same page');
   const favAfter = (await apiGet('/api/v1/courses?per_page=100')).filter((c) => c.is_favorite).map((c) => c.course_code || c.name);
@@ -1570,6 +1584,13 @@ try {
   check((await sw.evaluate(() => self.BCV.settings.get())).appearance.darkMode === 'on' && (await options.$eval('html', (e) => e.dataset.theme)) === 'dark' && (await options.$eval('.theme.is-on', (b) => b.dataset.value)) === 'on', 'a theme tile saves and repaints the page');
   await options.screenshot({ path: join(out, '29-options-dark.png') });
   await options.click('.theme[data-value="system"]');
+  await options.waitForTimeout(250);
+  // Appearance: and where the courses sit, the same choice the last step of the setup offers
+  check((await options.$$eval('#sideCourses button', (bs) => bs.map((b) => b.textContent))).join(',') === 'Always listed,On hover' && (await options.$eval('#sideCourses button.is-on', (b) => b.dataset.value)) === 'always', 'the courses in the sidebar: listed or on hover, listed to begin with');
+  await options.click('#sideCourses button[data-value="hover"]');
+  await options.waitForTimeout(250);
+  check((await sw.evaluate(() => self.BCV.settings.get())).appearance.sideCourses === 'hover' && (await options.$eval('#sideCourses button.is-on', (b) => b.dataset.value)) === 'hover', 'changing it saves');
+  await options.click('#sideCourses button[data-value="always"]');
   await options.waitForTimeout(250);
   // Sites and data
   await options.click('.navlink[data-section="sites"]');

@@ -416,6 +416,7 @@
     const b = e.target.closest('.theme');
     if (b) save({ appearance: { darkMode: b.dataset.value } });
   });
+  onSeg($('sideCourses'), (v) => save({ appearance: { sideCourses: v } }));
 
   // ---- Canvas sites ---------------------------------------------------------------------------------
   const normaliseHost = (raw) => {
@@ -588,6 +589,7 @@
     for (const [id, path] of TEXT) { const el = $(id); if (document.activeElement !== el) el.value = getPath(settings, path) ?? ''; }
     paintSmart();
     [...$('themes').querySelectorAll('.theme')].forEach((b) => b.classList.toggle('is-on', b.dataset.value === (settings.appearance.darkMode || 'system')));
+    setSeg($('sideCourses'), settings.appearance.sideCourses || 'always');
     renderDomains();
     paintStatus();
     paint();

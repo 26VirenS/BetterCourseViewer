@@ -158,6 +158,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
 .row__body { flex: 1; min-width: 0; }
 .row__code { display: block; font: 600 14.5px/1.25 var(--font); color: var(--ink); }
 .row__name { display: block; margin-top: 2px; font: 400 12px/1.3 var(--font); color: var(--ink3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row__why { display: block; margin-top: 3px; font: 400 12px/1.4 var(--font); color: var(--ink3); text-wrap: pretty; }
 .row__nick { flex: 0 0 124px; min-width: 0; height: 32px; padding: 0 10px; border: 1px solid var(--edge); border-radius: 10px; background: var(--fill); font: 500 12.5px/1 var(--font); color: var(--ink); outline: none; cursor: text; }
 .row__nick:focus { border-color: var(--blue); }
 .row__nick::placeholder { color: var(--ink3); }

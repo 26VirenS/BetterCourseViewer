@@ -20,8 +20,11 @@
     { key: 'openai', name: 'ChatGPT', note: 'Available now', ready: true, settingsKey: 'openaiKey', placeholder: 'sk-…', url: 'https://platform.openai.com/api-keys', host: 'platform.openai.com', steps: ['API keys → Create new secret key', 'Paste it above. It is shown only once.'] },
     { key: 'gemini', name: 'Gemini', note: 'Coming soon', ready: false },
   ];
-  const LABELS = ['Continue', 'Continue', 'Finish'];
-  const STEP_LABELS = ['1 of 3', '2 of 3', '3 of 3', 'Done'];
+  // the four steps, the button that leaves each one, and the label above the card (function
+  // declarations, so the list can sit here beside the labels it is paired with)
+  const STEPS = [courses, grades, smart, sidebar];
+  const LABELS = ['Continue', 'Continue', 'Continue', 'Finish'];
+  const STEP_LABELS = ['1 of 4', '2 of 4', '3 of 4', '4 of 4', 'Done'];
   const PURPOSE = 'Smart Panel is intended to be a smart assistant that helps with learning. It is not intended to help complete assignments, cheat on quizzes, or any other purpose than to assist with learning.';
   const MARK = '<svg viewBox="0 0 120 120" width="23" height="23" aria-hidden="true"><defs><linearGradient id="sheetSm" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#fff" stop-opacity=".9"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient></defs><rect x="16" y="18" width="53" height="84" rx="14" fill="url(#sheetSm)"/><path d="M28 30 H69 A30 30 0 0 1 69 90 H28" fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><path d="M35 42 H69 A18 18 0 0 1 69 78 H35" fill="none" stroke="rgba(255,255,255,.72)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><path d="M42 54 H69 A6 6 0 0 1 69 66 H42" fill="none" stroke="rgba(255,255,255,.46)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
@@ -67,6 +70,7 @@
       scanning: false, scanError: null, courses: [], favs: new Set(), nicks: {},
       tracking: true, goal: 3.5, targets: {},
       provider: settings.smart?.openaiKey && !settings.smart?.claudeKey ? 'openai' : 'claude', key: '', keyOk: false, keyMsg: '',
+      sideCourses: settings.appearance?.sideCourses === 'hover' ? 'hover' : 'always',
       closing: false,
     };
     const host = h('div', { id: 'bcv-setup' });
@@ -74,7 +78,7 @@
     const shadow = host.attachShadow({ mode: 'open' });
     const stepLabel = h('span', { class: 'top__step', id: 'stepLabel' });
     const skipBtn = h('button', { class: 'top__skip', id: 'skip', type: 'button', text: 'Skip', onclick: () => finish({ skipped: true }) });
-    const progress = h('div', { class: 'progress', id: 'progress', 'aria-hidden': 'true' }, [h('span'), h('span'), h('span')]);
+    const progress = h('div', { class: 'progress', id: 'progress', 'aria-hidden': 'true' }, STEPS.map(() => h('span')));
     const body = h('div', { class: 'card__body', id: 'body' });
     const foot = h('footer', { class: 'foot', id: 'foot' });
     const card = h('section', { class: 'card', id: 'card', 'aria-live': 'polite' }, [body, foot]);
@@ -186,8 +190,6 @@
     ].filter(Boolean));
     return nextBtn;
   }
-
-  const STEPS = [courses, grades, smart]; // function declarations below
 
   function go(n, dir = n > st.step ? 1 : -1) {
     st.step = Math.max(0, Math.min(STEPS.length - 1, n));
@@ -378,11 +380,11 @@
       h('div', { class: 'notice notice--red', id: 'purpose', text: PURPOSE }),
       provs, field, result, steps,
     );
-    notNow = h('button', { type: 'button', class: 'btn btn--quiet', id: 'notNow', text: 'Not now', onclick: () => { st.key = ''; st.keyOk = false; finish({ skipped: false }); } });
+    notNow = h('button', { type: 'button', class: 'btn btn--quiet', id: 'notNow', text: 'Not now', onclick: () => { st.key = ''; st.keyOk = false; go(3); } });
     const nextBtn = footer({
       onNext: async () => {
         const key = input.value.trim();
-        if (!key) { await finish({ skipped: false }); return; }
+        if (!key) { go(3); return; }
         const p = provider();
         result.textContent = 'Checking the key…';
         result.className = 'result';
@@ -397,7 +399,7 @@
           result.textContent = st.keyMsg;
           result.className = 'result is-ok';
           await new Promise((res) => setTimeout(res, 350));
-          await finish({ skipped: false });
+          go(3);
         } else {
           st.keyOk = false;
           result.textContent = r?.message || 'The key could not be checked. Check it and try again, or skip for now.';
@@ -417,6 +419,38 @@
       notNow.hidden = input.value.trim().length > 0;
     });
     notNow.hidden = input.value.trim().length > 0;
+  }
+
+  // ---- where the courses live ----------------------------------------------------------------------
+  /** The courses chosen in step 1 go down the sidebar, or into a panel that opens off the Courses
+   *  row. The choice is written as it is made, so Back and Finish both leave it set, and Settings →
+   *  Appearance has the same two options afterwards. */
+  function sidebar() {
+    const { body } = ui;
+    const OPTIONS = [
+      ['always', 'Always on the sidebar', 'Your courses are listed under the navigation, a press away at all times.'],
+      ['hover', 'When I hover on Courses', 'They open in a panel beside the Courses row instead, and the sidebar stays short.'],
+    ];
+    const rows = OPTIONS.map(([value, title, why]) => h('button', {
+      type: 'button',
+      class: `row ${st.sideCourses === value ? 'is-on' : ''}`,
+      dataset: { value },
+      onclick: async () => {
+        st.sideCourses = value;
+        [...rows].forEach((b) => b.classList.toggle('is-on', b.dataset.value === value));
+        await S.update({ appearance: { sideCourses: value } }).catch(() => {});
+      },
+    }, [
+      h('span', { class: 'row__body' }, [h('span', { class: 'row__code', text: title }), h('span', { class: 'row__why', text: why })]),
+      h('span', { class: 'row__box' }, svg(CHECK, { size: 13, stroke: '#fff', width: 3 })),
+    ]));
+    stagger(rows, 70);
+    body.append(
+      h('h1', { class: 'h1', text: 'Your courses' }),
+      h('p', { class: 'sub', text: 'Where the courses you chose should sit in the sidebar. Either way it is the same list, and you can change it in Settings.' }),
+      h('div', { class: 'rows' }, rows),
+    );
+    footer({ onNext: () => finish({ skipped: false }) });
   }
 
   // ---- done: save, close, tour ---------------------------------------------------------------------

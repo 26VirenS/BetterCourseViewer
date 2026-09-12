@@ -13,6 +13,7 @@
       darkMode: 'system',         // 'off' | 'on' | 'system'
       siteName: '',               // shown in the sidebar brand row; blank = derived from the host
       logoUrl: '',                // sidebar tile image; blank = the school's own mark from Canvas's theme
+      sideCourses: 'always',      // where the favourite courses live: 'always' on the sidebar, or 'hover' off the Courses row
     },
     smart: {
       enabled: true,
