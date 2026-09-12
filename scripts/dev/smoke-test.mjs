@@ -1094,7 +1094,15 @@ try {
   // mockup 14: the pressed control is the progress bar. A sidebar row that starts a load fills left to
   // right with a flat wash in its own icon colour, under its label; a second press is a no-op.
   const slowCal = /\/calendar(\?.*)?$/; // the next page's own document is held back, so the pressed row's wash can be watched
-  await page.route(slowCal, async (route) => { if (route.request().resourceType() !== 'document') { await route.continue().catch(() => {}); return; } await new Promise((r) => setTimeout(r, 900)); await route.continue().catch(() => {}); });
+  // It holds back one document and then steps aside on its own. (Unrouting instead would race the
+  // request it is already holding, and that document arrives empty: no page, no extension, no screen.)
+  let holdCal = true;
+  await page.route(slowCal, async (route) => {
+    if (route.request().resourceType() !== 'document' || !holdCal) { await route.continue().catch(() => {}); return; }
+    holdCal = false;
+    await new Promise((r) => setTimeout(r, 900));
+    await route.continue().catch(() => {});
+  });
   const wash = await page.evaluate(() => { // the press and the reading in one task: the wash is painted synchronously by the press
     const row = document.querySelector('.bcv-nav__item[data-nav="calendar"]');
     row.click();
@@ -1105,9 +1113,8 @@ try {
     return { anim: cs.animationName, origin: cs.transformOrigin, bg: cs.backgroundColor, loading: row.classList.contains('is-loading'), under: getComputedStyle(row.querySelector('.bcv-nav__ic')).position, clipped: getComputedStyle(row).overflow, others: document.querySelectorAll('.bcv-load').length, stillOne: row.querySelectorAll('.bcv-load').length };
   }).catch((e) => ({ error: e.message }));
   check(wash && wash.anim === 'bcv-load' && /^0px/.test(wash.origin) && wash.bg === 'rgba(88, 86, 214, 0.2)' && wash.loading && wash.under === 'relative' && wash.clipped === 'hidden' && wash.others === 1 && wash.stillOne === 1, `Calendar fills its own row with a 20% wash of its indigo, from the left, under the label; no other row lights and a second press changes nothing: ${JSON.stringify(wash)}`);
-  await page.unroute(slowCal);
-  await page.waitForFunction(() => location.pathname === '/calendar' && document.documentElement.classList.contains('bcv-settled') && !document.querySelector('.bcv-load'), null, { timeout: 15000 });
-  check(true, 'the wash leaves when the next page has drawn its screen');
+  const washGone = await page.waitForFunction(() => location.pathname === '/calendar' && document.documentElement.classList.contains('bcv-settled') && !document.querySelector('.bcv-load'), null, { timeout: 15000 }).then(() => true).catch(() => false);
+  check(washGone, `the wash leaves when the next page has drawn its screen${washGone ? '' : `: ${JSON.stringify(await page.evaluate(() => ({ url: location.href, settled: document.documentElement.classList.contains('bcv-settled'), loads: document.querySelectorAll('.bcv-load').length, app: !!document.getElementById('bcv-app') })).catch((e) => e.message))}`}`);
   await page.goto(`${BASE}/`);
   await page.waitForSelector('.bcv-stat', { timeout: 10000 });
   // mockup 9: blocks follow the screen on a stagger from one helper (delay = index × step, capped at 420ms)

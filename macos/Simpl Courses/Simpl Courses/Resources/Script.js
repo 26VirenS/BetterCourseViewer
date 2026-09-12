@@ -1,24 +1,27 @@
 // The window follows one state at a time: on, off, missing (Safari has never heard of the
 // extension) or unknown (the answer has not come back yet). ViewController.swift calls show().
+// Everything is addressed by id: the body carries the state class names too, so a lookup by class
+// name can return the body first and writing to it would empty the window.
+const STATES = ['on', 'off', 'missing'];
+
 function show(state, useSettingsInsteadOfPreferences, detail) {
-    if (useSettingsInsteadOfPreferences) {
-        document.getElementsByClassName('state-on')[0].innerText = "Simpl Courses’s extension is currently on. You can turn it off in the Extensions section of Safari Settings.";
-        document.getElementsByClassName('state-off')[0].innerText = "Simpl Courses’s extension is currently off. You can turn it on in the Extensions section of Safari Settings.";
-        document.getElementsByClassName('open-preferences')[0].innerText = "Quit and Open Safari Settings…";
+    if (useSettingsInsteadOfPreferences) { // macOS 13 and later call them Settings
+        document.getElementById('line-on').innerText = "Simpl Courses’s extension is currently on. You can turn it off in the Extensions section of Safari Settings.";
+        document.getElementById('line-off').innerText = "Simpl Courses’s extension is currently off. You can turn it on in the Extensions section of Safari Settings.";
+        document.getElementById('open-preferences').innerText = "Quit and Open Safari Settings…";
     }
 
-    const known = ['on', 'off', 'missing'];
-    document.body.className = `state-${known.indexOf(state) === -1 ? 'unknown' : state}`;
-    document.querySelector('.detail').innerText = detail || '';
+    document.body.className = `state-${STATES.indexOf(state) === -1 ? 'unknown' : state}`;
+    document.getElementById('detail').innerText = detail || '';
 }
 
 function openPreferences() {
     webkit.messageHandlers.controller.postMessage("open-preferences");
 }
 
-document.querySelector("button.open-preferences").addEventListener("click", openPreferences);
+document.getElementById('open-preferences').addEventListener("click", openPreferences);
 
 // The app explains what goes and hands its bundled uninstaller to the Terminal (see AppDelegate.swift).
-document.querySelector("button.uninstall").addEventListener("click", () => {
+document.getElementById('uninstall').addEventListener("click", () => {
     webkit.messageHandlers.controller.postMessage("uninstall");
 });

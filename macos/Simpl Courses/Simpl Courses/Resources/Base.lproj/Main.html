@@ -9,19 +9,22 @@
     <link rel="stylesheet" href="../Style.css">
     <script src="../Script.js" defer></script>
 </head>
+<!-- the body carries the state; the lines carry the state they belong to (Style.css shows one of
+     them), and the script addresses each by id — the body shares those class names, so a lookup by
+     class can land on the body itself and take the whole window with it -->
 <body class="state-unknown">
     <img src="../Icon.png" width="128" height="128" alt="Simpl Courses Icon">
-    <p class="state-unknown">Reading Safari…</p>
-    <p class="state-on">Simpl Courses’s extension is currently on. You can turn it off in Safari Extensions preferences.</p>
-    <p class="state-off">Simpl Courses’s extension is currently off. You can turn it on in Safari Extensions preferences.</p>
-    <p class="state-missing">Safari does not have Simpl Courses’s extension yet.</p>
-    <ol class="state-missing steps">
+    <p id="line-unknown" class="state-unknown">Reading Safari…</p>
+    <p id="line-on" class="state-on">Simpl Courses’s extension is currently on. You can turn it off in Safari Extensions preferences.</p>
+    <p id="line-off" class="state-off">Simpl Courses’s extension is currently off. You can turn it on in Safari Extensions preferences.</p>
+    <p id="line-missing" class="state-missing">Safari does not have Simpl Courses’s extension yet.</p>
+    <ol id="steps" class="state-missing steps">
         <li>Keep this app in the <b>Applications</b> folder and open it once. Safari reads the extension out of the app, so the app has to stay put.</li>
         <li>Open Safari, then <b>Safari → Settings → Extensions</b>, and tick <b>Simpl Courses</b>.</li>
         <li>Built without an Apple developer team? Safari lists an unsigned extension only while <b>Safari → Settings → Developer → Allow unsigned extensions</b> is on — and that switch turns itself off every time Safari quits, so turn it on after each restart.</li>
     </ol>
-    <p class="state-missing detail"></p>
-    <button class="open-preferences">Quit and Open Safari Extensions Preferences…</button>
-    <button class="uninstall">Uninstall Simpl Courses…</button>
+    <p id="detail" class="state-missing detail"></p>
+    <button id="open-preferences" class="open-preferences">Quit and Open Safari Extensions Preferences…</button>
+    <button id="uninstall" class="uninstall">Uninstall Simpl Courses…</button>
 </body>
 </html>

@@ -28,8 +28,10 @@ body {
     text-align: center;
 }
 
-/* one state at a time: the body carries state-on, state-off, state-missing or state-unknown */
-:is(.state-on, .state-off, .state-missing, .state-unknown) {
+/* One state at a time: the body carries state-on, state-off, state-missing or state-unknown, and
+   the lines inside it carry the state they belong to. The rule reaches inside the body only —
+   matching the body itself would hide the whole window. */
+body :is(.state-on, .state-off, .state-missing, .state-unknown) {
     display: none;
 }
 
