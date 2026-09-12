@@ -1,9 +1,11 @@
 #!/bin/bash
 # Uninstall Simpl Courses (Mac): the app and everything it stored, gone in one go.
 #
-# Double-click this file in the Finder (the first time, right-click → Open if macOS asks), or in
-# the Terminal:  bash uninstall-mac.command
-# The Simpl Courses app runs it for you from its menu: Simpl Courses → Uninstall Simpl Courses…
+# Run it in the Terminal:  bash ~/Downloads/uninstall-simpl-courses-mac.command
+# (a downloaded script is quarantined by macOS, so double-clicking it in the Finder is refused —
+# "damaged and can't be opened" — while the Terminal runs it happily).
+# The app carries a copy: Simpl Courses → Uninstall Simpl Courses… puts the line that runs it on
+# the clipboard, ready to paste into the Terminal.
 #
 # Deleting the app on its own leaves the extension's storage behind inside Safari (settings, keys,
 # grade history), which is what this script is for. It removes, showing each item as it goes:
@@ -15,8 +17,32 @@
 # Options:  --dry-run   list what would go, remove nothing
 #           --yes       skip the confirmation
 #           --keep-app  remove the data only, leave the app where it is
-# Environment (the app's menu sets these):  SIMPL_APP_ID (bundle identifier, default
-# com.simplcourses.app), SIMPL_APP_PATH (the app to remove, when it is not in a usual place).
+# Environment (rarely needed; the copy inside the app fills both in from where it sits):
+#   SIMPL_APP_ID (bundle identifier, default com.simplcourses.app), SIMPL_APP_PATH (the app to
+#   remove, when it is not in a usual place).
+
+# The copy inside the app: it sits in the folder it is about to move to the Trash, so it takes the
+# app's identifier and path from where it sits, copies itself to the temporary folder, and runs from
+# there. Nothing it deletes can then pull the ground from under it.
+SELF="${BASH_SOURCE[0]}"
+case "$SELF" in /*) ;; *) SELF="$PWD/$SELF" ;; esac
+if [[ -z "${SIMPL_RELAUNCHED:-}" && "$SELF" == *.app/Contents/Resources/* ]]; then
+  BUNDLE="${SELF%/Contents/Resources/*}"
+  COPY="${TMPDIR:-/tmp}/simpl-courses-uninstall-$$.command"
+  if ! cp "$SELF" "$COPY" 2>/dev/null; then
+    echo "The uninstaller could not be copied to a temporary folder." >&2
+    exit 1
+  fi
+  chmod +x "$COPY" 2>/dev/null
+  export SIMPL_RELAUNCHED=1
+  export SIMPL_APP_PATH="${SIMPL_APP_PATH:-$BUNDLE}"
+  if [[ -z "${SIMPL_APP_ID:-}" && -f "$BUNDLE/Contents/Info.plist" ]]; then
+    FOUND_ID="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$BUNDLE/Contents/Info.plist" 2>/dev/null)"
+    [[ -n "$FOUND_ID" ]] && export SIMPL_APP_ID="$FOUND_ID"
+  fi
+  exec /bin/bash "$COPY" "$@" # exec keeps the process id, so the copy cleans itself up below
+fi
+[[ -n "${SIMPL_RELAUNCHED:-}" ]] && trap 'rm -f "${TMPDIR:-/tmp}/simpl-courses-uninstall-$$.command"' EXIT
 
 APP_NAME="Simpl Courses"
 APP_ID="${SIMPL_APP_ID:-com.simplcourses.app}"
@@ -30,7 +56,7 @@ for arg in "$@"; do
     --dry-run) DRY_RUN=1 ;;
     --yes|-y) YES=1 ;;
     --keep-app) KEEP_APP=1 ;;
-    -h|--help) sed -n '2,20p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,22p' "$SELF"; exit 0 ;;
     *) echo "Unknown option: $arg" >&2; exit 2 ;;
   esac
 done
@@ -132,14 +158,22 @@ find_safari_data() { # what Safari keeps for the extension: storage, caches, its
 }
 
 # ---- removing -----------------------------------------------------------------------------------------
-quit_app() { # ask an app to quit by name; force it after a few seconds
-  local name="$1" i
+quit_app() { # ask an app to quit by name, and wait for it rather than pulling the rug out from under it
+  local name="$1" i answer
   pgrep -xq "$name" 2>/dev/null || return 0
   say "  quitting $name…"
+  # (macOS may ask to let the Terminal control $name; if that is refused, the wait below still works)
   if have osascript; then osascript -e "tell application \"$name\" to quit" >/dev/null 2>&1; fi
-  for i in 1 2 3 4 5 6 7 8 9 10; do pgrep -xq "$name" 2>/dev/null || return 0; sleep 1; done
-  killall "$name" 2>/dev/null || true
-  sleep 1
+  for i in $(seq 1 20); do pgrep -xq "$name" 2>/dev/null || return 0; sleep 1; done
+  while pgrep -xq "$name" 2>/dev/null; do
+    if [[ "$YES" -eq 1 || ! -t 0 ]]; then # nobody to ask: end it, its windows come back on the next launch
+      killall "$name" 2>/dev/null || true
+      sleep 2
+      return 0
+    fi
+    read -r -p "  $name is still open. Quit it and press Return (or type k to force it to quit): " answer
+    case "$answer" in k|K) killall "$name" 2>/dev/null || true; sleep 2 ;; esac
+  done
 }
 trash() { # move an app bundle to the Trash (a copy elsewhere is not taken with it)
   local app="$1" name dest
