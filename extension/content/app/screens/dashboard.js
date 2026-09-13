@@ -260,7 +260,7 @@
       return U.enter(h('button', { type: 'button', class: 'bcv-card bcv-stat', onclick: (e) => onOpen(e.currentTarget) }, [
         U.el('bcv-stat__head', [U.svg(icon, { size: 14, stroke: color, width: 1.9 }), U.text('bcv-label bcv-label--inline', lbl, 'span'), valueEl]),
         U.el('bcv-stat__noterow', [U.text('bcv-stat__note', note, 'span'), U.svg(IC.chevron, { size: 13, stroke: 'var(--bcv-ink3)', width: 2, cls: 'bcv-stat__chev' })]),
-      ]), i, 50);
+      ]), 0); // no stagger: the six land together
     }
 
     /** The detail sheet behind a counter: header with the number, then one row per item.
@@ -355,7 +355,7 @@
             U.el('bcv-ccard__foot', [...quick, badgeEl]),
           ]),
         ]);
-        grid.append(first ? U.enter(card, i, 55) : card); // the cards float in beneath the workload, once
+        grid.append(first ? U.enter(card) : card); // the cards float in beneath the workload, once, all on the same beat
         store.progress(c.id).then(({ done, total }) => {
           if (!total) return;
           progress.append(

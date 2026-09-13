@@ -263,6 +263,9 @@ try {
   const cards = await texts('.bcv-ccard');
   check(cards.length === 5 && /F26-MATH 021 20/.test(cards[0]) && /of \d+ items submitted/.test(cards[0]) && /due today/.test(cards[0]), `course cards: ${cards[0]}`);
   check((await page.$$('.bcv-ccard__quick')).length === 20, 'quick links on every card');
+  // they arrive together rather than one after another (the entrance itself is only on a first draw)
+  const cardDelays = await page.$$eval('.bcv-ccard', (els) => els.map((e) => getComputedStyle(e).animationDelay));
+  check(cardDelays.length === 5 && cardDelays.every((d) => d === '0s'), `no course card waits its turn: ${cardDelays.join(',')}`);
   await shot(page, '02-dashboard-cards');
   // course colour from the card menu
   await page.click('.bcv-ccard .bcv-ccard__more');
@@ -1168,9 +1171,9 @@ try {
   check(washGone, `the wash leaves when the next page has drawn its screen${washGone ? '' : `: ${JSON.stringify(await page.evaluate(() => ({ url: location.href, settled: document.documentElement.classList.contains('bcv-settled'), loads: document.querySelectorAll('.bcv-load').length, app: !!document.getElementById('bcv-app') })).catch((e) => e.message))}`}`);
   await page.goto(`${BASE}/`);
   await page.waitForSelector('.bcv-stat', { timeout: 10000 });
-  // mockup 9: blocks follow the screen on a stagger from one helper (delay = index × step, capped at 420ms)
+  // the cards on this screen arrive together rather than one after another: one fade-up, no delay
   const stagger = await page.evaluate(() => [...document.querySelectorAll('.bcv-stat.bcv-enter')].map((e) => `${getComputedStyle(e).animationName}@${getComputedStyle(e).animationDelay}`));
-  check(stagger.slice(0, 3).join(',') === 'bcv-fade-up@0s,bcv-fade-up@0.05s,bcv-fade-up@0.1s', `stat cards arrive on a 50ms stagger: ${stagger.join(',')}`);
+  check(stagger.length === 6 && stagger.every((a) => a === 'bcv-fade-up@0s'), `the six stat cards land on the same beat: ${stagger.join(',')}`);
   // mockup 11: data animates in — counters roll (and land exactly), workload bars wipe from the left, rows float in
   const workAnim = await page.evaluate(() => ({
     bars: [...document.querySelectorAll('.bcv-work__fill--grow')].map((e) => `${getComputedStyle(e).animationName}@${getComputedStyle(e).animationDelay}`),
