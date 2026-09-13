@@ -32,6 +32,19 @@
   }
   const canvasPage = (f, ctx) => (ctx && ctx.url ? `${ctx.url}/files/${f.id}` : `/files/${f.id}`);
   const canvasPreview = (f, ctx) => (ctx && ctx.url ? `${ctx.url}/files/${f.id}/file_preview` : `/files/${f.id}/file_preview`);
+  /** The file's own address without the "download it" flag: what a new tab shows as itself. */
+  const inlineUrl = (f) => {
+    try {
+      const u = new URL(f.url, location.origin);
+      u.searchParams.delete('download_frd');
+      return u.pathname + (u.search || '') + (u.hash || '');
+    } catch {
+      return f.url;
+    }
+  };
+  /** Where "Open in new tab" goes: the file itself where a browser shows one as it is (an image,
+   *  a PDF, text, video, audio), Canvas's own page for the file otherwise. */
+  const newTabUrl = (f, k, ctx) => (['image', 'pdf', 'text', 'video', 'audio'].includes(k.kind) ? inlineUrl(f) : `${canvasPage(f, ctx)}?bcv=native`);
 
   let current = null; // { ov, restore }
   function close() {
@@ -82,10 +95,12 @@
     const download = h('a', { class: 'bcv-btn bcv-btn--primary bcv-viewer__dl', href: f.url, download: f.filename || name, text: 'Download' });
     download.prepend(U.svg(IC.download, { size: 14, stroke: 'currentColor', width: 1.9 }));
     const inCanvas = U.btn('Open in Canvas', { cls: 'bcv-viewer__canvas', onClick: () => { close(); BCV.app.go(`${canvasPage(f, context)}?bcv=native`); } });
+    const newTab = h('a', { class: 'bcv-btn bcv-viewer__tab', href: newTabUrl(f, k, context), target: '_blank', rel: 'noopener', title: 'Open in a new tab', text: 'Open in new tab' });
+    newTab.prepend(U.svg(IC.external || IC.link || IC.doc, { size: 13, stroke: 'currentColor', width: 1.9 }));
     head.replaceChildren(
       U.tile(k.icon, { color: pal.text, tint: pal.tint, size: 32, iconSize: 16 }),
       U.el('bcv-sheet__titles', [U.text('bcv-sheet__title', name), U.text('bcv-sheet__note', note)]),
-      U.el('bcv-viewer__acts', [inCanvas, download]),
+      U.el('bcv-viewer__acts', [inCanvas, newTab, download]),
       closeBtn,
     );
 

@@ -939,12 +939,13 @@ try {
   await page.waitForSelector('.bcv-viewer .bcv-viewer__frame', { timeout: 5000 });
   const vHead = (await texts('.bcv-viewer .bcv-sheet__head'))[0];
   check(/Course Syllabus\.pdf/.test(vHead) && /PDF · 212 KB · modified/.test(vHead) && (await page.$eval('.bcv-viewer__frame', (e) => e.getAttribute('src'))) === '/courses/101/files/f1/file_preview' && (await page.$eval('.bcv-viewer a[download]', (e) => e.getAttribute('href'))) === '/files/f1/download' && (await texts('.bcv-viewer__canvas'))[0] === 'Open in Canvas' && tabsOpened.length === 0 && page.url().endsWith('/courses/101/files'), `a PDF opens in the viewer over the page — Canvas's own preview framed, Download and Open in Canvas in the sheet — and no new tab: ${vHead}`);
+  check((await page.$eval('.bcv-viewer__tab', (e) => [e.textContent.trim(), e.getAttribute('href'), e.getAttribute('target')].join(' | '))) === 'Open in new tab | /files/f1/download | _blank', 'an Open in new tab button opens the PDF itself in a new tab, on request only');
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('.bcv-viewer'), null, { timeout: 3000 });
   check(await page.evaluate(() => document.activeElement?.classList.contains('bcv-row')), 'Escape closes it and hands focus back to the row');
   await page.click('.bcv-body .bcv-row:has-text("Lecture 3 whiteboard.png")');
   await page.waitForFunction(() => { const i = document.querySelector('.bcv-viewer__img'); return i && i.complete && i.naturalWidth > 0; }, null, { timeout: 5000 });
-  check((await page.$eval('.bcv-viewer__img', (e) => e.naturalWidth)) === 640 && /Image · 295 KB/.test((await texts('.bcv-viewer .bcv-sheet__head'))[0]), 'an image is shown as itself');
+  check((await page.$eval('.bcv-viewer__img', (e) => e.naturalWidth)) === 640 && /Image · 295 KB/.test((await texts('.bcv-viewer .bcv-sheet__head'))[0]) && (await page.$eval('.bcv-viewer__tab', (e) => e.getAttribute('href'))) === '/files/f5/download?verifier=abc', 'an image is shown as itself (and its new-tab link drops the download flag)');
   await shot(page, '20b-file-viewer');
   await page.click('.bcv-viewer .bcv-sheet__close');
   await page.waitForFunction(() => !document.querySelector('.bcv-viewer'), null, { timeout: 3000 });
