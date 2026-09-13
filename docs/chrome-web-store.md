@@ -32,7 +32,7 @@ DASHBOARD · a real overview: what is due today and this week, unread announceme
 
 COURSES · every course tab redrawn: home, announcements, assignments (by date or type), discussions with threaded replies, people, pages, files, quizzes, modules and a grades card with nested rings per assignment group plus a what-if mode. The course rail is built from the course's own navigation, with counts for unread announcements and grades posted this week.
 
-TO DO, CALENDAR, INBOX, GROUPS · planner items you can mark done or dismiss, a month view of every course, your Canvas conversations, and your groups.
+TO DO, CALENDAR, INBOX, GROUPS · planner items you can mark done or dismiss, a month view of your courses, your Canvas conversations, and your groups.
 
 GRADES · one page for every course: current score, GPA computed from the scores Canvas reports (labelled as computed, never official), targets, and a trend over time kept only on your computer.
 

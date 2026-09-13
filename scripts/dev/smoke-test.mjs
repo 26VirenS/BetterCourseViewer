@@ -70,9 +70,12 @@ try {
   const extId = new URL(sw.url()).host;
   console.log('extension id', extId);
   const setSettings = (patch) => sw.evaluate(async (p) => self.BCV.settings.update(p), patch);
-  const setupTab = context.pages().find((p) => p.url().endsWith('/setup/setup.html')) || await context.waitForEvent('page', { timeout: 8000 }).catch(() => null);
-  check(!!setupTab && setupTab.url().endsWith('/setup/setup.html'), 'installing the extension opens the guided setup page');
-  if (setupTab) await setupTab.close();
+  const isSetup = (p) => p.url().endsWith('/setup/setup.html');
+  if (!context.pages().some(isSetup)) await context.waitForEvent('page', { timeout: 8000 }).catch(() => null);
+  await new Promise((r) => setTimeout(r, 800)); // the install offers the page from two places at once (onInstalled, the background starting): both have run by now
+  const setupTabs = context.pages().filter(isSetup);
+  check(setupTabs.length === 1, `installing the extension opens the guided setup page — once, not twice (${setupTabs.length} open)`);
+  for (const t of setupTabs) await t.close();
   check((await sw.evaluate(async () => (await self.BCV.api.storage.local.get('setup:flow'))['setup:flow'])) === 2, 'the build records its setup flow, so an update from an older flow offers the page once more');
   // Safari turns the extension on without an install event, so the page is offered again on a new
   // browser session while setup is unfinished — and never again once it is done or skipped.
@@ -458,12 +461,22 @@ try {
   check(evs.length >= 10 && evs.some((t) => /Dis01/.test(t)), `month view events: ${evs.length}`);
   check(await page.$('.bcv-ev__label.bcv-strike'), 'submitted/past events are struck through');
   const cals = await texts('.bcv-calrow__name');
-  check(cals.length === 11 && cals[0] === 'Sam Student' && (await page.$$('.bcv-switch.is-on')).length === 10, `calendars list with switches: ${cals.length} (10 on, Canvas's limit)`);
-  check((await texts('.bcv-calrow--refused .bcv-calrow__name'))[0] === 'Placement Exam: Chemistry' && /would not share one calendar \(Placement Exam: Chemistry\)/.test((await texts('.bcv-cal__notice'))[0]) && !evs.some((t) => /Chemistry placement/.test(t)), 'a calendar Canvas refuses (401) is retried alone, marked "Not shared", and the rest still load');
+  const ownCals = await texts('.bcv-cal__own .bcv-calrow__name');
+  const otherCals = await texts('.bcv-cal__other .bcv-calrow__name');
+  check(cals.length === 11 && ownCals.length === 5 && !ownCals.includes('Sam Student') && otherCals[0] === 'Sam Student' && otherCals.includes('Placement Exam: Chemistry') && otherCals.includes('Attestation Fall 2026 1')
+    && (await page.$$('.bcv-cal__own .bcv-switch.is-on')).length === 5 && (await page.$$('.bcv-cal__other .bcv-switch.is-on')).length === 0,
+  `the favourite courses are the calendars on by default; the personal calendar, other courses and groups wait under Other calendars, off: ${ownCals.join(', ')} | other: ${otherCals.join(', ')}`);
+  check(!evs.some((t) => /Chemistry placement/.test(t)) && !(await page.$('.bcv-cal__notice')), 'nothing from an Other calendar is shown, and nothing is said about it, until it is turned on');
+  // turning on a calendar Canvas refuses (401): it is retried alone, marked, and the rest still load
+  await (await page.$$('.bcv-cal__other .bcv-switch'))[otherCals.indexOf('Placement Exam: Chemistry')].click();
+  await page.waitForSelector('.bcv-calrow--refused', { timeout: 10000 });
+  check((await texts('.bcv-calrow--refused .bcv-calrow__name'))[0] === 'Placement Exam: Chemistry' && /would not share one calendar \(Placement Exam: Chemistry\)/.test((await texts('.bcv-cal__notice'))[0]) && !(await texts('.bcv-ev')).some((t) => /Chemistry placement/.test(t)) && (await texts('.bcv-ev')).length === evs.length, 'a calendar Canvas refuses (401) is retried alone, marked "Not shared", and the rest still load');
   await shot(page, '06-calendar-month');
-  await (await page.$$('.bcv-switch'))[0].click();
+  await (await page.$$('.bcv-cal__own .bcv-switch'))[0].click(); // the first favourite course off…
   await page.waitForTimeout(400);
   check((await texts('.bcv-ev')).length < evs.length, 'switching a calendar off hides its events');
+  await (await page.$$('.bcv-cal__own .bcv-switch'))[0].click(); // …and on again: the week and agenda checks below read its events
+  await page.waitForFunction((n) => document.querySelectorAll('.bcv-ev').length >= n, evs.length, { timeout: 10000 });
   await page.click('.bcv-seg__btn[data-value="week"]');
   await page.waitForSelector('.bcv-week__grid', { timeout: 5000 });
   check((await page.$$('.bcv-week__hour')).length === 16 && (await page.$('.bcv-week__col--today')), 'week view: 8a–11p rows, today column');
@@ -538,8 +551,11 @@ try {
   check(gpaCards.length === 5 && /^A− F26-MATH 021 20 MATH-021-20 92\.4% 3\.7 pts Needs \d+% of the remaining 507 pts 93 pts earned so far Target A− Details$/.test(gpaCards[0]) && gpaCards.filter((t) => /^N\/A .*N\/A — pts Nothing graded yet — no score to project from .*No grade yet Details$/.test(t)).length === 1, `course cards: ${gpaCards[0]} || ${gpaCards[4]}`);
   // hovering the ring alone opens the group breakdown in place; the card keeps its size
   const cardHeight = await page.$eval('.bcv-gpa__card', (el) => el.getBoundingClientRect().height);
+  const ringAtRest = await page.$eval('.bcv-gpa__card .bcv-gpa__ringsvg', (el) => Math.round(el.getBoundingClientRect().width));
   await page.hover('.bcv-gpa__card .bcv-gpa__ringbox');
   await waitText('.bcv-gpa__card', /By group/); // waitText reads textContent (source case) and keeps no regex flags
+  const ringHovered = await page.$eval('.bcv-gpa__card.is-hover .bcv-gpa__ringsvg', (el) => Math.round(el.getBoundingClientRect().width));
+  check(ringAtRest === 82 && ringHovered === 82, `the course ring is one size at rest and expanded (the group rings nest inside it): ${ringAtRest}px → ${ringHovered}px`);
   const hoverCard = (await texts('.bcv-gpa__card'))[0];
   check(/^by group 92\.4% .*Discussion Quizzes \d+%/i.test(hoverCard) && (await page.$$('.bcv-gpa__card.is-hover .bcv-gpa__ringsvg circle')).length >= 6 && Math.abs((await page.$eval('.bcv-gpa__card', (el) => el.getBoundingClientRect().height)) - cardHeight) < 1, `hovering the ring shows the group rings + breakdown without resizing the card: ${hoverCard}`);
   await page.mouse.move(5, 5);
@@ -763,6 +779,9 @@ try {
   await page.waitForSelector('.bcv-group__head', { timeout: 10000 });
   const agroups = await texts('.bcv-group__head');
   check(agroups[0].startsWith('Upcoming Assignments') && agroups.some((t) => /Past Assignments \d+ graded/.test(t)), `assignment groups: ${agroups.join(' | ')}`);
+  // the rows fade in one after another down the column, 20ms apart, quickly (200ms each)
+  const aEnter = await page.$$eval('.bcv-body .bcv-card--list .bcv-row', (els) => els.map((e) => [e.classList.contains('bcv-enter'), e.style.getPropertyValue('--bcv-delay'), e.style.getPropertyValue('--bcv-dur')]));
+  check(aEnter.length >= 6 && aEnter.every(([on, , dur], i) => on && dur === '200ms' && aEnter[i][1] === `${Math.min(i * 20, 420)}ms`), `assignment rows fade in one at a time, 20ms apart: ${aEnter.slice(0, 4).map((a) => a[1]).join(',')}…`);
   const arows = await texts('.bcv-body .bcv-row');
   check(arows.some((t) => /Qz01.*Due .* at 11:59pm · –\/10 pts.*Not submitted/.test(t)) && arows.some((t) => /Lec05-PreQuiz.*19\/19 pts.*Graded/.test(t)), 'assignment rows: due, points, status badge');
   await shot(page, '13-course-assignments');

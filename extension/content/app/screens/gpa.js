@@ -292,8 +292,9 @@
       });
       return out;
     }
-    /** The 56px ring: the course total, plus the group rings when expanded. `delay` (ms) sweeps
-     *  the course arc in from empty; null draws it at its value at once. */
+    /** The ring (drawn at 82px on the cards, 62px in the Details sheet): the course total, plus the
+     *  group rings nested inside when expanded. `delay` (ms) sweeps the course arc in from empty;
+     *  null draws it at its value at once. */
     function ringSvg(c, pct, cats, expanded, delay = null) {
       const svg = svgEl('svg', { viewBox: '0 0 56 56', class: 'bcv-gpa__ringsvg' });
       svg.append(svgEl('circle', { cx: 28, cy: 28, r: RING_R, fill: 'none', stroke: ringTrack(), 'stroke-width': 6 }));
@@ -344,8 +345,7 @@
       );
       function paint() {
         card.classList.toggle('is-hover', hover);
-        ringWrap.classList.toggle('is-big', hover);
-        letter.hidden = hover;
+        letter.hidden = hover; // the ring keeps its size: the group rings nest inside it
         catsG.replaceChildren(...(hover ? catCircles(cats) : []));
         info.replaceChildren(hover
           ? U.el('bcv-gpa__bygroup', [

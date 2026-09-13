@@ -314,7 +314,15 @@ if (typeof importScripts === 'function' && !self.BCV?.providers) {
    *  been done — once per browser session, so Safari turning the extension on (which is not an
    *  install, and often follows a rebuild) still lands on it, and finishing setup ends it for good.
    *  Without session storage there is nothing to tell one run from the next, so it opens once ever. */
-  async function offerSetup() {
+  // One offer at a time. An install runs this twice at once — from onInstalled and from the
+  // background starting — and two runs that both read the flags before either has set them both
+  // open the page; the second now waits for the first and finds the page already offered.
+  let offering = null;
+  function offerSetup() {
+    if (!offering) offering = offerSetupNow().finally(() => { offering = null; });
+    return offering;
+  }
+  async function offerSetupNow() {
     try {
       await migrateSetup();
       const state = await api.storage.local.get(['setup:offered', 'setup:done']);

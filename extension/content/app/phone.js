@@ -1091,17 +1091,24 @@
     }
     function calendarsRow() {
       return h('button', { type: 'button', class: 'bcv-ph-linkrow', onclick: () => openSheet({
-        title: 'Calendars', label: 'Calendars', note: 'Canvas shows at most 10 calendars at once.',
-        body: U.el('bcv-ph-sheet__list', contexts.map((c) => U.el('bcv-ph-srow bcv-ph-srow--static', [
-          h('span', { class: 'bcv-ph-srow__bar', style: { background: c.color } }),
-          U.el('bcv-ph-srow__body', [U.text('bcv-ph-srow__label bcv-ellip', c.name)]),
-          U.switchEl(chosen.includes(c.code), async (on) => {
-            if (on && chosen.length >= 10) { U.toast('Canvas shows at most 10 calendars at once. Turn one off first.', { error: true }); return; }
-            chosen = on ? [...chosen, c.code] : chosen.filter((x) => x !== c.code);
-            await store.setSelectedContexts(chosen);
-            load();
-          }, `Show ${c.name}`),
-        ]))),
+        title: 'Calendars', label: 'Calendars', note: 'Your courses are on; the rest are off until you turn one on. Canvas shows at most 10 calendars at once.',
+        body: (() => {
+          // the favourite courses first, on by default; the personal calendar, other courses and groups under their own heading
+          const own = store.ownContexts(contexts);
+          const ownSet = new Set(own.map((c) => c.code));
+          const other = contexts.filter((c) => !ownSet.has(c.code));
+          const srow = (c) => U.el('bcv-ph-srow bcv-ph-srow--static', [
+            h('span', { class: 'bcv-ph-srow__bar', style: { background: c.color } }),
+            U.el('bcv-ph-srow__body', [U.text('bcv-ph-srow__label bcv-ellip', c.name)]),
+            U.switchEl(chosen.includes(c.code), async (on) => {
+              if (on && chosen.length >= 10) { U.toast('Canvas shows at most 10 calendars at once. Turn one off first.', { error: true }); return; }
+              chosen = on ? [...chosen, c.code] : chosen.filter((x) => x !== c.code);
+              await store.setSelectedContexts(chosen);
+              load();
+            }, `Show ${c.name}`),
+          ]);
+          return U.el('bcv-ph-sheet__list', [...own.map(srow), other.length ? U.text('bcv-ph-sheet__sub', 'Other calendars') : null, ...other.map(srow)]);
+        })(),
       }) }, [U.svg(IC.cal, { size: 15, stroke: 'var(--bcv-ink2)', width: 1.9 }), h('span', { text: `Calendars · ${chosen.length} of ${contexts.length} shown` }), chev()]);
     }
     function draw() {

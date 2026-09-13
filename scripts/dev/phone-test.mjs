@@ -329,11 +329,11 @@ try {
   check((await texts('.bcv-ph-gcard__sub')).every((t) => /\d+ of \d+ graded|nothing graded/.test(t)) && (await texts('.bcv-ph-gcard__letter')).some((t) => /^[A-F][+−]?$/.test(t)), `cards show graded counts and letters: ${(await texts('.bcv-ph-gcard__letter')).join(', ')}`);
   await shot('04-grades');
   // the goal stepper in the hero saves as it goes
-  const before = (await texts('.bcv-ph-hero__goalv'))[0];
-  await page.click('.bcv-ph-hero__step:last-child');
-  const after = (await texts('.bcv-ph-hero__goalv'))[0];
-  check(/^\d\.\d\d$/.test(before) && Math.abs(Number(after) - Number(before) - 0.05) < 0.001 && (await texts('.bcv-ph-hero__goalnote'))[0] === `goal ${after}`, `goal stepper: ${before} → ${after}, the note follows`);
+  const before = (await texts('.bcv-ph-hero__goalv'))[0]; // 4.00, the top of the scale: so it steps down first
   await page.click('.bcv-ph-hero__step:first-child');
+  const after = (await texts('.bcv-ph-hero__goalv'))[0];
+  check(/^\d\.\d\d$/.test(before) && Math.abs(Number(before) - Number(after) - 0.05) < 0.001 && (await texts('.bcv-ph-hero__goalnote'))[0] === `goal ${after}`, `goal stepper: ${before} → ${after}, the note follows`);
+  await page.click('.bcv-ph-hero__step:last-child');
   await eventually(async () => (await texts('.bcv-ph-hero__goalv'))[0] === before);
   // a ring expands on a tap, one at a time
   await page.click('.bcv-ph-gcard:nth-child(1) .bcv-ph-gcard__hd');
@@ -460,14 +460,19 @@ try {
   await page.goto(`${BASE}/?bcv=setup`);
   await page.waitForSelector('#bcv-setup .row', { timeout: 20000 });
   await page.waitForTimeout(400);
-  check((await page.$$('#bcv-setup .row.is-on')).length === 5 && (await page.$eval('#bcv-setup .card', (e) => e.getBoundingClientRect().right <= window.innerWidth + 1 && e.getBoundingClientRect().left >= 0)) && await noOverflow(), 'the setup card fits the phone screen and lists the favourites checked');
+  check((await page.$$('#bcv-setup .row.is-on')).length === 0 && (await page.$$('#bcv-setup .row[data-course]')).length >= 5 && (await page.$eval('#bcv-setup #next', (e) => e.disabled)) && (await page.$eval('#bcv-setup .card', (e) => e.getBoundingClientRect().right <= window.innerWidth + 1 && e.getBoundingClientRect().left >= 0)) && await noOverflow(), 'the setup card fits the phone screen and lists the courses, none picked yet (Continue waits for one)');
   await shot('11-setup');
+  await page.$$eval('#bcv-setup .row[data-course]', (els) => els.slice(0, 5).forEach((e) => e.click())); // pick five
+  // (Playwright selectors reach into the card's shadow root; document.querySelector would not)
+  check(await eventually(async () => (await page.$$('#bcv-setup .row.is-on')).length === 5 && !(await page.$eval('#bcv-setup #next', (e) => e.disabled))), 'five picked: the rows tick and Continue comes alive');
   await page.click('#bcv-setup #next');
   await page.waitForSelector('#bcv-setup #track', { timeout: 10000 });
   check(await noOverflow() && (await page.$$('#bcv-setup .target')).length === 5, 'the grades step keeps to the screen with a target row per course');
   await shot('11b-setup-grades');
   await page.click('#bcv-setup #next');
   await page.waitForSelector('#bcv-setup .prov', { timeout: 10000 });
+  // a phone has no sidebar to place the courses on, so the setup is three steps here and ends on this one
+  check((await page.$$('#bcv-setup .progress span')).length === 3 && (await page.$eval('#bcv-setup #stepLabel', (e) => e.textContent)) === '3 of 3' && (await page.$eval('#bcv-setup #next', (e) => e.textContent)) === 'Finish', `three steps on a phone (no sidebar step), the last one ending in Finish: ${await page.$eval('#bcv-setup #stepLabel', (e) => e.textContent)}`);
   await page.click('#bcv-setup #notNow');
   await page.waitForSelector('.bcv-tour__card', { timeout: 20000 });
   check((await page.$('#bcv-setup')) === null && page.url() === `${BASE}/`, 'Not now closes the card and the tour starts on Today');

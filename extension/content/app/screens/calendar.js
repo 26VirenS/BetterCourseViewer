@@ -331,15 +331,23 @@
       load();
     }
 
+    // The user's own calendars (the favourite courses) are on by default; the personal calendar,
+    // courses not starred and groups sit under Other calendars, off until turned on.
     function calendarsCard() {
+      const own = store.ownContexts(contexts);
+      const ownSet = new Set(own.map((c) => c.code));
+      const other = contexts.filter((c) => !ownSet.has(c.code));
+      const row = (c) => U.row([
+        U.dot(c.color, 'bcv-dot--sq'),
+        U.text('bcv-calrow__name bcv-pretty', c.name, 'span'),
+        refused.has(c.code) ? h('span', { class: 'bcv-badge bcv-badge--xs', title: 'Canvas refused this calendar (a restricted or concluded course)', text: 'Not shared' }) : null,
+        U.switchEl(selected.includes(c.code), (on) => toggleContext(c.code, on), `Show ${c.name}`),
+      ], { mod: `bcv-row--p12-16 ${refused.has(c.code) ? 'bcv-calrow--refused' : ''}` });
       return h('div', {}, [
         U.label('Calendars'),
-        U.card(contexts.map((c) => U.row([
-          U.dot(c.color, 'bcv-dot--sq'),
-          U.text('bcv-calrow__name bcv-pretty', c.name, 'span'),
-          refused.has(c.code) ? h('span', { class: 'bcv-badge bcv-badge--xs', title: 'Canvas refused this calendar (a restricted or concluded course)', text: 'Not shared' }) : null,
-          U.switchEl(selected.includes(c.code), (on) => toggleContext(c.code, on), `Show ${c.name}`),
-        ], { mod: `bcv-row--p12-16 ${refused.has(c.code) ? 'bcv-calrow--refused' : ''}` })), 'bcv-card--list'),
+        own.length ? U.card(own.map(row), 'bcv-card--list bcv-cal__own') : U.emptyCard('No courses'),
+        other.length ? U.label('Other calendars') : null,
+        other.length ? U.card(other.map(row), 'bcv-card--list bcv-cal__other') : null,
       ]);
     }
     async function toggleContext(code, on) {

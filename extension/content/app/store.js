@@ -535,24 +535,29 @@
   async function calendarContexts() {
     const [u, cs, gs] = await Promise.all([me(), courses(), groups().catch(() => [])]);
     const list = [{ code: `user_${u.id}`, name: u.name, color: '#0a84ff', kind: 'user' }];
-    for (const c of cs) if (c.state !== 'past') list.push({ code: `course_${c.id}`, name: c.name, color: c.color, kind: 'course', courseId: c.id });
+    for (const c of cs) if (c.state !== 'past') list.push({ code: `course_${c.id}`, name: c.name, color: c.color, kind: 'course', courseId: c.id, favorite: !!c.favorite });
     for (const g of gs || []) list.push({ code: `group_${g.id}`, name: g.name, color: '#6b5f7a', kind: 'group' });
     return list;
   }
-  /** Which calendars to show: our own saved choice, else the selection the
-   *  user made in Canvas's calendar, else the first ten. An empty or stale
-   *  list falls back too, so the calendar is never blank for lack of a pick. */
+  /** The calendars that are the user's own: the favourite courses — the one course list every
+   *  screen follows — or, until one is starred, every current course. Everything else (the
+   *  personal calendar, courses not starred, groups) is an "other" calendar. */
+  function ownContexts(all) {
+    const courses = all.filter((c) => c.kind === 'course');
+    const favs = courses.filter((c) => c.favorite);
+    return favs.length ? favs : courses;
+  }
+  /** Which calendars to show: our own saved choice, else the user's own calendars (at most
+   *  Canvas's ten). A stale saved list falls back too, so the calendar is never blank for lack
+   *  of a pick. The other calendars are off until turned on. */
   async function selectedContexts(all) {
-    const e = env();
     const codes = new Set(all.map((c) => c.code));
     const stored = await pref('calendarContexts');
-    const fromCanvas = Array.isArray(e.SELECTED_CONTEXT_CODES) ? e.SELECTED_CONTEXT_CODES : null;
-    for (const cand of [stored, fromCanvas]) {
-      if (!Array.isArray(cand) || !cand.length) continue;
-      const kept = cand.filter((c) => codes.has(c));
+    if (Array.isArray(stored) && stored.length) {
+      const kept = stored.filter((c) => codes.has(c));
       if (kept.length) return kept;
     }
-    return all.slice(0, 10).map((c) => c.code);
+    return ownContexts(all).slice(0, 10).map((c) => c.code);
   }
   async function setSelectedContexts(codes) {
     await setPref('calendarContexts', codes);
@@ -1096,7 +1101,7 @@
     env, pref, setPref, me, account, colors, courses, favorites, cards, setFavorite, setNickname, currentTerm, dashboardView, setDashboardView,
     planner, classify, todo, todoWindow, setComplete, dismiss, restore, invalidatePlanner, createNote, deleteNote, activity, activitySummary, unreadCount, groups, group,
     announcementsFeed, streamSeen, markStreamSeen, setColor, history, helpLinks,
-    calendarContexts, selectedContexts, setSelectedContexts, calendarEvents, plannerRange,
+    calendarContexts, ownContexts, selectedContexts, setSelectedContexts, calendarEvents, plannerRange,
     conversations, conversation, markRead, setStarred, replyTo, compose, searchRecipients, invalidateInbox,
     course, tabs, frontPage, syllabus, courseTodo, ignoreTodo, courseStream, assignments, assignment, submission, assignmentGroups, progress,
     announcements, discussions, discussion, discussionView, postEntry, markTopicRead, people, sections, courseGroups, pages, page,

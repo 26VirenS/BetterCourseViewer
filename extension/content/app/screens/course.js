@@ -622,7 +622,7 @@
     return b;
   };
 
-  T.assignmentsBlock = async (ctx, shell, { query = '', mode = 'date' } = {}) => {
+  T.assignmentsBlock = async (ctx, shell, { query = '', mode = 'date', enter = true } = {}) => {
     const { app } = ctx;
     const c = shell.course;
     const [list, groups] = await Promise.all([store.assignments(c.id).catch(() => null), mode === 'type' ? store.assignmentGroups(c.id).catch(() => null) : null]);
@@ -630,10 +630,13 @@
     const now = new Date();
     const q = query.toLowerCase();
     const items = list.filter((a) => !q || a.name.toLowerCase().includes(q));
+    // the rows fade in one after another down the column, quickly (20ms apart, capped so a long
+    // list never crawls) — on the first draw only; a search or a re-sort just redraws
+    let n = 0;
     const row = (a) => {
       const { icon, quiz } = typeIcon(a);
       const pal = quiz ? U.palette('#5856d6', shell.dark) : c.palette;
-      return U.row([
+      const rowEl = U.row([
         U.tile(icon, { color: pal.text, tint: pal.tint }),
         U.el('bcv-row__body', [
           U.text('bcv-row__title bcv-row__title--145 bcv-ellip', a.name),
@@ -642,6 +645,7 @@
         statusBadge(a, shell.dark),
         U.chev(),
       ], { onClick: () => app.go(quiz && a.quiz_id ? `${c.url}/quizzes/${a.quiz_id}` : `${c.url}/assignments/${a.id}`) });
+      return enter ? U.enter(rowEl, n++, 20, 200) : rowEl;
     };
     const section = (title, sub, arr) => (arr.length ? h('div', {}, [U.groupHead(title, sub), U.card(arr.map(row), 'bcv-card--list')]) : null);
     if (mode === 'type' && groups) {
@@ -679,9 +683,12 @@
     b.append(U.el('bcv-head__tools', [U.search('Search assignments', (q) => { query = q; draw(); }, 'bcv-search--200'), U.seg([['date', 'Show by date'], ['type', 'Show by type']], mode, (v) => { mode = v; draw(); })]), wrap);
     b.querySelector('.bcv-head__tools').style.marginTop = '0';
     wrap.append(U.loading());
+    let drawn = false; // the rows' entrance plays on the first draw; a search or re-sort just redraws
     async function draw() {
-      const el = await T.assignmentsBlock(ctx, shell, { query, mode });
-      if (ctx.alive()) wrap.replaceChildren(el);
+      const el = await T.assignmentsBlock(ctx, shell, { query, mode, enter: !drawn });
+      if (!ctx.alive()) return;
+      drawn = true;
+      wrap.replaceChildren(el);
     }
     await draw();
     const list = await store.assignments(c.id).catch(() => []);

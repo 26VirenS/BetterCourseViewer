@@ -23,11 +23,20 @@
     { key: 'openai', name: 'ChatGPT', note: 'Available now', ready: true, settingsKey: 'openaiKey', placeholder: 'sk-…', url: 'https://platform.openai.com/api-keys', host: 'platform.openai.com', steps: ['API keys → Create new secret key', 'Paste it above. It is shown only once.'] },
     { key: 'gemini', name: 'Gemini', note: 'Coming soon', ready: false },
   ];
-  // the four steps, the button that leaves each one, and the label above the card (function
-  // declarations, so the list can sit here beside the labels it is paired with)
-  const STEPS = [courses, grades, smart, sidebar];
-  const LABELS = ['Continue', 'Continue', 'Continue', 'Finish'];
-  const STEP_LABELS = ['1 of 4', '2 of 4', '3 of 4', '4 of 4', 'Done'];
+  // the steps, the button that leaves each one, and the label above the card (function
+  // declarations, so the list can sit here beside the labels it is paired with). A phone has no
+  // sidebar to place the courses on, so the last step is left out there: the lists are settled
+  // when the card opens (see start()).
+  let STEPS = [courses, grades, smart, sidebar];
+  let LABELS = ['Continue', 'Continue', 'Continue', 'Finish'];
+  let STEP_LABELS = ['1 of 4', '2 of 4', '3 of 4', '4 of 4', 'Done'];
+  const settleSteps = () => {
+    STEPS = BCV.phone?.active() ? [courses, grades, smart] : [courses, grades, smart, sidebar];
+    LABELS = STEPS.map((_, i) => (i === STEPS.length - 1 ? 'Finish' : 'Continue'));
+    STEP_LABELS = [...STEPS.map((_, i) => `${i + 1} of ${STEPS.length}`), 'Done'];
+  };
+  /** Leaves the smart-panel step: on to the sidebar step where there is one, else the end. */
+  const afterSmart = () => (STEPS.includes(sidebar) ? go(3) : finish({ skipped: false }));
   const PURPOSE = 'Smart Panel is intended to be a smart assistant that helps with learning. It is not intended to help complete assignments, cheat on quizzes, or any other purpose than to assist with learning.';
   const MARK = '<svg viewBox="0 0 120 120" width="23" height="23" aria-hidden="true"><defs><linearGradient id="sheetSm" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#fff" stop-opacity=".9"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient></defs><rect x="16" y="18" width="53" height="84" rx="14" fill="url(#sheetSm)"/><path d="M28 30 H69 A30 30 0 0 1 69 90 H28" fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><path d="M35 42 H69 A18 18 0 0 1 69 78 H35" fill="none" stroke="rgba(255,255,255,.72)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><path d="M42 54 H69 A6 6 0 0 1 69 66 H42" fill="none" stroke="rgba(255,255,255,.46)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
@@ -76,6 +85,7 @@
       sideCourses: settings.appearance?.sideCourses === 'hover' ? 'hover' : 'always',
       closing: false,
     };
+    settleSteps();
     const host = h('div', { id: 'bcv-setup' });
     host.setAttribute('data-theme', app.isDark() ? 'dark' : 'light');
     const shadow = host.attachShadow({ mode: 'open' });
@@ -389,7 +399,7 @@
       h('div', { class: 'notice notice--red', id: 'purpose', text: PURPOSE }),
       provs, field, result, steps,
     );
-    notNow = h('button', { type: 'button', class: 'btn btn--quiet', id: 'notNow', text: 'Not now', onclick: () => { st.key = ''; st.keyOk = false; go(3); } });
+    notNow = h('button', { type: 'button', class: 'btn btn--quiet', id: 'notNow', text: 'Not now', onclick: () => { st.key = ''; st.keyOk = false; afterSmart(); } });
     const nextBtn = footer({
       disabled: () => !input.value.trim(), // an empty field leaves by Not now, not by Continue
       onNext: async () => {
@@ -409,7 +419,7 @@
           result.textContent = st.keyMsg;
           result.className = 'result is-ok';
           await new Promise((res) => setTimeout(res, 350));
-          go(3);
+          afterSmart();
         } else {
           st.keyOk = false;
           result.textContent = r?.message || 'The key could not be checked. Check it and try again, or skip for now.';
