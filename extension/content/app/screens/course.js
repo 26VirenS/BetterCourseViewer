@@ -399,6 +399,7 @@
       case 'people': el = await B.people(ctx, shell); break;
       case 'pages': el = await B.pages(ctx, shell); break;
       case 'files': case 'folder': el = await B.files(ctx, shell); break;
+      case 'file': el = await B.files(ctx, shell); if (ctx.alive() && route.arg) BCV.viewer?.open({ id: route.arg }, { context: course }); break; // a link to one file: the folder behind, the file in the viewer
       case 'quizzes': el = await B.quizzes(ctx, shell); break;
       case 'modules': el = await B.modules(ctx, shell); break;
       case 'announcement': el = await D.discussion(ctx, shell, { announcement: true }); break;
@@ -827,10 +828,8 @@
     const c = shell.course;
     const b = body();
     let query = '';
-    let selected = null;
-    const dl = U.btn('Download', { icon: IC.download, kind: 'fill36', disabled: true, onClick: () => { if (selected) window.open(selected.url, '_blank', 'noopener'); } });
     const wrap = h('div');
-    b.append(U.el('bcv-head__tools', [U.search('Search files', (q) => { query = q.toLowerCase(); draw(); }, 'bcv-search--200'), dl]), wrap);
+    b.append(U.el('bcv-head__tools', [U.search('Search files', (q) => { query = q.toLowerCase(); draw(); })]), wrap);
     b.querySelector('.bcv-head__tools').style.marginTop = '0';
     wrap.append(U.loading());
     let folder;
@@ -858,18 +857,19 @@
         ...files.map((f) => {
           const kind = FILE_KINDS.find(([re]) => re.test(f['content-type'] || f.mime_class || '')) || [null, 'File', IC.doc, '#8e8e93'];
           const pal = U.palette(kind[3], shell.dark);
+          // a file opens in the viewer over the page (its own Download and Open in Canvas are in
+          // there), never in a new tab; the row is still a link to the file's page for a new-tab click
           const rowEl = U.row([
             U.tile(kind[2], { color: pal.text, tint: pal.tint }),
             U.el('bcv-row__body', [U.text('bcv-row__title bcv-row__title--145 bcv-ellip', f.display_name || f.filename), U.text('bcv-row__sub', `${kind[1]} · modified ${U.fmtRecent(f.updated_at || f.modified_at)}`)]),
             U.text('bcv-files__size', fmtSize(f.size), 'span'),
-            h('a', { href: `${c.url}/files/${f.id}`, title: 'Preview', style: { display: 'flex' }, onclick: (e) => e.stopPropagation() }, U.chev()),
-          ], { onClick: () => {
-            selected = f;
-            dl.disabled = false;
-            wrap.querySelectorAll('.bcv-row.is-selected').forEach((r) => r.classList.remove('is-selected'));
-            rowEl.classList.add('is-selected');
-          } });
-          rowEl.addEventListener('dblclick', () => app.go(`${c.url}/files/${f.id}`));
+            U.chev(),
+          ], { href: `${c.url}/files/${f.id}` });
+          rowEl.addEventListener('click', (e) => {
+            if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+            e.preventDefault();
+            BCV.viewer.open(f, { context: c, from: rowEl });
+          });
           return rowEl;
         }),
       ];
@@ -941,12 +941,19 @@
           if (it.type === 'File' && id) return `${c.url}/files/${id}`;
           return it.html_url || it.external_url || c.url;
         })();
-        return U.row([
+        const rowEl = U.row([
           U.tile(ITEM_ICON[it.type] || IC.doc, { color: c.palette.text, tint: c.palette.tint }),
           U.el('bcv-row__body', [U.text('bcv-row__title bcv-row__title--145 bcv-ellip', it.title), sub ? U.text('bcv-row__sub', sub) : null]),
           it.completion_requirement ? h('span', { class: `bcv-circle ${completed ? 'is-done' : ''}`, title: completed ? 'Done' : 'Not done', style: { cursor: 'default' } }, completed ? U.svg('M6 12l4 4 8-8', { size: 12, stroke: '#fff', width: 2.4 }) : null) : null,
           U.chev(),
         ], { mod: `bcv-module__item bcv-indent-${Math.min(it.indent || 0, 3)}`, href: itemHref });
+        // a file in a module opens in the viewer over the page, like one in Files
+        if (it.type === 'File' && it.content_id) rowEl.addEventListener('click', (e) => {
+          if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+          e.preventDefault();
+          BCV.viewer.open({ id: it.content_id }, { context: c, from: rowEl });
+        });
+        return rowEl;
       }));
       const card = U.card([
         h('button', { type: 'button', class: 'bcv-module__head', onclick: () => { card.classList.toggle('bcv-module--open'); itemsEl.hidden = !card.classList.contains('bcv-module--open'); } }, [

@@ -69,10 +69,22 @@
   const ready = sync();
   S.onChange((s) => sync(s));
   // (No page-top loading bar: the sidebar row that was pressed is the progress indicator, mockup 14.)
-  // Safety net: if the interface never mounts (script error, blocked page),
-  // give the page back to Canvas rather than leaving it blank.
+  // Safety net: if the interface never mounts (a script error, a blocked page, an answer that
+  // never comes), the page is loaded once more — a fresh load clears most of what wedges — and,
+  // if it happens again within the minute, given back to Canvas rather than left blank.
   setTimeout(() => {
-    if (html.classList.contains('bcv-on') && !document.getElementById('bcv-app')) html.classList.remove('bcv-on');
+    if (!html.classList.contains('bcv-on') || document.getElementById('bcv-app')) return;
+    const key = 'bcv:reloaded';
+    let again = false;
+    try {
+      const m = JSON.parse(sessionStorage.getItem(key) || 'null');
+      again = !!m && m.path === location.pathname + location.search && Date.now() - m.at < 60000;
+      if (!again) sessionStorage.setItem(key, JSON.stringify({ path: location.pathname + location.search, at: Date.now() }));
+    } catch {
+      again = true; // no session storage to remember by: never risk a loop
+    }
+    if (again) html.classList.remove('bcv-on');
+    else location.reload();
   }, 8000);
   try {
     window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => sync(current));

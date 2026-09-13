@@ -1,0 +1,113 @@
+/* File viewer: a file opened from Files, a module or a link opens in a sheet over the page
+ * rather than in a new tab — its name and details up top, a preview where one can be drawn
+ * (images, video, audio and text here; PDFs and documents through Canvas's own preview, which
+ * is made to be framed), and Download and Open in Canvas beside it. Escape, the close button
+ * or a click outside puts it away and hands focus back to the row that opened it. */
+(function () {
+  const BCV = (self.BCV = self.BCV || {});
+  const { h } = BCV.utils;
+  const U = BCV.ui;
+  const IC = BCV.IC;
+  const store = BCV.store;
+
+  const fmtSize = (n) => {
+    if (!Number.isFinite(n)) return '';
+    if (n < 1024) return `${n} B`;
+    if (n < 1048576) return `${Math.round(n / 1024)} KB`;
+    if (n < 1073741824) return `${(n / 1048576).toFixed(1)} MB`;
+    return `${(n / 1073741824).toFixed(1)} GB`;
+  };
+
+  /** What a file is, by its content type (its name as a fallback), and how it is best shown. */
+  function kindOf(f) {
+    const t = String(f['content-type'] || f.mime_class || '').toLowerCase();
+    const name = String(f.display_name || f.filename || '').toLowerCase();
+    if (t.startsWith('image/')) return { kind: 'image', label: 'Image', icon: IC.image || IC.page, color: '#34c759' };
+    if (t.startsWith('video/')) return { kind: 'video', label: 'Video', icon: IC.video || IC.doc, color: '#ff375f' };
+    if (t.startsWith('audio/')) return { kind: 'audio', label: 'Audio', icon: IC.video || IC.doc, color: '#ff9500' };
+    if (t === 'application/pdf' || name.endsWith('.pdf')) return { kind: 'pdf', label: 'PDF', icon: IC.doc, color: '#ff453a' };
+    if (t.startsWith('text/') || /\.(md|txt|csv|json|log)$/.test(name)) return { kind: 'text', label: 'Text', icon: IC.page, color: '#8e8e93' };
+    if (/word|officedocument|presentation|spreadsheet|ms-excel|ms-powerpoint|msword|rtf|opendocument/.test(t) || /\.(docx?|pptx?|xlsx?|odt|odp|ods|rtf)$/.test(name)) return { kind: 'doc', label: 'Document', icon: IC.doc, color: '#0a84ff' };
+    return { kind: 'other', label: 'File', icon: IC.doc, color: '#8e8e93' };
+  }
+  const canvasPage = (f, ctx) => (ctx && ctx.url ? `${ctx.url}/files/${f.id}` : `/files/${f.id}`);
+  const canvasPreview = (f, ctx) => (ctx && ctx.url ? `${ctx.url}/files/${f.id}/file_preview` : `/files/${f.id}/file_preview`);
+
+  let current = null; // { ov, restore }
+  function close() {
+    if (!current) return;
+    const { ov, restore } = current;
+    current = null;
+    ov.remove();
+    try { restore?.focus?.(); } catch { /* it may be gone */ }
+  }
+  const isOpen = () => !!current;
+
+  /** Opens `file` — an API File object, or just `{ id }`, fetched here — over the page. `context`
+   *  is the course or group it belongs to (its Canvas addresses hang off that); `from` is the
+   *  control that was pressed, which the sheet grows out of and hands focus back to. */
+  async function open(file, { context = null, from = null } = {}) {
+    close();
+    const dark = !!BCV.app?.isDark?.();
+    const ov = U.el('bcv-sheet-ov bcv-viewer-ov', null, { role: 'dialog', 'aria-label': 'File', tabindex: '-1' });
+    const sheet = U.el('bcv-sheet bcv-viewer');
+    const head = U.el('bcv-sheet__head');
+    const body = U.el('bcv-viewer__body', U.loading('inset', 2));
+    sheet.append(head, body);
+    ov.append(sheet);
+    ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
+    ov.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.stopPropagation(); close(); } });
+    current = { ov, restore: from && from.focus ? from : document.activeElement };
+    document.body.append(ov);
+    if (from) U.morphFrom(sheet, from);
+    const closeBtn = h('button', { type: 'button', class: 'bcv-sheet__close', 'aria-label': 'Close', onclick: close }, U.svg(IC.close, { size: 13, stroke: 'var(--bcv-ink2)', width: 2.3 }));
+    head.append(U.el('bcv-sheet__titles', [U.text('bcv-sheet__title', file?.display_name || file?.filename || 'File')]), closeBtn);
+    ov.focus();
+
+    // the details, when only an id came (a module item, a link into the page)
+    let f = file && (file.display_name || file.url) ? file : null;
+    if (!f) {
+      try { f = await store.file(file.id); } catch (e) {
+        if (current?.ov !== ov) return;
+        body.replaceChildren(U.el('bcv-viewer__none', [U.errorBox(`This file could not be read: ${e?.message || e}`)]));
+        return;
+      }
+    }
+    if (current?.ov !== ov) return; // closed, or another file opened, while the details were on their way
+    const k = kindOf(f);
+    const pal = U.palette(k.color, dark);
+    const name = f.display_name || f.filename || 'File';
+    const when = f.updated_at || f.modified_at || f.created_at;
+    const note = [k.label, fmtSize(f.size), when ? `modified ${U.fmtRecent(when)}` : null].filter(Boolean).join(' · ');
+    const download = h('a', { class: 'bcv-btn bcv-btn--primary bcv-viewer__dl', href: f.url, download: f.filename || name, text: 'Download' });
+    download.prepend(U.svg(IC.download, { size: 14, stroke: 'currentColor', width: 1.9 }));
+    const inCanvas = U.btn('Open in Canvas', { cls: 'bcv-viewer__canvas', onClick: () => { close(); BCV.app.go(`${canvasPage(f, context)}?bcv=native`); } });
+    head.replaceChildren(
+      U.tile(k.icon, { color: pal.text, tint: pal.tint, size: 32, iconSize: 16 }),
+      U.el('bcv-sheet__titles', [U.text('bcv-sheet__title', name), U.text('bcv-sheet__note', note)]),
+      U.el('bcv-viewer__acts', [inCanvas, download]),
+      closeBtn,
+    );
+
+    const none = (why) => U.el('bcv-viewer__none', [
+      U.tile(k.icon, { color: pal.text, tint: pal.tint, size: 32, iconSize: 16 }),
+      h('div', { text: why }),
+      h('a', { class: 'bcv-btn bcv-btn--primary', href: f.url, download: f.filename || name, text: 'Download' }),
+    ]);
+    const frame = (src) => h('iframe', { class: 'bcv-viewer__frame', src, title: name, allow: 'fullscreen' });
+    let view;
+    if (k.kind === 'image') view = h('img', { class: 'bcv-viewer__img', src: f.url, alt: name });
+    else if (k.kind === 'video') view = h('video', { class: 'bcv-viewer__media', src: f.url, controls: 'controls', preload: 'metadata' });
+    else if (k.kind === 'audio') view = h('audio', { class: 'bcv-viewer__media bcv-viewer__media--audio', src: f.url, controls: 'controls', preload: 'metadata' });
+    else if (k.kind === 'text') {
+      view = h('pre', { class: 'bcv-viewer__text', text: '' });
+      fetch(f.url, { credentials: 'same-origin' }).then((r) => (r.ok ? r.text() : Promise.reject(new Error(`${r.status}`)))).then((t) => { view.textContent = t.slice(0, 200000); }).catch(() => { if (current?.ov === ov) body.replaceChildren(none('The text could not be read.')); });
+    } else if (f.preview_url) view = frame(f.preview_url); // Canvas's document preview, when its service made one
+    else if (k.kind === 'pdf' || k.kind === 'doc') view = frame(canvasPreview(f, context)); // Canvas's own preview of the file
+    else view = none('No preview for this kind of file.');
+    body.replaceChildren(view);
+    if (view.tagName === 'IMG') view.addEventListener('error', () => { if (current?.ov === ov) body.replaceChildren(none('The image could not be shown.')); });
+  }
+
+  BCV.viewer = { open, close, isOpen, kindOf, fmtSize };
+})();

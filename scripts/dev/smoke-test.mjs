@@ -917,11 +917,33 @@ try {
   await tab('files');
   await page.waitForSelector('.bcv-body .bcv-row', { timeout: 10000 });
   const frows = await texts('.bcv-body .bcv-row');
-  check(frows.length === 5 && /Course Information Folder · modified/.test(frows[0]) && /Course Syllabus.pdf PDF · modified .* 212 KB/.test(frows[4]), `files: ${frows[4]}`);
-  check(await page.$eval('.bcv-btn--fill36', (b) => b.disabled), 'Download disabled until a file is selected');
-  await (await page.$$('.bcv-body .bcv-row'))[4].click();
-  check(await page.$eval('.bcv-btn--fill36', (b) => !b.disabled) && (await page.$('.bcv-row.is-selected')), 'selecting a file enables Download');
+  check(frows.length === 7 && /Course Information Folder · modified/.test(frows[0]) && frows.some((t) => /Course Syllabus.pdf PDF · modified .* 212 KB/.test(t)), `files: ${frows.find((t) => /Syllabus/.test(t))}`);
+  check(!(await page.$('.bcv-btn--fill36')) && (await page.$$eval('.bcv-body .bcv-row[href*="/files/f"]', (els) => els.length)) === 4, 'no Download button in the header: each file is a link to its page that opens the viewer, which has its own');
   await shot(page, '20-course-files');
+  // the file viewer: a file opens in a sheet over the page, never in a new tab
+  const tabsOpened = [];
+  const onTab = (p) => tabsOpened.push(p);
+  context.on('page', onTab);
+  await page.click('.bcv-body .bcv-row:has-text("Course Syllabus.pdf")');
+  await page.waitForSelector('.bcv-viewer .bcv-viewer__frame', { timeout: 5000 });
+  const vHead = (await texts('.bcv-viewer .bcv-sheet__head'))[0];
+  check(/Course Syllabus\.pdf/.test(vHead) && /PDF · 212 KB · modified/.test(vHead) && (await page.$eval('.bcv-viewer__frame', (e) => e.getAttribute('src'))) === '/courses/101/files/f1/file_preview' && (await page.$eval('.bcv-viewer a[download]', (e) => e.getAttribute('href'))) === '/files/f1/download' && (await texts('.bcv-viewer__canvas'))[0] === 'Open in Canvas' && tabsOpened.length === 0 && page.url().endsWith('/courses/101/files'), `a PDF opens in the viewer over the page — Canvas's own preview framed, Download and Open in Canvas in the sheet — and no new tab: ${vHead}`);
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !document.querySelector('.bcv-viewer'), null, { timeout: 3000 });
+  check(await page.evaluate(() => document.activeElement?.classList.contains('bcv-row')), 'Escape closes it and hands focus back to the row');
+  await page.click('.bcv-body .bcv-row:has-text("Lecture 3 whiteboard.png")');
+  await page.waitForFunction(() => { const i = document.querySelector('.bcv-viewer__img'); return i && i.complete && i.naturalWidth > 0; }, null, { timeout: 5000 });
+  check((await page.$eval('.bcv-viewer__img', (e) => e.naturalWidth)) === 640 && /Image · 295 KB/.test((await texts('.bcv-viewer .bcv-sheet__head'))[0]), 'an image is shown as itself');
+  await shot(page, '20b-file-viewer');
+  await page.click('.bcv-viewer .bcv-sheet__close');
+  await page.waitForFunction(() => !document.querySelector('.bcv-viewer'), null, { timeout: 3000 });
+  await page.click('.bcv-body .bcv-row:has-text("reading-list.txt")');
+  await page.waitForFunction(() => /Reading list/.test(document.querySelector('.bcv-viewer__text')?.textContent || ''), null, { timeout: 5000 });
+  check(/Chapter 3/.test((await texts('.bcv-viewer__text'))[0]), 'a text file shows its text');
+  await page.mouse.click(8, 8); // outside the sheet
+  await page.waitForFunction(() => !document.querySelector('.bcv-viewer'), null, { timeout: 3000 });
+  check(tabsOpened.length === 0, 'and nothing in the viewer ever opened a new tab');
+  context.off('page', onTab);
   await page.click('.bcv-body .bcv-row');
   await page.waitForSelector('.bcv-crumbs', { timeout: 10000 });
   check(page.url().endsWith('/files/folder/Course%20Information') && (await texts('.bcv-body .bcv-row'))[0].includes('Resources_Policy.pdf'), 'folder navigation by path');
@@ -1611,6 +1633,27 @@ try {
   await mockConfig({ groupsFail: false });
   await page.goto(`${BASE}/groups`);
   await page.waitForSelector('.bcv-body .bcv-row', { timeout: 15000 });
+  // getting unstuck: a screen whose answer never comes is given one fresh load after 15s (a reload
+  // clears most of what wedges), remembered for the page so a second stall is shown, never looped on
+  console.log('getting unstuck');
+  let holdQuizzes = true;
+  const quizzesRe = /\/api\/v1\/courses\/101\/quizzes(\?|$)/;
+  await page.route(quizzesRe, async (route) => { if (holdQuizzes) return; await route.continue().catch(() => {}); }); // held: never answered while the hold is on
+  await page.gotoRaw(`${BASE}/courses/101/quizzes`); // raw: this page never settles on its own
+  const stallStart = Date.now();
+  await page.waitForNavigation({ timeout: 30000 }); // the reload
+  const stalledFor = Date.now() - stallStart;
+  const reloadMark = await page.evaluate(() => JSON.parse(sessionStorage.getItem('bcv:reloaded') || 'null'));
+  check(stalledFor >= 14000 && stalledFor <= 26000 && reloadMark && reloadMark.path === '/courses/101/quizzes', `a screen still waiting after 15s is loaded once more (after ${Math.round(stalledFor / 1000)}s), and the reload is remembered for the page: ${JSON.stringify(reloadMark)}`);
+  // the hold is still on, so the fresh page stalls too: this time it is shown (Canvas's own page,
+  // with the note) and not reloaded again — the reload a minute ago is remembered
+  await page.waitForSelector('.bcv-toast', { timeout: 25000 });
+  check(/Showing Canvas's own page: it took too long/.test((await texts('.bcv-toast')).join(' ')) && (await page.$('html.bcv-punch')) !== null && (await page.evaluate(() => JSON.parse(sessionStorage.getItem('bcv:reloaded')).at)) === reloadMark.at, `a second stall within the minute is shown, not reloaded again: ${(await texts('.bcv-toast')).join(' | ')}`);
+  holdQuizzes = false;
+  await page.unroute(quizzesRe);
+  await page.goto(`${BASE}/courses/101/quizzes`);
+  await page.waitForSelector('.bcv-body .bcv-row', { timeout: 20000 });
+  check(!(await page.$('html.bcv-punch')), 'and once Canvas answers again the screen draws as usual');
   // ---- notifications ------------------------------------------------------------------------------------
   console.log('notifications');
   await page.goto(`${BASE}/#notifications`);

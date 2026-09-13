@@ -208,6 +208,8 @@ const files = {
   r101: [
     { id: 'f2', display_name: 'math21-F26 planned lecture schedule.xlsx', filename: 'schedule.xlsx', 'content-type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', size: 49152, updated_at: ago(15 * D), url: '/files/f2/download' },
     { id: 'f1', display_name: 'Course Syllabus.pdf', filename: 'syllabus.pdf', 'content-type': 'application/pdf', size: 217088, updated_at: ago(18 * D), url: '/files/f1/download' },
+    { id: 'f5', display_name: 'Lecture 3 whiteboard.png', filename: 'whiteboard.png', 'content-type': 'image/png', size: 302011, updated_at: ago(12 * D), url: '/files/f5/download?download_frd=1&verifier=abc' },
+    { id: 'f6', display_name: 'reading-list.txt', filename: 'reading-list.txt', 'content-type': 'text/plain', size: 412, updated_at: ago(11 * D), url: '/files/f6/download?download_frd=1&verifier=def' },
   ],
   f101a: [{ id: 'f3', display_name: 'Resources_Policy.pdf', filename: 'Resources_Policy.pdf', 'content-type': 'application/pdf', size: 130000, updated_at: ago(16 * D), url: '/files/f3/download' }],
   f101b: [{ id: 'f4', display_name: 'Dis01 worksheet.pdf', filename: 'dis01.pdf', 'content-type': 'application/pdf', size: 80000, updated_at: ago(3 * D), url: '/files/f4/download' }],
@@ -440,6 +442,8 @@ on('GET', /^\/api\/v1\/courses\/(\w+)\/folders\/root$/, (url, m) => folders[`r${
 on('GET', /^\/api\/v1\/courses\/(\w+)\/folders\/by_path\/(.+)$/, (url, m) => { const path = `course files/${decodeURIComponent(m[2])}`; const f = Object.values(folders).find((x) => x.full_name === path); return f ? [folders[`r${m[1]}`], f] : { errors: [{ message: 'not found' }] }; });
 on('GET', /^\/api\/v1\/folders\/(\w+)\/folders$/, (url, m) => Object.values(folders).filter((f) => f.parent_folder_id === m[1]));
 on('GET', /^\/api\/v1\/folders\/(\w+)\/files$/, (url, m) => files[m[1]] || []);
+// one file by id, as the File API gives it (folder_id, and a preview_url only where Canvadocs would provide one: none here)
+on('GET', /^\/api\/v1\/files\/(\w+)$/, (url, m) => { for (const [fid, list] of Object.entries(files)) { const f = list.find((x) => x.id === m[1]); if (f) return { ...f, folder_id: fid, preview_url: null, mime_class: (f['content-type'] || '').split('/')[0] }; } return { __status: 404, errors: [{ message: 'not found' }] }; });
 on('GET', /^\/api\/v1\/courses\/(\w+)\/quizzes\/(\w+)\/submissions$/, (url, m) => ({ quiz_submissions: (quizSubs.get(m[2]) || []).map(pubSub) }));
 on('POST', /^\/api\/v1\/courses\/(\w+)\/quizzes\/(\w+)\/submissions$/, (url, m) => {
   const list = quizSubs.get(m[2]) || [];
@@ -562,9 +566,18 @@ const server = http.createServer((req, res) => {
       res.writeHead(200, { 'content-type': 'text/html' });
       return res.end('<html><body style="font-family:sans-serif;padding:20px">Embedded tool content</body></html>');
     }
-    if (path.startsWith('/files/')) {
-      res.writeHead(200, { 'content-type': 'application/pdf' });
+    if (path.startsWith('/files/')) { // a file's bytes, as its content type says (an attachment, the way Canvas's download URL serves them)
+      const fid = path.split('/')[2];
+      const f = Object.values(files).flat().find((x) => x.id === fid);
+      const type = f?.['content-type'] || 'application/pdf';
+      if (type.startsWith('image/')) { res.writeHead(200, { 'content-type': 'image/svg+xml', 'content-disposition': 'attachment' }); return res.end('<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360"><rect width="640" height="360" fill="#f4f1e8"/><text x="24" y="60" font-size="28" font-family="sans-serif">Lecture 3 whiteboard</text></svg>'); }
+      if (type.startsWith('text/')) { res.writeHead(200, { 'content-type': 'text/plain; charset=utf-8', 'content-disposition': 'attachment' }); return res.end('Reading list\n- Chapter 3\n- Chapter 4, sections 1-2\n'); }
+      res.writeHead(200, { 'content-type': type, 'content-disposition': 'attachment' });
       return res.end('%PDF-1.4 mock');
+    }
+    if (/^\/(courses|groups)\/\w+\/files\/\w+\/file_preview$/.test(path)) { // Canvas's own preview of a file, made to be framed
+      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+      return res.end('<html><body style="font-family:sans-serif;padding:20px"><div id="file_preview">Canvas file preview</div></body></html>');
     }
     if (path.startsWith('/equation_images/')) { // Canvas renders LaTeX in question feedback as images
       res.writeHead(200, { 'content-type': 'image/svg+xml' });

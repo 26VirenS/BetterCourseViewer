@@ -1741,3 +1741,24 @@ html.bcv-phone .bcv-nf__act { margin-left: auto; }
 .bcv-menu__sep { height: 1px; background: var(--bcv-sep); margin: 6px 4px; }
 #bcv-app .bcv-menu__item--danger, .bcv-menu__item--danger { color: #ff453a; }
 .bcv-menu__item--danger .bcv-menu__ic { background: rgba(255,69,58,.14); color: #ff453a; }
+
+/* ---- file viewer: a file opens in a sheet over the page, not in a new tab ------------------- */
+.bcv-sheet-ov.bcv-viewer-ov { padding: 28px; }
+.bcv-viewer { width: min(1100px, 100%); height: calc(100vh - 56px); }
+.bcv-viewer .bcv-sheet__head { align-items: center; gap: 12px; padding: 14px 18px 14px 20px; }
+.bcv-viewer .bcv-sheet__title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bcv-viewer__acts { display: flex; align-items: center; gap: 8px; flex: none; }
+.bcv-viewer__dl { text-decoration: none; }
+.bcv-viewer__body { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; background: var(--bcv-fill); overflow: auto; position: relative; }
+.bcv-viewer__img { max-width: 100%; max-height: 100%; object-fit: contain; display: block; }
+.bcv-viewer__frame { width: 100%; height: 100%; border: 0; background: #fff; display: block; }
+.bcv-viewer__media { max-width: 100%; max-height: 100%; }
+.bcv-viewer__media--audio { width: min(520px, 90%); }
+.bcv-viewer__text { align-self: stretch; margin: 0; padding: 22px 26px; width: 100%; box-sizing: border-box; overflow: auto; font: 400 13px/1.6 ui-monospace, Menlo, Consolas, monospace; color: var(--bcv-ink); white-space: pre-wrap; word-break: break-word; }
+.bcv-viewer__none { text-align: center; padding: 40px; color: var(--bcv-ink2); font: 400 14px/1.5 var(--bcv-font); display: flex; flex-direction: column; align-items: center; gap: 14px; }
+.bcv-viewer__none .bcv-btn { text-decoration: none; }
+@media (max-width: 720px) {
+  .bcv-sheet-ov.bcv-viewer-ov { padding: 10px; }
+  .bcv-viewer { height: calc(100vh - 20px); border-radius: 20px; }
+  .bcv-viewer__canvas { display: none; }
+}

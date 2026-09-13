@@ -102,6 +102,7 @@
       case 'people': el = await T.people(ctx, shell); break;
       case 'pages': el = await T.pages(ctx, shell); break;
       case 'files': case 'folder': el = await T.files(ctx, shell); break;
+      case 'file': el = await T.files(ctx, shell); if (ctx.alive() && route.arg) BCV.viewer?.open({ id: route.arg }, { context: group }); break; // a link to one file: the folder behind, the file in the viewer
       case 'announcement': el = await D.discussion(ctx, shell, { announcement: true }); break;
       case 'discussion': el = await D.discussion(ctx, shell, {}); break;
       case 'page': el = await D.page(ctx, shell); break;

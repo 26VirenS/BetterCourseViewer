@@ -572,7 +572,52 @@
       else if (!state.loadKey) state.loadKey = loadKeyFor(state.route || parseRoute());
     } else state.loadKey = null;
     paintLoad();
+    // a wash that outlives what it was lit for (a page that never left, a load that never came
+    // back) is cleared rather than left sweeping for good
+    clearTimeout(state.washGuard);
+    if (on) state.washGuard = setTimeout(() => { if (state.loadKey && html.classList.contains('bcv-settled')) progress(false); }, 25000);
   }
+
+  // ---- getting unstuck ---------------------------------------------------------------------
+  // A page can wedge in a few ways — a screen whose answer never comes, the extension updated
+  // under the page (its scripts cut off from storage and the background), a wash lit for a load
+  // that never arrived — and each is caught and undone: a reload where that is safe, a note where
+  // it would lose work (a quiz attempt, a submission being written, text being typed). A page is
+  // reloaded for this at most once a minute, so a fault that survives a reload is shown, never
+  // looped on.
+  const RELOAD_MARK = 'bcv:reloaded';
+  function recentlyReloaded() {
+    try {
+      const m = JSON.parse(sessionStorage.getItem(RELOAD_MARK) || 'null');
+      return !!m && m.path === location.pathname + location.search && Date.now() - m.at < 60000;
+    } catch {
+      return true; // nothing to remember by: never risk a loop
+    }
+  }
+  const typing = () => { const a = document.activeElement; return !!a && (a.tagName === 'TEXTAREA' || (a.tagName === 'INPUT' && a.value) || a.isContentEditable); };
+  /** Reloads to get unstuck when that loses nothing and has not just been tried; otherwise a note. Returns whether it reloaded. */
+  function recover(why) {
+    if (inQuiz() || state.submitOpen || typing() || recentlyReloaded()) {
+      U.toast(`${why}. Reload the page to continue.`, { error: true, ms: 8000 });
+      return false;
+    }
+    try { sessionStorage.setItem(RELOAD_MARK, JSON.stringify({ path: location.pathname + location.search, at: Date.now() })); } catch { /* checked above */ }
+    progress(true);
+    location.reload();
+    return true;
+  }
+  // The extension updated or was reloaded while this page was open: its scripts are orphaned (no
+  // storage, no background), so nothing it saves or asks for would land. Noticed when the page
+  // is looked at again, and mended with a fresh load, which runs the new scripts.
+  const hadContext = (() => { try { return !!BCV.api?.runtime?.id; } catch { return false; } })();
+  const contextGone = () => { try { return !BCV.api?.runtime?.id; } catch { return true; } };
+  function checkContext() {
+    if (!hadContext || self.BCVBridge?.native || document.visibilityState !== 'visible' || !contextGone()) return;
+    recover('Simpl Courses was updated');
+  }
+  document.addEventListener('visibilitychange', checkContext);
+  window.addEventListener('focus', checkContext);
+  window.addEventListener('pageshow', checkContext);
 
   // ---- screens --------------------------------------------------------------------------------
   const SCREEN_PATIENCE = 15000; // a screen still not drawn after this gives way to Canvas's own page
@@ -632,6 +677,9 @@
       if (only) gaveWay = only.textContent.trim();
     }
     if (gaveWay && alive()) {
+      // an answer that never came: a fresh load clears most of what wedges, so that is tried once
+      // before the page is given to Canvas (a screen that failed outright is not retried this way)
+      if (gaveWay === 'it took too long' && recover('The page took too long to load')) return;
       // Canvas's own page for this address is not the one underneath (the address moved in place): fetch it
       if (state.nativePath !== location.pathname + location.search) { location.reload(); return; }
       try {

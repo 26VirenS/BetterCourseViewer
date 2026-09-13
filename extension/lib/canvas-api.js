@@ -80,14 +80,24 @@
   }
   const pause = (ms) => new Promise((r) => setTimeout(r, ms));
 
+  // A request that never answers would hold its gate slot and its screen for good: after this
+  // long it is given up, a GET is asked once more, and then it fails like any other request (the
+  // screen shows its error, or gives way, rather than waiting forever).
+  let REQUEST_TIMEOUT = 20000;
+  const tune = ({ requestTimeout } = {}) => { if (Number.isFinite(requestTimeout)) REQUEST_TIMEOUT = requestTimeout; };
+
   async function request(method, path, { params, body, all = false, maxPages = 10 } = {}) {
     let url = buildUrl(path, params);
     const results = [];
     let pages = 0;
     let throttled = 0;
+    let timedOut = 0;
     while (url && pages < maxPages) {
       if (method === 'GET') await admit();
       let res, text;
+      let again = false; // this page timed out and is to be asked once more
+      const ac = typeof AbortController === 'function' ? new AbortController() : null;
+      const timer = ac ? setTimeout(() => ac.abort(), REQUEST_TIMEOUT) : null;
       try {
         // Canvas refuses any non-GET request without the CSRF token, body or not (a DELETE has none).
         res = await fetch(url, {
@@ -100,11 +110,19 @@
             'x-requested-with': 'XMLHttpRequest',
           },
           body: body ? JSON.stringify(body) : undefined,
+          signal: ac ? ac.signal : undefined,
         });
         text = await res.text();
+      } catch (e) {
+        if (!(ac && ac.signal.aborted)) throw e;
+        if (method !== 'GET' || timedOut >= 1) throw new CanvasError('Canvas did not answer in time', 0);
+        timedOut++;
+        again = true;
       } finally {
+        clearTimeout(timer);
         if (method === 'GET') release();
       }
+      if (again) continue;
       if (!res.ok) {
         // the bucket ran dry all the same (Canvas's own page traffic counts against it too): this
         // is not a refusal of the thing asked for, so the page is asked for again after a moment
@@ -335,7 +353,7 @@
   }
 
   BCV.canvas = {
-    get, post, put, del, upload, cached, ready, invalidate, invalidatePrefix, clearAll, navigated, csrfToken, CanvasError,
+    get, post, put, del, upload, cached, ready, invalidate, invalidatePrefix, clearAll, navigated, tune, csrfToken, CanvasError,
     plannerItems, dashboardCards, activeCourses, courseColors, setPlannerComplete,
     coursesWithScores, courseTabs, course, courseModules, announcements, unreadCount,
   };
