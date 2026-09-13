@@ -42,9 +42,34 @@
       return f.url;
     }
   };
-  /** Where "Open in new tab" goes: the file itself where a browser shows one as it is (an image,
-   *  a PDF, text, video, audio), Canvas's own page for the file otherwise. */
-  const newTabUrl = (f, k, ctx) => (['image', 'pdf', 'text', 'video', 'audio'].includes(k.kind) ? inlineUrl(f) : `${canvasPage(f, ctx)}?bcv=native`);
+  /** The kinds a browser shows as they are in a tab of their own: an image, a PDF, text, video, audio. */
+  const SHOWABLE = ['image', 'pdf', 'text', 'video', 'audio'];
+  /** "Open in new tab" for a file a browser can show. Canvas serves its download address as an
+   *  attachment whatever is asked (a tab given it downloads the file), so the bytes are fetched
+   *  here and the tab is handed a copy of its own to show. The tab is opened on the press itself
+   *  — a tab opened later would be blocked as a pop-up — and says what it is doing until the
+   *  file lands; if the bytes cannot be read it is sent to the file's own address instead. */
+  async function openInTab(f, name) {
+    const w = window.open('', '_blank');
+    if (!w) { U.toast('The browser blocked the new tab.', { error: true }); return; }
+    try {
+      w.document.title = name;
+      w.document.body.style.cssText = 'font: 15px/1.5 -apple-system, system-ui, sans-serif; color: #555; padding: 40px;';
+      w.document.body.textContent = `Opening ${name}…`;
+    } catch { /* the tab is not ours to write in: it will still be sent the file */ }
+    try {
+      const r = await fetch(f.url, { credentials: 'same-origin' });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const raw = await r.blob();
+      const type = f['content-type'] || raw.type || 'application/octet-stream';
+      const blob = raw.type === type ? raw : new Blob([raw], { type });
+      const url = URL.createObjectURL(blob);
+      w.location.href = url;
+      setTimeout(() => URL.revokeObjectURL(url), 5 * 60 * 1000); // the tab has read it long before
+    } catch {
+      try { w.location.href = inlineUrl(f); } catch { /* nothing more to try */ }
+    }
+  }
 
   let current = null; // { ov, restore }
   function close() {
@@ -95,8 +120,11 @@
     const download = h('a', { class: 'bcv-btn bcv-btn--primary bcv-viewer__dl', href: f.url, download: f.filename || name, text: 'Download' });
     download.prepend(U.svg(IC.download, { size: 14, stroke: 'currentColor', width: 1.9 }));
     const inCanvas = U.btn('Open in Canvas', { cls: 'bcv-viewer__canvas', onClick: () => { close(); BCV.app.go(`${canvasPage(f, context)}?bcv=native`); } });
-    const newTab = h('a', { class: 'bcv-btn bcv-viewer__tab', href: newTabUrl(f, k, context), target: '_blank', rel: 'noopener', title: 'Open in a new tab', text: 'Open in new tab' });
-    newTab.prepend(U.svg(IC.external || IC.link || IC.doc, { size: 13, stroke: 'currentColor', width: 1.9 }));
+    // Open in new tab: the file itself where a browser can show it, Canvas's own page for it otherwise
+    const newTab = SHOWABLE.includes(k.kind)
+      ? U.btn('Open in new tab', { cls: 'bcv-viewer__tab', icon: IC.external || IC.link || IC.doc, iconSize: 13, title: 'Open in a new tab', onClick: () => openInTab(f, name) })
+      : h('a', { class: 'bcv-btn bcv-viewer__tab', href: `${canvasPage(f, context)}?bcv=native`, target: '_blank', rel: 'noopener', title: 'Open in a new tab', text: 'Open in new tab' });
+    if (newTab.tagName === 'A') newTab.prepend(U.svg(IC.external || IC.link || IC.doc, { size: 13, stroke: 'currentColor', width: 1.9 }));
     head.replaceChildren(
       U.tile(k.icon, { color: pal.text, tint: pal.tint, size: 32, iconSize: 16 }),
       U.el('bcv-sheet__titles', [U.text('bcv-sheet__title', name), U.text('bcv-sheet__note', note)]),

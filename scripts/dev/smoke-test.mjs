@@ -939,23 +939,34 @@ try {
   await page.waitForSelector('.bcv-viewer .bcv-viewer__frame', { timeout: 5000 });
   const vHead = (await texts('.bcv-viewer .bcv-sheet__head'))[0];
   check(/Course Syllabus\.pdf/.test(vHead) && /PDF · 212 KB · modified/.test(vHead) && (await page.$eval('.bcv-viewer__frame', (e) => e.getAttribute('src'))) === '/courses/101/files/f1/file_preview' && (await page.$eval('.bcv-viewer a[download]', (e) => e.getAttribute('href'))) === '/files/f1/download' && (await texts('.bcv-viewer__canvas'))[0] === 'Open in Canvas' && tabsOpened.length === 0 && page.url().endsWith('/courses/101/files'), `a PDF opens in the viewer over the page — Canvas's own preview framed, Download and Open in Canvas in the sheet — and no new tab: ${vHead}`);
-  check((await page.$eval('.bcv-viewer__tab', (e) => [e.textContent.trim(), e.getAttribute('href'), e.getAttribute('target')].join(' | '))) === 'Open in new tab | /files/f1/download | _blank', 'an Open in new tab button opens the PDF itself in a new tab, on request only');
+  check((await page.$eval('.bcv-viewer__tab', (e) => [e.tagName, e.textContent.trim()].join(' | '))) === 'BUTTON | Open in new tab', 'an Open in new tab button is there for a PDF (a press hands a tab the file itself; Canvas\'s own address would download it)');
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('.bcv-viewer'), null, { timeout: 3000 });
   check(await page.evaluate(() => document.activeElement?.classList.contains('bcv-row')), 'Escape closes it and hands focus back to the row');
   await page.click('.bcv-body .bcv-row:has-text("Lecture 3 whiteboard.png")');
   await page.waitForFunction(() => { const i = document.querySelector('.bcv-viewer__img'); return i && i.complete && i.naturalWidth > 0; }, null, { timeout: 5000 });
-  check((await page.$eval('.bcv-viewer__img', (e) => e.naturalWidth)) === 640 && /Image · 295 KB/.test((await texts('.bcv-viewer .bcv-sheet__head'))[0]) && (await page.$eval('.bcv-viewer__tab', (e) => e.getAttribute('href'))) === '/files/f5/download?verifier=abc', 'an image is shown as itself (and its new-tab link drops the download flag)');
+  check((await page.$eval('.bcv-viewer__img', (e) => e.naturalWidth)) === 640 && /Image · 295 KB/.test((await texts('.bcv-viewer .bcv-sheet__head'))[0]), 'an image is shown as itself');
   await shot(page, '20b-file-viewer');
   await page.click('.bcv-viewer .bcv-sheet__close');
   await page.waitForFunction(() => !document.querySelector('.bcv-viewer'), null, { timeout: 3000 });
   await page.click('.bcv-body .bcv-row:has-text("reading-list.txt")');
   await page.waitForFunction(() => /Reading list/.test(document.querySelector('.bcv-viewer__text')?.textContent || ''), null, { timeout: 5000 });
   check(/Chapter 3/.test((await texts('.bcv-viewer__text'))[0]), 'a text file shows its text');
+  // Open in new tab, pressed: the tab is handed a copy of the file's own bytes (a blob address), and shows it
+  const [openedTab] = await Promise.all([context.waitForEvent('page', { timeout: 8000 }), page.click('.bcv-viewer__tab')]);
+  await openedTab.waitForFunction(() => location.protocol === 'blob:' && /Reading list/.test(document.body?.textContent || ''), null, { timeout: 8000 }).catch(() => {});
+  check(openedTab.url().startsWith('blob:') && /Reading list/.test(await openedTab.evaluate(() => document.body.textContent)), `Open in new tab shows the file itself in a tab of its own: ${openedTab.url().slice(0, 30)}…`);
+  await openedTab.close();
   await page.mouse.click(8, 8); // outside the sheet
   await page.waitForFunction(() => !document.querySelector('.bcv-viewer'), null, { timeout: 3000 });
-  check(tabsOpened.length === 0, 'and nothing in the viewer ever opened a new tab');
+  check(tabsOpened.length === 1, 'and only that press ever opened a tab');
   context.off('page', onTab);
+  // a document a browser cannot show: the button is a link to Canvas's own page for the file
+  await page.click('.bcv-body .bcv-row:has-text("planned lecture schedule.xlsx")');
+  await page.waitForSelector('.bcv-viewer .bcv-viewer__frame', { timeout: 5000 });
+  check((await page.$eval('.bcv-viewer__tab', (e) => [e.tagName, e.getAttribute('href'), e.getAttribute('target')].join(' | '))) === 'A | /courses/101/files/f2?bcv=native | _blank', 'for a document the browser cannot show, Open in new tab goes to Canvas\'s page for it');
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !document.querySelector('.bcv-viewer'), null, { timeout: 3000 });
   await page.click('.bcv-body .bcv-row');
   await page.waitForSelector('.bcv-crumbs', { timeout: 10000 });
   check(page.url().endsWith('/files/folder/Course%20Information') && (await texts('.bcv-body .bcv-row'))[0].includes('Resources_Policy.pdf'), 'folder navigation by path');
