@@ -986,6 +986,33 @@ try {
   await tab('modules');
   await page.waitForSelector('.bcv-module', { timeout: 10000 });
   check((await page.$$('.bcv-module')).length === 1 && (await texts('.bcv-module__item')).length === 2, 'modules list');
+  // Back means where you came from: the same page says Modules when opened from Modules, Pages when
+  // opened from Pages, and Pages (the list it belongs to) when opened straight in with nothing before
+  await clickScreen('.bcv-module__item[href*="/pages/course-information"]');
+  await page.waitForSelector('.bcv-detail__back', { timeout: 10000 });
+  check((await texts('.bcv-detail__back'))[0] === 'Modules' && page.url().endsWith('/courses/101/pages/course-information'), `a page opened from Modules says Back to Modules: ${(await texts('.bcv-detail__back'))[0]}`);
+  await clickScreen('.bcv-detail__back');
+  check(page.url().endsWith('/courses/101/modules') && (await page.$('.bcv-module')) !== null, 'and Back returns to Modules');
+  await tab('pages');
+  await page.waitForSelector('.bcv-body .bcv-row', { timeout: 10000 });
+  await clickScreen('.bcv-body .bcv-row');
+  await page.waitForSelector('.bcv-detail__back', { timeout: 10000 });
+  check((await texts('.bcv-detail__back'))[0] === 'Pages' && page.url().endsWith('/courses/101/pages/course-information'), `the same page opened from Pages says Back to Pages: ${(await texts('.bcv-detail__back'))[0]}`);
+  await page.evaluate(() => sessionStorage.removeItem('bcv:trail')); // straight in, nothing before it
+  await page.goto(`${BASE}/courses/101/pages/course-information`);
+  await page.waitForSelector('.bcv-detail__back', { timeout: 10000 });
+  check((await texts('.bcv-detail__back'))[0] === 'Pages', 'a page opened straight in falls back to the list it belongs to');
+  // and from outside a course: an assignment opened from To Do goes back to To Do, and the course
+  // header's Back leaves the course for where it was entered from
+  await nav('todo');
+  await page.waitForSelector('.bcv-body .bcv-row a.bcv-row__body[href*="/assignments/"]', { timeout: 10000 });
+  await clickScreen('.bcv-body .bcv-row a.bcv-row__body[href*="/assignments/"]');
+  await page.waitForSelector('.bcv-detail__back', { timeout: 10000 });
+  check((await texts('.bcv-detail__back'))[0] === 'To Do' && (await texts('.bcv-ctx__back'))[0] === 'To Do', `an assignment opened from To Do says Back to To Do, and so does the course header: ${(await texts('.bcv-detail__back'))[0]} / ${(await texts('.bcv-ctx__back'))[0]}`);
+  await tab('modules');
+  check((await texts('.bcv-ctx__back'))[0] === 'To Do', 'moving between the course\'s tabs keeps the header\'s Back on where the course was entered from');
+  await clickScreen('.bcv-ctx__back');
+  check(page.url().endsWith('/#todo') && (await page.$('.bcv-todo__add')) !== null, 'and it goes there');
   await page.goto(`${BASE}/courses/102/modules`);
   await page.waitForSelector('.bcv-module', { timeout: 10000 });
   const mods = await texts('.bcv-module__head');

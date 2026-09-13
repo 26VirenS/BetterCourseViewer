@@ -188,8 +188,13 @@
     const narrow = !!(await store.pref('courseSideCollapsed', false));
     // --bcv-rail-wash: the loading wash for a pressed rail row, the course colour at 20% (30% in dark), mockup 14
     const screen = U.el('bcv-screen bcv-screen--ctx', null, { style: { '--w': '1180px', '--bcv-rail-color': c.color, '--bcv-rail-tint': c.palette.tint, '--bcv-rail-text': c.palette.text, '--bcv-rail-wash': U.rgba(c.color, shell.dark ? 0.3 : 0.2) } });
+    // Back leaves the course for the screen it was entered from (the Dashboard, To Do, a group…),
+    // or the list it belongs to when there is nothing to come back from
+    const inside = (e) => e.url === c.url || e.url.startsWith(`${c.url}/`) || e.url.startsWith(`${c.url}?`);
+    const back = app.backTo ? app.backTo({ label: backLabel, href: backHref }, { skip: inside }) : { label: backLabel, href: backHref };
+    if (!activeId || activeId === 'home') app.nameHere?.(c.shortName || c.name); // the next screen's Back names the course (or group) itself
     const head = U.el('bcv-head bcv-head--course', U.el('bcv-head__in', [
-      h('button', { type: 'button', class: 'bcv-linkbtn', onclick: () => app.go(backHref) }, [U.svg(IC.back, { size: 14, stroke: 'var(--bcv-blue)', width: 2.1 }), backLabel]),
+      h('button', { type: 'button', class: 'bcv-linkbtn bcv-ctx__back', onclick: () => { app.markBack?.(); app.go(back.href); } }, [U.svg(IC.back, { size: 14, stroke: 'var(--bcv-blue)', width: 2.1 }), back.label]),
       U.el('bcv-course__title-row', [
         shell.kind === 'courses'
           ? h('button', { type: 'button', class: 'bcv-dot bcv-dot--sq bcv-colorbtn', title: 'Change course colour', 'aria-label': 'Change course colour', style: { background: c.color }, onclick: (e) => U.colorMenu(e.currentTarget, c.color, async (hex) => {

@@ -13,7 +13,9 @@
   const mainCol = () => h('div', { class: 'bcv-col', style: { flex: '1 1 560px' } });
   const sideCol = () => h('div', { class: 'bcv-col bcv-col--16', style: { flex: '1 1 300px' } });
   const meta = (pairs) => U.el('bcv-detail__meta', pairs.filter(([, v]) => v !== null && v !== undefined && v !== '').map(([k, v]) => h('span', { class: 'bcv-detail__meta-item' }, [h('b', { text: `${k} ` }), String(v)])));
-  const backBtn = (app, href, lbl) => h('button', { type: 'button', class: 'bcv-linkbtn', onclick: () => app.go(href) }, [U.svg(IC.back, { size: 14, stroke: 'var(--bcv-blue)', width: 2.1 }), lbl]);
+  const backBtn = (app, href, lbl) => h('button', { type: 'button', class: 'bcv-linkbtn bcv-detail__back', onclick: () => { app.markBack?.(); app.go(href); } }, [U.svg(IC.back, { size: 14, stroke: 'var(--bcv-blue)', width: 2.1 }), lbl]);
+  /** The item's Back: the screen it was opened from (Modules, the Dashboard, another item…), else the list it belongs to. */
+  const backTo = (app, href, lbl) => { const b = app.backTo ? app.backTo({ href, label: lbl }) : { href, label: lbl }; return backBtn(app, b.href, b.label); };
   const nativeHref = (path) => `${path}${path.includes('?') ? '&' : '?'}bcv=native`;
 
   const D = {};
@@ -59,7 +61,8 @@
     // scroll as the instructions, built from the assignment already loaded for this page. The
     // "Submit assignment" button and ?bcv=submit (a To Do row) just bring it into view.
     const fromTodo = route.params.get('from') === 'todo';
-    const back = fromTodo ? { href: '/#todo', label: 'To Do' } : { href: `${c.url}/assignments`, label: 'Assignments' };
+    const back = fromTodo ? { href: '/#todo', label: 'To Do' } : app.backTo ? app.backTo({ href: `${c.url}/assignments`, label: 'Assignments' }) : { href: `${c.url}/assignments`, label: 'Assignments' };
+    app.nameHere?.(a.name); // the next screen's Back names this assignment
     let extra = null; // the block's own smart suggestion joins the page's
     const applySmart = () => ctx.setSmart(!extra ? smart : { ...smart, actions: [...smart.actions, extra.action], context: () => `${smart.context()}\n\n${extra.context()}` });
     const block = nativeSubmit && !isTool ? await BCV.screens.submit.render(ctx, c, { embed: true, a, sub: s, back, onSmart: (x) => { extra = x; applySmart(); } }) : null;
@@ -123,6 +126,7 @@
     const [t, view] = await Promise.all([store.discussion(c.id, route.arg, K).catch(() => null), store.discussionView(c.id, route.arg, K).catch(() => null)]);
     if (!ctx.alive()) return b;
     if (!t) return main.replaceChildren(U.errorBox('This discussion could not be loaded.')) || b;
+    app.nameHere?.(t.title); // the next screen's Back names this thread
     store.markTopicRead(c.id, t.id, K);
     shell.reader = { title: t.title, html: t.message || '' };
     const people = new Map((view?.participants || []).map((p) => [String(p.id), p]));
@@ -159,7 +163,7 @@
     const flatten = (entries, depth = 0) => entries.flatMap((e) => [entryEl(e, depth), ...flatten(e.replies || [], depth + 1)]);
     const entries = view ? flatten(view.view || []) : [];
     main.replaceChildren(
-      backBtn(app, announcement ? `${c.url}/announcements` : `${c.url}/discussion_topics`, announcement ? 'Announcements' : 'Discussions'),
+      backTo(app, announcement ? `${c.url}/announcements` : `${c.url}/discussion_topics`, announcement ? 'Announcements' : 'Discussions'),
       U.card([
         U.el('bcv-detail', [
           h('h2', { class: 'bcv-detail__title bcv-pretty', text: t.title }),
@@ -202,8 +206,9 @@
     if (!ctx.alive()) return b;
     if (!p) return main.replaceChildren(U.errorBox('This page could not be loaded.')) || b;
     shell.reader = { title: p.title, html: p.body || '' };
+    app.nameHere?.(p.title); // the next screen's Back names this page
     main.replaceChildren(
-      backBtn(app, `${c.url}/pages`, 'Pages'),
+      backTo(app, `${c.url}/pages`, 'Pages'),
       U.card(U.el('bcv-detail', [
         h('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' } }, [h('h2', { class: 'bcv-detail__title bcv-pretty', text: p.title }), p.front_page ? U.badge('Front page', 'green', 'bcv-badge--sm') : null]),
         U.text('bcv-entry__date', `Created ${U.fmtDateComma(p.created_at)} · last edited ${U.fmtDateComma(p.updated_at)}${p.last_edited_by?.display_name ? ` by ${p.last_edited_by.display_name}` : ''}`),
@@ -234,6 +239,7 @@
     if (!ctx.alive()) return b;
     if (!q) return main.replaceChildren(U.errorBox('This quiz could not be loaded.')) || b;
     shell.reader = { title: q.title, html: q.description || '' };
+    app.nameHere?.(q.title);
     const TYPE = { assignment: 'Graded quiz', practice_quiz: 'Practice quiz', graded_survey: 'Graded survey', survey: 'Survey' };
     // attempts used/allowed from Canvas's own count on the submission; the Take button goes away at the limit
     const limit = store.quizAttemptLimit(q, subs);
@@ -243,7 +249,7 @@
     const latest = finished.slice().sort((a, b) => (Number(b.attempt) || 0) - (Number(a.attempt) || 0))[0] || null;
     const feedbackHref = (s) => `${c.url}/quizzes/${q.id}?bcv=feedback&sub=${encodeURIComponent(s.id)}`;
     main.replaceChildren(
-      backBtn(app, `${c.url}/quizzes`, 'Quizzes'),
+      backTo(app, `${c.url}/quizzes`, 'Quizzes'),
       U.card(U.el('bcv-detail', [
         h('h2', { class: 'bcv-detail__title bcv-pretty', text: q.title }),
         meta([['Due', q.due_at ? U.fmtAt(q.due_at) : 'No due date'], ['Points', q.points_possible ?? '—'], ['Questions', q.question_count ?? '—'], ['Time limit', q.time_limit ? `${q.time_limit} minutes` : 'None'], ['Attempts', limit.allowed === null ? `${limit.used} used · unlimited` : `${limit.used} of ${limit.allowed} used`], ['Type', TYPE[q.quiz_type] || q.quiz_type], ['Available until', q.lock_at ? U.fmtAt(q.lock_at) : null]]),
@@ -282,7 +288,7 @@
     if (!ctx.alive()) return b;
     shell.reader = { title: 'Syllabus', html };
     main.replaceChildren(
-      backBtn(app, `${c.url}/assignments`, 'Assignments'),
+      backTo(app, `${c.url}/assignments`, 'Assignments'),
       U.card(U.el('bcv-detail', [h('h2', { class: 'bcv-detail__title', text: 'Syllabus' }), html ? CS().prose(html) : U.text('bcv-hint', 'No syllabus description has been added.')]), 'bcv-card--22'),
     );
     const dated = (list || []).filter((a) => a.due_at).sort((x, y) => U.parse(x.due_at) - U.parse(y.due_at));

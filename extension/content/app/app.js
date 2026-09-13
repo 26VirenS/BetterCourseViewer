@@ -95,6 +95,83 @@
     return r;
   }
 
+  // ---- where you came from ------------------------------------------------------------------------
+  // The screens visited in this tab, in order, kept in the tab's session storage so a real page
+  // load does not forget them. Every Back in the interface names the screen actually left for this
+  // one — Modules, when a page was opened from Modules; the Dashboard, when an assignment was
+  // opened from there — rather than the place the item belongs to, which stays the fallback (a
+  // link straight into a page, with nothing before it). Going back to a screen already on the
+  // trail drops what came after it, so Back never leads round in a circle.
+  const TRAIL_KEY = 'bcv:trail';
+  const readTrail = () => { try { const t = JSON.parse(sessionStorage.getItem(TRAIL_KEY) || '[]'); return Array.isArray(t) ? t : []; } catch { return []; } };
+  const writeTrail = (t) => { try { sessionStorage.setItem(TRAIL_KEY, JSON.stringify(t.slice(-24))); } catch { /* no session storage: the fallbacks stand */ } };
+  const TAB_NAMES = { home: 'Home', stream: 'Stream', announcements: 'Announcements', assignments: 'Assignments', discussions: 'Discussions', grades: 'Grades', people: 'People', pages: 'Pages', files: 'Files', folder: 'Files', file: 'Files', quizzes: 'Quizzes', modules: 'Modules', syllabus: 'Syllabus', announcement: 'Announcement', discussion: 'Discussion', assignment: 'Assignment', page: 'Page', quiz: 'Quiz' };
+  /** What to call a screen on a Back button: a root screen's nav name, a course tab's name, the course itself for its home. */
+  function labelFor(r) {
+    const root = { dashboard: BCV.phone?.active() ? 'Today' : 'Dashboard', courses: 'Courses', groups: 'Groups', todo: 'To Do', calendar: 'Calendar', inbox: 'Inbox', gpa: 'Grades', notifications: 'Notifications' }[r.screen];
+    if (root) return root;
+    if (r.screen === 'course' || r.screen === 'group') {
+      if (!r.tab || r.tab === 'home') {
+        const c = (state.favs || []).find((x) => String(x.id) === String(r.courseId));
+        return c?.shortName || c?.name || (r.screen === 'group' ? 'Group' : 'Course');
+      }
+      return TAB_NAMES[r.tab] || 'Back';
+    }
+    return 'Back';
+  }
+  /** As a screen is drawn: the trail gains it (or drops back to it, when it was already there), and
+   *  state.from becomes the entry before it — the screen this one was reached from. */
+  function noteArrival(r) {
+    const trail = readTrail();
+    const cur = r.url;
+    const kind = state.navKind || 'push';
+    state.navKind = null;
+    const top = trail[trail.length - 1];
+    if (top && top.url === cur) {
+      /* the same screen again (a reload, a redraw): nothing moves */
+    } else if (kind === 'replace' && top) {
+      trail[trail.length - 1] = { url: cur, label: labelFor(r) };
+    } else {
+      // Back to a screen already on the trail: what followed it goes. The browser's back and the
+      // interface's own Back may land several entries down; any other move counts as a return only
+      // when it lands on the entry just before (a tab pressed, then its neighbour, then it again).
+      const depth = kind === 'pop' ? 8 : 1;
+      let seen = -1;
+      for (let i = trail.length - 2; i >= Math.max(0, trail.length - 1 - depth); i--) if (trail[i].url === cur) { seen = i; break; }
+      if (seen >= 0) trail.length = seen + 1;
+      else trail.push({ url: cur, label: labelFor(r) });
+    }
+    writeTrail(trail);
+    state.trail = trail;
+    state.from = trail.length >= 2 ? trail[trail.length - 2] : null;
+  }
+  /** The Back a screen shows: the screen it was reached from — unless `skip` rules that entry out
+   *  (a course header's Back must leave the course, so entries inside it are passed over) — and
+   *  `fallback`, the place the screen belongs to, when there is nothing to come back from. */
+  function backTo(fallback, { skip = null } = {}) {
+    const trail = state.trail || [];
+    const cur = trail[trail.length - 1]?.url;
+    for (let i = trail.length - 2; i >= 0; i--) {
+      const e = trail[i];
+      if (!e || e.url === cur) continue;
+      if (skip && skip(e)) continue;
+      return { label: e.label || 'Back', href: e.url, fromTrail: true };
+    }
+    return { ...fallback, fromTrail: false };
+  }
+  /** A screen naming itself once it knows (an item's title): the next screen's Back then says that. */
+  function nameHere(label) {
+    if (!label) return;
+    const trail = readTrail();
+    const top = trail[trail.length - 1];
+    if (!top || top.url !== state.route?.url) return;
+    top.label = String(label).trim().slice(0, 60);
+    writeTrail(trail);
+    state.trail = trail;
+  }
+  /** A Back button about to be followed: the move it makes pops the trail like the browser's back does. */
+  function markBack() { state.backPress = Date.now(); }
+
   /** A quiz attempt is open on this page: our own quiz flow (state.quizOpen)
    *  or Canvas's take-quiz page underneath. */
   const inQuiz = () => !!state.quizOpen || /\/quizzes\/\d+\/take\b/.test(location.pathname) || !!document.querySelector('#submit_quiz_form, #quiz_taking_form, form.take_quiz_form');
@@ -139,6 +216,8 @@
     state.quizOpen = false; // leaving on purpose: no second prompt from the unload guard
     state.submitOpen = false;
     const samePage = url.pathname === location.pathname && url.search === location.search;
+    state.navKind = replace ? 'replace' : (state.backPress && Date.now() - state.backPress < 1500 ? 'pop' : 'push');
+    state.backPress = 0;
     if (samePage && (url.hash || location.hash)) {
       if (replace) history.replaceState({ bcv: true }, '', url.pathname + url.search + url.hash);
       else location.hash = url.hash;
@@ -165,6 +244,7 @@
   }
 
   window.addEventListener('popstate', () => {
+    state.navKind = 'pop';
     if (state.nativePath !== location.pathname + location.search && !inPlaceHop(new URL(location.href))) {
       location.reload();
       return;
@@ -642,6 +722,7 @@
     const prev = state.route;
     const r = parseRoute();
     state.route = r;
+    noteArrival(r); // the trail, and state.from: what every Back on this screen names
     const id = ++state.renderId;
     const alive = () => id === state.renderId;
     BCV.canvas.navigated?.(); // from here on, this screen's requests go before anything warming for the last one
@@ -912,7 +993,7 @@
   }
 
   BCV.app = {
-    state, go, render, renderSide, parseRoute, refreshCounts, loadShellData, punchIn, punchOut, siteName, toggleTheme, logout,
+    state, go, render, renderSide, parseRoute, refreshCounts, loadShellData, punchIn, punchOut, siteName, toggleTheme, logout, backTo, nameHere, markBack,
     isDark: () => state.dark,
     smartContext: () => state.smartTopic || state.smartCtx,
     /** Scope the smart panel to one item (a quiz question) until it is closed; null restores the page's suggestions. */

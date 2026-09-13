@@ -384,6 +384,7 @@ try {
 
   // ---- a course ----------------------------------------------------------------------------------
   console.log('course');
+  await page.evaluate(() => sessionStorage.removeItem('bcv:trail')); // a fresh tab: nothing to come back from, so Back is the structural parent
   await page.goto(`${BASE}/courses/101`);
   await ready();
   await page.waitForSelector('.bcv-ph-body--course .bcv-ph-card', { timeout: 15000 });
@@ -405,18 +406,30 @@ try {
   await ready();
   await page.waitForSelector('.bcv-ph-row--link[data-tab="assignments"]', { timeout: 15000 });
   await tapScreen('.bcv-ph-row--link[data-tab="assignments"]');
-  check((await page.$eval('.bcv-ph-tab.is-active', (e) => e.dataset.tab)) === 'assignments' && (await texts('.bcv-topbar__back'))[0] === 'Back' && (await texts('.bcv-ph-tab'))[0] === 'Home', 'a link opens that tab, with the chip row for the rest');
+  check((await page.$eval('.bcv-ph-tab.is-active', (e) => e.dataset.tab)) === 'assignments' && (await texts('.bcv-ph-tab'))[0] === 'Home', 'a link opens that tab, with the chip row for the rest');
+  check((await texts('.bcv-topbar__back'))[0] === 'F26-MATH 021 20', `the tab's Back names the course it was opened from, as the Courses list names it: ‹ ${(await texts('.bcv-topbar__back'))[0]}`);
   await shot('06c-course-assignments');
   // the edge swipe pops the stack like Back
   await page.mouse.move(8, 500); await page.mouse.down(); await page.mouse.move(140, 505, { steps: 8 }); await page.mouse.up();
   check(await eventually(async () => page.url() === `${BASE}/courses/101` && !!(await page.$('.bcv-ph-body--course'))), 'an edge swipe from the left pops back to the course');
+  check(await eventually(async () => (await texts('.bcv-topbar__back'))[0] === 'Courses'), `and the pop leaves the course's Back at Courses again (‹ ${(await texts('.bcv-topbar__back'))[0]})`);
+  // an item opened from the Today tab says Back to Today, not to the list it belongs to
+  await tab('dashboard');
+  await page.waitForSelector('.bcv-ph-row[href*="/assignments/"]', { timeout: 15000 });
+  await tapScreen('.bcv-ph-row[href*="/assignments/"]');
+  await page.waitForSelector('.bcv-ph-item__title', { timeout: 15000 });
+  check(await eventually(async () => (await texts('.bcv-topbar__back'))[0] === 'Today'), `an item opened from Today says Back to Today (‹ ${(await texts('.bcv-topbar__back'))[0]})`);
+  await tapScreen('.bcv-topbar__back');
+  check(await eventually(async () => page.url() === `${BASE}/` && !!(await page.$('.bcv-ph-stat'))), 'and Back goes to Today');
 
   // ---- an item with the submit block on the same page --------------------------------------------
   console.log('item');
+  await page.evaluate(() => sessionStorage.removeItem('bcv:trail')); // a link straight into the item: Back falls back to its course
   await page.goto(`${BASE}/courses/104/assignments/4002`);
   await ready();
   await page.waitForSelector('.bcv-ph-item__title', { timeout: 15000 });
   check((await texts('.bcv-ph-item__title'))[0] === 'Week 2 Post Class Assignment: GC articles' && (await texts('.bcv-topbar__title'))[0] === 'Week 2 Post Class Assignment: GC articles', 'item title and the back bar title');
+  check((await texts('.bcv-topbar__back'))[0] === 'Back', `with nothing to come back from, the back bar says Back (‹ ${(await texts('.bcv-topbar__back'))[0]})`);
   check(/Due .* · \d+ points/.test((await texts('.bcv-ph-item__meta'))[0]) && (await raw('.bcv-ph-instr .bcv-ph-kicker'))[0] === 'Instructions', `meta line and Instructions card: ${(await texts('.bcv-ph-item__meta'))[0]}`);
   check(!(await page.$('.bcv-head--course')) && (await texts('.bcv-ph-chip--course'))[0] === 'F26-SPRK 010 103', 'an item page drops the course header; its course chip says where it is');
   check(!(await page.$('.bcv-ph-bigbtn.is-primary')) && !!(await page.$('.bcv-ph-body--item .bcv-sb--embed')) && (await raw('.bcv-sb--embed .bcv-sb__kicker'))[0] === 'Submit work', 'handing in lives on the same page: the submit block at the end, no separate Submit screen');

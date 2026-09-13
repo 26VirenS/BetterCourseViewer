@@ -97,11 +97,15 @@
     if (r.screen === 'groups' || r.screen === 'inbox' || r.screen === 'notifications') return { label: 'Today', href: '/' };
     return { label: 'Back', href: '/' };
   }
+  /** The screen Back names and goes to: the one this screen was reached from (the trail), else its structural parent. */
+  const backOf = (app, r) => (app.backTo ? app.backTo(parentOf(r)) : parentOf(r));
   function goBack(app, r) {
     let sameSite = false;
     try { sameSite = !!document.referrer && new URL(document.referrer).origin === location.origin; } catch { sameSite = false; }
-    if (history.length > 1 && sameSite) history.back();
-    else app.go(parentOf(r).href);
+    const back = backOf(app, r);
+    // history.back() keeps the stack honest when the previous entry is the one the button names; a typed URL or a fresh tab goes there directly
+    if (history.length > 1 && sameSite && back.fromTrail) history.back();
+    else { app.markBack?.(); app.go(back.href); }
   }
   /** After a screen lands: the top bar for pushed screens, the active tab. */
   function afterRender(app, r, el) {
@@ -112,7 +116,7 @@
     if (!topbarEl) return;
     topbarEl.hidden = isRoot;
     if (isRoot) return;
-    const parent = parentOf(r);
+    const parent = backOf(app, r);
     // an item page drops the course header altogether (its own title and course chip say where it is)
     const courseHead = el.querySelector('.bcv-head--course');
     if (courseHead && el.querySelector('.bcv-ph-body--item')) courseHead.remove();
