@@ -343,10 +343,38 @@
           h('button', { type: 'button', class: 'bcv-gpa__details', onclick: (e) => openDetail(c, e.currentTarget) }, ['Details', U.svg(IC.chevron, { size: 13, stroke: 'var(--bcv-blue)', width: 2.1 })]),
         ]),
       );
+      let leaving = null; // the timer that clears the group rings once they have swept back out
       function paint() {
         card.classList.toggle('is-hover', hover);
-        letter.hidden = hover; // the ring keeps its size: the group rings nest inside it
-        catsG.replaceChildren(...(hover ? catCircles(cats) : []));
+        clearTimeout(leaving);
+        leaving = null;
+        if (hover) {
+          // the ring keeps its size: the group rings nest inside it and sweep in (a sweep-out
+          // still under way is simply replaced by a fresh sweep-in)
+          letter.hidden = true;
+          letter.classList.remove('is-back');
+          catsG.replaceChildren(...catCircles(cats));
+        } else if (catsG.childElementCount) {
+          // the pointer left: the rings sweep back out from wherever they have got to, last in
+          // first out, their tracks fading with them; the letter returns once they have gone
+          const fills = [...catsG.querySelectorAll('.bcv-ring--fill-cat')];
+          const n = fills.length;
+          fills.forEach((el, k) => {
+            el.style.strokeDasharray = getComputedStyle(el).strokeDasharray;
+            el.style.setProperty('--bcv-delay', `${(n - 1 - k) * 60}ms`);
+            el.classList.add('bcv-ring--unfill');
+          });
+          for (const t of catsG.querySelectorAll('circle:not(.bcv-ring--fill-cat)')) t.classList.add('bcv-ring--track-out');
+          const total = U.reducedMotion() ? 0 : (n ? (n - 1) * 60 : 0) + 420;
+          leaving = setTimeout(() => {
+            leaving = null;
+            catsG.replaceChildren();
+            letter.hidden = false;
+            letter.classList.add('is-back');
+          }, total);
+        } else {
+          letter.hidden = false;
+        }
         info.replaceChildren(hover
           ? U.el('bcv-gpa__bygroup', [
             U.el('bcv-gpa__bygroup-head', [U.text('bcv-gpa__kicker2', 'By group', 'span'), U.text('bcv-gpa__bygroup-pct', `${store.fmtPts(pct)}%`, 'span')]),

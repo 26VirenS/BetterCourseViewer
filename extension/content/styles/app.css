@@ -39,6 +39,8 @@ html[data-bcv-theme="dark"] {
 @keyframes bcv-scrim { from { opacity: 0; -webkit-backdrop-filter: blur(0); backdrop-filter: blur(0); } to { opacity: 1; -webkit-backdrop-filter: var(--bcv-blur-scrim); backdrop-filter: var(--bcv-blur-scrim); } }
 /* data arrives rather than appears: an arc sweeps from empty to its value (the `to` is the ring's own dasharray), a line strokes itself on */
 @keyframes bcv-ring-fill { from { stroke-dasharray: 0 999; } }
+@keyframes bcv-ring-unfill { to { stroke-dasharray: 0 999; } }
+@keyframes bcv-fade-out { to { opacity: 0; } }
 @keyframes bcv-line-draw { from { stroke-dashoffset: 420; } to { stroke-dashoffset: 0; } }
 /* screens rise in; sheets grow over a blurring scrim; popovers pop */
 .bcv-main > .bcv-screen, .bcv-main > .bcv-qz, .bcv-main > .bcv-sb { animation: bcv-fade-up .34s cubic-bezier(.32,.72,0,1) both; }
@@ -58,6 +60,10 @@ html.bcv-phone .bcv-sheet { animation: bcv-sheet .26s cubic-bezier(.32,.72,0,1) 
 /* Grades entry: each course ring sweeps to its score 70ms down the grid; group rings fill in as they mount; the trend line draws left to right and its dots follow */
 .bcv-ring--fill { animation: bcv-ring-fill .9s cubic-bezier(.32,.72,0,1) var(--bcv-delay, 0ms) both; }
 .bcv-ring--fill-cat { animation-duration: .55s; }
+/* the pointer leaving a Grades ring: each group ring sweeps back to empty (from wherever it had got to, set inline), its track fades, and the letter returns */
+.bcv-ring--unfill { animation: bcv-ring-unfill .4s cubic-bezier(.4,0,.6,1) var(--bcv-delay, 0ms) forwards; }
+.bcv-ring--track-out { animation: bcv-fade-out .4s ease var(--bcv-delay, 0ms) forwards; }
+.bcv-gpa__ringletter.is-back { animation: bcv-fade-in .22s ease-out both; }
 .bcv-gpa__line--draw { stroke-dasharray: 420; animation: bcv-line-draw 1.05s cubic-bezier(.32,.72,0,1) .2s both; }
 .bcv-gpa__pt--in { animation: bcv-pop .25s cubic-bezier(.32,.72,0,1) var(--bcv-delay, 0ms) backwards; }
 /* hover and press: cards lift, buttons give (transitions stay on pseudo-state only, mockup 8 rule) */
@@ -100,7 +106,7 @@ html[data-bcv-theme="dark"] .bcv-skel { --bcv-skel: linear-gradient(90deg, rgba(
 @media (prefers-reduced-motion: reduce) {
   /* entrances go (data lands on its final value at once); the loading indicators (the row wash, the shimmer) stay */
   .bcv-main > .bcv-screen, .bcv-main > .bcv-qz, .bcv-main > .bcv-sb, .bcv-sheet-ov, .bcv-sheet, .bcv-smart, .bcv-menu, .bcv-toast, .bcv-gpa__pop, .bcv-reader-ov, .bcv-skel, .bcv-enter, .bcv-fb__fill,
-  .bcv-work__row--in, .bcv-work__fill--grow, .bcv-ring--fill, .bcv-gpa__line--draw, .bcv-gpa__pt--in { animation: none; }
+  .bcv-work__row--in, .bcv-work__fill--grow, .bcv-ring--fill, .bcv-ring--unfill, .bcv-ring--track-out, .bcv-gpa__ringletter.is-back, .bcv-gpa__line--draw, .bcv-gpa__pt--in { animation: none; }
   .bcv-stat, .bcv-gpa__card, .bcv-ccard, .bcv-btn, .bcv-sb__btn, .bcv-side, .bcv-head--course, .bcv-rail { transition: none; }
 }
 

@@ -598,6 +598,12 @@ try {
   check(/^by group 92\.4% .*Discussion Quizzes \d+%/i.test(hoverCard) && (await page.$$('.bcv-gpa__card.is-hover .bcv-gpa__ringsvg circle')).length >= 6 && Math.abs((await page.$eval('.bcv-gpa__card', (el) => el.getBoundingClientRect().height)) - cardHeight) < 1, `hovering the ring shows the group rings + breakdown without resizing the card: ${hoverCard}`);
   await page.mouse.move(5, 5);
   await page.waitForFunction(() => !document.querySelector('.bcv-gpa__card.is-hover'), null, { timeout: 5000 });
+  // leaving: the group rings sweep back out, last in first out, their tracks fading; the letter comes back once they have gone
+  const outAnim = await page.evaluate(() => [...document.querySelectorAll('.bcv-gpa__card .bcv-ring--unfill')].map((e) => `${getComputedStyle(e).animationName}@${getComputedStyle(e).animationDelay}@${getComputedStyle(e).animationFillMode}`));
+  const outTracks = await page.evaluate(() => [...document.querySelectorAll('.bcv-gpa__card .bcv-ring--track-out')].map((e) => getComputedStyle(e).animationName));
+  check(outAnim.length >= 2 && outAnim.every((a, i) => a === `bcv-ring-unfill@${Number(((outAnim.length - 1 - i) * 60) / 1000)}s@forwards`) && outTracks.length === outAnim.length && outTracks.every((a) => a === 'bcv-fade-out') && (await page.$eval('.bcv-gpa__card .bcv-gpa__ringletter', (e) => e.hidden)), `leaving the ring sweeps the group rings back out, last in first, tracks fading, the letter still away: ${outAnim.join(',')}`);
+  await page.waitForFunction(() => !document.querySelector('.bcv-gpa__card .bcv-ring--unfill') && !document.querySelector('.bcv-gpa__card .bcv-gpa__ringletter').hidden, null, { timeout: 3000 });
+  check((await page.$eval('.bcv-gpa__card .bcv-gpa__ringletter', (e) => getComputedStyle(e).animationName)) === 'bcv-fade-in' && (await page.$$('.bcv-gpa__card .bcv-gpa__cats circle')).length === 0, 'and once they have gone the rings are cleared and the letter fades back in');
   await shot(page, '09d-grades-panel');
   // Details: the course's grade page in a sheet, with the target stepper
   await page.click('.bcv-gpa__card .bcv-gpa__details');
