@@ -48,31 +48,74 @@
   }
 
   // ---- local per-site preferences (things Canvas has no API for) ---------------
+  // ---- the student's own metadata for this site (priorities, views, goals…) --------------------
+  // One object in storage.local, shared by every tab on the site. A write reads the object again
+  // first and changes only its own key, and a change made in another tab replaces this tab's copy
+  // — so a tab that has sat open for a while never puts a stale object back over what was set in
+  // another (the priorities on To Do were the usual casualty).
+  // Within a tab the writes go one at a time, each read-then-write against storage, and a write
+  // shows in this tab's copy the moment it is asked for (a read right after it sees it), so two
+  // quick writes never lose each other's key either.
   const prefKey = `prefs:${location.host}`;
   let prefsCache = null;
-  async function prefs() {
-    if (prefsCache) return prefsCache;
+  const pending = []; // writes asked for but not in storage yet: laid over whatever storage says
+  const readPrefs = async () => {
     try {
       const r = await api.storage.local.get(prefKey);
-      prefsCache = r[prefKey] || {};
+      return r[prefKey] && typeof r[prefKey] === 'object' ? { ...r[prefKey] } : {};
     } catch {
-      prefsCache = {};
+      return {};
     }
+  };
+  const applyOp = (p, op) => {
+    if ('value' in op) p[op.key] = op.value;
+    else {
+      const cur = p[op.key] && typeof p[op.key] === 'object' ? { ...p[op.key] } : {};
+      for (const [k, v] of Object.entries(op.patch)) { if (v === null || v === undefined) delete cur[k]; else cur[k] = v; }
+      p[op.key] = cur;
+    }
+    return p;
+  };
+  const withPending = (p) => pending.reduce((acc, op) => applyOp(acc, op), { ...p });
+  async function prefs() {
+    if (!prefsCache) prefsCache = withPending(await readPrefs());
     return prefsCache;
   }
   async function pref(key, fallback = null) {
     const p = await prefs();
     return p[key] === undefined ? fallback : p[key];
   }
-  async function setPref(key, value) {
-    const p = await prefs();
-    p[key] = value;
-    prefsCache = p;
-    try {
-      await api.storage.local.set({ [prefKey]: p });
-    } catch {
-      /* ignore */
-    }
+  let writing = Promise.resolve();
+  function write(op) {
+    pending.push(op);
+    if (prefsCache) prefsCache = applyOp({ ...prefsCache }, op);
+    const done = writing.then(async () => {
+      const p = applyOp(await readPrefs(), op); // the latest object in storage, this change on it
+      try {
+        await api.storage.local.set({ [prefKey]: p });
+      } catch {
+        /* ignore */
+      }
+      pending.splice(pending.indexOf(op), 1);
+      prefsCache = withPending(p);
+      return p[op.key];
+    });
+    writing = done.catch(() => {});
+    return done;
+  }
+  /** Writes one key. */
+  const setPref = (key, value) => write({ key, value });
+  /** Changes some entries of an object-valued pref (a null entry deletes), and resolves to the
+   *  whole object as it is now — for maps that several tabs edit, such as the To Do priorities. */
+  const mergePref = (key, patch) => write({ key, patch: patch || {} });
+  try {
+    api.storage.onChanged.addListener((changes, area) => {
+      if (area !== 'local' || !changes[prefKey]) return;
+      const next = changes[prefKey].newValue;
+      prefsCache = withPending(next && typeof next === 'object' ? next : {});
+    });
+  } catch {
+    /* no change events here: each write still reads the latest object first */
   }
 
   // ---- user + site --------------------------------------------------------------
@@ -343,13 +386,28 @@
     return (items || []).map((it) => classify(it, map)).filter((it) => it.date);
   }
 
-  /** Everything in the To Do window (today through the next 7 days), including
-   *  items already completed, submitted or dismissed; the screen decides what to show. */
+  /** The student's own planner items — tasks added here or in Canvas's planner without a course,
+   *  and personal events — over a long span (three months back, a year on): a task of your own
+   *  is not bound to the seven-day window, so one dated last week or next month is still read.
+   *  Asked for under the user's own context code, so the answer is a handful of items. */
+  async function rawUserPlanner({ force = false, refresh = false } = {}) {
+    const u = await me();
+    return C.cached('planner:mine', 3 * MIN, () =>
+      C.get('/api/v1/planner/items', { params: { start_date: isoDays(-90), end_date: isoDays(365), 'context_codes[]': [`user_${u.id}`], per_page: 100 }, all: true, maxPages: 3 }), { force, refresh });
+  }
+  /** Everything on the To Do list, including items already completed, submitted or dismissed
+   *  (the screen decides what to show): course work from today through the next 7 days, and every
+   *  task of the student's own whatever its date — a task is theirs until they tick it off or
+   *  delete it, so one from yesterday or one for next month stays on the list. */
   async function todoWindow(opts = {}) {
-    const items = await planner(opts);
+    const [items, mineRaw] = await Promise.all([planner(opts), rawUserPlanner(opts).catch(() => [])]);
     const t = now();
-    const end = U.addDays(U.startOfDay(t), 8);
-    return items.filter((it) => it.date >= U.startOfDay(t) && it.date < end && it.type !== 'announcement');
+    const start = U.startOfDay(t);
+    const end = U.addDays(start, 8);
+    const inWindow = (it) => it.date >= start && it.date < end;
+    const seen = new Set(items.map((it) => it.id));
+    const mine = (mineRaw || []).map((it) => classify(it)).filter((it) => it.date && it.custom && !seen.has(it.id));
+    return [...items.filter((it) => it.type !== 'announcement' && (it.custom || inWindow(it))), ...mine].sort((a, b) => a.date - b.date);
   }
   /** Items still open on the To Do list: not done, not dismissed. */
   async function todo(opts = {}) {
@@ -371,7 +429,7 @@
   const dismiss = (item) => override(item, { dismissed: true });
   const restore = (item) => override(item, { dismissed: false, marked_complete: false });
   async function invalidatePlanner() {
-    await Promise.all([C.invalidate('planner:21'), C.invalidate('planner:14'), C.invalidate('planner:60')]);
+    await Promise.all([C.invalidate('planner:21'), C.invalidate('planner:14'), C.invalidate('planner:60'), C.invalidate('planner:mine')]);
   }
 
   // ---- activity + counts ------------------------------------------------------------------
@@ -1098,7 +1156,7 @@
   }
 
   BCV.store = {
-    env, pref, setPref, me, account, colors, courses, favorites, cards, setFavorite, setNickname, currentTerm, dashboardView, setDashboardView,
+    env, pref, setPref, mergePref, me, account, colors, courses, favorites, cards, setFavorite, setNickname, currentTerm, dashboardView, setDashboardView,
     planner, classify, todo, todoWindow, setComplete, dismiss, restore, invalidatePlanner, createNote, deleteNote, activity, activitySummary, unreadCount, groups, group,
     announcementsFeed, streamSeen, markStreamSeen, setColor, history, helpLinks,
     calendarContexts, ownContexts, selectedContexts, setSelectedContexts, calendarEvents, plannerRange,

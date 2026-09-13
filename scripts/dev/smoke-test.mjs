@@ -422,6 +422,29 @@ try {
   check((await page.$eval(`.bcv-row[data-item="${workId}"] .bcv-pri`, (e) => e.textContent.trim())) === 'Low' && /^(assignment|quiz|discussion_topic|wiki_page|calendar_event):/.test(workId), `a Canvas item's priority is kept by its stable id and survives a reload: ${workId} → Low`);
   const prefPri = (await sw.evaluate(async () => Object.entries(await chrome.storage.local.get(null)).find(([k]) => k.startsWith('prefs:'))?.[1]?.todoPriority));
   check(prefPri && prefPri[workId] === 1 && Object.values(prefPri).includes(3), `priority lives in the site's preferences, never in Canvas: ${JSON.stringify(prefPri)}`);
+  // Two tabs. The site's preferences are one object; a second tab that loaded its copy earlier and
+  // then writes a preference of its own must not put that older copy back over a priority set here.
+  const tabB = await context.newPage();
+  await tabB.goto(`${BASE}/`);
+  await tabB.waitForSelector('.bcv-stat', { timeout: 15000 }); // tab B has read the preferences by now
+  const secondWork = page.locator('.bcv-row', { hasNot: page.locator('.bcv-todo__del') }).filter({ has: page.locator('.bcv-pri') }).nth(1);
+  const secondId = await secondWork.getAttribute('data-item');
+  await secondWork.locator('.bcv-pri').click();
+  await page.waitForSelector('.bcv-menu', { timeout: 3000 });
+  await page.click('.bcv-menu__item:nth-child(1)'); // High, set in tab A after tab B loaded
+  await page.waitForFunction((id) => document.querySelector(`.bcv-row[data-item="${id}"] .bcv-pri`)?.textContent.trim() === 'High', secondId, { timeout: 5000 });
+  await tabB.click('.bcv-nav__item[data-nav="todo"]');
+  await tabB.waitForSelector('.bcv-todo__done', { timeout: 15000 });
+  await tabB.click('.bcv-todo__done'); // tab B writes a preference of its own (show completed)
+  await tabB.waitForSelector('.bcv-body .bcv-row--done', { timeout: 5000 });
+  const priAfterB = (await sw.evaluate(async () => Object.entries(await chrome.storage.local.get(null)).find(([k]) => k.startsWith('prefs:'))?.[1]));
+  check(priAfterB?.todoPriority?.[workId] === 1 && priAfterB?.todoPriority?.[secondId] === 3 && priAfterB?.todoShowDone === true, `a preference written in another tab keeps the priorities set here (both tabs' changes are in storage): ${JSON.stringify(priAfterB?.todoPriority)}, showDone ${priAfterB?.todoShowDone}`);
+  await tabB.click('.bcv-todo__done'); // and back, so the later checks start from hidden
+  await tabB.waitForFunction(() => !document.querySelector('.bcv-body .bcv-row--done'), null, { timeout: 5000 });
+  await tabB.close();
+  await page.reload();
+  await page.waitForSelector('.bcv-row[data-item] .bcv-pri', { timeout: 10000 });
+  check((await page.$eval(`.bcv-row[data-item="${secondId}"] .bcv-pri`, (e) => e.textContent.trim())) === 'High' && (await page.$eval(`.bcv-row[data-item="${workId}"] .bcv-pri`, (e) => e.textContent.trim())) === 'Low', 'and both priorities are still on the rows after a reload');
   // By priority buckets High → Low → Unprioritised and drops the empty Medium bucket
   await page.click('.bcv-head .bcv-seg__btn:nth-child(2)');
   await page.waitForFunction(() => /^High priority/.test(document.querySelector('.bcv-group__head')?.textContent || ''), null, { timeout: 5000 });
@@ -435,6 +458,21 @@ try {
   await page.waitForFunction(() => ![...document.querySelectorAll('.bcv-group__head')].some((e) => /^My tasks/.test(e.textContent)), null, { timeout: 10000 });
   await page.waitForFunction((n) => Number(document.querySelector('.bcv-nav__item[data-nav="todo"] .bcv-nav__count').textContent) === n, badgeBefore, { timeout: 5000 });
   check((await fetch(`${BASE}/api/v1/planner_notes`).then((r) => r.text()).then((t) => JSON.parse(t.replace(/^while\(1\);/, '')))).length === 0 && !(await page.$('.bcv-todo__del')), 'Delete removes the planner note from Canvas; the list and the badge agree again');
+  // A task of your own stays on the list until it is done, whatever its date: one from three days
+  // ago and one for three weeks on are both there (course work keeps to the seven-day window).
+  const noteApi = (method, path, body) => fetch(`${BASE}${path}`, { method, headers: { 'content-type': 'application/json', 'x-csrf-token': 'mock+csrf/token=' }, body: body ? JSON.stringify(body) : undefined }).then((r) => r.text()).then((t) => JSON.parse(t.replace(/^while\(1\);/, ''))); // the mock, like Canvas, refuses a write without the session's token
+  const oldNote = await noteApi('POST', '/api/v1/planner_notes', { title: 'Return the library book', todo_date: new Date(Date.now() - 3 * 864e5).toISOString() });
+  const farNote = await noteApi('POST', '/api/v1/planner_notes', { title: 'Book the dentist', todo_date: new Date(Date.now() + 20 * 864e5).toISOString() });
+  await page.reload();
+  await page.waitForFunction(() => [...document.querySelectorAll('.bcv-group__head')].some((e) => /^My tasks/.test(e.textContent)), null, { timeout: 10000 });
+  const mineTitles = await page.evaluate(() => { const head = [...document.querySelectorAll('.bcv-group__head')].find((e) => /^My tasks/.test(e.textContent)); return [...head.parentElement.querySelectorAll('.bcv-row__title')].map((e) => e.textContent.trim()); });
+  await page.waitForFunction((n) => Number(document.querySelector('.bcv-nav__item[data-nav="todo"] .bcv-nav__count').textContent) === n + 2, badgeBefore, { timeout: 5000 });
+  check(mineTitles.join(' | ') === 'Return the library book | Book the dentist' && (await texts('.bcv-group__head')).filter((t) => /^My tasks/.test(t)).length === 1, `a task from three days ago and one three weeks out both stay under My tasks, oldest first, and the badge counts them: ${mineTitles.join(' | ')}`);
+  await noteApi('DELETE', `/api/v1/planner_notes/${oldNote.id}`);
+  await noteApi('DELETE', `/api/v1/planner_notes/${farNote.id}`);
+  await page.reload();
+  await page.waitForFunction((n) => Number(document.querySelector('.bcv-nav__item[data-nav="todo"] .bcv-nav__count').textContent) === n, badgeBefore, { timeout: 10000 });
+  await page.waitForSelector('.bcv-todo__add', { timeout: 10000 });
   check(true, 'ticking the circle marks an item complete');
   check((await page.$eval('.bcv-body > :first-child', (e) => e.className)).includes('bcv-todo__add') && /^Show completed · \d+$/.test((await texts('.bcv-todo__done'))[0]), `Add your own task leads the page; a small header button shows completed items with their count: ${(await texts('.bcv-todo__done'))[0]}`);
   await page.click('.bcv-todo__done');

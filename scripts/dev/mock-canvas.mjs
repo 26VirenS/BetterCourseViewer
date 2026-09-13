@@ -342,7 +342,13 @@ on('GET', /^\/help_links$/, () => [
   { id: 'it_help', text: 'IT Help Desk', subtext: 'Campus technology support', url: 'https://it.example.edu/help', type: 'custom', available_to: ['student'] },
 ]);
 on('DELETE', /^\/api\/v1\/users\/self\/favorites\/courses\/(\w+)$/, (url, m) => { favorites.delete(m[1]); return { context_id: m[1] }; });
-on('GET', /^\/api\/v1\/planner\/items$/, (url) => filterDates(plannerItems(), url, 'plannable_date'));
+on('GET', /^\/api\/v1\/planner\/items$/, (url) => {
+  // like Canvas: context_codes[] narrows the answer to those contexts; the student's own items
+  // (a note without a course, a personal event) live under user_<id>
+  const codes = url.searchParams.getAll('context_codes[]');
+  const items = codes.length ? plannerItems().filter((it) => codes.includes(it.course_id ? `course_${it.course_id}` : 'user_7')) : plannerItems();
+  return filterDates(items, url, 'plannable_date');
+});
 on('GET', /^\/api\/v1\/planner_notes$/, () => notes.slice());
 on('POST', /^\/api\/v1\/planner_notes$/, (url, m, body) => { const n = { id: `note${++noteSeq}`, title: String(body.title || ''), todo_date: body.todo_date || null, course_id: body.course_id || null, details: body.details || '', workflow_state: 'active', user_id: 'self' }; notes.push(n); return n; });
 on('DELETE', /^\/api\/v1\/planner_notes\/(\w+)$/, (url, m) => { const i = notes.findIndex((n) => n.id === m[1]); if (i < 0) return {}; const [n] = notes.splice(i, 1); return n; });

@@ -604,7 +604,7 @@
     if (!['date', 'priority', 'course'].includes(group)) group = 'date';
     let showDone = !!(await store.pref('todoShowDone', false));
     const priPref = await store.pref('todoPriority', {});
-    const pri = priPref && typeof priPref === 'object' ? { ...priPref } : {};
+    let pri = priPref && typeof priPref === 'object' ? { ...priPref } : {}; // replaced by the merged map on every write
     let [items, sel] = await Promise.all([store.todoWindow().catch(() => null), selection()]);
     if (!ctx.alive()) return screen;
     if (!items) {
@@ -614,9 +614,9 @@
     const isOpen = (it) => !it.complete && !it.dismissed && !it.submitted;
     const isDone = (it) => it.complete || it.submitted;
     const priOf = (it) => Number(pri[it.id]) || 0;
-    const setPri = (it, lv) => {
+    const setPri = (it, lv) => { // one entry, merged against the latest map in storage
       if (lv) pri[it.id] = lv; else delete pri[it.id];
-      store.setPref('todoPriority', pri);
+      store.mergePref('todoPriority', { [it.id]: lv || null }).then((map) => { if (ctx.alive()) pri = map; });
     };
     const now = new Date();
     const visibleItems = () => items.filter((it) => !it.dismissed && inSelection(sel, it)); // the selected courses and the student's own tasks
@@ -640,7 +640,7 @@
       try {
         await store.deleteNote(it.raw.plannable_id);
         delete pri[it.id];
-        store.setPref('todoPriority', pri);
+        store.mergePref('todoPriority', { [it.id]: null }).then((map) => { if (ctx.alive()) pri = map; });
         await reload();
       } catch (e) {
         U.toast(`Could not delete it: ${e.message}`, { error: true });
@@ -738,7 +738,7 @@
       draw();
       try {
         const note = await store.createNote({ title: draft.title.trim(), todoDate: when.toISOString() });
-        if (note && note.id && draft.pri) { pri[`planner_note:${note.id}`] = draft.pri; await store.setPref('todoPriority', pri); }
+        if (note && note.id && draft.pri) { pri[`planner_note:${note.id}`] = draft.pri; pri = await store.mergePref('todoPriority', { [`planner_note:${note.id}`]: draft.pri }); }
         Object.assign(draft, { open: false, title: '', date: null, pri: 2, busy: false });
         await reload();
         U.toast('Added to your Canvas planner.');

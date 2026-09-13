@@ -38,7 +38,7 @@
     if (!['date', 'priority', 'course'].includes(group)) group = 'date';
     let showDone = !!(await store.pref('todoShowDone', false));
     const priPref = await store.pref('todoPriority', {});
-    const pri = priPref && typeof priPref === 'object' ? { ...priPref } : {}; // item id → 0..3
+    let pri = priPref && typeof priPref === 'object' ? { ...priPref } : {}; // item id → 0..3; replaced by the merged map on every write
     const sub = U.el('bcv-head__sub', '…');
     const segWrap = h('div', { class: 'bcv-ml-auto bcv-todo__tools' });
     const body = U.el('bcv-body bcv-body--24');
@@ -54,9 +54,11 @@
     const isOpen = (it) => !it.complete && !it.dismissed && !it.submitted;
     const isDone = (it) => it.complete || it.submitted;
     const priOf = (it) => Number(pri[it.id]) || 0;
+    // one entry changed against the latest map in storage (another tab may have set others since
+    // this screen was drawn), and the map on screen replaced by the merged one
     const setPri = (it, lv) => {
       if (lv) pri[it.id] = lv; else delete pri[it.id];
-      store.setPref('todoPriority', pri);
+      store.mergePref('todoPriority', { [it.id]: lv || null }).then((map) => { if (ctx.alive()) pri = map; });
       draw();
     };
     // the header's tools: a small button that shows completed and dismissed items, then the sort
@@ -160,7 +162,7 @@
       try {
         await store.deleteNote(it.raw.plannable_id);
         delete pri[it.id];
-        store.setPref('todoPriority', pri);
+        store.mergePref('todoPriority', { [it.id]: null }).then((map) => { if (ctx.alive()) pri = map; });
         await reload();
       } catch (e) {
         rowEl.style.opacity = '';
@@ -211,7 +213,7 @@
         const note = await store.createNote({ title: draft.title.trim(), todoDate: when.toISOString() });
         if (note && note.id && draft.pri) { // the draft's priority follows the new task
           pri[`planner_note:${note.id}`] = draft.pri;
-          await store.setPref('todoPriority', pri);
+          pri = await store.mergePref('todoPriority', { [`planner_note:${note.id}`]: draft.pri });
         }
         Object.assign(draft, { open: false, title: '', date: null, pri: 2, busy: false });
         await reload();
