@@ -218,7 +218,11 @@ try {
   await page.waitForFunction(() => !document.querySelector('.bcv-sheet'), null, { timeout: 3000 });
   await page.click('.bcv-stats .bcv-stat:nth-child(2)');
   await page.waitForSelector('.bcv-sheet', { timeout: 5000 });
-  check(/^\d+ Due this week$/.test((await texts('.bcv-sheet__line'))[0]) && /^Week of \w+ \d+ · \d courses?$/.test((await texts('.bcv-sheet__note'))[0]) && (await texts('.bcv-sheet__row')).some((t) => /Lec06-PreQuiz Quiz · 17 pts · \w{3} 10:30 AM/.test(t)), `Due this week sheet: ${(await texts('.bcv-sheet__note'))[0]}`);
+  // the sheet lists exactly what the counter counted; naming one item here would break every Sunday,
+  // when the rest of "this week" is already behind us
+  const weekLine = (await texts('.bcv-sheet__line'))[0];
+  const weekRows = await texts('.bcv-sheet__row');
+  check(/^\d+ Due this week$/.test(weekLine) && Number(weekLine.split(' ')[0]) === weekRows.length && /^Week of \w+ \d+ · \d courses?$/.test((await texts('.bcv-sheet__note'))[0]) && weekRows.every((t) => /·/.test(t)) && weekRows.some((t) => /· \d+ pts ·/.test(t)), `Due this week sheet: ${weekLine} / ${(await texts('.bcv-sheet__note'))[0]} / ${weekRows.length} rows, e.g. ${weekRows[0] || '(none)'}`);
   await page.click('.bcv-sheet-ov', { position: { x: 5, y: 5 } });
   await page.waitForFunction(() => !document.querySelector('.bcv-sheet'), null, { timeout: 3000 });
   await page.click('.bcv-stats .bcv-stat:nth-child(3)');
@@ -558,20 +562,22 @@ try {
   await page.waitForSelector('.bcv-gpa-set', { timeout: 5000 });
   await page.fill('#bcv-gpa-prior', '3.42');
   await page.fill('#bcv-gpa-prior-n', '8');
-  await page.click('.bcv-gpa-set__ctl .bcv-gpa-set__step:last-child');
-  check((await texts('.bcv-gpa-set__val'))[0] === '3.75', 'goal steps by 0.05 in the settings sheet');
+  await page.click('.bcv-gpa-set__ctl .bcv-gpa-set__step:last-child'); // + at the 4.00 default: already at the top of the scale
+  check((await texts('.bcv-gpa-set__val'))[0] === '4.00', `the goal does not climb past 4.00: ${(await texts('.bcv-gpa-set__val'))[0]}`);
+  await page.click('.bcv-gpa-set__ctl .bcv-gpa-set__step:first-child');
+  check((await texts('.bcv-gpa-set__val'))[0] === '3.95', 'goal steps by 0.05 in the settings sheet');
   await page.click('.bcv-gpa-set__foot .bcv-btn');
   await page.waitForFunction(() => !document.querySelector('.bcv-gpa__banner'), null, { timeout: 5000 });
   const hero = (await texts('.bcv-gpa__hero'))[0];
-  check(/Cumulative 3\.4[23]/.test(hero) && /3\.42 across 8 courses before this term/.test(hero) && /Goal 3\.75/.test(hero) && /One snapshot so far/.test((await texts('.bcv-gpa__trend'))[0]) && (await texts('.bcv-gpa__stat'))[0].includes('Needs a second snapshot'), `tracking on: ${hero.slice(0, 120)}`);
+  check(/Cumulative 3\.4[23]/.test(hero) && /3\.42 across 8 courses before this term/.test(hero) && /Goal 3\.95/.test(hero) && /One snapshot so far/.test((await texts('.bcv-gpa__trend'))[0]) && (await texts('.bcv-gpa__stat'))[0].includes('Needs a second snapshot'), `tracking on: ${hero.slice(0, 120)}`);
   // prefs live in chrome.storage.local under `prefs:<canvas host>`; the first snapshot lands the day tracking starts
   const readPrefs = () => sw.evaluate(async () => Object.entries(await chrome.storage.local.get(null)).find(([k]) => k.startsWith('prefs:'))?.[1] || null);
-  check(await eventually(async () => { const p = await readPrefs(); return Array.isArray(p?.gpaSnapshots) && p.gpaSnapshots.length === 1 && typeof p.gpaSnapshots[0].gpa === 'number' && /^\d{4}-\d{2}-\d{2}$/.test(p.gpaSnapshots[0].date) && p.gpaTracking?.priorCourses === 8 && p.gpaGoal === 3.75; }), `a first snapshot is recorded the day tracking starts: ${JSON.stringify((await readPrefs())?.gpaSnapshots)}`);
+  check(await eventually(async () => { const p = await readPrefs(); return Array.isArray(p?.gpaSnapshots) && p.gpaSnapshots.length === 1 && typeof p.gpaSnapshots[0].gpa === 'number' && /^\d{4}-\d{2}-\d{2}$/.test(p.gpaSnapshots[0].date) && p.gpaTracking?.priorCourses === 8 && p.gpaGoal === 3.95; }), `a first snapshot is recorded the day tracking starts: ${JSON.stringify((await readPrefs())?.gpaSnapshots)}`);
   await shot(page, '09e-grades-panel-tracking');
   page.once('dialog', (d) => d.accept());
   await page.click('.bcv-gpa__linkbtn');
   await page.waitForSelector('.bcv-gpa__banner', { timeout: 5000 });
-  check(await eventually(async () => { const p = await readPrefs(); return p?.gpaTracking === null && Array.isArray(p?.gpaSnapshots) && p.gpaSnapshots.length === 0 && p.gpaGoal === 3.75; }) && /needs your past record/.test((await texts('.bcv-gpa__hero'))[0]), 'Reset setup forgets the prior record and snapshots but keeps the goal');
+  check(await eventually(async () => { const p = await readPrefs(); return p?.gpaTracking === null && Array.isArray(p?.gpaSnapshots) && p.gpaSnapshots.length === 0 && p.gpaGoal === 3.95; }) && /needs your past record/.test((await texts('.bcv-gpa__hero'))[0]), 'Reset setup forgets the prior record and snapshots but keeps the goal');
 
   // ---- handing work in (assignment submission flow) -------------------------------------
   console.log('submission');
@@ -1296,14 +1302,25 @@ try {
   check(page.url() === `${BASE}/` && (await page.$('.bcv-stat')) !== null && (await page.$$(su('.blob'))).length === 4 && (await sStep()) === '1 of 4' && (await page.$$(su('.progress span'))).length === 4 && (await page.$eval('html', (e) => getComputedStyle(e).overflow)) === 'hidden', 'the setup opens as a glass card over the dashboard: the address cleaned, four steps, the page held still');
   await shot(page, '32-setup-over-page');
   const scanned = await texts(su('.row__code'));
-  check((await texts(su('.h1')))[0] === 'Which are you in?' && scanned.length >= 8 && (await page.$$(su('.row.is-on'))).length === 5 && (await texts(su('.listhead span')))[0] === '5 selected', `step 1 read the enrolments: ${scanned.length} active courses, the 5 favourites checked`);
-  const firstOn = await page.$(su('.row.is-on'));
-  const firstOff = await page.$(su('.row:not(.is-on)'));
-  const offCode = await firstOn.$eval('.row__code', (e) => e.textContent.trim());
-  const onCode = await firstOff.$eval('.row__code', (e) => e.textContent.trim());
-  await firstOn.click();
-  await firstOff.click();
-  check((await texts(su('.listhead span')))[0] === '5 selected' && (await page.$$(su('.row.is-on'))).length === 5, 'rows toggle with the count');
+  // nothing is ticked to begin with, whatever Canvas already has starred, and Continue is dead until
+  // something is: the list picked here is the one every screen then follows
+  check((await texts(su('.h1')))[0] === 'Which are you in?' && scanned.length >= 8 && (await page.$$(su('.row.is-on'))).length === 0 && (await texts(su('.listhead span')))[0] === '0 selected' && (await page.$eval(su('#next'), (b) => b.disabled)), `step 1 read the enrolments with none preselected: ${scanned.length} active courses, 0 checked, Continue off`);
+  const rowCodes = await page.$$eval(su('.row[data-course]'), (els) => els.map((e) => [e.dataset.course, e.querySelector('.row__code').textContent.trim()]));
+  const starredBefore = (await apiGet('/api/v1/courses?per_page=100')).filter((c) => c.is_favorite).map((c) => String(c.id));
+  // Pick five: one Canvas had not starred and one starred course deliberately left out, so the write
+  // is exercised in both directions whatever the checks above left behind.
+  const starredRows = rowCodes.filter(([id]) => starredBefore.includes(id));
+  const freshRows = rowCodes.filter(([id]) => !starredBefore.includes(id));
+  check(starredRows.length >= 1 && freshRows.length >= 1 && rowCodes.length >= 6, `the mock offers both starred and unstarred courses to pick between: ${starredRows.length} + ${freshRows.length}`);
+  const dropped = starredRows[0];
+  const picks = [freshRows[0], ...starredRows.slice(1), ...freshRows.slice(1)].slice(0, 5);
+  const onCode = freshRows[0][1];
+  const offCode = dropped[1];
+  for (const [id] of picks) await page.click(su(`.row[data-course="${id}"]`));
+  check((await texts(su('.listhead span')))[0] === '5 selected' && (await page.$$(su('.row.is-on'))).length === 5 && !(await page.$eval(su('#next'), (b) => b.disabled)), 'rows toggle with the count, and Continue comes alive once one is picked');
+  await page.click(su(`.row[data-course="${picks[0][0]}"]`));
+  check((await texts(su('.listhead span')))[0] === '4 selected' && (await page.$$(su('.row.is-on'))).length === 4, 'and a second press unticks it');
+  await page.click(su(`.row[data-course="${picks[0][0]}"]`));
   // a nickname typed on a row is saved with the rest (Canvas's own nickname)
   const nickRow = page.locator(su('.row.is-on')).last();
   const nickId = await nickRow.getAttribute('data-course');
@@ -1311,25 +1328,35 @@ try {
   check((await page.$$(su('.row.is-on'))).length === 5 && (await page.$eval(su('.row__nick'), (e) => e.placeholder)) === 'Nickname', 'every row has a Nickname field; typing in one does not toggle the row');
   await shot(page, '32c-setup-courses');
   await sNext('#track');
-  check((await sStep()) === '2 of 4' && (await page.$eval(su('#track'), (e) => e.classList.contains('is-on'))) && (await texts(su('#goal')))[0] === '3.50' && (await page.$$(su('.target'))).length === 5 && (await page.$$(su('.seg button.is-on'))).length === 5 && (await page.$$eval(su('.target:first-child .seg button'), (bs) => bs.map((b) => b.textContent))).join(' ') === 'C B B+ A- A A+', 'step 2: tracking on, a 3.50 goal, a target row per chosen course, letters low to high with A+ on the right');
-  await page.click(su('.stepper button:last-child'));
-  await page.click(su('.stepper button:last-child'));
+  const firstTargets = await page.$$eval(su('.target .seg button.is-on'), (bs) => bs.map((b) => b.textContent));
+  check((await sStep()) === '2 of 4' && (await page.$eval(su('#track'), (e) => e.classList.contains('is-on'))) && (await texts(su('#goal')))[0] === '4.00' && (await page.$$(su('.target'))).length === 5 && firstTargets.join(',') === 'A+,A+,A+,A+,A+' && (await page.$$eval(su('.target:first-child .seg button'), (bs) => bs.map((b) => b.textContent))).join(' ') === 'C B B+ A- A A+', `step 2: tracking on, a 4.00 goal, every course aiming at A+, letters low to high: ${firstTargets.join(',')}`);
+  await page.click(su('.stepper button:last-child')); // already at the top of the scale: it stays there
+  check((await texts(su('#goal')))[0] === '4.00', `the goal does not climb past 4.00: ${(await texts(su('#goal')))[0]}`);
+  await page.click(su('.stepper button:first-child'));
+  await page.click(su('.stepper button:first-child'));
   await page.click(su('.target:first-child .seg button:nth-child(3)'));
-  check((await texts(su('#goal')))[0] === '3.60' && (await page.$eval(su('.target:first-child .seg button.is-on'), (b) => b.textContent)) === 'B+', 'the goal stepper and a target pick');
+  check((await texts(su('#goal')))[0] === '3.90' && (await page.$eval(su('.target:first-child .seg button.is-on'), (b) => b.textContent)) === 'B+', 'the goal stepper and a target pick');
   await shot(page, '32d-setup-grades');
   await sNext('.prov');
   const sProvs = await texts(su('.prov'));
   const purpose = (await texts(su('#purpose')))[0];
   check((await sStep()) === '3 of 4' && sProvs.length === 3 && /Gemini\s*Coming soon/.test(sProvs[2]) && (await page.$eval(su('.prov.is-soon'), (b) => b.getAttribute('aria-disabled'))) === 'true' && /console\.anthropic\.com/.test((await texts(su('.keystep')))[0]) && !(await page.$eval(su('#notNow'), (b) => b.hidden)), `step 3 offers Claude, ChatGPT and Gemini (coming soon) with the key steps: ${sProvs.join(' | ')}`);
+  // the only two ways off this step: a key that checks out, or Not now. Continue is dead while the
+  // field is empty, so the panel is never left half-set-up by pressing the blue button to get past.
+  check((await page.$eval(su('#next'), (b) => b.disabled)) && !(await page.$eval(su('#notNow'), (b) => b.hidden)), 'with no key Continue is off and Not now is the way on');
+  await page.$eval(su('#next'), (el) => el.click()); // dispatched straight at it: page.click() would wait for it to become enabled
+  await page.waitForTimeout(300);
+  check((await sStep()) === '3 of 4', `and pressing it anyway does nothing: still ${await sStep()}`);
   check(/^Smart Panel is intended to be a smart assistant that helps with learning\. It is not intended to help complete assignments, cheat on quizzes/.test(purpose) && /^rgb\(2(29|55), (55|105), (43|97)\)$/.test(await page.$eval(su('#purpose'), (e) => getComputedStyle(e).color)), `the purpose notice, in red: ${await page.$eval(su('#purpose'), (e) => getComputedStyle(e).color)}`);
   await page.click(su('.prov[data-provider="openai"]'));
   check(/platform\.openai\.com/.test((await texts(su('.keystep')))[0]), 'ChatGPT swaps the key steps');
   await page.fill(su('#key'), 'sk-test-setup');
-  check(await page.$eval(su('#notNow'), (b) => b.hidden), 'typing a key hides Not now');
+  check((await page.$eval(su('#notNow'), (b) => b.hidden)) && !(await page.$eval(su('#next'), (b) => b.disabled)), 'typing a key hides Not now and wakes Continue');
   await page.click(su('#next'));
   await page.waitForFunction((s) => /rejected|Could not|works|Unauthorized|invalid|checked/i.test(document.querySelector(s).shadowRoot.querySelector('#keyResult').textContent), '#bcv-setup', { timeout: 20000 });
-  check((await page.$eval(su('#keyResult'), (e) => e.classList.contains('is-err'))) && (await sStep()) === '3 of 4', `a key that does not validate stays on the step: ${await page.$eval(su('#keyResult'), (e) => e.textContent)}`);
+  check((await page.$eval(su('#keyResult'), (e) => e.classList.contains('is-err'))) && (await sStep()) === '3 of 4' && !(await page.$eval(su('#next'), (b) => b.disabled)), `a key that does not validate stays on the step, with Continue still pressable to try again: ${await page.$eval(su('#keyResult'), (e) => e.textContent)}`);
   await page.fill(su('#key'), '');
+  check((await page.$eval(su('#next'), (b) => b.disabled)) && !(await page.$eval(su('#notNow'), (b) => b.hidden)), 'clearing the field puts Continue back to sleep and Not now back');
   await shot(page, '32e-setup-smart');
   await page.click(su('#notNow'));
   // step 4: where the courses chosen in step 1 should sit
@@ -1358,7 +1385,7 @@ try {
   await fetch(`${BASE}/api/v1/users/self/course_nicknames/${nickId}`, { method: 'DELETE', headers: { 'x-csrf-token': 'mock+csrf/token=' } }); // back to the real name for what follows
   check((await texts('.bcv-fav')).length === 5, 'the sidebar follows the new favourites');
   const savedPrefs = await prefsOf();
-  check(savedPrefs.gpaGoal === 3.6 && savedPrefs.gpaTracking?.since && savedPrefs.gpaTracking.priorGpa === null && Object.values(savedPrefs.gradeTargets || {}).includes('B+') && savedPrefs.setupDone === true && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('setup:done'))['setup:done'])) === true, `the grade choices landed where the Grades page reads them, and the done flags are set: ${JSON.stringify({ goal: savedPrefs.gpaGoal, tracking: savedPrefs.gpaTracking, targets: savedPrefs.gradeTargets })}`);
+  check(savedPrefs.gpaGoal === 3.9 && savedPrefs.gpaTracking?.since && savedPrefs.gpaTracking.priorGpa === null && Object.values(savedPrefs.gradeTargets || {}).includes('B+') && savedPrefs.setupDone === true && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('setup:done'))['setup:done'])) === true, `the grade choices landed where the Grades page reads them, and the done flags are set: ${JSON.stringify({ goal: savedPrefs.gpaGoal, tracking: savedPrefs.gpaTracking, targets: savedPrefs.gradeTargets })}`);
   const tourTitle = () => page.$eval('.bcv-tour__title', (e) => e.textContent.trim()).catch(() => '');
   // headless Chromium only advances CSS animations when it paints a frame: let the screen's entrance finish first
   // (a poll that paints a frame each time, so the entrance and the ring's own transition can play out)
@@ -1421,13 +1448,13 @@ try {
   await sw.evaluate(() => self.BCV.api.storage.local.remove('setup:done'));
   await page.goto(`${BASE}/grades?bcv=setup`);
   await page.waitForSelector(su('.row'), { timeout: 20000 });
-  await (await page.$(su('.row.is-on'))).click();
+  await page.click(su('.row[data-course]')); // tick one, so Skip has a change it must not write
   await page.click(su('#skip'));
   await page.waitForFunction(() => !document.querySelector('#bcv-setup'), null, { timeout: 5000 });
   await page.waitForTimeout(300);
   check(page.url() === `${BASE}/grades` && (await page.$('.bcv-tour')) === null && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('setup:done'))['setup:done'])) === true && (await apiGet('/api/v1/courses?per_page=100')).filter((c) => c.is_favorite).length === favBefore, 'Skip closes the card where it was opened, marks the setup done, writes nothing and starts no tour');
   await page.waitForSelector('.bcv-gpa__hero', { timeout: 15000 });
-  check((await texts('.bcv-gpa__hero-sub'))[0]?.includes('This term so far') && (await texts('.bcv-gpa__goal-s'))[0] === 'Goal 3.60 · set it in settings', 'the Grades page tracks without a record from the setup, with the goal it set');
+  check((await texts('.bcv-gpa__hero-sub'))[0]?.includes('This term so far') && (await texts('.bcv-gpa__goal-s'))[0] === 'Goal 3.90 · set it in settings', 'the Grades page tracks without a record from the setup, with the goal it set');
 
   // ---- the account panel ----------------------------------------------------------------------------------
   console.log('account panel');
@@ -1569,12 +1596,12 @@ try {
   await options.screenshot({ path: join(out, '29-options-courses.png'), fullPage: true });
   // Grades: the same preferences as the Grades page
   await options.click('.navlink[data-section="grades"]');
-  check((await oTexts('#gpaGoal'))[0] === '3.60' && (await options.$eval('#tracking', (e) => e.classList.contains('is-on'))) && /recorded|from today/i.test((await oTexts('#historyLabel'))[0]), `Grades shows the goal and tracking the setup chose: ${(await oTexts('#historyLabel'))[0]}`);
+  check((await oTexts('#gpaGoal'))[0] === '3.90' && (await options.$eval('#tracking', (e) => e.classList.contains('is-on'))) && /recorded|from today/i.test((await oTexts('#historyLabel'))[0]), `Grades shows the goal and tracking the setup chose: ${(await oTexts('#historyLabel'))[0]}`);
   await options.click('#whatIf');
   await options.click('#goalUp');
   await options.waitForTimeout(500);
   const gp = await prefsOf();
-  check(gp.whatIfScores === false && gp.gpaGoal === 3.65, 'what-if off and the goal step save under the site');
+  check(gp.whatIfScores === false && gp.gpaGoal === 3.95, 'what-if off and the goal step save under the site');
   await options.click('#whatIf');
   await options.waitForTimeout(400);
   // Appearance: theme tiles

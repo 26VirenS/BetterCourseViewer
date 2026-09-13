@@ -831,7 +831,7 @@
     const currentAll = all.filter((c) => c.state === 'current');
     const starredAll = currentAll.filter((c) => c.favorite); // the one course list, chosen in setup
     const courseList = (starredAll.length ? starredAll : currentAll).filter((c) => !hidden.has(String(c.id)));
-    let goal = Number.isFinite(goalPref) ? goalPref : 3.7;
+    let goal = Number.isFinite(goalPref) ? goalPref : 4; // the same goal the setup starts from
     const targets = targetsPref && typeof targetsPref === 'object' ? { ...targetsPref } : {};
     let whatIf = false; // nothing here is saved
     const whatIfVals = {};

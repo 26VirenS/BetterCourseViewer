@@ -16,6 +16,7 @@
   const SCALE = [['A+', 97, 4], ['A', 93, 4], ['A−', 90, 3.7], ['B+', 87, 3.3], ['B', 83, 3], ['B−', 80, 2.7], ['C+', 77, 2.3], ['C', 73, 2], ['C−', 70, 1.7], ['D', 60, 1], ['F', 0, 0]];
   const OLD_SCALE = ['A', 'A−', 'B+', 'B', 'B−', 'C+', 'C', 'C−', 'D', 'F']; // targets saved before A+ existed were indices into this
   const POINTS = { 'A+': 4, A: 4, 'A-': 3.7, 'B+': 3.3, B: 3, 'B-': 2.7, 'C+': 2.3, C: 2, 'C-': 1.7, 'D+': 1.3, D: 1, 'D-': 0.7, F: 0 };
+  const DEFAULT_GOAL = 4; // the goal the setup starts from, for anyone who skipped it
   const norm = (g) => String(g || '').replace(/−/g, '-').toUpperCase().trim();
   /** A saved target (a letter, or an index into the scale before A+) → its index on SCALE, or -1. */
   const targetIndex = (t) => {
@@ -105,7 +106,7 @@
     let tracking = trackingPref && typeof trackingPref === 'object' && (trackingPref.since || Number.isFinite(trackingPref.priorGpa))
       ? { ...trackingPref, priorGpa: Number.isFinite(trackingPref.priorGpa) ? trackingPref.priorGpa : null, priorCourses: Number.isFinite(trackingPref.priorCourses) ? trackingPref.priorCourses : 0 }
       : null;
-    let goal = Number.isFinite(goalPref) ? goalPref : 3.7;
+    let goal = Number.isFinite(goalPref) ? goalPref : DEFAULT_GOAL;
     const hasGoal = () => goal > 0;
     const hasPrior = () => !!tracking && Number.isFinite(tracking.priorGpa) && tracking.priorCourses > 0;
     const targets = targetsPref && typeof targetsPref === 'object' ? { ...targetsPref } : {};

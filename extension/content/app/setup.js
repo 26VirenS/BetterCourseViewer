@@ -1,11 +1,14 @@
 /* The guided setup, drawn over the Canvas page the student is on (the "Simpl Courses Setup"
- * mockup's glass card, in a shadow root so Canvas's styles never reach it). Three steps:
- *   1 the courses, read from the enrolments (unchecked ones stay hidden everywhere: they become the
- *     Canvas favourites, the one list every screen follows) ·
+ * mockup's glass card, in a shadow root so Canvas's styles never reach it). Four steps:
+ *   1 the courses, read from the enrolments (nothing is ticked to start with; unchecked ones stay
+ *     hidden everywhere: they become the Canvas favourites, the one list every screen follows) ·
  *   2 grades (tracking, a goal, a target letter per course) ·
- *   3 the smart panel, optional, with the steps to get a key ·
+ *   3 the smart panel, optional — but the choice is not: a key that checks out, or Not now ·
+ *   4 where those courses sit, on the sidebar or in a panel off the Courses row ·
  * then straight into the tour. Opened by ?bcv=setup (the toolbar popup's Set up button, the
- * account sheet on a phone, the app's first launch). Skip writes the "done" flags and no tour. */
+ * account sheet on a phone, the app's first launch). Skip writes the "done" flags and no tour.
+ * Each step that asks something refuses to be passed by accident: Continue is dead until it has
+ * an answer, so nothing is left half-set-up by pressing the blue button to get through. */
 (function () {
   const BCV = (self.BCV = self.BCV || {});
   const { h } = BCV.utils;
@@ -68,7 +71,7 @@
     st = {
       app, settings, step: 0,
       scanning: false, scanError: null, courses: [], favs: new Set(), nicks: {},
-      tracking: true, goal: 3.5, targets: {},
+      tracking: true, goal: 4, targets: {},
       provider: settings.smart?.openaiKey && !settings.smart?.claudeKey ? 'openai' : 'claude', key: '', keyOk: false, keyMsg: '',
       sideCourses: settings.appearance?.sideCourses === 'hover' ? 'hover' : 'always',
       closing: false,
@@ -169,8 +172,11 @@
     ui.card.classList.add('is-shaking');
   }
 
+  /** `disabled` may be a function, for a step whose button comes and goes with what is typed: it is
+   *  asked again when the button is released, so a press does not restore a stale answer. */
   function footer({ next = LABELS[st.step], onNext, disabled = false, back = st.step > 0 } = {}) {
-    const nextBtn = h('button', { type: 'button', class: 'btn', id: 'next', text: next, disabled: disabled || null });
+    const off = () => (typeof disabled === 'function' ? !!disabled() : !!disabled);
+    const nextBtn = h('button', { type: 'button', class: 'btn', id: 'next', text: next, disabled: off() || null });
     nextBtn.addEventListener('click', async () => {
       if (nextBtn.disabled) return;
       nextBtn.classList.add('is-busy');
@@ -181,7 +187,7 @@
         console.error('[Simpl Courses setup]', e);
       }
       nextBtn.classList.remove('is-busy');
-      nextBtn.disabled = disabled;
+      nextBtn.disabled = off();
     });
     ui.foot.append(...[
       back ? h('button', { type: 'button', class: 'btn btn--ghost', id: 'back', text: 'Back', onclick: () => go(st.step - 1, -1) }) : null,
@@ -205,9 +211,11 @@
       const favIds = new Set((favs || []).map((c) => String(c.id)));
       const list = (all || []).filter((c) => c.state === 'current').map((c) => ({ id: String(c.id), code: c.code || c.name, name: c.name, originalName: c.originalName || c.name, nickname: c.nickname || '', color: c.color, favorite: !!c.favorite || favIds.has(String(c.id)) }));
       st.courses = list;
-      const starred = list.filter((c) => c.favorite).map((c) => c.id);
-      st.favs = new Set(starred.length ? starred : list.map((c) => c.id)); // until something is starred, Canvas shows every course
-      for (const c of list) if (!(c.id in st.targets)) st.targets[c.id] = 'A';
+      // Nothing is ticked to begin with, whatever Canvas already has starred: this list is what every
+      // screen then follows, so it is worth choosing rather than inheriting. Continue stays disabled
+      // until at least one is picked.
+      st.favs = new Set();
+      for (const c of list) if (!(c.id in st.targets)) st.targets[c.id] = 'A+';
     } catch (e) {
       st.scanError = e?.message || 'The course list could not be read.';
       st.courses = [];
@@ -318,7 +326,7 @@
     const targets = chosen.map((c) => h('div', { class: 'target', dataset: { course: c.id } }, [
       h('span', { class: 'row__dot', style: { background: c.color } }),
       h('span', { class: 'target__code', text: c.code }),
-      h('div', { class: 'seg' }, GRADES.map((letter) => h('button', { type: 'button', class: `seg__b ${(st.targets[c.id] || 'A') === letter ? 'is-on' : ''}`, text: letter, onclick: (e) => {
+      h('div', { class: 'seg' }, GRADES.map((letter) => h('button', { type: 'button', class: `seg__b ${(st.targets[c.id] || 'A+') === letter ? 'is-on' : ''}`, text: letter, onclick: (e) => {
         st.targets[c.id] = letter;
         [...e.currentTarget.parentNode.children].forEach((b) => b.classList.toggle('is-on', b === e.currentTarget));
       } }))),
@@ -347,6 +355,7 @@
     const result = h('div', { class: 'result', id: 'keyResult', text: st.keyMsg });
     const steps = h('div', { class: 'keysteps' });
     let notNow = null; // the quiet button in the footer, built below
+    let syncButtons = () => {}; // …and the pair of them kept in step with the field, assigned with it
     const drawSteps = () => {
       const p = provider();
       input.placeholder = p.placeholder;
@@ -368,7 +377,7 @@
       result.className = 'result';
       [...provs.children].forEach((b) => b.classList.toggle('is-on', b.dataset.provider === p.key));
       drawSteps();
-      if (notNow) notNow.hidden = input.value.trim().length > 0;
+      syncButtons(); // the key for the provider just chosen may be there or not
     } }, [h('span', { class: 'prov__n', text: p.name }), h('span', { class: 'prov__s', text: p.note })])));
     stagger([...provs.children], 60);
     drawSteps();
@@ -382,9 +391,10 @@
     );
     notNow = h('button', { type: 'button', class: 'btn btn--quiet', id: 'notNow', text: 'Not now', onclick: () => { st.key = ''; st.keyOk = false; go(3); } });
     const nextBtn = footer({
+      disabled: () => !input.value.trim(), // an empty field leaves by Not now, not by Continue
       onNext: async () => {
         const key = input.value.trim();
-        if (!key) { go(3); return; }
+        if (!key) return; // (the button is disabled without one; this is the belt to that braces)
         const p = provider();
         result.textContent = 'Checking the key…';
         result.className = 'result';
@@ -411,14 +421,22 @@
       },
     });
     nextBtn.before(notNow);
+    // The two ways off this step are exactly one each: a key that checks out, or Not now. With the
+    // field empty Continue is dead and Not now is the button offered, so the panel is never left
+    // half-set-up by someone pressing the blue button to get past it.
+    syncButtons = () => {
+      const typed = input.value.trim().length > 0;
+      notNow.hidden = typed;
+      nextBtn.disabled = !typed;
+    };
     input.addEventListener('input', () => {
       st.key = input.value;
       st.keyOk = false;
       tick.hidden = true;
       field.classList.remove('is-bad');
-      notNow.hidden = input.value.trim().length > 0;
+      syncButtons();
     });
-    notNow.hidden = input.value.trim().length > 0;
+    syncButtons();
   }
 
   // ---- where the courses live ----------------------------------------------------------------------
@@ -469,7 +487,7 @@
       if (!skipped) {
         const [targetsPref] = await Promise.all([store.pref('gradeTargets')]);
         const targets = { ...((targetsPref && typeof targetsPref === 'object') ? targetsPref : {}) };
-        for (const c of st.courses) if (st.favs.has(c.id)) targets[c.id] = GRADES.includes(st.targets[c.id]) ? st.targets[c.id] : 'A';
+        for (const c of st.courses) if (st.favs.has(c.id)) targets[c.id] = GRADES.includes(st.targets[c.id]) ? st.targets[c.id] : 'A+';
         await Promise.all([
           store.setPref('gpaGoal', st.goal),
           store.setPref('gpaTracking', st.tracking ? { priorGpa: null, priorCourses: 0, since: new Date().toISOString().slice(0, 10) } : null),

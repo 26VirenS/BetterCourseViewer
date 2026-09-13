@@ -316,7 +316,7 @@
   const fmtDate = (iso) => { const d = new Date(`${iso}T12:00:00`); return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString(undefined, { month: 'long', day: 'numeric' }); };
   async function loadGrades() {
     const p = await readPrefs();
-    grades.goal = Number.isFinite(p.gpaGoal) ? p.gpaGoal : 0;
+    grades.goal = Number.isFinite(p.gpaGoal) ? p.gpaGoal : 4; // the same goal the setup starts from
     grades.tracking = p.gpaTracking && typeof p.gpaTracking === 'object' && (p.gpaTracking.since || Number.isFinite(p.gpaTracking.priorGpa)) ? p.gpaTracking : null;
     grades.whatIf = p.whatIfScores !== false;
     grades.snaps = Array.isArray(p.gpaSnapshots) ? p.gpaSnapshots : [];
