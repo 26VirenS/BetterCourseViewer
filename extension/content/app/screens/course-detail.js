@@ -248,6 +248,11 @@
     const finished = (subs || []).filter((s) => s.workflow_state === 'complete' || s.workflow_state === 'pending_review');
     const latest = finished.slice().sort((a, b) => (Number(b.attempt) || 0) - (Number(a.attempt) || 0))[0] || null;
     const feedbackHref = (s) => `${c.url}/quizzes/${q.id}?bcv=feedback&sub=${encodeURIComponent(s.id)}`;
+    // a quiz set to one question at a time runs on Canvas's own page (its API refuses the questions):
+    // an open attempt resumes at /take, a new one starts from Canvas's quiz page and its Take button
+    const inCanvas = !!q.one_question_at_a_time;
+    const resumeHref = inCanvas ? `${c.url}/quizzes/${q.id}/take?bcv=native` : `${c.url}/quizzes/${q.id}?bcv=take`;
+    const takeHref = open ? resumeHref : (inCanvas ? nativeHref(`${c.url}/quizzes/${q.id}`) : `${c.url}/quizzes/${q.id}?bcv=take`);
     main.replaceChildren(
       backTo(app, `${c.url}/quizzes`, 'Quizzes'),
       U.card(U.el('bcv-detail', [
@@ -256,10 +261,11 @@
         U.el('bcv-detail__actions', [
           q.locked_for_user ? U.badge(q.lock_explanation ? htmlToText(q.lock_explanation, 120) : 'Locked', 'orange')
             : noneLeft ? U.badge(`No attempts left · ${U.plural(limit.allowed, 'attempt')} allowed`, 'orange')
-              : U.btn(open ? 'Resume attempt' : 'Take the quiz', { kind: 'primary', icon: IC.bolt, iconColor: '#fff', onClick: () => app.go(`${c.url}/quizzes/${q.id}?bcv=take`) }),
+              : U.btn(open ? (inCanvas ? 'Resume in Canvas' : 'Resume attempt') : (inCanvas ? 'Take the quiz in Canvas' : 'Take the quiz'), { kind: 'primary', icon: inCanvas ? IC.external : IC.bolt, iconColor: '#fff', onClick: () => app.go(takeHref) }),
           latest && q.hide_results !== 'always' ? U.btn('See feedback', { kind: noneLeft && !q.locked_for_user ? 'primary' : '', icon: IC.check, iconColor: noneLeft && !q.locked_for_user ? '#fff' : undefined, onClick: () => app.go(feedbackHref(latest)) }) : null,
-          q.locked_for_user ? null : U.btn('Open in Canvas', { icon: IC.external, onClick: () => app.go(nativeHref(`${c.url}/quizzes/${q.id}`)) }),
+          q.locked_for_user || (inCanvas && !noneLeft) ? null : U.btn('Open in Canvas', { icon: IC.external, onClick: () => app.go(nativeHref(`${c.url}/quizzes/${q.id}`)) }),
         ]),
+        inCanvas ? U.text('bcv-hint', 'Canvas shows this quiz one question at a time on its own page, so the attempt runs there.') : null,
         q.description ? CS().prose(q.description) : U.text('bcv-hint', 'No instructions.'),
       ]), 'bcv-card--22'),
     );
@@ -268,7 +274,7 @@
       U.el('bcv-row__body', [U.text('bcv-row__title bcv-row__title--145', `Attempt ${s.attempt}`), U.text('bcv-row__sub', s.finished_at ? `Finished ${U.fmtAt(s.finished_at)}` : 'In progress')]),
       U.badge(s.kept_score !== null && s.kept_score !== undefined ? `${store.fmtPts(s.kept_score)} / ${q.points_possible}` : (s.score !== null && s.score !== undefined ? `${store.fmtPts(s.score)} / ${q.points_possible}` : '—'), s.workflow_state === 'complete' ? 'green' : ''),
       // a finished attempt opens its feedback; an open one resumes
-    ], { mod: 'bcv-row--p12', href: s.workflow_state === 'untaken' ? `${c.url}/quizzes/${q.id}?bcv=take` : feedbackHref(s) })), 'bcv-card--list') : U.emptyCard('No attempts yet.')]));
+    ], { mod: 'bcv-row--p12', href: s.workflow_state === 'untaken' ? resumeHref : feedbackHref(s) })), 'bcv-card--list') : U.emptyCard('No attempts yet.')]));
     ctx.setSmart({
       label: `${c.name} · ${q.title}`,
       actions: [{ label: 'What does this quiz cover?', note: `${U.plural(q.question_count || 0, 'question')} · ${q.points_possible} pts`, icon: IC.bolt, prompt: 'From the instructions, what does this quiz cover and how should I prepare? Do not guess at the questions.' }],

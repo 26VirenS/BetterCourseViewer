@@ -55,6 +55,10 @@
     const phone = !!BCV.phone?.active();
     st.mode = quiz.one_question_at_a_time || phone ? 'one' : (await store.pref('quizMode', 'one'));
     const forcedOne = !!quiz.one_question_at_a_time || phone;
+    // Canvas's API will not hand out the questions of a quiz set to one question at a time (400,
+    // "Cannot receive one question at a time questions in the API"), so that attempt runs on
+    // Canvas's own quiz page inside the shell: Begin goes there instead of starting it here.
+    const inCanvas = !!quiz.one_question_at_a_time;
     const noBack = !!quiz.cant_go_back;
     const timed = !!quiz.time_limit;
     // Attempts come from Canvas's own count on the submission (plus any extra the instructor
@@ -231,7 +235,8 @@
       const bullets = [
         ['#34c759', CHECK, 'Answers save as you pick them. You can leave and come back.'],
         timed ? ['#ff9500', IC.warn, `Time limit: ${quiz.time_limit} minutes. The clock starts when you begin and keeps running if you leave.`] : null,
-        forcedOne ? ['var(--bcv-ink3)', MODE_ONE, noBack ? 'One question at a time, and you cannot go back to a previous question.' : 'One question at a time.'] : null,
+        inCanvas ? ['var(--bcv-ink3)', MODE_ONE, `Canvas shows this quiz one question at a time on its own page${noBack ? ', and you cannot go back to a previous question' : ''}. Begin opens it there.`]
+          : forcedOne ? ['var(--bcv-ink3)', MODE_ONE, noBack ? 'One question at a time, and you cannot go back to a previous question.' : 'One question at a time.'] : null,
         attemptsLeft !== null ? ['var(--bcv-ink3)', IC.bolt, attemptsLeft > 0 ? `${U.plural(attemptsLeft, 'attempt')} left of ${allowed}.` : `No attempts left — this quiz allows ${U.plural(allowed, 'attempt')}.`] : ['var(--bcv-ink3)', IC.bolt, 'Unlimited attempts.'],
         quiz.lock_at ? ['var(--bcv-ink3)', IC.lock, `Available until ${U.fmtAt(quiz.lock_at)}.`] : null,
       ].filter(Boolean);
@@ -241,7 +246,7 @@
       // out of attempts: the primary action becomes the feedback for the last one (when released)
       const startBtn = !canStart && lastDone && !resultsHidden(lastDone)
         ? h('button', { type: 'button', class: 'bcv-qz__begin', text: 'See your feedback', onclick: () => openFeedback(lastDone, 'intro') })
-        : h('button', { type: 'button', class: 'bcv-qz__begin', text: st.sub ? 'Continue attempt' : (canStart ? 'Begin attempt' : 'No attempts left'), disabled: !canStart || null, onclick: begin });
+        : h('button', { type: 'button', class: 'bcv-qz__begin', text: st.sub ? (inCanvas ? 'Continue in Canvas' : 'Continue attempt') : (canStart ? (inCanvas ? 'Begin in Canvas' : 'Begin attempt') : 'No attempts left'), disabled: !canStart || null, onclick: begin });
       return U.el('bcv-qz__intro', [
         h('div', {}, [
           h('h1', { class: 'bcv-qz__h1 bcv-pretty', text: quiz.title }),
@@ -259,7 +264,15 @@
       ]);
     }
 
+    // Canvas's own quiz page: an open attempt resumes at /take; a fresh one starts from the quiz
+    // page there (its own Take button, access code and all), never from the API.
+    function handOff() {
+      setOpen(false);
+      clearInterval(st.timer);
+      app.go(st.sub ? `${quizUrl}/take?bcv=native` : `${quizUrl}?bcv=native`, { confirmed: true });
+    }
     async function begin() {
+      if (inCanvas) return handOff();
       body.replaceChildren(U.loading(st.sub ? 'Resuming your attempt…' : 'Starting your attempt…'));
       try {
         st.sub = await store.quizApi.start(cid, qid, st.code);
@@ -273,6 +286,11 @@
         draw();
         window.scrollTo(0, 0);
       } catch (e) {
+        if (/one question at a time/i.test(e.message || '')) {
+          // the quiz did not say so but Canvas did: the attempt just opened is carried on over there
+          U.toast('Canvas shows this quiz one question at a time on its own page.');
+          return handOff();
+        }
         st.stage = 'intro';
         draw();
         U.toast(`Could not start the attempt: ${e.message}`, { error: true });

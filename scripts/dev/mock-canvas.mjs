@@ -307,6 +307,9 @@ const htmlPages = {
   // when a file is chosen the return page posts externalContentReady to the window that framed it
   '/courses/104/external_tools/t1/resource_selection': () => `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Box</title></head><body style="font-family:sans-serif;padding:24px"><h2 id="tool-title">Box picker (the tool's own page)</h2><p>The tool owns everything here. Choosing a file hands it back to the assignment page.</p><button id="pick" onclick="window.parent.postMessage({ subject: 'externalContentReady', service: 'external_tool_dialog', contents: [{ '@type': 'FileItem', url: 'http://localhost:${port}/files/box1/download', text: 'GC-articles-Sharma.pdf', mediaType: 'application/pdf' }] }, '*')">Use GC-articles-Sharma.pdf</button></body></html>`,
   '/courses/101/quizzes/9011/take': () => page({ title: 'Lec06-PreQuiz', courseId: '101', body: '<h1>Lec06-PreQuiz</h1><form id="submit_quiz_form"><p>Question 1 of 4</p><label><input type="radio" name="q1"> A</label> <label><input type="radio" name="q1"> B</label><p><button type="button" class="btn">Submit Quiz</button></p></form>' }),
+  // a one-question-at-a-time quiz: Canvas's own quiz page (its Take button starts the attempt there) and its take page
+  '/courses/101/quizzes/9014': () => page({ title: 'Lec07-PreQuiz', courseId: '101', body: '<h1>Lec07-PreQuiz</h1><p>Canvas\'s quiz page: one question at a time.</p><a id="take_quiz_link" class="btn btn-primary" href="/courses/101/quizzes/9014/take?user_id=7" data-method="post">Take the Quiz</a>' }),
+  '/courses/101/quizzes/9014/take': () => page({ title: 'Lec07-PreQuiz', courseId: '101', body: '<h1>Lec07-PreQuiz</h1><form id="submit_quiz_form"><p>Question 1 of 4</p><label><input type="radio" name="q1"> A</label> <label><input type="radio" name="q1"> B</label><p><button type="button" class="btn">Next</button></p></form>' }),
 };
 
 // ---- API routing ------------------------------------------------------------------------------
@@ -449,12 +452,19 @@ on('POST', /^\/api\/v1\/courses\/(\w+)\/quizzes\/(\w+)\/submissions$/, (url, m) 
   const list = quizSubs.get(m[2]) || [];
   const q = quizzes(m[1]).find((x) => x.id === m[2]);
   if (!q) return null;
-  const s = { id: `qs${m[2]}-${list.length + 1}`, quiz_id: m[2], user_id: '7', attempt: list.length + 1, started_at: new Date().toISOString(), end_at: q.time_limit ? new Date(Date.now() + q.time_limit * 60e3).toISOString() : null, finished_at: null, workflow_state: 'untaken', validation_token: `tok-${m[2]}-${list.length + 1}`, score: null, kept_score: null, state: {} };
+  const s = { id: `qs${m[2]}-${list.length + 1}`, quiz_id: m[2], course_id: m[1], user_id: '7', attempt: list.length + 1, started_at: new Date().toISOString(), end_at: q.time_limit ? new Date(Date.now() + q.time_limit * 60e3).toISOString() : null, finished_at: null, workflow_state: 'untaken', validation_token: `tok-${m[2]}-${list.length + 1}`, score: null, kept_score: null, state: {} };
   list.push(s);
   quizSubs.set(m[2], list);
   return { quiz_submissions: [pubSub(s)] };
 });
-on('GET', /^\/api\/v1\/quiz_submissions\/([\w-]+)\/questions$/, (url, m) => { const s = findSub(m[1]); return s ? subQuestions(s) : null; });
+// Canvas refuses the questions of a one-question-at-a-time quiz (its own page shows them), exactly as the real API does
+const oneAtATime = (s) => !!(s.course_id && quizzes(s.course_id).find((q) => q.id === s.quiz_id)?.one_question_at_a_time);
+on('GET', /^\/api\/v1\/quiz_submissions\/([\w-]+)\/questions$/, (url, m) => {
+  const s = findSub(m[1]);
+  if (!s) return null;
+  if (oneAtATime(s)) return { __status: 400, errors: [{ message: 'Cannot receive one question at a time questions in the API' }] };
+  return subQuestions(s);
+});
 on('POST', /^\/api\/v1\/quiz_submissions\/([\w-]+)\/questions$/, (url, m, body) => {
   const s = findSub(m[1]);
   if (!s || body.validation_token !== s.validation_token) return null;

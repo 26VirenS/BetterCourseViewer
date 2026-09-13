@@ -1152,19 +1152,28 @@ try {
   await page.click('.bcv-qz__begin');
   await page.waitForSelector('.bcv-fb__q', { timeout: 10000 });
   check((await texts('.bcv-fb__btns .bcv-qz__big')).join('|') === 'Quiz overview|Back to F26-MATH 021 20', 'feedback opened from the intro links back to it');
-  // one question at a time + no going back
+  // one question at a time: Canvas's API refuses the questions ("Cannot receive one question at a time
+  // questions in the API"), so the attempt runs on Canvas's own quiz page inside the shell
+  await page.goto(`${BASE}/courses/101/quizzes/9014`);
+  await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
+  check((await texts('.bcv-detail__actions .bcv-btn')).join(',') === 'Take the quiz in Canvas' && (await texts('.bcv-detail .bcv-hint')).some((t) => /one question at a time on its own page/.test(t)), `a one-question-at-a-time quiz sends you to Canvas's own page, and says why: ${(await texts('.bcv-detail__actions .bcv-btn')).join(',')}`);
+  await page.click('.bcv-detail__actions .bcv-btn--primary');
+  await page.waitForSelector('html.bcv-punch #content #take_quiz_link', { timeout: 10000 });
+  check(page.url() === `${BASE}/courses/101/quizzes/9014?bcv=native` && (await visible('.bcv-side')), `Take the quiz lands on Canvas's quiz page inside the shell, with Canvas's own Take button (${page.url().replace(BASE, '')})`);
   await page.goto(`${BASE}/courses/101/quizzes/9014?bcv=take`);
   await page.waitForSelector('.bcv-qz__begin', { timeout: 10000 });
-  check((await texts('.bcv-qz__bullet')).some((t) => /cannot go back/.test(t)), 'one-at-a-time / no-going-back quizzes say so up front');
+  check((await texts('.bcv-qz__bullet')).some((t) => /one question at a time on its own page, and you cannot go back/.test(t)) && (await texts('.bcv-qz__begin'))[0] === 'Begin in Canvas', 'a link straight to the intro says so too, and Begin opens it there');
   await page.click('.bcv-qz__begin');
-  await page.waitForSelector('.bcv-qz__opt', { timeout: 10000 });
-  check(!(await visible('.bcv-qz__modes')) && (await texts('.bcv-qz__foot .bcv-qz__btn')).join(',') === 'Next', 'no mode switch and no Back button when the quiz forbids it');
-  await page.click('.bcv-qz__btn--next');
-  await waitText('.bcv-qz__qnum', /Question 2/);
-  check(await page.$('.bcv-qz__pill:first-child:disabled'), 'earlier questions lock when the quiz says no going back');
-  await page.click('.bcv-qz__exit');
+  await page.waitForSelector('html.bcv-punch #content #take_quiz_link', { timeout: 10000 });
+  check(page.url() === `${BASE}/courses/101/quizzes/9014?bcv=native`, 'Begin goes to Canvas\'s quiz page, never to the API');
+  // an attempt Canvas already opened (the API's own refusal, seen after the start call) is carried on over there
+  await noteApi('POST', '/api/v1/courses/101/quizzes/9014/submissions', {});
+  await page.goto(`${BASE}/courses/101/quizzes/9014`);
   await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
-  check(page.url() === `${BASE}/courses/101/quizzes/9014` && (await texts('.bcv-detail__actions .bcv-btn--primary'))[0] === 'Resume attempt', 'Save and exit keeps the attempt open: the quiz page offers to resume it');
+  check((await texts('.bcv-detail__actions .bcv-btn--primary'))[0] === 'Resume in Canvas' && (await page.$eval('.bcv-col .bcv-row[href]', (a) => a.getAttribute('href'))) === '/courses/101/quizzes/9014/take?bcv=native', 'an open attempt resumes on Canvas\'s take page, from the button and the attempt row');
+  await page.click('.bcv-detail__actions .bcv-btn--primary');
+  await page.waitForSelector('html.bcv-punch #content #submit_quiz_form', { timeout: 10000 });
+  check(page.url() === `${BASE}/courses/101/quizzes/9014/take?bcv=native`, 'Resume lands on the open attempt in Canvas');
   // a quiz graded before today (seeded): its attempt row opens the feedback, with the instructor's comment
   await page.goto(`${BASE}/courses/101/quizzes/9001`);
   await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
