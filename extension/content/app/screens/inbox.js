@@ -259,5 +259,9 @@
     return screen;
   }
 
-  BCV.screens.inbox = { render };
+  /** What the screen asks for first (the course list for the pill, the inbox itself), so a press
+   *  on Inbox lands from the memo. */
+  const prefetch = () => Promise.all([store.courses().catch(() => {}), store.conversations().catch(() => {})]);
+
+  BCV.screens.inbox = { render, prefetch };
 })();

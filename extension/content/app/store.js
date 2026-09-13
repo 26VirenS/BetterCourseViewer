@@ -399,21 +399,24 @@
       const params = { start_date: isoDay(U.addDays(now(), -60)), end_date: isoDay(U.addDays(now(), 2)), active_only: true, per_page: 50 };
       const fetchCodes = (codes) => C.get('/api/v1/announcements', { params: { ...params, 'context_codes[]': codes }, all: true, maxPages: 3 });
       const out = [];
-      for (let i = 0; i < cs.length; i += 10) {
-        const codes = cs.slice(i, i + 10).map((c) => `course_${c.id}`);
+      // every ten-course chunk at once, and on a refusal every course of that chunk at once — the
+      // same shape as the calendar: one round trip rather than one per chunk or per course
+      const chunks = [];
+      for (let i = 0; i < cs.length; i += 10) chunks.push(cs.slice(i, i + 10).map((c) => `course_${c.id}`));
+      await Promise.all(chunks.map(async (codes) => {
         try {
           out.push(...((await fetchCodes(codes)) || []));
         } catch (err) {
           if (!REFUSED.has(err.status)) throw err;
-          for (const code of codes) {
+          await Promise.all(codes.map(async (code) => {
             try {
               out.push(...((await fetchCodes([code])) || []));
             } catch (err2) {
               if (!REFUSED.has(err2.status)) throw err2;
             }
-          }
+          }));
         }
-      }
+      }));
       return out.sort((a, b) => (U.parse(b.posted_at) || 0) - (U.parse(a.posted_at) || 0));
     }, { force, refresh });
   }

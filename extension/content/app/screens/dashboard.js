@@ -22,7 +22,7 @@
     );
     body.append(U.loading('rows', 6)); // list-row skeletons hold the place until the planner lands
 
-    let view = await store.dashboardView();
+    let view = 'list';
     const draw = () => {
       segWrap.replaceChildren(U.seg([['cards', 'Cards'], ['list', 'List'], ['activity', 'Recent activity']], view, async (v) => {
         view = v;
@@ -32,16 +32,39 @@
       renderBody();
     };
 
-    const [planner, favs, courses, feed, seen] = await Promise.all([
+    // The announcements feed is the slow one — it waits for the course list and then asks per ten
+    // courses — so the screen does not wait for it: its counter starts as "…" and fills when it
+    // lands. Everything else here is already in the memo from the shell, so the first paint is one
+    // round trip away, not three. The saved view is read alongside the data rather than before it.
+    const feedP = store.announcementsFeed().catch(() => null);
+    let feedById = null; // set when the feed lands; the activity view reads it at draw time
+    const [planner, favs, courses, seen, savedView] = await Promise.all([
       store.planner().catch(() => null),
       store.favorites().catch(() => []),
       store.courses().catch(() => []),
-      store.announcementsFeed().catch(() => null), // announcements with their read state
       store.streamSeen().catch(() => new Set()), // stream items opened from here
+      store.dashboardView().catch(() => 'list'),
     ]);
     if (!ctx.alive()) return screen;
+    view = savedView;
+    // Unread: the announcement's own read state when we know it, else the stream's flag; either
+    // way an item opened from here loses its dot. The activity rows on screen are kept here so
+    // that a feed landing after they were drawn settles their dots in place.
+    let actRows = []; // { a, dot }
+    const isUnread = (a) => {
+      if (seen.has(String(a.id))) return false;
+      if (a.type === 'Announcement' && feedById && a.announcement_id !== undefined) {
+        const f = feedById.get(String(a.announcement_id));
+        if (f) return f.read_state === 'unread';
+      }
+      return a.read_state === false;
+    };
+    feedP.then((feed) => {
+      if (feed) feedById = new Map(feed.map((a) => [String(a.id), a]));
+      if (!ctx.alive() || !feed) return;
+      for (const { a, dot } of actRows) dot.style.background = isUnread(a) ? '#0a84ff' : 'transparent';
+    });
     const courseMap = new Map(courses.map((c) => [c.id, c]));
-    const feedById = feed ? new Map(feed.map((a) => [String(a.id), a])) : null;
     const now = new Date();
     const todayStart = U.startOfDay(now);
     const weekStart = U.startOfWeek(now);
@@ -138,11 +161,14 @@
           note: !count ? 'Nothing unread' : perCourse.size === 1 ? `${unread.length === 2 ? 'Both' : unread.length === 1 ? 'One' : 'All'} from ${top}` : `From ${U.plural(perCourse.size, 'course')}`,
         };
       };
-      if (feed) {
-        // the Announcements API knows every announcement and whether you have read it
-        const unread = feed.filter((a) => a.read_state === 'unread').map((a) => ({ title: a.title, when: a.posted_at, courseId: String(a.context_code || '').replace(/^course_/, ''), courseName: a.context_name || '', url: a.html_url }));
-        finish(unread, unread.length);
-      } else {
+      feedP.then((feed) => {
+        if (!ctx.alive()) return;
+        if (feed) {
+          // the Announcements API knows every announcement and whether you have read it
+          const unread = feed.filter((a) => a.read_state === 'unread').map((a) => ({ title: a.title, when: a.posted_at, courseId: String(a.context_code || '').replace(/^course_/, ''), courseName: a.context_name || '', url: a.html_url }));
+          finish(unread, unread.length);
+          return;
+        }
         // fallback: the activity stream's summary count and whatever unread announcements the stream still carries
         Promise.all([store.activitySummary().catch(() => null), store.activity().catch(() => [])]).then(([summary, stream]) => {
           if (!ctx.alive()) return;
@@ -156,7 +182,7 @@
             .map((a) => ({ title: a.title, when: a.updated_at || a.created_at, courseId: String(a.course_id || ''), courseName: a.context_name || '', url: activityUrl(a) }));
           finish(unread, count, count > unread.length ? `${U.plural(count - unread.length, 'more is', 'more are')} not in the recent activity stream` : '');
         });
-      }
+      });
 
       // ---- the second row: Overdue, Graded this week, Classes today (mockup 13) ----
       const land = (card, count, note, seed) => {
@@ -499,16 +525,7 @@
       if (!ctx.alive()) return wrap;
       if (!stream) return U.emptyCard('Recent activity could not be loaded.');
       if (!stream.length) return U.emptyCard('No recent activity.');
-      // Unread: the announcement's own read state when we know it, else the stream's
-      // flag; either way an item opened from here loses its dot.
-      const isUnread = (a) => {
-        if (seen.has(String(a.id))) return false;
-        if (a.type === 'Announcement' && feedById && a.announcement_id !== undefined) {
-          const f = feedById.get(String(a.announcement_id));
-          if (f) return f.read_state === 'unread';
-        }
-        return a.read_state === false;
-      };
+      actRows = [];
       wrap.replaceChildren(...stream.slice(0, 30).map((a) => {
         const course = courseMap.get(String(a.course_id));
         const pal = course ? course.palette : U.palette('#5856d6', dark);
@@ -516,8 +533,10 @@
         const extra = a.type === 'DiscussionTopic' && a.total_root_discussion_entries ? ` · ${a.total_root_discussion_entries} replies` : '';
         const preview = BCV.utils.htmlToText(a.message || a.latest_messages?.[0]?.message || '', 160).replace(/\s+/g, ' ');
         const url = activityUrl(a);
+        const dot = U.dot(isUnread(a) ? '#0a84ff' : 'transparent', 'bcv-act__dot');
+        actRows.push({ a, dot });
         const rowEl = U.row([
-          U.dot(isUnread(a) ? '#0a84ff' : 'transparent', 'bcv-act__dot'),
+          dot,
           U.tile(ACTIVITY_ICON[a.type] || IC.doc, { color: pal.text, tint: pal.tint, size: 32, iconSize: 16 }),
           U.el('bcv-row__body', [
             U.el('bcv-row__head', [U.text('bcv-act__title bcv-pretty', a.title || kind, 'span'), U.text('bcv-row__when', U.fmtShort(a.updated_at || a.created_at), 'span')]),
@@ -556,5 +575,17 @@
     return screen;
   }
 
-  BCV.screens.dashboard = { render };
+  /** Warm what the dashboard waits for beyond the shell's own data: the announcements feed, and
+   *  each favourite's assignments and today's events (the Overdue, Graded and Classes counters). */
+  async function prefetch() {
+    store.announcementsFeed().catch(() => {});
+    const favs = await store.favorites().catch(() => []);
+    const today = U.startOfDay(new Date());
+    await Promise.all([
+      ...favs.map((c) => store.assignments(c.id).catch(() => {})),
+      favs.length ? store.calendarEvents(today, today, favs.map((c) => `course_${c.id}`)).catch(() => {}) : null,
+    ]);
+  }
+
+  BCV.screens.dashboard = { render, prefetch };
 })();

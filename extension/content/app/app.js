@@ -215,6 +215,22 @@
   /** A screen that can start its own reading before it is asked for (the calendar's is several
    *  requests deep) warms it when the pointer reaches its row. Once per page per screen, and
    *  quietly: a failure here is nothing to report, the screen itself will say so. */
+  // ---- the background: what the next press will want ---------------------------------------------
+  // Once a screen has settled and the page is idle, the other screens' first requests are made now
+  // rather than on the press, so a hop lands from the memo. Nothing is kept between pages — this is
+  // the same per-page memo every screen already shares — and the screen on show always goes first:
+  // this waits for it to settle, then for an idle moment, and stands down if the user has moved on.
+  const ROOT_WARM = ['dashboard', 'todo', 'calendar', 'inbox', 'gpa', 'groups', 'courses', 'notifications'];
+  function warmAround(r) {
+    if (BCV.phone?.active()) return;
+    const id = state.renderId;
+    const later = (fn) => (window.requestIdleCallback ? window.requestIdleCallback(fn, { timeout: 1200 }) : setTimeout(fn, 500));
+    later(() => {
+      if (id !== state.renderId) return;
+      if (r.screen === 'course' || r.screen === 'group') { BCV.screens.course.warmTabs?.(r); return; }
+      for (const key of ROOT_WARM) if (key !== r.screen) warm(key);
+    });
+  }
   const warmed = new Set();
   function warm(key) {
     if (warmed.has(key)) return;
@@ -566,6 +582,7 @@
     state.route = r;
     const id = ++state.renderId;
     const alive = () => id === state.renderId;
+    BCV.canvas.navigated?.(); // from here on, this screen's requests go before anything warming for the last one
     state.renderedAt = Date.now();
     html.classList.remove('bcv-settled');
     // the row that was pressed keeps its wash; otherwise the sidebar row for this route lights (a fresh
@@ -629,6 +646,7 @@
     if (el.parentNode !== main) main.replaceChildren(el); // a screen that kept its shell (a course's rail) stays put
     progress(false);
     html.classList.add('bcv-settled'); // drawn, from Canvas's answer (the harness waits for this)
+    warmAround(r);
     document.title = titleFor(r);
     if (phone()) BCV.phone.afterRender(BCV.app, r, el);
     BCV.smart?.refresh?.();
@@ -660,6 +678,7 @@
   }
 
   async function loadShellData({ force = false } = {}) {
+    store.groups({ force }).catch(() => {}); // alongside, not awaited: Groups and the calendar's contexts both want it, and neither should pay a round trip for it later
     const [me, favs, term, todos, unread, account, notifs] = await Promise.all([
       store.me({ force }).catch(() => null),
       store.favorites({ force }).catch(() => []),

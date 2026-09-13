@@ -608,5 +608,15 @@
     return screen;
   }
 
-  BCV.screens.gpa = { render, courseMath, SCALE, letterFor, pointsFor, targetIndex };
+  /** What the screen asks for first — the course list, then each followed course's assignment
+   *  groups — so a press on Grades lands from the memo. The same list render() settles on. */
+  async function prefetch() {
+    const all = await store.courses().catch(() => null);
+    if (!all) return;
+    const currentCourses = all.filter((c) => c.state === 'current');
+    const starredCourses = currentCourses.filter((c) => c.favorite);
+    await Promise.all((starredCourses.length ? starredCourses : currentCourses).map((c) => store.assignmentGroups(c.id).catch(() => {})));
+  }
+
+  BCV.screens.gpa = { render, courseMath, SCALE, letterFor, pointsFor, targetIndex, prefetch };
 })();

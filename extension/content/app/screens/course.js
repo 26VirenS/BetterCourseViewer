@@ -134,6 +134,52 @@
     return out;
   }
 
+  // ---- the tabs' first requests, made early ----------------------------------------------------
+  // What each tab asks for first. It is started on hover of the tab's rail row, alongside the shell
+  // when it is the tab being opened (so the column and the rail arrive together rather than one
+  // after the other), and on idle for every other tab once a course has landed. Nothing is kept
+  // between pages: this is the per-page memo the tab would fill on its own, filled a moment sooner.
+  const TAB_WARM = {
+    // a group's home is its front page and stream; a course's is whatever its instructor chose as
+    // the home view, read off the course list when it is here already (the front page otherwise)
+    home: (id, kind) => {
+      if (kind === 'groups') return [store.frontPage(id, { kind }), store.courseStream(id, { kind })];
+      const view = (BCV.canvas.ready('courses:all') || []).find((c) => String(c.id) === id)?.default_view || 'wiki';
+      const main = view === 'modules' ? [store.modules(id)]
+        : view === 'assignments' ? [store.assignments(id), store.assignmentGroups(id)]
+          : view === 'syllabus' ? [store.syllabus(id)]
+            : view === 'feed' ? [store.courseStream(id, { kind })]
+              : [store.frontPage(id, { kind })];
+      return [...main, store.courseTodo(id)];
+    },
+    stream: (id, kind) => [store.courseStream(id, { kind })],
+    announcements: (id, kind) => [store.announcements(id, { kind })],
+    assignments: (id) => [store.assignments(id)],
+    grades: (id) => [store.assignmentGroups(id)],
+    discussions: (id, kind) => [store.discussions(id, { kind })],
+    people: (id, kind) => [store.people(id, { kind }), kind === 'courses' ? store.sections(id) : null, kind === 'courses' ? store.courseGroups(id) : null],
+    pages: (id, kind) => [store.pages(id, { kind })],
+    files: (id, kind) => [store.rootFolder(id, { kind }).then((f) => (f ? store.folderContents(f.id) : null))],
+    quizzes: (id) => [store.quizzes(id)],
+    modules: (id) => [store.modules(id)],
+    syllabus: (id) => [store.syllabus(id)],
+  };
+  const GROUP_TABS = ['home', 'stream', 'announcements', 'discussions', 'people', 'pages', 'files'];
+  function warmTab(kind, id, tab) {
+    const f = TAB_WARM[tab];
+    if (!f || !id || (kind === 'groups' && !GROUP_TABS.includes(tab))) return;
+    try {
+      for (const p of f(String(id), kind)) if (p) Promise.resolve(p).catch(() => {});
+    } catch {
+      /* nothing to warm */
+    }
+  }
+  /** Every other tab of the course (or group) on screen, once it has landed and the page is idle. */
+  function warmTabs(r) {
+    const kind = r.screen === 'group' ? 'groups' : 'courses';
+    for (const tab of kind === 'groups' ? GROUP_TABS : Object.keys(TAB_WARM)) if (tab !== r.tab) warmTab(kind, r.courseId, tab);
+  }
+
   /** Header (back link, colour, title, pills, Immersive Reader) plus the
    *  grouped rail of the context's tabs, for courses and groups. */
   async function contextShell(ctx, shell, { backLabel, backHref, tabs, activeId, pills = [] }) {
@@ -200,6 +246,8 @@
         dataset: { tab: t.id },
         title: t.label,
         onclick: () => { if (shell.railLoad === t.id) return; shell.markRail(t.id); app.go(t.href); }, // the pressed row fills until its column lands; a repeat press is a no-op
+        onpointerenter: () => warmTab(shell.kind, c.id, t.id), // the pointer arrives before the press: the tab's data starts loading now
+        onfocus: () => warmTab(shell.kind, c.id, t.id),
       }, [
         h('span', { class: 'bcv-rail__tile' }, U.svg(t.icon, { size: 20, width: 1.8 })), // the glyph in the course colour (mockup 11)
         h('span', { class: 'bcv-rail__label', text: t.label }),
@@ -207,7 +255,7 @@
       ]);
     };
     const rail = h('nav', { class: `bcv-rail ${narrow ? 'is-narrow' : ''}`, 'aria-label': `${c.name} menu` }, [
-      ...groups.filter((g) => g.items.length).map((g, i) => U.enter(U.el('bcv-rail__group', [U.text('bcv-rail__title', g.title), U.el('bcv-rail__list', g.items.map(item))]), i, 60)),
+      ...groups.filter((g) => g.items.length).map((g) => U.enter(U.el('bcv-rail__group', [U.text('bcv-rail__title', g.title), U.el('bcv-rail__list', g.items.map(item))]))),
       external.length ? U.enter(U.el('bcv-rail__group bcv-rail__group--ext', [
         U.text('bcv-rail__title', 'Campus tools'),
         U.el('bcv-rail__list', external.map((t) => h('button', {
@@ -217,7 +265,7 @@
           title: t.label,
           onclick: () => { if (shell.railLoad === t.id) return; shell.markRail(t.id); app.go(t.href); },
         }, [h('span', { class: 'bcv-rail__label', text: t.label }), U.svg(EXT_ARROW, { size: 12, width: 2, style: { flex: 'none' } })]))),
-      ]), groups.filter((g) => g.items.length).length, 60) : null,
+      ])) : null,
     ]);
     // the rail's own loading key (separate from the sidebar's): the row named fills with the course
     // colour; null clears it. A row already filling keeps its fill (the animation never restarts).
@@ -279,6 +327,7 @@
     screen.append(head, U.el('bcv-body', U.loading()));
     head.append(U.el('bcv-head__in', U.loading()));
 
+    warmTab('courses', id, route.tab); // the column's own data, in the same round trip as the tabs
     const [course, tabsRaw] = await Promise.all([store.course(id).catch(() => null), store.tabs(id).catch(() => [])]);
     if (!ctx.alive()) return screen;
     if (!course) {
@@ -416,8 +465,8 @@
     const { app } = ctx;
     const c = shell.course;
     const b = body('bcv-body--course-cols');
-    const left = U.enter(h('div', { class: 'bcv-col', style: { flex: '1 1 440px' } }), 1, 60, 400); // the front-page card follows the rail
-    const right = U.enter(h('div', { class: 'bcv-col bcv-col--16', style: { flex: '1 1 300px' } }), 2, 70, 400); // then the side column
+    const left = U.enter(h('div', { class: 'bcv-col', style: { flex: '1 1 440px' } })); // both columns arrive with the rail, on the same beat
+    const right = U.enter(h('div', { class: 'bcv-col bcv-col--16', style: { flex: '1 1 300px' } }));
     b.append(left, right);
     left.append(U.loading());
 
@@ -913,6 +962,6 @@
     return b;
   };
 
-  BCV.screens.course = { render, prose, linksFrom, typeIcon, ptsLabel, statusBadge, openReader, contextShell, keptShell, holdShell, heldShell, syncShell };
+  BCV.screens.course = { render, prose, linksFrom, typeIcon, ptsLabel, statusBadge, openReader, contextShell, keptShell, holdShell, heldShell, syncShell, warmTab, warmTabs };
   BCV.screens.courseTabs = T;
 })();

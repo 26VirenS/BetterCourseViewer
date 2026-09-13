@@ -50,25 +50,69 @@
     }
   }
 
+  // ---- the gate: how many requests are out at once, and whose go first -----------------------
+  // Canvas throttles by what is outstanding: every open request holds 50 units of a 700-unit
+  // bucket until it answers, so past about a dozen in flight the rest are refused (a 403) rather
+  // than queued. The gate keeps the app under that. It also decides the order: each request
+  // carries the navigation it was made under, and the newest navigation's requests are served
+  // first — so the screen being opened never waits behind what the background asked for on the
+  // screen before it. Writes are never held.
+  const MAX_INFLIGHT = 10;
+  let navigation = 0; // the app counts its navigations here
+  let open = 0;
+  const waiting = []; // { nav, resolve }, in the order asked
+  const navigated = () => { navigation++; };
+  function admit() {
+    if (open < MAX_INFLIGHT) {
+      open++;
+      return Promise.resolve();
+    }
+    return new Promise((resolve) => waiting.push({ nav: navigation, resolve }));
+  }
+  function release() {
+    if (!waiting.length) {
+      open--;
+      return;
+    }
+    let next = 0; // the newest navigation's first request; the slot passes straight to it
+    for (let i = 1; i < waiting.length; i++) if (waiting[i].nav > waiting[next].nav) next = i;
+    waiting.splice(next, 1)[0].resolve();
+  }
+  const pause = (ms) => new Promise((r) => setTimeout(r, ms));
+
   async function request(method, path, { params, body, all = false, maxPages = 10 } = {}) {
     let url = buildUrl(path, params);
     const results = [];
     let pages = 0;
+    let throttled = 0;
     while (url && pages < maxPages) {
-      // Canvas refuses any non-GET request without the CSRF token, body or not (a DELETE has none).
-      const res = await fetch(url, {
-        method,
-        credentials: 'same-origin',
-        headers: {
-          accept: ACCEPT,
-          ...(method !== 'GET' ? { 'x-csrf-token': csrfToken() } : {}),
-          ...(body ? { 'content-type': 'application/json' } : {}),
-          'x-requested-with': 'XMLHttpRequest',
-        },
-        body: body ? JSON.stringify(body) : undefined,
-      });
-      const text = await res.text();
+      if (method === 'GET') await admit();
+      let res, text;
+      try {
+        // Canvas refuses any non-GET request without the CSRF token, body or not (a DELETE has none).
+        res = await fetch(url, {
+          method,
+          credentials: 'same-origin',
+          headers: {
+            accept: ACCEPT,
+            ...(method !== 'GET' ? { 'x-csrf-token': csrfToken() } : {}),
+            ...(body ? { 'content-type': 'application/json' } : {}),
+            'x-requested-with': 'XMLHttpRequest',
+          },
+          body: body ? JSON.stringify(body) : undefined,
+        });
+        text = await res.text();
+      } finally {
+        if (method === 'GET') release();
+      }
       if (!res.ok) {
+        // the bucket ran dry all the same (Canvas's own page traffic counts against it too): this
+        // is not a refusal of the thing asked for, so the page is asked for again after a moment
+        if (res.status === 403 && /rate limit/i.test(text) && throttled < 2) {
+          throttled++;
+          await pause(700 * throttled);
+          continue;
+        }
         let msg = `Canvas API ${res.status}`;
         try {
           const j = parseBody(text);
@@ -291,7 +335,7 @@
   }
 
   BCV.canvas = {
-    get, post, put, del, upload, cached, ready, invalidate, invalidatePrefix, clearAll, csrfToken, CanvasError,
+    get, post, put, del, upload, cached, ready, invalidate, invalidatePrefix, clearAll, navigated, csrfToken, CanvasError,
     plannerItems, dashboardCards, activeCourses, courseColors, setPlannerComplete,
     coursesWithScores, courseTabs, course, courseModules, announcements, unreadCount,
   };

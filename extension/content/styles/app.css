@@ -45,7 +45,7 @@ html[data-bcv-theme="dark"] {
 .bcv-main > .bcv-screen--skel { animation: none; } /* the placeholder does not rise; the real screen does when it lands */
 /* staggered entry: major blocks and list items follow the screen root, index × step, capped at 420ms (U.enter).
    The fill is backwards only: the end state is the element's own, so a hover lift can move it once it has landed. */
-.bcv-enter { animation: bcv-fade-up var(--bcv-dur, 380ms) cubic-bezier(.32,.72,0,1) var(--bcv-delay, 0ms) backwards; }
+.bcv-enter { animation: bcv-fade-up var(--bcv-dur, 240ms) cubic-bezier(.32,.72,0,1) var(--bcv-delay, 0ms) backwards; }
 .bcv-reader-btn[hidden] { display: none; } /* the Immersive Reader button only exists where there is a body to read */
 .bcv-sheet-ov { animation: bcv-scrim .28s cubic-bezier(.32,.72,0,1) both; }
 .bcv-sheet { animation: bcv-morph .34s cubic-bezier(.32,.72,0,1) backwards; transform-origin: 50% 50%; }

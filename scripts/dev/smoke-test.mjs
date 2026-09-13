@@ -288,7 +288,8 @@ try {
   await page.waitForSelector('.bcv-entry', { timeout: 10000 });
   await page.goto(`${BASE}/`);
   await page.waitForSelector('.bcv-act__title', { timeout: 10000 });
-  check((await dots()) === 2, `opening a stream item clears its dot: ${await dots()} left`);
+  // the announcement's own read state arrives with the feed, a moment after the list is drawn
+  check(await eventually(async () => (await dots()) === 2), `opening a stream item clears its dot: ${await dots()} left`);
   await page.click('.bcv-seg__btn[data-value="list"]');
 
   // ---- courses ----------------------------------------------------------------------------
@@ -1135,6 +1136,62 @@ try {
   await page.click('#bcv-theme-btn');
   await page.waitForFunction(() => document.documentElement.getAttribute('data-bcv-theme') === 'light', null, { timeout: 5000 });
 
+  // ---- loading in the background: the next press is ready before it happens -------------------
+  console.log('background loading');
+  {
+    // every API request the page makes, in the order issued, and how many were out at once: the
+    // route answers each one itself (fetch, then fulfil), so what is in flight is counted exactly
+    const api = [];
+    let open = 0, peak = 0;
+    // the announcements feed is the slow call: held back, the Dashboard must paint without it
+    const feedRe = /\/api\/v1\/announcements\?/;
+    let holdFeed = true; // every feed request (the mock refuses one course, so it is asked again per course) waits while this holds
+    const counter = '**/api/v1/**';
+    await page.route(counter, async (route) => {
+      const url = route.request().url();
+      api.push(url.replace(BASE, '').replace(/\?.*$/, ''));
+      if (holdFeed && feedRe.test(url)) await new Promise((r) => setTimeout(r, 2500));
+      open++; peak = Math.max(peak, open);
+      try {
+        const response = await route.fetch();
+        open--;
+        await route.fulfill({ response });
+      } catch {
+        open--;
+        await route.abort().catch(() => {});
+      }
+    });
+    await page.goto(`${BASE}/`);
+    await page.waitForSelector('.bcv-stat', { timeout: 10000 });
+    const early = await page.evaluate(() => [...document.querySelectorAll('.bcv-stat__value')].map((e) => e.textContent.trim()));
+    check(early.length === 6 && /^\d+$/.test(early[0]) && /^\d+$/.test(early[1]) && early[2] === '…', `the Dashboard paints without waiting for the announcements feed, its counter still to come: ${early.join(' | ')}`);
+    holdFeed = false;
+    await waitText('.bcv-stats > :nth-child(3) .bcv-stat__value', /^\d+$/);
+    check(true, 'and that counter fills in when the feed lands');
+    await page.waitForTimeout(2500); // the page went idle: the other screens' first requests are made now
+    // the Dashboard itself never asks for the inbox or for assignment groups: those are the Inbox's
+    // and the Grades' first requests, made in the background (the timing is not pinned — the
+    // warming starts the moment the screen settles, before the harness can look)
+    const warmed = api.filter((u) => /\/api\/v1\/conversations$|\/api\/v1\/courses\/\d+\/assignment_groups$/.test(u));
+    const has = (re) => warmed.some((u) => re.test(u));
+    check(has(/\/api\/v1\/conversations$/) && has(/\/assignment_groups$/), `once it settled, the Inbox and the Grades asked for their data without a press (${warmed.length} such requests, ${api.length} in all)`);
+    check(peak <= 10 && peak >= 5, `never more than ten requests in flight, however many were asked for at once (peak ${peak})`);
+    const before = api.length;
+    await nav('groups');
+    await nav('inbox');
+    await nav('gpa');
+    await page.waitForSelector('.bcv-gpa__value', { timeout: 10000 });
+    check(api.length === before, `Groups, Inbox and Grades then open from the memo, with no request at all (${api.length - before} made)`);
+    // inside a course, hovering a tab's rail row starts its data; the press then lands from the memo
+    await page.click('.bcv-fav');
+    await page.waitForSelector('.bcv-rail [data-tab="quizzes"]', { timeout: 10000 });
+    await page.waitForTimeout(2500); // every other tab warms on idle; quizzes among them
+    const beforeTab = api.length;
+    await tab('quizzes');
+    check(api.length === beforeTab && (await page.$$('.bcv-body .bcv-row')).length > 0, `a course tab warmed on idle opens with no request (${api.length - beforeTab} made)`);
+    await page.unroute(counter);
+  }
+
   // ---- motion (mockup 8): entrances by keyframes, a loading bar + skeletons, reduced motion ----
   console.log('motion');
   await page.goto(`${BASE}/`);
@@ -1237,12 +1294,15 @@ try {
   await page.unroute(slow);
   await page.waitForSelector('.bcv-sb__foot', { timeout: 15000 });
   check(!(await page.$('.bcv-skel')) && !(await page.$('.bcv-load')), 'the skeleton and the wash leave when the content lands');
-  // the course rail loads the same way, in the course colour, with its own key: only the pressed row
+  // the course rail loads the same way, in the course colour, with its own key: only the pressed row.
+  // Every tab's data is asked for in the background once the course has landed, so the hold is in
+  // place before the page: the discussions request — whether the background's or the press's own —
+  // is still out when the row is pressed, and the row fills until it answers.
+  const slowDisc = /\/api\/v1\/courses\/101\/discussion_topics(\?|$)/; // Discussions is not read by Home, so the tab really fetches
+  await page.route(slowDisc, async (route) => { await new Promise((r) => setTimeout(r, 900)); await route.continue().catch(() => {}); });
   await page.goto(`${BASE}/courses/101`);
   await page.waitForSelector('.bcv-rail__item', { timeout: 10000 });
   await page.waitForFunction(() => document.documentElement.classList.contains('bcv-settled') && !document.querySelector('.bcv-load'), null, { timeout: 10000 });
-  const slowDisc = /\/api\/v1\/courses\/101\/discussion_topics(\?|$)/; // Discussions is not read by Home, so the tab really fetches
-  await page.route(slowDisc, async (route) => { await new Promise((r) => setTimeout(r, 900)); await route.continue().catch(() => {}); });
   await page.evaluate(() => document.querySelector('.bcv-rail__item[data-tab="discussions"]').click());
   await page.waitForSelector('.bcv-rail__item[data-tab="discussions"] .bcv-load--rail', { timeout: 3000 });
   const railWash = await page.evaluate(() => ({ bg: getComputedStyle(document.querySelector('.bcv-rail__item[data-tab="discussions"] .bcv-load')).backgroundColor, lit: [...document.querySelectorAll('.bcv-load')].length, sidebar: !!document.querySelector('#bcv-side .bcv-load'), railColor: getComputedStyle(document.querySelector('.bcv-screen--ctx')).getPropertyValue('--bcv-rail-color').trim().toLowerCase() }));

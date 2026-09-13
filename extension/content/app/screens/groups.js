@@ -58,5 +58,8 @@
     return screen;
   }
 
-  BCV.screens.groups = { render };
+  /** What the screen asks for first, so a press on Groups lands from the memo. */
+  const prefetch = () => store.groups().catch(() => {});
+
+  BCV.screens.groups = { render, prefetch };
 })();

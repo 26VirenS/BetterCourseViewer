@@ -21,6 +21,7 @@
     screen.append(head, U.el('bcv-body', U.loading()));
     head.append(U.el('bcv-head__in', U.loading()));
 
+    BCV.screens.course.warmTab('groups', id, route.tab); // the column's own data, in the same round trip as the tabs
     const [group, tabsRaw] = await Promise.all([store.group(id).catch(() => null), store.tabs(id, { kind: 'groups' }).catch(() => [])]);
     if (!ctx.alive()) return screen;
     if (!group) {
