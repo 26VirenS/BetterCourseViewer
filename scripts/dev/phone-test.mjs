@@ -59,7 +59,9 @@ try {
   let [sw] = context.serviceWorkers();
   if (!sw) sw = await context.waitForEvent('serviceworker', { timeout: 15000 });
   const setSettings = (patch) => sw.evaluate(async (p) => self.BCV.settings.update(p), patch);
-  await sw.evaluate(() => self.BCV.api.storage.local.set({ 'setup:offered': true })); // the first-run setup is exercised on its own below
+  // until it is done every page opens the setup; it is exercised on its own below. The flow marker goes with the flags: the
+  // background's one-time migration clears them when it finds an older flow, and it may run after this.
+  await sw.evaluate(() => self.BCV.api.storage.local.set({ 'setup:offered': true, 'setup:done': true, 'setup:flow': 2 }));
 
   const page = await context.newPage();
   // a page is ready to poke once it is drawn, nothing painted from the cache is still waiting on

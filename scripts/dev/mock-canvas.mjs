@@ -77,7 +77,7 @@ const A = {
   104: [
     ['4001', 'Week 1 reflection', 'Assignments', 10, 10, -6, 23.98, -7, {}],
     // the mockup's example: file or text or link, four file types, open for a week, unlimited attempts
-    ['4002', 'Week 2 Post Class Assignment: GC articles', 'Assignments', 10, null, 0, 23.98, null, { types: ['online_upload', 'online_text_entry', 'online_url'], ext: ['pdf', 'docx', 'png', 'jpg'], window: true, attempts: -1, description: '<p>Submit the Grand Challenge you chose with an explanation of why it matters, plus three scientific papers or news articles in APA or MLA format.</p>' }],
+    ['4002', 'Week 2 Post Class Assignment: GC articles', 'Assignments', 10, null, 0, 23.98, null, { types: ['online_upload', 'online_text_entry', 'online_url'], ext: ['pdf', 'docx', 'png', 'jpg'], window: true, attempts: -1, description: '<p>Submit the Grand Challenge you chose with an explanation of why it matters, plus three scientific papers or news articles in APA or MLA format. See the <a class="instructure_file_link" title="Course Syllabus.pdf" href="/courses/101/files/f1?wrap=1">citation guide</a> before you start.</p>' }],
     ['4003', 'Knewton Alta: Unit 2', 'Assignments', 20, null, 5, 23.98, null, { tool: 'https://tool.example.com/launch' }],
   ],
   105: [
@@ -552,6 +552,8 @@ const server = http.createServer((req, res) => {
     // like Canvas: every write needs the session's CSRF token, body or not (file storage is a separate
     // service and has none). The token lives in the _csrf_token cookie (URL-encoded), never in a meta tag.
     if (req.method !== 'GET' && !path.startsWith('/__mock/') && !path.startsWith('/__upload/') && path !== '/logout' && req.headers['x-csrf-token'] !== CSRF) return json(res, { errors: [{ message: 'invalid authenticity token' }] }, 422);
+    // a session that has ended: like Canvas, every API call answers 401 "unauthenticated" (the pages themselves are still served here, so the app boots and finds out)
+    if (mockConfig.sessionLost && path.startsWith('/api/')) return json(res, { status: 'unauthenticated', errors: [{ message: 'user authorization required' }] }, 401);
     for (const [method, re, handler] of routes) {
       if (method !== req.method) continue;
       const m = path.match(re);

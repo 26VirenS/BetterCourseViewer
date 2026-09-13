@@ -618,6 +618,23 @@
   document.addEventListener('visibilitychange', checkContext);
   window.addEventListener('focus', checkContext);
   window.addEventListener('pageshow', checkContext);
+  // The Canvas session ending under the page (signed out elsewhere, expired overnight): the first
+  // request Canvas answers with "unauthenticated" sends the page to sign in again — a reload lands
+  // on Canvas's sign-in, which brings the page back afterwards — and nothing else stalls on it.
+  BCV.canvas.onSessionLost?.(() => {
+    if (state.sessionGone) return;
+    state.sessionGone = true;
+    progress(false);
+    recover('Your Canvas session has ended');
+  });
+  // Back to the tab after a while away, Canvas is asked the cheapest question there is, so a
+  // session that ended in the meantime is found out now rather than by the next press.
+  let hiddenAt = 0;
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') { hiddenAt = Date.now(); return; }
+    if (hiddenAt && Date.now() - hiddenAt > 5 * 60 * 1000 && !self.BCVBridge?.native) BCV.canvas.checkSession?.();
+    hiddenAt = 0;
+  });
 
   // ---- screens --------------------------------------------------------------------------------
   const SCREEN_PATIENCE = 15000; // a screen still not drawn after this gives way to Canvas's own page
@@ -687,7 +704,7 @@
       } catch (e2) {
         el = U.el('bcv-screen', U.el('bcv-body', U.errorBox(`This page could not be drawn: ${e2?.message || e2}`)));
       }
-      if (alive()) U.toast(`Showing Canvas's own page: ${gaveWay}`, { error: true, ms: 6000 });
+      if (alive() && BCV.canvas.sessionOk?.() !== false) U.toast(`Showing Canvas's own page: ${gaveWay}`, { error: true, ms: 6000 }); // (a session that ended has its own note up)
     }
     clearTimeout(skeleton);
     if (!alive()) return;
@@ -833,15 +850,18 @@
     }
   }
 
-  /** True once, on the first signed-in Canvas page in the app (browsers open the setup page instead). */
-  async function firstRun() {
+  /** True until the guided setup has been finished — in a browser and in the app alike. The card
+   *  cannot be skipped, and closing the tab does not get past it either: every signed-in Canvas
+   *  page with the interface on opens it again until its steps are done (a quiz attempt under
+   *  way is left alone). The flag it reads is the one the setup's last step writes. */
+  async function needsSetup() {
     const r = parseRoute();
-    if (!self.BCVBridge?.native || r.params.get('bcv') === 'setup' || inQuiz()) return false;
+    if (r.params.get('bcv') === 'setup' || inQuiz()) return false;
     try {
-      const flag = await BCV.api.storage.local.get('setup:offered');
-      if (flag && flag['setup:offered']) return false;
+      const flag = await BCV.api.storage.local.get('setup:done');
+      if (flag && flag['setup:done']) return false;
       await BCV.api.storage.local.set({ 'setup:offered': true });
-      return !(await store.pref('setupDone', false));
+      return true;
     } catch {
       return false;
     }
@@ -857,9 +877,9 @@
       html.classList.remove('bcv-on');
       return;
     }
-    // The first Canvas page with the interface on opens the guided setup, once (a flag in the
-    // extension's storage, shared by every site), unless the setup was already finished.
-    if (state.settings.appearance.skin !== false && await firstRun()) {
+    // Until the guided setup has been finished (a flag in the extension's storage, shared by every
+    // site), every Canvas page with the interface on opens it over the Dashboard.
+    if (state.settings.appearance.skin !== false && await needsSetup()) {
       go('/?bcv=setup', { replace: true });
       return;
     }

@@ -85,5 +85,21 @@ check(opened === 1, 'and the gate still lets the next request through');
 pending.shift().resolve();
 await after;
 
+console.log('a session that has ended');
+let lostCalls = 0;
+C.onSessionLost(() => { lostCalls++; });
+check(C.sessionOk() === true, 'the session is fine until Canvas says otherwise');
+const gone = C.get('/api/v1/users/self');
+await tick();
+pending.shift().resolve(401, '{"status":"unauthenticated","errors":[{"message":"user authorization required"}]}');
+let goneErr = null;
+try { await gone; } catch (e) { goneErr = e; }
+check(goneErr && goneErr.status === 401 && /Signed out/.test(goneErr.message) && C.sessionOk() === false && lostCalls === 1, `a 401 "unauthenticated" answer ends the session and is reported once: ${goneErr?.message}`);
+const fetchesBefore = finished.length + pending.length;
+let nextErr = null;
+try { await C.get('/api/v1/next'); } catch (e) { nextErr = e; }
+check(nextErr && nextErr.status === 401 && finished.length + pending.length === fetchesBefore && lostCalls === 1, 'every request after it fails at once, without asking Canvas, and it is not reported again');
+check((await C.checkSession()) === false, 'checkSession says so');
+
 console.log(fails ? `\n${fails} check(s) failed` : '\nAll checks passed.');
 process.exit(fails ? 1 : 0);

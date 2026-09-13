@@ -8,7 +8,7 @@
   const { h } = BCV.utils;
   const U = BCV.ui;
   const IC = BCV.IC;
-  const store = BCV.store;
+  const store = () => BCV.store; // read when used: the store's script loads after this one
 
   const fmtSize = (n) => {
     if (!Number.isFinite(n)) return '';
@@ -67,7 +67,7 @@
     // the details, when only an id came (a module item, a link into the page)
     let f = file && (file.display_name || file.url) ? file : null;
     if (!f) {
-      try { f = await store.file(file.id); } catch (e) {
+      try { f = await store().file(file.id); } catch (e) {
         if (current?.ov !== ov) return;
         body.replaceChildren(U.el('bcv-viewer__none', [U.errorBox(`This file could not be read: ${e?.message || e}`)]));
         return;
@@ -109,5 +109,28 @@
     if (view.tagName === 'IMG') view.addEventListener('error', () => { if (current?.ov === ov) body.replaceChildren(none('The image could not be shown.')); });
   }
 
-  BCV.viewer = { open, close, isOpen, kindOf, fmtSize };
+  // A link to a file anywhere in the interface — in an assignment's text, a page, a discussion,
+  // an announcement, a module — opens the viewer too, rather than a new tab or Canvas's file page.
+  // A download link (Canvas's ".../download?download_frd=1") is left to download; so is a click
+  // with a modifier, and anything outside the app or inside the viewer itself.
+  const FILE_LINK = /^\/(?:(courses|groups)\/(\w+)\/)?files\/(\w+)(?:\/preview)?\/?$/;
+  function linkToFile(a) {
+    let url;
+    try { url = new URL(a.href, location.origin); } catch { return null; }
+    if (url.origin !== location.origin) return null;
+    const m = url.pathname.match(FILE_LINK);
+    if (!m) return null;
+    return { id: m[3], context: m[1] ? { url: `/${m[1]}/${m[2]}` } : null };
+  }
+  document.addEventListener('click', (e) => {
+    if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    const a = e.target.closest?.('a[href]');
+    if (!a || !a.closest('#bcv-app') || a.closest('.bcv-viewer-ov') || a.hasAttribute('download')) return;
+    const hit = linkToFile(a);
+    if (!hit) return;
+    e.preventDefault();
+    open({ id: hit.id }, { context: hit.context, from: a });
+  }, true);
+
+  BCV.viewer = { open, close, isOpen, kindOf, fmtSize, linkToFile };
 })();

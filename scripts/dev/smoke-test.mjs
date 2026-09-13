@@ -91,9 +91,10 @@ try {
   };
   check(await offerAgain(), 'the setup page opens again on a new browser session while setup is unfinished (Safari enables without installing)');
   await sw.evaluate(() => self.BCV.api.storage.local.set({ 'setup:done': true }));
-  check(!(await offerAgain()), 'once setup is done or skipped it never opens again');
-  await sw.evaluate(() => self.BCV.api.storage.local.remove('setup:done'));
-  await sw.evaluate(() => self.BCV.api.storage.local.set({ 'setup:offered': true }));
+  check(!(await offerAgain()), 'once setup is done it never opens again');
+  // the setup counts as done for the rest of the suite (until it is done, every page opens the card
+  // — the guided-setup sections below clear the flag when that is what they are checking)
+  await sw.evaluate(() => self.BCV.api.storage.local.set({ 'setup:offered': true, 'setup:done': true }));
 
   page = await context.newPage();
   // a page is ready to poke once it is drawn and nothing painted from the cache is still waiting on Canvas
@@ -649,6 +650,16 @@ try {
   await page.goto(`${BASE}/courses/104/assignments/4002`);
   await page.waitForSelector('.bcv-detail__actions .bcv-btn--primary', { timeout: 10000 });
   check((await texts('.bcv-detail__actions .bcv-btn--primary'))[0] === 'Submit assignment', 'the assignment page offers our own submit flow');
+  // a link to a file in the assignment's own text opens the viewer over the page, not a new tab or Canvas's file page
+  const proseTabs = [];
+  const onProseTab = (p) => proseTabs.push(p);
+  context.on('page', onProseTab);
+  await page.click('.bcv-prose a.instructure_file_link');
+  await page.waitForSelector('.bcv-viewer .bcv-viewer__frame', { timeout: 8000 });
+  check(/Course Syllabus\.pdf/.test((await texts('.bcv-viewer .bcv-sheet__title'))[0]) && (await page.$eval('.bcv-viewer__frame', (e) => e.getAttribute('src'))) === '/courses/101/files/f1/file_preview' && proseTabs.length === 0 && page.url() === `${BASE}/courses/104/assignments/4002`, 'a file linked from an assignment\'s text opens in the viewer, over the assignment, with no new tab');
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !document.querySelector('.bcv-viewer'), null, { timeout: 3000 });
+  context.off('page', onProseTab);
   // mockup 11: the flow is a block at the end of the assignment page itself, not a destination of its own
   const inView = (sel) => page.$eval(sel, (el) => { const r = el.getBoundingClientRect(); return r.top >= 0 && r.top < window.innerHeight; });
   check(!!(await page.$('#bcv-main .bcv-detail + .bcv-sb--embed, #bcv-main .bcv-sb--embed')) && (await page.$$('.bcv-sb__foot')).length === 1 && !(await page.$('.bcv-sb__h1')) && (await page.$eval('.bcv-sb__foot', (el) => getComputedStyle(el).position)) === 'static', 'handing in is a block under the instructions in the same scroll, with a plain (not sticky) submit row');
@@ -1581,7 +1592,7 @@ try {
   await page.waitForFunction(() => !document.querySelector('.bcv-tour'), null, { timeout: 5000 });
   check((await prefsOf()).tour === null && !(await page.$('html.bcv-touring')), 'Done ends the tour and clears its state');
 
-  // ---- the page after install, and Skip --------------------------------------------------------------
+  // ---- the page after install --------------------------------------------------------------
   console.log('setup page');
   const setup = await context.newPage();
   const sTexts = (sel) => setup.$$eval(sel, (els) => els.map((e) => (e.innerText || e.textContent).replace(/\s+/g, ' ').trim()));
@@ -1591,18 +1602,6 @@ try {
   check((await sTexts('.welcome .h1'))[0] === 'Simpl Courses is installed' && (await setup.$$('.blob')).length === 4 && how.join(' | ') === 'Open your Canvas | Press the puzzle piece, then Simpl Courses | Press Set up' && (await setup.$('.how__puzzle svg')) !== null && /puzzle piece at the right of the toolbar and choose Simpl Courses/.test((await sTexts('.how__s'))[1]) && (await sTexts('#next'))[0] === 'Got it' && (await setup.$('#host')) === null && (await setup.$('.progress')) === null, `the page after install says how to start, and asks nothing: ${how.join(' | ')}`);
   await setup.screenshot({ path: join(out, '32-setup-welcome.png') });
   await setup.close().catch(() => {});
-  // Skip on the card: the done flags, no favourites written, no tour
-  const favBefore = (await apiGet('/api/v1/courses?per_page=100')).filter((c) => c.is_favorite).length;
-  await sw.evaluate(() => self.BCV.api.storage.local.remove('setup:done'));
-  await page.goto(`${BASE}/grades?bcv=setup`);
-  await page.waitForSelector(su('.row'), { timeout: 20000 });
-  await page.click(su('.row[data-course]')); // tick one, so Skip has a change it must not write
-  await page.click(su('#skip'));
-  await page.waitForFunction(() => !document.querySelector('#bcv-setup'), null, { timeout: 5000 });
-  await page.waitForTimeout(300);
-  check(page.url() === `${BASE}/grades` && (await page.$('.bcv-tour')) === null && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('setup:done'))['setup:done'])) === true && (await apiGet('/api/v1/courses?per_page=100')).filter((c) => c.is_favorite).length === favBefore, 'Skip closes the card where it was opened, marks the setup done, writes nothing and starts no tour');
-  await page.waitForSelector('.bcv-gpa__hero', { timeout: 15000 });
-  check((await texts('.bcv-gpa__hero-sub'))[0]?.includes('This term so far') && (await texts('.bcv-gpa__goal-s'))[0] === 'Goal 3.90 · set it in settings', 'the Grades page tracks without a record from the setup, with the goal it set');
 
   // ---- the account panel ----------------------------------------------------------------------------------
   console.log('account panel');
@@ -1654,6 +1653,26 @@ try {
   await page.goto(`${BASE}/courses/101/quizzes`);
   await page.waitForSelector('.bcv-body .bcv-row', { timeout: 20000 });
   check(!(await page.$('html.bcv-punch')), 'and once Canvas answers again the screen draws as usual');
+  // a Canvas session that has ended: the first "unauthenticated" answer sends the page to sign in
+  // again (a reload, once — it lands on Canvas's sign-in on a real site), every other request is
+  // failed at once rather than each screen stalling on its own, and a second time within the
+  // minute it is said rather than looped on
+  await mockConfig({ sessionLost: true });
+  const apiCalls = [];
+  const countApi = (r) => { if (/\/api\/v1\//.test(r.url())) apiCalls.push(r.url()); };
+  page.on('request', countApi);
+  await page.gotoRaw(`${BASE}/`);
+  await page.waitForNavigation({ timeout: 20000 }); // the reload
+  await page.waitForSelector('.bcv-toast', { timeout: 20000 });
+  const sessionMark = await page.evaluate(() => JSON.parse(sessionStorage.getItem('bcv:reloaded') || 'null'));
+  const atNote = apiCalls.length; // the shell's first wave was already out when the first answer came; nothing may follow it
+  await page.waitForTimeout(1500);
+  page.off('request', countApi);
+  check(/Your Canvas session has ended\. Reload the page to continue\./.test((await texts('.bcv-toast')).join(' ')) && sessionMark?.path === '/' && apiCalls.length === atNote, `a session that has ended is noticed at the first answer: one reload, then the note, and nothing more is asked of Canvas (${apiCalls.length - atNote} requests after the note): ${(await texts('.bcv-toast')).join(' | ')}`);
+  await mockConfig({ sessionLost: false });
+  await page.goto(`${BASE}/`);
+  await page.waitForSelector('.bcv-stat', { timeout: 20000 });
+  check(!(await page.$('.bcv-toast')), 'signed in again, the page is itself again');
   // ---- notifications ------------------------------------------------------------------------------------
   console.log('notifications');
   await page.goto(`${BASE}/#notifications`);
@@ -1837,6 +1856,40 @@ try {
   check(/^v\d+\.\d+/.test(await popupPage.$eval('#version', (el) => el.textContent)), `popup shows the version: ${await popupPage.$eval('#version', (el) => el.textContent)}`);
   check((await popupPage.$eval('#foot-setup', (el) => el.textContent)) === 'Guided setup', 'the popup links to the guided setup');
   await popupPage.screenshot({ path: join(out, '30-popup.png') });
+
+  // ---- the setup cannot be skipped (last: finishing it here writes the site's preferences afresh) ----
+  console.log('setup cannot be skipped');
+  // The card cannot be skipped: there is no Skip, Escape does nothing, and leaving the page does
+  // not get past it — until its steps are done, every page with the interface on opens it again.
+  await sw.evaluate(() => self.BCV.api.storage.local.remove('setup:done'));
+  await page.goto(`${BASE}/grades?bcv=setup`);
+  await page.waitForSelector(su('.row'), { timeout: 20000 });
+  check((await page.$(su('#skip'))) === null && (await page.$(su('.top__skip'))) === null, 'the card has no Skip');
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(300);
+  check((await page.$('#bcv-setup')) !== null && (await sStep()) === '1 of 4', 'Escape does not close it');
+  await page.goto(`${BASE}/courses`); // walking away: the next page opens it again, over the Dashboard
+  await page.waitForSelector(su('.row'), { timeout: 20000 });
+  check(page.url() === `${BASE}/` && (await sStep()) === '1 of 4' && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('setup:done'))['setup:done'])) === undefined, `leaving the page does not get past it: the next page opens the card again, unfinished (${await sStep()})`);
+  // the only way out is through: the steps, then the tour (the favourites already starred are the
+  // ones picked, so finishing here changes nothing in Canvas for the sections that follow)
+  const keepStarred = (await apiGet('/api/v1/courses?per_page=100')).filter((c) => c.is_favorite).map((c) => String(c.id));
+  for (const id of keepStarred) await page.click(su(`.row[data-course="${id}"]`));
+  await page.click(su('#next'));
+  await page.waitForSelector(su('#track'), { timeout: 10000 });
+  await page.click(su('#next'));
+  await page.waitForSelector(su('.prov'), { timeout: 10000 });
+  await page.click(su('#notNow'));
+  await page.waitForSelector(su('.row[data-value]'), { timeout: 10000 });
+  await page.click(su('#next')); // Finish
+  await page.waitForFunction(() => !document.querySelector('#bcv-setup'), null, { timeout: 15000 });
+  await page.waitForSelector('.bcv-tour__card', { timeout: 20000 });
+  check((await sw.evaluate(async () => (await self.BCV.api.storage.local.get('setup:done'))['setup:done'])) === true, 'finishing the steps is what marks the setup done, and the tour follows');
+  await page.keyboard.press('Escape'); // the tour can be left; the setup could not
+  await page.waitForFunction(() => !document.querySelector('.bcv-tour__card'), null, { timeout: 5000 });
+  await page.goto(`${BASE}/grades`);
+  await page.waitForSelector('.bcv-gpa__hero', { timeout: 15000 });
+  check((await page.$('#bcv-setup')) === null && (await texts('.bcv-gpa__hero-sub'))[0]?.includes('This term so far') && (await texts('.bcv-gpa__goal-s'))[0] === 'Goal 4.00 · set it in settings', 'once done the card stays away, and the Grades page tracks with the goal the setup set');
 
   // ---- Reset everything reaches the site: the one-line note a Canvas tab keeps in its own storage goes too ----
   console.log('reset');

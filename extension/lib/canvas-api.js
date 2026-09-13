@@ -80,6 +80,30 @@
   }
   const pause = (ms) => new Promise((r) => setTimeout(r, ms));
 
+  // ---- the session ---------------------------------------------------------------------------
+  // A Canvas session that has ended (signed out elsewhere, expired overnight) answers every API
+  // call with a 401 "unauthenticated" or a redirect to the sign-in page. The first such answer is
+  // reported to the app, which sends the page to sign in again; every request after it fails at
+  // once rather than each screen finding out for itself and stalling on the way.
+  let sessionLost = false;
+  const sessionListeners = new Set();
+  const onSessionLost = (fn) => { sessionListeners.add(fn); return () => sessionListeners.delete(fn); };
+  const sessionOk = () => !sessionLost;
+  const looksSignedOut = (res, text) => {
+    if (res.status === 401 && /unauthenticated|authorization required|must be logged in/i.test(text || '')) return true;
+    try { return !!res.redirected && /^\/login(\/|$)/.test(new URL(res.url, location.origin).pathname); } catch { return false; }
+  };
+  function loseSession() {
+    if (sessionLost) return;
+    sessionLost = true;
+    for (const fn of sessionListeners) { try { fn(); } catch { /* ignore */ } }
+  }
+  /** Asks Canvas the cheapest question there is; false once the session has ended. */
+  async function checkSession() {
+    try { await request('GET', '/api/v1/users/self'); } catch { /* a lost session is reported by the request itself */ }
+    return !sessionLost;
+  }
+
   // A request that never answers would hold its gate slot and its screen for good: after this
   // long it is given up, a GET is asked once more, and then it fails like any other request (the
   // screen shows its error, or gives way, rather than waiting forever).
@@ -93,6 +117,7 @@
     let throttled = 0;
     let timedOut = 0;
     while (url && pages < maxPages) {
+      if (sessionLost) throw new CanvasError('Signed out of Canvas', 401);
       if (method === 'GET') await admit();
       let res, text;
       let again = false; // this page timed out and is to be asked once more
@@ -123,6 +148,10 @@
         if (method === 'GET') release();
       }
       if (again) continue;
+      if (looksSignedOut(res, text)) {
+        loseSession();
+        throw new CanvasError('Signed out of Canvas', 401);
+      }
       if (!res.ok) {
         // the bucket ran dry all the same (Canvas's own page traffic counts against it too): this
         // is not a refusal of the thing asked for, so the page is asked for again after a moment
@@ -353,7 +382,7 @@
   }
 
   BCV.canvas = {
-    get, post, put, del, upload, cached, ready, invalidate, invalidatePrefix, clearAll, navigated, tune, csrfToken, CanvasError,
+    get, post, put, del, upload, cached, ready, invalidate, invalidatePrefix, clearAll, navigated, tune, onSessionLost, sessionOk, checkSession, csrfToken, CanvasError,
     plannerItems, dashboardCards, activeCourses, courseColors, setPlannerComplete,
     coursesWithScores, courseTabs, course, courseModules, announcements, unreadCount,
   };

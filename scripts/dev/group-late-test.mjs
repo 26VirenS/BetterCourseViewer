@@ -34,7 +34,7 @@ const context = await chromium.launchPersistentContext(userDataDir, { channel: '
 try {
   let [sw] = context.serviceWorkers();
   if (!sw) sw = await context.waitForEvent('serviceworker', { timeout: 15000 });
-  await sw.evaluate(() => self.BCV.api.storage.local.set({ 'setup:offered': true, 'setup:done': true }));
+  await sw.evaluate(() => self.BCV.api.storage.local.set({ 'setup:offered': true, 'setup:done': true, 'setup:flow': 2 })); // the flow marker too: the background's migration clears the flags for an older flow, and may run after this
   const page = await context.newPage();
   page.on('pageerror', (e) => failures.push(`page error: ${e.message}`));
   await page.route(/\/api\/v1\/courses\?/, async (route) => { await new Promise((r) => setTimeout(r, 2000)); await route.continue().catch(() => {}); });

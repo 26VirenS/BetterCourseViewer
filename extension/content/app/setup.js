@@ -90,7 +90,7 @@
     host.setAttribute('data-theme', app.isDark() ? 'dark' : 'light');
     const shadow = host.attachShadow({ mode: 'open' });
     const stepLabel = h('span', { class: 'top__step', id: 'stepLabel' });
-    const skipBtn = h('button', { class: 'top__skip', id: 'skip', type: 'button', text: 'Skip', onclick: () => finish({ skipped: true }) });
+    // no Skip: the setup is the way in, and comes back on every page until it is finished
     const progress = h('div', { class: 'progress', id: 'progress', 'aria-hidden': 'true' }, STEPS.map(() => h('span')));
     const body = h('div', { class: 'card__body', id: 'body' });
     const foot = h('footer', { class: 'foot', id: 'foot' });
@@ -98,13 +98,13 @@
     const overlay = h('div', { class: 'overlay', role: 'dialog', 'aria-label': 'Simpl Courses setup' }, [
       h('div', { class: 'bg', 'aria-hidden': 'true' }, ['a', 'b', 'c', 'd'].map((k) => h('i', { class: `blob blob--${k}` }))),
       h('main', { class: 'page' }, [
-        h('header', { class: 'top' }, [h('span', { class: 'mark mark--sm', 'aria-hidden': 'true', html: MARK }), h('span', { class: 'top__name', text: 'Simpl Courses' }), stepLabel, skipBtn]),
+        h('header', { class: 'top' }, [h('span', { class: 'mark mark--sm', 'aria-hidden': 'true', html: MARK }), h('span', { class: 'top__name', text: 'Simpl Courses' }), stepLabel]),
         progress,
         card,
       ]),
     ]);
     shadow.append(h('style', { text: self.BCV_SETUP_CSS || '' }), overlay);
-    ui = { host, overlay, card, body, foot, progress, stepLabel, skipBtn };
+    ui = { host, overlay, card, body, foot, progress, stepLabel };
     html.classList.add('bcv-setup-open');
     (document.body || html).append(host);
     go(0, 1);
@@ -484,36 +484,33 @@
   // ---- done: save, close, tour ---------------------------------------------------------------------
   /** Everything the steps decided, where the screens read it: favourites through Canvas (the one
    *  list every screen follows), the grade preferences under this host, the "done" flags the popup
-   *  and the first-run check read. Then the card shows a check for a moment, closes, and the tour
-   *  starts on this page. Skipping writes only the flags, and no tour. */
-  async function finish({ skipped = false } = {}) {
+   *  and the every-page check read. Then the card shows a check for a moment, closes, and the tour
+   *  starts on this page. There is no other way out: the card is only done when the steps are. */
+  async function finish() {
     if (!st || st.closing) return;
     st.closing = true;
     const { app } = st;
-    ui.skipBtn.hidden = true;
     let favChanged = false;
     try {
       await store.setPref('setupDone', true);
-      if (!skipped) {
-        const [targetsPref] = await Promise.all([store.pref('gradeTargets')]);
-        const targets = { ...((targetsPref && typeof targetsPref === 'object') ? targetsPref : {}) };
-        for (const c of st.courses) if (st.favs.has(c.id)) targets[c.id] = GRADES.includes(st.targets[c.id]) ? st.targets[c.id] : 'A+';
-        await Promise.all([
-          store.setPref('gpaGoal', st.goal),
-          store.setPref('gpaTracking', st.tracking ? { priorGpa: null, priorCourses: 0, since: new Date().toISOString().slice(0, 10) } : null),
-          store.setPref('gradeTargets', targets),
-        ]);
-        const changes = st.courses.filter((c) => c.favorite !== st.favs.has(c.id));
-        for (const c of changes) await store.setFavorite(c.id, st.favs.has(c.id)).catch(() => {});
-        const renamed = st.courses.filter((c) => c.id in st.nicks && String(st.nicks[c.id]).trim() !== (c.nickname || ''));
-        for (const c of renamed) await store.setNickname(c.id, st.nicks[c.id]).catch(() => {});
-        favChanged = changes.length > 0 || renamed.length > 0;
-      }
+      const [targetsPref] = await Promise.all([store.pref('gradeTargets')]);
+      const targets = { ...((targetsPref && typeof targetsPref === 'object') ? targetsPref : {}) };
+      for (const c of st.courses) if (st.favs.has(c.id)) targets[c.id] = GRADES.includes(st.targets[c.id]) ? st.targets[c.id] : 'A+';
+      await Promise.all([
+        store.setPref('gpaGoal', st.goal),
+        store.setPref('gpaTracking', st.tracking ? { priorGpa: null, priorCourses: 0, since: new Date().toISOString().slice(0, 10) } : null),
+        store.setPref('gradeTargets', targets),
+      ]);
+      const changes = st.courses.filter((c) => c.favorite !== st.favs.has(c.id));
+      for (const c of changes) await store.setFavorite(c.id, st.favs.has(c.id)).catch(() => {});
+      const renamed = st.courses.filter((c) => c.id in st.nicks && String(st.nicks[c.id]).trim() !== (c.nickname || ''));
+      for (const c of renamed) await store.setNickname(c.id, st.nicks[c.id]).catch(() => {});
+      favChanged = changes.length > 0 || renamed.length > 0;
       await BCV.api.storage.local.set({ 'setup:done': true, 'setup:offered': true });
     } catch (e) {
       console.error('[Simpl Courses setup]', e);
     }
-    if (!skipped && ui) {
+    if (ui) {
       // a moment of "all set" before the page takes over
       const check = h('span', { class: 'done__check', 'aria-hidden': 'true', html: '<svg viewBox="0 0 24 24" width="31" height="31" fill="none" stroke="#34c759" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path class="arc" style="--len:30" d="M20 6L9 17l-5-5" stroke-dasharray="30"/></svg>' });
       st.step = STEPS.length; // past the last step: every segment done, the label "Done"
@@ -527,7 +524,7 @@
       app.loadShellData({ force: true });
       await app.render();
     }
-    if (!skipped && BCV.tour) await BCV.tour.start(app);
+    if (BCV.tour) await BCV.tour.start(app);
   }
 
   BCV.setup = { open, close, active, PROVIDERS };

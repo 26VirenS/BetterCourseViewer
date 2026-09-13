@@ -26,7 +26,7 @@
   const setupDone = async () => {
     try {
       const flag = await api.storage.local.get('setup:done');
-      return !!(flag && flag['setup:done']); // written only by this setup flow (the card, or its Skip)
+      return !!(flag && flag['setup:done']); // written only by the setup card's last step
     } catch {
       return true; // storage unreadable: never hide the switches over it
     }
@@ -166,7 +166,7 @@
   });
 
   const status = $('status');
-  // Until the guided setup has run (or been skipped on purpose) the popup shows nothing but the
+  // Until the guided setup has been finished the popup shows nothing but the
   // Set up button.
   if (!(await setupDone())) {
     document.body.classList.add('is-fresh');
