@@ -110,7 +110,7 @@
   let REQUEST_TIMEOUT = 20000;
   const tune = ({ requestTimeout } = {}) => { if (Number.isFinite(requestTimeout)) REQUEST_TIMEOUT = requestTimeout; };
 
-  async function request(method, path, { params, body, form = null, all = false, maxPages = 10 } = {}) {
+  async function request(method, path, { params, body, all = false, maxPages = 10 } = {}) {
     let url = buildUrl(path, params);
     const results = [];
     let pages = 0;
@@ -131,11 +131,10 @@
           headers: {
             accept: ACCEPT,
             ...(method !== 'GET' ? { 'x-csrf-token': csrfToken() } : {}),
-            // a form sets its own content-type, boundary and all: naming one here would break it
-            ...(body && !form ? { 'content-type': 'application/json' } : {}),
+            ...(body ? { 'content-type': 'application/json' } : {}),
             'x-requested-with': 'XMLHttpRequest',
           },
-          body: form || (body ? JSON.stringify(body) : undefined),
+          body: body ? JSON.stringify(body) : undefined,
           signal: ac ? ac.signal : undefined,
         });
         text = await res.text();
@@ -182,8 +181,6 @@
 
   const get = (path, opts) => request('GET', path, opts);
   const post = (path, body, opts) => request('POST', path, { ...opts, body });
-  /** POST a multipart form — what Canvas's own forms send when a file goes with the fields. */
-  const postForm = (path, form, opts) => request('POST', path, { ...opts, form });
   const put = (path, body, opts) => request('PUT', path, { ...opts, body });
   const del = (path, opts) => request('DELETE', path, opts);
 
@@ -385,7 +382,7 @@
   }
 
   BCV.canvas = {
-    get, post, postForm, put, del, upload, cached, ready, invalidate, invalidatePrefix, clearAll, navigated, tune, onSessionLost, sessionOk, checkSession, csrfToken, CanvasError,
+    get, post, put, del, upload, cached, ready, invalidate, invalidatePrefix, clearAll, navigated, tune, onSessionLost, sessionOk, checkSession, csrfToken, CanvasError,
     plannerItems, dashboardCards, activeCourses, courseColors, setPlannerComplete,
     coursesWithScores, courseTabs, course, courseModules, announcements, unreadCount,
   };

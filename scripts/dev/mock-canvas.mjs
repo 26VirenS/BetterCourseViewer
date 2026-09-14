@@ -184,7 +184,7 @@ const announcements = {
 };
 const topicFull = (courseId, id) => {
   const t = [...(discussions[courseId] || []), ...(announcements[courseId] || [])].find((x) => x.id === String(id));
-  return t ? { ...t, html_url: `/courses/${courseId}/discussion_topics/${t.id}`, locked: false, require_initial_post: !!t.require_initial_post, attachments: t.attachments || [] } : null;
+  return t ? { ...t, html_url: `/courses/${courseId}/discussion_topics/${t.id}`, locked: false, require_initial_post: !!t.require_initial_post, attachments: [] } : null;
 };
 const entries = new Map();
 const viewFor = (topicId) => ({
@@ -315,6 +315,7 @@ const htmlPages = {
   // a homework-submission tool's own picker, framed by the assignment page exactly as Canvas frames it;
   // when a file is chosen the return page posts externalContentReady to the window that framed it
   '/courses/104/external_tools/t1/resource_selection': () => `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Box</title></head><body style="font-family:sans-serif;padding:24px"><h2 id="tool-title">Box picker (the tool's own page)</h2><p>The tool owns everything here. Choosing a file hands it back to the assignment page.</p><button id="pick" onclick="window.parent.postMessage({ subject: 'externalContentReady', service: 'external_tool_dialog', contents: [{ '@type': 'FileItem', url: 'http://localhost:${port}/files/box1/download', text: 'GC-articles-Sharma.pdf', mediaType: 'application/pdf' }] }, '*')">Use GC-articles-Sharma.pdf</button></body></html>`,
+  '/courses/101/discussion_topics/new': () => page({ title: 'New Discussion Topic', courseId: '101', body: '<h1>New Discussion Topic</h1><form id="edit_discussion_form"><label for="discussion-title">Topic Title</label><input id="discussion-title" type="text" /><div class="tox-tinymce" role="application">Topic content</div><label><input type="checkbox" /> Participants must respond to the topic before viewing other replies</label><label><input type="checkbox" /> Allow liking</label><button type="submit" class="btn btn-primary">Save</button></form>' }),
   '/courses/101/quizzes/9011/take': () => page({ title: 'Lec06-PreQuiz', courseId: '101', body: '<h1>Lec06-PreQuiz</h1><form id="submit_quiz_form"><p>Question 1 of 4</p><label><input type="radio" name="q1"> A</label> <label><input type="radio" name="q1"> B</label><p><button type="button" class="btn">Submit Quiz</button></p></form>' }),
 };
 
@@ -521,26 +522,6 @@ on('PUT', /^\/api\/v1\/courses\/(\w+)\/discussion_topics\/(\w+)\/read_all$/, (ur
   return { ok: true };
 });
 on('GET', /^\/api\/v1\/courses\/(\w+)\/discussion_topics\/(\w+)$/, (url, m) => topicFull(m[1], m[2]));
-// starting a discussion: Canvas takes the title and the first post together and hands back the topic
-on('POST', /^\/api\/v1\/courses\/(\w+)\/discussion_topics$/, (url, m, body, raw) => {
-  // Canvas's own form sends multipart when a file goes with it: the fields are parts, not JSON
-  let att = null;
-  if (raw && /^--/.test(raw)) {
-    const boundary = raw.slice(0, raw.indexOf('\r\n'));
-    body = {};
-    for (const part of raw.split(boundary)) {
-      const name = (part.match(/name="([^"]*)"/) || [])[1];
-      if (!name) continue;
-      const value = part.slice(part.indexOf('\r\n\r\n') + 4).replace(/\r\n$/, '');
-      if (/filename="/.test(part)) att = { display_name: (part.match(/filename="([^"]*)"/) || [])[1], size: value.length };
-      else body[name] = value === 'true' ? true : value === 'false' ? false : value;
-    }
-  }
-  if (!body.title || !body.message) return { __status: 400, errors: [{ message: 'title and message are required' }] };
-  const t = { id: String(Date.now()), title: body.title, message: body.message, posted_at: new Date().toISOString(), created_at: new Date().toISOString(), last_reply_at: null, unread_count: 0, discussion_subentry_count: 0, read_state: 'read', published: body.published !== false, discussion_type: body.discussion_type || 'threaded', require_initial_post: !!body.require_initial_post, allow_rating: !!body.allow_rating, delayed_post_at: body.delayed_post_at || null, lock_at: body.lock_at || null, author: { display_name: 'Ava Student' }, user_name: 'Ava Student', pinned: false, locked: false, attachments: att ? [{ id: `at${++fileSeq}`, display_name: att.display_name, size: att.size, url: `/files/at/download` }] : [] };
-  discussions[m[1]] = [t, ...(discussions[m[1]] || [])];
-  return { ...t, html_url: `/courses/${m[1]}/discussion_topics/${t.id}` };
-});
 on('GET', /^\/api\/v1\/courses\/(\w+)\/discussion_topics$/, (url, m) => (url.searchParams.get('only_announcements') === 'true' ? (announcements[m[1]] || []) : (discussions[m[1]] || [])).map((t) => ({ ...t, html_url: `/courses/${m[1]}/discussion_topics/${t.id}` })));
 on('GET', /^\/api\/v1\/courses\/(\w+)\/users$/, (url, m) => people(m[1]));
 on('GET', /^\/api\/v1\/courses\/(\w+)\/sections$/, (url, m) => sections(m[1]));
@@ -625,12 +606,6 @@ on('POST', /^\/api\/v1\/courses\/(\w+)\/assignments\/(\w+)\/submissions\/self\/f
   const token = `tok${++fileSeq}`;
   pendingUploads.set(token, { name: body.name, size: body.size, content_type: body.content_type });
   return { upload_url: `http://localhost:${port}/__upload/${token}`, upload_params: { key: `submissions/${token}`, acl: 'private', success_action_status: '201' }, file_param: 'file' };
-});
-// a file into the user's own files: the same three-step upload, without an assignment behind it
-on('POST', /^\/api\/v1\/users\/self\/files$/, (url, m, body) => {
-  const token = `tok${++fileSeq}`;
-  pendingUploads.set(token, { name: body.name, size: body.size, content_type: body.content_type });
-  return { upload_url: `http://localhost:${port}/__upload/${token}`, upload_params: { key: `users/self/${token}` }, file_param: 'file' };
 });
 // the storage step: a multipart POST with no CSRF token, like S3 or inst-fs; the file is the last field
 on('POST', /^\/__upload\/(\w+)$/, (url, m, body, raw) => {

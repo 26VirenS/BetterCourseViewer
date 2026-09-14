@@ -943,49 +943,12 @@ try {
   // 7003 was opened from the dashboard stream earlier in this run, so Canvas now reports it read
   check(drows.length === 4 && /Is there any discussion happening this week\?.*Last post.*23 replies/.test(drows[1]) && !/23 unread/.test(drows[1]) && drows.some((t) => /Discussion Quiz for this week.*1 unread/.test(t)), `discussions (read state from Canvas): ${drows[1].slice(0, 80)}`);
   await shot(page, '15-course-discussions');
-  // starting one: Canvas takes the title and the first post together, so the sheet asks for both
+  // starting one is Canvas's own editor, with everything Canvas offers there; our shell stays over it
   await page.click('.bcv-head__tools .bcv-btn--primary');
-  await page.waitForSelector('.bcv-sheet--compose', { timeout: 5000 });
-  await page.click('.bcv-sheet--compose .bcv-btn--primary');
-  check((await page.$eval('.bcv-disc__err', (e) => e.textContent)) === 'A discussion needs a title.' && (await page.$$('.bcv-sheet--compose')).length === 1, 'an empty discussion is not posted: it says what is missing');
-  await page.fill('.bcv-sheet--compose .bcv-input', 'Study group for the midterm?');
-  await page.click('.bcv-sheet--compose .bcv-btn--primary');
-  check((await page.$eval('.bcv-disc__err', (e) => e.textContent)) === 'A discussion needs a first post.', 'a title alone is not a discussion either');
-  // the editor is the post as it will read: typing, then a real bold run, then a list
-  await page.click('.bcv-ed__body');
-  await page.keyboard.type('Anyone want to meet Thursday afternoon? I can bring ');
-  await page.click('.bcv-ed__btn[title="Bold"]');
-  await page.keyboard.type('notes');
-  await page.click('.bcv-ed__btn[title="Bold"]');
-  await page.keyboard.type('.');
-  await page.keyboard.press('Enter');
-  await page.click('.bcv-ed__btn[title="Bulleted list"]');
-  await page.keyboard.type('Bring a calculator');
-  const edHtml = await page.$eval('.bcv-ed__body', (e) => e.innerHTML);
-  check(/<b>notes<\/b>|<strong>notes<\/strong>/.test(edHtml) && /<ul>/.test(edHtml), `the editor holds the post as written: ${edHtml.slice(0, 120)}`);
-  // and the HTML behind it can be edited directly
-  await page.click('.bcv-ed__btn[title="Edit the HTML"]');
-  check(!(await page.$eval('.bcv-ed__src', (e) => e.hidden)) && (await page.$eval('.bcv-ed__body', (e) => e.hidden)) && (await page.$eval('.bcv-ed__src', (e) => e.value)) === edHtml, 'the source view shows the HTML that will be posted');
-  await page.click('.bcv-ed__btn[title="Edit the HTML"]');
-  // a file goes with it, the way Canvas's own form sends one
-  await page.setInputFiles('.bcv-compose__field input[type="file"]:not([accept])', { name: 'meeting-notes.txt', mimeType: 'text/plain', buffer: Buffer.from('Thursday 3pm, library room 202.') });
-  check(/meeting-notes\.txt · 1 KB/.test(await page.$eval('.bcv-compose__file', (e) => e.textContent)), `the file chosen is named before it goes: ${await page.$eval('.bcv-compose__file', (e) => e.textContent)}`);
-  // Canvas's own options, and when the thread opens and closes
-  for (const label of ['Post before seeing replies', 'Allow liking']) {
-    await page.click(`.bcv-compose__opt:has(.bcv-compose__optlbl:text-is("${label}")) .bcv-switch`);
-  }
-  const switches = await page.$$eval('.bcv-compose__opt', (els) => els.map((e) => `${e.querySelector('.bcv-compose__optlbl').textContent}:${e.querySelector('.bcv-switch').getAttribute('aria-checked')}`));
-  check(switches.join(' | ') === 'Threaded replies:true | Post before seeing replies:true | Allow liking:true', `Canvas's own options, as they will be sent: ${switches.join(' | ')}`);
-  await page.click('.bcv-sheet--compose .bcv-btn--primary');
-  await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
-  check(/\/courses\/101\/discussion_topics\/\d+$/.test(page.url()) && (await page.$eval('.bcv-detail__title', (e) => e.textContent)) === 'Study group for the midterm?' && /Anyone want to meet Thursday afternoon\?/.test(await page.$eval('.bcv-detail', (e) => e.textContent)), `a discussion started here is posted to Canvas and opened: ${page.url()}`);
-  const madeId = page.url().split('/').pop();
-  const made = await sw.evaluate(async (id) => (await fetch(`http://localhost:8787/api/v1/courses/101/discussion_topics/${id}`).then((r) => r.text()).then((t) => JSON.parse(t.replace(/^while\(1\);/, '')))), madeId);
-  check(made.require_initial_post === true && made.allow_rating === true && made.discussion_type === 'threaded' && /<(b|strong)>notes<\/(b|strong)>/.test(made.message) && /<ul>/.test(made.message) && made.attachments?.[0]?.display_name === 'meeting-notes.txt', `the options, the post as HTML and the file all go to Canvas with it: ${JSON.stringify({ r: made.require_initial_post, l: made.allow_rating, t: made.discussion_type, f: made.attachments?.[0]?.display_name })}`);
-  await shot(page, '15b-new-discussion');
-  await tab('discussions');
-  await page.waitForSelector('.bcv-row', { timeout: 10000 });
-  check((await texts('.bcv-body .bcv-row')).some((t) => /Study group for the midterm\?/.test(t)), 'and it is in the list, which no longer serves what it held before');
+  await page.waitForSelector('html.bcv-punch #edit_discussion_form', { timeout: 15000 });
+  check(page.url() === `${BASE}/courses/101/discussion_topics/new` && (await page.$('#bcv-app .bcv-rail')) !== null && /Topic Title/.test(await page.$eval('#edit_discussion_form', (e) => e.textContent)), `New discussion opens Canvas's own editor with the shell over it: ${page.url()}`);
+  await page.goBack();
+  await page.waitForSelector('.bcv-body .bcv-row', { timeout: 15000 });
   await page.click('.bcv-body .bcv-row');
   await page.waitForSelector('.bcv-entry', { timeout: 10000 });
   check((await page.$$('.bcv-entry')).length === 2 && (await page.$('.bcv-entry--reply')), 'thread with nested replies');

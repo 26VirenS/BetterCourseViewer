@@ -834,22 +834,6 @@
   /** Canvas's three-step upload for a submission file: preflight for the storage URL,
    *  POST the bytes there (progress reaches the row), then confirm when storage
    *  answers with a location instead of the file. Returns the file id. */
-  /** A file into the signed-in user's own files, through Canvas's three-step upload. Used for the
-   *  pictures put inside a post, which have to live somewhere Canvas serves before the post can
-   *  point at them. Returns the file as Canvas recorded it. */
-  async function uploadUserFile(file, { folder = 'discussion attachments', onProgress = null } = {}) {
-    const pre = await C.post('/api/v1/users/self/files', { name: file.name, size: file.size, content_type: file.type || undefined, parent_folder_path: folder, on_duplicate: 'rename' });
-    if (!pre?.upload_url) throw new Error('Canvas did not return an upload URL');
-    const form = new FormData();
-    for (const [k, v] of Object.entries(pre.upload_params || {})) form.append(k, v);
-    form.append(pre.file_param || 'file', file, file.name); // the file must be the last field
-    let done = await C.upload(pre.upload_url, form, { onProgress });
-    if (done?.location) done = await C.get(done.location);
-    const fid = attachmentId(done);
-    if (!fid) throw new Error('the upload did not finish');
-    return { id: String(fid), name: done?.display_name || done?.filename || file.name, url: done?.url || '', previewUrl: `/users/self/files/${fid}/preview` };
-  }
-
   async function uploadSubmissionFile(cid, aid, file, onProgress) {
     const pre = await C.post(preflightPath(cid, aid), { name: file.name, size: file.size, content_type: file.type || undefined, on_duplicate: 'rename' });
     if (!pre?.upload_url) throw new Error('Canvas did not return an upload URL');
@@ -936,30 +920,6 @@
   }
   function discussionView(id, tid, { force = true, refresh = false, kind = 'courses' } = {}) {
     return C.cached(`discview:${kind}:${id}:${tid}`, MIN, () => C.get(`/api/v1/${kind}/${id}/discussion_topics/${tid}/view`).catch(() => null), { force, refresh });
-  }
-  /** Start a discussion: the fields Canvas's own new-topic form sends, and the topic it hands back.
-   *  A file goes with it the way that form sends one — as a multipart `attachment` field, which is
-   *  the one attachment Canvas keeps on a topic. */
-  async function createDiscussion(id, { title, message, threaded = true, requireInitialPost = false, allowRating = false, availableFrom = null, until = null, attachment = null }, { kind = 'courses' } = {}) {
-    const fields = {
-      title,
-      message,
-      discussion_type: threaded ? 'threaded' : 'side_comment',
-      published: true,
-      require_initial_post: !!requireInitialPost,
-      allow_rating: !!allowRating,
-      ...(availableFrom ? { delayed_post_at: availableFrom } : {}),
-      ...(until ? { lock_at: until } : {}),
-    };
-    let t;
-    if (attachment) {
-      const form = new FormData();
-      for (const [k, v] of Object.entries(fields)) form.append(k, typeof v === 'boolean' ? String(v) : v);
-      form.append('attachment', attachment, attachment.name);
-      t = await C.postForm(`/api/v1/${kind}/${id}/discussion_topics`, form);
-    } else t = await C.post(`/api/v1/${kind}/${id}/discussion_topics`, fields);
-    await C.invalidate(`disc:${kind}:${id}`); // the list is stale the moment this lands
-    return t;
   }
   async function postEntry(id, tid, message, parentId = null, { kind = 'courses' } = {}) {
     const r = parentId
@@ -1213,9 +1173,9 @@
     calendarContexts, ownContexts, selectedContexts, setSelectedContexts, calendarEvents, plannerRange,
     conversations, conversation, markRead, setStarred, replyTo, compose, searchRecipients, invalidateInbox,
     course, tabs, frontPage, syllabus, courseTodo, ignoreTodo, courseStream, assignments, assignment, submission, assignmentGroups, progress,
-    announcements, discussions, discussion, discussionView, createDiscussion, postEntry, markTopicRead, people, sections, courseGroups, pages, page,
+    announcements, discussions, discussion, discussionView, postEntry, markTopicRead, people, sections, courseGroups, pages, page,
     rootFolder, folderContents, folderByPath, file, quizzes, quiz, quizSubmissions, quizApi, modules, gradeModel, fmtPts,
     notifications, notifState, setNotifState, notifUnread,
-    homeworkTools, uploadUserFile, uploadSubmissionFile, uploadSubmissionFileFromUrl, submitAssignment, invalidateAssignment, quizAttemptLimit,
+    homeworkTools, uploadSubmissionFile, uploadSubmissionFileFromUrl, submitAssignment, invalidateAssignment, quizAttemptLimit,
   };
 })();
