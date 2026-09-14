@@ -40,7 +40,30 @@
       f.after(open);
     });
     wrap.append(...Array.from(doc.body.childNodes));
+    fitDark(wrap);
     return wrap;
+  }
+
+  // Canvas pages carry their own colours: a school's page template, an author's coloured panel, a
+  // banner with a light plate behind the text. The dark appearance recolours our own text, but it
+  // cannot recolour someone else's background — so a light panel would end up holding near-white
+  // text and read as blank. Anything the page itself paints an opaque light background on keeps
+  // dark ink instead (and its links a blue that reads on light). Measured once the prose is on the
+  // page, because the colour can come from the school's stylesheet as easily as from the markup.
+  function fitDark(wrap) {
+    if (!BCV.app?.isDark?.()) return;
+    let tries = 0;
+    const pass = () => {
+      if (!wrap.isConnected) { if (tries++ < 10) requestAnimationFrame(pass); return; }
+      for (const el of wrap.querySelectorAll('*')) {
+        const m = /rgba?\(([^)]+)\)/.exec(getComputedStyle(el).backgroundColor || '');
+        if (!m) continue;
+        const [r, g, b, a = 1] = m[1].split(',').map((n) => Number(n.trim()));
+        if (!(a > 0.5)) continue; // see-through: our own background is what shows
+        if ((0.2126 * r + 0.7152 * g + 0.0722 * b) / 255 > 0.55) el.classList.add('bcv-onlight');
+      }
+    };
+    requestAnimationFrame(pass);
   }
 
   function linksFrom(html, max = 4) {

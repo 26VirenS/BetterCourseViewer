@@ -218,7 +218,10 @@
       backTo(app, `${c.url}/pages`, 'Pages'),
       U.card(U.el('bcv-detail', [
         h('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' } }, [h('h2', { class: 'bcv-detail__title bcv-pretty', text: p.title }), p.front_page ? U.badge('Front page', 'green', 'bcv-badge--sm') : null]),
-        U.text('bcv-entry__date', `Created ${U.fmtDateComma(p.created_at)} · last edited ${U.fmtDateComma(p.updated_at)}${p.last_edited_by?.display_name ? ` by ${p.last_edited_by.display_name}` : ''}`),
+        U.text('bcv-entry__date', [
+          p.created_at ? `Created ${U.fmtDateComma(p.created_at)}` : null, // a page Canvas gives no dates for says nothing, not a bare "·"
+          p.updated_at ? `last edited ${U.fmtDateComma(p.updated_at)}${p.last_edited_by?.display_name ? ` by ${p.last_edited_by.display_name}` : ''}` : null,
+        ].filter(Boolean).join(' · ')),
         CS().prose(p.body || ''),
       ]), 'bcv-card--22'),
     );

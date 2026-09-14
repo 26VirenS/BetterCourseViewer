@@ -1306,6 +1306,24 @@ try {
   await page.waitForSelector('.bcv-front', { timeout: 10000 });
   check(await visible('.bcv-reader-btn'), 'Immersive Reader button is there on the course front page');
   await shot(page, '27-dark-course-home');
+  // a Canvas page that paints its own light panel keeps dark text there, so a school's template
+  // does not read as blank in the dark appearance
+  await page.goto(`${BASE}/courses/101/pages/course-information`);
+  await page.waitForSelector('.bcv-prose', { timeout: 10000 });
+  await page.waitForFunction(() => !!document.querySelector('.bcv-prose .bcv-onlight'), null, { timeout: 5000 }).catch(() => {});
+  const onLight = await page.evaluate(() => {
+    const panel = document.querySelector('.bcv-prose .bcv-onlight');
+    const plain = document.querySelector('.bcv-prose > p');
+    const lum = (c) => { const [r, g, b] = /rgba?\(([^)]+)\)/.exec(c)[1].split(',').map(Number); return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255; };
+    return {
+      marked: !!panel,
+      panelInk: panel ? lum(getComputedStyle(panel.querySelector('h2') || panel).color) : null,
+      panelBg: panel ? lum(getComputedStyle(panel).backgroundColor) : null,
+      plainInk: plain ? lum(getComputedStyle(plain).color) : null,
+    };
+  });
+  check(onLight.marked && onLight.panelBg > 0.55 && onLight.panelInk < 0.3 && onLight.plainInk > 0.7, `a light panel of the page's own keeps dark text in the dark appearance, while the rest of the page stays light on dark: ${JSON.stringify(onLight)}`);
+  await shot(page, '27c-dark-page-onlight');
   // punch-through pages: the hole is darkened by a filter unless "View in light mode" is on
   await page.goto(`${BASE}/courses/101/external_tools/9`);
   await page.waitForSelector('html.bcv-punch #content', { timeout: 10000 });
@@ -1767,7 +1785,7 @@ try {
   await page.goto(`${BASE}/`);
   await page.waitForSelector('.bcv-stat', { timeout: 20000 });
   check(!(await page.$('.bcv-toast')), 'signed in again, the page is itself again');
-  // a page left sitting half an hour or more is stale: the first press on coming back reloads it
+  // a page left sitting five minutes or more is stale: the first press on coming back reloads it
   // rather than acting on it, so the session is renewed and every screen is drawn again. The clock
   // the page keeps lives in the extension's own world, so the test winds it back from there.
   const windBack = (ms) => sw.evaluate(async ([base, back]) => {
@@ -1781,14 +1799,14 @@ try {
   check(!(await awakeNav) && !!(await page.$('.bcv-sheet-ov')), 'a press while the page is awake does what it says, and reloads nothing');
   await page.click('.bcv-sheet-ov', { position: { x: 5, y: 5 } }); // the scrim closes it, as everywhere else in the suite
   await page.waitForFunction(() => !document.querySelector('.bcv-sheet-ov'), null, { timeout: 5000 });
-  await windBack(31 * 60 * 1000); // away since before the half hour
+  await windBack(6 * 60 * 1000); // away since before the five minutes
   const awayNav = page.waitForNavigation({ timeout: 15000 }).then(() => true).catch(() => false);
   await page.click('.bcv-stat');
-  check(await awayNav, 'after half an hour away the first press reloads the page instead of acting on it');
+  check(await awayNav, 'after five minutes away the first press reloads the page instead of acting on it');
   await page.waitForSelector('.bcv-stat', { timeout: 20000 });
   check((await page.evaluate(() => JSON.parse(sessionStorage.getItem('bcv:reloaded') || 'null')))?.path === '/' && !(await page.$('.bcv-sheet-ov')), 'the reload is remembered (so it cannot loop) and the press it swallowed opened nothing');
   // and it never loops: away again within the minute says so instead of reloading again
-  await windBack(31 * 60 * 1000);
+  await windBack(6 * 60 * 1000);
   await page.click('.bcv-stat');
   check(await eventually(async () => /You were away for a while\. Reload the page to continue\./.test((await texts('.bcv-toast')).join(' '))), 'a second stale press within the minute asks rather than reloading again');
   await page.evaluate(() => sessionStorage.removeItem('bcv:reloaded'));

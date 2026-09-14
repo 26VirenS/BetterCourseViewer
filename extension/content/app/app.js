@@ -722,7 +722,7 @@
   // Reading counts as being here, so scrolling and typing keep the page awake; a reload that would
   // lose work (a quiz attempt, a submission being written, text half typed) gives way to a note,
   // and recover() will not reload the same page twice in a minute.
-  const AWAY_STALE = 30 * 60 * 1000;
+  const AWAY_STALE = 5 * 60 * 1000;
   state.lastHere = Date.now(); // when this page last saw a sign of life (also what the tests wind back)
   const here = () => { state.lastHere = Date.now(); };
   let scrollTick = 0;

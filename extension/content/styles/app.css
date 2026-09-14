@@ -646,6 +646,10 @@ html[data-bcv-theme="dark"] .bcv-cal__notice--warn { color: #ffb44d; }
 .bcv-prose pre code { background: transparent; padding: 0; }
 .bcv-prose hr { border: 0; border-top: 1px solid var(--bcv-sep); margin: 18px 0; }
 .bcv-prose--14 { font-size: 14.5px; }
+/* a part of a Canvas page that paints its own light background keeps dark ink in the dark
+   appearance, so a school's coloured panel does not end up white-on-white (see fitDark) */
+html[data-bcv-theme="dark"] .bcv-prose .bcv-onlight, html[data-bcv-theme="dark"] .bcv-prose .bcv-onlight * { color: #1c1c1e; }
+html[data-bcv-theme="dark"] .bcv-prose .bcv-onlight a, html[data-bcv-theme="dark"] .bcv-prose a.bcv-onlight { color: #0a5dc2; }
 .bcv-prose .bcv-embed-open { display: inline-flex; margin: 6px 0 14px; }
 .bcv-people__sections { flex: none; font: 400 12.5px/1.35 var(--bcv-font); color: var(--bcv-ink3); text-align: right; }
 .bcv-disc__badge-unread { }
