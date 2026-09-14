@@ -734,7 +734,8 @@
     if (!quiet) progress(true, state.loadKey || (withinCourse ? null : loadKeyFor(r)));
     state.quizOpen = false;
     state.submitOpen = false;
-    html.classList.remove('bcv-quiz', 'bcv-quiz-fb'); // the quiz screen puts them back while an attempt or its feedback is on screen
+    html.classList.remove('bcv-quiz', 'bcv-quiz-fb', 'bcv-quiz-pop'); // the quiz screen puts them back while an attempt or its feedback is on screen
+    for (const el of document.querySelectorAll('.bcv-qz__pop, .bcv-qz__scrim')) el.remove(); // an attempt's popup never outlives its screen
     punchOut(); // a native screen punches back in while it builds
     closeQuickNav(); // the courses panel belongs to the row it came from, not to the next screen
     syncSide(); // the sidebar follows the route in place; it is rebuilt only when what it shows changes

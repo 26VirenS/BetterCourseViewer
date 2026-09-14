@@ -40,7 +40,7 @@
     // header and the rail away so the questions take the page. app.js clears it on the next render.
 
     // fbSub: the finished attempt the feedback stage shows; fbFrom: 'done' when it was opened from the receipt
-    const st = { stage: 'intro', idx: 0, mode: 'one', quiz: null, sub: null, questions: [], flags: {}, saving: 0, savedAt: 0, timer: null, warned: {}, done: null, code: '', fbSub: null, fbFrom: null, fb: null, page: null, paged: false, inflight: new Set() };
+    const st = { stage: 'intro', idx: 0, mode: 'one', quiz: null, sub: null, questions: [], flags: {}, saving: 0, savedAt: 0, timer: null, warned: {}, done: null, code: '', fbSub: null, fbFrom: null, fb: null, page: null, paged: false, inflight: new Set(), loadingIdx: null };
     const screen = U.el('bcv-qz');
     screen.append(U.loading('Loading the quiz…'));
 
@@ -90,6 +90,7 @@
     const leave = () => {
       setOpen(false);
       clearInterval(st.timer);
+      closePop();
       app.go(quizUrl, { confirmed: true });
     };
 
@@ -110,7 +111,65 @@
     const body = h('div', { class: 'bcv-qz__body' });
     screen.replaceChildren(head, body);
 
+    // ---- the attempt as a popup confined to the course's column (desktop) ------------------------
+    // Begin / Continue open the attempt over the course's own column — a scrim and a glass card placed
+    // from the column's edges and kept there through scrolls and resizes — while the sidebar, the
+    // course header and the rail stay where they are and the intro stays underneath. The card lives
+    // on the document body (nothing above the app clips or repositions it); app.js sweeps any left
+    // behind by a navigation. A phone keeps the whole screen (html.bcv-quiz).
+    const popMode = () => !phone;
+    const scrim = h('div', { class: 'bcv-qz__scrim', 'aria-hidden': 'true' });
+    const card = h('div', { class: 'bcv-qz__popcard' });
+    const pop = h('div', { class: 'bcv-qz__pop', role: 'dialog', 'aria-modal': 'true', 'aria-label': `${quiz.title} — attempt` }, card);
+    const under = h('div', { class: 'bcv-qz__under', 'aria-hidden': 'true' }); // what shows behind the scrim: the intro, out of reach while the attempt is up
+    let popOpen = false;
+    let popRO = null;
+    function place() {
+      if (!popOpen) return;
+      const col = screen.closest('.bcv-cmain') || screen.parentElement;
+      if (!col) return;
+      const r = col.getBoundingClientRect();
+      for (const el of [scrim, pop]) {
+        el.style.setProperty('--bcv-pop-l', `${Math.max(0, Math.round(r.left))}px`);
+        el.style.setProperty('--bcv-pop-t', `${Math.max(0, Math.round(r.top))}px`);
+        el.style.setProperty('--bcv-pop-r', `${Math.max(0, Math.round(window.innerWidth - r.right))}px`);
+      }
+    }
+    function openPop() {
+      if (popOpen) return;
+      popOpen = true;
+      card.append(head, body);
+      under.replaceChildren(intro());
+      under.inert = true;
+      screen.replaceChildren(under);
+      document.body.append(scrim, pop);
+      html.classList.add('bcv-quiz-pop');
+      place();
+      window.addEventListener('scroll', place, { passive: true });
+      window.addEventListener('resize', place);
+      const col = screen.closest('.bcv-cmain');
+      if (col && typeof ResizeObserver !== 'undefined') {
+        popRO = new ResizeObserver(place);
+        popRO.observe(col);
+      }
+    }
+    function closePop() {
+      if (!popOpen) return;
+      popOpen = false;
+      window.removeEventListener('scroll', place);
+      window.removeEventListener('resize', place);
+      popRO?.disconnect();
+      popRO = null;
+      scrim.remove();
+      pop.remove();
+      html.classList.remove('bcv-quiz-pop');
+      screen.replaceChildren(head, body);
+    }
+    /** The top of whatever scrolls the attempt: the popup's own body, else the page. */
+    const toTop = () => { if (popOpen) body.scrollTop = 0; else window.scrollTo(0, 0); };
+
     function tick() {
+      if (!ctx.alive()) { closePop(); clearInterval(st.timer); return; } // the screen left with the popup up (a navigation): nothing stays behind
       const sub = st.sub;
       if (!sub) {
         timerLabel.textContent = timed ? `${quiz.time_limit} min` : '0:00';
@@ -190,25 +249,29 @@
     // ---- stages --------------------------------------------------------------------
     function draw() {
       if (!ctx.alive()) {
+        closePop();
         clearInterval(st.timer);
         window.removeEventListener('beforeunload', onUnload);
         return;
       }
+      const embedded = st.stage === 'intro' || st.stage === 'feedback'; // in the column, under the course header
+      if (popMode()) { if (embedded) closePop(); else openPop(); }
       modeWrap.replaceChildren(...(st.stage === 'take' && !forcedOne ? [
         modeBtn('one', 'One question at a time', MODE_ONE),
         modeBtn('all', 'Scroll through all questions', MODE_ALL),
       ] : []));
       modeWrap.hidden = !(st.stage === 'take' && !forcedOne);
       paintProgress();
+      body.classList.toggle('is-busy', st.loadingIdx !== null && st.stage === 'take');
       if (st.stage === 'intro') body.replaceChildren(intro());
+      else if (st.stage === 'starting') body.replaceChildren(h('p', { class: 'bcv-qz__starting', text: st.sub ? 'Resuming your attempt…' : 'Starting your attempt…' }));
       else if (st.stage === 'take') body.replaceChildren(st.mode === 'all' ? takeAll() : takeOne());
       else if (st.stage === 'review') body.replaceChildren(review());
       else if (st.stage === 'feedback') body.replaceChildren(feedback());
       else body.replaceChildren(done());
       screen.classList.toggle('is-feedback', st.stage === 'feedback');
-      const embedded = st.stage === 'intro' || st.stage === 'feedback'; // in the column, under the course header
-      screen.classList.toggle('is-embedded', embedded);
-      html.classList.toggle('bcv-quiz', !embedded); // the attempt (and its receipt) takes the page
+      screen.classList.toggle('is-embedded', embedded || popOpen); // the column keeps the intro under the popup
+      html.classList.toggle('bcv-quiz', !embedded && !popMode()); // on a phone the attempt (and its receipt) takes the page
       setOpen(st.stage === 'take' || st.stage === 'review');
       ctx.setSmart(st.stage === 'feedback' ? feedbackSmart() : {
         label: `${quiz.title} · quiz`,
@@ -220,31 +283,36 @@
       return h('button', { type: 'button', class: `bcv-qz__mode ${st.mode === key ? 'is-active' : ''}`, title: label, 'aria-label': label, onclick: () => { st.mode = key; store.setPref('quizMode', key); draw(); } }, U.svg(icon, { size: 15, width: 1.9 }));
     }
 
+    // The pills are the progress bar (mockup 14): the pill of a question on its way fills left to right
+    // like a sidebar row, while the question on screen stays put — no skeleton. Before the questions
+    // arrive, one pill stands for each question the quiz says it has, the first of them filling.
     function paintProgress() {
-      if (st.stage !== 'take') {
+      const starting = st.stage === 'starting';
+      if (st.stage !== 'take' && !starting) {
         progressWrap.replaceChildren();
         return;
       }
-      const all = st.mode === 'all';
-      progressWrap.replaceChildren(U.el(`bcv-qz__progress ${all ? 'bcv-qz__progress--all' : ''}`, st.questions.map((q, k) => {
-        const current = k === st.idx;
-        const locked = noBack && k < st.idx;
+      const all = st.mode === 'all' && !starting;
+      const list = st.questions.length ? st.questions : Array.from({ length: Math.max(1, Number(quiz.question_count) || 1) }, (_, k) => ({ id: `pending-${k}`, pending: true, flagged: false, answer: null }));
+      progressWrap.replaceChildren(U.el(`bcv-qz__progress ${all ? 'bcv-qz__progress--all' : ''}`, list.map((q, k) => {
+        const current = !starting && k === st.idx;
+        const locked = !starting && noBack && k < st.idx;
+        const loading = st.loadingIdx === k;
         return h('button', {
           type: 'button',
-          class: `bcv-qz__pill ${current ? 'is-current' : ''} ${isAnswered(q) ? 'is-answered' : ''} ${q.flagged ? 'is-flagged' : ''}`,
+          class: `bcv-qz__pill ${current ? 'is-current' : ''} ${!q.pending && isAnswered(q) ? 'is-answered' : ''} ${q.flagged ? 'is-flagged' : ''} ${loading ? 'is-loading' : ''}`,
           disabled: locked || null,
           title: `Question ${k + 1}${q.flagged ? ' · flagged' : ''}`,
           onclick: () => {
-            if (locked) return;
+            if (locked || q.pending || st.loadingIdx !== null) return;
             if (st.paged) { if (k !== st.idx) turnPage({ questionId: q.id }); return; }
             st.idx = k;
             if (all) {
-              const el = document.getElementById(`bcv-q${k}`);
-              if (el) window.scrollTo({ top: window.scrollY + el.getBoundingClientRect().top - 130, behavior: 'smooth' });
+              document.getElementById(`bcv-q${k}`)?.scrollIntoView({ block: 'start', behavior: 'smooth' });
               paintProgress();
             } else draw();
           },
-        }, String(k + 1));
+        }, h('span', { class: 'bcv-qz__pilln', text: String(k + 1) }));
       })));
     }
 
@@ -282,7 +350,10 @@
     }
 
     async function begin() {
-      body.replaceChildren(U.loading(st.sub ? 'Resuming your attempt…' : 'Starting your attempt…'));
+      // the popup opens at once, its pills standing for the questions to come, the first filling while they load
+      st.stage = 'starting';
+      st.loadingIdx = 0;
+      draw();
       try {
         st.sub = await store.quizApi.start(cid, qid, st.code);
         if (!st.paged) {
@@ -300,11 +371,13 @@
         for (const q of st.questions) q.flagged = !!q.flagged;
         if (!st.paged) st.idx = noBack ? Math.max(0, st.questions.findIndex((q) => !isAnswered(q))) : 0;
         if (st.idx < 0) st.idx = 0;
+        st.loadingIdx = null;
         st.stage = 'take';
         tick();
         draw();
-        window.scrollTo(0, 0);
+        toTop();
       } catch (e) {
+        st.loadingIdx = null;
         st.stage = 'intro';
         draw();
         U.toast(`Could not start the attempt: ${e.message}`, { error: true });
@@ -333,19 +406,26 @@
      *  form (the question is marked read, which is what "no going back" rests on); a pill fetches that
      *  question's page. Every answer is on Canvas before the move, since a read question takes no more. */
     async function turnPage(how) {
+      if (st.loadingIdx !== null) return; // one move at a time
+      // the pill of the question on its way is the progress bar; the question on screen stays, inert, until it arrives
+      const target = how.questionId !== undefined ? st.questions.findIndex((q) => String(q.id) === String(how.questionId)) : st.idx + (how.toward || 1);
+      st.loadingIdx = Math.max(0, Math.min(st.questions.length - 1, target));
+      paintProgress();
+      body.classList.add('is-busy');
       await settled();
       if (!ctx.alive()) return;
-      body.replaceChildren(U.loading(how.action ? 'Next question…' : 'Loading the question…'));
       try {
         const f = st.page?.form || {};
         const fields = { attempt: f.attempt ?? st.sub.attempt, validation_token: f.validationToken || st.sub.validation_token, last_question_id: f.lastQuestionId || cur()?.id || null };
         const pg = how.action ? await QP().advance(how.action, fields) : await QP().fetchPage(quizUrl, { questionId: how.questionId, accessCode: st.code });
         if (!ctx.alive()) return;
+        st.loadingIdx = null;
         applyPage(pg);
         draw();
-        window.scrollTo(0, 0);
+        toTop();
       } catch (e) {
         if (!ctx.alive()) return;
+        st.loadingIdx = null;
         draw();
         U.toast(`Could not move to that question: ${e.message}`, { error: true });
       }
@@ -420,23 +500,23 @@
       if (!q) return U.el('bcv-qz__page', U.emptyCard('This quiz has no questions.'));
       const last = st.paged ? !st.page?.form.nextAction : k === st.questions.length - 1;
       const back = () => {
-        if (st.paged) { turnPage(st.page?.form.prevAction ? { action: st.page.form.prevAction } : { questionId: st.questions[k - 1].id }); return; }
+        if (st.paged) { turnPage(st.page?.form.prevAction ? { action: st.page.form.prevAction, toward: -1 } : { questionId: st.questions[k - 1].id }); return; }
         st.idx = Math.max(0, k - 1);
         draw();
-        window.scrollTo(0, 0);
+        toTop();
       };
       const next = () => {
-        if (st.paged) { turnPage({ action: st.page.form.nextAction }); return; }
+        if (st.paged) { turnPage({ action: st.page.form.nextAction, toward: 1 }); return; }
         st.idx = Math.min(st.questions.length - 1, k + 1);
         draw();
-        window.scrollTo(0, 0);
+        toTop();
       };
       return h('div', { class: 'bcv-qz__stage' }, [
         U.el('bcv-qz__page', questionBlock(q, k)),
         footer([
           noBack ? null : h('button', { type: 'button', class: 'bcv-qz__btn', text: 'Back', disabled: k === 0 || null, onclick: back }),
           last
-            ? h('button', { type: 'button', class: 'bcv-qz__btn bcv-qz__btn--primary', text: 'Review answers', onclick: () => { st.stage = 'review'; draw(); window.scrollTo(0, 0); } })
+            ? h('button', { type: 'button', class: 'bcv-qz__btn bcv-qz__btn--primary', text: 'Review answers', onclick: () => { st.stage = 'review'; draw(); toTop(); } })
             : h('button', { type: 'button', class: 'bcv-qz__btn bcv-qz__btn--primary bcv-qz__btn--next', text: 'Next', onclick: next }),
         ]),
       ]);
@@ -445,7 +525,7 @@
     function takeAll() {
       return h('div', { class: 'bcv-qz__stage' }, [
         U.el('bcv-qz__page bcv-qz__page--all', st.questions.map((q, k) => questionBlock(q, k, { compact: true }))),
-        footer([h('button', { type: 'button', class: 'bcv-qz__btn bcv-qz__btn--primary', text: 'Review answers', onclick: () => { st.stage = 'review'; draw(); window.scrollTo(0, 0); } })]),
+        footer([h('button', { type: 'button', class: 'bcv-qz__btn bcv-qz__btn--primary', text: 'Review answers', onclick: () => { st.stage = 'review'; draw(); toTop(); } })]),
       ]);
     }
 
@@ -475,7 +555,7 @@
             st.idx = k;
             draw();
             if (st.mode === 'all') document.getElementById(`bcv-q${k}`)?.scrollIntoView({ block: 'start' });
-            else window.scrollTo(0, 0);
+            else toTop();
           } }, [
             h('span', { class: 'bcv-qz__sumn', text: `Q${k + 1}` }),
             h('span', { class: 'bcv-qz__sumq bcv-ellip', text: htmlToText(q.question_text || q.question_name || '', 120).replace(/\s+/g, ' ') }),
@@ -484,7 +564,7 @@
           ]);
         }), 'bcv-card--list'),
         U.el('bcv-qz__reviewbtns', [
-          h('button', { type: 'button', class: 'bcv-qz__big', text: 'Keep working', onclick: () => { st.stage = 'take'; draw(); window.scrollTo(0, 0); } }),
+          h('button', { type: 'button', class: 'bcv-qz__big', text: 'Keep working', onclick: () => { st.stage = 'take'; draw(); toTop(); } }),
           h('button', { type: 'button', class: 'bcv-qz__big bcv-qz__big--primary', text: 'Submit quiz', onclick: submit }),
         ]),
         h('p', { class: 'bcv-qz__note bcv-pretty', text: 'Submitting ends the attempt. Blank questions are graded as incorrect.' }),
@@ -494,14 +574,14 @@
     async function submit() {
       const blanks = st.questions.length - answeredCount();
       if (!window.confirm(`Submit this attempt now?${blanks ? `\n\n${U.plural(blanks, 'question is', 'questions are')} still blank.` : ''}`)) return;
-      body.replaceChildren(U.loading('Submitting…'));
+      body.replaceChildren(h('p', { class: 'bcv-qz__starting', text: 'Submitting…' })); // inside the attempt nothing is a skeleton
       try {
         st.done = await store.quizApi.complete(cid, qid, st.sub, st.code);
         st.stage = 'done';
         clearInterval(st.timer);
         app.refreshCounts();
         draw();
-        window.scrollTo(0, 0);
+        toTop();
       } catch (e) {
         st.stage = 'review';
         draw();
@@ -558,6 +638,7 @@
     function exitTo(href) {
       setOpen(false);
       clearInterval(st.timer);
+      closePop();
       app.go(href, { confirmed: true });
     }
     function openFeedback(sub, from) {
@@ -566,7 +647,7 @@
       st.fb = null;
       st.stage = 'feedback';
       draw();
-      window.scrollTo(0, 0);
+      toTop();
     }
     /** Why results are withheld (a sentence), or null when Canvas shows them. */
     function resultsHidden(sub) {
@@ -721,8 +802,8 @@
       const sub = st.fbSub;
       const wrap = U.el('bcv-fb');
       const btns = () => U.el('bcv-fb__btns', [
-        st.fbFrom === 'done' ? h('button', { type: 'button', class: 'bcv-qz__big', text: 'Back to receipt', onclick: () => { st.stage = 'done'; draw(); window.scrollTo(0, 0); } }) : null,
-        st.fbFrom === 'intro' ? h('button', { type: 'button', class: 'bcv-qz__big', text: 'Quiz overview', onclick: () => { st.stage = 'intro'; draw(); window.scrollTo(0, 0); } }) : null,
+        st.fbFrom === 'done' ? h('button', { type: 'button', class: 'bcv-qz__big', text: 'Back to receipt', onclick: () => { st.stage = 'done'; draw(); toTop(); } }) : null,
+        st.fbFrom === 'intro' ? h('button', { type: 'button', class: 'bcv-qz__big', text: 'Quiz overview', onclick: () => { st.stage = 'intro'; draw(); toTop(); } }) : null,
         h('button', { type: 'button', class: 'bcv-qz__big bcv-qz__big--primary', text: `Back to ${course.name}`, onclick: () => exitTo(course.url) }),
       ]);
       if (!sub) {

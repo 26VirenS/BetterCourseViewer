@@ -692,15 +692,19 @@ const server = http.createServer((req, res) => {
     }
     const handler = htmlPages[path];
     let qm;
+    const slow = (fn) => setTimeout(fn, mockConfig.quizPageDelay || 0); // test-only: a slow quiz page, to watch the progress fill
     if (!handler && req.method === 'GET' && (qm = path.match(/^\/courses\/(\w+)\/quizzes\/(\w+)\/take(?:\/questions\/(\w+))?$/))) { // Canvas's own quiz-taking page
-      const html = takePage(qm[1], qm[2], qm[3] || url.searchParams.get('question_id'));
-      if (!html) { res.writeHead(302, { location: `/courses/${qm[1]}/quizzes/${qm[2]}` }); return res.end(); } // no open attempt: back to the quiz page, as Canvas does
-      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'set-cookie': `_csrf_token=${encodeURIComponent(CSRF)}; Path=/` });
-      return res.end(html);
+      const [cid, quizId, qid] = [qm[1], qm[2], qm[3] || url.searchParams.get('question_id')];
+      return slow(() => {
+        const html = takePage(cid, quizId, qid);
+        if (!html) { res.writeHead(302, { location: `/courses/${cid}/quizzes/${quizId}` }); return res.end(); } // no open attempt: back to the quiz page, as Canvas does
+        res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'set-cookie': `_csrf_token=${encodeURIComponent(CSRF)}; Path=/` });
+        res.end(html);
+      });
     }
     if (req.method === 'POST' && (qm = path.match(/^\/courses\/(\w+)\/quizzes\/(\w+)\/submissions\/([\w-]+)\/record_answer$/))) { // its Next / Previous
-      res.writeHead(302, { location: recordAnswer(qm[1], qm[2], qm[3], raw) });
-      return res.end();
+      const [cid, quizId, sid] = [qm[1], qm[2], qm[3]];
+      return slow(() => { res.writeHead(302, { location: recordAnswer(cid, quizId, sid, raw) }); res.end(); });
     }
     res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'set-cookie': `_csrf_token=${encodeURIComponent(CSRF)}; Path=/` });
     res.end(handler ? handler() : page({ title: path.split('/').pop() || 'Canvas', courseId: (path.match(/^\/courses\/(\d+)/) || [])[1], body: `<h1>${path}</h1><p>Mock page rendered by Canvas.</p>` }));

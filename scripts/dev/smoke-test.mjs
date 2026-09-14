@@ -1056,9 +1056,16 @@ try {
   await page.click('.bcv-qz__begin');
   await page.waitForSelector('.bcv-qz__opt', { timeout: 10000 });
   check((await page.$$('.bcv-qz__pill')).length === 4 && (await page.$('.bcv-qz__pill:first-child.is-current')) && (await texts('.bcv-qz__qnum'))[0] === 'Question 1', 'attempt started through the API: progress pills and question 1');
-  // Begin attempt folds the chrome away, smoothly: the sidebar, the course header and the rail slide to nothing
-  const folded = await page.waitForFunction(() => document.documentElement.classList.contains('bcv-quiz') && getComputedStyle(document.querySelector('.bcv-side')).width === '0px' && getComputedStyle(document.querySelector('.bcv-rail')).width === '0px' && getComputedStyle(document.querySelector('.bcv-head--course')).maxHeight === '0px', null, { timeout: 5000 }).then(() => true).catch(() => false);
-  check(folded && /width/.test(await page.$eval('.bcv-side', (e) => getComputedStyle(e).transitionProperty)) && !(await visible('#bcv-fab')), 'the attempt takes the page: the sidebar, header and rail fold away (a transition), the smart button steps out');
+  // Begin attempt opens the attempt as a popup confined to the course's column: the sidebar, the course header
+  // and the rail stay put (nothing folds away), the intro stays underneath, the smart button steps out
+  await page.waitForSelector('body > .bcv-qz__pop .bcv-qz__opt', { timeout: 10000 });
+  const popGeo = await page.evaluate(() => {
+    const rect = (sel) => { const r = document.querySelector(sel).getBoundingClientRect(); return { l: Math.round(r.left), t: Math.round(r.top), r: Math.round(r.right), w: Math.round(r.width) }; };
+    const col = rect('.bcv-cmain'), pop = rect('.bcv-qz__pop'), scrim = rect('.bcv-qz__scrim');
+    return { col, pop, scrim, side: rect('.bcv-side').w, fold: document.documentElement.classList.contains('bcv-quiz'), popClass: document.documentElement.classList.contains('bcv-quiz-pop'), fab: getComputedStyle(document.querySelector('#bcv-fab')).display, intro: !!document.querySelector('.bcv-cmain .bcv-qz__under .bcv-qz__begin'), card: !!document.querySelector('.bcv-qz__popcard .bcv-qz__head + .bcv-qz__body') };
+  });
+  const near = (a, b) => Math.abs(a - b) <= 1;
+  check(!popGeo.fold && popGeo.popClass && popGeo.side === 242 && near(popGeo.pop.l, popGeo.col.l) && near(popGeo.pop.t, popGeo.col.t) && near(popGeo.pop.r, popGeo.col.r) && near(popGeo.scrim.l, popGeo.col.l) && popGeo.fab === 'none' && popGeo.intro && popGeo.card && (await visible('.bcv-rail')) && (await visible('.bcv-head--course')), `the attempt is a popup confined to the course's column; the sidebar, header and rail stay, the intro stays under it, the smart button steps out: ${JSON.stringify(popGeo)}`);
   check(/^(19|20):\d\d$/.test((await texts('.bcv-qz__clock'))[0]), `timer counts down from the attempt's end_at: ${(await texts('.bcv-qz__clock'))[0]}`);
   check((await page.$$('.bcv-qz__letter')).length === 5 && (await texts('.bcv-qz__letter')).join('') === 'ABCDE', 'lettered options');
   await page.click('.bcv-qz__opt');
@@ -1092,7 +1099,7 @@ try {
   await page.click('.bcv-qz__foot .bcv-qz__btn--primary');
   await page.waitForSelector('.bcv-qz__sum', { timeout: 5000 });
   const sums = await texts('.bcv-qz__sum');
-  check(sums.length === 4 && /^Q1.*-3\.15 m\/s$/.test(sums[0]) && /Q3.*Not answered/.test(sums[2]) && /^Q4.*3\.15$/.test(sums[3]) && /3 of 4 answered · 1 left blank/.test((await texts('.bcv-qz__lead'))[0]), `review lists every answer: ${sums.join(' | ')}`);
+  check(sums.length === 4 && /^Q1.*-3\.15 m\/s$/.test(sums[0]) && /Q3.*Not answered/.test(sums[2]) && /^Q4.*3\.15$/.test(sums[3]) && /3 of 4 answered · 1 left blank/.test((await texts('.bcv-qz__pop .bcv-qz__lead'))[0]), `review lists every answer: ${sums.join(' | ')}`);
   await shot(page, '22f-quiz-review');
   await page.click('.bcv-qz__sum:nth-child(3)');
   await page.waitForSelector('.bcv-qz__page--all', { timeout: 5000 });
@@ -1108,15 +1115,15 @@ try {
   await page.waitForSelector('.bcv-qz__done', { timeout: 10000 });
   const doneCards = await texts('.bcv-qz__donecard');
   // Q2 was answered wrong on purpose (-2 m): 4 + 0 + 4 + 5 of 17
-  check((await texts('.bcv-qz__h1'))[0] === 'Attempt submitted' && /Questions answered 4 of 4 answered/.test(doneCards[0]) && /Score 13 \/ 17/.test(doneCards[1] || ''), `submitted screen shows the score Canvas returned: ${doneCards.join(' | ')}`);
+  check((await texts('.bcv-qz__pop .bcv-qz__h1'))[0] === 'Attempt submitted' && /Questions answered 4 of 4 answered/.test(doneCards[0]) && /Score 13 \/ 17/.test(doneCards[1] || ''), `submitted screen shows the score Canvas returned: ${doneCards.join(' | ')}`);
   await shot(page, '22g-quiz-done');
   // ---- quiz feedback (mockup 9): the receipt leads to the attempt's results ------------------------
   console.log('quiz feedback');
   check((await texts('.bcv-qz__donebtns .bcv-qz__big')).join('|') === 'See feedback|Back to F26-MATH 021 20|Quiz page', `receipt offers the feedback once Canvas releases results: ${(await texts('.bcv-qz__donebtns .bcv-qz__big')).join('|')}`);
   await page.click('.bcv-qz__donebtns .bcv-qz__big--primary');
   await page.waitForSelector('.bcv-fb__q', { timeout: 10000 });
-  const unfolded = await page.waitForFunction(() => !document.documentElement.classList.contains('bcv-quiz') && getComputedStyle(document.querySelector('.bcv-side')).width === '242px' && getComputedStyle(document.querySelector('.bcv-rail')).width !== '0px', null, { timeout: 5000 }).then(() => true).catch(() => false);
-  check(unfolded && !!(await page.$('.bcv-cmain .bcv-qz.is-embedded .bcv-fb')), 'the feedback sits back in the course column: the sidebar, header and rail return');
+  const popGone = await page.waitForFunction(() => !document.querySelector('.bcv-qz__pop') && !document.querySelector('.bcv-qz__scrim') && !document.documentElement.classList.contains('bcv-quiz-pop') && !document.documentElement.classList.contains('bcv-quiz'), null, { timeout: 5000 }).then(() => true).catch(() => false);
+  check(popGone && !!(await page.$('.bcv-cmain .bcv-qz.is-embedded .bcv-fb')) && (await visible('#bcv-fab')), 'the feedback sits back in the course column: the popup is gone, the smart button is back');
   const fbLine = (await texts('.bcv-fb__scoreline'))[0];
   check(/^13 \/ 17 76% 3 of 4 correct · graded /.test(fbLine) && (await page.$$('.bcv-fb__q')).length === 4 && !(await page.$('.bcv-fb__comment')), `score card from the attempt's own numbers: ${fbLine}`);
   const fbCards = await texts('.bcv-fb__q');
@@ -1140,7 +1147,7 @@ try {
   await page.waitForFunction(() => !document.querySelector('#bcv-smart'), null, { timeout: 5000 });
   await page.click('.bcv-fb__btns .bcv-qz__big:first-child');
   await page.waitForSelector('.bcv-qz__done', { timeout: 5000 });
-  check((await texts('.bcv-qz__h1'))[0] === 'Attempt submitted', 'Back to receipt returns to the submitted screen');
+  check((await texts('.bcv-qz__pop .bcv-qz__h1'))[0] === 'Attempt submitted', 'Back to receipt returns to the submitted screen');
   await page.click('.bcv-qz__donebtns .bcv-qz__big:last-child');
   await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
   check(page.url() === `${BASE}/courses/101/quizzes/9011` && (await texts('.bcv-grades__side, .bcv-col .bcv-row')).some((t) => /Attempt 1/.test(t)), 'back to the quiz page, which now lists the attempt');
@@ -1162,8 +1169,13 @@ try {
   await page.click('.bcv-detail__actions .bcv-btn--primary');
   await page.waitForSelector('.bcv-qz__begin', { timeout: 10000 });
   check((await texts('.bcv-qz__bullet')).some((t) => /One question at a time, and you cannot go back/.test(t)) && (await texts('.bcv-qz__begin'))[0] === 'Begin attempt', 'the intro says one at a time and no going back; Begin starts the attempt here');
+  // a slow quiz page: the popup opens at once with a pill per question and the first filling as the progress bar — no skeleton
+  await noteApi('POST', '/__mock/config', { quizPageDelay: 900 });
   await page.click('.bcv-qz__begin');
+  await page.waitForSelector('.bcv-qz__pop .bcv-qz__pill:first-child.is-loading', { timeout: 4000 });
+  check((await page.$$('.bcv-qz__pop .bcv-qz__pill')).length === 4 && !(await page.$('.bcv-qz__pop .bcv-skel')) && (await texts('.bcv-qz__starting'))[0] === 'Starting your attempt…' && (await page.$eval('.bcv-qz__pill.is-loading', (e) => getComputedStyle(e).animationName)) === 'bcv-pill-load', 'Begin opens the popup at once: four pills for the questions to come, the first filling as the progress bar, no skeleton');
   await page.waitForSelector('.bcv-qz__opt', { timeout: 10000 });
+  check(!(await page.$('.bcv-qz__pill.is-loading')) && !(await page.$('.bcv-qz__body.is-busy')), 'the fill goes once the question is there');
   check((await page.$$('.bcv-qz__pill')).length === 4 && (await page.$('.bcv-qz__pill:first-child.is-current')) && (await texts('.bcv-qz__qnum'))[0] === 'Question 1' && (await texts('.bcv-qz__qof'))[0] === 'of 4 · 4 points' && (await texts('.bcv-qz__optlabel')).join('|') === '-3.15 m/s|-2 m/s|0 m/s|1.37 m/s|None of the above', `question 1 as read from Canvas's own quiz page, the list of four from its right column: ${(await texts('.bcv-qz__optlabel')).join(' | ')}`);
   check(!(await visible('.bcv-qz__modes')) && (await texts('.bcv-qz__foot .bcv-qz__btn')).join(',') === 'Next', 'no mode switch and no Back button when the quiz forbids it');
   await page.click('.bcv-qz__opt');
@@ -1188,7 +1200,12 @@ try {
   await page.click('.bcv-qz__opt:nth-child(4)');
   await waitText('.bcv-qz__answered', /2 of 4 answered · Saved/);
   await page.click('.bcv-qz__btn--next');
+  // while question 3 is on its way, question 2 stays on screen (inert) and pill 3 fills: the pill is the loading animation
+  await page.waitForSelector('.bcv-qz__pill:nth-child(3).is-loading', { timeout: 4000 });
+  const fillNow = await page.$eval('.bcv-qz__pill:nth-child(3)', (e) => { const cs = getComputedStyle(e); return { anim: cs.animationName, size: cs.backgroundSize, img: cs.backgroundImage.slice(0, 16) }; });
+  check((await texts('.bcv-qz__qnum'))[0] === 'Question 2' && !!(await page.$('.bcv-qz__body.is-busy')) && !(await page.$('.bcv-qz__pop .bcv-skel')) && fillNow.anim === 'bcv-pill-load' && fillNow.img === 'linear-gradient(', `moving on: the next question's pill fills like a sidebar row while the current one stays put — no skeleton (${JSON.stringify(fillNow)})`);
   await waitText('.bcv-qz__qnum', /Question 3/);
+  await noteApi('POST', '/__mock/config', { quizPageDelay: 0 });
   await page.click('.bcv-qz__opt:nth-child(1)');
   await page.click('.bcv-qz__opt:nth-child(3)');
   await waitText('.bcv-qz__answered', /3 of 4 answered · Saved/);
@@ -1201,11 +1218,11 @@ try {
   await page.click('.bcv-qz__foot .bcv-qz__btn--primary');
   await page.waitForSelector('.bcv-qz__sum', { timeout: 5000 });
   const oqSums = await texts('.bcv-qz__sum');
-  check(oqSums.length === 4 && /^Q1.*Answered$/.test(oqSums[0]) && /^Q4.*3\.15$/.test(oqSums[3]) && (await page.$$('.bcv-qz__sum:disabled')).length === 4 && /4 of 4 answered · nothing left blank/.test((await texts('.bcv-qz__lead'))[0]), `review lists every question — the ones passed as Canvas reports them, none re-openable: ${oqSums.join(' | ')}`);
+  check(oqSums.length === 4 && /^Q1.*Answered$/.test(oqSums[0]) && /^Q4.*3\.15$/.test(oqSums[3]) && (await page.$$('.bcv-qz__sum:disabled')).length === 4 && /4 of 4 answered · nothing left blank/.test((await texts('.bcv-qz__pop .bcv-qz__lead'))[0]), `review lists every question — the ones passed as Canvas reports them, none re-openable: ${oqSums.join(' | ')}`);
   page.once('dialog', (d) => d.accept());
   await page.click('.bcv-qz__big--primary');
   await page.waitForSelector('.bcv-qz__done', { timeout: 10000 });
-  check((await texts('.bcv-qz__h1'))[0] === 'Attempt submitted' && /Score \d+ \/ 20/.test((await texts('.bcv-qz__donecard'))[1] || ''), `submitted through the API, with the score Canvas returned: ${(await texts('.bcv-qz__donecard')).join(' | ')}`);
+  check((await texts('.bcv-qz__pop .bcv-qz__h1'))[0] === 'Attempt submitted' && /Score \d+ \/ 20/.test((await texts('.bcv-qz__donecard'))[1] || ''), `submitted through the API, with the score Canvas returned: ${(await texts('.bcv-qz__donecard')).join(' | ')}`);
   await page.click('.bcv-qz__donebtns .bcv-qz__big--primary');
   await page.waitForSelector('.bcv-fb__q', { timeout: 10000 });
   check((await page.$$('.bcv-fb__q')).length === 4 && (await texts('.bcv-fb__chip')).some((t) => t === 'You: -3.15 m/s') && (await texts('.bcv-fb__chip')).some((t) => t === 'You: 3.15'), `feedback for a one-at-a-time quiz: the attempt's own question set, the answers from the graded history: ${(await texts('.bcv-fb__chip')).join(' | ')}`);
