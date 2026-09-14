@@ -161,6 +161,27 @@ try {
   await page.click('.bcv-ph-row .bcv-ph-circle');
   await eventually(() => page.$eval('.bcv-ph-row', (e) => !e.classList.contains('is-done')));
 
+  // a row previews the item first: a phone has no room beside the list, so it rises from the bottom
+  const rowTitle = await page.$eval('.bcv-ph-row__title', (e) => e.textContent);
+  await page.click('.bcv-ph-row__body');
+  await page.waitForSelector('.bcv-ph-sheet--pv .bcv-pv__title', { timeout: 10000 });
+  await page.waitForFunction(() => !document.querySelector('.bcv-pv .bcv-skel'), null, { timeout: 10000 });
+  const pv = await page.$eval('.bcv-ph-sheet--pv', (e) => ({
+    title: e.querySelector('.bcv-pv__title').textContent,
+    meta: e.querySelector('.bcv-pv__meta').textContent,
+    go: e.querySelector('.bcv-ph-sheet__actions .bcv-ph-bigbtn').textContent,
+    has: !!e.querySelector('.bcv-pv__prose, .bcv-pv__none'),
+    wide: Math.round(e.getBoundingClientRect().width) === Math.round(window.innerWidth),
+  }));
+  check(pv.title === rowTitle && /^(Assignment|Quiz|Discussion|Announcement|Page) · /.test(pv.meta) && /^Open the /.test(pv.go) && pv.has && pv.wide && page.url().endsWith('/'), `a row previews the item in a sheet rather than leaving Today: ${JSON.stringify(pv)}`);
+  check(!(await page.$eval('html', (e) => e.classList.contains('bcv-preview'))), 'the phone never shifts the interface for it: the sheet carries the preview');
+  // the button under it is the way through
+  await page.click('.bcv-ph-sheet__actions .bcv-ph-bigbtn');
+  await page.waitForFunction(() => !location.pathname.endsWith('/') && !document.querySelector('.bcv-sheet-ov'), null, { timeout: 15000 });
+  check(/\/courses\/\d+\/(assignments|quizzes|discussion_topics|announcements|pages)\//.test(page.url()), `the button under the preview opens the item: ${page.url()}`);
+  await page.goto(`${BASE}/`);
+  await page.waitForSelector('.bcv-ph-row', { timeout: 15000 });
+
   // ---- Notifications (from the bell) ------------------------------------------------------------
   console.log('Notifications');
   const bellBadge = (await texts('.bcv-ph-bell__badge'))[0] || '';
@@ -414,7 +435,9 @@ try {
   // an item opened from the Today tab says Back to Today, not to the list it belongs to
   await tab('dashboard');
   await page.waitForSelector('.bcv-ph-row[href*="/assignments/"]', { timeout: 15000 });
-  await tapScreen('.bcv-ph-row[href*="/assignments/"]');
+  await page.click('.bcv-ph-row[href*="/assignments/"] .bcv-ph-row__body'); // the preview first, then through it
+  await page.waitForSelector('.bcv-ph-sheet--pv .bcv-ph-sheet__actions .bcv-ph-bigbtn', { timeout: 15000 });
+  await tapScreen('.bcv-ph-sheet--pv .bcv-ph-sheet__actions .bcv-ph-bigbtn');
   await page.waitForSelector('.bcv-ph-item__title', { timeout: 15000 });
   check(await eventually(async () => (await texts('.bcv-topbar__back'))[0] === 'Today'), `an item opened from Today says Back to Today (‹ ${(await texts('.bcv-topbar__back'))[0]})`);
   await tapScreen('.bcv-topbar__back');

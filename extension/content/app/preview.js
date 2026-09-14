@@ -1,11 +1,13 @@
-/* A preview of a dashboard item, without leaving the dashboard.
+/* A preview of a listed item, without leaving the list it is in.
  *
- * Pressing a row on the dashboard opens the item beside it rather than navigating: the interface
- * slides left and a panel comes in on the right with what that item actually says — an
- * announcement or discussion's first post, an assignment's instructions with its due date, points
- * and where the submission stands, a quiz's rules, a page's body. The button at the bottom is the
- * way through to the item's own screen; Escape, the close button, a press outside and any
- * navigation dismiss it.
+ * Pressing a row opens the item beside it rather than navigating: the interface slides left and a
+ * panel comes in on the right with what that item actually says — an announcement or discussion's
+ * first post, an assignment's instructions with its due date, points and where the submission
+ * stands, a quiz's rules, a page's body. The button at the bottom is the way through to the item's
+ * own screen; Escape, the close button, a press outside and any navigation dismiss it.
+ *
+ * A phone has no room beside a list, so there the same preview rises from the bottom as a sheet,
+ * with the same button under it — the content and the rules are one, only the shape differs.
  *
  * Only the kinds we can read are previewed. Anything else is left to navigate as it always did, so
  * a row never dead-ends in a panel that cannot say anything. */
@@ -30,7 +32,7 @@
   /** The route this link lands on, when it is an item we can preview; else null. */
   function previewable(href) {
     const app = BCV.app;
-    if (!app?.parseRoute || BCV.phone?.active()) return null; // a phone has no room beside the list
+    if (!app?.parseRoute) return null;
     let r;
     try { r = app.parseRoute(new URL(href, location.origin).href); } catch { return null; }
     if (r.params.get('bcv')) return null; // ?bcv=take, ?bcv=native and friends mean business, not a preview
@@ -138,6 +140,26 @@
     const app = BCV.app;
     close();
     const body = U.el('bcv-pv__body');
+    body.append(U.loading('rows', 3));
+    // what the panel is for, in either shape: the item read from Canvas, put into the body it owns
+    const fill = (owner) => {
+      const mine = () => cur && cur.panel === owner;
+      load(r).then((d) => {
+        if (!mine()) return;
+        const chips = (d.chips || []).filter(Boolean);
+        body.replaceChildren(...[
+          h('h2', { class: 'bcv-pv__title bcv-pretty', text: d.title }),
+          U.text('bcv-pv__meta', d.meta.filter(Boolean).join(' · ')),
+          chips.length ? U.el('bcv-pv__chips', chips.map((c) => U.badge(c[0], c[1]))) : null,
+          String(d.body || '').trim()
+            ? BCV.screens.course.prose(d.body, { cls: 'bcv-pv__prose' })
+            : U.text('bcv-pv__none', 'Canvas holds no description for this one.'),
+        ].filter(Boolean));
+      }).catch((e) => {
+        if (!mine()) return;
+        body.replaceChildren(U.errorBox(e.message || 'This could not be read.'));
+      });
+    };
     const panel = h('aside', { class: 'bcv-pv', role: 'dialog', 'aria-modal': 'false', 'aria-label': `Preview of this ${KINDS[r.tab].label}` }, [
       U.el('bcv-pv__head', [
         U.text('bcv-pv__kicker', 'Preview', 'span'),
@@ -149,6 +171,18 @@
         onclick: () => { const to = r.url; const h2 = host; close(); h2?.closest('.bcv-sheet-ov')?.remove(); app.go(to); },
       })),
     ]);
+    if (BCV.phone?.active()) {
+      // a phone: the same preview, risen from the bottom, with the button under it as a sheet action
+      const sheet = BCV.phone.openSheet({
+        label: `Preview of this ${KINDS[r.tab].label}`,
+        body: U.el('bcv-pv bcv-pv--sheet', body),
+        actions: [{ label: KINDS[r.tab].go, primary: true, onSelect: () => app.go(r.url) }],
+        cls: 'bcv-ph-sheet--pv',
+      });
+      cur = { panel: sheet?.sheet?.closest('.bcv-sheet-ov') || document.querySelector('.bcv-sheet-ov'), route: r, host: null };
+      fill(cur.panel);
+      return true;
+    }
     if (host) {
       // beside the list it was opened from, inside the thing already on screen: it widens, nothing moves
       panel.classList.add('bcv-pv--in');
@@ -162,23 +196,7 @@
       requestAnimationFrame(() => { if (cur && cur.panel === panel) document.addEventListener('pointerdown', onDown, true); });
     }
     cur = { panel, route: r, host };
-    body.append(U.loading('rows', 3));
-    const mine = () => cur && cur.panel === panel;
-    load(r).then((d) => {
-      if (!mine()) return;
-      const chips = (d.chips || []).filter(Boolean);
-      body.replaceChildren(...[
-        h('h2', { class: 'bcv-pv__title bcv-pretty', text: d.title }),
-        U.text('bcv-pv__meta', d.meta.filter(Boolean).join(' · ')),
-        chips.length ? U.el('bcv-pv__chips', chips.map((c) => U.badge(c[0], c[1]))) : null,
-        String(d.body || '').trim()
-          ? BCV.screens.course.prose(d.body, { cls: 'bcv-pv__prose' })
-          : U.text('bcv-pv__none', 'Canvas holds no description for this one.'),
-      ].filter(Boolean));
-    }).catch((e) => {
-      if (!mine()) return;
-      body.replaceChildren(U.errorBox(e.message || 'This could not be read.'));
-    });
+    fill(panel);
     return true;
   }
 

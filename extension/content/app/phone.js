@@ -86,6 +86,10 @@
     topbarEl = h('div', { id: 'bcv-topbar', class: 'bcv-topbar', hidden: true });
     return topbarEl;
   }
+  /** A row that leads to an item: the preview rises from the bottom where there is one to show,
+   *  and the row goes where it always went where there is not. */
+  const openItem = (app, url) => { if (!BCV.preview?.open(url)) app.go(url); };
+
   function paintChrome(app, { focus = false } = {}) {
     paintTabs(app);
     document.getElementById('bcv-app')?.classList.toggle('bcv-focus', focus);
@@ -298,7 +302,7 @@
       rowEl?.classList.toggle('is-done', done);
     };
     const pts = it.points !== null && it.points !== undefined ? ` · ${store.fmtPts(it.points)} pts` : '';
-    rowEl = h('a', { class: 'bcv-ph-row', href: it.url, onclick: (e) => { if (e.metaKey || e.ctrlKey) return; e.preventDefault(); app.go(it.url); } }, [
+    rowEl = h('a', { class: 'bcv-ph-row', href: it.url, onclick: (e) => { if (e.metaKey || e.ctrlKey) return; e.preventDefault(); openItem(app, it.url); } }, [
       circle,
       U.el('bcv-ph-row__body', [
         U.text('bcv-ph-row__title bcv-ellip', it.title),
@@ -1137,12 +1141,12 @@
     const kindOf = (a) => (isQuizA(a) ? 'Quiz' : (a.submission_types || []).includes('discussion_topic') ? 'Discussion' : 'Assignment');
     const hrefOf = (a) => (isQuizA(a) && a.quiz_id ? `${c.url}/quizzes/${a.quiz_id}` : `${c.url}/assignments/${a.id}`);
 
-    const workRowA = (a) => h('a', { class: 'bcv-ph-row', href: hrefOf(a), onclick: (e) => { e.preventDefault(); app.go(hrefOf(a)); } }, [
+    const workRowA = (a) => h('a', { class: 'bcv-ph-row', href: hrefOf(a), onclick: (e) => { e.preventDefault(); openItem(app, hrefOf(a)); } }, [
       h('span', { class: 'bcv-ph-row__tile', style: { background: c.palette.tint } }, U.svg(isQuizA(a) ? IC.bolt : IC.doc, { size: 15, stroke: c.palette.text, width: 1.9 })),
       U.el('bcv-ph-row__body', [U.text('bcv-ph-row__title bcv-ellip', a.name), U.text('bcv-ph-row__sub bcv-ellip', `${kindOf(a)} · ${a.points_possible !== null && a.points_possible !== undefined ? `${store.fmtPts(a.points_possible)} pts` : 'no points'}${a.due_at ? ` · ${dueText(U.parse(a.due_at))}` : ''}`)]),
       chev(),
     ]);
-    const doneRowA = (a) => h('a', { class: 'bcv-ph-row is-done', href: hrefOf(a), onclick: (e) => { e.preventDefault(); app.go(hrefOf(a)); } }, [
+    const doneRowA = (a) => h('a', { class: 'bcv-ph-row is-done', href: hrefOf(a), onclick: (e) => { e.preventDefault(); openItem(app, hrefOf(a)); } }, [
       circleBox(true),
       U.el('bcv-ph-row__body', [U.text('bcv-ph-row__title bcv-ellip', a.name), U.text('bcv-ph-row__sub bcv-ellip', `${kindOf(a)} · submitted${a.submission?.submitted_at ? ` ${U.fmtAt(a.submission.submitted_at)}` : ''}${a.submission?.workflow_state === 'graded' && a.submission.score !== null && a.submission.score !== undefined ? ` · ${store.fmtPts(a.submission.score)}/${a.points_possible ?? '–'}` : ''}`)]),
       chev(),

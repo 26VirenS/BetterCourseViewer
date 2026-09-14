@@ -1304,6 +1304,10 @@ html.bcv-preview #bcv-app { padding-right: var(--bcv-pv-w); }
   html.bcv-preview #bcv-app { padding-right: 0; }
   .bcv-pv { width: 100%; }
 }
+/* on a phone the same preview is the body of a sheet: no chrome of its own, the sheet carries it */
+.bcv-ph-sheet--pv .bcv-pv--sheet { position: static; width: auto; max-width: none; z-index: auto; border: 0; border-radius: 0; box-shadow: none; background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; animation: none; display: block; }
+.bcv-ph-sheet--pv .bcv-pv__body { max-height: min(56vh, 460px); padding: 4px 18px 6px; }
+.bcv-ph-sheet--pv .bcv-pv__title { font-size: 19px; }
 
 /* ---- toast ---------------------------------------------------------------- */
 .bcv-toast { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); z-index: 60; padding: 10px 16px; border-radius: 14px; background: var(--bcv-glass); -webkit-backdrop-filter: var(--bcv-blur-glass); backdrop-filter: var(--bcv-blur-glass); box-shadow: var(--bcv-shadow-hi); border: 1px solid var(--bcv-edge); font: 500 13px/1.3 var(--bcv-font); color: var(--bcv-ink); max-width: 480px; }
@@ -1687,6 +1691,11 @@ html.bcv-phone .bcv-qz__opts { gap: 7px; }
 html.bcv-phone .bcv-qz__opt { min-height: 52px; padding: 12px 14px; border-radius: 15px; gap: 12px; }
 html.bcv-phone .bcv-qz__letter { width: 24px; height: 24px; border-radius: 8px; font-size: 11.5px; }
 html.bcv-phone .bcv-qz__optlabel { font-size: 16px; }
+/* the full list of options under a feedback answer, at a phone's width */
+html.bcv-phone .bcv-fb__more { height: 32px; padding: 0 12px; font-size: 13px; }
+html.bcv-phone .bcv-fb__opt { flex-wrap: wrap; padding: 10px 12px; font-size: 14px; }
+html.bcv-phone .bcv-fb__opttext { flex: 1 1 60%; }
+html.bcv-phone .bcv-fb__opttag { font-size: 11px; }
 html.bcv-phone .bcv-qz__footin { padding: 10px 14px calc(10px + var(--bcv-ph-bottom)); gap: 10px; }
 html.bcv-phone .bcv-qz__btn { height: 44px; padding: 0 18px; font-size: 14.5px; }
 html.bcv-phone .bcv-qz__intro, html.bcv-phone .bcv-qz__review, html.bcv-phone .bcv-qz__done, html.bcv-phone .bcv-fb { padding: 24px 16px 40px; }
