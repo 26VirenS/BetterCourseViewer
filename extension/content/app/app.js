@@ -633,6 +633,13 @@
   // the sidebar mounts. There is no separate bar: one indicator, attached to the thing that caused
   // the wait. state.loadKey names WHICH control is loading (a boolean would light every row).
   const NAV_KEY = { dashboard: 'dashboard', todo: 'todo', notifications: 'notifications', courses: 'courses', groups: 'groups', group: 'groups', calendar: 'calendar', inbox: 'inbox', gpa: 'gpa' };
+  /** Canvas's own page for the attempt on screen — where turning the look off mid-quiz should land. */
+  function rawQuizUrl() {
+    const r = state.route;
+    if (!r || r.screen !== 'course' || r.tab !== 'quiz' || !r.courseId || !r.arg) return null;
+    return `${location.origin}/courses/${r.courseId}/quizzes/${r.arg}/take`;
+  }
+
   function loadKeyFor(r) {
     if (r.screen === 'course' && r.courseId) return state.favs.some((c) => String(c.id) === String(r.courseId)) ? `fav:${r.courseId}` : null;
     return NAV_KEY[r.screen] || null;
@@ -998,6 +1005,16 @@
         // only, and stock Canvas comes back whole rather than patched. The app's web view keeps
         // the page and repaints in place instead.
         progress(true);
+        // Turning the look off in the middle of an attempt is a different move: reloading would put
+        // the browser's own "leave this page?" in the way and then land back where the attempt was
+        // being taken, with nothing to take it in. Go to Canvas's own quiz page instead — every
+        // answer is already saved there, so the attempt simply carries on the way Canvas takes it.
+        const raw = !st.skin && state.quizOpen ? rawQuizUrl() : null;
+        if (raw) {
+          state.quizOpen = false; // the guard belongs to our screen, and our screen is being left on purpose
+          location.href = raw;
+          return;
+        }
         location.reload();
         return;
       }

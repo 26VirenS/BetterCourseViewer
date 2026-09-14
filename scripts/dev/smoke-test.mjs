@@ -942,6 +942,22 @@ try {
   // 7003 was opened from the dashboard stream earlier in this run, so Canvas now reports it read
   check(drows.length === 4 && /Is there any discussion happening this week\?.*Last post.*23 replies/.test(drows[1]) && !/23 unread/.test(drows[1]) && drows.some((t) => /Discussion Quiz for this week.*1 unread/.test(t)), `discussions (read state from Canvas): ${drows[1].slice(0, 80)}`);
   await shot(page, '15-course-discussions');
+  // starting one: Canvas takes the title and the first post together, so the sheet asks for both
+  await page.click('.bcv-head__tools .bcv-btn--primary');
+  await page.waitForSelector('.bcv-sheet--compose', { timeout: 5000 });
+  await page.click('.bcv-sheet--compose .bcv-btn--primary');
+  check((await page.$eval('.bcv-disc__err', (e) => e.textContent)) === 'A discussion needs a title.' && (await page.$$('.bcv-sheet--compose')).length === 1, 'an empty discussion is not posted: it says what is missing');
+  await page.fill('.bcv-sheet--compose .bcv-input', 'Study group for the midterm?');
+  await page.click('.bcv-sheet--compose .bcv-btn--primary');
+  check((await page.$eval('.bcv-disc__err', (e) => e.textContent)) === 'A discussion needs a first post.', 'a title alone is not a discussion either');
+  await page.fill('.bcv-sheet--compose .bcv-textarea', 'Anyone want to meet Thursday afternoon?');
+  await page.click('.bcv-sheet--compose .bcv-btn--primary');
+  await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
+  check(/\/courses\/101\/discussion_topics\/\d+$/.test(page.url()) && (await page.$eval('.bcv-detail__title', (e) => e.textContent)) === 'Study group for the midterm?' && /Anyone want to meet Thursday afternoon\?/.test(await page.$eval('.bcv-detail', (e) => e.textContent)), `a discussion started here is posted to Canvas and opened: ${page.url()}`);
+  await shot(page, '15b-new-discussion');
+  await tab('discussions');
+  await page.waitForSelector('.bcv-row', { timeout: 10000 });
+  check((await texts('.bcv-body .bcv-row')).some((t) => /Study group for the midterm\?/.test(t)), 'and it is in the list, which no longer serves what it held before');
   await page.click('.bcv-body .bcv-row');
   await page.waitForSelector('.bcv-entry', { timeout: 10000 });
   check((await page.$$('.bcv-entry')).length === 2 && (await page.$('.bcv-entry--reply')), 'thread with nested replies');
@@ -1212,8 +1228,8 @@ try {
   const fbLine = (await texts('.bcv-fb__scoreline'))[0];
   check(/^13 \/ 17 76% 3 of 4 correct · graded /.test(fbLine) && (await page.$$('.bcv-fb__q')).length === 4 && !(await page.$('.bcv-fb__comment')), `score card from the attempt's own numbers: ${fbLine}`);
   const fbCards = await texts('.bcv-fb__q');
-  check(/^Question 1 4 \/ 4 What is the velocity at t = 5\? You: -3\.15 m\/s worked solution/i.test(fbCards[0]) && !/Correct:/.test(fbCards[0]) && (await page.$('.bcv-fb__q:nth-of-type(2) img.equation_image')), `a correct question: points, Explain, your answer, the instructor's solution with Canvas's equation image: ${fbCards[0]}`);
-  check(/^Question 2 0 \/ 4 .*You: -2 m Correct: -3\.15 m worked solution 17\.68 m is the position reading/i.test(fbCards[1]), `a wrong question shows the correct answer (show_correct_answers) and the incorrect-answer comment: ${fbCards[1]}`);
+  check(/^Question 1 4 \/ 4 What is the velocity at t = 5\? You: -3\.15 m\/s Show all 5 options worked solution/i.test(fbCards[0]) && !/Correct:/.test(fbCards[0]) && (await page.$('.bcv-fb__q:nth-of-type(2) img.equation_image')), `a correct question: points, Explain, your answer, the instructor's solution with Canvas's equation image: ${fbCards[0]}`);
+  check(/^Question 2 0 \/ 4 .*You: -2 m Correct: -3\.15 m Show all 5 options worked solution 17\.68 m is the position reading/i.test(fbCards[1]), `a wrong question shows the correct answer (show_correct_answers) and the incorrect-answer comment: ${fbCards[1]}`);
   check(/Question 3 4 \/ 4 .*Your instructor left no worked solution/i.test(fbCards[2]) && /Question 4 5 \/ 5 .*You: 3\.15 .*Only one root/i.test(fbCards[3]), `no solution says so; plain-text comments render too: ${fbCards[2]} | ${fbCards[3]}`);
   // an answer that is nothing but a formula: Canvas leaves its text empty and holds the equation as
   // an image, so the chip shows the equation rather than the blank it used to ("You: ,")
@@ -1222,6 +1238,25 @@ try {
     return { eqs: [...chip.querySelectorAll('img.equation_image')].map((e) => e.getAttribute('data-equation-content')), label: chip.firstChild.textContent };
   });
   check(q3eq.eqs.length === 2 && q3eq.eqs[0] === '\\vec{v}' && q3eq.label === 'You: ', `an answer that is only a formula shows the formula in the feedback: ${JSON.stringify(q3eq)}`);
+  // the equation service sizes its picture in points at its own text size, so left alone a formula
+  // towers over the sentence holding it; it is sized to that text instead, and sits on the line
+  const eqFit = await page.$eval('.bcv-fb__solbody img.equation_image', (img) => {
+    const cs = getComputedStyle(img);
+    return { set: img.style.height, w: img.style.width, h: Math.round(img.getBoundingClientRect().height), fs: parseFloat(getComputedStyle(img.parentElement).fontSize), natural: img.naturalHeight, va: cs.verticalAlign, display: cs.display, attrs: img.hasAttribute('width') || img.hasAttribute('height') };
+  });
+  check(/em$/.test(eqFit.set) && eqFit.w === 'auto' && !eqFit.attrs && eqFit.h < eqFit.natural && eqFit.h > eqFit.fs && eqFit.h <= eqFit.fs * 4 && eqFit.va === 'middle' && eqFit.display === 'inline-block', `a formula is sized to the text it sits in and reads on the line: ${JSON.stringify(eqFit)}`);
+  // every option the question offered, for checking the rest — folded away until asked for
+  const optsBtn = await page.$$('.bcv-fb__q .bcv-fb__more');
+  check(optsBtn.length === 3 && (await page.$eval('.bcv-fb__q .bcv-fb__more .bcv-fb__morelbl', (e) => e.textContent)) === 'Show all 5 options' && (await page.$eval('.bcv-fb__q .bcv-fb__opts', (e) => e.hidden)), 'each choice question offers its full list of options, folded away');
+  await optsBtn[0].click();
+  const shownOpts = await page.$$eval('.bcv-fb__q:nth-of-type(2) .bcv-fb__opt', (els) => els.map((e) => e.textContent.trim().replace(/\s+/g, ' ')));
+  check(shownOpts.length === 5 && shownOpts[0] === 'A-3.15 m/sYour answerCorrect' && (await page.$eval('.bcv-fb__q .bcv-fb__more .bcv-fb__morelbl', (e) => e.textContent)) === 'Hide the options', `the options open with your pick marked: ${shownOpts.join(' | ')}`);
+  // a wrong question marks the right one as well, since this quiz shows correct answers
+  await (await page.$$('.bcv-fb__q .bcv-fb__more'))[1].click();
+  const wrongOpts = await page.$$eval('.bcv-fb__q:nth-of-type(3) .bcv-fb__opt', (els) => els.map((e) => `${e.textContent.trim().replace(/\s+/g, ' ')}${e.classList.contains('is-right') ? ' [right]' : ''}${e.classList.contains('is-mine') ? ' [mine]' : ''}`));
+  check(wrongOpts.length === 5 && wrongOpts.filter((t) => t.includes('[right]')).length === 1 && wrongOpts.filter((t) => t.includes('[mine]')).length === 1 && wrongOpts.some((t) => /Correct.*\[right\]/.test(t)), `a wrong question marks both your pick and the right one: ${wrongOpts.join(' | ')}`);
+  await (await page.$$('.bcv-fb__q .bcv-fb__more'))[0].click();
+  check(await page.$eval('.bcv-fb__q .bcv-fb__opts', (e) => e.hidden), 'pressing it again folds the options away');
   const eqText = await sw.evaluate(async (base) => {
     const [tab] = await chrome.tabs.query({ url: `${base}/*` });
     const [{ result }] = await chrome.scripting.executeScript({
@@ -1635,6 +1670,24 @@ try {
   await setSettings({ appearance: { skin: false } });
   await page.waitForFunction(() => !document.documentElement.classList.contains('bcv-on'), null, { timeout: 5000 });
   check(page.url() === `${BASE}/courses` && (await visible('#application')) && (await page.title()).includes('courses'), 'look off after navigating shows the same page in stock Canvas (it was underneath all along)');
+  // Turning the look off with an attempt on screen is not a reload: reloading would put the
+  // browser's own "leave this page?" in the way and then land back on our quiz flow with nothing to
+  // run it. It goes to Canvas's own take page, where every answer already saved is picked up.
+  await page.goto(`${BASE}/courses/101/quizzes/9001`); // with the look still off, then turn it on here
+  await page.waitForSelector('#application', { timeout: 10000 });
+  await setSettings({ appearance: { skin: true } });
+  await page.waitForSelector('.bcv-detail__title', { timeout: 20000 });
+  await sw.evaluate(async () => (await fetch('http://localhost:8787/__mock/reopen-quiz', { method: 'POST', body: JSON.stringify({ quizId: '9001' }) })).ok);
+  await sw.evaluate(async (base) => {
+    const [tab] = await chrome.tabs.query({ url: `${base}/*` });
+    await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'ISOLATED', func: () => { self.BCV.app.state.quizOpen = true; } });
+  }, BASE);
+  await setSettings({ appearance: { skin: false } });
+  await page.waitForURL(`${BASE}/courses/101/quizzes/9001/take`, { timeout: 15000 });
+  await page.waitForLoadState('domcontentloaded');
+  check(page.url() === `${BASE}/courses/101/quizzes/9001/take` && (await visible('#application')) && !(await page.$('#bcv-app')) && (await page.$('#submit_quiz_form, .question_holder')) !== null, `the look off mid-attempt lands on Canvas's own quiz page rather than reloading ours: ${page.url()}`);
+  await page.goto(`${BASE}/courses`); // the look is still off: back where the next check expects it
+  await page.waitForSelector('#application', { timeout: 10000 });
   await setSettings({ appearance: { skin: true } });
   await page.waitForSelector('#bcv-app .bcv-nav__item', { timeout: 10000 });
 

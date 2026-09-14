@@ -479,6 +479,13 @@ on('GET', /^\/api\/v1\/groups\/(\w+)$/, (url, m) => { const g = groupList.find((
 // test-only switches: POST /__mock/config {"calendarFail": true}
 const mockConfig = { calendarFail: false };
 on('POST', /^\/__mock\/config$/, (url, m, body) => Object.assign(mockConfig, body));
+// test-only: put an attempt back to untaken, so Canvas's own take page has something to show
+on('POST', /^\/__mock\/reopen-quiz$/, (url, m, body) => {
+  const s = (quizSubs.get(String(body.quizId)) || [])[0];
+  if (!s) return { __status: 404, errors: [{ message: 'no attempt' }] };
+  s.workflow_state = 'untaken';
+  return { ok: true };
+});
 on('GET', /^\/api\/v1\/calendar_events$/, (url) => {
   const codes = url.searchParams.getAll('context_codes[]');
   const type = url.searchParams.get('type') || 'event';
@@ -514,6 +521,13 @@ on('PUT', /^\/api\/v1\/courses\/(\w+)\/discussion_topics\/(\w+)\/read_all$/, (ur
   return { ok: true };
 });
 on('GET', /^\/api\/v1\/courses\/(\w+)\/discussion_topics\/(\w+)$/, (url, m) => topicFull(m[1], m[2]));
+// starting a discussion: Canvas takes the title and the first post together and hands back the topic
+on('POST', /^\/api\/v1\/courses\/(\w+)\/discussion_topics$/, (url, m, body) => {
+  if (!body.title || !body.message) return { __status: 400, errors: [{ message: 'title and message are required' }] };
+  const t = { id: String(Date.now()), title: body.title, message: body.message, posted_at: new Date().toISOString(), created_at: new Date().toISOString(), last_reply_at: null, unread_count: 0, discussion_subentry_count: 0, read_state: 'read', published: body.published !== false, discussion_type: body.discussion_type || 'threaded', author: { display_name: 'Ava Student' }, user_name: 'Ava Student', pinned: false, locked: false };
+  discussions[m[1]] = [t, ...(discussions[m[1]] || [])];
+  return { ...t, html_url: `/courses/${m[1]}/discussion_topics/${t.id}` };
+});
 on('GET', /^\/api\/v1\/courses\/(\w+)\/discussion_topics$/, (url, m) => (url.searchParams.get('only_announcements') === 'true' ? (announcements[m[1]] || []) : (discussions[m[1]] || [])).map((t) => ({ ...t, html_url: `/courses/${m[1]}/discussion_topics/${t.id}` })));
 on('GET', /^\/api\/v1\/courses\/(\w+)\/users$/, (url, m) => people(m[1]));
 on('GET', /^\/api\/v1\/courses\/(\w+)\/sections$/, (url, m) => sections(m[1]));
@@ -679,9 +693,16 @@ const server = http.createServer((req, res) => {
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
       return res.end('<html><body style="font-family:sans-serif;padding:20px"><div id="file_preview">Canvas file preview</div></body></html>');
     }
-    if (path.startsWith('/equation_images/')) { // Canvas renders LaTeX in question feedback as images
+    if (path.startsWith('/equation_images/')) {
+      // Canvas does not typeset a formula itself: it hands the LaTeX to its equation service and
+      // serves back what that returns — an SVG sized in points, at the service's own text size, so
+      // the browser renders it a third larger again and a stacked formula comes back two lines tall.
+      let tex = path.slice('/equation_images/'.length);
+      try { tex = decodeURIComponent(tex); } catch { /* leave it as it came */ }
+      const tall = /\\frac|\\lim|\\sum|\\int|\\sqrt/.test(tex);
+      const [w, hh] = tall ? [58, 34] : [30, 12];
       res.writeHead(200, { 'content-type': 'image/svg+xml' });
-      return res.end('<svg xmlns="http://www.w3.org/2000/svg" width="130" height="28"><text x="0" y="20" font-size="16" font-family="serif">v(5) = dx/dt = 0</text></svg>');
+      return res.end(`<svg xmlns="http://www.w3.org/2000/svg" width="${w}pt" height="${hh}pt" viewBox="0 0 ${w} ${hh}"><text x="0" y="${hh - 2}" font-size="9" font-family="serif">${tex.replace(/[<>&]/g, '')}</text></svg>`);
     }
     if (path === '/logout') { // Canvas's logout: a DELETE (a POST with _method=delete) carrying the session's token
       const params = new URLSearchParams(raw);

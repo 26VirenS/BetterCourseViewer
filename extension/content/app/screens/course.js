@@ -40,8 +40,34 @@
       f.after(open);
     });
     wrap.append(...Array.from(doc.body.childNodes));
+    fitMath(wrap);
     fitDark(wrap);
     return wrap;
+  }
+
+  // Canvas does not typeset a formula on the page: it asks its equation service for a picture of one
+  // and drops that in. What comes back is an SVG sized in points at the service's own idea of a text
+  // size, so left alone it renders about half again too large and sits on the line like a picture
+  // rather than like text — a fraction towers over the sentence holding it, pushing the words to the
+  // bottom of the line. The shape is right, only the size is not, so the height is set from the
+  // picture's own proportions in ems — a formula then follows the text it sits in at every size —
+  // and the width is left to follow. A tall one (a limit over a fraction) is allowed four lines; a
+  // small one is never shrunk below the text around it.
+  const MATH_PT = 0.75; // points to CSS pixels, undone: the service sizes the picture in points
+  const MATH_BASE = 16; // the text size it typesets for
+  function fitMath(wrap) {
+    for (const img of wrap.querySelectorAll('img.equation_image')) {
+      img.removeAttribute('width'); // Canvas's own numbers are the picture's, not the line's
+      img.removeAttribute('height');
+      const fit = () => {
+        if (!img.naturalHeight) return;
+        const em = (img.naturalHeight * MATH_PT) / MATH_BASE;
+        img.style.height = `${Math.min(Math.max(em, 1), 4).toFixed(3)}em`;
+        img.style.width = 'auto';
+      };
+      if (img.complete) fit();
+      else img.addEventListener('load', fit, { once: true });
+    }
   }
 
   // Canvas pages carry their own colours: a school's page template, an author's coloured panel, a
@@ -706,13 +732,68 @@
     return b;
   };
 
+  /** Start a discussion: Canvas takes the title and the first post together, so the sheet asks for
+   *  both and the topic it creates is opened straight away. */
+  function composeDiscussion(ctx, shell, onMade) {
+    const c = shell.course;
+    document.querySelector('.bcv-sheet-ov')?.remove();
+    const ov = U.el('bcv-sheet-ov', null, { role: 'dialog', 'aria-label': 'New discussion' });
+    const close = () => ov.remove();
+    ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
+    ov.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+    const title = h('input', { class: 'bcv-input', type: 'text', placeholder: 'Title', maxlength: '255', 'aria-label': 'Title' });
+    const message = h('textarea', { class: 'bcv-textarea', rows: 7, placeholder: 'What would you like to say?', 'aria-label': 'First post' });
+    const err = U.text('bcv-error bcv-disc__err', '');
+    err.hidden = true;
+    let busy = false;
+    const post = U.btn('Post', { kind: 'primary', onClick: async () => {
+      if (busy) return;
+      const t = title.value.trim(), m = message.value.trim();
+      if (!t || !m) {
+        err.textContent = !t ? 'A discussion needs a title.' : 'A discussion needs a first post.';
+        err.hidden = false;
+        (t ? message : title).focus();
+        return;
+      }
+      busy = true;
+      post.disabled = true;
+      err.hidden = true;
+      try {
+        const made = await store.createDiscussion(c.id, { title: t, message: m }, { kind: shell.kind });
+        close();
+        U.toast('Discussion posted.');
+        onMade?.(made);
+      } catch (e) {
+        busy = false;
+        post.disabled = false;
+        // Canvas refuses when the course does not let students start one; say that rather than the raw error
+        err.textContent = /403|unauthor|not allowed|permission/i.test(e?.message || '')
+          ? 'This course does not let students start a discussion.'
+          : `It could not be posted: ${e?.message || e}`;
+        err.hidden = false;
+      }
+    } });
+    ov.append(U.el('bcv-sheet bcv-sheet--compose', [
+      U.el('bcv-sheet__head', [
+        U.el('bcv-sheet__titles', [U.text('bcv-sheet__title', 'New discussion'), U.text('bcv-sheet__note', c.shortName || c.name)]),
+        h('button', { type: 'button', class: 'bcv-sheet__close', 'aria-label': 'Close', onclick: close }, U.svg(IC.close, { size: 13, stroke: 'var(--bcv-ink2)', width: 2.3 })),
+      ]),
+      U.el('bcv-compose', [title, message, err]),
+      U.el('bcv-sheet__foot', [U.btn('Cancel', { onClick: close }), post]),
+    ]));
+    document.body.append(ov);
+    ov.tabIndex = -1;
+    title.focus();
+  }
+
   T.discussions = async (ctx, shell) => {
     const { app } = ctx;
     const c = shell.course;
     const b = body();
     let query = '';
     const wrap = h('div');
-    b.append(U.el('bcv-head__tools', [U.search('Search by title or author', (q) => { query = q.toLowerCase(); draw(); }, 'bcv-search--200'), U.text('bcv-group__sub', 'Ordered by recent activity', 'span')]), wrap);
+    const newBtn = U.btn('New discussion', { kind: 'primary', icon: IC.plus, iconColor: '#fff', onClick: () => composeDiscussion(ctx, shell, (made) => { if (made?.id) app.go(`${c.url}/discussion_topics/${made.id}`); }) });
+    b.append(U.el('bcv-head__tools', [U.search('Search by title or author', (q) => { query = q.toLowerCase(); draw(); }, 'bcv-search--200'), U.text('bcv-group__sub', 'Ordered by recent activity', 'span'), h('div', { class: 'bcv-ml-auto' }, newBtn)]), wrap);
     b.querySelector('.bcv-head__tools').style.marginTop = '0';
     wrap.append(U.loading());
     const list = await store.discussions(c.id, { kind: shell.kind }).catch(() => null);
@@ -968,6 +1049,6 @@
     return b;
   };
 
-  BCV.screens.course = { render, prose, linksFrom, typeIcon, ptsLabel, statusBadge, openReader, contextShell, keptShell, holdShell, heldShell, syncShell, warmTab, warmTabs };
+  BCV.screens.course = { render, prose, fitMath, linksFrom, typeIcon, ptsLabel, statusBadge, openReader, contextShell, keptShell, holdShell, heldShell, syncShell, warmTab, warmTabs };
   BCV.screens.courseTabs = T;
 })();

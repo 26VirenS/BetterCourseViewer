@@ -695,6 +695,47 @@
       const score = sub.kept_score ?? sub.score;
       return { sub, rows, released, comments, possible, score: score === null || score === undefined ? null : Number(score), gradedAt: asub?.graded_at || sub.finished_at };
     }
+    /** Every option the question offered, folded away under the answer. The chips say what you put
+     *  and what was right; this is for checking the rest — what the other options actually were, and
+     *  which of them you picked. Nothing is revealed that the quiz keeps back: an option is marked
+     *  correct only where Canvas already shows the correct answer. */
+    function fbOptions(r) {
+      const q = r.q;
+      const opts = q.answers || [];
+      if (!(CHOICE.has(q.question_type) || MULTI.has(q.question_type)) || !opts.length) return null;
+      const a = q.answer;
+      const mine = new Set((Array.isArray(a) ? a : answered(a) ? [a] : []).map(String));
+      const marksRight = correctVisible() && r.correct !== null;
+      const list = U.el('bcv-fb__opts', opts.map((o, j) => {
+        const picked = mine.has(String(o.id));
+        const right = marksRight && Number(o.weight) === 100;
+        const body = String(o.text || '').trim()
+          ? h('span', { class: 'bcv-fb__opttext', text: o.text })
+          : String(o.html || '').trim()
+            ? CS().prose(o.html, { cls: 'bcv-fb__opttext bcv-fb__chiprich' })
+            : h('span', { class: 'bcv-fb__opttext', text: '—' });
+        return U.el(`bcv-fb__opt ${picked ? 'is-mine' : ''} ${right ? 'is-right' : ''}`, [
+          h('span', { class: 'bcv-fb__optletter', text: LETTERS[j] || String(j + 1) }),
+          body,
+          picked ? U.text('bcv-fb__opttag', 'Your answer', 'span') : null,
+          right ? U.text('bcv-fb__opttag bcv-fb__opttag--right', 'Correct', 'span') : null,
+        ]);
+      }));
+      list.hidden = true;
+      const label = U.text('bcv-fb__morelbl', `Show all ${U.plural(opts.length, 'option')}`, 'span');
+      const btn = h('button', {
+        type: 'button', class: 'bcv-fb__more', 'aria-expanded': 'false',
+        onclick: () => {
+          const open = list.hidden;
+          list.hidden = !open;
+          btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+          btn.classList.toggle('is-open', open);
+          label.textContent = open ? 'Hide the options' : `Show all ${U.plural(opts.length, 'option')}`;
+        },
+      }, [label, U.svg(IC.chevron, { size: 12, width: 2.2, cls: 'bcv-fb__morechev' })]);
+      return U.el('bcv-fb__optwrap', [btn, list]);
+    }
+
     function fbCard(r, i) {
       const dark = app.isDark();
       const ok = r.correct === true, part = r.correct === 'partial', bad = r.correct === false;
@@ -716,6 +757,7 @@
           h('span', { class: 'bcv-fb__chip', style: { background: tint, color: ink } }, chipBody('You: ', r.yours)),
           showRight ? h('span', { class: 'bcv-fb__chip bcv-fb__chip--right' }, chipBody('Correct: ', r.right)) : null,
         ]),
+        fbOptions(r),
         U.el('bcv-fb__sol', [
           U.text('bcv-fb__kicker', 'Worked solution', 'span'),
           sol ? (sol.html ? CS().prose(sol.html, { cls: 'bcv-fb__solbody' }) : h('p', { class: 'bcv-fb__solbody', text: sol.text })) : U.text('bcv-fb__none', 'Your instructor left no worked solution for this question.'),

@@ -921,6 +921,12 @@
   function discussionView(id, tid, { force = true, refresh = false, kind = 'courses' } = {}) {
     return C.cached(`discview:${kind}:${id}:${tid}`, MIN, () => C.get(`/api/v1/${kind}/${id}/discussion_topics/${tid}/view`).catch(() => null), { force, refresh });
   }
+  /** Start a discussion. Canvas takes the title and the first post together; the topic comes back. */
+  async function createDiscussion(id, { title, message }, { kind = 'courses' } = {}) {
+    const t = await C.post(`/api/v1/${kind}/${id}/discussion_topics`, { title, message, discussion_type: 'threaded', published: true });
+    await C.invalidate(`disc:${kind}:${id}`); // the list is stale the moment this lands
+    return t;
+  }
   async function postEntry(id, tid, message, parentId = null, { kind = 'courses' } = {}) {
     const r = parentId
       ? await C.post(`/api/v1/${kind}/${id}/discussion_topics/${tid}/entries/${parentId}/replies`, { message })
@@ -1173,7 +1179,7 @@
     calendarContexts, ownContexts, selectedContexts, setSelectedContexts, calendarEvents, plannerRange,
     conversations, conversation, markRead, setStarred, replyTo, compose, searchRecipients, invalidateInbox,
     course, tabs, frontPage, syllabus, courseTodo, ignoreTodo, courseStream, assignments, assignment, submission, assignmentGroups, progress,
-    announcements, discussions, discussion, discussionView, postEntry, markTopicRead, people, sections, courseGroups, pages, page,
+    announcements, discussions, discussion, discussionView, createDiscussion, postEntry, markTopicRead, people, sections, courseGroups, pages, page,
     rootFolder, folderContents, folderByPath, file, quizzes, quiz, quizSubmissions, quizApi, modules, gradeModel, fmtPts,
     notifications, notifState, setNotifState, notifUnread,
     homeworkTools, uploadSubmissionFile, uploadSubmissionFileFromUrl, submitAssignment, invalidateAssignment, quizAttemptLimit,
