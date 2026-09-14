@@ -1012,12 +1012,23 @@
       await C.invalidate(`quizsubs:${courseId}:${quizId}`);
       return sub;
     },
-    /** The attempt's questions, merged with their full text and answers. */
-    async questions(sub) {
-      const r = await C.get(`/api/v1/quiz_submissions/${sub.id}/questions`, { params: { include: ['quiz_question'] } });
-      const full = new Map((r?.quiz_questions || []).map((q) => [String(q.id), q]));
-      return (r?.quiz_submission_questions || []).map((q) => ({ ...(full.get(String(q.id)) || {}), ...q, id: String(q.id) }))
-        .sort((a, b) => (a.position || 0) - (b.position || 0));
+    /** The attempt's questions, merged with their full text and answers. A quiz set to one question at
+     *  a time refuses this listing ("Cannot receive one question at a time questions in the API"); for
+     *  a finished attempt its question set is still readable from the quiz's own questions endpoint,
+     *  scoped to that attempt (once the results are visible), without the answers — those come from
+     *  the graded history the caller holds. */
+    async questions(sub, { courseId = null, quizId = null } = {}) {
+      try {
+        const r = await C.get(`/api/v1/quiz_submissions/${sub.id}/questions`, { params: { include: ['quiz_question'] } });
+        const full = new Map((r?.quiz_questions || []).map((q) => [String(q.id), q]));
+        return (r?.quiz_submission_questions || []).map((q) => ({ ...(full.get(String(q.id)) || {}), ...q, id: String(q.id) }))
+          .sort((a, b) => (a.position || 0) - (b.position || 0));
+      } catch (e) {
+        if (!courseId || !/one question at a time/i.test(e.message || '')) throw e;
+        const qs = await C.get(`/api/v1/courses/${courseId}/quizzes/${quizId || sub.quiz_id}/questions`, { params: { quiz_submission_id: sub.id, quiz_submission_attempt: sub.attempt, per_page: 50 }, all: true, maxPages: 4 });
+        return (Array.isArray(qs) ? qs : []).map((q) => ({ ...q, id: String(q.id), answer: null, flagged: false }))
+          .sort((a, b) => (a.position || 0) - (b.position || 0));
+      }
     },
     answer(sub, questionId, answer) {
       return C.post(`/api/v1/quiz_submissions/${sub.id}/questions`, { attempt: sub.attempt, validation_token: sub.validation_token, quiz_questions: [{ id: questionId, answer }] });

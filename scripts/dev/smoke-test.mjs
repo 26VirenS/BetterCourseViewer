@@ -1152,28 +1152,63 @@ try {
   await page.click('.bcv-qz__begin');
   await page.waitForSelector('.bcv-fb__q', { timeout: 10000 });
   check((await texts('.bcv-fb__btns .bcv-qz__big')).join('|') === 'Quiz overview|Back to F26-MATH 021 20', 'feedback opened from the intro links back to it');
-  // one question at a time: Canvas's API refuses the questions ("Cannot receive one question at a time
-  // questions in the API"), so the attempt runs on Canvas's own quiz page inside the shell
+  // one question at a time + no going back. Canvas's API refuses to list these questions ("Cannot receive one
+  // question at a time questions in the API"; the mock refuses too), so each one is read from Canvas's own quiz
+  // page and every move goes through that page's record-answer form — which is also how Canvas enforces no
+  // going back. Answers, flags, the clock and the submit stay API calls.
   await page.goto(`${BASE}/courses/101/quizzes/9014`);
   await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
-  check((await texts('.bcv-detail__actions .bcv-btn')).join(',') === 'Take the quiz in Canvas' && (await texts('.bcv-detail .bcv-hint')).some((t) => /one question at a time on its own page/.test(t)), `a one-question-at-a-time quiz sends you to Canvas's own page, and says why: ${(await texts('.bcv-detail__actions .bcv-btn')).join(',')}`);
+  check((await texts('.bcv-detail__actions .bcv-btn')).join(',') === 'Take the quiz,Open in Canvas', 'a one-question-at-a-time quiz has the same Take button as any other');
   await page.click('.bcv-detail__actions .bcv-btn--primary');
-  await page.waitForSelector('html.bcv-punch #content #take_quiz_link', { timeout: 10000 });
-  check(page.url() === `${BASE}/courses/101/quizzes/9014?bcv=native` && (await visible('.bcv-side')), `Take the quiz lands on Canvas's quiz page inside the shell, with Canvas's own Take button (${page.url().replace(BASE, '')})`);
-  await page.goto(`${BASE}/courses/101/quizzes/9014?bcv=take`);
   await page.waitForSelector('.bcv-qz__begin', { timeout: 10000 });
-  check((await texts('.bcv-qz__bullet')).some((t) => /one question at a time on its own page, and you cannot go back/.test(t)) && (await texts('.bcv-qz__begin'))[0] === 'Begin in Canvas', 'a link straight to the intro says so too, and Begin opens it there');
+  check((await texts('.bcv-qz__bullet')).some((t) => /One question at a time, and you cannot go back/.test(t)) && (await texts('.bcv-qz__begin'))[0] === 'Begin attempt', 'the intro says one at a time and no going back; Begin starts the attempt here');
   await page.click('.bcv-qz__begin');
-  await page.waitForSelector('html.bcv-punch #content #take_quiz_link', { timeout: 10000 });
-  check(page.url() === `${BASE}/courses/101/quizzes/9014?bcv=native`, 'Begin goes to Canvas\'s quiz page, never to the API');
-  // an attempt Canvas already opened (the API's own refusal, seen after the start call) is carried on over there
-  await noteApi('POST', '/api/v1/courses/101/quizzes/9014/submissions', {});
-  await page.goto(`${BASE}/courses/101/quizzes/9014`);
+  await page.waitForSelector('.bcv-qz__opt', { timeout: 10000 });
+  check((await page.$$('.bcv-qz__pill')).length === 4 && (await page.$('.bcv-qz__pill:first-child.is-current')) && (await texts('.bcv-qz__qnum'))[0] === 'Question 1' && (await texts('.bcv-qz__qof'))[0] === 'of 4 · 4 points' && (await texts('.bcv-qz__optlabel')).join('|') === '-3.15 m/s|-2 m/s|0 m/s|1.37 m/s|None of the above', `question 1 as read from Canvas's own quiz page, the list of four from its right column: ${(await texts('.bcv-qz__optlabel')).join(' | ')}`);
+  check(!(await visible('.bcv-qz__modes')) && (await texts('.bcv-qz__foot .bcv-qz__btn')).join(',') === 'Next', 'no mode switch and no Back button when the quiz forbids it');
+  await page.click('.bcv-qz__opt');
+  await waitText('.bcv-qz__answered', /1 of 4 answered · Saved/);
+  const oqSub = (await noteApi('GET', '/api/v1/courses/101/quizzes/9014/submissions')).quiz_submissions.find((s) => s.workflow_state === 'untaken');
+  let oq = await noteApi('GET', `/__mock/quizsub/${oqSub.id}`);
+  check(String(oq.answers['90141']) === '901411' && !oq.read['90141'], 'the pick went through the quiz-submission API; nothing is marked read yet');
+  await page.click('.bcv-qz__flag');
+  await page.waitForSelector('.bcv-qz__flag.is-on', { timeout: 5000 });
+  await page.click('.bcv-qz__btn--next');
+  await waitText('.bcv-qz__qnum', /Question 2/);
+  oq = await noteApi('GET', `/__mock/quizsub/${oqSub.id}`);
+  check(oq.read['90141'] === true && oq.flags['90141'] === true && (await page.$('.bcv-qz__pill:first-child:disabled')) && (await page.$('.bcv-qz__pill:first-child.is-answered.is-flagged')) && (await page.$('.bcv-qz__pill:nth-child(2).is-current')), 'Next posted Canvas\'s record-answer form: question 1 is marked read (and locked here), the flag went through the API, question 2 came from the next page');
+  await page.click('.bcv-qz__exit');
   await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
-  check((await texts('.bcv-detail__actions .bcv-btn--primary'))[0] === 'Resume in Canvas' && (await page.$eval('.bcv-col .bcv-row[href]', (a) => a.getAttribute('href'))) === '/courses/101/quizzes/9014/take?bcv=native', 'an open attempt resumes on Canvas\'s take page, from the button and the attempt row');
+  check(page.url() === `${BASE}/courses/101/quizzes/9014` && (await texts('.bcv-detail__actions .bcv-btn--primary'))[0] === 'Resume attempt', 'Save and exit keeps the attempt open: the quiz page offers to resume it');
   await page.click('.bcv-detail__actions .bcv-btn--primary');
-  await page.waitForSelector('html.bcv-punch #content #submit_quiz_form', { timeout: 10000 });
-  check(page.url() === `${BASE}/courses/101/quizzes/9014/take?bcv=native`, 'Resume lands on the open attempt in Canvas');
+  await page.waitForSelector('.bcv-qz__begin', { timeout: 10000 });
+  await page.click('.bcv-qz__begin');
+  await page.waitForSelector('.bcv-qz__opt', { timeout: 10000 });
+  check((await texts('.bcv-qz__qnum'))[0] === 'Question 2' && (await page.$('.bcv-qz__pill:first-child.is-answered:disabled')) && (await texts('.bcv-qz__answered'))[0].startsWith('1 of 4 answered'), 'resuming lands on the first unread question, as Canvas decides, with question 1 still counted as answered');
+  await page.click('.bcv-qz__opt:nth-child(4)');
+  await waitText('.bcv-qz__answered', /2 of 4 answered · Saved/);
+  await page.click('.bcv-qz__btn--next');
+  await waitText('.bcv-qz__qnum', /Question 3/);
+  await page.click('.bcv-qz__opt:nth-child(1)');
+  await page.click('.bcv-qz__opt:nth-child(3)');
+  await waitText('.bcv-qz__answered', /3 of 4 answered · Saved/);
+  check((await page.$$('.bcv-qz__opt.is-selected')).length === 2, 'a multiple-answer question read from the page keeps every pick');
+  await page.click('.bcv-qz__btn--next');
+  await waitText('.bcv-qz__qnum', /Question 4/);
+  await page.fill('.bcv-qz__q input', '3.15');
+  await waitText('.bcv-qz__answered', /4 of 4 answered · Saved/);
+  check((await texts('.bcv-qz__foot .bcv-qz__btn')).join(',') === 'Review answers', 'the last page offers the review');
+  await page.click('.bcv-qz__foot .bcv-qz__btn--primary');
+  await page.waitForSelector('.bcv-qz__sum', { timeout: 5000 });
+  const oqSums = await texts('.bcv-qz__sum');
+  check(oqSums.length === 4 && /^Q1.*Answered$/.test(oqSums[0]) && /^Q4.*3\.15$/.test(oqSums[3]) && (await page.$$('.bcv-qz__sum:disabled')).length === 4 && /4 of 4 answered · nothing left blank/.test((await texts('.bcv-qz__lead'))[0]), `review lists every question — the ones passed as Canvas reports them, none re-openable: ${oqSums.join(' | ')}`);
+  page.once('dialog', (d) => d.accept());
+  await page.click('.bcv-qz__big--primary');
+  await page.waitForSelector('.bcv-qz__done', { timeout: 10000 });
+  check((await texts('.bcv-qz__h1'))[0] === 'Attempt submitted' && /Score \d+ \/ 20/.test((await texts('.bcv-qz__donecard'))[1] || ''), `submitted through the API, with the score Canvas returned: ${(await texts('.bcv-qz__donecard')).join(' | ')}`);
+  await page.click('.bcv-qz__donebtns .bcv-qz__big--primary');
+  await page.waitForSelector('.bcv-fb__q', { timeout: 10000 });
+  check((await page.$$('.bcv-fb__q')).length === 4 && (await texts('.bcv-fb__chip')).some((t) => t === 'You: -3.15 m/s') && (await texts('.bcv-fb__chip')).some((t) => t === 'You: 3.15'), `feedback for a one-at-a-time quiz: the attempt's own question set, the answers from the graded history: ${(await texts('.bcv-fb__chip')).join(' | ')}`);
   // a quiz graded before today (seeded): its attempt row opens the feedback, with the instructor's comment
   await page.goto(`${BASE}/courses/101/quizzes/9001`);
   await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });

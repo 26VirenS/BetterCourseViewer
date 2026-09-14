@@ -108,7 +108,7 @@ function assignmentObj(courseId, row) {
       : (earned !== null && id === '1002' ? [{ author_name: c.teacher, created_at: at(dueDay + 1, 9, 0), comment: 'Check the domain restrictions in question 3 — the rest was solid.' }] : []),
     rubric_assessment: extra.rubric && earned !== null ? { c1: { points: 4, rating_id: 'r2', comments: 'Sign error in part b.' }, c2: { points: 4, rating_id: 'r3' } } : undefined,
     // quiz assignments: Canvas keeps each attempt's per-question grading in submission_history
-    submission_history: extra.quiz ? (quizSubs.get(String(Number(id) + 8000)) || []).filter((s) => s.workflow_state === 'complete').map((s) => ({ attempt: s.attempt, score: s.score, submission_data: quizQuestionBank(s.quiz_id).map((q) => ({ question_id: q.id, correct: gradeQuestion(q, s.state[q.id]?.answer), points: gradeQuestion(q, s.state[q.id]?.answer) ? q.points_possible : 0 })) })) : undefined,
+    submission_history: extra.quiz ? (quizSubs.get(String(Number(id) + 8000)) || []).filter((s) => s.workflow_state === 'complete').map((s) => ({ attempt: s.attempt, score: s.score, submission_data: quizQuestionBank(s.quiz_id).map((q) => ({ question_id: q.id, correct: gradeQuestion(q, s.state[q.id]?.answer), points: gradeQuestion(q, s.state[q.id]?.answer) ? q.points_possible : 0, ...histFields(q, s.state[q.id]?.answer) })) })) : undefined,
   };
   return {
     id, name, description: extra.description || `<p>Complete <strong>${name}</strong> as described in lecture. Show all work and submit a single PDF.</p><ul><li>Use the chain rule where appropriate.</li><li>Label each step.</li></ul>${extra.rubric ? '<p>See the rubric for how points are awarded.</p>' : ''}`,
@@ -237,7 +237,14 @@ const gradeQuestion = (q, a) => {
   const picked = (Array.isArray(a) ? a : [a]).map(String).sort();
   return picked.join() === right.join();
 };
-const pubSub = ({ state, ...s }) => s;
+const pubSub = ({ state, read, ...s }) => s;
+// the student's answer the way Canvas's graded history records it (answer_id / answer_<id> flags / text)
+const histFields = (q, a) => {
+  if (a === null || a === undefined || a === '') return {};
+  if (q.question_type === 'multiple_answers_question') return Object.fromEntries((Array.isArray(a) ? a : [a]).map((id) => [`answer_${id}`, '1']));
+  if (q.question_type === 'numerical_question') return { text: String(a) };
+  return { answer_id: a, text: String(a) };
+};
 const findSub = (id) => [...quizSubs.values()].flat().find((s) => s.id === id) || null;
 const subQuestions = (s) => {
   const done = s.workflow_state === 'complete';
@@ -307,10 +314,80 @@ const htmlPages = {
   // when a file is chosen the return page posts externalContentReady to the window that framed it
   '/courses/104/external_tools/t1/resource_selection': () => `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Box</title></head><body style="font-family:sans-serif;padding:24px"><h2 id="tool-title">Box picker (the tool's own page)</h2><p>The tool owns everything here. Choosing a file hands it back to the assignment page.</p><button id="pick" onclick="window.parent.postMessage({ subject: 'externalContentReady', service: 'external_tool_dialog', contents: [{ '@type': 'FileItem', url: 'http://localhost:${port}/files/box1/download', text: 'GC-articles-Sharma.pdf', mediaType: 'application/pdf' }] }, '*')">Use GC-articles-Sharma.pdf</button></body></html>`,
   '/courses/101/quizzes/9011/take': () => page({ title: 'Lec06-PreQuiz', courseId: '101', body: '<h1>Lec06-PreQuiz</h1><form id="submit_quiz_form"><p>Question 1 of 4</p><label><input type="radio" name="q1"> A</label> <label><input type="radio" name="q1"> B</label><p><button type="button" class="btn">Submit Quiz</button></p></form>' }),
-  // a one-question-at-a-time quiz: Canvas's own quiz page (its Take button starts the attempt there) and its take page
-  '/courses/101/quizzes/9014': () => page({ title: 'Lec07-PreQuiz', courseId: '101', body: '<h1>Lec07-PreQuiz</h1><p>Canvas\'s quiz page: one question at a time.</p><a id="take_quiz_link" class="btn btn-primary" href="/courses/101/quizzes/9014/take?user_id=7" data-method="post">Take the Quiz</a>' }),
-  '/courses/101/quizzes/9014/take': () => page({ title: 'Lec07-PreQuiz', courseId: '101', body: '<h1>Lec07-PreQuiz</h1><form id="submit_quiz_form"><p>Question 1 of 4</p><label><input type="radio" name="q1"> A</label> <label><input type="radio" name="q1"> B</label><p><button type="button" class="btn">Next</button></p></form>' }),
 };
+
+// ---- Canvas's own quiz-taking page -----------------------------------------------------------
+// Rendered the way Canvas renders it (take_quiz.html.erb, the display_question / multi_answer /
+// single_answer partials, the question list of the right column): the form with its classes and
+// hidden fields, one question per page when the quiz says so, the Next/Previous buttons carrying
+// the record_answer action, and — when going back is off — the first unread question whatever the
+// URL asks for. The extension reads one-question-at-a-time quizzes from here, since the API refuses
+// to list their questions.
+const answeredQ = (s, q) => { const a = s.state[q.id]?.answer; return !(a === null || a === undefined || a === '' || (Array.isArray(a) && !a.length)); };
+const takeQuestionHtml = (q, s) => {
+  const st = s.state[q.id] || {};
+  const a = st.answer;
+  const label = (ans) => `<div class="answer_label" id="question_${q.id}_answer_${ans.id}_label">${ans.html || ans.text}</div>`;
+  let answers;
+  if (q.question_type === 'multiple_answers_question') answers = `<fieldset><legend class="screenreader-only">Group of answer choices</legend>${q.answers.map((ans) => `<div class="answer"><label class="answer_row user_content"><span class="answer_input"><input type="hidden" name="question_${q.id}_answer_${ans.id}" value="0"/><input type="checkbox" class="question_input" name="question_${q.id}_answer_${ans.id}" value="1" id="question_${q.id}_answer_${ans.id}"${(Array.isArray(a) ? a : []).map(String).includes(String(ans.id)) ? ' checked' : ''} aria-labelledby="question_${q.id}_answer_${ans.id}_label" /></span>${label(ans)}</label></div>`).join('')}</fieldset>`;
+  else if (q.question_type === 'numerical_question') answers = `<div class="form-control numerical-question-holder"><input type="text" name="question_${q.id}" value="${a ?? ''}" class="form-control__input question_input numerical_question_input" autocomplete="off" aria-label="Numerical answer" /></div>`;
+  else if (q.question_type === 'essay_question') answers = `<div class="form-control textarea-question-holder"><textarea name="question_${q.id}" class="question_input" autocomplete="off">${a ?? ''}</textarea></div>`;
+  else if (q.question_type === 'short_answer_question') answers = `<div class="form-control text-box-question-holder"><input type="text" name="question_${q.id}" value="${a ?? ''}" class="question_input" autocomplete="off" /></div>`;
+  else answers = `<fieldset><legend class="screenreader-only">Group of answer choices</legend>${q.answers.map((ans) => `<div class="answer"><label class="answer_row user_content"><span class="answer_input"><input type="radio" class="question_input" name="question_${q.id}" value="${ans.id}" id="question_${q.id}_answer_${ans.id}"${String(a) === String(ans.id) ? ' checked' : ''} aria-labelledby="question_${q.id}_answer_${ans.id}_label" /></span>${label(ans)}</label></div>`).join('')}</fieldset>`;
+  return `<div role="region" aria-label="Question" class="quiz_sortable question_holder"><div style="display: block; height: 1px; overflow: hidden;">&nbsp;</div><a name="question_${q.id}"></a><div class="display_question question ${q.question_type}${st.flagged ? ' marked' : ''}" id="question_${q.id}"><a href="#" class="flag_question" role="checkbox" aria-checked="${st.flagged ? 'true' : 'false'}"><span class="screenreader-only">Flag question: ${q.question_name}</span></a><div class="header"><span class="name question_name" role="heading" aria-level="2">${q.question_name}</span><span class="question_points_holder"><span class="points question_points">${q.points_possible}</span> pts</span></div><div style="display: none;"><span class="question_type">${q.question_type}</span><span class="answer_selection_type"></span></div><div class="text"><div class="original_question_text" style="display: none;"><textarea disabled style="display: none;" name="question_text" class="textarea_question_text">${q.question_text.replace(/</g, '&lt;')}</textarea></div><div id="question_${q.id}_question_text" class="question_text user_content">${q.question_text}</div><div class="answers">${answers}</div><div class="after_answers"></div></div><div class="clear"></div></div></div>`;
+};
+function takePage(courseId, quizId, questionId) {
+  const q = quizzes(courseId).find((x) => x.id === quizId);
+  const s = (quizSubs.get(quizId) || []).find((x) => x.workflow_state === 'untaken');
+  if (!q || !s) return null;
+  const bank = quizQuestionBank(quizId);
+  s.read ||= {};
+  let current = null;
+  if (q.cant_go_back) current = bank.find((x) => !s.read[x.id]) || bank[bank.length - 1];
+  else if (questionId) current = bank.find((x) => x.id === questionId) || null;
+  else current = bank[0];
+  if (!current) return null;
+  const shown = q.one_question_at_a_time ? [current] : bank;
+  const idx = bank.indexOf(current);
+  const next = q.one_question_at_a_time ? bank[idx + 1] || null : null;
+  const prev = q.one_question_at_a_time && !q.cant_go_back && idx > 0 ? bank[idx - 1] : null;
+  const qPath = (x) => `/courses/${courseId}/quizzes/${quizId}/take/questions/${x.id}`;
+  const action = (nextPath) => `/courses/${courseId}/quizzes/${quizId}/submissions/${s.id}/record_answer?user_id=7&next_question_path=${encodeURIComponent(nextPath)}`;
+  const submitAction = `/courses/${courseId}/quizzes/${quizId}/submissions?user_id=7`;
+  const classes = [q.one_question_at_a_time ? 'one_question_at_a_time' : 'all_questions', q.cant_go_back ? 'cant_go_back' : '', !next || !q.one_question_at_a_time ? 'last_page' : ''].filter(Boolean).join(' ');
+  const icon = (x) => `<i class="placeholder ${answeredQ(s, x) ? 'icon-check' : 'icon-question'}"><span class="screenreader-only icon-text">${answeredQ(s, x) ? 'Answered' : "Haven't Answered Yet"}</span></i>`;
+  const list = bank.map((x, i) => `<li id="list_question_${x.id}" class="list_question${answeredQ(s, x) ? ' answered' : ''}${s.state[x.id]?.flagged ? ' marked' : ''}${i <= idx ? ' seen' : ''}${q.one_question_at_a_time && x.id === current.id ? ' current_question' : ''}">${
+    !q.one_question_at_a_time ? `<a class="jump_to_question_link" href="#question_${x.id}">${icon(x)}${x.question_name}<span class="screenreader-only marked-status"></span></a>`
+      : q.cant_go_back ? `<span>${icon(x)}${x.question_name}<span class="screenreader-only marked-status"></span><span>` : `<a class="no-warning" href="${qPath(x)}">${icon(x)}${x.question_name}<span class="screenreader-only marked-status"></span></a>`}</li>`).join('');
+  const body = `<h3 class="loading" style="display:none">Loading...</h3><div class="loaded"><header class="quiz-header"><h1>${q.title}</h1>Started: ${s.started_at}<h2>Quiz Instructions</h2><div id="quiz-instructions" class="user_content">${q.description}</div></header>
+<form id="submit_quiz_form" class="${classes}" method="post" action="${next ? action(qPath(next)) : submitAction}"><div id="questions" class="assessing"><input type="hidden" name="attempt" value="${s.attempt}"/><input type="hidden" name="validation_token" value="${s.validation_token}"/><div style="display: none;" id="quiz_urls"><a href="/courses/${courseId}/quizzes/${quizId}/submissions/backup?user_id=7" class="backup_quiz_submission_url">&nbsp;</a><span class="started_at">${s.started_at}</span><span class="end_at">${s.end_at || ''}</span><span class="time_limit">${q.time_limit || ''}</span><span class="time_left">${s.end_at ? Math.round((new Date(s.end_at) - Date.now()) / 1000) : ''}</span></div>${shown.map((x) => takeQuestionHtml(x, s)).join('')}<div class="button-container clearfix">${prev ? `<button type="submit" class="Button submit_button previous-question" data-action="${action(qPath(prev))}" aria-label="Previous Question" disabled><i class="icon-mini-arrow-left"></i>Previous</button>` : ''}${next ? `<input type="hidden" name="last_question_id" id="last_question_id" value="${current.id}" /><button type="submit" class="Button submit_button  next-question" data-action="${action(qPath(next))}" aria-label="Next Question" disabled>Next<i class="icon-mini-arrow-right"></i></button>` : ''}</div></div><div class="form-actions"><span id="last_saved_indicator">Not saved</span><button type="submit" class="btn submit_button quiz_submit btn-secondary" id="submit_quiz_button" data-action="${submitAction}">Submit Quiz</button></div></form></div>`;
+  const right = `<div><h3 style="margin: 0px;">Questions</h3><ul id="question_list" style="max-height: 200px; overflow: auto;" class="${q.cant_go_back ? 'read_only' : ''}">${list}</ul><div id="quiz-time-elapsed"><span class="time_header">Time Running:</span><div class="time_running"></div></div></div>`;
+  return page({ title: q.title, courseId, body: `${body}<div id="right-side-wrapper"><aside id="right-side" role="complementary">${right}</aside></div>` });
+}
+// Next/Previous the way Canvas's page posts them: the question is marked read, any answers on the form are
+// kept (unless going back is off and the question was already read), and the browser is sent on to the next page
+function recordAnswer(courseId, quizId, subId, raw) {
+  const q = quizzes(courseId).find((x) => x.id === quizId);
+  const s = findSub(subId);
+  const p = new URLSearchParams(raw);
+  if (!q || !s || s.workflow_state !== 'untaken' || p.get('validation_token') !== s.validation_token) return `/courses/${courseId}/quizzes/${quizId}`;
+  s.read ||= {};
+  const bank = quizQuestionBank(quizId);
+  for (const [k, v] of p) {
+    const m = k.match(/^question_(\d+)(?:_answer_(\d+))?$/);
+    if (!m) continue;
+    if (q.cant_go_back && s.read[m[1]]) continue;
+    const cur = s.state[m[1]] || (s.state[m[1]] = {});
+    if (m[2]) {
+      const set = new Set((Array.isArray(cur.answer) ? cur.answer : []).map(String));
+      if (v === '1') set.add(m[2]); else set.delete(m[2]);
+      cur.answer = [...set].map(Number);
+    } else cur.answer = v === '' ? null : (bank.find((x) => x.id === m[1])?.question_type === 'numerical_question' && /^-?\d+(\.\d+)?$/.test(v) ? Number(v) : v);
+  }
+  const last = p.get('last_question_id');
+  if (last) s.read[last] = true;
+  return p.get('next_question_path') || `/courses/${courseId}/quizzes/${quizId}/take`;
+}
 
 // ---- API routing ------------------------------------------------------------------------------
 const routes = [];
@@ -452,7 +529,7 @@ on('POST', /^\/api\/v1\/courses\/(\w+)\/quizzes\/(\w+)\/submissions$/, (url, m) 
   const list = quizSubs.get(m[2]) || [];
   const q = quizzes(m[1]).find((x) => x.id === m[2]);
   if (!q) return null;
-  const s = { id: `qs${m[2]}-${list.length + 1}`, quiz_id: m[2], course_id: m[1], user_id: '7', attempt: list.length + 1, started_at: new Date().toISOString(), end_at: q.time_limit ? new Date(Date.now() + q.time_limit * 60e3).toISOString() : null, finished_at: null, workflow_state: 'untaken', validation_token: `tok-${m[2]}-${list.length + 1}`, score: null, kept_score: null, state: {} };
+  const s = { id: `qs${m[2]}-${list.length + 1}`, quiz_id: m[2], course_id: m[1], read: {}, user_id: '7', attempt: list.length + 1, started_at: new Date().toISOString(), end_at: q.time_limit ? new Date(Date.now() + q.time_limit * 60e3).toISOString() : null, finished_at: null, workflow_state: 'untaken', validation_token: `tok-${m[2]}-${list.length + 1}`, score: null, kept_score: null, state: {} };
   list.push(s);
   quizSubs.set(m[2], list);
   return { quiz_submissions: [pubSub(s)] };
@@ -482,6 +559,15 @@ on('POST', /^\/api\/v1\/courses\/(\w+)\/quizzes\/(\w+)\/submissions\/([\w-]+)\/c
   s.kept_score = s.score;
   return { quiz_submissions: [pubSub(s)] };
 });
+// the quiz's question set as one attempt saw it (Quiz Questions API): a student reads only a finished attempt whose results are visible
+on('GET', /^\/api\/v1\/courses\/(\w+)\/quizzes\/(\w+)\/questions$/, (url, m) => {
+  const s = url.searchParams.get('quiz_submission_id') ? findSub(url.searchParams.get('quiz_submission_id')) : null;
+  if (!s) return { __status: 401, errors: [{ message: 'user not authorized to perform that action' }] };
+  if (s.workflow_state !== 'complete') return { __status: 401, errors: [{ message: 'Cannot view questions due to quiz settings' }] };
+  return quizQuestionBank(m[2]);
+});
+// test-only: what the mock holds for an attempt (its read marks, answers and flags)
+on('GET', /^\/__mock\/quizsub\/([\w-]+)$/, (url, m) => { const s = findSub(m[1]); return s ? { read: s.read || {}, answers: Object.fromEntries(Object.entries(s.state).map(([k, v]) => [k, v.answer ?? null])), flags: Object.fromEntries(Object.entries(s.state).map(([k, v]) => [k, !!v.flagged])) } : null; });
 on('GET', /^\/api\/v1\/courses\/(\w+)\/quizzes\/(\w+)$/, (url, m) => quizzes(m[1]).find((q) => q.id === m[2]) || null);
 on('GET', /^\/api\/v1\/courses\/(\w+)\/quizzes$/, (url, m) => quizzes(m[1]));
 on('GET', /^\/api\/v1\/courses\/(\w+)\/modules$/, (url, m) => modules[m[1]] || []);
@@ -561,7 +647,7 @@ const server = http.createServer((req, res) => {
     }
     // like Canvas: every write needs the session's CSRF token, body or not (file storage is a separate
     // service and has none). The token lives in the _csrf_token cookie (URL-encoded), never in a meta tag.
-    if (req.method !== 'GET' && !path.startsWith('/__mock/') && !path.startsWith('/__upload/') && path !== '/logout' && req.headers['x-csrf-token'] !== CSRF) return json(res, { errors: [{ message: 'invalid authenticity token' }] }, 422);
+    if (req.method !== 'GET' && !path.startsWith('/__mock/') && !path.startsWith('/__upload/') && path !== '/logout' && !path.endsWith('/record_answer') && req.headers['x-csrf-token'] !== CSRF) return json(res, { errors: [{ message: 'invalid authenticity token' }] }, 422);
     // a session that has ended: like Canvas, every API call answers 401 "unauthenticated" (the pages themselves are still served here, so the app boots and finds out)
     if (mockConfig.sessionLost && path.startsWith('/api/')) return json(res, { status: 'unauthenticated', errors: [{ message: 'user authorization required' }] }, 401);
     for (const [method, re, handler] of routes) {
@@ -605,6 +691,17 @@ const server = http.createServer((req, res) => {
       return res.end(req.method === 'GET' ? '<html><body><h1>Log out?</h1><form method="post"><button>Log out</button></form></body></html>' : '<html><body><h1>Page Error</h1><p>There was a problem with your last request.</p></body></html>');
     }
     const handler = htmlPages[path];
+    let qm;
+    if (!handler && req.method === 'GET' && (qm = path.match(/^\/courses\/(\w+)\/quizzes\/(\w+)\/take(?:\/questions\/(\w+))?$/))) { // Canvas's own quiz-taking page
+      const html = takePage(qm[1], qm[2], qm[3] || url.searchParams.get('question_id'));
+      if (!html) { res.writeHead(302, { location: `/courses/${qm[1]}/quizzes/${qm[2]}` }); return res.end(); } // no open attempt: back to the quiz page, as Canvas does
+      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'set-cookie': `_csrf_token=${encodeURIComponent(CSRF)}; Path=/` });
+      return res.end(html);
+    }
+    if (req.method === 'POST' && (qm = path.match(/^\/courses\/(\w+)\/quizzes\/(\w+)\/submissions\/([\w-]+)\/record_answer$/))) { // its Next / Previous
+      res.writeHead(302, { location: recordAnswer(qm[1], qm[2], qm[3], raw) });
+      return res.end();
+    }
     res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'set-cookie': `_csrf_token=${encodeURIComponent(CSRF)}; Path=/` });
     res.end(handler ? handler() : page({ title: path.split('/').pop() || 'Canvas', courseId: (path.match(/^\/courses\/(\d+)/) || [])[1], body: `<h1>${path}</h1><p>Mock page rendered by Canvas.</p>` }));
   });

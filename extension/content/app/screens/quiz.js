@@ -10,6 +10,7 @@
   const U = BCV.ui;
   const IC = BCV.IC;
   const store = BCV.store;
+  const QP = () => BCV.quizPage; // Canvas's own quiz page as a question source (one-question-at-a-time quizzes)
   const LETTERS = 'ABCDEFGHIJKLMNOP';
   const FLAG = 'M6 4v16M6 4h11l-2 4 2 4H6';
   const CHECK = 'M20 6L9 17l-5-5';
@@ -39,7 +40,7 @@
     // header and the rail away so the questions take the page. app.js clears it on the next render.
 
     // fbSub: the finished attempt the feedback stage shows; fbFrom: 'done' when it was opened from the receipt
-    const st = { stage: 'intro', idx: 0, mode: 'one', quiz: null, sub: null, questions: [], flags: {}, saving: 0, savedAt: 0, timer: null, warned: {}, done: null, code: '', fbSub: null, fbFrom: null, fb: null };
+    const st = { stage: 'intro', idx: 0, mode: 'one', quiz: null, sub: null, questions: [], flags: {}, saving: 0, savedAt: 0, timer: null, warned: {}, done: null, code: '', fbSub: null, fbFrom: null, fb: null, page: null, paged: false, inflight: new Set() };
     const screen = U.el('bcv-qz');
     screen.append(U.loading('Loading the quiz…'));
 
@@ -54,11 +55,13 @@
     // a phone shows one question per screen (the mockup); the scroll-through mode is a desktop choice
     const phone = !!BCV.phone?.active();
     st.mode = quiz.one_question_at_a_time || phone ? 'one' : (await store.pref('quizMode', 'one'));
-    const forcedOne = !!quiz.one_question_at_a_time || phone;
-    // Canvas's API will not hand out the questions of a quiz set to one question at a time (400,
-    // "Cannot receive one question at a time questions in the API"), so that attempt runs on
-    // Canvas's own quiz page inside the shell: Begin goes there instead of starting it here.
-    const inCanvas = !!quiz.one_question_at_a_time;
+    let forcedOne = !!quiz.one_question_at_a_time || phone;
+    // A quiz set to one question at a time cannot list its questions through the API (Canvas refuses:
+    // "Cannot receive one question at a time questions in the API"), but Canvas's own page shows one
+    // per request and the answer, flag, clock and submit calls still work. So the attempt runs here
+    // as for any other quiz, each question read from that page (BCV.quizPage) and every move made
+    // the way that page makes it — which is also how Canvas enforces "no going back".
+    st.paged = !!quiz.one_question_at_a_time;
     const noBack = !!quiz.cant_go_back;
     const timed = !!quiz.time_limit;
     // Attempts come from Canvas's own count on the submission (plus any extra the instructor
@@ -130,7 +133,7 @@
 
     // ---- state helpers -------------------------------------------------------------
     const cur = () => st.questions[Math.min(st.idx, st.questions.length - 1)];
-    const isAnswered = (q) => INFO.has(q.question_type) || answered(q.answer);
+    const isAnswered = (q) => INFO.has(q.question_type) || (q.loaded === false ? !!q.answered : answered(q.answer)); // not yet read from Canvas's page: what its list says
     const answeredCount = () => st.questions.filter(isAnswered).length;
     const answeredLabel = () => `${answeredCount()} of ${st.questions.length} answered`;
     const saveState = () => (st.saving > 0 ? 'Saving…' : st.savedAt ? 'Saved' : '');
@@ -139,22 +142,36 @@
       q.answer = answer;
       st.saving++;
       paintFooter();
+      const p = store.quizApi.answer(st.sub, q.id, answer);
+      st.inflight.add(p);
       try {
-        await store.quizApi.answer(st.sub, q.id, answer);
+        await p;
         st.savedAt = Date.now();
       } catch (e) {
         U.toast(`Could not save that answer: ${e.message}`, { error: true });
       } finally {
+        st.inflight.delete(p);
         st.saving--;
         paintFooter();
         paintProgress();
       }
     }
     const textTimers = new Map();
+    const textPending = new Map();
     function saveText(q, value) {
       q.answer = value;
       clearTimeout(textTimers.get(q.id));
-      textTimers.set(q.id, setTimeout(() => save(q, value), 600));
+      textPending.set(q.id, [q, value]);
+      textTimers.set(q.id, setTimeout(() => { textPending.delete(q.id); save(q, value); }, 600));
+    }
+    /** Every answer on Canvas: typed text still waiting on its pause is sent now, and the saves in flight are awaited. */
+    async function settled() {
+      for (const [id, [q, value]] of [...textPending]) {
+        clearTimeout(textTimers.get(id));
+        textPending.delete(id);
+        save(q, value);
+      }
+      if (st.inflight.size) await Promise.allSettled([...st.inflight]);
     }
     async function toggleFlag(q) {
       const on = !q.flagged;
@@ -219,6 +236,7 @@
           title: `Question ${k + 1}${q.flagged ? ' · flagged' : ''}`,
           onclick: () => {
             if (locked) return;
+            if (st.paged) { if (k !== st.idx) turnPage({ questionId: q.id }); return; }
             st.idx = k;
             if (all) {
               const el = document.getElementById(`bcv-q${k}`);
@@ -235,8 +253,7 @@
       const bullets = [
         ['#34c759', CHECK, 'Answers save as you pick them. You can leave and come back.'],
         timed ? ['#ff9500', IC.warn, `Time limit: ${quiz.time_limit} minutes. The clock starts when you begin and keeps running if you leave.`] : null,
-        inCanvas ? ['var(--bcv-ink3)', MODE_ONE, `Canvas shows this quiz one question at a time on its own page${noBack ? ', and you cannot go back to a previous question' : ''}. Begin opens it there.`]
-          : forcedOne ? ['var(--bcv-ink3)', MODE_ONE, noBack ? 'One question at a time, and you cannot go back to a previous question.' : 'One question at a time.'] : null,
+        forcedOne ? ['var(--bcv-ink3)', MODE_ONE, noBack ? 'One question at a time, and you cannot go back to a previous question.' : 'One question at a time.'] : null,
         attemptsLeft !== null ? ['var(--bcv-ink3)', IC.bolt, attemptsLeft > 0 ? `${U.plural(attemptsLeft, 'attempt')} left of ${allowed}.` : `No attempts left — this quiz allows ${U.plural(allowed, 'attempt')}.`] : ['var(--bcv-ink3)', IC.bolt, 'Unlimited attempts.'],
         quiz.lock_at ? ['var(--bcv-ink3)', IC.lock, `Available until ${U.fmtAt(quiz.lock_at)}.`] : null,
       ].filter(Boolean);
@@ -246,7 +263,7 @@
       // out of attempts: the primary action becomes the feedback for the last one (when released)
       const startBtn = !canStart && lastDone && !resultsHidden(lastDone)
         ? h('button', { type: 'button', class: 'bcv-qz__begin', text: 'See your feedback', onclick: () => openFeedback(lastDone, 'intro') })
-        : h('button', { type: 'button', class: 'bcv-qz__begin', text: st.sub ? (inCanvas ? 'Continue in Canvas' : 'Continue attempt') : (canStart ? (inCanvas ? 'Begin in Canvas' : 'Begin attempt') : 'No attempts left'), disabled: !canStart || null, onclick: begin });
+        : h('button', { type: 'button', class: 'bcv-qz__begin', text: st.sub ? 'Continue attempt' : (canStart ? 'Begin attempt' : 'No attempts left'), disabled: !canStart || null, onclick: begin });
       return U.el('bcv-qz__intro', [
         h('div', {}, [
           h('h1', { class: 'bcv-qz__h1 bcv-pretty', text: quiz.title }),
@@ -264,36 +281,73 @@
       ]);
     }
 
-    // Canvas's own quiz page: an open attempt resumes at /take; a fresh one starts from the quiz
-    // page there (its own Take button, access code and all), never from the API.
-    function handOff() {
-      setOpen(false);
-      clearInterval(st.timer);
-      app.go(st.sub ? `${quizUrl}/take?bcv=native` : `${quizUrl}?bcv=native`, { confirmed: true });
-    }
     async function begin() {
-      if (inCanvas) return handOff();
       body.replaceChildren(U.loading(st.sub ? 'Resuming your attempt…' : 'Starting your attempt…'));
       try {
         st.sub = await store.quizApi.start(cid, qid, st.code);
-        st.questions = await store.quizApi.questions(st.sub);
+        if (!st.paged) {
+          try {
+            st.questions = await store.quizApi.questions(st.sub);
+          } catch (e) {
+            if (!/one question at a time/i.test(e.message || '')) throw e;
+            st.paged = true; // the quiz did not say so, but Canvas did
+            forcedOne = true;
+            st.mode = 'one';
+          }
+        }
+        if (st.paged) applyPage(await QP().fetchPage(quizUrl, { accessCode: st.code }));
         // Question ids arrive as strings (our Accept header); Canvas wants numeric answer ids back.
         for (const q of st.questions) q.flagged = !!q.flagged;
-        st.idx = noBack ? Math.max(0, st.questions.findIndex((q) => !isAnswered(q))) : 0;
+        if (!st.paged) st.idx = noBack ? Math.max(0, st.questions.findIndex((q) => !isAnswered(q))) : 0;
         if (st.idx < 0) st.idx = 0;
         st.stage = 'take';
         tick();
         draw();
         window.scrollTo(0, 0);
       } catch (e) {
-        if (/one question at a time/i.test(e.message || '')) {
-          // the quiz did not say so but Canvas did: the attempt just opened is carried on over there
-          U.toast('Canvas shows this quiz one question at a time on its own page.');
-          return handOff();
-        }
         st.stage = 'intro';
         draw();
         U.toast(`Could not start the attempt: ${e.message}`, { error: true });
+      }
+    }
+    /** A page of Canvas's quiz page folded into the attempt: its question list is the spine (every
+     *  question in order, with what Canvas knows of each) and the question shown is filled in; the
+     *  others keep what was read of them before, or stay stubs until their turn. */
+    function applyPage(pg) {
+      if (!pg.ok || !pg.questions.length) throw QP().notShown(pg);
+      st.page = pg;
+      const known = new Map(st.questions.map((q) => [String(q.id), q]));
+      const shown = new Map(pg.questions.map((q) => [String(q.id), q]));
+      const spine = pg.list.length ? pg.list : pg.questions.map((q) => ({ id: q.id, name: q.question_name, answered: answered(q.answer), flagged: q.flagged, textOnly: q.question_type === 'text_only_question' }));
+      st.questions = spine.map((e, k) => {
+        const full = shown.get(String(e.id));
+        if (full) return { ...full, position: k + 1 };
+        const old = known.get(String(e.id));
+        if (old && old.loaded !== false) return { ...old, position: k + 1, flagged: !!e.flagged };
+        return { id: String(e.id), position: k + 1, question_name: e.name, question_type: e.textOnly ? 'text_only_question' : 'unknown_question', question_text: '', answers: [], answer: null, answered: !!e.answered, flagged: !!e.flagged, loaded: false };
+      });
+      const at = st.questions.findIndex((q) => String(q.id) === String(pg.questions[0].id));
+      st.idx = at >= 0 ? at : 0;
+    }
+    /** A move on a paged attempt goes through Canvas's own page: Next and Previous post its record-answer
+     *  form (the question is marked read, which is what "no going back" rests on); a pill fetches that
+     *  question's page. Every answer is on Canvas before the move, since a read question takes no more. */
+    async function turnPage(how) {
+      await settled();
+      if (!ctx.alive()) return;
+      body.replaceChildren(U.loading(how.action ? 'Next question…' : 'Loading the question…'));
+      try {
+        const f = st.page?.form || {};
+        const fields = { attempt: f.attempt ?? st.sub.attempt, validation_token: f.validationToken || st.sub.validation_token, last_question_id: f.lastQuestionId || cur()?.id || null };
+        const pg = how.action ? await QP().advance(how.action, fields) : await QP().fetchPage(quizUrl, { questionId: how.questionId, accessCode: st.code });
+        if (!ctx.alive()) return;
+        applyPage(pg);
+        draw();
+        window.scrollTo(0, 0);
+      } catch (e) {
+        if (!ctx.alive()) return;
+        draw();
+        U.toast(`Could not move to that question: ${e.message}`, { error: true });
       }
     }
 
@@ -344,7 +398,7 @@
       // Matching, fill-in-the-blanks, dropdowns, file upload, calculated…: Canvas's own page handles these on the same attempt.
       return U.card(U.el('bcv-detail', [
         U.text('bcv-hint', `This ${type.replace(/_/g, ' ').replace(' question', '')} question is answered on Canvas's quiz page. Your other answers are already saved there.`),
-        U.btn('Answer in Canvas', { kind: 'primary', icon: IC.external, iconColor: '#fff', onClick: () => { setOpen(false); app.go(`${quizUrl}/take?bcv=native`, { confirmed: true }); } }),
+        U.btn('Answer in Canvas', { kind: 'primary', icon: IC.external, iconColor: '#fff', onClick: () => { setOpen(false); app.go(st.paged && !noBack ? `${quizUrl}/take/questions/${q.id}?bcv=native` : `${quizUrl}/take?bcv=native`, { confirmed: true }); } }),
       ]), 'bcv-card--22');
     }
 
@@ -364,14 +418,26 @@
       const q = cur();
       const k = st.idx;
       if (!q) return U.el('bcv-qz__page', U.emptyCard('This quiz has no questions.'));
-      const last = k === st.questions.length - 1;
+      const last = st.paged ? !st.page?.form.nextAction : k === st.questions.length - 1;
+      const back = () => {
+        if (st.paged) { turnPage(st.page?.form.prevAction ? { action: st.page.form.prevAction } : { questionId: st.questions[k - 1].id }); return; }
+        st.idx = Math.max(0, k - 1);
+        draw();
+        window.scrollTo(0, 0);
+      };
+      const next = () => {
+        if (st.paged) { turnPage({ action: st.page.form.nextAction }); return; }
+        st.idx = Math.min(st.questions.length - 1, k + 1);
+        draw();
+        window.scrollTo(0, 0);
+      };
       return h('div', { class: 'bcv-qz__stage' }, [
         U.el('bcv-qz__page', questionBlock(q, k)),
         footer([
-          noBack ? null : h('button', { type: 'button', class: 'bcv-qz__btn', text: 'Back', disabled: k === 0 || null, onclick: () => { st.idx = Math.max(0, k - 1); draw(); window.scrollTo(0, 0); } }),
+          noBack ? null : h('button', { type: 'button', class: 'bcv-qz__btn', text: 'Back', disabled: k === 0 || null, onclick: back }),
           last
             ? h('button', { type: 'button', class: 'bcv-qz__btn bcv-qz__btn--primary', text: 'Review answers', onclick: () => { st.stage = 'review'; draw(); window.scrollTo(0, 0); } })
-            : h('button', { type: 'button', class: 'bcv-qz__btn bcv-qz__btn--primary bcv-qz__btn--next', text: 'Next', onclick: () => { st.idx = Math.min(st.questions.length - 1, k + 1); draw(); window.scrollTo(0, 0); } }),
+            : h('button', { type: 'button', class: 'bcv-qz__btn bcv-qz__btn--primary bcv-qz__btn--next', text: 'Next', onclick: next }),
         ]),
       ]);
     }
@@ -405,6 +471,7 @@
           return h('button', { type: 'button', class: 'bcv-qz__sum', disabled: noBack || null, onclick: () => {
             if (noBack) return;
             st.stage = 'take';
+            if (st.paged) { turnPage({ questionId: q.id }); return; }
             st.idx = k;
             draw();
             if (st.mode === 'all') document.getElementById(`bcv-q${k}`)?.scrollIntoView({ block: 'start' });
@@ -413,7 +480,7 @@
             h('span', { class: 'bcv-qz__sumn', text: `Q${k + 1}` }),
             h('span', { class: 'bcv-qz__sumq bcv-ellip', text: htmlToText(q.question_text || q.question_name || '', 120).replace(/\s+/g, ' ') }),
             q.flagged ? U.svg(FLAG, { size: 13, stroke: '#ff9500', width: 2, style: { flex: 'none' } }) : null,
-            h('span', { class: `bcv-qz__suma ${txt === null && !INFO.has(q.question_type) ? 'is-blank' : ''}`, text: INFO.has(q.question_type) ? '—' : (txt === null ? 'Not answered' : txt) }),
+            h('span', { class: `bcv-qz__suma ${txt === null && !INFO.has(q.question_type) && !isAnswered(q) ? 'is-blank' : ''}`, text: INFO.has(q.question_type) ? '—' : (txt !== null ? txt : isAnswered(q) ? 'Answered' : 'Not answered') }),
           ]);
         }), 'bcv-card--list'),
         U.el('bcv-qz__reviewbtns', [
@@ -518,6 +585,16 @@
       return true;
     }
     const parseCorrect = (v) => (v === true || v === 'true' ? true : v === false || v === 'false' ? false : v === 'partial' ? 'partial' : null);
+    /** The student's answer as the graded history records it (answer_id, answer_<id> flags, or text). */
+    function histAnswer(q, d) {
+      if (MULTI.has(q.question_type)) {
+        const on = Object.keys(d).filter((k) => /^answer_\d+$/.test(k) && String(d[k]) === '1').map((k) => Number(k.slice(7)));
+        return on.length ? on : null;
+      }
+      const text = d.text === undefined || d.text === null || d.text === '' ? null : d.text;
+      if (CHOICE.has(q.question_type)) return d.answer_id ?? (text !== null && Number.isFinite(Number(text)) ? Number(text) : null);
+      return text;
+    }
     /** The correct answer(s) as text: the answers Canvas weights 100 (absent when censored). */
     function fbRight(q) {
       const one = (a) => {
@@ -541,7 +618,7 @@
     }
     async function loadFeedback(sub) {
       const [qs, asub] = await Promise.all([
-        store.quizApi.questions(sub),
+        store.quizApi.questions(sub, { courseId: cid, quizId: qid }),
         quiz.assignment_id ? store.submission(cid, quiz.assignment_id, { force: true }).catch(() => null) : Promise.resolve(null),
       ]);
       const me = String(store.env().current_user_id || '');
@@ -551,6 +628,7 @@
       const graded = new Map((hist?.submission_data || []).map((d) => [String(d.question_id), d]));
       const rows = qs.map((q, k) => {
         const d = graded.get(String(q.id)) || null;
+        if (d && !answered(q.answer)) q.answer = histAnswer(q, d); // a one-at-a-time quiz: its answers come from the graded history
         const correct = parseCorrect(q.correct) ?? (d ? parseCorrect(d.correct) : null);
         const possible = Number(q.points_possible) || 0;
         const earned = d && d.points !== undefined && d.points !== null ? Number(d.points) : correct === true ? possible : correct === false ? 0 : null;
