@@ -125,7 +125,7 @@ html.bcv-on #bcv-app { display: flex; }
 #bcv-app ::-webkit-scrollbar { width: 10px; height: 10px; }
 #bcv-app ::-webkit-scrollbar-thumb { background: rgba(120,120,128,.4); border-radius: 6px; border: 3px solid transparent; background-clip: content-box; }
 #bcv-app svg { display: block; }
-#bcv-app [hidden], .bcv-qz__pop [hidden] { display: none !important; } /* the attempt's popup sits outside #bcv-app, on the body */
+#bcv-app [hidden] { display: none !important; }
 #bcv-app .bcv-ellip { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #bcv-app .bcv-pretty { text-wrap: pretty; }
 
@@ -308,7 +308,6 @@ html[data-bcv-theme="dark"] .bcv-badge--orange { color: #ffb44d; }
 .bcv-row--done .bcv-row__title { text-decoration: line-through; color: var(--bcv-ink3); }
 /* one de-emphasis signal only (the muted, struck title); a faded tile on top of it failed contrast */
 .bcv-row--done .bcv-tile { opacity: 1; }
-.bcv-native__tabs { margin-top: 0; }
 .bcv-label { padding: 0 4px 8px; font: 600 11.5px/1.2 var(--bcv-font); color: var(--bcv-ink3); text-transform: uppercase; letter-spacing: .05em; }
 .bcv-label--inline { padding: 0; }
 .bcv-label--105 { font-size: 10.5px; }
@@ -1096,7 +1095,7 @@ html[data-bcv-theme="dark"] .bcv-fb__chip--right { color: #5ddb7d; }
 html.bcv-on.bcv-punch #application, html.bcv-on.bcv-punch #wrapper { display: block !important; }
 html.bcv-on.bcv-punch body { background: var(--bcv-bg) !important; }
 html.bcv-punch #bcv-app { position: fixed; inset: 0; z-index: 10; min-height: 0; overflow: hidden; background: transparent; pointer-events: none; }
-html.bcv-punch .bcv-side, html.bcv-punch .bcv-head, html.bcv-punch .bcv-rail, html.bcv-punch .bcv-native__bar, html.bcv-punch .bcv-native__tabs { pointer-events: auto; }
+html.bcv-punch .bcv-side, html.bcv-punch .bcv-head, html.bcv-punch .bcv-rail, html.bcv-punch .bcv-native__bar { pointer-events: auto; }
 html.bcv-punch .bcv-main { overflow: hidden; }
 html.bcv-punch #header, html.bcv-punch #left-side, html.bcv-punch #footer, html.bcv-punch .ic-app-nav-toggle-and-crumbs, html.bcv-punch #breadcrumbs, html.bcv-punch #mobile-header, html.bcv-punch .ic-app-course-menu, html.bcv-punch #skip_navigation_link, html.bcv-punch #global_nav_tray_container, html.bcv-punch .ic-app-header__secondary-navigation { display: none !important; }
 html.bcv-punch #application, html.bcv-punch #wrapper, html.bcv-punch #not_right_side { margin: 0 !important; padding: 0 !important; width: auto !important; max-width: none !important; min-height: 0 !important; display: block !important; position: static !important; float: none !important; }
@@ -1131,35 +1130,20 @@ html.bcv-quiz .bcv-screen--ctx .bcv-rail { width: 0; padding-left: 0; padding-ri
 html.bcv-quiz .bcv-screen--ctx .bcv-cmain { border-left: 0; }
 html.bcv-quiz .bcv-fab, html.bcv-quiz #bcv-smart { display: none !important; }
 .bcv-qz { min-height: 100vh; display: flex; flex-direction: column; background: var(--bcv-bg); }
-/* On a desktop the attempt is a popup confined to the course's column (the sidebar, the course header and
-   the rail stay put, the intro stays underneath): a scrim over the column's rectangle and a glass card in
-   it, both on the document body, placed by quiz.js from the column's own edges (--bcv-pop-l/t/r) and kept
-   there through scrolls and resizes. The card's body scrolls; the head and the footer stay in view. */
-.bcv-qz__scrim { position: fixed; left: var(--bcv-pop-l, 0px); top: var(--bcv-pop-t, 0px); right: var(--bcv-pop-r, 0px); bottom: 0; z-index: 30; background: var(--bcv-scrim); -webkit-backdrop-filter: var(--bcv-blur-scrim); backdrop-filter: var(--bcv-blur-scrim); animation: bcv-scrim .28s cubic-bezier(.32,.72,0,1) both; }
-.bcv-qz__pop { position: fixed; left: var(--bcv-pop-l, 0px); top: var(--bcv-pop-t, 0px); right: var(--bcv-pop-r, 0px); bottom: 0; z-index: 31; display: flex; align-items: stretch; justify-content: center; padding: 16px; box-sizing: border-box; font-family: var(--bcv-font); font-size: 14px; line-height: 1.4; color: var(--bcv-ink); -webkit-font-smoothing: antialiased; }
-.bcv-qz__popcard { width: min(920px, 100%); background: var(--bcv-glass); -webkit-backdrop-filter: var(--bcv-blur-glass); backdrop-filter: var(--bcv-blur-glass); border: 1px solid var(--bcv-edge); border-radius: 24px; box-shadow: var(--bcv-shadow-glass); display: flex; flex-direction: column; overflow: hidden; box-sizing: border-box; animation: bcv-morph .34s cubic-bezier(.32,.72,0,1) backwards; }
-.bcv-qz__popcard .bcv-qz__head { position: static; }
-.bcv-qz__popcard .bcv-qz__body { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; }
-.bcv-qz__popcard .bcv-qz__page { padding-bottom: 40px; }
-.bcv-qz__popcard .bcv-qz__q { scroll-margin-top: 20px; }
-.bcv-qz__popcard .bcv-qz__done { padding-top: 48px; }
-.bcv-qz__starting { flex: 1; margin: 0; display: flex; align-items: center; justify-content: center; padding: 60px 28px; font: 500 14px/1.4 var(--bcv-font); color: var(--bcv-ink3); }
-html.bcv-quiz-pop .bcv-fab, html.bcv-quiz-pop #bcv-smart { display: none !important; }
+.bcv-qz__starting { flex: 1; margin: 0; display: flex; align-items: center; justify-content: center; padding: 80px 28px; font: 500 14px/1.4 var(--bcv-font); color: var(--bcv-ink3); }
 /* A question on its way: what is on screen stays, inert, and the pill of the question being fetched fills
    left to right — the same flat wash, easing and duration as a pressed sidebar row (mockup 14). The wash
    is the pill's own background (a button gives an absolutely positioned child no box in Chromium), so it
-   is one element: the number stays put and legible while the fill passes under it. */
+   is one element: the number stays put and legible while the fill passes under it. background-origin is
+   the border box, so the wash fills the whole rounded pill rather than a rectangle inside its border. */
 .bcv-qz__body.is-busy { pointer-events: none; opacity: .72; transition: opacity .2s ease; }
 .bcv-qz__pill { position: relative; overflow: hidden; --bcv-pill-wash: rgba(10,132,255,.22); }
 html[data-bcv-theme="dark"] .bcv-qz__pill { --bcv-pill-wash: rgba(10,132,255,.34); }
-.bcv-qz__pill.is-current { --bcv-pill-wash: rgba(255,255,255,.3); }
+.bcv-qz__pill.is-current { --bcv-pill-wash: rgba(255,255,255,.32); }
 .bcv-qz__pilln { position: relative; }
-.bcv-qz__pill.is-loading { background-image: linear-gradient(var(--bcv-pill-wash), var(--bcv-pill-wash)); background-repeat: no-repeat; background-position: 0 0; animation: bcv-pill-load .62s cubic-bezier(.4,0,.2,1) both; }
+.bcv-qz__pill.is-loading { background-image: linear-gradient(var(--bcv-pill-wash), var(--bcv-pill-wash)); background-repeat: no-repeat; background-position: left center; background-origin: border-box; background-clip: border-box; animation: bcv-pill-load .62s cubic-bezier(.4,0,.2,1) both; }
 @keyframes bcv-pill-load { from { background-size: 0% 100%; } to { background-size: 100% 100%; } }
-@media (prefers-reduced-motion: reduce) {
-  .bcv-qz__scrim, .bcv-qz__popcard { animation: none; }
-  .bcv-qz__pill.is-loading { animation: none; background-size: 60% 100%; }
-}
+@media (prefers-reduced-motion: reduce) { .bcv-qz__pill.is-loading { animation: none; background-size: 60% 100%; } }
 .bcv-qz__head { position: sticky; top: 0; z-index: 6; background: var(--bcv-chrome); -webkit-backdrop-filter: var(--bcv-blur-chrome); backdrop-filter: var(--bcv-blur-chrome); border-bottom: 1px solid var(--bcv-edge); }
 .bcv-qz__headrow { max-width: 760px; margin: 0 auto; padding: 14px 28px; display: flex; align-items: center; gap: 14px; }
 .bcv-qz__exit { flex: none; width: 34px; height: 34px; border: 0; border-radius: 17px; background: var(--bcv-fill); cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--bcv-ink2); padding: 0; }

@@ -461,7 +461,7 @@
 
   T.native = (ctx, shell) => {
     const b = body('bcv-body--24');
-    b.append(BCV.screens.native.block(ctx, { inCourse: true }));
+    b.append(BCV.screens.native.block(ctx));
     ctx.setSmart({ label: `${shell.course.name} · ${document.title.split(':')[0]}`, actions: [], context: () => BCV.utils.elementText(document.getElementById('content'), 12000) });
     return b;
   };

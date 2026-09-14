@@ -17,6 +17,8 @@
   /** The item's Back: the screen it was opened from (Modules, the Dashboard, another item…), else the list it belongs to. */
   const backTo = (app, href, lbl) => { const b = app.backTo ? app.backTo({ href, label: lbl }) : { href, label: lbl }; return backBtn(app, b.href, b.label); };
   const nativeHref = (path) => `${path}${path.includes('?') ? '&' : '?'}bcv=native`;
+  /** "10 pts" from a points field, or nothing when Canvas carries no points for the item (never "null pts"). */
+  const pts = (v) => (v === null || v === undefined || v === '' ? null : `${store.fmtPts(v)} pts`);
 
   const D = {};
 
@@ -51,7 +53,7 @@
       actions: [
         { label: 'Summarize this assignment', note: `${a.points_possible ?? '?'} pts · ${a.due_at ? `due ${U.fmtShort(a.due_at)}` : 'no due date'}`, icon: IC.doc, prompt: 'Summarize what this assignment asks for, the deliverable, and how it is graded.' },
         { label: 'Make a checklist', note: 'Steps to finish it, in order', icon: IC.check, prompt: 'Turn this assignment into a step-by-step checklist I can work through, with a rough time estimate per step.' },
-        feedback ? { label: 'Explain rubric feedback', note: s.score !== undefined && s.score !== null ? `${store.fmtPts(s.score)} / ${a.points_possible}` : 'Comments and rubric', icon: IC.chart, prompt: 'Explain my grade and feedback in plain language: where I lost points, what the comments mean, and what to do differently next time.' } : null,
+        feedback ? { label: 'Explain rubric feedback', note: s.score !== undefined && s.score !== null ? `${store.fmtPts(s.score)}${a.points_possible === null || a.points_possible === undefined ? '' : ` / ${store.fmtPts(a.points_possible)}`}` : 'Comments and rubric', icon: IC.chart, prompt: 'Explain my grade and feedback in plain language: where I lost points, what the comments mean, and what to do differently next time.' } : null,
       ].filter(Boolean),
       context: () => [`Assignment: ${a.name}`, `Course: ${c.name}`, `Due: ${a.due_at ? U.fmtAt(a.due_at) : 'none'} · Points: ${a.points_possible}`, `Submission types: ${types}`, '', 'Description:', htmlToText(a.description || '', 10000), '', a.rubric?.length ? `Rubric:\n${a.rubric.map((cr) => `- ${cr.description} (${cr.points} pts): ${cr.long_description || ''}${s.rubric_assessment?.[cr.id] ? ` → got ${s.rubric_assessment[cr.id].points}${s.rubric_assessment[cr.id].comments ? `, "${s.rubric_assessment[cr.id].comments}"` : ''}` : ''}`).join('\n')}` : '', `Submission: ${status}${s.score != null ? `, score ${s.score}` : ''}`, (s.submission_comments || []).map((cm) => `Comment from ${cm.author_name}: ${cm.comment}`).join('\n')].join('\n'),
     };
@@ -169,7 +171,12 @@
           h('h2', { class: 'bcv-detail__title bcv-pretty', text: t.title }),
           U.el('bcv-row__head', [
             U.avatar(t.author?.avatar_image_url, t.author?.display_name, 38),
-            h('div', { style: { flex: '1', minWidth: '0' } }, [U.text('bcv-entry__author', t.author?.display_name || 'Instructor'), U.text('bcv-entry__date', `${U.fmtAtUpper(t.posted_at || t.delayed_post_at)}${t.assignment ? ` · ${t.assignment.points_possible} pts · due ${U.fmtAtUpper(t.assignment.due_at)}` : ''}${t.lock_at ? ` · available until ${U.fmtAtUpper(t.lock_at)}` : ''}`)]),
+            h('div', { style: { flex: '1', minWidth: '0' } }, [U.text('bcv-entry__author', t.author?.display_name || 'Instructor'), U.text('bcv-entry__date', [
+              U.fmtAtUpper(t.posted_at || t.delayed_post_at),
+              pts(t.assignment?.points_possible), // a graded discussion Canvas gave no points for says nothing, not "null pts"
+              t.assignment?.due_at ? `due ${U.fmtAtUpper(t.assignment.due_at)}` : null,
+              t.lock_at ? `available until ${U.fmtAtUpper(t.lock_at)}` : null,
+            ].filter(Boolean).join(' · '))]),
             t.locked ? U.badge('Closed for comments') : null,
           ]),
           CS().prose(t.message || ''),
@@ -266,13 +273,13 @@
     );
     side.append(h('div', {}, [U.label('Attempts'), (subs || []).length ? U.card((subs || []).map((s) => U.row([
       U.tile(IC.bolt, { color: '#7d7bef', tint: 'rgba(88,86,214,.16)' }),
-      U.el('bcv-row__body', [U.text('bcv-row__title bcv-row__title--145', `Attempt ${s.attempt}`), U.text('bcv-row__sub', s.finished_at ? `Finished ${U.fmtAt(s.finished_at)}` : 'In progress')]),
+      U.el('bcv-row__body', [U.text('bcv-row__title bcv-row__title--145', s.attempt ? `Attempt ${s.attempt}` : 'Attempt'), U.text('bcv-row__sub', s.finished_at ? `Finished ${U.fmtAt(s.finished_at)}` : 'In progress')]),
       U.badge(s.kept_score !== null && s.kept_score !== undefined ? `${store.fmtPts(s.kept_score)} / ${q.points_possible}` : (s.score !== null && s.score !== undefined ? `${store.fmtPts(s.score)} / ${q.points_possible}` : '—'), s.workflow_state === 'complete' ? 'green' : ''),
       // a finished attempt opens its feedback; an open one resumes
     ], { mod: 'bcv-row--p12', href: s.workflow_state === 'untaken' ? takeHref : feedbackHref(s) })), 'bcv-card--list') : U.emptyCard('No attempts yet.')]));
     ctx.setSmart({
       label: `${c.name} · ${q.title}`,
-      actions: [{ label: 'What does this quiz cover?', note: `${U.plural(q.question_count || 0, 'question')} · ${q.points_possible} pts`, icon: IC.bolt, prompt: 'From the instructions, what does this quiz cover and how should I prepare? Do not guess at the questions.' }],
+      actions: [{ label: 'What does this quiz cover?', note: [U.plural(q.question_count || 0, 'question'), pts(q.points_possible)].filter(Boolean).join(' · '), icon: IC.bolt, prompt: 'From the instructions, what does this quiz cover and how should I prepare? Do not guess at the questions.' }],
       context: () => `Quiz: ${q.title}\nType: ${TYPE[q.quiz_type] || q.quiz_type}\nDue: ${q.due_at ? U.fmtAt(q.due_at) : 'none'} · ${q.points_possible} pts · ${q.question_count} questions · time limit ${q.time_limit || 'none'}\n\n${htmlToText(q.description || '', 8000)}\n\nAttempts: ${(subs || []).map((s) => `#${s.attempt} ${s.workflow_state} score ${s.kept_score ?? s.score ?? '—'}`).join('; ') || 'none'}`,
     });
     return b;

@@ -90,7 +90,6 @@
     const leave = () => {
       setOpen(false);
       clearInterval(st.timer);
-      closePop();
       app.go(quizUrl, { confirmed: true });
     };
 
@@ -111,65 +110,9 @@
     const body = h('div', { class: 'bcv-qz__body' });
     screen.replaceChildren(head, body);
 
-    // ---- the attempt as a popup confined to the course's column (desktop) ------------------------
-    // Begin / Continue open the attempt over the course's own column — a scrim and a glass card placed
-    // from the column's edges and kept there through scrolls and resizes — while the sidebar, the
-    // course header and the rail stay where they are and the intro stays underneath. The card lives
-    // on the document body (nothing above the app clips or repositions it); app.js sweeps any left
-    // behind by a navigation. A phone keeps the whole screen (html.bcv-quiz).
-    const popMode = () => !phone;
-    const scrim = h('div', { class: 'bcv-qz__scrim', 'aria-hidden': 'true' });
-    const card = h('div', { class: 'bcv-qz__popcard' });
-    const pop = h('div', { class: 'bcv-qz__pop', role: 'dialog', 'aria-modal': 'true', 'aria-label': `${quiz.title} — attempt` }, card);
-    const under = h('div', { class: 'bcv-qz__under', 'aria-hidden': 'true' }); // what shows behind the scrim: the intro, out of reach while the attempt is up
-    let popOpen = false;
-    let popRO = null;
-    function place() {
-      if (!popOpen) return;
-      const col = screen.closest('.bcv-cmain') || screen.parentElement;
-      if (!col) return;
-      const r = col.getBoundingClientRect();
-      for (const el of [scrim, pop]) {
-        el.style.setProperty('--bcv-pop-l', `${Math.max(0, Math.round(r.left))}px`);
-        el.style.setProperty('--bcv-pop-t', `${Math.max(0, Math.round(r.top))}px`);
-        el.style.setProperty('--bcv-pop-r', `${Math.max(0, Math.round(window.innerWidth - r.right))}px`);
-      }
-    }
-    function openPop() {
-      if (popOpen) return;
-      popOpen = true;
-      card.append(head, body);
-      under.replaceChildren(intro());
-      under.inert = true;
-      screen.replaceChildren(under);
-      document.body.append(scrim, pop);
-      html.classList.add('bcv-quiz-pop');
-      place();
-      window.addEventListener('scroll', place, { passive: true });
-      window.addEventListener('resize', place);
-      const col = screen.closest('.bcv-cmain');
-      if (col && typeof ResizeObserver !== 'undefined') {
-        popRO = new ResizeObserver(place);
-        popRO.observe(col);
-      }
-    }
-    function closePop() {
-      if (!popOpen) return;
-      popOpen = false;
-      window.removeEventListener('scroll', place);
-      window.removeEventListener('resize', place);
-      popRO?.disconnect();
-      popRO = null;
-      scrim.remove();
-      pop.remove();
-      html.classList.remove('bcv-quiz-pop');
-      screen.replaceChildren(head, body);
-    }
-    /** The top of whatever scrolls the attempt: the popup's own body, else the page. */
-    const toTop = () => { if (popOpen) body.scrollTop = 0; else window.scrollTo(0, 0); };
+    const toTop = () => window.scrollTo(0, 0);
 
     function tick() {
-      if (!ctx.alive()) { closePop(); clearInterval(st.timer); return; } // the screen left with the popup up (a navigation): nothing stays behind
       const sub = st.sub;
       if (!sub) {
         timerLabel.textContent = timed ? `${quiz.time_limit} min` : '0:00';
@@ -249,13 +192,11 @@
     // ---- stages --------------------------------------------------------------------
     function draw() {
       if (!ctx.alive()) {
-        closePop();
         clearInterval(st.timer);
         window.removeEventListener('beforeunload', onUnload);
         return;
       }
       const embedded = st.stage === 'intro' || st.stage === 'feedback'; // in the column, under the course header
-      if (popMode()) { if (embedded) closePop(); else openPop(); }
       modeWrap.replaceChildren(...(st.stage === 'take' && !forcedOne ? [
         modeBtn('one', 'One question at a time', MODE_ONE),
         modeBtn('all', 'Scroll through all questions', MODE_ALL),
@@ -270,8 +211,8 @@
       else if (st.stage === 'feedback') body.replaceChildren(feedback());
       else body.replaceChildren(done());
       screen.classList.toggle('is-feedback', st.stage === 'feedback');
-      screen.classList.toggle('is-embedded', embedded || popOpen); // the column keeps the intro under the popup
-      html.classList.toggle('bcv-quiz', !embedded && !popMode()); // on a phone the attempt (and its receipt) takes the page
+      screen.classList.toggle('is-embedded', embedded);
+      html.classList.toggle('bcv-quiz', !embedded); // the attempt (and its receipt) takes the page
       setOpen(st.stage === 'take' || st.stage === 'review');
       ctx.setSmart(st.stage === 'feedback' ? feedbackSmart() : {
         label: `${quiz.title} · quiz`,
@@ -638,7 +579,6 @@
     function exitTo(href) {
       setOpen(false);
       clearInterval(st.timer);
-      closePop();
       app.go(href, { confirmed: true });
     }
     function openFeedback(sub, from) {

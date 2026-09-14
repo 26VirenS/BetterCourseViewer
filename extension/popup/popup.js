@@ -80,8 +80,11 @@
     if (!granted) {
       msg.textContent = 'Asking for permission…';
       // Chrome closes this popup when its permission dialog opens, so the background finishes the
-      // job from this note once the permission lands (see continuePending in background.js).
-      await api.storage.local.set({ 'setup:pending': { origin, tabId: tab?.id ?? null, next, at: Date.now() } }).catch(() => {});
+      // job from this note once the permission lands (see continuePending in background.js). The
+      // note is written without waiting on purpose: permissions.request() has to be called while
+      // the press is still the browser's idea of a user gesture, and awaiting anything first loses
+      // it — Safari then refuses with "Must be called during a user gesture".
+      api.storage.local.set({ 'setup:pending': { origin, tabId: tab?.id ?? null, next, at: Date.now() } }).catch(() => {});
       let ok = false;
       try {
         ok = await api.permissions.request({ origins: [`${origin}/*`] });

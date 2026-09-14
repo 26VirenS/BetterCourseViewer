@@ -715,6 +715,30 @@
     if (hiddenAt && Date.now() - hiddenAt > 5 * 60 * 1000 && !self.BCVBridge?.native) BCV.canvas.checkSession?.();
     hiddenAt = 0;
   });
+  // A page left sitting for a long stretch — a tab open overnight, a laptop asleep, another window
+  // all afternoon — is working from what it read back then, and the Canvas session behind it may
+  // have ended since. So the first thing done on coming back (a press or a key) reloads the page
+  // instead of acting on it: the session is renewed and every screen is drawn from fresh answers.
+  // Reading counts as being here, so scrolling and typing keep the page awake; a reload that would
+  // lose work (a quiz attempt, a submission being written, text half typed) gives way to a note,
+  // and recover() will not reload the same page twice in a minute.
+  const AWAY_STALE = 30 * 60 * 1000;
+  state.lastHere = Date.now(); // when this page last saw a sign of life (also what the tests wind back)
+  const here = () => { state.lastHere = Date.now(); };
+  let scrollTick = 0;
+  window.addEventListener('scroll', () => { const n = Date.now(); if (n - scrollTick > 2000) { scrollTick = n; here(); } }, { passive: true });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') here(); });
+  window.addEventListener('focus', here);
+  function wake(e) {
+    const away = Date.now() - state.lastHere;
+    here();
+    if (away < AWAY_STALE || self.BCVBridge?.native) return; // the app holds its own session
+    if (!recover('You were away for a while')) return;
+    e.preventDefault();
+    e.stopPropagation();
+  }
+  document.addEventListener('pointerdown', wake, true);
+  document.addEventListener('keydown', wake, true);
 
   // ---- screens --------------------------------------------------------------------------------
   const SCREEN_PATIENCE = 15000; // a screen still not drawn after this gives way to Canvas's own page
@@ -734,8 +758,7 @@
     if (!quiet) progress(true, state.loadKey || (withinCourse ? null : loadKeyFor(r)));
     state.quizOpen = false;
     state.submitOpen = false;
-    html.classList.remove('bcv-quiz', 'bcv-quiz-fb', 'bcv-quiz-pop'); // the quiz screen puts them back while an attempt or its feedback is on screen
-    for (const el of document.querySelectorAll('.bcv-qz__pop, .bcv-qz__scrim')) el.remove(); // an attempt's popup never outlives its screen
+    html.classList.remove('bcv-quiz', 'bcv-quiz-fb'); // the quiz screen puts them back while an attempt or its feedback is on screen
     punchOut(); // a native screen punches back in while it builds
     closeQuickNav(); // the courses panel belongs to the row it came from, not to the next screen
     syncSide(); // the sidebar follows the route in place; it is rebuilt only when what it shows changes

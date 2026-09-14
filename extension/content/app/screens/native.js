@@ -15,18 +15,6 @@
     return (h1 && h1.textContent.trim()) || t || 'Canvas';
   }
 
-  /** Canvas's own sub-navigation for this page (course/group/account menu), as pills. */
-  function subNav(app, { inCourse }) {
-    if (inCourse) return null;
-    const links = Array.from(document.querySelectorAll('#section-tabs a[href], #left-side nav a[href]'));
-    if (!links.length) return null;
-    return U.el('bcv-tabs bcv-native__tabs', links.map((a) => {
-      const active = a.classList.contains('active') || a.getAttribute('aria-current') === 'page';
-      const href = a.getAttribute('href');
-      return h('button', { type: 'button', class: `bcv-tab ${active ? 'is-active' : ''}`, onclick: () => app.go(href) }, [U.svg(IC.page, { size: 13, stroke: active ? '#fff' : 'var(--bcv-ink2)', width: 1.9 }), a.textContent.trim()]);
-    }));
-  }
-
   // In the dark appearance the Canvas content in the hole is darkened with a
   // filter; some embeds (viewers, tool pickers) read badly that way, so the bar
   // offers to show the hole as Canvas drew it. The choice is kept per site.
@@ -60,10 +48,10 @@
     return btn;
   }
 
-  /** Builds the native block: a note bar, the page's sub-nav (outside a
-   *  course shell) and the hole Canvas's page shows through. `inCourse`
-   *  skips the sub-nav (the course shell has its own rail). */
-  function block(ctx, { inCourse = false } = {}) {
+  /** Builds the native block: a note bar and the hole Canvas's page shows
+   *  through. Canvas's own sub-navigation is not repeated here — the sidebar
+   *  and the course rail already lead everywhere it led. */
+  function block(ctx) {
     const app = ctx.app;
     const hasContent = !!(document.getElementById('content') || document.getElementById('main'));
     const note = U.el('bcv-native__bar', [
@@ -74,7 +62,7 @@
     ]);
     const hole = U.el('bcv-native__hole', hasContent ? null : U.emptyCard('Canvas did not render anything for this page.'));
     if (hasContent) app.punchIn(hole);
-    return U.el('bcv-native', [note, subNav(app, { inCourse }), hole]);
+    return U.el('bcv-native', [note, hole]);
   }
 
   async function render(ctx) {
