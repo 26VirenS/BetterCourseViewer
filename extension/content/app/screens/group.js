@@ -182,11 +182,6 @@
     }
     parts.push(h('div', {}, [U.label('Recent activity'), streamEl]));
     left.replaceChildren(...parts);
-    ctx.setSmart({
-      label: `${g.name} · Home`,
-      actions: [{ label: 'Catch me up', note: 'Recent activity in this group', icon: IC.stream, prompt: 'Catch me up on what has happened in this group recently, in a few bullets.' }],
-      context: () => `Group: ${g.name}${g.course ? ` (in ${g.course.name})` : ''}\n${htmlToText(g.description || '', 2000)}\n\n${BCV.utils.elementText(left, 8000)}`,
-    });
     return b;
   }
 

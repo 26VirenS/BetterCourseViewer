@@ -31,7 +31,7 @@
     safari
       ? ['Press the Simpl Courses button', h('span', {}, ['It is the ', h('i', { class: 'how__icon', 'aria-hidden': 'true' }), ' button in the toolbar. If Safari asks, allow Simpl Courses on the site.'])]
       : ['Press the puzzle piece, then Simpl Courses', h('span', {}, ['Click the ', h('i', { class: 'how__puzzle', 'aria-hidden': 'true', html: PUZZLE }), ' puzzle piece at the right of the toolbar and choose ', h('b', { text: 'Simpl Courses' }), ' ', h('i', { class: 'how__icon', 'aria-hidden': 'true' }), '. Press the pin next to it and the button stays in the toolbar.'])],
-    ['Press Set up', h('span', {}, ['Simpl Courses asks to run on that site, then walks through your courses, grades and the smart panel, and ends with a tour.'])],
+    ['Press Set up', h('span', {}, ['Simpl Courses asks to run on that site, then walks through your courses and grades, and ends with a tour.'])],
   ].map(([t, s], i) => h('div', { class: 'how__step' }, [h('span', { class: 'how__n', text: String(i + 1) }), h('div', {}, [h('span', { class: 'how__t', text: t }), h('span', { class: 'how__s' }, [s])])]));
   steps.forEach((el, i) => { el.style.animationDelay = `${220 + i * 90}ms`; });
 

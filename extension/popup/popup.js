@@ -179,10 +179,6 @@
     return;
   }
 
-  // smart status
-  send({ type: 'providerStatus' }).then((s) => {
-    $('smart-status').textContent = s?.configured ? `Smart panel: ${s.label}` : 'Smart panel: add a key in Settings';
-  });
 
   if (!onWeb) {
     status.textContent = 'Open a Canvas page to use it.';

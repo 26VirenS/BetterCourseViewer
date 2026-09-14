@@ -19,7 +19,7 @@ struct SettingsSheet: View {
                     Button("Sign out", role: .destructive) { confirmSignOut = true }
                 }
                 Section {
-                    NavigationLink("Look, appearance and smart panel") {
+                    NavigationLink("Look and appearance") {
                         CanvasWebView(controller: web)
                             .ignoresSafeArea(edges: .bottom)
                             .navigationTitle("Settings")

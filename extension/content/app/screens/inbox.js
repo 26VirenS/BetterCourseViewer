@@ -53,7 +53,6 @@
       if (!ctx.alive()) return;
       drawList();
       drawReader();
-      updateSmart();
     }
 
     const names = (c) => (c.participants || []).filter((p) => String(p.id) !== String(c.audience?.[0] && false)).map((p) => p.name).join(', ');
@@ -135,7 +134,7 @@
       }
       const pmap = new Map((conv.participants || []).map((p) => [String(p.id), p]));
       const course = conv.context_code?.startsWith('course_') ? courseMap.get(conv.context_code.slice(7)) : null;
-      const replyBox = h('textarea', { class: 'bcv-textarea', placeholder: 'Write a reply…', rows: 3, dataset: { smartInsert: 'reply' } });
+      const replyBox = h('textarea', { class: 'bcv-textarea', placeholder: 'Write a reply…', rows: 3 });
       const sendBtn = U.btn('Send', { kind: 'primary', icon: IC.send, iconColor: '#fff', onClick: async () => {
         const text = replyBox.value.trim();
         if (!text) return;
@@ -172,14 +171,6 @@
         })),
         U.el('bcv-reader__reply', [U.text('bcv-reply__title', 'Reply'), replyBox, h('div', { style: { display: 'flex', justifyContent: 'flex-end' } }, sendBtn)]),
       );
-      ctx.setSmart({
-        label: `Inbox · ${conv.subject || 'conversation'}`,
-        actions: [
-          { label: 'Summarize this thread', note: `${U.plural((conv.messages || []).length, 'message')}`, icon: IC.mail, prompt: 'Summarize this conversation and list anything I need to do or answer.' },
-          { label: 'Draft a reply', note: 'Polite, short, in my voice', icon: IC.reply, prompt: 'Draft a short, polite reply to the latest message. Leave placeholders where I need to fill in specifics.', insert: true },
-        ],
-        context: () => `Subject: ${conv.subject}\n` + (conv.messages || []).map((m) => `${pmap.get(String(m.author_id))?.name || 'Unknown'} (${U.fmtAtUpper(m.created_at)}):\n${m.body}`).reverse().join('\n\n'),
-      });
     }
 
     function composeForm() {
@@ -192,7 +183,7 @@
       const courseSel = h('select', { class: 'bcv-select' }, [h('option', { value: '', text: 'No course (direct message)' }), ...courses.filter((c) => c.state !== 'past').map((c) => h('option', { value: `course_${c.id}`, text: c.name, selected: contextCode === `course_${c.id}` || null }))]);
       courseSel.addEventListener('change', () => { contextCode = courseSel.value || null; });
       const subject = h('input', { class: 'bcv-input', type: 'text', placeholder: 'Subject' });
-      const bodyBox = h('textarea', { class: 'bcv-textarea', placeholder: 'Message', rows: 6, dataset: { smartInsert: 'compose' } });
+      const bodyBox = h('textarea', { class: 'bcv-textarea', placeholder: 'Message', rows: 6 });
       let timer = null;
       const drawChips = () => {
         chipsWrap.replaceChildren(...recipients.map((r) => h('span', { class: 'bcv-recip' }, [r.name, h('button', { type: 'button', 'aria-label': `Remove ${r.name}`, onclick: () => { recipients = recipients.filter((x) => x !== r); drawChips(); } }, U.svg(IC.close, { size: 10, stroke: 'var(--bcv-ink3)', width: 2.2 }))])), input);
@@ -231,11 +222,6 @@
           sendBtn.disabled = false;
         }
       } });
-      ctx.setSmart({
-        label: 'Inbox · new message',
-        actions: [{ label: 'Draft this message', note: 'Tell me what you want to say', icon: IC.compose, prompt: 'Help me write this message. Ask me one question if you need more detail; otherwise draft it concisely.', insert: true }],
-        context: () => `Composing to: ${recipients.map((r) => r.name).join(', ') || '(nobody yet)'}\nCourse: ${contextCode ? (courseMap.get(contextCode.slice(7))?.name || contextCode) : 'none'}\nSubject: ${subject.value}\nDraft so far:\n${bodyBox.value}`,
-      });
       return U.el('bcv-compose', [
         U.el('bcv-row__head', [U.text('bcv-compose__title', 'New message'), h('span', { class: 'bcv-ml-auto' }), U.iconbtn(IC.close, { title: 'Cancel', onClick: () => { mode = selectedId ? 'read' : 'empty'; drawReader(); } })]),
         U.el('bcv-field', [U.text('bcv-field__label', 'To'), anchor]),
@@ -246,14 +232,6 @@
       ]);
     }
 
-    function updateSmart() {
-      if (mode !== 'empty') return;
-      ctx.setSmart({
-        label: 'Inbox',
-        actions: [{ label: 'Triage my inbox', note: `${U.plural((convs || []).filter((c) => c.workflow_state === 'unread').length, 'unread conversation')}`, icon: IC.mail, prompt: 'Go through these conversations and tell me which need a reply, which are informational, and suggest a one-line reply where useful.' }],
-        context: () => (convs || []).slice(0, 30).map((c) => `- ${U.fmtDateComma(c.last_message_at)} · ${names(c)} · ${c.subject || '(no subject)'} · ${c.workflow_state}\n  ${(c.last_message || '').slice(0, 300)}`).join('\n'),
-      });
-    }
 
     await load();
     return screen;

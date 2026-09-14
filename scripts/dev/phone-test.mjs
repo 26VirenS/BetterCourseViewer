@@ -135,8 +135,6 @@ try {
   check((await texts('.bcv-ph-ghead__t')).some((t) => /^(Today|Tonight|Next up)$/.test(t)) && (await page.$$('.bcv-ph-row')).length > 0, `the day's list: ${(await texts('.bcv-ph-ghead__t')).join(', ')}`);
   check((await raw('.bcv-ph-kicker')).includes('Week load') && (await page.$$('.bcv-ph-load__row')).length > 0, 'week load card with per-course bars');
   check(await visible('.bcv-ph-bell') && await visible('.bcv-ph-avatar') && !(await page.$('.bcv-reader-btn:not([hidden])')), 'the bell and the avatar on the title row; no reader button anywhere on the phone');
-  const fab = await page.$eval('#bcv-fab', (e) => { const r = e.getBoundingClientRect(); return { w: Math.round(r.width), h: Math.round(r.height), above: Math.round(document.getElementById('bcv-tabbar').getBoundingClientRect().top - r.bottom) }; });
-  check(await visible('#bcv-fab') && fab.w >= 48 && fab.h >= 48 && fab.above >= 0, `the smart button (≥48px) floats above the tab bar (${JSON.stringify(fab)})`);
   check(await noOverflow(), 'no horizontal overflow');
   await shot('01-today');
 
@@ -451,24 +449,12 @@ try {
   await page.click('.bcv-qz__begin');
   await page.waitForSelector('.bcv-qz__opt', { timeout: 15000 });
   check((await page.$$('.bcv-qz__page--one, .bcv-qz__q')).length > 0 && await noOverflow(), 'one question at a time on a phone, no overflow');
-  check(await eventually(async () => !(await visible('#bcv-tabbar')) && !(await visible('#bcv-topbar')) && !(await visible('#bcv-fab'))), 'the attempt takes the whole screen: the tab bar, the back bar and the smart button go');
+  check(await eventually(async () => !(await visible('#bcv-tabbar')) && !(await visible('#bcv-topbar'))), 'the attempt takes the whole screen: the tab bar and the back bar go');
   const urlBefore = page.url();
   await page.mouse.move(8, 500); await page.mouse.down(); await page.mouse.move(140, 505, { steps: 8 }); await page.mouse.up();
   await new Promise((r) => setTimeout(r, 400));
   check(page.url() === urlBefore && !!(await page.$('.bcv-qz__opt')), 'the edge swipe is off during a quiz');
   await shot('09b-quiz-question');
-
-  // ---- the smart panel --------------------------------------------------------------------------
-  console.log('smart panel');
-  await page.goto(`${BASE}/`);
-  await ready();
-  await page.waitForSelector('.bcv-ph-stat', { timeout: 15000 });
-  await page.click('#bcv-fab');
-  await page.waitForSelector('#bcv-smart', { timeout: 5000 });
-  const smartBox = await page.$eval('#bcv-smart', (e) => { const r = e.getBoundingClientRect(); return { w: Math.round(r.width), l: Math.round(r.left), b: Math.round(window.innerHeight - r.bottom) }; });
-  check(smartBox.w >= 380 && smartBox.l <= 12, `the smart panel fills the width as a sheet (${JSON.stringify(smartBox)})`);
-  await shot('10-smart');
-  await page.keyboard.press('Escape');
 
   // ---- guided setup + the tour on a phone -------------------------------------------------------
   console.log('guided setup');
@@ -484,13 +470,11 @@ try {
   await page.waitForSelector('#bcv-setup #track', { timeout: 10000 });
   check(await noOverflow() && (await page.$$('#bcv-setup .target')).length === 5, 'the grades step keeps to the screen with a target row per course');
   await shot('11b-setup-grades');
+  // a phone has no sidebar to place the courses on, so the grades step is the last one here
+  check((await page.$$('#bcv-setup .progress span')).length === 2 && (await page.$eval('#bcv-setup #stepLabel', (e) => e.textContent)) === '2 of 2' && (await page.$eval('#bcv-setup #next', (e) => e.textContent.trim())) === 'Finish', 'a phone gets two steps, and the grades step finishes the setup');
   await page.click('#bcv-setup #next');
-  await page.waitForSelector('#bcv-setup .prov', { timeout: 10000 });
-  // a phone has no sidebar to place the courses on, so the setup is three steps here and ends on this one
-  check((await page.$$('#bcv-setup .progress span')).length === 3 && (await page.$eval('#bcv-setup #stepLabel', (e) => e.textContent)) === '3 of 3' && (await page.$eval('#bcv-setup #next', (e) => e.textContent)) === 'Finish', `three steps on a phone (no sidebar step), the last one ending in Finish: ${await page.$eval('#bcv-setup #stepLabel', (e) => e.textContent)}`);
-  await page.click('#bcv-setup #notNow');
   await page.waitForSelector('.bcv-tour__card', { timeout: 20000 });
-  check((await page.$('#bcv-setup')) === null && page.url() === `${BASE}/`, 'Not now closes the card and the tour starts on Today');
+  check((await page.$('#bcv-setup')) === null && page.url() === `${BASE}/`, 'Finish closes the card and the tour starts on Today');
   const overStats = await eventually(() => page.evaluate(() => { const r = document.querySelector('.bcv-tour__ring').getBoundingClientRect(); const t = document.querySelector('.bcv-ph-stats').getBoundingClientRect(); return r.width > 0 && r.left <= t.left + 1 && r.top <= t.top + 1 && r.right >= t.right - 1 && r.bottom >= t.bottom - 1; }).catch(() => false), 3000);
   check((await texts('.bcv-tour__title'))[0] === 'Your day at a glance' && overStats, 'the tour spotlights the phone counters');
   await page.click('.bcv-tour__btn.is-primary');

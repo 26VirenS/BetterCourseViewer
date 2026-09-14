@@ -71,17 +71,16 @@ Replaces the interface of the Canvas learning-management system on the user's ow
 
 | Permission | Justification |
 | --- | --- |
-| `storage` | Keeps the user's settings, a short-lived cache of Canvas API responses, unsent drafts and the optional smart-panel API key locally in the browser. |
+| `storage` | Keeps the user's settings, a short-lived cache of Canvas API responses, and unsent drafts locally in the browser. |
 | `scripting` | Registers the extension's content scripts on a Canvas site the user adds with "Enable on this site" (schools host Canvas at their own domains). |
 | `activeTab` | Lets the toolbar popup read the current tab's address to show whether the extension is enabled on that site and offer to enable it. |
-| Host permissions (one field for all of them) | `*://*.instructure.com/*` is Canvas's hosted domain: the extension draws its interface on those pages and calls Canvas's REST API with the user's existing session. `https://api.anthropic.com/*` and `https://api.openai.com/*` are for the optional smart panel, which sends the user's question (and, if enabled, the current page's text) to the provider the user chose, with the user's own API key; nothing is sent unless the user adds a key and sends a message. The optional `*://*/*` exists because many schools serve Canvas from their own address (e.g. canvas.university.edu): access is requested only for the single site the user picks by clicking "Enable on this site", can be revoked in the browser, and no site is touched without that click. |
+| Host permissions (one field for all of them) | `*://*.instructure.com/*` is Canvas's hosted domain: the extension draws its interface on those pages and calls Canvas's REST API with the user's existing session. |
 
 **Remote code:** select **No, I am not using remote code** (the justification box only applies to "Yes"; all code ships inside the package).
 
 **Data usage** — tick:
 
 - **Authentication information** (the user's own Claude/ChatGPT API key, stored locally; sent only to that provider).
-- **Website content** (the text of the Canvas page the user is reading, sent to the chosen provider only when the user asks the smart panel something; Canvas data otherwise stays in the browser).
 - **Personal communications** (the page the user asks about can be a Canvas inbox conversation or a discussion thread, so that text reaches the provider in the same way).
 
 Then certify all three statements (no sale, no use unrelated to the single purpose, no creditworthiness/lending use) — all true.

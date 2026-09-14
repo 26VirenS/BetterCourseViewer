@@ -35,11 +35,6 @@
     let favOrder = favList.map((c) => c.id);
     let favIds = new Set(favOrder);
     let termOrder = (await store.pref('termOrder', [])) || [];
-    ctx.setSmart({
-      label: 'All Courses',
-      actions: [{ label: 'Compare my courses', note: `${U.plural(courses.filter((c) => c.state === 'current').length, 'current course')}`, icon: IC.chart, prompt: 'Give me a one-line status per current course: current score if known, what is next, and anything overdue.' }],
-      context: () => courses.map((c) => `- ${c.name} (${c.code}) · ${c.term} · ${c.state} · ${c.role}${c.score !== null ? ` · score ${c.score}%` : ''}`).join('\n'),
-    });
 
     const now = new Date();
     const todayStart = U.startOfDay(now);

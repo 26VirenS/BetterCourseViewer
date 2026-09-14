@@ -3,7 +3,6 @@
  *   1 the courses, read from the enrolments (nothing is ticked to start with; unchecked ones stay
  *     hidden everywhere: they become the Canvas favourites, the one list every screen follows) ·
  *   2 grades (tracking, a goal, a target letter per course) ·
- *   3 the smart panel, optional — but the choice is not: a key that checks out, or Not now ·
  *   4 where those courses sit, on the sidebar or in a panel off the Courses row ·
  * then straight into the tour. Opened by ?bcv=setup (the toolbar popup's Set up button, the
  * account sheet on a phone, the app's first launch). Skip writes the "done" flags and no tour.
@@ -18,26 +17,18 @@
 
   const CHECK = 'M20 6L9 17l-5-5';
   const GRADES = ['C', 'B', 'B+', 'A-', 'A', 'A+']; // the target letters, lowest on the left (saved as the letter the Grades page reads)
-  const PROVIDERS = [
-    { key: 'claude', name: 'Claude', note: 'Available now', ready: true, settingsKey: 'claudeKey', placeholder: 'sk-ant-…', url: 'https://console.anthropic.com/settings/keys', host: 'console.anthropic.com', steps: ['API keys → Create key', 'Paste it above. It is shown only once.'] },
-    { key: 'openai', name: 'ChatGPT', note: 'Available now', ready: true, settingsKey: 'openaiKey', placeholder: 'sk-…', url: 'https://platform.openai.com/api-keys', host: 'platform.openai.com', steps: ['API keys → Create new secret key', 'Paste it above. It is shown only once.'] },
-    { key: 'gemini', name: 'Gemini', note: 'Coming soon', ready: false },
-  ];
   // the steps, the button that leaves each one, and the label above the card (function
   // declarations, so the list can sit here beside the labels it is paired with). A phone has no
   // sidebar to place the courses on, so the last step is left out there: the lists are settled
   // when the card opens (see start()).
-  let STEPS = [courses, grades, smart, sidebar];
-  let LABELS = ['Continue', 'Continue', 'Continue', 'Finish'];
+  let STEPS = [courses, grades, sidebar];
+  let LABELS = ['Continue', 'Continue', 'Finish'];
   let STEP_LABELS = ['1 of 4', '2 of 4', '3 of 4', '4 of 4', 'Done'];
   const settleSteps = () => {
-    STEPS = BCV.phone?.active() ? [courses, grades, smart] : [courses, grades, smart, sidebar];
+    STEPS = BCV.phone?.active() ? [courses, grades] : [courses, grades, sidebar];
     LABELS = STEPS.map((_, i) => (i === STEPS.length - 1 ? 'Finish' : 'Continue'));
     STEP_LABELS = [...STEPS.map((_, i) => `${i + 1} of ${STEPS.length}`), 'Done'];
   };
-  /** Leaves the smart-panel step: on to the sidebar step where there is one, else the end. */
-  const afterSmart = () => (STEPS.includes(sidebar) ? go(3) : finish({ skipped: false }));
-  const PURPOSE = 'Smart Panel is intended to be a smart assistant that helps with learning. It is not intended to help complete assignments, cheat on quizzes, or any other purpose than to assist with learning.';
   const MARK = '<svg viewBox="0 0 120 120" width="23" height="23" aria-hidden="true"><defs><linearGradient id="sheetSm" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#fff" stop-opacity=".9"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient></defs><rect x="16" y="18" width="53" height="84" rx="14" fill="url(#sheetSm)"/><path d="M28 30 H69 A30 30 0 0 1 69 90 H28" fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><path d="M35 42 H69 A18 18 0 0 1 69 78 H35" fill="none" stroke="rgba(255,255,255,.72)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><path d="M42 54 H69 A6 6 0 0 1 69 66 H42" fill="none" stroke="rgba(255,255,255,.46)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
   let ui = null; // the open overlay: { host, overlay, card, body, foot, progress, stepLabel, skipBtn }
@@ -81,8 +72,7 @@
       app, settings, step: 0,
       scanning: false, scanError: null, courses: [], favs: new Set(), nicks: {},
       tracking: true, goal: 4, targets: {},
-      provider: settings.smart?.openaiKey && !settings.smart?.claudeKey ? 'openai' : 'claude', key: '', keyOk: false, keyMsg: '',
-      sideCourses: settings.appearance?.sideCourses === 'hover' ? 'hover' : 'always',
+      sideCourses: settings.appearance?.sideCourses === 'always' ? 'always' : 'hover', // the panel off the Courses row is the default
       closing: false,
     };
     settleSteps();
@@ -350,103 +340,7 @@
       h('div', { class: 'kicker', text: 'Target grade' }),
       h('div', { class: 'targets' }, targets.length ? targets : [h('div', { class: 'empty', text: 'No courses chosen: nothing to aim at yet.' })]),
     );
-    footer({ onNext: () => go(2) });
-  }
-
-  // ---- the smart panel -----------------------------------------------------------------------------
-  function smart() {
-    const { body } = ui;
-    const settings = st.settings;
-    const provider = () => PROVIDERS.find((p) => p.key === st.provider) || PROVIDERS[0];
-    const input = h('input', { type: 'password', id: 'key', placeholder: provider().placeholder, autocomplete: 'off', spellcheck: 'false', 'aria-label': 'API key', value: st.key });
-    const tick = svg(CHECK, { size: 16, stroke: '#34c759', width: 2.6, cls: 'tick' });
-    tick.hidden = !st.keyOk;
-    const field = h('div', { class: 'field field--key' }, [input, tick]);
-    const result = h('div', { class: 'result', id: 'keyResult', text: st.keyMsg });
-    const steps = h('div', { class: 'keysteps' });
-    let notNow = null; // the quiet button in the footer, built below
-    let syncButtons = () => {}; // …and the pair of them kept in step with the field, assigned with it
-    const drawSteps = () => {
-      const p = provider();
-      input.placeholder = p.placeholder;
-      steps.replaceChildren(
-        h('div', { class: 'keystep' }, [h('b', { text: '1' }), h('span', {}, ['Sign in at ', h('a', { href: p.url, target: '_blank', rel: 'noopener', text: p.host })])]),
-        ...p.steps.map((s2, i) => h('div', { class: 'keystep' }, [h('b', { text: String(i + 2) }), h('span', { text: s2 })])),
-      );
-      stagger([...steps.children], 60);
-      settleHeight();
-    };
-    const provs = h('div', { class: 'provs' }, PROVIDERS.map((p) => h('button', { type: 'button', class: `prov ${p.ready ? '' : 'is-soon'} ${st.provider === p.key && p.ready ? 'is-on' : ''}`, dataset: { provider: p.key }, 'aria-disabled': p.ready ? null : 'true', onclick: () => {
-      if (!p.ready) return;
-      st.provider = p.key;
-      st.keyOk = false;
-      st.key = settings.smart?.[p.settingsKey] || '';
-      input.value = st.key;
-      tick.hidden = true;
-      result.textContent = '';
-      result.className = 'result';
-      [...provs.children].forEach((b) => b.classList.toggle('is-on', b.dataset.provider === p.key));
-      drawSteps();
-      syncButtons(); // the key for the provider just chosen may be there or not
-    } }, [h('span', { class: 'prov__n', text: p.name }), h('span', { class: 'prov__s', text: p.note })])));
-    stagger([...provs.children], 60);
-    drawSteps();
-    if (!st.key) st.key = settings.smart?.[provider().settingsKey] || '';
-    input.value = st.key;
-    body.append(
-      h('h1', { class: 'h1', text: 'Smart panel' }),
-      h('p', { class: 'sub', text: 'Optional. Runs on your own key, billed by the provider.' }),
-      h('div', { class: 'notice notice--red', id: 'purpose', text: PURPOSE }),
-      provs, field, result, steps,
-    );
-    notNow = h('button', { type: 'button', class: 'btn btn--quiet', id: 'notNow', text: 'Not now', onclick: () => { st.key = ''; st.keyOk = false; afterSmart(); } });
-    const nextBtn = footer({
-      disabled: () => !input.value.trim(), // an empty field leaves by Not now, not by Continue
-      onNext: async () => {
-        const key = input.value.trim();
-        if (!key) return; // (the button is disabled without one; this is the belt to that braces)
-        const p = provider();
-        result.textContent = 'Checking the key…';
-        result.className = 'result';
-        // one cheap call before saving, so a typo surfaces here rather than mid-semester
-        const r = await BCV.smartClient.send({ type: 'testKey', provider: p.key, key });
-        if (r?.ok) {
-          st.key = key;
-          st.keyOk = true;
-          st.keyMsg = r.message || 'The key works.';
-          await S.update({ smart: { [p.settingsKey]: key, preferred: p.key } });
-          tick.hidden = false;
-          result.textContent = st.keyMsg;
-          result.className = 'result is-ok';
-          await new Promise((res) => setTimeout(res, 350));
-          afterSmart();
-        } else {
-          st.keyOk = false;
-          result.textContent = r?.message || 'The key could not be checked. Check it and try again, or skip for now.';
-          result.className = 'result is-err';
-          field.classList.add('is-bad');
-          shake();
-          settleHeight();
-        }
-      },
-    });
-    nextBtn.before(notNow);
-    // The two ways off this step are exactly one each: a key that checks out, or Not now. With the
-    // field empty Continue is dead and Not now is the button offered, so the panel is never left
-    // half-set-up by someone pressing the blue button to get past it.
-    syncButtons = () => {
-      const typed = input.value.trim().length > 0;
-      notNow.hidden = typed;
-      nextBtn.disabled = !typed;
-    };
-    input.addEventListener('input', () => {
-      st.key = input.value;
-      st.keyOk = false;
-      tick.hidden = true;
-      field.classList.remove('is-bad');
-      syncButtons();
-    });
-    syncButtons();
+    footer({ onNext: () => (STEPS.includes(sidebar) ? go(2) : finish({ skipped: false })) });
   }
 
   // ---- where the courses live ----------------------------------------------------------------------
@@ -527,5 +421,5 @@
     if (BCV.tour) await BCV.tour.start(app);
   }
 
-  BCV.setup = { open, close, active, PROVIDERS };
+  BCV.setup = { open, close, active };
 })();

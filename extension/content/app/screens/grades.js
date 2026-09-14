@@ -149,14 +149,6 @@
         if (el) { el.focus(); el.select(); }
         focusId = null;
       }
-      ctx.setSmart({
-        label: `${c.name} · Grades`,
-        actions: [
-          { label: 'Explain my grade', note: gm.total === null ? 'Nothing graded yet' : `${gm.total}% so far`, icon: IC.chart, prompt: 'Explain how my current grade in this course is built from the groups and weights, and which items matter most from here.' },
-          { label: 'What do I need on the final?', note: gm.weighted ? 'Uses the group weights' : 'Uses points', icon: IC.bolt, prompt: 'Using the weights and what is graded so far, what scores do I need on the remaining items to reach an A, a B and a C? Show the arithmetic briefly.' },
-        ],
-        context: () => [`Course: ${c.name}. Current total ${gm.total === null ? 'not available' : `${gm.total}%`}${c.grade ? ` (${c.grade})` : ''}. ${gm.weighted ? 'Weighted groups.' : 'Not weighted.'}`, 'Groups: ' + gm.weights.map((w) => `${w.name} ${w.pct}`).join('; '), 'By group: ' + gm.legend.map((l) => `${l.label} ${l.value} (${l.detail})`).join('; '), 'Assignments:', ...gm.rows.map((g) => `- ${g.name} [${g.group}] ${g.earned === null ? 'ungraded' : `${g.earned}`} / ${g.possible}${g.badge ? ` · ${g.badge}` : ''}${g.due ? ` · due ${U.fmtBy(g.due)}` : ''}`)].join('\n'),
-      });
     }
     function ns(tag) {
       return document.createElementNS(NS, tag);

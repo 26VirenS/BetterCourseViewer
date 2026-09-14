@@ -106,7 +106,7 @@ try {
     .shot{left:24px;top:118px;width:620px}
   </style></head><body><div class="bg"></div>
   <div class="row"><img class="icon" src="${icon}"><div class="name">Simpl Courses</div></div>
-  <div class="sub">Canvas, quietly rebuilt — dashboard, courses, grades, quizzes and a smart panel.</div>
+  <div class="sub">Canvas, quietly rebuilt — dashboard, courses, grades and quizzes.</div>
   <img class="shot" src="${dash}"></body></html>`;
   const tileMarquee = () => `<!doctype html><html><head><meta charset="utf-8"><style>${base(1400, 560)}
     .txt{position:absolute;left:64px;top:128px;width:520px}
@@ -115,7 +115,7 @@ try {
     .sub{font-weight:500;font-size:20px;line-height:1.35;opacity:.92}
     .shot{right:-40px;top:70px;width:820px;border-radius:16px}
   </style></head><body><div class="bg"></div>
-  <div class="txt"><img class="icon" src="${icon}"><div class="name">Simpl Courses</div><div class="sub">Canvas, quietly rebuilt — dashboard, courses, grades, quizzes and a smart panel, drawn from your own Canvas data</div></div>
+  <div class="txt"><img class="icon" src="${icon}"><div class="name">Simpl Courses</div><div class="sub">Canvas, quietly rebuilt — dashboard, courses, grades and quizzes, drawn from your own Canvas data</div></div>
   <img class="shot" src="${dash}"></body></html>`;
   const promo = await context.newPage();
   await promo.setViewportSize({ width: 440, height: 280 });

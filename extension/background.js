@@ -1,95 +1,23 @@
 /* Simpl Courses background script.
  * Runs as a service worker (Safari 16.4+, Chrome) or a non-persistent
  * background page (older Safari, Firefox). Responsibilities:
- *  - stream smart-assistant replies to content scripts over a port
- *  - validate API keys for the options page
  *  - keep the toolbar badge in sync with due-soon counts
  *  - register content scripts for user-added Canvas domains
  */
-if (typeof importScripts === 'function' && !self.BCV?.providers) {
-  importScripts('lib/settings.js', 'lib/providers.js');
+if (typeof importScripts === 'function' && !self.BCV?.settings) {
+  importScripts('lib/settings.js');
 }
 
 (function () {
   const BCV = self.BCV;
   const api = BCV.api;
   const S = BCV.settings;
-  const P = BCV.providers;
-
-  const streams = new Map(); // request id -> AbortController
-
-  // ---- smart assistant streaming ----------------------------------------
-  api.runtime.onConnect.addListener((port) => {
-    if (port.name !== 'bcv-smart') return;
-    const owned = new Set();
-    port.onMessage.addListener(async (msg) => {
-      if (!msg || typeof msg !== 'object') return;
-      if (msg.type === 'abort') {
-        streams.get(msg.id)?.abort();
-        streams.delete(msg.id);
-        return;
-      }
-      if (msg.type !== 'chat') return;
-      const id = msg.id;
-      const controller = new AbortController();
-      streams.set(id, controller);
-      owned.add(id);
-      const post = (m) => {
-        try {
-          port.postMessage(m);
-        } catch {
-          controller.abort();
-        }
-      };
-      try {
-        const settings = await S.get();
-        const smart = settings.smart;
-        const provider = S.resolveProvider(smart);
-        if (!provider) {
-          post({ type: 'error', id, message: 'Add a Claude or ChatGPT key in Settings to turn on smart features.' });
-          return;
-        }
-        const model = S.modelFor(smart, provider);
-        const common = {
-          apiKey: provider === 'openai' ? smart.openaiKey.trim() : smart.claudeKey.trim(),
-          model,
-          system: msg.system || '',
-          messages: Array.isArray(msg.messages) ? msg.messages : [],
-          depth: smart.depth,
-          signal: controller.signal,
-          onStart: (info) => post({ type: 'start', id, provider, model: info.model || model }),
-          onDelta: (text) => post({ type: 'delta', id, text }),
-        };
-        const result = provider === 'openai' ? await P.streamOpenAI(common) : await P.streamClaude(common);
-        post({ type: 'done', id, provider, model: result.model, stopReason: result.stopReason });
-      } catch (e) {
-        if (e?.name === 'AbortError') post({ type: 'done', id, aborted: true });
-        else post({ type: 'error', id, message: e?.message || 'Something went wrong.' });
-      } finally {
-        streams.delete(id);
-        owned.delete(id);
-      }
-    });
-    port.onDisconnect.addListener(() => {
-      for (const id of owned) {
-        streams.get(id)?.abort();
-        streams.delete(id);
-      }
-      owned.clear();
-    });
-  });
 
   // ---- one-shot messages --------------------------------------------------
   api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (!msg || typeof msg !== 'object') return false;
     const reply = (p) => Promise.resolve(p).then(sendResponse, (e) => sendResponse({ ok: false, message: e?.message || String(e) }));
     switch (msg.type) {
-      case 'providerStatus':
-        reply(providerStatus());
-        return true;
-      case 'testKey':
-        reply(P.testKey(msg.provider, msg.key));
-        return true;
       case 'openOptions':
         reply(openOptions());
         return true;
@@ -127,18 +55,6 @@ if (typeof importScripts === 'function' && !self.BCV?.providers) {
       } catch { /* not a Canvas tab */ }
     }));
     return { ok: true, cleared };
-  }
-
-  async function providerStatus() {
-    const settings = await S.get();
-    const provider = S.resolveProvider(settings.smart);
-    return {
-      configured: !!provider,
-      provider,
-      label: S.providerLabel(provider),
-      model: provider ? S.modelFor(settings.smart, provider) : null,
-      enabled: settings.smart.enabled !== false,
-    };
   }
 
   async function openOptions() {

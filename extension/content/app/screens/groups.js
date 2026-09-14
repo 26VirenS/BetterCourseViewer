@@ -21,7 +21,6 @@
       body.replaceChildren(U.errorBox('Your groups could not be loaded.'));
       return screen;
     }
-    ctx.setSmart({ label: 'Groups', actions: [], context: () => groups.map((g) => `- ${g.name}${g.description ? `: ${BCV.utils.htmlToText(g.description, 200)}` : ''} (${g.members_count || '?'} members)`).join('\n') });
 
     const rowFor = ({ g, c }) => U.row([
       U.tile(IC.people, { color: c?.color || '#5856d6', tint: c ? U.rgba(c.color, 0.16) : 'rgba(88,86,214,.16)' }),

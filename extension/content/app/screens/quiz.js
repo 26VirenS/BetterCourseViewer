@@ -214,11 +214,6 @@
       screen.classList.toggle('is-embedded', embedded);
       html.classList.toggle('bcv-quiz', !embedded); // the attempt (and its receipt) takes the page
       setOpen(st.stage === 'take' || st.stage === 'review');
-      ctx.setSmart(st.stage === 'feedback' ? feedbackSmart() : {
-        label: `${quiz.title} · quiz`,
-        actions: [],
-        context: () => `Quiz: ${quiz.title} (${course.name}). ${st.questions.length} questions. This is an open attempt; the smart panel must not answer quiz questions for the student.`,
-      });
     }
     function modeBtn(key, label, icon) {
       return h('button', { type: 'button', class: `bcv-qz__mode ${st.mode === key ? 'is-active' : ''}`, title: label, 'aria-label': label, onclick: () => { st.mode = key; store.setPref('quizMode', key); draw(); } }, U.svg(icon, { size: 15, width: 1.9 }));
@@ -558,11 +553,9 @@
 
     // ---- feedback (mockup 9) ---------------------------------------------------------
     // A finished attempt, question by question: your answer, the correct one when the
-    // quiz's settings allow it, the instructor's worked solution and a smart-panel entry
-    // point scoped to that question. Everything comes from the attempt's own question data
+    // quiz's settings allow it, the instructor's worked solution. Everything comes from the attempt's own question data
     // and the assignment submission's comments; nothing is fetched beyond that.
     const CS = () => BCV.screens.course;
-    const SPARK = 'M12 3l1.9 4.1L18 9l-4.1 1.9L12 15l-1.9-4.1L6 9l4.1-1.9zM18 15l.9 2.1L21 18l-2.1.9L18 21l-.9-2.1L15 18l2.1-.9z';
     const CROSS = 'M6 6l12 12M18 6L6 18';
     function finished(s) {
       return !!s && (s.workflow_state === 'complete' || s.workflow_state === 'pending_review');
@@ -660,36 +653,6 @@
       const score = sub.kept_score ?? sub.score;
       return { sub, rows, released, comments, possible, score: score === null || score === undefined ? null : Number(score), gradedAt: asub?.graded_at || sub.finished_at };
     }
-    function feedbackSmart() {
-      const fb = st.fb;
-      const sub = st.fbSub;
-      return {
-        label: `${quiz.title} · feedback`,
-        actions: fb && fb.released ? [
-          { label: 'What should I review?', note: `${fb.rows.filter((r) => r.correct !== true).length} to look at`, icon: IC.book, prompt: 'From this feedback, which topics should I review first and why? Keep it to the questions I lost points on.' },
-          { label: 'Quiz me on the misses', note: 'New questions, same ideas', icon: IC.bolt, prompt: 'Write three practice questions (with brief answers) on the concepts behind the questions I got wrong.' },
-        ] : [],
-        context: () => `Quiz feedback: ${quiz.title} (${course.name}).\nScore: ${fb && fb.score !== null ? `${store.fmtPts(fb.score)} / ${store.fmtPts(fb.possible)}` : 'not posted'}${sub ? ` · attempt ${sub.attempt}` : ''}.\n${fb ? fb.rows.map((r) => `- Q${r.k + 1} (${r.correct === true ? 'correct' : r.correct === false ? 'wrong' : r.correct === 'partial' ? 'partial credit' : 'not graded yet'}): ${r.text}\n  Your answer: ${r.yours ?? 'no answer'}${r.right && r.correct !== true && correctVisible() ? ` · Correct: ${r.right}` : ''}`).join('\n') : ''}\n\nThis is a study aid, not a regrade: the score cannot change here.`,
-      };
-    }
-    function askAbout(r) {
-      const ok = r.correct === true;
-      const solText = r.sol ? (r.sol.text || htmlToText(r.sol.html, 2000)) : '';
-      const showRight = !ok && correctVisible() && r.right;
-      app.setSmartTopic({
-        label: `Question ${r.k + 1} · ${r.text.slice(0, 80)}${r.text.length > 80 ? '…' : ''}`,
-        actions: [
-          { label: 'Walk me through this step by step', note: 'From the question to the answer', icon: IC.book, prompt: 'Walk me through this question step by step, using the worked solution where there is one. Do not change or dispute the score.' },
-          ok
-            ? { label: 'Why is this right?', note: 'The idea behind the answer', icon: IC.check, prompt: 'Explain why my answer is right, and what would have made it wrong.' }
-            : { label: 'Why was my answer wrong?', note: 'Compare my answer with the worked solution', icon: IC.check, prompt: 'Compare my answer with the correct one and explain where my reasoning went wrong.' },
-          { label: 'Give me a similar practice problem', note: 'Same idea, new numbers', icon: IC.bolt, prompt: 'Give me one similar practice problem on the same concept, then the worked answer after a line break.' },
-          { label: 'Find where this was covered', note: `In ${course.name}`, icon: IC.search, prompt: 'Where in this course was this concept covered? Point me to the module, page, reading or lecture, based on the course materials.' },
-        ],
-        context: () => `Quiz: ${quiz.title} (${course.name}, course id ${cid}${quiz.assignment_id ? `, assignment id ${quiz.assignment_id}` : ''})\nQuestion ${r.k + 1}: ${r.text}\nStudent's answer: ${r.yours ?? 'no answer'}\nCorrect answer: ${showRight ? r.right : ok ? (r.yours ?? '—') : 'not shown by the instructor'}\nOutcome: ${ok ? 'correct' : r.correct === 'partial' ? 'partial credit' : 'wrong'}${r.earned !== null ? ` · ${store.fmtPts(r.earned)} / ${store.fmtPts(r.possible)} points` : ''}\nWorked solution from the instructor: ${solText || 'none given'}\n\nThis is a study aid, not a regrade: the score cannot change here.`,
-      });
-      BCV.smart?.open?.();
-    }
     function fbCard(r, i) {
       const dark = app.isDark();
       const ok = r.correct === true, part = r.correct === 'partial', bad = r.correct === false;
@@ -705,7 +668,6 @@
           h('span', { class: 'bcv-fb__mark', style: { background: tint } }, U.svg(mark, { size: 13, stroke: ink, width: 2.8 })),
           h('span', { class: 'bcv-fb__qn', text: `Question ${r.k + 1}` }),
           h('span', { class: 'bcv-fb__score', style: { color: ink }, text: scoreLbl }),
-          r.correct === null ? null : h('button', { type: 'button', class: 'bcv-fb__ask', 'aria-label': `${ok ? 'Explain' : 'Why was this wrong?'} — question ${r.k + 1}`, onclick: () => askAbout(r) }, [U.svg(SPARK, { size: 13, stroke: 'var(--bcv-blue)', width: 1.9 }), h('span', { text: ok ? 'Explain' : 'Why was this wrong?' })]),
         ]),
         CS().prose(r.q.question_text || r.q.question_name || '', { cls: 'bcv-fb__qtext' }),
         U.el('bcv-fb__chips', [
@@ -764,7 +726,6 @@
         if (!ctx.alive() || st.stage !== 'feedback' || st.fbSub !== sub) return;
         st.fb = fb;
         wrap.replaceChildren(...feedbackParts(fb), btns());
-        ctx.setSmart(feedbackSmart());
       }).catch((e) => {
         if (ctx.alive()) wrap.replaceChildren(U.errorBox(`The feedback could not be loaded: ${e.message}`), btns());
       });

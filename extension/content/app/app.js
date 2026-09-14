@@ -25,11 +25,9 @@
     account: null,
     nativePath: location.pathname + location.search, // the URL Canvas actually rendered
     renderId: 0,
-    smartCtx: null,
     dark: false,
     quizOpen: false, // our quiz flow has an attempt on screen
     submitOpen: false, // our submission flow has unsent files or text on screen
-    smartTopic: null, // a question-level topic the smart panel is scoped to (quiz feedback); cleared on close and on navigation
   };
 
   // ---- routing ----------------------------------------------------------------------------
@@ -603,8 +601,8 @@
     const m = U.el('bcv-menu bcv-menu--account', [
       U.el('bcv-menu__head', [U.avatar(me?.avatar, me?.name, 34), h('div', { style: { minWidth: '0' } }, [U.text('bcv-menu__name bcv-ellip', me?.name || 'Account'), U.text('bcv-menu__sub bcv-ellip', me?.email || me?.login_id || siteName())])]),
       item(state.dark ? IC.sun : IC.moon, state.dark ? 'Light appearance' : 'Dark appearance', null, toggleTheme),
-      item(IC.settings, 'Simpl Courses settings', 'Look, courses, grades, the smart panel', () => BCV.smartClient?.openOptions?.()),
-      item(IC.sparkle, 'Guided setup', 'Courses, grades, the smart panel', () => go('/?bcv=setup')),
+      item(IC.settings, 'Simpl Courses settings', 'Look, courses and grades', openSettings),
+      item(IC.sparkle, 'Guided setup', 'Courses, grades and a tour', () => go('/?bcv=setup')),
       item(IC.cal, 'Tour', 'What changed, on the real pages', () => go('/?bcv=tour')),
       U.el('bcv-menu__sep'),
       item(IC.people, 'Canvas profile', null, () => go('/profile')),
@@ -622,6 +620,11 @@
   async function toggleTheme() {
     const next = state.dark ? 'off' : 'on';
     await S.update({ appearance: { darkMode: next } });
+  }
+
+  /** Simpl Courses settings, opened by the background (a content script cannot open it itself). */
+  function openSettings() {
+    try { BCV.api.runtime.sendMessage({ type: 'openOptions' }); } catch { U.toast('Open Simpl Courses settings from the toolbar button.'); }
   }
 
   // ---- the pressed control is the progress bar (mockup 14) ---------------------------------------
@@ -762,9 +765,7 @@
     punchOut(); // a native screen punches back in while it builds
     closeQuickNav(); // the courses panel belongs to the row it came from, not to the next screen
     syncSide(); // the sidebar follows the route in place; it is rebuilt only when what it shows changes
-    const ctx = { app: BCV.app, route: r, alive, dark: state.dark, setSmart: (c) => setSmartContext(c, id) };
-    state.smartCtx = null;
-    state.smartTopic = null;
+    const ctx = { app: BCV.app, route: r, alive, dark: state.dark };
     // Screens build off-DOM and land whole. A screen still fetching after 150ms gets a
     // skeleton in its place, shaped like its content (course cards on Grades, list rows
     // elsewhere); a cached screen lands before that and never flashes it.
@@ -819,7 +820,6 @@
     warmAround(r);
     document.title = titleFor(r);
     if (phone()) BCV.phone.afterRender(BCV.app, r, el);
-    BCV.smart?.refresh?.();
     // ?bcv=setup (the popup's Set up button, the account sheet, the app's first launch): the guided
     // setup over this page, which drops the parameter and starts the tour when it is done
     if (r.params.get('bcv') === 'setup' && BCV.setup && !BCV.setup.active()) BCV.setup.open(BCV.app);
@@ -839,12 +839,6 @@
   function titleFor(r) {
     const base = { dashboard: 'Dashboard', courses: 'Courses', groups: 'Groups', todo: 'To Do', calendar: 'Calendar', inbox: 'Inbox', gpa: 'Grades', notifications: 'Notifications' }[r.screen];
     return base ? `${base} · ${siteName()}` : document.title;
-  }
-
-  function setSmartContext(c, id) {
-    if (id !== state.renderId) return;
-    state.smartCtx = c;
-    BCV.smart?.refresh?.();
   }
 
   async function loadShellData({ force = false } = {}) {
@@ -943,12 +937,10 @@
       if (!started) {
         started = true;
         loadShellData();
-        BCV.smart?.mount?.(BCV.app);
         await render();
       }
     } else {
       punchOut();
-      BCV.smart?.hide?.();
       if (state.originalTitle) document.title = state.originalTitle;
       // Canvas only rendered the page that was loaded; if we navigated since, load this one.
       if (started && state.nativePath !== location.pathname + location.search) location.reload();
@@ -1019,12 +1011,7 @@
   BCV.app = {
     state, go, render, renderSide, parseRoute, refreshCounts, loadShellData, punchIn, punchOut, siteName, toggleTheme, logout, backTo, nameHere, markBack,
     isDark: () => state.dark,
-    smartContext: () => state.smartTopic || state.smartCtx,
-    /** Scope the smart panel to one item (a quiz question) until it is closed; null restores the page's suggestions. */
-    setSmartTopic: (topic) => {
-      state.smartTopic = topic || null;
-      BCV.smart?.refresh?.();
-    },
+    openSettings,
     main: () => main,
   };
 

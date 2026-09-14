@@ -70,19 +70,12 @@
       );
     };
 
-    function updateSmart() {
+    /** The header's count line: what is open, across how many courses, and how many are your own. */
+    function paintSub() {
       const list = (items || []).filter(isOpen);
       const courses = new Set(list.filter((i) => !i.custom).map((i) => i.courseId)); // a task of your own is not a course
       const mine = list.filter((i) => i.custom).length;
       sub.textContent = list.length ? `${U.plural(list.length, 'item')} across ${U.plural(courses.size, 'course')}${mine ? ` · ${mine === 1 ? 'one' : mine} of your own` : ''}` : 'Nothing on your list';
-      ctx.setSmart({
-        label: 'To Do',
-        actions: [
-          { label: 'Summarize what’s due', note: `${U.plural(list.filter((i) => i.isDue).length, 'item')} actually due`, icon: IC.check, prompt: 'Summarize this list: what is actually due (with points and times) versus what is only scheduled. Order by urgency.' },
-          { label: 'Plan the next 7 days', note: `${U.plural(list.length, 'item')} on the list`, icon: IC.cal, prompt: 'Turn this list into a realistic day-by-day plan for the next seven days.' },
-        ],
-        context: () => list.map((it) => `- ${U.fmtAt(it.date)} · ${it.courseName} · ${it.kind} · ${it.title}${it.points !== null ? ` · ${it.points} pts` : ''}${priOf(it) ? ` · priority ${priMeta(priOf(it)).label.toLowerCase()}` : ''}${it.isDue ? '' : it.custom ? '' : ' · (to-do date, not a due date)'}`).join('\n'),
-      });
     }
 
     async function change(it, fn, rowEl) {
@@ -90,7 +83,7 @@
       try {
         await fn();
         app.refreshCounts();
-        updateSmart();
+        paintSub();
         setSeg(); // the completed count on the header button
         draw();
       } catch (e) {
@@ -103,7 +96,7 @@
       items = await store.todoWindow({ force: true }).catch(() => items);
       if (!ctx.alive()) return;
       app.refreshCounts();
-      updateSmart();
+      paintSub();
       setSeg();
       draw();
     }
@@ -280,7 +273,7 @@
     }
 
     setSeg();
-    updateSmart();
+    paintSub();
     draw();
     return screen;
   }

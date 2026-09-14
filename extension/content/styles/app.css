@@ -52,7 +52,7 @@ html[data-bcv-theme="dark"] {
 .bcv-sheet-ov { animation: bcv-scrim .28s cubic-bezier(.32,.72,0,1) both; }
 .bcv-sheet { animation: bcv-morph .34s cubic-bezier(.32,.72,0,1) backwards; transform-origin: 50% 50%; }
 html.bcv-phone .bcv-sheet { animation: bcv-sheet .26s cubic-bezier(.32,.72,0,1) both; } /* the phone's bottom sheets keep their rise */
-.bcv-smart, .bcv-menu, .bcv-toast, .bcv-gpa__pop { animation: bcv-pop .2s cubic-bezier(.32,.72,0,1) both; }
+ .bcv-menu, .bcv-toast, .bcv-gpa__pop { animation: bcv-pop .2s cubic-bezier(.32,.72,0,1) both; }
 .bcv-reader-ov { animation: bcv-fade-in .2s ease both; }
 /* Dashboard entry: workload rows float in and their bars wipe from the left, staggered down the list */
 .bcv-work__row--in { animation: bcv-fade-up .42s cubic-bezier(.32,.72,0,1) var(--bcv-delay, 0ms) backwards; }
@@ -105,7 +105,7 @@ html[data-bcv-theme="dark"] .bcv-skel { --bcv-skel: linear-gradient(90deg, rgba(
 .bcv-skel__btn { height: 34px; border-radius: 17px; }
 @media (prefers-reduced-motion: reduce) {
   /* entrances go (data lands on its final value at once); the loading indicators (the row wash, the shimmer) stay */
-  .bcv-main > .bcv-screen, .bcv-main > .bcv-qz, .bcv-main > .bcv-sb, .bcv-sheet-ov, .bcv-sheet, .bcv-smart, .bcv-menu, .bcv-toast, .bcv-gpa__pop, .bcv-reader-ov, .bcv-skel, .bcv-enter, .bcv-fb__fill,
+  .bcv-main > .bcv-screen, .bcv-main > .bcv-qz, .bcv-main > .bcv-sb, .bcv-sheet-ov, .bcv-sheet, .bcv-menu, .bcv-toast, .bcv-gpa__pop, .bcv-reader-ov, .bcv-skel, .bcv-enter, .bcv-fb__fill,
   .bcv-work__row--in, .bcv-work__fill--grow, .bcv-ring--fill, .bcv-ring--unfill, .bcv-ring--track-out, .bcv-gpa__ringletter.is-back, .bcv-gpa__line--draw, .bcv-gpa__pt--in { animation: none; }
   .bcv-stat, .bcv-gpa__card, .bcv-ccard, .bcv-btn, .bcv-sb__btn, .bcv-side, .bcv-head--course, .bcv-rail { transition: none; }
 }
@@ -379,7 +379,7 @@ html[data-bcv-theme="dark"] .bcv-badge--orange { color: #ffb44d; }
 .bcv-reorder__down svg { transform: rotate(90deg); }
 .bcv-reorder button:disabled { opacity: .35; cursor: default; }
 /* quiz in progress: nothing to click away with */
-.bcv-focus .bcv-nav, .bcv-focus .bcv-side__group, .bcv-focus .bcv-fab, .bcv-focus .bcv-rail, .bcv-focus .bcv-linkbtn, .bcv-focus .bcv-account { display: none !important; }
+.bcv-focus .bcv-nav, .bcv-focus .bcv-side__group, .bcv-focus .bcv-rail, .bcv-focus .bcv-linkbtn, .bcv-focus .bcv-account { display: none !important; }
 .bcv-focus .bcv-cmain { border-left: 0; }
 .bcv-focus__card { margin-top: 6px; padding: 14px; border-radius: 16px; background: var(--bcv-card); box-shadow: var(--bcv-shadow); display: flex; flex-direction: column; gap: 10px; }
 .bcv-focus__title { font: 600 13.5px/1.3 var(--bcv-font); }
@@ -924,22 +924,6 @@ html[data-bcv-theme="dark"] .bcv-gpa__need--no { color: #ff8098; }
 .bcv-gpa-set__foot { padding: 14px 22px 18px; border-top: 1px solid var(--bcv-sep); display: flex; align-items: center; gap: 12px; }
 .bcv-gpa-set__foot span { flex: 1; font: 500 12.5px/1.3 var(--bcv-font); color: var(--bcv-ink3); }
 
-/* ---- smart panel ---------------------------------------------------------- */
-.bcv-fab { position: fixed; right: 18px; bottom: 18px; z-index: 20; width: 30px; height: 30px; border: 0; border-radius: 15px; background: var(--bcv-fill); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); display: flex; align-items: center; justify-content: center; cursor: pointer; opacity: .62; padding: 0; }
-.bcv-fab:hover { opacity: 1; background: var(--bcv-card); }
-.bcv-smart { position: fixed; right: 18px; bottom: 18px; z-index: 25; width: 340px; max-width: calc(100vw - 36px); max-height: min(560px, calc(100vh - 36px)); background: var(--bcv-glass); -webkit-backdrop-filter: var(--bcv-blur-glass); backdrop-filter: var(--bcv-blur-glass); border: 1px solid var(--bcv-edge); border-radius: 22px; box-shadow: var(--bcv-shadow-glass); display: flex; flex-direction: column; overflow: hidden; font-family: var(--bcv-font); color: var(--bcv-ink); }
-.bcv-smart--wide { width: 420px; max-height: min(720px, calc(100vh - 36px)); }
-.bcv-smart__head { padding: 18px 18px 12px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--bcv-edge); }
-.bcv-smart__title { font: 600 14px/1.25 var(--bcv-font); }
-.bcv-smart__ctx { margin-top: 2px; font: 400 11.5px/1.25 var(--bcv-font); color: var(--bcv-ink3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.bcv-smart__body { flex: 1; overflow: auto; padding: 16px 18px; display: flex; flex-direction: column; gap: 14px; }
-.bcv-smart__label { font: 600 11px/1.2 var(--bcv-font); color: var(--bcv-ink3); text-transform: uppercase; letter-spacing: .05em; }
-.bcv-smart__label--gap { margin-top: 4px; }
-.bcv-smart__actions { display: flex; flex-direction: column; gap: 8px; }
-.bcv-smart__action { display: flex; align-items: center; gap: 10px; padding: 11px 12px; border: 0; border-radius: 14px; background: var(--bcv-card); box-shadow: var(--bcv-shadow); cursor: pointer; text-align: left; width: 100%; }
-.bcv-smart__action:hover { background: var(--bcv-hover); }
-.bcv-smart__action-label { display: block; font: 600 13px/1.3 var(--bcv-font); color: var(--bcv-ink); }
-.bcv-smart__action-note { display: block; margin-top: 2px; font: 400 11.5px/1.35 var(--bcv-font); color: var(--bcv-ink3); }
 .bcv-bubble { max-width: 92%; padding: 10px 13px; border-radius: 16px 16px 16px 5px; background: var(--bcv-card); box-shadow: var(--bcv-shadow); font: 400 13px/1.5 var(--bcv-font); color: var(--bcv-ink); align-self: flex-start; overflow-wrap: anywhere; }
 .bcv-bubble--user { align-self: flex-end; max-width: 88%; padding: 9px 13px; border-radius: 16px 16px 5px 16px; background: var(--bcv-blue); color: #fff; box-shadow: none; line-height: 1.45; white-space: pre-wrap; }
 .bcv-bubble--error { background: var(--bcv-red-soft); color: var(--bcv-red-text); box-shadow: none; }
@@ -952,16 +936,6 @@ html[data-bcv-theme="dark"] .bcv-gpa__need--no { color: #ff8098; }
 .bcv-bubble__tools { display: flex; gap: 6px; margin-top: 8px; }
 .bcv-bubble__tool { border: 0; background: var(--bcv-fill); border-radius: 9px; padding: 4px 8px; font: 600 11px/1.2 var(--bcv-font); color: var(--bcv-ink2); cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
 .bcv-bubble.is-streaming::after { content: ''; display: inline-block; width: 6px; height: 12px; margin-left: 3px; vertical-align: -2px; background: var(--bcv-blue); border-radius: 2px; animation: bcv-pulse 1s infinite; }
-.bcv-smart__foot { padding: 12px 18px 18px; border-top: 1px solid var(--bcv-edge); display: flex; align-items: center; gap: 8px; }
-.bcv-smart__input { flex: 1; display: flex; align-items: center; min-height: 38px; padding: 0 14px; border-radius: 19px; background: var(--bcv-fill); }
-.bcv-smart__input textarea { flex: 1; border: 0 !important; background: transparent !important; padding: 10px 0; margin: 0; font: 400 13.5px/1.35 var(--bcv-font); color: var(--bcv-ink) !important; outline: none; resize: none; max-height: 120px; box-shadow: none !important; -webkit-appearance: none; appearance: none; }
-.bcv-smart__input textarea::placeholder { color: var(--bcv-ink3); }
-.bcv-smart__send { flex: none; width: 38px; height: 38px; border: 0; border-radius: 19px; background: var(--bcv-blue); display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; }
-.bcv-smart__send:disabled { opacity: .4; cursor: default; }
-.bcv-smart__send--stop { background: var(--bcv-red); }
-.bcv-smart__tools { display: flex; gap: 8px; align-items: center; }
-.bcv-smart__toolbtn { border: 0; background: transparent; padding: 0; font: 500 11.5px/1 var(--bcv-font); color: var(--bcv-ink3); cursor: pointer; }
-.bcv-smart__toolbtn:hover { color: var(--bcv-blue); }
 
 
 /* ---- native (hybrid) pages ------------------------------------------------- */
@@ -1077,8 +1051,6 @@ html[data-bcv-theme="dark"] .bcv-sb__chip--due { color: #ffb44d; }
 .bcv-fb__mark { flex: none; width: 24px; height: 24px; border-radius: 12px; display: flex; align-items: center; justify-content: center; }
 .bcv-fb__qn { font: 700 12.5px/1.2 var(--bcv-font); letter-spacing: -.01em; }
 .bcv-fb__score { margin-left: auto; font: 600 12.5px/1.2 var(--bcv-font); }
-.bcv-fb__ask { flex: none; display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 11px; border: 0; border-radius: 14px; background: var(--bcv-blue-soft); color: var(--bcv-blue); cursor: pointer; font: 600 12px/1 var(--bcv-font); white-space: nowrap; }
-.bcv-fb__ask:hover { background: var(--bcv-fill); }
 .bcv-fb__qtext { font-size: 16px; line-height: 1.4; font-weight: 600; letter-spacing: -.015em; text-wrap: pretty; }
 .bcv-fb__qtext p { margin: 0; }
 .bcv-fb__chips { display: flex; gap: 9px; flex-wrap: wrap; align-items: center; }
@@ -1122,7 +1094,7 @@ html[data-bcv-theme="dark"].bcv-punch:not(.bcv-punch-light) #content img, html[d
 /* ---- quiz taking (mockup): chrome hidden, one column ----------------------- */
 /* The quiz flow lives in the course's column: the intro and the feedback sit under the course header
    beside the rail (is-embedded); an attempt (html.bcv-quiz) folds the sidebar, the header and the rail
-   away, smoothly, and takes the page; the smart panel steps out for the attempt. */
+   away, smoothly, and takes the page. */
 .bcv-qz.is-embedded { min-height: 0; }
 .bcv-qz.is-embedded .bcv-qz__head { display: none; }
 .bcv-side { transition: width .45s cubic-bezier(.32,.72,0,1), padding .45s cubic-bezier(.32,.72,0,1), opacity .25s ease; }
@@ -1132,7 +1104,6 @@ html.bcv-quiz .bcv-screen--ctx .bcv-head--course { max-height: 0; padding-top: 0
 .bcv-rail { transition: width .45s cubic-bezier(.32,.72,0,1), padding .45s cubic-bezier(.32,.72,0,1), opacity .25s ease; }
 html.bcv-quiz .bcv-screen--ctx .bcv-rail { width: 0; padding-left: 0; padding-right: 0; opacity: 0; overflow: hidden; pointer-events: none; }
 html.bcv-quiz .bcv-screen--ctx .bcv-cmain { border-left: 0; }
-html.bcv-quiz .bcv-fab, html.bcv-quiz #bcv-smart { display: none !important; }
 .bcv-qz { min-height: 100vh; display: flex; flex-direction: column; background: var(--bcv-bg); }
 .bcv-qz__starting { flex: 1; margin: 0; display: flex; align-items: center; justify-content: center; padding: 80px 28px; font: 500 14px/1.4 var(--bcv-font); color: var(--bcv-ink3); }
 /* A question on its way: what is on screen stays, inert, and the pill of the question being fetched fills
@@ -1319,16 +1290,12 @@ html.bcv-phone .bcv-seg__btn { flex: 1; text-align: center; padding: 9px 0; }
 html.bcv-phone .bcv-linkbtn { display: none; } /* the back bar has the way back */
 html.bcv-phone .bcv-hint { padding: 0 4px; }
 html.bcv-phone .bcv-reader-btn { display: none !important; } /* no Immersive Reader on the phone: iOS has Reader, Speak Screen and Dynamic Type */
-/* sheets and the smart panel come up from the bottom, with a grab handle */
+/* sheets come up from the bottom, with a grab handle */
 @keyframes bcv-sheet-up { from { opacity: 0; transform: translateY(60px); } to { opacity: 1; transform: none; } }
 html.bcv-phone .bcv-sheet-ov { align-items: flex-end; padding: 0; }
 html.bcv-phone .bcv-sheet { width: 100%; max-width: none; max-height: 88vh; border-radius: 26px 26px 0 0; border-bottom: 0; padding-bottom: var(--bcv-ph-bottom); animation: bcv-sheet-up .3s cubic-bezier(.32,.72,0,1) both; transform-origin: 50% 100%; }
 .bcv-ph-sheet__handle { flex: none; padding: 8px 0 10px; display: flex; justify-content: center; cursor: grab; touch-action: none; }
 .bcv-ph-sheet__handle span { width: 38px; height: 5px; border-radius: 3px; background: var(--bcv-fill); }
-html.bcv-phone .bcv-fab { right: 16px; bottom: calc(var(--bcv-ph-tabbar) + var(--bcv-ph-bottom) + 20px); width: 52px; height: 52px; border-radius: 26px; opacity: 1; background: rgba(10,132,255,.92); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); box-shadow: 0 8px 22px rgba(10,79,214,.36); }
-html.bcv-phone .bcv-fab svg { stroke: #fff; width: 22px; height: 22px; }
-html.bcv-phone.bcv-quiz-fb .bcv-fab { bottom: 18px; }
-html.bcv-phone .bcv-smart { left: 0; right: 0; bottom: 0; width: auto; max-width: none; max-height: 82vh; border-radius: 26px 26px 0 0; border-bottom: 0; padding-bottom: var(--bcv-ph-bottom); animation: bcv-sheet-up .3s cubic-bezier(.32,.72,0,1) both; }
 html.bcv-phone .bcv-menu { position: fixed; left: 12px !important; right: 12px !important; top: auto !important; bottom: calc(var(--bcv-ph-tabbar) + var(--bcv-ph-bottom) + 12px); min-width: 0; }
 html.bcv-phone .bcv-toast { bottom: calc(var(--bcv-ph-tabbar) + var(--bcv-ph-bottom) + 14px); max-width: calc(100vw - 32px); }
 /* course shell: no rail; a chip row of the tabs on the tabs below Home */
@@ -1625,7 +1592,7 @@ html.bcv-phone .bcv-sb--embed .bcv-sb__btn--primary { width: 100%; height: 50px;
 .bcv-ph-me { display: flex; align-items: center; gap: 12px; padding: 2px 20px 4px; }
 .bcv-ph-me__name { font: 700 17px/1.2 var(--bcv-display); letter-spacing: -.02em; }
 .bcv-ph-me__sub { margin-top: 2px; font: 400 12px/1.3 var(--bcv-font); color: var(--bcv-ink3); }
-@media (prefers-reduced-motion: reduce) { html.bcv-phone .bcv-sheet, html.bcv-phone .bcv-smart, .bcv-ph-composer, .bcv-ph-warn, .bcv-ph-gcard__more { animation: none; } }
+@media (prefers-reduced-motion: reduce) { html.bcv-phone .bcv-sheet, .bcv-ph-composer, .bcv-ph-warn, .bcv-ph-gcard__more { animation: none; } }
 /* quiz: pills across, sticky footer, one question per screen */
 html.bcv-phone .bcv-qz__head { padding-top: var(--bcv-ph-top); }
 html.bcv-phone .bcv-qz__headrow { padding: 10px 14px; gap: 10px; }

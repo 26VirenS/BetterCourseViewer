@@ -42,7 +42,7 @@
   /** The flow on its own (the phone), or — `embed` — the block the assignment page hosts at the
    *  end of its own scroll (mockup 11): the assignment already on the page is reused, never
    *  refetched, the instructions stay above, and the mode chosen is remembered per assignment. */
-  async function render(ctx, course, { embed = false, a: aGiven = null, sub: subGiven = null, back: backGiven = null, onSmart = null, title: kicker = 'Hand in' } = {}) {
+  async function render(ctx, course, { embed = false, a: aGiven = null, sub: subGiven = null, back: backGiven = null, title: kicker = 'Hand in' } = {}) {
     const { app, route } = ctx;
     const cid = course.id, aid = route.arg;
     const fromTodo = route.params.get('from') === 'todo';
@@ -482,22 +482,8 @@
       const checkAction = { label: 'Check what I am handing in', note: st.files.length ? U.plural(st.files.length, 'file') + ' attached' : st.tab === 'text' ? 'My text entry' : 'Nothing attached yet', icon: IC.check, prompt: 'From the instructions, list what should be handed in and compare it with what I have attached or written. Point out anything missing or in the wrong format. Do not write the work for me.' };
       const attached = () => [`Attached: ${st.files.map((f) => f.name).join(', ') || 'nothing'}`, st.link ? `Link: ${st.link.url}` : '', st.tab === 'text' ? `Text entry so far:\n${st.text.slice(0, 6000)}` : ''].filter(Boolean).join('\n');
       if (embed) { // the page keeps its own suggestions and adds this one
-        onSmart?.({ action: checkAction, context: attached });
         return;
       }
-      ctx.setSmart({
-        label: `${a.name} · handing in`,
-        actions: [
-          { label: 'Summarize this assignment', note: `${store.fmtPts(a.points_possible ?? 0)} pts · ${a.due_at ? `due ${U.fmtShort(a.due_at)}` : 'no due date'}`, icon: IC.doc, prompt: 'Summarize what this assignment asks for, the deliverable, and how it is graded.' },
-          checkAction,
-        ],
-        context: () => [
-          `Assignment: ${a.name}`, `Course: ${course.name}`, `Due: ${a.due_at ? U.fmtAt(a.due_at) : 'none'} · Points: ${a.points_possible ?? '—'}`,
-          `${acceptsLine.replace(/^accepts/, 'Accepts')} · ${allowedExt.length ? `file types ${extWords()}` : 'any file type'}`, '',
-          'Instructions:', htmlToText(a.description || '', 8000), '',
-          attached(),
-        ].join('\n'),
-      });
     }
     draw();
     return screen;

@@ -1058,7 +1058,7 @@ try {
   check((await page.$$('.bcv-qz__pill')).length === 4 && (await page.$('.bcv-qz__pill:first-child.is-current')) && (await texts('.bcv-qz__qnum'))[0] === 'Question 1', 'attempt started through the API: progress pills and question 1');
   // Begin attempt folds the chrome away, smoothly: the sidebar, the course header and the rail slide to nothing
   const folded = await page.waitForFunction(() => document.documentElement.classList.contains('bcv-quiz') && getComputedStyle(document.querySelector('.bcv-side')).width === '0px' && getComputedStyle(document.querySelector('.bcv-rail')).width === '0px' && getComputedStyle(document.querySelector('.bcv-head--course')).maxHeight === '0px', null, { timeout: 5000 }).then(() => true).catch(() => false);
-  check(folded && /width/.test(await page.$eval('.bcv-side', (e) => getComputedStyle(e).transitionProperty)) && !(await visible('#bcv-fab')), 'the attempt takes the page: the sidebar, header and rail fold away (a transition), the smart button steps out');
+  check(folded && /width/.test(await page.$eval('.bcv-side', (e) => getComputedStyle(e).transitionProperty)) && !(await page.$('#bcv-fab')), 'the attempt takes the page: the sidebar, header and rail fold away (a transition)');
   check(/^(19|20):\d\d$/.test((await texts('.bcv-qz__clock'))[0]), `timer counts down from the attempt's end_at: ${(await texts('.bcv-qz__clock'))[0]}`);
   check((await page.$$('.bcv-qz__letter')).length === 5 && (await texts('.bcv-qz__letter')).join('') === 'ABCDE', 'lettered options');
   await page.click('.bcv-qz__opt');
@@ -1120,24 +1120,11 @@ try {
   const fbLine = (await texts('.bcv-fb__scoreline'))[0];
   check(/^13 \/ 17 76% 3 of 4 correct · graded /.test(fbLine) && (await page.$$('.bcv-fb__q')).length === 4 && !(await page.$('.bcv-fb__comment')), `score card from the attempt's own numbers: ${fbLine}`);
   const fbCards = await texts('.bcv-fb__q');
-  check(/^Question 1 4 \/ 4 Explain What is the velocity at t = 5\? You: -3\.15 m\/s worked solution/i.test(fbCards[0]) && !/Correct:/.test(fbCards[0]) && (await page.$('.bcv-fb__q:nth-of-type(2) img.equation_image')), `a correct question: points, Explain, your answer, the instructor's solution with Canvas's equation image: ${fbCards[0]}`);
-  check(/^Question 2 0 \/ 4 Why was this wrong\? .*You: -2 m Correct: -3\.15 m worked solution 17\.68 m is the position reading/i.test(fbCards[1]), `a wrong question shows the correct answer (show_correct_answers) and the incorrect-answer comment: ${fbCards[1]}`);
+  check(/^Question 1 4 \/ 4 What is the velocity at t = 5\? You: -3\.15 m\/s worked solution/i.test(fbCards[0]) && !/Correct:/.test(fbCards[0]) && (await page.$('.bcv-fb__q:nth-of-type(2) img.equation_image')), `a correct question: points, Explain, your answer, the instructor's solution with Canvas's equation image: ${fbCards[0]}`);
+  check(/^Question 2 0 \/ 4 .*You: -2 m Correct: -3\.15 m worked solution 17\.68 m is the position reading/i.test(fbCards[1]), `a wrong question shows the correct answer (show_correct_answers) and the incorrect-answer comment: ${fbCards[1]}`);
   check(/Question 3 4 \/ 4 .*Your instructor left no worked solution/i.test(fbCards[2]) && /Question 4 5 \/ 5 .*You: 3\.15 .*Only one root/i.test(fbCards[3]), `no solution says so; plain-text comments render too: ${fbCards[2]} | ${fbCards[3]}`);
   check((await page.$$eval('.bcv-fb > .bcv-enter', (els) => els.map((e) => e.style.getPropertyValue('--bcv-delay')))).join(',') === '0ms,45ms,90ms,135ms,180ms', 'feedback cards arrive on a 45ms stagger');
   await shot(page, '22h-quiz-feedback');
-  // per-question smart topic: the panel re-titles to the question and swaps its suggestions; closing clears it
-  await (await page.$$('.bcv-fb__ask'))[1].click();
-  await page.waitForSelector('#bcv-smart', { timeout: 5000 });
-  check((await texts('.bcv-smart__ctx'))[0] === 'Reading: Question 2 · What is the displacement between t = 0 and t = 5?', `smart panel scoped to the question: ${(await texts('.bcv-smart__ctx'))[0]}`);
-  check((await texts('.bcv-smart__action-label')).join(',') === 'Walk me through this step by step,Why was my answer wrong?,Give me a similar practice problem,Find where this was covered', `question-level suggestions: ${(await texts('.bcv-smart__action-label')).join(',')}`);
-  await shot(page, '22i-quiz-feedback-smart');
-  await page.keyboard.press('Escape');
-  await page.waitForFunction(() => !document.querySelector('#bcv-smart'), null, { timeout: 5000 });
-  await page.click('#bcv-fab');
-  await page.waitForSelector('#bcv-smart', { timeout: 5000 });
-  check((await texts('.bcv-smart__ctx'))[0] === 'Reading: Lec06-PreQuiz · feedback' && (await texts('.bcv-smart__action-label')).join(',') === 'What should I review?,Quiz me on the misses', `closing the panel brings the page-level suggestions back: ${(await texts('.bcv-smart__ctx'))[0]}`);
-  await page.keyboard.press('Escape');
-  await page.waitForFunction(() => !document.querySelector('#bcv-smart'), null, { timeout: 5000 });
   await page.click('.bcv-fb__btns .bcv-qz__big:first-child');
   await page.waitForSelector('.bcv-qz__done', { timeout: 5000 });
   check((await texts('.bcv-qz__h1'))[0] === 'Attempt submitted', 'Back to receipt returns to the submitted screen');
@@ -1265,28 +1252,10 @@ try {
   check(!(await texts('.bcv-btn--primary')).includes('Submit in Canvas'), 'no submit button for tool assignments');
   await shot(page, '14b-assignment-tool');
 
-  // ---- smart panel --------------------------------------------------------------------------------
-  console.log('smart panel');
+  // the interface never says "AI" anywhere
   await page.goto(`${BASE}/courses/101/assignments/1009`);
   await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
-  await page.click('#bcv-fab');
-  await page.waitForSelector('#bcv-smart', { timeout: 5000 });
-  check((await texts('.bcv-smart__ctx'))[0] === 'Reading: F26-MATH 021 20 · Dis01', `smart context: ${(await texts('.bcv-smart__ctx'))[0]}`);
-  const actions = await texts('.bcv-smart__action-label');
-  check(actions.join(',') === 'Summarize this assignment,Make a checklist,Check what I am handing in', `suggested actions (the page's own, plus the hand-in block's): ${actions.join(', ')}`);
   check(!(await page.content()).match(/\bAI\b/), 'the interface never says "AI"');
-  await shot(page, '24-smart-panel');
-  await page.fill('#bcv-smart textarea', 'What is this about?');
-  await page.press('#bcv-smart textarea', 'Enter');
-  await page.waitForSelector('.bcv-bubble--error', { timeout: 10000 });
-  check(/Add a Claude or ChatGPT key/.test((await texts('.bcv-bubble--error'))[0]) && (await page.$('.bcv-bubble--error .bcv-btn')), 'no key → setup message with a Settings button');
-  await setSettings({ smart: { claudeKey: 'sk-ant-test-not-real' } });
-  await page.click('.bcv-smart__action');
-  await page.waitForFunction(() => document.querySelectorAll('.bcv-bubble--error').length === 2, null, { timeout: 30000 });
-  check(/Claude/.test((await texts('.bcv-bubble--error'))[1]), `provider error surfaced: ${(await texts('.bcv-bubble--error'))[1].slice(0, 60)}`);
-  await setSettings({ smart: { claudeKey: '' } });
-  await page.click('#bcv-smart .bcv-iconbtn');
-  await page.waitForFunction(() => !document.querySelector('#bcv-smart'), null, { timeout: 5000 });
 
   // ---- dark appearance -------------------------------------------------------------------------------
   console.log('appearance');
@@ -1541,7 +1510,7 @@ try {
   await page.waitForFunction(() => !document.documentElement.classList.contains('bcv-on'), null, { timeout: 5000 });
   check(await visible('#application') && !(await visible('#bcv-app')), '"Open in stock Canvas" turns the look off: stock Canvas is back');
   check(!(await page.$('html.bcv-punch')) && (await visible('#header')) && (await page.$eval('#content', (el) => el.getBoundingClientRect().left < 200)), 'turning the look off ends the punch-through: Canvas lays its page out itself again');
-  check(!(await page.$('#bcv-fab')) && !(await page.$('#bcv-skin')), 'smart button hidden, nothing of ours left on the page');
+  check(!(await page.$('#bcv-fab')) && !(await page.$('#bcv-skin')), 'nothing of ours left on the page');
   await shot(page, '28-skin-off');
   await page.goto(`${BASE}/`);
   await page.waitForSelector('#application', { timeout: 10000 });
@@ -1570,7 +1539,7 @@ try {
   await page.goto(`${BASE}/?bcv=setup`);
   await page.waitForSelector(su('.row'), { timeout: 20000 });
   await page.waitForTimeout(500);
-  check(page.url() === `${BASE}/` && (await page.$('.bcv-stat')) !== null && (await page.$$(su('.blob'))).length === 4 && (await sStep()) === '1 of 4' && (await page.$$(su('.progress span'))).length === 4 && (await page.$eval('html', (e) => getComputedStyle(e).overflow)) === 'hidden', 'the setup opens as a glass card over the dashboard: the address cleaned, four steps, the page held still');
+  check(page.url() === `${BASE}/` && (await page.$('.bcv-stat')) !== null && (await page.$$(su('.blob'))).length === 4 && (await sStep()) === '1 of 3' && (await page.$$(su('.progress span'))).length === 3 && (await page.$eval('html', (e) => getComputedStyle(e).overflow)) === 'hidden', 'the setup opens as a glass card over the dashboard: the address cleaned, four steps, the page held still');
   await shot(page, '32-setup-over-page');
   const scanned = await texts(su('.row__code'));
   // nothing is ticked to begin with, whatever Canvas already has starred, and Continue is dead until
@@ -1600,7 +1569,7 @@ try {
   await shot(page, '32c-setup-courses');
   await sNext('#track');
   const firstTargets = await page.$$eval(su('.target .seg button.is-on'), (bs) => bs.map((b) => b.textContent));
-  check((await sStep()) === '2 of 4' && (await page.$eval(su('#track'), (e) => e.classList.contains('is-on'))) && (await texts(su('#goal')))[0] === '4.00' && (await page.$$(su('.target'))).length === 5 && firstTargets.join(',') === 'A+,A+,A+,A+,A+' && (await page.$$eval(su('.target:first-child .seg button'), (bs) => bs.map((b) => b.textContent))).join(' ') === 'C B B+ A- A A+', `step 2: tracking on, a 4.00 goal, every course aiming at A+, letters low to high: ${firstTargets.join(',')}`);
+  check((await sStep()) === '2 of 3' && (await page.$eval(su('#track'), (e) => e.classList.contains('is-on'))) && (await texts(su('#goal')))[0] === '4.00' && (await page.$$(su('.target'))).length === 5 && firstTargets.join(',') === 'A+,A+,A+,A+,A+' && (await page.$$eval(su('.target:first-child .seg button'), (bs) => bs.map((b) => b.textContent))).join(' ') === 'C B B+ A- A A+', `step 2: tracking on, a 4.00 goal, every course aiming at A+, letters low to high: ${firstTargets.join(',')}`);
   await page.click(su('.stepper button:last-child')); // already at the top of the scale: it stays there
   check((await texts(su('#goal')))[0] === '4.00', `the goal does not climb past 4.00: ${(await texts(su('#goal')))[0]}`);
   await page.click(su('.stepper button:first-child'));
@@ -1608,33 +1577,12 @@ try {
   await page.click(su('.target:first-child .seg button:nth-child(3)'));
   check((await texts(su('#goal')))[0] === '3.90' && (await page.$eval(su('.target:first-child .seg button.is-on'), (b) => b.textContent)) === 'B+', 'the goal stepper and a target pick');
   await shot(page, '32d-setup-grades');
-  await sNext('.prov');
-  const sProvs = await texts(su('.prov'));
-  const purpose = (await texts(su('#purpose')))[0];
-  check((await sStep()) === '3 of 4' && sProvs.length === 3 && /Gemini\s*Coming soon/.test(sProvs[2]) && (await page.$eval(su('.prov.is-soon'), (b) => b.getAttribute('aria-disabled'))) === 'true' && /console\.anthropic\.com/.test((await texts(su('.keystep')))[0]) && !(await page.$eval(su('#notNow'), (b) => b.hidden)), `step 3 offers Claude, ChatGPT and Gemini (coming soon) with the key steps: ${sProvs.join(' | ')}`);
-  // the only two ways off this step: a key that checks out, or Not now. Continue is dead while the
-  // field is empty, so the panel is never left half-set-up by pressing the blue button to get past.
-  check((await page.$eval(su('#next'), (b) => b.disabled)) && !(await page.$eval(su('#notNow'), (b) => b.hidden)), 'with no key Continue is off and Not now is the way on');
-  await page.$eval(su('#next'), (el) => el.click()); // dispatched straight at it: page.click() would wait for it to become enabled
-  await page.waitForTimeout(300);
-  check((await sStep()) === '3 of 4', `and pressing it anyway does nothing: still ${await sStep()}`);
-  check(/^Smart Panel is intended to be a smart assistant that helps with learning\. It is not intended to help complete assignments, cheat on quizzes/.test(purpose) && /^rgb\(2(29|55), (55|105), (43|97)\)$/.test(await page.$eval(su('#purpose'), (e) => getComputedStyle(e).color)), `the purpose notice, in red: ${await page.$eval(su('#purpose'), (e) => getComputedStyle(e).color)}`);
-  await page.click(su('.prov[data-provider="openai"]'));
-  check(/platform\.openai\.com/.test((await texts(su('.keystep')))[0]), 'ChatGPT swaps the key steps');
-  await page.fill(su('#key'), 'sk-test-setup');
-  check((await page.$eval(su('#notNow'), (b) => b.hidden)) && !(await page.$eval(su('#next'), (b) => b.disabled)), 'typing a key hides Not now and wakes Continue');
-  await page.click(su('#next'));
-  await page.waitForFunction((s) => /rejected|Could not|works|Unauthorized|invalid|checked/i.test(document.querySelector(s).shadowRoot.querySelector('#keyResult').textContent), '#bcv-setup', { timeout: 20000 });
-  check((await page.$eval(su('#keyResult'), (e) => e.classList.contains('is-err'))) && (await sStep()) === '3 of 4' && !(await page.$eval(su('#next'), (b) => b.disabled)), `a key that does not validate stays on the step, with Continue still pressable to try again: ${await page.$eval(su('#keyResult'), (e) => e.textContent)}`);
-  await page.fill(su('#key'), '');
-  check((await page.$eval(su('#next'), (b) => b.disabled)) && !(await page.$eval(su('#notNow'), (b) => b.hidden)), 'clearing the field puts Continue back to sleep and Not now back');
-  await shot(page, '32e-setup-smart');
-  await page.click(su('#notNow'));
-  // step 4: where the courses chosen in step 1 should sit
+  await sNext('.row[data-value]');
+  // the last step: where the courses chosen in step 1 should sit
   await page.waitForSelector(su('.row[data-value]'), { timeout: 10000 });
   await page.waitForTimeout(450);
   const sideOpts = await texts(su('.row[data-value] .row__code'));
-  check((await sStep()) === '4 of 4' && sideOpts.join(' | ') === 'Always on the sidebar | When I hover on Courses' && (await page.$eval(su('.row[data-value="always"]'), (e) => e.classList.contains('is-on'))) && (await page.$eval(su('#next'), (e) => e.textContent)) === 'Finish', `step 4 asks where the courses live, on the sidebar by default: ${sideOpts.join(' | ')}`);
+  check((await sStep()) === '3 of 3' && sideOpts.join(' | ') === 'Always on the sidebar | When I hover on Courses' && (await page.$eval(su('.row[data-value="always"]'), (e) => e.classList.contains('is-on'))) && (await page.$eval(su('#next'), (e) => e.textContent)) === 'Finish', `step 4 asks where the courses live, on the sidebar by default: ${sideOpts.join(' | ')}`);
   await shot(page, '32f-setup-sidebar');
   const pickSide = async (v) => {
     await page.click(su(`.row[data-value="${v}"]`));
@@ -1672,11 +1620,10 @@ try {
   const rects = () => page.evaluate(() => { const rr = (el) => { if (!el) return null; const r = el.getBoundingClientRect(); return [r.left, r.top, r.right, r.bottom].map(Math.round); }; return JSON.stringify({ ring: rr(document.querySelector('.bcv-tour__ring')), stats: rr(document.querySelector('.bcv-stats')), stat: rr(document.querySelector('.bcv-stat')), n: document.querySelectorAll('.bcv-stat').length, anim: document.getAnimations().length, tf: getComputedStyle(document.querySelector('.bcv-stat')).transform }); });
   await page.waitForTimeout(700); // the dashboard's entrance, then the ring settles on the counters
   const covers = (sel) => page.evaluate((s) => { const r = document.querySelector('.bcv-tour__ring').getBoundingClientRect(); const t = document.querySelector(s).getBoundingClientRect(); return r.left <= t.left + 1 && r.top <= t.top + 1 && r.right >= t.right - 1 && r.bottom >= t.bottom - 1; }, sel);
-  check((await tourTitle()) === 'Your day at a glance' && /^1 of 13$/i.test((await texts('.bcv-tour__count'))[0]) && (await covers('.bcv-stat')), `stop 1 spotlights the counters (${await rects()})`);
+  check((await tourTitle()) === 'Your day at a glance' && /^1 of 12$/i.test((await texts('.bcv-tour__count'))[0]) && (await covers('.bcv-stat')), `stop 1 spotlights the counters (${await rects()})`);
   const next = async (title) => { await page.click('.bcv-tour__btn.is-primary'); await page.waitForFunction((t) => document.querySelector('.bcv-tour__title')?.textContent.trim() === t, title, { timeout: 15000 }); };
   await next('Everything in one place');
   check(await ringOver('.bcv-nav'), 'stop 2 spotlights the sidebar');
-  await next('The smart panel');
   await next('Light or dark');
   check(await ringOver('#bcv-theme-btn'), 'stop 4 spotlights the appearance switch');
   await shot(page, '31-tour');
@@ -1722,7 +1669,7 @@ try {
   await page.click('#bcv-account');
   await page.waitForSelector('.bcv-menu--account', { timeout: 5000 });
   const acctItems = await texts('.bcv-menu--account .bcv-menu__item');
-  check(acctItems.map((t) => t.split('\n')[0].trim()).join(' | ') === 'Dark appearance | Simpl Courses settings Look, courses, grades, the smart panel | Guided setup Courses, grades, the smart panel | Tour What changed, on the real pages | Canvas profile | All Canvas settings Profile, notifications, integrations | Notification preferences | Log out' && (await page.$eval('.bcv-menu--account', (m) => m.getBoundingClientRect().bottom <= window.innerHeight)), `the profile row opens a panel above itself: ${acctItems.join(' | ')}`);
+  check(acctItems.map((t) => t.split('\n')[0].trim()).join(' | ') === 'Dark appearance | Simpl Courses settings Look, courses and grades | Guided setup Courses, grades and a tour | Tour What changed, on the real pages | Canvas profile | All Canvas settings Profile, notifications, integrations | Notification preferences | Log out' && (await page.$eval('.bcv-menu--account', (m) => m.getBoundingClientRect().bottom <= window.innerHeight)), `the profile row opens a panel above itself: ${acctItems.join(' | ')}`);
   await shot(page, '34-account-panel');
   // the mock keeps the token in the _csrf_token cookie only, like Canvas (no meta tag), and its /logout
   // accepts a DELETE carrying exactly that token; anything else lands on Canvas's "Page Error"
@@ -1877,25 +1824,8 @@ try {
   await options.goto(`chrome-extension://${extId}/options/options.html`);
   await options.waitForSelector('#skin', { timeout: 5000 });
   const navLabels = await oTexts('.navlink__label');
-  check(navLabels.join(' | ') === 'General | Courses & targets | Grades | Smart panel | Appearance | Canvas sites | Data & about' && (await oTexts('#title'))[0] === 'General' && (await options.$eval('.navlink.is-active', (e) => e.dataset.section)) === 'general' && (await options.$eval('#skin', (e) => e.classList.contains('is-on'))) && !(await options.$eval('#dot-smart', (e) => e.hidden)), `settings open on General with the seven sections and an orange dot on Smart panel while no key is set: ${navLabels.join(' | ')}`);
   check(/^Version \d+\.\d+/.test(await options.$eval('#version', (el) => el.textContent)) && /^1 site$/.test((await oTexts('#statusText'))[0]), `settings show the version and the site count: ${await options.$eval('#version', (el) => el.textContent)} · ${(await oTexts('#statusText'))[0]}`);
   await options.screenshot({ path: join(out, '29-options-general.png') });
-  await options.click('.navlink[data-section="smart"]');
-  await options.fill('#openaiKey', 'sk-test');
-  await options.dispatchEvent('#openaiKey', 'change');
-  await options.waitForTimeout(300);
-  check(/ChatGPT/.test(await options.$eval('#smartStatus', (el) => el.textContent)) && (await oTexts('#openaiPill'))[0] === 'Connected' && !(await options.$eval('#saved', (e) => e.hidden)) && (await options.$eval('#dot-smart', (e) => e.hidden)) && /smart panel on/.test((await oTexts('#statusText'))[0]), 'a key saves on change: Saved pill, Connected pill, status pill and the nav dot follow');
-  await options.click('#testOpenAI');
-  await options.waitForFunction(() => /rejected|Could not|works|Unauthorized|invalid/i.test(document.querySelector('#openaiResult').textContent), null, { timeout: 20000 });
-  console.log('   key test result:', await options.$eval('#openaiResult', (el) => el.textContent));
-  await options.click('#depth button[data-value="thorough"]');
-  await options.waitForTimeout(200);
-  check((await sw.evaluate(() => self.BCV.settings.get())).smart.depth === 'thorough' && (await options.$eval('#depth .is-on', (b) => b.textContent)) === 'Thorough' && (await oTexts('.keycard__name')).join(' | ') === 'Claude | ChatGPT | Gemini' && (await oTexts('.keycard--soon .pill'))[0] === 'Coming soon', 'the depth segment saves; Claude, ChatGPT and Gemini (coming soon) cards');
-  await options.screenshot({ path: join(out, '29-options-smart.png'), fullPage: true });
-  await options.fill('#openaiKey', '');
-  await options.dispatchEvent('#openaiKey', 'change');
-  await options.click('#depth button[data-value="balanced"]');
-  // Courses & targets: read from the site the page last used, written through Canvas favourites
   await options.click('.navlink[data-section="courses"]');
   await options.waitForSelector('.course', { timeout: 15000 });
   const favCount = (await apiGet('/api/v1/courses?per_page=100')).filter((c) => c.is_favorite).length;
@@ -1954,7 +1884,7 @@ try {
   check(!(await options.$eval('#addDomain', (b) => b.disabled)), 'an address with a dot enables Add');
   await options.click('.navlink[data-section="data"]');
   await options.waitForSelector('.stat', { timeout: 5000 });
-  check((await oTexts('.stat')).length === 5 && (await oTexts('.stat b'))[0] === 'none' && (await oTexts('.action .row__t')).join(' | ') === 'Clear smart panel conversations | Export settings | Import settings | Reset everything', `Data & about: ${(await oTexts('.stat')).join(' | ')}`);
+  check((await oTexts('.stat')).length === 3 && (await oTexts('.stat b'))[0] === 'none' && (await oTexts('.action .row__t')).join(' | ') === 'Export settings | Import settings | Reset everything', `Data & about: ${(await oTexts('.stat')).join(' | ')}`);
   // the section ends with the uninstall steps for the browser this page is open in (Chromium here)
   const unSteps = await oTexts('#uninstallSteps li');
   check((await oTexts('#uninstall .row__t'))[0] === 'Uninstalling' && unSteps.length === 2 && /^Press Reset everything above/.test(unSteps[0]) && /chrome:\/\/extensions/.test(unSteps[1]) && /Remove/.test(unSteps[1]) && /Canvas account, favourites and course nicknames live on Canvas/.test((await oTexts('#uninstallNote'))[0]), `Data & about explains uninstalling for this browser: ${unSteps.join(' | ').slice(0, 140)}`);
@@ -2018,10 +1948,10 @@ try {
   check((await page.$(su('#skip'))) === null && (await page.$(su('.top__skip'))) === null, 'the card has no Skip');
   await page.keyboard.press('Escape');
   await page.waitForTimeout(300);
-  check((await page.$('#bcv-setup')) !== null && (await sStep()) === '1 of 4', 'Escape does not close it');
+  check((await page.$('#bcv-setup')) !== null && (await sStep()) === '1 of 3', 'Escape does not close it');
   await page.goto(`${BASE}/courses`); // walking away: the next page opens it again, over the Dashboard
   await page.waitForSelector(su('.row'), { timeout: 20000 });
-  check(page.url() === `${BASE}/` && (await sStep()) === '1 of 4' && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('setup:done'))['setup:done'])) === undefined, `leaving the page does not get past it: the next page opens the card again, unfinished (${await sStep()})`);
+  check(page.url() === `${BASE}/` && (await sStep()) === '1 of 3' && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('setup:done'))['setup:done'])) === undefined, `leaving the page does not get past it: the next page opens the card again, unfinished (${await sStep()})`);
   // the only way out is through: the steps, then the tour (the favourites already starred are the
   // ones picked, so finishing here changes nothing in Canvas for the sections that follow)
   const keepStarred = (await apiGet('/api/v1/courses?per_page=100')).filter((c) => c.is_favorite).map((c) => String(c.id));
@@ -2029,8 +1959,6 @@ try {
   await page.click(su('#next'));
   await page.waitForSelector(su('#track'), { timeout: 10000 });
   await page.click(su('#next'));
-  await page.waitForSelector(su('.prov'), { timeout: 10000 });
-  await page.click(su('#notNow'));
   await page.waitForSelector(su('.row[data-value]'), { timeout: 10000 });
   await page.click(su('#next')); // Finish
   await page.waitForFunction(() => !document.querySelector('#bcv-setup'), null, { timeout: 15000 });
@@ -2053,7 +1981,7 @@ try {
   await options.click('#resetSettings');
   await page.waitForFunction(() => localStorage.getItem('bcv:early') === null, null, { timeout: 5000 }).catch(() => {});
   const afterReset = await sw.evaluate(async () => Object.keys(await self.BCV.api.storage.local.get(null)));
-  check((await page.evaluate(() => localStorage.getItem('bcv:early'))) === null && !afterReset.some((k) => k.startsWith('prefs:') || k.startsWith('smart:')), `Reset everything clears the note on the open Canvas tab and the extension's own storage (left: ${afterReset.join(', ') || 'nothing'})`);
+  check((await page.evaluate(() => localStorage.getItem('bcv:early'))) === null && !afterReset.some((k) => k.startsWith('prefs:')), `Reset everything clears the note on the open Canvas tab and the extension's own storage (left: ${afterReset.join(', ') || 'nothing'})`);
 } catch (e) {
   console.error('smoke test crashed:', e?.stack || e);
   failures.push('crash: ' + e.message);

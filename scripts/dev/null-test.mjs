@@ -76,7 +76,7 @@ try {
     await route.fulfill({ response: res, body });
   });
 
-  // what is on screen, including the sheets, the viewer, the smart panel and the tab title —
+  // what is on screen, including the sheets, the viewer and the tab title —
   // they hang off the document, not off the app's own element
   const sweep = () => page.evaluate(() => {
     const out = [];
@@ -114,7 +114,7 @@ try {
     await new Promise((r) => setTimeout(r, 400));
     const hits = [...await sweep()];
     // and whatever this screen opens over itself
-    for (const sel of ['#bcv-fab', '.bcv-stat', '.bcv-row--link', '.bcv-gpa__details', '.bcv-ccard']) {
+    for (const sel of ['.bcv-stat', '.bcv-row--link', '.bcv-gpa__details', '.bcv-ccard']) {
       const el = await page.$(sel);
       if (!el) continue;
       await el.click({ timeout: 1500 }).catch(() => {});

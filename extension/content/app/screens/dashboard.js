@@ -84,17 +84,7 @@
     const dueWeek = dueItems.filter((it) => it.date >= weekStart && it.date < weekEnd && !it.submitted);
     const weekAll = (planner || []).filter((it) => it.isDue && it.date >= weekStart && it.date < weekEnd && (it.points === null || it.points > 0) && it.type !== 'announcement');
 
-    // ---- smart context ------------------------------------------------------------
     const todayCourses = new Set(dueToday.map((i) => i.courseName));
-    ctx.setSmart({
-      label: 'Dashboard',
-      actions: [
-        { label: 'Summarize what’s due', note: `${U.plural(dueToday.length, 'item')} today across ${U.plural(todayCourses.size, 'course')}`, icon: IC.check, prompt: 'Summarize what is actually due today and tomorrow, grouped by course, with points and times. Flag anything already overdue.' },
-        { label: 'Plan my week', note: `${U.plural(dueWeek.length, 'item')} due this week`, icon: IC.cal, prompt: 'Make a day-by-day plan for this week that gets everything submitted before it is due. Keep it short.' },
-        { label: 'Catch up on announcements', note: 'Recent announcements and activity', icon: IC.bell, prompt: 'Summarize the recent announcements and activity in two or three bullets per course. Skip anything trivial.' },
-      ],
-      context: () => contextText(live, favs),
-    });
 
     function contextText(items, favList) {
       const lines = ['Upcoming planner items (next 3 weeks):'];

@@ -81,40 +81,6 @@
         </div>
       </section>
 
-      <!-- Smart panel -->
-      <section class="section" id="smart" data-title="Smart panel" data-sub="Your own key, sent straight to the provider." data-words="smart panel claude chatgpt gemini key model depth read page remember conversation">
-        <div class="card card--pad keycard" id="card-claude">
-          <div class="row"><span class="keycard__name">Claude</span><span class="pill" id="claudePill">No key</span></div>
-          <div class="field">
-            <input type="password" id="claudeKey" placeholder="sk-ant-…" autocomplete="off" spellcheck="false" aria-label="Claude API key">
-            <button class="btn btn--xs" type="button" data-reveal="claudeKey">Show</button>
-            <button class="btn btn--xs btn--blue" id="testClaude" type="button">Test</button>
-          </div>
-          <div class="row row--meta"><span class="note">Get one at <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a> <span class="result" id="claudeResult"></span></span><input type="text" class="model" id="claudeModel" placeholder="claude-opus-5" spellcheck="false" aria-label="Claude model"></div>
-        </div>
-        <div class="card card--pad keycard" id="card-openai">
-          <div class="row"><span class="keycard__name">ChatGPT</span><span class="pill" id="openaiPill">No key</span></div>
-          <div class="field">
-            <input type="password" id="openaiKey" placeholder="sk-…" autocomplete="off" spellcheck="false" aria-label="ChatGPT API key">
-            <button class="btn btn--xs" type="button" data-reveal="openaiKey">Show</button>
-            <button class="btn btn--xs btn--blue" id="testOpenAI" type="button">Test</button>
-          </div>
-          <div class="row row--meta"><span class="note">Get one at <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener">platform.openai.com</a> <span class="result" id="openaiResult"></span></span><input type="text" class="model" id="openaiModel" placeholder="gpt-5" spellcheck="false" aria-label="ChatGPT model"></div>
-        </div>
-        <div class="card card--pad keycard keycard--soon" aria-disabled="true">
-          <div class="row"><span class="keycard__name">Gemini</span><span class="pill">Coming soon</span></div>
-          <p class="note">Not wired up yet.</p>
-        </div>
-        <div class="card">
-          <div class="row row--pad"><span class="row__t row__t--grow row__t--med">Response depth</span><div class="seg" id="depth"><button type="button" data-value="quick">Brief</button><button type="button" data-value="balanced">Balanced</button><button type="button" data-value="thorough">Thorough</button></div></div>
-          <div class="row row--pad row--line"><span class="row__t row__t--grow row__t--med">When both keys are set, use</span><div class="seg" id="preferred"><button type="button" data-value="claude">Claude</button><button type="button" data-value="openai">ChatGPT</button></div></div>
-          <div class="row row--pad row--line"><span class="row__body"><span class="row__t row__t--med">Read the page you are on</span><span class="row__s">Assignments, discussions, due dates.</span></span><button class="switch" id="includePageContext" type="button" role="switch" aria-checked="true" aria-label="Read the page you are on"><span class="switch__knob"></span></button></div>
-          <div class="row row--pad row--line"><span class="row__t row__t--grow row__t--med">Remember conversation per page</span><button class="switch" id="persistChat" type="button" role="switch" aria-checked="true" aria-label="Remember conversation per page"><span class="switch__knob"></span></button></div>
-        </div>
-        <p class="note note--out" id="smartStatus"></p>
-      </section>
-
-      <!-- Appearance -->
       <section class="section" id="appearance" data-title="Appearance" data-sub="Theme and school branding." data-words="appearance theme light dark system site name logo sidebar branding courses hover quick nav flyout">
         <div class="themes" id="themes">
           <button type="button" class="theme" data-value="off"><span class="theme__pv theme__pv--light"><i class="theme__side"></i><i class="theme__bar"></i><i class="theme__card"></i></span><span class="theme__label">Light</span></button>
@@ -152,7 +118,6 @@
       <section class="section" id="data" data-title="Data &amp; about" data-sub="What is stored here." data-words="data about cache export import reset keys storage uninstall remove delete">
         <div class="card card--list" id="dataStats"></div>
         <div class="card card--list actions">
-          <button type="button" class="action" id="clearCache"><span class="row__body"><span class="row__t">Clear smart panel conversations</span><span class="row__s">The chats remembered per page. Canvas data is never kept here: every page asks Canvas afresh.</span></span><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
           <button type="button" class="action" id="exportSettings"><span class="row__body"><span class="row__t">Export settings</span><span class="row__s">JSON, without keys.</span></span><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
           <button type="button" class="action" id="importSettings"><span class="row__body"><span class="row__t">Import settings</span><span class="row__s">Replaces current preferences.</span></span><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
           <button type="button" class="action action--danger" id="resetSettings"><span class="row__body"><span class="row__t">Reset everything</span><span class="row__s">Clears preferences, history and keys.</span></span><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>

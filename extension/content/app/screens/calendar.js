@@ -192,7 +192,6 @@
         loading = false;
       }
       draw();
-      updateSmart();
       warmNeighbours();
     }
 
@@ -394,18 +393,6 @@
       });
     }
 
-    function updateSmart() {
-      const [s, e] = visibleRange();
-      const vis = events.filter((ev) => ev.date >= s && ev.date < e);
-      ctx.setSmart({
-        label: 'Calendar',
-        actions: [
-          { label: 'What’s coming up', note: `${U.plural(vis.length, 'item')} in view`, icon: IC.cal, prompt: 'List what is coming up in this calendar view by day, marking what is already submitted or past. Keep it tight.' },
-          { label: 'Find my busiest days', note: title(), icon: IC.chart, prompt: 'Which days in this range have the most due, and what should I start early?' },
-        ],
-        context: () => vis.map((ev) => `- ${U.fmtAt(ev.date)} · ${ev.contextName} · ${ev.isAssignment ? 'due' : 'event'} · ${ev.title}${ev.done ? ' · submitted/past' : ''}`).join('\n'),
-      });
-    }
 
     // The screen is handed over as soon as the grid can be drawn; the events land in it when Canvas
     // answers. Waiting here would keep the whole month behind the slowest calendar request.

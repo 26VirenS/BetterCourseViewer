@@ -485,7 +485,6 @@
   T.native = (ctx, shell) => {
     const b = body('bcv-body--24');
     b.append(BCV.screens.native.block(ctx));
-    ctx.setSmart({ label: `${shell.course.name} · ${document.title.split(':')[0]}`, actions: [], context: () => BCV.utils.elementText(document.getElementById('content'), 12000) });
     return b;
   };
 
@@ -540,7 +539,6 @@
 
     // left column: what the instructor chose as the home view
     const view = c.defaultView;
-    let smartCtx = '';
     if (view === 'modules') {
       left.replaceChildren(await T.modulesBlock(ctx, shell));
     } else if (view === 'assignments') {
@@ -549,7 +547,6 @@
       const html = await store.syllabus(c.id).catch(() => '');
       if (!ctx.alive()) return b;
       shell.reader = { title: 'Syllabus', html };
-      smartCtx = htmlToText(html, 12000);
       left.replaceChildren(U.card(U.el('bcv-front', [frontHead(IC.page, 'Syllabus'), prose(html), chips(html)]), 'bcv-card--22'));
     } else if (view === 'feed') {
       left.replaceChildren(await T.streamBlock(ctx, shell));
@@ -558,7 +555,6 @@
       if (!ctx.alive()) return b;
       if (fp && fp.body !== undefined) {
         shell.reader = { title: fp.title, html: fp.body };
-        smartCtx = `Front page: ${fp.title}\n${htmlToText(fp.body, 12000)}`;
         left.replaceChildren(U.card(U.el('bcv-front', [frontHead(IC.doc, `Front page · ${fp.title}`), prose(fp.body || ''), chips(fp.body)]), 'bcv-card--22'));
       } else {
         left.replaceChildren(await T.modulesBlock(ctx, shell));
@@ -571,14 +567,6 @@
       const links = linksFrom(html);
       return links.length ? U.el('bcv-chips', links.map((l) => h('a', { class: 'bcv-chip', href: l.href, text: l.text }))) : null;
     }
-    ctx.setSmart({
-      label: `${c.name} · Home`,
-      actions: [
-        { label: 'Summarize this course page', note: 'Key policies, links and dates', icon: IC.book, prompt: 'Summarize this course home page: key policies, where things live, and any dates mentioned.' },
-        { label: 'What should I do first?', note: 'Based on the course To Do', icon: IC.check, prompt: 'Given this course page and its To Do list, what should I do first and why?' },
-      ],
-      context: () => smartCtx || `Course ${c.name} (${c.code}), ${c.term}. Teachers: ${c.teachers.join(', ')}`,
-    });
     return b;
   };
 
@@ -612,7 +600,6 @@
   T.stream = async (ctx, shell) => {
     const b = body();
     b.append(U.groupHead('Course stream', 'Recent activity in this course'), await T.streamBlock(ctx, shell));
-    ctx.setSmart({ label: `${shell.course.name} · Stream`, actions: [{ label: 'Catch me up', note: 'Recent activity in this course', icon: IC.stream, prompt: 'Catch me up on this course’s recent activity in a few bullets.' }], context: () => BCV.utils.elementText(b, 8000) });
     return b;
   };
 
@@ -643,11 +630,6 @@
       ], { mod: 'bcv-row--p16 bcv-row--top', onClick: () => app.go(`${c.url}/announcements/${a.id}`) })), 'bcv-card--list'));
     }
     draw();
-    ctx.setSmart({
-      label: `${c.name} · Announcements`,
-      actions: [{ label: 'Summarize announcements', note: `${U.plural((list || []).filter((a) => a.read_state === 'unread').length, 'unread')}`, icon: IC.bell, prompt: 'Summarize these announcements, newest first, and pull out any dates or actions I need to take.' }],
-      context: () => (list || []).slice(0, 15).map((a) => `## ${a.title} (${a.author?.display_name || ''}, ${U.fmtAtUpper(a.posted_at)})\n${htmlToText(a.message || '', 1500)}`).join('\n\n'),
-    });
     return b;
   };
 
@@ -721,14 +703,6 @@
     }
     await draw();
     const list = await store.assignments(c.id).catch(() => []);
-    ctx.setSmart({
-      label: `${c.name} · Assignments`,
-      actions: [
-        { label: 'What’s actually due', note: `${U.plural(list.filter((a) => a.due_at && U.parse(a.due_at) > new Date() && !a.submission?.submitted_at).length, 'open item')}`, icon: IC.check, prompt: 'List what is still due in this course in order, with points, and flag anything overdue or missing.' },
-        { label: 'Estimate my workload', note: 'By week, from due dates and points', icon: IC.chart, prompt: 'Group the remaining assignments by week and estimate which weeks are heaviest.' },
-      ],
-      context: () => list.map((a) => `- ${a.name} · ${a.due_at ? `due ${U.fmtAt(a.due_at)}` : 'no due date'} · ${a.points_possible ?? '?'} pts · ${a.submission?.workflow_state || 'unsubmitted'}${a.submission?.score != null ? ` · score ${a.submission.score}` : ''}`).join('\n'),
-    });
     return b;
   };
 
@@ -767,11 +741,6 @@
       wrap.replaceChildren(U.el('bcv-col bcv-col--18', parts));
     }
     draw();
-    ctx.setSmart({
-      label: `${c.name} · Discussions`,
-      actions: [{ label: 'What needs a reply?', note: `${U.plural((list || []).reduce((s, d) => s + (Number(d.unread_count) || 0), 0), 'unread post')}`, icon: IC.disc, prompt: 'Which of these discussions have unread activity or a due date, and which should I reply to first?' }],
-      context: () => (list || []).map((d) => `- ${d.title} · ${d.discussion_subentry_count || 0} replies · ${d.unread_count || 0} unread${d.assignment ? ` · graded, ${d.assignment.points_possible} pts, due ${U.fmtAt(d.assignment.due_at)}` : ''}\n  ${htmlToText(d.message || '', 300).replace(/\s+/g, ' ')}`).join('\n'),
-    });
     return b;
   };
 
@@ -818,7 +787,6 @@
       ], { mod: 'bcv-row--p12', href: `${c.url}/users/${u.id}` })), 'bcv-card--list'));
     }
     draw();
-    ctx.setSmart({ label: `${c.name} · People`, actions: [], context: () => `${U.plural((users || []).length, 'person')} in ${c.name}. Teachers: ${c.teachers.join(', ')}` });
     return b;
   };
 
@@ -842,7 +810,6 @@
       ], { mod: 'bcv-row--p15', onClick: () => app.go(`${c.url}/pages/${p.url}`) })), 'bcv-card--list') : U.emptyCard('No pages published yet.'),
       U.hint(`This course has ${U.plural(sorted.length, 'published page')}. ${sorted.some((p) => p.front_page) ? 'The front page is what you see under Home.' : ''}`),
     );
-    ctx.setSmart({ label: `${c.name} · Pages`, actions: [], context: () => sorted.map((p) => `- ${p.title}${p.front_page ? ' (front page)' : ''} · edited ${U.fmtDateComma(p.updated_at)}`).join('\n') });
     return b;
   };
 
@@ -908,7 +875,6 @@
       ]));
     }
     draw();
-    ctx.setSmart({ label: `${c.name} · Files`, actions: [], context: () => [...contents.folders.map((f) => `- [folder] ${f.name}`), ...contents.files.map((f) => `- ${f.display_name} (${fmtSize(f.size)}, ${f['content-type']})`)].join('\n') });
     return b;
   };
 
@@ -937,7 +903,6 @@
       wrap.replaceChildren(parts.length ? U.el('bcv-col bcv-col--18', parts) : U.emptyCard(query ? 'No quizzes match.' : 'No quizzes yet.'));
     }
     draw();
-    ctx.setSmart({ label: `${c.name} · Quizzes`, actions: [{ label: 'Which quizzes are open?', note: `${U.plural((list || []).length, 'quiz', 'quizzes')} in this course`, icon: IC.bolt, prompt: 'Which quizzes are still open or upcoming, with due dates, points and question counts?' }], context: () => (list || []).map((q) => `- ${q.title} · ${q.quiz_type} · ${q.due_at ? `due ${U.fmtAt(q.due_at)}` : 'no due date'} · ${q.points_possible} pts · ${q.question_count} questions · ${q.time_limit ? `${q.time_limit} min` : 'no time limit'}`).join('\n') });
     return b;
   };
 
@@ -1000,7 +965,6 @@
     const b = body();
     b.append(await T.modulesBlock(ctx, shell));
     const list = await store.modules(shell.course.id).catch(() => []);
-    ctx.setSmart({ label: `${shell.course.name} · Modules`, actions: [{ label: 'Where am I in this course?', note: `${U.plural(list.length, 'module')}`, icon: IC.modules, prompt: 'Based on the modules and their completion, where am I in this course and what comes next?' }], context: () => list.map((m) => `## ${m.name} (${m.state})\n${(m.items || []).map((it) => `- ${it.type}: ${it.title}${it.completion_requirement ? (it.completion_requirement.completed ? ' [done]' : ' [not done]') : ''}${it.content_details?.due_at ? ` due ${U.fmtAt(it.content_details.due_at)}` : ''}`).join('\n')}`).join('\n\n') });
     return b;
   };
 

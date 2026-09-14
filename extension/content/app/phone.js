@@ -263,8 +263,8 @@
         { icon: IC.people, label: 'Groups', href: '/groups' },
         ...(BCV.extras?.phoneRows?.(app) || []), // what the school added to Canvas's own nav
         { icon: dark ? IC.sun : IC.moon, label: dark ? 'Light appearance' : 'Dark appearance', onSelect: () => app.toggleTheme() },
-        { icon: IC.settings, label: 'Settings', note: 'Look, courses, grades, the smart panel', onSelect: () => BCV.smartClient?.openOptions?.() },
-        { icon: IC.sparkle, label: 'Guided setup', note: 'Courses, grades, the smart panel, a tour', href: '/?bcv=setup' },
+        { icon: IC.settings, label: 'Settings', note: 'Look, courses and grades', onSelect: () => BCV.settingsLink?.() },
+        { icon: IC.sparkle, label: 'Guided setup', note: 'Courses, grades and a tour', href: '/?bcv=setup' },
         { icon: IC.people, label: 'Profile', note: 'Your Canvas profile', href: '/profile' },
         { icon: IC.external, label: 'All Canvas settings', note: 'Profile, notifications, integrations', href: '/profile/settings' },
         { icon: IC.external, label: native()?.signOut ? 'Sign out' : 'Log out', note: native()?.signOut ? 'Clears the Canvas session on this device' : 'Ends your Canvas session', danger: true, onSelect: () => app.logout() },
@@ -398,14 +398,6 @@
     ]) : null;
 
     body.replaceChildren(...[enter(stats, 0), enter(listBlock, 1), load ? enter(load, 2) : null].filter(Boolean));
-    ctx.setSmart({
-      label: 'Today',
-      actions: [
-        { label: 'Summarize what’s due', note: `${U.plural(dueToday.length, 'item')} today`, icon: IC.check, prompt: 'Summarize what is actually due today and tomorrow, grouped by course, with points and times. Flag anything already overdue.' },
-        { label: 'Plan my week', note: `${U.plural(dueWeek.length, 'item')} due this week`, icon: IC.cal, prompt: 'Make a day-by-day plan for this week that gets everything submitted before it is due. Keep it short.' },
-      ],
-      context: () => ['Upcoming planner items:', ...open.slice(0, 60).map((it) => `- ${U.fmtAt(it.date)} · ${it.courseName} · ${it.kind} · ${it.title}${it.points !== null ? ` · ${it.points} pts` : ''}${it.isDue ? '' : ' · (to-do date)'}`)].join('\n'),
-    });
     return screen;
   }
 
@@ -506,11 +498,6 @@
       if (gone.length) parts.push(h('button', { type: 'button', class: 'bcv-ph-disclose', id: 'bcv-nf-restore', text: `Restore ${U.plural(gone.length, 'cleared notification')}`, onclick: async () => { state.gone = {}; await persist(); draw(); } }));
       parts.push(U.hint('Swipe a notification left to mark it read or clear it.', 'bcv-ph-foot'));
       body.replaceChildren(...parts);
-      ctx.setSmart({
-        label: 'Notifications',
-        actions: [{ label: 'What needs me first?', note: U.plural(all.length, 'alert'), icon: IC.bell, prompt: 'Look at these alerts and tell me, in order, what to deal with first and why. Keep it to a short list.' }],
-        context: () => all.map((n) => `- [${(meta[n.cat] || meta.system).label}] ${n.title} · ${n.course || ''} · ${n.whenText || ''} · ${n.note || ''}${state.read[n.id] ? ' · read' : ''}`).join('\n'),
-      });
     }
     draw();
     return screen;
@@ -584,11 +571,6 @@
       U.el('bcv-ph-clist', list.length ? list.map(row) : [emptyRow('No courses selected. Choose them in the guided setup or Settings.')]),
       list.length < current.length ? U.hint(`${U.plural(current.length - list.length, 'other course')} hidden here and everywhere else on the phone. Change the selection in Settings → Courses & targets.`, 'bcv-ph-foot') : null,
     );
-    ctx.setSmart({
-      label: 'Courses',
-      actions: [{ label: 'Compare my courses', note: U.plural(list.length, 'course'), icon: IC.chart, prompt: 'Give me a one-line status per current course: current score if known, what is next, and anything overdue.' }],
-      context: () => list.map((c) => `- ${c.name} (${c.code}) · ${c.term} · ${c.state}${c.score !== null ? ` · score ${c.score}%` : ''}`).join('\n'),
-    });
     return screen;
   }
 
@@ -797,14 +779,6 @@
         for (const [k, list] of days) groups.push(block(k, list));
       }
       body.replaceChildren(...[enter(progress, 0), seg, showRow, composer(), ...groups.filter(Boolean).map((g, i) => enter(g, i + 1)), U.hint('Tap a task to edit it. Swipe left for quick actions. Priority is yours alone and never reaches Canvas.', 'bcv-ph-foot')]);
-      ctx.setSmart({
-        label: 'To Do',
-        actions: [
-          { label: 'Summarize what’s due', note: `${U.plural(open.filter((i) => i.isDue).length, 'item')} actually due`, icon: IC.check, prompt: 'Summarize this list: what is actually due (with points and times) versus what is only scheduled. Order by urgency.' },
-          { label: 'Plan the next 7 days', note: `${U.plural(open.length, 'item')} on the list`, icon: IC.cal, prompt: 'Turn this list into a realistic day-by-day plan for the next seven days.' },
-        ],
-        context: () => open.map((it) => `- ${U.fmtAt(it.date)} · ${courseOf(it)} · ${it.kind} · ${it.title}${it.points !== null ? ` · ${it.points} pts` : ''}${priOf(it) ? ` · priority ${priMeta(priOf(it)).label.toLowerCase()}` : ''}`).join('\n'),
-      });
     }
     draw();
     return screen;
@@ -977,14 +951,6 @@
     drawList();
     body.replaceChildren(enter(hero, 0, 380), whatIfRow, warn, list, U.hint('Term GPA is computed here from the scores Canvas reports, on a 4.0 scale with every course counting equally. It is not your school’s official GPA. Tap a course for its category rings and target.', 'bcv-ph-foot'));
     const rows0 = rowsFor();
-    ctx.setSmart({
-      label: 'Grades',
-      actions: [
-        { label: 'Explain my GPA', note: termGpaOf(rows0) === null ? 'No scores yet' : `${gpa2(termGpaOf(rows0))} this term`, icon: IC.chart, prompt: 'Explain how my term GPA is built from my course scores and letter grades, and which course moves it most.' },
-        { label: 'Reach my goal', note: `Goal ${gpa2(goal)}`, icon: IC.bolt, prompt: 'Given each course’s score, what do I need in each course to reach my GPA goal? Keep the arithmetic brief.' },
-      ],
-      context: () => { const rows = rowsFor(); return [`Term GPA ${gpa2(termGpaOf(rows))} (goal ${gpa2(goal)}), ${rows.filter((r) => r.scored).length} scored courses, every course weighted equally.`, ...rows.map((r) => `- ${r.c.name}: ${r.scored ? `${r.pct}% (${r.letter}, ${r.pts.toFixed(1)})${r.tried ? ' [what-if]' : ''}` : 'no score yet'}; ${r.graded} of ${r.total} graded`)].join('\n'); },
-    });
     return screen;
   }
 
@@ -1133,11 +1099,6 @@
       body.replaceChildren(...parts.filter(Boolean).map((p, i) => enter(p, i)));
       const [s, e] = range();
       const vis = events.filter((ev) => ev.date >= s && ev.date < e);
-      ctx.setSmart({
-        label: 'Calendar',
-        actions: [{ label: 'What’s coming up', note: `${U.plural(vis.length, 'item')} in view`, icon: IC.cal, prompt: 'List what is coming up in this calendar view by day, marking what is already submitted or past. Keep it tight.' }],
-        context: () => vis.map((ev) => `- ${U.fmtAt(ev.date)} · ${ev.contextName} · ${ev.isAssignment ? 'due' : 'event'} · ${ev.title}${ev.done ? ' · submitted/past' : ''}`).join('\n'),
-      });
     }
     await load();
     return screen;
@@ -1226,19 +1187,11 @@
       front ? enter(front, 3) : null,
       !asg ? U.errorBox('The assignment list could not be loaded.') : null,
     ].filter(Boolean));
-    ctx.setSmart({
-      label: c.name,
-      actions: [
-        { label: 'What’s due in this course', note: U.plural(open.length, 'open item'), icon: IC.check, prompt: 'List what is due in this course with dates and points, most urgent first.' },
-        frontText ? { label: 'Summarize the front page', note: 'The key points', icon: IC.book, prompt: 'Summarize this course page into the key points a student needs, keeping any dates and instructions.' } : null,
-      ].filter(Boolean),
-      context: () => [`Course: ${c.name}`, 'Open work:', ...open.map((a) => `- ${a.name} · ${kindOf(a)} · ${a.due_at ? U.fmtAt(a.due_at) : 'no due date'} · ${a.points_possible} pts`), '', frontText ? `Front page:\n${frontText}` : ''].join('\n'),
-    });
     return b;
   }
 
   // ---- assignment (the item page): handing in lives here, on the same scroll ------------------
-  async function assignment(ctx, shell, { a, s, types, isTool, toolNewTab, toolLaunch, nativeSubmit, canvasOnly, attemptsLeft, status, smart }) {
+  async function assignment(ctx, shell, { a, s, types, isTool, toolNewTab, toolLaunch, nativeSubmit, canvasOnly, attemptsLeft, status }) {
     const { app } = ctx;
     const c = shell.course;
     const CS = BCV.screens.course;
@@ -1251,9 +1204,7 @@
     const primary = isTool
       ? (toolNewTab ? { label: 'Open the tool', go: () => window.open(toolLaunch, '_blank', 'noopener') } : { label: 'Open the tool', go: () => app.go(nativeHref(`${c.url}/assignments/${a.id}`)) })
       : canvasOnly ? { label: s.submitted_at ? 'Resubmit in Canvas' : 'Submit in Canvas', go: () => app.go(nativeHref(`${c.url}/assignments/${a.id}`)) } : null;
-    let extra = null;
-    const applySmart = () => { if (smart) ctx.setSmart(!extra ? smart : { ...smart, actions: [...smart.actions, extra.action], context: () => `${smart.context()}\n\n${extra.context()}` }); };
-    const block = embeds ? await BCV.screens.submit.render(ctx, c, { embed: true, a, sub: s, back: { href: `${c.url}/assignments`, label: 'Assignments' }, title: 'Submit work', onSmart: (x) => { extra = x; applySmart(); } }) : null;
+    const block = embeds ? await BCV.screens.submit.render(ctx, c, { embed: true, a, sub: s, back: { href: `${c.url}/assignments`, label: 'Assignments' }, title: 'Submit work' }) : null;
     if (!ctx.alive()) return b;
     b.append(...[
       h('span', { class: 'bcv-ph-chip bcv-ph-chip--course', style: { background: c.palette.tint, color: c.palette.text }, text: c.shortName || c.name }),
@@ -1276,7 +1227,6 @@
       block,
     ].filter(Boolean));
     if (block && ctx.route.params.get('bcv') === 'submit') for (const ms of [80, 600]) setTimeout(() => block.scrollIntoView({ block: 'start' }), ms);
-    applySmart();
     return b;
   }
 

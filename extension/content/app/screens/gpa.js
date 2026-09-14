@@ -617,19 +617,6 @@
         ]),
       ].filter(Boolean));
       entered = true;
-      ctx.setSmart({
-        label: 'Grades',
-        actions: [
-          { label: 'Explain my GPA', note: m.termGpa === null ? 'No scores yet' : `${gpa2(m.termGpa)} this term`, icon: IC.chart, prompt: 'Explain how my term GPA is built from my course scores and letter grades, and which course moves it most.' },
-          { label: 'Reach my goal', note: hasGoal() ? `Goal ${gpa2(goal)}` : 'No goal set', icon: IC.bolt, prompt: 'Given each course’s score, target and the points still to come, what do I need in each course to reach my GPA goal? Keep the arithmetic brief.' },
-        ],
-        context: () => [
-          `Term GPA ${gpa2(m.termGpa)} (${hasGoal() ? `goal ${gpa2(goal)}` : 'no goal set'}), ${m.n} scored courses of ${m.shownCount} shown, every course weighted equally.`,
-          ...m.rows.map((r) => `- ${r.c.name}: ${r.pct}% (${r.letter}, ${r.pts.toFixed(1)}); target ${r.target[0]} ${r.target[1]}%; ${r.m.known ? `${store.fmtPts(r.m.earned)} pts earned, ${store.fmtPts(r.m.remaining)} pts remaining; needs ${r.needed === null ? 'n/a' : `${Math.round(r.needed)}%`} of the rest` : 'assignment list unavailable'}; groups: ${gmFor(r.c).legend.map((l) => `${l.label} ${l.value}`).join(', ') || 'none graded'}`),
-          ...m.unscored.map((c) => `- ${c.name}: no score yet (not counted)`),
-          m.hiddenList.length ? `Hidden by the student, not counted: ${m.hiddenList.map((c) => c.name).join(', ')}` : '',
-        ].join('\n'),
-      });
     }
 
     await refresh();

@@ -15,17 +15,6 @@
       logoUrl: '',                // sidebar tile image; blank = the school's own mark from Canvas's theme
       sideCourses: 'always',      // where the favourite courses live: 'always' on the sidebar, or 'hover' off the Courses row
     },
-    smart: {
-      enabled: true,
-      claudeKey: '',
-      openaiKey: '',
-      preferred: 'claude',        // when both keys are set
-      claudeModel: 'claude-opus-5',
-      openaiModel: 'gpt-5',
-      depth: 'balanced',          // 'quick' | 'balanced' | 'thorough'
-      includePageContext: true,
-      persistChat: true,
-    },
     domains: [],                  // extra Canvas origins, e.g. "https://canvas.myschool.edu"
   };
 
@@ -81,26 +70,6 @@
     return () => api.storage.onChanged.removeListener(handler);
   }
 
-  /** Which smart provider to use, given the configured keys. */
-  function resolveProvider(smart) {
-    const hasClaude = !!(smart.claudeKey && smart.claudeKey.trim());
-    const hasOpenAI = !!(smart.openaiKey && smart.openaiKey.trim());
-    if (hasClaude && hasOpenAI) return smart.preferred === 'openai' ? 'openai' : 'claude';
-    if (hasClaude) return 'claude';
-    if (hasOpenAI) return 'openai';
-    return null;
-  }
-
-  function providerLabel(provider) {
-    return provider === 'openai' ? 'ChatGPT' : provider === 'claude' ? 'Claude' : 'Not set up';
-  }
-
-  function modelFor(smart, provider) {
-    return provider === 'openai'
-      ? (smart.openaiModel || DEFAULTS.smart.openaiModel)
-      : (smart.claudeModel || DEFAULTS.smart.claudeModel);
-  }
-
   /** Effective appearance: is dark on, given the system preference. */
   function isDark(settings, systemDark) {
     const mode = settings?.appearance?.darkMode || 'system';
@@ -116,9 +85,6 @@
     update: updateSettings,
     replace: replaceSettings,
     onChange: onSettingsChange,
-    resolveProvider,
-    providerLabel,
-    modelFor,
     isDark,
   };
 })();

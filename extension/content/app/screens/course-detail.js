@@ -48,26 +48,15 @@
     const attemptsLeft = !(a.allowed_attempts > 0) || (s.attempt || 0) < a.allowed_attempts;
     const status = s.excused ? 'Excused' : s.workflow_state === 'graded' ? 'Graded' : s.submitted_at ? (s.late ? 'Submitted late' : 'Submitted') : s.missing ? 'Missing' : 'Not submitted';
     const feedback = (s.submission_comments || []).length || Object.keys(s.rubric_assessment || {}).length;
-    const smart = {
-      label: `${c.name} · ${a.name}`,
-      actions: [
-        { label: 'Summarize this assignment', note: `${a.points_possible ?? '?'} pts · ${a.due_at ? `due ${U.fmtShort(a.due_at)}` : 'no due date'}`, icon: IC.doc, prompt: 'Summarize what this assignment asks for, the deliverable, and how it is graded.' },
-        { label: 'Make a checklist', note: 'Steps to finish it, in order', icon: IC.check, prompt: 'Turn this assignment into a step-by-step checklist I can work through, with a rough time estimate per step.' },
-        feedback ? { label: 'Explain rubric feedback', note: s.score !== undefined && s.score !== null ? `${store.fmtPts(s.score)}${a.points_possible === null || a.points_possible === undefined ? '' : ` / ${store.fmtPts(a.points_possible)}`}` : 'Comments and rubric', icon: IC.chart, prompt: 'Explain my grade and feedback in plain language: where I lost points, what the comments mean, and what to do differently next time.' } : null,
-      ].filter(Boolean),
-      context: () => [`Assignment: ${a.name}`, `Course: ${c.name}`, `Due: ${a.due_at ? U.fmtAt(a.due_at) : 'none'} · Points: ${a.points_possible}`, `Submission types: ${types}`, '', 'Description:', htmlToText(a.description || '', 10000), '', a.rubric?.length ? `Rubric:\n${a.rubric.map((cr) => `- ${cr.description} (${cr.points} pts): ${cr.long_description || ''}${s.rubric_assessment?.[cr.id] ? ` → got ${s.rubric_assessment[cr.id].points}${s.rubric_assessment[cr.id].comments ? `, "${s.rubric_assessment[cr.id].comments}"` : ''}` : ''}`).join('\n')}` : '', `Submission: ${status}${s.score != null ? `, score ${s.score}` : ''}`, (s.submission_comments || []).map((cm) => `Comment from ${cm.author_name}: ${cm.comment}`).join('\n')].join('\n'),
-    };
     // the phone draws the item page its own way (the iPhone mockup)
-    if (BCV.phone?.active()) return BCV.phone.assignment(ctx, shell, { a, s, types, isTool, toolNewTab, toolLaunch, nativeSubmit, canvasOnly, attemptsLeft, status, smart });
+    if (BCV.phone?.active()) return BCV.phone.assignment(ctx, shell, { a, s, types, isTool, toolNewTab, toolLaunch, nativeSubmit, canvasOnly, attemptsLeft, status });
     // Handing in lives inside the assignment (mockup 11): the block sits at the end of the same
     // scroll as the instructions, built from the assignment already loaded for this page. The
     // "Submit assignment" button and ?bcv=submit (a To Do row) just bring it into view.
     const fromTodo = route.params.get('from') === 'todo';
     const back = fromTodo ? { href: '/#todo', label: 'To Do' } : app.backTo ? app.backTo({ href: `${c.url}/assignments`, label: 'Assignments' }) : { href: `${c.url}/assignments`, label: 'Assignments' };
     app.nameHere?.(a.name); // the next screen's Back names this assignment
-    let extra = null; // the block's own smart suggestion joins the page's
-    const applySmart = () => ctx.setSmart(!extra ? smart : { ...smart, actions: [...smart.actions, extra.action], context: () => `${smart.context()}\n\n${extra.context()}` });
-    const block = nativeSubmit && !isTool ? await BCV.screens.submit.render(ctx, c, { embed: true, a, sub: s, back, onSmart: (x) => { extra = x; applySmart(); } }) : null;
+    const block = nativeSubmit && !isTool ? await BCV.screens.submit.render(ctx, c, { embed: true, a, sub: s, back }) : null;
     if (!ctx.alive()) return b;
     const toBlock = (behavior = 'smooth') => block?.scrollIntoView({ behavior, block: 'start' });
     // replaceChildren() would print a literal "null" for a missing block, so drop them first
@@ -113,7 +102,6 @@
         ]);
       }))), 'bcv-card--22')]));
     }
-    applySmart();
     return b;
   };
 
@@ -133,7 +121,7 @@
     shell.reader = { title: t.title, html: t.message || '' };
     const people = new Map((view?.participants || []).map((p) => [String(p.id), p]));
     let replyTo = null;
-    const replyBox = h('textarea', { class: 'bcv-textarea', placeholder: announcement ? 'Comment on this announcement…' : 'Write your reply…', rows: 4, dataset: { smartInsert: 'reply' } });
+    const replyBox = h('textarea', { class: 'bcv-textarea', placeholder: announcement ? 'Comment on this announcement…' : 'Write your reply…', rows: 4 });
     const replyTitle = U.text('bcv-reply__title', 'Reply');
     const post = U.btn('Post reply', { kind: 'primary', icon: IC.send, iconColor: '#fff', onClick: async () => {
       const text = replyBox.value.trim();
@@ -190,15 +178,6 @@
       meta([['Replies', t.discussion_subentry_count ?? entries.length], ['Unread', t.unread_count ?? 0], ['Last post', t.last_reply_at ? U.fmtAtUpper(t.last_reply_at) : null], ['Type', announcement ? 'Announcement' : t.assignment ? 'Graded discussion' : 'Discussion'], ['Points', t.assignment?.points_possible ?? null], ['Due', t.assignment?.due_at ? U.fmtAt(t.assignment.due_at) : null]]),
       t.require_initial_post ? U.text('bcv-hint', 'You must post before you can see other replies.') : null,
     ]), 'bcv-card--22')]));
-    ctx.setSmart({
-      label: `${c.name} · ${t.title}`,
-      actions: [
-        { label: announcement ? 'Summarize this announcement' : 'Summarize this discussion', note: `${U.plural(entries.length, 'reply', 'replies')}`, icon: IC.disc, prompt: 'Summarize the prompt and the main points people have made so far. Note anything I am asked to do.' },
-        announcement ? null : { label: 'Draft a discussion reply', note: t.assignment ? `Graded · ${t.assignment.points_possible} pts` : 'Thoughtful, in my own voice', icon: IC.reply, prompt: 'Draft a reply to this discussion prompt in a natural student voice: specific, a couple of paragraphs, referencing the prompt and one other post if there is one. I will edit it before posting.', insert: true },
-        { label: 'Reply to a specific post', note: 'Tell me which one', icon: IC.people, prompt: 'Ask me which post I want to respond to, then draft a short, respectful reply that adds something new.', insert: true },
-      ].filter(Boolean),
-      context: () => [`${announcement ? 'Announcement' : 'Discussion'}: ${t.title}`, `By ${t.author?.display_name || ''} on ${U.fmtAtUpper(t.posted_at)}`, t.assignment ? `Graded: ${t.assignment.points_possible} pts, due ${U.fmtAt(t.assignment.due_at)}` : '', '', htmlToText(t.message || '', 6000), '', 'Replies:', ...(view?.view || []).slice(0, 25).map((e) => `- ${people.get(String(e.user_id))?.display_name || 'Someone'} (${U.fmtAtUpper(e.created_at)}): ${htmlToText(e.message || '', 800).replace(/\s+/g, ' ')}`)].join('\n'),
-    });
     return b;
   };
 
@@ -227,14 +206,6 @@
     );
     const links = CS().linksFrom(p.body, 8);
     side.append(links.length ? h('div', {}, [U.label('Links on this page'), U.card(links.map((l) => U.row([U.svg(IC.link, { size: 15, stroke: 'var(--bcv-blue)', width: 1.8, style: { flex: 'none' } }), U.text('bcv-course-link bcv-ellip', l.text, 'span'), U.chev()], { mod: 'bcv-row--p13-16', href: l.href })), 'bcv-card--list')]) : null);
-    ctx.setSmart({
-      label: `${c.name} · ${p.title}`,
-      actions: [
-        { label: 'Condense this page', note: `${Math.max(1, Math.round(htmlToText(p.body || '').split(/\s+/).length / 200))} min read`, icon: IC.book, prompt: 'Condense this page into the key points a student needs, keeping any dates, links and instructions.' },
-        { label: 'Practice questions', note: 'Check my understanding', icon: IC.bolt, prompt: 'Write five practice questions (with brief answers) based on this page.' },
-      ],
-      context: () => `Page: ${p.title}\n\n${htmlToText(p.body || '', 14000)}`,
-    });
     return b;
   };
 
@@ -280,11 +251,6 @@
       U.badge(s.kept_score !== null && s.kept_score !== undefined ? `${store.fmtPts(s.kept_score)} / ${q.points_possible}` : (s.score !== null && s.score !== undefined ? `${store.fmtPts(s.score)} / ${q.points_possible}` : '—'), s.workflow_state === 'complete' ? 'green' : ''),
       // a finished attempt opens its feedback; an open one resumes
     ], { mod: 'bcv-row--p12', href: s.workflow_state === 'untaken' ? takeHref : feedbackHref(s) })), 'bcv-card--list') : U.emptyCard('No attempts yet.')]));
-    ctx.setSmart({
-      label: `${c.name} · ${q.title}`,
-      actions: [{ label: 'What does this quiz cover?', note: [U.plural(q.question_count || 0, 'question'), pts(q.points_possible)].filter(Boolean).join(' · '), icon: IC.bolt, prompt: 'From the instructions, what does this quiz cover and how should I prepare? Do not guess at the questions.' }],
-      context: () => `Quiz: ${q.title}\nType: ${TYPE[q.quiz_type] || q.quiz_type}\nDue: ${q.due_at ? U.fmtAt(q.due_at) : 'none'} · ${q.points_possible} pts · ${q.question_count} questions · time limit ${q.time_limit || 'none'}\n\n${htmlToText(q.description || '', 8000)}\n\nAttempts: ${(subs || []).map((s) => `#${s.attempt} ${s.workflow_state} score ${s.kept_score ?? s.score ?? '—'}`).join('; ') || 'none'}`,
-    });
     return b;
   };
 
@@ -307,11 +273,6 @@
       U.el('bcv-row__body', [U.text('bcv-row__title bcv-row__title--14 bcv-ellip', a.name), U.text('bcv-row__sub bcv-row__sub--115', `Due ${U.fmtAt(a.due_at)} · ${a.points_possible ?? 0} pts`)]),
       U.chev(),
     ], { mod: 'bcv-row--p12-16', href: `${c.url}/assignments/${a.id}` })), 'bcv-card--list') : U.emptyCard('No dated assignments.')]));
-    ctx.setSmart({
-      label: `${c.name} · Syllabus`,
-      actions: [{ label: 'Key dates from the syllabus', note: 'Exams, deadlines, policies', icon: IC.cal, prompt: 'Extract every date, deadline and policy from this syllabus as a clean list.' }, { label: 'Summarize grading policy', note: 'How the grade is built', icon: IC.chart, prompt: 'Explain how the final grade is computed according to this syllabus.' }],
-      context: () => `Syllabus for ${c.name}:\n${htmlToText(html || '', 14000)}\n\nDated assignments:\n${dated.map((a) => `- ${U.fmtAt(a.due_at)} · ${a.name} · ${a.points_possible} pts`).join('\n')}`,
-    });
     return b;
   };
 

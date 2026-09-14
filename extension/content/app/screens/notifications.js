@@ -137,13 +137,6 @@
         ]));
       }
       body.replaceChildren(...parts);
-      ctx.setSmart({
-        label: 'Notifications',
-        actions: [
-          { label: 'What needs me first?', note: `${U.plural(all.length, 'alert')}`, icon: IC.bell, prompt: 'Look at these alerts and tell me, in order, what to deal with first and why. Keep it to a short list.' },
-        ],
-        context: () => all.map((n) => `- [${meta[n.cat].label}] ${n.title} · ${n.course || ''} · ${n.whenText || rel(n.when)} · ${n.note || ''}${state.read[n.id] ? ' · read' : ''}`).join('\n'),
-      });
     }
     draw();
     return screen;

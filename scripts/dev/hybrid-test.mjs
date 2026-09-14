@@ -3,7 +3,7 @@
 // page the way ios/SimplCourses/Web/ScriptBundle.swift does it (bridge first, then background, then
 // the manifest's content scripts at their run_at, then the stylesheet), against the mock Canvas in
 // headless Chromium. No extension runtime exists here, so the bridge's fallback paths are exercised:
-// storage on localStorage, the in-page message bus, the smart panel's port to background.js.
+// storage on localStorage and the in-page message bus.
 // Requires Playwright (project or global install).
 import { createRequire } from 'node:module';
 import { spawn, execSync } from 'node:child_process';
@@ -109,15 +109,6 @@ try {
   check(got.dark === 'on' && got.def === 7, 'storage.get supports a key and {key: default}');
   await page.evaluate(() => browser.storage.local.set({ settings: { appearance: { darkMode: 'off' } } }));
   await page.waitForFunction(() => document.documentElement.getAttribute('data-bcv-theme') === 'light', null, { timeout: 5000 });
-
-  console.log('smart panel over the in-page port');
-  await page.click('#bcv-fab');
-  await page.waitForSelector('#bcv-smart', { timeout: 5000 });
-  await page.fill('#bcv-smart textarea', 'What is due?');
-  await page.press('#bcv-smart textarea', 'Enter');
-  await page.waitForSelector('.bcv-bubble--error', { timeout: 10000 });
-  check(/Add a Claude or ChatGPT key/.test((await texts('.bcv-bubble--error'))[0]), 'runtime.connect streams to background.js and back: the no-key reply arrives over the port');
-  await page.keyboard.press('Escape');
 
   console.log('navigation');
   await page.goto(`${BASE}/courses/101`);

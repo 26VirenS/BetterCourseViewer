@@ -21,7 +21,6 @@
     ['general', 'General', 'M12 3l7 4v6c0 4-3 7-7 8-4-1-7-4-7-8V7z'],
     ['courses', 'Courses & targets', 'M5 4h13v16H5zM5 17h13M9 8h5'],
     ['grades', 'Grades', 'M4 19h16M7 16V9M12 16V5M17 16v-4'],
-    ['smart', 'Smart panel', 'M12 3l1.9 4.1L18 9l-4.1 1.9L12 15l-1.9-4.1L6 9l4.1-1.9z'],
     ['appearance', 'Appearance', 'M12 3a9 9 0 100 18c1.1 0 2-.9 2-2 0-1.5 1-2 2-2h1a4 4 0 004-4c0-5-4.5-10-9-10z'],
     ['sites', 'Canvas sites', 'M12 3a9 9 0 100 18 9 9 0 000-18zM3 12h18M12 3a15 15 0 010 18a15 15 0 010-18'],
     ['data', 'Data & about', 'M4 7c0-1.7 3.6-3 8-3s8 1.3 8 3-3.6 3-8 3-8-1.3-8-3zM4 7v10c0 1.7 3.6 3 8 3s8-1.3 8-3V7'],
@@ -164,13 +163,10 @@
     const active = document.querySelector('.section.is-active');
     if (q && firstShown && (!active || document.querySelector(`.navlink[data-section="${active.id}"]`).hidden)) showSection(firstShown);
   });
-  const keyCount = () => (settings.smart.claudeKey?.trim() ? 1 : 0) + (settings.smart.openaiKey?.trim() ? 1 : 0);
   function paintStatus() {
     const n = (settings.domains || []).length + 1;
-    const on = keyCount() > 0;
-    $('status').classList.toggle('is-on', on);
-    $('statusText').textContent = on ? `${n} ${n === 1 ? 'site' : 'sites'} · smart panel on` : `${n} ${n === 1 ? 'site' : 'sites'}`;
-    $('dot-smart').hidden = on;
+    $('status').classList.toggle('is-on', true);
+    $('statusText').textContent = `${n} ${n === 1 ? 'site' : 'sites'}`;
   }
 
   // ---- switches, segs -----------------------------------------------------------------------------
@@ -354,8 +350,8 @@
   }
   if (site.host) loadGrades();
 
-  // ---- Smart panel ----------------------------------------------------------------------------------
-  const TEXT = [['claudeKey', 'smart.claudeKey'], ['openaiKey', 'smart.openaiKey'], ['claudeModel', 'smart.claudeModel'], ['openaiModel', 'smart.openaiModel'], ['siteName', 'appearance.siteName'], ['logoUrl', 'appearance.logoUrl']];
+  // ---- text fields shared by the sections below ----------------------------------------------------
+  const TEXT = [['siteName', 'appearance.siteName'], ['logoUrl', 'appearance.logoUrl']];
   const getPath = (obj, path) => path.split('.').reduce((o, k) => (o == null ? undefined : o[k]), obj);
   const patchFor = (path, value) => path.split('.').reverse().reduce((acc, k) => ({ [k]: acc }), value);
   for (const [id, path] of TEXT) {
@@ -375,42 +371,6 @@
     input.type = show ? 'text' : 'password';
     btn.textContent = show ? 'Hide' : 'Show';
   }));
-  async function test(provider, inputId, resultId, btnId) {
-    const key = $(inputId).value.trim();
-    const out = $(resultId);
-    const btn = $(btnId);
-    btn.disabled = true;
-    out.className = 'result';
-    out.textContent = 'Testing…';
-    await save(patchFor(provider === 'openai' ? 'smart.openaiKey' : 'smart.claudeKey', key));
-    const r = await send({ type: 'testKey', provider, key });
-    out.textContent = r?.message || 'No response from the extension.';
-    out.className = `result ${r?.ok ? 'is-ok' : 'is-err'}`;
-    btn.disabled = false;
-  }
-  $('testClaude').addEventListener('click', () => test('claude', 'claudeKey', 'claudeResult', 'testClaude'));
-  $('testOpenAI').addEventListener('click', () => test('openai', 'openaiKey', 'openaiResult', 'testOpenAI'));
-  onSeg($('depth'), (v) => save({ smart: { depth: v } }));
-  onSeg($('preferred'), (v) => save({ smart: { preferred: v } }));
-  onSwitch($('includePageContext'), (on) => save({ smart: { includePageContext: on } }));
-  onSwitch($('persistChat'), (on) => save({ smart: { persistChat: on } }));
-  function paintSmart() {
-    const c = !!settings.smart.claudeKey?.trim();
-    const o = !!settings.smart.openaiKey?.trim();
-    $('claudePill').textContent = c ? 'Connected' : 'No key';
-    $('claudePill').classList.toggle('is-on', c);
-    $('openaiPill').textContent = o ? 'Connected' : 'No key';
-    $('openaiPill').classList.toggle('is-on', o);
-    setSeg($('depth'), settings.smart.depth || 'balanced');
-    setSeg($('preferred'), settings.smart.preferred || 'claude');
-    setSwitch($('includePageContext'), settings.smart.includePageContext);
-    setSwitch($('persistChat'), settings.smart.persistChat);
-    const provider = S.resolveProvider(settings.smart);
-    $('smartStatus').textContent = provider
-      ? `The smart panel uses ${S.providerLabel(provider)} (${S.modelFor(settings.smart, provider)})${c && o ? ' because both keys are set and it is your preferred provider' : ''}. Requests go straight from this browser to the provider with your key.`
-      : 'The smart panel stays quiet until you add a key. Requests go straight from this browser to the provider with your key; nothing passes through any other server.';
-  }
-
   // ---- Appearance ----------------------------------------------------------------------------------
   $('themes').addEventListener('click', (e) => {
     const b = e.target.closest('.theme');
@@ -481,23 +441,18 @@
   // ---- Data & about ----------------------------------------------------------------------------------
   async function renderStats() {
     let snaps = 0;
-    let chats = 0;
     let sites = 0;
     try {
       const all = await api.storage.local.get(null);
       for (const k of Object.keys(all)) {
         if (k.startsWith('prefs:')) { sites += 1; if (Array.isArray(all[k]?.gpaSnapshots)) snaps += all[k].gpaSnapshots.length; }
-        if (k.startsWith('smart:')) chats += 1;
       }
     } catch {
       /* ignore */
     }
-    const keys = keyCount();
     $('dataStats').replaceChildren(
       h('div', { class: 'stat' }, [h('span', { text: 'Canvas data kept here' }), h('b', { text: 'none' })]),
       h('div', { class: 'stat' }, [h('span', { text: 'Grade snapshots' }), h('b', { text: snaps ? `${snaps} ${snaps === 1 ? 'day' : 'days'}` : (grades.tracking ? 'from today' : 'none') })]),
-      h('div', { class: 'stat' }, [h('span', { text: 'Smart panel conversations' }), h('b', { text: chats ? String(chats) : 'none' })]),
-      h('div', { class: 'stat' }, [h('span', { text: 'API keys stored' }), h('b', { text: keys ? `${keys} (local only)` : 'none' })]),
       h('div', { class: 'stat' }, [h('span', { text: 'Sites with preferences' }), h('b', { text: String(sites) })]),
     );
   }
@@ -535,17 +490,8 @@
     $('uninstallNote').textContent = 'Nothing else is kept anywhere: your Canvas account, favourites and course nicknames live on Canvas and stay as they are.';
   }
   paintUninstall();
-  $('clearCache').addEventListener('click', async () => {
-    const all = await api.storage.local.get(null);
-    const keys = Object.keys(all).filter((k) => k.startsWith('smart:') || k.startsWith('cache:'));
-    await api.storage.local.remove(keys);
-    flash(`Cleared ${keys.length} ${keys.length === 1 ? 'conversation' : 'conversations'}`);
-    renderStats();
-  });
   $('exportSettings').addEventListener('click', () => {
     const copy = JSON.parse(JSON.stringify(settings));
-    copy.smart.claudeKey = '';
-    copy.smart.openaiKey = '';
     download('simpl-courses-settings.json', JSON.stringify(copy, null, 2), 'application/json');
   });
   $('importSettings').addEventListener('click', () => $('importFile').click());
@@ -555,8 +501,7 @@
     try {
       const data = JSON.parse(await file.text());
       if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('shape');
-      const keep = { smart: { claudeKey: settings.smart.claudeKey, openaiKey: settings.smart.openaiKey } };
-      settings = await S.replace(S.deepMerge(data, keep));
+      settings = await S.replace(data);
       flash('Imported');
       paintAll();
     } catch {
@@ -587,7 +532,6 @@
   function paintAll() {
     setSwitch($('skin'), settings.appearance.skin !== false);
     for (const [id, path] of TEXT) { const el = $(id); if (document.activeElement !== el) el.value = getPath(settings, path) ?? ''; }
-    paintSmart();
     [...$('themes').querySelectorAll('.theme')].forEach((b) => b.classList.toggle('is-on', b.dataset.value === (settings.appearance.darkMode || 'system')));
     setSeg($('sideCourses'), settings.appearance.sideCourses || 'always');
     renderDomains();
