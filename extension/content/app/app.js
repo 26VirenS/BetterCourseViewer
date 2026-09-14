@@ -764,6 +764,7 @@
     html.classList.remove('bcv-quiz', 'bcv-quiz-fb'); // the quiz screen puts them back while an attempt or its feedback is on screen
     punchOut(); // a native screen punches back in while it builds
     closeQuickNav(); // the courses panel belongs to the row it came from, not to the next screen
+    BCV.preview?.close(); // a preview beside the list belongs to the list it was opened from
     syncSide(); // the sidebar follows the route in place; it is rebuilt only when what it shows changes
     const ctx = { app: BCV.app, route: r, alive, dark: state.dark };
     // Screens build off-DOM and land whole. A screen still fetching after 150ms gets a

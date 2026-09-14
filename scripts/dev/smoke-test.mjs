@@ -233,9 +233,38 @@ try {
   await page.waitForSelector('.bcv-sheet', { timeout: 5000 });
   const annRows = await texts('.bcv-sheet__row');
   check((await texts('.bcv-sheet__line'))[0] === '3 Unread announcements' && annRows.length === 3 && /^Field site sign-ups Posted \w+ \d+ · unread F26-SPRK 010 103$/.test(annRows[0]) && !(await page.$('.bcv-sheet__more')), `the number and the rows come from the same list (Announcements API): ${annRows.join(' | ')}`);
+  // a sheet row steps the sheet aside and previews the item beside the dashboard, not on top of it
   await page.click('.bcv-sheet__row');
+  await page.waitForSelector('.bcv-pv', { timeout: 10000 });
+  check(!(await page.$('.bcv-sheet')) && page.url().endsWith('/'), 'a sheet row closes the sheet and previews the item, without navigating');
+  await page.waitForFunction(() => !document.querySelector('.bcv-pv .bcv-skel'), null, { timeout: 10000 });
+  const pvSheet = await page.$eval('.bcv-pv', (e) => ({
+    kicker: e.querySelector('.bcv-pv__kicker').textContent,
+    title: e.querySelector('.bcv-pv__title').textContent,
+    meta: e.querySelector('.bcv-pv__meta').textContent,
+    body: e.querySelector('.bcv-pv__prose')?.textContent.slice(0, 40) || '',
+    go: e.querySelector('.bcv-pv__go').textContent,
+  }));
+  check(pvSheet.kicker === 'Preview' && pvSheet.title === 'Field site sign-ups' && /^Announcement · .+/.test(pvSheet.meta) && pvSheet.body.length > 10 && pvSheet.go === 'Open the announcement', `the preview reads the announcement: ${JSON.stringify(pvSheet)}`);
+  // the interface keeps its place and gives up its right edge; the panel fills it
+  await page.waitForTimeout(400); // the interface takes .34s to make room
+  const pvBox = await page.evaluate(() => {
+    const p = document.querySelector('.bcv-pv').getBoundingClientRect();
+    return { left: Math.round(p.left), right: Math.round(p.right), win: window.innerWidth, pad: getComputedStyle(document.getElementById('bcv-app')).paddingRight, cls: document.documentElement.classList.contains('bcv-preview') };
+  });
+  check(pvBox.cls && pvBox.right === pvBox.win && pvBox.left > pvBox.win / 2 && parseFloat(pvBox.pad) === pvBox.win - pvBox.left, `the panel sits on the right and the interface moves left by its width: ${JSON.stringify(pvBox)}`);
+  await shot(page, '01c-dashboard-preview');
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !document.querySelector('.bcv-pv') && !document.documentElement.classList.contains('bcv-preview'), null, { timeout: 3000 });
+  check(true, 'Escape closes the preview and puts the interface back');
+  // the button at the bottom is the way through to the item's own screen
+  await page.click('.bcv-stats .bcv-stat:nth-child(3)');
+  await page.waitForSelector('.bcv-sheet', { timeout: 5000 });
+  await page.click('.bcv-sheet__row');
+  await page.waitForSelector('.bcv-pv__go', { timeout: 10000 });
+  await page.click('.bcv-pv__go');
   await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
-  check(page.url().endsWith('/courses/104/announcements/8005'), 'a sheet row opens the item');
+  check(page.url().endsWith('/courses/104/announcements/8005') && !(await page.$('.bcv-pv')), 'the button at the bottom of the preview opens the item');
   await page.goto(`${BASE}/`);
   await page.waitForSelector('.bcv-day .bcv-row', { timeout: 10000 });
   await waitText('.bcv-stats > :nth-child(3) .bcv-stat__value', /^2$/);
@@ -249,6 +278,55 @@ try {
   check(listRows.some((t) => /Dis01.*10 pts.*Due 11:59 PM/.test(t)) && listRows.some((t) => /Quiz.*Qz01/.test(t)), 'list rows show course · kind, points and due time');
   check(listRows.some((t) => /to-do date/.test(t)), 'to-do-dated items are labelled, not shown as due');
   await shot(page, '01-dashboard-list');
+  // a list row previews the item beside the dashboard rather than navigating to it
+  const assignRow = await page.$('.bcv-day a.bcv-row[href*="/assignments/"]');
+  const assignHref = await assignRow.getAttribute('href');
+  await assignRow.click({ position: { x: 220, y: 22 } }); // past the tick circle, on the row body
+  await page.waitForFunction(() => document.querySelector('.bcv-pv') && !document.querySelector('.bcv-pv .bcv-skel'), null, { timeout: 10000 });
+  const pvRow = await page.$eval('.bcv-pv', (e) => ({
+    meta: e.querySelector('.bcv-pv__meta').textContent,
+    chips: [...e.querySelectorAll('.bcv-pv__chips .bcv-badge')].map((b) => b.textContent),
+    has: !!e.querySelector('.bcv-pv__prose, .bcv-pv__none'),
+    go: e.querySelector('.bcv-pv__go').textContent,
+  }));
+  check(page.url().endsWith('/') && /^Assignment · (due .+|no due date)( · \d+(\.\d+)? pts)?$/.test(pvRow.meta) && pvRow.chips.length >= 1 && /^(Graded|Submitted|Submitted late|Missing|Not submitted|Excused)$/.test(pvRow.chips[0]) && pvRow.has && pvRow.go === 'Open the assignment', `a list row previews the assignment without navigating: ${JSON.stringify(pvRow)}`);
+  check(!/null|NaN|undefined/.test(await page.$eval('.bcv-pv', (e) => e.textContent)), 'the preview never shows a raw null');
+  // nothing is covered or dimmed: the interface stays live beside the panel, so pressing another
+  // item we can read swaps what the panel shows rather than putting it away
+  const wasTitle = await page.$eval('.bcv-pv__title', (e) => e.textContent);
+  const nextRow = (await page.$$(`.bcv-day a.bcv-row[href*="/assignments/"]:not([href="${assignHref}"])`))[0];
+  await nextRow.click({ position: { x: 220, y: 22 } });
+  await page.waitForFunction((was) => document.querySelector('.bcv-pv__title')?.textContent !== was && !document.querySelector('.bcv-pv .bcv-skel'), wasTitle, { timeout: 10000 });
+  const pvSwap = await page.$eval('.bcv-pv__meta', (e) => e.textContent);
+  check((await page.$$('.bcv-pv')).length === 1 && /^Assignment · /.test(pvSwap) && (await page.$eval('html', (e) => e.classList.contains('bcv-preview'))), `pressing another row swaps the preview in place, the interface never moving back: ${pvSwap}`);
+  // a press anywhere else puts it away, and goes through to what was pressed
+  await page.click('.bcv-head .bcv-h1');
+  await page.waitForFunction(() => !document.querySelector('.bcv-pv') && !document.documentElement.classList.contains('bcv-preview'), null, { timeout: 3000 });
+  check(true, 'a press on the interface closes the preview');
+  // only the kinds we can read are previewed; everything else navigates the way it always did
+  const pvRoutes = await sw.evaluate(async (base) => {
+    const [tab] = await chrome.tabs.query({ url: `${base}/*` });
+    const [{ result }] = await chrome.scripting.executeScript({
+      target: { tabId: tab.id }, world: 'ISOLATED',
+      func: () => [
+        '/courses/101/assignments/9001', '/courses/101/quizzes/5001', '/courses/101/discussion_topics/7001',
+        '/courses/101/announcements/8001', '/courses/101/pages/week-1', '/groups/201/discussion_topics/7001',
+        '/courses/101/assignments', '/courses/101/modules', '/courses/101', '/conversations',
+        '/courses/101/files/3001', '/groups/201/assignments/9001', '/courses/101/quizzes/5001?bcv=take',
+      ].map((u) => `${u}:${self.BCV.preview.previewable(u) ? 'look' : 'go'}`),
+    });
+    return result;
+  }, BASE);
+  check(pvRoutes.filter((r) => r.endsWith(':look')).length === 6 && pvRoutes.slice(0, 6).every((r) => r.endsWith(':look')) && pvRoutes.slice(6).every((r) => r.endsWith(':go')), `only readable items are previewed: ${pvRoutes.join(' | ')}`);
+  // navigating away takes the preview with it
+  await (await page.$('.bcv-day a.bcv-row[href*="/assignments/"]')).click({ position: { x: 220, y: 22 } });
+  await page.waitForSelector('.bcv-pv', { timeout: 10000 });
+  check(assignHref.includes('/assignments/') && (await page.$eval('.bcv-pv', (e) => e.parentElement.tagName)) === 'BODY', 'the preview stands over the page, beside the dashboard it came from');
+  await page.click('.bcv-nav__item[data-nav="courses"]');
+  await page.waitForSelector('[data-term]', { timeout: 10000 });
+  check(!(await page.$('.bcv-pv')) && !(await page.$eval('html', (e) => e.classList.contains('bcv-preview'))), 'navigating away closes the preview');
+  await page.click('.bcv-nav__item[data-nav="dashboard"]');
+  await page.waitForSelector('.bcv-day .bcv-row', { timeout: 10000 });
   // mark one done
   const rowsBefore = (await page.$$('.bcv-day .bcv-row')).length;
   await page.click('.bcv-day .bcv-row .bcv-circle');
@@ -288,7 +366,12 @@ try {
   check((await dots()) === 3, `unread dots: ${await dots()} (the announcement read a moment ago has none)`);
   await shot(page, '03-dashboard-activity');
   check(await sw.evaluate(async () => (await fetch('http://localhost:8787/dashboard/view').then((r) => r.text())).includes('activity')), 'dashboard view persisted to Canvas');
+  // an activity row previews too; reading it there counts as opening it, so its dot clears
   await (await page.$$('.bcv-body .bcv-row--top'))[1].click();
+  await page.waitForFunction(() => document.querySelector('.bcv-pv') && !document.querySelector('.bcv-pv .bcv-skel'), null, { timeout: 10000 });
+  const pvAct = await page.$eval('.bcv-pv', (e) => `${e.querySelector('.bcv-pv__title').textContent} | ${e.querySelector('.bcv-pv__meta').textContent} | ${e.querySelector('.bcv-pv__go').textContent}`);
+  check(/ \| Discussion · .+ \| Open the discussion$/.test(pvAct) && (await dots()) === 2, `an activity row previews the discussion and loses its dot: ${pvAct}`);
+  await page.click('.bcv-pv__go');
   await page.waitForSelector('.bcv-entry', { timeout: 10000 });
   await page.goto(`${BASE}/`);
   await page.waitForSelector('.bcv-act__title', { timeout: 10000 });
@@ -1101,6 +1184,15 @@ try {
   await page.click('#bcv-q2 .bcv-qz__opt:nth-child(3)');
   await waitText('.bcv-qz__answered', /4 of 4 answered · Saved/);
   check((await page.$$('#bcv-q2 .bcv-qz__opt.is-selected')).length === 2, 'multiple-answer questions keep every pick');
+  // A pick marks the option in place rather than drawing the question again: a formula in the
+  // question or its options is an image Canvas serves, and rebuilding it made every equation on
+  // screen blink away and back on each press.
+  await page.$eval('#bcv-q2 .bcv-qz__qtext img.equation_image', (img) => { img.dataset.bcvSeen = '1'; });
+  await page.click('#bcv-q2 .bcv-qz__opt:nth-child(2)');
+  await page.click('#bcv-q2 .bcv-qz__opt:nth-child(2)');
+  await waitText('.bcv-qz__answered', /4 of 4 answered · Saved/);
+  const eqKept = await page.$eval('#bcv-q2 .bcv-qz__qtext img.equation_image', (img) => img.dataset.bcvSeen === '1');
+  check(eqKept && (await page.$$('#bcv-q2 .bcv-qz__opt.is-selected')).length === 2 && (await page.$$('#bcv-q2 .bcv-qz__optlabel img.equation_image')).length === 2, 'a pick marks the option in place: the formulas on screen are never torn down and fetched again');
   await page.click('.bcv-qz__foot .bcv-qz__btn--primary');
   await page.waitForSelector('.bcv-qz__big--primary', { timeout: 5000 });
   page.once('dialog', (d) => d.accept());
@@ -1123,6 +1215,25 @@ try {
   check(/^Question 1 4 \/ 4 What is the velocity at t = 5\? You: -3\.15 m\/s worked solution/i.test(fbCards[0]) && !/Correct:/.test(fbCards[0]) && (await page.$('.bcv-fb__q:nth-of-type(2) img.equation_image')), `a correct question: points, Explain, your answer, the instructor's solution with Canvas's equation image: ${fbCards[0]}`);
   check(/^Question 2 0 \/ 4 .*You: -2 m Correct: -3\.15 m worked solution 17\.68 m is the position reading/i.test(fbCards[1]), `a wrong question shows the correct answer (show_correct_answers) and the incorrect-answer comment: ${fbCards[1]}`);
   check(/Question 3 4 \/ 4 .*Your instructor left no worked solution/i.test(fbCards[2]) && /Question 4 5 \/ 5 .*You: 3\.15 .*Only one root/i.test(fbCards[3]), `no solution says so; plain-text comments render too: ${fbCards[2]} | ${fbCards[3]}`);
+  // an answer that is nothing but a formula: Canvas leaves its text empty and holds the equation as
+  // an image, so the chip shows the equation rather than the blank it used to ("You: ,")
+  const q3eq = await page.$$eval('.bcv-fb__q', (els) => {
+    const chip = els[2].querySelector('.bcv-fb__chip');
+    return { eqs: [...chip.querySelectorAll('img.equation_image')].map((e) => e.getAttribute('data-equation-content')), label: chip.firstChild.textContent };
+  });
+  check(q3eq.eqs.length === 2 && q3eq.eqs[0] === '\\vec{v}' && q3eq.label === 'You: ', `an answer that is only a formula shows the formula in the feedback: ${JSON.stringify(q3eq)}`);
+  const eqText = await sw.evaluate(async (base) => {
+    const [tab] = await chrome.tabs.query({ url: `${base}/*` });
+    const [{ result }] = await chrome.scripting.executeScript({
+      target: { tabId: tab.id }, world: 'ISOLATED',
+      func: () => [
+        self.BCV.utils.htmlToText('<p><img class="equation_image" title="\\vec{v}" alt="LaTeX: \\vec{v}" data-equation-content="\\vec{v}"></p>'),
+        self.BCV.utils.htmlToText('<p>A diagram: <img src="/x.png" alt="the free-body diagram"></p>'),
+      ],
+    });
+    return result;
+  }, BASE);
+  check(eqText[0] === '\\vec{v}' && eqText[1] === 'A diagram: the free-body diagram', `a formula Canvas keeps as an image reads as the formula, and any image as its alt text: ${JSON.stringify(eqText)}`);
   check((await page.$$eval('.bcv-fb > .bcv-enter', (els) => els.map((e) => e.style.getPropertyValue('--bcv-delay')))).join(',') === '0ms,45ms,90ms,135ms,180ms', 'feedback cards arrive on a 45ms stagger');
   await shot(page, '22h-quiz-feedback');
   await page.click('.bcv-fb__btns .bcv-qz__big:first-child');

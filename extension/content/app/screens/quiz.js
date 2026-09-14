@@ -384,23 +384,41 @@
       const opts = (q.answers || []);
       if (CHOICE.has(type) || MULTI.has(type)) {
         const multi = MULTI.has(type);
-        const selected = multi ? new Set((Array.isArray(q.answer) ? q.answer : []).map(String)) : new Set(q.answer !== null && q.answer !== undefined ? [String(q.answer)] : []);
-        return U.el('bcv-qz__opts', opts.map((a, j) => {
-          const sel = selected.has(String(a.id));
+        const chosen = () => (multi
+          ? new Set((Array.isArray(q.answer) ? q.answer : []).map(String))
+          : new Set(q.answer !== null && q.answer !== undefined ? [String(q.answer)] : []));
+        // A pick marks the options in place rather than drawing the question again: a question whose
+        // text or options hold a formula would otherwise rebuild every equation image Canvas serves,
+        // and the formulas visibly blink away and back on each press. save() repaints the count and
+        // the pills itself, so nothing else here has to move.
+        const btns = [];
+        const marks = () => {
+          const on = chosen();
+          for (const [a, b] of btns) {
+            const sel = on.has(String(a.id));
+            b.classList.toggle('is-selected', sel);
+            b.setAttribute('aria-pressed', sel ? 'true' : 'false');
+          }
+        };
+        const wrap = U.el('bcv-qz__opts', opts.map((a, j) => {
           const label = a.html ? BCV.screens.course.prose(a.html, { cls: 'bcv-qz__optlabel' }) : h('span', { class: 'bcv-qz__optlabel', text: a.text || `Option ${LETTERS[j]}` });
-          return h('button', { type: 'button', class: `bcv-qz__opt ${sel ? 'is-selected' : ''} ${compact ? 'bcv-qz__opt--compact' : ''}`, 'aria-pressed': sel ? 'true' : 'false', onclick: () => {
+          const b = h('button', { type: 'button', class: `bcv-qz__opt ${compact ? 'bcv-qz__opt--compact' : ''}`, onclick: () => {
             if (multi) {
-              const next = new Set(selected);
+              const next = chosen();
               if (next.has(String(a.id))) next.delete(String(a.id)); else next.add(String(a.id));
               save(q, [...next].map(Number));
             } else save(q, Number(a.id));
-            draw();
+            marks();
           } }, [
             h('span', { class: 'bcv-qz__letter', text: LETTERS[j] || String(j + 1) }),
             label,
             U.svg(CHECK, { size: compact ? 18 : 19, stroke: '#0a84ff', width: 2.6, cls: 'bcv-qz__tick' }),
           ]);
+          btns.push([a, b]);
+          return b;
         }));
+        marks();
+        return wrap;
       }
       if (TEXT.has(type)) {
         const isEssay = type === 'essay_question';
@@ -465,14 +483,25 @@
       ]);
     }
 
-    function answerText(q) {
+    /** An answer as pieces to show: its own words, and the rich content Canvas holds it in when there
+     *  is any — which is how a formula arrives, as an equation image with the LaTeX on the tag. */
+    function answerParts(q) {
       const a = q.answer;
       if (!answered(a)) return null;
       const opts = q.answers || [];
-      const name = (id) => { const o = opts.find((x) => String(x.id) === String(id)); return o ? (o.text || htmlToText(o.html || '', 80)) : String(id); };
-      if (Array.isArray(a)) return a.map(name).join(', ');
-      if (CHOICE.has(q.question_type)) return name(a);
-      return String(a);
+      const one = (id) => {
+        const o = opts.find((x) => String(x.id) === String(id));
+        return o ? { text: o.text || '', html: o.html || '' } : { text: String(id), html: '' };
+      };
+      if (Array.isArray(a)) return a.map(one);
+      if (CHOICE.has(q.question_type)) return [one(a)];
+      return [{ text: String(a), html: '' }];
+    }
+    const partText = (p) => (String(p.text).trim() ? p.text : htmlToText(p.html || '', 80)) || '—';
+    /** The same, flattened to one line — for the review list and anywhere a plain string is wanted. */
+    function answerText(q) {
+      const parts = answerParts(q);
+      return parts ? parts.map(partText).join(', ') : null;
     }
 
     function review() {
@@ -556,6 +585,19 @@
     // quiz's settings allow it, the instructor's worked solution. Everything comes from the attempt's own question data
     // and the assignment submission's comments; nothing is fetched beyond that.
     const CS = () => BCV.screens.course;
+    /** A chip's contents: the label, then each answer — its own words where it has them, and Canvas's
+     *  own content where it does not, so an answer that is a formula shows the formula. */
+    function chipBody(label, parts) {
+      const out = [h('span', { text: label })];
+      if (!parts?.length) return [...out, h('span', { text: 'no answer' })];
+      parts.forEach((p, i) => {
+        if (i) out.push(h('span', { text: ', ' }));
+        if (String(p.text || '').trim()) out.push(h('span', { text: p.text }));
+        else if (String(p.html || '').trim()) out.push(CS().prose(p.html, { cls: 'bcv-fb__chiprich' }));
+        else out.push(h('span', { text: '—' }));
+      });
+      return out;
+    }
     const CROSS = 'M6 6l12 12M18 6L6 18';
     function finished(s) {
       return !!s && (s.workflow_state === 'complete' || s.workflow_state === 'pending_review');
@@ -609,19 +651,19 @@
       if (CHOICE.has(q.question_type)) return d.answer_id ?? (text !== null && Number.isFinite(Number(text)) ? Number(text) : null);
       return text;
     }
-    /** The correct answer(s) as text: the answers Canvas weights 100 (absent when censored). */
+    /** The correct answer(s): the answers Canvas weights 100 (absent when censored), as the pieces
+     *  answerParts gives, so a formula shows as the formula rather than as nothing. */
     function fbRight(q) {
       const one = (a) => {
-        if (a.text) return a.text;
-        if (a.html) return htmlToText(a.html, 80);
-        if (a.numerical_answer_type === 'range_answer' && a.start !== undefined) return `${a.start} – ${a.end}`;
-        if (a.exact !== undefined && a.exact !== null) return Number(a.margin) ? `${a.exact} ± ${a.margin}` : String(a.exact);
-        if (a.approximate !== undefined && a.approximate !== null) return String(a.approximate);
-        if (a.left && a.right) return `${a.left} → ${a.right}`;
+        if (String(a.text || '').trim() || String(a.html || '').trim()) return { text: a.text || '', html: a.html || '' };
+        if (a.numerical_answer_type === 'range_answer' && a.start !== undefined) return { text: `${a.start} – ${a.end}`, html: '' };
+        if (a.exact !== undefined && a.exact !== null) return { text: Number(a.margin) ? `${a.exact} ± ${a.margin}` : String(a.exact), html: '' };
+        if (a.approximate !== undefined && a.approximate !== null) return { text: String(a.approximate), html: '' };
+        if (a.left && a.right) return { text: `${a.left} → ${a.right}`, html: '' };
         return null;
       };
       const parts = (q.answers || []).filter((a) => Number(a.weight) === 100).map(one).filter(Boolean);
-      return parts.length ? parts.join(', ') : null;
+      return parts.length ? parts : null;
     }
     /** Solution html from the question data: the neutral comment, else the one for this outcome. */
     function fbSolution(q, ok) {
@@ -646,7 +688,7 @@
         const correct = parseCorrect(q.correct) ?? (d ? parseCorrect(d.correct) : null);
         const possible = Number(q.points_possible) || 0;
         const earned = d && d.points !== undefined && d.points !== null ? Number(d.points) : correct === true ? possible : correct === false ? 0 : null;
-        return { q, k, correct, possible, earned, text: htmlToText(q.question_text || q.question_name || '', 400).replace(/\s+/g, ' ').trim(), yours: answerText(q), right: fbRight(q), sol: fbSolution(q, correct === true), info: INFO.has(q.question_type) };
+        return { q, k, correct, possible, earned, text: htmlToText(q.question_text || q.question_name || '', 400).replace(/\s+/g, ' ').trim(), yours: answerParts(q), right: fbRight(q), sol: fbSolution(q, correct === true), info: INFO.has(q.question_type) };
       }).filter((r) => !r.info);
       const released = rows.some((r) => r.correct !== null);
       const possible = Number(quiz.points_possible) || rows.reduce((s, r) => s + r.possible, 0);
@@ -661,7 +703,7 @@
           : part ? ['#ff9500', 'rgba(255,149,0,.16)'] : ['var(--bcv-ink3)', 'var(--bcv-fill)'];
       const mark = ok ? CHECK : bad ? CROSS : part ? 'M5 12h14' : 'M12 17h.01M9.5 9.5a2.5 2.5 0 015 0c0 1.6-2.5 2-2.5 4';
       const scoreLbl = r.earned !== null ? `${store.fmtPts(r.earned)} / ${store.fmtPts(r.possible)}` : part ? `Partial · ${store.fmtPts(r.possible)} pts` : `${store.fmtPts(r.possible)} pts`;
-      const showRight = !ok && r.correct !== null && correctVisible() && r.right;
+      const showRight = !ok && r.correct !== null && correctVisible() && !!r.right?.length;
       const sol = r.sol;
       return U.enter(U.el('bcv-fb__q', [
         U.el('bcv-fb__qhead', [
@@ -671,8 +713,8 @@
         ]),
         CS().prose(r.q.question_text || r.q.question_name || '', { cls: 'bcv-fb__qtext' }),
         U.el('bcv-fb__chips', [
-          h('span', { class: 'bcv-fb__chip', style: { background: tint, color: ink }, text: `You: ${r.yours ?? 'no answer'}` }),
-          showRight ? h('span', { class: 'bcv-fb__chip bcv-fb__chip--right', text: `Correct: ${r.right}` }) : null,
+          h('span', { class: 'bcv-fb__chip', style: { background: tint, color: ink } }, chipBody('You: ', r.yours)),
+          showRight ? h('span', { class: 'bcv-fb__chip bcv-fb__chip--right' }, chipBody('Correct: ', r.right)) : null,
         ]),
         U.el('bcv-fb__sol', [
           U.text('bcv-fb__kicker', 'Worked solution', 'span'),

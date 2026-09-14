@@ -297,7 +297,8 @@
           h('button', { type: 'button', class: 'bcv-sheet__close', 'aria-label': 'Close', onclick: close }, U.svg(IC.close, { size: 13, stroke: 'var(--bcv-ink2)', width: 2.3 })),
         ]),
         U.el('bcv-sheet__list', [
-          ...(def.items.length ? def.items.map((i) => h('a', { class: 'bcv-sheet__row', href: i.url, onclick: (e) => { e.preventDefault(); app.go(i.url); } }, [
+          // the sheet stands where the panel would: it steps aside so the preview opens beside the dashboard
+          ...(def.items.length ? def.items.map((i) => h('a', { class: 'bcv-sheet__row', href: i.url, onclick: (e) => { e.preventDefault(); close(); if (!BCV.preview?.open(i.url)) app.go(i.url); } }, [
             h('span', { class: 'bcv-sheet__dot', style: { background: i.color } }),
             U.el('bcv-sheet__body', [U.text('bcv-sheet__title bcv-pretty', i.title), U.text('bcv-sheet__meta', i.meta)]),
             h('span', { class: 'bcv-sheet__course bcv-ellip', style: { background: i.tint, color: i.color }, text: i.course }),
@@ -537,7 +538,10 @@
         rowEl.addEventListener('click', (e) => {
           if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return; // new-tab clicks stay native
           e.preventDefault();
-          store.markStreamSeen(a.id).catch(() => {}).then(() => app.go(url));
+          // reading it beside the list counts as opening it, so the unread dot clears either way
+          const looked = BCV.preview?.open(url);
+          store.markStreamSeen(a.id).catch(() => {}).then(() => { if (!looked) app.go(url); });
+          if (looked) dot.style.background = 'transparent';
         });
         return rowEl;
       }));
@@ -562,6 +566,8 @@
     }
 
     draw();
+    // a press on an item we can read opens it beside the list rather than navigating
+    BCV.preview?.attach(screen);
     return screen;
   }
 

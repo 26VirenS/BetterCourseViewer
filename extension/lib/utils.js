@@ -51,6 +51,14 @@
         a.textContent = `${text} (${href})`;
       }
     });
+    // Canvas keeps a formula as an image and the LaTeX on the tag itself, so an answer or a heading
+    // that is nothing but a formula would come back blank. Read the formula (any image's alt text,
+    // in fact) rather than dropping it.
+    doc.querySelectorAll('img').forEach((img) => {
+      const eq = img.getAttribute('data-equation-content') || (img.classList.contains('equation_image') ? img.getAttribute('title') : '') || '';
+      const src = eq || (img.getAttribute('alt') || '').replace(/^LaTeX:\s*/i, '');
+      img.replaceWith(doc.createTextNode(src.trim()));
+    });
     doc.querySelectorAll('li').forEach((li) => li.prepend('- '));
     doc.querySelectorAll('br').forEach((br) => br.replaceWith('\n'));
     doc.querySelectorAll('p, div, li, h1, h2, h3, h4, h5, h6, tr, blockquote, pre, section, article, header, footer, table').forEach((el) => {
