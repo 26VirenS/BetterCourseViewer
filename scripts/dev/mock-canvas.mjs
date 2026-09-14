@@ -184,7 +184,7 @@ const announcements = {
 };
 const topicFull = (courseId, id) => {
   const t = [...(discussions[courseId] || []), ...(announcements[courseId] || [])].find((x) => x.id === String(id));
-  return t ? { ...t, html_url: `/courses/${courseId}/discussion_topics/${t.id}`, locked: false, require_initial_post: !!t.require_initial_post, attachments: [] } : null;
+  return t ? { ...t, html_url: `/courses/${courseId}/discussion_topics/${t.id}`, locked: false, require_initial_post: !!t.require_initial_post, attachments: t.attachments || [] } : null;
 };
 const entries = new Map();
 const viewFor = (topicId) => ({
@@ -522,9 +522,22 @@ on('PUT', /^\/api\/v1\/courses\/(\w+)\/discussion_topics\/(\w+)\/read_all$/, (ur
 });
 on('GET', /^\/api\/v1\/courses\/(\w+)\/discussion_topics\/(\w+)$/, (url, m) => topicFull(m[1], m[2]));
 // starting a discussion: Canvas takes the title and the first post together and hands back the topic
-on('POST', /^\/api\/v1\/courses\/(\w+)\/discussion_topics$/, (url, m, body) => {
+on('POST', /^\/api\/v1\/courses\/(\w+)\/discussion_topics$/, (url, m, body, raw) => {
+  // Canvas's own form sends multipart when a file goes with it: the fields are parts, not JSON
+  let att = null;
+  if (raw && /^--/.test(raw)) {
+    const boundary = raw.slice(0, raw.indexOf('\r\n'));
+    body = {};
+    for (const part of raw.split(boundary)) {
+      const name = (part.match(/name="([^"]*)"/) || [])[1];
+      if (!name) continue;
+      const value = part.slice(part.indexOf('\r\n\r\n') + 4).replace(/\r\n$/, '');
+      if (/filename="/.test(part)) att = { display_name: (part.match(/filename="([^"]*)"/) || [])[1], size: value.length };
+      else body[name] = value === 'true' ? true : value === 'false' ? false : value;
+    }
+  }
   if (!body.title || !body.message) return { __status: 400, errors: [{ message: 'title and message are required' }] };
-  const t = { id: String(Date.now()), title: body.title, message: body.message, posted_at: new Date().toISOString(), created_at: new Date().toISOString(), last_reply_at: null, unread_count: 0, discussion_subentry_count: 0, read_state: 'read', published: body.published !== false, discussion_type: body.discussion_type || 'threaded', require_initial_post: !!body.require_initial_post, allow_rating: !!body.allow_rating, delayed_post_at: body.delayed_post_at || null, lock_at: body.lock_at || null, author: { display_name: 'Ava Student' }, user_name: 'Ava Student', pinned: false, locked: false };
+  const t = { id: String(Date.now()), title: body.title, message: body.message, posted_at: new Date().toISOString(), created_at: new Date().toISOString(), last_reply_at: null, unread_count: 0, discussion_subentry_count: 0, read_state: 'read', published: body.published !== false, discussion_type: body.discussion_type || 'threaded', require_initial_post: !!body.require_initial_post, allow_rating: !!body.allow_rating, delayed_post_at: body.delayed_post_at || null, lock_at: body.lock_at || null, author: { display_name: 'Ava Student' }, user_name: 'Ava Student', pinned: false, locked: false, attachments: att ? [{ id: `at${++fileSeq}`, display_name: att.display_name, size: att.size, url: `/files/at/download` }] : [] };
   discussions[m[1]] = [t, ...(discussions[m[1]] || [])];
   return { ...t, html_url: `/courses/${m[1]}/discussion_topics/${t.id}` };
 });
@@ -612,6 +625,12 @@ on('POST', /^\/api\/v1\/courses\/(\w+)\/assignments\/(\w+)\/submissions\/self\/f
   const token = `tok${++fileSeq}`;
   pendingUploads.set(token, { name: body.name, size: body.size, content_type: body.content_type });
   return { upload_url: `http://localhost:${port}/__upload/${token}`, upload_params: { key: `submissions/${token}`, acl: 'private', success_action_status: '201' }, file_param: 'file' };
+});
+// a file into the user's own files: the same three-step upload, without an assignment behind it
+on('POST', /^\/api\/v1\/users\/self\/files$/, (url, m, body) => {
+  const token = `tok${++fileSeq}`;
+  pendingUploads.set(token, { name: body.name, size: body.size, content_type: body.content_type });
+  return { upload_url: `http://localhost:${port}/__upload/${token}`, upload_params: { key: `users/self/${token}` }, file_param: 'file' };
 });
 // the storage step: a multipart POST with no CSRF token, like S3 or inst-fs; the file is the last field
 on('POST', /^\/__upload\/(\w+)$/, (url, m, body, raw) => {

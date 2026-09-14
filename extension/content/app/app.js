@@ -25,10 +25,18 @@
     account: null,
     nativePath: location.pathname + location.search, // the URL Canvas actually rendered
     renderId: 0,
+    loadAt: 0, // when the wash on screen was lit: a load still lit long after is stuck, not busy
     dark: false,
     quizOpen: false, // our quiz flow has an attempt on screen
     submitOpen: false, // our submission flow has unsent files or text on screen
   };
+
+  // A press on a row that is already loading is ignored, so a double press does not start the same
+  // screen twice. That has to run out: a load can be left lit for good — a tab put away mid-load, a
+  // reply that never came, a timer a hidden tab never ran — and the row it belongs to would then
+  // answer nothing, for ever. Past this, the next press is taken as a fresh one.
+  const LOAD_STUCK = 5000;
+  const loadStuck = () => !!state.loadKey && Date.now() - (state.loadAt || 0) > LOAD_STUCK;
 
   // ---- routing ----------------------------------------------------------------------------
   const COURSE_TABS = [
@@ -419,7 +427,7 @@
       // sidebar — the Courses row it came out of carries it instead
       onclick: () => {
         const key = `fav:${c.id}`;
-        if (state.loadKey === key) return;
+        if (state.loadKey === key && !loadStuck()) return;
         const wash = hoverCourses() ? 'courses' : key;
         closeQuickNav();
         progress(true, wash);
@@ -540,7 +548,7 @@
         class: `bcv-nav__item ${r.screen === key || (key === 'groups' && r.screen === 'group') ? 'is-active' : ''}`,
         dataset: { nav: key, load: key, loadColor: glyphColor },
         ...(key === 'courses' && hoverCourses() ? { 'aria-haspopup': 'true', 'aria-expanded': 'false' } : {}),
-        onclick: () => { if (state.loadKey === key) return; closeQuickNav(); progress(true, key); go(href); }, // a second press on the loading row is a no-op
+        onclick: () => { if (state.loadKey === key && !loadStuck()) return; closeQuickNav(); progress(true, key); go(href); }, // a second press on the loading row is a no-op, until that load is plainly stuck
         onpointerenter: (e) => { warm(key); quickNavHover(key, e.currentTarget); }, // the pointer arrives before the press: the screen's own data starts loading now
         onpointerleave: () => { quickNavRelease(key); quickNavLeave(key); },
         onfocus: (e) => { warm(key); quickNavHover(key, e.currentTarget); },
@@ -660,7 +668,11 @@
     if (on) {
       if (key !== undefined) state.loadKey = key;
       else if (!state.loadKey) state.loadKey = loadKeyFor(state.route || parseRoute());
-    } else state.loadKey = null;
+      state.loadAt = Date.now();
+    } else {
+      state.loadKey = null;
+      state.loadAt = 0;
+    }
     paintLoad();
     // a wash that outlives what it was lit for (a page that never left, a load that never came
     // back) is cleared rather than left sweeping for good
@@ -737,8 +749,15 @@
   const here = () => { state.lastHere = Date.now(); };
   let scrollTick = 0;
   window.addEventListener('scroll', () => { const n = Date.now(); if (n - scrollTick > 2000) { scrollTick = n; here(); } }, { passive: true });
-  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') here(); });
-  window.addEventListener('focus', here);
+  // Going away is the last moment we know they were here; coming back is not a sign of life at all
+  // — it is the press that follows which has to decide. Marking the return as life would defeat the
+  // whole thing, since the return always comes first.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') { here(); return; }
+    // a wash lit when they left is still sweeping — a hidden tab runs no timers — and the row it
+    // belongs to would answer nothing; it is put out here so the page is pressable again
+    if (loadStuck()) progress(false);
+  });
   function wake(e) {
     const away = Date.now() - state.lastHere;
     here();

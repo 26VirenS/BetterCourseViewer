@@ -732,61 +732,136 @@
     return b;
   };
 
-  /** Start a discussion. Canvas's own editor asks for a title, the first post, the two options that
-   *  change how the thread behaves, and when it should open and close; this asks for the same, and
-   *  sends exactly the fields Canvas's own form sends. The post is written in plain text with the
-   *  usual marks — **bold**, *italic*, a list, a quote, a link — and goes up as HTML, which is what
-   *  Canvas stores; Preview shows what will be posted before it is. */
+  /** Start a discussion. Canvas's own editor asks for a title, the post itself, the two options that
+   *  change how the thread behaves, when it should open and close, and a file to go with it; this
+   *  asks for the same and sends the same fields. The post is written as it will read — bold, links,
+   *  lists, headings, quotes, code and pictures, all in place — with a source view for anyone who
+   *  would rather write the HTML, which is what Canvas stores either way. */
   function composeDiscussion(ctx, shell, onMade) {
     const c = shell.course;
     document.querySelector('.bcv-sheet-ov')?.remove();
     const ov = U.el('bcv-sheet-ov', null, { role: 'dialog', 'aria-label': 'New discussion' });
     const close = () => ov.remove();
     ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
-    ov.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+    ov.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !e.target.closest('.bcv-ed__body')) close(); });
 
     const title = h('input', { class: 'bcv-input', type: 'text', placeholder: 'Topic title', maxlength: '255', 'aria-label': 'Topic title' });
-    const box = h('textarea', { class: 'bcv-textarea bcv-compose__box', rows: 8, placeholder: 'What would you like to say?', 'aria-label': 'Topic content' });
-    const preview = U.el('bcv-prose bcv-prose--14 bcv-compose__preview');
-    preview.hidden = true;
 
-    // the marks the box understands, wrapped around the selection (or dropped in where the caret is)
-    const MARKS = [
-      ['Bold', 'B', '**', '**', 'bold text'],
-      ['Italic', 'I', '*', '*', 'italic text'],
-      ['Link', '🔗', '[', '](https://)', 'link text'],
-      ['Bulleted list', '•', '\n- ', '', 'item'],
-      ['Quote', '❝', '\n> ', '', 'quoted'],
-      ['Code', '</>', '`', '`', 'code'],
-    ];
-    const wrapMark = (before, after, holder) => {
-      const a = box.selectionStart, b = box.selectionEnd;
-      const picked = box.value.slice(a, b) || holder;
-      box.value = `${box.value.slice(0, a)}${before}${picked}${after}${box.value.slice(b)}`;
-      box.focus();
-      box.setSelectionRange(a + before.length, a + before.length + picked.length);
-      paintPreview();
-    };
-    const bar = U.el('bcv-compose__bar', MARKS.map(([label, glyph, before, after, holder]) => h('button', {
-      type: 'button', class: 'bcv-compose__mark', title: label, 'aria-label': label, text: glyph,
-      onclick: () => wrapMark(before, after, holder),
-    })));
-    const asHtml = () => BCV.markdown.render(box.value.trim());
-    const previewBtn = h('button', { type: 'button', class: 'bcv-compose__mark bcv-compose__preview-btn', text: 'Preview', 'aria-pressed': 'false', onclick: () => {
-      const on = preview.hidden;
-      preview.hidden = !on;
-      box.hidden = on;
-      previewBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
-      previewBtn.classList.toggle('is-on', on);
-      paintPreview();
-    } });
-    bar.append(h('div', { class: 'bcv-ml-auto' }, previewBtn));
-    function paintPreview() {
-      if (preview.hidden) return;
-      const html = asHtml();
-      preview.replaceChildren(...(html.trim() ? Array.from(prose(html).childNodes) : [U.text('bcv-compose__empty', 'Nothing to preview yet.')]));
+    // ---- the editor ------------------------------------------------------------------------
+    // A contenteditable box, so what is typed is what will be posted. The commands are the browser's
+    // own; the HTML that comes out is put through the same cleaning as anything Canvas sends us.
+    const ed = h('div', { class: 'bcv-ed__body', contenteditable: 'true', role: 'textbox', 'aria-multiline': 'true', 'aria-label': 'Topic content', 'data-placeholder': 'What would you like to say?' });
+    const src = h('textarea', { class: 'bcv-textarea bcv-ed__src', rows: 10, spellcheck: 'false', 'aria-label': 'Topic content, as HTML' });
+    src.hidden = true;
+    let sourceOn = false;
+    const sync = () => { ed.classList.toggle('is-empty', !ed.textContent.trim() && !ed.querySelector('img')); };
+    const cmd = (name, value = null) => { ed.focus(); document.execCommand(name, false, value); sync(); };
+    ed.addEventListener('input', sync);
+    ed.addEventListener('paste', (e) => {
+      // paste as text: a paste from a Canvas page would otherwise carry its whole stylesheet with it
+      const t = e.clipboardData?.getData('text/plain');
+      if (t === undefined) return;
+      e.preventDefault();
+      document.execCommand('insertText', false, t);
+    });
+
+    const toolBtn = (label, glyph, run, { wide = false } = {}) => h('button', {
+      type: 'button', class: `bcv-ed__btn ${wide ? 'bcv-ed__btn--wide' : ''}`, title: label, 'aria-label': label,
+      onmousedown: (e) => e.preventDefault(), // keep the selection: the press must not take the caret
+      onclick: run,
+    }, typeof glyph === 'string' && glyph.length <= 3 ? h('span', { text: glyph }) : U.svg(glyph, { size: 14, width: 1.9 }));
+
+    function linkPrompt() {
+      const sel = String(window.getSelection?.() || '');
+      U.promptSheet({
+        title: 'Add a link', note: sel ? `On “${sel.slice(0, 60)}”` : 'The address will be the text too.', placeholder: 'https://', maxLength: 500, saveLabel: 'Add',
+        onSave: (v) => {
+          const href = /^[a-z][a-z0-9+.-]*:/i.test(v) ? v : `https://${v}`;
+          ed.focus();
+          if (sel) document.execCommand('createLink', false, href);
+          else document.execCommand('insertHTML', false, `<a href="${BCV.utils.escapeHtml(href)}">${BCV.utils.escapeHtml(href)}</a>`);
+          sync();
+        },
+      });
     }
-    box.addEventListener('input', paintPreview);
+
+    const picker = h('input', { type: 'file', accept: 'image/*', style: { display: 'none' } });
+    picker.addEventListener('change', async () => {
+      const file = picker.files?.[0];
+      picker.value = '';
+      if (!file) return;
+      const note = U.toast(`Uploading ${file.name}…`, { ms: 60000 });
+      try {
+        const up = await store.uploadUserFile(file);
+        note?.remove?.();
+        ed.focus();
+        document.execCommand('insertHTML', false, `<img src="${BCV.utils.escapeHtml(up.previewUrl)}" alt="${BCV.utils.escapeHtml(up.name)}">`);
+        sync();
+      } catch (e) {
+        note?.remove?.();
+        U.toast(`That picture could not be uploaded: ${e?.message || e}`, { error: true });
+      }
+    });
+
+    const srcBtn = toolBtn('Edit the HTML', '</>', () => {
+      sourceOn = !sourceOn;
+      if (sourceOn) src.value = ed.innerHTML;
+      else { ed.innerHTML = src.value; sync(); }
+      src.hidden = !sourceOn;
+      ed.hidden = sourceOn;
+      srcBtn.classList.toggle('is-on', sourceOn);
+      (sourceOn ? src : ed).focus();
+    }, { wide: true });
+
+    const bar = U.el('bcv-ed__bar', [
+      toolBtn('Bold', 'B', () => cmd('bold')),
+      toolBtn('Italic', 'I', () => cmd('italic')),
+      toolBtn('Underline', 'U', () => cmd('underline')),
+      U.el('bcv-ed__sep'),
+      toolBtn('Heading', 'H', () => cmd('formatBlock', '<h2>')),
+      toolBtn('Bulleted list', '•', () => cmd('insertUnorderedList')),
+      toolBtn('Numbered list', '1.', () => cmd('insertOrderedList'), { wide: true }),
+      toolBtn('Quote', '❝', () => cmd('formatBlock', '<blockquote>')),
+      toolBtn('Code', '{ }', () => cmd('formatBlock', '<pre>'), { wide: true }),
+      U.el('bcv-ed__sep'),
+      toolBtn('Add a link', IC.link || 'M10 13a5 5 0 007 0l3-3a5 5 0 00-7-7l-1 1M14 11a5 5 0 00-7 0l-3 3a5 5 0 007 7l1-1', linkPrompt),
+      toolBtn('Add a picture', IC.image || 'M3 5h18v14H3zM3 16l5-5 4 4 3-3 6 6', () => picker.click()),
+      toolBtn('Clear formatting', '⌫', () => cmd('removeFormat'), { wide: true }),
+      h('div', { class: 'bcv-ml-auto' }, srcBtn),
+    ]);
+    const editor = U.el('bcv-ed', [bar, ed, src, picker]);
+    sync();
+    /** What will be posted: the editor's own HTML (or the source view's), cleaned the way Canvas's is. */
+    const asHtml = () => {
+      const raw = (sourceOn ? src.value : ed.innerHTML).trim();
+      if (!raw) return '';
+      const doc = new DOMParser().parseFromString(raw, 'text/html');
+      doc.querySelectorAll('script, style, link, meta, object, embed, iframe').forEach((n) => n.remove());
+      doc.querySelectorAll('*').forEach((n) => {
+        for (const a of Array.from(n.attributes)) if (/^on/i.test(a.name) || (a.name === 'href' && /^javascript:/i.test(a.value))) n.removeAttribute(a.name);
+      });
+      return doc.body.innerHTML.trim();
+    };
+    const hasBody = () => !!asHtml().replace(/<br\s*\/?>|&nbsp;|\s/gi, '').replace(/<\/?(p|div)>/gi, '');
+
+    // ---- the file that goes with it ---------------------------------------------------------
+    // Canvas keeps one attachment on a topic, the way its own form sends it; pictures inside the
+    // post are uploaded separately and are not limited.
+    let attachment = null;
+    const filePicker = h('input', { type: 'file', style: { display: 'none' } });
+    const fileRow = U.el('bcv-compose__file');
+    const paintFile = () => {
+      fileRow.replaceChildren(...(attachment ? [
+        U.svg(IC.paperclip || 'M21 11l-9 9a5 5 0 01-7-7l9-9a3.5 3.5 0 015 5l-9 9a2 2 0 01-3-3l8-8', { size: 14, stroke: 'var(--bcv-ink3)', width: 1.9 }),
+        U.text('bcv-compose__filename bcv-ellip', `${attachment.name} · ${attachment.size >= 1048576 ? `${(attachment.size / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(attachment.size / 1024))} KB`}`, 'span'),
+        h('button', { type: 'button', class: 'bcv-compose__clear', text: 'Remove', onclick: () => { attachment = null; paintFile(); } }),
+      ] : [
+        h('button', { type: 'button', class: 'bcv-ed__btn bcv-ed__btn--wide', text: 'Attach a file', onclick: () => filePicker.click() }),
+        U.text('bcv-compose__optnote', 'One file, as Canvas keeps one on a topic.', 'span'),
+      ]));
+    };
+    filePicker.addEventListener('change', () => { attachment = filePicker.files?.[0] || null; filePicker.value = ''; paintFile(); });
+    paintFile();
 
     // the two options Canvas's own form offers, and what it calls them
     const opts = { require_initial_post: false, allow_rating: false, threaded: true };
@@ -826,12 +901,11 @@
     let busy = false;
     const post = U.btn('Post', { kind: 'primary', onClick: async () => {
       if (busy) return;
-      const t = title.value.trim(), m = box.value.trim();
-      if (!t || !m) {
+      const t = title.value.trim();
+      if (!t || !hasBody()) {
         err.textContent = !t ? 'A discussion needs a title.' : 'A discussion needs a first post.';
         err.hidden = false;
-        (t ? box : title).focus();
-        if (t) { preview.hidden = true; box.hidden = false; }
+        (t ? (sourceOn ? src : ed) : title).focus();
         return;
       }
       const from = at(when.from, when.fromTime), until = at(when.until, when.untilTime);
@@ -842,6 +916,7 @@
       }
       busy = true;
       post.disabled = true;
+      post.textContent = attachment ? 'Posting the file…' : 'Posting…';
       err.hidden = true;
       try {
         const made = await store.createDiscussion(c.id, {
@@ -852,6 +927,7 @@
           allowRating: opts.allow_rating,
           availableFrom: from,
           until,
+          attachment,
         }, { kind: shell.kind });
         close();
         U.toast('Discussion posted.');
@@ -859,6 +935,7 @@
       } catch (e) {
         busy = false;
         post.disabled = false;
+        post.textContent = 'Post';
         // Canvas refuses when the course does not let students start one; say that rather than the raw error
         err.textContent = /403|unauthor|not allowed|permission/i.test(e?.message || '')
           ? 'This course does not let students start a discussion.'
@@ -874,7 +951,8 @@
       ]),
       U.el('bcv-compose', [
         U.el('bcv-compose__field', [U.text('bcv-compose__lbl', 'Topic title'), title]),
-        U.el('bcv-compose__field', [U.text('bcv-compose__lbl', 'Topic content'), bar, box, preview]),
+        U.el('bcv-compose__field', [U.text('bcv-compose__lbl', 'Topic content'), editor]),
+        U.el('bcv-compose__field', [U.text('bcv-compose__lbl', 'Attachment'), fileRow, filePicker]),
         U.el('bcv-compose__field', [
           U.text('bcv-compose__lbl', 'Options'),
           optRow('threaded', 'Threaded replies', 'People can reply to each other, not only to you'),

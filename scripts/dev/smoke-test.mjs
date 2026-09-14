@@ -951,11 +951,25 @@ try {
   await page.fill('.bcv-sheet--compose .bcv-input', 'Study group for the midterm?');
   await page.click('.bcv-sheet--compose .bcv-btn--primary');
   check((await page.$eval('.bcv-disc__err', (e) => e.textContent)) === 'A discussion needs a first post.', 'a title alone is not a discussion either');
-  await page.fill('.bcv-sheet--compose .bcv-textarea', 'Anyone want to meet Thursday afternoon? I can bring **notes**.');
-  // the marks the box understands, and a preview of exactly what will be posted
-  await page.click('.bcv-sheet--compose .bcv-compose__preview-btn');
-  check((await page.$eval('.bcv-compose__preview', (e) => e.innerHTML)).includes('<strong>notes</strong>') && (await page.$eval('.bcv-compose__box', (e) => e.hidden)), 'Preview shows the post as it will go up');
-  await page.click('.bcv-sheet--compose .bcv-compose__preview-btn');
+  // the editor is the post as it will read: typing, then a real bold run, then a list
+  await page.click('.bcv-ed__body');
+  await page.keyboard.type('Anyone want to meet Thursday afternoon? I can bring ');
+  await page.click('.bcv-ed__btn[title="Bold"]');
+  await page.keyboard.type('notes');
+  await page.click('.bcv-ed__btn[title="Bold"]');
+  await page.keyboard.type('.');
+  await page.keyboard.press('Enter');
+  await page.click('.bcv-ed__btn[title="Bulleted list"]');
+  await page.keyboard.type('Bring a calculator');
+  const edHtml = await page.$eval('.bcv-ed__body', (e) => e.innerHTML);
+  check(/<b>notes<\/b>|<strong>notes<\/strong>/.test(edHtml) && /<ul>/.test(edHtml), `the editor holds the post as written: ${edHtml.slice(0, 120)}`);
+  // and the HTML behind it can be edited directly
+  await page.click('.bcv-ed__btn[title="Edit the HTML"]');
+  check(!(await page.$eval('.bcv-ed__src', (e) => e.hidden)) && (await page.$eval('.bcv-ed__body', (e) => e.hidden)) && (await page.$eval('.bcv-ed__src', (e) => e.value)) === edHtml, 'the source view shows the HTML that will be posted');
+  await page.click('.bcv-ed__btn[title="Edit the HTML"]');
+  // a file goes with it, the way Canvas's own form sends one
+  await page.setInputFiles('.bcv-compose__field input[type="file"]:not([accept])', { name: 'meeting-notes.txt', mimeType: 'text/plain', buffer: Buffer.from('Thursday 3pm, library room 202.') });
+  check(/meeting-notes\.txt · 1 KB/.test(await page.$eval('.bcv-compose__file', (e) => e.textContent)), `the file chosen is named before it goes: ${await page.$eval('.bcv-compose__file', (e) => e.textContent)}`);
   // Canvas's own options, and when the thread opens and closes
   for (const label of ['Post before seeing replies', 'Allow liking']) {
     await page.click(`.bcv-compose__opt:has(.bcv-compose__optlbl:text-is("${label}")) .bcv-switch`);
@@ -967,7 +981,7 @@ try {
   check(/\/courses\/101\/discussion_topics\/\d+$/.test(page.url()) && (await page.$eval('.bcv-detail__title', (e) => e.textContent)) === 'Study group for the midterm?' && /Anyone want to meet Thursday afternoon\?/.test(await page.$eval('.bcv-detail', (e) => e.textContent)), `a discussion started here is posted to Canvas and opened: ${page.url()}`);
   const madeId = page.url().split('/').pop();
   const made = await sw.evaluate(async (id) => (await fetch(`http://localhost:8787/api/v1/courses/101/discussion_topics/${id}`).then((r) => r.text()).then((t) => JSON.parse(t.replace(/^while\(1\);/, '')))), madeId);
-  check(made.require_initial_post === true && made.allow_rating === true && made.discussion_type === 'threaded' && /<strong>notes<\/strong>/.test(made.message), `the options go to Canvas with it, and the post as HTML: ${JSON.stringify({ r: made.require_initial_post, l: made.allow_rating, t: made.discussion_type })}`);
+  check(made.require_initial_post === true && made.allow_rating === true && made.discussion_type === 'threaded' && /<(b|strong)>notes<\/(b|strong)>/.test(made.message) && /<ul>/.test(made.message) && made.attachments?.[0]?.display_name === 'meeting-notes.txt', `the options, the post as HTML and the file all go to Canvas with it: ${JSON.stringify({ r: made.require_initial_post, l: made.allow_rating, t: made.discussion_type, f: made.attachments?.[0]?.display_name })}`);
   await shot(page, '15b-new-discussion');
   await tab('discussions');
   await page.waitForSelector('.bcv-row', { timeout: 10000 });
@@ -1936,6 +1950,48 @@ try {
   check(await eventually(async () => /You were away for a while\. Reload the page to continue\./.test((await texts('.bcv-toast')).join(' '))), 'a second stale press within the minute asks rather than reloading again');
   await page.evaluate(() => sessionStorage.removeItem('bcv:reloaded'));
   await windBack(0);
+  await page.goto(`${BASE}/`);
+  await page.waitForSelector('.bcv-stat', { timeout: 20000 });
+  // Coming back to the tab is not itself a sign of life — the return always comes before the press,
+  // so counting it would leave the page working from what it read before they left.
+  await windBack(6 * 60 * 1000);
+  await page.evaluate(() => {
+    document.dispatchEvent(new Event('visibilitychange')); // as the browser sends it on the way back
+  });
+  const backNav = page.waitForNavigation({ timeout: 12000 }).then(() => true).catch(() => false);
+  await page.click('.bcv-stat');
+  check(await backNav, 'coming back to the tab does not count as being here: the first press still reloads');
+  await page.waitForSelector('.bcv-stat', { timeout: 20000 });
+  await page.evaluate(() => sessionStorage.removeItem('bcv:reloaded'));
+  await windBack(0);
+  // A load left lit for good — a tab put away mid-load, a reply that never came — used to make the
+  // row it belonged to dead for the rest of the page's life: every press on it was read as a double
+  // press. Past a few seconds it is plainly stuck, and the next press is taken as a fresh one.
+  await sw.evaluate(async (base) => {
+    const [tab] = await chrome.tabs.query({ url: `${base}/*` });
+    await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'ISOLATED', func: () => {
+      self.BCV.app.state.loadKey = 'courses';
+      self.BCV.app.state.loadAt = Date.now() - 30000; // lit half a minute ago and never put out
+    } });
+  }, BASE);
+  await page.click('.bcv-nav__item[data-nav="courses"]');
+  await page.waitForSelector('[data-term]', { timeout: 15000 });
+  check(page.url() === `${BASE}/courses`, 'a press on a row whose load never came back still works');
+  // and on coming back to the tab, a wash left sweeping is put out rather than left lit
+  await sw.evaluate(async (base) => {
+    const [tab] = await chrome.tabs.query({ url: `${base}/*` });
+    await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'ISOLATED', func: () => {
+      self.BCV.app.state.loadKey = 'todo';
+      self.BCV.app.state.loadAt = Date.now() - 30000;
+      self.BCV.app.state.lastHere = Date.now(); // not the away case: this is only the stuck wash
+      document.dispatchEvent(new Event('visibilitychange'));
+    } });
+  }, BASE);
+  check(await eventually(async () => (await sw.evaluate(async (base) => {
+    const [tab] = await chrome.tabs.query({ url: `${base}/*` });
+    const [{ result }] = await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'ISOLATED', func: () => self.BCV.app.state.loadKey });
+    return result;
+  }, BASE)) === null), 'coming back puts out a wash that was left sweeping while the tab was away');
   await page.goto(`${BASE}/`);
   await page.waitForSelector('.bcv-stat', { timeout: 20000 });
   // ---- notifications ------------------------------------------------------------------------------------
