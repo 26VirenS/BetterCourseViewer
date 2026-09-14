@@ -732,8 +732,11 @@
     return b;
   };
 
-  /** Start a discussion: Canvas takes the title and the first post together, so the sheet asks for
-   *  both and the topic it creates is opened straight away. */
+  /** Start a discussion. Canvas's own editor asks for a title, the first post, the two options that
+   *  change how the thread behaves, and when it should open and close; this asks for the same, and
+   *  sends exactly the fields Canvas's own form sends. The post is written in plain text with the
+   *  usual marks — **bold**, *italic*, a list, a quote, a link — and goes up as HTML, which is what
+   *  Canvas stores; Preview shows what will be posted before it is. */
   function composeDiscussion(ctx, shell, onMade) {
     const c = shell.course;
     document.querySelector('.bcv-sheet-ov')?.remove();
@@ -741,25 +744,115 @@
     const close = () => ov.remove();
     ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
     ov.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
-    const title = h('input', { class: 'bcv-input', type: 'text', placeholder: 'Title', maxlength: '255', 'aria-label': 'Title' });
-    const message = h('textarea', { class: 'bcv-textarea', rows: 7, placeholder: 'What would you like to say?', 'aria-label': 'First post' });
+
+    const title = h('input', { class: 'bcv-input', type: 'text', placeholder: 'Topic title', maxlength: '255', 'aria-label': 'Topic title' });
+    const box = h('textarea', { class: 'bcv-textarea bcv-compose__box', rows: 8, placeholder: 'What would you like to say?', 'aria-label': 'Topic content' });
+    const preview = U.el('bcv-prose bcv-prose--14 bcv-compose__preview');
+    preview.hidden = true;
+
+    // the marks the box understands, wrapped around the selection (or dropped in where the caret is)
+    const MARKS = [
+      ['Bold', 'B', '**', '**', 'bold text'],
+      ['Italic', 'I', '*', '*', 'italic text'],
+      ['Link', '🔗', '[', '](https://)', 'link text'],
+      ['Bulleted list', '•', '\n- ', '', 'item'],
+      ['Quote', '❝', '\n> ', '', 'quoted'],
+      ['Code', '</>', '`', '`', 'code'],
+    ];
+    const wrapMark = (before, after, holder) => {
+      const a = box.selectionStart, b = box.selectionEnd;
+      const picked = box.value.slice(a, b) || holder;
+      box.value = `${box.value.slice(0, a)}${before}${picked}${after}${box.value.slice(b)}`;
+      box.focus();
+      box.setSelectionRange(a + before.length, a + before.length + picked.length);
+      paintPreview();
+    };
+    const bar = U.el('bcv-compose__bar', MARKS.map(([label, glyph, before, after, holder]) => h('button', {
+      type: 'button', class: 'bcv-compose__mark', title: label, 'aria-label': label, text: glyph,
+      onclick: () => wrapMark(before, after, holder),
+    })));
+    const asHtml = () => BCV.markdown.render(box.value.trim());
+    const previewBtn = h('button', { type: 'button', class: 'bcv-compose__mark bcv-compose__preview-btn', text: 'Preview', 'aria-pressed': 'false', onclick: () => {
+      const on = preview.hidden;
+      preview.hidden = !on;
+      box.hidden = on;
+      previewBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+      previewBtn.classList.toggle('is-on', on);
+      paintPreview();
+    } });
+    bar.append(h('div', { class: 'bcv-ml-auto' }, previewBtn));
+    function paintPreview() {
+      if (preview.hidden) return;
+      const html = asHtml();
+      preview.replaceChildren(...(html.trim() ? Array.from(prose(html).childNodes) : [U.text('bcv-compose__empty', 'Nothing to preview yet.')]));
+    }
+    box.addEventListener('input', paintPreview);
+
+    // the two options Canvas's own form offers, and what it calls them
+    const opts = { require_initial_post: false, allow_rating: false, threaded: true };
+    const optRow = (key, label, note) => {
+      const sw = U.switchEl(opts[key], (on) => { opts[key] = on; }, label);
+      return U.el('bcv-compose__opt', [U.el('bcv-compose__opttext', [U.text('bcv-compose__optlbl', label), note ? U.text('bcv-compose__optnote', note) : null]), sw]);
+    };
+
+    // when it opens and closes: Canvas takes a day and a time for each, and either may be left alone
+    const when = { from: null, fromTime: '', until: null, untilTime: '' };
+    const timeField = (k) => h('input', { class: 'bcv-input bcv-compose__time', type: 'time', 'aria-label': k === 'fromTime' ? 'Available from time' : 'Until time', oninput: (e) => { when[k] = e.target.value; } });
+    const dateRow = (label, dayKey, timeKey) => {
+      const time = timeField(timeKey);
+      const mkDay = () => U.dateField(null, (d) => { when[dayKey] = d; }, { label });
+      let day = mkDay();
+      const clear = h('button', { type: 'button', class: 'bcv-compose__clear', text: 'Clear', onclick: () => {
+        when[dayKey] = null;
+        when[timeKey] = '';
+        time.value = '';
+        const fresh = mkDay(); // the field remembers its day, so a cleared one is a new one
+        day.replaceWith(fresh);
+        day = fresh;
+      } });
+      return U.el('bcv-compose__when', [U.text('bcv-compose__optlbl', label), U.el('bcv-compose__whenrow', [day, time, clear])]);
+    };
+    /** A day and a time as one moment, the way Canvas stores it; the day alone means midnight. */
+    const at = (day, time) => {
+      if (!day) return null;
+      const d = new Date(day);
+      const [hh, mm] = String(time || '').split(':');
+      d.setHours(Number(hh) || 0, Number(mm) || 0, 0, 0);
+      return d.toISOString();
+    };
+
     const err = U.text('bcv-error bcv-disc__err', '');
     err.hidden = true;
     let busy = false;
     const post = U.btn('Post', { kind: 'primary', onClick: async () => {
       if (busy) return;
-      const t = title.value.trim(), m = message.value.trim();
+      const t = title.value.trim(), m = box.value.trim();
       if (!t || !m) {
         err.textContent = !t ? 'A discussion needs a title.' : 'A discussion needs a first post.';
         err.hidden = false;
-        (t ? message : title).focus();
+        (t ? box : title).focus();
+        if (t) { preview.hidden = true; box.hidden = false; }
+        return;
+      }
+      const from = at(when.from, when.fromTime), until = at(when.until, when.untilTime);
+      if (from && until && until <= from) {
+        err.textContent = 'It cannot close before it opens.';
+        err.hidden = false;
         return;
       }
       busy = true;
       post.disabled = true;
       err.hidden = true;
       try {
-        const made = await store.createDiscussion(c.id, { title: t, message: m }, { kind: shell.kind });
+        const made = await store.createDiscussion(c.id, {
+          title: t,
+          message: asHtml(),
+          threaded: opts.threaded,
+          requireInitialPost: opts.require_initial_post,
+          allowRating: opts.allow_rating,
+          availableFrom: from,
+          until,
+        }, { kind: shell.kind });
         close();
         U.toast('Discussion posted.');
         onMade?.(made);
@@ -773,12 +866,28 @@
         err.hidden = false;
       }
     } });
+
     ov.append(U.el('bcv-sheet bcv-sheet--compose', [
       U.el('bcv-sheet__head', [
         U.el('bcv-sheet__titles', [U.text('bcv-sheet__title', 'New discussion'), U.text('bcv-sheet__note', c.shortName || c.name)]),
         h('button', { type: 'button', class: 'bcv-sheet__close', 'aria-label': 'Close', onclick: close }, U.svg(IC.close, { size: 13, stroke: 'var(--bcv-ink2)', width: 2.3 })),
       ]),
-      U.el('bcv-compose', [title, message, err]),
+      U.el('bcv-compose', [
+        U.el('bcv-compose__field', [U.text('bcv-compose__lbl', 'Topic title'), title]),
+        U.el('bcv-compose__field', [U.text('bcv-compose__lbl', 'Topic content'), bar, box, preview]),
+        U.el('bcv-compose__field', [
+          U.text('bcv-compose__lbl', 'Options'),
+          optRow('threaded', 'Threaded replies', 'People can reply to each other, not only to you'),
+          optRow('require_initial_post', 'Post before seeing replies', 'Everyone must answer before the thread opens to them'),
+          optRow('allow_rating', 'Allow liking', 'Replies can be liked'),
+        ]),
+        U.el('bcv-compose__field', [
+          U.text('bcv-compose__lbl', 'Available'),
+          U.el('bcv-compose__dates', [dateRow('Available from', 'from', 'fromTime'), dateRow('Until', 'until', 'untilTime')]),
+          U.text('bcv-compose__optnote', 'Leave both alone to open it now and keep it open.'),
+        ]),
+        err,
+      ]),
       U.el('bcv-sheet__foot', [U.btn('Cancel', { onClick: close }), post]),
     ]));
     document.body.append(ov);

@@ -921,9 +921,18 @@
   function discussionView(id, tid, { force = true, refresh = false, kind = 'courses' } = {}) {
     return C.cached(`discview:${kind}:${id}:${tid}`, MIN, () => C.get(`/api/v1/${kind}/${id}/discussion_topics/${tid}/view`).catch(() => null), { force, refresh });
   }
-  /** Start a discussion. Canvas takes the title and the first post together; the topic comes back. */
-  async function createDiscussion(id, { title, message }, { kind = 'courses' } = {}) {
-    const t = await C.post(`/api/v1/${kind}/${id}/discussion_topics`, { title, message, discussion_type: 'threaded', published: true });
+  /** Start a discussion: the fields Canvas's own new-topic form sends, and the topic it hands back. */
+  async function createDiscussion(id, { title, message, threaded = true, requireInitialPost = false, allowRating = false, availableFrom = null, until = null }, { kind = 'courses' } = {}) {
+    const t = await C.post(`/api/v1/${kind}/${id}/discussion_topics`, {
+      title,
+      message,
+      discussion_type: threaded ? 'threaded' : 'side_comment',
+      published: true,
+      require_initial_post: !!requireInitialPost,
+      allow_rating: !!allowRating,
+      ...(availableFrom ? { delayed_post_at: availableFrom } : {}),
+      ...(until ? { lock_at: until } : {}),
+    });
     await C.invalidate(`disc:${kind}:${id}`); // the list is stale the moment this lands
     return t;
   }

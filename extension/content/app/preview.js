@@ -40,10 +40,11 @@
     return r;
   }
 
-  let cur = null; // { panel, route }
+  let cur = null; // { panel, route, host }
   function close() {
     if (!cur) return;
     cur.panel.remove();
+    cur.host?.classList.remove('is-split');
     html.classList.remove('bcv-preview');
     document.removeEventListener('keydown', onKey, true);
     document.removeEventListener('pointerdown', onDown, true);
@@ -128,8 +129,10 @@
     return { title: p.title, meta: ['Page', p.updated_at ? `edited ${U.fmtDateComma(p.updated_at)}` : null], body: p.body || '' };
   }
 
-  /** Opens the panel for a link. Returns false when that link is not one we preview. */
-  function open(href) {
+  /** Opens the panel for a link. Returns false when that link is not one we preview.
+   *  `host` puts the panel inside something that is already on screen — a counter's sheet — which
+   *  widens to make room for it instead of standing aside; everything else is the same panel. */
+  function open(href, { host = null } = {}) {
     const r = previewable(href);
     if (!r) return false;
     const app = BCV.app;
@@ -143,15 +146,22 @@
       body,
       U.el('bcv-pv__foot', h('button', {
         type: 'button', class: 'bcv-pv__go', text: KINDS[r.tab].go,
-        onclick: () => { const to = r.url; close(); app.go(to); },
+        onclick: () => { const to = r.url; const h2 = host; close(); h2?.closest('.bcv-sheet-ov')?.remove(); app.go(to); },
       })),
     ]);
-    document.body.append(panel);
-    html.classList.add('bcv-preview');
-    document.addEventListener('keydown', onKey, true);
-    // on the next frame, so the press that opened this one does not close it again
-    requestAnimationFrame(() => { if (cur && cur.panel === panel) document.addEventListener('pointerdown', onDown, true); });
-    cur = { panel, route: r };
+    if (host) {
+      // beside the list it was opened from, inside the thing already on screen: it widens, nothing moves
+      panel.classList.add('bcv-pv--in');
+      host.classList.add('is-split');
+      host.append(panel);
+    } else {
+      document.body.append(panel);
+      html.classList.add('bcv-preview');
+      document.addEventListener('keydown', onKey, true);
+      // on the next frame, so the press that opened this one does not close it again
+      requestAnimationFrame(() => { if (cur && cur.panel === panel) document.addEventListener('pointerdown', onDown, true); });
+    }
+    cur = { panel, route: r, host };
     body.append(U.loading('rows', 3));
     const mine = () => cur && cur.panel === panel;
     load(r).then((d) => {

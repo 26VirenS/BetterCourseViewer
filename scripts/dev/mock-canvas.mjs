@@ -184,7 +184,7 @@ const announcements = {
 };
 const topicFull = (courseId, id) => {
   const t = [...(discussions[courseId] || []), ...(announcements[courseId] || [])].find((x) => x.id === String(id));
-  return t ? { ...t, html_url: `/courses/${courseId}/discussion_topics/${t.id}`, locked: false, require_initial_post: false, attachments: [] } : null;
+  return t ? { ...t, html_url: `/courses/${courseId}/discussion_topics/${t.id}`, locked: false, require_initial_post: !!t.require_initial_post, attachments: [] } : null;
 };
 const entries = new Map();
 const viewFor = (topicId) => ({
@@ -524,7 +524,7 @@ on('GET', /^\/api\/v1\/courses\/(\w+)\/discussion_topics\/(\w+)$/, (url, m) => t
 // starting a discussion: Canvas takes the title and the first post together and hands back the topic
 on('POST', /^\/api\/v1\/courses\/(\w+)\/discussion_topics$/, (url, m, body) => {
   if (!body.title || !body.message) return { __status: 400, errors: [{ message: 'title and message are required' }] };
-  const t = { id: String(Date.now()), title: body.title, message: body.message, posted_at: new Date().toISOString(), created_at: new Date().toISOString(), last_reply_at: null, unread_count: 0, discussion_subentry_count: 0, read_state: 'read', published: body.published !== false, discussion_type: body.discussion_type || 'threaded', author: { display_name: 'Ava Student' }, user_name: 'Ava Student', pinned: false, locked: false };
+  const t = { id: String(Date.now()), title: body.title, message: body.message, posted_at: new Date().toISOString(), created_at: new Date().toISOString(), last_reply_at: null, unread_count: 0, discussion_subentry_count: 0, read_state: 'read', published: body.published !== false, discussion_type: body.discussion_type || 'threaded', require_initial_post: !!body.require_initial_post, allow_rating: !!body.allow_rating, delayed_post_at: body.delayed_post_at || null, lock_at: body.lock_at || null, author: { display_name: 'Ava Student' }, user_name: 'Ava Student', pinned: false, locked: false };
   discussions[m[1]] = [t, ...(discussions[m[1]] || [])];
   return { ...t, html_url: `/courses/${m[1]}/discussion_topics/${t.id}` };
 });

@@ -233,38 +233,39 @@ try {
   await page.waitForSelector('.bcv-sheet', { timeout: 5000 });
   const annRows = await texts('.bcv-sheet__row');
   check((await texts('.bcv-sheet__line'))[0] === '3 Unread announcements' && annRows.length === 3 && /^Field site sign-ups Posted \w+ \d+ · unread F26-SPRK 010 103$/.test(annRows[0]) && !(await page.$('.bcv-sheet__more')), `the number and the rows come from the same list (Announcements API): ${annRows.join(' | ')}`);
-  // a sheet row steps the sheet aside and previews the item beside the dashboard, not on top of it
+  // a sheet row previews inside the sheet: it widens and the preview takes its right, the list staying
+  const sheetW0 = await page.$eval(".bcv-sheet", (e) => Math.round(e.getBoundingClientRect().width));
   await page.click('.bcv-sheet__row');
-  await page.waitForSelector('.bcv-pv', { timeout: 10000 });
-  check(!(await page.$('.bcv-sheet')) && page.url().endsWith('/'), 'a sheet row closes the sheet and previews the item, without navigating');
+  await page.waitForSelector('.bcv-sheet.is-split .bcv-pv--in', { timeout: 10000 });
   await page.waitForFunction(() => !document.querySelector('.bcv-pv .bcv-skel'), null, { timeout: 10000 });
-  const pvSheet = await page.$eval('.bcv-pv', (e) => ({
+  const pvSheet = await page.$eval('.bcv-sheet', (e) => ({
     kicker: e.querySelector('.bcv-pv__kicker').textContent,
     title: e.querySelector('.bcv-pv__title').textContent,
     meta: e.querySelector('.bcv-pv__meta').textContent,
     body: e.querySelector('.bcv-pv__prose')?.textContent.slice(0, 40) || '',
     go: e.querySelector('.bcv-pv__go').textContent,
+    rows: e.querySelectorAll('.bcv-sheet__row').length,
   }));
-  check(pvSheet.kicker === 'Preview' && pvSheet.title === 'Field site sign-ups' && /^Announcement · .+/.test(pvSheet.meta) && pvSheet.body.length > 10 && pvSheet.go === 'Open the announcement', `the preview reads the announcement: ${JSON.stringify(pvSheet)}`);
-  // the interface keeps its place and gives up its right edge; the panel fills it
-  await page.waitForTimeout(400); // the interface takes .34s to make room
-  const pvBox = await page.evaluate(() => {
-    const p = document.querySelector('.bcv-pv').getBoundingClientRect();
-    return { left: Math.round(p.left), right: Math.round(p.right), win: window.innerWidth, pad: getComputedStyle(document.getElementById('bcv-app')).paddingRight, cls: document.documentElement.classList.contains('bcv-preview') };
+  check(pvSheet.kicker === 'Preview' && pvSheet.title === 'Field site sign-ups' && /^Announcement · .+/.test(pvSheet.meta) && pvSheet.body.length > 10 && pvSheet.go === 'Open the announcement' && pvSheet.rows === 3, `the preview reads the announcement beside the list it came from: ${JSON.stringify(pvSheet)}`);
+  await page.waitForTimeout(400); // the sheet takes .3s to make room
+  const split = await page.evaluate(() => {
+    const sheet = document.querySelector('.bcv-sheet').getBoundingClientRect();
+    const pv = document.querySelector('.bcv-pv--in').getBoundingClientRect();
+    const list = document.querySelector('.bcv-sheet__list').getBoundingClientRect();
+    return { w: Math.round(sheet.width), pvRight: Math.round(pv.right), sheetRight: Math.round(sheet.right), pvLeft: Math.round(pv.left), listRight: Math.round(list.right), shifted: document.documentElement.classList.contains('bcv-preview') };
   });
-  check(pvBox.cls && pvBox.right === pvBox.win && pvBox.left > pvBox.win / 2 && parseFloat(pvBox.pad) === pvBox.win - pvBox.left, `the panel sits on the right and the interface moves left by its width: ${JSON.stringify(pvBox)}`);
+  check(split.w > sheetW0 && Math.abs(split.pvRight - split.sheetRight) <= 2 && split.pvLeft >= split.listRight - 2 && !split.shifted, `the sheet grew and the preview sits on its right, the page itself never moving: ${JSON.stringify({ ...split, sheetW0 })}`);
   await shot(page, '01c-dashboard-preview');
-  await page.keyboard.press('Escape');
-  await page.waitForFunction(() => !document.querySelector('.bcv-pv') && !document.documentElement.classList.contains('bcv-preview'), null, { timeout: 3000 });
-  check(true, 'Escape closes the preview and puts the interface back');
-  // the button at the bottom is the way through to the item's own screen
-  await page.click('.bcv-stats .bcv-stat:nth-child(3)');
-  await page.waitForSelector('.bcv-sheet', { timeout: 5000 });
-  await page.click('.bcv-sheet__row');
-  await page.waitForSelector('.bcv-pv__go', { timeout: 10000 });
+  // pressing another row swaps what the panel shows, the sheet staying put
+  await (await page.$$('.bcv-sheet__row'))[1].click();
+  await page.waitForFunction(() => document.querySelector('.bcv-pv__title')?.textContent === 'Prerequisite Skills Test', null, { timeout: 10000 });
+  check((await page.$$('.bcv-pv')).length === 1 && (await page.$('.bcv-sheet.is-split')) !== null, 'another row swaps the preview inside the sheet');
+  // the button at the bottom is the way through to the item's own screen, and it takes the sheet with it
+  await (await page.$$('.bcv-sheet__row'))[0].click();
+  await page.waitForFunction(() => document.querySelector('.bcv-pv__title')?.textContent === 'Field site sign-ups', null, { timeout: 10000 });
   await page.click('.bcv-pv__go');
   await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
-  check(page.url().endsWith('/courses/104/announcements/8005') && !(await page.$('.bcv-pv')), 'the button at the bottom of the preview opens the item');
+  check(page.url().endsWith('/courses/104/announcements/8005') && !(await page.$('.bcv-pv')) && !(await page.$('.bcv-sheet')), 'the button at the bottom of the preview opens the item and closes the sheet');
   await page.goto(`${BASE}/`);
   await page.waitForSelector('.bcv-day .bcv-row', { timeout: 10000 });
   await waitText('.bcv-stats > :nth-child(3) .bcv-stat__value', /^2$/);
@@ -950,10 +951,23 @@ try {
   await page.fill('.bcv-sheet--compose .bcv-input', 'Study group for the midterm?');
   await page.click('.bcv-sheet--compose .bcv-btn--primary');
   check((await page.$eval('.bcv-disc__err', (e) => e.textContent)) === 'A discussion needs a first post.', 'a title alone is not a discussion either');
-  await page.fill('.bcv-sheet--compose .bcv-textarea', 'Anyone want to meet Thursday afternoon?');
+  await page.fill('.bcv-sheet--compose .bcv-textarea', 'Anyone want to meet Thursday afternoon? I can bring **notes**.');
+  // the marks the box understands, and a preview of exactly what will be posted
+  await page.click('.bcv-sheet--compose .bcv-compose__preview-btn');
+  check((await page.$eval('.bcv-compose__preview', (e) => e.innerHTML)).includes('<strong>notes</strong>') && (await page.$eval('.bcv-compose__box', (e) => e.hidden)), 'Preview shows the post as it will go up');
+  await page.click('.bcv-sheet--compose .bcv-compose__preview-btn');
+  // Canvas's own options, and when the thread opens and closes
+  for (const label of ['Post before seeing replies', 'Allow liking']) {
+    await page.click(`.bcv-compose__opt:has(.bcv-compose__optlbl:text-is("${label}")) .bcv-switch`);
+  }
+  const switches = await page.$$eval('.bcv-compose__opt', (els) => els.map((e) => `${e.querySelector('.bcv-compose__optlbl').textContent}:${e.querySelector('.bcv-switch').getAttribute('aria-checked')}`));
+  check(switches.join(' | ') === 'Threaded replies:true | Post before seeing replies:true | Allow liking:true', `Canvas's own options, as they will be sent: ${switches.join(' | ')}`);
   await page.click('.bcv-sheet--compose .bcv-btn--primary');
   await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
   check(/\/courses\/101\/discussion_topics\/\d+$/.test(page.url()) && (await page.$eval('.bcv-detail__title', (e) => e.textContent)) === 'Study group for the midterm?' && /Anyone want to meet Thursday afternoon\?/.test(await page.$eval('.bcv-detail', (e) => e.textContent)), `a discussion started here is posted to Canvas and opened: ${page.url()}`);
+  const madeId = page.url().split('/').pop();
+  const made = await sw.evaluate(async (id) => (await fetch(`http://localhost:8787/api/v1/courses/101/discussion_topics/${id}`).then((r) => r.text()).then((t) => JSON.parse(t.replace(/^while\(1\);/, '')))), madeId);
+  check(made.require_initial_post === true && made.allow_rating === true && made.discussion_type === 'threaded' && /<strong>notes<\/strong>/.test(made.message), `the options go to Canvas with it, and the post as HTML: ${JSON.stringify({ r: made.require_initial_post, l: made.allow_rating, t: made.discussion_type })}`);
   await shot(page, '15b-new-discussion');
   await tab('discussions');
   await page.waitForSelector('.bcv-row', { timeout: 10000 });
