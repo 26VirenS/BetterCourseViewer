@@ -1146,7 +1146,10 @@ html[data-bcv-theme="dark"] .bcv-fb__opttag--right { color: #5ddb7d; }
 html.bcv-on.bcv-punch #application, html.bcv-on.bcv-punch #wrapper { display: block !important; }
 html.bcv-on.bcv-punch body { background: var(--bcv-bg) !important; }
 html.bcv-punch #bcv-app { position: fixed; inset: 0; z-index: 10; min-height: 0; overflow: hidden; background: transparent; pointer-events: none; }
-html.bcv-punch .bcv-side, html.bcv-punch .bcv-head, html.bcv-punch .bcv-rail, html.bcv-punch .bcv-native__bar { pointer-events: auto; }
+/* #bcv-app lets presses through to Canvas's page in the hole, so every piece of our own chrome over
+   it has to take them back — the phone's back bar and tab bar included, or a phone (which has no
+   address bar to type its way out of one) is stuck on the Canvas page it opened. */
+html.bcv-punch .bcv-side, html.bcv-punch .bcv-head, html.bcv-punch .bcv-rail, html.bcv-punch .bcv-native__bar, html.bcv-punch .bcv-topbar, html.bcv-punch .bcv-tabbar { pointer-events: auto; }
 html.bcv-punch .bcv-main { overflow: hidden; }
 html.bcv-punch #header, html.bcv-punch #left-side, html.bcv-punch #footer, html.bcv-punch .ic-app-nav-toggle-and-crumbs, html.bcv-punch #breadcrumbs, html.bcv-punch #mobile-header, html.bcv-punch .ic-app-course-menu, html.bcv-punch #skip_navigation_link, html.bcv-punch #global_nav_tray_container, html.bcv-punch .ic-app-header__secondary-navigation { display: none !important; }
 html.bcv-punch #application, html.bcv-punch #wrapper, html.bcv-punch #not_right_side { margin: 0 !important; padding: 0 !important; width: auto !important; max-width: none !important; min-height: 0 !important; display: block !important; position: static !important; float: none !important; }
@@ -1165,6 +1168,9 @@ html[data-bcv-theme="dark"].bcv-punch:not(.bcv-punch-light) #content img, html[d
   html.bcv-punch #main { flex-direction: column; }
   html.bcv-punch #right-side-wrapper { flex: none !important; width: auto !important; max-width: none !important; }
 }
+/* on a phone the hole has to clear the glass tab bar, or Canvas's last rows sit under it */
+html.bcv-phone.bcv-punch #main { margin-bottom: calc(var(--bcv-ph-tabbar) + var(--bcv-ph-bottom) + 24px) !important; }
+html.bcv-phone.bcv-punch #content { padding: 16px 16px !important; border-radius: 18px; }
 
 /* ---- quiz taking (mockup): chrome hidden, one column ----------------------- */
 /* The quiz flow lives in the course's column: the intro and the feedback sit under the course header

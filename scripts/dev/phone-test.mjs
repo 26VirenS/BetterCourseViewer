@@ -99,6 +99,15 @@ try {
   const tab = (id) => tapScreen(`.bcv-tabbar__item[data-tab="${id}"]`);
   const ready = () => page.waitForSelector('#bcv-app .bcv-tabbar__item', { timeout: 15000 });
   const sheet = () => page.waitForSelector('.bcv-sheet-ov .bcv-ph-sheet', { timeout: 5000 });
+  // The counters are redrawn when their counts land, so a press can meet a card on its way out and
+  // wait for a steady box that never comes. Every actionability check still has to pass — the press
+  // is only tried again, against whatever card is there now.
+  const press = async (sel) => {
+    for (let i = 0; i < 3; i++) {
+      try { await page.click(sel, { timeout: 7000 }); return; } catch { await settle(); await rolled(); }
+    }
+    await page.click(sel, { timeout: 7000 });
+  };
   const closeSheet = async () => { await page.keyboard.press('Escape'); await eventually(async () => !(await page.$('.bcv-sheet-ov'))); };
   const noOverflow = () => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1);
   // a finger dragging a row left: 1:1 during the drag, latching open past half the tray
@@ -138,7 +147,7 @@ try {
   check(await noOverflow(), 'no horizontal overflow');
   await shot('01-today');
 
-  await page.click('.bcv-ph-stat:nth-child(2)');
+  await press('.bcv-ph-stat:nth-child(2)');
   await sheet();
   check((await texts('.bcv-ph-sheet__title'))[0] === 'Due this week' && (await page.$$('.bcv-ph-srow')).length > 0 && await visible('.bcv-ph-sheet__handle'), 'a counter opens its list as a bottom sheet with a grab handle');
   await shot('01b-today-sheet');
@@ -149,7 +158,7 @@ try {
   check(!!(await page.$('.bcv-sheet-ov')), 'a short drag on the handle springs the sheet back');
   await page.mouse.move(handle.x, handle.y); await page.mouse.down(); await page.mouse.move(handle.x, handle.y + 160, { steps: 6 }); await page.mouse.up();
   check(await eventually(async () => !(await page.$('.bcv-sheet-ov'))), 'a drag past 110px dismisses it');
-  await page.click('.bcv-ph-stat:nth-child(2)');
+  await press('.bcv-ph-stat:nth-child(2)');
   await sheet();
   await closeSheet();
   check(!(await page.$('.bcv-sheet-ov')), 'Escape closes the sheet');
@@ -462,6 +471,26 @@ try {
   await shot('08-item-submit');
   await page.click('.bcv-topbar__back');
   check(await eventually(async () => page.url() === `${BASE}/courses/104`), 'the back bar returns to the course');
+
+  // ---- "Open in Canvas" ---------------------------------------------------------------------------
+  // A phone has no address bar to type its way out of a Canvas page with, so the way back has to be
+  // on screen and has to work: #bcv-app lets presses through to the page in the hole, and the back
+  // bar and tab bar over it have to take them back.
+  console.log('open in Canvas');
+  await page.goto(`${BASE}/courses/104/assignments/4002?bcv=native`);
+  await ready();
+  await page.waitForSelector('html.bcv-punch #content', { timeout: 15000 });
+  check((await visible('#bcv-topbar')) && (await visible('#bcv-tabbar')), 'the back bar and the tab bar stay over a Canvas page');
+  const reach = await page.evaluate(() => {
+    const hits = (el) => { if (!el) return false; const r = el.getBoundingClientRect(); const t = document.elementFromPoint(Math.round(r.left + r.width / 2), Math.round(r.top + r.height / 2)); return !!t && (t === el || el.contains(t)); };
+    const bar = document.querySelector('#bcv-topbar').getBoundingClientRect();
+    return { back: hits(document.querySelector('.bcv-topbar__back')), tab: hits(document.querySelector('.bcv-tabbar__item')), below: Math.round(document.querySelector('#main').getBoundingClientRect().top) >= Math.round(bar.bottom) - 1 };
+  });
+  check(reach.back && reach.tab && reach.below, `a press lands on the back bar and the tab bar rather than the Canvas page under them, and Canvas's page starts below the bar: ${JSON.stringify(reach)}`);
+  check(await noOverflow(), 'no horizontal overflow on a Canvas page');
+  await shot('09-open-in-canvas');
+  await page.click('.bcv-topbar__back');
+  check(await eventually(async () => !page.url().includes('bcv=native') && !(await page.$('html.bcv-punch'))), 'the back bar gets out of the Canvas page, back to the courses look');
 
   // ---- a quiz ------------------------------------------------------------------------------------
   console.log('quiz');
