@@ -1412,7 +1412,7 @@ try {
   // The button is red because it is a way out: it hands the attempt to Canvas as it stands.
   const rawBtn = await page.$eval('.bcv-qz__raw', (e) => ({ text: e.textContent.trim(), title: e.title, red: (([, r, g, b]) => ({ r: +r, g: +g, b: +b }))(getComputedStyle(e).color.match(/(\d+), (\d+), (\d+)/)) }));
   check(/Canvas page/.test(rawBtn.text) && /answers are already saved/.test(rawBtn.title) && /not restarted/.test(rawBtn.title) && rawBtn.red.r > 150 && rawBtn.red.r > rawBtn.red.g * 1.8, `a way out of the quiz UI, and it says what it does not do: ${JSON.stringify(rawBtn)}`);
-  check(!(await page.$eval('.bcv-qz__rawnote', (e) => e.hidden)) && /every answer is saved, nothing restarts/.test(await page.$eval('.bcv-qz__rawnote', (e) => e.textContent)), 'and the promise is on the page during an attempt, not only in a tooltip');
+  check(!(await page.$('.bcv-qz__rawnote')) && (await page.$eval('.bcv-qz__head', (e) => !/nothing restarts/.test(e.textContent))), 'and the promise stays in the tooltip: no note under the pills');
   // nothing reloads a quiz: a screen that gives way goes to Canvas's own quiz page instead
   const noReload = await sw.evaluate(async (base) => {
     const [tab] = await chrome.tabs.query({ url: `${base}/*` });

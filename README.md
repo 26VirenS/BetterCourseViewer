@@ -74,7 +74,7 @@ Anything without a screen of its own – external tools and their embeds (Box, Y
 
 **A quiz is never reloaded out from under you** – nothing in the recovery paths may throw away an attempt: a screen that takes too long, a page that looks wedged, five minutes away — on a quiz each of these says so rather than reloading, and where the page really must give way it goes to Canvas's own quiz page (a navigation, keeping the attempt) instead of reloading ours. The attempt runs at `?bcv=take`, which has no `/take` in its path, and that was exactly what the old guard was looking for.
 
-**Canvas page** – a red button in the quiz header hands the attempt to Canvas as it stands, at any time: every answer is already saved with Canvas, so nothing restarts and no question is asked again. The line under the pills says so while an attempt is on.
+**Canvas page** – a red button in the quiz header hands the attempt to Canvas as it stands, at any time: every answer is already saved with Canvas, so nothing restarts and no question is asked again. Its tooltip says exactly that.
 
 **One interface per page** – a page can end up with these scripts in it twice (Safari re-injects a site's registered content scripts when the extension looks at its permissions, which is what opening the toolbar popup does). A copy that finds an interface already there does nothing, so the whole thing never appears twice, one scrolling past the other.
 
