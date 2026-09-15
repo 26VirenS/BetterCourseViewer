@@ -81,7 +81,7 @@
     const attemptsLeft = limit.left;
     const allowed = limit.allowed;
     if (route.params.get('bcv') === 'feedback') {
-      st.fbSub = pickFeedbackSub(route.params.get('sub'));
+      st.fbSub = pickFeedbackSub(route.params.get('sub'), route.params.get('attempt'));
       st.stage = 'feedback';
     }
 
@@ -450,15 +450,14 @@
         const rows = [];
         const send = () => {
           const pairs = [];
-          for (const [aid, sel] of rows) if (sel.value) pairs.push({ answer_id: Number(aid) || aid, match_id: Number(sel.value) || sel.value });
+          for (const [aid, sel] of rows) { const v = sel.bcvPicker ? sel.bcvPicker.value : sel.value; if (v) pairs.push({ answer_id: Number(aid) || aid, match_id: Number(v) || v }); }
           save(q, pairs);
         };
         return U.el(`bcv-qz__match ${compact ? 'bcv-qz__match--compact' : ''}`, opts.map((a) => {
-          const sel = h('select', { class: 'bcv-select bcv-qz__sel', 'aria-label': `Match for ${a.text || a.left || 'this'}`, onchange: send }, [
-            h('option', { value: '', text: 'Choose…' }),
-            ...matches.map((m) => h('option', { value: String(m.match_id), text: m.text })),
-          ]);
-          sel.value = chosen.get(String(a.id)) || '';
+          const sel = U.picker(
+            [{ value: '', text: 'Choose…' }, ...matches.map((m) => ({ value: String(m.match_id), text: m.text, html: m.html || '' }))],
+            chosen.get(String(a.id)) || '', send, { label: `Match for ${a.text || a.left || 'this'}`, cls: 'bcv-qz__sel' },
+          );
           rows.push([String(a.id), sel]);
           const left = a.html ? BCV.screens.course.prose(a.html, { cls: 'bcv-qz__matchleft' }) : h('span', { class: 'bcv-qz__matchleft', text: a.text || a.left || '' });
           return U.el('bcv-qz__matchrow', [left, sel]);
@@ -474,7 +473,7 @@
         const send = () => {
           const out = {};
           for (const [blank, f] of fields) {
-            const v = String(f.value || '').trim();
+            const v = String((f.bcvPicker ? f.bcvPicker.value : f.value) || '').trim();
             if (v) out[blank] = drops ? (Number(v) || v) : v;
           }
           save(q, out);
@@ -482,13 +481,14 @@
         if (!blanks.length) return null;
         return U.el(`bcv-qz__blanks ${compact ? 'bcv-qz__blanks--compact' : ''}`, blanks.map((blank) => {
           const mine = opts.filter((a) => String(a.blank_id) === String(blank));
+          const held0 = held[blank] === undefined || held[blank] === null ? '' : String(held[blank]);
           const f = drops
-            ? h('select', { class: 'bcv-select bcv-qz__sel', 'aria-label': blank, onchange: send }, [
-              h('option', { value: '', text: 'Choose…' }),
-              ...mine.map((a) => h('option', { value: String(a.id), text: a.text || htmlToText(a.html || '', 60) })),
-            ])
+            ? U.picker(
+              [{ value: '', text: 'Choose…' }, ...mine.map((a) => ({ value: String(a.id), text: a.text || '', html: a.html || '' }))],
+              held0, send, { label: blank, cls: 'bcv-qz__sel' },
+            )
             : h('input', { class: 'bcv-input', type: 'text', placeholder: 'Your answer', 'aria-label': blank, oninput: () => saveSoon(send) });
-          f.value = held[blank] === undefined || held[blank] === null ? '' : String(held[blank]);
+          if (!drops) f.value = held0;
           fields.push([blank, f]);
           return U.el('bcv-qz__blankrow', [U.text('bcv-qz__blanklbl', blank, 'span'), f]);
         }));
@@ -684,9 +684,23 @@
         .filter(finished)
         .sort((a, b) => (Number(b.attempt) || 0) - (Number(a.attempt) || 0))[0] || null;
     }
-    function pickFeedbackSub(wantId) {
+    function pickFeedbackSub(wantId, wantAttempt) {
       const list = (subs || []).filter(finished);
-      return (wantId && list.find((s) => String(s.id) === String(wantId))) || latestFinished();
+      if (wantId) {
+        const m = list.find((s) => String(s.id) === String(wantId));
+        if (m) return m;
+      }
+      const n = Number(wantAttempt);
+      if (n > 0) {
+        const m = list.find((s) => Number(s.attempt) === n);
+        if (m) return m;
+        // Canvas keeps one quiz submission per student, so an earlier attempt has none of its own:
+        // it is read through that same submission, scoped to the attempt asked for, and its score
+        // and grading come from the assignment submission's history.
+        const any = (subs || [])[0];
+        if (any) return { ...any, attempt: n, workflow_state: 'complete', finished_at: null, score: null, kept_score: null };
+      }
+      return latestFinished();
     }
     function exitTo(href) {
       setOpen(false);
@@ -769,7 +783,7 @@
       }).filter((r) => !r.info);
       const released = rows.some((r) => r.correct !== null);
       const possible = Number(quiz.points_possible) || rows.reduce((s, r) => s + r.possible, 0);
-      const score = sub.kept_score ?? sub.score;
+      const score = hist?.score ?? sub.score ?? sub.kept_score; // that attempt's own score, not the best so far
       return { sub, rows, released, comments, possible, score: score === null || score === undefined ? null : Number(score), gradedAt: asub?.graded_at || sub.finished_at };
     }
     /** Every option the question offered, folded away under the answer. The chips say what you put

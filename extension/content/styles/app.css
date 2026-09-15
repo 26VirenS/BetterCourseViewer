@@ -577,6 +577,25 @@ html[data-bcv-theme="dark"] .bcv-cal__notice--warn { color: #ffb44d; }
 .bcv-input:focus { box-shadow: 0 0 0 2px var(--bcv-blue-soft); }
 .bcv-textarea { min-height: 96px; padding: 10px 12px; border-radius: 12px; background: var(--bcv-fill) !important; border: 0 !important; font: 400 14px/1.5 var(--bcv-font); color: var(--bcv-ink) !important; outline: none; width: 100%; resize: vertical; -webkit-appearance: none; appearance: none; margin: 0; box-shadow: none; }
 .bcv-textarea:focus { box-shadow: 0 0 0 2px var(--bcv-blue-soft); }
+/* a dropdown that shows what a native one cannot: an option that is a formula is a picture, and a
+ * <select> would render it as nothing. The face and the list draw Canvas's own content instead. */
+.bcv-picker { display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 10px 0 12px; border: 0; border-radius: 11px; background: var(--bcv-fill); color: var(--bcv-ink); font: 400 14px/1 var(--bcv-font); cursor: pointer; text-align: left; }
+.bcv-picker:hover { background: var(--bcv-fill2); }
+.bcv-picker:focus-visible { box-shadow: 0 0 0 2px var(--bcv-blue-soft); outline: none; }
+.bcv-picker__face { flex: 1; min-width: 0; display: flex; align-items: center; }
+.bcv-picker__label { min-width: 0; }
+.bcv-picker__label--none { color: var(--bcv-ink3); }
+.bcv-picker__chev { flex: none; }
+.bcv-picker__list { position: fixed; z-index: 45; overflow: auto; padding: 6px; border-radius: 14px; background: var(--bcv-glass); -webkit-backdrop-filter: var(--bcv-blur-glass); backdrop-filter: var(--bcv-blur-glass); border: 1px solid var(--bcv-edge); box-shadow: var(--bcv-shadow-hi); display: flex; flex-direction: column; gap: 2px; font-family: var(--bcv-font); animation: bcv-qn-in .16s cubic-bezier(.32,.72,0,1) both; }
+.bcv-picker__opt { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; border: 0; border-radius: 9px; background: transparent; color: var(--bcv-ink); font: 400 14px/1.35 var(--bcv-font); text-align: left; cursor: pointer; }
+.bcv-picker__opt:hover, .bcv-picker__opt:focus-visible { background: var(--bcv-fill2); outline: none; }
+.bcv-picker__opttext { flex: 1; min-width: 0; }
+.bcv-picker__tick { flex: none; visibility: hidden; }
+.bcv-picker__opt.is-on .bcv-picker__tick { visibility: visible; }
+/* Canvas's own content inside either: laid out inline, so a formula sits on the line it is on */
+.bcv-picker__rich { flex: 1; min-width: 0; margin: 0; }
+.bcv-picker__rich > * { margin: 0; display: inline; }
+.bcv-picker__rich img { max-height: 1.9em; width: auto; vertical-align: middle; }
 .bcv-select { height: 36px; padding: 0 12px; border-radius: 11px; background: var(--bcv-fill) !important; border: 0 !important; font: 500 13.5px/1 var(--bcv-font); color: var(--bcv-ink) !important; outline: none; -webkit-appearance: none; appearance: none; cursor: pointer; margin: 0; }
 .bcv-compose { padding: 20px 22px; display: flex; flex-direction: column; gap: 14px; }
 .bcv-compose__title { font: 700 19px/1.25 var(--bcv-display); letter-spacing: -.02em; }

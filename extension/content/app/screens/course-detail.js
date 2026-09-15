@@ -217,6 +217,9 @@
     b.append(main, side);
     main.append(U.loading());
     const [q, subs] = await Promise.all([store.quiz(c.id, route.arg).catch(() => null), store.quizSubmissions(c.id, route.arg).catch(() => [])]);
+    // Canvas keeps one quiz submission per student — the one in play — so the attempts before it are
+    // not in that list at all. Every finished attempt is in the assignment submission's history.
+    const asub = q?.assignment_id ? await store.submission(c.id, q.assignment_id).catch(() => null) : null;
     if (!ctx.alive()) return b;
     if (!q) return main.replaceChildren(U.errorBox('This quiz could not be loaded.')) || b;
     shell.reader = { title: q.title, html: q.description || '' };
@@ -229,12 +232,39 @@
     const finished = (subs || []).filter((s) => s.workflow_state === 'complete' || s.workflow_state === 'pending_review');
     const latest = finished.slice().sort((a, b) => (Number(b.attempt) || 0) - (Number(a.attempt) || 0))[0] || null;
     const feedbackHref = (s) => `${c.url}/quizzes/${q.id}?bcv=feedback&sub=${encodeURIComponent(s.id)}`;
+    // an earlier attempt has no quiz submission of its own to name, so it is asked for by its number
+    const feedbackAt = (n) => `${c.url}/quizzes/${q.id}?bcv=feedback&attempt=${n}`;
     const takeHref = `${c.url}/quizzes/${q.id}?bcv=take`; // every quiz is taken here, one question at a time included
+    /** Every attempt: the finished ones from the history, and the one in play from the live submission. */
+    function attemptList() {
+      const hist = (asub?.submission_history || []).filter((x) => Number(x.attempt) > 0);
+      const done = hist.length
+        ? hist.map((x) => ({ n: Number(x.attempt), score: x.score, at: x.submitted_at || x.graded_at, href: feedbackAt(Number(x.attempt)), live: false }))
+        : finished.map((s) => ({ n: Number(s.attempt) || 0, score: s.score, at: s.finished_at, href: feedbackHref(s), live: false }));
+      const inPlay = (subs || []).find((s) => s.workflow_state === 'untaken');
+      // the open attempt carries the best score so far, which is an earlier attempt's: it shows none
+      if (inPlay) done.push({ n: Number(inPlay.attempt) || done.length + 1, score: null, at: null, href: takeHref, live: true });
+      return done.sort((x, y) => x.n - y.n).filter((x, i, all) => i === all.findIndex((z) => z.n === x.n));
+    }
+    const attempts = attemptList();
+    const attemptRows = attempts.map((x) => U.row([
+      U.tile(IC.bolt, { color: '#7d7bef', tint: 'rgba(88,86,214,.16)' }),
+      U.el('bcv-row__body', [U.text('bcv-row__title bcv-row__title--145', `Attempt ${x.n}`), U.text('bcv-row__sub', x.live ? 'In progress' : (x.at ? `Finished ${U.fmtAt(x.at)}` : 'Finished'))]),
+      U.badge(!x.live && x.score !== null && x.score !== undefined ? `${store.fmtPts(x.score)} / ${q.points_possible}` : '—', x.live ? '' : 'green'),
+      // a finished attempt opens its own feedback; the one in play resumes
+    ], { mod: 'bcv-row--p12', href: x.href }));
+    /** What the header says about attempts, with the one being taken counted as taken. */
+    function attemptsLine() {
+      const inPlay = attempts.find((x) => x.live);
+      const used = attempts.length; // the open one is one of them
+      if (limit.allowed === null) return `${used} used · unlimited`;
+      return inPlay ? `${used} of ${limit.allowed} used · attempt ${inPlay.n} in progress` : `${used} of ${limit.allowed} used`;
+    }
     main.replaceChildren(
       backTo(app, `${c.url}/quizzes`, 'Quizzes'),
       U.card(U.el('bcv-detail', [
         h('h2', { class: 'bcv-detail__title bcv-pretty', text: q.title }),
-        meta([['Due', q.due_at ? U.fmtAt(q.due_at) : 'No due date'], ['Points', q.points_possible ?? '—'], ['Questions', q.question_count ?? '—'], ['Time limit', q.time_limit ? `${q.time_limit} minutes` : 'None'], ['Attempts', limit.allowed === null ? `${limit.used} used · unlimited` : `${limit.used} of ${limit.allowed} used`], ['Type', TYPE[q.quiz_type] || q.quiz_type], ['Available until', q.lock_at ? U.fmtAt(q.lock_at) : null]]),
+        meta([['Due', q.due_at ? U.fmtAt(q.due_at) : 'No due date'], ['Points', q.points_possible ?? '—'], ['Questions', q.question_count ?? '—'], ['Time limit', q.time_limit ? `${q.time_limit} minutes` : 'None'], ['Attempts', attemptsLine()], ['Type', TYPE[q.quiz_type] || q.quiz_type], ['Available until', q.lock_at ? U.fmtAt(q.lock_at) : null]]),
         U.el('bcv-detail__actions', [
           q.locked_for_user ? U.badge(q.lock_explanation ? htmlToText(q.lock_explanation, 120) : 'Locked', 'orange')
             : noneLeft ? U.badge(`No attempts left · ${U.plural(limit.allowed, 'attempt')} allowed`, 'orange')
@@ -245,12 +275,7 @@
         q.description ? CS().prose(q.description) : U.text('bcv-hint', 'No instructions.'),
       ]), 'bcv-card--22'),
     );
-    side.append(h('div', {}, [U.label('Attempts'), (subs || []).length ? U.card((subs || []).map((s) => U.row([
-      U.tile(IC.bolt, { color: '#7d7bef', tint: 'rgba(88,86,214,.16)' }),
-      U.el('bcv-row__body', [U.text('bcv-row__title bcv-row__title--145', s.attempt ? `Attempt ${s.attempt}` : 'Attempt'), U.text('bcv-row__sub', s.finished_at ? `Finished ${U.fmtAt(s.finished_at)}` : 'In progress')]),
-      U.badge(s.kept_score !== null && s.kept_score !== undefined ? `${store.fmtPts(s.kept_score)} / ${q.points_possible}` : (s.score !== null && s.score !== undefined ? `${store.fmtPts(s.score)} / ${q.points_possible}` : '—'), s.workflow_state === 'complete' ? 'green' : ''),
-      // a finished attempt opens its feedback; an open one resumes
-    ], { mod: 'bcv-row--p12', href: s.workflow_state === 'untaken' ? takeHref : feedbackHref(s) })), 'bcv-card--list') : U.emptyCard('No attempts yet.')]));
+    side.append(h('div', {}, [U.label('Attempts'), attemptRows.length ? U.card(attemptRows, 'bcv-card--list') : U.emptyCard('No attempts yet.')]));
     return b;
   };
 

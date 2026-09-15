@@ -1347,7 +1347,7 @@ try {
   // a quiz graded before today (seeded): its attempt row opens the feedback, with the instructor's comment
   await page.goto(`${BASE}/courses/101/quizzes/9001`);
   await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
-  check((await texts('.bcv-detail__actions .bcv-btn--primary'))[0] === 'See feedback' && (await texts('.bcv-detail__actions .bcv-badge'))[0] === 'No attempts left · 1 attempt allowed' && (await page.$eval('.bcv-col .bcv-row[href]', (a) => a.getAttribute('href'))) === '/courses/101/quizzes/9001?bcv=feedback&sub=qs1', 'a used-up quiz leads to its feedback from the button and the attempt row');
+  check((await texts('.bcv-detail__actions .bcv-btn--primary'))[0] === 'See feedback' && (await texts('.bcv-detail__actions .bcv-badge'))[0] === 'No attempts left · 1 attempt allowed' && (await page.$eval('.bcv-col .bcv-row[href]', (a) => a.getAttribute('href'))) === '/courses/101/quizzes/9001?bcv=feedback&attempt=1', 'a used-up quiz leads to its feedback from the button and the attempt row');
   await page.click('.bcv-col .bcv-row[href]');
   await page.waitForSelector('.bcv-fb__q', { timeout: 10000 });
   const fbLine2 = (await texts('.bcv-fb__scoreline'))[0];
@@ -1372,12 +1372,20 @@ try {
   await page.click('.bcv-qz__pill:nth-child(5)');
   await waitText('.bcv-qz__qnum', /Question 5/);
   const matchLeft = await texts('.bcv-qz__matchleft');
-  const matchOpts = await page.$$eval('.bcv-qz__matchrow:first-child .bcv-qz__sel option', (els) => els.map((e) => e.textContent));
+  await page.click('.bcv-qz__matchrow:first-child .bcv-qz__sel');
+  await page.waitForSelector('.bcv-picker__list', { timeout: 5000 });
+  const matchOpts = await page.$$eval('.bcv-picker__list .bcv-picker__opt', (els) => els.map((e) => e.textContent.trim()));
+  await page.keyboard.press('Escape');
   check(matchLeft.length === 3 && matchLeft[0] === '9.8' && matchOpts.length === 4 && matchOpts[0] === 'Choose…' && matchOpts.includes('Speed of light') && !(await page.$('.bcv-qz__q .bcv-hint')), `a matching question is answered here: ${matchLeft.join(' | ')} → ${matchOpts.slice(1).join(' | ')}`);
-  const mSel = await page.$$('.bcv-qz__match .bcv-qz__sel');
-  await mSel[0].selectOption({ label: 'Acceleration due to gravity' });
-  await mSel[1].selectOption({ label: 'Speed of light' });
-  await mSel[2].selectOption({ label: 'Gravitational constant' });
+  const pickIn = async (sel, label) => {
+    await page.click(sel);
+    await page.waitForSelector('.bcv-picker__list', { timeout: 5000 });
+    await page.click(`.bcv-picker__list .bcv-picker__opt:has-text("${label}")`);
+    await page.waitForFunction(() => !document.querySelector('.bcv-picker__list'), null, { timeout: 5000 });
+  };
+  await pickIn('.bcv-qz__matchrow:nth-child(1) .bcv-qz__sel', 'Acceleration due to gravity');
+  await pickIn('.bcv-qz__matchrow:nth-child(2) .bcv-qz__sel', 'Speed of light');
+  await pickIn('.bcv-qz__matchrow:nth-child(3) .bcv-qz__sel', 'Gravitational constant');
   await waitText('.bcv-qz__answered', /1 of 6 answered · Saved/);
   check(true, 'every pair saves as it is set');
   await shot(page, '22i-quiz-matching');
@@ -1385,10 +1393,9 @@ try {
   await page.click('.bcv-qz__pill:nth-child(6)');
   await waitText('.bcv-qz__qnum', /Question 6/);
   const blankLbls = await texts('.bcv-qz__blanklbl');
-  check(blankLbls.join('|') === 'rate|what' && (await page.$$('.bcv-qz__blanks .bcv-qz__sel')).length === 2, `a blank each, named for the blank it fills: ${blankLbls.join(' | ')}`);
-  const bSel = await page.$$('.bcv-qz__blanks .bcv-qz__sel');
-  await bSel[0].selectOption({ label: 'rate of change' });
-  await bSel[1].selectOption({ label: 'position' });
+  check(blankLbls.join('|') === 'rate|what' && (await page.$$('.bcv-qz__blanks .bcv-picker')).length === 2, `a blank each, named for the blank it fills: ${blankLbls.join(' | ')}`);
+  await pickIn('.bcv-qz__blankrow:nth-child(1) .bcv-qz__sel', 'rate of change');
+  await pickIn('.bcv-qz__blankrow:nth-child(2) .bcv-qz__sel', 'position');
   await waitText('.bcv-qz__answered', /2 of 6 answered · Saved/);
   // Canvas kept them: its own take page comes back with the same picks set
   const kept = await sw.evaluate(async () => {
@@ -1401,6 +1408,19 @@ try {
   await page.waitForSelector('.bcv-qz__sum', { timeout: 10000 });
   const sums6 = await texts('.bcv-qz__sum');
   check(/9\.8 → Acceleration due to gravity/.test(sums6[4]) && /rate: rate of change/.test(sums6[5]), `the review names both sides of every pair and every blank: ${sums6[4]} | ${sums6[5]}`);
+  // ---- every attempt is listed, and an earlier one can be opened -----------------------------------
+  // Canvas keeps one quiz submission per student — the one in play — so the attempts before it come
+  // from the assignment submission's history. The open one carries the best score so far, which is an
+  // earlier attempt's: it must not be shown against the attempt still being taken.
+  await page.goto(`${BASE}/courses/101/quizzes/9001`);
+  await page.waitForSelector('.bcv-col .bcv-row[href]', { timeout: 20000 });
+  const attempts = await page.$$eval('.bcv-col .bcv-row[href]', (els) => els.map((e) => ({ t: e.textContent.replace(/\s+/g, ' ').trim(), href: e.getAttribute('href') })));
+  check(attempts.length === 2 && /^Attempt 1Finished.*13 \/ 16$/.test(attempts[0].t) && attempts[0].href === '/courses/101/quizzes/9001?bcv=feedback&attempt=1' && attempts[1].t === 'Attempt 2In progress—' && /bcv=take$/.test(attempts[1].href), `both attempts are listed, the one in play without a score that is not its own: ${attempts.map((x) => x.t).join(' | ')}`);
+  check(/2 of 5 used · attempt 2 in progress/.test(await page.$eval('.bcv-detail__meta, .bcv-detail', (e) => e.textContent)), `the header counts the attempt being taken: ${(await page.$eval('.bcv-detail', (e) => e.textContent)).match(/\d+ of \d+ used[^·]*(· attempt \d+ in progress)?/)?.[0]}`);
+  // and the earlier one opens, with its own score rather than the best so far
+  await page.click('.bcv-col .bcv-row[href*="attempt=1"]');
+  await page.waitForSelector('.bcv-fb__scoreline', { timeout: 15000 });
+  check(/^13 \/ 16 /.test((await texts('.bcv-fb__scoreline'))[0]) && (await page.$$('.bcv-fb__q')).length >= 4, `an earlier attempt opens its own feedback: ${(await texts('.bcv-fb__scoreline'))[0]}`);
   await noteApi('POST', '/__mock/config', { richQuestions: false });
   await page.goto(`${BASE}/courses/101/quizzes/9001`);
   await page.waitForSelector('.bcv-qz__intro, .bcv-detail__title', { timeout: 20000 });

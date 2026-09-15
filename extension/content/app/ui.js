@@ -157,6 +157,122 @@
     return t;
   }
 
+  /** A dropdown that can show what a native one cannot.
+   *
+   *  A `<select>` renders its options as plain text, so an option that is a formula — which Canvas
+   *  serves as a picture — comes out blank in one. This is a button that opens a list, so each
+   *  option is drawn the way the rest of the interface draws Canvas content: pictures, formulas and
+   *  all. It answers the keyboard the way a select does (arrows move, Enter and Space pick, Escape
+   *  shuts, typing jumps to a label) and reports itself as a listbox.
+   *
+   *  options: [{ value, text, html }] — `html` is Canvas's own content for that option, when it has
+   *  any. `value` is what onChange is given. */
+  function picker(options, value, onChange, { label = '', placeholder = 'Choose…', cls = '' } = {}) {
+    let cur = value === null || value === undefined ? '' : String(value);
+    let list = null;
+    let typed = '';
+    let typedAt = 0;
+    const opt = (v) => options.find((o) => String(o.value) === String(v)) || null;
+    const face = el('bcv-picker__face');
+    const btn = h('button', {
+      type: 'button', class: `bcv-picker ${cls}`, 'aria-haspopup': 'listbox', 'aria-expanded': 'false', ...(label ? { 'aria-label': label } : {}),
+    }, [face, svg('M6 9l6 6 6-6', { size: 13, stroke: 'var(--bcv-ink3)', width: 2.2, cls: 'bcv-picker__chev' })]);
+
+    const drawFace = () => {
+      const o = opt(cur);
+      face.replaceChildren(o
+        ? (String(o.html || '').trim() && !String(o.text || '').trim()
+          ? BCV.screens.course.prose(o.html, { cls: 'bcv-picker__rich' })
+          : text('bcv-picker__label bcv-ellip', o.text || BCV.utils.htmlToText(o.html || '', 80) || String(o.value), 'span'))
+        : text('bcv-picker__label bcv-picker__label--none bcv-ellip', placeholder, 'span'));
+      btn.classList.toggle('is-set', !!o);
+    };
+
+    function onAway(e) { if (!list?.contains(e.target) && !btn.contains(e.target)) close(); }
+    function close() {
+      if (!list) return;
+      list.remove();
+      list = null;
+      btn.setAttribute('aria-expanded', 'false');
+      document.removeEventListener('pointerdown', onAway, true);
+      window.removeEventListener('resize', close);
+      window.removeEventListener('scroll', onScroll, true);
+    }
+    // the page moving under it takes it away — but the list scrolling inside itself does not
+    function onScroll(e) { if (!list?.contains(e.target)) close(); }
+    const pick = (v) => {
+      cur = v === null || v === undefined ? '' : String(v);
+      drawFace();
+      close();
+      btn.focus();
+      onChange(cur);
+    };
+
+    function open() {
+      if (list) { close(); return; }
+      closeMenus();
+      const r = btn.getBoundingClientRect();
+      list = el('bcv-picker__list', options.map((o) => h('button', {
+        type: 'button', class: `bcv-picker__opt ${String(o.value) === cur ? 'is-on' : ''}`, role: 'option',
+        'aria-selected': String(o.value) === cur ? 'true' : 'false', dataset: { value: String(o.value) },
+        onclick: () => pick(o.value),
+      }, [
+        String(o.html || '').trim() && !String(o.text || '').trim()
+          ? BCV.screens.course.prose(o.html, { cls: 'bcv-picker__rich' })
+          : text('bcv-picker__opttext', o.text || BCV.utils.htmlToText(o.html || '', 120) || String(o.value), 'span'),
+        svg('M20 6L9 17l-5-5', { size: 14, stroke: 'var(--bcv-blue)', width: 2.4, cls: 'bcv-picker__tick' }),
+      ])), { role: 'listbox', ...(label ? { 'aria-label': label } : {}) });
+      // over everything, placed under the button — or above it when the room is below
+      const below = window.innerHeight - r.bottom;
+      list.style.left = `${Math.max(8, Math.min(r.left, window.innerWidth - Math.max(r.width, 220) - 8))}px`;
+      list.style.minWidth = `${Math.max(r.width, 220)}px`;
+      if (below < 220 && r.top > below) { list.style.bottom = `${window.innerHeight - r.top + 6}px`; list.style.maxHeight = `${Math.max(120, r.top - 16)}px`; }
+      else { list.style.top = `${r.bottom + 6}px`; list.style.maxHeight = `${Math.max(120, below - 16)}px`; }
+      document.body.append(list);
+      btn.setAttribute('aria-expanded', 'true');
+      (list.querySelector('.bcv-picker__opt.is-on') || list.firstElementChild)?.focus({ preventScroll: true });
+      requestAnimationFrame(() => {
+        if (!list) return;
+        document.addEventListener('pointerdown', onAway, true);
+        window.addEventListener('resize', close);
+        window.addEventListener('scroll', onScroll, true);
+      });
+    }
+
+    const move = (from, step) => {
+      const all = [...(list?.querySelectorAll('.bcv-picker__opt') || [])];
+      if (!all.length) return;
+      const i = all.indexOf(from);
+      all[Math.max(0, Math.min(all.length - 1, (i < 0 ? 0 : i) + step))].focus();
+    };
+    const jump = (key) => {
+      const now = Date.now();
+      typed = now - typedAt > 900 ? key : typed + key;
+      typedAt = now;
+      const all = [...(list?.querySelectorAll('.bcv-picker__opt') || [])];
+      all.find((x) => x.textContent.trim().toLowerCase().startsWith(typed.toLowerCase()))?.focus();
+    };
+    btn.addEventListener('click', open);
+    btn.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
+    });
+    btn.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+    // the list's own keys: the buttons in it have focus while it is open
+    const listKeys = (e) => {
+      if (!list || !list.contains(e.target)) return;
+      if (e.key === 'ArrowDown') { e.preventDefault(); move(e.target, 1); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); move(e.target, -1); }
+      else if (e.key === 'Home') { e.preventDefault(); move(null, 0); }
+      else if (e.key === 'Escape') { e.preventDefault(); close(); btn.focus(); }
+      else if (e.key === 'Tab') close();
+      else if (e.key.length === 1) jump(e.key);
+    };
+    document.addEventListener('keydown', listKeys, true);
+    drawFace();
+    btn.bcvPicker = { set: (v) => { cur = v === null || v === undefined ? '' : String(v); drawFace(); }, get value() { return cur; }, close };
+    return btn;
+  }
+
   /** Dropdown menu anchored under `anchor`. items: [{label, sub, active, onSelect}] */
   function menu(anchor, items) {
     closeMenus();
@@ -579,7 +695,7 @@
 
   BCV.ui = {
     svg, star, chev, el, text, tile, dot, card, row, label, h2, groupHead, badge, seg, search, switchEl, btn, iconbtn, chip, pill,
-    empty, emptyCard, loading, errorBox, hint, avatar, toast, menu, closeMenus, colorMenu, COURSE_COLORS, fmtDay, datePop, dateField, promptSheet,
+    empty, emptyCard, loading, errorBox, hint, avatar, toast, menu, closeMenus, picker, colorMenu, COURSE_COLORS, fmtDay, datePop, dateField, promptSheet,
     DAY, startOfDay, addDays, sameDay, dayDiff, startOfWeek, parse, MONTHS, MONTHS_LONG, DAYS, DAYS_LONG,
     fmtTime, fmtTimeLower, fmtShort, fmtLong, fmtDateComma, fmtAt, fmtAtUpper, fmtBy, dayTitle, fmtDow, fmtRecent, whenShort, plural,
     hexToRgb, rgba, palette, FALLBACK_COLORS, initials, enter, roll, morphFrom, reducedMotion,
