@@ -183,6 +183,23 @@
   const inQuiz = () => !!state.quizOpen || /\/quizzes\/\d+\/take\b/.test(location.pathname) || !!document.querySelector('#submit_quiz_form, #quiz_taking_form, form.take_quiz_form');
   const confirmLeave = () => window.confirm('You are in the middle of a quiz. Leave it anyway?\n\nCanvas keeps your answers so far, but a timer keeps running and some quizzes allow only one attempt.');
 
+  /** Is a quiz of ours on this page at all — the intro, an attempt, the review, the feedback?
+   *
+   *  Wider than inQuiz(), which asks whether leaving needs a warning; this asks whether the page may
+   *  be thrown away and drawn again. It may not: our attempt runs at ?bcv=take, which has no /take in
+   *  its path, so a reload lands back on the quiz page with the flow gone and the question on screen
+   *  lost. Anything that would reload asks this first. */
+  const quizHere = () => !!state.quizOpen
+    || html.classList.contains('bcv-quiz')
+    || !!document.querySelector('#bcv-app .bcv-qz')
+    || state.route?.tab === 'quiz';
+  /** Canvas's own page for the quiz here, punched through, as the fallback a reload cannot be. */
+  function nativeQuizUrl() {
+    const r = state.route;
+    if (!r || r.tab !== 'quiz' || !r.courseId || !r.arg) return null;
+    return `${location.origin}/courses/${r.courseId}/quizzes/${r.arg}${state.quizOpen ? '/take' : ''}?bcv=native`;
+  }
+
   /** Navigation stays on the page whenever both ends are screens the interface draws itself: the
    *  address moves (pushState), the screen is rendered in place, the sidebar, tab bar and a
    *  course's rail keep still, and Canvas's own page underneath is left as it was. Canvas is
@@ -270,6 +287,7 @@
   const phone = () => !!BCV.phone?.active();
   function mount() {
     if (root) return;
+    if (document.getElementById('bcv-app')) return; // another copy of these scripts already built it
     root = h('div', { id: 'bcv-app' });
     main = h('main', { class: 'bcv-main', id: 'bcv-main' });
     if (phone()) {
@@ -699,7 +717,7 @@
   const typing = () => { const a = document.activeElement; return !!a && (a.tagName === 'TEXTAREA' || (a.tagName === 'INPUT' && a.value) || a.isContentEditable); };
   /** Reloads to get unstuck when that loses nothing and has not just been tried; otherwise a note. Returns whether it reloaded. */
   function recover(why) {
-    if (inQuiz() || state.submitOpen || typing() || recentlyReloaded()) {
+    if (inQuiz() || quizHere() || state.submitOpen || typing() || recentlyReloaded()) {
       U.toast(`${why}. Reload the page to continue.`, { error: true, ms: 8000 });
       return false;
     }
@@ -831,7 +849,19 @@
       // before the page is given to Canvas (a screen that failed outright is not retried this way)
       if (gaveWay === 'it took too long' && recover('The page took too long to load')) return;
       // Canvas's own page for this address is not the one underneath (the address moved in place): fetch it
-      if (state.nativePath !== location.pathname + location.search) { location.reload(); return; }
+      if (state.nativePath !== location.pathname + location.search) {
+        // — except on a quiz, where a reload would land back on the quiz page with the attempt's
+        // flow gone. Canvas's own quiz page is the fallback there, reached by going to it.
+        const raw = quizHere() ? nativeQuizUrl() : null;
+        if (raw) {
+          U.toast(`Opening Canvas's own quiz page: ${gaveWay}`, { error: true, ms: 6000 });
+          state.quizOpen = false; // leaving on purpose: no prompt from the unload guard
+          location.href = raw;
+          return;
+        }
+        location.reload();
+        return;
+      }
       try {
         el = await screens.native.render(ctx);
       } catch (e2) {
@@ -1049,9 +1079,20 @@
     state, go, render, renderSide, parseRoute, refreshCounts, loadShellData, punchIn, punchOut, siteName, toggleTheme, logout, backTo, nameHere, markBack,
     isDark: () => state.dark,
     openSettings,
+    recover, // (the suite checks that a quiz is never reloaded out from under)
     main: () => main,
   };
 
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, { once: true });
-  else boot();
+  // One interface per page, whoever asks.
+  //
+  // A page can end up with these scripts in it twice — Safari re-injects a site's registered content
+  // scripts when the extension looks at its permissions, which is what opening the toolbar popup
+  // does — and a second copy would build a second shell under the first: the whole interface twice,
+  // one scrolling past the other. A copy that finds one already here does nothing at all.
+  const already = !!self.__bcvBooted || !!document.getElementById('bcv-app');
+  self.__bcvBooted = true;
+  if (!already) {
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, { once: true });
+    else boot();
+  }
 })();

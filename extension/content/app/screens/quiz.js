@@ -109,14 +109,29 @@
     const timerLabel = h('span', { class: 'bcv-qz__clock', text: '0:00' });
     const modeWrap = h('div', { class: 'bcv-seg bcv-qz__modes' });
     const progressWrap = h('div');
+    // The way out of our quiz UI without giving anything up: Canvas's own quiz page, punched through.
+    // Every answer is already with Canvas — the attempt is not restarted and nothing is re-asked.
+    const toRaw = () => {
+      setOpen(false); // leaving on purpose: no prompt from the unload guard
+      clearInterval(st.timer);
+      const attempt = st.sub && (st.stage === 'take' || st.stage === 'review');
+      location.href = `${location.origin}${quizUrl}${attempt ? '/take' : ''}?bcv=native`;
+    };
+    const rawBtn = h('button', {
+      type: 'button', class: 'bcv-qz__raw', onclick: toRaw,
+      title: "Show Canvas's own quiz page. Your answers are already saved with Canvas — the attempt is not restarted and the page is not reloaded from the start.",
+    }, [U.svg(IC.external, { size: 13, width: 2 }), h('span', { text: 'Canvas page' })]);
+    const rawNote = U.text('bcv-qz__rawnote', 'Canvas page hands the attempt to Canvas as it stands — every answer is saved, nothing restarts.');
     const head = U.el('bcv-qz__head', [
       U.el('bcv-qz__headrow', [
         h('button', { type: 'button', class: 'bcv-qz__exit', title: 'Save and exit', 'aria-label': 'Save and exit', onclick: leave }, U.svg(IC.close, { size: 16, width: 2.2 })),
         h('div', { class: 'bcv-qz__titles' }, [U.text('bcv-qz__title bcv-ellip', quiz.title), U.text('bcv-qz__sub', `${course.name} · ${dueDay}`)]),
         modeWrap,
+        rawBtn,
         U.el('bcv-qz__timer', [U.svg('M12 5a8 8 0 100 16 8 8 0 000-16zM12 9v4l3 2', { size: 13, stroke: 'var(--bcv-ink3)', width: 2 }), timerLabel]),
       ]),
       progressWrap,
+      rawNote,
     ]);
     const body = h('div', { class: 'bcv-qz__body' });
     screen.replaceChildren(head, body);
@@ -167,6 +182,7 @@
         st.saving--;
         paintFooter();
         paintProgress();
+      rawNote.hidden = !(st.stage === 'take' || st.stage === 'review');
       }
     }
     // typing into a blank saves on a pause, the way every other typed answer does

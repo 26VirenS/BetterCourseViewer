@@ -1408,6 +1408,35 @@ try {
   await page.waitForSelector('.bcv-qz__sum', { timeout: 10000 });
   const sums6 = await texts('.bcv-qz__sum');
   check(/9\.8 → Acceleration due to gravity/.test(sums6[4]) && /rate: rate of change/.test(sums6[5]), `the review names both sides of every pair and every blank: ${sums6[4]} | ${sums6[5]}`);
+  // ---- the way out of the quiz UI, and never a reload out from under one ---------------------------
+  // The button is red because it is a way out: it hands the attempt to Canvas as it stands.
+  const rawBtn = await page.$eval('.bcv-qz__raw', (e) => ({ text: e.textContent.trim(), title: e.title, red: (([, r, g, b]) => ({ r: +r, g: +g, b: +b }))(getComputedStyle(e).color.match(/(\d+), (\d+), (\d+)/)) }));
+  check(/Canvas page/.test(rawBtn.text) && /answers are already saved/.test(rawBtn.title) && /not restarted/.test(rawBtn.title) && rawBtn.red.r > 150 && rawBtn.red.r > rawBtn.red.g * 1.8, `a way out of the quiz UI, and it says what it does not do: ${JSON.stringify(rawBtn)}`);
+  check(!(await page.$eval('.bcv-qz__rawnote', (e) => e.hidden)) && /every answer is saved, nothing restarts/.test(await page.$eval('.bcv-qz__rawnote', (e) => e.textContent)), 'and the promise is on the page during an attempt, not only in a tooltip');
+  // nothing reloads a quiz: a screen that gives way goes to Canvas's own quiz page instead
+  const noReload = await sw.evaluate(async (base) => {
+    const [tab] = await chrome.tabs.query({ url: `${base}/*` });
+    const [{ result }] = await chrome.scripting.executeScript({
+      target: { tabId: tab.id }, world: 'ISOLATED',
+      func: () => {
+        let reloaded = false;
+        const real = self.location.reload;
+        self.location.reload = () => { reloaded = true; };
+        const ok = self.BCV.app.recover('test');
+        self.location.reload = real;
+        return { ok, reloaded, settled: document.documentElement.classList.contains('bcv-settled') };
+      },
+    });
+    return result;
+  }, BASE);
+  check(noReload.ok === false && noReload.reloaded === false, `a quiz is never reloaded out from under: ${JSON.stringify(noReload)}`);
+  check(await eventually(async () => /Reload the page to continue/.test((await texts('.bcv-toast')).join(' '))), 'it says so rather than doing it');
+  // the button leaves for Canvas's own page, carrying the attempt
+  await page.click('.bcv-qz__raw');
+  await page.waitForFunction(() => /bcv=native/.test(location.search), null, { timeout: 15000 });
+  await page.waitForLoadState('domcontentloaded');
+  check(/\/courses\/101\/quizzes\/9001\/take\?bcv=native$/.test(page.url()), `the way out lands on Canvas's own take page, with the attempt still open: ${page.url()}`);
+
   // ---- every attempt is listed, and an earlier one can be opened -----------------------------------
   // Canvas keeps one quiz submission per student — the one in play — so the attempts before it come
   // from the assignment submission's history. The open one carries the best score so far, which is an
@@ -2168,6 +2197,38 @@ try {
     await self.BCV.api.storage.local.set({ [k]: p });
     await self.BCV.api.storage.local.remove('setup:done');
   });
+  // Opening the popup must not disturb the page behind it: the interface is not built a second time
+  // and the screen on show is not drawn again (a second copy of everything, scrollable, was reported).
+  await page.goto(`${BASE}/`);
+  await page.waitForSelector('.bcv-stat', { timeout: 20000 });
+  await page.evaluate(() => { document.querySelector('#bcv-app .bcv-screen').dataset.bcvMark = '1'; });
+  const probePage = await context.newPage();
+  await probePage.goto(`chrome-extension://${extId}/popup/popup.html`);
+  await probePage.waitForTimeout(900);
+  await probePage.close();
+  await page.bringToFront();
+  await page.waitForTimeout(400);
+  const after = await page.evaluate(() => ({
+    apps: document.querySelectorAll('#bcv-app').length,
+    screens: document.querySelectorAll('#bcv-main > .bcv-screen').length,
+    same: document.querySelector('#bcv-app .bcv-screen')?.dataset.bcvMark === '1',
+  }));
+  check(after.apps === 1 && after.screens === 1 && after.same, `opening the popup leaves the page alone — one interface, one screen, not drawn again: ${JSON.stringify(after)}`);
+  // Safari puts a site's registered content scripts into the page again when the extension looks at
+  // its permissions — which is what opening the popup does — so the scripts must survive being run
+  // twice. Injected again here, deliberately: the second copy must build nothing.
+  const twice = await sw.evaluate(async (base) => {
+    const [tab] = await chrome.tabs.query({ url: `${base}/*` });
+    const files = chrome.runtime.getManifest().content_scripts[1].js;
+    await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'ISOLATED', files });
+    const [{ result }] = await chrome.scripting.executeScript({
+      target: { tabId: tab.id }, world: 'ISOLATED',
+      func: () => ({ apps: document.querySelectorAll('#bcv-app').length, screens: document.querySelectorAll('#bcv-main > .bcv-screen').length, mark: document.querySelector('#bcv-app .bcv-screen')?.dataset.bcvMark === '1' }),
+    });
+    return result;
+  }, BASE);
+  check(twice.apps === 1 && twice.screens === 1 && twice.mark, `the scripts put into the page a second time build nothing: still one interface, the screen untouched: ${JSON.stringify(twice)}`);
+
   let popupPage = await context.newPage();
   await popupPage.goto(`chrome-extension://${extId}/popup/popup.html`);
   await popupPage.waitForTimeout(500);
