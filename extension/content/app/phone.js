@@ -1225,8 +1225,16 @@
       a.discussion_topic?.id ? h('button', { type: 'button', class: 'bcv-ph-bigbtn', text: 'Open discussion', onclick: () => app.go(`${c.url}/discussion_topics/${a.discussion_topic.id}`) }) : null,
       (s.submission_comments || []).length ? h('div', {}, [groupHead('Comments'), listCard(s.submission_comments.map((cm) => U.el('bcv-ph-comment', [U.el('bcv-ph-comment__head', [U.text('bcv-ph-comment__who', cm.author_name || cm.author?.display_name || 'Comment', 'span'), U.text('bcv-ph-comment__when', U.fmtAt(cm.created_at), 'span')]), U.text('bcv-ph-comment__body bcv-pretty', cm.comment || '')])))]) : null,
       a.rubric?.length ? h('div', {}, [groupHead(a.rubric_settings?.title || 'Rubric'), listCard(a.rubric.map((cr) => {
-        const got = (s.rubric_assessment || {})[cr.id];
-        return U.el('bcv-ph-rub', [U.el('bcv-ph-row__body', [U.text('bcv-ph-row__title', cr.description), U.text('bcv-ph-row__sub bcv-pretty', [cr.long_description, got?.comments ? `“${got.comments}”` : null].filter(Boolean).join(' · '))]), U.text('bcv-ph-row__right', got && got.points !== undefined ? `${store.fmtPts(got.points)} / ${cr.points}` : `${cr.points} pts`, 'span')]);
+        const p = CS.rubricParts(cr, (s.rubric_assessment || {})[cr.id]);
+        return U.el('bcv-ph-rub', [
+          U.el('bcv-ph-row__body', [
+            U.text('bcv-ph-row__title', p.name),
+            p.long ? CS.prose(p.long, { cls: 'bcv-prose--13 bcv-rubric__long' }) : null,
+            p.ratings.length ? U.el('bcv-rubric__ratings', p.ratings.map((r) => h('span', { class: `bcv-rubric__rating ${r.got ? 'is-got' : ''}`, text: r.label }))) : null,
+            p.comment ? U.text('bcv-ph-row__sub bcv-pretty', p.comment) : null,
+          ]),
+          U.text('bcv-ph-row__right', p.pts, 'span'),
+        ]);
       }))]) : null,
       block,
     ].filter(Boolean));

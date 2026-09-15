@@ -76,20 +76,88 @@
   // text and read as blank. Anything the page itself paints an opaque light background on keeps
   // dark ink instead (and its links a blue that reads on light). Measured once the prose is on the
   // page, because the colour can come from the school's stylesheet as easily as from the markup.
+  //
+  // The other half of the same problem: text the page paints a dark colour on. Canvas's own editor
+  // writes #2D3B45 into a paste from Word, a school template sets near-black ink, a link comes in
+  // as Canvas blue — all written for a white page, all but invisible on ours. So any colour the
+  // page sets itself that is too dark to read here is turned over: the hue and (most of) the
+  // saturation it chose are kept, only its lightness is flipped, so a dark red stays a red.
+  const TOO_DARK = 0.42; // sunk into our background; our own dimmest ink (#8e8e93) is 0.56
+  const LIGHT_BG = 0.55; // a plate the page paints light enough to keep dark ink on
+  const OWN_BG = 0.35; // anything above this is light enough that dark text on it still reads
+  const rgbOf = (css) => {
+    const m = /rgba?\(([^)]+)\)/.exec(css || '');
+    if (!m) return null;
+    const [r, g, b, a = 1] = m[1].split(',').map((n) => Number(n.trim()));
+    return { r, g, b, a, lum: (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255 };
+  };
+  /** The same colour with its lightness turned over: readable on black, still recognisably itself. */
+  function flip({ r, g, b }) {
+    const R = r / 255, G = g / 255, B = b / 255;
+    const mx = Math.max(R, G, B), mn = Math.min(R, G, B), d = mx - mn;
+    const l = (mx + mn) / 2;
+    let hue = 0;
+    if (d) {
+      hue = mx === R ? ((G - B) / d) % 6 : mx === G ? (B - R) / d + 2 : (R - G) / d + 4;
+      hue = Math.round(hue * 60);
+      if (hue < 0) hue += 360;
+    }
+    const sat = d ? Math.min(0.8, d / (1 - Math.abs(2 * l - 1))) : 0; // capped: a flipped colour should not glow
+    const light = Math.min(0.94, Math.max(0.72, 1 - l));
+    return `hsl(${hue}, ${Math.round(sat * 100)}%, ${Math.round(light * 100)}%)`;
+  }
   function fitDark(wrap) {
     if (!BCV.app?.isDark?.()) return;
     let tries = 0;
     const pass = () => {
       if (!wrap.isConnected) { if (tries++ < 10) requestAnimationFrame(pass); return; }
-      for (const el of wrap.querySelectorAll('*')) {
-        const m = /rgba?\(([^)]+)\)/.exec(getComputedStyle(el).backgroundColor || '');
-        if (!m) continue;
-        const [r, g, b, a = 1] = m[1].split(',').map((n) => Number(n.trim()));
-        if (!(a > 0.5)) continue; // see-through: our own background is what shows
-        if ((0.2126 * r + 0.7152 * g + 0.0722 * b) / 255 > 0.55) el.classList.add('bcv-onlight');
+      const all = Array.from(wrap.querySelectorAll('*'));
+      const plates = new Map(); // element → how light the page paints it, for the text pass below
+      for (const el of all) {
+        const bg = rgbOf(getComputedStyle(el).backgroundColor);
+        if (!bg || !(bg.a > 0.5)) continue; // see-through: our own background is what shows
+        plates.set(el, bg.lum);
+        if (bg.lum > LIGHT_BG) el.classList.add('bcv-onlight');
       }
+      // Read every colour before changing any, so a child is compared against what the page gave its
+      // parent rather than against what this pass just set there.
+      const fixes = [];
+      for (const el of all) {
+        if (el.closest('.bcv-onlight')) continue; // dark ink is the right ink there
+        const mine = rgbOf(getComputedStyle(el).color);
+        if (!mine || mine.lum > TOO_DARK) continue;
+        const parent = el.parentElement;
+        if (parent && getComputedStyle(parent).color === getComputedStyle(el).color) continue; // inherited, not set here
+        let plate = null; // the nearest background the page paints behind this text
+        for (let p = el; p && p !== wrap.parentElement; p = p.parentElement) if (plates.has(p)) { plate = plates.get(p); break; }
+        if (plate !== null && plate > OWN_BG) continue;
+        fixes.push(el);
+      }
+      for (const el of fixes) el.style.setProperty('color', flip(rgbOf(getComputedStyle(el).color)), 'important');
     };
     requestAnimationFrame(pass);
+  }
+
+  // A rubric criterion is not the flat pair of strings it looks like: its long description is Canvas
+  // rich text (a criterion written as bullets arrives as "…page header<br/>• Lab title"), its
+  // ratings are a list the assessment points into by id, and the score it was given is separate
+  // again. Joined into one line, the markup showed as markup and every rating but one was dropped —
+  // so the pieces are handed out whole here and drawn, not flattened, by both layouts.
+  function rubricParts(cr, got) {
+    const ratings = (cr?.ratings || []).filter((r) => r && (r.description || r.points !== null));
+    const rated = got?.rating_id !== undefined && got?.rating_id !== null
+      ? ratings.find((r) => String(r.id) === String(got.rating_id)) || null
+      : null;
+    const pts = (n) => (n === null || n === undefined ? '' : store.fmtPts(n));
+    return {
+      name: htmlToText(cr?.description || '', 300),
+      long: htmlToText(cr?.long_description || '', 6000).trim() ? cr.long_description : null,
+      ratings: ratings.map((r) => ({ id: r.id, got: !!rated && String(r.id) === String(rated.id), label: `${htmlToText(r.description || '', 200) || 'Rating'}${r.points === null || r.points === undefined ? '' : ` (${pts(r.points)})`}` })),
+      rated,
+      comment: got?.comments ? `“${got.comments}”` : null,
+      // graded: what it earned out of what it is worth; ungraded: what it is worth
+      pts: got && got.points !== null && got.points !== undefined ? `${pts(got.points)} / ${pts(cr.points)}` : `${pts(cr?.points)} pts`,
+    };
   }
 
   function linksFrom(html, max = 4) {
@@ -996,6 +1064,6 @@
     return b;
   };
 
-  BCV.screens.course = { render, prose, fitMath, linksFrom, typeIcon, ptsLabel, statusBadge, openReader, contextShell, keptShell, holdShell, heldShell, syncShell, warmTab, warmTabs };
+  BCV.screens.course = { render, prose, fitMath, rubricParts, linksFrom, typeIcon, ptsLabel, statusBadge, openReader, contextShell, keptShell, holdShell, heldShell, syncShell, warmTab, warmTabs };
   BCV.screens.courseTabs = T;
 })();

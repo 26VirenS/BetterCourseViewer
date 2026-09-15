@@ -94,11 +94,17 @@
     if (a.rubric?.length) {
       const assess = s.rubric_assessment || {};
       side.append(h('div', {}, [U.label(a.rubric_settings?.title || 'Rubric'), U.card(U.el('bcv-detail', U.el('bcv-rubric', a.rubric.map((cr) => {
-        const got = assess[cr.id];
-        const rating = got?.rating_id ? (cr.ratings || []).find((r) => r.id === got.rating_id) : null;
+        const p = CS().rubricParts(cr, assess[cr.id]);
         return U.el('bcv-rubric__row', [
-          U.el('bcv-rubric__crit', [U.text('bcv-rubric__name', cr.description), U.text('bcv-rubric__desc', [cr.long_description, rating ? `Rated: ${rating.description}` : null, got?.comments ? `“${got.comments}”` : null].filter(Boolean).join(' · ') || (cr.ratings || []).map((r) => `${r.description} (${r.points})`).join(' · '))]),
-          U.text('bcv-rubric__pts', got && got.points !== undefined ? `${store.fmtPts(got.points)} / ${cr.points}` : `${cr.points} pts`, 'span'),
+          U.el('bcv-rubric__crit', [
+            U.text('bcv-rubric__name', p.name),
+            p.long ? CS().prose(p.long, { cls: 'bcv-prose--13 bcv-rubric__long' }) : null,
+            // every rating the criterion offers, the one it was given marked — the way Canvas's own
+            // table shows them, rather than only whichever line happened to be there
+            p.ratings.length ? U.el('bcv-rubric__ratings', p.ratings.map((r) => h('span', { class: `bcv-rubric__rating ${r.got ? 'is-got' : ''}`, text: r.label }))) : null,
+            p.comment ? U.text('bcv-rubric__note bcv-pretty', p.comment) : null,
+          ]),
+          U.text('bcv-rubric__pts', p.pts, 'span'),
         ]);
       }))), 'bcv-card--22')]));
     }

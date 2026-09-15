@@ -121,11 +121,21 @@
       type: 'button', class: 'bcv-qz__raw', onclick: toRaw,
       title: "Show Canvas's own quiz page. Your answers are already saved with Canvas — the attempt is not restarted and the page is not reloaded from the start.",
     }, [U.svg(IC.external, { size: 13, width: 2 }), h('span', { text: 'Canvas page' })]);
+    // The instructions are on the intro card, but an attempt takes the page and the card with it —
+    // and that is exactly when a rule about rounding or a link to a formula sheet is wanted. So they
+    // stay one press away the whole way through, in a sheet over the questions, drawn as prose (the
+    // quiz's own links, tables and formulas included) rather than flattened to text.
+    const hasInstructions = !!htmlToText(quiz.description || '', 4000).trim();
+    const instrBtn = h('button', {
+      type: 'button', class: 'bcv-qz__instrbtn', onclick: openInstructions,
+      title: "Show this quiz's instructions. Nothing about your attempt changes.",
+    }, [U.svg(IC.book, { size: 13, width: 2 }), h('span', { text: 'Instructions' })]);
     const head = U.el('bcv-qz__head', [
       U.el('bcv-qz__headrow', [
         h('button', { type: 'button', class: 'bcv-qz__exit', title: 'Save and exit', 'aria-label': 'Save and exit', onclick: leave }, U.svg(IC.close, { size: 16, width: 2.2 })),
         h('div', { class: 'bcv-qz__titles' }, [U.text('bcv-qz__title bcv-ellip', quiz.title), U.text('bcv-qz__sub', `${course.name} · ${dueDay}`)]),
         modeWrap,
+        instrBtn,
         rawBtn,
         U.el('bcv-qz__timer', [U.svg('M12 5a8 8 0 100 16 8 8 0 000-16zM12 9v4l3 2', { size: 13, stroke: 'var(--bcv-ink3)', width: 2 }), timerLabel]),
       ]),
@@ -133,6 +143,32 @@
     ]);
     const body = h('div', { class: 'bcv-qz__body' });
     screen.replaceChildren(head, body);
+
+    function openInstructions() {
+      const written = hasInstructions
+        ? BCV.screens.course.prose(quiz.description, { cls: 'bcv-qz__desc' })
+        : h('p', { class: 'bcv-qz__p', text: 'This quiz came with no instructions.' });
+      const inner = U.el('bcv-qz__instr', [written]);
+      if (BCV.phone?.active()) {
+        BCV.phone.openSheet({ label: 'Quiz instructions', title: 'Instructions', note: quiz.title, body: inner });
+        return;
+      }
+      document.querySelector('.bcv-sheet-ov')?.remove();
+      const ov = U.el('bcv-sheet-ov', null, { role: 'dialog', 'aria-label': 'Quiz instructions' });
+      const close = () => ov.remove();
+      ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
+      ov.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+      ov.append(U.el('bcv-sheet bcv-sheet--instr', [
+        U.el('bcv-sheet__head', [
+          h('div', { style: { flex: '1', minWidth: '0' } }, [U.text('bcv-sheet__title', 'Instructions'), U.text('bcv-sheet__desc bcv-ellip', quiz.title)]),
+          h('button', { type: 'button', class: 'bcv-sheet__close', 'aria-label': 'Close', onclick: close }, U.svg(IC.close, { size: 13, stroke: 'var(--bcv-ink2)', width: 2.3 })),
+        ]),
+        inner,
+      ]));
+      document.body.append(ov);
+      ov.tabIndex = -1;
+      ov.focus();
+    }
 
     const toTop = () => window.scrollTo(0, 0);
 
@@ -229,6 +265,7 @@
         modeBtn('all', 'Scroll through all questions', MODE_ALL),
       ] : []));
       modeWrap.hidden = !(st.stage === 'take' && !forcedOne);
+      instrBtn.hidden = st.stage === 'intro'; // the intro card already has them in front of you
       paintProgress();
       body.classList.toggle('is-busy', st.loadingIdx !== null && st.stage === 'take');
       if (st.stage === 'intro') body.replaceChildren(intro());

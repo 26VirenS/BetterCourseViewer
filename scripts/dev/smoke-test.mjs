@@ -731,9 +731,16 @@ try {
   // ---- handing work in (assignment submission flow) -------------------------------------
   console.log('submission');
   const readSub = (cid, aid) => fetch(`${BASE}/api/v1/courses/${cid}/assignments/${aid}/submissions/self`).then((r) => r.text()).then((t) => JSON.parse(t.replace(/^while\(1\);/, '')));
+  // once a rubric is marked, the rating the work was given is the one filled in, with its score and note
+  await page.goto(`${BASE}/courses/104/assignments/4001`);
+  await page.waitForSelector('.bcv-rubric__row', { timeout: 10000 });
+  const marked = await page.$eval('.bcv-rubric__row', (e) => ({ got: e.querySelector('.bcv-rubric__rating.is-got')?.textContent, pts: e.querySelector('.bcv-rubric__pts')?.textContent, note: e.querySelector('.bcv-rubric__note')?.textContent }));
+  check(marked.got === 'Partial (3)' && marked.pts === '4 / 6' && /Sign error in part b\./.test(marked.note || ''), `a marked criterion shows the rating it was given, its score and the marker's note: ${JSON.stringify(marked)}`);
   await page.goto(`${BASE}/courses/104/assignments/4002`);
   await page.waitForSelector('.bcv-detail__actions .bcv-btn--primary', { timeout: 10000 });
   check((await texts('.bcv-detail__actions .bcv-btn--primary'))[0] === 'Submit assignment', 'the assignment page offers our own submit flow');
+  // the colours the page sets on its own text are its own in the light appearance: nothing is flipped
+  check((await page.$eval('.bcv-prose span[style*="color"]', (e) => getComputedStyle(e).color)) === 'rgb(45, 59, 69)', 'the light appearance leaves the page\'s own text colours exactly as Canvas set them');
   // a link to a file in the assignment's own text opens the viewer over the page, not a new tab or Canvas's file page
   const proseTabs = [];
   const onProseTab = (p) => proseTabs.push(p);
@@ -933,6 +940,11 @@ try {
   for (const r of dis01) if (/Dis01/.test(await r.textContent())) { await r.click(); break; }
   await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
   check((await texts('.bcv-detail__title'))[0] === 'Dis01' && (await texts('.bcv-detail__meta'))[0].includes('Points 10') && (await page.$$('.bcv-rubric__row')).length === 2, 'assignment detail with rubric');
+  // a criterion is Canvas rich text: its own bullets and line breaks are drawn, not printed as markup
+  const crit = await page.$eval('.bcv-rubric__row', (e) => ({ long: e.querySelector('.bcv-rubric__long')?.innerText || '', brs: e.querySelectorAll('.bcv-rubric__long br').length, raw: e.textContent }));
+  check(crit.brs === 1 && /Every answer is correct/.test(crit.long) && /Units on each one/.test(crit.long) && !/&lt;|<br/.test(crit.raw), `a criterion written as rich text reads as written, its markup never as text: ${JSON.stringify(crit)}`);
+  // and every rating it offers is there, not just whichever line the row had room for
+  check((await texts('.bcv-rubric__row:first-child .bcv-rubric__rating')).join(' | ') === 'Full (6) | Partial (3)' && !(await page.$('.bcv-rubric__rating.is-got')), 'every rating of a criterion is listed, and none is marked earned on an ungraded assignment');
   check((await texts('.bcv-btn--primary'))[0] === 'Submit assignment', 'submit button opens our own submission flow');
   await shot(page, '14-assignment');
 
@@ -1413,6 +1425,15 @@ try {
   const rawBtn = await page.$eval('.bcv-qz__raw', (e) => ({ text: e.textContent.trim(), title: e.title, red: (([, r, g, b]) => ({ r: +r, g: +g, b: +b }))(getComputedStyle(e).color.match(/(\d+), (\d+), (\d+)/)) }));
   check(/Canvas page/.test(rawBtn.text) && /answers are already saved/.test(rawBtn.title) && /not restarted/.test(rawBtn.title) && rawBtn.red.r > 150 && rawBtn.red.r > rawBtn.red.g * 1.8, `a way out of the quiz UI, and it says what it does not do: ${JSON.stringify(rawBtn)}`);
   check(!(await page.$('.bcv-qz__rawnote')) && (await page.$eval('.bcv-qz__head', (e) => !/nothing restarts/.test(e.textContent))), 'and the promise stays in the tooltip: no note under the pills');
+  // the quiz's own instructions are on the intro card, which the attempt takes the page from — so
+  // they stay a press away in the header, as the quiz wrote them
+  check(await visible('.bcv-qz__instrbtn'), 'the instructions are reachable from the attempt');
+  await page.click('.bcv-qz__instrbtn');
+  await page.waitForSelector('.bcv-sheet--instr .bcv-qz__instr .bcv-prose', { timeout: 8000 });
+  const instr = await page.$eval('.bcv-sheet--instr', (e) => e.textContent);
+  check(/Instructions/.test(instr) && /four questions on the pre-lecture reading/.test(instr) && (await page.$('.bcv-qz__sum')), `the quiz's own instructions open over the attempt, which is still there underneath: ${instr.slice(0, 80)}`);
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !document.querySelector('.bcv-sheet--instr'), null, { timeout: 5000 });
   // nothing reloads a quiz: a screen that gives way goes to Canvas's own quiz page instead
   const noReload = await sw.evaluate(async (base) => {
     const [tab] = await chrome.tabs.query({ url: `${base}/*` });
@@ -1528,6 +1549,23 @@ try {
   });
   check(onLight.marked && onLight.panelBg > 0.55 && onLight.panelInk < 0.3 && onLight.plainInk > 0.7, `a light panel of the page's own keeps dark text in the dark appearance, while the rest of the page stays light on dark: ${JSON.stringify(onLight)}`);
   await shot(page, '27c-dark-page-onlight');
+  // the other half of it: ink the page paints dark (Canvas's own editor writes #2D3B45 into a paste)
+  // was written for a white page, so on ours it is turned over rather than left to sink into black
+  await page.goto(`${BASE}/courses/104/assignments/4002`);
+  await page.waitForSelector('.bcv-prose span[style*="color"]', { timeout: 10000 });
+  await page.waitForFunction(() => {
+    const e = document.querySelector('.bcv-prose span[style*="color"]');
+    const [r, g, b] = /rgba?\(([^)]+)\)/.exec(getComputedStyle(e).color)[1].split(',').map(Number);
+    return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255 > 0.6;
+  }, null, { timeout: 5000 }).catch(() => {});
+  const flipped = await page.$eval('.bcv-prose span[style*="color"]', (e) => {
+    const rgb = (c) => /rgba?\(([^)]+)\)/.exec(c)[1].split(',').map(Number);
+    const [r, g, b] = rgb(getComputedStyle(e).color);
+    const [br, bg, bb] = rgb(getComputedStyle(document.querySelector('#bcv-app')).backgroundColor);
+    return { r, g, b, lum: (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255, bgLum: (0.2126 * br + 0.7152 * bg + 0.0722 * bb) / 255 };
+  });
+  check(flipped.lum > 0.6 && flipped.lum - flipped.bgLum > 0.5 && flipped.b > flipped.r, `dark ink the page set is turned over in the dark appearance, hue and all, rather than left on black: ${JSON.stringify(flipped)}`);
+  await shot(page, '27d-dark-page-flipped');
   // punch-through pages: the hole is darkened by a filter unless "View in light mode" is on
   await page.goto(`${BASE}/courses/101/external_tools/9`);
   await page.waitForSelector('html.bcv-punch #content', { timeout: 10000 });

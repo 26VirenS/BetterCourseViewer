@@ -75,9 +75,9 @@ const A = {
     ['3002', 'Prelab 3', 'Prelabs', 15, null, 3, 23.98, null, {}],
   ],
   104: [
-    ['4001', 'Week 1 reflection', 'Assignments', 10, 10, -6, 23.98, -7, {}],
+    ['4001', 'Week 1 reflection', 'Assignments', 10, 10, -6, 23.98, -7, { rubric: true }],
     // the mockup's example: file or text or link, four file types, open for a week, unlimited attempts
-    ['4002', 'Week 2 Post Class Assignment: GC articles', 'Assignments', 10, null, 0, 23.98, null, { types: ['online_upload', 'online_text_entry', 'online_url'], ext: ['pdf', 'docx', 'png', 'jpg'], window: true, attempts: -1, description: '<p>Submit the Grand Challenge you chose with an explanation of why it matters, plus three scientific papers or news articles in APA or MLA format. See the <a class="instructure_file_link" title="Course Syllabus.pdf" href="/courses/101/files/f1?wrap=1">citation guide</a> before you start.</p>' }],
+    ['4002', 'Week 2 Post Class Assignment: GC articles', 'Assignments', 10, null, 0, 23.98, null, { types: ['online_upload', 'online_text_entry', 'online_url'], ext: ['pdf', 'docx', 'png', 'jpg'], window: true, attempts: -1, description: '<p>Submit the Grand Challenge you chose with an explanation of why it matters, plus three scientific papers or news articles in APA or MLA format. See the <a class="instructure_file_link" title="Course Syllabus.pdf" href="/courses/101/files/f1?wrap=1">citation guide</a> before you start.</p><p><span style="color: #2d3b45;">Bring the printed rubric to lab — the TA marks it in person.</span></p>' }],
     ['4003', 'Knewton Alta: Unit 2', 'Assignments', 20, null, 5, 23.98, null, { tool: 'https://tool.example.com/launch' }],
   ],
   105: [
@@ -89,7 +89,8 @@ const A = {
 };
 const GROUPS = { 101: [['Discussion Quizzes', 18], ['Midterms', 57], ['Final', 25], ['Effort', 0], ['Collaboration', 0], ['Coursework (Knewton Alta)', 0]] };
 const rubric = [
-  { id: 'c1', description: 'Correctness', long_description: 'Answers are correct.', points: 6, ratings: [{ id: 'r1', description: 'Full', points: 6 }, { id: 'r2', description: 'Partial', points: 3 }] },
+  // a criterion written as rich text, the way Canvas's rubric editor stores one
+  { id: 'c1', description: 'Correctness', long_description: '<p>&bull; Every answer is correct<br/>&bull; Units on each one</p>', points: 6, ratings: [{ id: 'r1', description: 'Full', points: 6 }, { id: 'r2', description: 'Partial', points: 3 }] },
   { id: 'c2', description: 'Work shown', long_description: 'Steps are legible and complete.', points: 4, ratings: [{ id: 'r3', description: 'Full', points: 4 }, { id: 'r4', description: 'Partial', points: 2 }] },
 ];
 function assignmentObj(courseId, row) {
