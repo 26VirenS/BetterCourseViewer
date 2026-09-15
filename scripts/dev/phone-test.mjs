@@ -229,7 +229,7 @@ try {
   await page.click('.bcv-ph-avatar');
   await sheet();
   const acct = await texts('.bcv-ph-srow__label');
-  check(acct.join(',') === 'Inbox,Groups,History,My Materials,Help,Dark appearance,Settings,Guided setup,Profile,All Canvas settings,Log out', `account sheet rows, with the school's own nav entries: ${acct.join(', ')} (no Sign out outside the app)`);
+  check(acct.join(',') === 'Inbox,Groups,History,My Materials,Help,Dark appearance,Settings,Locked quizzes,Guided setup,Profile,All Canvas settings,Log out', `account sheet rows, with the school's own nav entries: ${acct.join(', ')} (no Sign out outside the app)`);
   check((await texts('.bcv-ph-srow__note'))[0] === 'No unread messages' || /unread message/.test((await texts('.bcv-ph-srow__note'))[0]), `Inbox row carries the unread count: ${(await texts('.bcv-ph-srow__note'))[0]}`);
   await shot('01c-account-sheet');
   await page.evaluate(() => { window.__bcvMarker = 1; });
@@ -471,6 +471,39 @@ try {
   await shot('08-item-submit');
   await page.click('.bcv-topbar__back');
   check(await eventually(async () => page.url() === `${BASE}/courses/104`), 'the back bar returns to the course');
+
+  // ---- the rubric ---------------------------------------------------------------------------------
+  // How the marks are decided belongs with the decision to hand work in, and with the mark itself:
+  // a button in each place, one grid behind both. On a phone it is a sheet, never a card at the end
+  // of a scroll nobody reaches.
+  console.log('rubric');
+  await page.goto(`${BASE}/courses/101/assignments/1009`);
+  await ready();
+  await page.waitForSelector('.bcv-sb--embed .bcv-sb__btn--primary', { timeout: 15000 });
+  check(!(await page.$('.bcv-rubg')) && (await texts('.bcv-sb__foot .bcv-rubbtn'))[0] === 'Rubric', 'the rubric is a button beside Submit assignment, not a card down the page');
+  await page.click('.bcv-sb__foot .bcv-rubbtn');
+  await page.waitForSelector('.bcv-ph-sheet--rub .bcv-rubg__row', { timeout: 8000 });
+  const sheetRub = await page.evaluate(() => ({
+    title: document.querySelector('.bcv-ph-sheet__title')?.textContent,
+    note: document.querySelector('.bcv-ph-sheet__note')?.textContent,
+    rows: document.querySelectorAll('.bcv-rubg__row').length,
+    rates: [...document.querySelectorAll('.bcv-rubg__row:first-child .bcv-rubg__rate')].map((e) => e.innerText.replace(/\s+/g, ' ').trim()),
+    stacked: getComputedStyle(document.querySelector('.bcv-rubg__rates')).display,
+  }));
+  check(sheetRub.title === 'Dis01 rubric' && /2 criteria/.test(sheetRub.note || '') && sheetRub.rows === 2 && sheetRub.rates.join(' | ') === '6 pts Full | 3 pts Partial' && sheetRub.stacked === 'grid', `the rubric opens as a grid on the phone: ${JSON.stringify(sheetRub)}`);
+  check(await noOverflow(), 'no horizontal overflow with the rubric open');
+  await shot('08b-rubric');
+  await closeSheet();
+  // and a marked assignment offers the same grid from the grade itself
+  await page.goto(`${BASE}/courses/104/assignments/4001`);
+  await ready();
+  await page.waitForSelector('.bcv-ph-banner', { timeout: 15000 });
+  check((await texts('.bcv-ph-banner .bcv-rubbtn'))[0] === 'See breakdown', 'a graded assignment offers See breakdown beside the grade');
+  await page.click('.bcv-ph-banner .bcv-rubbtn');
+  await page.waitForSelector('.bcv-ph-sheet--rub .bcv-rubg__rate.is-got', { timeout: 8000 });
+  const got = await page.$eval('.bcv-rubg__row', (e) => ({ got: e.querySelector('.bcv-rubg__rate.is-got')?.innerText.replace(/\s+/g, ' ').trim(), pts: e.querySelector('.bcv-rubg__ptsv')?.textContent }));
+  check(got.got === '3 pts Partial' && got.pts === '4 / 6', `and it fills in the rating the work was given: ${JSON.stringify(got)}`);
+  await closeSheet();
 
   // ---- "Open in Canvas" ---------------------------------------------------------------------------
   // A phone has no address bar to type its way out of a Canvas page with, so the way back has to be

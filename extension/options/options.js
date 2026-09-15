@@ -177,6 +177,13 @@
 
   // ---- General --------------------------------------------------------------------------------------
   onSwitch($('skin'), (on) => save({ appearance: { skin: on } }));
+  // Turning the guard off is the one setting here that can cost a grade, so it is not a switch you
+  // can flick past: the disclaimer has to be accepted, and saying no leaves the switch where it was.
+  onSwitch($('lockedQuizzes'), (on) => {
+    if (on && !confirm(BCV.settings.LOCKED_QUIZ_DISCLAIMER)) { setSwitch($('lockedQuizzes'), false); return; }
+    setSwitch($('lockedQuizzes'), on);
+    save({ quizzes: { lockedHere: on } });
+  });
   const openOnCanvas = async (param) => {
     const msg = $('generalMsg');
     if (!site.origin) {

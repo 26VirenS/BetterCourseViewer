@@ -268,11 +268,29 @@
         ...(BCV.extras?.phoneRows?.(app) || []), // what the school added to Canvas's own nav
         { icon: dark ? IC.sun : IC.moon, label: dark ? 'Light appearance' : 'Dark appearance', onSelect: () => app.toggleTheme() },
         { icon: IC.settings, label: 'Settings', note: 'Look, courses and grades', onSelect: () => BCV.settingsLink?.() },
+        // the one setting that has to be reachable without the options page: the app has no tab to open one in
+        { icon: IC.lock, label: 'Locked quizzes', note: BCV.settings.quizzesHere(app.state.settings) ? 'Taken here' : 'Taken on Canvas’s own page', onSelect: () => lockedQuizSheet(app) },
         { icon: IC.sparkle, label: 'Guided setup', note: 'Courses, grades and a tour', href: '/?bcv=setup' },
         { icon: IC.people, label: 'Profile', note: 'Your Canvas profile', href: '/profile' },
         { icon: IC.external, label: 'All Canvas settings', note: 'Profile, notifications, integrations', href: '/profile/settings' },
         { icon: IC.external, label: native()?.signOut ? 'Sign out' : 'Log out', note: native()?.signOut ? 'Clears the Canvas session on this device' : 'Ends your Canvas session', danger: true, onSelect: () => app.logout() },
       ],
+    });
+  }
+
+  /** Where a quiz Canvas locks is taken. Turning the guard off is the one setting here that can cost
+   *  a grade, so it is not a switch to flick past: the sheet says what it means and the button that
+   *  takes it off says so too. Turning it back on needs no warning at all. */
+  function lockedQuizSheet(app) {
+    const on = BCV.settings.quizzesHere(app.state.settings);
+    openSheet({
+      label: 'Locked quizzes', title: 'Locked quizzes',
+      note: BCV.settings.LOCKED_QUIZ_DISCLAIMER,
+      cls: 'bcv-ph-sheet--locked',
+      body: U.el('bcv-ph-lockstate', U.text('bcv-ph-lockstate__t', on ? 'Locked quizzes are taken here.' : 'Locked quizzes open on Canvas’s own page.')),
+      actions: on
+        ? [{ label: 'Hand them back to Canvas', primary: true, onSelect: () => BCV.settings.update({ quizzes: { lockedHere: false } }) }]
+        : [{ label: 'I accept — take them here', cls: 'is-danger', onSelect: () => BCV.settings.update({ quizzes: { lockedHere: true } }) }],
     });
   }
 
@@ -1195,6 +1213,21 @@
   }
 
   // ---- assignment (the item page): handing in lives here, on the same scroll ------------------
+  /** The rubric button that sits with Submit assignment, because how the marks are decided belongs
+   *  next to the decision to hand work in. It opens the same grid the desktop shows beside the
+   *  assignment; on a phone that grid is a sheet, where it has the screen to itself.
+   *  A fresh button each call: it goes in the submit block's own row, or on the page when there is
+   *  no block to put it in (an assignment with nothing to submit still has a rubric). */
+  function rubricButton(a, s, { cls = 'bcv-sb__btn', label = 'Rubric' } = {}) {
+    const CS = BCV.screens.course;
+    if (!a.rubric?.length) return null;
+    const title = a.rubric_settings?.title || 'Rubric';
+    return h('button', {
+      type: 'button', class: `${cls} bcv-rubbtn`, 'aria-label': `${label}: ${title}`,
+      onclick: () => CS.openRubric(a, s),
+    }, [U.svg(IC.sheet, { size: 14, stroke: 'currentColor', width: 1.9 }), h('span', { text: label })]);
+  }
+
   async function assignment(ctx, shell, { a, s, types, isTool, toolNewTab, toolLaunch, nativeSubmit, canvasOnly, attemptsLeft, status }) {
     const { app } = ctx;
     const c = shell.course;
@@ -1208,7 +1241,7 @@
     const primary = isTool
       ? (toolNewTab ? { label: 'Open the tool', go: () => window.open(toolLaunch, '_blank', 'noopener') } : { label: 'Open the tool', go: () => app.go(nativeHref(`${c.url}/assignments/${a.id}`)) })
       : canvasOnly ? { label: s.submitted_at ? 'Resubmit in Canvas' : 'Submit in Canvas', go: () => app.go(nativeHref(`${c.url}/assignments/${a.id}`)) } : null;
-    const block = embeds ? await BCV.screens.submit.render(ctx, c, { embed: true, a, sub: s, back: { href: `${c.url}/assignments`, label: 'Assignments' }, title: 'Submit work' }) : null;
+    const block = embeds ? await BCV.screens.submit.render(ctx, c, { embed: true, a, sub: s, back: { href: `${c.url}/assignments`, label: 'Assignments' }, title: 'Submit work', aside: () => rubricButton(a, s) }) : null;
     if (!ctx.alive()) return b;
     b.append(...[
       h('span', { class: 'bcv-ph-chip bcv-ph-chip--course', style: { background: c.palette.tint, color: c.palette.text }, text: c.shortName || c.name }),
@@ -1217,25 +1250,18 @@
       s.submitted_at || graded ? U.el(`bcv-ph-banner ${status === 'Missing' ? 'bcv-ph-banner--warn' : ''}`, [
         U.svg(CHECK, { size: 20, stroke: 'var(--bcv-green-text)', width: 2.6, style: { flex: 'none' } }),
         h('div', { style: { flex: '1', minWidth: '0' } }, [U.text('bcv-ph-banner__t', status), U.text('bcv-ph-banner__s', `${s.submitted_at ? U.fmtAt(s.submitted_at) : ''}${graded ? ` · ${store.fmtPts(s.score)} / ${a.points_possible ?? '—'}` : s.submitted_at ? ' · awaiting grade' : ''}`)]),
+        // a mark is a number until you can see how it was reached: the rubric is one press from it
+        graded ? rubricButton(a, s, { cls: 'bcv-ph-banner__btn', label: 'See breakdown' }) : null,
       ]) : (status === 'Missing' ? U.el('bcv-ph-banner bcv-ph-banner--warn', [U.svg(IC.warn, { size: 20, stroke: 'var(--bcv-red-text)', width: 2.2, style: { flex: 'none' } }), h('div', {}, [U.text('bcv-ph-banner__t', 'Missing'), U.text('bcv-ph-banner__s', 'Canvas marked this as missing')])]) : null),
       U.el('bcv-ph-card bcv-ph-instr', [U.text('bcv-ph-kicker', 'Instructions', 'span'), a.description ? CS.prose(a.description, { cls: 'bcv-ph-prose' }) : U.text('bcv-ph-load__none', 'No description.'), types ? U.text('bcv-ph-instr__note', `Accepts ${types}`) : null]),
       isTool && !toolNewTab ? U.el('bcv-ph-card', [U.text('bcv-ph-kicker', 'External tool', 'span'), h('iframe', { class: 'bcv-frame bcv-frame--doc', src: toolLaunch, title: a.name, allowfullscreen: '', allow: 'fullscreen; microphone; camera; display-capture; autoplay; clipboard-write' })]) : null,
       primary ? h('button', { type: 'button', class: 'bcv-ph-bigbtn is-primary', text: primary.label, onclick: primary.go }) : null,
+      // no submit block to put it in (an external tool, a Canvas-only hand-in, nothing to submit at
+      // all): the rubric still gets a button, where the block's own would have been
+      block ? null : rubricButton(a, s, { cls: 'bcv-ph-bigbtn' }),
       a.quiz_id ? h('button', { type: 'button', class: 'bcv-ph-bigbtn', text: 'Open quiz', onclick: () => app.go(`${c.url}/quizzes/${a.quiz_id}`) }) : null,
       a.discussion_topic?.id ? h('button', { type: 'button', class: 'bcv-ph-bigbtn', text: 'Open discussion', onclick: () => app.go(`${c.url}/discussion_topics/${a.discussion_topic.id}`) }) : null,
       (s.submission_comments || []).length ? h('div', {}, [groupHead('Comments'), listCard(s.submission_comments.map((cm) => U.el('bcv-ph-comment', [U.el('bcv-ph-comment__head', [U.text('bcv-ph-comment__who', cm.author_name || cm.author?.display_name || 'Comment', 'span'), U.text('bcv-ph-comment__when', U.fmtAt(cm.created_at), 'span')]), U.text('bcv-ph-comment__body bcv-pretty', cm.comment || '')])))]) : null,
-      a.rubric?.length ? h('div', {}, [groupHead(a.rubric_settings?.title || 'Rubric'), listCard(a.rubric.map((cr) => {
-        const p = CS.rubricParts(cr, (s.rubric_assessment || {})[cr.id]);
-        return U.el('bcv-ph-rub', [
-          U.el('bcv-ph-row__body', [
-            U.text('bcv-ph-row__title', p.name),
-            p.long ? CS.prose(p.long, { cls: 'bcv-prose--13 bcv-rubric__long' }) : null,
-            p.ratings.length ? U.el('bcv-rubric__ratings', p.ratings.map((r) => h('span', { class: `bcv-rubric__rating ${r.got ? 'is-got' : ''}`, text: r.label }))) : null,
-            p.comment ? U.text('bcv-ph-row__sub bcv-pretty', p.comment) : null,
-          ]),
-          U.text('bcv-ph-row__right', p.pts, 'span'),
-        ]);
-      }))]) : null,
       block,
     ].filter(Boolean));
     if (block && ctx.route.params.get('bcv') === 'submit') for (const ms of [80, 600]) setTimeout(() => block.scrollIntoView({ block: 'start' }), ms);

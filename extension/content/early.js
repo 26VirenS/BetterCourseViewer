@@ -47,11 +47,14 @@
 
   // 2. Authoritative: extension storage.
   let current = null;
+  let shown = null; // the state the page is currently drawn for, so a flip can be told from a first read
   const listeners = new Set();
   async function sync(settings) {
     current = settings || (await S.get());
     const state = { skin: current.appearance.skin !== false, dark: S.isDark(current, systemDark()) };
+    const flipped = !!shown && shown.skin !== state.skin;
     apply(state);
+    shown = state;
     try {
       if (!wiped) localStorage.setItem(CACHE_KEY, JSON.stringify(state));
     } catch {
@@ -64,6 +67,14 @@
         /* ignore */
       }
     }
+    // The look going on or off is a different page: stock Canvas has to come back whole, and our
+    // shell has to be built over a page Canvas drew without it. app.js does that whenever it is
+    // listening. When nothing is, nobody would — the class flips and the page just sits there until
+    // the safety net below notices, eight seconds later. That happens for real: Safari re-injects a
+    // site's content scripts when the extension looks at its permissions (opening the toolbar popup
+    // does), and a re-injected app.js finds the interface already booted and stands down, leaving
+    // this copy with no listener. So the reload is done here when there is no one to do it.
+    if (flipped && !listeners.size && !self.BCVBridge?.native) location.reload();
     return state;
   }
   const ready = sync();

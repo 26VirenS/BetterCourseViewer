@@ -74,6 +74,13 @@
     // the way that page makes it — which is also how Canvas enforces "no going back".
     st.paged = !!quiz.one_question_at_a_time;
     const noBack = !!quiz.cant_go_back;
+    // A quiz Canvas locks seals each question the moment you leave it: an answer cannot be changed,
+    // a question cannot be returned to, and an attempt that goes wrong cannot be taken again. That is
+    // the one case where being a second implementation is not worth the risk, however well this one
+    // works — so it is handed to Canvas's own page. The setting takes the guard off for anyone who
+    // would rather have it here, and says what they are taking on.
+    const handOff = noBack && !BCV.settings.quizzesHere(app.state.settings);
+    const nativeQuiz = `${quizUrl}?bcv=native`;
     const timed = !!quiz.time_limit;
     // Attempts come from Canvas's own count on the submission (plus any extra the instructor
     // granted); allowed === null means unlimited. The store refuses to start one past the limit too.
@@ -102,6 +109,12 @@
       setOpen(false);
       clearInterval(st.timer);
       app.go(quizUrl, { confirmed: true });
+    };
+    /** Hand a locked quiz to Canvas's own page, under our shell. */
+    const toCanvas = () => {
+      setOpen(false); // leaving on purpose: no prompt from the unload guard
+      clearInterval(st.timer);
+      app.go(nativeQuiz, { confirmed: true });
     };
 
     // ---- header -------------------------------------------------------------------
@@ -319,6 +332,7 @@
     function intro() {
       const pts = quiz.points_possible !== null && quiz.points_possible !== undefined ? `${store.fmtPts(quiz.points_possible)} points` : 'ungraded';
       const bullets = [
+        handOff ? ['#ff9500', IC.lock, 'This quiz seals each question once you leave it, and an attempt that goes wrong cannot be taken again — so it is taken on Canvas’s own page rather than here. Simpl Courses settings → Quizzes will take it here instead.'] : null,
         ['#34c759', CHECK, 'Answers save as you pick them. You can leave and come back.'],
         timed ? ['#ff9500', IC.warn, `Time limit: ${quiz.time_limit} minutes. The clock starts when you begin and keeps running if you leave.`] : null,
         forcedOne ? ['var(--bcv-ink3)', MODE_ONE, noBack ? 'One question at a time, and you cannot go back to a previous question.' : 'One question at a time.'] : null,
@@ -331,7 +345,9 @@
       // out of attempts: the primary action becomes the feedback for the last one (when released)
       const startBtn = !canStart && lastDone && !resultsHidden(lastDone)
         ? h('button', { type: 'button', class: 'bcv-qz__begin', text: 'See your feedback', onclick: () => openFeedback(lastDone, 'intro') })
-        : h('button', { type: 'button', class: 'bcv-qz__begin', text: st.sub ? 'Continue attempt' : (canStart ? 'Begin attempt' : 'No attempts left'), disabled: !canStart || null, onclick: begin });
+        : handOff && canStart
+          ? h('button', { type: 'button', class: 'bcv-qz__begin', text: st.sub ? 'Continue in Canvas' : 'Take it in Canvas', onclick: toCanvas })
+          : h('button', { type: 'button', class: 'bcv-qz__begin', text: st.sub ? 'Continue attempt' : (canStart ? 'Begin attempt' : 'No attempts left'), disabled: !canStart || null, onclick: begin });
       return U.el('bcv-qz__intro', [
         h('div', {}, [
           h('h1', { class: 'bcv-qz__h1 bcv-pretty', text: quiz.title }),
@@ -350,6 +366,7 @@
     }
 
     async function begin() {
+      if (handOff) { toCanvas(); return; } // a locked quiz is Canvas's to run, however this was reached
       // the popup opens at once, its pills standing for the questions to come, the first filling while they load
       st.stage = 'starting';
       st.loadingIdx = 0;

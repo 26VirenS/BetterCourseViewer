@@ -731,11 +731,17 @@ try {
   // ---- handing work in (assignment submission flow) -------------------------------------
   console.log('submission');
   const readSub = (cid, aid) => fetch(`${BASE}/api/v1/courses/${cid}/assignments/${aid}/submissions/self`).then((r) => r.text()).then((t) => JSON.parse(t.replace(/^while\(1\);/, '')));
-  // once a rubric is marked, the rating the work was given is the one filled in, with its score and note
+  // a graded assignment offers the breakdown beside the grade, and it opens the rubric grid
   await page.goto(`${BASE}/courses/104/assignments/4001`);
-  await page.waitForSelector('.bcv-rubric__row', { timeout: 10000 });
-  const marked = await page.$eval('.bcv-rubric__row', (e) => ({ got: e.querySelector('.bcv-rubric__rating.is-got')?.textContent, pts: e.querySelector('.bcv-rubric__pts')?.textContent, note: e.querySelector('.bcv-rubric__note')?.textContent }));
-  check(marked.got === 'Partial (3)' && marked.pts === '4 / 6' && /Sign error in part b\./.test(marked.note || ''), `a marked criterion shows the rating it was given, its score and the marker's note: ${JSON.stringify(marked)}`);
+  await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
+  check(!(await page.$('.bcv-rubg')) && (await texts('.bcv-rubbtn')).includes('See breakdown'), 'a graded assignment offers "See breakdown" beside the grade, and the rubric is not on the page until it is asked for');
+  await page.click('.bcv-rubbtn');
+  await page.waitForSelector('.bcv-sheet--rub .bcv-rubg__row', { timeout: 8000 });
+  // once a rubric is marked, the rating the work was given is the one filled in, with its score and note
+  const marked = await page.$eval('.bcv-sheet--rub .bcv-rubg__row', (e) => ({ got: e.querySelector('.bcv-rubg__rate.is-got')?.innerText.replace(/\s+/g, ' ').trim(), pts: e.querySelector('.bcv-rubg__ptsv')?.textContent, note: e.querySelector('.bcv-rubg__note')?.textContent, rates: e.querySelectorAll('.bcv-rubg__rate').length }));
+  check(marked.got === '3 pts Partial' && marked.pts === '4 / 6' && marked.rates === 2 && /Sign error in part b\./.test(marked.note || ''), `a marked criterion shows every rating with the one it was given filled in, its score and the marker's note: ${JSON.stringify(marked)}`);
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !document.querySelector('.bcv-sheet--rub'), null, { timeout: 5000 });
   await page.goto(`${BASE}/courses/104/assignments/4002`);
   await page.waitForSelector('.bcv-detail__actions .bcv-btn--primary', { timeout: 10000 });
   check((await texts('.bcv-detail__actions .bcv-btn--primary'))[0] === 'Submit assignment', 'the assignment page offers our own submit flow');
@@ -939,12 +945,19 @@ try {
   const dis01 = (await page.$$('.bcv-body .bcv-row')).filter(async () => true);
   for (const r of dis01) if (/Dis01/.test(await r.textContent())) { await r.click(); break; }
   await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
-  check((await texts('.bcv-detail__title'))[0] === 'Dis01' && (await texts('.bcv-detail__meta'))[0].includes('Points 10') && (await page.$$('.bcv-rubric__row')).length === 2, 'assignment detail with rubric');
+  check((await texts('.bcv-detail__title'))[0] === 'Dis01' && (await texts('.bcv-detail__meta'))[0].includes('Points 10'), 'assignment detail loads');
+  // the rubric is a popup opened from the button beside Submit assignment, not a card down the page
+  check((await texts('.bcv-detail__actions .bcv-rubbtn'))[0] === 'Rubric' && !(await page.$('.bcv-rubg')), 'the rubric is a press away from Submit assignment, not spent on the page');
+  await page.click('.bcv-detail__actions .bcv-rubbtn');
+  await page.waitForSelector('.bcv-sheet--rub .bcv-rubg__row', { timeout: 8000 });
+  check((await page.$$('.bcv-sheet--rub .bcv-rubg__row')).length === 2, 'the rubric opens as a grid, one row per criterion');
   // a criterion is Canvas rich text: its own bullets and line breaks are drawn, not printed as markup
-  const crit = await page.$eval('.bcv-rubric__row', (e) => ({ long: e.querySelector('.bcv-rubric__long')?.innerText || '', brs: e.querySelectorAll('.bcv-rubric__long br').length, raw: e.textContent }));
+  const crit = await page.$eval('.bcv-sheet--rub .bcv-rubg__row', (e) => ({ long: e.querySelector('.bcv-rubric__long')?.innerText || '', brs: e.querySelectorAll('.bcv-rubric__long br').length, raw: e.textContent }));
   check(crit.brs === 1 && /Every answer is correct/.test(crit.long) && /Units on each one/.test(crit.long) && !/&lt;|<br/.test(crit.raw), `a criterion written as rich text reads as written, its markup never as text: ${JSON.stringify(crit)}`);
-  // and every rating it offers is there, not just whichever line the row had room for
-  check((await texts('.bcv-rubric__row:first-child .bcv-rubric__rating')).join(' | ') === 'Full (6) | Partial (3)' && !(await page.$('.bcv-rubric__rating.is-got')), 'every rating of a criterion is listed, and none is marked earned on an ungraded assignment');
+  // and every rating it offers is a cell across the row, not just whichever line there was room for
+  check((await texts('.bcv-sheet--rub .bcv-rubg__row:first-child .bcv-rubg__rate')).join(' | ') === '6 pts Full | 3 pts Partial' && !(await page.$('.bcv-rubg__rate.is-got')), 'every rating of a criterion is a cell, and none is filled in on an ungraded assignment');
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !document.querySelector('.bcv-sheet--rub'), null, { timeout: 5000 });
   check((await texts('.bcv-btn--primary'))[0] === 'Submit assignment', 'submit button opens our own submission flow');
   await shot(page, '14-assignment');
 
@@ -1118,8 +1131,25 @@ try {
   await page.goto(`${BASE}/courses/102/modules`);
   await page.waitForSelector('.bcv-module', { timeout: 10000 });
   const mods = await texts('.bcv-module__head');
-  check(mods.length === 3 && /Week 1: Kinematics 2 of 2 requirements done/.test(mods[0]) && /Week 3: Energy Locked until/.test(mods[2]), `modules: ${mods.join(' | ')}`);
+  check(mods.length === 4 && /Week 1: Kinematics 2 of 2 requirements done/.test(mods[0]) && /Week 3: Energy Locked until/.test(mods[2]), `modules: ${mods.join(' | ')}`);
   check((await page.$$('.bcv-circle.is-done')).length === 3 && (await page.$('.bcv-indent-1')), 'completion marks and indents');
+  // by date is the order the work has to be done in, not the order the course was built in
+  const names = () => texts('.bcv-module__name');
+  check((await names()).join(' | ') === 'Week 1: Kinematics | Week 2: Forces | Week 3: Energy | Week 0: Orientation', `course order is Canvas's own: ${(await names()).join(' | ')}`);
+  await page.click('.bcv-module__bar .bcv-seg__btn[data-value="date"]');
+  await page.waitForFunction(() => document.querySelector('.bcv-module__name')?.textContent === 'Week 0: Orientation', null, { timeout: 5000 });
+  check((await names()).join(' | ') === 'Week 0: Orientation | Week 1: Kinematics | Week 2: Forces | Week 3: Energy', `by date puts the soonest first, wherever it was built: ${(await names()).join(' | ')}`);
+  // open all / close all, and the slide rather than a jump
+  const openCount = () => page.$$eval('.bcv-module', (els) => els.filter((e) => e.classList.contains('bcv-module--open')).length);
+  check((await texts('.bcv-module__all'))[0] === 'Open all' && (await openCount()) < 4, 'not every module starts open, so the button offers Open all');
+  await page.click('.bcv-module__all');
+  check((await openCount()) === 4 && (await texts('.bcv-module__all'))[0] === 'Close all', 'Open all opens every module and turns into Close all');
+  const slide = await page.$eval('.bcv-module--open .bcv-module__wrap', (e) => ({ prop: getComputedStyle(e).transitionProperty, rows: getComputedStyle(e).gridTemplateRows }));
+  check(/grid-template-rows/.test(slide.prop) && slide.rows !== '0px', `opening and closing is a slide, not a jump: ${JSON.stringify(slide)}`);
+  await page.click('.bcv-module__all');
+  check((await openCount()) === 0 && (await texts('.bcv-module__all'))[0] === 'Open all', 'Close all closes every one');
+  await page.click('.bcv-module__bar .bcv-seg__btn[data-value="course"]');
+  await page.waitForFunction(() => document.querySelector('.bcv-module__name')?.textContent === 'Week 1: Kinematics', null, { timeout: 5000 });
   await shot(page, '22-course-modules');
 
   // course home with modules as the default view + syllabus home
@@ -1292,9 +1322,23 @@ try {
   // question at a time questions in the API"; the mock refuses too), so each one is read from Canvas's own quiz
   // page and every move goes through that page's record-answer form — which is also how Canvas enforces no
   // going back. Answers, flags, the clock and the submit stay API calls.
+  // Out of the box a quiz Canvas locks is not taken here at all: it seals each answer as you pass it
+  // and cannot be taken again, so it goes to Canvas's own page and the reason is on the screen.
   await page.goto(`${BASE}/courses/101/quizzes/9014`);
   await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
-  check((await texts('.bcv-detail__actions .bcv-btn')).join(',') === 'Take the quiz,Open in Canvas', 'a one-question-at-a-time quiz has the same Take button as any other');
+  check((await texts('.bcv-detail__actions .bcv-btn')).join(',') === 'Take it in Canvas,Open in Canvas' && (await texts('.bcv-detail')).join(' ').includes('seals each question once you leave it'), `a quiz that locks its questions is handed to Canvas, and says why: ${(await texts('.bcv-detail__actions'))[0]}`);
+  await page.goto(`${BASE}/courses/101/quizzes/9014?bcv=take`);
+  await page.waitForSelector('.bcv-qz__begin', { timeout: 10000 });
+  check((await texts('.bcv-qz__begin'))[0] === 'Take it in Canvas' && (await texts('.bcv-qz__bullet')).some((t) => /seals each question once you leave it/.test(t)), 'and its intro sends you there too, rather than starting an attempt here');
+  await page.click('.bcv-qz__begin');
+  await page.waitForFunction(() => location.search.includes('bcv=native'), null, { timeout: 8000 });
+  check(page.url().includes('bcv=native') && (await page.$('html.bcv-punch')) !== null, `taking it opens Canvas's own quiz page under our shell: ${page.url()}`);
+  // The override says take it here anyway. Everything below runs with it on — which is also what
+  // proves the setting reaches the screen.
+  await setSettings({ quizzes: { lockedHere: true } });
+  await page.goto(`${BASE}/courses/101/quizzes/9014`);
+  await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
+  check((await texts('.bcv-detail__actions .bcv-btn')).join(',') === 'Take the quiz,Open in Canvas' && !(await texts('.bcv-detail')).join(' ').includes('seals each question'), 'with the override on it has the same Take button as any other quiz, and the warning is gone');
   await page.click('.bcv-detail__actions .bcv-btn--primary');
   await page.waitForSelector('.bcv-qz__begin', { timeout: 10000 });
   check((await texts('.bcv-qz__bullet')).some((t) => /One question at a time, and you cannot go back/.test(t)) && (await texts('.bcv-qz__begin'))[0] === 'Begin attempt', 'the intro says one at a time and no going back; Begin starts the attempt here');
@@ -1791,7 +1835,24 @@ try {
   check(!(await page.$('#bcv-app')) || !(await visible('#bcv-app')), 'the look stays off on the next page load');
   await setSettings({ appearance: { skin: true } });
   await page.waitForSelector('#bcv-app .bcv-nav__item', { timeout: 10000 });
-  check(await visible('#bcv-app'), 'switching the look back on from settings applies in place');
+  check(await visible('#bcv-app'), 'switching the look back on from settings brings the interface back');
+  // ...and it comes back even when the copy that hears the change has no listener. Safari re-injects
+  // a site's content scripts when the extension looks at its permissions (opening the toolbar popup
+  // does): the re-injected app.js finds the interface already booted and stands down, so the fresh
+  // early.js beside it has nobody to tell. The look button then flipped a class and nothing happened.
+  await setSettings({ appearance: { skin: false } });
+  await page.waitForFunction(() => !document.documentElement.classList.contains('bcv-on'), null, { timeout: 8000 });
+  await page.evaluate(() => { window.__bcvMark = 1; }); // only a reload clears it
+  await sw.evaluate(async (base) => {
+    const [tab] = await chrome.tabs.query({ url: `${base}/*` });
+    // early.js again, exactly as Safari puts it back: a fresh copy with no listener of its own
+    await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'ISOLATED', files: chrome.runtime.getManifest().content_scripts[0].js });
+    // and app.js left believing the look is already on, so it will not act — whatever reloads now is the early script
+    await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'ISOLATED', func: () => { self.BCV.app.state.settings.appearance.skin = true; } });
+  }, BASE);
+  await setSettings({ appearance: { skin: true } });
+  await page.waitForSelector('#bcv-app .bcv-nav__item', { timeout: 15000 });
+  check((await page.evaluate(() => window.__bcvMark === undefined)) && (await visible('#bcv-app')), 'the look button reloads and brings the interface back even when the copy that heard the change has no listener');
   await nav('courses');
   await page.waitForSelector('.bcv-ccard__hero--term', { timeout: 10000 });
   await setSettings({ appearance: { skin: false } });

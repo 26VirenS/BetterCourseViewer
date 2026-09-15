@@ -711,17 +711,35 @@ html[data-bcv-theme="dark"] .bcv-prose .bcv-onlight img.equation_image { filter:
 .bcv-rubric__crit { flex: 1; min-width: 0; }
 .bcv-rubric__name { font: 600 14px/1.35 var(--bcv-font); }
 .bcv-rubric__desc { margin-top: 2px; font: 400 12.5px/1.4 var(--bcv-font); color: var(--bcv-ink3); }
+.bcv-rubric__pts { flex: none; font: 600 14px/1.2 var(--bcv-font); min-width: 70px; text-align: right; }
+/* The rubric grid: a criterion's name and score on one line, what it asks for under that, and every
+   rating it offers as a cell across the row below — the one the work was given filled in. It holds
+   at a sidebar's width and at a phone's, the cells reflowing rather than the row scrolling. */
+.bcv-rubg { display: flex; flex-direction: column; }
+.bcv-rubg__row { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 12px; padding: 13px 0; border-top: 1px solid var(--bcv-sep); }
+.bcv-rubg__row:first-child { border-top: 0; padding-top: 0; }
+.bcv-rubg__crit { grid-column: 1; grid-row: 1; min-width: 0; }
+.bcv-rubg__pts { grid-column: 2; grid-row: 1; text-align: right; }
+.bcv-rubg__rates { grid-column: 1 / -1; grid-row: 2; margin-top: 9px; display: grid; grid-template-columns: repeat(auto-fit, minmax(92px, 1fr)); gap: 6px; }
+.bcv-rubg__name { font: 600 14px/1.35 var(--bcv-font); color: var(--bcv-ink); }
+.bcv-rubg__ptsv { font: 600 14px/1.2 var(--bcv-font); color: var(--bcv-ink); white-space: nowrap; }
+.bcv-rubg__note { margin-top: 6px; font: 400 12px/1.4 var(--bcv-font); color: var(--bcv-ink2); text-align: left; }
+.bcv-rubg__rate { border: 1px solid var(--bcv-edge); border-radius: 11px; padding: 7px 9px; background: var(--bcv-fill); min-width: 0; }
+.bcv-rubg__rate.is-got { background: rgba(52,199,89,.16); border-color: rgba(52,199,89,.45); }
+.bcv-rubg__ratepts { font: 600 12px/1.2 var(--bcv-font); color: var(--bcv-ink); }
+.bcv-rubg__rate.is-got .bcv-rubg__ratepts { color: var(--bcv-green-text); }
+.bcv-rubg__ratetext { margin-top: 3px; font: 400 11.5px/1.3 var(--bcv-font); color: var(--bcv-ink3); overflow-wrap: anywhere; }
+.bcv-rubg__rate.is-got .bcv-rubg__ratetext { color: var(--bcv-ink2); }
+.bcv-rubg__norates { font: 400 12.5px/1.4 var(--bcv-font); color: var(--bcv-ink3); }
 /* a criterion written as rich text (bullets, line breaks, a link to the marking guide) reads as it
-   was written; the ratings sit under it as chips, the one it earned filled in */
+   was written rather than as markup */
 .bcv-rubric__long { margin-top: 3px; color: var(--bcv-ink2); }
 .bcv-rubric__long > :last-child { margin-bottom: 0; }
 .bcv-rubric__long p, .bcv-rubric__long ul, .bcv-rubric__long ol { margin-bottom: 6px; }
 .bcv-rubric__long li { margin-bottom: 2px; }
-.bcv-rubric__ratings { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 4px 5px; }
-.bcv-rubric__rating { font: 400 11.5px/1.35 var(--bcv-font); color: var(--bcv-ink3); background: var(--bcv-fill); border-radius: 7px; padding: 2px 7px; }
-.bcv-rubric__rating.is-got { background: rgba(52,199,89,.16); color: var(--bcv-green-text); font-weight: 600; }
-.bcv-rubric__note { margin-top: 6px; font: 400 12.5px/1.4 var(--bcv-font); color: var(--bcv-ink2); }
-.bcv-rubric__pts { flex: none; font: 600 14px/1.2 var(--bcv-font); min-width: 70px; text-align: right; }
+/* the rubric button sits with Submit assignment and opens the grid as a sheet */
+.bcv-rubbtn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; }
+.bcv-ph-sheet--rub .bcv-ph-rubsheet { padding: 2px 16px 10px; overflow: auto; max-height: 62vh; }
 .bcv-comment { padding: 12px 0; border-top: 1px solid var(--bcv-sep); }
 .bcv-comment:first-child { border-top: 0; padding-top: 0; }
 .bcv-comment__head { display: flex; gap: 8px; align-items: baseline; }
@@ -744,7 +762,15 @@ html[data-bcv-theme="dark"] .bcv-prose .bcv-onlight img.equation_image { filter:
 .bcv-module__head { display: flex; align-items: center; gap: 10px; padding: 14px 18px; cursor: pointer; border: 0; background: transparent; width: 100%; text-align: left; font: inherit; color: inherit; }
 .bcv-module__name { flex: 1; min-width: 0; font: 600 15px/1.35 var(--bcv-font); letter-spacing: -.01em; }
 .bcv-module__state { font: 400 12px/1.2 var(--bcv-font); color: var(--bcv-ink3); }
-.bcv-module__items { border-top: 1px solid var(--bcv-sep); }
+/* opening and closing is a slide, not a jump: the row takes the items' own height with it, so
+   nothing has to be measured and a module of any length behaves the same */
+.bcv-module__wrap { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .3s cubic-bezier(.32,.72,0,1); }
+.bcv-module--open .bcv-module__wrap { grid-template-rows: 1fr; }
+.bcv-module__items { min-height: 0; overflow: hidden; }
+.bcv-module--open > .bcv-module__wrap > .bcv-module__items { border-top: 1px solid var(--bcv-sep); }
+@media (prefers-reduced-motion: reduce) { .bcv-module__wrap { transition: none; } }
+.bcv-module__bar { display: flex; align-items: center; gap: 10px; padding: 0 2px 2px; }
+.bcv-module__all { cursor: pointer; border: 1px solid var(--bcv-edge); background: var(--bcv-card); }
 .bcv-module__item { padding-left: 18px; }
 .bcv-indent-1 { padding-left: 38px; } .bcv-indent-2 { padding-left: 58px; } .bcv-indent-3 { padding-left: 78px; }
 .bcv-module__toggle { }
@@ -1660,6 +1686,12 @@ html[data-bcv-theme="dark"] .bcv-ph-day.is-off .bcv-ph-day__n { color: #48484a; 
 .bcv-ph-ev__time { flex: none; font: 400 11.5px/1.2 var(--bcv-font); color: var(--bcv-ink3); }
 .bcv-ph-linkrow { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 50px; padding: 13px 15px; border: 0; border-radius: 18px; background: var(--bcv-card); box-shadow: var(--bcv-shadow); cursor: pointer; text-align: left; font: 500 14.5px/1.3 var(--bcv-font); color: var(--bcv-ink); }
 .bcv-ph-linkrow span { flex: 1; min-width: 0; }
+.bcv-ph-linkrow .bcv-ph-linkrow__right { flex: none; font: 600 13px/1.2 var(--bcv-font); color: var(--bcv-ink3); }
+.bcv-ph-sheet--locked .bcv-ph-sheet__note { white-space: pre-line; }
+.bcv-ph-lockstate { padding: 2px 18px 0; }
+.bcv-ph-lockstate__t { font: 600 14px/1.4 var(--bcv-font); color: var(--bcv-ink); }
+.bcv-ph-bigbtn.is-danger { color: var(--bcv-red-text, #c01d43); border-color: var(--bcv-red-edge, rgba(255,69,58,.4)); background: var(--bcv-red-tint, rgba(255,69,58,.12)); }
+.bcv-ph-banner__btn { flex: none; display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 11px; border: 1px solid var(--bcv-edge); border-radius: 15px; background: var(--bcv-card); color: var(--bcv-ink2); font: 600 12.5px/1 var(--bcv-font); cursor: pointer; }
 .bcv-ph-notice { padding: 12px 14px; border-radius: 14px; background: rgba(255,149,0,.14); font: 500 13px/1.4 var(--bcv-font); color: #8a5200; }
 html[data-bcv-theme="dark"] .bcv-ph-notice { color: #ffb44d; }
 /* notifications (pushed from the bell on Today) */

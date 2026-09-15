@@ -47,6 +47,7 @@
     const canvasOnly = !nativeSubmit && (a.submission_types || []).some((t) => ['media_recording', 'student_annotation'].includes(t));
     const attemptsLeft = !(a.allowed_attempts > 0) || (s.attempt || 0) < a.allowed_attempts;
     const status = s.excused ? 'Excused' : s.workflow_state === 'graded' ? 'Graded' : s.submitted_at ? (s.late ? 'Submitted late' : 'Submitted') : s.missing ? 'Missing' : 'Not submitted';
+    const graded = s.workflow_state === 'graded' && s.score !== null && s.score !== undefined;
     const feedback = (s.submission_comments || []).length || Object.keys(s.rubric_assessment || {}).length;
     // the phone draws the item page its own way (the iPhone mockup)
     if (BCV.phone?.active()) return BCV.phone.assignment(ctx, shell, { a, s, types, isTool, toolNewTab, toolLaunch, nativeSubmit, canvasOnly, attemptsLeft, status });
@@ -74,6 +75,8 @@
           a.quiz_id ? U.btn('Open quiz', { icon: IC.bolt, onClick: () => app.go(`${c.url}/quizzes/${a.quiz_id}`) }) : null,
           a.discussion_topic?.id ? U.btn('Open discussion', { icon: IC.disc, onClick: () => app.go(`${c.url}/discussion_topics/${a.discussion_topic.id}`) }) : null,
           isTool && !toolNewTab ? U.btn('Open in Canvas', { icon: IC.external, onClick: () => app.go(nativeHref(`${c.url}/assignments/${a.id}`)) }) : null,
+          // how the marks are decided, beside the decision to hand work in
+          a.rubric?.length ? U.btn('Rubric', { icon: IC.sheet, cls: 'bcv-rubbtn', onClick: () => CS().openRubric(a, s) }) : null,
         ]),
         a.description ? CS().prose(a.description) : (isTool ? null : U.text('bcv-hint', 'No description.')),
       ]), 'bcv-card--22'),
@@ -87,27 +90,15 @@
     if (block && route.params.get('bcv') === 'submit') for (const ms of [80, 600]) setTimeout(() => toBlock('auto'), ms); // opened to hand in: land on the block (again once Canvas's own page has finished loading under us)
     // side: submission + rubric
     side.append(h('div', {}, [U.label('Submission'), U.card(U.el('bcv-detail', [
-      h('div', { style: { display: 'flex', alignItems: 'baseline', gap: '10px', flexWrap: 'wrap' } }, [h('span', { class: 'bcv-stat__value', text: s.workflow_state === 'graded' && s.score !== null && s.score !== undefined ? `${store.fmtPts(s.score)} / ${a.points_possible ?? '—'}` : '—' }), U.badge(status, status === 'Graded' ? 'green' : /Missing|Not/.test(status) ? 'red' : /late/.test(status) ? 'orange' : '')]),
+      h('div', { style: { display: 'flex', alignItems: 'baseline', gap: '10px', flexWrap: 'wrap' } }, [
+        h('span', { class: 'bcv-stat__value', text: s.workflow_state === 'graded' && s.score !== null && s.score !== undefined ? `${store.fmtPts(s.score)} / ${a.points_possible ?? '—'}` : '—' }),
+        U.badge(status, status === 'Graded' ? 'green' : /Missing|Not/.test(status) ? 'red' : /late/.test(status) ? 'orange' : ''),
+        // a mark is a number until you can see how it was reached
+        graded && a.rubric?.length ? U.btn('See breakdown', { kind: 'xs', icon: IC.sheet, cls: 'bcv-rubbtn bcv-ml-auto', onClick: () => CS().openRubric(a, s) }) : null,
+      ]),
       meta([['Submitted', s.submitted_at ? U.fmtAt(s.submitted_at) : null], ['Grade', s.grade && String(s.grade) !== String(s.score) ? s.grade : null], ['Graded', s.graded_at ? U.fmtAt(s.graded_at) : null], ['Attempt', s.attempt || null]]),
       (s.submission_comments || []).length ? h('div', {}, [U.label('Comments'), ...s.submission_comments.map((cm) => U.el('bcv-comment', [U.el('bcv-comment__head', [U.text('bcv-comment__author', cm.author_name || cm.author?.display_name || 'Comment', 'span'), U.text('bcv-comment__date', U.fmtAt(cm.created_at), 'span')]), U.text('bcv-comment__body', cm.comment || '')]))]) : null,
     ]), 'bcv-card--22')]));
-    if (a.rubric?.length) {
-      const assess = s.rubric_assessment || {};
-      side.append(h('div', {}, [U.label(a.rubric_settings?.title || 'Rubric'), U.card(U.el('bcv-detail', U.el('bcv-rubric', a.rubric.map((cr) => {
-        const p = CS().rubricParts(cr, assess[cr.id]);
-        return U.el('bcv-rubric__row', [
-          U.el('bcv-rubric__crit', [
-            U.text('bcv-rubric__name', p.name),
-            p.long ? CS().prose(p.long, { cls: 'bcv-prose--13 bcv-rubric__long' }) : null,
-            // every rating the criterion offers, the one it was given marked — the way Canvas's own
-            // table shows them, rather than only whichever line happened to be there
-            p.ratings.length ? U.el('bcv-rubric__ratings', p.ratings.map((r) => h('span', { class: `bcv-rubric__rating ${r.got ? 'is-got' : ''}`, text: r.label }))) : null,
-            p.comment ? U.text('bcv-rubric__note bcv-pretty', p.comment) : null,
-          ]),
-          U.text('bcv-rubric__pts', p.pts, 'span'),
-        ]);
-      }))), 'bcv-card--22')]));
-    }
     return b;
   };
 
@@ -235,6 +226,9 @@
     const limit = store.quizAttemptLimit(q, subs);
     const open = (subs || []).some((s) => s.workflow_state === 'untaken');
     const noneLeft = limit.allowed !== null && limit.left <= 0 && !open;
+    // "lock questions after answering": Canvas seals each answer as you pass it and the attempt
+    // cannot be taken again, so it is Canvas's own page that runs it unless the setting says here
+    const lockedAway = !!q.cant_go_back && !BCV.settings.quizzesHere(app.state.settings);
     const finished = (subs || []).filter((s) => s.workflow_state === 'complete' || s.workflow_state === 'pending_review');
     const latest = finished.slice().sort((a, b) => (Number(b.attempt) || 0) - (Number(a.attempt) || 0))[0] || null;
     const feedbackHref = (s) => `${c.url}/quizzes/${q.id}?bcv=feedback&sub=${encodeURIComponent(s.id)}`;
@@ -274,10 +268,13 @@
         U.el('bcv-detail__actions', [
           q.locked_for_user ? U.badge(q.lock_explanation ? htmlToText(q.lock_explanation, 120) : 'Locked', 'orange')
             : noneLeft ? U.badge(`No attempts left · ${U.plural(limit.allowed, 'attempt')} allowed`, 'orange')
-              : U.btn(open ? 'Resume attempt' : 'Take the quiz', { kind: 'primary', icon: IC.bolt, iconColor: '#fff', onClick: () => app.go(takeHref) }),
+              // a quiz Canvas locks is taken on Canvas's own page unless the setting says otherwise
+              : lockedAway ? U.btn(open ? 'Continue in Canvas' : 'Take it in Canvas', { kind: 'primary', icon: IC.external, iconColor: '#fff', onClick: () => app.go(nativeHref(`${c.url}/quizzes/${q.id}`)) })
+                : U.btn(open ? 'Resume attempt' : 'Take the quiz', { kind: 'primary', icon: IC.bolt, iconColor: '#fff', onClick: () => app.go(takeHref) }),
           latest && q.hide_results !== 'always' ? U.btn('See feedback', { kind: noneLeft && !q.locked_for_user ? 'primary' : '', icon: IC.check, iconColor: noneLeft && !q.locked_for_user ? '#fff' : undefined, onClick: () => app.go(feedbackHref(latest)) }) : null,
           q.locked_for_user ? null : U.btn('Open in Canvas', { icon: IC.external, onClick: () => app.go(nativeHref(`${c.url}/quizzes/${q.id}`)) }),
         ]),
+        lockedAway ? U.text('bcv-hint bcv-pretty', 'This quiz seals each question once you leave it, and an attempt that goes wrong cannot be taken again — so it is taken on Canvas’s own page rather than here. Simpl Courses settings → Quizzes will take it here instead.') : null,
         q.description ? CS().prose(q.description) : U.text('bcv-hint', 'No instructions.'),
       ]), 'bcv-card--22'),
     );

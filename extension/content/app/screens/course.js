@@ -152,12 +152,88 @@
     return {
       name: htmlToText(cr?.description || '', 300),
       long: htmlToText(cr?.long_description || '', 6000).trim() ? cr.long_description : null,
-      ratings: ratings.map((r) => ({ id: r.id, got: !!rated && String(r.id) === String(rated.id), label: `${htmlToText(r.description || '', 200) || 'Rating'}${r.points === null || r.points === undefined ? '' : ` (${pts(r.points)})`}` })),
+      ratings: ratings.map((r) => ({
+        id: r.id,
+        got: !!rated && String(r.id) === String(rated.id),
+        text: htmlToText(r.description || '', 200) || 'Rating',
+        pts: r.points === null || r.points === undefined ? '' : `${pts(r.points)} pts`,
+        label: `${htmlToText(r.description || '', 200) || 'Rating'}${r.points === null || r.points === undefined ? '' : ` (${pts(r.points)})`}`,
+      })),
       rated,
       comment: got?.comments ? `“${got.comments}”` : null,
       // graded: what it earned out of what it is worth; ungraded: what it is worth
       pts: got && got.points !== null && got.points !== undefined ? `${pts(got.points)} / ${pts(cr.points)}` : `${pts(cr?.points)} pts`,
     };
+  }
+
+  /** The rubric as the grid Canvas marks on: one row per criterion, its name and score on the first
+   *  line, and every rating it offers as a cell across the row below — the rating the work was given
+   *  filled in. A grid rather than a table because it has to hold at a sidebar's width and at a
+   *  phone's: the rating cells reflow, nothing scrolls sideways. */
+  function rubricGrid(rubric, assessment, { cls = '' } = {}) {
+    const rows = (rubric || []).map((cr) => {
+      const p = rubricParts(cr, (assessment || {})[cr.id]);
+      return U.el('bcv-rubg__row', [
+        U.el('bcv-rubg__crit', [
+          U.text('bcv-rubg__name', p.name),
+          p.long ? prose(p.long, { cls: 'bcv-prose--13 bcv-rubric__long' }) : null,
+        ]),
+        U.el('bcv-rubg__rates', p.ratings.length
+          ? p.ratings.map((r) => U.el(`bcv-rubg__rate ${r.got ? 'is-got' : ''}`, [
+            r.pts ? U.text('bcv-rubg__ratepts', r.pts) : null,
+            U.text('bcv-rubg__ratetext', r.text),
+          ]))
+          : U.text('bcv-rubg__norates', 'No ratings')),
+        U.el('bcv-rubg__pts', [
+          U.text('bcv-rubg__ptsv', p.pts),
+          p.comment ? U.text('bcv-rubg__note bcv-pretty', p.comment) : null,
+        ]),
+      ]);
+    });
+    return U.el(`bcv-rubg ${cls}`, rows);
+  }
+
+  /** What the rubric is worth, and what it gave, from its own points rather than the assignment's. */
+  function rubricScore(rubric, assessment) {
+    const num = (v) => (v === null || v === undefined || v === '' ? null : Number(v));
+    const worth = (rubric || []).reduce((n, cr) => n + (num(cr.points) || 0), 0);
+    const marked = (rubric || []).filter((cr) => num((assessment || {})[cr.id]?.points) !== null);
+    return {
+      marked: marked.length > 0,
+      text: marked.length
+        ? `${store.fmtPts(marked.reduce((n, cr) => n + num(assessment[cr.id].points), 0))} / ${store.fmtPts(worth)}`
+        : `${store.fmtPts(worth)} pts`,
+    };
+  }
+
+  /** The rubric grid as a sheet over the page — a bottom sheet on a phone, a dialog on the desktop.
+   *  One place it is drawn, however it was asked for: from the button beside Submit assignment, or
+   *  from See breakdown beside a grade. */
+  function openRubric(a, sub) {
+    const assess = sub?.rubric_assessment || {};
+    const title = a.rubric_settings?.title || 'Rubric';
+    const score = rubricScore(a.rubric, assess);
+    const note = `${a.rubric.length === 1 ? '1 criterion' : `${a.rubric.length} criteria`} · ${score.marked ? `marked ${score.text}` : score.text}`;
+    const grid = rubricGrid(a.rubric, assess);
+    if (BCV.phone?.active()) {
+      BCV.phone.openSheet({ label: 'Rubric', title, note, cls: 'bcv-ph-sheet--rub', body: U.el('bcv-rubsheet', grid) });
+      return;
+    }
+    document.querySelector('.bcv-sheet-ov')?.remove();
+    const ov = U.el('bcv-sheet-ov', null, { role: 'dialog', 'aria-label': 'Rubric' });
+    const close = () => ov.remove();
+    ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
+    ov.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+    ov.append(U.el('bcv-sheet bcv-sheet--rub', [
+      U.el('bcv-sheet__head', [
+        h('div', { style: { flex: '1', minWidth: '0' } }, [U.text('bcv-sheet__title', title), U.text('bcv-sheet__desc', note)]),
+        h('button', { type: 'button', class: 'bcv-sheet__close', 'aria-label': 'Close', onclick: close }, U.svg(IC.close, { size: 13, stroke: 'var(--bcv-ink2)', width: 2.3 })),
+      ]),
+      U.el('bcv-rubsheet', grid),
+    ]));
+    document.body.append(ov);
+    ov.tabIndex = -1;
+    ov.focus();
   }
 
   function linksFrom(html, max = 4) {
@@ -1003,6 +1079,19 @@
   };
 
   const ITEM_ICON = { Assignment: IC.doc, Quiz: IC.bolt, Discussion: IC.disc, Page: IC.page, File: IC.folder, ExternalUrl: IC.link, ExternalTool: IC.shield };
+  /** The date a module is "on": the soonest thing in it that has one — a due date first, then what
+   *  Canvas unlocks it at. A module of pages and links has none and sorts to the end. */
+  function moduleDate(m) {
+    const times = [];
+    for (const it of m.items || []) {
+      const t = U.parse(it.content_details?.due_at) || U.parse(it.content_details?.unlock_at);
+      if (t) times.push(+t);
+    }
+    const un = U.parse(m.unlock_at);
+    if (un) times.push(+un);
+    return times.length ? Math.min(...times) : null;
+  }
+
   T.modulesBlock = async (ctx, shell) => {
     const c = shell.course;
     const list = await store.modules(c.id).catch(() => null);
@@ -1044,18 +1133,55 @@
         });
         return rowEl;
       }));
-      const card = U.card([
-        h('button', { type: 'button', class: 'bcv-module__head', onclick: () => { card.classList.toggle('bcv-module--open'); itemsEl.hidden = !card.classList.contains('bcv-module--open'); } }, [
-          U.svg(IC.chevron, { size: 15, stroke: 'var(--bcv-ink3)', width: 2, cls: 'bcv-module__toggle' }),
-          U.text('bcv-module__name', m.name, 'span'),
-          U.text('bcv-module__state', stateText, 'span'),
-        ]),
-        itemsEl,
-      ], `bcv-card--list bcv-module ${open.has(String(m.id)) ? 'bcv-module--open' : ''}`);
-      itemsEl.hidden = !open.has(String(m.id));
+      // The items live in a collapsing grid row rather than behind [hidden], so opening and closing
+      // is a slide: 0fr → 1fr takes the rows' own height with it, whatever that turns out to be, and
+      // nothing has to be measured. (Reduced motion turns the transition off in the stylesheet.)
+      const wrap = U.el('bcv-module__wrap', itemsEl);
+      const head = h('button', { type: 'button', class: 'bcv-module__head', 'aria-expanded': String(open.has(String(m.id))) }, [
+        U.svg(IC.chevron, { size: 15, stroke: 'var(--bcv-ink3)', width: 2, cls: 'bcv-module__toggle' }),
+        U.text('bcv-module__name', m.name, 'span'),
+        U.text('bcv-module__state', stateText, 'span'),
+      ]);
+      const card = U.card([head, wrap], `bcv-card--list bcv-module ${open.has(String(m.id)) ? 'bcv-module--open' : ''}`);
+      card.dataset.date = moduleDate(m) ?? '';
+      card.dataset.pos = String(m.position ?? 0);
+      card.setOpen = (on) => {
+        card.classList.toggle('bcv-module--open', on);
+        head.setAttribute('aria-expanded', String(on));
+      };
+      head.addEventListener('click', () => card.setOpen(!card.classList.contains('bcv-module--open')));
       return card;
     });
-    return U.el('bcv-col bcv-col--16', cards);
+    const col = U.el('bcv-col bcv-col--16');
+    // Canvas's own order is the order the course was built in; by date is the order it has to be done
+    // in. Both are kept as they were last left, per course.
+    const orderKey = `modOrder:${c.id}`;
+    const sortCards = (order) => {
+      const sorted = cards.slice().sort((x, y) => {
+        if (order !== 'date') return Number(x.dataset.pos) - Number(y.dataset.pos);
+        const a = x.dataset.date === '' ? Infinity : Number(x.dataset.date);
+        const b = y.dataset.date === '' ? Infinity : Number(y.dataset.date);
+        return a === b ? Number(x.dataset.pos) - Number(y.dataset.pos) : a - b;
+      });
+      for (const el of sorted) col.append(el); // append moves; the cards themselves are never rebuilt
+    };
+    const allOpen = () => cards.every((x) => x.classList.contains('bcv-module--open'));
+    const bulkBtn = h('button', { type: 'button', class: 'bcv-chip bcv-module__all', onclick: () => { const on = !allOpen(); for (const x of cards) x.setOpen(on); paintBulk(); } });
+    function paintBulk() {
+      bulkBtn.textContent = allOpen() ? 'Close all' : 'Open all';
+    }
+    for (const x of cards) x.addEventListener('click', (e) => { if (e.target.closest('.bcv-module__head')) paintBulk(); });
+    let order = (await store.pref(orderKey, 'course')) === 'date' ? 'date' : 'course';
+    const seg = U.seg([['course', 'Course order'], ['date', 'By date']], order, (v) => {
+      order = v;
+      store.setPref(orderKey, v);
+      for (const b of seg.querySelectorAll('.bcv-seg__btn')) b.classList.toggle('is-active', b.dataset.value === v);
+      sortCards(v);
+    });
+    paintBulk();
+    sortCards(order);
+    col.prepend(U.el('bcv-module__bar', [seg, h('span', { class: 'bcv-ml-auto' }), bulkBtn]));
+    return col;
   };
   T.modules = async (ctx, shell) => {
     const b = body();
@@ -1064,6 +1190,6 @@
     return b;
   };
 
-  BCV.screens.course = { render, prose, fitMath, rubricParts, linksFrom, typeIcon, ptsLabel, statusBadge, openReader, contextShell, keptShell, holdShell, heldShell, syncShell, warmTab, warmTabs };
+  BCV.screens.course = { render, prose, fitMath, rubricParts, rubricGrid, rubricScore, openRubric, linksFrom, typeIcon, ptsLabel, statusBadge, openReader, contextShell, keptShell, holdShell, heldShell, syncShell, warmTab, warmTabs };
   BCV.screens.courseTabs = T;
 })();

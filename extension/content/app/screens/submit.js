@@ -42,7 +42,7 @@
   /** The flow on its own (the phone), or — `embed` — the block the assignment page hosts at the
    *  end of its own scroll (mockup 11): the assignment already on the page is reused, never
    *  refetched, the instructions stay above, and the mode chosen is remembered per assignment. */
-  async function render(ctx, course, { embed = false, a: aGiven = null, sub: subGiven = null, back: backGiven = null, title: kicker = 'Hand in' } = {}) {
+  async function render(ctx, course, { embed = false, a: aGiven = null, sub: subGiven = null, back: backGiven = null, title: kicker = 'Hand in', aside = null } = {}) {
     const { app, route } = ctx;
     const cid = course.id, aid = route.arg;
     const fromTodo = route.params.get('from') === 'todo';
@@ -367,14 +367,19 @@
       return st.link?.url ? { ok: true, note: lateNote() } : { ok: false, note: 'Pick a tool or enter a link to submit.' };
     }
     function paintFoot() {
+      // `aside` is a button that belongs with Submit assignment (the rubric). It keeps the row even
+      // where there is nothing to submit — an assignment marked on paper still has a rubric to read.
+      const extra = typeof aside === 'function' ? aside() : aside;
       if (st.stage !== 'edit' || !nativeAny || lockedText() || attemptsLeft() <= 0) {
-        foot.hidden = true;
+        foot.hidden = !extra;
+        if (extra) foot.replaceChildren(U.el('bcv-sb__footin', [h('span', { style: { flex: '1' } }), extra]));
         return;
       }
       foot.hidden = false;
       const r = readiness();
       foot.replaceChildren(U.el('bcv-sb__footin', [
         U.text('bcv-sb__footnote bcv-pretty', st.busy ? 'Sending to Canvas…' : r.note, 'span'),
+        extra,
         embed ? null : h('button', { type: 'button', class: 'bcv-sb__btn', text: 'Cancel', disabled: st.busy || null, onclick: () => app.go(back.href) }),
         h('button', { type: 'button', class: 'bcv-sb__btn bcv-sb__btn--primary', text: st.busy ? 'Submitting…' : 'Submit assignment', disabled: !r.ok || st.busy || null, onclick: submit }),
       ]));
