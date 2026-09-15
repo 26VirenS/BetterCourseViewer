@@ -1230,6 +1230,18 @@ html[data-bcv-theme="dark"] .bcv-qz__opt.is-selected { background: rgba(10,132,2
 .bcv-qz__opt--compact .bcv-qz__optlabel { font-size: 16px; }
 .bcv-qz__page--all .bcv-qz__opts { gap: 7px; }
 .bcv-qz__text { padding: 0 4px; }
+/* matching, and the kinds with a blank each: a row per value, its control beside it */
+.bcv-qz__match, .bcv-qz__blanks { display: flex; flex-direction: column; gap: 8px; max-width: 640px; }
+.bcv-qz__matchrow, .bcv-qz__blankrow { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 14px; background: var(--bcv-fill2); border: 1.5px solid transparent; }
+.bcv-qz__matchleft, .bcv-qz__blanklbl { flex: 1; min-width: 0; font: 500 15px/1.4 var(--bcv-font); }
+.bcv-qz__blanklbl { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; color: var(--bcv-ink2); }
+.bcv-qz__matchrow .bcv-prose { margin: 0; }
+.bcv-qz__sel { flex: none; width: 210px; max-width: 48%; }
+.bcv-qz__blankrow .bcv-input { flex: none; width: 210px; max-width: 48%; }
+.bcv-select { height: 36px; padding: 0 30px 0 12px; border-radius: 11px; background: var(--bcv-fill) !important; border: 0 !important; font: 400 14px/1 var(--bcv-font); color: var(--bcv-ink) !important; outline: none; -webkit-appearance: none; appearance: none; cursor: pointer; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238e8e93' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") !important; background-repeat: no-repeat !important; background-position: right 9px center !important; background-size: 13px !important; }
+.bcv-select:focus { box-shadow: 0 0 0 2px var(--bcv-blue-soft); }
+html.bcv-phone .bcv-qz__matchrow, html.bcv-phone .bcv-qz__blankrow { flex-wrap: wrap; gap: 8px; }
+html.bcv-phone .bcv-qz__sel, html.bcv-phone .bcv-qz__blankrow .bcv-input { width: 100%; max-width: none; }
 .bcv-qz__text .bcv-input { height: 48px; border-radius: 14px; font-size: 16px; }
 .bcv-qz__text .bcv-textarea { font-size: 16px; }
 .bcv-qz__foot { position: sticky; bottom: 0; z-index: 6; background: var(--bcv-chrome); -webkit-backdrop-filter: var(--bcv-blur-chrome); backdrop-filter: var(--bcv-blur-chrome); border-top: 1px solid var(--bcv-edge); }

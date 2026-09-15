@@ -37,6 +37,16 @@
   };
 
   /** One `.display_question` block as the question shape the quiz screen draws (the API's shape). */
+  /** The value a matching dropdown is set against: its row's text, less whatever the dropdown says. */
+  function leftOf(sel) {
+    const row = sel.closest('.answer_match, .answer, tr, li, div');
+    if (!row) return '';
+    const own = sel.selectedOptions?.[0]?.textContent || '';
+    const left = row.querySelector('.answer_match_left, .answer_match_left_html');
+    const text = (left ? left.textContent : row.textContent.replace(own, '')).replace(/\s+/g, ' ').trim();
+    return text;
+  }
+
   function parseQuestion(el) {
     const id = idOf(el, 'question_');
     if (!id || !/^\d+$/.test(id)) return null;
@@ -58,6 +68,29 @@
       const aid = (inp) => inp.name.slice(`question_${id}_answer_`.length);
       q.answers = boxes.map((inp) => ({ id: aid(inp), ...labelOf(inp) }));
       q.answer = boxes.filter((inp) => inp.checked).map((inp) => num(aid(inp)) ?? aid(inp));
+    } else if (type === 'matching_question') {
+      // Canvas draws each left-hand value with a dropdown of the same right-hand list beside it. The
+      // list is read off the first dropdown (every one carries it), and the left-hand text off the row.
+      const sels = [...scope.querySelectorAll(`select[name^="question_${id}_answer_"]`)];
+      if (sels.length) {
+        q.matches = [...sels[0].options].filter((o) => o.value).map((o) => ({ match_id: num(o.value) ?? o.value, text: o.textContent.trim() }));
+        q.answers = sels.map((sel) => ({ id: sel.name.slice(`question_${id}_answer_`.length), text: leftOf(sel) }));
+        const on = sels.filter((sel) => sel.value);
+        q.answer = on.length ? on.map((sel) => ({ answer_id: num(sel.name.slice(`question_${id}_answer_`.length)) ?? sel.name.slice(`question_${id}_answer_`.length), match_id: num(sel.value) ?? sel.value })) : null;
+      }
+    } else if (type === 'multiple_dropdowns_question' || type === 'fill_in_multiple_blanks_question') {
+      // one field per blank, named for the blank it fills; a dropdown carries that blank's own list
+      const fields = [...scope.querySelectorAll(`select[name^="question_${id}_"], input[type="text"][name^="question_${id}_"]`)]
+        .filter((f) => !f.name.startsWith(`question_${id}_answer_`));
+      const blankOf = (f) => f.name.slice(`question_${id}_`.length);
+      if (fields.length) {
+        q.blanks = fields.map(blankOf);
+        q.answers = fields.flatMap((f) => (f.tagName === 'SELECT'
+          ? [...f.options].filter((o) => o.value).map((o) => ({ id: num(o.value) ?? o.value, text: o.textContent.trim(), blank_id: blankOf(f) }))
+          : []));
+        const filled = fields.filter((f) => String(f.value || '').trim());
+        q.answer = filled.length ? Object.fromEntries(filled.map((f) => [blankOf(f), f.tagName === 'SELECT' ? (num(f.value) ?? f.value) : f.value.trim()])) : null;
+      }
     } else {
       const field = el.querySelector(`textarea[name="question_${id}"], input[type="text"][name="question_${id}"]`);
       if (field) {

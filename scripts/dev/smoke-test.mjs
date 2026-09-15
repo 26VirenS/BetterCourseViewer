@@ -1356,6 +1356,55 @@ try {
   check(/Question 2 0 \/ 4 .*You: 17\.68 m Correct: -3\.15 m/i.test((await texts('.bcv-fb__q'))[1]), `the seeded wrong answer with the correct one beside it: ${(await texts('.bcv-fb__q'))[1]}`);
   await shot(page, '22j-quiz-feedback-seeded');
 
+  // ---- matching, and the kinds with a blank each ---------------------------------------------------
+  // Canvas draws these as dropdowns and used to be the only place that could take them; they are
+  // answered here now, and go up in the shapes Canvas's own API asks for.
+  console.log('quiz: matching and blanks');
+  await noteApi('POST', '/__mock/config', { richQuestions: true });
+  await page.goto(`${BASE}/courses/101/quizzes/9001`);
+  await page.waitForSelector('.bcv-detail__actions .bcv-btn--primary', { timeout: 20000 });
+  await page.click('.bcv-detail__actions .bcv-btn--primary'); // to the quiz's own intro
+  await page.waitForSelector('.bcv-qz__begin', { timeout: 20000 });
+  await page.click('.bcv-qz__begin');
+  await page.waitForSelector('.bcv-qz__pill', { timeout: 20000 });
+  check((await page.$$('.bcv-qz__pill')).length === 6, `the attempt carries every question, the two new kinds included: ${(await page.$$('.bcv-qz__pill')).length}`);
+  // matching: a row per left-hand value, the same list of right-hand ones beside each
+  await page.click('.bcv-qz__pill:nth-child(5)');
+  await waitText('.bcv-qz__qnum', /Question 5/);
+  const matchLeft = await texts('.bcv-qz__matchleft');
+  const matchOpts = await page.$$eval('.bcv-qz__matchrow:first-child .bcv-qz__sel option', (els) => els.map((e) => e.textContent));
+  check(matchLeft.length === 3 && matchLeft[0] === '9.8' && matchOpts.length === 4 && matchOpts[0] === 'Choose…' && matchOpts.includes('Speed of light') && !(await page.$('.bcv-qz__q .bcv-hint')), `a matching question is answered here: ${matchLeft.join(' | ')} → ${matchOpts.slice(1).join(' | ')}`);
+  const mSel = await page.$$('.bcv-qz__match .bcv-qz__sel');
+  await mSel[0].selectOption({ label: 'Acceleration due to gravity' });
+  await mSel[1].selectOption({ label: 'Speed of light' });
+  await mSel[2].selectOption({ label: 'Gravitational constant' });
+  await waitText('.bcv-qz__answered', /1 of 6 answered · Saved/);
+  check(true, 'every pair saves as it is set');
+  await shot(page, '22i-quiz-matching');
+  // a blank each, from a dropdown of that blank's own list
+  await page.click('.bcv-qz__pill:nth-child(6)');
+  await waitText('.bcv-qz__qnum', /Question 6/);
+  const blankLbls = await texts('.bcv-qz__blanklbl');
+  check(blankLbls.join('|') === 'rate|what' && (await page.$$('.bcv-qz__blanks .bcv-qz__sel')).length === 2, `a blank each, named for the blank it fills: ${blankLbls.join(' | ')}`);
+  const bSel = await page.$$('.bcv-qz__blanks .bcv-qz__sel');
+  await bSel[0].selectOption({ label: 'rate of change' });
+  await bSel[1].selectOption({ label: 'position' });
+  await waitText('.bcv-qz__answered', /2 of 6 answered · Saved/);
+  // Canvas kept them: its own take page comes back with the same picks set
+  const kept = await sw.evaluate(async () => {
+    const html = await (await fetch('http://localhost:8787/courses/101/quizzes/9001/take')).text();
+    return (html.match(/<option value="[^"]*" selected>[^<]*<\/option>/g) || []).map((m) => m.replace(/.*selected>/, '').replace('</option>', ''));
+  });
+  check(kept.length === 5 && kept.join(' | ') === 'Acceleration due to gravity | Speed of light | Gravitational constant | rate of change | position', `Canvas's own page comes back with every pick set, in its own shapes: ${kept.join(' | ')}`);
+  // and the review names what was set, rather than a bare id
+  await page.click('.bcv-qz__foot .bcv-qz__btn--primary');
+  await page.waitForSelector('.bcv-qz__sum', { timeout: 10000 });
+  const sums6 = await texts('.bcv-qz__sum');
+  check(/9\.8 → Acceleration due to gravity/.test(sums6[4]) && /rate: rate of change/.test(sums6[5]), `the review names both sides of every pair and every blank: ${sums6[4]} | ${sums6[5]}`);
+  await noteApi('POST', '/__mock/config', { richQuestions: false });
+  await page.goto(`${BASE}/courses/101/quizzes/9001`);
+  await page.waitForSelector('.bcv-qz__intro, .bcv-detail__title', { timeout: 20000 });
+
   // ---- hybrid (native) page inside the shell ----------------------------------------------------
   console.log('native pages');
   await page.goto(`${BASE}/courses/101/external_tools/9`);

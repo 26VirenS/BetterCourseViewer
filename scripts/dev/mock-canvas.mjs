@@ -215,7 +215,7 @@ const files = {
   f101b: [{ id: 'f4', display_name: 'Dis01 worksheet.pdf', filename: 'dis01.pdf', 'content-type': 'application/pdf', size: 80000, updated_at: ago(3 * D), url: '/files/f4/download' }],
   f101c: [],
 };
-const quizzes = (courseId) => allAssignments(courseId).filter((a) => a.is_quiz_assignment).map((a, i) => ({ id: a.quiz_id, title: a.name, due_at: a.due_at, points_possible: a.points_possible, question_count: 4, quiz_type: a.name === 'Skills_Check' ? 'practice_quiz' : 'assignment', time_limit: 20, allowed_attempts: 1, description: `<p>${a.name}: four questions on the pre-lecture reading.</p>`, html_url: `/courses/${courseId}/quizzes/${a.quiz_id}`, locked_for_user: false, assignment_id: a.id, one_question_at_a_time: a.name === 'Lec07-PreQuiz', cant_go_back: a.name === 'Lec07-PreQuiz', hide_results: null, show_correct_answers: true, shuffle_answers: false }));
+const quizzes = (courseId) => allAssignments(courseId).filter((a) => a.is_quiz_assignment).map((a, i) => ({ id: a.quiz_id, title: a.name, due_at: a.due_at, points_possible: a.points_possible, question_count: mockConfig.richQuestions ? 6 : 4, quiz_type: a.name === 'Skills_Check' ? 'practice_quiz' : 'assignment', time_limit: 20, allowed_attempts: mockConfig.richQuestions ? 5 : 1, description: `<p>${a.name}: four questions on the pre-lecture reading.</p>`, html_url: `/courses/${courseId}/quizzes/${a.quiz_id}`, locked_for_user: false, assignment_id: a.id, one_question_at_a_time: a.name === 'Lec07-PreQuiz', cant_go_back: a.name === 'Lec07-PreQuiz', hide_results: null, show_correct_answers: true, shuffle_answers: false }));
 
 // ---- quiz attempts (stateful, like Canvas's quiz submission API) --------------------------
 // quiz 9001 was taken once: q1 right, q2 wrong (17.68 m), q3 right, q4 right = 13 of 16
@@ -229,12 +229,43 @@ const quizQuestionBank = (quizId) => {
     // answers that are nothing but a formula: Canvas leaves answer_text empty and holds the equation
     // as its own image, with the LaTeX on the tag (question 3 of the real quiz this mirrors)
     { id: `${quizId}3`, position: 3, question_name: 'Question 3', question_type: 'multiple_answers_question', question_text: '<p>Which of these are vector quantities, such as <img class=\"equation_image\" title=\"\\vec{v}\" src=\"/equation_images/%5Cvec%7Bv%7D\" alt=\"LaTeX: \\vec{v}\" data-equation-content=\"\\vec{v}\">?</p>', points_possible: 4, answers: [{ id: Number(`${quizId}31`), text: '', html: '<p><img class=\"equation_image\" title=\"\\vec{v}\" src=\"/equation_images/%5Cvec%7Bv%7D\" alt=\"LaTeX: \\vec{v}\" data-equation-content=\"\\vec{v}\"></p>', weight: 100 }, { id: Number(`${quizId}32`), text: 'Speed', html: '', weight: 0 }, { id: Number(`${quizId}33`), text: '', html: '<p><img class=\"equation_image\" title=\"\\vec{a}=\\frac{d\\vec{v}}{dt}\" src=\"/equation_images/%5Cvec%7Ba%7D\" alt=\"LaTeX: \\vec{a}=\\frac{d\\vec{v}}{dt}\" data-equation-content=\"\\vec{a}=\\frac{d\\vec{v}}{dt}\"></p>', weight: 100 }] },
+    // Canvas's own shapes for these: matching carries its right-hand list in `matches`, and the blank
+    // kinds tag every answer with the blank it belongs to. Test-only, so every other count stands.
+    ...(mockConfig.richQuestions ? [{ id: `${quizId}5`, position: 5, question_name: 'Question 5', question_type: 'matching_question', question_text: '<p>Match each reading to what it measures.</p>', points_possible: 3,
+      answers: [
+        { id: Number(`${quizId}51`), text: '9.8', match_id: 901 },
+        { id: Number(`${quizId}52`), text: '3.0 × 10⁸', match_id: 902 },
+        { id: Number(`${quizId}53`), text: '6.67 × 10⁻¹¹', match_id: 903 },
+      ],
+      matches: [{ match_id: 901, text: 'Acceleration due to gravity' }, { match_id: 902, text: 'Speed of light' }, { match_id: 903, text: 'Gravitational constant' }] },
+    { id: `${quizId}6`, position: 6, question_name: 'Question 6', question_type: 'multiple_dropdowns_question', question_text: '<p>Velocity is the [rate] of [what] with respect to time.</p>', points_possible: 2,
+      answers: [
+        { id: Number(`${quizId}61`), text: 'rate of change', blank_id: 'rate', weight: 100 },
+        { id: Number(`${quizId}62`), text: 'total amount', blank_id: 'rate', weight: 0 },
+        { id: Number(`${quizId}63`), text: 'position', blank_id: 'what', weight: 100 },
+        { id: Number(`${quizId}64`), text: 'mass', blank_id: 'what', weight: 0 },
+      ] }] : []),
     { id: `${quizId}4`, position: 4, question_name: 'Question 4', question_type: 'numerical_question', question_text: '<p>At what time (in seconds) is the object momentarily at rest? See the <a href="/courses/101/pages/chapter-4-notes">chapter 4 notes</a>.</p>', points_possible: 5, answers: [{ id: Number(`${quizId}41`), text: '3.15', weight: 100, exact: 3.15 }], neutral_comments: 'Only one root in the interval: v(t) = 0 at t = 3.15 s.' },
   ];
 };
 const gradeQuestion = (q, a) => {
   if (a === null || a === undefined || a === '') return false;
   if (q.question_type === 'numerical_question') return Number(a) === q.answers[0].exact;
+  // matching: every left-hand value set against the match it was written with
+  if (q.question_type === 'matching_question') {
+    const want = new Map(q.answers.map((x) => [String(x.id), String(x.match_id)]));
+    const got = new Map((Array.isArray(a) ? a : []).map((p2) => [String(p2.answer_id), String(p2.match_id)]));
+    return want.size === got.size && [...want].every(([k, v]) => got.get(k) === v);
+  }
+  // a blank each: the option Canvas weights 100 for that blank, or the text it holds
+  if (q.question_type === 'multiple_dropdowns_question' || q.question_type === 'fill_in_multiple_blanks_question') {
+    const blanks = [...new Set(q.answers.map((x) => x.blank_id))];
+    const held = a && typeof a === 'object' && !Array.isArray(a) ? a : {};
+    return blanks.every((b) => {
+      const right = q.answers.filter((x) => x.blank_id === b && x.weight === 100);
+      return right.some((x) => String(held[b]) === String(q.question_type === 'multiple_dropdowns_question' ? x.id : x.text));
+    });
+  }
   const right = q.answers.filter((x) => x.weight === 100).map((x) => String(x.id)).sort();
   const picked = (Array.isArray(a) ? a : [a]).map(String).sort();
   return picked.join() === right.join();
@@ -326,7 +357,7 @@ const htmlPages = {
 // the record_answer action, and — when going back is off — the first unread question whatever the
 // URL asks for. The extension reads one-question-at-a-time quizzes from here, since the API refuses
 // to list their questions.
-const answeredQ = (s, q) => { const a = s.state[q.id]?.answer; return !(a === null || a === undefined || a === '' || (Array.isArray(a) && !a.length)); };
+const answeredQ = (s, q) => { const a = s.state[q.id]?.answer; if (a === null || a === undefined || a === '') return false; if (Array.isArray(a)) return !!a.length; if (typeof a === 'object') return !!Object.keys(a).length; return true; };
 const takeQuestionHtml = (q, s) => {
   const st = s.state[q.id] || {};
   const a = st.answer;
@@ -336,6 +367,17 @@ const takeQuestionHtml = (q, s) => {
   else if (q.question_type === 'numerical_question') answers = `<div class="form-control numerical-question-holder"><input type="text" name="question_${q.id}" value="${a ?? ''}" class="form-control__input question_input numerical_question_input" autocomplete="off" aria-label="Numerical answer" /></div>`;
   else if (q.question_type === 'essay_question') answers = `<div class="form-control textarea-question-holder"><textarea name="question_${q.id}" class="question_input" autocomplete="off">${a ?? ''}</textarea></div>`;
   else if (q.question_type === 'short_answer_question') answers = `<div class="form-control text-box-question-holder"><input type="text" name="question_${q.id}" value="${a ?? ''}" class="question_input" autocomplete="off" /></div>`;
+  else if (q.question_type === 'matching_question') answers = `<div class="answers_wrapper">${q.answers.map((ans) => {
+    const on = (Array.isArray(a) ? a : []).find((p2) => String(p2.answer_id) === String(ans.id));
+    return `<div class="answer"><div class="answer_match"><div class="answer_match_left">${ans.text}</div><div class="answer_match_right"><select class="question_input" name="question_${q.id}_answer_${ans.id}" aria-label="Match"><option value="">[ Choose ]</option>${(q.matches || []).map((m) => `<option value="${m.match_id}"${on && String(on.match_id) === String(m.match_id) ? ' selected' : ''}>${m.text}</option>`).join('')}</select></div></div></div>`;
+  }).join('')}</div>`;
+  else if (q.question_type === 'multiple_dropdowns_question' || q.question_type === 'fill_in_multiple_blanks_question') {
+    const blanks = [...new Set(q.answers.map((ans) => ans.blank_id))];
+    const held = a && typeof a === 'object' && !Array.isArray(a) ? a : {};
+    answers = `<div class="answers_wrapper">${blanks.map((b) => (q.question_type === 'multiple_dropdowns_question'
+      ? `<select class="question_input" name="question_${q.id}_${b}" aria-label="${b}"><option value="">[ Choose ]</option>${q.answers.filter((ans) => ans.blank_id === b).map((ans) => `<option value="${ans.id}"${String(held[b]) === String(ans.id) ? ' selected' : ''}>${ans.text}</option>`).join('')}</select>`
+      : `<input type="text" class="question_input" name="question_${q.id}_${b}" value="${held[b] ?? ''}" aria-label="${b}" />`)).join('')}</div>`;
+  }
   else answers = `<fieldset><legend class="screenreader-only">Group of answer choices</legend>${q.answers.map((ans) => `<div class="answer"><label class="answer_row user_content"><span class="answer_input"><input type="radio" class="question_input" name="question_${q.id}" value="${ans.id}" id="question_${q.id}_answer_${ans.id}"${String(a) === String(ans.id) ? ' checked' : ''} aria-labelledby="question_${q.id}_answer_${ans.id}_label" /></span>${label(ans)}</label></div>`).join('')}</fieldset>`;
   return `<div role="region" aria-label="Question" class="quiz_sortable question_holder"><div style="display: block; height: 1px; overflow: hidden;">&nbsp;</div><a name="question_${q.id}"></a><div class="display_question question ${q.question_type}${st.flagged ? ' marked' : ''}" id="question_${q.id}"><a href="#" class="flag_question" role="checkbox" aria-checked="${st.flagged ? 'true' : 'false'}"><span class="screenreader-only">Flag question: ${q.question_name}</span></a><div class="header"><span class="name question_name" role="heading" aria-level="2">${q.question_name}</span><span class="question_points_holder"><span class="points question_points">${q.points_possible}</span> pts</span></div><div style="display: none;"><span class="question_type">${q.question_type}</span><span class="answer_selection_type"></span></div><div class="text"><div class="original_question_text" style="display: none;"><textarea disabled style="display: none;" name="question_text" class="textarea_question_text">${q.question_text.replace(/</g, '&lt;')}</textarea></div><div id="question_${q.id}_question_text" class="question_text user_content">${q.question_text}</div><div class="answers">${answers}</div><div class="after_answers"></div></div><div class="clear"></div></div></div>`;
 };

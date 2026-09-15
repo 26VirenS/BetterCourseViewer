@@ -23,10 +23,21 @@
     const hh = Math.floor(s / 3600), mm = Math.floor((s % 3600) / 60), ss = s % 60;
     return hh ? `${hh}:${pad(mm)}:${pad(ss)}` : `${mm}:${pad(ss)}`;
   };
-  const answered = (v) => !(v === null || v === undefined || v === '' || (Array.isArray(v) && !v.length));
+  // Matching saves a list of pairs and the blank kinds save one value per blank, so neither an empty
+  // list nor an empty set of blanks counts as answered.
+  const answered = (v) => {
+    if (v === null || v === undefined || v === '') return false;
+    if (Array.isArray(v)) return !!v.length;
+    if (typeof v === 'object') return !!Object.keys(v).length;
+    return true;
+  };
   const CHOICE = new Set(['multiple_choice_question', 'true_false_question']);
   const MULTI = new Set(['multiple_answers_question']);
   const TEXT = new Set(['short_answer_question', 'essay_question', 'numerical_question']);
+  const MATCH = new Set(['matching_question']);
+  // one field per blank: a dropdown of that blank's own list, or a line to type in
+  const DROPS = new Set(['multiple_dropdowns_question']);
+  const BLANKS = new Set(['multiple_dropdowns_question', 'fill_in_multiple_blanks_question']);
   const INFO = new Set(['text_only_question']);
 
   async function render(ctx, course) {
@@ -158,6 +169,9 @@
         paintProgress();
       }
     }
+    // typing into a blank saves on a pause, the way every other typed answer does
+    let blankTimer = null;
+    const saveSoon = (fn) => { clearTimeout(blankTimer); blankTimer = setTimeout(fn, 600); };
     const textTimers = new Map();
     const textPending = new Map();
     function saveText(q, value) {
@@ -428,6 +442,57 @@
         field.value = q.answer === null || q.answer === undefined ? '' : String(q.answer);
         return U.el('bcv-qz__text', field);
       }
+      // Matching: each left-hand value with the same list of right-hand ones beside it. Canvas takes
+      // the picks as pairs — the answer's own id against the match it was set to.
+      if (MATCH.has(type)) {
+        const matches = q.matches || [];
+        const chosen = new Map((Array.isArray(q.answer) ? q.answer : []).map((p2) => [String(p2.answer_id), String(p2.match_id)]));
+        const rows = [];
+        const send = () => {
+          const pairs = [];
+          for (const [aid, sel] of rows) if (sel.value) pairs.push({ answer_id: Number(aid) || aid, match_id: Number(sel.value) || sel.value });
+          save(q, pairs);
+        };
+        return U.el(`bcv-qz__match ${compact ? 'bcv-qz__match--compact' : ''}`, opts.map((a) => {
+          const sel = h('select', { class: 'bcv-select bcv-qz__sel', 'aria-label': `Match for ${a.text || a.left || 'this'}`, onchange: send }, [
+            h('option', { value: '', text: 'Choose…' }),
+            ...matches.map((m) => h('option', { value: String(m.match_id), text: m.text })),
+          ]);
+          sel.value = chosen.get(String(a.id)) || '';
+          rows.push([String(a.id), sel]);
+          const left = a.html ? BCV.screens.course.prose(a.html, { cls: 'bcv-qz__matchleft' }) : h('span', { class: 'bcv-qz__matchleft', text: a.text || a.left || '' });
+          return U.el('bcv-qz__matchrow', [left, sel]);
+        }));
+      }
+      // A blank each: a dropdown of that blank's own list, or a line to type in. Canvas takes them as
+      // one value per blank, named for the blank.
+      if (BLANKS.has(type)) {
+        const drops = DROPS.has(type);
+        const blanks = q.blanks?.length ? q.blanks : [...new Set(opts.map((a) => a.blank_id).filter(Boolean))];
+        const held = q.answer && typeof q.answer === 'object' && !Array.isArray(q.answer) ? q.answer : {};
+        const fields = [];
+        const send = () => {
+          const out = {};
+          for (const [blank, f] of fields) {
+            const v = String(f.value || '').trim();
+            if (v) out[blank] = drops ? (Number(v) || v) : v;
+          }
+          save(q, out);
+        };
+        if (!blanks.length) return null;
+        return U.el(`bcv-qz__blanks ${compact ? 'bcv-qz__blanks--compact' : ''}`, blanks.map((blank) => {
+          const mine = opts.filter((a) => String(a.blank_id) === String(blank));
+          const f = drops
+            ? h('select', { class: 'bcv-select bcv-qz__sel', 'aria-label': blank, onchange: send }, [
+              h('option', { value: '', text: 'Choose…' }),
+              ...mine.map((a) => h('option', { value: String(a.id), text: a.text || htmlToText(a.html || '', 60) })),
+            ])
+            : h('input', { class: 'bcv-input', type: 'text', placeholder: 'Your answer', 'aria-label': blank, oninput: () => saveSoon(send) });
+          f.value = held[blank] === undefined || held[blank] === null ? '' : String(held[blank]);
+          fields.push([blank, f]);
+          return U.el('bcv-qz__blankrow', [U.text('bcv-qz__blanklbl', blank, 'span'), f]);
+        }));
+      }
       if (INFO.has(type)) return null;
       // Matching, fill-in-the-blanks, dropdowns, file upload, calculated…: Canvas's own page handles these on the same attempt.
       return U.card(U.el('bcv-detail', [
@@ -485,6 +550,7 @@
 
     /** An answer as pieces to show: its own words, and the rich content Canvas holds it in when there
      *  is any — which is how a formula arrives, as an equation image with the LaTeX on the tag. */
+    const partText = (p) => (String(p.text).trim() ? p.text : htmlToText(p.html || '', 80)) || '—';
     function answerParts(q) {
       const a = q.answer;
       if (!answered(a)) return null;
@@ -493,11 +559,22 @@
         const o = opts.find((x) => String(x.id) === String(id));
         return o ? { text: o.text || '', html: o.html || '' } : { text: String(id), html: '' };
       };
+      // a pair each: the left-hand value and what it was set to
+      if (MATCH.has(q.question_type)) {
+        const nameOf = (mid) => (q.matches || []).find((m) => String(m.match_id) === String(mid))?.text || String(mid);
+        return a.map((p2) => ({ text: `${one(p2.answer_id).text || partText(one(p2.answer_id))} → ${nameOf(p2.match_id)}`, html: '' }));
+      }
+      // one value per blank, named for the blank it fills
+      if (BLANKS.has(q.question_type)) {
+        return Object.entries(a).map(([blank, v]) => {
+          const o = DROPS.has(q.question_type) ? opts.find((x) => String(x.id) === String(v) && String(x.blank_id) === String(blank)) : null;
+          return { text: `${blank}: ${o ? (o.text || htmlToText(o.html || '', 60)) : v}`, html: '' };
+        });
+      }
       if (Array.isArray(a)) return a.map(one);
       if (CHOICE.has(q.question_type)) return [one(a)];
       return [{ text: String(a), html: '' }];
     }
-    const partText = (p) => (String(p.text).trim() ? p.text : htmlToText(p.html || '', 80)) || '—';
     /** The same, flattened to one line — for the review list and anywhere a plain string is wanted. */
     function answerText(q) {
       const parts = answerParts(q);
