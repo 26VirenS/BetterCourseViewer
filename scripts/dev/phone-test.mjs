@@ -503,8 +503,15 @@ try {
   await page.goto(`${BASE}/courses/104/assignments/4001`);
   await ready();
   await page.waitForSelector('.bcv-ph-banner', { timeout: 15000 });
-  check((await texts('.bcv-ph-banner .bcv-rubbtn'))[0] === 'See breakdown', 'a graded assignment offers See breakdown beside the grade');
-  await page.click('.bcv-ph-banner .bcv-rubbtn');
+  check((await texts('.bcv-ph-bigbtn.bcv-rubbtn'))[0] === 'See breakdown', 'a graded assignment offers See breakdown under the grade');
+  // and the banner itself opens what is behind the mark: the attempts, and the thread
+  await page.click('.bcv-ph-banner.is-link');
+  await page.waitForSelector('.bcv-sheet--sub .bcv-xrow', { timeout: 8000 });
+  const phAttempts = await texts('.bcv-sheet--sub .bcv-xrow');
+  check(phAttempts.length === 2 && /^Attempt 2 /.test(phAttempts[0]) && !!(await page.$('.bcv-sub__box')), `the mark opens every attempt and the comment box on a phone: ${phAttempts.join(' | ')}`);
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !document.querySelector('.bcv-sheet--sub'), null, { timeout: 5000 });
+  await page.click('.bcv-ph-bigbtn.bcv-rubbtn');
   await page.waitForSelector('.bcv-ph-sheet--rub .bcv-rubg__cell.is-got', { timeout: 8000 });
   const got = await page.$eval('.bcv-rubg__row', (e) => ({ got: e.querySelector('.bcv-rubg__cell.is-got')?.innerText.replace(/\s+/g, ' ').trim(), pts: e.querySelector('.bcv-rubg__ptsv')?.textContent }));
   check(/^3 Partial/.test(got.got || '') && got.pts === '4 / 6', `and it rings the level the work was given: ${JSON.stringify(got)}`);

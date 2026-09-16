@@ -65,21 +65,19 @@
       backBtn(app, back.href, back.label),
       U.card(U.el('bcv-detail', [
         h('h2', { class: 'bcv-detail__title bcv-pretty', text: a.name }),
-        // The mark goes at the top, where it is the first thing read: it is the answer to the
-        // question the page is opened with. The side column keeps the detail (when it was handed in,
-        // when it was marked, the comments) — this is the number and nothing else.
-        graded ? U.el('bcv-detail__grade', [
+        // The mark sits in the corner of the card, beside the title: the first thing read, and small
+        // enough that it does not take the page from the assignment itself. It opens what is behind
+        // it — every attempt, what was handed in, and the thread it came back on.
+        graded ? h('button', { type: 'button', class: 'bcv-detail__grade', title: 'See your submissions and feedback', onclick: () => openSubmissions(ctx, c, a, s) }, [
           U.el('bcv-detail__gradev', [
             h('span', { class: 'bcv-detail__gradescore', text: store.fmtPts(s.score) }),
             h('span', { class: 'bcv-detail__gradeof', text: `/ ${a.points_possible ?? '—'}` }),
           ]),
           h('div', { class: 'bcv-detail__gradeside' }, [
-            U.text('bcv-detail__gradepc', a.points_possible ? `${Math.round((Number(s.score) / Number(a.points_possible)) * 100)}%` : '', 'span'),
-            U.text('bcv-detail__gradewhen', s.graded_at ? `Marked ${U.fmtAt(s.graded_at)}` : 'Marked', 'span'),
+            U.text('bcv-detail__gradepc', a.points_possible ? `${Math.round((Number(s.score) / Number(a.points_possible)) * 100)}%` : (s.grade ? String(s.grade) : ''), 'span'),
+            U.text('bcv-detail__gradewhen', s.graded_at ? U.fmtAt(s.graded_at) : 'Marked', 'span'),
           ]),
-          h('span', { class: 'bcv-ml-auto' }),
-          s.grade && String(s.grade) !== String(s.score) ? U.badge(String(s.grade), 'green') : null,
-          a.rubric?.length ? U.btn('See breakdown', { kind: 'xs', icon: IC.sheet, cls: 'bcv-rubbtn', onClick: () => CS().openRubric(a, s) }) : null,
+          U.chev(),
         ]) : null,
         meta([['Due', a.due_at ? U.fmtAt(a.due_at) : 'No due date'], ['Points', a.points_possible ?? '—'], ['Submitting', types], ['Available', available], ['Attempts', a.allowed_attempts && a.allowed_attempts > 0 ? `${s.attempt || 0} of ${a.allowed_attempts}` : null]]),
         U.el('bcv-detail__actions', [
@@ -317,6 +315,135 @@
     ], { mod: 'bcv-row--p12-16', href: `${c.url}/assignments/${a.id}` })), 'bcv-card--list') : U.emptyCard('No dated assignments.')]));
     return b;
   };
+
+  // ---- what was handed in, and what came back -----------------------------------------------------
+  /** Every attempt Canvas kept, newest first. A submission with no history is the one attempt there is. */
+  function attemptsOf(s) {
+    const hist = (s.submission_history || []).filter((x) => x && (x.submitted_at || x.attempt));
+    const list = hist.length ? hist : (s.submitted_at || s.attempt ? [s] : []);
+    return list.slice().sort((x, y) => (Number(y.attempt) || 0) - (Number(x.attempt) || 0));
+  }
+  const TYPE_WORD = { online_upload: 'File upload', online_text_entry: 'Text entry', online_url: 'Website URL', online_quiz: 'Quiz', discussion_topic: 'Discussion', media_recording: 'Media recording', student_annotation: 'Annotation', basic_lti_launch: 'External tool', on_paper: 'On paper', none: 'Nothing to submit' };
+
+  /** What one attempt was: what it carried, when it landed, what it scored. */
+  function attemptBody(c, a, at) {
+    const rows = [];
+    for (const f of at.attachments || []) {
+      rows.push(U.row([
+        U.tile(IC.doc, { color: 'var(--bcv-ink2)', tint: 'var(--bcv-fill)', size: 30, iconSize: 14 }),
+        U.el('bcv-sub__body', [U.text('bcv-xrow__t bcv-ellip', f.display_name || f.filename || 'File'), U.text('bcv-xrow__s', [f['content-type'] || f.content_type, f.size ? `${Math.round(f.size / 1024)} KB` : null].filter(Boolean).join(' · '))]),
+        U.chev(),
+      ], { cls: 'bcv-xrow', onClick: () => BCV.viewer?.open({ id: f.id }, { context: c }) }));
+    }
+    if (at.url) rows.push(h('a', { class: 'bcv-row bcv-xrow bcv-row--link', href: at.url, target: '_blank', rel: 'noopener', style: { color: 'inherit' } }, [
+      U.tile(IC.link, { color: 'var(--bcv-ink2)', tint: 'var(--bcv-fill)', size: 30, iconSize: 14 }),
+      U.el('bcv-sub__body', [U.text('bcv-xrow__t bcv-ellip', at.url), U.text('bcv-xrow__s', 'Opens in a new tab')]),
+    ]));
+    return U.el('bcv-sub__att', [
+      U.el('bcv-sub__attmeta', [
+        U.text('bcv-sub__attwhen', at.submitted_at ? `Handed in ${U.fmtAt(at.submitted_at)}` : 'Not handed in'),
+        at.late ? U.badge('Late', 'orange') : null,
+        h('span', { class: 'bcv-ml-auto' }),
+        at.score !== null && at.score !== undefined ? U.badge(`${store.fmtPts(at.score)} / ${a.points_possible ?? '—'}`, 'green') : U.badge('Not marked'),
+      ]),
+      U.text('bcv-sub__kind', TYPE_WORD[at.submission_type] || at.submission_type || 'Submission'),
+      rows.length ? U.card(rows, 'bcv-card--list') : null,
+      at.body ? U.card(U.el('bcv-detail', CS().prose(at.body, { cls: 'bcv-prose--14' })), 'bcv-card--22') : null,
+      !rows.length && !at.body && !at.url ? U.text('bcv-hint', 'Canvas kept no copy of what was handed in for this attempt.') : null,
+    ]);
+  }
+
+  /** The sheet behind the mark: every attempt, what it was, and the thread it came back on. */
+  function openSubmissions(ctx, c, a, sub) {
+    const { app } = ctx;
+    let s = sub;
+    document.querySelector('.bcv-sheet-ov')?.remove();
+    const ov = U.el('bcv-sheet-ov', null, { role: 'dialog', 'aria-label': 'Submission' });
+    // Escape is listened for on the document, not the sheet: drilling into an attempt and back takes
+    // the focused button away with it, and focus lands on the body, where the sheet never hears it.
+    const onKey = (e) => { if (e.key === 'Escape') close(); };
+    const close = () => { document.removeEventListener('keydown', onKey, true); ov.remove(); };
+    ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
+    document.addEventListener('keydown', onKey, true);
+    const body = U.el('bcv-sub__page');
+    const title = U.text('bcv-sheet__title', 'Submission');
+    const desc = U.text('bcv-sheet__desc bcv-ellip', a.name);
+    const headBack = h('button', { type: 'button', class: 'bcv-sub__back bcv-linkbtn', hidden: true, onclick: () => list() }, [U.svg(IC.back, { size: 14, stroke: 'var(--bcv-blue)', width: 2.1 }), 'All attempts']);
+    ov.append(U.el('bcv-sheet bcv-sheet--sub', [
+      U.el('bcv-sheet__head', [
+        h('div', { style: { flex: '1', minWidth: '0' } }, [headBack, title, desc]),
+        h('button', { type: 'button', class: 'bcv-sheet__close', 'aria-label': 'Close', onclick: close }, U.svg(IC.close, { size: 13, stroke: 'var(--bcv-ink2)', width: 2.3 })),
+      ]),
+      body,
+    ]));
+
+    let view = () => list(); // what to draw again once a comment has landed: wherever you are now
+    function comments() {
+      const thread = (s.submission_comments || []).filter((cm) => cm && cm.comment);
+      const box = h('textarea', { class: 'bcv-input bcv-sub__box', rows: '2', placeholder: 'Reply to your instructor…', 'aria-label': 'Comment on this submission' });
+      let busy = false;
+      const send = U.btn('Send', { kind: 'primary', cls: 'bcv-sub__send', onClick: async () => {
+        const text = box.value.trim();
+        if (!text || busy) return;
+        busy = true;
+        send.disabled = true;
+        try {
+          await store.commentOnSubmission(c.id, a.id, text);
+          const fresh = await store.submission(c.id, a.id, { force: true }).catch(() => null);
+          if (fresh) s = fresh;
+          view(); // back where they were, with the thread as Canvas now has it
+        } catch (e) {
+          busy = false;
+          send.disabled = false;
+          U.toast(`The comment was not sent: ${e?.message || e}`, { error: true });
+        }
+      } });
+      return h('div', {}, [
+        U.label('Comments'),
+        thread.length
+          ? U.card(thread.map((cm) => U.el('bcv-comment', [
+            U.el('bcv-comment__head', [U.text('bcv-comment__author', cm.author_name || cm.author?.display_name || 'Comment', 'span'), U.text('bcv-comment__date', U.fmtAt(cm.created_at), 'span')]),
+            U.text('bcv-comment__body bcv-pretty', cm.comment || ''),
+          ])), 'bcv-card--22')
+          : U.emptyCard('No comments on this submission yet.'),
+        U.el('bcv-sub__compose', [box, U.el('bcv-sub__composebtns', [h('span', { class: 'bcv-ml-auto' }), send])]),
+      ]);
+    }
+
+    function list() {
+      view = () => list();
+      headBack.hidden = true;
+      title.textContent = 'Submission';
+      const all = attemptsOf(s);
+      const rows = all.map((at) => U.row([
+        U.tile(IC.doc, { color: 'var(--bcv-ink2)', tint: 'var(--bcv-fill)', size: 30, iconSize: 14 }),
+        U.el('bcv-sub__body', [
+          U.text('bcv-xrow__t', `Attempt ${at.attempt || 1}`),
+          U.text('bcv-xrow__s', [at.submitted_at ? U.fmtAt(at.submitted_at) : 'Not handed in', TYPE_WORD[at.submission_type] || null].filter(Boolean).join(' · ')),
+        ]),
+        at.score !== null && at.score !== undefined ? U.badge(`${store.fmtPts(at.score)} / ${a.points_possible ?? '—'}`, 'green') : null,
+        U.chev(),
+      ], { cls: 'bcv-xrow', onClick: () => one(at) }));
+      body.replaceChildren(...[
+        U.label('Attempts'),
+        rows.length ? U.card(rows, 'bcv-card--list') : U.emptyCard('Canvas has no attempt recorded for this assignment.'),
+        a.rubric?.length ? U.btn('See the rubric breakdown', { icon: IC.sheet, cls: 'bcv-rubbtn bcv-sub__rub', onClick: () => { close(); CS().openRubric(a, s); } }) : null,
+        comments(),
+      ].filter(Boolean));
+    }
+    function one(at) {
+      view = () => one(at);
+      headBack.hidden = false;
+      title.textContent = `Attempt ${at.attempt || 1}`;
+      body.replaceChildren(attemptBody(c, a, at), comments());
+    }
+    list();
+    document.body.append(ov);
+    ov.tabIndex = -1;
+    ov.focus();
+    return { close };
+  }
+  D.openSubmissions = openSubmissions;
 
   BCV.screens.courseDetail = D;
 })();

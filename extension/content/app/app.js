@@ -755,32 +755,40 @@
     if (hiddenAt && Date.now() - hiddenAt > 5 * 60 * 1000 && !self.BCVBridge?.native) BCV.canvas.checkSession?.();
     hiddenAt = 0;
   });
-  // A page left sitting for a long stretch — a tab open overnight, a laptop asleep, another window
-  // all afternoon — is working from what it read back then, and the Canvas session behind it may
-  // have ended since. So the first thing done on coming back (a press or a key) reloads the page
-  // instead of acting on it: the session is renewed and every screen is drawn from fresh answers.
-  // Reading counts as being here, so scrolling and typing keep the page awake; a reload that would
-  // lose work (a quiz attempt, a submission being written, text half typed) gives way to a note,
-  // and recover() will not reload the same page twice in a minute.
-  const AWAY_STALE = 5 * 60 * 1000;
+  // A page left sitting for a long stretch — a tab open in another window, a laptop asleep, an
+  // afternoon somewhere else — is working from what it read back then, and the Canvas session behind
+  // it may have ended since. So it reloads itself: the session is renewed and every screen is drawn
+  // from fresh answers. Coming back to the tab is what does it, rather than the press after (which
+  // had to be swallowed to be of any use, and looked like nothing happening at all); where the tab
+  // never went away — another window simply on top of it — the first press still stands in for that.
+  // Reading counts as being here, so scrolling keeps the page awake.
+  //
+  // A quiz is never touched by any of this, at all: not a reload, not a note. An attempt is the one
+  // thing on any of these screens that cannot be redrawn from Canvas, and being told about it while
+  // taking one is worse than useless.
+  const AWAY_STALE = 3 * 60 * 1000;
   state.lastHere = Date.now(); // when this page last saw a sign of life (also what the tests wind back)
   const here = () => { state.lastHere = Date.now(); };
   let scrollTick = 0;
   window.addEventListener('scroll', () => { const n = Date.now(); if (n - scrollTick > 2000) { scrollTick = n; here(); } }, { passive: true });
-  // Going away is the last moment we know they were here; coming back is not a sign of life at all
-  // — it is the press that follows which has to decide. Marking the return as life would defeat the
-  // whole thing, since the return always comes first.
+  const awayLong = () => Date.now() - state.lastHere >= AWAY_STALE;
+  /** The stale-page reload, wherever it is noticed from. A quiz is left completely alone. */
+  function wakeStale() {
+    if (self.BCVBridge?.native) return false; // the app holds its own session
+    if (inQuiz() || quizHere()) { here(); return false; } // never on a quiz, and no note either
+    return recover('You were away for a while');
+  }
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') { here(); return; }
     // a wash lit when they left is still sweeping — a hidden tab runs no timers — and the row it
     // belongs to would answer nothing; it is put out here so the page is pressable again
     if (loadStuck()) progress(false);
+    if (awayLong()) wakeStale();
   });
   function wake(e) {
-    const away = Date.now() - state.lastHere;
+    const stale = awayLong();
     here();
-    if (away < AWAY_STALE || self.BCVBridge?.native) return; // the app holds its own session
-    if (!recover('You were away for a while')) return;
+    if (!stale || !wakeStale()) return;
     e.preventDefault();
     e.stopPropagation();
   }

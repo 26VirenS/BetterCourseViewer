@@ -1247,12 +1247,17 @@
       h('span', { class: 'bcv-ph-chip bcv-ph-chip--course', style: { background: c.palette.tint, color: c.palette.text }, text: c.shortName || c.name }),
       h('h1', { class: 'bcv-ph-item__title bcv-pretty', text: a.name }),
       U.text('bcv-ph-item__meta', `${a.due_at ? `Due ${dueText(U.parse(a.due_at))}` : 'No due date'} · ${a.points_possible !== null && a.points_possible !== undefined ? `${store.fmtPts(a.points_possible)} points` : 'no points'}${a.allowed_attempts > 0 ? ` · attempt ${s.attempt || 0} of ${a.allowed_attempts}` : ''}`),
-      s.submitted_at || graded ? U.el(`bcv-ph-banner ${status === 'Missing' ? 'bcv-ph-banner--warn' : ''}`, [
+      // the banner opens what is behind the mark: every attempt, what was handed in, and the thread
+      s.submitted_at || graded ? h(graded ? 'button' : 'div', {
+        type: graded ? 'button' : null, class: `bcv-ph-banner ${status === 'Missing' ? 'bcv-ph-banner--warn' : ''} ${graded ? 'is-link' : ''}`,
+        onclick: graded ? () => BCV.screens.courseDetail.openSubmissions(ctx, c, a, s) : null,
+      }, [
         U.svg(CHECK, { size: 20, stroke: 'var(--bcv-green-text)', width: 2.6, style: { flex: 'none' } }),
         h('div', { style: { flex: '1', minWidth: '0' } }, [U.text('bcv-ph-banner__t', status), U.text('bcv-ph-banner__s', `${s.submitted_at ? U.fmtAt(s.submitted_at) : ''}${graded ? ` · ${store.fmtPts(s.score)} / ${a.points_possible ?? '—'}` : s.submitted_at ? ' · awaiting grade' : ''}`)]),
-        // a mark is a number until you can see how it was reached: the rubric is one press from it
-        graded ? rubricButton(a, s, { cls: 'bcv-ph-banner__btn', label: 'See breakdown' }) : null,
+        graded ? chev() : null,
       ]) : (status === 'Missing' ? U.el('bcv-ph-banner bcv-ph-banner--warn', [U.svg(IC.warn, { size: 20, stroke: 'var(--bcv-red-text)', width: 2.2, style: { flex: 'none' } }), h('div', {}, [U.text('bcv-ph-banner__t', 'Missing'), U.text('bcv-ph-banner__s', 'Canvas marked this as missing')])]) : null),
+      // and the rubric keeps its own button, where the marks are decided rather than reported
+      graded ? rubricButton(a, s, { cls: 'bcv-ph-bigbtn', label: 'See breakdown' }) : null,
       U.el('bcv-ph-card bcv-ph-instr', [U.text('bcv-ph-kicker', 'Instructions', 'span'), a.description ? CS.prose(a.description, { cls: 'bcv-ph-prose' }) : U.text('bcv-ph-load__none', 'No description.'), types ? U.text('bcv-ph-instr__note', `Accepts ${types}`) : null]),
       isTool && !toolNewTab ? U.el('bcv-ph-card', [U.text('bcv-ph-kicker', 'External tool', 'span'), h('iframe', { class: 'bcv-frame bcv-frame--doc', src: toolLaunch, title: a.name, allowfullscreen: '', allow: 'fullscreen; microphone; camera; display-capture; autoplay; clipboard-write' })]) : null,
       primary ? h('button', { type: 'button', class: 'bcv-ph-bigbtn is-primary', text: primary.label, onclick: primary.go }) : null,

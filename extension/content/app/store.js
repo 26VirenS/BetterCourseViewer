@@ -892,6 +892,14 @@
     await invalidateAssignment(cid, aid);
     return result;
   }
+  /** A comment on your own submission — the same thread the instructor's feedback comes back on. */
+  async function commentOnSubmission(cid, aid, text) {
+    const body = String(text || '').trim();
+    if (!body) throw new Error('Nothing to send.');
+    const result = await C.put(`/api/v1/courses/${cid}/assignments/${aid}/submissions/self`, { comment: { text_comment: body } });
+    await invalidateAssignment(cid, aid);
+    return result;
+  }
   async function invalidateAssignment(cid, aid) {
     await Promise.all([C.invalidate(`assignment:${cid}:${aid}`), C.invalidate(`submission:${cid}:${aid}`), C.invalidate(`assignments:${cid}`), C.invalidate(`agroups:${cid}`), C.invalidate(`ctodo:${cid}`), invalidatePlanner()]);
   }
@@ -1176,6 +1184,6 @@
     announcements, discussions, discussion, discussionView, postEntry, markTopicRead, people, sections, courseGroups, pages, page,
     rootFolder, folderContents, folderByPath, file, quizzes, quiz, quizSubmissions, quizApi, modules, gradeModel, fmtPts,
     notifications, notifState, setNotifState, notifUnread,
-    homeworkTools, uploadSubmissionFile, uploadSubmissionFileFromUrl, submitAssignment, invalidateAssignment, quizAttemptLimit,
+    homeworkTools, uploadSubmissionFile, uploadSubmissionFileFromUrl, submitAssignment, commentOnSubmission, invalidateAssignment, quizAttemptLimit,
   };
 })();

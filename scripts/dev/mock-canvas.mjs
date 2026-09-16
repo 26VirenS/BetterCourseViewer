@@ -110,7 +110,14 @@ function assignmentObj(courseId, row) {
       : (earned !== null && id === '1002' ? [{ author_name: c.teacher, created_at: at(dueDay + 1, 9, 0), comment: 'Check the domain restrictions in question 3 — the rest was solid.' }] : []),
     rubric_assessment: extra.rubric && earned !== null ? { c1: { points: 4, rating_id: 'r2', comments: 'Sign error in part b.' }, c2: { points: 4, rating_id: 'r3' } } : undefined,
     // quiz assignments: Canvas keeps each attempt's per-question grading in submission_history
-    submission_history: extra.quiz ? (quizSubs.get(String(Number(id) + 8000)) || []).filter((s) => s.workflow_state === 'complete').map((s) => ({ attempt: s.attempt, score: s.score, submission_data: quizQuestionBank(s.quiz_id).map((q) => ({ question_id: q.id, correct: gradeQuestion(q, s.state[q.id]?.answer), points: gradeQuestion(q, s.state[q.id]?.answer) ? q.points_possible : 0, ...histFields(q, s.state[q.id]?.answer) })) })) : undefined,
+    submission_history: extra.quiz ? (quizSubs.get(String(Number(id) + 8000)) || []).filter((s) => s.workflow_state === 'complete').map((s) => ({ attempt: s.attempt, score: s.score, submission_data: quizQuestionBank(s.quiz_id).map((q) => ({ question_id: q.id, correct: gradeQuestion(q, s.state[q.id]?.answer), points: gradeQuestion(q, s.state[q.id]?.answer) ? q.points_possible : 0, ...histFields(q, s.state[q.id]?.answer) })) }))
+      // everything else keeps what was handed in, attempt by attempt
+      : (submitted ? [
+        { attempt: 1, submitted_at: at(dueDay - 3, 14, 20), submission_type: 'online_text_entry', score: null, late: false, body: `<p>First pass at <strong>${name}</strong>. I will attach the working before the deadline.</p>` },
+        { attempt: 2, submitted_at: subDay !== null ? at(subDay, 15, 52) : at(dueDay - 1, 16, 1), submission_type: 'online_upload', score: earned, late: !!extra.late, attachments: [{ id: `f${id}`, display_name: `${name.replace(/[^\w]+/g, '-')}.pdf`, filename: `${name}.pdf`, 'content-type': 'application/pdf', size: 148231 }] },
+      ] : undefined),
+    submission_type: submitted ? (extra.quiz ? 'online_quiz' : 'online_upload') : null,
+    attachments: submitted && !extra.quiz ? [{ id: `f${id}`, display_name: `${name.replace(/[^\w]+/g, '-')}.pdf`, filename: `${name}.pdf`, 'content-type': 'application/pdf', size: 148231 }] : undefined,
   };
   return {
     id, name, description: extra.description || `<p>Complete <strong>${name}</strong> as described in lecture. Show all work and submit a single PDF.</p><ul><li>Use the chain rule where appropriate.</li><li>Label each step.</li></ul>${extra.rubric ? '<p>See the rubric for how points are awarded.</p>' : ''}`,
@@ -556,7 +563,22 @@ on('GET', /^\/api\/v1\/courses\/(\w+)\/front_page$/, (url, m) => { const p = (pa
 on('GET', /^\/api\/v1\/courses\/(\w+)\/todo$/, (url, m) => allAssignments(m[1]).filter((a) => !a.submission.submitted_at && new Date(a.due_at) > now).slice(0, 5).map((a) => ({ type: 'submitting', assignment: { id: a.id, name: a.name, due_at: a.due_at, html_url: a.html_url, points_possible: a.points_possible }, ignore: `/api/v1/users/self/todo/assignment_${a.id}/submitting?permanent=0`, ignore_permanently: `/api/v1/users/self/todo/assignment_${a.id}/submitting?permanent=1`, html_url: a.html_url, context_type: 'Course', course_id: m[1] })));
 on('DELETE', /^\/api\/v1\/users\/self\/todo\//, () => ({ ok: true }));
 on('GET', /^\/api\/v1\/courses\/(\w+)\/activity_stream$/, (url, m) => [{ id: 'ca1', type: 'Announcement', title: 'Prerequisite Skills Test', message: '<p>Results posted.</p>', course_id: m[1], read_state: false, updated_at: ago(6 * D), html_url: `/courses/${m[1]}/announcements/8001` }]);
-on('GET', /^\/api\/v1\/courses\/(\w+)\/assignments\/(\w+)\/submissions\/self$/, (url, m) => (allAssignments(m[1]).find((a) => a.id === m[2]) || {}).submission || null);
+// comments a student leaves on their own submission, kept for the life of the server
+const ownComments = new Map();
+on('GET', /^\/api\/v1\/courses\/(\w+)\/assignments\/(\w+)\/submissions\/self$/, (url, m) => {
+  const sub = (allAssignments(m[1]).find((a) => a.id === m[2]) || {}).submission || null;
+  const mine = ownComments.get(`${m[1]}:${m[2]}`) || [];
+  return sub && mine.length ? { ...sub, submission_comments: [...(sub.submission_comments || []), ...mine] } : sub;
+});
+on('PUT', /^\/api\/v1\/courses\/(\w+)\/assignments\/(\w+)\/submissions\/self$/, (url, m, body) => {
+  const text = body?.comment?.text_comment;
+  if (!text) return { error: 'no comment' };
+  const key = `${m[1]}:${m[2]}`;
+  const list = ownComments.get(key) || [];
+  list.push({ id: `oc${list.length + 1}`, author_id: '7', author_name: 'Sam Student', created_at: new Date().toISOString(), comment: String(text) });
+  ownComments.set(key, list);
+  return (allAssignments(m[1]).find((a) => a.id === m[2]) || {}).submission || {};
+});
 on('GET', /^\/api\/v1\/courses\/(\w+)\/assignments\/(\w+)$/, (url, m) => allAssignments(m[1]).find((a) => a.id === m[2]) || null);
 on('GET', /^\/api\/v1\/courses\/(\w+)\/assignments$/, (url, m) => allAssignments(m[1]));
 on('GET', /^\/api\/v1\/courses\/(\w+)\/assignment_groups$/, (url, m) => assignmentGroups(m[1]));

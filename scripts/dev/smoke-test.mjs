@@ -731,11 +731,36 @@ try {
   // ---- handing work in (assignment submission flow) -------------------------------------
   console.log('submission');
   const readSub = (cid, aid) => fetch(`${BASE}/api/v1/courses/${cid}/assignments/${aid}/submissions/self`).then((r) => r.text()).then((t) => JSON.parse(t.replace(/^while\(1\);/, '')));
-  // a graded assignment offers the breakdown beside the grade, and it opens the rubric grid
+  // the mark sits in the corner of the card, beside the title, and opens what is behind it
   await page.goto(`${BASE}/courses/104/assignments/4001`);
   await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
-  check(!(await page.$('.bcv-rubg')) && (await texts('.bcv-rubbtn')).includes('See breakdown'), 'a graded assignment offers "See breakdown" beside the grade, and the rubric is not on the page until it is asked for');
-  await page.click('.bcv-rubbtn');
+  const markBox = await page.evaluate(() => {
+    const g = document.querySelector('.bcv-detail__grade'), card = g.closest('.bcv-detail'), t = document.querySelector('.bcv-detail__title');
+    const gr = g.getBoundingClientRect(), cr = card.getBoundingClientRect(), tr = t.getBoundingClientRect();
+    return { tag: g.tagName, right: Math.round(cr.right - gr.right), top: Math.round(gr.top - cr.top), clearsTitle: parseFloat(getComputedStyle(t).paddingRight) >= gr.width && tr.width > gr.width, size: Math.round(parseFloat(getComputedStyle(g.querySelector('.bcv-detail__gradescore')).fontSize)) };
+  });
+  check(markBox.tag === 'BUTTON' && markBox.right <= 2 && markBox.top <= 2 && markBox.clearsTitle && markBox.size >= 18 && markBox.size <= 26, `the mark is a press in the card's top right corner, clear of the title: ${JSON.stringify(markBox)}`);
+  // and behind it: every attempt Canvas kept, what each one carried, and the thread it came back on
+  await page.click('.bcv-detail__grade');
+  await page.waitForSelector('.bcv-sheet--sub .bcv-xrow', { timeout: 8000 });
+  const subAttempts = await texts('.bcv-sheet--sub .bcv-xrow');
+  check(subAttempts.length === 2 && /^Attempt 2 /.test(subAttempts[0]) && /File upload/.test(subAttempts[0]) && /^Attempt 1 /.test(subAttempts[1]) && /Text entry/.test(subAttempts[1]), `the mark opens every attempt, newest first: ${subAttempts.join(' | ')}`);
+  await page.click('.bcv-sheet--sub .bcv-xrow');
+  await page.waitForSelector('.bcv-sub__att', { timeout: 5000 });
+  const att = await page.$eval('.bcv-sub__att', (e) => ({ kind: e.querySelector('.bcv-sub__kind')?.textContent, when: e.querySelector('.bcv-sub__attwhen')?.textContent, file: e.querySelector('.bcv-xrow__t')?.textContent }));
+  check(att.kind === 'File upload' && /^Handed in /.test(att.when || '') && /\.pdf$/.test(att.file || ''), `pressing an attempt shows what was handed in: ${JSON.stringify(att)}`);
+  // the comments thread is there, and a reply of your own goes to Canvas and comes back on it
+  const before = (await texts('.bcv-sheet--sub .bcv-comment')).length;
+  await page.fill('.bcv-sub__box', 'Could you say more about part b?');
+  await page.click('.bcv-sub__send');
+  check(await eventually(async () => (await texts('.bcv-sheet--sub .bcv-comment')).some((t) => /Could you say more about part b\?/.test(t))), 'a comment of your own is sent to Canvas and comes back on the thread');
+  check((await texts('.bcv-sheet--sub .bcv-comment')).length === before + 1 && (await readSub('104', '4001')).submission_comments.some((cm) => /part b\?/.test(cm.comment)), 'and Canvas is what it was read back from, not the screen');
+  await page.click('.bcv-sub__back');
+  await page.waitForSelector('.bcv-sheet--sub .bcv-xrow', { timeout: 5000 });
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !document.querySelector('.bcv-sheet--sub'), null, { timeout: 5000 });
+  check(!(await page.$('.bcv-rubg')) && (await texts('.bcv-detail__actions .bcv-rubbtn'))[0] === 'Rubric', 'the rubric keeps its own button, and is not on the page until it is asked for');
+  await page.click('.bcv-detail__actions .bcv-rubbtn');
   await page.waitForSelector('.bcv-sheet--rub .bcv-rubg__row', { timeout: 8000 });
   // once a rubric is marked, the rating the work was given is the one filled in, with its score and note
   const marked = await page.$eval('.bcv-sheet--rub .bcv-rubg__row', (e) => ({ got: e.querySelector('.bcv-rubg__cell.is-got')?.innerText.replace(/\s+/g, ' ').trim(), pts: e.querySelector('.bcv-rubg__ptsv')?.textContent, note: e.querySelector('.bcv-rubg__note')?.textContent, cells: e.querySelectorAll('.bcv-rubg__cell').length }));
@@ -2122,9 +2147,10 @@ try {
   await page.goto(`${BASE}/`);
   await page.waitForSelector('.bcv-stat', { timeout: 20000 });
   check(!(await page.$('.bcv-toast')), 'signed in again, the page is itself again');
-  // a page left sitting five minutes or more is stale: the first press on coming back reloads it
-  // rather than acting on it, so the session is renewed and every screen is drawn again. The clock
-  // the page keeps lives in the extension's own world, so the test winds it back from there.
+  // a page left sitting three minutes or more is stale: coming back to the tab reloads it, so the
+  // session is renewed and every screen is drawn again; where the tab never went away, the first
+  // press stands in for that. The clock the page keeps lives in the extension's own world, so the
+  // test winds it back from there.
   const windBack = (ms) => sw.evaluate(async ([base, back]) => {
     const [tab] = await chrome.tabs.query({ url: `${base}/*` });
     await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'ISOLATED', args: [back], func: (b) => { self.BCV.app.state.lastHere = Date.now() - b; } });
@@ -2136,30 +2162,61 @@ try {
   check(!(await awakeNav) && !!(await page.$('.bcv-sheet-ov')), 'a press while the page is awake does what it says, and reloads nothing');
   await page.click('.bcv-sheet-ov', { position: { x: 5, y: 5 } }); // the scrim closes it, as everywhere else in the suite
   await page.waitForFunction(() => !document.querySelector('.bcv-sheet-ov'), null, { timeout: 5000 });
-  await windBack(6 * 60 * 1000); // away since before the five minutes
+  await windBack(4 * 60 * 1000); // away since before the three minutes
   const awayNav = page.waitForNavigation({ timeout: 15000 }).then(() => true).catch(() => false);
   await page.click('.bcv-stat');
-  check(await awayNav, 'after five minutes away the first press reloads the page instead of acting on it');
+  check(await awayNav, 'after three minutes away the first press reloads the page instead of acting on it');
   await page.waitForSelector('.bcv-stat', { timeout: 20000 });
   check((await page.evaluate(() => JSON.parse(sessionStorage.getItem('bcv:reloaded') || 'null')))?.path === '/' && !(await page.$('.bcv-sheet-ov')), 'the reload is remembered (so it cannot loop) and the press it swallowed opened nothing');
+  // and coming back to the tab is enough on its own: no press has to be spent on it
+  await page.evaluate(() => sessionStorage.removeItem('bcv:reloaded'));
+  await windBack(4 * 60 * 1000);
+  const backNav = page.waitForNavigation({ timeout: 15000 }).then(() => true).catch(() => false);
+  await sw.evaluate(async (base) => {
+    const [tab] = await chrome.tabs.query({ url: `${base}/*` });
+    await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'ISOLATED', func: () => document.dispatchEvent(new Event('visibilitychange')) });
+  }, BASE);
+  check(await backNav, 'coming back to the tab after three minutes reloads it on its own');
+  await page.waitForSelector('.bcv-stat', { timeout: 20000 });
+  // a quiz is left completely alone by it — not a reload, and not a note either
+  await page.goto(`${BASE}/courses/101/quizzes/9001?bcv=take`);
+  await page.waitForSelector('.bcv-qz__begin', { timeout: 15000 });
+  await page.evaluate(() => sessionStorage.removeItem('bcv:reloaded'));
+  await windBack(4 * 60 * 1000);
+  const quizNav = page.waitForNavigation({ timeout: 4000 }).then(() => true).catch(() => false);
+  await sw.evaluate(async (base) => {
+    const [tab] = await chrome.tabs.query({ url: `${base}/*` });
+    await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'ISOLATED', func: () => document.dispatchEvent(new Event('visibilitychange')) });
+  }, BASE);
+  await page.click('.bcv-qz__h1');
+  check(!(await quizNav) && !(await page.$('.bcv-toast')) && (await page.$('.bcv-qz__begin')) !== null, 'a quiz is left alone by the stale-page reload: nothing reloads and nothing is said');
+  await page.goto(`${BASE}/`);
+  await page.waitForSelector('.bcv-stat', { timeout: 20000 });
   // and it never loops: away again within the minute says so instead of reloading again
-  await windBack(6 * 60 * 1000);
+  await page.evaluate(() => sessionStorage.removeItem('bcv:reloaded'));
+  await windBack(4 * 60 * 1000);
+  const loopNav = page.waitForNavigation({ timeout: 15000 }).then(() => true).catch(() => false);
+  await page.click('.bcv-stat');
+  await loopNav; // the one that is allowed, and leaves its mark
+  await page.waitForSelector('.bcv-stat', { timeout: 20000 });
+  await windBack(4 * 60 * 1000);
   await page.click('.bcv-stat');
   check(await eventually(async () => /You were away for a while\. Reload the page to continue\./.test((await texts('.bcv-toast')).join(' '))), 'a second stale press within the minute asks rather than reloading again');
   await page.evaluate(() => sessionStorage.removeItem('bcv:reloaded'));
   await windBack(0);
   await page.goto(`${BASE}/`);
   await page.waitForSelector('.bcv-stat', { timeout: 20000 });
-  // Coming back to the tab is not itself a sign of life — the return always comes before the press,
-  // so counting it would leave the page working from what it read before they left.
-  await windBack(6 * 60 * 1000);
-  await page.evaluate(() => {
-    document.dispatchEvent(new Event('visibilitychange')); // as the browser sends it on the way back
-  });
-  const backNav = page.waitForNavigation({ timeout: 12000 }).then(() => true).catch(() => false);
+  // Coming back is not itself a sign of life: where the tab never went away at all — another window
+  // simply sitting on top of it — no visibilitychange is ever sent, and the first press is what has
+  // to notice. Reading does keep the page awake, so a scroll stands the reload down.
+  await windBack(4 * 60 * 1000);
+  await page.evaluate(() => window.dispatchEvent(new Event('scroll')));
+  await new Promise((r) => setTimeout(r, 150));
+  const scrolledNav = page.waitForNavigation({ timeout: 2500 }).then(() => true).catch(() => false);
   await page.click('.bcv-stat');
-  check(await backNav, 'coming back to the tab does not count as being here: the first press still reloads');
-  await page.waitForSelector('.bcv-stat', { timeout: 20000 });
+  check(!(await scrolledNav) && !!(await page.$('.bcv-sheet-ov')), 'reading keeps the page awake: a scroll stands the stale reload down');
+  await page.click('.bcv-sheet-ov', { position: { x: 5, y: 5 } });
+  await page.waitForFunction(() => !document.querySelector('.bcv-sheet-ov'), null, { timeout: 5000 });
   await page.evaluate(() => sessionStorage.removeItem('bcv:reloaded'));
   await windBack(0);
   // A load left lit for good — a tab put away mid-load, a reply that never came — used to make the
