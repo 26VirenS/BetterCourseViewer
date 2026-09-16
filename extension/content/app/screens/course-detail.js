@@ -65,6 +65,22 @@
       backBtn(app, back.href, back.label),
       U.card(U.el('bcv-detail', [
         h('h2', { class: 'bcv-detail__title bcv-pretty', text: a.name }),
+        // The mark goes at the top, where it is the first thing read: it is the answer to the
+        // question the page is opened with. The side column keeps the detail (when it was handed in,
+        // when it was marked, the comments) — this is the number and nothing else.
+        graded ? U.el('bcv-detail__grade', [
+          U.el('bcv-detail__gradev', [
+            h('span', { class: 'bcv-detail__gradescore', text: store.fmtPts(s.score) }),
+            h('span', { class: 'bcv-detail__gradeof', text: `/ ${a.points_possible ?? '—'}` }),
+          ]),
+          h('div', { class: 'bcv-detail__gradeside' }, [
+            U.text('bcv-detail__gradepc', a.points_possible ? `${Math.round((Number(s.score) / Number(a.points_possible)) * 100)}%` : '', 'span'),
+            U.text('bcv-detail__gradewhen', s.graded_at ? `Marked ${U.fmtAt(s.graded_at)}` : 'Marked', 'span'),
+          ]),
+          h('span', { class: 'bcv-ml-auto' }),
+          s.grade && String(s.grade) !== String(s.score) ? U.badge(String(s.grade), 'green') : null,
+          a.rubric?.length ? U.btn('See breakdown', { kind: 'xs', icon: IC.sheet, cls: 'bcv-rubbtn', onClick: () => CS().openRubric(a, s) }) : null,
+        ]) : null,
         meta([['Due', a.due_at ? U.fmtAt(a.due_at) : 'No due date'], ['Points', a.points_possible ?? '—'], ['Submitting', types], ['Available', available], ['Attempts', a.allowed_attempts && a.allowed_attempts > 0 ? `${s.attempt || 0} of ${a.allowed_attempts}` : null]]),
         U.el('bcv-detail__actions', [
           isTool ? (toolNewTab ? U.btn('Open the tool', { kind: 'primary', icon: IC.external, iconColor: '#fff', onClick: () => window.open(toolLaunch, '_blank', 'noopener') }) : null)
@@ -93,8 +109,6 @@
       h('div', { style: { display: 'flex', alignItems: 'baseline', gap: '10px', flexWrap: 'wrap' } }, [
         h('span', { class: 'bcv-stat__value', text: s.workflow_state === 'graded' && s.score !== null && s.score !== undefined ? `${store.fmtPts(s.score)} / ${a.points_possible ?? '—'}` : '—' }),
         U.badge(status, status === 'Graded' ? 'green' : /Missing|Not/.test(status) ? 'red' : /late/.test(status) ? 'orange' : ''),
-        // a mark is a number until you can see how it was reached
-        graded && a.rubric?.length ? U.btn('See breakdown', { kind: 'xs', icon: IC.sheet, cls: 'bcv-rubbtn bcv-ml-auto', onClick: () => CS().openRubric(a, s) }) : null,
       ]),
       meta([['Submitted', s.submitted_at ? U.fmtAt(s.submitted_at) : null], ['Grade', s.grade && String(s.grade) !== String(s.score) ? s.grade : null], ['Graded', s.graded_at ? U.fmtAt(s.graded_at) : null], ['Attempt', s.attempt || null]]),
       (s.submission_comments || []).length ? h('div', {}, [U.label('Comments'), ...s.submission_comments.map((cm) => U.el('bcv-comment', [U.el('bcv-comment__head', [U.text('bcv-comment__author', cm.author_name || cm.author?.display_name || 'Comment', 'span'), U.text('bcv-comment__date', U.fmtAt(cm.created_at), 'span')]), U.text('bcv-comment__body', cm.comment || '')]))]) : null,

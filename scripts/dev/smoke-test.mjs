@@ -1031,6 +1031,27 @@ try {
   await page.click('.bcv-banner .bcv-btn');
   await page.click('.bcv-whatif-btn');
   await page.waitForFunction(() => !document.querySelector('.bcv-banner'), null, { timeout: 5000 });
+  // a grade is the start of a question, and the answer is on the assignment's own page: the whole
+  // row goes there, while the score keeps its own presses so a what-if can still be started on it
+  const gradeRow = await page.$eval('.bcv-grades__main .bcv-card--list .bcv-row', (e) => ({ tag: e.tagName, href: e.getAttribute('href'), name: e.querySelector('.bcv-grade__name')?.textContent, score: e.querySelector('.bcv-grade__score')?.textContent }));
+  check(gradeRow.tag === 'A' && /\/courses\/101\/assignments\/\d+$/.test(gradeRow.href || ''), `a grades row opens the assignment it is about: ${JSON.stringify(gradeRow)}`);
+  await page.click('.bcv-grades__main .bcv-card--list .bcv-row .bcv-grade__score');
+  await new Promise((r) => setTimeout(r, 400));
+  check(/\/courses\/101\/grades$/.test(page.url()), 'and a press on the score stays put, so a what-if can be started there');
+  await page.click('.bcv-grades__main .bcv-card--list .bcv-row');
+  await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
+  check(/\/courses\/101\/assignments\/\d+$/.test(page.url()) && (await texts('.bcv-detail__title'))[0] === gradeRow.name, `pressing the row lands on that assignment: ${page.url()}`);
+  // and the mark is the first thing on it, not something to go looking for in the side column
+  const top = await page.evaluate(() => {
+    const g = document.querySelector('.bcv-detail__grade');
+    const body = document.querySelector('.bcv-prose');
+    return g ? { score: g.querySelector('.bcv-detail__gradescore')?.textContent, of: g.querySelector('.bcv-detail__gradeof')?.textContent, pc: g.querySelector('.bcv-detail__gradepc')?.textContent, aboveText: !!body && g.compareDocumentPosition(body) === Node.DOCUMENT_POSITION_FOLLOWING } : null;
+  });
+  // the same numbers the row carried, as a percentage too, and above the assignment's own text
+  const [rowEarned, rowPoss] = gradeRow.score.split(' / ');
+  check(top && top.score === rowEarned && top.of === `/ ${rowPoss}` && top.pc === `${Math.round((Number(rowEarned) / Number(rowPoss)) * 100)}%` && top.aboveText, `the mark is at the top of the assignment, the same one the grades row showed: ${JSON.stringify(top)} from ${gradeRow.score}`);
+  await page.goto(`${BASE}/courses/101/grades`);
+  await page.waitForSelector('.bcv-rings__svg', { timeout: 10000 });
 
   // people
   await tab('people');

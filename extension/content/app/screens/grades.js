@@ -120,6 +120,9 @@
         let scoreEl;
         if (!st.on) {
           scoreEl = h('span', { class: 'bcv-grade__score', title: 'Double-click to test a what-if score', text: `${g.earned === null ? '—' : store.fmtPts(g.earned)} / ${store.fmtPts(g.possible)}` });
+          // the row opens the assignment, so the score has to keep its own presses: otherwise the
+          // first half of the double-click that starts a what-if would navigate away instead
+          scoreEl.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); });
           scoreEl.addEventListener('dblclick', () => { st.on = true; focusId = g.id; draw(); });
         } else {
           const input = h('input', { type: 'text', inputmode: 'decimal', placeholder: '—', class: `bcv-whatif__input ${g.hypothetical ? 'is-hyp' : ''}`, dataset: { wf: g.id }, value: st.values[g.id] === undefined ? (g.earned === null ? '' : String(g.earned)) : st.values[g.id] });
@@ -127,15 +130,19 @@
           input.addEventListener('change', () => { st.values[g.id] = input.value.replace(/[^0-9.]/g, ''); focusId = null; draw(); });
           input.addEventListener('keydown', (e) => { if (e.key === 'Enter') input.blur(); });
           scoreEl = U.el('bcv-whatif', [input, U.text('bcv-whatif__possible', `/ ${store.fmtPts(g.possible)}`, 'span')]);
+          scoreEl.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); }); // typing a what-if is not opening the row
         }
+        // the whole row opens the assignment it is a line about — a grade is the start of a question
+        // ("why?"), and the answer is on the assignment's own page
         return U.row([
           U.el('bcv-row__body', [
-            h('div', { style: { display: 'flex', alignItems: 'baseline', gap: '8px', flexWrap: 'wrap' } }, [h('a', { class: 'bcv-grade__name bcv-pretty', href: g.url || `${c.url}/grades`, style: { color: 'inherit' }, text: g.name }), g.badge ? U.badge(g.badge, g.badge === 'Late' ? 'orange' : g.badge === 'Missing' ? 'red' : '', 'bcv-badge--xs') : null]),
+            h('div', { style: { display: 'flex', alignItems: 'baseline', gap: '8px', flexWrap: 'wrap' } }, [U.text('bcv-grade__name bcv-pretty', g.name, 'span'), g.badge ? U.badge(g.badge, g.badge === 'Late' ? 'orange' : g.badge === 'Missing' ? 'red' : '', 'bcv-badge--xs') : null]),
             U.text('bcv-row__sub', `${g.group} · due ${g.due ? U.fmtBy(g.due) : '—'} · submitted ${g.submitted ? U.fmtAt(g.submitted) : '—'}`),
           ]),
           dotEl,
           scoreEl,
-        ]);
+          g.url ? U.chev() : null,
+        ], { href: g.url || null });
       });
       const tableCard = h('div', {}, [
         U.el('bcv-group__head bcv-group__head--10', [U.h2('Assignments'), U.text('bcv-group__sub bcv-ml-auto', 'Arranged by due date', 'span')]),
