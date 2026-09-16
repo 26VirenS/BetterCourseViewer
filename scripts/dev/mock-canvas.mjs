@@ -120,10 +120,10 @@ function assignmentObj(courseId, row) {
       // everything else keeps what was handed in, attempt by attempt
       : (submitted ? [
         { attempt: 1, submitted_at: at(dueDay - 3, 14, 20), submission_type: 'online_text_entry', score: null, late: false, body: `<p>First pass at <strong>${name}</strong>. I will attach the working before the deadline.</p>` },
-        { attempt: 2, submitted_at: subDay !== null ? at(subDay, 15, 52) : at(dueDay - 1, 16, 1), submission_type: 'online_upload', score: earned, late: !!extra.late, attachments: [{ id: `f${id}`, display_name: `${name.replace(/[^\w]+/g, '-')}.pdf`, filename: `${name}.pdf`, 'content-type': 'application/pdf', size: 148231 }] },
+        { attempt: 2, submitted_at: subDay !== null ? at(subDay, 15, 52) : at(dueDay - 1, 16, 1), submission_type: 'online_upload', score: earned, late: !!extra.late, attachments: [{ id: `f${id}`, display_name: `${name.replace(/[^\w]+/g, '-')}.pdf`, filename: `${name}.pdf`, 'content-type': 'application/pdf', size: 148231, url: `/files/f${id}/download?download_frd=1` }] },
       ] : undefined),
     submission_type: submitted ? (extra.quiz ? 'online_quiz' : 'online_upload') : null,
-    attachments: submitted && !extra.quiz ? [{ id: `f${id}`, display_name: `${name.replace(/[^\w]+/g, '-')}.pdf`, filename: `${name}.pdf`, 'content-type': 'application/pdf', size: 148231 }] : undefined,
+    attachments: submitted && !extra.quiz ? [{ id: `f${id}`, display_name: `${name.replace(/[^\w]+/g, '-')}.pdf`, filename: `${name}.pdf`, 'content-type': 'application/pdf', size: 148231, url: `/files/f${id}/download?download_frd=1` }] : undefined,
   };
   return {
     id, name, description: extra.description || `<p>Complete <strong>${name}</strong> as described in lecture. Show all work and submit a single PDF.</p><ul><li>Use the chain rule where appropriate.</li><li>Label each step.</li></ul>${extra.rubric ? '<p>See the rubric for how points are awarded.</p>' : ''}`,
@@ -748,7 +748,7 @@ const server = http.createServer((req, res) => {
       res.writeHead(200, { 'content-type': 'text/html' });
       return res.end('<html><body style="font-family:sans-serif;padding:20px">Embedded tool content</body></html>');
     }
-    if (path.startsWith('/files/')) { // a file's bytes, as its content type says (an attachment, the way Canvas's download URL serves them)
+    if (path.startsWith('/files/') && !path.endsWith('/file_preview')) { // a file's bytes, as its content type says (an attachment, the way Canvas's download URL serves them)
       const fid = path.split('/')[2];
       const f = Object.values(files).flat().find((x) => x.id === fid);
       const type = f?.['content-type'] || 'application/pdf';
@@ -757,9 +757,21 @@ const server = http.createServer((req, res) => {
       res.writeHead(200, { 'content-type': type, 'content-disposition': 'attachment' });
       return res.end('%PDF-1.4 mock');
     }
-    if (/^\/(courses|groups)\/\w+\/files\/\w+\/file_preview$/.test(path)) { // Canvas's own preview of a file, made to be framed
+    // Canvas's own preview of a file, made to be framed. A course context only resolves the course's
+    // own files: a submission attachment is the student's, so asking for it under /courses/:id is
+    // the 404 page, exactly as real Canvas answers.
+    if (/^\/(courses|groups)\/\w+\/files\/\w+\/file_preview$/.test(path)) {
+      const fid = path.split('/')[4];
+      if (!Object.values(files).flat().some((x) => x.id === fid)) {
+        res.writeHead(404, { 'content-type': 'text/html; charset=utf-8' });
+        return res.end('<html><body><h1>Whoops... Looks like nothing is here!</h1><p>Page Not Found</p></body></html>');
+      }
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
       return res.end('<html><body style="font-family:sans-serif;padding:20px"><div id="file_preview">Canvas file preview</div></body></html>');
+    }
+    if (/^\/files\/\w+\/file_preview$/.test(path)) { // the same preview with no context: any file the user can read
+      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+      return res.end('<html><body style="font-family:sans-serif;padding:20px"><div id="file_preview" data-bcv-scope="no-context">Canvas file preview</div></body></html>');
     }
     if (path.startsWith('/equation_images/')) {
       // Canvas does not typeset a formula itself: it hands the LaTeX to its equation service and

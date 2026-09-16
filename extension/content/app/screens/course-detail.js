@@ -57,7 +57,7 @@
     const held = graded && s.posted_at === null;
     const feedback = (s.submission_comments || []).length || Object.keys(s.rubric_assessment || {}).length;
     // the phone draws the item page its own way (the iPhone mockup)
-    if (BCV.phone?.active()) return BCV.phone.assignment(ctx, shell, { a, s, types, isTool, toolNewTab, toolLaunch, nativeSubmit, canvasOnly, attemptsLeft, status });
+    if (BCV.phone?.active()) return BCV.phone.assignment(ctx, shell, { a, s, types, available, isTool, toolNewTab, toolLaunch, nativeSubmit, canvasOnly, attemptsLeft, status, posted, held });
     // Handing in lives inside the assignment (mockup 11): the block sits at the end of the same
     // scroll as the instructions, built from the assignment already loaded for this page. The
     // "Submit assignment" button and ?bcv=submit (a To Do row) just bring it into view.
@@ -357,7 +357,9 @@
     document.querySelector('.bcv-sheet-ov')?.remove();
     const ov = U.el('bcv-sheet-ov', null, { role: 'dialog', 'aria-label': 'Submission' });
     // Escape is listened for on the document: the sheet's own focus moves as attempts are switched.
-    const onKey = (e) => { if (e.key === 'Escape') close(); };
+    // It listens in the capture phase, ahead of anything opened over it, so it stands aside while a
+    // file from this sheet is being read — one Escape should close the file, not the sheet under it.
+    const onKey = (e) => { if (e.key === 'Escape' && !BCV.viewer?.isOpen?.()) close(); };
     const close = () => { document.removeEventListener('keydown', onKey, true); ov.remove(); };
     ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
     document.addEventListener('keydown', onKey, true);
@@ -414,9 +416,11 @@
         ['Score', scoreOf(cur) === null ? 'Not graded' : `${scoreOf(cur)} / ${possible}`],
       ].map(([k, v]) => U.el('bcv-subs__fact', [U.text('bcv-subs__factk', k), U.text('bcv-subs__factv bcv-pretty', v)])));
 
-      // Canvas's attachment links expire, so the file is opened through the viewer by id rather than
-      // from a URL kept here.
-      const files = (cur.attachments || []).map((f) => h('button', { type: 'button', class: 'bcv-subs__att', onclick: () => BCV.viewer?.open({ id: f.id }, { context: c }) }, [
+      // What you handed in is not one of the course's files — it is your own, and Canvas has no
+      // /courses/:id/files/:fid for it, which is what a course context asks for and gets a 404 from.
+      // The attachment Canvas just handed back carries its own name, size, type and preview, so it is
+      // opened as itself, with no context; nothing about it is kept, because these links expire.
+      const files = (cur.attachments || []).map((f) => h('button', { type: 'button', class: 'bcv-subs__att', onclick: () => BCV.viewer?.open(f) }, [
         h('span', { class: 'bcv-subs__attkind', text: fileKind(f) }),
         h('span', { class: 'bcv-subs__attbody' }, [
           U.text('bcv-subs__attname bcv-ellip', f.display_name || f.filename || 'File', 'span'),
@@ -496,6 +500,7 @@
     return { close };
   }
   D.openSubmissions = openSubmissions;
+  D.attemptsFact = attemptsFact; // the phone draws the same five facts, from the same fields
 
   BCV.screens.courseDetail = D;
 })();

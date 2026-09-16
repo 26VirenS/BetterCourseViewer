@@ -1228,7 +1228,37 @@
     }, [U.svg(IC.sheet, { size: 14, stroke: 'currentColor', width: 1.9 }), h('span', { text: label })]);
   }
 
-  async function assignment(ctx, shell, { a, s, types, isTool, toolNewTab, toolLaunch, nativeSubmit, canvasOnly, attemptsLeft, status }) {
+  /** The mark, as the phone's version of the desktop chip: it sits in the title's row, it carries the
+   *  number and nothing else, and pressing it is the way in to every attempt and the thread. Where
+   *  Canvas has marked but not posted, there is no number to carry — only the fact that one is held. */
+  function gradeChip(ctx, c, a, s, { posted, held }) {
+    if (!posted && !held) return null;
+    const pc = a.points_possible ? `${Math.round((Number(s.score) / Number(a.points_possible)) * 100)}%` : (s.grade ? String(s.grade) : '');
+    return h('button', {
+      type: 'button', class: `bcv-ph-grade ${held ? 'bcv-ph-grade--held' : ''}`,
+      'aria-label': 'Submission details and comments',
+      onclick: () => BCV.screens.courseDetail.openSubmissions(ctx, c, a, s),
+    }, [
+      h('span', { class: 'bcv-ph-grade__body' }, posted ? [
+        h('span', { class: 'bcv-ph-grade__v' }, [
+          h('span', { class: 'bcv-ph-grade__score', text: store.fmtPts(s.score) }),
+          h('span', { class: 'bcv-ph-grade__of', text: `/ ${a.points_possible ?? '—'}` }),
+        ]),
+        U.text('bcv-ph-grade__side', [pc, s.graded_at ? U.fmtAt(s.graded_at) : 'Marked'].filter(Boolean).join(' · '), 'span'),
+      ] : [
+        U.text('bcv-ph-grade__held', 'Not yet posted', 'span'),
+        U.text('bcv-ph-grade__side', 'Not released yet', 'span'),
+      ]),
+      chev(),
+    ]);
+  }
+
+  /** The assignment's facts as one wrapping row, never a table: Canvas's own fields, and no fact at
+   *  all where Canvas has no value — an assignment with no unlock date must not claim one. */
+  const phFacts = (pairs) => U.el('bcv-ph-facts', pairs.filter(([, v]) => v !== null && v !== undefined && v !== '')
+    .map(([k, v]) => h('span', { class: 'bcv-ph-fact' }, [h('b', { text: `${k} ` }), String(v)])));
+
+  async function assignment(ctx, shell, { a, s, types, available, isTool, toolNewTab, toolLaunch, nativeSubmit, canvasOnly, attemptsLeft, status, posted, held }) {
     const { app } = ctx;
     const c = shell.course;
     const CS = BCV.screens.course;
@@ -1245,16 +1275,25 @@
     if (!ctx.alive()) return b;
     b.append(...[
       h('span', { class: 'bcv-ph-chip bcv-ph-chip--course', style: { background: c.palette.tint, color: c.palette.text }, text: c.shortName || c.name }),
-      h('h1', { class: 'bcv-ph-item__title bcv-pretty', text: a.name }),
-      U.text('bcv-ph-item__meta', `${a.due_at ? `Due ${dueText(U.parse(a.due_at))}` : 'No due date'} · ${a.points_possible !== null && a.points_possible !== undefined ? `${store.fmtPts(a.points_possible)} points` : 'no points'}${a.allowed_attempts > 0 ? ` · attempt ${s.attempt || 0} of ${a.allowed_attempts}` : ''}`),
-      // the banner opens what is behind the mark: every attempt, what was handed in, and the thread
-      s.submitted_at || graded ? h(graded ? 'button' : 'div', {
-        type: graded ? 'button' : null, class: `bcv-ph-banner ${status === 'Missing' ? 'bcv-ph-banner--warn' : ''} ${graded ? 'is-link' : ''}`,
-        onclick: graded ? () => BCV.screens.courseDetail.openSubmissions(ctx, c, a, s) : null,
-      }, [
+      // The title and the mark share the phone's first row exactly as they do on the desktop: the
+      // mark is the answer the page is opened for, and the way in to what is behind it. Ungraded,
+      // the chip is absent and the title has the row to itself.
+      U.el('bcv-ph-item__head', [
+        h('h1', { class: 'bcv-ph-item__title bcv-pretty', text: a.name }),
+        gradeChip(ctx, c, a, s, { posted, held }),
+      ]),
+      phFacts([
+        ['Due', a.due_at ? dueText(U.parse(a.due_at)) : 'No due date'],
+        ['Points', a.points_possible ?? '—'],
+        ['Submitting', types],
+        ['Available', available],
+        ['Attempts', BCV.screens.courseDetail.attemptsFact(a, s)],
+      ]),
+      // The banner is what is true before a mark exists: handed in and waiting, or not handed in at
+      // all. Once there is a mark the chip above carries it, and a second copy would only repeat it.
+      !graded && s.submitted_at ? U.el(`bcv-ph-banner ${status === 'Missing' ? 'bcv-ph-banner--warn' : ''}`, [
         U.svg(CHECK, { size: 20, stroke: 'var(--bcv-green-text)', width: 2.6, style: { flex: 'none' } }),
-        h('div', { style: { flex: '1', minWidth: '0' } }, [U.text('bcv-ph-banner__t', status), U.text('bcv-ph-banner__s', `${s.submitted_at ? U.fmtAt(s.submitted_at) : ''}${graded ? ` · ${store.fmtPts(s.score)} / ${a.points_possible ?? '—'}` : s.submitted_at ? ' · awaiting grade' : ''}`)]),
-        graded ? chev() : null,
+        h('div', { style: { flex: '1', minWidth: '0' } }, [U.text('bcv-ph-banner__t', status), U.text('bcv-ph-banner__s', `${U.fmtAt(s.submitted_at)} · awaiting grade`)]),
       ]) : (status === 'Missing' ? U.el('bcv-ph-banner bcv-ph-banner--warn', [U.svg(IC.warn, { size: 20, stroke: 'var(--bcv-red-text)', width: 2.2, style: { flex: 'none' } }), h('div', {}, [U.text('bcv-ph-banner__t', 'Missing'), U.text('bcv-ph-banner__s', 'Canvas marked this as missing')])]) : null),
       // and the rubric keeps its own button, where the marks are decided rather than reported
       graded ? rubricButton(a, s, { cls: 'bcv-ph-bigbtn', label: 'See breakdown' }) : null,
@@ -1266,7 +1305,10 @@
       block ? null : rubricButton(a, s, { cls: 'bcv-ph-bigbtn' }),
       a.quiz_id ? h('button', { type: 'button', class: 'bcv-ph-bigbtn', text: 'Open quiz', onclick: () => app.go(`${c.url}/quizzes/${a.quiz_id}`) }) : null,
       a.discussion_topic?.id ? h('button', { type: 'button', class: 'bcv-ph-bigbtn', text: 'Open discussion', onclick: () => app.go(`${c.url}/discussion_topics/${a.discussion_topic.id}`) }) : null,
-      (s.submission_comments || []).length ? h('div', {}, [groupHead('Comments'), listCard(s.submission_comments.map((cm) => U.el('bcv-ph-comment', [U.el('bcv-ph-comment__head', [U.text('bcv-ph-comment__who', cm.author_name || cm.author?.display_name || 'Comment', 'span'), U.text('bcv-ph-comment__when', U.fmtAt(cm.created_at), 'span')]), U.text('bcv-ph-comment__body bcv-pretty', cm.comment || '')])))]) : null,
+      // Only where there is no chip to open: comments carry the attempt they belong to, and the sheet
+      // is the one place that filters them. An unfiltered list beside it shows a first draft's
+      // feedback as feedback on the final hand-in.
+      !posted && !held && (s.submission_comments || []).length ? h('div', {}, [groupHead('Comments'), listCard(s.submission_comments.map((cm) => U.el('bcv-ph-comment', [U.el('bcv-ph-comment__head', [U.text('bcv-ph-comment__who', cm.author_name || cm.author?.display_name || 'Comment', 'span'), U.text('bcv-ph-comment__when', U.fmtAt(cm.created_at), 'span')]), U.text('bcv-ph-comment__body bcv-pretty', cm.comment || '')])))]) : null,
       block,
     ].filter(Boolean));
     if (block && ctx.route.params.get('bcv') === 'submit') for (const ms of [80, 600]) setTimeout(() => block.scrollIntoView({ block: 'start' }), ms);

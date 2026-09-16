@@ -771,6 +771,21 @@ try {
   check(sheetTop.width === 560 && sheetTop.score === '10 / 10' && sheetTop.count === '2 comments' && sheetTop.facts.length === 5, `the sheet is 560 wide and heads with the score and the thread's size: ${JSON.stringify(sheetTop).slice(0, 160)}`);
   check(sheetTop.facts.join(' | ') === 'Submitted=Sep 9 at 3:52pm | Attempt=2 of 2 | Type=File upload | Graded=Sep 10 at 8:00am | Score=10 / 10', `five facts, all from the selected attempt: ${sheetTop.facts.join(' | ')}`);
   check(/^PDF /.test(sheetTop.att || '') && /\.pdf/.test(sheetTop.att || '') && /KB/.test(sheetTop.att || '') && /Open$/.test(sheetTop.att || ''), `the attachment says its kind, name, size and how to open it: ${sheetTop.att}`);
+  // what was handed in is the student's own file, not the course's: asked for under /courses/:id it
+  // is Canvas's 404 page, so it has to be opened with no context at all
+  await page.click('.bcv-subs__att');
+  await page.waitForSelector('.bcv-viewer-ov .bcv-viewer__frame', { timeout: 8000 });
+  const attSrc = await page.$eval('.bcv-viewer-ov .bcv-viewer__frame', (e) => e.getAttribute('src'));
+  check(/^\/files\/\w+\/file_preview/.test(attSrc || ''), `a submission attachment previews with no course context: ${attSrc}`);
+  const attFramed = await eventually(async () => {
+    const fr = page.frames().find((f) => /\/file_preview/.test(f.url()));
+    return fr ? (await fr.$('#file_preview[data-bcv-scope="no-context"]')) !== null : false;
+  });
+  check(attFramed, 'and Canvas serves it, rather than the page-not-found it answers a course context with');
+  // one Escape closes the file, and leaves the sheet it was opened from where it was
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !document.querySelector('.bcv-viewer-ov'), null, { timeout: 5000 });
+  check(!!(await page.$('.bcv-sheet--sub .bcv-subs__facts')), 'closing the file leaves the submission sheet it was opened from standing');
   // surface 3: a segment per attempt, each carrying its own score, latest selected
   const segs = await page.$$eval('.bcv-subs__segbtn', (els) => els.map((e) => `${e.innerText.replace(/\s+/g, ' ').trim()}${e.classList.contains('is-on') ? ' *' : ''}`));
   check(segs.join(' | ') === 'Attempt 1 — | Attempt 2 10 / 10 *', `a segment per attempt with its own score, latest selected: ${segs.join(' | ')}`);
@@ -1964,7 +1979,9 @@ try {
   await page.waitForSelector('.bcv-ccard__hero--term', { timeout: 10000 });
   await setSettings({ appearance: { skin: false } });
   await page.waitForFunction(() => !document.documentElement.classList.contains('bcv-on'), null, { timeout: 5000 });
-  check(page.url() === `${BASE}/courses` && (await visible('#application')) && (await page.title()).includes('courses'), 'look off after navigating shows the same page in stock Canvas (it was underneath all along)');
+  // the class goes the moment the setting lands, but Canvas's own page is only there once the
+  // reload it triggers has finished — wait for the page, not for the class
+  check(await eventually(async () => { try { return page.url() === `${BASE}/courses` && (await visible('#application')) && (await page.title()).includes('courses'); } catch { return false; } }), 'look off after navigating shows the same page in stock Canvas (it was underneath all along)');
   // Turning the look off with an attempt on screen is not a reload: reloading would put the
   // browser's own "leave this page?" in the way and then land back on our quiz flow with nothing to
   // run it. It goes to Canvas's own take page, where every answer already saved is picked up.

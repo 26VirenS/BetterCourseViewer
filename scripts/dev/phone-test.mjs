@@ -97,14 +97,23 @@ try {
     await rolled();
   };
   const tab = (id) => tapScreen(`.bcv-tabbar__item[data-tab="${id}"]`);
-  const ready = () => page.waitForSelector('#bcv-app .bcv-tabbar__item', { timeout: 15000 });
+  // The background's one-time migration can clear the setup flags after they were written above, and
+  // the card it then opens sits over everything, whenever it happens to run — put them back and load
+  // the page again. Every check still runs against the app itself; only the card is cleared.
+  const noSetup = async () => {
+    if (!(await page.$('#bcv-setup'))) return false;
+    await sw.evaluate(() => self.BCV.api.storage.local.set({ 'setup:offered': true, 'setup:done': true, 'setup:flow': 2 }));
+    await page.goto(page.url());
+    return true;
+  };
+  const ready = async () => { await noSetup(); return page.waitForSelector('#bcv-app .bcv-tabbar__item', { timeout: 15000 }); };
   const sheet = () => page.waitForSelector('.bcv-sheet-ov .bcv-ph-sheet', { timeout: 5000 });
   // The counters are redrawn when their counts land, so a press can meet a card on its way out and
   // wait for a steady box that never comes. Every actionability check still has to pass — the press
   // is only tried again, against whatever card is there now.
   const press = async (sel) => {
     for (let i = 0; i < 3; i++) {
-      try { await page.click(sel, { timeout: 7000 }); return; } catch { await settle(); await rolled(); }
+      try { await page.click(sel, { timeout: 7000 }); return; } catch { await noSetup(); await settle(); await rolled(); }
     }
     await page.click(sel, { timeout: 7000 });
   };
@@ -460,7 +469,8 @@ try {
   await page.waitForSelector('.bcv-ph-item__title', { timeout: 15000 });
   check((await texts('.bcv-ph-item__title'))[0] === 'Week 2 Post Class Assignment: GC articles' && (await texts('.bcv-topbar__title'))[0] === 'Week 2 Post Class Assignment: GC articles', 'item title and the back bar title');
   check((await texts('.bcv-topbar__back'))[0] === 'Back', `with nothing to come back from, the back bar says Back (‹ ${(await texts('.bcv-topbar__back'))[0]})`);
-  check(/Due .* · \d+ points/.test((await texts('.bcv-ph-item__meta'))[0]) && (await raw('.bcv-ph-instr .bcv-ph-kicker'))[0] === 'Instructions', `meta line and Instructions card: ${(await texts('.bcv-ph-item__meta'))[0]}`);
+  const itemFacts = (await texts('.bcv-ph-fact')).join(' · ');
+  check(/^Due /.test(itemFacts) && /Points \d+/.test(itemFacts) && (await raw('.bcv-ph-instr .bcv-ph-kicker'))[0] === 'Instructions', `fact row and Instructions card: ${itemFacts}`);
   check(!(await page.$('.bcv-head--course')) && (await texts('.bcv-ph-chip--course'))[0] === 'F26-SPRK 010 103', 'an item page drops the course header; its course chip says where it is');
   check(!(await page.$('.bcv-ph-bigbtn.is-primary')) && !!(await page.$('.bcv-ph-body--item .bcv-sb--embed')) && (await raw('.bcv-sb--embed .bcv-sb__kicker'))[0] === 'Submit work', 'handing in lives on the same page: the submit block at the end, no separate Submit screen');
   check(/^[\w ]+ 11:59 PM 10 points Attempt 1 of unlimited$/.test((await texts('.bcv-sb--embed .bcv-sb__chips'))[0]), `the block's chips: ${(await texts('.bcv-sb--embed .bcv-sb__chips'))[0]} (no course chip, nothing stray)`);
@@ -502,19 +512,42 @@ try {
   // and a marked assignment offers the same grid from the grade itself
   await page.goto(`${BASE}/courses/104/assignments/4001`);
   await ready();
-  await page.waitForSelector('.bcv-ph-banner', { timeout: 15000 });
+  await page.waitForSelector('.bcv-ph-grade', { timeout: 15000 });
   check((await texts('.bcv-ph-bigbtn.bcv-rubbtn'))[0] === 'See breakdown', 'a graded assignment offers See breakdown under the grade');
-  // and the banner itself opens what is behind the mark: the attempts, and the thread
-  await page.click('.bcv-ph-banner.is-link');
+  // the mark sits in the title's own row, at its end, exactly as it does on the desktop
+  const phMark = await page.evaluate(() => {
+    const g = document.querySelector('.bcv-ph-grade'), t = document.querySelector('.bcv-ph-item__title');
+    const gr = g.getBoundingClientRect(), tr = t.getBoundingClientRect(), hr = g.parentElement.getBoundingClientRect();
+    return { tag: g.tagName, inHead: g.parentElement === t.parentElement, rightOfTitle: Math.round(gr.left - tr.right) >= 6, insetRight: Math.round(hr.right - gr.right) <= 1, score: g.querySelector('.bcv-ph-grade__score')?.textContent, banner: !!document.querySelector('.bcv-ph-banner') };
+  });
+  check(phMark.tag === 'BUTTON' && phMark.inHead && phMark.rightOfTitle && phMark.insetRight && phMark.score === '10' && !phMark.banner, `the mark is a chip in the title's row, and the banner it replaces is gone: ${JSON.stringify(phMark)}`);
+  // the facts wrap into one row rather than a table, and no fact is invented where Canvas has none
+  const phFacts = await page.$$eval('.bcv-ph-fact', (els) => els.map((e) => e.innerText.replace(/\s+/g, ' ').trim()));
+  const webFacts = await page.evaluate(async (base) => { // the same five, from the same fields, as the desktop draws
+    const r = await fetch(`${base}/api/v1/courses/104/assignments/4001?include[]=submission`, { credentials: 'same-origin' });
+    const a = JSON.parse((await r.text()).replace(/^while\(1\);/, '')); // Canvas guards its JSON
+    return { attempts: `${a.submission.attempt || 0} of ${a.allowed_attempts}`, points: String(a.points_possible), available: !!(a.unlock_at || a.lock_at) };
+  }, BASE);
+  check(phFacts.length === 4 && /^Due /.test(phFacts[0]) && phFacts[1] === `Points ${webFacts.points}` && phFacts[3] === `Attempts ${webFacts.attempts}` && !webFacts.available && !phFacts.some((t) => /^Available/.test(t)), `the phone draws the same facts, and none Canvas has no value for: ${phFacts.join(' | ')}`);
+  await shot('08c-assignment-graded');
+  // and the chip opens what is behind the mark: the attempts, and the thread
+  await page.click('.bcv-ph-grade');
   await page.waitForSelector('.bcv-sheet--sub .bcv-subs__facts', { timeout: 8000 });
   const phSub = await page.evaluate(() => ({
     segs: [...document.querySelectorAll('.bcv-subs__segbtn')].map((e) => e.innerText.replace(/\s+/g, ' ').trim()),
     facts: document.querySelectorAll('.bcv-subs__fact').length,
     reply: !!document.querySelector('.bcv-subs__input'),
     fits: document.querySelector('.bcv-sheet--sub').getBoundingClientRect().width <= window.innerWidth,
+    // a segment's score is the point of the switcher: it must be on screen, inside its own segment
+    scores: [...document.querySelectorAll('.bcv-subs__segbtn')].map((b) => {
+      const sub = b.querySelector('.bcv-subs__segsub'), br = b.getBoundingClientRect(), sr = sub.getBoundingClientRect();
+      return { text: sub.textContent, w: Math.round(sr.width), h: Math.round(sr.height), inside: sr.right <= br.right + 1 && sr.bottom <= br.bottom + 1, under: sr.top >= b.querySelector('.bcv-subs__seglabel').getBoundingClientRect().bottom - 1 };
+    }),
   }));
-  check(phSub.segs.length === 2 && /^Attempt 2 /.test(phSub.segs[1]) && phSub.facts === 5 && phSub.reply && phSub.fits, `the mark opens the attempts, the facts and the reply field on a phone, within the screen: ${JSON.stringify(phSub)}`);
+  check(phSub.segs.length === 2 && /^Attempt 2 /.test(phSub.segs[1]) && phSub.facts === 5 && phSub.reply && phSub.fits, `the mark opens the attempts, the facts and the reply field on a phone, within the screen: ${JSON.stringify({ ...phSub, scores: undefined })}`);
+  check(phSub.scores.length === 2 && phSub.scores.every((s) => s.h > 0 && s.w > 0 && s.inside && s.under) && phSub.scores[1].text === '10 / 10', `each segment carries its own score, under its label and inside its own segment: ${JSON.stringify(phSub.scores)}`);
   check(await noOverflow(), 'no horizontal overflow with the submission sheet open');
+  await shot('08d-submission-sheet');
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('.bcv-sheet--sub'), null, { timeout: 5000 });
   await page.click('.bcv-ph-bigbtn.bcv-rubbtn');
