@@ -17,7 +17,18 @@
   let wiped = false;
   try {
     BCV.api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-      if (!msg || msg.type !== 'wipeSiteNote') return false;
+      if (!msg) return false;
+      // The background pushes every settings change here as well as writing it, because a content
+      // script cannot count on hearing storage.onChanged — in Safari it often never fires for a
+      // change made in the popup or the settings page, and the look switch then did nothing at all
+      // to the page it was pressed for. Handed the new settings directly, this takes exactly the
+      // path a storage change would have taken.
+      if (msg.type === 'settingsPush') {
+        sendResponse({ ok: true });
+        if (msg.settings) sync(msg.settings);
+        return false;
+      }
+      if (msg.type !== 'wipeSiteNote') return false;
       wiped = true;
       try { localStorage.removeItem(CACHE_KEY); } catch { /* ignore */ }
       sendResponse({ ok: true });

@@ -36,10 +36,26 @@ if (typeof importScripts === 'function' && !self.BCV?.settings) {
       case 'wipeSiteNotes':
         reply(wipeSiteNotes());
         return true;
+      case 'pushSettings': // the popup and the settings page ask for this straight after a save
+        reply(S.get().then(pushSettings).then(() => ({ ok: true })));
+        return true;
       default:
         return false;
     }
   });
+
+  // A settings change has to reach the open Canvas tabs, and storage.onChanged is not a reliable way
+  // to get it there: in Safari a content script often never hears a change written by the popup or
+  // the settings page, so the look switch wrote the setting and the page it was pressed for sat
+  // exactly as it was. Messaging a tab does work (it is how Reset everything reaches them), so every
+  // change is pushed to every tab as well. A tab that already knows does nothing with it; a tab with
+  // none of ours in it never answers.
+  S.onChange((settings) => { pushSettings(settings); });
+  async function pushSettings(settings) {
+    let tabs = [];
+    try { tabs = await api.tabs.query({}); } catch { return; }
+    await Promise.all(tabs.map((t) => api.tabs.sendMessage(t.id, { type: 'settingsPush', settings }).catch(() => {})));
+  }
 
   /** Reset everything (the settings page): every open Canvas tab is told to drop the one-line note it
    *  keeps in its own site storage (the look and the appearance, applied before first paint), so

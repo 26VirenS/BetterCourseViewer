@@ -38,8 +38,14 @@
     $('darkMode').value = settings.appearance.darkMode;
   };
   bind();
-  $('skin').addEventListener('change', (e) => S.update({ appearance: { skin: e.target.checked } }));
-  $('darkMode').addEventListener('change', (e) => S.update({ appearance: { darkMode: e.target.value } }));
+  // Saving is not enough on its own: a content script cannot count on hearing a storage change (in
+  // Safari it often never fires for one written here), so the background is asked to hand the new
+  // settings to the open tabs. Without this the look switch left the page it was pressed for
+  // exactly as it was until it was reloaded by hand.
+  const push = () => api.runtime.sendMessage({ type: 'pushSettings' }).catch(() => {});
+  const saveAppearance = async (patch) => { await S.update(patch); await push(); };
+  $('skin').addEventListener('change', (e) => saveAppearance({ appearance: { skin: e.target.checked } }));
+  $('darkMode').addEventListener('change', (e) => saveAppearance({ appearance: { darkMode: e.target.value } }));
   S.onChange((s) => {
     settings = s;
     bind();

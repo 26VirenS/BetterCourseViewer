@@ -65,6 +65,9 @@
   const save = async (patch) => {
     try {
       settings = await S.update(patch);
+      // and hand it to the open Canvas tabs: a content script cannot count on hearing the storage
+      // change itself (Safari often never delivers one written from here)
+      await api.runtime.sendMessage({ type: 'pushSettings' }).catch(() => {});
       flash();
     } catch (e) {
       flash(`Not saved: ${e?.message || e}`, true);

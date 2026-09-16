@@ -156,6 +156,7 @@
         id: r.id,
         got: !!rated && String(r.id) === String(rated.id),
         text: htmlToText(r.description || '', 200) || 'Rating',
+        value: r.points === null || r.points === undefined ? null : Number(r.points),
         pts: r.points === null || r.points === undefined ? '' : `${pts(r.points)} pts`,
         label: `${htmlToText(r.description || '', 200) || 'Rating'}${r.points === null || r.points === undefined ? '' : ` (${pts(r.points)})`}`,
       })),
@@ -170,27 +171,71 @@
    *  line, and every rating it offers as a cell across the row below — the rating the work was given
    *  filled in. A grid rather than a table because it has to hold at a sidebar's width and at a
    *  phone's: the rating cells reflow, nothing scrolls sideways. */
+  // A rubric is read down and across at once — "what is this criterion, and what would each level of
+  // it be worth?" — so the levels are columns, headed once, rather than repeated on every row. Canvas
+  // does not name the levels: each criterion carries its own ratings, so they are ranked by points
+  // (best first) and lined up by rank, and the names of the best-stocked criterion head the columns.
+  // The top level reads green, nothing reads grey, and anything between reads amber.
+  const RUB_ACCENT = ['#0a6cff', '#34c759', '#5856d6', '#ff9500', '#30b0c7', '#e71f63'];
+  // by what the level is worth, not where it sits: the best is green, nothing at all is grey, and
+  // everything between is amber — so a two-level 6/3 reads as full and partial, never as full and none
+  const rubTier = (r, best) => {
+    if (!r || r.value === null || r.value === undefined) return 'part';
+    if (r.value === best) return 'full';
+    return r.value === 0 ? 'none' : 'part';
+  };
   function rubricGrid(rubric, assessment, { cls = '' } = {}) {
-    const rows = (rubric || []).map((cr) => {
+    const list = rubric || [];
+    const parts = list.map((cr) => {
       const p = rubricParts(cr, (assessment || {})[cr.id]);
-      return U.el('bcv-rubg__row', [
-        U.el('bcv-rubg__crit', [
-          U.text('bcv-rubg__name', p.name),
-          p.long ? prose(p.long, { cls: 'bcv-prose--13 bcv-rubric__long' }) : null,
-        ]),
-        U.el('bcv-rubg__rates', p.ratings.length
-          ? p.ratings.map((r) => U.el(`bcv-rubg__rate ${r.got ? 'is-got' : ''}`, [
-            r.pts ? U.text('bcv-rubg__ratepts', r.pts) : null,
-            U.text('bcv-rubg__ratetext', r.text),
-          ]))
-          : U.text('bcv-rubg__norates', 'No ratings')),
-        U.el('bcv-rubg__pts', [
-          U.text('bcv-rubg__ptsv', p.pts),
-          p.comment ? U.text('bcv-rubg__note bcv-pretty', p.comment) : null,
-        ]),
-      ]);
+      // best first: the columns are levels, and a level is worth what it is worth
+      p.ratings = p.ratings.slice().sort((a, b) => (b.value ?? -Infinity) - (a.value ?? -Infinity));
+      return p;
     });
-    return U.el(`bcv-rubg ${cls}`, rows);
+    const cols = Math.max(0, ...parts.map((p) => p.ratings.length));
+    const heads = parts.find((p) => p.ratings.length === cols)?.ratings || [];
+    const headBest = heads[0]?.value ?? null;
+    const grid = U.el(`bcv-rubg ${cls}`, null, { style: { '--bcv-rubcols': String(cols) } });
+    if (cols) {
+      grid.append(U.el('bcv-rubg__head', [
+        U.text('bcv-rubg__h', 'Criterion'),
+        ...heads.map((r) => h('span', { class: `bcv-rubg__h bcv-rubg__h--${rubTier(r, headBest)} bcv-ellip`, title: r.text, text: r.text })),
+      ]));
+    }
+    parts.forEach((p, n) => {
+      const desc = p.long ? prose(p.long, { cls: 'bcv-prose--13 bcv-rubg__desc' }) : null;
+      // a description only earns a button when it does not fit; measured once it is on the page
+      const more = desc ? h('button', { type: 'button', class: 'bcv-rubg__more', hidden: true, onclick: () => {
+        const open = desc.classList.toggle('is-open');
+        more.textContent = open ? 'Less' : 'More';
+      } }, 'More') : null;
+      if (desc) {
+        let tries = 0;
+        const fit = () => {
+          if (!desc.isConnected) { if (tries++ < 20) requestAnimationFrame(fit); return; }
+          more.hidden = desc.scrollHeight <= desc.clientHeight + 1;
+        };
+        requestAnimationFrame(fit);
+      }
+      grid.append(U.el('bcv-rubg__row', [
+        U.el('bcv-rubg__crit', [
+          U.el('bcv-rubg__critline', [U.text('bcv-rubg__name', p.name), U.text('bcv-rubg__ptsv', p.pts, 'span')]),
+          desc,
+          more,
+          p.comment ? U.text('bcv-rubg__note bcv-pretty', p.comment) : null,
+          h('span', { class: 'bcv-rubg__accent', style: { background: RUB_ACCENT[n % RUB_ACCENT.length] } }),
+        ]),
+        ...Array.from({ length: cols }, (_, i) => {
+          const r = p.ratings[i];
+          if (!r) return U.el('bcv-rubg__cell bcv-rubg__cell--empty');
+          return U.el(`bcv-rubg__cell bcv-rubg__cell--${rubTier(r, p.ratings[0]?.value ?? null)} ${r.got ? 'is-got' : ''}`, [
+            U.text('bcv-rubg__cellpts', r.value === null || r.value === undefined ? '–' : store.fmtPts(r.value)),
+            U.text('bcv-rubg__celltext', r.text),
+          ]);
+        }),
+      ]));
+    });
+    return grid;
   }
 
   /** What the rubric is worth, and what it gave, from its own points rather than the assignment's. */
@@ -213,10 +258,16 @@
     const assess = sub?.rubric_assessment || {};
     const title = a.rubric_settings?.title || 'Rubric';
     const score = rubricScore(a.rubric, assess);
-    const note = `${a.rubric.length === 1 ? '1 criterion' : `${a.rubric.length} criteria`} · ${score.marked ? `marked ${score.text}` : score.text}`;
+    const worth = score.text.split(' / ').pop().replace(' pts', '');
+    const note = score.marked ? `Marked ${score.text} · ${a.rubric.length === 1 ? '1 criterion' : `${a.rubric.length} criteria`}`
+      : `Not yet graded · shown before you submit`;
+    const foot = score.marked ? 'One level is marked per criterion; the points beside each name are what it was given.'
+      : 'Your instructor marks one level per criterion. Totals appear here once grades post.';
     const grid = rubricGrid(a.rubric, assess);
+    // the badge is the rubric's own total, which is not always the assignment's
+    const badge = U.el('bcv-rubg__badge', [U.text('bcv-rubg__badgen', worth), U.text('bcv-rubg__badgeu', 'pts')]);
     if (BCV.phone?.active()) {
-      BCV.phone.openSheet({ label: 'Rubric', title, note, cls: 'bcv-ph-sheet--rub', body: U.el('bcv-rubsheet', grid) });
+      BCV.phone.openSheet({ label: 'Rubric', title, note, cls: 'bcv-ph-sheet--rub', body: U.el('bcv-rubsheet', [grid, U.text('bcv-rubg__foot bcv-pretty', foot)]) });
       return;
     }
     document.querySelector('.bcv-sheet-ov')?.remove();
@@ -225,11 +276,13 @@
     ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
     ov.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
     ov.append(U.el('bcv-sheet bcv-sheet--rub', [
-      U.el('bcv-sheet__head', [
+      U.el('bcv-sheet__head bcv-sheet__head--rub', [
+        badge,
         h('div', { style: { flex: '1', minWidth: '0' } }, [U.text('bcv-sheet__title', title), U.text('bcv-sheet__desc', note)]),
         h('button', { type: 'button', class: 'bcv-sheet__close', 'aria-label': 'Close', onclick: close }, U.svg(IC.close, { size: 13, stroke: 'var(--bcv-ink2)', width: 2.3 })),
       ]),
       U.el('bcv-rubsheet', grid),
+      U.text('bcv-rubg__foot bcv-pretty', foot),
     ]));
     document.body.append(ov);
     ov.tabIndex = -1;
@@ -1079,17 +1132,20 @@
   };
 
   const ITEM_ICON = { Assignment: IC.doc, Quiz: IC.bolt, Discussion: IC.disc, Page: IC.page, File: IC.folder, ExternalUrl: IC.link, ExternalTool: IC.shield };
-  /** The date a module is "on": the soonest thing in it that has one — a due date first, then what
-   *  Canvas unlocks it at. A module of pages and links has none and sorts to the end. */
-  function moduleDate(m) {
-    const times = [];
-    for (const it of m.items || []) {
-      const t = U.parse(it.content_details?.due_at) || U.parse(it.content_details?.unlock_at);
-      if (t) times.push(+t);
-    }
-    const un = U.parse(m.unlock_at);
-    if (un) times.push(+un);
-    return times.length ? Math.min(...times) : null;
+  /** When a module next wants something: the soonest due date still ahead of it, else the last one
+   *  that has gone by, else nothing at all (a module of pages and links). Sorting by it puts the work
+   *  in the order it has to be done — what is coming first, what is finished after it. */
+  function moduleDue(m) {
+    const now = Date.now();
+    let next = null, past = null;
+    const see = (t) => {
+      if (!t) return;
+      const v = +t;
+      if (v >= now) { if (next === null || v < next) next = v; } else if (past === null || v > past) past = v;
+    };
+    for (const it of m.items || []) see(U.parse(it.content_details?.due_at));
+    see(U.parse(m.unlock_at));
+    return { next, past };
   }
 
   T.modulesBlock = async (ctx, shell) => {
@@ -1137,13 +1193,18 @@
       // is a slide: 0fr → 1fr takes the rows' own height with it, whatever that turns out to be, and
       // nothing has to be measured. (Reduced motion turns the transition off in the stylesheet.)
       const wrap = U.el('bcv-module__wrap', itemsEl);
+      // when the module next wants something, on the head where it can be read without opening it
+      const due = moduleDue(m);
+      const dueText = due.next !== null ? `Next due ${U.whenShort(new Date(due.next))}` : due.past !== null ? `Last due ${U.fmtShort(new Date(due.past))}` : '';
       const head = h('button', { type: 'button', class: 'bcv-module__head', 'aria-expanded': String(open.has(String(m.id))) }, [
         U.svg(IC.chevron, { size: 15, stroke: 'var(--bcv-ink3)', width: 2, cls: 'bcv-module__toggle' }),
         U.text('bcv-module__name', m.name, 'span'),
+        dueText ? h('span', { class: `bcv-module__due ${due.next !== null ? 'is-next' : ''}`, text: dueText }) : null,
         U.text('bcv-module__state', stateText, 'span'),
       ]);
       const card = U.card([head, wrap], `bcv-card--list bcv-module ${open.has(String(m.id)) ? 'bcv-module--open' : ''}`);
-      card.dataset.date = moduleDate(m) ?? '';
+      card.dataset.date = due.next ?? '';
+      card.dataset.past = due.past ?? '';
       card.dataset.pos = String(m.position ?? 0);
       card.setOpen = (on) => {
         card.classList.toggle('bcv-module--open', on);
@@ -1156,12 +1217,16 @@
     // Canvas's own order is the order the course was built in; by date is the order it has to be done
     // in. Both are kept as they were last left, per course.
     const orderKey = `modOrder:${c.id}`;
+    // Next due: what is coming, soonest first; then what has gone by, most recent first; then the
+    // modules with no dates at all. Canvas's own order breaks any tie.
+    const rank = (el) => (el.dataset.date !== '' ? [0, Number(el.dataset.date)] : el.dataset.past !== '' ? [1, -Number(el.dataset.past)] : [2, 0]);
     const sortCards = (order) => {
       const sorted = cards.slice().sort((x, y) => {
         if (order !== 'date') return Number(x.dataset.pos) - Number(y.dataset.pos);
-        const a = x.dataset.date === '' ? Infinity : Number(x.dataset.date);
-        const b = y.dataset.date === '' ? Infinity : Number(y.dataset.date);
-        return a === b ? Number(x.dataset.pos) - Number(y.dataset.pos) : a - b;
+        const [ga, va] = rank(x), [gb, vb] = rank(y);
+        if (ga !== gb) return ga - gb;
+        if (va !== vb) return va - vb;
+        return Number(x.dataset.pos) - Number(y.dataset.pos);
       });
       for (const el of sorted) col.append(el); // append moves; the cards themselves are never rebuilt
     };
@@ -1172,7 +1237,7 @@
     }
     for (const x of cards) x.addEventListener('click', (e) => { if (e.target.closest('.bcv-module__head')) paintBulk(); });
     let order = (await store.pref(orderKey, 'course')) === 'date' ? 'date' : 'course';
-    const seg = U.seg([['course', 'Course order'], ['date', 'By date']], order, (v) => {
+    const seg = U.seg([['course', 'Course order'], ['date', 'Next due']], order, (v) => {
       order = v;
       store.setPref(orderKey, v);
       for (const b of seg.querySelectorAll('.bcv-seg__btn')) b.classList.toggle('is-active', b.dataset.value === v);

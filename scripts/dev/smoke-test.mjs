@@ -738,8 +738,10 @@ try {
   await page.click('.bcv-rubbtn');
   await page.waitForSelector('.bcv-sheet--rub .bcv-rubg__row', { timeout: 8000 });
   // once a rubric is marked, the rating the work was given is the one filled in, with its score and note
-  const marked = await page.$eval('.bcv-sheet--rub .bcv-rubg__row', (e) => ({ got: e.querySelector('.bcv-rubg__rate.is-got')?.innerText.replace(/\s+/g, ' ').trim(), pts: e.querySelector('.bcv-rubg__ptsv')?.textContent, note: e.querySelector('.bcv-rubg__note')?.textContent, rates: e.querySelectorAll('.bcv-rubg__rate').length }));
-  check(marked.got === '3 pts Partial' && marked.pts === '4 / 6' && marked.rates === 2 && /Sign error in part b\./.test(marked.note || ''), `a marked criterion shows every rating with the one it was given filled in, its score and the marker's note: ${JSON.stringify(marked)}`);
+  const marked = await page.$eval('.bcv-sheet--rub .bcv-rubg__row', (e) => ({ got: e.querySelector('.bcv-rubg__cell.is-got')?.innerText.replace(/\s+/g, ' ').trim(), pts: e.querySelector('.bcv-rubg__ptsv')?.textContent, note: e.querySelector('.bcv-rubg__note')?.textContent, cells: e.querySelectorAll('.bcv-rubg__cell').length }));
+  check(/^3 Partial/.test(marked.got || '') && marked.pts === '4 / 6' && marked.cells === 3 && /Sign error in part b\./.test(marked.note || ''), `a marked criterion rings the level it was given, and carries its score and the marker's note: ${JSON.stringify(marked)}`);
+  const rubHead = { desc: await page.$eval('.bcv-sheet--rub .bcv-sheet__desc', (e) => e.textContent), badge: await page.$eval('.bcv-rubg__badge', (e) => e.innerText.replace(/\s+/g, ' ').trim()) };
+  check(rubHead.desc === 'Marked 8 / 10 · 2 criteria' && rubHead.badge === '10 PTS', `the sheet heads with the rubric's own total and what it gave: ${JSON.stringify(rubHead)}`);
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('.bcv-sheet--rub'), null, { timeout: 5000 });
   await page.goto(`${BASE}/courses/104/assignments/4002`);
@@ -951,11 +953,24 @@ try {
   await page.click('.bcv-detail__actions .bcv-rubbtn');
   await page.waitForSelector('.bcv-sheet--rub .bcv-rubg__row', { timeout: 8000 });
   check((await page.$$('.bcv-sheet--rub .bcv-rubg__row')).length === 2, 'the rubric opens as a grid, one row per criterion');
+  // the levels are columns, headed once, and coloured by what they are worth rather than by position
+  const head = await page.$$eval('.bcv-rubg__head .bcv-rubg__h', (els) => els.map((e) => `${e.textContent}:${(e.className.match(/--(\w+)/) || [, 'plain'])[1]}`));
+  check(head.join(' | ') === 'Criterion:plain | Full marks:full | Partial:part | No marks:none', `the levels head the columns once, best to nothing: ${head.join(' | ')}`);
+  const cells = await page.$eval('.bcv-rubg__row', (row) => [...row.querySelectorAll('.bcv-rubg__cell')].map((e) => `${e.querySelector('.bcv-rubg__cellpts').textContent}/${e.querySelector('.bcv-rubg__celltext').textContent}/${(e.className.match(/cell--(\w+)/) || [, '?'])[1]}`));
+  check(cells.join(' | ') === '6/Full marks/full | 3/Partial/part | 0/No marks/none' && !(await page.$('.bcv-rubg__cell.is-got')), `every level is a cell with what it is worth, and none is marked on an ungraded assignment: ${cells.join(' | ')}`);
   // a criterion is Canvas rich text: its own bullets and line breaks are drawn, not printed as markup
-  const crit = await page.$eval('.bcv-sheet--rub .bcv-rubg__row', (e) => ({ long: e.querySelector('.bcv-rubric__long')?.innerText || '', brs: e.querySelectorAll('.bcv-rubric__long br').length, raw: e.textContent }));
-  check(crit.brs === 1 && /Every answer is correct/.test(crit.long) && /Units on each one/.test(crit.long) && !/&lt;|<br/.test(crit.raw), `a criterion written as rich text reads as written, its markup never as text: ${JSON.stringify(crit)}`);
-  // and every rating it offers is a cell across the row, not just whichever line there was room for
-  check((await texts('.bcv-sheet--rub .bcv-rubg__row:first-child .bcv-rubg__rate')).join(' | ') === '6 pts Full | 3 pts Partial' && !(await page.$('.bcv-rubg__rate.is-got')), 'every rating of a criterion is a cell, and none is filled in on an ungraded assignment');
+  const crit = await page.$eval('.bcv-sheet--rub .bcv-rubg__row', (e) => ({ long: e.querySelector('.bcv-rubg__desc')?.innerText || '', brs: e.querySelectorAll('.bcv-rubg__desc br').length, raw: e.textContent }));
+  check(crit.brs === 2 && /Every answer is correct/.test(crit.long) && /Units on each one/.test(crit.long) && !/&lt;|<br/.test(crit.raw), `a criterion written as rich text reads as written, its markup never as text: ${JSON.stringify(crit)}`);
+  // and one too long for its card is clamped, with a button that appears only where it is needed
+  const clamp = await page.evaluate(() => {
+    const rows = [...document.querySelectorAll('.bcv-rubg__row')];
+    const at = (i) => { const d = rows[i].querySelector('.bcv-rubg__desc'); const b = rows[i].querySelector('.bcv-rubg__more'); return { cut: d.scrollHeight > d.clientHeight + 1, btn: !!b && !b.hidden }; };
+    return { long: at(0), short: at(1) };
+  });
+  check(clamp.long.cut && clamp.long.btn && !clamp.short.cut && !clamp.short.btn, `a long criterion is clamped and offers More; a short one is left alone: ${JSON.stringify(clamp)}`);
+  await page.click('.bcv-rubg__more');
+  const opened = await page.$eval('.bcv-rubg__row', (e) => ({ open: e.querySelector('.bcv-rubg__desc').classList.contains('is-open'), label: e.querySelector('.bcv-rubg__more').textContent, shows: e.querySelector('.bcv-rubg__desc').scrollHeight <= e.querySelector('.bcv-rubg__desc').clientHeight + 1 }));
+  check(opened.open && opened.label === 'Less' && opened.shows, `More shows the rest of it and becomes Less: ${JSON.stringify(opened)}`);
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('.bcv-sheet--rub'), null, { timeout: 5000 });
   check((await texts('.bcv-btn--primary'))[0] === 'Submit assignment', 'submit button opens our own submission flow');
@@ -1131,14 +1146,16 @@ try {
   await page.goto(`${BASE}/courses/102/modules`);
   await page.waitForSelector('.bcv-module', { timeout: 10000 });
   const mods = await texts('.bcv-module__head');
-  check(mods.length === 4 && /Week 1: Kinematics 2 of 2 requirements done/.test(mods[0]) && /Week 3: Energy Locked until/.test(mods[2]), `modules: ${mods.join(' | ')}`);
+  check(mods.length === 4 && /^Week 1: Kinematics .*2 of 2 requirements done$/.test(mods[0]) && /^Week 3: Energy .*Locked until/.test(mods[2]), `modules: ${mods.join(' | ')}`);
+  // each head says when the module next wants something, so the list reads without opening anything
+  check((await texts('.bcv-module__due')).join(' | ') === 'Last due Sep 9 | Last due Sep 15 | Next due Mon | Last due Aug 26' && (await page.$$('.bcv-module__due.is-next')).length === 1, `each module says when it next wants something: ${(await texts('.bcv-module__due')).join(' | ')}`);
   check((await page.$$('.bcv-circle.is-done')).length === 3 && (await page.$('.bcv-indent-1')), 'completion marks and indents');
   // by date is the order the work has to be done in, not the order the course was built in
   const names = () => texts('.bcv-module__name');
   check((await names()).join(' | ') === 'Week 1: Kinematics | Week 2: Forces | Week 3: Energy | Week 0: Orientation', `course order is Canvas's own: ${(await names()).join(' | ')}`);
   await page.click('.bcv-module__bar .bcv-seg__btn[data-value="date"]');
-  await page.waitForFunction(() => document.querySelector('.bcv-module__name')?.textContent === 'Week 0: Orientation', null, { timeout: 5000 });
-  check((await names()).join(' | ') === 'Week 0: Orientation | Week 1: Kinematics | Week 2: Forces | Week 3: Energy', `by date puts the soonest first, wherever it was built: ${(await names()).join(' | ')}`);
+  await page.waitForFunction(() => document.querySelector('.bcv-module__name')?.textContent === 'Week 3: Energy', null, { timeout: 5000 });
+  check((await names()).join(' | ') === 'Week 3: Energy | Week 2: Forces | Week 1: Kinematics | Week 0: Orientation', `Next due puts what is coming first, then what has gone by, most recent first: ${(await names()).join(' | ')}`);
   // open all / close all, and the slide rather than a jump
   const openCount = () => page.$$eval('.bcv-module', (els) => els.filter((e) => e.classList.contains('bcv-module--open')).length);
   check((await texts('.bcv-module__all'))[0] === 'Open all' && (await openCount()) < 4, 'not every module starts open, so the button offers Open all');

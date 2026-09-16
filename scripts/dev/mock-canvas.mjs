@@ -89,9 +89,10 @@ const A = {
 };
 const GROUPS = { 101: [['Discussion Quizzes', 18], ['Midterms', 57], ['Final', 25], ['Effort', 0], ['Collaboration', 0], ['Coursework (Knewton Alta)', 0]] };
 const rubric = [
-  // a criterion written as rich text, the way Canvas's rubric editor stores one
-  { id: 'c1', description: 'Correctness', long_description: '<p>&bull; Every answer is correct<br/>&bull; Units on each one</p>', points: 6, ratings: [{ id: 'r1', description: 'Full', points: 6 }, { id: 'r2', description: 'Partial', points: 3 }] },
-  { id: 'c2', description: 'Work shown', long_description: 'Steps are legible and complete.', points: 4, ratings: [{ id: 'r3', description: 'Full', points: 4 }, { id: 'r4', description: 'Partial', points: 2 }] },
+  // a criterion written as rich text, the way Canvas's rubric editor stores one, and long enough that
+  // it has to be clamped
+  { id: 'c1', description: 'Correctness', long_description: '<p>&bull; Every answer is correct<br/>&bull; Units on each one<br/>&bull; Working shown for every step, in the order it was done, with the reasoning written out so a marker can follow it without having to guess at anything</p>', points: 6, ratings: [{ id: 'r1', description: 'Full marks', points: 6 }, { id: 'r2', description: 'Partial', points: 3 }, { id: 'r2b', description: 'No marks', points: 0 }] },
+  { id: 'c2', description: 'Work shown', long_description: 'Steps are legible and complete.', points: 4, ratings: [{ id: 'r3', description: 'Full marks', points: 4 }, { id: 'r4', description: 'Partial', points: 2 }, { id: 'r4b', description: 'No marks', points: 0 }] },
 ];
 function assignmentObj(courseId, row) {
   const [id, name, group, possible, earned, dueDay, dueHour, subDay, extra] = row;

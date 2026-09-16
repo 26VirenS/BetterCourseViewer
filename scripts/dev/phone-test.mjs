@@ -483,14 +483,19 @@ try {
   check(!(await page.$('.bcv-rubg')) && (await texts('.bcv-sb__foot .bcv-rubbtn'))[0] === 'Rubric', 'the rubric is a button beside Submit assignment, not a card down the page');
   await page.click('.bcv-sb__foot .bcv-rubbtn');
   await page.waitForSelector('.bcv-ph-sheet--rub .bcv-rubg__row', { timeout: 8000 });
-  const sheetRub = await page.evaluate(() => ({
-    title: document.querySelector('.bcv-ph-sheet__title')?.textContent,
-    note: document.querySelector('.bcv-ph-sheet__note')?.textContent,
-    rows: document.querySelectorAll('.bcv-rubg__row').length,
-    rates: [...document.querySelectorAll('.bcv-rubg__row:first-child .bcv-rubg__rate')].map((e) => e.innerText.replace(/\s+/g, ' ').trim()),
-    stacked: getComputedStyle(document.querySelector('.bcv-rubg__rates')).display,
-  }));
-  check(sheetRub.title === 'Dis01 rubric' && /2 criteria/.test(sheetRub.note || '') && sheetRub.rows === 2 && sheetRub.rates.join(' | ') === '6 pts Full | 3 pts Partial' && sheetRub.stacked === 'grid', `the rubric opens as a grid on the phone: ${JSON.stringify(sheetRub)}`);
+  const sheetRub = await page.evaluate(() => {
+    const row = document.querySelector('.bcv-rubg__row');
+    return {
+      title: document.querySelector('.bcv-ph-sheet__title')?.textContent,
+      note: document.querySelector('.bcv-ph-sheet__note')?.textContent,
+      rows: document.querySelectorAll('.bcv-rubg__row').length,
+      cells: [...row.querySelectorAll('.bcv-rubg__cell')].map((e) => e.innerText.replace(/\s+/g, ' ').trim()),
+      // narrow, the columns have nowhere to go: each criterion is its own block with its levels under it
+      stacked: getComputedStyle(document.querySelector('.bcv-rubg')).display === 'block' && getComputedStyle(row).display === 'grid',
+      headHidden: getComputedStyle(document.querySelector('.bcv-rubg__head')).display === 'none',
+    };
+  });
+  check(sheetRub.title === 'Dis01 rubric' && /shown before you submit/.test(sheetRub.note || '') && sheetRub.rows === 2 && sheetRub.cells.join(' | ') === '6 Full marks | 3 Partial | 0 No marks' && sheetRub.stacked && sheetRub.headHidden, `the rubric stacks into blocks on a phone, one per criterion: ${JSON.stringify(sheetRub)}`);
   check(await noOverflow(), 'no horizontal overflow with the rubric open');
   await shot('08b-rubric');
   await closeSheet();
@@ -500,9 +505,9 @@ try {
   await page.waitForSelector('.bcv-ph-banner', { timeout: 15000 });
   check((await texts('.bcv-ph-banner .bcv-rubbtn'))[0] === 'See breakdown', 'a graded assignment offers See breakdown beside the grade');
   await page.click('.bcv-ph-banner .bcv-rubbtn');
-  await page.waitForSelector('.bcv-ph-sheet--rub .bcv-rubg__rate.is-got', { timeout: 8000 });
-  const got = await page.$eval('.bcv-rubg__row', (e) => ({ got: e.querySelector('.bcv-rubg__rate.is-got')?.innerText.replace(/\s+/g, ' ').trim(), pts: e.querySelector('.bcv-rubg__ptsv')?.textContent }));
-  check(got.got === '3 pts Partial' && got.pts === '4 / 6', `and it fills in the rating the work was given: ${JSON.stringify(got)}`);
+  await page.waitForSelector('.bcv-ph-sheet--rub .bcv-rubg__cell.is-got', { timeout: 8000 });
+  const got = await page.$eval('.bcv-rubg__row', (e) => ({ got: e.querySelector('.bcv-rubg__cell.is-got')?.innerText.replace(/\s+/g, ' ').trim(), pts: e.querySelector('.bcv-rubg__ptsv')?.textContent }));
+  check(/^3 Partial/.test(got.got || '') && got.pts === '4 / 6', `and it rings the level the work was given: ${JSON.stringify(got)}`);
   await closeSheet();
 
   // ---- "Open in Canvas" ---------------------------------------------------------------------------
