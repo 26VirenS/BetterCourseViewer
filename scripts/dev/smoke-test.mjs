@@ -385,6 +385,7 @@ try {
   const dashAllRows = () => page.$$eval('.bcv-day .bcv-row', (els) => els.length);
   const [doneBefore, allBefore] = [await dashDoneRows(), await dashAllRows()];
   check(doneBefore > 0 && (await texts('.bcv-dash__done'))[0] === 'Hide completed' && (await page.$eval('.bcv-dash__done', (e) => e.getBoundingClientRect().height <= 32)), `the list shows its done rows, ticked, with a small Hide completed above them (${doneBefore} of ${allBefore} done)`);
+  await shot(page, '01d-dashboard-hide-done');
   await page.click('.bcv-dash__done');
   check(await eventually(async () => (await dashDoneRows()) === 0 && (await dashAllRows()) === allBefore - doneBefore), 'Hide completed takes exactly the done rows out');
   check((await texts('.bcv-dash__done'))[0] === `Show completed · ${doneBefore}` && (await page.$eval('.bcv-dash__done', (e) => e.classList.contains('is-on'))), `and the button says how many it is hiding: ${(await texts('.bcv-dash__done'))[0]}`);
@@ -2134,6 +2135,7 @@ try {
   await page.click(su('.row[data-view="list"]'));
   await page.click(su('.row[data-view="activity"]'));
   check(await eventually(async () => { const d = await dashPref(); return d.cards && d.list && d.activity && !(await page.$eval(su('#next'), (b) => b.disabled)); }), 'and back on, Continue lives again');
+  await shot(page, '32e-setup-dashboard');
   await sNext('.row[data-value]');
   // the last step: where the courses chosen in step 1 should sit
   await page.waitForSelector(su('.row[data-value]'), { timeout: 10000 });
