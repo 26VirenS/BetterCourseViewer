@@ -96,16 +96,20 @@
     const main = mainCol(), side = sideCol();
     b.append(main, side);
     main.append(U.loading());
-    // the item's place in its modules (for Mark as done) and among the course's assignments (for
-    // Previous / Next) come with it; neither is allowed to hold the page up or fail it
-    const [a, sub, modItem, groups] = await Promise.all([
-      store.assignment(c.id, route.arg).catch(() => null), store.submission(c.id, route.arg).catch(() => null),
-      store.moduleItemFor(c.id, 'Assignment', route.arg).catch(() => null), store.assignmentGroups(c.id).catch(() => null),
-    ]);
+    const [a, sub] = await Promise.all([store.assignment(c.id, route.arg).catch(() => null), store.submission(c.id, route.arg).catch(() => null)]);
     if (!ctx.alive()) return b;
     if (!a) return main.replaceChildren(U.errorBox('This assignment could not be loaded.')) || b;
     const s = sub || a.submission || {};
-    const nav = store.assignmentNeighbours(groups, a.id);
+    // The item's place in its modules (Mark as done) and among the course's assignments (Previous /
+    // Next) are asked for now and drawn when they land: the page never waits for them. The course's
+    // assignment list is the slow one — every assignment with its submission — and behind a
+    // dashboard's own requests it took the page past its patience, which reads as a page that never
+    // comes. Each slot is filled, or taken out, when the answer arrives.
+    const later = Promise.all([store.moduleItemFor(c.id, 'Assignment', route.arg).catch(() => null), store.assignmentGroups(c.id).catch(() => null)])
+      .then(([modItem, groups]) => ({ modItem, nav: store.assignmentNeighbours(groups, a.id) }));
+    const slot = (cls) => h('span', { class: cls, hidden: '' });
+    // (the slot has a parent from the moment it is drawn, before the screen is in the document)
+    const fill = (el, make) => later.then((x) => { if (!ctx.alive() || !el.parentNode) return; const made = make(x); if (made) el.replaceWith(made); else el.remove(); });
     const types = (a.submission_types || []).map((t) => ({ online_upload: 'a file upload', online_text_entry: 'a text entry', online_url: 'a website URL', media_recording: 'a media recording', discussion_topic: 'a discussion post', online_quiz: 'a quiz', external_tool: 'an external tool', on_paper: 'on paper', none: 'nothing to submit', student_annotation: 'an annotation' }[t] || t)).join(', ');
     shell.reader = { title: a.name, html: a.description || '' };
     const isTool = (a.submission_types || []).includes('external_tool');
@@ -127,7 +131,7 @@
     const held = graded && s.posted_at === null;
     const feedback = (s.submission_comments || []).length || Object.keys(s.rubric_assessment || {}).length;
     // the phone draws the item page its own way (the iPhone mockup)
-    if (BCV.phone?.active()) return BCV.phone.assignment(ctx, shell, { a, s, types, available, isTool, toolNewTab, toolLaunch, nativeSubmit, canvasOnly, attemptsLeft, status, posted, held, modItem, nav });
+    if (BCV.phone?.active()) return BCV.phone.assignment(ctx, shell, { a, s, types, available, isTool, toolNewTab, toolLaunch, nativeSubmit, canvasOnly, attemptsLeft, status, posted, held, slot, fill });
     // Handing in lives inside the assignment (mockup 11): the block sits at the end of the same
     // scroll as the instructions, built from the assignment already loaded for this page. The
     // "Submit assignment" button and ?bcv=submit (a To Do row) just bring it into view.
@@ -179,10 +183,10 @@
           // how the marks are decided, beside the decision to hand work in
           a.rubric?.length ? U.btn('Rubric', { icon: IC.sheet, cls: 'bcv-rubbtn', onClick: () => CS().openRubric(a, s) }) : null,
           // where Canvas asks for a mark rather than work, the mark is the page's action
-          doneButton(ctx, c, a, modItem, { primary: !nativeSubmit && !isTool && !canvasOnly }),
+          (() => { const el = slot('bcv-detail__doneslot'); fill(el, ({ modItem }) => doneButton(ctx, c, a, modItem, { primary: !nativeSubmit && !isTool && !canvasOnly })); return el; })(),
         ]),
         a.description ? CS().prose(a.description) : (isTool ? null : U.text('bcv-hint', 'No description.')),
-        navRow(app, c, nav),
+        (() => { const el = slot('bcv-detail__navslot'); fill(el, ({ nav }) => navRow(app, c, nav)); return el; })(),
       ]), 'bcv-card--22'),
       // External-tool assignments (Knewton, Gradescope, …) are done inside the tool: embed the launch.
       isTool && !toolNewTab ? U.card(U.el('bcv-detail', [

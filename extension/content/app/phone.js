@@ -1258,7 +1258,7 @@
   const phFacts = (pairs) => U.el('bcv-ph-facts', pairs.filter(([, v]) => v !== null && v !== undefined && v !== '')
     .map(([k, v]) => h('span', { class: 'bcv-ph-fact' }, [h('b', { text: `${k} ` }), String(v)])));
 
-  async function assignment(ctx, shell, { a, s, types, available, isTool, toolNewTab, toolLaunch, nativeSubmit, canvasOnly, attemptsLeft, status, posted, held, modItem, nav }) {
+  async function assignment(ctx, shell, { a, s, types, available, isTool, toolNewTab, toolLaunch, nativeSubmit, canvasOnly, attemptsLeft, status, posted, held, slot, fill }) {
     const { app } = ctx;
     const c = shell.course;
     const CS = BCV.screens.course;
@@ -1300,8 +1300,9 @@
       U.el('bcv-ph-card bcv-ph-instr', [U.text('bcv-ph-kicker', 'Instructions', 'span'), a.description ? CS.prose(a.description, { cls: 'bcv-ph-prose' }) : U.text('bcv-ph-load__none', 'No description.'), types ? U.text('bcv-ph-instr__note', `Accepts ${types}`) : null]),
       isTool && !toolNewTab ? U.el('bcv-ph-card', [U.text('bcv-ph-kicker', 'External tool', 'span'), h('iframe', { class: 'bcv-frame bcv-frame--doc', src: toolLaunch, title: a.name, allowfullscreen: '', allow: 'fullscreen; microphone; camera; display-capture; autoplay; clipboard-write' })]) : null,
       primary ? h('button', { type: 'button', class: 'bcv-ph-bigbtn is-primary', text: primary.label, onclick: primary.go }) : null,
-      // where Canvas asks for a mark rather than work, the mark is the page's action
-      BCV.screens.courseDetail.doneButton(ctx, c, a, modItem, { cls: 'bcv-ph-bigbtn bcv-ph-done', primary: !embeds && !primary }),
+      // where Canvas asks for a mark rather than work, the mark is the page's action (drawn when
+      // the item's module answers; the page does not wait for it)
+      (() => { const el = slot('bcv-ph-doneslot'); fill(el, ({ modItem }) => BCV.screens.courseDetail.doneButton(ctx, c, a, modItem, { cls: 'bcv-ph-bigbtn bcv-ph-done', primary: !embeds && !primary })); return el; })(),
       // no submit block to put it in (an external tool, a Canvas-only hand-in, nothing to submit at
       // all): the rubric still gets a button, where the block's own would have been
       block ? null : rubricButton(a, s, { cls: 'bcv-ph-bigbtn' }),
@@ -1313,7 +1314,7 @@
       !posted && !held && (s.submission_comments || []).length ? h('div', {}, [groupHead('Comments'), listCard(s.submission_comments.map((cm) => U.el('bcv-ph-comment', [U.el('bcv-ph-comment__head', [U.text('bcv-ph-comment__who', cm.author_name || cm.author?.display_name || 'Comment', 'span'), U.text('bcv-ph-comment__when', U.fmtAt(cm.created_at), 'span')]), U.text('bcv-ph-comment__body bcv-pretty', cm.comment || '')])))]) : null,
       block,
       // the assignments either side, last: where to go once this one is read or handed in
-      BCV.screens.courseDetail.navRow(app, c, nav, 'bcv-ph-nav'),
+      (() => { const el = slot('bcv-ph-navslot'); fill(el, ({ nav }) => BCV.screens.courseDetail.navRow(app, c, nav, 'bcv-ph-nav')); return el; })(),
     ].filter(Boolean));
     if (block && ctx.route.params.get('bcv') === 'submit') for (const ms of [80, 600]) setTimeout(() => block.scrollIntoView({ block: 'start' }), ms);
     return b;
