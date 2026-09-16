@@ -892,11 +892,15 @@
     await invalidateAssignment(cid, aid);
     return result;
   }
-  /** A comment on your own submission — the same thread the instructor's feedback comes back on. */
-  async function commentOnSubmission(cid, aid, text) {
+  /** A comment on your own submission — the same thread the instructor's feedback comes back on.
+   *  Canvas files a comment against an attempt, so it is named: unpinned, feedback on a first draft
+   *  and on the final hand-in end up in the same thread. */
+  async function commentOnSubmission(cid, aid, text, attempt = null) {
     const body = String(text || '').trim();
     if (!body) throw new Error('Nothing to send.');
-    const result = await C.put(`/api/v1/courses/${cid}/assignments/${aid}/submissions/self`, { comment: { text_comment: body } });
+    const comment = { text_comment: body };
+    if (attempt) comment.attempt = attempt;
+    const result = await C.put(`/api/v1/courses/${cid}/assignments/${aid}/submissions/self`, { comment });
     await invalidateAssignment(cid, aid);
     return result;
   }

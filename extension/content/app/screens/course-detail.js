@@ -19,6 +19,9 @@
   const nativeHref = (path) => `${path}${path.includes('?') ? '&' : '?'}bcv=native`;
   /** "10 pts" from a points field, or nothing when Canvas carries no points for the item (never "null pts"). */
   const pts = (v) => (v === null || v === undefined || v === '' ? null : `${store.fmtPts(v)} pts`);
+  /** Canvas says −1 for unlimited attempts, and nothing at all where the assignment does not limit them. */
+  const attemptsFact = (a, s) => (a.allowed_attempts > 0 ? `${s.attempt || 0} of ${a.allowed_attempts}`
+    : a.allowed_attempts === -1 ? `${s.attempt || 0} of unlimited` : null);
 
   const D = {};
 
@@ -48,6 +51,10 @@
     const attemptsLeft = !(a.allowed_attempts > 0) || (s.attempt || 0) < a.allowed_attempts;
     const status = s.excused ? 'Excused' : s.workflow_state === 'graded' ? 'Graded' : s.submitted_at ? (s.late ? 'Submitted late' : 'Submitted') : s.missing ? 'Missing' : 'Not submitted';
     const graded = s.workflow_state === 'graded' && s.score !== null && s.score !== undefined;
+    // Canvas posts a grade separately from marking it: posted_at === null means the instructor is
+    // holding it back, and a number shown then is a number the student is not supposed to have.
+    const posted = graded && s.posted_at !== null;
+    const held = graded && s.posted_at === null;
     const feedback = (s.submission_comments || []).length || Object.keys(s.rubric_assessment || {}).length;
     // the phone draws the item page its own way (the iPhone mockup)
     if (BCV.phone?.active()) return BCV.phone.assignment(ctx, shell, { a, s, types, isTool, toolNewTab, toolLaunch, nativeSubmit, canvasOnly, attemptsLeft, status });
@@ -64,22 +71,32 @@
     main.replaceChildren(...[
       backBtn(app, back.href, back.label),
       U.card(U.el('bcv-detail', [
-        h('h2', { class: 'bcv-detail__title bcv-pretty', text: a.name }),
-        // The mark sits in the corner of the card, beside the title: the first thing read, and small
-        // enough that it does not take the page from the assignment itself. It opens what is behind
-        // it — every attempt, what was handed in, and the thread it came back on.
-        graded ? h('button', { type: 'button', class: 'bcv-detail__grade', title: 'See your submissions and feedback', onclick: () => openSubmissions(ctx, c, a, s) }, [
-          U.el('bcv-detail__gradev', [
-            h('span', { class: 'bcv-detail__gradescore', text: store.fmtPts(s.score) }),
-            h('span', { class: 'bcv-detail__gradeof', text: `/ ${a.points_possible ?? '—'}` }),
-          ]),
-          h('div', { class: 'bcv-detail__gradeside' }, [
-            U.text('bcv-detail__gradepc', a.points_possible ? `${Math.round((Number(s.score) / Number(a.points_possible)) * 100)}%` : (s.grade ? String(s.grade) : ''), 'span'),
-            U.text('bcv-detail__gradewhen', s.graded_at ? U.fmtAt(s.graded_at) : 'Marked', 'span'),
-          ]),
-          U.chev(),
-        ]) : null,
-        meta([['Due', a.due_at ? U.fmtAt(a.due_at) : 'No due date'], ['Points', a.points_possible ?? '—'], ['Submitting', types], ['Available', available], ['Attempts', a.allowed_attempts && a.allowed_attempts > 0 ? `${s.attempt || 0} of ${a.allowed_attempts}` : null]]),
+        // The title and the mark share one wrapping row: the mark is the answer to the question the
+        // page is opened with, and it is the way in to what is behind it — every attempt, what was
+        // handed in, and the thread it came back on. Ungraded, the chip is not there at all and the
+        // title has the row to itself; a score Canvas has not posted shows no number, because an
+        // unposted 0 reads exactly like a real one.
+        U.el('bcv-detail__head', [
+          h('h2', { class: 'bcv-detail__title bcv-pretty', text: a.name }),
+          posted ? h('button', { type: 'button', class: 'bcv-detail__grade', title: 'Submission details and comments', onclick: () => openSubmissions(ctx, c, a, s) }, [
+            U.el('bcv-detail__gradev', [
+              h('span', { class: 'bcv-detail__gradescore', text: store.fmtPts(s.score) }),
+              h('span', { class: 'bcv-detail__gradeof', text: `/ ${a.points_possible ?? '—'}` }),
+            ]),
+            h('div', { class: 'bcv-detail__gradeside' }, [
+              U.text('bcv-detail__gradepc', a.points_possible ? `${Math.round((Number(s.score) / Number(a.points_possible)) * 100)}%` : (s.grade ? String(s.grade) : ''), 'span'),
+              U.text('bcv-detail__gradewhen', s.graded_at ? U.fmtAt(s.graded_at) : 'Marked', 'span'),
+            ]),
+            U.chev(),
+          ]) : (held ? h('button', { type: 'button', class: 'bcv-detail__grade bcv-detail__grade--held', title: 'Submission details and comments', onclick: () => openSubmissions(ctx, c, a, s) }, [
+            h('div', { class: 'bcv-detail__gradeside' }, [
+              U.text('bcv-detail__gradepc', 'Not yet posted', 'span'),
+              U.text('bcv-detail__gradewhen', 'Your instructor has not released it', 'span'),
+            ]),
+            U.chev(),
+          ]) : null),
+        ]),
+        meta([['Due', a.due_at ? U.fmtAt(a.due_at) : 'No due date'], ['Points', a.points_possible ?? '—'], ['Submitting', types], ['Available', available], ['Attempts', attemptsFact(a, s)]]),
         U.el('bcv-detail__actions', [
           isTool ? (toolNewTab ? U.btn('Open the tool', { kind: 'primary', icon: IC.external, iconColor: '#fff', onClick: () => window.open(toolLaunch, '_blank', 'noopener') }) : null)
             : nativeSubmit ? (a.locked_for_user ? U.badge(a.lock_explanation ? htmlToText(a.lock_explanation, 120) : 'Locked', 'orange')
@@ -317,127 +334,162 @@
   };
 
   // ---- what was handed in, and what came back -----------------------------------------------------
-  /** Every attempt Canvas kept, newest first. A submission with no history is the one attempt there is. */
+  // Built to the assignment handoff: the mark opens a sheet over the page (the page never unmounts,
+  // so nothing in progress is lost), carrying the attempt switcher, five facts, the attachment for
+  // that attempt, that attempt's thread, and a reply field pinned under it.
+
+  /** Every attempt Canvas kept, oldest first. A submission with no history is the one attempt there is. */
   function attemptsOf(s) {
     const hist = (s.submission_history || []).filter((x) => x && (x.submitted_at || x.attempt));
     const list = hist.length ? hist : (s.submitted_at || s.attempt ? [s] : []);
-    return list.slice().sort((x, y) => (Number(y.attempt) || 0) - (Number(x.attempt) || 0));
+    return list.slice().sort((x, y) => (Number(x.attempt) || 0) - (Number(y.attempt) || 0));
   }
-  const TYPE_WORD = { online_upload: 'File upload', online_text_entry: 'Text entry', online_url: 'Website URL', online_quiz: 'Quiz', discussion_topic: 'Discussion', media_recording: 'Media recording', student_annotation: 'Annotation', basic_lti_launch: 'External tool', on_paper: 'On paper', none: 'Nothing to submit' };
+  const TYPE_WORD = { online_upload: 'File upload', online_text_entry: 'Text entry', online_url: 'Website URL', online_quiz: 'Online quiz', discussion_topic: 'Discussion', media_recording: 'Media recording', student_annotation: 'Annotation', basic_lti_launch: 'External tool', on_paper: 'On paper', none: 'Nothing to submit' };
+  const fileSize = (n) => (n === null || n === undefined ? '' : n >= 1048576 ? `${(n / 1048576).toFixed(n >= 10485760 ? 0 : 1)} MB` : n >= 1024 ? `${Math.round(n / 1024)} KB` : `${n} B`);
+  const fileKind = (f) => ((String(f.display_name || f.filename || '').match(/\.([a-z0-9]+)$/i) || [, 'file'])[1] || 'file').toUpperCase().slice(0, 4);
 
-  /** What one attempt was: what it carried, when it landed, what it scored. */
-  function attemptBody(c, a, at) {
-    const rows = [];
-    for (const f of at.attachments || []) {
-      rows.push(U.row([
-        U.tile(IC.doc, { color: 'var(--bcv-ink2)', tint: 'var(--bcv-fill)', size: 30, iconSize: 14 }),
-        U.el('bcv-sub__body', [U.text('bcv-xrow__t bcv-ellip', f.display_name || f.filename || 'File'), U.text('bcv-xrow__s', [f['content-type'] || f.content_type, f.size ? `${Math.round(f.size / 1024)} KB` : null].filter(Boolean).join(' · '))]),
-        U.chev(),
-      ], { cls: 'bcv-xrow', onClick: () => BCV.viewer?.open({ id: f.id }, { context: c }) }));
-    }
-    if (at.url) rows.push(h('a', { class: 'bcv-row bcv-xrow bcv-row--link', href: at.url, target: '_blank', rel: 'noopener', style: { color: 'inherit' } }, [
-      U.tile(IC.link, { color: 'var(--bcv-ink2)', tint: 'var(--bcv-fill)', size: 30, iconSize: 14 }),
-      U.el('bcv-sub__body', [U.text('bcv-xrow__t bcv-ellip', at.url), U.text('bcv-xrow__s', 'Opens in a new tab')]),
-    ]));
-    return U.el('bcv-sub__att', [
-      U.el('bcv-sub__attmeta', [
-        U.text('bcv-sub__attwhen', at.submitted_at ? `Handed in ${U.fmtAt(at.submitted_at)}` : 'Not handed in'),
-        at.late ? U.badge('Late', 'orange') : null,
-        h('span', { class: 'bcv-ml-auto' }),
-        at.score !== null && at.score !== undefined ? U.badge(`${store.fmtPts(at.score)} / ${a.points_possible ?? '—'}`, 'green') : U.badge('Not marked'),
-      ]),
-      U.text('bcv-sub__kind', TYPE_WORD[at.submission_type] || at.submission_type || 'Submission'),
-      rows.length ? U.card(rows, 'bcv-card--list') : null,
-      at.body ? U.card(U.el('bcv-detail', CS().prose(at.body, { cls: 'bcv-prose--14' })), 'bcv-card--22') : null,
-      !rows.length && !at.body && !at.url ? U.text('bcv-hint', 'Canvas kept no copy of what was handed in for this attempt.') : null,
-    ]);
-  }
-
-  /** The sheet behind the mark: every attempt, what it was, and the thread it came back on. */
+  /** The sheet behind the mark. Everything in it is scoped to the attempt selected above it. */
   function openSubmissions(ctx, c, a, sub) {
-    const { app } = ctx;
     let s = sub;
+    // the latest attempt, every time it opens: attempt 1 of one assignment must not select attempt 1 of the next
+    let picked = null;
+    const me = String(store.env?.().current_user_id ?? '');
     document.querySelector('.bcv-sheet-ov')?.remove();
     const ov = U.el('bcv-sheet-ov', null, { role: 'dialog', 'aria-label': 'Submission' });
-    // Escape is listened for on the document, not the sheet: drilling into an attempt and back takes
-    // the focused button away with it, and focus lands on the body, where the sheet never hears it.
+    // Escape is listened for on the document: the sheet's own focus moves as attempts are switched.
     const onKey = (e) => { if (e.key === 'Escape') close(); };
     const close = () => { document.removeEventListener('keydown', onKey, true); ov.remove(); };
     ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
     document.addEventListener('keydown', onKey, true);
-    const body = U.el('bcv-sub__page');
-    const title = U.text('bcv-sheet__title', 'Submission');
-    const desc = U.text('bcv-sheet__desc bcv-ellip', a.name);
-    const headBack = h('button', { type: 'button', class: 'bcv-sub__back bcv-linkbtn', hidden: true, onclick: () => list() }, [U.svg(IC.back, { size: 14, stroke: 'var(--bcv-blue)', width: 2.1 }), 'All attempts']);
-    ov.append(U.el('bcv-sheet bcv-sheet--sub', [
-      U.el('bcv-sheet__head', [
-        h('div', { style: { flex: '1', minWidth: '0' } }, [headBack, title, desc]),
-        h('button', { type: 'button', class: 'bcv-sheet__close', 'aria-label': 'Close', onclick: close }, U.svg(IC.close, { size: 13, stroke: 'var(--bcv-ink2)', width: 2.3 })),
-      ]),
-      body,
-    ]));
+    const sheet = U.el('bcv-sheet bcv-sheet--sub');
+    sheet.addEventListener('click', (e) => e.stopPropagation()); // sending must never dismiss the sheet
+    ov.append(sheet);
 
-    let view = () => list(); // what to draw again once a comment has landed: wherever you are now
-    function comments() {
-      const thread = (s.submission_comments || []).filter((cm) => cm && cm.comment);
-      const box = h('textarea', { class: 'bcv-input bcv-sub__box', rows: '2', placeholder: 'Reply to your instructor…', 'aria-label': 'Comment on this submission' });
+    let draft = ''; // survives a repaint, and comes back if the post fails
+
+    function draw() {
+      const all = attemptsOf(s);
+      const latest = all[all.length - 1] || null;
+      const idx = picked === null ? all.length - 1 : Math.max(0, Math.min(picked, all.length - 1));
+      const cur = all[idx] || s;
+      const isLatest = !latest || cur === latest;
+      const possible = a.points_possible ?? '—';
+      const scoreOf = (x) => (x && x.score !== null && x.score !== undefined ? store.fmtPts(x.score) : null);
+      // Canvas files each comment against an attempt; unfiltered, feedback on a first draft comes
+      // back as feedback on the final one. Comments with no attempt belong to the latest.
+      const thread = (s.submission_comments || []).filter((cm) => cm && cm.comment)
+        .filter((cm) => (cm.attempt ? Number(cm.attempt) === Number(cur.attempt || 1) : isLatest));
+
+      const head = U.el('bcv-subs__head', [
+        U.el('bcv-subs__score', [
+          h('span', { class: 'bcv-subs__scoren', text: scoreOf(cur) ?? '—' }),
+          h('span', { class: 'bcv-subs__scoreof', text: `/ ${possible}` }),
+        ]),
+        h('div', { style: { flex: '1', minWidth: '0' } }, [
+          U.text('bcv-subs__title bcv-ellip', a.name),
+          U.text('bcv-subs__count', `${thread.length} ${thread.length === 1 ? 'comment' : 'comments'}`),
+        ]),
+        h('button', { type: 'button', class: 'bcv-sheet__close', 'aria-label': 'Close', onclick: close }, U.svg(IC.close, { size: 13, stroke: 'var(--bcv-ink2)', width: 2.3 })),
+      ]);
+
+      // one segment per attempt, each carrying its own score, so improvement is visible without opening anything
+      const seg = all.length > 1 ? U.el('bcv-subs__seg', all.map((at, i) => h('button', {
+        type: 'button', class: `bcv-subs__segbtn ${i === idx ? 'is-on' : ''}`, onclick: () => { picked = i; draw(); },
+      }, [
+        U.text('bcv-subs__seglabel', `Attempt ${at.attempt || i + 1}`, 'span'),
+        U.text('bcv-subs__segsub', scoreOf(at) === null ? '—' : `${scoreOf(at)} / ${possible}`, 'span'),
+      ]))) : null;
+
+      const oldNote = !isLatest ? U.el('bcv-subs__old', [
+        U.svg('M12 5a8 8 0 100 16 8 8 0 000-16zM12 9v4l3 2', { size: 16, width: 2.1, cls: 'bcv-subs__oldicon' }),
+        U.text('bcv-subs__oldtext bcv-pretty', `You are viewing attempt ${cur.attempt || idx + 1}. Only the latest attempt (${latest.attempt || all.length}) is graded.`, 'span'),
+        h('button', { type: 'button', class: 'bcv-subs__latest', text: 'Latest', onclick: () => { picked = all.length - 1; draw(); } }),
+      ]) : null;
+
+      const facts = U.el('bcv-subs__facts', [
+        ['Submitted', cur.submitted_at ? U.fmtAt(cur.submitted_at) : 'Not handed in'],
+        ['Attempt', `${cur.attempt || idx + 1} of ${a.allowed_attempts > 0 ? a.allowed_attempts : 'unlimited'}`],
+        ['Type', TYPE_WORD[cur.submission_type] || cur.submission_type || '—'],
+        ['Graded', scoreOf(cur) === null ? 'Not graded' : (s.graded_at ? U.fmtAt(s.graded_at) : 'Graded')],
+        ['Score', scoreOf(cur) === null ? 'Not graded' : `${scoreOf(cur)} / ${possible}`],
+      ].map(([k, v]) => U.el('bcv-subs__fact', [U.text('bcv-subs__factk', k), U.text('bcv-subs__factv bcv-pretty', v)])));
+
+      // Canvas's attachment links expire, so the file is opened through the viewer by id rather than
+      // from a URL kept here.
+      const files = (cur.attachments || []).map((f) => h('button', { type: 'button', class: 'bcv-subs__att', onclick: () => BCV.viewer?.open({ id: f.id }, { context: c }) }, [
+        h('span', { class: 'bcv-subs__attkind', text: fileKind(f) }),
+        h('span', { class: 'bcv-subs__attbody' }, [
+          U.text('bcv-subs__attname bcv-ellip', f.display_name || f.filename || 'File', 'span'),
+          U.text('bcv-subs__attsize', fileSize(f.size), 'span'),
+        ]),
+        U.text('bcv-subs__attopen', 'Open', 'span'),
+      ]));
+      if (cur.url) files.push(h('a', { class: 'bcv-subs__att', href: cur.url, target: '_blank', rel: 'noopener' }, [
+        h('span', { class: 'bcv-subs__attkind', text: 'LINK' }),
+        h('span', { class: 'bcv-subs__attbody' }, [U.text('bcv-subs__attname bcv-ellip', cur.url, 'span'), U.text('bcv-subs__attsize', 'Opens in a new tab', 'span')]),
+        U.text('bcv-subs__attopen', 'Open', 'span'),
+      ]));
+
+      const bubbles = thread.map((cm) => {
+        const mine = me && String(cm.author_id ?? '') === me;
+        const who = mine ? 'You' : (cm.author_name || cm.author?.display_name || 'Your instructor');
+        return U.el(`bcv-subs__cm ${mine ? 'is-mine' : ''}`, [
+          U.el('bcv-subs__cmhead', [
+            h('span', { class: 'bcv-subs__cmav', text: U.initials(who) }),
+            U.text('bcv-subs__cmwho', who, 'span'),
+            U.text('bcv-subs__cmwhen', U.fmtAt(cm.created_at), 'span'),
+          ]),
+          U.text('bcv-subs__cmbody bcv-pretty', cm.comment),
+        ]);
+      });
+
+      const body = U.el('bcv-subs__body', [
+        seg,
+        oldNote,
+        facts,
+        files.length ? U.el('bcv-subs__files', files) : null,
+        h('div', {}, [
+          U.text('bcv-subs__kicker', 'Comments'),
+          thread.length ? U.el('bcv-subs__thread', bubbles) : U.text('bcv-subs__none bcv-pretty', 'No comments yet. Anything you add here goes to your instructor.'),
+        ]),
+      ]);
+
+      // Canvas pins a comment to the current attempt, so an old attempt cannot take one: filing it
+      // there would put it against the latest anyway, in the wrong place.
+      const input = h('input', { class: 'bcv-subs__input', type: 'text', value: draft, placeholder: 'Add a comment', 'aria-label': 'Add a comment' });
+      input.addEventListener('input', () => { draft = input.value; });
       let busy = false;
-      const send = U.btn('Send', { kind: 'primary', cls: 'bcv-sub__send', onClick: async () => {
-        const text = box.value.trim();
+      const send = h('button', { type: 'button', class: 'bcv-subs__send', text: 'Send', onclick: async () => {
+        const text = input.value.trim();
         if (!text || busy) return;
         busy = true;
         send.disabled = true;
+        input.value = '';
+        draft = '';
         try {
-          await store.commentOnSubmission(c.id, a.id, text);
+          await store.commentOnSubmission(c.id, a.id, text, cur.attempt || null);
           const fresh = await store.submission(c.id, a.id, { force: true }).catch(() => null);
           if (fresh) s = fresh;
-          view(); // back where they were, with the thread as Canvas now has it
+          draw();
         } catch (e) {
+          draft = text; // put it back rather than losing it
           busy = false;
           send.disabled = false;
+          input.value = text;
           U.toast(`The comment was not sent: ${e?.message || e}`, { error: true });
         }
       } });
-      return h('div', {}, [
-        U.label('Comments'),
-        thread.length
-          ? U.card(thread.map((cm) => U.el('bcv-comment', [
-            U.el('bcv-comment__head', [U.text('bcv-comment__author', cm.author_name || cm.author?.display_name || 'Comment', 'span'), U.text('bcv-comment__date', U.fmtAt(cm.created_at), 'span')]),
-            U.text('bcv-comment__body bcv-pretty', cm.comment || ''),
-          ])), 'bcv-card--22')
-          : U.emptyCard('No comments on this submission yet.'),
-        U.el('bcv-sub__compose', [box, U.el('bcv-sub__composebtns', [h('span', { class: 'bcv-ml-auto' }), send])]),
-      ]);
+      const foot = isLatest
+        ? U.el('bcv-subs__foot', [
+          U.el('bcv-subs__compose', [input, send]),
+          U.text('bcv-subs__perm', 'Comments go to your instructor and cannot be edited or deleted once sent.'),
+        ])
+        : U.el('bcv-subs__foot', U.text('bcv-subs__perm', 'Comments can only be added on your latest attempt.'));
+
+      sheet.replaceChildren(head, body, foot);
     }
 
-    function list() {
-      view = () => list();
-      headBack.hidden = true;
-      title.textContent = 'Submission';
-      const all = attemptsOf(s);
-      const rows = all.map((at) => U.row([
-        U.tile(IC.doc, { color: 'var(--bcv-ink2)', tint: 'var(--bcv-fill)', size: 30, iconSize: 14 }),
-        U.el('bcv-sub__body', [
-          U.text('bcv-xrow__t', `Attempt ${at.attempt || 1}`),
-          U.text('bcv-xrow__s', [at.submitted_at ? U.fmtAt(at.submitted_at) : 'Not handed in', TYPE_WORD[at.submission_type] || null].filter(Boolean).join(' · ')),
-        ]),
-        at.score !== null && at.score !== undefined ? U.badge(`${store.fmtPts(at.score)} / ${a.points_possible ?? '—'}`, 'green') : null,
-        U.chev(),
-      ], { cls: 'bcv-xrow', onClick: () => one(at) }));
-      body.replaceChildren(...[
-        U.label('Attempts'),
-        rows.length ? U.card(rows, 'bcv-card--list') : U.emptyCard('Canvas has no attempt recorded for this assignment.'),
-        a.rubric?.length ? U.btn('See the rubric breakdown', { icon: IC.sheet, cls: 'bcv-rubbtn bcv-sub__rub', onClick: () => { close(); CS().openRubric(a, s); } }) : null,
-        comments(),
-      ].filter(Boolean));
-    }
-    function one(at) {
-      view = () => one(at);
-      headBack.hidden = false;
-      title.textContent = `Attempt ${at.attempt || 1}`;
-      body.replaceChildren(attemptBody(c, a, at), comments());
-    }
-    list();
+    draw();
     document.body.append(ov);
     ov.tabIndex = -1;
     ov.focus();

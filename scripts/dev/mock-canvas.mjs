@@ -51,7 +51,7 @@ const A = {
     ['1003', 'Dis00', 'Collaboration', 10, 10, -7, 23.98, null, {}],
     ['1004', 'Qz00', 'Discussion Quizzes', 10, 10, -7, 23.98, null, { quiz: true }],
     ['1005', 'Skills_Check', 'Discussion Quizzes', 14, 8, -7, 23.98, null, { quiz: true, omit: true }],
-    ['1006', 'Functions and Their Representations', 'Effort', 30, 30, -6, 23.98, -12, {}],
+    ['1006', 'Functions and Their Representations', 'Effort', 30, 30, -6, 23.98, -12, { held: true }],
     ['1007', 'Lec05-PreQuiz', 'Effort', 19, 19, -1, 10.5, -2, { quiz: true }],
     ['1008', 'Transformation of Functions and Sinusoidal Functions', 'Effort', 30, 0, -1, 23.98, 0, { late: true }],
     ['1009', 'Dis01', 'Collaboration', 10, null, 0, 23.98, null, { rubric: true }],
@@ -104,10 +104,16 @@ function assignmentObj(courseId, row) {
   const submission = {
     id: `s${id}`, assignment_id: id, workflow_state: earned !== null ? 'graded' : submitted ? 'submitted' : 'unsubmitted', score: earned, grade: earned === null ? null : String(earned),
     submitted_at: subDay !== null ? at(subDay, 15, 52) : (earned !== null ? at(dueDay - 1, 16, 1) : null), graded_at: earned !== null ? at(dueDay, 8, 0) : null,
+    // Canvas posts a grade separately from marking it; one assignment here is marked but held back
+    posted_at: earned !== null ? (extra.held ? null : at(dueDay, 8, 5)) : null,
     late: !!extra.late, missing: false, excused: false, attempt: submitted ? 1 : null,
-    submission_comments: extra.rubric ? [] : id === '1001'
-      ? [{ author_id: `t${courseId}`, author_name: c.teacher, created_at: at(dueDay + 1, 9, 0), comment: 'Nice work on the derivative questions. Watch the difference between an instantaneous reading and an interval total — that cost you question 2.' }, { author_id: '7', author_name: 'Sam Student', created_at: at(dueDay + 1, 10, 0), comment: 'Thanks, I see it now.' }]
-      : (earned !== null && id === '1002' ? [{ author_name: c.teacher, created_at: at(dueDay + 1, 9, 0), comment: 'Check the domain restrictions in question 3 — the rest was solid.' }] : []),
+    // 4001 is the worked example for the submission sheet: two attempts, and comments filed against
+    // each of them, so the thread shown has to be the selected attempt's rather than all of them
+    submission_comments: id === '4001'
+      ? [{ author_id: `t${courseId}`, author_name: c.teacher, created_at: at(dueDay - 2, 9, 0), attempt: 1, comment: 'This is only a first pass — attach the working before the deadline and I will mark it.' }, { author_id: `t${courseId}`, author_name: c.teacher, created_at: at(dueDay + 1, 9, 0), attempt: 2, comment: 'Nice work on the derivative questions. Watch the difference between an instantaneous reading and an interval total — that cost you question 2.' }, { author_id: '7', author_name: 'Sam Student', created_at: at(dueDay + 1, 10, 0), attempt: 2, comment: 'Thanks, I see it now.' }]
+      : extra.rubric ? [] : id === '1001'
+        ? [{ author_id: `t${courseId}`, author_name: c.teacher, created_at: at(dueDay + 1, 9, 0), comment: 'Nice work on the derivative questions. Watch the difference between an instantaneous reading and an interval total — that cost you question 2.' }, { author_id: '7', author_name: 'Sam Student', created_at: at(dueDay + 1, 10, 0), comment: 'Thanks, I see it now.' }]
+        : (earned !== null && id === '1002' ? [{ author_id: `t${courseId}`, author_name: c.teacher, created_at: at(dueDay + 1, 9, 0), attempt: 2, comment: 'Check the domain restrictions in question 3 — the rest was solid.' }] : []),
     rubric_assessment: extra.rubric && earned !== null ? { c1: { points: 4, rating_id: 'r2', comments: 'Sign error in part b.' }, c2: { points: 4, rating_id: 'r3' } } : undefined,
     // quiz assignments: Canvas keeps each attempt's per-question grading in submission_history
     submission_history: extra.quiz ? (quizSubs.get(String(Number(id) + 8000)) || []).filter((s) => s.workflow_state === 'complete').map((s) => ({ attempt: s.attempt, score: s.score, submission_data: quizQuestionBank(s.quiz_id).map((q) => ({ question_id: q.id, correct: gradeQuestion(q, s.state[q.id]?.answer), points: gradeQuestion(q, s.state[q.id]?.answer) ? q.points_possible : 0, ...histFields(q, s.state[q.id]?.answer) })) }))
@@ -575,7 +581,7 @@ on('PUT', /^\/api\/v1\/courses\/(\w+)\/assignments\/(\w+)\/submissions\/self$/, 
   if (!text) return { error: 'no comment' };
   const key = `${m[1]}:${m[2]}`;
   const list = ownComments.get(key) || [];
-  list.push({ id: `oc${list.length + 1}`, author_id: '7', author_name: 'Sam Student', created_at: new Date().toISOString(), comment: String(text) });
+  list.push({ id: `oc${list.length + 1}`, author_id: '7', author_name: 'Sam Student', created_at: new Date().toISOString(), attempt: body.comment.attempt ? Number(body.comment.attempt) : undefined, comment: String(text) });
   ownComments.set(key, list);
   return (allAssignments(m[1]).find((a) => a.id === m[2]) || {}).submission || {};
 });

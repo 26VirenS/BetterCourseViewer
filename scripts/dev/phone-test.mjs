@@ -506,9 +506,15 @@ try {
   check((await texts('.bcv-ph-bigbtn.bcv-rubbtn'))[0] === 'See breakdown', 'a graded assignment offers See breakdown under the grade');
   // and the banner itself opens what is behind the mark: the attempts, and the thread
   await page.click('.bcv-ph-banner.is-link');
-  await page.waitForSelector('.bcv-sheet--sub .bcv-xrow', { timeout: 8000 });
-  const phAttempts = await texts('.bcv-sheet--sub .bcv-xrow');
-  check(phAttempts.length === 2 && /^Attempt 2 /.test(phAttempts[0]) && !!(await page.$('.bcv-sub__box')), `the mark opens every attempt and the comment box on a phone: ${phAttempts.join(' | ')}`);
+  await page.waitForSelector('.bcv-sheet--sub .bcv-subs__facts', { timeout: 8000 });
+  const phSub = await page.evaluate(() => ({
+    segs: [...document.querySelectorAll('.bcv-subs__segbtn')].map((e) => e.innerText.replace(/\s+/g, ' ').trim()),
+    facts: document.querySelectorAll('.bcv-subs__fact').length,
+    reply: !!document.querySelector('.bcv-subs__input'),
+    fits: document.querySelector('.bcv-sheet--sub').getBoundingClientRect().width <= window.innerWidth,
+  }));
+  check(phSub.segs.length === 2 && /^Attempt 2 /.test(phSub.segs[1]) && phSub.facts === 5 && phSub.reply && phSub.fits, `the mark opens the attempts, the facts and the reply field on a phone, within the screen: ${JSON.stringify(phSub)}`);
+  check(await noOverflow(), 'no horizontal overflow with the submission sheet open');
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('.bcv-sheet--sub'), null, { timeout: 5000 });
   await page.click('.bcv-ph-bigbtn.bcv-rubbtn');
