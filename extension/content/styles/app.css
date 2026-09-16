@@ -775,7 +775,8 @@ html[data-bcv-theme="dark"] .bcv-rubg__cell--part.is-got { box-shadow: inset 0 0
 /* The mark in the corner of the assignment card, beside the title: the first thing read, small
    enough not to take the page from the assignment itself, and a press away from what is behind it. */
 .bcv-detail { position: relative; }
-#bcv-app .bcv-detail__grade { position: absolute; top: 0; right: 0; z-index: 1; display: flex; align-items: center; gap: 11px; padding: 9px 11px 9px 13px; border-radius: 14px; background: rgba(52,199,89,.12); border: 1px solid rgba(52,199,89,.28); cursor: pointer; text-align: left; color: inherit; font: inherit; }
+/* inset by the card's own padding: `right: 0` is the padding box's edge, which is the card's edge */
+#bcv-app .bcv-detail__grade { position: absolute; top: 22px; right: 28px; z-index: 1; display: flex; align-items: center; gap: 11px; padding: 9px 11px 9px 13px; border-radius: 14px; background: rgba(52,199,89,.12); border: 1px solid rgba(52,199,89,.28); cursor: pointer; text-align: left; color: inherit; font: inherit; }
 #bcv-app .bcv-detail__grade:hover { background: rgba(52,199,89,.2); }
 .bcv-detail:has(.bcv-detail__grade) .bcv-detail__title { padding-right: 210px; }
 .bcv-detail__gradev { display: flex; align-items: baseline; gap: 4px; }
@@ -1058,6 +1059,8 @@ html[data-bcv-theme="dark"] .bcv-gpa__need--no { color: #ff8098; }
 .bcv-gpa-detail__list { border-radius: 16px; overflow: hidden; background: var(--bcv-fill2); }
 .bcv-gpa-detail__arow { display: flex; align-items: center; gap: 12px; padding: 11px 14px; border-top: 1px solid var(--bcv-sep); }
 .bcv-gpa-detail__arow:first-child { border-top: 0; }
+.bcv-gpa-detail__arow.is-link { cursor: pointer; border-radius: 10px; }
+.bcv-gpa-detail__arow.is-link:hover { background: var(--bcv-fill); }
 .bcv-gpa-detail__abody { flex: 1; min-width: 0; }
 .bcv-gpa-detail__aname { font: 600 13.5px/1.35 var(--bcv-font); }
 .bcv-gpa-detail__agroup { margin-top: 2px; font: 400 11.5px/1.3 var(--bcv-font); color: var(--bcv-ink3); }

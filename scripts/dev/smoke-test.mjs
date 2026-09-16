@@ -695,6 +695,16 @@ try {
   await page.waitForSelector('.bcv-gpa-detail', { timeout: 5000 });
   const detail = (await texts('.bcv-gpa-detail'))[0];
   check(/^F26-MATH 021 20 MATH-021-20 92\.4% A− Target − A− · 90% \+ by group/i.test(detail) && /how the grade is weighted 100% of final grade/i.test(detail) && /Midterms 57% · nothing graded/.test(detail) && (await page.$$('.bcv-gpa-detail__arow')).length === 17 && (await page.$$('.bcv-gpa-detail .bcv-wbar__seg--ungraded')).length === 2, `details sheet: ${detail.slice(0, 200)}`);
+  // the Grades page lists the same assignments, and they open the same way the course page's do
+  const gpaRow = await page.$eval('.bcv-gpa-detail__arow', (e) => ({ tag: e.tagName, href: e.getAttribute('href'), name: e.querySelector('.bcv-gpa-detail__aname')?.textContent }));
+  check(gpaRow.tag === 'A' && /\/courses\/\d+\/assignments\/\d+$/.test(gpaRow.href || ''), `a row on the Grades page opens the assignment it is about: ${JSON.stringify(gpaRow)}`);
+  await page.click('.bcv-gpa-detail__arow');
+  await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
+  check(/\/courses\/\d+\/assignments\/\d+$/.test(page.url()) && (await texts('.bcv-detail__title'))[0] === gpaRow.name && !(await page.$('.bcv-sheet-ov')), `and it lands there with the sheet put away: ${page.url()}`);
+  await page.goBack();
+  await page.waitForSelector('.bcv-gpa__card .bcv-gpa__details', { timeout: 15000 });
+  await page.click('.bcv-gpa__card .bcv-gpa__details');
+  await page.waitForSelector('.bcv-gpa-detail', { timeout: 5000 });
   await page.click('.bcv-gpa-detail__step:last-child');
   await waitText('.bcv-gpa-detail__tval', /^A · 93%$/);
   check(/Needs 9\d% of the remaining 507 pts .*Target A Details$/.test((await texts('.bcv-gpa__card'))[0]), `a target stepped in the sheet updates the card behind it: ${(await texts('.bcv-gpa__card'))[0]}`);
@@ -739,7 +749,8 @@ try {
     const gr = g.getBoundingClientRect(), cr = card.getBoundingClientRect(), tr = t.getBoundingClientRect();
     return { tag: g.tagName, right: Math.round(cr.right - gr.right), top: Math.round(gr.top - cr.top), clearsTitle: parseFloat(getComputedStyle(t).paddingRight) >= gr.width && tr.width > gr.width, size: Math.round(parseFloat(getComputedStyle(g.querySelector('.bcv-detail__gradescore')).fontSize)) };
   });
-  check(markBox.tag === 'BUTTON' && markBox.right <= 2 && markBox.top <= 2 && markBox.clearsTitle && markBox.size >= 18 && markBox.size <= 26, `the mark is a press in the card's top right corner, clear of the title: ${JSON.stringify(markBox)}`);
+  // inset by the card's own padding, not flush against its edge
+  check(markBox.tag === 'BUTTON' && markBox.right >= 20 && markBox.right <= 34 && markBox.top >= 16 && markBox.top <= 32 && markBox.clearsTitle && markBox.size >= 18 && markBox.size <= 26, `the mark is a press in the card's top right corner, inset from its edges and clear of the title: ${JSON.stringify(markBox)}`);
   // and behind it: every attempt Canvas kept, what each one carried, and the thread it came back on
   await page.click('.bcv-detail__grade');
   await page.waitForSelector('.bcv-sheet--sub .bcv-xrow', { timeout: 8000 });

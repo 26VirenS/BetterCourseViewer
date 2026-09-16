@@ -494,10 +494,18 @@
           ]);
         const list = U.el('bcv-gpa-detail__sec bcv-gpa-detail__sec--line', [
           U.el('bcv-gpa-detail__hrow', [U.text('bcv-gpa__kicker2', 'Assignments', 'span'), U.text('bcv-gpa-detail__hsub', 'Blue dot means graded', 'span')]),
-          gm.rows.length ? U.el('bcv-gpa-detail__list', gm.rows.map((g) => U.el('bcv-gpa-detail__arow', [
+          // every row opens the assignment it is a line about, the same as on the course's own Grades
+          // page: a grade is the start of a question, and the answer is on that page
+          gm.rows.length ? U.el('bcv-gpa-detail__list', gm.rows.map((g) => h(g.url ? 'a' : 'div', {
+            class: `bcv-gpa-detail__arow ${g.url ? 'is-link' : ''}`,
+            href: g.url || null,
+            style: g.url ? { color: 'inherit' } : null,
+            onclick: g.url ? () => close() : null, // the sheet belongs to the page being left
+          }, [
             h('span', { class: 'bcv-gpa__catdot', style: { background: g.earned !== null ? '#0a84ff' : 'transparent' } }),
             U.el('bcv-gpa-detail__abody', [U.text('bcv-gpa-detail__aname bcv-pretty', g.name), U.text('bcv-gpa-detail__agroup', `${g.group}${g.badge ? ` · ${g.badge}` : ''}`)]),
             U.text('bcv-gpa-detail__ascore', `${g.earned === null ? '—' : store.fmtPts(g.earned)} / ${store.fmtPts(g.possible)}`, 'span'),
+            g.url ? U.chev() : null,
           ]))) : U.text('bcv-gpa-detail__note', 'No assignments in this course.'),
           h('a', { class: 'bcv-gpa-detail__link', href: `${c.url}/grades`, text: 'Open the course Grades page' }),
         ]);
