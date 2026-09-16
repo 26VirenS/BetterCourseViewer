@@ -23,12 +23,16 @@
     body.append(U.loading('rows', 6)); // list-row skeletons hold the place until the planner lands
 
     let view = 'list';
+    // the views the setup (or Settings) asked for; with one, there is nothing to switch between
+    const ALL_VIEWS = [['cards', 'Cards'], ['list', 'List'], ['activity', 'Recent activity']];
+    let views = ALL_VIEWS;
+    let hideDone = false; // the list without what is already done; kept per site, like To Do's
     const draw = () => {
-      segWrap.replaceChildren(U.seg([['cards', 'Cards'], ['list', 'List'], ['activity', 'Recent activity']], view, async (v) => {
+      segWrap.replaceChildren(...(views.length > 1 ? [U.seg(views, view, async (v) => {
         view = v;
         draw();
         store.setDashboardView(v);
-      }));
+      })] : []));
       renderBody();
     };
 
@@ -38,15 +42,22 @@
     // round trip away, not three. The saved view is read alongside the data rather than before it.
     const feedP = store.announcementsFeed().catch(() => null);
     let feedById = null; // set when the feed lands; the activity view reads it at draw time
-    const [planner, favs, courses, seen, savedView] = await Promise.all([
+    const [planner, favs, courses, seen, savedView, settings, hidePref] = await Promise.all([
       store.planner().catch(() => null),
       store.favorites().catch(() => []),
       store.courses().catch(() => []),
       store.streamSeen().catch(() => new Set()), // stream items opened from here
       store.dashboardView().catch(() => 'list'),
+      BCV.settings.get().catch(() => null),
+      store.pref('dashHideDone', false).catch(() => false),
     ]);
     if (!ctx.alive()) return screen;
-    view = savedView;
+    const wanted = settings?.appearance?.dashboard || {};
+    views = ALL_VIEWS.filter(([k]) => wanted[k] !== false);
+    if (!views.length) views = ALL_VIEWS; // nothing chosen is not a dashboard: everything, as before
+    // the view saved on the Canvas profile, unless it is one that was switched off here
+    view = views.some(([k]) => k === savedView) ? savedView : views[0][0];
+    hideDone = !!hidePref;
     // Unread: the announcement's own read state when we know it, else the stream's flag; either
     // way an item opened from here loses its dot. The activity rows on screen are kept here so
     // that a feed landing after they were drawn settles their dots in place.
@@ -445,11 +456,21 @@
     // ---- list view -----------------------------------------------------------------------
     function listBlock() {
       if (!planner) return U.emptyCard('Your planner could not be loaded.');
-      // Completed and submitted items stay in the list, ticked, so they can be unticked.
+      // Completed and submitted items stay in the list, ticked, so they can be unticked — unless
+      // the list is asked to hide them, which one small button at its top does and undoes.
       const upcoming = (planner || []).filter((it) => !it.dismissed && it.type !== 'announcement' && it.date >= todayStart).sort((a, b) => a.date - b.date);
       if (!upcoming.length) return U.emptyCard('Nothing coming up in the next three weeks.');
+      const doneOf = (it) => !!(it.complete || it.submitted);
+      const doneN = upcoming.filter(doneOf).length;
+      const kept = hideDone ? upcoming.filter((it) => !doneOf(it)) : upcoming;
+      const tools = doneN || hideDone ? U.el('bcv-dash__tools', U.btn(hideDone ? `Show completed${doneN ? ` · ${doneN}` : ''}` : 'Hide completed', {
+        kind: 'xs', icon: IC.check, cls: `bcv-dash__done ${hideDone ? 'is-on' : ''}`,
+        title: hideDone ? 'Completed and submitted items are hidden' : 'Hide completed and submitted items',
+        onClick: () => { hideDone = !hideDone; store.setPref('dashHideDone', hideDone); renderBody(); },
+      })) : null;
+      if (!kept.length) return U.el('bcv-col', [tools, U.emptyCard('Everything coming up is done.')].filter(Boolean), { style: { gap: '12px' } });
       const days = new Map();
-      for (const it of upcoming) {
+      for (const it of kept) {
         const k = U.startOfDay(it.date).getTime();
         if (!days.has(k)) days.set(k, []);
         days.get(k).push(it);
@@ -464,7 +485,7 @@
           U.card(items.map((it) => plannerRow(it)), 'bcv-card--list'),
         ]), out.length, 70, 420)); // day groups follow the stat cards
       }
-      return U.el('bcv-col', out, { style: { gap: '26px' } });
+      return U.el('bcv-col', [tools, ...out].filter(Boolean), { style: { gap: '26px' } });
     }
     function plannerRow(it) {
       const pal = it.course ? it.course.palette : U.palette(null, dark);

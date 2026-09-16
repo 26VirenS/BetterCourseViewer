@@ -379,6 +379,32 @@ try {
   // the announcement's own read state arrives with the feed, a moment after the list is drawn
   check(await eventually(async () => (await dots()) === 2), `opening a stream item clears its dot: ${await dots()} left`);
   await page.click('.bcv-seg__btn[data-value="list"]');
+  // one small button at the top of the list hides what is already done, and says how much it hid
+  await page.waitForSelector('.bcv-dash__done', { timeout: 10000 });
+  const dashDoneRows = () => page.$$eval('.bcv-day .bcv-row', (els) => els.filter((e) => e.classList.contains('bcv-row--done')).length);
+  const dashAllRows = () => page.$$eval('.bcv-day .bcv-row', (els) => els.length);
+  const [doneBefore, allBefore] = [await dashDoneRows(), await dashAllRows()];
+  check(doneBefore > 0 && (await texts('.bcv-dash__done'))[0] === 'Hide completed' && (await page.$eval('.bcv-dash__done', (e) => e.getBoundingClientRect().height <= 32)), `the list shows its done rows, ticked, with a small Hide completed above them (${doneBefore} of ${allBefore} done)`);
+  await page.click('.bcv-dash__done');
+  check(await eventually(async () => (await dashDoneRows()) === 0 && (await dashAllRows()) === allBefore - doneBefore), 'Hide completed takes exactly the done rows out');
+  check((await texts('.bcv-dash__done'))[0] === `Show completed · ${doneBefore}` && (await page.$eval('.bcv-dash__done', (e) => e.classList.contains('is-on'))), `and the button says how many it is hiding: ${(await texts('.bcv-dash__done'))[0]}`);
+  await page.reload();
+  await page.waitForSelector('.bcv-dash__done', { timeout: 15000 });
+  check(await eventually(async () => (await texts('.bcv-dash__done'))[0] === `Show completed · ${doneBefore}`), 'the choice is kept across a reload');
+  await page.click('.bcv-dash__done');
+  check(await eventually(async () => (await dashDoneRows()) === doneBefore), 'Show completed brings them back');
+  // the views the dashboard offers are the ones the setup (or Settings) asked for; one alone needs no switcher
+  await setSettings({ appearance: { dashboard: { activity: false } } });
+  await page.reload();
+  await page.waitForSelector('.bcv-head .bcv-seg__btn', { timeout: 15000 });
+  check((await page.$$eval('.bcv-head .bcv-seg__btn', (bs) => bs.map((b) => b.dataset.value))).join(',') === 'cards,list', `a view switched off in the settings is not offered: ${(await page.$$eval('.bcv-head .bcv-seg__btn', (bs) => bs.map((b) => b.dataset.value))).join(',')}`);
+  await setSettings({ appearance: { dashboard: { cards: false, activity: false } } });
+  await page.reload();
+  await page.waitForSelector('.bcv-day', { timeout: 15000 });
+  check(!(await page.$('.bcv-head .bcv-seg__btn')) && !!(await page.$('.bcv-day')), 'with one view left there is no switcher, and the dashboard is that view');
+  await setSettings({ appearance: { dashboard: { cards: true, list: true, activity: true } } });
+  await page.reload();
+  await page.waitForSelector('.bcv-head .bcv-seg__btn', { timeout: 15000 });
 
   // ---- courses ----------------------------------------------------------------------------
   console.log('courses');
@@ -2055,7 +2081,7 @@ try {
   await page.goto(`${BASE}/?bcv=setup`);
   await page.waitForSelector(su('.row'), { timeout: 20000 });
   await page.waitForTimeout(500);
-  check(page.url() === `${BASE}/` && (await page.$('.bcv-stat')) !== null && (await page.$$(su('.blob'))).length === 4 && (await sStep()) === '1 of 3' && (await page.$$(su('.progress span'))).length === 3 && (await page.$eval('html', (e) => getComputedStyle(e).overflow)) === 'hidden', 'the setup opens as a glass card over the dashboard: the address cleaned, four steps, the page held still');
+  check(page.url() === `${BASE}/` && (await page.$('.bcv-stat')) !== null && (await page.$$(su('.blob'))).length === 4 && (await sStep()) === '1 of 4' && (await page.$$(su('.progress span'))).length === 4 && (await page.$eval('html', (e) => getComputedStyle(e).overflow)) === 'hidden', 'the setup opens as a glass card over the dashboard: the address cleaned, four steps, the page held still');
   await shot(page, '32-setup-over-page');
   const scanned = await texts(su('.row__code'));
   // nothing is ticked to begin with, whatever Canvas already has starred, and Continue is dead until
@@ -2085,7 +2111,7 @@ try {
   await shot(page, '32c-setup-courses');
   await sNext('#track');
   const firstTargets = await page.$$eval(su('.target .seg button.is-on'), (bs) => bs.map((b) => b.textContent));
-  check((await sStep()) === '2 of 3' && (await page.$eval(su('#track'), (e) => e.classList.contains('is-on'))) && (await texts(su('#goal')))[0] === '4.00' && (await page.$$(su('.target'))).length === 5 && firstTargets.join(',') === 'A+,A+,A+,A+,A+' && (await page.$$eval(su('.target:first-child .seg button'), (bs) => bs.map((b) => b.textContent))).join(' ') === 'C B B+ A- A A+', `step 2: tracking on, a 4.00 goal, every course aiming at A+, letters low to high: ${firstTargets.join(',')}`);
+  check((await sStep()) === '2 of 4' && (await page.$eval(su('#track'), (e) => e.classList.contains('is-on'))) && (await texts(su('#goal')))[0] === '4.00' && (await page.$$(su('.target'))).length === 5 && firstTargets.join(',') === 'A+,A+,A+,A+,A+' && (await page.$$eval(su('.target:first-child .seg button'), (bs) => bs.map((b) => b.textContent))).join(' ') === 'C B B+ A- A A+', `step 2: tracking on, a 4.00 goal, every course aiming at A+, letters low to high: ${firstTargets.join(',')}`);
   await page.click(su('.stepper button:last-child')); // already at the top of the scale: it stays there
   check((await texts(su('#goal')))[0] === '4.00', `the goal does not climb past 4.00: ${(await texts(su('#goal')))[0]}`);
   await page.click(su('.stepper button:first-child'));
@@ -2093,12 +2119,27 @@ try {
   await page.click(su('.target:first-child .seg button:nth-child(3)'));
   check((await texts(su('#goal')))[0] === '3.90' && (await page.$eval(su('.target:first-child .seg button.is-on'), (b) => b.textContent)) === 'B+', 'the goal stepper and a target pick');
   await shot(page, '32d-setup-grades');
+  await sNext('.row[data-view]');
+  // step 3: what the Dashboard shows — three views, each on or off, at least one kept on
+  await page.waitForTimeout(450);
+  const dashRows = await page.evaluate(() => [...document.querySelector('#bcv-setup').shadowRoot.querySelectorAll('.row[data-view]')].map((r) => `${r.querySelector('.row__code').textContent}${r.classList.contains('is-on') ? ' *' : ''} — ${r.querySelector('.row__why').textContent}`));
+  check((await sStep()) === '3 of 4' && dashRows.join(' | ') === 'Courses * — Your courses as cards, with what is due next. | List * — Everything due, day by day, with a tick to mark it done. | Recent activity * — New announcements, replies and grades as they arrive.', `step 3 asks what the Dashboard shows, each with a line saying what it is: ${dashRows.join(' | ')}`);
+  const dashPref = () => sw.evaluate(async () => (await self.BCV.settings.get()).appearance.dashboard);
+  await page.click(su('.row[data-view="activity"]'));
+  check(await eventually(async () => (await dashPref()).activity === false) && !(await page.$eval(su('.row[data-view="activity"]'), (e) => e.classList.contains('is-on'))), 'switching a view off writes it as it is chosen');
+  await page.click(su('.row[data-view="cards"]'));
+  await page.click(su('.row[data-view="list"]'));
+  check(await eventually(async () => page.$eval(su('#next'), (b) => b.disabled)), 'with every view off, Continue is dead — a dashboard with nothing on it is not one');
+  await page.click(su('.row[data-view="cards"]'));
+  await page.click(su('.row[data-view="list"]'));
+  await page.click(su('.row[data-view="activity"]'));
+  check(await eventually(async () => { const d = await dashPref(); return d.cards && d.list && d.activity && !(await page.$eval(su('#next'), (b) => b.disabled)); }), 'and back on, Continue lives again');
   await sNext('.row[data-value]');
   // the last step: where the courses chosen in step 1 should sit
   await page.waitForSelector(su('.row[data-value]'), { timeout: 10000 });
   await page.waitForTimeout(450);
   const sideOpts = await texts(su('.row[data-value] .row__code'));
-  check((await sStep()) === '3 of 3' && sideOpts.join(' | ') === 'Always on the sidebar | When I hover on Courses' && (await page.$eval(su('.row[data-value="always"]'), (e) => e.classList.contains('is-on'))) && (await page.$eval(su('#next'), (e) => e.textContent)) === 'Finish', `step 4 asks where the courses live, on the sidebar by default: ${sideOpts.join(' | ')}`);
+  check((await sStep()) === '4 of 4' && sideOpts.join(' | ') === 'Always on the sidebar | When I hover on Courses' && (await page.$eval(su('.row[data-value="always"]'), (e) => e.classList.contains('is-on'))) && (await page.$eval(su('#next'), (e) => e.textContent)) === 'Finish', `step 4 asks where the courses live, on the sidebar by default: ${sideOpts.join(' | ')}`);
   await shot(page, '32f-setup-sidebar');
   const pickSide = async (v) => {
     await page.click(su(`.row[data-value="${v}"]`));
@@ -2467,6 +2508,20 @@ try {
   check((await sw.evaluate(() => self.BCV.settings.get())).appearance.sideCourses === 'hover' && (await options.$eval('#sideCourses button.is-on', (b) => b.dataset.value)) === 'hover', 'changing it saves');
   await options.click('#sideCourses button[data-value="always"]');
   await options.waitForTimeout(250);
+  // Appearance: the Dashboard's views, the same three the setup asks about
+  check((await options.$$eval('#dashCards, #dashList, #dashActivity', (bs) => bs.map((b) => b.classList.contains('is-on')))).join(',') === 'true,true,true', 'the three dashboard switches start on');
+  await options.click('#dashActivity');
+  await options.waitForTimeout(250);
+  check((await sw.evaluate(() => self.BCV.settings.get())).appearance.dashboard.activity === false && !(await options.$eval('#dashActivity', (b) => b.classList.contains('is-on'))), 'switching one off saves');
+  await options.click('#dashCards');
+  await options.waitForTimeout(250);
+  await options.click('#dashList');
+  await options.waitForTimeout(250);
+  check((await sw.evaluate(() => self.BCV.settings.get())).appearance.dashboard.list !== false && (await options.$eval('#dashList', (b) => b.classList.contains('is-on'))), 'the last one on cannot be switched off');
+  await options.click('#dashCards');
+  await options.click('#dashActivity');
+  await options.waitForTimeout(250);
+  check((await sw.evaluate(() => self.BCV.settings.get())).appearance.dashboard.activity === true, 'and back on saves too');
   // Sites and data
   await options.click('.navlink[data-section="sites"]');
   check((await oTexts('.site__host'))[0] === '*.instructure.com' && (await options.$eval('#addDomain', (b) => b.disabled)), 'Canvas sites lists the built-in host; Add waits for an address');
@@ -2570,16 +2625,18 @@ try {
   check((await page.$(su('#skip'))) === null && (await page.$(su('.top__skip'))) === null, 'the card has no Skip');
   await page.keyboard.press('Escape');
   await page.waitForTimeout(300);
-  check((await page.$('#bcv-setup')) !== null && (await sStep()) === '1 of 3', 'Escape does not close it');
+  check((await page.$('#bcv-setup')) !== null && (await sStep()) === '1 of 4', 'Escape does not close it');
   await page.goto(`${BASE}/courses`); // walking away: the next page opens it again, over the Dashboard
   await page.waitForSelector(su('.row'), { timeout: 20000 });
-  check(page.url() === `${BASE}/` && (await sStep()) === '1 of 3' && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('setup:done'))['setup:done'])) === undefined, `leaving the page does not get past it: the next page opens the card again, unfinished (${await sStep()})`);
+  check(page.url() === `${BASE}/` && (await sStep()) === '1 of 4' && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('setup:done'))['setup:done'])) === undefined, `leaving the page does not get past it: the next page opens the card again, unfinished (${await sStep()})`);
   // the only way out is through: the steps, then the tour (the favourites already starred are the
   // ones picked, so finishing here changes nothing in Canvas for the sections that follow)
   const keepStarred = (await apiGet('/api/v1/courses?per_page=100')).filter((c) => c.is_favorite).map((c) => String(c.id));
   for (const id of keepStarred) await page.click(su(`.row[data-course="${id}"]`));
   await page.click(su('#next'));
   await page.waitForSelector(su('#track'), { timeout: 10000 });
+  await page.click(su('#next'));
+  await page.waitForSelector(su('.row[data-view]'), { timeout: 10000 });
   await page.click(su('#next'));
   await page.waitForSelector(su('.row[data-value]'), { timeout: 10000 });
   await page.click(su('#next')); // Finish

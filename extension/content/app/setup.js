@@ -21,11 +21,12 @@
   // declarations, so the list can sit here beside the labels it is paired with). A phone has no
   // sidebar to place the courses on, so the last step is left out there: the lists are settled
   // when the card opens (see start()).
-  let STEPS = [courses, grades, sidebar];
-  let LABELS = ['Continue', 'Continue', 'Finish'];
+  let STEPS = [courses, grades, dashboard, sidebar];
+  let LABELS = ['Continue', 'Continue', 'Continue', 'Finish'];
   let STEP_LABELS = ['1 of 4', '2 of 4', '3 of 4', '4 of 4', 'Done'];
   const settleSteps = () => {
-    STEPS = BCV.phone?.active() ? [courses, grades] : [courses, grades, sidebar];
+    // a phone's Today has no views to choose between, and no sidebar: both of those steps are left out
+    STEPS = BCV.phone?.active() ? [courses, grades] : [courses, grades, dashboard, sidebar];
     LABELS = STEPS.map((_, i) => (i === STEPS.length - 1 ? 'Finish' : 'Continue'));
     STEP_LABELS = [...STEPS.map((_, i) => `${i + 1} of ${STEPS.length}`), 'Done'];
   };
@@ -73,6 +74,7 @@
       scanning: false, scanError: null, courses: [], favs: new Set(), nicks: {},
       tracking: true, goal: 4, targets: {},
       sideCourses: settings.appearance?.sideCourses === 'always' ? 'always' : 'hover', // the panel off the Courses row is the default
+      dash: { cards: true, list: true, activity: true, ...(settings.appearance?.dashboard || {}) }, // the Dashboard's views
       closing: false,
     };
     settleSteps();
@@ -341,6 +343,42 @@
       h('div', { class: 'targets' }, targets.length ? targets : [h('div', { class: 'empty', text: 'No courses chosen: nothing to aim at yet.' })]),
     );
     footer({ onNext: () => (STEPS.includes(sidebar) ? go(2) : finish({ skipped: false })) });
+  }
+
+  // ---- what the Dashboard shows ---------------------------------------------------------------------
+  /** The Dashboard's three views, each on or off. At least one stays on — a dashboard with nothing on
+   *  it is not one — and the choice is written as it is made, so Back and Finish both leave it set;
+   *  Settings → Appearance has the same three switches afterwards. */
+  function dashboard() {
+    const { body } = ui;
+    const VIEWS = [
+      ['cards', 'Courses', 'Your courses as cards, with what is due next.'],
+      ['list', 'List', 'Everything due, day by day, with a tick to mark it done.'],
+      ['activity', 'Recent activity', 'New announcements, replies and grades as they arrive.'],
+    ];
+    const anyOn = () => VIEWS.some(([k]) => st.dash[k] !== false);
+    const rows = VIEWS.map(([key, title, why]) => h('button', {
+      type: 'button',
+      class: `row ${st.dash[key] !== false ? 'is-on' : ''}`,
+      dataset: { view: key },
+      onclick: async (e) => {
+        st.dash[key] = st.dash[key] === false;
+        e.currentTarget.classList.toggle('is-on', st.dash[key]);
+        const next = ui.foot?.querySelector('#next');
+        if (next) next.disabled = !anyOn();
+        await S.update({ appearance: { dashboard: { [key]: st.dash[key] } } }).catch(() => {});
+      },
+    }, [
+      h('span', { class: 'row__body' }, [h('span', { class: 'row__code', text: title }), h('span', { class: 'row__why', text: why })]),
+      h('span', { class: 'row__box' }, svg(CHECK, { size: 13, stroke: '#fff', width: 3 })),
+    ]));
+    stagger(rows, 70);
+    body.append(
+      h('h1', { class: 'h1', text: 'Your dashboard' }),
+      h('p', { class: 'sub', text: 'What the Dashboard shows. Keep at least one; you can change it in Settings.' }),
+      h('div', { class: 'rows' }, rows),
+    );
+    footer({ onNext: () => go(STEPS.indexOf(dashboard) + 1), disabled: () => !anyOn() });
   }
 
   // ---- where the courses live ----------------------------------------------------------------------

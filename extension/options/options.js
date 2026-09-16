@@ -387,6 +387,15 @@
     if (b) save({ appearance: { darkMode: b.dataset.value } });
   });
   onSeg($('sideCourses'), (v) => save({ appearance: { sideCourses: v } }));
+  // the Dashboard's views: a switch may not take the last one off — a dashboard with nothing on it is not one
+  const DASH = [['dashCards', 'cards'], ['dashList', 'list'], ['dashActivity', 'activity']];
+  for (const [id, key] of DASH) {
+    onSwitch($(id), (on) => {
+      const d = { cards: true, list: true, activity: true, ...(settings.appearance.dashboard || {}) };
+      if (!on && !DASH.some(([, k]) => k !== key && d[k] !== false)) { setSwitch($(id), true); return; }
+      save({ appearance: { dashboard: { [key]: on } } });
+    });
+  }
 
   // ---- Canvas sites ---------------------------------------------------------------------------------
   const normaliseHost = (raw) => {
@@ -544,6 +553,7 @@
     for (const [id, path] of TEXT) { const el = $(id); if (document.activeElement !== el) el.value = getPath(settings, path) ?? ''; }
     [...$('themes').querySelectorAll('.theme')].forEach((b) => b.classList.toggle('is-on', b.dataset.value === (settings.appearance.darkMode || 'system')));
     setSeg($('sideCourses'), settings.appearance.sideCourses || 'always');
+    for (const [id, key] of DASH) setSwitch($(id), settings.appearance.dashboard?.[key] !== false);
     renderDomains();
     paintStatus();
     paint();

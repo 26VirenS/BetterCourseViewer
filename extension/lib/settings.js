@@ -14,6 +14,7 @@
       siteName: '',               // shown in the sidebar brand row; blank = derived from the host
       logoUrl: '',                // sidebar tile image; blank = the school's own mark from Canvas's theme
       sideCourses: 'always',      // where the favourite courses live: 'always' on the sidebar, or 'hover' off the Courses row
+      dashboard: { cards: true, list: true, activity: true }, // which of the Dashboard's views are offered; at least one stays on
     },
     quizzes: {
       // A quiz Canvas locks — each question sealed the moment you leave it, no going back — cannot be
