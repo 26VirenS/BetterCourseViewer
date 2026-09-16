@@ -655,7 +655,8 @@
       case 'modules': el = await B.modules(ctx, shell); break;
       case 'announcement': el = await D.discussion(ctx, shell, { announcement: true }); break;
       case 'discussion': el = await D.discussion(ctx, shell, {}); break;
-      case 'assignment': el = await D.assignment(ctx, shell); break;
+      // ?bcv=feedback is the mark's own screen, as it is for a quiz: the same route, a different view
+      case 'assignment': el = route.params.get('bcv') === 'feedback' ? await BCV.screens.feedback.render(ctx, shell) : await D.assignment(ctx, shell); break;
       case 'syllabus': el = await D.syllabus(ctx, shell); break;
       case 'page': el = await D.page(ctx, shell); break;
       case 'quiz': el = ['take', 'feedback'].includes(route.params.get('bcv')) ? await BCV.screens.quiz.render(ctx, course) : await D.quiz(ctx, shell); break;

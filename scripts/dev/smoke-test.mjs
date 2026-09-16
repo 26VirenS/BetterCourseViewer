@@ -755,25 +755,55 @@ try {
   await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
   const heldChip = await page.$eval('.bcv-detail__grade', (e) => ({ held: e.classList.contains('bcv-detail__grade--held'), text: e.innerText.replace(/\s+/g, ' ').trim(), digits: /\d/.test(e.innerText) }));
   check(heldChip.held && /^Not yet posted/.test(heldChip.text) && !heldChip.digits, `a held grade says so and shows no number: ${JSON.stringify(heldChip)}`);
-  // surface 2: the sheet over the page — score, count, five facts, the attachment, the thread
+  // The mark opens the feedback screen — the same shape as a quiz's, in the course's own column.
+  // The sheet it replaced is kept in the build, off behind SUB_SHEET, because the preview it framed
+  // is Canvas's own document service and that service answers "service unavailable" often enough
+  // that a sheet built around it reads as broken.
   await page.goto(`${BASE}/courses/104/assignments/4001`);
   await page.waitForSelector('.bcv-detail__grade', { timeout: 10000 });
   await page.click('.bcv-detail__grade');
-  await page.waitForSelector('.bcv-sheet--sub .bcv-subs__facts', { timeout: 8000 });
-  await page.waitForFunction(() => Math.round(document.querySelector('.bcv-sheet--sub').getBoundingClientRect().width) === 560, null, { timeout: 4000 }).catch(() => {}); // the width animates in; measure where it lands
-  const sheetTop = await page.evaluate(() => ({
-    width: Math.round(document.querySelector('.bcv-sheet--sub').getBoundingClientRect().width),
-    score: document.querySelector('.bcv-subs__score').innerText.replace(/\s+/g, ' ').trim(),
-    count: document.querySelector('.bcv-subs__count').textContent,
-    facts: [...document.querySelectorAll('.bcv-subs__fact')].map((e) => `${e.querySelector('.bcv-subs__factk').textContent}=${e.querySelector('.bcv-subs__factv').textContent}`),
-    att: document.querySelector('.bcv-subs__att')?.innerText.replace(/\s+/g, ' ').trim(),
+  await page.waitForSelector('.bcv-fb__scorecard', { timeout: 10000 });
+  const asScreen = await page.evaluate(() => ({ embedded: !!document.querySelector('.bcv-fb')?.closest('.bcv-qz.is-embedded'), sheet: !!document.querySelector('.bcv-sheet--sub') }));
+  check(page.url().includes('bcv=feedback') && asScreen.embedded && !asScreen.sheet, `the mark opens a screen, not a sheet: ${page.url()} ${JSON.stringify(asScreen)}`);
+  const sheetKept = await sw.evaluate(async (base) => {
+    const [tab] = await chrome.tabs.query({ url: `${base}/*` });
+    const [{ result }] = await chrome.scripting.executeScript({
+      target: { tabId: tab.id }, world: 'ISOLATED', func: () => typeof self.BCV.screens.courseDetail.openSubmissions === 'function',
+    });
+    return result;
+  }, BASE);
+  check(sheetKept, 'and the sheet it replaced is still in the build, off rather than gone');
+  const fbTop = await page.evaluate(() => ({
+    score: document.querySelector('.bcv-fb__big').textContent,
+    pct: document.querySelector('.bcv-fb__pct')?.textContent,
+    summary: document.querySelector('.bcv-fb__summary').textContent,
+    bar: document.querySelector('.bcv-fb__fill').style.width,
+    comments: [...document.querySelectorAll('.bcv-fb__scorecard .bcv-fb__ctext')].map((e) => e.textContent),
   }));
-  check(sheetTop.width === 560 && sheetTop.score === '10 / 10' && sheetTop.count === '2 comments' && sheetTop.facts.length === 5, `the sheet is 560 wide and heads with the score and the thread's size: ${JSON.stringify(sheetTop).slice(0, 160)}`);
-  check(sheetTop.facts.join(' | ') === 'Submitted=Sep 9 at 3:52pm | Attempt=2 of 2 | Type=File upload | Graded=Sep 10 at 8:00am | Score=10 / 10', `five facts, all from the selected attempt: ${sheetTop.facts.join(' | ')}`);
-  check(/^PDF /.test(sheetTop.att || '') && /\.pdf/.test(sheetTop.att || '') && /KB/.test(sheetTop.att || '') && /Open$/.test(sheetTop.att || ''), `the attachment says its kind, name, size and how to open it: ${sheetTop.att}`);
+  check(fbTop.score === '10 / 10' && fbTop.pct === '100%' && fbTop.bar === '100%' && /^Week 1 reflection · graded /.test(fbTop.summary), `it heads with the score, the percent and when it was graded: ${JSON.stringify(fbTop).slice(0, 170)}`);
+  check(fbTop.comments.length === 1 && /derivative questions/.test(fbTop.comments[0]), `and the instructor's own words on the graded attempt: ${fbTop.comments.join(' | ').slice(0, 80)}`);
+  // one card per attempt, latest first, each with its own facts, its own file and its own thread
+  const subCards = await page.$$eval('.bcv-fb__q', (els) => els.map((e) => ({
+    n: e.querySelector('.bcv-fb__qn').textContent,
+    latest: !!e.querySelector('.bcv-fb__tag'),
+    score: e.querySelector('.bcv-fb__score').textContent,
+    facts: [...e.querySelectorAll('.bcv-fb__fact')].map((f) => `${f.querySelector('.bcv-fb__factk').textContent}=${f.querySelector('.bcv-fb__factv').textContent}`).join(' | '),
+    files: [...e.querySelectorAll('.bcv-fb__file')].map((f) => f.innerText.replace(/\s+/g, ' ').trim()),
+    thread: [...e.querySelectorAll('.bcv-fb__ctext')].map((c) => c.textContent),
+    note: e.querySelector('.bcv-fb__note')?.textContent || null,
+  })));
+  check(subCards.length === 2 && subCards[0].n === 'Attempt 2' && subCards[0].latest && subCards[1].n === 'Attempt 1' && !subCards[1].latest, `one card per attempt, latest first: ${subCards.map((x) => `${x.n}${x.latest ? '*' : ''}`).join(' | ')}`);
+  check(subCards[0].score === '10 / 10' && /Submitted=Sep 9 at 3:52pm/.test(subCards[0].facts) && /Type=File upload/.test(subCards[0].facts) && /Graded=Sep 10 at 8:00am/.test(subCards[0].facts), `the latest attempt's own facts: ${subCards[0].facts}`);
+  check(subCards[1].score === 'Not graded' && /Type=Text entry/.test(subCards[1].facts) && /Only your latest attempt is graded/.test(subCards[1].note || ''), `an older attempt is not the graded one, and says so: ${subCards[1].score} · ${subCards[1].facts}`);
+  // comments are filed against an attempt: a first draft's feedback is not feedback on the final one
+  check(subCards[0].thread.length === 2 && /derivative questions/.test(subCards[0].thread[0]) && /Thanks, I see it now/.test(subCards[0].thread[1]), `the latest attempt's thread: ${subCards[0].thread.join(' | ').slice(0, 80)}`);
+  check(subCards[1].thread.length === 1 && /only a first pass/.test(subCards[1].thread[0]), `and the first attempt's own: ${subCards[1].thread.join(' | ').slice(0, 60)}`);
+  // the file is offered two ways on purpose: Canvas's preview service can be down, a download cannot
+  check(subCards[0].files.length === 1 && /^PDF /.test(subCards[0].files[0]) && /\.pdf/.test(subCards[0].files[0]) && /KB/.test(subCards[0].files[0]) && /Preview Download$/.test(subCards[0].files[0]), `the file says its kind, name and size, and offers both ways at it: ${subCards[0].files[0]}`);
+  check(await page.$eval('.bcv-fb__fileact--dl', (e) => /^\/files\/\w+\/download/.test(e.getAttribute('href') || '')), "the download is the file's own address, with no course context");
   // what was handed in is the student's own file, not the course's: asked for under /courses/:id it
-  // is Canvas's 404 page, so it has to be opened with no context at all
-  await page.click('.bcv-subs__att');
+  // is Canvas's 404 page, so it has to be previewed with no context at all
+  await page.click('.bcv-fb__file .bcv-fb__fileact');
   await page.waitForSelector('.bcv-viewer-ov .bcv-viewer__frame', { timeout: 8000 });
   const attSrc = await page.$eval('.bcv-viewer-ov .bcv-viewer__frame', (e) => e.getAttribute('src'));
   check(/^\/files\/\w+\/file_preview/.test(attSrc || ''), `a submission attachment previews with no course context: ${attSrc}`);
@@ -782,42 +812,52 @@ try {
     return fr ? (await fr.$('#file_preview[data-bcv-scope="no-context"]')) !== null : false;
   });
   check(attFramed, 'and Canvas serves it, rather than the page-not-found it answers a course context with');
-  // one Escape closes the file, and leaves the sheet it was opened from where it was
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('.bcv-viewer-ov'), null, { timeout: 5000 });
-  check(!!(await page.$('.bcv-sheet--sub .bcv-subs__facts')), 'closing the file leaves the submission sheet it was opened from standing');
-  // surface 3: a segment per attempt, each carrying its own score, latest selected
-  const segs = await page.$$eval('.bcv-subs__segbtn', (els) => els.map((e) => `${e.innerText.replace(/\s+/g, ' ').trim()}${e.classList.contains('is-on') ? ' *' : ''}`));
-  check(segs.join(' | ') === 'Attempt 1 — | Attempt 2 10 / 10 *', `a segment per attempt with its own score, latest selected: ${segs.join(' | ')}`);
-  // comments are filed against an attempt: the latest one's thread is not the first draft's
-  const latestThread = await texts('.bcv-subs__cmbody');
-  check(latestThread.length === 2 && /derivative questions/.test(latestThread[0]) && /Thanks, I see it now/.test(latestThread[1]), `the thread is the selected attempt's: ${latestThread.join(' | ').slice(0, 90)}`);
-  check((await page.$eval('.bcv-subs__cm:last-child', (e) => e.classList.contains('is-mine'))) && !(await page.$eval('.bcv-subs__cm', (e) => e.classList.contains('is-mine'))), 'your own words sit on the right of the thread, the instructor\'s on the left');
-  // an older attempt swaps the facts, the thread and the reply field, and says why
-  await page.click('.bcv-subs__segbtn');
-  await page.waitForSelector('.bcv-subs__old', { timeout: 5000 });
-  const old = await page.evaluate(() => ({
-    note: document.querySelector('.bcv-subs__oldtext').textContent,
-    facts: [...document.querySelectorAll('.bcv-subs__fact')].map((e) => `${e.querySelector('.bcv-subs__factk').textContent}=${e.querySelector('.bcv-subs__factv').textContent}`).join(' | '),
-    thread: [...document.querySelectorAll('.bcv-subs__cmbody')].map((e) => e.textContent),
-    canReply: !!document.querySelector('.bcv-subs__input'),
-    foot: document.querySelector('.bcv-subs__perm').textContent,
-  }));
-  check(/^You are viewing attempt 1\. Only the latest attempt \(2\) is graded\.$/.test(old.note) && /Type=Text entry/.test(old.facts) && /Score=Not graded/.test(old.facts), `an old attempt says so and swaps its facts: ${old.note} · ${old.facts}`);
-  check(old.thread.length === 1 && /only a first pass/.test(old.thread[0]) && !old.canReply && old.foot === 'Comments can only be added on your latest attempt.', `and its own thread, with no reply field: ${JSON.stringify(old.thread)} ${old.foot}`);
-  await page.click('.bcv-subs__latest');
-  await page.waitForFunction(() => !document.querySelector('.bcv-subs__old'), null, { timeout: 5000 });
-  check(!!(await page.$('.bcv-subs__input')), 'Latest brings the reply field back');
+  check(!!(await page.$('.bcv-fb__scorecard')), 'closing the file leaves the feedback screen it was opened from standing');
   // a reply of your own goes to Canvas, pinned to the attempt it was written on, and comes back on it
-  const before = (await texts('.bcv-subs__cmbody')).length;
-  await page.fill('.bcv-subs__input', 'Could you say more about part b?');
-  await page.click('.bcv-subs__send');
-  check(await eventually(async () => (await texts('.bcv-subs__cmbody')).some((t) => /Could you say more about part b\?/.test(t))), 'a comment of your own is sent to Canvas and comes back on the thread');
+  const before = (await texts('.bcv-fb__q .bcv-fb__ctext')).length;
+  await page.fill('.bcv-fb__input', 'Could you say more about part b?');
+  await page.click('.bcv-fb__send');
+  check(await eventually(async () => (await texts('.bcv-fb__ctext')).some((t) => /Could you say more about part b\?/.test(t))), 'a comment of your own is sent to Canvas and comes back on the thread');
   const posted = (await readSub('104', '4001')).submission_comments.find((cm) => /part b\?/.test(cm.comment));
-  check((await texts('.bcv-subs__cmbody')).length === before + 1 && posted && Number(posted.attempt) === 2, `and Canvas has it against the attempt it was written on: ${JSON.stringify(posted && { attempt: posted.attempt })}`);
-  check(/cannot be edited or deleted/.test((await texts('.bcv-subs__perm'))[0] || ''), 'the field says a comment cannot be taken back');
-  await page.keyboard.press('Escape');
-  await page.waitForFunction(() => !document.querySelector('.bcv-sheet--sub'), null, { timeout: 5000 });
+  check((await texts('.bcv-fb__q .bcv-fb__ctext')).length === before + 1 && posted && Number(posted.attempt) === 2, `and Canvas has it against the attempt it was written on: ${JSON.stringify(posted && { attempt: posted.attempt })}`);
+  check(/cannot be edited or deleted/.test((await texts('.bcv-fb__perm'))[0] || ''), 'the field says a comment cannot be taken back');
+  // the way back out, as a quiz's feedback has: the rubric, the assignment, the course
+  const fbBtns = await texts('.bcv-fb__btns .bcv-qz__big');
+  check(fbBtns.join(' | ') === 'See the rubric | Back to the assignment | Back to F26-SPRK 010 103', `the way back out: ${fbBtns.join(' | ')}`);
+  await page.click('.bcv-fb__btns .bcv-qz__big:nth-child(2)');
+  await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
+  check(!page.url().includes('bcv=feedback'), 'and Back to the assignment leaves the feedback screen behind');
+  // ---- Mark as done, and Previous / Next ------------------------------------------------------
+  // Mark as done is offered only where Canvas asks for it: a module item with a must_mark_done
+  // requirement. The button is the requirement's own state, and pressing it makes Canvas's call.
+  const seq = (cid, aid) => fetch(`${BASE}/api/v1/courses/${cid}/module_item_sequence?asset_type=Assignment&asset_id=${aid}`).then((r) => r.text()).then((x) => JSON.parse(x.replace(/^while\(1\);/, '')));
+  check(!(await page.$('.bcv-detail__actions [aria-pressed]')), 'an assignment no module asks a mark for has no Mark as done');
+  await page.goto(`${BASE}/courses/101/assignments/1003`);
+  await page.waitForSelector('.bcv-detail__actions [aria-pressed]', { timeout: 10000 });
+  const doneBtn = await page.$eval('.bcv-detail__actions [aria-pressed]', (e) => ({ text: e.textContent.trim(), pressed: e.getAttribute('aria-pressed'), done: e.classList.contains('is-done') }));
+  check(doneBtn.text === 'Mark as done' && doneBtn.pressed === 'false' && !doneBtn.done && (await seq('101', '1003')).items[0].current.completion_requirement.completed === false, `a must_mark_done assignment offers Mark as done, unmarked: ${JSON.stringify(doneBtn)}`);
+  await page.click('.bcv-detail__actions [aria-pressed]');
+  check(await eventually(async () => (await page.$eval('.bcv-detail__actions [aria-pressed]', (e) => e.getAttribute('aria-pressed'))) === 'true'), 'pressing it marks the item done');
+  const afterDone = await page.$eval('.bcv-detail__actions [aria-pressed]', (e) => ({ text: e.textContent.trim(), done: e.classList.contains('is-done') }));
+  check(afterDone.text === 'Done' && afterDone.done && (await seq('101', '1003')).items[0].current.completion_requirement.completed === true, `the button says Done, green, and Canvas has the mark: ${JSON.stringify(afterDone)}`);
+  await page.click('.bcv-detail__actions [aria-pressed]');
+  // the button repaints once Canvas has answered and the caches are cleared: wait for it, not for the mock
+  check(await eventually(async () => (await page.$eval('.bcv-detail__actions [aria-pressed]', (e) => e.textContent.trim())) === 'Mark as done') && (await seq('101', '1003')).items[0].current.completion_requirement.completed === false, 'pressing Done takes the mark back');
+  // Previous / Next go through the assignments in the order the Assignments tab lists them
+  const groups = await fetch(`${BASE}/api/v1/courses/101/assignment_groups?include[]=assignments`).then((r) => r.text()).then((x) => JSON.parse(x.replace(/^while\(1\);/, '')));
+  const ordered = groups.flatMap((g) => g.assignments || []).filter((a) => a.published !== false).sort((x, y) => ((Date.parse(x.due_at) || Infinity) - (Date.parse(y.due_at) || Infinity)) || String(x.name).localeCompare(String(y.name)));
+  const at1003 = ordered.findIndex((a) => String(a.id) === '1003');
+  const navBtns = await page.$$eval('.bcv-detail__nav .bcv-detail__navbtn', (els) => els.map((e) => ({ dir: e.classList.contains('bcv-detail__navbtn--prev') ? 'prev' : 'next', kicker: e.querySelector('.bcv-detail__navkicker').textContent, name: e.querySelector('.bcv-detail__navname').textContent })));
+  const want = [ordered[at1003 - 1] && { dir: 'prev', kicker: 'Previous', name: ordered[at1003 - 1].name }, ordered[at1003 + 1] && { dir: 'next', kicker: 'Next', name: ordered[at1003 + 1].name }].filter(Boolean);
+  check(JSON.stringify(navBtns) === JSON.stringify(want), `Previous and Next name the assignments either side, in the tab's order: ${navBtns.map((b) => `${b.kicker}: ${b.name}`).join(' | ')}`);
+  await page.click('.bcv-detail__nav .bcv-detail__navbtn--next');
+  // the old title is still on screen while the next page comes: wait for the new one, not for a title
+  const nextOpened = await page.waitForFunction((x) => location.pathname.endsWith(`/assignments/${x.id}`) && document.querySelector('.bcv-detail__title')?.textContent === x.name, ordered[at1003 + 1], { timeout: 10000 }).then(() => true).catch(() => false);
+  check(nextOpened, `Next opens the next assignment: ${(await texts('.bcv-detail__title'))[0]}`);
+  await page.goto(`${BASE}/courses/104/assignments/4001`); // the rubric checks below read this page
+  await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
   check(!(await page.$('.bcv-rubg')) && (await texts('.bcv-detail__actions .bcv-rubbtn'))[0] === 'Rubric', 'the rubric keeps its own button, and is not on the page until it is asked for');
   await page.click('.bcv-detail__actions .bcv-rubbtn');
   await page.waitForSelector('.bcv-sheet--rub .bcv-rubg__row', { timeout: 8000 });
@@ -1220,7 +1260,7 @@ try {
   // modules
   await tab('modules');
   await page.waitForSelector('.bcv-module', { timeout: 10000 });
-  check((await page.$$('.bcv-module')).length === 1 && (await texts('.bcv-module__item')).length === 2, 'modules list');
+  check((await page.$$('.bcv-module')).length === 1 && (await texts('.bcv-module__item')).length === 3, `modules list: ${(await texts('.bcv-module__item')).length} items (the page, the quiz, and the assignment the module asks a mark for)`);
   // Back means where you came from: the same page says Modules when opened from Modules, Pages when
   // opened from Pages, and Pages (the list it belongs to) when opened straight in with nothing before
   await clickScreen('.bcv-module__item[href*="/pages/course-information"]');

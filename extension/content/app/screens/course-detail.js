@@ -23,7 +23,71 @@
   const attemptsFact = (a, s) => (a.allowed_attempts > 0 ? `${s.attempt || 0} of ${a.allowed_attempts}`
     : a.allowed_attempts === -1 ? `${s.attempt || 0} of unlimited` : null);
 
+  /** The submission sheet (openSubmissions, below) is kept but is no longer what the mark opens.
+   *  The file preview it framed is Canvas's own document service, which answers "service
+   *  unavailable" often enough that the sheet read as broken, and a sheet has to hold everything at
+   *  once. The mark now goes to the feedback screen — the same shape as a quiz's — where a file is
+   *  opened or downloaded rather than framed. Set this to true to bring the sheet back. */
+  const SUB_SHEET = false;
+  /** The mark's destination: the feedback screen, or the sheet when it is switched back on. */
+  const openMark = (ctx, c, a, s) => (SUB_SHEET
+    ? openSubmissions(ctx, c, a, s)
+    : ctx.app.go(`${c.url}/assignments/${a.id}?bcv=feedback`));
+
   const D = {};
+
+  /** "Mark as done", where Canvas asks for it: an assignment that is a module item with a
+   *  must_mark_done requirement has nothing to hand in, and the mark is the whole of the work. The
+   *  button is the requirement's own state and flips it — pressed once more it takes the mark back,
+   *  as Canvas's own does. Absent for every other assignment, because the call would do nothing. */
+  function doneButton(ctx, c, a, item, { cls = 'bcv-btn', primary = false } = {}) {
+    const req = item?.completion_requirement;
+    if (!item || req?.type !== 'must_mark_done') return null;
+    let done = !!req.completed;
+    let busy = false;
+    const btn = h('button', { type: 'button', class: cls, 'aria-pressed': String(done) });
+    const paint = () => {
+      btn.replaceChildren(U.svg(done ? 'M20 6L9 17l-5-5' : 'M12 4a8 8 0 100 16 8 8 0 000-16z', { size: 14, stroke: 'currentColor', width: 2.2 }), done ? 'Done' : 'Mark as done');
+      btn.classList.toggle('is-done', done);
+      btn.classList.toggle(cls === 'bcv-btn' ? 'bcv-btn--primary' : 'is-primary', primary && !done);
+      btn.setAttribute('aria-pressed', String(done));
+      btn.title = done ? 'Marked as done — press to take that back' : 'Mark this assignment as done';
+    };
+    btn.addEventListener('click', async () => {
+      if (busy) return;
+      busy = true;
+      btn.disabled = true;
+      const want = !done;
+      try {
+        await store.markItemDone(c.id, item.module_id, item.id, want, { assetId: a.id });
+        done = want;
+        paint();
+      } catch (e) {
+        U.toast(`Canvas did not take the mark: ${e?.message || e}`, { error: true });
+      } finally {
+        busy = false;
+        btn.disabled = false;
+      }
+    });
+    paint();
+    return btn;
+  }
+
+  /** The assignments either side of this one, in the order the Assignments tab lists them, as a
+   *  Previous / Next row: each names where it goes, and an edge with nothing beyond it keeps its
+   *  side empty rather than letting the other button drift across. */
+  function navRow(app, c, nav, cls = 'bcv-detail__nav') {
+    if (!nav || (!nav.prev && !nav.next)) return null;
+    const one = (x, dir) => (x ? h('button', {
+      type: 'button', class: `${cls}btn ${cls}btn--${dir}`, title: x.name,
+      onclick: () => app.go(`${c.url}/assignments/${x.id}`),
+    }, [
+      dir === 'prev' ? U.svg(IC.back, { size: 14, stroke: 'currentColor', width: 2.1 }) : null,
+      U.el(`${cls}body`, [U.text(`${cls}kicker`, dir === 'prev' ? 'Previous' : 'Next', 'span'), U.text(`${cls}name bcv-ellip`, x.name, 'span')]),
+      dir === 'next' ? U.svg(IC.chevron, { size: 14, stroke: 'currentColor', width: 2.1 }) : null,
+    ]) : h('span', { class: `${cls}gap` }));
+    return U.el(cls, [one(nav.prev, 'prev'), one(nav.next, 'next')]);
+  }
 
   D.assignment = async (ctx, shell) => {
     const { app, route } = ctx;
@@ -32,10 +96,16 @@
     const main = mainCol(), side = sideCol();
     b.append(main, side);
     main.append(U.loading());
-    const [a, sub] = await Promise.all([store.assignment(c.id, route.arg).catch(() => null), store.submission(c.id, route.arg).catch(() => null)]);
+    // the item's place in its modules (for Mark as done) and among the course's assignments (for
+    // Previous / Next) come with it; neither is allowed to hold the page up or fail it
+    const [a, sub, modItem, groups] = await Promise.all([
+      store.assignment(c.id, route.arg).catch(() => null), store.submission(c.id, route.arg).catch(() => null),
+      store.moduleItemFor(c.id, 'Assignment', route.arg).catch(() => null), store.assignmentGroups(c.id).catch(() => null),
+    ]);
     if (!ctx.alive()) return b;
     if (!a) return main.replaceChildren(U.errorBox('This assignment could not be loaded.')) || b;
     const s = sub || a.submission || {};
+    const nav = store.assignmentNeighbours(groups, a.id);
     const types = (a.submission_types || []).map((t) => ({ online_upload: 'a file upload', online_text_entry: 'a text entry', online_url: 'a website URL', media_recording: 'a media recording', discussion_topic: 'a discussion post', online_quiz: 'a quiz', external_tool: 'an external tool', on_paper: 'on paper', none: 'nothing to submit', student_annotation: 'an annotation' }[t] || t)).join(', ');
     shell.reader = { title: a.name, html: a.description || '' };
     const isTool = (a.submission_types || []).includes('external_tool');
@@ -57,7 +127,7 @@
     const held = graded && s.posted_at === null;
     const feedback = (s.submission_comments || []).length || Object.keys(s.rubric_assessment || {}).length;
     // the phone draws the item page its own way (the iPhone mockup)
-    if (BCV.phone?.active()) return BCV.phone.assignment(ctx, shell, { a, s, types, available, isTool, toolNewTab, toolLaunch, nativeSubmit, canvasOnly, attemptsLeft, status, posted, held });
+    if (BCV.phone?.active()) return BCV.phone.assignment(ctx, shell, { a, s, types, available, isTool, toolNewTab, toolLaunch, nativeSubmit, canvasOnly, attemptsLeft, status, posted, held, modItem, nav });
     // Handing in lives inside the assignment (mockup 11): the block sits at the end of the same
     // scroll as the instructions, built from the assignment already loaded for this page. The
     // "Submit assignment" button and ?bcv=submit (a To Do row) just bring it into view.
@@ -78,7 +148,7 @@
         // unposted 0 reads exactly like a real one.
         U.el('bcv-detail__head', [
           h('h2', { class: 'bcv-detail__title bcv-pretty', text: a.name }),
-          posted ? h('button', { type: 'button', class: 'bcv-detail__grade', title: 'Submission details and comments', onclick: () => openSubmissions(ctx, c, a, s) }, [
+          posted ? h('button', { type: 'button', class: 'bcv-detail__grade', title: 'Feedback, attempts and comments', onclick: () => openMark(ctx, c, a, s) }, [
             U.el('bcv-detail__gradev', [
               h('span', { class: 'bcv-detail__gradescore', text: store.fmtPts(s.score) }),
               h('span', { class: 'bcv-detail__gradeof', text: `/ ${a.points_possible ?? '—'}` }),
@@ -88,7 +158,7 @@
               U.text('bcv-detail__gradewhen', s.graded_at ? U.fmtAt(s.graded_at) : 'Marked', 'span'),
             ]),
             U.chev(),
-          ]) : (held ? h('button', { type: 'button', class: 'bcv-detail__grade bcv-detail__grade--held', title: 'Submission details and comments', onclick: () => openSubmissions(ctx, c, a, s) }, [
+          ]) : (held ? h('button', { type: 'button', class: 'bcv-detail__grade bcv-detail__grade--held', title: 'Feedback, attempts and comments', onclick: () => openMark(ctx, c, a, s) }, [
             h('div', { class: 'bcv-detail__gradeside' }, [
               U.text('bcv-detail__gradepc', 'Not yet posted', 'span'),
               U.text('bcv-detail__gradewhen', 'Your instructor has not released it', 'span'),
@@ -108,8 +178,11 @@
           isTool && !toolNewTab ? U.btn('Open in Canvas', { icon: IC.external, onClick: () => app.go(nativeHref(`${c.url}/assignments/${a.id}`)) }) : null,
           // how the marks are decided, beside the decision to hand work in
           a.rubric?.length ? U.btn('Rubric', { icon: IC.sheet, cls: 'bcv-rubbtn', onClick: () => CS().openRubric(a, s) }) : null,
+          // where Canvas asks for a mark rather than work, the mark is the page's action
+          doneButton(ctx, c, a, modItem, { primary: !nativeSubmit && !isTool && !canvasOnly }),
         ]),
         a.description ? CS().prose(a.description) : (isTool ? null : U.text('bcv-hint', 'No description.')),
+        navRow(app, c, nav),
       ]), 'bcv-card--22'),
       // External-tool assignments (Knewton, Gradescope, …) are done inside the tool: embed the launch.
       isTool && !toolNewTab ? U.card(U.el('bcv-detail', [
@@ -499,8 +572,11 @@
     ov.focus();
     return { close };
   }
-  D.openSubmissions = openSubmissions;
+  D.openSubmissions = openSubmissions; // kept, and reachable, but no longer what the mark opens
+  D.openMark = openMark;
   D.attemptsFact = attemptsFact; // the phone draws the same five facts, from the same fields
+  D.doneButton = doneButton;
+  D.navRow = navRow;
 
   BCV.screens.courseDetail = D;
 })();

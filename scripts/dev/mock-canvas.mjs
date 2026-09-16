@@ -311,7 +311,23 @@ const modules = {
     // built last, due first: the one module whose course order and date order disagree
     { id: 'm4', name: 'Week 0: Orientation', state: 'completed', position: 4, items: [{ id: 'i7', type: 'Assignment', title: 'Safety quiz', html_url: '/courses/102/assignments/2001', content_details: { due_at: at(-21, 23, 59), points_possible: 5 } }] },
   ],
-  101: [{ id: 'm11', name: 'Unit 1: Functions', state: 'started', position: 1, items: [{ id: 'i11', type: 'Page', title: 'Course Information', html_url: '/courses/101/pages/course-information' }, { id: 'i12', type: 'Quiz', title: 'Lec06-PreQuiz', html_url: '/courses/101/quizzes/9011', content_details: { due_at: at(1, 10, 30), points_possible: 17 } }] }],
+  101: [{ id: 'm11', name: 'Unit 1: Functions', state: 'started', position: 1, items: [{ id: 'i11', type: 'Page', title: 'Course Information', html_url: '/courses/101/pages/course-information' }, { id: 'i12', type: 'Quiz', title: 'Lec06-PreQuiz', html_url: '/courses/101/quizzes/9011', content_details: { due_at: at(1, 10, 30), points_possible: 17 } },
+    // an assignment with nothing to hand in: the module asks for a mark instead, as Canvas's "Mark as done"
+    { id: 'i13', type: 'Assignment', content_id: '1003', title: 'Dis00', html_url: '/courses/101/assignments/1003', completion_requirement: { type: 'must_mark_done', completed: false } }] }],
+};
+/** Canvas's module_item_sequence: the module item an asset is, and the items either side of it. */
+function moduleItemSequence(courseId, assetType, assetId) {
+  const flat = (modules[courseId] || []).flatMap((mod) => (mod.items || []).filter((it) => it.type !== 'SubHeader').map((it) => ({ ...it, module_id: mod.id })));
+  const re = new RegExp(`/${{ Assignment: 'assignments', Quiz: 'quizzes', Page: 'pages', Discussion: 'discussion_topics', File: 'files' }[assetType] || assetType}/${assetId}$`);
+  const i = flat.findIndex((it) => it.type === assetType && re.test(it.html_url || ''));
+  if (i < 0) return { items: [], modules: [] };
+  return { items: [{ prev: flat[i - 1] || null, current: flat[i], next: flat[i + 1] || null }], modules: (modules[courseId] || []).map((m) => ({ id: m.id, name: m.name })) };
+}
+const setItemDone = (courseId, mid, iid, done) => {
+  const it = (modules[courseId] || []).find((m) => m.id === mid)?.items.find((x) => x.id === iid);
+  if (!it || it.completion_requirement?.type !== 'must_mark_done') return null;
+  it.completion_requirement.completed = done;
+  return { ...it, module_id: mid };
 };
 const people = (courseId) => [
   ['u1', 'Victor Adinna', null, 'Discussion-32D · Lecture-30', 'StudentEnrollment'], ['u2', 'Alan Aguilar', 'He/Him/His', 'Discussion-24D · Lecture-20', 'StudentEnrollment'], ['u3', 'Wail Ahmed', null, 'Discussion-22D · Lecture-20', 'StudentEnrollment'],
@@ -655,6 +671,9 @@ on('GET', /^\/__mock\/quizsub\/([\w-]+)$/, (url, m) => { const s = findSub(m[1])
 on('GET', /^\/api\/v1\/courses\/(\w+)\/quizzes\/(\w+)$/, (url, m) => quizzes(m[1]).find((q) => q.id === m[2]) || null);
 on('GET', /^\/api\/v1\/courses\/(\w+)\/quizzes$/, (url, m) => quizzes(m[1]));
 on('GET', /^\/api\/v1\/courses\/(\w+)\/modules$/, (url, m) => modules[m[1]] || []);
+on('GET', /^\/api\/v1\/courses\/(\w+)\/module_item_sequence$/, (url, m) => moduleItemSequence(m[1], url.searchParams.get('asset_type'), url.searchParams.get('asset_id')));
+on('PUT', /^\/api\/v1\/courses\/(\w+)\/modules\/(\w+)\/items\/(\w+)\/done$/, (url, m) => setItemDone(m[1], m[2], m[3], true));
+on('DELETE', /^\/api\/v1\/courses\/(\w+)\/modules\/(\w+)\/items\/(\w+)\/done$/, (url, m) => setItemDone(m[1], m[2], m[3], false));
 
 // ---- handing work in ------------------------------------------------------------------------
 const pendingUploads = new Map(); // upload token -> preflight

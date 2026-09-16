@@ -530,31 +530,49 @@ try {
   }, BASE);
   check(phFacts.length === 4 && /^Due /.test(phFacts[0]) && phFacts[1] === `Points ${webFacts.points}` && phFacts[3] === `Attempts ${webFacts.attempts}` && !webFacts.available && !phFacts.some((t) => /^Available/.test(t)), `the phone draws the same facts, and none Canvas has no value for: ${phFacts.join(' | ')}`);
   await shot('08c-assignment-graded');
-  // and the chip opens what is behind the mark: the attempts, and the thread
+  // and the chip opens what is behind the mark: the feedback screen, the same shape as a quiz's,
+  // in the course column rather than as a sheet (the sheet is kept in the build, off)
   await page.click('.bcv-ph-grade');
-  await page.waitForSelector('.bcv-sheet--sub .bcv-subs__facts', { timeout: 8000 });
-  const phSub = await page.evaluate(() => ({
-    segs: [...document.querySelectorAll('.bcv-subs__segbtn')].map((e) => e.innerText.replace(/\s+/g, ' ').trim()),
-    facts: document.querySelectorAll('.bcv-subs__fact').length,
-    reply: !!document.querySelector('.bcv-subs__input'),
-    fits: document.querySelector('.bcv-sheet--sub').getBoundingClientRect().width <= window.innerWidth,
-    // a segment's score is the point of the switcher: it must be on screen, inside its own segment
-    scores: [...document.querySelectorAll('.bcv-subs__segbtn')].map((b) => {
-      const sub = b.querySelector('.bcv-subs__segsub'), br = b.getBoundingClientRect(), sr = sub.getBoundingClientRect();
-      return { text: sub.textContent, w: Math.round(sr.width), h: Math.round(sr.height), inside: sr.right <= br.right + 1 && sr.bottom <= br.bottom + 1, under: sr.top >= b.querySelector('.bcv-subs__seglabel').getBoundingClientRect().bottom - 1 };
-    }),
+  await page.waitForSelector('.bcv-fb__scorecard', { timeout: 10000 });
+  const phFb = await page.evaluate(() => ({
+    url: location.search, sheet: !!document.querySelector('.bcv-sheet--sub'),
+    score: document.querySelector('.bcv-fb__big').textContent,
+    cards: [...document.querySelectorAll('.bcv-fb__q .bcv-fb__qn')].map((e) => e.textContent),
+    files: [...document.querySelectorAll('.bcv-fb__file')].map((e) => e.innerText.replace(/\s+/g, ' ').trim()),
+    reply: !!document.querySelector('.bcv-fb__input'),
+    btns: [...document.querySelectorAll('.bcv-fb__btns .bcv-qz__big')].map((e) => e.textContent),
+    fits: [...document.querySelectorAll('.bcv-fb__q, .bcv-fb__scorecard, .bcv-fb__file')].every((e) => e.getBoundingClientRect().right <= window.innerWidth + 1),
   }));
-  check(phSub.segs.length === 2 && /^Attempt 2 /.test(phSub.segs[1]) && phSub.facts === 5 && phSub.reply && phSub.fits, `the mark opens the attempts, the facts and the reply field on a phone, within the screen: ${JSON.stringify({ ...phSub, scores: undefined })}`);
-  check(phSub.scores.length === 2 && phSub.scores.every((s) => s.h > 0 && s.w > 0 && s.inside && s.under) && phSub.scores[1].text === '10 / 10', `each segment carries its own score, under its label and inside its own segment: ${JSON.stringify(phSub.scores)}`);
-  check(await noOverflow(), 'no horizontal overflow with the submission sheet open');
-  await shot('08d-submission-sheet');
-  await page.keyboard.press('Escape');
-  await page.waitForFunction(() => !document.querySelector('.bcv-sheet--sub'), null, { timeout: 5000 });
+  check(/bcv=feedback/.test(phFb.url) && !phFb.sheet && phFb.score === '10 / 10' && phFb.cards.join(' | ') === 'Attempt 2 | Attempt 1' && phFb.reply, `the mark opens the feedback screen on a phone: ${JSON.stringify({ ...phFb, files: undefined, btns: undefined })}`);
+  check(phFb.files.length === 1 && /Preview Download$/.test(phFb.files[0]) && phFb.btns.length === 3 && phFb.fits && await noOverflow(), `with the file both ways, the way back, and everything inside the screen: ${phFb.files[0]} · ${phFb.btns.join(' | ')}`);
+  await shot('08d-feedback');
+  await page.goto(`${BASE}/courses/104/assignments/4001`); // the rubric check below reads the page itself
+  await ready();
+  await page.waitForSelector('.bcv-ph-bigbtn.bcv-rubbtn', { timeout: 15000 });
   await page.click('.bcv-ph-bigbtn.bcv-rubbtn');
   await page.waitForSelector('.bcv-ph-sheet--rub .bcv-rubg__cell.is-got', { timeout: 8000 });
   const got = await page.$eval('.bcv-rubg__row', (e) => ({ got: e.querySelector('.bcv-rubg__cell.is-got')?.innerText.replace(/\s+/g, ' ').trim(), pts: e.querySelector('.bcv-rubg__ptsv')?.textContent }));
   check(/^3 Partial/.test(got.got || '') && got.pts === '4 / 6', `and it rings the level the work was given: ${JSON.stringify(got)}`);
   await closeSheet();
+
+  // ---- Mark as done, and Previous / Next, on a phone -------------------------------------------
+  await page.goto(`${BASE}/courses/101/assignments/1003`);
+  await ready();
+  await page.waitForSelector('.bcv-ph-done', { timeout: 15000 });
+  const phDone = await page.$eval('.bcv-ph-done', (e) => ({ text: e.textContent.trim(), pressed: e.getAttribute('aria-pressed'), big: e.classList.contains('bcv-ph-bigbtn') }));
+  check(phDone.text === 'Mark as done' && phDone.pressed === 'false' && phDone.big, `a must_mark_done assignment offers Mark as done as a big button: ${JSON.stringify(phDone)}`);
+  await press('.bcv-ph-done');
+  check(await eventually(async () => (await page.$eval('.bcv-ph-done', (e) => e.getAttribute('aria-pressed') === 'true' && e.textContent.trim() === 'Done'))), 'pressing it marks the item done and the button says so');
+  await press('.bcv-ph-done'); // and back, so the desktop suite starts from the same state
+  await eventually(async () => (await page.$eval('.bcv-ph-done', (e) => e.getAttribute('aria-pressed'))) === 'false');
+  const phNav = await page.$$eval('.bcv-ph-nav .bcv-ph-navbtn', (els) => els.map((e) => `${e.querySelector('.bcv-ph-navkicker').textContent}: ${e.querySelector('.bcv-ph-navname').textContent}`));
+  check(phNav.length >= 1 && phNav.every((x) => /^(Previous|Next): .+/.test(x)) && await noOverflow(), `Previous / Next sit at the end of the page: ${phNav.join(' | ')}`);
+  await shot('08e-assignment-done-nav');
+  await press('.bcv-ph-nav .bcv-ph-navbtn--next');
+  // the old title is still on screen while the next page comes: wait for the new one by name
+  const nextName = phNav.find((x) => x.startsWith('Next: ')).slice(6);
+  const phNext = await page.waitForFunction((name) => !location.pathname.endsWith('/assignments/1003') && document.querySelector('.bcv-ph-item__title')?.textContent === name, nextName, { timeout: 10000 }).then(() => true).catch(() => false);
+  check(phNext, `Next opens the next assignment: ${(await texts('.bcv-ph-item__title'))[0]}`);
 
   // ---- "Open in Canvas" ---------------------------------------------------------------------------
   // A phone has no address bar to type its way out of a Canvas page with, so the way back has to be

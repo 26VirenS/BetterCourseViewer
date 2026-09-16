@@ -1064,6 +1064,31 @@
     return C.cached(`modules:${id}`, 10 * MIN, () =>
       C.get(`/api/v1/courses/${id}/modules`, { params: { per_page: 50, include: ['items', 'content_details'] }, all: true, maxPages: 4 }), { force, refresh });
   }
+  /** The module item an assignment (or page, quiz…) is, with its completion requirement — Canvas's
+   *  own module_item_sequence, which is also what its page reads to decide whether to offer "Mark as
+   *  done". Null when the item is in no module, or Canvas does not answer. */
+  function moduleItemFor(id, type, assetId, { force = false } = {}) {
+    return C.cached(`modseq:${id}:${type}:${assetId}`, 2 * MIN, () =>
+      C.get(`/api/v1/courses/${id}/module_item_sequence`, { params: { asset_type: type, asset_id: assetId } })
+        .then((r) => (r?.items || [])[0]?.current || null).catch(() => null), { force });
+  }
+  /** Mark a module item done, or take that back: the same call Canvas's own "Mark as done" makes.
+   *  The item's module and the sequence it came from are read again afterwards, so every screen
+   *  that counts completed items sees it. */
+  async function markItemDone(id, mid, iid, done, { type = 'Assignment', assetId = null } = {}) {
+    if (done) await C.put(`/api/v1/courses/${id}/modules/${mid}/items/${iid}/done`, {});
+    else await C.del(`/api/v1/courses/${id}/modules/${mid}/items/${iid}/done`);
+    await Promise.all([C.invalidate(`modules:${id}`), assetId ? C.invalidate(`modseq:${id}:${type}:${assetId}`) : null, invalidatePlanner()]);
+  }
+  /** The assignments either side of one, in the order the Assignments tab lists them: by due date,
+   *  the undated last, and by name between equals. From the groups already loaded for the tab. */
+  function assignmentNeighbours(groups, aid) {
+    const t = (a) => U.parse(a.due_at);
+    const list = (groups || []).flatMap((g) => g.assignments || []).filter((a) => a.published !== false)
+      .sort((x, y) => ((t(x) || Infinity) - (t(y) || Infinity)) || String(x.name || '').localeCompare(String(y.name || '')));
+    const i = list.findIndex((a) => String(a.id) === String(aid));
+    return i < 0 ? { prev: null, next: null } : { prev: list[i - 1] || null, next: list[i + 1] || null };
+  }
 
   // ---- grades model -------------------------------------------------------------------------------
   /** Build the grade picture: one ring per group that has graded, counted work. */
@@ -1186,7 +1211,7 @@
     conversations, conversation, markRead, setStarred, replyTo, compose, searchRecipients, invalidateInbox,
     course, tabs, frontPage, syllabus, courseTodo, ignoreTodo, courseStream, assignments, assignment, submission, assignmentGroups, progress,
     announcements, discussions, discussion, discussionView, postEntry, markTopicRead, people, sections, courseGroups, pages, page,
-    rootFolder, folderContents, folderByPath, file, quizzes, quiz, quizSubmissions, quizApi, modules, gradeModel, fmtPts,
+    rootFolder, folderContents, folderByPath, file, quizzes, quiz, quizSubmissions, quizApi, modules, moduleItemFor, markItemDone, assignmentNeighbours, gradeModel, fmtPts,
     notifications, notifState, setNotifState, notifUnread,
     homeworkTools, uploadSubmissionFile, uploadSubmissionFileFromUrl, submitAssignment, commentOnSubmission, invalidateAssignment, quizAttemptLimit,
   };
