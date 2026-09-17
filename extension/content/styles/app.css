@@ -135,9 +135,7 @@ html[data-bcv-theme="dark"] .bcv-skel { --bcv-skel: linear-gradient(90deg, rgba(
 /* (folded in both directions: at max-height 0 alone the row would still lend the pill its width) */
 .bcv-look__persist { display: flex; align-items: center; gap: 10px; max-height: 0; max-width: 0; padding: 0; opacity: 0; border-top: 1px solid transparent; overflow: hidden; transition: max-height .22s ease, max-width .22s ease, opacity .18s ease, padding .22s ease, border-color .22s ease; }
 #bcv-look:hover .bcv-look__persist, #bcv-look:has(:focus-visible) .bcv-look__persist { max-height: 44px; max-width: 260px; padding: 5px 7px 6px 6px; opacity: 1; border-top-color: rgba(255,255,255,.12); }
-.bcv-look__pbody { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.bcv-look__ptext { font: 600 10.5px/1.2 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif; white-space: nowrap; }
-.bcv-look__phint { font: 400 9.5px/1.2 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif; color: rgba(255,255,255,.62); white-space: nowrap; }
+.bcv-look__ptext { flex: 1; min-width: 0; font: 600 10.5px/1.2 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif; white-space: nowrap; }
 .bcv-look__sw--small { width: 18px; height: 11px; }
 .bcv-look__sw--small .bcv-look__knob { width: 7px; height: 7px; }
 .bcv-look__persist.is-on .bcv-look__sw { background: #34c759; }
@@ -145,6 +143,32 @@ html[data-bcv-theme="dark"] .bcv-skel { --bcv-skel: linear-gradient(90deg, rgba(
 /* the phone layout's own header has the corner; the setup and the tour cover the page */
 html.bcv-phone.bcv-on #bcv-look, html.bcv-setup-open #bcv-look, html.bcv-touring #bcv-look { display: none; }
 @media (max-width: 700px) { #bcv-look .bcv-look__text { display: none; } }
+
+/* ---- Away Refresh: the stale-page reload, announced first. A pill floats down from the top — a
+ * dial counting three seconds down in orange (a ring that empties, a hand that sweeps once round, a
+ * shorter one that steps), "Away Refresh", "Click to cancel" — and the reload takes it away. ---- */
+#bcv-away { position: fixed; top: calc(10px + env(safe-area-inset-top, 0px)); left: 50%; z-index: 2147482001; margin: 0; padding: 0; transform: translate(-50%, -160%); opacity: 0; pointer-events: none; transition: transform .46s cubic-bezier(.2,1.1,.3,1), opacity .24s ease; }
+#bcv-away.is-in { transform: translate(-50%, 0); opacity: 1; pointer-events: auto; }
+#bcv-away.is-out { transform: translate(-50%, -160%); opacity: 0; pointer-events: none; transition: transform .32s cubic-bezier(.5,0,.8,.5), opacity .22s ease; }
+.bcv-away__btn { display: flex; align-items: center; gap: 12px; margin: 0; height: 52px; padding: 0 20px 0 9px; border: 1px solid rgba(255,255,255,.14); border-radius: 26px; background: rgba(28,28,30,.9); -webkit-backdrop-filter: blur(18px) saturate(1.4); backdrop-filter: blur(18px) saturate(1.4); box-shadow: 0 10px 34px rgba(0,0,0,.34); color: #fff; cursor: pointer; text-align: left; font: 500 13px/1 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif; letter-spacing: -.01em; text-transform: none; }
+.bcv-away__btn:active { opacity: .85; }
+.bcv-away__dial { flex: none; width: 36px; height: 36px; }
+.bcv-away__dial svg { display: block; width: 36px; height: 36px; overflow: visible; }
+.bcv-away__track { fill: none; stroke: rgba(255,159,10,.22); stroke-width: 2.4; }
+.bcv-away__ring { fill: none; stroke: #ff9f0a; stroke-width: 2.4; stroke-linecap: butt; stroke-dasharray: 94.25; stroke-dashoffset: 0; transform: rotate(-90deg); transform-origin: 18px 18px; animation: bcv-away-ring 3s linear forwards; }
+.bcv-away__tick { stroke: rgba(255,255,255,.26); stroke-width: 1; stroke-linecap: round; }
+.bcv-away__tick--q { stroke: rgba(255,255,255,.6); stroke-width: 1.4; }
+.bcv-away__hand { stroke: #fff; stroke-width: 1.6; stroke-linecap: round; transform-origin: 18px 18px; }
+.bcv-away__hand--long { animation: bcv-away-sweep 3s linear forwards; }
+.bcv-away__hand--short { stroke-width: 2.1; animation: bcv-away-step 3s linear forwards; }
+.bcv-away__pin { fill: #ff9f0a; }
+.bcv-away__body { display: flex; flex-direction: column; gap: 3px; }
+.bcv-away__title { font: 600 13.5px/1.15 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif; letter-spacing: -.012em; color: #fff; white-space: nowrap; }
+.bcv-away__hint { font: 400 11px/1.2 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif; color: rgba(255,255,255,.55); white-space: nowrap; }
+@keyframes bcv-away-ring { to { stroke-dashoffset: 94.25; } }
+@keyframes bcv-away-sweep { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes bcv-away-step { from { transform: rotate(0deg); } to { transform: rotate(90deg); } }
+@media (prefers-reduced-motion: reduce) { #bcv-away, #bcv-away.is-in, #bcv-away.is-out { transform: translate(-50%, 0); transition: opacity .2s ease; } }
 
 html.bcv-on { background: var(--bcv-bg) !important; }
 html.bcv-on body { margin: 0 !important; padding: 0 !important; background: var(--bcv-bg) !important; overflow: auto !important; min-height: 100vh; }

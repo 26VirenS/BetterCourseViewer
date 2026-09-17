@@ -795,7 +795,57 @@
   function wakeStale() {
     if (self.BCVBridge?.native) return false; // the app holds its own session
     if (inQuiz() || quizHere()) { here(); return false; } // never on a quiz, and no note either
-    return recover('You were away for a while');
+    return awayRefresh();
+  }
+  // The reload is announced before it happens: a pill floats down from the top of the page — a dial
+  // counting three seconds down in orange (a ring that empties, a hand that sweeps once round, a
+  // shorter one that steps), "Away Refresh", "Click to cancel" — and the page reloads when the count
+  // runs out. A press on the pill (or Escape) stands the reload down, and the page counts as awake
+  // again, so the next press acts as itself. Where a reload would lose work or has just been tried
+  // there is no pill: the note says so, as before. Returns whether a reload is coming.
+  const AWAY_COUNT = 3000;
+  const AWAY_WHY = 'You were away for a while';
+  let away = null; // the pill on show: { el, timer }
+  function awayCancel() {
+    if (!away) return;
+    const { el, timer } = away;
+    away = null;
+    clearTimeout(timer);
+    here();
+    el.classList.remove('is-in');
+    el.classList.add('is-out');
+    setTimeout(() => el.remove(), 400);
+  }
+  function awayRefresh() {
+    if (away) return true; // already counting
+    if (inQuiz() || quizHere() || state.submitOpen || typing() || recentlyReloaded()) return recover(AWAY_WHY); // the note, and no reload
+    const ticks = [];
+    for (let i = 0; i < 12; i++) {
+      const a = (i * Math.PI) / 6;
+      const q = i % 3 === 0; // the quarter hours, a little longer and brighter
+      const s = Math.sin(a);
+      const c = Math.cos(a);
+      const r1 = q ? 10 : 10.8;
+      const f = (n) => n.toFixed(2);
+      ticks.push(`<line class="bcv-away__tick${q ? ' bcv-away__tick--q' : ''}" x1="${f(18 + r1 * s)}" y1="${f(18 - r1 * c)}" x2="${f(18 + 12.4 * s)}" y2="${f(18 - 12.4 * c)}"/>`);
+    }
+    const dial = `<svg viewBox="0 0 36 36" aria-hidden="true"><circle class="bcv-away__track" cx="18" cy="18" r="15"/><circle class="bcv-away__ring" cx="18" cy="18" r="15"/>${ticks.join('')}<line class="bcv-away__hand bcv-away__hand--short" x1="18" y1="18" x2="18" y2="10.5"/><line class="bcv-away__hand bcv-away__hand--long" x1="18" y1="18" x2="18" y2="7"/><circle class="bcv-away__pin" cx="18" cy="18" r="1.7"/></svg>`;
+    const btn = h('button', { type: 'button', class: 'bcv-away__btn', 'aria-label': 'Away refresh in three seconds. Press to cancel.' }, [
+      h('span', { class: 'bcv-away__dial', html: dial }),
+      h('span', { class: 'bcv-away__body' }, [h('span', { class: 'bcv-away__title', text: 'Away Refresh' }), h('span', { class: 'bcv-away__hint', text: 'Click to cancel' })]),
+    ]);
+    btn.addEventListener('click', awayCancel);
+    const el = h('div', { id: 'bcv-away', class: 'bcv-away', role: 'status' }, btn);
+    document.body.append(el);
+    void el.offsetWidth; // so the float-down is a transition from off the top, not a first paint
+    el.classList.add('is-in');
+    const timer = setTimeout(() => {
+      if (!away || away.el !== el) return;
+      away = null;
+      if (!recover(AWAY_WHY)) el.remove(); // the reload takes the pill with it; a note does not
+    }, AWAY_COUNT);
+    away = { el, timer };
+    return true;
   }
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') { here(); return; }
@@ -804,15 +854,32 @@
     if (loadStuck()) progress(false);
     if (awayLong()) wakeStale();
   });
+  // The press that finds the page stale is swallowed whole — its pointerdown here, and the click
+  // that follows it below — since acting on what it pressed and reloading three seconds later would
+  // be the worst of both. Presses while the pill is already counting act as themselves: the pill
+  // has said what is coming, and it is the one place to stop it.
+  let swallowClick = false;
   function wake(e) {
+    if (e.target?.closest?.('#bcv-away')) return; // the pill's own press: Click to cancel
+    if (away && e.key === 'Escape') { awayCancel(); e.preventDefault(); e.stopPropagation(); return; }
+    if (e.type === 'pointerdown') swallowClick = false;
+    if (away) { here(); return; }
     const stale = awayLong();
     here();
     if (!stale || !wakeStale()) return;
     e.preventDefault();
     e.stopPropagation();
+    if (e.type === 'pointerdown') swallowClick = true;
   }
   document.addEventListener('pointerdown', wake, true);
   document.addEventListener('keydown', wake, true);
+  document.addEventListener('click', (e) => {
+    if (!swallowClick) return;
+    swallowClick = false;
+    if (e.target?.closest?.('#bcv-away')) return;
+    e.preventDefault();
+    e.stopPropagation();
+  }, true);
 
   // ---- screens --------------------------------------------------------------------------------
   const SCREEN_PATIENCE = 15000; // a screen still not drawn after this gives way to Canvas's own page
@@ -1033,9 +1100,8 @@
       h('span', { class: 'bcv-look__text', text: 'Simpl Courses' }),
       sw(),
     ]);
-    const hint = h('span', { class: 'bcv-look__phint' });
     const persistBtn = h('button', { type: 'button', class: 'bcv-look__persist', role: 'switch', 'aria-label': 'Persistent' }, [
-      h('span', { class: 'bcv-look__pbody' }, [h('span', { class: 'bcv-look__ptext', text: 'Persistent' }), hint]),
+      h('span', { class: 'bcv-look__ptext', text: 'Persistent' }),
       sw('bcv-look__sw--small'),
     ]);
     const box = h('div', { id: 'bcv-look', class: 'bcv-look' }, [mainBtn, persistBtn]);
@@ -1047,7 +1113,6 @@
       mainBtn.title = now ? 'Simpl Courses look is on. Press for stock Canvas.' : 'Stock Canvas. Press for the Simpl Courses look.';
       persistBtn.classList.toggle('is-on', keep);
       persistBtn.setAttribute('aria-checked', keep ? 'true' : 'false');
-      hint.textContent = keep ? 'The switch saves, for every page' : 'The switch changes this page only';
       persistBtn.title = keep ? 'Persistent is on: the look switch saves. Press so it changes this page only.' : 'Persistent is off: the look switch changes this page only. Press so it saves.';
     };
     mainBtn.addEventListener('click', () => {

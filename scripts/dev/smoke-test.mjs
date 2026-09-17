@@ -153,10 +153,10 @@ try {
   // under the pointer the name comes out and a second row opens: Persistent, the same switch the popup has
   await page.hover('#bcv-look');
   check(await eventually(() => page.$eval('#bcv-look', (e) => e.getBoundingClientRect().width > 120 && e.querySelector('.bcv-look__text').getBoundingClientRect().width > 40 && e.querySelector('.bcv-look__persist').getBoundingClientRect().height > 20 && getComputedStyle(e.querySelector('.bcv-look__persist')).opacity === '1')), 'hovering the switch brings out the name and opens the Persistent row');
-  const persistRow = await page.$eval('#bcv-look .bcv-look__persist', (e) => ({ on: e.getAttribute('aria-checked'), text: e.querySelector('.bcv-look__ptext').textContent, hint: e.querySelector('.bcv-look__phint').textContent }));
-  check(persistRow.on === 'false' && persistRow.text === 'Persistent' && persistRow.hint === 'The switch changes this page only', `the row reads the setting, off to begin with: ${JSON.stringify(persistRow)}`);
+  const persistRow = await page.$eval('#bcv-look .bcv-look__persist', (e) => ({ on: e.getAttribute('aria-checked'), text: e.textContent.trim(), hint: e.querySelector('.bcv-look__phint') !== null }));
+  check(persistRow.on === 'false' && persistRow.text === 'Persistent' && !persistRow.hint, `the row reads the setting, off to begin with, and says nothing more: ${JSON.stringify(persistRow)}`);
   await page.click('#bcv-look .bcv-look__persist');
-  check(await eventually(async () => (await sw.evaluate(async () => (await self.BCV.settings.get()).appearance.persistLook)) === true) && (await page.$eval('#bcv-look .bcv-look__persist', (e) => e.getAttribute('aria-checked'))) === 'true' && (await page.$eval('#bcv-look .bcv-look__phint', (e) => e.textContent)) === 'The switch saves, for every page' && (await visible('#bcv-app')), 'pressing it turns Persistent on — saved, the row says so, and nothing reloads');
+  check(await eventually(async () => (await sw.evaluate(async () => (await self.BCV.settings.get()).appearance.persistLook)) === true) && (await page.$eval('#bcv-look .bcv-look__persist', (e) => e.getAttribute('aria-checked'))) === 'true' && (await visible('#bcv-app')), 'pressing it turns Persistent on — saved, the switch shows it, and nothing reloads');
   await page.click('#bcv-look .bcv-look__persist');
   check(await eventually(async () => (await sw.evaluate(async () => (await self.BCV.settings.get()).appearance.persistLook)) === false) && (await page.$eval('#bcv-look .bcv-look__persist', (e) => e.getAttribute('aria-checked'))) === 'false', 'and off again');
   await shot(page, '01d-look-switch-open');
@@ -2560,20 +2560,42 @@ try {
   await page.waitForFunction(() => !document.querySelector('.bcv-sheet-ov'), null, { timeout: 5000 });
   await windBack(4 * 60 * 1000); // away since before the three minutes
   const awayNav = page.waitForNavigation({ timeout: 15000 }).then(() => true).catch(() => false);
+  const pressedAt = Date.now();
   await page.click('.bcv-stat');
-  check(await awayNav, 'after three minutes away the first press reloads the page instead of acting on it');
+  // the reload is announced first: a pill floats down at the top — a dial counting three seconds down in orange, "Away Refresh", "Click to cancel"
+  await page.waitForSelector('#bcv-away.is-in', { timeout: 3000 });
+  await page.waitForFunction(() => { const e = document.querySelector('#bcv-away'); return !!e && e.getBoundingClientRect().top >= 0; }, null, { timeout: 2000 }); // the float-down settles
+  const pill = await page.$eval('#bcv-away', (e) => { const ring = getComputedStyle(e.querySelector('.bcv-away__ring')); const hand = getComputedStyle(e.querySelector('.bcv-away__hand--long')); const r = e.getBoundingClientRect(); return { title: e.querySelector('.bcv-away__title').textContent, hint: e.querySelector('.bcv-away__hint').textContent, hintDim: getComputedStyle(e.querySelector('.bcv-away__hint')).color !== getComputedStyle(e.querySelector('.bcv-away__title')).color, ring: ring.stroke, ringAnim: `${ring.animationName}@${ring.animationDuration}`, handAnim: `${hand.animationName}@${hand.animationDuration}`, ticks: e.querySelectorAll('.bcv-away__tick').length, hands: e.querySelectorAll('.bcv-away__hand').length, top: Math.round(r.top), centred: Math.abs((r.left + r.right) / 2 - window.innerWidth / 2) < 2, fixed: getComputedStyle(e).position === 'fixed' }; });
+  check(pill.title === 'Away Refresh' && pill.hint === 'Click to cancel' && pill.hintDim && pill.ring === 'rgb(255, 159, 10)' && pill.ringAnim === 'bcv-away-ring@3s' && pill.handAnim === 'bcv-away-sweep@3s' && pill.ticks === 12 && pill.hands === 2 && pill.fixed && pill.top >= 0 && pill.top < 40 && pill.centred && !(await page.$('.bcv-sheet-ov')), `after three minutes away the first press is swallowed and a pill floats down at the top, its dial counting three seconds down in orange: ${JSON.stringify(pill)}`);
+  await shot(page, '35-away-refresh');
+  check((await awayNav) && Date.now() - pressedAt >= 2800, `and the page reloads when the count runs out, not before (${Date.now() - pressedAt} ms after the press)`);
   await page.waitForSelector('.bcv-stat', { timeout: 20000 });
   check((await page.evaluate(() => JSON.parse(sessionStorage.getItem('bcv:reloaded') || 'null')))?.path === '/' && !(await page.$('.bcv-sheet-ov')), 'the reload is remembered (so it cannot loop) and the press it swallowed opened nothing');
-  // and coming back to the tab is enough on its own: no press has to be spent on it
-  await page.evaluate(() => sessionStorage.removeItem('bcv:reloaded'));
-  await windBack(4 * 60 * 1000);
-  const backNav = page.waitForNavigation({ timeout: 15000 }).then(() => true).catch(() => false);
-  await sw.evaluate(async (base) => {
+  // and coming back to the tab is enough on its own: no press has to be spent on it — the same pill, then the reload
+  const comeBack = () => sw.evaluate(async (base) => {
     const [tab] = await chrome.tabs.query({ url: `${base}/*` });
     await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'ISOLATED', func: () => document.dispatchEvent(new Event('visibilitychange')) });
   }, BASE);
-  check(await backNav, 'coming back to the tab after three minutes reloads it on its own');
+  await page.evaluate(() => sessionStorage.removeItem('bcv:reloaded'));
+  await windBack(4 * 60 * 1000);
+  const backNav = page.waitForNavigation({ timeout: 15000 }).then(() => true).catch(() => false);
+  await comeBack();
+  await page.waitForSelector('#bcv-away.is-in', { timeout: 3000 });
+  check(await backNav, 'coming back to the tab after three minutes floats the pill down and reloads on its own');
   await page.waitForSelector('.bcv-stat', { timeout: 20000 });
+  // a press on the pill stands the reload down, and the page counts as awake again: the next press acts as itself
+  await page.evaluate(() => sessionStorage.removeItem('bcv:reloaded'));
+  await windBack(4 * 60 * 1000);
+  const cancelNav = page.waitForNavigation({ timeout: 4500 }).then(() => true).catch(() => false);
+  await comeBack();
+  await page.waitForSelector('#bcv-away.is-in', { timeout: 3000 });
+  await page.click('#bcv-away .bcv-away__btn');
+  check((await eventually(async () => !(await page.$('#bcv-away')))) && !(await cancelNav), 'Click to cancel: the pill goes and nothing reloads');
+  const afterCancelNav = page.waitForNavigation({ timeout: 2500 }).then(() => true).catch(() => false);
+  await page.click('.bcv-stat');
+  check(!(await afterCancelNav) && !!(await page.$('.bcv-sheet-ov')) && !(await page.$('#bcv-away')), 'and the press after a cancel does what it says');
+  await page.click('.bcv-sheet-ov', { position: { x: 5, y: 5 } });
+  await page.waitForFunction(() => !document.querySelector('.bcv-sheet-ov'), null, { timeout: 5000 });
   // a quiz is left completely alone by it — not a reload, and not a note either
   await page.goto(`${BASE}/courses/101/quizzes/9001?bcv=take`);
   await page.waitForSelector('.bcv-qz__begin', { timeout: 15000 });
@@ -2585,7 +2607,7 @@ try {
     await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'ISOLATED', func: () => document.dispatchEvent(new Event('visibilitychange')) });
   }, BASE);
   await page.click('.bcv-qz__h1');
-  check(!(await quizNav) && !(await page.$('.bcv-toast')) && (await page.$('.bcv-qz__begin')) !== null, 'a quiz is left alone by the stale-page reload: nothing reloads and nothing is said');
+  check(!(await quizNav) && !(await page.$('.bcv-toast')) && !(await page.$('#bcv-away')) && (await page.$('.bcv-qz__begin')) !== null, 'a quiz is left alone by the stale-page reload: no pill, nothing reloads and nothing is said');
   await page.goto(`${BASE}/`);
   await page.waitForSelector('.bcv-stat', { timeout: 20000 });
   // and it never loops: away again within the minute says so instead of reloading again
@@ -2597,7 +2619,7 @@ try {
   await page.waitForSelector('.bcv-stat', { timeout: 20000 });
   await windBack(4 * 60 * 1000);
   await page.click('.bcv-stat');
-  check(await eventually(async () => /You were away for a while\. Reload the page to continue\./.test((await texts('.bcv-toast')).join(' '))), 'a second stale press within the minute asks rather than reloading again');
+  check((await eventually(async () => /You were away for a while\. Reload the page to continue\./.test((await texts('.bcv-toast')).join(' ')))) && !(await page.$('#bcv-away')), 'a second stale press within the minute asks rather than reloading again, and no pill counts down to nothing');
   await page.evaluate(() => sessionStorage.removeItem('bcv:reloaded'));
   await windBack(0);
   await page.goto(`${BASE}/`);
