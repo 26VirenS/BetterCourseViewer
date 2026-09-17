@@ -103,6 +103,12 @@
   function showFound(f) {
     if (!f || !f.origin || leaving) return;
     const host = hostOf(f.origin);
+    if (f.granted && f.error) { // allowed, but the setup could not be opened there: say why, and offer the press
+      setStatus(`Found ${host}, but ${f.error}.`);
+      found.replaceChildren(h('button', { type: 'button', class: 'btn', id: 'allow', text: `Open the setup on ${host}`, onclick: () => { setStatus(`Opening the setup on ${host}…`, true); api.runtime.sendMessage({ type: 'startSetup', origin: f.origin, tabId: f.tabId }).catch(() => {}); } }));
+      found.hidden = false;
+      return;
+    }
     if (f.granted) {
       found.hidden = true;
       setStatus(`Found ${host} — the setup is opening there.`, true);
@@ -122,9 +128,10 @@
     if (changes['setup:found']?.newValue) showFound(changes['setup:found'].newValue);
     if (changes['setup:done']?.newValue) leave(0); // set up from elsewhere: this page has nothing left to say
   });
-  const initial = await api.storage.local.get('setup:found').catch(() => ({}));
-  const f = initial && initial['setup:found'];
-  if (f && Date.now() - (f.at || 0) < 10 * 60 * 1000) showFound(f);
+  // what was found before this page opened is checked, not believed: the background looks for the
+  // tab again, and only a tab still there counts
+  const first = await api.runtime.sendMessage({ type: 'checkFound' }).catch(() => null);
+  if (first && first.found) showFound(first.found);
   if (!safari) api.runtime.sendMessage({ type: 'scanTabs' }).catch(() => {}); // a Canvas that is already open
   await api.storage.local.set({ 'setup:offered': true }).catch(() => {});
 })();

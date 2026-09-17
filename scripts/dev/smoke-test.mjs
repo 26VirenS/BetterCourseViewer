@@ -2232,6 +2232,15 @@ try {
   await setup.waitForSelector('.welcome .h1', { timeout: 10000 });
   check((await sTexts('.welcome .h1'))[0] === 'Head over to your courses website.' && (await setup.$$('.blob')).length === 4 && !(await setup.$('.how')) && /Waiting for a Canvas tab/.test((await sTexts('#status'))[0]) && (await setup.$eval('#found', (e) => e.hidden)) && (await setup.$eval('.welcome .h1', (e) => parseFloat(getComputedStyle(e).fontSize))) >= 36, `the page after install says one thing, in big letters, and watches: ${(await sTexts('#status'))[0]}`);
   await setup.screenshot({ path: join(out, '32-setup-welcome.png') });
+  // what counts as Canvas by its address alone: Canvas's hosts, its paths, and its own favicon — the
+  // one thing a school's own address gives away from its dashboard at /
+  const looks = await sw.evaluate(() => [
+    ['https://school.instructure.com/', null], ['https://canvas.school.edu/', null], ['https://lms.school.edu/courses', null],
+    ['https://lms.school.edu/?login_success=1', null], ['https://lms.school.edu/', 'https://du11hjcvx0uqb.cloudfront.net/dist/images/favicon-e10d657a73.ico'],
+    ['https://lms.school.edu/', 'https://lms.school.edu/dist/images/favicon-4a9c.ico'], ['https://lms.school.edu/', null],
+    ['https://example.com/courses-of-action', 'https://example.com/favicon.ico'], ['https://mail.google.com/', 'https://mail.google.com/favicon.ico'],
+  ].map(([u, icon]) => self.BCV.background.looksLikeCanvas(new URL(u), icon ? { favIconUrl: icon } : null)));
+  check(looks.join(',') === 'true,true,true,true,true,true,false,false,false', `a Canvas is told by its host, its paths or its own favicon, and nothing else is: ${looks.join(',')}`);
   // a Canvas on a site not yet allowed is named, with one button to allow it: a permission can only be asked for from a press
   await sw.evaluate(() => self.BCV.api.storage.local.set({ 'setup:found': { origin: 'https://lms.example.edu', tabId: null, granted: false, at: Date.now() } }));
   await setup.waitForFunction(() => !document.getElementById('found').hidden, null, { timeout: 5000 });

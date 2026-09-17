@@ -42,6 +42,12 @@ if (typeof importScripts === 'function' && !self.BCV?.settings) {
       case 'scanTabs': // the page after install, as it opens: a Canvas that is already open
         reply(scanTabs());
         return true;
+      case 'checkFound': // the page after install, as it opens: is what was found still there?
+        reply(checkFound());
+        return true;
+      case 'startSetup': // the page after install, from a press: the setup on that site's tab
+        reply(startSetupOn(msg.origin, msg.tabId, { force: true }).then((ok) => ({ ok })));
+        return true;
       default:
         return false;
     }
@@ -317,10 +323,14 @@ if (typeof importScripts === 'function' && !self.BCV?.settings) {
    *  paths only Canvas has. Without a permission for the site its address is all there is to go on,
    *  and a school's own name for it (lms.school.edu) gives nothing away — the page after install
    *  takes an address typed in for those. */
-  function looksLikeCanvas(url) {
+  function looksLikeCanvas(url, tab = null) {
     if (!/^https?:$/.test(url.protocol)) return false;
     if (/(^|\.)instructure\.com$|(^|\.)canvaslms\.com$|canvas/i.test(url.hostname)) return true;
-    return /^\/(courses|dashboard|calendar|conversations|login\/canvas)(\/|$)/.test(url.pathname) || url.searchParams.has('login_success');
+    if (/^\/(courses|dashboard|calendar|conversations|login\/canvas)(\/|$)/.test(url.pathname) || url.searchParams.has('login_success')) return true;
+    // Canvas's own favicon, from its own build (/dist/images/favicon-…) on a school's own address
+    // as much as on Instructure's CDN: the one thing a dashboard sitting at / still gives away
+    const icon = String(tab?.favIconUrl || '');
+    return /\/dist\/images\/favicon[-.]/i.test(icon) || /instructure|canvas/i.test(icon);
   }
   const ourPage = (url) => url.startsWith(api.runtime.getURL(''));
   async function siteGranted(origin) {
@@ -333,19 +343,56 @@ if (typeof importScripts === 'function' && !self.BCV?.settings) {
    *  was found and offers to allow it: that press is the gesture a permission request needs, and
    *  the one thing the browser will not let happen on its own. Only the address is read. */
   const noticed = new Set();
-  /** The setup, opened on a tab of an allowed site: once per site per run, so the page it loads does
-   *  not open it again under the card. The site's scripts are registered first where they are not
-   *  built in — a site allowed from Safari's own settings has none until then. */
-  async function startSetupOn(origin, tabId) {
-    if (noticed.has(origin)) return;
+  const noteFound = (f) => api.storage.local.set({ 'setup:found': { ...f, at: Date.now() } });
+  /** The setup, opened on a tab of an allowed site: once per site per run (a press on the page after
+   *  install may force it), so the page it loads does not open it again under the card. The site's
+   *  scripts are registered first where they are not built in — a site allowed from Safari's own
+   *  settings has none until then. The tab is brought forward, window and all; what goes wrong on
+   *  the way is written down for the page after install to say, rather than swallowed. */
+  async function startSetupOn(origin, tabId, { force = false } = {}) {
+    if (!force && noticed.has(origin)) return false;
     noticed.add(origin);
     if (!/\.instructure\.com$/i.test(new URL(origin).hostname)) {
       const r = await registerDomain(origin);
-      if (r && r.ok === false) return;
+      if (r && r.ok === false) { await noteFound({ origin, tabId, granted: true, error: r.message || 'its scripts could not be registered' }); return false; }
     }
-    await api.storage.local.set({ 'setup:found': { origin, tabId, granted: true, at: Date.now() } });
     await S.update({ appearance: { skin: true } });
-    await api.tabs.update(tabId, { url: `${origin}/?bcv=setup`, active: true });
+    try {
+      const t = await api.tabs.update(tabId, { url: `${origin}/?bcv=setup`, active: true });
+      if (t && t.windowId != null && api.windows?.update) await api.windows.update(t.windowId, { focused: true }).catch(() => {});
+    } catch (e) {
+      await noteFound({ origin, tabId, granted: true, error: `the tab could not be opened (${e?.message || e})` });
+      return false;
+    }
+    await noteFound({ origin, tabId, granted: true });
+    return true;
+  }
+  /** What the page after install found, checked again as that page opens: the tab it was found on
+   *  may be long gone, and a note that outlives its tab reads as a Canvas that is not there. A live
+   *  allowed tab has the setup opened on it now; a live tab not yet allowed is named; nothing live
+   *  is nothing found. */
+  async function checkFound() {
+    try {
+      const all = await api.storage.local.get(['setup:found', 'setup:done']);
+      if (all['setup:done']) return { done: true };
+      const f = all['setup:found'];
+      if (!f || !f.origin) return { none: true };
+      let tab = null;
+      if (f.tabId != null) { try { tab = await api.tabs.get(f.tabId); } catch { tab = null; } }
+      if (!tab || !tab.url || new URL(tab.url).origin !== f.origin) {
+        const tabs = await api.tabs.query({ url: `${f.origin}/*` }).catch(() => []);
+        tab = (tabs || []).find((t) => t.url) || null;
+      }
+      if (!tab) { await api.storage.local.remove('setup:found'); return { none: true }; }
+      if (!(await siteGranted(f.origin))) {
+        await noteFound({ origin: f.origin, tabId: tab.id, granted: false });
+      } else if (new URL(tab.url).searchParams.get('bcv') !== 'setup') {
+        await startSetupOn(f.origin, tab.id, { force: true });
+      }
+      return { found: (await api.storage.local.get('setup:found'))['setup:found'] || null };
+    } catch (e) {
+      return { none: true, error: e?.message || String(e) };
+    }
   }
   async function noticeTab(tab) {
     try {
@@ -359,7 +406,7 @@ if (typeof importScripts === 'function' && !self.BCV?.settings) {
       // user's own word, whatever its address looks like; any other is judged by its address alone
       const granted = await siteGranted(origin);
       if (!granted) {
-        if (looksLikeCanvas(url)) await api.storage.local.set({ 'setup:found': { origin, tabId: tab.id, granted: false, at: Date.now() } });
+        if (looksLikeCanvas(url, tab)) await noteFound({ origin, tabId: tab.id, granted: false });
         return;
       }
       await startSetupOn(origin, tab.id);
@@ -369,7 +416,9 @@ if (typeof importScripts === 'function' && !self.BCV?.settings) {
   }
   // a page that has loaded, not an address that moved in place: the setup card cleans ?bcv=setup
   // off the address as it opens, and that must not read as a fresh arrival
-  if (api.tabs?.onUpdated) api.tabs.onUpdated.addListener((tabId, info, tab) => { if (info.status === 'complete') noticeTab(tab); });
+  // (a favicon or a title arriving is not an address moving, and the favicon is what tells a
+  // school's own address apart)
+  if (api.tabs?.onUpdated) api.tabs.onUpdated.addListener((tabId, info, tab) => { if (info.status === 'complete' || info.favIconUrl || info.title) noticeTab(tab); });
   /** Every open tab looked at once: a Canvas that was open before the page after install was.
    *  (Chrome only: Safari asks the user about every open site before it will say their addresses.) */
   async function scanTabs() {
@@ -421,5 +470,5 @@ if (typeof importScripts === 'function' && !self.BCV?.settings) {
   // even when onInstalled/onStartup never fired (Safari rebuilds, reloads).
   ensureDomains().then(adoptGranted);
   offerSetup();
-  BCV.background = { offerSetup, ensureDomains, forgetNoticed: () => noticed.clear() }; // the harness drives these directly
+  BCV.background = { offerSetup, ensureDomains, looksLikeCanvas, forgetNoticed: () => noticed.clear() }; // the harness drives these directly
 })();
