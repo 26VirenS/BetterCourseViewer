@@ -61,7 +61,7 @@ try {
   const setSettings = (patch) => sw.evaluate(async (p) => self.BCV.settings.update(p), patch);
   // until it is done every page opens the setup; it is exercised on its own below. The flow marker goes with the flags: the
   // background's one-time migration clears them when it finds an older flow, and it may run after this.
-  await sw.evaluate(() => self.BCV.api.storage.local.set({ 'setup:offered': true, 'setup:done': true, 'setup:flow': 3 }));
+  await sw.evaluate((v) => self.BCV.api.storage.local.set({ 'setup:offered': true, 'setup:done': true, 'setup:flow': 3, 'whatsnew:seen': v }), manifest.version);
 
   const page = await context.newPage();
   // a page is ready to poke once it is drawn, nothing painted from the cache is still waiting on
@@ -102,7 +102,7 @@ try {
   // the page again. Every check still runs against the app itself; only the card is cleared.
   const noSetup = async () => {
     if (!(await page.$('#bcv-setup'))) return false;
-    await sw.evaluate(() => self.BCV.api.storage.local.set({ 'setup:offered': true, 'setup:done': true, 'setup:flow': 3 }));
+    await sw.evaluate((v) => self.BCV.api.storage.local.set({ 'setup:offered': true, 'setup:done': true, 'setup:flow': 3, 'whatsnew:seen': v }), manifest.version);
     await page.goto(page.url());
     return true;
   };
@@ -238,7 +238,7 @@ try {
   await page.click('.bcv-ph-avatar');
   await sheet();
   const acct = await texts('.bcv-ph-srow__label');
-  check(acct.join(',') === 'Inbox,Groups,History,My Materials,Help,Dark appearance,Settings,Locked quizzes,Guided setup,Profile,All Canvas settings,Log out', `account sheet rows, with the school's own nav entries: ${acct.join(', ')} (no Sign out outside the app)`);
+  check(acct.join(',') === 'Inbox,Groups,History,My Materials,Help,Dark appearance,Settings,Locked quizzes,Guided setup,What’s new,Profile,All Canvas settings,Log out', `account sheet rows, with the school's own nav entries: ${acct.join(', ')} (no Sign out outside the app)`);
   check((await texts('.bcv-ph-srow__note'))[0] === 'No unread messages' || /unread message/.test((await texts('.bcv-ph-srow__note'))[0]), `Inbox row carries the unread count: ${(await texts('.bcv-ph-srow__note'))[0]}`);
   await shot('01c-account-sheet');
   await page.evaluate(() => { window.__bcvMarker = 1; });
@@ -649,8 +649,21 @@ try {
   await page.waitForFunction(() => !document.querySelector('.bcv-tour'), null, { timeout: 5000 });
   await page.click('.bcv-ph-avatar');
   await sheet();
-  check((await texts('.bcv-ph-srow__label')).includes('Guided setup'), 'the account sheet offers the guided setup');
+  check((await texts('.bcv-ph-srow__label')).includes('Guided setup') && (await texts('.bcv-ph-srow__label')).includes('What’s new'), 'the account sheet offers the guided setup and What’s new');
   await closeSheet();
+
+  // ---- what's new after an update, on a phone ---------------------------------------------------
+  console.log("what's new");
+  await sw.evaluate(async () => { await self.BCV.api.storage.local.set({ 'whatsnew:from': '2.7.5' }); await self.BCV.api.storage.local.remove('whatsnew:seen'); });
+  await page.goto(`${BASE}/`);
+  await page.waitForSelector('#bcv-whatsnew .wn__note', { timeout: 20000 });
+  await page.waitForFunction(() => document.querySelector('#bcv-whatsnew')?.shadowRoot.querySelector('.intro')?.hidden === true, null, { timeout: 8000 });
+  await page.waitForTimeout(400);
+  check((await page.$$('#bcv-whatsnew .wn__filter')).length === 4 && (await page.$eval('#bcv-whatsnew .wn__filters', (e) => getComputedStyle(e).flexDirection)) === 'row' && (await page.$eval('#bcv-whatsnew .wn__to', (e) => e.textContent)) === manifest.version && await noOverflow(), 'what’s new fits the phone: the filters in a row above the notes');
+  await shot('13-whats-new');
+  await page.click('#bcv-whatsnew #dismiss');
+  await page.waitForFunction(() => !document.querySelector('#bcv-whatsnew'), null, { timeout: 5000 });
+  check(!(await page.$('#bcv-whatsnew')) && (await sw.evaluate(async (v) => (await self.BCV.api.storage.local.get('whatsnew:seen'))['whatsnew:seen'] === v, manifest.version)), 'Back to Canvas closes it and marks the version seen');
 
   check(errors.length === 0, `no page errors${errors.length ? `: ${errors.slice(0, 3).join(' | ')}` : ''}`);
 } catch (e) {

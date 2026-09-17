@@ -313,6 +313,14 @@ if (typeof importScripts === 'function' && !self.BCV?.settings) {
   api.runtime.onInstalled.addListener(async (details) => {
     await ensureDomains({ force: true });
     if (details.reason === 'install') await offerSetup();
+    // An update: the first Canvas page after it shows what changed (content/app/whatsnew.js), from
+    // the version left behind — the oldest one still unread, when several updates go by unseen.
+    if (details.reason === 'update' && details.previousVersion) {
+      try {
+        const p = await api.storage.local.get('whatsnew:from');
+        if (!p['whatsnew:from']) await api.storage.local.set({ 'whatsnew:from': details.previousVersion });
+      } catch { /* the page then says the version alone */ }
+    }
   });
   if (api.runtime.onStartup) api.runtime.onStartup.addListener(() => ensureDomains());
   // Every time the background wakes: cheap check, repairs stale registrations

@@ -493,7 +493,10 @@
       const renamed = st.courses.filter((c) => c.id in st.nicks && String(st.nicks[c.id]).trim() !== (c.nickname || ''));
       for (const c of renamed) await store.setNickname(c.id, st.nicks[c.id]).catch(() => {});
       favChanged = changes.length > 0 || renamed.length > 0;
-      await BCV.api.storage.local.set({ 'setup:done': true, 'setup:offered': true });
+      // the version installed is seen: What's new is for updates, never for a fresh install
+      let installed = null;
+      try { installed = BCV.api.runtime.getManifest().version || null; } catch { /* no version to note */ }
+      await BCV.api.storage.local.set({ 'setup:done': true, 'setup:offered': true, ...(installed ? { 'whatsnew:seen': installed } : {}) });
     } catch (e) {
       console.error('[Simpl Courses setup]', e);
     }

@@ -630,6 +630,7 @@
       item(IC.settings, 'Simpl Courses settings', 'Look, courses and grades', openSettings),
       item(IC.sparkle, 'Guided setup', 'Courses, grades and a tour', () => go('/?bcv=setup')),
       item(IC.cal, 'Tour', 'What changed, on the real pages', () => go('/?bcv=tour')),
+      item(IC.star, 'What’s new', 'What changed in this version', () => BCV.whatsnew?.open(BCV.app, { manual: true })),
       U.el('bcv-menu__sep'),
       item(IC.people, 'Canvas profile', null, () => go('/profile')),
       item(IC.external, 'All Canvas settings', 'Profile, notifications, integrations', () => go('/profile/settings')),
@@ -1078,6 +1079,12 @@
     }
     await applySkin(state.lookOn);
     mountLookToggle();
+    // The first Canvas page after an update shows what changed: once per version, never over the
+    // setup, the tour or a quiz attempt, and never on a fresh install (the setup marks its version seen).
+    if (state.lookOn && BCV.whatsnew && !inQuiz() && !BCV.setup?.active() && !html.classList.contains('bcv-touring')) {
+      const change = await BCV.whatsnew.due();
+      if (change && !BCV.setup?.active() && !html.classList.contains('bcv-touring')) BCV.whatsnew.open(BCV.app, change);
+    }
     BCV.extras?.prime?.(BCV.app);
     // Settings reads this site, and writes to Canvas with the session's token the page can see (Settings cannot read the cookie itself)
     const token = BCV.canvas.csrfToken();

@@ -39,7 +39,7 @@ try {
   const setMode = (mode) => sw.evaluate(async (m) => {
     const S = self.BCV.settings;
     await S.update({ appearance: { sideCourses: m } });
-    await self.BCV.api.storage.local.set({ 'setup:offered': true, 'setup:done': true, 'setup:flow': 3 }); // the flow marker too: the background's migration clears the flags for an older flow, and may run after this
+    await self.BCV.api.storage.local.set({ 'setup:offered': true, 'setup:done': true, 'setup:flow': 3, 'whatsnew:seen': self.BCV.api.runtime.getManifest().version }); // the flow marker too: the background's migration clears the flags for an older flow, and may run after this
   }, mode);
 
   await setMode('always');

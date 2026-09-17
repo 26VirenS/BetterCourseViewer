@@ -64,7 +64,7 @@ try {
   if (!sw) sw = await context.waitForEvent('serviceworker', { timeout: 15000 });
   await new Promise((r) => setTimeout(r, 1200));
   for (const t of context.pages()) if (t.url().endsWith('/setup/setup.html')) await t.close();
-  await sw.evaluate(() => self.BCV.api.storage.local.set({ 'setup:offered': true, 'setup:done': true, 'setup:flow': 3 }));
+  await sw.evaluate((v) => self.BCV.api.storage.local.set({ 'setup:offered': true, 'setup:done': true, 'setup:flow': 3, 'whatsnew:seen': v }), manifest.version);
 
   const page = await context.newPage();
   await page.route('**/api/v1/**', async (route) => {

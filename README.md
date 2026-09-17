@@ -159,6 +159,7 @@ Your Canvas account, favourites and course nicknames live on Canvas and are neve
 - A small **Simpl Courses** switch sits at the top right of every Canvas page, over the new look and over stock Canvas alike: press it and the look goes off or on (the page loads afresh, so stock Canvas comes back whole). The toolbar popup has the same **Simpl Courses look** switch with a **Persistent** switch under it: off (the default), the look switch changes the page you are on only, and a reload or the next page brings the saved look back; on, the look switch saves, and every page follows. Settings → General's look switch always saves; Settings → Appearance has Light / Dark / System as three preview tiles. The popup's footer and the Settings sidebar show the installed version number. Until the guided setup has run (or been skipped on purpose) the popup shows nothing but a **Set up** button.
 - **Settings** is one section at a time from a sidebar with search and a status pill: General (the look, run the tour again, reopen the setup); Courses & targets (every active course with a show/hide switch that writes your Canvas favourites and a target letter per course); Grades (tracking, the GPA goal, what-if scores on or off, the recorded history with a CSV export); Appearance; Canvas sites (Add asks for the site's permission from the click, Remove gives it back); Data & about (what is stored, then clear, export, import and a red Reset everything that also gives up the added sites). Every control saves on change and flashes Saved once the write has landed.
 - Pages Canvas draws itself have an **Open in stock Canvas** button that flips the same switch.
+- **What's new** – the first Canvas page after an update shows what changed in that version, once: the jump it made (from 2.7.5 → 2.12.0), the notes filtered by New / Improved / Fixed, and the releases before it behind *See earlier versions* with the ones you skipped marked. *Back to Canvas* (or Escape) dismisses it; it is under the account panel afterwards. A fresh install never sees it (the setup comes first), and it never opens over the setup, the tour or a quiz.
 
 ## How it stays honest
 
@@ -225,6 +226,14 @@ node scripts/dev/mock-canvas.mjs        # http://localhost:8787
 node scripts/dev/smoke-test.mjs         # screenshots in scripts/dev/out/
 node scripts/dev/phone-test.mjs         # the phone layout; screenshots in scripts/dev/out/phone-*.png
 ```
+
+### Releasing
+
+Every release, in this order:
+
+1. Bump the version in all six places: `extension/manifest.json`, `ios/project.yml`, the four `MARKETING_VERSION` lines in `macos/Simpl Courses/Simpl Courses.xcodeproj/project.pbxproj` and the two in `ios/SimplCourses.xcodeproj/project.pbxproj`. The smoke suite fails when they disagree.
+2. Add the release's **What's new** entry at the top of `extension/content/app/whatsnew-notes.js`: the version, the date, and a note per change in the student's terms (a kind, a title of a few words, one sentence, where to find it). The smoke suite fails when the newest entry is not the manifest's version, so a release cannot ship without its notes.
+3. Run the suites (`scripts/dev/*-test.mjs`), commit, push. The Package workflow tags the commit and publishes the release with the Safari and Chrome zips.
 
 ## Privacy
 

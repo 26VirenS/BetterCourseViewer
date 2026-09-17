@@ -56,6 +56,20 @@ const shot = (page, name) => page.screenshot({ path: join(out, `${name}.png`) })
   check(iosYml.includes(`MARKETING_VERSION: "${manifest.version}"`), `iOS app version is ${manifest.version}`);
 }
 
+// 4. every release ships its What's New notes (content/app/whatsnew-notes.js): the first Canvas
+// page after an update shows them, so a version without an entry is a version with nothing to say
+const cmpVer = (a, b) => { const x = String(a).split('.').map(Number); const y = String(b).split('.').map(Number); for (let i = 0; i < Math.max(x.length, y.length); i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d; } return 0; };
+const whatsNew = new Function('self', `${readFileSync(join(extDir, 'content', 'app', 'whatsnew-notes.js'), 'utf8')}; return self.BCV_WHATS_NEW;`)({});
+{
+  console.log("\nwhat's new notes");
+  const newest = whatsNew[0];
+  check(!!newest && newest.version === manifest.version, `the newest What's New entry is this version (${manifest.version}): ${newest?.version}`);
+  check(/^\d{4}-\d{2}-\d{2}$/.test(newest?.date || '') && Array.isArray(newest?.notes) && newest.notes.length > 0, `the notes for ${manifest.version} are dated and not empty`);
+  const bad = whatsNew.flatMap((v) => (v.notes || []).map((n) => ({ v: v.version, ...n }))).filter((n) => !['new', 'improved', 'fixed'].includes(n.kind) || !n.title || n.title.length > 48 || !n.body || n.body.length > 170 || (n.where || '').length > 48 || !n.icon);
+  check(bad.length === 0, `every note has a kind, a short title, one sentence, a short where and an icon${bad.length ? `: ${bad.map((n) => `${n.v} · ${n.title}`).join(' | ')}` : ''}`);
+  check(whatsNew.every((v, i) => i === 0 || cmpVer(whatsNew[i - 1].version, v.version) > 0), 'the entries are newest first, no version twice');
+}
+
 const userDataDir = join(tmpdir(), `bcv-profile-${Date.now()}`);
 const context = await chromium.launchPersistentContext(userDataDir, {
   channel: 'chromium',
@@ -90,11 +104,11 @@ try {
     return opened.length > 0;
   };
   check(await offerAgain(), 'the setup page opens again on a new browser session while setup is unfinished (Safari enables without installing)');
-  await sw.evaluate(() => self.BCV.api.storage.local.set({ 'setup:done': true }));
+  await sw.evaluate((v) => self.BCV.api.storage.local.set({ 'setup:done': true, 'whatsnew:seen': v }), manifest.version); // (seen: What's new is driven on purpose below, not over every page)
   check(!(await offerAgain()), 'once setup is done it never opens again');
   // the setup counts as done for the rest of the suite (until it is done, every page opens the card
   // — the guided-setup sections below clear the flag when that is what they are checking)
-  await sw.evaluate(() => self.BCV.api.storage.local.set({ 'setup:offered': true, 'setup:done': true }));
+  await sw.evaluate((v) => self.BCV.api.storage.local.set({ 'setup:offered': true, 'setup:done': true, 'whatsnew:seen': v }), manifest.version);
 
   page = await context.newPage();
   // a page is ready to poke once it is drawn and nothing painted from the cache is still waiting on Canvas
@@ -2280,6 +2294,59 @@ try {
   await page.waitForFunction(() => !document.querySelector('.bcv-tour'), null, { timeout: 5000 });
   check((await prefsOf()).tour === null && !(await page.$('html.bcv-touring')), 'Done ends the tour and clears its state');
 
+  // ---- what's new after an update ----------------------------------------------------------------
+  console.log("what's new");
+  const wn = (sel) => `#bcv-whatsnew ${sel}`; // in a shadow root, like the setup
+  const cur = whatsNew[0];
+  const kindCounts = { new: 0, improved: 0, fixed: 0 };
+  cur.notes.forEach((n) => { kindCounts[n.kind] += 1; });
+  // an update from 2.7.5 (the background notes the version left behind), this version not yet seen
+  await sw.evaluate(async () => { await self.BCV.api.storage.local.set({ 'whatsnew:from': '2.7.5' }); await self.BCV.api.storage.local.remove('whatsnew:seen'); });
+  await page.goto(`${BASE}/`);
+  await page.waitForSelector(wn('.wn__note'), { timeout: 20000 });
+  await page.waitForFunction(() => document.querySelector('#bcv-whatsnew')?.shadowRoot.querySelector('.intro')?.hidden === true, null, { timeout: 8000 }); // the word-mark first
+  await page.waitForTimeout(500);
+  const wnHead = await page.evaluate(() => { const r = document.querySelector('#bcv-whatsnew').shadowRoot; return { from: r.querySelector('.wn__from')?.textContent ?? null, to: r.querySelector('.wn__to')?.textContent, ver: r.querySelector('.wn__ver')?.textContent, date: r.querySelector('.wn__date')?.textContent, filters: [...r.querySelectorAll('.wn__filter')].map((f) => `${f.querySelector('.wn__flabel').textContent} ${f.querySelector('.wn__count').textContent}${f.classList.contains('is-on') ? ' *' : ''}`), notes: [...r.querySelectorAll('.wn__note')].map((n) => `${n.dataset.kind}: ${n.querySelector('.wn__title').textContent} [${n.querySelector('.wn__kind').textContent}]`), foot: r.querySelector('#dismiss')?.textContent.trim(), hint: r.querySelector('.fr__hint')?.textContent }; });
+  check(wnHead.from === 'from 2.7.5' && wnHead.to === manifest.version && wnHead.ver === `Version ${manifest.version}` && /\d{4}/.test(wnHead.date) && wnHead.filters.join(' | ') === `Everything ${cur.notes.length} * | New ${kindCounts.new} | Improved ${kindCounts.improved} | Fixed ${kindCounts.fixed}` && wnHead.notes.length === cur.notes.length && wnHead.notes[0] === `${cur.notes[0].kind}: ${cur.notes[0].title} [${{ new: 'New', improved: 'Improved', fixed: 'Fixed' }[cur.notes[0].kind]}]` && wnHead.foot === 'Back to Canvas' && /once per version/.test(wnHead.hint), `the first page after an update shows what changed, from the version left behind: ${JSON.stringify(wnHead)}`);
+  check(page.url() === `${BASE}/` && (await page.$('.bcv-stat')) !== null && (await page.$eval('html', (e) => getComputedStyle(e).overflow)) === 'hidden', 'it sits over the page, which is drawn underneath and held still');
+  await shot(page, '33-whats-new');
+  // the rail filters the one list, with its counts
+  await page.click(wn('.wn__filter[data-filter="new"]'));
+  await page.waitForTimeout(350);
+  check((await page.$$eval(wn('.wn__note'), (els) => els.map((e) => e.dataset.kind))).every((k) => k === 'new') && (await page.$$(wn('.wn__note'))).length === kindCounts.new && (await page.$eval(wn('.wn__filter[data-filter="new"]'), (e) => e.classList.contains('is-on'))), 'New keeps the new notes only');
+  await page.click(wn('.wn__filter[data-filter="all"]'));
+  await page.waitForTimeout(200);
+  // the releases before this one behind one link, the ones skipped marked
+  await page.click(wn('#log'));
+  await page.waitForSelector(wn('.wn__hv'), { timeout: 5000 });
+  const hist = await page.$$eval(wn('.wn__hv'), (els) => els.map((e) => `${e.querySelector('.wn__hver').textContent}${e.querySelector('.wn__pill') ? ' (new to you)' : ''}`));
+  const expectHist = whatsNew.slice(1, 9).map((v) => `${v.version}${cmpVer(v.version, '2.7.5') > 0 ? ' (new to you)' : ''}`);
+  check(hist.join(' | ') === expectHist.join(' | ') && (await texts(wn('#log')))[0] === 'Back to this release' && !(await page.$(wn('.wn__filter.is-on'))), `See earlier versions lists them newest first, the ones skipped marked: ${hist.join(' | ')}`);
+  await shot(page, '33b-whats-new-history');
+  await page.click(wn('#log'));
+  await page.waitForSelector(wn('.wn__note'), { timeout: 5000 });
+  // Back to Canvas: seen now (not when it opened), and never again for this version
+  await page.click(wn('#dismiss'));
+  await page.waitForFunction(() => !document.querySelector('#bcv-whatsnew'), null, { timeout: 5000 });
+  const wnFlags = await sw.evaluate(() => self.BCV.api.storage.local.get(['whatsnew:seen', 'whatsnew:from']));
+  check(wnFlags['whatsnew:seen'] === manifest.version && wnFlags['whatsnew:from'] === undefined && !(await page.$('html.bcv-setup-open')), `Back to Canvas marks the version seen and lets the page go: ${JSON.stringify(wnFlags)}`);
+  await page.goto(`${BASE}/`);
+  await page.waitForSelector('#bcv-app .bcv-nav__item', { timeout: 10000 });
+  await page.waitForTimeout(600);
+  check(!(await page.$('#bcv-whatsnew')), 'and the next page does not show it again');
+  // reachable again from the account menu, for this version (no jump to state)
+  await page.waitForSelector('#bcv-account', { timeout: 15000 });
+  const openAccount = async () => { await page.click('#bcv-account'); return page.waitForSelector('.bcv-menu--account', { timeout: 3000 }).then(() => true, () => false); };
+  if (!(await openAccount())) { await page.waitForTimeout(800); await openAccount(); } // a sidebar redraw can close a menu just opened
+  const menuItems = await texts('.bcv-menu--account .bcv-menu__item');
+  check(menuItems.some((t) => /What.s new/.test(t)), `the account menu has What’s new: ${menuItems.map((t) => t.split('\n')[0]).join(' | ')}`);
+  await page.locator('.bcv-menu--account .bcv-menu__item').filter({ hasText: /What.s new/ }).click();
+  await page.waitForSelector(wn('.wn__note'), { timeout: 10000 });
+  check((await page.$(wn('.wn__from'))) === null && (await page.$eval(wn('.wn__to'), (e) => e.textContent)) === manifest.version, 'the account menu opens it again, for this version');
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !document.querySelector('#bcv-whatsnew'), null, { timeout: 5000 });
+  check(!(await page.$('#bcv-whatsnew')), 'Escape closes it too');
+
   // ---- the page after install --------------------------------------------------------------
   console.log('setup page');
   const setup = await context.newPage();
@@ -2310,7 +2377,7 @@ try {
   await page.click('#bcv-account');
   await page.waitForSelector('.bcv-menu--account', { timeout: 5000 });
   const acctItems = await texts('.bcv-menu--account .bcv-menu__item');
-  check(acctItems.map((t) => t.split('\n')[0].trim()).join(' | ') === 'Dark appearance | Simpl Courses settings Look, courses and grades | Guided setup Courses, grades and a tour | Tour What changed, on the real pages | Canvas profile | All Canvas settings Profile, notifications, integrations | Notification preferences | Log out' && (await page.$eval('.bcv-menu--account', (m) => m.getBoundingClientRect().bottom <= window.innerHeight)), `the profile row opens a panel above itself: ${acctItems.join(' | ')}`);
+  check(acctItems.map((t) => t.split('\n')[0].trim()).join(' | ') === 'Dark appearance | Simpl Courses settings Look, courses and grades | Guided setup Courses, grades and a tour | Tour What changed, on the real pages | What’s new What changed in this version | Canvas profile | All Canvas settings Profile, notifications, integrations | Notification preferences | Log out' && (await page.$eval('.bcv-menu--account', (m) => m.getBoundingClientRect().bottom <= window.innerHeight)), `the profile row opens a panel above itself: ${acctItems.join(' | ')}`);
   await shot(page, '34-account-panel');
   // the mock keeps the token in the _csrf_token cookie only, like Canvas (no meta tag), and its /logout
   // accepts a DELETE carrying exactly that token; anything else lands on Canvas's "Page Error"
@@ -2681,7 +2748,7 @@ try {
   await popupPage.goto(`chrome-extension://${extId}/popup/popup.html`);
   await popupPage.waitForTimeout(400);
   check(!(await popupPage.$eval('#setup-card', (el) => el.hidden)), 'an older setup mark alone does not count: the popup still asks');
-  await sw.evaluate(() => self.BCV.api.storage.local.set({ 'setup:done': true }));
+  await sw.evaluate((v) => self.BCV.api.storage.local.set({ 'setup:done': true, 'whatsnew:seen': v }), manifest.version); // (seen: What's new is driven on purpose below, not over every page)
   popupPage = await context.newPage();
   await popupPage.goto(`chrome-extension://${extId}/popup/popup.html`);
   await popupPage.waitForTimeout(500);
