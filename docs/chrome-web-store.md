@@ -74,6 +74,7 @@ Replaces the interface of the Canvas learning-management system on the user's ow
 | `storage` | Keeps the user's settings, a short-lived cache of Canvas API responses, and unsent drafts locally in the browser. |
 | `scripting` | Registers the extension's content scripts on a Canvas site the user adds with "Enable on this site" (schools host Canvas at their own domains). |
 | `activeTab` | Lets the toolbar popup read the current tab's address to show whether the extension is enabled on that site and offer to enable it. |
+| `tabs` | Lets the extension notice a tab arriving on Canvas after install, so the setup can open on that page by itself (a site already allowed) or the page after install can name the site and offer to allow it. Only the address is read, and only until the setup is done. |
 | Host permissions (one field for all of them) | `*://*.instructure.com/*` is Canvas's hosted domain: the extension draws its interface on those pages and calls Canvas's REST API with the user's existing session. |
 
 **Remote code:** select **No, I am not using remote code** (the justification box only applies to "Yes"; all code ships inside the package).
@@ -124,4 +125,4 @@ The same Chrome zip loads in Microsoft Edge and can be submitted to Edge Add-ons
 
 ## First run
 
-Installing opens `setup/setup.html` in a new tab: a short page that says how to start (open your Canvas, press the toolbar button, press Set up). The toolbar popup's **Set up** button requests permission for the current tab's origin alone (from the click), then opens the guided setup as a card over that Canvas page, so the listing's justification for optional host permissions can point at it.
+Installing opens `setup/setup.html` in a new tab: one line in big letters (head over to your courses website) that then watches for a Canvas tab: an allowed site opens the setup by itself, any other is named with a button to allow it. The toolbar popup's **Set up** button requests permission for the current tab's origin alone (from the click), then opens the guided setup as a card over that Canvas page, so the listing's justification for optional host permissions can point at it.

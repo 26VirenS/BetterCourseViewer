@@ -820,7 +820,11 @@ try {
     note: e.querySelector('.bcv-fb__note')?.textContent || null,
   })));
   check(subCards.length === 2 && subCards[0].n === 'Attempt 2' && subCards[0].latest && subCards[1].n === 'Attempt 1' && !subCards[1].latest, `one card per attempt, latest first: ${subCards.map((x) => `${x.n}${x.latest ? '*' : ''}`).join(' | ')}`);
-  check(subCards[0].score === '10 / 10' && /Submitted=Sep 9 at 3:52pm/.test(subCards[0].facts) && /Type=File upload/.test(subCards[0].facts) && /Graded=Sep 10 at 8:00am/.test(subCards[0].facts), `the latest attempt's own facts: ${subCards[0].facts}`);
+  // the mock dates everything from today, so the expected strings come from its own answer, formatted the way the app formats a time
+  const fmtAtLike = (iso) => { const d = new Date(iso); const h = d.getHours() % 12 || 12; return `${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][d.getMonth()]} ${d.getDate()} at ${h}:${String(d.getMinutes()).padStart(2, '0')}${d.getHours() < 12 ? 'am' : 'pm'}`; };
+  const sub4001 = await readSub('104', '4001');
+  const latestHist = sub4001.submission_history.find((x) => Number(x.attempt) === 2);
+  check(subCards[0].score === '10 / 10' && subCards[0].facts === `Submitted=${fmtAtLike(latestHist.submitted_at)} | Type=File upload | Graded=${fmtAtLike(sub4001.graded_at)}`, `the latest attempt's own facts, from Canvas's own dates: ${subCards[0].facts}`);
   check(subCards[1].score === 'Not graded' && /Type=Text entry/.test(subCards[1].facts) && /Only your latest attempt is graded/.test(subCards[1].note || ''), `an older attempt is not the graded one, and says so: ${subCards[1].score} · ${subCards[1].facts}`);
   // comments are filed against an attempt: a first draft's feedback is not feedback on the final one
   check(subCards[0].thread.length === 2 && /derivative questions/.test(subCards[0].thread[0]) && /Thanks, I see it now/.test(subCards[0].thread[1]), `the latest attempt's thread: ${subCards[0].thread.join(' | ').slice(0, 80)}`);
@@ -1320,7 +1324,11 @@ try {
   const mods = await texts('.bcv-module__head');
   check(mods.length === 4 && /^Week 1: Kinematics .*2 of 2 requirements done$/.test(mods[0]) && /^Week 3: Energy .*Locked until/.test(mods[2]), `modules: ${mods.join(' | ')}`);
   // each head says when the module next wants something, so the list reads without opening anything
-  check((await texts('.bcv-module__due')).join(' | ') === 'Last due Sep 9 | Last due Sep 15 | Next due Mon | Last due Aug 26' && (await page.$$('.bcv-module__due.is-next')).length === 1, `each module says when it next wants something: ${(await texts('.bcv-module__due')).join(' | ')}`);
+  // (the mock dates its modules from today: Week 1's report a week ago, Week 2's homework yesterday, Week 3 unlocking in five days, Week 0's quiz three weeks ago)
+  const dayAt = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return d; };
+  const mdOf = (n) => { const d = dayAt(n); return `${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][d.getMonth()]} ${d.getDate()}`; };
+  const dowOf = (n) => ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][dayAt(n).getDay()];
+  check((await texts('.bcv-module__due')).join(' | ') === `Last due ${mdOf(-7)} | Last due ${mdOf(-1)} | Next due ${dowOf(5)} | Last due ${mdOf(-21)}` && (await page.$$('.bcv-module__due.is-next')).length === 1, `each module says when it next wants something: ${(await texts('.bcv-module__due')).join(' | ')}`);
   check((await page.$$('.bcv-circle.is-done')).length === 3 && (await page.$('.bcv-indent-1')), 'completion marks and indents');
   // by date is the order the work has to be done in, not the order the course was built in
   const names = () => texts('.bcv-module__name');
@@ -2212,14 +2220,34 @@ try {
 
   // ---- the page after install --------------------------------------------------------------
   console.log('setup page');
+  // One line in big letters, and then it watches: the background notices a tab arriving on Canvas.
+  // (the main page is a Canvas tab too: parked on the root, whose address says nothing, so the
+  // page after install has nothing to find until the tab below opens on /courses)
+  await page.goto(`${BASE}/`);
+  await page.waitForSelector('.bcv-stat', { timeout: 15000 });
+  await sw.evaluate(() => self.BCV.api.storage.local.remove(['setup:done', 'setup:found']));
   const setup = await context.newPage();
   const sTexts = (sel) => setup.$$eval(sel, (els) => els.map((e) => (e.innerText || e.textContent).replace(/\s+/g, ' ').trim()));
   await setup.goto(`chrome-extension://${extId}/setup/setup.html`);
   await setup.waitForSelector('.welcome .h1', { timeout: 10000 });
-  const how = await sTexts('.how__t');
-  check((await sTexts('.welcome .h1'))[0] === 'Simpl Courses is installed' && (await setup.$$('.blob')).length === 4 && how.join(' | ') === 'Open your Canvas | Press the puzzle piece, then Simpl Courses | Press Set up' && (await setup.$('.how__puzzle svg')) !== null && /puzzle piece at the right of the toolbar and choose Simpl Courses/.test((await sTexts('.how__s'))[1]) && (await sTexts('#next'))[0] === 'Got it' && (await setup.$('#host')) === null && (await setup.$('.progress')) === null, `the page after install says how to start, and asks nothing: ${how.join(' | ')}`);
+  check((await sTexts('.welcome .h1'))[0] === 'Head over to your courses website.' && (await setup.$$('.blob')).length === 4 && !(await setup.$('.how')) && /Waiting for a Canvas tab/.test((await sTexts('#status'))[0]) && (await setup.$eval('#found', (e) => e.hidden)) && (await setup.$eval('.welcome .h1', (e) => parseFloat(getComputedStyle(e).fontSize))) >= 36, `the page after install says one thing, in big letters, and watches: ${(await sTexts('#status'))[0]}`);
   await setup.screenshot({ path: join(out, '32-setup-welcome.png') });
-  await setup.close().catch(() => {});
+  // a Canvas on a site not yet allowed is named, with one button to allow it: a permission can only be asked for from a press
+  await sw.evaluate(() => self.BCV.api.storage.local.set({ 'setup:found': { origin: 'https://lms.example.edu', tabId: null, granted: false, at: Date.now() } }));
+  await setup.waitForFunction(() => !document.getElementById('found').hidden, null, { timeout: 5000 });
+  check(/^Found lms\.example\.edu\./.test((await sTexts('#status'))[0]) && (await sTexts('#allow'))[0] === 'Allow Simpl Courses on lms.example.edu', `a site not yet allowed is named, with one button to allow it: ${(await sTexts('#allow'))[0]}`);
+  await setup.screenshot({ path: join(out, '32b-setup-found.png') });
+  // a Canvas on a site already allowed: the setup opens there by itself, and this page says so and goes
+  const canvasTab = await context.newPage();
+  await canvasTab.goto(`${BASE}/courses`);
+  // (the card cleans ?bcv=setup off the address as it opens, so the card itself is what is waited for)
+  const autoOpened = await canvasTab.waitForFunction(() => location.pathname === '/' && !!document.querySelector('#bcv-setup'), null, { timeout: 20000 }).then(() => true).catch(() => false);
+  const foundNote = await sw.evaluate(async () => (await self.BCV.api.storage.local.get('setup:found'))['setup:found']);
+  check(autoOpened && foundNote && foundNote.granted === true && foundNote.origin === new URL(canvasTab.url()).origin, `a tab arriving on an allowed Canvas is taken to the setup by itself: ${canvasTab.url()} ${JSON.stringify(foundNote)}`);
+  check(await eventually(async () => setup.isClosed() || /^Found localhost:\d+ — the setup is opening there\.$/.test((await sTexts('#status').catch(() => ['']))[0])), 'and the page after install says where it went, then closes');
+  await canvasTab.close().catch(() => {});
+  if (!setup.isClosed()) await setup.close().catch(() => {});
+  await sw.evaluate(() => self.BCV.api.storage.local.set({ 'setup:done': true, 'setup:offered': true }).then(() => self.BCV.api.storage.local.remove('setup:found')));
 
   // ---- the account panel ----------------------------------------------------------------------------------
   console.log('account panel');
@@ -2457,7 +2485,9 @@ try {
   await options.goto(`chrome-extension://${extId}/options/options.html`);
   await options.waitForSelector('#skin', { timeout: 5000 });
   const navLabels = await oTexts('.navlink__label');
-  check(/^Version \d+\.\d+/.test(await options.$eval('#version', (el) => el.textContent)) && /^1 site$/.test((await oTexts('#statusText'))[0]), `settings show the version and the site count: ${await options.$eval('#version', (el) => el.textContent)} · ${(await oTexts('#statusText'))[0]}`);
+  // the count is Canvas's own host plus every site allowed since (the mock, registered when the page after install found it)
+  const siteN = 1 + ((await sw.evaluate(() => self.BCV.settings.get())).domains || []).length;
+  check(/^Version \d+\.\d+/.test(await options.$eval('#version', (el) => el.textContent)) && (await oTexts('#statusText'))[0] === `${siteN} site${siteN === 1 ? '' : 's'}`, `settings show the version and the site count: ${await options.$eval('#version', (el) => el.textContent)} · ${(await oTexts('#statusText'))[0]}`);
   await options.screenshot({ path: join(out, '29-options-general.png') });
   await options.click('.navlink[data-section="courses"]');
   await options.waitForSelector('.course', { timeout: 15000 });
@@ -2614,6 +2644,13 @@ try {
     const to = src.indexOf('permissions.request(', from);
     const between = from >= 0 && to > from ? src.slice(from, to) : 'await';
     check(!between.includes('await'), 'the popup asks for the site permission straight from the press, awaiting nothing first (Safari refuses otherwise)');
+  }
+  { // and the page after install, which asks the same way from its Allow button
+    const src = readFileSync(join(root, 'extension', 'setup', 'setup.js'), 'utf8');
+    const from = src.indexOf('Asking for permission');
+    const to = src.indexOf('permissions.request(', from);
+    const between = from >= 0 && to > from ? src.slice(from, to) : 'await';
+    check(!between.includes('await'), 'the page after install asks for the site permission straight from the press too');
   }
   await popupPage.screenshot({ path: join(out, '30-popup.png') });
 

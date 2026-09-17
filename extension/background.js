@@ -39,6 +39,9 @@ if (typeof importScripts === 'function' && !self.BCV?.settings) {
       case 'pushSettings': // the popup and the settings page ask for this straight after a save
         reply(S.get().then(pushSettings).then(() => ({ ok: true })));
         return true;
+      case 'scanTabs': // the page after install, as it opens: a Canvas that is already open
+        reply(scanTabs());
+        return true;
       default:
         return false;
     }
@@ -308,6 +311,57 @@ if (typeof importScripts === 'function' && !self.BCV?.settings) {
     }
   }
   if (api.permissions && api.permissions.onAdded) api.permissions.onAdded.addListener(continuePending);
+
+  // ---- noticing a Canvas tab ------------------------------------------------------------------
+  /** Does this address look like Canvas? Canvas's own hosts, a host with canvas in its name, or the
+   *  paths only Canvas has. Without a permission for the site its address is all there is to go on,
+   *  and a school's own name for it (lms.school.edu) gives nothing away — the page after install
+   *  takes an address typed in for those. */
+  function looksLikeCanvas(url) {
+    if (!/^https?:$/.test(url.protocol)) return false;
+    if (/(^|\.)instructure\.com$|(^|\.)canvaslms\.com$|canvas/i.test(url.hostname)) return true;
+    return /^\/(courses|dashboard|calendar|conversations|login\/canvas)(\/|$)/.test(url.pathname) || url.searchParams.has('login_success');
+  }
+  const ourPage = (url) => url.startsWith(api.runtime.getURL(''));
+  async function siteGranted(origin) {
+    if (/\.instructure\.com$/i.test(new URL(origin).hostname)) return true;
+    try { return await api.permissions.contains({ origins: [`${origin}/*`] }); } catch { return false; }
+  }
+  /** A tab that has arrived on a Canvas page while the setup is still to do. Where the site is
+   *  already allowed, the setup opens there now — once per site per run, so the page it loads does
+   *  not open it again under the card. Where it is not, the page after install is told which site
+   *  was found and offers to allow it: that press is the gesture a permission request needs, and
+   *  the one thing the browser will not let happen on its own. Only the address is read. */
+  const noticed = new Set();
+  async function noticeTab(tab) {
+    try {
+      if (!tab || !tab.url || tab.id == null || ourPage(tab.url)) return;
+      const url = new URL(tab.url);
+      if (!looksLikeCanvas(url) || url.searchParams.get('bcv') === 'setup') return;
+      const state = await api.storage.local.get('setup:done');
+      if (state['setup:done']) return;
+      const origin = url.origin;
+      const granted = await siteGranted(origin);
+      await api.storage.local.set({ 'setup:found': { origin, tabId: tab.id, granted, at: Date.now() } });
+      if (!granted || noticed.has(origin)) return;
+      noticed.add(origin);
+      if (!/\.instructure\.com$/i.test(url.hostname)) {
+        const r = await registerDomain(origin);
+        if (r && r.ok === false) return;
+      }
+      await S.update({ appearance: { skin: true } });
+      await api.tabs.update(tab.id, { url: `${origin}/?bcv=setup`, active: true });
+    } catch {
+      /* a tab that closed, or one we may not read */
+    }
+  }
+  if (api.tabs?.onUpdated) api.tabs.onUpdated.addListener((tabId, info, tab) => { if (info.status === 'complete' || info.url) noticeTab(tab); });
+  /** Every open tab looked at once: a Canvas that was open before the page after install was. */
+  async function scanTabs() {
+    const tabs = await api.tabs.query({}).catch(() => []);
+    for (const t of tabs || []) await noticeTab(t);
+    return { ok: true };
+  }
 
   // ---- lifecycle ----------------------------------------------------------
   api.runtime.onInstalled.addListener(async (details) => {

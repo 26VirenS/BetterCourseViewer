@@ -111,6 +111,22 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
 .mark--lg .arc--3 { animation-duration: .8s; animation-delay: .26s; }
 .welcome .h1 { font-size: 32px; line-height: 1.12; letter-spacing: -.035em; animation: fadeUp .45s var(--ease) .15s both; }
 .welcome .lead { margin: 0; max-width: 330px; font: 400 15px/1.55 var(--font); color: var(--ink2); text-wrap: pretty; animation: fadeUp .45s var(--ease) .25s both; }
+/* the page after install: one line in big letters, then a watch that says what it has found */
+.welcome--big { gap: 16px; padding: 16px 0 6px; }
+.welcome .h1--huge { font-size: 40px; line-height: 1.08; max-width: 430px; }
+.watch { margin: 6px 0 0; display: inline-flex; align-items: center; gap: 9px; padding: 8px 14px; border-radius: 999px; background: var(--card); border: 1px solid var(--edge); font: 500 13px/1.3 var(--font); color: var(--ink2); animation: fadeUp .45s var(--ease) .35s both; }
+.watch__dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--blue); animation: watchPulse 1.6s ease-in-out infinite; }
+.watch.is-on .watch__dot { background: #34c759; animation: none; }
+@keyframes watchPulse { 0%, 100% { opacity: .35; transform: scale(.85); } 50% { opacity: 1; transform: scale(1); } }
+.found { margin-top: 4px; display: flex; flex-direction: column; align-items: center; gap: 12px; animation: fadeUp .35s var(--ease) both; }
+.found__t { margin: 0; max-width: 360px; font: 500 14px/1.45 var(--font); color: var(--ink2); text-wrap: pretty; }
+.other { width: 100%; }
+.other__s { cursor: pointer; font: 500 12.5px/1.4 var(--font); color: var(--ink3); list-style: none; text-align: center; }
+.other__s::-webkit-details-marker { display: none; }
+.other__row { margin-top: 10px; display: flex; gap: 8px; }
+.addr { flex: 1; min-width: 0; height: 40px; padding: 0 14px; border: 1px solid var(--edge); border-radius: 20px; background: var(--card); color: var(--ink); font: 400 14px/1 var(--font); outline: none; }
+.addr:focus { border-color: var(--blue); }
+.btn--sm { height: 40px; padding: 0 18px; font-size: 14px; border-radius: 20px; }
 
 .field { margin-top: 18px; display: flex; align-items: center; gap: 10px; padding: 13px 15px; border-radius: 15px; background: var(--card); border: 1px solid var(--edge); transition: border-color .25s ease, box-shadow .25s ease; }
 .field.is-ok { border-color: rgba(52,199,89,.5); }
