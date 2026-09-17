@@ -229,7 +229,7 @@ if (typeof importScripts === 'function' && !self.BCV?.settings) {
 
   /** Which setup flow this build carries. A build that changes the flow bumps it, and the flags
    *  from the older flow ("offered", "done") are cleared once, so the new flow is seen once. */
-  const SETUP_FLOW = 2;
+  const SETUP_FLOW = 3;
   /** Older builds kept Canvas answers in storage; nothing is kept between pages now. */
   async function dropStoredCache() {
     try {
@@ -337,6 +337,39 @@ if (typeof importScripts === 'function' && !self.BCV?.settings) {
     if (/\.instructure\.com$/i.test(new URL(origin).hostname)) return true;
     try { return await api.permissions.contains({ origins: [`${origin}/*`] }); } catch { return false; }
   }
+  /** Whether the browser granted every site at install (Chrome does, from the manifest). Where it
+   *  did, a site being allowed says nothing about it — the page has to be Canvas by its own signs.
+   *  Safari asks per site whatever the manifest says, so there an allowed site is one the user chose. */
+  async function broadGrant() {
+    try { return await api.permissions.contains({ origins: ['<all_urls>'] }); } catch { return false; }
+  }
+  /** Canvas, by the page itself — run inside the tab, DOM only: Canvas's own favicon from its own
+   *  build, its application shell, or the banner for its iOS app. A login page carries them too. */
+  const sniffFn = () => {
+    const d = document;
+    const icon = [...d.querySelectorAll('link[rel~="icon"], link[rel="shortcut icon"]')].some((l) => /\/dist\/images\/favicon[-.]/i.test(l.href || ''));
+    const shell = !!d.querySelector('#application.ic-app, body.ic-Layout, .ic-Layout-wrapper, #wrapper.ic-Layout-wrapper');
+    const banner = !!d.querySelector('meta[name="apple-itunes-app"][content*="480883488"]');
+    return { canvas: icon || shell || banner, origin: location.origin };
+  };
+  async function sniff(tabId) {
+    try {
+      const res = await api.scripting.executeScript({ target: { tabId }, func: sniffFn });
+      return !!(res && res[0] && res[0].result && res[0].result.canvas);
+    } catch {
+      return false; // a page that cannot be reached: the browser's own pages, a site Safari has not allowed
+    }
+  }
+  /** Signed in there? The setup reads the API with the user's session; on a login page it would have
+   *  nothing to read, and the tab arrives again once they are in. */
+  async function signedIn(origin) {
+    try {
+      const r = await fetch(`${origin}/api/v1/users/self`, { credentials: 'include', headers: { accept: 'application/json' } });
+      return r.status !== 401 && r.status !== 403;
+    } catch {
+      return true; // not knowable from here: let the setup find out
+    }
+  }
   /** A tab that has arrived on a Canvas page while the setup is still to do. Where the site is
    *  already allowed, the setup opens there now — once per site per run, so the page it loads does
    *  not open it again under the card. Where it is not, the page after install is told which site
@@ -351,6 +384,10 @@ if (typeof importScripts === 'function' && !self.BCV?.settings) {
    *  the way is written down for the page after install to say, rather than swallowed. */
   async function startSetupOn(origin, tabId, { force = false } = {}) {
     if (!force && noticed.has(origin)) return false;
+    if (!(await signedIn(origin))) { // the login page: the tab arrives again once they are in
+      await noteFound({ origin, tabId, granted: true, error: 'sign in to Canvas there first' });
+      return false;
+    }
     noticed.add(origin);
     if (!/\.instructure\.com$/i.test(new URL(origin).hostname)) {
       const r = await registerDomain(origin);
@@ -402,13 +439,14 @@ if (typeof importScripts === 'function' && !self.BCV?.settings) {
       const state = await api.storage.local.get('setup:done');
       if (state['setup:done']) return;
       const origin = url.origin;
-      // a site the browser has allowed for Simpl Courses was allowed for Canvas: it is Canvas by the
-      // user's own word, whatever its address looks like; any other is judged by its address alone
       const granted = await siteGranted(origin);
-      if (!granted) {
-        if (looksLikeCanvas(url, tab)) await noteFound({ origin, tabId: tab.id, granted: false });
-        return;
-      }
+      // Is it Canvas? By its address where that says so. Where the browser allows every site the
+      // page itself is asked (a tiny look at the DOM, nothing kept); where it allows this one site,
+      // the user allowed it for Canvas, and that is the user's own word for it.
+      let canvas = looksLikeCanvas(url, tab);
+      if (!canvas && granted) canvas = (await broadGrant()) ? await sniff(tab.id) : true;
+      if (!canvas) return;
+      if (!granted) { await noteFound({ origin, tabId: tab.id, granted: false }); return; } // Safari, or a Chrome kept off this site: the page after install offers the press
       await startSetupOn(origin, tab.id);
     } catch {
       /* a tab that closed, or one we may not read */
@@ -470,5 +508,5 @@ if (typeof importScripts === 'function' && !self.BCV?.settings) {
   // even when onInstalled/onStartup never fired (Safari rebuilds, reloads).
   ensureDomains().then(adoptGranted);
   offerSetup();
-  BCV.background = { offerSetup, ensureDomains, looksLikeCanvas, forgetNoticed: () => noticed.clear() }; // the harness drives these directly
+  BCV.background = { offerSetup, ensureDomains, looksLikeCanvas, sniffFn, forgetNoticed: () => noticed.clear() }; // the harness drives these directly
 })();

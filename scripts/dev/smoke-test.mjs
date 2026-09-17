@@ -76,7 +76,7 @@ try {
   const setupTabs = context.pages().filter(isSetup);
   check(setupTabs.length === 1, `installing the extension opens the guided setup page — once, not twice (${setupTabs.length} open)`);
   for (const t of setupTabs) await t.close();
-  check((await sw.evaluate(async () => (await self.BCV.api.storage.local.get('setup:flow'))['setup:flow'])) === 2, 'the build records its setup flow, so an update from an older flow offers the page once more');
+  check((await sw.evaluate(async () => (await self.BCV.api.storage.local.get('setup:flow'))['setup:flow'])) === 3, 'the build records its setup flow, so an update from an older flow offers the page once more');
   // Safari turns the extension on without an install event, so the page is offered again on a new
   // browser session while setup is unfinished — and never again once it is done or skipped.
   const setupPages = () => context.pages().filter((pg) => pg.url().endsWith('/setup/setup.html'));
@@ -2250,7 +2250,13 @@ try {
   // (the setup is undone only now, with the page open and watching: an allowed tab loading is what it waits for)
   await sw.evaluate(() => { self.BCV.background.forgetNoticed(); return self.BCV.api.storage.local.remove('setup:done'); }); // (a site is started once per run; this run has been on the mock all along)
   const canvasTab = await context.newPage();
-  await canvasTab.goto(`${BASE}/courses`);
+  await canvasTab.goto(`${BASE}/`); // the root: an address that says nothing, so it is the page itself that has to say Canvas
+  const sniffed = await sw.evaluate(async (base) => {
+    const tabs = await chrome.tabs.query({ url: `${base}/` });
+    const [{ result }] = await chrome.scripting.executeScript({ target: { tabId: tabs[0].id }, func: self.BCV.background.sniffFn });
+    return result;
+  }, BASE);
+  check(sniffed && sniffed.canvas === true && sniffed.origin === BASE, `the page itself says Canvas — its own favicon and shell: ${JSON.stringify(sniffed)}`);
   // (the card cleans ?bcv=setup off the address as it opens, so the card itself is what is waited for)
   const autoOpened = await canvasTab.waitForFunction(() => location.pathname === '/' && !!document.querySelector('#bcv-setup'), null, { timeout: 20000 }).then(() => true).catch(() => false);
   const foundNote = await sw.evaluate(async () => (await self.BCV.api.storage.local.get('setup:found'))['setup:found']);
