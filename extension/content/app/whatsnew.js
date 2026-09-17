@@ -112,6 +112,7 @@
     intro.hidden = false;
     intro.classList.remove('is-fading');
     main.classList.remove('is-in');
+    BCV.setup?.placeDot?.(intro); // the dot where the word ends, in this system's font
     void intro.offsetWidth;
     timers.push(setTimeout(() => { if (ui) ui.intro.classList.add('is-fading'); }, 1900));
     timers.push(setTimeout(() => { if (ui) { ui.intro.hidden = true; ui.main.classList.add('is-in'); } }, 2340));

@@ -2220,6 +2220,11 @@ try {
   await page.waitForTimeout(500);
   // the word-mark plays first (about two seconds), then the setup rises under it
   check(page.url() === `${BASE}/` && (await page.$('.bcv-stat')) !== null && (await page.$(su('.intro'))) !== null && (await page.$$(su('.rail__item'))).length === 4 && (await sStep()) === '1 of 4' && (await page.$eval('html', (e) => getComputedStyle(e).overflow)) === 'hidden', 'the setup opens over the dashboard on its own ground: the address cleaned, a word-mark, a rail of four steps, the page held still');
+  // the dot after "Simpl" sits where the word ends in this system's font (here a Windows-like one,
+  // wider than the Mac's: drawn at the design's fixed place it would land on the l)
+  const dotOf = (hostSel) => page.evaluate((sel) => { const r = document.querySelector(sel).shadowRoot; const t = r.querySelector('.intro text'); const d = r.querySelector('.intro__dot'); const b = t.getBBox(); const vb = r.querySelector('.intro svg').getAttribute('viewBox').split(' ').map(Number); return { gap: Math.round(Number(d.getAttribute('cx')) - (b.x + b.width)), end: Math.round(b.x + b.width), cx: Number(d.getAttribute('cx')), fits: vb[2] >= Number(d.getAttribute('cx')) + 9 }; }, hostSel);
+  const setupDot = await dotOf('#bcv-setup');
+  check(setupDot.gap >= 10 && setupDot.gap <= 18 && setupDot.fits, `the dot after Simpl sits just past the word as drawn here, inside the drawing: ${JSON.stringify(setupDot)}`);
   await page.waitForFunction(() => document.querySelector('#bcv-setup')?.shadowRoot.querySelector('.intro')?.hidden === true, null, { timeout: 8000 });
   await page.waitForTimeout(500);
   await shot(page, '32-setup-over-page');
@@ -2395,6 +2400,8 @@ try {
   await sw.evaluate(async () => { await self.BCV.api.storage.local.set({ 'whatsnew:from': '2.7.5' }); await self.BCV.api.storage.local.remove('whatsnew:seen'); });
   await page.goto(`${BASE}/`);
   await page.waitForSelector(wn('.wn__note'), { timeout: 20000 });
+  const wnDot = await dotOf('#bcv-whatsnew');
+  check(wnDot.gap >= 10 && wnDot.gap <= 18 && wnDot.fits, `its word-mark's dot sits just past the word too: ${JSON.stringify(wnDot)}`);
   await page.waitForFunction(() => document.querySelector('#bcv-whatsnew')?.shadowRoot.querySelector('.intro')?.hidden === true, null, { timeout: 8000 }); // the word-mark first
   await page.waitForTimeout(500);
   const wnHead = await page.evaluate(() => { const r = document.querySelector('#bcv-whatsnew').shadowRoot; return { from: r.querySelector('.wn__from')?.textContent ?? null, to: r.querySelector('.wn__to')?.textContent, ver: r.querySelector('.wn__ver')?.textContent, date: r.querySelector('.wn__date')?.textContent, filters: [...r.querySelectorAll('.wn__filter')].map((f) => `${f.querySelector('.wn__flabel').textContent} ${f.querySelector('.wn__count').textContent}${f.classList.contains('is-on') ? ' *' : ''}`), notes: [...r.querySelectorAll('.wn__note')].map((n) => `${n.dataset.kind}: ${n.querySelector('.wn__title').textContent} [${n.querySelector('.wn__kind').textContent}]`), foot: r.querySelector('#dismiss')?.textContent.trim(), hint: r.querySelector('.fr__hint')?.textContent }; });
