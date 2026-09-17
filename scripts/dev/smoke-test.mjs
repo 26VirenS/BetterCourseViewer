@@ -1265,6 +1265,18 @@ try {
   await page.waitForSelector('.bcv-grades__main .bcv-row', { timeout: 15000 });
   check(await eventually(async () => (await scoreOf('Lec01-PreQuiz')) === '16 / 16') && (await page.evaluate(() => window.__bcvMark === 1)), `past its freshness the mark is asked for again on the next look, no reload (${await scoreOf('Lec01-PreQuiz')}, mark ${await page.evaluate(() => window.__bcvMark)})`);
   await setFreshness(30000);
+  // and never the browser's own cache: even where Canvas (or something in front of it) says an answer
+  // may be kept for ten minutes, a fresh page asks again and sees the mark posted since
+  await fetch(`${BASE}/__mock/config`, { method: 'POST', body: JSON.stringify({ cacheable: true }) });
+  await page.goto(`${BASE}/courses/101/grades`);
+  await page.waitForSelector('.bcv-grades__main .bcv-row', { timeout: 15000 });
+  const lastApi = await fetch(`${BASE}/__mock/last-api`).then((r) => r.text()).then((t) => JSON.parse(t.replace(/^while\(1\);/, '')));
+  check((await scoreOf('Lec01-PreQuiz')) === '16 / 16' && lastApi.headers['cache-control'] === 'no-cache' && lastApi.headers.pragma === 'no-cache', `every question to Canvas says not to answer from a cache (${lastApi.path}: ${lastApi.headers['cache-control']})`);
+  await mockScore({ assignmentId: '1001', score: 14 });
+  await page.goto(`${BASE}/courses/101/grades`);
+  await page.waitForSelector('.bcv-grades__main .bcv-row', { timeout: 15000 });
+  check(await eventually(async () => (await scoreOf('Lec01-PreQuiz')) === '14 / 16'), `a fresh page never draws a cached body: the mark posted since shows (${await scoreOf('Lec01-PreQuiz')})`);
+  await fetch(`${BASE}/__mock/config`, { method: 'POST', body: JSON.stringify({ cacheable: false }) });
   await mockScore({ assignmentId: '1001', score: 13 }); // the seeded mark again for what follows
   await page.goto(`${BASE}/courses/101/grades`);
   await page.waitForSelector('.bcv-rings__svg', { timeout: 10000 });

@@ -125,11 +125,18 @@
       const timer = ac ? setTimeout(() => ac.abort(), REQUEST_TIMEOUT) : null;
       try {
         // Canvas refuses any non-GET request without the CSRF token, body or not (a DELETE has none).
+        // Never the browser's HTTP cache, and nothing in between is to answer from its own: a
+        // score read from a cached body is a score days old (a grade a tool posted, never seen
+        // until a look switch happened to reload the page) — the per-page memo above is the only
+        // cache these answers live in.
         res = await fetch(url, {
           method,
           credentials: 'same-origin',
+          cache: 'no-store',
           headers: {
             accept: ACCEPT,
+            'cache-control': 'no-cache',
+            pragma: 'no-cache',
             ...(method !== 'GET' ? { 'x-csrf-token': csrfToken() } : {}),
             ...(body ? { 'content-type': 'application/json' } : {}),
             'x-requested-with': 'XMLHttpRequest',

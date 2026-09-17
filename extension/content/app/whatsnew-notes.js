@@ -21,6 +21,9 @@
     clock: 'M12 5a8 8 0 100 16 8 8 0 000-16zM12 9v4l3 2',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.12.2', date: '2026-09-17', notes: [
+      { kind: 'fixed', title: 'Never a days-old grade', body: 'Canvas is always asked afresh: nothing is read from the browser’s cache, so a grade posted days ago cannot go on missing.', where: 'Grades, and a course’s Grades tab', icon: P.check },
+    ] },
     { version: '2.12.1', date: '2026-09-17', notes: [
       { kind: 'fixed', title: 'Grades from tools show up', body: 'A grade a tool posts while the page is open now shows on the next look at Grades, no reload needed.', where: 'Grades, and a course’s Grades tab', icon: P.check },
     ] },

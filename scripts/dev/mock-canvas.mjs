@@ -473,7 +473,9 @@ function recordAnswer(courseId, quizId, subId, raw) {
 const routes = [];
 const on = (method, re, handler) => routes.push([method, re, handler]);
 const json = (res, data, status = 200) => {
-  res.writeHead(status, { 'content-type': 'application/json; charset=utf-8' });
+  // test-only: with cacheable on, API answers say they may be kept for ten minutes — the extension must not let the browser keep them
+  const cache = mockConfig.cacheable && status === 200 ? { 'cache-control': 'public, max-age=600' } : {};
+  res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', ...cache });
   res.end('while(1);' + JSON.stringify(data));
 };
 const filterDates = (list, url, field) => {
@@ -554,9 +556,12 @@ on('GET', /^\/api\/v1\/groups\/(\w+)\/pages$/, () => [{ url: 'group-notes', titl
 on('GET', /^\/api\/v1\/groups\/(\w+)\/pages\/([^/]+)$/, () => ({ url: 'group-notes', title: 'Group notes', body: '<p>Meeting Tuesday.</p>', created_at: ago(5 * D), updated_at: ago(D) }));
 on('GET', /^\/api\/v1\/groups\/(\w+)\/folders\/root$/, (url, m) => ({ id: `rg${m[1]}`, name: 'group files', full_name: 'group files', context_id: m[1] }));
 on('GET', /^\/api\/v1\/groups\/(\w+)$/, (url, m) => { const g = groupList.find((x) => x.id === m[1]); return g ? { ...g, avatar_url: null } : null; });
-// test-only switches: POST /__mock/config {"calendarFail": true}
-const mockConfig = { calendarFail: false };
+// test-only switches: POST /__mock/config {"calendarFail": true} — cacheable: API answers carry a ten-minute max-age
+const mockConfig = { calendarFail: false, cacheable: false };
 on('POST', /^\/__mock\/config$/, (url, m, body) => Object.assign(mockConfig, body));
+// test-only: the last API request as it arrived (its headers say whether the extension asked for a fresh answer)
+let lastApi = null;
+on('GET', /^\/__mock\/last-api$/, () => lastApi);
 // test-only: a grade lands from elsewhere (a tool's frame, a teacher) — an assignment's score, a course's total
 on('POST', /^\/__mock\/score$/, (url, m, body) => {
   if (body.assignmentId != null) scoreOverrides.set(String(body.assignmentId), body.score);
@@ -761,6 +766,7 @@ const server = http.createServer((req, res) => {
     if (req.method !== 'GET' && !path.startsWith('/__mock/') && !path.startsWith('/__upload/') && path !== '/logout' && !path.endsWith('/record_answer') && req.headers['x-csrf-token'] !== CSRF) return json(res, { errors: [{ message: 'invalid authenticity token' }] }, 422);
     // a session that has ended: like Canvas, every API call answers 401 "unauthenticated" (the pages themselves are still served here, so the app boots and finds out)
     if (mockConfig.sessionLost && path.startsWith('/api/')) return json(res, { status: 'unauthenticated', errors: [{ message: 'user authorization required' }] }, 401);
+    if (path.startsWith('/api/')) lastApi = { method: req.method, path, headers: req.headers };
     for (const [method, re, handler] of routes) {
       if (method !== req.method) continue;
       const m = path.match(re);
