@@ -94,8 +94,10 @@ const rubric = [
   { id: 'c1', description: 'Correctness', long_description: '<p>&bull; Every answer is correct<br/>&bull; Units on each one<br/>&bull; Working shown for every step, in the order it was done, with the reasoning written out so a marker can follow it without having to guess at anything</p>', points: 6, ratings: [{ id: 'r1', description: 'Full marks', points: 6 }, { id: 'r2', description: 'Partial', points: 3 }, { id: 'r2b', description: 'No marks', points: 0 }] },
   { id: 'c2', description: 'Work shown', long_description: 'Steps are legible and complete.', points: 4, ratings: [{ id: 'r3', description: 'Full marks', points: 4 }, { id: 'r4', description: 'Partial', points: 2 }, { id: 'r4b', description: 'No marks', points: 0 }] },
 ];
+const scoreOverrides = new Map(); // assignment id → a score that landed after the seed (POST /__mock/score)
 function assignmentObj(courseId, row) {
-  const [id, name, group, possible, earned, dueDay, dueHour, subDay, extra] = row;
+  const [id, name, group, possible, seeded, dueDay, dueHour, subDay, extra] = row;
+  const earned = scoreOverrides.has(String(id)) ? scoreOverrides.get(String(id)) : seeded;
   const c = courseById(courseId);
   const groups = (GROUPS[courseId] || [[Object.keys(groupNames(courseId))[0], 0]]);
   const gIdx = groups.findIndex(([g]) => g === group);
@@ -555,6 +557,12 @@ on('GET', /^\/api\/v1\/groups\/(\w+)$/, (url, m) => { const g = groupList.find((
 // test-only switches: POST /__mock/config {"calendarFail": true}
 const mockConfig = { calendarFail: false };
 on('POST', /^\/__mock\/config$/, (url, m, body) => Object.assign(mockConfig, body));
+// test-only: a grade lands from elsewhere (a tool's frame, a teacher) — an assignment's score, a course's total
+on('POST', /^\/__mock\/score$/, (url, m, body) => {
+  if (body.assignmentId != null) scoreOverrides.set(String(body.assignmentId), body.score);
+  if (body.courseId != null && body.courseScore != null) { const c = courseById(body.courseId); if (c) c.score = body.courseScore; }
+  return { ok: true };
+});
 // test-only: put an attempt back to untaken, so Canvas's own take page has something to show
 on('POST', /^\/__mock\/reopen-quiz$/, (url, m, body) => {
   const s = (quizSubs.get(String(body.quizId)) || [])[0];

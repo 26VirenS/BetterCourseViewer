@@ -160,13 +160,13 @@
     }, { force, refresh });
   }
 
-  function rawCourses({ force = false, refresh = false } = {}) {
+  function rawCourses({ force = false, refresh = false, maxAge = 0 } = {}) {
     return C.cached('courses:all', 15 * MIN, () =>
       C.get('/api/v1/courses', {
         params: { per_page: 100, include: ['term', 'favorites', 'total_scores', 'teachers', 'sections', 'course_image'] },
         all: true,
         maxPages: 5,
-      }), { force, refresh });
+      }), { force, refresh, maxAge });
   }
 
   function cards({ force = false, refresh = false } = {}) {
@@ -188,8 +188,8 @@
   }
 
   /** All courses, decorated with colour, palette, favourite flag and state. */
-  async function courses({ force = false, refresh = false } = {}) {
-    const [list, cols, dark] = await Promise.all([rawCourses({ force, refresh }), colors({ force, refresh }), Promise.resolve(BCV.early?.isDark?.() ?? false)]);
+  async function courses({ force = false, refresh = false, maxAge = 0 } = {}) {
+    const [list, cols, dark] = await Promise.all([rawCourses({ force, refresh, maxAge }), colors({ force, refresh }), Promise.resolve(BCV.early?.isDark?.() ?? false)]);
     const seen = new Set();
     const out = [];
     let fallbackIdx = 0;
@@ -802,22 +802,36 @@
   function courseStream(id, { force = false, refresh = false, kind = 'courses' } = {}) {
     return C.cached(`cstream:${kind}:${id}`, 3 * MIN, () => C.get(`/api/v1/${kind}/${id}/activity_stream`, { params: { per_page: 40 } }), { force, refresh });
   }
-  function assignments(id, { force = false, refresh = false } = {}) {
+  function assignments(id, { force = false, refresh = false, maxAge = 0 } = {}) {
     return C.cached(`assignments:${id}`, 10 * MIN, () =>
-      C.get(`/api/v1/courses/${id}/assignments`, { params: { per_page: 100, include: ['submission', 'all_dates'], order_by: 'due_at' }, all: true, maxPages: 4 }), { force, refresh });
+      C.get(`/api/v1/courses/${id}/assignments`, { params: { per_page: 100, include: ['submission', 'all_dates'], order_by: 'due_at' }, all: true, maxPages: 4 }), { force, refresh, maxAge });
   }
-  function assignment(id, aid, { force = false, refresh = false } = {}) {
+  function assignment(id, aid, { force = false, refresh = false, maxAge = 0 } = {}) {
     return C.cached(`assignment:${id}:${aid}`, 5 * MIN, () =>
-      C.get(`/api/v1/courses/${id}/assignments/${aid}`, { params: { include: ['submission', 'score_statistics', 'can_submit'] } }), { force, refresh });
+      C.get(`/api/v1/courses/${id}/assignments/${aid}`, { params: { include: ['submission', 'score_statistics', 'can_submit'] } }), { force, refresh, maxAge });
   }
   function submission(id, aid, { force = false, refresh = false } = {}) {
     return C.cached(`submission:${id}:${aid}`, 5 * MIN, () =>
       // submission_history carries per-question points for quiz attempts (the feedback screen reads it)
       C.get(`/api/v1/courses/${id}/assignments/${aid}/submissions/self`, { params: { include: ['submission_comments', 'rubric_assessment', 'submission_history'] } }).catch(() => null), { force, refresh });
   }
-  function assignmentGroups(id, { force = false, refresh = false } = {}) {
+  function assignmentGroups(id, { force = false, refresh = false, maxAge = 0 } = {}) {
     return C.cached(`agroups:${id}`, 10 * MIN, () =>
-      C.get(`/api/v1/courses/${id}/assignment_groups`, { params: { per_page: 50, include: ['assignments', 'submission'], exclude_assignment_submission_types: ['wiki_page'] }, all: true, maxPages: 3 }), { force, refresh });
+      C.get(`/api/v1/courses/${id}/assignment_groups`, { params: { per_page: 50, include: ['assignments', 'submission'], exclude_assignment_submission_types: ['wiki_page'] }, all: true, maxPages: 3 }), { force, refresh, maxAge });
+  }
+  // ---- grades change behind the page's back ------------------------------------------------------
+  // A grade lands in Canvas while this page keeps what it read: a tool (an LTI plugin marking work
+  // in its own frame), a teacher elsewhere. Every screen that shows a score forgets its answers here,
+  // so the next draw asks again — on the way back from a tool's page or frame, and on returning to
+  // the tab after a while away (app.js). And a grades screen never draws from an answer older than
+  // `freshness.grades`, whatever the memo's TTL (a test winds it down to 0).
+  const freshness = { grades: 30e3 };
+  async function invalidateGrades() {
+    await Promise.all([
+      C.invalidate('courses:all'), C.invalidate('cards'), C.invalidatePrefix('course:'),
+      C.invalidatePrefix('assignments:'), C.invalidatePrefix('agroups:'), C.invalidatePrefix('assignment:'), C.invalidatePrefix('submission:'),
+      C.invalidate('activity'), C.invalidate('activity:summary'), invalidatePlanner(),
+    ]);
   }
   // ---- handing work in ------------------------------------------------------------------------
   /** Tools the instructor enabled for handing work in (Box, Office 365, …): Canvas draws one
@@ -1204,7 +1218,7 @@
   }
 
   BCV.store = {
-    env, pref, setPref, mergePref, me, account, colors, courses, favorites, cards, setFavorite, setNickname, currentTerm, dashboardView, setDashboardView,
+    env, pref, setPref, mergePref, me, account, colors, courses, favorites, cards, setFavorite, setNickname, currentTerm, dashboardView, setDashboardView, freshness, invalidateGrades,
     planner, classify, todo, todoWindow, setComplete, dismiss, restore, invalidatePlanner, createNote, deleteNote, activity, activitySummary, unreadCount, groups, group,
     announcementsFeed, streamSeen, markStreamSeen, setColor, history, helpLinks,
     calendarContexts, ownContexts, selectedContexts, setSelectedContexts, calendarEvents, plannerRange,

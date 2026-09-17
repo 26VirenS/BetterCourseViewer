@@ -1223,6 +1223,52 @@ try {
   await page.goto(`${BASE}/courses/101/grades`);
   await page.waitForSelector('.bcv-rings__svg', { timeout: 10000 });
 
+  // ---- a grade that lands from elsewhere is never shown stale -----------------------------------------
+  // A tool (an LTI plugin marking work in its own frame) or a teacher posts a grade while this page
+  // keeps what it read. The scores are asked for again once a tool's frame has been on screen, and a
+  // grades screen never draws from an answer older than its freshness — no reload, no look switch.
+  console.log('grades stay fresh');
+  const mockScore = (body) => fetch(`${BASE}/__mock/score`, { method: 'POST', body: JSON.stringify(body) }).then((r) => r.ok);
+  const scoreOf = (name) => page.$$eval('.bcv-grades__main .bcv-row', (els, n) => els.find((e) => e.querySelector('.bcv-grade__name')?.textContent === n)?.querySelector('.bcv-grade__score')?.textContent || null, name);
+  // in-place hops and a knob, driven from inside the interface (the content script's own world)
+  const appGo = (path) => sw.evaluate(async ({ base, path: p }) => { const [t] = await chrome.tabs.query({ url: `${base}/*` }); await chrome.scripting.executeScript({ target: { tabId: t.id }, world: 'ISOLATED', func: (href) => { self.BCV.app.go(href); }, args: [p] }); }, { base: BASE, path });
+  const setFreshness = (ms) => sw.evaluate(async ({ base, ms: v }) => { const [t] = await chrome.tabs.query({ url: `${base}/*` }); await chrome.scripting.executeScript({ target: { tabId: t.id }, world: 'ISOLATED', func: (n) => { self.BCV.store.freshness.grades = n; }, args: [v] }); }, { base: BASE, ms });
+  await page.evaluate(() => { window.__bcvMark = 1; }); // only a reload clears it: everything below stays in place
+  check((await scoreOf('Lec01-PreQuiz')) === '13 / 16', `the quiz's mark to begin with: ${await scoreOf('Lec01-PreQuiz')}`);
+  check(await mockScore({ assignmentId: '1001', score: 15 }), 'a new mark lands in Canvas for it, behind the page\'s back');
+  // a tool's frame on screen in between (Box, in the submit block of another course's assignment), then back to Grades, all in place
+  await appGo('/courses/104/assignments/4002');
+  await page.waitForSelector('.bcv-sb--embed', { timeout: 15000 });
+  if (await page.$('.bcv-sb__done')) { await page.click('.bcv-sb__donebtns .bcv-sb__btn:not(.bcv-sb__btn--primary)'); await page.waitForSelector('.bcv-sb__tabs', { timeout: 5000 }); }
+  await page.click('.bcv-sb__tab[data-tab=other]');
+  await page.click('.bcv-sb__tool');
+  await page.waitForSelector('.bcv-sheet--tool .bcv-sb__frame', { timeout: 5000 });
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !document.querySelector('.bcv-sheet--tool'), null, { timeout: 5000 });
+  const leaveAnyway = (d) => d.accept(); // an unsent draft in the block asks before leaving: leave
+  page.on('dialog', leaveAnyway);
+  await appGo('/courses/101/grades');
+  await page.waitForSelector('.bcv-grades__main .bcv-row', { timeout: 15000 });
+  page.off('dialog', leaveAnyway);
+  check(await eventually(async () => (await scoreOf('Lec01-PreQuiz')) === '15 / 16') && (await page.evaluate(() => window.__bcvMark === 1)), `a tool's frame was on screen in between: back on Grades the new mark shows, asked for again, no reload (${await scoreOf('Lec01-PreQuiz')}, mark ${await page.evaluate(() => window.__bcvMark)})`);
+  check(await mockScore({ assignmentId: '1001', score: 16 }), 'and another lands');
+  await appGo('/');
+  await page.waitForSelector('.bcv-stat', { timeout: 15000 });
+  await appGo('/courses/101/grades');
+  await page.waitForSelector('.bcv-grades__main .bcv-row', { timeout: 15000 });
+  await page.waitForTimeout(500);
+  check((await scoreOf('Lec01-PreQuiz')) === '15 / 16', `within the freshness the answer just read is drawn again, no request (${await scoreOf('Lec01-PreQuiz')})`);
+  await setFreshness(1); // a millisecond: the suite cannot wait the 30 seconds (0 would mean no limit)
+  await appGo('/');
+  await page.waitForSelector('.bcv-stat', { timeout: 15000 });
+  await appGo('/courses/101/grades');
+  await page.waitForSelector('.bcv-grades__main .bcv-row', { timeout: 15000 });
+  check(await eventually(async () => (await scoreOf('Lec01-PreQuiz')) === '16 / 16') && (await page.evaluate(() => window.__bcvMark === 1)), `past its freshness the mark is asked for again on the next look, no reload (${await scoreOf('Lec01-PreQuiz')}, mark ${await page.evaluate(() => window.__bcvMark)})`);
+  await setFreshness(30000);
+  await mockScore({ assignmentId: '1001', score: 13 }); // the seeded mark again for what follows
+  await page.goto(`${BASE}/courses/101/grades`);
+  await page.waitForSelector('.bcv-rings__svg', { timeout: 10000 });
+
   // people
   await tab('people');
   await page.waitForSelector('.bcv-body .bcv-row', { timeout: 10000 });

@@ -85,7 +85,7 @@
     body.append(U.loading('cards', 6)); // course-card skeletons: the layout does not jump when the data lands
 
     const [all, term, trackingPref, goalPref, targetsPref, snapsPref, hiddenPref] = await Promise.all([
-      store.courses().catch(() => null), store.currentTerm().catch(() => ''),
+      store.courses({ maxAge: store.freshness.grades }).catch(() => null), store.currentTerm().catch(() => ''), // never a score older than the freshness: a tool may have posted one since
       store.pref('gpaTracking'), store.pref('gpaGoal'), store.pref('gradeTargets'), store.pref('gpaSnapshots'), store.pref('gpaHidden'),
     ]);
     if (!ctx.alive()) return screen;

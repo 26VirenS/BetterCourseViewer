@@ -18,7 +18,7 @@
     const dark = shell.dark;
     const b = U.el('bcv-body bcv-body--course-cols');
     b.append(U.loading());
-    const groups = await store.assignmentGroups(c.id).catch(() => null);
+    const groups = await store.assignmentGroups(c.id, { maxAge: store.freshness.grades }).catch(() => null); // never a score older than the freshness: a tool may have posted one since
     if (!ctx.alive()) return b;
     if (!groups) return b.replaceChildren(U.errorBox('Grades could not be loaded.')) || b;
     const st = whatIfState.get(c.id) || { on: false, values: {} };

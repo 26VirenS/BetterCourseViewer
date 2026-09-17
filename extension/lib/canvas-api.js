@@ -223,21 +223,24 @@
   // for its TTL and is fetched again after that. Nothing is kept between pages.
   // A write invalidates a key; a request for that key that was already running when the write
   // happened answers its caller but never lands in the memo (it would put the stale list back).
-  const memory = new Map(); // key → { value, until }
+  // A caller that must not draw from an old answer (a score: a tool may have posted a grade since)
+  // asks with maxAge — an answer older than that is fetched again, whatever its TTL.
+  const memory = new Map(); // key → { value, at, until }
   const inflight = new Map();
   const generation = new Map();
   const cacheKey = (key) => `${location.host}:${key}`;
-  async function cached(key, ttlMs, loader, { force = false, refresh = false } = {}) {
+  async function cached(key, ttlMs, loader, { force = false, refresh = false, maxAge = 0 } = {}) {
     const k = cacheKey(key);
     if (!force && !refresh) {
       const hit = memory.get(k);
-      if (hit && (!hit.until || hit.until > Date.now())) return hit.value;
+      const fresh = hit && (!hit.until || hit.until > Date.now()) && !(maxAge > 0 && Date.now() - (hit.at || 0) > maxAge);
+      if (fresh) return hit.value;
       if (inflight.has(k)) return inflight.get(k);
     }
     const gen = generation.get(k) || 0;
     const run = (async () => {
       const value = await loader();
-      if ((generation.get(k) || 0) === gen) memory.set(k, { value, until: ttlMs > 0 ? Date.now() + ttlMs : 0 });
+      if ((generation.get(k) || 0) === gen) memory.set(k, { value, at: Date.now(), until: ttlMs > 0 ? Date.now() + ttlMs : 0 });
       return value;
     })();
     inflight.set(k, run);

@@ -302,6 +302,16 @@
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') U.closeMenus();
     });
+    // A tool's frame going away (Box or Office 365 in the submit sheet, any framed LTI tool) may
+    // have left a grade behind: the scores are asked for again on the next draw. The sheets that
+    // hold such frames hang off the body, not the shell, so that is what is watched.
+    new MutationObserver((muts) => {
+      for (const m of muts) {
+        for (const n of m.removedNodes) {
+          if (n.nodeType === 1 && (n.matches?.('iframe.bcv-sb__frame') || n.querySelector?.('iframe.bcv-sb__frame'))) { store.invalidateGrades(); return; }
+        }
+      }
+    }).observe(document.body, { childList: true, subtree: true });
     // Every plain link inside a screen (a module item, a link in a page's prose, a row) navigates the
     // way the sidebar does: in place when the interface draws that address, a real load otherwise.
     main.addEventListener('click', (e) => {
@@ -751,9 +761,17 @@
   // Back to the tab after a while away, Canvas is asked the cheapest question there is, so a
   // session that ended in the meantime is found out now rather than by the next press.
   let hiddenAt = 0;
+  const onGradesScreen = () => { const rt = state.route; return !!rt && (rt.screen === 'gpa' || (rt.screen === 'course' && rt.tab === 'grades')); };
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') { hiddenAt = Date.now(); return; }
     if (hiddenAt && Date.now() - hiddenAt > 5 * 60 * 1000 && !self.BCVBridge?.native) BCV.canvas.checkSession?.();
+    // A grade may have landed while the tab was away (work marked in a tool in another window, a
+    // teacher): the scores are asked for again, and a grades screen on show is drawn again now —
+    // unless a what-if is being typed into, which a redraw would wipe.
+    if (hiddenAt && Date.now() - hiddenAt > 60 * 1000 && !inQuiz()) {
+      store.invalidateGrades();
+      if (onGradesScreen() && !document.querySelector('.bcv-whatif, .bcv-whatif__input')) render({ quiet: true });
+    }
     hiddenAt = 0;
   });
   // A page left sitting for a long stretch — a tab open in another window, a laptop asleep, an
@@ -798,10 +816,14 @@
 
   // ---- screens --------------------------------------------------------------------------------
   const SCREEN_PATIENCE = 15000; // a screen still not drawn after this gives way to Canvas's own page
+  /** A Canvas-drawn page or a tool's page: work marked there (an LTI plugin posting a grade) lands
+   *  behind this page's back, so the scores are asked for again on the way back from one. */
+  const toolish = (rt) => !!rt && (rt.screen === 'native' || rt.tab === 'tool');
   async function render({ quiet = false } = {}) {
     const prev = state.route;
     const r = parseRoute();
     state.route = r;
+    if (toolish(prev) && !toolish(r)) store.invalidateGrades();
     noteArrival(r); // the trail, and state.from: what every Back on this screen names
     const id = ++state.renderId;
     const alive = () => id === state.renderId;
