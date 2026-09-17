@@ -1021,27 +1021,53 @@
   // for every page, or this page view only (see BCV.early.flipLook). The popup and Settings →
   // General have the same switch; "Open in stock Canvas" on a Canvas-drawn page is the same move.
   const LOOK_MARK = '<svg viewBox="0 0 120 120" width="18" height="18" aria-hidden="true"><rect x="16" y="18" width="53" height="84" rx="14" fill="rgba(255,255,255,.35)"/><path d="M28 30 H69 A30 30 0 0 1 69 90 H28" fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><path d="M35 42 H69 A18 18 0 0 1 69 78 H35" fill="none" stroke="rgba(255,255,255,.72)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><path d="M42 54 H69 A6 6 0 0 1 69 66 H42" fill="none" stroke="rgba(255,255,255,.46)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  // Under the pointer (or the keyboard's focus) it opens a second row: Persistent, the same switch
+  // the popup has, so what a press of the look switch does can be changed right there.
   function mountLookToggle() {
     if (self.BCVBridge?.native || document.getElementById('bcv-look')) return; // the app has its own settings sheet
     const on = () => !!BCV.early?.isOn?.();
-    const btn = h('button', { type: 'button', id: 'bcv-look', class: 'bcv-look', role: 'switch' }, [
+    const persist = () => !!(BCV.early?.settings?.() || state.settings)?.appearance?.persistLook;
+    const sw = (cls = '') => h('span', { class: `bcv-look__sw ${cls}`, 'aria-hidden': 'true' }, h('span', { class: 'bcv-look__knob' }));
+    const mainBtn = h('button', { type: 'button', class: 'bcv-look__main', role: 'switch', 'aria-label': 'Simpl Courses look' }, [
       h('span', { class: 'bcv-look__mark', 'aria-hidden': 'true', html: LOOK_MARK }),
       h('span', { class: 'bcv-look__text', text: 'Simpl Courses' }),
-      h('span', { class: 'bcv-look__sw', 'aria-hidden': 'true' }, h('span', { class: 'bcv-look__knob' })),
+      sw(),
     ]);
+    const hint = h('span', { class: 'bcv-look__phint' });
+    const persistBtn = h('button', { type: 'button', class: 'bcv-look__persist', role: 'switch', 'aria-label': 'Persistent' }, [
+      h('span', { class: 'bcv-look__pbody' }, [h('span', { class: 'bcv-look__ptext', text: 'Persistent' }), hint]),
+      sw('bcv-look__sw--small'),
+    ]);
+    const box = h('div', { id: 'bcv-look', class: 'bcv-look' }, [mainBtn, persistBtn]);
     const paint = () => {
       const now = on();
-      btn.classList.toggle('is-on', now);
-      btn.setAttribute('aria-checked', now ? 'true' : 'false');
-      btn.setAttribute('aria-label', 'Simpl Courses look');
-      btn.title = now ? 'Simpl Courses look is on. Press for stock Canvas.' : 'Stock Canvas. Press for the Simpl Courses look.';
+      const keep = persist();
+      mainBtn.classList.toggle('is-on', now);
+      mainBtn.setAttribute('aria-checked', now ? 'true' : 'false');
+      mainBtn.title = now ? 'Simpl Courses look is on. Press for stock Canvas.' : 'Stock Canvas. Press for the Simpl Courses look.';
+      persistBtn.classList.toggle('is-on', keep);
+      persistBtn.setAttribute('aria-checked', keep ? 'true' : 'false');
+      hint.textContent = keep ? 'The switch saves, for every page' : 'The switch changes this page only';
+      persistBtn.title = keep ? 'Persistent is on: the look switch saves. Press so it changes this page only.' : 'Persistent is off: the look switch changes this page only. Press so it saves.';
     };
-    btn.addEventListener('click', () => {
-      btn.classList.add('is-busy'); // the page loads afresh; until then the press is not repeated
-      Promise.resolve(BCV.early?.flipLook?.(!on())).finally(() => btn.classList.remove('is-busy'));
+    mainBtn.addEventListener('click', () => {
+      box.classList.add('is-busy'); // the page loads afresh; until then the press is not repeated
+      Promise.resolve(BCV.early?.flipLook?.(!on())).finally(() => box.classList.remove('is-busy'));
+    });
+    persistBtn.addEventListener('click', async () => {
+      // like the popup's: turning it on makes the look this page shows the saved one, so what is on
+      // screen is what stays (and nothing reloads)
+      const want = !persist();
+      const patch = { appearance: { persistLook: want } };
+      if (want) patch.appearance.skin = on();
+      try {
+        const next = await S.update(patch);
+        await BCV.early?.sync?.(next); // a storage change may never reach this page (Safari): applied here
+      } catch { /* the page keeps its own */ }
+      paint();
     });
     paint();
-    document.body.append(btn);
+    document.body.append(box);
     BCV.early?.onChange?.(paint);
   }
 

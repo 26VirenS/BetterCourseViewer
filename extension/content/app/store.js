@@ -1078,13 +1078,33 @@
     return C.cached(`modules:${id}`, 10 * MIN, () =>
       C.get(`/api/v1/courses/${id}/modules`, { params: { per_page: 50, include: ['items', 'content_details'] }, all: true, maxPages: 4 }), { force, refresh });
   }
-  /** The module item an assignment (or page, quiz…) is, with its completion requirement — Canvas's
-   *  own module_item_sequence, which is also what its page reads to decide whether to offer "Mark as
-   *  done". Null when the item is in no module, or Canvas does not answer. */
-  function moduleItemFor(id, type, assetId, { force = false } = {}) {
-    return C.cached(`modseq:${id}:${type}:${assetId}`, 2 * MIN, () =>
+  /** The module item an assignment (or page, quiz…) is, with its completion requirement. Canvas's
+   *  own module_item_sequence first (what its page reads for "Mark as done"). Where that names no
+   *  item, or an item without its requirement — a live Canvas answers either way, and a graded
+   *  discussion or a quiz sits in its module as the topic or the quiz, not as its assignment — the
+   *  modules themselves are read, and the item found there by its id (the sequence's, or the
+   *  module_item_id Canvas puts in a link from the Modules page), by what it holds (the assignment,
+   *  its quiz, its topic), or by its link. Null when the item is in no module, or Canvas does not
+   *  answer. */
+  async function moduleItemFor(id, type, assetId, { force = false, asset = null, itemId = null } = {}) {
+    const fromSeq = await C.cached(`modseq:${id}:${type}:${assetId}`, 2 * MIN, () =>
       C.get(`/api/v1/courses/${id}/module_item_sequence`, { params: { asset_type: type, asset_id: assetId } })
         .then((r) => (r?.items || [])[0]?.current || null).catch(() => null), { force });
+    if (fromSeq?.completion_requirement && (!itemId || String(fromSeq.id) === String(itemId))) return fromSeq;
+    let mods = null;
+    try { mods = await modules(id, { force }); } catch { return fromSeq; }
+    const flat = (mods || []).flatMap((m) => (m.items || []).map((it) => ({ ...it, module_id: it.module_id || m.id })));
+    const kinds = { Assignment: 'assignments', Quiz: 'quizzes', Page: 'pages', Discussion: 'discussion_topics', File: 'files' };
+    const keys = [[type, String(assetId)]];
+    if (asset?.quiz_id) keys.push(['Quiz', String(asset.quiz_id)]);
+    if (asset?.discussion_topic?.id) keys.push(['Discussion', String(asset.discussion_topic.id)]);
+    const links = keys.map(([t, k]) => new RegExp(`/${kinds[t] || t}/${k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:[/?#]|$)`));
+    const holds = (it) => keys.some(([t, k]) => it.type === t && String(it.content_id) === k) || links.some((re) => re.test(it.html_url || ''));
+    const same = (it, other) => other != null && String(it.id) === String(other);
+    const cands = flat.filter((it) => same(it, itemId) || same(it, fromSeq?.id) || holds(it));
+    const best = cands.find((it) => same(it, itemId)) || cands.find((it) => it.completion_requirement?.type === 'must_mark_done') || cands.find((it) => it.completion_requirement) || cands[0];
+    if (!best) return fromSeq;
+    return { ...(fromSeq || {}), ...best, module_id: best.module_id || fromSeq?.module_id };
   }
   /** Mark a module item done, or take that back: the same call Canvas's own "Mark as done" makes.
    *  The item's module and the sequence it came from are read again afterwards, so every screen

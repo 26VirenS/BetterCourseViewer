@@ -105,7 +105,7 @@
     // assignment list is the slow one — every assignment with its submission — and behind a
     // dashboard's own requests it took the page past its patience, which reads as a page that never
     // comes. Each slot is filled, or taken out, when the answer arrives.
-    const later = Promise.all([store.moduleItemFor(c.id, 'Assignment', route.arg).catch(() => null), store.assignmentGroups(c.id).catch(() => null)])
+    const later = Promise.all([store.moduleItemFor(c.id, 'Assignment', route.arg, { asset: a, itemId: route.params.get('module_item_id') }).catch(() => null), store.assignmentGroups(c.id).catch(() => null)])
       .then(([modItem, groups]) => ({ modItem, nav: store.assignmentNeighbours(groups, a.id) }));
     const slot = (cls) => h('span', { class: cls, hidden: '' });
     // (the slot has a parent from the moment it is drawn, before the screen is in the document)

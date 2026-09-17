@@ -148,8 +148,20 @@ try {
   await page.waitForSelector('#bcv-app .bcv-nav__item', { timeout: 10000 });
   check(await visible('#bcv-app'), 'app shell visible');
   check(!(await visible('#application')), 'stock Canvas hidden');
-  const lookBtn = await page.$eval('#bcv-look', (e) => { const r = e.getBoundingClientRect(); return { fixed: getComputedStyle(e).position === 'fixed', top: Math.round(r.top), right: Math.round(window.innerWidth - r.right), on: e.getAttribute('aria-checked'), text: e.textContent.trim() }; }).catch(() => null);
-  check(!!lookBtn && lookBtn.fixed && lookBtn.top < 40 && lookBtn.right < 24 && lookBtn.on === 'true' && lookBtn.text === 'Simpl Courses', `the look switch sits at the top right of the page, on: ${JSON.stringify(lookBtn)}`);
+  const lookBtn = await page.$eval('#bcv-look', (e) => { const r = e.getBoundingClientRect(); const m = e.querySelector('.bcv-look__main'); return { fixed: getComputedStyle(e).position === 'fixed', top: Math.round(r.top), right: Math.round(window.innerWidth - r.right), on: m.getAttribute('aria-checked'), text: m.querySelector('.bcv-look__text').textContent.trim(), persistShown: e.querySelector('.bcv-look__persist').getBoundingClientRect().height }; }).catch(() => null);
+  check(!!lookBtn && lookBtn.fixed && lookBtn.top < 40 && lookBtn.right < 24 && lookBtn.on === 'true' && lookBtn.text === 'Simpl Courses' && lookBtn.persistShown === 0, `the look switch sits at the top right of the page, on, its Persistent row folded away: ${JSON.stringify(lookBtn)}`);
+  // under the pointer it opens a second row: Persistent, the same switch the popup has
+  await page.hover('#bcv-look');
+  check(await eventually(() => page.$eval('#bcv-look .bcv-look__persist', (e) => e.getBoundingClientRect().height > 20 && getComputedStyle(e).opacity === '1')), 'hovering the switch opens the Persistent row');
+  const persistRow = await page.$eval('#bcv-look .bcv-look__persist', (e) => ({ on: e.getAttribute('aria-checked'), text: e.querySelector('.bcv-look__ptext').textContent, hint: e.querySelector('.bcv-look__phint').textContent }));
+  check(persistRow.on === 'false' && persistRow.text === 'Persistent' && persistRow.hint === 'The switch changes this page only', `the row reads the setting, off to begin with: ${JSON.stringify(persistRow)}`);
+  await page.click('#bcv-look .bcv-look__persist');
+  check(await eventually(async () => (await sw.evaluate(async () => (await self.BCV.settings.get()).appearance.persistLook)) === true) && (await page.$eval('#bcv-look .bcv-look__persist', (e) => e.getAttribute('aria-checked'))) === 'true' && (await page.$eval('#bcv-look .bcv-look__phint', (e) => e.textContent)) === 'The switch saves, for every page' && (await visible('#bcv-app')), 'pressing it turns Persistent on — saved, the row says so, and nothing reloads');
+  await page.click('#bcv-look .bcv-look__persist');
+  check(await eventually(async () => (await sw.evaluate(async () => (await self.BCV.settings.get()).appearance.persistLook)) === false) && (await page.$eval('#bcv-look .bcv-look__persist', (e) => e.getAttribute('aria-checked'))) === 'false', 'and off again');
+  await shot(page, '01d-look-switch-open');
+  await page.mouse.move(700, 500);
+  check(await eventually(() => page.$eval('#bcv-look .bcv-look__persist', (e) => e.getBoundingClientRect().height === 0)), 'the row folds away when the pointer leaves');
   await page.waitForSelector('.bcv-nav__item', { timeout: 10000 });
   const brand = await page.evaluate(() => {
     const img = document.querySelector('.bcv-brand__logo img');
@@ -891,6 +903,24 @@ try {
   await page.click('.bcv-detail__actions [aria-pressed]');
   // the button repaints once Canvas has answered and the caches are cleared: wait for it, not for the mock
   check(await eventually(async () => (await page.$eval('.bcv-detail__actions [aria-pressed]', (e) => e.textContent.trim())) === 'Mark as done') && (await seq('101', '1003')).items[0].current.completion_requirement.completed === false, 'pressing Done takes the mark back');
+  // A live Canvas can answer the sequence with the item bare of its requirement, or name no item at
+  // all for an assignment that sits in its module as a discussion or a quiz: the modules themselves
+  // say then, and the button is there all the same.
+  const modulesOf = (cid) => fetch(`${BASE}/api/v1/courses/${cid}/modules?include[]=items`).then((r) => r.text()).then((x) => JSON.parse(x.replace(/^while\(1\);/, '')));
+  await fetch(`${BASE}/__mock/config`, { method: 'POST', body: JSON.stringify({ bareSequence: true }) });
+  await page.goto(`${BASE}/courses/101/assignments/1003`);
+  await page.waitForSelector('.bcv-detail__actions [aria-pressed]', { timeout: 10000 });
+  check((await seq('101', '1003')).items[0].current.completion_requirement === undefined && (await page.$eval('.bcv-detail__actions [aria-pressed]', (e) => e.textContent.trim())) === 'Mark as done', 'the sequence without its requirement: the modules say, and Mark as done is there');
+  await fetch(`${BASE}/__mock/config`, { method: 'POST', body: JSON.stringify({ bareSequence: false }) });
+  await page.goto(`${BASE}/courses/105/assignments/5003`);
+  await page.waitForSelector('.bcv-detail__actions [aria-pressed]', { timeout: 10000 });
+  check((await seq('105', '5003')).items.length === 0 && (await page.$eval('.bcv-detail__actions [aria-pressed]', (e) => e.textContent.trim())) === 'Mark as done', 'a graded discussion sits in its module as the topic: the sequence names nothing, the modules do, and Mark as done is there');
+  await page.click('.bcv-detail__actions [aria-pressed]');
+  check(await eventually(async () => (await page.$eval('.bcv-detail__actions [aria-pressed]', (e) => e.getAttribute('aria-pressed'))) === 'true') && (await modulesOf('105'))[0].items[0].completion_requirement.completed === true, 'and pressing it marks the topic\'s item done in Canvas');
+  await page.click('.bcv-detail__actions [aria-pressed]');
+  check(await eventually(async () => (await page.$eval('.bcv-detail__actions [aria-pressed]', (e) => e.textContent.trim())) === 'Mark as done') && (await modulesOf('105'))[0].items[0].completion_requirement.completed === false, 'and takes it back');
+  await page.goto(`${BASE}/courses/101/assignments/1003`); // where the checks below carry on
+  await page.waitForSelector('.bcv-detail__actions [aria-pressed]', { timeout: 10000 });
   // Previous / Next go through the assignments in the order the Assignments tab lists them
   const groups = await fetch(`${BASE}/api/v1/courses/101/assignment_groups?include[]=assignments`).then((r) => r.text()).then((x) => JSON.parse(x.replace(/^while\(1\);/, '')));
   const ordered = groups.flatMap((g) => g.assignments || []).filter((a) => a.published !== false).sort((x, y) => ((Date.parse(x.due_at) || Infinity) - (Date.parse(y.due_at) || Infinity)) || String(x.name).localeCompare(String(y.name)));
@@ -2092,7 +2122,7 @@ try {
   // ---- the look off and on: the switch at the top right, "Open in stock Canvas", Persistent ------------
   console.log('the look off and on');
   const lookSaved = async () => (await sw.evaluate(async () => (await self.BCV.settings.get()).appearance)).skin !== false;
-  const lookAt = () => page.$eval('#bcv-look', (e) => e.getAttribute('aria-checked')).catch(() => null);
+  const lookAt = () => page.$eval('#bcv-look .bcv-look__main', (e) => e.getAttribute('aria-checked')).catch(() => null);
   const stockShown = async () => { await page.waitForFunction(() => !document.documentElement.classList.contains('bcv-on') && !!document.querySelector('#bcv-look') && !!document.querySelector('#application'), null, { timeout: 15000 }); await page.waitForTimeout(300); };
   await page.goto(`${BASE}/courses/101/external_tools/9`);
   await page.waitForSelector('html.bcv-punch #content', { timeout: 10000 });
@@ -2106,24 +2136,27 @@ try {
   await page.waitForSelector('#bcv-app .bcv-nav__item', { timeout: 10000 });
   check(await visible('#bcv-app') && (await lookAt()) === 'true', 'with Persistent off, the next page brings the saved look back');
   // the switch at the top right: stock Canvas for this page, and a reload brings the look back
-  await page.click('#bcv-look');
+  await page.click('#bcv-look .bcv-look__main');
   await stockShown();
   check(await visible('#application') && !(await page.$('#bcv-app')) && (await lookAt()) === 'false' && (await lookSaved()) === true, 'the switch at the top right shows stock Canvas for this page, the saved look untouched');
   await page.reload();
   await page.waitForSelector('#bcv-app .bcv-nav__item', { timeout: 10000 });
   check(await visible('#bcv-app') && (await lookAt()) === 'true', 'and a reload brings the look back');
-  // Persistent on: the same switch saves the choice, and every page follows
-  await setSettings({ appearance: { persistLook: true } });
+  // Persistent on, from the row under the switch: the same switch then saves the choice, and every page follows
+  await page.hover('#bcv-look');
+  await eventually(() => page.$eval('#bcv-look .bcv-look__persist', (e) => e.getBoundingClientRect().height > 20));
+  await page.click('#bcv-look .bcv-look__persist');
+  await eventually(async () => (await sw.evaluate(async () => (await self.BCV.settings.get()).appearance.persistLook)) === true);
   await page.waitForTimeout(400);
   check(await visible('#bcv-app') && (await lookAt()) === 'true', 'Persistent going on changes nothing on the page');
-  await page.click('#bcv-look');
+  await page.click('#bcv-look .bcv-look__main');
   await stockShown();
   check(await visible('#application') && (await lookSaved()) === false, 'with Persistent on, the switch at the top right saves the look off');
   await page.goto(`${BASE}/`);
   await page.waitForSelector('#application', { timeout: 10000 });
   await page.waitForTimeout(400);
-  check(!(await page.$('#bcv-app')) && (await lookAt()) === 'false', 'the look stays off on the next page load');
-  await page.click('#bcv-look');
+  check(!(await page.$('#bcv-app')) && (await lookAt()) === 'false' && (await page.$eval('#bcv-look .bcv-look__persist', (e) => e.getAttribute('aria-checked'))) === 'true', 'the look stays off on the next page load, and the row over stock Canvas reads Persistent on');
+  await page.click('#bcv-look .bcv-look__main');
   await page.waitForSelector('#bcv-app .bcv-nav__item', { timeout: 10000 });
   check(await visible('#bcv-app') && (await lookSaved()) === true && (await lookAt()) === 'true', 'and the switch brings it back, saved');
   await setSettings({ appearance: { persistLook: false } }); // the default again for what follows

@@ -83,7 +83,7 @@ const A = {
   105: [
     ['5001', 'Journal #1', 'Journals', 5, 5, -6, 23.98, -6, {}],
     ['5002', 'Research Day Activity: Choosing a Field Site', 'Activities', 5, null, 0, 23.98, null, {}],
-    ['5003', 'Journal #2', 'Journals', 5, null, 1, 23.98, null, {}],
+    ['5003', 'Journal #2', 'Journals', 5, null, 1, 23.98, null, { discussion: '7503' }], // a graded discussion, in its module as the topic (with a must_mark_done requirement)
   ],
   106: [], 201: [], 202: [], 301: [['9001', 'Final project', 'Projects', 100, 97, -110, 23.98, -111, {}]],
 };
@@ -133,6 +133,7 @@ function assignmentObj(courseId, row) {
     submission_types: extra.quiz ? ['online_quiz'] : extra.tool ? ['external_tool'] : extra.types || ['online_upload', 'online_text_entry'], is_quiz_assignment: !!extra.quiz, quiz_id: extra.quiz ? String(Number(id) + 8000) : undefined,
     allowed_extensions: extra.ext || [], locked_for_user: false,
     external_tool_tag_attributes: extra.tool ? { url: extra.tool, new_tab: false, resource_link_id: 'rl1' } : undefined,
+    discussion_topic: extra.discussion ? { id: extra.discussion, title: name, html_url: `/courses/${courseId}/discussion_topics/${extra.discussion}` } : undefined, // a graded discussion: the assignment behind a topic
     assignment_group_id: `g${courseId}-${Math.max(gIdx, 0)}`, omit_from_final_grade: !!extra.omit, allowed_attempts: extra.attempts ?? 2, rubric: extra.rubric ? rubric : undefined, rubric_settings: extra.rubric ? { title: 'Dis01 rubric' } : undefined,
     submission: apiSubmissions.get(id) || submission, // a submission made through the API replaces the seeded one
   };
@@ -316,6 +317,9 @@ const modules = {
   101: [{ id: 'm11', name: 'Unit 1: Functions', state: 'started', position: 1, items: [{ id: 'i11', type: 'Page', title: 'Course Information', html_url: '/courses/101/pages/course-information' }, { id: 'i12', type: 'Quiz', title: 'Lec06-PreQuiz', html_url: '/courses/101/quizzes/9011', content_details: { due_at: at(1, 10, 30), points_possible: 17 } },
     // an assignment with nothing to hand in: the module asks for a mark instead, as Canvas's "Mark as done"
     { id: 'i13', type: 'Assignment', content_id: '1003', title: 'Dis00', html_url: '/courses/101/assignments/1003', completion_requirement: { type: 'must_mark_done', completed: false } }] }],
+  // a graded discussion sits in its module as the topic, not as its assignment: the sequence asked for
+  // the assignment names nothing, as Canvas's does, and the item is found through the modules instead
+  105: [{ id: 'm51', name: 'Journals', state: 'started', position: 1, items: [{ id: 'i51', type: 'Discussion', content_id: '7503', title: 'Journal #2', html_url: '/courses/105/discussion_topics/7503', completion_requirement: { type: 'must_mark_done', completed: false } }] }],
 };
 /** Canvas's module_item_sequence: the module item an asset is, and the items either side of it. */
 function moduleItemSequence(courseId, assetType, assetId) {
@@ -323,7 +327,9 @@ function moduleItemSequence(courseId, assetType, assetId) {
   const re = new RegExp(`/${{ Assignment: 'assignments', Quiz: 'quizzes', Page: 'pages', Discussion: 'discussion_topics', File: 'files' }[assetType] || assetType}/${assetId}$`);
   const i = flat.findIndex((it) => it.type === assetType && re.test(it.html_url || ''));
   if (i < 0) return { items: [], modules: [] };
-  return { items: [{ prev: flat[i - 1] || null, current: flat[i], next: flat[i + 1] || null }], modules: (modules[courseId] || []).map((m) => ({ id: m.id, name: m.name })) };
+  // test-only: a live Canvas can answer the sequence with the items bare of their completion requirement
+  const bare = (it) => { if (!it || !mockConfig.bareSequence) return it || null; const { completion_requirement, ...rest } = it; return rest; };
+  return { items: [{ prev: bare(flat[i - 1]), current: bare(flat[i]), next: bare(flat[i + 1]) }], modules: (modules[courseId] || []).map((m) => ({ id: m.id, name: m.name })) };
 }
 const setItemDone = (courseId, mid, iid, done) => {
   const it = (modules[courseId] || []).find((m) => m.id === mid)?.items.find((x) => x.id === iid);
@@ -557,7 +563,7 @@ on('GET', /^\/api\/v1\/groups\/(\w+)\/pages\/([^/]+)$/, () => ({ url: 'group-not
 on('GET', /^\/api\/v1\/groups\/(\w+)\/folders\/root$/, (url, m) => ({ id: `rg${m[1]}`, name: 'group files', full_name: 'group files', context_id: m[1] }));
 on('GET', /^\/api\/v1\/groups\/(\w+)$/, (url, m) => { const g = groupList.find((x) => x.id === m[1]); return g ? { ...g, avatar_url: null } : null; });
 // test-only switches: POST /__mock/config {"calendarFail": true} — cacheable: API answers carry a ten-minute max-age
-const mockConfig = { calendarFail: false, cacheable: false };
+const mockConfig = { calendarFail: false, cacheable: false, bareSequence: false };
 on('POST', /^\/__mock\/config$/, (url, m, body) => Object.assign(mockConfig, body));
 // test-only: the last API request as it arrived (its headers say whether the extension asked for a fresh answer)
 let lastApi = null;

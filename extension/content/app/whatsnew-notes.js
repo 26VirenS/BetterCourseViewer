@@ -21,6 +21,10 @@
     clock: 'M12 5a8 8 0 100 16 8 8 0 000-16zM12 9v4l3 2',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.13.0', date: '2026-09-17', notes: [
+      { kind: 'new', title: 'Persistent, under the look switch', body: 'Rest on the switch at the top right and a second row opens: Persistent, to choose whether the switch saves or changes this page only.', where: 'Top right of any Canvas page', icon: P.toggle },
+      { kind: 'fixed', title: 'Mark as done, wherever a module asks', body: 'The button now shows for assignments that sit in a module as a discussion or a quiz, and whenever Canvas leaves the requirement out of its answer.', where: 'The assignment page', icon: P.check },
+    ] },
     { version: '2.12.2', date: '2026-09-17', notes: [
       { kind: 'fixed', title: 'Never a days-old grade', body: 'Canvas is always asked afresh: nothing is read from the browser’s cache, so a grade posted days ago cannot go on missing.', where: 'Grades, and a course’s Grades tab', icon: P.check },
     ] },
