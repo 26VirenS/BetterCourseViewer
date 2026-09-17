@@ -148,11 +148,11 @@ try {
   await page.waitForSelector('#bcv-app .bcv-nav__item', { timeout: 10000 });
   check(await visible('#bcv-app'), 'app shell visible');
   check(!(await visible('#application')), 'stock Canvas hidden');
-  const lookBtn = await page.$eval('#bcv-look', (e) => { const r = e.getBoundingClientRect(); const m = e.querySelector('.bcv-look__main'); return { fixed: getComputedStyle(e).position === 'fixed', top: Math.round(r.top), right: Math.round(window.innerWidth - r.right), on: m.getAttribute('aria-checked'), text: m.querySelector('.bcv-look__text').textContent.trim(), persistShown: e.querySelector('.bcv-look__persist').getBoundingClientRect().height }; }).catch(() => null);
-  check(!!lookBtn && lookBtn.fixed && lookBtn.top < 40 && lookBtn.right < 24 && lookBtn.on === 'true' && lookBtn.text === 'Simpl Courses' && lookBtn.persistShown === 0, `the look switch sits at the top right of the page, on, its Persistent row folded away: ${JSON.stringify(lookBtn)}`);
-  // under the pointer it opens a second row: Persistent, the same switch the popup has
+  const lookBtn = await page.$eval('#bcv-look', (e) => { const r = e.getBoundingClientRect(); const m = e.querySelector('.bcv-look__main'); return { fixed: getComputedStyle(e).position === 'fixed', top: Math.round(r.top), right: Math.round(window.innerWidth - r.right), w: Math.round(r.width), h: Math.round(r.height), on: m.getAttribute('aria-checked'), text: m.querySelector('.bcv-look__text').textContent.trim(), textShown: m.querySelector('.bcv-look__text').getBoundingClientRect().width, persistShown: e.querySelector('.bcv-look__persist').getBoundingClientRect().height }; }).catch(() => null);
+  check(!!lookBtn && lookBtn.fixed && lookBtn.top < 40 && lookBtn.right < 24 && lookBtn.w <= 60 && lookBtn.h <= 26 && lookBtn.on === 'true' && lookBtn.text === 'Simpl Courses' && lookBtn.textShown === 0 && lookBtn.persistShown === 0, `the look switch sits at the top right of the page, on, folded to the mark and the switch: ${JSON.stringify(lookBtn)}`);
+  // under the pointer the name comes out and a second row opens: Persistent, the same switch the popup has
   await page.hover('#bcv-look');
-  check(await eventually(() => page.$eval('#bcv-look .bcv-look__persist', (e) => e.getBoundingClientRect().height > 20 && getComputedStyle(e).opacity === '1')), 'hovering the switch opens the Persistent row');
+  check(await eventually(() => page.$eval('#bcv-look', (e) => e.getBoundingClientRect().width > 120 && e.querySelector('.bcv-look__text').getBoundingClientRect().width > 40 && e.querySelector('.bcv-look__persist').getBoundingClientRect().height > 20 && getComputedStyle(e.querySelector('.bcv-look__persist')).opacity === '1')), 'hovering the switch brings out the name and opens the Persistent row');
   const persistRow = await page.$eval('#bcv-look .bcv-look__persist', (e) => ({ on: e.getAttribute('aria-checked'), text: e.querySelector('.bcv-look__ptext').textContent, hint: e.querySelector('.bcv-look__phint').textContent }));
   check(persistRow.on === 'false' && persistRow.text === 'Persistent' && persistRow.hint === 'The switch changes this page only', `the row reads the setting, off to begin with: ${JSON.stringify(persistRow)}`);
   await page.click('#bcv-look .bcv-look__persist');
@@ -161,7 +161,7 @@ try {
   check(await eventually(async () => (await sw.evaluate(async () => (await self.BCV.settings.get()).appearance.persistLook)) === false) && (await page.$eval('#bcv-look .bcv-look__persist', (e) => e.getAttribute('aria-checked'))) === 'false', 'and off again');
   await shot(page, '01d-look-switch-open');
   await page.mouse.move(700, 500);
-  check(await eventually(() => page.$eval('#bcv-look .bcv-look__persist', (e) => e.getBoundingClientRect().height === 0)), 'the row folds away when the pointer leaves');
+  check(await eventually(() => page.$eval('#bcv-look', (e) => e.querySelector('.bcv-look__persist').getBoundingClientRect().height === 0 && e.getBoundingClientRect().width <= 60)), 'the row folds away, and the name with it, when the pointer leaves');
   await page.waitForSelector('.bcv-nav__item', { timeout: 10000 });
   const brand = await page.evaluate(() => {
     const img = document.querySelector('.bcv-brand__logo img');

@@ -1,9 +1,10 @@
-/* What changed in each release, in the student's terms: the data behind the What's New page
+/* What changed in each release, in plain words: the data behind the What's New page
  * (content/app/whatsnew.js), newest first. Every release ships its entry here — the suite fails
  * when the newest entry is not the manifest's version. A note is a kind (new | improved | fixed),
- * a title of a few words, ONE sentence of what the student can now do, where to find it (a
- * breadcrumb, or blank), and an icon path. Nothing is fetched: the notes travel with the build.
- * Nothing internal belongs here — if it does not change what the student sees, leave it out. */
+ * a short title (a few plain words, no cleverness), ONE short sentence saying what the student can
+ * now do, where to find it (a breadcrumb, or blank), and an icon path. Nothing is fetched: the notes
+ * travel with the build. Nothing internal belongs here — if it does not change what the student
+ * sees, leave it out. */
 (function () {
   const P = {
     sparkle: 'M12 3l1.9 4.1L18 9l-4.1 1.9L12 15l-1.9-4.1L6 9l4.1-1.9z',
@@ -21,52 +22,55 @@
     clock: 'M12 5a8 8 0 100 16 8 8 0 000-16zM12 9v4l3 2',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.13.2', date: '2026-09-17', notes: [
+      { kind: 'improved', title: 'Smaller switch at the top right', body: 'The switch is now just the logo and the toggle; hover over it to see the name and the Persistent option.', where: 'Top right of any Canvas page', icon: P.toggle },
+    ] },
     { version: '2.13.1', date: '2026-09-17', notes: [
-      { kind: 'fixed', title: 'The dot after Simpl, in its place', body: 'On Windows and Linux the word is drawn wider than on a Mac, and the blue dot landed on the l; it now sits where the word ends.', where: 'The setup and What’s new word-mark', icon: P.sparkle },
+      { kind: 'fixed', title: 'Blue dot in the right place', body: 'On Windows and Linux the blue dot after “Simpl” now sits where it should.', where: 'Setup and What’s new screens', icon: P.sparkle },
     ] },
     { version: '2.13.0', date: '2026-09-17', notes: [
-      { kind: 'new', title: 'Persistent, under the look switch', body: 'Rest on the switch at the top right and a second row opens: Persistent, to choose whether the switch saves or changes this page only.', where: 'Top right of any Canvas page', icon: P.toggle },
-      { kind: 'fixed', title: 'Mark as done, wherever a module asks', body: 'The button now shows for assignments that sit in a module as a discussion or a quiz, and whenever Canvas leaves the requirement out of its answer.', where: 'The assignment page', icon: P.check },
+      { kind: 'new', title: 'Persistent option on the switch', body: 'Hover over the switch at the top right to turn Persistent on or off.', where: 'Top right of any Canvas page', icon: P.toggle },
+      { kind: 'fixed', title: 'Mark as done shows up more often', body: 'The Mark as done button now shows for discussions and quizzes in modules too.', where: 'The assignment page', icon: P.check },
     ] },
     { version: '2.12.2', date: '2026-09-17', notes: [
-      { kind: 'fixed', title: 'Never a days-old grade', body: 'Canvas is always asked afresh: nothing is read from the browser’s cache, so a grade posted days ago cannot go on missing.', where: 'Grades, and a course’s Grades tab', icon: P.check },
+      { kind: 'fixed', title: 'Grades are always up to date', body: 'Grades are loaded fresh from Canvas every time, so an old grade can no longer stick around.', where: 'Grades', icon: P.check },
     ] },
     { version: '2.12.1', date: '2026-09-17', notes: [
-      { kind: 'fixed', title: 'Grades from tools show up', body: 'A grade a tool posts while the page is open now shows on the next look at Grades, no reload needed.', where: 'Grades, and a course’s Grades tab', icon: P.check },
+      { kind: 'fixed', title: 'Grades from tools show up', body: 'A grade posted by a tool now shows the next time you open Grades, no reload needed.', where: 'Grades', icon: P.check },
     ] },
     { version: '2.12.0', date: '2026-09-17', notes: [
-      { kind: 'new', title: 'What’s new, after an update', body: 'The first Canvas page after an update shows what changed in that version, once, then gets out of the way.', where: 'Account → What’s new', icon: P.sparkle },
-      { kind: 'new', title: 'Earlier versions, one link away', body: 'See earlier versions lists the releases before this one, newest first, with the ones you skipped marked.', where: 'What’s new → See earlier versions', icon: P.layers },
+      { kind: 'new', title: 'What’s new screen', body: 'After an update, the first Canvas page you open shows what changed.', where: 'Account → What’s new', icon: P.sparkle },
+      { kind: 'new', title: 'Earlier versions', body: 'Press See earlier versions to read about older updates.', where: 'What’s new → See earlier versions', icon: P.layers },
     ] },
     { version: '2.11.0', date: '2026-09-17', notes: [
-      { kind: 'new', title: 'A look switch on every page', body: 'A small switch at the top right turns the Simpl Courses look off or on, over stock Canvas too.', where: 'Top right of any Canvas page', icon: P.toggle },
-      { kind: 'new', title: 'Persistent, in the popup', body: 'Off, the look switch changes this page only; on, it saves and every page follows.', where: 'Toolbar popup → Persistent', icon: P.check },
-      { kind: 'improved', title: 'Open in stock Canvas follows suit', body: 'On a page Canvas draws itself, the button is for this page only unless Persistent is on.', where: '', icon: P.eye },
+      { kind: 'new', title: 'Switch on every page', body: 'A small switch at the top right turns the Simpl Courses look on or off.', where: 'Top right of any Canvas page', icon: P.toggle },
+      { kind: 'new', title: 'Persistent option in the popup', body: 'Turn on Persistent to keep the look off (or on) across every page.', where: 'Toolbar popup → Persistent', icon: P.check },
+      { kind: 'improved', title: 'Open in stock Canvas', body: 'This button now changes only the page you are on, unless Persistent is on.', where: '', icon: P.eye },
     ] },
     { version: '2.10.1', date: '2026-09-17', notes: [
-      { kind: 'improved', title: 'Classes come ticked in setup', body: 'Courses named like a class, MATH 021 or PHYS 008HL, are ticked for you; resource sites are not.', where: 'Guided setup → Your courses', icon: P.check },
-      { kind: 'improved', title: 'A scrollbar on the course list', body: 'The setup’s course list shows its scrollbar at all times, so the courses below are not missed.', where: 'Guided setup → Your courses', icon: P.scroll },
+      { kind: 'improved', title: 'Classes are ticked for you', body: 'Courses with names like MATH 021 are selected for you during setup.', where: 'Guided setup → Your courses', icon: P.check },
+      { kind: 'improved', title: 'Scrollbar on the course list', body: 'The course list in setup always shows a scrollbar, so you can tell there are more courses below.', where: 'Guided setup → Your courses', icon: P.scroll },
     ] },
     { version: '2.10.0', date: '2026-09-17', notes: [
-      { kind: 'new', title: 'A new guided setup', body: 'A rail of steps with your answers, previews of the dashboard and sidebar, and a read-back before Open Canvas.', where: 'Account → Guided setup', icon: P.steps },
-      { kind: 'improved', title: 'Dashboard picked from previews', body: 'Cards, List and Activity are shown as miniatures drawn in your own course colours.', where: 'Guided setup → Dashboard', icon: P.pic },
+      { kind: 'new', title: 'New guided setup', body: 'Setup now walks you through each step, with previews and a summary at the end.', where: 'Account → Guided setup', icon: P.steps },
+      { kind: 'improved', title: 'Dashboard previews', body: 'Pick Cards, List or Activity from small previews drawn in your own course colours.', where: 'Guided setup → Dashboard', icon: P.pic },
     ] },
     { version: '2.9.1', date: '2026-09-17', notes: [
-      { kind: 'improved', title: 'The page after install draws each step', body: 'Open your Canvas, press the toolbar button, press Set up: each one pictured, not only described.', where: '', icon: P.pic },
+      { kind: 'improved', title: 'Install page shows each step', body: 'The page after install now shows a picture for each step.', where: '', icon: P.pic },
     ] },
     { version: '2.7.5', date: '2026-09-16', notes: [
-      { kind: 'fixed', title: 'Assignments open at once', body: 'The assignment page no longer waits for Mark as done and Previous / Next before it shows.', where: '', icon: P.clock },
+      { kind: 'fixed', title: 'Assignments open faster', body: 'Assignment pages no longer wait for the Mark as done and Previous / Next buttons before showing.', where: '', icon: P.clock },
     ] },
     { version: '2.7.3', date: '2026-09-16', notes: [
-      { kind: 'new', title: 'Hide what is done on the Dashboard', body: 'A small Hide completed switch on the Dashboard list keeps only what is still to do.', where: 'Dashboard → List', icon: P.list },
+      { kind: 'new', title: 'Hide completed on the Dashboard', body: 'A Hide completed switch on the Dashboard list hides what you have already finished.', where: 'Dashboard → List', icon: P.list },
     ] },
     { version: '2.7.2', date: '2026-09-16', notes: [
-      { kind: 'new', title: 'Feedback and grade for an assignment', body: 'The mark on an assignment opens a feedback screen with the score, comments and every attempt.', where: 'Any assignment → the grade', icon: P.pen },
-      { kind: 'new', title: 'Mark as done', body: 'An assignment that asks to be marked done has the button on the page itself.', where: 'The assignment page', icon: P.check },
-      { kind: 'new', title: 'Previous and Next', body: 'Move to the previous or the next assignment from the page you are on.', where: 'The assignment page', icon: P.arrows },
+      { kind: 'new', title: 'Feedback and grade for an assignment', body: 'Press the grade on an assignment to see the score, comments and every attempt.', where: 'Any assignment → the grade', icon: P.pen },
+      { kind: 'new', title: 'Mark as done', body: 'Assignments that need to be marked done now have the button right on the page.', where: 'The assignment page', icon: P.check },
+      { kind: 'new', title: 'Previous and Next', body: 'Move to the previous or next assignment from the page you are on.', where: 'The assignment page', icon: P.arrows },
     ] },
     { version: '2.7.1', date: '2026-09-16', notes: [
-      { kind: 'fixed', title: 'Attachments open on the phone', body: 'A submission’s attachment opens instead of a 404, and the phone follows the handoff.', where: '', icon: P.clip },
+      { kind: 'fixed', title: 'Attachments open on the phone', body: 'Attachments on submissions now open properly instead of showing a 404.', where: '', icon: P.clip },
     ] },
   ];
 })();
