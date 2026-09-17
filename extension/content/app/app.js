@@ -992,9 +992,39 @@
     for (const v of ['--bcv-hole-top', '--bcv-hole-left', '--bcv-hole-width']) html.style.removeProperty(v);
   }
 
+  // ---- the switch at the top right: the look on or off, on every page ------------------------------
+  // Over our own shell and over stock Canvas alike — it lives outside #bcv-app, so a page drawn
+  // without the shell has it too. What a press does is the popup's Persistent switch's call: saved
+  // for every page, or this page view only (see BCV.early.flipLook). The popup and Settings →
+  // General have the same switch; "Open in stock Canvas" on a Canvas-drawn page is the same move.
+  const LOOK_MARK = '<svg viewBox="0 0 120 120" width="18" height="18" aria-hidden="true"><rect x="16" y="18" width="53" height="84" rx="14" fill="rgba(255,255,255,.35)"/><path d="M28 30 H69 A30 30 0 0 1 69 90 H28" fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><path d="M35 42 H69 A18 18 0 0 1 69 78 H35" fill="none" stroke="rgba(255,255,255,.72)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><path d="M42 54 H69 A6 6 0 0 1 69 66 H42" fill="none" stroke="rgba(255,255,255,.46)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  function mountLookToggle() {
+    if (self.BCVBridge?.native || document.getElementById('bcv-look')) return; // the app has its own settings sheet
+    const on = () => !!BCV.early?.isOn?.();
+    const btn = h('button', { type: 'button', id: 'bcv-look', class: 'bcv-look', role: 'switch' }, [
+      h('span', { class: 'bcv-look__mark', 'aria-hidden': 'true', html: LOOK_MARK }),
+      h('span', { class: 'bcv-look__text', text: 'Simpl Courses' }),
+      h('span', { class: 'bcv-look__sw', 'aria-hidden': 'true' }, h('span', { class: 'bcv-look__knob' })),
+    ]);
+    const paint = () => {
+      const now = on();
+      btn.classList.toggle('is-on', now);
+      btn.setAttribute('aria-checked', now ? 'true' : 'false');
+      btn.setAttribute('aria-label', 'Simpl Courses look');
+      btn.title = now ? 'Simpl Courses look is on. Press for stock Canvas.' : 'Stock Canvas. Press for the Simpl Courses look.';
+    };
+    btn.addEventListener('click', () => {
+      btn.classList.add('is-busy'); // the page loads afresh; until then the press is not repeated
+      Promise.resolve(BCV.early?.flipLook?.(!on())).finally(() => btn.classList.remove('is-busy'));
+    });
+    paint();
+    document.body.append(btn);
+    BCV.early?.onChange?.(paint);
+  }
+
   // ---- boot ---------------------------------------------------------------------------------------
-  // The look is switched on and off from the toolbar popup and Settings → Appearance
-  // (and "Open in stock Canvas" on Canvas-drawn pages); nothing sits on the page itself.
+  // The look is switched on and off from the switch at the top right of every page, the toolbar
+  // popup and Settings → General (and "Open in stock Canvas" on Canvas-drawn pages).
   let started = false;
   async function applySkin(on) {
     if (on) {
@@ -1041,21 +1071,24 @@
     }
     // Until the guided setup has been finished (a flag in the extension's storage, shared by every
     // site), every Canvas page with the interface on opens it over the Dashboard.
-    if (state.settings.appearance.skin !== false && await needsSetup()) {
+    state.lookOn = BCV.early?.isOn?.() ?? state.settings.appearance.skin !== false; // the page's own look: the saved one, or this page's one-page note
+    if (state.lookOn && await needsSetup()) {
       go('/?bcv=setup', { replace: true });
       return;
     }
-    await applySkin(state.settings.appearance.skin !== false);
+    await applySkin(state.lookOn);
+    mountLookToggle();
     BCV.extras?.prime?.(BCV.app);
     // Settings reads this site, and writes to Canvas with the session's token the page can see (Settings cannot read the cookie itself)
     const token = BCV.canvas.csrfToken();
     BCV.api.storage.local.set({ 'site:last': { host: location.host, origin: location.origin, at: Date.now() }, ...(token ? { [`csrf:${location.host}`]: token } : {}) }).catch(() => {});
     BCV.early?.onChange((st, settings) => {
       const wasDark = state.dark;
-      const wasSkin = state.settings.appearance.skin !== false;
+      const wasSkin = state.lookOn; // the look this page shows (a one-page note may differ from the saved look)
       state.settings = settings;
       state.logo = undefined; // a logo URL changed in Settings applies on the next sidebar draw
       state.dark = st.dark;
+      state.lookOn = st.skin;
       if (((st.skin && wasDark !== st.dark) || wasSkin !== st.skin) && !self.BCVBridge?.native) {
         // In a browser the appearance and the look are a fresh load: Canvas's own page
         // (punched-through pages, embedded tools, the quiz frames) is drawn for one appearance
@@ -1085,6 +1118,7 @@
 
   BCV.app = {
     state, go, render, renderSide, parseRoute, refreshCounts, loadShellData, punchIn, punchOut, siteName, toggleTheme, logout, backTo, nameHere, markBack,
+    rawQuizUrl, // (the look switch turns the look off mid-quiz by going there, see early.js)
     isDark: () => state.dark,
     openSettings,
     recover, // (the suite checks that a quiz is never reloaded out from under)

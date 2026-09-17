@@ -134,7 +134,8 @@ try {
   await page.waitForSelector('#bcv-app .bcv-nav__item', { timeout: 10000 });
   check(await visible('#bcv-app'), 'app shell visible');
   check(!(await visible('#application')), 'stock Canvas hidden');
-  check(!(await page.$('#bcv-skin')), 'no switch floats on the page (the look is toggled from the popup and settings)');
+  const lookBtn = await page.$eval('#bcv-look', (e) => { const r = e.getBoundingClientRect(); return { fixed: getComputedStyle(e).position === 'fixed', top: Math.round(r.top), right: Math.round(window.innerWidth - r.right), on: e.getAttribute('aria-checked'), text: e.textContent.trim() }; }).catch(() => null);
+  check(!!lookBtn && lookBtn.fixed && lookBtn.top < 40 && lookBtn.right < 24 && lookBtn.on === 'true' && lookBtn.text === 'Simpl Courses', `the look switch sits at the top right of the page, on: ${JSON.stringify(lookBtn)}`);
   await page.waitForSelector('.bcv-nav__item', { timeout: 10000 });
   const brand = await page.evaluate(() => {
     const img = document.querySelector('.bcv-brand__logo img');
@@ -2016,23 +2017,45 @@ try {
   check(reduced[0] === 'none' && reduced[1] === 'none/matrix(0.6, 0, 0, 1, 0, 0)' && reduced[2] === 'none' && reduced[3] === 'none' && reduced[4] === dueNow, `reduced motion drops the entrances (and the stagger, the bar wipe, the counter roll); the row wash holds still part way: ${reduced.join(' / ')}`);
   await page.emulateMedia({ reducedMotion: 'no-preference' });
 
-  // ---- the look switched off from settings (popup / options) -------------------------------------------
-  console.log('look off from settings');
+  // ---- the look off and on: the switch at the top right, "Open in stock Canvas", Persistent ------------
+  console.log('the look off and on');
+  const lookSaved = async () => (await sw.evaluate(async () => (await self.BCV.settings.get()).appearance)).skin !== false;
+  const lookAt = () => page.$eval('#bcv-look', (e) => e.getAttribute('aria-checked')).catch(() => null);
+  const stockShown = async () => { await page.waitForFunction(() => !document.documentElement.classList.contains('bcv-on') && !!document.querySelector('#bcv-look') && !!document.querySelector('#application'), null, { timeout: 15000 }); await page.waitForTimeout(300); };
   await page.goto(`${BASE}/courses/101/external_tools/9`);
   await page.waitForSelector('html.bcv-punch #content', { timeout: 10000 });
+  // Persistent is off to begin with: "Open in stock Canvas" is for this page view only
   await page.click('.bcv-native__stock');
-  await page.waitForFunction(() => !document.documentElement.classList.contains('bcv-on'), null, { timeout: 5000 });
-  check(await visible('#application') && !(await visible('#bcv-app')), '"Open in stock Canvas" turns the look off: stock Canvas is back');
+  await stockShown();
+  check(await visible('#application') && !(await page.$('#bcv-app')) && (await lookAt()) === 'false' && (await lookSaved()) === true, '"Open in stock Canvas" shows stock Canvas with the switch at the top right reading off, and the saved look untouched');
   check(!(await page.$('html.bcv-punch')) && (await visible('#header')) && (await page.$eval('#content', (el) => el.getBoundingClientRect().left < 200)), 'turning the look off ends the punch-through: Canvas lays its page out itself again');
-  check(!(await page.$('#bcv-fab')) && !(await page.$('#bcv-skin')), 'nothing of ours left on the page');
   await shot(page, '28-skin-off');
+  await page.goto(`${BASE}/`);
+  await page.waitForSelector('#bcv-app .bcv-nav__item', { timeout: 10000 });
+  check(await visible('#bcv-app') && (await lookAt()) === 'true', 'with Persistent off, the next page brings the saved look back');
+  // the switch at the top right: stock Canvas for this page, and a reload brings the look back
+  await page.click('#bcv-look');
+  await stockShown();
+  check(await visible('#application') && !(await page.$('#bcv-app')) && (await lookAt()) === 'false' && (await lookSaved()) === true, 'the switch at the top right shows stock Canvas for this page, the saved look untouched');
+  await page.reload();
+  await page.waitForSelector('#bcv-app .bcv-nav__item', { timeout: 10000 });
+  check(await visible('#bcv-app') && (await lookAt()) === 'true', 'and a reload brings the look back');
+  // Persistent on: the same switch saves the choice, and every page follows
+  await setSettings({ appearance: { persistLook: true } });
+  await page.waitForTimeout(400);
+  check(await visible('#bcv-app') && (await lookAt()) === 'true', 'Persistent going on changes nothing on the page');
+  await page.click('#bcv-look');
+  await stockShown();
+  check(await visible('#application') && (await lookSaved()) === false, 'with Persistent on, the switch at the top right saves the look off');
   await page.goto(`${BASE}/`);
   await page.waitForSelector('#application', { timeout: 10000 });
   await page.waitForTimeout(400);
-  check(!(await page.$('#bcv-app')) || !(await visible('#bcv-app')), 'the look stays off on the next page load');
-  await setSettings({ appearance: { skin: true } });
+  check(!(await page.$('#bcv-app')) && (await lookAt()) === 'false', 'the look stays off on the next page load');
+  await page.click('#bcv-look');
   await page.waitForSelector('#bcv-app .bcv-nav__item', { timeout: 10000 });
-  check(await visible('#bcv-app'), 'switching the look back on from settings brings the interface back');
+  check(await visible('#bcv-app') && (await lookSaved()) === true && (await lookAt()) === 'true', 'and the switch brings it back, saved');
+  await setSettings({ appearance: { persistLook: false } }); // the default again for what follows
+  await page.waitForTimeout(300);
   // ...and it comes back even when the copy that hears the change has no listener. Safari re-injects
   // a site's content scripts when the extension looks at its permissions (opening the toolbar popup
   // does): the re-injected app.js finds the interface already booted and stands down, so the fresh
@@ -2663,6 +2686,12 @@ try {
   await popupPage.goto(`chrome-extension://${extId}/popup/popup.html`);
   await popupPage.waitForTimeout(500);
   check((await popupPage.$eval('#setup-card', (el) => el.hidden)) && !(await hiddenIn('.section')), 'after setup the popup shows the switches again');
+  // the look switch, and under it Persistent (off to begin with), which says what a press of the look switch does
+  check((await popupPage.$eval('#skin', (el) => el.checked)) === true && (await popupPage.$eval('#persist', (el) => el.checked)) === false && /changes this page only/.test(await popupPage.$eval('#persist', (el) => el.closest('label').textContent)), 'the popup has the look switch with Persistent under it, off to begin with');
+  await popupPage.click('label:has(#persist) .switch__track');
+  check(await eventually(async () => (await sw.evaluate(async () => (await self.BCV.settings.get()).appearance.persistLook)) === true), 'Persistent on is saved');
+  await popupPage.click('label:has(#persist) .switch__track');
+  check(await eventually(async () => (await sw.evaluate(async () => (await self.BCV.settings.get()).appearance.persistLook)) === false), 'and off again');
   check(/^v\d+\.\d+/.test(await popupPage.$eval('#version', (el) => el.textContent)), `popup shows the version: ${await popupPage.$eval('#version', (el) => el.textContent)}`);
   check((await popupPage.$eval('#foot-setup', (el) => el.textContent)) === 'Guided setup', 'the popup links to the guided setup');
   // Safari refuses permissions.request() unless it is still the browser's idea of a user gesture,

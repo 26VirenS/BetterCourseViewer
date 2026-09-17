@@ -58,7 +58,8 @@
       U.text('bcv-native__note', 'This page is shown as Canvas drew it, inside the new look.'),
       h('span', { class: 'bcv-ml-auto' }),
       lightButton(ctx),
-      U.btn('Open in stock Canvas', { icon: IC.external, kind: 'xs', cls: 'bcv-native__stock', onClick: async () => BCV.settings.update({ appearance: { skin: false } }) }),
+      // the same move as the switch at the top right: saved, or this page only (the popup's Persistent switch decides)
+      U.btn('Open in stock Canvas', { icon: IC.external, kind: 'xs', cls: 'bcv-native__stock', onClick: async () => (BCV.early?.flipLook ? BCV.early.flipLook(false) : BCV.settings.update({ appearance: { skin: false } })) }),
     ]);
     const hole = U.el('bcv-native__hole', hasContent ? null : U.emptyCard('Canvas did not render anything for this page.'));
     if (hasContent) app.punchIn(hole);

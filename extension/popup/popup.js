@@ -33,8 +33,10 @@
   };
 
   let settings = await S.get();
+  let tabLook = null; // what the Canvas tab behind this popup shows ({ on, persist, once }), asked once the tab is known
   const bind = () => {
-    $('skin').checked = settings.appearance.skin !== false;
+    $('skin').checked = tabLook ? tabLook.on : settings.appearance.skin !== false;
+    $('persist').checked = !!settings.appearance.persistLook;
     $('darkMode').value = settings.appearance.darkMode;
   };
   bind();
@@ -44,7 +46,35 @@
   // exactly as it was until it was reloaded by hand.
   const push = () => api.runtime.sendMessage({ type: 'pushSettings' }).catch(() => {});
   const saveAppearance = async (patch) => { await S.update(patch); await push(); };
-  $('skin').addEventListener('change', (e) => saveAppearance({ appearance: { skin: e.target.checked } }));
+  /** A word with the Canvas tab behind this popup (its early.js answers); null off a Canvas tab. */
+  const askTab = (msg) => new Promise((resolve) => {
+    if (!tab?.id) return resolve(null);
+    try {
+      const p = api.tabs.sendMessage(tab.id, msg);
+      if (p && typeof p.then === 'function') p.then((r) => resolve(r || null), () => resolve(null));
+      else resolve(p ?? null);
+    } catch {
+      resolve(null);
+    }
+  });
+  $('skin').addEventListener('change', async (e) => {
+    const on = e.target.checked;
+    // Persistent on: saved, for every page. Off: this page only — the tab flips itself (a fresh
+    // load with a one-page note), and the saved look is back on the next load. Off a Canvas tab
+    // there is nothing to flip but the saved look.
+    if (!settings.appearance.persistLook && tabLook && (await askTab({ type: 'lookFlip', on }))) {
+      tabLook = { ...tabLook, on };
+      return;
+    }
+    await saveAppearance({ appearance: { skin: on } });
+  });
+  $('persist').addEventListener('change', async (e) => {
+    const on = e.target.checked;
+    // Turning it on makes the look this tab shows the saved one, so what is on screen is what stays.
+    const patch = { appearance: { persistLook: on } };
+    if (on && tabLook) patch.appearance.skin = tabLook.on;
+    await saveAppearance(patch);
+  });
   $('darkMode').addEventListener('change', (e) => saveAppearance({ appearance: { darkMode: e.target.value } }));
   S.onChange((s) => {
     settings = s;
@@ -69,6 +99,10 @@
   }
   const url = tab?.url ? new URL(tab.url) : null;
   const onWeb = !!url && /^https?:$/.test(url.protocol);
+  // the look switch shows what this tab shows (a one-page note may differ from the saved look)
+  tabLook = onWeb ? await askTab({ type: 'lookState' }) : null;
+  if (tabLook && typeof tabLook.on !== 'boolean') tabLook = null;
+  bind();
   const origin = onWeb ? url.origin : '';
   const builtIn = onWeb && /\.instructure\.com$/i.test(url.hostname);
   const saved = onWeb && (settings.domains || []).includes(origin);

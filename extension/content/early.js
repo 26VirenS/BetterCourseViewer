@@ -10,6 +10,17 @@
   const S = BCV.settings;
   const html = document.documentElement;
   const CACHE_KEY = 'bcv:early';
+  // A one-page note left by the look switch when Persistent is off: this page view shows the look
+  // the other way round, and the next load (a reload, the next page) goes back to the saved look.
+  const ONCE_KEY = 'bcv:once';
+  let override = null; // true/false for this page's life, or null for the saved look
+  try {
+    const once = sessionStorage.getItem(ONCE_KEY);
+    if (once === 'on' || once === 'off') {
+      override = once === 'on';
+      sessionStorage.removeItem(ONCE_KEY);
+    }
+  } catch { /* no session storage: the saved look */ }
 
   // Reset everything (the settings page) reaches every open Canvas tab: the copy kept in this
   // site's own storage goes too, so nothing of the extension's stays behind on the site. It is
@@ -26,6 +37,16 @@
       if (msg.type === 'settingsPush') {
         sendResponse({ ok: true });
         if (msg.settings) sync(msg.settings);
+        return false;
+      }
+      // the popup's look switch asks this tab what it shows, and flips it (see flipLook)
+      if (msg.type === 'lookState') {
+        sendResponse({ on: html.classList.contains('bcv-on'), persist: !!current?.appearance?.persistLook, once: override !== null });
+        return false;
+      }
+      if (msg.type === 'lookFlip') {
+        sendResponse({ ok: true });
+        flipLook(!!msg.on);
         return false;
       }
       if (msg.type !== 'wipeSiteNote') return false;
@@ -47,27 +68,31 @@
     html.setAttribute('data-bcv-theme', dark ? 'dark' : 'light');
   }
 
-  // 1. Instant: cached values from the page origin's localStorage.
+  // 1. Instant: cached values from the page origin's localStorage (the one-page note wins for the look).
   try {
-    const cached = localStorage.getItem(CACHE_KEY);
-    if (cached) apply(JSON.parse(cached));
-    else apply({ skin: true, dark: systemDark() });
+    const cached = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null');
+    const base = cached && typeof cached === 'object' ? cached : { skin: true, dark: systemDark() };
+    apply({ ...base, skin: override ?? base.skin });
   } catch {
-    apply({ skin: true, dark: systemDark() });
+    apply({ skin: override ?? true, dark: systemDark() });
   }
 
   // 2. Authoritative: extension storage.
   let current = null;
   let shown = null; // the state the page is currently drawn for, so a flip can be told from a first read
+  let lastStored = null; // the saved look as last read, so a change to it can be told from a re-read
   const listeners = new Set();
   async function sync(settings) {
     current = settings || (await S.get());
-    const state = { skin: current.appearance.skin !== false, dark: S.isDark(current, systemDark()) };
+    const stored = current.appearance.skin !== false;
+    if (lastStored !== null && stored !== lastStored) override = null; // a saved change beats the one-page note
+    lastStored = stored;
+    const state = { skin: override ?? stored, dark: S.isDark(current, systemDark()) };
     const flipped = !!shown && shown.skin !== state.skin;
     apply(state);
     shown = state;
     try {
-      if (!wiped) localStorage.setItem(CACHE_KEY, JSON.stringify(state));
+      if (!wiped) localStorage.setItem(CACHE_KEY, JSON.stringify({ skin: stored, dark: state.dark })); // the saved look, never the one-page note
     } catch {
       /* ignore */
     }
@@ -90,6 +115,38 @@
   }
   const ready = sync();
   S.onChange((s) => sync(s));
+
+  /** The look the other way round. With Persistent on (the popup) it is saved, and Settings, the
+   *  popup and every page follow; off, it is for this page view alone — a one-page note, and a
+   *  reload or the next page brings the saved look back. Either way the page is loaded afresh
+   *  (stock Canvas has to come back whole; our shell has to be built over a page Canvas drew
+   *  without it), except mid-quiz, where Canvas's own attempt page is the place to land (every
+   *  answer is already saved there). The app's web view repaints in place instead. */
+  async function flipLook(on) {
+    const settings = current || (await S.get());
+    if (settings.appearance?.persistLook) {
+      const next = await S.update({ appearance: { skin: on } });
+      await sync(next); // a storage change may never reach this page (Safari): applied here, the reload follows
+      return;
+    }
+    if (self.BCVBridge?.native) {
+      override = on;
+      await sync(current);
+      return;
+    }
+    try {
+      sessionStorage.setItem(ONCE_KEY, on ? 'on' : 'off');
+    } catch {
+      return; // no session storage to leave the note in: nothing to flip with
+    }
+    const raw = !on ? BCV.app?.rawQuizUrl?.() : null;
+    if (raw) {
+      if (BCV.app?.state) BCV.app.state.quizOpen = false; // our screen is being left on purpose
+      location.href = raw;
+      return;
+    }
+    location.reload();
+  }
   // (No page-top loading bar: the sidebar row that was pressed is the progress indicator, mockup 14.)
   // Safety net: if the interface never mounts (a script error, a blocked page, an answer that
   // never comes), the page is loaded once more — a fresh load clears most of what wedges — and,
@@ -121,6 +178,8 @@
     settings: () => current,
     isDark: () => html.getAttribute('data-bcv-theme') === 'dark',
     isOn: () => html.classList.contains('bcv-on'),
+    isOnce: () => override !== null, // this page view shows the look the other way round from the saved one
+    flipLook,
     onChange: (fn) => {
       listeners.add(fn);
       return () => listeners.delete(fn);
