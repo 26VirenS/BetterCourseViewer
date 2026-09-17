@@ -2220,51 +2220,26 @@ try {
 
   // ---- the page after install --------------------------------------------------------------
   console.log('setup page');
-  // One line in big letters, and then it watches: the background notices a tab arriving on Canvas.
-  // (the main page is a Canvas tab too: parked on the root, whose address says nothing, so the
-  // page after install has nothing to find until the tab below opens on /courses)
-  await page.goto(`${BASE}/`);
-  await page.waitForSelector('.bcv-stat', { timeout: 15000 });
-  await sw.evaluate(() => self.BCV.api.storage.local.remove('setup:found'));
   const setup = await context.newPage();
   const sTexts = (sel) => setup.$$eval(sel, (els) => els.map((e) => (e.innerText || e.textContent).replace(/\s+/g, ' ').trim()));
   await setup.goto(`chrome-extension://${extId}/setup/setup.html`);
   await setup.waitForSelector('.welcome .h1', { timeout: 10000 });
-  check((await sTexts('.welcome .h1'))[0] === 'Head over to your courses website.' && (await setup.$$('.blob')).length === 4 && !(await setup.$('.how')) && /Waiting for a Canvas tab/.test((await sTexts('#status'))[0]) && (await setup.$eval('#found', (e) => e.hidden)) && (await setup.$eval('.welcome .h1', (e) => parseFloat(getComputedStyle(e).fontSize))) >= 36, `the page after install says one thing, in big letters, and watches: ${(await sTexts('#status'))[0]}`);
+  await setup.waitForTimeout(700); // the steps come in one after another
+  const how = await sTexts('.how__t');
+  check((await sTexts('.welcome .h1'))[0] === 'Simpl Courses is installed' && (await setup.$$('.blob')).length === 4 && how.join(' | ') === 'Open your Canvas | Open Simpl Courses from the toolbar | Press Set up', `the page after install says the three things to do: ${how.join(' | ')}`);
+  // each step is drawn as well as said: the address bar on Canvas, the puzzle piece and the menu behind it, the popup's one button
+  const pics = await setup.evaluate(() => [...document.querySelectorAll('.how__step')].map((s) => ({
+    bar: s.querySelector('.pic__bar')?.textContent.trim() || null,
+    hot: !!s.querySelector('.pic__ico--hot'),
+    menu: s.querySelector('.pic__menu')?.textContent.trim() || null,
+    btn: s.querySelector('.pic__btn')?.textContent.trim() || null,
+    said: s.querySelector('.how__s').textContent,
+  })));
+  check(pics.length === 3 && pics[0].bar === 'yourschool.instructure.com' && pics[1].hot && pics[1].menu === 'Simpl Courses' && pics[2].btn === 'Set up', `and each is drawn: the address, the highlighted puzzle piece with Simpl Courses behind it, the Set up button: ${JSON.stringify(pics.map((x) => [x.bar, x.hot, x.menu, x.btn]))}`);
+  check(/puzzle piece at the right of the address bar/.test(pics[1].said) && /pin beside it/.test(pics[1].said) && /asks once to allow Simpl Courses on that site/.test(pics[2].said), 'the words say where the puzzle piece is, what the pin does, and that Chrome asks once about the site');
+  check((await setup.$eval('#next', (b) => b.textContent.trim())) === 'Got it', 'and the one button on the page just closes it');
   await setup.screenshot({ path: join(out, '32-setup-welcome.png') });
-  // what counts as Canvas by its address alone: Canvas's hosts, its paths, and its own favicon — the
-  // one thing a school's own address gives away from its dashboard at /
-  const looks = await sw.evaluate(() => [
-    ['https://school.instructure.com/', null], ['https://canvas.school.edu/', null], ['https://lms.school.edu/courses', null],
-    ['https://lms.school.edu/?login_success=1', null], ['https://lms.school.edu/', 'https://du11hjcvx0uqb.cloudfront.net/dist/images/favicon-e10d657a73.ico'],
-    ['https://lms.school.edu/', 'https://lms.school.edu/dist/images/favicon-4a9c.ico'], ['https://lms.school.edu/', null],
-    ['https://example.com/courses-of-action', 'https://example.com/favicon.ico'], ['https://mail.google.com/', 'https://mail.google.com/favicon.ico'],
-  ].map(([u, icon]) => self.BCV.background.looksLikeCanvas(new URL(u), icon ? { favIconUrl: icon } : null)));
-  check(looks.join(',') === 'true,true,true,true,true,true,false,false,false', `a Canvas is told by its host, its paths or its own favicon, and nothing else is: ${looks.join(',')}`);
-  // a Canvas on a site not yet allowed is named, with one button to allow it: a permission can only be asked for from a press
-  await sw.evaluate(() => self.BCV.api.storage.local.set({ 'setup:found': { origin: 'https://lms.example.edu', tabId: null, granted: false, at: Date.now() } }));
-  await setup.waitForFunction(() => !document.getElementById('found').hidden, null, { timeout: 5000 });
-  check(/^Found lms\.example\.edu\./.test((await sTexts('#status'))[0]) && (await sTexts('#allow'))[0] === 'Allow Simpl Courses on lms.example.edu', `a site not yet allowed is named, with one button to allow it: ${(await sTexts('#allow'))[0]}`);
-  await setup.screenshot({ path: join(out, '32b-setup-found.png') });
-  // a Canvas on a site already allowed: the setup opens there by itself, and this page says so and goes
-  // (the setup is undone only now, with the page open and watching: an allowed tab loading is what it waits for)
-  await sw.evaluate(() => { self.BCV.background.forgetNoticed(); return self.BCV.api.storage.local.remove('setup:done'); }); // (a site is started once per run; this run has been on the mock all along)
-  const canvasTab = await context.newPage();
-  await canvasTab.goto(`${BASE}/`); // the root: an address that says nothing, so it is the page itself that has to say Canvas
-  const sniffed = await sw.evaluate(async (base) => {
-    const tabs = await chrome.tabs.query({ url: `${base}/` });
-    const [{ result }] = await chrome.scripting.executeScript({ target: { tabId: tabs[0].id }, func: self.BCV.background.sniffFn });
-    return result;
-  }, BASE);
-  check(sniffed && sniffed.canvas === true && sniffed.origin === BASE, `the page itself says Canvas — its own favicon and shell: ${JSON.stringify(sniffed)}`);
-  // (the card cleans ?bcv=setup off the address as it opens, so the card itself is what is waited for)
-  const autoOpened = await canvasTab.waitForFunction(() => location.pathname === '/' && !!document.querySelector('#bcv-setup'), null, { timeout: 20000 }).then(() => true).catch(() => false);
-  const foundNote = await sw.evaluate(async () => (await self.BCV.api.storage.local.get('setup:found'))['setup:found']);
-  check(autoOpened && foundNote && foundNote.granted === true && foundNote.origin === new URL(canvasTab.url()).origin, `a tab arriving on an allowed Canvas is taken to the setup by itself: ${canvasTab.url()} ${JSON.stringify(foundNote)}`);
-  check(await eventually(async () => setup.isClosed() || /^Found localhost:\d+ — the setup is opening there\.$/.test((await sTexts('#status').catch(() => ['']))[0])), 'and the page after install says where it went, then closes');
-  await canvasTab.close().catch(() => {});
-  if (!setup.isClosed()) await setup.close().catch(() => {});
-  await sw.evaluate(() => self.BCV.api.storage.local.set({ 'setup:done': true, 'setup:offered': true }).then(() => self.BCV.api.storage.local.remove('setup:found')));
+  await setup.close().catch(() => {});
 
   // ---- the account panel ----------------------------------------------------------------------------------
   console.log('account panel');
@@ -2661,13 +2636,6 @@ try {
     const to = src.indexOf('permissions.request(', from);
     const between = from >= 0 && to > from ? src.slice(from, to) : 'await';
     check(!between.includes('await'), 'the popup asks for the site permission straight from the press, awaiting nothing first (Safari refuses otherwise)');
-  }
-  { // and the page after install, which asks the same way from its Allow button
-    const src = readFileSync(join(root, 'extension', 'setup', 'setup.js'), 'utf8');
-    const from = src.indexOf('Asking for permission');
-    const to = src.indexOf('permissions.request(', from);
-    const between = from >= 0 && to > from ? src.slice(from, to) : 'await';
-    check(!between.includes('await'), 'the page after install asks for the site permission straight from the press too');
   }
   await popupPage.screenshot({ path: join(out, '30-popup.png') });
 

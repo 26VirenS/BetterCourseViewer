@@ -111,22 +111,6 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
 .mark--lg .arc--3 { animation-duration: .8s; animation-delay: .26s; }
 .welcome .h1 { font-size: 32px; line-height: 1.12; letter-spacing: -.035em; animation: fadeUp .45s var(--ease) .15s both; }
 .welcome .lead { margin: 0; max-width: 330px; font: 400 15px/1.55 var(--font); color: var(--ink2); text-wrap: pretty; animation: fadeUp .45s var(--ease) .25s both; }
-/* the page after install: one line in big letters, then a watch that says what it has found */
-.welcome--big { gap: 16px; padding: 16px 0 6px; }
-.welcome .h1--huge { font-size: 40px; line-height: 1.08; max-width: 430px; }
-.watch { margin: 6px 0 0; display: inline-flex; align-items: center; gap: 9px; padding: 8px 14px; border-radius: 999px; background: var(--card); border: 1px solid var(--edge); font: 500 13px/1.3 var(--font); color: var(--ink2); animation: fadeUp .45s var(--ease) .35s both; }
-.watch__dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--blue); animation: watchPulse 1.6s ease-in-out infinite; }
-.watch.is-on .watch__dot { background: #34c759; animation: none; }
-@keyframes watchPulse { 0%, 100% { opacity: .35; transform: scale(.85); } 50% { opacity: 1; transform: scale(1); } }
-.found { margin-top: 4px; display: flex; flex-direction: column; align-items: center; gap: 12px; animation: fadeUp .35s var(--ease) both; }
-.found__t { margin: 0; max-width: 360px; font: 500 14px/1.45 var(--font); color: var(--ink2); text-wrap: pretty; }
-.other { width: 100%; }
-.other__s { cursor: pointer; font: 500 12.5px/1.4 var(--font); color: var(--ink3); list-style: none; text-align: center; }
-.other__s::-webkit-details-marker { display: none; }
-.other__row { margin-top: 10px; display: flex; gap: 8px; }
-.addr { flex: 1; min-width: 0; height: 40px; padding: 0 14px; border: 1px solid var(--edge); border-radius: 20px; background: var(--card); color: var(--ink); font: 400 14px/1 var(--font); outline: none; }
-.addr:focus { border-color: var(--blue); }
-.btn--sm { height: 40px; padding: 0 18px; font-size: 14px; border-radius: 20px; }
 
 .field { margin-top: 18px; display: flex; align-items: center; gap: 10px; padding: 13px 15px; border-radius: 15px; background: var(--card); border: 1px solid var(--edge); transition: border-color .25s ease, box-shadow .25s ease; }
 .field.is-ok { border-color: rgba(52,199,89,.5); }
@@ -154,6 +138,25 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
 .how__n { flex: none; width: 26px; height: 26px; border-radius: 13px; background: var(--blue); color: #fff; font: 600 13px/26px var(--font); text-align: center; }
 .how__t { display: block; font: 600 14.5px/1.3 var(--font); color: var(--ink); }
 .how__s { display: block; margin-top: 3px; font: 400 12.5px/1.45 var(--font); color: var(--ink3); text-wrap: pretty; }
+/* the page after install: each step with a small picture of the thing to find */
+.how__step--pic { align-items: flex-start; }
+.how__body { flex: 1; min-width: 0; }
+.how__step--pic .how__t { font-size: 15.5px; }
+.how__step--pic .how__s { font-size: 13px; color: var(--ink2); }
+.pic { margin-top: 10px; padding: 12px 14px; border-radius: 14px; background: var(--fill); display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.pic__bar { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px; background: var(--card); border: 1px solid var(--edge); font: 500 12.5px/1 var(--mono); color: var(--ink2); }
+.pic__tool { display: flex; align-items: center; gap: 8px; }
+.pic__ico { width: 28px; height: 28px; border-radius: 9px; background: var(--card); border: 1px solid var(--edge); display: inline-flex; align-items: center; justify-content: center; color: var(--ink3); }
+.pic__ico--hot { background: rgba(10,132,255,.14); border-color: var(--blue); color: var(--blue); box-shadow: 0 0 0 3px rgba(10,132,255,.18); }
+.pic__ico--mark { padding: 4px; }
+.pic__hint { font: 600 12px/1 var(--font); color: var(--blue); }
+.pic__menu { display: inline-flex; align-items: center; gap: 9px; min-width: 190px; padding: 8px 10px; border-radius: 10px; background: var(--card); border: 1px solid var(--edge); font: 600 12.5px/1 var(--font); color: var(--ink); }
+.pic__pin { margin-left: auto; color: var(--ink3); display: inline-flex; }
+.mark--xs { width: 18px; height: 18px; border-radius: 5px; box-shadow: none; }
+.mark--xs svg { display: block; }
+.pic__popup { width: 200px; padding: 10px; border-radius: 12px; background: var(--card); border: 1px solid var(--edge); display: flex; flex-direction: column; gap: 9px; }
+.pic__popuphead { display: flex; align-items: center; gap: 7px; font: 600 11.5px/1.2 var(--font); color: var(--ink3); }
+.pic__btn { display: block; height: 32px; border-radius: 16px; background: var(--blue); color: #fff; font: 600 13px/32px var(--font); text-align: center; }
 .how__s b { font-weight: 600; color: var(--ink2); }
 .how__icon { display: inline-flex; vertical-align: -3px; width: 16px; height: 16px; border-radius: 4px; background: linear-gradient(158deg, #0a84ff, #0a4fd6); margin: 0 2px; }
 .how__puzzle { display: inline-flex; align-items: center; justify-content: center; vertical-align: -4px; width: 20px; height: 20px; border-radius: 6px; background: var(--fill); color: var(--ink2); margin: 0 2px; }

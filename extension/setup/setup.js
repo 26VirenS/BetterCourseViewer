@@ -1,8 +1,6 @@
-/* The page after install (Safari and Chrome): one line, in big letters — head over to your courses
- * website — and then it watches. The background notices a tab arriving on Canvas (noticeTab in
- * background.js): a site already allowed opens the setup there on its own and this page closes;
- * any other site is named here with one button to allow it, the press being the gesture a
- * permission request needs. A Canvas that is not called one can be typed in. */
+/* The page after install (Safari and Chrome): the same glass card as the guided setup, with the
+ * three things to do — each one drawn, not only described. The steps themselves run over the
+ * Canvas page: open Canvas, press the toolbar button, press Set up (see content/app/setup.js). */
 (async function () {
   const BCV = self.BCV;
   const api = BCV.api;
@@ -23,115 +21,73 @@
 
   const body = document.getElementById('body');
   const foot = document.getElementById('foot');
-  // Safari says a tab's address only once the user has allowed the site — and asks them about every
-  // open site if asked for all the addresses at once — so there the page waits for a tab to arrive
-  // rather than looking around, and says what Safari will ask.
   const safari = /apple/i.test(navigator.vendor || '') && !/chrome|crios|edg/i.test(navigator.userAgent);
+  const svg = (d, { size = 14, width = 1.9, cls = '' } = {}) => h('span', { class: cls, 'aria-hidden': 'true', html: `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="${width}" stroke-linecap="round" stroke-linejoin="round"><path d="${d}"/></svg>` });
+  const PUZZLE = 'M10 4a2 2 0 114 0v1h3a1 1 0 011 1v3h1a2 2 0 110 4h-1v3a1 1 0 01-1 1h-3v-1a2 2 0 10-4 0v1H7a1 1 0 01-1-1v-3H5a2 2 0 110-4h1V6a1 1 0 011-1h3z';
+  const LOCK = 'M7 11V8a5 5 0 0110 0v3M6 11h12v9H6z';
+  const PIN = 'M12 17v4M8 3h8l-1 6 3 3v2H6v-2l3-3z';
+  const STAR = 'M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z';
+  const SEARCH = 'M11 4a7 7 0 100 14 7 7 0 000-14zM20 20l-3.5-3.5';
+  const DOTS = 'M5 12h.01M12 12h.01M19 12h.01';
+  const SHEET = '<svg viewBox="0 0 120 120" width="100%" height="100%"><rect x="16" y="18" width="53" height="84" rx="14" fill="rgba(255,255,255,.35)"/><path d="M28 30 H69 A30 30 0 0 1 69 90 H28" fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><path d="M35 42 H69 A18 18 0 0 1 69 78 H35" fill="none" stroke="rgba(255,255,255,.72)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><path d="M42 54 H69 A6 6 0 0 1 69 66 H42" fill="none" stroke="rgba(255,255,255,.46)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  const markXs = () => h('span', { class: 'mark mark--xs', 'aria-hidden': 'true', html: SHEET });
   const mark = h('span', { class: 'mark mark--lg', 'aria-hidden': 'true' });
   mark.innerHTML = '<svg viewBox="0 0 120 120" width="76" height="76"><defs><linearGradient id="sheetLg" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#fff" stop-opacity=".9"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient></defs><rect class="sheet" x="16" y="18" width="53" height="84" rx="14" fill="url(#sheetLg)"/><path class="arc arc--1" style="--len:178" d="M28 30 H69 A30 30 0 0 1 69 90 H28" fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="178"/><path class="arc arc--2" style="--len:126" d="M35 42 H69 A18 18 0 0 1 69 78 H35" fill="none" stroke="rgba(255,255,255,.72)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="126"/><path class="arc arc--3" style="--len:74" d="M42 54 H69 A6 6 0 0 1 69 66 H42" fill="none" stroke="rgba(255,255,255,.46)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="74"/></svg>';
 
-  const statusText = h('span', { id: 'statusText', text: 'Waiting for a Canvas tab to open…' });
-  const status = h('p', { class: 'watch', id: 'status' }, [h('span', { class: 'watch__dot', 'aria-hidden': 'true' }), statusText]);
-  const found = h('div', { class: 'found', id: 'found', hidden: '' });
-  const setStatus = (text, on = false) => { statusText.textContent = text; status.classList.toggle('is-on', on); };
-  const hostOf = (origin) => { try { return new URL(origin).host; } catch { return origin; } };
-  const normalise = (raw) => {
-    const v = String(raw || '').trim();
-    if (!v) return null;
-    try { return new URL(/^https?:\/\//i.test(v) ? v : `https://${v}`).origin; } catch { return null; }
-  };
+  // ---- the three steps, each with a small picture of the thing to find --------------------------
+  // 1. the address bar, on Canvas
+  const picCanvas = h('div', { class: 'pic', 'aria-hidden': 'true' }, [
+    h('span', { class: 'pic__bar' }, [svg(LOCK, { size: 12, width: 2 }), h('span', { text: 'yourschool.instructure.com' })]),
+  ]);
+  // 2. the toolbar: Chrome's puzzle piece and the menu behind it, or Safari's own button
+  const picToolbar = safari
+    ? h('div', { class: 'pic', 'aria-hidden': 'true' }, [
+      h('div', { class: 'pic__tool' }, [
+        h('span', { class: 'pic__ico' }, svg(SEARCH, { size: 13 })),
+        h('span', { class: 'pic__ico' }, svg(DOTS, { size: 13, width: 2.6 })),
+        h('span', { class: 'pic__ico pic__ico--hot pic__ico--mark' }, markXs()),
+        h('span', { class: 'pic__hint', text: '← this one' }),
+      ]),
+    ])
+    : h('div', { class: 'pic', 'aria-hidden': 'true' }, [
+      h('div', { class: 'pic__tool' }, [
+        h('span', { class: 'pic__ico' }, svg(STAR, { size: 13 })),
+        h('span', { class: 'pic__ico pic__ico--hot' }, svg(PUZZLE, { size: 15 })),
+        h('span', { class: 'pic__hint', text: '← the puzzle piece' }),
+      ]),
+      h('div', { class: 'pic__menu' }, [markXs(), h('span', { text: 'Simpl Courses' }), h('span', { class: 'pic__pin' }, svg(PIN, { size: 13 }))]),
+    ]);
+  // 3. the popup, with its one button
+  const picPopup = h('div', { class: 'pic', 'aria-hidden': 'true' }, [
+    h('div', { class: 'pic__popup' }, [
+      h('div', { class: 'pic__popuphead' }, [markXs(), h('span', { text: 'Simpl Courses' })]),
+      h('span', { class: 'pic__btn', text: 'Set up' }),
+    ]),
+  ]);
+
+  const steps = [
+    ['Open your Canvas', h('span', {}, ['In this browser, go to your school\'s Canvas and sign in — the address usually ends in ', h('b', { text: 'instructure.com' }), ', but a school\'s own name for it works too.']), picCanvas],
+    safari
+      ? ['Press the Simpl Courses button', h('span', {}, ['It is in Safari\'s toolbar, next to the address bar. If Safari asks, choose ', h('b', { text: 'Always Allow on This Website' }), '.']), picToolbar]
+      : ['Open Simpl Courses from the toolbar', h('span', {}, ['Click the puzzle piece at the right of the address bar, then ', h('b', { text: 'Simpl Courses' }), '. Click the pin beside it and the button stays in the toolbar.']), picToolbar],
+    ['Press Set up', h('span', {}, [safari ? 'The popup has one button. ' : 'The popup has one button. Chrome asks once to allow Simpl Courses on that site. ', 'Then the setup walks through your courses and grades on the page itself, and ends with a tour.']), picPopup],
+  ].map(([t, s, pic], i) => h('div', { class: 'how__step how__step--pic' }, [
+    h('span', { class: 'how__n', text: String(i + 1) }),
+    h('div', { class: 'how__body' }, [h('span', { class: 'how__t', text: t }), h('span', { class: 'how__s' }, [s]), pic]),
+  ]));
+  steps.forEach((el, i) => { el.style.animationDelay = `${220 + i * 90}ms`; });
 
   body.append(
-    h('div', { class: 'welcome welcome--big' }, [
+    h('div', { class: 'welcome' }, [
       mark,
-      h('h1', { class: 'h1 h1--huge', text: 'Head over to your courses website.' }),
-      h('p', { class: 'lead', text: safari
-        ? 'When Safari asks, allow Simpl Courses on the site — the setup starts on your Canvas page right after.'
-        : 'This page notices when you get there, and the setup starts on your Canvas page.' }),
-      status,
-      found,
+      h('h1', { class: 'h1', text: 'Simpl Courses is installed' }),
+      h('p', { class: 'lead', text: 'Set it up from your Canvas page. Three steps, about a minute.' }),
     ]),
+    h('div', { class: 'how' }, steps),
   );
-
-  // a Canvas that is not called one: its address, typed in, allowed from that press
-  const input = h('input', { class: 'addr', id: 'addr', type: 'url', placeholder: 'https://lms.myschool.edu', spellcheck: 'false', 'aria-label': 'Your Canvas address' });
-  const addrGo = h('button', { type: 'button', class: 'btn btn--sm', id: 'addrGo', text: 'Allow and open', onclick: () => allow(normalise(input.value), null) });
-  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') addrGo.click(); });
-  foot.append(h('details', { class: 'other' }, [
-    h('summary', { class: 'other__s', text: 'Not found by itself? Enter the address' }),
-    h('div', { class: 'other__row' }, [input, addrGo]),
-  ]));
-
-  let leaving = false;
-  const leave = (ms) => { if (leaving) return; leaving = true; setTimeout(() => window.close(), ms); };
-
-  /** Permission for the site (from the press), its scripts registered, then the setup over that
-   *  tab — the popup's own flow, on this page. */
-  async function allow(origin, tabId) {
-    if (!origin) { setStatus('That does not look like an address.'); return; }
-    setStatus('Asking for permission…');
-    // Safari refuses permissions.request() unless it is still the browser's idea of a user
-    // gesture, so nothing is waited for between the press and the call; the note lets the
-    // background finish from it (continuePending) should this page be gone when the permission lands.
-    api.storage.local.set({ 'setup:pending': { origin, tabId, next: 'setup', at: Date.now() } }).catch(() => {});
-    let ok = false;
-    try {
-      ok = await api.permissions.request({ origins: [`${origin}/*`] });
-    } catch (e) {
-      await api.storage.local.remove('setup:pending').catch(() => {});
-      setStatus(`Permission request failed: ${e?.message || e}`);
-      return;
-    }
-    await api.storage.local.remove('setup:pending').catch(() => {}); // still here: this page finishes it
-    if (!ok) { setStatus('Permission was not granted. Simpl Courses can only run on a site you allow.'); return; }
-    const r = await api.runtime.sendMessage({ type: 'registerDomain', origin }).catch(() => null);
-    if (r && r.ok === false) { setStatus(r.message || 'Could not enable this site.'); return; }
-    await S.update({ appearance: { skin: true } }).catch(() => {});
-    setStatus(`Opening the setup on ${hostOf(origin)}…`, true);
-    const target = `${origin}/?bcv=setup`;
-    try {
-      if (tabId != null) await api.tabs.update(tabId, { url: target, active: true });
-      else await api.tabs.create({ url: target });
-    } catch {
-      await api.tabs.create({ url: target }).catch(() => {});
-    }
-    leave(600);
-  }
-
-  /** What the background found: a site already allowed is where the setup has gone; any other is
-   *  named here, with the one press that allows it. */
-  function showFound(f) {
-    if (!f || !f.origin || leaving) return;
-    const host = hostOf(f.origin);
-    if (f.granted && f.error) { // allowed, but the setup could not be opened there: say why, and offer the press
-      setStatus(`Found ${host}, but ${f.error}.`);
-      found.replaceChildren(h('button', { type: 'button', class: 'btn', id: 'allow', text: `Open the setup on ${host}`, onclick: () => { setStatus(`Opening the setup on ${host}…`, true); api.runtime.sendMessage({ type: 'startSetup', origin: f.origin, tabId: f.tabId }).catch(() => {}); } }));
-      found.hidden = false;
-      return;
-    }
-    if (f.granted) {
-      found.hidden = true;
-      setStatus(`Found ${host} — the setup is opening there.`, true);
-      leave(1800);
-      return;
-    }
-    setStatus(`Found ${host}.`);
-    found.replaceChildren(
-      h('p', { class: 'found__t', text: `Simpl Courses needs to be allowed on ${host} to run there.` }),
-      h('button', { type: 'button', class: 'btn', id: 'allow', text: `Allow Simpl Courses on ${host}`, onclick: () => allow(f.origin, f.tabId) }),
-    );
-    found.hidden = false;
-  }
-
-  api.storage.onChanged.addListener((changes, area) => {
-    if (area !== 'local') return;
-    if (changes['setup:found']?.newValue) showFound(changes['setup:found'].newValue);
-    if (changes['setup:done']?.newValue) leave(0); // set up from elsewhere: this page has nothing left to say
-  });
-  // what was found before this page opened is checked, not believed: the background looks for the
-  // tab again, and only a tab still there counts
-  const first = await api.runtime.sendMessage({ type: 'checkFound' }).catch(() => null);
-  if (first && first.found) showFound(first.found);
-  if (!safari) api.runtime.sendMessage({ type: 'scanTabs' }).catch(() => {}); // a Canvas that is already open
+  foot.append(
+    h('span', { class: 'foot__spacer' }),
+    h('button', { type: 'button', class: 'btn', id: 'next', text: 'Got it', onclick: () => window.close() }),
+  );
   await api.storage.local.set({ 'setup:offered': true }).catch(() => {});
 })();
