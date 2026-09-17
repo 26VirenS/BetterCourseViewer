@@ -23,6 +23,10 @@
 
   const body = document.getElementById('body');
   const foot = document.getElementById('foot');
+  // Safari says a tab's address only once the user has allowed the site — and asks them about every
+  // open site if asked for all the addresses at once — so there the page waits for a tab to arrive
+  // rather than looking around, and says what Safari will ask.
+  const safari = /apple/i.test(navigator.vendor || '') && !/chrome|crios|edg/i.test(navigator.userAgent);
   const mark = h('span', { class: 'mark mark--lg', 'aria-hidden': 'true' });
   mark.innerHTML = '<svg viewBox="0 0 120 120" width="76" height="76"><defs><linearGradient id="sheetLg" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#fff" stop-opacity=".9"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient></defs><rect class="sheet" x="16" y="18" width="53" height="84" rx="14" fill="url(#sheetLg)"/><path class="arc arc--1" style="--len:178" d="M28 30 H69 A30 30 0 0 1 69 90 H28" fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="178"/><path class="arc arc--2" style="--len:126" d="M35 42 H69 A18 18 0 0 1 69 78 H35" fill="none" stroke="rgba(255,255,255,.72)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="126"/><path class="arc arc--3" style="--len:74" d="M42 54 H69 A6 6 0 0 1 69 66 H42" fill="none" stroke="rgba(255,255,255,.46)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="74"/></svg>';
 
@@ -41,7 +45,9 @@
     h('div', { class: 'welcome welcome--big' }, [
       mark,
       h('h1', { class: 'h1 h1--huge', text: 'Head over to your courses website.' }),
-      h('p', { class: 'lead', text: 'This page notices when you get there, and the setup starts on your Canvas page.' }),
+      h('p', { class: 'lead', text: safari
+        ? 'When Safari asks, allow Simpl Courses on the site — the setup starts on your Canvas page right after.'
+        : 'This page notices when you get there, and the setup starts on your Canvas page.' }),
       status,
       found,
     ]),
@@ -119,6 +125,6 @@
   const initial = await api.storage.local.get('setup:found').catch(() => ({}));
   const f = initial && initial['setup:found'];
   if (f && Date.now() - (f.at || 0) < 10 * 60 * 1000) showFound(f);
-  api.runtime.sendMessage({ type: 'scanTabs' }).catch(() => {}); // a Canvas that is already open
+  if (!safari) api.runtime.sendMessage({ type: 'scanTabs' }).catch(() => {}); // a Canvas that is already open
   await api.storage.local.set({ 'setup:offered': true }).catch(() => {});
 })();

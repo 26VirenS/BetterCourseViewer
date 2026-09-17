@@ -2225,7 +2225,7 @@ try {
   // page after install has nothing to find until the tab below opens on /courses)
   await page.goto(`${BASE}/`);
   await page.waitForSelector('.bcv-stat', { timeout: 15000 });
-  await sw.evaluate(() => self.BCV.api.storage.local.remove(['setup:done', 'setup:found']));
+  await sw.evaluate(() => self.BCV.api.storage.local.remove('setup:found'));
   const setup = await context.newPage();
   const sTexts = (sel) => setup.$$eval(sel, (els) => els.map((e) => (e.innerText || e.textContent).replace(/\s+/g, ' ').trim()));
   await setup.goto(`chrome-extension://${extId}/setup/setup.html`);
@@ -2238,6 +2238,8 @@ try {
   check(/^Found lms\.example\.edu\./.test((await sTexts('#status'))[0]) && (await sTexts('#allow'))[0] === 'Allow Simpl Courses on lms.example.edu', `a site not yet allowed is named, with one button to allow it: ${(await sTexts('#allow'))[0]}`);
   await setup.screenshot({ path: join(out, '32b-setup-found.png') });
   // a Canvas on a site already allowed: the setup opens there by itself, and this page says so and goes
+  // (the setup is undone only now, with the page open and watching: an allowed tab loading is what it waits for)
+  await sw.evaluate(() => { self.BCV.background.forgetNoticed(); return self.BCV.api.storage.local.remove('setup:done'); }); // (a site is started once per run; this run has been on the mock all along)
   const canvasTab = await context.newPage();
   await canvasTab.goto(`${BASE}/courses`);
   // (the card cleans ?bcv=setup off the address as it opens, so the card itself is what is waited for)

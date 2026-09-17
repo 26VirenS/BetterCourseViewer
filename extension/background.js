@@ -333,34 +333,82 @@ if (typeof importScripts === 'function' && !self.BCV?.settings) {
    *  was found and offers to allow it: that press is the gesture a permission request needs, and
    *  the one thing the browser will not let happen on its own. Only the address is read. */
   const noticed = new Set();
+  /** The setup, opened on a tab of an allowed site: once per site per run, so the page it loads does
+   *  not open it again under the card. The site's scripts are registered first where they are not
+   *  built in — a site allowed from Safari's own settings has none until then. */
+  async function startSetupOn(origin, tabId) {
+    if (noticed.has(origin)) return;
+    noticed.add(origin);
+    if (!/\.instructure\.com$/i.test(new URL(origin).hostname)) {
+      const r = await registerDomain(origin);
+      if (r && r.ok === false) return;
+    }
+    await api.storage.local.set({ 'setup:found': { origin, tabId, granted: true, at: Date.now() } });
+    await S.update({ appearance: { skin: true } });
+    await api.tabs.update(tabId, { url: `${origin}/?bcv=setup`, active: true });
+  }
   async function noticeTab(tab) {
     try {
       if (!tab || !tab.url || tab.id == null || ourPage(tab.url)) return;
       const url = new URL(tab.url);
-      if (!looksLikeCanvas(url) || url.searchParams.get('bcv') === 'setup') return;
+      if (!/^https?:$/.test(url.protocol) || url.searchParams.get('bcv') === 'setup') return;
       const state = await api.storage.local.get('setup:done');
       if (state['setup:done']) return;
       const origin = url.origin;
+      // a site the browser has allowed for Simpl Courses was allowed for Canvas: it is Canvas by the
+      // user's own word, whatever its address looks like; any other is judged by its address alone
       const granted = await siteGranted(origin);
-      await api.storage.local.set({ 'setup:found': { origin, tabId: tab.id, granted, at: Date.now() } });
-      if (!granted || noticed.has(origin)) return;
-      noticed.add(origin);
-      if (!/\.instructure\.com$/i.test(url.hostname)) {
-        const r = await registerDomain(origin);
-        if (r && r.ok === false) return;
+      if (!granted) {
+        if (looksLikeCanvas(url)) await api.storage.local.set({ 'setup:found': { origin, tabId: tab.id, granted: false, at: Date.now() } });
+        return;
       }
-      await S.update({ appearance: { skin: true } });
-      await api.tabs.update(tab.id, { url: `${origin}/?bcv=setup`, active: true });
+      await startSetupOn(origin, tab.id);
     } catch {
       /* a tab that closed, or one we may not read */
     }
   }
-  if (api.tabs?.onUpdated) api.tabs.onUpdated.addListener((tabId, info, tab) => { if (info.status === 'complete' || info.url) noticeTab(tab); });
-  /** Every open tab looked at once: a Canvas that was open before the page after install was. */
+  // a page that has loaded, not an address that moved in place: the setup card cleans ?bcv=setup
+  // off the address as it opens, and that must not read as a fresh arrival
+  if (api.tabs?.onUpdated) api.tabs.onUpdated.addListener((tabId, info, tab) => { if (info.status === 'complete') noticeTab(tab); });
+  /** Every open tab looked at once: a Canvas that was open before the page after install was.
+   *  (Chrome only: Safari asks the user about every open site before it will say their addresses.) */
   async function scanTabs() {
     const tabs = await api.tabs.query({}).catch(() => []);
     for (const t of tabs || []) await noticeTab(t);
     return { ok: true };
+  }
+  /** A site allowed by whatever means — this page, the popup, or the browser's own settings, which
+   *  is how Safari does it: its scripts registered, and the setup opened on a tab of it if the
+   *  setup is still to do. */
+  async function adoptOrigins(patterns, { open = true } = {}) {
+    for (const pat of patterns || []) {
+      if (/\*\./.test(pat) || /^\*:\/\/\*\//.test(pat)) continue; // a wildcard host: the built-in one, or everything
+      const origin = normalizeOrigin(pat.replace(/^\*:\/\//, 'https://').replace(/\/\*$/, ''));
+      if (!origin || /\.instructure\.com$/i.test(new URL(origin).hostname)) continue;
+      try {
+        const settings = await S.get();
+        if (!settings.domains.includes(origin)) await registerDomain(origin);
+        if (!open) continue;
+        const state = await api.storage.local.get('setup:done');
+        if (state['setup:done']) continue;
+        const tabs = await api.tabs.query({ url: `${origin}/*` }).catch(() => []);
+        const tab = (tabs || []).find((t) => t.url && new URL(t.url).searchParams.get('bcv') !== 'setup') || (tabs || [])[0];
+        if (tab && tab.id != null) await startSetupOn(origin, tab.id);
+      } catch {
+        /* the next one */
+      }
+    }
+  }
+  if (api.permissions && api.permissions.onAdded) api.permissions.onAdded.addListener((added) => adoptOrigins(added && added.origins));
+  /** Sites the browser already allows that this extension never registered — allowed from the
+   *  browser's own settings, on Safari. Read on every wake, so a site allowed there works after. */
+  async function adoptGranted() {
+    try {
+      const all = await api.permissions.getAll();
+      await adoptOrigins(all && all.origins, { open: false });
+    } catch {
+      /* no permissions API, or nothing to adopt */
+    }
   }
 
   // ---- lifecycle ----------------------------------------------------------
@@ -371,7 +419,7 @@ if (typeof importScripts === 'function' && !self.BCV?.settings) {
   if (api.runtime.onStartup) api.runtime.onStartup.addListener(() => ensureDomains());
   // Every time the background wakes: cheap check, repairs stale registrations
   // even when onInstalled/onStartup never fired (Safari rebuilds, reloads).
-  ensureDomains();
+  ensureDomains().then(adoptGranted);
   offerSetup();
-  BCV.background = { offerSetup, ensureDomains }; // the harness drives these directly
+  BCV.background = { offerSetup, ensureDomains, forgetNoticed: () => noticed.clear() }; // the harness drives these directly
 })();
