@@ -262,12 +262,14 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
   --bg: #fbfbfd; --tile: #f4f4f7; --panel: #fff; --ink: #111113; --ink2: #3c3c43; --ink3: #6c6c70; --ink4: #77777c;
   --hair: rgba(60,60,67,.12); --faint: rgba(60,60,67,.18); --stage: rgba(60,60,67,.06); --box-edge: rgba(60,60,67,.3);
   --rail-on: rgba(60,60,67,.06); --row-on: rgba(10,132,255,.09); --off: rgba(118,118,128,.16); --switch-off: rgba(118,118,128,.2);
+  --track: rgba(60,60,67,.08); --thumb: rgba(60,60,67,.32); --thumb-hot: rgba(60,60,67,.5);
   background: var(--bg); -webkit-backdrop-filter: none; backdrop-filter: none; overflow-y: auto; color: var(--ink);
 }
 :host([data-theme="dark"]) .overlay.overlay--solid, html[data-theme="dark"] .overlay--solid {
   --bg: #000; --tile: #121214; --panel: #1e1e21; --ink: #f5f5f7; --ink2: #d1d1d6; --ink3: #98989d; --ink4: #9b9ba1;
   --hair: rgba(255,255,255,.1); --faint: rgba(255,255,255,.16); --stage: rgba(255,255,255,.05); --box-edge: rgba(255,255,255,.3);
   --rail-on: rgba(255,255,255,.07); --row-on: rgba(10,132,255,.16); --off: rgba(118,118,128,.24); --switch-off: rgba(118,118,128,.32);
+  --track: rgba(255,255,255,.08); --thumb: rgba(255,255,255,.32); --thumb-hot: rgba(255,255,255,.5);
   background: var(--bg);
 }
 .overlay .page--fr { height: auto; min-height: 100%; overflow: visible; padding: 40px 32px; align-items: center; justify-content: center; gap: 0; }
@@ -333,7 +335,14 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
 .page--fr .listhead { margin-top: 22px; align-items: baseline; gap: 12px; font: 500 11.5px/1.2 var(--font); color: var(--ink4); }
 .page--fr .linkbtn { flex: none; height: 28px; padding: 0 12px; border: 1px solid var(--hair); border-radius: 14px; background: transparent; font: 600 12px/1 var(--font); color: var(--blue); transition: background .2s ease; }
 .page--fr .linkbtn:hover { background: var(--tile); }
-.page--fr .rows { margin-top: 4px; max-height: 300px; gap: 2px; }
+/* the course list scrolls behind a scrollbar that is always drawn (a classic one, not the overlay kind
+ * that hides between scrolls), so it is plain that there are more courses below */
+.page--fr .rows { margin-top: 4px; max-height: 300px; gap: 2px; overflow-y: scroll; padding-right: 8px; scrollbar-width: thin; scrollbar-color: var(--thumb) var(--track); }
+.page--fr .rows::-webkit-scrollbar { width: 8px; height: auto; }
+.page--fr .rows::-webkit-scrollbar-track { background: var(--track); border-radius: 4px; }
+.page--fr .rows::-webkit-scrollbar-thumb { background: var(--thumb); border-radius: 4px; border: 0; }
+.page--fr .rows::-webkit-scrollbar-thumb:hover { background: var(--thumb-hot); }
+.page--fr .rows::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
 .page--fr .row { gap: 13px; padding: 11px 12px 11px 11px; border: 0; border-radius: 11px; background: transparent; animation: frRise .32s var(--ease) both; transition: background .2s ease; }
 .page--fr .row:active { transform: none; }
 .page--fr .row.is-on { background: var(--row-on); border: 0; padding: 11px 12px 11px 11px; }

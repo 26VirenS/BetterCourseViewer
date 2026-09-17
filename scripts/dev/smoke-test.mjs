@@ -2096,12 +2096,27 @@ try {
   await page.waitForTimeout(500);
   await shot(page, '32-setup-over-page');
   const railNow = () => page.$$eval(su('.rail__item'), (els) => els.map((e) => `${e.querySelector('.rail__name').textContent}: ${e.querySelector('.rail__answer').textContent}${e.classList.contains('is-done') ? ' ✓' : ''}${e.disabled ? ' (locked)' : ''}`));
-  check((await railNow()).join(' | ') === 'Your courses: None yet | Grades: Not yet (locked) | Dashboard: Not yet (locked) | Sidebar: Not yet (locked)', `the rail names every step and really locks the ones ahead: ${(await railNow()).join(' | ')}`);
+  const tickedNow = (await page.$$(su('.row.is-on'))).length; // the ones named like a class, ticked already (checked below)
+  check(tickedNow > 0 && (await railNow()).join(' | ') === `Your courses: ${tickedNow} courses | Grades: Not yet (locked) | Dashboard: Not yet (locked) | Sidebar: Not yet (locked)`, `the rail names every step and really locks the ones ahead: ${(await railNow()).join(' | ')}`);
   const scanned = await texts(su('.row__code'));
   const total = scanned.length;
-  // nothing is ticked to begin with, whatever Canvas already has starred, and Continue is dead until
-  // something is: the list picked here is the one every screen then follows
-  check((await texts(su('.fr__h1')))[0] === 'Which courses are you in?' && scanned.length >= 8 && (await page.$$(su('.row.is-on'))).length === 0 && (await texts(su('.listhead span')))[0] === `0 of ${total} selected` && (await texts(su('#selectAll')))[0] === 'Select all' && (await page.$eval(su('#next'), (b) => b.disabled)) && (await texts(su('#hint')))[0] === 'Pick at least one course.', `step 1 read the enrolments with none preselected: ${scanned.length} active courses, 0 checked, Continue off with a hint`);
+  const railAnswer = (step) => page.$eval(su(`.rail__item[data-step="${step}"] .rail__answer`), (e) => e.textContent);
+  // Courses named like a class (a subject and a number: MATH 021, PHYS 008HL) are ticked for the
+  // student; a resource site or a placement exam is not, whatever Canvas has starred. Continue is
+  // alive as soon as one is ticked: the list picked here is the one every screen then follows.
+  const CLASS = /\b[A-Z]{2,5}\s?-?\s?\d{1,4}[A-Z]{0,3}\b/;
+  const rowsNow = await page.$$eval(su('.row[data-course]'), (els) => els.map((e) => ({ id: e.dataset.course, code: e.querySelector('.row__code').textContent.trim(), name: e.querySelector('.row__name').textContent.trim(), on: e.classList.contains('is-on') })));
+  const classy = rowsNow.filter((r) => CLASS.test(r.code) || CLASS.test(r.name));
+  const others = rowsNow.filter((r) => !classy.includes(r));
+  check((await texts(su('.fr__h1')))[0] === 'Which courses are you in?' && scanned.length >= 8 && classy.length >= 5 && others.length >= 2 && rowsNow.every((r) => r.on === classy.includes(r)) && (await texts(su('.listhead span')))[0] === `${classy.length} of ${total} selected` && (await texts(su('#selectAll')))[0] === 'Select all' && !(await page.$eval(su('#next'), (b) => b.disabled)) && (await texts(su('#hint')))[0] === '' && (await railAnswer('courses')) === `${classy.length} courses`, `step 1 read the enrolments and ticked the ones named like a class: ${classy.map((r) => r.code).join(', ')} on; ${others.map((r) => r.name).join(' / ')} off`);
+  // Clear all leaves none ticked, whatever was: Continue is dead with a hint until one is picked
+  const clearAll = async () => { if ((await texts(su('#selectAll')))[0] === 'Select all') await page.click(su('#selectAll')); await page.click(su('#selectAll')); };
+  await clearAll();
+  check((await page.$$(su('.row.is-on'))).length === 0 && (await texts(su('.listhead span')))[0] === `0 of ${total} selected` && (await page.$eval(su('#next'), (b) => b.disabled)) && (await texts(su('#hint')))[0] === 'Pick at least one course.' && (await railAnswer('courses')) === 'None yet', 'Clear all unticks them all: Continue is dead with a hint until one is picked');
+  // the list scrolls behind a scrollbar that is always drawn, so the courses below the fold are not
+  // missed (headless Chromium hides every scrollbar, so the rule is read off the styles, not measured)
+  const listBar = await page.$eval(su('.rows'), (e) => ({ bar: getComputedStyle(e, '::-webkit-scrollbar').width, scrolls: e.scrollHeight > e.clientHeight, mode: getComputedStyle(e).overflowY }));
+  check(listBar.bar === '8px' && listBar.scrolls && listBar.mode === 'scroll', `the course list has a scrollbar that is always drawn, with more below: ${JSON.stringify(listBar)}`);
   const rowCodes = await page.$$eval(su('.row[data-course]'), (els) => els.map((e) => [e.dataset.course, e.querySelector('.row__code').textContent.trim()]));
   const starredBefore = (await apiGet('/api/v1/courses?per_page=100')).filter((c) => c.is_favorite).map((c) => String(c.id));
   // Pick five: one Canvas had not starred and one starred course deliberately left out, so the write
@@ -2114,7 +2129,6 @@ try {
   const onCode = freshRows[0][1];
   const offCode = dropped[1];
   for (const [id] of picks) await page.click(su(`.row[data-course="${id}"]`));
-  const railAnswer = (step) => page.$eval(su(`.rail__item[data-step="${step}"] .rail__answer`), (e) => e.textContent);
   check((await texts(su('.listhead span')))[0] === `5 of ${total} selected` && (await page.$$(su('.row.is-on'))).length === 5 && !(await page.$eval(su('#next'), (b) => b.disabled)) && (await texts(su('#hint')))[0] === '' && (await railAnswer('courses')) === '5 courses', 'rows toggle with the count, the rail answers, and Continue comes alive once one is picked');
   await page.click(su(`.row[data-course="${picks[0][0]}"]`));
   check((await texts(su('.listhead span')))[0] === `4 of ${total} selected` && (await page.$$(su('.row.is-on'))).length === 4 && (await railAnswer('courses')) === '4 courses', 'and a second press unticks it');
@@ -2681,6 +2695,7 @@ try {
   // the only way out is through: the steps, then the tour (the favourites already starred are the
   // ones picked, so finishing here changes nothing in Canvas for the sections that follow)
   const keepStarred = (await apiGet('/api/v1/courses?per_page=100')).filter((c) => c.is_favorite).map((c) => String(c.id));
+  await clearAll(); // the ones named like a class come ticked: start from none, then exactly the starred
   for (const id of keepStarred) await page.click(su(`.row[data-course="${id}"]`));
   await page.click(su('#next'));
   await page.waitForSelector(su('#track'), { timeout: 10000 });

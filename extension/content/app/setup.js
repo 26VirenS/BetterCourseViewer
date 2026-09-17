@@ -3,8 +3,9 @@
  * is not yet configured, so showing it is noise. A word-mark plays first, then four steps with a
  * rail down the left that shows every step and the answer given so far — back is always open,
  * forward is Continue alone, steps ahead read "Not yet" and are really disabled:
- *   1 the courses, read from the enrolments (nothing is ticked to start with; unchecked ones stay
- *     hidden everywhere: they become the Canvas favourites, the one list every screen follows) ·
+ *   1 the courses, read from the enrolments (the ones named like a class are ticked to start with;
+ *     unchecked ones stay hidden everywhere: they become the Canvas favourites, the one list every
+ *     screen follows) ·
  *   2 grades (a history kept on this device, a goal, a target letter per course) ·
  *   3 what the Dashboard shows first, chosen by looking at miniatures of the real layouts ·
  *   4 where those courses sit, on the sidebar or in a panel off the Courses row ·
@@ -31,8 +32,12 @@
   ];
   let STEPS = ALL;
   const settleSteps = () => { STEPS = BCV.phone?.active() ? ALL.filter((s) => s.key === 'courses' || s.key === 'grades') : ALL; };
+  // A course named like a class — a subject and a number: MATH 021, PHYS 008HL, CS-101 — is ticked
+  // for the student; a resource site, a placement exam or an orientation is not.
+  const CLASS_CODE = /\b[A-Z]{2,5}\s?-?\s?\d{1,4}[A-Z]{0,3}\b/;
+  const looksLikeClass = (c) => CLASS_CODE.test(c.code || '') || CLASS_CODE.test(c.originalName || '');
   const COPY = {
-    courses: ['Which courses are you in?', 'Unchecked courses stay hidden everywhere. A nickname replaces the name across the app.'],
+    courses: ['Which courses are you in?', 'Courses named like a class are ticked already. Unchecked courses stay hidden everywhere. A nickname replaces the name across the app.'],
     grades: ['Grades', 'Canvas keeps no history. Simpl Courses can, on this device.'],
     dashboard: ['What you see first', 'Pick the shape of your dashboard.'],
     sidebar: ['Where your courses live', 'Either way it is the same list.'],
@@ -240,10 +245,10 @@
       const favIds = new Set((favs || []).map((c) => String(c.id)));
       const list = (all || []).filter((c) => c.state === 'current').map((c) => ({ id: String(c.id), code: c.code || c.name, name: c.name, originalName: c.originalName || c.name, nickname: c.nickname || '', color: c.color, favorite: !!c.favorite || favIds.has(String(c.id)) }));
       st.courses = list;
-      // Nothing is ticked to begin with, whatever Canvas already has starred: this list is what every
-      // screen then follows, so it is worth choosing rather than inheriting. Continue stays disabled
-      // until at least one is picked.
-      st.favs = new Set();
+      // The courses named like a class are ticked to begin with and the rest are not, whatever Canvas
+      // already has starred: this list is what every screen then follows, so it is worth choosing
+      // rather than inheriting. Continue stays disabled while nothing is ticked.
+      st.favs = new Set(list.filter(looksLikeClass).map((c) => c.id));
       for (const c of list) if (!(c.id in st.targets)) st.targets[c.id] = 'A+';
     } catch (e) {
       st.scanError = e?.message || 'The course list could not be read.';

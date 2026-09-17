@@ -616,8 +616,12 @@ try {
   await page.waitForSelector('#bcv-setup .row', { timeout: 20000 });
   await page.waitForFunction(() => document.querySelector('#bcv-setup')?.shadowRoot.querySelector('.intro')?.hidden === true, null, { timeout: 8000 }); // the word-mark first
   await page.waitForTimeout(400);
-  check((await page.$$('#bcv-setup .row.is-on')).length === 0 && (await page.$$('#bcv-setup .row[data-course]')).length >= 5 && (await page.$eval('#bcv-setup #next', (e) => e.disabled)) && (await page.$eval('#bcv-setup .fr', (e) => e.getBoundingClientRect().right <= window.innerWidth + 1 && e.getBoundingClientRect().left >= 0)) && !(await page.locator('#bcv-setup .rail').isVisible()) && (await page.$eval('#bcv-setup #stepLabel', (e) => e.textContent)) === '1 of 2' && await noOverflow(), 'the setup fits the phone screen without the rail and lists the courses, none picked yet (Continue waits for one)');
+  check((await page.$$('#bcv-setup .row.is-on')).length === 6 && (await page.$$('#bcv-setup .row[data-course]')).length >= 8 && !(await page.$eval('#bcv-setup #next', (e) => e.disabled)) && (await page.$eval('#bcv-setup .fr', (e) => e.getBoundingClientRect().right <= window.innerWidth + 1 && e.getBoundingClientRect().left >= 0)) && !(await page.locator('#bcv-setup .rail').isVisible()) && (await page.$eval('#bcv-setup #stepLabel', (e) => e.textContent)) === '1 of 2' && await noOverflow(), 'the setup fits the phone screen without the rail and lists the courses, the six named like a class ticked already');
   await shot('11-setup');
+  // start from none (Clear all), then pick five by hand
+  if ((await page.$eval('#bcv-setup #selectAll', (e) => e.textContent)) === 'Select all') await page.click('#bcv-setup #selectAll');
+  await page.click('#bcv-setup #selectAll');
+  check(await eventually(async () => (await page.$$('#bcv-setup .row.is-on')).length === 0 && (await page.$eval('#bcv-setup #next', (e) => e.disabled))), 'Clear all unticks them all, and Continue waits for one');
   await page.$$eval('#bcv-setup .row[data-course]', (els) => els.slice(0, 5).forEach((e) => e.click())); // pick five
   // (Playwright selectors reach into the card's shadow root; document.querySelector would not)
   check(await eventually(async () => (await page.$$('#bcv-setup .row.is-on')).length === 5 && !(await page.$eval('#bcv-setup #next', (e) => e.disabled))), 'five picked: the rows tick and Continue comes alive');
