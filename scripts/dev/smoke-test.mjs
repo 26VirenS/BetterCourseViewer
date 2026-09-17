@@ -2394,9 +2394,10 @@ try {
   console.log("what's new");
   const wn = (sel) => `#bcv-whatsnew ${sel}`; // in a shadow root, like the setup
   const cur = whatsNew[0];
-  const kindCounts = { new: 0, improved: 0, fixed: 0 };
-  cur.notes.forEach((n) => { kindCounts[n.kind] += 1; });
-  // an update from 2.7.5 (the background notes the version left behind), this version not yet seen
+  const wnPage = () => page.evaluate(() => { const r = document.querySelector('#bcv-whatsnew').shadowRoot; return { since: r.querySelector('.wn__since')?.textContent ?? null, versions: [...r.querySelectorAll('.wn__vh')].map((v) => v.querySelector('.wn__vnum').textContent), dates: [...r.querySelectorAll('.wn__vdate')].map((d) => d.textContent), notes: [...r.querySelectorAll('.wn__note')].map((n) => `${n.dataset.version} ${n.dataset.kind}: ${n.querySelector('.wn__title').textContent}`), clutter: r.querySelectorAll('.wn__kind, .wn__where, .wn__filter, .wn__rail, .wn__jump, .fr__hint').length, more: r.querySelector('#earlier')?.textContent ?? null, foot: [...r.querySelectorAll('.fr__foot button')].map((b) => b.textContent.trim()), scroll: (() => { const l = r.querySelector('#notes'); return { over: l.scrollHeight > l.clientHeight, bar: getComputedStyle(l, '::-webkit-scrollbar').width }; })() }; });
+  // an update from 2.7.5 (the background notes the version left behind), this version not yet seen:
+  // one page lists every version since, newest first — a few skipped updates make one page, not one each
+  const sinceOld = whatsNew.filter((v) => cmpVer(v.version, '2.7.5') > 0);
   await sw.evaluate(async () => { await self.BCV.api.storage.local.set({ 'whatsnew:from': '2.7.5' }); await self.BCV.api.storage.local.remove('whatsnew:seen'); });
   await page.goto(`${BASE}/`);
   await page.waitForSelector(wn('.wn__note'), { timeout: 20000 });
@@ -2404,35 +2405,38 @@ try {
   check(wnDot.gap >= 10 && wnDot.gap <= 18 && wnDot.fits, `its word-mark's dot sits just past the word too: ${JSON.stringify(wnDot)}`);
   await page.waitForFunction(() => document.querySelector('#bcv-whatsnew')?.shadowRoot.querySelector('.intro')?.hidden === true, null, { timeout: 8000 }); // the word-mark first
   await page.waitForTimeout(500);
-  const wnHead = await page.evaluate(() => { const r = document.querySelector('#bcv-whatsnew').shadowRoot; return { from: r.querySelector('.wn__from')?.textContent ?? null, to: r.querySelector('.wn__to')?.textContent, ver: r.querySelector('.wn__ver')?.textContent, date: r.querySelector('.wn__date')?.textContent, filters: [...r.querySelectorAll('.wn__filter')].map((f) => `${f.querySelector('.wn__flabel').textContent} ${f.querySelector('.wn__count').textContent}${f.classList.contains('is-on') ? ' *' : ''}`), notes: [...r.querySelectorAll('.wn__note')].map((n) => `${n.dataset.kind}: ${n.querySelector('.wn__title').textContent} [${n.querySelector('.wn__kind').textContent}]`), foot: r.querySelector('#dismiss')?.textContent.trim(), hint: r.querySelector('.fr__hint')?.textContent }; });
-  check(wnHead.from === 'from 2.7.5' && wnHead.to === manifest.version && wnHead.ver === `Version ${manifest.version}` && /\d{4}/.test(wnHead.date) && wnHead.filters.join(' | ') === `Everything ${cur.notes.length} * | New ${kindCounts.new} | Improved ${kindCounts.improved} | Fixed ${kindCounts.fixed}` && wnHead.notes.length === cur.notes.length && wnHead.notes[0] === `${cur.notes[0].kind}: ${cur.notes[0].title} [${{ new: 'New', improved: 'Improved', fixed: 'Fixed' }[cur.notes[0].kind]}]` && wnHead.foot === 'Back to Canvas' && /once per version/.test(wnHead.hint), `the first page after an update shows what changed, from the version left behind: ${JSON.stringify(wnHead)}`);
+  const wn1 = await wnPage();
+  const expectNotes = sinceOld.flatMap((v) => v.notes.map((n) => `${v.version} ${n.kind}: ${n.title}`));
+  check(wn1.since === 'Everything since 2.7.5' && sinceOld.length > 1 && wn1.versions.join(' | ') === sinceOld.map((v) => v.version).join(' | ') && wn1.dates.length === sinceOld.length && wn1.dates.every((d) => /\d{4}/.test(d)) && wn1.notes.join(' | ') === expectNotes.join(' | ') && wn1.clutter === 0 && wn1.more === 'Earlier versions' && wn1.foot.join(',') === 'Back to Canvas' && wn1.scroll.over && wn1.scroll.bar === '8px', `the first page after an update lists every version since the one left behind, newest first, with one button and a scrollbar for the rest: ${JSON.stringify(wn1)}`);
   check(page.url() === `${BASE}/` && (await page.$('.bcv-stat')) !== null && (await page.$eval('html', (e) => getComputedStyle(e).overflow)) === 'hidden', 'it sits over the page, which is drawn underneath and held still');
   await shot(page, '33-whats-new');
-  // the rail filters the one list, with its counts
-  await page.click(wn('.wn__filter[data-filter="new"]'));
-  await page.waitForTimeout(350);
-  check((await page.$$eval(wn('.wn__note'), (els) => els.map((e) => e.dataset.kind))).every((k) => k === 'new') && (await page.$$(wn('.wn__note'))).length === kindCounts.new && (await page.$eval(wn('.wn__filter[data-filter="new"]'), (e) => e.classList.contains('is-on'))), 'New keeps the new notes only');
-  await page.click(wn('.wn__filter[data-filter="all"]'));
-  await page.waitForTimeout(200);
-  // the releases before this one behind one link, the ones skipped marked
-  await page.click(wn('#log'));
-  await page.waitForSelector(wn('.wn__hv'), { timeout: 5000 });
-  const hist = await page.$$eval(wn('.wn__hv'), (els) => els.map((e) => `${e.querySelector('.wn__hver').textContent}${e.querySelector('.wn__pill') ? ' (new to you)' : ''}`));
-  const expectHist = whatsNew.slice(1, 9).map((v) => `${v.version}${cmpVer(v.version, '2.7.5') > 0 ? ' (new to you)' : ''}`);
-  check(hist.join(' | ') === expectHist.join(' | ') && (await texts(wn('#log')))[0] === 'Back to this release' && !(await page.$(wn('.wn__filter.is-on'))), `See earlier versions lists them newest first, the ones skipped marked: ${hist.join(' | ')}`);
-  await shot(page, '33b-whats-new-history');
-  await page.click(wn('#log'));
-  await page.waitForSelector(wn('.wn__note'), { timeout: 5000 });
-  // Back to Canvas: seen now (not when it opened), and never again for this version
+  // shown once: opening it is what marks the version seen, not closing it
+  check(await eventually(async () => { const f = await sw.evaluate(() => self.BCV.api.storage.local.get(['whatsnew:seen', 'whatsnew:from'])); return f['whatsnew:seen'] === manifest.version && f['whatsnew:from'] === undefined; }), 'opening it marks the version seen at once');
+  // Earlier versions appends the releases before the jump to the same list
+  await page.click(wn('#earlier'));
+  await page.waitForTimeout(400);
+  const wn2 = await wnPage();
+  const expectAll = [...sinceOld, ...whatsNew.filter((v) => cmpVer(v.version, '2.7.5') <= 0).slice(0, 8)];
+  check(wn2.versions.join(' | ') === expectAll.map((v) => v.version).join(' | ') && wn2.notes.length === expectAll.reduce((n, v) => n + v.notes.length, 0) && (wn2.more === null) === (expectAll.length === whatsNew.length), `Earlier versions appends the ones before the jump, newest first: ${wn2.versions.join(' | ')}`);
+  await shot(page, '33b-whats-new-earlier');
+  // Back to Canvas lets the page go; the next page does not show it again
   await page.click(wn('#dismiss'));
   await page.waitForFunction(() => !document.querySelector('#bcv-whatsnew'), null, { timeout: 5000 });
-  const wnFlags = await sw.evaluate(() => self.BCV.api.storage.local.get(['whatsnew:seen', 'whatsnew:from']));
-  check(wnFlags['whatsnew:seen'] === manifest.version && wnFlags['whatsnew:from'] === undefined && !(await page.$('html.bcv-setup-open')), `Back to Canvas marks the version seen and lets the page go: ${JSON.stringify(wnFlags)}`);
+  check(!(await page.$('html.bcv-setup-open')), 'Back to Canvas lets the page go');
   await page.goto(`${BASE}/`);
   await page.waitForSelector('#bcv-app .bcv-nav__item', { timeout: 10000 });
   await page.waitForTimeout(600);
   check(!(await page.$('#bcv-whatsnew')), 'and the next page does not show it again');
-  // reachable again from the account menu, for this version (no jump to state)
+  // closed any other way — the page reloaded while it was up — it is seen all the same: once is once
+  await sw.evaluate(async () => { await self.BCV.api.storage.local.set({ 'whatsnew:from': '2.12.0' }); await self.BCV.api.storage.local.remove('whatsnew:seen'); });
+  await page.goto(`${BASE}/`);
+  await page.waitForSelector(wn('.wn__note'), { timeout: 20000 });
+  await eventually(async () => (await sw.evaluate(() => self.BCV.api.storage.local.get('whatsnew:seen')))['whatsnew:seen'] === manifest.version);
+  await page.goto(`${BASE}/`);
+  await page.waitForSelector('#bcv-app .bcv-nav__item', { timeout: 10000 });
+  await page.waitForTimeout(600);
+  check(!(await page.$('#bcv-whatsnew')), 'a page reloaded while it was up does not show it again either');
+  // reachable again from the account menu, for this version alone
   await page.waitForSelector('#bcv-account', { timeout: 15000 });
   const openAccount = async () => { await page.click('#bcv-account'); return page.waitForSelector('.bcv-menu--account', { timeout: 3000 }).then(() => true, () => false); };
   if (!(await openAccount())) { await page.waitForTimeout(800); await openAccount(); } // a sidebar redraw can close a menu just opened
@@ -2440,7 +2444,8 @@ try {
   check(menuItems.some((t) => /What.s new/.test(t)), `the account menu has What’s new: ${menuItems.map((t) => t.split('\n')[0]).join(' | ')}`);
   await page.locator('.bcv-menu--account .bcv-menu__item').filter({ hasText: /What.s new/ }).click();
   await page.waitForSelector(wn('.wn__note'), { timeout: 10000 });
-  check((await page.$(wn('.wn__from'))) === null && (await page.$eval(wn('.wn__to'), (e) => e.textContent)) === manifest.version, 'the account menu opens it again, for this version');
+  const wn3 = await wnPage();
+  check(wn3.since === null && wn3.versions.join(' | ') === manifest.version && wn3.notes.length === cur.notes.length && wn3.more === 'Earlier versions', `the account menu opens it again, for this version alone: ${JSON.stringify(wn3.versions)}`);
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('#bcv-whatsnew'), null, { timeout: 5000 });
   check(!(await page.$('#bcv-whatsnew')), 'Escape closes it too');

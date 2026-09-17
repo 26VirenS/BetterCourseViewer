@@ -433,67 +433,39 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
 .page--fr .summary__k { font: 400 13px/1.4 var(--font); color: var(--ink4); }
 .page--fr .summary__v { max-width: 230px; font: 500 13px/1.4 var(--font); color: var(--ink); }
 
-/* ==== What's new after an update (the "What's New" mockup): the setup's ground and rail, a list of
- * notes on the right, the earlier versions behind one link ==== */
+/* ==== What's new after an update: the setup's ground, one list — a heading per version, then its
+ * notes — and Earlier versions as one button at the foot of the list ==== */
 @keyframes frFade { from { opacity: 0; } to { opacity: 1; } }
 .overlay--solid { --hue-new: #0a84ff; --tint-new: rgba(10,132,255,.1); --hue-improved: #1a6b30; --tint-improved: rgba(52,199,89,.14); --hue-fixed: #5b3ea8; --tint-fixed: rgba(140,110,240,.13); --accent-soft: rgba(10,132,255,.1); }
 :host([data-theme="dark"]) .overlay--solid, html[data-theme="dark"] .overlay--solid { --tint-new: rgba(10,132,255,.18); --hue-improved: #5ddb7d; --tint-improved: rgba(52,199,89,.2); --hue-fixed: #c2a6f5; --tint-fixed: rgba(140,110,240,.2); --accent-soft: rgba(10,132,255,.18); }
-.wn__jump { flex: none; display: flex; align-items: center; gap: 8px; color: var(--ink4); }
-.wn__jump svg { display: block; }
-.wn__from { font: 500 12px/1.2 var(--mono); color: var(--ink4); }
-.wn__to { padding: 4px 10px; border-radius: 12px; background: var(--accent-soft); font: 600 12px/1.2 var(--mono); color: var(--blue); }
-.wn__rail { flex: none; width: 226px; padding-right: 26px; border-right: 1px solid var(--hair); display: flex; flex-direction: column; }
-.wn__ver { font: 600 26px/1.15 var(--display); letter-spacing: -.03em; color: var(--ink); }
-.wn__date { margin-top: 8px; font: 400 12.5px/1.5 var(--font); color: var(--ink4); }
-.wn__filters { margin-top: 24px; display: flex; flex-direction: column; gap: 3px; }
-.wn__filter { display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 12px; border: 0; border-radius: 11px; background: transparent; cursor: pointer; text-align: left; color: var(--ink2); font: 400 13px/1.3 var(--font); letter-spacing: -.01em; transition: background .2s ease, color .2s ease; }
-.wn__filter.is-on { background: var(--rail-on); color: var(--ink); font-weight: 600; }
-.wn__dot { flex: none; width: 7px; height: 7px; border-radius: 4px; background: var(--ink3); }
-.wn__filter[data-filter="new"] .wn__dot { background: var(--hue-new); }
-.wn__filter[data-filter="improved"] .wn__dot { background: var(--hue-improved); }
-.wn__filter[data-filter="fixed"] .wn__dot { background: var(--hue-fixed); }
-.wn__flabel { flex: 1; min-width: 0; }
-.wn__count { flex: none; font: 500 11.5px/1.2 var(--mono); color: var(--ink4); }
-.wn__filter.is-on .wn__count { color: var(--ink3); }
-.wn__spacer { flex: 1; }
-.wn__log { border: 0; background: transparent; cursor: pointer; padding: 9px 12px; text-align: left; font: 500 12px/1.3 var(--font); color: var(--ink4); transition: color .2s ease; }
-.wn__log:hover { color: var(--ink3); }
-.wn__list { flex: 1; min-height: 0; max-height: 436px; animation: frFade .26s ease both; }
-.wn__note { display: flex; gap: 16px; padding: 18px 0; border-top: 1px solid var(--hair); animation: frRise .34s var(--ease) both; --hue: var(--ink3); --tint: var(--tile); }
-.wn__note[data-kind="new"], .wn__hline[data-kind="new"] { --hue: var(--hue-new); --tint: var(--tint-new); }
-.wn__note[data-kind="improved"], .wn__hline[data-kind="improved"] { --hue: var(--hue-improved); --tint: var(--tint-improved); }
-.wn__note[data-kind="fixed"], .wn__hline[data-kind="fixed"] { --hue: var(--hue-fixed); --tint: var(--tint-fixed); }
+.wn .fr__body { display: flex; flex-direction: column; min-height: 0; }
+/* (the scrollbar shows whenever the list runs past its height, so the versions below are not missed) */
+.wn__list { flex: 1; min-height: 0; max-height: 480px; padding-right: 10px; animation: frFade .26s ease both; scrollbar-width: thin; scrollbar-color: var(--thumb) var(--track); }
+.wn__list::-webkit-scrollbar { width: 8px; height: auto; }
+.wn__list::-webkit-scrollbar-track { background: var(--track); border-radius: 4px; }
+.wn__list::-webkit-scrollbar-thumb { background: var(--thumb); border-radius: 4px; border: 0; }
+.wn__list::-webkit-scrollbar-thumb:hover { background: var(--thumb-hot); }
+.wn__list::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
+.wn__since { padding-bottom: 16px; font: 400 13px/1.4 var(--font); color: var(--ink4); }
+.wn__vh { display: flex; align-items: baseline; gap: 10px; padding: 26px 0 8px; animation: frRise .34s var(--ease) both; }
+.wn__vh:first-child, .wn__since + .wn__vh { padding-top: 0; }
+.wn__vnum { font: 600 20px/1.2 var(--display); letter-spacing: -.024em; color: var(--ink); }
+.wn__vdate { font: 400 12px/1.3 var(--font); color: var(--ink4); }
+.wn__note { display: flex; gap: 16px; padding: 16px 0; border-top: 1px solid var(--hair); animation: frRise .34s var(--ease) both; --hue: var(--ink3); --tint: var(--tile); }
+.wn__note[data-kind="new"] { --hue: var(--hue-new); --tint: var(--tint-new); }
+.wn__note[data-kind="improved"] { --hue: var(--hue-improved); --tint: var(--tint-improved); }
+.wn__note[data-kind="fixed"] { --hue: var(--hue-fixed); --tint: var(--tint-fixed); }
 .wn__ic { flex: none; width: 34px; height: 34px; border-radius: 10px; background: var(--tint); color: var(--hue); display: flex; align-items: center; justify-content: center; }
 .wn__ic svg { display: block; }
 .wn__nbody { flex: 1; min-width: 0; }
-.wn__head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
-.wn__title { font: 600 15.5px/1.3 var(--font); letter-spacing: -.016em; color: var(--ink); }
-.wn__kind { padding: 2px 8px; border-radius: 7px; background: var(--tint); font: 600 10px/1.4 var(--font); letter-spacing: .03em; color: var(--hue); }
-.wn__text { display: block; margin-top: 5px; font: 400 13px/1.55 var(--font); color: var(--ink3); text-wrap: pretty; }
-.wn__where { display: block; margin-top: 7px; font: 400 11.5px/1.3 var(--font); color: var(--ink4); }
-.wn__hist { flex: 1; min-height: 0; max-height: 436px; animation: frRise .3s var(--ease) both; }
-.wn__ht { font: 600 19px/1.25 var(--display); letter-spacing: -.024em; color: var(--ink); }
-.wn__hv { margin-top: 20px; animation: frRise .34s var(--ease) both; }
-.wn__hhead { display: flex; align-items: baseline; gap: 10px; padding-bottom: 8px; }
-.wn__hver { font: 600 13.5px/1.2 var(--mono); color: var(--ink); }
-.wn__hrule { flex: 1; min-width: 0; height: 1px; background: var(--hair); align-self: center; }
-.wn__hdate { font: 400 11.5px/1.2 var(--font); color: var(--ink4); }
-.wn__pill { padding: 2px 7px; border-radius: 6px; background: var(--accent-soft); font: 600 10px/1.4 var(--font); letter-spacing: .03em; color: var(--blue); }
-.wn__hline { display: flex; align-items: baseline; gap: 11px; padding: 6px 0; --hue: var(--ink3); }
-.wn__hdot { flex: none; width: 5px; height: 5px; border-radius: 3px; background: var(--hue); position: relative; top: -2px; }
-.wn__htext { flex: 1; min-width: 0; font: 400 13px/1.5 var(--font); color: var(--ink3); text-wrap: pretty; }
-.wn__htext b { font-weight: 600; color: var(--ink2); }
+.wn__title { display: block; font: 600 15.5px/1.3 var(--font); letter-spacing: -.016em; color: var(--ink); }
+.wn__text { display: block; margin-top: 4px; font: 400 13px/1.55 var(--font); color: var(--ink3); text-wrap: pretty; }
+.wn__more { display: block; width: 100%; margin-top: 4px; padding: 14px 0 6px; border: 0; border-top: 1px solid var(--hair); background: transparent; cursor: pointer; text-align: left; font: 500 13px/1.3 var(--font); color: var(--blue); }
+.wn__more:hover { text-decoration: underline; }
 .wn .fr__foot { padding-top: 22px; }
-.wn .fr__body { display: flex; flex-direction: column; }
 
 @media (max-width: 700px) {
-  .wn .fr__cols { flex-direction: column; }
-  .wn__rail { width: auto; padding: 0 0 14px; border-right: 0; border-bottom: 1px solid var(--hair); margin-bottom: 6px; }
-  .wn__filters { flex-direction: row; flex-wrap: wrap; gap: 4px; margin-top: 14px; }
-  .wn__filter { width: auto; padding: 7px 10px; gap: 7px; }
-  .wn__spacer { display: none; }
-  .wn__log { padding: 8px 0 0; }
-  .wn__list, .wn__hist { max-height: 52vh; }
+  .wn__list { max-height: 56vh; }
 }
 @media (max-width: 700px) {
   .overlay .page--fr { padding: 22px 16px 32px; }

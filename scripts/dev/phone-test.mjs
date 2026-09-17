@@ -659,7 +659,7 @@ try {
   await page.waitForSelector('#bcv-whatsnew .wn__note', { timeout: 20000 });
   await page.waitForFunction(() => document.querySelector('#bcv-whatsnew')?.shadowRoot.querySelector('.intro')?.hidden === true, null, { timeout: 8000 });
   await page.waitForTimeout(400);
-  check((await page.$$('#bcv-whatsnew .wn__filter')).length === 4 && (await page.$eval('#bcv-whatsnew .wn__filters', (e) => getComputedStyle(e).flexDirection)) === 'row' && (await page.$eval('#bcv-whatsnew .wn__to', (e) => e.textContent)) === manifest.version && await noOverflow(), 'what’s new fits the phone: the filters in a row above the notes');
+  check((await page.$$('#bcv-whatsnew .wn__vh')).length > 1 && (await page.$eval('#bcv-whatsnew .wn__vnum', (e) => e.textContent)) === manifest.version && (await page.$('#bcv-whatsnew .wn__filter')) === null && (await page.$('#bcv-whatsnew #earlier')) !== null && await noOverflow(), 'what’s new fits the phone: one list, this version first, Earlier versions at its foot');
   await shot('13-whats-new');
   await page.click('#bcv-whatsnew #dismiss');
   await page.waitForFunction(() => !document.querySelector('#bcv-whatsnew'), null, { timeout: 5000 });
