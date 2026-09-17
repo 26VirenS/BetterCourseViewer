@@ -798,9 +798,9 @@
     return awayRefresh();
   }
   // The reload is announced before it happens: a pill floats down from the top of the page — a dial
-  // counting three seconds down in orange (a ring that empties, a hand that sweeps once round, a
-  // shorter one that steps), "Away Refresh", "Click to cancel" — and the page reloads when the count
-  // runs out. A press on the pill (or Escape) stands the reload down, and the page counts as awake
+  // counting three seconds down in orange (a dim ring, a bright arc of the time left that shrinks, a
+  // short hand riding its end), "Away Refresh", "Click to cancel" — and the page reloads when the
+  // count runs out. A press on the pill (or Escape) stands the reload down, and the page counts as awake
   // again, so the next press acts as itself. Where a reload would lose work or has just been tried
   // there is no pill: the note says so, as before. Returns whether a reload is coming.
   const AWAY_COUNT = 3000;
@@ -819,17 +819,9 @@
   function awayRefresh() {
     if (away) return true; // already counting
     if (inQuiz() || quizHere() || state.submitOpen || typing() || recentlyReloaded()) return recover(AWAY_WHY); // the note, and no reload
-    const ticks = [];
-    for (let i = 0; i < 12; i++) {
-      const a = (i * Math.PI) / 6;
-      const q = i % 3 === 0; // the quarter hours, a little longer and brighter
-      const s = Math.sin(a);
-      const c = Math.cos(a);
-      const r1 = q ? 10 : 10.8;
-      const f = (n) => n.toFixed(2);
-      ticks.push(`<line class="bcv-away__tick${q ? ' bcv-away__tick--q' : ''}" x1="${f(18 + r1 * s)}" y1="${f(18 - r1 * c)}" x2="${f(18 + 12.4 * s)}" y2="${f(18 - 12.4 * c)}"/>`);
-    }
-    const dial = `<svg viewBox="0 0 36 36" aria-hidden="true"><circle class="bcv-away__track" cx="18" cy="18" r="15"/><circle class="bcv-away__ring" cx="18" cy="18" r="15"/>${ticks.join('')}<line class="bcv-away__hand bcv-away__hand--short" x1="18" y1="18" x2="18" y2="10.5"/><line class="bcv-away__hand bcv-away__hand--long" x1="18" y1="18" x2="18" y2="7"/><circle class="bcv-away__pin" cx="18" cy="18" r="1.7"/></svg>`;
+    // the dial is the iPhone's timer: a dim ring, a bright arc of the time left that shrinks back to
+    // twelve o'clock, and a short hand just inside the ring that rides the arc's end round with it
+    const dial = '<svg viewBox="0 0 36 36" aria-hidden="true"><circle class="bcv-away__track" cx="18" cy="18" r="13"/><circle class="bcv-away__ring" cx="18" cy="18" r="13"/><line class="bcv-away__hand" x1="18" y1="8.6" x2="18" y2="13.2"/></svg>';
     const btn = h('button', { type: 'button', class: 'bcv-away__btn', 'aria-label': 'Away refresh in three seconds. Press to cancel.' }, [
       h('span', { class: 'bcv-away__dial', html: dial }),
       h('span', { class: 'bcv-away__body' }, [h('span', { class: 'bcv-away__title', text: 'Away Refresh' }), h('span', { class: 'bcv-away__hint', text: 'Click to cancel' })]),

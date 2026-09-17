@@ -21,6 +21,9 @@
     clock: 'M12 5a8 8 0 100 16 8 8 0 000-16zM12 9v4l3 2',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.14.1', date: '2026-09-17', notes: [
+      { kind: 'improved', title: 'A new Away Refresh dial', body: 'The countdown is now a dim ring with a bright orange arc of the time left, and a short hand that rides its end.', icon: P.clock },
+    ] },
     { version: '2.14.0', date: '2026-09-17', notes: [
       { kind: 'new', title: 'Away refresh, with a warning', body: 'Come back to a tab you left for a while and a small pill counts down three seconds before the page refreshes; click it to cancel.', icon: P.clock },
       { kind: 'improved', title: 'Persistent, without the small print', body: 'The line of explanation under the Persistent switch is gone.', icon: P.toggle },
