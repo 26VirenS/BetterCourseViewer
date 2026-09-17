@@ -2090,12 +2090,18 @@ try {
   await page.goto(`${BASE}/?bcv=setup`);
   await page.waitForSelector(su('.row'), { timeout: 20000 });
   await page.waitForTimeout(500);
-  check(page.url() === `${BASE}/` && (await page.$('.bcv-stat')) !== null && (await page.$$(su('.blob'))).length === 4 && (await sStep()) === '1 of 4' && (await page.$$(su('.progress span'))).length === 4 && (await page.$eval('html', (e) => getComputedStyle(e).overflow)) === 'hidden', 'the setup opens as a glass card over the dashboard: the address cleaned, four steps, the page held still');
+  // the word-mark plays first (about two seconds), then the setup rises under it
+  check(page.url() === `${BASE}/` && (await page.$('.bcv-stat')) !== null && (await page.$(su('.intro'))) !== null && (await page.$$(su('.rail__item'))).length === 4 && (await sStep()) === '1 of 4' && (await page.$eval('html', (e) => getComputedStyle(e).overflow)) === 'hidden', 'the setup opens over the dashboard on its own ground: the address cleaned, a word-mark, a rail of four steps, the page held still');
+  await page.waitForFunction(() => document.querySelector('#bcv-setup')?.shadowRoot.querySelector('.intro')?.hidden === true, null, { timeout: 8000 });
+  await page.waitForTimeout(500);
   await shot(page, '32-setup-over-page');
+  const railNow = () => page.$$eval(su('.rail__item'), (els) => els.map((e) => `${e.querySelector('.rail__name').textContent}: ${e.querySelector('.rail__answer').textContent}${e.classList.contains('is-done') ? ' ✓' : ''}${e.disabled ? ' (locked)' : ''}`));
+  check((await railNow()).join(' | ') === 'Your courses: None yet | Grades: Not yet (locked) | Dashboard: Not yet (locked) | Sidebar: Not yet (locked)', `the rail names every step and really locks the ones ahead: ${(await railNow()).join(' | ')}`);
   const scanned = await texts(su('.row__code'));
+  const total = scanned.length;
   // nothing is ticked to begin with, whatever Canvas already has starred, and Continue is dead until
   // something is: the list picked here is the one every screen then follows
-  check((await texts(su('.h1')))[0] === 'Which are you in?' && scanned.length >= 8 && (await page.$$(su('.row.is-on'))).length === 0 && (await texts(su('.listhead span')))[0] === '0 selected' && (await page.$eval(su('#next'), (b) => b.disabled)), `step 1 read the enrolments with none preselected: ${scanned.length} active courses, 0 checked, Continue off`);
+  check((await texts(su('.fr__h1')))[0] === 'Which courses are you in?' && scanned.length >= 8 && (await page.$$(su('.row.is-on'))).length === 0 && (await texts(su('.listhead span')))[0] === `0 of ${total} selected` && (await texts(su('#selectAll')))[0] === 'Select all' && (await page.$eval(su('#next'), (b) => b.disabled)) && (await texts(su('#hint')))[0] === 'Pick at least one course.', `step 1 read the enrolments with none preselected: ${scanned.length} active courses, 0 checked, Continue off with a hint`);
   const rowCodes = await page.$$eval(su('.row[data-course]'), (els) => els.map((e) => [e.dataset.course, e.querySelector('.row__code').textContent.trim()]));
   const starredBefore = (await apiGet('/api/v1/courses?per_page=100')).filter((c) => c.is_favorite).map((c) => String(c.id));
   // Pick five: one Canvas had not starred and one starred course deliberately left out, so the write
@@ -2108,62 +2114,81 @@ try {
   const onCode = freshRows[0][1];
   const offCode = dropped[1];
   for (const [id] of picks) await page.click(su(`.row[data-course="${id}"]`));
-  check((await texts(su('.listhead span')))[0] === '5 selected' && (await page.$$(su('.row.is-on'))).length === 5 && !(await page.$eval(su('#next'), (b) => b.disabled)), 'rows toggle with the count, and Continue comes alive once one is picked');
+  const railAnswer = (step) => page.$eval(su(`.rail__item[data-step="${step}"] .rail__answer`), (e) => e.textContent);
+  check((await texts(su('.listhead span')))[0] === `5 of ${total} selected` && (await page.$$(su('.row.is-on'))).length === 5 && !(await page.$eval(su('#next'), (b) => b.disabled)) && (await texts(su('#hint')))[0] === '' && (await railAnswer('courses')) === '5 courses', 'rows toggle with the count, the rail answers, and Continue comes alive once one is picked');
   await page.click(su(`.row[data-course="${picks[0][0]}"]`));
-  check((await texts(su('.listhead span')))[0] === '4 selected' && (await page.$$(su('.row.is-on'))).length === 4, 'and a second press unticks it');
-  await page.click(su(`.row[data-course="${picks[0][0]}"]`));
-  // a nickname typed on a row is saved with the rest (Canvas's own nickname)
+  check((await texts(su('.listhead span')))[0] === `4 of ${total} selected` && (await page.$$(su('.row.is-on'))).length === 4 && (await railAnswer('courses')) === '4 courses', 'and a second press unticks it');
+  await page.click(su('#selectAll'));
+  check((await page.$$(su('.row.is-on'))).length === total && (await texts(su('#selectAll')))[0] === 'Clear all', 'Select all ticks every course and turns into Clear all');
+  await page.click(su('#selectAll'));
+  check((await page.$$(su('.row.is-on'))).length === 0 && (await page.$eval(su('#next'), (b) => b.disabled)) && (await railAnswer('courses')) === 'None yet', 'Clear all unticks them all, and Continue dies again');
+  for (const [id] of picks) await page.click(su(`.row[data-course="${id}"]`));
+  // a nickname typed on a row is saved with the rest (Canvas's own nickname); the field shows on
+  // a ticked row only, and typing in it does not toggle the row
   const nickRow = page.locator(su('.row.is-on')).last();
   const nickId = await nickRow.getAttribute('data-course');
   await nickRow.locator('.row__nick').fill('Setup nick');
-  check((await page.$$(su('.row.is-on'))).length === 5 && (await page.$eval(su('.row__nick'), (e) => e.placeholder)) === 'Nickname', 'every row has a Nickname field; typing in one does not toggle the row');
+  check((await page.$$(su('.row.is-on'))).length === 5 && (await page.$eval(su('.row.is-on .row__nick'), (e) => e.placeholder)) === 'Nickname' && !(await page.locator(su('.row:not(.is-on) .row__nick')).first().isVisible()), 'a ticked row has a Nickname field (an unticked one does not); typing in it does not toggle the row');
+  const firstColour = await page.$eval(su('.row.is-on .row__dot'), (e) => e.style.background); // the first chosen course's colour: the preview tiles are drawn in it
   await shot(page, '32c-setup-courses');
   await sNext('#track');
   const firstTargets = await page.$$eval(su('.target .seg button.is-on'), (bs) => bs.map((b) => b.textContent));
   check((await sStep()) === '2 of 4' && (await page.$eval(su('#track'), (e) => e.classList.contains('is-on'))) && (await texts(su('#goal')))[0] === '4.00' && (await page.$$(su('.target'))).length === 5 && firstTargets.join(',') === 'A+,A+,A+,A+,A+' && (await page.$$eval(su('.target:first-child .seg button'), (bs) => bs.map((b) => b.textContent))).join(' ') === 'C B B+ A- A A+', `step 2: tracking on, a 4.00 goal, every course aiming at A+, letters low to high: ${firstTargets.join(',')}`);
+  check((await railNow()).join(' | ') === `Your courses: 5 courses ✓ | Grades: Tracking · goal 4.00 | Dashboard: Not yet (locked) | Sidebar: Not yet (locked)` && (await texts(su('.target__code'))).includes('Setup nick'), `the rail ticks step 1 with its answer, and the target rows carry the nickname typed there: ${(await railNow()).join(' | ')}`);
   await page.click(su('.stepper button:last-child')); // already at the top of the scale: it stays there
   check((await texts(su('#goal')))[0] === '4.00', `the goal does not climb past 4.00: ${(await texts(su('#goal')))[0]}`);
   await page.click(su('.stepper button:first-child'));
   await page.click(su('.stepper button:first-child'));
   await page.click(su('.target:first-child .seg button:nth-child(3)'));
-  check((await texts(su('#goal')))[0] === '3.90' && (await page.$eval(su('.target:first-child .seg button.is-on'), (b) => b.textContent)) === 'B+', 'the goal stepper and a target pick');
+  check((await texts(su('#goal')))[0] === '3.90' && (await page.$eval(su('.target:first-child .seg button.is-on'), (b) => b.textContent)) === 'B+' && (await railAnswer('grades')) === 'Tracking · goal 3.90', 'the goal stepper and a target pick, the rail following the goal');
+  await page.click(su('#track'));
+  check(!(await page.$eval(su('#track'), (e) => e.classList.contains('is-on'))) && (await page.$eval(su('#goalPanel'), (e) => e.classList.contains('is-hidden'))) && (await railAnswer('grades')) === 'Not tracking', 'history off hides the goal, and the rail reads Not tracking');
+  await page.click(su('#track'));
+  check((await page.$eval(su('#track'), (e) => e.classList.contains('is-on'))) && !(await page.$eval(su('#goalPanel'), (e) => e.classList.contains('is-hidden'))) && (await texts(su('#goal')))[0] === '3.90', 'and on again brings the goal back as it was');
   await shot(page, '32d-setup-grades');
-  await sNext('.row[data-view]');
-  // step 3: what the Dashboard shows — three views, each on or off, at least one kept on
-  await page.waitForTimeout(450);
-  const dashRows = await page.evaluate(() => [...document.querySelector('#bcv-setup').shadowRoot.querySelectorAll('.row[data-view]')].map((r) => `${r.querySelector('.row__code').textContent}${r.classList.contains('is-on') ? ' *' : ''} — ${r.querySelector('.row__why').textContent}`));
-  check((await sStep()) === '3 of 4' && dashRows.join(' | ') === 'Courses * — Your courses as cards, with what is due next. | List * — Everything due, day by day, with a tick to mark it done. | Recent activity * — New announcements, replies and grades as they arrive.', `step 3 asks what the Dashboard shows, each with a line saying what it is: ${dashRows.join(' | ')}`);
-  const dashPref = () => sw.evaluate(async () => (await self.BCV.settings.get()).appearance.dashboard);
-  await page.click(su('.row[data-view="activity"]'));
-  check(await eventually(async () => (await dashPref()).activity === false) && !(await page.$eval(su('.row[data-view="activity"]'), (e) => e.classList.contains('is-on'))), 'switching a view off writes it as it is chosen');
-  await page.click(su('.row[data-view="cards"]'));
-  await page.click(su('.row[data-view="list"]'));
-  check(await eventually(async () => page.$eval(su('#next'), (b) => b.disabled)), 'with every view off, Continue is dead — a dashboard with nothing on it is not one');
-  await page.click(su('.row[data-view="cards"]'));
-  await page.click(su('.row[data-view="list"]'));
-  await page.click(su('.row[data-view="activity"]'));
-  check(await eventually(async () => { const d = await dashPref(); return d.cards && d.list && d.activity && !(await page.$eval(su('#next'), (b) => b.disabled)); }), 'and back on, Continue lives again');
+  await sNext('.tile[data-view]');
+  // step 3: what the Dashboard shows first — three preview tiles drawn in the chosen courses' colours, one chosen
+  const VIEW_OF = { cards: 'cards', planner: 'list', activity: 'activity' };
+  const viewBefore = VIEW_OF[(await apiGet('/dashboard/view')).dashboard_view] || 'list';
+  const dashTiles = () => page.$$eval(su('.tile[data-view]'), (els) => els.map((t) => `${t.dataset.view}${t.classList.contains('is-on') ? ' *' : ''} [${t.querySelector('.tile__label').textContent}]`));
+  const tileWords = await page.$$eval(su('.tile[data-view]'), (els) => els.map((t) => `${t.querySelector('.tile__t').textContent} — ${t.querySelector('.tile__s').textContent}`));
+  check((await sStep()) === '3 of 4' && tileWords.join(' | ') === 'Cards — Courses as tiles, with what is due next. | List — Everything due, day by day, with a tick. | Activity — Announcements, replies and grades as they arrive.' && (await dashTiles()).join(' | ') === ['cards', 'list', 'activity'].map((v) => `${v}${v === viewBefore ? ' * [Selected]' : ' [Choose]'}`).join(' | '), `step 3 asks what the Dashboard shows first, the tile Canvas has (${viewBefore}) selected: ${(await dashTiles()).join(' | ')}`);
+  check((await page.$$(su('.tile[data-view="cards"] .mini__card'))).length === 4 && (await page.$eval(su('.tile[data-view="cards"] .mini__card'), (e) => e.style.background)) === firstColour && (await page.$$(su('.tile[data-view="list"] .mini__row'))).length === 4 && (await page.$$(su('.tile[data-view="activity"] .mini__row'))).length === 3, `the tiles are miniatures of the real layouts in the chosen courses' own colours (${firstColour})`);
+  const other = viewBefore === 'cards' ? 'activity' : 'cards';
+  await page.click(su(`.tile[data-view="${other}"]`));
+  check((await dashTiles()).join(' | ') === ['cards', 'list', 'activity'].map((v) => `${v}${v === other ? ' * [Selected]' : ' [Choose]'}`).join(' | ') && (await railAnswer('dashboard')) === { cards: 'Cards', list: 'List', activity: 'Activity' }[other] && VIEW_OF[(await apiGet('/dashboard/view')).dashboard_view] === viewBefore, 'one tile at a time, the rail says which, and nothing is written until the end');
   await shot(page, '32e-setup-dashboard');
-  await sNext('.row[data-value]');
-  // the last step: where the courses chosen in step 1 should sit
-  await page.waitForSelector(su('.row[data-value]'), { timeout: 10000 });
-  await page.waitForTimeout(450);
-  const sideOpts = await texts(su('.row[data-value] .row__code'));
-  check((await sStep()) === '4 of 4' && sideOpts.join(' | ') === 'Always on the sidebar | When I hover on Courses' && (await page.$eval(su('.row[data-value="always"]'), (e) => e.classList.contains('is-on'))) && (await page.$eval(su('#next'), (e) => e.textContent)) === 'Finish', `step 4 asks where the courses live, on the sidebar by default: ${sideOpts.join(' | ')}`);
+  await page.click(su(`.tile[data-view="${viewBefore}"]`)); // back to what Canvas had: the pages after this read it
+  await sNext('.tile[data-value]');
+  // step 4: where the courses chosen in step 1 should sit
+  const sideBefore = (await sw.evaluate(async () => (await self.BCV.settings.get()).appearance.sideCourses)) === 'always' ? 'always' : 'hover';
+  const sideTiles = () => page.$$eval(su('.tile[data-value]'), (els) => els.map((t) => `${t.querySelector('.tile__t').textContent}${t.classList.contains('is-on') ? ' *' : ''}`));
+  check((await sStep()) === '4 of 4' && (await sideTiles()).join(' | ') === `Always listed${sideBefore === 'always' ? ' *' : ''} | On hover${sideBefore === 'hover' ? ' *' : ''}` && (await page.$eval(su('#next'), (e) => e.textContent.trim())) === 'Finish', `step 4 asks where the courses live, the setting's own choice selected (${sideBefore}): ${(await sideTiles()).join(' | ')}`);
   await shot(page, '32f-setup-sidebar');
   const pickSide = async (v) => {
-    await page.click(su(`.row[data-value="${v}"]`));
-    await page.waitForFunction((val) => document.querySelector('#bcv-setup').shadowRoot.querySelector(`.row[data-value="${val}"]`).classList.contains('is-on'), v, { timeout: 5000 });
+    await page.click(su(`.tile[data-value="${v}"]`));
+    await page.waitForFunction((val) => document.querySelector('#bcv-setup').shadowRoot.querySelector(`.tile[data-value="${val}"]`).classList.contains('is-on'), v, { timeout: 5000 });
     return sw.evaluate(async () => (await self.BCV.settings.get()).appearance.sideCourses);
   };
-  check((await pickSide('hover')) === 'hover', 'picking one writes it as it is chosen, no Finish needed');
-  check((await pickSide('always')) === 'always' && (await page.$$(su('.row[data-value].is-on'))).length === 1, 'and changing the pick moves the tick, one at a time'); // back to the default: the checks below read the sidebar list
+  check((await pickSide('hover')) === sideBefore && (await railAnswer('sidebar')) === 'On hover', 'picking one moves the tick and the rail answer, and writes nothing yet');
+  check((await pickSide('always')) === sideBefore && (await page.$$(su('.tile[data-value].is-on'))).length === 1 && (await railAnswer('sidebar')) === 'Always listed', 'and changing the pick moves the tick, one at a time'); // the sidebar list: the checks below read it
+  await sNext('.summary__row');
+  // Ready: a read-back of every answer, then Open Canvas writes them all at once
+  const summary = await page.$$eval(su('.summary__row'), (els) => els.map((r) => `${r.querySelector('.summary__k').textContent}: ${r.querySelector('.summary__v').textContent}`));
+  check((await sStep()) === 'Ready' && (await texts(su('.fr__h1')))[0] === 'You’re set' && summary.join(' | ') === `Courses shown: 5 of ${total} | Grade history: On · goal 3.90 | Dashboard: ${{ cards: 'Cards', list: 'List', activity: 'Activity' }[viewBefore]} | Sidebar: Always listed` && (await page.$eval(su('#next'), (e) => e.textContent.trim())) === 'Open Canvas' && (await page.$(su('#back'))) !== null && (await page.$$(su('.rail__item.is-done'))).length === 4, `Finish shows the read-back with every rail step ticked: ${summary.join(' | ')}`);
+  await shot(page, '32g-setup-ready');
+  await page.click(su('#back'));
+  await page.waitForSelector(su('.tile[data-value]'), { timeout: 10000 });
+  check((await sStep()) === '4 of 4' && (await railNow()).filter((r) => r.includes('(locked)')).length === 0, 'Back from the read-back returns to the last step, nothing locked behind');
+  await page.click(su('.rail__item[data-step="courses"]'));
+  await page.waitForSelector(su('.row[data-course]'), { timeout: 10000 });
+  check((await sStep()) === '1 of 4' && (await page.$$(su('.row.is-on'))).length === 5 && (await page.$eval(su(`.row[data-course="${nickId}"] .row__nick`), (e) => e.value)) === 'Setup nick' && (await railNow()).join(' | ') === `Your courses: 5 courses | Grades: Tracking · goal 3.90 ✓ | Dashboard: ${{ cards: 'Cards', list: 'List', activity: 'Activity' }[viewBefore]} ✓ | Sidebar: Always listed ✓`, `the rail goes back to any step done, with its answers kept: ${(await railNow()).join(' | ')}`);
+  for (const s of ['#track', '.tile[data-view]', '.tile[data-value]', '.summary__row']) await sNext(s);
+  check((await sStep()) === 'Ready' && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('setup:done'))['setup:done'])) === undefined, 'forward again to the read-back: still nothing marked done');
   await page.click(su('#next'));
-  await page.waitForSelector(su('.done'), { timeout: 10000 });
-  const doneCard = await page.evaluate(() => { const r = document.querySelector('#bcv-setup')?.shadowRoot; return r ? [r.querySelector('#stepLabel')?.textContent.trim(), r.querySelector('.done .h1')?.textContent.trim()] : null; });
-  check(doneCard && doneCard[0] === 'Done' && doneCard[1] === 'All set', `Finish on the last step: a moment of All set (${JSON.stringify(doneCard)})`);
   await page.waitForSelector('.bcv-tour__card', { timeout: 20000 });
-  check(page.url() === `${BASE}/` && (await page.$('#bcv-setup')) === null && !(await page.$('html.bcv-setup-open')) && (await page.$eval('.bcv-tour__title', (e) => e.textContent.trim())) === 'Your day at a glance', 'then the card closes and the tour starts on the same page');
+  check(page.url() === `${BASE}/` && (await page.$('#bcv-setup')) === null && !(await page.$('html.bcv-setup-open')) && (await page.$eval('.bcv-tour__title', (e) => e.textContent.trim())) === 'Your day at a glance', 'Open Canvas closes the setup and the tour starts on the same page');
+  check((await sw.evaluate(async () => (await self.BCV.settings.get()).appearance.sideCourses)) === 'always' && VIEW_OF[(await apiGet('/dashboard/view')).dashboard_view] === viewBefore, 'the sidebar and dashboard choices were written on the way out');
   const favAfter = (await apiGet('/api/v1/courses?per_page=100')).filter((c) => c.is_favorite).map((c) => c.course_code || c.name);
   check(!favAfter.includes(offCode) && favAfter.includes(onCode) && favAfter.length === 5, `the chosen courses became the Canvas favourites: −${offCode} +${onCode}`);
   const nickedInSetup = (await apiGet('/api/v1/courses?per_page=100')).find((c) => String(c.id) === nickId);
@@ -2660,10 +2685,12 @@ try {
   await page.click(su('#next'));
   await page.waitForSelector(su('#track'), { timeout: 10000 });
   await page.click(su('#next'));
-  await page.waitForSelector(su('.row[data-view]'), { timeout: 10000 });
+  await page.waitForSelector(su('.tile[data-view]'), { timeout: 10000 });
   await page.click(su('#next'));
-  await page.waitForSelector(su('.row[data-value]'), { timeout: 10000 });
+  await page.waitForSelector(su('.tile[data-value]'), { timeout: 10000 });
   await page.click(su('#next')); // Finish
+  await page.waitForSelector(su('.summary__row'), { timeout: 10000 });
+  await page.click(su('#next')); // Open Canvas
   await page.waitForFunction(() => !document.querySelector('#bcv-setup'), null, { timeout: 15000 });
   await page.waitForSelector('.bcv-tour__card', { timeout: 20000 });
   check((await sw.evaluate(async () => (await self.BCV.api.storage.local.get('setup:done'))['setup:done'])) === true, 'finishing the steps is what marks the setup done, and the tour follows');

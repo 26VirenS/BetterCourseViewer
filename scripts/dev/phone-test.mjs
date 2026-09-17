@@ -614,8 +614,9 @@ try {
   console.log('guided setup');
   await page.goto(`${BASE}/?bcv=setup`);
   await page.waitForSelector('#bcv-setup .row', { timeout: 20000 });
+  await page.waitForFunction(() => document.querySelector('#bcv-setup')?.shadowRoot.querySelector('.intro')?.hidden === true, null, { timeout: 8000 }); // the word-mark first
   await page.waitForTimeout(400);
-  check((await page.$$('#bcv-setup .row.is-on')).length === 0 && (await page.$$('#bcv-setup .row[data-course]')).length >= 5 && (await page.$eval('#bcv-setup #next', (e) => e.disabled)) && (await page.$eval('#bcv-setup .card', (e) => e.getBoundingClientRect().right <= window.innerWidth + 1 && e.getBoundingClientRect().left >= 0)) && await noOverflow(), 'the setup card fits the phone screen and lists the courses, none picked yet (Continue waits for one)');
+  check((await page.$$('#bcv-setup .row.is-on')).length === 0 && (await page.$$('#bcv-setup .row[data-course]')).length >= 5 && (await page.$eval('#bcv-setup #next', (e) => e.disabled)) && (await page.$eval('#bcv-setup .fr', (e) => e.getBoundingClientRect().right <= window.innerWidth + 1 && e.getBoundingClientRect().left >= 0)) && !(await page.locator('#bcv-setup .rail').isVisible()) && (await page.$eval('#bcv-setup #stepLabel', (e) => e.textContent)) === '1 of 2' && await noOverflow(), 'the setup fits the phone screen without the rail and lists the courses, none picked yet (Continue waits for one)');
   await shot('11-setup');
   await page.$$eval('#bcv-setup .row[data-course]', (els) => els.slice(0, 5).forEach((e) => e.click())); // pick five
   // (Playwright selectors reach into the card's shadow root; document.querySelector would not)
@@ -624,11 +625,16 @@ try {
   await page.waitForSelector('#bcv-setup #track', { timeout: 10000 });
   check(await noOverflow() && (await page.$$('#bcv-setup .target')).length === 5, 'the grades step keeps to the screen with a target row per course');
   await shot('11b-setup-grades');
-  // a phone has no sidebar to place the courses on, so the grades step is the last one here
-  check((await page.$$('#bcv-setup .progress span')).length === 2 && (await page.$eval('#bcv-setup #stepLabel', (e) => e.textContent)) === '2 of 2' && (await page.$eval('#bcv-setup #next', (e) => e.textContent.trim())) === 'Finish', 'a phone gets two steps, and the grades step finishes the setup');
+  // a phone has no sidebar and no dashboard views to choose between: the grades step is the last one here
+  check((await page.$eval('#bcv-setup #stepLabel', (e) => e.textContent)) === '2 of 2' && (await page.$eval('#bcv-setup #next', (e) => e.textContent.trim())) === 'Continue', 'a phone gets two steps');
+  await page.click('#bcv-setup #next');
+  await page.waitForSelector('#bcv-setup .summary__row', { timeout: 10000 });
+  const readBack = await page.$$eval('#bcv-setup .summary__k', (els) => els.map((e) => e.textContent));
+  check((await page.$eval('#bcv-setup #stepLabel', (e) => e.textContent)) === 'Ready' && readBack.join(' | ') === 'Courses shown | Grade history' && (await page.$eval('#bcv-setup #next', (e) => e.textContent.trim())) === 'Open Canvas' && await noOverflow(), `then a read-back of those two answers alone, and Open Canvas: ${readBack.join(' | ')}`);
+  await shot('11c-setup-ready');
   await page.click('#bcv-setup #next');
   await page.waitForSelector('.bcv-tour__card', { timeout: 20000 });
-  check((await page.$('#bcv-setup')) === null && page.url() === `${BASE}/`, 'Finish closes the card and the tour starts on Today');
+  check((await page.$('#bcv-setup')) === null && page.url() === `${BASE}/`, 'Open Canvas closes the setup and the tour starts on Today');
   const overStats = await eventually(() => page.evaluate(() => { const r = document.querySelector('.bcv-tour__ring').getBoundingClientRect(); const t = document.querySelector('.bcv-ph-stats').getBoundingClientRect(); return r.width > 0 && r.left <= t.left + 1 && r.top <= t.top + 1 && r.right >= t.right - 1 && r.bottom >= t.bottom - 1; }).catch(() => false), 3000);
   check((await texts('.bcv-tour__title'))[0] === 'Your day at a glance' && overStats, 'the tour spotlights the phone counters');
   await page.click('.bcv-tour__btn.is-primary');
