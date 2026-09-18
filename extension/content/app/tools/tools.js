@@ -265,22 +265,23 @@
   } catch { /* no change events (the app): the next load reads it */ }
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && focusRead) focusLoad().then(paintAll).catch(() => {}); });
 
-  // ---- the top right: the pins beside the look switch, and the live widget under them -----------
-  // The look switch stands alone (content/app/app.js mounts it); the tray with the pins sits to its
-  // left and hides while the switch is open under the pointer (it grows leftwards). The live
-  // widget — a running timer — hangs under the switch, the phone's timer widget: a scale of the
-  // phase's minutes with the marker under the minutes left, a button or two, the count large in
-  // the phase's colour. The page's header rows step aside while it is up. All of it goes with the
+  // ---- the top right: the pins beside the look switch, and the live activity among them ---------
+  // The look switch stands alone (content/app/app.js mounts it); the tray sits to its left and
+  // hides while the switch is open under the pointer (it grows leftwards). A running timer is a
+  // live activity in that tray, carried the way the phone's island carries one: folded, a small
+  // black disc with the dial's hand sweeping round (the ring is what is left); pressed, it swells
+  // into the island — End and Pause as round buttons, the phase, the count large in its colour —
+  // and folds again on its own. A press on the count opens the timer. All of it goes with the
   // switch: the phone layout, the setup, the tour, the welcome, stock Canvas.
   function mountTray() {
     if (self.BCVBridge?.native) return null;
     let tray = document.getElementById('bcv-tray');
     if (!tray) {
       tray = h('div', { id: 'bcv-tray', class: 'bcv-tray' }, [
+        h('div', { id: 'bcv-live', class: 'bcv-live', hidden: true, role: 'status', 'aria-live': 'off' }),
         h('div', { id: 'bcv-pins', class: 'bcv-pins', hidden: true, role: 'toolbar', 'aria-label': 'Pinned tools' }),
       ]);
       document.body.append(tray);
-      document.body.append(h('div', { id: 'bcv-live', class: 'bcv-live', hidden: true, role: 'status', 'aria-live': 'off' }));
       pinsLoad().then(paintPins).catch(() => {});
       try { api.storage.onChanged?.addListener((changes, area) => { if ((!area || area === 'local') && changes[PINS_KEY]) pinsLoad().then(paintPins).catch(() => {}); }); } catch { /* no change events */ }
       watch(paintLive);
@@ -288,22 +289,9 @@
     }
     return tray;
   }
-  /** The scale's ticks and labels for a phase of `len` minutes: a tick a minute (every other past 45),
-   *  a label every minute, five or ten. Rebuilt when the length changes. */
-  function buildScale(scale, lenMin) {
-    const step = lenMin > 45 ? 2 : 1;
-    const every = lenMin <= 10 ? 1 : lenMin <= 30 ? 5 : 10;
-    const labels = scale.querySelector('.bcv-widget__labels');
-    const ticks = scale.querySelector('.bcv-widget__ticks');
-    labels.replaceChildren();
-    ticks.replaceChildren();
-    for (let m = 0; m <= lenMin; m += step) {
-      const x = `${(m / lenMin) * 100}%`;
-      ticks.append(h('span', { class: 'bcv-widget__tick', style: { left: x }, dataset: { min: String(m) } }));
-      if (m % every === 0 && (lenMin - m >= every / 2 || m === lenMin)) labels.append(h('span', { class: 'bcv-widget__label', style: { left: x }, text: String(m) }));
-    }
-    scale.dataset.len = String(lenMin);
-  }
+  const GLYPH_C = 2 * Math.PI * 7.5;
+  let islandTimer = 0;
+  let islandPhase = null; // the phase the island last showed: a new one opens it for a moment
   function paintLive(f) {
     const live = document.getElementById('bcv-live');
     if (!live) return;
@@ -311,148 +299,215 @@
     const on = running(f) || paused;
     let item = live.querySelector('.bcv-live__item[data-live="pomo"]');
     if (!on) {
-      html.classList.remove('bcv-live-on');
-      if (item) { item.classList.add('is-out'); setTimeout(() => { item.remove(); live.hidden = !live.querySelector('.bcv-live__item'); }, 320); }
+      islandPhase = null;
+      if (item) { islandClose(item); item.classList.add('is-out'); setTimeout(() => { item.remove(); live.hidden = !live.querySelector('.bcv-live__item'); }, 320); }
       return;
     }
     live.hidden = false;
-    html.classList.add('bcv-live-on');
     if (!item) {
-      item = h('div', { class: 'bcv-live__item bcv-widget', dataset: { live: 'pomo' }, role: 'group', tabindex: '0', title: 'Focus timer: press for the timer', 'aria-label': 'Focus timer',
-        onclick: (e) => { if (!e.target.closest('button')) open('pomo', { from: item }); },
-        onkeydown: (e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target === item) { e.preventDefault(); open('pomo', { from: item }); } } }, [
-        U.el('bcv-widget__scale', [U.el('bcv-widget__labels'), U.el('bcv-widget__ticks'), h('span', { class: 'bcv-widget__marker' })]),
-        U.el('bcv-widget__row', [
-          h('button', { type: 'button', class: 'bcv-widget__btn bcv-widget__main', onclick: (e) => { e.stopPropagation(); if (running()) focusPause(); else focusStart(); } }),
-          h('button', { type: 'button', class: 'bcv-widget__btn bcv-widget__btn--dim bcv-live__switch', hidden: true, onclick: (e) => { e.stopPropagation(); focusPhase(nextPhase(focus), { keepRunning: true }); } }),
-          U.el('bcv-widget__right', [U.text('bcv-live__phase', '', 'span'), U.text('bcv-live__time', '', 'span')]),
-        ]),
-      ]);
+      item = buildIsland();
       live.append(item);
+      islandPhase = f.phase;
     }
     item.classList.remove('is-out');
-    const color = PHASE_COLOR[f.phase];
-    const lenMin = Math.round(phaseLen(f) / 60);
-    const left = remaining(f);
-    item.style.setProperty('--bcv-live-color', color);
+    const len = phaseLen(f), left = remaining(f);
+    const frac = len > 0 ? Math.max(0, Math.min(1, left / len)) : 0;
+    item.style.setProperty('--bcv-live-color', PHASE_COLOR[f.phase]);
     item.classList.toggle('is-paused', paused && !running(f));
-    const scale = item.querySelector('.bcv-widget__scale');
-    if (scale.dataset.len !== String(lenMin)) buildScale(scale, lenMin);
-    const at = Math.max(0, Math.min(1, left / 60 / lenMin));
-    scale.querySelector('.bcv-widget__marker').style.left = `${at * 100}%`;
-    for (const t of scale.querySelectorAll('.bcv-widget__tick')) { // bright at the marker, dim away from it
-      const d = Math.abs(Number(t.dataset.min) / lenMin - at);
-      t.style.opacity = String(Math.max(0.22, 1 - d / 0.42));
-    }
-    for (const l of scale.querySelectorAll('.bcv-widget__label')) {
-      const d = Math.abs(Number(l.textContent) / lenMin - at);
-      l.style.opacity = String(Math.max(0.3, 1 - d / 0.5));
-    }
-    item.querySelector('.bcv-widget__main').textContent = running(f) ? 'Pause' : 'Resume';
-    const sw = item.querySelector('.bcv-live__switch');
+    item.querySelector('.bcv-island__arc').style.strokeDashoffset = `${GLYPH_C * (1 - frac)}`;
+    item.querySelector('.bcv-island__hand').style.transform = `rotate(${frac * 360}deg)`;
+    item.querySelector('.bcv-island__time').textContent = mmss(left);
+    item.querySelector('.bcv-island__label').textContent = running(f) ? ({ focus: 'Focus', short: 'Break', long: 'Long break' })[f.phase] : 'Paused';
+    const main = item.querySelector('.bcv-island__main');
+    main.replaceChildren(U.svg(running(f) ? IC.pause : IC.play, { size: 18, stroke: 'currentColor', width: 2.4 }));
+    main.setAttribute('aria-label', running(f) ? 'Pause' : 'Resume');
+    main.title = running(f) ? 'Pause' : 'Resume';
+    const sw = item.querySelector('.bcv-island__switch');
     sw.hidden = !running(f);
     sw.textContent = f.phase === 'focus' ? 'Break' : 'Focus';
-    item.querySelector('.bcv-live__time').textContent = mmss(left);
-    item.querySelector('.bcv-live__phase').textContent = running(f) ? ({ focus: 'Focus', short: 'Break', long: 'Long break' })[f.phase] : 'Paused';
+    item.title = `Focus timer: ${mmss(left)} left${running(f) ? '' : ', paused'}`;
+    item.setAttribute('aria-label', item.title);
+    // a phase that began by itself (or on a press elsewhere): the island opens to say so, briefly
+    if (islandPhase !== f.phase) { islandPhase = f.phase; if (running(f)) islandOpen(item, 5000); }
   }
+  /** The island: the folded disc with its dial, and the body that shows once it is open. */
+  function buildIsland() {
+    const glyph = svgEl('svg', { viewBox: '0 0 20 20', class: 'bcv-island__glyph', 'aria-hidden': 'true' });
+    glyph.append(
+      svgEl('circle', { class: 'bcv-island__ring', cx: 10, cy: 10, r: 7.5 }),
+      svgEl('circle', { class: 'bcv-island__arc', cx: 10, cy: 10, r: 7.5, 'stroke-dasharray': String(GLYPH_C) }),
+      svgEl('line', { class: 'bcv-island__hand', x1: 10, y1: 10, x2: 10, y2: 3.4 }),
+    );
+    const item = h('div', { class: 'bcv-live__item bcv-island', dataset: { live: 'pomo' }, role: 'group', tabindex: '0', 'aria-expanded': 'false',
+      onclick: (e) => {
+        if (e.target.closest('button')) return;
+        if (!item.classList.contains('is-open')) islandOpen(item);
+        else if (e.target.closest('.bcv-island__right')) open('pomo', { from: item });
+        else islandOpen(item); // (a press on the body keeps it open a while longer)
+      },
+      onkeydown: (e) => {
+        if (e.target !== item) return;
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (item.classList.contains('is-open')) open('pomo', { from: item }); else islandOpen(item); }
+        if (e.key === 'Escape' && item.classList.contains('is-open')) { e.stopPropagation(); islandClose(item); }
+      } }, [
+      U.el('bcv-island__fold', glyph),
+      U.el('bcv-island__body', [
+        U.el('bcv-island__btns', [
+          h('button', { type: 'button', class: 'bcv-island__btn bcv-island__cancel', title: 'End the session', 'aria-label': 'End', onclick: (e) => { e.stopPropagation(); focusReset(); } }, U.svg(IC.close, { size: 16, stroke: 'currentColor', width: 2.4 })),
+          h('button', { type: 'button', class: 'bcv-island__btn bcv-island__main', onclick: (e) => { e.stopPropagation(); islandOpen(item); if (running()) focusPause(); else focusStart(); } }),
+        ]),
+        U.el('bcv-island__right', [
+          U.el('bcv-island__meta', [
+            U.text('bcv-island__label', '', 'span'),
+            h('button', { type: 'button', class: 'bcv-island__switch', hidden: true, onclick: (e) => { e.stopPropagation(); islandOpen(item); focusPhase(nextPhase(focus), { keepRunning: true }); } }),
+          ]),
+          U.text('bcv-island__time', '', 'span'),
+        ]),
+      ]),
+    ]);
+    return item;
+  }
+  function islandOpen(item, ms = 6000) {
+    item.classList.add('is-open');
+    item.setAttribute('aria-expanded', 'true');
+    clearTimeout(islandTimer);
+    islandTimer = setTimeout(() => islandClose(item), ms);
+  }
+  function islandClose(item) {
+    clearTimeout(islandTimer);
+    islandTimer = 0;
+    item.classList.remove('is-open');
+    item.setAttribute('aria-expanded', 'false');
+  }
+  // a press anywhere else folds it
+  document.addEventListener('pointerdown', (e) => { const item = document.querySelector('#bcv-live .bcv-island.is-open'); if (item && !item.contains(e.target)) islandClose(item); }, true);
 
   // ---- the focus timer, the tool -------------------------------------------------------------
-  // A dial like the phone's: a ring of ticks, the arc of what is left in the phase's colour with a
-  // bright cap riding its end, the count large in the middle with the phase and when it ends; a
-  // phase picker whose highlight slides; four dots for the sessions towards a long break; three
-  // round controls — Reset, Start or Pause, Skip; and the three lengths as tiles.
+  // The phone's timer card: the minutes on a scale with the marker under the minutes set — a
+  // press or a drag along it (or the arrow keys) sets them — Start Timer, and the count large in
+  // the phase's colour. Going, the marker rides under the minutes left and the ticks brighten
+  // around it; the button is Pause, and Cancel beside it. Above it a phase picker whose highlight
+  // slides; under it four dots for the sessions towards a long break, and Skip.
+  const scaleMax = (phase, mins) => (mins <= 30 && phase !== 'focus' ? 30 : mins <= 60 ? 60 : 90);
+  /** The scale's ticks and labels for `max` minutes: about thirty ticks, a label every five, ten
+   *  or fifteen. Rebuilt when the range changes. */
+  function buildScale(scale, max) {
+    const step = max <= 30 ? 1 : max <= 60 ? 2 : 3;
+    const every = max <= 30 ? 5 : max <= 60 ? 10 : 15;
+    const labels = scale.querySelector('.bcv-pomo__labels');
+    const ticks = scale.querySelector('.bcv-pomo__ticks');
+    labels.replaceChildren();
+    ticks.replaceChildren();
+    for (let m = 0; m <= max; m += step) {
+      const x = `${(m / max) * 100}%`;
+      ticks.append(h('span', { class: 'bcv-pomo__tick', style: { left: x }, dataset: { min: String(m) } }));
+      if (m % every === 0) labels.append(h('span', { class: 'bcv-pomo__label', style: { left: x }, text: String(m) }));
+    }
+    scale.dataset.max = String(max);
+  }
+  /** The marker under `atMin`, the ticks and labels bright around it and dim away from it. */
+  function paintScale(scale, max, atMin) {
+    if (scale.dataset.max !== String(max)) buildScale(scale, max);
+    const at = Math.max(0, Math.min(1, atMin / max));
+    scale.querySelector('.bcv-pomo__marker').style.left = `${at * 100}%`;
+    for (const t of scale.querySelectorAll('.bcv-pomo__tick')) {
+      const d = Math.abs(Number(t.dataset.min) / max - at);
+      t.style.opacity = String(Math.max(0.22, 1 - d / 0.42));
+    }
+    for (const l of scale.querySelectorAll('.bcv-pomo__label')) {
+      const d = Math.abs(Number(l.textContent) / max - at);
+      l.style.opacity = String(Math.max(0.3, 1 - d / 0.5));
+    }
+  }
   function openTimer(app, { from = null } = {}) {
     const tool = toolOf('pomo');
     const body = U.el('bcv-pomo');
     const p = popup({ tool, title: 'Focus timer', sub: '', width: 440, body, from });
-    const R = 84, C = 2 * Math.PI * R;
     // the phase picker: three buttons over one sliding highlight
     const ind = h('span', { class: 'bcv-pomo__ind', 'aria-hidden': 'true' });
     const phaseBtns = Object.entries({ focus: 'Focus', short: 'Short', long: 'Long' }).map(([k, name]) => h('button', { type: 'button', class: 'bcv-pomo__phasebtn', role: 'tab', text: name, dataset: { value: k }, onclick: () => focusPhase(k) }));
     const phases = h('div', { class: 'bcv-pomo__phases', role: 'tablist' }, [ind, ...phaseBtns]);
-    // the dial
-    const svg = svgEl('svg', { viewBox: '0 0 200 200', class: 'bcv-pomo__svg', 'aria-hidden': 'true' });
-    const defs = svgEl('defs');
-    const grad = svgEl('linearGradient', { id: 'bcv-pomo-grad', x1: '0', y1: '0', x2: '1', y2: '1' });
-    const stopA = svgEl('stop', { offset: '0', 'stop-color': '#ff9500' });
-    const stopB = svgEl('stop', { offset: '1', 'stop-color': '#ffb340' });
-    grad.append(stopA, stopB); defs.append(grad);
-    const ticks = svgEl('circle', { class: 'bcv-pomo__ticks', cx: 100, cy: 100, r: 96 });
-    const track = svgEl('circle', { class: 'bcv-pomo__track', cx: 100, cy: 100, r: R });
-    const arc = svgEl('circle', { class: 'bcv-pomo__arc', cx: 100, cy: 100, r: R, 'stroke-dasharray': `${C}`, 'stroke-dashoffset': '0' });
-    const capG = svgEl('g', { class: 'bcv-pomo__cap' });
-    capG.append(svgEl('circle', { cx: 100, cy: 100 - R, r: 7, class: 'bcv-pomo__capdot' }), svgEl('circle', { cx: 100, cy: 100 - R, r: 3, fill: '#fff' }));
-    svg.append(defs, ticks, track, arc, capG);
-    const timeEl = U.text('bcv-pomo__time', '0:00');
+    // the card
+    const marker = h('span', { class: 'bcv-pomo__marker' });
+    const scale = h('div', { class: 'bcv-pomo__scale', role: 'slider', tabindex: '0', 'aria-label': 'Minutes', 'aria-valuemin': '1', 'aria-valuemax': '90' }, [U.el('bcv-pomo__labels'), U.el('bcv-pomo__ticks'), marker]);
+    const mainBtn = h('button', { type: 'button', class: 'bcv-pomo__btn bcv-pomo__main', onclick: () => (running() ? focusPause() : focusStart()) });
+    const cancelBtn = h('button', { type: 'button', class: 'bcv-pomo__btn bcv-pomo__btn--dim bcv-pomo__cancel', text: 'Cancel', hidden: true, onclick: () => focusReset() });
     const phaseEl = h('span', { class: 'bcv-pomo__phasepill' });
-    const endsEl = U.text('bcv-pomo__ends', '');
-    const dial = U.el('bcv-pomo__dial', [svg, U.el('bcv-pomo__center', [timeEl, phaseEl, endsEl])]);
-    // the sessions towards a long break
+    const endsEl = U.text('bcv-pomo__ends', '', 'span');
+    const timeEl = U.text('bcv-pomo__time', '0:00');
+    const card = U.el('bcv-pomo__card', [scale, U.el('bcv-pomo__row', [mainBtn, cancelBtn, U.el('bcv-pomo__right', [U.el('bcv-pomo__meta', [phaseEl, endsEl]), timeEl])])]);
+    // setting the minutes: a press or a drag along the scale while nothing is going; the record is
+    // written when the pointer lifts, the card following the pointer in the meantime
+    const idle = () => !running() && (focus.left === null || focus.left === undefined);
+    const minuteAt = (x) => {
+      const r = scale.getBoundingClientRect();
+      const max = Number(scale.dataset.max) || 30;
+      return Math.max(1, Math.min(90, Math.round(((x - r.left) / Math.max(1, r.width)) * max)));
+    };
+    let dragging = false;
+    const setMins = (v, persist) => {
+      const mins = { ...focus.mins, [focus.phase]: v };
+      if (persist) focusWrite({ mins, left: null });
+      else { focus = { ...focus, mins, left: null }; paintAll(); }
+    };
+    scale.addEventListener('pointerdown', (e) => {
+      if (!idle() || e.button !== 0) return;
+      dragging = true;
+      try { scale.setPointerCapture(e.pointerId); } catch { /* fine without */ }
+      scale.classList.add('is-drag');
+      setMins(minuteAt(e.clientX), false);
+      e.preventDefault();
+    });
+    scale.addEventListener('pointermove', (e) => { if (dragging) setMins(minuteAt(e.clientX), false); });
+    const endDrag = (e) => {
+      if (!dragging) return;
+      dragging = false;
+      scale.classList.remove('is-drag');
+      setMins(minuteAt(e.clientX), true);
+    };
+    scale.addEventListener('pointerup', endDrag);
+    scale.addEventListener('pointercancel', endDrag);
+    scale.addEventListener('keydown', (e) => {
+      if (!idle()) return;
+      const d = e.key === 'ArrowRight' || e.key === 'ArrowUp' ? 1 : e.key === 'ArrowLeft' || e.key === 'ArrowDown' ? -1 : 0;
+      if (!d) return;
+      e.preventDefault();
+      focusBump(focus.phase, d * (e.shiftKey ? 5 : 1));
+    });
+    // the sessions towards a long break, and Skip
     const dots = [0, 1, 2, 3].map(() => h('span', { class: 'bcv-pomo__dot' }));
     const dotsLabel = U.text('bcv-pomo__dotslabel', '', 'span');
-    const sessions = U.el('bcv-pomo__sessions', [U.el('bcv-pomo__dots', dots), dotsLabel]);
-    // the controls
-    const bigIc = h('span', { class: 'bcv-pomo__bigic' });
-    const big = h('button', { type: 'button', class: 'bcv-pomo__big', 'aria-label': 'Start', onclick: () => (running() ? focusPause() : focusStart()) }, bigIc);
-    const bigLbl = U.text('bcv-pomo__biglabel', 'Start', 'span');
-    const reset = h('button', { type: 'button', class: 'bcv-pomo__round bcv-pomo__reset', title: 'Reset', 'aria-label': 'Reset', onclick: () => focusReset() }, U.svg('M4 4v6h6M20 20v-6h-6M20 9A8 8 0 0 0 5.6 6.2L4 10M4 15a8 8 0 0 0 14.4 2.8L20 14', { size: 18, stroke: 'currentColor', width: 2 }));
-    const skip = h('button', { type: 'button', class: 'bcv-pomo__round bcv-pomo__skip', title: 'Skip to the next phase', 'aria-label': 'Skip', onclick: () => focusSkip() }, U.svg('M5 5l9 7-9 7zM17 5v14', { size: 18, stroke: 'currentColor', width: 2 }));
-    const controls = U.el('bcv-pomo__controls', [
-      U.el('bcv-pomo__ctl', [reset, U.text('bcv-pomo__ctllabel', 'Reset', 'span')]),
-      U.el('bcv-pomo__ctl bcv-pomo__ctl--big', [big, bigLbl]),
-      U.el('bcv-pomo__ctl', [skip, U.text('bcv-pomo__ctllabel', 'Skip', 'span')]),
-    ]);
-    // the lengths, as tiles
-    const lens = {};
-    const tiles = Object.entries(PHASES).map(([k, name]) => {
-      lens[k] = U.text('bcv-pomo__tilenum', '');
-      const tile = U.el('bcv-pomo__tile', [
-        U.text('bcv-pomo__tilelabel', name),
-        U.el('bcv-pomo__tilenumrow', [lens[k], U.text('bcv-pomo__tileunit', 'min', 'span')]),
-        U.el('bcv-pomo__tilebtns', [
-          h('button', { type: 'button', class: 'bcv-tool__step', text: '−', 'aria-label': `${name}: less`, onclick: () => focusBump(k, -1) }),
-          h('button', { type: 'button', class: 'bcv-tool__step', text: '+', 'aria-label': `${name}: more`, onclick: () => focusBump(k, 1) }),
-        ]),
-      ]);
-      tile.dataset.phase = k;
-      return tile;
-    });
-    const tilesRow = U.el('bcv-pomo__tiles', tiles);
-    body.append(...rise([phases, dial, sessions, controls, tilesRow, hint('Keeps running if you close this or leave the page. Away Refresh waits while a session is going.')], 50));
+    const skip = h('button', { type: 'button', class: 'bcv-pomo__skip', title: 'Skip to the next phase', onclick: () => focusSkip() }, [U.text('', 'Skip', 'span'), U.svg('M5 5l9 7-9 7zM17 5v14', { size: 13, stroke: 'currentColor', width: 2 })]);
+    const sessions = U.el('bcv-pomo__sessions', [U.el('bcv-pomo__dots', dots), dotsLabel, skip]);
+    body.append(...rise([phases, card, sessions, hint('Press or drag along the scale to set the minutes. Keeps running if you close this or leave the page; Away Refresh waits while a session is going.')], 50));
 
-    let lastFrac = null;
     const paint = (f) => {
       const color = PHASE_COLOR[f.phase];
       const len = phaseLen(f), left = remaining(f), on = running(f);
-      const frac = len > 0 ? Math.max(0, Math.min(1, left / len)) : 0;
+      const paused = !on && f.left !== null && f.left !== undefined;
+      const set = !on && !paused;
       body.style.setProperty('--bcv-pomo-color', color);
       body.classList.toggle('is-running', on);
+      body.classList.toggle('is-paused', paused);
       body.classList.toggle('is-break', f.phase !== 'focus');
       p.setSub(`${U.plural(f.done || 0, 'session')} today`);
       const idx = ['focus', 'short', 'long'].indexOf(f.phase);
       ind.style.transform = `translateX(${idx * 100}%)`;
       phaseBtns.forEach((b) => { b.classList.toggle('is-active', b.dataset.value === f.phase); b.setAttribute('aria-selected', b.dataset.value === f.phase ? 'true' : 'false'); });
-      // a big jump (a reset, a new phase) lands at once; a tick glides
-      const jump = lastFrac === null || Math.abs(frac - lastFrac) > 0.05;
-      svg.classList.toggle('is-jump', jump);
-      lastFrac = frac;
-      stopA.setAttribute('stop-color', color);
-      stopB.setAttribute('stop-color', f.phase === 'focus' ? '#ffb340' : '#5ddb7d');
-      arc.style.strokeDashoffset = `${C * (1 - frac)}`;
-      capG.style.transform = `rotate(${frac * 360}deg)`;
-      capG.style.opacity = frac > 0.005 ? '1' : '0';
+      const mins = Math.round(len / 60);
+      paintScale(scale, scaleMax(f.phase, mins), set ? mins : left / 60);
+      scale.classList.toggle('is-set', set);
+      scale.setAttribute('aria-valuenow', String(mins));
+      scale.setAttribute('aria-valuetext', `${U.plural(mins, 'minute')}${on ? `, ${mmss(left)} left` : paused ? ', paused' : ''}`);
+      scale.setAttribute('aria-disabled', set ? 'false' : 'true');
       timeEl.textContent = mmss(left);
       phaseEl.textContent = PHASES[f.phase];
-      const paused = !on && f.left !== null && f.left !== undefined;
-      endsEl.textContent = on ? `Ends ${U.fmtTime(new Date(f.endAt))}` : (paused ? 'Paused' : ' ');
+      endsEl.textContent = on ? `Ends ${U.fmtTime(new Date(f.endAt))}` : paused ? 'Paused' : '';
+      mainBtn.textContent = on ? 'Pause' : paused ? 'Resume' : 'Start Timer';
+      cancelBtn.hidden = set;
       const cycle = (f.done || 0) % 4;
       dots.forEach((d, i) => d.classList.toggle('is-on', i < cycle || (f.phase === 'long')));
       dotsLabel.textContent = f.phase === 'focus' ? `Session ${cycle + 1} of 4` : f.phase === 'long' ? 'Long break' : `Short break · ${4 - cycle} to a long one`;
-      big.setAttribute('aria-label', on ? 'Pause' : 'Start');
-      bigLbl.textContent = on ? 'Pause' : (paused ? 'Resume' : 'Start');
-      bigIc.replaceChildren(U.svg(on ? IC.pause : IC.play, { size: 24, stroke: '#fff', width: 2.4 }));
-      for (const [k, el] of Object.entries(lens)) el.textContent = String(f.mins[k]);
-      tiles.forEach((t) => t.classList.toggle('is-active', t.dataset.phase === f.phase));
     };
     const stop = watch(paint);
     const mo = new MutationObserver(() => { if (!p.alive()) { stop(); mo.disconnect(); } });

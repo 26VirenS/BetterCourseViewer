@@ -23,6 +23,10 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.19.0', date: '2026-09-18', notes: [
+      { kind: 'improved', title: 'Focus timer', body: 'Set the minutes on a scale, like the phone’s timer card.', icon: P.clock },
+      { kind: 'improved', title: 'Live activity', body: 'A small dial beside the switch. Press it to see the count.', icon: P.toggle },
+    ] },
     { version: '2.18.0', date: '2026-09-18', notes: [
       { kind: 'improved', title: 'Focus timer', body: 'A new dial, session dots, Skip, and smoother motion.', icon: P.clock },
       { kind: 'new', title: 'Live at the top right', body: 'A running timer sits next to the switch, not in the sidebar.', icon: P.toggle },
