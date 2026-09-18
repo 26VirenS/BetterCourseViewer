@@ -2287,19 +2287,15 @@ try {
   await page.waitForTimeout(500);
   await shot(page, '32-setup-over-page');
   const railNow = () => page.$$eval(su('.rail__item'), (els) => els.map((e) => `${e.querySelector('.rail__name').textContent}: ${e.querySelector('.rail__answer').textContent}${e.classList.contains('is-done') ? ' ✓' : ''}${e.disabled ? ' (locked)' : ''}`));
-  const tickedNow = (await page.$$(su('.row.is-on'))).length; // the ones named like a class, ticked already (checked below)
-  check(tickedNow > 0 && (await railNow()).join(' | ') === `Your courses: ${tickedNow} courses | Grades: Not yet (locked) | Dashboard: Not yet (locked) | Sidebar: Not yet (locked)`, `the rail names every step and really locks the ones ahead: ${(await railNow()).join(' | ')}`);
+  check((await railNow()).join(' | ') === 'Your courses: None yet | Grades: Not yet (locked) | Dashboard: Not yet (locked) | Sidebar: Not yet (locked)', `the rail names every step and really locks the ones ahead: ${(await railNow()).join(' | ')}`);
   const scanned = await texts(su('.row__code'));
   const total = scanned.length;
   const railAnswer = (step) => page.$eval(su(`.rail__item[data-step="${step}"] .rail__answer`), (e) => e.textContent);
-  // Courses named like a class (a subject and a number: MATH 021, PHYS 008HL) are ticked for the
-  // student; a resource site or a placement exam is not, whatever Canvas has starred. Continue is
-  // alive as soon as one is ticked: the list picked here is the one every screen then follows.
-  const CLASS = /\b[A-Z]{2,5}\s?-?\s?\d{1,4}[A-Z]{0,3}\b/;
-  const rowsNow = await page.$$eval(su('.row[data-course]'), (els) => els.map((e) => ({ id: e.dataset.course, code: e.querySelector('.row__code').textContent.trim(), name: e.querySelector('.row__name').textContent.trim(), on: e.classList.contains('is-on') })));
-  const classy = rowsNow.filter((r) => CLASS.test(r.code) || CLASS.test(r.name));
-  const others = rowsNow.filter((r) => !classy.includes(r));
-  check((await texts(su('.fr__h1')))[0] === 'Which courses are you in?' && scanned.length >= 8 && classy.length >= 5 && others.length >= 2 && rowsNow.every((r) => r.on === classy.includes(r)) && (await texts(su('.listhead span')))[0] === `${classy.length} of ${total} selected` && (await texts(su('#selectAll')))[0] === 'Select all' && !(await page.$eval(su('#next'), (b) => b.disabled)) && (await texts(su('#hint')))[0] === '' && (await railAnswer('courses')) === `${classy.length} courses`, `step 1 read the enrolments and ticked the ones named like a class: ${classy.map((r) => r.code).join(', ')} on; ${others.map((r) => r.name).join(' / ')} off`);
+  // Nothing is ticked to start with, whatever Canvas has starred: the list picked here is the one
+  // every screen then follows, so it is the student's to choose. Continue is dead, with a hint,
+  // until one is ticked.
+  const rowsNow = await page.$$eval(su('.row[data-course]'), (els) => els.map((e) => ({ id: e.dataset.course, on: e.classList.contains('is-on') })));
+  check((await texts(su('.fr__h1')))[0] === 'Which courses are you in?' && scanned.length >= 8 && rowsNow.every((r) => !r.on) && (await texts(su('.listhead span')))[0] === `0 of ${total} selected` && (await texts(su('#selectAll')))[0] === 'Select all' && (await page.$eval(su('#next'), (b) => b.disabled)) && (await texts(su('#hint')))[0] === 'Pick at least one course.' && (await railAnswer('courses')) === 'None yet', `step 1 read the enrolments and ticked none of them: ${scanned.length} courses, Continue waiting with its hint`);
   // Clear all leaves none ticked, whatever was: Continue is dead with a hint until one is picked
   const clearAll = async () => { if ((await texts(su('#selectAll')))[0] === 'Select all') await page.click(su('#selectAll')); await page.click(su('#selectAll')); };
   await clearAll();
@@ -2390,9 +2386,10 @@ try {
   check((await sStep()) === '1 of 4' && (await page.$$(su('.row.is-on'))).length === 5 && (await page.$eval(su(`.row[data-course="${nickId}"] .row__nick`), (e) => e.value)) === 'Setup nick' && (await railNow()).join(' | ') === `Your courses: 5 courses | Grades: Tracking · goal 3.90 ✓ | Dashboard: ${{ cards: 'Cards', list: 'List', activity: 'Activity' }[viewBefore]} ✓ | Sidebar: Always listed ✓`, `the rail goes back to any step done, with its answers kept: ${(await railNow()).join(' | ')}`);
   for (const s of ['#track', '.tile[data-view]', '.tile[data-value]', '.summary__row']) await sNext(s);
   check((await sStep()) === 'Ready' && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('setup:done'))['setup:done'])) === undefined, 'forward again to the read-back: still nothing marked done');
-  await page.click(su('#next'));
+  // Open Canvas writes everything and reloads the page: it comes back with the choices in place and the tour on it
+  await Promise.all([page.waitForNavigation({ timeout: 20000 }), page.click(su('#next'))]);
   await page.waitForSelector('.bcv-tour__card', { timeout: 20000 });
-  check(page.url() === `${BASE}/` && (await page.$('#bcv-setup')) === null && !(await page.$('html.bcv-setup-open')) && (await page.$eval('.bcv-tour__title', (e) => e.textContent.trim())) === 'Your day at a glance', 'Open Canvas closes the setup and the tour starts on the same page');
+  check(page.url() === `${BASE}/` && (await page.evaluate(() => performance.getEntriesByType('navigation')[0]?.type)) === 'reload' && (await page.$('#bcv-setup')) === null && !(await page.$('html.bcv-setup-open')) && (await page.$eval('.bcv-tour__title', (e) => e.textContent.trim())) === 'Your day at a glance', 'Open Canvas reloads the page, which comes back without the setup and with the tour on it');
   check((await sw.evaluate(async () => (await self.BCV.settings.get()).appearance.sideCourses)) === 'always' && VIEW_OF[(await apiGet('/dashboard/view')).dashboard_view] === viewBefore, 'the sidebar and dashboard choices were written on the way out');
   const favAfter = (await apiGet('/api/v1/courses?per_page=100')).filter((c) => c.is_favorite).map((c) => c.course_code || c.name);
   check(!favAfter.includes(offCode) && favAfter.includes(onCode) && favAfter.length === 5, `the chosen courses became the Canvas favourites: −${offCode} +${onCode}`);
@@ -2987,7 +2984,7 @@ try {
   // the only way out is through: the steps, then the tour (the favourites already starred are the
   // ones picked, so finishing here changes nothing in Canvas for the sections that follow)
   const keepStarred = (await apiGet('/api/v1/courses?per_page=100')).filter((c) => c.is_favorite).map((c) => String(c.id));
-  await clearAll(); // the ones named like a class come ticked: start from none, then exactly the starred
+  await clearAll(); // from none, then exactly the starred
   for (const id of keepStarred) await page.click(su(`.row[data-course="${id}"]`));
   await page.click(su('#next'));
   await page.waitForSelector(su('#track'), { timeout: 10000 });
@@ -2997,10 +2994,9 @@ try {
   await page.waitForSelector(su('.tile[data-value]'), { timeout: 10000 });
   await page.click(su('#next')); // Finish
   await page.waitForSelector(su('.summary__row'), { timeout: 10000 });
-  await page.click(su('#next')); // Open Canvas
-  await page.waitForFunction(() => !document.querySelector('#bcv-setup'), null, { timeout: 15000 });
+  await Promise.all([page.waitForNavigation({ timeout: 20000 }), page.click(su('#next'))]); // Open Canvas: the page reloads
   await page.waitForSelector('.bcv-tour__card', { timeout: 20000 });
-  check((await sw.evaluate(async () => (await self.BCV.api.storage.local.get('setup:done'))['setup:done'])) === true, 'finishing the steps is what marks the setup done, and the tour follows');
+  check((await page.$('#bcv-setup')) === null && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('setup:done'))['setup:done'])) === true, 'finishing the steps is what marks the setup done, and the tour follows the reload');
   await page.keyboard.press('Escape'); // the tour can be left; the setup could not
   await page.waitForFunction(() => !document.querySelector('.bcv-tour__card'), null, { timeout: 5000 });
   await page.goto(`${BASE}/grades`);

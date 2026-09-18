@@ -3,14 +3,14 @@
  * is not yet configured, so showing it is noise. A word-mark plays first, then four steps with a
  * rail down the left that shows every step and the answer given so far — back is always open,
  * forward is Continue alone, steps ahead read "Not yet" and are really disabled:
- *   1 the courses, read from the enrolments (the ones named like a class are ticked to start with;
+ *   1 the courses, read from the enrolments (nothing ticked to start with — the student picks;
  *     unchecked ones stay hidden everywhere: they become the Canvas favourites, the one list every
  *     screen follows) ·
  *   2 grades (a history kept on this device, a goal, a target letter per course) ·
  *   3 what the Dashboard shows first, chosen by looking at miniatures of the real layouts ·
  *   4 where those courses sit, on the sidebar or in a panel off the Courses row ·
- * then a read-back of what was chosen, and Open Canvas writes it all at once, closes, and the tour
- * starts. Opened by ?bcv=setup (the toolbar popup's Set up, the account sheet on a phone, the app's
+ * then a read-back of what was chosen, and Open Canvas writes it all at once and reloads the page,
+ * which comes back with everything in place and the tour on it. Opened by ?bcv=setup (the toolbar popup's Set up, the account sheet on a phone, the app's
  * first launch). A phone has no sidebar and no dashboard views to choose between: those two steps
  * are left out there. There is no Skip: an unconfigured install has nothing to show. */
 (function () {
@@ -32,12 +32,8 @@
   ];
   let STEPS = ALL;
   const settleSteps = () => { STEPS = BCV.phone?.active() ? ALL.filter((s) => s.key === 'courses' || s.key === 'grades') : ALL; };
-  // A course named like a class — a subject and a number: MATH 021, PHYS 008HL, CS-101 — is ticked
-  // for the student; a resource site, a placement exam or an orientation is not.
-  const CLASS_CODE = /\b[A-Z]{2,5}\s?-?\s?\d{1,4}[A-Z]{0,3}\b/;
-  const looksLikeClass = (c) => CLASS_CODE.test(c.code || '') || CLASS_CODE.test(c.originalName || '');
   const COPY = {
-    courses: ['Which courses are you in?', 'Courses named like a class are ticked already. Unchecked courses stay hidden everywhere. A nickname replaces the name across the app.'],
+    courses: ['Which courses are you in?', 'Tick the courses you are in. Unchecked courses stay hidden everywhere. A nickname replaces the name across the app.'],
     grades: ['Grades', 'Canvas keeps no history. Simpl Courses can, on this device.'],
     dashboard: ['What you see first', 'Pick the shape of your dashboard.'],
     sidebar: ['Where your courses live', 'Either way it is the same list.'],
@@ -266,10 +262,10 @@
       const favIds = new Set((favs || []).map((c) => String(c.id)));
       const list = (all || []).filter((c) => c.state === 'current').map((c) => ({ id: String(c.id), code: c.code || c.name, name: c.name, originalName: c.originalName || c.name, nickname: c.nickname || '', color: c.color, favorite: !!c.favorite || favIds.has(String(c.id)) }));
       st.courses = list;
-      // The courses named like a class are ticked to begin with and the rest are not, whatever Canvas
-      // already has starred: this list is what every screen then follows, so it is worth choosing
-      // rather than inheriting. Continue stays disabled while nothing is ticked.
-      st.favs = new Set(list.filter(looksLikeClass).map((c) => c.id));
+      // Nothing is ticked to begin with, whatever Canvas already has starred: this list is what every
+      // screen then follows, so it is the student's to choose. Continue stays disabled while nothing
+      // is ticked.
+      st.favs = new Set();
       for (const c of list) if (!(c.id in st.targets)) st.targets[c.id] = 'A+';
     } catch (e) {
       st.scanError = e?.message || 'The course list could not be read.';
@@ -490,13 +486,14 @@
   /** Everything the steps decided, written at once, where the screens read it: favourites through
    *  Canvas (the one list every screen follows), the grade preferences under this host, the
    *  dashboard view on the Canvas profile, the sidebar choice in the settings, and the "done" flags
-   *  the popup and the every-page check read. Then the card closes and the tour starts on this
-   *  page. There is no other way out: the card is only done when the steps are. */
+   *  the popup and the every-page check read. Then the page reloads: it comes back with everything
+   *  in place (the shell, the sidebar list and the dashboard view are all read at boot) and the
+   *  tour, armed before the reload, starts on it. The card stays up until the new page arrives.
+   *  There is no other way out: the card is only done when the steps are. */
   async function finish() {
     if (!st || st.closing) return;
     st.closing = true;
     const { app } = st;
-    let favChanged = false;
     try {
       await store.setPref('setupDone', true);
       const [targetsPref] = await Promise.all([store.pref('gradeTargets')]);
@@ -513,7 +510,6 @@
       for (const c of changes) await store.setFavorite(c.id, st.favs.has(c.id)).catch(() => {});
       const renamed = st.courses.filter((c) => c.id in st.nicks && String(st.nicks[c.id]).trim() !== (c.nickname || ''));
       for (const c of renamed) await store.setNickname(c.id, st.nicks[c.id]).catch(() => {});
-      favChanged = changes.length > 0 || renamed.length > 0;
       // the version installed is seen: What's new is for updates, never for a fresh install
       let installed = null;
       try { installed = BCV.api.runtime.getManifest().version || null; } catch { /* no version to note */ }
@@ -521,12 +517,13 @@
     } catch (e) {
       console.error('[Simpl Courses setup]', e);
     }
-    await close();
-    if (favChanged) {
-      app.loadShellData({ force: true });
-      await app.render();
-    }
-    if (BCV.tour) await BCV.tour.start(app);
+    if (BCV.tour) await BCV.tour.start(app, { draw: false }).catch(() => {}); // armed: the reloaded page resumes it
+    // the address loses the setup's own parameter first, or the reload would open the card again
+    try {
+      const u = new URL(location.href);
+      if (u.searchParams.has('bcv')) { u.searchParams.delete('bcv'); history.replaceState(null, '', u.pathname + u.search + u.hash); }
+    } catch { /* the address is left as it is */ }
+    location.reload();
   }
 
   BCV.setup = { open, close, active, placeDot };

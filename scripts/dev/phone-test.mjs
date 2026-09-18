@@ -616,7 +616,7 @@ try {
   await page.waitForSelector('#bcv-setup .row', { timeout: 20000 });
   await page.waitForFunction(() => document.querySelector('#bcv-setup')?.shadowRoot.querySelector('.intro')?.hidden === true, null, { timeout: 8000 }); // the word-mark first
   await page.waitForTimeout(400);
-  check((await page.$$('#bcv-setup .row.is-on')).length === 6 && (await page.$$('#bcv-setup .row[data-course]')).length >= 8 && !(await page.$eval('#bcv-setup #next', (e) => e.disabled)) && (await page.$eval('#bcv-setup .fr', (e) => e.getBoundingClientRect().right <= window.innerWidth + 1 && e.getBoundingClientRect().left >= 0)) && !(await page.locator('#bcv-setup .rail').isVisible()) && (await page.$eval('#bcv-setup #stepLabel', (e) => e.textContent)) === '1 of 2' && await noOverflow(), 'the setup fits the phone screen without the rail and lists the courses, the six named like a class ticked already');
+  check((await page.$$('#bcv-setup .row.is-on')).length === 0 && (await page.$$('#bcv-setup .row[data-course]')).length >= 8 && (await page.$eval('#bcv-setup #next', (e) => e.disabled)) && (await page.$eval('#bcv-setup .fr', (e) => e.getBoundingClientRect().right <= window.innerWidth + 1 && e.getBoundingClientRect().left >= 0)) && !(await page.locator('#bcv-setup .rail').isVisible()) && (await page.$eval('#bcv-setup #stepLabel', (e) => e.textContent)) === '1 of 2' && await noOverflow(), 'the setup fits the phone screen without the rail and lists the courses, none ticked for you');
   await shot('11-setup');
   // start from none (Clear all), then pick five by hand
   if ((await page.$eval('#bcv-setup #selectAll', (e) => e.textContent)) === 'Select all') await page.click('#bcv-setup #selectAll');
@@ -636,9 +636,9 @@ try {
   const readBack = await page.$$eval('#bcv-setup .summary__k', (els) => els.map((e) => e.textContent));
   check((await page.$eval('#bcv-setup #stepLabel', (e) => e.textContent)) === 'Ready' && readBack.join(' | ') === 'Courses shown | Grade history' && (await page.$eval('#bcv-setup #next', (e) => e.textContent.trim())) === 'Open Canvas' && await noOverflow(), `then a read-back of those two answers alone, and Open Canvas: ${readBack.join(' | ')}`);
   await shot('11c-setup-ready');
-  await page.click('#bcv-setup #next');
+  await Promise.all([page.waitForNavigation({ timeout: 20000 }), page.click('#bcv-setup #next')]); // Open Canvas: the page reloads
   await page.waitForSelector('.bcv-tour__card', { timeout: 20000 });
-  check((await page.$('#bcv-setup')) === null && page.url() === `${BASE}/`, 'Open Canvas closes the setup and the tour starts on Today');
+  check((await page.$('#bcv-setup')) === null && page.url() === `${BASE}/` && (await page.evaluate(() => performance.getEntriesByType('navigation')[0]?.type)) === 'reload', 'Open Canvas reloads the page and the tour starts on Today');
   const overStats = await eventually(() => page.evaluate(() => { const r = document.querySelector('.bcv-tour__ring').getBoundingClientRect(); const t = document.querySelector('.bcv-ph-stats').getBoundingClientRect(); return r.width > 0 && r.left <= t.left + 1 && r.top <= t.top + 1 && r.right >= t.right - 1 && r.bottom >= t.bottom - 1; }).catch(() => false), 3000);
   check((await texts('.bcv-tour__title'))[0] === 'Your day at a glance' && overStats, 'the tour spotlights the phone counters');
   await page.click('.bcv-tour__btn.is-primary');
