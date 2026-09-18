@@ -10,8 +10,9 @@
  *   3 what the Dashboard shows first, chosen by looking at miniatures of the real layouts ·
  *   4 where those courses sit, on the sidebar or in a panel off the Courses row ·
  * then a read-back of what was chosen, and Open Canvas writes it all at once and reloads the page,
- * which comes back with everything in place and the tour on it. Opened by ?bcv=setup (the toolbar popup's Set up, the account sheet on a phone, the app's
- * first launch). A phone has no sidebar and no dashboard views to choose between: those two steps
+ * which comes back black, with everything in place and the welcome on it (content/app/welcome.js:
+ * two pointers, the look switch and Away Refresh). Opened by ?bcv=setup (the toolbar popup's Set
+ * up, the account sheet on a phone, the app's first launch). A phone has no sidebar and no dashboard views to choose between: those two steps
  * are left out there. There is no Skip: an unconfigured install has nothing to show. */
 (function () {
   const BCV = (self.BCV = self.BCV || {});
@@ -488,7 +489,7 @@
    *  dashboard view on the Canvas profile, the sidebar choice in the settings, and the "done" flags
    *  the popup and the every-page check read. Then the page reloads: it comes back with everything
    *  in place (the shell, the sidebar list and the dashboard view are all read at boot) and the
-   *  tour, armed before the reload, starts on it. The card stays up until the new page arrives.
+   *  welcome, armed before the reload, on it. The card stays up until the new page arrives.
    *  There is no other way out: the card is only done when the steps are. */
   async function finish() {
     if (!st || st.closing) return;
@@ -517,7 +518,7 @@
     } catch (e) {
       console.error('[Simpl Courses setup]', e);
     }
-    if (BCV.tour) await BCV.tour.start(app, { draw: false }).catch(() => {}); // armed: the reloaded page resumes it
+    if (BCV.welcome) await BCV.welcome.arm().catch(() => {}); // armed: the reloaded page comes back black, with the welcome on it
     // the address loses the setup's own parameter first, or the reload would open the card again
     try {
       const u = new URL(location.href);

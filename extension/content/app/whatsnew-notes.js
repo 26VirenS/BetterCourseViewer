@@ -21,6 +21,9 @@
     clock: 'M12 5a8 8 0 100 16 8 8 0 000-16zM12 9v4l3 2',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.16.0', date: '2026-09-18', notes: [
+      { kind: 'new', title: 'Tips after setup', body: 'Two quick tips replace the tour after setup.', icon: P.sparkle },
+    ] },
     { version: '2.15.3', date: '2026-09-18', notes: [
       { kind: 'improved', title: 'Setup', body: 'You pick your courses yourself. The page reloads when you finish.', icon: P.steps },
     ] },

@@ -115,18 +115,19 @@ html[data-bcv-theme="dark"] .bcv-skel { --bcv-skel: linear-gradient(90deg, rgba(
  * nothing here leans on html.bcv-on). Small enough to sit above the page header's own controls. ---- */
 /* Folded, it is the mark and the switch alone; under the pointer (or the keyboard's focus) the name
  * comes out and a second row opens: Persistent, what a press of the look switch does. */
-#bcv-look { position: fixed; top: 6px; right: 10px; z-index: 2147482000; display: flex; flex-direction: column; align-items: stretch; margin: 0; padding: 0; border: 1px solid rgba(255,255,255,.14); border-radius: 12px; background: rgba(28,28,30,.86); -webkit-backdrop-filter: blur(16px) saturate(1.4); backdrop-filter: blur(16px) saturate(1.4); box-shadow: 0 2px 10px rgba(0,0,0,.2); color: #fff; font: 600 10.5px/1 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif; letter-spacing: -.01em; line-height: 1; text-transform: none; overflow: hidden; transition: box-shadow .18s ease, opacity .2s ease, border-radius .18s ease; }
+/* (.bcv-look-pill is the same pill without the place: the welcome after the setup shows an opened copy) */
+#bcv-look, .bcv-look-pill { position: fixed; top: 6px; right: 10px; z-index: 2147482000; display: flex; flex-direction: column; align-items: stretch; margin: 0; padding: 0; border: 1px solid rgba(255,255,255,.14); border-radius: 12px; background: rgba(28,28,30,.86); -webkit-backdrop-filter: blur(16px) saturate(1.4); backdrop-filter: blur(16px) saturate(1.4); box-shadow: 0 2px 10px rgba(0,0,0,.2); color: #fff; font: 600 10.5px/1 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif; letter-spacing: -.01em; line-height: 1; text-transform: none; overflow: hidden; transition: box-shadow .18s ease, opacity .2s ease, border-radius .18s ease; }
 /* (the keyboard's focus opens it too; a press with the pointer leaves focus behind, so that alone does not hold it open) */
-#bcv-look:hover, #bcv-look:has(:focus-visible) { border-radius: 13px; box-shadow: 0 6px 20px rgba(0,0,0,.3); }
+#bcv-look:hover, #bcv-look:has(:focus-visible), .bcv-look-pill.is-open { border-radius: 13px; box-shadow: 0 6px 20px rgba(0,0,0,.3); }
 #bcv-look.is-busy { opacity: .6; pointer-events: none; }
-#bcv-look button { margin: 0; border: 0; background: transparent; color: inherit; cursor: pointer; font: inherit; letter-spacing: inherit; text-align: left; }
+#bcv-look button, .bcv-look-pill button { margin: 0; border: 0; background: transparent; color: inherit; cursor: pointer; font: inherit; letter-spacing: inherit; text-align: left; }
 #bcv-look button:focus-visible { outline: 2px solid #0a84ff; outline-offset: -2px; border-radius: 11px; }
 .bcv-look__main { display: flex; align-items: center; gap: 0; height: 22px; padding: 0 5px 0 4px; }
 .bcv-look__main:active { opacity: .8; }
 .bcv-look__mark { flex: none; width: 14px; height: 14px; border-radius: 4px; background: linear-gradient(158deg, #0a84ff, #0a4fd6); display: flex; align-items: center; justify-content: center; margin-right: 6px; }
 .bcv-look__mark svg { display: block; width: 12px; height: 12px; }
 .bcv-look__text { flex: none; max-width: 0; opacity: 0; overflow: hidden; white-space: nowrap; transition: max-width .22s ease, opacity .18s ease, margin .22s ease; }
-#bcv-look:hover .bcv-look__text, #bcv-look:has(:focus-visible) .bcv-look__text { max-width: 110px; opacity: 1; margin-right: 8px; }
+#bcv-look:hover .bcv-look__text, #bcv-look:has(:focus-visible) .bcv-look__text, .bcv-look-pill.is-open .bcv-look__text { max-width: 110px; opacity: 1; margin-right: 8px; }
 .bcv-look__sw { flex: none; width: 20px; height: 12px; border-radius: 6px; background: rgba(120,120,128,.55); padding: 2px; box-sizing: border-box; display: flex; transition: background .2s ease; }
 .bcv-look__knob { width: 8px; height: 8px; border-radius: 4px; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.3); transition: transform .2s cubic-bezier(.34,1.3,.42,1); }
 .bcv-look__main.is-on .bcv-look__sw { background: #34c759; }
@@ -134,7 +135,7 @@ html[data-bcv-theme="dark"] .bcv-skel { --bcv-skel: linear-gradient(90deg, rgba(
 /* the second row, under the pointer or the keyboard's focus: Persistent, what a press of the look switch does */
 /* (folded in both directions: at max-height 0 alone the row would still lend the pill its width) */
 .bcv-look__persist { display: flex; align-items: center; gap: 10px; max-height: 0; max-width: 0; padding: 0; opacity: 0; border-top: 1px solid transparent; overflow: hidden; transition: max-height .22s ease, max-width .22s ease, opacity .18s ease, padding .22s ease, border-color .22s ease; }
-#bcv-look:hover .bcv-look__persist, #bcv-look:has(:focus-visible) .bcv-look__persist { max-height: 44px; max-width: 260px; padding: 5px 7px 6px 6px; opacity: 1; border-top-color: rgba(255,255,255,.12); }
+#bcv-look:hover .bcv-look__persist, #bcv-look:has(:focus-visible) .bcv-look__persist, .bcv-look-pill.is-open .bcv-look__persist { max-height: 44px; max-width: 260px; padding: 5px 7px 6px 6px; opacity: 1; border-top-color: rgba(255,255,255,.12); }
 .bcv-look__ptext { flex: 1; min-width: 0; font: 600 10.5px/1.2 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif; white-space: nowrap; }
 .bcv-look__sw--small { width: 18px; height: 11px; }
 .bcv-look__sw--small .bcv-look__knob { width: 7px; height: 7px; }
@@ -142,7 +143,7 @@ html[data-bcv-theme="dark"] .bcv-skel { --bcv-skel: linear-gradient(90deg, rgba(
 .bcv-look__persist.is-on .bcv-look__knob { transform: translateX(7px); }
 /* the phone layout's own header has the corner; the setup and the tour cover the page */
 html.bcv-phone.bcv-on #bcv-look, html.bcv-setup-open #bcv-look, html.bcv-touring #bcv-look { display: none; }
-@media (max-width: 700px) { #bcv-look .bcv-look__text { display: none; } }
+@media (max-width: 700px) { #bcv-look .bcv-look__text, .bcv-look-pill .bcv-look__text { display: none; } }
 
 /* ---- Away Refresh: the stale-page reload, announced first. A pill floats down from the top — a
  * dial counting three seconds down in orange, the iPhone's timer (a dim ring, a bright arc of the
@@ -164,6 +165,56 @@ html.bcv-phone.bcv-on #bcv-look, html.bcv-setup-open #bcv-look, html.bcv-touring
 @keyframes bcv-away-ring { to { stroke-dashoffset: 81.68; } }
 @keyframes bcv-away-sweep { from { transform: rotate(0deg); } to { transform: rotate(-360deg); } }
 @media (prefers-reduced-motion: reduce) { #bcv-away, #bcv-away.is-in, #bcv-away.is-out { transform: translate(-50%, 0); transition: opacity .2s ease; } }
+
+/* ---- the welcome after the setup (content/app/welcome.js): the reloaded page comes back black, and
+ * two pointers play on it in turn — a big white arrow at an opened copy of the look switch, then at
+ * a mock Away Refresh pill counting down in slow motion — each with three lines and a Continue that
+ * comes in after two seconds. The black sits over everything, the switch and the pill included. ---- */
+#bcv-welcome { position: fixed; inset: 0; z-index: 2147483000; margin: 0; padding: 0; background: #000; color: #fff; font: 400 15px/1.35 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif; letter-spacing: -.01em; text-transform: none; overflow: hidden; transition: opacity .35s ease; }
+#bcv-welcome.is-out { opacity: 0; pointer-events: none; }
+#bcv-welcome:focus { outline: none; }
+html.bcv-welcome { overflow: hidden; }
+/* the thing pointed at, where it will really be: the switch at the top right, larger; the pill at the top, larger */
+.bcv-welcome__look { position: absolute; top: 10px; right: 12px; z-index: auto; transform: scale(1.5); transform-origin: top right; pointer-events: none; box-shadow: 0 0 0 1px rgba(255,255,255,.22), 0 0 44px rgba(255,255,255,.24); animation: bcv-welcome-fade .5s ease both; }
+.bcv-welcome__away { --bcv-welcome-scale: 1.35; position: absolute; top: calc(10px + env(safe-area-inset-top, 0px)); left: 50%; pointer-events: none; transform: translate(-50%, 0) scale(var(--bcv-welcome-scale)); transform-origin: top center; animation: bcv-welcome-drop .5s cubic-bezier(.2,1.1,.3,1) both; }
+.bcv-welcome__away .bcv-away__btn { cursor: default; }
+.bcv-welcome__away .bcv-away__ring, .bcv-welcome__away .bcv-away__hand { animation-duration: 12s; animation-iteration-count: infinite; }
+.bcv-welcome__look.is-out, .bcv-welcome__away.is-out { animation: bcv-welcome-out .25s ease both; }
+/* the stage: the arrow, the three lines, Continue — under the switch, right-aligned; under the pill, centred */
+.bcv-welcome__stage { position: absolute; display: flex; flex-direction: column; gap: 14px; animation: bcv-welcome-in .5s ease both; }
+.bcv-welcome__stage.is-out { animation: bcv-welcome-out .25s ease both; }
+.bcv-welcome__stage[data-stage="look"] { top: 112px; right: 40px; left: 16px; align-items: flex-end; text-align: right; }
+.bcv-welcome__stage[data-stage="away"] { top: calc(104px + env(safe-area-inset-top, 0px)); left: 16px; right: 16px; align-items: center; text-align: center; }
+.bcv-welcome__arrowbox { display: block; flex: none; }
+.bcv-welcome__arrow { display: block; overflow: visible; }
+.bcv-welcome__arrow path { fill: none; stroke: #fff; stroke-width: 9; stroke-linecap: round; stroke-linejoin: round; }
+/* the arrow draws itself (pathLength="1" on the line: the dash is the whole of it), then the head comes in at its tip */
+.bcv-welcome__line { stroke-dasharray: 1 2; stroke-dashoffset: 1.05; animation: bcv-welcome-draw .6s ease-out .2s forwards; }
+.bcv-welcome__head { opacity: 0; animation: bcv-welcome-fade .25s ease .72s forwards; }
+.bcv-welcome__text { display: flex; flex-direction: column; gap: 8px; max-width: 560px; }
+.bcv-welcome__kicker { font: 500 16px/1.2 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif; color: rgba(255,255,255,.78); }
+.bcv-welcome__title { font: 700 clamp(26px, 4.2vw, 40px)/1.12 -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif; letter-spacing: -.022em; color: #fff; }
+.bcv-welcome__hint { font: 400 15px/1.4 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif; color: rgba(255,255,255,.5); max-width: 440px; }
+.bcv-welcome__next { margin: 10px 0 0; padding: 11px 26px; border: 0; border-radius: 999px; background: #fff; color: #000; font: 600 15px/1 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif; letter-spacing: -.01em; cursor: pointer; animation: bcv-welcome-in .35s ease both; }
+.bcv-welcome__next:hover { background: #e5e5ea; }
+.bcv-welcome__next:active { background: #d1d1d6; }
+.bcv-welcome__next:focus-visible { outline: 2px solid #0a84ff; outline-offset: 3px; }
+@keyframes bcv-welcome-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+@keyframes bcv-welcome-out { to { opacity: 0; } }
+@keyframes bcv-welcome-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes bcv-welcome-draw { to { stroke-dashoffset: 0; } }
+@keyframes bcv-welcome-drop { from { transform: translate(-50%, -160%) scale(var(--bcv-welcome-scale)); opacity: 0; } to { transform: translate(-50%, 0) scale(var(--bcv-welcome-scale)); opacity: 1; } }
+@media (max-width: 700px) {
+  .bcv-welcome__away { --bcv-welcome-scale: 1.15; }
+  .bcv-welcome__stage[data-stage="away"] { top: calc(92px + env(safe-area-inset-top, 0px)); }
+  .bcv-welcome__arrow { width: 80px; height: 120px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bcv-welcome__stage, .bcv-welcome__look, .bcv-welcome__away, .bcv-welcome__next, .bcv-welcome__head { animation: none; opacity: 1; }
+  .bcv-welcome__line { animation: none; stroke-dashoffset: 0; }
+  .bcv-welcome__stage.is-out, .bcv-welcome__look.is-out, .bcv-welcome__away.is-out { animation: none; opacity: 0; }
+  #bcv-welcome { transition: none; }
+}
 
 html.bcv-on { background: var(--bcv-bg) !important; }
 html.bcv-on body { margin: 0 !important; padding: 0 !important; background: var(--bcv-bg) !important; overflow: auto !important; min-height: 100vh; }

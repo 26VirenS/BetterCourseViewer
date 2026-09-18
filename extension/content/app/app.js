@@ -795,6 +795,7 @@
   function wakeStale() {
     if (self.BCVBridge?.native) return false; // the app holds its own session
     if (inQuiz() || quizHere()) { here(); return false; } // never on a quiz, and no note either
+    if (BCV.welcome?.active()) { here(); return false; } // the welcome after the setup is not reloaded out from under
     return awayRefresh();
   }
   // The reload is announced before it happens: a pill floats down from the top of the page — a dial
@@ -816,18 +817,23 @@
     el.classList.add('is-out');
     setTimeout(() => el.remove(), 400);
   }
-  function awayRefresh() {
-    if (away) return true; // already counting
-    if (inQuiz() || quizHere() || state.submitOpen || typing() || recentlyReloaded()) return recover(AWAY_WHY); // the note, and no reload
+  /** The pill's button — the dial and its two lines — with nothing wired: awayRefresh() wires the
+   *  press, and the welcome after the setup shows a copy counting down in slow motion. */
+  function awayPill() {
     // the dial is the iPhone's timer: a dim ring, a bright arc of the time left that shrinks back to
     // twelve o'clock, and a hand pivoting at the centre that points at the arc's end and turns with
     // it — widest at the pivot, tapering to a slim tip short of the ring, both ends round (two
     // circles, r 2.1 at the centre and r 1.3 at (18,9), and the tangents between them)
     const dial = '<svg viewBox="0 0 36 36" aria-hidden="true"><circle class="bcv-away__track" cx="18" cy="18" r="13"/><circle class="bcv-away__ring" cx="18" cy="18" r="13"/><path class="bcv-away__hand" d="M15.91 17.81A2.1 2.1 0 1 0 20.09 17.81L19.3 8.88A1.3 1.3 0 0 0 16.7 8.88Z"/></svg>';
-    const btn = h('button', { type: 'button', class: 'bcv-away__btn', 'aria-label': 'Away refresh in three seconds. Press to cancel.' }, [
+    return h('button', { type: 'button', class: 'bcv-away__btn', 'aria-label': 'Away refresh in three seconds. Press to cancel.' }, [
       h('span', { class: 'bcv-away__dial', html: dial }),
       h('span', { class: 'bcv-away__body' }, [h('span', { class: 'bcv-away__title', text: 'Away Refresh' }), h('span', { class: 'bcv-away__hint', text: 'Click to cancel' })]),
     ]);
+  }
+  function awayRefresh() {
+    if (away) return true; // already counting
+    if (inQuiz() || quizHere() || state.submitOpen || typing() || recentlyReloaded()) return recover(AWAY_WHY); // the note, and no reload
+    const btn = awayPill();
     btn.addEventListener('click', awayCancel);
     const el = h('div', { id: 'bcv-away', class: 'bcv-away', role: 'status' }, btn);
     document.body.append(el);
@@ -970,7 +976,8 @@
     document.title = titleFor(r);
     if (phone()) BCV.phone.afterRender(BCV.app, r, el);
     // ?bcv=setup (the popup's Set up button, the account sheet, the app's first launch): the guided
-    // setup over this page, which drops the parameter and starts the tour when it is done
+    // setup over this page, which drops the parameter and reloads the page when it is done (the
+    // welcome, two pointers on black, is the first thing the reloaded page shows: see boot())
     if (r.params.get('bcv') === 'setup' && BCV.setup && !BCV.setup.active()) BCV.setup.open(BCV.app);
     else if (r.params.get('bcv') === 'tour' && BCV.tour) startTourHere();
     else BCV.tour?.resume?.(BCV.app, r);
@@ -1184,13 +1191,20 @@
       go('/?bcv=setup', { replace: true });
       return;
     }
+    // The page after the setup's reload comes back black, and the welcome (two pointers: the look
+    // switch, Away Refresh) plays on it once the switch is up to point at. The black goes up before
+    // the page draws, so the Dashboard is never seen first.
+    const welcome = state.lookOn && BCV.welcome ? await BCV.welcome.due() : false;
+    if (welcome) BCV.welcome.cover();
     await applySkin(state.lookOn);
     mountLookToggle();
+    if (welcome) BCV.welcome.open(BCV.app).catch(() => {});
     // The first Canvas page after an update shows what changed: once per version, never over the
-    // setup, the tour or a quiz attempt, and never on a fresh install (the setup marks its version seen).
-    if (state.lookOn && BCV.whatsnew && !inQuiz() && !BCV.setup?.active() && !html.classList.contains('bcv-touring')) {
+    // setup, the welcome, the tour or a quiz attempt, and never on a fresh install (the setup marks its version seen).
+    const busy = () => BCV.setup?.active() || BCV.welcome?.active() || html.classList.contains('bcv-touring');
+    if (state.lookOn && BCV.whatsnew && !inQuiz() && !busy()) {
       const change = await BCV.whatsnew.due();
-      if (change && !BCV.setup?.active() && !html.classList.contains('bcv-touring')) BCV.whatsnew.open(BCV.app, change);
+      if (change && !busy()) BCV.whatsnew.open(BCV.app, change);
     }
     BCV.extras?.prime?.(BCV.app);
     // Settings reads this site, and writes to Canvas with the session's token the page can see (Settings cannot read the cookie itself)
@@ -1236,6 +1250,7 @@
     isDark: () => state.dark,
     openSettings,
     recover, // (the suite checks that a quiz is never reloaded out from under)
+    awayPill, // (the welcome after the setup shows a copy of the pill)
     main: () => main,
   };
 

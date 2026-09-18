@@ -52,14 +52,13 @@
     return true;
   };
 
-  /** Starts the tour at its first stop. `draw: false` only writes its state (the setup does that
-   *  before reloading the page: the reloaded page resumes the tour from what is written). */
-  async function start(app, { draw = true } = {}) {
+  /** Starts the tour at its first stop (the account panel, Settings → Run again, ?bcv=tour). */
+  async function start(app) {
     const favs = await store.favorites().catch(() => []);
     const all = favs.length ? favs : await store.courses().then((cs) => cs.filter((c) => c.state === 'current')).catch(() => []);
     st = { step: 0, courseId: all[0]?.id || null };
     await write();
-    if (!draw) return;
+    html.classList.add('bcv-touring'); // (from the first stop on, not only from the next page's resume)
     const first = routeOf(STOPS[0]);
     if (app.parseRoute().screen === 'dashboard' && !app.state.route?.params?.get('bcv')) show(app, app.state.route);
     else app.go(first);
