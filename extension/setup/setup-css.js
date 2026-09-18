@@ -486,4 +486,37 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
   .mark--lg .arc, .done__check .arc { stroke-dashoffset: 0; }
   .card__body.is-entering { opacity: 1; transform: none; }
 }
+
+/* ---- the page after install: black, a splash, then an arrow and a line or two per screen ---- */
+html.is-splash, html.is-splash body { background: #000; color: #fff; animation: none; }
+.splash { position: fixed; inset: 0; background: #000; color: #fff; overflow: hidden; font-family: var(--font); }
+.splash__stage { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; text-align: center; animation: splashIn .4s var(--ease) both; }
+.splash__stage.is-leaving { animation: splashOut .25s ease both; pointer-events: none; }
+@keyframes splashIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes splashOut { to { opacity: 0; transform: translateY(-8px); } }
+.splash__brand { display: flex; align-items: center; gap: 22px; }
+.mark--splash { width: 84px; height: 84px; padding: 12px; border-radius: 22px; box-shadow: 0 16px 40px rgba(10,79,214,.45); animation: pop .6s var(--spring) both; }
+.mark--splash svg { display: block; width: 100%; height: 100%; }
+.splash__word { font: 700 64px/1 var(--display); letter-spacing: -.045em; color: #fff; animation: fadeUp .5s var(--ease) .25s both; }
+.splash__text { position: relative; display: flex; flex-direction: column; align-items: center; gap: 10px; max-width: 540px; }
+.splash__stage--pin .splash__text { margin-top: 22vh; }
+.splash__kicker { font: 500 15px/1.3 var(--font); color: rgba(255,255,255,.55); animation: fadeUp .45s var(--ease) .1s both; }
+.splash__title { margin: 0; font: 700 42px/1.1 var(--display); letter-spacing: -.035em; color: #fff; text-wrap: balance; animation: fadeUp .45s var(--ease) .18s both; }
+.splash__hint { margin: 0; font: 400 17px/1.5 var(--font); color: rgba(255,255,255,.62); text-wrap: pretty; animation: fadeUp .45s var(--ease) .26s both; }
+.splash__hint b { font-weight: 600; color: rgba(255,255,255,.88); }
+.splash__btn { margin-top: 22px; height: 46px; padding: 0 26px; border: 0; border-radius: 23px; background: #fff; color: #000; cursor: pointer; font: 600 15.5px/1 var(--font); animation: fadeUp .4s var(--ease) both; transition: transform .18s var(--spring), box-shadow .25s ease; }
+.splash__btn:hover { transform: translateY(-1px); box-shadow: 0 8px 22px rgba(255,255,255,.18); }
+.splash__btn:active { transform: scale(.97); }
+.splash__btn[hidden] { display: none; }
+.splash__note { margin: 14px 0 0; font: 400 14px/1.4 var(--font); color: rgba(255,255,255,.5); }
+.splash__note[hidden] { display: none; }
+.splash__arrow { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+.splash__arrow path { fill: none; stroke: #fff; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+.splash__arrow .splash__line { animation: drawStroke 1s var(--ease) .3s both; }
+.splash__arrow .splash__head { animation: fadeIn .3s ease 1.1s both; }
+@media (max-width: 600px) { .splash__brand { gap: 16px; } .mark--splash { width: 64px; height: 64px; padding: 9px; border-radius: 17px; } .splash__word { font-size: 48px; } .splash__title { font-size: 30px; } .splash__hint { font-size: 15px; } }
+@media (prefers-reduced-motion: reduce) {
+  .splash__stage, .splash__stage.is-leaving, .mark--splash, .splash__word, .splash__kicker, .splash__title, .splash__hint, .splash__btn, .splash__arrow .splash__line, .splash__arrow .splash__head { animation: none; }
+  .splash__arrow .splash__line { stroke-dashoffset: 0 !important; }
+}
 `;

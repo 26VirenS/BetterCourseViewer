@@ -2550,28 +2550,30 @@ try {
   await page.waitForFunction(() => !document.querySelector('#bcv-whatsnew'), null, { timeout: 5000 });
   check(!(await page.$('#bcv-whatsnew')), 'Escape closes it too');
 
-  // ---- the page after install --------------------------------------------------------------
+  // ---- the page after install: black, a splash, an arrow to the puzzle piece, then where to go ----
   console.log('setup page');
   const setup = await context.newPage();
-  const sTexts = (sel) => setup.$$eval(sel, (els) => els.map((e) => (e.innerText || e.textContent).replace(/\s+/g, ' ').trim()));
+  const sText = (sel) => setup.$eval(sel, (e) => (e.innerText || e.textContent).replace(/\s+/g, ' ').trim()).catch(() => null);
   await setup.goto(`chrome-extension://${extId}/setup/setup.html`);
-  await setup.waitForSelector('.welcome .h1', { timeout: 10000 });
-  await setup.waitForTimeout(700); // the steps come in one after another
-  const how = await sTexts('.how__t');
-  check((await sTexts('.welcome .h1'))[0] === 'Simpl Courses is installed' && (await sTexts('.welcome .lead'))[0] === 'Three quick steps.' && (await setup.$$('.blob')).length === 4 && how.join(' | ') === 'Open your Canvas | Open Simpl Courses | Press Set up', `the page after install says the three things to do, briefly: ${how.join(' | ')}`);
-  // each step is drawn as well as said: the address bar on Canvas, the puzzle piece and the menu behind it, the popup's one button
-  const pics = await setup.evaluate(() => [...document.querySelectorAll('.how__step')].map((s) => ({
-    bar: s.querySelector('.pic__bar')?.textContent.trim() || null,
-    hot: !!s.querySelector('.pic__ico--hot'),
-    menu: s.querySelector('.pic__menu')?.textContent.trim() || null,
-    btn: s.querySelector('.pic__btn')?.textContent.trim() || null,
-    said: s.querySelector('.how__s').textContent,
-  })));
-  check(pics.length === 3 && pics[0].bar === 'yourschool.instructure.com' && pics[1].hot && pics[1].menu === 'Simpl Courses' && pics[2].btn === 'Set up', `and each is drawn: the address, the highlighted puzzle piece with Simpl Courses behind it, the Set up button: ${JSON.stringify(pics.map((x) => [x.bar, x.hot, x.menu, x.btn]))}`);
-  const said = await sTexts('.how__s');
-  check(/puzzle piece/.test(pics[1].said) && /pin/i.test(pics[1].said) && /asks once to allow/.test(pics[2].said) && said.every((s) => s.length <= 80), `the words name the puzzle piece, the pin and Chrome's one question, in a line each: ${said.join(' | ')}`);
-  check((await setup.$eval('#next', (b) => b.textContent.trim())) === 'Got it', 'and the one button on the page just closes it');
-  await setup.screenshot({ path: join(out, '32-setup-welcome.png') });
+  await setup.waitForSelector('.splash__stage[data-stage="splash"]', { timeout: 10000 });
+  check((await sText('.splash__word')) === 'Simpl.' && (await setup.evaluate(() => getComputedStyle(document.body).backgroundColor)) === 'rgb(0, 0, 0)' && (await setup.$('.mark--splash')) !== null && (await setup.$('.card')) === null, 'the page after install opens black, on the Simpl. splash');
+  await setup.waitForTimeout(700);
+  await setup.screenshot({ path: join(out, '32-setup-splash.png') });
+  await setup.waitForSelector('.splash__stage[data-stage="pin"]', { timeout: 6000 });
+  const pinAt = Date.now();
+  await setup.waitForTimeout(1500); // the arrow draws itself
+  const pinArrow = await setup.evaluate(() => { const p = document.querySelector('.splash__stage[data-stage="pin"] .splash__line'); if (!p) return null; const r = p.getBoundingClientRect(); return { right: Math.round(r.right), top: Math.round(r.top), w: innerWidth, drawn: getComputedStyle(p).strokeDashoffset, head: !!document.querySelector('.splash__head'), btnHidden: document.querySelector('.splash__stage[data-stage="pin"] .splash__btn').hidden, stages: document.querySelectorAll('.splash__stage:not(.is-leaving)').length }; });
+  check((await sText('.splash__stage[data-stage="pin"] .splash__title')) === 'Press the puzzle piece' && /press the pin next to Simpl Courses/.test(await sText('.splash__stage[data-stage="pin"] .splash__hint')) && !!pinArrow && pinArrow.right > pinArrow.w - 80 && pinArrow.top < 60 && pinArrow.drawn === '0px' && pinArrow.head && pinArrow.btnHidden && pinArrow.stages === 1, `the splash gives way to an arrow drawn up to the puzzle piece at the top right, with what to press and the pin, and no button yet (${JSON.stringify(pinArrow)})`);
+  await setup.screenshot({ path: join(out, '32b-setup-pin.png') });
+  await setup.waitForFunction(() => !document.querySelector('.splash__stage[data-stage="pin"] .splash__btn').hidden, null, { timeout: 8000 });
+  const pinWait = Date.now() - pinAt;
+  check(pinWait >= 3200 && (await sText('.splash__stage[data-stage="pin"] .splash__btn')) === 'Continue', `Continue comes in after four seconds (${pinWait} ms)`);
+  await setup.keyboard.press('Enter');
+  await setup.waitForSelector('.splash__stage[data-stage="go"]', { timeout: 5000 });
+  await setup.waitForFunction(() => !document.querySelector('.splash__stage[data-stage="go"] .splash__btn').hidden && document.querySelectorAll('.splash__stage').length === 1, null, { timeout: 5000 });
+  check((await sText('.splash__stage[data-stage="go"] .splash__title')) === 'Open your Canvas' && /Go to your school’s Canvas page and press the Simpl Courses button\. Setup runs there\./.test((await sText('.splash__stage[data-stage="go"] .splash__hint')).replace(/'/g, '’')) && (await sText('.splash__stage[data-stage="go"] .splash__btn')) === 'Got it', 'Enter continues: then where to go — open your Canvas and press the Simpl Courses button — with Got it');
+  await setup.screenshot({ path: join(out, '32c-setup-go.png') });
+  check((await sw.evaluate(async () => (await self.BCV.api.storage.local.get('setup:offered'))['setup:offered'])) === true, 'and the page marks itself offered, so it does not open again');
   await setup.close().catch(() => {});
 
   // ---- the account panel ----------------------------------------------------------------------------------
@@ -2666,7 +2668,7 @@ try {
   const focusStored = async () => (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('tools:focus'))['tools:focus']));
   const scaleInfo = () => page.$eval('.bcv-pomo__scale', (e) => ({ ticks: e.querySelectorAll('.bcv-pomo__tick').length, labels: [...e.querySelectorAll('.bcv-pomo__label')].map((x) => x.textContent).join(','), marker: e.querySelector('.bcv-pomo__marker').style.left, set: e.classList.contains('is-set') }));
   const sc0 = await scaleInfo();
-  check((await texts('.bcv-pomo__time'))[0] === '25:00' && (await raw('.bcv-pomo__phasepill'))[0] === 'Focus' && (await texts('.bcv-pomo__main'))[0] === 'Start Timer' && (await page.$eval('.bcv-pomo__cancel', (e) => e.hidden)) && (await toolSub()) === '0 sessions today' && (await raw('.bcv-pomo__dotslabel'))[0] === 'Session 1 of 4' && sc0.ticks === 31 && sc0.labels === '0,10,20,30,40,50,60' && /^41\.6/.test(sc0.marker) && sc0.set && (await page.$eval('.bcv-pomo__card', (e) => getComputedStyle(e).backgroundColor)) === 'rgb(0, 0, 0)' && (await page.$$('.bcv-pomo__phasebtn')).length === 3 && (await page.$('#bcv-live .bcv-live__item')) === null, `the timer opens idle at 25:00 on the phone's timer card, black: a scale of the hour with the marker under 25, Start Timer, Session 1 of 4, nothing in the tray yet (${JSON.stringify(sc0)})`);
+  check((await texts('.bcv-pomo__time'))[0] === '25:00' && (await raw('.bcv-pomo__phasepill'))[0] === 'Focus' && (await texts('.bcv-pomo__main'))[0] === 'Start Timer' && (await page.$eval('.bcv-pomo__cancel', (e) => e.hidden)) && (await toolSub()) === '0 sessions today' && (await raw('.bcv-pomo__dotslabel'))[0] === 'Session 1 of 4' && sc0.ticks === 31 && sc0.labels === '0,10,20,30,40,50,60' && /^41\.6/.test(sc0.marker) && sc0.set && (await page.$eval('.bcv-pomo__card', (e) => getComputedStyle(e).backgroundColor)) === 'rgb(0, 0, 0)' && (await page.$$('.bcv-pomo__phasebtn')).length === 3 && (await page.$('#bcv-pins .bcv-island')) === null, `the timer opens idle at 25:00 on the phone's timer card, black: a scale of the hour with the marker under 25, Start Timer, Session 1 of 4, nothing in the tray yet (${JSON.stringify(sc0)})`);
   // the minutes: a press on the scale, a drag along it, the arrow keys
   // (the scale's box is read once the popup has finished rising in: mid-rise it is scaled, and a point along it lands elsewhere)
   const stableBox = async (sel) => { let last = null; for (let i = 0; i < 30; i++) { const b = await (await page.$(sel)).boundingBox(); if (last && Math.abs(b.x - last.x) < 0.5 && Math.abs(b.width - last.width) < 0.5) return b; last = b; await page.waitForTimeout(120); } return last; };
@@ -2691,44 +2693,44 @@ try {
   await page.click('.bcv-pomo__phasebtn[data-value="focus"]');
   await eventually(async () => (await texts('.bcv-pomo__time'))[0] === '25:00', 3000);
   await page.click('.bcv-pomo__main');
-  await eventually(async () => (await texts('.bcv-pomo__main'))[0] === 'Pause' && (await page.$('#bcv-live .bcv-live__item')) !== null, 4000);
+  await eventually(async () => (await texts('.bcv-pomo__main'))[0] === 'Pause' && (await page.$('#bcv-pins .bcv-island.is-live')) !== null, 4000);
   const focusRec = await focusStored();
-  check((await texts('.bcv-pomo__main'))[0] === 'Pause' && !(await page.$eval('.bcv-pomo__cancel', (e) => e.hidden)) && !!focusRec && focusRec.endAt > Date.now() + 24 * 60 * 1000 && focusRec.phase === 'focus' && (await page.$eval('.bcv-pomo', (e) => e.classList.contains('is-running'))) && /^Ends \d/.test((await raw('.bcv-pomo__ends'))[0]) && !(await scaleInfo()).set && (await page.$('#bcv-live .bcv-island .bcv-island__hand')) !== null, `Start Timer writes the session's end time, not a count, says when it ends, turns the button to Pause with Cancel beside it, and a live activity appears in the tray (${JSON.stringify(focusRec)})`);
+  check((await texts('.bcv-pomo__main'))[0] === 'Pause' && !(await page.$eval('.bcv-pomo__cancel', (e) => e.hidden)) && !!focusRec && focusRec.endAt > Date.now() + 24 * 60 * 1000 && focusRec.phase === 'focus' && (await page.$eval('.bcv-pomo', (e) => e.classList.contains('is-running'))) && /^Ends \d/.test((await raw('.bcv-pomo__ends'))[0]) && !(await scaleInfo()).set && (await page.$('#bcv-pins .bcv-island .bcv-island__hand')) !== null, `Start Timer writes the session's end time, not a count, says when it ends, turns the button to Pause with Cancel beside it, and a live activity appears in the tray (${JSON.stringify(focusRec)})`);
   await shot(page, '38-tools-timer');
   await closeTool();
-  const disc = await page.$eval('#bcv-live .bcv-island', (e) => { const r = e.getBoundingClientRect(); const l = document.getElementById('bcv-look').getBoundingClientRect(); return { w: Math.round(r.width), h: Math.round(r.height), inTray: !!e.closest('#bcv-tray'), leftOfSwitch: r.right < l.left, sameRow: Math.abs(r.top - l.top) < 4, open: e.classList.contains('is-open'), hand: e.querySelector('.bcv-island__hand').style.transform, bg: getComputedStyle(e).backgroundColor }; });
-  check(disc.w === 24 && disc.h === 24 && disc.inTray && disc.leftOfSwitch && disc.sameRow && !disc.open && /^rotate\(3[5-9]\d/.test(disc.hand) && disc.bg === 'rgb(0, 0, 0)', `folded, it is a small black disc in the tray beside the switch, the dial's hand near the top with nearly all of the session left (${JSON.stringify(disc)})`);
-  await page.click('#bcv-live .bcv-island');
-  await eventually(async () => (await page.$eval('#bcv-live .bcv-island', (e) => e.classList.contains('is-open') && Math.round(e.getBoundingClientRect().width) === 250 && Math.round(e.getBoundingClientRect().height) === 78)), 3000);
-  const island = await page.$eval('#bcv-live .bcv-island', (e) => { const r = e.getBoundingClientRect(); return { w: Math.round(r.width), h: Math.round(r.height), time: e.querySelector('.bcv-island__time').textContent, label: e.querySelector('.bcv-island__label').textContent, main: e.querySelector('.bcv-island__main').getAttribute('aria-label'), cancel: e.querySelector('.bcv-island__cancel').getAttribute('aria-label'), sw: e.querySelector('.bcv-island__switch').textContent, swHidden: e.querySelector('.bcv-island__switch').hidden, color: getComputedStyle(e.querySelector('.bcv-island__time')).color, expanded: e.getAttribute('aria-expanded') }; });
+  const disc = await page.$eval('#bcv-pins .bcv-island', (e) => { const r = e.getBoundingClientRect(); const l = document.getElementById('bcv-look').getBoundingClientRect(); return { w: Math.round(r.width), h: Math.round(r.height), pins: e.parentElement.querySelectorAll('.bcv-pin').length, guest: e.classList.contains('is-guest'), leftOfSwitch: r.right < l.left, sameRow: Math.abs(r.top - l.top) < 4, open: e.classList.contains('is-open'), hand: e.querySelector('.bcv-island__hand').style.transform, bg: getComputedStyle(e.querySelector('.bcv-island__face')).backgroundColor, glyph: getComputedStyle(e.querySelector('.bcv-island__glyph')).opacity, ic: getComputedStyle(e.querySelector('.bcv-pin__ic')).opacity, x: getComputedStyle(e.querySelector('.bcv-pin__x')).display }; });
+  check(disc.w === 24 && disc.h === 24 && disc.pins === 1 && disc.guest && disc.leftOfSwitch && disc.sameRow && !disc.open && /^rotate\(3[5-9]\d/.test(disc.hand) && disc.bg === 'rgb(0, 0, 0)' && disc.glyph === '1' && disc.ic === '0' && disc.x === 'none', `the timer is not pinned, so it borrows a pin: one small black disc in the tray beside the switch, the dial's hand near the top with nearly all of the session left, no X (${JSON.stringify(disc)})`);
+  await page.click('#bcv-pins .bcv-island');
+  await eventually(async () => (await page.$eval('#bcv-pins .bcv-island', (e) => e.classList.contains('is-open') && Math.round(e.getBoundingClientRect().width) === 250 && Math.round(e.getBoundingClientRect().height) === 78)), 3000);
+  const island = await page.$eval('#bcv-pins .bcv-island', (e) => { const r = e.getBoundingClientRect(); return { w: Math.round(r.width), h: Math.round(r.height), time: e.querySelector('.bcv-island__time').textContent, label: e.querySelector('.bcv-island__label').textContent, main: e.querySelector('.bcv-island__main').getAttribute('aria-label'), cancel: e.querySelector('.bcv-island__cancel').getAttribute('aria-label'), sw: e.querySelector('.bcv-island__switch').textContent, swHidden: e.querySelector('.bcv-island__switch').hidden, color: getComputedStyle(e.querySelector('.bcv-island__time')).color, expanded: e.getAttribute('aria-expanded') }; });
   check(island.w === 250 && island.h === 78 && /^2[45]:\d\d$/.test(island.time) && island.label === 'Focus' && island.main === 'Pause' && island.cancel === 'End' && island.sw === 'Break' && !island.swHidden && island.color === 'rgb(255, 149, 0)' && island.expanded === 'true', `a press swells it into the island: End and Pause, the phase with Break beside it, the count large in orange (${JSON.stringify(island)})`);
   await shot(page, '38b-tools-island');
   await page.goto(`${BASE}/courses`);
-  check(await eventually(async () => (await page.$eval('#bcv-live .bcv-island', (e) => !e.classList.contains('is-open') && /^2[2-4]:\d\d$/.test(e.querySelector('.bcv-island__time').textContent)).catch(() => false)), 5000), 'the session survives a page change: the live activity is in the next page\'s tray, folded, still counting');
+  check(await eventually(async () => (await page.$eval('#bcv-pins .bcv-island', (e) => !e.classList.contains('is-open') && /^2[2-4]:\d\d$/.test(e.querySelector('.bcv-island__time').textContent)).catch(() => false)), 5000), 'the session survives a page change: the live activity is in the next page\'s tray, folded, still counting');
   await inPage('stale');
   await page.keyboard.press('Shift');
   await page.waitForTimeout(500);
   check((await page.$('#bcv-away')) === null && (await inPage('focusActive')) === true && page.url() === `${BASE}/courses`, 'a stale page is not reloaded out from under a session: no Away Refresh pill');
-  await page.click('#bcv-live .bcv-island');
-  await eventually(async () => (await page.$eval('#bcv-live .bcv-island', (e) => e.classList.contains('is-open'))), 3000);
-  await page.click('#bcv-live .bcv-island__switch');
-  await eventually(async () => (await raw('#bcv-live .bcv-island__label'))[0] === 'Break', 3000);
+  await page.click('#bcv-pins .bcv-island');
+  await eventually(async () => (await page.$eval('#bcv-pins .bcv-island', (e) => e.classList.contains('is-open'))), 3000);
+  await page.click('#bcv-pins .bcv-island__switch');
+  await eventually(async () => (await raw('#bcv-pins .bcv-island__label'))[0] === 'Break', 3000);
   const afterBreak = await focusStored();
-  check(afterBreak.phase === 'short' && afterBreak.endAt > Date.now() + 4 * 60 * 1000 && /^[45]:\d\d$/.test((await raw('#bcv-live .bcv-island__time'))[0]) && (await page.$eval('#bcv-live .bcv-island__switch', (e) => e.textContent)) === 'Focus' && (await page.$eval('#bcv-live .bcv-island', (e) => getComputedStyle(e).getPropertyValue('--bcv-live-color').trim())) === '#34c759', 'Break on the island switches to a short break at once, in green, the button now Focus');
-  await page.click('#bcv-live .bcv-island__main');
-  await eventually(async () => (await page.$eval('#bcv-live .bcv-island__main', (e) => e.getAttribute('aria-label'))) === 'Resume', 3000);
-  check((await page.$eval('#bcv-live .bcv-island', (e) => e.classList.contains('is-paused'))) && (await raw('#bcv-live .bcv-island__label'))[0] === 'Paused' && (await page.$eval('#bcv-live .bcv-island__switch', (e) => e.hidden)) && (await inPage('focusActive')) === false, 'Pause on the island holds the count and takes the switch away');
+  check(afterBreak.phase === 'short' && afterBreak.endAt > Date.now() + 4 * 60 * 1000 && /^[45]:\d\d$/.test((await raw('#bcv-pins .bcv-island__time'))[0]) && (await page.$eval('#bcv-pins .bcv-island__switch', (e) => e.textContent)) === 'Focus' && (await page.$eval('#bcv-pins .bcv-island', (e) => getComputedStyle(e).getPropertyValue('--bcv-live-color').trim())) === '#34c759', 'Break on the island switches to a short break at once, in green, the button now Focus');
+  await page.click('#bcv-pins .bcv-island__main');
+  await eventually(async () => (await page.$eval('#bcv-pins .bcv-island__main', (e) => e.getAttribute('aria-label'))) === 'Resume', 3000);
+  check((await page.$eval('#bcv-pins .bcv-island', (e) => e.classList.contains('is-paused'))) && (await raw('#bcv-pins .bcv-island__label'))[0] === 'Paused' && (await page.$eval('#bcv-pins .bcv-island__switch', (e) => e.hidden)) && (await inPage('focusActive')) === false, 'Pause on the island holds the count and takes the switch away');
   await page.click('h1');
-  check(await eventually(async () => (await page.$eval('#bcv-live .bcv-island', (e) => !e.classList.contains('is-open') && Math.round(e.getBoundingClientRect().width) === 24)), 3000), 'a press anywhere else folds it back to the disc');
-  await page.click('#bcv-live .bcv-island');
-  await eventually(async () => (await page.$eval('#bcv-live .bcv-island', (e) => e.classList.contains('is-open'))), 3000);
-  await page.click('#bcv-live .bcv-island__time');
+  check(await eventually(async () => (await page.$eval('#bcv-pins .bcv-island', (e) => !e.classList.contains('is-open') && Math.round(e.getBoundingClientRect().width) === 24)), 3000), 'a press anywhere else folds it back to the disc');
+  await page.click('#bcv-pins .bcv-island');
+  await eventually(async () => (await page.$eval('#bcv-pins .bcv-island', (e) => e.classList.contains('is-open'))), 3000);
+  await page.click('#bcv-pins .bcv-island__time');
   await page.waitForSelector('.bcv-tool[data-tool="pomo"]', { timeout: 5000 });
   check((await texts('.bcv-pomo__main'))[0] === 'Resume' && (await raw('.bcv-pomo__ends'))[0] === 'Paused' && (await page.$eval('.bcv-pomo', (e) => e.classList.contains('is-paused'))), 'a press on the island\'s count opens the timer, paused where it was');
   await page.click('.bcv-pomo__cancel');
   await eventually(async () => (await texts('.bcv-pomo__main'))[0] === 'Start Timer', 3000);
   await closeTool();
-  check(await eventually(async () => (await page.$('#bcv-live .bcv-live__item')) === null && (await page.$eval('#bcv-live', (e) => e.hidden)), 3000) && (await inPage('focusActive')) === false, 'Cancel ends the session: the live activity goes from the tray');
+  check(await eventually(async () => (await page.$('#bcv-pins .bcv-island')) === null && (await page.$eval('#bcv-pins', (e) => e.hidden)), 3000) && (await inPage('focusActive')) === false, 'Cancel ends the session: the borrowed pin goes from the tray');
   // the graphing calculator: Desmos in a frame, the way out beside it
   await page.goto(`${BASE}/#tools`);
   await openTool('graph');
@@ -2814,6 +2816,7 @@ try {
   await page.mouse.up();
   await page.waitForSelector('#bcv-pins .bcv-pin[data-tool="pomo"]', { timeout: 5000 });
   await page.waitForFunction(() => !document.querySelector('.bcv-tool-card--ghost'), null, { timeout: 3000 }); // the ghost flies into the pin's spot, then goes
+  await page.waitForFunction(() => { const p = document.querySelector('#bcv-pins .bcv-pin'); return !!p && p.getAnimations({ subtree: true }).every((a) => a.playState === 'finished'); }, null, { timeout: 3000 }); // (and the pin has finished popping in)
   const pinBox = await page.$eval('#bcv-pins .bcv-pin', (e) => { const r = e.getBoundingClientRect(); const l = document.getElementById('bcv-look').getBoundingClientRect(); return { top: Math.round(r.top), gap: Math.round(l.left - r.right), h: Math.round(r.height) }; });
   const pinsStored = await sw.evaluate(async () => (await self.BCV.api.storage.local.get('tools:pins'))['tools:pins']);
   check(pinBox.top === 6 && pinBox.gap === 8 && pinBox.h === 24 && JSON.stringify(pinsStored) === '["pomo"]' && (await page.$eval('.bcv-tool-card[data-tool="pomo"]', (e) => e.classList.contains('is-pinned'))) && (await page.$('.bcv-tool-ov')) === null && (await page.$('.bcv-tool-card--ghost.is-over')) === null, `letting go pins it: a small button beside the switch, the card marked, nothing opened (${JSON.stringify(pinBox)})`);
@@ -2825,11 +2828,34 @@ try {
   await page.waitForSelector('.bcv-tool[data-tool="pomo"]', { timeout: 5000 });
   check(page.url() === `${BASE}/calendar` && (await texts('.bcv-tool__title'))[0] === 'Focus timer', 'the pin is on every page, and opens its tool there');
   await closeTool();
+  // the pin is the timer's live activity: a session started shows in the same button, never a second one
+  await page.evaluate(() => { document.querySelector('#bcv-pins .bcv-pin[data-tool="pomo"]').dataset.mark = 'same'; });
+  await page.click('#bcv-pins .bcv-pin__btn');
+  await page.waitForSelector('.bcv-tool[data-tool="pomo"]', { timeout: 5000 });
+  await page.click('.bcv-pomo__main');
+  await eventually(async () => (await texts('.bcv-pomo__main'))[0] === 'Pause', 4000);
+  await closeTool();
+  const pinState = () => page.$eval('#bcv-pins', (bar) => { const pins = [...bar.querySelectorAll(':scope > .bcv-pin')]; const p = pins[0]; return { count: pins.length, mark: p?.dataset.mark, live: p?.classList.contains('is-live'), guest: p?.classList.contains('is-guest'), open: p?.classList.contains('is-open'), w: p ? Math.round(p.getBoundingClientRect().width) : 0, glyph: p ? getComputedStyle(p.querySelector('.bcv-island__glyph')).opacity : null, ic: p ? getComputedStyle(p.querySelector('.bcv-pin__ic')).opacity : null, hidden: bar.hidden }; });
+  let same = null;
+  await eventually(async () => { const r = await pinState(); same = r; return r.count === 1 && r.live && r.glyph === '1' && r.ic === '0'; }, 3000);
+  check(!!same && same.count === 1 && same.live && same.glyph === '1' && same.ic === '0' && same.mark === 'same' && !same.guest, `a session started from the pin shows in that same button, its glyph giving way to the dial: one pin, not two (${JSON.stringify(same)})`);
+  await page.click('#bcv-pins .bcv-pin__btn');
+  await eventually(async () => { const r = await pinState(); return r.open && r.w === 250; }, 3000);
+  check((await page.$eval('#bcv-pins .bcv-island', (e) => e.dataset.mark === 'same' && /^\d+:\d\d$/.test(e.querySelector('.bcv-island__time').textContent))), 'and that same pin swells into the island');
+  await shot(page, '41c-tools-pin-island');
+  await page.keyboard.press('Escape');
+  await eventually(async () => { const r = await pinState(); return !r.open && r.w === 24; }, 3000);
   await page.hover('#bcv-pins .bcv-pin');
   check(await eventually(() => page.$eval('#bcv-pins .bcv-pin__x', (e) => getComputedStyle(e).opacity === '1').catch(() => false), 2000), 'the pointer over a pin shows its X');
   await page.click('#bcv-pins .bcv-pin__x');
+  let unpinned = null;
+  await eventually(async () => { const r = await pinState(); unpinned = r; return r.guest; }, 3000);
+  check(!!unpinned && unpinned.count === 1 && unpinned.mark === 'same' && unpinned.live && JSON.stringify(await sw.evaluate(async () => (await self.BCV.api.storage.local.get('tools:pins'))['tools:pins'])) === '[]' && (await page.$eval('#bcv-pins .bcv-pin__x', (e) => getComputedStyle(e).display)) === 'none' && !(await page.$eval('.bcv-tool-card[data-tool="pomo"]', (e) => e.classList.contains('is-pinned')).catch(() => false)), `the X unpins it, and the session keeps that same button as a guest until it ends, with no X of its own (${JSON.stringify(unpinned)})`);
+  await page.click('#bcv-pins .bcv-pin__btn');
+  await eventually(async () => (await pinState()).open, 3000);
+  await page.click('#bcv-pins .bcv-island__cancel');
   await page.waitForFunction(() => !document.querySelector('#bcv-pins .bcv-pin'), null, { timeout: 3000 });
-  check((await page.$eval('#bcv-pins', (e) => e.hidden)) && JSON.stringify(await sw.evaluate(async () => (await self.BCV.api.storage.local.get('tools:pins'))['tools:pins'])) === '[]', 'the X takes the pin away');
+  check((await page.$eval('#bcv-pins', (e) => e.hidden)) && (await inPage('focusActive')) === false, 'End takes the borrowed pin away');
   await page.goto(`${BASE}/#tools`);
   check((await page.$('#bcv-welcome')) === null && (await page.$$('.bcv-tool-card')).length === 5 && !(await page.$eval('.bcv-tool-card[data-tool="pomo"]', (e) => e.classList.contains('is-pinned'))), 'the second time, Tools opens without the black, and the card is no longer marked');
 

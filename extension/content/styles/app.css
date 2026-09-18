@@ -2276,31 +2276,39 @@ html.bcv-dragpin #bcv-tray { opacity: 0; }
 #bcv-tray { position: fixed; top: 6px; right: 69px; z-index: 2147481999; display: flex; align-items: flex-start; gap: 8px; margin: 0; padding: 0; transition: opacity .18s ease; }
 #bcv-look:hover ~ #bcv-tray, #bcv-look:has(:focus-visible) ~ #bcv-tray { opacity: 0; pointer-events: none; }
 html.bcv-phone.bcv-on #bcv-tray, html.bcv-setup-open #bcv-tray, html.bcv-touring #bcv-tray, html.bcv-welcome #bcv-tray, html:not(.bcv-on) #bcv-tray { display: none; }
-#bcv-pins { display: flex; align-items: center; gap: 6px; }
-#bcv-pins[hidden], #bcv-live[hidden] { display: none !important; }
-/* the live activity in the tray: a running timer folded to a black disc with the dial's hand
- * sweeping round (the ring is what is left); pressed, it swells into the island — End and Pause as
- * round buttons, the phase, the count large in the phase's colour — and folds again by itself. */
-#bcv-live { display: flex; align-items: flex-start; margin: 0; padding: 0; }
-#bcv-live[hidden] { display: none !important; }
-.bcv-island { --bcv-live-color: #ff9500; position: relative; box-sizing: border-box; width: 24px; height: 24px; border: 1px solid rgba(255,255,255,.14); border-radius: 12px; background: #000; color: #fff; overflow: hidden; cursor: pointer; box-shadow: 0 2px 10px rgba(0,0,0,.25); font-family: var(--bcv-font); animation: bcv-live-in .5s cubic-bezier(.2,1.1,.3,1) both; transition: width .5s cubic-bezier(.32,.72,0,1), height .5s cubic-bezier(.32,.72,0,1), border-radius .5s cubic-bezier(.32,.72,0,1), box-shadow .3s ease; }
-.bcv-island:hover { box-shadow: 0 4px 14px rgba(0,0,0,.35); }
-.bcv-island:focus-visible { outline: 2px solid #0a84ff; outline-offset: 2px; }
-.bcv-island.is-out { animation: bcv-live-out .3s ease both; }
-.bcv-island.is-open { width: 250px; height: 78px; border-radius: 26px; box-shadow: 0 14px 36px rgba(0,0,0,.45); cursor: default; }
-.bcv-island__fold { position: absolute; top: -1px; left: -1px; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; transition: opacity .2s ease, transform .4s cubic-bezier(.32,.72,0,1); }
-.bcv-island.is-open .bcv-island__fold { opacity: 0; transform: scale(.6); pointer-events: none; }
-.bcv-island__glyph { width: 16px; height: 16px; overflow: visible; }
+#bcv-pins { display: flex; align-items: flex-start; gap: 6px; }
+#bcv-pins[hidden] { display: none !important; }
+/* the timer's pin as its live activity: while a session is going the pin's glyph gives way to the
+ * dial's hand sweeping round (the ring is what is left); pressed, the pin swells into the island —
+ * End and Pause as round buttons, the phase, the count large in the phase's colour — and folds
+ * again by itself. The same one button throughout: a timer that is not pinned borrows one. */
+.bcv-pin.bcv-island { --bcv-live-color: #ff9500; transition: width .5s cubic-bezier(.32,.72,0,1), height .5s cubic-bezier(.32,.72,0,1); }
+.bcv-pin.bcv-island.is-open { width: 250px; height: 78px; }
+.bcv-island__face { position: absolute; inset: 0; box-sizing: border-box; border: 1px solid rgba(255,255,255,.14); border-radius: 12px; background: rgba(28,28,30,.86); -webkit-backdrop-filter: blur(16px) saturate(1.4); backdrop-filter: blur(16px) saturate(1.4); box-shadow: 0 2px 10px rgba(0,0,0,.2); overflow: hidden; color: #fff; font-family: var(--bcv-font); transition: border-radius .5s cubic-bezier(.32,.72,0,1), background .3s ease, box-shadow .3s ease; }
+.bcv-island.is-live .bcv-island__face { background: #000; }
+.bcv-island.is-open .bcv-island__face { border-radius: 26px; box-shadow: 0 14px 36px rgba(0,0,0,.45); }
+.bcv-island .bcv-pin__btn { position: absolute; top: -1px; left: -1px; border-color: transparent; background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; box-shadow: none; transition: transform .16s cubic-bezier(.34,1.3,.42,1), opacity .2s ease; }
+.bcv-island .bcv-pin__btn:hover { box-shadow: none; }
+.bcv-island.is-open .bcv-pin__btn { opacity: 0; transform: scale(.6); pointer-events: none; }
+.bcv-island.is-open .bcv-pin__x, .bcv-island.is-folding .bcv-pin__x, .bcv-island.is-guest .bcv-pin__x { display: none; }
+.bcv-pin__ic { display: flex; }
+.bcv-island .bcv-pin__ic, .bcv-island__glyph { position: absolute; top: 50%; left: 50%; transition: opacity .3s ease, transform .4s cubic-bezier(.34,1.3,.42,1); }
+.bcv-island .bcv-pin__ic { width: 13px; height: 13px; margin: -6.5px 0 0 -6.5px; }
+.bcv-island__glyph { width: 16px; height: 16px; margin: -8px 0 0 -8px; overflow: visible; opacity: 0; transform: scale(.4) rotate(-90deg); }
+.bcv-island.is-live .bcv-pin__ic { opacity: 0; transform: scale(.4) rotate(90deg); }
+.bcv-island.is-live .bcv-island__glyph { opacity: 1; transform: none; }
 .bcv-island__ring { fill: none; stroke: var(--bcv-live-color); stroke-opacity: .3; stroke-width: 2; }
 .bcv-island__arc { fill: none; stroke: var(--bcv-live-color); stroke-width: 2; stroke-linecap: round; transform: rotate(-90deg); transform-origin: 10px 10px; transition: stroke-dashoffset 1s linear; }
 .bcv-island__hand { stroke: var(--bcv-live-color); stroke-width: 2; stroke-linecap: round; transform-origin: 10px 10px; transition: transform 1s linear; }
 .bcv-island.is-paused .bcv-island__glyph { animation: bcv-live-blink 1.6s ease-in-out infinite; }
+.bcv-pin.is-out { animation: bcv-live-out .3s ease both; pointer-events: none; }
 .bcv-island__body { position: absolute; inset: 0; display: flex; align-items: center; gap: 12px; padding: 0 20px 0 18px; opacity: 0; transform: scale(.92); transform-origin: 90% 20%; transition: opacity .16s ease, transform .16s ease; pointer-events: none; }
 .bcv-island.is-open .bcv-island__body { opacity: 1; transform: none; pointer-events: auto; transition: opacity .28s ease .14s, transform .45s cubic-bezier(.32,.72,0,1) .1s; }
 .bcv-island__btns { display: flex; gap: 8px; flex: none; }
 .bcv-island__btn { width: 40px; height: 40px; margin: 0; padding: 0; border: 0; border-radius: 20px; background: rgba(255,255,255,.14); color: rgba(255,255,255,.85); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: transform .16s cubic-bezier(.34,1.3,.42,1), background .2s ease; }
 .bcv-island__btn:hover { background: rgba(255,255,255,.22); }
 .bcv-island__btn:active { transform: scale(.92); }
+.bcv-island__btn:focus-visible { outline: 2px solid #0a84ff; outline-offset: 2px; }
 .bcv-island__main { background: color-mix(in srgb, var(--bcv-live-color) 28%, transparent); color: var(--bcv-live-color); }
 .bcv-island__main:hover { background: color-mix(in srgb, var(--bcv-live-color) 40%, transparent); }
 .bcv-island__right { margin-left: auto; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; min-width: 0; cursor: pointer; }
@@ -2310,7 +2318,6 @@ html.bcv-phone.bcv-on #bcv-tray, html.bcv-setup-open #bcv-tray, html.bcv-touring
 .bcv-island__switch:hover { background: rgba(255,255,255,.2); }
 .bcv-island__switch[hidden] { display: none; }
 .bcv-island__time { font: 300 34px/1 var(--bcv-display); font-variant-numeric: tabular-nums; letter-spacing: -.02em; color: var(--bcv-live-color); white-space: nowrap; }
-@keyframes bcv-live-in { from { transform: scale(.4); opacity: 0; } to { transform: none; opacity: 1; } }
 @keyframes bcv-live-out { to { transform: scale(.4); opacity: 0; } }
 @keyframes bcv-live-blink { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
 .bcv-pin { position: relative; display: block; width: 24px; height: 24px; }
@@ -2610,9 +2617,9 @@ html[data-bcv-theme="dark"] .bcv-conv__delta.is-more, html[data-bcv-theme="dark"
 @keyframes bcv-pop { from { transform: scale(.6); opacity: 0; } to { transform: none; opacity: 1; } }
 @keyframes bcv-flash { from { background: var(--bcv-blue-soft); } to { background: var(--bcv-fill2); } }
 @media (prefers-reduced-motion: reduce) {
-  .bcv-tool-card, .bcv-tool-card__tile, .bcv-tool-card__chev, .bcv-pomo__ind, .bcv-pomo__arc, .bcv-pomo__cap, .bcv-fc__flipper, .bcv-pomo__marker, .bcv-pomo__tick, .bcv-pomo__label, .bcv-island, .bcv-island__fold, .bcv-island__body, .bcv-island__arc, .bcv-island__hand { transition: none; }
+  .bcv-tool-card, .bcv-tool-card__tile, .bcv-tool-card__chev, .bcv-pomo__ind, .bcv-pomo__arc, .bcv-pomo__cap, .bcv-fc__flipper, .bcv-pomo__marker, .bcv-pomo__tick, .bcv-pomo__label, .bcv-pin.bcv-island, .bcv-island__face, .bcv-island .bcv-pin__btn, .bcv-island .bcv-pin__ic, .bcv-island__glyph, .bcv-island__body, .bcv-island__arc, .bcv-island__hand { transition: none; }
   .bcv-tool-card:hover { transform: none; }
-  .bcv-pin.is-new, .bcv-conv__drop.is-drag, .bcv-conv__run.is-busy, .bcv-conv__delta, .bcv-conv__outlabel, .bcv-cite__preview.is-fresh, .bcv-fc__fb, .bcv-island, .bcv-island.is-out, .bcv-island.is-paused .bcv-island__glyph, .bcv-pomo.is-paused .bcv-pomo__marker, .bcv-tool-ov.is-closing, .bcv-tool-ov.is-closing .bcv-sheet { animation: none; }
+  .bcv-pin.is-new, .bcv-conv__drop.is-drag, .bcv-conv__run.is-busy, .bcv-conv__delta, .bcv-conv__outlabel, .bcv-cite__preview.is-fresh, .bcv-fc__fb, .bcv-pin.is-out, .bcv-island.is-paused .bcv-island__glyph, .bcv-pomo.is-paused .bcv-pomo__marker, .bcv-tool-ov.is-closing, .bcv-tool-ov.is-closing .bcv-sheet { animation: none; }
 }
 
 /* the welcome's Dashboard stage: three counters at the top, the middle one pressed, the sheet behind

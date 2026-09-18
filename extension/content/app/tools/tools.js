@@ -265,23 +265,23 @@
   } catch { /* no change events (the app): the next load reads it */ }
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && focusRead) focusLoad().then(paintAll).catch(() => {}); });
 
-  // ---- the top right: the pins beside the look switch, and the live activity among them ---------
-  // The look switch stands alone (content/app/app.js mounts it); the tray sits to its left and
-  // hides while the switch is open under the pointer (it grows leftwards). A running timer is a
-  // live activity in that tray, carried the way the phone's island carries one: folded, a small
-  // black disc with the dial's hand sweeping round (the ring is what is left); pressed, it swells
-  // into the island — End and Pause as round buttons, the phase, the count large in its colour —
-  // and folds again on its own. A press on the count opens the timer. All of it goes with the
-  // switch: the phone layout, the setup, the tour, the welcome, stock Canvas.
+  // ---- the top right: the pins beside the look switch, and the timer's pin as its live activity --
+  // The look switch stands alone (content/app/app.js mounts it); the tray with the pins sits to its
+  // left and hides while the switch is open under the pointer (it grows leftwards). A running
+  // timer shows in its own pin — the one button, carried the way the phone's island carries a live
+  // activity: the pin's glyph gives way to the dial's hand sweeping round (the ring is what is
+  // left); pressed, the pin swells into the island — End and Pause as round buttons, the phase,
+  // the count large in its colour — and folds again on its own. A press on the count opens the
+  // timer. A timer that is not pinned borrows a pin for as long as it runs. All of it goes with
+  // the switch: the phone layout, the setup, the tour, the welcome, stock Canvas.
   function mountTray() {
     if (self.BCVBridge?.native) return null;
     let tray = document.getElementById('bcv-tray');
     if (!tray) {
-      tray = h('div', { id: 'bcv-tray', class: 'bcv-tray' }, [
-        h('div', { id: 'bcv-live', class: 'bcv-live', hidden: true, role: 'status', 'aria-live': 'off' }),
-        h('div', { id: 'bcv-pins', class: 'bcv-pins', hidden: true, role: 'toolbar', 'aria-label': 'Pinned tools' }),
-      ]);
+      const bar = h('div', { id: 'bcv-pins', class: 'bcv-pins', hidden: true, role: 'toolbar', 'aria-label': 'Pinned tools' });
+      tray = h('div', { id: 'bcv-tray', class: 'bcv-tray' }, bar);
       document.body.append(tray);
+      setTimeout(() => { bar.dataset.settled = '1'; }, 1200); // (what lands after this pops in; what the page loads with does not)
       pinsLoad().then(paintPins).catch(() => {});
       try { api.storage.onChanged?.addListener((changes, area) => { if ((!area || area === 'local') && changes[PINS_KEY]) pinsLoad().then(paintPins).catch(() => {}); }); } catch { /* no change events */ }
       watch(paintLive);
@@ -290,97 +290,94 @@
     return tray;
   }
   const GLYPH_C = 2 * Math.PI * 7.5;
+  /** Whether the timer has a session to show: going, or paused part way. */
+  const focusOn = (f = focus) => running(f) || (f.left !== null && f.left !== undefined);
   let islandTimer = 0;
   let islandPhase = null; // the phase the island last showed: a new one opens it for a moment
+  const livePin = () => document.querySelector('#bcv-pins > .bcv-pin[data-tool="pomo"]:not(.is-out)');
   function paintLive(f) {
-    const live = document.getElementById('bcv-live');
-    if (!live) return;
-    const paused = f.left !== null && f.left !== undefined; // (a stored time left: paused, even at the full length a second in)
-    const on = running(f) || paused;
-    let item = live.querySelector('.bcv-live__item[data-live="pomo"]');
+    const bar = document.getElementById('bcv-pins');
+    if (!bar) return;
+    const on = focusOn(f);
+    let item = livePin();
+    // a session that began needs the pin (borrowed if the timer is not pinned); one that ended returns a borrowed one
+    if ((on && !item) || (!on && item && item.classList.contains('is-guest'))) { paintPins(); item = livePin(); }
+    if (!item) return;
+    const btn = item.querySelector('.bcv-pin__btn');
     if (!on) {
       islandPhase = null;
-      if (item) { islandClose(item); item.classList.add('is-out'); setTimeout(() => { item.remove(); live.hidden = !live.querySelector('.bcv-live__item'); }, 320); }
+      islandClose(item);
+      item.classList.remove('is-live', 'is-paused');
+      btn.title = 'Focus timer';
+      btn.setAttribute('aria-label', 'Focus timer');
       return;
     }
-    live.hidden = false;
-    if (!item) {
-      item = buildIsland();
-      live.append(item);
-      islandPhase = f.phase;
-    }
-    item.classList.remove('is-out');
+    if (!item.classList.contains('is-live')) { item.classList.add('is-live'); islandPhase = f.phase; }
+    const paused = !running(f);
     const len = phaseLen(f), left = remaining(f);
     const frac = len > 0 ? Math.max(0, Math.min(1, left / len)) : 0;
     item.style.setProperty('--bcv-live-color', PHASE_COLOR[f.phase]);
-    item.classList.toggle('is-paused', paused && !running(f));
+    item.classList.toggle('is-paused', paused);
     item.querySelector('.bcv-island__arc').style.strokeDashoffset = `${GLYPH_C * (1 - frac)}`;
     item.querySelector('.bcv-island__hand').style.transform = `rotate(${frac * 360}deg)`;
     item.querySelector('.bcv-island__time').textContent = mmss(left);
-    item.querySelector('.bcv-island__label').textContent = running(f) ? ({ focus: 'Focus', short: 'Break', long: 'Long break' })[f.phase] : 'Paused';
+    item.querySelector('.bcv-island__label').textContent = paused ? 'Paused' : ({ focus: 'Focus', short: 'Break', long: 'Long break' })[f.phase];
     const main = item.querySelector('.bcv-island__main');
-    main.replaceChildren(U.svg(running(f) ? IC.pause : IC.play, { size: 18, stroke: 'currentColor', width: 2.4 }));
-    main.setAttribute('aria-label', running(f) ? 'Pause' : 'Resume');
-    main.title = running(f) ? 'Pause' : 'Resume';
+    main.replaceChildren(U.svg(paused ? IC.play : IC.pause, { size: 18, stroke: 'currentColor', width: 2.4 }));
+    main.setAttribute('aria-label', paused ? 'Resume' : 'Pause');
+    main.title = paused ? 'Resume' : 'Pause';
     const sw = item.querySelector('.bcv-island__switch');
-    sw.hidden = !running(f);
+    sw.hidden = paused;
     sw.textContent = f.phase === 'focus' ? 'Break' : 'Focus';
-    item.title = `Focus timer: ${mmss(left)} left${running(f) ? '' : ', paused'}`;
-    item.setAttribute('aria-label', item.title);
+    btn.title = `Focus timer: ${mmss(left)} left${paused ? ', paused' : ''}`;
+    btn.setAttribute('aria-label', btn.title);
     // a phase that began by itself (or on a press elsewhere): the island opens to say so, briefly
-    if (islandPhase !== f.phase) { islandPhase = f.phase; if (running(f)) islandOpen(item, 5000); }
+    if (islandPhase !== f.phase) { islandPhase = f.phase; if (!paused) islandOpen(item, 5000); }
   }
-  /** The island: the folded disc with its dial, and the body that shows once it is open. */
-  function buildIsland() {
+  /** The dial in the pin: the ring of what is left, and the hand at its end. */
+  function islandGlyph() {
     const glyph = svgEl('svg', { viewBox: '0 0 20 20', class: 'bcv-island__glyph', 'aria-hidden': 'true' });
     glyph.append(
       svgEl('circle', { class: 'bcv-island__ring', cx: 10, cy: 10, r: 7.5 }),
       svgEl('circle', { class: 'bcv-island__arc', cx: 10, cy: 10, r: 7.5, 'stroke-dasharray': String(GLYPH_C) }),
       svgEl('line', { class: 'bcv-island__hand', x1: 10, y1: 10, x2: 10, y2: 3.4 }),
     );
-    const item = h('div', { class: 'bcv-live__item bcv-island', dataset: { live: 'pomo' }, role: 'group', tabindex: '0', 'aria-expanded': 'false',
-      onclick: (e) => {
-        if (e.target.closest('button')) return;
-        if (!item.classList.contains('is-open')) islandOpen(item);
-        else if (e.target.closest('.bcv-island__right')) open('pomo', { from: item });
-        else islandOpen(item); // (a press on the body keeps it open a while longer)
-      },
-      onkeydown: (e) => {
-        if (e.target !== item) return;
-        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (item.classList.contains('is-open')) open('pomo', { from: item }); else islandOpen(item); }
-        if (e.key === 'Escape' && item.classList.contains('is-open')) { e.stopPropagation(); islandClose(item); }
-      } }, [
-      U.el('bcv-island__fold', glyph),
-      U.el('bcv-island__body', [
-        U.el('bcv-island__btns', [
-          h('button', { type: 'button', class: 'bcv-island__btn bcv-island__cancel', title: 'End the session', 'aria-label': 'End', onclick: (e) => { e.stopPropagation(); focusReset(); } }, U.svg(IC.close, { size: 16, stroke: 'currentColor', width: 2.4 })),
-          h('button', { type: 'button', class: 'bcv-island__btn bcv-island__main', onclick: (e) => { e.stopPropagation(); islandOpen(item); if (running()) focusPause(); else focusStart(); } }),
+    return glyph;
+  }
+  /** The island's body, shown once the pin has swelled: End and Pause, the phase and its switch, the count. */
+  function islandBody(item) {
+    return U.el('bcv-island__body', [
+      U.el('bcv-island__btns', [
+        h('button', { type: 'button', class: 'bcv-island__btn bcv-island__cancel', title: 'End the session', 'aria-label': 'End', onclick: (e) => { e.stopPropagation(); focusReset(); } }, U.svg(IC.close, { size: 16, stroke: 'currentColor', width: 2.4 })),
+        h('button', { type: 'button', class: 'bcv-island__btn bcv-island__main', onclick: (e) => { e.stopPropagation(); islandOpen(item); if (running()) focusPause(); else focusStart(); } }),
+      ]),
+      U.el('bcv-island__right', [
+        U.el('bcv-island__meta', [
+          U.text('bcv-island__label', '', 'span'),
+          h('button', { type: 'button', class: 'bcv-island__switch', hidden: true, onclick: (e) => { e.stopPropagation(); islandOpen(item); focusPhase(nextPhase(focus), { keepRunning: true }); } }),
         ]),
-        U.el('bcv-island__right', [
-          U.el('bcv-island__meta', [
-            U.text('bcv-island__label', '', 'span'),
-            h('button', { type: 'button', class: 'bcv-island__switch', hidden: true, onclick: (e) => { e.stopPropagation(); islandOpen(item); focusPhase(nextPhase(focus), { keepRunning: true }); } }),
-          ]),
-          U.text('bcv-island__time', '', 'span'),
-        ]),
+        U.text('bcv-island__time', '', 'span'),
       ]),
     ]);
-    return item;
   }
-  function islandOpen(item, ms = 6000) {
+  function islandOpen(item, ms = 6000, focusMain = false) {
     item.classList.add('is-open');
     item.setAttribute('aria-expanded', 'true');
     clearTimeout(islandTimer);
     islandTimer = setTimeout(() => islandClose(item), ms);
+    if (focusMain) setTimeout(() => item.querySelector('.bcv-island__main')?.focus(), 200);
   }
   function islandClose(item) {
     clearTimeout(islandTimer);
     islandTimer = 0;
+    if (!item.classList.contains('is-open')) return;
     item.classList.remove('is-open');
+    item.classList.add('is-folding'); // (no X on the way down: it belongs to the pin, not the island)
+    setTimeout(() => item.classList.remove('is-folding'), 520);
     item.setAttribute('aria-expanded', 'false');
   }
   // a press anywhere else folds it
-  document.addEventListener('pointerdown', (e) => { const item = document.querySelector('#bcv-live .bcv-island.is-open'); if (item && !item.contains(e.target)) islandClose(item); }, true);
+  document.addEventListener('pointerdown', (e) => { const item = document.querySelector('#bcv-pins .bcv-island.is-open'); if (item && !item.contains(e.target)) islandClose(item); }, true);
 
   // ---- the focus timer, the tool -------------------------------------------------------------
   // The phone's timer card: the minutes on a scale with the marker under the minutes set — a
@@ -567,18 +564,46 @@
   const pinned = (key) => pins.includes(key);
   /** One pin: a round dark button with the tool's glyph, and its X. */
   function pinEl(t, { demo = false } = {}) {
-    const el = h('span', { class: 'bcv-pin', dataset: { tool: t.key } }, [
-      h('button', { type: 'button', class: 'bcv-pin__btn', title: t.name, 'aria-label': t.name, tabindex: demo ? '-1' : '0', onclick: demo ? null : (e) => open(t.key, { from: e.currentTarget }) }, U.svg(t.icon, { size: 13, stroke: t.color, width: 2 })),
-      demo ? null : h('button', { type: 'button', class: 'bcv-pin__x', title: `Unpin ${t.name}`, 'aria-label': `Unpin ${t.name}`, onclick: (e) => { e.stopPropagation(); unpin(t.key); } }, U.svg(IC.close, { size: 8, stroke: '#fff', width: 2.6 })),
+    const live = t.key === 'pomo' && !demo; // (the timer's pin is also its live activity)
+    const el = h('span', { class: 'bcv-pin', dataset: { tool: t.key } });
+    const btn = h('button', { type: 'button', class: 'bcv-pin__btn', title: t.name, 'aria-label': t.name, tabindex: demo ? '-1' : '0',
+      onclick: demo ? null : (e) => { if (el.classList.contains('is-live')) islandOpen(el, 6000, e.detail === 0); else open(t.key, { from: e.currentTarget }); } }, [
+      h('span', { class: 'bcv-pin__ic' }, U.svg(t.icon, { size: 13, stroke: t.color, width: 2 })),
+      live ? islandGlyph() : null,
     ]);
+    if (live) {
+      el.classList.add('bcv-island');
+      el.dataset.live = 'pomo';
+      el.setAttribute('aria-expanded', 'false');
+      el.append(h('div', { class: 'bcv-island__face' }, [btn, islandBody(el)]));
+      // open: a press on the count opens the timer, a press elsewhere on the body keeps it open a while longer
+      el.addEventListener('click', (e) => { if (!el.classList.contains('is-open') || e.target.closest('button')) return; if (e.target.closest('.bcv-island__right')) open('pomo', { from: el }); else islandOpen(el); });
+      el.addEventListener('keydown', (e) => { if (e.key === 'Escape' && el.classList.contains('is-open')) { e.stopPropagation(); islandClose(el); btn.focus(); } });
+    } else el.append(btn);
+    if (!demo) el.append(h('button', { type: 'button', class: 'bcv-pin__x', title: `Unpin ${t.name}`, 'aria-label': `Unpin ${t.name}`, onclick: (e) => { e.stopPropagation(); unpin(t.key); } }, U.svg(IC.close, { size: 8, stroke: '#fff', width: 2.6 })));
     return el;
   }
+  /** The pins in their order, and the timer's pin borrowed while a session is going if it is not
+   *  pinned; a pin that is already up is kept (its motion, its open island) and only moved. */
   function paintPins() {
     const bar = document.getElementById('bcv-pins');
     if (!bar) return;
-    const had = new Set([...bar.querySelectorAll('.bcv-pin')].map((e) => e.dataset.tool));
-    bar.replaceChildren(...pins.map((k) => { const el = pinEl(toolOf(k)); if (had.size && !had.has(k)) el.classList.add('is-new'); return el; })); // (a pin that just landed pops in)
-    bar.hidden = pins.length === 0;
+    const keys = pins.filter((k) => toolOf(k));
+    if (focusOn() && !keys.includes('pomo')) keys.push('pomo');
+    const have = new Map([...bar.querySelectorAll(':scope > .bcv-pin:not(.is-out)')].map((e) => [e.dataset.tool, e]));
+    const next = keys.map((k) => {
+      let el = have.get(k);
+      if (!el) { el = pinEl(toolOf(k)); if (bar.dataset.settled) el.classList.add('is-new'); } // (a pin that just landed pops in)
+      el.classList.toggle('is-guest', k === 'pomo' && !pins.includes('pomo'));
+      return el;
+    });
+    for (const [k, el] of have) {
+      if (keys.includes(k)) continue;
+      if (el.classList.contains('is-live')) { islandClose(el); el.classList.add('is-out'); setTimeout(() => { el.remove(); bar.hidden = !bar.querySelector('.bcv-pin'); }, 320); }
+      else el.remove();
+    }
+    next.forEach((el, i) => { const ref = [...bar.children].filter((c) => !c.classList.contains('is-out'))[i] || null; if (ref !== el) bar.insertBefore(el, ref); });
+    bar.hidden = !bar.querySelector('.bcv-pin');
     for (const c of document.querySelectorAll('.bcv-tool-card')) c.classList.toggle('is-pinned', pins.includes(c.dataset.tool));
   }
   /** (kept for callers that ask for the pins alone: the tray holds them) */

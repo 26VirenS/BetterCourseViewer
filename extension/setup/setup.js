@@ -1,93 +1,111 @@
-/* The page after install (Safari and Chrome): the same glass card as the guided setup, with the
- * three things to do — each one drawn, not only described. The steps themselves run over the
- * Canvas page: open Canvas, press the toolbar button, press Set up (see content/app/setup.js). */
+/* The page after install (Safari and Chrome): black, the way the welcome on the page is — a splash,
+ * then an arrow to where the button lives with what to press there, then where to go. Continue
+ * comes in after a moment on the pointer screen (time to find the thing first), Got it on the last.
+ * The setup itself runs over the Canvas page: open Canvas, press the toolbar button, press Set up
+ * (see content/app/setup.js). */
 (async function () {
   const BCV = self.BCV;
   const api = BCV.api;
-  const S = BCV.settings;
   const { h } = BCV.utils;
-
-  // ---- appearance: the extension's choice, else the system's ------------------------------------
-  const mq = window.matchMedia?.('(prefers-color-scheme: dark)');
-  let settings = await S.get();
-  const paint = () => {
-    const mode = settings.appearance?.darkMode || 'system';
-    const dark = mode === 'on' || (mode === 'system' && !!mq?.matches);
-    document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
-  };
-  paint();
-  mq?.addEventListener?.('change', paint);
-  S.onChange((s) => { settings = s; paint(); });
-
-  const body = document.getElementById('body');
-  const foot = document.getElementById('foot');
   const safari = /apple/i.test(navigator.vendor || '') && !/chrome|crios|edg/i.test(navigator.userAgent);
-  const svg = (d, { size = 14, width = 1.9, cls = '' } = {}) => h('span', { class: cls, 'aria-hidden': 'true', html: `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="${width}" stroke-linecap="round" stroke-linejoin="round"><path d="${d}"/></svg>` });
-  const PUZZLE = 'M10 4a2 2 0 114 0v1h3a1 1 0 011 1v3h1a2 2 0 110 4h-1v3a1 1 0 01-1 1h-3v-1a2 2 0 10-4 0v1H7a1 1 0 01-1-1v-3H5a2 2 0 110-4h1V6a1 1 0 011-1h3z';
-  const LOCK = 'M7 11V8a5 5 0 0110 0v3M6 11h12v9H6z';
-  const PIN = 'M12 17v4M8 3h8l-1 6 3 3v2H6v-2l3-3z';
-  const STAR = 'M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z';
-  const SEARCH = 'M11 4a7 7 0 100 14 7 7 0 000-14zM20 20l-3.5-3.5';
-  const DOTS = 'M5 12h.01M12 12h.01M19 12h.01';
+  const WAIT = 4000; // Continue comes in after this long: time to take the pointer in first
+  const SPLASH = 1600; // the wordmark holds this long before the first screen
   const SHEET = '<svg viewBox="0 0 120 120" width="100%" height="100%"><rect x="16" y="18" width="53" height="84" rx="14" fill="rgba(255,255,255,.35)"/><path d="M28 30 H69 A30 30 0 0 1 69 90 H28" fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><path d="M35 42 H69 A18 18 0 0 1 69 78 H35" fill="none" stroke="rgba(255,255,255,.72)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><path d="M42 54 H69 A6 6 0 0 1 69 66 H42" fill="none" stroke="rgba(255,255,255,.46)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-  const markXs = () => h('span', { class: 'mark mark--xs', 'aria-hidden': 'true', html: SHEET });
-  const mark = h('span', { class: 'mark mark--lg', 'aria-hidden': 'true' });
-  mark.innerHTML = '<svg viewBox="0 0 120 120" width="76" height="76"><defs><linearGradient id="sheetLg" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#fff" stop-opacity=".9"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient></defs><rect class="sheet" x="16" y="18" width="53" height="84" rx="14" fill="url(#sheetLg)"/><path class="arc arc--1" style="--len:178" d="M28 30 H69 A30 30 0 0 1 69 90 H28" fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="178"/><path class="arc arc--2" style="--len:126" d="M35 42 H69 A18 18 0 0 1 69 78 H35" fill="none" stroke="rgba(255,255,255,.72)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="126"/><path class="arc arc--3" style="--len:74" d="M42 54 H69 A6 6 0 0 1 69 66 H42" fill="none" stroke="rgba(255,255,255,.46)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="74"/></svg>';
+  const SVG = 'http://www.w3.org/2000/svg';
+  const svgEl = (tag, attrs = {}) => { const el = document.createElementNS(SVG, tag); for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, String(v)); return el; };
 
-  // ---- the three steps, each with a small picture of the thing to find --------------------------
-  // 1. the address bar, on Canvas
-  const picCanvas = h('div', { class: 'pic', 'aria-hidden': 'true' }, [
-    h('span', { class: 'pic__bar' }, [svg(LOCK, { size: 12, width: 2 }), h('span', { text: 'yourschool.instructure.com' })]),
-  ]);
-  // 2. the toolbar: Chrome's puzzle piece and the menu behind it, or Safari's own button
-  const picToolbar = safari
-    ? h('div', { class: 'pic', 'aria-hidden': 'true' }, [
-      h('div', { class: 'pic__tool' }, [
-        h('span', { class: 'pic__ico' }, svg(SEARCH, { size: 13 })),
-        h('span', { class: 'pic__ico' }, svg(DOTS, { size: 13, width: 2.6 })),
-        h('span', { class: 'pic__ico pic__ico--hot pic__ico--mark' }, markXs()),
-        h('span', { class: 'pic__hint', text: '← this one' }),
+  const root = document.getElementById('splash');
+  document.documentElement.classList.add('is-splash');
+  let current = null;
+  let splashTimer = 0; // the splash moving on by itself
+  let revealTimer = 0; // a screen's button coming in
+  const button = (text, onclick) => h('button', { type: 'button', class: 'splash__btn', text, hidden: true, onclick });
+  /** The next screen in, the last one out. */
+  function show(el) {
+    clearTimeout(splashTimer);
+    const old = current;
+    if (old) { old.classList.add('is-leaving'); setTimeout(() => old.remove(), 300); }
+    current = el;
+    root.append(el);
+  }
+  const reveal = (btn, ms) => { clearTimeout(revealTimer); revealTimer = setTimeout(() => { btn.hidden = false; }, ms); };
+
+  // ---- the arrow: from the words up to the thing to press --------------------------------------
+  // Chrome keeps its extensions behind the puzzle piece at the top right of the window; the arrow
+  // goes there. Safari has no such piece: the button sits in the toolbar, so the arrow simply points
+  // up at the bar. Drawn in the window's own pixels, and again when the window changes size.
+  function arrow(kind) {
+    const svg = svgEl('svg', { class: 'splash__arrow', 'aria-hidden': 'true' });
+    const line = svgEl('path', { class: 'splash__line' });
+    const head = svgEl('path', { class: 'splash__head' });
+    svg.append(line, head);
+    const draw = () => {
+      const W = window.innerWidth, H = window.innerHeight;
+      svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+      const start = { x: W / 2, y: H * 0.5 - 150 };
+      const end = kind === 'corner' ? { x: W - 46, y: 30 } : { x: W / 2, y: 28 };
+      const ctrl = kind === 'corner' ? { x: W * 0.62, y: H * 0.5 - 150 - (H * 0.5 - 150 - 30) * 0.9 } : { x: W / 2, y: (start.y + end.y) / 2 };
+      line.setAttribute('d', `M${start.x} ${start.y} Q${ctrl.x} ${ctrl.y} ${end.x} ${end.y}`);
+      const a = Math.atan2(end.y - ctrl.y, end.x - ctrl.x); // the way the line arrives at its tip
+      const L = 16;
+      const p1 = { x: end.x - L * Math.cos(a - 0.5), y: end.y - L * Math.sin(a - 0.5) };
+      const p2 = { x: end.x - L * Math.cos(a + 0.5), y: end.y - L * Math.sin(a + 0.5) };
+      head.setAttribute('d', `M${p1.x.toFixed(1)} ${p1.y.toFixed(1)} L${end.x} ${end.y} L${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`);
+      const len = line.getTotalLength();
+      line.style.strokeDasharray = String(len);
+      line.style.strokeDashoffset = String(len);
+    };
+    requestAnimationFrame(draw);
+    window.addEventListener('resize', () => { if (svg.isConnected) draw(); });
+    return svg;
+  }
+
+  // ---- the three screens ---------------------------------------------------------------------
+  function splash() {
+    return h('div', { class: 'splash__stage splash__stage--word', dataset: { stage: 'splash' } }, [
+      h('div', { class: 'splash__brand' }, [
+        h('span', { class: 'mark mark--splash', 'aria-hidden': 'true', html: SHEET }),
+        h('span', { class: 'splash__word', text: 'Simpl.' }),
       ]),
-    ])
-    : h('div', { class: 'pic', 'aria-hidden': 'true' }, [
-      h('div', { class: 'pic__tool' }, [
-        h('span', { class: 'pic__ico' }, svg(STAR, { size: 13 })),
-        h('span', { class: 'pic__ico pic__ico--hot' }, svg(PUZZLE, { size: 15 })),
-        h('span', { class: 'pic__hint', text: '← the puzzle piece' }),
-      ]),
-      h('div', { class: 'pic__menu' }, [markXs(), h('span', { text: 'Simpl Courses' }), h('span', { class: 'pic__pin' }, svg(PIN, { size: 13 }))]),
     ]);
-  // 3. the popup, with its one button
-  const picPopup = h('div', { class: 'pic', 'aria-hidden': 'true' }, [
-    h('div', { class: 'pic__popup' }, [
-      h('div', { class: 'pic__popuphead' }, [markXs(), h('span', { text: 'Simpl Courses' })]),
-      h('span', { class: 'pic__btn', text: 'Set up' }),
-    ]),
-  ]);
+  }
+  function pin() {
+    const btn = button('Continue', () => show(go()));
+    const el = h('div', { class: `splash__stage splash__stage--pin${safari ? ' is-safari' : ''}`, dataset: { stage: 'pin' } }, [
+      arrow(safari ? 'up' : 'corner'),
+      h('div', { class: 'splash__text' }, [
+        h('span', { class: 'splash__kicker', text: safari ? 'In the toolbar' : 'Up here' }),
+        h('h1', { class: 'splash__title', text: safari ? 'Find the Simpl Courses button' : 'Press the puzzle piece' }),
+        h('p', { class: 'splash__hint' }, safari
+          ? ['It sits in the bar at the top. If Safari asks, choose ', h('b', { text: 'Always Allow on This Website' }), '.']
+          : ['Then press the pin next to ', h('b', { text: 'Simpl Courses' }), ', so it stays in the toolbar.']),
+        btn,
+      ]),
+    ]);
+    reveal(btn, WAIT);
+    return el;
+  }
+  function go() {
+    const note = h('p', { class: 'splash__note', text: 'You can close this tab.', hidden: true });
+    const btn = button('Got it', () => { try { window.close(); } catch { /* a tab the page did not open stays */ } setTimeout(() => { note.hidden = false; }, 400); });
+    const el = h('div', { class: 'splash__stage splash__stage--go', dataset: { stage: 'go' } }, [
+      h('div', { class: 'splash__text' }, [
+        h('span', { class: 'splash__kicker', text: 'Then' }),
+        h('h1', { class: 'splash__title', text: 'Open your Canvas' }),
+        h('p', { class: 'splash__hint' }, ['Go to your school\'s Canvas page and press the ', h('b', { text: 'Simpl Courses' }), ' button. Setup runs there.']),
+        btn,
+        note,
+      ]),
+    ]);
+    reveal(btn, 600);
+    return el;
+  }
 
-  const steps = [
-    ['Open your Canvas', h('span', {}, ['Sign in to your school\'s Canvas in this browser.']), picCanvas],
-    safari
-      ? ['Press the Simpl Courses button', h('span', {}, ['It\'s in the toolbar. If Safari asks, choose ', h('b', { text: 'Always Allow on This Website' }), '.']), picToolbar]
-      : ['Open Simpl Courses', h('span', {}, ['Click the puzzle piece, then ', h('b', { text: 'Simpl Courses' }), '. Pin it to keep it in the toolbar.']), picToolbar],
-    ['Press Set up', h('span', {}, [safari ? 'Setup runs on the page.' : 'Chrome asks once to allow the site. Then setup runs on the page.']), picPopup],
-  ].map(([t, s, pic], i) => h('div', { class: 'how__step how__step--pic' }, [
-    h('span', { class: 'how__n', text: String(i + 1) }),
-    h('div', { class: 'how__body' }, [h('span', { class: 'how__t', text: t }), h('span', { class: 'how__s' }, [s]), pic]),
-  ]));
-  steps.forEach((el, i) => { el.style.animationDelay = `${220 + i * 90}ms`; });
-
-  body.append(
-    h('div', { class: 'welcome' }, [
-      mark,
-      h('h1', { class: 'h1', text: 'Simpl Courses is installed' }),
-      h('p', { class: 'lead', text: 'Three quick steps.' }),
-    ]),
-    h('div', { class: 'how' }, steps),
-  );
-  foot.append(
-    h('span', { class: 'foot__spacer' }),
-    h('button', { type: 'button', class: 'btn', id: 'next', text: 'Got it', onclick: () => window.close() }),
-  );
+  // Enter presses the button that is up; a press anywhere on the splash moves it along
+  document.addEventListener('keydown', (e) => { if (e.key !== 'Enter') return; const btn = current?.querySelector('.splash__btn:not([hidden])'); if (btn) { e.preventDefault(); btn.click(); } });
+  show(splash());
+  const onward = () => { if (current?.dataset.stage === 'splash') show(pin()); };
+  splashTimer = setTimeout(onward, SPLASH);
+  root.addEventListener('click', () => { if (current?.dataset.stage === 'splash') onward(); });
   await api.storage.local.set({ 'setup:offered': true }).catch(() => {});
 })();
