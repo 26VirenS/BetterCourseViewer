@@ -232,7 +232,7 @@ node scripts/dev/phone-test.mjs         # the phone layout; screenshots in scrip
 Every release, in this order:
 
 1. Bump the version in all six places: `extension/manifest.json`, `ios/project.yml`, the four `MARKETING_VERSION` lines in `macos/Simpl Courses/Simpl Courses.xcodeproj/project.pbxproj` and the two in `ios/SimplCourses.xcodeproj/project.pbxproj`. The smoke suite fails when they disagree.
-2. Add the release's **What's new** entry at the top of `extension/content/app/whatsnew-notes.js`: the version, the date, and a note per change in plain words (a kind, a short title, one short sentence saying what the student can now do). The smoke suite fails when the newest entry is not the manifest's version, so a release cannot ship without its notes.
+2. Add the release's **What's new** entry at the top of `extension/content/app/whatsnew-notes.js`: the version, the date, and a note per change in plain words (a kind, a title of two to four words, one short line under 90 characters; the suite holds both limits). The smoke suite fails when the newest entry is not the manifest's version, so a release cannot ship without its notes.
 3. Run the suites (`scripts/dev/*-test.mjs`), commit, push. The Package workflow tags the commit and publishes the release with the Safari and Chrome zips.
 
 ## Privacy

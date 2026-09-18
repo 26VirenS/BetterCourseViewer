@@ -65,8 +65,8 @@ const whatsNew = new Function('self', `${readFileSync(join(extDir, 'content', 'a
   const newest = whatsNew[0];
   check(!!newest && newest.version === manifest.version, `the newest What's New entry is this version (${manifest.version}): ${newest?.version}`);
   check(/^\d{4}-\d{2}-\d{2}$/.test(newest?.date || '') && Array.isArray(newest?.notes) && newest.notes.length > 0, `the notes for ${manifest.version} are dated and not empty`);
-  const bad = whatsNew.flatMap((v) => (v.notes || []).map((n) => ({ v: v.version, ...n }))).filter((n) => !['new', 'improved', 'fixed'].includes(n.kind) || !n.title || n.title.length > 48 || !n.body || n.body.length > 170 || (n.where || '').length > 48 || !n.icon);
-  check(bad.length === 0, `every note has a kind, a short title, one sentence, a short where and an icon${bad.length ? `: ${bad.map((n) => `${n.v} · ${n.title}`).join(' | ')}` : ''}`);
+  const bad = whatsNew.flatMap((v) => (v.notes || []).map((n) => ({ v: v.version, ...n }))).filter((n) => !['new', 'improved', 'fixed'].includes(n.kind) || !n.title || n.title.length > 30 || !n.body || n.body.length > 90 || !n.icon);
+  check(bad.length === 0, `every note has a kind, a short title, one short line and an icon${bad.length ? `: ${bad.map((n) => `${n.v} · ${n.title}`).join(' | ')}` : ''}`);
   check(whatsNew.every((v, i) => i === 0 || cmpVer(whatsNew[i - 1].version, v.version) > 0), 'the entries are newest first, no version twice');
 }
 

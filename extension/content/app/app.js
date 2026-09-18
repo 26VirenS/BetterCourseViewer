@@ -820,10 +820,10 @@
     if (away) return true; // already counting
     if (inQuiz() || quizHere() || state.submitOpen || typing() || recentlyReloaded()) return recover(AWAY_WHY); // the note, and no reload
     // the dial is the iPhone's timer: a dim ring, a bright arc of the time left that shrinks back to
-    // twelve o'clock, and a short hand just inside the ring that rides the arc's end round with it —
-    // widest at its base towards the centre, tapering to a slim tip, both ends round (two circles,
-    // r 2.1 at (18,13) and r 1.3 at (18,9), and the tangents between them)
-    const dial = '<svg viewBox="0 0 36 36" aria-hidden="true"><circle class="bcv-away__track" cx="18" cy="18" r="13"/><circle class="bcv-away__ring" cx="18" cy="18" r="13"/><path class="bcv-away__hand" d="M15.94 12.58A2.1 2.1 0 1 0 20.06 12.58L19.27 8.74A1.3 1.3 0 0 0 16.73 8.74Z"/></svg>';
+    // twelve o'clock, and a hand pivoting at the centre that points at the arc's end and turns with
+    // it — widest at the pivot, tapering to a slim tip short of the ring, both ends round (two
+    // circles, r 2.1 at the centre and r 1.3 at (18,9), and the tangents between them)
+    const dial = '<svg viewBox="0 0 36 36" aria-hidden="true"><circle class="bcv-away__track" cx="18" cy="18" r="13"/><circle class="bcv-away__ring" cx="18" cy="18" r="13"/><path class="bcv-away__hand" d="M15.91 17.81A2.1 2.1 0 1 0 20.09 17.81L19.3 8.88A1.3 1.3 0 0 0 16.7 8.88Z"/></svg>';
     const btn = h('button', { type: 'button', class: 'bcv-away__btn', 'aria-label': 'Away refresh in three seconds. Press to cancel.' }, [
       h('span', { class: 'bcv-away__dial', html: dial }),
       h('span', { class: 'bcv-away__body' }, [h('span', { class: 'bcv-away__title', text: 'Away Refresh' }), h('span', { class: 'bcv-away__hint', text: 'Click to cancel' })]),
