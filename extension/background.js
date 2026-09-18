@@ -51,7 +51,7 @@ if (typeof importScripts === 'function' && !self.BCV?.settings) {
   // Canvas page as content scripts, so a page asks for them when a tool needs them and they land
   // in that page's isolated world beside our own scripts. Nothing outside lib/vendor/ can be asked
   // for, and nothing is fetched: the files travel with the build.
-  const VENDOR = new Set(['lib/vendor/mammoth.browser.min.js', 'lib/vendor/jspdf.umd.min.js', 'lib/vendor/pdf.min.js', 'lib/vendor/pdf.worker.min.js']);
+  const VENDOR = new Set(['lib/vendor/mammoth.browser.min.js', 'lib/vendor/jspdf.umd.min.js', 'lib/vendor/pdf.min.js', 'lib/vendor/pdf.worker.min.js', 'content/app/tools/office.js']);
   async function injectVendor(sender, files) {
     const list = Array.isArray(files) ? files.filter((f) => VENDOR.has(f)) : [];
     if (!list.length) throw new Error('Nothing to load');

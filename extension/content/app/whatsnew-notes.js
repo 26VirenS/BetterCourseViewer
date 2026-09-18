@@ -23,6 +23,11 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.23.0', date: '2026-09-18', notes: [
+      { kind: 'new', title: 'Word ⇄ PDF here', body: 'Word to PDF and back on this device: headings, lists, tables, links and pictures.', icon: P.arrows },
+      { kind: 'new', title: 'Pass/Fail courses', body: 'A switch on each course in setup. No letter to aim at, and it stays out of the GPA.', icon: P.toggle },
+      { kind: 'improved', title: 'Install arrow', body: 'The arrow after install points at the puzzle piece itself.', icon: P.steps },
+    ] },
     { version: '2.22.1', date: '2026-09-18', notes: [
       { kind: 'fixed', title: 'Access codes', body: 'The code goes with every answer, and is asked for again if Canvas wants it.', icon: P.check },
     ] },

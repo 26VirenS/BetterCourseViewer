@@ -25,7 +25,7 @@
     ['sites', 'Canvas sites', 'M12 3a9 9 0 100 18 9 9 0 000-18zM3 12h18M12 3a15 15 0 010 18a15 15 0 010-18'],
     ['data', 'Data & about', 'M4 7c0-1.7 3.6-3 8-3s8 1.3 8 3-3.6 3-8 3-8-1.3-8-3zM4 7v10c0 1.7 3.6 3 8 3s8-1.3 8-3V7'],
   ];
-  const LETTERS = ['C', 'B', 'B+', 'A-', 'A', 'A+']; // target letters, lowest on the left (saved as the letter the Grades page reads)
+  const LETTERS = ['C', 'B', 'B+', 'A-', 'A', 'A+', 'P/F']; // target letters, lowest on the left (saved as the letter the Grades page reads); P/F: pass/fail, out of the GPA
   const OLD_SCALE = ['A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-', 'D', 'F']; // targets saved before A+ existed were indices into this
   const targetLetter = (t) => (Number.isInteger(t) ? OLD_SCALE[t] : typeof t === 'string' ? t.replace(/−/g, '-') : null) || 'A';
   const gpa2 = (n) => (Number.isFinite(n) ? n : 0).toFixed(2);

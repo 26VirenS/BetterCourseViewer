@@ -154,6 +154,7 @@
     mammoth: { files: ['lib/vendor/mammoth.browser.min.js'], has: () => !!self.mammoth },
     jspdf: { files: ['lib/vendor/jspdf.umd.min.js'], has: () => !!self.jspdf?.jsPDF },
     pdf: { files: ['lib/vendor/pdf.min.js', 'lib/vendor/pdf.worker.min.js'], has: () => !!self.pdfjsLib?.getDocument },
+    office: { files: ['content/app/tools/office.js'], has: () => !!self.BCV?.office?.docxToPdf }, // (ours: Word ⇄ PDF, beside the libraries it uses)
   };
   const loading = {};
   async function vendor(name) {

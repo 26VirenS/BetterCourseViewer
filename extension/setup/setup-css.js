@@ -207,6 +207,12 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
 .target { display: flex; align-items: center; gap: 12px; padding: 11px 15px; border-radius: 16px; background: var(--card); border: 1px solid var(--edge); animation: fadeUp .38s var(--ease) both; }
 .target + .target { margin-top: 7px; }
 .target__code { flex: 1; min-width: 0; font: 600 14px/1.3 var(--font); color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.target .seg[hidden] { display: none; }
+.target__pfwrap { flex: none; display: flex; align-items: center; gap: 8px; margin-left: 4px; }
+.target__pflabel { font: 500 12px/1 var(--font); color: var(--ink3); }
+.page--fr .target .switch { width: 40px; height: 24px; border-radius: 12px; }
+.page--fr .target .switch__knob { width: 20px; height: 20px; border-radius: 10px; }
+.page--fr .target .switch.is-on .switch__knob { transform: translateX(16px); }
 .seg { flex: none; display: flex; padding: 2px; border-radius: 11px; background: var(--fill); border: 1px solid var(--edge); gap: 2px; }
 .seg button { border: 0; cursor: pointer; min-width: 33px; height: 27px; border-radius: 9px; font: 600 12.5px/1 var(--font); background: transparent; color: var(--ink3); transition: background .2s ease, color .2s ease, transform .2s var(--spring); }
 .seg button.is-on { background: var(--blue); color: #fff; box-shadow: 0 1px 3px rgba(10,132,255,.35); }
@@ -317,8 +323,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
 .fr__body { flex: 1; min-height: 0; transition: opacity .15s ease, transform .15s ease; }
 .fr__body.is-leaving { opacity: 0; transform: translateX(var(--leave, -14px)); }
 .fr__body.is-rising { animation: frRise .3s var(--ease) both; }
-.fr__h1 { margin: 0; font: 600 26px/1.2 var(--display); letter-spacing: -.03em; color: var(--ink); text-wrap: pretty; }
-.fr__blurb { margin: 9px 0 0; max-width: 430px; font: 400 13.5px/1.55 var(--font); color: var(--ink3); text-wrap: pretty; }
+.fr__h1 { margin: 0; font: 600 30px/1.15 var(--display); letter-spacing: -.03em; color: var(--ink); text-wrap: pretty; }
+.fr__blurb { margin: 9px 0 0; max-width: 460px; font: 400 15.5px/1.5 var(--font); color: var(--ink3); text-wrap: pretty; }
 .fr__foot { flex: none; padding-top: 26px; display: flex; align-items: center; gap: 18px; }
 .fr__hint { flex: 1; min-width: 0; font: 400 11.5px/1.4 var(--font); color: var(--ink4); text-wrap: pretty; }
 .page--fr .btn { height: 42px; border-radius: 21px; padding: 0 22px; font: 600 15px/1 var(--display); letter-spacing: -.012em; transition: background .22s ease, color .22s ease, box-shadow .22s ease; }

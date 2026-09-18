@@ -31,9 +31,13 @@
   const reveal = (btn, ms) => { clearTimeout(revealTimer); revealTimer = setTimeout(() => { btn.hidden = false; }, ms); };
 
   // ---- the arrow: from the words up to the thing to press --------------------------------------
-  // Chrome keeps its extensions behind the puzzle piece at the top right of the window; the arrow
-  // goes there. Safari has no such piece: the button sits in the toolbar, so the arrow simply points
-  // up at the bar. Drawn in the window's own pixels, and again when the window changes size.
+  // Chrome keeps its extensions behind the puzzle piece in the toolbar, above the page: right of
+  // the address bar, left of the profile picture and the ⋮ menu — about a hundred pixels in from
+  // the window's right edge, never in the corner itself (that is the menu). The arrow rises to the
+  // top of the page straight under it, so the head points up at the piece. Edge puts the piece a
+  // little further in. Safari has no such piece: the button sits in the toolbar, so the arrow simply
+  // points up at the bar. Drawn in the window's own pixels, and again when the window changes size.
+  const PIECE = /edg\//i.test(navigator.userAgent) ? 150 : 104; // the piece's centre, in from the right
   function arrow(kind) {
     const svg = svgEl('svg', { class: 'splash__arrow', 'aria-hidden': 'true' });
     const line = svgEl('path', { class: 'splash__line' });
@@ -43,8 +47,10 @@
       const W = window.innerWidth, H = window.innerHeight;
       svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
       const start = { x: W / 2, y: H * 0.5 - 150 };
-      const end = kind === 'corner' ? { x: W - 46, y: 30 } : { x: W / 2, y: 28 };
-      const ctrl = kind === 'corner' ? { x: W * 0.62, y: H * 0.5 - 150 - (H * 0.5 - 150 - 30) * 0.9 } : { x: W / 2, y: (start.y + end.y) / 2 };
+      const end = kind === 'corner' ? { x: Math.max(W / 2 + 40, W - PIECE), y: 14 } : { x: W / 2, y: 28 };
+      // a quadratic curve arrives along end − ctrl: the control point sits straight under the tip,
+      // so the line leaves the words sideways and comes up vertically under the piece
+      const ctrl = kind === 'corner' ? { x: end.x, y: start.y } : { x: W / 2, y: (start.y + end.y) / 2 };
       line.setAttribute('d', `M${start.x} ${start.y} Q${ctrl.x} ${ctrl.y} ${end.x} ${end.y}`);
       const a = Math.atan2(end.y - ctrl.y, end.x - ctrl.x); // the way the line arrives at its tip
       const L = 16;

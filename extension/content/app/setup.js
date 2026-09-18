@@ -23,6 +23,7 @@
 
   const CHECK = 'M20 6L9 17l-5-5';
   const GRADES = ['C', 'B', 'B+', 'A-', 'A', 'A+']; // the target letters, lowest on the left (saved as the letter the Grades page reads)
+  const PASS_FAIL = 'P/F'; // saved in place of a letter: the course is pass/fail, and stays out of the GPA
   const VIEWS = [['cards', 'Cards', 'Courses as tiles, with what is due next.'], ['list', 'List', 'Everything due, day by day, with a tick.'], ['activity', 'Activity', 'Announcements, replies and grades as they arrive.']];
   // the steps, in order, each with its name on the rail; the lists are settled when the card opens (see open())
   const ALL = [
@@ -34,7 +35,7 @@
   let STEPS = ALL;
   const settleSteps = () => { STEPS = BCV.phone?.active() ? ALL.filter((s) => s.key === 'courses' || s.key === 'grades') : ALL; };
   const COPY = {
-    courses: ['Which courses are you in?', 'Tick the courses you are in. Unchecked courses stay hidden everywhere. A nickname replaces the name across the app.'],
+    courses: ['Which classes are you in?', 'Only select the courses that count towards your GPA.'],
     grades: ['Grades', 'Canvas keeps no history. Simpl Courses can, on this device.'],
     dashboard: ['What you see first', 'Pick the shape of your dashboard.'],
     sidebar: ['Where your courses live', 'Either way it is the same list.'],
@@ -85,7 +86,7 @@
     st = {
       app, settings, step: 0, visited: new Set([0]),
       scanning: false, scanError: null, courses: [], favs: new Set(), nicks: {},
-      tracking: true, goal: 4, targets: {},
+      tracking: true, goal: 4, targets: {}, letters: {},
       dashView: ['cards', 'list', 'activity'].includes(savedView) ? savedView : 'list',
       sideCourses: settings.appearance?.sideCourses === 'always' ? 'always' : 'hover', // the panel off the Courses row is the default
       closing: false,
@@ -177,7 +178,7 @@
     const picked = chosen().length;
     switch (key) {
       case 'courses': return picked ? `${picked} ${picked === 1 ? 'course' : 'courses'}` : 'None yet';
-      case 'grades': return st.tracking ? `Tracking · goal ${gpa2(st.goal)}` : 'Not tracking';
+      case 'grades': { const pf = st.courses.filter((c) => st.favs.has(c.id) && st.targets[c.id] === PASS_FAIL).length; return `${st.tracking ? `Tracking · goal ${gpa2(st.goal)}` : 'Not tracking'}${pf ? ` · ${pf} pass/fail` : ''}`; }
       case 'dashboard': return VIEWS.find(([k]) => k === st.dashView)[1];
       case 'sidebar': return st.sideCourses === 'always' ? 'Always listed' : 'On hover';
       default: return '';
@@ -378,15 +379,34 @@
       goalRow.classList.toggle('is-hidden', !st.tracking);
       paintChrome();
     });
-    // the target rows carry the nickname, which is step 1 taking effect
-    const targets = picked.map((c) => h('div', { class: 'target', dataset: { course: c.id } }, [
-      h('span', { class: 'row__dot', style: { background: c.color } }),
-      h('span', { class: 'target__code', text: label(c) }),
-      h('div', { class: 'seg' }, GRADES.map((letter) => h('button', { type: 'button', class: `seg__b ${(st.targets[c.id] || 'A+') === letter ? 'is-on' : ''}`, text: letter, onclick: (e) => {
+    // the target rows carry the nickname, which is step 1 taking effect; a Pass/Fail switch on each
+    // takes the letter scale away (the course counts for nothing in the GPA, and there is no letter
+    // to aim at), and the letter it had comes back when the switch goes off
+    const targets = picked.map((c) => {
+      const pf = st.targets[c.id] === PASS_FAIL;
+      const seg = h('div', { class: 'seg', hidden: pf }, GRADES.map((letter) => h('button', { type: 'button', class: `seg__b ${(pf ? st.letters[c.id] : st.targets[c.id]) === letter ? 'is-on' : ''}`, text: letter, onclick: (e) => {
         st.targets[c.id] = letter;
+        st.letters[c.id] = letter;
         [...e.currentTarget.parentNode.children].forEach((b) => b.classList.toggle('is-on', b === e.currentTarget));
-      } }))),
-    ]));
+      } })));
+      const pfSwitch = h('button', { type: 'button', class: `switch switch--sm target__pf ${pf ? 'is-on' : ''}`, role: 'switch', 'aria-checked': pf ? 'true' : 'false', 'aria-label': `${label(c)} is pass/fail` }, h('span', { class: 'switch__knob' }));
+      const pfLabel = h('span', { class: 'target__pflabel', text: 'Pass/Fail' });
+      pfSwitch.addEventListener('click', () => {
+        const on = st.targets[c.id] !== PASS_FAIL;
+        if (on) { st.letters[c.id] = GRADES.includes(st.targets[c.id]) ? st.targets[c.id] : 'A+'; st.targets[c.id] = PASS_FAIL; }
+        else st.targets[c.id] = st.letters[c.id] || 'A+';
+        seg.hidden = on;
+        pfSwitch.classList.toggle('is-on', on);
+        pfSwitch.setAttribute('aria-checked', on ? 'true' : 'false');
+        paintChrome();
+      });
+      return h('div', { class: 'target', dataset: { course: c.id } }, [
+        h('span', { class: 'row__dot', style: { background: c.color } }),
+        h('span', { class: 'target__code', text: label(c) }),
+        seg,
+        h('span', { class: 'target__pfwrap' }, [pfLabel, pfSwitch]),
+      ]);
+    });
     stagger(targets, 40);
     body.append(
       ...heading('grades'),
@@ -499,7 +519,7 @@
       await store.setPref('setupDone', true);
       const [targetsPref] = await Promise.all([store.pref('gradeTargets')]);
       const targets = { ...((targetsPref && typeof targetsPref === 'object') ? targetsPref : {}) };
-      for (const c of st.courses) if (st.favs.has(c.id)) targets[c.id] = GRADES.includes(st.targets[c.id]) ? st.targets[c.id] : 'A+';
+      for (const c of st.courses) if (st.favs.has(c.id)) targets[c.id] = GRADES.includes(st.targets[c.id]) || st.targets[c.id] === PASS_FAIL ? st.targets[c.id] : 'A+';
       await Promise.all([
         store.setPref('gpaGoal', st.goal),
         store.setPref('gpaTracking', st.tracking ? { priorGpa: null, priorCourses: 0, since: new Date().toISOString().slice(0, 10) } : null),

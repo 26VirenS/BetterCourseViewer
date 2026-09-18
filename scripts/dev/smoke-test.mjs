@@ -750,6 +750,18 @@ try {
   check(gpaStats.length === 3 && /^Momentum.*Turn on tracking to compare snapshots$/i.test(gpaStats[0]) && /On-time submissions \d+% \d+ of \d+ submitted before the due time/i.test(gpaStats[1]) && (await page.$$('.bcv-gpa__chip')).length === 4 && /Highest .* at \d+% · lowest .* at \d+%/.test(gpaStats[2]), `stats: ${gpaStats.join(' | ')}`);
   const gpaCards = await texts('.bcv-gpa__card');
   check(gpaCards.length === 5 && /^A− F26-MATH 021 20 MATH-021-20 92\.4% 3\.7 pts Needs \d+% of the remaining 507 pts 93 pts earned so far Target A− Details$/.test(gpaCards[0]) && gpaCards.filter((t) => /^N\/A .*N\/A — pts Nothing graded yet — no score to project from .*No grade yet Details$/.test(t)).length === 1, `course cards: ${gpaCards[0]} || ${gpaCards[4]}`);
+  // a course saved as pass/fail (the setup's switch, P/F in place of a letter): its card says so, its score still shows, and the GPA leaves it out
+  const pfCourse = await page.$eval('.bcv-gpa__card', (e) => e.dataset.course);
+  const gpaBefore = (await texts('.bcv-gpa__value'))[0];
+  const setTarget = (id, v) => sw.evaluate(async ([id, v]) => { const k = 'prefs:localhost:8787'; const all = await self.BCV.api.storage.local.get(k); const p = all[k] || {}; p.gradeTargets = { ...(p.gradeTargets || {}) }; if (v) p.gradeTargets[id] = v; else delete p.gradeTargets[id]; await self.BCV.api.storage.local.set({ [k]: p }); }, [id, v]);
+  await setTarget(pfCourse, 'P/F');
+  await page.reload();
+  await page.waitForSelector('.bcv-gpa__value', { timeout: 15000 });
+  const pfCard = (await texts(`.bcv-gpa__card[data-course="${pfCourse}"]`))[0];
+  check((await texts('.bcv-head__sub'))[0] === 'Fall 2026 · 5 courses · 3 with grades so far' && /^P\/F F26-MATH 021 20 MATH-021-20 92\.4% — pts Pass\/Fail — no letter to aim at Counts for nothing in the GPA Pass\/Fail Details$/.test(pfCard) && (await texts('.bcv-gpa__value'))[0] !== gpaBefore, `a pass/fail course shows its score without points, says so instead of a target, and stays out of the GPA (${pfCard} · ${gpaBefore} → ${(await texts('.bcv-gpa__value'))[0]})`);
+  await setTarget(pfCourse, null);
+  await page.reload();
+  await page.waitForSelector('.bcv-gpa__value', { timeout: 15000 });
   // hovering the ring alone opens the group breakdown in place; the card keeps its size
   const cardHeight = await page.$eval('.bcv-gpa__card', (el) => el.getBoundingClientRect().height);
   const ringAtRest = await page.$eval('.bcv-gpa__card .bcv-gpa__ringsvg', (el) => Math.round(el.getBoundingClientRect().width));
@@ -2420,7 +2432,7 @@ try {
   // every screen then follows, so it is the student's to choose. Continue is dead, with a hint,
   // until one is ticked.
   const rowsNow = await page.$$eval(su('.row[data-course]'), (els) => els.map((e) => ({ id: e.dataset.course, on: e.classList.contains('is-on') })));
-  check((await texts(su('.fr__h1')))[0] === 'Which courses are you in?' && scanned.length >= 8 && rowsNow.every((r) => !r.on) && (await texts(su('.listhead span')))[0] === `0 of ${total} selected` && (await texts(su('#selectAll')))[0] === 'Select all' && (await page.$eval(su('#next'), (b) => b.disabled)) && (await texts(su('#hint')))[0] === 'Pick at least one course.' && (await railAnswer('courses')) === 'None yet', `step 1 read the enrolments and ticked none of them: ${scanned.length} courses, Continue waiting with its hint`);
+  check((await texts(su('.fr__h1')))[0] === 'Which classes are you in?' && (await texts(su('.fr__blurb')))[0] === 'Only select the courses that count towards your GPA.' && (await page.$eval(su('.fr__h1'), (e) => parseFloat(getComputedStyle(e).fontSize) >= 30)) && (await page.$eval(su('.fr__blurb'), (e) => { const s = getComputedStyle(e), t = getComputedStyle(e.previousElementSibling); return parseFloat(s.fontSize) >= 15 && parseFloat(s.fontSize) < parseFloat(t.fontSize) * 0.6 && s.color !== t.color; })) && scanned.length >= 8 && rowsNow.every((r) => !r.on) && (await texts(su('.listhead span')))[0] === `0 of ${total} selected` && (await texts(su('#selectAll')))[0] === 'Select all' && (await page.$eval(su('#next'), (b) => b.disabled)) && (await texts(su('#hint')))[0] === 'Pick at least one course.' && (await railAnswer('courses')) === 'None yet', `step 1 read the enrolments and ticked none of them: ${scanned.length} courses, Continue waiting with its hint`);
   // Clear all leaves none ticked, whatever was: Continue is dead with a hint until one is picked
   const clearAll = async () => { if ((await texts(su('#selectAll')))[0] === 'Select all') await page.click(su('#selectAll')); await page.click(su('#selectAll')); };
   await clearAll();
@@ -2467,10 +2479,18 @@ try {
   await page.click(su('.stepper button:first-child'));
   await page.click(su('.target:first-child .seg button:nth-child(3)'));
   check((await texts(su('#goal')))[0] === '3.90' && (await page.$eval(su('.target:first-child .seg button.is-on'), (b) => b.textContent)) === 'B+' && (await railAnswer('grades')) === 'Tracking · goal 3.90', 'the goal stepper and a target pick, the rail following the goal');
+  // a Pass/Fail switch on a target row takes the letter scale away (no letter to aim at, and the
+  // course stays out of the GPA); off again brings the letter back as it was
+  await page.click(su('.target:nth-child(2) .target__pf'));
+  check((await page.$eval(su('.target:nth-child(2) .seg'), (e) => e.hidden)) && (await page.$eval(su('.target:nth-child(2) .target__pf'), (e) => e.classList.contains('is-on') && e.getAttribute('aria-checked') === 'true')) && !(await page.$eval(su('.target:first-child .seg'), (e) => e.hidden)) && (await texts(su('.target:nth-child(2) .target__pflabel')))[0] === 'Pass/Fail' && (await railAnswer('grades')) === 'Tracking · goal 3.90 · 1 pass/fail', `Pass/Fail on a row takes its letters away, and the rail counts it: ${await railAnswer('grades')}`);
+  await page.click(su('.target:nth-child(2) .target__pf'));
+  check(!(await page.$eval(su('.target:nth-child(2) .seg'), (e) => e.hidden)) && (await page.$eval(su('.target:nth-child(2) .seg button.is-on'), (b) => b.textContent)) === 'A+' && (await railAnswer('grades')) === 'Tracking · goal 3.90', 'and off again brings the letter back as it was');
   await page.click(su('#track'));
   check(!(await page.$eval(su('#track'), (e) => e.classList.contains('is-on'))) && (await page.$eval(su('#goalPanel'), (e) => e.classList.contains('is-hidden'))) && (await railAnswer('grades')) === 'Not tracking', 'history off hides the goal, and the rail reads Not tracking');
   await page.click(su('#track'));
   check((await page.$eval(su('#track'), (e) => e.classList.contains('is-on'))) && !(await page.$eval(su('#goalPanel'), (e) => e.classList.contains('is-hidden'))) && (await texts(su('#goal')))[0] === '3.90', 'and on again brings the goal back as it was');
+  await page.click(su('.target:nth-child(3) .target__pf')); // the third course stays pass/fail: it is saved as P/F
+  check((await railAnswer('grades')) === 'Tracking · goal 3.90 · 1 pass/fail', `one course left pass/fail: ${await railAnswer('grades')}`);
   await shot(page, '32d-setup-grades');
   await sNext('.tile[data-view]');
   // step 3: what the Dashboard shows first — three preview tiles drawn in the chosen courses' colours, one chosen
@@ -2508,7 +2528,7 @@ try {
   check((await sStep()) === '4 of 4' && (await railNow()).filter((r) => r.includes('(locked)')).length === 0, 'Back from the read-back returns to the last step, nothing locked behind');
   await page.click(su('.rail__item[data-step="courses"]'));
   await page.waitForSelector(su('.row[data-course]'), { timeout: 10000 });
-  check((await sStep()) === '1 of 4' && (await page.$$(su('.row.is-on'))).length === 5 && (await page.$eval(su(`.row[data-course="${nickId}"] .row__nick`), (e) => e.value)) === 'Setup nick' && (await railNow()).join(' | ') === `Your courses: 5 courses | Grades: Tracking · goal 3.90 ✓ | Dashboard: ${{ cards: 'Cards', list: 'List', activity: 'Activity' }[viewBefore]} ✓ | Sidebar: Always listed ✓`, `the rail goes back to any step done, with its answers kept: ${(await railNow()).join(' | ')}`);
+  check((await sStep()) === '1 of 4' && (await page.$$(su('.row.is-on'))).length === 5 && (await page.$eval(su(`.row[data-course="${nickId}"] .row__nick`), (e) => e.value)) === 'Setup nick' && (await railNow()).join(' | ') === `Your courses: 5 courses | Grades: Tracking · goal 3.90 · 1 pass/fail ✓ | Dashboard: ${{ cards: 'Cards', list: 'List', activity: 'Activity' }[viewBefore]} ✓ | Sidebar: Always listed ✓`, `the rail goes back to any step done, with its answers kept: ${(await railNow()).join(' | ')}`);
   for (const s of ['#track', '.tile[data-view]', '.tile[data-value]', '.summary__row']) await sNext(s);
   check((await sStep()) === 'Ready' && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('setup:done'))['setup:done'])) === undefined, 'forward again to the read-back: still nothing marked done');
   // Open Canvas writes everything and reloads the page: it comes back black, with the choices in place
@@ -2559,7 +2579,7 @@ try {
   await fetch(`${BASE}/api/v1/users/self/course_nicknames/${nickId}`, { method: 'DELETE', headers: { 'x-csrf-token': 'mock+csrf/token=' } }); // back to the real name for what follows
   check((await texts('.bcv-fav')).length === 5, 'the sidebar follows the new favourites');
   const savedPrefs = await prefsOf();
-  check(savedPrefs.gpaGoal === 3.9 && savedPrefs.gpaTracking?.since && savedPrefs.gpaTracking.priorGpa === null && Object.values(savedPrefs.gradeTargets || {}).includes('B+') && savedPrefs.setupDone === true && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('setup:done'))['setup:done'])) === true, `the grade choices landed where the Grades page reads them, and the done flags are set: ${JSON.stringify({ goal: savedPrefs.gpaGoal, tracking: savedPrefs.gpaTracking, targets: savedPrefs.gradeTargets })}`);
+  check(savedPrefs.gpaGoal === 3.9 && savedPrefs.gpaTracking?.since && savedPrefs.gpaTracking.priorGpa === null && Object.values(savedPrefs.gradeTargets || {}).includes('B+') && Object.values(savedPrefs.gradeTargets || {}).includes('P/F') && savedPrefs.setupDone === true && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('setup:done'))['setup:done'])) === true, `the grade choices landed where the Grades page reads them, and the done flags are set: ${JSON.stringify({ goal: savedPrefs.gpaGoal, tracking: savedPrefs.gpaTracking, targets: savedPrefs.gradeTargets })}`);
   // the tour is no longer started for you: it is asked for (Settings → Run the tour again, the account panel: ?bcv=tour)
   await page.goto(`${BASE}/?bcv=tour`);
   await page.waitForSelector('.bcv-tour__card', { timeout: 20000 });
@@ -2684,7 +2704,7 @@ try {
   const pinAt = Date.now();
   await setup.waitForTimeout(1500); // the arrow draws itself
   const pinArrow = await setup.evaluate(() => { const p = document.querySelector('.splash__stage[data-stage="pin"] .splash__line'); if (!p) return null; const r = p.getBoundingClientRect(); return { right: Math.round(r.right), top: Math.round(r.top), w: innerWidth, drawn: getComputedStyle(p).strokeDashoffset, head: !!document.querySelector('.splash__head'), btnHidden: document.querySelector('.splash__stage[data-stage="pin"] .splash__btn').hidden, stages: document.querySelectorAll('.splash__stage:not(.is-leaving)').length }; });
-  check((await sText('.splash__stage[data-stage="pin"] .splash__title')) === 'Press the puzzle piece' && /press the pin next to Simpl Courses/.test(await sText('.splash__stage[data-stage="pin"] .splash__hint')) && !!pinArrow && pinArrow.right > pinArrow.w - 80 && pinArrow.top < 60 && pinArrow.drawn === '0px' && pinArrow.head && pinArrow.btnHidden && pinArrow.stages === 1, `the splash gives way to an arrow drawn up to the puzzle piece at the top right, with what to press and the pin, and no button yet (${JSON.stringify(pinArrow)})`);
+  check((await sText('.splash__stage[data-stage="pin"] .splash__title')) === 'Press the puzzle piece' && /press the pin next to Simpl Courses/.test(await sText('.splash__stage[data-stage="pin"] .splash__hint')) && !!pinArrow && pinArrow.right > pinArrow.w - 130 && pinArrow.right < pinArrow.w - 70 && pinArrow.top < 30 && pinArrow.drawn === '0px' && pinArrow.head && pinArrow.btnHidden && pinArrow.stages === 1, `the splash gives way to an arrow drawn straight up to just under the puzzle piece — a hundred pixels in from the corner, where Chrome keeps it, never the corner itself — with what to press and the pin, and no button yet (${JSON.stringify(pinArrow)})`);
   await setup.screenshot({ path: join(out, '32b-setup-pin.png') });
   await setup.waitForFunction(() => !document.querySelector('.splash__stage[data-stage="pin"] .splash__btn').hidden, null, { timeout: 8000 });
   const pinWait = Date.now() - pinAt;
@@ -2861,7 +2881,7 @@ try {
   await closeTool();
   // the file converter: the source kind decides the targets; images on the canvas, a PDF from an engine loaded when first needed
   await openTool('conv');
-  check((await toolSub()) === 'Runs on this device. Nothing is uploaded.' && (await page.$eval('.bcv-conv__run', (e) => e.disabled)) && /text-layout PDF/.test((await texts('.bcv-sheet__foot'))[0]), 'the converter opens empty, says nothing is uploaded and what a Word document becomes');
+  check((await toolSub()) === 'Runs on this device. Nothing is uploaded.' && (await page.$eval('.bcv-conv__run', (e) => e.disabled)) && /Word ⇄ PDF happens here/.test((await texts('.bcv-sheet__foot'))[0]), 'the converter opens empty, says nothing is uploaded and what a Word document becomes');
   const tinyPng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAAF0lEQVR42mNk+M/wn4EIwDiqkL4KAQC8oQn/Y0k3bwAAAABJRU5ErkJggg==', 'base64');
   await page.setInputFiles('.bcv-conv__drop input[type=file]', [{ name: 'tiny.png', mimeType: 'image/png', buffer: tinyPng }, { name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('hello') }]);
   await page.waitForSelector('.bcv-conv__row', { timeout: 5000 });
@@ -2877,6 +2897,75 @@ try {
   await page.click('.bcv-conv__run');
   await page.waitForFunction(() => document.querySelector('.bcv-conv__outlabel, .bcv-conv__err'), null, { timeout: 20000 });
   check(((await texts('.bcv-conv__outlabel'))[0] || '').endsWith('· 1 page') && (await page.$('.bcv-conv__delta')) === null && (await inPage('jspdf')), `a text file becomes a PDF: the engine lands in the page when first needed, and no size badge for a cross-format conversion (${(await texts('.bcv-conv__outlabel, .bcv-conv__err'))[0]})`);
+  // Word ⇄ PDF on this device. A real Word document — a heading, bold, italic, red words, a link,
+  // bullets and numbers, a serif run, a shaded bordered table, a picture, a page break, a centred
+  // line — becomes a PDF with all of it; a PDF drawn by hand — a bold heading, a paragraph over two
+  // lines, a bullet, blue words, a link, a picture, a second page — becomes a Word document that
+  // reflows. Both are read back here, byte by byte.
+  const zlib = require('node:zlib');
+  const storedZip = (files) => { const parts = [], cd = []; let off = 0; for (const [name, data] of files) { const body = Buffer.isBuffer(data) ? data : Buffer.from(data); const n = Buffer.from(name); const crc = zlib.crc32(body); const lh = Buffer.alloc(30); lh.writeUInt32LE(0x04034b50, 0); lh.writeUInt16LE(20, 4); lh.writeUInt32LE(crc, 14); lh.writeUInt32LE(body.length, 18); lh.writeUInt32LE(body.length, 22); lh.writeUInt16LE(n.length, 26); const ch = Buffer.alloc(46); ch.writeUInt32LE(0x02014b50, 0); ch.writeUInt16LE(20, 4); ch.writeUInt16LE(20, 6); ch.writeUInt32LE(crc, 16); ch.writeUInt32LE(body.length, 20); ch.writeUInt32LE(body.length, 24); ch.writeUInt16LE(n.length, 28); ch.writeUInt32LE(off, 42); parts.push(lh, n, body); cd.push(ch, n); off += 30 + n.length + body.length; } const cdBuf = Buffer.concat(cd); const end = Buffer.alloc(22); end.writeUInt32LE(0x06054b50, 0); end.writeUInt16LE(files.length, 8); end.writeUInt16LE(files.length, 10); end.writeUInt32LE(cdBuf.length, 12); end.writeUInt32LE(off, 16); return Buffer.concat([...parts, cdBuf, end]); };
+  const unzipAll = (buf) => { let i = buf.length - 22; while (i >= 0 && buf.readUInt32LE(i) !== 0x06054b50) i--; const count = buf.readUInt16LE(i + 10); let p = buf.readUInt32LE(i + 16); const out = {}; for (let k = 0; k < count; k++) { const method = buf.readUInt16LE(p + 10), csize = buf.readUInt32LE(p + 20), nlen = buf.readUInt16LE(p + 28), elen = buf.readUInt16LE(p + 30), clen = buf.readUInt16LE(p + 32), loff = buf.readUInt32LE(p + 42); const name = buf.toString('utf8', p + 46, p + 46 + nlen); const start = loff + 30 + buf.readUInt16LE(loff + 26) + buf.readUInt16LE(loff + 28); const data = buf.subarray(start, start + csize); out[name] = method === 8 ? zlib.inflateRawSync(data) : Buffer.from(data); p += 46 + nlen + elen + clen; } return out; };
+  const W_NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+  const wRun = (text, props = '') => `<w:r>${props ? `<w:rPr>${props}</w:rPr>` : ''}<w:t xml:space="preserve">${text}</w:t></w:r>`;
+  const docxFixture = storedZip([
+    ['[Content_Types].xml', '<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="png" ContentType="image/png"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/word/numbering.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml"/></Types>'],
+    ['_rels/.rels', '<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>'],
+    ['word/_rels/document.xml.rels', '<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" Target="numbering.xml"/><Relationship Id="rId4" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/image1.png"/><Relationship Id="rId5" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="https://example.com/lab" TargetMode="External"/></Relationships>'],
+    ['word/styles.xml', `<?xml version="1.0" encoding="UTF-8"?><w:styles xmlns:w="${W_NS}"><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri"/><w:sz w:val="22"/></w:rPr></w:rPrDefault></w:docDefaults><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/></w:style><w:style w:type="paragraph" w:styleId="Heading1"><w:name w:val="heading 1"/><w:basedOn w:val="Normal"/><w:pPr><w:spacing w:before="240" w:after="120"/></w:pPr><w:rPr><w:b/><w:sz w:val="32"/></w:rPr></w:style><w:style w:type="table" w:styleId="TableGrid"><w:name w:val="Table Grid"/><w:tblPr><w:tblBorders><w:top w:val="single" w:sz="4"/><w:left w:val="single" w:sz="4"/><w:bottom w:val="single" w:sz="4"/><w:right w:val="single" w:sz="4"/><w:insideH w:val="single" w:sz="4"/><w:insideV w:val="single" w:sz="4"/></w:tblBorders></w:tblPr></w:style></w:styles>`],
+    ['word/numbering.xml', `<?xml version="1.0" encoding="UTF-8"?><w:numbering xmlns:w="${W_NS}"><w:abstractNum w:abstractNumId="0"><w:lvl w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="bullet"/><w:lvlText w:val="&#xF0B7;"/><w:pPr><w:ind w:left="720" w:hanging="360"/></w:pPr></w:lvl></w:abstractNum><w:abstractNum w:abstractNumId="1"><w:lvl w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="decimal"/><w:lvlText w:val="%1."/><w:pPr><w:ind w:left="720" w:hanging="360"/></w:pPr></w:lvl></w:abstractNum><w:num w:numId="1"><w:abstractNumId w:val="0"/></w:num><w:num w:numId="2"><w:abstractNumId w:val="1"/></w:num></w:numbering>`],
+    ['word/media/image1.png', tinyPng],
+    ['word/document.xml', `<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="${W_NS}" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><w:body>`
+      + `<w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr>${wRun('Lab Report One')}</w:p>`
+      + `<w:p>${wRun('Plain text, ')}${wRun('bold words', '<w:b/>')}${wRun(', ')}${wRun('italic words', '<w:i/>')}${wRun(', ')}${wRun('red words', '<w:color w:val="FF0000"/>')}${wRun(' and a ')}<w:hyperlink r:id="rId5">${wRun('lab link')}</w:hyperlink>${wRun('.')}</w:p>`
+      + `<w:p><w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr></w:pPr>${wRun('First bullet')}</w:p><w:p><w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr></w:pPr>${wRun('Second bullet')}</w:p>`
+      + `<w:p><w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="2"/></w:numPr></w:pPr>${wRun('Step one')}</w:p><w:p><w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="2"/></w:numPr></w:pPr>${wRun('Step two')}</w:p>`
+      + `<w:p>${wRun('Serif line in Times.', '<w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman"/><w:sz w:val="28"/>')}</w:p>`
+      + `<w:tbl><w:tblPr><w:tblStyle w:val="TableGrid"/></w:tblPr><w:tblGrid><w:gridCol w:w="4680"/><w:gridCol w:w="4680"/></w:tblGrid><w:tr><w:tc><w:tcPr><w:shd w:val="clear" w:fill="D9D9D9"/></w:tcPr><w:p>${wRun('Cell A1')}</w:p></w:tc><w:tc><w:p>${wRun('Cell B1')}</w:p></w:tc></w:tr><w:tr><w:tc><w:p>${wRun('Cell A2')}</w:p></w:tc><w:tc><w:p>${wRun('Cell B2')}</w:p></w:tc></w:tr></w:tbl>`
+      + `<w:p><w:r><w:drawing><wp:inline><wp:extent cx="914400" cy="914400"/><wp:docPr id="1" name="Picture 1"/><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic><pic:blipFill><a:blip r:embed="rId4"/></pic:blipFill></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>`
+      + `<w:p><w:r><w:br w:type="page"/></w:r></w:p><w:p><w:pPr><w:jc w:val="center"/></w:pPr>${wRun('Second page, centered.')}</w:p>`
+      + `<w:sectPr><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/></w:sectPr></w:body></w:document>`],
+  ]);
+  await page.click('.bcv-conv__list .bcv-tool__link');
+  await page.setInputFiles('.bcv-conv__drop input[type=file]', [{ name: 'Lab report.docx', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', buffer: docxFixture }]);
+  await page.waitForSelector('.bcv-conv__row', { timeout: 5000 });
+  check((await raw('.bcv-tool__label'))[0] === 'Word document → convert to' && (await texts('.bcv-conv__formats .bcv-seg__btn')).join(' | ') === 'PDF | Text | HTML' && (await page.$eval('.bcv-conv__formats .bcv-seg__btn.is-active', (e) => e.dataset.value)) === 'pdf', 'a Word document offers PDF first, then Text and HTML');
+  const [docxDl] = await Promise.all([page.waitForEvent('download', { timeout: 30000 }), page.click('.bcv-conv__run')]);
+  await page.waitForFunction(() => document.querySelector('.bcv-conv__outlabel, .bcv-conv__err'), null, { timeout: 30000 });
+  const pdfOut = readFileSync(await docxDl.path());
+  const pdfText = (() => { const s = pdfOut.toString('latin1'); const chunks = []; let at = 0; for (;;) { const a = s.indexOf('stream\n', at); if (a < 0) break; const b = s.indexOf('endstream', a); if (b < 0) break; const bytes = pdfOut.subarray(a + 7, pdfOut[b - 1] === 10 ? b - 1 : b); try { chunks.push(zlib.inflateSync(bytes).toString('latin1')); } catch { chunks.push(bytes.toString('latin1')); } at = b + 9; } return `${s}\n${chunks.join('\n')}`; })();
+  const pdfHas = (re) => re.test(pdfText);
+  const pdfFacts = { pages: (pdfText.match(/\/Type\s*\/Page[^s]/g) || []).length, title: pdfHas(/\(Lab Report One\) Tj/), bold: pdfHas(/\/Helvetica-Bold/) && pdfHas(/\(bold words\) Tj/), italic: pdfHas(/\/Helvetica-Oblique/) && pdfHas(/\(italic words\) Tj/), times: pdfHas(/\/Times-Roman/) && pdfHas(/\(Serif line in Times\.\) Tj/), red: pdfHas(/1\. 0\. 0\. rg\n[\d. ]+ Td\n\(red words\) Tj/), link: pdfHas(/\/URI \(https:\/\/example\.com\/lab\)/), bullet: pdfHas(/\(\x95\) Tj/), numbers: pdfHas(/\(1\.\) Tj/) && pdfHas(/\(2\.\) Tj/), table: pdfHas(/\(Cell B2\) Tj/) && pdfHas(/0\.85 g\n[\d. -]+ re\nf/) && (pdfText.match(/ re\nS/g) || []).length >= 4, image: pdfHas(/\/Subtype \/Image/) && pdfHas(/\/Width 8/), page2: pdfHas(/\(Second page, centered\.\) Tj/), label: (await texts('.bcv-conv__outlabel, .bcv-conv__err'))[0] };
+  check(docxDl.suggestedFilename() === 'Lab report.pdf' && pdfOut.subarray(0, 5).toString() === '%PDF-' && pdfFacts.pages === 2 && Object.entries(pdfFacts).every(([k, v]) => k === 'label' || k === 'pages' || v === true) && /· 2 pages$/.test(pdfFacts.label), `Word → PDF on this device keeps the heading, bold, italic, the serif font, the red words, the link, bullets and numbers, the shaded bordered table, the picture and the page break (${JSON.stringify(pdfFacts)})`);
+  // and back
+  const pdfObjects = (objs) => { let out = '%PDF-1.4\n'; const offs = []; objs.forEach((o, i) => { offs.push(Buffer.byteLength(out, 'latin1')); out += `${i + 1} 0 obj\n${o}\nendobj\n`; }); const xref = Buffer.byteLength(out, 'latin1'); out += `xref\n0 ${objs.length + 1}\n0000000000 65535 f \n${offs.map((o) => `${String(o).padStart(10, '0')} 00000 n \n`).join('')}trailer\n<< /Size ${objs.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`; return Buffer.from(out, 'latin1'); };
+  const pdfStream = (body) => `<< /Length ${Buffer.byteLength(body, 'latin1')} >>\nstream\n${body}\nendstream`;
+  const pdfPage1 = 'BT /F1 20 Tf 72 700 Td (Chapter One) Tj ET\nBT /F2 11 Tf 72 670 Td (The first paragraph runs along the whole line and keeps going right to the) Tj ET\nBT /F2 11 Tf 72 656 Td (edge and then wraps onto a second line before it ends.) Tj ET\nBT /F2 11 Tf 72 630 Td (\\225 A bullet point) Tj ET\n0 0 1 rg BT /F2 11 Tf 72 604 Td (Blue words) Tj ET 0 0 0 rg\nBT /F2 11 Tf 72 580 Td (Visit the lab site) Tj ET\nq 100 0 0 50 72 500 cm /Im1 Do Q';
+  const pdfFixture = pdfObjects([
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R 8 0 R] /Count 2 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> /XObject << /Im1 6 0 R >> >> /Contents 7 0 R /Annots [10 0 R] >>',
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>',
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>',
+    `<< /Type /XObject /Subtype /Image /Width 2 /Height 2 /ColorSpace /DeviceRGB /BitsPerComponent 8 /Length 12 >>\nstream\n${'\xff\x00\x00\x00\xff\x00\x00\x00\xff\xff\xff\x00'}\nendstream`,
+    pdfStream(pdfPage1),
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F2 5 0 R >> >> /Contents 9 0 R >>',
+    pdfStream('BT /F2 11 Tf 72 700 Td (Second page text.) Tj ET'),
+    '<< /Type /Annot /Subtype /Link /Rect [72 577 160 592] /Border [0 0 0] /A << /S /URI /URI (https://example.com/lab) >> >>',
+  ]);
+  await page.click('.bcv-conv__list .bcv-tool__link');
+  await page.setInputFiles('.bcv-conv__drop input[type=file]', [{ name: 'Chapter.pdf', mimeType: 'application/pdf', buffer: pdfFixture }]);
+  await page.waitForSelector('.bcv-conv__row', { timeout: 5000 });
+  check((await texts('.bcv-conv__formats .bcv-seg__btn')).join(' | ') === 'Word | PNG pages | Text' && (await page.$eval('.bcv-conv__formats .bcv-seg__btn.is-active', (e) => e.dataset.value)) === 'docx', 'a PDF offers Word first, on this device, with no key');
+  const [pdfDl] = await Promise.all([page.waitForEvent('download', { timeout: 30000 }), page.click('.bcv-conv__run')]);
+  await page.waitForFunction(() => document.querySelector('.bcv-conv__outlabel, .bcv-conv__err'), null, { timeout: 30000 });
+  const docxOut = unzipAll(readFileSync(await pdfDl.path()));
+  const docXml = (docxOut['word/document.xml'] || Buffer.alloc(0)).toString('utf8');
+  const docRels = (docxOut['word/_rels/document.xml.rels'] || Buffer.alloc(0)).toString('utf8');
+  const docParas = docXml.match(/<w:p>.*?<\/w:p>/g) || [];
+  const paraWith = (s) => docParas.find((p) => p.includes(s)) || '';
+  const docFacts = { parts: Object.keys(docxOut).sort().join(','), heading: /<w:pStyle w:val="Heading1"\/>/.test(paraWith('Chapter One')) && /<w:b\/>/.test(paraWith('Chapter One')) && /<w:sz w:val="40"\/>/.test(paraWith('Chapter One')), joined: /keeps going right to the edge and then wraps/.test(paraWith('first paragraph')), bullet: /<w:numPr>/.test(paraWith('A bullet point')) && !/•/.test(paraWith('A bullet point')), blue: /<w:color w:val="0000FF"\/>/.test(paraWith('Blue words')), link: /<w:hyperlink r:id="rId100">/.test(paraWith('Visit the lab site')) && /Target="https:\/\/example\.com\/lab" TargetMode="External"/.test(docRels), picture: /<a:blip r:embed="rId500"\/>/.test(docXml) && docxOut['word/media/image1.png']?.subarray(0, 4).toString('latin1') === '\x89PNG', pageBreak: (docXml.match(/<w:br w:type="page"\/>/g) || []).length === 1 && /Second page text\./.test(docXml), pageSize: /<w:pgSz w:w="12240" w:h="15840"\/>/.test(docXml), font: /w:ascii="Arial"/.test(paraWith('first paragraph')), label: (await texts('.bcv-conv__outlabel, .bcv-conv__err'))[0] };
+  check(pdfDl.suggestedFilename() === 'Chapter.docx' && Object.entries(docFacts).every(([k, v]) => k === 'label' || k === 'parts' || v === true) && /^\d+ KB · Word · 2 pages · 1 picture$/.test(docFacts.label), `PDF → Word on this device: a heading from the size, a paragraph put back together across its lines, a bullet from its mark, the blue words, the link on its words, the picture, the page break and the page size (${JSON.stringify(docFacts)})`);
+  await shot(page, '39a-tools-convert-office');
   // the service: a CloudConvert key pasted in, then Word, PDF, slides and sheets go through it (a stand-in here)
   await page.click('.bcv-conv__list .bcv-tool__link');
   await inPage('ccBase');
@@ -2884,7 +2973,7 @@ try {
   await page.setInputFiles('.bcv-conv__drop input[type=file]', [{ name: 'sample.pdf', mimeType: 'application/pdf', buffer: tinyPdf }]);
   await page.waitForSelector('.bcv-conv__row', { timeout: 5000 });
   const noKey = { formats: (await texts('.bcv-conv__formats .bcv-seg__btn')).join(' | '), hint: (await raw('.bcv-conv__cloudhint'))[0], state: (await raw('.bcv-conv__ccstate'))[0], href: await page.$eval('.bcv-conv__cclink', (e) => e.href) };
-  check(noKey.formats === 'PNG pages | Text' && noKey.hint === 'Word and JPEG pages need CloudConvert. Connect a key below.' && noKey.state === 'Not connected' && noKey.href === 'https://cloudconvert.com/dashboard/api/v2/keys', `without a key a PDF offers what this device can do, says Word and JPEG pages need CloudConvert, and the card offers a free key (${JSON.stringify(noKey)})`);
+  check(noKey.formats === 'Word | PNG pages | Text' && noKey.hint === 'JPEG pages needs CloudConvert. Connect a key below.' && noKey.state === 'Not connected' && noKey.href === 'https://cloudconvert.com/dashboard/api/v2/keys', `without a key a PDF offers what this device can do (Word included), says JPEG pages need CloudConvert, and the card offers a free key (${JSON.stringify(noKey)})`);
   await page.fill('.bcv-conv__key', 'wrong-key');
   await page.click('.bcv-conv__connect');
   await page.waitForSelector('.bcv-conv__ccerr:not([hidden])', { timeout: 5000 });
@@ -2893,7 +2982,7 @@ try {
   await page.keyboard.press('Enter');
   await page.waitForFunction(() => /Connected/.test(document.querySelector('.bcv-conv__ccstate')?.textContent || ''), null, { timeout: 5000 });
   const ccStored = await sw.evaluate(async () => (await self.BCV.api.storage.local.get('tools:convert:cc'))['tools:convert:cc']);
-  check((await raw('.bcv-conv__ccstate'))[0] === 'Connected · sam · 25 credits' && ccStored?.key === 'cc-test-key' && (await toolSub()) === 'Word, PDF, slides and sheets go through CloudConvert.' && /real PDF through CloudConvert/.test((await texts('.bcv-sheet__foot'))[0]) && (await texts('.bcv-conv__formats .bcv-seg__btn')).join(' | ') === 'PNG pages | Text | Word | JPEG pages' && (await page.$eval('.bcv-conv__cloudhint', (e) => e.hidden)) && (await page.$eval('.bcv-conv__ccrow', (e) => e.hidden)), `Enter connects the right key: who and how many credits, the key kept on this device, the words change, and the PDF now offers Word and JPEG pages (${(await texts('.bcv-conv__formats .bcv-seg__btn')).join(' | ')})`);
+  check((await raw('.bcv-conv__ccstate'))[0] === 'Connected · sam · 25 credits' && ccStored?.key === 'cc-test-key' && (await toolSub()) === 'Word, PDF, slides and sheets go through CloudConvert.' && /through CloudConvert, in the original/.test((await texts('.bcv-sheet__foot'))[0]) && (await texts('.bcv-conv__formats .bcv-seg__btn')).join(' | ') === 'Word | PNG pages | Text | JPEG pages' && (await page.$eval('.bcv-conv__cloudhint', (e) => e.hidden)) && (await page.$eval('.bcv-conv__ccrow', (e) => e.hidden)), `Enter connects the right key: who and how many credits, the key kept on this device, the words change, and the PDF now offers Word and JPEG pages (${(await texts('.bcv-conv__formats .bcv-seg__btn')).join(' | ')})`);
   await page.click('.bcv-conv__formats .bcv-seg__btn[data-value="docx"]');
   const [ccDl] = await Promise.all([page.waitForEvent('download', { timeout: 20000 }), page.click('.bcv-conv__run')]);
   await page.waitForFunction(() => document.querySelector('.bcv-conv__outlabel, .bcv-conv__err'), null, { timeout: 20000 });
@@ -2910,10 +2999,10 @@ try {
   check((await raw('.bcv-conv__err'))[0] === 'The file could not be converted.' && (await page.$$('.bcv-conv__outlabel')).length === 1, 'a file the service refuses shows its reason on its own row, and the next file still converts');
   // the switch: Word and PDF back on this device; what only the service does stays offered
   await page.click('.bcv-conv__use input');
-  check(await eventually(async () => (await toolSub()) === 'Runs on this device; CloudConvert for what only it can do.' && /text-layout PDF/.test((await texts('.bcv-sheet__foot'))[0]), 2000) && (await texts('.bcv-conv__formats .bcv-seg__btn')).join(' | ') === 'PNG pages | Text | Word | JPEG pages' && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('tools:convert:cc'))['tools:convert:cc'])).use === false, 'the switch off keeps Word and PDF on this device, remembered, while Word from a PDF stays offered: only the service does that');
+  check(await eventually(async () => (await toolSub()) === 'Runs on this device; CloudConvert for what only it can do.' && /Word ⇄ PDF happens here/.test((await texts('.bcv-sheet__foot'))[0]), 2000) && (await texts('.bcv-conv__formats .bcv-seg__btn')).join(' | ') === 'Word | PNG pages | Text | JPEG pages' && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('tools:convert:cc'))['tools:convert:cc'])).use === false, 'the switch off keeps Word and PDF on this device, remembered, while Word from a PDF stays offered: only the service does that');
   await page.click('.bcv-conv__use input');
   await page.click('.bcv-conv__ccremove');
-  check(await eventually(async () => (await raw('.bcv-conv__ccstate'))[0] === 'Not connected', 2000) && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('tools:convert:cc'))['tools:convert:cc'])) == null && !(await page.$eval('.bcv-conv__cloudhint', (e) => e.hidden)) && (await texts('.bcv-conv__formats .bcv-seg__btn')).join(' | ') === 'PNG pages | Text', 'Remove key forgets it: back to what this device does');
+  check(await eventually(async () => (await raw('.bcv-conv__ccstate'))[0] === 'Not connected', 2000) && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('tools:convert:cc'))['tools:convert:cc'])) == null && !(await page.$eval('.bcv-conv__cloudhint', (e) => e.hidden)) && (await texts('.bcv-conv__formats .bcv-seg__btn')).join(' | ') === 'Word | PNG pages | Text', 'Remove key forgets it: back to what this device does');
   await shot(page, '39-tools-convert');
   await closeTool();
   // flashcards: decks kept here, imported from CSV, Study and Learn
@@ -3275,7 +3364,7 @@ try {
   await options.waitForFunction((id) => !document.querySelector(`.course[data-course="${id}"]`)?.classList.contains('is-off'), offId, { timeout: 10000 });
   await options.click(`.course[data-course="${offId}"] .seg button[data-value="B+"]`);
   await options.waitForTimeout(300);
-  check((await apiGet('/api/v1/courses?per_page=100')).find((c) => String(c.id) === offId).is_favorite && (await prefsOf()).gradeTargets?.[offId] === 'B+' && (await options.$$eval('.course:first-child .seg button', (bs) => bs.map((b) => b.textContent))).join(' ') === 'C B B+ A- A A+', 'showing it again restores the favourite, and the letter writes the target the Grades page reads; the letters run low to high with A+ on the right');
+  check((await apiGet('/api/v1/courses?per_page=100')).find((c) => String(c.id) === offId).is_favorite && (await prefsOf()).gradeTargets?.[offId] === 'B+' && (await options.$$eval('.course:first-child .seg button', (bs) => bs.map((b) => b.textContent))).join(' ') === 'C B B+ A- A A+ P/F', 'showing it again restores the favourite, and the letter writes the target the Grades page reads; the letters run low to high with A+ on the right, then P/F for a pass/fail course');
   // a nickname typed here is written to Canvas with the token the Canvas page remembered for this page
   const nickInput = options.locator(`.course[data-course="${offId}"] .course__nick`);
   await nickInput.fill('Settings nick');

@@ -1,17 +1,18 @@
 /* The file converter: drop a file and the tool works out what it is, then offers only the
- * conversions that exist for it. Two engines. On this device (lib/vendor/, loaded when first
- * needed: mammoth for DOCX, jsPDF for anything producing a PDF, pdf.js for reading one, the canvas
- * for image formats): images → PNG / JPEG / WebP / PDF, TXT or MD → PDF, CSV ⇄ JSON, DOCX → Text /
- * HTML, PDF → Text, and — as a text-layout PDF, real selectable text rather than a copy of the
- * styling — DOCX → PDF and PDF → PNG pages. Through CloudConvert (api.cloudconvert.com, with the
- * student's own API key pasted into the popup and kept on this device): the real thing — a Word
- * document laid out as the original, Word from a PDF, JPEG pages, slides and spreadsheets to PDF,
- * CSV to Excel, HEIC photos. With a key, Word and PDF go through the service unless the switch
- * says otherwise; what only the service can do is offered as soon as there is a key; images,
- * text, CSV and JSON never leave the device. One source kind per batch: files of another kind
- * dropped in alongside are reported as ignored, never silently dropped. Input is capped at 20 MB
- * and 30 pages on the device; one bad file never aborts the batch, and its row shows the engine's
- * own reason. */
+ * conversions that exist for it. Two engines. On this device (lib/vendor/ and tools/office.js,
+ * loaded when first needed: mammoth for DOCX to text, jsPDF for anything producing a PDF, pdf.js
+ * for reading one, office.js for Word ⇄ PDF, the canvas for image formats): images → PNG / JPEG /
+ * WebP / PDF, TXT or MD → PDF, CSV ⇄ JSON, DOCX → Text / HTML, PDF → Text / PNG pages, and Word ⇄
+ * PDF properly — headings, fonts matched to the closest built-in ones, bold and italic, colours,
+ * lists, tables, links and pictures, page for page (office.js says how). Through CloudConvert
+ * (api.cloudconvert.com, with the student's own API key pasted into the popup and kept on this
+ * device): the original's exact fonts and layout for Word and PDF, JPEG pages, slides and
+ * spreadsheets to PDF, CSV to Excel, HEIC photos. With a key, Word and PDF go through the service
+ * unless the switch says otherwise; what only the service can do is offered as soon as there is a
+ * key; images, text, CSV and JSON never leave the device. One source kind per batch: files of
+ * another kind dropped in alongside are reported as ignored, never silently dropped. Input is
+ * capped at 20 MB and 30 pages on the device; one bad file never aborts the batch, and its row
+ * shows the engine's own reason. */
 (function () {
   const BCV = (self.BCV = self.BCV || {});
   const { h } = BCV.utils;
@@ -27,7 +28,7 @@
     image: { label: 'Images', targets: [['png', 'PNG', 'device'], ['jpeg', 'JPEG', 'device'], ['webp', 'WebP', 'device'], ['pdf', 'PDF', 'device']] },
     heic: { label: 'HEIC photo', targets: [['jpg', 'JPEG', 'cloud'], ['png', 'PNG', 'cloud'], ['pdf', 'PDF', 'cloud']] },
     docx: { label: 'Word document', targets: [['pdf', 'PDF', 'both'], ['txt', 'Text', 'device'], ['html', 'HTML', 'device']] },
-    pdf: { label: 'PDF', targets: [['png', 'PNG pages', 'both'], ['txt', 'Text', 'device'], ['docx', 'Word', 'cloud'], ['jpg', 'JPEG pages', 'cloud']] },
+    pdf: { label: 'PDF', targets: [['docx', 'Word', 'both'], ['png', 'PNG pages', 'both'], ['txt', 'Text', 'device'], ['jpg', 'JPEG pages', 'cloud']] },
     pptx: { label: 'Slides', targets: [['pdf', 'PDF', 'cloud'], ['png', 'PNG slides', 'cloud']] },
     xlsx: { label: 'Spreadsheet', targets: [['pdf', 'PDF', 'cloud'], ['csv', 'CSV', 'cloud']] },
     text: { label: 'Text', targets: [['pdf', 'PDF', 'device']] },
@@ -219,13 +220,21 @@
         const { blocks, html } = await docxBlocks(rec.data);
         if (to === 'txt') { const blob = new Blob([blocks.map((b) => b.text).join('\n\n')], { type: 'text/plain;charset=utf-8' }); return { ok: true, bytes: download ? T.saveFile(`${base(rec.name)}.txt`, blob) : blob.size, label: U.plural(blocks.length, 'block') }; }
         if (to === 'html') { const blob = new Blob([`<!doctype html><meta charset="utf-8"><title>${base(rec.name)}</title>${html}`], { type: 'text/html;charset=utf-8' }); return { ok: true, bytes: download ? T.saveFile(`${base(rec.name)}.html`, blob) : blob.size, label: 'HTML' }; }
-        const doc = await jsPdfText(blocks);
+        await T.vendor('jspdf');
+        await T.vendor('office');
+        const doc = await BCV.office.docxToPdf(rec.data, self.jspdf.jsPDF);
         const blob = doc.output('blob');
         return { ok: true, bytes: download ? T.saveFile(`${base(rec.name)}.pdf`, blob) : blob.size, label: U.plural(doc.getNumberOfPages(), 'page') };
       }
       if (rec.kind === 'pdf') {
         const pdf = await pdfDoc(rec.data);
         const n = Math.min(pdf.numPages, MAX_PAGES);
+        if (to === 'docx') {
+          await T.vendor('office');
+          const r = await BCV.office.pdfToDocx(pdf, { maxPages: MAX_PAGES });
+          const blob = new Blob([r.bytes], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+          return { ok: true, bytes: download ? T.saveFile(`${base(rec.name)}.docx`, blob) : blob.size, label: `Word · ${U.plural(r.pages, 'page')}${r.pictures ? ` · ${U.plural(r.pictures, 'picture')}` : ''}` };
+        }
         if (to === 'txt') {
           const out = [];
           for (let i = 1; i <= n; i++) { const page = await pdf.getPage(i); const tc = await page.getTextContent(); out.push(tc.items.map((it) => it.str).join(' ')); }
@@ -277,7 +286,8 @@
 
   // ---- the popup -----------------------------------------------------------------------------
   const DEVICE_SUB = 'Runs on this device. Nothing is uploaded.';
-  const DEVICE_FOOT = 'Word documents convert to a text-layout PDF — selectable text, not a pixel copy of the original styling.';
+  const DEVICE_FOOT = 'Word ⇄ PDF happens here: headings, lists, tables, links and pictures, with the closest built-in fonts.';
+  const CLOUD_FOOT = 'Word and PDF go through CloudConvert, in the original’s own fonts and layout.';
   function open(app, { from = null } = {}) {
     const tool = T.toolOf('conv');
     const st = { files: [], kind: 'image', to: 'webp', q: 82, max: 0, drag: false, busy: false, note: '', stage: {}, cc: { key: '', username: '', credits: 0, use: true }, ccBusy: false, ccErr: '' };
@@ -325,7 +335,7 @@
     const removeBtn = h('button', { type: 'button', class: 'bcv-tool__link bcv-conv__ccremove', text: 'Remove key', onclick: () => { st.cc = { key: '', username: '', credits: 0, use: true }; st.ccErr = ''; keyInput.value = ''; T.save(CC_KEY, null).catch(() => {}); clearOut(); paint(); } });
     const ccLine = U.el('bcv-conv__ccline', [
       h('a', { class: 'bcv-tool__link bcv-conv__cclink', href: CC.keys, target: '_blank', rel: 'noopener', text: 'Get a free key' }),
-      h('span', { class: 'bcv-conv__ccwhy', text: 'Word, PDF, slides and sheets convert properly through it. Images and text stay on this device.' }),
+      h('span', { class: 'bcv-conv__ccwhy', text: 'Word and PDF keep their exact fonts and layout through it; slides, sheets and HEIC convert too. Images and text stay on this device.' }),
     ]);
     const serviceCard = T.card([U.el('bcv-tool__cardhead', [T.label('CloudConvert'), ccState]), keyRow, ccErr, ccLine, U.el('bcv-conv__ccfoot', [useRow, removeBtn])], 'bcv-conv__service');
     body.append(drop, T.card([kindLabel, formats, cloudHint, qWrap, maxWrap], 'bcv-conv__settings'), noteEl, listCard, run, serviceCard);
@@ -416,7 +426,7 @@
       noteEl.textContent = st.note;
       dropSub.textContent = connected() ? 'DOCX · PPTX · XLSX · PDF · images · HEIC · TXT · MD · CSV · JSON' : 'DOCX · PDF · images · TXT · MD · CSV · JSON';
       p.setSub(cloudOn() ? 'Word, PDF, slides and sheets go through CloudConvert.' : connected() ? 'Runs on this device; CloudConvert for what only it can do.' : DEVICE_SUB);
-      if (footEl) footEl.textContent = cloudOn() ? 'A Word document becomes a real PDF through CloudConvert, laid out as the original.' : DEVICE_FOOT;
+      if (footEl) footEl.textContent = cloudOn() ? CLOUD_FOOT : DEVICE_FOOT;
       listCard.hidden = !st.files.length;
       listCard.replaceChildren(
         U.el('bcv-tool__cardhead', [T.label(U.plural(st.files.length, 'file')), h('button', { type: 'button', class: 'bcv-tool__link', text: 'Clear', onclick: () => { st.files = []; st.note = ''; paint(); } })]),

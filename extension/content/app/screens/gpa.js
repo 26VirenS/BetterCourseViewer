@@ -24,6 +24,7 @@
     return letter ? SCALE.findIndex((s) => norm(s[0]) === norm(letter)) : -1;
   };
   const letterFor = (pct) => SCALE.find((s) => pct >= s[1]) || SCALE[SCALE.length - 1];
+  const isPassFail = (t) => typeof t === 'string' && /^p\s*\/\s*f$/i.test(t.trim()); // the setup's Pass/Fail switch, saved in place of a letter
   // Canvas's own letter when the course publishes one, else the standard scale
   const pointsFor = (letter, pct) => (norm(letter) in POINTS ? POINTS[norm(letter)] : letterFor(pct)[2]);
   const gpa2 = (n) => (n === null || n === undefined ? '—' : n.toFixed(2));
@@ -125,8 +126,11 @@
     // ---- the model: every number from a Canvas field or from user input ----------------
     function model() {
       const shown = courses.filter((c) => !hidden.has(String(c.id)));
-      const scored = shown.filter((c) => c.score !== null && c.score !== undefined);
-      const unscored = shown.filter((c) => c.score === null || c.score === undefined);
+      // a pass/fail course (the setup's switch, saved as P/F in place of a target letter) has no
+      // letter to aim at and counts for nothing in the GPA; its score still shows
+      const passFail = shown.filter((c) => isPassFail(targets[c.id]));
+      const scored = shown.filter((c) => c.score !== null && c.score !== undefined && !isPassFail(targets[c.id]));
+      const unscored = shown.filter((c) => (c.score === null || c.score === undefined) && !isPassFail(targets[c.id]));
       const rows = scored.map((c) => {
         const pct = Number(c.score);
         const letter = c.grade ? String(c.grade).replace(/-/g, '−') : letterFor(pct)[0];
@@ -156,7 +160,7 @@
       }
       const today = dayKey();
       const prev = [...snaps].reverse().find((s) => s.date !== today) || null;
-      return { rows, unscored, n, shownCount: shown.length, hiddenList: courses.filter((c) => hidden.has(String(c.id))), termGpa, lowGpa, cum, submitted, onTime, prev };
+      return { rows, unscored, passFail, n, shownCount: shown.length, hiddenList: courses.filter((c) => hidden.has(String(c.id))), termGpa, lowGpa, cum, submitted, onTime, prev };
     }
     const courseLabel = (m) => `${U.plural(m.shownCount, 'course')} · ${m.n} with grades so far`;
     const needText = (r) => (!r.m.known ? 'Target maths needs the course’s assignment list'
@@ -311,6 +315,7 @@
     function courseCard(r, i = 0) {
       const c = r.c;
       const ungraded = !!r.ungraded;
+      const pf = !!r.passFail;
       const pct = ungraded ? null : r.pct;
       const cats = gmFor(c).legend; // groups with graded work, in Canvas's order (weighted first)
       let hover = false;
@@ -318,14 +323,15 @@
       const svg = ringSvg(c, pct, [], false, entered ? null : Math.min(i * 70, 380)); // rings sweep in 70ms apart down the grid
       const catsG = svgEl('g', { class: 'bcv-gpa__cats' });
       svg.append(catsG);
-      const letter = h('span', { class: 'bcv-gpa__ringletter', style: { color: ungraded ? 'var(--bcv-ink3)' : c.palette.text }, text: ungraded ? 'N/A' : r.letter });
+      const letter = h('span', { class: 'bcv-gpa__ringletter', style: { color: ungraded ? 'var(--bcv-ink3)' : c.palette.text }, text: ungraded ? 'N/A' : pf ? 'P/F' : r.letter });
       const ringWrap = h('div', { class: 'bcv-gpa__ringwrap' }, [svg, letter]);
       const ringBox = h('div', { class: 'bcv-gpa__ringbox', title: cats.length ? 'Hover for the group breakdown' : null }, ringWrap);
       const info = h('div', { class: 'bcv-gpa__cinfo' });
       const hideSlot = h('div', { class: 'bcv-gpa__hideslot' }, h('button', { type: 'button', class: 'bcv-gpa__hide', title: 'Hide this course', 'aria-label': `Hide ${c.shortName || c.name} from the GPA`, onclick: () => hideCourse(c) }, U.svg(EYE_OFF, { size: 14, stroke: 'currentColor', width: 1.9 })));
       const targetChip = ungraded
         ? h('span', { class: 'bcv-gpa__cchip bcv-gpa__cchip--na', text: 'No grade yet' })
-        : h('span', { class: 'bcv-gpa__cchip', style: { background: c.palette.tint, color: c.palette.text }, text: `Target ${r.target[0]}` });
+        : pf ? h('span', { class: 'bcv-gpa__cchip bcv-gpa__cchip--na', text: 'Pass/Fail' })
+          : h('span', { class: 'bcv-gpa__cchip', style: { background: c.palette.tint, color: c.palette.text }, text: `Target ${r.target[0]}` });
       ringBox.addEventListener('mouseenter', () => { if (!hover && cats.length) { hover = true; paint(); } });
       ringBox.addEventListener('mouseleave', () => { if (hover) { hover = false; paint(); } });
       card.append(
@@ -333,10 +339,10 @@
         h('div', {}, [
           U.el('bcv-gpa__cbar', [
             h('div', { class: 'bcv-gpa__cfill', style: { width: `${ungraded ? 0 : clamp(pct, 0, 100)}%`, background: c.color } }),
-            ungraded ? null : h('span', { class: 'bcv-gpa__tick', title: `Target ${r.target[0]}`, style: { left: `${Math.min(100, r.target[1])}%` } }),
+            ungraded || pf ? null : h('span', { class: 'bcv-gpa__tick', title: `Target ${r.target[0]}`, style: { left: `${Math.min(100, r.target[1])}%` } }),
           ]),
-          U.text(`bcv-gpa__need bcv-pretty ${ungraded ? '' : needClass(r)}`, ungraded ? 'Nothing graded yet — no score to project from' : needText(r)),
-          U.text('bcv-gpa__cnote', ungraded ? 'Canvas has not computed a score, so it counts for nothing here' : r.m.known ? `${store.fmtPts(r.m.earned)} pts earned so far` : 'Score as Canvas reports it'),
+          U.text(`bcv-gpa__need bcv-pretty ${ungraded || pf ? '' : needClass(r)}`, ungraded ? 'Nothing graded yet — no score to project from' : pf ? 'Pass/Fail — no letter to aim at' : needText(r)),
+          U.text('bcv-gpa__cnote', ungraded ? 'Canvas has not computed a score, so it counts for nothing here' : pf ? 'Counts for nothing in the GPA' : r.m.known ? `${store.fmtPts(r.m.earned)} pts earned so far` : 'Score as Canvas reports it'),
         ]),
         U.el('bcv-gpa__cfoot', [
           targetChip,
@@ -383,7 +389,7 @@
           : U.el('bcv-gpa__cbody', [
             U.text('bcv-gpa__ccode bcv-ellip', c.shortName || c.name),
             U.text('bcv-gpa__cname bcv-ellip', c.nickname ? c.originalName : (c.code || c.name)),
-            U.el('bcv-gpa__cscore', [U.text('bcv-gpa__cpct', ungraded ? 'N/A' : `${store.fmtPts(pct)}%`, 'span'), U.text('bcv-gpa__cpts', ungraded ? '— pts' : `${r.pts.toFixed(1)} pts`, 'span')]),
+            U.el('bcv-gpa__cscore', [U.text('bcv-gpa__cpct', ungraded ? 'N/A' : `${store.fmtPts(pct)}%`, 'span'), U.text('bcv-gpa__cpts', ungraded || pf ? '— pts' : `${r.pts.toFixed(1)} pts`, 'span')]),
           ]));
         hideSlot.hidden = hover;
         targetChip.hidden = hover && !ungraded;
@@ -392,7 +398,7 @@
       return card;
     }
     function courseGrid(m) {
-      const cards = [...m.rows, ...m.unscored.map((c) => ({ c, ungraded: true }))];
+      const cards = [...m.rows, ...m.passFail.map((c) => (c.score === null || c.score === undefined ? { c, ungraded: true, passFail: true } : { c, passFail: true, pct: Number(c.score) })), ...m.unscored.map((c) => ({ c, ungraded: true }))];
       return h('div', {}, [
         U.el('bcv-group__head', [U.h2('All courses'), U.text('bcv-group__sub bcv-ml-auto', 'Hover a ring for the group breakdown', 'span')]),
         cards.length ? U.el('bcv-gpa__grid', cards.map((r, i) => U.enter(courseCard(r, i), i, 55))) : U.emptyCard(m.hiddenList.length ? 'Every course is hidden.' : 'No current courses.'),
@@ -440,17 +446,19 @@
       }
       function paint() {
         const m = current || model();
-        const r = m.rows.find((x) => x.c.id === c.id) || null; // null: no Canvas score yet
+        const r = m.rows.find((x) => x.c.id === c.id) || null; // null: no Canvas score yet, or a pass/fail course
+        const pf = isPassFail(targets[c.id]);
+        const pfPct = pf && c.score !== null && c.score !== undefined ? Number(c.score) : null;
         const gm = gmFor(c);
         const cats = gm.legend;
         const head = U.el('bcv-sheet__head bcv-gpa-detail__head', [
-          h('div', { class: 'bcv-gpa-detail__ring' }, ringSvg(c, r ? r.pct : null, cats, true)),
+          h('div', { class: 'bcv-gpa-detail__ring' }, ringSvg(c, r ? r.pct : pfPct, cats, true)),
           U.el('bcv-sheet__titles', [
             U.text('bcv-gpa-detail__title bcv-ellip', c.shortName || c.name),
             U.text('bcv-gpa-detail__name', c.nickname ? c.originalName : (c.code || c.name)),
             U.el('bcv-gpa-detail__line', [
-              U.text('bcv-gpa-detail__pct', r ? `${store.fmtPts(r.pct)}%` : 'N/A', 'span'),
-              h('span', { class: 'bcv-gpa-detail__letter', style: r ? { background: c.palette.tint, color: c.palette.text } : null, text: r ? r.letter : 'No grade yet' }),
+              U.text('bcv-gpa-detail__pct', r ? `${store.fmtPts(r.pct)}%` : pfPct !== null ? `${store.fmtPts(pfPct)}%` : 'N/A', 'span'),
+              h('span', { class: 'bcv-gpa-detail__letter', style: r || pfPct !== null ? { background: c.palette.tint, color: c.palette.text } : null, text: r ? r.letter : pf ? 'Pass/Fail' : 'No grade yet' }),
               r ? U.el('bcv-gpa-detail__target', [
                 U.text('bcv-gpa-detail__tlabel', 'Target', 'span'),
                 h('button', { type: 'button', class: 'bcv-gpa-detail__step', text: '−', 'aria-label': 'Lower the target', disabled: r.idx >= SCALE.length - 1 || null, onclick: () => bump(r, 1) }),
