@@ -39,10 +39,26 @@ if (typeof importScripts === 'function' && !self.BCV?.settings) {
       case 'pushSettings': // the popup and the settings page ask for this straight after a save
         reply(S.get().then(pushSettings).then(() => ({ ok: true })));
         return true;
+      case 'inject': // a bundled library, into the tab that asks for it (the Tools tab's file converter)
+        reply(injectVendor(sender, msg.files));
+        return true;
       default:
         return false;
     }
   });
+
+  // The converter's libraries (lib/vendor/, see LICENSES.txt there) are too big to run on every
+  // Canvas page as content scripts, so a page asks for them when a tool needs them and they land
+  // in that page's isolated world beside our own scripts. Nothing outside lib/vendor/ can be asked
+  // for, and nothing is fetched: the files travel with the build.
+  const VENDOR = new Set(['lib/vendor/mammoth.browser.min.js', 'lib/vendor/jspdf.umd.min.js', 'lib/vendor/pdf.min.js', 'lib/vendor/pdf.worker.min.js']);
+  async function injectVendor(sender, files) {
+    const list = Array.isArray(files) ? files.filter((f) => VENDOR.has(f)) : [];
+    if (!list.length) throw new Error('Nothing to load');
+    if (!sender?.tab?.id || !api.scripting?.executeScript) throw new Error('Not available here');
+    await api.scripting.executeScript({ target: { tabId: sender.tab.id, frameIds: [sender.frameId || 0] }, files: list });
+    return { ok: true, files: list };
+  }
 
   // A settings change has to reach the open Canvas tabs, and storage.onChanged is not a reliable way
   // to get it there: in Safari a content script often never hears a change written by the popup or

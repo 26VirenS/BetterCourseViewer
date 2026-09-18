@@ -1,0 +1,9 @@
+Third-party libraries bundled for the Tools tab's file converter (content/app/tools/convert.js).
+They are packaged with the extension and injected into a Canvas tab only when the converter needs
+them (background.js, the "inject" message); nothing is fetched from the network.
+
+mammoth.browser.min.js — mammoth.js 1.x, BSD 2-Clause — https://github.com/mwilliamson/mammoth.js
+jspdf.umd.min.js       — jsPDF 2.5.2, MIT                — https://github.com/parallax/jsPDF
+pdf.min.js             — pdf.js 3.11.174, Apache-2.0     — https://github.com/mozilla/pdf.js
+pdf.worker.min.js      — pdf.js 3.11.174, Apache-2.0     — (loaded beside pdf.min.js so it runs on
+                         the main thread: a content script cannot start a worker from the extension)

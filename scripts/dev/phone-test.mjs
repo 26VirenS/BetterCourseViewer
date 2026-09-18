@@ -238,7 +238,7 @@ try {
   await page.click('.bcv-ph-avatar');
   await sheet();
   const acct = await texts('.bcv-ph-srow__label');
-  check(acct.join(',') === 'Inbox,Groups,History,My Materials,Help,Dark appearance,Settings,Locked quizzes,Guided setup,What’s new,Profile,All Canvas settings,Log out', `account sheet rows, with the school's own nav entries: ${acct.join(', ')} (no Sign out outside the app)`);
+  check(acct.join(',') === 'Inbox,Groups,Tools,History,My Materials,Help,Dark appearance,Settings,Locked quizzes,Guided setup,What’s new,Profile,All Canvas settings,Log out', `account sheet rows, with Tools and the school's own nav entries: ${acct.join(', ')} (no Sign out outside the app)`);
   check((await texts('.bcv-ph-srow__note'))[0] === 'No unread messages' || /unread message/.test((await texts('.bcv-ph-srow__note'))[0]), `Inbox row carries the unread count: ${(await texts('.bcv-ph-srow__note'))[0]}`);
   await shot('01c-account-sheet');
   await page.evaluate(() => { window.__bcvMarker = 1; });
@@ -654,6 +654,33 @@ try {
   await sheet();
   check((await texts('.bcv-ph-srow__label')).includes('Guided setup') && (await texts('.bcv-ph-srow__label')).includes('What’s new'), 'the account sheet offers the guided setup and What’s new');
   await closeSheet();
+
+  // ---- Tools on a phone: under the avatar; the first press goes black, the words alone (no switch to drag to) ----
+  console.log('tools');
+  await sw.evaluate(() => self.BCV.api.storage.local.remove(['tools:welcomed', 'tools:decks']));
+  await page.click('.bcv-ph-avatar');
+  await sheet();
+  check((await texts('.bcv-ph-srow__label')).includes('Tools'), 'the account sheet has a Tools row');
+  await page.click('.bcv-ph-srow:has-text("Tools")');
+  await page.waitForSelector('#bcv-welcome[data-stage="tools"]', { timeout: 20000 });
+  const twAt = Date.now();
+  check(page.url() === `${BASE}/#tools` && (await page.$eval('#bcv-welcome', (e) => getComputedStyle(e).backgroundColor)) === 'rgb(0, 0, 0)' && (await texts('.bcv-welcome__title'))[0] === 'Some helpful things' && (await texts('.bcv-welcome__hint'))[0] === 'some tools to help you do more, quickly.' && await noOverflow(), 'the first press on Tools: black, the title and the gray line under it');
+  check(await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000) && Date.now() - twAt >= 3000, 'Continue comes in after four seconds');
+  await page.waitForTimeout(400);
+  await page.screenshot({ path: join(out, 'phone-13-tools-welcome.png') });
+  await page.click('.bcv-welcome__next');
+  await page.waitForFunction(() => !document.querySelector('#bcv-welcome'), null, { timeout: 5000 });
+  check((await page.$$('.bcv-tool-card')).length === 5 && (await texts('.bcv-topbar__title'))[0] === 'Tools' && await noOverflow() && (await page.$eval('#bcv-pins', (e) => getComputedStyle(e).display).catch(() => 'none')) === 'none' && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('tools:welcomed'))['tools:welcomed'])) === true, 'one Continue (a phone has no switch to drag to): the five cards in one column, no pins, the welcome marked seen');
+  await shot('13b-tools');
+  await page.click('.bcv-tool-card[data-tool="fc"]');
+  await page.waitForSelector('.bcv-tool[data-tool="fc"]', { timeout: 5000 });
+  await page.click('.bcv-fc__new');
+  await page.waitForSelector('.bcv-fc__name', { timeout: 3000 });
+  check((await page.$eval('.bcv-tool', (e) => { const r = e.getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth + 1 && r.top >= 0 && r.bottom <= innerHeight + 1; })) && (await page.$eval('.bcv-fc__name', (e) => e.value)) === 'Untitled deck' && (await texts('.bcv-tool__title'))[0] === 'Untitled deck', 'a tool opens as a popup that fits the phone screen');
+  await page.screenshot({ path: join(out, 'phone-13c-tools-deck.png') });
+  await page.keyboard.press('Escape');
+  await eventually(async () => !(await page.$('.bcv-tool-ov')));
+  check((await page.$('.bcv-tool-ov')) === null && page.url() === `${BASE}/#tools`, 'Escape closes it and leaves the page where it was');
 
   // ---- what's new after an update, on a phone ---------------------------------------------------
   console.log("what's new");

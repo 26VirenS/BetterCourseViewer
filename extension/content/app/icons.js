@@ -61,5 +61,19 @@
     // mockup 12: To Do priority flag and the student's own tasks
     flag: 'M6 4v16M6 4h11l-2 4 2 4H6',
     task: 'M9 11l3 3 5-6M5 5h14v14H5z',
+    // the Tools mockup: the sidebar row, the five tools and their popups
+    tool: 'M14.5 3.5a5 5 0 0 0-6 6l-5 5V20h4l5-5a5 5 0 0 0 6-6l-3 3-3-3z',
+    timer: 'M12 7.5a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM12 11v3.5l2.5 1.5M9.5 3.5h5M12 3.5v4',
+    graph: 'M4 20V4M4 20h16M7.5 16.5c2-8 4.5-9 6-4.5s3 5 4.5 1',
+    convert: 'M7 4h7l4 4v12H7zM14 4v4h4M4.5 10.5v6h6M4.5 16.5l3-3',
+    cards: 'M7.5 7.5h11v11h-11zM5 15.5V5h10',
+    quote: 'M9 6.5C6.5 8 5.5 10 5.5 13v4.5h5V11H8c0-1.5.5-2.5 2-3.5zM18 6.5c-2.5 1.5-3.5 3.5-3.5 6.5v4.5h5V11H17c0-1.5.5-2.5 2-3.5z',
+    globe: 'M12 3.5a8.5 8.5 0 1 0 0 17 8.5 8.5 0 0 0 0-17zM3.5 12h17M12 3.5c2.5 2.3 2.5 14.2 0 17-2.5-2.8-2.5-14.7 0-17z',
+    journal: 'M6 3.5h9l4 4v13H6zM15 3.5v4h4M9.5 13h6M9.5 16.5h4',
+    slides: 'M4 5h16v10H4zM12 15v4M8.5 19h7',
+    upload: 'M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19.5h14',
+    play: 'M8 5l11 7-11 7z',
+    pause: 'M9 6v12M15 6v12',
+    pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
 })();

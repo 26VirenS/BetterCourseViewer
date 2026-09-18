@@ -67,7 +67,7 @@
     const params = url.searchParams;
     const hash = url.hash.replace(/^#/, '');
     const r = { url: url.pathname + url.search + url.hash, path, params, hash, screen: 'native', courseId: null, tab: null, arg: null, sub: null };
-    if (path === '/' || path === '/dashboard') r.screen = hash === 'todo' ? 'todo' : hash === 'notifications' ? 'notifications' : 'dashboard';
+    if (path === '/' || path === '/dashboard') r.screen = hash === 'todo' ? 'todo' : hash === 'notifications' ? 'notifications' : hash === 'tools' ? 'tools' : 'dashboard';
     else if (path === '/courses') r.screen = 'courses';
     else if (path === '/groups') r.screen = 'groups';
     else if (path === '/calendar' || path === '/calendar2') r.screen = 'calendar';
@@ -114,7 +114,7 @@
   const TAB_NAMES = { home: 'Home', stream: 'Stream', announcements: 'Announcements', assignments: 'Assignments', discussions: 'Discussions', grades: 'Grades', people: 'People', pages: 'Pages', files: 'Files', folder: 'Files', file: 'Files', quizzes: 'Quizzes', modules: 'Modules', syllabus: 'Syllabus', announcement: 'Announcement', discussion: 'Discussion', assignment: 'Assignment', page: 'Page', quiz: 'Quiz' };
   /** What to call a screen on a Back button: a root screen's nav name, a course tab's name, the course itself for its home. */
   function labelFor(r) {
-    const root = { dashboard: BCV.phone?.active() ? 'Today' : 'Dashboard', courses: 'Courses', groups: 'Groups', todo: 'To Do', calendar: 'Calendar', inbox: 'Inbox', gpa: 'Grades', notifications: 'Notifications' }[r.screen];
+    const root = { dashboard: BCV.phone?.active() ? 'Today' : 'Dashboard', courses: 'Courses', groups: 'Groups', todo: 'To Do', calendar: 'Calendar', inbox: 'Inbox', gpa: 'Grades', notifications: 'Notifications', tools: 'Tools' }[r.screen];
     if (root) return root;
     if (r.screen === 'course' || r.screen === 'group') {
       if (!r.tab || r.tab === 'home') {
@@ -365,6 +365,7 @@
     ['notifications', 'Notifications', IC.bell, '#ff453a', '/#notifications', state.notifCount ? String(state.notifCount) : ''],
     ['inbox', 'Inbox', IC.mail, '#0a84ff', '/conversations', state.unread ? String(state.unread) : ''],
     ['gpa', 'Grades', IC.chart, state.dark ? '#c874f5' : '#af52de', '/grades', ''], // purple: Calendar already has the indigo
+    ['tools', 'Tools', IC.tool, '#30b0c7', '/#tools', ''], // one row at the bottom, however many tools ship: the tools are cards on its page
   ];
 
   function siteName() {
@@ -596,6 +597,7 @@
       ]),
       BCV.extras?.sideGroup?.(BCV.app), // what the school added to Canvas's own nav (tools, History, Help)
       U.el('bcv-side__bottom', [
+        BCV.tools?.chipSlot?.(BCV.app), // the focus timer while a session is going: the time left, the phase, Break or Focus under the pointer
         h('button', { type: 'button', class: 'bcv-theme-btn', id: 'bcv-theme-btn', onclick: toggleTheme }, [
           h('span', { class: 'bcv-theme-btn__ic' }, U.svg(state.dark ? IC.sun : IC.moon, { size: 14, width: 1.8 })),
           h('span', { text: state.dark ? 'Light appearance' : 'Dark appearance' }),
@@ -669,7 +671,7 @@
   // own icon colour until the screen is drawn; a fresh page lights the row for its route as soon as
   // the sidebar mounts. There is no separate bar: one indicator, attached to the thing that caused
   // the wait. state.loadKey names WHICH control is loading (a boolean would light every row).
-  const NAV_KEY = { dashboard: 'dashboard', todo: 'todo', notifications: 'notifications', courses: 'courses', groups: 'groups', group: 'groups', calendar: 'calendar', inbox: 'inbox', gpa: 'gpa' };
+  const NAV_KEY = { dashboard: 'dashboard', todo: 'todo', notifications: 'notifications', courses: 'courses', groups: 'groups', group: 'groups', calendar: 'calendar', inbox: 'inbox', gpa: 'gpa', tools: 'tools' };
   /** Canvas's own page for the attempt on screen — where turning the look off mid-quiz should land. */
   function rawQuizUrl() {
     const r = state.route;
@@ -796,6 +798,7 @@
     if (self.BCVBridge?.native) return false; // the app holds its own session
     if (inQuiz() || quizHere()) { here(); return false; } // never on a quiz, and no note either
     if (BCV.welcome?.active()) { here(); return false; } // the welcome after the setup is not reloaded out from under
+    if (BCV.tools?.focusActive()) { here(); return false; } // a focus session is going: no reload under it (it ends by itself, so this holds for one phase at most)
     return awayRefresh();
   }
   // The reload is announced before it happens: a pill floats down from the top of the page — a dial
@@ -993,7 +996,7 @@
   }
 
   function titleFor(r) {
-    const base = { dashboard: 'Dashboard', courses: 'Courses', groups: 'Groups', todo: 'To Do', calendar: 'Calendar', inbox: 'Inbox', gpa: 'Grades', notifications: 'Notifications' }[r.screen];
+    const base = { dashboard: 'Dashboard', courses: 'Courses', groups: 'Groups', todo: 'To Do', calendar: 'Calendar', inbox: 'Inbox', gpa: 'Grades', notifications: 'Notifications', tools: 'Tools' }[r.screen];
     return base ? `${base} · ${siteName()}` : document.title;
   }
 
@@ -1198,6 +1201,7 @@
     if (welcome) BCV.welcome.cover();
     await applySkin(state.lookOn);
     mountLookToggle();
+    if (state.lookOn) { BCV.tools?.mountPins?.(); BCV.tools?.focusLoad?.().catch(() => {}); } // the pinned tools beside the switch; the focus timer's clock, so a session going is known
     if (welcome) BCV.welcome.open(BCV.app).catch(() => {});
     // The first Canvas page after an update shows what changed: once per version, never over the
     // setup, the welcome, the tour or a quiz attempt, and never on a fresh install (the setup marks its version seen).

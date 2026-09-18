@@ -19,8 +19,14 @@
     arrows: 'M4 12h16M10 6l-6 6 6 6M14 6l6 6-6 6',
     clip: 'M21 11l-9 9a5 5 0 01-7-7l9-9a3 3 0 014 4l-9 9a1 1 0 01-2-2l8-8',
     clock: 'M12 5a8 8 0 100 16 8 8 0 000-16zM12 9v4l3 2',
+    tool: 'M14.5 3.5a5 5 0 0 0-6 6l-5 5V20h4l5-5a5 5 0 0 0 6-6l-3 3-3-3z',
+    pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.17.0', date: '2026-09-18', notes: [
+      { kind: 'new', title: 'Tools', body: 'Citations, a focus timer, Desmos, a file converter and flashcards.', icon: P.tool },
+      { kind: 'new', title: 'Pin a tool', body: 'Drag a tool card to the top. It becomes a button next to the switch.', icon: P.pin },
+    ] },
     { version: '2.16.1', date: '2026-09-18', notes: [
       { kind: 'improved', title: 'Tips after setup', body: 'Continue waits a little longer.', icon: P.sparkle },
     ] },

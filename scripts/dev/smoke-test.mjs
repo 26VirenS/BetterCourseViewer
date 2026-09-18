@@ -200,7 +200,7 @@ try {
   await page.goto(`${BASE}/`);
   await page.waitForSelector('#bcv-app .bcv-nav__item', { timeout: 10000 });
   const navItems = await texts('.bcv-nav .bcv-nav__item');
-  check(navItems.length === 8 && navItems[0].startsWith('Dashboard') && /^Notifications( \d+)?$/.test(navItems[5]) && navItems[6].startsWith('Inbox') && navItems[7] === 'Grades', `sidebar nav: ${navItems.join(' | ')}`);
+  check(navItems.length === 9 && navItems[0].startsWith('Dashboard') && /^Notifications( \d+)?$/.test(navItems[5]) && navItems[6].startsWith('Inbox') && navItems[7] === 'Grades' && navItems[8] === 'Tools', `sidebar nav: ${navItems.join(' | ')}`);
   await waitText('.bcv-nav__item[data-nav="todo"] .bcv-nav__count', /\d/);
   const todoCount = Number((await texts('.bcv-nav__item[data-nav="todo"] .bcv-nav__count'))[0]);
   check(todoCount >= 8, `To Do count in nav = ${todoCount}`);
@@ -2577,6 +2577,208 @@ try {
   check(body.get('_method') === 'delete' && body.get('authenticity_token') === 'mock+csrf/token=', `Log out submits Canvas's own logout form with the session's token, decoded from the cookie: ${logoutReq.postData()}`);
   await page.waitForFunction(() => /Logged out|Page Error/.test(document.body.textContent), null, { timeout: 10000 });
   check(await page.evaluate(() => /Logged out/.test(document.body.textContent) && !/Page Error/.test(document.body.textContent)), 'Canvas accepts it and logs the session out (no "Page Error")');
+
+  // ---- Tools: one row, a page of cards, each tool in a popup; a card dragged to the top is a pin ----------
+  console.log('tools');
+  await sw.evaluate(() => self.BCV.api.storage.local.remove(['tools:welcomed', 'tools:pins', 'tools:decks', 'tools:citations', 'tools:focus']));
+  // a few reads and pokes in the page's own world (the content scripts' isolated world, through the background)
+  const inPage = (op) => sw.evaluate(async ([base, o]) => {
+    const [tab] = await chrome.tabs.query({ url: `${base}/*` });
+    const [{ result }] = await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'ISOLATED', args: [o], func: (what) => {
+      if (what === 'stale') { self.BCV.app.state.lastHere = Date.now() - 4 * 60 * 1000; return true; }
+      if (what === 'focusActive') return self.BCV.tools.focusActive();
+      if (what === 'jspdf') return !!self.jspdf?.jsPDF;
+      return null;
+    } });
+    return result;
+  }, [BASE, op]);
+  await page.goto(`${BASE}/#tools`);
+  // the first press: the screen goes black and says what Tools is, then shows the drag
+  await page.waitForSelector('#bcv-welcome[data-stage="tools"]', { timeout: 20000 });
+  const twAt = Date.now();
+  const noContT = (await page.$('.bcv-welcome__next:not([hidden])')) === null;
+  const tLines = () => page.$$eval('#bcv-welcome .bcv-welcome__kicker, #bcv-welcome .bcv-welcome__title, #bcv-welcome .bcv-welcome__hint', (els) => els.map((e) => e.textContent));
+  check((await page.$eval('#bcv-welcome', (e) => getComputedStyle(e).backgroundColor)) === 'rgb(0, 0, 0)' && (await tLines()).join(' | ') === 'Some helpful things | some tools to help you do more, quickly.' && (await page.$eval('.bcv-welcome__hint', (e) => getComputedStyle(e).color)) === 'rgba(255, 255, 255, 0.5)' && (await page.$('.bcv-welcome__arrow')) === null, `the first press on Tools: black, the title and the gray line under it (${(await tLines()).join(' | ')})`);
+  check(noContT && await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000) && Date.now() - twAt >= 3000, 'Continue comes in after four seconds');
+  await page.waitForTimeout(400);
+  await shot(page, '36-tools-welcome');
+  await page.click('.bcv-welcome__next');
+  await page.waitForSelector('#bcv-welcome[data-stage="pin"]', { timeout: 5000 });
+  const demo = await page.$eval('#bcv-welcome', (e) => ({ look: !!e.querySelector('.bcv-welcome__look--folded'), card: e.querySelector('.bcv-welcome__democard .bcv-tool-card__name')?.textContent, pin: !!e.querySelector('.bcv-welcome__demopin .bcv-pin__btn'), cursor: !!e.querySelector('.bcv-welcome__cursor'), anim: getComputedStyle(e.querySelector('.bcv-welcome__democard')).animationName, loops: getComputedStyle(e.querySelector('.bcv-welcome__democard')).animationIterationCount }));
+  check(demo.look && demo.card === 'Focus timer' && demo.pin && demo.cursor && demo.anim === 'bcv-welcome-drag' && demo.loops === 'infinite' && (await tLines()).join(' | ') === 'Tools | Drag a tool to the top | It becomes a small button next to the Simpl Courses switch, on every page.', `then the drag is shown, round and round: a card pulled to the top turning into a pin beside the folded switch (${JSON.stringify(demo)})`);
+  await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000);
+  await page.waitForTimeout(1800);
+  await shot(page, '36b-tools-welcome-pin');
+  await page.click('.bcv-welcome__next');
+  await page.waitForFunction(() => !document.querySelector('#bcv-welcome'), null, { timeout: 5000 });
+  check((await sw.evaluate(async () => (await self.BCV.api.storage.local.get('tools:welcomed'))['tools:welcomed'])) === true, 'the last Continue takes the black away and marks the welcome seen');
+  // the page: one row at the bottom of the nav, five cards
+  const raw = (sel) => page.$$eval(sel, (els) => els.map((e) => e.textContent.replace(/\s+/g, ' ').trim())); // (textContent: the small labels are drawn in capitals by CSS)
+  const toolNav = await texts('.bcv-nav > .bcv-nav__item');
+  check(toolNav[toolNav.length - 1].startsWith('Tools') && (await page.$eval('.bcv-nav__item[data-nav="tools"]', (e) => e.classList.contains('is-active'))) && (await texts('.bcv-h1'))[0] === 'Tools' && (await texts('.bcv-head__sub'))[0] === 'Things Simpl Courses does on its own.', 'Tools is the last row of the sidebar, lit, and the page is titled');
+  const cardNames = await texts('.bcv-tool-card__name');
+  check(cardNames.join(' | ') === 'Citation generator | Focus timer | Graphing calculator | File converter | Flashcards' && (await page.$$('.bcv-tool-card__open')).length === 5, `five cards, each with Open: ${cardNames.join(' | ')}`);
+  await shot(page, '36c-tools');
+  const closeTool = async () => { await page.keyboard.press('Escape'); await page.waitForFunction(() => !document.querySelector('.bcv-tool-ov'), null, { timeout: 5000 }); };
+  const openTool = async (key) => { await page.click(`.bcv-tool-card[data-tool="${key}"]`); await page.waitForSelector(`.bcv-tool[data-tool="${key}"]`, { timeout: 5000 }); };
+  const toolSub = () => texts('.bcv-tool__sub').then((t) => t[0]);
+  // the citation generator: style and type pick the template, the fields fill it, a guard keeps a
+  // value out of a type that has no field for it
+  await openTool('cite');
+  const fillCite = async (f) => { for (const [k, v] of Object.entries(f)) await page.fill(`.bcv-tool__input[data-field="${k}"]`, v); await page.waitForTimeout(150); };
+  const cite = () => page.$eval('.bcv-cite__preview', (e) => e.textContent.replace(/\s+/g, ' ').trim());
+  check((await texts('.bcv-tool__title'))[0] === 'Citation generator' && (await toolSub()) === 'MLA 9 · 5 to fill' && (await page.$eval('.bcv-cite__copy', (e) => e.disabled)) && (await texts('.bcv-cite__missing'))[0] === 'Add author, page title, website, year, url to finish this citation.' && (await page.$$('.bcv-cite__field.is-needed')).length === 5, 'the citation generator opens on MLA 9 for a website, names the five fields it needs, and keeps Copy and Save inert');
+  await fillCite({ author: 'Jane R. Okonkwo', title: 'How Students Actually Read Syllabi', container: 'The Atlantic', month: 'March', day: '4', year: '2026', url: 'theatlantic.com/education/syllabi-study', accessed: '12 September 2026' });
+  check((await cite()) === 'Okonkwo, Jane R. “How Students Actually Read Syllabi.” The Atlantic, 4 March 2026. theatlantic.com/education/syllabi-study. Accessed 12 September 2026.' && (await page.$eval('.bcv-cite__preview .bcv-cite__i', (e) => e.textContent)) === 'The Atlantic' && (await texts('.bcv-cite__intext'))[0] === '(Okonkwo)' && (await texts('.bcv-cite__badge'))[0] === 'Ready' && !(await page.$eval('.bcv-cite__copy', (e) => e.disabled)) && (await toolSub()) === 'MLA 9 · Ready', `MLA 9 for a website forms as the fields fill, the container in real italics, the in-text form beside it: ${await cite()}`);
+  await page.click('.bcv-tool .bcv-seg__btn[data-value="apa"]');
+  check((await cite()) === 'Okonkwo, J. R. (2026, March 4). How Students Actually Read Syllabi. The Atlantic. https://theatlantic.com/education/syllabi-study' && (await texts('.bcv-cite__intext'))[0] === '(Okonkwo, 2026)', `APA 7 from the same fields, nothing retyped: ${await cite()}`);
+  await page.click('.bcv-tool .bcv-seg__btn[data-value="chicago"]');
+  check((await cite()) === 'Okonkwo, Jane R. “How Students Actually Read Syllabi.” The Atlantic. March 4, 2026. https://theatlantic.com/education/syllabi-study.' && (await texts('.bcv-cite__intext'))[0] === '(Okonkwo 2026)', `Chicago 17: ${await cite()}`);
+  await page.click('.bcv-cite__type[data-type="book"]');
+  await page.waitForSelector('.bcv-tool__input[data-field="publisher"]', { timeout: 3000 });
+  check((await page.$('.bcv-tool__input[data-field="url"]')) === null && !(await cite()).includes('theatlantic') && (await cite()) === 'Okonkwo, Jane R. How Students Actually Read Syllabi. 2026.' && (await page.$eval('.bcv-tool__input[data-field="author"]', (e) => e.value)) === 'Jane R. Okonkwo' && (await toolSub()) === 'Chicago 17 · 1 to fill', `Book keeps the author, title and year, has no URL field, so the website's URL never reaches its citation; the publisher is asked for (${await cite()})`);
+  await page.click('.bcv-cite__type[data-type="website"]');
+  await page.waitForSelector('.bcv-tool__input[data-field="url"]', { timeout: 3000 });
+  await page.click('.bcv-tool .bcv-seg__btn[data-value="mla"]');
+  check((await cite()).startsWith('Okonkwo, Jane R. “How Students Actually Read Syllabi.” The Atlantic, 4 March 2026.') && (await page.$eval('.bcv-tool__input[data-field="url"]', (e) => e.value)) === 'theatlantic.com/education/syllabi-study', 'back on Website the URL is still there: the shared values survive a change of type');
+  await page.click('.bcv-cite__save');
+  await page.waitForSelector('.bcv-cite__savedrow', { timeout: 3000 });
+  const savedCites = await sw.evaluate(async () => (await self.BCV.api.storage.local.get('tools:citations'))['tools:citations']);
+  check((await texts('.bcv-cite__tag'))[0] === 'MLA 9' && Array.isArray(savedCites) && savedCites.length === 1 && savedCites[0].plain.startsWith('Okonkwo, Jane R.') && (await raw('.bcv-tool__label')).includes('Saved · 1'), 'Save keeps the citation on this device, tagged with its style');
+  await shot(page, '37-tools-cite');
+  await closeTool();
+  // the focus timer: kept by the clock, a chip in the sidebar, Away Refresh waits
+  await openTool('pomo');
+  check((await texts('.bcv-pomo__time'))[0] === '25:00' && (await texts('.bcv-pomo__phase'))[0] === 'Focus' && (await texts('.bcv-pomo__big'))[0] === 'Start' && (await toolSub()) === '0 sessions today' && (await page.$('#bcv-fchip .bcv-fchip')) === null, 'the timer opens idle at 25:00, no chip in the sidebar yet');
+  await page.click('.bcv-pomo__len:nth-child(1) .bcv-tool__step:last-child');
+  check(await eventually(async () => (await texts('.bcv-pomo__time'))[0] === '26:00' && (await texts('.bcv-tool__stepval'))[0] === '26 min', 3000), 'a longer Focus length moves the idle count');
+  await page.click('.bcv-pomo__len:nth-child(1) .bcv-tool__step:first-child');
+  await page.click('.bcv-pomo__big');
+  await eventually(async () => (await texts('.bcv-pomo__big'))[0] === 'Pause' && (await page.$('#bcv-fchip .bcv-fchip')) !== null, 4000);
+  const focusRec = await sw.evaluate(async () => (await self.BCV.api.storage.local.get('tools:focus'))['tools:focus']);
+  check((await texts('.bcv-pomo__big'))[0] === 'Pause' && !!focusRec && focusRec.endAt > Date.now() + 24 * 60 * 1000 && focusRec.phase === 'focus' && /^2[45]:\d\d$/.test((await texts('.bcv-fchip__time'))[0]) && (await texts('.bcv-fchip__phase'))[0] === 'Focus', `Start writes the session's end time, not a count, and the chip appears in the sidebar (${JSON.stringify(focusRec)})`);
+  await shot(page, '38-tools-timer');
+  await closeTool();
+  await page.goto(`${BASE}/courses`);
+  check(await eventually(async () => /^24:\d\d$/.test((await texts('.bcv-fchip__time'))[0] || '') && (await page.$eval('#bcv-fchip .bcv-fchip__switch', (e) => e.textContent).catch(() => '')) === 'Break', 5000), 'the session survives a page change: the chip is on the next page, with Break under the pointer');
+  await inPage('stale');
+  await page.keyboard.press('Shift');
+  await page.waitForTimeout(500);
+  check((await page.$('#bcv-away')) === null && (await inPage('focusActive')) === true && page.url() === `${BASE}/courses`, 'a stale page is not reloaded out from under a session: no Away Refresh pill');
+  await page.hover('#bcv-fchip .bcv-fchip');
+  await page.click('#bcv-fchip .bcv-fchip__switch');
+  await eventually(async () => (await texts('.bcv-fchip__phase'))[0] === 'Break', 3000);
+  const afterBreak = await sw.evaluate(async () => (await self.BCV.api.storage.local.get('tools:focus'))['tools:focus']);
+  check(afterBreak.phase === 'short' && afterBreak.endAt > Date.now() + 4 * 60 * 1000 && (await texts('.bcv-fchip__phase'))[0] === 'Break' && /^[45]:\d\d$/.test((await texts('.bcv-fchip__time'))[0]), 'Break under the pointer switches to a short break at once, without opening the tool');
+  await page.click('#bcv-fchip .bcv-fchip__time');
+  await page.waitForSelector('.bcv-tool[data-tool="pomo"]', { timeout: 5000 });
+  await page.click('.bcv-pomo__reset');
+  await eventually(async () => (await texts('.bcv-pomo__big'))[0] === 'Start', 3000);
+  await closeTool();
+  check((await page.$('#bcv-fchip .bcv-fchip')) === null && (await inPage('focusActive')) === false, 'the chip opens the timer; Reset ends the session and the chip goes');
+  // the graphing calculator: Desmos in a frame, the way out beside it
+  await page.goto(`${BASE}/#tools`);
+  await openTool('graph');
+  const graphTall = await eventually(() => page.$eval('.bcv-tool[data-tool="graph"]', (e) => e.getBoundingClientRect().height >= 600).catch(() => false), 3000); // (the popup grows in from the card)
+  check((await page.$eval('.bcv-graph__frame', (e) => e.getAttribute('src'))) === 'https://www.desmos.com/calculator' && (await page.$eval('.bcv-graph__out', (e) => e.href)) === 'https://www.desmos.com/calculator' && graphTall && (await toolSub()) === 'Powered by Desmos', 'the graphing calculator is Desmos in a frame, tall, with the way out to desmos.com beside it');
+  await closeTool();
+  // the file converter: the source kind decides the targets; images on the canvas, a PDF from an engine loaded when first needed
+  await openTool('conv');
+  check((await toolSub()) === 'Runs on this device. Nothing is uploaded.' && (await page.$eval('.bcv-conv__run', (e) => e.disabled)) && /text-layout PDF/.test((await texts('.bcv-sheet__foot'))[0]), 'the converter opens empty, says nothing is uploaded and what a Word document becomes');
+  const tinyPng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAAF0lEQVR42mNk+M/wn4EIwDiqkL4KAQC8oQn/Y0k3bwAAAABJRU5ErkJggg==', 'base64');
+  await page.setInputFiles('.bcv-conv__drop input[type=file]', [{ name: 'tiny.png', mimeType: 'image/png', buffer: tinyPng }, { name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('hello') }]);
+  await page.waitForSelector('.bcv-conv__row', { timeout: 5000 });
+  check((await texts('.bcv-conv__formats .bcv-seg__btn')).join(' | ') === 'PNG | JPEG | WebP | PDF' && (await raw('.bcv-tool__label'))[0] === 'Images → convert to' && (await texts('.bcv-tool__note'))[0] === '1 file of a different type ignored' && (await page.$$('.bcv-conv__row')).length === 1 && /8 × 8 · 1 KB/.test((await texts('.bcv-conv__meta'))[0]) && !(await page.$eval('.bcv-conv__opt', (e) => e.hidden)), 'an image sets the targets and shows the image controls; a text file dropped alongside is reported as ignored, not silently dropped');
+  await page.click('.bcv-conv__formats .bcv-seg__btn[data-value="webp"]');
+  await page.click('.bcv-conv__run');
+  await page.waitForSelector('.bcv-conv__outlabel', { timeout: 10000 });
+  check(/^\d+ KB · 8 × 8$/.test((await texts('.bcv-conv__outlabel'))[0]) && (await page.$('.bcv-conv__delta')) !== null, `an image converts on the canvas, in the page, with the size change beside it: ${(await texts('.bcv-conv__outlabel'))[0]} ${(await texts('.bcv-conv__delta'))[0]}`);
+  await page.click('.bcv-conv__list .bcv-tool__link');
+  await page.setInputFiles('.bcv-conv__drop input[type=file]', [{ name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('# Title\n\nHello there.\n\nSecond paragraph.') }]);
+  await page.waitForSelector('.bcv-conv__row', { timeout: 5000 });
+  check((await raw('.bcv-tool__label'))[0] === 'Text → convert to' && (await texts('.bcv-conv__formats .bcv-seg__btn')).join(' | ') === 'PDF' && (await page.$$eval('.bcv-conv__opt', (els) => els.every((e) => e.hidden))) && (await texts('.bcv-conv__ext'))[0] === 'TXT', 'a text file offers PDF alone, and the image controls go');
+  await page.click('.bcv-conv__run');
+  await page.waitForFunction(() => document.querySelector('.bcv-conv__outlabel, .bcv-conv__err'), null, { timeout: 20000 });
+  check(((await texts('.bcv-conv__outlabel'))[0] || '').endsWith('· 1 page') && (await page.$('.bcv-conv__delta')) === null && (await inPage('jspdf')), `a text file becomes a PDF: the engine lands in the page when first needed, and no size badge for a cross-format conversion (${(await texts('.bcv-conv__outlabel, .bcv-conv__err'))[0]})`);
+  await shot(page, '39-tools-convert');
+  await closeTool();
+  // flashcards: decks kept here, imported from CSV, Study and Learn
+  await openTool('fc');
+  check((await toolSub()) === '0 decks' && (await page.$('.bcv-fc__deck')) === null && (await texts('.bcv-fc__actions .bcv-btn')).join(' | ') === 'New deck | Import CSV | Download template', 'flashcards start with no decks: New deck, Import CSV and a template');
+  await page.setInputFiles('.bcv-fc input[type=file]', [{ name: 'derivatives.csv', mimeType: 'text/csv', buffer: Buffer.from('Term,Definition\nPower rule,"d/dx x^n = n*x^(n-1)"\nSum rule,"one, two"\n') }]);
+  await page.waitForSelector('.bcv-fc__editrow', { timeout: 5000 });
+  check((await texts('.bcv-tool__note'))[0] === '2 cards imported.' && (await page.$$('.bcv-fc__editrow')).length === 2 && (await page.$$eval('.bcv-fc__editrow .bcv-fc__def', (els) => els.map((e) => e.value))).join(' | ') === 'd/dx x^n = n*x^(n-1) | one, two' && (await page.$eval('.bcv-fc__name', (e) => e.value)) === 'derivatives' && (await texts('.bcv-tool__title'))[0] === 'derivatives', 'Import CSV: the header row is skipped, a quoted comma survives, the deck is named after the file');
+  await page.click('.bcv-fc__add');
+  await page.waitForFunction(() => document.querySelectorAll('.bcv-fc__editrow').length === 3, null, { timeout: 3000 });
+  await page.locator('.bcv-fc__editrow').nth(2).locator('.bcv-fc__term').fill('Chain rule');
+  await page.locator('.bcv-fc__editrow').nth(2).locator('.bcv-fc__def').fill('outer times inner');
+  await page.click('.bcv-tool__back');
+  await page.waitForSelector('.bcv-fc__deck', { timeout: 3000 });
+  const decks = await sw.evaluate(async () => (await self.BCV.api.storage.local.get('tools:decks'))['tools:decks']);
+  check((await texts('.bcv-fc__deckcount'))[0] === '3 cards' && (await texts('.bcv-fc__pct'))[0] === '0% mastered' && decks.length === 1 && decks[0].cards.length === 3 && decks[0].cards[2].term === 'Chain rule' && decks[0].cards.every((c) => c.level === 0), 'Add card and the edits land on the deck, kept on this device');
+  await page.click('.bcv-fc__study');
+  await page.waitForSelector('.bcv-fc__face', { timeout: 3000 });
+  check((await raw('.bcv-fc__side'))[0] === 'Term' && (await texts('.bcv-fc__faceterm'))[0] === 'Power rule' && (await texts('.bcv-fc__pos'))[0] === '1 / 3', 'Study is a flip deck: the first term');
+  await page.click('.bcv-fc__face');
+  check((await raw('.bcv-fc__side'))[0] === 'Definition' && (await texts('.bcv-fc__facedef'))[0] === 'd/dx x^n = n*x^(n-1)', 'a press flips it to the definition');
+  await page.click('.bcv-fc__next');
+  check((await texts('.bcv-fc__faceterm'))[0] === 'Sum rule' && (await texts('.bcv-fc__pos'))[0] === '2 / 3', 'Next moves on, term side up');
+  await page.click('.bcv-tool__back');
+  await page.waitForSelector('.bcv-fc__deck', { timeout: 3000 });
+  await page.click('.bcv-fc__learn');
+  await page.waitForSelector('.bcv-fc__choice', { timeout: 3000 });
+  const choices1 = await texts('.bcv-fc__choice');
+  check((await raw('.bcv-fc__mode'))[0] === 'Pick the definition' && (await texts('.bcv-fc__q'))[0] === 'Power rule' && choices1.length === 3 && choices1.includes('d/dx x^n = n*x^(n-1)') && (await toolSub()) === '0 of 3 mastered', `Learn asks the first card as multiple choice, the choices the deck's own definitions (${choices1.join(' | ')})`);
+  await page.click('.bcv-fc__choice:has-text("one, two")');
+  await page.waitForSelector('.bcv-fc__fb--no', { timeout: 3000 });
+  check((await texts('.bcv-fc__fbtitle'))[0] === 'Not quite — it comes back later' && (await texts('.bcv-fc__fbanswer'))[0] === 'd/dx x^n = n*x^(n-1)' && (await page.$eval('.bcv-fc__choice.is-right', (e) => e.textContent)) === 'd/dx x^n = n*x^(n-1)' && (await page.$eval('.bcv-fc__choice.is-wrong', (e) => e.textContent)) === 'one, two' && (await texts('.bcv-fc__choice')).join('|') === choices1.join('|'), 'a wrong pick is marked, the right one shown, and the choices hold still');
+  await page.click('.bcv-fc__nextq');
+  await page.waitForSelector('.bcv-fc__choice', { timeout: 3000 });
+  check((await texts('.bcv-fc__q'))[0] === 'Power rule' && (await raw('.bcv-fc__mode'))[0] === 'Pick the definition', 'the card comes straight back at zero');
+  await page.click('.bcv-fc__choice:has-text("d/dx")');
+  await page.waitForSelector('.bcv-fc__fb--ok', { timeout: 3000 });
+  await page.click('.bcv-fc__nextq');
+  await page.waitForSelector('.bcv-fc__typed', { timeout: 3000 });
+  check((await raw('.bcv-fc__mode'))[0] === 'Type the definition' && (await texts('.bcv-fc__q'))[0] === 'Power rule', 'right once: the same card is asked again, typed from memory (recognition is not recall)');
+  await page.fill('.bcv-fc__typed', 'D/DX X^N = N*X^(N-1)!');
+  await page.click('.bcv-fc__check');
+  await page.waitForSelector('.bcv-fc__fb--ok', { timeout: 3000 });
+  await page.click('.bcv-fc__nextq');
+  await page.waitForSelector('.bcv-fc__choice', { timeout: 3000 });
+  const decks2 = await sw.evaluate(async () => (await self.BCV.api.storage.local.get('tools:decks'))['tools:decks']);
+  check((await toolSub()) === '1 of 3 mastered' && (await texts('.bcv-fc__progress'))[0] === '1 / 3' && (await texts('.bcv-fc__q'))[0] === 'Sum rule' && decks2[0].cards.find((c) => c.term === 'Power rule').level === 2, 'typed right (case and punctuation aside): two in a row masters the card, kept on the card itself; the next card comes up');
+  await shot(page, '40-tools-flashcards');
+  await closeTool();
+  // a card dragged to the top becomes a pin beside the switch, on every page
+  const cardBox = await page.$eval('.bcv-tool-card[data-tool="pomo"]', (e) => { const r = e.getBoundingClientRect(); return { x: r.left + 60, y: r.top + 30 }; });
+  await page.mouse.move(cardBox.x, cardBox.y);
+  await page.mouse.down();
+  for (let i = 1; i <= 10; i++) { await page.mouse.move(cardBox.x + (900 - cardBox.x) * (i / 10), cardBox.y + (40 - cardBox.y) * (i / 10)); await page.waitForTimeout(20); }
+  await page.waitForTimeout(250);
+  const dragging = await page.evaluate(() => ({ ghost: !!document.querySelector('.bcv-tool-card--ghost.is-over'), drop: document.getElementById('bcv-pins-drop')?.textContent, over: document.getElementById('bcv-pins-drop')?.classList.contains('is-over'), src: document.querySelector('.bcv-tool-card[data-tool="pomo"]').classList.contains('is-dragging') }));
+  check(dragging.ghost && dragging.drop === 'Pin here' && dragging.over && dragging.src, `pulling a card up: a ghost follows the pointer and "Pin here" lights at the top (${JSON.stringify(dragging)})`);
+  await shot(page, '41-tools-drag');
+  await page.mouse.up();
+  await page.waitForSelector('#bcv-pins .bcv-pin[data-tool="pomo"]', { timeout: 5000 });
+  await page.waitForFunction(() => !document.querySelector('.bcv-tool-card--ghost'), null, { timeout: 3000 }); // the ghost flies into the pin's spot, then goes
+  const pinBox = await page.$eval('#bcv-pins .bcv-pin', (e) => { const r = e.getBoundingClientRect(); const l = document.getElementById('bcv-look').getBoundingClientRect(); return { top: Math.round(r.top), gap: Math.round(l.left - r.right), h: Math.round(r.height) }; });
+  const pinsStored = await sw.evaluate(async () => (await self.BCV.api.storage.local.get('tools:pins'))['tools:pins']);
+  check(pinBox.top === 6 && pinBox.gap === 8 && pinBox.h === 24 && JSON.stringify(pinsStored) === '["pomo"]' && (await page.$eval('.bcv-tool-card[data-tool="pomo"]', (e) => e.classList.contains('is-pinned'))) && (await page.$('.bcv-tool-ov')) === null && (await page.$('.bcv-tool-card--ghost.is-over')) === null, `letting go pins it: a small button beside the switch, the card marked, nothing opened (${JSON.stringify(pinBox)})`);
+  await page.waitForTimeout(500);
+  await shot(page, '41b-tools-pinned');
+  await page.goto(`${BASE}/calendar`);
+  await page.waitForSelector('#bcv-pins .bcv-pin', { timeout: 10000 });
+  await page.click('#bcv-pins .bcv-pin__btn');
+  await page.waitForSelector('.bcv-tool[data-tool="pomo"]', { timeout: 5000 });
+  check(page.url() === `${BASE}/calendar` && (await texts('.bcv-tool__title'))[0] === 'Focus timer', 'the pin is on every page, and opens its tool there');
+  await closeTool();
+  await page.hover('#bcv-pins .bcv-pin');
+  check(await eventually(() => page.$eval('#bcv-pins .bcv-pin__x', (e) => getComputedStyle(e).opacity === '1').catch(() => false), 2000), 'the pointer over a pin shows its X');
+  await page.click('#bcv-pins .bcv-pin__x');
+  await page.waitForFunction(() => !document.querySelector('#bcv-pins .bcv-pin'), null, { timeout: 3000 });
+  check((await page.$eval('#bcv-pins', (e) => e.hidden)) && JSON.stringify(await sw.evaluate(async () => (await self.BCV.api.storage.local.get('tools:pins'))['tools:pins'])) === '[]', 'the X takes the pin away');
+  await page.goto(`${BASE}/#tools`);
+  check((await page.$('#bcv-welcome')) === null && (await page.$$('.bcv-tool-card')).length === 5 && !(await page.$eval('.bcv-tool-card[data-tool="pomo"]', (e) => e.classList.contains('is-pinned'))), 'the second time, Tools opens without the black, and the card is no longer marked');
 
   // ---- never a broken card -----------------------------------------------------------------------------
   console.log('resilience');
