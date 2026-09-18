@@ -169,7 +169,7 @@ html.bcv-phone.bcv-on #bcv-look, html.bcv-setup-open #bcv-look, html.bcv-touring
 /* ---- the welcome after the setup (content/app/welcome.js): the reloaded page comes back black, and
  * two pointers play on it in turn — a big white arrow at an opened copy of the look switch, then at
  * a mock Away Refresh pill counting down in slow motion — each with three lines and a Continue that
- * comes in after two seconds. The black sits over everything, the switch and the pill included. ---- */
+ * comes in after four seconds. The black sits over everything, the switch and the pill included. ---- */
 #bcv-welcome { position: fixed; inset: 0; z-index: 2147483000; margin: 0; padding: 0; background: #000; color: #fff; font: 400 15px/1.35 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif; letter-spacing: -.01em; text-transform: none; overflow: hidden; transition: opacity .35s ease; }
 #bcv-welcome.is-out { opacity: 0; pointer-events: none; }
 #bcv-welcome:focus { outline: none; }

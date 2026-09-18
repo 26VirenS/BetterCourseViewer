@@ -2,7 +2,7 @@
  * shows. Stage one points a big arrow at the look switch at the top right — an opened, still copy of
  * the real one, Persistent row and all, so the switch is exactly where it will be — and says what it
  * is for. Stage two points at a mock Away Refresh pill counting its three seconds down in slow
- * motion. Each stage is the arrow, three lines and a Continue that comes in after two seconds; the
+ * motion. Each stage is the arrow, three lines and a Continue that comes in after four seconds; the
  * second Continue takes the black away. Armed by the setup's Open Canvas (a flag in the extension's
  * storage, read before the page draws so the reload comes back black rather than showing the
  * Dashboard first) and cleared by that last press. A phone has no switch in its header, so it gets
@@ -12,7 +12,7 @@
   const { h } = BCV.utils;
   const html = document.documentElement;
   const KEY = 'welcome:pending';
-  const WAIT = 2000; // Continue comes in after this long, on each stage
+  const WAIT = 4000; // Continue comes in after this long, on each stage: time to take the pointer in first
   const LEAVE = 260; // a stage's fade-out (app.css: bcv-welcome-out)
 
   const STAGES = {

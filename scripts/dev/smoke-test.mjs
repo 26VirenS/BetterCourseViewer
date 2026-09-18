@@ -2387,7 +2387,7 @@ try {
   for (const s of ['#track', '.tile[data-view]', '.tile[data-value]', '.summary__row']) await sNext(s);
   check((await sStep()) === 'Ready' && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('setup:done'))['setup:done'])) === undefined, 'forward again to the read-back: still nothing marked done');
   // Open Canvas writes everything and reloads the page: it comes back black, with the choices in place
-  // and the welcome on it — two pointers in turn, each with a Continue that comes in after two seconds
+  // and the welcome on it — two pointers in turn, each with a Continue that comes in after four seconds
   await Promise.all([page.waitForNavigation({ timeout: 20000 }), page.click(su('#next'))]);
   await page.waitForSelector('#bcv-welcome[data-stage="look"]', { timeout: 20000 });
   const welcomeAt = Date.now();
@@ -2399,7 +2399,7 @@ try {
   check(!!lookCopy && lookCopy.top === 10 && lookCopy.rightGap === 12 && lookCopy.w > 180 && lookCopy.h > 60 && lookCopy.persist && lookCopy.text === 'Persistent' && lookCopy.name === 'Simpl Courses' && lookCopy.on, `stage one shows an opened copy of the look switch at the top right, Persistent row and all: ${JSON.stringify(lookCopy)}`);
   const arrowBox = await page.$eval('.bcv-welcome__stage[data-stage="look"] .bcv-welcome__arrow', (e) => { const r = e.getBoundingClientRect(); return { w: Math.round(r.width), h: Math.round(r.height), stroke: getComputedStyle(e.querySelector('path')).stroke }; });
   check(arrowBox.h >= 200 && arrowBox.w >= 200 && arrowBox.stroke === 'rgb(255, 255, 255)' && (await welcomeLines()).join(' | ') === 'just in case | Use this to disable Simpl | Use Persistent to keep Simpl off for a while', `a big white arrow and the three lines (${(await welcomeLines()).join(' | ')})`);
-  check(noContinueYet && await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 4000) && Date.now() - welcomeAt >= 1200 && (await texts('.bcv-welcome__next'))[0] === 'Continue', 'Continue is not there at first, and comes in after two seconds');
+  check(noContinueYet && await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000) && Date.now() - welcomeAt >= 3000 && (await texts('.bcv-welcome__next'))[0] === 'Continue', 'Continue is not there at first, and comes in after four seconds');
   await page.waitForTimeout(400); // its entrance
   await shot(page, '31-welcome-look');
   await page.click('.bcv-welcome__next');
@@ -2411,7 +2411,7 @@ try {
   const awayCopy = await page.$eval('.bcv-welcome__away', (e) => { const r = e.getBoundingClientRect(); return { top: Math.round(r.top), centred: Math.abs((r.left + r.right) / 2 - innerWidth / 2) < 2, title: e.querySelector('.bcv-away__title').textContent, hint: e.querySelector('.bcv-away__hint').textContent, ring: getComputedStyle(e.querySelector('.bcv-away__ring')).animationDuration, hand: getComputedStyle(e.querySelector('.bcv-away__hand')).animationDuration, loops: getComputedStyle(e.querySelector('.bcv-away__ring')).animationIterationCount }; }).catch(() => null);
   check((await welcomeBox()).bg === 'rgb(0, 0, 0)' && !!awayCopy && awayCopy.top === 10 && awayCopy.centred && awayCopy.title === 'Away Refresh' && awayCopy.hint === 'Click to cancel' && awayCopy.ring === '12s' && awayCopy.hand === '12s' && awayCopy.loops === 'infinite' && (await page.$('#bcv-away')) === null, `stage two: the switch and its words are gone, the screen is still black, and a mock Away Refresh pill counts down in slow motion at the top (${JSON.stringify(awayCopy)})`);
   check((await welcomeLines()).join(' | ') === 'Away Refresh | Click to cancel | Away refresh prevents errors that show up after you’ve been gone for a while' && (await page.$eval('.bcv-welcome__stage[data-stage="away"] .bcv-welcome__arrow', (e) => e.getBoundingClientRect().height >= 120)), `an arrow up at the pill and the three lines (${(await welcomeLines()).join(' | ')})`);
-  check(noContinueYet2 && await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 4000) && Date.now() - awayAt >= 1200, 'Continue comes in after two seconds here too');
+  check(noContinueYet2 && await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000) && Date.now() - awayAt >= 3000, 'Continue comes in after four seconds here too');
   await page.waitForTimeout(400);
   await shot(page, '31b-welcome-away');
   await page.keyboard.press('Enter'); // Enter is Continue too
@@ -3029,7 +3029,7 @@ try {
   await page.waitForSelector('#bcv-welcome[data-stage="look"]', { timeout: 20000 });
   check((await page.$('#bcv-setup')) === null && (await page.$('.bcv-tour__card')) === null && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('setup:done'))['setup:done'])) === true, 'finishing the steps is what marks the setup done, and the welcome follows the reload');
   for (const st of ['away', null]) { // Continue, twice: the second pointer, then the page
-    await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 4000);
+    await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000);
     await page.click('.bcv-welcome__next');
     if (st) await page.waitForSelector(`#bcv-welcome[data-stage="${st}"]`, { timeout: 5000 });
     else await page.waitForFunction(() => !document.querySelector('#bcv-welcome'), null, { timeout: 5000 });
