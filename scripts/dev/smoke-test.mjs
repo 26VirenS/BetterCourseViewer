@@ -995,8 +995,26 @@ try {
   check(/^nothing attached yet$/i.test((await texts('.bcv-sb__count'))[0]), `a forbidden type is refused before any upload, with the reason: ${(await texts('.bcv-sb__count'))[0]}`); // innerText carries the CSS uppercase
   await page.setInputFiles('.bcv-sb__pane input[type=file]', { name: 'grand-challenge-notes.docx', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', buffer: Buffer.alloc(38912, 'a') });
   await waitText('.bcv-sb__count', /^1 file attached$/);
-  check((await texts('.bcv-sb__file'))[0].replace(/\s+/g, ' ') === 'DOCX grand-challenge-notes.docx 38 KB · ready to submit', `file row: ${(await texts('.bcv-sb__file'))[0].replace(/\s+/g, ' ')}`);
+  check((await texts('.bcv-sb__file'))[0].replace(/\s+/g, ' ') === 'DOCX grand-challenge-notes.docx 38 KB · ready to submit Preview', `file row, with a Preview button: ${(await texts('.bcv-sb__file'))[0].replace(/\s+/g, ' ')}`);
   check(/anything after 11:59 PM is marked late/.test((await texts('.bcv-sb__footnote'))[0]) && !(await page.$('.bcv-sb__btn--primary[disabled]')), 'submit unlocks with a file and the note says when late starts');
+  // Preview opens the attached file in the viewer, from this device, before anything is handed in
+  await page.setInputFiles('.bcv-sb__pane input[type=file]', { name: 'figure.png', mimeType: 'image/png', buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64') });
+  await waitText('.bcv-sb__count', /^2 files attached$/);
+  check((await page.$$('.bcv-sb__file .bcv-sb__preview')).length === 2, 'each attached file has a Preview button');
+  await page.click('.bcv-sb__files .bcv-sb__file:nth-child(2) .bcv-sb__preview');
+  await page.waitForFunction(() => document.querySelector('.bcv-viewer img.bcv-viewer__img')?.naturalWidth === 1, null, { timeout: 5000 });
+  const pv = await page.evaluate(() => { const v = document.querySelector('.bcv-viewer'); const img = v.querySelector('img.bcv-viewer__img'); return { title: v.querySelector('.bcv-sheet__title').textContent, note: v.querySelector('.bcv-sheet__note').textContent, blob: img.src.startsWith('blob:'), acts: [...v.querySelectorAll('.bcv-viewer__acts .bcv-btn')].map((b) => b.textContent.trim()) }; });
+  check(pv.title === 'figure.png' && /^Image · \d+ B · not handed in yet$/.test(pv.note) && pv.blob && pv.acts.join(',') === 'Open in new tab', `Preview shows the picture itself, read from this device, with no Canvas actions: ${JSON.stringify(pv)}`);
+  await shot(page, '20b-preview-before-submit');
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !document.querySelector('.bcv-viewer-ov'), null, { timeout: 3000 });
+  await page.click('.bcv-sb__files .bcv-sb__file:nth-child(1) .bcv-sb__preview');
+  await page.waitForSelector('.bcv-viewer .bcv-viewer__none', { timeout: 5000 });
+  check(/No preview for this kind of file until it is handed in\./.test((await texts('.bcv-viewer__none'))[0]) && !(await page.$('.bcv-viewer__none a')) && !(await page.$('.bcv-viewer__acts .bcv-btn')), 'a document has no preview until Canvas has it — and no Download or Open in Canvas for a file that is not there yet');
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !document.querySelector('.bcv-viewer-ov'), null, { timeout: 3000 });
+  await page.click('.bcv-sb__files .bcv-sb__file:nth-child(2) .bcv-sb__x');
+  await waitText('.bcv-sb__count', /^1 file attached$/);
   // Other: the tool's own picker, punched through in a sheet; what it hands back joins the list
   await page.click('.bcv-sb__tab[data-tab=other]');
   check((await texts('.bcv-sb__toolname')).join(' | ') === 'Box | Office 365 | Website URL', `Other rows: ${(await texts('.bcv-sb__toolname')).join(' | ')}`);
@@ -2793,6 +2811,18 @@ try {
   check(gp.whatIfScores === false && gp.gpaGoal === 3.95, 'what-if off and the goal step save under the site');
   await options.click('#whatIf');
   await options.waitForTimeout(400);
+  // Import CSV: a history exported elsewhere joins this one — the days it did not have, in date order; a day already recorded here is kept as it is
+  const snapsBefore = (await prefsOf()).gpaSnapshots || [];
+  const todaySnap = snapsBefore[0]?.date || null;
+  const csvLines = ['date,term_gpa', '2026-09-01,3.250', '2026-09-02,3.300', ...(todaySnap ? [`${todaySnap},1.000`] : []), '2026-09-03,'];
+  await options.setInputFiles('#importCsvFile', { name: 'simpl-courses-gpa.csv', mimeType: 'text/csv', buffer: Buffer.from(csvLines.join('\n')) });
+  await options.waitForFunction(() => /^Imported 2 days$/.test(document.querySelector('#savedText')?.textContent || ''), null, { timeout: 5000 });
+  const snapsAfter = (await prefsOf()).gpaSnapshots;
+  check(snapsAfter.length === snapsBefore.length + 2 && snapsAfter.map((s) => s.date).join(',') === ['2026-09-01', '2026-09-02', ...snapsBefore.map((s) => s.date)].join(',') && snapsAfter[0].gpa === 3.25 && (!todaySnap || snapsAfter.find((s) => s.date === todaySnap).gpa === snapsBefore[0].gpa) && /^\d+ days recorded$/.test((await oTexts('#historyLabel'))[0]), `Import CSV adds the days it did not have, in date order, keeps today's own and skips an empty row: ${snapsAfter.map((s) => `${s.date}=${s.gpa}`).join(' ')}`);
+  await options.setInputFiles('#importCsvFile', { name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('not a csv at all') });
+  await options.waitForFunction(() => /not a GPA export/.test(document.querySelector('#savedText')?.textContent || ''), null, { timeout: 5000 });
+  check((await prefsOf()).gpaSnapshots.length === snapsBefore.length + 2, 'a file that is not a GPA export is refused and changes nothing');
+  await options.screenshot({ path: join(out, '29-options-grades.png') });
   // Appearance: theme tiles
   await options.click('.navlink[data-section="appearance"]');
   await options.click('.theme[data-value="on"]');

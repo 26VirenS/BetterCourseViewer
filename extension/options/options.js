@@ -333,7 +333,7 @@
     setSwitch($('whatIf'), grades.whatIf);
     $('gpaGoal').textContent = gpa2(grades.goal);
     const n = grades.snaps.length;
-    const since = grades.tracking?.since || grades.snaps[0]?.date;
+    const since = [grades.tracking?.since, grades.snaps[0]?.date].filter(Boolean).sort()[0]; // the earliest day the history holds, imported ones included
     $('historyLabel').textContent = grades.tracking ? (n ? `${n} ${n === 1 ? 'day' : 'days'} recorded` : 'Recording from today') : (n ? 'History paused' : 'No history yet');
     $('historyNote').textContent = grades.tracking ? (since ? `Since ${fmtDate(since)}` : '') : (n ? 'Existing snapshots kept.' : 'Turn tracking on to keep one snapshot a day.');
     $('exportCsv').disabled = !n;
@@ -351,6 +351,48 @@
     const lines = ['date,term_gpa', ...grades.snaps.map((s) => `${s.date},${Number.isFinite(s.gpa) ? s.gpa.toFixed(3) : ''}`)];
     download(`simpl-courses-gpa-${site.host || 'canvas'}.csv`, lines.join('\n'), 'text/csv');
   });
+  // Import CSV: a history exported earlier — from another browser, another device, or before a
+  // reset — comes back in. The file is what Export CSV writes (date,term_gpa per line, the header
+  // optional). A date already recorded here is kept as it is; the rest are added, and the history
+  // is sorted by date. Tracking itself is left as it was.
+  $('importCsv').addEventListener('click', () => $('importCsvFile').click());
+  $('importCsvFile').addEventListener('change', async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    let rows;
+    try {
+      rows = parseGpaCsv(await file.text());
+    } catch {
+      flash('That file is not a GPA export', true);
+      return;
+    }
+    const have = new Set(grades.snaps.map((s) => s.date));
+    const added = rows.filter((r) => !have.has(r.date));
+    if (added.length) {
+      grades.snaps = [...grades.snaps, ...added].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+      try { await setPref('gpaSnapshots', grades.snaps); } catch { flash('Could not save the history', true); return; }
+      paintGrades();
+    }
+    flash(added.length ? `Imported ${added.length} ${added.length === 1 ? 'day' : 'days'}` : 'Nothing new to import');
+  });
+  /** The rows of a GPA export: a date and a term GPA on the 4.0 scale; a row with no GPA carries
+   *  nothing and is skipped; anything else is not a GPA export. */
+  function parseGpaCsv(text) {
+    const out = new Map();
+    for (const raw of String(text).split(/\r?\n/)) {
+      const line = raw.trim();
+      if (!line) continue;
+      const [d, g] = line.split(',').map((s) => (s || '').trim().replace(/^"|"$/g, ''));
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) { if (/^date$/i.test(d)) continue; throw new Error('not a GPA export'); }
+      if (g === '' || g === undefined) continue;
+      const gpa = Number(g);
+      if (!Number.isFinite(gpa) || gpa < 0 || gpa > 4) throw new Error('not a GPA export');
+      out.set(d, { date: d, gpa });
+    }
+    if (!out.size) throw new Error('not a GPA export');
+    return [...out.values()];
+  }
   function download(name, text, type) {
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([text], { type }));

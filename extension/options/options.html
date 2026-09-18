@@ -68,7 +68,7 @@
       </section>
 
       <!-- Grades -->
-      <section class="section" id="grades" data-title="Grades" data-sub="History and goals." data-words="grades gpa goal tracking history snapshot what-if csv export">
+      <section class="section" id="grades" data-title="Grades" data-sub="History and goals." data-words="grades gpa goal tracking history snapshot what-if csv export import">
         <div class="card">
           <div class="row row--pad">
             <span class="row__body"><span class="row__t">Track grades over time</span><span class="row__s">One snapshot a day, stored locally.</span></span>
@@ -84,7 +84,7 @@
           </div>
         </div>
         <div class="card card--pad">
-          <div class="row"><span class="row__body"><span class="row__t" id="historyLabel">No history yet</span><span class="row__s" id="historyNote"></span></span><button class="btn btn--sm" id="exportCsv" type="button">Export CSV</button></div>
+          <div class="row"><span class="row__body"><span class="row__t" id="historyLabel">No history yet</span><span class="row__s" id="historyNote"></span></span><span style="display:flex;gap:8px;flex:none"><button class="btn btn--sm" id="importCsv" type="button" title="Bring in a GPA history exported from another browser or device">Import CSV</button><button class="btn btn--sm" id="exportCsv" type="button">Export CSV</button></span><input type="file" id="importCsvFile" accept=".csv,text/csv" hidden></div>
         </div>
       </section>
 

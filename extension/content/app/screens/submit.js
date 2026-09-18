@@ -190,10 +190,17 @@
       const sub = U.text('bcv-sb__fsub', fileStatus(f));
       const fill = h('div', { class: 'bcv-sb__barfill', style: { width: `${Math.round((f.progress || 0) * 100)}%` } });
       const bar = h('div', { class: 'bcv-sb__bar', hidden: f.status !== 'uploading' }, fill);
+      // Preview: the file as it sits on this device, in the file viewer, before anything is sent
+      // (a file a tool handed back is only an address Canvas will fetch, so it has none)
+      const preview = f.file ? U.btn('Preview', { kind: 'xs', cls: 'bcv-sb__preview', title: 'See the file before handing it in', onClick: (e) => {
+        if (!f.objectUrl) f.objectUrl = URL.createObjectURL(f.file);
+        BCV.viewer?.open({ local: true, display_name: f.name, filename: f.name, url: f.objectUrl, 'content-type': f.file.type || '', size: f.size }, { from: e?.currentTarget || null });
+      } }) : null;
       const row = U.el(`bcv-sb__file ${f.status === 'failed' ? 'is-failed' : ''}`, [
         h('span', { class: 'bcv-sb__kind', text: kindOf(f.name) }),
         U.el('bcv-sb__fbody', [U.text('bcv-sb__fname bcv-ellip', f.name), sub, bar]),
-        h('button', { type: 'button', class: 'bcv-sb__x', title: 'Remove', 'aria-label': `Remove ${f.name}`, disabled: st.busy || null, onclick: () => { st.files = st.files.filter((x) => x !== f); draw(); } }, U.svg(IC.close, { size: 12, stroke: 'var(--bcv-ink3)', width: 2.2 })),
+        preview,
+        h('button', { type: 'button', class: 'bcv-sb__x', title: 'Remove', 'aria-label': `Remove ${f.name}`, disabled: st.busy || null, onclick: () => { if (f.objectUrl) { URL.revokeObjectURL(f.objectUrl); f.objectUrl = null; } st.files = st.files.filter((x) => x !== f); draw(); } }, U.svg(IC.close, { size: 12, stroke: 'var(--bcv-ink3)', width: 2.2 })),
       ]);
       f.paint = () => {
         sub.textContent = fileStatus(f);

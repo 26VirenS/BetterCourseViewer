@@ -21,6 +21,9 @@
     clock: 'M12 5a8 8 0 100 16 8 8 0 000-16zM12 9v4l3 2',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.15.1', date: '2026-09-18', notes: [
+      { kind: 'new', title: 'Preview before you submit', body: 'Attached files have a Preview button.', icon: P.eye },
+    ] },
     { version: '2.15.0', date: '2026-09-18', notes: [
       { kind: 'new', title: 'Clear overdue items', body: 'Press the X next to an overdue item to clear it.', icon: P.check },
       { kind: 'improved', title: 'Shorter install page', body: 'Three quick steps, a line each.', icon: P.pic },

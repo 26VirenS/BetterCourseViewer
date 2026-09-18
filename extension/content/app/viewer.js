@@ -116,7 +116,10 @@
     const pal = U.palette(k.color, dark);
     const name = f.display_name || f.filename || 'File';
     const when = f.updated_at || f.modified_at || f.created_at;
-    const note = [k.label, fmtSize(f.size), when ? `modified ${U.fmtRecent(when)}` : null].filter(Boolean).join(' · ');
+    // a file still on this device (attached to a hand-in, not sent yet: f.local, its url a blob of
+    // its own) has no Canvas page, no preview service and nothing to download — only what a browser
+    // can show of it here, and a tab of its own for the kinds one can show
+    const note = [k.label, fmtSize(f.size), f.local ? 'not handed in yet' : when ? `modified ${U.fmtRecent(when)}` : null].filter(Boolean).join(' · ');
     const download = h('a', { class: 'bcv-btn bcv-btn--primary bcv-viewer__dl', href: f.url, download: f.filename || name, text: 'Download' });
     download.prepend(U.svg(IC.download, { size: 14, stroke: 'currentColor', width: 1.9 }));
     const inCanvas = U.btn('Open in Canvas', { cls: 'bcv-viewer__canvas', onClick: () => { close(); BCV.app.go(`${canvasPage(f, context)}?bcv=native`); } });
@@ -128,14 +131,14 @@
     head.replaceChildren(
       U.tile(k.icon, { color: pal.text, tint: pal.tint, size: 32, iconSize: 16 }),
       U.el('bcv-sheet__titles', [U.text('bcv-sheet__title', name), U.text('bcv-sheet__note', note)]),
-      U.el('bcv-viewer__acts', [inCanvas, newTab, download]),
+      U.el('bcv-viewer__acts', f.local ? [SHOWABLE.includes(k.kind) ? newTab : null] : [inCanvas, newTab, download]),
       closeBtn,
     );
 
     const none = (why) => U.el('bcv-viewer__none', [
       U.tile(k.icon, { color: pal.text, tint: pal.tint, size: 32, iconSize: 16 }),
       h('div', { text: why }),
-      h('a', { class: 'bcv-btn bcv-btn--primary', href: f.url, download: f.filename || name, text: 'Download' }),
+      f.local ? null : h('a', { class: 'bcv-btn bcv-btn--primary', href: f.url, download: f.filename || name, text: 'Download' }),
     ]);
     const frame = (src) => h('iframe', { class: 'bcv-viewer__frame', src, title: name, allow: 'fullscreen' });
     let view;
@@ -146,6 +149,8 @@
       view = h('pre', { class: 'bcv-viewer__text', text: '' });
       fetch(f.url, { credentials: 'same-origin' }).then((r) => (r.ok ? r.text() : Promise.reject(new Error(`${r.status}`)))).then((t) => { view.textContent = t.slice(0, 200000); }).catch(() => { if (current?.ov === ov) body.replaceChildren(none('The text could not be read.')); });
     } else if (f.preview_url) view = frame(f.preview_url); // Canvas's document preview, when its service made one
+    else if (k.kind === 'pdf' && f.local) view = frame(f.url); // the browser's own PDF view of the file on this device
+    else if (f.local) view = none('No preview for this kind of file until it is handed in.');
     else if (k.kind === 'pdf' || k.kind === 'doc') view = frame(canvasPreview(f, context)); // Canvas's own preview of the file
     else view = none('No preview for this kind of file.');
     body.replaceChildren(view);
