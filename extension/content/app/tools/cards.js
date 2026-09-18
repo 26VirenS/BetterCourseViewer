@@ -84,7 +84,7 @@
       else if (st.view === 'edit') parts.push(...editView(d, cards));
       else if (st.view === 'study') parts.push(...studyView(cards));
       else parts.push(...learnView(cards, mastered));
-      body.replaceChildren(csvInput, ...parts);
+      body.replaceChildren(csvInput, ...T.rise(parts));
     }
 
     function decksView() {
@@ -144,12 +144,15 @@
       if (!cards.length) return [T.hint('This deck has no cards yet.')];
       const idx = Math.min(st.idx, cards.length - 1);
       const face = cards[idx];
-      return [
-        h('button', { type: 'button', class: 'bcv-fc__face', onclick: () => { st.flip = !st.flip; paint(); } }, [
-          U.text('bcv-fc__side', st.flip ? 'Definition' : 'Term'),
-          U.text(st.flip ? 'bcv-fc__facedef bcv-pretty' : 'bcv-fc__faceterm bcv-pretty', st.flip ? face.def : face.term),
-          U.text('bcv-fc__flip', 'Click to flip'),
+      // both sides on one card that turns over (app.css: a 3D flip), so a flip is not a redraw
+      const faceEl = h('button', { type: 'button', class: `bcv-fc__face ${st.flip ? 'is-flipped' : ''}`, 'aria-label': 'Flip the card', onclick: () => { st.flip = !st.flip; faceEl.classList.toggle('is-flipped', st.flip); } }, [
+        U.el('bcv-fc__flipper', [
+          U.el('bcv-fc__panel bcv-fc__panel--front', [U.text('bcv-fc__side', 'Term'), U.text('bcv-fc__faceterm bcv-pretty', face.term), U.text('bcv-fc__flip', 'Click to flip')]),
+          U.el('bcv-fc__panel bcv-fc__panel--back', [U.text('bcv-fc__side', 'Definition'), U.text('bcv-fc__facedef bcv-pretty', face.def), U.text('bcv-fc__flip', 'Click to flip back')]),
         ]),
+      ]);
+      return [
+        faceEl,
         U.el('bcv-fc__nav', [
           U.btn('Back', { cls: 'bcv-fc__prev', onClick: () => { st.idx = Math.max(0, idx - 1); st.flip = false; paint(); } }),
           U.text('bcv-fc__pos', `${idx + 1} / ${cards.length}`),

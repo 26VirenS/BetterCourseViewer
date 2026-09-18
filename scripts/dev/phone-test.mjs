@@ -336,6 +336,7 @@ try {
   await page.fill('.bcv-ph-composer__title', 'Return the library books');
   await page.click('.bcv-ph-composer__date');
   await page.waitForSelector('.bcv-datepop', { timeout: 3000 });
+  await page.waitForFunction(() => { const e = document.querySelector('.bcv-datepop'); return !!e && e.getAnimations({ subtree: true }).every((a) => a.playState === 'finished'); }, null, { timeout: 3000 }).catch(() => {}); // it grows in from the field first
   const popBox = await page.$eval('.bcv-datepop', (e) => { const r = e.getBoundingClientRect(); return { l: Math.round(r.left), r: Math.round(window.innerWidth - r.right), b: Math.round(window.innerHeight - r.bottom), day: Math.round(e.querySelector('.bcv-datepop__day').getBoundingClientRect().height), clipped: e.scrollHeight > e.clientHeight + 1 }; });
   check((await page.$$('.bcv-datepop__day')).length === 42 && popBox.l === popBox.r && popBox.l >= 12 && popBox.l <= 24 && popBox.b > 60 && popBox.day >= 40 && !popBox.clipped && (await texts('.bcv-datepop__q')).join(',') === 'Today,Tomorrow,Next Monday', `the calendar rises above the tab bar, full width, with touch-sized days and the shortcuts in view (${JSON.stringify(popBox)})`);
   await shot('03e-todo-calendar');
@@ -643,10 +644,16 @@ try {
   const welcomeAt = Date.now();
   const noContinueYet = (await page.$('.bcv-welcome__next:not([hidden])')) === null;
   const welcomeInfo = await page.$eval('#bcv-welcome', (e) => { const r = e.getBoundingClientRect(); const pill = e.querySelector('.bcv-welcome__away'); const p = pill?.getBoundingClientRect(); return { stage: e.dataset.stage, bg: getComputedStyle(e).backgroundColor, full: r.width === innerWidth && r.height === innerHeight, look: !!e.querySelector('.bcv-welcome__look'), pill: !!pill, fits: !!p && p.left >= 0 && p.right <= innerWidth, ring: pill ? getComputedStyle(pill.querySelector('.bcv-away__ring')).animationDuration : null, lines: ['.bcv-welcome__kicker', '.bcv-welcome__title', '.bcv-welcome__hint'].map((s) => e.querySelector(s)?.textContent) }; });
-  check((await page.$('#bcv-setup')) === null && page.url() === `${BASE}/` && (await page.evaluate(() => performance.getEntriesByType('navigation')[0]?.type)) === 'reload' && (await page.$('.bcv-tour__card')) === null && welcomeInfo.stage === 'away' && welcomeInfo.bg === 'rgb(0, 0, 0)' && welcomeInfo.full && !welcomeInfo.look && welcomeInfo.pill && welcomeInfo.fits && welcomeInfo.ring === '12s' && welcomeInfo.lines.join(' | ') === 'Away Refresh | Click to cancel | Away refresh prevents errors that show up after you’ve been gone for a while' && await noOverflow(), `Open Canvas reloads the page, which comes back black with the Away Refresh pointer alone, no tour: ${JSON.stringify(welcomeInfo)}`);
-  check(noContinueYet && await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000) && Date.now() - welcomeAt >= 3000, 'Continue comes in after four seconds');
+  check((await page.$('#bcv-setup')) === null && page.url() === `${BASE}/` && /^(reload|navigate)$/.test(await page.evaluate(() => performance.getEntriesByType('navigation')[0]?.type)) && (await page.$('.bcv-tour__card')) === null && welcomeInfo.stage === 'away' && welcomeInfo.bg === 'rgb(0, 0, 0)' && welcomeInfo.full && !welcomeInfo.look && welcomeInfo.pill && welcomeInfo.fits && welcomeInfo.ring === '12s' && welcomeInfo.lines.join(' | ') === 'Away Refresh | Click to cancel | Away refresh prevents errors that show up after you’ve been gone for a while' && await noOverflow(), `Open Canvas reloads the page, which comes back black with the Away Refresh pointer alone, no tour: ${JSON.stringify(welcomeInfo)}`);
+  check(noContinueYet && await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000) && Date.now() - welcomeAt >= 2200, 'Continue comes in after three seconds');
   await page.waitForTimeout(400);
   await page.screenshot({ path: join(out, 'phone-12-welcome.png') }); // (not shot(): the mock dial loops for ever, and shot() waits for every animation to end)
+  await page.click('.bcv-welcome__next');
+  await page.waitForSelector('#bcv-welcome[data-stage="peek"]', { timeout: 5000 });
+  check((await page.$$('.bcv-welcome__stat')).length === 3 && (await page.$('.bcv-welcome__sheetmock')) !== null && (await texts('.bcv-welcome__title'))[0] === 'Press a card, then an item' && await noOverflow(), 'then the Dashboard pointer: the counters, the middle one pressed, the sheet behind it, on the phone too');
+  await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000);
+  await page.waitForTimeout(400);
+  await page.screenshot({ path: join(out, 'phone-12b-welcome-peek.png') });
   await page.click('.bcv-welcome__next');
   await page.waitForFunction(() => !document.querySelector('#bcv-welcome'), null, { timeout: 5000 });
   check((await page.$('.bcv-tour')) === null && !(await page.$('html.bcv-welcome')) && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('welcome:pending'))['welcome:pending'])) === undefined && (await page.$('.bcv-ph-stats')) !== null, 'Continue takes the black away: Today, no tour, and the welcome does not come back');
@@ -665,7 +672,7 @@ try {
   await page.waitForSelector('#bcv-welcome[data-stage="tools"]', { timeout: 20000 });
   const twAt = Date.now();
   check(page.url() === `${BASE}/#tools` && (await page.$eval('#bcv-welcome', (e) => getComputedStyle(e).backgroundColor)) === 'rgb(0, 0, 0)' && (await texts('.bcv-welcome__title'))[0] === 'Some helpful things' && (await texts('.bcv-welcome__hint'))[0] === 'some tools to help you do more, quickly.' && await noOverflow(), 'the first press on Tools: black, the title and the gray line under it');
-  check(await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000) && Date.now() - twAt >= 3000, 'Continue comes in after four seconds');
+  check(await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000) && Date.now() - twAt >= 2200, 'Continue comes in after three seconds');
   await page.waitForTimeout(400);
   await page.screenshot({ path: join(out, 'phone-13-tools-welcome.png') });
   await page.click('.bcv-welcome__next');

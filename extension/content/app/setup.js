@@ -519,12 +519,17 @@
       console.error('[Simpl Courses setup]', e);
     }
     if (BCV.welcome) await BCV.welcome.arm().catch(() => {}); // armed: the reloaded page comes back black, with the welcome on it
-    // the address loses the setup's own parameter first, or the reload would open the card again
+    // a fresh load of this page, without the setup's own parameter (which would open the card again):
+    // a navigation to the address itself, and a plain reload after it should the first not take
+    let next = location.href;
     try {
       const u = new URL(location.href);
-      if (u.searchParams.has('bcv')) { u.searchParams.delete('bcv'); history.replaceState(null, '', u.pathname + u.search + u.hash); }
+      u.searchParams.delete('bcv');
+      next = u.pathname + u.search + u.hash;
+      history.replaceState(null, '', next);
     } catch { /* the address is left as it is */ }
-    location.reload();
+    setTimeout(() => { try { location.reload(); } catch { /* the navigation below is under way */ } }, 1500);
+    location.replace(next);
   }
 
   BCV.setup = { open, close, active, placeDot };

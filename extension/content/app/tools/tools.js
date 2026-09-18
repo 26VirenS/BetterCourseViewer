@@ -3,9 +3,10 @@
  * it returns the student exactly where they were — a tool is a task, not a place. This file holds
  * what the tools share: the registry and the popup shell (the citation generator, the flashcards
  * and the converter build their own bodies in the files beside this one; the focus timer and the
- * graphing calculator are small enough to live here), the timer's own clock, and the pins — a card
- * dragged to the top of the page becomes a small button beside the look switch at the top right,
- * on every page, that opens the tool from anywhere.
+ * graphing calculator are small enough to live here), the timer's own clock, and the tray at the
+ * top right beside the look switch — the pins (a card dragged to the top of the page becomes a
+ * small button there, on every page, that opens the tool from anywhere) and the live widget under
+ * them (a running timer, the phone's timer widget: the minutes left on a scale, Pause, Break).
  *
  * Everything a tool keeps (decks, saved citations, the timer) lives in the extension's storage on
  * this device; nothing is written to Canvas or sent anywhere. */
@@ -16,6 +17,7 @@
   const IC = BCV.IC;
   const html = document.documentElement;
   const api = BCV.api;
+  const SVG = 'http://www.w3.org/2000/svg';
 
   // ---- storage: one key per thing, on this device -------------------------------------------
   async function load(key, fallback) {
@@ -25,6 +27,7 @@
     try { await api.storage.local.set({ [key]: value }); } catch { /* the page keeps its own */ }
   }
   const uid = (p = 'x') => `${p}${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
+  const svgEl = (tag, attrs = {}) => { const el = document.createElementNS(SVG, tag); for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v); return el; };
 
   // ---- the registry --------------------------------------------------------------------------
   // key, name, the one line under it, the icon and the accent (used for the icon tile and nothing
@@ -49,8 +52,8 @@
 
   // ---- the popup shell -----------------------------------------------------------------------
   /** One popup over the page: a head (the tool's tile, a title and a line under it, Back where a
-   *  tool has views, Close), then the tool's own body, scrolling. Escape and the scrim close it;
-   *  a tool that must not lose work can say so (onClose returning false keeps it up). */
+   *  tool has views, Close), then the tool's own body, scrolling; what the body holds rises in,
+   *  one thing after another. Escape (from anywhere) and the scrim close it. */
   function popup({ tool, title, sub = '', width = 620, body, foot = null, cls = '', onClose = null, from = null }) {
     document.querySelector('.bcv-sheet-ov')?.remove();
     const ov = U.el('bcv-sheet-ov bcv-tool-ov', null, { role: 'dialog', 'aria-label': title || tool.name });
@@ -59,11 +62,12 @@
       if (closed) return;
       if (onClose && onClose() === false) return;
       closed = true;
-      ov.remove();
+      ov.classList.add('is-closing');
+      setTimeout(() => ov.remove(), 180);
     };
     ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
     // Escape from anywhere on the page (a download click leaves the focus on the page's body)
-    const onKey = (e) => { if (e.key !== 'Escape' || !ov.isConnected) return; e.stopPropagation(); close(); };
+    const onKey = (e) => { if (e.key !== 'Escape' || !ov.isConnected || closed) return; e.stopPropagation(); close(); };
     document.addEventListener('keydown', onKey, true);
     const mo = new MutationObserver(() => { if (!ov.isConnected) { document.removeEventListener('keydown', onKey, true); mo.disconnect(); } });
     mo.observe(document.body, { childList: true });
@@ -109,6 +113,8 @@
     h('button', { type: 'button', class: 'bcv-tool__step', text: '+', 'aria-label': 'More', onclick: up }),
   ]);
   const input = (attrs = {}) => h('input', { class: 'bcv-input bcv-tool__input', type: 'text', ...attrs });
+  /** Children rise in one after another (the popups' cards, rows and fields). */
+  const rise = (nodes, step = 45) => { let i = 0; for (const n of nodes) if (n && n.nodeType === 1) U.enter(n, i++, step, 320); return nodes; };
   const saveFile = (name, blob) => {
     const url = URL.createObjectURL(blob);
     const a = h('a', { href: url, download: name, style: { display: 'none' } });
@@ -172,6 +178,7 @@
   // { phase, mins, endAt (running) | left (paused, seconds) | null, done, day }.
   const FOCUS_KEY = 'tools:focus';
   const PHASES = { focus: 'Focus', short: 'Short break', long: 'Long break' };
+  const PHASE_COLOR = { focus: '#ff9500', short: '#34c759', long: '#34c759' };
   const today = () => new Date().toISOString().slice(0, 10);
   const fresh = () => ({ phase: 'focus', mins: { focus: 25, short: 5, long: 15 }, endAt: null, left: null, done: 0, day: today() });
   let focus = fresh(); // the record as this page last saw it
@@ -184,35 +191,44 @@
     return f.left === null || f.left === undefined ? phaseLen(f) : Math.max(0, f.left);
   }
   const mmss = (s) => `${Math.floor(Math.max(0, s) / 60)}:${String(Math.max(0, s) % 60).padStart(2, '0')}`;
+  const nextPhase = (f) => (f.phase === 'focus' ? ((f.done || 0) % 4 === 0 && f.done > 0 ? 'long' : 'short') : 'focus');
   /** The record from storage, with a session that ran out while nobody was looking settled: the
    *  phase that ended counts, the next one waits, stopped. */
   async function focusLoad() {
     const raw = await load(FOCUS_KEY, null);
     const f = raw && typeof raw === 'object' ? { ...fresh(), ...raw, mins: { ...fresh().mins, ...(raw.mins || {}) } } : fresh();
     if (f.day !== today()) { f.done = 0; f.day = today(); }
-    if (f.endAt && f.endAt <= Date.now()) settle(f);
+    while (f.endAt && f.endAt <= Date.now()) settle(f); // (a break that started by itself may have run out too)
     focus = f;
     focusRead = true;
     return f;
   }
+  /** A phase that ran out: a focus block counts and its break starts by itself, from the moment
+   *  the block ended; a break that ran out leaves the next focus block waiting for a press (a
+   *  session should not start with nobody at the desk). */
   function settle(f) {
     const wasFocus = f.phase === 'focus';
+    const at = f.endAt || Date.now();
     if (wasFocus) f.done = (f.done || 0) + 1;
     f.phase = wasFocus ? (f.done % 4 === 0 ? 'long' : 'short') : 'focus';
-    f.endAt = null;
+    f.endAt = wasFocus ? at + phaseLen(f, f.phase) * 1000 : null;
     f.left = null;
     f.ended = wasFocus ? 'focus' : 'break'; // (what just finished: the page says so once)
   }
+  const record = (f) => ({ phase: f.phase, mins: f.mins, endAt: f.endAt, left: f.left, done: f.done, day: f.day });
   async function focusWrite(patch) {
     focus = { ...focus, ...patch };
-    await save(FOCUS_KEY, { phase: focus.phase, mins: focus.mins, endAt: focus.endAt, left: focus.left, done: focus.done, day: focus.day });
+    await save(FOCUS_KEY, record(focus));
     paintAll();
     return focus;
   }
   const focusStart = () => focusWrite({ endAt: Date.now() + remaining() * 1000, left: null, ended: null });
   const focusPause = () => focusWrite({ left: remaining(), endAt: null });
   const focusReset = () => focusWrite({ left: null, endAt: null, ended: null });
-  const focusPhase = (p) => (PHASES[p] ? focusWrite({ phase: p, left: null, endAt: null, ended: null }) : Promise.resolve(focus));
+  const focusPhase = (p, { keepRunning = false } = {}) => (PHASES[p] ? focusWrite({ phase: p, left: null, endAt: keepRunning ? Date.now() + phaseLen(focus, p) * 1000 : null, ended: null }) : Promise.resolve(focus));
+  /** Skip to the phase after this one; a session that was going keeps going there. A skipped focus
+   *  block does not count as one done. */
+  const focusSkip = () => focusPhase(nextPhase(focus), { keepRunning: running() });
   const focusBump = (p, d) => {
     const v = Math.max(1, Math.min(90, (Number(focus.mins[p]) || 25) + d));
     const mins = { ...focus.mins, [p]: v };
@@ -227,8 +243,8 @@
   function paintAll() {
     if (focus.endAt && focus.endAt <= Date.now()) {
       settle(focus);
-      save(FOCUS_KEY, { phase: focus.phase, mins: focus.mins, endAt: null, left: null, done: focus.done, day: focus.day });
-      U.toast(focus.ended === 'focus' ? 'Focus session done. Time for a break.' : 'Break over. Back to it.');
+      save(FOCUS_KEY, record(focus));
+      U.toast(focus.ended === 'focus' ? `Focus session done. ${PHASES[focus.phase]} started.` : 'Break over. Press Start when you are back.');
     }
     for (const fn of painters) { try { fn(focus); } catch { painters.delete(fn); } }
     const want = painters.size > 0 && (focus.endAt || false);
@@ -240,7 +256,7 @@
     paintAll();
     return () => { painters.delete(fn); paintAll(); };
   }
-  // another tab (or the popup) moved the timer: the chip here follows
+  // another tab (or the popup) moved the timer: the tray here follows
   try {
     api.storage.onChanged?.addListener((changes, area) => {
       if (area && area !== 'local') return;
@@ -249,101 +265,200 @@
   } catch { /* no change events (the app): the next load reads it */ }
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && focusRead) focusLoad().then(paintAll).catch(() => {}); });
 
-  /** The chip in the sidebar: the time left and the phase, in the phase's colour, only while a
-   *  session is going or paused mid-phase. The pointer over it slides in Break (during focus) or
-   *  Focus (during a break) — one press switches phase without opening the tool; the chip itself
-   *  opens the timer. Paused or idle there is nothing to switch to, so no button. */
-  function chipSlot(app) {
-    const slot = h('div', { class: 'bcv-fchip-slot', id: 'bcv-fchip' });
-    const paint = (f) => {
-      const live = f.endAt || (f.left !== null && f.left !== undefined && f.left < phaseLen(f));
-      if (!live) { slot.replaceChildren(); slot.hidden = true; return; }
-      slot.hidden = false;
-      const color = f.phase === 'focus' ? '#ff9500' : '#34c759';
-      const time = mmss(remaining(f));
-      let chip = slot.firstElementChild;
-      if (!chip) {
-        chip = h('div', { class: 'bcv-fchip', role: 'button', tabindex: '0', title: 'Focus timer', onclick: () => open('pomo', { from: chip }), onkeydown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open('pomo', { from: chip }); } } }, [
-          h('span', { class: 'bcv-fchip__ic' }, U.svg(IC.timer, { size: 17, stroke: color, width: 1.9 })),
-          U.el('bcv-fchip__body', [U.text('bcv-fchip__time', time), U.text('bcv-fchip__phase', '')]),
-          h('button', { type: 'button', class: 'bcv-fchip__switch', hidden: true, onclick: (e) => { e.stopPropagation(); const next = f.phase === 'focus' ? 'short' : 'focus'; focusWrite({ phase: next, endAt: Date.now() + phaseLen(f, next) * 1000, left: null, ended: null }); } }),
-        ]);
-        slot.append(chip);
-      }
-      chip.style.background = tintOf(color, app?.isDark?.());
-      chip.querySelector('.bcv-fchip__ic svg')?.setAttribute('stroke', color);
-      chip.querySelector('.bcv-fchip__time').textContent = time;
-      chip.querySelector('.bcv-fchip__phase').textContent = f.endAt ? ({ focus: 'Focus', short: 'Break', long: 'Long break' })[f.phase] : `${PHASES[f.phase]} · paused`;
-      const sw = chip.querySelector('.bcv-fchip__switch');
-      sw.hidden = !f.endAt; // (CSS shows it under the pointer)
-      sw.textContent = f.phase === 'focus' ? 'Break' : 'Focus';
-      sw.style.background = color;
-    };
-    const stop = watch(paint);
-    // the sidebar is rebuilt now and then (its children replaced whole): a slot that left it stops painting
-    const mo = new MutationObserver(() => { if (!slot.isConnected) { stop(); mo.disconnect(); } });
-    queueMicrotask(() => { const side = slot.closest('.bcv-side'); if (slot.isConnected && side) mo.observe(side, { childList: true }); else stop(); });
-    if (!focusRead) focusLoad().then(paintAll).catch(() => {});
-    return slot;
+  // ---- the top right: the pins beside the look switch, and the live widget under them -----------
+  // The look switch stands alone (content/app/app.js mounts it); the tray with the pins sits to its
+  // left and hides while the switch is open under the pointer (it grows leftwards). The live
+  // widget — a running timer — hangs under the switch, the phone's timer widget: a scale of the
+  // phase's minutes with the marker under the minutes left, a button or two, the count large in
+  // the phase's colour. The page's header rows step aside while it is up. All of it goes with the
+  // switch: the phone layout, the setup, the tour, the welcome, stock Canvas.
+  function mountTray() {
+    if (self.BCVBridge?.native) return null;
+    let tray = document.getElementById('bcv-tray');
+    if (!tray) {
+      tray = h('div', { id: 'bcv-tray', class: 'bcv-tray' }, [
+        h('div', { id: 'bcv-pins', class: 'bcv-pins', hidden: true, role: 'toolbar', 'aria-label': 'Pinned tools' }),
+      ]);
+      document.body.append(tray);
+      document.body.append(h('div', { id: 'bcv-live', class: 'bcv-live', hidden: true, role: 'status', 'aria-live': 'off' }));
+      pinsLoad().then(paintPins).catch(() => {});
+      try { api.storage.onChanged?.addListener((changes, area) => { if ((!area || area === 'local') && changes[PINS_KEY]) pinsLoad().then(paintPins).catch(() => {}); }); } catch { /* no change events */ }
+      watch(paintLive);
+      if (!focusRead) focusLoad().then(paintAll).catch(() => {});
+    }
+    return tray;
+  }
+  /** The scale's ticks and labels for a phase of `len` minutes: a tick a minute (every other past 45),
+   *  a label every minute, five or ten. Rebuilt when the length changes. */
+  function buildScale(scale, lenMin) {
+    const step = lenMin > 45 ? 2 : 1;
+    const every = lenMin <= 10 ? 1 : lenMin <= 30 ? 5 : 10;
+    const labels = scale.querySelector('.bcv-widget__labels');
+    const ticks = scale.querySelector('.bcv-widget__ticks');
+    labels.replaceChildren();
+    ticks.replaceChildren();
+    for (let m = 0; m <= lenMin; m += step) {
+      const x = `${(m / lenMin) * 100}%`;
+      ticks.append(h('span', { class: 'bcv-widget__tick', style: { left: x }, dataset: { min: String(m) } }));
+      if (m % every === 0 && (lenMin - m >= every / 2 || m === lenMin)) labels.append(h('span', { class: 'bcv-widget__label', style: { left: x }, text: String(m) }));
+    }
+    scale.dataset.len = String(lenMin);
+  }
+  function paintLive(f) {
+    const live = document.getElementById('bcv-live');
+    if (!live) return;
+    const paused = f.left !== null && f.left !== undefined; // (a stored time left: paused, even at the full length a second in)
+    const on = running(f) || paused;
+    let item = live.querySelector('.bcv-live__item[data-live="pomo"]');
+    if (!on) {
+      html.classList.remove('bcv-live-on');
+      if (item) { item.classList.add('is-out'); setTimeout(() => { item.remove(); live.hidden = !live.querySelector('.bcv-live__item'); }, 320); }
+      return;
+    }
+    live.hidden = false;
+    html.classList.add('bcv-live-on');
+    if (!item) {
+      item = h('div', { class: 'bcv-live__item bcv-widget', dataset: { live: 'pomo' }, role: 'group', tabindex: '0', title: 'Focus timer: press for the timer', 'aria-label': 'Focus timer',
+        onclick: (e) => { if (!e.target.closest('button')) open('pomo', { from: item }); },
+        onkeydown: (e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target === item) { e.preventDefault(); open('pomo', { from: item }); } } }, [
+        U.el('bcv-widget__scale', [U.el('bcv-widget__labels'), U.el('bcv-widget__ticks'), h('span', { class: 'bcv-widget__marker' })]),
+        U.el('bcv-widget__row', [
+          h('button', { type: 'button', class: 'bcv-widget__btn bcv-widget__main', onclick: (e) => { e.stopPropagation(); if (running()) focusPause(); else focusStart(); } }),
+          h('button', { type: 'button', class: 'bcv-widget__btn bcv-widget__btn--dim bcv-live__switch', hidden: true, onclick: (e) => { e.stopPropagation(); focusPhase(nextPhase(focus), { keepRunning: true }); } }),
+          U.el('bcv-widget__right', [U.text('bcv-live__phase', '', 'span'), U.text('bcv-live__time', '', 'span')]),
+        ]),
+      ]);
+      live.append(item);
+    }
+    item.classList.remove('is-out');
+    const color = PHASE_COLOR[f.phase];
+    const lenMin = Math.round(phaseLen(f) / 60);
+    const left = remaining(f);
+    item.style.setProperty('--bcv-live-color', color);
+    item.classList.toggle('is-paused', paused && !running(f));
+    const scale = item.querySelector('.bcv-widget__scale');
+    if (scale.dataset.len !== String(lenMin)) buildScale(scale, lenMin);
+    const at = Math.max(0, Math.min(1, left / 60 / lenMin));
+    scale.querySelector('.bcv-widget__marker').style.left = `${at * 100}%`;
+    for (const t of scale.querySelectorAll('.bcv-widget__tick')) { // bright at the marker, dim away from it
+      const d = Math.abs(Number(t.dataset.min) / lenMin - at);
+      t.style.opacity = String(Math.max(0.22, 1 - d / 0.42));
+    }
+    for (const l of scale.querySelectorAll('.bcv-widget__label')) {
+      const d = Math.abs(Number(l.textContent) / lenMin - at);
+      l.style.opacity = String(Math.max(0.3, 1 - d / 0.5));
+    }
+    item.querySelector('.bcv-widget__main').textContent = running(f) ? 'Pause' : 'Resume';
+    const sw = item.querySelector('.bcv-live__switch');
+    sw.hidden = !running(f);
+    sw.textContent = f.phase === 'focus' ? 'Break' : 'Focus';
+    item.querySelector('.bcv-live__time').textContent = mmss(left);
+    item.querySelector('.bcv-live__phase').textContent = running(f) ? ({ focus: 'Focus', short: 'Break', long: 'Long break' })[f.phase] : 'Paused';
   }
 
   // ---- the focus timer, the tool -------------------------------------------------------------
+  // A dial like the phone's: a ring of ticks, the arc of what is left in the phase's colour with a
+  // bright cap riding its end, the count large in the middle with the phase and when it ends; a
+  // phase picker whose highlight slides; four dots for the sessions towards a long break; three
+  // round controls — Reset, Start or Pause, Skip; and the three lengths as tiles.
   function openTimer(app, { from = null } = {}) {
     const tool = toolOf('pomo');
-    const body = U.el('bcv-tool__col bcv-pomo');
-    const p = popup({ tool, title: 'Focus timer', sub: '', width: 420, body, from });
-    let phaseSeg, timeEl, phaseEl, ring, bigBtn, bigIc, bigLbl, lens;
+    const body = U.el('bcv-pomo');
+    const p = popup({ tool, title: 'Focus timer', sub: '', width: 440, body, from });
+    const R = 84, C = 2 * Math.PI * R;
+    // the phase picker: three buttons over one sliding highlight
+    const ind = h('span', { class: 'bcv-pomo__ind', 'aria-hidden': 'true' });
+    const phaseBtns = Object.entries({ focus: 'Focus', short: 'Short', long: 'Long' }).map(([k, name]) => h('button', { type: 'button', class: 'bcv-pomo__phasebtn', role: 'tab', text: name, dataset: { value: k }, onclick: () => focusPhase(k) }));
+    const phases = h('div', { class: 'bcv-pomo__phases', role: 'tablist' }, [ind, ...phaseBtns]);
+    // the dial
+    const svg = svgEl('svg', { viewBox: '0 0 200 200', class: 'bcv-pomo__svg', 'aria-hidden': 'true' });
+    const defs = svgEl('defs');
+    const grad = svgEl('linearGradient', { id: 'bcv-pomo-grad', x1: '0', y1: '0', x2: '1', y2: '1' });
+    const stopA = svgEl('stop', { offset: '0', 'stop-color': '#ff9500' });
+    const stopB = svgEl('stop', { offset: '1', 'stop-color': '#ffb340' });
+    grad.append(stopA, stopB); defs.append(grad);
+    const ticks = svgEl('circle', { class: 'bcv-pomo__ticks', cx: 100, cy: 100, r: 96 });
+    const track = svgEl('circle', { class: 'bcv-pomo__track', cx: 100, cy: 100, r: R });
+    const arc = svgEl('circle', { class: 'bcv-pomo__arc', cx: 100, cy: 100, r: R, 'stroke-dasharray': `${C}`, 'stroke-dashoffset': '0' });
+    const capG = svgEl('g', { class: 'bcv-pomo__cap' });
+    capG.append(svgEl('circle', { cx: 100, cy: 100 - R, r: 7, class: 'bcv-pomo__capdot' }), svgEl('circle', { cx: 100, cy: 100 - R, r: 3, fill: '#fff' }));
+    svg.append(defs, ticks, track, arc, capG);
+    const timeEl = U.text('bcv-pomo__time', '0:00');
+    const phaseEl = h('span', { class: 'bcv-pomo__phasepill' });
+    const endsEl = U.text('bcv-pomo__ends', '');
+    const dial = U.el('bcv-pomo__dial', [svg, U.el('bcv-pomo__center', [timeEl, phaseEl, endsEl])]);
+    // the sessions towards a long break
+    const dots = [0, 1, 2, 3].map(() => h('span', { class: 'bcv-pomo__dot' }));
+    const dotsLabel = U.text('bcv-pomo__dotslabel', '', 'span');
+    const sessions = U.el('bcv-pomo__sessions', [U.el('bcv-pomo__dots', dots), dotsLabel]);
+    // the controls
+    const bigIc = h('span', { class: 'bcv-pomo__bigic' });
+    const big = h('button', { type: 'button', class: 'bcv-pomo__big', 'aria-label': 'Start', onclick: () => (running() ? focusPause() : focusStart()) }, bigIc);
+    const bigLbl = U.text('bcv-pomo__biglabel', 'Start', 'span');
+    const reset = h('button', { type: 'button', class: 'bcv-pomo__round bcv-pomo__reset', title: 'Reset', 'aria-label': 'Reset', onclick: () => focusReset() }, U.svg('M4 4v6h6M20 20v-6h-6M20 9A8 8 0 0 0 5.6 6.2L4 10M4 15a8 8 0 0 0 14.4 2.8L20 14', { size: 18, stroke: 'currentColor', width: 2 }));
+    const skip = h('button', { type: 'button', class: 'bcv-pomo__round bcv-pomo__skip', title: 'Skip to the next phase', 'aria-label': 'Skip', onclick: () => focusSkip() }, U.svg('M5 5l9 7-9 7zM17 5v14', { size: 18, stroke: 'currentColor', width: 2 }));
+    const controls = U.el('bcv-pomo__controls', [
+      U.el('bcv-pomo__ctl', [reset, U.text('bcv-pomo__ctllabel', 'Reset', 'span')]),
+      U.el('bcv-pomo__ctl bcv-pomo__ctl--big', [big, bigLbl]),
+      U.el('bcv-pomo__ctl', [skip, U.text('bcv-pomo__ctllabel', 'Skip', 'span')]),
+    ]);
+    // the lengths, as tiles
+    const lens = {};
+    const tiles = Object.entries(PHASES).map(([k, name]) => {
+      lens[k] = U.text('bcv-pomo__tilenum', '');
+      const tile = U.el('bcv-pomo__tile', [
+        U.text('bcv-pomo__tilelabel', name),
+        U.el('bcv-pomo__tilenumrow', [lens[k], U.text('bcv-pomo__tileunit', 'min', 'span')]),
+        U.el('bcv-pomo__tilebtns', [
+          h('button', { type: 'button', class: 'bcv-tool__step', text: '−', 'aria-label': `${name}: less`, onclick: () => focusBump(k, -1) }),
+          h('button', { type: 'button', class: 'bcv-tool__step', text: '+', 'aria-label': `${name}: more`, onclick: () => focusBump(k, 1) }),
+        ]),
+      ]);
+      tile.dataset.phase = k;
+      return tile;
+    });
+    const tilesRow = U.el('bcv-pomo__tiles', tiles);
+    body.append(...rise([phases, dial, sessions, controls, tilesRow, hint('Keeps running if you close this or leave the page. Away Refresh waits while a session is going.')], 50));
+
+    let lastFrac = null;
     const paint = (f) => {
-      const color = f.phase === 'focus' ? '#ff9500' : '#34c759';
-      const len = phaseLen(f), left = remaining(f);
+      const color = PHASE_COLOR[f.phase];
+      const len = phaseLen(f), left = remaining(f), on = running(f);
+      const frac = len > 0 ? Math.max(0, Math.min(1, left / len)) : 0;
+      body.style.setProperty('--bcv-pomo-color', color);
+      body.classList.toggle('is-running', on);
+      body.classList.toggle('is-break', f.phase !== 'focus');
       p.setSub(`${U.plural(f.done || 0, 'session')} today`);
-      phaseSeg.querySelectorAll('.bcv-seg__btn').forEach((b) => b.classList.toggle('is-active', b.dataset.value === f.phase));
+      const idx = ['focus', 'short', 'long'].indexOf(f.phase);
+      ind.style.transform = `translateX(${idx * 100}%)`;
+      phaseBtns.forEach((b) => { b.classList.toggle('is-active', b.dataset.value === f.phase); b.setAttribute('aria-selected', b.dataset.value === f.phase ? 'true' : 'false'); });
+      // a big jump (a reset, a new phase) lands at once; a tick glides
+      const jump = lastFrac === null || Math.abs(frac - lastFrac) > 0.05;
+      svg.classList.toggle('is-jump', jump);
+      lastFrac = frac;
+      stopA.setAttribute('stop-color', color);
+      stopB.setAttribute('stop-color', f.phase === 'focus' ? '#ffb340' : '#5ddb7d');
+      arc.style.strokeDashoffset = `${C * (1 - frac)}`;
+      capG.style.transform = `rotate(${frac * 360}deg)`;
+      capG.style.opacity = frac > 0.005 ? '1' : '0';
       timeEl.textContent = mmss(left);
       phaseEl.textContent = PHASES[f.phase];
-      const c = 2 * Math.PI * 64, frac = len > 0 ? Math.max(0, Math.min(1, left / len)) : 0;
-      ring.setAttribute('stroke-dasharray', `${(frac * c).toFixed(1)} ${((1 - frac) * c).toFixed(1)}`);
-      ring.setAttribute('stroke', color);
-      bigBtn.style.background = color;
-      const on = running(f);
-      bigLbl.textContent = on ? 'Pause' : (left < len ? 'Resume' : 'Start');
-      bigIc.replaceChildren(U.svg(on ? IC.pause : IC.play, { size: 15, stroke: '#fff', width: 2.2 }));
-      for (const [k, el] of Object.entries(lens)) el.textContent = `${f.mins[k]} min`;
+      const paused = !on && f.left !== null && f.left !== undefined;
+      endsEl.textContent = on ? `Ends ${U.fmtTime(new Date(f.endAt))}` : (paused ? 'Paused' : ' ');
+      const cycle = (f.done || 0) % 4;
+      dots.forEach((d, i) => d.classList.toggle('is-on', i < cycle || (f.phase === 'long')));
+      dotsLabel.textContent = f.phase === 'focus' ? `Session ${cycle + 1} of 4` : f.phase === 'long' ? 'Long break' : `Short break · ${4 - cycle} to a long one`;
+      big.setAttribute('aria-label', on ? 'Pause' : 'Start');
+      bigLbl.textContent = on ? 'Pause' : (paused ? 'Resume' : 'Start');
+      bigIc.replaceChildren(U.svg(on ? IC.pause : IC.play, { size: 24, stroke: '#fff', width: 2.4 }));
+      for (const [k, el] of Object.entries(lens)) el.textContent = String(f.mins[k]);
+      tiles.forEach((t) => t.classList.toggle('is-active', t.dataset.phase === f.phase));
     };
-    phaseSeg = seg([['focus', 'Focus'], ['short', 'Short'], ['long', 'Long']], focus.phase, (k) => focusPhase(k));
-    phaseSeg.classList.add('bcv-pomo__phases');
-    ring = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-    const dial = h('div', { class: 'bcv-pomo__dial' });
-    const svgEl = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svgEl.setAttribute('viewBox', '0 0 160 160');
-    svgEl.setAttribute('class', 'bcv-pomo__svg');
-    const track = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-    for (const [el, extra] of [[track, { class: 'bcv-pomo__track' }], [ring, { class: 'bcv-pomo__ring', 'stroke-linecap': 'round' }]]) {
-      el.setAttribute('cx', '80'); el.setAttribute('cy', '80'); el.setAttribute('r', '64'); el.setAttribute('fill', 'none'); el.setAttribute('stroke-width', '10');
-      for (const [k, v] of Object.entries(extra)) el.setAttribute(k, v);
-      svgEl.append(el);
-    }
-    timeEl = U.text('bcv-pomo__time', '0:00');
-    phaseEl = U.text('bcv-pomo__phase', '');
-    dial.append(svgEl, U.el('bcv-pomo__center', [timeEl, phaseEl]));
-    bigIc = h('span', { class: 'bcv-pomo__bigic' });
-    bigLbl = h('span', { text: 'Start' });
-    bigBtn = h('button', { type: 'button', class: 'bcv-pomo__big', onclick: () => (running() ? focusPause() : focusStart()) }, [bigIc, bigLbl]);
-    const reset = U.btn('Reset', { cls: 'bcv-pomo__reset', onClick: () => focusReset() });
-    lens = {};
-    const rows = Object.entries(PHASES).map(([k, name]) => {
-      lens[k] = U.text('bcv-tool__stepval', '');
-      return U.el('bcv-pomo__len', [U.text('bcv-pomo__lenlabel', name), stepper(lens[k], () => focusBump(k, -1), () => focusBump(k, 1))]);
-    });
-    body.append(
-      phaseSeg,
-      dial,
-      U.el('bcv-pomo__btns', [bigBtn, reset]),
-      U.el('bcv-pomo__lens', [...rows, hint('Keeps running if you close this or leave the page. Away Refresh waits while a session is going.')]),
-    );
     const stop = watch(paint);
     const mo = new MutationObserver(() => { if (!p.alive()) { stop(); mo.disconnect(); } });
     mo.observe(document.body, { childList: true });
     if (!focusRead) focusLoad().then(paintAll).catch(() => {});
+    return p;
   }
 
   // ---- the graphing calculator ---------------------------------------------------------------
@@ -358,18 +473,19 @@
     const p = popup({ tool, title: 'Graphing calculator', sub: 'Powered by Desmos', width: 960, cls: 'bcv-tool--tall', body, from });
     const fail = () => {
       if (!p.alive()) return;
-      body.replaceChildren(U.el('bcv-graph__fail', [
+      body.replaceChildren(U.el('bcv-graph__fail', rise([
         U.svg(IC.warn, { size: 26, stroke: 'var(--bcv-orange)', width: 1.9 }),
         U.text('bcv-graph__failtitle', 'Desmos could not load'),
         U.text('bcv-graph__failtext bcv-pretty', 'Check your connection, or open desmos.com in a new tab instead.'),
         h('a', { class: 'bcv-btn bcv-btn--primary', href: DESMOS, target: '_blank', rel: 'noopener', text: 'Open desmos.com' }),
-      ]));
+      ])));
     };
     const frame = h('iframe', { class: 'bcv-graph__frame', src: DESMOS, title: 'Desmos graphing calculator', allow: 'fullscreen', referrerpolicy: 'no-referrer' });
     body.append(frame, h('a', { class: 'bcv-graph__out', href: DESMOS, target: '_blank', rel: 'noopener', text: 'Open in a new tab' }));
     const onCsp = (e) => { if (/desmos\.com/.test(e.blockedURI || '')) fail(); };
     document.addEventListener('securitypolicyviolation', onCsp);
     frame.addEventListener('error', fail);
+    frame.addEventListener('load', () => frame.classList.add('is-in'));
     const mo = new MutationObserver(() => { if (!p.alive()) { document.removeEventListener('securitypolicyviolation', onCsp); mo.disconnect(); } });
     mo.observe(document.body, { childList: true });
   }
@@ -405,18 +521,13 @@
   function paintPins() {
     const bar = document.getElementById('bcv-pins');
     if (!bar) return;
-    bar.replaceChildren(...pins.map((k) => pinEl(toolOf(k))));
+    const had = new Set([...bar.querySelectorAll('.bcv-pin')].map((e) => e.dataset.tool));
+    bar.replaceChildren(...pins.map((k) => { const el = pinEl(toolOf(k)); if (had.size && !had.has(k)) el.classList.add('is-new'); return el; })); // (a pin that just landed pops in)
     bar.hidden = pins.length === 0;
     for (const c of document.querySelectorAll('.bcv-tool-card')) c.classList.toggle('is-pinned', pins.includes(c.dataset.tool));
   }
-  /** The bar beside the look switch, once per page (after the switch, so its hover can hide the bar). */
-  function mountPins() {
-    if (self.BCVBridge?.native || document.getElementById('bcv-pins')) return;
-    const bar = h('div', { id: 'bcv-pins', class: 'bcv-pins', hidden: true, role: 'toolbar', 'aria-label': 'Pinned tools' });
-    document.body.append(bar);
-    pinsLoad().then(paintPins).catch(() => {});
-    try { api.storage.onChanged?.addListener((changes, area) => { if ((!area || area === 'local') && changes[PINS_KEY]) pinsLoad().then(paintPins).catch(() => {}); }); } catch { /* no change events */ }
-  }
+  /** (kept for callers that ask for the pins alone: the tray holds them) */
+  const mountPins = () => mountTray();
 
   /** The drag: press a card and pull it up; a ghost of it follows the pointer, the top of the page
    *  says "Pin here", and letting go there pins the tool (the ghost flies into its new spot). A press
@@ -504,7 +615,7 @@
     }, [
       h('span', { class: 'bcv-tool-card__tile', style: { background: tintOf(t.color, dark) } }, U.svg(t.icon, { size: 21, stroke: t.color, width: 1.8 })),
       U.el('bcv-tool-card__text', [U.text('bcv-tool-card__name', t.name), U.text('bcv-tool-card__note bcv-pretty', t.note)]),
-      U.el('bcv-tool-card__open', [h('span', { text: 'Open' }), U.svg('M9 6l6 6-6 6', { size: 13, stroke: 'var(--bcv-blue)', width: 2.2 })]),
+      U.el('bcv-tool-card__open', [h('span', { text: 'Open' }), U.svg('M9 6l6 6-6 6', { size: 13, stroke: 'var(--bcv-blue)', width: 2.2, cls: 'bcv-tool-card__chev' })]),
       h('span', { class: 'bcv-tool-card__pinned', title: 'Pinned next to the switch' }, U.svg(IC.pin, { size: 11, stroke: 'currentColor', width: 2 })),
     ]);
     if (!demo) draggable(el, t);
@@ -525,8 +636,8 @@
   }
 
   BCV.tools = {
-    TOOLS, toolOf, tintOf, open, popup, seg, note, hint, card, label, stepper, input, saveFile, copyText, parseCsv, csvCell, uid, load, save, vendor,
-    focusActive, focusLoad, remaining, running, chipSlot, mmss,
-    mountPins, pinsLoad, pin, unpin, pinned, pinEl, cardEl, paintPins, welcomeIfFirst,
+    TOOLS, toolOf, tintOf, open, popup, seg, note, hint, card, label, stepper, input, rise, saveFile, copyText, parseCsv, csvCell, uid, load, save, vendor,
+    focusActive, focusLoad, remaining, running, mmss,
+    mountTray, mountPins, pinsLoad, pin, unpin, pinned, pinEl, cardEl, paintPins, welcomeIfFirst,
   };
 })();

@@ -3,16 +3,17 @@
  * Two runs use it. After the setup, the reloaded page comes back black (the flag is read before
  * the page draws, so the Dashboard is never seen first) and points at the look switch at the top
  * right — an opened, still copy of the real one, Persistent row and all — then at a mock Away
- * Refresh pill counting its three seconds down in slow motion. The first time Tools opens, it says
- * what Tools is, then shows the drag: a card pulled to the top turning into a pin beside the
- * switch. A phone has no switch in its header, so it gets the pointers that need none; the app
+ * Refresh pill counting its three seconds down in slow motion, then at the Dashboard's way in: a
+ * counter pressed, the list behind it, an item previewed beside the list. The first time Tools
+ * opens, it says what Tools is, then shows the drag: a card pulled to the top turning into a pin
+ * beside the switch. A phone has no switch in its header, so it gets the pointers that need none; the app
  * (no switch, no Away Refresh) never sees the setup's. */
 (function () {
   const BCV = (self.BCV = self.BCV || {});
   const { h } = BCV.utils;
   const html = document.documentElement;
   const KEY = 'welcome:pending'; // the setup's run, armed for the reloaded page
-  const WAIT = 4000; // Continue comes in after this long, on each stage: time to take the pointer in first
+  const WAIT = 3000; // Continue comes in after this long, on each stage: time to take the pointer in first
   const LEAVE = 260; // a stage's fade-out (app.css: bcv-welcome-out)
 
   // key → the stage: its layout (app.css: .bcv-welcome__stage[data-stage]), the lines, an arrow
@@ -30,8 +31,12 @@
     },
     tools: { layout: 'center', title: 'Some helpful things', hint: 'some tools to help you do more, quickly.' },
     pin: {
-      layout: 'pin', kicker: 'Tools', title: 'Drag a tool to the top', hint: 'It becomes a small button next to the Simpl Courses switch, on every page.',
+      layout: 'demo', kicker: 'Tools', title: 'Drag a tool to the top', hint: 'It becomes a small button next to the Simpl Courses switch, on every page.',
       prop: (app, ctx) => pinDemo(app, ctx.look),
+    },
+    peek: {
+      layout: 'demo', kicker: 'Dashboard', title: 'Press a card, then an item', hint: 'A card opens what is behind its number. An item opens beside the list, so you never leave the page.',
+      prop: () => peekDemo(),
     },
   };
 
@@ -100,6 +105,27 @@
       pinBtn ? h('div', { class: 'bcv-welcome__demopin' }, pinBtn) : null,
     ]);
   }
+  /** The dashboard's way in, shown: the three counters at the top, a cursor pressing the middle one,
+   *  the sheet of what is behind it rising, a press on its first row, and the preview sliding in
+   *  beside the list — drawn as shapes, not numbers, round and round (app.css). */
+  function peekDemo() {
+    const bar = (cls) => h('span', { class: `bcv-welcome__bar ${cls}` });
+    const stat = (label, mid) => h('div', { class: `bcv-welcome__stat ${mid ? 'bcv-welcome__stat--mid' : ''}` }, [
+      h('span', { class: 'bcv-welcome__statlabel', text: label }),
+      bar('bcv-welcome__bar--num'),
+      bar('bcv-welcome__bar--sub'),
+    ]);
+    const row = (i) => h('div', { class: `bcv-welcome__row ${i === 0 ? 'bcv-welcome__row--first' : ''}` }, [h('span', { class: 'bcv-welcome__dot' }), bar('bcv-welcome__bar--row'), h('span', { class: 'bcv-welcome__chip' })]);
+    return h('div', { class: 'bcv-welcome__peek', 'aria-hidden': 'true' }, [
+      h('div', { class: 'bcv-welcome__stats' }, [stat('Due today'), stat('Due this week', true), stat('Unread announcements')]),
+      h('div', { class: 'bcv-welcome__sheetmock' }, [
+        h('div', { class: 'bcv-welcome__sheethead' }, [bar('bcv-welcome__bar--big'), h('span', { class: 'bcv-welcome__sheettitle', text: 'Due this week' })]),
+        h('div', { class: 'bcv-welcome__sheetrows' }, [row(0), row(1), row(2)]),
+      ]),
+      h('div', { class: 'bcv-welcome__pvmock' }, [bar('bcv-welcome__bar--title'), bar('bcv-welcome__bar--line'), bar('bcv-welcome__bar--line'), bar('bcv-welcome__bar--line bcv-welcome__bar--short'), h('span', { class: 'bcv-welcome__pvbtn', text: 'Open' })]),
+      h('span', { class: 'bcv-welcome__cursor bcv-welcome__cursor--peek', html: '<svg viewBox="0 0 24 24" width="26" height="26"><path d="M5 3l14 9-6 1.5 3.5 6.5-2.5 1.5-3.5-6.5L6 19z" fill="#fff" stroke="#1c1c1e" stroke-width="1.4" stroke-linejoin="round"/></svg>' }),
+    ]);
+  }
   const arrowOf = ({ w, ht, line, head }) => h('span', { class: 'bcv-welcome__arrowbox', 'aria-hidden': 'true', html:
     `<svg class="bcv-welcome__arrow" viewBox="0 0 ${w} ${ht}" width="${w}" height="${ht}"><path class="bcv-welcome__line" pathLength="1" d="${line}"/><path class="bcv-welcome__head" d="${head}"/></svg>` });
 
@@ -143,15 +169,15 @@
   }
 
   /** The whole run, from black to the page: the stages named, in turn, then the black fades. With
-   *  no keys it is the setup's run (the switch where there is one, then Away Refresh), and its flag
-   *  goes; another run says what to do when it ends. */
+   *  no keys it is the setup's run (the switch where there is one, then Away Refresh, then the
+   *  Dashboard's way in), and its flag goes; another run says what to do when it ends. */
   async function open(app, keys = null, { onDone = null } = {}) {
     const el = cover();
     // the switch is looked for as each stage starts (a page's first draw comes before it is mounted);
     // a phone's header has none, so the stages that point at it are left out there
     const lookNow = () => { const l = document.getElementById('bcv-look'); return l && getComputedStyle(l).display !== 'none' ? l : null; };
     const setupRun = !keys;
-    for (const key of (keys || ['look', 'away']).filter((k) => STAGES[k])) {
+    for (const key of (keys || ['look', 'away', 'peek']).filter((k) => STAGES[k])) {
       const look = lookNow();
       if (!look && (key === 'look' || key === 'pin')) continue;
       await stage(app, key, { look });

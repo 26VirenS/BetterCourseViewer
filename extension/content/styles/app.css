@@ -169,7 +169,7 @@ html.bcv-phone.bcv-on #bcv-look, html.bcv-setup-open #bcv-look, html.bcv-touring
 /* ---- the welcome after the setup (content/app/welcome.js): the reloaded page comes back black, and
  * two pointers play on it in turn — a big white arrow at an opened copy of the look switch, then at
  * a mock Away Refresh pill counting down in slow motion — each with three lines and a Continue that
- * comes in after four seconds. The black sits over everything, the switch and the pill included. ---- */
+ * comes in after three seconds. The black sits over everything, the switch and the pill included. ---- */
 #bcv-welcome { position: fixed; inset: 0; z-index: 2147483000; margin: 0; padding: 0; background: #000; color: #fff; font: 400 15px/1.35 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif; letter-spacing: -.01em; text-transform: none; overflow: hidden; transition: opacity .35s ease; }
 #bcv-welcome.is-out { opacity: 0; pointer-events: none; }
 #bcv-welcome:focus { outline: none; }
@@ -2267,14 +2267,48 @@ html.bcv-phone .bcv-nf__act { margin-left: auto; }
 .bcv-tool-card--ghost { position: fixed; z-index: 2147483100; margin: 0; pointer-events: none; box-shadow: var(--bcv-shadow-glass); transform: scale(.94); transform-origin: top left; opacity: .96; transition: transform .2s cubic-bezier(.32,.72,0,1); }
 .bcv-tool-card--ghost.is-over { transform: scale(.42); }
 html.bcv-dragpin, html.bcv-dragpin #bcv-app, html.bcv-dragpin .bcv-tool-card { cursor: grabbing; }
-html.bcv-dragpin #bcv-pins { opacity: 0; }
+html.bcv-dragpin #bcv-tray { opacity: 0; }
 .bcv-pins-drop { position: fixed; top: 6px; right: 69px; z-index: 2147482000; display: flex; align-items: center; gap: 6px; height: 24px; padding: 0 10px; box-sizing: border-box; border: 1.5px dashed rgba(255,255,255,.6); border-radius: 12px; background: rgba(28,28,30,.86); color: #fff; font: 600 11px/1 var(--bcv-font); letter-spacing: -.01em; white-space: nowrap; animation: bcv-welcome-fade .18s ease both; transition: background .18s ease, border-color .18s ease, transform .18s ease; }
 .bcv-pins-drop.is-over { background: #0a84ff; border-color: #fff; transform: scale(1.08); }
-/* the pins beside the switch: round dark buttons with the tool's glyph, an X under the pointer */
-#bcv-pins { position: fixed; top: 6px; right: 69px; z-index: 2147481999; display: flex; align-items: center; gap: 6px; margin: 0; padding: 0; transition: opacity .18s ease; }
-#bcv-pins[hidden] { display: none; }
-#bcv-look:hover ~ #bcv-pins, #bcv-look:has(:focus-visible) ~ #bcv-pins { opacity: 0; pointer-events: none; } /* the opened switch grows leftwards over them */
-html.bcv-phone.bcv-on #bcv-pins, html.bcv-setup-open #bcv-pins, html.bcv-touring #bcv-pins, html.bcv-welcome #bcv-pins, html:not(.bcv-on) #bcv-pins { display: none; }
+/* the tray beside the switch: live activities (a running timer), then the pins. The opened switch
+ * grows leftwards over it, so it hides while the switch is under the pointer; and it goes with the
+ * switch: the phone layout, the setup, the tour, the welcome, stock Canvas. */
+#bcv-tray { position: fixed; top: 6px; right: 69px; z-index: 2147481999; display: flex; align-items: center; gap: 8px; margin: 0; padding: 0; transition: opacity .18s ease; }
+#bcv-look:hover ~ #bcv-tray, #bcv-look:has(:focus-visible) ~ #bcv-tray { opacity: 0; pointer-events: none; }
+html.bcv-phone.bcv-on #bcv-tray, html.bcv-setup-open #bcv-tray, html.bcv-touring #bcv-tray, html.bcv-welcome #bcv-tray, html:not(.bcv-on) #bcv-tray { display: none; }
+#bcv-pins { display: flex; align-items: center; gap: 6px; }
+#bcv-pins[hidden], #bcv-live[hidden] { display: none !important; }
+/* the live widget under the switch: the phone's timer widget — a scale of the phase's minutes with
+ * the marker under the minutes left (bright ticks near it, dim away from it), Pause and Break, the
+ * count large in the phase's colour. A press on it (not on a button) opens the timer. */
+#bcv-live { position: fixed; top: 38px; right: 10px; z-index: 2147481998; margin: 0; padding: 0; transition: opacity .18s ease; }
+#bcv-look:hover ~ #bcv-live, #bcv-look:has(:focus-visible) ~ #bcv-live { opacity: 0; pointer-events: none; }
+html.bcv-phone.bcv-on #bcv-live, html.bcv-setup-open #bcv-live, html.bcv-touring #bcv-live, html.bcv-welcome #bcv-live, html:not(.bcv-on) #bcv-live { display: none; }
+html.bcv-live-on:not(.bcv-phone) .bcv-head__row { padding-right: 250px; } /* the header's controls step out from under it */
+.bcv-widget { --bcv-live-color: #ff9500; position: relative; width: 240px; box-sizing: border-box; padding: 10px 14px 12px; border: 1px solid rgba(255,255,255,.1); border-radius: 22px; background: #000; color: #fff; box-shadow: 0 12px 34px rgba(0,0,0,.45); cursor: pointer; font-family: var(--bcv-font); animation: bcv-live-in .55s cubic-bezier(.2,1.1,.3,1) both; transition: box-shadow .2s ease; }
+.bcv-widget:hover { box-shadow: 0 16px 40px rgba(0,0,0,.55); }
+.bcv-widget:focus-visible { outline: 2px solid #0a84ff; outline-offset: 2px; }
+.bcv-widget.is-out { animation: bcv-live-out .3s ease both; }
+.bcv-widget__scale { position: relative; height: 46px; margin: 0 8px; }
+.bcv-widget__labels { position: absolute; left: 0; right: 0; top: 0; height: 12px; }
+.bcv-widget__label { position: absolute; top: 0; transform: translateX(-50%); font: 600 9.5px/1 var(--bcv-font); color: var(--bcv-live-color); transition: opacity .6s ease; }
+.bcv-widget__ticks { position: absolute; left: 0; right: 0; top: 16px; height: 20px; }
+.bcv-widget__tick { position: absolute; top: 0; width: 2px; height: 20px; margin-left: -1px; border-radius: 1px; background: var(--bcv-live-color); transition: opacity .6s ease; }
+.bcv-widget__marker { position: absolute; top: 39px; width: 0; height: 0; margin-left: -5px; border-left: 5px solid transparent; border-right: 5px solid transparent; border-bottom: 7px solid var(--bcv-live-color); transition: left 1s linear; }
+.bcv-widget.is-paused .bcv-widget__marker { animation: bcv-live-blink 1.6s ease-in-out infinite; }
+.bcv-widget__row { display: flex; align-items: flex-end; gap: 6px; margin-top: 8px; }
+.bcv-widget__btn { flex: none; height: 30px; margin: 0; padding: 0 12px; border: 0; border-radius: 15px; background: color-mix(in srgb, var(--bcv-live-color) 22%, transparent); color: var(--bcv-live-color); cursor: pointer; font: 600 12.5px/1 var(--bcv-font); letter-spacing: -.01em; white-space: nowrap; transition: transform .16s cubic-bezier(.34,1.3,.42,1), background .2s ease; }
+.bcv-widget__btn:hover { background: color-mix(in srgb, var(--bcv-live-color) 32%, transparent); }
+.bcv-widget__btn:active { transform: scale(.95); }
+.bcv-widget__btn--dim { background: rgba(255,255,255,.1); color: rgba(255,255,255,.75); }
+.bcv-widget__btn--dim:hover { background: rgba(255,255,255,.16); }
+.bcv-widget__btn[hidden] { display: none; }
+.bcv-widget__right { margin-left: auto; display: flex; flex-direction: column; align-items: flex-end; gap: 1px; }
+.bcv-live__phase { font: 600 9.5px/1.2 var(--bcv-font); letter-spacing: .06em; text-transform: uppercase; color: rgba(255,255,255,.5); }
+.bcv-live__time { font: 300 30px/1 var(--bcv-display); font-variant-numeric: tabular-nums; letter-spacing: -.02em; color: var(--bcv-live-color); }
+@keyframes bcv-live-in { from { transform: translateY(-24px) scale(.96); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes bcv-live-out { to { transform: translateY(-24px) scale(.96); opacity: 0; } }
+@keyframes bcv-live-blink { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
 .bcv-pin { position: relative; display: block; width: 24px; height: 24px; }
 .bcv-pin__btn { display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; margin: 0; padding: 0; border: 1px solid rgba(255,255,255,.14); border-radius: 12px; background: rgba(28,28,30,.86); -webkit-backdrop-filter: blur(16px) saturate(1.4); backdrop-filter: blur(16px) saturate(1.4); box-shadow: 0 2px 10px rgba(0,0,0,.2); cursor: pointer; transition: transform .16s cubic-bezier(.34,1.3,.42,1), box-shadow .18s ease; }
 .bcv-pin__btn:hover { transform: scale(1.1); box-shadow: 0 6px 20px rgba(0,0,0,.3); }
@@ -2329,33 +2363,55 @@ html[data-bcv-theme="dark"] .bcv-tool__note--warn { color: #ffb44d; }
   .bcv-tool--tall { height: calc(100vh - 24px); }
 }
 
-/* the focus timer */
-.bcv-pomo { align-items: center; gap: 18px; }
-.bcv-pomo__phases { align-self: stretch; }
-.bcv-pomo__dial { position: relative; width: 160px; height: 160px; display: flex; align-items: center; justify-content: center; }
-.bcv-pomo__svg { position: absolute; inset: 0; width: 160px; height: 160px; transform: rotate(-90deg); }
-.bcv-pomo__track { stroke: var(--bcv-fill); }
-.bcv-pomo__ring { transition: stroke-dasharray .3s linear; }
-.bcv-pomo__center { position: relative; text-align: center; }
-.bcv-pomo__time { font: 600 40px/1 var(--bcv-display); font-variant-numeric: tabular-nums; letter-spacing: -.03em; }
-.bcv-pomo__phase { margin-top: 5px; font: 500 12px/1.2 var(--bcv-font); color: var(--bcv-ink3); }
-.bcv-pomo__btns { display: flex; gap: 8px; align-self: stretch; }
-.bcv-pomo__big { flex: 1; height: 44px; margin: 0; border: 0; border-radius: 22px; color: #fff; cursor: pointer; font: 600 15px/1 var(--bcv-font); display: flex; align-items: center; justify-content: center; gap: 8px; }
-.bcv-pomo__big:active { opacity: .85; }
+/* the focus timer: a dial like the phone's — a ring of ticks, the arc of what is left in the phase's
+ * colour with a bright cap riding its end, the count large in the middle — a phase picker whose
+ * highlight slides, four dots for the sessions towards a long break, three round controls, and the
+ * lengths as tiles. While a session is going the arc and the big button breathe. */
+.bcv-pomo { --bcv-pomo-color: #ff9500; display: flex; flex-direction: column; align-items: center; gap: 18px; }
+.bcv-pomo__phases { position: relative; display: grid; grid-template-columns: repeat(3, 1fr); align-self: stretch; padding: 3px; border-radius: 12px; background: var(--bcv-fill); }
+.bcv-pomo__ind { position: absolute; top: 3px; left: 3px; width: calc((100% - 6px) / 3); height: calc(100% - 6px); border-radius: 9px; background: var(--bcv-card); box-shadow: var(--bcv-shadow); transition: transform .32s cubic-bezier(.32,.72,0,1); }
+.bcv-pomo__phasebtn { position: relative; margin: 0; padding: 9px 0; border: 0; background: transparent; cursor: pointer; font: 600 13px/1.2 var(--bcv-font); color: var(--bcv-ink2); transition: color .2s ease; }
+.bcv-pomo__phasebtn.is-active { color: var(--bcv-ink); }
+.bcv-pomo__dial { position: relative; width: 220px; height: 220px; display: flex; align-items: center; justify-content: center; }
+.bcv-pomo__svg { position: absolute; inset: 0; width: 220px; height: 220px; overflow: visible; }
+.bcv-pomo__ticks { fill: none; stroke: var(--bcv-ink3); stroke-width: 2; stroke-dasharray: 1.4 8.653; opacity: .35; transform: rotate(-90deg); transform-origin: 100px 100px; }
+.bcv-pomo__track { fill: none; stroke: var(--bcv-fill); stroke-width: 12; }
+.bcv-pomo__arc { fill: none; stroke: url(#bcv-pomo-grad); stroke-width: 12; stroke-linecap: round; transform: rotate(-90deg); transform-origin: 100px 100px; transition: stroke-dashoffset 1s linear; }
+.bcv-pomo.is-running .bcv-pomo__arc { animation: bcv-pomo-breathe 2.6s ease-in-out infinite; }
+.bcv-pomo__cap { transform-origin: 100px 100px; transition: transform 1s linear, opacity .2s ease; }
+.bcv-pomo__capdot { fill: var(--bcv-pomo-color); filter: drop-shadow(0 0 6px var(--bcv-pomo-color)); transition: fill .3s ease; }
+.bcv-pomo__svg.is-jump .bcv-pomo__arc, .bcv-pomo__svg.is-jump .bcv-pomo__cap { transition: none; }
+.bcv-pomo__center { position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.bcv-pomo__time { font: 500 50px/1 var(--bcv-display); font-variant-numeric: tabular-nums; letter-spacing: -.035em; color: var(--bcv-ink); }
+.bcv-pomo__phasepill { padding: 3px 9px; border-radius: 8px; background: color-mix(in srgb, var(--bcv-pomo-color) 16%, transparent); font: 600 11px/1.3 var(--bcv-font); color: var(--bcv-pomo-color); transition: background .3s ease, color .3s ease; }
+.bcv-pomo__ends { min-height: 14px; font: 500 11.5px/1.2 var(--bcv-font); color: var(--bcv-ink3); }
+.bcv-pomo__sessions { display: flex; flex-direction: column; align-items: center; gap: 7px; margin-top: -6px; }
+.bcv-pomo__dots { display: flex; gap: 7px; }
+.bcv-pomo__dot { width: 8px; height: 8px; border-radius: 4px; background: var(--bcv-fill); transition: background .3s ease, transform .35s cubic-bezier(.34,1.4,.42,1); }
+.bcv-pomo__dot.is-on { background: var(--bcv-pomo-color); transform: scale(1.15); }
+.bcv-pomo__dotslabel { font: 500 11.5px/1.2 var(--bcv-font); color: var(--bcv-ink3); }
+.bcv-pomo__controls { display: flex; align-items: flex-start; justify-content: center; gap: 28px; }
+.bcv-pomo__ctl { display: flex; flex-direction: column; align-items: center; gap: 7px; }
+.bcv-pomo__ctllabel, .bcv-pomo__biglabel { font: 500 11.5px/1.2 var(--bcv-font); color: var(--bcv-ink3); }
+.bcv-pomo__round { width: 48px; height: 48px; margin: 0; padding: 0; border: 0; border-radius: 24px; background: var(--bcv-fill); color: var(--bcv-ink2); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: transform .16s cubic-bezier(.34,1.3,.42,1), background .18s ease; }
+.bcv-pomo__round:hover { transform: scale(1.06); }
+.bcv-pomo__round:active { transform: scale(.92); }
+.bcv-pomo__big { width: 72px; height: 72px; margin: 0; padding: 0; border: 0; border-radius: 36px; background: var(--bcv-pomo-color); color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 22px color-mix(in srgb, var(--bcv-pomo-color) 45%, transparent); transition: transform .16s cubic-bezier(.34,1.3,.42,1), background .3s ease, box-shadow .3s ease; }
+.bcv-pomo__big:hover { transform: scale(1.05); }
+.bcv-pomo__big:active { transform: scale(.92); }
+.bcv-pomo.is-running .bcv-pomo__big { animation: bcv-pomo-pulse 2.6s ease-in-out infinite; }
 .bcv-pomo__bigic { display: flex; }
-.bcv-tool .bcv-pomo__reset { height: 44px; border-radius: 22px; padding: 0 18px; font-size: 14.5px; }
-.bcv-pomo__lens { align-self: stretch; padding-top: 16px; border-top: 1px solid var(--bcv-sep); display: flex; flex-direction: column; gap: 11px; }
-.bcv-pomo__len { display: flex; align-items: center; gap: 12px; }
-.bcv-pomo__lenlabel { flex: 1; min-width: 0; font: 500 13.5px/1.3 var(--bcv-font); color: var(--bcv-ink2); }
-/* the chip in the sidebar while a session is going or paused mid-phase */
-.bcv-fchip-slot[hidden] { display: none; }
-.bcv-fchip { position: relative; display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 12px; cursor: pointer; }
-.bcv-fchip__ic { flex: none; display: flex; }
-.bcv-fchip__body { flex: 1; min-width: 0; }
-.bcv-fchip__time { font: 600 13.5px/1.15 var(--bcv-mono); color: var(--bcv-ink); }
-.bcv-fchip__phase { margin-top: 2px; font: 500 10.5px/1.2 var(--bcv-font); color: var(--bcv-ink3); }
-.bcv-fchip__switch { flex: none; height: 26px; padding: 0 11px; border: 0; border-radius: 13px; color: #fff; cursor: pointer; font: 600 11.5px/1 var(--bcv-font); display: none; animation: bcv-welcome-fade .16s ease both; }
-.bcv-fchip:hover .bcv-fchip__switch:not([hidden]), .bcv-fchip:focus-within .bcv-fchip__switch:not([hidden]) { display: block; }
+.bcv-pomo__tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; align-self: stretch; padding-top: 16px; border-top: 1px solid var(--bcv-sep); }
+.bcv-pomo__tile { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 8px 10px; border-radius: 16px; background: var(--bcv-card); box-shadow: var(--bcv-shadow); border: 1.5px solid transparent; transition: border-color .3s ease, transform .2s ease; }
+.bcv-pomo__tile.is-active { border-color: var(--bcv-pomo-color); }
+.bcv-pomo__tilelabel { font: 600 10.5px/1.2 var(--bcv-font); color: var(--bcv-ink3); text-transform: uppercase; letter-spacing: .06em; white-space: nowrap; }
+.bcv-pomo__tilenumrow { display: flex; align-items: baseline; gap: 3px; }
+.bcv-pomo__tilenum { font: 600 24px/1 var(--bcv-display); letter-spacing: -.03em; font-variant-numeric: tabular-nums; color: var(--bcv-ink); }
+.bcv-pomo__tileunit { font: 500 11px/1 var(--bcv-font); color: var(--bcv-ink3); }
+.bcv-pomo__tilebtns { display: flex; gap: 4px; padding: 2px; border-radius: 10px; background: var(--bcv-fill); }
+.bcv-pomo .bcv-tool__hint { text-align: center; }
+@keyframes bcv-pomo-breathe { 0%, 100% { filter: drop-shadow(0 0 3px color-mix(in srgb, var(--bcv-pomo-color) 50%, transparent)); } 50% { filter: drop-shadow(0 0 10px color-mix(in srgb, var(--bcv-pomo-color) 85%, transparent)); } }
+@keyframes bcv-pomo-pulse { 0%, 100% { box-shadow: 0 8px 22px color-mix(in srgb, var(--bcv-pomo-color) 45%, transparent); } 50% { box-shadow: 0 8px 32px color-mix(in srgb, var(--bcv-pomo-color) 72%, transparent); } }
 
 /* the graphing calculator: Desmos in a frame, or the way out when the frame is refused */
 .bcv-graph { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; }
@@ -2414,7 +2470,12 @@ html[data-bcv-theme="dark"] .bcv-cite__req, html[data-bcv-theme="dark"] .bcv-cit
 .bcv-fc__def { flex: 1 1 55%; }
 .bcv-fc__editrow .bcv-iconbtn { background: transparent; }
 .bcv-fc__editrow .bcv-iconbtn:hover { background: var(--bcv-fill); }
-.bcv-fc__face { width: 100%; box-sizing: border-box; min-height: 200px; margin: 0; padding: 28px 26px; border: 1px solid var(--bcv-edge); border-radius: 20px; background: var(--bcv-card); box-shadow: var(--bcv-shadow); cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; text-align: center; color: var(--bcv-ink); font-family: var(--bcv-font); }
+.bcv-fc__face { width: 100%; margin: 0; padding: 0; border: 0; background: transparent; cursor: pointer; perspective: 1200px; text-align: center; color: var(--bcv-ink); font-family: var(--bcv-font); }
+.bcv-fc__flipper { position: relative; min-height: 200px; transform-style: preserve-3d; transition: transform .6s cubic-bezier(.32,.72,0,1); }
+.bcv-fc__face.is-flipped .bcv-fc__flipper { transform: rotateY(180deg); }
+.bcv-fc__panel { position: absolute; inset: 0; box-sizing: border-box; padding: 28px 26px; border: 1px solid var(--bcv-edge); border-radius: 20px; background: var(--bcv-card); box-shadow: var(--bcv-shadow); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; -webkit-backface-visibility: hidden; backface-visibility: hidden; transition: background .2s ease; }
+.bcv-fc__panel--back { transform: rotateY(180deg); }
+.bcv-fc__face:hover .bcv-fc__panel { background: var(--bcv-hover); }
 .bcv-fc__side { font: 600 10.5px/1.2 var(--bcv-font); color: var(--bcv-ink3); text-transform: uppercase; letter-spacing: .06em; }
 .bcv-fc__faceterm { font: 600 24px/1.35 var(--bcv-display); letter-spacing: -.02em; }
 .bcv-fc__facedef { font: 400 19px/1.45 var(--bcv-font); }
@@ -2485,7 +2546,7 @@ html[data-bcv-theme="dark"] .bcv-conv__delta.is-more, html[data-bcv-theme="dark"
 .bcv-welcome__stage[data-stage="center"] { top: 0; bottom: 0; left: 16px; right: 16px; justify-content: center; align-items: center; text-align: center; }
 .bcv-welcome__stage[data-stage="center"] .bcv-welcome__title { font-size: clamp(30px, 5vw, 48px); }
 .bcv-welcome__stage[data-stage="center"] .bcv-welcome__hint { font-size: 17px; }
-.bcv-welcome__stage[data-stage="pin"] { top: 56%; left: 16px; right: 16px; align-items: center; text-align: center; }
+.bcv-welcome__stage[data-stage="demo"] { top: 56%; left: 16px; right: 16px; align-items: center; text-align: center; }
 .bcv-welcome__pindemo { position: absolute; inset: 0; pointer-events: none; animation: bcv-welcome-fade .4s ease both; }
 .bcv-welcome__pindemo.is-out { animation: bcv-welcome-out .25s ease both; }
 .bcv-welcome__democard { position: absolute; width: 258px; left: calc(50% - 129px); top: 24%; transform-origin: top right; animation: bcv-welcome-drag 5.2s cubic-bezier(.4,0,.2,1) infinite; }
@@ -2519,4 +2580,94 @@ html[data-bcv-theme="dark"] .bcv-conv__delta.is-more, html[data-bcv-theme="dark"
   .bcv-welcome__democard, .bcv-welcome__cursor { animation: none; opacity: 0; }
   .bcv-welcome__demopin { animation: none; opacity: 1; transform: scale(1.5); }
   .bcv-welcome__pindemo { animation: none; opacity: 1; }
+}
+
+/* ---- motion across Tools: cards lift and their chevron leads under the pointer, a popup's
+ * contents rise in one after another (tools.js: rise), a closing popup fades, a pin that lands
+ * pops, a converter at work shimmers, a citation that changed flashes. ---- */
+.bcv-tool-card { transition: background .2s ease, transform .22s cubic-bezier(.32,.72,0,1), box-shadow .22s ease; }
+.bcv-tool-card:hover { transform: translateY(-2px); box-shadow: var(--bcv-shadow-lift); }
+.bcv-tool-card:active { transform: translateY(0) scale(.985); }
+.bcv-tool-card__tile { transition: transform .28s cubic-bezier(.34,1.3,.42,1); }
+.bcv-tool-card:hover .bcv-tool-card__tile { transform: scale(1.08) rotate(-4deg); }
+.bcv-tool-card__chev { transition: transform .2s ease; }
+.bcv-tool-card:hover .bcv-tool-card__chev { transform: translateX(3px); }
+.bcv-tool-ov.is-closing { animation: bcv-tool-ovout .18s ease both; }
+.bcv-tool-ov.is-closing .bcv-sheet { animation: bcv-tool-out .18s ease both; }
+.bcv-pin.is-new { animation: bcv-pin-pop .5s cubic-bezier(.34,1.4,.42,1) both; }
+.bcv-conv__drop.is-drag { animation: bcv-drop-pulse 1s ease-in-out infinite; }
+.bcv-conv__run.is-busy { background: linear-gradient(90deg, var(--bcv-blue) 0%, #5aa0ff 50%, var(--bcv-blue) 100%) !important; background-size: 200% 100% !important; color: #fff !important; opacity: 1; animation: bcv-shimmer 1.2s linear infinite; }
+.bcv-conv__delta, .bcv-conv__outlabel { animation: bcv-pop .35s cubic-bezier(.34,1.4,.42,1) both; }
+.bcv-cite__preview.is-fresh { animation: bcv-flash .6s ease both; }
+.bcv-fc__fb { animation: bcv-fade-up .3s cubic-bezier(.32,.72,0,1) both; }
+.bcv-fc__choice { transition: background .18s ease, border-color .18s ease, transform .16s cubic-bezier(.34,1.3,.42,1); }
+.bcv-fc__choice:hover:not(:disabled) { transform: translateX(3px); }
+.bcv-graph__frame { opacity: 0; transition: opacity .4s ease; }
+.bcv-graph__frame.is-in { opacity: 1; }
+@keyframes bcv-tool-ovout { to { opacity: 0; } }
+@keyframes bcv-tool-out { to { opacity: 0; transform: scale(.97); } }
+@keyframes bcv-pin-pop { from { transform: scale(.3); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes bcv-drop-pulse { 0%, 100% { box-shadow: 0 0 0 0 var(--bcv-blue-soft); } 50% { box-shadow: 0 0 0 6px var(--bcv-blue-soft); } }
+@keyframes bcv-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+@keyframes bcv-pop { from { transform: scale(.6); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes bcv-flash { from { background: var(--bcv-blue-soft); } to { background: var(--bcv-fill2); } }
+@media (prefers-reduced-motion: reduce) {
+  .bcv-tool-card, .bcv-tool-card__tile, .bcv-tool-card__chev, .bcv-pomo__ind, .bcv-pomo__arc, .bcv-pomo__cap, .bcv-fc__flipper, .bcv-widget__marker, .bcv-widget__tick, .bcv-widget__label { transition: none; }
+  .bcv-tool-card:hover { transform: none; }
+  .bcv-pin.is-new, .bcv-conv__drop.is-drag, .bcv-conv__run.is-busy, .bcv-conv__delta, .bcv-conv__outlabel, .bcv-cite__preview.is-fresh, .bcv-fc__fb, .bcv-widget, .bcv-widget.is-out, .bcv-widget.is-paused .bcv-widget__marker, .bcv-pomo.is-running .bcv-pomo__arc, .bcv-pomo.is-running .bcv-pomo__big, .bcv-tool-ov.is-closing, .bcv-tool-ov.is-closing .bcv-sheet { animation: none; }
+}
+
+/* the welcome's Dashboard stage: three counters at the top, the middle one pressed, the sheet behind
+ * it rising, its first row pressed, the preview sliding in beside the list — shapes, on a 7s loop */
+.bcv-welcome__peek { position: absolute; inset: 0; pointer-events: none; animation: bcv-welcome-fade .4s ease both; font-family: var(--bcv-font); }
+.bcv-welcome__peek.is-out { animation: bcv-welcome-out .25s ease both; }
+.bcv-welcome__stats { position: absolute; top: 9%; left: 50%; transform: translateX(-50%); display: flex; gap: 12px; animation: bcv-welcome-peekstats 7s ease-in-out infinite; }
+.bcv-welcome__stat { width: 172px; box-sizing: border-box; padding: 14px 16px; border-radius: 16px; background: #fff; color: #1c1c1e; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 10px 30px rgba(0,0,0,.45); }
+.bcv-welcome__stat--mid { animation: bcv-welcome-peekpress 7s ease-in-out infinite; }
+.bcv-welcome__statlabel { font: 700 9.5px/1.2 var(--bcv-font); letter-spacing: .05em; text-transform: uppercase; color: #8e8e93; }
+.bcv-welcome__bar { display: block; border-radius: 6px; background: rgba(60,60,67,.14); }
+.bcv-welcome__bar--num { width: 34px; height: 26px; background: #1c1c1e; border-radius: 7px; align-self: flex-end; margin-top: -22px; }
+.bcv-welcome__bar--sub { width: 70px; height: 8px; }
+.bcv-welcome__sheetmock { position: absolute; top: calc(9% + 112px); left: calc(50% - 190px); width: 380px; border-radius: 20px; background: #fff; color: #1c1c1e; box-shadow: 0 16px 44px rgba(0,0,0,.5); overflow: hidden; opacity: 0; animation: bcv-welcome-peeksheet 7s ease-in-out infinite; }
+.bcv-welcome__sheethead { display: flex; align-items: center; gap: 10px; padding: 16px 18px 12px; border-bottom: 1px solid rgba(60,60,67,.1); }
+.bcv-welcome__bar--big { width: 30px; height: 26px; border-radius: 7px; background: #1c1c1e; }
+.bcv-welcome__sheettitle { font: 600 14px/1.2 var(--bcv-font); }
+.bcv-welcome__row { display: flex; align-items: center; gap: 12px; padding: 12px 18px; border-top: 1px solid rgba(60,60,67,.08); }
+.bcv-welcome__row--first { border-top: 0; animation: bcv-welcome-peekrow 7s ease-in-out infinite; }
+.bcv-welcome__dot { width: 9px; height: 9px; border-radius: 50%; background: #0a84ff; flex: none; }
+.bcv-welcome__row:nth-child(2) .bcv-welcome__dot { background: #ff9500; }
+.bcv-welcome__row:nth-child(3) .bcv-welcome__dot { background: #34c759; }
+.bcv-welcome__bar--row { flex: 1; height: 10px; max-width: 190px; }
+.bcv-welcome__chip { margin-left: auto; width: 62px; height: 18px; border-radius: 9px; background: rgba(10,132,255,.14); }
+.bcv-welcome__pvmock { position: absolute; top: calc(9% + 112px); left: calc(50% + 204px); width: 230px; box-sizing: border-box; padding: 18px; border-radius: 18px; background: #fff; box-shadow: 0 16px 44px rgba(0,0,0,.5); display: flex; flex-direction: column; gap: 10px; opacity: 0; animation: bcv-welcome-peekpv 7s ease-in-out infinite; }
+.bcv-welcome__bar--title { width: 70%; height: 14px; background: #1c1c1e; border-radius: 5px; margin-bottom: 4px; }
+.bcv-welcome__bar--line { width: 100%; height: 8px; }
+.bcv-welcome__bar--short { width: 55%; }
+.bcv-welcome__pvbtn { margin-top: 8px; align-self: flex-start; padding: 7px 14px; border-radius: 14px; background: #0a84ff; color: #fff; font: 600 11px/1 var(--bcv-font); }
+.bcv-welcome__cursor--peek { left: calc(50% + 120px); top: calc(9% + 150px); animation: bcv-welcome-peekcursor 7s ease-in-out infinite; }
+@keyframes bcv-welcome-peekstats { 0% { opacity: 0; } 6%, 88% { opacity: 1; } 96%, 100% { opacity: 0; } }
+@keyframes bcv-welcome-peekpress { 0%, 18% { transform: none; box-shadow: 0 10px 30px rgba(0,0,0,.45); } 21% { transform: scale(.96); box-shadow: 0 0 0 4px rgba(10,132,255,.55), 0 10px 30px rgba(0,0,0,.45); } 26%, 100% { transform: none; box-shadow: 0 0 0 2px rgba(10,132,255,.35), 0 10px 30px rgba(0,0,0,.45); } }
+@keyframes bcv-welcome-peeksheet { 0%, 24% { opacity: 0; transform: translateY(14px) scale(.98); } 31%, 88% { opacity: 1; transform: none; } 96%, 100% { opacity: 0; transform: none; } }
+@keyframes bcv-welcome-peekrow { 0%, 46% { background: transparent; } 49%, 100% { background: rgba(10,132,255,.12); } }
+@keyframes bcv-welcome-peekpv { 0%, 50% { opacity: 0; transform: translateX(24px); } 57%, 88% { opacity: 1; transform: none; } 96%, 100% { opacity: 0; transform: none; } }
+@keyframes bcv-welcome-peekcursor {
+  0%, 6% { left: calc(50% + 120px); top: calc(9% + 150px); transform: scale(1); opacity: 0; }
+  16% { left: calc(50% + 20px); top: calc(9% + 54px); transform: scale(1); opacity: 1; }
+  20% { left: calc(50% + 20px); top: calc(9% + 54px); transform: scale(.85); opacity: 1; }
+  24% { left: calc(50% + 20px); top: calc(9% + 54px); transform: scale(1); opacity: 1; }
+  32% { left: calc(50% + 20px); top: calc(9% + 54px); transform: scale(1); opacity: 1; }
+  44% { left: calc(50% - 60px); top: calc(9% + 186px); transform: scale(1); opacity: 1; }
+  48% { left: calc(50% - 60px); top: calc(9% + 186px); transform: scale(.85); opacity: 1; }
+  52%, 84% { left: calc(50% - 60px); top: calc(9% + 186px); transform: scale(1); opacity: 1; }
+  92%, 100% { left: calc(50% - 60px); top: calc(9% + 186px); transform: scale(1); opacity: 0; }
+}
+@media (max-width: 700px) {
+  .bcv-welcome__stats { gap: 8px; transform: translateX(-50%) scale(.68); transform-origin: top center; }
+  .bcv-welcome__sheetmock { left: 16px; width: calc(100% - 32px); transform-origin: top center; }
+  .bcv-welcome__pvmock { display: none; }
+  .bcv-welcome__cursor--peek { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bcv-welcome__stats, .bcv-welcome__stat--mid, .bcv-welcome__sheetmock, .bcv-welcome__row--first, .bcv-welcome__pvmock, .bcv-welcome__cursor--peek, .bcv-welcome__peek { animation: none; opacity: 1; }
+  .bcv-welcome__cursor--peek { opacity: 0; }
 }

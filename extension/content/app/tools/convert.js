@@ -279,6 +279,7 @@
         }),
       );
       run.disabled = !st.files.length || st.busy;
+      run.classList.toggle('is-busy', st.busy);
       run.replaceChildren(h('span', { text: st.busy ? 'Converting…' : st.files.length > 1 ? 'Convert & download all' : 'Convert & download' }));
     }
     paint();

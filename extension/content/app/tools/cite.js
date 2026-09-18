@@ -238,7 +238,9 @@
       wcLabel.textContent = `${STYLE_NAME[st.style]} · works cited`;
       readyBadge.textContent = ok ? 'Ready' : `${miss.length} to fill`;
       readyBadge.classList.toggle('is-ready', ok);
+      const wasText = preview.textContent;
       preview.replaceChildren(...build(st.style, st.type, st.f).map((seg) => h('span', { class: seg.italic ? 'bcv-cite__i' : '', text: seg.text })));
+      if (wasText && wasText !== preview.textContent) { preview.classList.remove('is-fresh'); void preview.offsetWidth; preview.classList.add('is-fresh'); } // a change flashes, once
       inTextEl.textContent = inText(st.style, st.type, st.f);
       missing.hidden = ok;
       missing.replaceChildren(U.svg(IC.warn, { size: 15, stroke: 'var(--bcv-orange)', width: 2 }), h('span', { class: 'bcv-pretty', text: `Add ${miss.map((m) => m.label.toLowerCase()).join(', ')} to finish this citation.` }));

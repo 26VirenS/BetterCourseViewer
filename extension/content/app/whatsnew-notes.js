@@ -23,6 +23,11 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.18.0', date: '2026-09-18', notes: [
+      { kind: 'improved', title: 'Focus timer', body: 'A new dial, session dots, Skip, and smoother motion.', icon: P.clock },
+      { kind: 'new', title: 'Live at the top right', body: 'A running timer sits next to the switch, not in the sidebar.', icon: P.toggle },
+      { kind: 'improved', title: 'Tools in motion', body: 'Cards, popups and flashcards move as you use them.', icon: P.sparkle },
+    ] },
     { version: '2.17.0', date: '2026-09-18', notes: [
       { kind: 'new', title: 'Tools', body: 'Citations, a focus timer, Desmos, a file converter and flashcards.', icon: P.tool },
       { kind: 'new', title: 'Pin a tool', body: 'Drag a tool card to the top. It becomes a button next to the switch.', icon: P.pin },

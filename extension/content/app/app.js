@@ -597,7 +597,6 @@
       ]),
       BCV.extras?.sideGroup?.(BCV.app), // what the school added to Canvas's own nav (tools, History, Help)
       U.el('bcv-side__bottom', [
-        BCV.tools?.chipSlot?.(BCV.app), // the focus timer while a session is going: the time left, the phase, Break or Focus under the pointer
         h('button', { type: 'button', class: 'bcv-theme-btn', id: 'bcv-theme-btn', onclick: toggleTheme }, [
           h('span', { class: 'bcv-theme-btn__ic' }, U.svg(state.dark ? IC.sun : IC.moon, { size: 14, width: 1.8 })),
           h('span', { text: state.dark ? 'Light appearance' : 'Dark appearance' }),
@@ -1201,7 +1200,7 @@
     if (welcome) BCV.welcome.cover();
     await applySkin(state.lookOn);
     mountLookToggle();
-    if (state.lookOn) { BCV.tools?.mountPins?.(); BCV.tools?.focusLoad?.().catch(() => {}); } // the pinned tools beside the switch; the focus timer's clock, so a session going is known
+    if (state.lookOn) { BCV.tools?.mountTray?.(); BCV.tools?.focusLoad?.().catch(() => {}); } // the tray beside the switch (live activities, pinned tools); the focus timer's clock, so a session going is known
     if (welcome) BCV.welcome.open(BCV.app).catch(() => {});
     // The first Canvas page after an update shows what changed: once per version, never over the
     // setup, the welcome, the tour or a quiz attempt, and never on a fresh install (the setup marks its version seen).
