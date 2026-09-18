@@ -2521,6 +2521,24 @@ html[data-bcv-theme="dark"] .bcv-cite__req, html[data-bcv-theme="dark"] .bcv-cit
 .bcv-conv__drop.is-drag { border-color: var(--bcv-blue); background: var(--bcv-blue-soft); }
 .bcv-conv__droptitle { font: 600 14px/1.3 var(--bcv-font); color: var(--bcv-ink); }
 .bcv-conv__dropsub { font: 400 12px/1.4 var(--bcv-font); color: var(--bcv-ink3); }
+.bcv-conv__cloudhint { font: 400 12px/1.4 var(--bcv-font); color: var(--bcv-ink3); }
+.bcv-conv__cloudhint[hidden] { display: none; }
+.bcv-conv__stage { flex: none; font: 500 12px/1.2 var(--bcv-font); color: var(--bcv-ink3); animation: bcv-conv-stage 1.4s ease-in-out infinite; }
+@keyframes bcv-conv-stage { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
+/* the service card: the key in, who it belongs to, the switch, the way out */
+.bcv-conv__service { gap: 10px; }
+.bcv-conv__ccstate { display: inline-flex; align-items: center; gap: 6px; font: 500 12px/1.2 var(--bcv-font); color: var(--bcv-ink3); }
+.bcv-conv__ccstate::before { content: ''; width: 7px; height: 7px; border-radius: 4px; background: var(--bcv-ink3); opacity: .5; }
+.bcv-conv__ccstate.is-on { color: var(--bcv-green, #34c759); }
+.bcv-conv__ccstate.is-on::before { background: var(--bcv-green, #34c759); opacity: 1; }
+.bcv-conv__ccrow { display: flex; gap: 8px; align-items: center; }
+.bcv-conv__ccrow .bcv-conv__key { flex: 1; min-width: 0; font-family: var(--bcv-mono, ui-monospace, Menlo, monospace); font-size: 12.5px; }
+.bcv-conv__ccrow[hidden], .bcv-conv__ccline[hidden], .bcv-conv__use[hidden], .bcv-conv__ccremove[hidden], .bcv-conv__ccerr[hidden] { display: none; }
+.bcv-conv__ccline { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; font: 400 12px/1.45 var(--bcv-font); color: var(--bcv-ink3); }
+.bcv-conv__ccfoot { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.bcv-conv__ccfoot:empty, .bcv-conv__ccfoot:not(:has(:not([hidden]))) { display: none; }
+.bcv-conv__use { display: flex; align-items: center; gap: 8px; cursor: pointer; font: 500 13px/1.3 var(--bcv-font); color: var(--bcv-ink2); }
+.bcv-conv__use input { width: 16px; height: 16px; margin: 0; accent-color: var(--bcv-blue); cursor: pointer; }
 .bcv-conv__settings { gap: 14px; }
 .bcv-conv__opt { padding-top: 14px; border-top: 1px solid var(--bcv-sep); }
 .bcv-conv__optrow { display: flex; align-items: center; gap: 12px; }

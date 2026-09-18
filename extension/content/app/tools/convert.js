@@ -1,12 +1,17 @@
 /* The file converter: drop a file and the tool works out what it is, then offers only the
- * conversions that exist for it — DOCX → PDF / Text / HTML, PDF → PNG pages / Text, images →
- * PNG / JPEG / WebP / PDF, TXT or MD → PDF, CSV ⇄ JSON. One source kind per batch: files of another
- * kind dropped in alongside are reported as ignored, never silently dropped. Everything runs in
- * the page (lib/vendor/, loaded when first needed: mammoth for DOCX, jsPDF for anything producing
- * a PDF, pdf.js for reading one, the canvas for image formats); nothing is uploaded. DOCX → PDF is
- * a TEXT-LAYOUT PDF — real selectable text, headings and lists, not a pixel copy of the styling —
- * and the popup says so. Input is capped at 20 MB and 30 pages; one bad file never aborts the
- * batch, and its row shows the engine's own reason. */
+ * conversions that exist for it. Two engines. On this device (lib/vendor/, loaded when first
+ * needed: mammoth for DOCX, jsPDF for anything producing a PDF, pdf.js for reading one, the canvas
+ * for image formats): images → PNG / JPEG / WebP / PDF, TXT or MD → PDF, CSV ⇄ JSON, DOCX → Text /
+ * HTML, PDF → Text, and — as a text-layout PDF, real selectable text rather than a copy of the
+ * styling — DOCX → PDF and PDF → PNG pages. Through CloudConvert (api.cloudconvert.com, with the
+ * student's own API key pasted into the popup and kept on this device): the real thing — a Word
+ * document laid out as the original, Word from a PDF, JPEG pages, slides and spreadsheets to PDF,
+ * CSV to Excel, HEIC photos. With a key, Word and PDF go through the service unless the switch
+ * says otherwise; what only the service can do is offered as soon as there is a key; images,
+ * text, CSV and JSON never leave the device. One source kind per batch: files of another kind
+ * dropped in alongside are reported as ignored, never silently dropped. Input is capped at 20 MB
+ * and 30 pages on the device; one bad file never aborts the batch, and its row shows the engine's
+ * own reason. */
 (function () {
   const BCV = (self.BCV = self.BCV || {});
   const { h } = BCV.utils;
@@ -16,18 +21,27 @@
 
   const MAX_BYTES = 20 * 1024 * 1024;
   const MAX_PAGES = 30;
+  // a target is [format, label, where]: 'device' runs here, 'cloud' needs the service, 'both'
+  // runs here unless the service is connected and switched on
   const MATRIX = {
-    image: { label: 'Images', targets: [['png', 'PNG'], ['jpeg', 'JPEG'], ['webp', 'WebP'], ['pdf', 'PDF']] },
-    docx: { label: 'Word document', targets: [['pdf', 'PDF'], ['txt', 'Text'], ['html', 'HTML']] },
-    pdf: { label: 'PDF', targets: [['png', 'PNG pages'], ['txt', 'Text']] },
-    text: { label: 'Text', targets: [['pdf', 'PDF']] },
-    csv: { label: 'CSV', targets: [['json', 'JSON']] },
-    json: { label: 'JSON', targets: [['csv', 'CSV']] },
+    image: { label: 'Images', targets: [['png', 'PNG', 'device'], ['jpeg', 'JPEG', 'device'], ['webp', 'WebP', 'device'], ['pdf', 'PDF', 'device']] },
+    heic: { label: 'HEIC photo', targets: [['jpg', 'JPEG', 'cloud'], ['png', 'PNG', 'cloud'], ['pdf', 'PDF', 'cloud']] },
+    docx: { label: 'Word document', targets: [['pdf', 'PDF', 'both'], ['txt', 'Text', 'device'], ['html', 'HTML', 'device']] },
+    pdf: { label: 'PDF', targets: [['png', 'PNG pages', 'both'], ['txt', 'Text', 'device'], ['docx', 'Word', 'cloud'], ['jpg', 'JPEG pages', 'cloud']] },
+    pptx: { label: 'Slides', targets: [['pdf', 'PDF', 'cloud'], ['png', 'PNG slides', 'cloud']] },
+    xlsx: { label: 'Spreadsheet', targets: [['pdf', 'PDF', 'cloud'], ['csv', 'CSV', 'cloud']] },
+    text: { label: 'Text', targets: [['pdf', 'PDF', 'device']] },
+    csv: { label: 'CSV', targets: [['json', 'JSON', 'device'], ['xlsx', 'Excel', 'cloud']] },
+    json: { label: 'JSON', targets: [['csv', 'CSV', 'device']] },
   };
+  const whereOf = (kind, to) => (MATRIX[kind]?.targets.find((t) => t[0] === to) || [])[2] || '';
   /** The kind, from the extension first (Windows reports .docx inconsistently), then the MIME type. */
   function kindOf(file) {
     const n = (file.name || '').toLowerCase();
     if (/\.docx$/.test(n)) return 'docx';
+    if (/\.pptx$/.test(n)) return 'pptx';
+    if (/\.xlsx$/.test(n)) return 'xlsx';
+    if (/\.hei[cf]$/.test(n)) return 'heic';
     if (/\.pdf$/.test(n) || file.type === 'application/pdf') return 'pdf';
     if (/\.csv$/.test(n)) return 'csv';
     if (/\.json$/.test(n)) return 'json';
@@ -41,7 +55,90 @@
   const readAs = (file, how) => new Promise((resolve, reject) => { const r = new FileReader(); r.onload = () => resolve(r.result); r.onerror = () => reject(new Error('The file could not be read.')); r[how](file); });
   const imageSize = (url) => new Promise((resolve) => { const img = new Image(); img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight }); img.onerror = () => resolve({ w: 0, h: 0 }); img.src = url; });
 
-  // ---- engines -------------------------------------------------------------------------------
+  // ---- the service: CloudConvert ---------------------------------------------------------------
+  // Their API v2: a job of three tasks — import/upload, convert, export/url. The upload goes to the
+  // form the import task hands back; the job is polled until it is finished or has failed; the
+  // export task names the files to fetch. The key is the student's own (a free account is enough
+  // for everyday files), kept in this device's storage and sent as a bearer token, nowhere else.
+  const CC_KEY = 'tools:convert:cc';
+  const CC = { base: 'https://api.cloudconvert.com/v2', keys: 'https://cloudconvert.com/dashboard/api/v2/keys' };
+  const setBase = (url) => { CC.base = String(url).replace(/\/+$/, ''); }; // (the dev harness points it at a stand-in)
+  async function ccError(r) {
+    let msg = '';
+    try { const j = await r.json(); msg = j?.message || j?.errors?.[0]?.message || (typeof j?.errors === 'object' && Object.values(j.errors).flat()[0]) || ''; } catch { /* no body */ }
+    if (r.status === 401) return new Error('The key was refused. Check it in your CloudConvert dashboard.');
+    if (r.status === 402) return new Error('The CloudConvert account has no credits left.');
+    return new Error(msg || `CloudConvert answered ${r.status}.`);
+  }
+  async function ccFetch(path, key, init = {}) {
+    let r;
+    try {
+      r = await fetch(`${CC.base}${path}`, { ...init, headers: { authorization: `Bearer ${key}`, accept: 'application/json', ...(init.body ? { 'content-type': 'application/json' } : {}) } });
+    } catch { throw new Error('CloudConvert could not be reached.'); }
+    if (!r.ok) throw await ccError(r);
+    return r.json();
+  }
+  /** Who the key belongs to, and what is left on the account. */
+  async function ccMe(key) {
+    const j = await ccFetch('/users/me', key);
+    return { username: j?.data?.username || j?.data?.email || 'you', credits: Number(j?.data?.credits) || 0 };
+  }
+  /** One file through the service: { files: [{ filename, url, size }] }. */
+  async function ccConvert({ file, name, to, key, onStage }) {
+    const job = await ccFetch('/jobs', key, { method: 'POST', body: JSON.stringify({
+      tasks: {
+        'import-1': { operation: 'import/upload' },
+        'convert-1': { operation: 'convert', input: 'import-1', output_format: to },
+        'export-1': { operation: 'export/url', input: 'convert-1', archive_multiple_files: true },
+      },
+      tag: 'simpl-courses',
+    }) });
+    const id = job?.data?.id;
+    const form = (job?.data?.tasks || []).find((t) => t.name === 'import-1')?.result?.form;
+    if (!id || !form?.url) throw new Error('CloudConvert did not open an upload.');
+    const fd = new FormData();
+    for (const [k, v] of Object.entries(form.parameters || {})) fd.append(k, v);
+    fd.append('file', file, name); // (last: the store reads the fields before the bytes)
+    let r;
+    try { r = await fetch(form.url, { method: 'POST', body: fd }); } catch { throw new Error('The upload to CloudConvert failed.'); }
+    if (!r.ok) throw new Error(`The upload was refused (${r.status}).`);
+    onStage?.('Converting…');
+    const until = Date.now() + 240000;
+    for (;;) {
+      const j = (await ccFetch(`/jobs/${id}`, key))?.data;
+      if (j?.status === 'finished') {
+        const files = (j.tasks || []).find((t) => t.name === 'export-1')?.result?.files || [];
+        if (!files.length) throw new Error('CloudConvert returned no file.');
+        return { files };
+      }
+      if (j?.status === 'error') {
+        const bad = (j.tasks || []).find((t) => t.status === 'error');
+        throw new Error(bad?.message || 'CloudConvert could not convert this file.');
+      }
+      if (Date.now() > until) throw new Error('CloudConvert took too long.');
+      await new Promise((res) => setTimeout(res, 1200));
+    }
+  }
+  async function cloudOne(rec, { to, key, download, onStage }) {
+    try {
+      onStage?.('Uploading…');
+      const { files } = await ccConvert({ file: rec.file, name: rec.name, to, key, onStage });
+      onStage?.('Downloading…');
+      let bytes = 0;
+      for (const f of files) {
+        let blob = null;
+        try { const r = await fetch(f.url); if (r.ok) blob = await r.blob(); } catch { /* below */ }
+        if (blob) { bytes += blob.size; if (download) T.saveFile(f.filename, blob); }
+        else { bytes += Number(f.size) || 0; if (download) clickDownload(f.url, f.filename); } // (a store that refuses the page's read: the browser fetches it itself)
+      }
+      const ext = (files[0].filename || '').split('.').pop().toUpperCase();
+      return { ok: true, bytes, label: `${files.length > 1 ? U.plural(files.length, 'file') : ext} · CloudConvert` };
+    } catch (e) {
+      return { ok: false, why: e?.message || 'CloudConvert could not convert this file.' };
+    }
+  }
+
+  // ---- the engines on this device --------------------------------------------------------------
   async function jsPdfText(lines) {
     await T.vendor('jspdf');
     const doc = new self.jspdf.jsPDF({ unit: 'pt', format: 'letter' });
@@ -94,8 +191,13 @@
   const clickDownload = (url, name) => { const a = h('a', { href: url, download: name, style: { display: 'none' } }); document.body.append(a); a.click(); a.remove(); };
 
   /** One file → its output (downloaded when asked); {ok, bytes, label} or {ok:false, why}. */
-  async function convertOne(rec, { to, q, max, download }) {
+  async function convertOne(rec, { to, q, max, download, cloud = false, key = '', onStage = null }) {
     const fail = (why) => ({ ok: false, why: why || 'Could not convert this file.' });
+    const where = whereOf(rec.kind, to);
+    if (where === 'cloud' || (where === 'both' && cloud && key)) {
+      if (!key) return fail('This one needs CloudConvert. Connect a key below.');
+      return cloudOne(rec, { to, key, download, onStage });
+    }
     try {
       if (rec.kind === 'image') {
         const r = await rasterize(rec, to, max);
@@ -174,18 +276,23 @@
   }
 
   // ---- the popup -----------------------------------------------------------------------------
+  const DEVICE_SUB = 'Runs on this device. Nothing is uploaded.';
+  const DEVICE_FOOT = 'Word documents convert to a text-layout PDF — selectable text, not a pixel copy of the original styling.';
   function open(app, { from = null } = {}) {
     const tool = T.toolOf('conv');
-    const st = { files: [], kind: 'image', to: 'webp', q: 82, max: 0, drag: false, busy: false, note: '' };
+    const st = { files: [], kind: 'image', to: 'webp', q: 82, max: 0, drag: false, busy: false, note: '', stage: {}, cc: { key: '', username: '', credits: 0, use: true }, ccBusy: false, ccErr: '' };
     const body = U.el('bcv-conv');
-    const p = T.popup({ tool, title: 'File converter', sub: 'Runs on this device. Nothing is uploaded.', width: 560, body, from,
-      foot: 'Word documents convert to a text-layout PDF — selectable text, not a pixel copy of the original styling.' });
-    const fileInput = h('input', { type: 'file', accept: '.docx,.pdf,.txt,.md,.csv,.json,image/*', multiple: true, hidden: true });
+    const p = T.popup({ tool, title: 'File converter', sub: DEVICE_SUB, width: 560, body, from, foot: DEVICE_FOOT });
+    const footEl = p.sheet.querySelector('.bcv-sheet__foot');
+    const connected = () => !!st.cc.key;
+    const cloudOn = () => connected() && st.cc.use !== false;
+    const fileInput = h('input', { type: 'file', accept: '.docx,.pptx,.xlsx,.pdf,.txt,.md,.csv,.json,.heic,.heif,image/*', multiple: true, hidden: true });
     fileInput.addEventListener('change', () => { addFiles(fileInput.files); fileInput.value = ''; });
+    const dropSub = U.text('bcv-conv__dropsub', '');
     const drop = h('label', { class: 'bcv-conv__drop' }, [
       U.svg(IC.upload, { size: 24, stroke: 'var(--bcv-ink3)', width: 1.8 }),
       U.text('bcv-conv__droptitle', 'Drop files here, or choose them'),
-      U.text('bcv-conv__dropsub', 'DOCX · PDF · images · TXT · MD · CSV · JSON'),
+      dropSub,
       fileInput,
     ]);
     drop.addEventListener('dragover', (e) => { e.preventDefault(); drop.classList.add('is-drag'); });
@@ -193,6 +300,7 @@
     drop.addEventListener('drop', (e) => { e.preventDefault(); drop.classList.remove('is-drag'); addFiles(e.dataTransfer?.files); });
     const kindLabel = T.label('');
     const formats = U.el('bcv-conv__formats');
+    const cloudHint = U.text('bcv-conv__cloudhint bcv-pretty', '');
     const qWrap = U.el('bcv-conv__opt');
     const qVal = U.text('bcv-tool__stepval', '', 'span');
     const qRange = h('input', { type: 'range', min: '40', max: '100', step: '1', class: 'bcv-conv__range', 'aria-label': 'Quality' });
@@ -203,17 +311,53 @@
     const noteEl = T.note('', 'warn');
     const listCard = T.card([], 'bcv-conv__list');
     const run = U.btn('Convert & download', { kind: 'primary', cls: 'bcv-conv__run', onClick: () => convertAll() });
-    body.append(drop, T.card([kindLabel, formats, qWrap, maxWrap], 'bcv-conv__settings'), noteEl, listCard, run);
+    // the service card: the key in, who it belongs to, the switch, the way out
+    const ccState = h('span', { class: 'bcv-conv__ccstate' });
+    const keyInput = h('input', { type: 'text', class: 'bcv-input bcv-tool__input bcv-conv__key', placeholder: 'Paste your API key', autocomplete: 'off', spellcheck: 'false', 'aria-label': 'CloudConvert API key' });
+    keyInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); connect(); } });
+    const connectBtn = U.btn('Connect', { kind: 'primary', cls: 'bcv-conv__connect', onClick: () => connect() });
+    const keyRow = U.el('bcv-conv__ccrow', [keyInput, connectBtn]);
+    const ccErr = T.note('', 'warn');
+    ccErr.classList.add('bcv-conv__ccerr');
+    const useBox = h('input', { type: 'checkbox', checked: true });
+    useBox.addEventListener('change', () => { st.cc.use = useBox.checked; T.save(CC_KEY, st.cc).catch(() => {}); clearOut(); paint(); });
+    const useRow = h('label', { class: 'bcv-conv__use' }, [useBox, h('span', { text: 'Send Word and PDF through CloudConvert' })]);
+    const removeBtn = h('button', { type: 'button', class: 'bcv-tool__link bcv-conv__ccremove', text: 'Remove key', onclick: () => { st.cc = { key: '', username: '', credits: 0, use: true }; st.ccErr = ''; keyInput.value = ''; T.save(CC_KEY, null).catch(() => {}); clearOut(); paint(); } });
+    const ccLine = U.el('bcv-conv__ccline', [
+      h('a', { class: 'bcv-tool__link bcv-conv__cclink', href: CC.keys, target: '_blank', rel: 'noopener', text: 'Get a free key' }),
+      h('span', { class: 'bcv-conv__ccwhy', text: 'Word, PDF, slides and sheets convert properly through it. Images and text stay on this device.' }),
+    ]);
+    const serviceCard = T.card([U.el('bcv-tool__cardhead', [T.label('CloudConvert'), ccState]), keyRow, ccErr, ccLine, U.el('bcv-conv__ccfoot', [useRow, removeBtn])], 'bcv-conv__service');
+    body.append(drop, T.card([kindLabel, formats, cloudHint, qWrap, maxWrap], 'bcv-conv__settings'), noteEl, listCard, run, serviceCard);
 
     const clearOut = () => { st.files = st.files.map((f) => ({ ...f, out: null })); };
+    const seen = new Set(); // rows that have had their entrance
+    /** The targets on offer for the kind: what runs here, and what only the service does once there is a key. */
+    const targets = (kind) => (MATRIX[kind] || MATRIX.image).targets.filter((t) => t[2] !== 'cloud' || connected());
+    async function connect() {
+      const key = keyInput.value.trim();
+      if (!key || st.ccBusy) return;
+      st.ccBusy = true; st.ccErr = '';
+      paint();
+      try {
+        const me = await ccMe(key);
+        st.cc = { key, username: me.username, credits: me.credits, use: st.cc.use !== false };
+        await T.save(CC_KEY, st.cc);
+        clearOut();
+      } catch (e) {
+        st.ccErr = e?.message || 'CloudConvert could not be reached.';
+      }
+      st.ccBusy = false;
+      if (p.alive()) paint();
+    }
     async function addFiles(list) {
       const all = Array.from(list || []);
       const typed = all.map((f) => ({ f, kind: kindOf(f) })).filter((x) => x.kind);
       if (!typed.length) { st.note = 'Unsupported file type.'; paint(); return; }
       let kind = st.files.length ? st.kind : typed[0].kind;
       let same = typed.filter((x) => x.kind === kind);
-      if (!same.length) { kind = typed[0].kind; same = typed.filter((x) => x.kind === kind); st.files = []; st.to = MATRIX[kind].targets[0][0]; }
-      if (!st.files.length && st.kind !== kind) st.to = MATRIX[kind].targets[0][0];
+      if (!same.length) { kind = typed[0].kind; same = typed.filter((x) => x.kind === kind); st.files = []; st.to = targets(kind)[0]?.[0] || MATRIX[kind].targets[0][0]; }
+      if (!st.files.length && st.kind !== kind) st.to = targets(kind)[0]?.[0] || MATRIX[kind].targets[0][0];
       st.kind = kind;
       const dropped = typed.length - same.length;
       const over = same.filter((x) => x.f.size > MAX_BYTES).length;
@@ -224,10 +368,11 @@
       paint();
       for (const x of same.filter((y) => y.f.size <= MAX_BYTES)) {
         try {
-          const data = await readAs(x.f, x.kind === 'image' ? 'readAsDataURL' : x.kind === 'docx' || x.kind === 'pdf' ? 'readAsArrayBuffer' : 'readAsText');
+          const how = x.kind === 'image' ? 'readAsDataURL' : x.kind === 'docx' || x.kind === 'pdf' ? 'readAsArrayBuffer' : x.kind === 'text' || x.kind === 'csv' || x.kind === 'json' ? 'readAsText' : null;
+          const data = how ? await readAs(x.f, how) : null; // (what only the service takes is not read here: it goes up as it is)
           const size = x.kind === 'image' ? await imageSize(data) : { w: 0, h: 0 };
           if (!p.alive()) return;
-          st.files = [...st.files, { id: T.uid('f'), name: x.f.name, size: x.f.size, kind: x.kind, data, w: size.w, h: size.h, out: null }];
+          st.files = [...st.files, { id: T.uid('f'), name: x.f.name, size: x.f.size, kind: x.kind, data, file: x.f, w: size.w, h: size.h, out: null }];
           paint();
         } catch (e) {
           st.note = e?.message || 'A file could not be read.';
@@ -238,9 +383,15 @@
     async function convertAll() {
       if (st.busy || !st.files.length) return;
       st.busy = true;
+      st.stage = {};
       paint();
       const next = [];
-      for (const rec of st.files) next.push({ ...rec, out: await convertOne(rec, { to: st.to, q: st.q, max: st.max, download: true }) }); // (one at a time, one bad file never stops the rest)
+      for (const rec of st.files) { // (one at a time, one bad file never stops the rest)
+        const out = await convertOne(rec, { to: st.to, q: st.q, max: st.max, download: true, cloud: cloudOn(), key: st.cc.key, onStage: (s) => { st.stage[rec.id] = s; if (p.alive()) paint(); } });
+        delete st.stage[rec.id];
+        next.push({ ...rec, out });
+        if (p.alive()) { st.files = st.files.map((f) => (f.id === rec.id ? { ...f, out } : f)); paint(); }
+      }
       if (!p.alive()) return;
       st.files = next;
       st.busy = false;
@@ -248,8 +399,13 @@
     }
     function paint() {
       const m = MATRIX[st.kind] || MATRIX.image;
+      const on = targets(st.kind);
+      if (!on.some((t) => t[0] === st.to)) st.to = on[0]?.[0] || m.targets[0][0];
       kindLabel.textContent = `${m.label} → convert to`;
-      formats.replaceChildren(T.seg(m.targets, st.to, (k) => { st.to = k; clearOut(); paint(); }));
+      formats.replaceChildren(T.seg(on.map((t) => [t[0], t[1]]), st.to, (k) => { st.to = k; clearOut(); paint(); }));
+      const locked = m.targets.filter((t) => t[2] === 'cloud' && !connected()).map((t) => t[1]);
+      cloudHint.hidden = !locked.length;
+      cloudHint.textContent = locked.length ? `${locked.length > 1 ? `${locked.slice(0, -1).join(', ')} and ${locked[locked.length - 1]}` : locked[0]} ${locked.length > 1 ? 'need' : 'needs'} CloudConvert. Connect a key below.` : '';
       const lossy = st.kind === 'image' && (st.to === 'jpeg' || st.to === 'webp');
       qWrap.hidden = !lossy;
       qRange.value = String(st.q);
@@ -258,6 +414,9 @@
       maxVal.textContent = st.max > 0 ? `${st.max} px wide` : 'Original size';
       noteEl.hidden = !st.note;
       noteEl.textContent = st.note;
+      dropSub.textContent = connected() ? 'DOCX · PPTX · XLSX · PDF · images · HEIC · TXT · MD · CSV · JSON' : 'DOCX · PDF · images · TXT · MD · CSV · JSON';
+      p.setSub(cloudOn() ? 'Word, PDF, slides and sheets go through CloudConvert.' : connected() ? 'Runs on this device; CloudConvert for what only it can do.' : DEVICE_SUB);
+      if (footEl) footEl.textContent = cloudOn() ? 'A Word document becomes a real PDF through CloudConvert, laid out as the original.' : DEVICE_FOOT;
       listCard.hidden = !st.files.length;
       listCard.replaceChildren(
         U.el('bcv-tool__cardhead', [T.label(U.plural(st.files.length, 'file')), h('button', { type: 'button', class: 'bcv-tool__link', text: 'Clear', onclick: () => { st.files = []; st.note = ''; paint(); } })]),
@@ -267,6 +426,7 @@
           const row = U.el('bcv-conv__row', [
             f.kind === 'image' ? h('span', { class: 'bcv-conv__thumb', role: 'img', 'aria-label': 'preview', style: { backgroundImage: `url("${f.data}")` } }) : h('span', { class: 'bcv-conv__ext', text: (f.name.split('.').pop() || '').toUpperCase().slice(0, 4) }),
             U.el('bcv-conv__rowbody', [U.text('bcv-conv__name bcv-ellip', f.name), U.text('bcv-conv__meta', `${f.kind === 'image' && f.w ? `${f.w} × ${f.h} · ` : ''}${kb(f.size)}`)]),
+            st.stage[f.id] ? U.text('bcv-conv__stage', st.stage[f.id], 'span') : null,
             done ? U.el('bcv-conv__out', [
               done && f.kind === 'image' && st.to !== 'pdf' ? h('span', { class: `bcv-conv__delta ${delta > 0 ? 'is-less' : 'is-more'}`, text: delta > 0 ? `−${delta}%` : `+${Math.abs(delta)}%` }) : null,
               U.text('bcv-conv__outlabel', `${kb(f.out.bytes)} · ${f.out.label}`),
@@ -274,17 +434,34 @@
             bad ? U.text('bcv-conv__err bcv-pretty', f.out.why) : null,
             U.iconbtn(IC.close, { size: 26, iconSize: 12, title: 'Remove', onClick: () => { st.files = st.files.filter((x) => x.id !== f.id); paint(); } }),
           ]);
-          U.enter(row, i, 30, 280);
+          if (!seen.has(f.id)) { seen.add(f.id); U.enter(row, i, 30, 280); } // (a row comes in once; a repaint while it converts must not blank it)
           return row;
         }),
       );
       run.disabled = !st.files.length || st.busy;
       run.classList.toggle('is-busy', st.busy);
       run.replaceChildren(h('span', { text: st.busy ? 'Converting…' : st.files.length > 1 ? 'Convert & download all' : 'Convert & download' }));
+      // the service card
+      ccState.textContent = st.ccBusy ? 'Checking…' : connected() ? `Connected · ${st.cc.username} · ${U.plural(st.cc.credits, 'credit')}` : 'Not connected';
+      ccState.classList.toggle('is-on', connected());
+      keyRow.hidden = connected();
+      ccLine.hidden = connected();
+      ccErr.hidden = !st.ccErr;
+      ccErr.textContent = st.ccErr;
+      connectBtn.disabled = st.ccBusy;
+      connectBtn.classList.toggle('is-busy', st.ccBusy);
+      useRow.hidden = !connected();
+      useBox.checked = st.cc.use !== false;
+      removeBtn.hidden = !connected();
     }
     paint();
+    T.load(CC_KEY, null).then((saved) => {
+      if (!p.alive() || !saved || typeof saved !== 'object' || !saved.key) return;
+      st.cc = { key: String(saved.key), username: saved.username || 'you', credits: Number(saved.credits) || 0, use: saved.use !== false };
+      paint();
+    }).catch(() => {});
     return p;
   }
 
-  BCV.toolsConvert = { open, kindOf, convertOne, MATRIX };
+  BCV.toolsConvert = { open, kindOf, convertOne, MATRIX, setBase };
 })();

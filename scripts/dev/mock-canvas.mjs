@@ -756,6 +756,57 @@ on('POST', /^\/api\/v1\/courses\/(\w+)\/assignments\/(\w+)\/submissions$/, (url,
 });
 on('GET', /^\/api\/v1\/courses\/(\w+)$/, (url, m) => { const c = courseById(m[1]); return c ? { ...fullCourse(c), syllabus_body: '<h2>Syllabus</h2><p>Lectures MWF 10:30. Midterm 1 in week 5, Midterm 2 in week 9, final in finals week. Late work loses 10% per day.</p>' } : null; });
 
+// ---- a stand-in for CloudConvert (api.cloudconvert.com/v2), for the converter's cloud engine ---
+// The key `cc-test-key` is the one that works. A job is one poll of "processing", then finished;
+// a file whose name says "bad" fails the way the service fails one. /cc/__log lists what came up.
+const CC_KEY = 'cc-test-key';
+const ccJobs = new Map();
+const ccLog = [];
+const TINY_PDF = Buffer.from('%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 200]>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n');
+const ccJson = (res, data, status = 200) => { res.writeHead(status, { 'content-type': 'application/json' }); res.end(JSON.stringify(data)); }; // (plain JSON: no Canvas prefix on another host's answers)
+function ccMock(req, res, path, raw) {
+  const ok = (req.headers.authorization || '') === `Bearer ${CC_KEY}`;
+  let m;
+  if (path === '/cc/__log') return ccJson(res, ccLog);
+  if (req.method === 'POST' && (m = path.match(/^\/cc\/upload\/(\w+)$/))) {
+    const job = ccJobs.get(m[1]);
+    if (!job) return ccJson(res, { message: 'No such upload.' }, 404);
+    job.uploaded = raw.length;
+    job.name = (raw.match(/filename="([^"]+)"/) || [])[1] || 'file';
+    ccLog.push({ job: job.id, uploaded: raw.length, name: job.name, to: job.to });
+    res.writeHead(201, { 'content-type': 'application/json' });
+    return res.end('{}');
+  }
+  if (req.method === 'GET' && (m = path.match(/^\/cc\/files\/(\w+)\/(.+)$/))) {
+    const job = ccJobs.get(m[1]);
+    if (!job) return ccJson(res, { message: 'Gone.' }, 404);
+    const isPdf = /\.pdf$/i.test(m[2]);
+    const bytes = isPdf ? TINY_PDF : Buffer.from(`converted ${job.name} to ${job.to}\n`.repeat(40));
+    res.writeHead(200, { 'content-type': isPdf ? 'application/pdf' : 'application/octet-stream', 'content-disposition': `attachment; filename="${m[2]}"`, 'content-length': bytes.length });
+    return res.end(bytes);
+  }
+  if (!ok) return ccJson(res, { message: 'Unauthenticated.' }, 401);
+  if (req.method === 'GET' && path === '/cc/v2/users/me') return ccJson(res, { data: { id: 1, username: 'sam', email: 'sam@example.edu', credits: 25 } });
+  if (req.method === 'POST' && path === '/cc/v2/jobs') {
+    let body = {};
+    try { body = JSON.parse(raw); } catch { body = {}; }
+    const conv = Object.values(body.tasks || {}).find((t) => t && t.operation === 'convert');
+    const id = `job${ccJobs.size + 1}`;
+    ccJobs.set(id, { id, to: conv?.output_format || 'pdf', polls: 0, uploaded: 0, name: '' });
+    return ccJson(res, { data: { id, status: 'waiting', tasks: [{ id: `${id}-import`, name: 'import-1', operation: 'import/upload', status: 'waiting', result: { form: { url: `http://localhost:${port}/cc/upload/${id}`, parameters: { key: `up/${id}`, signature: 'x' } } } }] } }, 201);
+  }
+  if (req.method === 'GET' && (m = path.match(/^\/cc\/v2\/jobs\/(\w+)$/))) {
+    const job = ccJobs.get(m[1]);
+    if (!job) return ccJson(res, { message: 'Not found.' }, 404);
+    job.polls++;
+    if (job.polls < 2) return ccJson(res, { data: { id: job.id, status: 'processing', tasks: [] } });
+    if (/bad/i.test(job.name)) return ccJson(res, { data: { id: job.id, status: 'error', tasks: [{ name: 'convert-1', operation: 'convert', status: 'error', code: 'INPUT_FILE_INVALID', message: 'The file could not be converted.' }] } });
+    const out = `${job.name.replace(/\.[^.]+$/, '')}.${job.to}`;
+    return ccJson(res, { data: { id: job.id, status: 'finished', tasks: [{ name: 'convert-1', operation: 'convert', status: 'finished' }, { name: 'export-1', operation: 'export/url', status: 'finished', result: { files: [{ filename: out, size: 1234, url: `http://localhost:${port}/cc/files/${job.id}/${out}` }] } }] } });
+  }
+  return ccJson(res, { message: 'Not found.' }, 404);
+}
+
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, `http://localhost:${port}`);
   const path = url.pathname.replace(/\/+$/, '') || '/';
@@ -768,6 +819,7 @@ const server = http.createServer((req, res) => {
     } catch {
       body = {};
     }
+    if (path.startsWith('/cc/')) return ccMock(req, res, path, raw); // (the conversion service, another host altogether)
     // like Canvas: every write needs the session's CSRF token, body or not (file storage is a separate
     // service and has none). The token lives in the _csrf_token cookie (URL-encoded), never in a meta tag.
     if (req.method !== 'GET' && !path.startsWith('/__mock/') && !path.startsWith('/__upload/') && path !== '/logout' && !path.endsWith('/record_answer') && req.headers['x-csrf-token'] !== CSRF) return json(res, { errors: [{ message: 'invalid authenticity token' }] }, 422);

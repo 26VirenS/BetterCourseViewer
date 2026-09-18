@@ -2556,7 +2556,8 @@ try {
   const sText = (sel) => setup.$eval(sel, (e) => (e.innerText || e.textContent).replace(/\s+/g, ' ').trim()).catch(() => null);
   await setup.goto(`chrome-extension://${extId}/setup/setup.html`);
   await setup.waitForSelector('.splash__stage[data-stage="splash"]', { timeout: 10000 });
-  check((await sText('.splash__word')) === 'Simpl.' && (await setup.evaluate(() => getComputedStyle(document.body).backgroundColor)) === 'rgb(0, 0, 0)' && (await setup.$('.mark--splash')) !== null && (await setup.$('.card')) === null, 'the page after install opens black, on the Simpl. splash');
+  const splashSeen = await setup.evaluate(() => ({ word: document.querySelector('.splash__word')?.textContent, bg: getComputedStyle(document.body).backgroundColor, mark: !!document.querySelector('.mark--splash'), card: !!document.querySelector('.card') })); // (read in one go: the splash holds for a moment and a slow run would miss it)
+  check(splashSeen.word === 'Simpl.' && splashSeen.bg === 'rgb(0, 0, 0)' && splashSeen.mark && !splashSeen.card, `the page after install opens black, on the Simpl. splash (${JSON.stringify(splashSeen)})`);
   await setup.waitForTimeout(700);
   await setup.screenshot({ path: join(out, '32-setup-splash.png') });
   await setup.waitForSelector('.splash__stage[data-stage="pin"]', { timeout: 6000 });
@@ -2604,6 +2605,7 @@ try {
       if (what === 'stale') { self.BCV.app.state.lastHere = Date.now() - 4 * 60 * 1000; return true; }
       if (what === 'focusActive') return self.BCV.tools.focusActive();
       if (what === 'jspdf') return !!self.jspdf?.jsPDF;
+      if (what === 'ccBase') { self.BCV.toolsConvert.setBase(`${location.origin}/cc/v2`); return true; }
       return null;
     } });
     return result;
@@ -2755,6 +2757,43 @@ try {
   await page.click('.bcv-conv__run');
   await page.waitForFunction(() => document.querySelector('.bcv-conv__outlabel, .bcv-conv__err'), null, { timeout: 20000 });
   check(((await texts('.bcv-conv__outlabel'))[0] || '').endsWith('· 1 page') && (await page.$('.bcv-conv__delta')) === null && (await inPage('jspdf')), `a text file becomes a PDF: the engine lands in the page when first needed, and no size badge for a cross-format conversion (${(await texts('.bcv-conv__outlabel, .bcv-conv__err'))[0]})`);
+  // the service: a CloudConvert key pasted in, then Word, PDF, slides and sheets go through it (a stand-in here)
+  await page.click('.bcv-conv__list .bcv-tool__link');
+  await inPage('ccBase');
+  const tinyPdf = Buffer.from('%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 200]>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n');
+  await page.setInputFiles('.bcv-conv__drop input[type=file]', [{ name: 'sample.pdf', mimeType: 'application/pdf', buffer: tinyPdf }]);
+  await page.waitForSelector('.bcv-conv__row', { timeout: 5000 });
+  const noKey = { formats: (await texts('.bcv-conv__formats .bcv-seg__btn')).join(' | '), hint: (await raw('.bcv-conv__cloudhint'))[0], state: (await raw('.bcv-conv__ccstate'))[0], href: await page.$eval('.bcv-conv__cclink', (e) => e.href) };
+  check(noKey.formats === 'PNG pages | Text' && noKey.hint === 'Word and JPEG pages need CloudConvert. Connect a key below.' && noKey.state === 'Not connected' && noKey.href === 'https://cloudconvert.com/dashboard/api/v2/keys', `without a key a PDF offers what this device can do, says Word and JPEG pages need CloudConvert, and the card offers a free key (${JSON.stringify(noKey)})`);
+  await page.fill('.bcv-conv__key', 'wrong-key');
+  await page.click('.bcv-conv__connect');
+  await page.waitForSelector('.bcv-conv__ccerr:not([hidden])', { timeout: 5000 });
+  check(/refused/.test((await raw('.bcv-conv__ccerr'))[0]) && (await raw('.bcv-conv__ccstate'))[0] === 'Not connected', `a wrong key is refused, in words: ${(await raw('.bcv-conv__ccerr'))[0]}`);
+  await page.fill('.bcv-conv__key', 'cc-test-key');
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(() => /Connected/.test(document.querySelector('.bcv-conv__ccstate')?.textContent || ''), null, { timeout: 5000 });
+  const ccStored = await sw.evaluate(async () => (await self.BCV.api.storage.local.get('tools:convert:cc'))['tools:convert:cc']);
+  check((await raw('.bcv-conv__ccstate'))[0] === 'Connected · sam · 25 credits' && ccStored?.key === 'cc-test-key' && (await toolSub()) === 'Word, PDF, slides and sheets go through CloudConvert.' && /real PDF through CloudConvert/.test((await texts('.bcv-sheet__foot'))[0]) && (await texts('.bcv-conv__formats .bcv-seg__btn')).join(' | ') === 'PNG pages | Text | Word | JPEG pages' && (await page.$eval('.bcv-conv__cloudhint', (e) => e.hidden)) && (await page.$eval('.bcv-conv__ccrow', (e) => e.hidden)), `Enter connects the right key: who and how many credits, the key kept on this device, the words change, and the PDF now offers Word and JPEG pages (${(await texts('.bcv-conv__formats .bcv-seg__btn')).join(' | ')})`);
+  await page.click('.bcv-conv__formats .bcv-seg__btn[data-value="docx"]');
+  const [ccDl] = await Promise.all([page.waitForEvent('download', { timeout: 20000 }), page.click('.bcv-conv__run')]);
+  await page.waitForFunction(() => document.querySelector('.bcv-conv__outlabel, .bcv-conv__err'), null, { timeout: 20000 });
+  const ccLog = await (await page.request.get(`${BASE}/cc/__log`)).json();
+  check(ccDl.suggestedFilename() === 'sample.docx' && /· DOCX · CloudConvert$/.test((await texts('.bcv-conv__outlabel'))[0] || '') && ccLog.length === 1 && ccLog[0].to === 'docx' && ccLog[0].name === 'sample.pdf' && ccLog[0].uploaded > 100, `PDF → Word goes through the service: the file is uploaded, the job asks for docx, and the Word document comes down (${JSON.stringify(ccLog)} · ${(await texts('.bcv-conv__outlabel, .bcv-conv__err'))[0]})`);
+  await shot(page, '39b-tools-convert-cloud');
+  // a file the service cannot convert: its row says so, the batch goes on
+  await page.click('.bcv-conv__list .bcv-tool__link');
+  await page.setInputFiles('.bcv-conv__drop input[type=file]', [{ name: 'bad.pdf', mimeType: 'application/pdf', buffer: tinyPdf }, { name: 'fine.pdf', mimeType: 'application/pdf', buffer: tinyPdf }]);
+  await page.waitForFunction(() => document.querySelectorAll('.bcv-conv__row').length === 2, null, { timeout: 5000 });
+  await page.click('.bcv-conv__formats .bcv-seg__btn[data-value="docx"]');
+  await page.click('.bcv-conv__run');
+  await page.waitForFunction(() => document.querySelectorAll('.bcv-conv__outlabel, .bcv-conv__err').length === 2, null, { timeout: 30000 });
+  check((await raw('.bcv-conv__err'))[0] === 'The file could not be converted.' && (await page.$$('.bcv-conv__outlabel')).length === 1, 'a file the service refuses shows its reason on its own row, and the next file still converts');
+  // the switch: Word and PDF back on this device; what only the service does stays offered
+  await page.click('.bcv-conv__use input');
+  check(await eventually(async () => (await toolSub()) === 'Runs on this device; CloudConvert for what only it can do.' && /text-layout PDF/.test((await texts('.bcv-sheet__foot'))[0]), 2000) && (await texts('.bcv-conv__formats .bcv-seg__btn')).join(' | ') === 'PNG pages | Text | Word | JPEG pages' && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('tools:convert:cc'))['tools:convert:cc'])).use === false, 'the switch off keeps Word and PDF on this device, remembered, while Word from a PDF stays offered: only the service does that');
+  await page.click('.bcv-conv__use input');
+  await page.click('.bcv-conv__ccremove');
+  check(await eventually(async () => (await raw('.bcv-conv__ccstate'))[0] === 'Not connected', 2000) && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('tools:convert:cc'))['tools:convert:cc'])) == null && !(await page.$eval('.bcv-conv__cloudhint', (e) => e.hidden)) && (await texts('.bcv-conv__formats .bcv-seg__btn')).join(' | ') === 'PNG pages | Text', 'Remove key forgets it: back to what this device does');
   await shot(page, '39-tools-convert');
   await closeTool();
   // flashcards: decks kept here, imported from CSV, Study and Learn

@@ -23,6 +23,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.21.0', date: '2026-09-18', notes: [
+      { kind: 'new', title: 'Real conversions', body: 'Paste a CloudConvert key: Word, PDF, slides and sheets convert properly.', icon: P.arrows },
+    ] },
     { version: '2.20.0', date: '2026-09-18', notes: [
       { kind: 'improved', title: 'After install', body: 'A splash, an arrow to the button, then where to go. Nothing to read.', icon: P.steps },
       { kind: 'improved', title: 'One button', body: 'The timer’s pin is its live activity. It morphs; no second button.', icon: P.toggle },

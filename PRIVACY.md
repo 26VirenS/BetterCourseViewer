@@ -9,6 +9,7 @@ Simpl Courses is a browser extension that redraws the Canvas learning-management
 - **Your Canvas data.** On Canvas pages the extension calls the same Canvas REST API your browser already uses, with the session you are already signed in with, to draw your dashboard, courses, assignments, grades, calendar, inbox, groups, quizzes and submissions. Responses are cached briefly in the extension's storage in your browser so pages open quickly, and are never sent anywhere else.
 - **Your Canvas settings.** Course colours, nicknames, favourites and the dashboard view come from your Canvas profile and are changed only when you change them in the interface, through the same Canvas endpoints Canvas's own pages use.
 - **Page content, only for the smart panel.** If you open the smart panel and ask something, the content of the page you are looking at (for example an assignment description or a discussion thread) and your question are sent from your browser to the provider you chose — Anthropic (Claude) or OpenAI (ChatGPT) — using the API key you entered. Nothing is sent to a provider unless you open the panel and send a message, and you can turn page content off under Settings. Those requests are governed by the provider's own privacy policy.
+- **Files you convert, only through CloudConvert and only if you connected it.** The file converter under Tools runs on this device. If you paste a CloudConvert API key into it, Word, PDF, slides, spreadsheets and HEIC photos you drop in are uploaded from your browser to CloudConvert (api.cloudconvert.com) with that key, converted there, and downloaded back; images, text, CSV and JSON never leave the device either way, and a switch keeps Word and PDF on the device too. Nothing is uploaded unless you connected a key and pressed Convert. Those files are governed by CloudConvert's own privacy policy.
 
 ## What the extension stores
 
@@ -16,6 +17,7 @@ Everything below lives in the extension's local storage in your browser. **Reset
 
 - your settings (appearance, the sites you enabled it on, preferences such as list groupings), plus a one-line copy of the look and the appearance in each Canvas site's own storage so a page never flashes stock Canvas before first paint (Reset everything clears it on every open Canvas tab);
 - your Claude and/or ChatGPT API key, if you added one — stored only locally, never included in settings exports, and sent only to that provider's API;
+- your CloudConvert API key, if you connected one in the file converter — stored only locally, never included in settings exports, and sent only to CloudConvert's API; **Remove key** in the converter forgets it;
 - unsent drafts (a text-entry submission you have not sent yet);
 - the Grades page's optional inputs (a prior GPA, a goal, target grades) and its daily GPA snapshots, which are computed from the scores Canvas returns and never leave your browser.
 
