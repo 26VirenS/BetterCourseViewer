@@ -940,6 +940,25 @@ try {
   check(await eventually(async () => (await page.$eval('.bcv-detail__actions [aria-pressed]', (e) => e.getAttribute('aria-pressed'))) === 'true') && (await modulesOf('105'))[0].items[0].completion_requirement.completed === true, 'and pressing it marks the topic\'s item done in Canvas');
   await page.click('.bcv-detail__actions [aria-pressed]');
   check(await eventually(async () => (await page.$eval('.bcv-detail__actions [aria-pressed]', (e) => e.textContent.trim())) === 'Mark as done') && (await modulesOf('105'))[0].items[0].completion_requirement.completed === false, 'and takes it back');
+  // A page in a module that asks for a mark (a page of lecture videos, a reading) has the button too, at its foot
+  const pageSeq = () => fetch(`${BASE}/api/v1/courses/101/module_item_sequence?asset_type=Page&asset_id=chapter-4-notes`).then((r) => r.text()).then((x) => JSON.parse(x.replace(/^while\(1\);/, '')));
+  await page.goto(`${BASE}/courses/101/pages/chapter-4-notes?module_item_id=i14`);
+  await page.waitForSelector('.bcv-detail__actions--foot [aria-pressed]', { timeout: 10000 });
+  const pageDone = await page.$eval('.bcv-detail__actions--foot [aria-pressed]', (e) => ({ text: e.textContent.trim(), pressed: e.getAttribute('aria-pressed'), title: e.title, below: e.getBoundingClientRect().top > document.querySelector('.bcv-detail .bcv-prose, .bcv-detail__title').getBoundingClientRect().bottom }));
+  check(pageDone.text === 'Mark as done' && pageDone.pressed === 'false' && /this page/.test(pageDone.title) && pageDone.below && (await pageSeq()).items[0].current.completion_requirement.completed === false, `a page a module asks a mark for offers Mark as done at its foot: ${JSON.stringify(pageDone)}`);
+  await shot(page, '21b-page-mark-as-done');
+  check(!/\bnull\b/.test(await page.$eval('.bcv-screen', (e) => e.innerText)), 'a page with no links on it writes nothing where the links would go');
+  await page.click('.bcv-detail__actions--foot [aria-pressed]');
+  check(await eventually(async () => (await page.$eval('.bcv-detail__actions--foot [aria-pressed]', (e) => e.getAttribute('aria-pressed'))) === 'true') && (await pageSeq()).items[0].current.completion_requirement.completed === true, 'pressing it marks the page\'s item done in Canvas');
+  await page.click('.bcv-detail__actions--foot [aria-pressed]');
+  check(await eventually(async () => (await page.$eval('.bcv-detail__actions--foot [aria-pressed]', (e) => e.textContent.trim())) === 'Mark as done') && (await pageSeq()).items[0].current.completion_requirement.completed === false, 'and takes it back');
+  await page.goto(`${BASE}/courses/101/pages/chapter-4-notes`); // the same page reached without a module_item_id: the modules still say
+  await page.waitForSelector('.bcv-detail__actions--foot [aria-pressed]', { timeout: 10000 });
+  check((await page.$eval('.bcv-detail__actions--foot [aria-pressed]', (e) => e.textContent.trim())) === 'Mark as done', 'reached from anywhere, the page still finds its module item');
+  await page.goto(`${BASE}/courses/101/pages/course-information`);
+  await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
+  await page.waitForTimeout(700);
+  check(!(await page.$('.bcv-detail__actions--foot [aria-pressed]')), 'a page no module asks a mark for has no button');
   await page.goto(`${BASE}/courses/101/assignments/1003`); // where the checks below carry on
   await page.waitForSelector('.bcv-detail__actions [aria-pressed]', { timeout: 10000 });
   // Previous / Next go through the assignments in the order the Assignments tab lists them
@@ -1433,7 +1452,7 @@ try {
   // modules
   await tab('modules');
   await page.waitForSelector('.bcv-module', { timeout: 10000 });
-  check((await page.$$('.bcv-module')).length === 1 && (await texts('.bcv-module__item')).length === 3, `modules list: ${(await texts('.bcv-module__item')).length} items (the page, the quiz, and the assignment the module asks a mark for)`);
+  check((await page.$$('.bcv-module')).length === 1 && (await texts('.bcv-module__item')).length === 4, `modules list: ${(await texts('.bcv-module__item')).length} items (two pages, the quiz, and the assignment the module asks a mark for)`);
   // Back means where you came from: the same page says Modules when opened from Modules, Pages when
   // opened from Pages, and Pages (the list it belongs to) when opened straight in with nothing before
   await clickScreen('.bcv-module__item[href*="/pages/course-information"]');

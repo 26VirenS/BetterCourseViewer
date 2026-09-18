@@ -21,6 +21,9 @@
     clock: 'M12 5a8 8 0 100 16 8 8 0 000-16zM12 9v4l3 2',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.15.2', date: '2026-09-18', notes: [
+      { kind: 'fixed', title: 'Mark as done on pages', body: 'Pages in a module that ask for a mark have the button too.', icon: P.check },
+    ] },
     { version: '2.15.1', date: '2026-09-18', notes: [
       { kind: 'new', title: 'Preview before you submit', body: 'Attached files have a Preview button.', icon: P.eye },
     ] },

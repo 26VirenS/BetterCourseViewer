@@ -1105,7 +1105,7 @@
     if (asset?.quiz_id) keys.push(['Quiz', String(asset.quiz_id)]);
     if (asset?.discussion_topic?.id) keys.push(['Discussion', String(asset.discussion_topic.id)]);
     const links = keys.map(([t, k]) => new RegExp(`/${kinds[t] || t}/${k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:[/?#]|$)`));
-    const holds = (it) => keys.some(([t, k]) => it.type === t && String(it.content_id) === k) || links.some((re) => re.test(it.html_url || ''));
+    const holds = (it) => keys.some(([t, k]) => it.type === t && (String(it.content_id) === k || (t === 'Page' && it.page_url === k))) || links.some((re) => re.test(it.html_url || '')); // a Page item carries its url, not a content id
     const same = (it, other) => other != null && String(it.id) === String(other);
     const cands = flat.filter((it) => same(it, itemId) || same(it, fromSeq?.id) || holds(it));
     const best = cands.find((it) => same(it, itemId)) || cands.find((it) => it.completion_requirement?.type === 'must_mark_done') || cands.find((it) => it.completion_requirement) || cands[0];

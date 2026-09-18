@@ -314,7 +314,7 @@ const modules = {
     // built last, due first: the one module whose course order and date order disagree
     { id: 'm4', name: 'Week 0: Orientation', state: 'completed', position: 4, items: [{ id: 'i7', type: 'Assignment', title: 'Safety quiz', html_url: '/courses/102/assignments/2001', content_details: { due_at: at(-21, 23, 59), points_possible: 5 } }] },
   ],
-  101: [{ id: 'm11', name: 'Unit 1: Functions', state: 'started', position: 1, items: [{ id: 'i11', type: 'Page', title: 'Course Information', html_url: '/courses/101/pages/course-information' }, { id: 'i12', type: 'Quiz', title: 'Lec06-PreQuiz', html_url: '/courses/101/quizzes/9011', content_details: { due_at: at(1, 10, 30), points_possible: 17 } },
+  101: [{ id: 'm11', name: 'Unit 1: Functions', state: 'started', position: 1, items: [{ id: 'i11', type: 'Page', title: 'Course Information', html_url: '/courses/101/pages/course-information' }, { id: 'i14', type: 'Page', page_url: 'chapter-4-notes', title: 'Chapter 4 notes', html_url: '/courses/101/pages/chapter-4-notes', completion_requirement: { type: 'must_mark_done', completed: false } },{ id: 'i12', type: 'Quiz', title: 'Lec06-PreQuiz', html_url: '/courses/101/quizzes/9011', content_details: { due_at: at(1, 10, 30), points_possible: 17 } },
     // an assignment with nothing to hand in: the module asks for a mark instead, as Canvas's "Mark as done"
     { id: 'i13', type: 'Assignment', content_id: '1003', title: 'Dis00', html_url: '/courses/101/assignments/1003', completion_requirement: { type: 'must_mark_done', completed: false } }] }],
   // a graded discussion sits in its module as the topic, not as its assignment: the sequence asked for

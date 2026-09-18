@@ -36,11 +36,12 @@
 
   const D = {};
 
-  /** "Mark as done", where Canvas asks for it: an assignment that is a module item with a
+  /** "Mark as done", where Canvas asks for it: an assignment or a page that is a module item with a
    *  must_mark_done requirement has nothing to hand in, and the mark is the whole of the work. The
    *  button is the requirement's own state and flips it — pressed once more it takes the mark back,
-   *  as Canvas's own does. Absent for every other assignment, because the call would do nothing. */
-  function doneButton(ctx, c, a, item, { cls = 'bcv-btn', primary = false } = {}) {
+   *  as Canvas's own does. Absent for everything else, because the call would do nothing. `type`
+   *  is the asset's kind in the module (Assignment, Page); `noun` is what the title calls it. */
+  function doneButton(ctx, c, a, item, { cls = 'bcv-btn', primary = false, type = 'Assignment', noun = 'assignment' } = {}) {
     const req = item?.completion_requirement;
     if (!item || req?.type !== 'must_mark_done') return null;
     let done = !!req.completed;
@@ -51,7 +52,7 @@
       btn.classList.toggle('is-done', done);
       btn.classList.toggle(cls === 'bcv-btn' ? 'bcv-btn--primary' : 'is-primary', primary && !done);
       btn.setAttribute('aria-pressed', String(done));
-      btn.title = done ? 'Marked as done — press to take that back' : 'Mark this assignment as done';
+      btn.title = done ? 'Marked as done — press to take that back' : `Mark this ${noun} as done`;
     };
     btn.addEventListener('click', async () => {
       if (busy) return;
@@ -59,7 +60,7 @@
       btn.disabled = true;
       const want = !done;
       try {
-        await store.markItemDone(c.id, item.module_id, item.id, want, { assetId: a.id });
+        await store.markItemDone(c.id, item.module_id, item.id, want, { type, assetId: a.id });
         done = want;
         paint();
       } catch (e) {
@@ -296,6 +297,10 @@
     if (!p) return main.replaceChildren(U.errorBox('This page could not be loaded.')) || b;
     shell.reader = { title: p.title, html: p.body || '' };
     app.nameHere?.(p.title); // the next screen's Back names this page
+    // Mark as done, at the foot of the page, where a module asks for it (a page of lecture videos,
+    // a reading): asked for after the page is drawn, so the page never waits on the modules
+    const slug = p.url || route.arg;
+    const doneSlot = h('div', { class: 'bcv-detail__actions bcv-detail__actions--foot', hidden: true });
     main.replaceChildren(
       backTo(app, `${c.url}/pages`, 'Pages'),
       U.card(U.el('bcv-detail', [
@@ -305,10 +310,18 @@
           p.updated_at ? `last edited ${U.fmtDateComma(p.updated_at)}${p.last_edited_by?.display_name ? ` by ${p.last_edited_by.display_name}` : ''}` : null,
         ].filter(Boolean).join(' · ')),
         CS().prose(p.body || ''),
+        doneSlot,
       ]), 'bcv-card--22'),
     );
+    store.moduleItemFor(c.id, 'Page', slug, { itemId: route.params?.get?.('module_item_id') || null }).catch(() => null).then((item) => {
+      if (!ctx.alive()) return;
+      const btn = doneButton(ctx, c, { id: slug }, item, { primary: true, type: 'Page', noun: 'page' });
+      if (!btn) return;
+      doneSlot.append(btn);
+      doneSlot.hidden = false;
+    });
     const links = CS().linksFrom(p.body, 8);
-    side.append(links.length ? h('div', {}, [U.label('Links on this page'), U.card(links.map((l) => U.row([U.svg(IC.link, { size: 15, stroke: 'var(--bcv-blue)', width: 1.8, style: { flex: 'none' } }), U.text('bcv-course-link bcv-ellip', l.text, 'span'), U.chev()], { mod: 'bcv-row--p13-16', href: l.href })), 'bcv-card--list')]) : null);
+    if (links.length) side.append(h('div', {}, [U.label('Links on this page'), U.card(links.map((l) => U.row([U.svg(IC.link, { size: 15, stroke: 'var(--bcv-blue)', width: 1.8, style: { flex: 'none' } }), U.text('bcv-course-link bcv-ellip', l.text, 'span'), U.chev()], { mod: 'bcv-row--p13-16', href: l.href })), 'bcv-card--list')])); // (append(null) would write the word "null" on the page)
     return b;
   };
 
