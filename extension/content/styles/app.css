@@ -157,7 +157,7 @@ html.bcv-phone.bcv-on #bcv-look, html.bcv-setup-open #bcv-look, html.bcv-touring
 .bcv-away__dial svg { display: block; width: 36px; height: 36px; overflow: visible; }
 .bcv-away__track { fill: none; stroke: rgba(255,159,10,.34); stroke-width: 3; }
 .bcv-away__ring { fill: none; stroke: #ff9f0a; stroke-width: 3; stroke-linecap: round; stroke-dasharray: 81.68; stroke-dashoffset: 0; transform: rotate(-90deg); transform-origin: 18px 18px; animation: bcv-away-ring 3s linear forwards; }
-.bcv-away__hand { stroke: #ff9f0a; stroke-width: 3.2; stroke-linecap: round; transform-origin: 18px 18px; animation: bcv-away-sweep 3s linear forwards; }
+.bcv-away__hand { fill: #ff9f0a; stroke: none; transform-origin: 18px 18px; animation: bcv-away-sweep 3s linear forwards; }
 .bcv-away__body { display: flex; flex-direction: column; gap: 3px; }
 .bcv-away__title { font: 600 13.5px/1.15 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif; letter-spacing: -.012em; color: #fff; white-space: nowrap; }
 .bcv-away__hint { font: 400 11px/1.2 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif; color: rgba(255,255,255,.55); white-space: nowrap; }

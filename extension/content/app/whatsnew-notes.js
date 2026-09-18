@@ -21,6 +21,9 @@
     clock: 'M12 5a8 8 0 100 16 8 8 0 000-16zM12 9v4l3 2',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.14.2', date: '2026-09-18', notes: [
+      { kind: 'improved', title: 'A softer hand on the dial', body: 'The Away Refresh hand is wider at its base and tapers to a rounded tip.', icon: P.clock },
+    ] },
     { version: '2.14.1', date: '2026-09-17', notes: [
       { kind: 'improved', title: 'A new Away Refresh dial', body: 'The countdown is now a dim ring with a bright orange arc of the time left, and a short hand that rides its end.', icon: P.clock },
     ] },
