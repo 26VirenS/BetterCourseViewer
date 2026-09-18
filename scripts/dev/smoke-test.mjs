@@ -378,12 +378,15 @@ try {
   await page.waitForSelector('.bcv-day .bcv-row', { timeout: 10000 });
   // mark one done
   const rowsBefore = (await page.$$('.bcv-day .bcv-row')).length;
+  // (an item already graded sits in the list ticked from the start: the row pressed here is followed by its title)
+  const firstTitle = await page.$eval('.bcv-day .bcv-row .bcv-row__title', (e) => e.textContent);
+  const doneTitled = (t) => [...document.querySelectorAll('.bcv-day .bcv-row.bcv-row--done')].some((r) => r.querySelector('.bcv-row__title')?.textContent === t);
   await page.click('.bcv-day .bcv-row .bcv-circle');
-  await page.waitForSelector('.bcv-day .bcv-row.bcv-row--done', { timeout: 5000 });
+  await page.waitForFunction(doneTitled, firstTitle, { timeout: 5000 });
   await page.waitForFunction((n) => Number(document.querySelector('.bcv-nav__item[data-nav="todo"] .bcv-nav__count').textContent) === n - 1, todoCount, { timeout: 5000 });
   check((await page.$$('.bcv-day .bcv-row')).length === rowsBefore, 'marking an item done keeps it in the list, ticked (planner override)');
   await page.click('.bcv-day .bcv-row.bcv-row--done .bcv-circle');
-  await page.waitForFunction(() => !document.querySelector('.bcv-day .bcv-row--done'), null, { timeout: 5000 });
+  await page.waitForFunction((t) => ![...document.querySelectorAll('.bcv-day .bcv-row.bcv-row--done')].some((r) => r.querySelector('.bcv-row__title')?.textContent === t), firstTitle, { timeout: 5000 });
   check(true, 'ticking again marks it not done');
   await page.click('.bcv-day .bcv-row .bcv-circle');
   await page.waitForSelector('.bcv-day .bcv-row.bcv-row--done', { timeout: 5000 });
@@ -1191,6 +1194,13 @@ try {
   await page.waitForSelector('.bcv-group__head', { timeout: 10000 });
   const agroups = await texts('.bcv-group__head');
   check(agroups[0].startsWith('Upcoming Assignments') && agroups.some((t) => /Past Assignments \d+ graded/.test(t)), `assignment groups: ${agroups.join(' | ')}`);
+  // (in another course:) an assignment already graded is done, whatever its date says
+  await page.goto(`${BASE}/courses/102/assignments`);
+  await page.waitForSelector('.bcv-group__head', { timeout: 10000 });
+  const safety = await page.$$eval('.bcv-group__head, .bcv-body .bcv-card--list .bcv-row', (els) => { let group = ''; for (const e of els) { if (e.classList.contains('bcv-group__head')) group = e.textContent.replace(/\s+/g, ' ').trim(); else if (/Lab safety check/.test(e.textContent)) return { group, sub: e.querySelector('.bcv-row__sub')?.textContent.replace(/\s+/g, ' ').trim() }; } return null; });
+  check(!!safety && /^Past Assignments/.test(safety.group) && safety.sub === 'Graded · 10/10 pts', `an assignment that already has a grade is done, not upcoming, though its due date is still ahead: ${JSON.stringify(safety)}`);
+  await page.goto(`${BASE}/courses/101/assignments`);
+  await page.waitForSelector('.bcv-group__head', { timeout: 10000 });
   // the rows fade in one after another down the column, 20ms apart, quickly (200ms each)
   const aEnter = await page.$$eval('.bcv-body .bcv-card--list .bcv-row', (els) => els.map((e) => [e.classList.contains('bcv-enter'), e.style.getPropertyValue('--bcv-delay'), e.style.getPropertyValue('--bcv-dur')]));
   check(aEnter.length >= 6 && aEnter.every(([on, , dur], i) => on && dur === '200ms' && aEnter[i][1] === `${Math.min(i * 20, 420)}ms`), `assignment rows fade in one at a time, 20ms apart: ${aEnter.slice(0, 4).map((a) => a[1]).join(',')}…`);
@@ -1770,6 +1780,71 @@ try {
   check(/Question 2 0 \/ 4 .*You: 17\.68 m Correct: -3\.15 m/i.test((await texts('.bcv-fb__q'))[1]), `the seeded wrong answer with the correct one beside it: ${(await texts('.bcv-fb__q'))[1]}`);
   await shot(page, '22j-quiz-feedback-seeded');
 
+  // ---- a restricted quiz: an access code Canvas does not tell the student -------------------------
+  console.log('restricted quiz');
+  await page.goto(`${BASE}/courses/102/quizzes`);
+  await page.waitForSelector('.bcv-row', { timeout: 10000 });
+  check(await page.$$eval('.bcv-row', (els) => els.some((e) => /Lec08-PreQuiz/.test(e.textContent) && /Access code/.test(e.textContent))), 'the quiz list says which quiz needs an access code');
+  await page.goto(`${BASE}/courses/102/quizzes/10019`);
+  await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
+  check((await texts('.bcv-detail__title'))[0] === 'Lec08-PreQuiz' && /Restrictions Access code/.test((await texts('.bcv-detail'))[0]), 'the quiz page names the restriction');
+  await page.click('.bcv-detail__actions .bcv-btn--primary');
+  await page.waitForSelector('.bcv-qz__begin', { timeout: 10000 });
+  check((await texts('.bcv-qz__bullet')).some((t) => /needs an access code from your instructor/.test(t)) && (await page.$('.bcv-qz__code')) !== null && (await texts('.bcv-qz__begin'))[0] === 'Enter the access code' && (await page.$eval('.bcv-qz__begin', (b) => b.disabled)), 'the intro says an access code is needed, offers the field, and Begin waits for it');
+  await page.fill('.bcv-qz__code', 'nope');
+  check(await eventually(async () => !(await page.$eval('.bcv-qz__begin', (b) => b.disabled)) && (await texts('.bcv-qz__begin'))[0] === 'Begin attempt', 2000), 'a code typed turns Begin on');
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(() => /refused/.test(document.querySelector('.bcv-qz__codeerr')?.textContent || ''), null, { timeout: 10000 });
+  check((await texts('.bcv-qz__codeerr'))[0] === 'That access code was refused. Check it with your instructor.' && (await page.$('.bcv-qz__opt')) === null, 'a wrong code is refused, in words');
+  await page.fill('.bcv-qz__code', 'PHYS8');
+  await page.click('.bcv-qz__begin');
+  await page.waitForSelector('.bcv-qz__opt', { timeout: 10000 });
+  const restrictedStart = await noteApi('GET', '/api/v1/courses/102/quizzes/10019/submissions');
+  check((await page.$$('.bcv-qz__pill')).length === 4 && (await page.$('.bcv-qz__codeerr')) === null && (restrictedStart.quiz_submissions || []).some((sub) => sub.workflow_state === 'untaken'), 'the right code starts the attempt: Canvas has it open and the questions are up');
+  const leaveRestricted = (d) => d.accept();
+  page.once('dialog', leaveRestricted);
+  await page.goto(`${BASE}/courses/102/quizzes/10019`);
+  page.off('dialog', leaveRestricted);
+  await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
+  // a code Canvas does not even announce: the refusal at Begin brings the field
+  await page.goto(`${BASE}/courses/102/quizzes/10022?bcv=take`);
+  await page.waitForSelector('.bcv-qz__begin', { timeout: 10000 });
+  check((await page.$('.bcv-qz__code')) === null && (await texts('.bcv-qz__begin'))[0] === 'Begin attempt' && !(await page.$eval('.bcv-qz__begin', (b) => b.disabled)), 'a quiz whose code Canvas does not announce opens with Begin and no field');
+  await page.click('.bcv-qz__begin');
+  await page.waitForSelector('.bcv-qz__codeerr', { timeout: 10000 });
+  await page.waitForFunction(() => document.activeElement?.classList.contains('bcv-qz__code'), null, { timeout: 3000 });
+  check((await texts('.bcv-qz__codeerr'))[0] === 'This quiz needs an access code. Enter it above, then begin.' && (await page.$('.bcv-qz__opt')) === null && (await texts('.bcv-qz__begin'))[0] === 'Enter the access code', 'Canvas refuses: the field appears with the words, the cursor in it, and Begin waits');
+  await page.fill('.bcv-qz__code', 'PHYS9');
+  await page.click('.bcv-qz__begin');
+  await page.waitForSelector('.bcv-qz__opt', { timeout: 10000 });
+  check((await page.$$('.bcv-qz__pill')).length === 4, 'the right code starts it');
+  page.once('dialog', leaveRestricted);
+  await page.goto(`${BASE}/courses/102/quizzes/10022`);
+  page.off('dialog', leaveRestricted);
+  await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
+
+  // ---- a graded survey: no right answers, points for taking part, its own words --------------------
+  console.log('survey');
+  await page.goto(`${BASE}/courses/102/quizzes/10020`);
+  await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
+  check((await texts('.bcv-detail__title'))[0] === 'EXTRA POINTS 1' && /Type Graded survey/.test((await texts('.bcv-detail'))[0]) && (await texts('.bcv-detail__actions .bcv-btn--primary'))[0] === 'Take the survey', 'a graded survey is listed as one, and the button says survey');
+  await page.click('.bcv-detail__actions .bcv-btn--primary');
+  await page.waitForSelector('.bcv-qz__begin', { timeout: 10000 });
+  check(/4 questions · 2 points for taking part/.test((await texts('.bcv-qz__lead'))[0]) && (await texts('.bcv-qz__bullet')).some((t) => /no right answers/.test(t)) && (await texts('.bcv-qz__begin'))[0] === 'Begin survey', 'the intro says what a survey is: no right answers, the points for taking part, Begin survey');
+  await page.click('.bcv-qz__begin');
+  await page.waitForSelector('.bcv-qz__opt', { timeout: 10000 });
+  for (const i of [0, 1, 2]) await page.click(`#bcv-q${i} .bcv-qz__opt:nth-child(1)`);
+  await waitText('.bcv-qz__answered', /3 of 4 answered · Saved/);
+  await page.click('.bcv-qz__foot .bcv-qz__btn--primary');
+  await page.waitForSelector('.bcv-qz__big--primary', { timeout: 5000 });
+  page.once('dialog', (d) => d.accept());
+  await page.click('.bcv-qz__big--primary');
+  await page.waitForSelector('.bcv-qz__done', { timeout: 10000 });
+  const surveyCards = await texts('.bcv-qz__donecard');
+  check((await texts('.bcv-qz__h1'))[0] === 'Responses recorded' && /Thanks for taking part/.test((await texts('.bcv-qz__lead'))[0]) && /Questions answered 3 of 4 answered/.test(surveyCards[0]) && /For taking part 2 points/.test(surveyCards[1] || '') && !surveyCards.some((t) => /^Score/.test(t)) && (await texts('.bcv-qz__donebtns .bcv-qz__big')).join('|') === 'Back to F26-PHYS 008 01|Survey page', `the receipt says the responses are in, the points for taking part, and no score or feedback: ${surveyCards.join(' | ')}`);
+  await page.click('.bcv-qz__donebtns .bcv-qz__big--primary');
+  await page.waitForSelector('.bcv-screen, .bcv-cmain', { timeout: 10000 });
+
   // ---- matching, and the kinds with a blank each ---------------------------------------------------
   // Canvas draws these as dropdowns and used to be the only place that could take them; they are
   // answered here now, and go up in the shapes Canvas's own API asks for.
@@ -1781,7 +1856,7 @@ try {
   await page.waitForSelector('.bcv-qz__begin', { timeout: 20000 });
   await page.click('.bcv-qz__begin');
   await page.waitForSelector('.bcv-qz__pill', { timeout: 20000 });
-  check((await page.$$('.bcv-qz__pill')).length === 6, `the attempt carries every question, the two new kinds included: ${(await page.$$('.bcv-qz__pill')).length}`);
+  check((await page.$$('.bcv-qz__pill')).length === 7, `the attempt carries every question, the three new kinds included: ${(await page.$$('.bcv-qz__pill')).length}`);
   // matching: a row per left-hand value, the same list of right-hand ones beside each
   await page.click('.bcv-qz__pill:nth-child(5)');
   await waitText('.bcv-qz__qnum', /Question 5/);
@@ -1800,7 +1875,7 @@ try {
   await pickIn('.bcv-qz__matchrow:nth-child(1) .bcv-qz__sel', 'Acceleration due to gravity');
   await pickIn('.bcv-qz__matchrow:nth-child(2) .bcv-qz__sel', 'Speed of light');
   await pickIn('.bcv-qz__matchrow:nth-child(3) .bcv-qz__sel', 'Gravitational constant');
-  await waitText('.bcv-qz__answered', /1 of 6 answered · Saved/);
+  await waitText('.bcv-qz__answered', /1 of 7 answered · Saved/);
   check(true, 'every pair saves as it is set');
   await shot(page, '22i-quiz-matching');
   // a blank each, from a dropdown of that blank's own list
@@ -1810,7 +1885,19 @@ try {
   check(blankLbls.join('|') === 'rate|what' && (await page.$$('.bcv-qz__blanks .bcv-picker')).length === 2, `a blank each, named for the blank it fills: ${blankLbls.join(' | ')}`);
   await pickIn('.bcv-qz__blankrow:nth-child(1) .bcv-qz__sel', 'rate of change');
   await pickIn('.bcv-qz__blankrow:nth-child(2) .bcv-qz__sel', 'position');
-  await waitText('.bcv-qz__answered', /2 of 6 answered · Saved/);
+  await waitText('.bcv-qz__answered', /2 of 7 answered · Saved/);
+  // an essay, written with paragraphs and a list: it goes to Canvas as the simple HTML its editor would keep
+  await page.click('.bcv-qz__pill:nth-child(7)');
+  await waitText('.bcv-qz__qnum', /Question 7/);
+  await page.fill('.bcv-textarea', 'Pros:\n\n• Ability to work together\n• Divide and conquer group work\n\nCons\n\n• Unreliable group mates');
+  await waitText('.bcv-qz__answered', /3 of 7 answered · Saved/);
+  const essaySent = (await noteApi('GET', '/api/v1/quiz_submissions/qs9001-2/questions')).quiz_submission_questions.find((q) => String(q.id) === '90017')?.answer || '';
+  check(/^<p>Pros:<\/p><ul><li>Ability to work together<\/li><li>Divide and conquer group work<\/li><\/ul><p>Cons<\/p><ul><li>Unreliable group mates<\/li><\/ul>$/.test(essaySent), `the essay reaches Canvas as paragraphs and lists, not as a lump of text: ${essaySent}`);
+  await page.click('.bcv-qz__pill:nth-child(6)');
+  await waitText('.bcv-qz__qnum', /Question 6/);
+  await page.click('.bcv-qz__pill:nth-child(7)');
+  await waitText('.bcv-qz__qnum', /Question 7/);
+  check((await page.$eval('.bcv-textarea', (e) => e.value)) === 'Pros:\n\n• Ability to work together\n• Divide and conquer group work\n\nCons\n\n• Unreliable group mates', 'and comes back into the box as readable text, the list as bullets');
   // Canvas kept them: its own take page comes back with the same picks set
   const kept = await sw.evaluate(async () => {
     const html = await (await fetch('http://localhost:8787/courses/101/quizzes/9001/take')).text();
@@ -1821,7 +1908,7 @@ try {
   await page.click('.bcv-qz__foot .bcv-qz__btn--primary');
   await page.waitForSelector('.bcv-qz__sum', { timeout: 10000 });
   const sums6 = await texts('.bcv-qz__sum');
-  check(/9\.8 → Acceleration due to gravity/.test(sums6[4]) && /rate: rate of change/.test(sums6[5]), `the review names both sides of every pair and every blank: ${sums6[4]} | ${sums6[5]}`);
+  check(/9\.8 → Acceleration due to gravity/.test(sums6[4]) && /rate: rate of change/.test(sums6[5]) && /Ability to work together/.test(sums6[6]) && !/<(p|ul|li)>/.test(sums6[6]), `the review names both sides of every pair, every blank, and the essay's words without its tags: ${sums6[4]} | ${sums6[5]} | ${sums6[6]}`);
   // ---- the way out of the quiz UI, and never a reload out from under one ---------------------------
   // The button is red because it is a way out: it hands the attempt to Canvas as it stands.
   const rawBtn = await page.$eval('.bcv-qz__raw', (e) => ({ text: e.textContent.trim(), title: e.title, red: (([, r, g, b]) => ({ r: +r, g: +g, b: +b }))(getComputedStyle(e).color.match(/(\d+), (\d+), (\d+)/)) }));
@@ -1873,6 +1960,9 @@ try {
   await page.click('.bcv-col .bcv-row[href*="attempt=1"]');
   await page.waitForSelector('.bcv-fb__scoreline', { timeout: 15000 });
   check(/^13 \/ 16 /.test((await texts('.bcv-fb__scoreline'))[0]) && (await page.$$('.bcv-fb__q')).length >= 4, `an earlier attempt opens its own feedback: ${(await texts('.bcv-fb__scoreline'))[0]}`);
+  // an essay written in Canvas's own editor shows as its paragraphs and lists, under the question, never as tags
+  const essayFb = await page.$eval('.bcv-fb__essay', (e) => ({ items: [...e.querySelectorAll('li')].map((li) => li.textContent.trim()), paras: e.querySelectorAll('p').length, raw: /<(p|ul|li)>/.test(e.textContent), chip: e.closest('.bcv-fb__q')?.querySelector('.bcv-fb__chip')?.textContent })).catch(() => null);
+  check(!!essayFb && essayFb.items.join(' | ') === 'Ability to work together | Divide and conquer assignments/group work | Ideate together & create better ideas. | Unreliable group mates cause a more stressful workload | Have to set times to meet up outside of class' && essayFb.paras === 2 && !essayFb.raw && essayFb.chip === 'Your answer, below', `the feedback shows a written answer as formatting, the chip pointing to it: ${JSON.stringify(essayFb)}`);
   await noteApi('POST', '/__mock/config', { richQuestions: false });
   await page.goto(`${BASE}/courses/101/quizzes/9001`);
   await page.waitForSelector('.bcv-qz__intro, .bcv-detail__title', { timeout: 20000 });

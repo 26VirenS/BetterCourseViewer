@@ -570,12 +570,12 @@
         circle,
         U.tile(it.icon, { color: pal.text, tint: pal.tint }),
         U.el('bcv-row__body', [
-          U.text('bcv-row__over', `${it.courseName} · ${it.kind}${it.isDue ? '' : ' · to-do date'}${it.submitted ? ' · submitted' : ''}`),
+          U.text('bcv-row__over', `${it.courseName} · ${it.kind}${it.isDue ? '' : ' · to-do date'}${it.graded ? ' · graded' : it.submitted ? ' · submitted' : ''}`),
           U.text('bcv-row__title bcv-ellip', it.title),
         ]),
         U.el('bcv-row__right', [
           U.text('bcv-row__pts', it.points !== null && it.points !== undefined ? `${store.fmtPts(it.points)} pts` : (it.isDue ? '' : it.kind)),
-          U.text('bcv-row__due', `${it.isDue ? 'Due' : 'At'} ${U.fmtTime(it.date)}`),
+          U.text('bcv-row__due', it.graded ? 'Graded' : it.submitted && it.isDue ? 'Submitted' : `${it.isDue ? 'Due' : 'At'} ${U.fmtTime(it.date)}`), // (work with a grade is not due, whatever its date)
         ]),
         U.chev(),
       ], { mod: 'bcv-row--p14', href: it.url });

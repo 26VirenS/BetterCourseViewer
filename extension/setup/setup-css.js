@@ -488,7 +488,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
 }
 
 /* ---- the page after install: black, a splash, then an arrow and a line or two per screen ---- */
-html.is-splash, html.is-splash body { background: #000; color: #fff; animation: none; }
+html.is-splash, html.is-splash body { background: #000; color: #fff; animation: none; transition: none; } /* black from the first paint: the class is on the page itself, so nothing fades to it */
 .splash { position: fixed; inset: 0; background: #000; color: #fff; overflow: hidden; font-family: var(--font); }
 .splash__stage { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; text-align: center; animation: splashIn .4s var(--ease) both; }
 .splash__stage.is-leaving { animation: splashOut .25s ease both; pointer-events: none; }

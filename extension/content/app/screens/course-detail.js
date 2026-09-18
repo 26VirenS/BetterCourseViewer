@@ -6,6 +6,9 @@
   const { h, htmlToText } = BCV.utils;
   const U = BCV.ui;
   const IC = BCV.IC;
+  /** How a quiz is restricted, in words: an access code, an IP filter, Respondus LockDown Browser. */
+  const restrictions = (q) => [q.has_access_code || q.access_code ? 'Access code' : null, q.ip_filter ? 'Allowed networks only' : null, q.require_lockdown_browser ? 'LockDown Browser' : null].filter(Boolean);
+  const hasGrade = (a) => { const s = a?.submission || {}; return s.workflow_state === 'graded' && s.score !== null && s.score !== undefined; };
   const store = BCV.store;
   const CS = () => BCV.screens.course;
 
@@ -383,14 +386,14 @@
       backTo(app, `${c.url}/quizzes`, 'Quizzes'),
       U.card(U.el('bcv-detail', [
         h('h2', { class: 'bcv-detail__title bcv-pretty', text: q.title }),
-        meta([['Due', q.due_at ? U.fmtAt(q.due_at) : 'No due date'], ['Points', q.points_possible ?? '—'], ['Questions', q.question_count ?? '—'], ['Time limit', q.time_limit ? `${q.time_limit} minutes` : 'None'], ['Attempts', attemptsLine()], ['Type', TYPE[q.quiz_type] || q.quiz_type], ['Available until', q.lock_at ? U.fmtAt(q.lock_at) : null]]),
+        meta([['Due', q.due_at ? U.fmtAt(q.due_at) : 'No due date'], ['Points', q.points_possible ?? '—'], ['Questions', q.question_count ?? '—'], ['Time limit', q.time_limit ? `${q.time_limit} minutes` : 'None'], ['Attempts', attemptsLine()], ['Type', TYPE[q.quiz_type] || q.quiz_type], ...(restrictions(q).length ? [['Restrictions', restrictions(q).join(' · ')]] : []), ['Available until', q.lock_at ? U.fmtAt(q.lock_at) : null]]),
         U.el('bcv-detail__actions', [
           q.locked_for_user ? U.badge(q.lock_explanation ? htmlToText(q.lock_explanation, 120) : 'Locked', 'orange')
             : noneLeft ? U.badge(`No attempts left · ${U.plural(limit.allowed, 'attempt')} allowed`, 'orange')
               // a quiz Canvas locks is taken on Canvas's own page unless the setting says otherwise
               : lockedAway ? U.btn(open ? 'Continue in Canvas' : 'Take it in Canvas', { kind: 'primary', icon: IC.external, iconColor: '#fff', onClick: () => app.go(nativeHref(`${c.url}/quizzes/${q.id}`)) })
-                : U.btn(open ? 'Resume attempt' : 'Take the quiz', { kind: 'primary', icon: IC.bolt, iconColor: '#fff', onClick: () => app.go(takeHref) }),
-          latest && q.hide_results !== 'always' ? U.btn('See feedback', { kind: noneLeft && !q.locked_for_user ? 'primary' : '', icon: IC.check, iconColor: noneLeft && !q.locked_for_user ? '#fff' : undefined, onClick: () => app.go(feedbackHref(latest)) }) : null,
+                : U.btn(open ? (/survey/.test(q.quiz_type || '') ? 'Continue survey' : 'Resume attempt') : (/survey/.test(q.quiz_type || '') ? 'Take the survey' : 'Take the quiz'), { kind: 'primary', icon: IC.bolt, iconColor: '#fff', onClick: () => app.go(takeHref) }),
+          latest && q.hide_results !== 'always' && !/survey/.test(q.quiz_type || '') ? U.btn('See feedback', { kind: noneLeft && !q.locked_for_user ? 'primary' : '', icon: IC.check, iconColor: noneLeft && !q.locked_for_user ? '#fff' : undefined, onClick: () => app.go(feedbackHref(latest)) }) : null,
           q.locked_for_user ? null : U.btn('Open in Canvas', { icon: IC.external, onClick: () => app.go(nativeHref(`${c.url}/quizzes/${q.id}`)) }),
         ]),
         lockedAway ? U.text('bcv-hint bcv-pretty', 'This quiz seals each question once you leave it, and an attempt that goes wrong cannot be taken again — so it is taken on Canvas’s own page rather than here. Simpl Courses settings → Quizzes will take it here instead.') : null,
@@ -417,7 +420,7 @@
     );
     const dated = (list || []).filter((a) => a.due_at).sort((x, y) => U.parse(x.due_at) - U.parse(y.due_at));
     side.append(h('div', {}, [U.label('Course summary'), dated.length ? U.card(dated.slice(0, 40).map((a) => U.row([
-      U.el('bcv-row__body', [U.text('bcv-row__title bcv-row__title--14 bcv-ellip', a.name), U.text('bcv-row__sub bcv-row__sub--115', `Due ${U.fmtAt(a.due_at)} · ${a.points_possible ?? 0} pts`)]),
+      U.el('bcv-row__body', [U.text('bcv-row__title bcv-row__title--14 bcv-ellip', a.name), U.text('bcv-row__sub bcv-row__sub--115', `${hasGrade(a) ? 'Graded' : `Due ${U.fmtAt(a.due_at)}`} · ${a.points_possible ?? 0} pts`)]),
       U.chev(),
     ], { mod: 'bcv-row--p12-16', href: `${c.url}/assignments/${a.id}` })), 'bcv-card--list') : U.emptyCard('No dated assignments.')]));
     return b;

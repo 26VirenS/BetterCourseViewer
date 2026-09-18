@@ -67,6 +67,10 @@ const A = {
   102: [
     ['2001', 'Lab 1 report', 'Labs', 20, 18, -7, 23.98, -8, {}],
     ['2002', 'W2 HW', 'Homework', 15, null, -1, 23.98, null, {}],
+    ['2018', 'Lab safety check', 'Homework', 10, 10, 6, 12, -10, { gradedDay: -9 }], // graded early: due next week, already marked
+    ['2019', 'Lec08-PreQuiz', 'Homework', 20, null, 8, 10.5, null, { quiz: true, code: 'PHYS8' }], // a restricted quiz: an access code the student is not told
+    ['2020', 'EXTRA POINTS 1', 'Homework', 2, null, 10, 12.5, null, { quiz: true, survey: 'graded_survey' }], // a graded survey: points for taking part
+    ['2022', 'Lec09-PreQuiz', 'Homework', 20, null, 9, 10.5, null, { quiz: true, code: 'PHYS9', codeHidden: true }], // an access code Canvas does not even announce
     ['2003', 'Lab 2', 'Labs', 20, null, 2, 23.98, null, {}],
     ['2004', 'W3 HW', 'Homework', 15, null, 6, 23.98, null, {}],
   ],
@@ -105,7 +109,7 @@ function assignmentObj(courseId, row) {
   const submitted = subDay !== null || earned !== null;
   const submission = {
     id: `s${id}`, assignment_id: id, workflow_state: earned !== null ? 'graded' : submitted ? 'submitted' : 'unsubmitted', score: earned, grade: earned === null ? null : String(earned),
-    submitted_at: subDay !== null ? at(subDay, 15, 52) : (earned !== null ? at(dueDay - 1, 16, 1) : null), graded_at: earned !== null ? at(dueDay, 8, 0) : null,
+    submitted_at: subDay !== null ? at(subDay, 15, 52) : (earned !== null ? at(dueDay - 1, 16, 1) : null), graded_at: earned !== null ? at(extra.gradedDay ?? dueDay, 8, 0) : null,
     // Canvas posts a grade separately from marking it; one assignment here is marked but held back
     posted_at: earned !== null ? (extra.held ? null : at(dueDay, 8, 5)) : null,
     late: !!extra.late, missing: false, excused: false, attempt: submitted ? 1 : null,
@@ -132,6 +136,7 @@ function assignmentObj(courseId, row) {
     due_at: due, lock_at: extra.window ? at(dueDay, 23, 59) : null, unlock_at: extra.window ? at(dueDay - 7, 0, 0) : null, points_possible: possible, grading_type: 'points', published: true, html_url: `/courses/${courseId}/assignments/${id}`,
     submission_types: extra.quiz ? ['online_quiz'] : extra.tool ? ['external_tool'] : extra.types || ['online_upload', 'online_text_entry'], is_quiz_assignment: !!extra.quiz, quiz_id: extra.quiz ? String(Number(id) + 8000) : undefined,
     allowed_extensions: extra.ext || [], locked_for_user: false,
+    quiz_access_code: extra.code || null, quiz_ip_filter: extra.ip || null, quiz_lockdown: !!extra.lockdown, quiz_survey: extra.survey || null, quiz_code_hidden: !!extra.codeHidden, // (the mock's own notes: what the quiz built from this is restricted by)
     external_tool_tag_attributes: extra.tool ? { url: extra.tool, new_tab: false, resource_link_id: 'rl1' } : undefined,
     discussion_topic: extra.discussion ? { id: extra.discussion, title: name, html_url: `/courses/${courseId}/discussion_topics/${extra.discussion}` } : undefined, // a graded discussion: the assignment behind a topic
     assignment_group_id: `g${courseId}-${Math.max(gIdx, 0)}`, omit_from_final_grade: !!extra.omit, allowed_attempts: extra.attempts ?? 2, rubric: extra.rubric ? rubric : undefined, rubric_settings: extra.rubric ? { title: 'Dis01 rubric' } : undefined,
@@ -233,11 +238,11 @@ const files = {
   f101b: [{ id: 'f4', display_name: 'Dis01 worksheet.pdf', filename: 'dis01.pdf', 'content-type': 'application/pdf', size: 80000, updated_at: ago(3 * D), url: '/files/f4/download' }],
   f101c: [],
 };
-const quizzes = (courseId) => allAssignments(courseId).filter((a) => a.is_quiz_assignment).map((a, i) => ({ id: a.quiz_id, title: a.name, due_at: a.due_at, points_possible: a.points_possible, question_count: mockConfig.richQuestions ? 6 : 4, quiz_type: a.name === 'Skills_Check' ? 'practice_quiz' : 'assignment', time_limit: 20, allowed_attempts: mockConfig.richQuestions ? 5 : 1, description: `<p>${a.name}: four questions on the pre-lecture reading.</p>`, html_url: `/courses/${courseId}/quizzes/${a.quiz_id}`, locked_for_user: false, assignment_id: a.id, one_question_at_a_time: a.name === 'Lec07-PreQuiz', cant_go_back: a.name === 'Lec07-PreQuiz', hide_results: null, show_correct_answers: true, shuffle_answers: false }));
+const quizzes = (courseId) => allAssignments(courseId).filter((a) => a.is_quiz_assignment).map((a, i) => ({ id: a.quiz_id, title: a.name, due_at: a.due_at, points_possible: a.points_possible, question_count: mockConfig.richQuestions ? 7 : 4, quiz_type: a.quiz_survey || (a.name === 'Skills_Check' ? 'practice_quiz' : 'assignment'), time_limit: 20, allowed_attempts: mockConfig.richQuestions ? 5 : 1, description: `<p>${a.name}: four questions on the pre-lecture reading.</p>`, html_url: `/courses/${courseId}/quizzes/${a.quiz_id}`, locked_for_user: false, assignment_id: a.id, one_question_at_a_time: a.name === 'Lec07-PreQuiz', cant_go_back: a.name === 'Lec07-PreQuiz', hide_results: null, show_correct_answers: true, shuffle_answers: false, has_access_code: !!a.quiz_access_code && !a.quiz_code_hidden, ip_filter: a.quiz_ip_filter || null, require_lockdown_browser: !!a.quiz_lockdown }));
 
 // ---- quiz attempts (stateful, like Canvas's quiz submission API) --------------------------
 // quiz 9001 was taken once: q1 right, q2 wrong (17.68 m), q3 right, q4 right = 13 of 16
-const quizSubs = new Map([['9001', [{ id: 'qs1', quiz_id: '9001', attempt: 1, score: 13, kept_score: 13, started_at: at(-14, 15, 30), finished_at: at(-14, 15, 52), workflow_state: 'complete', validation_token: 'tok-1', state: { 90011: { answer: 900111 }, 90012: { answer: 900124 }, 90013: { answer: [900131, 900133] }, 90014: { answer: 3.15 } } }]]]);
+const quizSubs = new Map([['9001', [{ id: 'qs1', quiz_id: '9001', attempt: 1, score: 13, kept_score: 13, started_at: at(-14, 15, 30), finished_at: at(-14, 15, 52), workflow_state: 'complete', validation_token: 'tok-1', state: { 90011: { answer: 900111 }, 90012: { answer: 900124 }, 90013: { answer: [900131, 900133] }, 90014: { answer: 3.15 }, 90017: { answer: '<p>Pros:&nbsp;</p>\n<ul>\n<li>Ability to work together</li>\n<li>Divide and conquer assignments/group work&nbsp;</li>\n<li>Ideate together &amp; create better ideas.&nbsp;</li>\n</ul>\n<p>Cons</p>\n<ul>\n<li>Unreliable group mates cause a more stressful workload</li>\n<li>Have to set times to meet up outside of class&nbsp;</li>\n</ul>' } } }]]]); // (the essay, the way Canvas's editor keeps one, counts only when the rich set is on)
 const quizQuestionBank = (quizId) => {
   const mc = (n, text, opts, extra = {}) => ({ id: `${quizId}${n}`, position: n, question_name: `Question ${n}`, question_type: 'multiple_choice_question', question_text: `<p>${text}</p>`, points_possible: 4, answers: opts.map((t, i) => ({ id: Number(`${quizId}${n}${i + 1}`), text: t, html: '', weight: i === 0 ? 100 : 0 })), ...extra });
   return [
@@ -262,12 +267,15 @@ const quizQuestionBank = (quizId) => {
         { id: Number(`${quizId}62`), text: 'total amount', blank_id: 'rate', weight: 0 },
         { id: Number(`${quizId}63`), text: 'position', blank_id: 'what', weight: 100 },
         { id: Number(`${quizId}64`), text: 'mass', blank_id: 'what', weight: 0 },
-      ] }] : []),
+      ] },
+    // an essay: Canvas keeps the answer as the editor's HTML (paragraphs, lists), which is what comes back
+    { id: `${quizId}7`, position: 7, question_name: 'Question 7', question_type: 'essay_question', question_text: '<p>What are the pros and cons of group work?</p>', points_possible: 2, answers: [] }] : []),
     { id: `${quizId}4`, position: 4, question_name: 'Question 4', question_type: 'numerical_question', question_text: '<p>At what time (in seconds) is the object momentarily at rest? See the <a href="/courses/101/pages/chapter-4-notes">chapter 4 notes</a>.</p>', points_possible: 5, answers: [{ id: Number(`${quizId}41`), text: '3.15', weight: 100, exact: 3.15 }], neutral_comments: 'Only one root in the interval: v(t) = 0 at t = 3.15 s.' },
   ];
 };
 const gradeQuestion = (q, a) => {
   if (a === null || a === undefined || a === '') return false;
+  if (q.question_type === 'essay_question') return String(a).replace(/<[^>]+>/g, '').trim().length > 0; // (anything written earns the points here)
   if (q.question_type === 'numerical_question') return Number(a) === q.answers[0].exact;
   // matching: every left-hand value set against the match it was written with
   if (q.question_type === 'matching_question') {
@@ -645,10 +653,13 @@ on('GET', /^\/api\/v1\/folders\/(\w+)\/files$/, (url, m) => files[m[1]] || []);
 // one file by id, as the File API gives it (folder_id, and a preview_url only where Canvadocs would provide one: none here)
 on('GET', /^\/api\/v1\/files\/(\w+)$/, (url, m) => { for (const [fid, list] of Object.entries(files)) { const f = list.find((x) => x.id === m[1]); if (f) return { ...f, folder_id: fid, preview_url: null, mime_class: (f['content-type'] || '').split('/')[0] }; } return { __status: 404, errors: [{ message: 'not found' }] }; });
 on('GET', /^\/api\/v1\/courses\/(\w+)\/quizzes\/(\w+)\/submissions$/, (url, m) => ({ quiz_submissions: (quizSubs.get(m[2]) || []).map(pubSub) }));
-on('POST', /^\/api\/v1\/courses\/(\w+)\/quizzes\/(\w+)\/submissions$/, (url, m) => {
+on('POST', /^\/api\/v1\/courses\/(\w+)\/quizzes\/(\w+)\/submissions$/, (url, m, body) => {
   const list = quizSubs.get(m[2]) || [];
   const q = quizzes(m[1]).find((x) => x.id === m[2]);
   if (!q) return null;
+  // a quiz with an access code refuses an attempt without it, the way Canvas does (403, "invalid access code")
+  const asg = allAssignments(m[1]).find((x) => x.quiz_id === m[2]);
+  if (asg?.quiz_access_code && (body || {}).access_code !== asg.quiz_access_code) return { __status: 403, errors: [{ message: 'invalid access code' }] };
   const s = { id: `qs${m[2]}-${list.length + 1}`, quiz_id: m[2], course_id: m[1], read: {}, user_id: '7', attempt: list.length + 1, started_at: new Date().toISOString(), end_at: q.time_limit ? new Date(Date.now() + q.time_limit * 60e3).toISOString() : null, finished_at: null, workflow_state: 'untaken', validation_token: `tok-${m[2]}-${list.length + 1}`, score: null, kept_score: null, state: {} };
   list.push(s);
   quizSubs.set(m[2], list);

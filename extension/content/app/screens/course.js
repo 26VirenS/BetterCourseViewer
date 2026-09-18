@@ -311,6 +311,8 @@
     if (t.includes('discussion_topic') || a.discussion_topic) return { icon: IC.disc, quiz: false };
     return { icon: IC.doc, quiz: false };
   }
+  /** Whether the assignment already has a grade: then it is done, whatever its due date says. */
+  const hasGrade = (a) => { const s = a?.submission || {}; return s.workflow_state === 'graded' && s.score !== null && s.score !== undefined; };
   function ptsLabel(a) {
     const s = a.submission || {};
     const poss = a.points_possible;
@@ -875,7 +877,7 @@
         U.tile(icon, { color: pal.text, tint: pal.tint }),
         U.el('bcv-row__body', [
           U.text('bcv-row__title bcv-row__title--145 bcv-ellip', a.name),
-          U.text('bcv-row__sub', `${a.due_at ? `Due ${U.fmtAt(a.due_at)}` : 'No due date'} · ${ptsLabel(a)}`),
+          U.text('bcv-row__sub', `${hasGrade(a) ? 'Graded' : a.due_at ? `Due ${U.fmtAt(a.due_at)}` : 'No due date'} · ${ptsLabel(a)}`), // (a grade ends "due", whatever the date)
         ]),
         statusBadge(a, shell.dark),
         U.chev(),
@@ -894,6 +896,7 @@
       const s = a.submission || {};
       const done = s.submitted_at || s.workflow_state === 'graded' || s.excused;
       if (!due) undated.push(a);
+      else if (hasGrade(a)) past.push(a); // graded is done: nothing is due once it has a grade, even before its date
       else if (due >= now) upcoming.push(a);
       else if (!done && (a.points_possible || 0) > 0 && !(a.submission_types || []).some((t) => ['none', 'on_paper', 'not_graded'].includes(t))) overdue.push(a);
       else past.push(a);
@@ -1122,7 +1125,7 @@
         const arr = items.filter((q) => (q.quiz_type || 'assignment') === type);
         return arr.length ? h('div', {}, [U.label(lbl), U.card(arr.map((q) => U.row([
           U.tile(IC.bolt, { color: '#7d7bef', tint: 'rgba(88,86,214,.16)' }),
-          U.el('bcv-row__body', [U.text('bcv-row__title bcv-row__title--145', q.title), U.text('bcv-row__sub', `${q.due_at ? `Due ${U.fmtAt(q.due_at)}` : 'No due date'} · ${store.fmtPts(q.points_possible || 0)} pts · ${U.plural(q.question_count || 0, 'question')}`)]),
+          U.el('bcv-row__body', [U.text('bcv-row__title bcv-row__title--145', q.title), U.text('bcv-row__sub', `${q.due_at ? `Due ${U.fmtAt(q.due_at)}` : 'No due date'} · ${store.fmtPts(q.points_possible || 0)} pts · ${U.plural(q.question_count || 0, 'question')}${q.has_access_code ? ' · Access code' : ''}${q.require_lockdown_browser ? ' · LockDown Browser' : ''}`)]),
           U.chev(),
         ], { onClick: () => app.go(`${c.url}/quizzes/${q.id}`) })), 'bcv-card--list')]) : null;
       }).filter(Boolean);

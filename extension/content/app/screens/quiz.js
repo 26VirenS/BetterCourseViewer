@@ -25,6 +25,49 @@
   };
   // Matching saves a list of pairs and the blank kinds save one value per blank, so neither an empty
   // list nor an empty set of blanks counts as answered.
+  // An essay is rich text the way Canvas keeps it: what its editor wrote comes as HTML (paragraphs,
+  // lists), and goes back the same way. The box shows it as readable text; the review and the
+  // feedback show it as formatting, never as tags.
+  const looksHtml = (v) => /<\/?(p|ul|ol|li|br|div|b|strong|i|em|u|span|a|h[1-6]|blockquote|pre)\b[^>]*>/i.test(String(v || ''));
+  /** Rich text as an editor would show it: a blank line between paragraphs, a bullet (or a number) per item, no tags. */
+  function htmlToPlain(html) {
+    const box = h('div', { html: String(html || '') });
+    const out = [];
+    const walk = (node, depth) => {
+      for (const n of node.childNodes) {
+        if (n.nodeType === 3) { out.push(n.textContent.replace(/\u00a0/g, ' ')); continue; }
+        if (n.nodeType !== 1) continue;
+        const tag = n.tagName.toLowerCase();
+        if (tag === 'br') { out.push('\n'); continue; }
+        if (tag === 'li') {
+          const ordered = n.parentElement?.tagName === 'OL';
+          out.push(`${'  '.repeat(Math.max(0, depth - 1))}${ordered ? `${[...n.parentElement.children].indexOf(n) + 1}. ` : '• '}`);
+          walk(n, depth);
+          out.push('\n');
+          continue;
+        }
+        if (tag === 'ul' || tag === 'ol') { walk(n, depth + 1); out.push('\n'); continue; }
+        if (/^(p|div|h[1-6]|blockquote|pre|tr)$/.test(tag)) { walk(n, depth); out.push('\n\n'); continue; }
+        walk(n, depth);
+      }
+    };
+    walk(box, 0);
+    return out.join('').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+  }
+  /** Typed text as the simple HTML Canvas keeps essays in: a paragraph per blank line, a list where every line starts with a bullet or a number. */
+  function plainToHtml(text) {
+    const esc = (t) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const item = /^\s*([•\-*]|\d+[.)])\s+/;
+    return String(text || '').split(/\n{2,}/).map((block) => {
+      const lines = block.split('\n').map((l) => l.trimEnd()).filter((l) => l.trim());
+      if (!lines.length) return '';
+      if (lines.every((l) => item.test(l))) {
+        const ordered = lines.every((l) => /^\s*\d+[.)]\s+/.test(l));
+        return `<${ordered ? 'ol' : 'ul'}>${lines.map((l) => `<li>${esc(l.replace(item, ''))}</li>`).join('')}</${ordered ? 'ol' : 'ul'}>`;
+      }
+      return `<p>${lines.map(esc).join('<br>')}</p>`;
+    }).filter(Boolean).join('');
+  }
   const answered = (v) => {
     if (v === null || v === undefined || v === '') return false;
     if (Array.isArray(v)) return !!v.length;
@@ -331,33 +374,51 @@
 
     function intro() {
       const pts = quiz.points_possible !== null && quiz.points_possible !== undefined ? `${store.fmtPts(quiz.points_possible)} points` : 'ungraded';
+      // Canvas tells a student a quiz has a code (has_access_code) but not the code; where it does not
+      // say, the refusal at Begin does (st.needsCode), and the field appears then
+      const needsCode = !!(quiz.access_code || quiz.has_access_code || st.needsCode);
+      const lockdown = !!quiz.require_lockdown_browser;
+      // a survey: no right answers, points (if any) for taking part, and the words say so
+      const survey = /survey/.test(quiz.quiz_type || '');
+      const gradedSurvey = quiz.quiz_type === 'graded_survey';
+      const ptsLine = survey ? (gradedSurvey ? `${pts} for taking part` : 'not graded') : pts;
+      let refreshBegin = () => {};
       const bullets = [
         handOff ? ['#ff9500', IC.lock, 'This quiz seals each question once you leave it, and an attempt that goes wrong cannot be taken again — so it is taken on Canvas’s own page rather than here. Simpl Courses settings → Quizzes will take it here instead.'] : null,
-        ['#34c759', CHECK, 'Answers save as you pick them. You can leave and come back.'],
+        survey ? ['#34c759', CHECK, 'A survey has no right answers. Your responses are saved as you go, and you can leave and come back.'] : ['#34c759', CHECK, 'Answers save as you pick them. You can leave and come back.'],
+        quiz.anonymous_submissions ? ['var(--bcv-ink3)', IC.people, 'Your responses are anonymous.'] : null,
         timed ? ['#ff9500', IC.warn, `Time limit: ${quiz.time_limit} minutes. The clock starts when you begin and keeps running if you leave.`] : null,
         forcedOne ? ['var(--bcv-ink3)', MODE_ONE, noBack ? 'One question at a time, and you cannot go back to a previous question.' : 'One question at a time.'] : null,
         attemptsLeft !== null ? ['var(--bcv-ink3)', IC.bolt, attemptsLeft > 0 ? `${U.plural(attemptsLeft, 'attempt')} left of ${allowed}.` : `No attempts left — this quiz allows ${U.plural(allowed, 'attempt')}.`] : ['var(--bcv-ink3)', IC.bolt, 'Unlimited attempts.'],
         quiz.lock_at ? ['var(--bcv-ink3)', IC.lock, `Available until ${U.fmtAt(quiz.lock_at)}.`] : null,
+        // the restrictions Canvas lets an instructor set: an access code, an IP filter, LockDown Browser
+        needsCode ? ['#ff9500', IC.lock, 'This quiz needs an access code from your instructor.'] : null,
+        quiz.ip_filter ? ['#ff9500', IC.lock, 'This quiz can only be taken from an allowed network, such as the classroom or campus.'] : null,
+        lockdown ? ['#ff9500', IC.lock, 'This quiz requires Respondus LockDown Browser. Open Canvas in that browser to take it.'] : null,
       ].filter(Boolean);
-      const codeInput = quiz.access_code || quiz.has_access_code ? h('input', { class: 'bcv-input', type: 'text', placeholder: 'Access code', autocomplete: 'off', oninput: (e) => { st.code = e.target.value; } }) : null;
-      const canStart = !quiz.locked_for_user && (attemptsLeft === null || attemptsLeft > 0 || !!st.sub);
+      const codeInput = needsCode ? h('input', { class: 'bcv-input bcv-qz__code', type: 'text', placeholder: 'Access code', value: st.code || '', autocomplete: 'off', spellcheck: 'false', 'aria-label': 'Access code', oninput: (e) => { st.code = e.target.value; refreshBegin(); }, onkeydown: (e) => { if (e.key === 'Enter') { e.preventDefault(); begin(); } } }) : null;
+      const canStart = !quiz.locked_for_user && !lockdown && (attemptsLeft === null || attemptsLeft > 0 || !!st.sub);
+      const codeMissing = () => needsCode && !(st.code || '').trim(); // the code comes first: Begin waits for it
+      const beginLabel = () => (st.sub ? (survey ? 'Continue survey' : 'Continue attempt') : canStart ? (codeMissing() ? 'Enter the access code' : survey ? 'Begin survey' : 'Begin attempt') : lockdown ? 'Needs LockDown Browser' : 'No attempts left');
       const lastDone = canStart ? null : latestFinished();
       // out of attempts: the primary action becomes the feedback for the last one (when released)
-      const startBtn = !canStart && lastDone && !resultsHidden(lastDone)
+      const startBtn = !canStart && lastDone && !survey && !resultsHidden(lastDone)
         ? h('button', { type: 'button', class: 'bcv-qz__begin', text: 'See your feedback', onclick: () => openFeedback(lastDone, 'intro') })
         : handOff && canStart
           ? h('button', { type: 'button', class: 'bcv-qz__begin', text: st.sub ? 'Continue in Canvas' : 'Take it in Canvas', onclick: toCanvas })
-          : h('button', { type: 'button', class: 'bcv-qz__begin', text: st.sub ? 'Continue attempt' : (canStart ? 'Begin attempt' : 'No attempts left'), disabled: !canStart || null, onclick: begin });
+          : h('button', { type: 'button', class: 'bcv-qz__begin', text: beginLabel(), disabled: (!canStart || codeMissing()) || null, dataset: { begin: '1' }, onclick: begin });
+      refreshBegin = () => { if (startBtn.dataset.begin) { startBtn.disabled = (!canStart || codeMissing()) || null; startBtn.textContent = beginLabel(); } };
       return U.el('bcv-qz__intro', [
         h('div', {}, [
           h('h1', { class: 'bcv-qz__h1 bcv-pretty', text: quiz.title }),
-          h('p', { class: 'bcv-qz__lead', text: `${course.name} · ${U.plural(quiz.question_count || 0, 'question')} · ${pts} · ${quiz.due_at ? `Due ${U.fmtTime(quiz.due_at)}, ${U.fmtShort(quiz.due_at)}` : 'No due date'}` }),
+          h('p', { class: 'bcv-qz__lead', text: `${course.name} · ${U.plural(quiz.question_count || 0, 'question')} · ${ptsLine} · ${quiz.due_at ? `Due ${U.fmtTime(quiz.due_at)}, ${U.fmtShort(quiz.due_at)}` : 'No due date'}` }),
         ]),
         U.card(U.el('bcv-qz__before', [
           U.text('bcv-qz__kicker', 'Before you start'),
           quiz.description ? BCV.screens.course.prose(quiz.description, { cls: 'bcv-qz__desc' }) : h('p', { class: 'bcv-qz__p', text: 'Read each question carefully. Your answers are sent to Canvas as you pick them.' }),
           U.el('bcv-qz__bullets', bullets.map(([color, icon, text]) => U.el('bcv-qz__bullet', [U.svg(icon, { size: 18, stroke: color, width: 2, style: { flex: 'none', marginTop: '1px' } }), h('span', { class: 'bcv-pretty', text })]))),
           codeInput,
+          st.codeErr ? U.text('bcv-error bcv-qz__codeerr', st.codeErr) : null,
           quiz.locked_for_user ? U.text('bcv-error', quiz.lock_explanation ? htmlToText(quiz.lock_explanation, 200) : 'This quiz is locked.') : null,
         ]), 'bcv-card--22'),
         startBtn,
@@ -367,12 +428,14 @@
 
     async function begin() {
       if (handOff) { toCanvas(); return; } // a locked quiz is Canvas's to run, however this was reached
+      if ((quiz.access_code || quiz.has_access_code || st.needsCode) && !(st.code || '').trim()) { st.codeErr = 'Enter the access code first.'; draw(); return; } // required before an attempt
       // the popup opens at once, its pills standing for the questions to come, the first filling while they load
       st.stage = 'starting';
       st.loadingIdx = 0;
       draw();
       try {
         st.sub = await store.quizApi.start(cid, qid, st.code);
+        st.codeErr = '';
         if (!st.paged) {
           try {
             st.questions = await store.quizApi.questions(st.sub);
@@ -396,8 +459,22 @@
       } catch (e) {
         st.loadingIdx = null;
         st.stage = 'intro';
+        const msg = String(e?.message || '');
+        // a restricted quiz refuses in words: the code field appears (or says the code was wrong), an IP filter is explained
+        if (/access code/i.test(msg)) {
+          st.codeErr = st.code ? 'That access code was refused. Check it with your instructor.' : 'This quiz needs an access code. Enter it above, then begin.';
+          st.needsCode = true;
+          draw();
+          setTimeout(() => { const f = document.querySelector('.bcv-qz__code'); if (f) { f.focus(); f.select(); } }, 60);
+          return;
+        }
+        if (/ip address|ip filter|from your (ip|location|network)/i.test(msg)) {
+          st.codeErr = 'Canvas only allows this quiz from certain networks (an IP filter). Try from the classroom or campus network.';
+          draw();
+          return;
+        }
         draw();
-        U.toast(`Could not start the attempt: ${e.message}`, { error: true });
+        U.toast(`Could not start the attempt: ${msg}`, { error: true });
       }
     }
     /** A page of Canvas's quiz page folded into the attempt: its question list is the spine (every
@@ -504,9 +581,9 @@
       if (TEXT.has(type)) {
         const isEssay = type === 'essay_question';
         const field = isEssay
-          ? h('textarea', { class: 'bcv-textarea', rows: 6, placeholder: 'Your answer…', oninput: (e) => saveText(q, e.target.value) })
+          ? h('textarea', { class: 'bcv-textarea', rows: 6, placeholder: 'Your answer…', oninput: (e) => { const v = e.target.value; saveText(q, looksHtml(q.answer) || /\n/.test(v) || /^\s*([•\-*]|\d+[.)])\s+/.test(v) ? plainToHtml(v) : v); } })
           : h('input', { class: 'bcv-input', type: type === 'numerical_question' ? 'number' : 'text', step: 'any', placeholder: type === 'numerical_question' ? 'Number' : 'Your answer', oninput: (e) => saveText(q, type === 'numerical_question' && e.target.value !== '' ? Number(e.target.value) : e.target.value) });
-        field.value = q.answer === null || q.answer === undefined ? '' : String(q.answer);
+        field.value = q.answer === null || q.answer === undefined ? '' : isEssay && looksHtml(q.answer) ? htmlToPlain(q.answer) : String(q.answer);
         return U.el('bcv-qz__text', field);
       }
       // Matching: each left-hand value with the same list of right-hand ones beside it. Canvas takes
@@ -640,7 +717,8 @@
       }
       if (Array.isArray(a)) return a.map(one);
       if (CHOICE.has(q.question_type)) return [one(a)];
-      return [{ text: String(a), html: '' }];
+      if (looksHtml(a)) return [{ text: '', html: String(a), block: true }]; // (an essay written in Canvas's editor: formatting, not tags)
+      return [{ text: String(a), html: '', block: q.question_type === 'essay_question' && (String(a).length > 90 || /\n/.test(String(a))) }];
     }
     /** The same, flattened to one line — for the review list and anywhere a plain string is wanted. */
     function answerText(q) {
@@ -706,20 +784,24 @@
 
     function done() {
       const d = st.done || {};
-      const scoreVisible = !quiz.hide_results && d.score !== null && d.score !== undefined && d.workflow_state !== 'pending_review';
+      const survey = /survey/.test(quiz.quiz_type || '');
+      const gradedSurvey = quiz.quiz_type === 'graded_survey';
+      const scoreVisible = !survey && !quiz.hide_results && d.score !== null && d.score !== undefined && d.workflow_state !== 'pending_review';
+      const feedbackOn = scoreVisible && d.id && !resultsHidden(d);
       return U.el('bcv-qz__done', [
         U.el('bcv-qz__donemark', U.svg(CHECK, { size: 34, stroke: '#34c759', width: 2.4 })),
         h('div', {}, [
-          h('h1', { class: 'bcv-qz__h1 bcv-qz__h1--28', text: 'Attempt submitted' }),
-          h('p', { class: 'bcv-qz__lead bcv-pretty', text: `${quiz.title} · submitted ${U.fmtAtUpper(d.finished_at || new Date())}. ${scoreVisible ? '' : 'Your score posts once your instructor releases it.'}` }),
+          h('h1', { class: 'bcv-qz__h1 bcv-qz__h1--28', text: survey ? 'Responses recorded' : 'Attempt submitted' }),
+          h('p', { class: 'bcv-qz__lead bcv-pretty', text: `${quiz.title} · submitted ${U.fmtAtUpper(d.finished_at || new Date())}. ${survey ? (gradedSurvey ? 'Thanks for taking part — the points for it post to your grades.' : 'Thanks for taking part.') : scoreVisible ? '' : 'Your score posts once your instructor releases it.'}` }),
         ]),
         U.el('bcv-qz__donecard', [h('span', { class: 'bcv-qz__donek', text: 'Questions answered' }), h('span', { class: 'bcv-qz__donev', text: answeredLabel() })]),
         scoreVisible ? U.el('bcv-qz__donecard', [h('span', { class: 'bcv-qz__donek', text: 'Score' }), h('span', { class: 'bcv-qz__donev', text: `${store.fmtPts(d.kept_score ?? d.score)} / ${store.fmtPts(quiz.points_possible || 0)}` })]) : null,
+        gradedSurvey && quiz.points_possible ? U.el('bcv-qz__donecard', [h('span', { class: 'bcv-qz__donek', text: 'For taking part' }), h('span', { class: 'bcv-qz__donev', text: `${store.fmtPts(quiz.points_possible)} ${Number(quiz.points_possible) === 1 ? 'point' : 'points'}` })]) : null,
         U.el('bcv-qz__donebtns', [
-          // feedback only once Canvas has released it (hide_results); the receipt says so otherwise
-          scoreVisible && d.id && !resultsHidden(d) ? h('button', { type: 'button', class: 'bcv-qz__big bcv-qz__big--primary', text: 'See feedback', onclick: () => openFeedback(d, 'done') }) : null,
-          h('button', { type: 'button', class: `bcv-qz__big ${scoreVisible && d.id && !resultsHidden(d) ? '' : 'bcv-qz__big--primary'}`, text: `Back to ${course.name}`, onclick: () => exitTo(course.url) }),
-          h('button', { type: 'button', class: 'bcv-qz__big', text: 'Quiz page', onclick: () => exitTo(quizUrl) }),
+          // feedback only once Canvas has released it (hide_results); the receipt says so otherwise. A survey has none.
+          feedbackOn ? h('button', { type: 'button', class: 'bcv-qz__big bcv-qz__big--primary', text: 'See feedback', onclick: () => openFeedback(d, 'done') }) : null,
+          h('button', { type: 'button', class: `bcv-qz__big ${feedbackOn ? '' : 'bcv-qz__big--primary'}`, text: `Back to ${course.name}`, onclick: () => exitTo(course.url) }),
+          h('button', { type: 'button', class: 'bcv-qz__big', text: survey ? 'Survey page' : 'Quiz page', onclick: () => exitTo(quizUrl) }),
         ]),
       ]);
     }
@@ -912,9 +994,10 @@
         ]),
         CS().prose(r.q.question_text || r.q.question_name || '', { cls: 'bcv-fb__qtext' }),
         U.el('bcv-fb__chips', [
-          h('span', { class: 'bcv-fb__chip', style: { background: tint, color: ink } }, chipBody('You: ', r.yours)),
+          h('span', { class: 'bcv-fb__chip', style: { background: tint, color: ink } }, r.yours?.some((p) => p.block) ? [h('span', { text: 'Your answer, below' })] : chipBody('You: ', r.yours)),
           showRight ? h('span', { class: 'bcv-fb__chip bcv-fb__chip--right' }, chipBody('Correct: ', r.right)) : null,
         ]),
+        r.yours?.some((p) => p.block) ? U.el('bcv-fb__essay', r.yours.map((p) => (p.html ? CS().prose(p.html, { cls: 'bcv-fb__essaybody bcv-prose' }) : h('p', { class: 'bcv-fb__essaybody', text: p.text })))) : null,
         fbOptions(r),
         U.el('bcv-fb__sol', [
           U.text('bcv-fb__kicker', 'Worked solution', 'span'),

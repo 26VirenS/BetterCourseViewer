@@ -23,6 +23,13 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.22.0', date: '2026-09-18', notes: [
+      { kind: 'new', title: 'Quizzes with a code', body: 'A quiz that needs an access code asks for it first. Network limits are explained.', icon: P.check },
+      { kind: 'new', title: 'Surveys', body: 'Surveys and graded surveys are taken here, in their own words.', icon: P.list },
+      { kind: 'improved', title: 'Fresh on return', body: 'Come back to a tab and it reads Canvas again. Lists expire sooner.', icon: P.arrows },
+      { kind: 'improved', title: 'Written answers', body: 'Essay answers keep their paragraphs and lists, in feedback too.', icon: P.pen },
+      { kind: 'improved', title: 'Graded means done', body: 'Work that already has a grade is never shown as due.', icon: P.check },
+    ] },
     { version: '2.21.0', date: '2026-09-18', notes: [
       { kind: 'new', title: 'Real conversions', body: 'Paste a CloudConvert key: Word, PDF, slides and sheets convert properly.', icon: P.arrows },
     ] },

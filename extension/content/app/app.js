@@ -769,9 +769,17 @@
     // A grade may have landed while the tab was away (work marked in a tool in another window, a
     // teacher): the scores are asked for again, and a grades screen on show is drawn again now —
     // unless a what-if is being typed into, which a redraw would wipe.
-    if (hiddenAt && Date.now() - hiddenAt > 60 * 1000 && !inQuiz()) {
+    const gone = hiddenAt ? Date.now() - hiddenAt : 0;
+    if (gone > 60 * 1000 && !inQuiz()) {
       store.invalidateGrades();
-      if (onGradesScreen() && !document.querySelector('.bcv-whatif, .bcv-whatif__input')) render({ quiet: true });
+      // Back after a minute and a half or more (short of the stale-page reload below): the memo is
+      // dropped and the screen drawn again from Canvas, silently — an assignment posted meanwhile is
+      // on the next draw, not the next reload. An open submission, a field being typed in, a what-if
+      // and the welcome are left alone; a shorter absence redraws a grades screen alone, as before.
+      const whatIf = !!document.querySelector('.bcv-whatif, .bcv-whatif__input');
+      const fresh = gone >= RETURN_FRESH && !awayLong() && !self.BCVBridge?.native && !quizHere() && !state.submitOpen && !typing() && !BCV.welcome?.active?.() && state.lookOn && !!document.getElementById('bcv-app') && !whatIf;
+      if (fresh) { BCV.canvas.clearAll(); render({ quiet: true }); }
+      else if (onGradesScreen() && !whatIf) render({ quiet: true });
     }
     hiddenAt = 0;
   });
@@ -792,6 +800,7 @@
   let scrollTick = 0;
   window.addEventListener('scroll', () => { const n = Date.now(); if (n - scrollTick > 2000) { scrollTick = n; here(); } }, { passive: true });
   const awayLong = () => Date.now() - state.lastHere >= AWAY_STALE;
+  const RETURN_FRESH = 90 * 1000; // back after this long: every list is read from Canvas again (see the tab handler above)
   /** The stale-page reload, wherever it is noticed from. A quiz is left completely alone. */
   function wakeStale() {
     if (self.BCVBridge?.native) return false; // the app holds its own session

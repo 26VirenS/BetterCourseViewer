@@ -170,7 +170,7 @@
   }
 
   function cards({ force = false, refresh = false } = {}) {
-    return C.cached('cards', 15 * MIN, () => C.get('/api/v1/dashboard/dashboard_cards'), { force, refresh });
+    return C.cached('cards', 5 * MIN, () => C.get('/api/v1/dashboard/dashboard_cards'), { force, refresh });
   }
 
   const now = () => new Date();
@@ -315,7 +315,7 @@
     return U.addDays(U.startOfDay(now()), n).toISOString();
   }
   function rawPlanner(days = 21, { force = false, refresh = false } = {}) {
-    return C.cached(`planner:${days}`, 3 * MIN, () =>
+    return C.cached(`planner:${days}`, 1.5 * MIN, () => // (what is due changes under a tab left open: short-lived)
       C.get('/api/v1/planner/items', { params: { start_date: isoDays(-7), end_date: isoDays(days), per_page: 100 }, all: true, maxPages: 5 }), { force, refresh });
   }
 
@@ -809,7 +809,7 @@
     return C.cached(`cstream:${kind}:${id}`, 3 * MIN, () => C.get(`/api/v1/${kind}/${id}/activity_stream`, { params: { per_page: 40 } }), { force, refresh });
   }
   function assignments(id, { force = false, refresh = false, maxAge = 0 } = {}) {
-    return C.cached(`assignments:${id}`, 10 * MIN, () =>
+    return C.cached(`assignments:${id}`, 3 * MIN, () =>
       C.get(`/api/v1/courses/${id}/assignments`, { params: { per_page: 100, include: ['submission', 'all_dates'], order_by: 'due_at' }, all: true, maxPages: 4 }), { force, refresh, maxAge });
   }
   function assignment(id, aid, { force = false, refresh = false, maxAge = 0 } = {}) {
