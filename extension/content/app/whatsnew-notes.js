@@ -23,6 +23,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.22.1', date: '2026-09-18', notes: [
+      { kind: 'fixed', title: 'Access codes', body: 'The code goes with every answer, and is asked for again if Canvas wants it.', icon: P.check },
+    ] },
     { version: '2.22.0', date: '2026-09-18', notes: [
       { kind: 'new', title: 'Quizzes with a code', body: 'A quiz that needs an access code asks for it first. Network limits are explained.', icon: P.check },
       { kind: 'new', title: 'Surveys', body: 'Surveys and graded surveys are taken here, in their own words.', icon: P.list },

@@ -1062,11 +1062,12 @@
           .sort((a, b) => (a.position || 0) - (b.position || 0));
       }
     },
-    answer(sub, questionId, answer) {
-      return C.post(`/api/v1/quiz_submissions/${sub.id}/questions`, { attempt: sub.attempt, validation_token: sub.validation_token, quiz_questions: [{ id: questionId, answer }] });
+    // (a quiz with an access code wants it on every call about the attempt, not only at the start)
+    answer(sub, questionId, answer, accessCode) {
+      return C.post(`/api/v1/quiz_submissions/${sub.id}/questions`, { attempt: sub.attempt, validation_token: sub.validation_token, ...(accessCode ? { access_code: accessCode } : {}), quiz_questions: [{ id: questionId, answer }] });
     },
-    flag(sub, questionId, on) {
-      return C.put(`/api/v1/quiz_submissions/${sub.id}/questions/${questionId}/${on ? 'flag' : 'unflag'}`, { attempt: sub.attempt, validation_token: sub.validation_token });
+    flag(sub, questionId, on, accessCode) {
+      return C.put(`/api/v1/quiz_submissions/${sub.id}/questions/${questionId}/${on ? 'flag' : 'unflag'}`, { attempt: sub.attempt, validation_token: sub.validation_token, ...(accessCode ? { access_code: accessCode } : {}) });
     },
     time(courseId, quizId, sub) {
       return C.get(`/api/v1/courses/${courseId}/quizzes/${quizId}/submissions/${sub.id}/time`);

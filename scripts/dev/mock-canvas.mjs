@@ -305,6 +305,9 @@ const histFields = (q, a) => {
   return { answer_id: a, text: String(a) };
 };
 const findSub = (id) => [...quizSubs.values()].flat().find((s) => s.id === id) || null;
+// the access code an attempt's quiz wants, if any (the config can change it under a running attempt); refused the way Canvas refuses
+const codeOf = (s) => (s && s.course_id ? (mockConfig.quizCode?.[s.quiz_id] || allAssignments(s.course_id).find((x) => x.quiz_id === s.quiz_id)?.quiz_access_code || null) : null);
+const codeRefused = (s, body) => { const need = codeOf(s); return need && (body || {}).access_code !== need ? { __status: 403, errors: [{ message: 'invalid access code' }] } : null; };
 const subQuestions = (s) => {
   const done = s.workflow_state === 'complete';
   const bank = quizQuestionBank(s.quiz_id);
@@ -676,10 +679,12 @@ on('GET', /^\/api\/v1\/quiz_submissions\/([\w-]+)\/questions$/, (url, m) => {
 on('POST', /^\/api\/v1\/quiz_submissions\/([\w-]+)\/questions$/, (url, m, body) => {
   const s = findSub(m[1]);
   if (!s || body.validation_token !== s.validation_token) return null;
+  const refused = codeRefused(s, body);
+  if (refused) return refused;
   for (const q of body.quiz_questions || []) s.state[String(q.id)] = { ...(s.state[String(q.id)] || {}), answer: q.answer };
   return subQuestions(s);
 });
-on('PUT', /^\/api\/v1\/quiz_submissions\/([\w-]+)\/questions\/(\w+)\/(flag|unflag)$/, (url, m) => { const s = findSub(m[1]); if (!s) return null; s.state[m[2]] = { ...(s.state[m[2]] || {}), flagged: m[3] === 'flag' }; return subQuestions(s); });
+on('PUT', /^\/api\/v1\/quiz_submissions\/([\w-]+)\/questions\/(\w+)\/(flag|unflag)$/, (url, m, body) => { const s = findSub(m[1]); if (!s) return null; const refused = codeRefused(s, body); if (refused) return refused; s.state[m[2]] = { ...(s.state[m[2]] || {}), flagged: m[3] === 'flag' }; return subQuestions(s); });
 on('GET', /^\/api\/v1\/courses\/(\w+)\/quizzes\/(\w+)\/submissions\/([\w-]+)\/time$/, (url, m) => { const s = findSub(m[3]); return s ? { end_at: s.end_at, time_left: s.end_at ? Math.round((new Date(s.end_at) - Date.now()) / 1000) : null } : null; });
 on('POST', /^\/api\/v1\/courses\/(\w+)\/quizzes\/(\w+)\/submissions\/([\w-]+)\/complete$/, (url, m) => {
   const s = findSub(m[3]);

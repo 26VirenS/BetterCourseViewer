@@ -1801,6 +1801,36 @@ try {
   await page.waitForSelector('.bcv-qz__opt', { timeout: 10000 });
   const restrictedStart = await noteApi('GET', '/api/v1/courses/102/quizzes/10019/submissions');
   check((await page.$$('.bcv-qz__pill')).length === 4 && (await page.$('.bcv-qz__codeerr')) === null && (restrictedStart.quiz_submissions || []).some((sub) => sub.workflow_state === 'untaken'), 'the right code starts the attempt: Canvas has it open and the questions are up');
+  // the code goes with every answer (Canvas wants it there too)
+  await page.click('.bcv-qz__opt');
+  await waitText('.bcv-qz__answered', /1 of 4 answered · Saved/);
+  check(true, 'an answer saves, the code along with it');
+  // the attempt resumed in another tab: the code is not known there, so Continue waits for it
+  const tab2 = await context.newPage();
+  await tab2.goto(`${BASE}/courses/102/quizzes/10019?bcv=take`);
+  await tab2.waitForSelector('.bcv-qz__begin', { timeout: 10000 });
+  check((await tab2.$eval('.bcv-qz__begin', (b) => b.disabled)) && (await tab2.$eval('.bcv-qz__begin', (b) => b.textContent.trim())) === 'Enter the access code', 'resumed in another tab, the attempt asks for the code again before continuing');
+  await tab2.fill('.bcv-qz__code', 'PHYS8');
+  await tab2.click('.bcv-qz__begin');
+  await tab2.waitForSelector('.bcv-qz__opt', { timeout: 10000 });
+  // the code changes under the attempt: the next save is refused, the page asks for the code there and then, and saves again
+  await noteApi('POST', '/__mock/config', { quizCode: { 10019: 'NEW1' } });
+  await tab2.click('.bcv-qz__opt:nth-child(2)');
+  await tab2.waitForSelector('.bcv-sheet--prompt', { timeout: 10000 });
+  check((await tab2.$eval('.bcv-sheet--prompt .bcv-sheet__title', (e) => e.textContent.trim())) === 'Access code' && /save your answers/.test(await tab2.$eval('.bcv-sheet--prompt .bcv-sheet__note', (e) => e.textContent)), 'a save Canvas refuses for the code brings a prompt for it rather than a dead toast');
+  await tab2.fill('.bcv-prompt__input', 'wrong');
+  await tab2.click('.bcv-prompt__save');
+  await tab2.waitForFunction(() => /invalid access code/.test([...document.querySelectorAll('.bcv-toast')].map((t) => t.textContent).join(' ')), null, { timeout: 5000 });
+  check(!!(await tab2.$('.bcv-sheet--prompt')), 'a wrong code there is refused in words and the prompt stays');
+  await tab2.fill('.bcv-prompt__input', 'NEW1');
+  await tab2.click('.bcv-prompt__save');
+  await tab2.waitForFunction(() => !document.querySelector('.bcv-sheet--prompt'), null, { timeout: 10000 });
+  await tab2.waitForFunction(() => /Saved/.test(document.querySelector('.bcv-qz__answered')?.textContent || ''), null, { timeout: 10000 });
+  await tab2.click('.bcv-qz__opt:nth-child(3)');
+  await tab2.waitForFunction(() => /Saved/.test(document.querySelector('.bcv-qz__answered')?.textContent || ''), null, { timeout: 10000 });
+  check(!(await tab2.$('.bcv-sheet--prompt')), 'the new code saves the answer and stays with the attempt: the next save asks for nothing');
+  await noteApi('POST', '/__mock/config', { quizCode: null });
+  await tab2.close();
   const leaveRestricted = (d) => d.accept();
   page.once('dialog', leaveRestricted);
   await page.goto(`${BASE}/courses/102/quizzes/10019`);

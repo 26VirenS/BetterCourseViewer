@@ -256,17 +256,50 @@
     const answeredLabel = () => `${answeredCount()} of ${st.questions.length} answered`;
     const saveState = () => (st.saving > 0 ? 'Saving…' : st.savedAt ? 'Saved' : '');
 
+    // The access code, for the whole attempt: Canvas wants it on every answer, flag and the hand-in,
+    // not only at the start. It is kept for this tab (sessionStorage, under the quiz), so an attempt
+    // resumed here does not ask again; resumed in another tab, the intro asks first. Should Canvas
+    // refuse a save for the code all the same (a code changed, an attempt begun on Canvas's own
+    // page), the page asks for it there and then, and saves again — never a dead toast.
+    const CODE_KEY = `bcv:qzcode:${qid}`;
+    const remembered = () => { try { return sessionStorage.getItem(CODE_KEY) || ''; } catch { return ''; } };
+    const remember = (code) => { try { if (code) sessionStorage.setItem(CODE_KEY, code); else sessionStorage.removeItem(CODE_KEY); } catch { /* fine without */ } };
+    const codeFor = () => (st.code || '').trim() || remembered();
+    const codeRefused = (e) => /access code/i.test(String(e?.message || ''));
+    let codePrompt = null; // the prompt on show, and the saves waiting on it: [q, answer][]
+    function askForCode(q, answer) {
+      if (codePrompt) { codePrompt.push([q, answer]); return; }
+      codePrompt = [[q, answer]];
+      U.promptSheet({
+        label: 'Access code', title: 'Access code', note: 'Canvas wants the quiz’s access code to save your answers. Enter it to keep going — it stays with this attempt.',
+        placeholder: 'Access code', value: '', saveLabel: 'Save answer',
+        onSave: async (v) => {
+          if (!v) throw new Error('Enter the access code.');
+          await store.quizApi.answer(st.sub, q.id, answer, v); // (refused again: the prompt says so and stays)
+          st.code = v;
+          remember(v);
+          st.savedAt = Date.now();
+          const rest = codePrompt.slice(1);
+          codePrompt = null;
+          paintFooter();
+          for (const [q2, a2] of rest) save(q2, a2); // the answers that waited on the code
+        },
+      });
+      // (a prompt closed without a code: the answers stay unsaved, the footer says so, and the next save asks again)
+      const watch = setInterval(() => { if (!document.querySelector('.bcv-sheet--prompt')) { clearInterval(watch); codePrompt = null; } }, 400);
+    }
     async function save(q, answer) {
       q.answer = answer;
       st.saving++;
       paintFooter();
-      const p = store.quizApi.answer(st.sub, q.id, answer);
+      const p = store.quizApi.answer(st.sub, q.id, answer, codeFor());
       st.inflight.add(p);
       try {
         await p;
         st.savedAt = Date.now();
       } catch (e) {
-        U.toast(`Could not save that answer: ${e.message}`, { error: true });
+        if (codeRefused(e)) askForCode(q, answer);
+        else U.toast(`Could not save that answer: ${e.message}`, { error: true });
       } finally {
         st.inflight.delete(p);
         st.saving--;
@@ -299,7 +332,7 @@
       q.flagged = on;
       paintProgress();
       try {
-        await store.quizApi.flag(st.sub, q.id, on);
+        await store.quizApi.flag(st.sub, q.id, on, codeFor());
       } catch (e) {
         q.flagged = !on;
         paintProgress();
@@ -377,6 +410,7 @@
       // Canvas tells a student a quiz has a code (has_access_code) but not the code; where it does not
       // say, the refusal at Begin does (st.needsCode), and the field appears then
       const needsCode = !!(quiz.access_code || quiz.has_access_code || st.needsCode);
+      if (needsCode && !(st.code || '').trim()) st.code = remembered(); // (an attempt resumed in this tab: the code is still known)
       const lockdown = !!quiz.require_lockdown_browser;
       // a survey: no right answers, points (if any) for taking part, and the words say so
       const survey = /survey/.test(quiz.quiz_type || '');
@@ -399,7 +433,7 @@
       const codeInput = needsCode ? h('input', { class: 'bcv-input bcv-qz__code', type: 'text', placeholder: 'Access code', value: st.code || '', autocomplete: 'off', spellcheck: 'false', 'aria-label': 'Access code', oninput: (e) => { st.code = e.target.value; refreshBegin(); }, onkeydown: (e) => { if (e.key === 'Enter') { e.preventDefault(); begin(); } } }) : null;
       const canStart = !quiz.locked_for_user && !lockdown && (attemptsLeft === null || attemptsLeft > 0 || !!st.sub);
       const codeMissing = () => needsCode && !(st.code || '').trim(); // the code comes first: Begin waits for it
-      const beginLabel = () => (st.sub ? (survey ? 'Continue survey' : 'Continue attempt') : canStart ? (codeMissing() ? 'Enter the access code' : survey ? 'Begin survey' : 'Begin attempt') : lockdown ? 'Needs LockDown Browser' : 'No attempts left');
+      const beginLabel = () => (canStart && codeMissing() ? 'Enter the access code' : st.sub ? (survey ? 'Continue survey' : 'Continue attempt') : canStart ? (survey ? 'Begin survey' : 'Begin attempt') : lockdown ? 'Needs LockDown Browser' : 'No attempts left');
       const lastDone = canStart ? null : latestFinished();
       // out of attempts: the primary action becomes the feedback for the last one (when released)
       const startBtn = !canStart && lastDone && !survey && !resultsHidden(lastDone)
@@ -436,6 +470,7 @@
       try {
         st.sub = await store.quizApi.start(cid, qid, st.code);
         st.codeErr = '';
+        if ((st.code || '').trim()) remember(st.code.trim());
         if (!st.paged) {
           try {
             st.questions = await store.quizApi.questions(st.sub);
@@ -446,7 +481,7 @@
             st.mode = 'one';
           }
         }
-        if (st.paged) applyPage(await QP().fetchPage(quizUrl, { accessCode: st.code }));
+        if (st.paged) applyPage(await QP().fetchPage(quizUrl, { accessCode: codeFor() }));
         // Question ids arrive as strings (our Accept header); Canvas wants numeric answer ids back.
         for (const q of st.questions) q.flagged = !!q.flagged;
         if (!st.paged) st.idx = noBack ? Math.max(0, st.questions.findIndex((q) => !isAnswered(q))) : 0;
@@ -511,7 +546,7 @@
       try {
         const f = st.page?.form || {};
         const fields = { attempt: f.attempt ?? st.sub.attempt, validation_token: f.validationToken || st.sub.validation_token, last_question_id: f.lastQuestionId || cur()?.id || null };
-        const pg = how.action ? await QP().advance(how.action, fields) : await QP().fetchPage(quizUrl, { questionId: how.questionId, accessCode: st.code });
+        const pg = how.action ? await QP().advance(how.action, fields) : await QP().fetchPage(quizUrl, { questionId: how.questionId, accessCode: codeFor() });
         if (!ctx.alive()) return;
         st.loadingIdx = null;
         applyPage(pg);
@@ -763,7 +798,7 @@
       if (!window.confirm(`Submit this attempt now?${blanks ? `\n\n${U.plural(blanks, 'question is', 'questions are')} still blank.` : ''}`)) return;
       body.replaceChildren(h('p', { class: 'bcv-qz__starting', text: 'Submitting…' })); // inside the attempt nothing is a skeleton
       try {
-        st.done = await store.quizApi.complete(cid, qid, st.sub, st.code);
+        st.done = await store.quizApi.complete(cid, qid, st.sub, codeFor());
         st.stage = 'done';
         clearInterval(st.timer);
         app.refreshCounts();
