@@ -429,7 +429,13 @@
   const dismiss = (item) => override(item, { dismissed: true });
   const restore = (item) => override(item, { dismissed: false, marked_complete: false });
   async function invalidatePlanner() {
-    await Promise.all([C.invalidate('planner:21'), C.invalidate('planner:14'), C.invalidate('planner:60'), C.invalidate('planner:mine')]);
+    await Promise.all([C.invalidate('planner:21'), C.invalidate('planner:14'), C.invalidate('planner:60'), C.invalidate('planner:mine'), C.invalidate('planner:overrides')]);
+  }
+  /** Every planner override of the student's (marked complete, dismissed), whatever the item's date:
+   *  what the Overdue card reads for late work, which comes from the course's assignments rather
+   *  than the planner window and so carries no override of its own. */
+  async function plannerOverrides({ force = false } = {}) {
+    return C.cached('planner:overrides', 3 * MIN, () => C.get('/api/v1/planner/overrides', { params: { per_page: 100 }, all: true, maxPages: 5 }), { force });
   }
 
   // ---- activity + counts ------------------------------------------------------------------
@@ -1239,7 +1245,7 @@
 
   BCV.store = {
     env, pref, setPref, mergePref, me, account, colors, courses, favorites, cards, setFavorite, setNickname, currentTerm, dashboardView, setDashboardView, freshness, invalidateGrades,
-    planner, classify, todo, todoWindow, setComplete, dismiss, restore, invalidatePlanner, createNote, deleteNote, activity, activitySummary, unreadCount, groups, group,
+    planner, classify, todo, todoWindow, setComplete, dismiss, restore, invalidatePlanner, plannerOverrides, createNote, deleteNote, activity, activitySummary, unreadCount, groups, group,
     announcementsFeed, streamSeen, markStreamSeen, setColor, history, helpLinks,
     calendarContexts, ownContexts, selectedContexts, setSelectedContexts, calendarEvents, plannerRange,
     conversations, conversation, markRead, setStarred, replyTo, compose, searchRecipients, invalidateInbox,

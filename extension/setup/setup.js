@@ -66,11 +66,11 @@
   ]);
 
   const steps = [
-    ['Open your Canvas', h('span', {}, ['In this browser, go to your school\'s Canvas and sign in — the address usually ends in ', h('b', { text: 'instructure.com' }), ', but a school\'s own name for it works too.']), picCanvas],
+    ['Open your Canvas', h('span', {}, ['Sign in to your school\'s Canvas in this browser.']), picCanvas],
     safari
-      ? ['Press the Simpl Courses button', h('span', {}, ['It is in Safari\'s toolbar, next to the address bar. If Safari asks, choose ', h('b', { text: 'Always Allow on This Website' }), '.']), picToolbar]
-      : ['Open Simpl Courses from the toolbar', h('span', {}, ['Click the puzzle piece at the right of the address bar, then ', h('b', { text: 'Simpl Courses' }), '. Click the pin beside it and the button stays in the toolbar.']), picToolbar],
-    ['Press Set up', h('span', {}, [safari ? 'The popup has one button. ' : 'The popup has one button. Chrome asks once to allow Simpl Courses on that site. ', 'Then the setup walks through your courses and grades on the page itself, and ends with a tour.']), picPopup],
+      ? ['Press the Simpl Courses button', h('span', {}, ['It\'s in the toolbar. If Safari asks, choose ', h('b', { text: 'Always Allow on This Website' }), '.']), picToolbar]
+      : ['Open Simpl Courses', h('span', {}, ['Click the puzzle piece, then ', h('b', { text: 'Simpl Courses' }), '. Pin it to keep it in the toolbar.']), picToolbar],
+    ['Press Set up', h('span', {}, [safari ? 'Setup runs on the page.' : 'Chrome asks once to allow the site. Then setup runs on the page.']), picPopup],
   ].map(([t, s, pic], i) => h('div', { class: 'how__step how__step--pic' }, [
     h('span', { class: 'how__n', text: String(i + 1) }),
     h('div', { class: 'how__body' }, [h('span', { class: 'how__t', text: t }), h('span', { class: 'how__s' }, [s]), pic]),
@@ -81,7 +81,7 @@
     h('div', { class: 'welcome' }, [
       mark,
       h('h1', { class: 'h1', text: 'Simpl Courses is installed' }),
-      h('p', { class: 'lead', text: 'Set it up from your Canvas page. Three steps, about a minute.' }),
+      h('p', { class: 'lead', text: 'Three quick steps.' }),
     ]),
     h('div', { class: 'how' }, steps),
   );

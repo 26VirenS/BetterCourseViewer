@@ -221,8 +221,29 @@ try {
   await page.waitForSelector('.bcv-sheet', { timeout: 5000 });
   const overdueRows = await texts('.bcv-sheet__row');
   check((await texts('.bcv-sheet__line'))[0] === '1 Overdue' && /counts as 0 until graded$/.test((await texts('.bcv-sheet__note'))[0]) && overdueRows.length === 1 && /^W2 HW Assignment · 15 pts · due \w+ \d+ · not submitted F26-PHYS 008 01$/.test(overdueRows[0]), `the Overdue sheet lists exactly what it counted: ${overdueRows.join(' | ')}`);
+  // an X beside each row clears it, one at a time: dismissed on Canvas's planner, the row goes, the counts follow
+  const xInfo = await page.$$eval('.bcv-sheet__item .bcv-sheet__x', (els) => els.map((e) => ({ tag: e.tagName, label: e.getAttribute('aria-label'), title: e.title })));
+  check(xInfo.length === 1 && xInfo[0].label === 'Clear: W2 HW' && xInfo[0].title === 'Clear', `each overdue row has an X to clear it: ${JSON.stringify(xInfo)}`);
+  await page.waitForTimeout(450); // the sheet's morph settles before the shot
+  await shot(page, '02b-overdue-sheet');
+  await page.click('.bcv-sheet__item .bcv-sheet__x');
+  check(await eventually(async () => (await page.$$('.bcv-sheet__row')).length === 0 && (await texts('.bcv-sheet__line'))[0] === '0 Overdue' && (await texts('.bcv-sheet__list .bcv-empty')).join('') === 'Nothing is overdue.'), 'the X clears the row, the sheet counts down to 0 and says so');
+  check(await eventually(async () => /^Overdue\s*0\s*Nothing overdue$/i.test((await texts('.bcv-stat'))[3])), `the card behind the sheet reads 0 too: ${(await texts('.bcv-stat'))[3]}`);
+  const dismissedOnCanvas = await page.evaluate(async () => { const r = await fetch(`/api/v1/planner/items?start_date=${new Date(Date.now() - 14 * 864e5).toISOString()}&end_date=${new Date(Date.now() + 21 * 864e5).toISOString()}&per_page=100`); const items = JSON.parse((await r.text()).replace(/^while\(1\);/, '')); const it = items.find((i) => i.plannable_type === 'assignment' && String(i.plannable_id) === '2002'); return it ? { title: it.plannable?.title, dismissed: !!it.planner_override?.dismissed, complete: !!it.planner_override?.marked_complete, ovId: it.planner_override?.id || null } : null; });
+  check(dismissedOnCanvas?.title === 'W2 HW' && dismissedOnCanvas.dismissed === true && dismissedOnCanvas.complete === false && !!dismissedOnCanvas.ovId, `Canvas's planner carries the dismissal (not a completion), so the To Do list and every device agree: ${JSON.stringify(dismissedOnCanvas)}`);
+  if (!dismissedOnCanvas?.ovId) throw new Error('no planner override to undo: the checks that follow need the item back');
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('.bcv-sheet'), null, { timeout: 3000 });
+  // put it back for the checks that follow: the override undone on Canvas is all it takes (nothing is kept
+  // locally) — through the page's own client, which carries the session's CSRF token every write needs
+  await sw.evaluate(async ([base, ovId]) => {
+    const [tab] = await chrome.tabs.query({ url: `${base}/*` });
+    await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'ISOLATED', args: [ovId], func: (id) => self.BCV.canvas.put(`/api/v1/planner/overrides/${id}`, { dismissed: false }) });
+  }, [BASE, dismissedOnCanvas.ovId]);
+  await page.goto(`${BASE}/`);
+  await page.waitForSelector('.bcv-stat', { timeout: 20000 });
+  await waitText('.bcv-stats > :nth-child(4) .bcv-stat__value', /^1$/);
+  check(/^Overdue\s*1\s*1 not submitted$/i.test((await texts('.bcv-stat'))[3]), `restored on Canvas, it counts again: ${(await texts('.bcv-stat'))[3]}`);
   // Graded this week: graded_at inside the week, points earned over points possible
   check(/^Graded this week\s*\d+\s*(\d+(\.\d+)? \/ \d+(\.\d+)? points|No grades posted this week)$/i.test(stats[4]), `Graded this week with its points ratio: ${stats[4]}`);
   await page.click('.bcv-stats .bcv-stat:nth-child(5)');
@@ -2458,7 +2479,7 @@ try {
   await setup.waitForSelector('.welcome .h1', { timeout: 10000 });
   await setup.waitForTimeout(700); // the steps come in one after another
   const how = await sTexts('.how__t');
-  check((await sTexts('.welcome .h1'))[0] === 'Simpl Courses is installed' && (await setup.$$('.blob')).length === 4 && how.join(' | ') === 'Open your Canvas | Open Simpl Courses from the toolbar | Press Set up', `the page after install says the three things to do: ${how.join(' | ')}`);
+  check((await sTexts('.welcome .h1'))[0] === 'Simpl Courses is installed' && (await sTexts('.welcome .lead'))[0] === 'Three quick steps.' && (await setup.$$('.blob')).length === 4 && how.join(' | ') === 'Open your Canvas | Open Simpl Courses | Press Set up', `the page after install says the three things to do, briefly: ${how.join(' | ')}`);
   // each step is drawn as well as said: the address bar on Canvas, the puzzle piece and the menu behind it, the popup's one button
   const pics = await setup.evaluate(() => [...document.querySelectorAll('.how__step')].map((s) => ({
     bar: s.querySelector('.pic__bar')?.textContent.trim() || null,
@@ -2468,7 +2489,8 @@ try {
     said: s.querySelector('.how__s').textContent,
   })));
   check(pics.length === 3 && pics[0].bar === 'yourschool.instructure.com' && pics[1].hot && pics[1].menu === 'Simpl Courses' && pics[2].btn === 'Set up', `and each is drawn: the address, the highlighted puzzle piece with Simpl Courses behind it, the Set up button: ${JSON.stringify(pics.map((x) => [x.bar, x.hot, x.menu, x.btn]))}`);
-  check(/puzzle piece at the right of the address bar/.test(pics[1].said) && /pin beside it/.test(pics[1].said) && /asks once to allow Simpl Courses on that site/.test(pics[2].said), 'the words say where the puzzle piece is, what the pin does, and that Chrome asks once about the site');
+  const said = await sTexts('.how__s');
+  check(/puzzle piece/.test(pics[1].said) && /pin/i.test(pics[1].said) && /asks once to allow/.test(pics[2].said) && said.every((s) => s.length <= 80), `the words name the puzzle piece, the pin and Chrome's one question, in a line each: ${said.join(' | ')}`);
   check((await setup.$eval('#next', (b) => b.textContent.trim())) === 'Got it', 'and the one button on the page just closes it');
   await setup.screenshot({ path: join(out, '32-setup-welcome.png') });
   await setup.close().catch(() => {});

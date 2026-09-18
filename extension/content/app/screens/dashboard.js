@@ -42,7 +42,7 @@
     // round trip away, not three. The saved view is read alongside the data rather than before it.
     const feedP = store.announcementsFeed().catch(() => null);
     let feedById = null; // set when the feed lands; the activity view reads it at draw time
-    const [planner, favs, courses, seen, savedView, settings, hidePref] = await Promise.all([
+    const [planner, favs, courses, seen, savedView, settings, hidePref, overrides] = await Promise.all([
       store.planner().catch(() => null),
       store.favorites().catch(() => []),
       store.courses().catch(() => []),
@@ -50,7 +50,9 @@
       store.dashboardView().catch(() => 'list'),
       BCV.settings.get().catch(() => null),
       store.pref('dashHideDone', false).catch(() => false),
+      store.plannerOverrides().catch(() => []), // what the X on the Overdue list wrote, on any device (see below)
     ]);
+    const dismissedKeys = new Set((Array.isArray(overrides) ? overrides : []).filter((o) => o?.dismissed).map((o) => `${o.plannable_type}:${o.plannable_id}`));
     if (!ctx.alive()) return screen;
     const wanted = settings?.appearance?.dashboard || {};
     views = ALL_VIEWS.filter(([k]) => wanted[k] !== false);
@@ -194,7 +196,7 @@
       };
       const kindOf = (a) => (a.is_quiz_assignment || a.quiz_id || (a.submission_types || []).includes('online_quiz') ? 'Quiz' : (a.submission_types || []).includes('discussion_topic') ? 'Discussion' : 'Assignment');
       const palOf = (c) => (c ? c.palette : U.palette('#8e8e93', dark));
-      let overdueSheet = { label: 'Overdue', value: '…', icon: IC.clock, color: '#ff453a', note: 'Loading…', items: [] };
+      const overdueSheet = { label: 'Overdue', value: '…', icon: IC.clock, color: '#ff453a', note: 'Loading…', items: [] }; // one object: an open sheet reads it after a clear
       let gradedSheet = { label: 'Graded this week', value: '…', icon: IC.chart, color: '#5856d6', note: 'Loading…', items: [] };
       let classSheet = { label: 'Classes today', value: '…', icon: IC.book, color: '#30b0c7', note: 'Loading…', items: [] };
       const overdueCard = stat('Overdue', '…', '', IC.clock, '#ff453a', (from) => openSheet(overdueSheet, from));
@@ -206,14 +208,18 @@
         if (!byCourse || !planner) { overdueCard.remove(); gradedCard.remove(); return; }
         // Overdue: past due with nothing submitted (Canvas's missing flag, or the due time passed), plus
         // work handed in late that still has no score. It counts as 0 until it is graded.
+        // Each row has an X: the item is dismissed on Canvas's planner — the same call as the To Do
+        // screen's X, so it leaves that list too and every device agrees. Late work is read from the
+        // course's assignments rather than the planner window, so its dismissal is looked up in the
+        // student's own list of overrides.
         const seen = new Set();
         const overdue = [];
-        let missingN = 0, lateN = 0;
+        const plannerByKey = new Map((planner || []).map((it) => [it.id, it]));
         for (const it of live) {
           if (!it.isDue || it.submitted || it.excused || !(it.missing || it.date < now)) continue;
-          seen.add(`${it.type}:${it.raw.plannable_id}`);
-          missingN++;
-          overdue.push({ title: it.title, meta: [it.kind, it.points !== null ? `${store.fmtPts(it.points)} pts` : null, `due ${U.fmtShort(it.date)}`, 'not submitted'].filter(Boolean).join(' · '), course: it.course?.shortName || it.courseName || '—', color: palOf(it.course).text, tint: palOf(it.course).tint, url: it.url, date: it.date });
+          const key = `${it.type}:${it.raw.plannable_id}`;
+          seen.add(key);
+          overdue.push({ key, late: false, item: it, title: it.title, meta: [it.kind, it.points !== null ? `${store.fmtPts(it.points)} pts` : null, `due ${U.fmtShort(it.date)}`, 'not submitted'].filter(Boolean).join(' · '), course: it.course?.shortName || it.courseName || '—', color: palOf(it.course).text, tint: palOf(it.course).tint, url: it.url, date: it.date });
         }
         for (const { c, list } of byCourse) {
           for (const a of list || []) {
@@ -221,17 +227,31 @@
             if (!s || !s.late || s.excused || (s.score !== null && s.score !== undefined)) continue;
             if (seen.has(`assignment:${a.id}`) || (a.quiz_id && seen.has(`quiz:${a.quiz_id}`))) continue;
             seen.add(`assignment:${a.id}`);
-            lateN++;
-            overdue.push({ title: a.name, meta: [kindOf(a), a.points_possible !== null && a.points_possible !== undefined ? `${store.fmtPts(a.points_possible)} pts` : null, a.due_at ? `due ${U.fmtShort(a.due_at)}` : null, 'submitted late · ungraded'].filter(Boolean).join(' · '), course: c.shortName || c.name, color: c.palette.text, tint: c.palette.tint, url: a.html_url || `${c.url}/assignments/${a.id}`, date: U.parse(a.due_at) || now });
+            const key = a.quiz_id ? `quiz:${a.quiz_id}` : `assignment:${a.id}`;
+            if (dismissedKeys.has(key) || dismissedKeys.has(`assignment:${a.id}`) || plannerByKey.get(key)?.dismissed) continue;
+            const item = plannerByKey.get(key) || { type: a.quiz_id ? 'quiz' : 'assignment', raw: { plannable_id: a.quiz_id || a.id, planner_override: null } };
+            overdue.push({ key, late: true, item, title: a.name, meta: [kindOf(a), a.points_possible !== null && a.points_possible !== undefined ? `${store.fmtPts(a.points_possible)} pts` : null, a.due_at ? `due ${U.fmtShort(a.due_at)}` : null, 'submitted late · ungraded'].filter(Boolean).join(' · '), course: c.shortName || c.name, color: c.palette.text, tint: c.palette.tint, url: a.html_url || `${c.url}/assignments/${a.id}`, date: U.parse(a.due_at) || now });
           }
         }
         overdue.sort(byDate);
-        const parts = [missingN ? U.plural(missingN, 'not submitted', 'not submitted') : null, lateN ? `${lateN} late, still open` : null].filter(Boolean);
-        land(overdueCard, overdue.length, overdue.length ? parts.join(' · ') : 'Nothing overdue', 6.9);
-        overdueSheet = {
-          label: 'Overdue', value: String(overdue.length), icon: IC.clock, color: '#ff453a', items: overdue, empty: 'Nothing is overdue.',
-          note: overdue.length ? `${lateN ? 'Still accepting late work · ' : ''}counts as 0 until graded` : 'Nothing past its due date without a submission',
+        const paintOverdue = () => {
+          const lateN = overdue.filter((o) => o.late).length;
+          const missingN = overdue.length - lateN;
+          const parts = [missingN ? U.plural(missingN, 'not submitted', 'not submitted') : null, lateN ? `${lateN} late, still open` : null].filter(Boolean);
+          if (overdueCard.isConnected) land(overdueCard, overdue.length, overdue.length ? parts.join(' · ') : 'Nothing overdue', 6.9);
+          Object.assign(overdueSheet, {
+            value: String(overdue.length), items: overdue, empty: 'Nothing is overdue.',
+            note: overdue.length ? `${lateN ? 'Still accepting late work · ' : ''}counts as 0 until graded` : 'Nothing past its due date without a submission',
+          });
         };
+        const clearOverdue = async (o) => {
+          await store.dismiss(o.item); // on Canvas: a failure leaves the row where it is
+          const i = overdue.indexOf(o);
+          if (i >= 0) overdue.splice(i, 1);
+          paintOverdue();
+        };
+        for (const o of overdue) o.clear = () => clearOverdue(o);
+        paintOverdue();
         // Graded this week: submissions graded inside this week (graded_at, never due_at); excused
         // ones count but carry no score, so they stay out of the points ratio
         const graded = [];
@@ -309,14 +329,47 @@
         ]),
         U.el('bcv-sheet__list', [
           // the sheet itself makes room: it widens and the preview opens on its right, the list beside it
-          ...(def.items.length ? def.items.map((i) => h('a', { class: 'bcv-sheet__row', href: i.url, onclick: (e) => { e.preventDefault(); if (!BCV.preview?.open(i.url, { host: ov.firstElementChild })) { close(); app.go(i.url); } } }, [
-            h('span', { class: 'bcv-sheet__dot', style: { background: i.color } }),
-            U.el('bcv-sheet__body', [U.text('bcv-sheet__title bcv-pretty', i.title), U.text('bcv-sheet__meta', i.meta)]),
-            h('span', { class: 'bcv-sheet__course bcv-ellip', style: { background: i.tint, color: i.color }, text: i.course }),
-          ])) : [U.empty(def.empty || 'Nothing here.')]),
+          ...(def.items.length ? def.items.map((i) => rowFor(i)) : [U.empty(def.empty || 'Nothing here.')]),
           def.more ? U.text('bcv-sheet__more', def.more) : null,
         ]),
       ]));
+      /** A row, and — where the item can be cleared (the Overdue list) — an X beside it: the item goes
+       *  one press at a time, the header counts down with it, and a failure leaves the row and says so. */
+      function rowFor(i) {
+        const row = h('a', { class: 'bcv-sheet__row', href: i.url, onclick: (e) => { e.preventDefault(); if (!BCV.preview?.open(i.url, { host: ov.firstElementChild })) { close(); app.go(i.url); } } }, [
+          h('span', { class: 'bcv-sheet__dot', style: { background: i.color } }),
+          U.el('bcv-sheet__body', [U.text('bcv-sheet__title bcv-pretty', i.title), U.text('bcv-sheet__meta', i.meta)]),
+          h('span', { class: 'bcv-sheet__course bcv-ellip', style: { background: i.tint, color: i.color }, text: i.course }),
+        ]);
+        if (!i.clear) return row;
+        const x = U.iconbtn(IC.close, { size: 24, title: 'Clear', onClick: async (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          x.disabled = true;
+          wrap.classList.add('is-busy');
+          try {
+            await i.clear();
+          } catch {
+            wrap.classList.remove('is-busy');
+            x.disabled = false;
+            U.toast('Couldn’t clear that. Try again.', { error: true });
+            return;
+          }
+          wrap.classList.add('is-gone');
+          setTimeout(() => {
+            wrap.remove();
+            const list = ov.querySelector('.bcv-sheet__list');
+            ov.querySelector('.bcv-sheet__value').textContent = def.value;
+            ov.querySelector('.bcv-sheet__note').textContent = def.note;
+            if (list && !list.querySelector('.bcv-sheet__row')) list.prepend(U.empty(def.empty || 'Nothing here.'));
+            ov.focus(); // the press took the focus with it; Escape still closes the sheet
+          }, 220);
+        } });
+        x.classList.add('bcv-sheet__x');
+        x.setAttribute('aria-label', `Clear: ${i.title}`);
+        const wrap = U.el('bcv-sheet__item', [row, x]);
+        return wrap;
+      }
       document.body.append(ov);
       U.morphFrom(ov.firstElementChild, from);
       ov.tabIndex = -1;
