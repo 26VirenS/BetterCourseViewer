@@ -190,7 +190,13 @@
 
   /** A quiz attempt is open on this page: our own quiz flow (state.quizOpen)
    *  or Canvas's take-quiz page underneath. */
-  const inQuiz = () => !!state.quizOpen || /\/quizzes\/\d+\/take\b/.test(location.pathname) || !!document.querySelector('#submit_quiz_form, #quiz_taking_form, form.take_quiz_form');
+  /** New Quizzes, and other quiz tools, run in a frame Canvas launches: an attempt in one is a quiz here too. */
+  const quizLti = () => !!document.querySelector('iframe[src*="quiz-lti"], iframe[src*="quizzes.next"], iframe[src*="quiz-api"], iframe[src*="quizzes-next"], #quiz-lti-iframe');
+  const inQuiz = () => !!state.quizOpen || /\/quizzes\/\d+\/take\b/.test(location.pathname) || !!document.querySelector('#submit_quiz_form, #quiz_taking_form, form.take_quiz_form') || quizLti();
+  /** While an attempt is going the page says so, and the pinned tools are put away: nothing opens over a quiz. */
+  function syncQuizFlag() { html.classList.toggle('bcv-in-quiz', inQuiz()); }
+  let quizFlagT = 0;
+  new MutationObserver(() => { clearTimeout(quizFlagT); quizFlagT = setTimeout(syncQuizFlag, 250); }).observe(document.documentElement, { childList: true, subtree: true }); // (a quiz tool's frame lands after the page does)
   const confirmLeave = () => window.confirm('You are in the middle of a quiz. Leave it anyway?\n\nCanvas keeps your answers so far, but a timer keeps running and some quizzes allow only one attempt.');
 
   /** Is a quiz of ours on this page at all — the intro, an attempt, the review, the feedback?
@@ -200,6 +206,7 @@
    *  its path, so a reload lands back on the quiz page with the flow gone and the question on screen
    *  lost. Anything that would reload asks this first. */
   const quizHere = () => !!state.quizOpen
+    || quizLti()
     || html.classList.contains('bcv-quiz')
     || !!document.querySelector('#bcv-app .bcv-qz')
     || state.route?.tab === 'quiz';
@@ -810,6 +817,9 @@
   let scrollTick = 0;
   window.addEventListener('scroll', () => { const n = Date.now(); if (n - scrollTick > 2000) { scrollTick = n; here(); } }, { passive: true });
   const awayLong = () => Date.now() - state.lastHere >= AWAY_STALE;
+  /** Whether something is open over the page that a reload would take away: a tool's popup, a file
+   *  preview, a sheet of any kind, the hand-in block with work in it, a menu or picker list. */
+  const overlayOpen = () => !!state.submitOpen || !!document.querySelector('.bcv-sheet-ov, .bcv-viewer-ov, .bcv-tool-ov, .bcv-picker__list, .bcv-menu');
   const RETURN_FRESH = 90 * 1000; // back after this long: every list is read from Canvas again (see the tab handler above)
   /** The stale-page reload, wherever it is noticed from. A quiz is left completely alone. */
   function wakeStale() {
@@ -817,6 +827,7 @@
     if (inQuiz() || quizHere()) { here(); return false; } // never on a quiz, and no note either
     if (BCV.welcome?.active()) { here(); return false; } // the welcome after the setup is not reloaded out from under
     if (BCV.tools?.focusActive()) { here(); return false; } // a focus session is going: no reload under it (it ends by itself, so this holds for one phase at most)
+    if (overlayOpen()) { here(); return false; } // a tool, a preview, a sheet or a hand-in is open: nothing is reloaded out from under it, and the page counts as awake
     return awayRefresh();
   }
   // The reload is announced before it happens: a pill floats down from the top of the page — a dial
@@ -908,6 +919,7 @@
    *  behind this page's back, so the scores are asked for again on the way back from one. */
   const toolish = (rt) => !!rt && (rt.screen === 'native' || rt.tab === 'tool');
   async function render({ quiet = false } = {}) {
+    syncQuizFlag();
     const prev = state.route;
     const r = parseRoute();
     state.route = r;
@@ -1413,6 +1425,7 @@
     openSettings,
     recover, // (the suite checks that a quiz is never reloaded out from under)
     awayPill, // (the welcome after the setup shows a copy of the pill)
+    syncQuizFlag, // (the quiz screen says when an attempt opens and closes)
     lookDemo, // (the welcome shows the switch working, on a copy of it)
     main: () => main,
   };

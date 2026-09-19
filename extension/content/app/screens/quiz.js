@@ -147,6 +147,7 @@
     window.addEventListener('beforeunload', onUnload);
     const setOpen = (open) => {
       app.state.quizOpen = open && ctx.alive();
+      BCV.app?.syncQuizFlag?.(); // (the pinned tools go while the attempt is on)
     };
     const leave = () => {
       setOpen(false);
@@ -769,7 +770,14 @@
           h('p', { class: 'bcv-qz__lead', text: `${answeredLabel()} · ${blanks === 0 ? 'nothing left blank' : `${blanks} left blank`}. Tap any question to change it.` }),
         ]),
         U.card(st.questions.map((q, k) => {
+          const parts = INFO.has(q.question_type) ? null : answerParts(q);
           const txt = answerText(q);
+          // the answer as it was given: its own words, or Canvas's own content where the words are a
+          // formula (an equation image with the LaTeX on the tag — the image is shown, never the LaTeX)
+          const cell = h('span', { class: `bcv-qz__suma ${txt === null && !INFO.has(q.question_type) && !isAnswered(q) ? 'is-blank' : ''}` });
+          if (INFO.has(q.question_type)) cell.textContent = '—';
+          else if (parts) parts.forEach((p2, i) => { if (i) cell.append(', '); if (String(p2.text || '').trim()) cell.append(p2.text); else if (String(p2.html || '').trim()) cell.append(BCV.screens.course.prose(p2.html, { cls: 'bcv-qz__sumrich' })); else cell.append('—'); });
+          else cell.textContent = isAnswered(q) ? 'Answered' : 'Not answered';
           return h('button', { type: 'button', class: 'bcv-qz__sum', disabled: noBack || null, onclick: () => {
             if (noBack) return;
             st.stage = 'take';
@@ -780,9 +788,9 @@
             else toTop();
           } }, [
             h('span', { class: 'bcv-qz__sumn', text: `Q${k + 1}` }),
-            h('span', { class: 'bcv-qz__sumq bcv-ellip', text: htmlToText(q.question_text || q.question_name || '', 120).replace(/\s+/g, ' ') }),
+            h('span', { class: 'bcv-qz__sumq bcv-ellip' }, String(q.question_text || '').trim() ? BCV.screens.course.prose(q.question_text, { cls: 'bcv-qz__sumrich' }) : h('span', { text: q.question_name || '' })), // (the question as Canvas holds it: a formula in it is the formula, not its LaTeX)
             q.flagged ? U.svg(FLAG, { size: 13, stroke: '#ff9500', width: 2, style: { flex: 'none' } }) : null,
-            h('span', { class: `bcv-qz__suma ${txt === null && !INFO.has(q.question_type) && !isAnswered(q) ? 'is-blank' : ''}`, text: INFO.has(q.question_type) ? '—' : (txt !== null ? txt : isAnswered(q) ? 'Answered' : 'Not answered') }),
+            cell,
           ]);
         }), 'bcv-card--list'),
         U.el('bcv-qz__reviewbtns', [

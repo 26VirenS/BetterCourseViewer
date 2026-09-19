@@ -23,6 +23,14 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.36.0', date: '2026-09-19', notes: [
+      { kind: 'new', title: 'Draw and type on PDFs', body: 'A pen, text boxes, underline and strike-through, six colours, undo and redo.', icon: P.pen },
+      { kind: 'improved', title: 'Citation generator', body: 'Source types as tiles, the fields still needed as chips, Today for the date, tidier.', icon: P.list },
+      { kind: 'improved', title: 'The Cite pin', body: 'The citation pin is a plain button now: press it and the generator opens.', icon: P.pin },
+      { kind: 'fixed', title: 'Away Refresh waits', body: 'No reload while a tool, a preview, a sheet or a hand-in is open; the page counts as awake.', icon: P.clock },
+      { kind: 'fixed', title: 'New Quizzes are quizzes', body: 'A quiz taken in a frame Canvas launches is never reloaded out from under you either.', icon: P.check },
+      { kind: 'improved', title: 'No pins in a quiz', body: 'The pinned tools are put away while a quiz attempt is going.', icon: P.pin },
+    ] },
     { version: '2.35.1', date: '2026-09-19', notes: [
       { kind: 'improved', title: 'The switch, shown again', body: 'The black screen for the switch comes back once, redrawn: each stop on a small slider.', icon: P.toggle },
       { kind: 'improved', title: 'Merge & split icon', body: 'The card wears a page with a cut line across it.', icon: P.layers },

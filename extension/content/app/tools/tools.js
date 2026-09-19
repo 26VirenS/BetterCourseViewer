@@ -625,13 +625,12 @@
   const pinned = (key) => pins.includes(key);
   // ---- the quick menus: a pin swelling into a capsule under the pointer --------------------------
   // The pins other than the timer's open the way its island does: under the pointer (a mouse or a
-  // pen) the pin swells into a capsule holding the tool's quickest use — a link to cite, a grade
-  // worked out, a file to convert, a set to study — and folds when the pointer leaves. The full tool
-  // is a press on the pin (or Enter) away, as before, and a press on the capsule's name. The
-  // calculator's pin swells into more than a capsule: a panel with the whole scientific calculator
-  // in it (Apple's, key for key).
+  // pen) the pin swells into a capsule holding the tool's quickest use — a grade worked out, a file
+  // to convert, a set to study — and folds when the pointer leaves. The full tool is a press on the
+  // pin (or Enter) away, as before, and a press on the capsule's name. The calculator's pin swells
+  // into more than a capsule: a panel with the whole scientific calculator in it (Apple's, key for
+  // key). The citation generator's pin has no capsule: it is a button to the tool, nothing more.
   const QUICK = {
-    cite: { w: 300, build: quickCite },
     graph: { w: 408, h: 262, panel: true, build: quickCalc },
     need: { w: 400, build: quickNeed },
     conv: { w: 250, build: quickConv },
@@ -694,13 +693,6 @@
     drop.addEventListener('dragleave', () => drop.classList.remove('is-drag'));
     drop.addEventListener('drop', (e) => { e.preventDefault(); drop.classList.remove('is-drag'); hand(e.dataTransfer?.files); });
     return [drop, input];
-  }
-  /** Citation generator: a link pasted here opens the tool with it filled in, on Website. */
-  function quickCite({ go }) {
-    const inp = h('input', { type: 'url', class: 'bcv-quick__input', placeholder: 'Paste a link to cite', 'aria-label': 'A link to cite' });
-    const cite = () => { const url = inp.value.trim(); inp.value = ''; go(url ? { url } : {}); };
-    inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); cite(); } });
-    return { els: [quickName('Cite', go, 'Open the citation generator'), inp, quickGo(IC.chevron, 'Cite it', cite)] };
   }
   /** A sum worked out: + − × ÷ ^ and brackets, sqrt, sin, cos, tan, asin, acos, atan, ln, log, abs,
    *  exp, pi and e. The number, to ten figures, or null for anything else. */

@@ -3000,8 +3000,8 @@ html[data-bcv-theme="dark"] .bcv-conv__delta.is-more, html[data-bcv-theme="dark"
 .bcv-mark__pages.is-box .bcv-mark__text, .bcv-mark__pages.is-note .bcv-mark__text { pointer-events: none; }
 .bcv-mark__pages.is-box .bcv-mark__page { cursor: crosshair; }
 .bcv-mark__pages.is-note .bcv-mark__page { cursor: copy; }
-.bcv-mark__layer { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
-.bcv-mark__hl { position: absolute; background: var(--c); opacity: .45; mix-blend-mode: multiply; border-radius: 2px; pointer-events: auto; cursor: pointer; }
+.bcv-mark__layer { position: absolute; inset: 0; z-index: 3; pointer-events: none; } /* (over the text layer, so pins, text boxes and strokes can be pressed; the layer itself lets the selection through) */
+.bcv-mark__hl { position: absolute; background: var(--c); opacity: .45; mix-blend-mode: multiply; border-radius: 2px; pointer-events: none; } /* (a stroke over words must not get in the way of selecting them; a highlight is picked in the panel) */
 .bcv-mark__hl--box { opacity: .3; border: 1.5px solid var(--c); box-sizing: border-box; }
 .bcv-mark__hl.is-active { outline: 2px solid var(--bcv-blue); outline-offset: 1px; }
 .bcv-mark__draft { position: absolute; border: 1.5px dashed var(--bcv-blue); background: rgba(10,132,255,.12); box-sizing: border-box; }
@@ -3028,3 +3028,52 @@ html[data-bcv-theme="dark"] .bcv-conv__delta.is-more, html[data-bcv-theme="dark"
 .bcv-mark__bubble .bcv-mark__tool { height: 24px; border-color: rgba(255,255,255,.22); background: transparent; color: #fff; }
 .bcv-mark__bubble .bcv-mark__tool:hover { background: rgba(255,255,255,.14); }
 @keyframes bcv-mark-pop { from { opacity: 0; transform: translateY(4px) scale(.96); } to { opacity: 1; transform: none; } }
+/* ---- 2.36.0: the citation generator redrawn; the annotator's pen, text boxes, underline and strike ---- */
+.bcv-cite { display: flex; flex-direction: column; flex-wrap: nowrap; gap: 14px; }
+.bcv-cite__toprow { display: flex; gap: 24px; align-items: flex-start; flex-wrap: wrap; }
+.bcv-cite__topcol { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.bcv-cite__topcol--types { flex: 1 1 420px; }
+.bcv-cite__types { display: flex; gap: 8px; flex-wrap: wrap; }
+.bcv-cite__type { flex: 1 1 84px; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 7px; padding: 10px 8px 9px; border: 1px solid var(--bcv-edge); border-radius: 14px; background: var(--bcv-card); color: var(--bcv-ink2); cursor: pointer; font: 500 11.5px/1.15 var(--bcv-font); text-align: center; box-shadow: var(--bcv-shadow); transition: background .15s ease, border-color .15s ease, transform .15s ease; }
+.bcv-cite__typeic { width: 30px; height: 30px; border-radius: 15px; background: var(--bcv-fill); display: flex; align-items: center; justify-content: center; color: var(--bcv-ink2); transition: background .15s ease, color .15s ease; }
+.bcv-cite__type:hover { transform: translateY(-1px); background: var(--bcv-hover); }
+.bcv-cite__type.is-on { background: var(--bcv-blue-soft); border-color: var(--bcv-blue); box-shadow: inset 0 0 0 .5px var(--bcv-blue); color: var(--bcv-blue); font-weight: 600; }
+.bcv-cite__type.is-on .bcv-cite__typeic { background: var(--bcv-blue); color: #fff; }
+.bcv-cite__grid { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+.bcv-cite__side { display: flex; flex-direction: column; gap: 14px; position: sticky; top: 0; }
+.bcv-cite__dot { width: 6px; height: 6px; border-radius: 3px; background: var(--bcv-orange); align-self: center; }
+.bcv-cite__field:not(.is-needed) .bcv-cite__dot { background: var(--bcv-green); }
+.bcv-cite__today { margin-left: auto; padding: 0; font-size: 11.5px; }
+.bcv-cite__preview { font-size: 16px; line-height: 1.7; }
+.bcv-cite__preview.is-empty::before { content: 'The citation forms here as the details go in.'; color: var(--bcv-ink3); font: 400 13px/1.5 var(--bcv-font); text-indent: 0; display: block; margin-left: -22px; }
+.bcv-cite__chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.bcv-cite__chip { height: 26px; margin: 0; padding: 0 11px; border-radius: 13px; border: 1px solid rgba(255,149,0,.45); background: transparent; color: #8a5200; font: 600 11.5px/1 var(--bcv-font); cursor: pointer; transition: background .15s ease; }
+.bcv-cite__chip:hover { background: rgba(255,149,0,.12); }
+.bcv-cite__savedrow .bcv-iconbtn { background: transparent; }
+.bcv-cite__savedrow .bcv-iconbtn:hover { background: var(--bcv-fill); }
+.bcv-mark__sizes { display: flex; gap: 3px; margin-left: 4px; }
+.bcv-mark__size { width: 26px; height: 26px; margin: 0; padding: 0; border-radius: 13px; border: 1px solid var(--bcv-edge); background: var(--bcv-card); font: 700 10.5px/1 var(--bcv-font); color: var(--bcv-ink2); cursor: pointer; }
+.bcv-mark__size.is-on { background: var(--bcv-ink); color: var(--bcv-bg); border-color: var(--bcv-ink); }
+.bcv-mark__bar .bcv-iconbtn:disabled { opacity: .35; cursor: default; }
+.bcv-mark__ink { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.bcv-mark__stroke { pointer-events: stroke; cursor: pointer; }
+.bcv-mark__stroke.is-active { filter: drop-shadow(0 0 2px var(--bcv-blue)) drop-shadow(0 0 1px var(--bcv-blue)); }
+.bcv-mark__pages.is-pen .bcv-mark__text, .bcv-mark__pages.is-text .bcv-mark__text { pointer-events: none; }
+.bcv-mark__pages.is-pen .bcv-mark__page { cursor: crosshair; touch-action: none; }
+.bcv-mark__pages.is-text .bcv-mark__page { cursor: text; }
+.bcv-mark__hl--ul, .bcv-mark__hl--st { opacity: 1; mix-blend-mode: normal; border-radius: 1px; }
+.bcv-mark__textbox { position: absolute; z-index: 3; pointer-events: auto; min-height: 16px; border: 1px dashed transparent; border-radius: 4px; box-sizing: border-box; }
+.bcv-mark__textbox:hover, .bcv-mark__textbox.is-active { border-color: var(--bcv-blue); }
+.bcv-mark__textfield { display: block; width: 100%; box-sizing: border-box; margin: 0 !important; padding: 2px 4px !important; border: 0 !important; border-radius: 0 !important; background: transparent !important; color: inherit; font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif !important; font-weight: 400; line-height: 1.25 !important; resize: none; overflow: hidden; outline: none !important; box-shadow: none !important; min-height: 1.4em; }
+.bcv-mark__textfield::placeholder { color: rgba(120,120,128,.6); }
+.bcv-mark__grip { position: absolute; left: -9px; top: -9px; width: 16px; height: 16px; border-radius: 8px; background: var(--bcv-blue); border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.3); box-sizing: border-box; cursor: move; opacity: 0; transition: opacity .15s ease; touch-action: none; }
+.bcv-mark__textbox:hover .bcv-mark__grip, .bcv-mark__textbox.is-active .bcv-mark__grip { opacity: 1; }
+.bcv-mark__dot--ul, .bcv-mark__dot--st { height: 3px; border-radius: 2px; margin-top: 8px; }
+.bcv-mark__dot--ink { border-radius: 2px; transform: rotate(45deg); }
+.bcv-mark__dot--text { border-radius: 2px; }
+.bcv-mark__bubble { flex-wrap: nowrap; }
+.bcv-mark__bubble .bcv-mark__sep { background: rgba(255,255,255,.22); margin: 0 2px; }
+html.bcv-in-quiz #bcv-tray { display: none !important; } /* (no pinned tools, no quick menus, over a quiz attempt) */
+.bcv-qz__suma .bcv-qz__sumrich, .bcv-qz__suma .bcv-qz__sumrich p, .bcv-qz__sumq .bcv-qz__sumrich, .bcv-qz__sumq .bcv-qz__sumrich * { display: inline; margin: 0; padding: 0; font: inherit; color: inherit; } /* (a formula answer on the review row: the image, in line with the words) */
+.bcv-qz__suma img.equation_image { max-height: 1.7em; }
+.bcv-qz__sumq img.equation_image { max-height: 1.6em; }

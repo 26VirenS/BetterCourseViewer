@@ -1593,6 +1593,7 @@ try {
   // Begin attempt folds the chrome away, smoothly: the sidebar, the course header and the rail slide to nothing
   const folded = await page.waitForFunction(() => document.documentElement.classList.contains('bcv-quiz') && getComputedStyle(document.querySelector('.bcv-side')).width === '0px' && getComputedStyle(document.querySelector('.bcv-rail')).width === '0px' && getComputedStyle(document.querySelector('.bcv-head--course')).maxHeight === '0px', null, { timeout: 5000 }).then(() => true).catch(() => false);
   check(folded && /width/.test(await page.$eval('.bcv-side', (e) => getComputedStyle(e).transitionProperty)) && !(await page.$('#bcv-fab')), 'the attempt takes the page: the sidebar, header and rail fold away (a transition)');
+  check((await page.$eval('html', (e) => e.classList.contains('bcv-in-quiz'))) && (await page.$eval('#bcv-tray', (e) => getComputedStyle(e).display)) === 'none', 'while the attempt is going the page says so and the pinned tools are put away: nothing to open over a quiz');
   check(/^(19|20):\d\d$/.test((await texts('.bcv-qz__clock'))[0]), `timer counts down from the attempt's end_at: ${(await texts('.bcv-qz__clock'))[0]}`);
   check((await page.$$('.bcv-qz__letter')).length === 5 && (await texts('.bcv-qz__letter')).join('') === 'ABCDE', 'lettered options');
   await page.click('.bcv-qz__opt');
@@ -1794,6 +1795,7 @@ try {
   await page.click('.bcv-qz__foot .bcv-qz__btn--primary');
   await page.waitForSelector('.bcv-qz__sum', { timeout: 5000 });
   const oqSums = await texts('.bcv-qz__sum');
+  check((await page.$$('.bcv-qz__sum:nth-child(3) .bcv-qz__suma img.equation_image')).length >= 1 && (await page.$$('.bcv-qz__sum:nth-child(3) .bcv-qz__sumq img.equation_image')).length === 1 && !/\\(vec|frac|displaystyle)/.test(oqSums[2]) && !/LaTeX/.test(oqSums[2]), `a formula in the question or the answer shows on the review row as the formula itself, never its LaTeX (${oqSums[2]})`);
   check(oqSums.length === 4 && /^Q1.*Answered$/.test(oqSums[0]) && /^Q4.*3\.15$/.test(oqSums[3]) && (await page.$$('.bcv-qz__sum:disabled')).length === 4 && /4 of 4 answered · nothing left blank/.test((await texts('.bcv-qz__lead'))[0]), `review lists every question — the ones passed as Canvas reports them, none re-openable: ${oqSums.join(' | ')}`);
   page.once('dialog', (d) => d.accept());
   await page.click('.bcv-qz__big--primary');
@@ -2884,6 +2886,11 @@ try {
   const fillCite = async (f) => { for (const [k, v] of Object.entries(f)) await page.fill(`.bcv-tool__input[data-field="${k}"]`, v); await page.waitForTimeout(150); };
   const cite = () => page.$eval('.bcv-cite__preview', (e) => e.textContent.replace(/\s+/g, ' ').trim());
   check((await texts('.bcv-tool__title'))[0] === 'Citation generator' && (await toolSub()) === 'MLA 9 · 5 to fill' && (await page.$eval('.bcv-cite__copy', (e) => e.disabled)) && (await texts('.bcv-cite__missing'))[0] === 'Add author, page title, website, year, url to finish this citation.' && (await page.$$('.bcv-cite__field.is-needed')).length === 5, 'the citation generator opens on MLA 9 for a website, names the five fields it needs, and keeps Copy and Save inert');
+  check((await page.$$('.bcv-cite__typeic')).length === 5 && (await texts('.bcv-cite__chip')).join(' | ') === 'Author | Page title | Website | Year | URL' && (await page.$$('.bcv-cite__side .bcv-tool__card')).length === 2 && (await page.$$('.bcv-cite__dot')).length === 5 && (await page.$eval('.bcv-cite__type.is-on .bcv-cite__typeic', (e) => getComputedStyle(e).backgroundColor)) === 'rgb(10, 108, 255)', 'the source types are tiles with a glyph each, the one chosen in blue; the fields still needed are chips; the result column sits beside the details');
+  await page.click('.bcv-cite__chip[data-key="year"]');
+  check(await page.evaluate(() => document.activeElement?.dataset.field === 'year'), 'a chip puts the cursor in that field');
+  await page.click('.bcv-cite__today');
+  check(/^\d{1,2} [A-Z][a-z]+ \d{4}$/.test(await page.$eval('.bcv-tool__input[data-field="accessed"]', (e) => e.value)), 'Today fills the date accessed');
   await fillCite({ author: 'Jane R. Okonkwo', title: 'How Students Actually Read Syllabi', container: 'The Atlantic', month: 'March', day: '4', year: '2026', url: 'theatlantic.com/education/syllabi-study', accessed: '12 September 2026' });
   check((await cite()) === 'Okonkwo, Jane R. “How Students Actually Read Syllabi.” The Atlantic, 4 March 2026. theatlantic.com/education/syllabi-study. Accessed 12 September 2026.' && (await page.$eval('.bcv-cite__preview .bcv-cite__i', (e) => e.textContent)) === 'The Atlantic' && (await texts('.bcv-cite__intext'))[0] === '(Okonkwo)' && (await texts('.bcv-cite__badge'))[0] === 'Ready' && !(await page.$eval('.bcv-cite__copy', (e) => e.disabled)) && (await toolSub()) === 'MLA 9 · Ready', `MLA 9 for a website forms as the fields fill, the container in real italics, the in-text form beside it: ${await cite()}`);
   await page.click('.bcv-tool .bcv-seg__btn[data-value="apa"]');
@@ -3433,11 +3440,11 @@ try {
     // the annotator
     console.log('annotator');
     await openTool('mark');
-    check((await texts('.bcv-conv__droptitle'))[0] === 'Drop a PDF to mark up' && (await page.$$('.bcv-mark__recent')).length === 0 && (await toolSub()) === 'Highlights and notes, kept on this device per file.', 'the annotator opens on a drop zone with nothing marked up before');
+    check((await texts('.bcv-conv__droptitle'))[0] === 'Drop a PDF to mark up' && (await page.$$('.bcv-mark__recent')).length === 0 && (await toolSub()) === 'Highlights, drawings, text and notes, kept on this device per file.', 'the annotator opens on a drop zone with nothing marked up before');
     await page.setInputFiles('.bcv-mark__drop input[type=file]', [{ name: 'Chapter.pdf', mimeType: 'application/pdf', buffer: ntTwo }]);
     check(await eventually(() => page.$$('.bcv-mark__page').then((r) => r.length === 2), 10000) && await eventually(() => page.$$('.bcv-mark__page[data-page="1"] .bcv-mark__text span').then((r) => r.length >= 3), 15000) && (await texts('.bcv-tool__title'))[0] === 'Chapter.pdf' && (await texts('.bcv-mark__pageno'))[0] === 'Page 1 of 2' && (await texts('.bcv-mark__count'))[0] === 'Nothing marked yet' && (await page.$eval('.bcv-mark__page[data-page="1"] canvas', (e) => e.width > 600 && e.height > 800)), 'the PDF draws page by page with a text layer over each, the panel empty');
     const ntSel = await page.evaluate(() => { const span = [...document.querySelectorAll('.bcv-mark__page[data-page="1"] .bcv-mark__text span')].find((s) => /mitochondria/.test(s.textContent)); if (!span) return ''; const r = document.createRange(); r.selectNodeContents(span); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); return sel.toString(); });
-    check(ntSel === 'The mitochondria is the powerhouse of the cell.' && await eventually(() => page.$('.bcv-mark__bubble').then((b) => !!b), 3000) && (await page.$$('.bcv-mark__bubble .bcv-mark__swatch')).length === 4 && (await texts('.bcv-mark__bubble .bcv-mark__tool'))[0] === 'Note', 'selecting words brings up a bubble of four colours and Note');
+    check(ntSel === 'The mitochondria is the powerhouse of the cell.' && await eventually(() => page.$('.bcv-mark__bubble').then((b) => !!b), 3000) && (await page.$$('.bcv-mark__bubble .bcv-mark__swatch')).length === 6 && (await texts('.bcv-mark__bubble .bcv-mark__tool')).join(' ') === 'Underline Strike Note', 'selecting words brings up a bubble of six colours, Underline, Strike and Note');
     await shot(page, '43-annotator-bubble');
     await page.click('.bcv-mark__bubble .bcv-mark__swatch[data-color="green"]');
     await page.waitForTimeout(200);
@@ -3469,6 +3476,58 @@ try {
     await page.click('.bcv-mark__item:nth-child(3) .bcv-iconbtn');
     await page.waitForTimeout(400);
     check((await page.$$('.bcv-mark__hl')).length === 1 && (await texts('.bcv-mark__count'))[0] === '1 highlight · 1 note' && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('tools:mark:index'))['tools:mark:index'][0].hl)) === 1, 'a mark removed in the panel goes from the page and from what is kept');
+    // the fuller editor: a pen stroke, a text box, an underline, undo and redo, a press on a mark and Delete, all in the copy
+    await page.click('.bcv-mark__tool[data-tool="pen"]');
+    await page.click('.bcv-mark__swatch[data-color="red"]');
+    await page.click('.bcv-mark__size[data-size="L"]');
+    await page.mouse.move(ntPg.x + ntPg.width * 0.25, ntPg.y + ntPg.height * 0.4);
+    await page.mouse.down();
+    await page.mouse.move(ntPg.x + ntPg.width * 0.45, ntPg.y + ntPg.height * 0.44, { steps: 10 });
+    await page.mouse.move(ntPg.x + ntPg.width * 0.6, ntPg.y + ntPg.height * 0.4, { steps: 10 });
+    await page.mouse.up();
+    await page.waitForTimeout(300);
+    const ntInk = await page.$eval('.bcv-mark__ink path.bcv-mark__stroke', (e) => ({ stroke: e.getAttribute('stroke'), w: e.getAttribute('stroke-width'), d: e.getAttribute('d').slice(0, 1), curves: (e.getAttribute('d').match(/Q/g) || []).length }));
+    check((await page.$$('.bcv-mark__stroke')).length === 1 && ntInk.stroke === '#ff3b30' && ntInk.w === '6' && ntInk.d === 'M' && ntInk.curves >= 4 && (await texts('.bcv-mark__item .bcv-mark__snippet')).includes('Drawing') && (await page.$eval('.bcv-mark__tool[data-tool="pen"]', (e) => e.classList.contains('is-on'))) && !(await page.$eval('.bcv-mark__sizes', (e) => e.hidden)), `Draw lays a red, thick pen stroke where the pointer went, smoothed, and stays the tool with its sizes shown (${JSON.stringify(ntInk)})`);
+    await page.click('.bcv-mark__tool[data-tool="text"]');
+    await page.click('.bcv-mark__swatch[data-color="black"]');
+    await page.mouse.click(ntPg.x + ntPg.width * 0.3, ntPg.y + ntPg.height * 0.62);
+    check(await eventually(() => page.evaluate(() => document.activeElement?.classList.contains('bcv-mark__textfield')), 2000), 'Text then a press on the page opens a box to type in there');
+    await page.keyboard.type('Typed here');
+    await page.waitForTimeout(500);
+    const ntText = await page.$eval('.bcv-mark__textbox', (e) => ({ left: parseFloat(e.style.left), top: parseFloat(e.style.top), text: e.querySelector('textarea').value, color: e.querySelector('textarea').style.color, size: parseFloat(e.querySelector('textarea').style.fontSize) }));
+    check(ntText.text === 'Typed here' && ntText.left > 28 && ntText.left < 32 && ntText.top > 60 && ntText.top < 64 && ntText.color === 'rgb(28, 28, 30)' && ntText.size > 14 && ntText.size < 20 && (await texts('.bcv-mark__item .bcv-mark__snippet')).includes('“Typed here”'), `the words land in black on the page, sized to it, and in the panel (${JSON.stringify(ntText)})`);
+    await page.click('.bcv-mark__tool[data-tool="select"]');
+    const ntGrip = await (await page.$('.bcv-mark__textbox .bcv-mark__grip')).boundingBox();
+    await page.mouse.move(ntGrip.x + 8, ntGrip.y + 8);
+    await page.mouse.down();
+    await page.mouse.move(ntGrip.x + 120, ntGrip.y - 60, { steps: 8 });
+    await page.mouse.up();
+    await page.waitForTimeout(300);
+    const ntMoved = await page.$eval('.bcv-mark__textbox', (e) => ({ left: parseFloat(e.style.left), top: parseFloat(e.style.top) }));
+    check(ntMoved.left > ntText.left + 10 && ntMoved.top < ntText.top - 3, `the box's grip drags it to a new spot (${JSON.stringify(ntMoved)})`);
+    await page.evaluate(() => { const span = [...document.querySelectorAll('.bcv-mark__page[data-page="1"] .bcv-mark__text span')].find((s) => /Osmosis/.test(s.textContent)); const r = document.createRange(); r.selectNodeContents(span); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); });
+    check(await eventually(() => page.$('.bcv-mark__bubble .bcv-mark__tool[data-act="ul"]').then((b) => !!b), 3000), 'the bubble comes up over the words again');
+    await page.click('.bcv-mark__bubble .bcv-mark__tool[data-act="ul"]');
+    await page.waitForTimeout(200);
+    check((await page.$$('.bcv-mark__hl--ul')).length === 1 && (await texts('.bcv-mark__count'))[0] === '2 highlights · 1 note · 1 drawing · 1 text box', `Underline draws a line under the words; the panel counts every kind (${(await texts('.bcv-mark__count'))[0]})`);
+    await page.click('.bcv-mark__undo');
+    await page.waitForTimeout(200);
+    const ntUndone = (await page.$$('.bcv-mark__hl--ul')).length === 0;
+    await page.click('.bcv-mark__redo');
+    await page.waitForTimeout(200);
+    check(ntUndone && (await page.$$('.bcv-mark__hl--ul')).length === 1, 'Undo takes the underline back, Redo puts it back');
+    await page.mouse.click(ntPg.x + ntPg.width * 0.45, ntPg.y + ntPg.height * 0.44);
+    await page.waitForTimeout(150);
+    const ntPicked = await page.$eval('.bcv-mark__stroke', (e) => e.classList.contains('is-active'));
+    await page.keyboard.press('Delete');
+    await page.waitForTimeout(200);
+    const ntGone = (await page.$$('.bcv-mark__stroke')).length === 0;
+    await page.keyboard.press('Control+z');
+    await page.waitForTimeout(200);
+    check(ntPicked && ntGone && (await page.$$('.bcv-mark__stroke')).length === 1, 'a press on the stroke picks it, Delete takes it away, and Control-Z brings it back');
+    const ntSaved2 = await ntDownload(() => page.click('.bcv-mark__save'));
+    const ntPdf2 = ntSaved2.bytes.toString('latin1');
+    check((ntPdf2.match(/\/Subtype \/Ink/g) || []).length === 1 && /\/InkList/.test(ntPdf2) && (ntPdf2.match(/\/Subtype \/FreeText/g) || []).length === 1 && (ntPdf2.match(/\/Subtype \/Underline/g) || []).length === 1 && /\/Helv/.test(ntPdf2) && /54797065642068657265/i.test(ntPdf2) && /\/BaseFont \/Helvetica/.test(ntPdf2) && (ntPdf2.match(/\/Subtype \/Highlight/g) || []).length === 1, 'Save PDF writes the drawing as ink, the typed words as free text in Helvetica, and the underline, each a real annotation beside the highlight and the note');
     await closeTool();
 
     // image to text
@@ -3495,13 +3554,14 @@ try {
   await page.waitForTimeout(600);
   const quickPin = (key) => `#bcv-pins .bcv-pin[data-tool="${key}"]`;
   const quickOpen = async (key, hh = 44) => { const b = await (await page.$(quickPin(key))).boundingBox(); await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2); await eventually(() => page.$eval(quickPin(key), (e, want) => e.classList.contains('is-open') && Math.round(e.getBoundingClientRect().height) === want, hh), 3000); await page.waitForTimeout(550); return page.$eval(quickPin(key), (e) => ({ w: Math.round(e.getBoundingClientRect().width), h: Math.round(e.getBoundingClientRect().height), radius: getComputedStyle(e.querySelector('.bcv-quick__face')).borderRadius, name: e.querySelector('.bcv-quick__name')?.textContent, btnGone: getComputedStyle(e.querySelector('.bcv-pin__btn')).opacity === '0' })); };
-  check((await page.$$('#bcv-pins .bcv-pin.bcv-quick')).length === 4 && (await page.$$eval('#bcv-pins .bcv-pin', (els) => els.map((e) => Math.round(e.getBoundingClientRect().width)))).every((w) => w === 24), 'four pins in the tray, each a disc, each with a quick menu folded in it');
-  const q1 = await quickOpen('cite');
-  check(q1.w === 300 && q1.h === 44 && q1.radius === '22px' && q1.name === 'Cite' && q1.btnGone && (await page.$eval(`${quickPin('cite')} .bcv-quick__input`, (e) => e.placeholder)) === 'Paste a link to cite', `the citation pin swells into a capsule under the pointer: a field for a link and a round Cite (${JSON.stringify(q1)})`);
-  await page.fill(`${quickPin('cite')} .bcv-quick__input`, 'https://example.org/reading');
-  await page.keyboard.press('Enter');
+  check((await page.$$('#bcv-pins .bcv-pin.bcv-quick')).length === 3 && !(await page.$eval(quickPin('cite'), (e) => e.classList.contains('bcv-quick'))) && (await page.$$eval('#bcv-pins .bcv-pin', (els) => els.map((e) => Math.round(e.getBoundingClientRect().width)))).every((w) => w === 24), 'four pins in the tray, each a disc; three with a quick menu folded in them, the citation pin a plain button');
+  const citePinBox = await (await page.$(quickPin('cite'))).boundingBox();
+  await page.mouse.move(citePinBox.x + citePinBox.width / 2, citePinBox.y + citePinBox.height / 2);
+  await page.waitForTimeout(500);
+  check(Math.round((await (await page.$(quickPin('cite'))).boundingBox()).width) === 24 && (await page.$('.bcv-tool-ov')) === null, 'the pointer over the citation pin opens nothing');
+  await page.click(`${quickPin('cite')} .bcv-pin__btn`);
   await page.waitForSelector('.bcv-tool[data-tool="cite"]', { timeout: 5000 });
-  check((await page.$eval('.bcv-tool__input[data-field="url"]', (e) => e.value)) === 'https://example.org/reading' && (await page.$eval('.bcv-cite__type.is-on', (e) => e.dataset.type)) === 'website' && !(await page.$eval(quickPin('cite'), (e) => e.classList.contains('is-open'))), 'Enter opens the tool with the link filled in, on Website, and the capsule folds');
+  check((await texts('.bcv-tool__title'))[0] === 'Citation generator' && (await page.$$('.bcv-cite__type')).length === 5, 'a press on it opens the generator itself');
   await closeTool();
   const q2 = await quickOpen('graph', 262);
   const calcKey = async (k) => { await page.click(`.bcv-calc__key[data-key="${k}"]`); };
@@ -3653,6 +3713,13 @@ try {
   const awakeNav = page.waitForNavigation({ timeout: 2500 }).then(() => true).catch(() => false);
   await page.click('.bcv-stat');
   check(!(await awakeNav) && !!(await page.$('.bcv-sheet-ov')), 'a press while the page is awake does what it says, and reloads nothing');
+  // with a sheet, a tool's popup or a preview open, Away Refresh stands down: nothing is reloaded out from under it, and the page counts as awake again
+  const awayAge = () => sw.evaluate(async (base) => { const [tab] = await chrome.tabs.query({ url: `${base}/*` }); const [{ result }] = await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'ISOLATED', func: () => Date.now() - self.BCV.app.state.lastHere }); return result; }, BASE);
+  await windBack(4 * 60 * 1000);
+  const sheetNav = page.waitForNavigation({ timeout: 2500 }).then(() => true).catch(() => false);
+  await page.click('.bcv-sheet', { position: { x: 24, y: 24 } });
+  await page.waitForTimeout(400);
+  check(!(await sheetNav) && (await page.$('#bcv-away')) === null && !!(await page.$('.bcv-sheet-ov')) && (await awayAge()) < 60 * 1000, 'with a sheet, a popup or a preview open, Away Refresh stands down: no pill, no reload, and the page counts as awake again');
   await page.click('.bcv-sheet-ov', { position: { x: 5, y: 5 } }); // the scrim closes it, as everywhere else in the suite
   await page.waitForFunction(() => !document.querySelector('.bcv-sheet-ov'), null, { timeout: 5000 });
   await windBack(4 * 60 * 1000); // away since before the three minutes

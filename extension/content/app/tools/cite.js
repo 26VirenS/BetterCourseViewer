@@ -153,33 +153,32 @@
   }
 
   // ---- the popup -----------------------------------------------------------------------------
+  // Style and source across the top, the details on the left, the citation on the right where it
+  // forms as the fields fill — the fields still needed as chips that put the cursor in them, Copy,
+  // Save, and the saved list under it.
+  const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  const todayWords = () => { const d = new Date(); return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`; };
   async function open(app, { from = null, url = '' } = {}) {
     const tool = T.toolOf('cite');
-    const dark = app.isDark();
-    const st = { style: 'mla', type: 'website', f: { ...EMPTY, ...(url ? { url: String(url) } : {}) }, saved: [], copied: 0 }; // (a link handed in — the quick menu on the pin — is filled in, on Website)
+    const st = { style: 'mla', type: 'website', f: { ...EMPTY, ...(url ? { url: String(url) } : {}) }, saved: [], copied: 0 };
     const raw = await T.load(KEY, []);
     st.saved = Array.isArray(raw) ? raw.filter((x) => x && Array.isArray(x.parts)) : [];
 
-    const left = U.el('bcv-cite__col');
-    const right = U.el('bcv-cite__col');
-    const body = U.el('bcv-cite', [left, right]);
-    const p = T.popup({ tool, title: 'Citation generator', sub: '', width: 960, body, from });
+    const body = U.el('bcv-cite');
+    const p = T.popup({ tool, title: 'Citation generator', sub: '', width: 980, body, from });
 
-    // left: style, type, the fields
+    // across the top: the style, and the kind of source
     const styleSeg = T.seg(STYLES, st.style, (k) => { st.style = k; paint(); });
     const typeRow = U.el('bcv-cite__types');
-    const fieldsWrap = U.el('bcv-cite__fields');
-    const clearBtn = h('button', { type: 'button', class: 'bcv-tool__link', text: 'Clear', onclick: () => { st.f = { ...EMPTY }; buildFields(); paint(); } });
-    left.append(
-      T.card([T.label('Style'), styleSeg, U.el('bcv-tool__divider'), T.label('Source type'), typeRow]),
-      T.card([U.el('bcv-tool__cardhead', [T.label('Details'), clearBtn]), fieldsWrap]),
-    );
     function buildTypes() {
       typeRow.replaceChildren(...TYPES.map(([k, name, icon]) => h('button', {
-        type: 'button', class: `bcv-cite__type ${st.type === k ? 'is-on' : ''}`, dataset: { type: k },
+        type: 'button', class: `bcv-cite__type ${st.type === k ? 'is-on' : ''}`, dataset: { type: k }, 'aria-pressed': st.type === k ? 'true' : 'false',
         onclick: () => { if (st.type === k) return; st.type = k; buildTypes(); buildFields(); paint(); },
-      }, [U.svg(icon, { size: 14, stroke: 'currentColor', width: 1.9 }), h('span', { text: name })])));
+      }, [h('span', { class: 'bcv-cite__typeic' }, U.svg(icon, { size: 15, stroke: 'currentColor', width: 1.9 })), h('span', { class: 'bcv-cite__typename', text: name })])));
     }
+    // the details
+    const fieldsWrap = U.el('bcv-cite__fields');
+    const clearBtn = h('button', { type: 'button', class: 'bcv-tool__link', text: 'Clear', onclick: () => { st.f = { ...EMPTY }; buildFields(); paint(); } });
     const inputs = {};
     function buildFields() {
       fieldsWrap.replaceChildren(...fieldDefs(st.type).map((d, i) => {
@@ -187,25 +186,28 @@
         inp.addEventListener('input', () => { st.f[d.key] = inp.value; st.copied = 0; paint(); });
         inputs[d.key] = inp;
         const req = U.text('bcv-cite__req', '', 'span');
+        const today = d.key === 'accessed' ? h('button', { type: 'button', class: 'bcv-tool__link bcv-tool__link--blue bcv-cite__today', text: 'Today', onclick: () => { inp.value = todayWords(); st.f.accessed = inp.value; paint(); } }) : null;
         const lab = h('label', { class: 'bcv-cite__field', style: { flex: d.flex } }, [
-          U.el('bcv-cite__fieldlabel', [h('span', { text: d.label }), req]),
+          U.el('bcv-cite__fieldlabel', [h('span', { text: d.label }), d.req ? h('span', { class: 'bcv-cite__dot', title: 'Needed' }) : null, req, today]),
           inp,
         ]);
         lab.dataset.key = d.key;
-        U.enter(lab, i, 35, 300);
+        U.enter(lab, i, 30, 280);
         return lab;
       }));
     }
+    const details = T.card([U.el('bcv-tool__cardhead', [T.label('Details'), clearBtn]), fieldsWrap, T.hint('Several authors: a semicolon between them. Leave out what you do not have; the citation shapes itself around it.')], 'bcv-cite__details');
 
-    // right: the preview, in text, what is missing, Copy and Save; the saved list
+    // the result: the citation as it forms, the in-text form, what is still needed, Copy and Save
     const readyBadge = h('span', { class: 'bcv-cite__badge' });
     const wcLabel = T.label('');
     const preview = h('p', { class: 'bcv-cite__preview' });
     const inTextEl = U.text('bcv-cite__intext', '', 'span');
     const copyInText = U.iconbtn(IC.copy, { size: 28, iconSize: 13, title: 'Copy in-text citation', onClick: () => { T.copyText(inText(st.style, st.type, st.f)); U.toast('In-text citation copied.'); } });
     const missing = U.el('bcv-cite__missing');
+    const chips = U.el('bcv-cite__chips');
     const copyBtn = U.btn('Copy citation', { kind: 'primary', icon: IC.copy, cls: 'bcv-cite__copy', onClick: () => { if (!ready()) return; T.copyText(plain(build(st.style, st.type, st.f))); st.copied = Date.now(); paint(); setTimeout(() => { if (Date.now() - st.copied >= 1500) { st.copied = 0; paint(); } }, 1600); } });
-    const saveBtn = U.btn('Save', { cls: 'bcv-cite__save', onClick: async () => {
+    const saveBtn = U.btn('Save', { icon: IC.plus, cls: 'bcv-cite__save', onClick: async () => {
       if (!ready()) return;
       const P = build(st.style, st.type, st.f);
       st.saved = [...st.saved, { id: T.uid('c'), style: STYLE_NAME[st.style], parts: P, plain: plain(P) }];
@@ -214,20 +216,23 @@
       paintSaved();
       U.toast('Saved. It stays on this device.');
     } });
+    const result = T.card([
+      U.el('bcv-tool__cardhead', [wcLabel, readyBadge]),
+      preview,
+      U.el('bcv-cite__intextrow', [T.label('In text'), inTextEl, copyInText]),
+      missing,
+      chips,
+      U.el('bcv-tool__btns', [copyBtn, saveBtn]),
+    ], 'bcv-cite__result');
     const savedLabel = T.label('Saved');
     const copyAll = h('button', { type: 'button', class: 'bcv-tool__link bcv-tool__link--blue', text: 'Copy list', onclick: () => { T.copyText(st.saved.map((x) => x.plain).sort().join('\n')); U.toast('List copied, alphabetically.'); } });
     const savedList = U.el('bcv-cite__saved');
-    right.append(
-      T.card([
-        U.el('bcv-tool__cardhead', [wcLabel, readyBadge]),
-        preview,
-        U.el('bcv-cite__intextrow', [T.label('In text'), inTextEl, copyInText]),
-        missing,
-        U.el('bcv-tool__btns', [copyBtn, saveBtn]),
-      ]),
-      T.card([U.el('bcv-tool__cardhead', [savedLabel, copyAll]), savedList], 'bcv-cite__savedcard'),
-      T.hint('Double-check it against your class’s style guide.'),
+    const savedCard = T.card([U.el('bcv-tool__cardhead', [savedLabel, copyAll]), savedList], 'bcv-cite__savedcard');
+    body.append(
+      T.card([U.el('bcv-cite__toprow', [U.el('bcv-cite__topcol', [T.label('Style'), styleSeg]), U.el('bcv-cite__topcol bcv-cite__topcol--types', [T.label('Source'), typeRow])])], 'bcv-cite__top'),
+      U.el('bcv-cite__grid', [details, U.el('bcv-cite__side', [result, savedCard, T.hint('Double-check it against your class’s style guide.')])]),
     );
+
     const missingDefs = () => fieldDefs(st.type).filter((d) => d.req && !String(st.f[d.key] || '').trim());
     const ready = () => missingDefs().length === 0;
     function paint() {
@@ -240,10 +245,13 @@
       readyBadge.classList.toggle('is-ready', ok);
       const wasText = preview.textContent;
       preview.replaceChildren(...build(st.style, st.type, st.f).map((seg) => h('span', { class: seg.italic ? 'bcv-cite__i' : '', text: seg.text })));
+      preview.classList.toggle('is-empty', !preview.textContent.trim());
       if (wasText && wasText !== preview.textContent) { preview.classList.remove('is-fresh'); void preview.offsetWidth; preview.classList.add('is-fresh'); } // a change flashes, once
       inTextEl.textContent = inText(st.style, st.type, st.f);
       missing.hidden = ok;
       missing.replaceChildren(U.svg(IC.warn, { size: 15, stroke: 'var(--bcv-orange)', width: 2 }), h('span', { class: 'bcv-pretty', text: `Add ${miss.map((m) => m.label.toLowerCase()).join(', ')} to finish this citation.` }));
+      chips.hidden = ok;
+      chips.replaceChildren(...miss.map((m) => h('button', { type: 'button', class: 'bcv-cite__chip', dataset: { key: m.key }, text: m.label, title: `Fill in the ${m.label.toLowerCase()}`, onclick: () => inputs[m.key]?.focus() })));
       copyBtn.disabled = !ok;
       saveBtn.disabled = !ok;
       copyBtn.replaceChildren(U.svg(st.copied ? IC.check : IC.copy, { size: 14, stroke: 'currentColor', width: 2.1 }), h('span', { text: st.copied ? 'Copied' : 'Copy citation' }));
@@ -262,17 +270,17 @@
         const row = U.el('bcv-cite__savedrow', [
           h('span', { class: 'bcv-cite__tag', text: x.style }),
           h('p', { class: 'bcv-cite__savedtext' }, x.parts.map((seg) => h('span', { class: seg.italic ? 'bcv-cite__i' : '', text: seg.text }))),
+          U.iconbtn(IC.copy, { size: 26, iconSize: 12, title: 'Copy this one', onClick: () => { T.copyText(x.plain); U.toast('Copied.'); } }),
           U.iconbtn(IC.close, { size: 26, iconSize: 12, title: 'Remove', onClick: async () => { st.saved = st.saved.filter((y) => y.id !== x.id); await T.save(KEY, st.saved); paintSaved(); } }),
         ]);
         U.enter(row, i, 35, 300);
         return row;
-      }) : [T.hint('Saved citations stay on this device.')]));
+      }) : [T.hint('Saved citations stay on this device. Copy list gives them alphabetically.')]));
     }
     buildTypes();
     buildFields();
     paint();
     paintSaved();
-    void dark;
     return p;
   }
 
