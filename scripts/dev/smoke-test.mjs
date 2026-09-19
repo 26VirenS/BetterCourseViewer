@@ -2773,7 +2773,7 @@ try {
   // the page: one row at the bottom of the nav, five cards
   const raw = (sel) => page.$$eval(sel, (els) => els.map((e) => e.textContent.replace(/\s+/g, ' ').trim())); // (textContent: the small labels are drawn in capitals by CSS)
   const toolNav = await texts('.bcv-nav > .bcv-nav__item');
-  check(toolNav[toolNav.length - 1].startsWith('Tools') && (await page.$eval('.bcv-nav__item[data-nav="tools"]', (e) => e.classList.contains('is-active'))) && (await texts('.bcv-h1'))[0] === 'Tools' && (await texts('.bcv-head__sub'))[0] === 'Things Simpl Courses does on its own.', 'Tools is the last row of the sidebar, lit, and the page is titled');
+  check(toolNav[toolNav.length - 1].startsWith('Tools') && (await page.$eval('.bcv-nav__item[data-nav="tools"]', (e) => e.classList.contains('is-active'))) && (await texts('.bcv-h1'))[0] === 'Tools' && (await texts('.bcv-head__sub'))[0] === 'Handy things, right here.', 'Tools is the last row of the sidebar, lit, and the page is titled');
   const cardNames = await texts('.bcv-tool-card__name');
   check(cardNames.join(' | ') === 'Citation generator | Focus timer | Graphing calculator | File converter | Flashcards' && (await page.$$('.bcv-tool-card__open')).length === 5, `five cards, each with Open: ${cardNames.join(' | ')}`);
   await shot(page, '36c-tools');
@@ -2881,7 +2881,7 @@ try {
   await closeTool();
   // the file converter: the source kind decides the targets; images on the canvas, a PDF from an engine loaded when first needed
   await openTool('conv');
-  check((await toolSub()) === 'Runs on this device. Nothing is uploaded.' && (await page.$eval('.bcv-conv__run', (e) => e.disabled)) && /Word ⇄ PDF happens here/.test((await texts('.bcv-sheet__foot'))[0]), 'the converter opens empty, says nothing is uploaded and what a Word document becomes');
+  check((await toolSub()) === 'Runs on this device. Nothing is uploaded.' && (await page.$eval('.bcv-conv__run', (e) => e.disabled)) && /Word and PDF convert right here/.test((await texts('.bcv-sheet__foot'))[0]), 'the converter opens empty, says nothing is uploaded and what a Word document becomes');
   const tinyPng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAAF0lEQVR42mNk+M/wn4EIwDiqkL4KAQC8oQn/Y0k3bwAAAABJRU5ErkJggg==', 'base64');
   await page.setInputFiles('.bcv-conv__drop input[type=file]', [{ name: 'tiny.png', mimeType: 'image/png', buffer: tinyPng }, { name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('hello') }]);
   await page.waitForSelector('.bcv-conv__row', { timeout: 5000 });
@@ -2982,7 +2982,7 @@ try {
   await page.keyboard.press('Enter');
   await page.waitForFunction(() => /Connected/.test(document.querySelector('.bcv-conv__ccstate')?.textContent || ''), null, { timeout: 5000 });
   const ccStored = await sw.evaluate(async () => (await self.BCV.api.storage.local.get('tools:convert:cc'))['tools:convert:cc']);
-  check((await raw('.bcv-conv__ccstate'))[0] === 'Connected · sam · 25 credits' && ccStored?.key === 'cc-test-key' && (await toolSub()) === 'Word, PDF, slides and sheets go through CloudConvert.' && /through CloudConvert, in the original/.test((await texts('.bcv-sheet__foot'))[0]) && (await texts('.bcv-conv__formats .bcv-seg__btn')).join(' | ') === 'Word | PNG pages | Text | JPEG pages' && (await page.$eval('.bcv-conv__cloudhint', (e) => e.hidden)) && (await page.$eval('.bcv-conv__ccrow', (e) => e.hidden)), `Enter connects the right key: who and how many credits, the key kept on this device, the words change, and the PDF now offers Word and JPEG pages (${(await texts('.bcv-conv__formats .bcv-seg__btn')).join(' | ')})`);
+  check((await raw('.bcv-conv__ccstate'))[0] === 'Connected · sam · 25 credits' && ccStored?.key === 'cc-test-key' && (await toolSub()) === 'Word, PDF, slides and sheets go through CloudConvert.' && /look exactly like the original/.test((await texts('.bcv-sheet__foot'))[0]) && (await texts('.bcv-conv__formats .bcv-seg__btn')).join(' | ') === 'Word | PNG pages | Text | JPEG pages' && (await page.$eval('.bcv-conv__cloudhint', (e) => e.hidden)) && (await page.$eval('.bcv-conv__ccrow', (e) => e.hidden)), `Enter connects the right key: who and how many credits, the key kept on this device, the words change, and the PDF now offers Word and JPEG pages (${(await texts('.bcv-conv__formats .bcv-seg__btn')).join(' | ')})`);
   await page.click('.bcv-conv__formats .bcv-seg__btn[data-value="docx"]');
   const [ccDl] = await Promise.all([page.waitForEvent('download', { timeout: 20000 }), page.click('.bcv-conv__run')]);
   await page.waitForFunction(() => document.querySelector('.bcv-conv__outlabel, .bcv-conv__err'), null, { timeout: 20000 });
@@ -2999,58 +2999,124 @@ try {
   check((await raw('.bcv-conv__err'))[0] === 'The file could not be converted.' && (await page.$$('.bcv-conv__outlabel')).length === 1, 'a file the service refuses shows its reason on its own row, and the next file still converts');
   // the switch: Word and PDF back on this device; what only the service does stays offered
   await page.click('.bcv-conv__use input');
-  check(await eventually(async () => (await toolSub()) === 'Runs on this device; CloudConvert for what only it can do.' && /Word ⇄ PDF happens here/.test((await texts('.bcv-sheet__foot'))[0]), 2000) && (await texts('.bcv-conv__formats .bcv-seg__btn')).join(' | ') === 'Word | PNG pages | Text | JPEG pages' && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('tools:convert:cc'))['tools:convert:cc'])).use === false, 'the switch off keeps Word and PDF on this device, remembered, while Word from a PDF stays offered: only the service does that');
+  check(await eventually(async () => (await toolSub()) === 'Runs on this device. CloudConvert only when needed.' && /Word and PDF convert right here/.test((await texts('.bcv-sheet__foot'))[0]), 2000) && (await texts('.bcv-conv__formats .bcv-seg__btn')).join(' | ') === 'Word | PNG pages | Text | JPEG pages' && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('tools:convert:cc'))['tools:convert:cc'])).use === false, 'the switch off keeps Word and PDF on this device, remembered, while Word from a PDF stays offered: only the service does that');
   await page.click('.bcv-conv__use input');
   await page.click('.bcv-conv__ccremove');
   check(await eventually(async () => (await raw('.bcv-conv__ccstate'))[0] === 'Not connected', 2000) && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('tools:convert:cc'))['tools:convert:cc'])) == null && !(await page.$eval('.bcv-conv__cloudhint', (e) => e.hidden)) && (await texts('.bcv-conv__formats .bcv-seg__btn')).join(' | ') === 'Word | PNG pages | Text', 'Remove key forgets it: back to what this device does');
   await shot(page, '39-tools-convert');
   await closeTool();
-  // flashcards: decks kept here, imported from CSV, Study and Learn
+  // flashcards, Quizlet style: sets kept here, a set page with four ways to study and the terms under it
   await openTool('fc');
-  check((await toolSub()) === '0 decks' && (await page.$('.bcv-fc__deck')) === null && (await texts('.bcv-fc__actions .bcv-btn')).join(' | ') === 'New deck | Import CSV | Download template', 'flashcards start with no decks: New deck, Import CSV and a template');
+  check((await toolSub()) === '0 sets' && (await page.$('.bcv-fc__deck')) === null && (await texts('.bcv-fc__actions .bcv-btn')).join(' | ') === 'Create a set | Import CSV | Template', 'flashcards start with no sets: Create a set, Import CSV and a template');
   await page.setInputFiles('.bcv-fc input[type=file]', [{ name: 'derivatives.csv', mimeType: 'text/csv', buffer: Buffer.from('Term,Definition\nPower rule,"d/dx x^n = n*x^(n-1)"\nSum rule,"one, two"\n') }]);
   await page.waitForSelector('.bcv-fc__editrow', { timeout: 5000 });
-  check((await texts('.bcv-tool__note'))[0] === '2 cards imported.' && (await page.$$('.bcv-fc__editrow')).length === 2 && (await page.$$eval('.bcv-fc__editrow .bcv-fc__def', (els) => els.map((e) => e.value))).join(' | ') === 'd/dx x^n = n*x^(n-1) | one, two' && (await page.$eval('.bcv-fc__name', (e) => e.value)) === 'derivatives' && (await texts('.bcv-tool__title'))[0] === 'derivatives', 'Import CSV: the header row is skipped, a quoted comma survives, the deck is named after the file');
+  check((await texts('.bcv-tool__note'))[0] === '2 cards imported.' && (await page.$$('.bcv-fc__editrow')).length === 2 && (await page.$$eval('.bcv-fc__editrow .bcv-fc__def', (els) => els.map((e) => e.value))).join(' | ') === 'd/dx x^n = n*x^(n-1) | one, two' && (await page.$eval('.bcv-fc__name', (e) => e.value)) === 'derivatives' && (await texts('.bcv-tool__title'))[0] === 'derivatives', 'Import CSV: the header row is skipped, a quoted comma survives, the set is named after the file');
   await page.click('.bcv-fc__add');
   await page.waitForFunction(() => document.querySelectorAll('.bcv-fc__editrow').length === 3, null, { timeout: 3000 });
   await page.locator('.bcv-fc__editrow').nth(2).locator('.bcv-fc__term').fill('Chain rule');
   await page.locator('.bcv-fc__editrow').nth(2).locator('.bcv-fc__def').fill('outer times inner');
-  await page.click('.bcv-tool__back');
-  await page.waitForSelector('.bcv-fc__deck', { timeout: 3000 });
+  // paste: one card per line, a tab, a comma or a dash between the term and the definition
+  await page.click('.bcv-fc__pastetoggle');
+  await page.fill('.bcv-fc__paste', 'Product rule\tuv prime plus u prime v\nQuotient rule - low d high minus high d low\n\nnot a card');
+  check((await texts('.bcv-fc__pastecount'))[0] === '2 cards' && !(await page.$eval('.bcv-fc__pasteimport', (e) => e.disabled)), 'pasted text is counted as it is typed: two lines that split, one that does not');
+  await page.click('.bcv-fc__pasteimport');
+  await page.waitForFunction(() => document.querySelectorAll('.bcv-fc__editrow').length === 5, null, { timeout: 3000 });
+  check((await texts('.bcv-tool__note'))[0] === '2 cards added.' && (await page.$$eval('.bcv-fc__editrow .bcv-fc__term', (els) => els.map((e) => e.value))).slice(3).join(' | ') === 'Product rule | Quotient rule', 'Add these cards puts them on the set');
+  await page.click('.bcv-fc__done-btn');
+  await page.waitForSelector('.bcv-fc__tile', { timeout: 3000 });
   const decks = await sw.evaluate(async () => (await self.BCV.api.storage.local.get('tools:decks'))['tools:decks']);
-  check((await texts('.bcv-fc__deckcount'))[0] === '3 cards' && (await texts('.bcv-fc__pct'))[0] === '0% mastered' && decks.length === 1 && decks[0].cards.length === 3 && decks[0].cards[2].term === 'Chain rule' && decks[0].cards.every((c) => c.level === 0), 'Add card and the edits land on the deck, kept on this device');
-  await page.click('.bcv-fc__study');
-  await page.waitForSelector('.bcv-fc__face', { timeout: 3000 });
-  check(!(await page.$eval('.bcv-fc__face', (e) => e.classList.contains('is-flipped'))) && (await texts('.bcv-fc__faceterm'))[0] === 'Power rule' && (await texts('.bcv-fc__pos'))[0] === '1 / 3' && (await page.$eval('.bcv-fc__flipper', (e) => getComputedStyle(e).transformStyle)) === 'preserve-3d', 'Study is a flip deck: the first term, face up');
+  check((await toolSub()) === '5 terms' && (await page.$$eval('.bcv-fc__tile', (els) => els.map((e) => e.dataset.mode))).join(',') === 'cards,learn,test,match' && (await texts('.bcv-fc__termstitle'))[0] === 'Terms in this set (5)' && (await page.$$('.bcv-fc__termrow')).length === 5 && (await texts('.bcv-fc__faceterm'))[0] === 'Power rule' && (await texts('.bcv-fc__pos'))[0] === '1 / 5' && decks.length === 1 && decks[0].cards.length === 5 && decks[0].cards[2].term === 'Chain rule' && decks[0].cards.every((c) => c.level === 0), 'Done opens the set page: four ways to study, the first card face up, the terms listed under it, all of it kept on this device');
   await page.click('.bcv-fc__face');
-  check(await eventually(() => page.$eval('.bcv-fc__face', (e) => e.classList.contains('is-flipped') && /matrix3d|rotateY/.test(getComputedStyle(e.querySelector('.bcv-fc__flipper')).transform)), 2000) && (await texts('.bcv-fc__facedef'))[0] === 'd/dx x^n = n*x^(n-1)', 'a press turns it over to the definition');
+  check(await eventually(() => page.$eval('.bcv-fc__face', (e) => e.classList.contains('is-flipped') && /matrix3d|rotateY/.test(getComputedStyle(e.querySelector('.bcv-fc__flipper')).transform)), 2000) && (await texts('.bcv-fc__facedef'))[0] === 'd/dx x^n = n*x^(n-1)' && (await page.$eval('.bcv-fc__flipper', (e) => getComputedStyle(e).transformStyle)) === 'preserve-3d', 'a press turns the card over to the definition');
   await page.click('.bcv-fc__next');
-  check((await texts('.bcv-fc__faceterm'))[0] === 'Sum rule' && (await texts('.bcv-fc__pos'))[0] === '2 / 3', 'Next moves on, term side up');
+  check((await texts('.bcv-fc__faceterm'))[0] === 'Sum rule' && (await texts('.bcv-fc__pos'))[0] === '2 / 5' && !(await page.$eval('.bcv-fc__face', (e) => e.classList.contains('is-flipped'))), 'the arrow moves on, term side up');
+  await page.click('.bcv-fc__termrow:nth-child(3) .bcv-fc__star'); // (the head is the first child)
+  check(await eventually(async () => (await page.$eval('.bcv-fc__termrow:nth-child(3) .bcv-fc__star', (e) => e.classList.contains('is-on'))) && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('tools:decks'))['tools:decks'][0].cards[1].star)) === true, 2000), 'a star on a term is kept on the card');
+  await shot(page, '40-tools-flashcards');
+  // Flashcards: know it or still learning it, the arrow keys too, then the counts and Keep reviewing
+  await page.click('.bcv-fc__tile[data-mode="cards"]');
+  await page.waitForSelector('.bcv-fc__mark--know', { timeout: 3000 });
+  check((await toolSub()) === '1 of 5' && (await texts('.bcv-fc__faceterm'))[0] === 'Power rule' && (await texts('.bcv-fc__markcount')).join(',') === '0,0' && (await page.$eval('.bcv-fc__undo', (e) => e.disabled)), 'Flashcards starts on the first card with nothing marked yet');
+  await page.click('.bcv-fc__mark--know');
+  await page.keyboard.press('ArrowLeft');
+  await page.keyboard.press('ArrowRight');
+  check(await eventually(async () => (await toolSub()) === '4 of 5' && (await texts('.bcv-fc__markcount')).join(',') === '1,2', 2000) && (await texts('.bcv-fc__faceterm'))[0] === 'Product rule', 'Know and the arrow keys mark cards and move on: one still learning, two known');
+  await page.click('.bcv-fc__undo');
+  check(await eventually(async () => (await toolSub()) === '3 of 5' && (await texts('.bcv-fc__markcount')).join(',') === '1,1', 2000), 'Undo takes the last mark back');
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press('ArrowLeft');
+  await page.waitForSelector('.bcv-fc__keep', { timeout: 3000 });
+  check((await texts('.bcv-fc__donetitle'))[0] === 'Nice work!' && (await texts('.bcv-fc__countn')).join(',') === '3,2' && (await texts('.bcv-fc__keep'))[0] === 'Keep reviewing 2 terms', 'the end of the round: the counts, and Keep reviewing for the two still being learned');
+  await shot(page, '40b-tools-flashcards-round');
+  await page.click('.bcv-fc__keep');
+  await page.waitForSelector('.bcv-fc__mark--know', { timeout: 3000 });
+  check((await toolSub()) === '1 of 2' && (await texts('.bcv-fc__faceterm'))[0] === 'Sum rule', 'Keep reviewing runs only those two again');
   await page.click('.bcv-tool__back');
-  await page.waitForSelector('.bcv-fc__deck', { timeout: 3000 });
-  await page.click('.bcv-fc__learn');
+  await page.waitForSelector('.bcv-fc__tile', { timeout: 3000 });
+  // Learn: multiple choice first, then typed; two in a row masters a card
+  await page.click('.bcv-fc__tile[data-mode="learn"]');
   await page.waitForSelector('.bcv-fc__choice', { timeout: 3000 });
-  const choices1 = await texts('.bcv-fc__choice');
-  check((await raw('.bcv-fc__mode'))[0] === 'Pick the definition' && (await texts('.bcv-fc__q'))[0] === 'Power rule' && choices1.length === 3 && choices1.includes('d/dx x^n = n*x^(n-1)') && (await toolSub()) === '0 of 3 mastered', `Learn asks the first card as multiple choice, the choices the deck's own definitions (${choices1.join(' | ')})`);
-  await page.click('.bcv-fc__choice:has-text("one, two")');
+  const choices1 = await texts('.bcv-fc__choicet');
+  check((await raw('.bcv-fc__mode'))[0] === 'Pick the definition' && (await texts('.bcv-fc__q'))[0] === 'Power rule' && choices1.length === 4 && choices1.includes('d/dx x^n = n*x^(n-1)') && (await toolSub()) === '0 of 5 mastered', `Learn asks the first card as multiple choice, the choices the set's own definitions (${choices1.join(' | ')})`);
+  const wrong1 = choices1.find((c) => c !== 'd/dx x^n = n*x^(n-1)');
+  await page.click(`.bcv-fc__choice:has-text("${wrong1}")`);
   await page.waitForSelector('.bcv-fc__fb--no', { timeout: 3000 });
-  check((await texts('.bcv-fc__fbtitle'))[0] === 'Not quite — it comes back later' && (await texts('.bcv-fc__fbanswer'))[0] === 'd/dx x^n = n*x^(n-1)' && (await page.$eval('.bcv-fc__choice.is-right', (e) => e.textContent)) === 'd/dx x^n = n*x^(n-1)' && (await page.$eval('.bcv-fc__choice.is-wrong', (e) => e.textContent)) === 'one, two' && (await texts('.bcv-fc__choice')).join('|') === choices1.join('|'), 'a wrong pick is marked, the right one shown, and the choices hold still');
+  check((await texts('.bcv-fc__fbtitle'))[0] === 'Not quite. It comes back later.' && (await texts('.bcv-fc__fbanswer'))[0] === 'd/dx x^n = n*x^(n-1)' && (await page.$eval('.bcv-fc__choice.is-right .bcv-fc__choicet', (e) => e.textContent)) === 'd/dx x^n = n*x^(n-1)' && (await page.$eval('.bcv-fc__choice.is-wrong .bcv-fc__choicet', (e) => e.textContent)) === wrong1 && (await texts('.bcv-fc__choicet')).join('|') === choices1.join('|'), 'a wrong pick is marked, the right one shown, and the choices hold still');
   await page.click('.bcv-fc__nextq');
   await page.waitForSelector('.bcv-fc__choice', { timeout: 3000 });
   check((await texts('.bcv-fc__q'))[0] === 'Power rule' && (await raw('.bcv-fc__mode'))[0] === 'Pick the definition', 'the card comes straight back at zero');
-  await page.click('.bcv-fc__choice:has-text("d/dx")');
+  await page.keyboard.press(String((await texts('.bcv-fc__choicet')).indexOf('d/dx x^n = n*x^(n-1)') + 1));
   await page.waitForSelector('.bcv-fc__fb--ok', { timeout: 3000 });
   await page.click('.bcv-fc__nextq');
   await page.waitForSelector('.bcv-fc__typed', { timeout: 3000 });
-  check((await raw('.bcv-fc__mode'))[0] === 'Type the definition' && (await texts('.bcv-fc__q'))[0] === 'Power rule', 'right once: the same card is asked again, typed from memory (recognition is not recall)');
+  check((await raw('.bcv-fc__mode'))[0] === 'Type the definition' && (await texts('.bcv-fc__q'))[0] === 'Power rule', 'a number key picks a choice; right once, the same card is asked again, typed from memory');
   await page.fill('.bcv-fc__typed', 'D/DX X^N = N*X^(N-1)!');
   await page.click('.bcv-fc__check');
   await page.waitForSelector('.bcv-fc__fb--ok', { timeout: 3000 });
   await page.click('.bcv-fc__nextq');
   await page.waitForSelector('.bcv-fc__choice', { timeout: 3000 });
   const decks2 = await sw.evaluate(async () => (await self.BCV.api.storage.local.get('tools:decks'))['tools:decks']);
-  check((await toolSub()) === '1 of 3 mastered' && (await texts('.bcv-fc__progress'))[0] === '1 / 3' && (await texts('.bcv-fc__q'))[0] === 'Sum rule' && decks2[0].cards.find((c) => c.term === 'Power rule').level === 2, 'typed right (case and punctuation aside): two in a row masters the card, kept on the card itself; the next card comes up');
-  await shot(page, '40-tools-flashcards');
+  check((await toolSub()) === '1 of 5 mastered' && (await texts('.bcv-fc__progress'))[0] === '1 / 5' && (await texts('.bcv-fc__q'))[0] === 'Sum rule' && decks2[0].cards.find((c) => c.term === 'Power rule').level === 2, 'typed right (case and punctuation aside): two in a row masters the card, kept on the card itself; the next card comes up');
+  await shot(page, '40c-tools-flashcards-learn');
+  await page.click('.bcv-tool__back');
+  await page.waitForSelector('.bcv-fc__tile', { timeout: 3000 });
+  // Test: questions of three kinds, marked at the end with the answers shown
+  await page.click('.bcv-fc__tile[data-mode="test"]');
+  await page.waitForSelector('.bcv-fc__question', { timeout: 3000 });
+  const kinds = await texts('.bcv-fc__qkind');
+  check((await toolSub()) === '5 questions' && kinds.length === 5 && new Set(kinds).size === 3 && (await texts('.bcv-fc__progress'))[0] === '0 / 5', `a test of five questions of three kinds (${kinds.join(', ')})`);
+  const testDecks = await sw.evaluate(async () => (await self.BCV.api.storage.local.get('tools:decks'))['tools:decks']);
+  for (let i = 0; i < 5; i++) { // every one right, from the set itself
+    const qs = `.bcv-fc__question[data-q="q${i}"]`;
+    const kind = await page.$eval(`${qs} .bcv-fc__qkind`, (e) => e.textContent);
+    const prompt = await page.$eval(`${qs} .bcv-fc__qprompt`, (e) => e.textContent);
+    if (kind === 'Multiple choice') { const def = testDecks[0].cards.find((c) => c.term === prompt).def; const k = (await page.$$eval(`${qs} .bcv-fc__choicet`, (els) => els.map((e) => e.textContent))).indexOf(def); await page.click(`${qs} .bcv-fc__choice:nth-child(${k + 1})`); }
+    else if (kind === 'True or false') { const shown = await page.$eval(`${qs} .bcv-fc__tfdef`, (e) => e.textContent); const truth = testDecks[0].cards.find((c) => c.term === prompt).def === shown; await page.click(`${qs} .bcv-fc__choice:nth-child(${truth ? 1 : 2})`); }
+    else await page.fill(`${qs} .bcv-fc__written`, testDecks[0].cards.find((c) => c.def === prompt).term);
+  }
+  await page.fill('.bcv-fc__question[data-q="q2"] .bcv-fc__written', 'nope'); // one wrong on purpose
+  await page.click('.bcv-fc__submit');
+  await page.waitForSelector('.bcv-fc__score', { timeout: 3000 });
+  check((await texts('.bcv-fc__scoren'))[0] === '80%' && (await texts('.bcv-fc__scorel'))[0] === '4 of 5 right' && (await page.$$('.bcv-fc__question.is-wrong')).length === 1 && (await page.$$('.bcv-fc__question.is-right')).length === 4 && /^Answer: /.test((await texts('.bcv-fc__question.is-wrong .bcv-fc__qanswer'))[0]) && (await page.$('.bcv-fc__submit')) === null, 'Submit marks the test: the score, each question right or wrong, the answer shown where it was wrong');
+  await shot(page, '40d-tools-flashcards-test');
+  await page.click('.bcv-fc__toset');
+  await page.waitForSelector('.bcv-fc__tile', { timeout: 3000 });
+  // Match: pair the tiles against the clock; a wrong pair shakes, a right one goes
+  await page.click('.bcv-fc__tile[data-mode="match"]');
+  await page.waitForSelector('.bcv-fc__tilecard', { timeout: 3000 });
+  check((await page.$$('.bcv-fc__tilecard')).length === 10 && (await texts('.bcv-fc__clock'))[0] === '0.0 s', 'Match lays out the five terms and their definitions as ten tiles, the clock at zero');
+  const tiles = await page.$$eval('.bcv-fc__tilecard', (els) => els.map((e) => ({ card: e.dataset.card, kind: e.dataset.kind, i: Number(e.dataset.tile) })));
+  const termOf = (card) => tiles.find((t) => t.card === card && t.kind === 'term'), defOf = (card) => tiles.find((t) => t.card === card && t.kind === 'def');
+  const ids = [...new Set(tiles.map((t) => t.card))];
+  await page.click(`.bcv-fc__tilecard[data-tile="${termOf(ids[0]).i}"]`);
+  await page.click(`.bcv-fc__tilecard[data-tile="${defOf(ids[1]).i}"]`);
+  check((await page.$$('.bcv-fc__tilecard.is-wrong')).length === 2 && (await page.$$('.bcv-fc__tilecard.is-matched')).length === 0, 'a wrong pair is shaken and stays');
+  for (const id of ids) { await page.click(`.bcv-fc__tilecard[data-tile="${termOf(id).i}"]`); await page.click(`.bcv-fc__tilecard[data-tile="${defOf(id).i}"]`); }
+  await page.waitForSelector('.bcv-fc__again', { timeout: 3000 });
+  const matchDecks = await sw.evaluate(async () => (await self.BCV.api.storage.local.get('tools:decks'))['tools:decks']);
+  check(/^Matched in \d+\.\d s$/.test((await texts('.bcv-fc__donetitle'))[0]) && (await texts('.bcv-fc__donetext'))[0] === 'A new best time!' && matchDecks[0].best > 0, `every pair matched: the time, and a best kept on the set (${(await texts('.bcv-fc__donetitle'))[0]})`);
+  await shot(page, '40e-tools-flashcards-match');
   await closeTool();
   // a card dragged to the top becomes a pin beside the switch, on every page
   const cardBox = await page.$eval('.bcv-tool-card[data-tool="pomo"]', (e) => { const r = e.getBoundingClientRect(); return { x: r.left + 60, y: r.top + 30 }; });

@@ -226,7 +226,7 @@
         U.el('bcv-tool__btns', [copyBtn, saveBtn]),
       ]),
       T.card([U.el('bcv-tool__cardhead', [savedLabel, copyAll]), savedList], 'bcv-cite__savedcard'),
-      T.hint('Always check the result against your course’s required style guide.'),
+      T.hint('Double-check it against your class’s style guide.'),
     );
     const missingDefs = () => fieldDefs(st.type).filter((d) => d.req && !String(st.f[d.key] || '').trim());
     const ready = () => missingDefs().length === 0;
@@ -266,7 +266,7 @@
         ]);
         U.enter(row, i, 35, 300);
         return row;
-      }) : [T.hint('Saved citations stay on this device. Nothing is sent to Canvas.')]));
+      }) : [T.hint('Saved citations stay on this device.')]));
     }
     buildTypes();
     buildFields();

@@ -23,6 +23,10 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.24.0', date: '2026-09-19', notes: [
+      { kind: 'new', title: 'Flashcards, Quizlet style', body: 'A set page with Flashcards, Learn, Test and Match, stars, and paste to add cards.', icon: P.layers },
+      { kind: 'improved', title: 'Simpler Tools', body: 'Every tool says what it does in a few plain words.', icon: P.tool },
+    ] },
     { version: '2.23.0', date: '2026-09-18', notes: [
       { kind: 'new', title: 'Word ⇄ PDF here', body: 'Word to PDF and back on this device: headings, lists, tables, links and pictures.', icon: P.arrows },
       { kind: 'new', title: 'Pass/Fail courses', body: 'A switch on each course in setup. No letter to aim at, and it stays out of the GPA.', icon: P.toggle },

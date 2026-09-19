@@ -683,7 +683,7 @@ try {
   await page.waitForSelector('.bcv-tool[data-tool="fc"]', { timeout: 5000 });
   await page.click('.bcv-fc__new');
   await page.waitForSelector('.bcv-fc__name', { timeout: 3000 });
-  check((await page.$eval('.bcv-tool', (e) => { const r = e.getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth + 1 && r.top >= 0 && r.bottom <= innerHeight + 1; })) && (await page.$eval('.bcv-fc__name', (e) => e.value)) === 'Untitled deck' && (await texts('.bcv-tool__title'))[0] === 'Untitled deck', 'a tool opens as a popup that fits the phone screen');
+  check((await page.$eval('.bcv-tool', (e) => { const r = e.getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth + 1 && r.top >= 0 && r.bottom <= innerHeight + 1; })) && (await page.$eval('.bcv-fc__name', (e) => e.value)) === 'Untitled set' && (await texts('.bcv-tool__title'))[0] === 'Untitled set', 'a tool opens as a popup that fits the phone screen');
   await page.screenshot({ path: join(out, 'phone-13c-tools-deck.png') });
   await page.keyboard.press('Escape');
   await eventually(async () => !(await page.$('.bcv-tool-ov')));

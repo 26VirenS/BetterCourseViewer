@@ -13,7 +13,7 @@
     const screen = U.el('bcv-screen');
     const grid = U.el('bcv-tools');
     screen.append(
-      U.el('bcv-head', U.el('bcv-head__in', U.el('bcv-head__row', [U.el('', [U.text('bcv-h1', 'Tools', 'h1'), U.text('bcv-head__sub', 'Things Simpl Courses does on its own.')])]))),
+      U.el('bcv-head', U.el('bcv-head__in', U.el('bcv-head__row', [U.el('', [U.text('bcv-h1', 'Tools', 'h1'), U.text('bcv-head__sub', 'Handy things, right here.')])]))),
       U.el('bcv-body bcv-body--24', grid),
     );
     const welcome = T().welcomeIfFirst(app).catch(() => false); // the black goes up now, over the page drawing under it

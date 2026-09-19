@@ -34,11 +34,11 @@
   // else); open() draws the tool. A tool that is not built is not listed: a dead card is worse
   // than a shorter grid.
   const TOOLS = [
-    { key: 'cite', name: 'Citation generator', note: 'MLA, APA or Chicago from the fields you fill in.', icon: IC.quote, color: '#30b0c7', open: (app, o) => BCV.toolsCite.open(app, o) },
-    { key: 'pomo', name: 'Focus timer', note: 'Pomodoro sessions that keep running while you work.', icon: IC.timer, color: '#ff9500', open: (app, o) => openTimer(app, o) },
-    { key: 'graph', name: 'Graphing calculator', note: 'Desmos, without leaving the page you are working on.', icon: IC.graph, color: '#5856d6', open: (app, o) => openGraph(app, o) },
-    { key: 'conv', name: 'File converter', note: 'DOCX to PDF, PDF to images, and image formats.', icon: IC.convert, color: '#34c759', open: (app, o) => BCV.toolsConvert.open(app, o) },
-    { key: 'fc', name: 'Flashcards', note: 'Write a deck or import one, then study or learn it.', icon: IC.cards, color: '#0a84ff', open: (app, o) => BCV.toolsCards.open(app, o) },
+    { key: 'cite', name: 'Citation generator', note: 'Cite a source in MLA, APA or Chicago.', icon: IC.quote, color: '#30b0c7', open: (app, o) => BCV.toolsCite.open(app, o) },
+    { key: 'pomo', name: 'Focus timer', note: 'Focus for a while, then take a break.', icon: IC.timer, color: '#ff9500', open: (app, o) => openTimer(app, o) },
+    { key: 'graph', name: 'Graphing calculator', note: 'Desmos, right here.', icon: IC.graph, color: '#5856d6', open: (app, o) => openGraph(app, o) },
+    { key: 'conv', name: 'File converter', note: 'Word, PDF and images, any way round.', icon: IC.convert, color: '#34c759', open: (app, o) => BCV.toolsConvert.open(app, o) },
+    { key: 'fc', name: 'Flashcards', note: 'Make a set. Flip, learn, test, match.', icon: IC.cards, color: '#0a84ff', open: (app, o) => BCV.toolsCards.open(app, o) },
   ];
   const toolOf = (key) => TOOLS.find((t) => t.key === key) || null;
   const tintOf = (color, dark) => `color-mix(in srgb, ${color} ${dark ? 26 : 15}%, transparent)`;
@@ -477,7 +477,7 @@
     const dotsLabel = U.text('bcv-pomo__dotslabel', '', 'span');
     const skip = h('button', { type: 'button', class: 'bcv-pomo__skip', title: 'Skip to the next phase', onclick: () => focusSkip() }, [U.text('', 'Skip', 'span'), U.svg('M5 5l9 7-9 7zM17 5v14', { size: 13, stroke: 'currentColor', width: 2 })]);
     const sessions = U.el('bcv-pomo__sessions', [U.el('bcv-pomo__dots', dots), dotsLabel, skip]);
-    body.append(...rise([phases, card, sessions, hint('Press or drag along the scale to set the minutes. Keeps running if you close this or leave the page; Away Refresh waits while a session is going.')], 50));
+    body.append(...rise([phases, card, sessions, hint('Drag the scale to set the minutes. It keeps going if you close this.')], 50));
 
     const paint = (f) => {
       const color = PHASE_COLOR[f.phase];

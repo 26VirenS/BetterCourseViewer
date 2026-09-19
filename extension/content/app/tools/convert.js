@@ -286,8 +286,8 @@
 
   // ---- the popup -----------------------------------------------------------------------------
   const DEVICE_SUB = 'Runs on this device. Nothing is uploaded.';
-  const DEVICE_FOOT = 'Word ⇄ PDF happens here: headings, lists, tables, links and pictures, with the closest built-in fonts.';
-  const CLOUD_FOOT = 'Word and PDF go through CloudConvert, in the original’s own fonts and layout.';
+  const DEVICE_FOOT = 'Word and PDF convert right here, with the closest built-in fonts.';
+  const CLOUD_FOOT = 'Word and PDF go through CloudConvert, so they look exactly like the original.';
   function open(app, { from = null } = {}) {
     const tool = T.toolOf('conv');
     const st = { files: [], kind: 'image', to: 'webp', q: 82, max: 0, drag: false, busy: false, note: '', stage: {}, cc: { key: '', username: '', credits: 0, use: true }, ccBusy: false, ccErr: '' };
@@ -335,7 +335,7 @@
     const removeBtn = h('button', { type: 'button', class: 'bcv-tool__link bcv-conv__ccremove', text: 'Remove key', onclick: () => { st.cc = { key: '', username: '', credits: 0, use: true }; st.ccErr = ''; keyInput.value = ''; T.save(CC_KEY, null).catch(() => {}); clearOut(); paint(); } });
     const ccLine = U.el('bcv-conv__ccline', [
       h('a', { class: 'bcv-tool__link bcv-conv__cclink', href: CC.keys, target: '_blank', rel: 'noopener', text: 'Get a free key' }),
-      h('span', { class: 'bcv-conv__ccwhy', text: 'Word and PDF keep their exact fonts and layout through it; slides, sheets and HEIC convert too. Images and text stay on this device.' }),
+      h('span', { class: 'bcv-conv__ccwhy', text: 'Exact fonts and layout for Word and PDF. Slides, sheets and HEIC too.' }),
     ]);
     const serviceCard = T.card([U.el('bcv-tool__cardhead', [T.label('CloudConvert'), ccState]), keyRow, ccErr, ccLine, U.el('bcv-conv__ccfoot', [useRow, removeBtn])], 'bcv-conv__service');
     body.append(drop, T.card([kindLabel, formats, cloudHint, qWrap, maxWrap], 'bcv-conv__settings'), noteEl, listCard, run, serviceCard);
@@ -425,7 +425,7 @@
       noteEl.hidden = !st.note;
       noteEl.textContent = st.note;
       dropSub.textContent = connected() ? 'DOCX · PPTX · XLSX · PDF · images · HEIC · TXT · MD · CSV · JSON' : 'DOCX · PDF · images · TXT · MD · CSV · JSON';
-      p.setSub(cloudOn() ? 'Word, PDF, slides and sheets go through CloudConvert.' : connected() ? 'Runs on this device; CloudConvert for what only it can do.' : DEVICE_SUB);
+      p.setSub(cloudOn() ? 'Word, PDF, slides and sheets go through CloudConvert.' : connected() ? 'Runs on this device. CloudConvert only when needed.' : DEVICE_SUB);
       if (footEl) footEl.textContent = cloudOn() ? CLOUD_FOOT : DEVICE_FOOT;
       listCard.hidden = !st.files.length;
       listCard.replaceChildren(
