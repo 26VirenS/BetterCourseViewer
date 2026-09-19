@@ -1110,15 +1110,22 @@
   // in the middle, grey, stock Canvas for this page view only (a press toggles between these two,
   // and a reload or the next page brings the look back — BCV.early.flipLook's one-page note); on
   // the left, orange, the lock — the look saved off, so every page is stock Canvas until it is
-  // unlocked (BCV.early.setLook). The colour fills out from the middle stop to the knob. A press on
-  // the slider itself goes to the stop nearest the press — its left side is the lock, its right
-  // side on — and the knob can be dragged; a press elsewhere on the pill toggles on and off for
-  // this page, as do Enter and Space, and the arrow keys step it. Under the pointer (or the
-  // keyboard's focus) the pill opens: the name comes out, saying which, and the slider grows for
-  // the fingers. The popup and Settings → General have the saved switch, the same as the lock;
-  // "Open in stock Canvas" on a Canvas-drawn page is the middle stop.
+  // unlocked (BCV.early.setLook). The slider is drawn at its own size — a 208 by 48 track, a white
+  // knob of 40 with a glyph in it (a tick, a dash, a lock), the colour running out from the middle
+  // stop as far as the knob, a dot at each stop, LOCKED and ACTIVE in the room the knob leaves —
+  // and scaled to the pill: a quarter folded, three quarters under the pointer. A press on the
+  // slider goes to the stop in that third of it — its left third the lock, its right third on —
+  // and the knob can be dragged, gliding to the nearest stop when let go; a press elsewhere on
+  // the pill toggles on and off for this page, as do Enter and Space, and the arrow keys step it.
+  // Under the pointer (or the keyboard's focus) the pill opens: the name comes out, saying which,
+  // and the slider grows for the fingers. The popup and Settings → General have the saved switch,
+  // the same as the lock; "Open in stock Canvas" on a Canvas-drawn page is the middle stop.
   const LOOK_MARK = '<svg viewBox="0 0 120 120" width="18" height="18" aria-hidden="true"><rect x="16" y="18" width="53" height="84" rx="14" fill="rgba(255,255,255,.35)"/><path d="M28 30 H69 A30 30 0 0 1 69 90 H28" fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><path d="M35 42 H69 A18 18 0 0 1 69 78 H35" fill="none" stroke="rgba(255,255,255,.72)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><path d="M42 54 H69 A6 6 0 0 1 69 66 H42" fill="none" stroke="rgba(255,255,255,.46)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-  const LOCK_MARK = '<svg viewBox="0 0 10 10" width="6" height="6" aria-hidden="true"><rect x="1.5" y="4.5" width="7" height="5" rx="1.2" fill="#fff"/><path d="M3 4.5V3.2a2 2 0 0 1 4 0v1.3" fill="none" stroke="#fff" stroke-width="1.4"/></svg>';
+  // the slider's own geometry: the track 208 wide, the knob 40 with its left at 4, 84 or 164 (its
+  // centre 80px from stop to stop, the middle one at 104), the fill from the middle stop's own
+  // round end (84 to 124) out to the knob's centre
+  const SL = { w: 208, mid: 104, r: 20, knob: 40, stops: [4, 84, 164], green: '#34c759', orange: '#ff9500', grey: '#8e8e93' };
+  const SL_GLYPH = { '1': 'M20 6L9 17l-5-5', '0': 'M6 12h12', '-1': 'M6 11h12v9H6zM9 11V8a3 3 0 016 0v3' };
   const LOOK_WORDS = { '1': 'Simpl Courses', '0': 'Off for this page', '-1': 'Locked off' };
   const LOOK_TITLES = {
     '1': 'Simpl Courses is on. Press for stock Canvas on this page; the left side of the slider locks it off.',
@@ -1129,14 +1136,16 @@
     if (self.BCVBridge?.native || document.getElementById('bcv-look')) return; // the app has its own settings sheet
     const pos = () => (BCV.early?.lookPos ? BCV.early.lookPos() : BCV.early?.isOn?.() ? 1 : 0);
     const clamp = (p) => Math.max(-1, Math.min(1, p));
-    const knob = h('span', { class: 'bcv-look__knob' });
+    const knobFor = (p) => SL.stops[p + 1];
+    const nearest = (x) => { let best = 0; SL.stops.forEach((s, i) => { if (Math.abs(s - x) < Math.abs(SL.stops[best] - x)) best = i; }); return best - 1; };
+    const glyph = h('span', { class: 'bcv-look__glyph', html: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d=""/></svg>' });
+    const knob = h('span', { class: 'bcv-look__knob' }, glyph);
+    const fill = h('span', { class: 'bcv-look__fill' });
+    const lockLbl = h('span', { class: 'bcv-look__lbl', text: 'LOCKED' });
+    const onLbl = h('span', { class: 'bcv-look__lbl', text: 'ACTIVE' });
+    const slider = h('span', { class: 'bcv-look__slider' }, [fill, ...SL.stops.map((s) => h('span', { class: 'bcv-look__tick', style: { left: `${s + SL.r - 2}px` } })), lockLbl, onLbl, knob]);
+    const track = h('span', { class: 'bcv-look__sw', 'aria-hidden': 'true' }, slider);
     const text = h('span', { class: 'bcv-look__text', text: 'Simpl Courses' });
-    const track = h('span', { class: 'bcv-look__sw', 'aria-hidden': 'true' }, [
-      h('span', { class: 'bcv-look__fill bcv-look__fill--lock' }),
-      h('span', { class: 'bcv-look__fill bcv-look__fill--on' }),
-      h('span', { class: 'bcv-look__lockmark', html: LOCK_MARK }),
-      knob,
-    ]);
     const mainBtn = h('button', { type: 'button', class: 'bcv-look__main', role: 'slider', 'aria-label': 'Simpl Courses look', 'aria-orientation': 'horizontal', 'aria-valuemin': '-1', 'aria-valuemax': '1' }, [
       h('span', { class: 'bcv-look__mark', 'aria-hidden': 'true', html: LOOK_MARK }),
       text,
@@ -1144,10 +1153,45 @@
     ]);
     const box = h('div', { id: 'bcv-look', class: 'bcv-look' }, [mainBtn]);
     let drag = null;
-    // the knob's place, -1 to 1, in a property the stylesheet turns into its offset and the fills'
-    // reach (the stops sit further apart while the slider is grown under the pointer)
-    const knobAt = (x) => { mainBtn.style.setProperty('--bcv-look-x', String(Math.round(x * 1000) / 1000)); };
-    const stopPx = () => parseFloat(getComputedStyle(track).getPropertyValue('--bcv-look-stop')) || 9;
+    let knobX = knobFor(pos());
+    let raf = 0;
+    const scale = () => (track.getBoundingClientRect().width || SL.w / 4) / SL.w; // the slider's size on the page, over its own
+    // the knob at x (its left, in the slider's own px), and everything that follows it: the fill
+    // from the middle stop to the knob's centre, in green to the right and orange to the left; the
+    // glyph for the stop the knob is nearest; LOCKED and ACTIVE fading in as the knob leaves room
+    const paintKnob = (x) => {
+      knobX = x;
+      const c = x + SL.r, right = c > SL.mid;
+      knob.style.left = `${x}px`;
+      fill.style.left = `${right ? SL.mid - SL.r : c}px`;
+      fill.style.width = `${Math.abs(c - SL.mid) < 0.5 ? 0 : right ? c - (SL.mid - SL.r) : SL.mid + SL.r - c}px`; // (none at the middle stop itself: its stub would show at the knob's edge)
+      fill.style.background = right ? SL.green : SL.orange;
+      fill.style.borderRadius = right ? '20px 3px 3px 20px' : '3px 20px 20px 3px';
+      const live = nearest(x);
+      glyph.firstElementChild.style.stroke = live === 1 ? SL.green : live === -1 ? SL.orange : SL.grey;
+      glyph.querySelector('path').setAttribute('d', SL_GLYPH[String(live)]);
+      lockLbl.style.left = `${(x + SL.knob + SL.mid + SL.r) / 2}px`;
+      lockLbl.style.opacity = String(Math.max(0, Math.min(1, (SL.mid + SL.r - (x + SL.knob) - 34) / 30)));
+      onLbl.style.left = `${(SL.mid - SL.r + x) / 2}px`;
+      onLbl.style.opacity = String(Math.max(0, Math.min(1, (x - (SL.mid - SL.r) - 34) / 30)));
+    };
+    // the knob glides to a stop (a third of a second, easing both ways), the fill following frame by frame
+    const glide = (to) => {
+      cancelAnimationFrame(raf);
+      raf = 0;
+      const from = knobX;
+      if (Math.abs(to - from) < 0.5 || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) { paintKnob(to); return; }
+      const dur = 300 + Math.min(130, Math.abs(to - from) * 0.7);
+      const t0 = performance.now();
+      const ease = (t) => (t < 0.5 ? 8 * t * t * t * t : 1 - ((-2 * t + 2) ** 4) / 2);
+      const step = () => {
+        const k = Math.min(1, (performance.now() - t0) / dur);
+        paintKnob(from + (to - from) * ease(k));
+        raf = k < 1 ? requestAnimationFrame(step) : 0;
+      };
+      raf = requestAnimationFrame(step);
+    };
+    let painted = false;
     const paint = () => {
       const p = pos();
       mainBtn.classList.toggle('is-on', p === 1);
@@ -1157,22 +1201,26 @@
       mainBtn.setAttribute('aria-valuetext', p === 1 ? 'On' : p === 0 ? 'Off for this page' : 'Locked off');
       mainBtn.title = LOOK_TITLES[String(p)];
       text.textContent = LOOK_WORDS[String(p)];
-      if (!drag) knobAt(p);
+      if (drag) return;
+      if (painted) glide(knobFor(p)); else paintKnob(knobFor(p));
+      painted = true;
     };
     const go = (p) => {
-      if (p === pos()) return;
-      knobAt(p);
+      if (p === pos()) { glide(knobFor(p)); return; }
+      glide(knobFor(p));
       box.classList.add('is-busy'); // the page loads afresh; until then the press is not repeated
       Promise.resolve(BCV.early?.setLook?.(p)).finally(() => { box.classList.remove('is-busy'); paint(); });
     };
-    // a press on the slider goes to the stop nearest it (its left side the lock, its right side
-    // on); a press elsewhere on the pill (or Enter, Space) toggles on and off for this page
+    // a press on the slider goes to the stop in that third of it (the left third the lock, the
+    // right third on); a press elsewhere on the pill (or Enter, Space) toggles on and off for this page
     let dragged = false;
     mainBtn.addEventListener('click', (e) => {
       if (dragged) return;
       const r = track.getBoundingClientRect();
       const onTrack = e.detail > 0 && e.clientX >= r.left - 4 && e.clientX <= r.right + 4 && e.clientY >= r.top - 6 && e.clientY <= r.bottom + 6;
-      go(onTrack ? clamp(Math.round((e.clientX - (r.left + r.width / 2)) / stopPx())) : pos() === 1 ? 0 : 1);
+      if (!onTrack) { go(pos() === 1 ? 0 : 1); return; }
+      const rel = (e.clientX - r.left) / scale();
+      go(rel < SL.w / 3 ? -1 : rel < (2 * SL.w) / 3 ? 0 : 1);
     });
     mainBtn.addEventListener('keydown', (e) => {
       const p = e.key === 'ArrowLeft' || e.key === 'ArrowDown' ? pos() - 1 : e.key === 'ArrowRight' || e.key === 'ArrowUp' ? pos() + 1 : e.key === 'Home' ? -1 : e.key === 'End' ? 1 : null;
@@ -1180,19 +1228,20 @@
       e.preventDefault();
       go(clamp(p));
     });
-    // the knob dragged: it follows the pointer between the stops and lands on the nearest when let go
-    mainBtn.addEventListener('pointerdown', (e) => { if (e.button === 0) drag = { x: e.clientX, from: pos(), at: pos(), id: e.pointerId, moved: false }; });
+    // the knob dragged: it follows the pointer between the stops and glides to the nearest when let go
+    mainBtn.addEventListener('pointerdown', (e) => { if (e.button === 0) drag = { x: e.clientX, knob0: knobX, id: e.pointerId, moved: false }; });
     mainBtn.addEventListener('pointermove', (e) => {
       if (!drag || e.pointerId !== drag.id) return;
-      const dx = e.clientX - drag.x;
+      const dx = (e.clientX - drag.x) / scale();
       if (!drag.moved) {
-        if (Math.abs(dx) < 4) return;
+        if (Math.abs(dx) < 3) return;
         drag.moved = true;
+        cancelAnimationFrame(raf);
+        raf = 0;
         mainBtn.classList.add('is-drag');
         try { mainBtn.setPointerCapture(e.pointerId); } catch { /* fine without */ }
       }
-      drag.at = clamp(drag.from + dx / stopPx());
-      knobAt(drag.at);
+      paintKnob(Math.max(SL.stops[0], Math.min(SL.stops[2], drag.knob0 + dx)));
     });
     const dragEnd = (e) => {
       if (!drag || e.pointerId !== drag.id) return;
@@ -1202,8 +1251,7 @@
       mainBtn.classList.remove('is-drag');
       dragged = true; // the click that follows is this drag's, not a press
       setTimeout(() => { dragged = false; }, 0);
-      const p = Math.round(d.at);
-      if (p === pos()) paint(); else go(p);
+      go(nearest(knobX));
     };
     mainBtn.addEventListener('pointerup', dragEnd);
     mainBtn.addEventListener('pointercancel', dragEnd);

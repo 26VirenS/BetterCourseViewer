@@ -23,6 +23,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.31.0', date: '2026-09-19', notes: [
+      { kind: 'improved', title: 'New look switch', body: 'A white knob with a tick, a dash or a lock in it, and the colour out from the middle.', icon: P.toggle },
+    ] },
     { version: '2.30.0', date: '2026-09-19', notes: [
       { kind: 'improved', title: 'Bigger look switch', body: 'The slider grows under the pointer. Press its left side to lock, its right side for on.', icon: P.toggle },
     ] },
