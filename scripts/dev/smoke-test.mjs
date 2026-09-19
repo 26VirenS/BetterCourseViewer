@@ -2833,30 +2833,32 @@ try {
   // the focus timer: the minutes set on the phone's timer card, kept by the clock, a live activity in the tray beside the switch, Away Refresh waits
   await openTool('pomo');
   const focusStored = async () => (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('tools:focus'))['tools:focus']));
-  const scaleInfo = () => page.$eval('.bcv-pomo__scale', (e) => ({ ticks: e.querySelectorAll('.bcv-pomo__tick').length, labels: [...e.querySelectorAll('.bcv-pomo__label')].map((x) => x.textContent).join(','), marker: e.querySelector('.bcv-pomo__marker').style.left, set: e.classList.contains('is-set') }));
+  const scaleInfo = () => page.$eval('.bcv-tool .bcv-pomo__scale', (e) => { const strip = e.querySelector('.bcv-pomo__strip'); const ppm = Number(e.dataset.ppm); const tx = Number((/translateX\(([-\d.]+)px\)/.exec(strip.style.transform) || [])[1]); return { ticks: e.querySelectorAll('.bcv-pomo__tick').length, labels: [...e.querySelectorAll('.bcv-pomo__label')].map((x) => x.textContent).join(','), centre: Math.round(((e.clientWidth / 2 - tx) / ppm) * 10) / 10, markerLeft: Math.round(parseFloat(getComputedStyle(e.querySelector('.bcv-pomo__marker')).left)), half: Math.round(e.clientWidth / 2), set: e.classList.contains('is-set') }; });
   const sc0 = await scaleInfo();
-  check((await texts('.bcv-pomo__time'))[0] === '25:00' && (await raw('.bcv-pomo__phasepill'))[0] === 'Focus' && (await texts('.bcv-pomo__main'))[0] === 'Start Timer' && (await page.$eval('.bcv-pomo__cancel', (e) => e.hidden)) && (await toolSub()) === '0 sessions today' && (await raw('.bcv-pomo__dotslabel'))[0] === 'Session 1 of 4' && sc0.ticks === 31 && sc0.labels === '0,10,20,30,40,50,60' && /^41\.6/.test(sc0.marker) && sc0.set && (await page.$eval('.bcv-pomo__card', (e) => getComputedStyle(e).backgroundColor)) === 'rgb(0, 0, 0)' && (await page.$$('.bcv-pomo__phasebtn')).length === 3 && (await page.$('#bcv-pins .bcv-island')) === null, `the timer opens idle at 25:00 on the phone's timer card, black: a scale of the hour with the marker under 25, Start Timer, Session 1 of 4, nothing in the tray yet (${JSON.stringify(sc0)})`);
-  // the minutes: a press on the scale, a drag along it, the arrow keys
+  check((await texts('.bcv-pomo__time'))[0] === '25:00' && (await raw('.bcv-pomo__phasepill'))[0] === 'Focus' && (await texts('.bcv-pomo__main'))[0] === 'Start Timer' && (await page.$eval('.bcv-pomo__cancel', (e) => e.hidden)) && (await toolSub()) === '0 sessions today' && (await raw('.bcv-pomo__dotslabel'))[0] === 'Session 1 of 4' && sc0.ticks === 91 && sc0.labels === '0,5,10,15,20,25,30,35,40,45,50,55,60,65,70,75,80,85,90' && sc0.centre === 25 && Math.abs(sc0.markerLeft - sc0.half) <= 1 && sc0.set, `the timer opens on Focus at 25 minutes: the strip of an hour and a half slid so 25 sits under the marker fixed at the centre, Start Timer, no Cancel (${JSON.stringify(sc0)})`);
+  // the minutes: the strip slides under the marker — a tap brings that minute to the middle, a drag moves the strip, the arrow keys nudge it
   // (the scale's box is read once the popup has finished rising in: mid-rise it is scaled, and a point along it lands elsewhere)
   const stableBox = async (sel) => { let last = null; for (let i = 0; i < 30; i++) { const b = await (await page.$(sel)).boundingBox(); if (last && Math.abs(b.x - last.x) < 0.5 && Math.abs(b.width - last.width) < 0.5) return b; last = b; await page.waitForTimeout(120); } return last; };
-  const sb = await stableBox('.bcv-pomo__scale');
-  await page.mouse.click(sb.x + sb.width * 0.5, sb.y + sb.height / 2);
-  check(await eventually(async () => (await texts('.bcv-pomo__time'))[0] === '30:00' && (await scaleInfo()).marker === '50%' && (await focusStored())?.mins?.focus === 30, 3000), 'a press half way along the scale sets 30 minutes, and the record keeps it');
-  await page.mouse.move(sb.x + sb.width * 0.5, sb.y + sb.height / 2);
+  const sb = await stableBox('.bcv-tool .bcv-pomo__scale');
+  const ppm = await page.$eval('.bcv-tool .bcv-pomo__scale', (e) => Number(e.dataset.ppm));
+  const cx = sb.x + sb.width / 2, cy = sb.y + sb.height / 2;
+  await page.mouse.click(cx + 5 * ppm, cy);
+  check(await eventually(async () => (await texts('.bcv-pomo__time'))[0] === '30:00' && (await scaleInfo()).centre === 30 && (await focusStored())?.mins?.focus === 30, 3000), 'a tap five minutes right of the marker brings 30 under it, and the record keeps it');
+  await page.mouse.move(cx, cy);
   await page.mouse.down();
-  await page.mouse.move(sb.x + sb.width * 0.25, sb.y + sb.height / 2, { steps: 8 });
-  const midDrag = { time: (await texts('.bcv-pomo__time'))[0], drag: await page.$eval('.bcv-pomo__scale', (e) => e.classList.contains('is-drag')), stored: (await focusStored()).mins.focus };
+  await page.mouse.move(cx + 10 * ppm, cy, { steps: 8 });
+  const midDrag = { time: (await texts('.bcv-pomo__time'))[0], drag: await page.$eval('.bcv-tool .bcv-pomo__scale', (e) => e.classList.contains('is-drag')), stored: (await focusStored()).mins.focus, marker: (await scaleInfo()).markerLeft, half: (await scaleInfo()).half };
   await page.mouse.up();
-  check(midDrag.time === '15:00' && midDrag.drag && midDrag.stored === 30 && await eventually(async () => (await focusStored()).mins.focus === 15 && !(await page.$eval('.bcv-pomo__scale', (e) => e.classList.contains('is-drag'))), 3000), `a drag follows the pointer (15:00 a quarter along) and writes the record when it lifts (${JSON.stringify(midDrag)})`);
-  await page.focus('.bcv-pomo__scale');
+  check(midDrag.time === '20:00' && midDrag.drag && midDrag.stored === 30 && Math.abs(midDrag.marker - midDrag.half) <= 1 && await eventually(async () => (await focusStored()).mins.focus === 20 && !(await page.$eval('.bcv-tool .bcv-pomo__scale', (e) => e.classList.contains('is-drag'))), 3000), `a drag to the right slides the strip so fewer minutes sit under the marker (20:00 ten minutes along), the marker itself never moving, and the record is written when the pointer lifts (${JSON.stringify(midDrag)})`);
+  await page.focus('.bcv-tool .bcv-pomo__scale');
   await page.keyboard.press('ArrowRight');
-  check(await eventually(async () => (await texts('.bcv-pomo__time'))[0] === '16:00', 3000), 'the arrow keys move it a minute');
-  await page.mouse.click(sb.x + sb.width * (25 / 60), sb.y + sb.height / 2);
+  check(await eventually(async () => (await texts('.bcv-pomo__time'))[0] === '21:00', 3000), 'the arrow keys move it a minute');
+  await page.mouse.click(cx + 4 * ppm, cy);
   await eventually(async () => (await texts('.bcv-pomo__time'))[0] === '25:00', 3000);
   await page.click('.bcv-pomo__phasebtn[data-value="short"]');
-  await eventually(async () => (await texts('.bcv-pomo__time'))[0] === '5:00' && (await scaleInfo()).ticks === 31, 3000);
+  await eventually(async () => (await texts('.bcv-pomo__time'))[0] === '5:00' && (await scaleInfo()).ticks === 61, 3000);
   const scS = await scaleInfo();
-  check((await texts('.bcv-pomo__time'))[0] === '5:00' && (await raw('.bcv-pomo__phasepill'))[0] === 'Short break' && /translateX\(100%\)/.test((await page.$eval('.bcv-pomo__ind', (e) => e.style.transform))) && scS.ticks === 31 && scS.labels === '0,5,10,15,20,25,30' && /^16\.6/.test(scS.marker), `the phase picker slides its highlight to Short: the card shows its five minutes on a half-hour scale (${JSON.stringify(scS)})`);
+  check((await texts('.bcv-pomo__time'))[0] === '5:00' && (await raw('.bcv-pomo__phasepill'))[0] === 'Short break' && /translateX\(100%\)/.test((await page.$eval('.bcv-pomo__ind', (e) => e.style.transform))) && scS.ticks === 61 && scS.labels === '0,5,10,15,20,25,30,35,40,45,50,55,60' && scS.centre === 5, `the phase picker slides its highlight to Short: the card shows its five minutes under the marker on an hour's strip (${JSON.stringify(scS)})`);
   await page.click('.bcv-pomo__phasebtn[data-value="focus"]');
   await eventually(async () => (await texts('.bcv-pomo__time'))[0] === '25:00', 3000);
   await page.click('.bcv-pomo__main');
@@ -3164,21 +3166,46 @@ try {
   await shot(page, '41b-tools-pinned');
   await page.goto(`${BASE}/calendar`);
   await page.waitForSelector('#bcv-pins .bcv-pin', { timeout: 10000 });
+  // the pin is on every page; pressed while nothing is going, it swells into a small setter: the strip under the marker and Start — set, and go
+  // (the setter follows the timer's phase, in its colour: the cancel above left it on a short break)
+  const setterInfo = () => page.$eval('#bcv-pins .bcv-island', (e) => { const sc = e.querySelector('.bcv-island__scale'); const strip = sc.querySelector('.bcv-pomo__strip'); const tx = Number((/translateX\(([-\d.]+)px\)/.exec(strip.style.transform) || [])[1]); return { mins: e.querySelector('.bcv-island__mins').textContent, go: !!e.querySelector('.bcv-island__go'), ticks: sc.querySelectorAll('.bcv-pomo__tick').length, centre: Math.round((sc.clientWidth / 2 - tx) / Number(sc.dataset.ppm)), color: getComputedStyle(e).getPropertyValue('--bcv-live-color').trim(), bodyShown: getComputedStyle(e.querySelector('.bcv-island__body')).display !== 'none', popup: !!document.querySelector('.bcv-tool[data-tool="pomo"]') }; });
+  const setterUp = () => eventually(async () => (await page.$eval('#bcv-pins .bcv-island', (e) => e.classList.contains('is-set') && e.classList.contains('is-open') && Math.round(e.getBoundingClientRect().width) === 250)), 3000);
   await page.click('#bcv-pins .bcv-pin__btn');
+  await setterUp();
+  await page.waitForTimeout(700); // the strip is laid out again once the island has its width
+  const setter = await setterInfo();
+  check(page.url() === `${BASE}/calendar` && setter.mins === '5 min' && setter.go && setter.ticks === 61 && setter.centre === 5 && setter.color === '#34c759' && !setter.bodyShown && !setter.popup, `the pin is on every page; pressed idle, it opens the small setter on the phase the timer is on — the short break's 5 under the marker on an hour's strip, in green, Start, no End or count, no popup (${JSON.stringify(setter)})`);
+  await shot(page, '41d-tools-pin-setter');
+  // a drag on the small strip sets the minutes; the minutes themselves open the timer
+  const isb = await (await page.$('#bcv-pins .bcv-island__scale')).boundingBox();
+  const ippm = await page.$eval('#bcv-pins .bcv-island__scale', (e) => Number(e.dataset.ppm));
+  await page.mouse.move(isb.x + isb.width / 2, isb.y + isb.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(isb.x + isb.width / 2 - 5 * ippm, isb.y + isb.height / 2, { steps: 6 });
+  await page.mouse.up();
+  check(await eventually(async () => (await texts('#bcv-pins .bcv-island__mins'))[0] === '10 min' && (await focusStored())?.mins?.short === 10, 3000), 'a drag to the left on the small strip brings 10 under the marker, kept in the record as the short break\'s minutes');
+  await page.click('#bcv-pins .bcv-island__mins');
   await page.waitForSelector('.bcv-tool[data-tool="pomo"]', { timeout: 5000 });
-  check(page.url() === `${BASE}/calendar` && (await texts('.bcv-tool__title'))[0] === 'Focus timer', 'the pin is on every page, and opens its tool there');
+  check((await texts('.bcv-tool__title'))[0] === 'Focus timer' && (await texts('.bcv-pomo__time'))[0] === '10:00' && (await raw('.bcv-pomo__phasepill'))[0] === 'Short break', 'the minutes on the setter open the timer itself, at those minutes, on that phase');
+  await page.click('.bcv-pomo__phasebtn[data-value="focus"]');
+  await eventually(async () => (await texts('.bcv-pomo__time'))[0] === '25:00', 3000);
   await closeTool();
-  // the pin is the timer's live activity: a session started shows in the same button, never a second one
+  // the pin is the timer's live activity: a session started from the setter shows in the same button, never a second one
   await page.evaluate(() => { document.querySelector('#bcv-pins .bcv-pin[data-tool="pomo"]').dataset.mark = 'same'; });
+  await page.click('.bcv-h1').catch(() => page.mouse.click(300, 60)); // a press elsewhere folds the setter
+  await eventually(async () => (await page.$eval('#bcv-pins .bcv-island', (e) => !e.classList.contains('is-open'))), 3000);
   await page.click('#bcv-pins .bcv-pin__btn');
-  await page.waitForSelector('.bcv-tool[data-tool="pomo"]', { timeout: 5000 });
-  await page.click('.bcv-pomo__main');
-  await eventually(async () => (await texts('.bcv-pomo__main'))[0] === 'Pause', 4000);
-  await closeTool();
+  await setterUp();
+  await page.waitForTimeout(700);
+  const setterF = await setterInfo();
+  check(setterF.mins === '25 min' && setterF.ticks === 91 && setterF.centre === 25 && setterF.color === '#ff9500', `back on Focus in the timer, the setter follows: 25 under the marker on the longer strip, in orange (${JSON.stringify(setterF)})`);
+  await page.click('#bcv-pins .bcv-island__go');
   const pinState = () => page.$eval('#bcv-pins', (bar) => { const pins = [...bar.querySelectorAll(':scope > .bcv-pin')]; const p = pins[0]; return { count: pins.length, mark: p?.dataset.mark, live: p?.classList.contains('is-live'), guest: p?.classList.contains('is-guest'), open: p?.classList.contains('is-open'), w: p ? Math.round(p.getBoundingClientRect().width) : 0, glyph: p ? getComputedStyle(p.querySelector('.bcv-island__glyph')).opacity : null, ic: p ? getComputedStyle(p.querySelector('.bcv-pin__ic')).opacity : null, hidden: bar.hidden }; });
   let same = null;
   await eventually(async () => { const r = await pinState(); same = r; return r.count === 1 && r.live && r.glyph === '1' && r.ic === '0'; }, 3000);
   check(!!same && same.count === 1 && same.live && same.glyph === '1' && same.ic === '0' && same.mark === 'same' && !same.guest, `a session started from the pin shows in that same button, its glyph giving way to the dial: one pin, not two (${JSON.stringify(same)})`);
+  await page.click('.bcv-h1').catch(() => page.mouse.click(300, 60));
+  await eventually(async () => { const r = await pinState(); return !r.open && r.w === 24; }, 6000);
   await page.click('#bcv-pins .bcv-pin__btn');
   await eventually(async () => { const r = await pinState(); return r.open && r.w === 250; }, 3000);
   check((await page.$eval('#bcv-pins .bcv-island', (e) => e.dataset.mark === 'same' && /^\d+:\d\d$/.test(e.querySelector('.bcv-island__time').textContent))), 'and that same pin swells into the island');

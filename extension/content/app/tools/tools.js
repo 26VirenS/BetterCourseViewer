@@ -230,11 +230,6 @@
   /** Skip to the phase after this one; a session that was going keeps going there. A skipped focus
    *  block does not count as one done. */
   const focusSkip = () => focusPhase(nextPhase(focus), { keepRunning: running() });
-  const focusBump = (p, d) => {
-    const v = Math.max(1, Math.min(90, (Number(focus.mins[p]) || 25) + d));
-    const mins = { ...focus.mins, [p]: v };
-    return focusWrite({ mins, ...(p === focus.phase && !focus.endAt ? { left: null } : {}) });
-  };
   /** Whether a session is going right now: the stale-page reload stands back while it is (a session
    *  ends by itself, so nothing can hold the reload off for longer than one phase). */
   const focusActive = () => running();
@@ -307,7 +302,7 @@
     const btn = item.querySelector('.bcv-pin__btn');
     if (!on) {
       islandPhase = null;
-      islandClose(item);
+      if (item.classList.contains('is-set')) paintSetter(item, f); else islandClose(item); // (the setter stays up: set, and go)
       item.classList.remove('is-live', 'is-paused');
       btn.title = 'Focus timer';
       btn.setAttribute('aria-label', 'Focus timer');
@@ -361,6 +356,36 @@
       ]),
     ]);
   }
+  /** The pinned timer's island while nothing is going: the strip and Start alone — set, and go. A
+   *  press on the minutes opens the timer itself. */
+  function islandSetter(item) {
+    const scale = scaleEl('bcv-island__scale');
+    const mins = h('button', { type: 'button', class: 'bcv-island__mins', title: 'Open the timer', onclick: (e) => { e.stopPropagation(); open('pomo', { from: item }); } });
+    const go = h('button', { type: 'button', class: 'bcv-island__btn bcv-island__go', title: 'Start', 'aria-label': 'Start', onclick: (e) => { e.stopPropagation(); focusStart(); islandOpen(item, 5000); } }, U.svg(IC.play, { size: 18, stroke: 'currentColor', width: 2.4 }));
+    scaleHands(scale, { idle: () => !focusOn(), mins: () => Math.round(phaseLen(focus) / 60), set: (v, persist) => {
+      const m = { ...focus.mins, [focus.phase]: v };
+      if (persist) focusWrite({ mins: m, left: null }); else { focus = { ...focus, mins: m, left: null }; paintSetter(item, focus); }
+      islandOpen(item, 8000);
+    } });
+    return U.el('bcv-island__set', [U.el('bcv-island__setscale', [mins, scale]), go]);
+  }
+  function paintSetter(item, f) {
+    const scale = item.querySelector('.bcv-island__scale');
+    if (!scale) return;
+    const m = Math.round(phaseLen(f) / 60);
+    item.style.setProperty('--bcv-live-color', PHASE_COLOR[f.phase]);
+    paintScale(scale, scaleMax(f.phase), m);
+    scale.setAttribute('aria-valuenow', String(m));
+    scale.setAttribute('aria-valuetext', U.plural(m, 'minute'));
+    item.querySelector('.bcv-island__mins').textContent = `${m} min`;
+  }
+  function islandSet(item, focusKb = false) {
+    item.classList.add('is-set');
+    paintSetter(item, focus);
+    islandOpen(item, 8000);
+    for (const ms of [120, 320, 560]) setTimeout(() => { if (item.classList.contains('is-set')) paintSetter(item, focus); }, ms); // (the strip is laid out in pixels: again as the island swells to its width)
+    if (focusKb) setTimeout(() => item.querySelector('.bcv-island__scale')?.focus(), 200);
+  }
   function islandOpen(item, ms = 6000, focusMain = false) {
     item.classList.add('is-open');
     item.setAttribute('aria-expanded', 'true');
@@ -371,6 +396,7 @@
   function islandClose(item) {
     clearTimeout(islandTimer);
     islandTimer = 0;
+    item.classList.remove('is-set');
     if (!item.classList.contains('is-open')) return;
     item.classList.remove('is-open');
     item.classList.add('is-folding'); // (no X on the way down: it belongs to the pin, not the island)
@@ -381,42 +407,77 @@
   document.addEventListener('pointerdown', (e) => { const item = document.querySelector('#bcv-pins .bcv-island.is-open'); if (item && !item.contains(e.target)) islandClose(item); }, true);
 
   // ---- the focus timer, the tool -------------------------------------------------------------
-  // The phone's timer card: the minutes on a scale with the marker under the minutes set — a
-  // press or a drag along it (or the arrow keys) sets them — Start Timer, and the count large in
-  // the phase's colour. Going, the marker rides under the minutes left and the ticks brighten
-  // around it; the button is Pause, and Cancel beside it. Above it a phase picker whose highlight
-  // slides; under it four dots for the sessions towards a long break, and Skip.
-  const scaleMax = (phase, mins) => (mins <= 30 && phase !== 'focus' ? 30 : mins <= 60 ? 60 : 90);
-  /** The scale's ticks and labels for `max` minutes: about thirty ticks, a label every five, ten
-   *  or fifteen. Rebuilt when the range changes. */
+  // The phone's timer card: a strip of minutes slides under a marker fixed at the centre — a drag
+  // moves the strip, a tap brings the minute under the pointer to the middle, the arrow keys nudge
+  // it — Start Timer, and the count large in the phase's colour. Going, the strip slides on by
+  // itself as the minutes run out, the ticks brightest around the marker; the button is Pause, and
+  // Cancel beside it. Above it a phase picker whose highlight slides; under it four dots for the
+  // sessions towards a long break, and Skip. The pinned timer's island carries a small copy of the
+  // strip and Start alone: set, and go.
+  const SCALE_SPAN = 30; // minutes across the scale, whatever its width
+  const scaleMax = (phase) => (phase === 'focus' ? 90 : 60);
+  const ppm = (scale) => (scale.clientWidth || 360) / SCALE_SPAN; // pixels per minute
+  /** The strip's ticks (every minute, taller every five) and its labels (every five) for `max` minutes. */
   function buildScale(scale, max) {
-    const step = max <= 30 ? 1 : max <= 60 ? 2 : 3;
-    const every = max <= 30 ? 5 : max <= 60 ? 10 : 15;
-    const labels = scale.querySelector('.bcv-pomo__labels');
-    const ticks = scale.querySelector('.bcv-pomo__ticks');
-    labels.replaceChildren();
-    ticks.replaceChildren();
-    for (let m = 0; m <= max; m += step) {
-      const x = `${(m / max) * 100}%`;
-      ticks.append(h('span', { class: 'bcv-pomo__tick', style: { left: x }, dataset: { min: String(m) } }));
-      if (m % every === 0) labels.append(h('span', { class: 'bcv-pomo__label', style: { left: x }, text: String(m) }));
+    const strip = scale.querySelector('.bcv-pomo__strip');
+    const p = ppm(scale);
+    strip.replaceChildren();
+    strip.style.width = `${max * p}px`;
+    for (let m = 0; m <= max; m++) {
+      strip.append(h('span', { class: `bcv-pomo__tick${m % 5 === 0 ? ' bcv-pomo__tick--major' : ''}`, style: { left: `${m * p}px` }, dataset: { min: String(m) } }));
+      if (m % 5 === 0) strip.append(h('span', { class: 'bcv-pomo__label', style: { left: `${m * p}px` }, text: String(m) }));
     }
     scale.dataset.max = String(max);
+    scale.dataset.ppm = p.toFixed(3);
   }
-  /** The marker under `atMin`, the ticks and labels bright around it and dim away from it. */
+  /** The strip slid so `atMin` sits under the centre marker, the ticks and labels bright around it. */
   function paintScale(scale, max, atMin) {
-    if (scale.dataset.max !== String(max)) buildScale(scale, max);
-    const at = Math.max(0, Math.min(1, atMin / max));
-    scale.querySelector('.bcv-pomo__marker').style.left = `${at * 100}%`;
-    for (const t of scale.querySelectorAll('.bcv-pomo__tick')) {
-      const d = Math.abs(Number(t.dataset.min) / max - at);
-      t.style.opacity = String(Math.max(0.22, 1 - d / 0.42));
-    }
-    for (const l of scale.querySelectorAll('.bcv-pomo__label')) {
-      const d = Math.abs(Number(l.textContent) / max - at);
-      l.style.opacity = String(Math.max(0.3, 1 - d / 0.5));
-    }
+    const p = ppm(scale);
+    if (scale.dataset.max !== String(max) || scale.dataset.ppm !== p.toFixed(3)) buildScale(scale, max);
+    const at = Math.max(0, Math.min(max, atMin));
+    const strip = scale.querySelector('.bcv-pomo__strip');
+    strip.style.transform = `translateX(${(scale.clientWidth || 360) / 2 - at * p}px)`;
+    scale.dataset.at = at.toFixed(2);
+    for (const t of strip.querySelectorAll('.bcv-pomo__tick')) t.style.opacity = String(Math.max(0.18, 1 - Math.abs(Number(t.dataset.min) - at) / 13));
+    for (const l of strip.querySelectorAll('.bcv-pomo__label')) l.style.opacity = String(Math.max(0.28, 1 - Math.abs(Number(l.textContent) - at) / 14));
   }
+  /** A scale set by hand: a drag slides the strip (the record written when the pointer lifts, the
+   *  card following in the meantime), a tap brings that minute to the middle, the arrow keys nudge
+   *  it (five at a time with Shift). Nothing while a session is going or paused. */
+  function scaleHands(scale, { idle, mins, set }) {
+    let drag = null;
+    const clamp = (v) => Math.max(1, Math.min(Number(scale.dataset.max) || 90, Math.round(v)));
+    scale.addEventListener('pointerdown', (e) => {
+      if (!idle() || e.button !== 0) return;
+      drag = { x: e.clientX, from: mins(), moved: false };
+      try { scale.setPointerCapture(e.pointerId); } catch { /* fine without */ }
+      scale.classList.add('is-drag');
+      e.preventDefault();
+    });
+    scale.addEventListener('pointermove', (e) => {
+      if (!drag) return;
+      if (Math.abs(e.clientX - drag.x) > 3) drag.moved = true;
+      if (drag.moved) set(clamp(drag.from - (e.clientX - drag.x) / ppm(scale)), false);
+    });
+    const end = (e) => {
+      if (!drag) return;
+      const d = drag;
+      drag = null;
+      scale.classList.remove('is-drag');
+      if (d.moved) set(clamp(d.from - (e.clientX - d.x) / ppm(scale)), true);
+      else { const r = scale.getBoundingClientRect(); set(clamp(d.from + (e.clientX - (r.left + r.width / 2)) / ppm(scale)), true); }
+    };
+    scale.addEventListener('pointerup', end);
+    scale.addEventListener('pointercancel', end);
+    scale.addEventListener('keydown', (e) => {
+      if (!idle()) return;
+      const d = e.key === 'ArrowRight' || e.key === 'ArrowUp' ? 1 : e.key === 'ArrowLeft' || e.key === 'ArrowDown' ? -1 : 0;
+      if (!d) return;
+      e.preventDefault();
+      set(clamp(mins() + d * (e.shiftKey ? 5 : 1)), true);
+    });
+  }
+  const scaleEl = (cls = '') => h('div', { class: `bcv-pomo__scale ${cls}`, role: 'slider', tabindex: '0', 'aria-label': 'Minutes', 'aria-valuemin': '1', 'aria-valuemax': '90' }, [U.el('bcv-pomo__strip'), h('span', { class: 'bcv-pomo__marker' })]);
   function openTimer(app, { from = null } = {}) {
     const tool = toolOf('pomo');
     const body = U.el('bcv-pomo');
@@ -426,52 +487,21 @@
     const phaseBtns = Object.entries({ focus: 'Focus', short: 'Short', long: 'Long' }).map(([k, name]) => h('button', { type: 'button', class: 'bcv-pomo__phasebtn', role: 'tab', text: name, dataset: { value: k }, onclick: () => focusPhase(k) }));
     const phases = h('div', { class: 'bcv-pomo__phases', role: 'tablist' }, [ind, ...phaseBtns]);
     // the card
-    const marker = h('span', { class: 'bcv-pomo__marker' });
-    const scale = h('div', { class: 'bcv-pomo__scale', role: 'slider', tabindex: '0', 'aria-label': 'Minutes', 'aria-valuemin': '1', 'aria-valuemax': '90' }, [U.el('bcv-pomo__labels'), U.el('bcv-pomo__ticks'), marker]);
+    const scale = scaleEl();
     const mainBtn = h('button', { type: 'button', class: 'bcv-pomo__btn bcv-pomo__main', onclick: () => (running() ? focusPause() : focusStart()) });
     const cancelBtn = h('button', { type: 'button', class: 'bcv-pomo__btn bcv-pomo__btn--dim bcv-pomo__cancel', text: 'Cancel', hidden: true, onclick: () => focusReset() });
     const phaseEl = h('span', { class: 'bcv-pomo__phasepill' });
     const endsEl = U.text('bcv-pomo__ends', '', 'span');
     const timeEl = U.text('bcv-pomo__time', '0:00');
     const card = U.el('bcv-pomo__card', [scale, U.el('bcv-pomo__row', [mainBtn, cancelBtn, U.el('bcv-pomo__right', [U.el('bcv-pomo__meta', [phaseEl, endsEl]), timeEl])])]);
-    // setting the minutes: a press or a drag along the scale while nothing is going; the record is
-    // written when the pointer lifts, the card following the pointer in the meantime
+    // setting the minutes: the strip under the pointer while nothing is going
     const idle = () => !running() && (focus.left === null || focus.left === undefined);
-    const minuteAt = (x) => {
-      const r = scale.getBoundingClientRect();
-      const max = Number(scale.dataset.max) || 30;
-      return Math.max(1, Math.min(90, Math.round(((x - r.left) / Math.max(1, r.width)) * max)));
-    };
-    let dragging = false;
     const setMins = (v, persist) => {
       const mins = { ...focus.mins, [focus.phase]: v };
       if (persist) focusWrite({ mins, left: null });
       else { focus = { ...focus, mins, left: null }; paintAll(); }
     };
-    scale.addEventListener('pointerdown', (e) => {
-      if (!idle() || e.button !== 0) return;
-      dragging = true;
-      try { scale.setPointerCapture(e.pointerId); } catch { /* fine without */ }
-      scale.classList.add('is-drag');
-      setMins(minuteAt(e.clientX), false);
-      e.preventDefault();
-    });
-    scale.addEventListener('pointermove', (e) => { if (dragging) setMins(minuteAt(e.clientX), false); });
-    const endDrag = (e) => {
-      if (!dragging) return;
-      dragging = false;
-      scale.classList.remove('is-drag');
-      setMins(minuteAt(e.clientX), true);
-    };
-    scale.addEventListener('pointerup', endDrag);
-    scale.addEventListener('pointercancel', endDrag);
-    scale.addEventListener('keydown', (e) => {
-      if (!idle()) return;
-      const d = e.key === 'ArrowRight' || e.key === 'ArrowUp' ? 1 : e.key === 'ArrowLeft' || e.key === 'ArrowDown' ? -1 : 0;
-      if (!d) return;
-      e.preventDefault();
-      focusBump(focus.phase, d * (e.shiftKey ? 5 : 1));
-    });
+    scaleHands(scale, { idle, mins: () => Math.round(phaseLen(focus) / 60), set: setMins });
     // the sessions towards a long break, and Skip
     const dots = [0, 1, 2, 3].map(() => h('span', { class: 'bcv-pomo__dot' }));
     const dotsLabel = U.text('bcv-pomo__dotslabel', '', 'span');
@@ -493,7 +523,7 @@
       ind.style.transform = `translateX(${idx * 100}%)`;
       phaseBtns.forEach((b) => { b.classList.toggle('is-active', b.dataset.value === f.phase); b.setAttribute('aria-selected', b.dataset.value === f.phase ? 'true' : 'false'); });
       const mins = Math.round(len / 60);
-      paintScale(scale, scaleMax(f.phase, mins), set ? mins : left / 60);
+      paintScale(scale, scaleMax(f.phase), set ? mins : left / 60);
       scale.classList.toggle('is-set', set);
       scale.setAttribute('aria-valuenow', String(mins));
       scale.setAttribute('aria-valuetext', `${U.plural(mins, 'minute')}${on ? `, ${mmss(left)} left` : paused ? ', paused' : ''}`);
@@ -508,6 +538,8 @@
       dotsLabel.textContent = f.phase === 'focus' ? `Session ${cycle + 1} of 4` : f.phase === 'long' ? 'Long break' : `Short break · ${4 - cycle} to a long one`;
     };
     const stop = watch(paint);
+    const ro = new ResizeObserver(() => { if (p.alive()) paint(focus); else ro.disconnect(); }); // (the strip is laid out in pixels: a card that changes width lays it out again)
+    ro.observe(scale);
     const mo = new MutationObserver(() => { if (!p.alive()) { stop(); mo.disconnect(); } });
     mo.observe(document.body, { childList: true });
     if (!focusRead) focusLoad().then(paintAll).catch(() => {});
@@ -568,7 +600,7 @@
     const live = t.key === 'pomo' && !demo; // (the timer's pin is also its live activity)
     const el = h('span', { class: 'bcv-pin', dataset: { tool: t.key } });
     const btn = h('button', { type: 'button', class: 'bcv-pin__btn', title: t.name, 'aria-label': t.name, tabindex: demo ? '-1' : '0',
-      onclick: demo ? null : (e) => { if (el.classList.contains('is-live')) islandOpen(el, 6000, e.detail === 0); else open(t.key, { from: e.currentTarget }); } }, [
+      onclick: demo ? null : (e) => { if (el.classList.contains('is-live')) islandOpen(el, 6000, e.detail === 0); else if (live) islandSet(el, e.detail === 0); else open(t.key, { from: e.currentTarget }); } }, [
       h('span', { class: 'bcv-pin__ic' }, U.svg(t.icon, { size: 13, stroke: t.color, width: 2 })),
       live ? islandGlyph() : null,
     ]);
@@ -576,7 +608,7 @@
       el.classList.add('bcv-island');
       el.dataset.live = 'pomo';
       el.setAttribute('aria-expanded', 'false');
-      el.append(h('div', { class: 'bcv-island__face' }, [btn, islandBody(el)]));
+      el.append(h('div', { class: 'bcv-island__face' }, [btn, islandBody(el), islandSetter(el)]));
       // open: a press on the count opens the timer, a press elsewhere on the body keeps it open a while longer
       el.addEventListener('click', (e) => { if (!el.classList.contains('is-open') || e.target.closest('button')) return; if (e.target.closest('.bcv-island__right')) open('pomo', { from: el }); else islandOpen(el); });
       el.addEventListener('keydown', (e) => { if (e.key === 'Escape' && el.classList.contains('is-open')) { e.stopPropagation(); islandClose(el); btn.focus(); } });

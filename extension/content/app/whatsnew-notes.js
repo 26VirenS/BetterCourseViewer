@@ -23,6 +23,10 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.26.0', date: '2026-09-19', notes: [
+      { kind: 'improved', title: 'Timer scale', body: 'The marker stays in the middle. Drag the scale left or right to set the minutes.', icon: P.clock },
+      { kind: 'new', title: 'Set and go', body: 'The pinned timer opens a small scale and a Start button. Set it, and go.', icon: P.pin },
+    ] },
     { version: '2.25.0', date: '2026-09-19', notes: [
       { kind: 'new', title: 'Convert to hand in', body: 'A file of the wrong type is offered as one the assignment takes, converted here.', icon: P.arrows },
       { kind: 'fixed', title: 'One Away Refresh', body: 'Coming back to a tab shows one pill, never a stack of them.', icon: P.clock },
