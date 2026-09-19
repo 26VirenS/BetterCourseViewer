@@ -10,7 +10,6 @@
     version: 2,
     appearance: {
       skin: true,                 // the redesigned interface; off = stock Canvas
-      persistLook: false,         // the look switch (the popup, the top right of the page): saved for every page, or this page view only
       darkMode: 'system',         // 'off' | 'on' | 'system'
       siteName: '',               // shown in the sidebar brand row; blank = derived from the host
       logoUrl: '',                // sidebar tile image; blank = the school's own mark from Canvas's theme

@@ -20,7 +20,7 @@
   // (viewBox size, the line, the head) and the thing pointed at, built when the stage opens
   const STAGES = {
     look: {
-      layout: 'look', kicker: 'just in case', title: 'Use this to disable Simpl', hint: 'Use Persistent to keep Simpl off for a while',
+      layout: 'look', kicker: 'just in case', title: 'Press this to turn Simpl off for a page', hint: 'Drag it left to lock Simpl off',
       arrow: { w: 260, ht: 230, line: 'M40 215C40 150 100 90 150 30', head: 'M111.4 40.6L150 30L146.7 69.9' }, // a curve from the text up to the switch's underside
       prop: (app, ctx) => lookCopy(ctx.look, true),
     },

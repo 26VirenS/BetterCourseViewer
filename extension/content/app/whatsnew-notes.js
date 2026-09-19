@@ -23,6 +23,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.29.0', date: '2026-09-19', notes: [
+      { kind: 'new', title: 'Three-way look switch', body: 'Press for stock Canvas on this page. Drag it left, or press twice, to lock Simpl off.', icon: P.toggle },
+    ] },
     { version: '2.28.0', date: '2026-09-19', notes: [
       { kind: 'improved', title: 'Word into a PDF hand-in', body: 'Where only PDF is allowed, the picker takes Word, text and pictures, and says so.', icon: P.arrows },
     ] },

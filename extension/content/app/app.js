@@ -1104,55 +1104,99 @@
     for (const v of ['--bcv-hole-top', '--bcv-hole-left', '--bcv-hole-width']) html.style.removeProperty(v);
   }
 
-  // ---- the switch at the top right: the look on or off, on every page ------------------------------
+  // ---- the switch at the top right: the look on, off for this page, or locked off ------------------
   // Over our own shell and over stock Canvas alike — it lives outside #bcv-app, so a page drawn
-  // without the shell has it too. What a press does is the popup's Persistent switch's call: saved
-  // for every page, or this page view only (see BCV.early.flipLook). The popup and Settings →
-  // General have the same switch; "Open in stock Canvas" on a Canvas-drawn page is the same move.
+  // without the shell has it too. One slider with three stops: on the right, green, the look on;
+  // in the middle, grey, stock Canvas for this page view only (a press toggles between these two,
+  // and a reload or the next page brings the look back — BCV.early.flipLook's one-page note); on
+  // the left, orange, the lock — the look saved off, so every page is stock Canvas until it is
+  // unlocked (BCV.early.setLook). The lock takes a deliberate move: the knob dragged there, a
+  // double press, or the arrow keys; a press unlocks. Under the pointer (or the keyboard's focus)
+  // the name comes out, saying which. The popup and Settings → General have the saved switch, the
+  // same as the lock; "Open in stock Canvas" on a Canvas-drawn page is the middle stop.
   const LOOK_MARK = '<svg viewBox="0 0 120 120" width="18" height="18" aria-hidden="true"><rect x="16" y="18" width="53" height="84" rx="14" fill="rgba(255,255,255,.35)"/><path d="M28 30 H69 A30 30 0 0 1 69 90 H28" fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><path d="M35 42 H69 A18 18 0 0 1 69 78 H35" fill="none" stroke="rgba(255,255,255,.72)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><path d="M42 54 H69 A6 6 0 0 1 69 66 H42" fill="none" stroke="rgba(255,255,255,.46)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-  // Under the pointer (or the keyboard's focus) it opens a second row: Persistent, the same switch
-  // the popup has, so what a press of the look switch does can be changed right there.
+  const LOCK_MARK = '<svg viewBox="0 0 10 10" width="6" height="6" aria-hidden="true"><rect x="1.5" y="4.5" width="7" height="5" rx="1.2" fill="#fff"/><path d="M3 4.5V3.2a2 2 0 0 1 4 0v1.3" fill="none" stroke="#fff" stroke-width="1.4"/></svg>';
+  const LOOK_STOP = 9; // px from one stop of the knob to the next
+  const LOOK_WORDS = { '1': 'Simpl Courses', '0': 'Off for this page', '-1': 'Locked off' };
+  const LOOK_TITLES = {
+    '1': 'Simpl Courses is on. Press for stock Canvas on this page; drag the knob left, or press twice, to lock it off.',
+    '0': 'Stock Canvas for this page. Press for Simpl Courses; drag the knob left, or press twice, to lock it off.',
+    '-1': 'Simpl Courses is locked off. Press, or drag the knob right, to unlock it.',
+  };
   function mountLookToggle() {
     if (self.BCVBridge?.native || document.getElementById('bcv-look')) return; // the app has its own settings sheet
-    const on = () => !!BCV.early?.isOn?.();
-    const persist = () => !!(BCV.early?.settings?.() || state.settings)?.appearance?.persistLook;
-    const sw = (cls = '') => h('span', { class: `bcv-look__sw ${cls}`, 'aria-hidden': 'true' }, h('span', { class: 'bcv-look__knob' }));
-    const mainBtn = h('button', { type: 'button', class: 'bcv-look__main', role: 'switch', 'aria-label': 'Simpl Courses look' }, [
+    const pos = () => (BCV.early?.lookPos ? BCV.early.lookPos() : BCV.early?.isOn?.() ? 1 : 0);
+    const knob = h('span', { class: 'bcv-look__knob' });
+    const text = h('span', { class: 'bcv-look__text', text: 'Simpl Courses' });
+    const mainBtn = h('button', { type: 'button', class: 'bcv-look__main', role: 'slider', 'aria-label': 'Simpl Courses look', 'aria-orientation': 'horizontal', 'aria-valuemin': '-1', 'aria-valuemax': '1' }, [
       h('span', { class: 'bcv-look__mark', 'aria-hidden': 'true', html: LOOK_MARK }),
-      h('span', { class: 'bcv-look__text', text: 'Simpl Courses' }),
-      sw(),
+      text,
+      h('span', { class: 'bcv-look__sw', 'aria-hidden': 'true' }, [h('span', { class: 'bcv-look__lockmark', html: LOCK_MARK }), knob]),
     ]);
-    const persistBtn = h('button', { type: 'button', class: 'bcv-look__persist', role: 'switch', 'aria-label': 'Persistent' }, [
-      h('span', { class: 'bcv-look__ptext', text: 'Persistent' }),
-      sw('bcv-look__sw--small'),
-    ]);
-    const box = h('div', { id: 'bcv-look', class: 'bcv-look' }, [mainBtn, persistBtn]);
+    const box = h('div', { id: 'bcv-look', class: 'bcv-look' }, [mainBtn]);
+    let drag = null;
+    const knobAt = (p) => { knob.style.transform = `translateX(${(p + 1) * LOOK_STOP}px)`; };
     const paint = () => {
-      const now = on();
-      const keep = persist();
-      mainBtn.classList.toggle('is-on', now);
-      mainBtn.setAttribute('aria-checked', now ? 'true' : 'false');
-      mainBtn.title = now ? 'Simpl Courses look is on. Press for stock Canvas.' : 'Stock Canvas. Press for the Simpl Courses look.';
-      persistBtn.classList.toggle('is-on', keep);
-      persistBtn.setAttribute('aria-checked', keep ? 'true' : 'false');
-      persistBtn.title = keep ? 'Persistent is on: the look switch saves. Press so it changes this page only.' : 'Persistent is off: the look switch changes this page only. Press so it saves.';
+      const p = pos();
+      mainBtn.classList.toggle('is-on', p === 1);
+      mainBtn.classList.toggle('is-off', p === 0);
+      mainBtn.classList.toggle('is-lock', p === -1);
+      mainBtn.setAttribute('aria-valuenow', String(p));
+      mainBtn.setAttribute('aria-valuetext', p === 1 ? 'On' : p === 0 ? 'Off for this page' : 'Locked off');
+      mainBtn.title = LOOK_TITLES[String(p)];
+      text.textContent = LOOK_WORDS[String(p)];
+      if (!drag) knobAt(p);
     };
-    mainBtn.addEventListener('click', () => {
+    const go = (p) => {
+      if (p === pos()) return;
+      knobAt(p);
       box.classList.add('is-busy'); // the page loads afresh; until then the press is not repeated
-      Promise.resolve(BCV.early?.flipLook?.(!on())).finally(() => box.classList.remove('is-busy'));
+      Promise.resolve(BCV.early?.setLook?.(p)).finally(() => { box.classList.remove('is-busy'); paint(); });
+    };
+    // a press toggles on and off for this page; a second press within a beat is the lock instead
+    // (or, locked, the unlock); the first press waits that beat, as the page would load afresh on it
+    let clickTimer = 0;
+    let dragged = false;
+    mainBtn.addEventListener('click', (e) => {
+      if (dragged) return;
+      clearTimeout(clickTimer);
+      clickTimer = 0;
+      if (e.detail >= 2) { go(pos() === -1 ? 1 : -1); return; }
+      clickTimer = setTimeout(() => { clickTimer = 0; go(pos() === 1 ? 0 : 1); }, 260);
     });
-    persistBtn.addEventListener('click', async () => {
-      // like the popup's: turning it on makes the look this page shows the saved one, so what is on
-      // screen is what stays (and nothing reloads)
-      const want = !persist();
-      const patch = { appearance: { persistLook: want } };
-      if (want) patch.appearance.skin = on();
-      try {
-        const next = await S.update(patch);
-        await BCV.early?.sync?.(next); // a storage change may never reach this page (Safari): applied here
-      } catch { /* the page keeps its own */ }
-      paint();
+    mainBtn.addEventListener('keydown', (e) => {
+      const p = e.key === 'ArrowLeft' || e.key === 'ArrowDown' ? pos() - 1 : e.key === 'ArrowRight' || e.key === 'ArrowUp' ? pos() + 1 : e.key === 'Home' ? -1 : e.key === 'End' ? 1 : null;
+      if (p === null) return;
+      e.preventDefault();
+      go(Math.max(-1, Math.min(1, p)));
     });
+    // the knob dragged: it follows the pointer between the stops and lands on the nearest when let go
+    mainBtn.addEventListener('pointerdown', (e) => { if (e.button === 0) drag = { x: e.clientX, from: pos(), at: (pos() + 1) * LOOK_STOP, id: e.pointerId, moved: false }; });
+    mainBtn.addEventListener('pointermove', (e) => {
+      if (!drag || e.pointerId !== drag.id) return;
+      const dx = e.clientX - drag.x;
+      if (!drag.moved) {
+        if (Math.abs(dx) < 4) return;
+        drag.moved = true;
+        mainBtn.classList.add('is-drag');
+        try { mainBtn.setPointerCapture(e.pointerId); } catch { /* fine without */ }
+      }
+      drag.at = Math.max(0, Math.min(2 * LOOK_STOP, (drag.from + 1) * LOOK_STOP + dx));
+      knob.style.transform = `translateX(${drag.at}px)`;
+    });
+    const dragEnd = (e) => {
+      if (!drag || e.pointerId !== drag.id) return;
+      const d = drag;
+      drag = null;
+      if (!d.moved) return;
+      mainBtn.classList.remove('is-drag');
+      dragged = true; // the click that follows is this drag's, not a press
+      setTimeout(() => { dragged = false; }, 0);
+      const p = Math.round(d.at / LOOK_STOP) - 1;
+      if (p === pos()) paint(); else go(p);
+    };
+    mainBtn.addEventListener('pointerup', dragEnd);
+    mainBtn.addEventListener('pointercancel', dragEnd);
     paint();
     document.body.append(box);
     BCV.early?.onChange?.(paint);

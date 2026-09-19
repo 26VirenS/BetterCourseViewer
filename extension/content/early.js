@@ -39,16 +39,6 @@
         if (msg.settings) sync(msg.settings);
         return false;
       }
-      // the popup's look switch asks this tab what it shows, and flips it (see flipLook)
-      if (msg.type === 'lookState') {
-        sendResponse({ on: html.classList.contains('bcv-on'), persist: !!current?.appearance?.persistLook, once: override !== null });
-        return false;
-      }
-      if (msg.type === 'lookFlip') {
-        sendResponse({ ok: true });
-        flipLook(!!msg.on);
-        return false;
-      }
       if (msg.type !== 'wipeSiteNote') return false;
       wiped = true;
       try { localStorage.removeItem(CACHE_KEY); } catch { /* ignore */ }
@@ -116,19 +106,12 @@
   const ready = sync();
   S.onChange((s) => sync(s));
 
-  /** The look the other way round. With Persistent on (the popup) it is saved, and Settings, the
-   *  popup and every page follow; off, it is for this page view alone — a one-page note, and a
-   *  reload or the next page brings the saved look back. Either way the page is loaded afresh
-   *  (stock Canvas has to come back whole; our shell has to be built over a page Canvas drew
-   *  without it), except mid-quiz, where Canvas's own attempt page is the place to land (every
-   *  answer is already saved there). The app's web view repaints in place instead. */
+  /** The look the other way round, for this page view alone: a one-page note, and a reload or
+   *  the next page brings the saved look back. The page is loaded afresh (stock Canvas has to come
+   *  back whole; our shell has to be built over a page Canvas drew without it), except mid-quiz,
+   *  where Canvas's own attempt page is the place to land (every answer is already saved there).
+   *  The app's web view repaints in place instead. */
   async function flipLook(on) {
-    const settings = current || (await S.get());
-    if (settings.appearance?.persistLook) {
-      const next = await S.update({ appearance: { skin: on } });
-      await sync(next); // a storage change may never reach this page (Safari): applied here, the reload follows
-      return;
-    }
     if (self.BCVBridge?.native) {
       override = on;
       await sync(current);
@@ -146,6 +129,36 @@
       return;
     }
     location.reload();
+  }
+  /** The switch at the top right has three positions. 1: the look on. 0: stock Canvas for this
+   *  page view only (flipLook's one-page note). -1: locked off — saved, so every page is stock
+   *  Canvas until it is unlocked (Settings and the popup show the same saved switch). Unlocking
+   *  saves the look on again; unlocked to 0, this page stays stock Canvas on a one-page note and
+   *  the look is back on the next page. */
+  const locked = () => !!current && current.appearance?.skin === false;
+  const lookPos = () => (locked() ? -1 : html.classList.contains('bcv-on') ? 1 : 0);
+  async function setLook(pos) {
+    if (!current) await ready;
+    if (pos === lookPos()) return;
+    if (pos === -1) {
+      const next = await S.update({ appearance: { skin: false } });
+      await sync(next); // a storage change may never reach this page (Safari): applied here, the reload follows
+      return;
+    }
+    if (locked()) {
+      const next = await S.update({ appearance: { skin: true } });
+      if (pos === 0 && !self.BCVBridge?.native) {
+        try {
+          sessionStorage.setItem(ONCE_KEY, 'off');
+          location.reload();
+          return;
+        } catch { /* no note to leave: on, then */ }
+      }
+      await sync(next);
+      if (pos === 0) { override = false; await sync(next); } // the app's web view: off for this page, in place
+      return;
+    }
+    await flipLook(pos === 1);
   }
   // (No page-top loading bar: the sidebar row that was pressed is the progress indicator, mockup 14.)
   // Safety net: if the interface never mounts (a script error, a blocked page, an answer that
@@ -179,6 +192,8 @@
     isDark: () => html.getAttribute('data-bcv-theme') === 'dark',
     isOn: () => html.classList.contains('bcv-on'),
     isOnce: () => override !== null, // this page view shows the look the other way round from the saved one
+    lookPos,
+    setLook,
     flipLook,
     onChange: (fn) => {
       listeners.add(fn);
