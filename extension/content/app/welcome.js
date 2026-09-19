@@ -2,17 +2,22 @@
  * with a Continue that comes in after a few seconds; the last Continue takes the black away.
  * Two runs use it. After the setup, the reloaded page comes back black (the flag is read before
  * the page draws, so the Dashboard is never seen first) and points at the look switch at the top
- * right — an opened, still copy of the real one, Persistent row and all — then at a mock Away
- * Refresh pill counting its three seconds down in slow motion, then at the Dashboard's way in: a
+ * right — a copy of the real one, shown working: a pointer comes to it, presses its stops and
+ * drags its knob, the lines under it saying what each move does — then at a mock Away Refresh
+ * pill counting its three seconds down in slow motion, then at the Dashboard's way in: a
  * counter pressed, the list behind it, an item previewed beside the list. The first time Tools
  * opens, it says what Tools is, then shows the drag: a card pulled to the top turning into a pin
  * beside the switch. A phone has no switch in its header, so it gets the pointers that need none; the app
- * (no switch, no Away Refresh) never sees the setup's. */
+ * (no switch, no Away Refresh) never sees the setup's. Anyone who had Simpl before the switch
+ * became a slider gets its show alone, once: their What's New mark is from before it. */
 (function () {
   const BCV = (self.BCV = self.BCV || {});
   const { h } = BCV.utils;
   const html = document.documentElement;
   const KEY = 'welcome:pending'; // the setup's run, armed for the reloaded page
+  const KEY2 = 'welcome:look2'; // the switch's show seen (with the setup's run, or alone after an update)
+  const LOOK2_SINCE = '2.33.0'; // the version the slider came in: a What's New mark from before it means the show is owed
+  const CURSOR = '<svg viewBox="0 0 24 24" width="26" height="26"><path d="M5 3l14 9-6 1.5 3.5 6.5-2.5 1.5-3.5-6.5L6 19z" fill="#fff" stroke="#1c1c1e" stroke-width="1.4" stroke-linejoin="round"/></svg>';
   const WAIT = 3000; // Continue comes in after this long, on each stage: time to take the pointer in first
   const LEAVE = 260; // a stage's fade-out (app.css: bcv-welcome-out)
 
@@ -20,9 +25,17 @@
   // (viewBox size, the line, the head) and the thing pointed at, built when the stage opens
   const STAGES = {
     look: {
-      layout: 'look', kicker: 'just in case', title: 'Press this to turn Simpl off for a page', hint: 'Drag it left to lock Simpl off',
-      arrow: { w: 260, ht: 230, line: 'M40 215C40 150 100 90 150 30', head: 'M111.4 40.6L150 30L146.7 69.9' }, // a curve from the text up to the switch's underside
-      prop: (app, ctx) => lookCopy(ctx.look, true),
+      layout: 'look', kicker: 'the switch at the top right', title: 'Point at it', hint: 'It opens when the pointer comes near.',
+      // the show's moves, each with its lines (title, hint); and the one line for all of it with reduced motion
+      steps: [
+        ['Point at it', 'It opens when the pointer comes near.'],
+        ['Press the middle', 'Stock Canvas for this page only. Simpl is back when the page reloads.'],
+        ['Press the right', 'Simpl Courses on.'],
+        ['Drag the knob left to lock', 'Simpl stays off on every page until you unlock it. Pressing the left end does the same.'],
+        ['Press the right to unlock', 'And Simpl is back, on every page.'],
+      ],
+      still: ['Press it, or drag the knob', 'The middle is stock Canvas for this page. The right is Simpl on. The left locks Simpl off, on every page, until you unlock it.'],
+      prop: (app, ctx) => lookShow(app, ctx),
     },
     away: {
       layout: 'away', kicker: 'Away Refresh', title: 'Click to cancel', hint: 'Away refresh prevents errors that show up after you’ve been gone for a while',
@@ -51,9 +64,17 @@
   async function clear() {
     try { await BCV.api.storage.local.remove(KEY); } catch { /* already gone */ }
   }
+  const older = (a, b) => { const x = String(a).split('.').map(Number), y = String(b).split('.').map(Number); for (let i = 0; i < 3; i++) { if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) < (y[i] || 0); } return false; };
+  /** Which run this page owes: 'setup' (the setup's, armed), 'look' (the switch's show alone, once,
+   *  for anyone who had Simpl before the slider), or none. */
   async function due() {
     if (self.BCVBridge?.native) { await clear(); return false; } // the app: no switch, no Away Refresh
-    try { return (await BCV.api.storage.local.get(KEY))[KEY] === true; } catch { return false; }
+    try {
+      const f = await BCV.api.storage.local.get([KEY, KEY2, 'setup:done', 'whatsnew:seen']);
+      if (f[KEY] === true) return 'setup';
+      if (f['setup:done'] && !f[KEY2] && typeof f['whatsnew:seen'] === 'string' && older(f['whatsnew:seen'], LOOK2_SINCE)) return 'look';
+    } catch { /* nothing to read: nothing owed */ }
+    return false;
   }
 
   /** The black, now: before the page draws, so the reload comes back black and stays that way. */
@@ -83,6 +104,65 @@
     copy.setAttribute('aria-hidden', 'true');
     for (const b of copy.querySelectorAll('button')) { b.tabIndex = -1; b.removeAttribute('title'); }
     return copy;
+  }
+  /** The switch, shown working: a copy of it at the top right (app.lookDemo: the same DOM, its knob
+   *  put where the show says), and a pointer that comes to it (it opens), presses its middle (off
+   *  for this page), its right (on), drags its knob to the left stop (locked) and presses its right
+   *  again (unlocked), round and round, the stage's lines saying what each move does (ctx.say). With
+   *  reduced motion: the opened copy, still, and one line for all of it. */
+  function lookShow(app, ctx) {
+    const demo = app.lookDemo?.();
+    if (!demo) return null;
+    const s = STAGES.look;
+    demo.el.classList.add('bcv-welcome__look');
+    const cursor = h('span', { class: 'bcv-welcome__cursor bcv-welcome__cursor--look', 'aria-hidden': 'true', html: CURSOR });
+    const wrap = h('div', { class: 'bcv-welcome__lookshow', 'aria-hidden': 'true' }, [demo.el, cursor]);
+    const say = (i) => ctx.say?.(s.steps[i][0], s.steps[i][1]);
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) { demo.open(true); ctx.say?.(s.still[0], s.still[1]); return wrap; }
+    const alive = () => wrap.isConnected && !wrap.classList.contains('is-out');
+    const point = (nx) => { const r = demo.slider.el.getBoundingClientRect(); return { x: r.left + (nx / 208) * r.width, y: r.top + r.height / 2 }; }; // the slider's own x, on the page
+    const disc = () => { const r = demo.el.getBoundingClientRect(); return { x: r.right - r.height / 2, y: r.top + r.height / 2 }; };
+    const away = () => { const d = disc(); return { x: d.x - 150, y: d.y + 130 }; };
+    const cursorTo = ({ x, y }, ms) => { cursor.style.setProperty('--cms', `${ms}ms`); cursor.style.setProperty('--cx', `${x - 5}px`); cursor.style.setProperty('--cy', `${y - 3}px`); };
+    const q = (ms, fn) => setTimeout(() => { if (alive()) fn(); }, ms);
+    const press = () => { cursor.classList.add('is-press'); q(180, () => cursor.classList.remove('is-press')); };
+    const drag = (fromC, toC, ms) => { // the knob and the pointer together, frame by frame
+      const t0 = performance.now();
+      const step = () => {
+        if (!alive()) return;
+        const k = Math.min(1, (performance.now() - t0) / ms);
+        const e = k < 0.5 ? 2 * k * k : 1 - ((-2 * k + 2) ** 2) / 2;
+        const c = fromC + (toC - fromC) * e;
+        demo.slider.paint(c - 20);
+        cursorTo(point(c), 0);
+        if (k < 1) requestAnimationFrame(step);
+      };
+      requestAnimationFrame(step);
+    };
+    const loop = () => {
+      if (!alive()) return;
+      demo.setPos(1, { glide: false });
+      demo.open(false);
+      say(0);
+      cursor.style.opacity = '0';
+      cursorTo(away(), 0);
+      q(250, () => { cursor.style.opacity = '1'; cursorTo(disc(), 800); });
+      q(1150, () => demo.open(true));
+      q(2100, () => { say(1); cursorTo(point(104), 600); });
+      q(2800, () => { press(); demo.setPos(0); });
+      q(4500, () => { say(2); cursorTo(point(173), 600); });
+      q(5200, () => { press(); demo.setPos(1); });
+      q(6900, () => { say(3); cursorTo(point(184), 600); });
+      q(7600, () => { cursor.classList.add('is-press'); drag(184, 24, 1100); });
+      q(8800, () => { cursor.classList.remove('is-press'); demo.setPos(-1); });
+      q(10400, () => { say(4); cursorTo(point(173), 600); });
+      q(11100, () => { press(); demo.setPos(1); });
+      q(12300, () => { cursorTo(away(), 700); cursor.style.opacity = '0'; });
+      q(12700, () => demo.open(false));
+      q(13500, loop);
+    };
+    q(60, loop); // (once the stage is on the page, so the copy can be measured)
+    return wrap;
   }
   /** The Away Refresh pill as it will be, its dial in slow motion (app.css) and nothing wired. */
   function awayMock(app) {
@@ -135,16 +215,19 @@
     const s = STAGES[key];
     const next = h('button', { type: 'button', class: 'bcv-welcome__next', text: 'Continue' });
     next.hidden = true;
-    const box = h('div', { class: 'bcv-welcome__stage', dataset: { stage: s.layout } }, [
-      s.arrow ? arrowOf(s.arrow) : null,
-      h('div', { class: 'bcv-welcome__text' }, [
-        s.kicker ? h('div', { class: 'bcv-welcome__kicker', text: s.kicker }) : null,
-        h('div', { class: 'bcv-welcome__title', text: s.title }),
-        h('div', { class: 'bcv-welcome__hint', text: s.hint }),
-      ]),
-      next,
-    ]);
-    const prop = s.prop ? s.prop(app, ctx) : null;
+    const titleEl = h('div', { class: 'bcv-welcome__title', text: s.title });
+    const hintEl = h('div', { class: 'bcv-welcome__hint', text: s.hint });
+    const textBox = h('div', { class: 'bcv-welcome__text' }, [s.kicker ? h('div', { class: 'bcv-welcome__kicker', text: s.kicker }) : null, titleEl, hintEl]);
+    const box = h('div', { class: 'bcv-welcome__stage', dataset: { stage: s.layout } }, [s.arrow ? arrowOf(s.arrow) : null, textBox, next]);
+    // the lines changed by the thing shown, as its show moves on: out, swapped, in
+    let swap = 0;
+    const say = (title, hint) => {
+      if (titleEl.textContent === title && hintEl.textContent === hint) return;
+      clearTimeout(swap);
+      textBox.classList.add('is-swap');
+      swap = setTimeout(() => { titleEl.textContent = title; hintEl.textContent = hint; textBox.classList.remove('is-swap'); }, 160);
+    };
+    const prop = s.prop ? s.prop(app, { ...ctx, say }) : null;
     ui.el.dataset.stage = key;
     ui.el.replaceChildren(...[prop, box].filter(Boolean));
     ui.stage = { key, box, prop, next };
@@ -181,6 +264,7 @@
       const look = lookNow();
       if (!look && (key === 'look' || key === 'pin')) continue;
       await stage(app, key, { look });
+      if (key === 'look') { try { await BCV.api.storage.local.set({ [KEY2]: true }); } catch { /* shown all the same */ } } // (seen: not owed again after an update)
       await leave();
     }
     if (setupRun) await clear();

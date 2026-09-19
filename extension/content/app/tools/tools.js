@@ -614,6 +614,111 @@
   const pin = (key) => setPins(pins.includes(key) ? pins : [...pins, key]);
   const unpin = (key) => setPins(pins.filter((k) => k !== key));
   const pinned = (key) => pins.includes(key);
+  // ---- the quick menus: a pin swelling into a capsule under the pointer --------------------------
+  // The pins other than the timer's open the way its island does: under the pointer (a mouse or a
+  // pen) the pin swells into a capsule holding the tool's quickest use — a link to cite, a sum to
+  // work out, a file to convert, a set to study — and folds when the pointer leaves. The full tool
+  // is a press on the pin (or Enter) away, as before, and a press on the capsule's name.
+  const QUICK = { cite: { w: 300, build: quickCite }, graph: { w: 290, build: quickGraph }, conv: { w: 250, build: quickConv }, fc: { w: 320, build: quickCards } };
+  function quickHover(item, t) {
+    const q = QUICK[t.key];
+    if (!q) return null;
+    item.classList.add('bcv-quick');
+    item.style.setProperty('--bcv-quick-w', `${q.w}px`);
+    item.style.setProperty('--bcv-quick-color', t.color);
+    const body = U.el('bcv-quick__body');
+    let panel = null;
+    let leave = 0;
+    const closeQ = () => {
+      if (!item.classList.contains('is-open')) return;
+      item.classList.remove('is-open');
+      item.classList.add('is-folding'); // (no X on the way down: it belongs to the pin)
+      setTimeout(() => item.classList.remove('is-folding'), 480);
+      item.setAttribute('aria-expanded', 'false');
+    };
+    const openQ = () => {
+      if (!panel) { panel = q.build({ item, go: (o = {}) => { closeQ(); open(t.key, { from: item, ...o }); } }); body.replaceChildren(...panel.els); }
+      panel.onOpen?.();
+      item.classList.add('is-open');
+      item.setAttribute('aria-expanded', 'true');
+    };
+    item.addEventListener('pointerenter', (e) => { if (e.pointerType === 'touch' || item.classList.contains('is-out')) return; clearTimeout(leave); item.classList.add('is-hover'); openQ(); });
+    item.addEventListener('pointerleave', (e) => {
+      if (e.pointerType === 'touch') return;
+      item.classList.remove('is-hover');
+      clearTimeout(leave);
+      leave = setTimeout(() => { if (!item.classList.contains('is-hover') && !item.querySelector(':focus')) closeQ(); }, 260); // (a field being typed in holds it open)
+    });
+    item.addEventListener('keydown', (e) => { if (e.key === 'Escape' && item.classList.contains('is-open')) { e.stopPropagation(); closeQ(); item.querySelector('.bcv-pin__btn')?.focus(); } });
+    item.addEventListener('focusout', () => setTimeout(() => { if (!item.classList.contains('is-hover') && !item.querySelector(':focus')) closeQ(); }, 0));
+    return body;
+  }
+  document.addEventListener('pointerdown', (e) => { for (const item of document.querySelectorAll('#bcv-pins .bcv-quick.is-open')) if (!item.contains(e.target)) { item.classList.remove('is-hover'); item.querySelector(':focus')?.blur(); item.classList.remove('is-open'); item.setAttribute('aria-expanded', 'false'); } }, true);
+  const quickName = (name, go, title) => h('button', { type: 'button', class: 'bcv-quick__name', title, 'aria-label': title, text: name, onclick: () => go() });
+  const quickGo = (icon, title, onclick) => h('button', { type: 'button', class: 'bcv-quick__go', title, 'aria-label': title, onclick }, U.svg(icon, { size: 14, stroke: '#fff', width: 2.3 }));
+  /** Citation generator: a link pasted here opens the tool with it filled in, on Website. */
+  function quickCite({ go }) {
+    const inp = h('input', { type: 'url', class: 'bcv-quick__input', placeholder: 'Paste a link to cite', 'aria-label': 'A link to cite' });
+    const cite = () => { const url = inp.value.trim(); inp.value = ''; go(url ? { url } : {}); };
+    inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); cite(); } });
+    return { els: [quickName('Cite', go, 'Open the citation generator'), inp, quickGo(IC.chevron, 'Cite it', cite)] };
+  }
+  /** A sum worked out: + − × ÷ ^ and brackets, sqrt, sin, cos, tan, asin, acos, atan, ln, log, abs,
+   *  exp, pi and e. The number, to ten figures, or null for anything else. */
+  function evalSum(text) {
+    const s = String(text || '').replace(/×/g, '*').replace(/÷/g, '/').replace(/−/g, '-').replace(/\s+/g, '');
+    if (!s) return null;
+    let i = 0;
+    const FN = { sqrt: Math.sqrt, sin: Math.sin, cos: Math.cos, tan: Math.tan, asin: Math.asin, acos: Math.acos, atan: Math.atan, ln: Math.log, log: Math.log10, abs: Math.abs, exp: Math.exp };
+    const CONST = { pi: Math.PI, e: Math.E };
+    const bad = () => { throw new Error('sum'); };
+    function atom() {
+      const ch = s[i];
+      if (ch === '(') { i++; const v = expr(); if (s[i] !== ')') bad(); i++; return v; }
+      if (ch === '-') { i++; return -atom(); }
+      if (ch === '+') { i++; return atom(); }
+      const w = /^[a-z]+/i.exec(s.slice(i));
+      if (w) { const name = w[0].toLowerCase(); i += name.length; if (name in FN) { if (s[i] !== '(') bad(); return FN[name](atom()); } if (name in CONST) return CONST[name]; bad(); }
+      const m = /^\d*\.?\d+(e[+-]?\d+)?/i.exec(s.slice(i));
+      if (!m) bad();
+      i += m[0].length;
+      return parseFloat(m[0]);
+    }
+    function power() { const b = atom(); if (s[i] === '^') { i++; return b ** power(); } return b; }
+    function term() { let v = power(); while (s[i] === '*' || s[i] === '/') { const op = s[i++]; const r = power(); v = op === '*' ? v * r : v / r; } return v; }
+    function expr() { let v = term(); while (s[i] === '+' || s[i] === '-') { const op = s[i++]; const r = term(); v = op === '+' ? v + r : v - r; } return v; }
+    try { const v = expr(); if (i !== s.length || !Number.isFinite(v)) return null; return String(Number(v.toPrecision(10))); } catch { return null; }
+  }
+  /** Graphing calculator: a sum worked out as it is typed; the graph a press away. */
+  function quickGraph({ go }) {
+    const inp = h('input', { type: 'text', class: 'bcv-quick__input', placeholder: 'A sum: 2^10, sin(pi/6)…', 'aria-label': 'A sum to work out', autocomplete: 'off' });
+    const out = U.text('bcv-quick__result', '', 'span');
+    const calc = () => { const v = evalSum(inp.value); out.textContent = v === null ? (inp.value.trim() ? '?' : '') : `= ${v}`; };
+    inp.addEventListener('input', calc);
+    inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); calc(); } });
+    return { els: [quickName('Sum', go, 'Open the graphing calculator'), inp, out, quickGo(IC.graph, 'Open the graphing calculator', () => go())] };
+  }
+  /** File converter: a file dropped or chosen here opens the tool with it in. */
+  function quickConv({ go }) {
+    const input = h('input', { type: 'file', multiple: true, hidden: true, accept: '.docx,.pptx,.xlsx,.pdf,.txt,.md,.csv,.json,.heic,.heif,image/*', 'aria-label': 'Files to convert' });
+    input.addEventListener('change', () => { const files = Array.from(input.files || []); input.value = ''; if (files.length) go({ files }); });
+    const drop = h('button', { type: 'button', class: 'bcv-quick__drop', text: 'Drop a file to convert', onclick: () => input.click() });
+    drop.addEventListener('dragover', (e) => { e.preventDefault(); drop.classList.add('is-drag'); });
+    drop.addEventListener('dragleave', () => drop.classList.remove('is-drag'));
+    drop.addEventListener('drop', (e) => { e.preventDefault(); drop.classList.remove('is-drag'); const files = Array.from(e.dataTransfer?.files || []); if (files.length) go({ files }); });
+    return { els: [quickName('Convert', go, 'Open the file converter'), drop, input] };
+  }
+  /** Flashcards: the sets as chips, a press opening one to study; the sets read again each time it opens. */
+  function quickCards({ go }) {
+    const chips = U.el('bcv-quick__chips');
+    const onOpen = async () => {
+      const raw = await load('tools:decks', []);
+      const decks = Array.isArray(raw) ? raw.filter((d) => d && d.id) : [];
+      chips.replaceChildren(...(decks.length ? decks.slice(0, 8).map((d) => h('button', { type: 'button', class: 'bcv-quick__chip', title: `${d.name || 'Untitled set'} · ${U.plural((d.cards || []).length, 'term')}`, text: d.name || 'Untitled set', onclick: () => go({ deck: d.id }) })) : [U.text('bcv-quick__none', 'No sets yet', 'span')]));
+    };
+    return { els: [quickName('Study', go, 'Open Flashcards'), chips, quickGo(IC.chevron, 'Open Flashcards', () => go())], onOpen };
+  }
+
   /** One pin: a round dark button with the tool's glyph, and its X. */
   function pinEl(t, { demo = false } = {}) {
     const live = t.key === 'pomo' && !demo; // (the timer's pin is also its live activity)
@@ -632,7 +737,10 @@
       // open: a press on the count opens the timer, a press elsewhere on the body keeps it open a while longer
       el.addEventListener('click', (e) => { if (!el.classList.contains('is-open') || e.target.closest('button')) return; if (e.target.closest('.bcv-island__right')) open('pomo', { from: el }); else islandOpen(el); });
       el.addEventListener('keydown', (e) => { if (e.key === 'Escape' && el.classList.contains('is-open')) { e.stopPropagation(); islandClose(el); btn.focus(); } });
-    } else el.append(btn);
+    } else {
+      const quick = demo ? null : quickHover(el, t);
+      if (quick) { el.setAttribute('aria-expanded', 'false'); el.append(h('div', { class: 'bcv-quick__face' }, [btn, quick])); } else el.append(btn);
+    }
     if (!demo) el.append(h('button', { type: 'button', class: 'bcv-pin__x', title: `Unpin ${t.name}`, 'aria-label': `Unpin ${t.name}`, onclick: (e) => { e.stopPropagation(); unpin(t.key); } }, U.svg(IC.close, { size: 8, stroke: '#fff', width: 2.6 })));
     return el;
   }

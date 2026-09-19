@@ -153,10 +153,10 @@
   }
 
   // ---- the popup -----------------------------------------------------------------------------
-  async function open(app, { from = null } = {}) {
+  async function open(app, { from = null, url = '' } = {}) {
     const tool = T.toolOf('cite');
     const dark = app.isDark();
-    const st = { style: 'mla', type: 'website', f: { ...EMPTY }, saved: [], copied: 0 };
+    const st = { style: 'mla', type: 'website', f: { ...EMPTY, ...(url ? { url: String(url) } : {}) }, saved: [], copied: 0 }; // (a link handed in — the quick menu on the pin — is filled in, on Website)
     const raw = await T.load(KEY, []);
     st.saved = Array.isArray(raw) ? raw.filter((x) => x && Array.isArray(x.parts)) : [];
 

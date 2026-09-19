@@ -289,11 +289,12 @@
   const DEVICE_SUB = 'Runs on this device. Nothing is uploaded.';
   const DEVICE_FOOT = 'Word and PDF convert right here, with the closest built-in fonts.';
   const CLOUD_FOOT = 'Word and PDF go through CloudConvert, so they look exactly like the original.';
-  function open(app, { from = null } = {}) {
+  function open(app, { from = null, files = null } = {}) {
     const tool = T.toolOf('conv');
     const st = { files: [], kind: 'image', to: 'webp', q: 82, max: 0, drag: false, busy: false, note: '', stage: {}, cc: { key: '', username: '', credits: 0, use: true }, ccBusy: false, ccErr: '' };
     const body = U.el('bcv-conv');
     const p = T.popup({ tool, title: 'File converter', sub: DEVICE_SUB, width: 560, body, from, foot: DEVICE_FOOT });
+    if (files && files.length) queueMicrotask(() => addFiles(files)); // (files handed in — the quick menu on the pin — are in as soon as the popup is up)
     const footEl = p.sheet.querySelector('.bcv-sheet__foot');
     const connected = () => !!st.cc.key;
     const cloudOn = () => connected() && st.cc.use !== false;

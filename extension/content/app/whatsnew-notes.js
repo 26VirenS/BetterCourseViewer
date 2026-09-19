@@ -23,6 +23,12 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.33.0', date: '2026-09-19', notes: [
+      { kind: 'new', title: 'How the switch works', body: 'A short show of the new switch, once: point, press each side, drag the knob.', icon: P.toggle },
+      { kind: 'new', title: 'Quick menus on pins', body: 'Point at a pinned tool: cite a link, work out a sum, convert a file, study a set.', icon: P.pin },
+      { kind: 'improved', title: 'Learn remembers', body: 'Wrong cards come back soon, learned ones return for a check in a day, then less often.', icon: P.layers },
+      { kind: 'new', title: 'Share a set', body: 'Share sends the set as a CSV. A friend adds it with Import CSV.', icon: P.arrows },
+    ] },
     { version: '2.32.0', date: '2026-09-19', notes: [
       { kind: 'improved', title: 'Look switch folds to its mark', body: 'A small disc with the mark, in the state’s colour. Point at it and it opens up.', icon: P.toggle },
     ] },

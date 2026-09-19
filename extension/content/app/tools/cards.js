@@ -66,10 +66,11 @@
     { key: 'match', name: 'Match', icon: IC.grid, color: '#34c759' },
   ];
 
-  async function open(app, { from = null } = {}) {
+  async function open(app, { from = null, deck: startDeck = null, mode = null } = {}) {
     const tool = T.toolOf('fc');
     const raw = await T.load(KEY, []);
     const st = { decks: Array.isArray(raw) ? raw.filter((d) => d && d.id) : [], view: 'sets', deck: null, idx: 0, flip: false, typed: '', fb: null, last: '', note: '', round: null, test: null, match: null, pasteOpen: false, paste: '' };
+    if (startDeck && st.decks.some((d) => d.id === startDeck)) { st.deck = startDeck; st.view = 'set'; } // (opened straight at a set: the quick menu on the pin)
     const persist = () => T.save(KEY, st.decks);
     const deck = () => st.decks.find((d) => d.id === st.deck) || null;
     const patchDeck = (fn) => { st.decks = st.decks.map((d) => (d.id === st.deck ? fn(d) : d)); return persist(); };
@@ -161,9 +162,11 @@
       return b;
     }
     function setView(d, cards) {
+      const due = cards.filter((c) => dueNow(c)).length;
       const tiles = U.el('bcv-fc__tiles', MODES.map((m) => h('button', { type: 'button', class: 'bcv-fc__tile', dataset: { mode: m.key }, disabled: !cards.length, onclick: () => start(m.key) }, [
         h('span', { class: 'bcv-fc__tileicon', style: { background: T.tintOf(m.color, dark) } }, U.svg(m.icon, { size: 17, stroke: m.color, width: 1.9 })),
         U.text('bcv-fc__tilename', m.name, 'span'),
+        m.key === 'learn' && due ? U.text('bcv-fc__tiledue', `${due} to review`, 'span') : null, // (learned cards back for their quick check)
       ])));
       const idx = Math.min(st.idx, Math.max(0, cards.length - 1));
       const preview = cards.length ? [
@@ -179,7 +182,7 @@
         ]),
       ] : [U.el('bcv-fc__empty', [U.text('bcv-fc__emptytitle', 'No terms yet'), U.text('bcv-fc__emptytext', 'Press Edit to add some.')])];
       const terms = U.el('bcv-fc__terms', [
-        U.el('bcv-fc__termshead', [U.text('bcv-fc__termstitle', `Terms in this set (${cards.length})`), U.btn('Edit', { cls: 'bcv-fc__edit', onClick: () => go('edit', { deck: d.id }) })]),
+        U.el('bcv-fc__termshead', [U.text('bcv-fc__termstitle', `Terms in this set (${cards.length})`), U.el('bcv-fc__setbtns', [U.btn('Share', { cls: 'bcv-fc__share', disabled: !cards.length, onClick: () => share(d) }), U.btn('Edit', { cls: 'bcv-fc__edit', onClick: () => go('edit', { deck: d.id }) })])]),
         ...cards.map((c, i) => { const row = U.el('bcv-fc__termrow', [U.text('bcv-fc__termtext bcv-pretty', c.term), U.text('bcv-fc__deftext bcv-pretty', c.def), starBtn(c)]); row.dataset.card = c.id; U.enter(row, i, 20, 240); return row; }),
       ]);
       return [tiles, ...preview, terms];
@@ -187,7 +190,7 @@
     function start(mode) {
       const cards = cardsOf(deck());
       if (mode === 'cards') { const starred = cards.filter((c) => c.star); go('cards', { round: { ids: (st.starOnly && starred.length ? starred : cards).map((c) => c.id), i: 0, know: [], learning: [], history: [] } }); }
-      else if (mode === 'learn') go('learn');
+      else if (mode === 'learn') go('learn', { learnQ: null, asked: null });
       else if (mode === 'test') go('test', { test: makeTest(cards) });
       else go('match', { match: makeMatch(cards) });
     }
@@ -283,7 +286,7 @@
         U.el('bcv-fc__editbar', [
           U.btn(st.pasteOpen ? 'Close paste' : 'Paste terms', { cls: 'bcv-fc__pastetoggle', onClick: () => { st.pasteOpen = !st.pasteOpen; paint(); } }),
           U.btn('Import CSV', { cls: 'bcv-fc__import', onClick: () => csvInput.click() }),
-          U.btn('Export CSV', { cls: 'bcv-fc__export', disabled: !cards.length, onClick: () => { if (d) T.saveFile(`${(d.name || 'set').replace(/[^\w -]+/g, '').trim().replace(/\s+/g, '-').toLowerCase() || 'set'}.csv`, new Blob([csvOf(d)], { type: 'text/csv;charset=utf-8' })); } }),
+          U.btn('Export CSV', { cls: 'bcv-fc__export', disabled: !cards.length, onClick: () => { if (d) T.saveFile(fileNameOf(d), new Blob([csvOf(d)], { type: 'text/csv;charset=utf-8' })); } }),
         ]),
         pasteBox,
         ...rows,
@@ -293,10 +296,38 @@
       ].filter(Boolean);
     }
 
-    // ---- Learn: multiple choice, then typed; two in a row masters a card ---------------------
-    async function answer(card, ok) {
-      await patchCard(card.id, (y) => ({ ...y, level: ok ? Math.min(2, (y.level || 0) + 1) : 0 }));
-      st.fb = ok ? 'correct' : 'wrong';
+    // ---- Learn: multiple choice, then typed from memory; spaced, and remembered across days ----
+    // A card is asked as multiple choice first (the wrong choices the definitions most like the
+    // right one), then typed from memory — the term from its definition where the term is short,
+    // the way it will be needed, else the definition. Two right in a row and it is learned. A wrong
+    // answer sends it back to the start and brings it round again after two other cards, a first
+    // right answer after three, so nothing repeats back to back. A learned card comes back for a
+    // typed check after a day, then at growing gaps (2.5× each time it is right); a miss then
+    // starts it over. A near miss when typing (a letter out, in a longer answer) counts.
+    const DAY = 86400000;
+    const dueNow = (c, now = Date.now()) => (c.level || 0) >= 2 && !!c.due && c.due <= now;
+    const wordsOf = (x) => new Set(norm(x).split(' ').filter(Boolean));
+    const alike = (x, y) => { const A = wordsOf(x), B = wordsOf(y); let n = 0; for (const w of A) if (B.has(w)) n++; return n * 10 - Math.abs(norm(x).length - norm(y).length) / 8; };
+    const editsBetween = (x, y) => { const m = x.length, n = y.length; if (!m) return n; if (!n) return m; let prev = Array.from({ length: n + 1 }, (_, j) => j); for (let i = 1; i <= m; i++) { const cur = [i]; for (let j = 1; j <= n; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (x[i - 1] === y[j - 1] ? 0 : 1)); prev = cur; } return prev[n]; };
+    /** 'right', 'close' (a near miss, in a longer answer) or null. */
+    const matchOf = (typed, want) => { const x = norm(typed), y = norm(want); if (!x) return null; if (x === y) return 'right'; const slack = y.length >= 12 ? 2 : y.length >= 6 ? 1 : 0; return slack && editsBetween(x, y) <= slack ? 'close' : null; };
+    const askTermOf = (c) => String(c.term || '').length <= 40;
+    const learnQueue = (cards) => { const now = Date.now(); return [...cards.filter((c) => (c.level || 0) < 2), ...cards.filter((c) => dueNow(c, now))].map((c) => c.id); };
+    async function answer(card, ok, { close = false } = {}) {
+      const now = Date.now();
+      const review = (card.level || 0) >= 2;
+      await patchCard(card.id, (y) => {
+        if (!ok) return { ...y, level: 0, iv: 0, due: null };
+        if (review) { const iv = Math.max(1, Math.round((y.iv || 1) * 2.5)); return { ...y, iv, due: now + iv * DAY }; }
+        const level = Math.min(2, (y.level || 0) + 1);
+        return level === 2 ? { ...y, level, iv: 1, due: now + DAY } : { ...y, level };
+      });
+      // the queue: a wrong card comes round again after two others, a first right answer after three; learned, it leaves
+      const q = (st.learnQ || []).filter((id) => id !== card.id);
+      if (!ok) q.splice(Math.min(2, q.length), 0, card.id);
+      else if (!review && (card.level || 0) === 0) q.splice(Math.min(3, q.length), 0, card.id);
+      st.learnQ = q;
+      st.fb = ok ? (close ? 'close' : 'correct') : 'wrong';
       st.last = st.typed;
       paint();
     }
@@ -304,18 +335,17 @@
       const pct = cards.length ? Math.round((mastered / cards.length) * 100) : 0;
       const bar = U.el('bcv-fc__bar', [h('span', { class: 'bcv-fc__track bcv-fc__track--6' }, h('span', { class: 'bcv-fc__fill', style: { width: `${pct}%` } })), U.text('bcv-fc__progress', `${mastered} / ${cards.length}`)]);
       if (!cards.length) return [bar, T.hint('Add some terms first.')];
-      // the queue, derived: the cards not yet mastered. A card answered right is still the current
-      // one until Next, so its feedback stays on screen (it was asked at its previous level)
+      if (!st.learnQ) st.learnQ = learnQueue(cards);
+      // the card asked: the queue's first — or, with feedback on screen, the one just answered (it was asked at its previous level)
       const asked = st.fb && st.asked ? cards.find((c) => c.id === st.asked) : null;
-      const queue = cards.filter((c) => (c.level || 0) < 2);
-      const cur = asked || queue[0] || null;
+      const cur = asked || cards.find((c) => c.id === st.learnQ[0]) || null;
       if (!cur) {
         return [bar, U.el('bcv-fc__done', [
           h('span', { class: 'bcv-fc__donetick' }, U.svg(IC.check, { size: 28, stroke: 'var(--bcv-green)', width: 2.4 })),
           U.text('bcv-fc__donetitle', 'You’ve learned them all!'),
-          U.text('bcv-fc__donetext bcv-pretty', 'Every card right twice in a row.'),
+          U.text('bcv-fc__donetext bcv-pretty', 'Every card right twice in a row. They come back for a quick check in a day, then less and less often.'),
           U.el('bcv-tool__btns bcv-fc__donebtns', [
-            U.btn('Start over', { kind: 'primary', cls: 'bcv-fc__restart', onClick: async () => { await patchDeck((x) => ({ ...x, cards: cardsOf(x).map((c) => ({ ...c, level: 0 })) })); paint(); } }),
+            U.btn('Start over', { kind: 'primary', cls: 'bcv-fc__restart', onClick: async () => { await patchDeck((x) => ({ ...x, cards: cardsOf(x).map((c) => ({ ...c, level: 0, iv: 0, due: null })) })); st.learnQ = null; paint(); } }),
             U.btn('Back to set', { cls: 'bcv-fc__toset', onClick: () => go('set') }),
           ]),
         ])];
@@ -323,19 +353,23 @@
       const level = st.fb ? st.askedLevel : (cur.level || 0);
       if (!st.fb) { st.asked = cur.id; st.askedLevel = cur.level || 0; }
       const isChoice = level === 0;
-      const kids = [U.text('bcv-fc__mode', isChoice ? 'Pick the definition' : 'Type the definition'), U.text('bcv-fc__q bcv-pretty', cur.term)];
+      const review = level >= 2;
+      const askTerm = !isChoice && askTermOf(cur);
+      const want = askTerm ? cur.term : cur.def;
+      const modeWords = isChoice ? 'Pick the definition' : `${review ? 'Quick check: type' : 'Type'} the ${askTerm ? 'term' : 'definition'}`;
+      const kids = [U.text('bcv-fc__mode', modeWords), U.text('bcv-fc__q bcv-pretty', askTerm ? cur.def : cur.term)];
       if (isChoice) {
         const others = cards.filter((c) => c.id !== cur.id).map((c) => c.def);
-        const pool = shuffleFor(`${cur.id}p`, others).slice(0, 3).concat([cur.def]);
+        const pool = shuffleFor(`${cur.id}p`, others).sort((x, y) => alike(y, cur.def) - alike(x, cur.def)).slice(0, 3).concat([cur.def]); // (the wrong choices the ones most like the right one)
         const choices = shuffleFor(`${cur.id}|${level}`, pool);
         kids.push(U.el('bcv-fc__choices', choices.map((d, k) => {
           const right = d === cur.def, wrongPick = st.fb === 'wrong' && d === st.last;
           return h('button', { type: 'button', class: `bcv-fc__choice ${st.fb && right ? 'is-right' : ''} ${wrongPick ? 'is-wrong' : ''}`, disabled: !!st.fb, onclick: () => { st.typed = d; answer(cur, right); } }, [U.text('bcv-fc__choicen', String(k + 1), 'span'), U.text('bcv-fc__choicet', d, 'span')]);
         })));
       } else {
-        const inp = T.input({ value: st.typed, placeholder: 'Type the definition', 'aria-label': 'Your answer', class: 'bcv-input bcv-tool__input bcv-fc__typed', disabled: !!st.fb });
+        const inp = T.input({ value: st.typed, placeholder: askTerm ? 'Type the term' : 'Type the definition', 'aria-label': 'Your answer', class: 'bcv-input bcv-tool__input bcv-fc__typed', disabled: !!st.fb });
         inp.addEventListener('input', () => { st.typed = inp.value; });
-        const check = () => { if (!st.fb) answer(cur, norm(st.typed) === norm(cur.def)); };
+        const check = () => { if (st.fb) return; const m = matchOf(st.typed, want); answer(cur, !!m, { close: m === 'close' }); };
         inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') check(); });
         kids.push(U.el('bcv-fc__typerow', [inp, U.btn('Answer', { kind: 'primary', cls: 'bcv-fc__check', disabled: !!st.fb, onClick: check })]));
         if (!st.fb) queueMicrotask(() => inp.focus());
@@ -343,11 +377,24 @@
       if (!st.fb) kids.push(h('button', { type: 'button', class: 'bcv-tool__link bcv-fc__dontknow', text: 'Don’t know', onclick: () => { st.typed = ''; answer(cur, false); } }));
       if (st.fb) {
         const next = U.btn('Next', { kind: 'primary', cls: 'bcv-fc__nextq', onClick: () => { st.fb = null; st.typed = ''; st.last = ''; st.asked = null; paint(); } });
-        kids.push(st.fb === 'correct'
-          ? U.el('bcv-fc__fb bcv-fc__fb--ok', [U.svg(IC.check, { size: 16, stroke: 'var(--bcv-green)', width: 2.6 }), U.text('bcv-fc__fbtitle', 'Correct'), next])
-          : U.el('bcv-fc__fb bcv-fc__fb--no', [U.svg(IC.close, { size: 16, stroke: 'var(--bcv-red)', width: 2.4 }), U.el('bcv-fc__fbbody', [U.text('bcv-fc__fbtitle', 'Not quite. It comes back later.'), U.text('bcv-fc__fbanswer bcv-pretty', cur.def)]), next]));
+        kids.push(st.fb === 'wrong'
+          ? U.el('bcv-fc__fb bcv-fc__fb--no', [U.svg(IC.close, { size: 16, stroke: 'var(--bcv-red)', width: 2.4 }), U.el('bcv-fc__fbbody', [U.text('bcv-fc__fbtitle', 'Not quite. It comes back later.'), U.text('bcv-fc__fbanswer bcv-pretty', want)]), next])
+          : U.el('bcv-fc__fb bcv-fc__fb--ok', [U.svg(IC.check, { size: 16, stroke: 'var(--bcv-green)', width: 2.6 }), st.fb === 'close' ? U.el('bcv-fc__fbbody', [U.text('bcv-fc__fbtitle', 'Close enough'), U.text('bcv-fc__fbanswer bcv-pretty', want)]) : U.text('bcv-fc__fbtitle', 'Correct'), next]));
       }
-      return [bar, T.card(kids, 'bcv-fc__learn'), T.hint('Multiple choice first, then typed. Two right in a row and it’s learned.')];
+      return [bar, T.card(kids, 'bcv-fc__learn'), T.hint('Wrong ones come back sooner. Learned ones return for a quick check in a day, then less often.')];
+    }
+    // ---- Share: the set as its CSV, to a friend --------------------------------------------------
+    const fileNameOf = (d) => `${((d && d.name) || 'set').replace(/[^\w -]+/g, '').trim().replace(/\s+/g, '-').toLowerCase() || 'set'}.csv`;
+    /** The set's CSV handed to the system's share sheet where there is one (a phone, Safari), else
+     *  saved: a friend adds it under Flashcards with Import CSV. */
+    async function share(d) {
+      if (!d) return;
+      const file = new File([csvOf(d)], fileNameOf(d), { type: 'text/csv' });
+      if (navigator.canShare?.({ files: [file] })) {
+        try { await navigator.share({ files: [file], title: d.name || 'Flashcards', text: 'A Simpl Courses flashcard set. Add it under Tools → Flashcards → Import CSV.' }); return; } catch (e) { if (e?.name === 'AbortError') return; }
+      }
+      T.saveFile(file.name, file);
+      U.toast('Saved as a CSV. Send it to a friend: they add it with Import CSV under Flashcards.', { ms: 4200 });
     }
 
     // ---- Test: questions from the set, marked at the end -------------------------------------
@@ -460,6 +507,7 @@
     document.addEventListener('keydown', onKey, true);
 
     paint();
+    if (mode && st.deck) start(mode);
     return p;
   }
 

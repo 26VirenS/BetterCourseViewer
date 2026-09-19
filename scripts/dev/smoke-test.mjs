@@ -2619,13 +2619,17 @@ try {
   const welcomeBox = () => page.$eval('#bcv-welcome', (e) => { const r = e.getBoundingClientRect(); return { bg: getComputedStyle(e).backgroundColor, full: r.left === 0 && r.top === 0 && r.width === innerWidth && r.height === innerHeight }; });
   const welcomeLines = () => Promise.all(['.bcv-welcome__kicker', '.bcv-welcome__title', '.bcv-welcome__hint'].map((s) => texts(s).then((t) => t[0] || '')));
   check(page.url() === `${BASE}/` && /^(reload|navigate)$/.test(await page.evaluate(() => performance.getEntriesByType('navigation')[0]?.type)) && (await page.$('#bcv-setup')) === null && !(await page.$('html.bcv-setup-open')) && (await page.$('.bcv-tour__card')) === null && (await welcomeBox()).bg === 'rgb(0, 0, 0)' && (await welcomeBox()).full, 'Open Canvas loads the page afresh, and it comes back black: no setup, no tour, the welcome over everything');
-  const lookCopy = await page.$eval('.bcv-welcome__look', (e) => { const r = e.getBoundingClientRect(); const s = e.querySelector('.bcv-look__sw').getBoundingClientRect(); return { top: Math.round(r.top), rightGap: Math.round(innerWidth - r.right), w: Math.round(r.width), h: Math.round(r.height), slider: s.width > 30 && s.height > 12, glyph: !!e.querySelector('.bcv-look__glyph path'), persist: !!e.querySelector('.bcv-look__persist'), name: e.querySelector('.bcv-look__text').textContent, on: e.querySelector('.bcv-look__main').classList.contains('is-on') }; }).catch(() => null);
-  check(!!lookCopy && lookCopy.top === 10 && lookCopy.rightGap === 12 && lookCopy.w > 180 && lookCopy.h > 24 && lookCopy.slider && lookCopy.glyph && !lookCopy.persist && lookCopy.name === 'Simpl Courses' && lookCopy.on, `stage one shows an opened copy of the look switch at the top right, the three-stop slider on its right stop: ${JSON.stringify(lookCopy)}`);
-  const arrowBox = await page.$eval('.bcv-welcome__stage[data-stage="look"] .bcv-welcome__arrow', (e) => { const r = e.getBoundingClientRect(); return { w: Math.round(r.width), h: Math.round(r.height), stroke: getComputedStyle(e.querySelector('path')).stroke }; });
-  check(arrowBox.h >= 200 && arrowBox.w >= 200 && arrowBox.stroke === 'rgb(255, 255, 255)' && (await welcomeLines()).join(' | ') === 'just in case | Press this to turn Simpl off for a page | Drag it left to lock Simpl off', `a big white arrow and the three lines (${(await welcomeLines()).join(' | ')})`);
+  // stage one: the switch shown working — a copy of it at the top right, a pointer that comes to it, presses its stops and drags its knob, the lines saying what each move does
+  const showAt = () => page.$eval('#bcv-welcome', (e) => { const p = e.querySelector('.bcv-welcome__look'); const r = p.getBoundingClientRect(); const c = e.querySelector('.bcv-welcome__cursor--look'); return { top: Math.round(r.top), rightGap: Math.round(innerWidth - r.right), open: p.classList.contains('is-open'), knob: p.querySelector('.bcv-look__knob').style.left, path: p.querySelector('.bcv-look__glyph path').getAttribute('d'), name: p.querySelector('.bcv-look__text').textContent, cursor: !!c, cursorShown: c ? getComputedStyle(c).opacity : null, arrow: !!e.querySelector('.bcv-welcome__arrow'), persist: !!p.querySelector('.bcv-look__persist') }; });
+  const s0 = await showAt();
+  check(s0.top === 10 && s0.rightGap === 12 && s0.cursor && !s0.arrow && !s0.persist && (await welcomeLines()).join(' | ') === 'the switch at the top right | Point at it | It opens when the pointer comes near.', `stage one shows a copy of the switch at the top right, a pointer, and the first lines (${JSON.stringify(s0)} | ${(await welcomeLines()).join(' | ')})`);
+  check(await eventually(async () => { const st = await showAt(); return st.open && st.cursorShown === '1'; }, 3000), 'the pointer comes to the switch and it opens');
   check(noContinueYet && await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000) && Date.now() - welcomeAt >= 2200 && (await texts('.bcv-welcome__next'))[0] === 'Continue', 'Continue is not there at first, and comes in after three seconds');
-  await page.waitForTimeout(400); // its entrance
+  check(await eventually(async () => { const st = await showAt(); return st.knob === '84px' && st.path === 'M6 12h12' && st.name === 'Off for this page' && (await welcomeLines())[1] === 'Press the middle'; }, 5000), 'the pointer presses the middle: the knob goes there with a dash in it, the copy says Off for this page, and the lines say what that does');
+  check(await eventually(async () => { const st = await showAt(); return st.knob === '164px' && (await welcomeLines())[1] === 'Press the right'; }, 5000), 'then the right: on again');
+  check(await eventually(async () => { const st = await showAt(); return st.knob === '4px' && st.path === 'M6 11h12v9H6zM9 11V8a3 3 0 016 0v3' && st.name === 'Locked off' && (await welcomeLines())[1] === 'Drag the knob left to lock'; }, 7000), 'then the knob is dragged to the left stop: locked, with the lock in it, and the lines say it stays off until unlocked');
   await shot(page, '31-welcome-look');
+  check(await eventually(async () => { const st = await showAt(); return st.knob === '164px' && (await welcomeLines())[1] === 'Press the right to unlock'; }, 5000), 'and the right again unlocks it');
   await page.click('.bcv-welcome__next');
   await page.waitForSelector('#bcv-welcome[data-stage="away"]', { timeout: 5000 });
   const awayAt = Date.now();
@@ -2650,6 +2654,20 @@ try {
   await page.click('.bcv-welcome__next');
   await page.waitForFunction(() => !document.querySelector('#bcv-welcome'), null, { timeout: 5000 });
   check(!(await page.$('html.bcv-welcome')) && (await page.$('.bcv-tour__card')) === null && !(await page.$('html.bcv-touring')) && (await prefsOf()).tour == null && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('welcome:pending'))['welcome:pending'])) === undefined && (await visible('#bcv-look')) && (await page.$('.bcv-stat')) !== null, 'the last Continue takes the black away: the Dashboard, the real switch, no tour, and the welcome does not come back');
+  // people who had Simpl before the switch became a slider get its show alone, once: their What's New mark is from before it
+  await sw.evaluate(async () => { await self.BCV.api.storage.local.remove('welcome:look2'); await self.BCV.api.storage.local.set({ 'whatsnew:seen': '2.31.0' }); });
+  await page.reload();
+  await page.waitForSelector('#bcv-welcome[data-stage="look"]', { timeout: 20000 });
+  check((await welcomeBox()).bg === 'rgb(0, 0, 0)' && !!(await page.$('.bcv-welcome__look')) && (await texts('.bcv-welcome__title'))[0] === 'Point at it', 'after an update from before the slider, the page comes back black with the switch\'s show alone');
+  await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000);
+  await page.click('.bcv-welcome__next');
+  await page.waitForFunction(() => !document.querySelector('#bcv-welcome'), null, { timeout: 5000 });
+  check((await sw.evaluate(async () => (await self.BCV.api.storage.local.get('welcome:look2'))['welcome:look2'])) === true && (await visible('#bcv-app')), 'its Continue is the last: the black goes, and the show is marked seen');
+  await sw.evaluate((v) => self.BCV.api.storage.local.set({ 'whatsnew:seen': v }), manifest.version);
+  await page.reload();
+  await page.waitForSelector('#bcv-app .bcv-nav__item', { timeout: 20000 });
+  await page.waitForTimeout(600);
+  check((await page.$('#bcv-welcome')) === null, 'and it does not come back');
   check((await sw.evaluate(async () => (await self.BCV.settings.get()).appearance.sideCourses)) === 'always' && VIEW_OF[(await apiGet('/dashboard/view')).dashboard_view] === viewBefore, 'the sidebar and dashboard choices were written on the way out');
   const favAfter = (await apiGet('/api/v1/courses?per_page=100')).filter((c) => c.is_favorite).map((c) => c.course_code || c.name);
   check(!favAfter.includes(offCode) && favAfter.includes(onCode) && favAfter.length === 5, `the chosen courses became the Canvas favourites: −${offCode} +${onCode}`);
@@ -3125,6 +3143,9 @@ try {
   check((await texts('.bcv-fc__faceterm'))[0] === 'Sum rule' && (await texts('.bcv-fc__pos'))[0] === '2 / 5' && !(await page.$eval('.bcv-fc__face', (e) => e.classList.contains('is-flipped'))), 'the arrow moves on, term side up');
   await page.click('.bcv-fc__termrow:nth-child(3) .bcv-fc__star'); // (the head is the first child)
   check(await eventually(async () => (await page.$eval('.bcv-fc__termrow:nth-child(3) .bcv-fc__star', (e) => e.classList.contains('is-on'))) && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('tools:decks'))['tools:decks'][0].cards[1].star)) === true, 2000), 'a star on a term is kept on the card');
+  // Share hands the set's CSV to the share sheet where there is one; here it saves it, and says what a friend does with it
+  const [shared] = await Promise.all([page.waitForEvent('download', { timeout: 5000 }), page.click('.bcv-fc__share')]);
+  check(shared.suggestedFilename() === `${(decks[0].name || 'set').replace(/[^\w -]+/g, '').trim().replace(/\s+/g, '-').toLowerCase() || 'set'}.csv` && /Import CSV/.test((await texts('.bcv-toast')).join(' ')), `Share saves the set as its CSV (${shared.suggestedFilename()}), with a word on Import CSV`);
   await shot(page, '40-tools-flashcards');
   // Flashcards: know it or still learning it, the arrow keys too, then the counts and Keep reviewing
   await page.click('.bcv-fc__tile[data-mode="cards"]');
@@ -3147,9 +3168,13 @@ try {
   check((await toolSub()) === '1 of 2' && (await texts('.bcv-fc__faceterm'))[0] === 'Sum rule', 'Keep reviewing runs only those two again');
   await page.click('.bcv-tool__back');
   await page.waitForSelector('.bcv-fc__tile', { timeout: 3000 });
-  // Learn: multiple choice first, then typed; two in a row masters a card
+  // Learn: multiple choice first, then typed from memory; a wrong card comes back after two others, a first right answer after three; two right in a row learns it
   await page.click('.bcv-fc__tile[data-mode="learn"]');
   await page.waitForSelector('.bcv-fc__choice', { timeout: 3000 });
+  const deckNow = async () => (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('tools:decks'))['tools:decks']))[0].cards;
+  const cardsNow = await deckNow();
+  const learnDef = (term) => cardsNow.find((c) => c.term === term).def;
+  const learnTerm = (def) => cardsNow.find((c) => c.def === def).term;
   const choices1 = await texts('.bcv-fc__choicet');
   check((await raw('.bcv-fc__mode'))[0] === 'Pick the definition' && (await texts('.bcv-fc__q'))[0] === 'Power rule' && choices1.length === 4 && choices1.includes('d/dx x^n = n*x^(n-1)') && (await toolSub()) === '0 of 5 mastered', `Learn asks the first card as multiple choice, the choices the set's own definitions (${choices1.join(' | ')})`);
   const wrong1 = choices1.find((c) => c !== 'd/dx x^n = n*x^(n-1)');
@@ -3158,19 +3183,38 @@ try {
   check((await texts('.bcv-fc__fbtitle'))[0] === 'Not quite. It comes back later.' && (await texts('.bcv-fc__fbanswer'))[0] === 'd/dx x^n = n*x^(n-1)' && (await page.$eval('.bcv-fc__choice.is-right .bcv-fc__choicet', (e) => e.textContent)) === 'd/dx x^n = n*x^(n-1)' && (await page.$eval('.bcv-fc__choice.is-wrong .bcv-fc__choicet', (e) => e.textContent)) === wrong1 && (await texts('.bcv-fc__choicet')).join('|') === choices1.join('|'), 'a wrong pick is marked, the right one shown, and the choices hold still');
   await page.click('.bcv-fc__nextq');
   await page.waitForSelector('.bcv-fc__choice', { timeout: 3000 });
-  check((await texts('.bcv-fc__q'))[0] === 'Power rule' && (await raw('.bcv-fc__mode'))[0] === 'Pick the definition', 'the card comes straight back at zero');
-  await page.keyboard.press(String((await texts('.bcv-fc__choicet')).indexOf('d/dx x^n = n*x^(n-1)') + 1));
-  await page.waitForSelector('.bcv-fc__fb--ok', { timeout: 3000 });
-  await page.click('.bcv-fc__nextq');
-  await page.waitForSelector('.bcv-fc__typed', { timeout: 3000 });
-  check((await raw('.bcv-fc__mode'))[0] === 'Type the definition' && (await texts('.bcv-fc__q'))[0] === 'Power rule', 'a number key picks a choice; right once, the same card is asked again, typed from memory');
-  await page.fill('.bcv-fc__typed', 'D/DX X^N = N*X^(N-1)!');
+  check((await texts('.bcv-fc__q'))[0] === 'Sum rule', 'the wrong card steps back: the next card comes up first');
+  // a right answer, by the number key of the right choice, or typed
+  const answerRight = async () => {
+    const mode = (await raw('.bcv-fc__mode'))[0];
+    const q = (await texts('.bcv-fc__q'))[0];
+    if (mode === 'Pick the definition') await page.keyboard.press(String((await texts('.bcv-fc__choicet')).indexOf(learnDef(q)) + 1));
+    else { await page.fill('.bcv-fc__typed', mode.endsWith('term') ? learnTerm(q) : learnDef(q)); await page.click('.bcv-fc__check'); }
+    await page.waitForSelector('.bcv-fc__fb--ok', { timeout: 3000 });
+    await page.click('.bcv-fc__nextq');
+    await page.waitForSelector('.bcv-fc__choice, .bcv-fc__typed', { timeout: 3000 });
+  };
+  await answerRight(); // Sum rule
+  await answerRight(); // Chain rule
+  check((await texts('.bcv-fc__q'))[0] === 'Power rule' && (await raw('.bcv-fc__mode'))[0] === 'Pick the definition', 'and the wrong card is back after two others, as multiple choice again');
+  await answerRight(); // Power rule, right once
+  await answerRight(); // Product rule
+  check((await raw('.bcv-fc__mode'))[0] === 'Type the term' && (await texts('.bcv-fc__q'))[0] === learnDef('Sum rule'), 'a card right once comes back after three others, typed from memory: the term, from its definition');
+  await page.fill('.bcv-fc__typed', 'SUM RULE.');
   await page.click('.bcv-fc__check');
   await page.waitForSelector('.bcv-fc__fb--ok', { timeout: 3000 });
+  check((await texts('.bcv-fc__fbtitle'))[0] === 'Correct' && (await toolSub()) === '1 of 5 mastered', 'typed right (case and punctuation aside): two in a row learns the card');
   await page.click('.bcv-fc__nextq');
-  await page.waitForSelector('.bcv-fc__choice', { timeout: 3000 });
-  const decks2 = await sw.evaluate(async () => (await self.BCV.api.storage.local.get('tools:decks'))['tools:decks']);
-  check((await toolSub()) === '1 of 5 mastered' && (await texts('.bcv-fc__progress'))[0] === '1 / 5' && (await texts('.bcv-fc__q'))[0] === 'Sum rule' && decks2[0].cards.find((c) => c.term === 'Power rule').level === 2, 'typed right (case and punctuation aside): two in a row masters the card, kept on the card itself; the next card comes up');
+  await page.waitForSelector('.bcv-fc__typed', { timeout: 3000 });
+  check((await texts('.bcv-fc__q'))[0] === learnDef('Chain rule'), 'the next card up is the other one right once, typed');
+  await page.fill('.bcv-fc__typed', 'Chain rulr');
+  await page.click('.bcv-fc__check');
+  await page.waitForSelector('.bcv-fc__fb--ok', { timeout: 3000 });
+  const learnt = await deckNow();
+  const sumCard = learnt.find((c) => c.term === 'Sum rule'), chainCard = learnt.find((c) => c.term === 'Chain rule');
+  check((await texts('.bcv-fc__fbtitle'))[0] === 'Close enough' && (await texts('.bcv-fc__fbanswer'))[0] === 'Chain rule' && (await toolSub()) === '2 of 5 mastered' && sumCard.level === 2 && sumCard.iv === 1 && sumCard.due > Date.now() + 23 * 3600 * 1000 && chainCard.level === 2, `a letter out in a longer answer is close enough, the exact answer shown; a learned card is due for a quick check in a day (${JSON.stringify({ sumCard, chainCard })})`);
+  await page.click('.bcv-fc__nextq');
+  await page.waitForSelector('.bcv-fc__typed', { timeout: 3000 });
   await shot(page, '40c-tools-flashcards-learn');
   await page.click('.bcv-tool__back');
   await page.waitForSelector('.bcv-fc__tile', { timeout: 3000 });
@@ -3293,6 +3337,48 @@ try {
   check((await page.$eval('#bcv-pins', (e) => e.hidden)) && (await inPage('focusActive')) === false, 'End takes the borrowed pin away');
   await page.goto(`${BASE}/#tools`);
   check((await page.$('#bcv-welcome')) === null && (await page.$$('.bcv-tool-card')).length === 5 && !(await page.$eval('.bcv-tool-card[data-tool="pomo"]', (e) => e.classList.contains('is-pinned'))), 'the second time, Tools opens without the black, and the card is no longer marked');
+
+  // ---- the quick menus: every pin but the timer's swells into a capsule under the pointer, the tool's quickest use in it ----
+  console.log('quick menus');
+  await sw.evaluate(() => self.BCV.api.storage.local.set({ 'tools:pins': ['cite', 'graph', 'conv', 'fc'] }));
+  await page.goto(`${BASE}/`);
+  await page.waitForSelector('#bcv-pins .bcv-pin[data-tool="fc"]', { timeout: 15000 });
+  await page.waitForTimeout(600);
+  const quickPin = (key) => `#bcv-pins .bcv-pin[data-tool="${key}"]`;
+  const quickOpen = async (key) => { const b = await (await page.$(quickPin(key))).boundingBox(); await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2); await eventually(() => page.$eval(quickPin(key), (e) => e.classList.contains('is-open') && Math.round(e.getBoundingClientRect().height) === 44), 3000); await page.waitForTimeout(550); return page.$eval(quickPin(key), (e) => ({ w: Math.round(e.getBoundingClientRect().width), h: Math.round(e.getBoundingClientRect().height), radius: getComputedStyle(e.querySelector('.bcv-quick__face')).borderRadius, name: e.querySelector('.bcv-quick__name')?.textContent, btnGone: getComputedStyle(e.querySelector('.bcv-pin__btn')).opacity === '0' })); };
+  check((await page.$$('#bcv-pins .bcv-pin.bcv-quick')).length === 4 && (await page.$$eval('#bcv-pins .bcv-pin', (els) => els.map((e) => Math.round(e.getBoundingClientRect().width)))).every((w) => w === 24), 'four pins in the tray, each a disc, each with a quick menu folded in it');
+  const q1 = await quickOpen('cite');
+  check(q1.w === 300 && q1.h === 44 && q1.radius === '22px' && q1.name === 'Cite' && q1.btnGone && (await page.$eval(`${quickPin('cite')} .bcv-quick__input`, (e) => e.placeholder)) === 'Paste a link to cite', `the citation pin swells into a capsule under the pointer: a field for a link and a round Cite (${JSON.stringify(q1)})`);
+  await page.fill(`${quickPin('cite')} .bcv-quick__input`, 'https://example.org/reading');
+  await page.keyboard.press('Enter');
+  await page.waitForSelector('.bcv-tool[data-tool="cite"]', { timeout: 5000 });
+  check((await page.$eval('.bcv-tool__input[data-field="url"]', (e) => e.value)) === 'https://example.org/reading' && (await page.$eval('.bcv-cite__type.is-on', (e) => e.dataset.type)) === 'website' && !(await page.$eval(quickPin('cite'), (e) => e.classList.contains('is-open'))), 'Enter opens the tool with the link filled in, on Website, and the capsule folds');
+  await closeTool();
+  const q2 = await quickOpen('graph');
+  await page.fill(`${quickPin('graph')} .bcv-quick__input`, '2^10 + sqrt(16)');
+  check(q2.w === 290 && q2.name === 'Sum' && (await texts(`${quickPin('graph')} .bcv-quick__result`))[0] === '= 1028', 'the calculator pin works a sum out as it is typed');
+  await page.fill(`${quickPin('graph')} .bcv-quick__input`, 'sin(pi/6)*2');
+  check((await texts(`${quickPin('graph')} .bcv-quick__result`))[0] === '= 1', 'functions and pi too');
+  await page.fill(`${quickPin('graph')} .bcv-quick__input`, '2+');
+  check((await texts(`${quickPin('graph')} .bcv-quick__result`))[0] === '?', 'and a sum that is not one yet says so');
+  await page.mouse.move(700, 500);
+  await page.mouse.click(700, 500);
+  check(await eventually(() => page.$eval(quickPin('graph'), (e) => !e.classList.contains('is-open') && Math.round(e.getBoundingClientRect().width) === 24), 3000), 'the capsule folds when the pointer leaves and presses elsewhere');
+  const q3 = await quickOpen('conv');
+  check(q3.w === 250 && q3.name === 'Convert' && (await texts(`${quickPin('conv')} .bcv-quick__drop`))[0] === 'Drop a file to convert', 'the converter pin offers a drop target');
+  await page.setInputFiles(`${quickPin('conv')} input[type=file]`, { name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('hello there') });
+  await page.waitForSelector('.bcv-tool[data-tool="conv"]', { timeout: 5000 });
+  check(await eventually(async () => (await texts('.bcv-conv__name')).includes('notes.txt'), 4000) && !(await page.$eval(quickPin('conv'), (e) => e.classList.contains('is-open'))), 'a file chosen there opens the tool with it in');
+  await closeTool();
+  const q4 = await quickOpen('fc');
+  const fcChips = await texts(`${quickPin('fc')} .bcv-quick__chip`);
+  check(q4.w === 320 && q4.name === 'Study' && fcChips.length === 1 && fcChips[0] === (decks[0].name || 'Untitled set'), `the flashcards pin lists the sets as chips (${fcChips.join(' | ')})`);
+  await page.click(`${quickPin('fc')} .bcv-quick__chip`);
+  await page.waitForSelector('.bcv-tool[data-tool="fc"] .bcv-fc__tile', { timeout: 5000 });
+  check((await texts('.bcv-tool__title'))[0] === (decks[0].name || 'Untitled set') && !(await page.$eval(quickPin('fc'), (e) => e.classList.contains('is-open'))), 'a chip opens the tool straight at that set');
+  await closeTool();
+  await sw.evaluate(() => self.BCV.api.storage.local.set({ 'tools:pins': [] }));
+  await page.mouse.move(700, 500);
 
   // ---- never a broken card -----------------------------------------------------------------------------
   console.log('resilience');
