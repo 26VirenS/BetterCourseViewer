@@ -15,8 +15,9 @@
   const { h } = BCV.utils;
   const html = document.documentElement;
   const KEY = 'welcome:pending'; // the setup's run, armed for the reloaded page
-  const KEY2 = 'welcome:look3'; // the switch's show seen (with the setup's run, or alone after an update)
-  const LOOK2_SINCE = '2.34.0'; // the show's own version: a What's New mark from before it means the show is owed
+  const KEY2 = 'welcome:look4'; // the switch's show seen (with the setup's run, or alone after an update); a new key when the show is redrawn, so everyone sees the new one once
+  const OLD_KEYS = ['welcome:look2', 'welcome:look3']; // the marks of the shows before it, cleared when this one is seen
+  const LOOK2_SINCE = '2.35.1'; // the show's own version: a What's New mark from before it means the show is owed
   const CURSOR = '<svg viewBox="0 0 24 24" width="26" height="26"><path d="M5 3l14 9-6 1.5 3.5 6.5-2.5 1.5-3.5-6.5L6 19z" fill="#fff" stroke="#1c1c1e" stroke-width="1.4" stroke-linejoin="round"/></svg>';
   const WAIT = 3000; // Continue comes in after this long, on each stage: time to take the pointer in first
   const LEAVE = 260; // a stage's fade-out (app.css: bcv-welcome-out)
@@ -256,7 +257,7 @@
       const look = lookNow();
       if (!look && (key === 'look' || key === 'pin')) continue;
       await stage(app, key, { look });
-      if (key === 'look') { try { await BCV.api.storage.local.set({ [KEY2]: true }); } catch { /* shown all the same */ } } // (seen: not owed again after an update)
+      if (key === 'look') { try { await BCV.api.storage.local.set({ [KEY2]: true }); await BCV.api.storage.local.remove(OLD_KEYS); } catch { /* shown all the same */ } } // (seen: not owed again after an update; the old shows' marks go)
       await leave();
     }
     if (setupRun) await clear();

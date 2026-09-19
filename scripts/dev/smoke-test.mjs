@@ -2656,14 +2656,14 @@ try {
   await page.waitForFunction(() => !document.querySelector('#bcv-welcome'), null, { timeout: 5000 });
   check(!(await page.$('html.bcv-welcome')) && (await page.$('.bcv-tour__card')) === null && !(await page.$('html.bcv-touring')) && (await prefsOf()).tour == null && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('welcome:pending'))['welcome:pending'])) === undefined && (await visible('#bcv-look')) && (await page.$('.bcv-stat')) !== null, 'the last Continue takes the black away: the Dashboard, the real switch, no tour, and the welcome does not come back');
   // people who had Simpl before the switch became a slider get its show alone, once: their What's New mark is from before it
-  await sw.evaluate(async () => { await self.BCV.api.storage.local.remove('welcome:look3'); await self.BCV.api.storage.local.set({ 'whatsnew:seen': '2.33.0' }); });
+  await sw.evaluate(async () => { await self.BCV.api.storage.local.remove('welcome:look4'); await self.BCV.api.storage.local.set({ 'whatsnew:seen': '2.35.0', 'welcome:look3': true }); });
   await page.reload();
   await page.waitForSelector('#bcv-welcome[data-stage="look"]', { timeout: 20000 });
   check((await welcomeBox()).bg === 'rgb(0, 0, 0)' && !!(await page.$('.bcv-welcome__look')) && (await texts('.bcv-welcome__title'))[0] === 'Press different parts for different things', 'after an update from before this show, the page comes back black with the switch\'s show alone');
   await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000);
   await page.click('.bcv-welcome__next');
   await page.waitForFunction(() => !document.querySelector('#bcv-welcome'), null, { timeout: 5000 });
-  check((await sw.evaluate(async () => (await self.BCV.api.storage.local.get('welcome:look3'))['welcome:look3'])) === true && (await visible('#bcv-app')), 'its Continue is the last: the black goes, and the show is marked seen');
+  check((await sw.evaluate(async () => { const f = await self.BCV.api.storage.local.get(['welcome:look4', 'welcome:look3']); return f['welcome:look4'] === true && !('welcome:look3' in f); })) && (await visible('#bcv-app')), 'its Continue is the last: the black goes, and the show is marked seen');
   await sw.evaluate((v) => self.BCV.api.storage.local.set({ 'whatsnew:seen': v }), manifest.version);
   await page.reload();
   await page.waitForSelector('#bcv-app .bcv-nav__item', { timeout: 20000 });

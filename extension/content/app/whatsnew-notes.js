@@ -23,6 +23,10 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.35.1', date: '2026-09-19', notes: [
+      { kind: 'improved', title: 'The switch, shown again', body: 'The black screen for the switch comes back once, redrawn: each stop on a small slider.', icon: P.toggle },
+      { kind: 'improved', title: 'Merge & split icon', body: 'The card wears a page with a cut line across it.', icon: P.layers },
+    ] },
     { version: '2.35.0', date: '2026-09-19', notes: [
       { kind: 'new', title: 'Grade needed', body: 'What you need on the final to hit your goal, every number from Canvas.', icon: P.steps },
       { kind: 'new', title: 'Merge & split PDFs', body: 'Join PDFs into one, or cut one into parts, on this device.', icon: P.layers },
