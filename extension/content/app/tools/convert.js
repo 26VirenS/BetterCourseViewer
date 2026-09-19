@@ -47,7 +47,7 @@
     if (/\.csv$/.test(n)) return 'csv';
     if (/\.json$/.test(n)) return 'json';
     if (/\.(png|jpe?g|webp|gif|bmp|avif)$/.test(n) || /^image\//.test(file.type)) return 'image';
-    if (/\.(txt|md|markdown|rtf)$/.test(n) || /^text\//.test(file.type)) return 'text';
+    if (/\.(txt|md|markdown)$/.test(n) || /^text\//.test(file.type)) return 'text';
     return '';
   }
   const kb = (b) => (b >= 1048576 ? `${(b / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`);
@@ -500,6 +500,27 @@
     }
     return null;
   }
+  /** What the hand-in can take besides the allowed types themselves: the kinds plan() would turn
+   *  into one of them (the service's only with a key), the extensions those files come with, and
+   *  a line for the drop zone — "Word, text and pictures are converted to PDF for you". Kinds whose
+   *  every extension is already allowed are not named: nothing is converted there. */
+  const EXTS = { image: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp', 'avif'], heic: ['heic', 'heif'], docx: ['docx'], pdf: ['pdf'], pptx: ['pptx'], xlsx: ['xlsx'], text: ['txt', 'md', 'markdown'], csv: ['csv'], json: ['json'] };
+  const KIND_WORDS = { image: 'pictures', heic: 'HEIC photos', docx: 'Word', pdf: 'PDF', pptx: 'slides', xlsx: 'spreadsheets', text: 'text', csv: 'CSV', json: 'JSON' };
+  const PLURAL = new Set(['pictures', 'HEIC photos', 'slides', 'spreadsheets']);
+  const andWords = (xs) => (xs.length <= 1 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`);
+  async function convertible(allowed) {
+    const want = new Set((allowed || []).map((e) => String(e).toLowerCase().replace(/^\./, '').trim()).filter(Boolean));
+    if (!want.size) return { kinds: [], exts: [], line: '' };
+    const cc = await T.load(CC_KEY, null).catch(() => null);
+    const key = cc && typeof cc === 'object' && cc.key ? String(cc.key) : '';
+    const fits = (to) => { const own = to === 'jpeg' ? 'jpg' : to; return want.has(own) || want.has(ALIAS[own]); };
+    const kinds = ['docx', 'text', 'image', 'pdf', 'pptx', 'xlsx', 'heic', 'csv', 'json'].filter((kind) => EXTS[kind].some((e) => !want.has(e)) && MATRIX[kind].targets.some(([to, label, where]) => !MANY.test(label) && (where !== 'cloud' || key) && fits(to)));
+    const exts = kinds.flatMap((k) => EXTS[k]).filter((e, i, all) => !want.has(e) && all.indexOf(e) === i);
+    const words = kinds.map((k) => KIND_WORDS[k]);
+    const verb = words.length > 1 || PLURAL.has(words[0]) ? 'are' : 'is';
+    const line = words.length ? `${andWords(words)} ${verb} converted${want.size === 1 ? ` to ${[...want][0].toUpperCase()}` : ''} for you` : '';
+    return { kinds, exts, line };
+  }
   /** The file, converted as plan() said: a File under its new name. Throws with the engine's own reason. */
   async function convertToFile(file, p, { onStage = null } = {}) {
     const kind = kindOf(file);
@@ -511,5 +532,5 @@
     return new File([out.blob], p.name, { type: MIME[p.ext] || out.blob.type || 'application/octet-stream' });
   }
 
-  BCV.toolsConvert = { open, kindOf, convertOne, MATRIX, setBase, plan, convertToFile };
+  BCV.toolsConvert = { open, kindOf, convertOne, MATRIX, setBase, plan, convertible, convertToFile };
 })();

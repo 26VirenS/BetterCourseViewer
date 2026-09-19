@@ -1022,8 +1022,17 @@ try {
   const subChips = await texts('.bcv-sb__chip');
   check(subChips.length === 3 && /^[A-Z][a-z]+ by 11:59 PM$/.test(subChips[0]) && subChips[1] === '10 points' && subChips[2] === 'Attempt 1 of unlimited' && (await texts('.bcv-sb__kicker'))[0].toLowerCase() === 'hand in', `block chips: ${subChips.join(' | ')}`);
   check(/^Open [A-Z][a-z]{2} \d+ – [A-Z][a-z]{2} \d+ · accepts a file upload, a text entry or a website URL$/.test((await texts('.bcv-sb__note'))[0]), `availability + accepted types: ${(await texts('.bcv-sb__note'))[0]}`);
-  check((await texts('.bcv-sb__dropsub'))[0] === 'PDF, DOCX, PNG or JPG only · as many files as you need' && (await page.getAttribute('.bcv-sb__pane input[type=file]', 'accept')) === '.pdf,.docx,.png,.jpg', 'allowed file types are read from the assignment and set the picker\'s accept');
+  check((await texts('.bcv-sb__dropsub'))[0] === 'PDF, DOCX, PNG or JPG only · as many files as you need' && (await texts('.bcv-sb__dropconv'))[0] === 'text and pictures are converted for you' && (await page.getAttribute('.bcv-sb__pane input[type=file]', 'accept')) === '.pdf,.docx,.png,.jpg,.txt,.md,.markdown,.jpeg,.webp,.gif,.bmp,.avif', `allowed file types are read from the assignment; the picker's accept takes them and the types that convert into them, and a line under the types says which are converted (${(await texts('.bcv-sb__dropconv'))[0]} | ${await page.getAttribute('.bcv-sb__pane input[type=file]', 'accept')})`);
   check((await texts('.bcv-sb__footnote'))[0] === 'Attach at least one file to submit.' && !!(await page.$('.bcv-sb__btn--primary[disabled]')), 'submit stays blocked until a file is attached');
+  // where only PDF is allowed (the usual case), the picker takes Word, text and pictures too, and the box says they are converted to PDF
+  const handIn = async () => { await page.reload(); await page.waitForSelector('.bcv-detail__actions .bcv-btn--primary', { timeout: 20000 }); await page.click('.bcv-detail__actions .bcv-btn--primary'); await page.waitForSelector('.bcv-sb__pane input[type=file]', { state: 'attached', timeout: 10000 }); };
+  await mockConfig({ ext: { 4002: ['pdf'] } });
+  await handIn();
+  const pdfOnly = { sub: (await texts('.bcv-sb__dropsub'))[0], conv: (await texts('.bcv-sb__dropconv'))[0], accept: await page.getAttribute('.bcv-sb__pane input[type=file]', 'accept'), color: await page.$eval('.bcv-sb__dropconv', (e) => getComputedStyle(e).color) };
+  check(pdfOnly.sub === 'PDF only · as many files as you need' && pdfOnly.conv === 'Word, text and pictures are converted to PDF for you' && pdfOnly.accept === '.pdf,.docx,.txt,.md,.markdown,.png,.jpg,.jpeg,.webp,.gif,.bmp,.avif' && pdfOnly.color !== (await page.$eval('.bcv-sb__dropsub', (e) => getComputedStyle(e).color)), `where only PDF is allowed, the box says Word, text and pictures are converted to PDF, in its own colour, and the picker does not grey a Word file out (${JSON.stringify(pdfOnly)})`);
+  await shot(page, '17b-handin-pdf-only');
+  await mockConfig({ ext: {} });
+  await handIn();
   // a file of another type is offered as what it can become — a text file as a PDF — converted here and attached under its new name
   await page.setInputFiles('.bcv-sb__pane input[type=file]', { name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('# Notes\n\nhello there') });
   await page.waitForSelector('.bcv-sheet--ask', { timeout: 5000 });

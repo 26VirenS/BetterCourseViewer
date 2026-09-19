@@ -135,7 +135,7 @@ function assignmentObj(courseId, row) {
     id, name, description: extra.description || `<p>Complete <strong>${name}</strong> as described in lecture. Show all work and submit a single PDF.</p><ul><li>Use the chain rule where appropriate.</li><li>Label each step.</li></ul>${extra.rubric ? '<p>See the rubric for how points are awarded.</p>' : ''}`,
     due_at: due, lock_at: extra.window ? at(dueDay, 23, 59) : null, unlock_at: extra.window ? at(dueDay - 7, 0, 0) : null, points_possible: possible, grading_type: 'points', published: true, html_url: `/courses/${courseId}/assignments/${id}`,
     submission_types: extra.quiz ? ['online_quiz'] : extra.tool ? ['external_tool'] : extra.types || ['online_upload', 'online_text_entry'], is_quiz_assignment: !!extra.quiz, quiz_id: extra.quiz ? String(Number(id) + 8000) : undefined,
-    allowed_extensions: extra.ext || [], locked_for_user: false,
+    allowed_extensions: mockConfig.ext?.[id] || extra.ext || [], locked_for_user: false, // (POST /__mock/config {"ext": {"4002": ["pdf"]}} narrows an assignment's types for a test)
     quiz_access_code: extra.code || null, quiz_ip_filter: extra.ip || null, quiz_lockdown: !!extra.lockdown, quiz_survey: extra.survey || null, quiz_code_hidden: !!extra.codeHidden, // (the mock's own notes: what the quiz built from this is restricted by)
     external_tool_tag_attributes: extra.tool ? { url: extra.tool, new_tab: false, resource_link_id: 'rl1' } : undefined,
     discussion_topic: extra.discussion ? { id: extra.discussion, title: name, html_url: `/courses/${courseId}/discussion_topics/${extra.discussion}` } : undefined, // a graded discussion: the assignment behind a topic

@@ -1317,6 +1317,7 @@ html[data-bcv-theme="dark"] .bcv-sb__chip--due { color: #ffb44d; }
 .bcv-sb__dropicon { width: 46px; height: 46px; border-radius: 15px; background: var(--bcv-blue-soft); display: flex; align-items: center; justify-content: center; }
 .bcv-sb__droptitle { font: 600 15px/1.3 var(--bcv-font); }
 .bcv-sb__dropsub { font: 400 12.5px/1.4 var(--bcv-font); color: var(--bcv-ink3); }
+.bcv-sb__dropconv { color: var(--bcv-blue); font-weight: 500; margin-top: -2px; } /* what is converted on the way in: the promise under the types line */
 .bcv-sb__count { padding: 0 4px; font: 600 11px/1.2 var(--bcv-font); color: var(--bcv-ink3); text-transform: uppercase; letter-spacing: .06em; }
 .bcv-sb__files { background: var(--bcv-card); border-radius: 18px; overflow: hidden; box-shadow: var(--bcv-shadow); }
 .bcv-sb__file { display: flex; align-items: center; gap: 13px; padding: 13px 16px; border-top: 1px solid var(--bcv-sep); }

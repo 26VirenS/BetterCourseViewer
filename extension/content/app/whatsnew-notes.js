@@ -23,6 +23,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.28.0', date: '2026-09-19', notes: [
+      { kind: 'improved', title: 'Word into a PDF hand-in', body: 'Where only PDF is allowed, the picker takes Word, text and pictures, and says so.', icon: P.arrows },
+    ] },
     { version: '2.27.0', date: '2026-09-19', notes: [
       { kind: 'improved', title: 'Timer opens on hover', body: 'Point at the pinned timer and it opens, like the switch beside it. Move away and it folds.', icon: P.pin },
     ] },

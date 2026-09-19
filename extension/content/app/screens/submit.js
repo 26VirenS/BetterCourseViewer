@@ -72,6 +72,9 @@
     const toolRows = (can.file || can.url) && Array.isArray(tools) ? tools.filter((t) => t && t.id && (!t.homework_submission || t.homework_submission.enabled !== false)) : [];
     const toolsFailed = (can.file || can.url) && tools === null;
     const allowedExt = (a.allowed_extensions || []).map((e) => String(e).toLowerCase().replace(/^\./, '').trim()).filter(Boolean);
+    // what else the drop zone takes: the types the converter turns into one of those (a Word file where only PDF is allowed)
+    const conv = allowedExt.length ? await (BCV.toolsConvert?.convertible?.(allowedExt) || Promise.resolve(null)).catch(() => null) : null;
+    if (!ctx.alive()) return screen;
     const extWords = () => listWords(allowedExt.map((e) => e.toUpperCase()));
     const typesLine = allowedExt.length ? `${extWords()} only` : 'Any file type';
     const acceptsLine = `accepts ${listWords(types.map((t) => WORDS[t] || t.replace(/_/g, ' ')))}`;
@@ -166,11 +169,13 @@
     }
 
     function filePane() {
-      const input = h('input', { type: 'file', multiple: true, hidden: true, accept: allowedExt.length ? allowedExt.map((e) => `.${e}`).join(',') : null, onchange: () => { addFiles(input.files); input.value = ''; } });
+      // the picker takes the allowed types and the ones that convert into them: a Word file is not greyed out where only PDF is allowed
+      const input = h('input', { type: 'file', multiple: true, hidden: true, accept: allowedExt.length ? [...allowedExt, ...(conv?.exts || [])].map((e) => `.${e}`).join(',') : null, onchange: () => { addFiles(input.files); input.value = ''; } });
       const drop = h('button', { type: 'button', class: 'bcv-sb__drop', onclick: () => input.click(), ondragover: (e) => { e.preventDefault(); drop.classList.add('is-over'); }, ondragleave: () => drop.classList.remove('is-over'), ondrop: (e) => { e.preventDefault(); drop.classList.remove('is-over'); addFiles(e.dataTransfer?.files); } }, [
         h('span', { class: 'bcv-sb__dropicon' }, U.svg(UPLOAD, { size: 22, stroke: 'var(--bcv-blue)', width: 1.9 })),
         h('span', { class: 'bcv-sb__droptitle', text: 'Drop a file here or choose one' }),
         h('span', { class: 'bcv-sb__dropsub', text: `${typesLine} · as many files as you need` }),
+        conv?.line ? h('span', { class: 'bcv-sb__dropsub bcv-sb__dropconv', text: conv.line }) : null,
       ]);
       const n = st.files.length;
       return U.el('bcv-sb__pane', [
