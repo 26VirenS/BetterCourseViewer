@@ -119,24 +119,23 @@ html[data-bcv-theme="dark"] .bcv-skel { --bcv-skel: linear-gradient(90deg, rgba(
 #bcv-look, .bcv-look-pill { position: fixed; top: 6px; right: 10px; z-index: 2147482000; display: flex; flex-direction: column; align-items: stretch; margin: 0; padding: 0; border: 1px solid rgba(255,255,255,.14); border-radius: 12px; background: rgba(28,28,30,.86); -webkit-backdrop-filter: blur(16px) saturate(1.4); backdrop-filter: blur(16px) saturate(1.4); box-shadow: 0 2px 10px rgba(0,0,0,.2); color: #fff; font: 600 10.5px/1 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif; letter-spacing: -.01em; line-height: 1; text-transform: none; overflow: hidden; transition: box-shadow .18s ease, opacity .2s ease, border-radius .18s ease; }
 /* (the keyboard's focus opens it too; a press with the pointer leaves focus behind, so that alone does not hold it open) */
 /* folded it is a 24px disc with the mark alone (the mark in the stop's colour: blue on, grey off for
- * this page, orange locked); under the pointer it opens into a capsule, the mark growing into the
- * slider in its place and the name coming out on the left */
-#bcv-look:hover, #bcv-look:has(:focus-visible), .bcv-look-pill.is-open { border-radius: 22px; box-shadow: 0 6px 20px rgba(0,0,0,.3); }
+ * this page, orange locked); under the pointer the disc's glass goes and the mark grows into the
+ * slider alone, in its place — no capsule around it, no name beside it */
+#bcv-look:hover, #bcv-look:has(:focus-visible), .bcv-look-pill.is-open { background: transparent; border-color: transparent; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
 #bcv-look.is-busy { opacity: .6; }
 #bcv-look.is-busy .bcv-look__main { pointer-events: none; } /* (no second press while the page loads afresh; the pill itself still opens under the pointer) */
 #bcv-look button, .bcv-look-pill button { margin: 0; border: 0; background: transparent; color: inherit; cursor: pointer; font: inherit; letter-spacing: inherit; text-align: left; }
-#bcv-look button:focus-visible { outline: 2px solid #0a84ff; outline-offset: -2px; border-radius: 22px; }
+#bcv-look button:focus-visible { outline: 2px solid #0a84ff; outline-offset: 2px; border-radius: 18px; }
 .bcv-look__main { --bcv-look-pad: 4px; position: relative; display: flex; align-items: center; justify-content: flex-end; gap: 0; box-sizing: border-box; width: 22px; height: 22px; padding: 0 var(--bcv-look-pad); user-select: none; -webkit-user-select: none; touch-action: none; transition: width .28s cubic-bezier(.32,.72,0,1), height .28s cubic-bezier(.32,.72,0,1), padding .28s cubic-bezier(.32,.72,0,1); }
 /* (never narrower than the disc while it opens: width jumps to auto with the name and the slider still at nothing, and a pill that shrank away from under the pointer would lose the hover and fold, frame after frame) */
-#bcv-look:hover .bcv-look__main, #bcv-look:has(:focus-visible) .bcv-look__main, .bcv-look-pill.is-open .bcv-look__main { --bcv-look-pad: 8px; width: auto; min-width: 22px; height: 42px; padding: 0 var(--bcv-look-pad) 0 14px; }
+#bcv-look:hover .bcv-look__main, #bcv-look:has(:focus-visible) .bcv-look__main, .bcv-look-pill.is-open .bcv-look__main { --bcv-look-pad: 0px; width: auto; min-width: 22px; height: 36px; padding: 0; }
 .bcv-look__main:active { opacity: .9; }
 .bcv-look__mark { position: absolute; top: 50%; right: var(--bcv-look-pad); width: 14px; height: 14px; margin-top: -7px; border-radius: 4px; background: linear-gradient(158deg, #0a84ff, #0a4fd6); display: flex; align-items: center; justify-content: center; transform-origin: 100% 50%; transition: transform .28s cubic-bezier(.32,.72,0,1), opacity .16s ease, right .28s cubic-bezier(.32,.72,0,1), background .2s ease; }
 .bcv-look__mark svg { display: block; width: 12px; height: 12px; }
 .bcv-look__main.is-off .bcv-look__mark { background: #8e8e93; }
 .bcv-look__main.is-lock .bcv-look__mark { background: #ff9500; }
 #bcv-look:hover .bcv-look__mark, #bcv-look:has(:focus-visible) .bcv-look__mark, .bcv-look-pill.is-open .bcv-look__mark { transform: scale(2.6); opacity: 0; pointer-events: none; }
-.bcv-look__text { flex: none; max-width: 0; opacity: 0; overflow: hidden; white-space: nowrap; transition: max-width .28s cubic-bezier(.32,.72,0,1), opacity .18s ease, margin .28s cubic-bezier(.32,.72,0,1); }
-#bcv-look:hover .bcv-look__text, #bcv-look:has(:focus-visible) .bcv-look__text, .bcv-look-pill.is-open .bcv-look__text { max-width: 120px; opacity: 1; margin-right: 10px; }
+.bcv-look__text { flex: none; max-width: 0; opacity: 0; overflow: hidden; white-space: nowrap; } /* (the stop's words, for the accessibility tree and the tests: never shown) */
 /* the slider, drawn at its own size — a 208 by 48 track, a white knob of 40 with a glyph in it (a
  * tick, a dash, a lock), the colour running out from the middle stop as far as the knob (green to
  * the right, orange to the left), a dot at each stop, LOCKED and ACTIVE in the room the knob
@@ -203,8 +202,8 @@ html.bcv-welcome { overflow: hidden; }
 /* the arrow draws itself (pathLength="1" on the line: the dash is the whole of it), then the head comes in at its tip */
 .bcv-welcome__line { stroke-dasharray: 1 2; stroke-dashoffset: 1.05; animation: bcv-welcome-draw .6s ease-out .2s forwards; }
 .bcv-welcome__head { opacity: 0; animation: bcv-welcome-fade .25s ease .72s forwards; }
-.bcv-welcome__text { display: flex; flex-direction: column; gap: 8px; max-width: 560px; transition: opacity .16s ease; }
-.bcv-welcome__text.is-swap { opacity: 0; } /* (the lines swapped as a show moves on) */
+.bcv-welcome__text { display: flex; flex-direction: column; gap: 8px; max-width: 560px; }
+.bcv-welcome__hint--lines { white-space: pre-line; } /* (one line per stop) */
 /* the switch shown working: a copy of it at the top right and a pointer that app.js/welcome.js moves about it (--cx/--cy, over --cms) */
 .bcv-welcome__lookshow { position: absolute; inset: 0; pointer-events: none; animation: bcv-welcome-fade .4s ease both; }
 .bcv-welcome__lookshow.is-out { animation: bcv-welcome-out .25s ease both; }

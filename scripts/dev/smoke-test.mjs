@@ -150,10 +150,10 @@ try {
   check(!(await visible('#application')), 'stock Canvas hidden');
   const lookBtn = await page.$eval('#bcv-look', (e) => { const r = e.getBoundingClientRect(); const m = e.querySelector('.bcv-look__main'); const mk = m.querySelector('.bcv-look__mark'); const s = m.querySelector('.bcv-look__sw').getBoundingClientRect(); const k = m.querySelector('.bcv-look__knob'); const f = m.querySelector('.bcv-look__fill'); return { fixed: getComputedStyle(e).position === 'fixed', top: Math.round(r.top), right: Math.round(window.innerWidth - r.right), w: Math.round(r.width), h: Math.round(r.height), radius: getComputedStyle(e).borderRadius, role: m.getAttribute('role'), pos: m.getAttribute('aria-valuenow'), mark: getComputedStyle(mk).opacity, markImg: getComputedStyle(mk).backgroundImage.startsWith('linear-gradient'), text: m.querySelector('.bcv-look__text').textContent.trim(), textShown: m.querySelector('.bcv-look__text').getBoundingClientRect().width, slider: `${Math.round(s.width)}x${Math.round(s.height)}`, sliderShown: getComputedStyle(m.querySelector('.bcv-look__slider')).opacity, knob: k.style.left, fill: `${f.style.left}+${f.style.width}`, color: f.style.background, glyph: m.querySelector('.bcv-look__glyph svg').style.stroke, path: m.querySelector('.bcv-look__glyph path').getAttribute('d'), ticks: m.querySelectorAll('.bcv-look__tick').length, labels: [...m.querySelectorAll('.bcv-look__lbl')].map((l) => `${l.textContent}:${l.style.opacity}`).join(' '), persist: !!e.querySelector('.bcv-look__persist') }; }).catch(() => null);
   check(!!lookBtn && lookBtn.fixed && lookBtn.top < 40 && lookBtn.right < 24 && lookBtn.w === 24 && lookBtn.h === 24 && lookBtn.radius === '12px' && lookBtn.role === 'slider' && lookBtn.pos === '1' && lookBtn.mark === '1' && lookBtn.markImg && lookBtn.text === 'Simpl Courses' && lookBtn.textShown === 0 && lookBtn.slider === '0x14' && lookBtn.sliderShown === '0' && lookBtn.knob === '164px' && lookBtn.fill === '84px+100px' && lookBtn.color === 'rgb(52, 199, 89)' && lookBtn.glyph === 'rgb(52, 199, 89)' && lookBtn.path === 'M20 6L9 17l-5-5' && lookBtn.ticks === 3 && lookBtn.labels === 'LOCKED:0 ACTIVE:1' && !lookBtn.persist, `the look switch sits at the top right of the page, folded to a disc with the blue mark alone, the slider in it ready on its right stop — the knob with a green tick, the green out from the middle, ACTIVE in the room left — but not shown: ${JSON.stringify(lookBtn)}`);
-  // under the pointer the disc opens into a capsule: the mark grows into the slider in its place, and the name comes out on the left
+  // under the pointer the disc's glass goes and the mark grows into the slider alone: no capsule around it, no name beside it
   await page.hover('#bcv-look');
-  const capsule = await eventually(() => page.$eval('#bcv-look', (e) => { const r = e.getBoundingClientRect(); const s = e.querySelector('.bcv-look__sw').getBoundingClientRect(); const k = e.querySelector('.bcv-look__knob').getBoundingClientRect(); const mk = e.querySelector('.bcv-look__mark'); return r.width > 220 && Math.round(r.height) === 44 && getComputedStyle(e).borderRadius === '22px' && e.querySelector('.bcv-look__text').getBoundingClientRect().width > 40 && Math.round(s.width) === 156 && Math.round(s.height) === 36 && getComputedStyle(e.querySelector('.bcv-look__slider')).opacity === '1' && Math.round(k.width) === 30 && Math.round(k.left + k.width / 2 - (s.left + s.width / 2)) === 60 && Math.abs(s.right - (r.right - 9)) <= 1 && getComputedStyle(mk).opacity === '0'; }));
-  check(capsule, 'hovering it opens the capsule — 44 tall with round ends, the name out on the left, the slider at three quarters (156 by 36, the knob 30 across, its centre 60px right of the middle) at the right end where the mark was, the mark gone into it');
+  const sliderOpen = await eventually(() => page.$eval('#bcv-look', (e) => { const r = e.getBoundingClientRect(); const s = e.querySelector('.bcv-look__sw').getBoundingClientRect(); const k = e.querySelector('.bcv-look__knob').getBoundingClientRect(); const mk = e.querySelector('.bcv-look__mark'); const cs = getComputedStyle(e); return Math.round(r.width) === 158 && Math.round(r.height) === 38 && cs.backgroundColor === 'rgba(0, 0, 0, 0)' && cs.boxShadow === 'none' && e.querySelector('.bcv-look__text').getBoundingClientRect().width === 0 && Math.round(s.width) === 156 && Math.round(s.height) === 36 && getComputedStyle(e.querySelector('.bcv-look__slider')).opacity === '1' && Math.round(k.width) === 30 && Math.round(k.left + k.width / 2 - (s.left + s.width / 2)) === 60 && Math.abs(s.right - (r.right - 1)) <= 1 && getComputedStyle(mk).opacity === '0'; }));
+  check(sliderOpen, 'hovering it opens the slider alone — 156 by 36 at three quarters, the knob 30 across, its centre 60px right of the middle, at the right end where the mark was, the mark gone into it, no glass or name around it');
   await shot(page, '01d-look-switch-open');
   await page.mouse.move(700, 500);
   check(await eventually(() => page.$eval('#bcv-look', (e) => { const r = e.getBoundingClientRect(); return Math.round(r.width) === 24 && Math.round(r.height) === 24 && getComputedStyle(e.querySelector('.bcv-look__mark')).opacity === '1'; })), 'it folds back to the disc with the mark when the pointer leaves');
@@ -2366,13 +2366,12 @@ try {
   await lookShown();
   look = await lookSettled();
   check(await visible('#bcv-app') && look.pos === '1' && look.knob === '164px' && look.fill === '84px+100px' && look.color === GREEN && look.path === TICK && look.labels === 'LOCKED:0 ACTIVE:1' && look.markImg, `the next page brings the look back: the knob on the right stop with a tick, the green out from the middle, ACTIVE in the room left, the folded mark blue again (${JSON.stringify(look)})`);
-  // a press on the name: the middle stop — stock Canvas for this page — and a reload brings the look back
-  await grownTrack();
-  const tx = await (await page.$('#bcv-look .bcv-look__text')).boundingBox();
-  await page.mouse.click(tx.x + tx.width / 2, tx.y + tx.height / 2);
+  // Enter on the switch: the middle stop — stock Canvas for this page — and a reload brings the look back
+  await page.focus('#bcv-look .bcv-look__main');
+  await page.keyboard.press('Enter');
   await stockShown();
   look = await lookSettled();
-  check(await visible('#application') && !(await page.$('#bcv-app')) && look.pos === '0' && look.knob === '84px' && look.text === 'Off for this page' && (await lookSaved()) === true, `a press on the name shows stock Canvas for this page: the middle stop, the name saying so, the saved look untouched (${JSON.stringify(look)})`);
+  check(await visible('#application') && !(await page.$('#bcv-app')) && look.pos === '0' && look.knob === '84px' && look.text === 'Off for this page' && (await lookSaved()) === true, `Enter on the switch is stock Canvas for this page: the middle stop, the words saying so, the saved look untouched (${JSON.stringify(look)})`);
   await page.reload();
   await lookShown();
   check(await visible('#bcv-app') && (await lookAt()).pos === '1', 'and a reload brings the look back');
@@ -2622,14 +2621,16 @@ try {
   // stage one: the switch shown working — a copy of it at the top right, a pointer that comes to it, presses its stops and drags its knob, the lines saying what each move does
   const showAt = () => page.$eval('#bcv-welcome', (e) => { const p = e.querySelector('.bcv-welcome__look'); const r = p.getBoundingClientRect(); const c = e.querySelector('.bcv-welcome__cursor--look'); return { top: Math.round(r.top), rightGap: Math.round(innerWidth - r.right), open: p.classList.contains('is-open'), knob: p.querySelector('.bcv-look__knob').style.left, path: p.querySelector('.bcv-look__glyph path').getAttribute('d'), name: p.querySelector('.bcv-look__text').textContent, cursor: !!c, cursorShown: c ? getComputedStyle(c).opacity : null, arrow: !!e.querySelector('.bcv-welcome__arrow'), persist: !!p.querySelector('.bcv-look__persist') }; });
   const s0 = await showAt();
-  check(s0.top === 10 && s0.rightGap === 12 && s0.cursor && !s0.arrow && !s0.persist && (await welcomeLines()).join(' | ') === 'the switch at the top right | Point at it | It opens when the pointer comes near.', `stage one shows a copy of the switch at the top right, a pointer, and the first lines (${JSON.stringify(s0)} | ${(await welcomeLines()).join(' | ')})`);
+  const stageLines = async () => (await welcomeLines()).map((t) => t.replace(/\s+/g, ' ').trim()).join(' | ');
+  const LOOK_LINES = 'There’s a new Simpl switch. | Press different parts for different things | Left: Simpl is off Middle: Simpl is inactive Right: Simpl is on & active.';
+  check(s0.top === 10 && s0.rightGap === 12 && s0.cursor && !s0.arrow && !s0.persist && (await stageLines()) === LOOK_LINES && (await page.$eval('.bcv-welcome__hint', (e) => getComputedStyle(e).whiteSpace)) === 'pre-line', `stage one shows a copy of the switch at the top right, a pointer, and the lines: a grey one above, the white one, and one per stop (${JSON.stringify(s0)} | ${await stageLines()})`);
   check(await eventually(async () => { const st = await showAt(); return st.open && st.cursorShown === '1'; }, 3000), 'the pointer comes to the switch and it opens');
   check(noContinueYet && await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000) && Date.now() - welcomeAt >= 2200 && (await texts('.bcv-welcome__next'))[0] === 'Continue', 'Continue is not there at first, and comes in after three seconds');
-  check(await eventually(async () => { const st = await showAt(); return st.knob === '84px' && st.path === 'M6 12h12' && st.name === 'Off for this page' && (await welcomeLines())[1] === 'Press the middle'; }, 5000), 'the pointer presses the middle: the knob goes there with a dash in it, the copy says Off for this page, and the lines say what that does');
-  check(await eventually(async () => { const st = await showAt(); return st.knob === '164px' && (await welcomeLines())[1] === 'Press the right'; }, 5000), 'then the right: on again');
-  check(await eventually(async () => { const st = await showAt(); return st.knob === '4px' && st.path === 'M6 11h12v9H6zM9 11V8a3 3 0 016 0v3' && st.name === 'Locked off' && (await welcomeLines())[1] === 'Drag the knob left to lock'; }, 7000), 'then the knob is dragged to the left stop: locked, with the lock in it, and the lines say it stays off until unlocked');
+  check(await eventually(async () => { const st = await showAt(); return st.knob === '84px' && st.path === 'M6 12h12' && st.name === 'Off for this page'; }, 5000) && (await stageLines()) === LOOK_LINES, 'the pointer presses the middle: the knob goes there with a dash in it, and the lines hold still');
+  check(await eventually(async () => (await showAt()).knob === '164px', 5000), 'then the right: on again');
+  check(await eventually(async () => { const st = await showAt(); return st.knob === '4px' && st.path === 'M6 11h12v9H6zM9 11V8a3 3 0 016 0v3' && st.name === 'Locked off'; }, 7000), 'then the knob is dragged to the left stop: locked, with the lock in it');
   await shot(page, '31-welcome-look');
-  check(await eventually(async () => { const st = await showAt(); return st.knob === '164px' && (await welcomeLines())[1] === 'Press the right to unlock'; }, 5000), 'and the right again unlocks it');
+  check(await eventually(async () => (await showAt()).knob === '164px', 5000), 'and the right again unlocks it');
   await page.click('.bcv-welcome__next');
   await page.waitForSelector('#bcv-welcome[data-stage="away"]', { timeout: 5000 });
   const awayAt = Date.now();
@@ -2655,14 +2656,14 @@ try {
   await page.waitForFunction(() => !document.querySelector('#bcv-welcome'), null, { timeout: 5000 });
   check(!(await page.$('html.bcv-welcome')) && (await page.$('.bcv-tour__card')) === null && !(await page.$('html.bcv-touring')) && (await prefsOf()).tour == null && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('welcome:pending'))['welcome:pending'])) === undefined && (await visible('#bcv-look')) && (await page.$('.bcv-stat')) !== null, 'the last Continue takes the black away: the Dashboard, the real switch, no tour, and the welcome does not come back');
   // people who had Simpl before the switch became a slider get its show alone, once: their What's New mark is from before it
-  await sw.evaluate(async () => { await self.BCV.api.storage.local.remove('welcome:look2'); await self.BCV.api.storage.local.set({ 'whatsnew:seen': '2.31.0' }); });
+  await sw.evaluate(async () => { await self.BCV.api.storage.local.remove('welcome:look3'); await self.BCV.api.storage.local.set({ 'whatsnew:seen': '2.33.0' }); });
   await page.reload();
   await page.waitForSelector('#bcv-welcome[data-stage="look"]', { timeout: 20000 });
-  check((await welcomeBox()).bg === 'rgb(0, 0, 0)' && !!(await page.$('.bcv-welcome__look')) && (await texts('.bcv-welcome__title'))[0] === 'Point at it', 'after an update from before the slider, the page comes back black with the switch\'s show alone');
+  check((await welcomeBox()).bg === 'rgb(0, 0, 0)' && !!(await page.$('.bcv-welcome__look')) && (await texts('.bcv-welcome__title'))[0] === 'Press different parts for different things', 'after an update from before this show, the page comes back black with the switch\'s show alone');
   await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000);
   await page.click('.bcv-welcome__next');
   await page.waitForFunction(() => !document.querySelector('#bcv-welcome'), null, { timeout: 5000 });
-  check((await sw.evaluate(async () => (await self.BCV.api.storage.local.get('welcome:look2'))['welcome:look2'])) === true && (await visible('#bcv-app')), 'its Continue is the last: the black goes, and the show is marked seen');
+  check((await sw.evaluate(async () => (await self.BCV.api.storage.local.get('welcome:look3'))['welcome:look3'])) === true && (await visible('#bcv-app')), 'its Continue is the last: the black goes, and the show is marked seen');
   await sw.evaluate((v) => self.BCV.api.storage.local.set({ 'whatsnew:seen': v }), manifest.version);
   await page.reload();
   await page.waitForSelector('#bcv-app .bcv-nav__item', { timeout: 20000 });

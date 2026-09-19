@@ -23,6 +23,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.34.0', date: '2026-09-19', notes: [
+      { kind: 'improved', title: 'Just the slider', body: 'The switch opens into the slider alone; the welcome now says what each part does.', icon: P.toggle },
+    ] },
     { version: '2.33.0', date: '2026-09-19', notes: [
       { kind: 'new', title: 'How the switch works', body: 'A short show of the new switch, once: point, press each side, drag the knob.', icon: P.toggle },
       { kind: 'new', title: 'Quick menus on pins', body: 'Point at a pinned tool: cite a link, work out a sum, convert a file, study a set.', icon: P.pin },
