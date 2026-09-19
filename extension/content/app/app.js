@@ -1113,13 +1113,15 @@
   // unlocked (BCV.early.setLook). The slider is drawn at its own size — a 208 by 48 track, a white
   // knob of 40 with a glyph in it (a tick, a dash, a lock), the colour running out from the middle
   // stop as far as the knob, a dot at each stop, LOCKED and ACTIVE in the room the knob leaves —
-  // and scaled to the pill: a quarter folded, three quarters under the pointer. A press on the
-  // slider goes to the stop in that third of it — its left third the lock, its right third on —
-  // and the knob can be dragged, gliding to the nearest stop when let go; a press elsewhere on
-  // the pill toggles on and off for this page, as do Enter and Space, and the arrow keys step it.
-  // Under the pointer (or the keyboard's focus) the pill opens: the name comes out, saying which,
-  // and the slider grows for the fingers. The popup and Settings → General have the saved switch,
-  // the same as the lock; "Open in stock Canvas" on a Canvas-drawn page is the middle stop.
+  // and shown at three quarters of that. Folded, the pill is a disc with the mark alone, in the
+  // stop's colour (blue on, grey off for this page, orange locked); under the pointer (or the
+  // keyboard's focus) it opens into a capsule, the mark growing into the slider in its place and
+  // the name coming out on the left, saying which. A press on the slider goes to the stop in that
+  // third of it — its left third the lock, its right third on — and the knob can be dragged,
+  // gliding to the nearest stop when let go; a press elsewhere on the pill toggles on and off for
+  // this page, as do Enter and Space, and the arrow keys step it. The popup and Settings → General
+  // have the saved switch, the same as the lock; "Open in stock Canvas" on a Canvas-drawn page is
+  // the middle stop.
   const LOOK_MARK = '<svg viewBox="0 0 120 120" width="18" height="18" aria-hidden="true"><rect x="16" y="18" width="53" height="84" rx="14" fill="rgba(255,255,255,.35)"/><path d="M28 30 H69 A30 30 0 0 1 69 90 H28" fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><path d="M35 42 H69 A18 18 0 0 1 69 78 H35" fill="none" stroke="rgba(255,255,255,.72)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><path d="M42 54 H69 A6 6 0 0 1 69 66 H42" fill="none" stroke="rgba(255,255,255,.46)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   // the slider's own geometry: the track 208 wide, the knob 40 with its left at 4, 84 or 164 (its
   // centre 80px from stop to stop, the middle one at 104), the fill from the middle stop's own
@@ -1155,7 +1157,7 @@
     let drag = null;
     let knobX = knobFor(pos());
     let raf = 0;
-    const scale = () => (track.getBoundingClientRect().width || SL.w / 4) / SL.w; // the slider's size on the page, over its own
+    const scale = () => (track.getBoundingClientRect().width || SL.w * 0.75) / SL.w; // the slider's size on the page, over its own
     // the knob at x (its left, in the slider's own px), and everything that follows it: the fill
     // from the middle stop to the knob's centre, in green to the right and orange to the left; the
     // glyph for the stop the knob is nearest; LOCKED and ACTIVE fading in as the knob leaves room
