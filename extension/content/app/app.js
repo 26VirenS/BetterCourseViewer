@@ -1126,7 +1126,7 @@
   // the slider's own geometry: the track 208 wide, the knob 40 with its left at 4, 84 or 164 (its
   // centre 80px from stop to stop, the middle one at 104), the fill from the middle stop's own
   // round end (84 to 124) out to the knob's centre
-  const SL = { w: 208, mid: 104, r: 20, knob: 40, stops: [4, 84, 164], green: '#34c759', orange: '#ff9500', grey: '#8e8e93' };
+  const SL = { w: 208, mid: 104, r: 20, knob: 40, stops: [4, 84, 164], green: '#34c759', orange: '#ff4f1f', grey: '#8e8e93' }; // (the lock's colour: a red-orange)
   const SL_GLYPH = { '1': 'M20 6L9 17l-5-5', '0': 'M6 12h12', '-1': 'M6 11h12v9H6zM9 11V8a3 3 0 016 0v3' };
   const LOOK_WORDS = { '1': 'Simpl Courses', '0': 'Off for this page', '-1': 'Locked off' };
   const LOOK_TITLES = {

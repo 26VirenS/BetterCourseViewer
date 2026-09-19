@@ -677,7 +677,7 @@ try {
   await page.screenshot({ path: join(out, 'phone-13-tools-welcome.png') });
   await page.click('.bcv-welcome__next');
   await page.waitForFunction(() => !document.querySelector('#bcv-welcome'), null, { timeout: 5000 });
-  check((await page.$$('.bcv-tool-card')).length === 5 && (await texts('.bcv-topbar__title'))[0] === 'Tools' && await noOverflow() && (await page.$eval('#bcv-pins', (e) => getComputedStyle(e).display).catch(() => 'none')) === 'none' && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('tools:welcomed'))['tools:welcomed'])) === true, 'one Continue (a phone has no switch to drag to): the five cards in one column, no pins, the welcome marked seen');
+  check((await page.$$('.bcv-tool-card')).length === 9 && (await texts('.bcv-topbar__title'))[0] === 'Tools' && await noOverflow() && (await page.$eval('#bcv-pins', (e) => getComputedStyle(e).display).catch(() => 'none')) === 'none' && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('tools:welcomed'))['tools:welcomed'])) === true, 'one Continue (a phone has no switch to drag to): the nine cards in one column, no pins, the welcome marked seen');
   await shot('13b-tools');
   await page.click('.bcv-tool-card[data-tool="fc"]');
   await page.waitForSelector('.bcv-tool[data-tool="fc"]', { timeout: 5000 });

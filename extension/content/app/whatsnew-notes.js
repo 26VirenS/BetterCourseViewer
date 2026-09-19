@@ -23,6 +23,15 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.35.0', date: '2026-09-19', notes: [
+      { kind: 'new', title: 'Grade needed', body: 'What you need on the final to hit your goal, every number from Canvas.', icon: P.steps },
+      { kind: 'new', title: 'Merge & split PDFs', body: 'Join PDFs into one, or cut one into parts, on this device.', icon: P.layers },
+      { kind: 'new', title: 'PDF annotator', body: 'Highlight, box and pin notes on a PDF; kept per file, saved into a copy.', icon: P.pen },
+      { kind: 'new', title: 'Image to text', body: 'Read the words off a picture or a scan, right here. Nothing is uploaded.', icon: P.pic },
+      { kind: 'improved', title: 'A real calculator', body: 'The calculator pin now opens a scientific calculator, laid out like the app.', icon: P.tool },
+      { kind: 'fixed', title: 'Pin fields on Canvas', body: 'The Cite pin’s field no longer comes out white and square on a real Canvas page.', icon: P.pin },
+      { kind: 'improved', title: 'The lock in red-orange', body: 'The switch’s locked stop is red-orange now; the welcome shows each stop on a small slider.', icon: P.toggle },
+    ] },
     { version: '2.34.0', date: '2026-09-19', notes: [
       { kind: 'improved', title: 'Just the slider', body: 'The switch opens into the slider alone; the welcome now says what each part does.', icon: P.toggle },
     ] },

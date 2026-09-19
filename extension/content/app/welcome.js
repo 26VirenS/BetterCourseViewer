@@ -25,7 +25,7 @@
   // (viewBox size, the line, the head) and the thing pointed at, built when the stage opens
   const STAGES = {
     look: {
-      layout: 'look', kicker: 'There’s a new Simpl switch.', title: 'Press different parts for different things', hint: ['Left: Simpl is off', 'Middle: Simpl is inactive', 'Right: Simpl is on & active.'],
+      layout: 'look', kicker: 'There’s a new Simpl switch.', title: 'Press different parts for different things', hint: ['Left: Simpl is off', 'Middle: Simpl is inactive', 'Right: Simpl is on & active.'], stops: [-1, 0, 1],
       prop: (app, ctx) => lookShow(app, ctx),
     },
     away: {
@@ -208,7 +208,14 @@
       h('div', { class: 'bcv-welcome__text' }, [
         s.kicker ? h('div', { class: 'bcv-welcome__kicker', text: s.kicker }) : null,
         h('div', { class: 'bcv-welcome__title', text: s.title }),
-        h('div', { class: `bcv-welcome__hint ${lines ? 'bcv-welcome__hint--lines' : ''}`, text: lines ? s.hint.join('\n') : s.hint }),
+        lines ? h('div', { class: 'bcv-welcome__hint bcv-welcome__hint--rows' }, s.hint.map((line, i) => { // (a row per stop, with a small slider showing where it is)
+          const at = line.indexOf(':');
+          const stop = s.stops?.[i] ?? 0;
+          return h('div', { class: 'bcv-welcome__stoprow' }, [
+            h('span', { class: 'bcv-welcome__stop', dataset: { stop: String(stop) }, style: { '--c': stop < 0 ? '#ff4f1f' : stop > 0 ? '#34c759' : '#8e8e93' }, 'aria-hidden': 'true' }, h('span', { class: 'bcv-welcome__stopknob' })),
+            h('span', { class: 'bcv-welcome__stoptext' }, at > 0 ? [h('b', { text: line.slice(0, at + 1) }), line.slice(at + 1)] : [line]),
+          ]);
+        })) : h('div', { class: 'bcv-welcome__hint', text: s.hint }),
       ]),
       next,
     ]);

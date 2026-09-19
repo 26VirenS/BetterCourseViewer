@@ -2348,7 +2348,7 @@ try {
   const lookSaved = async () => (await sw.evaluate(async () => (await self.BCV.settings.get()).appearance)).skin !== false;
   const lookAt = () => page.$eval('#bcv-look .bcv-look__main', (e) => { const f = e.querySelector('.bcv-look__fill'); return { pos: e.getAttribute('aria-valuenow'), knob: e.querySelector('.bcv-look__knob').style.left, fill: `${f.style.left}+${f.style.width}`, color: f.style.background, path: e.querySelector('.bcv-look__glyph path').getAttribute('d'), text: e.querySelector('.bcv-look__text').textContent, mark: getComputedStyle(e.querySelector('.bcv-look__mark')).backgroundColor, markImg: getComputedStyle(e.querySelector('.bcv-look__mark')).backgroundImage.startsWith('linear-gradient'), labels: [...e.querySelectorAll('.bcv-look__lbl')].map((l) => `${l.textContent}:${l.style.opacity}`).join(' ') }; }).catch(() => null);
   const lookSettled = async () => { await page.waitForTimeout(650); return lookAt(); }; // (the knob glides to its stop, the fill after it)
-  const GREEN = 'rgb(52, 199, 89)', ORANGE = 'rgb(255, 149, 0)', TICK = 'M20 6L9 17l-5-5', DASH = 'M6 12h12', LOCK = 'M6 11h12v9H6zM9 11V8a3 3 0 016 0v3';
+  const GREEN = 'rgb(52, 199, 89)', ORANGE = 'rgb(255, 79, 31)', TICK = 'M20 6L9 17l-5-5', DASH = 'M6 12h12', LOCK = 'M6 11h12v9H6zM9 11V8a3 3 0 016 0v3';
   const stockShown = async () => { await page.waitForFunction(() => !document.documentElement.classList.contains('bcv-on') && !!document.querySelector('#bcv-look') && !!document.querySelector('#application'), null, { timeout: 15000 }); await page.waitForTimeout(300); };
   const lookShown = async () => { await page.waitForSelector('#bcv-app .bcv-nav__item', { timeout: 15000 }); await page.waitForTimeout(200); };
   // the slider as it is under the pointer, grown to three quarters: 156 wide, the knob's centre 138 in at the right stop, 18 at the left
@@ -2381,7 +2381,7 @@ try {
   await stockShown();
   await eventually(async () => (await lookSaved()) === false);
   look = await lookSettled();
-  check(await visible('#application') && (await lookSaved()) === false && look.pos === '-1' && look.knob === '4px' && look.fill === '24px+100px' && look.color === ORANGE && look.path === LOCK && look.text === 'Locked off' && look.labels === 'LOCKED:1 ACTIVE:0' && look.mark === 'rgb(255, 149, 0)', `a press on the slider's left third locks: stock Canvas, the look saved off, the knob on the left stop with a lock in it, the orange from the middle out to it, LOCKED in the room left, the folded mark orange (${JSON.stringify(look)})`);
+  check(await visible('#application') && (await lookSaved()) === false && look.pos === '-1' && look.knob === '4px' && look.fill === '24px+100px' && look.color === ORANGE && look.path === LOCK && look.text === 'Locked off' && look.labels === 'LOCKED:1 ACTIVE:0' && look.mark === ORANGE, `a press on the slider's left third locks: stock Canvas, the look saved off, the knob on the left stop with a lock in it, the red-orange from the middle out to it, LOCKED in the room left, the folded mark red-orange (${JSON.stringify(look)})`);
   await shot(page, '28b-look-locked');
   await page.goto(`${BASE}/`);
   await page.waitForSelector('#application', { timeout: 10000 });
@@ -2623,7 +2623,7 @@ try {
   const s0 = await showAt();
   const stageLines = async () => (await welcomeLines()).map((t) => t.replace(/\s+/g, ' ').trim()).join(' | ');
   const LOOK_LINES = 'There’s a new Simpl switch. | Press different parts for different things | Left: Simpl is off Middle: Simpl is inactive Right: Simpl is on & active.';
-  check(s0.top === 10 && s0.rightGap === 12 && s0.cursor && !s0.arrow && !s0.persist && (await stageLines()) === LOOK_LINES && (await page.$eval('.bcv-welcome__hint', (e) => getComputedStyle(e).whiteSpace)) === 'pre-line', `stage one shows a copy of the switch at the top right, a pointer, and the lines: a grey one above, the white one, and one per stop (${JSON.stringify(s0)} | ${await stageLines()})`);
+  check(s0.top === 10 && s0.rightGap === 12 && s0.cursor && !s0.arrow && !s0.persist && (await stageLines()) === LOOK_LINES && (await page.$$eval('.bcv-welcome__stoprow', (els) => els.map((e) => `${e.querySelector('.bcv-welcome__stop').dataset.stop}:${getComputedStyle(e.querySelector('.bcv-welcome__stopknob')).left}:${e.querySelector('b').textContent}`))).join(' ') === '-1:2px:Left: 0:15px:Middle: 1:28px:Right:', `stage one shows a copy of the switch at the top right, a pointer, and the lines: a grey one above, the white one, and one per stop (${JSON.stringify(s0)} | ${await stageLines()})`);
   check(await eventually(async () => { const st = await showAt(); return st.open && st.cursorShown === '1'; }, 3000), 'the pointer comes to the switch and it opens');
   check(noContinueYet && await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000) && Date.now() - welcomeAt >= 2200 && (await texts('.bcv-welcome__next'))[0] === 'Continue', 'Continue is not there at first, and comes in after three seconds');
   check(await eventually(async () => { const st = await showAt(); return st.knob === '84px' && st.path === 'M6 12h12' && st.name === 'Off for this page'; }, 5000) && (await stageLines()) === LOOK_LINES, 'the pointer presses the middle: the knob goes there with a dash in it, and the lines hold still');
@@ -2873,7 +2873,7 @@ try {
   const toolNav = await texts('.bcv-nav > .bcv-nav__item');
   check(toolNav[toolNav.length - 1].startsWith('Tools') && (await page.$eval('.bcv-nav__item[data-nav="tools"]', (e) => e.classList.contains('is-active'))) && (await texts('.bcv-h1'))[0] === 'Tools' && (await texts('.bcv-head__sub'))[0] === 'Handy things, right here.', 'Tools is the last row of the sidebar, lit, and the page is titled');
   const cardNames = await texts('.bcv-tool-card__name');
-  check(cardNames.join(' | ') === 'Citation generator | Focus timer | Graphing calculator | File converter | Flashcards' && (await page.$$('.bcv-tool-card__open')).length === 5, `five cards, each with Open: ${cardNames.join(' | ')}`);
+  check(cardNames.join(' | ') === 'Citation generator | Focus timer | Graphing calculator | Grade needed | File converter | Merge & split PDFs | PDF annotator | Image to text | Flashcards' && (await page.$$('.bcv-tool-card__open')).length === 9, `nine cards, each with Open: ${cardNames.join(' | ')}`);
   await shot(page, '36c-tools');
   const closeTool = async () => { await page.keyboard.press('Escape'); await page.waitForFunction(() => !document.querySelector('.bcv-tool-ov'), null, { timeout: 5000 }); };
   const openTool = async (key) => { await page.click(`.bcv-tool-card[data-tool="${key}"]`); await page.waitForSelector(`.bcv-tool[data-tool="${key}"]`, { timeout: 5000 }); };
@@ -3337,7 +3337,155 @@ try {
   await page.waitForFunction(() => !document.querySelector('#bcv-pins .bcv-pin'), null, { timeout: 3000 });
   check((await page.$eval('#bcv-pins', (e) => e.hidden)) && (await inPage('focusActive')) === false, 'End takes the borrowed pin away');
   await page.goto(`${BASE}/#tools`);
-  check((await page.$('#bcv-welcome')) === null && (await page.$$('.bcv-tool-card')).length === 5 && !(await page.$eval('.bcv-tool-card[data-tool="pomo"]', (e) => e.classList.contains('is-pinned'))), 'the second time, Tools opens without the black, and the card is no longer marked');
+  check((await page.$('#bcv-welcome')) === null && (await page.$$('.bcv-tool-card')).length === 9 && !(await page.$eval('.bcv-tool-card[data-tool="pomo"]', (e) => e.classList.contains('is-pinned'))), 'the second time, Tools opens without the black, and the card is no longer marked');
+
+  // ---- the four tools of 2.35.0: grade needed, merge & split, the annotator, image to text ----
+  console.log('grade needed');
+  {
+    const ntStream = (body) => `<< /Length ${Buffer.byteLength(body, 'latin1')} >>\nstream\n${body}\nendstream`;
+    const ntTwo = pdfObjects([
+      '<< /Type /Catalog /Pages 2 0 R >>',
+      '<< /Type /Pages /Kids [3 0 R 6 0 R] /Count 2 >>',
+      '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>',
+      '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>',
+      ntStream('BT /F1 22 Tf 72 700 Td (Chapter One) Tj ET\nBT /F1 12 Tf 72 660 Td (The mitochondria is the powerhouse of the cell.) Tj ET\nBT /F1 12 Tf 72 640 Td (Osmosis moves water across a membrane.) Tj ET'),
+      '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 7 0 R >>',
+      ntStream('BT /F1 12 Tf 72 700 Td (Second page text.) Tj ET'),
+    ]);
+    const ntThree = pdfObjects([
+      '<< /Type /Catalog /Pages 2 0 R >>',
+      '<< /Type /Pages /Kids [3 0 R 5 0 R 7 0 R] /Count 3 >>',
+      '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] /Resources << /Font << /F1 9 0 R >> >> /Contents 4 0 R >>', ntStream('BT /F1 12 Tf 20 100 Td (Page one) Tj ET'),
+      '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] /Resources << /Font << /F1 9 0 R >> >> /Contents 6 0 R >>', ntStream('BT /F1 12 Tf 20 100 Td (Page two) Tj ET'),
+      '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] /Resources << /Font << /F1 9 0 R >> >> /Contents 8 0 R >>', ntStream('BT /F1 12 Tf 20 100 Td (Page three) Tj ET'),
+      '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+    ]);
+    const ntPages = (buf) => (buf.toString('latin1').match(/\/Type\s*\/Page[^s]/g) || []).length;
+    const ntDownload = async (action, ms = 30000) => { const [dl] = await Promise.all([page.waitForEvent('download', { timeout: ms }), action()]); return { name: dl.suggestedFilename(), bytes: readFileSync(await dl.path()) }; };
+    const ntField = (k) => page.$eval(`[data-field="${k}"]`, (e) => e.value);
+    // the favourites as the mock seeds them (the setup flow above swapped one): the tool lists favourites, and the sum below is MATH's
+    for (const id of ['101', '102', '103', '104', '105']) await fetch(`${BASE}/api/v1/users/self/favorites/courses/${id}`, { method: 'POST', headers: { 'x-csrf-token': 'mock+csrf/token=' } });
+    for (const id of ['106', '201', '202', '301']) await fetch(`${BASE}/api/v1/users/self/favorites/courses/${id}`, { method: 'DELETE', headers: { 'x-csrf-token': 'mock+csrf/token=' } });
+    await page.goto(`${BASE}/#tools`);
+    await page.reload(); // (a hash-only move keeps the page, and its course list from before the favourites were put back)
+    await page.waitForSelector('.bcv-tool-card[data-tool="ocr"]', { timeout: 15000 });
+    await page.waitForTimeout(500);
+    // grade needed: every number from Canvas
+    await openTool('need');
+    check(await eventually(() => raw('.bcv-need__pick .bcv-picker__label').then((t) => t.length === 3 && /%$/.test(t[1] || '') && /%$/.test(t[2] || '')), 8000) && (await toolSub()) === 'Every number from Canvas: your score, the weights, the points.', `Grade needed opens on a favourite course with its score from Canvas, a piece of work picked and a goal set (${(await raw('.bcv-need__pick .bcv-picker__label')).join(' | ')})`);
+    const ntPicks = await page.$$('.bcv-need__pick');
+    await ntPicks[0].$eval('.bcv-picker', (e) => e.click());
+    await page.click('.bcv-picker__list .bcv-picker__opt[data-value="101"]');
+    check(await eventually(() => raw('.bcv-need__pick .bcv-picker__label').then((t) => t[1] === 'Midterm 2 · 28.5%' && t[2] === 'A · 93%'), 8000) && (await ntField('now')) === '92.4' && (await ntField('worth')) === '28.5' && (await ntField('goal')) === '93', `MATH picked: the current score from Canvas, the heaviest ungraded piece with its share worked out from the group weight and points, the next letter up as the goal (${(await raw('.bcv-need__pick .bcv-picker__label')).join(' | ')})`);
+    check((await texts('.bcv-need__big'))[0] === '95%' && (await texts('.bcv-need__line'))[0] === 'on Midterm 2 to finish with an A (93%).' && (await texts('.bcv-need__grid .bcv-tool__hint'))[1] === "Midterms is 57% of the grade; this is 100 points of the group's 200." && (await texts('.bcv-need__row')).join(' | ') === 'A+ out of reach | A 95% | A− 84% | B+ 74% | B 60% | B− 49% | C+ 39% | C 25% | C− 14% | D already there', `the answer: 95% on Midterm 2 for an A, the piece's share explained, and every letter's price under it (${(await texts('.bcv-need__row')).join(' | ')})`);
+    await shot(page, '41-grade-needed');
+    await ntPicks[1].$eval('.bcv-picker', (e) => e.click());
+    const ntOpts = await texts('.bcv-picker__list .bcv-picker__opt');
+    check(ntOpts.slice(0, 4).join(' | ') === 'Midterm 2 · 28.5% | Midterm 1 · 28.5% | Final Exam · 25% | Qz01 · 9%' && ntOpts[ntOpts.length - 1] === 'Something else…' && !ntOpts.some((o) => /Lec01|Qz00|Skills_Check/.test(o)), `the pieces are the ungraded work, heaviest first, graded and omitted work left out, Something else last (${ntOpts.join(' | ')})`);
+    await page.click('.bcv-picker__list .bcv-picker__opt[data-value="1017"]');
+    await page.waitForTimeout(200);
+    check((await ntField('worth')) === '25' && (await texts('.bcv-need__big'))[0] === '95%' && (await texts('.bcv-need__line'))[0] === 'on Final Exam to finish with an A (93%).' && (await texts('.bcv-need__grid .bcv-tool__hint'))[1] === "Final is 25% of the grade; this is 200 points of the group's 200.", 'picking the final exam takes its 25% and works the sum again');
+    await page.fill('[data-field="now"]', '80');
+    await page.waitForTimeout(120);
+    check((await texts('.bcv-need__big'))[0] === 'Out of reach' && (await texts('.bcv-need__line'))[0] === 'Even 100% on Final Exam ends at 85%. Aim for a goal under that.' && (await texts('.bcv-need__row'))[1] === 'A out of reach' && (await texts('.bcv-need__row')).includes('B 92%'), 'a grade that cannot be reached says so, with where 100% would end');
+    await page.fill('[data-field="now"]', '99');
+    await page.waitForTimeout(120);
+    check((await texts('.bcv-need__big'))[0] === '75%', 'the sum follows the grade now as it is typed');
+    await ntPicks[0].$eval('.bcv-picker', (e) => e.click());
+    await page.click('.bcv-picker__list .bcv-picker__opt[data-value="102"]');
+    check(await eventually(() => raw('.bcv-need__pick .bcv-picker__label').then((t) => t[1] === 'Lec09-PreQuiz · 16.4%'), 8000) && (await ntField('now')) === '81' && (await ntField('worth')) === '16.4' && (await texts('.bcv-need__grid .bcv-tool__hint'))[1] === "20 points of the course's 122." && (await raw('.bcv-need__pick .bcv-picker__label'))[2] === 'B · 83%', `a course that does not weight its groups shares by points: 20 of the course's 122 (${(await raw('.bcv-need__pick .bcv-picker__label')).join(' | ')})`);
+    await ntPicks[0].$eval('.bcv-picker', (e) => e.click());
+    await page.click('.bcv-picker__list .bcv-picker__opt[data-value=""]');
+    await page.waitForTimeout(150);
+    check((await toolSub()) === 'Your own numbers.' && !(await page.$eval('[data-field="worth"]', (e) => e.closest('.bcv-need__field').hidden)) && (await page.$$eval('.bcv-need__pick', (els) => els.map((e) => e.hidden))).join(',') === 'false,true,false', 'Not from Canvas keeps the numbers as typed and asks what the work is worth');
+    await closeTool();
+
+    // merge & split
+    console.log('merge & split');
+    await openTool('pdfx');
+    check((await toolSub()) === 'Runs on this device. Nothing is uploaded.' && (await texts('.bcv-conv__droptitle'))[0] === 'Drop PDFs here, or choose them' && (await texts('.bcv-conv__dropsub'))[0] === 'Several to merge into one · one to split up', 'Merge & split opens on a drop zone and says nothing is uploaded');
+    await page.setInputFiles('.bcv-pdfx__drop input[type=file]', [{ name: 'Chapter.pdf', mimeType: 'application/pdf', buffer: ntTwo }, { name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('x') }, { name: 'Lab.pdf', mimeType: 'application/pdf', buffer: ntThree }]);
+    check(await eventually(() => page.$$('.bcv-pdfx__row').then((r) => r.length === 2), 10000) && (await texts('.bcv-pdfx__row .bcv-conv__rowbody')).join(' | ') === 'Chapter.pdf 2 pages · 1 KB | Lab.pdf 3 pages · 1 KB' && (await texts('.bcv-tool__note'))[0] === '1 file that is not a PDF ignored' && (await texts('.bcv-pdfx__run'))[0] === 'Merge & download' && !(await page.$eval('.bcv-pdfx__run', (e) => e.disabled)) && (await texts('.bcv-tool__hint'))[0] === 'One file, 5 pages, in this order.', `two PDFs counted page by page, the text file named as ignored, Merge ready (${(await texts('.bcv-pdfx__row .bcv-conv__rowbody')).join(' | ')})`);
+    await shot(page, '42-merge-split');
+    await page.click('.bcv-pdfx__row:nth-child(3) .bcv-pdfx__order .bcv-iconbtn:first-child');
+    check((await texts('.bcv-pdfx__name')).join(' | ') === 'Lab.pdf | Chapter.pdf', 'the arrows put the files in order');
+    const ntMerged = await ntDownload(() => page.click('.bcv-pdfx__run'));
+    check(ntMerged.name === 'Lab-merged.pdf' && ntPages(ntMerged.bytes) === 5 && /Page one/.test(ntMerged.bytes.toString('latin1')) && /Second page text/.test(ntMerged.bytes.toString('latin1')), `Merge downloads one PDF of every page in that order (${ntMerged.name}, ${ntPages(ntMerged.bytes)} pages)`);
+    await page.click('.bcv-pdfx__row:nth-child(2) > .bcv-iconbtn');
+    await page.click('.bcv-pdfx__mode .bcv-seg__btn[data-value="split"]');
+    await page.waitForTimeout(150);
+    check((await texts('.bcv-pdfx__part')).join(' | ') === 'Part 1 · page 1 | Part 2 · page 2' && (await texts('.bcv-pdfx__run'))[0] === 'Split into 2 files & download' && (await texts('.bcv-tool__hint'))[0] === '2 pages in Chapter.pdf.', 'Split starts on every page its own file, the parts listed');
+    await page.click('.bcv-pdfx__how .bcv-seg__btn[data-value="ranges"]');
+    await page.fill('.bcv-pdfx__opts .bcv-tool__input', '9');
+    await page.waitForTimeout(120);
+    check((await texts('.bcv-pdfx__plan .bcv-tool__note'))[0] === 'Pages as "1-3, 4, 6-8": each part on its own, between 1 and the last page.' && (await page.$eval('.bcv-pdfx__run', (e) => e.disabled)), 'a page range past the end is refused with the shape spelled out');
+    await page.fill('.bcv-pdfx__opts .bcv-tool__input', '2, 1-2');
+    await page.waitForTimeout(120);
+    check((await texts('.bcv-pdfx__part')).join(' | ') === 'Part 1 · page 2 | Part 2 · pages 1–2', 'page ranges typed out become the parts');
+    const ntDls = [];
+    const ntOnDl = async (dl) => ntDls.push({ name: dl.suggestedFilename(), bytes: readFileSync(await dl.path()) });
+    page.on('download', ntOnDl);
+    await page.click('.bcv-pdfx__run');
+    check(await eventually(() => ntDls.length === 2, 20000) && ntDls[0].name === 'Chapter-part1.pdf' && ntPages(ntDls[0].bytes) === 1 && /Second page text/.test(ntDls[0].bytes.toString('latin1')) && !/Chapter One/.test(ntDls[0].bytes.toString('latin1')) && ntDls[1].name === 'Chapter-part2.pdf' && ntPages(ntDls[1].bytes) === 2, `Split downloads one file per part with just its pages (${ntDls.map((d) => `${d.name} ${ntPages(d.bytes)}p`).join(', ')})`);
+    page.off('download', ntOnDl);
+    await closeTool();
+
+    // the annotator
+    console.log('annotator');
+    await openTool('mark');
+    check((await texts('.bcv-conv__droptitle'))[0] === 'Drop a PDF to mark up' && (await page.$$('.bcv-mark__recent')).length === 0 && (await toolSub()) === 'Highlights and notes, kept on this device per file.', 'the annotator opens on a drop zone with nothing marked up before');
+    await page.setInputFiles('.bcv-mark__drop input[type=file]', [{ name: 'Chapter.pdf', mimeType: 'application/pdf', buffer: ntTwo }]);
+    check(await eventually(() => page.$$('.bcv-mark__page').then((r) => r.length === 2), 10000) && await eventually(() => page.$$('.bcv-mark__page[data-page="1"] .bcv-mark__text span').then((r) => r.length >= 3), 15000) && (await texts('.bcv-tool__title'))[0] === 'Chapter.pdf' && (await texts('.bcv-mark__pageno'))[0] === 'Page 1 of 2' && (await texts('.bcv-mark__count'))[0] === 'Nothing marked yet' && (await page.$eval('.bcv-mark__page[data-page="1"] canvas', (e) => e.width > 600 && e.height > 800)), 'the PDF draws page by page with a text layer over each, the panel empty');
+    const ntSel = await page.evaluate(() => { const span = [...document.querySelectorAll('.bcv-mark__page[data-page="1"] .bcv-mark__text span')].find((s) => /mitochondria/.test(s.textContent)); if (!span) return ''; const r = document.createRange(); r.selectNodeContents(span); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); return sel.toString(); });
+    check(ntSel === 'The mitochondria is the powerhouse of the cell.' && await eventually(() => page.$('.bcv-mark__bubble').then((b) => !!b), 3000) && (await page.$$('.bcv-mark__bubble .bcv-mark__swatch')).length === 4 && (await texts('.bcv-mark__bubble .bcv-mark__tool'))[0] === 'Note', 'selecting words brings up a bubble of four colours and Note');
+    await shot(page, '43-annotator-bubble');
+    await page.click('.bcv-mark__bubble .bcv-mark__swatch[data-color="green"]');
+    await page.waitForTimeout(200);
+    const ntHl = await page.$eval('.bcv-mark__hl', (e) => ({ left: parseFloat(e.style.left), top: parseFloat(e.style.top), width: parseFloat(e.style.width), height: parseFloat(e.style.height), blend: getComputedStyle(e).mixBlendMode, color: e.style.getPropertyValue('--c') }));
+    check((await page.$$('.bcv-mark__hl')).length === 1 && ntHl.left > 10 && ntHl.left < 14 && ntHl.top > 14 && ntHl.top < 17 && ntHl.width > 35 && ntHl.width < 45 && ntHl.height > 1 && ntHl.height < 3 && ntHl.blend === 'multiply' && ntHl.color === '#30d158' && (await texts('.bcv-mark__item .bcv-mark__snippet')).join(' | ') === '“The mitochondria is the powerhouse of the cell.”' && (await texts('.bcv-mark__count'))[0] === '1 highlight' && (await page.$('.bcv-mark__bubble')) === null && (await page.evaluate(() => getSelection().toString())) === '', `the green swatch lays a marker stroke over the line, in the panel with its words (${JSON.stringify(ntHl)})`);
+    await page.click('.bcv-mark__tool[data-tool="note"]');
+    const ntPg = await (await page.$('.bcv-mark__page[data-page="1"]')).boundingBox();
+    await page.mouse.click(ntPg.x + ntPg.width * 0.5, ntPg.y + ntPg.height * 0.5);
+    check(await eventually(() => page.$$('.bcv-mark__pin').then((r) => r.length === 1), 3000) && await eventually(() => page.evaluate(() => document.activeElement?.classList.contains('bcv-mark__notefield')), 2000) && !(await page.$eval('.bcv-mark__tool[data-tool="note"]', (e) => e.classList.contains('is-on'))), 'Note then a press on the page pins a note there and puts the cursor in its field');
+    await page.keyboard.type('Ask about this in office hours');
+    await page.waitForTimeout(500);
+    await page.click('.bcv-mark__tool[data-tool="box"]');
+    await page.mouse.move(ntPg.x + ntPg.width * 0.2, ntPg.y + ntPg.height * 0.7);
+    await page.mouse.down();
+    await page.mouse.move(ntPg.x + ntPg.width * 0.5, ntPg.y + ntPg.height * 0.78, { steps: 6 });
+    await page.mouse.up();
+    await page.waitForTimeout(400);
+    const ntStored = await sw.evaluate(async () => { const all = await self.BCV.api.storage.local.get(null); const k = Object.keys(all).find((x) => x.startsWith('tools:mark:') && x !== 'tools:mark:index'); return { key: k, marks: all[k]?.marks?.map((m) => [m.kind, m.color, m.page, m.text, m.note]), index: all['tools:mark:index'] }; });
+    check((await page.$$('.bcv-mark__hl')).length === 2 && (await texts('.bcv-mark__item .bcv-mark__snippet')).join(' | ') === '“The mitochondria is the powerhouse of the cell.” | Note | Boxed area' && (await texts('.bcv-mark__count'))[0] === '2 highlights · 1 note' && /^tools:mark:[0-9a-f]{64}$/.test(ntStored.key || '') && JSON.stringify(ntStored.marks) === JSON.stringify([['hl', 'green', 1, 'The mitochondria is the powerhouse of the cell.', ''], ['note', 'green', 1, '', 'Ask about this in office hours'], ['box', 'green', 1, '', '']]) && ntStored.index.length === 1 && ntStored.index[0].name === 'Chapter.pdf' && ntStored.index[0].hl === 2 && ntStored.index[0].notes === 1, `a box dragged out joins them; all three are kept on this device under the file's own hash, and the index knows the file (${JSON.stringify(ntStored.marks)})`);
+    await shot(page, '43b-annotator-marks');
+    const ntSaved = await ntDownload(() => page.click('.bcv-mark__save'));
+    const ntPdf = ntSaved.bytes.toString('latin1');
+    check(ntSaved.name === 'Chapter-marked.pdf' && ntPages(ntSaved.bytes) === 2 && (ntPdf.match(/\/Subtype \/Highlight/g) || []).length === 1 && (ntPdf.match(/\/Subtype \/Text/g) || []).length === 1 && (ntPdf.match(/\/Subtype \/Square/g) || []).length === 1 && (ntPdf.match(/\/Subtype \/Popup/g) || []).length === 1 && /\/QuadPoints/.test(ntPdf) && /\/BM \/Multiply/.test(ntPdf) && /\/Type \/ExtGState/.test(ntPdf) && /Ask about this in office hours/.test((ntPdf.match(/\/Contents <([0-9A-Fa-f]+)>/g) || []).map((m) => Buffer.from(m.slice(11, -1), 'hex').toString('latin1').replace(/\u0000/g, '')).join(' | ')), `Save PDF writes a copy with real annotations: a Highlight with QuadPoints and a multiply appearance, a Square for the box, a Text note with its Popup and the note's words (${ntSaved.name})`);
+    await closeTool();
+    await openTool('mark');
+    check((await texts('.bcv-mark__recent')).join(' | ') === 'Chapter.pdf 2 highlights · 1 note · 2 pages · ' + new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ' Drop it again to see them', `the home lists the file marked up before (${(await texts('.bcv-mark__recent')).join(' | ')})`);
+    await page.setInputFiles('.bcv-mark__drop input[type=file]', [{ name: 'Chapter.pdf', mimeType: 'application/pdf', buffer: ntTwo }]);
+    check(await eventually(() => page.$$('.bcv-mark__item').then((r) => r.length === 3), 10000) && (await page.$$('.bcv-mark__hl')).length === 2 && (await page.$$('.bcv-mark__pin')).length === 1 && (await page.$eval('.bcv-mark__item:nth-child(2) textarea', (e) => e.value)) === 'Ask about this in office hours', 'the same file dropped again comes back marked up as it was left');
+    await page.click('.bcv-mark__item:nth-child(3) .bcv-iconbtn');
+    await page.waitForTimeout(400);
+    check((await page.$$('.bcv-mark__hl')).length === 1 && (await texts('.bcv-mark__count'))[0] === '1 highlight · 1 note' && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('tools:mark:index'))['tools:mark:index'][0].hl)) === 1, 'a mark removed in the panel goes from the page and from what is kept');
+    await closeTool();
+
+    // image to text
+    console.log('image to text');
+    await openTool('ocr');
+    check((await texts('.bcv-conv__droptitle'))[0] === 'Drop a picture or a scanned PDF' && (await texts('.bcv-conv__dropsub'))[0] === 'or paste a screenshot here · PNG, JPEG, WebP, PDF' && (await toolSub()) === 'Runs on this device. Nothing is uploaded.', 'Image to text opens on a drop zone that takes a paste too');
+    await page.setInputFiles('.bcv-ocr__drop input[type=file]', [{ name: 'Chapter.pdf', mimeType: 'application/pdf', buffer: ntTwo }]);
+    check(await eventually(() => page.$eval('.bcv-ocr__out', (e) => /^— Page 1 —\nChapter One The mitochondria/.test(e.value) && /— Page 2 —\nSecond page text\./.test(e.value)), 15000) && (await texts('.bcv-ocr__statustext'))[0] === "Read from the file's own text · 2 pages" && (await toolSub()) === '27 words · read from the file' && !(await page.$eval('.bcv-ocr__preview', (e) => e.hidden)), `a PDF with its own text is read straight from it, page by page (${(await texts('.bcv-ocr__statustext'))[0]})`);
+    const ntPng = await page.evaluate(() => { const cv = document.createElement('canvas'); cv.width = 900; cv.height = 240; const c = cv.getContext('2d'); c.fillStyle = '#fff'; c.fillRect(0, 0, 900, 240); c.fillStyle = '#000'; c.font = 'bold 64px Arial'; c.fillText('Hello world 2026', 40, 110); c.font = '40px Arial'; c.fillText('Photosynthesis makes sugar', 40, 190); return cv.toDataURL('image/png').split(',')[1]; });
+    await page.click('.bcv-ocr__sidebtns .bcv-btn');
+    await page.setInputFiles('.bcv-ocr input[type=file]', [{ name: 'board.png', mimeType: 'image/png', buffer: Buffer.from(ntPng, 'base64') }]);
+    check(await eventually(() => page.$eval('.bcv-ocr__out', (e) => /Hello world 2026/.test(e.value) && /Photosynthesis makes sugar/.test(e.value)), 120000) && (await texts('.bcv-ocr__statustext'))[0] === 'Read on this device' && (await toolSub()) === '6 words' && (await page.$eval('.bcv-ocr__preview', (e) => e.src.startsWith('data:image/png'))), `a picture of words is read on this device, by the engine framed in from the extension's own page: ${JSON.stringify(await page.$eval('.bcv-ocr__out', (e) => e.value))}`);
+    await shot(page, '44-image-to-text');
+    const ntTxt = await ntDownload(() => page.click('.bcv-ocr__result .bcv-tool__btns .bcv-btn:nth-child(2)'));
+    check(ntTxt.name === 'board.txt' && /Hello world 2026/.test(ntTxt.bytes.toString('utf8')), 'Save as text downloads the words under the picture\'s name');
+    await closeTool();
+  }
 
   // ---- the quick menus: every pin but the timer's swells into a capsule under the pointer, the tool's quickest use in it ----
   console.log('quick menus');
@@ -3346,7 +3494,7 @@ try {
   await page.waitForSelector('#bcv-pins .bcv-pin[data-tool="fc"]', { timeout: 15000 });
   await page.waitForTimeout(600);
   const quickPin = (key) => `#bcv-pins .bcv-pin[data-tool="${key}"]`;
-  const quickOpen = async (key) => { const b = await (await page.$(quickPin(key))).boundingBox(); await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2); await eventually(() => page.$eval(quickPin(key), (e) => e.classList.contains('is-open') && Math.round(e.getBoundingClientRect().height) === 44), 3000); await page.waitForTimeout(550); return page.$eval(quickPin(key), (e) => ({ w: Math.round(e.getBoundingClientRect().width), h: Math.round(e.getBoundingClientRect().height), radius: getComputedStyle(e.querySelector('.bcv-quick__face')).borderRadius, name: e.querySelector('.bcv-quick__name')?.textContent, btnGone: getComputedStyle(e.querySelector('.bcv-pin__btn')).opacity === '0' })); };
+  const quickOpen = async (key, hh = 44) => { const b = await (await page.$(quickPin(key))).boundingBox(); await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2); await eventually(() => page.$eval(quickPin(key), (e, want) => e.classList.contains('is-open') && Math.round(e.getBoundingClientRect().height) === want, hh), 3000); await page.waitForTimeout(550); return page.$eval(quickPin(key), (e) => ({ w: Math.round(e.getBoundingClientRect().width), h: Math.round(e.getBoundingClientRect().height), radius: getComputedStyle(e.querySelector('.bcv-quick__face')).borderRadius, name: e.querySelector('.bcv-quick__name')?.textContent, btnGone: getComputedStyle(e.querySelector('.bcv-pin__btn')).opacity === '0' })); };
   check((await page.$$('#bcv-pins .bcv-pin.bcv-quick')).length === 4 && (await page.$$eval('#bcv-pins .bcv-pin', (els) => els.map((e) => Math.round(e.getBoundingClientRect().width)))).every((w) => w === 24), 'four pins in the tray, each a disc, each with a quick menu folded in it');
   const q1 = await quickOpen('cite');
   check(q1.w === 300 && q1.h === 44 && q1.radius === '22px' && q1.name === 'Cite' && q1.btnGone && (await page.$eval(`${quickPin('cite')} .bcv-quick__input`, (e) => e.placeholder)) === 'Paste a link to cite', `the citation pin swells into a capsule under the pointer: a field for a link and a round Cite (${JSON.stringify(q1)})`);
@@ -3355,18 +3503,43 @@ try {
   await page.waitForSelector('.bcv-tool[data-tool="cite"]', { timeout: 5000 });
   check((await page.$eval('.bcv-tool__input[data-field="url"]', (e) => e.value)) === 'https://example.org/reading' && (await page.$eval('.bcv-cite__type.is-on', (e) => e.dataset.type)) === 'website' && !(await page.$eval(quickPin('cite'), (e) => e.classList.contains('is-open'))), 'Enter opens the tool with the link filled in, on Website, and the capsule folds');
   await closeTool();
-  const q2 = await quickOpen('graph');
-  await page.fill(`${quickPin('graph')} .bcv-quick__input`, '2^10 + sqrt(16)');
-  check(q2.w === 290 && q2.name === 'Sum' && (await texts(`${quickPin('graph')} .bcv-quick__result`))[0] === '= 1028', 'the calculator pin works a sum out as it is typed');
-  await page.fill(`${quickPin('graph')} .bcv-quick__input`, 'sin(pi/6)*2');
-  check((await texts(`${quickPin('graph')} .bcv-quick__result`))[0] === '= 1', 'functions and pi too');
-  await page.fill(`${quickPin('graph')} .bcv-quick__input`, '2+');
-  check((await texts(`${quickPin('graph')} .bcv-quick__result`))[0] === '?', 'and a sum that is not one yet says so');
+  const q2 = await quickOpen('graph', 262);
+  const calcKey = async (k) => { await page.click(`.bcv-calc__key[data-key="${k}"]`); };
+  const calcShown = () => texts('.bcv-calc__display').then((t) => t[0]);
+  check(q2.w === 408 && q2.h === 262 && q2.radius === '18px' && q2.name === 'Graph' && q2.btnGone && (await page.$$('.bcv-calc__key')).length === 49 && (await calcShown()) === '0' && (await page.$$eval('.bcv-calc__row:first-child .bcv-calc__key', (els) => els.map((e) => e.textContent))).join(' ') === '( ) mc m+ m− mr AC +/− % ÷' && (await page.$eval('.bcv-calc__key[data-key="/"]', (e) => getComputedStyle(e).backgroundColor)) === 'rgb(255, 159, 10)' && (await page.$eval('.bcv-calc__key[data-key="7"]', (e) => getComputedStyle(e).backgroundColor)) === 'rgb(92, 92, 95)' && (await page.$eval('.bcv-calc__key[data-key="ac"]', (e) => getComputedStyle(e).backgroundColor)) === 'rgb(165, 165, 165)', `the calculator pin opens into a panel: the whole scientific calculator, Apple's keys in Apple's colours, 49 of them under a display (${JSON.stringify(q2)})`);
+  for (const k of ['2', '+', '3', '*', '4', '=']) await calcKey(k);
+  check((await calcShown()) === '14', '2 + 3 × 4 = 14: the usual precedence');
+  await calcKey('ac'); for (const k of ['(', '2', '+', '3', ')', 'x2']) await calcKey(k);
+  check((await calcShown()) === '25', 'brackets group, and x² acts on the bracket\'s value at once');
+  await calcKey('ac'); for (const k of ['3', '0', 'sin']) await calcKey(k);
+  const calcSin = await calcShown();
+  await calcKey('second');
+  const calcSinLabel = await page.$eval('.bcv-calc__key[data-base="sin"]', (e) => ({ key: e.dataset.key, html: e.innerHTML, on: e.closest('.bcv-calc').querySelector('.bcv-calc__key[data-base="second"]').classList.contains('is-on') }));
+  await calcKey('asin');
+  check(calcSin === '0.5' && calcSinLabel.key === 'asin' && calcSinLabel.html === 'sin<sup>-1</sup>' && calcSinLabel.on && (await calcShown()) === '30', `sin 30 is 0.5 in degrees; 2nd turns the trig keys into their inverses and sin⁻¹ gives 30 back (${JSON.stringify(calcSinLabel)})`);
+  await calcKey('second'); await calcKey('rad'); await calcKey('ac'); await calcKey('pi'); await calcKey('sin');
+  check((await page.$eval('.bcv-calc__key[data-base="rad"]', (e) => e.textContent)) === 'Deg' && (await texts('.bcv-calc__mode'))[0] === 'Rad' && Math.abs(parseFloat(await calcShown())) < 1e-9, 'Rad switches to radians (the key now offers Deg, the display says Rad): sin π is 0');
+  await calcKey('rad'); await calcKey('ac'); for (const k of ['5', 'fact']) await calcKey(k);
+  const calcFact = await calcShown();
+  await calcKey('ac'); for (const k of ['1', '0', '0', '0', '0', '0', '0', '*', '1', '0', '0', '0', '=']) await calcKey(k);
+  check(calcFact === '120' && (await calcShown()) === '1,000,000,000', '5! is 120, and big numbers are grouped in thousands');
+  await calcKey('ac'); for (const k of ['8', '/']) await calcKey(k);
+  await page.waitForTimeout(250); // (the key's colour eases in)
+  const calcOpOn = await page.$eval('.bcv-calc__key[data-key="/"]', (e) => e.classList.contains('is-on') && getComputedStyle(e).backgroundColor === 'rgb(255, 255, 255)');
+  await calcKey('2'); await calcKey('=');
+  check(calcOpOn && (await calcShown()) === '4', 'the operator pressed lights up white until the next number, the way the app does it');
+  await calcKey('ac');
+  await page.focus('.bcv-calc');
+  await page.keyboard.type('2^10');
+  await page.keyboard.press('Enter');
+  check((await calcShown()) === '1,024', 'the keyboard works on the panel: 2^10 Enter');
+  await calcKey('ac');
+  await shot(page, '45-calculator-panel');
   await page.mouse.move(700, 500);
   await page.mouse.click(700, 500);
   check(await eventually(() => page.$eval(quickPin('graph'), (e) => !e.classList.contains('is-open') && Math.round(e.getBoundingClientRect().width) === 24), 3000), 'the capsule folds when the pointer leaves and presses elsewhere');
   const q3 = await quickOpen('conv');
-  check(q3.w === 250 && q3.name === 'Convert' && (await texts(`${quickPin('conv')} .bcv-quick__drop`))[0] === 'Drop a file to convert', 'the converter pin offers a drop target');
+  check(q3.w === 250 && q3.name === 'Convert' && (await texts(`${quickPin('conv')} .bcv-quick__drop`))[0] === 'Click to add a file', 'the converter pin offers a drop target that is also a picker');
   await page.setInputFiles(`${quickPin('conv')} input[type=file]`, { name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('hello there') });
   await page.waitForSelector('.bcv-tool[data-tool="conv"]', { timeout: 5000 });
   check(await eventually(async () => (await texts('.bcv-conv__name')).includes('notes.txt'), 4000) && !(await page.$eval(quickPin('conv'), (e) => e.classList.contains('is-open'))), 'a file chosen there opens the tool with it in');
@@ -3378,6 +3551,40 @@ try {
   await page.waitForSelector('.bcv-tool[data-tool="fc"] .bcv-fc__tile', { timeout: 5000 });
   check((await texts('.bcv-tool__title'))[0] === (decks[0].name || 'Untitled set') && !(await page.$eval(quickPin('fc'), (e) => e.classList.contains('is-open'))), 'a chip opens the tool straight at that set');
   await closeTool();
+  // the four new pins: a capsule that works the grade out, and drop targets that open the tools with the file in
+  {
+    await sw.evaluate(() => self.BCV.api.storage.local.set({ 'tools:pins': ['need', 'pdfx', 'mark', 'ocr'] }));
+    await page.goto(`${BASE}/`);
+    await page.waitForSelector('#bcv-pins .bcv-pin[data-tool="ocr"]', { timeout: 15000 });
+    await page.waitForTimeout(600);
+    const ntQ = await quickOpen('need');
+    await page.fill(`${quickPin('need')} .bcv-quick__input[aria-label="Your grade now"]`, '92.4');
+    await page.fill(`${quickPin('need')} .bcv-quick__input[aria-label="What the work left is worth"]`, '25');
+    await page.fill(`${quickPin('need')} .bcv-quick__input[aria-label="The grade wanted"]`, '93');
+    const ntQField = await page.$eval(`${quickPin('need')} .bcv-quick__input`, (e) => { const cs = getComputedStyle(e); return { h: Math.round(e.getBoundingClientRect().height), bg: cs.backgroundColor, radius: cs.borderRadius, border: cs.borderTopWidth, color: cs.color }; });
+    check(ntQ.w === 400 && ntQ.name === 'Need' && (await texts(`${quickPin('need')} .bcv-quick__result`))[0] === '→ 95%' && ntQField.h === 30 && ntQField.radius === '15px' && ntQField.border === '0px' && ntQField.bg === 'rgba(255, 255, 255, 0.12)' && ntQField.color === 'rgb(255, 255, 255)', `the grade pin's capsule: now, worth and goal, the mark worked out as they are typed, the fields round and translucent whatever the page's own styles say (${JSON.stringify(ntQField)})`);
+    await page.fill(`${quickPin('need')} .bcv-quick__input[aria-label="Your grade now"]`, '80');
+    check((await texts(`${quickPin('need')} .bcv-quick__result`))[0] === 'Out of reach', 'and says when it cannot be done');
+    await page.fill(`${quickPin('need')} .bcv-quick__input[aria-label="Your grade now"]`, '92.4');
+    await shot(page, '46-quick-need');
+    await page.keyboard.press('Enter');
+    await page.waitForSelector('.bcv-tool[data-tool="need"]', { timeout: 5000 });
+    await page.waitForTimeout(300);
+    check((await page.$eval('[data-field="now"]', (e) => e.value)) === '92.4' && (await page.$eval('[data-field="worth"]', (e) => e.value)) === '25' && (await page.$eval('[data-field="goal"]', (e) => e.value)) === '93' && (await texts('.bcv-need__big'))[0] === '95%' && (await toolSub()) === 'Your own numbers.', 'Enter opens the tool with those numbers in, as your own');
+    await closeTool();
+    await page.mouse.move(700, 500);
+    await page.waitForTimeout(600);
+    const ntDrops = {};
+    for (const k of ['pdfx', 'mark', 'ocr']) { const q = await quickOpen(k); ntDrops[k] = { ...q, text: (await texts(`${quickPin(k)} .bcv-quick__drop`))[0], multiple: await page.$eval(`${quickPin(k)} input[type=file]`, (e) => e.multiple), accept: await page.$eval(`${quickPin(k)} input[type=file]`, (e) => e.accept) }; await page.mouse.move(700, 500); await page.waitForTimeout(600); }
+    check(ntDrops.pdfx.name === 'PDFs' && ntDrops.pdfx.text === 'Click to add PDFs' && ntDrops.pdfx.multiple && ntDrops.mark.name === 'Mark up' && ntDrops.mark.text === 'Click to add a PDF' && !ntDrops.mark.multiple && ntDrops.ocr.name === 'Read' && ntDrops.ocr.text === 'Click to add a picture' && ntDrops.ocr.accept === 'image/*,.pdf', `the three file tools' pins each offer a drop target that is also a picker (${Object.values(ntDrops).map((d) => d.text).join(' | ')})`);
+    await quickOpen('mark');
+    await page.setInputFiles(`${quickPin('mark')} input[type=file]`, [{ name: 'Chapter.pdf', mimeType: 'application/pdf', buffer: pdfObjects(['<< /Type /Catalog /Pages 2 0 R >>', '<< /Type /Pages /Kids [3 0 R] /Count 1 >>', '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] >>']) }]);
+    await page.waitForSelector('.bcv-tool[data-tool="mark"]', { timeout: 5000 });
+    check(await eventually(() => page.$$('.bcv-mark__page').then((r) => r.length === 1), 10000) && !(await page.$eval(quickPin('mark'), (e) => e.classList.contains('is-open'))), 'a PDF chosen on the annotator\'s pin opens straight into it');
+    await closeTool();
+    await page.mouse.move(700, 500);
+    await page.waitForTimeout(600);
+  }
   await sw.evaluate(() => self.BCV.api.storage.local.set({ 'tools:pins': [] }));
   await page.mouse.move(700, 500);
 

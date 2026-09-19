@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Simpl Courses",
-  "version": "2.34.0",
+  "version": "2.35.0",
   "description": "Canvas with navigation that actually makes sense and a UI that you can actually use.",
   "author": "Simpl Courses contributors",
   "icons": {
@@ -31,7 +31,6 @@
     "service_worker": "background.js",
     "scripts": [
       "lib/settings.js",
-      "lib/providers.js",
       "background.js"
     ],
     "persistent": false
@@ -47,6 +46,19 @@
   "optional_host_permissions": [
     "*://*/*"
   ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "lib/ocr/reader.html"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    }
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
+  },
   "content_scripts": [
     {
       "matches": [
@@ -96,6 +108,10 @@
         "content/app/tools/cite.js",
         "content/app/tools/cards.js",
         "content/app/tools/convert.js",
+        "content/app/tools/need.js",
+        "content/app/tools/pdfs.js",
+        "content/app/tools/mark.js",
+        "content/app/tools/ocr.js",
         "content/app/screens/tools.js",
         "setup/setup-css.js",
         "content/app/setup.js",

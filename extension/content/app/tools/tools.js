@@ -37,7 +37,11 @@
     { key: 'cite', name: 'Citation generator', note: 'Cite a source in MLA, APA or Chicago.', icon: IC.quote, color: '#30b0c7', open: (app, o) => BCV.toolsCite.open(app, o) },
     { key: 'pomo', name: 'Focus timer', note: 'Focus for a while, then take a break.', icon: IC.timer, color: '#ff9500', open: (app, o) => openTimer(app, o) },
     { key: 'graph', name: 'Graphing calculator', note: 'Desmos, right here.', icon: IC.graph, color: '#5856d6', open: (app, o) => openGraph(app, o) },
+    { key: 'need', name: 'Grade needed', note: 'What you need on the final to hit your goal.', icon: IC.percent, color: '#ff375f', open: (app, o) => BCV.toolsNeed.open(app, o) },
     { key: 'conv', name: 'File converter', note: 'Word, PDF and images, any way round.', icon: IC.convert, color: '#34c759', open: (app, o) => BCV.toolsConvert.open(app, o) },
+    { key: 'pdfx', name: 'Merge & split PDFs', note: 'Join PDFs into one, or cut one into parts.', icon: IC.merge, color: '#bf5af2', open: (app, o) => BCV.toolsPdfs.open(app, o) },
+    { key: 'mark', name: 'PDF annotator', note: 'Highlight and add notes, kept per file.', icon: IC.marker, color: '#e5a500', open: (app, o) => BCV.toolsMark.open(app, o) },
+    { key: 'ocr', name: 'Image to text', note: 'Read the words off a picture or a scan.', icon: IC.scan, color: '#00b3a4', open: (app, o) => BCV.toolsOcr.open(app, o) },
     { key: 'fc', name: 'Flashcards', note: 'Make a set. Flip, learn, test, match.', icon: IC.cards, color: '#0a84ff', open: (app, o) => BCV.toolsCards.open(app, o) },
   ];
   const toolOf = (key) => TOOLS.find((t) => t.key === key) || null;
@@ -146,6 +150,10 @@
     return rows;
   }
   const csvCell = (v) => { const s = String(v == null ? '' : v); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+  /** A file read the way asked ('readAsArrayBuffer', 'readAsDataURL', 'readAsText'). */
+  const readAs = (file, how) => new Promise((resolve, reject) => { const r = new FileReader(); r.onload = () => resolve(r.result); r.onerror = () => reject(new Error('The file could not be read.')); r[how](file); });
+  const kb = (b) => (b >= 1048576 ? `${(b / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`);
+  const fileBase = (name) => String(name || 'file').replace(/\.[^.]+$/, '');
 
   // ---- the bundled libraries, on demand ------------------------------------------------------
   // The converter's engines (lib/vendor/) are asked for from the background, which lands them in
@@ -154,6 +162,7 @@
     mammoth: { files: ['lib/vendor/mammoth.browser.min.js'], has: () => !!self.mammoth },
     jspdf: { files: ['lib/vendor/jspdf.umd.min.js'], has: () => !!self.jspdf?.jsPDF },
     pdf: { files: ['lib/vendor/pdf.min.js', 'lib/vendor/pdf.worker.min.js'], has: () => !!self.pdfjsLib?.getDocument },
+    pdflib: { files: ['lib/vendor/pdf-lib.min.js'], has: () => !!self.PDFLib?.PDFDocument }, // (writing PDFs: pages copied, annotations added)
     office: { files: ['content/app/tools/office.js'], has: () => !!self.BCV?.office?.docxToPdf }, // (ours: Word ⇄ PDF, beside the libraries it uses)
   };
   const loading = {};
@@ -616,15 +625,28 @@
   const pinned = (key) => pins.includes(key);
   // ---- the quick menus: a pin swelling into a capsule under the pointer --------------------------
   // The pins other than the timer's open the way its island does: under the pointer (a mouse or a
-  // pen) the pin swells into a capsule holding the tool's quickest use — a link to cite, a sum to
-  // work out, a file to convert, a set to study — and folds when the pointer leaves. The full tool
-  // is a press on the pin (or Enter) away, as before, and a press on the capsule's name.
-  const QUICK = { cite: { w: 300, build: quickCite }, graph: { w: 290, build: quickGraph }, conv: { w: 250, build: quickConv }, fc: { w: 320, build: quickCards } };
+  // pen) the pin swells into a capsule holding the tool's quickest use — a link to cite, a grade
+  // worked out, a file to convert, a set to study — and folds when the pointer leaves. The full tool
+  // is a press on the pin (or Enter) away, as before, and a press on the capsule's name. The
+  // calculator's pin swells into more than a capsule: a panel with the whole scientific calculator
+  // in it (Apple's, key for key).
+  const QUICK = {
+    cite: { w: 300, build: quickCite },
+    graph: { w: 408, h: 262, panel: true, build: quickCalc },
+    need: { w: 400, build: quickNeed },
+    conv: { w: 250, build: quickConv },
+    pdfx: { w: 250, build: quickPdfs },
+    mark: { w: 250, build: quickMark },
+    ocr: { w: 260, build: quickOcr },
+    fc: { w: 320, build: quickCards },
+  };
   function quickHover(item, t) {
     const q = QUICK[t.key];
     if (!q) return null;
     item.classList.add('bcv-quick');
+    if (q.panel) item.classList.add('bcv-quick--panel');
     item.style.setProperty('--bcv-quick-w', `${q.w}px`);
+    item.style.setProperty('--bcv-quick-h', `${q.h || 44}px`);
     item.style.setProperty('--bcv-quick-color', t.color);
     const body = U.el('bcv-quick__body');
     let panel = null;
@@ -642,7 +664,13 @@
       item.classList.add('is-open');
       item.setAttribute('aria-expanded', 'true');
     };
-    item.addEventListener('pointerenter', (e) => { if (e.pointerType === 'touch' || item.classList.contains('is-out')) return; clearTimeout(leave); item.classList.add('is-hover'); openQ(); });
+    item.addEventListener('pointerenter', (e) => {
+      if (e.pointerType === 'touch' || item.classList.contains('is-out')) return;
+      clearTimeout(leave);
+      item.classList.add('is-hover');
+      for (const other of document.querySelectorAll('#bcv-pins .bcv-quick.is-open')) if (other !== item) { other.querySelector(':focus')?.blur(); other.classList.remove('is-hover'); other.classList.remove('is-open'); other.setAttribute('aria-expanded', 'false'); } // (one open at a time: a calculator left with the focus folds when the pointer moves on)
+      openQ();
+    });
     item.addEventListener('pointerleave', (e) => {
       if (e.pointerType === 'touch') return;
       item.classList.remove('is-hover');
@@ -656,6 +684,17 @@
   document.addEventListener('pointerdown', (e) => { for (const item of document.querySelectorAll('#bcv-pins .bcv-quick.is-open')) if (!item.contains(e.target)) { item.classList.remove('is-hover'); item.querySelector(':focus')?.blur(); item.classList.remove('is-open'); item.setAttribute('aria-expanded', 'false'); } }, true);
   const quickName = (name, go, title) => h('button', { type: 'button', class: 'bcv-quick__name', title, 'aria-label': title, text: name, onclick: () => go() });
   const quickGo = (icon, title, onclick) => h('button', { type: 'button', class: 'bcv-quick__go', title, 'aria-label': title, onclick }, U.svg(icon, { size: 14, stroke: '#fff', width: 2.3 }));
+  /** A drop target that is also a picker: files dropped or chosen go to the tool. */
+  function quickDrop({ go, text, accept, multiple = false, key = 'files', label }) {
+    const input = h('input', { type: 'file', multiple: multiple || null, hidden: true, accept, 'aria-label': label });
+    const hand = (list) => { const files = Array.from(list || []); if (!files.length) return; go(multiple ? { [key]: files } : { [key]: files[0] }); };
+    input.addEventListener('change', () => { hand(input.files); input.value = ''; });
+    const drop = h('button', { type: 'button', class: 'bcv-quick__drop', text, onclick: () => input.click() });
+    drop.addEventListener('dragover', (e) => { e.preventDefault(); drop.classList.add('is-drag'); });
+    drop.addEventListener('dragleave', () => drop.classList.remove('is-drag'));
+    drop.addEventListener('drop', (e) => { e.preventDefault(); drop.classList.remove('is-drag'); hand(e.dataTransfer?.files); });
+    return [drop, input];
+  }
   /** Citation generator: a link pasted here opens the tool with it filled in, on Website. */
   function quickCite({ go }) {
     const inp = h('input', { type: 'url', class: 'bcv-quick__input', placeholder: 'Paste a link to cite', 'aria-label': 'A link to cite' });
@@ -689,24 +728,175 @@
     function expr() { let v = term(); while (s[i] === '+' || s[i] === '-') { const op = s[i++]; const r = term(); v = op === '+' ? v + r : v - r; } return v; }
     try { const v = expr(); if (i !== s.length || !Number.isFinite(v)) return null; return String(Number(v.toPrecision(10))); } catch { return null; }
   }
-  /** Graphing calculator: a sum worked out as it is typed; the graph a press away. */
-  function quickGraph({ go }) {
-    const inp = h('input', { type: 'text', class: 'bcv-quick__input', placeholder: 'A sum: 2^10, sin(pi/6)…', 'aria-label': 'A sum to work out', autocomplete: 'off' });
+
+  // ---- the scientific calculator -------------------------------------------------------------
+  // Apple's calculator in scientific mode, key for key: the memory keys and brackets, 2nd, the
+  // powers and roots, the logs, the trig and hyperbolic functions with their inverses under 2nd,
+  // e, EE, π, Rand, Rad/Deg, and the number pad with AC, +/−, %, and the four operators. Sums keep
+  // the usual precedence (2 + 3 × 4 is 14) and brackets group; a function acts on the number on
+  // the display at once; = works the lot out. The keyboard works too once the panel has been
+  // pressed: digits, . + − × ÷ ^ ( ) %, Enter for =, Backspace, Escape to fold it.
+  const CALC_PREC = { '+': 1, '-': 1, '*': 2, '/': 2, '^': 3, root: 3, ypow: 3, logy: 3 };
+  const CALC_ALT = { ex: ['ypow', 'y<sup>x</sup>'], '10x': ['2x', '2<sup>x</sup>'], ln: ['logy', 'log<sub>y</sub>'], log10: ['log2', 'log<sub>2</sub>'], sin: ['asin', 'sin<sup>-1</sup>'], cos: ['acos', 'cos<sup>-1</sup>'], tan: ['atan', 'tan<sup>-1</sup>'], sinh: ['asinh', 'sinh<sup>-1</sup>'], cosh: ['acosh', 'cosh<sup>-1</sup>'], tanh: ['atanh', 'tanh<sup>-1</sup>'] };
+  const CALC_ROWS = [
+    [['(', '('], [')', ')'], ['mc', 'mc'], ['mplus', 'm+'], ['mminus', 'm−'], ['mr', 'mr'], ['ac', 'AC', 'top'], ['neg', '+/−', 'top'], ['pct', '%', 'top'], ['/', '÷', 'op']],
+    [['second', '2<sup>nd</sup>'], ['x2', 'x<sup>2</sup>'], ['x3', 'x<sup>3</sup>'], ['^', 'x<sup>y</sup>'], ['ex', 'e<sup>x</sup>'], ['10x', '10<sup>x</sup>'], ['7', '7', 'num'], ['8', '8', 'num'], ['9', '9', 'num'], ['*', '×', 'op']],
+    [['inv', '<sup>1</sup>&frasl;<sub>x</sub>'], ['sqrt', '<sup>2</sup>√x'], ['cbrt', '<sup>3</sup>√x'], ['root', '<sup>y</sup>√x'], ['ln', 'ln'], ['log10', 'log<sub>10</sub>'], ['4', '4', 'num'], ['5', '5', 'num'], ['6', '6', 'num'], ['-', '−', 'op']],
+    [['fact', 'x!'], ['sin', 'sin'], ['cos', 'cos'], ['tan', 'tan'], ['e', 'e'], ['ee', 'EE'], ['1', '1', 'num'], ['2', '2', 'num'], ['3', '3', 'num'], ['+', '+', 'op']],
+    [['rad', 'Rad'], ['sinh', 'sinh'], ['cosh', 'cosh'], ['tanh', 'tanh'], ['pi', 'π'], ['rand', 'Rand'], ['0', '0', 'num wide'], ['.', '.', 'num'], ['=', '=', 'op']],
+  ];
+  const CALC_TITLES = { mc: 'Memory clear', mplus: 'Memory add', mminus: 'Memory subtract', mr: 'Memory recall', ac: 'All clear', neg: 'Change sign', pct: 'Percent', second: 'Second functions', x2: 'Squared', x3: 'Cubed', '^': 'To the power of', ex: 'e to the x', '10x': '10 to the x', inv: 'One over x', sqrt: 'Square root', cbrt: 'Cube root', root: 'The y-th root of x', ln: 'Natural log', log10: 'Log base 10', fact: 'Factorial', ee: 'Times ten to the', rad: 'Switch to radians', pi: 'Pi', rand: 'A random number between 0 and 1', '/': 'Divide', '*': 'Multiply', '-': 'Subtract', '+': 'Add', '=': 'Equals', ypow: 'y to the x', '2x': '2 to the x', logy: 'Log base y', log2: 'Log base 2' };
+  const gamma = (z) => { // Lanczos: x! for a number that is not whole
+    if (z < 0.5) return Math.PI / (Math.sin(Math.PI * z) * gamma(1 - z));
+    const g = 7, C = [0.99999999999980993, 676.5203681218851, -1259.1392167224028, 771.32342877765313, -176.61502916214059, 12.507343278686905, -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7];
+    z -= 1;
+    let x = C[0];
+    for (let i = 1; i < g + 2; i++) x += C[i] / (z + i);
+    const t = z + g + 0.5;
+    return Math.sqrt(2 * Math.PI) * t ** (z + 0.5) * Math.exp(-t) * x;
+  };
+  const factorial = (n) => { if (n < 0) return NaN; if (Number.isInteger(n)) { if (n > 170) return Infinity; let r = 1; for (let i = 2; i <= n; i++) r *= i; return r; } return gamma(n + 1); };
+  /** The number for the display: up to twelve figures, thousands grouped, very large or small ones in e-notation. */
+  function calcFmt(v) {
+    if (!Number.isFinite(v)) return 'Error';
+    if (Object.is(v, -0)) v = 0;
+    const abs = Math.abs(v);
+    const s = abs >= 1e15 || (abs > 0 && abs < 1e-9) ? v.toExponential(8).replace(/\.?0+e/, 'e') : String(Number(v.toPrecision(12)));
+    return /e/.test(s) ? s : calcGroup(s);
+  }
+  const calcGroup = (s) => { const m = /^(-?)(\d*)(.*)$/.exec(s); return `${m[1]}${m[2].replace(/\B(?=(\d{3})+(?!\d))/g, ',')}${m[3]}`; };
+  function calcEngine() {
+    const st = { entry: null, cur: 0, tokens: [], fresh: true, mem: 0, deg: true, second: false, err: false, opKey: null };
+    const value = () => (st.entry !== null ? (parseFloat(st.entry) || 0) : st.cur);
+    const last = () => st.tokens[st.tokens.length - 1] || null;
+    const commit = () => { const l = last(); const v = value(); if (!l || l.t === 'op' || l.t === '(') st.tokens.push({ t: 'num', v }); else if (l.t === 'num') l.v = v; };
+    const settle = (v) => { st.cur = v; st.entry = null; st.fresh = true; st.err = !Number.isFinite(v); };
+    const apply = (op, a, b) => ({ '+': a + b, '-': a - b, '*': a * b, '/': a / b, '^': a ** b, root: a ** (1 / b), ypow: b ** a, logy: Math.log(a) / Math.log(b) })[op];
+    function evalTokens(ts) {
+      const out = [], ops = [];
+      const pop = () => { const op = ops.pop(); const b = out.pop(), a = out.pop(); out.push(apply(op, a ?? 0, b ?? 0)); };
+      for (const t of ts) {
+        if (t.t === 'num') out.push(t.v);
+        else if (t.t === '(') ops.push('(');
+        else if (t.t === ')') { while (ops.length && ops[ops.length - 1] !== '(') pop(); ops.pop(); }
+        else { while (ops.length && ops[ops.length - 1] !== '(' && (CALC_PREC[ops[ops.length - 1]] > CALC_PREC[t.v] || (CALC_PREC[ops[ops.length - 1]] === CALC_PREC[t.v] && t.v !== '^'))) pop(); ops.push(t.v); }
+      }
+      while (ops.length) { if (ops[ops.length - 1] === '(') { ops.pop(); continue; } pop(); }
+      return out.length ? out[out.length - 1] : 0;
+    }
+    const toRad = (x) => (st.deg ? (x * Math.PI) / 180 : x);
+    const fromRad = (x) => (st.deg ? (x * 180) / Math.PI : x);
+    const FN = {
+      x2: (x) => x * x, x3: (x) => x * x * x, ex: Math.exp, '10x': (x) => 10 ** x, '2x': (x) => 2 ** x, inv: (x) => 1 / x, sqrt: Math.sqrt, cbrt: Math.cbrt, ln: Math.log, log10: Math.log10, log2: Math.log2, fact: factorial,
+      sin: (x) => Math.sin(toRad(x)), cos: (x) => Math.cos(toRad(x)), tan: (x) => Math.tan(toRad(x)), asin: (x) => fromRad(Math.asin(x)), acos: (x) => fromRad(Math.acos(x)), atan: (x) => fromRad(Math.atan(x)),
+      sinh: Math.sinh, cosh: Math.cosh, tanh: Math.tanh, asinh: Math.asinh, acosh: Math.acosh, atanh: Math.atanh,
+    };
+    const CONST = { pi: Math.PI, e: Math.E };
+    const reset = () => { Object.assign(st, { entry: null, cur: 0, tokens: [], fresh: true, err: false, opKey: null }); };
+    function press(key) {
+      if (st.err && key !== 'ac') reset();
+      if (/^\d$/.test(key)) { st.entry = st.entry === null || st.fresh ? key : st.entry.length < 18 ? st.entry + key : st.entry; st.fresh = false; st.opKey = null; return; }
+      if (key === '.') { if (st.entry === null || st.fresh) st.entry = '0.'; else if (!/[.e]/.test(st.entry)) st.entry += '.'; st.fresh = false; st.opKey = null; return; }
+      if (key === 'ee') { if (st.entry === null || st.fresh) st.entry = String(value()); if (!/e/.test(st.entry)) st.entry += 'e'; st.fresh = false; return; }
+      if (key === 'back') { if (st.entry !== null && !st.fresh) { st.entry = st.entry.slice(0, -1); if (st.entry === '' || st.entry === '-') { st.entry = null; st.cur = 0; } } return; }
+      if (key === 'neg') { if (st.entry !== null && !st.fresh) st.entry = st.entry.startsWith('-') ? st.entry.slice(1) : `-${st.entry}`; else settle(-value()); return; }
+      if (key === 'pct') { settle(value() / 100); return; }
+      if (key === 'ac') { reset(); return; }
+      if (key in CALC_PREC) { commit(); const l = last(); if (l && l.t === 'op') l.v = key; else st.tokens.push({ t: 'op', v: key }); st.cur = value(); st.entry = null; st.fresh = true; st.opKey = key; return; }
+      if (key === '(') { const l = last(); if (st.entry !== null || (l && (l.t === 'num' || l.t === ')'))) { commit(); st.tokens.push({ t: 'op', v: '*' }); } st.tokens.push({ t: '(' }); st.entry = null; st.fresh = true; return; }
+      if (key === ')') {
+        let depth = 0, at = -1;
+        for (let i = st.tokens.length - 1; i >= 0; i--) { if (st.tokens[i].t === ')') depth++; else if (st.tokens[i].t === '(') { if (!depth) { at = i; break; } depth--; } }
+        if (at < 0) return;
+        commit();
+        const v = evalTokens(st.tokens.slice(at + 1));
+        st.tokens.splice(at, st.tokens.length - at, { t: 'num', v });
+        settle(v);
+        st.opKey = null;
+        return;
+      }
+      if (key === '=') { commit(); const v = evalTokens(st.tokens); st.tokens = []; settle(v); st.opKey = null; return; }
+      if (key in FN) { settle(FN[key](value())); st.opKey = null; return; }
+      if (key in CONST) { settle(CONST[key]); return; }
+      if (key === 'rand') { settle(Math.random()); return; }
+      if (key === 'mc') { st.mem = 0; return; }
+      if (key === 'mplus') { st.mem += value(); st.fresh = true; return; }
+      if (key === 'mminus') { st.mem -= value(); st.fresh = true; return; }
+      if (key === 'mr') { settle(st.mem); return; }
+      if (key === 'rad') { st.deg = !st.deg; return; }
+      if (key === 'second') { st.second = !st.second; }
+    }
+    const shown = () => (st.err ? 'Error' : st.entry !== null ? calcGroup(st.entry) : calcFmt(st.cur));
+    return { st, press, shown };
+  }
+  /** The calculator pin's panel: the display over the keys, the way the Calculator app lays them out. */
+  function quickCalc({ item, go }) {
+    const eng = calcEngine();
+    const root = h('div', { class: 'bcv-calc', tabindex: '0', role: 'application', 'aria-label': 'Scientific calculator' });
+    const display = h('div', { class: 'bcv-calc__display', 'aria-live': 'polite' });
+    const mode = h('span', { class: 'bcv-calc__mode', text: '' });
+    const head = U.el('bcv-calc__head', [quickName('Graph', go, 'Open the graphing calculator'), mode, U.text('bcv-calc__mem', '', 'span')]);
+    const keys = [];
+    const rows = CALC_ROWS.map((row) => U.el('bcv-calc__row', row.map(([key, label, cls = 'fn']) => {
+      const b = h('button', { type: 'button', class: `bcv-calc__key bcv-calc__key--${cls.split(' ')[0]} ${cls.includes('wide') ? 'bcv-calc__key--wide' : ''}`, dataset: { key, base: key }, html: label, title: CALC_TITLES[key] || label });
+      b.addEventListener('click', () => { eng.press(b.dataset.key); paint(); root.focus({ preventScroll: true }); });
+      keys.push(b);
+      return b;
+    })));
+    const KEYS = { Enter: '=', '=': '=', Backspace: 'back', '%': 'pct', '(': '(', ')': ')', '.': '.', '+': '+', '-': '-', '*': '*', x: '*', '/': '/', '^': '^' };
+    root.addEventListener('keydown', (e) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const k = /^\d$/.test(e.key) ? e.key : KEYS[e.key];
+      if (!k) return;
+      e.preventDefault();
+      e.stopPropagation();
+      eng.press(k);
+      paint();
+    });
+    function paint() {
+      const s = eng.shown();
+      display.textContent = s;
+      display.classList.toggle('is-long', s.length > 13);
+      display.classList.toggle('is-longer', s.length > 18);
+      mode.textContent = eng.st.deg ? '' : 'Rad';
+      head.querySelector('.bcv-calc__mem').textContent = eng.st.mem ? 'M' : '';
+      for (const b of keys) {
+        const base = b.dataset.base;
+        const alt = CALC_ALT[base];
+        if (alt) { const on = eng.st.second; b.dataset.key = on ? alt[0] : base; b.innerHTML = on ? alt[1] : CALC_ROWS.flat().find((r) => r[0] === base)[1]; b.title = CALC_TITLES[b.dataset.key] || ''; }
+        if (base === 'rad') { b.textContent = eng.st.deg ? 'Rad' : 'Deg'; b.title = eng.st.deg ? 'Switch to radians' : 'Switch to degrees'; }
+        b.classList.toggle('is-on', (base === 'second' && eng.st.second) || (b.dataset.key === eng.st.opKey && base !== '='));
+      }
+    }
+    root.append(head, display, U.el('bcv-calc__keys', rows));
+    paint();
+    return { els: [root] };
+  }
+  /** Grade needed: your grade now, what the work left is worth, the grade wanted — the mark it takes. */
+  function quickNeed({ go }) {
+    const field = (ph, label) => h('input', { type: 'text', inputmode: 'decimal', class: 'bcv-quick__input bcv-quick__input--num', placeholder: ph, 'aria-label': label, autocomplete: 'off' });
+    const now = field('Now %', 'Your grade now'), worth = field('Worth %', 'What the work left is worth'), goal = field('Goal %', 'The grade wanted');
     const out = U.text('bcv-quick__result', '', 'span');
-    const calc = () => { const v = evalSum(inp.value); out.textContent = v === null ? (inp.value.trim() ? '?' : '') : `= ${v}`; };
-    inp.addEventListener('input', calc);
-    inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); calc(); } });
-    return { els: [quickName('Sum', go, 'Open the graphing calculator'), inp, out, quickGo(IC.graph, 'Open the graphing calculator', () => go())] };
+    const num = (el) => { const v = parseFloat(String(el.value).replace('%', '')); return Number.isFinite(v) ? v : null; };
+    const calc = () => { const r = BCV.toolsNeed?.needed(num(now), num(worth), num(goal)); out.textContent = !r ? '' : r.kind === 'over' ? 'Out of reach' : r.kind === 'under' ? 'Already there' : `→ ${r.pct}%`; };
+    for (const el of [now, worth, goal]) { el.addEventListener('input', calc); el.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); go({ now: num(now), worth: num(worth), goal: num(goal) }); } }); }
+    return { els: [quickName('Need', go, 'Open Grade needed'), now, worth, goal, out, quickGo(IC.chevron, 'Work it out in full', () => go({ now: num(now), worth: num(worth), goal: num(goal) }))] };
   }
   /** File converter: a file dropped or chosen here opens the tool with it in. */
   function quickConv({ go }) {
-    const input = h('input', { type: 'file', multiple: true, hidden: true, accept: '.docx,.pptx,.xlsx,.pdf,.txt,.md,.csv,.json,.heic,.heif,image/*', 'aria-label': 'Files to convert' });
-    input.addEventListener('change', () => { const files = Array.from(input.files || []); input.value = ''; if (files.length) go({ files }); });
-    const drop = h('button', { type: 'button', class: 'bcv-quick__drop', text: 'Drop a file to convert', onclick: () => input.click() });
-    drop.addEventListener('dragover', (e) => { e.preventDefault(); drop.classList.add('is-drag'); });
-    drop.addEventListener('dragleave', () => drop.classList.remove('is-drag'));
-    drop.addEventListener('drop', (e) => { e.preventDefault(); drop.classList.remove('is-drag'); const files = Array.from(e.dataTransfer?.files || []); if (files.length) go({ files }); });
-    return { els: [quickName('Convert', go, 'Open the file converter'), drop, input] };
+    return { els: [quickName('Convert', go, 'Open the file converter'), ...quickDrop({ go, text: 'Click to add a file', accept: '.docx,.pptx,.xlsx,.pdf,.txt,.md,.csv,.json,.heic,.heif,image/*', multiple: true, label: 'Files to convert' })] };
+  }
+  /** Merge & split: PDFs dropped or chosen here open the tool with them in. */
+  function quickPdfs({ go }) {
+    return { els: [quickName('PDFs', go, 'Open Merge & split PDFs'), ...quickDrop({ go, text: 'Click to add PDFs', accept: '.pdf,application/pdf', multiple: true, label: 'PDFs to merge or split' })] };
+  }
+  /** PDF annotator: a PDF dropped or chosen here opens marked up as it was left. */
+  function quickMark({ go }) {
+    return { els: [quickName('Mark up', go, 'Open the PDF annotator'), ...quickDrop({ go, text: 'Click to add a PDF', accept: '.pdf,application/pdf', key: 'file', label: 'A PDF to mark up' })] };
+  }
+  /** Image to text: a picture dropped or chosen here is read at once. */
+  function quickOcr({ go }) {
+    return { els: [quickName('Read', go, 'Open Image to text'), ...quickDrop({ go, text: 'Click to add a picture', accept: 'image/*,.pdf', key: 'file', label: 'A picture to read' })] };
   }
   /** Flashcards: the sets as chips, a press opening one to study; the sets read again each time it opens. */
   function quickCards({ go }) {
@@ -877,7 +1067,7 @@
   }
 
   BCV.tools = {
-    TOOLS, toolOf, tintOf, open, popup, seg, note, hint, card, label, stepper, input, rise, saveFile, copyText, parseCsv, csvCell, uid, load, save, vendor,
+    TOOLS, toolOf, tintOf, open, popup, seg, note, hint, card, label, stepper, input, rise, saveFile, copyText, parseCsv, csvCell, readAs, kb, fileBase, uid, load, save, vendor, evalSum,
     focusActive, focusLoad, remaining, running, mmss,
     mountTray, mountPins, pinsLoad, pin, unpin, pinned, pinEl, cardEl, paintPins, welcomeIfFirst,
   };

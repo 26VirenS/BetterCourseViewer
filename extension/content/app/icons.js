@@ -75,5 +75,10 @@
     play: 'M8 5l11 7-11 7z',
     pause: 'M9 6v12M15 6v12',
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
+    // the four tools after them: what a grade needs, PDFs joined or cut, a PDF marked up, words read off a picture
+    percent: 'M19 5L5 19M7.5 4.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM16.5 14.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z',
+    merge: 'M4 5h6v5.5H4zM4 13.5h6V19H4zM14 9.25h6v5.5h-6zM10 7.75l4 2.75M10 16.25l4-2.75',
+    marker: 'M5 15l8.5-8.5 4 4L9 19H5zM12 8.5l4 4M3 21h9',
+    scan: 'M4 8V5.5A1.5 1.5 0 0 1 5.5 4H8M16 4h2.5A1.5 1.5 0 0 1 20 5.5V8M20 16v2.5a1.5 1.5 0 0 1-1.5 1.5H16M8 20H5.5A1.5 1.5 0 0 1 4 18.5V16M8.5 9h7M12 9v7',
   };
 })();

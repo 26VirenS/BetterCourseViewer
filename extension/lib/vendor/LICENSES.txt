@@ -1,9 +1,22 @@
-Third-party libraries bundled for the Tools tab's file converter (content/app/tools/convert.js).
-They are packaged with the extension and injected into a Canvas tab only when the converter needs
-them (background.js, the "inject" message); nothing is fetched from the network.
+Third-party libraries bundled for the Tools tab (content/app/tools/). They are packaged with the
+extension and used only when a tool needs them; nothing is fetched from the network. The
+converter's, the annotator's and the merge/split tool's libraries are injected into a Canvas tab on
+demand (background.js, the "inject" message); the text reader's run in the extension's own page
+(lib/ocr/reader.html), framed into the tab, because the recognition engine is WebAssembly in a
+worker and a content script can start neither.
 
 mammoth.browser.min.js — mammoth.js 1.x, BSD 2-Clause — https://github.com/mwilliamson/mammoth.js
 jspdf.umd.min.js       — jsPDF 2.5.2, MIT                — https://github.com/parallax/jsPDF
 pdf.min.js             — pdf.js 3.11.174, Apache-2.0     — https://github.com/mozilla/pdf.js
 pdf.worker.min.js      — pdf.js 3.11.174, Apache-2.0     — (loaded beside pdf.min.js so it runs on
                          the main thread: a content script cannot start a worker from the extension)
+pdf-lib.min.js         — pdf-lib 1.17.1, MIT             — https://github.com/Hopding/pdf-lib
+                         (merging and splitting PDFs page for page, and writing highlight and note
+                         annotations into a marked-up copy)
+tesseract/             — Tesseract.js 7.0.0, Apache-2.0  — https://github.com/naptha/tesseract.js
+  tesseract.min.js, worker.min.js
+  tesseract-core-simd-lstm.js, .wasm — tesseract.js-core 7.0.0 (Tesseract OCR 5, LSTM engine,
+                         WebAssembly SIMD build), Apache-2.0 — https://github.com/naptha/tesseract.js-core
+  lang/eng.traineddata.gz — @tesseract.js-data/eng 1.0.0 (the English model, "best_int"), MIT;
+                         the model itself is Tesseract's tessdata_best, Apache-2.0 —
+                         https://github.com/tesseract-ocr/tessdata_best
