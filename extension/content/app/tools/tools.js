@@ -390,8 +390,27 @@
     item.classList.add('is-open');
     item.setAttribute('aria-expanded', 'true');
     clearTimeout(islandTimer);
-    islandTimer = setTimeout(() => islandClose(item), ms);
+    islandTimer = setTimeout(() => { if (!item.classList.contains('is-hover')) islandClose(item); }, ms); // (under the pointer it stays up: the leave folds it)
     if (focusMain) setTimeout(() => item.querySelector('.bcv-island__main')?.focus(), 200);
+  }
+  /** The pointer over the pin swells it, the way the switch beside it opens under the pointer: the
+   *  live island while a session is going, the setter otherwise; it folds when the pointer leaves.
+   *  A finger does not hover: a tap opens it, as before. */
+  function islandHover(item) {
+    let leave = 0;
+    item.addEventListener('pointerenter', (e) => {
+      if (e.pointerType === 'touch' || item.classList.contains('is-out')) return;
+      clearTimeout(leave);
+      item.classList.add('is-hover');
+      if (item.classList.contains('is-open')) return;
+      if (item.classList.contains('is-live')) islandOpen(item); else islandSet(item);
+    });
+    item.addEventListener('pointerleave', (e) => {
+      if (e.pointerType === 'touch') return;
+      item.classList.remove('is-hover');
+      clearTimeout(leave);
+      leave = setTimeout(() => { if (!item.classList.contains('is-hover') && !item.querySelector(':focus-visible')) islandClose(item); }, 260);
+    });
   }
   function islandClose(item) {
     clearTimeout(islandTimer);
@@ -609,6 +628,7 @@
       el.dataset.live = 'pomo';
       el.setAttribute('aria-expanded', 'false');
       el.append(h('div', { class: 'bcv-island__face' }, [btn, islandBody(el), islandSetter(el)]));
+      islandHover(el);
       // open: a press on the count opens the timer, a press elsewhere on the body keeps it open a while longer
       el.addEventListener('click', (e) => { if (!el.classList.contains('is-open') || e.target.closest('button')) return; if (e.target.closest('.bcv-island__right')) open('pomo', { from: el }); else islandOpen(el); });
       el.addEventListener('keydown', (e) => { if (e.key === 'Escape' && el.classList.contains('is-open')) { e.stopPropagation(); islandClose(el); btn.focus(); } });

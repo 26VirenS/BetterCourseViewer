@@ -23,6 +23,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.27.0', date: '2026-09-19', notes: [
+      { kind: 'improved', title: 'Timer opens on hover', body: 'Point at the pinned timer and it opens, like the switch beside it. Move away and it folds.', icon: P.pin },
+    ] },
     { version: '2.26.0', date: '2026-09-19', notes: [
       { kind: 'improved', title: 'Timer scale', body: 'The marker stays in the middle. Drag the scale left or right to set the minutes.', icon: P.clock },
       { kind: 'new', title: 'Set and go', body: 'The pinned timer opens a small scale and a Start button. Set it, and go.', icon: P.pin },
