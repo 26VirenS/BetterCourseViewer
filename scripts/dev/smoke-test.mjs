@@ -1024,9 +1024,27 @@ try {
   check(/^Open [A-Z][a-z]{2} \d+ – [A-Z][a-z]{2} \d+ · accepts a file upload, a text entry or a website URL$/.test((await texts('.bcv-sb__note'))[0]), `availability + accepted types: ${(await texts('.bcv-sb__note'))[0]}`);
   check((await texts('.bcv-sb__dropsub'))[0] === 'PDF, DOCX, PNG or JPG only · as many files as you need' && (await page.getAttribute('.bcv-sb__pane input[type=file]', 'accept')) === '.pdf,.docx,.png,.jpg', 'allowed file types are read from the assignment and set the picker\'s accept');
   check((await texts('.bcv-sb__footnote'))[0] === 'Attach at least one file to submit.' && !!(await page.$('.bcv-sb__btn--primary[disabled]')), 'submit stays blocked until a file is attached');
-  await page.setInputFiles('.bcv-sb__pane input[type=file]', { name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('hello') });
-  await waitText('.bcv-toast', /notes\.txt.*isn't an accepted type.*PDF, DOCX, PNG or JPG/);
-  check(/^nothing attached yet$/i.test((await texts('.bcv-sb__count'))[0]), `a forbidden type is refused before any upload, with the reason: ${(await texts('.bcv-sb__count'))[0]}`); // innerText carries the CSS uppercase
+  // a file of another type is offered as what it can become — a text file as a PDF — converted here and attached under its new name
+  await page.setInputFiles('.bcv-sb__pane input[type=file]', { name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('# Notes\n\nhello there') });
+  await page.waitForSelector('.bcv-sheet--ask', { timeout: 5000 });
+  const askConv = { title: (await texts('.bcv-sheet--ask .bcv-sheet__title'))[0], note: (await texts('.bcv-ask__note'))[0], ok: (await texts('.bcv-ask__ok'))[0] };
+  await page.click('.bcv-ask__cancel');
+  check(askConv.title === 'Convert to PDF?' && askConv.note === 'This assignment only takes PDF, DOCX, PNG or JPG. “notes.txt” can be converted on this device and attached as “notes.pdf”.' && askConv.ok === 'Convert to PDF' && (await eventually(async () => !(await page.$('.bcv-sheet--ask')))) && /^nothing attached yet$/i.test((await texts('.bcv-sb__count'))[0]), `a type the assignment refuses that can become one it takes is offered as that, and Cancel attaches nothing (${JSON.stringify(askConv)})`); // innerText carries the CSS uppercase
+  await page.setInputFiles('.bcv-sb__pane input[type=file]', { name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('# Notes\n\nhello there') });
+  await page.waitForSelector('.bcv-sheet--ask', { timeout: 5000 });
+  await page.click('.bcv-ask__ok');
+  await waitText('.bcv-sb__count', /^1 file attached$/);
+  await page.waitForFunction(() => /ready to submit/.test(document.querySelector('.bcv-sb__fsub')?.textContent || ''), null, { timeout: 20000 });
+  const convRow = (await texts('.bcv-sb__file'))[0].replace(/\s+/g, ' ');
+  check(/^PDF notes\.pdf \d+ (KB|B) · ready to submit Preview$/.test(convRow), `Convert makes the PDF here and attaches it under its new name, ready to submit: ${convRow}`);
+  await page.click('.bcv-sb__files .bcv-sb__file:nth-child(1) .bcv-sb__x');
+  await waitText('.bcv-sb__count', /^Nothing attached yet$/);
+  // and a type nothing here can turn into one the assignment takes is refused, in words, with one button
+  await page.setInputFiles('.bcv-sb__pane input[type=file]', { name: 'lab.zip', mimeType: 'application/zip', buffer: Buffer.from('PK\u0003\u0004zip') });
+  await page.waitForSelector('.bcv-sheet--ask', { timeout: 5000 });
+  const askNo = { title: (await texts('.bcv-sheet--ask .bcv-sheet__title'))[0], note: (await texts('.bcv-ask__note'))[0], cancel: !!(await page.$('.bcv-ask__cancel')) };
+  await page.click('.bcv-ask__ok');
+  check(askNo.title === '“lab.zip” can’t be attached' && askNo.note === 'This assignment only takes PDF, DOCX, PNG or JPG. A ZIP file can’t be turned into any of those here.' && !askNo.cancel && (await eventually(async () => !(await page.$('.bcv-sheet--ask')))) && /^nothing attached yet$/i.test((await texts('.bcv-sb__count'))[0]), `a type nothing here can convert is refused before any upload, with the reason (${JSON.stringify(askNo)})`);
   await page.setInputFiles('.bcv-sb__pane input[type=file]', { name: 'grand-challenge-notes.docx', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', buffer: Buffer.alloc(38912, 'a') });
   await waitText('.bcv-sb__count', /^1 file attached$/);
   check((await texts('.bcv-sb__file'))[0].replace(/\s+/g, ' ') === 'DOCX grand-challenge-notes.docx 38 KB · ready to submit Preview', `file row, with a Preview button: ${(await texts('.bcv-sb__file'))[0].replace(/\s+/g, ' ')}`);
@@ -2040,6 +2058,13 @@ try {
   await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
   check(await page.$eval('.bcv-frame', (f) => /external_tools\/retrieve\?assignment_id=4003/.test(f.getAttribute('src'))), 'external-tool assignment embeds the tool launch');
   check(!(await texts('.bcv-btn--primary')).includes('Submit in Canvas'), 'no submit button for tool assignments');
+  // a grade the tool posts after its launch lands on the page by itself: the submission is asked for
+  // again once the tool has loaded, and again for a while, and the mark is drawn when it changes
+  check((await page.$('.bcv-detail__grade')) === null && (await texts('.bcv-stat__value'))[0] === '—', 'the tool assignment starts ungraded');
+  await mockScore({ assignmentId: 4003, score: 17 });
+  await page.waitForSelector('.bcv-detail__grade', { timeout: 15000 });
+  check((await texts('.bcv-detail__gradescore'))[0] === '17' && (await texts('.bcv-detail__gradeof'))[0] === '/ 20' && (await texts('.bcv-stat__value'))[0] === '17 / 20' && (await texts('.bcv-badge')).includes('Graded') && page.url().endsWith('/courses/104/assignments/4003'), `a grade the tool passes back after the launch shows without a reload: ${(await texts('.bcv-detail__gradescore'))[0]} ${(await texts('.bcv-detail__gradeof'))[0]}`);
+  await mockScore({ assignmentId: 4003, score: null });
   await shot(page, '14b-assignment-tool');
 
   // the interface never says "AI" anywhere
@@ -2840,6 +2865,7 @@ try {
   check((await texts('.bcv-pomo__main'))[0] === 'Pause' && !(await page.$eval('.bcv-pomo__cancel', (e) => e.hidden)) && !!focusRec && focusRec.endAt > Date.now() + 24 * 60 * 1000 && focusRec.phase === 'focus' && (await page.$eval('.bcv-pomo', (e) => e.classList.contains('is-running'))) && /^Ends \d/.test((await raw('.bcv-pomo__ends'))[0]) && !(await scaleInfo()).set && (await page.$('#bcv-pins .bcv-island .bcv-island__hand')) !== null, `Start Timer writes the session's end time, not a count, says when it ends, turns the button to Pause with Cancel beside it, and a live activity appears in the tray (${JSON.stringify(focusRec)})`);
   await shot(page, '38-tools-timer');
   await closeTool();
+  await page.waitForFunction(() => { const p = document.querySelector('#bcv-pins .bcv-island'); return !!p && p.getAnimations({ subtree: true }).every((a) => a.playState === 'finished' || a.playState === 'idle'); }, null, { timeout: 4000 }).catch(() => {}); // (measured once the pin has finished popping in)
   const disc = await page.$eval('#bcv-pins .bcv-island', (e) => { const r = e.getBoundingClientRect(); const l = document.getElementById('bcv-look').getBoundingClientRect(); return { w: Math.round(r.width), h: Math.round(r.height), pins: e.parentElement.querySelectorAll('.bcv-pin').length, guest: e.classList.contains('is-guest'), leftOfSwitch: r.right < l.left, sameRow: Math.abs(r.top - l.top) < 4, open: e.classList.contains('is-open'), hand: e.querySelector('.bcv-island__hand').style.transform, bg: getComputedStyle(e.querySelector('.bcv-island__face')).backgroundColor, glyph: getComputedStyle(e.querySelector('.bcv-island__glyph')).opacity, ic: getComputedStyle(e.querySelector('.bcv-pin__ic')).opacity, x: getComputedStyle(e.querySelector('.bcv-pin__x')).display }; });
   check(disc.w === 24 && disc.h === 24 && disc.pins === 1 && disc.guest && disc.leftOfSwitch && disc.sameRow && !disc.open && /^rotate\(3[5-9]\d/.test(disc.hand) && disc.bg === 'rgb(0, 0, 0)' && disc.glyph === '1' && disc.ic === '0' && disc.x === 'none', `the timer is not pinned, so it borrows a pin: one small black disc in the tray beside the switch, the dial's hand near the top with nearly all of the session left, no X (${JSON.stringify(disc)})`);
   await page.click('#bcv-pins .bcv-island');
@@ -3278,6 +3304,31 @@ try {
   check(!(await afterCancelNav) && !!(await page.$('.bcv-sheet-ov')) && !(await page.$('#bcv-away')), 'and the press after a cancel does what it says');
   await page.click('.bcv-sheet-ov', { position: { x: 5, y: 5 } });
   await page.waitForFunction(() => !document.querySelector('.bcv-sheet-ov'), null, { timeout: 5000 });
+  // The scripts in the page a second time (Safari puts them back when the extension looks at its
+  // permissions — opening the popup — and again when it updates) wire nothing twice: the second copy
+  // has no Away Refresh of its own, so a stale tab floats one pill, not a stack, and the one press clears it
+  await sw.evaluate(async (base) => { const [tab] = await chrome.tabs.query({ url: `${base}/*` }); await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'ISOLATED', files: chrome.runtime.getManifest().content_scripts[1].js }); }, BASE);
+  await page.evaluate(() => sessionStorage.removeItem('bcv:reloaded'));
+  await windBack(4 * 60 * 1000);
+  const twiceNav = page.waitForNavigation({ timeout: 4500 }).then(() => true).catch(() => false);
+  await comeBack();
+  await page.waitForSelector('#bcv-away.is-in', { timeout: 3000 });
+  await page.waitForTimeout(400);
+  const pills = await page.$$eval('.bcv-away', (els) => els.length);
+  await page.click('#bcv-away .bcv-away__btn');
+  check(pills === 1 && (await eventually(async () => (await page.$$('.bcv-away')).length === 0)) && !(await twiceNav) && (await page.$$('#bcv-look')).length === 1 && (await page.evaluate(() => document.documentElement.dataset.bcvApp)) === '1', `with the scripts in the page twice over, a stale tab gets one pill, not a stack (${pills}), and one press clears it`);
+  await windBack(0);
+  // and the page still goes where it is sent: the second copy never takes the app object over (in Safari
+  // before this: press the toolbar button, open a card, preview an item, press Open — nothing, until a reload)
+  await page.click('.bcv-stats > :nth-child(2)');
+  await page.waitForSelector('.bcv-sheet__row', { timeout: 10000 });
+  await page.click('.bcv-sheet__row');
+  await page.waitForSelector('.bcv-pv__go', { timeout: 10000 });
+  await page.click('.bcv-pv__go');
+  await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
+  check(/\/courses\/\d+\/(assignments|quizzes|discussion_topics|announcements)\/\d+/.test(page.url()) && !(await page.$('.bcv-sheet')) && (await page.$$('#bcv-app')).length === 1, `with the scripts in twice, a card, a preview and Open still go through to the item: ${page.url()}`);
+  await page.goto(`${BASE}/`);
+  await page.waitForSelector('.bcv-stat', { timeout: 20000 });
   // a quiz is left completely alone by it — not a reload, and not a note either
   await page.goto(`${BASE}/courses/101/quizzes/9001?bcv=take`);
   await page.waitForSelector('.bcv-qz__begin', { timeout: 15000 });

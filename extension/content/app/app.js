@@ -13,6 +13,16 @@
   const screens = (BCV.screens = BCV.screens || {});
 
   const html = document.documentElement;
+  // One copy of this script per page, whoever asks. A page can end up with these scripts in it
+  // twice — Safari re-injects a site's content scripts when the extension looks at its permissions
+  // (opening the toolbar popup does), and again when it is updated — and a second copy used to
+  // wire everything of its own under the first: its own Away Refresh with its own clock, its own
+  // presses, its own tab handlers, so coming back to a tab floated one pill per copy, stacked. A
+  // copy that finds one already here does nothing at all: no shell, no listeners, no pill. (The
+  // note on the page outlives any one world these scripts run in; the flag is for this world.)
+  if (self.__bcvBooted || html.dataset.bcvApp === '1') return;
+  self.__bcvBooted = true;
+  html.dataset.bcvApp = '1';
   const state = {
     settings: null,
     route: null,
@@ -842,7 +852,7 @@
     ]);
   }
   function awayRefresh() {
-    if (away) return true; // already counting
+    if (away || document.getElementById('bcv-away')) return true; // already counting (a pill from any copy of these scripts counts: never two)
     if (inQuiz() || quizHere() || state.submitOpen || typing() || recentlyReloaded()) return recover(AWAY_WHY); // the note, and no reload
     const btn = awayPill();
     btn.addEventListener('click', awayCancel);
@@ -1266,16 +1276,7 @@
     main: () => main,
   };
 
-  // One interface per page, whoever asks.
-  //
-  // A page can end up with these scripts in it twice — Safari re-injects a site's registered content
-  // scripts when the extension looks at its permissions, which is what opening the toolbar popup
-  // does — and a second copy would build a second shell under the first: the whole interface twice,
-  // one scrolling past the other. A copy that finds one already here does nothing at all.
-  const already = !!self.__bcvBooted || !!document.getElementById('bcv-app');
-  self.__bcvBooted = true;
-  if (!already) {
-    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, { once: true });
-    else boot();
-  }
+  // (a second copy of these scripts never gets this far: see the top of this file)
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, { once: true });
+  else boot();
 })();

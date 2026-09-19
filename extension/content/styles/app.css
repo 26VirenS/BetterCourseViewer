@@ -531,6 +531,9 @@ html[data-bcv-theme="dark"] .bcv-badge--orange { color: #ffb44d; }
 .bcv-prompt { padding: 16px 22px 20px; display: flex; flex-direction: column; gap: 14px; }
 .bcv-prompt__input { height: 42px; font-size: 15px; border-radius: 12px; }
 .bcv-prompt__btns { display: flex; align-items: center; gap: 8px; }
+.bcv-sheet--ask { width: 430px; }
+.bcv-ask__note { font: 400 14px/1.5 var(--bcv-font); color: var(--bcv-ink2); }
+.bcv-sb__file.is-converting .bcv-sb__fsub { color: var(--bcv-blue); }
 /* a course's main column dims while the next tab loads (the header and rail stay put) */
 .bcv-cmain { transition: opacity .2s ease; }
 .bcv-cmain.is-loading { opacity: .55; }

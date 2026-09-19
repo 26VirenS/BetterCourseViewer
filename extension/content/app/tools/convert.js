@@ -51,6 +51,7 @@
     return '';
   }
   const kb = (b) => (b >= 1048576 ? `${(b / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`);
+  const dataUrlBlob = (u) => { const [head, b64] = u.split(','); const mime = /data:([^;]+)/.exec(head)?.[1] || 'application/octet-stream'; const bin = atob(b64); const u8 = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i); return new Blob([u8], { type: mime }); };
   const dataBytes = (u) => { const b = u.slice(u.indexOf(',') + 1); return Math.round((b.length * 3) / 4) - (b.endsWith('==') ? 2 : b.endsWith('=') ? 1 : 0); };
   const base = (name) => String(name).replace(/\.[^.]+$/, '');
   const readAs = (file, how) => new Promise((resolve, reject) => { const r = new FileReader(); r.onload = () => resolve(r.result); r.onerror = () => reject(new Error('The file could not be read.')); r[how](file); });
@@ -125,15 +126,15 @@
       onStage?.('Uploading…');
       const { files } = await ccConvert({ file: rec.file, name: rec.name, to, key, onStage });
       onStage?.('Downloading…');
-      let bytes = 0;
+      let bytes = 0, first = null;
       for (const f of files) {
         let blob = null;
         try { const r = await fetch(f.url); if (r.ok) blob = await r.blob(); } catch { /* below */ }
-        if (blob) { bytes += blob.size; if (download) T.saveFile(f.filename, blob); }
+        if (blob) { bytes += blob.size; if (download) T.saveFile(f.filename, blob); else if (!first) first = { blob, name: f.filename }; }
         else { bytes += Number(f.size) || 0; if (download) clickDownload(f.url, f.filename); } // (a store that refuses the page's read: the browser fetches it itself)
       }
       const ext = (files[0].filename || '').split('.').pop().toUpperCase();
-      return { ok: true, bytes, label: `${files.length > 1 ? U.plural(files.length, 'file') : ext} · CloudConvert` };
+      return { ok: true, bytes, label: `${files.length > 1 ? U.plural(files.length, 'file') : ext} · CloudConvert`, blob: files.length === 1 ? first?.blob : null, name: first?.name };
     } catch (e) {
       return { ok: false, why: e?.message || 'CloudConvert could not convert this file.' };
     }
@@ -208,23 +209,23 @@
           const doc = new self.jspdf.jsPDF({ unit: 'px', format: [r.w, r.h] });
           doc.addImage(r.cv.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, r.w, r.h);
           const blob = doc.output('blob');
-          return { ok: true, bytes: download ? T.saveFile(`${base(rec.name)}.pdf`, blob) : blob.size, label: '1 page' };
+          return { ok: true, bytes: download ? T.saveFile(`${base(rec.name)}.pdf`, blob) : blob.size, label: '1 page', blob, name: `${base(rec.name)}.pdf` };
         }
         const mime = `image/${to}`;
         const url = to === 'png' ? r.cv.toDataURL(mime) : r.cv.toDataURL(mime, q / 100);
         if (!url.startsWith(`data:${mime}`)) return fail(`${to.toUpperCase()} is not supported by this browser.`);
         if (download) clickDownload(url, `${base(rec.name)}.${to === 'jpeg' ? 'jpg' : to}`);
-        return { ok: true, bytes: dataBytes(url), label: `${r.w} × ${r.h}` };
+        return { ok: true, bytes: dataBytes(url), label: `${r.w} × ${r.h}`, blob: download ? null : dataUrlBlob(url), name: `${base(rec.name)}.${to === 'jpeg' ? 'jpg' : to}` };
       }
       if (rec.kind === 'docx') {
         const { blocks, html } = await docxBlocks(rec.data);
-        if (to === 'txt') { const blob = new Blob([blocks.map((b) => b.text).join('\n\n')], { type: 'text/plain;charset=utf-8' }); return { ok: true, bytes: download ? T.saveFile(`${base(rec.name)}.txt`, blob) : blob.size, label: U.plural(blocks.length, 'block') }; }
-        if (to === 'html') { const blob = new Blob([`<!doctype html><meta charset="utf-8"><title>${base(rec.name)}</title>${html}`], { type: 'text/html;charset=utf-8' }); return { ok: true, bytes: download ? T.saveFile(`${base(rec.name)}.html`, blob) : blob.size, label: 'HTML' }; }
+        if (to === 'txt') { const blob = new Blob([blocks.map((b) => b.text).join('\n\n')], { type: 'text/plain;charset=utf-8' }); return { ok: true, bytes: download ? T.saveFile(`${base(rec.name)}.txt`, blob) : blob.size, label: U.plural(blocks.length, 'block'), blob, name: `${base(rec.name)}.txt` }; }
+        if (to === 'html') { const blob = new Blob([`<!doctype html><meta charset="utf-8"><title>${base(rec.name)}</title>${html}`], { type: 'text/html;charset=utf-8' }); return { ok: true, bytes: download ? T.saveFile(`${base(rec.name)}.html`, blob) : blob.size, label: 'HTML', blob, name: `${base(rec.name)}.html` }; }
         await T.vendor('jspdf');
         await T.vendor('office');
         const doc = await BCV.office.docxToPdf(rec.data, self.jspdf.jsPDF);
         const blob = doc.output('blob');
-        return { ok: true, bytes: download ? T.saveFile(`${base(rec.name)}.pdf`, blob) : blob.size, label: U.plural(doc.getNumberOfPages(), 'page') };
+        return { ok: true, bytes: download ? T.saveFile(`${base(rec.name)}.pdf`, blob) : blob.size, label: U.plural(doc.getNumberOfPages(), 'page'), blob, name: `${base(rec.name)}.pdf` };
       }
       if (rec.kind === 'pdf') {
         const pdf = await pdfDoc(rec.data);
@@ -233,13 +234,13 @@
           await T.vendor('office');
           const r = await BCV.office.pdfToDocx(pdf, { maxPages: MAX_PAGES });
           const blob = new Blob([r.bytes], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
-          return { ok: true, bytes: download ? T.saveFile(`${base(rec.name)}.docx`, blob) : blob.size, label: `Word · ${U.plural(r.pages, 'page')}${r.pictures ? ` · ${U.plural(r.pictures, 'picture')}` : ''}` };
+          return { ok: true, bytes: download ? T.saveFile(`${base(rec.name)}.docx`, blob) : blob.size, label: `Word · ${U.plural(r.pages, 'page')}${r.pictures ? ` · ${U.plural(r.pictures, 'picture')}` : ''}`, blob, name: `${base(rec.name)}.docx` };
         }
         if (to === 'txt') {
           const out = [];
           for (let i = 1; i <= n; i++) { const page = await pdf.getPage(i); const tc = await page.getTextContent(); out.push(tc.items.map((it) => it.str).join(' ')); }
           const blob = new Blob([out.join('\n\n')], { type: 'text/plain;charset=utf-8' });
-          return { ok: true, bytes: download ? T.saveFile(`${base(rec.name)}.txt`, blob) : blob.size, label: `${U.plural(n, 'page')} read` };
+          return { ok: true, bytes: download ? T.saveFile(`${base(rec.name)}.txt`, blob) : blob.size, label: `${U.plural(n, 'page')} read`, blob, name: `${base(rec.name)}.txt` };
         }
         let total = 0;
         for (let i = 1; i <= n; i++) {
@@ -257,7 +258,7 @@
         const blocks = String(rec.data).split(/\n{2,}/).map((t) => { const s = t.trim(); const m = s.match(/^(#{1,3})\s+(.*)$/); return m ? { text: m[2], h: m[1].length === 1 ? 1 : 2 } : { text: s, h: 0 }; }).filter((b) => b.text);
         const doc = await jsPdfText(blocks.length ? blocks : [{ text: '(empty file)', h: 0 }]);
         const blob = doc.output('blob');
-        return { ok: true, bytes: download ? T.saveFile(`${base(rec.name)}.pdf`, blob) : blob.size, label: U.plural(doc.getNumberOfPages(), 'page') };
+        return { ok: true, bytes: download ? T.saveFile(`${base(rec.name)}.pdf`, blob) : blob.size, label: U.plural(doc.getNumberOfPages(), 'page'), blob, name: `${base(rec.name)}.pdf` };
       }
       if (rec.kind === 'csv') {
         const rows = T.parseCsv(rec.data).filter((r) => r.some((c) => String(c).trim()));
@@ -265,7 +266,7 @@
         const head = rows[0].map((x, i) => String(x).trim() || `col${i + 1}`);
         const objs = rows.slice(1).map((r) => Object.fromEntries(head.map((k, i) => [k, r[i] == null ? '' : r[i]])));
         const blob = new Blob([JSON.stringify(objs, null, 2)], { type: 'application/json' });
-        return { ok: true, bytes: download ? T.saveFile(`${base(rec.name)}.json`, blob) : blob.size, label: U.plural(objs.length, 'record') };
+        return { ok: true, bytes: download ? T.saveFile(`${base(rec.name)}.json`, blob) : blob.size, label: U.plural(objs.length, 'record'), blob, name: `${base(rec.name)}.json` };
       }
       if (rec.kind === 'json') {
         let data;
@@ -276,7 +277,7 @@
         for (const o of arr) for (const k of Object.keys(o || {})) if (!keys.includes(k)) keys.push(k);
         const lines = [keys.map(T.csvCell).join(','), ...arr.map((o) => keys.map((k) => T.csvCell(o && typeof o[k] === 'object' ? JSON.stringify(o[k]) : (o ? o[k] : ''))).join(','))];
         const blob = new Blob([`${lines.join('\n')}\n`], { type: 'text/csv;charset=utf-8' });
-        return { ok: true, bytes: download ? T.saveFile(`${base(rec.name)}.csv`, blob) : blob.size, label: U.plural(arr.length, 'row') };
+        return { ok: true, bytes: download ? T.saveFile(`${base(rec.name)}.csv`, blob) : blob.size, label: U.plural(arr.length, 'row'), blob, name: `${base(rec.name)}.csv` };
       }
       return fail();
     } catch (e) {
@@ -473,5 +474,42 @@
     return p;
   }
 
-  BCV.toolsConvert = { open, kindOf, convertOne, MATRIX, setBase };
+  // ---- a hand-in: a file the assignment will not take, made into one it will ---------------
+  // The submission flow asks what a file of the wrong type could become (its allowed_extensions
+  // against the targets above), offers it, and attaches the result under its new name. Targets
+  // that give several files (the pages of a PDF) are no hand-in; the service's targets count only
+  // with a key connected, and Word and PDF go through it when the switch says so, as in the popup.
+  const MANY = /pages|slides/i;
+  const ALIAS = { jpg: 'jpeg', jpeg: 'jpg' };
+  const MIME = { pdf: 'application/pdf', docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', txt: 'text/plain', html: 'text/html', csv: 'text/csv', json: 'application/json', xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' };
+  /** What the file could become among the extensions given: { to, ext, name, cloud, key } or null. */
+  async function plan(file, allowed) {
+    const kind = kindOf(file);
+    const want = new Set((allowed || []).map((e) => String(e).toLowerCase().replace(/^\./, '').trim()).filter(Boolean));
+    if (!kind || !want.size) return null;
+    const cc = await T.load(CC_KEY, null).catch(() => null);
+    const key = cc && typeof cc === 'object' && cc.key ? String(cc.key) : '';
+    const useCloud = !!key && cc.use !== false;
+    for (const [to, label, where] of MATRIX[kind].targets) {
+      if (MANY.test(label)) continue;
+      const own = to === 'jpeg' ? 'jpg' : to;
+      const ext = want.has(own) ? own : want.has(ALIAS[own]) ? ALIAS[own] : null;
+      if (!ext) continue;
+      if (where === 'cloud' && !key) continue;
+      return { to, ext, label, name: `${base(file.name)}.${ext}`, cloud: where === 'cloud' || (where === 'both' && useCloud), key };
+    }
+    return null;
+  }
+  /** The file, converted as plan() said: a File under its new name. Throws with the engine's own reason. */
+  async function convertToFile(file, p, { onStage = null } = {}) {
+    const kind = kindOf(file);
+    const how = kind === 'image' ? 'readAsDataURL' : kind === 'docx' || kind === 'pdf' ? 'readAsArrayBuffer' : kind === 'text' || kind === 'csv' || kind === 'json' ? 'readAsText' : null;
+    const data = how ? await readAs(file, how) : null;
+    const out = await convertOne({ id: T.uid('f'), name: file.name, size: file.size, kind, data, file, w: 0, h: 0 }, { to: p.to, q: 90, max: 0, download: false, cloud: !!p.cloud, key: p.key || '', onStage });
+    if (!out.ok) throw new Error(out.why || 'Could not convert this file.');
+    if (!out.blob) throw new Error('That conversion gives more than one file.');
+    return new File([out.blob], p.name, { type: MIME[p.ext] || out.blob.type || 'application/octet-stream' });
+  }
+
+  BCV.toolsConvert = { open, kindOf, convertOne, MATRIX, setBase, plan, convertToFile };
 })();

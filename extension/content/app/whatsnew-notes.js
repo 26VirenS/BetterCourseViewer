@@ -23,6 +23,12 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.25.0', date: '2026-09-19', notes: [
+      { kind: 'new', title: 'Convert to hand in', body: 'A file of the wrong type is offered as one the assignment takes, converted here.', icon: P.arrows },
+      { kind: 'fixed', title: 'One Away Refresh', body: 'Coming back to a tab shows one pill, never a stack of them.', icon: P.clock },
+      { kind: 'fixed', title: 'Tool grades', body: 'A grade a tool passes back shows on the assignment by itself, no reload needed.', icon: P.check },
+      { kind: 'fixed', title: 'Safari: Open works', body: 'After the toolbar button, a preview’s Open goes through without a reload.', icon: P.check },
+    ] },
     { version: '2.24.0', date: '2026-09-19', notes: [
       { kind: 'new', title: 'Flashcards, Quizlet style', body: 'A set page with Flashcards, Learn, Test and Match, stars, and paste to add cards.', icon: P.layers },
       { kind: 'improved', title: 'Simpler Tools', body: 'Every tool says what it does in a few plain words.', icon: P.tool },

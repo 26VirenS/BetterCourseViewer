@@ -693,9 +693,37 @@
     return { close, input };
   }
 
+  /** A question with two answers, or a note with one (cancelLabel null): resolves true for the main
+   *  button, false for Cancel, Escape, the scrim or the X. */
+  function askSheet({ label = '', title, note = '', okLabel = 'OK', cancelLabel = 'Cancel', danger = false, from = null } = {}) {
+    document.querySelector('.bcv-sheet-ov')?.remove();
+    return new Promise((resolve) => {
+      const ov = el('bcv-sheet-ov', null, { role: 'dialog', 'aria-label': label || title });
+      let settled = false;
+      const done = (v) => { if (settled) return; settled = true; ov.remove(); resolve(v); };
+      ov.addEventListener('click', (e) => { if (e.target === ov) done(false); });
+      ov.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.stopPropagation(); done(false); } });
+      const ok = btn(okLabel, { kind: danger ? 'dangerSolid' : 'primary', cls: 'bcv-ask__ok', onClick: () => done(true) });
+      ov.append(el('bcv-sheet bcv-sheet--prompt bcv-sheet--ask', [
+        el('bcv-sheet__head', [
+          el('bcv-sheet__titles', [text('bcv-sheet__title bcv-pretty', title)]),
+          h('button', { type: 'button', class: 'bcv-sheet__close', 'aria-label': 'Close', onclick: () => done(false) }, svg(IC.close, { size: 13, stroke: 'var(--bcv-ink2)', width: 2.3 })),
+        ]),
+        el('bcv-prompt bcv-ask', [
+          note ? text('bcv-ask__note bcv-pretty', note) : null,
+          el('bcv-prompt__btns', [h('span', { style: { flex: '1' } }), cancelLabel ? btn(cancelLabel, { cls: 'bcv-ask__cancel', onClick: () => done(false) }) : null, ok]),
+        ]),
+      ]));
+      document.body.append(ov);
+      if (from) morphFrom(ov.firstElementChild, from);
+      ov.tabIndex = -1;
+      setTimeout(() => ok.focus(), 30);
+    });
+  }
+
   BCV.ui = {
     svg, star, chev, el, text, tile, dot, card, row, label, h2, groupHead, badge, seg, search, switchEl, btn, iconbtn, chip, pill,
-    empty, emptyCard, loading, errorBox, hint, avatar, toast, menu, closeMenus, picker, colorMenu, COURSE_COLORS, fmtDay, datePop, dateField, promptSheet,
+    empty, emptyCard, loading, errorBox, hint, avatar, toast, menu, closeMenus, picker, colorMenu, COURSE_COLORS, fmtDay, datePop, dateField, promptSheet, askSheet,
     DAY, startOfDay, addDays, sameDay, dayDiff, startOfWeek, parse, MONTHS, MONTHS_LONG, DAYS, DAYS_LONG,
     fmtTime, fmtTimeLower, fmtShort, fmtLong, fmtDateComma, fmtAt, fmtAtUpper, fmtBy, dayTitle, fmtDow, fmtRecent, whenShort, plural,
     hexToRgb, rgba, palette, FALLBACK_COLORS, initials, enter, roll, morphFrom, reducedMotion,

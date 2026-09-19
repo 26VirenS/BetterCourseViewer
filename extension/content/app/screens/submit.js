@@ -181,6 +181,7 @@
     }
     const fileStatus = (f) => {
       const lead = `${f.size ? `${fmtSize(f.size)} · ` : ''}${f.source ? `from ${f.source} · ` : ''}`;
+      if (f.status === 'converting') return `${(f.stage || 'Converting').replace(/…$/, '')} from ${f.from}…`;
       if (f.status === 'uploading') return `${lead}uploading ${Math.round((f.progress || 0) * 100)}%`;
       if (f.status === 'uploaded') return `${lead}uploaded`;
       if (f.status === 'failed') return `${lead}upload failed — ${f.error || 'try again'}`;
@@ -196,7 +197,7 @@
         if (!f.objectUrl) f.objectUrl = URL.createObjectURL(f.file);
         BCV.viewer?.open({ local: true, display_name: f.name, filename: f.name, url: f.objectUrl, 'content-type': f.file.type || '', size: f.size }, { from: e?.currentTarget || null });
       } }) : null;
-      const row = U.el(`bcv-sb__file ${f.status === 'failed' ? 'is-failed' : ''}`, [
+      const row = U.el(`bcv-sb__file ${f.status === 'failed' ? 'is-failed' : ''} ${f.status === 'converting' ? 'is-converting' : ''}`, [
         h('span', { class: 'bcv-sb__kind', text: kindOf(f.name) }),
         U.el('bcv-sb__fbody', [U.text('bcv-sb__fname bcv-ellip', f.name), sub, bar]),
         preview,
@@ -210,16 +211,41 @@
       };
       return row;
     }
-    /** Every pick is checked against the assignment's own allowed_extensions before it is listed. */
-    function addFiles(fileList) {
+    /** Every pick is checked against the assignment's own allowed_extensions before it is listed.
+     *  A file of another type is offered as what it can become (the converter's own engines: a Word
+     *  file as a PDF, a text file as a PDF, a photo as a JPEG), converted here and attached under
+     *  its new name; one that nothing here can turn into an accepted type is refused, and a sheet
+     *  says so. The sheets come one at a time, so a batch waits on each answer. */
+    async function addFiles(fileList) {
       let added = 0;
       for (const file of Array.from(fileList || [])) {
-        if (allowedExt.length && !allowedExt.includes(extOf(file.name))) {
-          U.toast(`“${file.name}” isn't an accepted type here — this assignment takes ${extWords()}.`, { error: true, ms: 4200 });
-          continue;
-        }
+        if (!ctx.alive()) return;
         if (!file.size) {
           U.toast(`“${file.name}” is empty.`, { error: true });
+          continue;
+        }
+        if (allowedExt.length && !allowedExt.includes(extOf(file.name))) {
+          const p = await (BCV.toolsConvert?.plan?.(file, allowedExt) || Promise.resolve(null)).catch(() => null);
+          if (!p) {
+            await U.askSheet({ title: `“${file.name}” can’t be attached`, note: `This assignment only takes ${extWords()}. A ${(extOf(file.name) || 'file').toUpperCase()} file can’t be turned into any of those here.`, okLabel: 'OK', cancelLabel: null });
+            continue;
+          }
+          const yes = await U.askSheet({ title: `Convert to ${p.ext.toUpperCase()}?`, note: `This assignment only takes ${extWords()}. “${file.name}” can be converted ${p.cloud ? 'through CloudConvert' : 'on this device'} and attached as “${p.name}”.`, okLabel: `Convert to ${p.ext.toUpperCase()}`, cancelLabel: 'Cancel' });
+          if (!yes || !ctx.alive()) continue;
+          if (st.files.some((x) => x.name === p.name)) { U.toast(`“${p.name}” is already attached.`, { error: true }); continue; }
+          const f = { id: ++seq, name: p.name, size: null, file: null, from: file.name, stage: '', status: 'converting', progress: 0, fileId: null };
+          st.files.push(f);
+          st.tab = 'file';
+          draw();
+          try {
+            const out = await BCV.toolsConvert.convertToFile(file, p, { onStage: (stage) => { f.stage = stage; f.paint?.(); } });
+            if (!ctx.alive()) return;
+            Object.assign(f, { file: out, size: out.size, status: 'ready', stage: '' });
+          } catch (e) {
+            st.files = st.files.filter((x) => x !== f);
+            U.toast(`Could not convert “${file.name}”: ${e?.message || e}`, { error: true, ms: 5000 });
+          }
+          draw();
           continue;
         }
         if (st.files.some((f) => f.file && f.name === file.name && f.size === file.size)) continue;
@@ -369,7 +395,7 @@
 
     // ---- footer + readiness --------------------------------------------------------
     function readiness() {
-      if (st.tab === 'file') return st.files.length ? { ok: true, note: lateNote() } : { ok: false, note: 'Attach at least one file to submit.' };
+      if (st.tab === 'file') return st.files.some((f) => f.status === 'converting') ? { ok: false, note: 'Wait for the conversion to finish.' } : st.files.length ? { ok: true, note: lateNote() } : { ok: false, note: 'Attach at least one file to submit.' };
       if (st.tab === 'text') return st.text.trim() ? { ok: true, note: lateNote() } : { ok: false, note: 'Write your response to submit.' };
       return st.link?.url ? { ok: true, note: lateNote() } : { ok: false, note: 'Pick a tool or enter a link to submit.' };
     }

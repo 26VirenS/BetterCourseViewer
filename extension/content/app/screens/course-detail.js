@@ -127,12 +127,13 @@
     const nativeSubmit = (a.submission_types || []).some((t) => ['online_upload', 'online_text_entry', 'online_url'].includes(t));
     const canvasOnly = !nativeSubmit && (a.submission_types || []).some((t) => ['media_recording', 'student_annotation'].includes(t));
     const attemptsLeft = !(a.allowed_attempts > 0) || (s.attempt || 0) < a.allowed_attempts;
-    const status = s.excused ? 'Excused' : s.workflow_state === 'graded' ? 'Graded' : s.submitted_at ? (s.late ? 'Submitted late' : 'Submitted') : s.missing ? 'Missing' : 'Not submitted';
-    const graded = s.workflow_state === 'graded' && s.score !== null && s.score !== undefined;
+    const statusOf = (x) => (x.excused ? 'Excused' : x.workflow_state === 'graded' ? 'Graded' : x.submitted_at ? (x.late ? 'Submitted late' : 'Submitted') : x.missing ? 'Missing' : 'Not submitted');
+    const gradedOf = (x) => x.workflow_state === 'graded' && x.score !== null && x.score !== undefined;
     // Canvas posts a grade separately from marking it: posted_at === null means the instructor is
     // holding it back, and a number shown then is a number the student is not supposed to have.
-    const posted = graded && s.posted_at !== null;
-    const held = graded && s.posted_at === null;
+    const postedOf = (x) => gradedOf(x) && x.posted_at !== null;
+    const heldOf = (x) => gradedOf(x) && x.posted_at === null;
+    const status = statusOf(s), posted = postedOf(s), held = heldOf(s);
     const feedback = (s.submission_comments || []).length || Object.keys(s.rubric_assessment || {}).length;
     // the phone draws the item page its own way (the iPhone mockup)
     if (BCV.phone?.active()) return BCV.phone.assignment(ctx, shell, { a, s, types, available, isTool, toolNewTab, toolLaunch, nativeSubmit, canvasOnly, attemptsLeft, status, posted, held, slot, fill });
@@ -145,6 +146,32 @@
     const block = nativeSubmit && !isTool ? await BCV.screens.submit.render(ctx, c, { embed: true, a, sub: s, back }) : null;
     if (!ctx.alive()) return b;
     const toBlock = (behavior = 'smooth') => block?.scrollIntoView({ behavior, block: 'start' });
+    // The mark beside the title: the way in to what is behind it. Ungraded, no chip at all; a score
+    // Canvas has not posted shows no number, because an unposted 0 reads exactly like a real one.
+    const gradeChip = (x) => (postedOf(x) ? h('button', { type: 'button', class: 'bcv-detail__grade', title: 'Feedback, attempts and comments', onclick: () => openMark(ctx, c, a, x) }, [
+      U.el('bcv-detail__gradev', [
+        h('span', { class: 'bcv-detail__gradescore', text: store.fmtPts(x.score) }),
+        h('span', { class: 'bcv-detail__gradeof', text: `/ ${a.points_possible ?? '—'}` }),
+      ]),
+      h('div', { class: 'bcv-detail__gradeside' }, [
+        U.text('bcv-detail__gradepc', a.points_possible ? `${Math.round((Number(x.score) / Number(a.points_possible)) * 100)}%` : (x.grade ? String(x.grade) : ''), 'span'),
+        U.text('bcv-detail__gradewhen', x.graded_at ? U.fmtAt(x.graded_at) : 'Marked', 'span'),
+      ]),
+      U.chev(),
+    ]) : heldOf(x) ? h('button', { type: 'button', class: 'bcv-detail__grade bcv-detail__grade--held', title: 'Feedback, attempts and comments', onclick: () => openMark(ctx, c, a, x) }, [
+      h('div', { class: 'bcv-detail__gradeside' }, [
+        U.text('bcv-detail__gradepc', 'Not yet posted', 'span'),
+        U.text('bcv-detail__gradewhen', 'Your instructor has not released it', 'span'),
+      ]),
+      U.chev(),
+    ]) : null);
+    const titleEl = h('h2', { class: 'bcv-detail__title bcv-pretty', text: a.name });
+    const headEl = U.el('bcv-detail__head', [titleEl, gradeChip(s)]);
+    const sideLine = (x) => [
+      h('span', { class: 'bcv-stat__value', text: gradedOf(x) ? `${store.fmtPts(x.score)} / ${a.points_possible ?? '—'}` : '—' }),
+      U.badge(statusOf(x), statusOf(x) === 'Graded' ? 'green' : /Missing|Not/.test(statusOf(x)) ? 'red' : /late/.test(statusOf(x)) ? 'orange' : ''),
+    ];
+    const sideLineEl = h('div', { style: { display: 'flex', alignItems: 'baseline', gap: '10px', flexWrap: 'wrap' } }, sideLine(s));
     // replaceChildren() would print a literal "null" for a missing block, so drop them first
     main.replaceChildren(...[
       backBtn(app, back.href, back.label),
@@ -154,26 +181,7 @@
         // handed in, and the thread it came back on. Ungraded, the chip is not there at all and the
         // title has the row to itself; a score Canvas has not posted shows no number, because an
         // unposted 0 reads exactly like a real one.
-        U.el('bcv-detail__head', [
-          h('h2', { class: 'bcv-detail__title bcv-pretty', text: a.name }),
-          posted ? h('button', { type: 'button', class: 'bcv-detail__grade', title: 'Feedback, attempts and comments', onclick: () => openMark(ctx, c, a, s) }, [
-            U.el('bcv-detail__gradev', [
-              h('span', { class: 'bcv-detail__gradescore', text: store.fmtPts(s.score) }),
-              h('span', { class: 'bcv-detail__gradeof', text: `/ ${a.points_possible ?? '—'}` }),
-            ]),
-            h('div', { class: 'bcv-detail__gradeside' }, [
-              U.text('bcv-detail__gradepc', a.points_possible ? `${Math.round((Number(s.score) / Number(a.points_possible)) * 100)}%` : (s.grade ? String(s.grade) : ''), 'span'),
-              U.text('bcv-detail__gradewhen', s.graded_at ? U.fmtAt(s.graded_at) : 'Marked', 'span'),
-            ]),
-            U.chev(),
-          ]) : (held ? h('button', { type: 'button', class: 'bcv-detail__grade bcv-detail__grade--held', title: 'Feedback, attempts and comments', onclick: () => openMark(ctx, c, a, s) }, [
-            h('div', { class: 'bcv-detail__gradeside' }, [
-              U.text('bcv-detail__gradepc', 'Not yet posted', 'span'),
-              U.text('bcv-detail__gradewhen', 'Your instructor has not released it', 'span'),
-            ]),
-            U.chev(),
-          ]) : null),
-        ]),
+        headEl,
         meta([['Due', a.due_at ? U.fmtAt(a.due_at) : 'No due date'], ['Points', a.points_possible ?? '—'], ['Submitting', types], ['Available', available], ['Attempts', attemptsFact(a, s)]]),
         U.el('bcv-detail__actions', [
           isTool ? (toolNewTab ? U.btn('Open the tool', { kind: 'primary', icon: IC.external, iconColor: '#fff', onClick: () => window.open(toolLaunch, '_blank', 'noopener') }) : null)
@@ -200,12 +208,39 @@
       block,
     ].filter(Boolean));
     if (block && route.params.get('bcv') === 'submit') for (const ms of [80, 600]) setTimeout(() => toBlock('auto'), ms); // opened to hand in: land on the block (again once Canvas's own page has finished loading under us)
+    // A tool's grade lands behind the page's back: the tool passes it back after its launch (some
+    // only when the student opens the assignment), and a page drawn a moment earlier would keep
+    // showing nothing. So the submission is asked for again once the tool has loaded and then for a
+    // while — every few seconds at first, then every quarter minute for three minutes, while the
+    // tab is looked at — and the mark and the side card are drawn again when it changes, in place,
+    // without touching the tool's frame.
+    if (isTool && !toolNewTab) {
+      let shown = s, tries = 0, timer = 0, started = false;
+      const changed = (x) => !!x && (x.score !== shown.score || x.workflow_state !== shown.workflow_state || x.posted_at !== shown.posted_at || x.grade !== shown.grade);
+      const poll = async () => {
+        timer = 0;
+        if (!ctx.alive()) return;
+        if (document.visibilityState === 'visible') {
+          const fresh = await store.submission(c.id, route.arg, { force: true }).catch(() => null);
+          if (!ctx.alive()) return;
+          if (changed(fresh)) {
+            shown = fresh;
+            headEl.replaceChildren(titleEl, gradeChip(fresh));
+            sideLineEl.replaceChildren(...sideLine(fresh));
+            store.invalidateGrades().catch(() => {}); // every other screen with a score asks again
+          }
+          tries++;
+        }
+        if (tries < 14) timer = setTimeout(poll, tries < 3 ? 4000 : 15000);
+      };
+      const start = () => { if (started) return; started = true; timer = setTimeout(poll, 2500); };
+      main.querySelector('.bcv-frame--doc')?.addEventListener('load', start);
+      setTimeout(start, 8000); // a frame that never says it loaded still gets its looks
+      ctx.onLeave?.(() => clearTimeout(timer));
+    }
     // side: submission + rubric
     side.append(h('div', {}, [U.label('Submission'), U.card(U.el('bcv-detail', [
-      h('div', { style: { display: 'flex', alignItems: 'baseline', gap: '10px', flexWrap: 'wrap' } }, [
-        h('span', { class: 'bcv-stat__value', text: s.workflow_state === 'graded' && s.score !== null && s.score !== undefined ? `${store.fmtPts(s.score)} / ${a.points_possible ?? '—'}` : '—' }),
-        U.badge(status, status === 'Graded' ? 'green' : /Missing|Not/.test(status) ? 'red' : /late/.test(status) ? 'orange' : ''),
-      ]),
+      sideLineEl,
       meta([['Submitted', s.submitted_at ? U.fmtAt(s.submitted_at) : null], ['Grade', s.grade && String(s.grade) !== String(s.score) ? s.grade : null], ['Graded', s.graded_at ? U.fmtAt(s.graded_at) : null], ['Attempt', s.attempt || null]]),
       (s.submission_comments || []).length ? h('div', {}, [U.label('Comments'), ...s.submission_comments.map((cm) => U.el('bcv-comment', [U.el('bcv-comment__head', [U.text('bcv-comment__author', cm.author_name || cm.author?.display_name || 'Comment', 'span'), U.text('bcv-comment__date', U.fmtAt(cm.created_at), 'span')]), U.text('bcv-comment__body', cm.comment || '')]))]) : null,
     ]), 'bcv-card--22')]));
