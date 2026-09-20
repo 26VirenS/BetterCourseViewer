@@ -2817,7 +2817,7 @@ try {
   await page.waitForFunction(() => !document.querySelector('#bcv-whatsnew'), null, { timeout: 5000 });
   check(!(await page.$('#bcv-whatsnew')), 'Escape closes it too');
 
-  // ---- the page after install: black, a splash, an arrow to the puzzle piece, then where to go ----
+  // ---- the page after install: black, a splash, then the one thing to do -------------------------
   console.log('setup page');
   const setup = await context.newPage();
   const sText = (sel) => setup.$eval(sel, (e) => (e.innerText || e.textContent).replace(/\s+/g, ' ').trim()).catch(() => null);
@@ -2827,21 +2827,16 @@ try {
   check(splashSeen.word === 'Simpl.' && splashSeen.bg === 'rgb(0, 0, 0)' && splashSeen.mark && !splashSeen.card, `the page after install opens black, on the Simpl. splash (${JSON.stringify(splashSeen)})`);
   await setup.waitForTimeout(700);
   await setup.screenshot({ path: join(out, '32-setup-splash.png') });
-  await setup.waitForSelector('.splash__stage[data-stage="pin"]', { timeout: 6000 });
-  const pinAt = Date.now();
-  await setup.waitForTimeout(1500); // the arrow draws itself
-  const pinArrow = await setup.evaluate(() => { const p = document.querySelector('.splash__stage[data-stage="pin"] .splash__line'); if (!p) return null; const r = p.getBoundingClientRect(); return { right: Math.round(r.right), top: Math.round(r.top), w: innerWidth, drawn: getComputedStyle(p).strokeDashoffset, head: !!document.querySelector('.splash__head'), btnHidden: document.querySelector('.splash__stage[data-stage="pin"] .splash__btn').hidden, stages: document.querySelectorAll('.splash__stage:not(.is-leaving)').length }; });
-  check((await sText('.splash__stage[data-stage="pin"] .splash__title')) === 'Press the puzzle piece' && /press the pin next to Simpl Courses/.test(await sText('.splash__stage[data-stage="pin"] .splash__hint')) && !!pinArrow && pinArrow.right > pinArrow.w - 130 && pinArrow.right < pinArrow.w - 70 && pinArrow.top < 30 && pinArrow.drawn === '0px' && pinArrow.head && pinArrow.btnHidden && pinArrow.stages === 1, `the splash gives way to an arrow drawn straight up to just under the puzzle piece — a hundred pixels in from the corner, where Chrome keeps it, never the corner itself — with what to press and the pin, and no button yet (${JSON.stringify(pinArrow)})`);
-  await setup.screenshot({ path: join(out, '32b-setup-pin.png') });
-  await setup.waitForFunction(() => !document.querySelector('.splash__stage[data-stage="pin"] .splash__btn').hidden, null, { timeout: 8000 });
-  const pinWait = Date.now() - pinAt;
-  check(pinWait >= 3200 && (await sText('.splash__stage[data-stage="pin"] .splash__btn')) === 'Continue', `Continue comes in after four seconds (${pinWait} ms)`);
-  await setup.keyboard.press('Enter');
-  await setup.waitForSelector('.splash__stage[data-stage="go"]', { timeout: 5000 });
-  await setup.waitForFunction(() => !document.querySelector('.splash__stage[data-stage="go"] .splash__btn').hidden && document.querySelectorAll('.splash__stage').length === 1, null, { timeout: 5000 });
-  check((await sText('.splash__stage[data-stage="go"] .splash__title')) === 'Open your Canvas' && /Go to your school’s Canvas page and press the Simpl Courses button\. Setup runs there\./.test((await sText('.splash__stage[data-stage="go"] .splash__hint')).replace(/'/g, '’')) && (await sText('.splash__stage[data-stage="go"] .splash__btn')) === 'Got it', 'Enter continues: then where to go — open your Canvas and press the Simpl Courses button — with Got it');
+  await setup.waitForSelector('.splash__stage[data-stage="go"]', { timeout: 6000 });
+  await setup.waitForFunction(() => document.querySelectorAll('.splash__stage').length === 1, null, { timeout: 5000 });
+  const goSeen = await setup.evaluate(() => ({ title: document.querySelector('.splash__title')?.textContent, hint: document.querySelector('.splash__hint')?.textContent, buttons: document.querySelectorAll('button, a').length, note: !!document.querySelector('.splash__note'), arrow: !!document.querySelector('.splash__arrow'), kicker: !!document.querySelector('.splash__kicker') }));
+  check(goSeen.title === 'Open your Canvas' && goSeen.hint === 'Setup will begin there.' && goSeen.buttons === 0 && !goSeen.note && !goSeen.arrow && !goSeen.kicker, `the splash gives way to the one thing to do — Open your Canvas, and under it that setup will begin there — and nothing to press: no button, no arrow, no aside (Safari's line about allowing the site is Safari's alone) (${JSON.stringify(goSeen)})`);
   await setup.screenshot({ path: join(out, '32c-setup-go.png') });
   check((await sw.evaluate(async () => (await self.BCV.api.storage.local.get('setup:offered'))['setup:offered'])) === true, 'and the page marks itself offered, so it does not open again');
+  // the setup beginning on a Canvas tab (the card's note in storage) is the end of the page: it closes itself
+  const closed = setup.waitForEvent('close', { timeout: 6000 }).then(() => true, () => false);
+  await sw.evaluate(() => self.BCV.api.storage.local.set({ 'setup:begun': Date.now() }));
+  check(await closed, 'and once the setup has begun on a Canvas tab, the page closes itself');
   await setup.close().catch(() => {});
 
   // ---- the account panel ----------------------------------------------------------------------------------

@@ -23,6 +23,10 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.43.0', date: '2026-09-20', notes: [
+      { kind: 'new', title: 'Setup finds Canvas', body: 'Install, open your Canvas, and setup begins there — at any address your school uses.', icon: P.sparkle },
+      { kind: 'improved', title: 'A shorter first page', body: 'The page after install just says Open your Canvas, and closes itself once setup begins.', icon: P.steps },
+    ] },
     { version: '2.42.0', date: '2026-09-20', notes: [
       { kind: 'improved', title: 'Groups open faster', body: 'The Groups list and a group’s page land sooner; activity fills in under the front page.', icon: P.clock },
       { kind: 'new', title: 'Reload a tool', body: 'A tool’s full-screen bar has Reload, for a sign-in that went round in circles.', icon: P.arrows },

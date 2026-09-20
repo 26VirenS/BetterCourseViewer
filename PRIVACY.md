@@ -1,6 +1,6 @@
 # Simpl Courses privacy policy
 
-_Last updated: 10 September 2026_
+_Last updated: 20 September 2026_
 
 Simpl Courses is a browser extension that redraws the Canvas learning-management system in your browser. It has no servers, no accounts and no analytics. This page describes exactly what the extension touches and where that data goes.
 
@@ -31,10 +31,11 @@ Everything below lives in the extension's local storage in your browser. **Reset
 ## Permissions, and why each is needed
 
 - **Canvas sites (`*.instructure.com`)** — to draw the new interface on Canvas pages and read Canvas's API for them.
-- **Optional access to a site you choose** — schools often host Canvas at their own address (for example `canvas.university.edu`). The extension asks for that one site only when you click **Enable on this site**, and it can be revoked from the browser's extension settings.
+- **Access to every site (the Chrome and Edge build)** — schools often host Canvas at their own address (for example `canvas.university.edu`), which cannot be known in advance. So the Chrome build may look at any page, and on every page it runs one short script that reads the page's own markup to tell whether it is a Canvas page — Canvas's page wrapper, its stylesheet bundle, its navigation. That is all it does there: it keeps nothing, sends nothing anywhere and changes nothing on a page that is not Canvas. When it finds a Canvas page you are signed in to (or Canvas's sign-in page), it turns the interface on for that site, the same as **Enable on this site** does. Chrome's *Site access* setting for the extension can narrow this to sites you choose.
+- **Optional access to a site you choose (the Safari and Firefox builds)** — these builds keep to Canvas's own domain plus the sites you add. The extension asks for a site only when you click **Enable on this site**, and it can be revoked from the browser's extension settings.
 - **`api.anthropic.com` / `api.openai.com`** — for the smart panel to reach the provider you chose with your own key. Unused unless you add a key.
 - **`storage`** — to keep the settings and cache described above in your browser.
-- **`scripting`** — to register the interface on a site you added with **Enable on this site**.
+- **`scripting`** — to register the interface on a site recognised as Canvas, or one you added with **Enable on this site**.
 - **`activeTab`** — so the toolbar popup can tell which site is open and whether the extension is enabled there.
 
 ## Changes and contact

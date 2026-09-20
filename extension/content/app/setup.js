@@ -92,6 +92,8 @@
       closing: false,
     };
     settleSteps();
+    // a note for the page after install (setup/setup.html), which closes itself once the setup is under way here
+    BCV.api.storage.local.set({ 'setup:begun': Date.now() }).catch(() => {});
     const host = h('div', { id: 'bcv-setup' });
     host.setAttribute('data-theme', app.isDark() ? 'dark' : 'light');
     const shadow = host.attachShadow({ mode: 'open' });

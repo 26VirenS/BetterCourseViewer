@@ -42,6 +42,12 @@ if (typeof importScripts === 'function' && !self.BCV?.settings) {
       case 'inject': // a bundled library, into the tab that asks for it (the Tools tab's file converter)
         reply(injectVendor(sender, msg.files));
         return true;
+      case 'canvasSeen': // the Chrome build's sniffer found Canvas on a site of the school's own
+        reply(canvasSeen(sender, msg));
+        return true;
+      case 'closeSetupTab': // the page after install, once the setup is under way on a Canvas tab
+        reply(sender?.tab?.id != null ? api.tabs.remove(sender.tab.id).then(() => ({ ok: true })) : { ok: false });
+        return true;
       default:
         return false;
     }
@@ -127,11 +133,12 @@ if (typeof importScripts === 'function' && !self.BCV?.settings) {
     return 'bcv-' + origin.replace(/[^a-z0-9]/gi, '-');
   }
 
-  /** Build registerContentScripts entries by mirroring the manifest. */
+  /** Build registerContentScripts entries by mirroring the manifest (the interface's scripts: the
+   *  Chrome build's sniffer, content/sniff.js, already runs everywhere and is not one of them). */
   function scriptsFor(origin) {
     const manifest = api.runtime.getManifest();
     const match = `${origin}/*`;
-    return (manifest.content_scripts || []).map((cs, i) => ({
+    return (manifest.content_scripts || []).filter((cs) => !(cs.js || []).includes('content/sniff.js')).map((cs, i) => ({
       id: `${scriptIdFor(origin)}-${i}`,
       matches: [match],
       js: cs.js || [],
@@ -189,6 +196,28 @@ if (typeof importScripts === 'function' && !self.BCV?.settings) {
     const settings = await S.get();
     await S.update({ domains: settings.domains.filter((d) => d !== origin) });
     return { ok: true };
+  }
+
+  /** The Chrome build found Canvas on a site of the school's own (content/sniff.js, which runs on every
+   *  page there and reports a Canvas page once): the site is enabled — its scripts registered, as Enable
+   *  on this site does from the toolbar — and, signed in, the tab is loaded again so the interface (and
+   *  the setup, until it is done) comes up on it now. Canvas's sign-in page is enabled but left as it
+   *  is: the page after signing in runs the interface. Canvas's own domain is built in and never asks. */
+  const seenTabs = new Map(); // tab id → when it was last loaded again for this, so a page that keeps asking is not loaded round and round
+  async function canvasSeen(sender, msg) {
+    const tabId = sender?.tab?.id;
+    let origin = null;
+    try { origin = new URL(sender?.tab?.url || sender?.url || msg?.origin).origin; } catch { return { ok: false }; }
+    if (!/^https?:$/.test(new URL(origin).protocol)) return { ok: false };
+    if (/\.instructure\.com$/i.test(new URL(origin).hostname)) return { ok: true, builtIn: true };
+    const r = await registerDomain(origin);
+    if (r && r.ok === false) return r;
+    if (!msg?.signedIn || tabId == null) return { ok: true, origin, reloaded: false };
+    const last = seenTabs.get(tabId) || 0;
+    if (Date.now() - last < 30 * 1000) return { ok: true, origin, reloaded: false };
+    seenTabs.set(tabId, Date.now());
+    try { await api.tabs.reload(tabId); } catch { /* the tab went */ }
+    return { ok: true, origin, reloaded: true };
   }
 
   async function listRegistered() {

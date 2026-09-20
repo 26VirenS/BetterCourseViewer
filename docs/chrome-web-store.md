@@ -42,7 +42,7 @@ SMART PANEL (optional) · add your own Claude or ChatGPT key and the panel reads
 
 HONEST BY DESIGN · every number on screen comes from Canvas's API; no control does anything the Canvas student API cannot; course colours, nicknames and favourites are yours from Canvas. Light and dark appearance, Reduce Motion respected.
 
-Works on every *.instructure.com site out of the box. If your school uses its own Canvas address, open it and click "Enable on this site" in the toolbar popup.
+Sets itself up: install it, open your Canvas, and the setup begins there — on every *.instructure.com site and on a school's own Canvas address alike (the extension recognises a Canvas page by its own markup, and does nothing on any other page).
 
 No accounts, no analytics, no servers. Open source: https://github.com/26VirenS/BetterCourseViewer
 ```
@@ -72,9 +72,9 @@ Replaces the interface of the Canvas learning-management system on the user's ow
 | Permission | Justification |
 | --- | --- |
 | `storage` | Keeps the user's settings, a short-lived cache of Canvas API responses, and unsent drafts locally in the browser. |
-| `scripting` | Registers the extension's content scripts on a Canvas site the user adds with "Enable on this site" (schools host Canvas at their own domains). |
+| `scripting` | Registers the extension's interface on a Canvas site once it is recognised as one (schools host Canvas at their own domains), and on a site the user adds with "Enable on this site". |
 | `activeTab` | Lets the toolbar popup read the current tab's address to show whether the extension is enabled on that site and offer to enable it. |
-| Host permissions (one field for all of them) | `*://*.instructure.com/*` is Canvas's hosted domain: the extension draws its interface on those pages and calls Canvas's REST API with the user's existing session. |
+| Host permissions (one field for all of them) | Schools host Canvas at domains of their own choosing (canvas.university.edu, learn.college.edu), which cannot be listed in advance, so the extension may look at any page. On every page it runs one small script (content/sniff.js, 40 lines) that reads the page's own markup for Canvas's — Canvas's page wrapper, its stylesheet bundle, its navigation — and does nothing else: it keeps nothing, sends nothing anywhere, and touches no page that is not Canvas. On a Canvas page the user is signed in to (or Canvas's sign-in page) it turns the interface on for that site. The interface itself runs only on Canvas sites: *.instructure.com (Canvas's hosted domain) and the sites recognised or added this way, where it draws its interface and calls Canvas's REST API with the user's existing session. |
 
 **Remote code:** select **No, I am not using remote code** (the justification box only applies to "Yes"; all code ships inside the package).
 
@@ -95,7 +95,7 @@ Then certify all three statements (no sale, no use unrelated to the single purpo
 
 ## 5. Submit
 
-Press **Submit for review**. Leave "publish automatically after review" ticked. Review usually takes from a few hours to a few days; the optional broad host permission (`*://*/*`) can put it in the longer queue, which is why the justification above spells out that it is optional and one-site-at-a-time. If a reviewer asks, the answers in section 3 are the ones to give.
+Press **Submit for review**. Leave "publish automatically after review" ticked. Review usually takes from a few hours to a few days; the broad host permission (`*://*/*`, which is what lets the extension find a school's own Canvas address by itself) puts it in the longer queue, which is why the justification above spells out exactly what runs on other sites — one 40-line script that reads the page's markup and does nothing else — and points at it by file. If a reviewer asks, the answers in section 3 are the ones to give; `content/sniff.js` in the package is short enough to read in full.
 
 After approval, the item's ID is in the dashboard URL and on the item page (a 32-letter string). Keep it for the next section.
 
@@ -124,4 +124,6 @@ The same Chrome zip loads in Microsoft Edge and can be submitted to Edge Add-ons
 
 ## First run
 
-Installing opens `setup/setup.html` in a new tab: a short page that says how to start (open your Canvas, press the toolbar button, press Set up). The toolbar popup's **Set up** button requests permission for the current tab's origin alone (from the click), then opens the guided setup as a card over that Canvas page, so the listing's justification for optional host permissions can point at it.
+Installing opens `setup/setup.html` in a new tab: a black page with the splash and then the one thing to do — *Open your Canvas. Setup will begin there.* — and nothing to press. The Chrome build finds Canvas by itself: `content/sniff.js` runs on every page (the broad host permission above), recognises a Canvas page by its markup, and the background enables that site and loads the page again; the guided setup then opens over it (it opens over every signed-in Canvas page until it is done), and the page after install closes itself. On `*.instructure.com` the interface is built in, so the setup opens on the first page there without the sniffer. The toolbar popup's **Set up** button is the by-hand way in, for a site Chrome's *Site access* setting keeps the sniffer off: it registers the site (asking for it from the click when it is not allowed already) and opens the setup over the page.
+
+The Chrome manifest itself comes from `scripts/chrome-manifest.py` (run by `scripts/package.sh`): it drops the Firefox/Safari keys, sets `host_permissions` to `*://*/*`, and adds the sniffer as a content script that runs on every site but `*.instructure.com`. `node scripts/dev/chrome-setup-test.mjs` loads that build in Chromium and checks the whole first run against the mock Canvas at a localhost address the manifest does not name.

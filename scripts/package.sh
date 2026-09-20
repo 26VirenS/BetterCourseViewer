@@ -4,10 +4,13 @@
 #   simpl-courses-<version>.zip         the extension/ folder as-is (what the Safari
 #                                            converter reads; also loads in Firefox)
 #   simpl-courses-chrome-<version>.zip  the Chrome / Edge build: the same files with the
-#                                            manifest trimmed to what Chrome's Manifest V3
-#                                            accepts (a service worker only, no Firefox/Safari
-#                                            keys). This is the file the Chrome Web Store
-#                                            developer dashboard takes.
+#                                            manifest rewritten by scripts/chrome-manifest.py —
+#                                            trimmed to what Chrome's Manifest V3 accepts (a
+#                                            service worker only, no Firefox/Safari keys), and
+#                                            given the run of every site plus the small script
+#                                            that finds Canvas on its own (content/sniff.js).
+#                                            This is the file the Chrome Web Store developer
+#                                            dashboard takes.
 #
 # Needs: zip, python3 (both ship with macOS's command-line tools and with GitHub's runners).
 set -euo pipefail
@@ -25,23 +28,7 @@ rm -f "$GENERIC" "$CHROME"
 STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT
 cp -R "$ROOT/extension/." "$STAGE/"
-python3 - "$STAGE/manifest.json" <<'PY'
-import json, sys
-path = sys.argv[1]
-m = json.load(open(path))
-bg = m.get('background', {})
-bg.pop('scripts', None)      # Firefox / older-Safari background page; Chrome MV3 runs the service worker
-bg.pop('persistent', None)
-m['background'] = bg
-m.pop('author', None)        # not a Chrome key (it would only produce an "unrecognized key" warning)
-# Safari draws the toolbar button from the icon's alpha channel, so the source manifest points it at the
-# mark-only glyphs; Chrome shows the toolbar icon in colour, so the Chrome build uses the blue tile there.
-m.setdefault('action', {})['default_icon'] = {s: f'icons/icon-{s}.png' for s in ('48', '96', '128')}
-assert len(m['description']) <= 132, 'the Chrome Web Store uses the manifest description as the summary (132 characters max)'
-with open(path, 'w') as f:
-    json.dump(m, f, indent=2)
-    f.write('\n')
-PY
+python3 "$ROOT/scripts/chrome-manifest.py" "$STAGE/manifest.json"
 (cd "$STAGE" && zip -qr "$CHROME" . -x '.DS_Store' '*/.DS_Store')
 
 echo "✅ $GENERIC"
