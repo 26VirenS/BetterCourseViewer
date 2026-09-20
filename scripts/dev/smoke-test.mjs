@@ -3026,7 +3026,7 @@ try {
   check((await toolSub()) === 'Scientific · the keyboard works too' && (await page.$$('.bcv-tool[data-tool="calc"] .bcv-calc__key')).length === 49 && (await page.$eval('.bcv-tool[data-tool="calc"] .bcv-calc', (e) => e.classList.contains('bcv-calc--big') && document.activeElement === e)) && (await texts('.bcv-tool[data-tool="calc"] .bcv-calc__display'))[0] === '0', 'the calculator is a tool of its own: the scientific keys, larger, with the focus on them');
   await page.keyboard.type('7*6');
   await page.keyboard.press('Enter');
-  check((await texts('.bcv-tool[data-tool="calc"] .bcv-calc__display'))[0] === '42' && (await page.$eval('.bcv-tool[data-tool="calc"] .bcv-calc__key[data-key="7"]', (e) => Math.round(e.getBoundingClientRect().height))) === 44, 'typed on the keyboard, 7 × 6 Enter shows 42 on keys 44 tall');
+  check((await texts('.bcv-tool[data-tool="calc"] .bcv-calc__display'))[0] === '42' && (await page.$eval('.bcv-tool[data-tool="calc"] .bcv-calc__key[data-key="7"]', (e) => Math.round(e.getBoundingClientRect().height))) === 54 && (await page.$eval('.bcv-tool[data-tool="calc"]', (e) => Math.round(e.getBoundingClientRect().width))) === 720, 'typed on the keyboard, 7 × 6 Enter shows 42, on keys 54 tall in a popup 720 wide');
   await shot(page, '19b-calculator-tool');
   await closeTool();
   // the file converter: the source kind decides the targets; images on the canvas, a PDF from an engine loaded when first needed
@@ -3657,7 +3657,7 @@ try {
   const q2 = await quickOpen('calc', 262);
   const calcKey = async (k) => { await page.click(`.bcv-calc__key[data-key="${k}"]`); };
   const calcShown = () => texts('.bcv-calc__display').then((t) => t[0]);
-  check(q2.w === 408 && q2.h === 262 && q2.radius === '18px' && q2.name === 'Calc' && q2.btnGone && (await page.$$('.bcv-calc__key')).length === 49 && (await calcShown()) === '0' && (await page.$$eval('.bcv-calc__row:first-child .bcv-calc__key', (els) => els.map((e) => e.textContent))).join(' ') === '( ) mc m+ m− mr AC +/− % ÷' && (await page.$eval('.bcv-calc__key[data-key="/"]', (e) => getComputedStyle(e).backgroundColor)) === 'rgb(255, 159, 10)' && (await page.$eval('.bcv-calc__key[data-key="7"]', (e) => getComputedStyle(e).backgroundColor)) === 'rgb(92, 92, 95)' && (await page.$eval('.bcv-calc__key[data-key="ac"]', (e) => getComputedStyle(e).backgroundColor)) === 'rgb(165, 165, 165)', `the calculator pin opens into a panel: the whole scientific calculator, Apple's keys in Apple's colours, 49 of them under a display (${JSON.stringify(q2)})`);
+  check(q2.w === 408 && q2.h === 262 && q2.radius === '18px' && q2.name === 'Calculator' && q2.btnGone && (await page.$$('.bcv-calc__key')).length === 49 && (await calcShown()) === '0' && (await page.$$eval('.bcv-calc__row:first-child .bcv-calc__key', (els) => els.map((e) => e.textContent))).join(' ') === '( ) mc m+ m− mr AC +/− % ÷' && (await page.$eval('.bcv-calc__key[data-key="/"]', (e) => getComputedStyle(e).backgroundColor)) === 'rgb(255, 159, 10)' && (await page.$eval('.bcv-calc__key[data-key="7"]', (e) => getComputedStyle(e).backgroundColor)) === 'rgb(92, 92, 95)' && (await page.$eval('.bcv-calc__key[data-key="ac"]', (e) => getComputedStyle(e).backgroundColor)) === 'rgb(165, 165, 165)', `the calculator pin opens into a panel: the whole scientific calculator, Apple's keys in Apple's colours, 49 of them under a display (${JSON.stringify(q2)})`);
   for (const k of ['2', '+', '3', '*', '4', '=']) await calcKey(k);
   check((await calcShown()) === '14', '2 + 3 × 4 = 14: the usual precedence');
   await calcKey('ac'); for (const k of ['(', '2', '+', '3', ')', 'x2']) await calcKey(k);
@@ -3690,7 +3690,7 @@ try {
   await page.mouse.click(700, 500);
   check(await eventually(() => page.$eval(quickPin('calc'), (e) => !e.classList.contains('is-open') && Math.round(e.getBoundingClientRect().width) === 24), 3000), 'the capsule folds when the pointer leaves and presses elsewhere');
   const qg = await quickOpen('graph', 470);
-  check(qg.w === 340 && qg.h === 470 && qg.radius === '18px' && qg.name === 'Graph' && (await page.$eval(`${quickPin('graph')} .bcv-qgraph__frame`, (e) => e.getAttribute('src'))) === 'https://www.desmos.com/calculator' && (await page.$eval(`${quickPin('graph')} .bcv-qgraph__out`, (e) => e.href)) === 'https://www.desmos.com/calculator' && (await page.$eval(`${quickPin('graph')} .bcv-qgraph__body`, (e) => { const r = e.getBoundingClientRect(); return r.height > r.width; })), 'the graphing pin swells into a small Desmos, portrait, loaded on the first hover, with the way out to desmos.com');
+  check(qg.w === 340 && qg.h === 470 && qg.radius === '18px' && qg.name === 'Full screen' && (await page.$eval(`${quickPin('graph')} .bcv-qgraph__frame`, (e) => e.getAttribute('src'))) === 'https://www.desmos.com/calculator' && (await page.$eval(`${quickPin('graph')} .bcv-qgraph__out`, (e) => e.href)) === 'https://www.desmos.com/calculator' && (await page.$eval(`${quickPin('graph')} .bcv-qgraph__body`, (e) => { const r = e.getBoundingClientRect(); return r.height > r.width; })), 'the graphing pin swells into a small Desmos, portrait, loaded on the first hover, with the way out to desmos.com');
   await shot(page, '45b-graph-pin');
   await page.mouse.move(700, 500);
   await page.mouse.click(700, 500);

@@ -3199,18 +3199,21 @@ html[data-bcv-theme="dark"] .bcv-pdfx { --px-row: #0f0f11; --px-page: #1f1f22; -
 .bcv-qcite__none { height: 18px; font: 400 11.5px/18px var(--bcv-font); color: rgba(255,255,255,.5); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* the calculator as a tool of its own, and the graphing pin's small Desmos (2.39.0) */
-.bcv-tool--calc .bcv-tool__body { padding: 14px; }
-.bcv-calc-tool { background: #1c1c1e; border-radius: 20px; padding: 14px 12px 12px; }
-.bcv-calc__title { font: 600 10px/1 var(--bcv-font); color: rgba(255,255,255,.55); letter-spacing: .02em; }
-.bcv-calc--big .bcv-calc__head { height: 20px; }
-.bcv-calc--big .bcv-calc__display { height: 78px; padding: 0 10px 8px; font-size: 46px; }
-.bcv-calc--big .bcv-calc__display.is-long { font-size: 32px; }
-.bcv-calc--big .bcv-calc__display.is-longer { font-size: 24px; }
-.bcv-calc--big .bcv-calc__keys, .bcv-calc--big .bcv-calc__row { gap: 5px; }
-.bcv-calc--big .bcv-calc__key { height: 44px; border-radius: 11px; font-size: 14px; }
-.bcv-calc--big .bcv-calc__key--num { font-size: 18px; }
-.bcv-calc--big .bcv-calc__key--op { font-size: 22px; }
-.bcv-calc--big .bcv-calc__key sup, .bcv-calc--big .bcv-calc__key sub { font-size: 9.5px; }
+.bcv-tool--calc .bcv-tool__body { padding: 16px; }
+.bcv-calc-tool { background: #1c1c1e; border-radius: 22px; padding: 16px 16px 16px; }
+.bcv-calc__title { font: 600 11px/1 var(--bcv-font); color: rgba(255,255,255,.55); letter-spacing: .02em; }
+.bcv-calc--big .bcv-calc__head { height: 22px; padding: 0 6px; }
+.bcv-calc--big .bcv-calc__mode, .bcv-calc--big .bcv-calc__mem { font-size: 11px; }
+.bcv-calc--big .bcv-calc__display { height: 96px; padding: 0 12px 10px; font-size: 58px; }
+.bcv-calc--big .bcv-calc__display.is-long { font-size: 40px; }
+.bcv-calc--big .bcv-calc__display.is-longer { font-size: 28px; }
+.bcv-calc--big .bcv-calc__keys, .bcv-calc--big .bcv-calc__row { gap: 7px; }
+.bcv-calc--big .bcv-calc__key { height: 54px; border-radius: 14px; font-size: 16px; }
+.bcv-calc--big .bcv-calc__key--num { font-size: 22px; }
+.bcv-calc--big .bcv-calc__key--op { font-size: 26px; }
+.bcv-calc--big .bcv-calc__key sup, .bcv-calc--big .bcv-calc__key sub { font-size: 11px; }
+.bcv-calc--big .bcv-calc__key sup { vertical-align: 8px; }
+.bcv-calc--big .bcv-calc__key sub { vertical-align: -4px; }
 .bcv-quick--panel .bcv-quick__body { inset: auto; top: 0; right: 0; width: var(--bcv-quick-w); height: var(--bcv-quick-h); box-sizing: border-box; } /* (the panel keeps its size while folded: a Desmos in it keeps its layout) */
 .bcv-qgraph { display: flex; flex-direction: column; gap: 6px; height: 100%; box-sizing: border-box; color: #fff; font-family: var(--bcv-font); }
 .bcv-qgraph__head { display: flex; align-items: center; gap: 8px; height: 16px; padding: 0 4px; }

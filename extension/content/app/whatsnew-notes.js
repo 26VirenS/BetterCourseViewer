@@ -23,6 +23,10 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.39.1', date: '2026-09-20', notes: [
+      { kind: 'improved', title: 'A wider calculator', body: 'The Calculator tool takes more of the page, with bigger keys; its pin says Calculator.', icon: P.steps },
+      { kind: 'improved', title: 'Desmos pin', body: 'Full screen at the top left opens the big graphing calculator; desmos.com at the right.', icon: P.sparkle },
+    ] },
     { version: '2.39.0', date: '2026-09-20', notes: [
       { kind: 'new', title: 'Tools open over the page', body: 'Campus tools, module links and tools open in a popup that fills the tab; pins stay.', icon: P.layers },
       { kind: 'new', title: 'Calculator on its own', body: 'The scientific calculator is a tool of its own now, with the keyboard on it.', icon: P.steps },

@@ -610,7 +610,7 @@
     const tool = toolOf('calc');
     const built = quickCalc({ popup: true });
     const body = U.el('bcv-calc-tool', built.els);
-    const p = popup({ tool, title: 'Calculator', sub: 'Scientific · the keyboard works too', width: 440, cls: 'bcv-tool--calc', body, from });
+    const p = popup({ tool, title: 'Calculator', sub: 'Scientific · the keyboard works too', width: 720, cls: 'bcv-tool--calc', body, from });
     setTimeout(() => { if (p.alive()) built.els[0].focus({ preventScroll: true }); }, 60);
     return p;
   }
@@ -845,7 +845,7 @@
     const root = h('div', { class: `bcv-calc${big ? ' bcv-calc--big' : ''}`, tabindex: '0', role: 'application', 'aria-label': 'Scientific calculator' });
     const display = h('div', { class: 'bcv-calc__display', 'aria-live': 'polite' });
     const mode = h('span', { class: 'bcv-calc__mode', text: '' });
-    const head = U.el('bcv-calc__head', [go ? quickName('Calc', go, 'Open the calculator') : U.text('bcv-calc__title', 'Scientific', 'span'), mode, U.text('bcv-calc__mem', '', 'span')]);
+    const head = U.el('bcv-calc__head', [go ? quickName('Calculator', go, 'Open the calculator, larger') : U.text('bcv-calc__title', 'Scientific', 'span'), mode, U.text('bcv-calc__mem', '', 'span')]);
     const keys = [];
     const rows = CALC_ROWS.map((row) => U.el('bcv-calc__row', row.map(([key, label, cls = 'fn']) => {
       const b = h('button', { type: 'button', class: `bcv-calc__key bcv-calc__key--${cls.split(' ')[0]} ${cls.includes('wide') ? 'bcv-calc__key--wide' : ''}`, dataset: { key, base: key }, html: label, title: CALC_TITLES[key] || label });
@@ -887,7 +887,7 @@
   function quickGraph({ go }) {
     const frame = h('iframe', { class: 'bcv-qgraph__frame', title: 'Desmos graphing calculator', allow: 'fullscreen', referrerpolicy: 'no-referrer' });
     const body = U.el('bcv-qgraph__body', [frame]);
-    const root = U.el('bcv-qgraph', [U.el('bcv-qgraph__head', [quickName('Graph', go, 'Open the graphing calculator'), h('a', { class: 'bcv-qgraph__out', href: DESMOS, target: '_blank', rel: 'noopener', text: 'desmos.com ↗' })]), body]);
+    const root = U.el('bcv-qgraph', [U.el('bcv-qgraph__head', [quickName('Full screen', go, 'Open the graphing calculator, larger'), h('a', { class: 'bcv-qgraph__out', href: DESMOS, target: '_blank', rel: 'noopener', text: 'desmos.com ↗' })]), body]);
     let loaded = false;
     const fail = () => body.replaceChildren(U.el('bcv-qgraph__fail', [U.text('bcv-qgraph__failtext', 'Desmos could not load here.'), h('a', { class: 'bcv-qgraph__link', href: DESMOS, target: '_blank', rel: 'noopener', text: 'Open desmos.com' })]));
     const onCsp = (e) => { if (/desmos\.com/.test(e.blockedURI || '')) fail(); };
