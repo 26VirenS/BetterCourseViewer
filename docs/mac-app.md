@@ -22,6 +22,15 @@ simplcourses.com rather than the App Store. The app is more than a wrapper now:
   checked against the feed, unpacked with `ditto`, checked to be Simpl Courses and signed, moved
   into this copy's place (this copy goes to the Trash) and opened again. *Install updates by
   themselves* is on by default; off, the window shows *Update now*.
+- **It opens on a first screen, and lives in the Applications folder.** The first launch shows a
+  black screen — *Let’s make Canvas simpler*, *Open Safari* — and the button opens Safari's
+  Extensions settings on the extension. A downloaded app opened straight from Downloads is run by
+  macOS from a hidden temporary copy (app translocation), and Safari cannot see an extension inside
+  such a copy: on a Mac with the app open, that is the one reason the window says Safari does not
+  have the extension. So the button, a prompt on any later launch from the wrong place, and *Move
+  to Applications* on the *This Mac* card all move the app there (`Placement` in
+  `AppDelegate.swift`: a copy in Applications, the download's quarantine mark removed so macOS runs
+  it in place, the copy the user opened to the Trash, the new one opened in its place).
 
 Because the app replaces itself, it is not sandboxed (the extension still is). Hardened runtime
 stays on, which is what notarization needs.

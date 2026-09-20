@@ -225,10 +225,14 @@
     const when = (t) => (t ? new Date(t * 1000).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) : '');
     const paintApp = (st) => {
       const e = st.extension || {};
+      const p = st.placement || {};
+      const move = e.state === 'missing' && (p.translocated === true || p.inApplications === false); // (the app is where Safari cannot see it: the button is the move)
       const [t, sub] = EXT[e.state] || EXT.unknown;
       $('extTitle').textContent = t;
       $('extSub').textContent = e.state === 'missing' ? (e.detail || '') : sub;
       $('extSteps').hidden = e.state !== 'missing';
+      $('moveApp').hidden = !move;
+      $('openSafari').hidden = move;
       const u = st.update || {};
       const act = $('updAction');
       act.hidden = true;
@@ -253,6 +257,12 @@
       const msg = $('appMsg');
       msg.hidden = !(r && r.ok === false);
       if (r && r.ok === false) msg.textContent = `${r.message || 'Safari could not open its settings.'} Open Safari, then Safari → Settings → Extensions and tick Simpl Courses.`;
+    });
+    $('moveApp').addEventListener('click', async () => {
+      const r = await self.SimplApp.moveToApplications().catch(() => null); // (done, the app opens again from there: no reply comes)
+      const msg = $('appMsg');
+      msg.hidden = !(r && r.ok === false);
+      if (r && r.ok === false) msg.textContent = r.message || 'The app could not move itself. Drag it to the Applications folder in the Finder, then open it again.';
     });
     $('checkUpdates').addEventListener('click', () => { self.SimplApp.checkUpdates(); });
     $('updAction').addEventListener('click', () => { self.SimplApp.installUpdate(); });

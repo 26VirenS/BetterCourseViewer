@@ -149,17 +149,6 @@ final class Updater {
         task.resume()
     }
 
-    private func run(_ path: String, _ arguments: [String]) throws -> Int32 {
-        let p = Process()
-        p.executableURL = URL(fileURLWithPath: path)
-        p.arguments = arguments
-        p.standardOutput = FileHandle.nullDevice
-        p.standardError = FileHandle.nullDevice
-        try p.run()
-        p.waitUntilExit()
-        return p.terminationStatus
-    }
-
     /// The zip checked, unpacked and put in this copy's place, then the new copy launched as this one quits.
     private func finish(zip: URL, release: Release) throws {
         if let expected = release.sha256?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(), !expected.isEmpty {
@@ -171,12 +160,12 @@ final class Updater {
         try FileManager.default.createDirectory(at: work, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: work); try? FileManager.default.removeItem(at: zip) }
         // ditto keeps a bundle whole (its resource forks, its signature) where a plain unzip may not
-        guard try run("/usr/bin/ditto", ["-x", "-k", zip.path, work.path]) == 0 else { throw UpdateError("The download could not be unpacked.") }
+        guard Shell.run("/usr/bin/ditto", ["-x", "-k", zip.path, work.path]) == 0 else { throw UpdateError("The download could not be unpacked.") }
         let items = try FileManager.default.contentsOfDirectory(at: work, includingPropertiesForKeys: nil)
         guard let newApp = items.first(where: { $0.pathExtension == "app" }) else { throw UpdateError("The download held no app.") }
         guard let newBundle = Bundle(url: newApp), newBundle.bundleIdentifier == Bundle.main.bundleIdentifier else { throw UpdateError("The download is not Simpl Courses.") }
-        guard try run("/usr/bin/codesign", ["--verify", "--deep", "--strict", newApp.path]) == 0 else { throw UpdateError("The download's signature did not check out, so it was not installed.") }
-        let current = Bundle.main.bundleURL
+        guard Shell.run("/usr/bin/codesign", ["--verify", "--deep", "--strict", newApp.path]) == 0 else { throw UpdateError("The download's signature did not check out, so it was not installed.") }
+        let current = Placement.originalURL // (the app as the user sees it, not a temporary copy macOS made)
         let folder = current.deletingLastPathComponent()
         guard FileManager.default.isWritableFile(atPath: folder.path) else {
             throw UpdateError("Simpl Courses cannot replace itself in \(folder.path). Move it to the Applications folder and try again.")
@@ -189,12 +178,8 @@ final class Updater {
             if let back = trashed as URL? { try? FileManager.default.moveItem(at: back, to: current) } // this copy back where it was
             throw error
         }
-        // the new copy opens once this one has quit; -n so LaunchServices starts it afresh rather than finding this one
-        let relaunch = Process()
-        relaunch.executableURL = URL(fileURLWithPath: "/bin/sh")
-        relaunch.arguments = ["-c", "sleep 1; /usr/bin/open -n \"$0\"", current.path]
-        try relaunch.run()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { NSApp.terminate(nil) }
+        Shell.run("/usr/bin/xattr", ["-dr", "com.apple.quarantine", current.path]) // (no quarantine mark: macOS runs it in place, where Safari sees it)
+        Placement.relaunch(current) // the new copy opens once this one has quit
     }
 
     /// The state as the settings window shows it.

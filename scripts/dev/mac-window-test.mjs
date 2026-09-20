@@ -68,6 +68,7 @@ const FAKE_APP = () => {
       }
       case 'app.state': return window.__appState;
       case 'app.openSafariSettings': return { ok: false, message: 'Safari is not running.' };
+      case 'app.moveToApplications': return { ok: false, message: 'The Applications folder cannot be written. Drag the app to the Applications folder in the Finder, then open it again.' };
       case 'file.save': return { ok: true, path: '/tmp/settings.json' };
       case 'file.open': return { ok: true, name: 'settings.json', text: JSON.stringify({ appearance: { darkMode: 'on', sideCourses: 'hover' } }) };
       default: return { ok: true };
@@ -104,7 +105,16 @@ try {
   check((await text('#extTitle')) === 'Simpl Courses is off in Safari' && /Tick it under Safari/.test(await text('#extSub')), `off: ${await text('#extTitle')}`);
   await push({ extension: { state: 'missing', detail: 'Safari could not find it.' } });
   const steps = await page.$$eval('#extSteps li', (els) => els.map((e) => e.innerText.replace(/\s+/g, ' ').trim()));
-  check((await text('#extTitle')) === 'Safari does not have the extension yet' && (await text('#extSub')) === 'Safari could not find it.' && !(await page.$eval('#extSteps', (e) => e.hidden)) && steps.length === 3 && /Applications/.test(steps[0]) && /Allow unsigned extensions/.test(steps[2]), `not known to Safari: Safari's own message and the three steps that put it back (${steps.map((s) => s.slice(0, 30)).join(' | ')})`);
+  check((await text('#extTitle')) === 'Safari does not have the extension yet' && (await text('#extSub')) === 'Safari could not find it.' && !(await page.$eval('#extSteps', (e) => e.hidden)) && steps.length === 3 && /Applications/.test(steps[0]) && /Allow unsigned extensions/.test(steps[2]) && (await page.$eval('#moveApp', (e) => e.hidden)) && !(await page.$eval('#openSafari', (e) => e.hidden)), `not known to Safari: Safari's own message and the three steps that put it back (${steps.map((s) => s.slice(0, 30)).join(' | ')})`);
+  await push({ extension: { state: 'missing', detail: 'macOS is running this copy from a temporary place, so Safari cannot see the extension inside it. Move the app to the Applications folder.' }, placement: { translocated: true, inApplications: false, path: '/Users/me/Downloads/Simpl Courses.app' } });
+  check(!(await page.$eval('#moveApp', (e) => e.hidden)) && (await page.$eval('#openSafari', (e) => e.hidden)) && /temporary place/.test(await text('#extSub')), `opened from Downloads (macOS running a temporary copy): the button is Move to Applications, and the line says why (${await text('#extSub')})`);
+  await page.screenshot({ path: join(root, 'scripts', 'dev', 'out', 'mac-window-move.png') });
+  await page.click('#moveApp');
+  await page.waitForTimeout(200);
+  check((await calls('app.moveToApplications')).length === 1 && /cannot be written\. Drag the app to the Applications folder/.test(await text('#appMsg')) && !(await page.$eval('#appMsg', (e) => e.hidden)), `Move to Applications reaches the app, and a refusal is said under the button: ${await text('#appMsg')}`);
+  await push({ extension: { state: 'missing', detail: 'Safari has not registered the extension yet. Open Safari once, then come back here.' }, placement: { translocated: false, inApplications: true, path: '/Applications/Simpl Courses.app' } });
+  check((await page.$eval('#moveApp', (e) => e.hidden)) && !(await page.$eval('#openSafari', (e) => e.hidden)), 'in the Applications folder, the button is Open Safari Settings again');
+  await page.evaluate(() => { document.getElementById('appMsg').hidden = true; });
   await push({ extension: { state: 'on', detail: '' }, update: { state: 'available', available: '9.10.0', automatic: true, checked: 1700000000, version: '9.9.9' } });
   check((await text('#updTitle')) === 'Version 9.10.0 is ready' && /You have 9\.9\.9\. It installs by itself in a moment\./.test(await text('#updSub')) && !(await page.$eval('#updAction', (e) => e.hidden)), `an update found: ${await text('#updTitle')} · ${await text('#updSub')}`);
   await push({ update: { state: 'downloading', progress: 0.42, automatic: true } });
@@ -124,7 +134,7 @@ try {
   await page.click('#openSafari');
   await page.waitForTimeout(200);
   const sent = await page.evaluate(() => window.__calls.filter((m) => m.cmd.startsWith('app.') && m.cmd !== 'app.state').map((m) => `${m.cmd}${'on' in m ? `:${m.on}` : ''}`));
-  check(sent.join(',') === 'app.checkUpdates,app.installUpdate,app.setAutoUpdate:true,app.setLoginItem:false,app.openSafariSettings', `Check now, Update now, the two switches and Open Safari Settings each reach the app: ${sent.join(',')}`);
+  check(sent.join(',') === 'app.moveToApplications,app.checkUpdates,app.installUpdate,app.setAutoUpdate:true,app.setLoginItem:false,app.openSafariSettings', `Check now, Update now, the two switches and Open Safari Settings each reach the app: ${sent.join(',')}`);
   check(/Safari is not running\. Open Safari, then Safari → Settings → Extensions/.test(await text('#appMsg')) && !(await page.$eval('#appMsg', (e) => e.hidden)), `Safari refusing to open its settings is said under the button: ${await text('#appMsg')}`);
 
   console.log('a setting, both ways');

@@ -68,6 +68,7 @@
     onState(fn) { stateListeners.add(fn); if (state) fn(state); else call('app.state').then((s) => { if (s && !state) { state = s; fn(s); } }).catch(() => {}); },
     state: () => state,
     openSafariSettings: () => call('app.openSafariSettings'),
+    moveToApplications: () => call('app.moveToApplications'),
     checkUpdates: () => call('app.checkUpdates'),
     installUpdate: () => call('app.installUpdate'),
     setAutoUpdate: (on) => call('app.setAutoUpdate', { on: !!on }),

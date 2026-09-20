@@ -10,6 +10,7 @@
 //
 
 import Cocoa
+import CoreServices
 import ServiceManagement
 
 @main
@@ -18,10 +19,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        Placement.register()
         makeStatusItem()
         NotificationCenter.default.addObserver(self, selector: #selector(windowClosed(_:)), name: NSWindow.willCloseNotification, object: nil)
         LoginItem.applyDefaultOnce()
         Updater.shared.start()
+        if !ViewController.welcomeDue(SharedStore()) { Placement.offerMoveIfNeeded() } // (the first screen's button does the move)
     }
 
     /// The hourly check needs the app running: the window closing does not end it.
@@ -106,11 +109,144 @@ enum LoginItem {
         }
     }
 
-    /// The first launch registers the app once; from then on the window's switch (and System Settings) decide.
+    /// The first launch from a place the app can stay registers it, and so does the first launch
+    /// after a move (the system's record names the path). Turned off in the window, it stays off;
+    /// from then on the window's switch (and System Settings) decide.
     static func applyDefaultOnce() {
+        guard !Placement.isTranslocated else { return } // registered from the temporary copy, the record would point there
         let d = UserDefaults.standard
-        if d.bool(forKey: "loginItemOffered") { return }
-        d.set(true, forKey: "loginItemOffered")
+        let here = Placement.originalURL.path
+        guard d.string(forKey: "loginItemOfferedAt") != here else { return }
+        d.set(here, forKey: "loginItemOfferedAt")
+        if d.object(forKey: "openAtLogin") as? Bool == false { return }
         set(true)
+    }
+}
+
+/// Where the app is, and whether Safari can use its extension from there. A downloaded app opened
+/// straight from Downloads is run by macOS from a hidden, read-only, temporary copy (App
+/// Translocation), and Safari cannot see an extension inside such a copy — on a Mac that has the
+/// app open, that is the one thing that makes the extension "missing". The app's home is the
+/// Applications folder, where Safari finds it and where it can replace itself with an update; the
+/// app offers to move itself there, and can.
+enum Placement {
+    private typealias IsTranslocatedFn = @convention(c) (CFURL, UnsafeMutablePointer<Bool>?, UnsafeMutablePointer<Unmanaged<CFError>?>?) -> Bool
+    private typealias OriginalPathFn = @convention(c) (CFURL, UnsafeMutablePointer<Unmanaged<CFError>?>?) -> Unmanaged<CFURL>?
+    private static let RTLD_DEFAULT = UnsafeMutableRawPointer(bitPattern: -2)
+
+    /// This running copy — the temporary one, when macOS made one.
+    static let runningURL = Bundle.main.bundleURL
+
+    /// macOS is running this copy from its temporary mount.
+    static let isTranslocated: Bool = {
+        if runningURL.path.contains("/AppTranslocation/") { return true }
+        guard let sym = dlsym(RTLD_DEFAULT, "SecTranslocateIsTranslocatedURL") else { return false }
+        var flag = false
+        return unsafeBitCast(sym, to: IsTranslocatedFn.self)(runningURL as CFURL, &flag, nil) && flag
+    }()
+
+    /// The app as the user sees it: the copy in Downloads that macOS made the temporary one from, or this copy.
+    static let originalURL: URL = {
+        guard isTranslocated, let sym = dlsym(RTLD_DEFAULT, "SecTranslocateCreateOriginalPathForURL"),
+              let original = unsafeBitCast(sym, to: OriginalPathFn.self)(runningURL as CFURL, nil)?.takeRetainedValue() else { return runningURL }
+        return original as URL
+    }()
+
+    /// In /Applications, or the user's own Applications folder.
+    static var isInApplications: Bool {
+        let folder = originalURL.deletingLastPathComponent().standardizedFileURL.path
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        return ["/Applications", "\(home)/Applications"].contains { folder == $0 || folder.hasPrefix($0 + "/") }
+    }
+
+    static var needsMove: Bool { isTranslocated || !isInApplications }
+
+    /// For the window: why the extension may be missing, and the button to put it right.
+    static var report: [String: Any] {
+        ["translocated": isTranslocated, "inApplications": isInApplications, "path": originalURL.path]
+    }
+
+    /// Makes sure LaunchServices has this copy — and so its extension — on record.
+    static func register() {
+        _ = LSRegisterURL(originalURL as CFURL, true)
+    }
+
+    /// On a launch from the wrong place, the offer to move: once from a folder the app works from,
+    /// every time while translocated, since nothing works from there.
+    static func offerMoveIfNeeded() {
+        guard needsMove else { return }
+        let d = UserDefaults.standard
+        if !isTranslocated && d.bool(forKey: "moveOffered") { return }
+        d.set(true, forKey: "moveOffered")
+        let alert = NSAlert()
+        alert.messageText = "Move Simpl Courses to the Applications folder?"
+        alert.informativeText = isTranslocated
+            ? "macOS is running this copy from a temporary place, and Safari cannot see the extension inside it. From the Applications folder, Safari finds it and the app can update itself."
+            : "Safari reads the extension out of the app, and updates replace the app in place, so it belongs in the Applications folder."
+        alert.addButton(withTitle: "Move to Applications")
+        alert.addButton(withTitle: "Not Now")
+        NSApp.activate(ignoringOtherApps: true)
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        do {
+            try moveToApplications()
+        } catch {
+            let failed = NSAlert()
+            failed.messageText = "Simpl Courses could not move itself"
+            failed.informativeText = "\(error.localizedDescription) Drag it to the Applications folder in the Finder, then open it again."
+            failed.runModal()
+        }
+    }
+
+    /// A copy in the Applications folder (the user's own when the shared one cannot be written), free
+    /// of the download's quarantine mark so macOS runs it in place, the copy the user opened to the
+    /// Trash, and the new one opened as this one quits.
+    @discardableResult
+    static func moveToApplications() throws -> URL {
+        let fm = FileManager.default
+        var folder = URL(fileURLWithPath: "/Applications", isDirectory: true)
+        if !fm.isWritableFile(atPath: folder.path) {
+            folder = fm.homeDirectoryForCurrentUser.appendingPathComponent("Applications", isDirectory: true)
+            try fm.createDirectory(at: folder, withIntermediateDirectories: true)
+        }
+        let dest = folder.appendingPathComponent(originalURL.lastPathComponent)
+        if dest.standardizedFileURL.path == originalURL.standardizedFileURL.path {
+            guard isTranslocated else { return dest }
+            // already in Applications, put there by something other than the Finder: the quarantine mark is all that is wrong
+            Shell.run("/usr/bin/xattr", ["-dr", "com.apple.quarantine", dest.path])
+            _ = LSRegisterURL(dest as CFURL, true)
+            relaunch(dest)
+            return dest
+        }
+        if fm.fileExists(atPath: dest.path) { try fm.trashItem(at: dest, resultingItemURL: nil) } // an older copy
+        try fm.copyItem(at: runningURL, to: dest)
+        Shell.run("/usr/bin/xattr", ["-dr", "com.apple.quarantine", dest.path])
+        try? fm.trashItem(at: originalURL, resultingItemURL: nil) // (when the original is not known, the temporary copy cannot be trashed: it stays)
+        _ = LSRegisterURL(dest as CFURL, true)
+        relaunch(dest)
+        return dest
+    }
+
+    /// The copy at `url` opens once this one has quit (-n: started afresh rather than this one found).
+    static func relaunch(_ url: URL) {
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: "/bin/sh")
+        p.arguments = ["-c", "sleep 1; /usr/bin/open -n \"$0\"", url.path]
+        try? p.run()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { NSApp.terminate(nil) }
+    }
+}
+
+/// A command run to its end, quietly; its exit status (-1 when it could not start).
+enum Shell {
+    @discardableResult
+    static func run(_ path: String, _ arguments: [String]) -> Int32 {
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: path)
+        p.arguments = arguments
+        p.standardOutput = FileHandle.nullDevice
+        p.standardError = FileHandle.nullDevice
+        do { try p.run() } catch { return -1 }
+        p.waitUntilExit()
+        return p.terminationStatus
     }
 }

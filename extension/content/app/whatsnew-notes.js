@@ -23,6 +23,11 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.44.1', date: '2026-09-20', notes: [
+      { kind: 'new', title: 'A first screen on the Mac', body: 'The app opens on Let’s make Canvas simpler, and a button that opens Safari.', icon: P.sparkle },
+      { kind: 'fixed', title: 'The Mac app finds its home', body: 'Opened from Downloads, it offers to move to the Applications folder, so Safari sees it.', icon: P.tool },
+      { kind: 'improved', title: 'Smoother pins', body: 'A pinned tool opens under the pointer without a stutter.', icon: P.pin },
+    ] },
     { version: '2.44.0', date: '2026-09-20', notes: [
       { kind: 'new', title: 'Settings live in the app', body: 'On a Mac, Simpl Courses is set up and controlled from its app; Safari follows it.', icon: P.tool },
       { kind: 'new', title: 'The app updates itself', body: 'It checks simplcourses.com every hour and installs a new version on its own.', icon: P.arrows },

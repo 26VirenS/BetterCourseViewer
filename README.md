@@ -104,7 +104,7 @@ Anything without a screen of its own – external tools and their embeds (Box, Y
 
 ## Install (the Mac app)
 
-Safari extensions ship inside a Mac app. Download **Simpl Courses** from [simplcourses.com](https://simplcourses.com/download/mac), move it to the Applications folder and open it, then open your Canvas: the setup begins there by itself (Safari asks once whether the extension may run on the site).
+Safari extensions ship inside a Mac app. Download **Simpl Courses** from [simplcourses.com](https://simplcourses.com/download/mac), open it and press **Open Safari** (opened from Downloads, the app moves itself to the Applications folder first: Safari can only see the extension from there), tick Simpl Courses in Safari's Extensions settings, then open your Canvas: the setup begins there by itself (Safari asks once whether the extension may run on the site).
 
 The app is the extension's home on a Mac:
 

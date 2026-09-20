@@ -30,9 +30,16 @@ class ViewController: NSViewController, WKNavigationDelegate, WKScriptMessageHan
     private var lastRevision: Int = -1
     private var extensionState: [String: Any] = ["state": "unknown", "detail": ""]
     private var pageReady = false
+    private var welcome: WelcomeView?
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        if Self.welcomeDue(store) {
+            let w = WelcomeView(frame: view.bounds)
+            w.onOpen = { [weak self] in self?.welcomeOpenSafari() }
+            view.addSubview(w, positioned: .above, relativeTo: webView)
+            welcome = w
+        }
         webView.navigationDelegate = self
         let controller = webView.configuration.userContentController
         controller.addScriptMessageHandler(self, contentWorld: .page, name: "simpl")
@@ -63,6 +70,41 @@ class ViewController: NSViewController, WKNavigationDelegate, WKScriptMessageHan
             }
         }
         refreshExtensionState()
+        if UserDefaults.standard.bool(forKey: "openSafariOnLaunch") {
+            // the first screen's Open Safari, carried over the move to the Applications folder
+            UserDefaults.standard.removeObject(forKey: "openSafariOnLaunch")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in self?.openSafariSettings { _, _ in } }
+        }
+    }
+
+    // ---- the first screen -------------------------------------------------------------------------
+
+    /// Once, on the first launch — not on a Mac whose setup is already done (an update arriving).
+    static func welcomeDue(_ store: SharedStore) -> Bool {
+        return !UserDefaults.standard.bool(forKey: "welcomed") && !store.read().setupDone
+    }
+
+    /// Open Safari, from the first screen. The app moves itself home first when it has to (Safari
+    /// cannot see the extension until then), and the copy that opens from there carries on.
+    private func welcomeOpenSafari() {
+        let d = UserDefaults.standard
+        d.set(true, forKey: "welcomed")
+        if Placement.needsMove {
+            d.set(true, forKey: "openSafariOnLaunch")
+            if (try? Placement.moveToApplications()) != nil { return } // this copy is quitting; the new one opens Safari
+            d.removeObject(forKey: "openSafariOnLaunch")
+        }
+        dismissWelcome()
+        openSafariSettings { _, _ in }
+    }
+
+    private func dismissWelcome() {
+        guard let w = welcome else { return }
+        welcome = nil
+        NSAnimationContext.runAnimationGroup({ ctx in
+            ctx.duration = 0.35
+            w.animator().alphaValue = 0
+        }, completionHandler: { w.removeFromSuperview() })
     }
 
     /// options/options.html inside the extension, which lives inside this app.
@@ -88,13 +130,12 @@ class ViewController: NSViewController, WKNavigationDelegate, WKScriptMessageHan
     // ---- Safari's word on the extension ------------------------------------------------------------
 
     /// on / off / missing. "missing" is Safari saying it has never heard of this extension, which is
-    /// the state worth explaining: the page lists what actually puts it back.
+    /// the state worth explaining: the page says why (nearly always where the app is) and what puts it back.
     private func refreshExtensionState() {
         SFSafariExtensionManager.getStateOfSafariExtension(withIdentifier: extensionBundleIdentifier) { state, error in
             DispatchQueue.main.async {
                 guard let state = state, error == nil else {
-                    let detail = error?.localizedDescription ?? "Safari does not list an extension with the identifier \(extensionBundleIdentifier)."
-                    self.extensionState = ["state": "missing", "detail": detail]
+                    self.extensionState = ["state": "missing", "detail": Self.missingDetail(error)]
                     self.pushState()
                     return
                 }
@@ -104,11 +145,29 @@ class ViewController: NSViewController, WKNavigationDelegate, WKScriptMessageHan
         }
     }
 
+    /// Why Safari would not know the extension. Its own words for it ("SFErrorDomain error 1") say
+    /// nothing; where the app is says nearly everything.
+    static func missingDetail(_ error: Error?) -> String {
+        if Placement.isTranslocated {
+            return "macOS is running this copy from a temporary place, so Safari cannot see the extension inside it. Move the app to the Applications folder."
+        }
+        if !Placement.isInApplications {
+            return "Safari cannot find the extension. Move the app to the Applications folder and open it again."
+        }
+        return "Safari has not registered the extension yet. Open Safari once, then come back here."
+    }
+
     private func openSafariSettings(_ reply: @escaping (Any?, String?) -> Void) {
         SFSafariApplication.showPreferencesForExtension(withIdentifier: extensionBundleIdentifier) { error in
             DispatchQueue.main.async {
                 if let error = error {
-                    reply(["ok": false, "message": error.localizedDescription], nil)
+                    // Safari will not show settings for an extension it does not know; bring Safari up at least
+                    if let safari = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.Safari") {
+                        NSWorkspace.shared.openApplication(at: safari, configuration: NSWorkspace.OpenConfiguration(), completionHandler: nil)
+                    }
+                    let ns = error as NSError
+                    let message = ns.domain == "SFErrorDomain" && ns.code == 1 ? Self.missingDetail(error) : error.localizedDescription
+                    reply(["ok": false, "message": message], nil)
                 } else {
                     reply(["ok": true], nil)
                 }
@@ -126,6 +185,7 @@ class ViewController: NSViewController, WKNavigationDelegate, WKScriptMessageHan
             "extension": extensionState,
             "update": Updater.shared.report,
             "loginItem": LoginItem.enabled,
+            "placement": Placement.report,
             "setupDone": snap.setupDone,
             "storePath": store.fileURL.path,
         ]
@@ -197,6 +257,13 @@ class ViewController: NSViewController, WKNavigationDelegate, WKScriptMessageHan
             replyHandler(appState, nil)
         case "app.openSafariSettings":
             openSafariSettings(replyHandler)
+        case "app.moveToApplications":
+            do {
+                try Placement.moveToApplications()
+                replyHandler(["ok": true], nil)
+            } catch {
+                replyHandler(["ok": false, "message": "\(error.localizedDescription) Drag the app to the Applications folder in the Finder, then open it again."], nil)
+            }
         case "app.checkUpdates":
             Updater.shared.check()
             replyHandler(["ok": true], nil)
@@ -321,5 +388,58 @@ class ViewController: NSViewController, WKNavigationDelegate, WKScriptMessageHan
     private static func json(_ value: Any) -> String {
         guard JSONSerialization.isValidJSONObject(value), let data = try? JSONSerialization.data(withJSONObject: value, options: []), let s = String(data: data, encoding: .utf8) else { return "null" }
         return s
+    }
+}
+
+/// The first screen: black, the app's icon, "Let’s make Canvas simpler" and Open Safari. It covers
+/// the settings until the button is pressed, and is not shown again.
+final class WelcomeView: NSView {
+    var onOpen: (() -> Void)?
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        wantsLayer = true
+        layer?.backgroundColor = NSColor.black.cgColor
+        appearance = NSAppearance(named: .darkAqua)
+        autoresizingMask = [.width, .height]
+
+        let icon = NSImageView(image: NSApp.applicationIconImage)
+        icon.imageScaling = .scaleProportionallyUpOrDown
+        icon.translatesAutoresizingMaskIntoConstraints = false
+
+        let title = NSTextField(labelWithString: "Let’s make Canvas simpler")
+        title.font = NSFont.systemFont(ofSize: 34, weight: .bold)
+        title.textColor = .white
+        title.alignment = .center
+        title.translatesAutoresizingMaskIntoConstraints = false
+
+        let button = NSButton(title: "Open Safari", target: self, action: #selector(pressed))
+        button.bezelStyle = .rounded
+        button.controlSize = .large
+        button.keyEquivalent = "\r"
+        button.translatesAutoresizingMaskIntoConstraints = false
+
+        let stack = NSStackView(views: [icon, title, button])
+        stack.orientation = .vertical
+        stack.alignment = .centerX
+        stack.spacing = 18
+        stack.setCustomSpacing(30, after: title)
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(stack)
+        NSLayoutConstraint.activate([
+            stack.centerXAnchor.constraint(equalTo: centerXAnchor),
+            stack.centerYAnchor.constraint(equalTo: centerYAnchor, constant: -16),
+            icon.widthAnchor.constraint(equalToConstant: 104),
+            icon.heightAnchor.constraint(equalToConstant: 104),
+            button.widthAnchor.constraint(greaterThanOrEqualToConstant: 170),
+        ])
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) is not used")
+    }
+
+    @objc private func pressed() {
+        onOpen?()
     }
 }
