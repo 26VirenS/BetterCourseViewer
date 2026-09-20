@@ -158,17 +158,22 @@
   // Save, and the saved list under it.
   const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
   const todayWords = () => { const d = new Date(); return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`; };
-  async function open(app, { from = null, url = '' } = {}) {
+  const STYLE_KEY = 'tools:cite:style'; // the style last chosen, in the tool or its pin: the one the next citation starts in
+  /** The popup. `url` fills the URL; `type` picks the source; `fields` fills what is known (a page's
+   *  title, a course, an instructor); `style` picks the style, else the one last used. */
+  async function open(app, { from = null, url = '', type = '', fields = null, style = '' } = {}) {
     const tool = T.toolOf('cite');
-    const st = { style: 'mla', type: 'website', f: { ...EMPTY, ...(url ? { url: String(url) } : {}) }, saved: [], copied: 0 };
-    const raw = await T.load(KEY, []);
+    const [raw, lastStyle] = await Promise.all([T.load(KEY, []), T.load(STYLE_KEY, 'mla')]);
+    const pick = STYLES.some(([k]) => k === style) ? style : STYLES.some(([k]) => k === lastStyle) ? lastStyle : 'mla';
+    const st = { style: pick, type: TYPES.some(([k]) => k === type) ? type : 'website', f: { ...EMPTY, ...(fields && typeof fields === 'object' ? fields : {}), ...(url ? { url: String(url) } : {}) }, saved: [], copied: 0 };
+    for (const k of Object.keys(st.f)) st.f[k] = String(st.f[k] ?? '').trim();
     st.saved = Array.isArray(raw) ? raw.filter((x) => x && Array.isArray(x.parts)) : [];
 
     const body = U.el('bcv-cite');
     const p = T.popup({ tool, title: 'Citation generator', sub: '', width: 980, body, from });
 
     // across the top: the style, and the kind of source
-    const styleSeg = T.seg(STYLES, st.style, (k) => { st.style = k; paint(); });
+    const styleSeg = T.seg(STYLES, st.style, (k) => { st.style = k; T.save(STYLE_KEY, k); paint(); });
     const typeRow = U.el('bcv-cite__types');
     function buildTypes() {
       typeRow.replaceChildren(...TYPES.map(([k, name, icon]) => h('button', {
@@ -284,5 +289,5 @@
     return p;
   }
 
-  BCV.toolsCite = { open, build, plain, inText, fieldDefs, authorString };
+  BCV.toolsCite = { open, build, plain, inText, fieldDefs, authorString, STYLES, todayWords, STYLE_KEY, KEY };
 })();

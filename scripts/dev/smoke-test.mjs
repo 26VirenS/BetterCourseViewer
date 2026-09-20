@@ -3576,21 +3576,53 @@ try {
 
   // ---- the quick menus: every pin but the timer's swells into a capsule under the pointer, the tool's quickest use in it ----
   console.log('quick menus');
-  await sw.evaluate(() => self.BCV.api.storage.local.set({ 'tools:pins': ['cite', 'graph', 'conv', 'fc'] }));
+  await sw.evaluate(() => self.BCV.api.storage.local.set({ 'tools:pins': ['cite', 'graph', 'conv', 'fc'], 'tools:cite:style': 'mla', 'tools:citations': [
+    { id: 'c1', style: 'MLA 9', parts: [{ text: 'Okonkwo, Jane R. “How Students Actually Read Syllabi.” ', italic: false }, { text: 'The Atlantic', italic: true }, { text: ', 4 March 2026, theatlantic.com/x.', italic: false }], plain: 'Okonkwo, Jane R. “How Students Actually Read Syllabi.” The Atlantic, 4 March 2026, theatlantic.com/x.' },
+    { id: 'c2', style: 'APA 7', parts: [{ text: 'Haddad, A. (2025). Reading habits. ', italic: false }, { text: 'Journal of Higher Education, 47', italic: true }, { text: '(3), 112–137.', italic: false }], plain: 'Haddad, A. (2025). Reading habits. Journal of Higher Education, 47(3), 112–137.' },
+  ] }));
   await page.goto(`${BASE}/`);
   await page.waitForSelector('#bcv-pins .bcv-pin[data-tool="fc"]', { timeout: 15000 });
   await page.waitForTimeout(600);
   const quickPin = (key) => `#bcv-pins .bcv-pin[data-tool="${key}"]`;
   const quickOpen = async (key, hh = 44) => { const b = await (await page.$(quickPin(key))).boundingBox(); await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2); await eventually(() => page.$eval(quickPin(key), (e, want) => e.classList.contains('is-open') && Math.round(e.getBoundingClientRect().height) === want, hh), 3000); await page.waitForTimeout(550); return page.$eval(quickPin(key), (e) => ({ w: Math.round(e.getBoundingClientRect().width), h: Math.round(e.getBoundingClientRect().height), radius: getComputedStyle(e.querySelector('.bcv-quick__face')).borderRadius, name: e.querySelector('.bcv-quick__name')?.textContent, btnGone: getComputedStyle(e.querySelector('.bcv-pin__btn')).opacity === '0' })); };
-  check((await page.$$('#bcv-pins .bcv-pin.bcv-quick')).length === 3 && !(await page.$eval(quickPin('cite'), (e) => e.classList.contains('bcv-quick'))) && (await page.$$eval('#bcv-pins .bcv-pin', (els) => els.map((e) => Math.round(e.getBoundingClientRect().width)))).every((w) => w === 24), 'four pins in the tray, each a disc; three with a quick menu folded in them, the citation pin a plain button');
-  const citePinBox = await (await page.$(quickPin('cite'))).boundingBox();
-  await page.mouse.move(citePinBox.x + citePinBox.width / 2, citePinBox.y + citePinBox.height / 2);
-  await page.waitForTimeout(500);
-  check(Math.round((await (await page.$(quickPin('cite'))).boundingBox()).width) === 24 && (await page.$('.bcv-tool-ov')) === null, 'the pointer over the citation pin opens nothing');
-  await page.click(`${quickPin('cite')} .bcv-pin__btn`);
+  check((await page.$$('#bcv-pins .bcv-pin.bcv-quick')).length === 4 && (await page.$$eval('#bcv-pins .bcv-pin', (els) => els.map((e) => Math.round(e.getBoundingClientRect().width)))).every((w) => w === 24), 'four pins in the tray, each a disc with a quick menu folded in it');
+  const qc = await quickOpen('cite', 192);
+  const qcSel = (sel) => `${quickPin('cite')} ${sel}`;
+  check(qc.w === 400 && qc.h === 192 && qc.radius === '18px' && qc.name === 'Cite' && qc.btnGone && (await page.$eval(qcSel('.bcv-quick__input'), (e) => e.placeholder)) === 'Paste a link to cite' && (await texts(qcSel('.bcv-qcite__style'))).join('/') === 'MLA 9/APA 7/Chicago 17' && (await page.$eval(qcSel('.bcv-qcite__style.is-on'), (e) => e.dataset.style)) === 'mla' && (await texts(qcSel('.bcv-qcite__heretitle')))[0] === 'Cite this page' && (await texts(qcSel('.bcv-qcite__heresub')))[0] === 'Dashboard' && (await texts(qcSel('.bcv-qcite__tag'))).join('/') === 'APA 7/MLA 9' && /^Haddad, A\. \(2025\)/.test((await texts(qcSel('.bcv-qcite__text')))[0]) && !(await page.$eval(qcSel('.bcv-qcite__link'), (e) => e.hidden)), `the citation pin swells into a panel: a link to cite, the page you are on, the style, and the last citations saved, newest first (${(await texts(qcSel('.bcv-qcite__tag'))).join('/')} · ${(await texts(qcSel('.bcv-qcite__heresub')))[0]})`);
+  await page.click(qcSel('.bcv-qcite__item:first-child .bcv-qcite__copy'));
+  check(await eventually(() => texts('.bcv-toast').then((t) => t.includes('Copied.')), 3000) && (await page.$eval(quickPin('cite'), (e) => e.classList.contains('is-open'))), 'a saved citation copies from the panel, which stays open');
+  await page.click(qcSel('.bcv-qcite__style[data-style="apa"]'));
+  await page.waitForTimeout(150);
+  check((await page.$eval(qcSel('.bcv-qcite__style.is-on'), (e) => e.dataset.style)) === 'apa' && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('tools:cite:style'))['tools:cite:style'])) === 'apa', 'the style picked in the panel is kept');
+  await page.fill(qcSel('.bcv-quick__input'), 'https://www.youtube.com/watch?v=abc123');
+  await page.keyboard.press('Enter');
   await page.waitForSelector('.bcv-tool[data-tool="cite"]', { timeout: 5000 });
-  check((await texts('.bcv-tool__title'))[0] === 'Citation generator' && (await page.$$('.bcv-cite__type')).length === 5, 'a press on it opens the generator itself');
+  await page.waitForTimeout(300);
+  check((await page.$eval('.bcv-cite__type.is-on', (e) => e.dataset.type)) === 'video' && (await page.$eval('[data-field="container"]', (e) => e.value)) === 'YouTube' && (await page.$eval('[data-field="url"]', (e) => e.value)) === 'https://www.youtube.com/watch?v=abc123' && (await texts('.bcv-cite__top .bcv-seg__btn.is-active'))[0] === 'APA 7' && (await toolSub()) === 'APA 7 · 3 to fill' && !(await page.$eval(quickPin('cite'), (e) => e.classList.contains('is-open'))), `a YouTube link pasted in the panel opens the generator as a video on YouTube, in the style kept (${await toolSub()})`);
   await closeTool();
+  await page.mouse.move(700, 500);
+  await page.waitForTimeout(300);
+  await quickOpen('cite', 192);
+  await page.click(qcSel('.bcv-qcite__here'));
+  await page.waitForSelector('.bcv-tool[data-tool="cite"]', { timeout: 5000 });
+  await page.waitForTimeout(300);
+  check((await page.$eval('.bcv-cite__type.is-on', (e) => e.dataset.type)) === 'website' && (await page.$eval('[data-field="title"]', (e) => e.value)) === 'Dashboard' && (await page.$eval('[data-field="url"]', (e) => e.value)) === page.url() && (await page.$eval('[data-field="container"]', (e) => e.value)).length > 0 && /^\d{1,2} [A-Z][a-z]+ \d{4}$/.test(await page.$eval('[data-field="accessed"]', (e) => e.value)), `Cite this page on the dashboard opens the generator with the page as a website, today as the date accessed (${await page.$eval('[data-field="container"]', (e) => e.value)})`);
+  await closeTool();
+  await page.goto(`${BASE}/courses/101/assignments/1006`);
+  await page.waitForSelector('#bcv-pins .bcv-pin[data-tool="cite"]', { timeout: 15000 });
+  await page.waitForTimeout(800);
+  await quickOpen('cite', 192);
+  const qcHereSub = (await texts(qcSel('.bcv-qcite__heresub')))[0];
+  await page.click(qcSel('.bcv-qcite__here'));
+  await page.waitForSelector('.bcv-tool[data-tool="cite"]', { timeout: 5000 });
+  await page.waitForTimeout(300);
+  const qcCourse = await page.$eval('[data-field="course"]', (e) => e.value);
+  const qcAuthor = await page.$eval('[data-field="author"]', (e) => e.value);
+  check((await page.$eval('.bcv-cite__type.is-on', (e) => e.dataset.type)) === 'coursefile' && qcCourse.length > 0 && qcAuthor.length > 0 && (await page.$eval('[data-field="year"]', (e) => e.value)) === String(new Date().getFullYear()) && (await page.$eval('[data-field="url"]', (e) => e.value)) === page.url() && qcHereSub.includes(qcCourse), `on a course page, Cite this page opens the generator as a course file with the course and its instructor in (${qcCourse} · ${qcAuthor} · panel said "${qcHereSub}")`);
+  await closeTool();
+  await page.goto(`${BASE}/`);
+  await page.waitForSelector('#bcv-pins .bcv-pin[data-tool="fc"]', { timeout: 15000 });
+  await page.waitForTimeout(600);
   const q2 = await quickOpen('graph', 262);
   const calcKey = async (k) => { await page.click(`.bcv-calc__key[data-key="${k}"]`); };
   const calcShown = () => texts('.bcv-calc__display').then((t) => t[0]);

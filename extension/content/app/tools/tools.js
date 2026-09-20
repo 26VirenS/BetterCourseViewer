@@ -409,7 +409,7 @@
   function islandHover(item) {
     let leave = 0;
     item.addEventListener('pointerenter', (e) => {
-      if (e.pointerType === 'touch' || item.classList.contains('is-out')) return;
+      if (e.pointerType === 'touch' || item.classList.contains('is-out') || document.querySelector('.bcv-tool-ov')) return; // (a tool open over the page: the pins stay folded)
       clearTimeout(leave);
       item.classList.add('is-hover');
       if (item.classList.contains('is-open')) return;
@@ -630,8 +630,10 @@
   // to convert, a set to study — and folds when the pointer leaves. The full tool is a press on the
   // pin (or Enter) away, as before, and a press on the capsule's name. The calculator's pin swells
   // into more than a capsule: a panel with the whole scientific calculator in it (Apple's, key for
-  // key). The citation generator's pin has no capsule: it is a button to the tool, nothing more.
+  // key). The citation generator's pin swells into a panel too: a link to cite, the page you are on,
+  // the style, and the last citations saved with a copy button each.
   const QUICK = {
+    cite: { w: 400, h: 150, panel: true, build: quickCite },
     graph: { w: 408, h: 262, panel: true, build: quickCalc },
     need: { w: 400, build: quickNeed },
     conv: { w: 250, build: quickConv },
@@ -665,7 +667,7 @@
       item.setAttribute('aria-expanded', 'true');
     };
     item.addEventListener('pointerenter', (e) => {
-      if (e.pointerType === 'touch' || item.classList.contains('is-out')) return;
+      if (e.pointerType === 'touch' || item.classList.contains('is-out') || document.querySelector('.bcv-tool-ov')) return; // (a tool open over the page: the pins stay folded)
       clearTimeout(leave);
       item.classList.add('is-hover');
       for (const other of document.querySelectorAll('#bcv-pins .bcv-quick.is-open')) if (other !== item) { other.querySelector(':focus')?.blur(); other.classList.remove('is-hover'); other.classList.remove('is-open'); other.setAttribute('aria-expanded', 'false'); } // (one open at a time: a calculator left with the focus folds when the pointer moves on)
@@ -864,6 +866,84 @@
     root.append(head, display, U.el('bcv-calc__keys', rows));
     paint();
     return { els: [root] };
+  }
+  /** Citation generator: a link pasted here opens the generator with it in (a YouTube link as a
+   *  video, a doi.org link as a journal article, anything else as a website with today's date);
+   *  Cite this page opens it with the page you are on filled in — on a course page as a course
+   *  file with the course and its instructor, elsewhere as a website; the style picked here is
+   *  kept (the generator starts in it); and the last three citations saved sit under it, each
+   *  with a copy button, with Copy list for all of them alphabetically. */
+  function quickCite({ item, go }) {
+    const C = () => BCV.toolsCite || {};
+    const STYLES = C().STYLES || [['mla', 'MLA 9'], ['apa', 'APA 7'], ['chicago', 'Chicago 17']];
+    const STYLE_KEY = C().STYLE_KEY || 'tools:cite:style';
+    const SAVED_KEY = C().KEY || 'tools:citations';
+    const GENERIC = new Set(['Home', 'Announcements', 'Assignments', 'Discussions', 'Grades', 'People', 'Pages', 'Files', 'Syllabus', 'Quizzes', 'Modules', 'Back', 'Course', 'Group']);
+    let style = 'mla';
+    let all = [];
+    const today = () => (C().todayWords ? C().todayWords() : new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }));
+    /** What a pasted link tells: the kind of source and the fields it settles. */
+    function linkPrefill(v) {
+      let u = null;
+      try { u = new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(v) ? v : `https://${v}`); } catch { /* not a link as such: handed over as typed */ }
+      const host = u ? u.hostname.replace(/^www\./, '') : '';
+      if (/(^|\.)(youtube\.com|youtu\.be)$/.test(host)) return { type: 'video', fields: { container: 'YouTube', url: v } };
+      if (/(^|\.)vimeo\.com$/.test(host)) return { type: 'video', fields: { container: 'Vimeo', url: v } };
+      if (/(^|\.)doi\.org$/.test(host)) return { type: 'journal', fields: { doi: u.pathname.replace(/^\/+/, '') } };
+      return { type: 'website', fields: { url: v, accessed: today() } };
+    }
+    /** The page you are on: its title where a screen shows one, the course and its instructor on a course page. */
+    function hereNow() {
+      const app = BCV.app || {};
+      const r = app.state?.route || app.parseRoute?.() || null;
+      const trail = app.state?.trail || [];
+      const top = trail[trail.length - 1];
+      const label = top && r && top.url === r.url ? String(top.label || '').trim() : '';
+      const shown = document.querySelector('.bcv-reader-ov__doc h1, .bcv-sb__h1, .bcv-qz__h1, .bcv-sheet:not(.bcv-tool) .bcv-sheet__title')?.textContent?.trim() || '';
+      const c = r?.courseId ? (app.state?.favs || []).find((x) => String(x.id) === String(r.courseId)) : null;
+      const courseName = c?.shortName || c?.name || '';
+      if (r && r.screen === 'course' && r.courseId) {
+        const title = shown || (label && label !== courseName && !GENERIC.has(label) ? label : '');
+        return { type: 'coursefile', sub: [title, c?.code || courseName].filter(Boolean).join(' · ') || 'this course, as a course file', fields: { title, course: c?.code || courseName, author: (c?.teachers || []).slice(0, 3).join('; '), year: String(new Date().getFullYear()), url: location.href } };
+      }
+      const title = shown || (label && !GENERIC.has(label) ? label : '') || String(document.title || '').replace(/\s+[·|]\s+[^·|]*$/, '').trim();
+      return { type: 'website', sub: title || location.hostname, fields: { title, container: app.siteName?.() || location.hostname, url: location.href, accessed: today() } };
+    }
+    const link = h('input', { type: 'text', inputmode: 'url', class: 'bcv-quick__input', placeholder: 'Paste a link to cite', 'aria-label': 'A link to cite', autocomplete: 'off', spellcheck: 'false' });
+    const citeLink = () => { const v = link.value.trim(); if (!v) { link.focus(); return; } go({ style, ...linkPrefill(v) }); link.value = ''; };
+    link.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); citeLink(); } });
+    const hereSub = U.text('bcv-qcite__heresub bcv-ellip', '', 'span');
+    const here = h('button', { type: 'button', class: 'bcv-qcite__here', title: 'Open the generator with this page filled in', onclick: () => { const n = hereNow(); go({ style, type: n.type, fields: n.fields }); } }, [
+      h('span', { class: 'bcv-qcite__hereic' }, U.svg(IC.page, { size: 12, stroke: 'currentColor', width: 2.1 })),
+      U.el('bcv-qcite__heretext', [U.text('bcv-qcite__heretitle', 'Cite this page', 'span'), hereSub]),
+      U.svg(IC.chevron, { size: 12, stroke: 'rgba(255,255,255,.5)', width: 2.2 }),
+    ]);
+    const styles = U.el('bcv-qcite__styles', null, { role: 'group', 'aria-label': 'Citation style' });
+    const paintStyles = () => styles.replaceChildren(...STYLES.map(([k, name]) => h('button', { type: 'button', class: `bcv-qcite__style${k === style ? ' is-on' : ''}`, dataset: { style: k }, 'aria-pressed': k === style ? 'true' : 'false', title: `Cite in ${name}`, text: name, onclick: () => { style = k; save(STYLE_KEY, k); paintStyles(); } })));
+    const copyAll = h('button', { type: 'button', class: 'bcv-qcite__link', text: 'Copy list', title: 'Copy every saved citation, alphabetically', onclick: () => { copyText(all.map((x) => x.plain).sort().join('\n')); U.toast('List copied, alphabetically.'); } });
+    const saved = U.el('bcv-qcite__saved');
+    const root = U.el('bcv-qcite', [
+      U.el('bcv-qcite__row', [quickName('Cite', () => go({ style }), 'Open the citation generator'), link, quickGo(IC.chevron, 'Cite this link', citeLink)]),
+      here,
+      U.el('bcv-qcite__row', [styles, U.text('bcv-qcite__label', 'Saved', 'span'), copyAll]),
+      saved,
+    ]);
+    const onOpen = async () => {
+      hereSub.textContent = hereNow().sub;
+      const [s, raw] = await Promise.all([load(STYLE_KEY, 'mla'), load(SAVED_KEY, [])]);
+      style = STYLES.some(([k]) => k === s) ? s : 'mla';
+      paintStyles();
+      all = Array.isArray(raw) ? raw.filter((x) => x && typeof x.plain === 'string' && x.plain) : [];
+      const last = all.slice(-3).reverse();
+      copyAll.hidden = !all.length;
+      saved.replaceChildren(...(last.length ? last.map((x) => U.el('bcv-qcite__item', [
+        h('span', { class: 'bcv-qcite__tag', text: x.style || '' }),
+        h('span', { class: 'bcv-qcite__text bcv-ellip', text: x.plain, title: x.plain }),
+        h('button', { type: 'button', class: 'bcv-qcite__copy', title: 'Copy this citation', 'aria-label': 'Copy this citation', onclick: () => { copyText(x.plain); U.toast('Copied.'); } }, U.svg(IC.copy, { size: 12, stroke: 'currentColor', width: 2.1 })),
+      ])) : [U.text('bcv-qcite__none', 'Citations you save in the generator show here.', 'span')]));
+      item.style.setProperty('--bcv-quick-h', `${132 + (last.length ? 32 * last.length - 4 : 18)}px`); // (the panel's height follows what is in it)
+    };
+    return { els: [root], onOpen };
   }
   /** Grade needed: your grade now, what the work left is worth, the grade wanted — the mark it takes. */
   function quickNeed({ go }) {

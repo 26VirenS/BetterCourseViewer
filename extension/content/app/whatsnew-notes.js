@@ -23,6 +23,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.38.0', date: '2026-09-20', notes: [
+      { kind: 'new', title: 'The Cite pin opens a panel', body: 'Paste a link, cite the page you are on, pick the style, copy a saved citation.', icon: P.pin },
+    ] },
     { version: '2.37.1', date: '2026-09-20', notes: [
       { kind: 'fixed', title: 'Citation generator laid out', body: 'Style and source sit on one row across the popup; the style switch has its room back.', icon: P.list },
     ] },
