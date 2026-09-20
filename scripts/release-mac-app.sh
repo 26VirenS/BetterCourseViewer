@@ -54,11 +54,20 @@ xcodebuild \
   CODE_SIGN_IDENTITY="Developer ID Application" \
   DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
   OTHER_CODE_SIGN_FLAGS="--timestamp" \
+  CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO \
   MARKETING_VERSION="$VERSION" \
   build | tail -n 20
+# (CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO: a plain build otherwise carries the debugger's
+# get-task-allow entitlement, and the notary service refuses an app that asks for it)
 APP="build/mac/Build/Products/Release/$APP_NAME.app"
 [[ -d "$APP" ]] || { echo "The app was not built at $APP" >&2; exit 1; }
 codesign --verify --deep --strict --verbose=2 "$APP"
+echo "▶ Signed as:"
+codesign -dvv "$APP" 2>&1 | grep -E "^(Authority|TeamIdentifier|Timestamp|Runtime Version)" | sed 's/^/    /'
+echo "▶ The app's entitlements:"
+codesign -d --entitlements :- "$APP" 2>/dev/null | grep -E "<key>|<string>|<true/>|<false/>" | sed 's/^[[:space:]]*/    /'
+echo "▶ The extension's entitlements:"
+codesign -d --entitlements :- "$APP/Contents/PlugIns/$APP_NAME Extension.appex" 2>/dev/null | grep -E "<key>|<string>|<true/>|<false/>" | sed 's/^[[:space:]]*/    /'
 
 # ---- notarize, staple, zip ---------------------------------------------------------------------------
 mkdir -p dist
@@ -66,7 +75,16 @@ ZIP="dist/$ZIP_NAME"
 rm -f "$ZIP"
 ditto -c -k --keepParent "$APP" "$ZIP"
 echo "▶ Notarizing"
-xcrun notarytool submit "$ZIP" --apple-id "$APPLE_ID" --password "$APPLE_APP_PASSWORD" --team-id "$APPLE_TEAM_ID" --wait
+SUBMIT="$(xcrun notarytool submit "$ZIP" --apple-id "$APPLE_ID" --password "$APPLE_APP_PASSWORD" --team-id "$APPLE_TEAM_ID" --wait --output-format json 2>&1 || true)"
+echo "$SUBMIT"
+SUBMISSION_ID="$(printf '%s' "$SUBMIT" | python3 -c "import json,sys; print(json.loads(sys.stdin.read().strip().splitlines()[-1]).get('id',''))" 2>/dev/null || true)"
+STATUS="$(printf '%s' "$SUBMIT" | python3 -c "import json,sys; print(json.loads(sys.stdin.read().strip().splitlines()[-1]).get('status',''))" 2>/dev/null || true)"
+if [[ "$STATUS" != "Accepted" ]]; then
+  echo "▶ The notary service said: ${STATUS:-nothing}. Its log:"
+  [[ -n "$SUBMISSION_ID" ]] && xcrun notarytool log "$SUBMISSION_ID" --apple-id "$APPLE_ID" --password "$APPLE_APP_PASSWORD" --team-id "$APPLE_TEAM_ID" || true
+  echo "The app was not notarized, so it was not published." >&2
+  exit 1
+fi
 xcrun stapler staple "$APP"
 rm -f "$ZIP"
 ditto -c -k --keepParent "$APP" "$ZIP" # the zip people download carries the stapled ticket
