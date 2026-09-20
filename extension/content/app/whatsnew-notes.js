@@ -23,6 +23,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.43.1', date: '2026-09-20', notes: [
+      { kind: 'improved', title: 'A small periodic table', body: 'Hover the periodic table pin for the whole table, small; press an element to open it.', icon: P.layers },
+    ] },
     { version: '2.43.0', date: '2026-09-20', notes: [
       { kind: 'new', title: 'Setup finds Canvas', body: 'Install, open your Canvas, and setup begins there — at any address your school uses.', icon: P.sparkle },
       { kind: 'improved', title: 'A shorter first page', body: 'The page after install just says Open your Canvas, and closes itself once setup begins.', icon: P.steps },

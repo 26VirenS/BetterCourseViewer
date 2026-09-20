@@ -649,7 +649,7 @@
     cite: { w: 400, h: 150, panel: true, build: quickCite },
     calc: { w: 408, h: 262, panel: true, build: quickCalc },
     graph: { w: 340, h: 470, panel: true, build: quickGraph },
-    ptable: { w: 430, build: quickPtable },
+    ptable: { w: 408, h: 262, panel: true, build: quickPtable }, // (the calculator's panel, to the pixel: the whole table, small)
     need: { w: 400, build: quickNeed },
     conv: { w: 250, build: quickConv },
     pdfx: { w: 250, build: quickPdfs },
@@ -898,18 +898,47 @@
     const onOpen = () => { if (loaded) return; loaded = true; document.addEventListener('securitypolicyviolation', onCsp); frame.src = DESMOS; };
     return { els: [root], onOpen };
   }
-  /** Periodic table: an element looked up by symbol, name or number as you type, its name, number
-   *  and mass in a line; Enter (or the arrow) opens the table on it. */
+  /** Periodic table: the whole table, small — every element in its place, coloured by its kind, in
+   *  a panel the size of the calculator's — with a search that lights the matches as you type and a
+   *  line naming the element under the pointer (or the first match): its name, number and mass.
+   *  A press on an element opens the table on it; so does Enter, on the first match. */
   function quickPtable({ go }) {
     const P = () => BCV.toolsPtable;
-    const input = h('input', { type: 'text', class: 'bcv-quick__input', placeholder: 'Symbol, name or number', 'aria-label': 'Find an element', autocomplete: 'off', spellcheck: 'false' });
-    const out = U.text('bcv-quick__result bcv-quick__result--wide', '', 'span');
-    let hit = null;
-    const look = () => { hit = P()?.find(input.value)[0] || null; out.textContent = hit ? P().line(hit) : input.value.trim() ? 'No element' : ''; };
-    const openOn = () => go(hit ? { select: hit.number } : {});
+    const input = h('input', { type: 'text', class: 'bcv-quick__input', placeholder: 'Find an element', 'aria-label': 'Find an element', autocomplete: 'off', spellcheck: 'false' });
+    const line = U.text('bcv-qpt__line', '', 'span');
+    const grid = U.el('bcv-qpt__grid', null, { role: 'grid', 'aria-label': 'The periodic table' });
+    const cells = new Map();
+    let hit = null; // the first element the search finds
+    let over = null; // the element under the pointer
+    const say = () => { const e = over || hit; line.textContent = e ? P().line(e) : input.value.trim() ? 'No element' : ''; };
+    // built on the first hover, once the elements are here (the table's own script loads after this one)
+    const build = () => {
+      const T = P();
+      if (!T || cells.size) return;
+      for (const e of T.ELEMENTS) {
+        const c = T.CATS.find((k) => k[0] === e.category) || T.CATS[T.CATS.length - 1];
+        const cell = h('button', { type: 'button', class: 'bcv-qpt__cell', dataset: { symbol: e.symbol, number: String(e.number) }, style: { '--c': c[2], gridColumn: String(e.x), gridRow: String(e.y) }, title: `${e.name} · ${e.number}`, 'aria-label': `${e.name}, ${e.number}`, text: e.symbol, onclick: () => go({ select: e.number }) });
+        cell.addEventListener('pointerenter', () => { over = e; say(); });
+        cell.addEventListener('pointerleave', () => { if (over === e) { over = null; say(); } });
+        cells.set(e.number, cell);
+        grid.append(cell);
+      }
+    };
+    const look = () => {
+      const T = P();
+      if (!T) return;
+      const q = input.value.trim();
+      const found = q ? T.find(q) : [];
+      hit = found[0] || null;
+      over = null; // typing takes the line, whatever the pointer rests on
+      const ids = new Set(found.map((e) => e.number));
+      for (const [n, cell] of cells) { cell.classList.toggle('is-match', !!q && ids.has(n)); cell.classList.toggle('is-dim', !!q && !ids.has(n)); }
+      say();
+    };
     input.addEventListener('input', look);
-    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); openOn(); } });
-    return { els: [quickName('Elements', go, 'Open the periodic table'), input, out, quickGo(IC.chevron, 'Open the table on it', openOn)] };
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); go(hit ? { select: hit.number } : {}); } });
+    const root = U.el('bcv-qpt', [U.el('bcv-qpt__head', [quickName('Elements', go, 'Open the periodic table'), input, line]), grid]);
+    return { els: [root], onOpen: build };
   }
   /** Citation generator: a link pasted here opens the generator with it in (a YouTube link as a
    *  video, a doi.org link as a journal article, anything else as a website with today's date);
