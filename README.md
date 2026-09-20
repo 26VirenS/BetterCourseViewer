@@ -44,6 +44,12 @@ Store to point at:
 `public/_redirects` sends `/privacy.html` to `/privacy` so the short address is the only one
 anyone sees, and `public/_headers` sets three safety headers.
 
+Two more addresses are the Mac app's. `/download/mac` is a redirect to the signed zip on the
+latest GitHub Release, so the download button on the page never changes; `/app/latest.json` is the
+update feed the app reads every hour (its version, the download's address and SHA-256). The
+release workflow on the development branch (`scripts/release-mac-app.sh`) rewrites both and pushes
+here after every release, so neither needs editing by hand.
+
 ## Editing
 
 The pages are plain HTML with inline styles. The links that leave the site are the two
