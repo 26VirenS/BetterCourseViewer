@@ -23,6 +23,10 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.44.0', date: '2026-09-20', notes: [
+      { kind: 'new', title: 'Settings live in the app', body: 'On a Mac, Simpl Courses is set up and controlled from its app; Safari follows it.', icon: P.tool },
+      { kind: 'new', title: 'The app updates itself', body: 'It checks simplcourses.com every hour and installs a new version on its own.', icon: P.arrows },
+    ] },
     { version: '2.43.1', date: '2026-09-20', notes: [
       { kind: 'improved', title: 'A small periodic table', body: 'Hover the periodic table pin for the whole table, small; press an element to open it.', icon: P.layers },
     ] },

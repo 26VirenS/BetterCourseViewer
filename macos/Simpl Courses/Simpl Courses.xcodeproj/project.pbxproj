@@ -7,11 +7,12 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A1B2C3D400000001000000A1 /* SharedStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D400000010000000A1 /* SharedStore.swift */; };
+		A1B2C3D400000002000000A1 /* SharedStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D400000010000000A1 /* SharedStore.swift */; };
+		A1B2C3D400000003000000A1 /* Updater.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D400000011000000A1 /* Updater.swift */; };
+		A1B2C3D400000004000000A1 /* Bridge.js in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D400000012000000A1 /* Bridge.js */; };
 		F7FED3AB3053804600DCC66B /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7FED3AA3053804600DCC66B /* AppDelegate.swift */; };
-		F7FED3AF3053804600DCC66B /* Main.html in Resources */ = {isa = PBXBuildFile; fileRef = F7FED3AD3053804600DCC66B /* Main.html */; };
 		F7FED3B13053804600DCC66B /* Icon.png in Resources */ = {isa = PBXBuildFile; fileRef = F7FED3B03053804600DCC66B /* Icon.png */; };
-		F7FED3B33053804600DCC66B /* Style.css in Resources */ = {isa = PBXBuildFile; fileRef = F7FED3B23053804600DCC66B /* Style.css */; };
-		F7FED3B53053804600DCC66B /* Script.js in Resources */ = {isa = PBXBuildFile; fileRef = F7FED3B43053804600DCC66B /* Script.js */; };
 		F7FED3B73053804600DCC66B /* ViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7FED3B63053804600DCC66B /* ViewController.swift */; };
 		F7FED3BA3053804600DCC66B /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = F7FED3B83053804600DCC66B /* Main.storyboard */; };
 		F7FED3BC3053804700DCC66B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F7FED3BB3053804700DCC66B /* Assets.xcassets */; };
@@ -50,12 +51,14 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		A1B2C3D400000010000000A1 /* SharedStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedStore.swift; sourceTree = "<group>"; };
+		A1B2C3D400000011000000A1 /* Updater.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Updater.swift; sourceTree = "<group>"; };
+		A1B2C3D400000012000000A1 /* Bridge.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = Bridge.js; sourceTree = "<group>"; };
+		A1B2C3D400000013000000A1 /* Simpl Courses.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "Simpl Courses.entitlements"; sourceTree = "<group>"; };
+		A1B2C3D400000014000000A1 /* Simpl Courses Extension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "Simpl Courses Extension.entitlements"; sourceTree = "<group>"; };
 		F7FED3A73053804600DCC66B /* Simpl Courses.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Simpl Courses.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		F7FED3AA3053804600DCC66B /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
-		F7FED3AE3053804600DCC66B /* Base */ = {isa = PBXFileReference; lastKnownFileType = text.html; name = Base; path = Base.lproj/Main.html; sourceTree = "<group>"; };
 		F7FED3B03053804600DCC66B /* Icon.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = Icon.png; sourceTree = "<group>"; };
-		F7FED3B23053804600DCC66B /* Style.css */ = {isa = PBXFileReference; lastKnownFileType = text.css; path = Style.css; sourceTree = "<group>"; };
-		F7FED3B43053804600DCC66B /* Script.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = Script.js; sourceTree = "<group>"; };
 		F7FED3B63053804600DCC66B /* ViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewController.swift; sourceTree = "<group>"; };
 		F7FED3B93053804600DCC66B /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
 		F7FED3BB3053804700DCC66B /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -92,8 +95,17 @@
 			children = (
 				F7FED3A93053804600DCC66B /* Simpl Courses */,
 				F7FED3C63053804700DCC66B /* Simpl Courses Extension */,
+				A1B2C3D400000020000000A1 /* Shared */,
 				F7FED3A83053804600DCC66B /* Products */,
 			);
+			sourceTree = "<group>";
+		};
+		A1B2C3D400000020000000A1 /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				A1B2C3D400000010000000A1 /* SharedStore.swift */,
+			);
+			path = Shared;
 			sourceTree = "<group>";
 		};
 		F7FED3A83053804600DCC66B /* Products */ = {
@@ -110,6 +122,8 @@
 			children = (
 				F7FED3AA3053804600DCC66B /* AppDelegate.swift */,
 				F7FED3B63053804600DCC66B /* ViewController.swift */,
+				A1B2C3D400000011000000A1 /* Updater.swift */,
+				A1B2C3D400000013000000A1 /* Simpl Courses.entitlements */,
 				F7FED3B83053804600DCC66B /* Main.storyboard */,
 				F7FED3BB3053804700DCC66B /* Assets.xcassets */,
 				F7FED3BD3053804700DCC66B /* Info.plist */,
@@ -121,10 +135,8 @@
 		F7FED3AC3053804600DCC66B /* Resources */ = {
 			isa = PBXGroup;
 			children = (
-				F7FED3AD3053804600DCC66B /* Main.html */,
 				F7FED3B03053804600DCC66B /* Icon.png */,
-				F7FED3B23053804600DCC66B /* Style.css */,
-				F7FED3B43053804600DCC66B /* Script.js */,
+				A1B2C3D400000012000000A1 /* Bridge.js */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -135,6 +147,7 @@
 				F7FED3D33053804700DCC66B /* Resources */,
 				F7FED3C73053804700DCC66B /* SafariWebExtensionHandler.swift */,
 				F7FED3C93053804700DCC66B /* Info.plist */,
+				A1B2C3D400000014000000A1 /* Simpl Courses Extension.entitlements */,
 			);
 			path = "Simpl Courses Extension";
 			sourceTree = "<group>";
@@ -235,11 +248,9 @@
 			isa = PBXResourcesBuildPhase;
 			files = (
 				F7FED3B13053804600DCC66B /* Icon.png in Resources */,
+				A1B2C3D400000004000000A1 /* Bridge.js in Resources */,
 				F7FED3BA3053804600DCC66B /* Main.storyboard in Resources */,
-				F7FED3B53053804600DCC66B /* Script.js in Resources */,
-				F7FED3AF3053804600DCC66B /* Main.html in Resources */,
 				F7FED3BC3053804700DCC66B /* Assets.xcassets in Resources */,
-				F7FED3B33053804600DCC66B /* Style.css in Resources */,
 			);
 		};
 		F7FED3C03053804700DCC66B /* Resources */ = {
@@ -263,12 +274,15 @@
 			files = (
 				F7FED3B73053804600DCC66B /* ViewController.swift in Sources */,
 				F7FED3AB3053804600DCC66B /* AppDelegate.swift in Sources */,
+				A1B2C3D400000003000000A1 /* Updater.swift in Sources */,
+				A1B2C3D400000001000000A1 /* SharedStore.swift in Sources */,
 			);
 		};
 		F7FED3BE3053804700DCC66B /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			files = (
 				F7FED3C83053804700DCC66B /* SafariWebExtensionHandler.swift in Sources */,
+				A1B2C3D400000002000000A1 /* SharedStore.swift in Sources */,
 			);
 		};
 /* End PBXSourcesBuildPhase section */
@@ -282,14 +296,6 @@
 /* End PBXTargetDependency section */
 
 /* Begin PBXVariantGroup section */
-		F7FED3AD3053804600DCC66B /* Main.html */ = {
-			isa = PBXVariantGroup;
-			children = (
-				F7FED3AE3053804600DCC66B /* Base */,
-			);
-			name = Main.html;
-			sourceTree = "<group>";
-		};
 		F7FED3B83053804600DCC66B /* Main.storyboard */ = {
 			isa = PBXVariantGroup;
 			children = (
@@ -422,12 +428,12 @@
 		F7FED3CD3053804700DCC66B /* Debug configuration for PBXNativeTarget "Simpl Courses Extension" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = "Simpl Courses Extension/Simpl Courses Extension.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = P258W5X962;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
-				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Simpl Courses Extension/Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "Simpl Courses Extension";
@@ -438,7 +444,7 @@
 					"@executable_path/../../../../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				MARKETING_VERSION = 2.43.1;
+				MARKETING_VERSION = 2.44.0;
 				OTHER_LDFLAGS = (
 					"-framework",
 					SafariServices,
@@ -457,12 +463,12 @@
 		F7FED3CE3053804700DCC66B /* Release configuration for PBXNativeTarget "Simpl Courses Extension" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = "Simpl Courses Extension/Simpl Courses Extension.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = P258W5X962;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
-				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Simpl Courses Extension/Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "Simpl Courses Extension";
@@ -473,7 +479,7 @@
 					"@executable_path/../../../../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				MARKETING_VERSION = 2.43.1;
+				MARKETING_VERSION = 2.44.0;
 				OTHER_LDFLAGS = (
 					"-framework",
 					SafariServices,
@@ -494,14 +500,13 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "Simpl Courses/Simpl Courses.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = P258W5X962;
-				ENABLE_APP_SANDBOX = YES;
+				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
-				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
-				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Simpl Courses/Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "Simpl Courses";
@@ -512,7 +517,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 2.43.1;
+				MARKETING_VERSION = 2.44.0;
 				OTHER_LDFLAGS = (
 					"-framework",
 					SafariServices,
@@ -536,14 +541,13 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "Simpl Courses/Simpl Courses.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = P258W5X962;
-				ENABLE_APP_SANDBOX = YES;
+				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
-				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
-				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Simpl Courses/Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "Simpl Courses";
@@ -554,7 +558,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 2.43.1;
+				MARKETING_VERSION = 2.44.0;
 				OTHER_LDFLAGS = (
 					"-framework",
 					SafariServices,

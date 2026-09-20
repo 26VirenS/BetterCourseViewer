@@ -17,14 +17,23 @@
     }
   });
 
+  // In the Mac app's window (the page over its bridge, Resources/Bridge.js) the app comes first —
+  // Safari's word on the extension, updates, open at login — and the two sections that need the
+  // browser's Canvas session (courses, grades) are not here: those are set on Canvas's own pages.
+  const inApp = !!self.SimplApp;
   const NAV = [
+    ...(inApp ? [['app', 'This Mac', 'M4 5h16v11H4zM8 20h8M12 16v4']] : []),
     ['general', 'General', 'M12 3l7 4v6c0 4-3 7-7 8-4-1-7-4-7-8V7z'],
-    ['courses', 'Courses & targets', 'M5 4h13v16H5zM5 17h13M9 8h5'],
-    ['grades', 'Grades', 'M4 19h16M7 16V9M12 16V5M17 16v-4'],
+    ...(inApp ? [] : [
+      ['courses', 'Courses & targets', 'M5 4h13v16H5zM5 17h13M9 8h5'],
+      ['grades', 'Grades', 'M4 19h16M7 16V9M12 16V5M17 16v-4'],
+    ]),
     ['appearance', 'Appearance', 'M12 3a9 9 0 100 18c1.1 0 2-.9 2-2 0-1.5 1-2 2-2h1a4 4 0 004-4c0-5-4.5-10-9-10z'],
     ['sites', 'Canvas sites', 'M12 3a9 9 0 100 18 9 9 0 000-18zM3 12h18M12 3a15 15 0 010 18a15 15 0 010-18'],
     ['data', 'Data & about', 'M4 7c0-1.7 3.6-3 8-3s8 1.3 8 3-3.6 3-8 3-8-1.3-8-3zM4 7v10c0 1.7 3.6 3 8 3s8-1.3 8-3V7'],
   ];
+  const NAV_KEYS = new Set(NAV.map(([k]) => k));
+  if (inApp) $('app').hidden = false;
   const LETTERS = ['C', 'B', 'B+', 'A-', 'A', 'A+', 'P/F']; // target letters, lowest on the left (saved as the letter the Grades page reads); P/F: pass/fail, out of the GPA
   const OLD_SCALE = ['A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-', 'D', 'F']; // targets saved before A+ existed were indices into this
   const targetLetter = (t) => (Number.isInteger(t) ? OLD_SCALE[t] : typeof t === 'string' ? t.replace(/−/g, '-') : null) || 'A';
@@ -141,8 +150,8 @@
     nav.append(h('button', { type: 'button', class: 'navlink', dataset: { section: key }, onclick: () => { history.replaceState(null, '', `#${key}`); showSection(key); } }, [tile, h('span', { class: 'navlink__label', text: label }), h('span', { class: 'navlink__dot', id: `dot-${key}`, hidden: true })]));
   }
   function showSection(id) {
-    let sec = document.getElementById(id);
-    if (!sec || !sec.classList.contains('section')) sec = document.querySelector('.section');
+    let sec = NAV_KEYS.has(id) ? document.getElementById(id) : null;
+    if (!sec || !sec.classList.contains('section')) sec = document.getElementById(NAV[0][0]);
     document.querySelectorAll('.section').forEach((s) => s.classList.toggle('is-active', s === sec));
     document.querySelectorAll('.navlink').forEach((a) => a.classList.toggle('is-active', a.dataset.section === sec.id));
     $('title').innerHTML = sec.dataset.title;
@@ -191,8 +200,8 @@
     const msg = $('generalMsg');
     if (!site.origin) {
       msg.hidden = false;
-      msg.textContent = 'Open your Canvas once so Simpl Courses knows the site, then come back here.';
-      await api.tabs.create({ url: api.runtime.getURL('setup/setup.html') }).catch(() => {});
+      msg.textContent = inApp ? 'Open your Canvas in Safari once so Simpl Courses knows the site, then come back here.' : 'Open your Canvas once so Simpl Courses knows the site, then come back here.';
+      if (!inApp) await api.tabs.create({ url: api.runtime.getURL('setup/setup.html') }).catch(() => {});
       return;
     }
     if (settings.appearance.skin === false) await save({ appearance: { skin: true } });
@@ -204,6 +213,56 @@
   };
   $('runTour').addEventListener('click', () => openOnCanvas('tour'));
   $('openSetup').addEventListener('click', () => openOnCanvas('setup'));
+
+  // ---- This Mac (the app's window only) --------------------------------------------------------------
+  if (inApp) {
+    const EXT = {
+      on: ['Simpl Courses is on in Safari', 'Turn it off under Safari → Settings → Extensions.'],
+      off: ['Simpl Courses is off in Safari', 'Tick it under Safari → Settings → Extensions, and open your Canvas: the setup begins there.'],
+      missing: ['Safari does not have the extension yet', ''],
+      unknown: ['Reading Safari…', ''],
+    };
+    const when = (t) => (t ? new Date(t * 1000).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) : '');
+    const paintApp = (st) => {
+      const e = st.extension || {};
+      const [t, sub] = EXT[e.state] || EXT.unknown;
+      $('extTitle').textContent = t;
+      $('extSub').textContent = e.state === 'missing' ? (e.detail || '') : sub;
+      $('extSteps').hidden = e.state !== 'missing';
+      const u = st.update || {};
+      const act = $('updAction');
+      act.hidden = true;
+      const checked = u.checked ? `Checked at ${when(u.checked)} · checks every hour` : 'Checks every hour.';
+      switch (u.state) {
+        case 'checking': $('updTitle').textContent = 'Checking for updates…'; $('updSub').textContent = `Version ${st.version}`; break;
+        case 'available': $('updTitle').textContent = `Version ${u.available} is ready`; $('updSub').textContent = `You have ${st.version}.${u.automatic === false ? '' : ' It installs by itself in a moment.'}`; act.hidden = false; break;
+        case 'downloading': $('updTitle').textContent = 'Downloading the update…'; $('updSub').textContent = `${Math.round((u.progress || 0) * 100)}%`; break;
+        case 'installing': $('updTitle').textContent = 'Installing…'; $('updSub').textContent = 'The app opens again by itself.'; break;
+        case 'failed': $('updTitle').textContent = 'Could not check for updates'; $('updSub').textContent = u.message || ''; break;
+        case 'upToDate': $('updTitle').textContent = `Version ${st.version} is the newest`; $('updSub').textContent = checked; break;
+        default: $('updTitle').textContent = `Version ${st.version}`; $('updSub').textContent = checked;
+      }
+      $('checkUpdates').disabled = ['checking', 'downloading', 'installing'].includes(u.state);
+      setSwitch($('autoUpdate'), u.automatic !== false);
+      setSwitch($('loginItem'), !!st.loginItem);
+      if (document.querySelector('.section.is-active')?.id === 'data') renderStats();
+    };
+    self.SimplApp.onState(paintApp);
+    $('openSafari').addEventListener('click', async () => {
+      const r = await self.SimplApp.openSafariSettings().catch(() => null);
+      const msg = $('appMsg');
+      msg.hidden = !(r && r.ok === false);
+      if (r && r.ok === false) msg.textContent = `${r.message || 'Safari could not open its settings.'} Open Safari, then Safari → Settings → Extensions and tick Simpl Courses.`;
+    });
+    $('checkUpdates').addEventListener('click', () => { self.SimplApp.checkUpdates(); });
+    $('updAction').addEventListener('click', () => { self.SimplApp.installUpdate(); });
+    onSwitch($('autoUpdate'), (on) => { setSwitch($('autoUpdate'), on); self.SimplApp.setAutoUpdate(on); });
+    onSwitch($('loginItem'), async (on) => {
+      setSwitch($('loginItem'), on);
+      const r = await self.SimplApp.setLoginItem(on).catch(() => null);
+      if (r && r.ok === false) { setSwitch($('loginItem'), !on); flash(r.message || 'Could not change the login item', true); }
+    });
+  }
 
   // ---- Courses & targets ------------------------------------------------------------------------------
   const courses = { list: null, shown: new Set(), targets: {}, loading: false };
@@ -394,6 +453,7 @@
     return [...out.values()];
   }
   function download(name, text, type) {
+    if (inApp) { self.SimplApp.saveFile(name, text).then((r) => { if (r && r.ok) flash('Saved'); else if (r && !r.cancelled) flash(r.message || 'Could not save', true); }); return; }
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([text], { type }));
     a.download = name;
@@ -475,7 +535,7 @@
     settings = await S.get();
     $('newDomain').value = '';
     $('addDomain').disabled = true;
-    msg.textContent = `Enabled on ${origin}. Reload that tab.`;
+    msg.textContent = r.message || `Enabled on ${origin}. Reload that tab.`;
     flash();
     paintAll();
   });
@@ -501,6 +561,17 @@
 
   // ---- Data & about ----------------------------------------------------------------------------------
   async function renderStats() {
+    if (inApp) {
+      const st = self.SimplApp.state() || {};
+      const extState = { on: 'on', off: 'off', missing: 'not found' }[st.extension?.state] || '…';
+      $('dataStats').replaceChildren(
+        h('div', { class: 'stat' }, [h('span', { text: 'Settings kept' }), h('b', { text: 'in the app, shared with Safari' })]),
+        h('div', { class: 'stat' }, [h('span', { text: 'Canvas data kept here' }), h('b', { text: 'none' })]),
+        h('div', { class: 'stat' }, [h('span', { text: 'Extension in Safari' }), h('b', { text: extState })]),
+        h('div', { class: 'stat' }, [h('span', { text: 'Grade history' }), h('b', { text: 'in Safari, on the Grades page' })]),
+      );
+      return;
+    }
     let snaps = 0;
     let sites = 0;
     try {
@@ -523,7 +594,7 @@
   // Reset everything above is what clears the settings, keys and history in every case.
   function paintUninstall() {
     const proto = location.protocol;
-    const platform = proto === 'safari-web-extension:' ? 'safari' : proto === 'file:' ? 'ios' : proto === 'moz-extension:' ? 'firefox' : 'chrome';
+    const platform = inApp || proto === 'safari-web-extension:' ? 'safari' : proto === 'file:' ? 'ios' : proto === 'moz-extension:' ? 'firefox' : 'chrome';
     const li = (parts) => h('li', {}, parts.map((p) => (typeof p === 'string' ? document.createTextNode(p) : p)));
     const b = (t) => h('b', { text: t });
     const code = (t) => h('code', { text: t });
@@ -555,12 +626,21 @@
     const copy = JSON.parse(JSON.stringify(settings));
     download('simpl-courses-settings.json', JSON.stringify(copy, null, 2), 'application/json');
   });
-  $('importSettings').addEventListener('click', () => $('importFile').click());
+  $('importSettings').addEventListener('click', async () => {
+    if (!inApp) { $('importFile').click(); return; }
+    const r = await self.SimplApp.openFile(['json']).catch(() => null);
+    if (!r || !r.ok) { if (r && !r.cancelled) flash(r.message || 'Could not open that file', true); return; }
+    await importSettingsText(r.text);
+  });
   $('importFile').addEventListener('change', async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    await importSettingsText(await file.text());
+    e.target.value = '';
+  });
+  async function importSettingsText(text) {
     try {
-      const data = JSON.parse(await file.text());
+      const data = JSON.parse(text);
       if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('shape');
       settings = await S.replace(data);
       flash('Imported');
@@ -568,8 +648,7 @@
     } catch {
       flash('That file is not a settings export', true);
     }
-    e.target.value = '';
-  });
+  }
   $('resetSettings').addEventListener('click', async () => {
     if (!confirm('Reset everything? Preferences, grade history, the sites you added and your API keys are cleared, the extension gives up its access to those sites, and the note it keeps on open Canvas tabs is cleared.')) return;
     for (const origin of settings.domains || []) {
@@ -603,5 +682,5 @@
   }
   paintAll();
   S.onChange((s) => { settings = s; paintAll(); });
-  showSection(location.hash ? location.hash.slice(1) : 'general');
+  showSection(location.hash ? location.hash.slice(1) : NAV[0][0]); // (This Mac in the app's window, General everywhere else)
 })();

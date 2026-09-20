@@ -10,6 +10,9 @@
   const S = BCV.settings;
   const html = document.documentElement;
   const CACHE_KEY = 'bcv:early';
+  // On a Mac the settings live in the app: the background takes them from it as this page loads
+  // (nothing happens anywhere else). The cached look below paints first; a change lands as a push.
+  try { Promise.resolve(BCV.api.runtime.sendMessage({ type: 'syncApp' })).catch(() => {}); } catch { /* no runtime here */ }
   // A one-page note left by the look switch when Persistent is off: this page view shows the look
   // the other way round, and the next load (a reload, the next page) goes back to the saved look.
   const ONCE_KEY = 'bcv:once';

@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
-# Builds the Simpl Courses macOS app (a Safari Web Extension host app).
+# Builds the Simpl Courses macOS app (a Safari Web Extension host app) by hand, ad-hoc signed.
 #
-# Requires Xcode (with the Command Line Tools selected) on macOS. Uses
-# Apple's safari-web-extension-converter to generate an Xcode project from
-# the extension/ folder, then optionally builds it with xcodebuild.
+# Requires Xcode (with the Command Line Tools selected) on macOS. The Xcode project under macos/
+# is kept in the repository and carries the app's own files (the settings window, the updater,
+# the shared store, the bridge, the entitlements): it is NOT regenerated. The converter path below
+# only runs when macos/ is missing, and a project made that way lacks those files — so do not
+# delete macos/ to "regenerate"; the release build is scripts/release-mac-app.sh (docs/mac-app.md).
 #
 #   ./scripts/build-mac-app.sh            # generate macos/Simpl Courses.xcodeproj
 #   ./scripts/build-mac-app.sh --build    # …and build the .app (Release, ad-hoc signed)

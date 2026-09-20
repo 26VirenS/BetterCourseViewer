@@ -99,24 +99,31 @@ Anything without a screen of its own – external tools and their embeds (Box, Y
 
 ## Requirements
 
-- Safari: macOS 13 Ventura or later, Safari 16.4 or later, and Xcode 15 or later (free, from the Mac App Store) to build the Mac app
+- Safari: macOS 13 Ventura or later and Safari 16.4 or later; the app comes from [simplcourses.com](https://simplcourses.com) (or is built with Xcode 15 or later, free from the Mac App Store)
 - Or Chrome / Edge on any platform – see [Chrome (and Edge)](#chrome-and-edge) below; no build needed
 
-## Install (build the Mac app)
+## Install (the Mac app)
 
-Safari extensions ship inside a Mac app, so the app is built with Xcode. The script uses Apple's converter to generate the Xcode project from the `extension/` folder.
+Safari extensions ship inside a Mac app. Download **Simpl Courses** from [simplcourses.com](https://simplcourses.com/download/mac), move it to the Applications folder and open it, then open your Canvas: the setup begins there by itself (Safari asks once whether the extension may run on the site).
+
+The app is the extension's home on a Mac:
+
+- **Its window is the settings.** *This Mac* first — whether the extension is on in Safari, with a button to Safari's Extensions settings; updates; *Install updates by themselves*; *Open at login* — then General, Appearance, Canvas sites and Data & about. Safari follows whatever is set there; the extension's own settings page is not used on a Mac (Settings in the toolbar popup and in the account panel open the app). Courses, targets and grade history are set on Canvas's own pages (All Courses, the Grades page), which have the Canvas session the window does not.
+- **It keeps itself up to date.** Every hour, and whenever it is opened, it reads `simplcourses.com/app/latest.json`; a newer version is downloaded, its checksum and signature checked, put in the app's place and opened again — by itself unless *Install updates by themselves* is off, in which case the window offers *Update now*. Closing the window leaves the app running for that, as a small mark in the menu bar with *Open Simpl Courses…*, *Check for Updates…* and *Quit*; it is a login item unless that is turned off. `docs/mac-app.md` has the whole of it, and how a release is signed and notarized.
+
+To build it yourself instead:
 
 1. Clone the repo and open a Terminal in it.
-2. Generate the Xcode project and open it:
+2. Open the Xcode project (it is kept in the repository, under `macos/`):
    ```bash
    ./scripts/build-mac-app.sh --open
    ```
-3. In Xcode press **⌘R** (Product → Run). The Simpl Courses app opens and tells you the extension is ready.
-4. In Safari go to **Settings → Extensions**, tick **Simpl Courses**, and click **Always Allow on Every Website** (or allow it on your school's Canvas site when Safari asks).
-5. If you built without an Apple developer team, turn on **Safari → Settings → Developer → Allow unsigned extensions** (enable the Developer tab under Settings → Advanced if it is hidden).
+3. In Xcode press **⌘R** (Product → Run). The Simpl Courses app opens on its settings window, which says whether Safari has the extension.
+4. In Safari go to **Settings → Extensions**, tick **Simpl Courses**, and allow it on your school's Canvas site when Safari asks.
+5. If you built without an Apple developer team, turn on **Safari → Settings → Developer → Allow unsigned extensions** (enable the Developer tab under Settings → Advanced if it is hidden). A build with no team also has no app group, so the app's window and the extension only share their settings in a signed build.
 6. Open your Canvas. The setup begins there by itself.
 
-Updating: `git pull`, then in Xcode Product → Clean Build Folder (⇧⌘K) and Product → Run (⌘R), then quit and reopen Safari. The project references the files in `extension/` directly, so a rebuild is all that is needed. If Safari still shows stock Canvas, delete the `macos/` folder and regenerate the project from scratch.
+Updating a build of your own: `git pull`, then in Xcode Product → Clean Build Folder (⇧⌘K) and Product → Run (⌘R), then quit and reopen Safari. The project references the files in `extension/` directly, so a rebuild is all that is needed. Do not delete `macos/` to regenerate the project: it carries the app's own files (the settings window, the updater, the shared store), which Apple's converter would not put back.
 
 **Safari does not list the extension.** It reads the extension out of the app, so:
 
@@ -124,7 +131,7 @@ Updating: `git pull`, then in Xcode Product → Clean Build Folder (⇧⌘K) and
 2. **Allow unsigned extensions** (Safari → Settings → Developer) is what lets a build without an Apple developer team be listed at all, and it turns itself off every time Safari quits. Turn it on again after each restart, then look under Settings → Extensions.
 3. A deleted or uninstalled copy can leave a stale record behind, so a fresh build is never looked at. `./scripts/build-mac-app.sh --build` re-registers what it builds; for a copy you moved by hand, run `/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "/Applications/Simpl Courses.app"` and reopen Safari.
 
-The app's own window says which of these is in the way: it shows the extension as on, off, or not known to Safari at all, and rereads the state whenever you come back to it.
+The app's window says which of these is in the way: *This Mac* shows the extension as on, off, or not known to Safari at all — with the steps that put it back — and rereads the state whenever you come back to it.
 
 To build from the command line instead of Xcode:
 
@@ -135,16 +142,17 @@ To build from the command line instead of Xcode:
 
 ### Build errors
 
-- **"Embedded binary's bundle identifier is not prefixed with the parent app's bundle identifier"** – the two targets' identifiers drifted apart. Select the project, then the **Simpl Courses** target → Signing & Capabilities and note its Bundle Identifier; then select the **Simpl Courses Extension** target and set its Bundle Identifier to that value plus `.Extension`. Give both targets the same Team, then Product → Clean Build Folder and run again. `rm -rf macos && ./scripts/build-mac-app.sh --open` also fixes it.
+- **"Embedded binary's bundle identifier is not prefixed with the parent app's bundle identifier"** – the two targets' identifiers drifted apart. Select the project, then the **Simpl Courses** target → Signing & Capabilities and note its Bundle Identifier; then select the **Simpl Courses Extension** target and set its Bundle Identifier to that value plus `.Extension`. Give both targets the same Team, then Product → Clean Build Folder and run again.
 - **"You have macOS X. The application requires macOS Y or later"** on another Mac – the build script pins the minimum macOS to 13 (Ventura) on every run, so rebuild with it after pulling; `MACOS_MIN=14.0 ./scripts/build-mac-app.sh --build` raises it if you want.
-- **"Failed to register bundle identifier"** (personal/free teams) – pick your own: `BUNDLE_ID=com.yourname.simplcourses ./scripts/build-mac-app.sh --open` (after deleting `macos/`).
+- **"Failed to register bundle identifier"** (personal/free teams) – pick your own in Xcode: both targets' Bundle Identifier under Signing & Capabilities (the extension's is the app's plus `.Extension`).
 
 ### School with its own Canvas address?
 
 The extension is on automatically for every `*.instructure.com` site. If your school uses a custom address such as `catcourses.ucmerced.edu`:
 
 - **Chrome / Edge (the Web Store build):** just open it. The Chrome build may look at any page, and one small script (`content/sniff.js`) reads each page's own markup for Canvas's — its page wrapper, its stylesheet bundle, its navigation — and, finding it on a page you are signed in to (or on Canvas's sign-in page), turns the interface on for that site, exactly as *Enable on this site* would, and loads the page again with the setup on it. On any other page it does nothing, keeps nothing and asks for nothing. Chrome's *Site access* setting for the extension can narrow this to sites you pick, and the toolbar popup's **Enable on this site** still works there.
-- **Safari (and Firefox):** open that site, then click the Simpl Courses toolbar icon → **Enable on catcourses.ucmerced.edu**, or add it under **Settings → Canvas sites**. Safari asks for each site as it is opened, so this build keeps to Canvas's own domain plus the sites you add.
+- **Safari:** open that site, then click the Simpl Courses toolbar icon → **Enable on catcourses.ucmerced.edu**, or add it under **Canvas sites** in the app's window and allow it when Safari asks on the site. Safari asks for each site as it is opened, so this build keeps to Canvas's own domain plus the sites you add.
+- **Firefox:** open that site, then click the toolbar icon → **Enable on this site**, or add it under **Settings → Canvas sites**.
 
 ## Uninstall
 
@@ -205,19 +213,22 @@ extension/
                                course (shell + tabs), course-detail, grades (course grade card), quiz, submit, native
   popup/, options/             toolbar popup and the settings page
 scripts/
-  build-mac-app.sh             generates the Xcode project / builds the .app
+  build-mac-app.sh             builds the .app by hand (ad-hoc signed); the Xcode project under macos/ is kept by hand
+  release-mac-app.sh           CI: the Mac app signed, notarized, zipped, on the Release, and the site's feed and download pointed at it
   package.sh                   zips the extension (generic + Chrome Web Store build)
   chrome-manifest.py           the Chrome build's manifest: Chrome's keys alone, every site, and content/sniff.js
   make-icons.mjs               regenerates the PNG icons
   dev/mock-canvas.mjs          a fake Canvas (pages + the API endpoints the app reads)
   dev/smoke-test.mjs           walks every screen in headless Chromium against the mock
   dev/phone-test.mjs           the same at an iPhone viewport: the phone layout (tab bar, sheets, course, item, quiz)
-  dev/mac-window-test.mjs      the Mac app's own window: its four states (on, off, not known to Safari, waiting) and its buttons
+  dev/mac-window-test.mjs      the Mac app's window: the settings page over the app's bridge, This Mac first, updates, a wipe
+  dev/app-sync-test.mjs        the extension taking its settings from the Mac app: revisions, a switch written up, a wipe
   dev/group-late-test.mjs      a group drawn before its course list lands, and the course folded in afterwards
   dev/side-courses-test.mjs    the favourite courses listed on the sidebar, and in the panel that opens off Courses
   dev/chrome-setup-test.mjs    the Chrome build finding a school's own Canvas on its own, and the page after install
   dev/store-shots.mjs          renders the Chrome Web Store screenshots and promo tiles into docs/store/
 docs/chrome-web-store.md       how to publish: listing text, permission justifications, release automation
+docs/mac-app.md                the Mac app: settings in the app, the extension following it, hourly updates, signing secrets
 docs/store/                    the store's screenshots and promo tiles
 PRIVACY.md                     the privacy policy the store listing links to
 .github/workflows/package.yml  builds the zips on every push; a v* tag makes a GitHub Release and publishes to the store

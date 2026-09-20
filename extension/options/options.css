@@ -207,3 +207,8 @@ html[data-theme="dark"] .docs__warn { color: #ffb44d; }
   .model { width: 110px; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+/* a section not on this platform's list (This Mac outside the app) stays out of sight whatever else says */
+.section[hidden] { display: none !important; }
+.steps--app { margin: 0 18px 16px; }
+.steps[hidden] { display: none; } /* (the flex above would otherwise beat the attribute) */

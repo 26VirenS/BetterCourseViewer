@@ -45,6 +45,9 @@ if (typeof importScripts === 'function' && !self.BCV?.settings) {
       case 'canvasSeen': // the Chrome build's sniffer found Canvas on a site of the school's own
         reply(canvasSeen(sender, msg));
         return true;
+      case 'syncApp': // a Canvas page loading on a Mac: the settings the app holds, taken now
+        reply(syncApp().then(() => ({ ok: true })));
+        return true;
       case 'closeSetupTab': // the page after install, once the setup is under way on a Canvas tab
         reply(sender?.tab?.id != null ? api.tabs.remove(sender.tab.id).then(() => ({ ok: true })) : { ok: false });
         return true;
@@ -72,7 +75,7 @@ if (typeof importScripts === 'function' && !self.BCV?.settings) {
   // exactly as it was. Messaging a tab does work (it is how Reset everything reaches them), so every
   // change is pushed to every tab as well. A tab that already knows does nothing with it; a tab with
   // none of ours in it never answers.
-  S.onChange((settings) => { pushSettings(settings); });
+  S.onChange((settings) => { pushSettings(settings); writeUp(settings); });
   async function pushSettings(settings) {
     let tabs = [];
     try { tabs = await api.tabs.query({}); } catch { return; }
@@ -96,6 +99,9 @@ if (typeof importScripts === 'function' && !self.BCV?.settings) {
   }
 
   async function openOptions() {
+    if (app.on) { // on a Mac the settings live in the app: its window comes up
+      try { await app.native({ type: 'openApp' }); return { ok: true }; } catch { /* the page below, then */ }
+    }
     try {
       await api.runtime.openOptionsPage();
       return { ok: true };
@@ -354,6 +360,99 @@ if (typeof importScripts === 'function' && !self.BCV?.settings) {
   }
   if (api.permissions && api.permissions.onAdded) api.permissions.onAdded.addListener(continuePending);
 
+  // ---- the Mac app: the settings' home on macOS ---------------------------------------------------
+  // On a Mac the extension lives inside the Simpl Courses app, and the app holds the settings: its
+  // window is where they are set, and this background takes them from the app's shared store through
+  // the native message handler (SafariWebExtensionHandler.swift) — on every Canvas page load, every
+  // few seconds while Safari is up, and after any switch pressed here (the popup, the look switch on
+  // a page), which is written up to the app so its window shows it. A revision number says whether
+  // there is anything new; a command the app left (a wipe after Reset everything) is run and reported
+  // done. Nowhere else (Chrome, Firefox, the iOS app) is there an app to ask.
+  const app = {
+    on: (() => { try { return typeof api.runtime.sendNativeMessage === 'function' && /Mac/.test(navigator.platform || '') && /apple/i.test(navigator.vendor || ''); } catch { return false; } })(),
+    revision: -1, // the store's revision as last taken (or written)
+    lastJSON: null, // the settings as last taken or written, so a change that is only ours coming back is not written up again
+    syncing: null,
+    native: (msg) => api.runtime.sendNativeMessage('application.id', msg),
+  };
+  async function syncApp() {
+    if (!app.on) return null;
+    if (app.syncing) return app.syncing;
+    app.syncing = syncOnce().finally(() => { app.syncing = null; });
+    const r = await app.syncing;
+    if (r && r.again) return syncApp(); // a command changed things here: ask again, with the store as it is now
+    return r;
+  }
+  async function syncOnce() {
+    try {
+      const extra = await api.storage.local.get(['site:last', 'setup:done']).catch(() => ({}));
+      const r = await app.native({ type: 'getSettings', revision: app.revision, site: extra['site:last'] || null, setupDone: !!extra['setup:done'] });
+      if (!r || typeof r.revision !== 'number') return null;
+      // what the app asked for comes first (a wipe changes what there is to exchange below)
+      const commands = Array.isArray(r.commands) ? r.commands.filter((c) => c && typeof c === 'object') : [];
+      if (commands.length) {
+        for (const c of commands) {
+          await runAppCommand(c).catch(() => {});
+          if (c.id) await app.native({ type: 'done', id: c.id }).catch(() => {});
+        }
+        return { again: true };
+      }
+      if (r.revision !== app.revision) {
+        if (r.settings && typeof r.settings === 'object') {
+          const merged = await S.replace(r.settings);
+          app.lastJSON = JSON.stringify(merged);
+          app.revision = r.revision;
+          ensureDomains(); // a site added in the app gets its scripts
+        } else if (!r.hasSettings) {
+          // the app has none yet (a first launch, a wipe): it takes ours — unless they went up a moment ago
+          const mine = await S.get();
+          const json = JSON.stringify(mine);
+          if (json !== app.lastJSON) {
+            app.lastJSON = json;
+            const w = await app.native({ type: 'setSettings', settings: mine });
+            app.revision = w && typeof w.revision === 'number' ? w.revision : r.revision;
+          } else {
+            app.revision = r.revision;
+          }
+        } else {
+          app.revision = r.revision;
+        }
+      }
+      return r;
+    } catch {
+      return null; // no app to ask (a build without one, a handler that failed): the settings here stand
+    }
+  }
+  /** A switch pressed here reaches the app's store (and its window). */
+  async function writeUp(settings) {
+    if (!app.on) return;
+    const json = JSON.stringify(settings);
+    if (json === app.lastJSON) return;
+    app.lastJSON = json;
+    try {
+      const w = await app.native({ type: 'setSettings', settings });
+      if (w && typeof w.revision === 'number') app.revision = w.revision;
+    } catch { /* the app answers next time */ }
+  }
+  /** What the app asks for: a wipe (Reset everything in its window), or the site notes cleared. */
+  async function runAppCommand(c) {
+    if (!c || typeof c !== 'object') return;
+    if (c.type === 'wipe') {
+      const settings = await S.get();
+      for (const origin of settings.domains || []) await unregisterDomain(origin).catch(() => {});
+      await api.storage.local.clear().catch(() => {});
+      try { await api.storage.session?.clear(); } catch { /* none */ }
+      await wipeSiteNotes().catch(() => {});
+      app.lastJSON = null;
+    } else if (c.type === 'wipeSiteNotes') {
+      await wipeSiteNotes().catch(() => {});
+    }
+  }
+  if (app.on) {
+    syncApp();
+    setInterval(syncApp, 5000);
+  }
+
   // ---- lifecycle ----------------------------------------------------------
   api.runtime.onInstalled.addListener(async (details) => {
     await ensureDomains({ force: true });
@@ -372,5 +471,5 @@ if (typeof importScripts === 'function' && !self.BCV?.settings) {
   // even when onInstalled/onStartup never fired (Safari rebuilds, reloads).
   ensureDomains();
   offerSetup();
-  BCV.background = { offerSetup, ensureDomains }; // the harness drives these directly
+  BCV.background = { offerSetup, ensureDomains, app, syncApp, openOptions }; // the harness drives these directly
 })();

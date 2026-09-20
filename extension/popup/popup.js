@@ -72,13 +72,15 @@
   const onWeb = !!url && /^https?:$/.test(url.protocol);
   const origin = onWeb ? url.origin : '';
   const builtIn = onWeb && /\.instructure\.com$/i.test(url.hostname);
+  // a site on the list is not a site allowed: the Mac app can add one, and Safari still has to be
+  // asked for it here, from a press — so the browser's own word is taken first, the list as a fallback
   const saved = onWeb && (settings.domains || []).includes(origin);
-  let granted = builtIn || saved;
+  let granted = builtIn;
   if (onWeb && !granted) {
     try {
       granted = await api.permissions.contains({ origins: [`${origin}/*`] });
     } catch {
-      granted = false;
+      granted = saved;
     }
   }
 

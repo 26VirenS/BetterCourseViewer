@@ -51,6 +51,26 @@ jobs:
             gh release create "$TAG" dist/*.zip --target "$GITHUB_SHA" --title "Simpl Courses $VERSION" --generate-notes
           fi
 
+  # The Mac app, for people to download from simplcourses.com: built, signed with a Developer ID,
+  # notarized and zipped on a Mac runner, put on the same Release, and the site branch's update
+  # feed and download address pointed at it (scripts/release-mac-app.sh). Without the Apple secrets
+  # the step says so and skips; docs/mac-app.md explains the one-time setup.
+  mac-app:
+    needs: package
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    runs-on: macos-15 # (Xcode 16: the project is in its format)
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build, sign, notarize and publish the Mac app
+        env:
+          MAC_CERT_P12: ${{ secrets.MAC_CERT_P12 }}
+          MAC_CERT_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          GH_TOKEN: ${{ github.token }}
+        run: ./scripts/release-mac-app.sh
+
   chrome-web-store:
     needs: package
     if: startsWith(github.ref, 'refs/tags/v')

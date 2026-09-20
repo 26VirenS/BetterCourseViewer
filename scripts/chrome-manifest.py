@@ -23,6 +23,7 @@ m.setdefault('action', {})['default_icon'] = {s: f'icons/icon-{s}.png' for s in 
 # finding it, turns the interface on for that site; on every other page it does nothing. Safari asks
 # for each site as it is opened, so the source manifest keeps to Canvas's own domain plus the sites
 # added by hand, and the sniffer is not in it.
+m['permissions'] = [p for p in m.get('permissions', []) if p != 'nativeMessaging']  # Safari's line to the Mac app; Chrome has no app to talk to
 m['host_permissions'] = ['*://*/*']
 m.pop('optional_host_permissions', None)
 if not any('content/sniff.js' in (cs.get('js') or []) for cs in m.get('content_scripts', [])):

@@ -35,6 +35,33 @@
         <span class="saved" id="saved" hidden><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg><span id="savedText">Saved</span></span>
       </div>
 
+      <!-- This Mac: the app's window only (the page runs in the Simpl Courses app there, over its bridge) -->
+      <section class="section" id="app" data-title="This Mac" data-sub="The app, Safari and updates." data-words="app mac safari extension update updates version login open at login menu bar install" hidden>
+        <div class="card">
+          <div class="row row--pad">
+            <span class="tile" aria-hidden="true"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/></svg></span>
+            <span class="row__body"><span class="row__t" id="extTitle">Reading Safari…</span><span class="row__s" id="extSub"></span></span>
+            <button class="btn" id="openSafari" type="button">Open Safari Settings…</button>
+          </div>
+          <ol class="steps steps--app" id="extSteps" hidden>
+            <li>Keep this app in the <b>Applications</b> folder. Safari reads the extension out of the app, so the app has to stay put.</li>
+            <li>Open Safari, then <b>Safari → Settings → Extensions</b>, and tick <b>Simpl Courses</b>.</li>
+            <li>Built without an Apple developer team? Safari lists an unsigned extension only while <b>Safari → Settings → Developer → Allow unsigned extensions</b> is on — and that switch turns itself off every time Safari quits.</li>
+          </ol>
+        </div>
+        <div class="card">
+          <div class="row row--pad">
+            <span class="tile" aria-hidden="true"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8.5 12.5L12 16l3.5-3.5"/></svg></span>
+            <span class="row__body"><span class="row__t" id="updTitle">Simpl Courses</span><span class="row__s" id="updSub">Checks for updates every hour.</span></span>
+            <button class="btn btn--primary" id="updAction" type="button" hidden>Update now</button>
+            <button class="btn" id="checkUpdates" type="button">Check now</button>
+          </div>
+          <div class="row row--pad row--line"><span class="row__body"><span class="row__t row__t--med">Install updates by themselves</span><span class="row__s">Found on the hourly check, installed, and the app opens again.</span></span><button class="switch" id="autoUpdate" type="button" role="switch" aria-checked="true" aria-label="Install updates by themselves"><span class="switch__knob"></span></button></div>
+          <div class="row row--pad row--line"><span class="row__body"><span class="row__t row__t--med">Open at login</span><span class="row__s">The app keeps watch from the menu bar. Closing this window leaves it running.</span></span><button class="switch" id="loginItem" type="button" role="switch" aria-checked="true" aria-label="Open at login"><span class="switch__knob"></span></button></div>
+          <p class="note note--msg" id="appMsg" hidden></p>
+        </div>
+      </section>
+
       <!-- General -->
       <section class="section" id="general" data-title="General" data-sub="Behaviour on Canvas." data-words="look switch redesign stock canvas tour setup quiz quizzes locked lock questions after answering no going back liability">
         <div class="card">
