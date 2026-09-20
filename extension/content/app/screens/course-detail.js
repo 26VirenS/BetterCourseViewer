@@ -184,7 +184,7 @@
         headEl,
         meta([['Due', a.due_at ? U.fmtAt(a.due_at) : 'No due date'], ['Points', a.points_possible ?? '—'], ['Submitting', types], ['Available', available], ['Attempts', attemptsFact(a, s)]]),
         U.el('bcv-detail__actions', [
-          isTool ? (toolNewTab ? U.btn('Open the tool', { kind: 'primary', icon: IC.external, iconColor: '#fff', onClick: () => window.open(toolLaunch, '_blank', 'noopener') }) : null)
+          isTool ? (toolNewTab ? U.btn('Open the tool', { kind: 'primary', icon: IC.external, iconColor: '#fff', onClick: (e) => (BCV.exttool ? BCV.exttool.open({ title: a.name, url: toolLaunch, page: `${c.url}/assignments/${a.id}`, newTab: toolLaunch, from: e?.currentTarget || null }) : window.open(toolLaunch, '_blank', 'noopener')) }) : null)
             : nativeSubmit ? (a.locked_for_user ? U.badge(a.lock_explanation ? htmlToText(a.lock_explanation, 120) : 'Locked', 'orange')
               : attemptsLeft ? U.btn(s.submitted_at ? 'Resubmit' : 'Submit assignment', { kind: 'primary', icon: IC.send, iconColor: '#fff', onClick: () => toBlock() })
                 : U.badge(`No attempts left · ${a.allowed_attempts} allowed`, 'orange'))
@@ -202,7 +202,7 @@
       ]), 'bcv-card--22'),
       // External-tool assignments (Knewton, Gradescope, …) are done inside the tool: embed the launch.
       isTool && !toolNewTab ? U.card(U.el('bcv-detail', [
-        U.el('bcv-row__head', [U.text('bcv-label bcv-label--inline', 'External tool', 'span'), h('span', { class: 'bcv-ml-auto' }), h('a', { class: 'bcv-chip', href: toolLaunch, target: '_blank', rel: 'noopener', text: 'Open in new tab' })]),
+        U.el('bcv-row__head', [U.text('bcv-label bcv-label--inline', 'External tool', 'span'), h('span', { class: 'bcv-ml-auto' }), h('button', { type: 'button', class: 'bcv-chip bcv-chip--full', text: 'Full screen', title: 'Open the tool in a popup that fills the tab', onclick: (e) => BCV.exttool?.open({ title: a.name, url: toolLaunch, page: `${c.url}/assignments/${a.id}`, newTab: toolLaunch, from: e.currentTarget }) }), h('a', { class: 'bcv-chip', href: toolLaunch, target: '_blank', rel: 'noopener', text: 'Open in new tab' })]),
         h('iframe', { class: 'bcv-frame bcv-frame--doc', src: toolLaunch, title: a.name, allowfullscreen: '', allow: 'fullscreen; microphone; camera; display-capture; autoplay; clipboard-write' }),
       ]), 'bcv-card--22') : null,
       block,

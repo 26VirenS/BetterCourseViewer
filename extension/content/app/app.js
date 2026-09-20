@@ -240,7 +240,7 @@
    *  load of Canvas's own page for that address. Turning the skin off reveals the page you are
    *  on (a reload, when the address moved in place).
    *  `confirmed`: the quiz screen already asked (or is leaving on purpose). */
-  function go(href, { replace = false, confirmed = false } = {}) {
+  function go(href, { replace = false, confirmed = false, label = '' } = {}) {
     let url;
     try {
       url = new URL(href, location.href);
@@ -251,6 +251,8 @@
       window.open(url.href, '_blank', 'noopener');
       return;
     }
+    // a tool Canvas launches (a course's campus tool, a link in a page to one): a popup over this page, not a page of its own
+    if (BCV.exttool?.isToolHref(url.href) && !inQuiz()) { BCV.exttool.openLink({ title: label || 'External tool', href: url.href }); return; }
     if (!confirmed && inQuiz() && url.pathname !== location.pathname && !confirmLeave()) return;
     if (!confirmed && state.submitOpen && (url.pathname !== location.pathname || url.search !== location.search) && !window.confirm('Your submission has not been sent yet. Leave anyway?\n\nAttached files are dropped; a text entry stays as a draft on this device.')) return;
     state.quizOpen = false; // leaving on purpose: no second prompt from the unload guard
@@ -337,9 +339,9 @@
       if (!a || !main.contains(a) || a.target === '_blank' || a.hasAttribute('download') || a.getAttribute('href').startsWith('#')) return;
       let url;
       try { url = new URL(a.href, location.href); } catch { return; }
-      if (url.origin !== location.origin || !inPlaceHop(url)) return;
+      if (url.origin !== location.origin || !(inPlaceHop(url) || BCV.exttool?.isToolHref(url.href))) return;
       e.preventDefault();
-      go(url.href);
+      go(url.href, { label: (a.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 80) });
     });
   }
 

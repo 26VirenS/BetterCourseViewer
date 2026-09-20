@@ -190,8 +190,12 @@ try {
   check((await texts('.bcv-xrow__t')).join(',') === 'Search the Canvas Guides,IT Help Desk' && /Reporting a problem/.test((await texts('.bcv-sheet__foot'))[0]), `Help lists the school's help links, leaving Canvas-only forms to Canvas: ${(await texts('.bcv-xrow__t')).join(', ')}`);
   await page.keyboard.press('Escape');
   await page.click('.bcv-nav__item--more[data-extra="tool"]');
+  await page.waitForSelector('.bcv-ext-ov .bcv-ext__frame', { timeout: 10000 });
+  const acctLoaded = await eventually(async () => { const f = page.frames().find((x) => x.url().includes('/external_tools/77')); return !!f && (await f.$('#account-tool')) !== null; }, 10000);
+  check((await page.$eval('.bcv-ext__frame', (e) => e.getAttribute('src'))) === `${BASE}/accounts/1/external_tools/77?launch_type=global_navigation&display=borderless` && (await texts('.bcv-ext .bcv-sheet__title'))[0] === 'My Materials' && page.url() === `${BASE}/` && acctLoaded && (await visible('#bcv-side')), 'an account tool opens in a popup over this page, Canvas\'s borderless launch framed in it, the page and the shell staying put');
+  await page.click('.bcv-ext__canvas');
   await page.waitForSelector('html.bcv-punch #account-tool', { timeout: 10000 });
-  check(page.url() === `${BASE}/accounts/1/external_tools/77?launch_type=global_navigation` && (await visible('#bcv-side')), 'an account tool opens Canvas\'s own page for it, with the shell kept over it');
+  check(page.url() === `${BASE}/accounts/1/external_tools/77?launch_type=global_navigation&bcv=native` && (await visible('#bcv-side')), 'Open in Canvas goes to Canvas\'s own page for it, with the shell kept over it');
   await page.goto(`${BASE}/`);
   await page.waitForSelector('#bcv-app .bcv-nav__item', { timeout: 10000 });
   const navItems = await texts('.bcv-nav .bcv-nav__item');
@@ -1174,6 +1178,14 @@ try {
   // dense screens fill the column up to 1180 (mockup 7 layout notes): 1400 viewport − 242 sidebar − 80 padding = 1078 here
   check(await page.$eval('.bcv-screen--ctx .bcv-head__in', (el) => Math.round(el.getBoundingClientRect().width) === 1078), `course screens fill the column (capped at 1180): ${await page.$eval('.bcv-screen--ctx .bcv-head__in', (el) => Math.round(el.getBoundingClientRect().width))}px`);
   check((await texts('.bcv-rail__ext')).join(',') === 'Resources & Policy', 'external tools are plain links under Campus tools');
+  await page.click('.bcv-rail__ext');
+  await page.waitForSelector('.bcv-ext-ov .bcv-ext__frame', { timeout: 5000 });
+  await page.waitForTimeout(600); // (the popup grows in from the rail's button)
+  const extLoaded = await eventually(async () => { const f = page.frames().find((x) => x.url().includes('/external_tools/9')); return !!f && (await f.$('#tool_content')) !== null; }, 10000);
+  check((await page.$eval('.bcv-ext__frame', (e) => e.getAttribute('src'))) === `${BASE}/courses/101/external_tools/9?display=borderless` && (await texts('.bcv-ext .bcv-sheet__title'))[0] === 'Resources & Policy' && (await page.$eval('.bcv-ext__tab', (e) => e.href)) === `${BASE}/courses/101/external_tools/9` && page.url() === `${BASE}/courses/101` && extLoaded && (await page.$eval('#bcv-tray', (e) => parseInt(getComputedStyle(e).zIndex, 10) > parseInt(getComputedStyle(document.querySelector('.bcv-ext-ov')).zIndex, 10))) && (await page.$eval('.bcv-ext', (e) => { const r = e.getBoundingClientRect(); return r.width >= innerWidth - 30 && r.height >= innerHeight - 70 && r.top >= 44; })), 'a campus tool opens in a popup that fills the tab, Canvas\'s borderless launch framed in it, the page and the pins staying put');
+  await shot(page, '11b-tool-popup');
+  await page.keyboard.press('Escape');
+  check(await eventually(() => page.$('.bcv-ext-ov').then((e) => !e), 3000) && page.url() === `${BASE}/courses/101`, 'Escape closes the popup and the course page is still there');
   const railGlyph = await page.evaluate(() => ({ active: getComputedStyle(document.querySelector('.bcv-rail__item.is-active .bcv-rail__tile svg')), idle: getComputedStyle(document.querySelector('.bcv-rail__item:not(.is-active) .bcv-rail__tile svg')), tile: getComputedStyle(document.querySelector('.bcv-rail__item.is-active .bcv-rail__tile')).backgroundColor }));
   check(await page.$('.bcv-rail__item[data-tab="home"].is-active') && railGlyph.active.stroke === 'rgb(23, 112, 171)' && railGlyph.active.opacity === '1' && railGlyph.idle.stroke === 'rgb(23, 112, 171)' && railGlyph.idle.opacity === '0.6' && railGlyph.tile === 'rgba(0, 0, 0, 0)', `rail glyphs take the course colour (the one picked earlier), no tile, dimmed unless active: ${railGlyph.active.stroke} / ${railGlyph.idle.opacity}`);
   check(await page.$('.bcv-head .bcv-colorbtn'), 'the colour square in the course header opens the palette');
@@ -1504,6 +1516,16 @@ try {
   check((await texts('.bcv-detail__back'))[0] === 'Modules' && page.url().endsWith('/courses/101/pages/course-information'), `a page opened from Modules says Back to Modules: ${(await texts('.bcv-detail__back'))[0]}`);
   await clickScreen('.bcv-detail__back');
   check(page.url().endsWith('/courses/101/modules') && (await page.$('.bcv-module')) !== null, 'and Back returns to Modules');
+  // a link in a module opens in a popup over the page, the site framed in it, with Open in new tab for one that refuses
+  await page.goto(`${BASE}/courses/102/modules`);
+  await page.waitForSelector('.bcv-module__item[href="https://phet.colorado.edu"]', { timeout: 15000 });
+  await page.click('.bcv-module__item[href="https://phet.colorado.edu"]');
+  await page.waitForSelector('.bcv-ext-ov .bcv-ext__frame', { timeout: 5000 });
+  check((await page.$eval('.bcv-ext__frame', (e) => e.getAttribute('src'))) === 'https://phet.colorado.edu' && (await texts('.bcv-ext .bcv-sheet__title'))[0] === 'PhET simulation' && (await page.$eval('.bcv-ext__tab', (e) => e.href)) === 'https://phet.colorado.edu/' && !(await page.$('.bcv-ext__canvas')) && page.url().endsWith('/courses/102/modules'), 'a module\'s link opens in the popup with the site framed and Open in new tab beside it, the modules page staying put');
+  await page.keyboard.press('Escape');
+  await eventually(() => page.$('.bcv-ext-ov').then((e) => !e), 3000);
+  await page.goto(`${BASE}/courses/101/modules`);
+  await page.waitForSelector('.bcv-module', { timeout: 15000 });
   await tab('pages');
   await page.waitForSelector('.bcv-body .bcv-row', { timeout: 10000 });
   await clickScreen('.bcv-body .bcv-row');
@@ -2875,7 +2897,7 @@ try {
   const toolNav = await texts('.bcv-nav > .bcv-nav__item');
   check(toolNav[toolNav.length - 1].startsWith('Tools') && (await page.$eval('.bcv-nav__item[data-nav="tools"]', (e) => e.classList.contains('is-active'))) && (await texts('.bcv-h1'))[0] === 'Tools' && (await texts('.bcv-head__sub'))[0] === 'Handy things, right here.', 'Tools is the last row of the sidebar, lit, and the page is titled');
   const cardNames = await texts('.bcv-tool-card__name');
-  check(cardNames.join(' | ') === 'Citation generator | Focus timer | Graphing calculator | Grade needed | File converter | Merge & split PDFs | PDF annotator | Image to text | Flashcards' && (await page.$$('.bcv-tool-card__open')).length === 9, `nine cards, each with Open: ${cardNames.join(' | ')}`);
+  check(cardNames.join(' | ') === 'Citation generator | Focus timer | Calculator | Graphing calculator | Grade needed | File converter | Merge & split PDFs | PDF annotator | Image to text | Flashcards' && (await page.$$('.bcv-tool-card__open')).length === 10, `ten cards, each with Open: ${cardNames.join(' | ')}`);
   await shot(page, '36c-tools');
   const closeTool = async () => { await page.keyboard.press('Escape'); await page.waitForFunction(() => !document.querySelector('.bcv-tool-ov'), null, { timeout: 5000 }); };
   const openTool = async (key) => { await page.click(`.bcv-tool-card[data-tool="${key}"]`); await page.waitForSelector(`.bcv-tool[data-tool="${key}"]`, { timeout: 5000 }); };
@@ -2997,6 +3019,15 @@ try {
   await openTool('graph');
   const graphTall = await eventually(() => page.$eval('.bcv-tool[data-tool="graph"]', (e) => e.getBoundingClientRect().height >= 600).catch(() => false), 3000); // (the popup grows in from the card)
   check((await page.$eval('.bcv-graph__frame', (e) => e.getAttribute('src'))) === 'https://www.desmos.com/calculator' && (await page.$eval('.bcv-graph__out', (e) => e.href)) === 'https://www.desmos.com/calculator' && graphTall && (await toolSub()) === 'Powered by Desmos', 'the graphing calculator is Desmos in a frame, tall, with the way out to desmos.com beside it');
+  await closeTool();
+  // the calculator: a tool of its own, the same scientific calculator larger, the keyboard on it
+  await openTool('calc');
+  await page.waitForTimeout(350);
+  check((await toolSub()) === 'Scientific · the keyboard works too' && (await page.$$('.bcv-tool[data-tool="calc"] .bcv-calc__key')).length === 49 && (await page.$eval('.bcv-tool[data-tool="calc"] .bcv-calc', (e) => e.classList.contains('bcv-calc--big') && document.activeElement === e)) && (await texts('.bcv-tool[data-tool="calc"] .bcv-calc__display'))[0] === '0', 'the calculator is a tool of its own: the scientific keys, larger, with the focus on them');
+  await page.keyboard.type('7*6');
+  await page.keyboard.press('Enter');
+  check((await texts('.bcv-tool[data-tool="calc"] .bcv-calc__display'))[0] === '42' && (await page.$eval('.bcv-tool[data-tool="calc"] .bcv-calc__key[data-key="7"]', (e) => Math.round(e.getBoundingClientRect().height))) === 44, 'typed on the keyboard, 7 × 6 Enter shows 42 on keys 44 tall');
+  await shot(page, '19b-calculator-tool');
   await closeTool();
   // the file converter: the source kind decides the targets; images on the canvas, a PDF from an engine loaded when first needed
   await openTool('conv');
@@ -3344,7 +3375,7 @@ try {
   await page.waitForFunction(() => !document.querySelector('#bcv-pins .bcv-pin'), null, { timeout: 3000 });
   check((await page.$eval('#bcv-pins', (e) => e.hidden)) && (await inPage('focusActive')) === false, 'End takes the borrowed pin away');
   await page.goto(`${BASE}/#tools`);
-  check((await page.$('#bcv-welcome')) === null && (await page.$$('.bcv-tool-card')).length === 9 && !(await page.$eval('.bcv-tool-card[data-tool="pomo"]', (e) => e.classList.contains('is-pinned'))), 'the second time, Tools opens without the black, and the card is no longer marked');
+  check((await page.$('#bcv-welcome')) === null && (await page.$$('.bcv-tool-card')).length === 10 && !(await page.$eval('.bcv-tool-card[data-tool="pomo"]', (e) => e.classList.contains('is-pinned'))), 'the second time, Tools opens without the black, and the card is no longer marked');
 
   // ---- the four tools of 2.35.0: grade needed, merge & split, the annotator, image to text ----
   console.log('grade needed');
@@ -3576,7 +3607,7 @@ try {
 
   // ---- the quick menus: every pin but the timer's swells into a capsule under the pointer, the tool's quickest use in it ----
   console.log('quick menus');
-  await sw.evaluate(() => self.BCV.api.storage.local.set({ 'tools:pins': ['cite', 'graph', 'conv', 'fc'], 'tools:cite:style': 'mla', 'tools:citations': [
+  await sw.evaluate(() => self.BCV.api.storage.local.set({ 'tools:pins': ['cite', 'calc', 'graph', 'conv', 'fc'], 'tools:cite:style': 'mla', 'tools:citations': [
     { id: 'c1', style: 'MLA 9', parts: [{ text: 'Okonkwo, Jane R. “How Students Actually Read Syllabi.” ', italic: false }, { text: 'The Atlantic', italic: true }, { text: ', 4 March 2026, theatlantic.com/x.', italic: false }], plain: 'Okonkwo, Jane R. “How Students Actually Read Syllabi.” The Atlantic, 4 March 2026, theatlantic.com/x.' },
     { id: 'c2', style: 'APA 7', parts: [{ text: 'Haddad, A. (2025). Reading habits. ', italic: false }, { text: 'Journal of Higher Education, 47', italic: true }, { text: '(3), 112–137.', italic: false }], plain: 'Haddad, A. (2025). Reading habits. Journal of Higher Education, 47(3), 112–137.' },
   ] }));
@@ -3585,7 +3616,7 @@ try {
   await page.waitForTimeout(600);
   const quickPin = (key) => `#bcv-pins .bcv-pin[data-tool="${key}"]`;
   const quickOpen = async (key, hh = 44) => { const b = await (await page.$(quickPin(key))).boundingBox(); await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2); await eventually(() => page.$eval(quickPin(key), (e, want) => e.classList.contains('is-open') && Math.round(e.getBoundingClientRect().height) === want, hh), 3000); await page.waitForTimeout(550); return page.$eval(quickPin(key), (e) => ({ w: Math.round(e.getBoundingClientRect().width), h: Math.round(e.getBoundingClientRect().height), radius: getComputedStyle(e.querySelector('.bcv-quick__face')).borderRadius, name: e.querySelector('.bcv-quick__name')?.textContent, btnGone: getComputedStyle(e.querySelector('.bcv-pin__btn')).opacity === '0' })); };
-  check((await page.$$('#bcv-pins .bcv-pin.bcv-quick')).length === 4 && (await page.$$eval('#bcv-pins .bcv-pin', (els) => els.map((e) => Math.round(e.getBoundingClientRect().width)))).every((w) => w === 24), 'four pins in the tray, each a disc with a quick menu folded in it');
+  check((await page.$$('#bcv-pins .bcv-pin.bcv-quick')).length === 5 && (await page.$$eval('#bcv-pins .bcv-pin', (els) => els.map((e) => Math.round(e.getBoundingClientRect().width)))).every((w) => w === 24), 'five pins in the tray, each a disc with a quick menu folded in it');
   const qc = await quickOpen('cite', 192);
   const qcSel = (sel) => `${quickPin('cite')} ${sel}`;
   check(qc.w === 400 && qc.h === 192 && qc.radius === '18px' && qc.name === 'Cite' && qc.btnGone && (await page.$eval(qcSel('.bcv-quick__input'), (e) => e.placeholder)) === 'Paste a link to cite' && (await texts(qcSel('.bcv-qcite__style'))).join('/') === 'MLA 9/APA 7/Chicago 17' && (await page.$eval(qcSel('.bcv-qcite__style.is-on'), (e) => e.dataset.style)) === 'mla' && (await texts(qcSel('.bcv-qcite__heretitle')))[0] === 'Cite this page' && (await texts(qcSel('.bcv-qcite__heresub')))[0] === 'Dashboard' && (await texts(qcSel('.bcv-qcite__tag'))).join('/') === 'APA 7/MLA 9' && /^Haddad, A\. \(2025\)/.test((await texts(qcSel('.bcv-qcite__text')))[0]) && !(await page.$eval(qcSel('.bcv-qcite__link'), (e) => e.hidden)), `the citation pin swells into a panel: a link to cite, the page you are on, the style, and the last citations saved, newest first (${(await texts(qcSel('.bcv-qcite__tag'))).join('/')} · ${(await texts(qcSel('.bcv-qcite__heresub')))[0]})`);
@@ -3623,10 +3654,10 @@ try {
   await page.goto(`${BASE}/`);
   await page.waitForSelector('#bcv-pins .bcv-pin[data-tool="fc"]', { timeout: 15000 });
   await page.waitForTimeout(600);
-  const q2 = await quickOpen('graph', 262);
+  const q2 = await quickOpen('calc', 262);
   const calcKey = async (k) => { await page.click(`.bcv-calc__key[data-key="${k}"]`); };
   const calcShown = () => texts('.bcv-calc__display').then((t) => t[0]);
-  check(q2.w === 408 && q2.h === 262 && q2.radius === '18px' && q2.name === 'Graph' && q2.btnGone && (await page.$$('.bcv-calc__key')).length === 49 && (await calcShown()) === '0' && (await page.$$eval('.bcv-calc__row:first-child .bcv-calc__key', (els) => els.map((e) => e.textContent))).join(' ') === '( ) mc m+ m− mr AC +/− % ÷' && (await page.$eval('.bcv-calc__key[data-key="/"]', (e) => getComputedStyle(e).backgroundColor)) === 'rgb(255, 159, 10)' && (await page.$eval('.bcv-calc__key[data-key="7"]', (e) => getComputedStyle(e).backgroundColor)) === 'rgb(92, 92, 95)' && (await page.$eval('.bcv-calc__key[data-key="ac"]', (e) => getComputedStyle(e).backgroundColor)) === 'rgb(165, 165, 165)', `the calculator pin opens into a panel: the whole scientific calculator, Apple's keys in Apple's colours, 49 of them under a display (${JSON.stringify(q2)})`);
+  check(q2.w === 408 && q2.h === 262 && q2.radius === '18px' && q2.name === 'Calc' && q2.btnGone && (await page.$$('.bcv-calc__key')).length === 49 && (await calcShown()) === '0' && (await page.$$eval('.bcv-calc__row:first-child .bcv-calc__key', (els) => els.map((e) => e.textContent))).join(' ') === '( ) mc m+ m− mr AC +/− % ÷' && (await page.$eval('.bcv-calc__key[data-key="/"]', (e) => getComputedStyle(e).backgroundColor)) === 'rgb(255, 159, 10)' && (await page.$eval('.bcv-calc__key[data-key="7"]', (e) => getComputedStyle(e).backgroundColor)) === 'rgb(92, 92, 95)' && (await page.$eval('.bcv-calc__key[data-key="ac"]', (e) => getComputedStyle(e).backgroundColor)) === 'rgb(165, 165, 165)', `the calculator pin opens into a panel: the whole scientific calculator, Apple's keys in Apple's colours, 49 of them under a display (${JSON.stringify(q2)})`);
   for (const k of ['2', '+', '3', '*', '4', '=']) await calcKey(k);
   check((await calcShown()) === '14', '2 + 3 × 4 = 14: the usual precedence');
   await calcKey('ac'); for (const k of ['(', '2', '+', '3', ')', 'x2']) await calcKey(k);
@@ -3657,7 +3688,13 @@ try {
   await shot(page, '45-calculator-panel');
   await page.mouse.move(700, 500);
   await page.mouse.click(700, 500);
-  check(await eventually(() => page.$eval(quickPin('graph'), (e) => !e.classList.contains('is-open') && Math.round(e.getBoundingClientRect().width) === 24), 3000), 'the capsule folds when the pointer leaves and presses elsewhere');
+  check(await eventually(() => page.$eval(quickPin('calc'), (e) => !e.classList.contains('is-open') && Math.round(e.getBoundingClientRect().width) === 24), 3000), 'the capsule folds when the pointer leaves and presses elsewhere');
+  const qg = await quickOpen('graph', 470);
+  check(qg.w === 340 && qg.h === 470 && qg.radius === '18px' && qg.name === 'Graph' && (await page.$eval(`${quickPin('graph')} .bcv-qgraph__frame`, (e) => e.getAttribute('src'))) === 'https://www.desmos.com/calculator' && (await page.$eval(`${quickPin('graph')} .bcv-qgraph__out`, (e) => e.href)) === 'https://www.desmos.com/calculator' && (await page.$eval(`${quickPin('graph')} .bcv-qgraph__body`, (e) => { const r = e.getBoundingClientRect(); return r.height > r.width; })), 'the graphing pin swells into a small Desmos, portrait, loaded on the first hover, with the way out to desmos.com');
+  await shot(page, '45b-graph-pin');
+  await page.mouse.move(700, 500);
+  await page.mouse.click(700, 500);
+  check(await eventually(() => page.$eval(quickPin('graph'), (e) => !e.classList.contains('is-open') && e.querySelector('.bcv-qgraph__frame') && Math.round(e.getBoundingClientRect().width) === 24), 3000), 'the Desmos panel folds and keeps its frame (the graph survives)');
   const q3 = await quickOpen('conv');
   check(q3.w === 250 && q3.name === 'Convert' && (await texts(`${quickPin('conv')} .bcv-quick__drop`))[0] === 'Click to add a file', 'the converter pin offers a drop target that is also a picker');
   await page.setInputFiles(`${quickPin('conv')} input[type=file]`, { name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('hello there') });

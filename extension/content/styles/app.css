@@ -3197,3 +3197,53 @@ html[data-bcv-theme="dark"] .bcv-pdfx { --px-row: #0f0f11; --px-page: #1f1f22; -
 .bcv-qcite__copy { flex: none; width: 24px; height: 24px; margin: 0; padding: 0; border: 0; border-radius: 12px; background: transparent; color: rgba(255,255,255,.7); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background .15s ease, color .15s ease; }
 .bcv-qcite__copy:hover { background: rgba(255,255,255,.16); color: #fff; }
 .bcv-qcite__none { height: 18px; font: 400 11.5px/18px var(--bcv-font); color: rgba(255,255,255,.5); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* the calculator as a tool of its own, and the graphing pin's small Desmos (2.39.0) */
+.bcv-tool--calc .bcv-tool__body { padding: 14px; }
+.bcv-calc-tool { background: #1c1c1e; border-radius: 20px; padding: 14px 12px 12px; }
+.bcv-calc__title { font: 600 10px/1 var(--bcv-font); color: rgba(255,255,255,.55); letter-spacing: .02em; }
+.bcv-calc--big .bcv-calc__head { height: 20px; }
+.bcv-calc--big .bcv-calc__display { height: 78px; padding: 0 10px 8px; font-size: 46px; }
+.bcv-calc--big .bcv-calc__display.is-long { font-size: 32px; }
+.bcv-calc--big .bcv-calc__display.is-longer { font-size: 24px; }
+.bcv-calc--big .bcv-calc__keys, .bcv-calc--big .bcv-calc__row { gap: 5px; }
+.bcv-calc--big .bcv-calc__key { height: 44px; border-radius: 11px; font-size: 14px; }
+.bcv-calc--big .bcv-calc__key--num { font-size: 18px; }
+.bcv-calc--big .bcv-calc__key--op { font-size: 22px; }
+.bcv-calc--big .bcv-calc__key sup, .bcv-calc--big .bcv-calc__key sub { font-size: 9.5px; }
+.bcv-quick--panel .bcv-quick__body { inset: auto; top: 0; right: 0; width: var(--bcv-quick-w); height: var(--bcv-quick-h); box-sizing: border-box; } /* (the panel keeps its size while folded: a Desmos in it keeps its layout) */
+.bcv-qgraph { display: flex; flex-direction: column; gap: 6px; height: 100%; box-sizing: border-box; color: #fff; font-family: var(--bcv-font); }
+.bcv-qgraph__head { display: flex; align-items: center; gap: 8px; height: 16px; padding: 0 4px; }
+.bcv-qgraph__out { margin-left: auto; font: 600 10px/1 var(--bcv-font); color: rgba(255,255,255,.55) !important; text-decoration: none !important; }
+.bcv-qgraph__out:hover { color: #fff !important; }
+.bcv-qgraph__body { flex: 1; min-height: 0; border-radius: 10px; overflow: hidden; background: #fff; }
+.bcv-qgraph__frame { display: block; width: 100%; height: 100%; border: 0; background: #fff; opacity: 0; transition: opacity .4s ease; }
+.bcv-qgraph__frame.is-in { opacity: 1; }
+.bcv-qgraph__fail { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 20px; text-align: center; background: #1c1c1e; }
+.bcv-qgraph__failtext { font: 500 12px/1.4 var(--bcv-font); color: rgba(255,255,255,.7); }
+.bcv-qgraph__link { padding: 8px 12px; border-radius: 12px; background: var(--bcv-quick-color); font: 600 12px/1 var(--bcv-font); color: #fff !important; text-decoration: none !important; }
+
+/* external tools in a popup that fills the tab (2.39.0): the page and the pins stay where they are */
+.bcv-ext-ov { padding: 50px 12px 12px; align-items: stretch; } /* (the strip above it is the tray's: the pins and the switch stay in reach) */
+.bcv-ext { width: 100%; max-width: none; height: 100%; max-height: none; display: flex; flex-direction: column; background: var(--bcv-bg); -webkit-backdrop-filter: none; backdrop-filter: none; }
+.bcv-ext__head { align-items: center; gap: 12px; padding: 12px 16px 12px 18px; }
+.bcv-ext .bcv-sheet__title, .bcv-ext .bcv-sheet__note { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bcv-ext__acts { display: flex; align-items: center; gap: 8px; flex: none; }
+.bcv-ext__tab { display: inline-flex; align-items: center; gap: 6px; text-decoration: none !important; }
+.bcv-ext__body { flex: 1; min-height: 0; position: relative; background: var(--bcv-fill); border-radius: 0 0 26px 26px; overflow: hidden; }
+.bcv-ext__frame { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: #fff; opacity: 0; transition: opacity .35s ease; }
+.bcv-ext__frame.is-in { opacity: 1; }
+.bcv-ext__wait { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 20px; text-align: center; }
+.bcv-ext__waittext { max-width: 420px; font: 500 13px/1.45 var(--bcv-font); color: var(--bcv-ink3); }
+.bcv-ext__body.is-loaded .bcv-ext__wait { display: none; }
+.bcv-ext__fail { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 40px 30px; text-align: center; background: var(--bcv-bg); }
+.bcv-ext__failtitle { font: 600 15px/1.3 var(--bcv-font); color: var(--bcv-ink); }
+.bcv-ext__failtext { max-width: 320px; font: 400 13px/1.5 var(--bcv-font); color: var(--bcv-ink3); }
+.bcv-ext__fail .bcv-btn { text-decoration: none !important; }
+.bcv-chip--full { cursor: pointer; }
+@media (max-width: 720px) {
+  .bcv-ext-ov { padding: 48px 0 0; }
+  .bcv-ext { border-radius: 18px 18px 0 0; border: 0; }
+  .bcv-ext__body { border-radius: 0; }
+  .bcv-ext__canvas { display: none; }
+}

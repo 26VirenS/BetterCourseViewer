@@ -516,7 +516,7 @@
           class: `bcv-rail__ext ${t.id === activeId ? 'is-active' : ''}`,
           dataset: { tab: t.id },
           title: t.label,
-          onclick: () => { if (shell.railLoad === t.id) return; shell.markRail(t.id); app.go(t.href); },
+          onclick: (e) => { if (BCV.exttool) BCV.exttool.openLink({ title: t.label, href: t.href, from: e.currentTarget }); else app.go(t.href); }, // (a popup over the page: the rail and the pins stay)
         }, [h('span', { class: 'bcv-rail__label', text: t.label }), U.svg(EXT_ARROW, { size: 12, width: 2, style: { flex: 'none' } })]))),
       ])) : null,
     ]);
@@ -1190,6 +1190,13 @@
           if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
           e.preventDefault();
           BCV.viewer.open({ id: it.content_id }, { context: c, from: rowEl });
+        });
+        // a link or a tool in a module opens in a popup over the page, the site (or Canvas's launch of the tool) framed in it
+        if ((it.type === 'ExternalUrl' || it.type === 'ExternalTool') && BCV.exttool) rowEl.addEventListener('click', (e) => {
+          if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+          e.preventDefault();
+          if (it.type === 'ExternalTool') BCV.exttool.open({ title: it.title, url: `${c.url}/external_tools/retrieve?display=borderless&url=${encodeURIComponent(it.external_url || '')}`, page: it.html_url ? (() => { try { return new URL(it.html_url, location.origin).pathname; } catch { return null; } })() : null, from: rowEl });
+          else BCV.exttool.open({ title: it.title, url: it.external_url || it.html_url, newTab: it.external_url || it.html_url, from: rowEl, icon: IC.link });
         });
         return rowEl;
       }));

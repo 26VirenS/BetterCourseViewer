@@ -23,6 +23,11 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.39.0', date: '2026-09-20', notes: [
+      { kind: 'new', title: 'Tools open over the page', body: 'Campus tools, module links and tools open in a popup that fills the tab; pins stay.', icon: P.layers },
+      { kind: 'new', title: 'Calculator on its own', body: 'The scientific calculator is a tool of its own now, with the keyboard on it.', icon: P.steps },
+      { kind: 'improved', title: 'Graphing pin', body: 'The graphing calculator’s pin swells into a small Desmos, portrait, that keeps its graph.', icon: P.sparkle },
+    ] },
     { version: '2.38.0', date: '2026-09-20', notes: [
       { kind: 'new', title: 'The Cite pin opens a panel', body: 'Paste a link, cite the page you are on, pick the style, copy a saved citation.', icon: P.pin },
     ] },

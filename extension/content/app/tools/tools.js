@@ -36,6 +36,7 @@
   const TOOLS = [
     { key: 'cite', name: 'Citation generator', note: 'Cite a source in MLA, APA or Chicago.', icon: IC.quote, color: '#30b0c7', open: (app, o) => BCV.toolsCite.open(app, o) },
     { key: 'pomo', name: 'Focus timer', note: 'Focus for a while, then take a break.', icon: IC.timer, color: '#ff9500', open: (app, o) => openTimer(app, o) },
+    { key: 'calc', name: 'Calculator', note: 'Scientific, laid out like the Mac\'s.', icon: IC.calc, color: '#ff9f0a', open: (app, o) => openCalc(app, o) },
     { key: 'graph', name: 'Graphing calculator', note: 'Desmos, right here.', icon: IC.graph, color: '#5856d6', open: (app, o) => openGraph(app, o) },
     { key: 'need', name: 'Grade needed', note: 'What you need on the final to hit your goal.', icon: IC.percent, color: '#ff375f', open: (app, o) => BCV.toolsNeed.open(app, o) },
     { key: 'conv', name: 'File converter', note: 'Word, PDF and images, any way round.', icon: IC.convert, color: '#34c759', open: (app, o) => BCV.toolsConvert.open(app, o) },
@@ -604,6 +605,16 @@
     mo.observe(document.body, { childList: true });
   }
 
+  /** The calculator as a tool of its own: the same scientific calculator, larger, the keyboard on it. */
+  function openCalc(app, { from = null } = {}) {
+    const tool = toolOf('calc');
+    const built = quickCalc({ popup: true });
+    const body = U.el('bcv-calc-tool', built.els);
+    const p = popup({ tool, title: 'Calculator', sub: 'Scientific · the keyboard works too', width: 440, cls: 'bcv-tool--calc', body, from });
+    setTimeout(() => { if (p.alive()) built.els[0].focus({ preventScroll: true }); }, 60);
+    return p;
+  }
+
   // ---- the pins: a tool as a small button beside the look switch -----------------------------
   // A card dragged to the top of the page lands there, on every page of the site, and opens its
   // tool from anywhere. The pointer over a pin shows an X that takes it away again.
@@ -628,13 +639,15 @@
   // The pins other than the timer's open the way its island does: under the pointer (a mouse or a
   // pen) the pin swells into a capsule holding the tool's quickest use — a grade worked out, a file
   // to convert, a set to study — and folds when the pointer leaves. The full tool is a press on the
-  // pin (or Enter) away, as before, and a press on the capsule's name. The calculator's pin swells
-  // into more than a capsule: a panel with the whole scientific calculator in it (Apple's, key for
-  // key). The citation generator's pin swells into a panel too: a link to cite, the page you are on,
-  // the style, and the last citations saved with a copy button each.
+  // pin (or Enter) away, as before, and a press on the capsule's name. Three pins swell into more
+  // than a capsule: the calculator's into a panel with the whole scientific calculator in it
+  // (Apple's, key for key); the graphing calculator's into a small Desmos, portrait, that keeps its
+  // graph while folded; the citation generator's into a link to cite, the page you are on, the
+  // style, and the last citations saved with a copy button each.
   const QUICK = {
     cite: { w: 400, h: 150, panel: true, build: quickCite },
-    graph: { w: 408, h: 262, panel: true, build: quickCalc },
+    calc: { w: 408, h: 262, panel: true, build: quickCalc },
+    graph: { w: 340, h: 470, panel: true, build: quickGraph },
     need: { w: 400, build: quickNeed },
     conv: { w: 250, build: quickConv },
     pdfx: { w: 250, build: quickPdfs },
@@ -653,6 +666,7 @@
     const body = U.el('bcv-quick__body');
     let panel = null;
     let leave = 0;
+    let hold = 0; // (a pin that just handed off to its tool stays folded a moment: the popup rising under the pointer is not a hover)
     const closeQ = () => {
       if (!item.classList.contains('is-open')) return;
       item.classList.remove('is-open');
@@ -661,13 +675,13 @@
       item.setAttribute('aria-expanded', 'false');
     };
     const openQ = () => {
-      if (!panel) { panel = q.build({ item, go: (o = {}) => { closeQ(); open(t.key, { from: item, ...o }); } }); body.replaceChildren(...panel.els); }
+      if (!panel) { panel = q.build({ item, go: (o = {}) => { hold = Date.now() + 900; closeQ(); open(t.key, { from: item, ...o }); } }); body.replaceChildren(...panel.els); }
       panel.onOpen?.();
       item.classList.add('is-open');
       item.setAttribute('aria-expanded', 'true');
     };
     item.addEventListener('pointerenter', (e) => {
-      if (e.pointerType === 'touch' || item.classList.contains('is-out') || document.querySelector('.bcv-tool-ov')) return; // (a tool open over the page: the pins stay folded)
+      if (e.pointerType === 'touch' || item.classList.contains('is-out') || Date.now() < hold || document.querySelector('.bcv-tool-ov')) return; // (a tool open over the page: the pins stay folded)
       clearTimeout(leave);
       item.classList.add('is-hover');
       for (const other of document.querySelectorAll('#bcv-pins .bcv-quick.is-open')) if (other !== item) { other.querySelector(':focus')?.blur(); other.classList.remove('is-hover'); other.classList.remove('is-open'); other.setAttribute('aria-expanded', 'false'); } // (one open at a time: a calculator left with the focus folds when the pointer moves on)
@@ -824,13 +838,14 @@
     const shown = () => (st.err ? 'Error' : st.entry !== null ? calcGroup(st.entry) : calcFmt(st.cur));
     return { st, press, shown };
   }
-  /** The calculator pin's panel: the display over the keys, the way the Calculator app lays them out. */
-  function quickCalc({ item, go }) {
+  /** The calculator pin's panel: the display over the keys, the way the Calculator app lays them out.
+   *  (The calculator tool's popup is the same, larger: `popup`.) */
+  function quickCalc({ go = null, popup: big = false } = {}) {
     const eng = calcEngine();
-    const root = h('div', { class: 'bcv-calc', tabindex: '0', role: 'application', 'aria-label': 'Scientific calculator' });
+    const root = h('div', { class: `bcv-calc${big ? ' bcv-calc--big' : ''}`, tabindex: '0', role: 'application', 'aria-label': 'Scientific calculator' });
     const display = h('div', { class: 'bcv-calc__display', 'aria-live': 'polite' });
     const mode = h('span', { class: 'bcv-calc__mode', text: '' });
-    const head = U.el('bcv-calc__head', [quickName('Graph', go, 'Open the graphing calculator'), mode, U.text('bcv-calc__mem', '', 'span')]);
+    const head = U.el('bcv-calc__head', [go ? quickName('Calc', go, 'Open the calculator') : U.text('bcv-calc__title', 'Scientific', 'span'), mode, U.text('bcv-calc__mem', '', 'span')]);
     const keys = [];
     const rows = CALC_ROWS.map((row) => U.el('bcv-calc__row', row.map(([key, label, cls = 'fn']) => {
       const b = h('button', { type: 'button', class: `bcv-calc__key bcv-calc__key--${cls.split(' ')[0]} ${cls.includes('wide') ? 'bcv-calc__key--wide' : ''}`, dataset: { key, base: key }, html: label, title: CALC_TITLES[key] || label });
@@ -866,6 +881,20 @@
     root.append(head, display, U.el('bcv-calc__keys', rows));
     paint();
     return { els: [root] };
+  }
+  /** The graphing calculator's pin: a small Desmos, portrait, loaded on the first hover and kept —
+   *  the graph survives the pin folding — with the way out to desmos.com where the frame is refused. */
+  function quickGraph({ go }) {
+    const frame = h('iframe', { class: 'bcv-qgraph__frame', title: 'Desmos graphing calculator', allow: 'fullscreen', referrerpolicy: 'no-referrer' });
+    const body = U.el('bcv-qgraph__body', [frame]);
+    const root = U.el('bcv-qgraph', [U.el('bcv-qgraph__head', [quickName('Graph', go, 'Open the graphing calculator'), h('a', { class: 'bcv-qgraph__out', href: DESMOS, target: '_blank', rel: 'noopener', text: 'desmos.com ↗' })]), body]);
+    let loaded = false;
+    const fail = () => body.replaceChildren(U.el('bcv-qgraph__fail', [U.text('bcv-qgraph__failtext', 'Desmos could not load here.'), h('a', { class: 'bcv-qgraph__link', href: DESMOS, target: '_blank', rel: 'noopener', text: 'Open desmos.com' })]));
+    const onCsp = (e) => { if (/desmos\.com/.test(e.blockedURI || '')) fail(); };
+    frame.addEventListener('error', fail);
+    frame.addEventListener('load', () => frame.classList.add('is-in'));
+    const onOpen = () => { if (loaded) return; loaded = true; document.addEventListener('securitypolicyviolation', onCsp); frame.src = DESMOS; };
+    return { els: [root], onOpen };
   }
   /** Citation generator: a link pasted here opens the generator with it in (a YouTube link as a
    *  video, a doi.org link as a journal article, anything else as a website with today's date);

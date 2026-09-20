@@ -1271,7 +1271,7 @@
     // and Canvas-only cases keep one big button
     const embeds = nativeSubmit && !isTool;
     const primary = isTool
-      ? (toolNewTab ? { label: 'Open the tool', go: () => window.open(toolLaunch, '_blank', 'noopener') } : { label: 'Open the tool', go: () => app.go(nativeHref(`${c.url}/assignments/${a.id}`)) })
+      ? (toolNewTab ? { label: 'Open the tool', go: () => (BCV.exttool ? BCV.exttool.open({ title: a.name, url: toolLaunch, page: `${c.url}/assignments/${a.id}`, newTab: toolLaunch }) : window.open(toolLaunch, '_blank', 'noopener')) } : { label: 'Open the tool', go: () => app.go(nativeHref(`${c.url}/assignments/${a.id}`)) })
       : canvasOnly ? { label: s.submitted_at ? 'Resubmit in Canvas' : 'Submit in Canvas', go: () => app.go(nativeHref(`${c.url}/assignments/${a.id}`)) } : null;
     const block = embeds ? await BCV.screens.submit.render(ctx, c, { embed: true, a, sub: s, back: { href: `${c.url}/assignments`, label: 'Assignments' }, title: 'Submit work', aside: () => rubricButton(a, s) }) : null;
     if (!ctx.alive()) return b;
