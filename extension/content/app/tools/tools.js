@@ -38,6 +38,7 @@
     { key: 'pomo', name: 'Focus timer', note: 'Focus for a while, then take a break.', icon: IC.timer, color: '#ff9500', open: (app, o) => openTimer(app, o) },
     { key: 'calc', name: 'Calculator', note: 'Scientific, laid out like the Mac\'s.', icon: IC.calc, color: '#ff9f0a', open: (app, o) => openCalc(app, o) },
     { key: 'graph', name: 'Graphing calculator', note: 'Desmos, right here.', icon: IC.graph, color: '#5856d6', open: (app, o) => openGraph(app, o) },
+    { key: 'ptable', name: 'Periodic table', note: 'Every element and its facts, in place.', icon: IC.table, color: '#30d158', open: (app, o) => BCV.toolsPtable.open(app, o) },
     { key: 'need', name: 'Grade needed', note: 'What you need on the final to hit your goal.', icon: IC.percent, color: '#ff375f', open: (app, o) => BCV.toolsNeed.open(app, o) },
     { key: 'conv', name: 'File converter', note: 'Word, PDF and images, any way round.', icon: IC.convert, color: '#34c759', open: (app, o) => BCV.toolsConvert.open(app, o) },
     { key: 'pdfx', name: 'Merge & split PDFs', note: 'Join pages from PDFs into one, or take pages out.', icon: IC.merge, color: '#bf5af2', open: (app, o) => BCV.toolsPdfs.open(app, o) },
@@ -648,6 +649,7 @@
     cite: { w: 400, h: 150, panel: true, build: quickCite },
     calc: { w: 408, h: 262, panel: true, build: quickCalc },
     graph: { w: 340, h: 470, panel: true, build: quickGraph },
+    ptable: { w: 430, build: quickPtable },
     need: { w: 400, build: quickNeed },
     conv: { w: 250, build: quickConv },
     pdfx: { w: 250, build: quickPdfs },
@@ -895,6 +897,19 @@
     frame.addEventListener('load', () => frame.classList.add('is-in'));
     const onOpen = () => { if (loaded) return; loaded = true; document.addEventListener('securitypolicyviolation', onCsp); frame.src = DESMOS; };
     return { els: [root], onOpen };
+  }
+  /** Periodic table: an element looked up by symbol, name or number as you type, its name, number
+   *  and mass in a line; Enter (or the arrow) opens the table on it. */
+  function quickPtable({ go }) {
+    const P = () => BCV.toolsPtable;
+    const input = h('input', { type: 'text', class: 'bcv-quick__input', placeholder: 'Symbol, name or number', 'aria-label': 'Find an element', autocomplete: 'off', spellcheck: 'false' });
+    const out = U.text('bcv-quick__result bcv-quick__result--wide', '', 'span');
+    let hit = null;
+    const look = () => { hit = P()?.find(input.value)[0] || null; out.textContent = hit ? P().line(hit) : input.value.trim() ? 'No element' : ''; };
+    const openOn = () => go(hit ? { select: hit.number } : {});
+    input.addEventListener('input', look);
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); openOn(); } });
+    return { els: [quickName('Elements', go, 'Open the periodic table'), input, out, quickGo(IC.chevron, 'Open the table on it', openOn)] };
   }
   /** Citation generator: a link pasted here opens the generator with it in (a YouTube link as a
    *  video, a doi.org link as a journal article, anything else as a website with today's date);

@@ -22,3 +22,8 @@ paddleocr/             — the Image to text engine: PaddleOCR's PP-OCRv6 models
                          https://github.com/RapidAI/RapidOCR
   ch_ppocr_mobile_v2.0_cls_mobile.onnx — PaddleOCR's text-angle classifier, Apache-2.0 (as above)
   ppocr_keys.txt       — the recogniser's character list, read out of the model's own metadata
+
+Data bundled with the tools (content/app/tools/):
+ptable-data.js         — the elements for the periodic table, trimmed from Bowserinator's
+                         Periodic-Table-JSON, CC BY-SA 3.0 (the one-line summaries are Wikipedia's,
+                         CC BY-SA) — https://github.com/Bowserinator/Periodic-Table-JSON

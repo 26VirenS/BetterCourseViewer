@@ -2902,7 +2902,7 @@ try {
   const toolNav = await texts('.bcv-nav > .bcv-nav__item');
   check(toolNav[toolNav.length - 1].startsWith('Tools') && (await page.$eval('.bcv-nav__item[data-nav="tools"]', (e) => e.classList.contains('is-active'))) && (await texts('.bcv-h1'))[0] === 'Tools' && (await texts('.bcv-head__sub'))[0] === 'Handy things, right here.', 'Tools is the last row of the sidebar, lit, and the page is titled');
   const cardNames = await texts('.bcv-tool-card__name');
-  check(cardNames.join(' | ') === 'Citation generator | Focus timer | Calculator | Graphing calculator | Grade needed | File converter | Merge & split PDFs | PDF annotator | Image to text | Flashcards' && (await page.$$('.bcv-tool-card__open')).length === 10, `ten cards, each with Open: ${cardNames.join(' | ')}`);
+  check(cardNames.join(' | ') === 'Citation generator | Focus timer | Calculator | Graphing calculator | Periodic table | Grade needed | File converter | Merge & split PDFs | PDF annotator | Image to text | Flashcards' && (await page.$$('.bcv-tool-card__open')).length === 11, `eleven cards, each with Open: ${cardNames.join(' | ')}`);
   await shot(page, '36c-tools');
   const closeTool = async () => { await page.keyboard.press('Escape'); await page.waitForFunction(() => !document.querySelector('.bcv-tool-ov'), null, { timeout: 5000 }); };
   const openTool = async (key) => { await page.click(`.bcv-tool-card[data-tool="${key}"]`); await page.waitForSelector(`.bcv-tool[data-tool="${key}"]`, { timeout: 5000 }); };
@@ -3033,6 +3033,22 @@ try {
   await page.keyboard.press('Enter');
   check((await texts('.bcv-tool[data-tool="calc"] .bcv-calc__display'))[0] === '42' && (await page.$eval('.bcv-tool[data-tool="calc"] .bcv-calc__key[data-key="7"]', (e) => Math.round(e.getBoundingClientRect().height))) === 54 && (await page.$eval('.bcv-tool[data-tool="calc"]', (e) => Math.round(e.getBoundingClientRect().width))) === 720, 'typed on the keyboard, 7 × 6 Enter shows 42, on keys 54 tall in a popup 720 wide');
   await shot(page, '19b-calculator-tool');
+  await closeTool();
+  // the periodic table: every element in place, a card for the one pressed, search, legend, arrow keys
+  await openTool('ptable');
+  await page.waitForTimeout(300);
+  check((await page.$$('.bcv-pt__cell')).length === 118 && (await toolSub()) === '118 elements' && (await page.$$('.bcv-pt__chip')).length === 10 && (await texts('.bcv-pt__hint'))[0] === 'Press an element, or type its symbol, name or number.' && (await page.$eval('.bcv-pt__cell[data-symbol="He"]', (e) => e.style.gridColumn === '18' && e.style.gridRow === '1')), 'the periodic table opens with all 118 elements in place, ten kinds in the legend, and a card waiting for a press');
+  await page.click('.bcv-pt__cell[data-symbol="Fe"]');
+  check((await texts('.bcv-pt__name'))[0] === 'Iron' && (await texts('.bcv-pt__bignum'))[0] === '26' && (await texts('.bcv-pt__cat'))[0] === 'Transition metal · 55.845 u' && (await texts('.bcv-pt__factv')).join(' | ') === 'Group 8 · Period 4 · d-block | Solid | [Ar] 3d6 4s2 | 1.83 | 1538 °C · 2861 °C | 7.874 g/cm³' && /^Iron is a chemical element/.test((await texts('.bcv-pt__summarytext'))[0]) && (await page.$eval('.bcv-pt__wiki', (e) => e.href)) === 'https://en.wikipedia.org/wiki/Iron' && (await toolSub()) === 'Iron · 26', `Iron pressed: its card in the table's corner, the facts, a line about it (${(await texts('.bcv-pt__factv')).join(' | ')})`);
+  await shot(page, '46-periodic-table');
+  await page.keyboard.press('ArrowRight');
+  check((await texts('.bcv-pt__name'))[0] === 'Cobalt' && (await page.$eval('.bcv-pt__cell.is-sel', (e) => e.dataset.symbol)) === 'Co', 'the arrow keys walk the table');
+  await page.fill('.bcv-pt__search', 'gold');
+  check((await page.$$eval('.bcv-pt__cell.is-match', (els) => els.map((e) => e.dataset.symbol))).join(',') === 'Au' && (await page.$$('.bcv-pt__cell.is-dim')).length === 117, 'a search lights the matches and dims the rest');
+  await page.press('.bcv-pt__search', 'Enter');
+  check((await texts('.bcv-pt__name'))[0] === 'Gold' && (await page.$eval('.bcv-pt__search', (e) => e.value)) === '' && !(await page.$('.bcv-pt__cell.is-dim')) && (await texts('.bcv-pt__cat'))[0] === 'Transition metal · 196.967 u', 'Enter picks the first match and clears the search');
+  await page.click('.bcv-pt__chip[data-cat="noble gas"]');
+  check((await page.$$('.bcv-pt__cell:not(.is-dim)')).length === 6 && (await page.$eval('.bcv-pt__chip[data-cat="noble gas"]', (e) => e.classList.contains('is-on'))), 'a legend chip lights its kind: the six noble gases (oganesson is still an unknown)');
   await closeTool();
   // the file converter: the source kind decides the targets; images on the canvas, a PDF from an engine loaded when first needed
   await openTool('conv');
@@ -3380,7 +3396,7 @@ try {
   await page.waitForFunction(() => !document.querySelector('#bcv-pins .bcv-pin'), null, { timeout: 3000 });
   check((await page.$eval('#bcv-pins', (e) => e.hidden)) && (await inPage('focusActive')) === false, 'End takes the borrowed pin away');
   await page.goto(`${BASE}/#tools`);
-  check((await page.$('#bcv-welcome')) === null && (await page.$$('.bcv-tool-card')).length === 10 && !(await page.$eval('.bcv-tool-card[data-tool="pomo"]', (e) => e.classList.contains('is-pinned'))), 'the second time, Tools opens without the black, and the card is no longer marked');
+  check((await page.$('#bcv-welcome')) === null && (await page.$$('.bcv-tool-card')).length === 11 && !(await page.$eval('.bcv-tool-card[data-tool="pomo"]', (e) => e.classList.contains('is-pinned'))), 'the second time, Tools opens without the black, and the card is no longer marked');
 
   // ---- the four tools of 2.35.0: grade needed, merge & split, the annotator, image to text ----
   console.log('grade needed');
@@ -3612,7 +3628,7 @@ try {
 
   // ---- the quick menus: every pin but the timer's swells into a capsule under the pointer, the tool's quickest use in it ----
   console.log('quick menus');
-  await sw.evaluate(() => self.BCV.api.storage.local.set({ 'tools:pins': ['cite', 'calc', 'graph', 'conv', 'fc'], 'tools:cite:style': 'mla', 'tools:citations': [
+  await sw.evaluate(() => self.BCV.api.storage.local.set({ 'tools:pins': ['cite', 'calc', 'graph', 'ptable', 'conv', 'fc'], 'tools:cite:style': 'mla', 'tools:citations': [
     { id: 'c1', style: 'MLA 9', parts: [{ text: 'Okonkwo, Jane R. “How Students Actually Read Syllabi.” ', italic: false }, { text: 'The Atlantic', italic: true }, { text: ', 4 March 2026, theatlantic.com/x.', italic: false }], plain: 'Okonkwo, Jane R. “How Students Actually Read Syllabi.” The Atlantic, 4 March 2026, theatlantic.com/x.' },
     { id: 'c2', style: 'APA 7', parts: [{ text: 'Haddad, A. (2025). Reading habits. ', italic: false }, { text: 'Journal of Higher Education, 47', italic: true }, { text: '(3), 112–137.', italic: false }], plain: 'Haddad, A. (2025). Reading habits. Journal of Higher Education, 47(3), 112–137.' },
   ] }));
@@ -3621,7 +3637,7 @@ try {
   await page.waitForTimeout(600);
   const quickPin = (key) => `#bcv-pins .bcv-pin[data-tool="${key}"]`;
   const quickOpen = async (key, hh = 44) => { const b = await (await page.$(quickPin(key))).boundingBox(); await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2); await eventually(() => page.$eval(quickPin(key), (e, want) => e.classList.contains('is-open') && Math.round(e.getBoundingClientRect().height) === want, hh), 3000); await page.waitForTimeout(550); return page.$eval(quickPin(key), (e) => ({ w: Math.round(e.getBoundingClientRect().width), h: Math.round(e.getBoundingClientRect().height), radius: getComputedStyle(e.querySelector('.bcv-quick__face')).borderRadius, name: e.querySelector('.bcv-quick__name')?.textContent, btnGone: getComputedStyle(e.querySelector('.bcv-pin__btn')).opacity === '0' })); };
-  check((await page.$$('#bcv-pins .bcv-pin.bcv-quick')).length === 5 && (await page.$$eval('#bcv-pins .bcv-pin', (els) => els.map((e) => Math.round(e.getBoundingClientRect().width)))).every((w) => w === 24), 'five pins in the tray, each a disc with a quick menu folded in it');
+  check((await page.$$('#bcv-pins .bcv-pin.bcv-quick')).length === 6 && (await page.$$eval('#bcv-pins .bcv-pin', (els) => els.map((e) => Math.round(e.getBoundingClientRect().width)))).every((w) => w === 24), 'six pins in the tray, each a disc with a quick menu folded in it');
   const qc = await quickOpen('cite', 192);
   const qcSel = (sel) => `${quickPin('cite')} ${sel}`;
   check(qc.w === 400 && qc.h === 192 && qc.radius === '18px' && qc.name === 'Cite' && qc.btnGone && (await page.$eval(qcSel('.bcv-quick__input'), (e) => e.placeholder)) === 'Paste a link to cite' && (await texts(qcSel('.bcv-qcite__style'))).join('/') === 'MLA 9/APA 7/Chicago 17' && (await page.$eval(qcSel('.bcv-qcite__style.is-on'), (e) => e.dataset.style)) === 'mla' && (await texts(qcSel('.bcv-qcite__heretitle')))[0] === 'Cite this page' && (await texts(qcSel('.bcv-qcite__heresub')))[0] === 'Dashboard' && (await texts(qcSel('.bcv-qcite__tag'))).join('/') === 'APA 7/MLA 9' && /^Haddad, A\. \(2025\)/.test((await texts(qcSel('.bcv-qcite__text')))[0]) && !(await page.$eval(qcSel('.bcv-qcite__link'), (e) => e.hidden)), `the citation pin swells into a panel: a link to cite, the page you are on, the style, and the last citations saved, newest first (${(await texts(qcSel('.bcv-qcite__tag'))).join('/')} · ${(await texts(qcSel('.bcv-qcite__heresub')))[0]})`);
@@ -3700,6 +3716,17 @@ try {
   await page.mouse.move(700, 500);
   await page.mouse.click(700, 500);
   check(await eventually(() => page.$eval(quickPin('graph'), (e) => !e.classList.contains('is-open') && e.querySelector('.bcv-qgraph__frame') && Math.round(e.getBoundingClientRect().width) === 24), 3000), 'the Desmos panel folds and keeps its frame (the graph survives)');
+  const qp = await quickOpen('ptable');
+  await page.fill(`${quickPin('ptable')} .bcv-quick__input`, 'Na');
+  await page.waitForTimeout(120);
+  check(qp.w === 430 && qp.name === 'Elements' && (await texts(`${quickPin('ptable')} .bcv-quick__result`))[0] === 'Sodium · 11 · 22.990', 'the periodic table pin looks an element up as you type');
+  await page.keyboard.press('Enter');
+  await page.waitForSelector('.bcv-tool[data-tool="ptable"]', { timeout: 5000 });
+  await page.waitForTimeout(300);
+  check((await texts('.bcv-pt__name'))[0] === 'Sodium' && (await page.$eval('.bcv-pt__cell.is-sel', (e) => e.dataset.symbol)) === 'Na' && !(await page.$eval(quickPin('ptable'), (e) => e.classList.contains('is-open'))), 'Enter opens the table on it');
+  await closeTool();
+  await page.mouse.move(700, 500);
+  await page.waitForTimeout(700);
   const q3 = await quickOpen('conv');
   check(q3.w === 250 && q3.name === 'Convert' && (await texts(`${quickPin('conv')} .bcv-quick__drop`))[0] === 'Click to add a file', 'the converter pin offers a drop target that is also a picker');
   await page.setInputFiles(`${quickPin('conv')} input[type=file]`, { name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('hello there') });

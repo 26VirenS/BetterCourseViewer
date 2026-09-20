@@ -23,6 +23,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.41.0', date: '2026-09-20', notes: [
+      { kind: 'new', title: 'Periodic table', body: 'Every element in place with its facts; search by symbol, name or number; a pin too.', icon: P.layers },
+    ] },
     { version: '2.40.0', date: '2026-09-20', notes: [
       { kind: 'improved', title: 'Tools fill the screen', body: 'A tool’s popup fills the screen but for its bar; the pins and the switch slide into it.', icon: P.layers },
       { kind: 'improved', title: 'Start assignment', body: 'An assignment done in a tool says Start or Continue assignment and opens it full screen.', icon: P.check },
