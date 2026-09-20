@@ -38,7 +38,7 @@ GRADES · one page for every course: current score, GPA computed from the scores
 
 HAND WORK IN · file upload, text entry or the tools your instructor enabled, with the assignment's own rules (due, attempts, accepted file types) up front. Quizzes run in a focused flow — one question at a time or all on one page, flags, a timer, a review screen — and finished attempts open a feedback view with your answer, the correct one when the quiz allows it, and the instructor's worked solution. Nothing is ever submitted for you.
 
-SMART PANEL (optional) · add your own Claude or ChatGPT key and the panel reads the page you are on: summarize what is due, plan the week, make a checklist from an assignment, condense a page, explain feedback. Requests go straight from your browser to the provider with your key.
+TOOLS · a citation generator, a focus timer, a scientific calculator, a graphing calculator, a periodic table, a grade-needed calculator, a file converter, PDF merge and split, a PDF annotator, image to text and flashcards — each on its own page and as a pin beside the look switch that opens on hover.
 
 HONEST BY DESIGN · every number on screen comes from Canvas's API; no control does anything the Canvas student API cannot; course colours, nicknames and favourites are yours from Canvas. Light and dark appearance, Reduce Motion respected.
 
@@ -71,21 +71,18 @@ Replaces the interface of the Canvas learning-management system on the user's ow
 
 | Permission | Justification |
 | --- | --- |
-| `storage` | Keeps the user's settings, a short-lived cache of Canvas API responses, and unsent drafts locally in the browser. |
-| `scripting` | Registers the extension's interface on a Canvas site once it is recognised as one (schools host Canvas at their own domains), and on a site the user adds with "Enable on this site". |
+| `storage` | Keeps the user's settings, a short-lived per-page cache of Canvas API responses, unsent drafts, the Grades page's optional local grade history, and the CloudConvert API key if the user connects one in the file converter — all locally in the browser. Nothing is synced or sent to the developer. |
+| `scripting` | Registers the extension's interface (its content scripts) on a Canvas site: one recognised as Canvas by its markup (schools host Canvas at domains of their own), or one the user adds with "Enable on this site". Also injects the extension's own bundled library files (the PDF and document libraries under lib/vendor) into a Canvas tab when a tool in the Tools tab needs them, so they do not load on every page. Never used to run remote code: every file injected ships inside the package. |
 | `activeTab` | Lets the toolbar popup read the current tab's address to show whether the extension is enabled on that site and offer to enable it. |
 | Host permissions (one field for all of them) | Schools host Canvas at domains of their own choosing (canvas.university.edu, learn.college.edu), which cannot be listed in advance, so the extension may look at any page. On every page it runs one small script (content/sniff.js, 40 lines) that reads the page's own markup for Canvas's — Canvas's page wrapper, its stylesheet bundle, its navigation — and does nothing else: it keeps nothing, sends nothing anywhere, and touches no page that is not Canvas. On a Canvas page the user is signed in to (or Canvas's sign-in page) it turns the interface on for that site. The interface itself runs only on Canvas sites: *.instructure.com (Canvas's hosted domain) and the sites recognised or added this way, where it draws its interface and calls Canvas's REST API with the user's existing session. |
 
 **Remote code:** select **No, I am not using remote code** (the justification box only applies to "Yes"; all code ships inside the package).
 
-**Data usage** — tick:
-
-- **Authentication information** (the user's own Claude/ChatGPT API key, stored locally; sent only to that provider).
-- **Personal communications** (the page the user asks about can be a Canvas inbox conversation or a discussion thread, so that text reaches the provider in the same way).
+**Data usage** — tick **Website content** and nothing else. The extension reads Canvas pages to draw its interface, the Chrome build's sniffer reads every page's markup to recognise Canvas, and a file the user drops on the converter goes to CloudConvert with the user's own key: page content, nothing personal, nothing to the developer. No other category applies — no identifiers, no credentials (the CloudConvert key stays in the browser), no messages, no location, no history, no activity.
 
 Then certify all three statements (no sale, no use unrelated to the single purpose, no creditworthiness/lending use) — all true.
 
-**Privacy policy URL:** `https://github.com/26VirenS/BetterCourseViewer/blob/HEAD/PRIVACY.md`
+**Privacy policy URL:** `https://github.com/26VirenS/BetterCourseViewer/blob/HEAD/PRIVACY.md`, or a page of your own carrying the same text (the listing links to it publicly, and the store asks you to certify that the data-usage answers match it — so when `PRIVACY.md` changes, the hosted page has to change with it).
 
 ## 4. Distribution tab
 

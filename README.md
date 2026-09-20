@@ -114,7 +114,7 @@ Safari extensions ship inside a Mac app, so the app is built with Xcode. The scr
 3. In Xcode press **⌘R** (Product → Run). The Simpl Courses app opens and tells you the extension is ready.
 4. In Safari go to **Settings → Extensions**, tick **Simpl Courses**, and click **Always Allow on Every Website** (or allow it on your school's Canvas site when Safari asks).
 5. If you built without an Apple developer team, turn on **Safari → Settings → Developer → Allow unsigned extensions** (enable the Developer tab under Settings → Advanced if it is hidden).
-6. Click the Simpl Courses toolbar icon → **Settings**, and paste your Claude and/or ChatGPT key. Press **Test** to check it.
+6. Open your Canvas. The setup begins there by itself.
 
 Updating: `git pull`, then in Xcode Product → Clean Build Folder (⇧⌘K) and Product → Run (⌘R), then quit and reopen Safari. The project references the files in `extension/` directly, so a rebuild is all that is needed. If Safari still shows stock Canvas, delete the `macos/` folder and regenerate the project from scratch.
 
@@ -193,8 +193,8 @@ The same extension runs inside an iOS app: a full-screen web view of your school
 ```
 extension/
   manifest.json                Manifest V3 (Safari, Chrome, Firefox)
-  background.js                streaming proxy to Claude/ChatGPT, key tests, custom sites
-  lib/                         settings, providers (raw fetch + SSE), Canvas REST helper, markdown, utils
+  background.js                badge, custom sites (and the Chrome sniffer's report), the page after install
+  lib/                         settings, Canvas REST helper (with the request gate), markdown, utils, the OCR reader, vendored libraries
   content/early.js             document_start: applies skin + appearance before first paint
   content/styles/app.css       the whole design system (light/dark variables, every component)
   content/app/icons.js         icon paths
