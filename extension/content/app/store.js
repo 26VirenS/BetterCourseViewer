@@ -589,7 +589,8 @@
 
   // ---- groups ---------------------------------------------------------------------------------
   function groups({ force = false, refresh = false } = {}) {
-    return C.cached('groups', 15 * MIN, () => C.get('/api/v1/users/self/groups', { params: { per_page: 50, include: ['group_category'] }, all: true }), { force, refresh });
+    // the biggest pages Canvas gives: a student's groups run back through every course they took, and each page is a round trip of its own
+    return C.cached('groups', 15 * MIN, () => C.get('/api/v1/users/self/groups', { params: { per_page: 100, include: ['group_category'] }, all: true, maxPages: 3 }), { force, refresh });
   }
 
   // ---- calendar -------------------------------------------------------------------------------
@@ -777,7 +778,8 @@
    *  if the list is already here, and otherwise arrives on `withCourse`, which the screen can take
    *  up after it has drawn. */
   async function group(id, { force = false, refresh = false } = {}) {
-    const g = await C.cached(`group:${id}`, 15 * MIN, () => C.get(`/api/v1/groups/${id}`, { params: { include: ['group_category', 'users'] } }), { force, refresh });
+    // (the members count comes with the group; the members themselves are the People tab's, not carried on every open)
+    const g = await C.cached(`group:${id}`, 15 * MIN, () => C.get(`/api/v1/groups/${id}`, { params: { include: ['group_category'] } }), { force, refresh });
     const shape = (course) => ({
       id: String(g.id), raw: g, name: g.name, originalName: g.name, nickname: null, code: g.name, term: course?.term || (g.context_type === 'Account' ? 'Account group' : ''), favorite: false,
       state: course?.state || 'current', role: 'Member', score: null, grade: null, teachers: [], sections: [], image: g.avatar_url || null, defaultView: 'feed', weighted: false,

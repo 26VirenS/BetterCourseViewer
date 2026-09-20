@@ -39,7 +39,7 @@
     const tabUrl = newTab || page || url;
     const foreign = !sameOrigin(url);
     const ov = U.el('bcv-sheet-ov bcv-ext-ov', null, { role: 'dialog', 'aria-label': title, tabindex: '-1' });
-    const frame = h('iframe', { class: 'bcv-ext__frame', src: url, title, allow: 'fullscreen; microphone; camera; display-capture; autoplay; clipboard-write; geolocation', referrerpolicy: 'strict-origin-when-cross-origin' });
+    const frame = h('iframe', { class: 'bcv-ext__frame', src: url, title, allow: 'fullscreen; microphone; camera; display-capture; autoplay; clipboard-write; geolocation; publickey-credentials-get; identity-credentials-get', referrerpolicy: 'strict-origin-when-cross-origin' }); // (no sandbox: a tool signs in, sets its cookies and opens its windows as it would on Canvas's own page)
     const wait = U.el('bcv-ext__wait', [U.text('bcv-ext__waittext', foreign ? 'Opening… if it stays blank, the site does not allow this: open it in a new tab.' : 'Opening…')]);
     const body = U.el('bcv-ext__body', [wait, frame]);
     const fail = () => {
@@ -53,14 +53,26 @@
     };
     const onCsp = (e) => { const b = String(e.blockedURI || ''); if (b && (url.startsWith(b) || b.startsWith(url.slice(0, 40)))) fail(); };
     document.addEventListener('securitypolicyviolation', onCsp);
-    frame.addEventListener('load', () => { frame.classList.add('is-in'); body.classList.add('is-loaded'); });
+    frame.addEventListener('load', () => {
+      if (frame.getAttribute('src') === 'about:blank') return; // (the blank page on the way through a reload: the tool is still to come)
+      frame.classList.add('is-in');
+      body.classList.add('is-loaded');
+    });
     frame.addEventListener('error', fail);
     const closeBtn = h('button', { type: 'button', class: 'bcv-sheet__close', 'aria-label': 'Close', onclick: close }, U.svg(IC.close, { size: 13, stroke: 'var(--bcv-ink2)', width: 2.3 }));
     const tab = h('a', { class: 'bcv-btn bcv-ext__tab', href: tabUrl, target: '_blank', rel: 'noopener', title: 'Open in a new tab' }, [U.svg(IC.external, { size: 13, stroke: 'currentColor', width: 1.9 }), h('span', { text: 'Open in new tab' })]);
+    // Reload: the launch again from the start (a tool that timed out, a sign-in that went round in circles)
+    const reload = h('button', { type: 'button', class: 'bcv-btn bcv-ext__reload', title: 'Load the tool again', 'aria-label': 'Reload' }, [U.svg('M4 12a8 8 0 108-8M4 4v5h5', { size: 13, stroke: 'currentColor', width: 2 }), h('span', { text: 'Reload' })]);
+    reload.addEventListener('click', () => {
+      frame.classList.remove('is-in');
+      body.classList.remove('is-loaded'); // "Opening…" again until the tool is back
+      frame.src = 'about:blank'; // through a blank page, so the launch starts over rather than the browser answering from what it had
+      setTimeout(() => { if (current?.ov === ov) frame.src = url; }, 30);
+    });
     const head = U.el('bcv-sheet__head bcv-ext__head', [
       U.tile(icon || IC.shield, { color: 'var(--bcv-blue)', tint: 'var(--bcv-blue-soft)', size: 32, iconSize: 16 }),
-      U.el('bcv-sheet__titles', [U.text('bcv-sheet__title', title), U.text('bcv-sheet__note', note || (foreign ? 'The site’s own page, framed here. The pinned tools stay beside the switch.' : 'Launched by Canvas, framed here. The pinned tools stay beside the switch.'))]),
-      U.el('bcv-ext__acts', [tab]),
+      U.el('bcv-sheet__titles', [U.text('bcv-sheet__title', title), note ? U.text('bcv-sheet__note', note) : null]), // (the bar carries the tool's name and nothing more)
+      U.el('bcv-ext__acts', [reload, tab]),
       closeBtn,
     ]);
     closeBtn.classList.add('bcv-ext__close');

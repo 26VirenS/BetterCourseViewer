@@ -3233,7 +3233,7 @@ html[data-bcv-theme="dark"] .bcv-pdfx { --px-row: #0f0f11; --px-page: #1f1f22; -
 .bcv-ext__close { position: absolute; top: 12px; right: 12px; }
 .bcv-ext .bcv-sheet__title, .bcv-ext .bcv-sheet__note { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .bcv-ext__acts { display: flex; align-items: center; gap: 8px; flex: none; }
-.bcv-ext__tab { display: inline-flex; align-items: center; gap: 6px; text-decoration: none !important; }
+.bcv-ext__tab, .bcv-ext__reload { display: inline-flex; align-items: center; gap: 6px; text-decoration: none !important; }
 .bcv-ext__body { flex: 1; min-height: 0; position: relative; background: var(--bcv-fill); overflow: hidden; }
 .bcv-ext__frame { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: #fff; opacity: 0; transition: opacity .35s ease; }
 .bcv-ext__frame.is-in { opacity: 1; }

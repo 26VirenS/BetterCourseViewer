@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 // The request layer on its own (extension/lib/canvas-api.js, run in a sandbox with a fake fetch):
 // the gate — at most ten GETs in flight, the newest navigation's requests served first when a
-// slot frees, writes never held — a throttled 403 asked again rather than thrown, a refusal still
-// thrown, and a request that never answers given up, asked once more, then failed.
+// slot frees, writes never held, a warm-up in flight giving its slot up to the screen being drawn
+// and asked again later, a queued warm-up the new screen wants moved up to its place — a
+// throttled 403 asked again rather than thrown, a refusal still thrown, and a request that never
+// answers given up, asked once more, then failed.
 import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -84,6 +86,41 @@ await tick();
 check(opened === 1, 'and the gate still lets the next request through');
 pending.shift().resolve();
 await after;
+
+console.log('warm-ups make way');
+C.tune({ requestTimeout: 20000 });
+// a screen has settled and its warm-ups fill every slot; a press: the new screen's request goes
+// out at once, in the slot the last warm-up out gives up, and that warm-up is asked again later,
+// behind the new screen's own requests
+C.settled();
+const warm = Array.from({ length: 12 }, (_, i) => C.get(`/api/v1/warm${i}`));
+await tick();
+check(opened === 10 && pending.length === 10, `ten warm-ups in flight of twelve (${opened} open)`);
+C.navigated();
+const press = C.get('/api/v1/press');
+await tick();
+const out = pending.map(path);
+check(opened === 10 && out.includes('/api/v1/press') && !out.includes('/api/v1/warm9') && out.includes('/api/v1/warm8'), `the press went out at once, in the slot the newest warm-up gave up: ${out.join(',')}`);
+pending.splice(pending.findIndex((p) => path(p) === '/api/v1/press'), 1)[0].resolve();
+await press;
+await tick();
+check(opened === 10 && path(pending.at(-1)) === '/api/v1/warm10', `the slot it freed went to the warm-up next in line, not the one that gave way (${path(pending.at(-1))})`);
+while (pending.length) { pending.shift().resolve(); await tick(); }
+await Promise.all(warm);
+check(finished.filter((u) => /warm9$/.test(u)).length === 1 && opened === 0, 'the warm-up that gave way was asked again and answered');
+// a warm-up asked for on the last screen, still queued when the next screen wants it: it moves up to the new screen's place
+C.settled();
+const queued = Array.from({ length: 12 }, (_, i) => C.cached(`memo${i}`, 0, () => C.get(`/api/v1/memo${i}`)));
+await tick();
+check(opened === 10 && pending.length === 10, 'ten warm-ups out, two queued');
+C.navigated();
+const wanted = C.cached('memo11', 0, () => C.get('/api/v1/memo11'));
+pending.shift().resolve();
+await tick();
+check(path(pending.at(-1)) === '/api/v1/memo11', `the queued one the new screen wants went out first, ahead of the one queued before it (${path(pending.at(-1))})`);
+while (pending.length) { pending.shift().resolve(); await tick(); }
+await Promise.all([...queued, wanted]);
+check(opened === 0 && finished.filter((u) => /memo11$/.test(u)).length === 1, 'and it was asked for once, shared by both');
 
 console.log('a session that has ended');
 let lostCalls = 0;

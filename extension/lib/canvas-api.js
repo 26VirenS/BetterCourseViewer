@@ -57,26 +57,62 @@
   // carries the navigation it was made under, and the newest navigation's requests are served
   // first — so the screen being opened never waits behind what the background asked for on the
   // screen before it. Writes are never held.
+  //
+  // Two more things keep a press quick when the background is busy. A request made after a screen
+  // has settled is a warm-up — what the next press might want, not what the user is waiting on —
+  // and when every slot is held, the screen being drawn takes one from a warm-up in flight for an
+  // older screen: that warm-up is stopped and asked again later, behind the screen's own requests.
+  // And a warm-up the new screen turns out to want (Groups pressed while its list is still queued
+  // behind the calendar's month) is moved up to the new screen's place in the queue rather than
+  // left waiting its turn as a warm-up.
   const MAX_INFLIGHT = 10;
   let navigation = 0; // the app counts its navigations here
+  let drawing = true; // until the screen settles, what is asked for is what the user is waiting on
   let open = 0;
-  const waiting = []; // { nav, resolve }, in the order asked
-  const navigated = () => { navigation++; };
-  function admit() {
+  let order = 0; // the order requests went out in
+  const waiting = []; // slots asked for while every slot was held: { nav, key, bg, resolve }, in the order asked
+  const running = new Set(); // the slots held: { nav, key, bg, ac, at, yielded }
+  let loadingKey = null; // the memo key whose loader is being called, so its requests can be found in the queue again
+  const navigated = () => { navigation++; drawing = true; };
+  const settled = () => { drawing = false; };
+  function admit(slot) {
     if (open < MAX_INFLIGHT) {
       open++;
+      running.add(slot);
       return Promise.resolve();
     }
-    return new Promise((resolve) => waiting.push({ nav: navigation, resolve }));
+    if (!slot.bg) {
+      // every slot is held: a warm-up in flight for an older screen gives its slot up to the screen
+      // being drawn — the oldest screen's, and of those the one that went out last (the least done)
+      let v = null;
+      for (const s of running) if (s.bg && s.nav < slot.nav && s.ac && (!v || s.nav < v.nav || (s.nav === v.nav && s.at > v.at))) v = s;
+      if (v) {
+        v.yielded = true;
+        running.delete(v);
+        v.ac.abort();
+        open++;
+        running.add(slot);
+        return Promise.resolve();
+      }
+    }
+    return new Promise((resolve) => { slot.resolve = resolve; waiting.push(slot); });
   }
-  function release() {
-    if (!waiting.length) {
+  function release(slot) {
+    running.delete(slot);
+    if (slot.yielded || !waiting.length) { // (a slot given up was taken over already: nothing to pass on)
       open--;
       return;
     }
     let next = 0; // the newest navigation's first request; the slot passes straight to it
     for (let i = 1; i < waiting.length; i++) if (waiting[i].nav > waiting[next].nav) next = i;
-    waiting.splice(next, 1)[0].resolve();
+    const s = waiting.splice(next, 1)[0];
+    running.add(s);
+    s.resolve();
+  }
+  /** The requests behind a memo key are now what the screen being drawn is waiting on. */
+  function promote(key) {
+    for (const s of waiting) if (s.key === key) { s.nav = navigation; s.bg = false; }
+    for (const s of running) if (s.key === key) { s.nav = navigation; s.bg = false; }
   }
   const pause = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -116,12 +152,19 @@
     let pages = 0;
     let throttled = 0;
     let timedOut = 0;
+    const slot = { nav: navigation, key: loadingKey, bg: !drawing, ac: null, at: 0, yielded: false }; // one slot, page by page
     while (url && pages < maxPages) {
       if (sessionLost) throw new CanvasError('Signed out of Canvas', 401);
-      if (method === 'GET') await admit();
+      if (method === 'GET') {
+        slot.ac = null;
+        slot.yielded = false;
+        await admit(slot);
+      }
       let res, text;
-      let again = false; // this page timed out and is to be asked once more
+      let again = false; // this page timed out (or gave its slot up) and is to be asked once more
       const ac = typeof AbortController === 'function' ? new AbortController() : null;
+      slot.ac = ac;
+      slot.at = ++order;
       const timer = ac ? setTimeout(() => ac.abort(), REQUEST_TIMEOUT) : null;
       try {
         // Canvas refuses any non-GET request without the CSRF token, body or not (a DELETE has none).
@@ -147,12 +190,16 @@
         text = await res.text();
       } catch (e) {
         if (!(ac && ac.signal.aborted)) throw e;
-        if (method !== 'GET' || timedOut >= 1) throw new CanvasError('Canvas did not answer in time', 0);
-        timedOut++;
-        again = true;
+        if (slot.yielded) {
+          again = true; // its slot went to the screen being drawn: asked again once a slot is free
+        } else {
+          if (method !== 'GET' || timedOut >= 1) throw new CanvasError('Canvas did not answer in time', 0);
+          timedOut++;
+          again = true;
+        }
       } finally {
         clearTimeout(timer);
-        if (method === 'GET') release();
+        if (method === 'GET') release(slot);
       }
       if (again) continue;
       if (looksSignedOut(res, text)) {
@@ -242,14 +289,26 @@
       const hit = memory.get(k);
       const fresh = hit && (!hit.until || hit.until > Date.now()) && !(maxAge > 0 && Date.now() - (hit.at || 0) > maxAge);
       if (fresh) return hit.value;
-      if (inflight.has(k)) return inflight.get(k);
+      if (inflight.has(k)) {
+        if (drawing) promote(k); // a warm-up still queued that the screen being drawn wants: it goes up to the screen's place
+        return inflight.get(k);
+      }
     }
     const gen = generation.get(k) || 0;
-    const run = (async () => {
-      const value = await loader();
-      if ((generation.get(k) || 0) === gen) memory.set(k, { value, at: Date.now(), until: ttlMs > 0 ? Date.now() + ttlMs : 0 });
-      return value;
-    })();
+    // the loader's own requests (the ones it makes before its first await, which is all of them for
+    // nearly every loader) are made while the key is set, so they can be found in the queue again
+    const was = loadingKey;
+    loadingKey = k;
+    let run;
+    try {
+      run = (async () => {
+        const value = await loader();
+        if ((generation.get(k) || 0) === gen) memory.set(k, { value, at: Date.now(), until: ttlMs > 0 ? Date.now() + ttlMs : 0 });
+        return value;
+      })();
+    } finally {
+      loadingKey = was;
+    }
     inflight.set(k, run);
     try {
       return await run;
@@ -392,7 +451,7 @@
   }
 
   BCV.canvas = {
-    get, post, put, del, upload, cached, ready, invalidate, invalidatePrefix, clearAll, navigated, tune, onSessionLost, sessionOk, checkSession, csrfToken, CanvasError,
+    get, post, put, del, upload, cached, ready, invalidate, invalidatePrefix, clearAll, navigated, settled, tune, onSessionLost, sessionOk, checkSession, csrfToken, CanvasError,
     plannerItems, dashboardCards, activeCourses, courseColors, setPlannerComplete,
     coursesWithScores, courseTabs, course, courseModules, announcements, unreadCount,
   };

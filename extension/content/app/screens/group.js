@@ -21,8 +21,12 @@
     screen.append(head, U.el('bcv-body', U.loading()));
     head.append(U.el('bcv-head__in', U.loading()));
 
-    BCV.screens.course.warmTab('groups', id, route.tab); // the column's own data, in the same round trip as the tabs
-    const [group, tabsRaw] = await Promise.all([store.group(id).catch(() => null), store.tabs(id, { kind: 'groups' }).catch(() => [])]);
+    // the shell's two calls are asked for first, the column's own data right behind them, all in one
+    // round trip: when the gate is busy the slots it frees go in the order asked, and the shell is
+    // what the screen waits on (a group's stream is Canvas's slowest answer for it)
+    const shellCalls = [store.group(id).catch(() => null), store.tabs(id, { kind: 'groups' }).catch(() => [])];
+    BCV.screens.course.warmTab('groups', id, route.tab);
+    const [group, tabsRaw] = await Promise.all(shellCalls);
     if (!ctx.alive()) return screen;
     if (!group) {
       head.replaceChildren(U.el('bcv-head__in', h('h1', { class: 'bcv-h1 bcv-h1--30', text: 'Group' })));
@@ -170,7 +174,11 @@
     function linkRow(lbl, icon, href) {
       return U.row([U.svg(icon, { size: 15, stroke: 'var(--bcv-blue)', width: 1.8, style: { flex: 'none' } }), U.text('bcv-course-link', lbl, 'span'), U.chev()], { mod: 'bcv-row--p13-16', onClick: () => app.go(href) });
     }
-    const [fp, streamEl] = await Promise.all([store.frontPage(g.id, { kind: 'groups' }).catch(() => null), BCV.screens.courseTabs.streamBlock(ctx, shell)]);
+    // The front page is one page read; the stream is Canvas's slowest answer for a group (it is put
+    // together on the spot from everything that happened in it). So the column is not held for
+    // both: it lands with the front page, and the activity's rows fill in under it when they come.
+    const streamP = BCV.screens.courseTabs.streamBlock(ctx, shell);
+    const fp = await store.frontPage(g.id, { kind: 'groups' }).catch(() => null);
     if (!ctx.alive()) return b;
     const parts = [];
     if (fp && fp.body) {
@@ -180,8 +188,10 @@
         BCV.screens.course.prose(fp.body),
       ]), 'bcv-card--22'));
     }
-    parts.push(h('div', {}, [U.label('Recent activity'), streamEl]));
+    const activity = h('div', {}, [U.label('Recent activity'), U.loading('rows', 3)]);
+    parts.push(activity);
     left.replaceChildren(...parts);
+    streamP.then((streamEl) => { if (ctx.alive()) activity.replaceChildren(U.label('Recent activity'), streamEl); }).catch(() => {});
     return b;
   }
 

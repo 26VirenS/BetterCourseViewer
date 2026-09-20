@@ -1007,6 +1007,7 @@
     if (el.parentNode !== main) main.replaceChildren(el); // a screen that kept its shell (a course's rail) stays put
     progress(false);
     html.classList.add('bcv-settled'); // drawn, from Canvas's answer (the harness waits for this)
+    BCV.canvas.settled?.(); // from here on this screen's requests are warm-ups: the next press takes their slots
     warmAround(r);
     document.title = titleFor(r);
     if (phone()) BCV.phone.afterRender(BCV.app, r, el);

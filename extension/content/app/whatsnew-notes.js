@@ -23,6 +23,11 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.42.0', date: '2026-09-20', notes: [
+      { kind: 'improved', title: 'Groups open faster', body: 'The Groups list and a group’s page land sooner; activity fills in under the front page.', icon: P.clock },
+      { kind: 'new', title: 'Reload a tool', body: 'A tool’s full-screen bar has Reload, for a sign-in that went round in circles.', icon: P.arrows },
+      { kind: 'improved', title: 'A quieter tool bar', body: 'A tool’s full-screen bar shows its name and nothing more.', icon: P.layers },
+    ] },
     { version: '2.41.1', date: '2026-09-20', notes: [
       { kind: 'fixed', title: 'A stray “null”', body: 'The PDF annotator’s home no longer shows “nullnull” under its drop zone.', icon: P.check },
     ] },
