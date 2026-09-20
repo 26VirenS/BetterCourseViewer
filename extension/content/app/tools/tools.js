@@ -121,7 +121,7 @@
   ]);
   const input = (attrs = {}) => h('input', { class: 'bcv-input bcv-tool__input', type: 'text', ...attrs });
   /** Children rise in one after another (the popups' cards, rows and fields). */
-  const rise = (nodes, step = 45) => { let i = 0; for (const n of nodes) if (n && n.nodeType === 1) U.enter(n, i++, step, 320); return nodes; };
+  const rise = (nodes, step = 45) => { const list = nodes.filter((n) => n !== null && n !== undefined && n !== false); let i = 0; for (const n of list) if (n && n.nodeType === 1) U.enter(n, i++, step, 320); return list; }; // (an empty slot — a card with nothing to show — is dropped, never handed on as the word "null")
   const saveFile = (name, blob) => {
     const url = URL.createObjectURL(blob);
     const a = h('a', { href: url, download: name, style: { display: 'none' } });

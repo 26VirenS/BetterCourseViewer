@@ -2906,6 +2906,14 @@ try {
   await shot(page, '36c-tools');
   const closeTool = async () => { await page.keyboard.press('Escape'); await page.waitForFunction(() => !document.querySelector('.bcv-tool-ov'), null, { timeout: 5000 }); };
   const openTool = async (key) => { await page.click(`.bcv-tool-card[data-tool="${key}"]`); await page.waitForSelector(`.bcv-tool[data-tool="${key}"]`, { timeout: 5000 }); };
+  // every tool opens clean: nothing empty spelled out as a word in it
+  for (const key of ['cite', 'pomo', 'calc', 'graph', 'ptable', 'need', 'conv', 'pdfx', 'mark', 'ocr', 'fc']) {
+    await openTool(key);
+    await page.waitForTimeout(250);
+    const stray = await page.$eval('.bcv-tool-ov', (e) => (e.textContent.match(/\b(null|undefined|NaN)\b/g) || []).join(','));
+    check(!stray, `${key} opens with no stray word in it${stray ? ` (${stray})` : ''}`);
+    await closeTool();
+  }
   const toolSub = () => texts('.bcv-tool__sub').then((t) => t[0]);
   // the citation generator: style and type pick the template, the fields fill it, a guard keeps a
   // value out of a type that has no field for it
