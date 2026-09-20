@@ -115,7 +115,8 @@ final class Updater {
     func install() {
         guard case .available(let release) = state else { return }
         state = .downloading(0)
-        let task = URLSession.shared.downloadTask(with: release.url) { [weak self] tempURL, _, error in
+        let task = URLSession.shared.downloadTask(with: release.url) { [weak self] tempURL, response, error in
+            let status = (response as? HTTPURLResponse)?.statusCode ?? 200
             // the download is gone once this closure returns: keep it
             var kept: URL?
             if let tempURL = tempURL {
@@ -128,6 +129,12 @@ final class Updater {
                 self.progressObservation = nil
                 guard error == nil, let zip = kept else {
                     self.state = .failed(error?.localizedDescription ?? "The update could not be downloaded.", Date())
+                    return
+                }
+                // an error page in the zip's place (a release that is not public, a wrong address) is not a mismatch: say what came back
+                guard status == 200 else {
+                    try? FileManager.default.removeItem(at: zip)
+                    self.state = .failed("The download address answered \(status) \(HTTPURLResponse.localizedString(forStatusCode: status)) instead of the app.", Date())
                     return
                 }
                 self.state = .installing
@@ -151,8 +158,11 @@ final class Updater {
 
     /// The zip checked, unpacked and put in this copy's place, then the new copy launched as this one quits.
     private func finish(zip: URL, release: Release) throws {
+        let data = try Data(contentsOf: zip)
+        guard data.count > 4, data[data.startIndex] == 0x50, data[data.startIndex + 1] == 0x4B else { // "PK": a zip
+            throw UpdateError("The download is not a zip (a web page in its place, most likely), so it was not installed.")
+        }
         if let expected = release.sha256?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(), !expected.isEmpty {
-            let data = try Data(contentsOf: zip)
             let digest = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
             guard digest == expected else { throw UpdateError("The download did not match the published checksum, so it was not installed.") }
         }
