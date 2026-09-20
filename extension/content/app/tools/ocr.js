@@ -1,9 +1,10 @@
 /* Image to text: the words read off a picture — a photo of the board, a screenshot of a slide, a
  * scanned PDF — into text that can be copied, saved or fixed up. A PDF that carries its own text
  * is read straight from it (pdf.js), no recognition needed; a scanned one is drawn page by page and
- * each page read. The reading is Tesseract on this device: WebAssembly in a worker, which a content
- * script can start neither of, so it runs in the extension's own page (lib/ocr/reader.html) framed
- * into the tab, hidden, and answers over postMessage. Nothing is uploaded; English for now. */
+ * each page read. The reading is PaddleOCR on this device (the PP-OCRv6 models on ONNX Runtime in
+ * WebAssembly), which a content script cannot run, so it runs in the extension's own page
+ * (lib/ocr/reader.html) framed into the tab, hidden, and answers over postMessage. Nothing is
+ * uploaded. */
 (function () {
   const BCV = (self.BCV = self.BCV || {});
   const { h } = BCV.utils;
@@ -59,7 +60,7 @@
     const tool = T.toolOf('ocr');
     const st = { file: null, preview: '', text: '', status: '', progress: -1, busy: false, source: '', note: '', conf: 0 };
     const body = U.el('bcv-ocr');
-    const p = T.popup({ tool, title: 'Image to text', sub: 'Runs on this device. Nothing is uploaded.', width: 760, body, from, foot: 'English for now. Clear, straight-on pictures read best.' });
+    const p = T.popup({ tool, title: 'Image to text', sub: 'Runs on this device. Nothing is uploaded.', width: 760, body, from, foot: 'English, Chinese and Japanese, printed or handwritten. Clear, straight-on pictures read best.' });
     const fileInput = h('input', { type: 'file', accept: 'image/*,.pdf,application/pdf', hidden: true });
     fileInput.addEventListener('change', () => { const f = fileInput.files?.[0]; fileInput.value = ''; if (f) take(f); });
     const onPaste = (e) => { if (!p.alive()) { document.removeEventListener('paste', onPaste); return; } const f = Array.from(e.clipboardData?.files || []).find((x) => isImage(x) || isPdf(x)); if (f) { e.preventDefault(); take(f); } };
@@ -178,7 +179,8 @@
         st.status = blobs.length > 1 ? `Reading page ${i + 1} of ${blobs.length}…` : 'Reading…';
         st.progress = 0;
         paintWork();
-        const r = await recognize(blobs[i], (m) => { if (!p.alive() || st.file !== f) return; st.status = m.status === 'recognizing text' ? (blobs.length > 1 ? `Reading page ${i + 1} of ${blobs.length}…` : 'Reading…') : m.status === 'loading language traineddata' ? 'Loading the English model…' : m.status === 'initializing tesseract' || m.status === 'loading tesseract core' ? 'Starting the reader…' : st.status; st.progress = m.status === 'recognizing text' ? m.progress : 0; paintWork(); });
+        const here = blobs.length > 1 ? `page ${i + 1} of ${blobs.length}` : '';
+        const r = await recognize(blobs[i], (m) => { if (!p.alive() || st.file !== f) return; st.status = m.status === 'loading' ? 'Loading the reader…' : m.status === 'finding' ? `Finding the text${here ? ` on ${here}` : ''}…` : m.status === 'reading' ? `Reading ${here ? `${here}` : 'the lines'}…` : st.status; st.progress = m.status === 'reading' ? m.progress : m.status === 'loading' ? m.progress : 0; paintWork(); });
         if (!p.alive() || st.file !== f) return;
         parts.push(r.text.trim());
         confSum += r.confidence || 0;
@@ -189,7 +191,7 @@
       st.source = 'ocr';
       st.busy = false;
       st.progress = -1;
-      st.status = st.text.trim() ? `Read on this device${kind === 'pdf' ? ` · ${U.plural(blobs.length, 'page')}` : ''}${conf && conf < 75 ? ' · some words uncertain' : ''}` : 'No words found in it.';
+      st.status = st.text.trim() ? `Read on this device${kind === 'pdf' ? ` · ${U.plural(blobs.length, 'page')}` : ''}${conf && conf < 80 ? ' · some words uncertain' : ''}` : 'No words found in it.';
       paintWork();
     }
     if (file) queueMicrotask(() => take(file)); else home();

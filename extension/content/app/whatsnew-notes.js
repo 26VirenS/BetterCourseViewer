@@ -23,6 +23,10 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.37.0', date: '2026-09-20', notes: [
+      { kind: 'improved', title: 'Image to text reads better', body: 'PaddleOCR now: sharper reading of pictures and scans, Chinese and Japanese too.', icon: P.eye },
+      { kind: 'improved', title: 'Merge & split redrawn', body: 'Every page a thumbnail: drag pages into the merged document; take pages out to split.', icon: P.layers },
+    ] },
     { version: '2.36.0', date: '2026-09-19', notes: [
       { kind: 'new', title: 'Draw and type on PDFs', body: 'A pen, text boxes, underline and strike-through, six colours, undo and redo.', icon: P.pen },
       { kind: 'improved', title: 'Citation generator', body: 'Source types as tiles, the fields still needed as chips, Today for the date, tidier.', icon: P.list },

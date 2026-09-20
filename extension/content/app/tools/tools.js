@@ -39,7 +39,7 @@
     { key: 'graph', name: 'Graphing calculator', note: 'Desmos, right here.', icon: IC.graph, color: '#5856d6', open: (app, o) => openGraph(app, o) },
     { key: 'need', name: 'Grade needed', note: 'What you need on the final to hit your goal.', icon: IC.percent, color: '#ff375f', open: (app, o) => BCV.toolsNeed.open(app, o) },
     { key: 'conv', name: 'File converter', note: 'Word, PDF and images, any way round.', icon: IC.convert, color: '#34c759', open: (app, o) => BCV.toolsConvert.open(app, o) },
-    { key: 'pdfx', name: 'Merge & split PDFs', note: 'Join PDFs into one, or cut one into parts.', icon: IC.merge, color: '#bf5af2', open: (app, o) => BCV.toolsPdfs.open(app, o) },
+    { key: 'pdfx', name: 'Merge & split PDFs', note: 'Join pages from PDFs into one, or take pages out.', icon: IC.merge, color: '#bf5af2', open: (app, o) => BCV.toolsPdfs.open(app, o) },
     { key: 'mark', name: 'PDF annotator', note: 'Highlight and add notes, kept per file.', icon: IC.marker, color: '#e5a500', open: (app, o) => BCV.toolsMark.open(app, o) },
     { key: 'ocr', name: 'Image to text', note: 'Read the words off a picture or a scan.', icon: IC.scan, color: '#00b3a4', open: (app, o) => BCV.toolsOcr.open(app, o) },
     { key: 'fc', name: 'Flashcards', note: 'Make a set. Flip, learn, test, match.', icon: IC.cards, color: '#0a84ff', open: (app, o) => BCV.toolsCards.open(app, o) },
@@ -58,7 +58,7 @@
   /** One popup over the page: a head (the tool's tile, a title and a line under it, Back where a
    *  tool has views, Close), then the tool's own body, scrolling; what the body holds rises in,
    *  one thing after another. Escape (from anywhere) and the scrim close it. */
-  function popup({ tool, title, sub = '', width = 620, body, foot = null, cls = '', onClose = null, from = null }) {
+  function popup({ tool, title, sub = '', width = 620, body, foot = null, cls = '', onClose = null, from = null, head = null }) {
     document.querySelector('.bcv-sheet-ov')?.remove();
     const ov = U.el('bcv-sheet-ov bcv-tool-ov', null, { role: 'dialog', 'aria-label': title || tool.name });
     let closed = false;
@@ -84,6 +84,7 @@
         back,
         h('span', { class: 'bcv-sheet__tile bcv-tool__tile', style: { background: tintOf(tool.color, BCV.app?.isDark?.()) } }, U.svg(tool.icon, { size: 18, stroke: tool.color, width: 1.8 })),
         U.el('bcv-sheet__titles', [titleEl, subEl]),
+        head, // (a tool's own control in the head, beside the close button: a mode switch, say)
         h('button', { type: 'button', class: 'bcv-sheet__close', 'aria-label': 'Close', onclick: close }, U.svg(IC.close, { size: 13, stroke: 'var(--bcv-ink2)', width: 2.3 })),
       ]),
       bodyEl,
