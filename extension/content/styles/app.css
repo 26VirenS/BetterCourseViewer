@@ -3018,10 +3018,12 @@ html[data-bcv-theme="dark"] .bcv-conv__delta.is-more, html[data-bcv-theme="dark"
 .bcv-mark__bubble .bcv-mark__tool:hover { background: rgba(255,255,255,.14); }
 @keyframes bcv-mark-pop { from { opacity: 0; transform: translateY(4px) scale(.96); } to { opacity: 1; transform: none; } }
 /* ---- 2.36.0: the citation generator redrawn; the annotator's pen, text boxes, underline and strike ---- */
-.bcv-cite { display: flex; flex-direction: column; flex-wrap: nowrap; gap: 14px; }
+.bcv-cite { display: flex; flex-direction: column; flex-wrap: nowrap; align-items: stretch; gap: 14px; }
+.bcv-cite__top { width: 100%; }
 .bcv-cite__toprow { display: flex; gap: 24px; align-items: flex-start; flex-wrap: wrap; }
-.bcv-cite__topcol { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
-.bcv-cite__topcol--types { flex: 1 1 420px; }
+.bcv-cite__topcol { flex: none; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; min-width: 0; }
+.bcv-cite__topcol .bcv-seg__btn { flex: none; padding: 9px 16px; } /* (the tools' segs fill their row; this one sits beside the source tiles, so it keeps its own width) */
+.bcv-cite__topcol--types { flex: 1 1 360px; align-items: stretch; }
 .bcv-cite__types { display: flex; gap: 8px; flex-wrap: wrap; }
 .bcv-cite__type { flex: 1 1 84px; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 7px; padding: 10px 8px 9px; border: 1px solid var(--bcv-edge); border-radius: 14px; background: var(--bcv-card); color: var(--bcv-ink2); cursor: pointer; font: 500 11.5px/1.15 var(--bcv-font); text-align: center; box-shadow: var(--bcv-shadow); transition: background .15s ease, border-color .15s ease, transform .15s ease; }
 .bcv-cite__typeic { width: 30px; height: 30px; border-radius: 15px; background: var(--bcv-fill); display: flex; align-items: center; justify-content: center; color: var(--bcv-ink2); transition: background .15s ease, color .15s ease; }

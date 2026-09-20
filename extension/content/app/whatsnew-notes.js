@@ -23,6 +23,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.37.1', date: '2026-09-20', notes: [
+      { kind: 'fixed', title: 'Citation generator laid out', body: 'Style and source sit on one row across the popup; the style switch has its room back.', icon: P.list },
+    ] },
     { version: '2.37.0', date: '2026-09-20', notes: [
       { kind: 'improved', title: 'Image to text reads better', body: 'PaddleOCR now: sharper reading of pictures and scans, Chinese and Japanese too.', icon: P.eye },
       { kind: 'improved', title: 'Merge & split redrawn', body: 'Every page a thumbnail: drag pages into the merged document; take pages out to split.', icon: P.layers },
