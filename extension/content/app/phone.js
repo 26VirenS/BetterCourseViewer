@@ -1271,7 +1271,7 @@
     // and Canvas-only cases keep one big button
     const embeds = nativeSubmit && !isTool;
     const primary = isTool
-      ? (toolNewTab ? { label: 'Open the tool', go: () => (BCV.exttool ? BCV.exttool.open({ title: a.name, url: toolLaunch, page: `${c.url}/assignments/${a.id}`, newTab: toolLaunch }) : window.open(toolLaunch, '_blank', 'noopener')) } : { label: 'Open the tool', go: () => app.go(nativeHref(`${c.url}/assignments/${a.id}`)) })
+      ? { label: s.submitted_at || (s.attempt || 0) > 0 ? 'Continue assignment' : 'Start assignment', go: () => (BCV.exttool ? BCV.exttool.open({ title: a.name, url: toolLaunch, newTab: toolLaunch }) : window.open(toolLaunch, '_blank', 'noopener')) }
       : canvasOnly ? { label: s.submitted_at ? 'Resubmit in Canvas' : 'Submit in Canvas', go: () => app.go(nativeHref(`${c.url}/assignments/${a.id}`)) } : null;
     const block = embeds ? await BCV.screens.submit.render(ctx, c, { embed: true, a, sub: s, back: { href: `${c.url}/assignments`, label: 'Assignments' }, title: 'Submit work', aside: () => rubricButton(a, s) }) : null;
     if (!ctx.alive()) return b;
@@ -1300,7 +1300,6 @@
       // and the rubric keeps its own button, where the marks are decided rather than reported
       graded ? rubricButton(a, s, { cls: 'bcv-ph-bigbtn', label: 'See breakdown' }) : null,
       U.el('bcv-ph-card bcv-ph-instr', [U.text('bcv-ph-kicker', 'Instructions', 'span'), a.description ? CS.prose(a.description, { cls: 'bcv-ph-prose' }) : U.text('bcv-ph-load__none', 'No description.'), types ? U.text('bcv-ph-instr__note', `Accepts ${types}`) : null]),
-      isTool && !toolNewTab ? U.el('bcv-ph-card', [U.text('bcv-ph-kicker', 'External tool', 'span'), h('iframe', { class: 'bcv-frame bcv-frame--doc', src: toolLaunch, title: a.name, allowfullscreen: '', allow: 'fullscreen; microphone; camera; display-capture; autoplay; clipboard-write' })]) : null,
       primary ? h('button', { type: 'button', class: 'bcv-ph-bigbtn is-primary', text: primary.label, onclick: primary.go }) : null,
       // where Canvas asks for a mark rather than work, the mark is the page's action (drawn when
       // the item's module answers; the page does not wait for it)

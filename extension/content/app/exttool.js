@@ -3,8 +3,9 @@
  * or sends them to a new tab. Here they open in a popup that fills the tab — the tool framed inside
  * it, through Canvas's own borderless launch for the tools Canvas launches, the site itself for a
  * plain link — so the page underneath and the pinned tools beside the switch stay where they are.
- * Open in new tab is always in the head, for a site that refuses to be framed; Open in Canvas goes
- * to Canvas's own page for a Canvas tool. Escape and the scrim close it. */
+ * It fills the screen but for its bar: the title, Open in new tab (for a site that refuses to be
+ * framed), and — sliding in from where they sit over the page — the pinned tools and the look
+ * switch, with the X always at the far right. Escape closes it. */
 (function () {
   const BCV = (self.BCV = self.BCV || {});
   const { h } = BCV.utils;
@@ -18,6 +19,7 @@
     current = null;
     if (!c) return;
     document.removeEventListener('securitypolicyviolation', c.onCsp);
+    document.documentElement.classList.remove('bcv-ext-open'); // (the pins and the look switch slide back out of the bar)
     c.ov.classList.add('is-closing');
     setTimeout(() => c.ov.remove(), 180);
     try { c.restore?.focus?.({ preventScroll: true }); } catch { /* gone */ }
@@ -28,11 +30,9 @@
     if (u.origin === location.origin && /\/external_tools\//.test(u.pathname) && !u.searchParams.has('display')) u.searchParams.set('display', 'borderless');
     return u.href;
   }
-  const withNative = (path) => `${path}${path.includes('?') ? '&' : '?'}bcv=native`;
   const sameOrigin = (href) => { try { return new URL(href, location.origin).origin === location.origin; } catch { return false; } };
 
-  /** The popup. `url` is what gets framed; `page` Canvas's own page for it (Open in Canvas), if
-   *  there is one; `newTab` what a new tab gets (the page, else the url). */
+  /** The popup. `url` is what gets framed; `newTab` what a new tab gets (else `page`, Canvas's own page for it, else the url). */
   function open({ title = 'External tool', url, page = null, newTab = null, note = '', from = null, icon = null } = {}) {
     if (!url) return null;
     close();
@@ -60,18 +60,17 @@
     const head = U.el('bcv-sheet__head bcv-ext__head', [
       U.tile(icon || IC.shield, { color: 'var(--bcv-blue)', tint: 'var(--bcv-blue-soft)', size: 32, iconSize: 16 }),
       U.el('bcv-sheet__titles', [U.text('bcv-sheet__title', title), U.text('bcv-sheet__note', note || (foreign ? 'The site’s own page, framed here. The pinned tools stay beside the switch.' : 'Launched by Canvas, framed here. The pinned tools stay beside the switch.'))]),
-      U.el('bcv-ext__acts', [
-        page ? U.btn('Open in Canvas', { cls: 'bcv-ext__canvas', onClick: () => { close(); BCV.app?.go(withNative(page)); } }) : null,
-        tab,
-      ]),
+      U.el('bcv-ext__acts', [tab]),
       closeBtn,
     ]);
+    closeBtn.classList.add('bcv-ext__close');
     const sheet = U.el('bcv-sheet bcv-ext', [head, body]);
     ov.append(sheet);
     ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
     ov.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.stopPropagation(); close(); } });
     current = { ov, onCsp, restore: from && from.focus ? from : document.activeElement };
     document.body.append(ov);
+    document.documentElement.classList.add('bcv-ext-open'); // the pins and the look switch slide into the bar, beside the X
     if (from) U.morphFrom(sheet, from);
     ov.focus({ preventScroll: true });
     return { close, ov };

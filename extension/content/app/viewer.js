@@ -1,7 +1,7 @@
 /* File viewer: a file opened from Files, a module or a link opens in a sheet over the page
  * rather than in a new tab — its name and details up top, a preview where one can be drawn
  * (images, video, audio and text here; PDFs and documents through Canvas's own preview, which
- * is made to be framed), and Download and Open in Canvas beside it. Escape, the close button
+ * is made to be framed), and Download and Open in new tab beside it. Escape, the close button
  * or a click outside puts it away and hands focus back to the row that opened it. */
 (function () {
   const BCV = (self.BCV = self.BCV || {});
@@ -122,7 +122,6 @@
     const note = [k.label, fmtSize(f.size), f.local ? 'not handed in yet' : when ? `modified ${U.fmtRecent(when)}` : null].filter(Boolean).join(' · ');
     const download = h('a', { class: 'bcv-btn bcv-btn--primary bcv-viewer__dl', href: f.url, download: f.filename || name, text: 'Download' });
     download.prepend(U.svg(IC.download, { size: 14, stroke: 'currentColor', width: 1.9 }));
-    const inCanvas = U.btn('Open in Canvas', { cls: 'bcv-viewer__canvas', onClick: () => { close(); BCV.app.go(`${canvasPage(f, context)}?bcv=native`); } });
     // Open in new tab: the file itself where a browser can show it, Canvas's own page for it otherwise
     const newTab = SHOWABLE.includes(k.kind)
       ? U.btn('Open in new tab', { cls: 'bcv-viewer__tab', icon: IC.external || IC.link || IC.doc, iconSize: 13, title: 'Open in a new tab', onClick: () => openInTab(f, name) })
@@ -131,7 +130,7 @@
     head.replaceChildren(
       U.tile(k.icon, { color: pal.text, tint: pal.tint, size: 32, iconSize: 16 }),
       U.el('bcv-sheet__titles', [U.text('bcv-sheet__title', name), U.text('bcv-sheet__note', note)]),
-      U.el('bcv-viewer__acts', f.local ? [SHOWABLE.includes(k.kind) ? newTab : null] : [inCanvas, newTab, download]),
+      U.el('bcv-viewer__acts', f.local ? [SHOWABLE.includes(k.kind) ? newTab : null] : [newTab, download]),
       closeBtn,
     );
 

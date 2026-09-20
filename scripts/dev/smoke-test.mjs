@@ -193,9 +193,10 @@ try {
   await page.waitForSelector('.bcv-ext-ov .bcv-ext__frame', { timeout: 10000 });
   const acctLoaded = await eventually(async () => { const f = page.frames().find((x) => x.url().includes('/external_tools/77')); return !!f && (await f.$('#account-tool')) !== null; }, 10000);
   check((await page.$eval('.bcv-ext__frame', (e) => e.getAttribute('src'))) === `${BASE}/accounts/1/external_tools/77?launch_type=global_navigation&display=borderless` && (await texts('.bcv-ext .bcv-sheet__title'))[0] === 'My Materials' && page.url() === `${BASE}/` && acctLoaded && (await visible('#bcv-side')), 'an account tool opens in a popup over this page, Canvas\'s borderless launch framed in it, the page and the shell staying put');
-  await page.click('.bcv-ext__canvas');
-  await page.waitForSelector('html.bcv-punch #account-tool', { timeout: 10000 });
-  check(page.url() === `${BASE}/accounts/1/external_tools/77?launch_type=global_navigation&bcv=native` && (await visible('#bcv-side')), 'Open in Canvas goes to Canvas\'s own page for it, with the shell kept over it');
+  await page.waitForTimeout(500);
+  check((await page.$eval('html', (e) => e.classList.contains('bcv-ext-open'))) && !(await page.$('.bcv-ext__canvas')) && (await page.$eval('#bcv-tray', (e) => getComputedStyle(e).right)) === '106px' && (await page.$eval('#bcv-look', (e) => getComputedStyle(e).right)) === '62px' && (await page.$eval('.bcv-ext__close', (e) => { const r = e.getBoundingClientRect(); return innerWidth - r.right <= 14 && r.top <= 14; })), 'the popup fills the screen but for its bar: the pins and the look switch slide into the bar, the X at the far right, and no Open in Canvas');
+  await page.keyboard.press('Escape');
+  check(await eventually(() => page.$('.bcv-ext-ov').then((e) => !e), 3000) && !(await page.$eval('html', (e) => e.classList.contains('bcv-ext-open'))) && await eventually(() => page.$eval('#bcv-tray', (e) => getComputedStyle(e).right === '42px'), 2000), 'closed, the pins slide back out to where they sit over the page');
   await page.goto(`${BASE}/`);
   await page.waitForSelector('#bcv-app .bcv-nav__item', { timeout: 10000 });
   const navItems = await texts('.bcv-nav .bcv-nav__item');
@@ -1182,7 +1183,7 @@ try {
   await page.waitForSelector('.bcv-ext-ov .bcv-ext__frame', { timeout: 5000 });
   await page.waitForTimeout(600); // (the popup grows in from the rail's button)
   const extLoaded = await eventually(async () => { const f = page.frames().find((x) => x.url().includes('/external_tools/9')); return !!f && (await f.$('#tool_content')) !== null; }, 10000);
-  check((await page.$eval('.bcv-ext__frame', (e) => e.getAttribute('src'))) === `${BASE}/courses/101/external_tools/9?display=borderless` && (await texts('.bcv-ext .bcv-sheet__title'))[0] === 'Resources & Policy' && (await page.$eval('.bcv-ext__tab', (e) => e.href)) === `${BASE}/courses/101/external_tools/9` && page.url() === `${BASE}/courses/101` && extLoaded && (await page.$eval('#bcv-tray', (e) => parseInt(getComputedStyle(e).zIndex, 10) > parseInt(getComputedStyle(document.querySelector('.bcv-ext-ov')).zIndex, 10))) && (await page.$eval('.bcv-ext', (e) => { const r = e.getBoundingClientRect(); return r.width >= innerWidth - 30 && r.height >= innerHeight - 70 && r.top >= 44; })), 'a campus tool opens in a popup that fills the tab, Canvas\'s borderless launch framed in it, the page and the pins staying put');
+  check((await page.$eval('.bcv-ext__frame', (e) => e.getAttribute('src'))) === `${BASE}/courses/101/external_tools/9?display=borderless` && (await texts('.bcv-ext .bcv-sheet__title'))[0] === 'Resources & Policy' && (await page.$eval('.bcv-ext__tab', (e) => e.href)) === `${BASE}/courses/101/external_tools/9` && page.url() === `${BASE}/courses/101` && extLoaded && (await page.$eval('#bcv-tray', (e) => parseInt(getComputedStyle(e).zIndex, 10) > parseInt(getComputedStyle(document.querySelector('.bcv-ext-ov')).zIndex, 10))) && (await page.$eval('.bcv-ext', (e) => { const r = e.getBoundingClientRect(); return r.width >= innerWidth - 2 && r.height >= innerHeight - 2 && r.top <= 1; })), 'a campus tool opens in a popup that fills the tab, Canvas\'s borderless launch framed in it, the page and the pins staying put');
   await shot(page, '11b-tool-popup');
   await page.keyboard.press('Escape');
   check(await eventually(() => page.$('.bcv-ext-ov').then((e) => !e), 3000) && page.url() === `${BASE}/courses/101`, 'Escape closes the popup and the course page is still there');
@@ -1461,7 +1462,7 @@ try {
   await page.click('.bcv-body .bcv-row:has-text("Course Syllabus.pdf")');
   await page.waitForSelector('.bcv-viewer .bcv-viewer__frame', { timeout: 5000 });
   const vHead = (await texts('.bcv-viewer .bcv-sheet__head'))[0];
-  check(/Course Syllabus\.pdf/.test(vHead) && /PDF · 212 KB · modified/.test(vHead) && (await page.$eval('.bcv-viewer__frame', (e) => e.getAttribute('src'))) === '/courses/101/files/f1/file_preview' && (await page.$eval('.bcv-viewer a[download]', (e) => e.getAttribute('href'))) === '/files/f1/download' && (await texts('.bcv-viewer__canvas'))[0] === 'Open in Canvas' && tabsOpened.length === 0 && page.url().endsWith('/courses/101/files'), `a PDF opens in the viewer over the page — Canvas's own preview framed, Download and Open in Canvas in the sheet — and no new tab: ${vHead}`);
+  check(/Course Syllabus\.pdf/.test(vHead) && /PDF · 212 KB · modified/.test(vHead) && (await page.$eval('.bcv-viewer__frame', (e) => e.getAttribute('src'))) === '/courses/101/files/f1/file_preview' && (await page.$eval('.bcv-viewer a[download]', (e) => e.getAttribute('href'))) === '/files/f1/download' && !(await page.$('.bcv-viewer__canvas')) && (await texts('.bcv-viewer__tab'))[0] === 'Open in new tab' && tabsOpened.length === 0 && page.url().endsWith('/courses/101/files'), `a PDF opens in the viewer over the page — Canvas's own preview framed, Download and Open in new tab in the sheet, no Open in Canvas — and no new tab opened: ${vHead}`);
   check((await page.$eval('.bcv-viewer__tab', (e) => [e.tagName, e.textContent.trim()].join(' | '))) === 'BUTTON | Open in new tab', 'an Open in new tab button is there for a PDF (a press hands a tab the file itself; Canvas\'s own address would download it)');
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('.bcv-viewer'), null, { timeout: 3000 });
@@ -2084,8 +2085,12 @@ try {
 
   await page.goto(`${BASE}/courses/104/assignments/4003`);
   await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
-  check(await page.$eval('.bcv-frame', (f) => /external_tools\/retrieve\?assignment_id=4003/.test(f.getAttribute('src'))), 'external-tool assignment embeds the tool launch');
-  check(!(await texts('.bcv-btn--primary')).includes('Submit in Canvas'), 'no submit button for tool assignments');
+  check((await texts('.bcv-detail__actions .bcv-btn--primary'))[0] === 'Start assignment' && !(await page.$('.bcv-frame')) && !(await texts('.bcv-detail__actions .bcv-btn')).includes('Open in Canvas'), `an external-tool assignment offers Start assignment, no frame on the page and no Open in Canvas (${(await texts('.bcv-detail__actions .bcv-btn')).join(',')})`);
+  await page.click('.bcv-detail__actions .bcv-btn--primary');
+  await page.waitForSelector('.bcv-ext-ov .bcv-ext__frame', { timeout: 5000 });
+  check(await page.$eval('.bcv-ext__frame', (f) => /external_tools\/retrieve\?assignment_id=4003/.test(f.getAttribute('src'))) && (await texts('.bcv-ext .bcv-sheet__title'))[0] === 'Knewton Alta: Unit 2' && page.url().endsWith('/courses/104/assignments/4003'), 'Start assignment opens the tool full screen over the page, Canvas\'s launch framed in it');
+  await page.keyboard.press('Escape');
+  await eventually(() => page.$('.bcv-ext-ov').then((e) => !e), 3000);
   // a grade the tool posts after its launch lands on the page by itself: the submission is asked for
   // again once the tool has loaded, and again for a while, and the mark is drawn when it changes
   check((await page.$('.bcv-detail__grade')) === null && (await texts('.bcv-stat__value'))[0] === '—', 'the tool assignment starts ungraded');
@@ -3632,7 +3637,7 @@ try {
   check((await page.$eval('.bcv-cite__type.is-on', (e) => e.dataset.type)) === 'video' && (await page.$eval('[data-field="container"]', (e) => e.value)) === 'YouTube' && (await page.$eval('[data-field="url"]', (e) => e.value)) === 'https://www.youtube.com/watch?v=abc123' && (await texts('.bcv-cite__top .bcv-seg__btn.is-active'))[0] === 'APA 7' && (await toolSub()) === 'APA 7 · 3 to fill' && !(await page.$eval(quickPin('cite'), (e) => e.classList.contains('is-open'))), `a YouTube link pasted in the panel opens the generator as a video on YouTube, in the style kept (${await toolSub()})`);
   await closeTool();
   await page.mouse.move(700, 500);
-  await page.waitForTimeout(300);
+  await page.waitForTimeout(700); // (a pin that just handed off holds folded a moment)
   await quickOpen('cite', 192);
   await page.click(qcSel('.bcv-qcite__here'));
   await page.waitForSelector('.bcv-tool[data-tool="cite"]', { timeout: 5000 });

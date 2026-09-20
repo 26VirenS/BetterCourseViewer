@@ -23,6 +23,11 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.40.0', date: '2026-09-20', notes: [
+      { kind: 'improved', title: 'Tools fill the screen', body: 'A tool’s popup fills the screen but for its bar; the pins and the switch slide into it.', icon: P.layers },
+      { kind: 'improved', title: 'Start assignment', body: 'An assignment done in a tool says Start or Continue assignment and opens it full screen.', icon: P.check },
+      { kind: 'improved', title: 'Fewer Open in Canvas', body: 'Gone from tools and files; kept where it matters, like quizzes.', icon: P.toggle },
+    ] },
     { version: '2.39.1', date: '2026-09-20', notes: [
       { kind: 'improved', title: 'A wider calculator', body: 'The Calculator tool takes more of the page, with bigger keys; its pin says Calculator.', icon: P.steps },
       { kind: 'improved', title: 'Desmos pin', body: 'Full screen at the top left opens the big graphing calculator; desmos.com at the right.', icon: P.sparkle },

@@ -121,6 +121,9 @@
     const toolNewTab = !!toolAttrs.new_tab;
     // Canvas's own launch route for an assignment's tool (same URL its assignment page embeds).
     const toolLaunch = toolAttrs.url ? `${c.url}/external_tools/retrieve?assignment_id=${a.id}&display=borderless&url=${encodeURIComponent(toolAttrs.url)}` : `${c.url}/assignments/${a.id}`;
+    let startPoll = () => {};
+    /** The tool, full screen over the page (a new tab only where there is no popup to be had); the grade is looked for once it is open. */
+    const launchTool = (from = null) => { if (BCV.exttool) { BCV.exttool.open({ title: a.name, url: toolLaunch, newTab: toolLaunch, from }); startPoll(); } else window.open(toolLaunch, '_blank', 'noopener'); };
     const available = a.unlock_at && a.lock_at ? `${U.fmtAt(a.unlock_at)} – ${U.fmtAt(a.lock_at)}` : a.unlock_at ? `from ${U.fmtAt(a.unlock_at)}` : a.lock_at ? `until ${U.fmtAt(a.lock_at)}` : null;
     // Our own submission flow handles uploads, text entries and URLs (plus the tools Canvas
     // lists for handing work in); media recordings and annotations stay on Canvas's page.
@@ -184,14 +187,13 @@
         headEl,
         meta([['Due', a.due_at ? U.fmtAt(a.due_at) : 'No due date'], ['Points', a.points_possible ?? '—'], ['Submitting', types], ['Available', available], ['Attempts', attemptsFact(a, s)]]),
         U.el('bcv-detail__actions', [
-          isTool ? (toolNewTab ? U.btn('Open the tool', { kind: 'primary', icon: IC.external, iconColor: '#fff', onClick: (e) => (BCV.exttool ? BCV.exttool.open({ title: a.name, url: toolLaunch, page: `${c.url}/assignments/${a.id}`, newTab: toolLaunch, from: e?.currentTarget || null }) : window.open(toolLaunch, '_blank', 'noopener')) }) : null)
+          isTool ? U.btn(s.submitted_at || (s.attempt || 0) > 0 ? 'Continue assignment' : 'Start assignment', { kind: 'primary', icon: IC.play, iconColor: '#fff', cls: 'bcv-detail__tool', onClick: (e) => { launchTool(e?.currentTarget || null); } })
             : nativeSubmit ? (a.locked_for_user ? U.badge(a.lock_explanation ? htmlToText(a.lock_explanation, 120) : 'Locked', 'orange')
               : attemptsLeft ? U.btn(s.submitted_at ? 'Resubmit' : 'Submit assignment', { kind: 'primary', icon: IC.send, iconColor: '#fff', onClick: () => toBlock() })
                 : U.badge(`No attempts left · ${a.allowed_attempts} allowed`, 'orange'))
               : canvasOnly ? U.btn(s.submitted_at ? 'Resubmit in Canvas' : 'Submit in Canvas', { kind: 'primary', icon: IC.external, iconColor: '#fff', onClick: () => app.go(nativeHref(`${c.url}/assignments/${a.id}`)) }) : null,
           a.quiz_id ? U.btn('Open quiz', { icon: IC.bolt, onClick: () => app.go(`${c.url}/quizzes/${a.quiz_id}`) }) : null,
           a.discussion_topic?.id ? U.btn('Open discussion', { icon: IC.disc, onClick: () => app.go(`${c.url}/discussion_topics/${a.discussion_topic.id}`) }) : null,
-          isTool && !toolNewTab ? U.btn('Open in Canvas', { icon: IC.external, onClick: () => app.go(nativeHref(`${c.url}/assignments/${a.id}`)) }) : null,
           // how the marks are decided, beside the decision to hand work in
           a.rubric?.length ? U.btn('Rubric', { icon: IC.sheet, cls: 'bcv-rubbtn', onClick: () => CS().openRubric(a, s) }) : null,
           // where Canvas asks for a mark rather than work, the mark is the page's action
@@ -200,11 +202,7 @@
         a.description ? CS().prose(a.description) : (isTool ? null : U.text('bcv-hint', 'No description.')),
         (() => { const el = slot('bcv-detail__navslot'); fill(el, ({ nav }) => navRow(app, c, nav)); return el; })(),
       ]), 'bcv-card--22'),
-      // External-tool assignments (Knewton, Gradescope, …) are done inside the tool: embed the launch.
-      isTool && !toolNewTab ? U.card(U.el('bcv-detail', [
-        U.el('bcv-row__head', [U.text('bcv-label bcv-label--inline', 'External tool', 'span'), h('span', { class: 'bcv-ml-auto' }), h('button', { type: 'button', class: 'bcv-chip bcv-chip--full', text: 'Full screen', title: 'Open the tool in a popup that fills the tab', onclick: (e) => BCV.exttool?.open({ title: a.name, url: toolLaunch, page: `${c.url}/assignments/${a.id}`, newTab: toolLaunch, from: e.currentTarget }) }), h('a', { class: 'bcv-chip', href: toolLaunch, target: '_blank', rel: 'noopener', text: 'Open in new tab' })]),
-        h('iframe', { class: 'bcv-frame bcv-frame--doc', src: toolLaunch, title: a.name, allowfullscreen: '', allow: 'fullscreen; microphone; camera; display-capture; autoplay; clipboard-write' }),
-      ]), 'bcv-card--22') : null,
+      // (an external-tool assignment is done inside the tool, opened full screen from Start assignment)
       block,
     ].filter(Boolean));
     if (block && route.params.get('bcv') === 'submit') for (const ms of [80, 600]) setTimeout(() => toBlock('auto'), ms); // opened to hand in: land on the block (again once Canvas's own page has finished loading under us)
@@ -214,7 +212,7 @@
     // while — every few seconds at first, then every quarter minute for three minutes, while the
     // tab is looked at — and the mark and the side card are drawn again when it changes, in place,
     // without touching the tool's frame.
-    if (isTool && !toolNewTab) {
+    if (isTool) {
       let shown = s, tries = 0, timer = 0, started = false;
       const changed = (x) => !!x && (x.score !== shown.score || x.workflow_state !== shown.workflow_state || x.posted_at !== shown.posted_at || x.grade !== shown.grade);
       const poll = async () => {
@@ -234,8 +232,8 @@
         if (tries < 14) timer = setTimeout(poll, tries < 3 ? 4000 : 15000);
       };
       const start = () => { if (started) return; started = true; timer = setTimeout(poll, 2500); };
-      main.querySelector('.bcv-frame--doc')?.addEventListener('load', start);
-      setTimeout(start, 8000); // a frame that never says it loaded still gets its looks
+      startPoll = start;
+      setTimeout(start, 8000); // a tool never opened still gets its looks: a grade can land from an earlier sitting
       ctx.onLeave?.(() => clearTimeout(timer));
     }
     // side: submission + rubric

@@ -675,7 +675,7 @@
       item.setAttribute('aria-expanded', 'false');
     };
     const openQ = () => {
-      if (!panel) { panel = q.build({ item, go: (o = {}) => { hold = Date.now() + 900; closeQ(); open(t.key, { from: item, ...o }); } }); body.replaceChildren(...panel.els); }
+      if (!panel) { panel = q.build({ item, go: (o = {}) => { hold = Date.now() + 400; closeQ(); open(t.key, { from: item, ...o }); } }); body.replaceChildren(...panel.els); }
       panel.onOpen?.();
       item.classList.add('is-open');
       item.setAttribute('aria-expanded', 'true');
