@@ -27,7 +27,9 @@ VERSION="$(python3 -c "import json;print(json.load(open('extension/manifest.json
 APP_NAME="Simpl Courses"
 PROJECT="macos/$APP_NAME/$APP_NAME.xcodeproj"
 TAG="v$VERSION"
-ZIP_NAME="Simpl-Courses-$VERSION.zip"
+ZIP_NAME="Simpl-Courses-Mac-$VERSION.zip"
+# (the Release already carries the extension zips, simpl-courses-<version>.zip among them, and
+# GitHub matches asset names without regard to case — so the app's zip says Mac in its name)
 SITE="https://simplcourses.com"
 
 # ---- the certificate, in a keychain of its own ----------------------------------------------
