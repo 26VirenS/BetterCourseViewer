@@ -43,6 +43,7 @@ const end = [];
 for (const rel of ['lib/settings.js', 'lib/providers.js', 'background.js']) start.push(wrap(rel));
 const css = [];
 for (const cs of manifest.content_scripts || []) {
+  if ((cs.js || []).includes('content/sniff.js')) continue; // (the browsers' finder of a school's Canvas: the app chooses the school natively, as ScriptBundle.swift skips it)
   const list = cs.run_at === 'document_start' ? start : end;
   for (const rel of cs.js || []) list.push(wrap(rel));
   for (const rel of cs.css || []) css.push(file(rel));

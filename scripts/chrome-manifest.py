@@ -18,11 +18,13 @@ m.pop('author', None)        # not a Chrome key (it would only produce an "unrec
 # Safari draws the toolbar button from the icon's alpha channel, so the source manifest points it at the
 # mark-only glyphs; Chrome shows the toolbar icon in colour, so the Chrome build uses the blue tile there.
 m.setdefault('action', {})['default_icon'] = {s: f'icons/icon-{s}.png' for s in ('48', '96', '128')}
-# The Chrome build finds Canvas on its own: schools host Canvas at addresses of their own, so it may
-# look at any page — one small script (content/sniff.js) that reads the page's markup for Canvas's and,
-# finding it, turns the interface on for that site; on every other page it does nothing. Safari asks
-# for each site as it is opened, so the source manifest keeps to Canvas's own domain plus the sites
-# added by hand, and the sniffer is not in it.
+# The extension finds Canvas on its own: schools host Canvas at addresses of their own, so one small
+# script (content/sniff.js, a content script in the source manifest for every build) reads the markup
+# of any page it may look at for Canvas's and, finding it, turns the interface on for that site; on
+# every other page it does nothing. Chrome lets it look at every site from the start (host_permissions
+# below); Safari and Firefox let it look at the sites they are told it may — every website at once
+# from the page after install, or a site at a time. The append below is kept for a source manifest
+# without the sniffer.
 m['permissions'] = [p for p in m.get('permissions', []) if p != 'nativeMessaging']  # Safari's line to the Mac app; Chrome has no app to talk to
 m['host_permissions'] = ['*://*/*']
 m.pop('optional_host_permissions', None)

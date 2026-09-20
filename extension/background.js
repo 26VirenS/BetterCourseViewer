@@ -140,7 +140,7 @@ if (typeof importScripts === 'function' && !self.BCV?.settings) {
   }
 
   /** Build registerContentScripts entries by mirroring the manifest (the interface's scripts: the
-   *  Chrome build's sniffer, content/sniff.js, already runs everywhere and is not one of them). */
+   *  sniffer, content/sniff.js, already runs on every site it may look at and is not one of them). */
   function scriptsFor(origin) {
     const manifest = api.runtime.getManifest();
     const match = `${origin}/*`;
@@ -204,11 +204,12 @@ if (typeof importScripts === 'function' && !self.BCV?.settings) {
     return { ok: true };
   }
 
-  /** The Chrome build found Canvas on a site of the school's own (content/sniff.js, which runs on every
-   *  page there and reports a Canvas page once): the site is enabled — its scripts registered, as Enable
-   *  on this site does from the toolbar — and, signed in, the tab is loaded again so the interface (and
-   *  the setup, until it is done) comes up on it now. Canvas's sign-in page is enabled but left as it
-   *  is: the page after signing in runs the interface. Canvas's own domain is built in and never asks. */
+  /** The sniffer found Canvas on a site of the school's own (content/sniff.js, which runs on every page
+   *  the extension may look at and reports a Canvas page once): the site is enabled — its scripts
+   *  registered, as Enable on this site does from the toolbar — and, signed in, the tab is loaded again
+   *  so the interface (and the setup, until it is done) comes up on it now. Canvas's sign-in page is
+   *  enabled but left as it is: the page after signing in runs the interface. Canvas's own domain is
+   *  built in and never asks. */
   const seenTabs = new Map(); // tab id → when it was last loaded again for this, so a page that keeps asking is not loaded round and round
   async function canvasSeen(sender, msg) {
     const tabId = sender?.tab?.id;

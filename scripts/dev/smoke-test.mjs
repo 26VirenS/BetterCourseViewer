@@ -2838,6 +2838,27 @@ try {
   await sw.evaluate(() => self.BCV.api.storage.local.set({ 'setup:begun': Date.now() }));
   check(await closed, 'and once the setup has begun on a Canvas tab, the page closes itself');
   await setup.close().catch(() => {});
+  // Safari's page: one press asks for every website (Safari's own prompt; here the request is answered
+  // yes by a stub), and the school's Canvas is then found by itself (content/sniff.js, in the manifest)
+  const sfSetup = await context.newPage();
+  await sfSetup.addInitScript(() => {
+    Object.defineProperty(navigator, 'vendor', { get: () => 'Apple Computer, Inc.' });
+    Object.defineProperty(navigator, 'userAgent', { get: () => 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15' });
+    window.__asked = [];
+    for (const o of [self.chrome, self.browser]) if (o && o.permissions) o.permissions.request = (req) => { window.__asked.push(req); return Promise.resolve(true); };
+  });
+  await sfSetup.goto(`chrome-extension://${extId}/setup/setup.html`);
+  await sfSetup.waitForSelector('.splash__stage[data-stage="go"]', { timeout: 8000 });
+  await sfSetup.waitForFunction(() => document.querySelectorAll('.splash__stage').length === 1, null, { timeout: 5000 });
+  const sfSeen = await sfSetup.evaluate(() => ({ title: document.querySelector('.splash__title')?.textContent, button: document.querySelector('.splash__btn')?.textContent, note: document.querySelector('.splash__note')?.textContent }));
+  check(sfSeen.title === 'Open your Canvas' && sfSeen.button === 'Let Simpl Courses find it' && /Safari asks once whether Simpl Courses may see every website/.test(sfSeen.note || ''), `Safari's page has the one press that asks for every website, and says why (${JSON.stringify(sfSeen)})`);
+  await sfSetup.screenshot({ path: join(out, '32d-setup-safari.png') });
+  await sfSetup.click('.splash__btn');
+  await sfSetup.waitForTimeout(250);
+  const sfAfter = await sfSetup.evaluate(() => ({ asked: window.__asked, hidden: document.querySelector('.splash__btn')?.hidden, note: document.querySelector('.splash__note')?.textContent }));
+  check(sfAfter.asked.length === 1 && (sfAfter.asked[0].origins || []).join() === '*://*/*' && sfAfter.hidden === true && /^Done\. Open your Canvas/.test(sfAfter.note || ''), `the press asks for every website and, allowed, the page says setup begins on the Canvas at any address (${JSON.stringify(sfAfter)})`);
+  check((await sw.evaluate(() => self.BCV.api.runtime.getManifest().content_scripts.some((cs) => (cs.js || []).includes('content/sniff.js') && cs.matches.includes('*://*/*') && (cs.exclude_matches || []).includes('*://*.instructure.com/*')))), 'the sniffer is in the manifest for every build: every site but Canvas\'s own, at idle');
+  await sfSetup.close().catch(() => {});
 
   // ---- the account panel ----------------------------------------------------------------------------------
   console.log('account panel');

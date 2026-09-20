@@ -32,8 +32,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         return false
     }
 
-    /// The Dock icon, or Launchpad, or `open` again: the window.
+    /// The Dock icon, or Launchpad, or `open` again: the window. Opened again from the Applications
+    /// folder while this temporary copy was still running (the app dragged there with its window
+    /// closed), that copy takes over: this one would only have shown its window again.
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        if let home = Placement.homeCopy {
+            Shell.run("/usr/bin/xattr", ["-dr", "com.apple.quarantine", home.path])
+            Placement.relaunch(home)
+            return false
+        }
         showWindow()
         return true
     }
@@ -161,6 +168,21 @@ enum Placement {
 
     static var needsMove: Bool { isTranslocated || !isInApplications }
 
+    /// A copy already in an Applications folder, while this running one is the temporary copy: the
+    /// user dragged the app there with its window closed and opened it again, which only brought
+    /// this one forward. Nil when this copy is the one in Applications (put there by something other
+    /// than the Finder, and still marked): that one is put right by removing the mark.
+    static var homeCopy: URL? {
+        guard isTranslocated else { return nil }
+        let fm = FileManager.default
+        let name = originalURL.lastPathComponent
+        for folder in ["/Applications", "\(fm.homeDirectoryForCurrentUser.path)/Applications"] {
+            let candidate = URL(fileURLWithPath: folder, isDirectory: true).appendingPathComponent(name)
+            if fm.fileExists(atPath: candidate.path), candidate.standardizedFileURL.path != originalURL.standardizedFileURL.path { return candidate }
+        }
+        return nil
+    }
+
     /// For the window: why the extension may be missing, and the button to put it right.
     static var report: [String: Any] {
         ["translocated": isTranslocated, "inApplications": isInApplications, "path": originalURL.path]
@@ -203,12 +225,7 @@ enum Placement {
     @discardableResult
     static func moveToApplications() throws -> URL {
         let fm = FileManager.default
-        var folder = URL(fileURLWithPath: "/Applications", isDirectory: true)
-        if !fm.isWritableFile(atPath: folder.path) {
-            folder = fm.homeDirectoryForCurrentUser.appendingPathComponent("Applications", isDirectory: true)
-            try fm.createDirectory(at: folder, withIntermediateDirectories: true)
-        }
-        let dest = folder.appendingPathComponent(originalURL.lastPathComponent)
+        let dest = try applicationsFolder().appendingPathComponent(originalURL.lastPathComponent)
         if dest.standardizedFileURL.path == originalURL.standardizedFileURL.path {
             guard isTranslocated else { return dest }
             // already in Applications, put there by something other than the Finder: the quarantine mark is all that is wrong
@@ -224,6 +241,16 @@ enum Placement {
         _ = LSRegisterURL(dest as CFURL, true)
         relaunch(dest)
         return dest
+    }
+
+    /// The Applications folder the app can go in: the shared one, or the user's own when that cannot be written.
+    static func applicationsFolder() throws -> URL {
+        let fm = FileManager.default
+        let shared = URL(fileURLWithPath: "/Applications", isDirectory: true)
+        if fm.isWritableFile(atPath: shared.path) { return shared }
+        let own = fm.homeDirectoryForCurrentUser.appendingPathComponent("Applications", isDirectory: true)
+        try fm.createDirectory(at: own, withIntermediateDirectories: true)
+        return own
     }
 
     /// The copy at `url` opens once this one has quit (-n: started afresh rather than this one found).

@@ -20,8 +20,10 @@ simplcourses.com rather than the App Store. The app is more than a wrapper now:
   at launch and every hour (the app stays running after its window closes, as a mark in the menu
   bar; it is a login item unless that is turned off). A newer version is downloaded, its SHA-256
   checked against the feed, unpacked with `ditto`, checked to be Simpl Courses and signed, moved
-  into this copy's place (this copy goes to the Trash) and opened again. *Install updates by
-  themselves* is on by default; off, the window shows *Update now*.
+  into this copy's place (this copy goes to the Trash) and opened again — or into the Applications
+  folder when this copy cannot be replaced where it is (a temporary copy macOS made, a folder that
+  cannot be written). *Install updates by themselves* is on by default; off, the window shows
+  *Update now*.
 - **It opens on a first screen, and lives in the Applications folder.** The first launch shows a
   black screen — *Let’s make Canvas simpler*, *Open Safari* — and the button opens Safari's
   Extensions settings on the extension. A downloaded app opened straight from Downloads is run by
@@ -87,7 +89,7 @@ shared when both can reach the same folder (a signed build).
 | --- | --- | --- | --- | --- |
 | Settings page | the app's window | the extension's own page | the extension's own page | in the app |
 | Source of truth | the app's shared store | `storage.local` | `storage.local` | the app's storage file |
-| Finding a school's own Canvas | added in the app (Safari asks for the site when it is opened) | on its own (`content/sniff.js`) | *Enable on this site* | the address typed in |
+| Finding a school's own Canvas | on its own (`content/sniff.js`) once Safari lets it see every website — one press on the page after install; or a site at a time, as Safari asks | on its own (`content/sniff.js`) | *Enable on this site* | the address typed in |
 | Updates | the app, hourly | the Web Store | manual | the App Store |
 
 `node scripts/dev/mac-window-test.mjs` runs the window's page in Chromium over a fake app;

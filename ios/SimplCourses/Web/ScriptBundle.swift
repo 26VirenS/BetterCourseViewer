@@ -59,8 +59,10 @@ enum ScriptBundle {
             // 3. the manifest's content scripts and stylesheet
             var css: [String] = []
             for entry in manifest["content_scripts"] as? [[String: Any]] ?? [] {
+                let js = entry["js"] as? [String] ?? []
+                if js.contains("content/sniff.js") { continue } // (the browsers' finder of a school's Canvas: here the school is chosen natively)
                 let time: WKUserScriptInjectionTime = (entry["run_at"] as? String) == "document_start" ? .atDocumentStart : .atDocumentEnd
-                for path in entry["js"] as? [String] ?? [] { add(path, at: time) }
+                for path in js { add(path, at: time) }
                 for path in entry["css"] as? [String] ?? [] { css.append(file(path)) }
             }
             if !css.isEmpty, let literal = JS.literal(css.joined(separator: "\n")) {

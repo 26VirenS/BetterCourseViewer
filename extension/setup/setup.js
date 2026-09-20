@@ -1,9 +1,11 @@
 /* The page after install (Safari and Chrome): black, the way the welcome on the page is — a splash,
  * then the one thing to do: Open your Canvas. Setup will begin there. Nothing to press: the setup
  * runs over the Canvas page on its own (content/app/setup.js opens over the first signed-in Canvas
- * page until it is done), and this page closes itself the moment it has begun. Chrome's build finds
- * the school's own Canvas address by itself (content/sniff.js); Safari asks for each site as it is
- * opened, so its page carries the one line about that. */
+ * page until it is done), and this page closes itself the moment it has begun. The school's own
+ * Canvas address is found by itself (content/sniff.js) on any site the extension may look at:
+ * Chrome's build may look at every site from the start; Safari has to be told, so its page carries
+ * one press that asks for every website at once (Safari's own prompt), and the line about Safari
+ * asking for a site at a time for whoever says no. */
 (async function () {
   const BCV = self.BCV;
   const api = BCV.api;
@@ -35,12 +37,30 @@
     ]);
   }
   function go() {
+    // Safari lets an extension look at a site only once it is told it may. One press here asks for
+    // every website at once (Safari's own prompt); allowed, the school's Canvas is then recognised by
+    // itself, wherever it is. Refused, Safari asks for a site at a time, from its toolbar button.
+    const note = safari ? h('p', { class: 'splash__note' }, ['Safari asks once whether Simpl Courses may see every website. That is how it recognises your school’s Canvas; on other sites it does nothing.']) : null;
+    const find = safari ? h('button', { type: 'button', class: 'splash__btn', text: 'Let Simpl Courses find it' }) : null;
+    if (find) {
+      find.addEventListener('click', () => {
+        // permissions.request() has to be called within the press itself: nothing awaited before it
+        let asked;
+        try { asked = Promise.resolve(api.permissions.request({ origins: ['*://*/*'] })); } catch (e) { asked = Promise.reject(e); }
+        const aSiteAtATime = () => note.replaceChildren('Not allowed. When Safari asks on your Canvas, press the ', h('b', { text: 'Simpl Courses' }), ' button in the toolbar and choose ', h('b', { text: 'Always Allow on This Website' }), '.');
+        asked.then((ok) => {
+          if (!ok) { aSiteAtATime(); return; }
+          find.hidden = true;
+          note.replaceChildren('Done. Open your Canvas, at whatever address your school uses, and setup begins there.');
+        }, aSiteAtATime);
+      });
+    }
     return h('div', { class: `splash__stage splash__stage--go${safari ? ' is-safari' : ''}`, dataset: { stage: 'go' } }, [
       h('div', { class: 'splash__text' }, [
         h('h1', { class: 'splash__title', text: 'Open your Canvas' }),
         h('p', { class: 'splash__hint', text: 'Setup will begin there.' }),
-        // Safari asks before an extension may run on a site: the one thing to know
-        safari ? h('p', { class: 'splash__note' }, ['If Safari asks, press the ', h('b', { text: 'Simpl Courses' }), ' button in the toolbar and choose ', h('b', { text: 'Always Allow on This Website' }), '.']) : null,
+        find,
+        note,
       ]),
     ]);
   }

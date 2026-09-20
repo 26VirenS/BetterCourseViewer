@@ -1,10 +1,12 @@
-/* The Chrome build finds Canvas on its own. Schools host Canvas at addresses of their own choosing
- * (canvas.school.edu, learn.school.edu), so the Chrome build may look at any page — and this is
- * everything it does there: a handful of reads of the page's own markup, at idle, to tell whether it
- * is a Canvas page. On any other page it does nothing, keeps nothing and asks for nothing. On a
- * Canvas page — signed in, or Canvas's own sign-in page — it tells the background once, which turns
- * the interface on for that site (exactly what Enable on this site does from the toolbar) and loads
- * the page again so the interface, and the setup until it is done, come up on it now.
+/* The extension finds Canvas on its own. Schools host Canvas at addresses of their own choosing
+ * (canvas.school.edu, learn.school.edu), so the extension may look at any page it is allowed on —
+ * Chrome allows every site from the start; Safari and Firefox allow each site as they are asked, or
+ * every website at once from the page after install — and this is everything it does there: a
+ * handful of reads of the page's own markup, at idle, to tell whether it is a Canvas page. On any
+ * other page it does nothing, keeps nothing and asks for nothing. On a Canvas page — signed in, or
+ * Canvas's own sign-in page — it tells the background once, which turns the interface on for that
+ * site (exactly what Enable on this site does from the toolbar) and loads the page again so the
+ * interface, and the setup until it is done, come up on it now.
  * Canvas's own domain (*.instructure.com) is built in and never comes here; a site already on has
  * the interface's scripts in this world, and this does nothing there either. */
 (function () {

@@ -104,7 +104,7 @@ Anything without a screen of its own – external tools and their embeds (Box, Y
 
 ## Install (the Mac app)
 
-Safari extensions ship inside a Mac app. Download **Simpl Courses** from [simplcourses.com](https://simplcourses.com/download/mac), open it and press **Open Safari** (opened from Downloads, the app moves itself to the Applications folder first: Safari can only see the extension from there), tick Simpl Courses in Safari's Extensions settings, then open your Canvas: the setup begins there by itself (Safari asks once whether the extension may run on the site).
+Safari extensions ship inside a Mac app. Download **Simpl Courses** from [simplcourses.com](https://simplcourses.com/download/mac), open it and press **Open Safari** (opened from Downloads, the app moves itself to the Applications folder first: Safari can only see the extension from there), tick Simpl Courses in Safari's Extensions settings, and on the page that opens press **Let Simpl Courses find it** (Safari asks once whether the extension may see every website: that is how it recognises your school's Canvas), then open your Canvas: the setup begins there by itself.
 
 The app is the extension's home on a Mac:
 
@@ -201,7 +201,7 @@ The same extension runs inside an iOS app: a full-screen web view of your school
 ```
 extension/
   manifest.json                Manifest V3 (Safari, Chrome, Firefox)
-  background.js                badge, custom sites (and the Chrome sniffer's report), the page after install
+  background.js                badge, custom sites (and the sniffer's report), the page after install
   lib/                         settings, Canvas REST helper (with the request gate), markdown, utils, the OCR reader, vendored libraries
   content/early.js             document_start: applies skin + appearance before first paint
   content/styles/app.css       the whole design system (light/dark variables, every component)
@@ -216,7 +216,7 @@ scripts/
   build-mac-app.sh             builds the .app by hand (ad-hoc signed); the Xcode project under macos/ is kept by hand
   release-mac-app.sh           CI: the Mac app signed, notarized, zipped, on the Release, and the site's feed and download pointed at it
   package.sh                   zips the extension (generic + Chrome Web Store build)
-  chrome-manifest.py           the Chrome build's manifest: Chrome's keys alone, every site, and content/sniff.js
+  chrome-manifest.py           the Chrome build's manifest: Chrome's keys alone, and every site from the start
   make-icons.mjs               regenerates the PNG icons
   dev/mock-canvas.mjs          a fake Canvas (pages + the API endpoints the app reads)
   dev/smoke-test.mjs           walks every screen in headless Chromium against the mock

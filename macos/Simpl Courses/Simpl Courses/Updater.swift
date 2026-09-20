@@ -12,6 +12,7 @@
 
 import Foundation
 import AppKit
+import CoreServices
 import CryptoKit
 
 struct UpdateError: LocalizedError {
@@ -176,20 +177,27 @@ final class Updater {
         guard let newBundle = Bundle(url: newApp), newBundle.bundleIdentifier == Bundle.main.bundleIdentifier else { throw UpdateError("The download is not Simpl Courses.") }
         guard Shell.run("/usr/bin/codesign", ["--verify", "--deep", "--strict", newApp.path]) == 0 else { throw UpdateError("The download's signature did not check out, so it was not installed.") }
         let current = Placement.originalURL // (the app as the user sees it, not a temporary copy macOS made)
-        let folder = current.deletingLastPathComponent()
-        guard FileManager.default.isWritableFile(atPath: folder.path) else {
-            throw UpdateError("Simpl Courses cannot replace itself in \(folder.path). Move it to the Applications folder and try again.")
+        var target = current
+        if Placement.isTranslocated || !FileManager.default.isWritableFile(atPath: current.deletingLastPathComponent().path) {
+            // this copy cannot be replaced where it is (a temporary copy macOS made of an app opened from Downloads, or a
+            // folder that cannot be written): the new one goes to the Applications folder, and this one to the Trash
+            target = try Placement.applicationsFolder().appendingPathComponent(current.lastPathComponent)
         }
+        let inPlace = target.standardizedFileURL.path == current.standardizedFileURL.path
         var trashed: NSURL?
-        try FileManager.default.trashItem(at: current, resultingItemURL: &trashed)
+        if FileManager.default.fileExists(atPath: target.path) {
+            try FileManager.default.trashItem(at: target, resultingItemURL: &trashed) // this copy, or an older one in Applications
+        }
         do {
-            try FileManager.default.moveItem(at: newApp, to: current)
+            try FileManager.default.moveItem(at: newApp, to: target)
         } catch {
-            if let back = trashed as URL? { try? FileManager.default.moveItem(at: back, to: current) } // this copy back where it was
+            if let back = trashed as URL? { try? FileManager.default.moveItem(at: back, to: target) } // what was there, back
             throw error
         }
-        Shell.run("/usr/bin/xattr", ["-dr", "com.apple.quarantine", current.path]) // (no quarantine mark: macOS runs it in place, where Safari sees it)
-        Placement.relaunch(current) // the new copy opens once this one has quit
+        if !inPlace { try? FileManager.default.trashItem(at: current, resultingItemURL: nil) } // (a temporary copy cannot be trashed: it stays)
+        Shell.run("/usr/bin/xattr", ["-dr", "com.apple.quarantine", target.path]) // (no quarantine mark: macOS runs it in place, where Safari sees it)
+        _ = LSRegisterURL(target as CFURL, true)
+        Placement.relaunch(target) // the new copy opens once this one has quit
     }
 
     /// The state as the settings window shows it.
