@@ -72,7 +72,7 @@
   async function open(app) {
     if (ui) return;
     // The ?bcv=setup that opened this is dropped from the address at once: a reload lands on the
-    // page itself, and the tour can start right here when the steps are done.
+    // page itself, and the welcome comes up on the reloaded page when the steps are done.
     const url = new URL(location.href);
     if (url.searchParams.get('bcv') === 'setup') {
       url.searchParams.delete('bcv');

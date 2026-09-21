@@ -20,7 +20,7 @@ import WebKit
 let appBundleIdentifier = Bundle.main.bundleIdentifier ?? "com.simplcourses.app"
 let extensionBundleIdentifier = "\(appBundleIdentifier).Extension"
 
-class ViewController: NSViewController, WKNavigationDelegate, WKScriptMessageHandlerWithReply {
+class ViewController: NSViewController, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandlerWithReply {
 
     @IBOutlet var webView: WKWebView!
 
@@ -41,6 +41,7 @@ class ViewController: NSViewController, WKNavigationDelegate, WKScriptMessageHan
             welcome = w
         }
         webView.navigationDelegate = self
+        webView.uiDelegate = self // (the page's confirm boxes — Reset everything, locked quizzes — need a hand to be shown at all)
         let controller = webView.configuration.userContentController
         controller.addScriptMessageHandler(self, contentWorld: .page, name: "simpl")
         // the bridge goes in before the page's own scripts, so `browser` is there when lib/settings.js looks for it
@@ -174,6 +175,37 @@ class ViewController: NSViewController, WKNavigationDelegate, WKScriptMessageHan
                 self.refreshExtensionState()
             }
         }
+    }
+
+    // ---- the page's own dialogs ----------------------------------------------------------------------
+    // A web view shows none of alert(), confirm() and prompt() on its own: without these, a confirm
+    // answers "no" at once, and Reset everything and Take locked quizzes here did nothing.
+
+    private func sheet(_ message: String, buttons: [String], accessory: NSView? = nil, done: @escaping (NSApplication.ModalResponse) -> Void) {
+        let alert = NSAlert()
+        alert.messageText = "Simpl Courses"
+        alert.informativeText = message
+        for title in buttons { alert.addButton(withTitle: title) }
+        alert.accessoryView = accessory
+        if let window = view.window {
+            alert.beginSheetModal(for: window, completionHandler: done)
+        } else {
+            done(alert.runModal())
+        }
+    }
+
+    func webView(_ webView: WKWebView, runJavaScriptAlertPanelWithMessage message: String, initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping () -> Void) {
+        sheet(message, buttons: ["OK"]) { _ in completionHandler() }
+    }
+
+    func webView(_ webView: WKWebView, runJavaScriptConfirmPanelWithMessage message: String, initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping (Bool) -> Void) {
+        sheet(message, buttons: ["OK", "Cancel"]) { completionHandler($0 == .alertFirstButtonReturn) }
+    }
+
+    func webView(_ webView: WKWebView, runJavaScriptTextInputPanelWithPrompt prompt: String, defaultText: String?, initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping (String?) -> Void) {
+        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 320, height: 24))
+        field.stringValue = defaultText ?? ""
+        sheet(prompt, buttons: ["OK", "Cancel"], accessory: field) { completionHandler($0 == .alertFirstButtonReturn ? field.stringValue : nil) }
     }
 
     // ---- the page's picture of the app ---------------------------------------------------------------

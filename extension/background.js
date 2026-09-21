@@ -454,10 +454,52 @@ if (typeof importScripts === 'function' && !self.BCV?.settings) {
     setInterval(syncApp, 5000);
   }
 
+  // ---- an update: every Canvas tab loads again, so the new version is on it at once -------------
+  // The tabs are the ones the interface runs on — Canvas's own domain from the manifest, the sites
+  // added (their registered scripts) — found by address; every other tab is left alone. Driven from
+  // onInstalled's update, and from the version noted in storage on every start (Safari rebuilds and
+  // reloads the extension without an onInstalled at times), once per version either way.
+  const VERSION_KEY = 'version:running';
+  let reloadedFor = null; // the version the tabs were loaded again for, this run
+  /** A manifest match pattern as a test of a tab's address. */
+  function matchRe(p) {
+    const m = /^(\*|https?):\/\/(\*|\*\.[^/]+|[^/*]+)(\/.*)$/.exec(p);
+    if (!m) return null;
+    const scheme = m[1] === '*' ? 'https?' : m[1];
+    const host = m[2] === '*' ? '[^/]+' : m[2].startsWith('*.') ? `(?:[^/]+\\.)?${m[2].slice(2).replace(/\./g, '\\.')}` : m[2].replace(/\./g, '\\.');
+    const path = m[3].replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*');
+    return new RegExp(`^${scheme}://${host}${path}$`, 'i');
+  }
+  async function canvasTabs() {
+    let tabs = [];
+    try { tabs = await api.tabs.query({}); } catch { return []; }
+    const manifestScripts = (api.runtime.getManifest().content_scripts || []).filter((cs) => !(cs.js || []).includes('content/sniff.js'));
+    const registered = await api.scripting?.getRegisteredContentScripts?.().catch(() => []) || [];
+    const res = [...manifestScripts, ...registered].flatMap((cs) => cs.matches || []).map(matchRe).filter(Boolean);
+    return tabs.filter((t) => typeof t.url === 'string' && /^https?:/.test(t.url) && res.some((re) => re.test(t.url)));
+  }
+  async function afterUpdate(previous) {
+    const version = api.runtime.getManifest().version;
+    if (reloadedFor === version) return { ok: true, reloaded: 0, previous, already: true };
+    reloadedFor = version;
+    const tabs = await canvasTabs();
+    await Promise.all(tabs.map((t) => api.tabs.reload(t.id).catch(() => {})));
+    return { ok: true, reloaded: tabs.length, previous };
+  }
+  async function noteVersion() {
+    const version = api.runtime.getManifest().version;
+    try {
+      const was = (await api.storage.local.get(VERSION_KEY))[VERSION_KEY];
+      await api.storage.local.set({ [VERSION_KEY]: version });
+      if (was && was !== version) await afterUpdate(was);
+    } catch { /* nothing to note it in */ }
+  }
+
   // ---- lifecycle ----------------------------------------------------------
   api.runtime.onInstalled.addListener(async (details) => {
     await ensureDomains({ force: true });
     if (details.reason === 'install') await offerSetup();
+    if (details.reason === 'update') await afterUpdate(details.previousVersion || null);
     // An update: the first Canvas page after it shows what changed (content/app/whatsnew.js), from
     // the version left behind — the oldest one still unread, when several updates go by unseen.
     if (details.reason === 'update' && details.previousVersion) {
@@ -472,5 +514,6 @@ if (typeof importScripts === 'function' && !self.BCV?.settings) {
   // even when onInstalled/onStartup never fired (Safari rebuilds, reloads).
   ensureDomains();
   offerSetup();
-  BCV.background = { offerSetup, ensureDomains, app, syncApp, openOptions }; // the harness drives these directly
+  noteVersion();
+  BCV.background = { offerSetup, ensureDomains, app, syncApp, openOptions, afterUpdate, canvasTabs }; // the harness drives these directly
 })();

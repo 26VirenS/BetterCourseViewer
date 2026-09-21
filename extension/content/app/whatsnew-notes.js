@@ -23,6 +23,11 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.47.0', date: '2026-09-21', notes: [
+      { kind: 'improved', title: 'The welcome, again', body: 'Settings → General → See it again replays the pointers on black. The old tour is gone.', icon: P.eye },
+      { kind: 'improved', title: 'Updates land at once', body: 'After an update, your open Canvas tabs load again by themselves with the new version.', icon: P.arrows },
+      { kind: 'fixed', title: 'The app’s switches act', body: 'In the Mac app, Take locked quizzes here and Reset everything ask first, then do it.', icon: P.toggle },
+    ] },
     { version: '2.46.0', date: '2026-09-21', notes: [
       { kind: 'improved', title: 'A fuller welcome', body: 'After setup, the black screen also points out Grades, Courses and Tools, each in turn.', icon: P.eye },
     ] },

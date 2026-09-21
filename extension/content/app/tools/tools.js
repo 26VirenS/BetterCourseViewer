@@ -281,7 +281,7 @@
   // left); pressed, the pin swells into the island — End and Pause as round buttons, the phase,
   // the count large in its colour — and folds again on its own. A press on the count opens the
   // timer. A timer that is not pinned borrows a pin for as long as it runs. All of it goes with
-  // the switch: the phone layout, the setup, the tour, the welcome, stock Canvas.
+  // the switch: the phone layout, the setup, the welcome, stock Canvas.
   function mountTray() {
     if (self.BCVBridge?.native) return null;
     let tray = document.getElementById('bcv-tray');

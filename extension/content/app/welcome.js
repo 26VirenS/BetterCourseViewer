@@ -42,12 +42,12 @@
       spot: () => navRow('gpa'),
     },
     courses: {
-      layout: 'side', kicker: 'Courses', title: 'Every course, one press away',
-      hint: (app) => (favsListed() ? 'The courses you star are listed right under it, on every page.' : 'Hover it to reach any course; the ones you star come first.'),
-      spot: () => navRow('courses'), also: () => (favsListed() ? { el: document.querySelector('#bcv-side .bcv-side__group'), text: 'Your starred courses, always here' } : null),
+      layout: 'side', kicker: 'Courses', title: 'See all your courses here',
+      hint: () => (favsGroup() ? '' : 'Hover it to reach any course; the ones you star come first.'),
+      spot: () => navRow('courses'), also: () => { const g = favsGroup(); return g ? { el: g, text: 'See your current classes here' } : null; },
     },
     tools: {
-      layout: 'side', kicker: 'Tools', title: 'Helpful tools, built in', hint: 'A calculator, citations, flashcards, a file converter, a periodic table and more — each pinnable to the top of every page.',
+      layout: 'side', kicker: 'Tools', title: 'Some tools, and some widgets', hint: 'Here you’ll find calculators, PDF converters and editors, a periodic table and more.',
       spot: () => navRow('tools'),
     },
     toolsIntro: { layout: 'center', title: 'Some helpful things', hint: 'some tools to help you do more, quickly.' },
@@ -56,15 +56,27 @@
       prop: (app, ctx) => pinDemo(app, ctx.look),
     },
     peek: {
-      layout: 'demo', kicker: 'Dashboard', title: 'Press a card, then an item', hint: 'A card opens what is behind its number. An item opens beside the list, so you never leave the page.',
+      layout: 'demo', kicker: 'Dashboard', title: 'Click any of the dashboard cards to see more', hint: 'Click an assignment, announcement, etc. to preview it.',
       prop: () => peekDemo(),
     },
   };
 
   /** A row of the sidebar's nav, when it is on the page and drawn (a phone has none). */
   const navRow = (key) => { const el = document.querySelector(`#bcv-side .bcv-nav__item[data-nav="${key}"]`); return el && el.getBoundingClientRect().width > 0 ? el : null; };
-  /** The starred courses are listed down the sidebar (not kept in a panel off the Courses row). */
-  const favsListed = () => { const g = document.querySelector('#bcv-side .bcv-side__group'); return !!g && g.getBoundingClientRect().height > 0; };
+  /** A row under the switch's show: the switch itself, small and still, its knob at that stop — the
+   *  same DOM the page carries (app.lookDemo), with nothing wired, rather than a drawing of it. */
+  function stopSwitch(app, stop) {
+    const demo = app?.lookDemo?.();
+    if (!demo) return null;
+    demo.setPos(stop, { glide: false });
+    demo.slider.el.classList.add('bcv-welcome__stopsw');
+    demo.slider.el.dataset.stop = String(stop);
+    return demo.slider.el;
+  }
+
+  /** The sidebar's list of starred courses, when they are listed there (not kept in a panel off the
+   *  Courses row): the group with course rows in it — "More from Canvas" is a group too, and not it. */
+  const favsGroup = () => { const g = [...document.querySelectorAll('#bcv-side .bcv-side__group')].find((el) => el.querySelector('.bcv-fav')); return g && g.getBoundingClientRect().height > 0 ? g : null; };
 
   let ui = null; // the welcome on show: { el, stage: { key, box, prop, next } | null, timer }
   const active = () => !!ui;
@@ -267,10 +279,10 @@
           const at = line.indexOf(':');
           const stop = s.stops?.[i] ?? 0;
           return h('div', { class: 'bcv-welcome__stoprow' }, [
-            h('span', { class: 'bcv-welcome__stop', dataset: { stop: String(stop) }, style: { '--c': stop < 0 ? '#ff4f1f' : stop > 0 ? '#34c759' : '#8e8e93' }, 'aria-hidden': 'true' }, h('span', { class: 'bcv-welcome__stopknob' })),
+            stopSwitch(app, stop),
             h('span', { class: 'bcv-welcome__stoptext' }, at > 0 ? [h('b', { text: line.slice(0, at + 1) }), line.slice(at + 1)] : [line]),
           ]);
-        })) : h('div', { class: 'bcv-welcome__hint', text: hint }),
+        })) : hint ? h('div', { class: 'bcv-welcome__hint', text: hint }) : null,
       ]),
       next,
     ]);

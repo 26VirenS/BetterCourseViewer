@@ -211,7 +211,7 @@
       location.href = `${site.origin}/?bcv=${param}`;
     }
   };
-  $('runTour').addEventListener('click', () => openOnCanvas('tour'));
+  $('runWelcome').addEventListener('click', () => openOnCanvas('welcome'));
   $('openSetup').addEventListener('click', () => openOnCanvas('setup'));
 
   // ---- This Mac (the app's window only) --------------------------------------------------------------

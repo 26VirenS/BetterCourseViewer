@@ -148,12 +148,12 @@ try {
   check((await page.$eval('#skin', (e) => e.classList.contains('is-on'))) && (await page.$eval('html', (e) => e.getAttribute('data-theme'))) === 'dark', 'a change the extension made (the look switch on a page, dark) arrives through the store and repaints the page');
   await page.click('.navlink[data-section="appearance"]');
   check((await page.$eval('.theme.is-on', (e) => e.dataset.value)) === 'on', 'and Appearance shows Dark');
-  await page.click('#runTour').catch(() => {});
+  await page.click('#runWelcome').catch(() => {});
   await page.click('.navlink[data-section="general"]');
-  await page.click('#runTour');
+  await page.click('#runWelcome');
   await page.waitForTimeout(150);
   const opened = await calls('open');
-  check(opened.length === 1 && opened[0].url === 'https://canvas.school.test/?bcv=tour', `Run again opens the tour on the Canvas the extension last drew, in Safari: ${opened[0]?.url}`);
+  check(opened.length === 1 && opened[0].url === 'https://canvas.school.test/?bcv=welcome', `See it again opens the welcome on the Canvas the extension last drew, in Safari: ${opened[0]?.url}`);
 
   console.log('a site added from the app');
   await page.click('.navlink[data-section="sites"]');

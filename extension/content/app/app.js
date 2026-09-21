@@ -226,7 +226,7 @@
   const DRAWN_TABS = new Set(['home', 'stream', 'announcements', 'assignments', 'discussions', 'grades', 'people', 'pages', 'files', 'folder', 'quizzes', 'modules', 'announcement', 'discussion', 'assignment', 'syllabus', 'page', 'quiz']);
   function drawnRoute(r) {
     const bcv = r.params.get('bcv');
-    if (bcv && !(r.screen === 'course' && r.tab === 'quiz' && (bcv === 'take' || bcv === 'feedback'))) return false; // native, submit, setup, tour: Canvas's own page is wanted; the quiz flow is drawn
+    if (bcv && !(r.screen === 'course' && r.tab === 'quiz' && (bcv === 'take' || bcv === 'feedback'))) return false; // native, submit, setup, welcome: Canvas's own page is wanted; the quiz flow is drawn
     if (r.screen === 'course' || r.screen === 'group') return DRAWN_TABS.has(r.tab);
     return r.screen !== 'native' && !!(screens[r.screen] || (BCV.phone?.active() && BCV.phone.screens[r.screen]));
   }
@@ -644,7 +644,7 @@
     form.submit();
   }
 
-  /** The panel over the account row: quick settings, the guided setup and tour, Canvas's own
+  /** The panel over the account row: quick settings, the guided setup and the welcome, Canvas's own
    *  profile and settings pages, and Log out. */
   function accountMenu(anchor) {
     if (document.querySelector('.bcv-menu--account')) { U.closeMenus(); return; }
@@ -658,8 +658,8 @@
       U.el('bcv-menu__head', [U.avatar(me?.avatar, me?.name, 34), h('div', { style: { minWidth: '0' } }, [U.text('bcv-menu__name bcv-ellip', me?.name || 'Account'), U.text('bcv-menu__sub bcv-ellip', me?.email || me?.login_id || siteName())])]),
       item(state.dark ? IC.sun : IC.moon, state.dark ? 'Light appearance' : 'Dark appearance', null, toggleTheme),
       item(IC.settings, 'Simpl Courses settings', 'Look, courses and grades', openSettings),
-      item(IC.sparkle, 'Guided setup', 'Courses, grades and a tour', () => go('/?bcv=setup')),
-      item(IC.cal, 'Tour', 'What changed, on the real pages', () => go('/?bcv=tour')),
+      item(IC.sparkle, 'Guided setup', 'Courses, grades and the welcome', () => go('/?bcv=setup')),
+      item(IC.cal, 'Welcome again', 'The pointers, on black', () => go('/?bcv=welcome')),
       item(IC.star, 'What’s new', 'What changed in this version', () => BCV.whatsnew?.open(BCV.app, { manual: true })),
       U.el('bcv-menu__sep'),
       item(IC.people, 'Canvas profile', null, () => go('/profile')),
@@ -1015,17 +1015,19 @@
     // setup over this page, which drops the parameter and reloads the page when it is done (the
     // welcome, two pointers on black, is the first thing the reloaded page shows: see boot())
     if (r.params.get('bcv') === 'setup' && BCV.setup && !BCV.setup.active()) BCV.setup.open(BCV.app);
-    else if (r.params.get('bcv') === 'tour' && BCV.tour) startTourHere();
-    else BCV.tour?.resume?.(BCV.app, r);
+    else if (r.params.get('bcv') === 'welcome' && BCV.welcome && !BCV.welcome.active()) welcomeHere();
   }
 
-  /** ?bcv=tour (Settings → Run again): the parameter is dropped, then the tour starts on this page. */
-  function startTourHere() {
+  /** ?bcv=welcome (Settings → General → See it again, the account panel): the parameter is dropped,
+   *  the page drawn, and the welcome — the pointers on black that follow the setup — runs over it again. */
+  async function welcomeHere() {
     const url = new URL(location.href);
     url.searchParams.delete('bcv');
     history.replaceState({ bcv: true }, '', url.pathname + url.search + url.hash);
     state.route = parseRoute();
-    BCV.tour.start(BCV.app);
+    BCV.welcome.cover();
+    await render();
+    BCV.welcome.open(BCV.app).catch(() => {});
   }
 
   function titleFor(r) {
@@ -1377,8 +1379,8 @@
     if (state.lookOn) { BCV.tools?.mountTray?.(); BCV.tools?.focusLoad?.().catch(() => {}); } // the tray beside the switch (live activities, pinned tools); the focus timer's clock, so a session going is known
     if (welcome) BCV.welcome.open(BCV.app, welcome === 'look' ? ['look'] : null).catch(() => {});
     // The first Canvas page after an update shows what changed: once per version, never over the
-    // setup, the welcome, the tour or a quiz attempt, and never on a fresh install (the setup marks its version seen).
-    const busy = () => BCV.setup?.active() || BCV.welcome?.active() || html.classList.contains('bcv-touring');
+    // setup, the welcome or a quiz attempt, and never on a fresh install (the setup marks its version seen).
+    const busy = () => BCV.setup?.active() || BCV.welcome?.active();
     if (state.lookOn && BCV.whatsnew && !inQuiz() && !busy()) {
       const change = await BCV.whatsnew.due();
       if (change && !busy()) BCV.whatsnew.open(BCV.app, change);

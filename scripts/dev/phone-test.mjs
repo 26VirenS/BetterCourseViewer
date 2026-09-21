@@ -611,7 +611,7 @@ try {
   check(page.url() === urlBefore && !!(await page.$('.bcv-qz__opt')), 'the edge swipe is off during a quiz');
   await shot('09b-quiz-question');
 
-  // ---- guided setup + the tour on a phone -------------------------------------------------------
+  // ---- guided setup + the welcome on a phone -------------------------------------------------------
   console.log('guided setup');
   await page.goto(`${BASE}/?bcv=setup`);
   await page.waitForSelector('#bcv-setup .row', { timeout: 20000 });
@@ -644,19 +644,19 @@ try {
   const welcomeAt = Date.now();
   const noContinueYet = (await page.$('.bcv-welcome__next:not([hidden])')) === null;
   const welcomeInfo = await page.$eval('#bcv-welcome', (e) => { const r = e.getBoundingClientRect(); const pill = e.querySelector('.bcv-welcome__away'); const p = pill?.getBoundingClientRect(); return { stage: e.dataset.stage, bg: getComputedStyle(e).backgroundColor, full: r.width === innerWidth && r.height === innerHeight, look: !!e.querySelector('.bcv-welcome__look'), pill: !!pill, fits: !!p && p.left >= 0 && p.right <= innerWidth, ring: pill ? getComputedStyle(pill.querySelector('.bcv-away__ring')).animationDuration : null, lines: ['.bcv-welcome__kicker', '.bcv-welcome__title', '.bcv-welcome__hint'].map((s) => e.querySelector(s)?.textContent) }; });
-  check((await page.$('#bcv-setup')) === null && page.url() === `${BASE}/` && /^(reload|navigate)$/.test(await page.evaluate(() => performance.getEntriesByType('navigation')[0]?.type)) && (await page.$('.bcv-tour__card')) === null && welcomeInfo.stage === 'away' && welcomeInfo.bg === 'rgb(0, 0, 0)' && welcomeInfo.full && !welcomeInfo.look && welcomeInfo.pill && welcomeInfo.fits && welcomeInfo.ring === '12s' && welcomeInfo.lines.join(' | ') === 'Away Refresh | Click to cancel | Away refresh prevents errors that show up after you’ve been gone for a while' && await noOverflow(), `Open Canvas reloads the page, which comes back black with the Away Refresh pointer alone, no tour: ${JSON.stringify(welcomeInfo)}`);
+  check((await page.$('#bcv-setup')) === null && page.url() === `${BASE}/` && /^(reload|navigate)$/.test(await page.evaluate(() => performance.getEntriesByType('navigation')[0]?.type)) && welcomeInfo.stage === 'away' && welcomeInfo.bg === 'rgb(0, 0, 0)' && welcomeInfo.full && !welcomeInfo.look && welcomeInfo.pill && welcomeInfo.fits && welcomeInfo.ring === '12s' && welcomeInfo.lines.join(' | ') === 'Away Refresh | Click to cancel | Away refresh prevents errors that show up after you’ve been gone for a while' && await noOverflow(), `Open Canvas reloads the page, which comes back black with the Away Refresh pointer alone, no tour: ${JSON.stringify(welcomeInfo)}`);
   check(noContinueYet && await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000) && Date.now() - welcomeAt >= 2200, 'Continue comes in after three seconds');
   await page.waitForTimeout(400);
   await page.screenshot({ path: join(out, 'phone-12-welcome.png') }); // (not shot(): the mock dial loops for ever, and shot() waits for every animation to end)
   await page.click('.bcv-welcome__next');
   await page.waitForSelector('#bcv-welcome[data-stage="peek"]', { timeout: 5000 });
-  check((await page.$$('.bcv-welcome__stat')).length === 3 && (await page.$('.bcv-welcome__sheetmock')) !== null && (await texts('.bcv-welcome__title'))[0] === 'Press a card, then an item' && await noOverflow(), 'then the Dashboard pointer: the counters, the middle one pressed, the sheet behind it, on the phone too');
+  check((await page.$$('.bcv-welcome__stat')).length === 3 && (await page.$('.bcv-welcome__sheetmock')) !== null && (await texts('.bcv-welcome__title'))[0] === 'Click any of the dashboard cards to see more' && await noOverflow(), 'then the Dashboard pointer: the counters, the middle one pressed, the sheet behind it, on the phone too');
   await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000);
   await page.waitForTimeout(400);
   await page.screenshot({ path: join(out, 'phone-12b-welcome-peek.png') });
   await page.click('.bcv-welcome__next');
   await page.waitForFunction(() => !document.querySelector('#bcv-welcome'), null, { timeout: 5000 });
-  check((await page.$('.bcv-tour')) === null && !(await page.$('html.bcv-welcome')) && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('welcome:pending'))['welcome:pending'])) === undefined && (await page.$('.bcv-ph-stats')) !== null, 'Continue takes the black away: Today, no tour, and the welcome does not come back');
+  check(!(await page.$('html.bcv-welcome')) && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('welcome:pending'))['welcome:pending'])) === undefined && (await page.$('.bcv-ph-stats')) !== null, 'Continue takes the black away: Today, and the welcome does not come back');
   await page.click('.bcv-ph-avatar');
   await sheet();
   check((await texts('.bcv-ph-srow__label')).includes('Guided setup') && (await texts('.bcv-ph-srow__label')).includes('What’s new'), 'the account sheet offers the guided setup and What’s new');
