@@ -1,10 +1,10 @@
 {
-  "version": "2.44.2",
+  "version": "2.45.0",
   "url": "https://simplcourses.com/download/mac",
-  "download": "https://github.com/26VirenS/BetterCourseViewer/releases/download/v2.44.2/Simpl-Courses-Mac-2.44.2.zip",
-  "sha256": "b5491476a7fed5bd342511e770e57132a1f2a07e8f1b72929910c76caa106a80",
-  "size": 33185843,
+  "download": "https://github.com/26VirenS/BetterCourseViewer/releases/download/v2.45.0/Simpl-Courses-Mac-2.45.0.zip",
+  "sha256": "264d941a64ea41a426a5c907eaf5be03d9b1e41322b147226cad9483e2c92c00",
+  "size": 33187805,
   "minimumOS": "13.0",
-  "notes": "https://github.com/26VirenS/BetterCourseViewer/releases/tag/v2.44.2",
-  "published": "2026-09-20T23:51:05Z"
+  "notes": "https://github.com/26VirenS/BetterCourseViewer/releases/tag/v2.45.0",
+  "published": "2026-09-21T01:10:34Z"
 }
