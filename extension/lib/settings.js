@@ -16,12 +16,6 @@
       sideCourses: 'always',      // where the favourite courses live: 'always' on the sidebar, or 'hover' off the Courses row
       dashboard: { cards: true, list: true, activity: true }, // which of the Dashboard's views are offered; at least one stays on
     },
-    quizzes: {
-      // A quiz Canvas locks — each question sealed the moment you leave it, no going back — cannot be
-      // retried if anything here goes wrong, so it is handed to Canvas's own page by default. Turning
-      // this on takes that guard off; the disclaimer on the switch says what that means.
-      lockedHere: false,
-    },
     domains: [],                  // extra Canvas origins, e.g. "https://canvas.myschool.edu"
   };
 
@@ -83,19 +77,6 @@
     return mode === 'on' || (mode === 'system' && !!systemDark);
   }
 
-  /** May a quiz Canvas locks (no going back) be taken in this interface? Off unless it was asked for. */
-  function quizzesHere(settings) {
-    return !!settings?.quizzes?.lockedHere;
-  }
-
-  /** The words the switch has to be accepted with before a locked quiz may be taken here. */
-  const LOCKED_QUIZ_DISCLAIMER = 'A quiz with "lock questions after answering" on cannot be gone back to: '
-    + 'once you leave a question Canvas seals your answer, and an attempt that goes wrong cannot be taken again.\n\n'
-    + 'Simpl Courses draws its own quiz screen over Canvas’s API. It is not made by your school or by Instructure, '
-    + 'and it is provided as is: nobody behind it is liable for a lost answer, a lost attempt or a lost grade, '
-    + 'however caused.\n\n'
-    + 'Turn this on and locked quizzes will be taken here instead of on Canvas’s own page.';
-
   BCV.settings = {
     DEFAULTS,
     STORAGE_KEY,
@@ -106,7 +87,5 @@
     replace: replaceSettings,
     onChange: onSettingsChange,
     isDark,
-    quizzesHere,
-    LOCKED_QUIZ_DISCLAIMER,
   };
 })();

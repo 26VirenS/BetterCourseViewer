@@ -381,9 +381,6 @@
     const limit = store.quizAttemptLimit(q, subs);
     const open = (subs || []).some((s) => s.workflow_state === 'untaken');
     const noneLeft = limit.allowed !== null && limit.left <= 0 && !open;
-    // "lock questions after answering": Canvas seals each answer as you pass it and the attempt
-    // cannot be taken again, so it is Canvas's own page that runs it unless the setting says here
-    const lockedAway = !!q.cant_go_back && !BCV.settings.quizzesHere(app.state.settings);
     const finished = (subs || []).filter((s) => s.workflow_state === 'complete' || s.workflow_state === 'pending_review');
     const latest = finished.slice().sort((a, b) => (Number(b.attempt) || 0) - (Number(a.attempt) || 0))[0] || null;
     const feedbackHref = (s) => `${c.url}/quizzes/${q.id}?bcv=feedback&sub=${encodeURIComponent(s.id)}`;
@@ -423,13 +420,11 @@
         U.el('bcv-detail__actions', [
           q.locked_for_user ? U.badge(q.lock_explanation ? htmlToText(q.lock_explanation, 120) : 'Locked', 'orange')
             : noneLeft ? U.badge(`No attempts left · ${U.plural(limit.allowed, 'attempt')} allowed`, 'orange')
-              // a quiz Canvas locks is taken on Canvas's own page unless the setting says otherwise
-              : lockedAway ? U.btn(open ? 'Continue in Canvas' : 'Take it in Canvas', { kind: 'primary', icon: IC.external, iconColor: '#fff', onClick: () => app.go(nativeHref(`${c.url}/quizzes/${q.id}`)) })
-                : U.btn(open ? (/survey/.test(q.quiz_type || '') ? 'Continue survey' : 'Resume attempt') : (/survey/.test(q.quiz_type || '') ? 'Take the survey' : 'Take the quiz'), { kind: 'primary', icon: IC.bolt, iconColor: '#fff', onClick: () => app.go(takeHref) }),
+              : U.btn(open ? (/survey/.test(q.quiz_type || '') ? 'Continue survey' : 'Resume attempt') : (/survey/.test(q.quiz_type || '') ? 'Take the survey' : 'Take the quiz'), { kind: 'primary', icon: IC.bolt, iconColor: '#fff', onClick: () => app.go(takeHref) }),
           latest && q.hide_results !== 'always' && !/survey/.test(q.quiz_type || '') ? U.btn('See feedback', { kind: noneLeft && !q.locked_for_user ? 'primary' : '', icon: IC.check, iconColor: noneLeft && !q.locked_for_user ? '#fff' : undefined, onClick: () => app.go(feedbackHref(latest)) }) : null,
           q.locked_for_user ? null : U.btn('Open in Canvas', { icon: IC.external, onClick: () => app.go(nativeHref(`${c.url}/quizzes/${q.id}`)) }),
         ]),
-        lockedAway ? U.text('bcv-hint bcv-pretty', 'This quiz seals each question once you leave it, and an attempt that goes wrong cannot be taken again — so it is taken on Canvas’s own page rather than here. Simpl Courses settings → Quizzes will take it here instead.') : null,
+        q.cant_go_back ? U.text('bcv-hint bcv-pretty', 'This quiz seals each question once you leave it: an answer cannot be changed and you cannot go back.') : null,
         q.description ? CS().prose(q.description) : U.text('bcv-hint', 'No instructions.'),
       ]), 'bcv-card--22'),
     );

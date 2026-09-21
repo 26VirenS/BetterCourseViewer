@@ -24,6 +24,12 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.49.0', date: '2026-09-21', notes: [
+      { kind: 'new', title: 'Windows tools open', body: 'A window a tool opens for itself lands in a popup.', icon: P.layers },
+      { kind: 'improved', title: 'Every quiz taken here', body: 'A quiz that seals its questions no longer opens on Canvas.', icon: P.check },
+      { kind: 'fixed', title: 'Discussions in order', body: 'Ordered by the date each row shows, newest activity first.', icon: P.list },
+      { kind: 'improved', title: 'Longer to open', body: 'A tool has ten seconds to open before it is given a tab.', icon: P.clock },
+    ] },
     { version: '2.48.1', date: '2026-09-21', notes: [
       { kind: 'new', title: 'A tool over a tool', body: 'One opened from another goes on top, then hands back.', icon: P.layers },
       { kind: 'improved', title: 'Dark is for the framed', body: 'Only a popup holding another site goes dark.', icon: P.eye },

@@ -13,6 +13,47 @@ if (typeof importScripts === 'function' && !self.BCV?.settings) {
   const api = BCV.api;
   const S = BCV.settings;
 
+  // ---- a window a framed tool opens for itself ----------------------------
+  // A tool in a popup sometimes asks for a browser window of its own — a sign-in, a viewer, a
+  // "this needs to open in a new window" button. The page cannot catch that: the frame is another
+  // origin, so its window.open is out of reach from there. Here it is a new tab with our Canvas tab
+  // as its opener, which is close enough to catch: the tab is taken away again and the address
+  // handed back to the page, which puts it in a popup over the one already up.
+  //
+  // Narrow on purpose. It only fires while that tab says a framed popup is open, it leaves alone the
+  // tabs we make ourselves (Open in new tab says so first), and a window opened with no address of
+  // its own — about:blank, written into afterwards — is left to the browser, there being nothing to
+  // hand over. A tool that must talk back to its opener is left alone the same way once it lands.
+  const framed = new Map(); // tabId -> { open, allowUntil }
+  const ALLOW_MS = 4000;
+  function notePopup(sender, msg) {
+    const id = sender?.tab?.id;
+    if (id == null) return { ok: false };
+    const was = framed.get(id) || {};
+    if (msg.open) framed.set(id, { ...was, open: true });
+    else framed.set(id, { ...was, open: false });
+    return { ok: true };
+  }
+  function allowTab(sender) {
+    const id = sender?.tab?.id;
+    if (id == null) return { ok: false };
+    framed.set(id, { ...(framed.get(id) || {}), allowUntil: Date.now() + ALLOW_MS });
+    return { ok: true };
+  }
+  api.tabs?.onRemoved?.addListener((id) => framed.delete(id));
+  api.tabs?.onCreated?.addListener(async (tab) => {
+    try {
+      const opener = tab.openerTabId;
+      if (opener == null) return;
+      const st = framed.get(opener);
+      if (!st?.open || Date.now() < (st.allowUntil || 0)) return;
+      const url = tab.pendingUrl || tab.url || '';
+      if (!/^https?:\/\//i.test(url)) return; // about:blank and the like: nothing to hand over
+      await api.tabs.sendMessage(opener, { type: 'framedPopup', url }); // first: a page that is not listening keeps its tab
+      await api.tabs.remove(tab.id);
+    } catch { /* the tab went, or the page is not listening: the browser keeps it */ }
+  });
+
   // ---- one-shot messages --------------------------------------------------
   api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (!msg || typeof msg !== 'object') return false;
@@ -50,6 +91,12 @@ if (typeof importScripts === 'function' && !self.BCV?.settings) {
         return true;
       case 'openTab': // an external tool that would not open in its popup: it gets a tab of its own
         reply(openTab(msg.url));
+        return true;
+      case 'framedPopup': // a framed tool is up on this tab, or has gone: see catchOpenedTab below
+        reply(notePopup(sender, msg));
+        return true;
+      case 'framedAllowTab': // our own Open in new tab, about to make one on purpose
+        reply(allowTab(sender));
         return true;
       case 'closeSetupTab': // the page after install, once the setup is under way on a Canvas tab
         reply(sender?.tab?.id != null ? api.tabs.remove(sender.tab.id).then(() => ({ ok: true })) : { ok: false });

@@ -950,11 +950,20 @@
       if (!list) return wrap.replaceChildren(U.errorBox('Discussions could not be loaded.'));
       const items = list.filter((d) => !query || `${d.title} ${d.author?.display_name || ''} ${d.user_name || ''}`.toLowerCase().includes(query));
       if (!items.length) return wrap.replaceChildren(U.emptyCard(query ? 'No discussions match.' : 'No discussions yet.'));
-      const pinned = items.filter((d) => d.pinned), open = items.filter((d) => !d.pinned && !d.locked), closed = items.filter((d) => !d.pinned && d.locked);
+      // Ordered by recent activity here, not only in the ask: Canvas is sent order_by=recent_activity
+      // but does not always honour it, and a list that came back by posting date reads as unsorted —
+      // a topic whose last post is the newest of all sitting under ones posted a week before it. The
+      // date sorted on is the date the row shows, so the order on screen is the order it reads.
+      const when = (d) => Math.max(...[d.last_reply_at, d.posted_at, d.created_at].map((s) => U.parse(s)?.getTime() || 0));
+      const byActivity = (a, z) => when(z) - when(a);
+      const pinned = items.filter((d) => d.pinned); // (left as Canvas orders them: pinning is the instructor's own running order)
+      const open = items.filter((d) => !d.pinned && !d.locked).sort(byActivity);
+      const closed = items.filter((d) => !d.pinned && d.locked).sort(byActivity);
       const rowFor = (d) => {
         const unread = Number(d.unread_count) || 0;
         const replies = Number(d.discussion_subentry_count) || 0;
-        const meta = [d.last_reply_at ? `Last post ${U.fmtAtUpper(d.last_reply_at)}` : `Posted ${U.fmtAtUpper(d.posted_at)}`, d.lock_at && U.parse(d.lock_at) > new Date() ? `available until ${U.fmtAtUpper(d.lock_at)}` : null, d.assignment?.due_at ? `due ${U.fmtAtUpper(d.assignment.due_at)}` : null].filter(Boolean).join(' · ');
+        const lastPost = d.last_reply_at && (U.parse(d.last_reply_at)?.getTime() || 0) >= (U.parse(d.posted_at)?.getTime() || 0);
+        const meta = [lastPost ? `Last post ${U.fmtAtUpper(d.last_reply_at)}` : `Posted ${U.fmtAtUpper(d.posted_at || d.created_at)}`, d.lock_at && U.parse(d.lock_at) > new Date() ? `available until ${U.fmtAtUpper(d.lock_at)}` : null, d.assignment?.due_at ? `due ${U.fmtAtUpper(d.assignment.due_at)}` : null].filter(Boolean).join(' · ');
         return U.row([
           U.dot(unread > 0 || d.read_state === 'unread' ? '#0a84ff' : 'transparent'),
           U.tile(IC.disc, { color: 'var(--bcv-ink3)', tint: 'var(--bcv-fill2)' }),

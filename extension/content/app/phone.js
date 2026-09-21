@@ -270,7 +270,6 @@
         { icon: dark ? IC.sun : IC.moon, label: dark ? 'Light appearance' : 'Dark appearance', onSelect: () => app.toggleTheme() },
         { icon: IC.settings, label: 'Settings', note: 'Look, courses and grades', onSelect: () => BCV.settingsLink?.() },
         // the one setting that has to be reachable without the options page: the app has no tab to open one in
-        { icon: IC.lock, label: 'Locked quizzes', note: BCV.settings.quizzesHere(app.state.settings) ? 'Taken here' : 'Taken on Canvas’s own page', onSelect: () => lockedQuizSheet(app) },
         { icon: IC.sparkle, label: 'Guided setup', note: 'Courses, grades and the welcome', href: '/?bcv=setup' },
         { icon: IC.star, label: 'What’s new', note: 'What changed in this version', onSelect: () => BCV.whatsnew?.open(app, { manual: true }) },
         { icon: IC.people, label: 'Profile', note: 'Your Canvas profile', href: '/profile' },
@@ -283,20 +282,6 @@
   /** Where a quiz Canvas locks is taken. Turning the guard off is the one setting here that can cost
    *  a grade, so it is not a switch to flick past: the sheet says what it means and the button that
    *  takes it off says so too. Turning it back on needs no warning at all. */
-  function lockedQuizSheet(app) {
-    const on = BCV.settings.quizzesHere(app.state.settings);
-    openSheet({
-      label: 'Locked quizzes', title: 'Locked quizzes',
-      note: BCV.settings.LOCKED_QUIZ_DISCLAIMER,
-      cls: 'bcv-ph-sheet--locked',
-      body: U.el('bcv-ph-lockstate', U.text('bcv-ph-lockstate__t', on ? 'Locked quizzes are taken here.' : 'Locked quizzes open on Canvas’s own page.')),
-      actions: on
-        ? [{ label: 'Hand them back to Canvas', primary: true, onSelect: () => BCV.settings.update({ quizzes: { lockedHere: false } }) }]
-        : [{ label: 'I accept — take them here', cls: 'is-danger', onSelect: () => BCV.settings.update({ quizzes: { lockedHere: true } }) }],
-    });
-  }
-
-  /** A work row: the circle marks it done (a planner override), the row opens it. */
   function workRow(app, it, { chip = true, time = false } = {}) {
     const isDone = () => !!(it.complete || it.submitted);
     const pal = it.custom ? TASK_PAL(app.isDark()) : it.course ? it.course.palette : U.palette('#8e8e93', app.isDark());

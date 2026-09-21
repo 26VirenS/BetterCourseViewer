@@ -238,7 +238,7 @@ try {
   await page.click('.bcv-ph-avatar');
   await sheet();
   const acct = await texts('.bcv-ph-srow__label');
-  check(acct.join(',') === 'Inbox,Groups,Tools,History,My Materials,Help,Dark appearance,Settings,Locked quizzes,Guided setup,What’s new,Profile,All Canvas settings,Log out', `account sheet rows, with Tools and the school's own nav entries: ${acct.join(', ')} (no Sign out outside the app)`);
+  check(acct.join(',') === 'Inbox,Groups,Tools,History,My Materials,Help,Dark appearance,Settings,Guided setup,What’s new,Profile,All Canvas settings,Log out', `account sheet rows, with Tools and the school's own nav entries: ${acct.join(', ')} (no Sign out outside the app)`);
   check((await texts('.bcv-ph-srow__note'))[0] === 'No unread messages' || /unread message/.test((await texts('.bcv-ph-srow__note'))[0]), `Inbox row carries the unread count: ${(await texts('.bcv-ph-srow__note'))[0]}`);
   await shot('01c-account-sheet');
   await page.evaluate(() => { window.__bcvMarker = 1; });

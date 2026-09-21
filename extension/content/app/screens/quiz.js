@@ -117,13 +117,9 @@
     // the way that page makes it — which is also how Canvas enforces "no going back".
     st.paged = !!quiz.one_question_at_a_time;
     const noBack = !!quiz.cant_go_back;
-    // A quiz Canvas locks seals each question the moment you leave it: an answer cannot be changed,
-    // a question cannot be returned to, and an attempt that goes wrong cannot be taken again. That is
-    // the one case where being a second implementation is not worth the risk, however well this one
-    // works — so it is handed to Canvas's own page. The setting takes the guard off for anyone who
-    // would rather have it here, and says what they are taking on.
-    const handOff = noBack && !BCV.settings.quizzesHere(app.state.settings);
-    const nativeQuiz = `${quizUrl}?bcv=native`;
+    // A quiz Canvas locks seals each question the moment you leave it: an answer cannot be changed
+    // and a question cannot be returned to. It is taken here like any other — noBack below is what
+    // enforces the sealing — and Open in Canvas is still on the page for anyone who wants it.
     const timed = !!quiz.time_limit;
     // Attempts come from Canvas's own count on the submission (plus any extra the instructor
     // granted); allowed === null means unlimited. The store refuses to start one past the limit too.
@@ -153,12 +149,6 @@
       setOpen(false);
       clearInterval(st.timer);
       app.go(quizUrl, { confirmed: true });
-    };
-    /** Hand a locked quiz to Canvas's own page, under our shell. */
-    const toCanvas = () => {
-      setOpen(false); // leaving on purpose: no prompt from the unload guard
-      clearInterval(st.timer);
-      app.go(nativeQuiz, { confirmed: true });
     };
 
     // ---- header -------------------------------------------------------------------
@@ -419,7 +409,7 @@
       const ptsLine = survey ? (gradedSurvey ? `${pts} for taking part` : 'not graded') : pts;
       let refreshBegin = () => {};
       const bullets = [
-        handOff ? ['#ff9500', IC.lock, 'This quiz seals each question once you leave it, and an attempt that goes wrong cannot be taken again — so it is taken on Canvas’s own page rather than here. Simpl Courses settings → Quizzes will take it here instead.'] : null,
+        noBack ? ['#ff9500', IC.lock, 'This quiz seals each question once you leave it: an answer cannot be changed and you cannot go back.'] : null,
         survey ? ['#34c759', CHECK, 'A survey has no right answers. Your responses are saved as you go, and you can leave and come back.'] : ['#34c759', CHECK, 'Answers save as you pick them. You can leave and come back.'],
         quiz.anonymous_submissions ? ['var(--bcv-ink3)', IC.people, 'Your responses are anonymous.'] : null,
         timed ? ['#ff9500', IC.warn, `Time limit: ${quiz.time_limit} minutes. The clock starts when you begin and keeps running if you leave.`] : null,
@@ -439,9 +429,7 @@
       // out of attempts: the primary action becomes the feedback for the last one (when released)
       const startBtn = !canStart && lastDone && !survey && !resultsHidden(lastDone)
         ? h('button', { type: 'button', class: 'bcv-qz__begin', text: 'See your feedback', onclick: () => openFeedback(lastDone, 'intro') })
-        : handOff && canStart
-          ? h('button', { type: 'button', class: 'bcv-qz__begin', text: st.sub ? 'Continue in Canvas' : 'Take it in Canvas', onclick: toCanvas })
-          : h('button', { type: 'button', class: 'bcv-qz__begin', text: beginLabel(), disabled: (!canStart || codeMissing()) || null, dataset: { begin: '1' }, onclick: begin });
+        : h('button', { type: 'button', class: 'bcv-qz__begin', text: beginLabel(), disabled: (!canStart || codeMissing()) || null, dataset: { begin: '1' }, onclick: begin });
       refreshBegin = () => { if (startBtn.dataset.begin) { startBtn.disabled = (!canStart || codeMissing()) || null; startBtn.textContent = beginLabel(); } };
       return U.el('bcv-qz__intro', [
         h('div', {}, [
@@ -462,7 +450,6 @@
     }
 
     async function begin() {
-      if (handOff) { toCanvas(); return; } // a locked quiz is Canvas's to run, however this was reached
       if ((quiz.access_code || quiz.has_access_code || st.needsCode) && !(st.code || '').trim()) { st.codeErr = 'Enter the access code first.'; draw(); return; } // required before an attempt
       // the popup opens at once, its pills standing for the questions to come, the first filling while they load
       st.stage = 'starting';

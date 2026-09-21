@@ -1311,7 +1311,12 @@ try {
   await page.waitForSelector('.bcv-body .bcv-row', { timeout: 10000 });
   const drows = await texts('.bcv-body .bcv-row');
   // 7003 was opened from the dashboard stream earlier in this run, so Canvas now reports it read
-  check(drows.length === 4 && /Is there any discussion happening this week\?.*Last post.*23 replies/.test(drows[1]) && !/23 unread/.test(drows[1]) && drows.some((t) => /Discussion Quiz for this week.*1 unread/.test(t)), `discussions (read state from Canvas): ${drows[1].slice(0, 80)}`);
+  const dweek = drows.find((t) => /Is there any discussion happening this week\?/.test(t)) || ''; // (by name, not by place: the order below is the point of its own check)
+  check(drows.length === 4 && /Last post.*23 replies/.test(dweek) && !/23 unread/.test(dweek) && drows.some((t) => /Discussion Quiz for this week.*1 unread/.test(t)), `discussions (read state from Canvas): ${dweek.slice(0, 80)}`);
+  // and they are in the order they read: each row's own date, newest first, never a newer one below
+  const dwhen = await page.$$eval('.bcv-body .bcv-row .bcv-row__sub--3', (els) => els.map((e) => e.textContent.split(' · ')[0].replace(/^(Last post|Posted)\s+/, '')));
+  const dts = dwhen.map((t) => { const [day, time] = t.split(' at '); return Date.parse(`${day} 2026 ${time || '12:00 AM'}`); });
+  check(dts.length === 4 && dts.every((v) => !Number.isNaN(v)) && dts.every((v, i) => i === 0 || dts[i - 1] >= v), `ordered by the date each row shows, newest first: ${dwhen.join(' | ')}`);
   await shot(page, '15-course-discussions');
   // starting one is Canvas's own editor, with everything Canvas offers there; our shell stays over it
   await page.click('.bcv-head__tools .bcv-btn--primary');
@@ -1763,23 +1768,11 @@ try {
   // question at a time questions in the API"; the mock refuses too), so each one is read from Canvas's own quiz
   // page and every move goes through that page's record-answer form — which is also how Canvas enforces no
   // going back. Answers, flags, the clock and the submit stay API calls.
-  // Out of the box a quiz Canvas locks is not taken here at all: it seals each answer as you pass it
-  // and cannot be taken again, so it goes to Canvas's own page and the reason is on the screen.
+  // A quiz Canvas locks seals each answer as you pass it and cannot be gone back to. It is taken
+  // here like any other now — the sealing is what the screen enforces, and it says so.
   await page.goto(`${BASE}/courses/101/quizzes/9014`);
   await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
-  check((await texts('.bcv-detail__actions .bcv-btn')).join(',') === 'Take it in Canvas,Open in Canvas' && (await texts('.bcv-detail')).join(' ').includes('seals each question once you leave it'), `a quiz that locks its questions is handed to Canvas, and says why: ${(await texts('.bcv-detail__actions'))[0]}`);
-  await page.goto(`${BASE}/courses/101/quizzes/9014?bcv=take`);
-  await page.waitForSelector('.bcv-qz__begin', { timeout: 10000 });
-  check((await texts('.bcv-qz__begin'))[0] === 'Take it in Canvas' && (await texts('.bcv-qz__bullet')).some((t) => /seals each question once you leave it/.test(t)), 'and its intro sends you there too, rather than starting an attempt here');
-  await page.click('.bcv-qz__begin');
-  await page.waitForFunction(() => location.search.includes('bcv=native'), null, { timeout: 8000 });
-  check(page.url().includes('bcv=native') && (await page.$('html.bcv-punch')) !== null, `taking it opens Canvas's own quiz page under our shell: ${page.url()}`);
-  // The override says take it here anyway. Everything below runs with it on — which is also what
-  // proves the setting reaches the screen.
-  await setSettings({ quizzes: { lockedHere: true } });
-  await page.goto(`${BASE}/courses/101/quizzes/9014`);
-  await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
-  check((await texts('.bcv-detail__actions .bcv-btn')).join(',') === 'Take the quiz,Open in Canvas' && !(await texts('.bcv-detail')).join(' ').includes('seals each question'), 'with the override on it has the same Take button as any other quiz, and the warning is gone');
+  check((await texts('.bcv-detail__actions .bcv-btn')).join(',') === 'Take the quiz,Open in Canvas' && (await texts('.bcv-detail')).join(' ').includes('seals each question once you leave it'), `a quiz that locks its questions has the same Take button as any other, and says what the sealing means: ${(await texts('.bcv-detail__actions'))[0]}`);
   await page.click('.bcv-detail__actions .bcv-btn--primary');
   await page.waitForSelector('.bcv-qz__begin', { timeout: 10000 });
   check((await texts('.bcv-qz__bullet')).some((t) => /One question at a time, and you cannot go back/.test(t)) && (await texts('.bcv-qz__begin'))[0] === 'Begin attempt', 'the intro says one at a time and no going back; Begin starts the attempt here');

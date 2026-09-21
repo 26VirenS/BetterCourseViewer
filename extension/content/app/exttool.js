@@ -28,7 +28,8 @@
     setTimeout(() => entry.ov.remove(), 180);
     const under = top();
     if (under) { under.ov.classList.remove('is-under'); under.ov.focus({ preventScroll: true }); return; }
-    document.documentElement.classList.remove('bcv-ext-open'); // (the last one out: the pins and the look switch slide back out of the bar)
+    tellBackground(false); // (the last one out: a new tab is the browser's business again)
+    document.documentElement.classList.remove('bcv-ext-open'); // (the pins and the look switch slide back out of the bar)
     try { entry.restore?.focus?.({ preventScroll: true }); } catch { /* gone */ }
   }
 
@@ -66,6 +67,23 @@
     try { const r = await BCV.api.storage.local.get(THEME_KEY); if (r[THEME_KEY]) theme = r[THEME_KEY] === 'light' ? 'light' : 'dark'; } catch { /* it stays dark */ }
     paintTheme();
   })();
+  // ---- a window the framed tool opens for itself --------------------------------------------
+  // The frame is another origin, so its window.open cannot be caught here. The background sees it
+  // as a new tab opened by this one and hands the address back (see catchOpenedTab there); it goes
+  // into a popup over the one already up, which is where the tool meant to put it.
+  const tellBackground = (open) => { try { BCV.api?.runtime?.sendMessage?.({ type: 'framedPopup', open }); } catch { /* no background to tell */ } };
+  /** Our own way to a tab, said out loud: without this the catcher would take it straight back. */
+  const allowTab = () => { try { BCV.api?.runtime?.sendMessage?.({ type: 'framedAllowTab' }); } catch { /* nothing to tell */ } };
+  try {
+    BCV.api?.runtime?.onMessage?.addListener?.((msg) => {
+      if (msg?.type !== 'framedPopup' || !msg.url || !isOpen()) return undefined;
+      let title = 'Opened by the tool';
+      try { title = new URL(msg.url).hostname.replace(/^www\./, ''); } catch { /* keep the plain words */ }
+      open({ title, url: msg.url, newTab: msg.url, icon: IC.external });
+      return undefined;
+    });
+  } catch { /* no background to hear from */ }
+
   /** Canvas's launch page for one of its tools, without Canvas's chrome round it. */
   function borderless(href) {
     const u = new URL(href, location.origin);
@@ -87,11 +105,11 @@
     const frame = h('iframe', { class: 'bcv-ext__frame', src: url, title, allow: 'fullscreen; microphone; camera; display-capture; autoplay; clipboard-write; geolocation; publickey-credentials-get; identity-credentials-get', referrerpolicy: 'strict-origin-when-cross-origin' }); // (no sandbox: a tool signs in, sets its cookies and opens its windows as it would on Canvas's own page)
     const wait = U.el('bcv-ext__wait', [U.text('bcv-ext__waittext', foreign ? 'Opening… if it stays blank, the site does not allow this: open it in a new tab.' : 'Opening…')]);
     const body = U.el('bcv-ext__body', [wait, frame]);
-    // A tool that never arrives: after this long the popup gives up and the tool gets a tab of its
+    // A tool that never arrives: after ten seconds the popup gives up and the tool gets a tab of its
     // own, which is where Canvas would have sent it anyway. (A tab opened this late is not the
     // browser's idea of a press, so the background opens it; window.open is the fallback, and the
     // card below is what is left when the browser refuses both.)
-    const SLOW = 5000;
+    const SLOW = 10000;
     let late = 0;
     const stopWaiting = () => { clearTimeout(late); late = 0; };
     const fail = () => {
@@ -101,7 +119,7 @@
         U.svg(IC.warn, { size: 26, stroke: 'var(--bcv-orange)', width: 1.9 }),
         U.text('bcv-ext__failtitle', 'This one will not open in a popup'),
         U.text('bcv-ext__failtext bcv-pretty', 'Your school’s Canvas does not allow it to be framed. Open it in a new tab instead.'),
-        h('a', { class: 'bcv-btn bcv-btn--primary', href: tabUrl, target: '_blank', rel: 'noopener', text: 'Open in new tab' }),
+        h('a', { class: 'bcv-btn bcv-btn--primary', href: tabUrl, target: '_blank', rel: 'noopener', text: 'Open in new tab', onclick: allowTab }),
       ]));
     };
     const toTab = async () => {
@@ -109,7 +127,7 @@
       stopWaiting();
       let opened = false;
       try { opened = !!(await BCV.api?.runtime?.sendMessage?.({ type: 'openTab', url: tabUrl }))?.ok; } catch { opened = false; }
-      if (!opened) opened = !!window.open(tabUrl, '_blank', 'noopener');
+      if (!opened) { allowTab(); opened = !!window.open(tabUrl, '_blank', 'noopener'); }
       if (opened) closeOne(entry);
       else fail();
     };
@@ -124,7 +142,7 @@
     });
     frame.addEventListener('error', fail);
     const closeBtn = h('button', { type: 'button', class: 'bcv-sheet__close', 'aria-label': 'Close', onclick: () => closeOne(entry) }, U.svg(IC.close, { size: 13, stroke: 'var(--bcv-ink2)', width: 2.3 }));
-    const tab = h('a', { class: 'bcv-btn bcv-ext__tab', href: tabUrl, target: '_blank', rel: 'noopener', title: 'Open in a new tab' }, [U.svg(IC.external, { size: 13, stroke: 'currentColor', width: 1.9 }), h('span', { text: 'Open in new tab' })]);
+    const tab = h('a', { class: 'bcv-btn bcv-ext__tab', href: tabUrl, target: '_blank', rel: 'noopener', title: 'Open in a new tab', onclick: allowTab }, [U.svg(IC.external, { size: 13, stroke: 'currentColor', width: 1.9 }), h('span', { text: 'Open in new tab' })]);
     // Reload: the launch again from the start (a tool that timed out, a sign-in that went round in circles)
     const reload = h('button', { type: 'button', class: 'bcv-btn bcv-ext__reload', title: 'Load the tool again', 'aria-label': 'Reload' }, [U.svg('M4 12a8 8 0 108-8M4 4v5h5', { size: 13, stroke: 'currentColor', width: 2 }), h('span', { text: 'Reload' })]);
     reload.addEventListener('click', () => {
@@ -147,6 +165,7 @@
     ov.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.stopPropagation(); closeOne(entry); } }); // (only the one in front has the focus, so a stack comes apart one at a time)
     entry = { ov, onCsp, stopWaiting, restore: under ? null : (from && from.focus ? from : document.activeElement) };
     stack.push(entry);
+    tellBackground(true); // (from here a window the tool opens for itself is caught and brought back)
     waitOn();
     document.body.append(ov);
     paintTheme(); // (the sun or the moon in this bar, named for what pressing it does)
