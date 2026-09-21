@@ -23,6 +23,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.45.1', date: '2026-09-21', notes: [
+      { kind: 'improved', title: 'A cleaner periodic table', body: 'Elements lose their outlines, in the table and its pin: the colour alone marks each one.', icon: P.layers },
+    ] },
     { version: '2.45.0', date: '2026-09-21', notes: [
       { kind: 'improved', title: 'An algebraic calculator', body: 'Type the whole sum, 2 + 3 × 4² or sin(30), and it is worked out under the line as you go.', icon: P.tool },
     ] },
