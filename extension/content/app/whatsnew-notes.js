@@ -24,6 +24,11 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.48.0', date: '2026-09-21', notes: [
+      { kind: 'new', title: 'Tools go dark', body: 'Every tool opens dark now, whatever the page under it is.', icon: P.eye },
+      { kind: 'new', title: 'A sun for light', body: 'Press the sun in a tool’s head to turn it light again.', icon: P.sparkle },
+      { kind: 'improved', title: 'Desmos goes dark too', body: 'The graphing calculator is turned over to match.', icon: P.tool },
+    ] },
     { version: '2.47.2', date: '2026-09-21', notes: [
       { kind: 'fixed', title: 'Pins show their icons', body: 'The panel’s blur was covering them.', icon: P.eye },
       { kind: 'new', title: 'A widget over a tool', body: 'The green light opens a tool over the one already up.', icon: P.layers },

@@ -26,6 +26,33 @@ html[data-bcv-theme="dark"] {
   --bcv-red-text: #ff8a80; --bcv-green-text: #5ddb7d; --bcv-dash: rgba(255,255,255,.28);
 }
 
+/* A tool's popup carries its own appearance, dark unless the sun in its head says otherwise, so it
+ * reads like the widgets in the tray whatever the page under it is. Both sets are spelled out: a
+ * light popup has to come out light over a dark Canvas as surely as a dark one does over a light
+ * one. Only the colours move; the fonts above are the same either way. */
+html[data-bcv-tools="light"] .bcv-tool-ov {
+  --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
+  --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
+  --bcv-hover: #fafafc; --bcv-chrome: rgba(242,242,246,.7); --bcv-panel: rgba(255,255,255,.55); --bcv-glass: rgba(255,255,255,.78); --bcv-scrim: rgba(0,0,0,.34);
+  --bcv-blue: #0a6cff; --bcv-blue-soft: rgba(10,108,255,.1);
+  --bcv-shadow: 0 1px 2px rgba(0,0,0,.05); --bcv-shadow-hi: 0 6px 18px rgba(0,0,0,.09); --bcv-shadow-lift: 0 8px 20px rgba(0,0,0,.1);
+  --bcv-red-text: #c1271d; --bcv-green-text: #1a6b30; --bcv-dash: rgba(60,60,67,.28);
+}
+html[data-bcv-tools="dark"] .bcv-tool-ov {
+  --bcv-bg: #000; --bcv-card: #1c1c1e; --bcv-ink: #f2f2f7; --bcv-ink2: #c7c7cc; --bcv-ink3: #8e8e93;
+  --bcv-sep: rgba(255,255,255,.08); --bcv-edge: rgba(255,255,255,.1); --bcv-fill: rgba(118,118,128,.28); --bcv-fill2: rgba(118,118,128,.14);
+  --bcv-hover: #2c2c2e; --bcv-chrome: rgba(0,0,0,.6); --bcv-panel: rgba(255,255,255,.05); --bcv-glass: rgba(28,28,30,.74); --bcv-scrim: rgba(0,0,0,.42);
+  --bcv-blue: #0a84ff; --bcv-blue-soft: rgba(10,132,255,.18);
+  --bcv-shadow: 0 1px 2px rgba(0,0,0,.4); --bcv-shadow-hi: 0 6px 20px rgba(0,0,0,.5); --bcv-shadow-lift: 0 8px 20px rgba(0,0,0,.45);
+  --bcv-red-text: #ff8a80; --bcv-green-text: #5ddb7d; --bcv-dash: rgba(255,255,255,.28);
+}
+/* the sun is on a dark popup (press it for light), the moon on a light one */
+.bcv-tool__theme { display: flex; align-items: center; justify-content: center; }
+html[data-bcv-tools="dark"] .bcv-tool__moon, html[data-bcv-tools="light"] .bcv-tool__sun { display: none; }
+/* Desmos is their page in a frame, so it cannot be styled from here: dark turns it over instead,
+   and the hue goes back round with it so the graph keeps roughly the colours it drew. */
+html[data-bcv-tools="dark"] .bcv-graph__frame, html[data-bcv-tools="dark"] .bcv-qgraph__frame { filter: invert(1) hue-rotate(180deg); background: #111; }
+
 /* ---- motion (mockup 8): keyframes for entrances and loading; transitions only for hover/active ---- */
 @keyframes bcv-fade-up { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 @keyframes bcv-fade-in { from { opacity: 0; } to { opacity: 1; } }
@@ -2470,7 +2497,7 @@ html.bcv-phone.bcv-on #bcv-tray, html.bcv-setup-open #bcv-tray, html.bcv-welcome
 .bcv-tool .bcv-seg { align-self: stretch; }
 .bcv-tool .bcv-seg__btn { flex: 1; padding: 9px 0; text-align: center; }
 .bcv-tool .bcv-sheet__foot { padding: 12px 22px 16px; }
-html[data-bcv-theme="dark"] .bcv-tool__note--warn { color: #ffb44d; }
+html[data-bcv-tools="dark"] .bcv-tool__note--warn { color: #ffb44d; }
 @media (max-width: 700px) {
   .bcv-tool-ov { padding: 12px; }
   .bcv-tool { width: 100% !important; max-height: calc(100vh - 24px); }
@@ -2554,7 +2581,7 @@ html[data-bcv-theme="dark"] .bcv-tool__note--warn { color: #ffb44d; }
 .bcv-cite__savedrow { display: flex; align-items: flex-start; gap: 12px; padding-top: 12px; border-top: 1px solid var(--bcv-sep); }
 .bcv-cite__tag { flex: none; padding: 3px 8px; border-radius: 7px; background: var(--bcv-fill); font: 600 10px/1.4 var(--bcv-font); color: var(--bcv-ink3); }
 .bcv-cite__savedtext { flex: 1; min-width: 0; margin: 0; font: 400 13.5px/1.6 ui-serif, "New York", Georgia, serif; color: var(--bcv-ink); word-break: break-word; }
-html[data-bcv-theme="dark"] .bcv-cite__req, html[data-bcv-theme="dark"] .bcv-cite__badge:not(.is-ready) { color: #ffb44d; }
+html[data-bcv-tools="dark"] .bcv-cite__req, html[data-bcv-tools="dark"] .bcv-cite__badge:not(.is-ready) { color: #ffb44d; }
 
 /* flashcards: the decks, the editor, the flip deck, and Learn */
 .bcv-fc__deck { position: relative; display: flex; flex-direction: column; gap: 9px; padding: 15px 16px; border: 1px solid var(--bcv-edge); border-radius: 18px; background: var(--bcv-card); box-shadow: var(--bcv-shadow); cursor: pointer; text-align: left; font-family: var(--bcv-font); color: var(--bcv-ink); }
@@ -2771,7 +2798,7 @@ html[data-bcv-theme="dark"] .bcv-cite__req, html[data-bcv-theme="dark"] .bcv-cit
 .bcv-conv__row .bcv-iconbtn { background: transparent; }
 .bcv-conv__row .bcv-iconbtn:hover { background: var(--bcv-fill); }
 .bcv-tool .bcv-conv__run { height: 44px; border-radius: 22px; font-size: 15px; justify-content: center; }
-html[data-bcv-theme="dark"] .bcv-conv__delta.is-more, html[data-bcv-theme="dark"] .bcv-conv__err { color: #ffb44d; }
+html[data-bcv-tools="dark"] .bcv-conv__delta.is-more, html[data-bcv-tools="dark"] .bcv-conv__err { color: #ffb44d; }
 
 /* the welcome's two Tools stages: the words alone, centred; then the drag, shown round and round —
  * the folded switch where it is, a card that a cursor pulls to the top right and that shrinks into
@@ -3104,7 +3131,7 @@ html.bcv-in-quiz #bcv-tray { display: none !important; } /* (no pinned tools, no
 .bcv-tool--pdfx .bcv-tool__body { padding: 0; gap: 0; }
 .bcv-tool--pdfx.is-drag .bcv-tool__body { box-shadow: inset 0 0 0 2px var(--bcv-blue); }
 .bcv-pdfx { --px-row: #f6f6f8; --px-page: #fff; --px-line: rgba(28,28,30,.32); --px-line2: rgba(60,60,67,.14); --px-dash: rgba(60,60,67,.2); --px-strike: rgba(60,60,67,.42); --px-red: #c01d43; --px-ghost: #fff; display: flex; flex-direction: column; }
-html[data-bcv-theme="dark"] .bcv-pdfx { --px-row: #0f0f11; --px-page: #1f1f22; --px-line: rgba(255,255,255,.44); --px-line2: rgba(255,255,255,.14); --px-dash: rgba(255,255,255,.18); --px-strike: rgba(255,255,255,.4); --px-red: #ff8098; --px-ghost: #26262a; }
+html[data-bcv-tools="dark"] .bcv-pdfx { --px-row: #0f0f11; --px-page: #1f1f22; --px-line: rgba(255,255,255,.44); --px-line2: rgba(255,255,255,.14); --px-dash: rgba(255,255,255,.18); --px-strike: rgba(255,255,255,.4); --px-red: #ff8098; --px-ghost: #26262a; }
 .bcv-pdfx__seg { flex: none; }
 .bcv-pdfx__seg .bcv-seg { border-radius: 11px; }
 .bcv-pdfx__seg .bcv-seg__btn { padding: 0 15px; height: 30px; border-radius: 9px; font-weight: 600; }

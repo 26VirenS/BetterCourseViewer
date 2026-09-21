@@ -2937,6 +2937,29 @@ try {
     check(!stray, `${key} opens with no stray word in it${stray ? ` (${stray})` : ''}`);
     await closeTool();
   }
+  // a tool's popup is dark over a light page, and the sun in its head turns it light and back
+  await openTool('graph');
+  await page.waitForTimeout(300);
+  const darkTool = await page.evaluate(() => {
+    const ov = document.querySelector('.bcv-tool-ov');
+    const s = getComputedStyle(ov.querySelector('.bcv-sheet'));
+    return { page: document.documentElement.getAttribute('data-bcv-theme'), tools: document.documentElement.getAttribute('data-bcv-tools'), ink: s.color, glass: getComputedStyle(ov.querySelector('.bcv-sheet')).backgroundColor, sun: !!ov.querySelector('.bcv-tool__sun') && getComputedStyle(ov.querySelector('.bcv-tool__sun')).display, moon: getComputedStyle(ov.querySelector('.bcv-tool__moon')).display, label: ov.querySelector('.bcv-tool__theme').title, frame: getComputedStyle(ov.querySelector('.bcv-graph__frame')).filter };
+  });
+  check(darkTool.tools === 'dark' && darkTool.ink === 'rgb(242, 242, 247)' && darkTool.glass === 'rgb(0, 0, 0)' && darkTool.sun === 'block' && darkTool.moon === 'none' && darkTool.label === 'Light appearance' && /invert\(1\)/.test(darkTool.frame), `a tool opens dark whatever the page is, with the sun in its head for light and Desmos turned over with it (${JSON.stringify(darkTool)})`);
+  await page.click('.bcv-tool-ov .bcv-tool__theme');
+  await page.waitForTimeout(300);
+  const lightTool = await page.evaluate(() => {
+    const ov = document.querySelector('.bcv-tool-ov');
+    return { tools: document.documentElement.getAttribute('data-bcv-tools'), ink: getComputedStyle(ov.querySelector('.bcv-sheet')).color, glass: getComputedStyle(ov.querySelector('.bcv-sheet')).backgroundColor, sun: getComputedStyle(ov.querySelector('.bcv-tool__sun')).display, moon: getComputedStyle(ov.querySelector('.bcv-tool__moon')).display, label: ov.querySelector('.bcv-tool__theme').title, frame: getComputedStyle(ov.querySelector('.bcv-graph__frame')).filter };
+  });
+  check(lightTool.tools === 'light' && lightTool.ink === 'rgb(28, 28, 30)' && lightTool.glass === 'rgb(242, 242, 246)' && lightTool.sun === 'none' && lightTool.moon === 'block' && lightTool.label === 'Dark appearance' && lightTool.frame === 'none', `the sun turns it light: dark ink, white glass, a moon to go back, and Desmos left alone (${JSON.stringify(lightTool)})`);
+  check((await sw.evaluate(async () => (await self.BCV.api.storage.local.get('tools:theme'))['tools:theme'])) === 'light', 'the choice is kept for every tool');
+  await shot(page, '36d-tool-light');
+  await page.click('.bcv-tool-ov .bcv-tool__theme');
+  await page.waitForTimeout(250);
+  await shot(page, '36e-tool-dark');
+  check((await page.evaluate(() => document.documentElement.getAttribute('data-bcv-tools'))) === 'dark' && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('tools:theme'))['tools:theme'])) === 'dark', 'the moon turns it back');
+  await closeTool();
   const toolSub = () => texts('.bcv-tool__sub').then((t) => t[0]);
   // the citation generator: style and type pick the template, the fields fill it, a guard keeps a
   // value out of a type that has no field for it
@@ -2944,7 +2967,7 @@ try {
   const fillCite = async (f) => { for (const [k, v] of Object.entries(f)) await page.fill(`.bcv-tool__input[data-field="${k}"]`, v); await page.waitForTimeout(150); };
   const cite = () => page.$eval('.bcv-cite__preview', (e) => e.textContent.replace(/\s+/g, ' ').trim());
   check((await texts('.bcv-tool__title'))[0] === 'Citation generator' && (await toolSub()) === 'MLA 9 · 5 to fill' && (await page.$eval('.bcv-cite__copy', (e) => e.disabled)) && (await texts('.bcv-cite__missing'))[0] === 'Add author, page title, website, year, url to finish this citation.' && (await page.$$('.bcv-cite__field.is-needed')).length === 5, 'the citation generator opens on MLA 9 for a website, names the five fields it needs, and keeps Copy and Save inert');
-  check((await page.$$('.bcv-cite__typeic')).length === 5 && (await texts('.bcv-cite__chip')).join(' | ') === 'Author | Page title | Website | Year | URL' && (await page.$$('.bcv-cite__side .bcv-tool__card')).length === 2 && (await page.$$('.bcv-cite__dot')).length === 5 && (await page.$eval('.bcv-cite__type.is-on .bcv-cite__typeic', (e) => getComputedStyle(e).backgroundColor)) === 'rgb(10, 108, 255)', 'the source types are tiles with a glyph each, the one chosen in blue; the fields still needed are chips; the result column sits beside the details');
+  check((await page.$$('.bcv-cite__typeic')).length === 5 && (await texts('.bcv-cite__chip')).join(' | ') === 'Author | Page title | Website | Year | URL' && (await page.$$('.bcv-cite__side .bcv-tool__card')).length === 2 && (await page.$$('.bcv-cite__dot')).length === 5 && (await page.$eval('.bcv-cite__type.is-on .bcv-cite__typeic', (e) => getComputedStyle(e).backgroundColor)) === 'rgb(10, 132, 255)', 'the source types are tiles with a glyph each, the one chosen in blue; the fields still needed are chips; the result column sits beside the details');
   await page.click('.bcv-cite__chip[data-key="year"]');
   check(await page.evaluate(() => document.activeElement?.dataset.field === 'year'), 'a chip puts the cursor in that field');
   await page.click('.bcv-cite__today');
