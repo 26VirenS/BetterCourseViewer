@@ -123,4 +123,15 @@ The same Chrome zip loads in Microsoft Edge and can be submitted to Edge Add-ons
 
 Installing opens `setup/setup.html` in a new tab: a black page with the splash and then the one thing to do — *Open your Canvas. Setup will begin there.* — and nothing to press. The Chrome build finds Canvas by itself: `content/sniff.js` runs on every page (the broad host permission above), recognises a Canvas page by its markup, and the background enables that site and loads the page again; the guided setup then opens over it (it opens over every signed-in Canvas page until it is done), and the page after install closes itself. On `*.instructure.com` the interface is built in, so the setup opens on the first page there without the sniffer. The toolbar popup's **Set up** button is the by-hand way in, for a site Chrome's *Site access* setting keeps the sniffer off: it registers the site (asking for it from the click when it is not allowed already) and opens the setup over the page.
 
+`scripts/package.sh` builds **two** Chrome zips, and which one the listing takes is a choice:
+
+| Zip | Asks for | Finds a school's own Canvas |
+| --- | --- | --- |
+| `simpl-courses-chrome-<version>.zip` | every site (`*://*/*`) | on its own, from `content/sniff.js` |
+| `simpl-courses-chrome-quiet-<version>.zip` | `*.instructure.com` only, the rest optional | by hand: *Enable on this site* in the toolbar button |
+
+The quiet one carries no `content/sniff.js` at all, so a review that balks at the broad host
+permission has nothing to balk at; the cost is that a school at its own address has to be added
+once. The release workflow publishes both and sends the first to the store.
+
 The Chrome manifest itself comes from `scripts/chrome-manifest.py` (run by `scripts/package.sh`): it drops the Firefox/Safari keys, sets `host_permissions` to `*://*/*`, and keeps the sniffer, the content script in the source manifest that runs on every site but `*.instructure.com` (Safari and Firefox run it on the sites they are allowed; Chrome on all of them). `node scripts/dev/chrome-setup-test.mjs` loads that build in Chromium and checks the whole first run against the mock Canvas at a localhost address the manifest does not name.

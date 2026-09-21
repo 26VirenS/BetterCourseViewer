@@ -3666,12 +3666,13 @@ try {
   await page.goto(`${BASE}/`);
   await page.waitForSelector('#bcv-pins .bcv-pin[data-tool="fc"]', { timeout: 15000 });
   await page.waitForTimeout(600);
+  const U_plural = (n) => `${n} ${n === 1 ? 'term' : 'terms'}`;
   const quickPin = (key) => `#bcv-pins .bcv-pin[data-tool="${key}"]`;
   const quickOpen = async (key, hh = 44) => { const b = await (await page.$(quickPin(key))).boundingBox(); await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2); await eventually(() => page.$eval(quickPin(key), (e, want) => e.classList.contains('is-open') && Math.round(e.getBoundingClientRect().height) === want, hh), 3000); await page.waitForTimeout(550); return page.$eval(quickPin(key), (e) => ({ w: Math.round(e.getBoundingClientRect().width), h: Math.round(e.getBoundingClientRect().height), radius: getComputedStyle(e.querySelector('.bcv-quick__face')).borderRadius, name: e.querySelector('.bcv-quick__name')?.textContent, btnGone: getComputedStyle(e.querySelector('.bcv-pin__btn')).opacity === '0' })); };
   check((await page.$$('#bcv-pins .bcv-pin.bcv-quick')).length === 6 && (await page.$$eval('#bcv-pins .bcv-pin', (els) => els.map((e) => Math.round(e.getBoundingClientRect().width)))).every((w) => w === 24), 'six pins in the tray, each a disc with a quick menu folded in it');
-  const qc = await quickOpen('cite', 192);
+  const qc = await quickOpen('cite', 212);
   const qcSel = (sel) => `${quickPin('cite')} ${sel}`;
-  check(qc.w === 400 && qc.h === 192 && qc.radius === '18px' && qc.name === 'Cite' && qc.btnGone && (await page.$eval(qcSel('.bcv-quick__input'), (e) => e.placeholder)) === 'Paste a link to cite' && (await texts(qcSel('.bcv-qcite__style'))).join('/') === 'MLA 9/APA 7/Chicago 17' && (await page.$eval(qcSel('.bcv-qcite__style.is-on'), (e) => e.dataset.style)) === 'mla' && (await texts(qcSel('.bcv-qcite__heretitle')))[0] === 'Cite this page' && (await texts(qcSel('.bcv-qcite__heresub')))[0] === 'Dashboard' && (await texts(qcSel('.bcv-qcite__tag'))).join('/') === 'APA 7/MLA 9' && /^Haddad, A\. \(2025\)/.test((await texts(qcSel('.bcv-qcite__text')))[0]) && !(await page.$eval(qcSel('.bcv-qcite__link'), (e) => e.hidden)), `the citation pin swells into a panel: a link to cite, the page you are on, the style, and the last citations saved, newest first (${(await texts(qcSel('.bcv-qcite__tag'))).join('/')} · ${(await texts(qcSel('.bcv-qcite__heresub')))[0]})`);
+  check(qc.w === 400 && qc.h === 212 && qc.radius === '26px' && qc.name === 'Cite' && qc.btnGone && (await page.$eval(qcSel('.bcv-quick__input'), (e) => e.placeholder)) === 'Paste a link to cite' && (await texts(qcSel('.bcv-qcite__style'))).join('/') === 'MLA 9/APA 7/Chicago 17' && (await page.$eval(qcSel('.bcv-qcite__style.is-on'), (e) => e.dataset.style)) === 'mla' && (await texts(qcSel('.bcv-qcite__heretitle')))[0] === 'Cite this page' && (await texts(qcSel('.bcv-qcite__heresub')))[0] === 'Dashboard' && (await texts(qcSel('.bcv-qcite__tag'))).join('/') === 'APA 7/MLA 9' && /^Haddad, A\. \(2025\)/.test((await texts(qcSel('.bcv-qcite__text')))[0]) && !(await page.$eval(qcSel('.bcv-qcite__link'), (e) => e.hidden)), `the citation pin swells into a panel: a link to cite, the page you are on, the style, and the last citations saved, newest first (${(await texts(qcSel('.bcv-qcite__tag'))).join('/')} · ${(await texts(qcSel('.bcv-qcite__heresub')))[0]})`);
   await page.click(qcSel('.bcv-qcite__item:first-child .bcv-qcite__copy'));
   check(await eventually(() => texts('.bcv-toast').then((t) => t.includes('Copied.')), 3000) && (await page.$eval(quickPin('cite'), (e) => e.classList.contains('is-open'))), 'a saved citation copies from the panel, which stays open');
   await page.click(qcSel('.bcv-qcite__style[data-style="apa"]'));
@@ -3685,7 +3686,7 @@ try {
   await closeTool();
   await page.mouse.move(700, 500);
   await page.waitForTimeout(700); // (a pin that just handed off holds folded a moment)
-  await quickOpen('cite', 192);
+  await quickOpen('cite', 212);
   await page.click(qcSel('.bcv-qcite__here'));
   await page.waitForSelector('.bcv-tool[data-tool="cite"]', { timeout: 5000 });
   await page.waitForTimeout(300);
@@ -3694,7 +3695,7 @@ try {
   await page.goto(`${BASE}/courses/101/assignments/1006`);
   await page.waitForSelector('#bcv-pins .bcv-pin[data-tool="cite"]', { timeout: 15000 });
   await page.waitForTimeout(800);
-  await quickOpen('cite', 192);
+  await quickOpen('cite', 212);
   const qcHereSub = (await texts(qcSel('.bcv-qcite__heresub')))[0];
   await page.click(qcSel('.bcv-qcite__here'));
   await page.waitForSelector('.bcv-tool[data-tool="cite"]', { timeout: 5000 });
@@ -3706,11 +3707,11 @@ try {
   await page.goto(`${BASE}/`);
   await page.waitForSelector('#bcv-pins .bcv-pin[data-tool="fc"]', { timeout: 15000 });
   await page.waitForTimeout(600);
-  const q2 = await quickOpen('calc', 262);
+  const q2 = await quickOpen('calc', 282);
   const calcKey = async (k) => { await page.click(`.bcv-calc__key[data-key="${k}"]`); };
   const calcShown = () => texts('.bcv-calc__expr').then((t) => t[0]);
   const calcSub = () => texts('.bcv-calc__sub').then((t) => t[0]);
-  check(q2.w === 408 && q2.h === 262 && q2.radius === '18px' && q2.name === 'Calculator' && q2.btnGone && (await page.$$('.bcv-calc__key')).length === 49 && (await calcShown()) === '0' && (await page.$$eval('.bcv-calc__row:first-child .bcv-calc__key', (els) => els.map((e) => e.textContent))).join(' ') === '( ) mc m+ m− mr AC +/− % ÷' && (await page.$eval('.bcv-calc__key[data-key="/"]', (e) => getComputedStyle(e).backgroundColor)) === 'rgb(255, 159, 10)' && (await page.$eval('.bcv-calc__key[data-key="7"]', (e) => getComputedStyle(e).backgroundColor)) === 'rgb(92, 92, 95)' && (await page.$eval('.bcv-calc__key[data-key="ac"]', (e) => getComputedStyle(e).backgroundColor)) === 'rgb(165, 165, 165)', `the calculator pin opens into a panel: the whole scientific calculator, Apple's keys in Apple's colours, 49 of them under a display (${JSON.stringify(q2)})`);
+  check(q2.w === 408 && q2.h === 282 && q2.radius === '26px' && q2.name === 'Calculator' && q2.btnGone && (await page.$$('.bcv-calc__key')).length === 49 && (await calcShown()) === '0' && (await page.$$eval('.bcv-calc__row:first-child .bcv-calc__key', (els) => els.map((e) => e.textContent))).join(' ') === '( ) mc m+ m− mr AC +/− % ÷' && (await page.$eval('.bcv-calc__key[data-key="/"]', (e) => getComputedStyle(e).backgroundColor)) === 'rgb(255, 159, 10)' && (await page.$eval('.bcv-calc__key[data-key="7"]', (e) => getComputedStyle(e).backgroundColor)) === 'rgb(92, 92, 95)' && (await page.$eval('.bcv-calc__key[data-key="ac"]', (e) => getComputedStyle(e).backgroundColor)) === 'rgb(165, 165, 165)', `the calculator pin opens into a panel: the whole scientific calculator, Apple's keys in Apple's colours, 49 of them under a display (${JSON.stringify(q2)})`);
   for (const k of ['2', '+', '3', '*', '4']) await calcKey(k);
   const calcLive = { line: await calcShown(), sub: await calcSub() };
   await calcKey('=');
@@ -3756,16 +3757,16 @@ try {
   await page.mouse.move(700, 500);
   await page.mouse.click(700, 500);
   check(await eventually(() => page.$eval(quickPin('calc'), (e) => !e.classList.contains('is-open') && Math.round(e.getBoundingClientRect().width) === 24), 3000), 'the capsule folds when the pointer leaves and presses elsewhere');
-  const qg = await quickOpen('graph', 470);
-  check(qg.w === 340 && qg.h === 470 && qg.radius === '18px' && qg.name === 'Full screen' && (await page.$eval(`${quickPin('graph')} .bcv-qgraph__frame`, (e) => e.getAttribute('src'))) === 'https://www.desmos.com/calculator' && (await page.$eval(`${quickPin('graph')} .bcv-qgraph__out`, (e) => e.href)) === 'https://www.desmos.com/calculator' && (await page.$eval(`${quickPin('graph')} .bcv-qgraph__body`, (e) => { const r = e.getBoundingClientRect(); return r.height > r.width; })), 'the graphing pin swells into a small Desmos, portrait, loaded on the first hover, with the way out to desmos.com');
+  const qg = await quickOpen('graph', 490);
+  check(qg.w === 340 && qg.h === 490 && qg.radius === '26px' && qg.name === 'Full screen' && (await page.$eval(`${quickPin('graph')} .bcv-qgraph__frame`, (e) => e.getAttribute('src'))) === 'https://www.desmos.com/calculator' && (await page.$eval(`${quickPin('graph')} .bcv-qgraph__out`, (e) => e.href)) === 'https://www.desmos.com/calculator' && (await page.$eval(`${quickPin('graph')} .bcv-qgraph__body`, (e) => { const r = e.getBoundingClientRect(); return r.height > r.width; })), 'the graphing pin swells into a small Desmos, portrait, loaded on the first hover, with the way out to desmos.com');
   await shot(page, '45b-graph-pin');
   await page.mouse.move(700, 500);
   await page.mouse.click(700, 500);
   check(await eventually(() => page.$eval(quickPin('graph'), (e) => !e.classList.contains('is-open') && e.querySelector('.bcv-qgraph__frame') && Math.round(e.getBoundingClientRect().width) === 24), 3000), 'the Desmos panel folds and keeps its frame (the graph survives)');
-  const qp = await quickOpen('ptable', 262);
+  const qp = await quickOpen('ptable', 282);
   const qpSel = (sel) => `${quickPin('ptable')} ${sel}`;
   const qpFit = await page.$eval(qpSel('.bcv-qpt__grid'), (e) => { const r = e.getBoundingClientRect(); const p = e.closest('.bcv-quick__body').getBoundingClientRect(); return { cells: e.querySelectorAll('.bcv-qpt__cell').length, inside: r.right <= p.right + 1 && r.bottom <= p.bottom + 1 && r.left >= p.left - 1, au: (() => { const c = e.querySelector('.bcv-qpt__cell[data-symbol="Au"]'); return `${c.style.gridColumn}/${c.style.gridRow}`; })(), cell: Math.round(e.querySelector('.bcv-qpt__cell').getBoundingClientRect().height) }; });
-  check(qp.w === 408 && qp.h === 262 && qp.radius === '18px' && qp.name === 'Elements' && qpFit.cells === 118 && qpFit.inside && qpFit.au === '11/6' && qpFit.cell === 20, `the periodic table pin swells into the whole table, small — every element in its place — in a panel the size of the calculator's (${JSON.stringify(qpFit)})`);
+  check(qp.w === 408 && qp.h === 282 && qp.radius === '26px' && qp.name === 'Elements' && qpFit.cells === 118 && qpFit.inside && qpFit.au === '11/6' && qpFit.cell === 20, `the periodic table pin swells into the whole table, small — every element in its place — in a panel the size of the calculator's (${JSON.stringify(qpFit)})`);
   await shot(page, '45c-ptable-pin');
   await page.hover(qpSel('.bcv-qpt__cell[data-symbol="Fe"]'));
   await page.waitForTimeout(120);
@@ -3775,32 +3776,32 @@ try {
   // (Na: sodium by its symbol, and vanadium, which has "na" in it — the table's own search, best first)
   check((await texts(qpSel('.bcv-qpt__line')))[0] === 'Sodium · 11 · 22.990' && (await page.$$eval(qpSel('.bcv-qpt__cell.is-match'), (els) => els.map((e) => e.dataset.symbol).join(','))) === 'Na,V' && (await page.$$(qpSel('.bcv-qpt__cell.is-dim'))).length === 116, `typing lights the matches, dims the rest and names the first (${await page.$$eval(qpSel('.bcv-qpt__cell.is-match'), (els) => els.map((e) => e.dataset.symbol).join(','))})`);
   await page.keyboard.press('Enter');
-  await page.waitForSelector('.bcv-tool[data-tool="ptable"]', { timeout: 5000 });
-  await page.waitForTimeout(300);
-  check((await texts('.bcv-pt__name'))[0] === 'Sodium' && (await page.$eval('.bcv-pt__cell.is-sel', (e) => e.dataset.symbol)) === 'Na' && !(await page.$eval(quickPin('ptable'), (e) => e.classList.contains('is-open'))), 'Enter opens the table on it');
-  await closeTool();
-  await page.mouse.move(700, 500);
-  await page.waitForTimeout(700);
-  await quickOpen('ptable', 262);
+  await page.waitForTimeout(250);
+  const qpNa = await page.$eval(qpSel('.bcv-qpt__info'), (e) => ({ sym: e.querySelector('.bcv-qpt__bigsym')?.textContent, num: e.querySelector('.bcv-qpt__bignum')?.textContent, name: e.querySelector('.bcv-qpt__name')?.textContent, cat: e.querySelector('.bcv-qpt__cat')?.textContent, facts: [...e.querySelectorAll('.bcv-qpt__factv')].map((f) => f.textContent).join('/') }));
+  check(qpNa.sym === 'Na' && qpNa.num === '11' && qpNa.name === 'Sodium' && qpNa.cat === 'Alkali metal' && qpNa.facts === '22.990/1/3' && (await page.$('.bcv-tool[data-tool="ptable"]')) === null && (await page.$eval(quickPin('ptable'), (e) => e.classList.contains('is-open'))), `Enter fills the space the table leaves with that element, and the tool itself stays shut (${JSON.stringify(qpNa)})`);
   await page.click(qpSel('.bcv-qpt__cell[data-symbol="Fe"]'));
+  await page.waitForTimeout(250);
+  const qpFe = await page.$eval(qpSel('.bcv-qpt__info'), (e) => ({ sym: e.querySelector('.bcv-qpt__bigsym')?.textContent, name: e.querySelector('.bcv-qpt__name')?.textContent }));
+  check(qpFe.sym === 'Fe' && qpFe.name === 'Iron' && (await page.$eval(qpSel('.bcv-qpt__cell.is-sel'), (e) => e.dataset.symbol)) === 'Fe' && (await page.$('.bcv-tool[data-tool="ptable"]')) === null, 'a press on an element shows it there too, and marks it in the table');
+  await shot(page, '45d-ptable-detail');
+  await page.click(qpSel('.bcv-quick__light--full'));
   await page.waitForSelector('.bcv-tool[data-tool="ptable"]', { timeout: 5000 });
-  await page.waitForTimeout(300);
-  check((await texts('.bcv-pt__name'))[0] === 'Iron' && (await page.$eval('.bcv-pt__cell.is-sel', (e) => e.dataset.symbol)) === 'Fe', 'a press on an element opens the table on it');
+  check((await page.$('.bcv-pt__grid')) !== null, 'the green light is what opens the whole table');
   await closeTool();
   await page.mouse.move(700, 500);
   await page.waitForTimeout(700);
-  const q3 = await quickOpen('conv');
-  check(q3.w === 250 && q3.name === 'Convert' && (await texts(`${quickPin('conv')} .bcv-quick__drop`))[0] === 'Click to add a file', 'the converter pin offers a drop target that is also a picker');
+  const q3 = await quickOpen('conv', 180);
+  check(q3.w === 300 && q3.name === 'File converter' && (await texts(`${quickPin('conv')} .bcv-quick__drop`))[0] === 'Click to add a file', 'the converter pin offers a drop target that is also a picker');
   await page.setInputFiles(`${quickPin('conv')} input[type=file]`, { name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('hello there') });
   await page.waitForSelector('.bcv-tool[data-tool="conv"]', { timeout: 5000 });
   check(await eventually(async () => (await texts('.bcv-conv__name')).includes('notes.txt'), 4000) && !(await page.$eval(quickPin('conv'), (e) => e.classList.contains('is-open'))), 'a file chosen there opens the tool with it in');
   await closeTool();
-  const q4 = await quickOpen('fc');
-  const fcChips = await texts(`${quickPin('fc')} .bcv-quick__chip`);
-  check(q4.w === 320 && q4.name === 'Study' && fcChips.length === 1 && fcChips[0] === (decks[0].name || 'Untitled set'), `the flashcards pin lists the sets as chips (${fcChips.join(' | ')})`);
-  await page.click(`${quickPin('fc')} .bcv-quick__chip`);
+  const q4 = await quickOpen('fc', 210);
+  const fcChips = await texts(`${quickPin('fc')} .bcv-qpan__itemname`);
+  check(q4.w === 330 && q4.name === 'Flashcards' && fcChips.length === 1 && fcChips[0] === (decks[0].name || 'Untitled set') && (await texts(`${quickPin('fc')} .bcv-qpan__itemsub`))[0] === U_plural(decks[0].cards.length), `the flashcards pin lists the sets, each with its count (${fcChips.join(' | ')})`);
+  await page.click(`${quickPin('fc')} .bcv-qpan__item`);
   await page.waitForSelector('.bcv-tool[data-tool="fc"] .bcv-fc__tile', { timeout: 5000 });
-  check((await texts('.bcv-tool__title'))[0] === (decks[0].name || 'Untitled set') && !(await page.$eval(quickPin('fc'), (e) => e.classList.contains('is-open'))), 'a chip opens the tool straight at that set');
+  check((await texts('.bcv-tool__title'))[0] === (decks[0].name || 'Untitled set') && !(await page.$eval(quickPin('fc'), (e) => e.classList.contains('is-open'))), 'a set opens the tool straight at it');
   await closeTool();
   // the four new pins: a capsule that works the grade out, and drop targets that open the tools with the file in
   {
@@ -3808,14 +3809,14 @@ try {
     await page.goto(`${BASE}/`);
     await page.waitForSelector('#bcv-pins .bcv-pin[data-tool="ocr"]', { timeout: 15000 });
     await page.waitForTimeout(600);
-    const ntQ = await quickOpen('need');
+    const ntQ = await quickOpen('need', 196);
     await page.fill(`${quickPin('need')} .bcv-quick__input[aria-label="Your grade now"]`, '92.4');
     await page.fill(`${quickPin('need')} .bcv-quick__input[aria-label="What the work left is worth"]`, '25');
     await page.fill(`${quickPin('need')} .bcv-quick__input[aria-label="The grade wanted"]`, '93');
     const ntQField = await page.$eval(`${quickPin('need')} .bcv-quick__input`, (e) => { const cs = getComputedStyle(e); return { h: Math.round(e.getBoundingClientRect().height), bg: cs.backgroundColor, radius: cs.borderRadius, border: cs.borderTopWidth, color: cs.color }; });
-    check(ntQ.w === 400 && ntQ.name === 'Need' && (await texts(`${quickPin('need')} .bcv-quick__result`))[0] === '→ 95%' && ntQField.h === 30 && ntQField.radius === '15px' && ntQField.border === '0px' && ntQField.bg === 'rgba(255, 255, 255, 0.12)' && ntQField.color === 'rgb(255, 255, 255)', `the grade pin's capsule: now, worth and goal, the mark worked out as they are typed, the fields round and translucent whatever the page's own styles say (${JSON.stringify(ntQField)})`);
+    check(ntQ.w === 340 && ntQ.name === 'Grade needed' && (await texts(`${quickPin('need')} .bcv-qpan__big`))[0] === '95%' && (await texts(`${quickPin('need')} .bcv-qpan__sub`))[0] === 'on everything still to come' && ntQField.h === 30 && ntQField.radius === '15px' && ntQField.border === '0px' && ntQField.bg === 'rgba(255, 255, 255, 0.12)' && ntQField.color === 'rgb(255, 255, 255)', `the grade widget: now, what is left and the goal, the mark worked out as they are typed, the fields round and translucent whatever the page's own styles say (${JSON.stringify(ntQField)})`);
     await page.fill(`${quickPin('need')} .bcv-quick__input[aria-label="Your grade now"]`, '80');
-    check((await texts(`${quickPin('need')} .bcv-quick__result`))[0] === 'Out of reach', 'and says when it cannot be done');
+    check((await texts(`${quickPin('need')} .bcv-qpan__big`))[0] === 'Out of reach', 'and says when it cannot be done');
     await page.fill(`${quickPin('need')} .bcv-quick__input[aria-label="Your grade now"]`, '92.4');
     await shot(page, '46-quick-need');
     await page.keyboard.press('Enter');
@@ -3826,9 +3827,9 @@ try {
     await page.mouse.move(700, 500);
     await page.waitForTimeout(600);
     const ntDrops = {};
-    for (const k of ['pdfx', 'mark', 'ocr']) { const q = await quickOpen(k); ntDrops[k] = { ...q, text: (await texts(`${quickPin(k)} .bcv-quick__drop`))[0], multiple: await page.$eval(`${quickPin(k)} input[type=file]`, (e) => e.multiple), accept: await page.$eval(`${quickPin(k)} input[type=file]`, (e) => e.accept) }; await page.mouse.move(700, 500); await page.waitForTimeout(600); }
-    check(ntDrops.pdfx.name === 'PDFs' && ntDrops.pdfx.text === 'Click to add PDFs' && ntDrops.pdfx.multiple && ntDrops.mark.name === 'Mark up' && ntDrops.mark.text === 'Click to add a PDF' && !ntDrops.mark.multiple && ntDrops.ocr.name === 'Read' && ntDrops.ocr.text === 'Click to add a picture' && ntDrops.ocr.accept === 'image/*,.pdf', `the three file tools' pins each offer a drop target that is also a picker (${Object.values(ntDrops).map((d) => d.text).join(' | ')})`);
-    await quickOpen('mark');
+    for (const k of ['pdfx', 'mark', 'ocr']) { const q = await quickOpen(k, 180); ntDrops[k] = { ...q, text: (await texts(`${quickPin(k)} .bcv-quick__drop`))[0], multiple: await page.$eval(`${quickPin(k)} input[type=file]`, (e) => e.multiple), accept: await page.$eval(`${quickPin(k)} input[type=file]`, (e) => e.accept) }; await page.mouse.move(700, 500); await page.waitForTimeout(600); }
+    check(ntDrops.pdfx.name === 'Merge & split' && ntDrops.pdfx.text === 'Click to add PDFs' && ntDrops.pdfx.multiple && ntDrops.mark.name === 'Mark up' && ntDrops.mark.text === 'Click to add a PDF' && !ntDrops.mark.multiple && ntDrops.ocr.name === 'Image to text' && ntDrops.ocr.text === 'Click to add a picture' && ntDrops.ocr.accept === 'image/*,.pdf', `the three file tools' pins each offer a drop target that is also a picker (${Object.values(ntDrops).map((d) => d.text).join(' | ')})`);
+    await quickOpen('mark', 180);
     await page.setInputFiles(`${quickPin('mark')} input[type=file]`, [{ name: 'Chapter.pdf', mimeType: 'application/pdf', buffer: pdfObjects(['<< /Type /Catalog /Pages 2 0 R >>', '<< /Type /Pages /Kids [3 0 R] /Count 1 >>', '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] >>']) }]);
     await page.waitForSelector('.bcv-tool[data-tool="mark"]', { timeout: 5000 });
     check(await eventually(() => page.$$('.bcv-mark__page').then((r) => r.length === 1), 10000) && !(await page.$eval(quickPin('mark'), (e) => e.classList.contains('is-open'))), 'a PDF chosen on the annotator\'s pin opens straight into it');

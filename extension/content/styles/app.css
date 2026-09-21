@@ -2306,7 +2306,9 @@ html.bcv-phone.bcv-on #bcv-tray, html.bcv-setup-open #bcv-tray, html.bcv-welcome
  * the island's corner while it is open, as it does the pin's. */
 .bcv-pin.bcv-island { --bcv-live-color: #ff9500; transition: width .5s cubic-bezier(.32,.72,0,1), height .5s cubic-bezier(.32,.72,0,1); }
 .bcv-pin.bcv-island.is-open { width: 250px; height: 78px; }
-.bcv-island__face { position: absolute; inset: 0; box-sizing: border-box; border: 1px solid rgba(255,255,255,.14); border-radius: 12px; background: rgba(28,28,30,.93); box-shadow: 0 2px 10px rgba(0,0,0,.2); overflow: hidden; color: #fff; font-family: var(--bcv-font); transition: border-radius .5s cubic-bezier(.32,.72,0,1), background .3s ease, box-shadow .3s ease; }
+.bcv-island__glass { position: absolute; top: 0; right: 0; width: 250px; height: 78px; -webkit-backdrop-filter: blur(22px) saturate(1.7); backdrop-filter: blur(22px) saturate(1.7); background: rgba(28,28,30,.7); pointer-events: none; }
+.bcv-island.is-live .bcv-island__glass { background: #000; -webkit-backdrop-filter: none; backdrop-filter: none; }
+.bcv-island__face { position: absolute; inset: 0; box-sizing: border-box; border: 1px solid rgba(255,255,255,.14); border-radius: 12px; background: transparent; box-shadow: 0 2px 10px rgba(0,0,0,.2); overflow: hidden; color: #fff; font-family: var(--bcv-font); transition: border-radius .5s cubic-bezier(.32,.72,0,1), background .3s ease, box-shadow .3s ease; }
 .bcv-island.is-live .bcv-island__face { background: #000; }
 .bcv-island.is-open .bcv-island__face { border-radius: 26px; box-shadow: 0 14px 36px rgba(0,0,0,.45); }
 .bcv-island .bcv-pin__btn { position: absolute; top: -1px; left: -1px; border-color: transparent; background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; box-shadow: none; transition: transform .16s cubic-bezier(.34,1.3,.42,1), opacity .2s ease; }
@@ -2361,18 +2363,36 @@ html.bcv-phone.bcv-on #bcv-tray, html.bcv-setup-open #bcv-tray, html.bcv-welcome
  * quickest use in it — a field and a round Go, chips, a drop target — on the island's dark glass */
 .bcv-pin.bcv-quick { --bcv-quick-w: 280px; --bcv-quick-color: #0a84ff; transition: width .45s cubic-bezier(.32,.72,0,1), height .45s cubic-bezier(.32,.72,0,1); }
 .bcv-pin.bcv-quick.is-open { width: var(--bcv-quick-w); height: 44px; }
-/* (no backdrop blur on the face: a blur re-drawn on every frame of the width and height change is
-   what made the opening stutter; at this opacity the page behind hardly showed through anyway) */
-.bcv-quick__face { position: absolute; inset: 0; box-sizing: border-box; border: 1px solid rgba(255,255,255,.14); border-radius: 12px; background: rgba(28,28,30,.94); box-shadow: 0 2px 10px rgba(0,0,0,.2); overflow: hidden; color: #fff; font-family: var(--bcv-font); transition: border-radius .45s cubic-bezier(.32,.72,0,1), box-shadow .3s ease; }
-.bcv-quick.is-open .bcv-quick__face { border-radius: 22px; box-shadow: 0 14px 36px rgba(0,0,0,.45); }
+.bcv-quick__face { position: absolute; inset: 0; box-sizing: border-box; border: 1px solid rgba(255,255,255,.14); border-radius: 12px; background: transparent; box-shadow: 0 2px 10px rgba(0,0,0,.2); overflow: hidden; color: #fff; font-family: var(--bcv-font); transition: border-radius .45s cubic-bezier(.32,.72,0,1), box-shadow .3s ease; }
+/* The blur sits on a layer of the panel's own size, clipped by the face rather than resized with it:
+   the page behind is blurred once, not on every frame of the opening, which is what used to stutter. */
+.bcv-quick__glass { position: absolute; top: 0; right: 0; width: var(--bcv-quick-w); height: var(--bcv-quick-h, 44px); -webkit-backdrop-filter: blur(22px) saturate(1.7); backdrop-filter: blur(22px) saturate(1.7); background: rgba(28,28,30,.7); pointer-events: none; }
+.bcv-quick.is-open .bcv-quick__face { border-radius: 26px; box-shadow: 0 14px 36px rgba(0,0,0,.45); }
+/* the two lights a Mac window wears: red back to the tray (once it has been pulled out), green full size */
+.bcv-quick__lights { display: flex; align-items: center; gap: 6px; flex: none; }
+.bcv-quick__light { flex: none; width: 12px; height: 12px; margin: 0; padding: 0; border: 0; border-radius: 6px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: transparent; transition: color .15s ease, filter .15s ease; }
+.bcv-quick__light--close { background: #ff5f57; display: none; }
+.bcv-quick__light--full { background: #28c840; }
+.bcv-quick.is-free .bcv-quick__light--close { display: flex; }
+.bcv-quick__lights:hover .bcv-quick__light { color: rgba(0,0,0,.5); }
+.bcv-quick__light:active { filter: brightness(.88); }
+.bcv-quick__light:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
+/* the grip along the bottom: dragging it pulls the widget out of the tray, and moves it after that */
+.bcv-quick__bar { position: absolute; left: 0; right: 0; bottom: 0; height: 20px; display: flex; align-items: center; justify-content: center; cursor: grab; opacity: 0; transition: opacity .2s ease .1s; touch-action: none; }
+.bcv-quick.is-open .bcv-quick__bar { opacity: 1; }
+.bcv-quick__bar:active { cursor: grabbing; }
+.bcv-quick__grip { width: 46px; height: 4px; border-radius: 2px; background: rgba(255,255,255,.22); transition: background .15s ease; }
+.bcv-quick__bar:hover .bcv-quick__grip { background: rgba(255,255,255,.45); }
+/* pulled out: it sits where it was put, above the page, and stays open until the red light */
+.bcv-pin.bcv-quick.is-free { position: fixed; z-index: 2147482100; }
+.bcv-quick.is-free .bcv-quick__face { box-shadow: 0 22px 60px rgba(0,0,0,.55); }
 .bcv-quick .bcv-pin__btn { position: absolute; top: -1px; left: -1px; border-color: transparent; background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; box-shadow: none; transition: transform .3s ease, opacity .25s ease; }
 .bcv-quick .bcv-pin__btn:hover { box-shadow: none; }
 .bcv-quick.is-open .bcv-pin__btn { opacity: 0; transform: scale(.6); pointer-events: none; }
 .bcv-quick.is-folding .bcv-pin__x { display: none; }
 .bcv-quick__body { position: absolute; inset: 0; display: flex; align-items: center; gap: 8px; padding: 0 7px 0 12px; opacity: 0; transform: scale(.94); transform-origin: 90% 50%; transition: opacity .16s ease, transform .3s ease; pointer-events: none; will-change: transform, opacity; }
 .bcv-quick.is-open .bcv-quick__body { opacity: 1; transform: none; pointer-events: auto; transition: opacity .28s ease .12s, transform .45s cubic-bezier(.32,.72,0,1) .08s; }
-.bcv-quick__name { flex: none; margin: 0; padding: 0; border: 0; background: transparent; font: 600 11px/1.2 var(--bcv-font); letter-spacing: .02em; color: rgba(255,255,255,.55); white-space: nowrap; cursor: pointer; }
-.bcv-quick__name:hover { color: #fff; }
+.bcv-quick__name { flex: none; margin: 0 0 0 3px; font: 600 11.5px/1.2 var(--bcv-font); letter-spacing: .02em; color: rgba(255,255,255,.68); white-space: nowrap; }
 .bcv-quick__input { flex: 1; min-width: 0; height: 30px; margin: 0; padding: 0 12px; border: 0; border-radius: 15px; background: rgba(255,255,255,.12); color: #fff; font: 500 12.5px/30px var(--bcv-font); outline: none; }
 .bcv-quick__input::placeholder { color: rgba(255,255,255,.4); }
 .bcv-quick__input:focus { background: rgba(255,255,255,.18); }
@@ -2896,7 +2916,7 @@ html[data-bcv-theme="dark"] .bcv-conv__delta.is-more, html[data-bcv-theme="dark"
 #bcv-pins .bcv-quick__input--num { flex: 0 0 62px !important; width: 62px !important; padding: 0 8px !important; text-align: center; }
 /* the calculator's pin opens into a panel rather than a capsule */
 .bcv-pin.bcv-quick.is-open { height: var(--bcv-quick-h, 44px); }
-.bcv-quick--panel.is-open .bcv-quick__face { border-radius: 18px; box-shadow: 0 16px 40px rgba(0,0,0,.45); }
+.bcv-quick--panel.is-open .bcv-quick__face { border-radius: 26px; box-shadow: 0 16px 40px rgba(0,0,0,.45); }
 .bcv-quick--panel .bcv-quick__body { display: block; padding: 10px; transform-origin: 100% 0; }
 .bcv-calc { display: flex; flex-direction: column; gap: 6px; height: 100%; box-sizing: border-box; outline: none; color: #fff; font-family: var(--bcv-font); }
 .bcv-calc__head { display: flex; align-items: center; gap: 8px; height: 16px; padding: 0 4px; }
@@ -3211,7 +3231,7 @@ html[data-bcv-theme="dark"] .bcv-pdfx { --px-row: #0f0f11; --px-page: #1f1f22; -
 .bcv-calc--big .bcv-calc__key sup, .bcv-calc--big .bcv-calc__key sub { font-size: 11px; }
 .bcv-calc--big .bcv-calc__key sup { vertical-align: 8px; }
 .bcv-calc--big .bcv-calc__key sub { vertical-align: -4px; }
-.bcv-quick--panel .bcv-quick__body { inset: auto; top: 0; right: 0; width: var(--bcv-quick-w); height: var(--bcv-quick-h); box-sizing: border-box; } /* (the panel keeps its size while folded: a Desmos in it keeps its layout) */
+.bcv-quick--panel .bcv-quick__body { inset: auto; top: 0; right: 0; width: var(--bcv-quick-w); height: calc(var(--bcv-quick-h) - 20px); box-sizing: border-box; } /* (the panel keeps its size while folded: a Desmos in it keeps its layout) */
 .bcv-qgraph { display: flex; flex-direction: column; gap: 6px; height: 100%; box-sizing: border-box; color: #fff; font-family: var(--bcv-font); }
 .bcv-qgraph__head { display: flex; align-items: center; gap: 8px; height: 16px; padding: 0 4px; }
 .bcv-qgraph__out { margin-left: auto; font: 600 10px/1 var(--bcv-font); color: rgba(255,255,255,.55) !important; text-decoration: none !important; }
@@ -3230,6 +3250,7 @@ html[data-bcv-theme="dark"] .bcv-pdfx { --px-row: #0f0f11; --px-page: #1f1f22; -
 .bcv-ext__close { position: absolute; top: 12px; right: 12px; }
 .bcv-ext .bcv-sheet__title, .bcv-ext .bcv-sheet__note { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .bcv-ext__acts { display: flex; align-items: center; gap: 8px; flex: none; }
+html.bcv-ext-open:not(.bcv-phone) .bcv-ext__acts { margin-right: calc(var(--bcv-tray-w, 24px) + 58px); transition: margin-right .45s cubic-bezier(.32,.72,0,1); } /* (the pins and the switch sit over this bar: the buttons move aside as a widget opens) */
 .bcv-ext__tab, .bcv-ext__reload { display: inline-flex; align-items: center; gap: 6px; text-decoration: none !important; }
 .bcv-ext__body { flex: 1; min-height: 0; position: relative; background: var(--bcv-fill); overflow: hidden; }
 .bcv-ext__frame { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: #fff; opacity: 0; transition: opacity .35s ease; }
@@ -3301,6 +3322,37 @@ html.bcv-ext-open:not(.bcv-phone) #bcv-look { top: 15px; right: 62px; }
 .bcv-qpt { display: flex; flex-direction: column; gap: 6px; height: 100%; box-sizing: border-box; color: #fff; font-family: var(--bcv-font); }
 .bcv-qpt__head { display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 2px; }
 .bcv-qpt__line { flex: 0 1 auto; min-width: 0; max-width: 168px; font: 500 11px/1.2 var(--bcv-font); font-variant-numeric: tabular-nums; color: rgba(255,255,255,.82); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: right; }
+/* a widget's panel: head, a line on what it is for, and what it holds — one box, not boxes in boxes */
+.bcv-qpan { display: flex; flex-direction: column; gap: 9px; height: 100%; box-sizing: border-box; }
+.bcv-qpan__head { display: flex; align-items: center; gap: 8px; }
+.bcv-qpan__note { font: 500 12px/1.4 var(--bcv-font); color: rgba(255,255,255,.62); }
+.bcv-qpan__row { display: flex; gap: 8px; }
+.bcv-qpan__row .bcv-quick__input--num { flex: 1 1 0 !important; width: auto !important; }
+.bcv-qpan__out { margin-top: auto; display: flex; flex-direction: column; gap: 2px; }
+.bcv-qpan__big { font: 600 30px/1.05 var(--bcv-display); letter-spacing: -.02em; color: #fff; font-variant-numeric: tabular-nums; }
+.bcv-qpan__sub { font: 500 11.5px/1.35 var(--bcv-font); color: rgba(255,255,255,.55); }
+.bcv-qpan .bcv-quick__drop { flex: 1 1 auto; height: auto; min-height: 70px; border-radius: 16px; font-size: 12.5px; }
+.bcv-qpan__list { display: flex; flex-direction: column; gap: 4px; overflow: auto; scrollbar-width: none; }
+.bcv-qpan__list::-webkit-scrollbar { display: none; }
+.bcv-qpan__item { display: flex; align-items: center; gap: 10px; width: 100%; margin: 0; padding: 7px 10px; border: 0; border-radius: 12px; background: rgba(255,255,255,.08); color: #fff; font: 500 12.5px/1.2 var(--bcv-font); text-align: left; cursor: pointer; transition: background .15s ease; }
+.bcv-qpan__item:hover { background: rgba(255,255,255,.18); }
+.bcv-qpan__itemname { flex: 1; min-width: 0; }
+.bcv-qpan__itemsub { flex: none; font: 500 11px/1.2 var(--bcv-font); color: rgba(255,255,255,.5); }
+.bcv-qpan__empty { font: 500 12px/1.4 var(--bcv-font); color: rgba(255,255,255,.45); }
+/* the element pressed, in the space the table leaves at its top left */
+.bcv-qpt__info { grid-column: 3 / 13; grid-row: 1 / 4; display: flex; align-items: center; gap: 10px; min-width: 0; padding: 0 4px; }
+.bcv-qpt__hint { font: 500 11.5px/1.2 var(--bcv-font); color: rgba(255,255,255,.38); }
+.bcv-qpt__big { flex: none; width: 46px; height: 46px; border-radius: 12px; background: color-mix(in srgb, var(--c) 30%, #1c1c1e); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; }
+.bcv-qpt__bigsym { font: 700 18px/1 var(--bcv-display); color: #fff; letter-spacing: -.02em; }
+.bcv-qpt__bignum { font: 600 9px/1 var(--bcv-font); color: rgba(255,255,255,.7); }
+.bcv-qpt__facts { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.bcv-qpt__name { font: 700 14px/1.15 var(--bcv-display); letter-spacing: -.01em; color: #fff; }
+.bcv-qpt__cat { font: 500 10.5px/1.2 var(--bcv-font); color: var(--c); text-transform: capitalize; }
+.bcv-qpt__facts-row { display: flex; gap: 12px; margin-top: 2px; }
+.bcv-qpt__fact { display: flex; flex-direction: column; gap: 1px; }
+.bcv-qpt__factk { font: 600 8.5px/1 var(--bcv-font); letter-spacing: .05em; text-transform: uppercase; color: rgba(255,255,255,.4); }
+.bcv-qpt__factv { font: 600 11px/1 var(--bcv-font); color: rgba(255,255,255,.85); font-variant-numeric: tabular-nums; }
+.bcv-qpt__cell.is-sel { box-shadow: 0 0 0 1.5px #fff; }
 .bcv-qpt__grid { display: grid; grid-template-columns: repeat(18, minmax(0, 1fr)); grid-template-rows: repeat(7, 20px) 6px repeat(2, 20px); gap: 2px 1.5px; align-content: start; }
 .bcv-qpt__cell { min-width: 0; margin: 0; padding: 0; border: 0; border-radius: 4px; background: color-mix(in srgb, var(--c) 26%, #1c1c1e); color: #fff; font: 700 8.5px/1 var(--bcv-display); letter-spacing: -.02em; cursor: pointer; box-sizing: border-box; display: flex; align-items: center; justify-content: center; transition: transform .1s ease, opacity .15s ease, box-shadow .12s ease, background .12s ease, color .12s ease; }
 .bcv-qpt__cell:hover { transform: scale(1.3); background: var(--c); color: #1c1c1e; box-shadow: 0 0 0 1.5px var(--c); z-index: 1; }

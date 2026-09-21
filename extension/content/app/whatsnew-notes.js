@@ -24,6 +24,8 @@
   };
   self.BCV_WHATS_NEW = [
     { version: '2.47.1', date: '2026-09-21', notes: [
+      { kind: 'improved', title: 'The widgets, redesigned', body: 'Blurred, rounder, one box each, and more in them: the pins are small panels now.', icon: P.layers },
+      { kind: 'new', title: 'Pull a widget out', body: 'Drag the bar under a widget and it stays where you put it; the red dot puts it back.', icon: P.pin },
       { kind: 'improved', title: 'Easier to read on black', body: 'The grey lines in the welcome are larger, heavier and brighter.', icon: P.eye },
       { kind: 'improved', title: 'A stuck tool gets a tab', body: 'A tool that has not opened in five seconds opens in a tab of its own instead.', icon: P.clock },
     ] },

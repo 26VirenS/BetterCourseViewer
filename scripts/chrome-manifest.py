@@ -1,14 +1,19 @@
 #!/usr/bin/env python3
 """Turns the source manifest (Safari's, which also loads in Firefox) into the Chrome / Edge one, in place.
 
-    python3 scripts/chrome-manifest.py path/to/manifest.json
+    python3 scripts/chrome-manifest.py path/to/manifest.json [--no-sniffer]
 
-Used by scripts/package.sh for the Chrome Web Store zip, and by scripts/dev/chrome-setup-test.mjs,
-which loads the result in Chromium and checks the Chrome build finds Canvas on its own."""
+Used by scripts/package.sh for the Chrome Web Store zips, and by scripts/dev/chrome-setup-test.mjs,
+which loads the result in Chromium and checks the Chrome build finds Canvas on its own.
+
+--no-sniffer makes the quiet build: Canvas's own domain and nothing else, no run of every site and
+no script that looks at one, for a listing that would rather not ask for the broad permission. A
+school's own Canvas address is added by hand there (the toolbar button's Enable on this site)."""
 import json
 import sys
 
 path = sys.argv[1]
+sniffer = '--no-sniffer' not in sys.argv[2:]
 m = json.load(open(path))
 bg = m.get('background', {})
 bg.pop('scripts', None)      # Firefox / older-Safari background page; Chrome MV3 runs the service worker
@@ -26,15 +31,21 @@ m.setdefault('action', {})['default_icon'] = {s: f'icons/icon-{s}.png' for s in 
 # from the page after install, or a site at a time. The append below is kept for a source manifest
 # without the sniffer.
 m['permissions'] = [p for p in m.get('permissions', []) if p != 'nativeMessaging']  # Safari's line to the Mac app; Chrome has no app to talk to
-m['host_permissions'] = ['*://*/*']
-m.pop('optional_host_permissions', None)
-if not any('content/sniff.js' in (cs.get('js') or []) for cs in m.get('content_scripts', [])):
-    m.setdefault('content_scripts', []).append({
-        'matches': ['*://*/*'],
-        'exclude_matches': ['*://*.instructure.com/*'],
-        'run_at': 'document_idle',
-        'js': ['content/sniff.js'],
-    })
+if sniffer:
+    m['host_permissions'] = ['*://*/*']
+    m.pop('optional_host_permissions', None)
+    if not any('content/sniff.js' in (cs.get('js') or []) for cs in m.get('content_scripts', [])):
+        m.setdefault('content_scripts', []).append({
+            'matches': ['*://*/*'],
+            'exclude_matches': ['*://*.instructure.com/*'],
+            'run_at': 'document_idle',
+            'js': ['content/sniff.js'],
+        })
+else:
+    # the quiet build: Canvas's own domain, and every other site asked for one at a time
+    m['host_permissions'] = ['*://*.instructure.com/*']
+    m['optional_host_permissions'] = ['*://*/*']
+    m['content_scripts'] = [cs for cs in m.get('content_scripts', []) if 'content/sniff.js' not in (cs.get('js') or [])]
 assert len(m['description']) <= 132, 'the Chrome Web Store uses the manifest description as the summary (132 characters max)'
 with open(path, 'w') as f:
     json.dump(m, f, indent=2)

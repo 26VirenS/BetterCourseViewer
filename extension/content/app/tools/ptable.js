@@ -122,5 +122,5 @@
     return p;
   }
 
-  BCV.toolsPtable = { open, find, line, byNumber, ELEMENTS, CATS };
+  BCV.toolsPtable = { open, find, line, massText, byNumber, ELEMENTS, CATS };
 })();

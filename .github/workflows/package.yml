@@ -25,6 +25,8 @@ jobs:
         run: |
           MANIFEST="$(python3 -c "import json;print(json.load(open('extension/manifest.json'))['version'])")"
           [ "v$MANIFEST" = "$GITHUB_REF_NAME" ] || { echo "tag $GITHUB_REF_NAME does not match manifest version $MANIFEST"; exit 1; }
+      # both Chrome builds: the one that finds Canvas on its own, and the quiet one (Canvas's own
+      # domain alone, no script that looks at other sites) for a listing that would rather not ask
       - uses: actions/upload-artifact@v4
         with:
           name: simpl-courses-chrome
@@ -94,5 +96,5 @@ jobs:
             echo "Chrome Web Store secrets are not set; skipping the store upload (docs/chrome-web-store.md explains the setup)."
             exit 0
           fi
-          ZIP="$(ls dist/simpl-courses-chrome-*.zip)"
+          ZIP="$(ls dist/simpl-courses-chrome-[0-9]*.zip)" # (the build that finds Canvas on its own; the quiet one is uploaded by hand when the listing asks)
           npx --yes chrome-webstore-upload-cli@3 upload --source "$ZIP" --auto-publish

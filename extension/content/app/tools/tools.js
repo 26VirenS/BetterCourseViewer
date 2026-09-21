@@ -289,6 +289,13 @@
       const bar = h('div', { id: 'bcv-pins', class: 'bcv-pins', hidden: true, role: 'toolbar', 'aria-label': 'Pinned tools' });
       tray = h('div', { id: 'bcv-tray', class: 'bcv-tray' }, bar);
       document.body.append(tray);
+      // how wide the tray is at this moment, for anything that has to keep out of its way: the
+      // external tool popup's own buttons sit under it, and move aside as a widget opens and folds
+      try {
+        const say = () => document.documentElement.style.setProperty('--bcv-tray-w', `${Math.round(tray.getBoundingClientRect().width)}px`);
+        new ResizeObserver(say).observe(tray);
+        say();
+      } catch { /* no observer here: the buttons keep their place */ }
       setTimeout(() => { bar.dataset.settled = '1'; }, 1200); // (what lands after this pops in; what the page loads with does not)
       pinsLoad().then(paintPins).catch(() => {});
       try { api.storage.onChanged?.addListener((changes, area) => { if ((!area || area === 'local') && changes[PINS_KEY]) pinsLoad().then(paintPins).catch(() => {}); }); } catch { /* no change events */ }
@@ -645,17 +652,19 @@
   // (Apple's, key for key); the graphing calculator's into a small Desmos, portrait, that keeps its
   // graph while folded; the citation generator's into a link to cite, the page you are on, the
   // style, and the last citations saved with a copy button each.
+  // (every widget is a panel: its height is what is in it plus BAR, the grip along the bottom)
+  const BAR = 20;
   const QUICK = {
-    cite: { w: 400, h: 150, panel: true, build: quickCite },
-    calc: { w: 408, h: 262, panel: true, build: quickCalc },
-    graph: { w: 340, h: 470, panel: true, build: quickGraph },
-    ptable: { w: 408, h: 262, panel: true, build: quickPtable }, // (the calculator's panel, to the pixel: the whole table, small)
-    need: { w: 400, build: quickNeed },
-    conv: { w: 250, build: quickConv },
-    pdfx: { w: 250, build: quickPdfs },
-    mark: { w: 250, build: quickMark },
-    ocr: { w: 260, build: quickOcr },
-    fc: { w: 320, build: quickCards },
+    cite: { w: 400, h: 150 + BAR, panel: true, build: quickCite },
+    calc: { w: 408, h: 262 + BAR, panel: true, build: quickCalc },
+    graph: { w: 340, h: 470 + BAR, panel: true, build: quickGraph },
+    ptable: { w: 408, h: 262 + BAR, panel: true, build: quickPtable }, // (the calculator's panel, to the pixel: the whole table, small)
+    need: { w: 340, h: 176 + BAR, panel: true, build: quickNeed },
+    conv: { w: 300, h: 160 + BAR, panel: true, build: quickConv },
+    pdfx: { w: 300, h: 160 + BAR, panel: true, build: quickPdfs },
+    mark: { w: 300, h: 160 + BAR, panel: true, build: quickMark },
+    ocr: { w: 300, h: 160 + BAR, panel: true, build: quickOcr },
+    fc: { w: 330, h: 190 + BAR, panel: true, build: quickCards },
   };
   function quickHover(item, t) {
     const q = QUICK[t.key];
@@ -665,23 +674,62 @@
     item.style.setProperty('--bcv-quick-w', `${q.w}px`);
     item.style.setProperty('--bcv-quick-h', `${q.h || 44}px`);
     item.style.setProperty('--bcv-quick-color', t.color);
+    const glass = U.el('bcv-quick__glass'); // the blur, kept at the panel's full size whatever the pin is doing: the page behind is blurred once, not on every frame of the opening
     const body = U.el('bcv-quick__body');
+    const bar = h('div', { class: 'bcv-quick__bar', title: 'Drag to pull this out' }, h('span', { class: 'bcv-quick__grip' }));
     let panel = null;
     let leave = 0;
     let hold = 0; // (a pin that just handed off to its tool stays folded a moment: the popup rising under the pointer is not a hover)
+    const pulledOut = () => item.classList.contains('is-free');
     const closeQ = () => {
+      if (pulledOut()) return; // pulled out of the tray: it stays where it was put, pointer or no pointer
       if (!item.classList.contains('is-open')) return;
       item.classList.remove('is-open');
       item.classList.add('is-folding'); // (no X on the way down: it belongs to the pin)
       setTimeout(() => item.classList.remove('is-folding'), 480);
       item.setAttribute('aria-expanded', 'false');
     };
+    /** Back to the tray, folded: the red light, and Escape while it is out. */
+    const dock = () => {
+      item.classList.remove('is-free', 'is-hover');
+      item.style.left = '';
+      item.style.top = '';
+      item.querySelector(':focus')?.blur();
+      item.classList.remove('is-open');
+      item.classList.add('is-folding');
+      setTimeout(() => item.classList.remove('is-folding'), 480);
+      item.setAttribute('aria-expanded', 'false');
+    };
     const openQ = () => {
-      if (!panel) { panel = q.build({ item, go: (o = {}) => { hold = Date.now() + 400; closeQ(); open(t.key, { from: item, ...o }); } }); body.replaceChildren(...panel.els); }
+      if (!panel) {
+        panel = q.build({ item, go: (o = {}) => { hold = Date.now() + 400; if (pulledOut()) dock(); else closeQ(); open(t.key, { from: item, ...o }); } });
+        body.replaceChildren(...panel.els);
+        body.querySelector('.bcv-quick__light--close')?.addEventListener('click', (e) => { e.stopPropagation(); dock(); });
+      }
       panel.onOpen?.();
       item.classList.add('is-open');
       item.setAttribute('aria-expanded', 'true');
     };
+    // The grip along the bottom pulls the widget out of the tray: from then on it sits where it is
+    // put, stays open, and wears a red light that puts it back. Dragging it again moves it about.
+    let drag = null;
+    bar.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      const r = item.getBoundingClientRect();
+      drag = { dx: e.clientX - r.left, dy: e.clientY - r.top, left: r.left, top: r.top };
+      try { bar.setPointerCapture(e.pointerId); } catch { /* the pointer went */ }
+    });
+    bar.addEventListener('pointermove', (e) => {
+      if (!drag) return;
+      if (!pulledOut()) { item.classList.add('is-free'); item.style.left = `${drag.left}px`; item.style.top = `${drag.top}px`; }
+      const w = item.offsetWidth || q.w;
+      item.style.left = `${Math.max(4, Math.min(window.innerWidth - w - 4, e.clientX - drag.dx))}px`;
+      item.style.top = `${Math.max(4, Math.min(window.innerHeight - 40, e.clientY - drag.dy))}px`;
+    });
+    const drop = (e) => { if (!drag) return; try { bar.releasePointerCapture(e.pointerId); } catch { /* already gone */ } drag = null; };
+    bar.addEventListener('pointerup', drop);
+    bar.addEventListener('pointercancel', drop);
     item.addEventListener('pointerenter', (e) => {
       if (e.pointerType === 'touch' || item.classList.contains('is-out') || Date.now() < hold || document.querySelector('.bcv-tool-ov')) return; // (a tool open over the page: the pins stay folded)
       clearTimeout(leave);
@@ -695,12 +743,18 @@
       clearTimeout(leave);
       leave = setTimeout(() => { if (!item.classList.contains('is-hover') && !item.querySelector(':focus')) closeQ(); }, 260); // (a field being typed in holds it open)
     });
-    item.addEventListener('keydown', (e) => { if (e.key === 'Escape' && item.classList.contains('is-open')) { e.stopPropagation(); closeQ(); item.querySelector('.bcv-pin__btn')?.focus(); } });
+    item.addEventListener('keydown', (e) => { if (e.key === 'Escape' && item.classList.contains('is-open')) { e.stopPropagation(); if (pulledOut()) dock(); else closeQ(); item.querySelector('.bcv-pin__btn')?.focus(); } });
     item.addEventListener('focusout', () => setTimeout(() => { if (!item.classList.contains('is-hover') && !item.querySelector(':focus')) closeQ(); }, 0));
-    return body;
+    return [glass, body, bar];
   }
-  document.addEventListener('pointerdown', (e) => { for (const item of document.querySelectorAll('#bcv-pins .bcv-quick.is-open')) if (!item.contains(e.target)) { item.classList.remove('is-hover'); item.querySelector(':focus')?.blur(); item.classList.remove('is-open'); item.setAttribute('aria-expanded', 'false'); } }, true);
-  const quickName = (name, go, title) => h('button', { type: 'button', class: 'bcv-quick__name', title, 'aria-label': title, text: name, onclick: () => go() });
+  document.addEventListener('pointerdown', (e) => { for (const item of document.querySelectorAll('#bcv-pins .bcv-quick.is-open:not(.is-free)')) if (!item.contains(e.target)) { item.classList.remove('is-hover'); item.querySelector(':focus')?.blur(); item.classList.remove('is-open'); item.setAttribute('aria-expanded', 'false'); } }, true);
+  /** A widget's head: the two lights a Mac window wears — red to put it back in the tray (only once
+   *  it has been pulled out), green to open the tool at full size — and the widget's name beside them. */
+  const quickName = (name, go, title) => U.el('bcv-quick__lights', [
+    h('button', { type: 'button', class: 'bcv-quick__light bcv-quick__light--close', title: 'Put it back', 'aria-label': 'Put it back' }, U.svg(IC.close, { size: 7, stroke: 'currentColor', width: 3 })),
+    h('button', { type: 'button', class: 'bcv-quick__light bcv-quick__light--full', title: title || `Open ${name}`, 'aria-label': title || `Open ${name}`, onclick: () => go() }, U.svg('M5 11V5h6M19 13v6h-6', { size: 8, stroke: 'currentColor', width: 3 })),
+    U.text('bcv-quick__name', name, 'span'),
+  ]);
   const quickGo = (icon, title, onclick) => h('button', { type: 'button', class: 'bcv-quick__go', title, 'aria-label': title, onclick }, U.svg(icon, { size: 14, stroke: '#fff', width: 2.3 }));
   /** A drop target that is also a picker: files dropped or chosen go to the tool. */
   function quickDrop({ go, text, accept, multiple = false, key = 'files', label }) {
@@ -983,19 +1037,41 @@
     const cells = new Map();
     let hit = null; // the first element the search finds
     let over = null; // the element under the pointer
+    let picked = null; // the element pressed: its details fill the empty corner of the table
     const say = () => { const e = over || hit; line.textContent = e ? P().line(e) : input.value.trim() ? 'No element' : ''; };
+    // the space the table leaves at its top left (the ten columns between hydrogen and boron)
+    const info = U.el('bcv-qpt__info', null, { 'aria-live': 'polite' });
+    const fact = (k, v) => U.el('bcv-qpt__fact', [U.text('bcv-qpt__factk', k, 'span'), U.text('bcv-qpt__factv', v, 'span')]);
+    const show = (e) => {
+      picked = e;
+      for (const [n, c] of cells) c.classList.toggle('is-sel', !!e && n === e.number);
+      if (!e) { info.replaceChildren(U.text('bcv-qpt__hint', 'Press an element')); return; }
+      const T = P();
+      const c = T.CATS.find((k) => k[0] === e.category) || T.CATS[T.CATS.length - 1];
+      info.style.setProperty('--c', c[2]);
+      info.replaceChildren(
+        U.el('bcv-qpt__big', [U.text('bcv-qpt__bigsym', e.symbol, 'span'), U.text('bcv-qpt__bignum', String(e.number), 'span')]),
+        U.el('bcv-qpt__facts', [
+          U.text('bcv-qpt__name', e.name),
+          U.text('bcv-qpt__cat', c[1], 'span'),
+          U.el('bcv-qpt__facts-row', [fact('Mass', T.massText ? T.massText(e) : String(e.mass ?? '—')), fact('Group', e.group ? String(e.group) : '—'), fact('Period', String(e.period ?? e.y ?? '—'))]),
+        ]),
+      );
+    };
     // built on the first hover, once the elements are here (the table's own script loads after this one)
     const build = () => {
       const T = P();
       if (!T || cells.size) return;
       for (const e of T.ELEMENTS) {
         const c = T.CATS.find((k) => k[0] === e.category) || T.CATS[T.CATS.length - 1];
-        const cell = h('button', { type: 'button', class: 'bcv-qpt__cell', dataset: { symbol: e.symbol, number: String(e.number) }, style: { '--c': c[2], gridColumn: String(e.x), gridRow: String(e.y) }, title: `${e.name} · ${e.number}`, 'aria-label': `${e.name}, ${e.number}`, text: e.symbol, onclick: () => go({ select: e.number }) });
+        const cell = h('button', { type: 'button', class: 'bcv-qpt__cell', dataset: { symbol: e.symbol, number: String(e.number) }, style: { '--c': c[2], gridColumn: String(e.x), gridRow: String(e.y) }, title: `${e.name} · ${e.number}`, 'aria-label': `${e.name}, ${e.number}`, text: e.symbol, onclick: () => show(e) });
         cell.addEventListener('pointerenter', () => { over = e; say(); });
         cell.addEventListener('pointerleave', () => { if (over === e) { over = null; say(); } });
         cells.set(e.number, cell);
         grid.append(cell);
       }
+      grid.append(info);
+      show(picked);
     };
     const look = () => {
       const T = P();
@@ -1009,7 +1085,7 @@
       say();
     };
     input.addEventListener('input', look);
-    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); go(hit ? { select: hit.number } : {}); } });
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); if (hit) show(hit); } });
     const root = U.el('bcv-qpt', [U.el('bcv-qpt__head', [quickName('Elements', go, 'Open the periodic table'), input, line]), grid]);
     return { els: [root], onOpen: build };
   }
@@ -1087,45 +1163,65 @@
         h('span', { class: 'bcv-qcite__text bcv-ellip', text: x.plain, title: x.plain }),
         h('button', { type: 'button', class: 'bcv-qcite__copy', title: 'Copy this citation', 'aria-label': 'Copy this citation', onclick: () => { copyText(x.plain); U.toast('Copied.'); } }, U.svg(IC.copy, { size: 12, stroke: 'currentColor', width: 2.1 })),
       ])) : [U.text('bcv-qcite__none', 'Citations you save in the generator show here.', 'span')]));
-      item.style.setProperty('--bcv-quick-h', `${132 + (last.length ? 32 * last.length - 4 : 18)}px`); // (the panel's height follows what is in it)
+      item.style.setProperty('--bcv-quick-h', `${132 + BAR + (last.length ? 32 * last.length - 4 : 18)}px`); // (the panel's height follows what is in it, plus the grip)
     };
     return { els: [root], onOpen };
   }
+  /** A widget's panel: the head (the lights and the name), a line saying what it is for, and what
+   *  it holds under that. One box, not boxes inside boxes. */
+  const quickPane = (name, go, title, note, kids) => U.el('bcv-qpan', [
+    U.el('bcv-qpan__head', [quickName(name, go, title)]),
+    note ? U.text('bcv-qpan__note', note) : null,
+    ...kids,
+  ]);
   /** Grade needed: your grade now, what the work left is worth, the grade wanted — the mark it takes. */
   function quickNeed({ go }) {
     const field = (ph, label) => h('input', { type: 'text', inputmode: 'decimal', class: 'bcv-quick__input bcv-quick__input--num', placeholder: ph, 'aria-label': label, autocomplete: 'off' });
-    const now = field('Now %', 'Your grade now'), worth = field('Worth %', 'What the work left is worth'), goal = field('Goal %', 'The grade wanted');
-    const out = U.text('bcv-quick__result', '', 'span');
+    const now = field('Now', 'Your grade now'), worth = field('Left', 'What the work left is worth'), goal = field('Goal', 'The grade wanted');
+    const out = U.text('bcv-qpan__big', '—');
+    const sub = U.text('bcv-qpan__sub', 'Your grade now, what is left, the grade you want.');
     const num = (el) => { const v = parseFloat(String(el.value).replace('%', '')); return Number.isFinite(v) ? v : null; };
-    const calc = () => { const r = BCV.toolsNeed?.needed(num(now), num(worth), num(goal)); out.textContent = !r ? '' : r.kind === 'over' ? 'Out of reach' : r.kind === 'under' ? 'Already there' : `→ ${r.pct}%`; };
+    const calc = () => {
+      const r = BCV.toolsNeed?.needed(num(now), num(worth), num(goal));
+      out.textContent = !r ? '—' : r.kind === 'over' ? 'Out of reach' : r.kind === 'under' ? 'Already there' : `${r.pct}%`;
+      sub.textContent = !r ? 'Your grade now, what is left, the grade you want.' : r.kind === 'ok' ? 'on everything still to come' : r.kind === 'over' ? 'not even full marks would get there' : 'the goal is already yours';
+    };
     for (const el of [now, worth, goal]) { el.addEventListener('input', calc); el.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); go({ now: num(now), worth: num(worth), goal: num(goal) }); } }); }
-    return { els: [quickName('Need', go, 'Open Grade needed'), now, worth, goal, out, quickGo(IC.chevron, 'Work it out in full', () => go({ now: num(now), worth: num(worth), goal: num(goal) }))] };
+    return { els: [quickPane('Grade needed', go, 'Open Grade needed', null, [
+      U.el('bcv-qpan__row', [now, worth, goal]),
+      U.el('bcv-qpan__out', [out, sub]),
+    ])] };
   }
+  /** A widget whose whole use is a file: the drop target, and a word on what comes of it. */
+  const quickFilePane = (name, go, title, note, drop) => ({ els: [quickPane(name, go, title, note, quickDrop(drop))] });
   /** File converter: a file dropped or chosen here opens the tool with it in. */
   function quickConv({ go }) {
-    return { els: [quickName('Convert', go, 'Open the file converter'), ...quickDrop({ go, text: 'Click to add a file', accept: '.docx,.pptx,.xlsx,.pdf,.txt,.md,.csv,.json,.heic,.heif,image/*', multiple: true, label: 'Files to convert' })] };
+    return quickFilePane('File converter', go, 'Open the file converter', 'Documents, slides, sheets, PDFs and pictures, turned into one another.', { go, text: 'Click to add a file', accept: '.docx,.pptx,.xlsx,.pdf,.txt,.md,.csv,.json,.heic,.heif,image/*', multiple: true, label: 'Files to convert' });
   }
   /** Merge & split: PDFs dropped or chosen here open the tool with them in. */
   function quickPdfs({ go }) {
-    return { els: [quickName('PDFs', go, 'Open Merge & split PDFs'), ...quickDrop({ go, text: 'Click to add PDFs', accept: '.pdf,application/pdf', multiple: true, label: 'PDFs to merge or split' })] };
+    return quickFilePane('Merge & split', go, 'Open Merge & split PDFs', 'Put PDFs together, pull pages out, or reorder them.', { go, text: 'Click to add PDFs', accept: '.pdf,application/pdf', multiple: true, label: 'PDFs to merge or split' });
   }
   /** PDF annotator: a PDF dropped or chosen here opens marked up as it was left. */
   function quickMark({ go }) {
-    return { els: [quickName('Mark up', go, 'Open the PDF annotator'), ...quickDrop({ go, text: 'Click to add a PDF', accept: '.pdf,application/pdf', key: 'file', label: 'A PDF to mark up' })] };
+    return quickFilePane('Mark up', go, 'Open the PDF annotator', 'Draw, highlight and add notes; a PDF opens as you left it.', { go, text: 'Click to add a PDF', accept: '.pdf,application/pdf', key: 'file', label: 'A PDF to mark up' });
   }
   /** Image to text: a picture dropped or chosen here is read at once. */
   function quickOcr({ go }) {
-    return { els: [quickName('Read', go, 'Open Image to text'), ...quickDrop({ go, text: 'Click to add a picture', accept: 'image/*,.pdf', key: 'file', label: 'A picture to read' })] };
+    return quickFilePane('Image to text', go, 'Open Image to text', 'The words in a picture or a scan, as text you can copy.', { go, text: 'Click to add a picture', accept: 'image/*,.pdf', key: 'file', label: 'A picture to read' });
   }
-  /** Flashcards: the sets as chips, a press opening one to study; the sets read again each time it opens. */
+  /** Flashcards: the sets as rows, a press opening one to study; the sets read again each time it opens. */
   function quickCards({ go }) {
-    const chips = U.el('bcv-quick__chips');
+    const list = U.el('bcv-qpan__list');
     const onOpen = async () => {
       const raw = await load('tools:decks', []);
       const decks = Array.isArray(raw) ? raw.filter((d) => d && d.id) : [];
-      chips.replaceChildren(...(decks.length ? decks.slice(0, 8).map((d) => h('button', { type: 'button', class: 'bcv-quick__chip', title: `${d.name || 'Untitled set'} · ${U.plural((d.cards || []).length, 'term')}`, text: d.name || 'Untitled set', onclick: () => go({ deck: d.id }) })) : [U.text('bcv-quick__none', 'No sets yet', 'span')]));
+      list.replaceChildren(...(decks.length ? decks.slice(0, 4).map((d) => h('button', { type: 'button', class: 'bcv-qpan__item', onclick: () => go({ deck: d.id }) }, [
+        U.text('bcv-qpan__itemname bcv-ellip', d.name || 'Untitled set', 'span'),
+        U.text('bcv-qpan__itemsub', U.plural((d.cards || []).length, 'term'), 'span'),
+      ])) : [U.text('bcv-qpan__empty', 'No sets yet — the tool makes one from your notes.')]));
     };
-    return { els: [quickName('Study', go, 'Open Flashcards'), chips, quickGo(IC.chevron, 'Open Flashcards', () => go())], onOpen };
+    return { els: [quickPane('Flashcards', go, 'Open Flashcards', 'Your sets, ready to study.', [list])], onOpen };
   }
 
   /** One pin: a round dark button with the tool's glyph, and its X. */
@@ -1141,14 +1237,14 @@
       el.classList.add('bcv-island');
       el.dataset.live = 'pomo';
       el.setAttribute('aria-expanded', 'false');
-      el.append(h('div', { class: 'bcv-island__face' }, [btn, islandBody(el), islandSetter(el)]));
+      el.append(h('div', { class: 'bcv-island__face' }, [U.el('bcv-island__glass'), btn, islandBody(el), islandSetter(el)]));
       islandHover(el);
       // open: a press on the count opens the timer, a press elsewhere on the body keeps it open a while longer
       el.addEventListener('click', (e) => { if (!el.classList.contains('is-open') || e.target.closest('button')) return; if (e.target.closest('.bcv-island__right')) open('pomo', { from: el }); else islandOpen(el); });
       el.addEventListener('keydown', (e) => { if (e.key === 'Escape' && el.classList.contains('is-open')) { e.stopPropagation(); islandClose(el); btn.focus(); } });
     } else {
       const quick = demo ? null : quickHover(el, t);
-      if (quick) { el.setAttribute('aria-expanded', 'false'); el.append(h('div', { class: 'bcv-quick__face' }, [btn, quick])); } else el.append(btn);
+      if (quick) { el.setAttribute('aria-expanded', 'false'); el.append(h('div', { class: 'bcv-quick__face' }, [btn, ...quick])); } else el.append(btn);
     }
     if (!demo) el.append(h('button', { type: 'button', class: 'bcv-pin__x', title: `Unpin ${t.name}`, 'aria-label': `Unpin ${t.name}`, onclick: (e) => { e.stopPropagation(); unpin(t.key); } }, U.svg(IC.close, { size: 8, stroke: '#fff', width: 2.6 })));
     return el;
