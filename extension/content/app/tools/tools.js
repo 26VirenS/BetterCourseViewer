@@ -741,13 +741,15 @@
   }
 
   // ---- the scientific calculator -------------------------------------------------------------
-  // Apple's calculator in scientific mode, key for key: the memory keys and brackets, 2nd, the
-  // powers and roots, the logs, the trig and hyperbolic functions with their inverses under 2nd,
-  // e, EE, π, Rand, Rad/Deg, and the number pad with AC, +/−, %, and the four operators. Sums keep
-  // the usual precedence (2 + 3 × 4 is 14) and brackets group; a function acts on the number on
-  // the display at once; = works the lot out. The keyboard works too once the panel has been
-  // pressed: digits, . + − × ÷ ^ ( ) %, Enter for =, Backspace, Escape to fold it.
-  const CALC_PREC = { '+': 1, '-': 1, '*': 2, '/': 2, '^': 3, root: 3, ypow: 3, logy: 3 };
+  // Apple's scientific keys, key for key — the memory keys and brackets, 2nd, the powers and roots,
+  // the logs, the trig and hyperbolic functions with their inverses under 2nd, e, EE, π, Rand,
+  // Rad/Deg, and the number pad with AC, +/−, %, and the four operators — but algebraic: what is
+  // typed stays on the line, the whole of it (2 + 3 × 4², sin(30) + √(16), (2 + 3)²), with its result
+  // worked out underneath as it grows, and = makes the result the line to carry on from (the sum it
+  // came from kept small above it). A function goes in front of its argument, the way it is written:
+  // sin, then the number, then ); x², x³, ¹/x, x! and % follow their number; two things side by side
+  // multiply (2π, 2(3 + 4)). The keyboard works too once the panel has been pressed: digits,
+  // . + − × ÷ ^ ( ) % ! , Enter for =, Backspace, Escape to fold it.
   const CALC_ALT = { ex: ['ypow', 'y<sup>x</sup>'], '10x': ['2x', '2<sup>x</sup>'], ln: ['logy', 'log<sub>y</sub>'], log10: ['log2', 'log<sub>2</sub>'], sin: ['asin', 'sin<sup>-1</sup>'], cos: ['acos', 'cos<sup>-1</sup>'], tan: ['atan', 'tan<sup>-1</sup>'], sinh: ['asinh', 'sinh<sup>-1</sup>'], cosh: ['acosh', 'cosh<sup>-1</sup>'], tanh: ['atanh', 'tanh<sup>-1</sup>'] };
   const CALC_ROWS = [
     [['(', '('], [')', ')'], ['mc', 'mc'], ['mplus', 'm+'], ['mminus', 'm−'], ['mr', 'mr'], ['ac', 'AC', 'top'], ['neg', '+/−', 'top'], ['pct', '%', 'top'], ['/', '÷', 'op']],
@@ -756,7 +758,13 @@
     [['fact', 'x!'], ['sin', 'sin'], ['cos', 'cos'], ['tan', 'tan'], ['e', 'e'], ['ee', 'EE'], ['1', '1', 'num'], ['2', '2', 'num'], ['3', '3', 'num'], ['+', '+', 'op']],
     [['rad', 'Rad'], ['sinh', 'sinh'], ['cosh', 'cosh'], ['tanh', 'tanh'], ['pi', 'π'], ['rand', 'Rand'], ['0', '0', 'num wide'], ['.', '.', 'num'], ['=', '=', 'op']],
   ];
-  const CALC_TITLES = { mc: 'Memory clear', mplus: 'Memory add', mminus: 'Memory subtract', mr: 'Memory recall', ac: 'All clear', neg: 'Change sign', pct: 'Percent', second: 'Second functions', x2: 'Squared', x3: 'Cubed', '^': 'To the power of', ex: 'e to the x', '10x': '10 to the x', inv: 'One over x', sqrt: 'Square root', cbrt: 'Cube root', root: 'The y-th root of x', ln: 'Natural log', log10: 'Log base 10', fact: 'Factorial', ee: 'Times ten to the', rad: 'Switch to radians', pi: 'Pi', rand: 'A random number between 0 and 1', '/': 'Divide', '*': 'Multiply', '-': 'Subtract', '+': 'Add', '=': 'Equals', ypow: 'y to the x', '2x': '2 to the x', logy: 'Log base y', log2: 'Log base 2' };
+  const CALC_TITLES = { mc: 'Memory clear', mplus: 'Memory add', mminus: 'Memory subtract', mr: 'Memory recall', ac: 'All clear', neg: 'Change sign', pct: 'Percent', second: 'Second functions', x2: 'Squared', x3: 'Cubed', '^': 'To the power of', ex: 'e to the x', '10x': '10 to the x', inv: 'One over x (x⁻¹)', sqrt: 'Square root', cbrt: 'Cube root', root: 'The y-th root of x: x^(1÷y)', ln: 'Natural log', log10: 'Log base 10', fact: 'Factorial', ee: 'Times ten to the', rad: 'Switch to radians', pi: 'Pi', rand: 'A random number between 0 and 1', '/': 'Divide', '*': 'Multiply', '-': 'Subtract', '+': 'Add', '=': 'Equals', ypow: 'To the power of', '2x': '2 to the x', logy: 'Log base y: log(x, y)', log2: 'Log base 2' };
+  // what each key puts on the line: a function with its bracket, a mark after a number, an operator
+  const CALC_FN = { sin: 'sin(', cos: 'cos(', tan: 'tan(', asin: 'sin⁻¹(', acos: 'cos⁻¹(', atan: 'tan⁻¹(', sinh: 'sinh(', cosh: 'cosh(', tanh: 'tanh(', asinh: 'sinh⁻¹(', acosh: 'cosh⁻¹(', atanh: 'tanh⁻¹(', ln: 'ln(', log10: 'log(', log2: 'log₂(', logy: 'log(', sqrt: '√(', cbrt: '∛(', ex: 'e^(', '10x': '10^(', '2x': '2^(' };
+  const CALC_POST = { x2: '²', x3: '³', inv: '⁻¹', fact: '!', pct: '%' };
+  const CALC_OPS = { '+': '+', '-': '−', '*': '×', '/': '÷', '^': '^', ypow: '^', root: '^(1÷' };
+  const CALC_LAST = /(?:sinh⁻¹|cosh⁻¹|tanh⁻¹|sin⁻¹|cos⁻¹|tan⁻¹|sinh|cosh|tanh|sin|cos|tan|log₂|log|ln|√|∛)\($|\^\(1÷$|⁻¹$|[\s\S]$/u; // the last thing on the line, for Backspace
+  const CALC_TOKEN = /\s*(?:(\d+(?:\.\d*)?(?:E−?\d+)?|\.\d+(?:E−?\d+)?)|(π|e)|(sinh⁻¹|cosh⁻¹|tanh⁻¹|sin⁻¹|cos⁻¹|tan⁻¹|sinh|cosh|tanh|sin|cos|tan|log₂|log|ln|√|∛)\(|(⁻¹|[()+−×÷^,!%²³]))/uy;
   const gamma = (z) => { // Lanczos: x! for a number that is not whole
     if (z < 0.5) return Math.PI / (Math.sin(Math.PI * z) * gamma(1 - z));
     const g = 7, C = [0.99999999999980993, 676.5203681218851, -1259.1392167224028, 771.32342877765313, -176.61502916214059, 12.507343278686905, -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7];
@@ -776,68 +784,128 @@
     return /e/.test(s) ? s : calcGroup(s);
   }
   const calcGroup = (s) => { const m = /^(-?)(\d*)(.*)$/.exec(s); return `${m[1]}${m[2].replace(/\B(?=(\d{3})+(?!\d))/g, ',')}${m[3]}`; };
-  function calcEngine() {
-    const st = { entry: null, cur: 0, tokens: [], fresh: true, mem: 0, deg: true, second: false, err: false, opKey: null };
-    const value = () => (st.entry !== null ? (parseFloat(st.entry) || 0) : st.cur);
-    const last = () => st.tokens[st.tokens.length - 1] || null;
-    const commit = () => { const l = last(); const v = value(); if (!l || l.t === 'op' || l.t === '(') st.tokens.push({ t: 'num', v }); else if (l.t === 'num') l.v = v; };
-    const settle = (v) => { st.cur = v; st.entry = null; st.fresh = true; st.err = !Number.isFinite(v); };
-    const apply = (op, a, b) => ({ '+': a + b, '-': a - b, '*': a * b, '/': a / b, '^': a ** b, root: a ** (1 / b), ypow: b ** a, logy: Math.log(a) / Math.log(b) })[op];
-    function evalTokens(ts) {
-      const out = [], ops = [];
-      const pop = () => { const op = ops.pop(); const b = out.pop(), a = out.pop(); out.push(apply(op, a ?? 0, b ?? 0)); };
-      for (const t of ts) {
-        if (t.t === 'num') out.push(t.v);
-        else if (t.t === '(') ops.push('(');
-        else if (t.t === ')') { while (ops.length && ops[ops.length - 1] !== '(') pop(); ops.pop(); }
-        else { while (ops.length && ops[ops.length - 1] !== '(' && (CALC_PREC[ops[ops.length - 1]] > CALC_PREC[t.v] || (CALC_PREC[ops[ops.length - 1]] === CALC_PREC[t.v] && t.v !== '^'))) pop(); ops.push(t.v); }
-      }
-      while (ops.length) { if (ops[ops.length - 1] === '(') { ops.pop(); continue; } pop(); }
-      return out.length ? out[out.length - 1] : 0;
+  /** The line worked out: `{ state: 'ok', value }`, or 'empty', 'incomplete' (an operator or a bracket
+   *  still wants a number: nothing to say yet) or 'bad' (it cannot be worked out — a division by
+   *  zero, a root of a negative). Brackets left open are closed for it. The usual precedence, ^ from
+   *  the right, − in front of a number, and two things side by side multiplied. */
+  function calcEval(src, deg) {
+    if (!src.trim()) return { state: 'empty' };
+    let open = 0;
+    for (const ch of src) { if (ch === '(') open++; else if (ch === ')') open--; }
+    const closed = src + ')'.repeat(Math.max(0, open));
+    const toks = [];
+    for (let i = 0; i < closed.length;) {
+      CALC_TOKEN.lastIndex = i;
+      const m = CALC_TOKEN.exec(closed);
+      if (!m || !m[0].length) return { state: 'bad' };
+      i = CALC_TOKEN.lastIndex;
+      if (m[1] !== undefined) toks.push({ t: 'num', v: parseFloat(m[1].replace('−', '-')) });
+      else if (m[2]) toks.push({ t: 'num', v: m[2] === 'π' ? Math.PI : Math.E });
+      else if (m[3]) toks.push({ t: 'fn', v: m[3] });
+      else if (m[4]) toks.push({ t: 'sym', v: m[4] });
     }
-    const toRad = (x) => (st.deg ? (x * Math.PI) / 180 : x);
-    const fromRad = (x) => (st.deg ? (x * 180) / Math.PI : x);
-    const FN = {
-      x2: (x) => x * x, x3: (x) => x * x * x, ex: Math.exp, '10x': (x) => 10 ** x, '2x': (x) => 2 ** x, inv: (x) => 1 / x, sqrt: Math.sqrt, cbrt: Math.cbrt, ln: Math.log, log10: Math.log10, log2: Math.log2, fact: factorial,
-      sin: (x) => Math.sin(toRad(x)), cos: (x) => Math.cos(toRad(x)), tan: (x) => Math.tan(toRad(x)), asin: (x) => fromRad(Math.asin(x)), acos: (x) => fromRad(Math.acos(x)), atan: (x) => fromRad(Math.atan(x)),
-      sinh: Math.sinh, cosh: Math.cosh, tanh: Math.tanh, asinh: Math.asinh, acosh: Math.acosh, atanh: Math.atanh,
+    const toRad = (x) => (deg ? (x * Math.PI) / 180 : x);
+    const fromRad = (x) => (deg ? (x * 180) / Math.PI : x);
+    const snap = (x) => (Math.abs(x) < 1e-14 ? 0 : x); // sin(π) is 0, not 1.2e-16 (π being what a float can hold of it)
+    const F = {
+      sin: (x) => snap(Math.sin(toRad(x))), cos: (x) => snap(Math.cos(toRad(x))), tan: (x) => snap(Math.tan(toRad(x))), 'sin⁻¹': (x) => fromRad(Math.asin(x)), 'cos⁻¹': (x) => fromRad(Math.acos(x)), 'tan⁻¹': (x) => fromRad(Math.atan(x)),
+      sinh: Math.sinh, cosh: Math.cosh, tanh: Math.tanh, 'sinh⁻¹': Math.asinh, 'cosh⁻¹': Math.acosh, 'tanh⁻¹': Math.atanh,
+      ln: Math.log, log: (x, b) => (b === undefined ? Math.log10(x) : Math.log(x) / Math.log(b)), 'log₂': Math.log2, '√': Math.sqrt, '∛': Math.cbrt,
     };
-    const CONST = { pi: Math.PI, e: Math.E };
-    const reset = () => { Object.assign(st, { entry: null, cur: 0, tokens: [], fresh: true, err: false, opKey: null }); };
+    let p = 0;
+    const sym = (s) => toks[p] !== undefined && toks[p].t === 'sym' && toks[p].v === s;
+    const startsValue = () => toks[p] !== undefined && (toks[p].t !== 'sym' || toks[p].v === '(');
+    const need = (what) => { throw new Error(what); };
+    const expr = () => { let v = term(); while (sym('+') || sym('−')) { const o = toks[p++].v; const r = term(); v = o === '+' ? v + r : v - r; } return v; };
+    const term = () => { let v = unary(); for (;;) { if (sym('×') || sym('÷')) { const o = toks[p++].v; const r = unary(); v = o === '×' ? v * r : v / r; } else if (startsValue()) v *= unary(); else return v; } };
+    const unary = () => { if (sym('−')) { p++; return -unary(); } if (sym('+')) { p++; return unary(); } return power(); };
+    const power = () => { const b = postfix(); if (sym('^')) { p++; return b ** unary(); } return b; };
+    const postfix = () => { let v = atom(); for (;;) { if (sym('!')) { p++; v = factorial(v); } else if (sym('%')) { p++; v /= 100; } else if (sym('²')) { p++; v *= v; } else if (sym('³')) { p++; v = v * v * v; } else if (sym('⁻¹')) { p++; v = 1 / v; } else return v; } };
+    const atom = () => {
+      const t = toks[p];
+      if (!t) need('incomplete');
+      if (t.t === 'num') { p++; return t.v; }
+      if (t.t === 'fn') { p++; const args = [expr()]; while (sym(',')) { p++; args.push(expr()); } if (!sym(')')) need('incomplete'); p++; return F[t.v](...args); }
+      if (sym('(')) { p++; const v = expr(); if (!sym(')')) need('incomplete'); p++; return v; }
+      return need('bad');
+    };
+    try {
+      const value = expr();
+      if (p < toks.length) return { state: 'bad' };
+      return Number.isFinite(value) ? { state: 'ok', value, closed } : { state: 'bad' };
+    } catch (e) {
+      return { state: e.message === 'incomplete' ? 'incomplete' : 'bad' };
+    }
+  }
+  function calcEngine() {
+    // expr: the line as typed (× ÷ − π √ and the rest as they show); fresh: the line is a result, so a
+    // number starts afresh and an operator carries on from it; sub: the sum a result came from
+    const st = { expr: '', sub: '', fresh: false, mem: 0, deg: true, second: false, err: false };
+    const endsOp = () => /[+−×÷^,(]$/.test(st.expr); // a number is wanted next
+    const endsValue = () => /[\d.πe)!%²³]$|⁻¹$/.test(st.expr); // something a mark or an operator can follow
+    const num = () => /(\d+(?:\.\d*)?(?:E−?\d*)?|\.\d*)$/.exec(st.expr); // the number being typed
+    /** A result as it goes back on the line: plain digits, E for the exponent, − for minus. */
+    const raw = (v) => String(Number(v.toPrecision(12))).replace('e+', 'E').replace('e-', 'E−').replace('-', '−');
+    const asNumber = (s) => Number(s.replace(/−/g, '-').replace(/E/g, 'e'));
+    const evalNow = () => calcEval(st.expr, st.deg);
+    const startFresh = (s) => { st.expr = s; st.fresh = false; st.sub = ''; };
+    const carryOn = () => { st.fresh = false; st.sub = ''; };
     function press(key) {
-      if (st.err && key !== 'ac') reset();
-      if (/^\d$/.test(key)) { st.entry = st.entry === null || st.fresh ? key : st.entry.length < 18 ? st.entry + key : st.entry; st.fresh = false; st.opKey = null; return; }
-      if (key === '.') { if (st.entry === null || st.fresh) st.entry = '0.'; else if (!/[.e]/.test(st.entry)) st.entry += '.'; st.fresh = false; st.opKey = null; return; }
-      if (key === 'ee') { if (st.entry === null || st.fresh) st.entry = String(value()); if (!/e/.test(st.entry)) st.entry += 'e'; st.fresh = false; return; }
-      if (key === 'back') { if (st.entry !== null && !st.fresh) { st.entry = st.entry.slice(0, -1); if (st.entry === '' || st.entry === '-') { st.entry = null; st.cur = 0; } } return; }
-      if (key === 'neg') { if (st.entry !== null && !st.fresh) st.entry = st.entry.startsWith('-') ? st.entry.slice(1) : `-${st.entry}`; else settle(-value()); return; }
-      if (key === 'pct') { settle(value() / 100); return; }
-      if (key === 'ac') { reset(); return; }
-      if (key in CALC_PREC) { commit(); const l = last(); if (l && l.t === 'op') l.v = key; else st.tokens.push({ t: 'op', v: key }); st.cur = value(); st.entry = null; st.fresh = true; st.opKey = key; return; }
-      if (key === '(') { const l = last(); if (st.entry !== null || (l && (l.t === 'num' || l.t === ')'))) { commit(); st.tokens.push({ t: 'op', v: '*' }); } st.tokens.push({ t: '(' }); st.entry = null; st.fresh = true; return; }
-      if (key === ')') {
-        let depth = 0, at = -1;
-        for (let i = st.tokens.length - 1; i >= 0; i--) { if (st.tokens[i].t === ')') depth++; else if (st.tokens[i].t === '(') { if (!depth) { at = i; break; } depth--; } }
-        if (at < 0) return;
-        commit();
-        const v = evalTokens(st.tokens.slice(at + 1));
-        st.tokens.splice(at, st.tokens.length - at, { t: 'num', v });
-        settle(v);
-        st.opKey = null;
+      st.err = false;
+      if (/^\d$/.test(key)) { if (st.fresh) startFresh(key); else st.expr += key; return; }
+      if (key === '.') { if (st.fresh) { startFresh('0.'); return; } const n = num(); if (!n) st.expr += '0.'; else if (!/[.E]/.test(n[0])) st.expr += '.'; return; }
+      if (key === 'ee') { if (st.fresh) carryOn(); const n = num(); if (n && !/E/.test(n[0])) st.expr += 'E'; return; }
+      if (key === 'back') { if (st.fresh) startFresh(''); else st.expr = st.expr.replace(CALC_LAST, ''); return; }
+      if (key === 'neg') {
+        if (st.fresh) carryOn();
+        const n = num();
+        if (!n) { if (!st.expr || endsOp()) st.expr += '−'; return; }
+        if (/E$/.test(n[0])) { st.expr += '−'; return; } // the exponent's sign
+        if (/E−$/.test(n[0])) { st.expr = st.expr.slice(0, -1); return; }
+        const before = st.expr.slice(0, n.index);
+        st.expr = /(^|[(+−×÷^,])−$/.test(before) ? before.slice(0, -1) + n[0] : `${before}−${n[0]}`; // a minus in front of the number, on or off
         return;
       }
-      if (key === '=') { commit(); const v = evalTokens(st.tokens); st.tokens = []; settle(v); st.opKey = null; return; }
-      if (key in FN) { settle(FN[key](value())); st.opKey = null; return; }
-      if (key in CONST) { settle(CONST[key]); return; }
-      if (key === 'rand') { settle(Math.random()); return; }
+      if (key in CALC_POST) { if (st.fresh) carryOn(); if (endsValue()) st.expr += CALC_POST[key]; return; }
+      if (key === 'ac') { st.expr = ''; st.sub = ''; st.fresh = false; return; }
+      if (key in CALC_OPS) {
+        const o = CALC_OPS[key];
+        if (st.fresh) carryOn();
+        if (!st.expr) { if (o === '−') st.expr = '−'; return; }
+        if (/[+−×÷^]$/.test(st.expr)) { if (o === '−' && /[×÷^]$/.test(st.expr)) st.expr += '−'; else st.expr = st.expr.replace(/[+−×÷^]$/, '') + o; return; } // 2 × − 3; otherwise the operator is swapped
+        if (/[(,]$/.test(st.expr)) { if (o === '−') st.expr += '−'; return; }
+        st.expr += o;
+        return;
+      }
+      if (key === '(') { if (st.fresh) startFresh('('); else st.expr += '('; return; }
+      if (key === ')') { let open = 0; for (const ch of st.expr) { if (ch === '(') open++; else if (ch === ')') open--; } if (open > 0 && endsValue()) st.expr += ')'; return; }
+      if (key === 'comma') { if (endsValue() && /\(/.test(st.expr)) st.expr += ','; return; }
+      if (key === '=') {
+        const r = evalNow();
+        if (r.state !== 'ok') { st.err = r.state === 'bad'; return; }
+        st.sub = `${r.closed} =`;
+        st.expr = raw(r.value);
+        st.fresh = true;
+        return;
+      }
+      if (key in CALC_FN) { if (st.fresh) { st.expr = `${CALC_FN[key]}${st.expr})`; st.fresh = false; st.sub = ''; } else st.expr += CALC_FN[key]; return; } // a result gets wrapped
+      if (key === 'pi' || key === 'e') { const c = key === 'pi' ? 'π' : 'e'; if (st.fresh) startFresh(c); else st.expr += c; return; }
+      if (key === 'rand') { const s = String(Math.round(Math.random() * 1e6) / 1e6); if (st.fresh) startFresh(s); else st.expr += s; return; }
       if (key === 'mc') { st.mem = 0; return; }
-      if (key === 'mplus') { st.mem += value(); st.fresh = true; return; }
-      if (key === 'mminus') { st.mem -= value(); st.fresh = true; return; }
-      if (key === 'mr') { settle(st.mem); return; }
+      if (key === 'mplus' || key === 'mminus') { const r = evalNow(); if (r.state === 'ok') st.mem += key === 'mplus' ? r.value : -r.value; return; }
+      if (key === 'mr') { const s = raw(st.mem); if (st.fresh) startFresh(s); else st.expr += s; return; }
       if (key === 'rad') { st.deg = !st.deg; return; }
       if (key === 'second') { st.second = !st.second; }
     }
-    const shown = () => (st.err ? 'Error' : st.entry !== null ? calcGroup(st.entry) : calcFmt(st.cur));
+    /** What the display shows: the line, and the small line above it — the result as the line grows,
+     *  or the sum a result came from. */
+    const pretty = (v) => calcFmt(v).replace(/-/g, '−'); // (the same minus as the line's)
+    const shown = () => {
+      if (!st.expr) return { line: '0', sub: st.err ? 'Error' : '' };
+      if (st.fresh) return { line: pretty(asNumber(st.expr)), sub: st.sub };
+      const r = evalNow();
+      return { line: st.expr, sub: r.state === 'ok' ? `= ${pretty(r.value)}` : r.state === 'bad' ? 'Error' : '' };
+    };
     return { st, press, shown };
   }
   /** The calculator pin's panel: the display over the keys, the way the Calculator app lays them out.
@@ -845,7 +913,9 @@
   function quickCalc({ go = null, popup: big = false } = {}) {
     const eng = calcEngine();
     const root = h('div', { class: `bcv-calc${big ? ' bcv-calc--big' : ''}`, tabindex: '0', role: 'application', 'aria-label': 'Scientific calculator' });
-    const display = h('div', { class: 'bcv-calc__display', 'aria-live': 'polite' });
+    const sub = h('div', { class: 'bcv-calc__sub', 'aria-live': 'polite' });
+    const line = h('div', { class: 'bcv-calc__expr', 'aria-live': 'polite' });
+    const display = U.el('bcv-calc__display', [sub, line]);
     const mode = h('span', { class: 'bcv-calc__mode', text: '' });
     const head = U.el('bcv-calc__head', [go ? quickName('Calculator', go, 'Open the calculator, larger') : U.text('bcv-calc__title', 'Scientific', 'span'), mode, U.text('bcv-calc__mem', '', 'span')]);
     const keys = [];
@@ -855,7 +925,7 @@
       keys.push(b);
       return b;
     })));
-    const KEYS = { Enter: '=', '=': '=', Backspace: 'back', '%': 'pct', '(': '(', ')': ')', '.': '.', '+': '+', '-': '-', '*': '*', x: '*', '/': '/', '^': '^' };
+    const KEYS = { Enter: '=', '=': '=', Backspace: 'back', '%': 'pct', '!': 'fact', ',': 'comma', '(': '(', ')': ')', '.': '.', '+': '+', '-': '-', '*': '*', x: '*', '/': '/', '^': '^' };
     root.addEventListener('keydown', (e) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       const k = /^\d$/.test(e.key) ? e.key : KEYS[e.key];
@@ -867,9 +937,12 @@
     });
     function paint() {
       const s = eng.shown();
-      display.textContent = s;
-      display.classList.toggle('is-long', s.length > 13);
-      display.classList.toggle('is-longer', s.length > 18);
+      line.textContent = s.line;
+      sub.textContent = s.sub;
+      line.classList.toggle('is-long', s.line.length > 13);
+      line.classList.toggle('is-longer', s.line.length > 18);
+      line.scrollLeft = line.scrollWidth; // a long line keeps its end in view
+      sub.scrollLeft = sub.scrollWidth;
       mode.textContent = eng.st.deg ? '' : 'Rad';
       head.querySelector('.bcv-calc__mem').textContent = eng.st.mem ? 'M' : '';
       for (const b of keys) {
@@ -877,7 +950,7 @@
         const alt = CALC_ALT[base];
         if (alt) { const on = eng.st.second; b.dataset.key = on ? alt[0] : base; b.innerHTML = on ? alt[1] : CALC_ROWS.flat().find((r) => r[0] === base)[1]; b.title = CALC_TITLES[b.dataset.key] || ''; }
         if (base === 'rad') { b.textContent = eng.st.deg ? 'Rad' : 'Deg'; b.title = eng.st.deg ? 'Switch to radians' : 'Switch to degrees'; }
-        b.classList.toggle('is-on', (base === 'second' && eng.st.second) || (b.dataset.key === eng.st.opKey && base !== '='));
+        b.classList.toggle('is-on', base === 'second' && eng.st.second);
       }
     }
     root.append(head, display, U.el('bcv-calc__keys', rows));

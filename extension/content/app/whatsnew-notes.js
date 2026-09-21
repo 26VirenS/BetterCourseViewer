@@ -23,6 +23,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.45.0', date: '2026-09-21', notes: [
+      { kind: 'improved', title: 'An algebraic calculator', body: 'Type the whole sum, 2 + 3 × 4² or sin(30), and it is worked out under the line as you go.', icon: P.tool },
+    ] },
     { version: '2.44.2', date: '2026-09-20', notes: [
       { kind: 'new', title: 'Safari finds your Canvas', body: 'Let Simpl Courses see every website once, and your school’s Canvas is found by itself.', icon: P.sparkle },
       { kind: 'fixed', title: 'Updates find their way home', body: 'On a Mac, an update goes into Applications when the app cannot replace itself in place.', icon: P.arrows },

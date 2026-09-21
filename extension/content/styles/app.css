@@ -2912,9 +2912,12 @@ html[data-bcv-theme="dark"] .bcv-conv__delta.is-more, html[data-bcv-theme="dark"
 .bcv-calc__head { display: flex; align-items: center; gap: 8px; height: 16px; padding: 0 4px; }
 .bcv-calc__mode, .bcv-calc__mem { font: 600 10px/1 var(--bcv-font); color: rgba(255,255,255,.55); letter-spacing: .02em; }
 .bcv-calc__mem { margin-left: auto; }
-.bcv-calc__display { height: 46px; display: flex; align-items: flex-end; justify-content: flex-end; padding: 0 8px 4px; font: 300 32px/1 var(--bcv-display); letter-spacing: -.01em; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: default; user-select: text; -webkit-user-select: text; }
-.bcv-calc__display.is-long { font-size: 23px; }
-.bcv-calc__display.is-longer { font-size: 17px; }
+/* the display: the line as typed, and above it, small, the result as the line grows (or the sum a result came from) */
+.bcv-calc__display { height: 46px; display: flex; flex-direction: column; align-items: flex-end; justify-content: flex-end; padding: 0 8px 3px; cursor: default; user-select: text; -webkit-user-select: text; }
+.bcv-calc__sub { max-width: 100%; min-height: 12px; font: 500 10.5px/1.15 var(--bcv-font); color: rgba(255,255,255,.55); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; }
+.bcv-calc__expr { max-width: 100%; font: 300 27px/1.1 var(--bcv-display); letter-spacing: -.01em; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; }
+.bcv-calc__expr.is-long { font-size: 21px; }
+.bcv-calc__expr.is-longer { font-size: 16px; }
 .bcv-calc__keys { display: flex; flex-direction: column; gap: 3px; }
 .bcv-calc__row { display: flex; gap: 3px; }
 .bcv-calc__key { flex: 1 1 0; min-width: 0; height: 30px; margin: 0; padding: 0; border: 0; border-radius: 7px; background: #3a3a3c; color: #fff; font: 500 12px/1 var(--bcv-font); cursor: pointer; display: flex; align-items: center; justify-content: center; white-space: nowrap; transition: filter .08s ease, background .12s ease, color .12s ease; -webkit-user-select: none; user-select: none; }
@@ -3206,9 +3209,11 @@ html[data-bcv-theme="dark"] .bcv-pdfx { --px-row: #0f0f11; --px-page: #1f1f22; -
 .bcv-calc__title { font: 600 11px/1 var(--bcv-font); color: rgba(255,255,255,.55); letter-spacing: .02em; }
 .bcv-calc--big .bcv-calc__head { height: 22px; padding: 0 6px; }
 .bcv-calc--big .bcv-calc__mode, .bcv-calc--big .bcv-calc__mem { font-size: 11px; }
-.bcv-calc--big .bcv-calc__display { height: 96px; padding: 0 12px 10px; font-size: 58px; }
-.bcv-calc--big .bcv-calc__display.is-long { font-size: 40px; }
-.bcv-calc--big .bcv-calc__display.is-longer { font-size: 28px; }
+.bcv-calc--big .bcv-calc__display { height: 96px; padding: 0 12px 8px; }
+.bcv-calc--big .bcv-calc__sub { min-height: 18px; font-size: 14px; }
+.bcv-calc--big .bcv-calc__expr { font-size: 50px; }
+.bcv-calc--big .bcv-calc__expr.is-long { font-size: 36px; }
+.bcv-calc--big .bcv-calc__expr.is-longer { font-size: 26px; }
 .bcv-calc--big .bcv-calc__keys, .bcv-calc--big .bcv-calc__row { gap: 7px; }
 .bcv-calc--big .bcv-calc__key { height: 54px; border-radius: 14px; font-size: 16px; }
 .bcv-calc--big .bcv-calc__key--num { font-size: 22px; }

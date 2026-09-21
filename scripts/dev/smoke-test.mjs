@@ -686,7 +686,9 @@ try {
   await page.click('.bcv-seg__btn[data-value="agenda"]');
   await page.waitForSelector('.bcv-agenda', { timeout: 5000 });
   check((await texts('.bcv-h1'))[0].includes(' – '), `agenda title: ${(await texts('.bcv-h1'))[0]}`);
-  check((await page.$$('.bcv-mini__day')).length === 42 && (await page.$('.bcv-mini__day--start')) && (await page.$('.bcv-mini__day--end')), 'agenda range picker mini calendar');
+  // (the grid is the start's month: the end is marked when it falls inside, and otherwise the grid's last day is inside the range)
+  const mini = await page.$$eval('.bcv-mini__day', (els) => ({ n: els.length, start: els.some((e) => e.classList.contains('bcv-mini__day--start')), end: els.some((e) => e.classList.contains('bcv-mini__day--end')), lastInside: !!els[els.length - 1]?.classList.contains('bcv-mini__day--inside') }));
+  check(mini.n === 42 && mini.start && (mini.end || mini.lastInside), `agenda range picker mini calendar (${JSON.stringify(mini)})`);
   const agendaHeads = await texts('.bcv-agenda .bcv-group__head');
   check(agendaHeads[0].includes('Today ·') && /\d items?/.test(agendaHeads[0]), `agenda day heads: ${agendaHeads[0]}`);
   await shot(page, '08-calendar-agenda');
@@ -3055,7 +3057,7 @@ try {
   check((await toolSub()) === 'Scientific · the keyboard works too' && (await page.$$('.bcv-tool[data-tool="calc"] .bcv-calc__key')).length === 49 && (await page.$eval('.bcv-tool[data-tool="calc"] .bcv-calc', (e) => e.classList.contains('bcv-calc--big') && document.activeElement === e)) && (await texts('.bcv-tool[data-tool="calc"] .bcv-calc__display'))[0] === '0', 'the calculator is a tool of its own: the scientific keys, larger, with the focus on them');
   await page.keyboard.type('7*6');
   await page.keyboard.press('Enter');
-  check((await texts('.bcv-tool[data-tool="calc"] .bcv-calc__display'))[0] === '42' && (await page.$eval('.bcv-tool[data-tool="calc"] .bcv-calc__key[data-key="7"]', (e) => Math.round(e.getBoundingClientRect().height))) === 54 && (await page.$eval('.bcv-tool[data-tool="calc"]', (e) => Math.round(e.getBoundingClientRect().width))) === 720, 'typed on the keyboard, 7 × 6 Enter shows 42, on keys 54 tall in a popup 720 wide');
+  check((await texts('.bcv-tool[data-tool="calc"] .bcv-calc__expr'))[0] === '42' && (await texts('.bcv-tool[data-tool="calc"] .bcv-calc__sub'))[0] === '7×6 =' && (await page.$eval('.bcv-tool[data-tool="calc"] .bcv-calc__key[data-key="7"]', (e) => Math.round(e.getBoundingClientRect().height))) === 54 && (await page.$eval('.bcv-tool[data-tool="calc"]', (e) => Math.round(e.getBoundingClientRect().width))) === 720, 'typed on the keyboard, 7 × 6 Enter shows 42, on keys 54 tall in a popup 720 wide');
   await shot(page, '19b-calculator-tool');
   await closeTool();
   // the periodic table: every element in place, a card for the one pressed, search, legend, arrow keys
@@ -3701,34 +3703,49 @@ try {
   await page.waitForTimeout(600);
   const q2 = await quickOpen('calc', 262);
   const calcKey = async (k) => { await page.click(`.bcv-calc__key[data-key="${k}"]`); };
-  const calcShown = () => texts('.bcv-calc__display').then((t) => t[0]);
+  const calcShown = () => texts('.bcv-calc__expr').then((t) => t[0]);
+  const calcSub = () => texts('.bcv-calc__sub').then((t) => t[0]);
   check(q2.w === 408 && q2.h === 262 && q2.radius === '18px' && q2.name === 'Calculator' && q2.btnGone && (await page.$$('.bcv-calc__key')).length === 49 && (await calcShown()) === '0' && (await page.$$eval('.bcv-calc__row:first-child .bcv-calc__key', (els) => els.map((e) => e.textContent))).join(' ') === '( ) mc m+ m− mr AC +/− % ÷' && (await page.$eval('.bcv-calc__key[data-key="/"]', (e) => getComputedStyle(e).backgroundColor)) === 'rgb(255, 159, 10)' && (await page.$eval('.bcv-calc__key[data-key="7"]', (e) => getComputedStyle(e).backgroundColor)) === 'rgb(92, 92, 95)' && (await page.$eval('.bcv-calc__key[data-key="ac"]', (e) => getComputedStyle(e).backgroundColor)) === 'rgb(165, 165, 165)', `the calculator pin opens into a panel: the whole scientific calculator, Apple's keys in Apple's colours, 49 of them under a display (${JSON.stringify(q2)})`);
-  for (const k of ['2', '+', '3', '*', '4', '=']) await calcKey(k);
-  check((await calcShown()) === '14', '2 + 3 × 4 = 14: the usual precedence');
+  for (const k of ['2', '+', '3', '*', '4']) await calcKey(k);
+  const calcLive = { line: await calcShown(), sub: await calcSub() };
+  await calcKey('=');
+  check(calcLive.line === '2+3×4' && calcLive.sub === '= 14' && (await calcShown()) === '14' && (await calcSub()) === '2+3×4 =', `algebraic: the whole sum stays on the line as it is typed, worked out underneath (${calcLive.line} · ${calcLive.sub}); = makes the result the line, the sum kept small above it (${await calcSub()})`);
   await calcKey('ac'); for (const k of ['(', '2', '+', '3', ')', 'x2']) await calcKey(k);
-  check((await calcShown()) === '25', 'brackets group, and x² acts on the bracket\'s value at once');
-  await calcKey('ac'); for (const k of ['3', '0', 'sin']) await calcKey(k);
+  const calcSq = { line: await calcShown(), sub: await calcSub() };
+  await calcKey('=');
+  check(calcSq.line === '(2+3)²' && calcSq.sub === '= 25' && (await calcShown()) === '25', `brackets group, and x² follows its bracket: ${calcSq.line} ${calcSq.sub}`);
+  await calcKey('ac'); for (const k of ['sin', '3', '0', ')', '=']) await calcKey(k);
   const calcSin = await calcShown();
   await calcKey('second');
   const calcSinLabel = await page.$eval('.bcv-calc__key[data-base="sin"]', (e) => ({ key: e.dataset.key, html: e.innerHTML, on: e.closest('.bcv-calc').querySelector('.bcv-calc__key[data-base="second"]').classList.contains('is-on') }));
   await calcKey('asin');
-  check(calcSin === '0.5' && calcSinLabel.key === 'asin' && calcSinLabel.html === 'sin<sup>-1</sup>' && calcSinLabel.on && (await calcShown()) === '30', `sin 30 is 0.5 in degrees; 2nd turns the trig keys into their inverses and sin⁻¹ gives 30 back (${JSON.stringify(calcSinLabel)})`);
-  await calcKey('second'); await calcKey('rad'); await calcKey('ac'); await calcKey('pi'); await calcKey('sin');
-  check((await page.$eval('.bcv-calc__key[data-base="rad"]', (e) => e.textContent)) === 'Deg' && (await texts('.bcv-calc__mode'))[0] === 'Rad' && Math.abs(parseFloat(await calcShown())) < 1e-9, 'Rad switches to radians (the key now offers Deg, the display says Rad): sin π is 0');
-  await calcKey('rad'); await calcKey('ac'); for (const k of ['5', 'fact']) await calcKey(k);
+  const calcWrapped = await calcShown();
+  await calcKey('=');
+  check(calcSin === '0.5' && calcSinLabel.key === 'asin' && calcSinLabel.html === 'sin<sup>-1</sup>' && calcSinLabel.on && calcWrapped === 'sin⁻¹(0.5)' && (await calcShown()) === '30', `sin(30) is 0.5 in degrees; 2nd turns the trig keys into their inverses, and sin⁻¹ wraps the result (${calcWrapped}) and gives 30 back (${JSON.stringify(calcSinLabel)})`);
+  await calcKey('second'); await calcKey('rad'); await calcKey('ac'); for (const k of ['sin', 'pi', ')', '=']) await calcKey(k);
+  check((await page.$eval('.bcv-calc__key[data-base="rad"]', (e) => e.textContent)) === 'Deg' && (await texts('.bcv-calc__mode'))[0] === 'Rad' && Math.abs(parseFloat(await calcShown())) < 1e-9, 'Rad switches to radians (the key now offers Deg, the display says Rad): sin(π) is 0');
+  await calcKey('rad'); await calcKey('ac'); for (const k of ['5', 'fact', '=']) await calcKey(k);
   const calcFact = await calcShown();
   await calcKey('ac'); for (const k of ['1', '0', '0', '0', '0', '0', '0', '*', '1', '0', '0', '0', '=']) await calcKey(k);
   check(calcFact === '120' && (await calcShown()) === '1,000,000,000', '5! is 120, and big numbers are grouped in thousands');
   await calcKey('ac'); for (const k of ['8', '/']) await calcKey(k);
-  await page.waitForTimeout(250); // (the key's colour eases in)
-  const calcOpOn = await page.$eval('.bcv-calc__key[data-key="/"]', (e) => e.classList.contains('is-on') && getComputedStyle(e).backgroundColor === 'rgb(255, 255, 255)');
-  await calcKey('2'); await calcKey('=');
-  check(calcOpOn && (await calcShown()) === '4', 'the operator pressed lights up white until the next number, the way the app does it');
+  const calcHalf = { line: await calcShown(), sub: await calcSub() };
+  await calcKey('2');
+  const calcWhole = { line: await calcShown(), sub: await calcSub() };
+  for (const k of ['+', '2', 'pi', '=']) await calcKey(k);
+  check(calcHalf.line === '8÷' && calcHalf.sub === '' && calcWhole.line === '8÷2' && calcWhole.sub === '= 4' && /^10\.2831853/.test(await calcShown()), `a sum still wanting a number says nothing underneath (${calcHalf.line}); the result appears as the number lands (${calcWhole.line} ${calcWhole.sub}); 2π multiplies side by side (${await calcShown()})`);
+  await calcKey('ac'); for (const k of ['2', '+', '3']) await calcKey(k);
+  await page.focus('.bcv-calc'); await page.keyboard.press('Backspace'); await page.keyboard.press('Backspace');
+  await calcKey('sin'); await page.focus('.bcv-calc'); await page.keyboard.press('Backspace');
+  check((await calcShown()) === '2', 'Backspace takes the last thing off the line, a function with its bracket as one');
   await calcKey('ac');
   await page.focus('.bcv-calc');
   await page.keyboard.type('2^10');
   await page.keyboard.press('Enter');
   check((await calcShown()) === '1,024', 'the keyboard works on the panel: 2^10 Enter');
+  await page.keyboard.type('+1');
+  await page.keyboard.press('Enter');
+  check((await calcShown()) === '1,025' && (await calcSub()) === '1024+1 =', `an operator after = carries on from the result (${await calcSub()})`);
   await calcKey('ac');
   await shot(page, '45-calculator-panel');
   await page.mouse.move(700, 500);
@@ -3858,7 +3875,8 @@ try {
   const countApi = (r) => { if (/\/api\/v1\//.test(r.url())) apiCalls.push(r.url()); };
   page.on('request', countApi);
   await page.gotoRaw(`${BASE}/`);
-  await page.waitForNavigation({ timeout: 20000 }); // the reload
+  // the reload, seen from the document it produced (a wait for the navigation itself can miss a quick one)
+  await page.waitForFunction(() => sessionStorage.getItem('bcv:reloaded') && performance.getEntriesByType('navigation')[0]?.type === 'reload', null, { timeout: 20000 });
   await page.waitForSelector('.bcv-toast', { timeout: 20000 });
   const sessionMark = await page.evaluate(() => JSON.parse(sessionStorage.getItem('bcv:reloaded') || 'null'));
   const atNote = apiCalls.length; // the shell's first wave was already out when the first answer came; nothing may follow it
