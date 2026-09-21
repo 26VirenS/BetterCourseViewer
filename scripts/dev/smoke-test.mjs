@@ -65,8 +65,8 @@ const whatsNew = new Function('self', `${readFileSync(join(extDir, 'content', 'a
   const newest = whatsNew[0];
   check(!!newest && newest.version === manifest.version, `the newest What's New entry is this version (${manifest.version}): ${newest?.version}`);
   check(/^\d{4}-\d{2}-\d{2}$/.test(newest?.date || '') && Array.isArray(newest?.notes) && newest.notes.length > 0, `the notes for ${manifest.version} are dated and not empty`);
-  const bad = whatsNew.flatMap((v) => (v.notes || []).map((n) => ({ v: v.version, ...n }))).filter((n) => !['new', 'improved', 'fixed'].includes(n.kind) || !n.title || n.title.length > 30 || !n.body || n.body.length > 90 || !n.icon);
-  check(bad.length === 0, `every note has a kind, a short title, one short line and an icon${bad.length ? `: ${bad.map((n) => `${n.v} · ${n.title}`).join(' | ')}` : ''}`);
+  const bad = whatsNew.flatMap((v) => (v.notes || []).map((n) => ({ v: v.version, ...n }))).filter((n) => !['new', 'improved', 'fixed'].includes(n.kind) || !n.title || n.title.length > 22 || !n.body || n.body.length > 60 || !n.icon);
+  check(bad.length === 0, `every note has a kind, a title of 22 characters at most, one line of 60 at most, and an icon${bad.length ? `: ${bad.map((n) => `${n.v} · ${n.title} (${n.title.length}/${n.body?.length})`).join(' | ')}` : ''}`);
   check(whatsNew.every((v, i) => i === 0 || cmpVer(whatsNew[i - 1].version, v.version) > 0), 'the entries are newest first, no version twice');
 }
 
@@ -3413,11 +3413,15 @@ try {
   await shot(page, '41c-tools-pin-island');
   await page.keyboard.press('Escape');
   await eventually(async () => { const r = await pinState(); return !r.open && r.w === 24; }, 3000);
-  // the X to unpin rides the island's corner while the pointer holds it open
+  // the X to unpin rides the island's corner, and shows only with the pointer on that corner:
+  // anywhere on the pin used to bring it, which on an open panel is a red dot floating off it
   await page.hover('#bcv-pins .bcv-pin');
   await eventually(async () => { const r = await pinState(); return r.open && r.w === 250; }, 3000);
+  const xQuiet = await page.$eval('#bcv-pins .bcv-pin__x', (e) => getComputedStyle(e).opacity);
+  await page.hover('#bcv-pins .bcv-pin__x');
+  await page.waitForTimeout(200);
   const xOnIsland = await page.$eval('#bcv-pins .bcv-island', (e) => { const x = e.querySelector('.bcv-pin__x').getBoundingClientRect(); const r = e.getBoundingClientRect(); return { opacity: getComputedStyle(e.querySelector('.bcv-pin__x')).opacity, right: Math.round(x.right - r.right), top: Math.round(r.top - x.top), title: e.querySelector('.bcv-pin__x').title }; });
-  check(xOnIsland.opacity === '1' && xOnIsland.right === 5 && xOnIsland.top === 5 && xOnIsland.title === 'Unpin Focus timer', `the pointer over the pin opens the island, and its X sits at the island's top right corner (${JSON.stringify(xOnIsland)})`);
+  check(xQuiet === '0' && xOnIsland.opacity === '1' && xOnIsland.right === 5 && xOnIsland.top === 5 && xOnIsland.title === 'Unpin Focus timer', `the pointer over the pin opens the island with no X on it; the X comes up only on its own corner, at the island's top right (${xQuiet} → ${JSON.stringify(xOnIsland)})`);
   await page.click('#bcv-pins .bcv-pin__x');
   let unpinned = null;
   await eventually(async () => { const r = await pinState(); unpinned = r; return r.guest; }, 3000);
@@ -3670,6 +3674,14 @@ try {
   const quickPin = (key) => `#bcv-pins .bcv-pin[data-tool="${key}"]`;
   const quickOpen = async (key, hh = 44) => { const b = await (await page.$(quickPin(key))).boundingBox(); await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2); await eventually(() => page.$eval(quickPin(key), (e, want) => e.classList.contains('is-open') && Math.round(e.getBoundingClientRect().height) === want, hh), 3000); await page.waitForTimeout(550); return page.$eval(quickPin(key), (e) => ({ w: Math.round(e.getBoundingClientRect().width), h: Math.round(e.getBoundingClientRect().height), radius: getComputedStyle(e.querySelector('.bcv-quick__face')).borderRadius, name: e.querySelector('.bcv-quick__name')?.textContent, btnGone: getComputedStyle(e.querySelector('.bcv-pin__btn')).opacity === '0' })); };
   check((await page.$$('#bcv-pins .bcv-pin.bcv-quick')).length === 6 && (await page.$$eval('#bcv-pins .bcv-pin', (els) => els.map((e) => Math.round(e.getBoundingClientRect().width)))).every((w) => w === 24), 'six pins in the tray, each a disc with a quick menu folded in it');
+  // the icon has to be the thing at the middle of a folded pin: the panel's blur is the full panel's
+  // size behind it, and painted over the button it would leave the tray a row of empty discs
+  const pinFaces = await page.$$eval('#bcv-pins .bcv-pin', (els) => els.map((e) => {
+    const r = e.getBoundingClientRect();
+    const hit = document.elementFromPoint(Math.round(r.left + r.width / 2), Math.round(r.top + r.height / 2));
+    return { tool: e.dataset.tool, onIcon: !!hit && !!hit.closest('.bcv-pin__btn'), ink: e.querySelector('.bcv-pin__ic svg') ? getComputedStyle(e.querySelector('.bcv-pin__ic')).opacity : null };
+  }));
+  check(pinFaces.length === 6 && pinFaces.every((p) => p.onIcon && p.ink === '1'), `every folded pin shows its icon — nothing of the panel is painted over it (${JSON.stringify(pinFaces)})`);
   const qc = await quickOpen('cite', 212);
   const qcSel = (sel) => `${quickPin('cite')} ${sel}`;
   check(qc.w === 400 && qc.h === 212 && qc.radius === '26px' && qc.name === 'Cite' && qc.btnGone && (await page.$eval(qcSel('.bcv-quick__input'), (e) => e.placeholder)) === 'Paste a link to cite' && (await texts(qcSel('.bcv-qcite__style'))).join('/') === 'MLA 9/APA 7/Chicago 17' && (await page.$eval(qcSel('.bcv-qcite__style.is-on'), (e) => e.dataset.style)) === 'mla' && (await texts(qcSel('.bcv-qcite__heretitle')))[0] === 'Cite this page' && (await texts(qcSel('.bcv-qcite__heresub')))[0] === 'Dashboard' && (await texts(qcSel('.bcv-qcite__tag'))).join('/') === 'APA 7/MLA 9' && /^Haddad, A\. \(2025\)/.test((await texts(qcSel('.bcv-qcite__text')))[0]) && !(await page.$eval(qcSel('.bcv-qcite__link'), (e) => e.hidden)), `the citation pin swells into a panel: a link to cite, the page you are on, the style, and the last citations saved, newest first (${(await texts(qcSel('.bcv-qcite__tag'))).join('/')} · ${(await texts(qcSel('.bcv-qcite__heresub')))[0]})`);
@@ -3754,11 +3766,45 @@ try {
   check((await calcShown()) === '1,025' && (await calcSub()) === '1024+1 =', `an operator after = carries on from the result (${await calcSub()})`);
   await calcKey('ac');
   await shot(page, '45-calculator-panel');
+  // the lights have to clear the panel's corner, which runs diagonally past the first of them:
+  // the gap to the curve, not to the edges, is what the eye reads
+  const lightFit = await page.$eval(quickPin('calc'), (e) => {
+    const p = e.querySelector('.bcv-quick__face').getBoundingClientRect();
+    const d = e.querySelector('.bcv-quick__light--full').getBoundingClientRect(); // (the green one: the red is display:none until the panel is pulled out, so it has no box)
+    const R = parseFloat(getComputedStyle(e.querySelector('.bcv-quick__face')).borderTopLeftRadius);
+    const r = d.width / 2;
+    const cx = d.left + r - p.left;
+    const cy = d.top + r - p.top;
+    return { R, r, top: Math.round(cy - r), left: Math.round(cx - r), arc: Math.round((R - r - Math.hypot(R - cx, R - cy)) * 10) / 10 };
+  });
+  // (a panel's own head sets how far down the row sits, so what is held here is the clearance
+  // itself: the gap to the curve no smaller than the gap to the edge, give or take a pixel)
+  check(lightFit.R === 26 && lightFit.r === 6 && lightFit.top >= 8 && lightFit.arc >= 8 && lightFit.arc >= lightFit.top - 1, `the first light sits clear of the corner: ${lightFit.arc}px between it and the curve, as much as the ${lightFit.top}px it keeps from the top edge (${JSON.stringify(lightFit)})`);
+  // pulled out by the grip, it stays where it was put — and stays open while another pin is hovered
+  const calcBar = await (await page.$(`${quickPin('calc')} .bcv-quick__bar`)).boundingBox();
+  await page.mouse.move(calcBar.x + calcBar.width / 2, calcBar.y + calcBar.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(520, 430, { steps: 8 });
+  await page.mouse.up();
+  await page.waitForTimeout(250);
+  const freed = await page.$eval(quickPin('calc'), (e) => ({ free: e.classList.contains('is-free'), open: e.classList.contains('is-open'), pos: getComputedStyle(e).position, x: Math.round(e.getBoundingClientRect().left), closeLight: getComputedStyle(e.querySelector('.bcv-quick__light--close')).display }));
+  check(freed.free && freed.open && freed.pos === 'fixed' && freed.closeLight === 'flex' && freed.x > 100, `the grip pulls the calculator out of the tray: fixed where it was dropped, open, with the red light to put it back (${JSON.stringify(freed)})`);
+  const qpHover = await (await page.$(quickPin('ptable'))).boundingBox();
+  await page.mouse.move(qpHover.x + qpHover.width / 2, qpHover.y + qpHover.height / 2);
+  await eventually(() => page.$eval(quickPin('ptable'), (e) => e.classList.contains('is-open')), 3000);
+  await page.waitForTimeout(400);
+  const bothUp = await page.evaluate(() => ({ calc: document.querySelector('#bcv-pins .bcv-pin[data-tool="calc"]').classList.contains('is-open'), ptable: document.querySelector('#bcv-pins .bcv-pin[data-tool="ptable"]').classList.contains('is-open') }));
+  check(bothUp.calc && bothUp.ptable, `hovering another pin leaves the one pulled out alone: both are up (${JSON.stringify(bothUp)})`);
+  await shot(page, '45f-widget-pulled-out');
+  await page.click(`${quickPin('calc')} .bcv-quick__light--close`);
+  await page.waitForTimeout(600);
+  const docked = await page.$eval(quickPin('calc'), (e) => ({ free: e.classList.contains('is-free'), open: e.classList.contains('is-open'), w: Math.round(e.getBoundingClientRect().width), left: e.style.left }));
+  check(!docked.free && !docked.open && docked.w === 24 && docked.left === '', `the red light puts it back in the tray, folded (${JSON.stringify(docked)})`);
   await page.mouse.move(700, 500);
   await page.mouse.click(700, 500);
   check(await eventually(() => page.$eval(quickPin('calc'), (e) => !e.classList.contains('is-open') && Math.round(e.getBoundingClientRect().width) === 24), 3000), 'the capsule folds when the pointer leaves and presses elsewhere');
   const qg = await quickOpen('graph', 490);
-  check(qg.w === 340 && qg.h === 490 && qg.radius === '26px' && qg.name === 'Full screen' && (await page.$eval(`${quickPin('graph')} .bcv-qgraph__frame`, (e) => e.getAttribute('src'))) === 'https://www.desmos.com/calculator' && (await page.$eval(`${quickPin('graph')} .bcv-qgraph__out`, (e) => e.href)) === 'https://www.desmos.com/calculator' && (await page.$eval(`${quickPin('graph')} .bcv-qgraph__body`, (e) => { const r = e.getBoundingClientRect(); return r.height > r.width; })), 'the graphing pin swells into a small Desmos, portrait, loaded on the first hover, with the way out to desmos.com');
+  check(qg.w === 340 && qg.h === 490 && qg.radius === '26px' && qg.name === 'Graphing' &&(await page.$eval(`${quickPin('graph')} .bcv-qgraph__frame`, (e) => e.getAttribute('src'))) === 'https://www.desmos.com/calculator' && (await page.$eval(`${quickPin('graph')} .bcv-qgraph__out`, (e) => e.href)) === 'https://www.desmos.com/calculator' && (await page.$eval(`${quickPin('graph')} .bcv-qgraph__body`, (e) => { const r = e.getBoundingClientRect(); return r.height > r.width; })), 'the graphing pin swells into a small Desmos, portrait, loaded on the first hover, with the way out to desmos.com');
   await shot(page, '45b-graph-pin');
   await page.mouse.move(700, 500);
   await page.mouse.click(700, 500);
@@ -3787,6 +3833,33 @@ try {
   await page.click(qpSel('.bcv-quick__light--full'));
   await page.waitForSelector('.bcv-tool[data-tool="ptable"]', { timeout: 5000 });
   check((await page.$('.bcv-pt__grid')) !== null, 'the green light is what opens the whole table');
+  await closeTool();
+  // a widget's green light while a tool is already up: the new one rises over it, the old one waits
+  // underneath and comes back when the top one closes
+  await page.mouse.move(700, 500);
+  await page.waitForTimeout(700);
+  await quickOpen('cite', 212);
+  await page.click(qcSel('.bcv-quick__light--full'));
+  await page.waitForSelector('.bcv-tool[data-tool="cite"]', { timeout: 5000 });
+  await page.waitForTimeout(400);
+  const qpBox = await (await page.$(quickPin('ptable'))).boundingBox();
+  await page.mouse.move(qpBox.x + qpBox.width / 2, qpBox.y + qpBox.height / 2);
+  check(await eventually(() => page.$eval(quickPin('ptable'), (e) => e.classList.contains('is-open')), 3000), 'the tray still works with a tool open: the pointer over a pin opens its widget over the popup');
+  await page.click(qpSel('.bcv-quick__light--full'));
+  await page.waitForSelector('.bcv-tool[data-tool="ptable"]', { timeout: 5000 });
+  await page.waitForTimeout(250);
+  const stacked = await page.evaluate(() => {
+    const ovs = [...document.querySelectorAll('.bcv-sheet-ov')];
+    const top = ovs[ovs.length - 1];
+    const under = ovs.find((o) => o.classList.contains('is-under'));
+    return { n: ovs.length, top: top?.querySelector('.bcv-sheet')?.dataset.tool, under: under?.querySelector('.bcv-sheet')?.dataset.tool, scrim: under ? getComputedStyle(under).backgroundColor : null, reach: under ? getComputedStyle(under).pointerEvents : null };
+  });
+  check(stacked.n === 2 && stacked.top === 'ptable' && stacked.under === 'cite' && stacked.scrim === 'rgba(0, 0, 0, 0)' && stacked.reach === 'none', `the table opens on top of the citation popup, which waits underneath out of reach with its scrim off, so the page is not dimmed twice (${JSON.stringify(stacked)})`);
+  await shot(page, '45e-widget-over-popup');
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(400);
+  const back = await page.evaluate(() => { const ovs = [...document.querySelectorAll('.bcv-sheet-ov')]; return { n: ovs.length, tool: ovs[0]?.querySelector('.bcv-sheet')?.dataset.tool, under: ovs[0]?.classList.contains('is-under') }; });
+  check(back.n === 1 && back.tool === 'cite' && !back.under, `closing the top one gives the citation popup back, itself again (${JSON.stringify(back)})`);
   await closeTool();
   await page.mouse.move(700, 500);
   await page.waitForTimeout(700);

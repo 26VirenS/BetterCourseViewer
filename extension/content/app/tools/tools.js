@@ -49,10 +49,17 @@
   const toolOf = (key) => TOOLS.find((t) => t.key === key) || null;
   const tintOf = (color, dark) => `color-mix(in srgb, ${color} ${dark ? 26 : 15}%, transparent)`;
 
+  let stackNext = false; // (read by popup() on the way in: see open()'s `over`)
   function open(key, opts = {}) {
     const t = toolOf(key);
     if (!t) return false;
+    // over: the tool rises over whatever sheet is already up rather than taking its place, and
+    // closing it gives that back. It is how a widget's green light works: the page you were on —
+    // an assignment, another tool — is still there underneath when you are done with the big one.
+    const up = document.querySelector('.bcv-sheet-ov:not(.is-under) > .bcv-sheet');
+    stackNext = opts.over === true && !!up && up.dataset.tool !== key; // (the same tool again takes its own place rather than piling on itself)
     t.open(BCV.app, opts);
+    stackNext = false;
     return true;
   }
 
@@ -61,7 +68,10 @@
    *  tool has views, Close), then the tool's own body, scrolling; what the body holds rises in,
    *  one thing after another. Escape (from anywhere) and the scrim close it. */
   function popup({ tool, title, sub = '', width = 620, body, foot = null, cls = '', onClose = null, from = null, head = null }) {
-    document.querySelector('.bcv-sheet-ov')?.remove();
+    // Stacking: the one already up is pushed under (its scrim goes, the new one's covers for both)
+    // and comes back when this one closes; otherwise this popup takes its place, as it always has.
+    if (stackNext) document.querySelector('.bcv-sheet-ov:not(.is-under)')?.classList.add('is-under');
+    else for (const old of document.querySelectorAll('.bcv-sheet-ov')) old.remove();
     const ov = U.el('bcv-sheet-ov bcv-tool-ov', null, { role: 'dialog', 'aria-label': title || tool.name });
     let closed = false;
     const close = () => {
@@ -69,11 +79,16 @@
       if (onClose && onClose() === false) return;
       closed = true;
       ov.classList.add('is-closing');
-      setTimeout(() => ov.remove(), 180);
+      setTimeout(() => {
+        ov.remove();
+        const under = [...document.querySelectorAll('.bcv-sheet-ov.is-under')].pop(); // (the nearest one below, back to itself)
+        if (under) { under.classList.remove('is-under'); under.focus?.({ preventScroll: true }); }
+      }, 180);
     };
     ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
-    // Escape from anywhere on the page (a download click leaves the focus on the page's body)
-    const onKey = (e) => { if (e.key !== 'Escape' || !ov.isConnected || closed) return; e.stopPropagation(); close(); };
+    // Escape from anywhere on the page (a download click leaves the focus on the page's body), and
+    // only from the top one: a stack comes apart one at a time.
+    const onKey = (e) => { if (e.key !== 'Escape' || !ov.isConnected || closed || ov.classList.contains('is-under')) return; e.stopPropagation(); close(); };
     document.addEventListener('keydown', onKey, true);
     const mo = new MutationObserver(() => { if (!ov.isConnected) { document.removeEventListener('keydown', onKey, true); mo.disconnect(); } });
     mo.observe(document.body, { childList: true });
@@ -379,7 +394,7 @@
    *  press on the minutes opens the timer itself. */
   function islandSetter(item) {
     const scale = scaleEl('bcv-island__scale');
-    const mins = h('button', { type: 'button', class: 'bcv-island__mins', title: 'Open the timer', onclick: (e) => { e.stopPropagation(); open('pomo', { from: item }); } });
+    const mins = h('button', { type: 'button', class: 'bcv-island__mins', title: 'Open the timer', onclick: (e) => { e.stopPropagation(); open('pomo', { from: item, over: true }); } });
     const go = h('button', { type: 'button', class: 'bcv-island__btn bcv-island__go', title: 'Start', 'aria-label': 'Start', onclick: (e) => { e.stopPropagation(); focusStart(); islandOpen(item, 5000); } }, U.svg(IC.play, { size: 18, stroke: 'currentColor', width: 2.4 }));
     scaleHands(scale, { idle: () => !focusOn(), mins: () => Math.round(phaseLen(focus) / 60), set: (v, persist) => {
       const m = { ...focus.mins, [focus.phase]: v };
@@ -418,7 +433,7 @@
   function islandHover(item) {
     let leave = 0;
     item.addEventListener('pointerenter', (e) => {
-      if (e.pointerType === 'touch' || item.classList.contains('is-out') || document.querySelector('.bcv-tool-ov')) return; // (a tool open over the page: the pins stay folded)
+      if (e.pointerType === 'touch' || item.classList.contains('is-out')) return;
       clearTimeout(leave);
       item.classList.add('is-hover');
       if (item.classList.contains('is-open')) return;
@@ -702,7 +717,7 @@
     };
     const openQ = () => {
       if (!panel) {
-        panel = q.build({ item, go: (o = {}) => { hold = Date.now() + 400; if (pulledOut()) dock(); else closeQ(); open(t.key, { from: item, ...o }); } });
+        panel = q.build({ item, go: (o = {}) => { hold = Date.now() + 400; if (pulledOut()) dock(); else closeQ(); open(t.key, { from: item, over: true, ...o }); } });
         body.replaceChildren(...panel.els);
         body.querySelector('.bcv-quick__light--close')?.addEventListener('click', (e) => { e.stopPropagation(); dock(); });
       }
@@ -731,10 +746,12 @@
     bar.addEventListener('pointerup', drop);
     bar.addEventListener('pointercancel', drop);
     item.addEventListener('pointerenter', (e) => {
-      if (e.pointerType === 'touch' || item.classList.contains('is-out') || Date.now() < hold || document.querySelector('.bcv-tool-ov')) return; // (a tool open over the page: the pins stay folded)
+      if (e.pointerType === 'touch' || item.classList.contains('is-out') || Date.now() < hold) return; // (the tray works over an open popup too: the widget's green light puts its tool on top of it)
       clearTimeout(leave);
       item.classList.add('is-hover');
-      for (const other of document.querySelectorAll('#bcv-pins .bcv-quick.is-open')) if (other !== item) { other.querySelector(':focus')?.blur(); other.classList.remove('is-hover'); other.classList.remove('is-open'); other.setAttribute('aria-expanded', 'false'); } // (one open at a time: a calculator left with the focus folds when the pointer moves on)
+      // one open at a time: a calculator left with the focus folds when the pointer moves on. One
+      // pulled out of the tray is not in that reckoning — it stays where it was put, open.
+      for (const other of document.querySelectorAll('#bcv-pins .bcv-quick.is-open:not(.is-free)')) if (other !== item) { other.querySelector(':focus')?.blur(); other.classList.remove('is-hover'); other.classList.remove('is-open'); other.setAttribute('aria-expanded', 'false'); }
       openQ();
     });
     item.addEventListener('pointerleave', (e) => {
@@ -1016,7 +1033,7 @@
   function quickGraph({ go }) {
     const frame = h('iframe', { class: 'bcv-qgraph__frame', title: 'Desmos graphing calculator', allow: 'fullscreen', referrerpolicy: 'no-referrer' });
     const body = U.el('bcv-qgraph__body', [frame]);
-    const root = U.el('bcv-qgraph', [U.el('bcv-qgraph__head', [quickName('Full screen', go, 'Open the graphing calculator, larger'), h('a', { class: 'bcv-qgraph__out', href: DESMOS, target: '_blank', rel: 'noopener', text: 'desmos.com ↗' })]), body]);
+    const root = U.el('bcv-qgraph', [U.el('bcv-qgraph__head', [quickName('Graphing', go, 'Open the graphing calculator, larger'), h('a', { class: 'bcv-qgraph__out', href: DESMOS, target: '_blank', rel: 'noopener', text: 'desmos.com ↗' })]), body]);
     let loaded = false;
     const fail = () => body.replaceChildren(U.el('bcv-qgraph__fail', [U.text('bcv-qgraph__failtext', 'Desmos could not load here.'), h('a', { class: 'bcv-qgraph__link', href: DESMOS, target: '_blank', rel: 'noopener', text: 'Open desmos.com' })]));
     const onCsp = (e) => { if (/desmos\.com/.test(e.blockedURI || '')) fail(); };
@@ -1229,7 +1246,7 @@
     const live = t.key === 'pomo' && !demo; // (the timer's pin is also its live activity)
     const el = h('span', { class: 'bcv-pin', dataset: { tool: t.key } });
     const btn = h('button', { type: 'button', class: 'bcv-pin__btn', title: t.name, 'aria-label': t.name, tabindex: demo ? '-1' : '0',
-      onclick: demo ? null : (e) => { if (el.classList.contains('is-live')) islandOpen(el, 6000, e.detail === 0); else if (live) islandSet(el, e.detail === 0); else open(t.key, { from: e.currentTarget }); } }, [
+      onclick: demo ? null : (e) => { if (el.classList.contains('is-live')) islandOpen(el, 6000, e.detail === 0); else if (live) islandSet(el, e.detail === 0); else open(t.key, { from: e.currentTarget, over: true }); } }, [
       h('span', { class: 'bcv-pin__ic' }, U.svg(t.icon, { size: 13, stroke: t.color, width: 2 })),
       live ? islandGlyph() : null,
     ]);
@@ -1240,11 +1257,11 @@
       el.append(h('div', { class: 'bcv-island__face' }, [U.el('bcv-island__glass'), btn, islandBody(el), islandSetter(el)]));
       islandHover(el);
       // open: a press on the count opens the timer, a press elsewhere on the body keeps it open a while longer
-      el.addEventListener('click', (e) => { if (!el.classList.contains('is-open') || e.target.closest('button')) return; if (e.target.closest('.bcv-island__right')) open('pomo', { from: el }); else islandOpen(el); });
+      el.addEventListener('click', (e) => { if (!el.classList.contains('is-open') || e.target.closest('button')) return; if (e.target.closest('.bcv-island__right')) open('pomo', { from: el, over: true }); else islandOpen(el); });
       el.addEventListener('keydown', (e) => { if (e.key === 'Escape' && el.classList.contains('is-open')) { e.stopPropagation(); islandClose(el); btn.focus(); } });
     } else {
-      const quick = demo ? null : quickHover(el, t);
-      if (quick) { el.setAttribute('aria-expanded', 'false'); el.append(h('div', { class: 'bcv-quick__face' }, [btn, ...quick])); } else el.append(btn);
+      const quick = demo ? null : quickHover(el, t); // [glass, body, bar] — the glass goes behind the button, or it would paint over the icon
+      if (quick) { el.setAttribute('aria-expanded', 'false'); el.append(h('div', { class: 'bcv-quick__face' }, [quick[0], btn, ...quick.slice(1)])); } else el.append(btn);
     }
     if (!demo) el.append(h('button', { type: 'button', class: 'bcv-pin__x', title: `Unpin ${t.name}`, 'aria-label': `Unpin ${t.name}`, onclick: (e) => { e.stopPropagation(); unpin(t.key); } }, U.svg(IC.close, { size: 8, stroke: '#fff', width: 2.6 })));
     return el;

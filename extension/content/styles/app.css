@@ -477,10 +477,15 @@ html[data-bcv-theme="dark"] .bcv-badge--orange { color: #ffb44d; }
 /* the sheet behind a counter */
 .bcv-sheet-ov { position: fixed; inset: 0; z-index: 40; background: var(--bcv-scrim); -webkit-backdrop-filter: var(--bcv-blur-scrim); backdrop-filter: var(--bcv-blur-scrim); display: flex; align-items: center; justify-content: center; padding: 28px; box-sizing: border-box; outline: none; font-family: var(--bcv-font); -webkit-font-smoothing: antialiased; }
 .bcv-sheet-ov * { box-sizing: border-box; }
+/* A widget's green light opens its tool over whatever sheet is already up: that one waits
+   underneath, out of reach and a little smaller, and comes back when the top one closes. Its
+   own scrim goes — the one above covers for both, or the page would be dimmed twice. */
+.bcv-sheet-ov.is-under { pointer-events: none; background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; animation: none; }
+.bcv-sheet-ov.is-under > .bcv-sheet { transform: scale(.96); opacity: .6; }
 .bcv-sheet { width: 520px; max-width: 100%; max-height: calc(100vh - 56px); background: var(--bcv-glass); -webkit-backdrop-filter: var(--bcv-blur-glass); backdrop-filter: var(--bcv-blur-glass); border: 1px solid var(--bcv-edge); color: var(--bcv-ink); border-radius: 26px; box-shadow: var(--bcv-shadow-glass); display: flex; flex-direction: column; overflow: hidden; box-sizing: border-box; }
 /* A row previewed from a counter's sheet opens inside the sheet: it widens and the preview takes
  * the right of it, the list staying where it is. Nothing else on the page moves. */
-.bcv-sheet { transition: width .3s cubic-bezier(.32,.72,0,1); }
+.bcv-sheet { transition: width .3s cubic-bezier(.32,.72,0,1), transform .3s cubic-bezier(.32,.72,0,1), opacity .3s ease; }
 .bcv-sheet.is-split { width: min(980px, 100%); display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 380px); grid-template-rows: auto minmax(0, 1fr); }
 .bcv-sheet.is-split > .bcv-sheet__head { grid-column: 1; grid-row: 1; }
 .bcv-sheet.is-split > .bcv-sheet__list { grid-column: 1; grid-row: 2; }
@@ -2370,6 +2375,11 @@ html.bcv-phone.bcv-on #bcv-tray, html.bcv-setup-open #bcv-tray, html.bcv-welcome
 .bcv-quick.is-open .bcv-quick__face { border-radius: 26px; box-shadow: 0 14px 36px rgba(0,0,0,.45); }
 /* the two lights a Mac window wears: red back to the tray (once it has been pulled out), green full size */
 .bcv-quick__lights { display: flex; align-items: center; gap: 6px; flex: none; }
+/* Clear of the corner: the panel's 26px radius runs diagonally past the first light, so 10px of
+   padding all round leaves only ~6px between the dot and the curve where 10px shows along the
+   edges. Another 6px from the left puts that back to ~9px, the way a Mac window's lights sit
+   further in from the side than from the top. */
+.bcv-quick--panel .bcv-quick__lights { margin-left: 6px; }
 .bcv-quick__light { flex: none; width: 12px; height: 12px; margin: 0; padding: 0; border: 0; border-radius: 6px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: transparent; transition: color .15s ease, filter .15s ease; }
 .bcv-quick__light--close { background: #ff5f57; display: none; }
 .bcv-quick__light--full { background: #28c840; }
@@ -2378,8 +2388,10 @@ html.bcv-phone.bcv-on #bcv-tray, html.bcv-setup-open #bcv-tray, html.bcv-welcome
 .bcv-quick__light:active { filter: brightness(.88); }
 .bcv-quick__light:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
 /* the grip along the bottom: dragging it pulls the widget out of the tray, and moves it after that */
-.bcv-quick__bar { position: absolute; left: 0; right: 0; bottom: 0; height: 20px; display: flex; align-items: center; justify-content: center; cursor: grab; opacity: 0; transition: opacity .2s ease .1s; touch-action: none; }
-.bcv-quick.is-open .bcv-quick__bar { opacity: 1; }
+/* Only the open panel's bar takes the pointer. Folded, the pin is 24px tall and the bar's 20px
+   would cover the icon from 4px down, so a press meant for the tool would start pulling it out. */
+.bcv-quick__bar { position: absolute; left: 0; right: 0; bottom: 0; height: 20px; display: flex; align-items: center; justify-content: center; cursor: grab; opacity: 0; pointer-events: none; transition: opacity .2s ease .1s; touch-action: none; }
+.bcv-quick.is-open .bcv-quick__bar { opacity: 1; pointer-events: auto; }
 .bcv-quick__bar:active { cursor: grabbing; }
 .bcv-quick__grip { width: 46px; height: 4px; border-radius: 2px; background: rgba(255,255,255,.22); transition: background .15s ease; }
 .bcv-quick__bar:hover .bcv-quick__grip { background: rgba(255,255,255,.45); }
@@ -2413,7 +2425,11 @@ html.bcv-phone.bcv-on #bcv-tray, html.bcv-setup-open #bcv-tray, html.bcv-welcome
 .bcv-pin__btn:hover { transform: scale(1.1); box-shadow: 0 6px 20px rgba(0,0,0,.3); }
 .bcv-pin__btn:focus-visible { outline: 2px solid #0a84ff; outline-offset: 2px; }
 .bcv-pin__x { position: absolute; top: -5px; right: -5px; width: 14px; height: 14px; margin: 0; padding: 0; border: 0; border-radius: 7px; background: #ff453a; display: flex; align-items: center; justify-content: center; cursor: pointer; opacity: 0; transform: scale(.6); transition: opacity .15s ease, transform .15s ease; }
-.bcv-pin:hover .bcv-pin__x, .bcv-pin:focus-within .bcv-pin__x { opacity: 1; transform: none; }
+/* It shows only under the pointer, at its own corner — the one the pin's disc wears. Hovering the
+   pin anywhere used to bring it, which on an open panel left a red dot floating off the top right.
+   Nothing widens its target: the dot overlaps the disc's top right already, and any reach back
+   towards the middle would take the press meant for the icon. */
+.bcv-pin__x:hover, .bcv-pin__x:focus-visible { opacity: 1; transform: none; }
 
 /* the popup shell: the tool's tile, a title and a line, Back where a tool has views, Close; the
  * body scrolls. On the page's ground (not glass), so the cards inside stand out. */
