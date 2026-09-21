@@ -12,19 +12,60 @@
   const U = BCV.ui;
   const IC = BCV.IC;
 
-  let current = null;
-  const isOpen = () => !!current && current.ov.isConnected;
-  function close() {
-    const c = current;
-    current = null;
-    if (!c) return;
-    c.stopWaiting?.();
-    document.removeEventListener('securitypolicyviolation', c.onCsp);
-    document.documentElement.classList.remove('bcv-ext-open'); // (the pins and the look switch slide back out of the bar)
-    c.ov.classList.add('is-closing');
-    setTimeout(() => c.ov.remove(), 180);
-    try { c.restore?.focus?.({ preventScroll: true }); } catch { /* gone */ }
+  // A popup can open over a popup: a tool that leads to another tool puts it on top rather than in
+  // its place, and closing the top one gives back the one underneath, still loaded and where it was.
+  const stack = [];
+  const top = () => stack[stack.length - 1] || null;
+  const isOpen = () => stack.length > 0;
+  function close() { closeOne(top()); } // (the one in front: the ones under it are out of reach)
+  function closeOne(entry) {
+    const i = entry ? stack.indexOf(entry) : -1;
+    if (i < 0) return;
+    stack.splice(i, 1);
+    entry.stopWaiting?.();
+    document.removeEventListener('securitypolicyviolation', entry.onCsp);
+    entry.ov.classList.add('is-closing');
+    setTimeout(() => entry.ov.remove(), 180);
+    const under = top();
+    if (under) { under.ov.classList.remove('is-under'); under.ov.focus({ preventScroll: true }); return; }
+    document.documentElement.classList.remove('bcv-ext-open'); // (the last one out: the pins and the look switch slide back out of the bar)
+    try { entry.restore?.focus?.({ preventScroll: true }); } catch { /* gone */ }
   }
+
+  // ---- the appearance of a framed popup ------------------------------------------------------
+  // A popup that frames somebody else's page is dark unless the sun in its bar says otherwise: the
+  // bar takes the dark palette and the page inside is turned over, which is the only way in — the
+  // frame is another origin and none of its styling is ours to set. An inversion is not their own
+  // dark theme, so the hue goes back round with it and colours land near where they started.
+  const THEME_KEY = 'ext:theme';
+  let theme = 'dark';
+  function paintTheme() {
+    document.documentElement.dataset.bcvExtTheme = theme;
+    const to = theme === 'dark' ? 'Light appearance' : 'Dark appearance';
+    for (const b of document.querySelectorAll('.bcv-ext__theme')) { b.title = to; b.setAttribute('aria-label', to); }
+  }
+  function setTheme(next) {
+    theme = next === 'light' ? 'light' : 'dark';
+    paintTheme();
+    try { BCV.api?.storage?.local?.set?.({ [THEME_KEY]: theme }); } catch { /* the page keeps its own */ }
+  }
+  /** The sun (press for light) or the moon (press for dark), for the bar of anything framed. It
+   *  names itself on the way out, since a popup built elsewhere never goes through paintTheme. */
+  const themeButton = () => {
+    const b = h('button', { type: 'button', class: 'bcv-btn bcv-ext__theme', onclick: () => setTheme(theme === 'dark' ? 'light' : 'dark') }, [
+      U.svg(IC.sun, { size: 14, stroke: 'currentColor', width: 1.9, cls: 'bcv-ext__sun' }),
+      U.svg(IC.moon, { size: 14, stroke: 'currentColor', width: 1.9, cls: 'bcv-ext__moon' }),
+    ]);
+    const to = theme === 'dark' ? 'Light appearance' : 'Dark appearance';
+    b.title = to;
+    b.setAttribute('aria-label', to);
+    return b;
+  };
+  paintTheme();
+  (async () => {
+    try { const r = await BCV.api.storage.local.get(THEME_KEY); if (r[THEME_KEY]) theme = r[THEME_KEY] === 'light' ? 'light' : 'dark'; } catch { /* it stays dark */ }
+    paintTheme();
+  })();
   /** Canvas's launch page for one of its tools, without Canvas's chrome round it. */
   function borderless(href) {
     const u = new URL(href, location.origin);
@@ -36,7 +77,10 @@
   /** The popup. `url` is what gets framed; `newTab` what a new tab gets (else `page`, Canvas's own page for it, else the url). */
   function open({ title = 'External tool', url, page = null, newTab = null, note = '', from = null, icon = null } = {}) {
     if (!url) return null;
-    close();
+    const under = top();
+    if (under) under.ov.classList.add('is-under'); // (it waits, loaded, out of reach until this one closes)
+    let entry = null;
+    const alive = () => stack.includes(entry);
     const tabUrl = newTab || page || url;
     const foreign = !sameOrigin(url);
     const ov = U.el('bcv-sheet-ov bcv-ext-ov', null, { role: 'dialog', 'aria-label': title, tabindex: '-1' });
@@ -52,7 +96,7 @@
     const stopWaiting = () => { clearTimeout(late); late = 0; };
     const fail = () => {
       stopWaiting();
-      if (current?.ov !== ov) return;
+      if (!alive()) return;
       body.replaceChildren(U.el('bcv-ext__fail', [
         U.svg(IC.warn, { size: 26, stroke: 'var(--bcv-orange)', width: 1.9 }),
         U.text('bcv-ext__failtitle', 'This one will not open in a popup'),
@@ -61,12 +105,12 @@
       ]));
     };
     const toTab = async () => {
-      if (current?.ov !== ov) return;
+      if (!alive()) return;
       stopWaiting();
       let opened = false;
       try { opened = !!(await BCV.api?.runtime?.sendMessage?.({ type: 'openTab', url: tabUrl }))?.ok; } catch { opened = false; }
       if (!opened) opened = !!window.open(tabUrl, '_blank', 'noopener');
-      if (opened) close();
+      if (opened) closeOne(entry);
       else fail();
     };
     const waitOn = () => { stopWaiting(); late = setTimeout(toTab, SLOW); };
@@ -79,7 +123,7 @@
       body.classList.add('is-loaded');
     });
     frame.addEventListener('error', fail);
-    const closeBtn = h('button', { type: 'button', class: 'bcv-sheet__close', 'aria-label': 'Close', onclick: close }, U.svg(IC.close, { size: 13, stroke: 'var(--bcv-ink2)', width: 2.3 }));
+    const closeBtn = h('button', { type: 'button', class: 'bcv-sheet__close', 'aria-label': 'Close', onclick: () => closeOne(entry) }, U.svg(IC.close, { size: 13, stroke: 'var(--bcv-ink2)', width: 2.3 }));
     const tab = h('a', { class: 'bcv-btn bcv-ext__tab', href: tabUrl, target: '_blank', rel: 'noopener', title: 'Open in a new tab' }, [U.svg(IC.external, { size: 13, stroke: 'currentColor', width: 1.9 }), h('span', { text: 'Open in new tab' })]);
     // Reload: the launch again from the start (a tool that timed out, a sign-in that went round in circles)
     const reload = h('button', { type: 'button', class: 'bcv-btn bcv-ext__reload', title: 'Load the tool again', 'aria-label': 'Reload' }, [U.svg('M4 12a8 8 0 108-8M4 4v5h5', { size: 13, stroke: 'currentColor', width: 2 }), h('span', { text: 'Reload' })]);
@@ -87,27 +131,29 @@
       frame.classList.remove('is-in');
       body.classList.remove('is-loaded'); // "Opening…" again until the tool is back
       frame.src = 'about:blank'; // through a blank page, so the launch starts over rather than the browser answering from what it had
-      setTimeout(() => { if (current?.ov === ov) frame.src = url; }, 30);
+      setTimeout(() => { if (alive()) frame.src = url; }, 30);
       waitOn(); // (the second try gets the same five seconds)
     });
     const head = U.el('bcv-sheet__head bcv-ext__head', [
       U.tile(icon || IC.shield, { color: 'var(--bcv-blue)', tint: 'var(--bcv-blue-soft)', size: 32, iconSize: 16 }),
       U.el('bcv-sheet__titles', [U.text('bcv-sheet__title', title), note ? U.text('bcv-sheet__note', note) : null]), // (the bar carries the tool's name and nothing more)
-      U.el('bcv-ext__acts', [reload, tab]),
+      U.el('bcv-ext__acts', [themeButton(), reload, tab]),
       closeBtn,
     ]);
     closeBtn.classList.add('bcv-ext__close');
     const sheet = U.el('bcv-sheet bcv-ext', [head, body]);
     ov.append(sheet);
-    ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
-    ov.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.stopPropagation(); close(); } });
-    current = { ov, onCsp, stopWaiting, restore: from && from.focus ? from : document.activeElement };
+    ov.addEventListener('click', (e) => { if (e.target === ov) closeOne(entry); });
+    ov.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.stopPropagation(); closeOne(entry); } }); // (only the one in front has the focus, so a stack comes apart one at a time)
+    entry = { ov, onCsp, stopWaiting, restore: under ? null : (from && from.focus ? from : document.activeElement) };
+    stack.push(entry);
     waitOn();
     document.body.append(ov);
+    paintTheme(); // (the sun or the moon in this bar, named for what pressing it does)
     document.documentElement.classList.add('bcv-ext-open'); // the pins and the look switch slide into the bar, beside the X
     if (from) U.morphFrom(sheet, from);
     ov.focus({ preventScroll: true });
-    return { close, ov };
+    return { close: () => closeOne(entry), ov };
   }
   /** A link to a tool, as Canvas gives it: Canvas's own tool pages are framed borderless with Open in
    *  Canvas beside them; any other address is framed as it is. */
@@ -120,5 +166,5 @@
   /** Is this address one Canvas launches a tool from? */
   const isToolHref = (href) => { try { const u = new URL(href, location.origin); return u.origin === location.origin && /\/external_tools\/(\d+|retrieve)\b/.test(u.pathname) && !u.searchParams.has('bcv'); } catch { return false; } };
 
-  BCV.exttool = { open, openLink, close, isOpen, isToolHref, borderless };
+  BCV.exttool = { open, openLink, close, isOpen, isToolHref, borderless, theme: { get: () => theme, set: setTheme, button: themeButton } };
 })();

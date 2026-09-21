@@ -24,9 +24,13 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.48.1', date: '2026-09-21', notes: [
+      { kind: 'new', title: 'A tool over a tool', body: 'One opened from another goes on top, then hands back.', icon: P.layers },
+      { kind: 'improved', title: 'Dark is for the framed', body: 'Only a popup holding another site goes dark.', icon: P.eye },
+    ] },
     { version: '2.48.0', date: '2026-09-21', notes: [
-      { kind: 'new', title: 'Tools go dark', body: 'Every tool opens dark now, whatever the page under it is.', icon: P.eye },
-      { kind: 'new', title: 'A sun for light', body: 'Press the sun in a tool’s head to turn it light again.', icon: P.sparkle },
+      { kind: 'new', title: 'Framed tools go dark', body: 'A school tool opens dark, bar and page alike.', icon: P.eye },
+      { kind: 'new', title: 'A sun for light', body: 'Press the sun in its bar to turn the pair light again.', icon: P.sparkle },
       { kind: 'improved', title: 'Desmos goes dark too', body: 'The graphing calculator is turned over to match.', icon: P.tool },
     ] },
     { version: '2.47.2', date: '2026-09-21', notes: [

@@ -26,23 +26,6 @@
   async function save(key, value) {
     try { await api.storage.local.set({ [key]: value }); } catch { /* the page keeps its own */ }
   }
-  // ---- the tools' own appearance ------------------------------------------------------------
-  // A tool's popup is dark whatever the page under it is: it floats over Canvas the way the
-  // widgets in the tray do, and dark is what suits a calculator, a table or a PDF at night. The
-  // sun in its head turns it light; the choice is kept, one setting for every tool. It rides on
-  // the root so a widget's frame can read it too, and the popup's own colours come from the
-  // variables redefined under it in app.css.
-  const THEME_KEY = 'tools:theme';
-  let toolTheme = 'dark';
-  function paintTheme() {
-    html.dataset.bcvTools = toolTheme;
-    const to = toolTheme === 'dark' ? 'Light appearance' : 'Dark appearance';
-    for (const b of document.querySelectorAll('.bcv-tool__theme')) { b.title = to; b.setAttribute('aria-label', to); }
-  }
-  function setToolTheme(next) { toolTheme = next === 'light' ? 'light' : 'dark'; paintTheme(); save(THEME_KEY, toolTheme); }
-  paintTheme();
-  load(THEME_KEY, 'dark').then((t) => { toolTheme = t === 'light' ? 'light' : 'dark'; paintTheme(); });
-
   const uid = (p = 'x') => `${p}${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
   const svgEl = (tag, attrs = {}) => { const el = document.createElementNS(SVG, tag); for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v); return el; };
 
@@ -116,13 +99,9 @@
     const sheet = U.el(`bcv-sheet bcv-tool ${cls}`, [
       U.el('bcv-sheet__head bcv-tool__head', [
         back,
-        h('span', { class: 'bcv-sheet__tile bcv-tool__tile', style: { background: tintOf(tool.color, toolTheme === 'dark') } }, U.svg(tool.icon, { size: 18, stroke: tool.color, width: 1.8 })),
+        h('span', { class: 'bcv-sheet__tile bcv-tool__tile', style: { background: tintOf(tool.color, BCV.app?.isDark?.()) } }, U.svg(tool.icon, { size: 18, stroke: tool.color, width: 1.8 })),
         U.el('bcv-sheet__titles', [titleEl, subEl]),
         head, // (a tool's own control in the head, beside the close button: a mode switch, say)
-        h('button', { type: 'button', class: 'bcv-sheet__close bcv-tool__theme', onclick: () => setToolTheme(toolTheme === 'dark' ? 'light' : 'dark') }, [
-          U.svg(IC.sun, { size: 14, stroke: 'var(--bcv-ink2)', width: 1.9, cls: 'bcv-tool__sun' }),
-          U.svg(IC.moon, { size: 14, stroke: 'var(--bcv-ink2)', width: 1.9, cls: 'bcv-tool__moon' }),
-        ]),
         h('button', { type: 'button', class: 'bcv-sheet__close', 'aria-label': 'Close', onclick: close }, U.svg(IC.close, { size: 13, stroke: 'var(--bcv-ink2)', width: 2.3 })),
       ]),
       bodyEl,
@@ -132,7 +111,6 @@
     sheet.dataset.tool = tool.key;
     ov.append(sheet);
     document.body.append(ov);
-    paintTheme(); // (the sun or the moon in this head, named for what pressing it does)
     if (from) U.morphFrom(sheet, from);
     ov.tabIndex = -1;
     ov.focus({ preventScroll: true });
@@ -630,7 +608,9 @@
   function openGraph(app, { from = null } = {}) {
     const tool = toolOf('graph');
     const body = U.el('bcv-graph');
-    const p = popup({ tool, title: 'Graphing calculator', sub: 'Powered by Desmos', width: 960, cls: 'bcv-tool--tall', body, from });
+    // Desmos is framed from their own domain, so this one carries the framed popups' sun as well:
+    // the page inside is turned over with them, since none of its styling is ours to set.
+    const p = popup({ tool, title: 'Graphing calculator', sub: 'Powered by Desmos', width: 960, cls: 'bcv-tool--tall', body, from, head: BCV.exttool?.theme?.button?.() || null });
     const fail = () => {
       if (!p.alive()) return;
       body.replaceChildren(U.el('bcv-graph__fail', rise([

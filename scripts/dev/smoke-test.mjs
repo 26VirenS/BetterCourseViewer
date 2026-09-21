@@ -2104,8 +2104,46 @@ try {
   await page.click('.bcv-detail__actions .bcv-btn--primary');
   await page.waitForSelector('.bcv-ext-ov .bcv-ext__frame', { timeout: 5000 });
   check(await page.$eval('.bcv-ext__frame', (f) => /external_tools\/retrieve\?assignment_id=4003/.test(f.getAttribute('src'))) && (await texts('.bcv-ext .bcv-sheet__title'))[0] === 'Knewton Alta: Unit 2' && page.url().endsWith('/courses/104/assignments/4003'), 'Start assignment opens the tool full screen over the page, Canvas\'s launch framed in it');
+  // a framed popup is dark, bar and all, with the page inside it turned over (another origin: there
+  // is no other way in), and the sun in its bar turns the pair light
+  const extDark = await page.evaluate(() => {
+    const ov = document.querySelector('.bcv-ext-ov');
+    return { ext: document.documentElement.getAttribute('data-bcv-ext-theme'), ink: getComputedStyle(ov.querySelector('.bcv-ext')).color, frame: getComputedStyle(ov.querySelector('.bcv-ext__frame')).filter, label: ov.querySelector('.bcv-ext__theme').title };
+  });
+  check(extDark.ext === 'dark' && extDark.ink === 'rgb(242, 242, 247)' && /invert\(1\)/.test(extDark.frame) && extDark.label === 'Light appearance', `the framed popup is dark with the tool inside it turned over (${JSON.stringify(extDark)})`);
+  await page.click('.bcv-ext-ov .bcv-ext__theme');
+  await page.waitForTimeout(250);
+  const extLight = await page.evaluate(() => {
+    const ov = document.querySelector('.bcv-ext-ov');
+    return { ink: getComputedStyle(ov.querySelector('.bcv-ext')).color, frame: getComputedStyle(ov.querySelector('.bcv-ext__frame')).filter, label: ov.querySelector('.bcv-ext__theme').title };
+  });
+  check(extLight.ink === 'rgb(28, 28, 30)' && extLight.frame === 'none' && extLight.label === 'Dark appearance', `the sun turns bar and tool light together (${JSON.stringify(extLight)})`);
+  await page.click('.bcv-ext-ov .bcv-ext__theme');
+  await page.waitForTimeout(200);
+  await shot(page, '14c-ext-dark');
+  // one framed popup over another: the second goes on top, the first waits underneath and comes back
+  // (from the isolated world the content scripts run in: the page's own has no BCV, and a tool
+  // reaching for another tool goes through this same call)
+  await sw.evaluate(async (base) => {
+    const [tab] = await chrome.tabs.query({ url: `${base}/*` });
+    await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'ISOLATED', func: () => self.BCV.exttool.open({ title: 'A second tool', url: '/external_tools/retrieve?url=second', newTab: '/second' }) });
+  }, BASE);
+  await page.waitForTimeout(350);
+  const extStack = await page.evaluate(() => {
+    const ovs = [...document.querySelectorAll('.bcv-ext-ov')];
+    return { n: ovs.length, top: ovs[ovs.length - 1].querySelector('.bcv-sheet__title').textContent, under: ovs[0].querySelector('.bcv-sheet__title').textContent, isUnder: ovs[0].classList.contains('is-under'), reach: getComputedStyle(ovs[0]).pointerEvents, scrim: getComputedStyle(ovs[0]).backgroundColor };
+  });
+  check(extStack.n === 2 && extStack.top === 'A second tool' && extStack.under === 'Knewton Alta: Unit 2' && extStack.isUnder && extStack.reach === 'none' && extStack.scrim === 'rgba(0, 0, 0, 0)', `a tool opened from a tool goes on top; the first waits underneath, out of reach, its scrim off (${JSON.stringify(extStack)})`);
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(400);
+  const extBack = await page.evaluate(() => {
+    const ovs = [...document.querySelectorAll('.bcv-ext-ov')];
+    return { n: ovs.length, title: ovs[0]?.querySelector('.bcv-sheet__title').textContent, isUnder: ovs[0]?.classList.contains('is-under'), barOn: document.documentElement.classList.contains('bcv-ext-open') };
+  });
+  check(extBack.n === 1 && extBack.title === 'Knewton Alta: Unit 2' && !extBack.isUnder && extBack.barOn, `Escape takes the top one off and gives the first back, itself again (${JSON.stringify(extBack)})`);
   await page.keyboard.press('Escape');
   await eventually(() => page.$('.bcv-ext-ov').then((e) => !e), 3000);
+  check(!(await page.evaluate(() => document.documentElement.classList.contains('bcv-ext-open'))), 'the last one out puts the pins and the switch back where they were');
   // a grade the tool posts after its launch lands on the page by itself: the submission is asked for
   // again once the tool has loaded, and again for a while, and the mark is drawn when it changes
   check((await page.$('.bcv-detail__grade')) === null && (await texts('.bcv-stat__value'))[0] === '—', 'the tool assignment starts ungraded');
@@ -2937,28 +2975,25 @@ try {
     check(!stray, `${key} opens with no stray word in it${stray ? ` (${stray})` : ''}`);
     await closeTool();
   }
-  // a tool's popup is dark over a light page, and the sun in its head turns it light and back
+  // Desmos is framed from desmos.com, so the graphing tool carries the framed popups' sun: the page
+  // inside is turned over when they are dark. The popup's own chrome still follows the page.
   await openTool('graph');
   await page.waitForTimeout(300);
-  const darkTool = await page.evaluate(() => {
+  const gDark = await page.evaluate(() => {
     const ov = document.querySelector('.bcv-tool-ov');
-    const s = getComputedStyle(ov.querySelector('.bcv-sheet'));
-    return { page: document.documentElement.getAttribute('data-bcv-theme'), tools: document.documentElement.getAttribute('data-bcv-tools'), ink: s.color, glass: getComputedStyle(ov.querySelector('.bcv-sheet')).backgroundColor, sun: !!ov.querySelector('.bcv-tool__sun') && getComputedStyle(ov.querySelector('.bcv-tool__sun')).display, moon: getComputedStyle(ov.querySelector('.bcv-tool__moon')).display, label: ov.querySelector('.bcv-tool__theme').title, frame: getComputedStyle(ov.querySelector('.bcv-graph__frame')).filter };
+    return { ext: document.documentElement.getAttribute('data-bcv-ext-theme'), ink: getComputedStyle(ov.querySelector('.bcv-sheet')).color, sun: getComputedStyle(ov.querySelector('.bcv-ext__sun')).display, moon: getComputedStyle(ov.querySelector('.bcv-ext__moon')).display, label: ov.querySelector('.bcv-ext__theme').title, frame: getComputedStyle(ov.querySelector('.bcv-graph__frame')).filter };
   });
-  check(darkTool.tools === 'dark' && darkTool.ink === 'rgb(242, 242, 247)' && darkTool.glass === 'rgb(0, 0, 0)' && darkTool.sun === 'block' && darkTool.moon === 'none' && darkTool.label === 'Light appearance' && /invert\(1\)/.test(darkTool.frame), `a tool opens dark whatever the page is, with the sun in its head for light and Desmos turned over with it (${JSON.stringify(darkTool)})`);
-  await page.click('.bcv-tool-ov .bcv-tool__theme');
-  await page.waitForTimeout(300);
-  const lightTool = await page.evaluate(() => {
-    const ov = document.querySelector('.bcv-tool-ov');
-    return { tools: document.documentElement.getAttribute('data-bcv-tools'), ink: getComputedStyle(ov.querySelector('.bcv-sheet')).color, glass: getComputedStyle(ov.querySelector('.bcv-sheet')).backgroundColor, sun: getComputedStyle(ov.querySelector('.bcv-tool__sun')).display, moon: getComputedStyle(ov.querySelector('.bcv-tool__moon')).display, label: ov.querySelector('.bcv-tool__theme').title, frame: getComputedStyle(ov.querySelector('.bcv-graph__frame')).filter };
-  });
-  check(lightTool.tools === 'light' && lightTool.ink === 'rgb(28, 28, 30)' && lightTool.glass === 'rgb(242, 242, 246)' && lightTool.sun === 'none' && lightTool.moon === 'block' && lightTool.label === 'Dark appearance' && lightTool.frame === 'none', `the sun turns it light: dark ink, white glass, a moon to go back, and Desmos left alone (${JSON.stringify(lightTool)})`);
-  check((await sw.evaluate(async () => (await self.BCV.api.storage.local.get('tools:theme'))['tools:theme'])) === 'light', 'the choice is kept for every tool');
-  await shot(page, '36d-tool-light');
-  await page.click('.bcv-tool-ov .bcv-tool__theme');
+  check(gDark.ext === 'dark' && gDark.ink === 'rgb(28, 28, 30)' && gDark.sun === 'block' && gDark.moon === 'none' && gDark.label === 'Light appearance' && /invert\(1\)/.test(gDark.frame), `Desmos is turned over while the popup round it keeps the page's own light appearance, with the sun in its head for light (${JSON.stringify(gDark)})`);
+  await page.click('.bcv-tool-ov .bcv-ext__theme');
   await page.waitForTimeout(250);
-  await shot(page, '36e-tool-dark');
-  check((await page.evaluate(() => document.documentElement.getAttribute('data-bcv-tools'))) === 'dark' && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('tools:theme'))['tools:theme'])) === 'dark', 'the moon turns it back');
+  const gLight = await page.evaluate(() => {
+    const ov = document.querySelector('.bcv-tool-ov');
+    return { ext: document.documentElement.getAttribute('data-bcv-ext-theme'), sun: getComputedStyle(ov.querySelector('.bcv-ext__sun')).display, moon: getComputedStyle(ov.querySelector('.bcv-ext__moon')).display, label: ov.querySelector('.bcv-ext__theme').title, frame: getComputedStyle(ov.querySelector('.bcv-graph__frame')).filter };
+  });
+  check(gLight.ext === 'light' && gLight.sun === 'none' && gLight.moon === 'block' && gLight.label === 'Dark appearance' && gLight.frame === 'none' && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('ext:theme'))['ext:theme'])) === 'light', `the sun leaves Desmos alone and puts a moon in its place, kept for every framed popup (${JSON.stringify(gLight)})`);
+  await page.click('.bcv-tool-ov .bcv-ext__theme');
+  await page.waitForTimeout(200);
+  check((await page.evaluate(() => document.documentElement.getAttribute('data-bcv-ext-theme'))) === 'dark', 'the moon turns it back');
   await closeTool();
   const toolSub = () => texts('.bcv-tool__sub').then((t) => t[0]);
   // the citation generator: style and type pick the template, the fields fill it, a guard keeps a
@@ -2967,7 +3002,7 @@ try {
   const fillCite = async (f) => { for (const [k, v] of Object.entries(f)) await page.fill(`.bcv-tool__input[data-field="${k}"]`, v); await page.waitForTimeout(150); };
   const cite = () => page.$eval('.bcv-cite__preview', (e) => e.textContent.replace(/\s+/g, ' ').trim());
   check((await texts('.bcv-tool__title'))[0] === 'Citation generator' && (await toolSub()) === 'MLA 9 · 5 to fill' && (await page.$eval('.bcv-cite__copy', (e) => e.disabled)) && (await texts('.bcv-cite__missing'))[0] === 'Add author, page title, website, year, url to finish this citation.' && (await page.$$('.bcv-cite__field.is-needed')).length === 5, 'the citation generator opens on MLA 9 for a website, names the five fields it needs, and keeps Copy and Save inert');
-  check((await page.$$('.bcv-cite__typeic')).length === 5 && (await texts('.bcv-cite__chip')).join(' | ') === 'Author | Page title | Website | Year | URL' && (await page.$$('.bcv-cite__side .bcv-tool__card')).length === 2 && (await page.$$('.bcv-cite__dot')).length === 5 && (await page.$eval('.bcv-cite__type.is-on .bcv-cite__typeic', (e) => getComputedStyle(e).backgroundColor)) === 'rgb(10, 132, 255)', 'the source types are tiles with a glyph each, the one chosen in blue; the fields still needed are chips; the result column sits beside the details');
+  check((await page.$$('.bcv-cite__typeic')).length === 5 && (await texts('.bcv-cite__chip')).join(' | ') === 'Author | Page title | Website | Year | URL' && (await page.$$('.bcv-cite__side .bcv-tool__card')).length === 2 && (await page.$$('.bcv-cite__dot')).length === 5 && (await page.$eval('.bcv-cite__type.is-on .bcv-cite__typeic', (e) => getComputedStyle(e).backgroundColor)) === 'rgb(10, 108, 255)', 'the source types are tiles with a glyph each, the one chosen in blue; the fields still needed are chips; the result column sits beside the details');
   await page.click('.bcv-cite__chip[data-key="year"]');
   check(await page.evaluate(() => document.activeElement?.dataset.field === 'year'), 'a chip puts the cursor in that field');
   await page.click('.bcv-cite__today');
