@@ -1281,7 +1281,7 @@
     if (!BCV.welcome) return false;
     if (await load(WELCOME_KEY, false)) return false;
     BCV.welcome.cover();
-    await BCV.welcome.open(app, ['tools', 'pin'], { onDone: () => save(WELCOME_KEY, true) }); // (the drag is left out where there is no switch: a phone)
+    await BCV.welcome.open(app, ['toolsIntro', 'pin'], { onDone: () => save(WELCOME_KEY, true) }); // (the drag is left out where there is no switch: a phone)
     return true;
   }
 

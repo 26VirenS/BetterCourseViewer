@@ -2763,6 +2763,19 @@ html[data-bcv-theme="dark"] .bcv-conv__delta.is-more, html[data-bcv-theme="dark"
 /* the welcome's two Tools stages: the words alone, centred; then the drag, shown round and round —
  * the folded switch where it is, a card that a cursor pulls to the top right and that shrinks into
  * a pin beside the switch */
+/* a row of the sidebar, seen through a hole in the black (the mask is the black; the overlay goes clear) */
+#bcv-welcome.bcv-welcome--holes { background: transparent; }
+.bcv-welcome__spot { position: absolute; inset: 0; pointer-events: none; animation: bcv-welcome-fade .3s ease both; }
+.bcv-welcome__spot.is-out { animation: bcv-welcome-out .25s ease both; }
+.bcv-welcome__mask { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.bcv-welcome__ring { fill: none; stroke: rgba(255,255,255,.4); stroke-width: 1.5; }
+.bcv-welcome__stage[data-stage="side"] { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; column-gap: 22px; row-gap: 12px; right: 16px; max-width: 720px; }
+.bcv-welcome__stage[data-stage="side"] .bcv-welcome__arrowbox { grid-row: 1 / 3; }
+.bcv-welcome__stage[data-stage="side"] .bcv-welcome__next { grid-column: 2; justify-self: start; margin: 0; }
+.bcv-welcome__side2 { position: absolute; display: flex; align-items: center; gap: 12px; pointer-events: none; animation: bcv-welcome-in .5s ease .35s both; }
+.bcv-welcome__side2 .bcv-welcome__arrow path { stroke-width: 6; }
+.bcv-welcome__side2text { font: 500 15px/1.3 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif; color: rgba(255,255,255,.75); max-width: 220px; }
+@media (prefers-reduced-motion: reduce) { .bcv-welcome__spot, .bcv-welcome__side2 { animation: none; opacity: 1; } .bcv-welcome__spot.is-out { opacity: 0; } }
 .bcv-welcome__stage[data-stage="center"] { top: 0; bottom: 0; left: 16px; right: 16px; justify-content: center; align-items: center; text-align: center; }
 .bcv-welcome__stage[data-stage="center"] .bcv-welcome__title { font-size: clamp(30px, 5vw, 48px); }
 .bcv-welcome__stage[data-stage="center"] .bcv-welcome__hint { font-size: 17px; }

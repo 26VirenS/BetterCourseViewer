@@ -4,7 +4,9 @@
  * the page draws, so the Dashboard is never seen first) and points at the look switch at the top
  * right — a copy of the real one, shown working: a pointer comes to it, presses its stops and
  * drags its knob, the lines under it saying what each part does — then at a mock Away Refresh
- * pill counting its three seconds down in slow motion, then at the Dashboard's way in: a
+ * pill counting its three seconds down in slow motion, then at three rows of the sidebar in turn
+ * — Grades, Courses (and the starred courses listed under it, when they are), Tools — each seen
+ * through a hole in the black with an arrow at it, then at the Dashboard's way in: a
  * counter pressed, the list behind it, an item previewed beside the list. The first time Tools
  * opens, it says what Tools is, then shows the drag: a card pulled to the top turning into a pin
  * beside the switch. A phone has no switch in its header, so it gets the pointers that need none; the app
@@ -34,7 +36,21 @@
       arrow: { w: 100, ht: 150, line: 'M50 140L50 14', head: 'M28 38L50 14L72 38' },
       prop: (app) => awayMock(app),
     },
-    tools: { layout: 'center', title: 'Some helpful things', hint: 'some tools to help you do more, quickly.' },
+    // the sidebar's rows, each shown through a hole in the black with an arrow at it (a phone has no sidebar: left out there)
+    grades: {
+      layout: 'side', kicker: 'Grades', title: 'All your grades, in one place', hint: 'Every course’s grade and its breakdown, side by side — and what you need on what’s left.',
+      spot: () => navRow('gpa'),
+    },
+    courses: {
+      layout: 'side', kicker: 'Courses', title: 'Every course, one press away',
+      hint: (app) => (favsListed() ? 'The courses you star are listed right under it, on every page.' : 'Hover it to reach any course; the ones you star come first.'),
+      spot: () => navRow('courses'), also: () => (favsListed() ? { el: document.querySelector('#bcv-side .bcv-side__group'), text: 'Your starred courses, always here' } : null),
+    },
+    tools: {
+      layout: 'side', kicker: 'Tools', title: 'Helpful tools, built in', hint: 'A calculator, citations, flashcards, a file converter, a periodic table and more — each pinnable to the top of every page.',
+      spot: () => navRow('tools'),
+    },
+    toolsIntro: { layout: 'center', title: 'Some helpful things', hint: 'some tools to help you do more, quickly.' },
     pin: {
       layout: 'demo', kicker: 'Tools', title: 'Drag a tool to the top', hint: 'It becomes a small button next to the Simpl Courses switch, on every page.',
       prop: (app, ctx) => pinDemo(app, ctx.look),
@@ -44,6 +60,11 @@
       prop: () => peekDemo(),
     },
   };
+
+  /** A row of the sidebar's nav, when it is on the page and drawn (a phone has none). */
+  const navRow = (key) => { const el = document.querySelector(`#bcv-side .bcv-nav__item[data-nav="${key}"]`); return el && el.getBoundingClientRect().width > 0 ? el : null; };
+  /** The starred courses are listed down the sidebar (not kept in a panel off the Courses row). */
+  const favsListed = () => { const g = document.querySelector('#bcv-side .bcv-side__group'); return !!g && g.getBoundingClientRect().height > 0; };
 
   let ui = null; // the welcome on show: { el, stage: { key, box, prop, next } | null, timer }
   const active = () => !!ui;
@@ -196,6 +217,38 @@
   }
   const arrowOf = ({ w, ht, line, head }) => h('span', { class: 'bcv-welcome__arrowbox', 'aria-hidden': 'true', html:
     `<svg class="bcv-welcome__arrow" viewBox="0 0 ${w} ${ht}" width="${w}" height="${ht}"><path class="bcv-welcome__line" pathLength="1" d="${line}"/><path class="bcv-welcome__head" d="${head}"/></svg>` });
+  const LEFT_ARROW = { w: 130, ht: 80, line: 'M120 40L14 40', head: 'M38 18L14 40L38 62' }; // at something to the left
+  const PAD = 6; // around a thing shown through the black
+  const holeOf = (el) => { const r = el.getBoundingClientRect(); return { x: r.left - PAD, y: r.top - PAD, w: r.width + PAD * 2, h: r.height + PAD * 2 }; };
+
+  /** The black with holes in it: the things named are seen as they are, the page under them, each
+   *  with a thin ring; a second thing (the starred courses under the Courses row) gets a small arrow
+   *  and a line of its own. Where the stage's words go is set on the stage from the first hole. */
+  function spotProp(s, app, box) {
+    const first = s.spot(app);
+    if (!first) return null;
+    const also = s.also?.(app);
+    const holes = [holeOf(first), also?.el ? holeOf(also.el) : null].filter(Boolean);
+    const id = `bcv-welcome-mask-${Date.now()}`;
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('class', 'bcv-welcome__mask');
+    svg.setAttribute('aria-hidden', 'true');
+    svg.innerHTML = `<defs><mask id="${id}"><rect width="100%" height="100%" fill="#fff"/>${holes.map((r) => `<rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" rx="12" fill="#000"/>`).join('')}</mask></defs>`
+      + `<rect width="100%" height="100%" fill="#000" mask="url(#${id})"/>`
+      + holes.map((r) => `<rect class="bcv-welcome__ring" x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" rx="12"/>`).join('');
+    const [h1] = holes;
+    box.style.left = `${Math.round(h1.x + h1.w + 30)}px`;
+    box.style.top = `${Math.max(16, Math.round(h1.y + h1.h / 2 - 40))}px`;
+    const wrap = h('div', { class: 'bcv-welcome__spot', 'aria-hidden': 'true' }, [svg]);
+    if (also?.el) {
+      const h2 = holes[1];
+      wrap.append(h('div', { class: 'bcv-welcome__side2', style: { left: `${Math.round(h2.x + h2.w + 30)}px`, top: `${Math.round(h2.y + h2.h / 2 - 20)}px` } }, [
+        arrowOf({ w: 80, ht: 40, line: 'M72 20L10 20', head: 'M26 6L10 20L26 34' }),
+        h('span', { class: 'bcv-welcome__side2text', text: also.text }),
+      ]));
+    }
+    return wrap;
+  }
 
   /** One stage on the black: the thing pointed at, the arrow, the lines, and Continue after a
    *  while. Resolves when Continue is pressed. */
@@ -203,24 +256,26 @@
     const s = STAGES[key];
     const next = h('button', { type: 'button', class: 'bcv-welcome__next', text: 'Continue' });
     next.hidden = true;
-    const lines = Array.isArray(s.hint); // (a hint of several lines: one per stop)
+    const hint = typeof s.hint === 'function' ? s.hint(app) : s.hint;
+    const lines = Array.isArray(hint); // (a hint of several lines: one per stop)
     const box = h('div', { class: 'bcv-welcome__stage', dataset: { stage: s.layout } }, [
-      s.arrow ? arrowOf(s.arrow) : null,
+      s.arrow ? arrowOf(s.arrow) : s.spot ? arrowOf(LEFT_ARROW) : null,
       h('div', { class: 'bcv-welcome__text' }, [
         s.kicker ? h('div', { class: 'bcv-welcome__kicker', text: s.kicker }) : null,
         h('div', { class: 'bcv-welcome__title', text: s.title }),
-        lines ? h('div', { class: 'bcv-welcome__hint bcv-welcome__hint--rows' }, s.hint.map((line, i) => { // (a row per stop, with a small slider showing where it is)
+        lines ? h('div', { class: 'bcv-welcome__hint bcv-welcome__hint--rows' }, hint.map((line, i) => { // (a row per stop, with a small slider showing where it is)
           const at = line.indexOf(':');
           const stop = s.stops?.[i] ?? 0;
           return h('div', { class: 'bcv-welcome__stoprow' }, [
             h('span', { class: 'bcv-welcome__stop', dataset: { stop: String(stop) }, style: { '--c': stop < 0 ? '#ff4f1f' : stop > 0 ? '#34c759' : '#8e8e93' }, 'aria-hidden': 'true' }, h('span', { class: 'bcv-welcome__stopknob' })),
             h('span', { class: 'bcv-welcome__stoptext' }, at > 0 ? [h('b', { text: line.slice(0, at + 1) }), line.slice(at + 1)] : [line]),
           ]);
-        })) : h('div', { class: 'bcv-welcome__hint', text: s.hint }),
+        })) : h('div', { class: 'bcv-welcome__hint', text: hint }),
       ]),
       next,
     ]);
-    const prop = s.prop ? s.prop(app, ctx) : null;
+    const prop = s.spot ? spotProp(s, app, box) : s.prop ? s.prop(app, ctx) : null;
+    ui.el.classList.toggle('bcv-welcome--holes', !!(s.spot && prop)); // (the black is the mask's, with the holes in it)
     ui.el.dataset.stage = key;
     ui.el.replaceChildren(...[prop, box].filter(Boolean));
     ui.stage = { key, box, prop, next };
@@ -237,6 +292,7 @@
     const st = ui?.stage;
     if (!st) return;
     ui.stage = null;
+    ui.el.classList.remove('bcv-welcome--holes'); // (the plain black is back under the mask before the mask fades: the page never shows through)
     st.box.classList.add('is-out');
     st.prop?.classList.add('is-out');
     await wait(LEAVE);
@@ -253,9 +309,10 @@
     // a phone's header has none, so the stages that point at it are left out there
     const lookNow = () => { const l = document.getElementById('bcv-look'); return l && getComputedStyle(l).display !== 'none' ? l : null; };
     const setupRun = !keys;
-    for (const key of (keys || ['look', 'away', 'peek']).filter((k) => STAGES[k])) {
+    for (const key of (keys || ['look', 'away', 'grades', 'courses', 'tools', 'peek']).filter((k) => STAGES[k])) {
       const look = lookNow();
       if (!look && (key === 'look' || key === 'pin')) continue;
+      if (STAGES[key].spot && !STAGES[key].spot(app)) continue; // (no sidebar row to point at: a phone)
       await stage(app, key, { look });
       if (key === 'look') { try { await BCV.api.storage.local.set({ [KEY2]: true }); await BCV.api.storage.local.remove(OLD_KEYS); } catch { /* shown all the same */ } } // (seen: not owed again after an update; the old shows' marks go)
       await leave();

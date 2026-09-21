@@ -2675,6 +2675,35 @@ try {
   await page.waitForTimeout(400);
   await shot(page, '31b-welcome-away');
   await page.keyboard.press('Enter'); // Enter is Continue too
+  // three rows of the sidebar in turn, each seen through a hole in the black with an arrow at it
+  const holes = () => page.$eval('#bcv-welcome', (e) => {
+    const rects = [...e.querySelectorAll('.bcv-welcome__mask mask rect')].slice(1).map((r) => ({ x: +r.getAttribute('x'), y: +r.getAttribute('y'), w: +r.getAttribute('width'), h: +r.getAttribute('height') }));
+    const box = e.querySelector('.bcv-welcome__stage[data-stage="side"]');
+    const b = box?.getBoundingClientRect();
+    return { bg: getComputedStyle(e).backgroundColor, holes: rects, rings: e.querySelectorAll('.bcv-welcome__ring').length, arrow: !!box?.querySelector('.bcv-welcome__arrow'), boxLeft: b ? Math.round(b.left) : null, side2: e.querySelector('.bcv-welcome__side2text')?.textContent || null };
+  });
+  const holeCovers = (hole, sel) => page.$eval(sel, (el, hole) => { const r = el.getBoundingClientRect(); return hole.x <= r.left && hole.y <= r.top && hole.x + hole.w >= r.right && hole.y + hole.h >= r.bottom; }, hole);
+  await page.waitForSelector('#bcv-welcome[data-stage="grades"]', { timeout: 5000 });
+  const g = await holes();
+  check(g.bg === 'rgba(0, 0, 0, 0)' && g.holes.length === 1 && g.rings === 1 && (await holeCovers(g.holes[0], '#bcv-side .bcv-nav__item[data-nav="gpa"]')) && g.arrow && g.boxLeft > g.holes[0].x + g.holes[0].w && !g.side2 && (await welcomeLines()).join(' | ') === 'Grades | All your grades, in one place | Every course’s grade and its breakdown, side by side — and what you need on what’s left.', `stage three: black everywhere but the Grades row, an arrow at it from the words to its right (${JSON.stringify(g)})`);
+  await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000);
+  await page.waitForTimeout(300);
+  await shot(page, '31d-welcome-grades');
+  await page.click('.bcv-welcome__next');
+  await page.waitForSelector('#bcv-welcome[data-stage="courses"]', { timeout: 5000 });
+  const c = await holes();
+  check(c.holes.length === 2 && c.rings === 2 && (await holeCovers(c.holes[0], '#bcv-side .bcv-nav__item[data-nav="courses"]')) && (await holeCovers(c.holes[1], '#bcv-side .bcv-side__group')) && c.side2 === 'Your starred courses, always here' && (await welcomeLines()).join(' | ') === 'Courses | Every course, one press away | The courses you star are listed right under it, on every page.', `stage four: the Courses row and, listed under it, the starred courses, each through its own hole, a second arrow at the list (${JSON.stringify(c)})`);
+  await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000);
+  await page.waitForTimeout(500);
+  await shot(page, '31e-welcome-courses');
+  await page.click('.bcv-welcome__next');
+  await page.waitForSelector('#bcv-welcome[data-stage="tools"]', { timeout: 5000 });
+  const t = await holes();
+  check(t.holes.length === 1 && (await holeCovers(t.holes[0], '#bcv-side .bcv-nav__item[data-nav="tools"]')) && !t.side2 && /^Tools \| Helpful tools, built in \| A calculator, citations, flashcards/.test((await welcomeLines()).join(' | ')), `stage five: the Tools row through its hole, and what the tools are (${(await welcomeLines()).join(' | ')})`);
+  await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000);
+  await page.waitForTimeout(300);
+  await shot(page, '31f-welcome-tools');
+  await page.click('.bcv-welcome__next');
   await page.waitForSelector('#bcv-welcome[data-stage="peek"]', { timeout: 5000 });
   const peekAt = Date.now();
   const noContinueYet3 = (await page.$('.bcv-welcome__next:not([hidden])')) === null;
@@ -2897,7 +2926,7 @@ try {
   }, [BASE, op]);
   await page.goto(`${BASE}/#tools`);
   // the first press: the screen goes black and says what Tools is, then shows the drag
-  await page.waitForSelector('#bcv-welcome[data-stage="tools"]', { timeout: 20000 });
+  await page.waitForSelector('#bcv-welcome[data-stage="toolsIntro"]', { timeout: 20000 });
   const twAt = Date.now();
   const noContT = (await page.$('.bcv-welcome__next:not([hidden])')) === null;
   const tLines = () => page.$$eval('#bcv-welcome .bcv-welcome__kicker, #bcv-welcome .bcv-welcome__title, #bcv-welcome .bcv-welcome__hint', (els) => els.map((e) => e.textContent));
@@ -4318,7 +4347,7 @@ try {
   await Promise.all([page.waitForNavigation({ timeout: 20000 }), page.click(su('#next'))]); // Open Canvas: the page reloads
   await page.waitForSelector('#bcv-welcome[data-stage="look"]', { timeout: 20000 });
   check((await page.$('#bcv-setup')) === null && (await page.$('.bcv-tour__card')) === null && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('setup:done'))['setup:done'])) === true, 'finishing the steps is what marks the setup done, and the welcome follows the reload');
-  for (const st of ['away', 'peek', null]) { // Continue, three times: the second and third pointers, then the page
+  for (const st of ['away', 'grades', 'courses', 'tools', 'peek', null]) { // Continue, six times: the pointers in turn, then the page
     await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000);
     await page.click('.bcv-welcome__next');
     if (st) await page.waitForSelector(`#bcv-welcome[data-stage="${st}"]`, { timeout: 5000 });
