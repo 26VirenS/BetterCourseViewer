@@ -23,6 +23,10 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.47.1', date: '2026-09-21', notes: [
+      { kind: 'improved', title: 'Easier to read on black', body: 'The grey lines in the welcome are larger, heavier and brighter.', icon: P.eye },
+      { kind: 'improved', title: 'A stuck tool gets a tab', body: 'A tool that has not opened in five seconds opens in a tab of its own instead.', icon: P.clock },
+    ] },
     { version: '2.47.0', date: '2026-09-21', notes: [
       { kind: 'improved', title: 'The welcome, again', body: 'Settings → General → See it again replays the pointers on black. The old tour is gone.', icon: P.eye },
       { kind: 'improved', title: 'Updates land at once', body: 'After an update, your open Canvas tabs load again by themselves with the new version.', icon: P.arrows },

@@ -48,6 +48,9 @@ if (typeof importScripts === 'function' && !self.BCV?.settings) {
       case 'syncApp': // a Canvas page loading on a Mac: the settings the app holds, taken now
         reply(syncApp().then(() => ({ ok: true })));
         return true;
+      case 'openTab': // an external tool that would not open in its popup: it gets a tab of its own
+        reply(openTab(msg.url));
+        return true;
       case 'closeSetupTab': // the page after install, once the setup is under way on a Canvas tab
         reply(sender?.tab?.id != null ? api.tabs.remove(sender.tab.id).then(() => ({ ok: true })) : { ok: false });
         return true;
@@ -96,6 +99,18 @@ if (typeof importScripts === 'function' && !self.BCV?.settings) {
       } catch { /* not a Canvas tab */ }
     }));
     return { ok: true, cleared };
+  }
+
+  /** A tab for a web address, opened from here: a content script's own window.open would be the
+   *  browser's idea of a popup once the press that started it is seconds old. */
+  async function openTab(url) {
+    if (!/^https?:\/\//i.test(String(url || ''))) return { ok: false };
+    try {
+      await api.tabs.create({ url });
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, message: e?.message || String(e) };
+    }
   }
 
   async function openOptions() {

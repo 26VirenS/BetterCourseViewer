@@ -1189,6 +1189,19 @@ try {
   await shot(page, '11b-tool-popup');
   await page.keyboard.press('Escape');
   check(await eventually(() => page.$('.bcv-ext-ov').then((e) => !e), 3000) && page.url() === `${BASE}/courses/101`, 'Escape closes the popup and the course page is still there');
+  // a tool that never comes: after five seconds the popup gives up and the tool gets a tab of its own
+  const hangTool = /\/courses\/101\/external_tools\/9\b/;
+  await page.route(hangTool, () => {}); // answered by nobody: the frame stays blank
+  await page.click('.bcv-rail__ext');
+  await page.waitForSelector('.bcv-ext-ov .bcv-ext__frame', { timeout: 5000 });
+  const slowAt = Date.now();
+  const toolTab = await context.waitForEvent('page', { timeout: 15000 });
+  await toolTab.waitForLoadState('domcontentloaded').catch(() => {});
+  const waited = Date.now() - slowAt;
+  const gone = await eventually(() => page.$('.bcv-ext-ov').then((e) => !e), 4000);
+  check(/\/courses\/101\/external_tools\/9/.test(toolTab.url()) && waited >= 4000 && gone, `a tool that will not open lands in a tab of its own after five seconds, and the popup goes (${waited} ms, ${toolTab.url()})`);
+  await toolTab.close();
+  await page.unroute(hangTool);
   const railGlyph = await page.evaluate(() => ({ active: getComputedStyle(document.querySelector('.bcv-rail__item.is-active .bcv-rail__tile svg')), idle: getComputedStyle(document.querySelector('.bcv-rail__item:not(.is-active) .bcv-rail__tile svg')), tile: getComputedStyle(document.querySelector('.bcv-rail__item.is-active .bcv-rail__tile')).backgroundColor }));
   check(await page.$('.bcv-rail__item[data-tab="home"].is-active') && railGlyph.active.stroke === 'rgb(23, 112, 171)' && railGlyph.active.opacity === '1' && railGlyph.idle.stroke === 'rgb(23, 112, 171)' && railGlyph.idle.opacity === '0.6' && railGlyph.tile === 'rgba(0, 0, 0, 0)', `rail glyphs take the course colour (the one picked earlier), no tile, dimmed unless active: ${railGlyph.active.stroke} / ${railGlyph.idle.opacity}`);
   check(await page.$('.bcv-head .bcv-colorbtn'), 'the colour square in the course header opens the palette');
@@ -2893,7 +2906,7 @@ try {
   const twAt = Date.now();
   const noContT = (await page.$('.bcv-welcome__next:not([hidden])')) === null;
   const tLines = () => page.$$eval('#bcv-welcome .bcv-welcome__kicker, #bcv-welcome .bcv-welcome__title, #bcv-welcome .bcv-welcome__hint', (els) => els.map((e) => e.textContent));
-  check((await page.$eval('#bcv-welcome', (e) => getComputedStyle(e).backgroundColor)) === 'rgb(0, 0, 0)' && (await tLines()).join(' | ') === 'Some helpful things | some tools to help you do more, quickly.' && (await page.$eval('.bcv-welcome__hint', (e) => getComputedStyle(e).color)) === 'rgba(255, 255, 255, 0.5)' && (await page.$('.bcv-welcome__arrow')) === null, `the first press on Tools: black, the title and the gray line under it (${(await tLines()).join(' | ')})`);
+  check((await page.$eval('#bcv-welcome', (e) => getComputedStyle(e).backgroundColor)) === 'rgb(0, 0, 0)' && (await tLines()).join(' | ') === 'Some helpful things | some tools to help you do more, quickly.' && (await page.$eval('.bcv-welcome__hint', (e) => getComputedStyle(e).color)) === 'rgba(255, 255, 255, 0.68)' && (await page.$('.bcv-welcome__arrow')) === null, `the first press on Tools: black, the title and the gray line under it (${(await tLines()).join(' | ')})`);
   check(noContT && await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000) && Date.now() - twAt >= 2200, 'Continue comes in after three seconds');
   await page.waitForTimeout(400);
   await shot(page, '36-tools-welcome');

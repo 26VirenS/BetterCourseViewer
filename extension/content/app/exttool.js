@@ -18,6 +18,7 @@
     const c = current;
     current = null;
     if (!c) return;
+    c.stopWaiting?.();
     document.removeEventListener('securitypolicyviolation', c.onCsp);
     document.documentElement.classList.remove('bcv-ext-open'); // (the pins and the look switch slide back out of the bar)
     c.ov.classList.add('is-closing');
@@ -42,7 +43,15 @@
     const frame = h('iframe', { class: 'bcv-ext__frame', src: url, title, allow: 'fullscreen; microphone; camera; display-capture; autoplay; clipboard-write; geolocation; publickey-credentials-get; identity-credentials-get', referrerpolicy: 'strict-origin-when-cross-origin' }); // (no sandbox: a tool signs in, sets its cookies and opens its windows as it would on Canvas's own page)
     const wait = U.el('bcv-ext__wait', [U.text('bcv-ext__waittext', foreign ? 'Opening… if it stays blank, the site does not allow this: open it in a new tab.' : 'Opening…')]);
     const body = U.el('bcv-ext__body', [wait, frame]);
+    // A tool that never arrives: after this long the popup gives up and the tool gets a tab of its
+    // own, which is where Canvas would have sent it anyway. (A tab opened this late is not the
+    // browser's idea of a press, so the background opens it; window.open is the fallback, and the
+    // card below is what is left when the browser refuses both.)
+    const SLOW = 5000;
+    let late = 0;
+    const stopWaiting = () => { clearTimeout(late); late = 0; };
     const fail = () => {
+      stopWaiting();
       if (current?.ov !== ov) return;
       body.replaceChildren(U.el('bcv-ext__fail', [
         U.svg(IC.warn, { size: 26, stroke: 'var(--bcv-orange)', width: 1.9 }),
@@ -51,10 +60,21 @@
         h('a', { class: 'bcv-btn bcv-btn--primary', href: tabUrl, target: '_blank', rel: 'noopener', text: 'Open in new tab' }),
       ]));
     };
+    const toTab = async () => {
+      if (current?.ov !== ov) return;
+      stopWaiting();
+      let opened = false;
+      try { opened = !!(await BCV.api?.runtime?.sendMessage?.({ type: 'openTab', url: tabUrl }))?.ok; } catch { opened = false; }
+      if (!opened) opened = !!window.open(tabUrl, '_blank', 'noopener');
+      if (opened) close();
+      else fail();
+    };
+    const waitOn = () => { stopWaiting(); late = setTimeout(toTab, SLOW); };
     const onCsp = (e) => { const b = String(e.blockedURI || ''); if (b && (url.startsWith(b) || b.startsWith(url.slice(0, 40)))) fail(); };
     document.addEventListener('securitypolicyviolation', onCsp);
     frame.addEventListener('load', () => {
       if (frame.getAttribute('src') === 'about:blank') return; // (the blank page on the way through a reload: the tool is still to come)
+      stopWaiting();
       frame.classList.add('is-in');
       body.classList.add('is-loaded');
     });
@@ -68,6 +88,7 @@
       body.classList.remove('is-loaded'); // "Opening…" again until the tool is back
       frame.src = 'about:blank'; // through a blank page, so the launch starts over rather than the browser answering from what it had
       setTimeout(() => { if (current?.ov === ov) frame.src = url; }, 30);
+      waitOn(); // (the second try gets the same five seconds)
     });
     const head = U.el('bcv-sheet__head bcv-ext__head', [
       U.tile(icon || IC.shield, { color: 'var(--bcv-blue)', tint: 'var(--bcv-blue-soft)', size: 32, iconSize: 16 }),
@@ -80,7 +101,8 @@
     ov.append(sheet);
     ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
     ov.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.stopPropagation(); close(); } });
-    current = { ov, onCsp, restore: from && from.focus ? from : document.activeElement };
+    current = { ov, onCsp, stopWaiting, restore: from && from.focus ? from : document.activeElement };
+    waitOn();
     document.body.append(ov);
     document.documentElement.classList.add('bcv-ext-open'); // the pins and the look switch slide into the bar, beside the X
     if (from) U.morphFrom(sheet, from);
