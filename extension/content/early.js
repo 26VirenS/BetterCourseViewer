@@ -6,6 +6,9 @@
   // Canvas pages loaded inside a frame (a tool's file picker, a file preview,
   // an LTI return page) are someone else's UI: leave them exactly as they are.
   if (window.self !== window.top) return;
+  // A tool launched from the interface gets a tab of its own, with the extension's bar over the
+  // tool rather than the interface's shell round it (content/toolbar.js). This is that tab.
+  try { if (new URLSearchParams(location.search).get('bcv') === 'tool') return; } catch { /* no search here */ }
   const BCV = self.BCV;
   const S = BCV.settings;
   const html = document.documentElement;

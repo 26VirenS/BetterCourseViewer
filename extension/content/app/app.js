@@ -251,7 +251,7 @@
       window.open(url.href, '_blank', 'noopener');
       return;
     }
-    // a tool Canvas launches (a course's campus tool, a link in a page to one): a popup over this page, not a page of its own
+    // a tool Canvas launches (a course's campus tool, a link in a page to one): a tab of its own with the interface's bar over it
     if (BCV.exttool?.isToolHref(url.href) && !inQuiz()) { BCV.exttool.openLink({ title: label || 'External tool', href: url.href }); return; }
     if (!confirmed && inQuiz() && url.pathname !== location.pathname && !confirmLeave()) return;
     if (!confirmed && state.submitOpen && (url.pathname !== location.pathname || url.search !== location.search) && !window.confirm('Your submission has not been sent yet. Leave anyway?\n\nAttached files are dropped; a text entry stays as a draft on this device.')) return;
@@ -1351,6 +1351,7 @@
 
   async function boot() {
     if (window.self !== window.top) return; // framed Canvas pages (tool pickers, previews) are left alone
+    if (BCV.exttool?.isToolTab?.()) { html.classList.remove('bcv-on'); return; } // the tool has this tab; its bar is the only thing of ours on it
     state.originalTitle = document.title;
     state.settings = BCV.early ? (await BCV.early.ready, BCV.early.settings()) : await S.get();
     state.dark = BCV.early?.isDark?.() ?? S.isDark(state.settings, false);

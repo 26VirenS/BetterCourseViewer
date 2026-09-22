@@ -16,75 +16,43 @@ if (typeof importScripts === 'function' && !self.BCV?.devcode) {
   const api = BCV.api;
   const S = BCV.settings;
 
-  // ---- a window a framed tool opens for itself ----------------------------
-  // A tool in a popup sometimes asks for a browser window of its own — a sign-in, a viewer, a
-  // "this needs to open in a new window" button. The page cannot catch that: the frame is another
-  // origin, so its window.open is out of reach from there. The browser tells the extension instead,
-  // as a new tab; the address goes back to the page, which puts it in a popup over the one already
-  // up, and the tab is taken away.
+  // ---- a tool in a tab of its own -----------------------------------------
+  // An external tool is not framed over Canvas any more: it opens in a tab, and the extension puts
+  // its own bar across the top of the tool's own page (content/toolbar.js) so it still reads as
+  // part of the interface. That means the tool is a real tab to the browser — its own cookies, its
+  // own windows, its own sign-in — which is the whole point: nothing has to be caught, handed back
+  // or nursed through a frame any more.
   //
-  // What counts as the tool's window is not fixed, because browsers do not agree on what they say
-  // about a new tab: whether they name the tab that opened it, whether the address is there yet.
-  // The settings behind it are in lib/devcode.js and read as a code (SC1-1000100 is what ships).
+  // What is kept here is the thread back: which Canvas tab a tool was opened from, so the X in its
+  // bar lands there. A tab the tool opens for itself is adopted into the same session, so a sign-in
+  // that goes through three sites keeps the bar and still comes home at the end.
   const DEV = BCV.devcode;
   let cap = { ...DEV.SHIPPED };
   api.storage?.local?.get?.(DEV.KEY).then((r) => { if (r?.[DEV.KEY]) cap = { ...DEV.SHIPPED, ...r[DEV.KEY] }; }).catch(() => {});
-  const framed = new Map(); // tabId -> { open, allowUntil, windowId }
-  const ALLOW_MS = 4000;
+  const tools = new Map(); // tabId -> { from, title, note, state }
   const seen = []; // the log, newest last, for the Developer section to read back
   function note(entry) {
     if (!cap.log) return;
     seen.push({ at: Date.now(), ...entry });
     if (seen.length > 120) seen.splice(0, seen.length - 120);
   }
-  function notePopup(sender, msg) {
-    const id = sender?.tab?.id;
-    if (id == null) return { ok: false };
-    const was = framed.get(id) || {};
-    framed.set(id, { ...was, open: !!msg.open, windowId: sender.tab.windowId });
-    note({ kind: 'popup', tabId: id, open: !!msg.open });
-    return { ok: true };
-  }
-  function allowTab(sender) {
-    const id = sender?.tab?.id;
-    if (id == null) return { ok: false };
-    framed.set(id, { ...(framed.get(id) || {}), allowUntil: Date.now() + ALLOW_MS });
-    note({ kind: 'allow', tabId: id });
-    return { ok: true };
-  }
-  /** The tab a framed popup is open on, if this new tab could have come from one. */
-  function opener(tab) {
-    if (!cap.mode) return null;
-    const live = [...framed.entries()].filter(([, st]) => st.open);
-    if (!live.length) return null;
-    if (cap.mode === 1) { const hit = live.find(([id]) => id === tab.openerTabId); return hit ? hit[0] : null; }
-    if (cap.mode === 2) { const hit = live.find(([, st]) => st.windowId === tab.windowId) || live.find(([id]) => id === tab.openerTabId); return hit ? hit[0] : null; }
-    return live[live.length - 1][0]; // mode 3: any new tab at all, to the popup opened last
-  }
-  /** The address, waited for when the browser has not filled it in yet. */
-  async function addressOf(tabId, first) {
-    const url = first.pendingUrl || first.url || '';
-    if (/^https?:\/\//i.test(url)) return url;
-    const ms = DEV.WAIT_MS[cap.wait] || 0;
-    if (!ms || (!cap.blank && url && url !== 'about:blank')) return '';
-    const until = Date.now() + ms;
-    while (Date.now() < until) {
-      await new Promise((r) => setTimeout(r, 120));
-      let t = null;
-      try { t = await api.tabs.get(tabId); } catch { return ''; } // the tab went
-      const u = t.pendingUrl || t.url || '';
-      if (/^https?:\/\//i.test(u)) return u;
-    }
-    return '';
-  }
-  /** Wait until the window has finished doing whatever it opened to do.
+  // A service worker is stopped and started again whenever the browser feels like it, and a tool's
+  // tab outlives that easily. The sessions are mirrored where they survive it, so the bar is still
+  // there — and still knows its way back — after the worker has been round the houses.
+  const KEEP = 'tool:tabs';
+  const store = api.storage?.session || api.storage?.local;
+  const save = () => { try { store?.set?.({ [KEEP]: [...tools.entries()] }); } catch { /* it lives in memory then */ } };
+  const loaded = (async () => {
+    try { const r = await store?.get?.(KEEP); for (const [id, t] of r?.[KEEP] || []) tools.set(Number(id), t); } catch { /* nothing kept */ }
+  })();
+  function setTool(id, t) { tools.set(id, t); save(); }
+
+  /** Wait until the tab has finished doing whatever it opened to do.
    *
-   *  A window a tool opens is usually a sign-in, and a sign-in is several pages: the tool, the
-   *  school's identity provider, a code, a redirect back. Taking its first address and closing it
-   *  breaks the whole thing in the middle — which is what taking it at once did. So it is left to
-   *  run, watched, and only reclaimed once it has settled: loaded, and at the same address for a
-   *  quiet stretch. Cut short by a cap, in case it never settles, and given up if the tab closes
-   *  itself first, which a sign-in that hands back to its opener usually does.
+   *  A tool's first address is rarely where it ends up: a launch redirects, a sign-in is several
+   *  pages — the tool, the school's identity provider, a code, a redirect back. While that is going
+   *  on the bar says so and asks for quiet, and it stops saying so once the tab has settled: loaded,
+   *  and at the same address for a quiet stretch. Cut short by a cap, in case it never settles.
    */
   async function settled(tabId) {
     const quiet = DEV.SETTLE_MS[cap.settle] ?? 2000;
@@ -95,7 +63,7 @@ if (typeof importScripts === 'function' && !self.BCV?.devcode) {
     while (Date.now() < until) {
       await new Promise((r) => setTimeout(r, 300));
       let t = null;
-      try { t = await api.tabs.get(tabId); } catch { return { gone: true, url: '' }; } // it closed itself: the sign-in is done and handed back
+      try { t = await api.tabs.get(tabId); } catch { return { gone: true, url: '' }; }
       const url = t.pendingUrl || t.url || '';
       if (url !== last || t.status !== 'complete') { last = url; since = t.status === 'complete' ? Date.now() : 0; continue; }
       if (!since) { since = Date.now(); continue; }
@@ -105,53 +73,92 @@ if (typeof importScripts === 'function' && !self.BCV?.devcode) {
     try { t = await api.tabs.get(tabId); } catch { return { gone: true, url: '' }; }
     return { gone: false, url: t.pendingUrl || t.url || '', capped: true };
   }
-  async function caught(tab) {
-    const entry = { kind: 'tab', tabId: tab.id, openerTabId: tab.openerTabId ?? null, windowId: tab.windowId, url: tab.url || '', pendingUrl: tab.pendingUrl || '' };
-    try {
-      const from = opener(tab);
-      if (from == null) { note({ ...entry, action: 'no match' }); return; }
-      if (Date.now() < (framed.get(from)?.allowUntil || 0)) { note({ ...entry, action: 'ours, left alone' }); return; }
-      const first = await addressOf(tab.id, tab);
-      if (!first) { note({ ...entry, action: 'no address' }); return; }
-      // the popup says what is going on and asks for no more windows while it does
-      try { await api.tabs.sendMessage(from, { type: 'framedBusy', on: true, url: first }); } catch { /* the page is not listening */ }
-      const end = await settled(tab.id);
-      try { await api.tabs.sendMessage(from, { type: 'framedBusy', on: false }); } catch { /* the page went */ }
-      if (end.gone) { note({ ...entry, url: first, action: 'closed itself while signing in: nothing to bring back' }); return; }
-      if (!/^https?:\/\//i.test(end.url)) { note({ ...entry, url: end.url, action: 'settled on no address' }); return; }
-      await api.tabs.sendMessage(from, { type: 'framedPopup', url: end.url, toast: !!cap.toast }); // first: a page that is not listening keeps its tab
-      if (cap.close) await api.tabs.remove(tab.id);
-      note({ ...entry, url: end.url, action: `${end.capped ? 'never settled, taken anyway' : 'settled'}; ${cap.close ? 'tab closed' : 'tab left open'}` });
-    } catch (e) {
-      try { await api.tabs.sendMessage(opener(tab), { type: 'framedBusy', on: false }); } catch { /* nothing to tell */ }
-      note({ ...entry, action: `could not: ${e?.message || e}` });
+  /** Watch a tool's tab until it stops moving, then take the notice down. */
+  async function watch(tabId) {
+    const end = await settled(tabId);
+    const t = tools.get(tabId);
+    if (!t || end.gone) return;
+    t.state = 'ready';
+    save();
+    note({ kind: 'settled', tabId, url: end.url, action: end.capped ? 'never settled, said so anyway' : 'settled' });
+    try { await api.tabs.sendMessage(tabId, { type: 'toolState', state: 'ready' }); } catch { /* no bar on it */ }
+  }
+  /** A tool link pressed in the interface: a tab for it, remembering the tab it was opened from. */
+  async function openTool(sender, msg) {
+    const from = sender?.tab?.id;
+    if (from == null || !msg?.url) return { ok: false };
+    // openerTabId is what makes the browser put the tool's tab beside the one it came from; a
+    // browser that will not take it still gets the tab, and the way home is remembered here anyway.
+    let tab = null;
+    try { tab = await api.tabs.create({ url: msg.url, active: true, openerTabId: from }); } catch { tab = await api.tabs.create({ url: msg.url, active: true }); }
+    setTool(tab.id, { from, title: msg.title || 'External tool', note: msg.note || '', state: 'auth' });
+    note({ kind: 'open', tabId: tab.id, from, url: msg.url });
+    watch(tab.id);
+    return { ok: true, tabId: tab.id };
+  }
+  /** Take a tab into the session its opener belongs to. Idempotent: the new-tab notice and the bar's
+   *  own question race each other, and either one may be the first to get here. */
+  function adopt(id, parent) {
+    if (tools.has(id)) return tools.get(id);
+    const t = { from: parent.from, title: parent.title, note: parent.note, state: 'auth' };
+    setTool(id, t);
+    watch(id);
+    return t;
+  }
+  /** What the bar on a page needs to know, if this tab is a tool's at all. */
+  async function toolTab(sender) {
+    await loaded;
+    const id = sender?.tab?.id;
+    if (id == null) return { ok: true, tool: null };
+    let t = tools.get(id);
+    if (!t) {
+      const parent = sender.tab.openerTabId == null ? null : tools.get(sender.tab.openerTabId);
+      if (parent) t = adopt(id, parent);
     }
+    return { ok: true, tool: t ? { title: t.title, note: t.note, state: t.state } : null };
+  }
+  /** The X in the bar: the tab goes, and the Canvas tab it came from comes back. */
+  async function closeTool(sender) {
+    await loaded;
+    const id = sender?.tab?.id;
+    if (id == null) return { ok: false };
+    const t = tools.get(id);
+    let back = false;
+    if (t?.from != null) { try { await api.tabs.update(t.from, { active: true }); back = true; } catch { /* that tab was closed */ } }
+    if (!back) {
+      // whatever else is there, newest first, skipping the tool tabs (which lead nowhere better)
+      try {
+        const rest = (await api.tabs.query({ windowId: sender.tab.windowId })).filter((x) => x.id !== id);
+        const pick = rest.reverse().find((x) => !tools.has(x.id)) || rest[0];
+        if (pick) await api.tabs.update(pick.id, { active: true });
+      } catch { /* nothing left to go back to */ }
+    }
+    tools.delete(id);
+    save();
+    note({ kind: 'close', tabId: id, action: back ? 'back to the Canvas tab' : 'back to whatever was there' });
+    try { await api.tabs.remove(id); } catch { /* already gone */ }
+    return { ok: true };
   }
   // What this browser will even say. A log that shows nothing is otherwise two different stories —
   // nothing opened, or nothing was reported — and those want opposite fixes.
-  const CAN = {
-    tabs: !!api.tabs,
-    onCreated: !!api.tabs?.onCreated,
-    windows: !!api.windows?.onCreated,
-    webNavigation: !!api.webNavigation?.onCreatedNavigationTarget,
-  };
+  const CAN = { tabs: !!api.tabs, onCreated: !!api.tabs?.onCreated, session: !!api.storage?.session };
   let heardATab = false;
-  api.tabs?.onRemoved?.addListener((id) => framed.delete(id));
-  api.tabs?.onCreated?.addListener((tab) => { heardATab = true; caught(tab); });
-  api.windows?.onCreated?.addListener(async (win) => {
-    if (!cap.windows) return;
-    try {
-      const tabs = await api.tabs.query({ windowId: win.id });
-      for (const t of tabs) await caught(t);
-    } catch { /* the window went */ }
+  api.tabs?.onRemoved?.addListener((id) => { if (tools.delete(id)) save(); });
+  // A window the tool opens for itself is the tool still: same session, same way home, same bar.
+  api.tabs?.onCreated?.addListener(async (tab) => {
+    heardATab = true;
+    await loaded;
+    const parent = tab.openerTabId == null ? null : tools.get(tab.openerTabId);
+    if (!parent || tools.has(tab.id)) return;
+    adopt(tab.id, parent);
+    note({ kind: 'adopt', tabId: tab.id, from: parent.from, url: tab.pendingUrl || tab.url || '' });
   });
   const normalNow = () => DEV.encode(cap) === DEV.encode(DEV.SHIPPED);
   function devGet() { return { ok: true, settings: { ...cap }, code: DEV.encode(cap), normal: normalNow() }; }
   async function devSet(settings) {
     cap = { ...DEV.SHIPPED, ...settings };
     // Back to normal forgets it rather than writing it down. A setting kept from a diagnosis would
-    // otherwise sit on top of every default that ships afterwards, which is how close-the-tab came
-    // to being off for good on a machine that had once been asked to catch everything.
+    // otherwise sit on top of every default that ships afterwards.
     if (normalNow()) await api.storage.local.remove(DEV.KEY);
     else await api.storage.local.set({ [DEV.KEY]: cap });
     return { ok: true, settings: { ...cap }, code: DEV.encode(cap), normal: normalNow() };
@@ -159,7 +166,7 @@ if (typeof importScripts === 'function' && !self.BCV?.devcode) {
   function devLog(clear) {
     const rows = seen.slice();
     if (clear) seen.length = 0;
-    return { ok: true, rows, code: DEV.encode(cap), can: { ...CAN, heardATab }, open: [...framed.entries()].filter(([, st]) => st.open).map(([id]) => id) };
+    return { ok: true, rows, code: DEV.encode(cap), can: { ...CAN, heardATab }, open: [...tools.keys()] };
   }
 
   // ---- one-shot messages --------------------------------------------------
@@ -197,11 +204,14 @@ if (typeof importScripts === 'function' && !self.BCV?.devcode) {
       case 'syncApp': // a Canvas page loading on a Mac: the settings the app holds, taken now
         reply(syncApp().then(() => ({ ok: true })));
         return true;
-      case 'framedPopup': // a framed tool is up on this tab, or has gone: see catchOpenedTab below
-        reply(notePopup(sender, msg));
+      case 'openTool': // a tool link in the interface: a tab of its own, with the bar over it
+        reply(openTool(sender, msg));
         return true;
-      case 'framedAllowTab': // our own Open in new tab, about to make one on purpose
-        reply(allowTab(sender));
+      case 'toolTab': // the bar asking whether this tab is a tool's
+        reply(toolTab(sender));
+        return true;
+      case 'closeTool': // the X in that bar
+        reply(closeTool(sender));
         return true;
       case 'devGet': // the Developer section: what the catch is set to
         reply(devGet());
@@ -304,9 +314,9 @@ if (typeof importScripts === 'function' && !self.BCV?.devcode) {
   }
 
   /** Build registerContentScripts entries by mirroring the manifest: the interface's own scripts and
-   *  nothing else. The sniffer already runs on every site it may look at, and content/popout.js
-   *  belongs inside a tool's own frame, which is never the Canvas site being added here. */
-  const NOT_THE_INTERFACE = ['content/sniff.js', 'content/popout.js'];
+   *  nothing else. The sniffer already runs on every site it may look at, and content/toolbar.js
+   *  belongs on a tool's own page, which is never the Canvas site being added here. */
+  const NOT_THE_INTERFACE = ['content/sniff.js', 'content/toolbar.js'];
   function scriptsFor(origin) {
     const manifest = api.runtime.getManifest();
     const match = `${origin}/*`;

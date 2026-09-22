@@ -81,6 +81,12 @@
   // one field per blank: a dropdown of that blank's own list, or a line to type in
   const DROPS = new Set(['multiple_dropdowns_question']);
   const BLANKS = new Set(['multiple_dropdowns_question', 'fill_in_multiple_blanks_question']);
+  /* Canvas takes an answer's id and a match's id as whole numbers and refuses anything else
+   * ("match_id must be of type Integer"). A picker only ever hands back a string, so every id it
+   * gives back is turned into one here. `Number(v) || v` used to do it, and let two through: an id
+   * of 0, which is falsy and went as the string "0", and a missing one, which went as "undefined". */
+  const whole = (v) => { const t = String(v ?? '').trim(); return /^-?\d+$/.test(t) ? Number(t) : v; };
+  const hasId = (v) => v !== null && v !== undefined && String(v).trim() !== '';
   /** The blanks a question has, as Canvas's page names them or as its own answers say. */
   const blanksOf = (q) => (q.blanks?.length ? q.blanks : [...new Set((q.answers || []).map((a) => a.blank_id).filter(Boolean))]);
   /* The question as something to read rather than answer. Canvas's own page writes a blank's field
@@ -604,8 +610,9 @@
     function weave(textEl, areaEl, q) {
       const holds = areaEl && areaEl.bcvBlanks;
       if (!holds || !holds.size) return;
+      const free = () => [...holds.keys()].filter((b) => !holds.get(b).placed);
       const put = (name, slot) => {
-        const held = holds.get(String(name));
+        const held = name == null ? null : holds.get(String(name));
         if (!held || held.placed) return false;
         held.placed = true;
         held.field.classList.add('bcv-qz__inblank');
@@ -613,11 +620,27 @@
         held.row.remove();
         return true;
       };
+      /* Which blank a control in the sentence stands for. Not its name: Canvas calls the field
+       * question_<id>_<hash of the blank>, so the name says nothing a reader can match — which is
+       * what left the fields stripped out and the rows still underneath. A dropdown says it outright
+       * instead, in the answers it offers: those ids belong to one blank and no other. Failing that
+       * (a line to type in offers nothing), the controls stand in the order the blanks do. */
+      const ids = new Map([...holds.keys()].map((b) => [b, new Set((q.answers || []).filter((a) => String(a.blank_id) === b).map((a) => String(a.id)))]));
+      const whose = (w) => {
+        if (w.tagName === 'SELECT') {
+          const vals = [...w.options].map((o) => String(o.value)).filter(Boolean);
+          const hit = vals.length ? free().find((b) => vals.every((v) => ids.get(b).has(v))) : null;
+          if (hit) return hit;
+        }
+        const tail = (w.getAttribute('name') || '').replace(`question_${q.id}_`, '');
+        if (holds.has(tail) && !holds.get(tail).placed) return tail;
+        return free()[0] || null;
+      };
       const head = `question_${q.id}_`;
-      for (const w of [...textEl.querySelectorAll(`select[name^="${head}"], input[name^="${head}"], textarea[name^="${head}"]`)]) {
-        if (!put((w.getAttribute('name') || '').slice(head.length), w)) w.remove(); // Canvas's own control answers nothing here
+      for (const w of [...textEl.querySelectorAll(`select[name^="${head}"], input[name^="${head}"], textarea[name^="${head}"], select.question_input, input.question_input`)]) {
+        if (!put(whose(w), w)) w.remove(); // Canvas's own control answers nothing here
       }
-      const spare = [...holds.keys()].filter((b) => !holds.get(b).placed);
+      const spare = free();
       if (!spare.length) return;
       const token = new RegExp(`\\[(${spare.map((b) => b.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})\\]`);
       const walk = document.createTreeWalker(textEl, NodeFilter.SHOW_TEXT);
@@ -691,12 +714,12 @@
         const rows = [];
         const send = () => {
           const pairs = [];
-          for (const [aid, sel] of rows) { const v = sel.bcvPicker ? sel.bcvPicker.value : sel.value; if (v) pairs.push({ answer_id: Number(aid) || aid, match_id: Number(v) || v }); }
+          for (const [aid, sel] of rows) { const v = sel.bcvPicker ? sel.bcvPicker.value : sel.value; if (v) pairs.push({ answer_id: whole(aid), match_id: whole(v) }); }
           save(q, pairs);
         };
         return U.el(`bcv-qz__match ${compact ? 'bcv-qz__match--compact' : ''}`, opts.map((a) => {
           const sel = U.picker(
-            [{ value: '', text: 'Choose…' }, ...matches.map((m) => ({ value: String(m.match_id), text: m.text, html: m.html || '' }))],
+            [{ value: '', text: 'Choose…' }, ...matches.filter((m) => hasId(m.match_id)).map((m) => ({ value: String(m.match_id), text: m.text, html: m.html || '' }))],
             chosen.get(String(a.id)) || '', send, { label: `Match for ${a.text || a.left || 'this'}`, cls: 'bcv-qz__sel' },
           );
           rows.push([String(a.id), sel]);
@@ -715,7 +738,7 @@
           const out = {};
           for (const [blank, f] of fields) {
             const v = String((f.bcvPicker ? f.bcvPicker.value : f.value) || '').trim();
-            if (v) out[blank] = drops ? (Number(v) || v) : v;
+            if (v) out[blank] = drops ? whole(v) : v;
           }
           save(q, out);
         };
@@ -813,8 +836,9 @@
       // one value per blank, named for the blank it fills
       if (BLANKS.has(q.question_type)) {
         return Object.entries(a).map(([blank, v]) => {
+          const named = !/^[0-9a-f]{8,}$/i.test(blank); // a quiz read from Canvas's own page knows the blank only as a hash of its name
           const o = DROPS.has(q.question_type) ? opts.find((x) => String(x.id) === String(v) && String(x.blank_id) === String(blank)) : null;
-          return { text: `${blank}: ${o ? (o.text || htmlToText(o.html || '', 60)) : v}`, html: '' };
+          return { text: `${named ? `${blank}: ` : ''}${o ? (o.text || htmlToText(o.html || '', 60)) : v}`, html: '' };
         });
       }
       if (Array.isArray(a)) return a.map(one);

@@ -138,7 +138,7 @@ try { await C.get('/api/v1/next'); } catch (e) { nextErr = e; }
 check(nextErr && nextErr.status === 401 && finished.length + pending.length === fetchesBefore && lostCalls === 1, 'every request after it fails at once, without asking Canvas, and it is not reported again');
 check((await C.checkSession()) === false, 'checkSession says so');
 
-// ---- the capture settings code (extension/lib/devcode.js) ------------------------------------
+// ---- the tool-tab settings code (extension/lib/devcode.js) -----------------------------------
 // The Developer section's settings travel as a short code that gets read out and typed back in, so
 // what matters is that a code means the same thing at both ends.
 const devSrc = readFileSync(join(root, 'extension', 'lib', 'devcode.js'), 'utf8');
@@ -147,16 +147,17 @@ devBox.self = devBox;
 vm.createContext(devBox);
 vm.runInContext(devSrc, devBox);
 const D = devBox.BCV.devcode;
-check(D.encode(D.SHIPPED) === 'SC2-21201002' && D.encode(D.EVERYTHING) === 'SC2-31510112', `the two codes worth knowing: ${D.encode(D.SHIPPED)} ships, ${D.encode(D.EVERYTHING)} catches everything`);
-const back = D.decode('SC2-31510112');
-check(back.ok && back.settings.mode === 3 && back.settings.wait === 5 && back.settings.close === 0 && back.settings.toast === 1, `a code reads back as the settings it stands for: ${JSON.stringify(back.settings)}`);
+check(D.encode(D.SHIPPED) === 'SC3-200' && D.encode(D.EVERYTHING) === 'SC3-211', `the two codes worth knowing: ${D.encode(D.SHIPPED)} ships, ${D.encode(D.EVERYTHING)} says everything`);
+const back = D.decode('SC3-511');
+check(back.ok && back.settings.settle === 5 && back.settings.log === 1 && back.settings.toast === 1, `a code reads back as the settings it stands for: ${JSON.stringify(back.settings)}`);
 check(D.encode(D.decode(D.encode(D.EVERYTHING)).settings) === D.encode(D.EVERYTHING), 'a code typed back in means what it meant');
-const loose = D.decode('sc2 3 1 5 1 0 1 1 2');
-check(loose.ok && D.encode(loose.settings) === 'SC2-31510112', 'spaces, lower case and a missing dash are all read the same');
-const bad = D.decode('SC2-999');
-check(!bad.ok && D.encode(bad.settings) === D.encode(D.SHIPPED) && /8 digits/.test(bad.message), `a code that is not one says so and changes nothing: ${bad.message}`);
-const over = D.decode('SC2-99999999');
-check(D.encode(over.settings) === 'SC2-31511115', `digits past the end of a setting come back to its last value, never past it: ${D.encode(over.settings)}`);
+const loose = D.decode('sc3 2 1 1');
+check(loose.ok && D.encode(loose.settings) === 'SC3-211', 'spaces, lower case and a missing dash are all read the same');
+const bad = D.decode('SC3-99999');
+check(!bad.ok && D.encode(bad.settings) === D.encode(D.SHIPPED) && /3 digits/.test(bad.message), `a code that is not one says so and changes nothing: ${bad.message}`);
+const over = D.decode('SC3-999');
+check(D.encode(over.settings) === 'SC3-511', `digits past the end of a setting come back to its last value, never past it: ${D.encode(over.settings)}`);
+check(!D.FIELDS.some((f) => ['mode', 'windows', 'wait', 'blank', 'close'].includes(f.key)), `nothing is caught any more, so nothing is left to tune about catching: ${D.FIELDS.map((f) => f.key).join(', ')}`);
 
 console.log(fails ? `\n${fails} check(s) failed` : '\nAll checks passed.');
 process.exit(fails ? 1 : 0);

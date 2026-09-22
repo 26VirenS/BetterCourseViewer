@@ -256,11 +256,11 @@ const quizQuestionBank = (quizId) => {
     // kinds tag every answer with the blank it belongs to. Test-only, so every other count stands.
     ...(mockConfig.richQuestions ? [{ id: `${quizId}5`, position: 5, question_name: 'Question 5', question_type: 'matching_question', question_text: '<p>Match each reading to what it measures.</p>', points_possible: 3,
       answers: [
-        { id: Number(`${quizId}51`), text: '9.8', match_id: 901 },
+        { id: Number(`${quizId}51`), text: '9.8', match_id: 0 }, // (0 on purpose: the id that is falsy, which the sending used to turn back into a string)
         { id: Number(`${quizId}52`), text: '3.0 × 10⁸', match_id: 902 },
         { id: Number(`${quizId}53`), text: '6.67 × 10⁻¹¹', match_id: 903 },
       ],
-      matches: [{ match_id: 901, text: 'Acceleration due to gravity' }, { match_id: 902, text: 'Speed of light' }, { match_id: 903, text: 'Gravitational constant' }] },
+      matches: [{ match_id: 0, text: 'Acceleration due to gravity' }, { match_id: 902, text: 'Speed of light' }, { match_id: 903, text: 'Gravitational constant' }] },
     { id: `${quizId}6`, position: 6, question_name: 'Question 6', question_type: 'multiple_dropdowns_question', question_text: '<p>Velocity is the [rate] of [what] with respect to time.</p>', points_possible: 2,
       answers: [
         { id: Number(`${quizId}61`), text: 'rate of change', blank_id: 'rate', weight: 100 },
@@ -308,13 +308,39 @@ const findSub = (id) => [...quizSubs.values()].flat().find((s) => s.id === id) |
 // the access code an attempt's quiz wants, if any (the config can change it under a running attempt); refused the way Canvas refuses
 const codeOf = (s) => (s && s.course_id ? (mockConfig.quizCode?.[s.quiz_id] || allAssignments(s.course_id).find((x) => x.quiz_id === s.quiz_id)?.quiz_access_code || null) : null);
 const codeRefused = (s, body) => { const need = codeOf(s); return need && (body || {}).access_code !== need ? { __status: 403, errors: [{ message: 'invalid access code' }] } : null; };
+// ---- the kinds with a blank each, the way Canvas serves them -----------------------------------
+// Canvas does not hand these over as the teacher wrote them. The field is rendered into the
+// sentence, where the blank is, both in its own page and in the question the API gives back — and
+// the field is NOT named after the blank: the name carries a hash of it (Canvas uses MD5; any hash
+// does here, the point being that the name is not the blank). So the only thing that says which
+// blank a dropdown belongs to is the set of answers it offers, which is what the interface reads.
+const BLANK_KINDS = new Set(['multiple_dropdowns_question', 'fill_in_multiple_blanks_question']);
+const blankTag = (b) => [...String(b)].reduce((n, c) => Math.imul(n, 33) + c.charCodeAt(0) >>> 0, 5381).toString(16).padStart(8, '0');
+const blankFields = (q, held = {}) => {
+  if (!BLANK_KINDS.has(q.question_type)) return q.question_text;
+  const drops = q.question_type === 'multiple_dropdowns_question';
+  return q.question_text.replace(/\[([^\]\s]+)\]/g, (m, b) => {
+    const mine = q.answers.filter((a) => String(a.blank_id) === b);
+    if (!mine.length) return m;
+    const name = `question_${q.id}_${blankTag(b)}`;
+    return drops
+      ? `<select class="question_input" name="${name}"><option value="">[ Select ]</option>${mine.map((a) => `<option value="${a.id}"${String(held[b]) === String(a.id) ? ' selected' : ''}>${a.text}</option>`).join('')}</select>`
+      : `<input type="text" class="question_input" name="${name}" value="${held[b] ?? ''}" />`;
+  });
+};
+/** A blank answer keyed by the hashed name back to the blank it fills, the way Canvas reads its own form. */
+const unhash = (q, answer) => {
+  if (!BLANK_KINDS.has(q?.question_type) || !answer || typeof answer !== 'object' || Array.isArray(answer)) return answer;
+  const byTag = new Map([...new Set(q.answers.map((a) => a.blank_id))].map((b) => [blankTag(b), b]));
+  return Object.fromEntries(Object.entries(answer).map(([k, v]) => [byTag.get(k) || k, v]));
+};
 const subQuestions = (s) => {
   const done = s.workflow_state === 'complete';
   const bank = quizQuestionBank(s.quiz_id);
   return {
     // like Canvas: `correct`, answer weights and the question comments only appear once the attempt is complete
     quiz_submission_questions: bank.map((q) => ({ id: q.id, position: q.position, flagged: !!s.state[q.id]?.flagged, answer: s.state[q.id]?.answer ?? null, ...(done ? { correct: gradeQuestion(q, s.state[q.id]?.answer) } : {}) })),
-    quiz_questions: bank.map((q) => (done ? q : { ...q, neutral_comments_html: undefined, correct_comments_html: undefined, incorrect_comments_html: undefined, neutral_comments: undefined, answers: q.answers.map(({ weight, ...a }) => a) })),
+    quiz_questions: bank.map((q) => ({ ...(done ? q : { ...q, neutral_comments_html: undefined, correct_comments_html: undefined, incorrect_comments_html: undefined, neutral_comments: undefined, answers: q.answers.map(({ weight, ...a }) => a) }), question_text: blankFields(q) })), // (the fields rendered in, with nothing picked: Canvas's own page sets those with a script of its own)
   };
 };
 const modules = {
@@ -414,17 +440,6 @@ const htmlPages = {
 // URL asks for. The extension reads one-question-at-a-time quizzes from here, since the API refuses
 // to list their questions.
 const answeredQ = (s, q) => { const a = s.state[q.id]?.answer; if (a === null || a === undefined || a === '') return false; if (Array.isArray(a)) return !!a.length; if (typeof a === 'object') return !!Object.keys(a).length; return true; };
-const BLANK_KINDS = new Set(['multiple_dropdowns_question', 'fill_in_multiple_blanks_question']);
-/** The question as Canvas writes it for the blank kinds: the field goes into the sentence, where the
- *  blank was written, and the answers block underneath is left empty. */
-const qtextOf = (q, a) => {
-  if (!BLANK_KINDS.has(q.question_type)) return q.question_text;
-  const held = a && typeof a === 'object' && !Array.isArray(a) ? a : {};
-  const widget = (b) => (q.question_type === 'multiple_dropdowns_question'
-    ? `<select class="question_input" name="question_${q.id}_${b}" aria-label="${b}"><option value="">[ Select ]</option>${q.answers.filter((ans) => ans.blank_id === b).map((ans) => `<option value="${ans.id}"${String(held[b]) === String(ans.id) ? ' selected' : ''}>${ans.text}</option>`).join('')}</select>`
-    : `<input type="text" class="question_input" name="question_${q.id}_${b}" value="${held[b] ?? ''}" aria-label="${b}" />`);
-  return q.question_text.replace(/\[([^\]\s]+)\]/g, (m, b) => (q.answers.some((ans) => String(ans.blank_id) === b) ? widget(b) : m));
-};
 const takeQuestionHtml = (q, s) => {
   const st = s.state[q.id] || {};
   const a = st.answer;
@@ -438,9 +453,9 @@ const takeQuestionHtml = (q, s) => {
     const on = (Array.isArray(a) ? a : []).find((p2) => String(p2.answer_id) === String(ans.id));
     return `<div class="answer"><div class="answer_match"><div class="answer_match_left">${ans.text}</div><div class="answer_match_right"><select class="question_input" name="question_${q.id}_answer_${ans.id}" aria-label="Match"><option value="">[ Choose ]</option>${(q.matches || []).map((m) => `<option value="${m.match_id}"${on && String(on.match_id) === String(m.match_id) ? ' selected' : ''}>${m.text}</option>`).join('')}</select></div></div></div>`;
   }).join('')}</div>`;
-  else if (BLANK_KINDS.has(q.question_type)) answers = ''; // (the fields are written into the sentence instead — see qtextOf)
+  else if (BLANK_KINDS.has(q.question_type)) answers = ''; // (the fields are written into the sentence instead — see blankFields)
   else answers = `<fieldset><legend class="screenreader-only">Group of answer choices</legend>${q.answers.map((ans) => `<div class="answer"><label class="answer_row user_content"><span class="answer_input"><input type="radio" class="question_input" name="question_${q.id}" value="${ans.id}" id="question_${q.id}_answer_${ans.id}"${String(a) === String(ans.id) ? ' checked' : ''} aria-labelledby="question_${q.id}_answer_${ans.id}_label" /></span>${label(ans)}</label></div>`).join('')}</fieldset>`;
-  return `<div role="region" aria-label="Question" class="quiz_sortable question_holder"><div style="display: block; height: 1px; overflow: hidden;">&nbsp;</div><a name="question_${q.id}"></a><div class="display_question question ${q.question_type}${st.flagged ? ' marked' : ''}" id="question_${q.id}"><a href="#" class="flag_question" role="checkbox" aria-checked="${st.flagged ? 'true' : 'false'}"><span class="screenreader-only">Flag question: ${q.question_name}</span></a><div class="header"><span class="name question_name" role="heading" aria-level="2">${q.question_name}</span><span class="question_points_holder"><span class="points question_points">${q.points_possible}</span> pts</span></div><div style="display: none;"><span class="question_type">${q.question_type}</span><span class="answer_selection_type"></span></div><div class="text"><div class="original_question_text" style="display: none;"><textarea disabled style="display: none;" name="question_text" class="textarea_question_text">${q.question_text.replace(/</g, '&lt;')}</textarea></div><div id="question_${q.id}_question_text" class="question_text user_content">${qtextOf(q, a)}</div><div class="answers">${answers}</div><div class="after_answers"></div></div><div class="clear"></div></div></div>`;
+  return `<div role="region" aria-label="Question" class="quiz_sortable question_holder"><div style="display: block; height: 1px; overflow: hidden;">&nbsp;</div><a name="question_${q.id}"></a><div class="display_question question ${q.question_type}${st.flagged ? ' marked' : ''}" id="question_${q.id}"><a href="#" class="flag_question" role="checkbox" aria-checked="${st.flagged ? 'true' : 'false'}"><span class="screenreader-only">Flag question: ${q.question_name}</span></a><div class="header"><span class="name question_name" role="heading" aria-level="2">${q.question_name}</span><span class="question_points_holder"><span class="points question_points">${q.points_possible}</span> pts</span></div><div style="display: none;"><span class="question_type">${q.question_type}</span><span class="answer_selection_type"></span></div><div class="text"><div class="original_question_text" style="display: none;"><textarea disabled style="display: none;" name="question_text" class="textarea_question_text">${q.question_text.replace(/</g, '&lt;')}</textarea></div><div id="question_${q.id}_question_text" class="question_text user_content">${blankFields(q, a && typeof a === 'object' && !Array.isArray(a) ? a : {})}</div><div class="answers">${answers}</div><div class="after_answers"></div></div><div class="clear"></div></div></div>`;
 };
 function takePage(courseId, quizId, questionId) {
   const q = quizzes(courseId).find((x) => x.id === quizId);
@@ -690,7 +705,17 @@ on('POST', /^\/api\/v1\/quiz_submissions\/([\w-]+)\/questions$/, (url, m, body) 
   if (!s || body.validation_token !== s.validation_token) return null;
   const refused = codeRefused(s, body);
   if (refused) return refused;
-  for (const q of body.quiz_questions || []) s.state[String(q.id)] = { ...(s.state[String(q.id)] || {}), answer: q.answer };
+  for (const q of body.quiz_questions || []) {
+    const asked = quizQuestionBank(s.quiz_id).find((x) => String(x.id) === String(q.id));
+    // Canvas is strict about the shape of a matching answer and says so rather than saving it: a
+    // pair's ids are whole numbers, and a string — an id of 0 sent as "0", a missing one sent as
+    // "undefined" — is refused with exactly this message.
+    const whole = (v) => typeof v === 'number' && Number.isInteger(v);
+    if (asked?.question_type === 'matching_question' && Array.isArray(q.answer) && q.answer.some((p2) => !whole(p2?.match_id) || !whole(p2?.answer_id))) {
+      return { __status: 400, errors: [{ message: 'match_id must be of type Integer' }] };
+    }
+    s.state[String(q.id)] = { ...(s.state[String(q.id)] || {}), answer: unhash(asked, q.answer) };
+  }
   return subQuestions(s);
 });
 on('PUT', /^\/api\/v1\/quiz_submissions\/([\w-]+)\/questions\/(\w+)\/(flag|unflag)$/, (url, m, body) => { const s = findSub(m[1]); if (!s) return null; const refused = codeRefused(s, body); if (refused) return refused; s.state[m[2]] = { ...(s.state[m[2]] || {}), flagged: m[3] === 'flag' }; return subQuestions(s); });

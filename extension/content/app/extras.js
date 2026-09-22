@@ -63,7 +63,7 @@
   function open(app, it) {
     if (it.kind === 'history') historySheet(app);
     else if (it.kind === 'help') helpSheet(app);
-    else if (it.kind === 'tool' && BCV.exttool) BCV.exttool.openLink({ title: it.label, href: it.href }); // (a popup over this page, the pins still beside the switch)
+    else if (it.kind === 'tool' && BCV.exttool) BCV.exttool.openLink({ title: it.label, href: it.href }); // (a tab of its own, this page left where it is)
     else app.go(it.href);
   }
 
@@ -90,7 +90,7 @@
   function phoneRows(app) {
     return items().map((it) => (it.kind === 'history' ? { icon: IC.clock, label: it.label, note: 'What you opened lately', onSelect: () => historySheet(app) }
       : it.kind === 'help' ? { icon: HELP, label: it.label, note: 'Your school\'s help links', onSelect: () => helpSheet(app) }
-        : it.kind === 'tool' && BCV.exttool ? { icon: IC.external, label: it.label, note: 'Opens over this page', onSelect: () => BCV.exttool.openLink({ title: it.label, href: it.href }) }
+        : it.kind === 'tool' && BCV.exttool ? { icon: IC.external, label: it.label, note: 'Opens in a new tab', onSelect: () => BCV.exttool.openLink({ title: it.label, href: it.href }) }
           : { icon: IC.external, label: it.label, note: 'Opens Canvas\'s page for it', href: it.href }));
   }
 

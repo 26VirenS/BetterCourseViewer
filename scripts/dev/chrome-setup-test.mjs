@@ -35,14 +35,14 @@ const check = (ok, label) => { console.log(`  ${ok ? '✓' : '✗'} ${label}`); 
 
 console.log('the Chrome manifest');
 const sniffer = manifest.content_scripts.find((cs) => (cs.js || []).includes('content/sniff.js'));
-// content/popout.js is the third that looks past Canvas: it sleeps in every frame until the popup
-// that framed it says so, and only then takes that frame's window.open
-const popout = manifest.content_scripts.find((cs) => (cs.js || []).includes('content/popout.js'));
-const own = manifest.content_scripts.filter((cs) => cs !== sniffer && cs !== popout);
+// content/toolbar.js is the other that looks past Canvas: it sleeps on every page until the
+// background says this tab is a tool's, and then puts the interface's bar over it
+const toolbar = manifest.content_scripts.find((cs) => (cs.js || []).includes('content/toolbar.js'));
+const own = manifest.content_scripts.filter((cs) => cs !== sniffer && cs !== toolbar);
 check(JSON.stringify(manifest.host_permissions) === '["*://*/*"]' && !manifest.optional_host_permissions, `the Chrome build has the run of every site, and no optional sites left to ask for: ${JSON.stringify(manifest.host_permissions)}`);
 check(!!sniffer && JSON.stringify(sniffer.matches) === '["*://*/*"]' && JSON.stringify(sniffer.exclude_matches) === '["*://*.instructure.com/*"]' && sniffer.js.length === 1 && sniffer.run_at === 'document_idle', `the sniffer alone runs on every site but Canvas's own, at idle: ${JSON.stringify(sniffer)}`);
 check(own.length === 2 && own.every((cs) => JSON.stringify(cs.matches) === '["*://*.instructure.com/*"]'), `the interface's own scripts still match Canvas's domain alone (${own.map((cs) => cs.matches.join(',')).join(' | ')})`);
-check(!!popout && JSON.stringify(popout.matches) === '["*://*/*"]' && popout.all_frames === true && popout.js.length === 1 && popout.run_at === 'document_start', `the frame script runs in every frame, early enough to be there before a tool asks for a window: ${JSON.stringify(popout)}`);
+check(!!toolbar && JSON.stringify(toolbar.matches) === '["*://*/*"]' && toolbar.js.length === 1 && toolbar.run_at === 'document_start', `the tool bar runs on every site, early enough to be there before the tool's page paints: ${JSON.stringify(toolbar)}`);
 check(!manifest.background.scripts && !('persistent' in manifest.background) && !manifest.author && manifest.action.default_icon['128'] === 'icons/icon-128.png', 'the Firefox/Safari keys are gone and the toolbar icon is the blue tile');
 
 // a site that is not Canvas — with a csrf meta and an #application of its own, as many sites have —

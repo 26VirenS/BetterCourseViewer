@@ -190,39 +190,61 @@ try {
   check((await texts('.bcv-xrow__t')).join(',') === 'Search the Canvas Guides,IT Help Desk' && /Reporting a problem/.test((await texts('.bcv-sheet__foot'))[0]), `Help lists the school's help links, leaving Canvas-only forms to Canvas: ${(await texts('.bcv-xrow__t')).join(', ')}`);
   await page.keyboard.press('Escape');
   await page.click('.bcv-nav__item--more[data-extra="tool"]');
-  await page.waitForSelector('.bcv-ext-ov .bcv-ext__frame', { timeout: 10000 });
-  const acctLoaded = await eventually(async () => { const f = page.frames().find((x) => x.url().includes('/external_tools/77')); return !!f && (await f.$('#account-tool')) !== null; }, 10000);
-  check((await page.$eval('.bcv-ext__frame', (e) => e.getAttribute('src'))) === `${BASE}/accounts/1/external_tools/77?launch_type=global_navigation&display=borderless` && (await texts('.bcv-ext .bcv-sheet__title'))[0] === 'My Materials' && page.url() === `${BASE}/` && acctLoaded && (await visible('#bcv-side')), 'an account tool opens in a popup over this page, Canvas\'s borderless launch framed in it, the page and the shell staying put');
-  await page.waitForTimeout(500);
-  check((await page.$eval('html', (e) => e.classList.contains('bcv-ext-open'))) && !(await page.$('.bcv-ext__canvas')) && (await page.$eval('#bcv-tray', (e) => getComputedStyle(e).right)) === '106px' && (await page.$eval('#bcv-look', (e) => getComputedStyle(e).right)) === '62px' && (await page.$eval('.bcv-ext__close', (e) => { const r = e.getBoundingClientRect(); return innerWidth - r.right <= 14 && r.top <= 14; })), 'the popup fills the screen but for its bar: the pins and the look switch slide into the bar, the X at the far right, and no Open in Canvas');
-  // The tool's own page sits in a frame inside the frame Canvas launched, and wants a window of its
-  // own. It is taken there, before the browser makes anything: no tab, a popup over the one it came
-  // from. (content/popout.js, woken by a hello passed down from the popup.)
-  const toolFrame = () => page.frames().find((f) => f.url().includes('/resource_selection'));
-  await eventually(async () => !!toolFrame() && (await toolFrame().$('#popout')) !== null, 10000);
-  const tabsBefore = context.pages().length;
-  await toolFrame().click('#popout');
-  // the bar says what is happening before the window is even there, and asks for no more windows
-  const said = await eventually(() => page.$eval('.bcv-ext-ov .bcv-ext__busy', (e) => !e.hidden).catch(() => false), 4000);
-  const busyLook = await page.evaluate(() => {
-    const ov = document.querySelector('.bcv-ext-ov');
-    const bar = ov?.querySelector('.bcv-ext__busy');
-    return { on: ov?.classList.contains('is-busy'), says: bar?.querySelector('.bcv-ext__busytext')?.textContent || '', bg: bar ? getComputedStyle(bar).backgroundColor : '', head: ov ? getComputedStyle(ov.querySelector('.bcv-ext__head')).backgroundColor : '' };
-  });
-  check(said && busyLook.on && /Authenticating\. Don’t open any new tabs or windows/.test(busyLook.says) && busyLook.bg === 'rgb(122, 20, 25)' && busyLook.head === 'rgb(92, 15, 19)', `while the tool's window is out there the bar goes dark red and says so (${JSON.stringify(busyLook)})`);
-  const stackedUp = await eventually(async () => (await page.$$('.bcv-ext-ov')).length === 2, 20000);
-  const outcome = await page.evaluate(() => {
-    const ovs = [...document.querySelectorAll('.bcv-ext-ov')];
-    return { n: ovs.length, top: ovs[ovs.length - 1]?.querySelector('.bcv-sheet__title')?.textContent, src: ovs[ovs.length - 1]?.querySelector('.bcv-ext__frame')?.getAttribute('src'), under: ovs[0]?.classList.contains('is-under') };
-  });
-  check(stackedUp && outcome.n === 2 && /tool-window/.test(outcome.src || '') && outcome.under && context.pages().length === tabsBefore, `once it has settled the window is brought back over the popup, and its tab is gone (${JSON.stringify(outcome)}, ${context.pages().length} tab(s))`);
-  const barOff = await page.evaluate(() => { const ov = document.querySelector('.bcv-ext-ov.is-busy'); return !ov; });
-  check(barOff, 'and the notice comes down with it');
-  await page.keyboard.press('Escape');
-  await page.waitForTimeout(400);
-  check((await page.$$('.bcv-ext-ov')).length === 1, 'Escape takes it off and gives the tool back');
-  await page.keyboard.press('Escape');
-  check(await eventually(() => page.$('.bcv-ext-ov').then((e) => !e), 3000) && !(await page.$eval('html', (e) => e.classList.contains('bcv-ext-open'))) && await eventually(() => page.$eval('#bcv-tray', (e) => getComputedStyle(e).right === '42px'), 2000), 'closed, the pins slide back out to where they sit over the page');
+  // A tool is not framed over the page any more: it gets a tab, and the extension puts its own bar
+  // across the top of the tool's own page. The bar lives in a shadow root of its own, so the tool's
+  // styling cannot reach it — and it is read here the same way, through the host element.
+  const toolPage = await context.waitForEvent('page', { timeout: 20000 });
+  await toolPage.waitForLoadState('domcontentloaded');
+  const barState = (p2) => p2.evaluate(() => document.querySelector('bcv-tool-bar')?.dataset.state || '');
+  const barRead = (p2) => p2.evaluate(() => {
+    const r = document.querySelector('bcv-tool-bar')?.shadowRoot;
+    if (!r) return null;
+    const auth = r.querySelector('.auth');
+    return {
+      title: r.querySelector('.title')?.textContent || '', note: r.querySelector('.note')?.textContent || '',
+      acts: [...r.querySelectorAll('.acts .btn')].map((b) => b.textContent.trim()).filter(Boolean).join(','),
+      x: !!r.querySelector('.x'), top: r.querySelector('.bar')?.getBoundingClientRect().top,
+      head: getComputedStyle(r.querySelector('.bar')).backgroundColor,
+      authOn: getComputedStyle(auth).display !== 'none', says: auth.textContent.trim(), authBg: getComputedStyle(auth).backgroundColor,
+      pushed: document.documentElement.style.marginTop,
+    };
+  }).catch(() => null);
+  await eventually(async () => !!(await barRead(toolPage)), 20000);
+  const acct = await barRead(toolPage);
+  check(toolPage.url() === `${BASE}/accounts/1/external_tools/77?launch_type=global_navigation&display=borderless&bcv=tool`
+    && acct.title === 'My Materials' && acct.note === 'localhost' && acct.x && acct.top === 0 && acct.acts === 'Reload'
+    && (await toolPage.$('#account-tool')) !== null && !(await toolPage.$('#bcv-app')) && page.url() === `${BASE}/`,
+  `an account tool opens in a tab of its own — Canvas's launch on it, the interface's bar over it, no shell — and the Dashboard stays where it was: ${JSON.stringify(acct)}`);
+  check(parseInt(acct.pushed, 10) > 52, `and the page is pushed down by the bar and its notice rather than hidden under them: ${acct.pushed}`);
+  // while the tab is still arriving — a launch redirects, a sign-in is several pages — the bar says so
+  check(/Authenticating\. Don’t open any new tabs or windows/.test(acct.says) && acct.authBg === 'rgb(122, 20, 25)' && acct.head === 'rgb(92, 15, 19)',
+    `and it says while the tool is still arriving, in dark red: ${JSON.stringify({ says: acct.says, bg: acct.authBg, head: acct.head })}`);
+  const arrived = await eventually(async () => (await barState(toolPage)) === 'ready', 25000);
+  await toolPage.waitForTimeout(400); // (the bar's colour goes back over .18s)
+  const calm = await barRead(toolPage);
+  check(arrived && !calm.authOn && calm.head === 'rgb(28, 28, 30)' && calm.pushed === '52px', `once it has arrived the notice comes down and the bar goes back to itself: ${JSON.stringify({ arrived, authOn: calm.authOn, head: calm.head, pushed: calm.pushed })}`);
+  // The tool's own page sits in a frame and wants a window of its own. It gets one — a real window,
+  // opened by the tool itself, nothing taken from it — and the background adopts the tab into the
+  // same session, so the bar is over that too and its X still knows the way back to Canvas.
+  const inner = () => toolPage.frames().find((f) => f.url().includes('/resource_selection'));
+  await eventually(async () => !!inner() && (await inner().$('#popout')) !== null, 15000);
+  const opening = context.waitForEvent('page', { timeout: 20000 });
+  await inner().click('#popout');
+  const win = await opening;
+  await win.waitForLoadState('domcontentloaded');
+  await eventually(async () => !!(await barRead(win)), 20000);
+  const winBar = await barRead(win);
+  check(/\/tool-window$/.test(win.url()) && winBar.title === 'My Materials' && winBar.x && (await win.$('#tool-window')) !== null,
+    `a window the tool opens for itself is the tool still: its own tab, the same bar over it: ${JSON.stringify({ url: win.url(), title: winBar.title })}`);
+  const had = context.pages().length;
+  await win.locator('bcv-tool-bar .x').click();
+  await eventually(async () => win.isClosed(), 10000);
+  check(win.isClosed() && context.pages().length === had - 1, 'the X closes that tab');
+  await toolPage.locator('bcv-tool-bar .x').click();
+  await eventually(async () => toolPage.isClosed(), 10000);
+  await page.bringToFront();
+  check(toolPage.isClosed() && page.url() === `${BASE}/` && (await page.$('#bcv-app')) !== null,
+    'and the X on the tool\'s own tab closes it and hands back to the Canvas tab it came from, still on the Dashboard');
   await page.goto(`${BASE}/`);
   await page.waitForSelector('#bcv-app .bcv-nav__item', { timeout: 10000 });
   const navItems = await texts('.bcv-nav .bcv-nav__item');
@@ -1207,30 +1229,32 @@ try {
   // dense screens fill the column up to 1180 (mockup 7 layout notes): 1400 viewport − 242 sidebar − 80 padding = 1078 here
   check(await page.$eval('.bcv-screen--ctx .bcv-head__in', (el) => Math.round(el.getBoundingClientRect().width) === 1078), `course screens fill the column (capped at 1180): ${await page.$eval('.bcv-screen--ctx .bcv-head__in', (el) => Math.round(el.getBoundingClientRect().width))}px`);
   check((await texts('.bcv-rail__ext')).join(',') === 'Resources & Policy', 'external tools are plain links under Campus tools');
+  const railOpening = context.waitForEvent('page', { timeout: 20000 });
   await page.click('.bcv-rail__ext');
-  await page.waitForSelector('.bcv-ext-ov .bcv-ext__frame', { timeout: 5000 });
-  await page.waitForTimeout(600); // (the popup grows in from the rail's button)
-  const extLoaded = await eventually(async () => { const f = page.frames().find((x) => x.url().includes('/external_tools/9')); return !!f && (await f.$('#tool_content')) !== null; }, 10000);
-  check((await page.$eval('.bcv-ext__frame', (e) => e.getAttribute('src'))) === `${BASE}/courses/101/external_tools/9?display=borderless` && (await texts('.bcv-ext .bcv-sheet__title'))[0] === 'Resources & Policy' && (await page.$eval('.bcv-ext__tab', (e) => e.href)) === `${BASE}/courses/101/external_tools/9` && page.url() === `${BASE}/courses/101` && extLoaded && (await page.$eval('#bcv-tray', (e) => parseInt(getComputedStyle(e).zIndex, 10) > parseInt(getComputedStyle(document.querySelector('.bcv-ext-ov')).zIndex, 10))) && (await page.$eval('.bcv-ext', (e) => { const r = e.getBoundingClientRect(); return r.width >= innerWidth - 2 && r.height >= innerHeight - 2 && r.top <= 1; })), 'a campus tool opens in a popup that fills the tab, Canvas\'s borderless launch framed in it, the page and the pins staying put');
-  await shot(page, '11b-tool-popup');
-  await page.keyboard.press('Escape');
-  check(await eventually(() => page.$('.bcv-ext-ov').then((e) => !e), 3000) && page.url() === `${BASE}/courses/101`, 'Escape closes the popup and the course page is still there');
-  // a tool that never comes is waited for, not given up on: no tab is forced, no card says it will
-  // not open, and the bar keeps Reload and Open in new tab for whoever wants them
+  const extTab = await railOpening;
+  await extTab.waitForLoadState('domcontentloaded');
+  await eventually(async () => !!(await barRead(extTab)), 20000);
+  const ext = await barRead(extTab);
+  check(extTab.url() === `${BASE}/courses/101/external_tools/9?display=borderless&bcv=tool` && ext.title === 'Resources & Policy'
+    && (await extTab.$('#tool_content')) !== null && !(await extTab.$('#bcv-app')) && page.url() === `${BASE}/courses/101`,
+  `a campus tool opens in a tab of its own, Canvas's launch on it, the course page staying where it was: ${JSON.stringify({ url: extTab.url(), title: ext.title })}`);
+  await shot(extTab, '11b-tool-tab');
+  await extTab.locator('bcv-tool-bar .x').click();
+  await eventually(async () => extTab.isClosed(), 10000);
+  await page.bringToFront();
+  check(extTab.isClosed() && page.url() === `${BASE}/courses/101`, 'the X closes it and the course page is still there');
+  // a tool that never answers is waited for, not given up on: the bar stays and says it is arriving
   const hangTool = /\/courses\/101\/external_tools\/9\b/;
-  await page.route(hangTool, () => {}); // answered by nobody: the frame stays blank
-  const tabsBeforeHang = context.pages().length;
+  await context.route(hangTool, () => {}); // answered by nobody
+  const hangOpening = context.waitForEvent('page', { timeout: 20000 });
   await page.click('.bcv-rail__ext');
-  await page.waitForSelector('.bcv-ext-ov .bcv-ext__frame', { timeout: 5000 });
-  await page.waitForTimeout(12000); // (longer than the give-up ever was)
-  const stillWaiting = await page.evaluate(() => {
-    const ov = document.querySelector('.bcv-ext-ov');
-    return { up: !!ov, fail: !!ov?.querySelector('.bcv-ext__fail'), says: ov?.querySelector('.bcv-ext__waittext')?.textContent || '', acts: [...(ov?.querySelectorAll('.bcv-ext__acts .bcv-btn') || [])].map((b2) => b2.textContent.trim()).join(',') };
-  });
-  check(stillWaiting.up && !stillWaiting.fail && stillWaiting.says === 'Opening…' && /Reload/.test(stillWaiting.acts) && /Open in new tab/.test(stillWaiting.acts) && context.pages().length === tabsBeforeHang, `a tool that will not open is waited for: the popup stays, no card gives up on it and no tab is forced (${JSON.stringify(stillWaiting)}, ${context.pages().length} tab(s))`);
-  await page.keyboard.press('Escape');
-  await eventually(() => page.$('.bcv-ext-ov').then((e) => !e), 3000);
-  await page.unroute(hangTool);
+  const hung = await hangOpening;
+  await hung.waitForTimeout(12000); // (longer than the give-up ever was)
+  const stillWaiting = { closed: hung.isClosed(), tabs: context.pages().length, here: page.url() };
+  check(!stillWaiting.closed && stillWaiting.here === `${BASE}/courses/101`, `a tool that will not answer is waited for: its tab stays, nothing gives up on it, and the course page is where it was (${JSON.stringify(stillWaiting)})`);
+  await hung.close();
+  await context.unroute(hangTool);
+  await page.bringToFront();
   const railGlyph = await page.evaluate(() => ({ active: getComputedStyle(document.querySelector('.bcv-rail__item.is-active .bcv-rail__tile svg')), idle: getComputedStyle(document.querySelector('.bcv-rail__item:not(.is-active) .bcv-rail__tile svg')), tile: getComputedStyle(document.querySelector('.bcv-rail__item.is-active .bcv-rail__tile')).backgroundColor }));
   check(await page.$('.bcv-rail__item[data-tab="home"].is-active') && railGlyph.active.stroke === 'rgb(23, 112, 171)' && railGlyph.active.opacity === '1' && railGlyph.idle.stroke === 'rgb(23, 112, 171)' && railGlyph.idle.opacity === '0.6' && railGlyph.tile === 'rgba(0, 0, 0, 0)', `rail glyphs take the course colour (the one picked earlier), no tile, dimmed unless active: ${railGlyph.active.stroke} / ${railGlyph.idle.opacity}`);
   check(await page.$('.bcv-head .bcv-colorbtn'), 'the colour square in the course header opens the palette');
@@ -1569,11 +1593,17 @@ try {
   // a link in a module opens in a popup over the page, the site framed in it, with Open in new tab for one that refuses
   await page.goto(`${BASE}/courses/102/modules`);
   await page.waitForSelector('.bcv-module__item[href="https://phet.colorado.edu"]', { timeout: 15000 });
+  // (the address is the real one in the module's data, which this machine has no way to reach, so the
+  //  tab lands on the browser's own error page — what is being checked is that a tab is where it went)
+  const hereBefore = context.pages().length;
+  const phetOpening = context.waitForEvent('page', { timeout: 20000 });
   await page.click('.bcv-module__item[href="https://phet.colorado.edu"]');
-  await page.waitForSelector('.bcv-ext-ov .bcv-ext__frame', { timeout: 5000 });
-  check((await page.$eval('.bcv-ext__frame', (e) => e.getAttribute('src'))) === 'https://phet.colorado.edu' && (await texts('.bcv-ext .bcv-sheet__title'))[0] === 'PhET simulation' && (await page.$eval('.bcv-ext__tab', (e) => e.href)) === 'https://phet.colorado.edu/' && !(await page.$('.bcv-ext__canvas')) && page.url().endsWith('/courses/102/modules'), 'a module\'s link opens in the popup with the site framed and Open in new tab beside it, the modules page staying put');
-  await page.keyboard.press('Escape');
-  await eventually(() => page.$('.bcv-ext-ov').then((e) => !e), 3000);
+  const phet = await phetOpening;
+  await phet.waitForLoadState('domcontentloaded').catch(() => {});
+  check(!phet.isClosed() && context.pages().length === hereBefore + 1 && page.url().endsWith('/courses/102/modules') && !(await page.$('.bcv-sheet-ov')),
+    `a module's link to a site of its own opens a tab for it rather than a sheet over the page, and the modules page stays put (${context.pages().length - hereBefore} tab opened)`);
+  await phet.close();
+  await page.bringToFront();
   await page.goto(`${BASE}/courses/101/modules`);
   await page.waitForSelector('.bcv-module', { timeout: 15000 });
   await tab('pages');
@@ -2002,7 +2032,9 @@ try {
   await pickIn('.bcv-qz__matchrow:nth-child(2) .bcv-qz__sel', 'Speed of light');
   await pickIn('.bcv-qz__matchrow:nth-child(3) .bcv-qz__sel', 'Gravitational constant');
   await waitText('.bcv-qz__answered', /1 of 7 answered · Saved/);
-  check(true, 'every pair saves as it is set');
+  const pairsSent = (await noteApi('GET', '/api/v1/quiz_submissions/qs9001-2/questions')).quiz_submission_questions.find((q) => String(q.id) === '90015')?.answer || [];
+  check(pairsSent.length === 3 && pairsSent.every((p2) => Number.isInteger(p2.match_id) && Number.isInteger(p2.answer_id)) && pairsSent.some((p2) => p2.match_id === 0),
+    `every pair saves as it is set, and reaches Canvas as whole numbers — an id of 0 included, which Canvas refuses as a string: ${JSON.stringify(pairsSent)}`);
   await shot(page, '22i-quiz-matching');
   // a blank each, as a field in the sentence the question wrote it into — not a list of its own
   await page.click('.bcv-qz__pill:nth-child(6)');
@@ -2123,7 +2155,8 @@ try {
   await page.click('.bcv-qz__foot .bcv-qz__btn--primary');
   await page.waitForSelector('.bcv-qz__sum', { timeout: 10000 });
   const sumRow = await page.$eval('.bcv-qz__sum:nth-child(5)', (e) => ({ q: e.querySelector('.bcv-qz__sumq').textContent.replace(/\s+/g, ' ').trim(), a: e.querySelector('.bcv-qz__suma').textContent.replace(/\s+/g, ' ').trim(), live: e.querySelectorAll('select, input').length }));
-  check(sumRow.live === 0 && /Velocity is the _____ of _____ with respect to time/.test(sumRow.q) && /rate: rate of change/.test(sumRow.a) && !/total amount/.test(sumRow.q), `the review reads a blank as a gap, with the pick beside it: ${JSON.stringify(sumRow)}`);
+  // (read from Canvas's page the blank is known only as a hash of its name, so the row names the picks alone)
+  check(sumRow.live === 0 && /Velocity is the _____ of _____ with respect to time/.test(sumRow.q) && sumRow.a === 'rate of change, position' && !/total amount/.test(sumRow.q), `the review reads a blank as a gap, with the pick beside it: ${JSON.stringify(sumRow)}`);
   page.once('dialog', (d) => d.accept());
   await page.click('.bcv-qz__big--primary');
   await page.waitForSelector('.bcv-qz__done', { timeout: 20000 });
@@ -2161,49 +2194,32 @@ try {
   await page.goto(`${BASE}/courses/104/assignments/4003`);
   await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
   check((await texts('.bcv-detail__actions .bcv-btn--primary'))[0] === 'Start assignment' && !(await page.$('.bcv-frame')) && !(await texts('.bcv-detail__actions .bcv-btn')).includes('Open in Canvas'), `an external-tool assignment offers Start assignment, no frame on the page and no Open in Canvas (${(await texts('.bcv-detail__actions .bcv-btn')).join(',')})`);
+  const knewtonOpening = context.waitForEvent('page', { timeout: 20000 });
   await page.click('.bcv-detail__actions .bcv-btn--primary');
-  await page.waitForSelector('.bcv-ext-ov .bcv-ext__frame', { timeout: 5000 });
-  check(await page.$eval('.bcv-ext__frame', (f) => /external_tools\/retrieve\?assignment_id=4003/.test(f.getAttribute('src'))) && (await texts('.bcv-ext .bcv-sheet__title'))[0] === 'Knewton Alta: Unit 2' && page.url().endsWith('/courses/104/assignments/4003'), 'Start assignment opens the tool full screen over the page, Canvas\'s launch framed in it');
-  // a framed popup is dark, bar and all, with the page inside it turned over (another origin: there
-  // is no other way in), and the sun in its bar turns the pair light
-  const extDark = await page.evaluate(() => {
-    const ov = document.querySelector('.bcv-ext-ov');
-    return { ext: document.documentElement.getAttribute('data-bcv-ext-theme'), ink: getComputedStyle(ov.querySelector('.bcv-ext')).color, frame: getComputedStyle(ov.querySelector('.bcv-ext__frame')).filter, label: ov.querySelector('.bcv-ext__theme').title };
-  });
-  check(extDark.ext === 'dark' && extDark.ink === 'rgb(242, 242, 247)' && /invert\(1\)/.test(extDark.frame) && extDark.label === 'Light appearance', `the framed popup is dark with the tool inside it turned over (${JSON.stringify(extDark)})`);
-  await page.click('.bcv-ext-ov .bcv-ext__theme');
-  await page.waitForTimeout(250);
-  const extLight = await page.evaluate(() => {
-    const ov = document.querySelector('.bcv-ext-ov');
-    return { ink: getComputedStyle(ov.querySelector('.bcv-ext')).color, frame: getComputedStyle(ov.querySelector('.bcv-ext__frame')).filter, label: ov.querySelector('.bcv-ext__theme').title };
-  });
-  check(extLight.ink === 'rgb(28, 28, 30)' && extLight.frame === 'none' && extLight.label === 'Dark appearance', `the sun turns bar and tool light together (${JSON.stringify(extLight)})`);
-  await page.click('.bcv-ext-ov .bcv-ext__theme');
-  await page.waitForTimeout(200);
-  await shot(page, '14c-ext-dark');
-  // one framed popup over another: the second goes on top, the first waits underneath and comes back
-  // (from the isolated world the content scripts run in: the page's own has no BCV, and a tool
-  // reaching for another tool goes through this same call)
-  await sw.evaluate(async (base) => {
-    const [tab] = await chrome.tabs.query({ url: `${base}/*` });
-    await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'ISOLATED', func: () => self.BCV.exttool.open({ title: 'A second tool', url: '/external_tools/retrieve?url=second', newTab: '/second' }) });
-  }, BASE);
-  await page.waitForTimeout(350);
-  const extStack = await page.evaluate(() => {
-    const ovs = [...document.querySelectorAll('.bcv-ext-ov')];
-    return { n: ovs.length, top: ovs[ovs.length - 1].querySelector('.bcv-sheet__title').textContent, under: ovs[0].querySelector('.bcv-sheet__title').textContent, isUnder: ovs[0].classList.contains('is-under'), reach: getComputedStyle(ovs[0]).pointerEvents, scrim: getComputedStyle(ovs[0]).backgroundColor };
-  });
-  check(extStack.n === 2 && extStack.top === 'A second tool' && extStack.under === 'Knewton Alta: Unit 2' && extStack.isUnder && extStack.reach === 'none' && extStack.scrim === 'rgba(0, 0, 0, 0)', `a tool opened from a tool goes on top; the first waits underneath, out of reach, its scrim off (${JSON.stringify(extStack)})`);
-  await page.keyboard.press('Escape');
-  await page.waitForTimeout(400);
-  const extBack = await page.evaluate(() => {
-    const ovs = [...document.querySelectorAll('.bcv-ext-ov')];
-    return { n: ovs.length, title: ovs[0]?.querySelector('.bcv-sheet__title').textContent, isUnder: ovs[0]?.classList.contains('is-under'), barOn: document.documentElement.classList.contains('bcv-ext-open') };
-  });
-  check(extBack.n === 1 && extBack.title === 'Knewton Alta: Unit 2' && !extBack.isUnder && extBack.barOn, `Escape takes the top one off and gives the first back, itself again (${JSON.stringify(extBack)})`);
-  await page.keyboard.press('Escape');
-  await eventually(() => page.$('.bcv-ext-ov').then((e) => !e), 3000);
-  check(!(await page.evaluate(() => document.documentElement.classList.contains('bcv-ext-open'))), 'the last one out puts the pins and the switch back where they were');
+  const knewton = await knewtonOpening;
+  await knewton.waitForLoadState('domcontentloaded');
+  await eventually(async () => !!(await barRead(knewton)), 20000);
+  const kn = await barRead(knewton);
+  check(/external_tools\/retrieve\?assignment_id=4003/.test(knewton.url()) && /bcv=tool/.test(knewton.url()) && kn.title === 'Knewton Alta: Unit 2' && page.url().endsWith('/courses/104/assignments/4003'),
+    `Start assignment opens the tool in a tab of its own, Canvas's launch on it, the assignment page staying put: ${JSON.stringify({ url: knewton.url(), title: kn.title })}`);
+  // the tool's page is somebody else's and cannot be styled from here, so dark turns it over; the
+  // sun in the bar turns it back, and the bar keeps its own colours either way
+  await eventually(async () => (await barState(knewton)) === 'ready', 25000);
+  await knewton.waitForTimeout(400);
+  const toolDark = await knewton.evaluate(() => ({ page: getComputedStyle(document.body).filter, bar: getComputedStyle(document.querySelector('bcv-tool-bar').shadowRoot.querySelector('.bar')).backgroundColor, label: document.querySelector('bcv-tool-bar').shadowRoot.querySelector('.theme').title }));
+  check(/invert\(1\)/.test(toolDark.page) && toolDark.bar === 'rgb(28, 28, 30)' && toolDark.label === 'Light appearance', `the tool's page is turned over and the bar is not (${JSON.stringify(toolDark)})`);
+  await knewton.locator('bcv-tool-bar .theme').click();
+  await knewton.waitForTimeout(250);
+  const toolLight = await knewton.evaluate(() => ({ page: getComputedStyle(document.body).filter, label: document.querySelector('bcv-tool-bar').shadowRoot.querySelector('.theme').title }));
+  check(toolLight.page === 'none' && toolLight.label === 'Dark appearance', `the sun leaves the tool's own colours alone (${JSON.stringify(toolLight)})`);
+  await shot(knewton, '14c-tool-light');
+  await knewton.locator('bcv-tool-bar .theme').click();
+  await knewton.waitForTimeout(200);
+  await shot(knewton, '14c-tool-dark');
+  await knewton.locator('bcv-tool-bar .x').click();
+  await eventually(async () => knewton.isClosed(), 10000);
+  await page.bringToFront();
+  check(knewton.isClosed() && page.url().endsWith('/courses/104/assignments/4003'), 'and the X hands the assignment page back');
   // a grade the tool posts after its launch lands on the page by itself: the submission is asked for
   // again once the tool has loaded, and again for a while, and the mark is drawn when it changes
   check((await page.$('.bcv-detail__grade')) === null && (await texts('.bcv-stat__value'))[0] === '—', 'the tool assignment starts ungraded');

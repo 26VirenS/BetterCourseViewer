@@ -26,36 +26,14 @@ html[data-bcv-theme="dark"] {
   --bcv-red-text: #ff8a80; --bcv-green-text: #5ddb7d; --bcv-dash: rgba(255,255,255,.28);
 }
 
-/* A popup that frames somebody else's page — a school tool, Desmos — carries its own appearance,
- * dark unless the sun in its bar says otherwise. Both sets are spelled out: a light one has to
- * come out light over a dark Canvas as surely as a dark one does over a light one. Only the
- * colours move; the fonts above are the same either way. */
-html[data-bcv-ext-theme="light"] .bcv-ext-ov {
-  --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
-  --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
-  --bcv-hover: #fafafc; --bcv-chrome: rgba(242,242,246,.7); --bcv-panel: rgba(255,255,255,.55); --bcv-glass: rgba(255,255,255,.78); --bcv-scrim: rgba(0,0,0,.34);
-  --bcv-blue: #0a6cff; --bcv-blue-soft: rgba(10,108,255,.1);
-  --bcv-shadow: 0 1px 2px rgba(0,0,0,.05); --bcv-shadow-hi: 0 6px 18px rgba(0,0,0,.09); --bcv-shadow-lift: 0 8px 20px rgba(0,0,0,.1);
-  --bcv-red-text: #c1271d; --bcv-green-text: #1a6b30; --bcv-dash: rgba(60,60,67,.28);
-}
-html[data-bcv-ext-theme="dark"] .bcv-ext-ov {
-  --bcv-bg: #000; --bcv-card: #1c1c1e; --bcv-ink: #f2f2f7; --bcv-ink2: #c7c7cc; --bcv-ink3: #8e8e93;
-  --bcv-sep: rgba(255,255,255,.08); --bcv-edge: rgba(255,255,255,.1); --bcv-fill: rgba(118,118,128,.28); --bcv-fill2: rgba(118,118,128,.14);
-  --bcv-hover: #2c2c2e; --bcv-chrome: rgba(0,0,0,.6); --bcv-panel: rgba(255,255,255,.05); --bcv-glass: rgba(28,28,30,.74); --bcv-scrim: rgba(0,0,0,.42);
-  --bcv-blue: #0a84ff; --bcv-blue-soft: rgba(10,132,255,.18);
-  --bcv-shadow: 0 1px 2px rgba(0,0,0,.4); --bcv-shadow-hi: 0 6px 20px rgba(0,0,0,.5); --bcv-shadow-lift: 0 8px 20px rgba(0,0,0,.45);
-  --bcv-red-text: #ff8a80; --bcv-green-text: #5ddb7d; --bcv-dash: rgba(255,255,255,.28);
-}
+/* The look switch, for anything of somebody else's shown here: the graphing tool's own board, and
+ * the tool's own tab (content/toolbar.js reads the same setting). Dark means the page is turned
+ * over — another origin cannot be styled from here — and the hue goes back round with it so what
+ * it drew keeps roughly its colours. */
 /* the sun is on a dark one (press it for light), the moon on a light one */
 .bcv-ext__theme { padding: 6px 8px; }
 html[data-bcv-ext-theme="dark"] .bcv-ext__moon, html[data-bcv-ext-theme="light"] .bcv-ext__sun { display: none; }
-/* The framed page is another site's, so it cannot be styled from here: dark turns it over instead,
-   and the hue goes back round with it so what it drew keeps roughly its colours. */
-html[data-bcv-ext-theme="dark"] .bcv-ext__frame, html[data-bcv-ext-theme="dark"] .bcv-graph__frame { filter: invert(1) hue-rotate(180deg); background: #111; }
-/* one framed popup over another: the one underneath waits, out of reach, its scrim off so the page
-   is not dimmed twice, and comes back when the top one closes */
-.bcv-ext-ov.is-under { pointer-events: none; background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; animation: none; }
-.bcv-ext-ov.is-under > .bcv-sheet { transform: scale(.97); opacity: .6; }
+html[data-bcv-ext-theme="dark"] .bcv-graph__frame { filter: invert(1) hue-rotate(180deg); background: #111; }
 
 /* ---- motion (mockup 8): keyframes for entrances and loading; transitions only for hover/active ---- */
 @keyframes bcv-fade-up { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
@@ -2903,7 +2881,7 @@ html[data-bcv-theme="dark"] .bcv-conv__delta.is-more, html[data-bcv-theme="dark"
 @media (prefers-reduced-motion: reduce) {
   .bcv-tool-card, .bcv-tool-card__tile, .bcv-tool-card__chev, .bcv-pomo__ind, .bcv-pomo__arc, .bcv-pomo__cap, .bcv-fc__flipper, .bcv-pomo__marker, .bcv-pomo__strip, .bcv-pomo__tick, .bcv-pomo__label, .bcv-pin.bcv-island, .bcv-island__face, .bcv-island .bcv-pin__btn, .bcv-island .bcv-pin__ic, .bcv-island__glyph, .bcv-island__body, .bcv-island__arc, .bcv-island__hand { transition: none; }
   .bcv-tool-card:hover { transform: none; }
-  .bcv-ext__busy, .bcv-pin.is-new, .bcv-conv__drop.is-drag, .bcv-conv__run.is-busy, .bcv-conv__delta, .bcv-conv__outlabel, .bcv-cite__preview.is-fresh, .bcv-fc__fb, .bcv-fc__tilecard.is-wrong, .bcv-pin.is-out, .bcv-island.is-paused .bcv-island__glyph, .bcv-pomo.is-paused .bcv-pomo__marker, .bcv-tool-ov.is-closing, .bcv-tool-ov.is-closing .bcv-sheet { animation: none; }
+  .bcv-pin.is-new, .bcv-conv__drop.is-drag, .bcv-conv__run.is-busy, .bcv-conv__delta, .bcv-conv__outlabel, .bcv-cite__preview.is-fresh, .bcv-fc__fb, .bcv-fc__tilecard.is-wrong, .bcv-pin.is-out, .bcv-island.is-paused .bcv-island__glyph, .bcv-pomo.is-paused .bcv-pomo__marker, .bcv-tool-ov.is-closing, .bcv-tool-ov.is-closing .bcv-sheet { animation: none; }
 }
 
 /* the welcome's Dashboard stage: three counters at the top, the middle one pressed, the sheet behind
@@ -3297,29 +3275,8 @@ html[data-bcv-theme="dark"] .bcv-pdfx { --px-row: #0f0f11; --px-page: #1f1f22; -
 .bcv-qgraph__failtext { font: 500 12px/1.4 var(--bcv-font); color: rgba(255,255,255,.7); }
 .bcv-qgraph__link { padding: 8px 12px; border-radius: 12px; background: var(--bcv-quick-color); font: 600 12px/1 var(--bcv-font); color: #fff !important; text-decoration: none !important; }
 
-/* external tools in a popup that fills the tab (2.39.0): the page and the pins stay where they are */
-.bcv-ext-ov { padding: 0; align-items: stretch; }
-.bcv-ext { width: 100%; max-width: none; height: 100%; max-height: none; border: 0; border-radius: 0; display: flex; flex-direction: column; background: var(--bcv-bg); -webkit-backdrop-filter: none; backdrop-filter: none; }
-.bcv-ext__head { position: relative; align-items: center; gap: 12px; min-height: 54px; padding: 9px 320px 9px 16px; } /* (the right of the bar is the tray's: the pins, the look switch, then the X) */
-.bcv-ext__close { position: absolute; top: 12px; right: 12px; }
-.bcv-ext .bcv-sheet__title, .bcv-ext .bcv-sheet__note { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.bcv-ext__acts { display: flex; align-items: center; gap: 8px; flex: none; }
-html.bcv-ext-open:not(.bcv-phone) .bcv-ext__acts { margin-right: calc(var(--bcv-tray-w, 24px) + 58px); transition: margin-right .45s cubic-bezier(.32,.72,0,1); } /* (the pins and the switch sit over this bar: the buttons move aside as a widget opens) */
-.bcv-ext__tab, .bcv-ext__reload { display: inline-flex; align-items: center; gap: 6px; text-decoration: none !important; }
-.bcv-ext__body { flex: 1; min-height: 0; position: relative; background: var(--bcv-fill); overflow: hidden; }
-.bcv-ext__frame { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: #fff; opacity: 0; transition: opacity .35s ease; }
-.bcv-ext__frame.is-in { opacity: 1; }
-.bcv-ext__wait { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 20px; text-align: center; }
-.bcv-ext__waittext { max-width: 420px; font: 500 13px/1.45 var(--bcv-font); color: var(--bcv-ink3); }
-.bcv-ext__body.is-loaded .bcv-ext__wait { display: none; }
 .bcv-chip--full { cursor: pointer; }
-/* the pins and the look switch slide into the popup's bar, beside the X, and back out when it closes */
 #bcv-tray { transition: opacity .18s ease, top .38s cubic-bezier(.32,.72,0,1), right .38s cubic-bezier(.32,.72,0,1); }
-html.bcv-ext-open:not(.bcv-phone) #bcv-tray { top: 15px; right: 106px; }
-html.bcv-ext-open:not(.bcv-phone) #bcv-look { top: 15px; right: 62px; }
-@media (max-width: 720px) {
-  .bcv-ext__head { padding-right: 56px; }
-}
 
 /* the periodic table (2.41.0): every element in place, a card in the table's corner, a line under it */
 .bcv-tool--pt .bcv-tool__body { padding: 14px 18px 18px; gap: 12px; }
@@ -3410,13 +3367,3 @@ html.bcv-ext-open:not(.bcv-phone) #bcv-look { top: 15px; right: 62px; }
 .bcv-qpt__cell.is-match { box-shadow: 0 0 0 1.5px #fff; }
 .bcv-qpt__cell.is-dim { opacity: .22; }
 
-/* ---- a tool signing in somewhere of its own ------------------------------------------------- */
-/* While a window the tool opened is out there, the bar goes dark red and says so: closing it, or
-   opening anything else, is what loses the sign-in half way through. */
-.bcv-ext-ov.is-busy .bcv-ext__head { background: #5c0f13; }
-.bcv-ext-ov.is-busy .bcv-ext__head .bcv-sheet__title, .bcv-ext-ov.is-busy .bcv-ext__head .bcv-sheet__note { color: #ffd9d6; }
-.bcv-ext__busy { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 16px 22px; background: #7a1419; color: #fff; text-align: center; animation: bcv-busy-in .25s cubic-bezier(.32,.72,0,1) both; }
-.bcv-ext__busy[hidden] { display: none; }
-.bcv-ext__busytext { font: 700 20px/1.25 var(--bcv-display); letter-spacing: -.01em; text-wrap: pretty; }
-@keyframes bcv-busy-in { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
-@media (max-width: 700px) { .bcv-ext__busytext { font-size: 16px; } }

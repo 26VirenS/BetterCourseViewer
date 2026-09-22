@@ -45,8 +45,12 @@ else:
     # the quiet build: Canvas's own domain, and every other site asked for one at a time
     m['host_permissions'] = ['*://*.instructure.com/*']
     m['optional_host_permissions'] = ['*://*/*']
-    quiet_out = ('content/sniff.js', 'content/popout.js')  # both look at sites the quiet build never asks for
-    m['content_scripts'] = [cs for cs in m.get('content_scripts', []) if not any(f in (cs.get('js') or []) for f in quiet_out)]
+    m['content_scripts'] = [cs for cs in m.get('content_scripts', []) if 'content/sniff.js' not in (cs.get('js') or [])]  # it looks at sites the quiet build never asks for
+    # The bar over a tool's own tab stays, narrowed to what this build asks for: Canvas's own domain
+    # (where a launch lands) and whatever site the reader has since said yes to, one at a time.
+    for cs in m['content_scripts']:
+        if 'content/toolbar.js' in (cs.get('js') or []):
+            cs['matches'] = ['*://*.instructure.com/*']
 assert len(m['description']) <= 132, 'the Chrome Web Store uses the manifest description as the summary (132 characters max)'
 with open(path, 'w') as f:
     json.dump(m, f, indent=2)

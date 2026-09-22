@@ -24,6 +24,12 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.55.0', date: '2026-09-22', notes: [
+      { kind: 'improved', title: 'Tools get a whole tab', body: 'A tool opens in its own tab, with our bar on top.', icon: P.layers },
+      { kind: 'new', title: 'The X brings you back', body: 'It closes the tool and returns to your Canvas tab.', icon: P.arrows },
+      { kind: 'fixed', title: 'Sign-ins just work', body: 'Nothing is taken from a tool while it signs you in.', icon: P.check },
+      { kind: 'fixed', title: 'Matching saves again', body: 'A pick that Canvas used to refuse now goes through.', icon: P.list },
+    ] },
     { version: '2.54.0', date: '2026-09-22', notes: [
       { kind: 'fixed', title: 'Blanks sit in the line', body: 'A dropdown fills the gap it was written into.', icon: P.pen },
       { kind: 'fixed', title: 'Every blank counts', body: 'A question is answered once no blank is left.', icon: P.check },

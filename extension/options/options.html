@@ -166,24 +166,24 @@
       </section>
 
       <!-- Hidden until it is asked for: press the version at the top left five times, or open this
-           page at #dev. It is here to find out what a browser actually reports about a window a
-           framed tool opens for itself, which is the one thing that cannot be worked out from here. -->
-      <section class="section" id="dev" data-title="Developer" data-sub="Catching a tool&rsquo;s own window." data-words="developer dev debug capture popup window tab code log" hidden>
+           page at #dev. It is here to find out what a browser actually reports about a tool's own
+           tab as it arrives, which is the one thing that cannot be worked out from here. -->
+      <section class="section" id="dev" data-title="Developer" data-sub="A tool&rsquo;s own tab." data-words="developer dev debug tool tab window code log" hidden>
         <div class="card card--pad">
           <div class="row"><span class="row__body"><span class="row__t">Settings code</span><span class="row__s">Every setting below in one code. Read it out, or type one in and press Use.</span></span></div>
           <div class="addrow">
-            <input type="text" id="devCode" class="input input--mono" placeholder="SC1-1000100" autocomplete="off" spellcheck="false" aria-label="Capture settings code">
+            <input type="text" id="devCode" class="input input--mono" placeholder="SC3-200" autocomplete="off" spellcheck="false" aria-label="Tool tab settings code">
             <button type="button" class="btn" id="devUse">Use</button>
           </div>
           <p class="note note--msg" id="devMsg"></p>
           <div class="chips">
-            <button type="button" class="chip" id="devEverything">Catch everything</button>
+            <button type="button" class="chip" id="devEverything">Say everything</button>
             <button type="button" class="chip" id="devShipped">Back to normal</button>
           </div>
         </div>
         <div class="card card--list" id="devFields"></div>
         <div class="card card--pad">
-          <div class="row"><span class="row__body"><span class="row__t">What was seen</span><span class="row__s" id="devSeenSub">Every new tab while a framed tool was open, and what happened to it.</span></span></div>
+          <div class="row"><span class="row__body"><span class="row__t">What was seen</span><span class="row__s" id="devSeenSub">Every tool tab opened, and what happened to it.</span></span></div>
           <pre class="devlog" id="devLog">Nothing yet.</pre>
           <div class="chips">
             <button type="button" class="chip" id="devRefresh">Refresh</button>
