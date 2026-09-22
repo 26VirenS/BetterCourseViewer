@@ -268,8 +268,14 @@
     groups: nav('<circle cx="8" cy="9" r="3"/><circle cx="16" cy="9" r="3"/><path d="M2 20a6 6 0 0 1 12 0M10 20a6 6 0 0 1 12 0"/>'),
   };
 
+  /* Where the interface's own floating parts go — the tray of pinned tools, a tool's popup, a menu,
+   * a toast. On Canvas that is <body>, and always has been. On a tool's own tab it is <html>: the
+   * look switch turns the tool's page over with a filter on <body>, and anything inside <body> is
+   * turned over with it, so ours would come out inverted. Outside it, they keep their own colours. */
+  const overlayRoot = () => BCV.overlayRoot || document.body;
+
   BCV.utils = {
     $, $$, h, escapeHtml, htmlToText, elementText, parseDate, startOfDay, relative, formatDue, urgency,
-    debounce, throttle, isEditable, copyText, observe, onUrlChange, uid, ICONS, NAV_ICONS, HOUR, DAY,
+    debounce, throttle, isEditable, copyText, observe, onUrlChange, uid, overlayRoot, ICONS, NAV_ICONS, HOUR, DAY,
   };
 })();

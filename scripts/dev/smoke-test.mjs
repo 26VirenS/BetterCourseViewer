@@ -23,17 +23,28 @@ const out = join(root, 'scripts', 'dev', 'out');
 mkdirSync(out, { recursive: true });
 const PORT = 8787;
 const BASE = `http://localhost:${PORT}`;
+// A tool is somebody else's site, on an origin of its own. One is served here so the tab a tool
+// opens into is a real cross-origin page — which is what decides whether the bar and the tray have
+// to be put in from outside, rather than already being there as the Canvas site's own scripts.
+const SIM_PORT = 8791;
+const SIM = `http://localhost:${SIM_PORT}`;
 
 // 1. temp copy of the extension whose content scripts also match localhost
 const extDir = join(tmpdir(), `bcv-ext-${Date.now()}`);
 cpSync(join(root, 'extension'), extDir, { recursive: true });
 const manifest = JSON.parse(readFileSync(join(extDir, 'manifest.json'), 'utf8'));
 for (const cs of manifest.content_scripts) cs.matches.push(`${BASE}/*`);
-manifest.host_permissions.push(`${BASE}/*`);
+manifest.host_permissions.push(`${BASE}/*`, `${SIM}/*`); // (a shipped build has the run of every site, or is given it a site at a time)
 writeFileSync(join(extDir, 'manifest.json'), JSON.stringify(manifest, null, 2));
 
 // 2. mock server
 const server = spawn(process.execPath, [join(root, 'scripts', 'dev', 'mock-canvas.mjs'), String(PORT)], { stdio: 'inherit' });
+const { createServer } = await import('node:http');
+const sim = createServer((req, res) => {
+  res.writeHead(200, { 'content-type': 'text/html' });
+  res.end('<!DOCTYPE html><html><head><title>Wave simulation</title></head><body style="font-family:sans-serif;padding:24px"><h1 id="sim">Wave simulation</h1><p>Somebody else\'s site.</p></body></html>');
+});
+await new Promise((r) => sim.listen(SIM_PORT, r));
 await new Promise((r) => setTimeout(r, 600));
 
 const failures = [];
@@ -1592,16 +1603,17 @@ try {
   check(page.url().endsWith('/courses/101/modules') && (await page.$('.bcv-module')) !== null, 'and Back returns to Modules');
   // a link in a module opens in a popup over the page, the site framed in it, with Open in new tab for one that refuses
   await page.goto(`${BASE}/courses/102/modules`);
-  await page.waitForSelector('.bcv-module__item[href="https://phet.colorado.edu"]', { timeout: 15000 });
-  // (the address is the real one in the module's data, which this machine has no way to reach, so the
-  //  tab lands on the browser's own error page — what is being checked is that a tab is where it went)
+  await page.waitForSelector(`.bcv-module__item[href="${SIM}/sim"]`, { timeout: 15000 });
   const hereBefore = context.pages().length;
   const phetOpening = context.waitForEvent('page', { timeout: 20000 });
-  await page.click('.bcv-module__item[href="https://phet.colorado.edu"]');
+  await page.click(`.bcv-module__item[href="${SIM}/sim"]`);
   const phet = await phetOpening;
-  await phet.waitForLoadState('domcontentloaded').catch(() => {});
-  check(!phet.isClosed() && context.pages().length === hereBefore + 1 && page.url().endsWith('/courses/102/modules') && !(await page.$('.bcv-sheet-ov')),
-    `a module's link to a site of its own opens a tab for it rather than a sheet over the page, and the modules page stays put (${context.pages().length - hereBefore} tab opened)`);
+  await phet.waitForLoadState('domcontentloaded');
+  await eventually(async () => !!(await barRead(phet)), 20000);
+  const phetBar = await barRead(phet);
+  check(phet.url() === `${SIM}/sim` && (await phet.$('#sim')) !== null && phetBar.title === 'PhET simulation' && phetBar.note === 'localhost'
+    && context.pages().length === hereBefore + 1 && page.url().endsWith('/courses/102/modules'),
+  `a module's link opens the site in a tab of its own — another origin entirely, with the bar put in over it — and the modules page stays put: ${JSON.stringify({ url: phet.url(), title: phetBar.title })}`);
   await phet.close();
   await page.bringToFront();
   await page.goto(`${BASE}/courses/101/modules`);
@@ -4048,6 +4060,64 @@ try {
   await page.mouse.move(700, 500);
 
   // ---- never a broken card -----------------------------------------------------------------------------
+  // ---- the pinned tools, on a tool's own tab -------------------------------------------------
+  // The tray is the one part of the interface meant to follow you about, and somebody else's page is
+  // exactly where a calculator is wanted. It is put in from outside on a site that is not Canvas —
+  // scripts and styles both — and mounts in the bar, outside <body> so the look switch cannot turn
+  // it over with the tool's page.
+  console.log('widgets on a tool tab');
+  const pinsBefore = await sw.evaluate(async () => (await self.BCV.api.storage.local.get('tools:pins'))['tools:pins'] || []);
+  await sw.evaluate(() => self.BCV.api.storage.local.set({ 'tools:pins': ['calc', 'ptable', 'cite'] })); // (three pinned, the way a student would have them)
+  await page.goto(`${BASE}/courses/102/modules`);
+  await page.waitForSelector(`.bcv-module__item[href="${SIM}/sim"]`, { timeout: 20000 });
+  const wOpening = context.waitForEvent('page', { timeout: 20000 });
+  await page.click(`.bcv-module__item[href="${SIM}/sim"]`);
+  const wTab = await wOpening;
+  await wTab.waitForLoadState('domcontentloaded');
+  await eventually(async () => wTab.evaluate(() => !!document.querySelector('#bcv-tray .bcv-pin')).catch(() => false), 25000);
+  const tray = await wTab.evaluate(() => {
+    const t = document.getElementById('bcv-tray');
+    const r = t.getBoundingClientRect();
+    const bar = document.querySelector('bcv-tool-bar').shadowRoot.querySelector('.bar').getBoundingClientRect();
+    return {
+      outsideBody: t.parentElement === document.documentElement,
+      pins: [...t.querySelectorAll('.bcv-pin')].map((p2) => p2.dataset.tool),
+      inBar: Math.round(r.top) >= Math.round(bar.top) && Math.round(r.top) < Math.round(bar.bottom),
+      shown: getComputedStyle(t).display,
+      inverted: getComputedStyle(t).filter,
+      pageInverted: getComputedStyle(document.body).filter,
+      shell: !!document.getElementById('bcv-app'),
+      styled: getComputedStyle(t.querySelector('.bcv-pin__btn')).borderRadius, // (the stylesheet came in with the scripts: a pin is a round button, not a bare span)
+    };
+  }).catch(() => null) || await wTab.evaluate(() => ({
+    why: 'no pins', cls: document.documentElement.className, hasTray: !!document.getElementById('bcv-tray'),
+    css: getComputedStyle(document.documentElement).getPropertyValue('--bcv-blue').trim(),
+    pins: document.querySelectorAll('#bcv-tray .bcv-pin').length,
+    trayShown: document.getElementById('bcv-tray') ? getComputedStyle(document.getElementById('bcv-tray')).display : '',
+  }));
+  check(!!tray.outsideBody && tray.pins?.join(',') === 'calc,ptable,cite' && tray.inBar && tray.shown === 'flex' && tray.inverted === 'none'
+    && /invert\(1\)/.test(tray.pageInverted || '') && !tray.shell && tray.styled === '12px',
+  `the pinned tools come with you onto a tool's own tab: in the bar, styled, outside <body> so the look switch leaves them alone while the tool's page is turned over, and nothing else of the interface: ${JSON.stringify(tray)}`);
+  await shot(wTab, '11c-tool-tab-widgets');
+  // and one opens over the tool's page, under the bar rather than behind the site's own stacking
+  // (once the tab has arrived: while the notice is up the popup starts below that too)
+  await eventually(async () => (await barState(wTab)) === 'ready', 25000);
+  await sw.evaluate(async (simUrl) => {
+    const [tab] = await chrome.tabs.query({ url: `${simUrl}/*` });
+    await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'ISOLATED', func: () => self.BCV.tools.open('calc') });
+  }, SIM);
+  await wTab.waitForSelector('.bcv-sheet-ov', { timeout: 15000 });
+  const pop = await wTab.evaluate(() => {
+    const ov = document.querySelector('.bcv-sheet-ov');
+    return { outsideBody: ov.parentElement === document.documentElement, top: Math.round(ov.getBoundingClientRect().top), z: getComputedStyle(ov).zIndex, filter: getComputedStyle(ov).filter, title: ov.querySelector('.bcv-tool__title')?.textContent || '' };
+  });
+  check(pop.outsideBody && pop.top === 52 && pop.z === '2147483646' && pop.filter === 'none' && pop.title === 'Calculator',
+    `a tool opened there rises over the tool's page and under the bar, its own colours intact: ${JSON.stringify(pop)}`);
+  await wTab.locator('bcv-tool-bar .x').click();
+  await eventually(async () => wTab.isClosed(), 10000);
+  await page.bringToFront();
+  await sw.evaluate((prev) => self.BCV.api.storage.local.set({ 'tools:pins': prev }), pinsBefore);
+
   console.log('resilience');
   await mockConfig({ groupsFail: true });
   await sw.evaluate(async () => { const all = await self.BCV.api.storage.local.get(null); await self.BCV.api.storage.local.remove(Object.keys(all).filter((k) => /:groups$/.test(k))); });
@@ -4575,6 +4645,7 @@ try {
 } finally {
   await context.close();
   server.kill();
+  sim.close();
   rmSync(extDir, { recursive: true, force: true });
   rmSync(userDataDir, { recursive: true, force: true });
 }

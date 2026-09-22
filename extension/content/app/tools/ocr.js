@@ -7,7 +7,7 @@
  * uploaded. */
 (function () {
   const BCV = (self.BCV = self.BCV || {});
-  const { h } = BCV.utils;
+  const { h, overlayRoot } = BCV.utils;
   const U = BCV.ui;
   const IC = BCV.IC;
   const T = BCV.tools;
@@ -41,7 +41,7 @@
         else if (m.type === 'error') { jobs.delete(m.id); j.reject(new Error(m.message || 'The text could not be read.')); }
       });
       frame.addEventListener('error', () => reject(new Error('The text reader could not load.')));
-      document.body.append(frame);
+      overlayRoot().append(frame);
     });
     ready.catch(() => { ready = null; frame?.remove(); frame = null; });
     return ready;

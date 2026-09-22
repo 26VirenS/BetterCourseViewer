@@ -117,6 +117,34 @@ if (typeof importScripts === 'function' && !self.BCV?.devcode) {
     }
     return { ok: true, tool: t ? { title: t.title, note: t.note, state: t.state } : null };
   }
+  /* The pinned tools, into a tool's own tab.
+   *
+   * The tray is meant to follow you about, and somebody else's page is exactly where a calculator or
+   * the timer is wanted. Its scripts are not content scripts of the site's — they would then load on
+   * every page in the world — so they are put in when the bar asks, on the tab the bar is on and
+   * nowhere else. The list is the interface's own, less everything that is about Canvas: no store,
+   * no API, no screens, no shell. */
+  const TRAY_JS = [
+    'lib/settings.js', 'lib/utils.js',
+    'content/app/icons.js', 'content/app/ui.js',
+    'content/app/tools/ptable-data.js', 'content/app/tools/ptable.js',
+    'content/app/tools/cite.js', 'content/app/tools/cards.js', 'content/app/tools/convert.js',
+    'content/app/tools/need.js', 'content/app/tools/pdfs.js', 'content/app/tools/mark.js',
+    'content/app/tools/ocr.js', 'content/app/tools/tools.js',
+  ];
+  async function toolWidgets(sender) {
+    const id = sender?.tab?.id;
+    if (id == null || !api.scripting?.executeScript) return { ok: false };
+    if (!tools.has(id)) return { ok: false }; // only a tool's own tab, and only one the bar is already on
+    try {
+      await api.scripting.insertCSS({ target: { tabId: id }, files: ['content/styles/app.css'] });
+      await api.scripting.executeScript({ target: { tabId: id }, files: TRAY_JS });
+      return { ok: true };
+    } catch (e) {
+      note({ kind: 'widgets', tabId: id, action: `could not: ${e?.message || e}` });
+      return { ok: false, message: e?.message || String(e) };
+    }
+  }
   /** The X in the bar: the tab goes, and the Canvas tab it came from comes back. */
   async function closeTool(sender) {
     await loaded;
@@ -212,6 +240,9 @@ if (typeof importScripts === 'function' && !self.BCV?.devcode) {
         return true;
       case 'closeTool': // the X in that bar
         reply(closeTool(sender));
+        return true;
+      case 'toolWidgets': // the pinned tools, into the tool's own tab
+        reply(toolWidgets(sender));
         return true;
       case 'devGet': // the Developer section: what the catch is set to
         reply(devGet());

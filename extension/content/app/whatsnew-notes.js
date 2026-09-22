@@ -24,6 +24,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.56.0', date: '2026-09-22', notes: [
+      { kind: 'new', title: 'Your pins go with you', body: 'The pinned tools sit in the bar on a tool’s own tab.', icon: P.pin },
+    ] },
     { version: '2.55.0', date: '2026-09-22', notes: [
       { kind: 'improved', title: 'Tools get a whole tab', body: 'A tool opens in its own tab, with our bar on top.', icon: P.layers },
       { kind: 'new', title: 'The X brings you back', body: 'It closes the tool and returns to your Canvas tab.', icon: P.arrows },

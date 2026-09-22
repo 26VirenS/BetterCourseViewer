@@ -2316,7 +2316,20 @@ html.bcv-dragpin #bcv-tray { opacity: 0; }
  * switch: the phone layout, the setup, the welcome, stock Canvas. */
 #bcv-tray { position: fixed; top: 6px; right: 42px; z-index: 2147481999; display: flex; align-items: flex-start; gap: 8px; margin: 0; padding: 0; transition: opacity .18s ease; }
 #bcv-look:hover ~ #bcv-tray, #bcv-look:has(:focus-visible) ~ #bcv-tray { opacity: 0; pointer-events: none; }
-html.bcv-phone.bcv-on #bcv-tray, html.bcv-setup-open #bcv-tray, html.bcv-welcome #bcv-tray, html:not(.bcv-on) #bcv-tray { display: none; }
+html.bcv-phone.bcv-on #bcv-tray, html.bcv-setup-open #bcv-tray, html.bcv-welcome #bcv-tray, html:not(.bcv-on):not(.bcv-tooltab) #bcv-tray { display: none; }
+/* On a tool's own tab the tray is the only part of the interface there, and it sits in the bar over
+   the tool — beside the X, where the pins used to slide when a tool was framed. It is outside
+   <body> (see overlayRoot), so the look switch turning the tool's page over leaves it alone, and it
+   is painted after the bar, which is why the two share the top of the z-index without a fight. */
+html.bcv-tooltab #bcv-tray { top: 14px; right: 190px; z-index: 2147483647; }
+html.bcv-tooltab { --bcv-font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif; }
+@media (max-width: 720px) { html.bcv-tooltab #bcv-tray { right: 96px; } }
+/* A tool's page is somebody else's and stacks as it likes, so on that tab everything of ours that
+   floats is lifted to the top — under the bar and the tray, which stay pressable — and a tool's own
+   popup starts below the bar rather than under it. */
+html.bcv-tooltab .bcv-sheet-ov { top: var(--bcv-toolbar-h, 52px); z-index: 2147483646; }
+html.bcv-tooltab .bcv-toast, html.bcv-tooltab .bcv-picker__list, html.bcv-tooltab .bcv-menu { z-index: 2147483646; }
+html.bcv-tooltab .bcv-pin.bcv-quick.is-free { z-index: 2147483647; }
 #bcv-pins { display: flex; align-items: flex-start; gap: 6px; }
 #bcv-pins[hidden] { display: none !important; }
 /* the timer's pin as its live activity: while a session is going the pin's glyph gives way to the

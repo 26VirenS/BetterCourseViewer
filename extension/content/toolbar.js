@@ -82,7 +82,10 @@
 
   /** Push the page down by whatever the bar and its notice take up, so nothing sits under them. */
   function push() {
-    try { document.documentElement.style.setProperty('margin-top', `${H + authH}px`, 'important'); } catch { /* the page went */ }
+    try {
+      document.documentElement.style.setProperty('margin-top', `${H + authH}px`, 'important');
+      document.documentElement.style.setProperty('--bcv-toolbar-h', `${H + authH}px`); // (what the tray's own popups start below)
+    } catch { /* the page went */ }
   }
 
   // The look switch turns the tool's page over rather than the whole document: the bar lives outside
@@ -105,6 +108,44 @@
     theme = next === 'light' ? 'light' : 'dark';
     paint();
     try { api.storage?.local?.set?.({ [THEME_KEY]: theme }); } catch { /* the tab keeps its own */ }
+  }
+
+  /* The pinned tools, here too.
+   *
+   * The tray beside the look switch is the one piece of the interface that is meant to follow you
+   * about — a calculator, the timer, the periodic table, a citation to write down — and a tool's tab
+   * is exactly where that is wanted: you are reading somebody else's page and you still want your
+   * calculator. So the tray's own scripts are asked for and dropped into this tab, and it mounts in
+   * the bar beside the X. Nothing else of the interface comes with them: no shell, no Canvas, no
+   * pages. What the tray needs and does not have here is stood in for below — what a page's rich
+   * text would be drawn with, what the appearance is, what site this is. A tool that wants Canvas
+   * (Grade needed) already copes with not reaching it, and says so where it would have said a
+   * number. Everything a tool keeps is in the extension's storage, so a pin is the same pin here.
+   */
+  async function widgets() {
+    const BCV = (self.BCV = self.BCV || {});
+    if (BCV.tools) return; // already here
+    BCV.overlayRoot = document.documentElement; // (outside <body>, so the look switch cannot turn them over)
+    BCV.screens = BCV.screens || {};
+    BCV.screens.course = BCV.screens.course || {
+      // the one thing the tray borrows from the pages: rich text, which only a picker's own options
+      // would use here. Plain and safe: the words, no markup of somebody else's carried in.
+      prose: (h2, { cls = '' } = {}) => {
+        const n = document.createElement('div');
+        n.className = `bcv-prose ${cls}`.trim();
+        const d = new DOMParser().parseFromString(String(h2 || ''), 'text/html');
+        n.textContent = d.body.textContent || '';
+        return n;
+      },
+    };
+    BCV.app = BCV.app || { isDark: () => theme === 'dark', state: {}, siteName: () => location.hostname.replace(/^www\./, '') };
+    try {
+      const r = await api.runtime.sendMessage({ type: 'toolWidgets' });
+      if (!r?.ok) return;
+      document.documentElement.dataset.bcvTheme = 'dark'; // the tray keeps the bar's own colours whatever the tool's page is doing
+      document.documentElement.classList.add('bcv-tooltab');
+      BCV.tools?.mountTray?.();
+    } catch { /* the tray simply is not here */ }
   }
 
   function setState(state) {
@@ -156,6 +197,7 @@
     attach();
     paint();
     setState(tool.state);
+    widgets();
   }
 
   /** Keep the bar on the page: a tool that rewrites the document from scratch would take it with it. */

@@ -15,7 +15,7 @@
  * shows the engine's own reason. */
 (function () {
   const BCV = (self.BCV = self.BCV || {});
-  const { h } = BCV.utils;
+  const { h, overlayRoot } = BCV.utils;
   const U = BCV.ui;
   const IC = BCV.IC;
   const T = BCV.tools;
@@ -190,7 +190,7 @@
     img.onerror = () => resolve(null);
     img.src = rec.data;
   });
-  const clickDownload = (url, name) => { const a = h('a', { href: url, download: name, style: { display: 'none' } }); document.body.append(a); a.click(); a.remove(); };
+  const clickDownload = (url, name) => { const a = h('a', { href: url, download: name, style: { display: 'none' } }); overlayRoot().append(a); a.click(); a.remove(); };
 
   /** One file → its output (downloaded when asked); {ok, bytes, label} or {ok:false, why}. */
   async function convertOne(rec, { to, q, max, download, cloud = false, key = '', onStage = null }) {

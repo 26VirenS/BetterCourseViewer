@@ -12,7 +12,7 @@
  * this device; nothing is written to Canvas or sent anywhere. */
 (function () {
   const BCV = (self.BCV = self.BCV || {});
-  const { h } = BCV.utils;
+  const { h, overlayRoot } = BCV.utils;
   const U = BCV.ui;
   const IC = BCV.IC;
   const html = document.documentElement;
@@ -110,7 +110,7 @@
     sheet.style.width = `${width}px`;
     sheet.dataset.tool = tool.key;
     ov.append(sheet);
-    document.body.append(ov);
+    overlayRoot().append(ov);
     if (from) U.morphFrom(sheet, from);
     ov.tabIndex = -1;
     ov.focus({ preventScroll: true });
@@ -140,7 +140,7 @@
   const saveFile = (name, blob) => {
     const url = URL.createObjectURL(blob);
     const a = h('a', { href: url, download: name, style: { display: 'none' } });
-    document.body.append(a);
+    overlayRoot().append(a);
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 3000);
@@ -303,7 +303,7 @@
     if (!tray) {
       const bar = h('div', { id: 'bcv-pins', class: 'bcv-pins', hidden: true, role: 'toolbar', 'aria-label': 'Pinned tools' });
       tray = h('div', { id: 'bcv-tray', class: 'bcv-tray' }, bar);
-      document.body.append(tray);
+      overlayRoot().append(tray);
       // how wide the tray is at this moment, for anything that has to keep out of its way: the
       // external tool popup's own buttons sit under it, and move aside as a widget opens and folds
       try {
@@ -1315,7 +1315,7 @@
         st.ghost.className = 'bcv-tool-card bcv-tool-card--ghost';
         st.ghost.style.width = `${st.w}px`;
         st.ghost.setAttribute('aria-hidden', 'true');
-        document.body.append(st.ghost);
+        overlayRoot().append(st.ghost);
         cardEl.classList.add('is-dragging');
         html.classList.add('bcv-dragpin');
         dropZone(true, t);
@@ -1366,7 +1366,7 @@
   function dropZone(show, t = null) {
     let z = document.getElementById('bcv-pins-drop');
     if (!show) { z?.remove(); return; }
-    if (!z) { z = h('div', { id: 'bcv-pins-drop', class: 'bcv-pins-drop', 'aria-hidden': 'true' }); document.body.append(z); }
+    if (!z) { z = h('div', { id: 'bcv-pins-drop', class: 'bcv-pins-drop', 'aria-hidden': 'true' }); overlayRoot().append(z); }
     z.replaceChildren(U.svg(IC.pin, { size: 13, stroke: 'currentColor', width: 2 }), h('span', { text: t && pinned(t.key) ? 'Already pinned' : 'Pin here' }));
   }
 

@@ -5,6 +5,7 @@
 (function () {
   const BCV = (self.BCV = self.BCV || {});
   const { h } = BCV.utils;
+  const { overlayRoot } = BCV.utils;
   const IC = BCV.IC;
 
   // ---- svg ----------------------------------------------------------------
@@ -151,7 +152,7 @@
   function toast(str, { error = false, ms = 2600 } = {}) {
     document.querySelectorAll('.bcv-toast').forEach((t) => t.remove());
     const t = el(`bcv-toast ${error ? 'bcv-toast--error' : ''}`, str, { role: 'status' });
-    document.body.append(t);
+    overlayRoot().append(t);
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => t.remove(), ms);
     return t;
@@ -228,7 +229,7 @@
       list.style.minWidth = `${Math.max(r.width, 220)}px`;
       if (below < 220 && r.top > below) { list.style.bottom = `${window.innerHeight - r.top + 6}px`; list.style.maxHeight = `${Math.max(120, r.top - 16)}px`; }
       else { list.style.top = `${r.bottom + 6}px`; list.style.maxHeight = `${Math.max(120, below - 16)}px`; }
-      document.body.append(list);
+      overlayRoot().append(list);
       btn.setAttribute('aria-expanded', 'true');
       (list.querySelector('.bcv-picker__opt.is-on') || list.firstElementChild)?.focus({ preventScroll: true });
       requestAnimationFrame(() => {
@@ -292,7 +293,7 @@
     ])));
     const r = anchor.getBoundingClientRect();
     Object.assign(m.style, { position: 'fixed', top: `${r.bottom + 6}px`, left: `${Math.min(r.left, window.innerWidth - 260)}px` });
-    document.body.append(m);
+    overlayRoot().append(m);
     setTimeout(() => document.addEventListener('click', closeMenus, { once: true }), 0);
     return m;
   }
@@ -320,7 +321,7 @@
     m.addEventListener('click', (e) => e.stopPropagation());
     const r = anchor.getBoundingClientRect();
     Object.assign(m.style, { position: 'fixed', top: `${r.bottom + 6}px`, left: `${Math.max(8, Math.min(r.left, window.innerWidth - 230))}px` });
-    document.body.append(m);
+    overlayRoot().append(m);
     setTimeout(() => document.addEventListener('click', closeMenus, { once: true }), 0);
     return m;
   }
@@ -623,7 +624,7 @@
     draw();
     const r = anchor.getBoundingClientRect();
     Object.assign(m.style, { position: 'fixed', top: `${r.bottom + 6}px`, left: `${Math.max(8, Math.min(r.left, window.innerWidth - 304))}px` });
-    document.body.append(m);
+    overlayRoot().append(m);
     const mr = m.getBoundingClientRect(); // above the field when there is no room below
     if (mr.bottom > window.innerHeight - 8 && r.top - mr.height - 6 > 8) m.style.top = `${r.top - mr.height - 6}px`;
     setTimeout(() => document.addEventListener('click', closeMenus, { once: true }), 0);
@@ -686,7 +687,7 @@
         ]),
       ]),
     ]));
-    document.body.append(ov);
+    overlayRoot().append(ov);
     if (from) morphFrom(ov.firstElementChild, from);
     ov.tabIndex = -1;
     setTimeout(() => { input.focus(); input.select(); }, 30);
@@ -714,7 +715,7 @@
           el('bcv-prompt__btns', [h('span', { style: { flex: '1' } }), cancelLabel ? btn(cancelLabel, { cls: 'bcv-ask__cancel', onClick: () => done(false) }) : null, ok]),
         ]),
       ]));
-      document.body.append(ov);
+      overlayRoot().append(ov);
       if (from) morphFrom(ov.firstElementChild, from);
       ov.tabIndex = -1;
       setTimeout(() => ok.focus(), 30);
