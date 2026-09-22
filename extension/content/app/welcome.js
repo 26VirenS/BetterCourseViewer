@@ -59,6 +59,16 @@
       layout: 'demo', kicker: 'Dashboard', title: 'Click any of the dashboard cards to see more', hint: 'Click an assignment, announcement, etc. to preview it.',
       prop: () => peekDemo(),
     },
+    // the Grades page's first opening (screens/gpa.js): a card's ring hovered for its breakdown,
+    // then what-if scores in a course's Details
+    gradeHover: {
+      layout: 'demo', kicker: 'Grades', title: 'Hover over a card to see a quick breakdown', hint: 'The ring opens into the groups behind the grade; leave it and it folds back.',
+      prop: () => hoverDemo(),
+    },
+    whatIf: {
+      layout: 'demo', kicker: 'Grades', title: 'What if? Grades', hint: 'Open a course’s Details, press “Try what-if scores” and change any score to see where the grade would land. Nothing is saved.',
+      prop: () => whatIfDemo(),
+    },
   };
 
   /** A row of the sidebar's nav, when it is on the page and drawn (a phone has none). */
@@ -225,6 +235,55 @@
       ]),
       h('div', { class: 'bcv-welcome__pvmock' }, [bar('bcv-welcome__bar--title'), bar('bcv-welcome__bar--line'), bar('bcv-welcome__bar--line'), bar('bcv-welcome__bar--line bcv-welcome__bar--short'), h('span', { class: 'bcv-welcome__pvbtn', text: 'Open' })]),
       h('span', { class: 'bcv-welcome__cursor bcv-welcome__cursor--peek', html: '<svg viewBox="0 0 24 24" width="26" height="26"><path d="M5 3l14 9-6 1.5 3.5 6.5-2.5 1.5-3.5-6.5L6 19z" fill="#fff" stroke="#1c1c1e" stroke-width="1.4" stroke-linejoin="round"/></svg>' }),
+    ]);
+  }
+  /** A course card of the Grades page, shown: a cursor comes to its ring, the group rings sweep in
+   *  and the breakdown takes the place of the target line beside it, then the cursor leaves and it
+   *  all folds back — shapes and a few numbers, round and round (app.css). */
+  function hoverDemo() {
+    const bar = (cls) => h('span', { class: `bcv-welcome__bar ${cls}` });
+    const C = (r) => (2 * Math.PI * r).toFixed(1);
+    const ring = (cls, r, pct) => `<circle class="${cls}" cx="41" cy="41" r="${r}" fill="none" stroke-width="5" stroke-linecap="round" stroke-dasharray="${((pct / 100) * 2 * Math.PI * r).toFixed(1)} ${C(r)}" style="--c:${C(r)}" transform="rotate(-90 41 41)"/>`;
+    const groups = [['Homework', '#0a84ff', '96%'], ['Quizzes', '#ff9f0a', '88%'], ['Midterms', '#34c759', '91%']];
+    return h('div', { class: 'bcv-welcome__hover', 'aria-hidden': 'true' }, [
+      h('div', { class: 'bcv-welcome__gcard' }, [
+        h('div', { class: 'bcv-welcome__gring', html: `<svg viewBox="0 0 82 82" width="82" height="82">${ring('bcv-welcome__gtrack', 34, 100)}${ring('bcv-welcome__gmain', 34, 92.4)}${ring('bcv-welcome__gcat bcv-welcome__gcat--1', 26, 96)}${ring('bcv-welcome__gcat bcv-welcome__gcat--2', 18, 88)}${ring('bcv-welcome__gcat bcv-welcome__gcat--3', 10, 91)}<text class="bcv-welcome__gletter" x="41" y="46" text-anchor="middle">A−</text></svg>` }),
+        h('div', { class: 'bcv-welcome__gbody' }, [
+          h('div', { class: 'bcv-welcome__gname', text: 'MATH 021' }),
+          h('div', { class: 'bcv-welcome__gpct', text: '92.4%' }),
+          h('div', { class: 'bcv-welcome__gslot' }, [
+            h('div', { class: 'bcv-welcome__gtarget' }, [bar('bcv-welcome__bar--gline'), bar('bcv-welcome__bar--gline bcv-welcome__bar--short')]),
+            h('div', { class: 'bcv-welcome__ggroups' }, [
+              h('div', { class: 'bcv-welcome__gkicker', text: 'By group' }),
+              ...groups.map(([name, color, value]) => h('div', { class: 'bcv-welcome__grow' }, [h('span', { class: 'bcv-welcome__gdot', style: { background: color } }), h('span', { class: 'bcv-welcome__gtxt', text: name }), h('span', { class: 'bcv-welcome__gval', text: value })])),
+            ]),
+          ]),
+        ]),
+      ]),
+      h('span', { class: 'bcv-welcome__cursor bcv-welcome__cursor--hover', html: CURSOR }),
+    ]);
+  }
+  /** What-if scores, shown: a course's Details with its assignments, a cursor pressing "Try what-if
+   *  scores", the scores turning into tinted fields, one of them changed and the total at the top
+   *  going red with it — shapes and a few numbers, round and round (app.css). */
+  function whatIfDemo() {
+    const bar = (cls) => h('span', { class: `bcv-welcome__bar ${cls}` });
+    const swap = (real, hyp) => [h('span', { class: 'bcv-welcome__wval bcv-welcome__wval--real', text: real }), h('span', { class: 'bcv-welcome__wval bcv-welcome__wval--hyp', text: hyp })];
+    const row = (i, real, hyp) => h('div', { class: `bcv-welcome__wrow ${i === 1 ? 'bcv-welcome__wrow--edit' : ''}` }, [
+      h('span', { class: 'bcv-welcome__dot' }),
+      bar('bcv-welcome__bar--row'),
+      h('span', { class: 'bcv-welcome__wscore' }, [h('span', { class: 'bcv-welcome__wbox' }, swap(real, hyp)), h('span', { class: 'bcv-welcome__wof', text: '/ 20' })]),
+    ]);
+    return h('div', { class: 'bcv-welcome__whatif', 'aria-hidden': 'true' }, [
+      h('div', { class: 'bcv-welcome__wsheet' }, [
+        h('div', { class: 'bcv-welcome__whead' }, [
+          h('div', { class: 'bcv-welcome__wtitle' }, [h('span', { class: 'bcv-welcome__wname', text: 'MATH 021' }), h('span', { class: 'bcv-welcome__wpct' }, swap('92.4%', '94.1%'))]),
+          h('span', { class: 'bcv-welcome__wbtn' }, swap('Try what-if scores', 'Exit what-if mode')),
+        ]),
+        h('div', { class: 'bcv-welcome__wbanner', text: 'This is not your actual score.' }),
+        h('div', { class: 'bcv-welcome__wrows' }, [row(0, '18', '18'), row(1, '15', '20'), row(2, '19', '19')]),
+      ]),
+      h('span', { class: 'bcv-welcome__cursor bcv-welcome__cursor--whatif', html: CURSOR }),
     ]);
   }
   const arrowOf = ({ w, ht, line, head }) => h('span', { class: 'bcv-welcome__arrowbox', 'aria-hidden': 'true', html:

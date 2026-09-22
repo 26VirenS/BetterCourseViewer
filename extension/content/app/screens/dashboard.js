@@ -88,12 +88,12 @@
     const live = (planner || []).filter((it) => !it.complete && !it.dismissed && it.type !== 'announcement' && inSel(it));
     const dueItems = live.filter((it) => it.isDue);
     // Overdue and Graded this week read each selected course's assignments (their submissions carry
-    // Canvas's own late / missing / graded_at flags); Classes today reads today's calendar events.
-    // A card whose fetch fails is dropped rather than shown as 0 (a false 0 on Overdue reads as "fine").
+    // Canvas's own late / missing / graded_at flags). A card whose fetch fails is dropped rather than
+    // shown as 0 (a false 0 on Overdue reads as "fine").
     const assignmentsP = Promise.all(favs.map(async (c) => ({ c, list: await store.assignments(c.id) }))).catch(() => null);
-    const eventsP = (favs.length ? store.calendarEvents(todayStart, todayStart, favs.map((c) => `course_${c.id}`)) : Promise.resolve([]))
-      .then((res) => (res && res.error ? null : Array.isArray(res) ? res : res?.events || [])).catch(() => null);
+    const tomorrowStart = U.addDays(todayStart, 1);
     const dueToday = dueItems.filter((it) => U.sameDay(it.date, now) && !it.submitted);
+    const dueTomorrow = dueItems.filter((it) => U.sameDay(it.date, tomorrowStart) && !it.submitted);
     const dueWeek = dueItems.filter((it) => it.date >= weekStart && it.date < weekEnd && !it.submitted);
     const weekAll = (planner || []).filter((it) => it.isDue && it.date >= weekStart && it.date < weekEnd && (it.points === null || it.points > 0) && it.type !== 'announcement');
 
@@ -187,7 +187,7 @@
         });
       });
 
-      // ---- the second row: Overdue, Graded this week, Classes today (mockup 13) ----
+      // ---- the second row: Overdue, Due tomorrow, Graded this week ----
       const land = (card, count, note, seed) => {
         const valueEl = card.querySelector('.bcv-stat__value');
         if (first && Date.now() - t0 < 2500) U.roll(valueEl, count, { seed });
@@ -198,11 +198,20 @@
       const palOf = (c) => (c ? c.palette : U.palette('#8e8e93', dark));
       const overdueSheet = { label: 'Overdue', value: '…', icon: IC.clock, color: '#ff453a', note: 'Loading…', items: [] }; // one object: an open sheet reads it after a clear
       let gradedSheet = { label: 'Graded this week', value: '…', icon: IC.chart, color: '#5856d6', note: 'Loading…', items: [] };
-      let classSheet = { label: 'Classes today', value: '…', icon: IC.book, color: '#30b0c7', note: 'Loading…', items: [] };
       const overdueCard = stat('Overdue', '…', '', IC.clock, '#ff453a', (from) => openSheet(overdueSheet, from));
       const gradedCard = stat('Graded this week', '…', '', IC.chart, '#5856d6', (from) => openSheet(gradedSheet, from));
-      const classCard = stat('Classes today', '…', '', IC.book, '#30b0c7', (from) => openSheet(classSheet, from));
-      cards.push(overdueCard, gradedCard, classCard);
+      cards.push(overdueCard);
+      // Due tomorrow: the planner's due items for the next day, the way Due today reads today's — what
+      // tonight is for, one card over from what today is for
+      if (planner) {
+        const tmPts = dueTomorrow.reduce((s, it) => s + (Number(it.points) || 0), 0);
+        cards.push(stat('Due tomorrow', String(dueTomorrow.length), dueTomorrow.length ? `${store.fmtPts(tmPts)} points total` : 'Nothing due tomorrow', IC.clock, '#ff9f0a', (from) => openSheet({
+          label: 'Due tomorrow', value: String(dueTomorrow.length), icon: IC.clock, color: '#ff9f0a',
+          note: `${store.fmtPts(tmPts)} points across ${U.plural(courseCount(dueTomorrow), 'course')} · ${U.DAYS_LONG[tomorrowStart.getDay()]}, ${U.MONTHS_LONG[tomorrowStart.getMonth()]} ${tomorrowStart.getDate()}`,
+          items: [...dueTomorrow].sort(byDate).map(dueRow), empty: 'Nothing is due tomorrow.',
+        }, from)));
+      }
+      cards.push(gradedCard);
       assignmentsP.then((byCourse) => {
         if (!ctx.alive()) return;
         if (!byCourse || !planner) { overdueCard.remove(); gradedCard.remove(); return; }
@@ -274,28 +283,6 @@
           note: graded.length ? `${store.fmtPts(earned)} of ${store.fmtPts(possible)} points earned · week of ${U.fmtShort(weekStart)}` : `Week of ${U.fmtShort(weekStart)}`,
         };
       });
-      eventsP.then((events) => {
-        if (!ctx.alive()) return;
-        if (!events) { classCard.remove(); return; }
-        // calendar events only (never assignments: the calendar shows those separately), on the selected courses, today
-        const classes = events
-          .filter((e) => e.type === 'event' && !e.assignment && U.parse(e.start_at) && U.sameDay(U.parse(e.start_at), now))
-          .map((e) => {
-            const c = courseMap.get(String(e.context_code || '').replace(/^course_/, ''));
-            const start = U.parse(e.start_at);
-            const end = U.parse(e.end_at) || start;
-            return { title: e.title || 'Event', meta: e.all_day ? 'Today · all day' : `Today · ${U.fmtTime(start)} – ${U.fmtTime(end)}`, course: c?.shortName || e.context_name || '—', color: palOf(c).text, tint: palOf(c).tint, url: e.html_url || '/calendar', start, end, allDay: !!e.all_day };
-          })
-          .sort((x, y) => x.start - y.start);
-        const timed = classes.filter((e) => !e.allDay);
-        const next = timed.find((e) => e.start >= now);
-        const last = timed[timed.length - 1];
-        land(classCard, classes.length, !classes.length ? 'No classes today' : next ? `Next at ${U.fmtTime(next.start)}` : last ? `Last ended ${U.fmtTime(last.end)}` : 'All day', 11.5);
-        classSheet = {
-          label: 'Classes today', value: String(classes.length), icon: IC.book, color: '#30b0c7', items: classes, empty: 'Nothing on the course calendars today.',
-          note: timed.length ? `First at ${U.fmtTime(timed[0].start)} · last ends ${U.fmtTime(last.end)}` : `${U.DAYS_LONG[now.getDay()]}, ${U.MONTHS_LONG[now.getMonth()]} ${now.getDate()}`,
-        };
-      });
       return U.el('bcv-stats', cards);
     }
     let statIndex = 0;
@@ -310,15 +297,18 @@
       ]), 0); // no stagger: the six land together
     }
 
-    /** The detail sheet behind a counter: header with the number, then one row per item.
-     *  It grows out of the counter that opened it (`from`). */
+    /** The detail sheet behind a counter: header with the number, then one row per item, and a
+     *  pane on the right where a row previews. It is one size from the start — the list beside the
+     *  pane, the pane saying what it is for until a row is pressed — rather than a narrow sheet that
+     *  widens for the preview and shrinks again after it: a sheet that keeps changing size is hard
+     *  to read. It grows out of the counter that opened it (`from`). */
     function openSheet(def, from = null) {
       document.querySelector('.bcv-sheet-ov')?.remove();
       const ov = U.el('bcv-sheet-ov', null, { role: 'dialog', 'aria-label': def.label });
       const close = () => ov.remove();
       ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
       ov.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
-      ov.append(U.el('bcv-sheet', [
+      ov.append(U.el('bcv-sheet bcv-sheet--steady', [
         U.el('bcv-sheet__head', [
           h('span', { class: 'bcv-sheet__tile' }, U.svg(def.icon, { size: 19, stroke: def.color, width: 1.9 })),
           U.el('bcv-sheet__titles', [
@@ -332,6 +322,7 @@
           ...(def.items.length ? def.items.map((i) => rowFor(i)) : [U.empty(def.empty || 'Nothing here.')]),
           def.more ? U.text('bcv-sheet__more', def.more) : null,
         ]),
+        U.el('bcv-sheet__pvhint', [U.svg(IC.doc, { size: 22, stroke: 'var(--bcv-ink3)', width: 1.7 }), U.text('bcv-sheet__pvhint-t', 'Press an item to preview it here', 'span')]),
       ]));
       /** A row, and — where the item can be cleared (the Overdue list) — an X beside it: the item goes
        *  one press at a time, the header counts down with it, and a failure leaves the row and says so. */

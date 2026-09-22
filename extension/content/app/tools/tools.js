@@ -301,6 +301,13 @@
     if (self.BCVBridge?.native) return null;
     let tray = document.getElementById('bcv-tray');
     if (!tray) {
+      // Which engine draws the glass: Safari blurs on a constant-size layer clipped by the face (a
+      // blur resized on every frame of the opening stuttered there), Chrome on the face itself (a
+      // blurred layer inside a rounded, clipped parent is what Chrome would not blur).
+      try {
+        const safari = /apple/i.test(navigator.vendor || '') && !/chrome|crios|edg/i.test(navigator.userAgent || '');
+        document.documentElement.classList.toggle('bcv-blink', !safari);
+      } catch { /* the stylesheet's own default, then */ }
       const bar = h('div', { id: 'bcv-pins', class: 'bcv-pins', hidden: true, role: 'toolbar', 'aria-label': 'Pinned tools' });
       tray = h('div', { id: 'bcv-tray', class: 'bcv-tray' }, bar);
       overlayRoot().append(tray);

@@ -85,9 +85,10 @@
     screen.append(U.el('bcv-head', U.el('bcv-head__in', U.el('bcv-head__row', h('div', {}, [h('h1', { class: 'bcv-h1', text: 'Grades' }), sub])))), body);
     body.append(U.loading('cards', 6)); // course-card skeletons: the layout does not jump when the data lands
 
-    const [all, term, trackingPref, goalPref, targetsPref, snapsPref, hiddenPref] = await Promise.all([
+    introIfFirst(ctx.app).catch(() => {}); // the first opening: the black goes up now, over the page drawing under it
+    const [all, term, trackingPref, goalPref, targetsPref, snapsPref, hiddenPref, whatIfPref] = await Promise.all([
       store.courses({ maxAge: store.freshness.grades }).catch(() => null), store.currentTerm().catch(() => ''), // never a score older than the freshness: a tool may have posted one since
-      store.pref('gpaTracking'), store.pref('gpaGoal'), store.pref('gradeTargets'), store.pref('gpaSnapshots'), store.pref('gpaHidden'),
+      store.pref('gpaTracking'), store.pref('gpaGoal'), store.pref('gradeTargets'), store.pref('gpaSnapshots'), store.pref('gpaHidden'), store.pref('whatIfScores', true),
     ]);
     if (!ctx.alive()) return screen;
     if (!all) {
@@ -122,6 +123,8 @@
       if (!gmCache.has(c.id)) gmCache.set(c.id, store.gradeModel(groupsBy.get(c.id) || [], c, {}, false, ctx.dark));
       return gmCache.get(c.id);
     };
+    const whatIfAllowed = whatIfPref !== false; // Settings → Grades → Show what-if scores
+    const whatIfBy = new Map(); // courseId → { on, values }: a Details sheet's what-if, kept while the page lives
 
     // ---- the model: every number from a Canvas field or from user input ----------------
     function model() {
@@ -436,6 +439,12 @@
       ov.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
       const sheet = U.el('bcv-sheet bcv-gpa-detail');
       ov.append(sheet);
+      // what-if scores, the course page's own (grades.js): the real scores loaded into fields, any of
+      // them changed to test an outcome; nothing saved, nothing sent. Kept per course while the page lives.
+      const wf = whatIfBy.get(c.id) || { on: false, values: {} };
+      whatIfBy.set(c.id, wf);
+      if (!whatIfAllowed) wf.on = false;
+      let focusId = null; // the field to put the caret back in after a repaint (a double-click on a score starts there)
       function bump(r, delta) {
         targets[c.id] = SCALE[clamp(r.idx + delta, 0, SCALE.length - 1)][0].replace(/−/g, '-'); // saved as the letter
         save();
@@ -449,16 +458,21 @@
         const r = m.rows.find((x) => x.c.id === c.id) || null; // null: no Canvas score yet, or a pass/fail course
         const pf = isPassFail(targets[c.id]);
         const pfPct = pf && c.score !== null && c.score !== undefined ? Number(c.score) : null;
-        const gm = gmFor(c);
+        // with a what-if on, the sheet is drawn from the hypothetical model: greyed rings, the what-if total up top
+        const gm = wf.on ? store.gradeModel(groupsBy.get(c.id) || [], c, wf.values, true, ctx.dark) : gmFor(c);
         const cats = gm.legend;
+        const hyp = wf.on && gm.total !== null && gm.total !== undefined ? gm.total : null;
+        const shownPct = hyp !== null ? hyp : r ? r.pct : pfPct;
         const head = U.el('bcv-sheet__head bcv-gpa-detail__head', [
-          h('div', { class: 'bcv-gpa-detail__ring' }, ringSvg(c, r ? r.pct : pfPct, cats, true)),
+          h('div', { class: 'bcv-gpa-detail__ring' }, ringSvg(c, shownPct, cats, true)),
           U.el('bcv-sheet__titles', [
             U.text('bcv-gpa-detail__title bcv-ellip', c.shortName || c.name),
             U.text('bcv-gpa-detail__name', c.nickname ? c.originalName : (c.code || c.name)),
             U.el('bcv-gpa-detail__line', [
-              U.text('bcv-gpa-detail__pct', r ? `${store.fmtPts(r.pct)}%` : pfPct !== null ? `${store.fmtPts(pfPct)}%` : 'N/A', 'span'),
-              h('span', { class: 'bcv-gpa-detail__letter', style: r || pfPct !== null ? { background: c.palette.tint, color: c.palette.text } : null, text: r ? r.letter : pf ? 'Pass/Fail' : 'No grade yet' }),
+              U.text(`bcv-gpa-detail__pct ${hyp !== null ? 'is-hyp' : ''}`, shownPct !== null && shownPct !== undefined ? `${store.fmtPts(shownPct)}%` : 'N/A', 'span'),
+              hyp !== null
+                ? h('span', { class: 'bcv-gpa-detail__letter is-hyp', text: `${letterFor(hyp)[0]} · what-if` })
+                : h('span', { class: 'bcv-gpa-detail__letter', style: r || pfPct !== null ? { background: c.palette.tint, color: c.palette.text } : null, text: r ? r.letter : pf ? 'Pass/Fail' : 'No grade yet' }),
               r ? U.el('bcv-gpa-detail__target', [
                 U.text('bcv-gpa-detail__tlabel', 'Target', 'span'),
                 h('button', { type: 'button', class: 'bcv-gpa-detail__step', text: '−', 'aria-label': 'Lower the target', disabled: r.idx >= SCALE.length - 1 || null, onclick: () => bump(r, 1) }),
@@ -500,8 +514,36 @@
             U.text('bcv-gpa__kicker2', 'How the grade is weighted', 'span'),
             U.text('bcv-gpa-detail__note bcv-pretty', 'This course does not weight its groups — the total is points earned over points possible.'),
           ]);
+        // the way through to the course's own Grades page: a proper button, not a line at the bottom
+        const go = U.btn('Open the course’s Grades page', { kind: 'primary', icon: IC.external, iconColor: '#fff', cls: 'bcv-gpa-detail__go', onClick: () => { close(); ctx.app.go(`${c.url}/grades`); } });
+        const whatIfBtn = whatIfAllowed ? h('button', { type: 'button', class: `bcv-whatif-btn ${wf.on ? 'is-on' : ''}`, text: wf.on ? 'Exit what-if mode' : 'Try what-if scores', onclick: () => { wf.on = !wf.on; focusId = null; paint(); } }) : null;
+        const banner = wf.on ? U.el('bcv-banner bcv-banner--sm', [
+          U.svg(IC.warn, { size: 20, stroke: 'var(--bcv-red)', width: 2, style: { flex: 'none' } }),
+          h('div', { style: { flex: '1', minWidth: '160px' } }, [U.text('bcv-banner__title', 'This is not your actual score.'), U.text('bcv-banner__sub', 'Your real scores are loaded in; change any of them to test an outcome. Nothing is saved or sent.')]),
+          U.btn('Clear all', { kind: 'danger', onClick: () => { wf.values = {}; focusId = null; paint(); } }),
+        ]) : null;
+        // a row's score: the number, or — with the what-if on — a field with the number in it
+        const scoreOf = (g) => {
+          if (!wf.on) {
+            const el = U.text('bcv-gpa-detail__ascore', `${g.earned === null ? '—' : store.fmtPts(g.earned)} / ${store.fmtPts(g.possible)}`, 'span');
+            if (whatIfAllowed) {
+              el.title = 'Double-click to test a what-if score';
+              el.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); }); // the first half of the double-click must not open the row
+              el.addEventListener('dblclick', () => { wf.on = true; focusId = g.id; paint(); });
+            }
+            return el;
+          }
+          const input = h('input', { type: 'text', inputmode: 'decimal', placeholder: '—', class: `bcv-whatif__input ${g.hypothetical ? 'is-hyp' : ''}`, dataset: { wf: g.id }, 'aria-label': `What-if score for ${g.name}`, value: wf.values[g.id] === undefined ? (g.earned === null ? '' : String(g.earned)) : wf.values[g.id] });
+          input.addEventListener('focus', () => input.select());
+          input.addEventListener('change', () => { wf.values[g.id] = input.value.replace(/[^0-9.]/g, ''); focusId = null; paint(); });
+          input.addEventListener('keydown', (e) => { if (e.key === 'Enter') input.blur(); });
+          const wrap = U.el('bcv-whatif', [input, U.text('bcv-whatif__possible', `/ ${store.fmtPts(g.possible)}`, 'span')]);
+          wrap.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); }); // typing a what-if is not opening the row
+          return wrap;
+        };
         const list = U.el('bcv-gpa-detail__sec bcv-gpa-detail__sec--line', [
-          U.el('bcv-gpa-detail__hrow', [U.text('bcv-gpa__kicker2', 'Assignments', 'span'), U.text('bcv-gpa-detail__hsub', 'Blue dot means graded', 'span')]),
+          U.el('bcv-gpa-detail__hrow', [U.text('bcv-gpa__kicker2', 'Assignments', 'span'), U.text('bcv-gpa-detail__hsub', wf.on ? 'Change any score to test it' : 'Blue dot means graded', 'span'), whatIfBtn]),
+          banner,
           // every row opens the assignment it is a line about, the same as on the course's own Grades
           // page: a grade is the start of a question, and the answer is on that page
           gm.rows.length ? U.el('bcv-gpa-detail__list', gm.rows.map((g) => h(g.url ? 'a' : 'div', {
@@ -512,12 +554,24 @@
           }, [
             h('span', { class: 'bcv-gpa__catdot', style: { background: g.earned !== null ? '#0a84ff' : 'transparent' } }),
             U.el('bcv-gpa-detail__abody', [U.text('bcv-gpa-detail__aname bcv-pretty', g.name), U.text('bcv-gpa-detail__agroup', `${g.group}${g.badge ? ` · ${g.badge}` : ''}`)]),
-            U.text('bcv-gpa-detail__ascore', `${g.earned === null ? '—' : store.fmtPts(g.earned)} / ${store.fmtPts(g.possible)}`, 'span'),
+            scoreOf(g),
             g.url ? U.chev() : null,
           ]))) : U.text('bcv-gpa-detail__note', 'No assignments in this course.'),
-          h('a', { class: 'bcv-gpa-detail__link', href: `${c.url}/grades`, text: 'Open the course Grades page' }),
         ]);
-        sheet.replaceChildren(head, U.el('bcv-sheet__list bcv-gpa-detail__body', [byGroup, weights, list]));
+        // one steady size, the scrolling inside it: the breakdown and the weights on the left with the
+        // way to the course's page under them, the assignments on the right (one column when narrow).
+        // A repaint (a what-if typed, a target stepped) keeps each side where it was scrolled to.
+        const scrolled = ['.bcv-gpa-detail__cols', '.bcv-gpa-detail__col--left', '.bcv-gpa-detail__col--right'].map((sel) => [sel, sheet.querySelector(sel)?.scrollTop || 0]);
+        sheet.replaceChildren(head, U.el('bcv-sheet__list bcv-gpa-detail__body', U.el('bcv-gpa-detail__cols', [
+          U.el('bcv-gpa-detail__col bcv-gpa-detail__col--left', [byGroup, weights, go]),
+          U.el('bcv-gpa-detail__col bcv-gpa-detail__col--right', [list]),
+        ])));
+        for (const [sel, top] of scrolled) if (top) { const el = sheet.querySelector(sel); if (el) el.scrollTop = top; }
+        if (focusId !== null) {
+          sheet.querySelector(`.bcv-whatif__input[data-wf="${focusId}"]`)?.focus();
+          focusId = null;
+        }
+        if (ov.isConnected && !ov.contains(document.activeElement)) ov.focus(); // whatever had focus was just redrawn; keep Escape working
       }
       paint();
       document.body.append(ov);
@@ -647,6 +701,23 @@
     const currentCourses = all.filter((c) => c.state === 'current');
     const starredCourses = currentCourses.filter((c) => c.favorite);
     await Promise.all((starredCourses.length ? starredCourses : currentCourses).map((c) => store.assignmentGroups(c.id).catch(() => {})));
+  }
+
+  // ---- the first opening: two pointers on black ------------------------------------------------
+  // The first time this page opens, the screen goes black and shows the two things that are not
+  // obvious from looking at it: a card's ring hovered for its breakdown, and what-if scores in a
+  // course's Details. Once, then never again (a flag in the extension's storage, the way Tools' is).
+  // A phone's Grades is another screen, and the app has its own first launch: neither sees it.
+  const INTRO_KEY = 'welcome:grades';
+  async function introIfFirst(app) {
+    if (!BCV.welcome || BCV.phone?.active?.() || self.BCVBridge?.native || BCV.welcome.active() || BCV.setup?.active?.()) return false;
+    try {
+      const f = await BCV.api.storage.local.get(INTRO_KEY);
+      if (f && f[INTRO_KEY]) return false;
+    } catch { return false; }
+    BCV.welcome.cover();
+    await BCV.welcome.open(app, ['gradeHover', 'whatIf'], { onDone: () => BCV.api.storage.local.set({ [INTRO_KEY]: true }).catch(() => {}) });
+    return true;
   }
 
   BCV.screens.gpa = { render, courseMath, SCALE, letterFor, pointsFor, targetIndex, prefetch };

@@ -271,7 +271,9 @@ try {
   await waitText('.bcv-stat__value', /^\d+$/);
   await page.waitForFunction(() => [...document.querySelectorAll('.bcv-stat__value')].length === 6 && [...document.querySelectorAll('.bcv-stat__value')].every((e) => /^\d+$/.test(e.textContent) && !e.dataset.rolling), null, { timeout: 15000 });
   const stats = await texts('.bcv-stat');
-  check(stats.length === 6 && /Due today\s*4\s*35 points total/i.test(stats[0]) && /Due this week/i.test(stats[1]) && /Unread announcements/i.test(stats[2]) && /^Overdue/i.test(stats[3]) && /^Graded this week/i.test(stats[4]) && /^Classes today/i.test(stats[5]), `six stat cards (mockup 13): ${stats.join(' | ')}`);
+  check(stats.length === 6 && /Due today\s*4\s*35 points total/i.test(stats[0]) && /Due this week/i.test(stats[1]) && /Unread announcements/i.test(stats[2]) && /^Overdue/i.test(stats[3]) && /^Due tomorrow/i.test(stats[4]) && /^Graded this week/i.test(stats[5]), `six stat cards (mockup 13), Due tomorrow before Graded this week: ${stats.join(' | ')}`);
+  const statLabel = await page.$eval('.bcv-stat__head .bcv-label', (e) => ({ size: parseFloat(getComputedStyle(e).fontSize), tt: getComputedStyle(e).textTransform, text: e.textContent }));
+  check(statLabel.size >= 13 && statLabel.tt === 'none', `a card is named in sentence case at a readable size, not a small capital label: ${JSON.stringify(statLabel)}`);
   check((await page.$eval('.bcv-stats', (e) => getComputedStyle(e).gridTemplateColumns.split(' ').length)) === 3 && (await page.$$eval('.bcv-stat', (els) => els.map((e) => Math.round(e.getBoundingClientRect().top)))).filter((t, i, a) => a.indexOf(t) === i).length === 2, 'a fixed 2×3 grid: three columns, two rows');
   await waitText('.bcv-stats > :nth-child(3) .bcv-stat__value', /^3$/);
   // Overdue: past due with nothing in (Canvas's missing flag) plus late work still without a score; the number matches its sheet
@@ -304,19 +306,20 @@ try {
   await waitText('.bcv-stats > :nth-child(4) .bcv-stat__value', /^1$/);
   check(/^Overdue\s*1\s*1 not submitted$/i.test((await texts('.bcv-stat'))[3]), `restored on Canvas, it counts again: ${(await texts('.bcv-stat'))[3]}`);
   // Graded this week: graded_at inside the week, points earned over points possible
-  check(/^Graded this week\s*\d+\s*(\d+(\.\d+)? \/ \d+(\.\d+)? points|No grades posted this week)$/i.test(stats[4]), `Graded this week with its points ratio: ${stats[4]}`);
-  await page.click('.bcv-stats .bcv-stat:nth-child(5)');
+  check(/^Graded this week\s*\d+\s*(\d+(\.\d+)? \/ \d+(\.\d+)? points|No grades posted this week)$/i.test(stats[5]), `Graded this week with its points ratio: ${stats[5]}`);
+  await page.click('.bcv-stats .bcv-stat:nth-child(6)');
   await page.waitForSelector('.bcv-sheet', { timeout: 5000 });
   const gradedRows = await texts('.bcv-sheet__row');
   check(/^\d+ Graded this week$/.test((await texts('.bcv-sheet__line'))[0]) && /week of \w+ \d+$/i.test((await texts('.bcv-sheet__note'))[0]) && gradedRows.length === Number((await texts('.bcv-sheet__value'))[0]) && gradedRows.every((t) => /(\d+(\.\d+)? \/ \d+(\.\d+)?|excused) · posted \w+ \d+/.test(t)), `the Graded sheet: score / possible and the posting day per row: ${gradedRows.slice(0, 2).join(' | ')}`);
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('.bcv-sheet'), null, { timeout: 3000 });
-  // Classes today: calendar events (never assignments) on the selected courses' calendars
-  check(/^Classes today\s*1\s*(Next at 3:00 PM|Last ended 4:15 PM)$/i.test(stats[5]), `Classes today from the course calendars, with the next start or the last end: ${stats[5]}`);
-  await page.click('.bcv-stats .bcv-stat:nth-child(6)');
+  // Due tomorrow: the planner's work due on the next calendar day and not yet handed in (the mock:
+  // the pre-quiz and the composition exercise in MATH 021, the journal in SPRK 010)
+  check(/^Due tomorrow\s*3\s*\d+(\.\d+)? points total$/i.test(stats[4]), `Due tomorrow counts tomorrow's unsubmitted work with its points: ${stats[4]}`);
+  await page.click('.bcv-stats .bcv-stat:nth-child(5)');
   await page.waitForSelector('.bcv-sheet', { timeout: 5000 });
-  const classRows = await texts('.bcv-sheet__row');
-  check((await texts('.bcv-sheet__line'))[0] === '1 Classes today' && (await texts('.bcv-sheet__note'))[0] === 'First at 3:00 PM · last ends 4:15 PM' && classRows.length === 1 && /^SPRK 010 seminar Today · 3:00 PM – 4:15 PM F26-SPRK 010 103$/.test(classRows[0]), `the Classes sheet: the event with its hours and course: ${classRows.join(' | ')}`);
+  const tmRows = await texts('.bcv-sheet__row');
+  check((await texts('.bcv-sheet__line'))[0] === '3 Due tomorrow' && /^\d+(\.\d+)? points across 2 courses · \w+day, \w+ \d+$/.test((await texts('.bcv-sheet__note'))[0]) && tmRows.length === 3 && tmRows.some((t) => /^Lec06-PreQuiz .*F26-MATH 021 20$/.test(t)) && tmRows.some((t) => /^Journal #2 .*F26-WRI 010 20$/.test(t)), `the Due tomorrow sheet names the day and lists exactly what it counted: ${(await texts('.bcv-sheet__note'))[0]} | ${tmRows.join(' | ')}`);
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('.bcv-sheet'), null, { timeout: 3000 });
   // each counter opens a sheet with the items it counted
@@ -340,8 +343,11 @@ try {
   await page.waitForSelector('.bcv-sheet', { timeout: 5000 });
   const annRows = await texts('.bcv-sheet__row');
   check((await texts('.bcv-sheet__line'))[0] === '3 Unread announcements' && annRows.length === 3 && /^Field site sign-ups Posted \w+ \d+ · unread F26-SPRK 010 103$/.test(annRows[0]) && !(await page.$('.bcv-sheet__more')), `the number and the rows come from the same list (Announcements API): ${annRows.join(' | ')}`);
-  // a sheet row previews inside the sheet: it widens and the preview takes its right, the list staying
-  const sheetW0 = await page.$eval(".bcv-sheet", (e) => Math.round(e.getBoundingClientRect().width));
+  // a sheet row previews inside the sheet: the sheet is one steady size from the start (the right
+  // side says a press previews there) and the preview takes that side, the list staying
+  await page.waitForTimeout(500); // the sheet's morph out of the card settles before it is measured
+  const steady0 = await page.$eval('.bcv-sheet', (e) => { const r = e.getBoundingClientRect(); const hint = e.querySelector('.bcv-sheet__pvhint'); return { w: Math.round(r.width), h: Math.round(r.height), steady: e.classList.contains('bcv-sheet--steady'), hint: hint ? hint.textContent.trim() : null, hintShown: !!hint && getComputedStyle(hint).display !== 'none' }; });
+  check(steady0.steady && steady0.w >= 900 && steady0.h >= 600 && steady0.hint === 'Press an item to preview it here' && steady0.hintShown, `the sheet opens at its full, steady size with the preview side waiting: ${JSON.stringify(steady0)}`);
   await page.click('.bcv-sheet__row');
   await page.waitForSelector('.bcv-sheet.is-split .bcv-pv--in', { timeout: 10000 });
   await page.waitForFunction(() => !document.querySelector('.bcv-pv .bcv-skel'), null, { timeout: 10000 });
@@ -359,9 +365,10 @@ try {
     const sheet = document.querySelector('.bcv-sheet').getBoundingClientRect();
     const pv = document.querySelector('.bcv-pv--in').getBoundingClientRect();
     const list = document.querySelector('.bcv-sheet__list').getBoundingClientRect();
-    return { w: Math.round(sheet.width), pvRight: Math.round(pv.right), sheetRight: Math.round(sheet.right), pvLeft: Math.round(pv.left), listRight: Math.round(list.right), shifted: document.documentElement.classList.contains('bcv-preview') };
+    const hint = document.querySelector('.bcv-sheet__pvhint');
+    return { w: Math.round(sheet.width), h: Math.round(sheet.height), pvRight: Math.round(pv.right), sheetRight: Math.round(sheet.right), pvLeft: Math.round(pv.left), listRight: Math.round(list.right), shifted: document.documentElement.classList.contains('bcv-preview'), hintShown: !!hint && getComputedStyle(hint).display !== 'none' };
   });
-  check(split.w > sheetW0 && Math.abs(split.pvRight - split.sheetRight) <= 2 && split.pvLeft >= split.listRight - 2 && !split.shifted, `the sheet grew and the preview sits on its right, the page itself never moving: ${JSON.stringify({ ...split, sheetW0 })}`);
+  check(split.w === steady0.w && split.h === steady0.h && Math.abs(split.pvRight - split.sheetRight) <= 2 && split.pvLeft >= split.listRight - 2 && !split.shifted && !split.hintShown, `the sheet keeps its size and the preview takes its right in place of the hint, the page itself never moving: ${JSON.stringify({ ...split, steady0 })}`);
   await shot(page, '01c-dashboard-preview');
   // pressing another row swaps what the panel shows, the sheet staying put
   await (await page.$$('.bcv-sheet__row'))[1].click();
@@ -720,23 +727,41 @@ try {
   const evs = await texts('.bcv-ev');
   check(evs.length >= 10 && evs.some((t) => /Dis01/.test(t)), `month view events: ${evs.length}`);
   check(await page.$('.bcv-ev__label.bcv-strike'), 'submitted/past events are struck through');
-  const cals = await texts('.bcv-calrow__name');
-  const ownCals = await texts('.bcv-cal__own .bcv-calrow__name');
-  const otherCals = await texts('.bcv-cal__other .bcv-calrow__name');
+  // the calendars live in a sheet off the Calendars button (which counts the ones on), so the month
+  // has the width of the page to itself
+  const calWide = await page.$eval('.bcv-cal', (e) => Math.round(e.getBoundingClientRect().width));
+  check(calWide >= 900 && !(await page.locator('.bcv-cal__side').isVisible()) && /^Calendars\s*5$/.test((await texts('.bcv-cal__calbtn'))[0]), `the month takes the page's width, the calendars behind a button that counts the ones on: ${calWide}px, "${(await texts('.bcv-cal__calbtn'))[0]}"`);
+  const openCals = async () => { await page.click('.bcv-cal__calbtn'); await page.waitForSelector('.bcv-cal__sheet', { timeout: 5000 }); await page.waitForTimeout(350); };
+  const closeCals = async () => { await page.keyboard.press('Escape'); await page.waitForFunction(() => !document.querySelector('.bcv-cal__sheet'), null, { timeout: 3000 }); };
+  await openCals();
+  const cals = await texts('.bcv-cal__sheet .bcv-calrow__name');
+  const ownCals = await texts('.bcv-cal__sheet .bcv-cal__own .bcv-calrow__name');
+  const otherCals = await texts('.bcv-cal__sheet .bcv-cal__other .bcv-calrow__name');
   check(cals.length === 11 && ownCals.length === 5 && !ownCals.includes('Sam Student') && otherCals[0] === 'Sam Student' && otherCals.includes('Placement Exam: Chemistry') && otherCals.includes('Attestation Fall 2026 1')
-    && (await page.$$('.bcv-cal__own .bcv-switch.is-on')).length === 5 && (await page.$$('.bcv-cal__other .bcv-switch.is-on')).length === 0,
-  `the favourite courses are the calendars on by default; the personal calendar, other courses and groups wait under Other calendars, off: ${ownCals.join(', ')} | other: ${otherCals.join(', ')}`);
+    && (await page.$$('.bcv-cal__sheet .bcv-cal__own .bcv-switch.is-on')).length === 5 && (await page.$$('.bcv-cal__sheet .bcv-cal__other .bcv-switch.is-on')).length === 0 && (await texts('.bcv-cal__sheet .bcv-sheet__note'))[0] === '5 of 11 on · up to 10 at once',
+  `the sheet: the favourite courses are the calendars on by default; the personal calendar, other courses and groups wait under Other calendars, off: ${ownCals.join(', ')} | other: ${otherCals.join(', ')}`);
   check(!evs.some((t) => /Chemistry placement/.test(t)) && !(await page.$('.bcv-cal__notice')), 'nothing from an Other calendar is shown, and nothing is said about it, until it is turned on');
-  // turning on a calendar Canvas refuses (401): it is retried alone, marked, and the rest still load
-  await (await page.$$('.bcv-cal__other .bcv-switch'))[otherCals.indexOf('Placement Exam: Chemistry')].click();
-  await page.waitForSelector('.bcv-calrow--refused', { timeout: 10000 });
-  check((await texts('.bcv-calrow--refused .bcv-calrow__name'))[0] === 'Placement Exam: Chemistry' && /would not share one calendar \(Placement Exam: Chemistry\)/.test((await texts('.bcv-cal__notice'))[0]) && !(await texts('.bcv-ev')).some((t) => /Chemistry placement/.test(t)) && (await texts('.bcv-ev')).length === evs.length, 'a calendar Canvas refuses (401) is retried alone, marked "Not shared", and the rest still load');
+  // turning on a calendar Canvas refuses (401): it is retried alone, marked, and the rest still load — the sheet staying up
+  await (await page.$$('.bcv-cal__sheet .bcv-cal__other .bcv-switch'))[otherCals.indexOf('Placement Exam: Chemistry')].click();
+  await page.waitForSelector('.bcv-cal__sheet .bcv-calrow--refused', { timeout: 10000 });
+  check((await texts('.bcv-calrow--refused .bcv-calrow__name'))[0] === 'Placement Exam: Chemistry' && /would not share one calendar \(Placement Exam: Chemistry\)/.test((await texts('.bcv-cal__notice'))[0]) && !(await texts('.bcv-ev')).some((t) => /Chemistry placement/.test(t)) && (await texts('.bcv-ev')).length === evs.length && /^\d+ of 11 on · up to 10 at once$/.test((await texts('.bcv-cal__sheet .bcv-sheet__note'))[0]), 'a calendar Canvas refuses (401) is retried alone, marked "Not shared" in the sheet, and the rest still load');
+  await closeCals();
   await shot(page, '06-calendar-month');
-  await (await page.$$('.bcv-cal__own .bcv-switch'))[0].click(); // the first favourite course off…
+  await openCals();
+  await (await page.$$('.bcv-cal__sheet .bcv-cal__own .bcv-switch'))[0].click(); // the first favourite course off…
   await page.waitForTimeout(400);
-  check((await texts('.bcv-ev')).length < evs.length, 'switching a calendar off hides its events');
-  await (await page.$$('.bcv-cal__own .bcv-switch'))[0].click(); // …and on again: the week and agenda checks below read its events
+  check((await texts('.bcv-ev')).length < evs.length && /^Calendars\s*\d+$/.test((await texts('.bcv-cal__calbtn'))[0]), 'switching a calendar off hides its events, the button counting along');
+  await (await page.$$('.bcv-cal__sheet .bcv-cal__own .bcv-switch'))[0].click(); // …and on again: the week and agenda checks below read its events
   await page.waitForFunction((n) => document.querySelectorAll('.bcv-ev').length >= n, evs.length, { timeout: 10000 });
+  await closeCals();
+  // an assignment on the grid opens in the preview panel beside the month rather than leaving the page
+  const chipTitle = await page.$eval('.bcv-ev[href*="/assignments/"]', (e) => e.querySelector('.bcv-ev__label').textContent);
+  await page.click('.bcv-ev[href*="/assignments/"]');
+  await page.waitForSelector('.bcv-pv', { timeout: 10000 }); // (the panel stands beside the page here, the way the To Do list's does)
+  await page.waitForFunction(() => !document.querySelector('.bcv-pv .bcv-skel'), null, { timeout: 10000 });
+  check(/\/calendar/.test(page.url()) && (await page.$eval('html', (e) => e.classList.contains('bcv-preview'))) && /^preview$/i.test((await texts('.bcv-pv__kicker'))[0]) && (await texts('.bcv-pv__title'))[0] === chipTitle && /assignment/i.test((await texts('.bcv-pv__meta'))[0]) && (await texts('.bcv-pv__go'))[0] === 'Open the assignment' && (await page.$('.bcv-cal__grid')) !== null, `pressing an assignment on the calendar previews it beside the month: ${JSON.stringify({ chip: chipTitle, url: page.url(), html: await page.$eval('html', (e) => e.className), kicker: (await texts('.bcv-pv__kicker'))[0], title: (await texts('.bcv-pv__title'))[0], meta: (await texts('.bcv-pv__meta'))[0], go: (await texts('.bcv-pv__go'))[0], grid: !!(await page.$('.bcv-cal__grid')) })}`);
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !document.querySelector('.bcv-pv'), null, { timeout: 5000 });
   await page.click('.bcv-seg__btn[data-value="week"]');
   await page.waitForSelector('.bcv-week__grid', { timeout: 5000 });
   check((await page.$$('.bcv-week__hour')).length === 16 && (await page.$('.bcv-week__col--today')), 'week view: 8a–11p rows, today column');
@@ -804,7 +829,32 @@ try {
   // ---- grades panel (sidebar Grades) --------------------------------------------------------
   console.log('grades panel');
   await nav('gpa');
-  await page.waitForSelector('.bcv-gpa__value', { timeout: 10000 });
+  // the first opening: black, two pointers — a card's ring hovered for its breakdown, then what-if
+  // scores in Details — each with a Continue after three seconds; the last takes the black away
+  await page.waitForSelector('#bcv-welcome[data-stage="gradeHover"]', { timeout: 20000 });
+  const gwAt = Date.now();
+  const gwNoCont = (await page.$('.bcv-welcome__next:not([hidden])')) === null;
+  const gLines = () => page.$$eval('#bcv-welcome .bcv-welcome__kicker, #bcv-welcome .bcv-welcome__title, #bcv-welcome .bcv-welcome__hint', (els) => els.map((e) => e.textContent));
+  const hoverDemo = await page.$eval('#bcv-welcome', (e) => ({ card: !!e.querySelector('.bcv-welcome__gcard'), rings: e.querySelectorAll('.bcv-welcome__gcat').length, cursor: !!e.querySelector('.bcv-welcome__cursor--hover'), anim: getComputedStyle(e.querySelector('.bcv-welcome__gcat')).animationName, loops: getComputedStyle(e.querySelector('.bcv-welcome__gcat')).animationIterationCount, groups: [...e.querySelectorAll('.bcv-welcome__gtxt')].map((x) => x.textContent).join(','), black: getComputedStyle(e).backgroundColor }));
+  check(gwNoCont && (await gLines()).join(' | ') === 'Grades | Hover over a card to see a quick breakdown | The ring opens into the groups behind the grade; leave it and it folds back.' && hoverDemo.black === 'rgb(0, 0, 0)' && hoverDemo.card && hoverDemo.rings === 3 && hoverDemo.cursor && hoverDemo.anim === 'bcv-welcome-hovercat' && hoverDemo.loops === 'infinite' && hoverDemo.groups === 'Homework,Quizzes,Midterms', `the first opening of Grades: black, a card whose ring is hovered for its breakdown, round and round (${JSON.stringify(hoverDemo)})`);
+  check(await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000) && Date.now() - gwAt >= 2200, 'Continue comes in after three seconds');
+  await page.waitForTimeout(400);
+  await shot(page, '09c0-grades-welcome-hover');
+  await page.click('.bcv-welcome__next');
+  await page.waitForSelector('#bcv-welcome[data-stage="whatIf"]', { timeout: 5000 });
+  const wfDemo = await page.$eval('#bcv-welcome', (e) => ({ sheet: !!e.querySelector('.bcv-welcome__wsheet'), btn: e.querySelector('.bcv-welcome__wbtn .bcv-welcome__wval--real')?.textContent, rows: e.querySelectorAll('.bcv-welcome__wrow').length, banner: e.querySelector('.bcv-welcome__wbanner')?.textContent, cursor: !!e.querySelector('.bcv-welcome__cursor--whatif'), anim: getComputedStyle(e.querySelector('.bcv-welcome__wbtn')).animationName }));
+  check((await gLines()).join(' | ') === 'Grades | What if? Grades | Open a course’s Details, press “Try what-if scores” and change any score to see where the grade would land. Nothing is saved.' && wfDemo.sheet && wfDemo.btn === 'Try what-if scores' && wfDemo.rows === 3 && wfDemo.banner === 'This is not your actual score.' && wfDemo.cursor && wfDemo.anim === 'bcv-welcome-wfbtn', `then what-if scores, shown: a Details sheet, the button pressed, a score changed and the total going red with it (${JSON.stringify(wfDemo)})`);
+  await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000);
+  await page.waitForTimeout(1800);
+  await shot(page, '09c1-grades-welcome-whatif');
+  await page.click('.bcv-welcome__next');
+  await page.waitForFunction(() => !document.querySelector('#bcv-welcome'), null, { timeout: 5000 });
+  check((await sw.evaluate(async () => (await self.BCV.api.storage.local.get('welcome:grades'))['welcome:grades'])) === true, 'the last Continue takes the black away and marks the show seen');
+  await page.reload();
+  await page.waitForSelector('.bcv-gpa__value', { timeout: 15000 });
+  await page.waitForTimeout(600);
+  check((await page.$('#bcv-welcome')) === null, 'and it does not come back');
+  await rolled(); // the GPA rolls up to its value on a fresh draw: read it once it has landed
   check(page.url() === `${BASE}/grades` && (await texts('.bcv-h1'))[0] === 'Grades' && (await texts('.bcv-head__sub'))[0] === 'Fall 2026 · 5 courses · 4 with grades so far', `grades panel header: ${(await texts('.bcv-head__sub'))[0]}`);
   check(/^3\.4[23]$/.test((await texts('.bcv-gpa__value'))[0]) && (await page.$('.bcv-gpa__banner')) && /needs your past record/.test((await texts('.bcv-gpa__hero'))[0]) && /No history yet/.test((await texts('.bcv-gpa__trend'))[0]), 'term GPA is the plain 4.0 average of the four scored courses; cumulative and trend wait for setup');
   const gpaStats = await texts('.bcv-gpa__stat');
@@ -846,6 +896,10 @@ try {
   await page.waitForSelector('.bcv-gpa-detail', { timeout: 5000 });
   const detail = (await texts('.bcv-gpa-detail'))[0];
   check(/^F26-MATH 021 20 MATH-021-20 92\.4% A− Target − A− · 90% \+ by group/i.test(detail) && /how the grade is weighted 100% of final grade/i.test(detail) && /Midterms 57% · nothing graded/.test(detail) && (await page.$$('.bcv-gpa-detail__arow')).length === 17 && (await page.$$('.bcv-gpa-detail .bcv-wbar__seg--ungraded')).length === 2, `details sheet: ${detail.slice(0, 200)}`);
+  // one steady size, the breakdown on the left and the assignments on the right, each side scrolling on its own
+  await page.waitForTimeout(500); // (the sheet's morph out of the Details button settles before it is measured)
+  const detailBox = await page.$eval('.bcv-gpa-detail', (e) => { const cols = e.querySelector('.bcv-gpa-detail__cols'); const right = e.querySelector('.bcv-gpa-detail__col--right'); const r = e.getBoundingClientRect(); return { w: Math.round(r.width), h: Math.round(r.height), cols: getComputedStyle(cols).gridTemplateColumns.split(' ').length, rightScrolls: right.scrollHeight > right.clientHeight + 2, sheetScrolls: e.scrollHeight > e.clientHeight + 2, go: e.querySelector('.bcv-gpa-detail__go')?.textContent.trim(), goTag: e.querySelector('.bcv-gpa-detail__go')?.tagName, link: !!e.querySelector('.bcv-gpa-detail__link') }; });
+  check(detailBox.w >= 1000 && detailBox.h === 720 && detailBox.cols === 2 && detailBox.rightScrolls && !detailBox.sheetScrolls && detailBox.go === 'Open the course’s Grades page' && detailBox.goTag === 'BUTTON' && !detailBox.link, `the sheet is one steady size, split in two, the assignments scrolling inside their column, with a real button to the course's page: ${JSON.stringify(detailBox)}`);
   // the Grades page lists the same assignments, and they open the same way the course page's do
   const gpaRow = await page.$eval('.bcv-gpa-detail__arow', (e) => ({ tag: e.tagName, href: e.getAttribute('href'), name: e.querySelector('.bcv-gpa-detail__aname')?.textContent }));
   check(gpaRow.tag === 'A' && /\/courses\/\d+\/assignments\/\d+$/.test(gpaRow.href || ''), `a row on the Grades page opens the assignment it is about: ${JSON.stringify(gpaRow)}`);
@@ -859,8 +913,34 @@ try {
   await page.click('.bcv-gpa-detail__step:last-child');
   await waitText('.bcv-gpa-detail__tval', /^A · 93%$/);
   check(/Needs 9\d% of the remaining 507 pts .*Target A Details$/.test((await texts('.bcv-gpa__card'))[0]), `a target stepped in the sheet updates the card behind it: ${(await texts('.bcv-gpa__card'))[0]}`);
-  await page.keyboard.press('Escape');
-  await page.waitForFunction(() => !document.querySelector('.bcv-sheet-ov'), null, { timeout: 5000 });
+  // what-if scores in the sheet: the button loads the real scores into bigger, tinted fields; a change
+  // moves the total at the top (red, marked what-if) and nothing behind the sheet moves
+  await page.click('.bcv-gpa-detail .bcv-whatif-btn');
+  await page.waitForSelector('.bcv-gpa-detail .bcv-whatif__input', { timeout: 5000 });
+  const wfFields = await page.$$eval('.bcv-gpa-detail .bcv-whatif__input', (els) => ({ n: els.length, h: Math.round(els[0].getBoundingClientRect().height), w: Math.round(els[0].getBoundingClientRect().width), bg: getComputedStyle(els[0]).backgroundColor, hyp: els.filter((e) => e.classList.contains('is-hyp')).length, first: els[0].value }));
+  check(wfFields.n === 17 && wfFields.h >= 34 && wfFields.w >= 68 && wfFields.bg !== 'rgba(0, 0, 0, 0)' && !/^rgb\(255, 255, 255\)$/.test(wfFields.bg) && wfFields.hyp === 0 && (await page.$('.bcv-gpa-detail .bcv-banner--sm')) !== null && (await texts('.bcv-gpa-detail .bcv-whatif-btn'))[0] === 'Exit what-if mode' && (await page.$eval('.bcv-gpa-detail__pct', (e) => e.classList.contains('is-hyp'))), `Try what-if scores: a bigger tinted field per assignment with the real score in it, the banner up: ${JSON.stringify(wfFields)}`);
+  const pctBefore = (await texts('.bcv-gpa-detail__pct'))[0];
+  // every graded assignment zeroed (one alone could sit in a group that carries no weight): the total has to move
+  const gradedWf = await page.$$eval('.bcv-gpa-detail__arow', (rows) => rows.filter((r) => r.querySelector('.bcv-whatif__input') && r.querySelector('.bcv-gpa__catdot')?.style.background === 'rgb(10, 132, 255)' && r.querySelector('.bcv-whatif__input').value !== '0').map((r) => r.querySelector('.bcv-whatif__input').dataset.wf)); // (a real 0 set to 0 is no change)
+  for (const id of gradedWf) {
+    await page.fill(`.bcv-gpa-detail .bcv-whatif__input[data-wf="${id}"]`, '0');
+    await page.keyboard.press('Enter');
+    await page.waitForSelector(`.bcv-gpa-detail .bcv-whatif__input[data-wf="${id}"].is-hyp`, { timeout: 5000 });
+  }
+  const pctAfter = (await texts('.bcv-gpa-detail__pct'))[0];
+  check(gradedWf.length > 0 && pctAfter !== pctBefore && /^\d+%$/.test(pctAfter) && (await page.$$('.bcv-gpa-detail .bcv-whatif__input.is-hyp')).length === gradedWf.length && /^A− F26-MATH 021 20 MATH-021-20 92\.4%/.test((await texts('.bcv-gpa__card'))[0]) && (await texts('.bcv-gpa-detail__letter'))[0].endsWith('· what-if'), `scores changed to 0 move the what-if total (${pctBefore} → ${pctAfter}, ${gradedWf.length} fields), marked what-if, the card behind untouched`);
+  await page.click('.bcv-gpa-detail .bcv-banner--sm button');
+  await page.waitForFunction(() => !document.querySelector('.bcv-gpa-detail .bcv-whatif__input.is-hyp'), null, { timeout: 5000 });
+  check((await texts('.bcv-gpa-detail__pct'))[0] === pctBefore, 'Clear all puts the real scores back');
+  await page.click('.bcv-gpa-detail .bcv-whatif-btn');
+  await page.waitForFunction(() => !document.querySelector('.bcv-gpa-detail .bcv-whatif__input'), null, { timeout: 5000 });
+  check((await page.$$('.bcv-gpa-detail__arow.is-link')).length === 17 && (await texts('.bcv-gpa-detail__pct'))[0] === '92.4%' && (await texts('.bcv-gpa-detail .bcv-whatif-btn'))[0] === 'Try what-if scores', 'Exit what-if mode: the rows are links again and the score is Canvas’s own');
+  // the button on the left is the way through to the course's own Grades page, and it takes the sheet with it
+  await page.click('.bcv-gpa-detail__go');
+  await page.waitForFunction(() => /\/courses\/\d+\/grades$/.test(location.pathname) && !document.querySelector('.bcv-sheet-ov'), null, { timeout: 10000 });
+  check(/\/courses\/\d+\/grades$/.test(page.url()) && !(await page.$('.bcv-sheet-ov')), `Open the course’s Grades page lands on it with the sheet put away: ${page.url()}`);
+  await page.goBack();
+  await page.waitForSelector('.bcv-gpa__card .bcv-gpa__hide', { timeout: 15000 });
   // hiding a course drops it from the GPA, reversibly, and the page says so
   await page.click('.bcv-gpa__card .bcv-gpa__hide');
   await page.waitForSelector('.bcv-gpa__tray', { timeout: 5000 });
@@ -2369,7 +2449,10 @@ try {
     await nav('inbox');
     await nav('gpa');
     await page.waitForSelector('.bcv-gpa__value', { timeout: 10000 });
-    check(api.length === before, `Groups, Inbox and Grades then open from the memo, with no request at all (${api.length - before} made)`);
+    // (the Calendar's own idle warming — calendar_events for the month — is background work of another
+    // screen's, not a request any of these three made: the Dashboard no longer fetches the month first)
+    const madeNow = api.slice(before).filter((u) => !/\/calendar_events/.test(u));
+    check(madeNow.length === 0, `Groups, Inbox and Grades then open from the memo, with no request at all (${madeNow.length} made${madeNow.length ? `: ${madeNow.join(', ')}` : ''})`);
     // inside a course, hovering a tab's rail row starts its data; the press then lands from the memo
     await page.click('.bcv-fav');
     await page.waitForSelector('.bcv-rail [data-tab="quizzes"]', { timeout: 10000 });
@@ -2662,7 +2745,7 @@ try {
   await page.waitForSelector(su('.row'), { timeout: 20000 });
   await page.waitForTimeout(500);
   // the word-mark plays first (about two seconds), then the setup rises under it
-  check(page.url() === `${BASE}/` && (await page.$('.bcv-stat')) !== null && (await page.$(su('.intro'))) !== null && (await page.$$(su('.rail__item'))).length === 4 && (await sStep()) === '1 of 4' && (await page.$eval('html', (e) => getComputedStyle(e).overflow)) === 'hidden', 'the setup opens over the dashboard on its own ground: the address cleaned, a word-mark, a rail of four steps, the page held still');
+  check(page.url() === `${BASE}/` && (await page.$('.bcv-stat')) !== null && (await page.$(su('.intro'))) !== null && (await page.$$(su('.rail__item'))).length === 5 && (await sStep()) === '1 of 5' && (await page.$eval('html', (e) => getComputedStyle(e).overflow)) === 'hidden', 'the setup opens over the dashboard on its own ground: the address cleaned, a word-mark, a rail of five steps, the page held still');
   // the dot after "Simpl" sits where the word ends in this system's font (here a Windows-like one,
   // wider than the Mac's: drawn at the design's fixed place it would land on the l)
   const dotOf = (hostSel) => page.evaluate((sel) => { const r = document.querySelector(sel).shadowRoot; const t = r.querySelector('.intro text'); const d = r.querySelector('.intro__dot'); const b = t.getBBox(); const vb = r.querySelector('.intro svg').getAttribute('viewBox').split(' ').map(Number); return { gap: Math.round(Number(d.getAttribute('cx')) - (b.x + b.width)), end: Math.round(b.x + b.width), cx: Number(d.getAttribute('cx')), fits: vb[2] >= Number(d.getAttribute('cx')) + 9 }; }, hostSel);
@@ -2672,7 +2755,7 @@ try {
   await page.waitForTimeout(500);
   await shot(page, '32-setup-over-page');
   const railNow = () => page.$$eval(su('.rail__item'), (els) => els.map((e) => `${e.querySelector('.rail__name').textContent}: ${e.querySelector('.rail__answer').textContent}${e.classList.contains('is-done') ? ' ✓' : ''}${e.disabled ? ' (locked)' : ''}`));
-  check((await railNow()).join(' | ') === 'Your courses: None yet | Grades: Not yet (locked) | Dashboard: Not yet (locked) | Sidebar: Not yet (locked)', `the rail names every step and really locks the ones ahead: ${(await railNow()).join(' | ')}`);
+  check((await railNow()).join(' | ') === 'Your courses: None yet | Grades: Not yet (locked) | Appearance: Not yet (locked) | Dashboard: Not yet (locked) | Sidebar: Not yet (locked)', `the rail names every step and really locks the ones ahead: ${(await railNow()).join(' | ')}`);
   const scanned = await texts(su('.row__code'));
   const total = scanned.length;
   const railAnswer = (step) => page.$eval(su(`.rail__item[data-step="${step}"] .rail__answer`), (e) => e.textContent);
@@ -2681,6 +2764,7 @@ try {
   // until one is ticked.
   const rowsNow = await page.$$eval(su('.row[data-course]'), (els) => els.map((e) => ({ id: e.dataset.course, on: e.classList.contains('is-on') })));
   check((await texts(su('.fr__h1')))[0] === 'Which classes are you in?' && (await texts(su('.fr__blurb')))[0] === 'Only select the courses that count towards your GPA.' && (await page.$eval(su('.fr__h1'), (e) => parseFloat(getComputedStyle(e).fontSize) >= 30)) && (await page.$eval(su('.fr__blurb'), (e) => { const s = getComputedStyle(e), t = getComputedStyle(e.previousElementSibling); return parseFloat(s.fontSize) >= 15 && parseFloat(s.fontSize) < parseFloat(t.fontSize) * 0.6 && s.color !== t.color; })) && scanned.length >= 8 && rowsNow.every((r) => !r.on) && (await texts(su('.listhead span')))[0] === `0 of ${total} selected` && (await texts(su('#selectAll')))[0] === 'Select all' && (await page.$eval(su('#next'), (b) => b.disabled)) && (await texts(su('#hint')))[0] === 'Pick at least one course.' && (await railAnswer('courses')) === 'None yet', `step 1 read the enrolments and ticked none of them: ${scanned.length} courses, Continue waiting with its hint`);
+  check(await page.$eval(su('.fr__blurb--strong'), (e) => { const s = getComputedStyle(e); return e.textContent === 'Only select the courses that count towards your GPA.' && parseInt(s.fontWeight, 10) >= 700 && parseFloat(s.fontSize) >= 16 && s.color === 'rgb(10, 132, 255)'; }), 'the line about the GPA is big, bold and blue: the one thing to get right on this step');
   // Clear all leaves none ticked, whatever was: Continue is dead with a hint until one is picked
   const clearAll = async () => { if ((await texts(su('#selectAll')))[0] === 'Select all') await page.click(su('#selectAll')); await page.click(su('#selectAll')); };
   await clearAll();
@@ -2719,8 +2803,8 @@ try {
   await shot(page, '32c-setup-courses');
   await sNext('#track');
   const firstTargets = await page.$$eval(su('.target .seg button.is-on'), (bs) => bs.map((b) => b.textContent));
-  check((await sStep()) === '2 of 4' && (await page.$eval(su('#track'), (e) => e.classList.contains('is-on'))) && (await texts(su('#goal')))[0] === '4.00' && (await page.$$(su('.target'))).length === 5 && firstTargets.join(',') === 'A+,A+,A+,A+,A+' && (await page.$$eval(su('.target:first-child .seg button'), (bs) => bs.map((b) => b.textContent))).join(' ') === 'C B B+ A- A A+', `step 2: tracking on, a 4.00 goal, every course aiming at A+, letters low to high: ${firstTargets.join(',')}`);
-  check((await railNow()).join(' | ') === `Your courses: 5 courses ✓ | Grades: Tracking · goal 4.00 | Dashboard: Not yet (locked) | Sidebar: Not yet (locked)` && (await texts(su('.target__code'))).includes('Setup nick'), `the rail ticks step 1 with its answer, and the target rows carry the nickname typed there: ${(await railNow()).join(' | ')}`);
+  check((await sStep()) === '2 of 5' && (await page.$eval(su('#track'), (e) => e.classList.contains('is-on'))) && (await texts(su('#goal')))[0] === '4.00' && (await page.$$(su('.target'))).length === 5 && firstTargets.join(',') === 'A+,A+,A+,A+,A+' && (await page.$$eval(su('.target:first-child .seg button'), (bs) => bs.map((b) => b.textContent))).join(' ') === 'C B B+ A- A A+', `step 2: tracking on, a 4.00 goal, every course aiming at A+, letters low to high: ${firstTargets.join(',')}`);
+  check((await railNow()).join(' | ') === `Your courses: 5 courses ✓ | Grades: Tracking · goal 4.00 | Appearance: Not yet (locked) | Dashboard: Not yet (locked) | Sidebar: Not yet (locked)` && (await texts(su('.target__code'))).includes('Setup nick'), `the rail ticks step 1 with its answer, and the target rows carry the nickname typed there: ${(await railNow()).join(' | ')}`);
   await page.click(su('.stepper button:last-child')); // already at the top of the scale: it stays there
   check((await texts(su('#goal')))[0] === '4.00', `the goal does not climb past 4.00: ${(await texts(su('#goal')))[0]}`);
   await page.click(su('.stepper button:first-child'));
@@ -2740,13 +2824,30 @@ try {
   await page.click(su('.target:nth-child(3) .target__pf')); // the third course stays pass/fail: it is saved as P/F
   check((await railAnswer('grades')) === 'Tracking · goal 3.90 · 1 pass/fail', `one course left pass/fail: ${await railAnswer('grades')}`);
   await shot(page, '32d-setup-grades');
+  await sNext('.tile[data-look]');
+  // step 3: light or dark — three tiles, the setting's own choice selected (Automatic to start with);
+  // a pick turns the card itself over as a preview, and writes nothing until the end
+  const LOOK_OF = { off: 'light', on: 'dark', system: 'system' };
+  const LOOK_NAME = { light: 'Light', dark: 'Dark', system: 'Automatic' };
+  const lookBefore = LOOK_OF[(await sw.evaluate(async () => (await self.BCV.settings.get()).appearance.darkMode))] || 'system';
+  const lookTiles = () => page.$$eval(su('.tile[data-look]'), (els) => els.map((t) => `${t.dataset.look}${t.classList.contains('is-on') ? ' *' : ''} [${t.querySelector('.tile__label').textContent}]`));
+  const lookWords = await page.$$eval(su('.tile[data-look]'), (els) => els.map((t) => `${t.querySelector('.tile__t').textContent} — ${t.querySelector('.tile__s').textContent}`));
+  const themeBefore = await page.$eval('#bcv-setup', (e) => e.getAttribute('data-theme'));
+  check((await sStep()) === '3 of 5' && (await texts(su('.fr__h1')))[0] === 'Light or dark?' && lookWords.join(' | ') === 'Light — Bright, all day. | Dark — Easy on the eyes. | Automatic — Follows your device, light by day and dark at night.' && (await lookTiles()).join(' | ') === ['light', 'dark', 'system'].map((v) => `${v}${v === lookBefore ? ' * [Selected]' : ' [Choose]'}`).join(' | ') && (await railAnswer('appearance')) === LOOK_NAME[lookBefore], `step 3 asks light or dark, the setting's own choice (${lookBefore}) selected: ${(await lookTiles()).join(' | ')}`);
+  await page.click(su('.tile[data-look="dark"]'));
+  check((await eventually(async () => (await page.$eval('#bcv-setup', (e) => e.getAttribute('data-theme'))) === 'dark' && (await page.$$(su('.tile[data-look].is-on'))).length === 1 && (await railAnswer('appearance')) === 'Dark')) && ((await sw.evaluate(async () => (await self.BCV.settings.get()).appearance.darkMode)) !== 'on' || lookBefore === 'dark'), 'picking Dark turns the card dark at once as a preview, the rail says Dark, and nothing is written yet');
+  await shot(page, '32e0-setup-appearance');
+  await page.click(su('.tile[data-look="light"]'));
+  check(await eventually(async () => (await page.$eval('#bcv-setup', (e) => e.getAttribute('data-theme'))) === 'light' && (await railAnswer('appearance')) === 'Light'), 'and Light turns it light again');
+  await page.click(su(`.tile[data-look="${lookBefore}"]`)); // back to the setting's own: the pages after this read it
+  check(await eventually(async () => (await page.$eval('#bcv-setup', (e) => e.getAttribute('data-theme'))) === themeBefore && (await railAnswer('appearance')) === LOOK_NAME[lookBefore]), `back to ${lookBefore}: the card is as it opened (${themeBefore})`);
   await sNext('.tile[data-view]');
-  // step 3: what the Dashboard shows first — three preview tiles drawn in the chosen courses' colours, one chosen
+  // step 4: what the Dashboard shows first — three preview tiles drawn in the chosen courses' colours, List chosen to start with
   const VIEW_OF = { cards: 'cards', planner: 'list', activity: 'activity' };
   const viewBefore = VIEW_OF[(await apiGet('/dashboard/view')).dashboard_view] || 'list';
   const dashTiles = () => page.$$eval(su('.tile[data-view]'), (els) => els.map((t) => `${t.dataset.view}${t.classList.contains('is-on') ? ' *' : ''} [${t.querySelector('.tile__label').textContent}]`));
   const tileWords = await page.$$eval(su('.tile[data-view]'), (els) => els.map((t) => `${t.querySelector('.tile__t').textContent} — ${t.querySelector('.tile__s').textContent}`));
-  check((await sStep()) === '3 of 4' && tileWords.join(' | ') === 'Cards — Courses as tiles, with what is due next. | List — Everything due, day by day, with a tick. | Activity — Announcements, replies and grades as they arrive.' && (await dashTiles()).join(' | ') === ['cards', 'list', 'activity'].map((v) => `${v}${v === viewBefore ? ' * [Selected]' : ' [Choose]'}`).join(' | '), `step 3 asks what the Dashboard shows first, the tile Canvas has (${viewBefore}) selected: ${(await dashTiles()).join(' | ')}`);
+  check((await sStep()) === '4 of 5' && tileWords.join(' | ') === 'Cards — Courses as tiles, with what is due next. | List — Everything due, day by day, with a tick. | Activity — Announcements, replies and grades as they arrive.' && (await dashTiles()).join(' | ') === ['cards', 'list', 'activity'].map((v) => `${v}${v === 'list' ? ' * [Selected]' : ' [Choose]'}`).join(' | '), `step 4 asks what the Dashboard shows first, List selected to start with whatever Canvas has (${viewBefore}): ${(await dashTiles()).join(' | ')}`);
   check((await page.$$(su('.tile[data-view="cards"] .mini__card'))).length === 4 && (await page.$eval(su('.tile[data-view="cards"] .mini__card'), (e) => e.style.background)) === firstColour && (await page.$$(su('.tile[data-view="list"] .mini__row'))).length === 4 && (await page.$$(su('.tile[data-view="activity"] .mini__row'))).length === 3, `the tiles are miniatures of the real layouts in the chosen courses' own colours (${firstColour})`);
   const other = viewBefore === 'cards' ? 'activity' : 'cards';
   await page.click(su(`.tile[data-view="${other}"]`));
@@ -2757,7 +2858,7 @@ try {
   // step 4: where the courses chosen in step 1 should sit
   const sideBefore = (await sw.evaluate(async () => (await self.BCV.settings.get()).appearance.sideCourses)) === 'always' ? 'always' : 'hover';
   const sideTiles = () => page.$$eval(su('.tile[data-value]'), (els) => els.map((t) => `${t.querySelector('.tile__t').textContent}${t.classList.contains('is-on') ? ' *' : ''}`));
-  check((await sStep()) === '4 of 4' && (await sideTiles()).join(' | ') === `Always listed${sideBefore === 'always' ? ' *' : ''} | On hover${sideBefore === 'hover' ? ' *' : ''}` && (await page.$eval(su('#next'), (e) => e.textContent.trim())) === 'Finish', `step 4 asks where the courses live, the setting's own choice selected (${sideBefore}): ${(await sideTiles()).join(' | ')}`);
+  check((await sStep()) === '5 of 5' && (await sideTiles()).join(' | ') === `Always listed${sideBefore === 'always' ? ' *' : ''} | On hover${sideBefore === 'hover' ? ' *' : ''}` && (await page.$eval(su('#next'), (e) => e.textContent.trim())) === 'Finish', `step 5 asks where the courses live, the setting's own choice selected (${sideBefore}): ${(await sideTiles()).join(' | ')}`);
   await shot(page, '32f-setup-sidebar');
   const pickSide = async (v) => {
     await page.click(su(`.tile[data-value="${v}"]`));
@@ -2769,15 +2870,15 @@ try {
   await sNext('.summary__row');
   // Ready: a read-back of every answer, then Open Canvas writes them all at once
   const summary = await page.$$eval(su('.summary__row'), (els) => els.map((r) => `${r.querySelector('.summary__k').textContent}: ${r.querySelector('.summary__v').textContent}`));
-  check((await sStep()) === 'Ready' && (await texts(su('.fr__h1')))[0] === 'You’re set' && summary.join(' | ') === `Courses shown: 5 of ${total} | Grade history: On · goal 3.90 | Dashboard: ${{ cards: 'Cards', list: 'List', activity: 'Activity' }[viewBefore]} | Sidebar: Always listed` && (await page.$eval(su('#next'), (e) => e.textContent.trim())) === 'Open Canvas' && (await page.$(su('#back'))) !== null && (await page.$$(su('.rail__item.is-done'))).length === 4, `Finish shows the read-back with every rail step ticked: ${summary.join(' | ')}`);
+  check((await sStep()) === 'Ready' && (await texts(su('.fr__h1')))[0] === 'You’re set' && summary.join(' | ') === `Courses shown: 5 of ${total} | Grade history: On · goal 3.90 | Appearance: ${LOOK_NAME[lookBefore]} | Dashboard: ${{ cards: 'Cards', list: 'List', activity: 'Activity' }[viewBefore]} | Sidebar: Always listed` && (await page.$eval(su('#next'), (e) => e.textContent.trim())) === 'Open Canvas' && (await page.$(su('#back'))) !== null && (await page.$$(su('.rail__item.is-done'))).length === 5, `Finish shows the read-back with every rail step ticked: ${summary.join(' | ')}`);
   await shot(page, '32g-setup-ready');
   await page.click(su('#back'));
   await page.waitForSelector(su('.tile[data-value]'), { timeout: 10000 });
-  check((await sStep()) === '4 of 4' && (await railNow()).filter((r) => r.includes('(locked)')).length === 0, 'Back from the read-back returns to the last step, nothing locked behind');
+  check((await sStep()) === '5 of 5' && (await railNow()).filter((r) => r.includes('(locked)')).length === 0, 'Back from the read-back returns to the last step, nothing locked behind');
   await page.click(su('.rail__item[data-step="courses"]'));
   await page.waitForSelector(su('.row[data-course]'), { timeout: 10000 });
-  check((await sStep()) === '1 of 4' && (await page.$$(su('.row.is-on'))).length === 5 && (await page.$eval(su(`.row[data-course="${nickId}"] .row__nick`), (e) => e.value)) === 'Setup nick' && (await railNow()).join(' | ') === `Your courses: 5 courses | Grades: Tracking · goal 3.90 · 1 pass/fail ✓ | Dashboard: ${{ cards: 'Cards', list: 'List', activity: 'Activity' }[viewBefore]} ✓ | Sidebar: Always listed ✓`, `the rail goes back to any step done, with its answers kept: ${(await railNow()).join(' | ')}`);
-  for (const s of ['#track', '.tile[data-view]', '.tile[data-value]', '.summary__row']) await sNext(s);
+  check((await sStep()) === '1 of 5' && (await page.$$(su('.row.is-on'))).length === 5 && (await page.$eval(su(`.row[data-course="${nickId}"] .row__nick`), (e) => e.value)) === 'Setup nick' && (await railNow()).join(' | ') === `Your courses: 5 courses | Grades: Tracking · goal 3.90 · 1 pass/fail ✓ | Appearance: ${LOOK_NAME[lookBefore]} ✓ | Dashboard: ${{ cards: 'Cards', list: 'List', activity: 'Activity' }[viewBefore]} ✓ | Sidebar: Always listed ✓`, `the rail goes back to any step done, with its answers kept: ${(await railNow()).join(' | ')}`);
+  for (const s of ['#track', '.tile[data-look]', '.tile[data-view]', '.tile[data-value]', '.summary__row']) await sNext(s);
   check((await sStep()) === 'Ready' && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('setup:done'))['setup:done'])) === undefined, 'forward again to the read-back: still nothing marked done');
   // Open Canvas writes everything and reloads the page: it comes back black, with the choices in place
   // and the welcome on it — two pointers in turn, each with a Continue that comes in after three seconds
@@ -2868,7 +2969,7 @@ try {
   await page.waitForSelector('#bcv-app .bcv-nav__item', { timeout: 20000 });
   await page.waitForTimeout(600);
   check((await page.$('#bcv-welcome')) === null, 'and it does not come back');
-  check((await sw.evaluate(async () => (await self.BCV.settings.get()).appearance.sideCourses)) === 'always' && VIEW_OF[(await apiGet('/dashboard/view')).dashboard_view] === viewBefore, 'the sidebar and dashboard choices were written on the way out');
+  check((await sw.evaluate(async () => (await self.BCV.settings.get()).appearance.sideCourses)) === 'always' && VIEW_OF[(await apiGet('/dashboard/view')).dashboard_view] === viewBefore && (await sw.evaluate(async () => (await self.BCV.settings.get()).appearance.darkMode)) === { light: 'off', dark: 'on', system: 'system' }[lookBefore], 'the sidebar, appearance and dashboard choices were written on the way out');
   const favAfter = (await apiGet('/api/v1/courses?per_page=100')).filter((c) => c.is_favorite).map((c) => c.course_code || c.name);
   check(!favAfter.includes(offCode) && favAfter.includes(onCode) && favAfter.length === 5, `the chosen courses became the Canvas favourites: −${offCode} +${onCode}`);
   const nickedInSetup = (await apiGet('/api/v1/courses?per_page=100')).find((c) => String(c.id) === nickId);
@@ -4594,10 +4695,10 @@ try {
   check((await page.$(su('#skip'))) === null && (await page.$(su('.top__skip'))) === null, 'the card has no Skip');
   await page.keyboard.press('Escape');
   await page.waitForTimeout(300);
-  check((await page.$('#bcv-setup')) !== null && (await sStep()) === '1 of 4', 'Escape does not close it');
+  check((await page.$('#bcv-setup')) !== null && (await sStep()) === '1 of 5', 'Escape does not close it');
   await page.goto(`${BASE}/courses`); // walking away: the next page opens it again, over the Dashboard
   await page.waitForSelector(su('.row'), { timeout: 20000 });
-  check(page.url() === `${BASE}/` && (await sStep()) === '1 of 4' && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('setup:done'))['setup:done'])) === undefined, `leaving the page does not get past it: the next page opens the card again, unfinished (${await sStep()})`);
+  check(page.url() === `${BASE}/` && (await sStep()) === '1 of 5' && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('setup:done'))['setup:done'])) === undefined, `leaving the page does not get past it: the next page opens the card again, unfinished (${await sStep()})`);
   // the only way out is through: the steps, then the welcome (the favourites already starred are the
   // ones picked, so finishing here changes nothing in Canvas for the sections that follow)
   const keepStarred = (await apiGet('/api/v1/courses?per_page=100')).filter((c) => c.is_favorite).map((c) => String(c.id));
@@ -4605,6 +4706,8 @@ try {
   for (const id of keepStarred) await page.click(su(`.row[data-course="${id}"]`));
   await page.click(su('#next'));
   await page.waitForSelector(su('#track'), { timeout: 10000 });
+  await page.click(su('#next'));
+  await page.waitForSelector(su('.tile[data-look]'), { timeout: 10000 });
   await page.click(su('#next'));
   await page.waitForSelector(su('.tile[data-view]'), { timeout: 10000 });
   await page.click(su('#next'));

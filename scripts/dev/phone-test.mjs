@@ -617,7 +617,8 @@ try {
   await page.waitForSelector('#bcv-setup .row', { timeout: 20000 });
   await page.waitForFunction(() => document.querySelector('#bcv-setup')?.shadowRoot.querySelector('.intro')?.hidden === true, null, { timeout: 8000 }); // the word-mark first
   await page.waitForTimeout(400);
-  check((await page.$$('#bcv-setup .row.is-on')).length === 0 && (await page.$$('#bcv-setup .row[data-course]')).length >= 8 && (await page.$eval('#bcv-setup #next', (e) => e.disabled)) && (await page.$eval('#bcv-setup .fr', (e) => e.getBoundingClientRect().right <= window.innerWidth + 1 && e.getBoundingClientRect().left >= 0)) && !(await page.locator('#bcv-setup .rail').isVisible()) && (await page.$eval('#bcv-setup #stepLabel', (e) => e.textContent)) === '1 of 2' && await noOverflow(), 'the setup fits the phone screen without the rail and lists the courses, none ticked for you');
+  check((await page.$$('#bcv-setup .row.is-on')).length === 0 && (await page.$$('#bcv-setup .row[data-course]')).length >= 8 && (await page.$eval('#bcv-setup #next', (e) => e.disabled)) && (await page.$eval('#bcv-setup .fr', (e) => e.getBoundingClientRect().right <= window.innerWidth + 1 && e.getBoundingClientRect().left >= 0)) && !(await page.locator('#bcv-setup .rail').isVisible()) && (await page.$eval('#bcv-setup #stepLabel', (e) => e.textContent)) === '1 of 3' && await noOverflow(), 'the setup fits the phone screen without the rail and lists the courses, none ticked for you');
+  check(await page.$eval('#bcv-setup .fr__blurb--strong', (e) => { const cs = getComputedStyle(e); return e.textContent === 'Only select the courses that count towards your GPA.' && parseInt(cs.fontWeight, 10) >= 700 && parseFloat(cs.fontSize) >= 16 && cs.color === 'rgb(10, 132, 255)'; }), 'the line about the GPA is big, bold and blue');
   await shot('11-setup');
   // start from none (Clear all), then pick five by hand
   if ((await page.$eval('#bcv-setup #selectAll', (e) => e.textContent)) === 'Select all') await page.click('#bcv-setup #selectAll');
@@ -630,12 +631,22 @@ try {
   await page.waitForSelector('#bcv-setup #track', { timeout: 10000 });
   check(await noOverflow() && (await page.$$('#bcv-setup .target')).length === 5, 'the grades step keeps to the screen with a target row per course');
   await shot('11b-setup-grades');
-  // a phone has no sidebar and no dashboard views to choose between: the grades step is the last one here
-  check((await page.$eval('#bcv-setup #stepLabel', (e) => e.textContent)) === '2 of 2' && (await page.$eval('#bcv-setup #next', (e) => e.textContent.trim())) === 'Continue', 'a phone gets two steps');
+  // a phone has no sidebar and no dashboard views to choose between: after the grades comes the
+  // look (light, dark or the device's), and that is the last step here
+  check((await page.$eval('#bcv-setup #stepLabel', (e) => e.textContent)) === '2 of 3' && (await page.$eval('#bcv-setup #next', (e) => e.textContent.trim())) === 'Continue', 'a phone gets three steps');
+  await page.click('#bcv-setup #next');
+  await page.waitForSelector('#bcv-setup .tile[data-look]', { timeout: 10000 });
+  const looks = await page.$$eval('#bcv-setup .tile[data-look]', (els) => els.map((e) => `${e.dataset.look}${e.classList.contains('is-on') ? '*' : ''}`));
+  const lookOn = (looks.find((l) => l.endsWith('*')) || '').replace('*', ''); // the setting's own choice comes selected (Automatic on a fresh install)
+  check(looks.join(' ') === ['light', 'dark', 'system'].map((v) => `${v}${v === lookOn ? '*' : ''}`).join(' ') && !!lookOn && (await page.$eval('#bcv-setup #stepLabel', (e) => e.textContent)) === '3 of 3' && (await page.$eval('#bcv-setup #next', (e) => e.textContent.trim())) === 'Finish' && await noOverflow(), `the appearance step offers light, dark and automatic, the setting's own choice picked: ${looks.join(' ')}`);
+  await page.click('#bcv-setup .tile[data-look="dark"]');
+  check(await eventually(async () => (await page.$eval('#bcv-setup', (e) => e.getAttribute('data-theme'))) === 'dark' && (await page.$eval('#bcv-setup .tile[data-look="dark"]', (e) => e.classList.contains('is-on')))), 'picking Dark turns the card dark at once, as a preview');
+  await page.click(`#bcv-setup .tile[data-look="${lookOn}"]`); // back to what was set: the pages after this read it
   await page.click('#bcv-setup #next');
   await page.waitForSelector('#bcv-setup .summary__row', { timeout: 10000 });
   const readBack = await page.$$eval('#bcv-setup .summary__k', (els) => els.map((e) => e.textContent));
-  check((await page.$eval('#bcv-setup #stepLabel', (e) => e.textContent)) === 'Ready' && readBack.join(' | ') === 'Courses shown | Grade history' && (await page.$eval('#bcv-setup #next', (e) => e.textContent.trim())) === 'Open Canvas' && await noOverflow(), `then a read-back of those two answers alone, and Open Canvas: ${readBack.join(' | ')}`);
+  const readVals = await page.$$eval('#bcv-setup .summary__v', (els) => els.map((e) => e.textContent));
+  check((await page.$eval('#bcv-setup #stepLabel', (e) => e.textContent)) === 'Ready' && readBack.join(' | ') === 'Courses shown | Grade history | Appearance' && readVals[2] === { light: 'Light', dark: 'Dark', system: 'Automatic' }[lookOn] && (await page.$eval('#bcv-setup #next', (e) => e.textContent.trim())) === 'Open Canvas' && await noOverflow(), `then a read-back of those three answers alone, and Open Canvas: ${readBack.join(' | ')} / ${readVals.join(' | ')}`);
   await shot('11c-setup-ready');
   await Promise.all([page.waitForNavigation({ timeout: 20000 }), page.click('#bcv-setup #next')]); // Open Canvas: the page reloads
   // …and comes back black, with the welcome on it. A phone's header has no look switch to point at,

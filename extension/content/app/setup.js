@@ -29,18 +29,25 @@
   const ALL = [
     { key: 'courses', name: 'Your courses', build: courses },
     { key: 'grades', name: 'Grades', build: grades },
+    { key: 'appearance', name: 'Appearance', build: appearance },
     { key: 'dashboard', name: 'Dashboard', build: dashboard },
     { key: 'sidebar', name: 'Sidebar', build: sidebar },
   ];
   let STEPS = ALL;
-  const settleSteps = () => { STEPS = BCV.phone?.active() ? ALL.filter((s) => s.key === 'courses' || s.key === 'grades') : ALL; };
+  const settleSteps = () => { STEPS = BCV.phone?.active() ? ALL.filter((s) => ['courses', 'grades', 'appearance'].includes(s.key)) : ALL; }; // (a phone has no sidebar and no dashboard views to choose between)
   const COPY = {
     courses: ['Which classes are you in?', 'Only select the courses that count towards your GPA.'],
     grades: ['Grades', 'Canvas keeps no history. Simpl Courses can, on this device.'],
+    appearance: ['Light or dark?', 'Pick the look. Automatic follows your device.'],
     dashboard: ['What you see first', 'Pick the shape of your dashboard.'],
     sidebar: ['Where your courses live', 'Either way it is the same list.'],
     done: ['You’re set', 'Open Canvas and Simpl Courses takes over.'],
   };
+
+  // the look: the setting's three values (settings.appearance.darkMode) under the names the step uses
+  const LOOK_OF = { off: 'light', on: 'dark', system: 'system' };
+  const DARK_OF = { light: 'off', dark: 'on', system: 'system' };
+  const LOOKS = [['light', 'Light', 'Bright, all day.'], ['dark', 'Dark', 'Easy on the eyes.'], ['system', 'Automatic', 'Follows your device, light by day and dark at night.']];
 
   let ui = null; // the open overlay: { host, overlay, intro, main, rail, stepLabel, body, foot, hint }
   let st = null;
@@ -81,13 +88,12 @@
       app.state.route = app.parseRoute();
     }
     const settings = await S.get();
-    let savedView = 'list';
-    try { savedView = await store.dashboardView(); } catch { /* the default */ }
     st = {
       app, settings, step: 0, visited: new Set([0]),
       scanning: false, scanError: null, courses: [], favs: new Set(), nicks: {},
       tracking: true, goal: 4, targets: {}, letters: {},
-      dashView: ['cards', 'list', 'activity'].includes(savedView) ? savedView : 'list',
+      dashView: 'list', // the list to start with, whatever Canvas has: the pick here is the student's
+      look: LOOK_OF[settings.appearance?.darkMode] || 'system', // light | dark | system
       sideCourses: settings.appearance?.sideCourses === 'always' ? 'always' : 'hover', // the panel off the Courses row is the default
       closing: false,
     };
@@ -181,6 +187,7 @@
     switch (key) {
       case 'courses': return picked ? `${picked} ${picked === 1 ? 'course' : 'courses'}` : 'None yet';
       case 'grades': { const pf = st.courses.filter((c) => st.favs.has(c.id) && st.targets[c.id] === PASS_FAIL).length; return `${st.tracking ? `Tracking · goal ${gpa2(st.goal)}` : 'Not tracking'}${pf ? ` · ${pf} pass/fail` : ''}`; }
+      case 'appearance': return LOOKS.find(([k]) => k === st.look)[1];
       case 'dashboard': return VIEWS.find(([k]) => k === st.dashView)[1];
       case 'sidebar': return st.sideCourses === 'always' ? 'Always listed' : 'On hover';
       default: return '';
@@ -331,6 +338,7 @@
       stagger([...rows.children], 40);
       head.textContent = COPY.courses[0];
       sub.textContent = COPY.courses[1];
+      sub.classList.add('fr__blurb--strong'); // the one thing to get right on this step, said big, bold and blue
       wrap.replaceChildren(h('div', { class: 'listhead' }, [count, allBtn]), rows);
       nextBtn.disabled = st.favs.size === 0;
       sayHint();
@@ -339,6 +347,7 @@
     const drawEmpty = () => {
       head.textContent = st.scanError ? 'The courses could not be read' : 'No active courses';
       sub.textContent = st.scanError ? st.scanError : 'Between terms? Canvas lists nothing active right now.';
+      sub.classList.remove('fr__blurb--strong');
       wrap.replaceChildren(h('div', { class: 'empty' }, [
         h('span', { text: st.scanError ? 'Check that you are signed in to Canvas, then try again.' : 'You can finish setup now and choose courses later on the Courses page.' }),
         h('button', { type: 'button', class: 'btn btn--sm', text: 'Try again', onclick: run }),
@@ -465,7 +474,30 @@
     footer({ onNext: () => go(st.step + 1) });
   }
 
-  // ---- 4 · where the courses live --------------------------------------------------------------------
+  // ---- 3 · light or dark ---------------------------------------------------------------------------
+  // Three tiles: a light window, a dark one, and one split down the middle for Automatic. The pick
+  // turns the card itself over at once, as a preview; the page under it waits for Open Canvas (a
+  // change of the look reloads the page on its own, so it is written last of all, in finish()).
+  function appearance() {
+    const { body } = ui;
+    const rows = (mod) => [h('span', { class: `mini__lookbar ${mod}` }), h('span', { class: `mini__lookrow ${mod}` }), h('span', { class: `mini__lookrow mini__lookrow--short ${mod}` })];
+    const minis = {
+      light: () => [h('span', { class: 'mini mini--look mini--look-light' }, rows(''))],
+      dark: () => [h('span', { class: 'mini mini--look mini--look-dark' }, rows('mini__lookrow--dark'))],
+      system: () => [h('span', { class: 'mini mini--look mini--look-system' }, [h('span', { class: 'mini__half mini__half--light' }, rows('')), h('span', { class: 'mini__half mini__half--dark' }, rows('mini__lookrow--dark'))])],
+    };
+    const grid = h('div', { class: 'tiles tiles--3' });
+    const draw = () => grid.replaceChildren(...LOOKS.map(([key, title, why]) => tile({ dataset: { look: key }, on: st.look === key, title, why, mini: minis[key](), pick: () => { st.look = key; draw(); paintChrome(); previewLook(); } })));
+    draw();
+    body.append(...heading('appearance'), grid);
+    footer({ next: st.step === STEPS.length - 1 ? 'Finish' : 'Continue', onNext: () => go(st.step + 1) });
+  }
+  const wantsDark = () => st.look === 'dark' || (st.look === 'system' && !!window.matchMedia?.('(prefers-color-scheme: dark)').matches);
+  function previewLook() {
+    if (ui) ui.host.setAttribute('data-theme', wantsDark() ? 'dark' : 'light');
+  }
+
+  // ---- 5 · where the courses live --------------------------------------------------------------------
   function sidebar() {
     const { body } = ui;
     const [a, b, c, d] = swatches();
@@ -496,6 +528,7 @@
     const rows = [
       ['Courses shown', `${picked} of ${st.courses.length}`],
       ['Grade history', st.tracking ? `On · goal ${gpa2(st.goal)}` : 'Off'],
+      ['Appearance', answer('appearance')],
       ...(STEPS.some((s) => s.key === 'dashboard') ? [['Dashboard', answer('dashboard')]] : []),
       ...(STEPS.some((s) => s.key === 'sidebar') ? [['Sidebar', answer('sidebar')]] : []),
     ];
@@ -541,6 +574,9 @@
       console.error('[Simpl Courses setup]', e);
     }
     if (BCV.welcome) await BCV.welcome.arm().catch(() => {}); // armed: the reloaded page comes back black, with the welcome on it
+    // the look, last of all: a change of it reloads the page on its own (app.js), which is the reload
+    // wanted here anyway — written any earlier it would cut the writes above short
+    if (DARK_OF[st.look] !== (st.settings?.appearance?.darkMode || 'system')) await S.update({ appearance: { darkMode: DARK_OF[st.look] } }).catch(() => {});
     // a fresh load of this page, without the setup's own parameter (which would open the card again):
     // a navigation to the address itself, and a plain reload after it should the first not take
     let next = location.href;

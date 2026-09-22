@@ -24,6 +24,16 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.57.0', date: '2026-09-22', notes: [
+      { kind: 'new', title: 'What-if on Grades', body: 'Try scores in a course’s Details and see the total move.', icon: P.pen },
+      { kind: 'improved', title: 'Details, side by side', body: 'Breakdown on the left, assignments on the right, one size.', icon: P.layers },
+      { kind: 'improved', title: 'A wider calendar', body: 'The calendars moved behind a button; the month has the room.', icon: P.arrows },
+      { kind: 'new', title: 'Preview from the grid', body: 'Press an assignment on the calendar to read it there.', icon: P.eye },
+      { kind: 'new', title: 'Due tomorrow', body: 'A dashboard card for tomorrow’s work, in place of classes.', icon: P.clock },
+      { kind: 'improved', title: 'Sheets hold still', body: 'A card’s list opens at one size and stays there.', icon: P.list },
+      { kind: 'new', title: 'Pick a look in setup', body: 'Setup now asks light, dark or automatic.', icon: P.toggle },
+      { kind: 'fixed', title: 'Widgets blur on Chrome', body: 'The glass behind a pinned tool frosts the page again.', icon: P.sparkle },
+    ] },
     { version: '2.56.0', date: '2026-09-22', notes: [
       { kind: 'new', title: 'Your pins go with you', body: 'The pinned tools sit in the bar on a tool’s own tab.', icon: P.pin },
     ] },

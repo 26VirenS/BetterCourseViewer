@@ -16,7 +16,7 @@
     const { app } = ctx;
     const dark = app.isDark();
     const now = new Date();
-    const screen = U.el('bcv-screen', null, { style: { '--w': '1180px' } });
+    const screen = U.el('bcv-screen', null, { style: { '--w': '1280px' } }); // wide: the month has the column to itself
     let view = await store.pref('calView', 'month');
     let anchor = U.startOfDay(now); // month/week cursor
     let miniMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -26,10 +26,15 @@
     const wantCourse = ctx.route.params.get('include_contexts');
 
     const titleEl = h('h1', { class: 'bcv-h1 bcv-h1--30' });
-    const segWrap = h('div', { class: 'bcv-ml-auto' });
+    const segWrap = h('div');
+    // the calendars (which courses' events show) live in a sheet off this button, counting the ones
+    // on, so the month has the width of the page rather than a column beside it
+    const calCount = h('span', { class: 'bcv-cal__calcount', text: '0' });
+    const calBtn = h('button', { type: 'button', class: 'bcv-roundbtn bcv-cal__calbtn', title: 'Choose which calendars show', 'aria-haspopup': 'dialog', onclick: (e) => openCalendars(e.currentTarget) }, [U.svg(IC.filter, { size: 13, stroke: 'var(--bcv-blue)', width: 2.1 }), h('span', { text: 'Calendars' }), calCount]);
     const body = U.el('bcv-body bcv-body--cols');
-    const mainCol = h('div', { style: { flex: '1 1 560px', minWidth: '0' } });
-    const sideCol = U.el('bcv-cal__side');
+    const mainCol = h('div', { style: { flex: '1 1 720px', minWidth: '0' } });
+    const sideCol = U.el('bcv-cal__side'); // the agenda's range picker; nothing else lives beside the grid now
+    sideCol.hidden = true;
     body.append(mainCol, sideCol);
     screen.append(
       U.el('bcv-head bcv-head--tight', U.el('bcv-head__in', U.el('bcv-head__row bcv-head__row--center', [
@@ -39,11 +44,12 @@
           U.iconbtn(IC.chevron, { size: 30, iconSize: 14, stroke: 'var(--bcv-blue)', width: 2.1, title: 'Next', onClick: () => shift(1) }),
           h('button', { type: 'button', class: 'bcv-roundbtn', text: 'Today', onclick: () => { anchor = U.startOfDay(now); miniMonth = new Date(now.getFullYear(), now.getMonth(), 1); if (view === 'agenda') range = { start: U.startOfDay(now), end: U.addDays(U.startOfDay(now), 20), picking: false }; load(); } }),
         ]),
-        segWrap,
+        U.el('bcv-cal__tools bcv-ml-auto', [calBtn, segWrap]),
       ]))),
       body,
     );
     mainCol.append(U.loading());
+    BCV.preview?.attach(screen); // an assignment, quiz or discussion on the grid opens in the preview panel, not away from the month
 
     // Only the calendars are waited for: they say which events to ask Canvas for. The planner is a
     // second multi-page read that nothing on screen needs to appear, so it arrives on its own and
@@ -332,7 +338,9 @@
 
     // The user's own calendars (the favourite courses) are on by default; the personal calendar,
     // courses not starred and groups sit under Other calendars, off until turned on.
-    function calendarsCard() {
+    /** The calendars, as rows with a switch each: the student's own courses first, then everything
+     *  else Canvas lists (the personal calendar, other courses, groups). Drawn into the sheet. */
+    function calendarsBody() {
       const own = store.ownContexts(contexts);
       const ownSet = new Set(own.map((c) => c.code));
       const other = contexts.filter((c) => !ownSet.has(c.code));
@@ -342,12 +350,36 @@
         refused.has(c.code) ? h('span', { class: 'bcv-badge bcv-badge--xs', title: 'Canvas refused this calendar (a restricted or concluded course)', text: 'Not shared' }) : null,
         U.switchEl(selected.includes(c.code), (on) => toggleContext(c.code, on), `Show ${c.name}`),
       ], { mod: `bcv-row--p12-16 ${refused.has(c.code) ? 'bcv-calrow--refused' : ''}` });
-      return h('div', {}, [
-        U.label('Calendars'),
+      return [
         own.length ? U.card(own.map(row), 'bcv-card--list bcv-cal__own') : U.emptyCard('No courses'),
         other.length ? U.label('Other calendars') : null,
         other.length ? U.card(other.map(row), 'bcv-card--list bcv-cal__other') : null,
+        U.hint('Struck-through items are submitted or past. Toggling a calendar hides its events; Canvas shows at most 10 at once.'),
+      ].filter(Boolean);
+    }
+    const calSub = () => `${selected.length} of ${contexts.length} on · up to 10 at once`;
+    let calSheet = null; // { ov, list, sub } while the calendars sheet is up: draw() repaints it as switches are pressed
+    function openCalendars(from = null) {
+      document.querySelector('.bcv-sheet-ov')?.remove();
+      const ov = U.el('bcv-sheet-ov', null, { role: 'dialog', 'aria-label': 'Calendars' });
+      const close = () => { ov.remove(); calSheet = null; };
+      ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
+      ov.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+      const sub = U.text('bcv-sheet__note', calSub());
+      const list = U.el('bcv-sheet__list', calendarsBody());
+      const sheet = U.el('bcv-sheet bcv-cal__sheet', [
+        U.el('bcv-sheet__head', [
+          U.el('bcv-sheet__titles', [U.text('bcv-sheet__line', 'Calendars'), sub]),
+          h('button', { type: 'button', class: 'bcv-sheet__close', 'aria-label': 'Close', onclick: close }, U.svg(IC.close, { size: 13, stroke: 'var(--bcv-ink2)', width: 2.3 })),
+        ]),
+        list,
       ]);
+      ov.append(sheet);
+      calSheet = { ov, list, sub };
+      document.body.append(ov);
+      U.morphFrom(sheet, from); // the sheet grows out of the button
+      ov.tabIndex = -1;
+      ov.focus();
     }
     async function toggleContext(code, on) {
       if (on) {
@@ -366,11 +398,14 @@
       const noticeEl = loading ? U.el('bcv-cal__notice bcv-cal__notice--hint', 'Loading events…')
         : !notice ? null : notice.kind === 'error' ? U.errorBox(notice.text) : U.el(`bcv-cal__notice bcv-cal__notice--${notice.kind}`, notice.text);
       mainCol.replaceChildren(...[noticeEl, view === 'week' ? weekGrid() : view === 'agenda' ? agendaList() : monthGrid()].filter(Boolean));
-      sideCol.replaceChildren(...[
-        view === 'agenda' ? miniCalendar() : null,
-        calendarsCard(),
-        U.hint('Struck-through items are submitted or past. Toggling a calendar hides its events.'),
-      ].filter(Boolean));
+      sideCol.hidden = view !== 'agenda';
+      sideCol.replaceChildren(...[view === 'agenda' ? miniCalendar() : null].filter(Boolean));
+      calCount.textContent = String(selected.length);
+      if (calSheet) { // the sheet is up: its rows and its count follow the switch just pressed
+        calSheet.list.replaceChildren(...calendarsBody());
+        calSheet.sub.textContent = calSub();
+        if (!calSheet.ov.contains(document.activeElement)) calSheet.ov.focus(); // the switch that had focus was just redrawn; keep Escape working
+      }
     }
 
     /** The neighbouring month or week, fetched quietly after this one is on screen: Previous and

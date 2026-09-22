@@ -325,6 +325,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
 .fr__body.is-rising { animation: frRise .3s var(--ease) both; }
 .fr__h1 { margin: 0; font: 600 30px/1.15 var(--display); letter-spacing: -.03em; color: var(--ink); text-wrap: pretty; }
 .fr__blurb { margin: 9px 0 0; max-width: 460px; font: 400 15.5px/1.5 var(--font); color: var(--ink3); text-wrap: pretty; }
+.fr__blurb--strong { max-width: 520px; font: 700 17px/1.4 var(--font); color: var(--blue); } /* the courses step's one instruction */
 .fr__foot { flex: none; padding-top: 26px; display: flex; align-items: center; gap: 18px; }
 .fr__hint { flex: 1; min-width: 0; font: 400 11.5px/1.4 var(--font); color: var(--ink4); text-wrap: pretty; }
 .page--fr .btn { height: 42px; border-radius: 21px; padding: 0 22px; font: 600 15px/1 var(--display); letter-spacing: -.012em; transition: background .22s ease, color .22s ease, box-shadow .22s ease; }
@@ -432,6 +433,19 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
 .mini__hair { display: block; margin-top: 5px; height: 1px; background: var(--hair); }
 .mini__stage { flex: 1; display: block; border-radius: 7px; background: var(--stage); }
 .mini__flyout { position: absolute; left: 62px; top: 14px; width: 64px; padding: 6px; border-radius: 7px; background: var(--panel); border: 1px solid var(--hair); display: flex; flex-direction: column; gap: 4px; }
+/* the look step: a light window, a dark one, and one split down the middle for Automatic */
+.mini--look { flex-direction: column; gap: 7px; padding: 9px; box-sizing: border-box; border-radius: 8px; border: 1px solid rgba(60,60,67,.14); }
+.mini--look-light { background: #fff; }
+.mini--look-dark { background: #1c1c1e; border-color: rgba(255,255,255,.12); }
+.mini--look-system { flex-direction: row; padding: 0; overflow: hidden; }
+.mini__half { flex: 1; display: flex; flex-direction: column; gap: 7px; padding: 9px; }
+.mini__half--light { background: #fff; }
+.mini__half--dark { background: #1c1c1e; }
+.mini__lookbar { display: block; height: 7px; width: 42%; border-radius: 4px; background: #1c1c1e; }
+.mini__lookrow { display: block; height: 5px; width: 100%; border-radius: 3px; background: rgba(60,60,67,.18); }
+.mini__lookrow--short { width: 62%; }
+.mini__lookbar.mini__lookrow--dark { background: #f2f2f7; }
+.mini__lookrow.mini__lookrow--dark { background: rgba(255,255,255,.22); }
 
 /* ready: the read-back */
 .page--fr .summary { margin-top: 22px; max-width: 420px; gap: 0; }
