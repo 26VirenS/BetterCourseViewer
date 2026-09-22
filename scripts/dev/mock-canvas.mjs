@@ -414,6 +414,17 @@ const htmlPages = {
 // URL asks for. The extension reads one-question-at-a-time quizzes from here, since the API refuses
 // to list their questions.
 const answeredQ = (s, q) => { const a = s.state[q.id]?.answer; if (a === null || a === undefined || a === '') return false; if (Array.isArray(a)) return !!a.length; if (typeof a === 'object') return !!Object.keys(a).length; return true; };
+const BLANK_KINDS = new Set(['multiple_dropdowns_question', 'fill_in_multiple_blanks_question']);
+/** The question as Canvas writes it for the blank kinds: the field goes into the sentence, where the
+ *  blank was written, and the answers block underneath is left empty. */
+const qtextOf = (q, a) => {
+  if (!BLANK_KINDS.has(q.question_type)) return q.question_text;
+  const held = a && typeof a === 'object' && !Array.isArray(a) ? a : {};
+  const widget = (b) => (q.question_type === 'multiple_dropdowns_question'
+    ? `<select class="question_input" name="question_${q.id}_${b}" aria-label="${b}"><option value="">[ Select ]</option>${q.answers.filter((ans) => ans.blank_id === b).map((ans) => `<option value="${ans.id}"${String(held[b]) === String(ans.id) ? ' selected' : ''}>${ans.text}</option>`).join('')}</select>`
+    : `<input type="text" class="question_input" name="question_${q.id}_${b}" value="${held[b] ?? ''}" aria-label="${b}" />`);
+  return q.question_text.replace(/\[([^\]\s]+)\]/g, (m, b) => (q.answers.some((ans) => String(ans.blank_id) === b) ? widget(b) : m));
+};
 const takeQuestionHtml = (q, s) => {
   const st = s.state[q.id] || {};
   const a = st.answer;
@@ -427,15 +438,9 @@ const takeQuestionHtml = (q, s) => {
     const on = (Array.isArray(a) ? a : []).find((p2) => String(p2.answer_id) === String(ans.id));
     return `<div class="answer"><div class="answer_match"><div class="answer_match_left">${ans.text}</div><div class="answer_match_right"><select class="question_input" name="question_${q.id}_answer_${ans.id}" aria-label="Match"><option value="">[ Choose ]</option>${(q.matches || []).map((m) => `<option value="${m.match_id}"${on && String(on.match_id) === String(m.match_id) ? ' selected' : ''}>${m.text}</option>`).join('')}</select></div></div></div>`;
   }).join('')}</div>`;
-  else if (q.question_type === 'multiple_dropdowns_question' || q.question_type === 'fill_in_multiple_blanks_question') {
-    const blanks = [...new Set(q.answers.map((ans) => ans.blank_id))];
-    const held = a && typeof a === 'object' && !Array.isArray(a) ? a : {};
-    answers = `<div class="answers_wrapper">${blanks.map((b) => (q.question_type === 'multiple_dropdowns_question'
-      ? `<select class="question_input" name="question_${q.id}_${b}" aria-label="${b}"><option value="">[ Choose ]</option>${q.answers.filter((ans) => ans.blank_id === b).map((ans) => `<option value="${ans.id}"${String(held[b]) === String(ans.id) ? ' selected' : ''}>${ans.text}</option>`).join('')}</select>`
-      : `<input type="text" class="question_input" name="question_${q.id}_${b}" value="${held[b] ?? ''}" aria-label="${b}" />`)).join('')}</div>`;
-  }
+  else if (BLANK_KINDS.has(q.question_type)) answers = ''; // (the fields are written into the sentence instead — see qtextOf)
   else answers = `<fieldset><legend class="screenreader-only">Group of answer choices</legend>${q.answers.map((ans) => `<div class="answer"><label class="answer_row user_content"><span class="answer_input"><input type="radio" class="question_input" name="question_${q.id}" value="${ans.id}" id="question_${q.id}_answer_${ans.id}"${String(a) === String(ans.id) ? ' checked' : ''} aria-labelledby="question_${q.id}_answer_${ans.id}_label" /></span>${label(ans)}</label></div>`).join('')}</fieldset>`;
-  return `<div role="region" aria-label="Question" class="quiz_sortable question_holder"><div style="display: block; height: 1px; overflow: hidden;">&nbsp;</div><a name="question_${q.id}"></a><div class="display_question question ${q.question_type}${st.flagged ? ' marked' : ''}" id="question_${q.id}"><a href="#" class="flag_question" role="checkbox" aria-checked="${st.flagged ? 'true' : 'false'}"><span class="screenreader-only">Flag question: ${q.question_name}</span></a><div class="header"><span class="name question_name" role="heading" aria-level="2">${q.question_name}</span><span class="question_points_holder"><span class="points question_points">${q.points_possible}</span> pts</span></div><div style="display: none;"><span class="question_type">${q.question_type}</span><span class="answer_selection_type"></span></div><div class="text"><div class="original_question_text" style="display: none;"><textarea disabled style="display: none;" name="question_text" class="textarea_question_text">${q.question_text.replace(/</g, '&lt;')}</textarea></div><div id="question_${q.id}_question_text" class="question_text user_content">${q.question_text}</div><div class="answers">${answers}</div><div class="after_answers"></div></div><div class="clear"></div></div></div>`;
+  return `<div role="region" aria-label="Question" class="quiz_sortable question_holder"><div style="display: block; height: 1px; overflow: hidden;">&nbsp;</div><a name="question_${q.id}"></a><div class="display_question question ${q.question_type}${st.flagged ? ' marked' : ''}" id="question_${q.id}"><a href="#" class="flag_question" role="checkbox" aria-checked="${st.flagged ? 'true' : 'false'}"><span class="screenreader-only">Flag question: ${q.question_name}</span></a><div class="header"><span class="name question_name" role="heading" aria-level="2">${q.question_name}</span><span class="question_points_holder"><span class="points question_points">${q.points_possible}</span> pts</span></div><div style="display: none;"><span class="question_type">${q.question_type}</span><span class="answer_selection_type"></span></div><div class="text"><div class="original_question_text" style="display: none;"><textarea disabled style="display: none;" name="question_text" class="textarea_question_text">${q.question_text.replace(/</g, '&lt;')}</textarea></div><div id="question_${q.id}_question_text" class="question_text user_content">${qtextOf(q, a)}</div><div class="answers">${answers}</div><div class="after_answers"></div></div><div class="clear"></div></div></div>`;
 };
 function takePage(courseId, quizId, questionId) {
   const q = quizzes(courseId).find((x) => x.id === quizId);

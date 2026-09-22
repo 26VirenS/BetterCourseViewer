@@ -79,8 +79,10 @@
         q.answer = on.length ? on.map((sel) => ({ answer_id: num(sel.name.slice(`question_${id}_answer_`.length)) ?? sel.name.slice(`question_${id}_answer_`.length), match_id: num(sel.value) ?? sel.value })) : null;
       }
     } else if (type === 'multiple_dropdowns_question' || type === 'fill_in_multiple_blanks_question') {
-      // one field per blank, named for the blank it fills; a dropdown carries that blank's own list
-      const fields = [...scope.querySelectorAll(`select[name^="question_${id}_"], input[type="text"][name^="question_${id}_"]`)]
+      // One field per blank, named for the blank it fills; a dropdown carries that blank's own list.
+      // Canvas writes these into the sentence itself, not into the answers block, so the whole
+      // question is searched rather than only the block the other kinds keep their answers in.
+      const fields = [...el.querySelectorAll(`select[name^="question_${id}_"], input[type="text"][name^="question_${id}_"]`)]
         .filter((f) => !f.name.startsWith(`question_${id}_answer_`));
       const blankOf = (f) => f.name.slice(`question_${id}_`.length);
       if (fields.length) {

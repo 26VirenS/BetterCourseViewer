@@ -2004,14 +2004,19 @@ try {
   await waitText('.bcv-qz__answered', /1 of 7 answered · Saved/);
   check(true, 'every pair saves as it is set');
   await shot(page, '22i-quiz-matching');
-  // a blank each, from a dropdown of that blank's own list
+  // a blank each, as a field in the sentence the question wrote it into — not a list of its own
   await page.click('.bcv-qz__pill:nth-child(6)');
   await waitText('.bcv-qz__qnum', /Question 6/);
-  const blankLbls = await texts('.bcv-qz__blanklbl');
-  check(blankLbls.join('|') === 'rate|what' && (await page.$$('.bcv-qz__blanks .bcv-picker')).length === 2, `a blank each, named for the blank it fills: ${blankLbls.join(' | ')}`);
-  await pickIn('.bcv-qz__blankrow:nth-child(1) .bcv-qz__sel', 'rate of change');
-  await pickIn('.bcv-qz__blankrow:nth-child(2) .bcv-qz__sel', 'position');
+  const readQ6 = () => page.$eval('.bcv-qz__qtext:has(.bcv-qz__inblank)', (e) => e.textContent.replace(/\s+/g, ' ').trim()); // (an earlier attempt's popup is still behind this one)
+  check((await page.$$('.bcv-qz__qtext .bcv-qz__inblank')).length === 2 && !(await page.$('.bcv-qz__blanks')) && (await readQ6()) === 'Velocity is the Choose… of Choose… with respect to time.', `each blank is a field where the question wrote it, and nothing repeats it underneath: ${await readQ6()}`);
+  check(!(await page.$('.bcv-qz__pill:nth-child(6).is-answered')), 'a question nobody has touched is not counted as answered');
+  await pickIn('.bcv-qz__qtext .bcv-qz__inblank >> nth=0', 'rate of change');
+  await waitText('.bcv-qz__answered', /1 of 7 answered · Saved/);
+  check(!(await page.$('.bcv-qz__pill:nth-child(6).is-answered')), 'one blank of two filled is not an answered question');
+  await pickIn('.bcv-qz__qtext .bcv-qz__inblank >> nth=1', 'position');
   await waitText('.bcv-qz__answered', /2 of 7 answered · Saved/);
+  check((await readQ6()) === 'Velocity is the rate of change of position with respect to time.' && !!(await page.$('.bcv-qz__pill:nth-child(6).is-answered')), `and the sentence reads as it was answered, the question counted once every blank is filled: ${await readQ6()}`);
+  await shot(page, '22j-quiz-blanks');
   // an essay, written with paragraphs and a list: it goes to Canvas as the simple HTML its editor would keep
   await page.click('.bcv-qz__pill:nth-child(7)');
   await waitText('.bcv-qz__qnum', /Question 7/);
@@ -2030,6 +2035,13 @@ try {
     return (html.match(/<option value="[^"]*" selected>[^<]*<\/option>/g) || []).map((m) => m.replace(/.*selected>/, '').replace('</option>', ''));
   });
   check(kept.length === 5 && kept.join(' | ') === 'Acceleration due to gravity | Speed of light | Gravitational constant | rate of change | position', `Canvas's own page comes back with every pick set, in its own shapes: ${kept.join(' | ')}`);
+  const inText = await sw.evaluate(async () => {
+    const html = await (await fetch('http://localhost:8787/courses/101/quizzes/9001/take')).text();
+    const block = html.slice(html.indexOf('id="question_90016"')).split('after_answers')[0];
+    const cut = block.indexOf('class="answers"');
+    return { text: (block.slice(0, cut).match(/<select/g) || []).length, under: (block.slice(cut).match(/<select/g) || []).length };
+  });
+  check(inText.text === 2 && inText.under === 0, `Canvas writes a blank's field into the sentence, not into the answers block underneath: ${JSON.stringify(inText)}`);
   // and the review names what was set, rather than a bare id
   await page.click('.bcv-qz__foot .bcv-qz__btn--primary');
   await page.waitForSelector('.bcv-qz__sum', { timeout: 10000 });
@@ -2089,6 +2101,32 @@ try {
   // an essay written in Canvas's own editor shows as its paragraphs and lists, under the question, never as tags
   const essayFb = await page.$eval('.bcv-fb__essay', (e) => ({ items: [...e.querySelectorAll('li')].map((li) => li.textContent.trim()), paras: e.querySelectorAll('p').length, raw: /<(p|ul|li)>/.test(e.textContent), chip: e.closest('.bcv-fb__q')?.querySelector('.bcv-fb__chip')?.textContent })).catch(() => null);
   check(!!essayFb && essayFb.items.join(' | ') === 'Ability to work together | Divide and conquer assignments/group work | Ideate together & create better ideas. | Unreliable group mates cause a more stressful workload | Have to set times to meet up outside of class' && essayFb.paras === 2 && !essayFb.raw && essayFb.chip === 'Your answer, below', `the feedback shows a written answer as formatting, the chip pointing to it: ${JSON.stringify(essayFb)}`);
+  // and the same question read from Canvas's own page, which is where the field really is: a quiz
+  // taken one question at a time has no API to list its questions, so the markup that arrives is
+  // Canvas's own — a dropdown sitting in the middle of the sentence. It is taken over, not left
+  // beside a second set of the same blanks (and Canvas's own control never shows a pick: its page
+  // sets those with a script of its own, which is not running here).
+  await page.goto(`${BASE}/courses/101/quizzes/9014?bcv=take`);
+  await page.waitForSelector('.bcv-qz__begin', { timeout: 20000 });
+  await page.click('.bcv-qz__begin');
+  await page.waitForSelector('.bcv-qz__opt', { timeout: 20000 });
+  for (const n of [2, 3, 4, 5]) { await page.click('.bcv-qz__btn--next'); await waitText('.bcv-qz__qnum', new RegExp(`Question ${n}$`)); }
+  const readPaged = () => page.$eval('.bcv-qz__qtext:has(.bcv-qz__inblank)', (e) => e.textContent.replace(/\s+/g, ' ').trim());
+  check((await page.$$('.bcv-qz__qtext .bcv-qz__inblank')).length === 2 && !(await page.$('.bcv-qz__blanks')) && !(await page.$('.bcv-qz__qtext select')) && (await readPaged()) === 'Velocity is the Choose… of Choose… with respect to time.', `a blank on Canvas's own page becomes the field in that sentence, drawn once: ${await readPaged()}`);
+  await pickIn('.bcv-qz__qtext .bcv-qz__inblank >> nth=0', 'rate of change');
+  await pickIn('.bcv-qz__qtext .bcv-qz__inblank >> nth=1', 'position');
+  await waitText('.bcv-qz__answered', /1 of 7 answered · Saved/);
+  check((await readPaged()) === 'Velocity is the rate of change of position with respect to time.', `and both picks save from the sentence: ${await readPaged()}`);
+  // the review reads the same question: a gap where the blank is, never the dropdown itself or the
+  // run-together list of everything it offered
+  for (const n of [6, 7]) { await page.click('.bcv-qz__btn--next'); await waitText('.bcv-qz__qnum', new RegExp(`Question ${n}$`)); }
+  await page.click('.bcv-qz__foot .bcv-qz__btn--primary');
+  await page.waitForSelector('.bcv-qz__sum', { timeout: 10000 });
+  const sumRow = await page.$eval('.bcv-qz__sum:nth-child(5)', (e) => ({ q: e.querySelector('.bcv-qz__sumq').textContent.replace(/\s+/g, ' ').trim(), a: e.querySelector('.bcv-qz__suma').textContent.replace(/\s+/g, ' ').trim(), live: e.querySelectorAll('select, input').length }));
+  check(sumRow.live === 0 && /Velocity is the _____ of _____ with respect to time/.test(sumRow.q) && /rate: rate of change/.test(sumRow.a) && !/total amount/.test(sumRow.q), `the review reads a blank as a gap, with the pick beside it: ${JSON.stringify(sumRow)}`);
+  page.once('dialog', (d) => d.accept());
+  await page.click('.bcv-qz__big--primary');
+  await page.waitForSelector('.bcv-qz__done', { timeout: 20000 });
   await noteApi('POST', '/__mock/config', { richQuestions: false });
   await page.goto(`${BASE}/courses/101/quizzes/9001`);
   await page.waitForSelector('.bcv-qz__intro, .bcv-detail__title', { timeout: 20000 });

@@ -81,6 +81,18 @@
   // one field per blank: a dropdown of that blank's own list, or a line to type in
   const DROPS = new Set(['multiple_dropdowns_question']);
   const BLANKS = new Set(['multiple_dropdowns_question', 'fill_in_multiple_blanks_question']);
+  /** The blanks a question has, as Canvas's page names them or as its own answers say. */
+  const blanksOf = (q) => (q.blanks?.length ? q.blanks : [...new Set((q.answers || []).map((a) => a.blank_id).filter(Boolean))]);
+  /* The question as something to read rather than answer. Canvas's own page writes a blank's field
+   * into the sentence, so the review row and the feedback would otherwise carry a live dropdown —
+   * and read it as its whole list of options run together. A blank shows there as a gap instead;
+   * what was picked for it is listed beside it either way. */
+  const noFields = (html, q) => {
+    if (!BLANKS.has(q.question_type) || !html) return html;
+    const doc = new DOMParser().parseFromString(String(html), 'text/html');
+    for (const w of doc.querySelectorAll(`[name^="question_${q.id}_"], .question_input`)) w.replaceWith(doc.createTextNode('_____'));
+    return doc.body.innerHTML;
+  };
   const INFO = new Set(['text_only_question']);
 
   async function render(ctx, course) {
@@ -242,7 +254,24 @@
 
     // ---- state helpers -------------------------------------------------------------
     const cur = () => st.questions[Math.min(st.idx, st.questions.length - 1)];
-    const isAnswered = (q) => INFO.has(q.question_type) || (q.loaded === false ? !!q.answered : answered(q.answer)); // not yet read from Canvas's page: what its list says
+    // A question with more than one part is answered when every part of it is. A blank kind saves one
+    // value per blank and matching saves a pair per value, so with one of three blanks filled the old
+    // test — anything in the object at all — called the question answered, painted its number blue and
+    // counted it in the total, while two thirds of it was still empty.
+    const isAnswered = (q) => {
+      if (INFO.has(q.question_type)) return true;
+      if (q.loaded === false) return !!q.answered; // not yet read from Canvas's page: what its list says
+      if (BLANKS.has(q.question_type)) {
+        const bs = blanksOf(q);
+        const held = q.answer && typeof q.answer === 'object' && !Array.isArray(q.answer) ? q.answer : {};
+        return bs.length ? bs.every((b) => answered(held[b])) : answered(q.answer);
+      }
+      if (MATCH.has(q.question_type)) {
+        const pairs = Array.isArray(q.answer) ? q.answer : [];
+        return (q.answers || []).length ? pairs.length >= q.answers.length : !!pairs.length;
+      }
+      return answered(q.answer);
+    };
     const answeredCount = () => st.questions.filter(isAnswered).length;
     const answeredLabel = () => `${answeredCount()} of ${st.questions.length} answered`;
     const saveState = () => (st.saving > 0 ? 'Saving…' : st.savedAt ? 'Saved' : '');
@@ -557,7 +586,52 @@
         INFO.has(q.question_type) ? null : flagBtn,
       ]);
       const text = BCV.screens.course.prose(q.question_text || q.question_name || '', { cls: `bcv-qz__qtext ${compact ? 'bcv-qz__qtext--compact' : ''}` });
-      return h('div', { id: `bcv-q${k}`, class: 'bcv-qz__q' }, [headRow, text, answerArea(q, compact)]);
+      const area = answerArea(q, compact);
+      weave(text, area, q);
+      const left = area && area.bcvBlanks && !area.children.length ? null : area; // (every blank went into the sentence)
+      return h('div', { id: `bcv-q${k}`, class: 'bcv-qz__q' }, [headRow, text, left]);
+    }
+
+    /* A blank belongs in the sentence it was written into, not in a list underneath it.
+     *
+     * Canvas's own take page puts the field inline — a dropdown in the middle of the question — and
+     * that markup arrives with the question text, so the question showed its blanks twice: Canvas's
+     * own control in the sentence, dead (its page sets the value with a script of its own, so it
+     * always read "[ Select ]"), and the row below it, live. The API gives the same question as it
+     * was written, with [name] where the field goes. Either way the field built for that blank is
+     * moved into the gap and the row it came from goes. A blank the text never names keeps its row,
+     * so nothing is left with no way to answer it. */
+    function weave(textEl, areaEl, q) {
+      const holds = areaEl && areaEl.bcvBlanks;
+      if (!holds || !holds.size) return;
+      const put = (name, slot) => {
+        const held = holds.get(String(name));
+        if (!held || held.placed) return false;
+        held.placed = true;
+        held.field.classList.add('bcv-qz__inblank');
+        slot.replaceWith(held.field);
+        held.row.remove();
+        return true;
+      };
+      const head = `question_${q.id}_`;
+      for (const w of [...textEl.querySelectorAll(`select[name^="${head}"], input[name^="${head}"], textarea[name^="${head}"]`)]) {
+        if (!put((w.getAttribute('name') || '').slice(head.length), w)) w.remove(); // Canvas's own control answers nothing here
+      }
+      const spare = [...holds.keys()].filter((b) => !holds.get(b).placed);
+      if (!spare.length) return;
+      const token = new RegExp(`\\[(${spare.map((b) => b.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})\\]`);
+      const walk = document.createTreeWalker(textEl, NodeFilter.SHOW_TEXT);
+      const hits = [];
+      for (let n = walk.nextNode(); n; n = walk.nextNode()) if (token.test(n.nodeValue)) hits.push(n);
+      for (const hit of hits) {
+        let node = hit;
+        for (let m = token.exec(node.nodeValue); m; m = token.exec(node.nodeValue)) {
+          const tok = node.splitText(m.index);
+          const rest = tok.splitText(m[0].length);
+          put(m[1], tok); // (a name written twice keeps the second one as it reads)
+          node = rest;
+        }
+      }
     }
 
     function answerArea(q, compact) {
@@ -634,7 +708,7 @@
       // one value per blank, named for the blank.
       if (BLANKS.has(type)) {
         const drops = DROPS.has(type);
-        const blanks = q.blanks?.length ? q.blanks : [...new Set(opts.map((a) => a.blank_id).filter(Boolean))];
+        const blanks = blanksOf(q);
         const held = q.answer && typeof q.answer === 'object' && !Array.isArray(q.answer) ? q.answer : {};
         const fields = [];
         const send = () => {
@@ -646,7 +720,8 @@
           save(q, out);
         };
         if (!blanks.length) return null;
-        return U.el(`bcv-qz__blanks ${compact ? 'bcv-qz__blanks--compact' : ''}`, blanks.map((blank) => {
+        const holds = new Map();
+        const wrap = U.el(`bcv-qz__blanks ${compact ? 'bcv-qz__blanks--compact' : ''}`, blanks.map((blank) => {
           const mine = opts.filter((a) => String(a.blank_id) === String(blank));
           const held0 = held[blank] === undefined || held[blank] === null ? '' : String(held[blank]);
           const f = drops
@@ -657,8 +732,12 @@
             : h('input', { class: 'bcv-input', type: 'text', placeholder: 'Your answer', 'aria-label': blank, oninput: () => saveSoon(send) });
           if (!drops) f.value = held0;
           fields.push([blank, f]);
-          return U.el('bcv-qz__blankrow', [U.text('bcv-qz__blanklbl', blank, 'span'), f]);
+          const row = U.el('bcv-qz__blankrow', [U.text('bcv-qz__blanklbl', blank, 'span'), f]);
+          holds.set(String(blank), { field: f, row, placed: false });
+          return row;
         }));
+        wrap.bcvBlanks = holds; // the sentence takes what it names (see weave)
+        return wrap;
       }
       if (INFO.has(type)) return null;
       // Matching, fill-in-the-blanks, dropdowns, file upload, calculated…: Canvas's own page handles these on the same attempt.
@@ -775,7 +854,7 @@
             else toTop();
           } }, [
             h('span', { class: 'bcv-qz__sumn', text: `Q${k + 1}` }),
-            h('span', { class: 'bcv-qz__sumq bcv-ellip' }, String(q.question_text || '').trim() ? BCV.screens.course.prose(q.question_text, { cls: 'bcv-qz__sumrich' }) : h('span', { text: q.question_name || '' })), // (the question as Canvas holds it: a formula in it is the formula, not its LaTeX)
+            h('span', { class: 'bcv-qz__sumq bcv-ellip' }, String(q.question_text || '').trim() ? BCV.screens.course.prose(noFields(q.question_text, q), { cls: 'bcv-qz__sumrich' }) : h('span', { text: q.question_name || '' })), // (the question as Canvas holds it: a formula in it is the formula, not its LaTeX)
             q.flagged ? U.svg(FLAG, { size: 13, stroke: '#ff9500', width: 2, style: { flex: 'none' } }) : null,
             cell,
           ]);
@@ -958,7 +1037,7 @@
         const correct = parseCorrect(q.correct) ?? (d ? parseCorrect(d.correct) : null);
         const possible = Number(q.points_possible) || 0;
         const earned = d && d.points !== undefined && d.points !== null ? Number(d.points) : correct === true ? possible : correct === false ? 0 : null;
-        return { q, k, correct, possible, earned, text: htmlToText(q.question_text || q.question_name || '', 400).replace(/\s+/g, ' ').trim(), yours: answerParts(q), right: fbRight(q), sol: fbSolution(q, correct === true), info: INFO.has(q.question_type) };
+        return { q, k, correct, possible, earned, text: htmlToText(noFields(q.question_text, q) || q.question_name || '', 400).replace(/\s+/g, ' ').trim(), yours: answerParts(q), right: fbRight(q), sol: fbSolution(q, correct === true), info: INFO.has(q.question_type) };
       }).filter((r) => !r.info);
       const released = rows.some((r) => r.correct !== null);
       const possible = Number(quiz.points_possible) || rows.reduce((s, r) => s + r.possible, 0);
@@ -1022,7 +1101,7 @@
           h('span', { class: 'bcv-fb__qn', text: `Question ${r.k + 1}` }),
           h('span', { class: 'bcv-fb__score', style: { color: ink }, text: scoreLbl }),
         ]),
-        CS().prose(r.q.question_text || r.q.question_name || '', { cls: 'bcv-fb__qtext' }),
+        CS().prose(noFields(r.q.question_text, r.q) || r.q.question_name || '', { cls: 'bcv-fb__qtext' }),
         U.el('bcv-fb__chips', [
           h('span', { class: 'bcv-fb__chip', style: { background: tint, color: ink } }, r.yours?.some((p) => p.block) ? [h('span', { text: 'Your answer, below' })] : chipBody('You: ', r.yours)),
           showRight ? h('span', { class: 'bcv-fb__chip bcv-fb__chip--right' }, chipBody('Correct: ', r.right)) : null,

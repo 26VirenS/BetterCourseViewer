@@ -24,6 +24,10 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.54.0', date: '2026-09-22', notes: [
+      { kind: 'fixed', title: 'Blanks sit in the line', body: 'A dropdown fills the gap it was written into.', icon: P.pen },
+      { kind: 'fixed', title: 'Every blank counts', body: 'A question is answered once no blank is left.', icon: P.check },
+    ] },
     { version: '2.53.0', date: '2026-09-22', notes: [
       { kind: 'improved', title: 'Sign-ins finish first', body: 'A tool’s window runs to the end before it is brought back.', icon: P.clock },
       { kind: 'new', title: 'It says when to wait', body: 'The bar goes red while a tool is signing in somewhere else.', icon: P.eye },

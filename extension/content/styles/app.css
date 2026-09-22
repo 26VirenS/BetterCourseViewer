@@ -1679,6 +1679,13 @@ html[data-bcv-theme="dark"] .bcv-qz__opt.is-selected { background: rgba(10,132,2
 .bcv-qz__matchrow .bcv-prose { margin: 0; }
 .bcv-qz__sel { flex: none; width: 210px; max-width: 48%; }
 .bcv-qz__blankrow .bcv-input { flex: none; width: 210px; max-width: 48%; }
+/* a blank the question wrote into its own sentence: the field sits on that line, sized to itself */
+.bcv-qz__qtext .bcv-qz__inblank { width: auto; max-width: min(100%, 300px); height: 32px; margin: 0 3px; vertical-align: middle; background: var(--bcv-fill2); box-shadow: inset 0 0 0 1.5px var(--bcv-edge); }
+.bcv-qz__qtext .bcv-qz__inblank:hover { background: var(--bcv-fill); }
+.bcv-qz__qtext .bcv-qz__inblank:focus-visible, .bcv-qz__qtext .bcv-qz__inblank:focus { box-shadow: 0 0 0 2px var(--bcv-blue-soft); }
+.bcv-qz__qtext .bcv-picker__label--none { color: var(--bcv-ink3); }
+.bcv-qz__qtext input.bcv-qz__inblank { min-width: 150px; display: inline-flex; }
+html.bcv-phone .bcv-qz__qtext .bcv-qz__inblank { width: auto; max-width: 100%; }
 .bcv-select { height: 36px; padding: 0 30px 0 12px; border-radius: 11px; background: var(--bcv-fill) !important; border: 0 !important; font: 400 14px/1 var(--bcv-font); color: var(--bcv-ink) !important; outline: none; -webkit-appearance: none; appearance: none; cursor: pointer; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238e8e93' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") !important; background-repeat: no-repeat !important; background-position: right 9px center !important; background-size: 13px !important; }
 .bcv-select:focus { box-shadow: 0 0 0 2px var(--bcv-blue-soft); }
 html.bcv-phone .bcv-qz__matchrow, html.bcv-phone .bcv-qz__blankrow { flex-wrap: wrap; gap: 8px; }
