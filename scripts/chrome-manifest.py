@@ -45,7 +45,8 @@ else:
     # the quiet build: Canvas's own domain, and every other site asked for one at a time
     m['host_permissions'] = ['*://*.instructure.com/*']
     m['optional_host_permissions'] = ['*://*/*']
-    m['content_scripts'] = [cs for cs in m.get('content_scripts', []) if 'content/sniff.js' not in (cs.get('js') or [])]
+    quiet_out = ('content/sniff.js', 'content/popout.js')  # both look at sites the quiet build never asks for
+    m['content_scripts'] = [cs for cs in m.get('content_scripts', []) if not any(f in (cs.get('js') or []) for f in quiet_out)]
 assert len(m['description']) <= 132, 'the Chrome Web Store uses the manifest description as the summary (132 characters max)'
 with open(path, 'w') as f:
     json.dump(m, f, indent=2)

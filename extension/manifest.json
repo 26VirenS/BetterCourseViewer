@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Simpl Courses",
-  "version": "2.50.1",
+  "version": "2.51.0",
   "description": "Canvas with navigation that actually makes sense and a UI that you can actually use.",
   "author": "Simpl Courses contributors",
   "icons": {
@@ -140,6 +140,18 @@
       "js": [
         "content/sniff.js"
       ]
+    },
+    {
+      "matches": [
+        "*://*/*"
+      ],
+      "all_frames": true,
+      "match_about_blank": true,
+      "run_at": "document_start",
+      "js": [
+        "content/popout.js"
+      ],
+      "world": "MAIN"
     }
   ]
 }

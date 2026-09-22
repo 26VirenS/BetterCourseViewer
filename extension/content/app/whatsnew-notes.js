@@ -24,6 +24,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.51.0', date: '2026-09-22', notes: [
+      { kind: 'improved', title: 'No tab at all', body: 'A window a tool opens is taken before the browser makes one.', icon: P.layers },
+    ] },
     { version: '2.50.1', date: '2026-09-22', notes: [
       { kind: 'fixed', title: 'Catching in Safari', body: 'Safari was never told a tab had opened. Now it is.', icon: P.layers },
     ] },

@@ -715,13 +715,15 @@
   }
   function devPaint() {
     $('devCode').value = DEV.encode(devNow);
+    $('devCode').style.color = DEV.encode(devNow) === DEV.encode(DEV.SHIPPED) ? '' : '#ff9500'; // (not the normal setting: say so at a glance)
     devPaintFields();
   }
   async function devApply(settingsNext) {
     const r = await devAsk({ type: 'devSet', settings: settingsNext });
     devNow = r?.settings || settingsNext;
     devPaint();
-    $('devMsg').textContent = `Now ${DEV.encode(devNow)} — ${DEV.explain(devNow).join(' · ')}`;
+    const normal = DEV.encode(devNow) === DEV.encode(DEV.SHIPPED);
+    $('devMsg').textContent = `${normal ? 'Now' : `NOT THE NORMAL SETTING (normal is ${DEV.encode(DEV.SHIPPED)}) —`} ${DEV.encode(devNow)} · ${DEV.explain(devNow).join(' · ')}`;
   }
   function devRows(r) {
     if (!r?.rows?.length) return 'Nothing yet. Open a tool, press the button that wants a new window, then Refresh.';

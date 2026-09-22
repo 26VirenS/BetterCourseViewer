@@ -110,11 +110,16 @@ if (typeof importScripts === 'function' && !self.BCV?.devcode) {
       for (const t of tabs) await caught(t);
     } catch { /* the window went */ }
   });
-  function devGet() { return { ok: true, settings: { ...cap }, code: DEV.encode(cap) }; }
+  const normalNow = () => DEV.encode(cap) === DEV.encode(DEV.SHIPPED);
+  function devGet() { return { ok: true, settings: { ...cap }, code: DEV.encode(cap), normal: normalNow() }; }
   async function devSet(settings) {
     cap = { ...DEV.SHIPPED, ...settings };
-    await api.storage.local.set({ [DEV.KEY]: cap });
-    return { ok: true, settings: { ...cap }, code: DEV.encode(cap) };
+    // Back to normal forgets it rather than writing it down. A setting kept from a diagnosis would
+    // otherwise sit on top of every default that ships afterwards, which is how close-the-tab came
+    // to being off for good on a machine that had once been asked to catch everything.
+    if (normalNow()) await api.storage.local.remove(DEV.KEY);
+    else await api.storage.local.set({ [DEV.KEY]: cap });
+    return { ok: true, settings: { ...cap }, code: DEV.encode(cap), normal: normalNow() };
   }
   function devLog(clear) {
     const rows = seen.slice();
@@ -278,12 +283,14 @@ if (typeof importScripts === 'function' && !self.BCV?.devcode) {
     return 'bcv-' + origin.replace(/[^a-z0-9]/gi, '-');
   }
 
-  /** Build registerContentScripts entries by mirroring the manifest (the interface's scripts: the
-   *  sniffer, content/sniff.js, already runs on every site it may look at and is not one of them). */
+  /** Build registerContentScripts entries by mirroring the manifest: the interface's own scripts and
+   *  nothing else. The sniffer already runs on every site it may look at, and content/popout.js
+   *  belongs inside a tool's own frame, which is never the Canvas site being added here. */
+  const NOT_THE_INTERFACE = ['content/sniff.js', 'content/popout.js'];
   function scriptsFor(origin) {
     const manifest = api.runtime.getManifest();
     const match = `${origin}/*`;
-    return (manifest.content_scripts || []).filter((cs) => !(cs.js || []).includes('content/sniff.js')).map((cs, i) => ({
+    return (manifest.content_scripts || []).filter((cs) => !NOT_THE_INTERFACE.some((f) => (cs.js || []).includes(f))).map((cs, i) => ({
       id: `${scriptIdFor(origin)}-${i}`,
       matches: [match],
       js: cs.js || [],

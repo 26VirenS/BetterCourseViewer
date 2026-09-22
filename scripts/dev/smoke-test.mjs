@@ -195,6 +195,24 @@ try {
   check((await page.$eval('.bcv-ext__frame', (e) => e.getAttribute('src'))) === `${BASE}/accounts/1/external_tools/77?launch_type=global_navigation&display=borderless` && (await texts('.bcv-ext .bcv-sheet__title'))[0] === 'My Materials' && page.url() === `${BASE}/` && acctLoaded && (await visible('#bcv-side')), 'an account tool opens in a popup over this page, Canvas\'s borderless launch framed in it, the page and the shell staying put');
   await page.waitForTimeout(500);
   check((await page.$eval('html', (e) => e.classList.contains('bcv-ext-open'))) && !(await page.$('.bcv-ext__canvas')) && (await page.$eval('#bcv-tray', (e) => getComputedStyle(e).right)) === '106px' && (await page.$eval('#bcv-look', (e) => getComputedStyle(e).right)) === '62px' && (await page.$eval('.bcv-ext__close', (e) => { const r = e.getBoundingClientRect(); return innerWidth - r.right <= 14 && r.top <= 14; })), 'the popup fills the screen but for its bar: the pins and the look switch slide into the bar, the X at the far right, and no Open in Canvas');
+  // The tool's own page sits in a frame inside the frame Canvas launched, and wants a window of its
+  // own. It is taken there, before the browser makes anything: no tab, a popup over the one it came
+  // from. (content/popout.js, woken by a hello passed down from the popup.)
+  const toolFrame = () => page.frames().find((f) => f.url().includes('/resource_selection'));
+  await eventually(async () => !!toolFrame() && (await toolFrame().$('#popout')) !== null, 10000);
+  const tabsBefore = context.pages().length;
+  await toolFrame().click('#popout');
+  const stackedUp = await eventually(async () => (await page.$$('.bcv-ext-ov')).length === 2, 5000);
+  const outcome = await page.evaluate(() => {
+    const ovs = [...document.querySelectorAll('.bcv-ext-ov')];
+    return { n: ovs.length, top: ovs[ovs.length - 1]?.querySelector('.bcv-sheet__title')?.textContent, src: ovs[ovs.length - 1]?.querySelector('.bcv-ext__frame')?.getAttribute('src'), under: ovs[0]?.classList.contains('is-under') };
+  });
+  check(stackedUp && outcome.n === 2 && /tool-window/.test(outcome.src || '') && outcome.under && context.pages().length === tabsBefore, `a window the tool asks for opens over it, with no tab made at all (${JSON.stringify(outcome)}, ${context.pages().length} tab(s))`);
+  const blocked = await toolFrame().evaluate(() => !!window.bcvOpened && window.bcvOpened.closed === false);
+  check(blocked, 'window.open still answers the tool, so one checking whether it was blocked is satisfied');
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(400);
+  check((await page.$$('.bcv-ext-ov')).length === 1, 'Escape takes it off and gives the tool back');
   await page.keyboard.press('Escape');
   check(await eventually(() => page.$('.bcv-ext-ov').then((e) => !e), 3000) && !(await page.$eval('html', (e) => e.classList.contains('bcv-ext-open'))) && await eventually(() => page.$eval('#bcv-tray', (e) => getComputedStyle(e).right === '42px'), 2000), 'closed, the pins slide back out to where they sit over the page');
   await page.goto(`${BASE}/`);
@@ -1199,7 +1217,7 @@ try {
   await toolTab.waitForLoadState('domcontentloaded').catch(() => {});
   const waited = Date.now() - slowAt;
   const gone = await eventually(() => page.$('.bcv-ext-ov').then((e) => !e), 4000);
-  check(/\/courses\/101\/external_tools\/9/.test(toolTab.url()) && waited >= 4000 && gone, `a tool that will not open lands in a tab of its own after five seconds, and the popup goes (${waited} ms, ${toolTab.url()})`);
+  check(/\/courses\/101\/external_tools\/9/.test(toolTab.url()) && waited >= 9000 && gone, `a tool that will not open lands in a tab of its own after ten seconds, and the popup goes (${waited} ms, ${toolTab.url()})`);
   await toolTab.close();
   await page.unroute(hangTool);
   const railGlyph = await page.evaluate(() => ({ active: getComputedStyle(document.querySelector('.bcv-rail__item.is-active .bcv-rail__tile svg')), idle: getComputedStyle(document.querySelector('.bcv-rail__item:not(.is-active) .bcv-rail__tile svg')), tile: getComputedStyle(document.querySelector('.bcv-rail__item.is-active .bcv-rail__tile')).backgroundColor }));

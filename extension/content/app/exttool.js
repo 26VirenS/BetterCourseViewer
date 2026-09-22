@@ -22,6 +22,7 @@
     const i = entry ? stack.indexOf(entry) : -1;
     if (i < 0) return;
     stack.splice(i, 1);
+    if (entry.token) tokens.delete(entry.token);
     entry.stopWaiting?.();
     document.removeEventListener('securitypolicyviolation', entry.onCsp);
     entry.ov.classList.add('is-closing');
@@ -68,20 +69,44 @@
     paintTheme();
   })();
   // ---- a window the framed tool opens for itself --------------------------------------------
-  // The frame is another origin, so its window.open cannot be caught here. The background sees it
-  // as a new tab opened by this one and hands the address back (see catchOpenedTab there); it goes
-  // into a popup over the one already up, which is where the tool meant to put it.
+  // Two ways, because neither reaches everywhere. content/popout.js runs inside the frame and takes
+  // window.open before the browser makes anything, which is the one that leaves no tab behind — it
+  // needs leave to run on the tool's own site, which the builds that may look at every site have.
+  // Failing that the background sees the tab afterwards and hands the address back, which works
+  // wherever the browser will say a tab was opened, at the cost of the tab being there first.
+  const HELLO = 'bcv:popout:hello';
+  const OPEN = 'bcv:popout:open';
   const tellBackground = (open) => { try { BCV.api?.runtime?.sendMessage?.({ type: 'framedPopup', open }); } catch { /* no background to tell */ } };
+  /** Open what a tool asked for, over the popup it asked from. */
+  function fromTool(url) {
+    let title = 'Opened by the tool';
+    try { title = new URL(url).hostname.replace(/^www\./, ''); } catch { /* keep the plain words */ }
+    open({ title, url, newTab: url, icon: IC.external });
+  }
+  // The hello carries a token and comes back on the address, which is what stands in for knowing
+  // which frame a message came from: a page we never greeted cannot say it. One token per popup,
+  // and a token is only good while its popup is open.
+  const tokens = new Set();
+  window.addEventListener('message', (e) => {
+    if (e.data?.type !== OPEN || !e.data.url || !tokens.has(e.data.token) || !isOpen()) return;
+    fromTool(String(e.data.url));
+  });
+  /** Greet the frame, again as it loads: a tool that navigates itself has a new document each time. */
+  function greet(frame, token) {
+    tokens.add(token);
+    const say = () => { try { frame.contentWindow?.postMessage({ type: HELLO, token }, '*'); } catch { /* not there yet */ } };
+    say();
+    for (const ms of [150, 600, 1500, 3000]) setTimeout(say, ms);
+    frame.addEventListener('load', say);
+  }
   /** Our own way to a tab, said out loud: without this the catcher would take it straight back. */
   const allowTab = () => { try { BCV.api?.runtime?.sendMessage?.({ type: 'framedAllowTab' }); } catch { /* nothing to tell */ } };
   try {
     BCV.api?.runtime?.onMessage?.addListener?.((msg) => {
       if (msg?.type !== 'framedPopup' || !msg.url) return undefined;
-      let title = 'Opened by the tool';
-      try { title = new URL(msg.url).hostname.replace(/^www\./, ''); } catch { /* keep the plain words */ }
-      if (msg.toast) U.toast(`Caught: ${title}`, { ms: 4000 }); // (the Developer section's own running commentary)
+      if (msg.toast) U.toast(`Caught a tab: ${msg.url}`, { ms: 4000 }); // (the Developer section's own running commentary)
       if (!isOpen()) return undefined; // (nothing to put it over: the browser keeps its window)
-      open({ title, url: msg.url, newTab: msg.url, icon: IC.external });
+      fromTool(msg.url);
       return undefined;
     });
   } catch { /* no background to hear from */ }
@@ -167,7 +192,9 @@
     ov.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.stopPropagation(); closeOne(entry); } }); // (only the one in front has the focus, so a stack comes apart one at a time)
     entry = { ov, onCsp, stopWaiting, restore: under ? null : (from && from.focus ? from : document.activeElement) };
     stack.push(entry);
-    tellBackground(true); // (from here a window the tool opens for itself is caught and brought back)
+    entry.token = `bcv${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`;
+    greet(frame, entry.token); // (the frame's own window.open is taken over from here: no tab is made at all)
+    tellBackground(true); // (and where that cannot reach, the background catches the tab instead)
     waitOn();
     document.body.append(ov);
     paintTheme(); // (the sun or the moon in this bar, named for what pressing it does)
