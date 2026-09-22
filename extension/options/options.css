@@ -212,3 +212,16 @@ html[data-theme="dark"] .docs__warn { color: #ffb44d; }
 .section[hidden] { display: none !important; }
 .steps--app { margin: 0 18px 16px; }
 .steps[hidden] { display: none; } /* (the flex above would otherwise beat the attribute) */
+
+/* ---- Developer: catching a tool's own window ------------------------------------------------ */
+.input--mono { font-family: var(--mono, ui-monospace, Menlo, monospace); letter-spacing: .06em; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.chip { height: 30px; padding: 0 13px; border: 0; border-radius: 15px; background: var(--fill); color: var(--ink2); cursor: pointer; font: 600 12.5px/1 var(--font); transition: background .2s ease; }
+.chip:hover { background: var(--fill2, var(--fill)); color: var(--ink); }
+.devlog { max-height: 340px; margin: 12px 0 0; padding: 12px 14px; overflow: auto; border-radius: 12px; background: var(--fill); color: var(--ink2); font: 400 11.5px/1.6 var(--mono, ui-monospace, Menlo, monospace); white-space: pre; -webkit-user-select: text; user-select: text; }
+.devfield { display: flex; align-items: center; gap: 12px; padding: 13px 16px; }
+.devfield + .devfield { border-top: 1px solid var(--sep); }
+.devfield__body { flex: 1; min-width: 0; }
+.devfield__opts { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+.devopt { height: 28px; padding: 0 11px; border: 0; border-radius: 14px; background: var(--fill); color: var(--ink3); cursor: pointer; font: 600 12px/1 var(--font); transition: background .2s ease, color .2s ease; }
+.devopt.is-on { background: var(--blue); color: #fff; }

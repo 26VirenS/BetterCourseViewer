@@ -14,12 +14,15 @@
   if (self.BCV) return; // the interface is on for this site already
   const doc = document;
   const app = doc.getElementById('application');
-  // Canvas's page wrapper, its stylesheet bundle, or its global navigation: any of them is Canvas's own markup
+  // Canvas's own page wrapper or its global navigation. Both are Canvas's markup and nobody else's,
+  // which is the point: a tool launched out of Canvas is a site of its own, and one that wears the
+  // school's Canvas theme carries Canvas's stylesheet bundle with it. That bundle used to be enough
+  // to pass for Canvas here, and a tool's own address was registered as a Canvas site on the
+  // strength of it. It is not enough on its own any more.
   const canvas = !!(app && app.classList.contains('ic-app'))
-    || !!doc.querySelector('link[rel="stylesheet"][href*="brandable_css"]')
     || !!doc.querySelector('#global_nav_tray_container, header.ic-app-header, #mobile-header.ic-app-header');
   if (!canvas) return;
-  // signed in: Canvas's inline ENV carries the user's id; the sign-in page carries its own form
+  // signed in: Canvas's inline ENV carries the user's id
   let signedIn = false;
   for (const s of doc.querySelectorAll('script:not([src])')) {
     const t = s.textContent || '';
@@ -27,7 +30,9 @@
     signedIn = /"current_user_id"\s*:\s*"?\d/.test(t);
     break;
   }
-  const login = !!doc.querySelector('.ic-Login, #login_form, form[action*="/login/"]');
+  // or it is Canvas's own sign-in page: .ic-Login is that page's own wrapper. A plain form pointing
+  // at /login/ is not — half the web has one, and a tool's sign-in was passing for Canvas's.
+  const login = !!doc.querySelector('.ic-Login');
   if (!signedIn && !login) return; // a public page of some other school's Canvas: nothing to set up
   try {
     const rt = (self.browser || self.chrome).runtime;

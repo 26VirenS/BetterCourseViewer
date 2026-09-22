@@ -7,6 +7,9 @@
 if (typeof importScripts === 'function' && !self.BCV?.settings) {
   importScripts('lib/settings.js');
 }
+if (typeof importScripts === 'function' && !self.BCV?.devcode) {
+  importScripts('lib/devcode.js');
+}
 
 (function () {
   const BCV = self.BCV;
@@ -16,43 +19,99 @@ if (typeof importScripts === 'function' && !self.BCV?.settings) {
   // ---- a window a framed tool opens for itself ----------------------------
   // A tool in a popup sometimes asks for a browser window of its own — a sign-in, a viewer, a
   // "this needs to open in a new window" button. The page cannot catch that: the frame is another
-  // origin, so its window.open is out of reach from there. Here it is a new tab with our Canvas tab
-  // as its opener, which is close enough to catch: the tab is taken away again and the address
-  // handed back to the page, which puts it in a popup over the one already up.
+  // origin, so its window.open is out of reach from there. The browser tells the extension instead,
+  // as a new tab; the address goes back to the page, which puts it in a popup over the one already
+  // up, and the tab is taken away.
   //
-  // Narrow on purpose. It only fires while that tab says a framed popup is open, it leaves alone the
-  // tabs we make ourselves (Open in new tab says so first), and a window opened with no address of
-  // its own — about:blank, written into afterwards — is left to the browser, there being nothing to
-  // hand over. A tool that must talk back to its opener is left alone the same way once it lands.
-  const framed = new Map(); // tabId -> { open, allowUntil }
+  // What counts as the tool's window is not fixed, because browsers do not agree on what they say
+  // about a new tab: whether they name the tab that opened it, whether the address is there yet.
+  // The settings behind it are in lib/devcode.js and read as a code (SC1-1000100 is what ships).
+  const DEV = BCV.devcode;
+  let cap = { ...DEV.SHIPPED };
+  api.storage?.local?.get?.(DEV.KEY).then((r) => { if (r?.[DEV.KEY]) cap = { ...DEV.SHIPPED, ...r[DEV.KEY] }; }).catch(() => {});
+  const framed = new Map(); // tabId -> { open, allowUntil, windowId }
   const ALLOW_MS = 4000;
+  const seen = []; // the log, newest last, for the Developer section to read back
+  function note(entry) {
+    if (!cap.log) return;
+    seen.push({ at: Date.now(), ...entry });
+    if (seen.length > 120) seen.splice(0, seen.length - 120);
+  }
   function notePopup(sender, msg) {
     const id = sender?.tab?.id;
     if (id == null) return { ok: false };
     const was = framed.get(id) || {};
-    if (msg.open) framed.set(id, { ...was, open: true });
-    else framed.set(id, { ...was, open: false });
+    framed.set(id, { ...was, open: !!msg.open, windowId: sender.tab.windowId });
+    note({ kind: 'popup', tabId: id, open: !!msg.open });
     return { ok: true };
   }
   function allowTab(sender) {
     const id = sender?.tab?.id;
     if (id == null) return { ok: false };
     framed.set(id, { ...(framed.get(id) || {}), allowUntil: Date.now() + ALLOW_MS });
+    note({ kind: 'allow', tabId: id });
     return { ok: true };
   }
-  api.tabs?.onRemoved?.addListener((id) => framed.delete(id));
-  api.tabs?.onCreated?.addListener(async (tab) => {
+  /** The tab a framed popup is open on, if this new tab could have come from one. */
+  function opener(tab) {
+    if (!cap.mode) return null;
+    const live = [...framed.entries()].filter(([, st]) => st.open);
+    if (!live.length) return null;
+    if (cap.mode === 1) { const hit = live.find(([id]) => id === tab.openerTabId); return hit ? hit[0] : null; }
+    if (cap.mode === 2) { const hit = live.find(([, st]) => st.windowId === tab.windowId) || live.find(([id]) => id === tab.openerTabId); return hit ? hit[0] : null; }
+    return live[live.length - 1][0]; // mode 3: any new tab at all, to the popup opened last
+  }
+  /** The address, waited for when the browser has not filled it in yet. */
+  async function addressOf(tabId, first) {
+    const url = first.pendingUrl || first.url || '';
+    if (/^https?:\/\//i.test(url)) return url;
+    const ms = DEV.WAIT_MS[cap.wait] || 0;
+    if (!ms || (!cap.blank && url && url !== 'about:blank')) return '';
+    const until = Date.now() + ms;
+    while (Date.now() < until) {
+      await new Promise((r) => setTimeout(r, 120));
+      let t = null;
+      try { t = await api.tabs.get(tabId); } catch { return ''; } // the tab went
+      const u = t.pendingUrl || t.url || '';
+      if (/^https?:\/\//i.test(u)) return u;
+    }
+    return '';
+  }
+  async function caught(tab) {
+    const entry = { kind: 'tab', tabId: tab.id, openerTabId: tab.openerTabId ?? null, windowId: tab.windowId, url: tab.url || '', pendingUrl: tab.pendingUrl || '' };
     try {
-      const opener = tab.openerTabId;
-      if (opener == null) return;
-      const st = framed.get(opener);
-      if (!st?.open || Date.now() < (st.allowUntil || 0)) return;
-      const url = tab.pendingUrl || tab.url || '';
-      if (!/^https?:\/\//i.test(url)) return; // about:blank and the like: nothing to hand over
-      await api.tabs.sendMessage(opener, { type: 'framedPopup', url }); // first: a page that is not listening keeps its tab
-      await api.tabs.remove(tab.id);
-    } catch { /* the tab went, or the page is not listening: the browser keeps it */ }
+      const from = opener(tab);
+      if (from == null) { note({ ...entry, action: 'no match' }); return; }
+      if (Date.now() < (framed.get(from)?.allowUntil || 0)) { note({ ...entry, action: 'ours, left alone' }); return; }
+      const url = await addressOf(tab.id, tab);
+      if (!url) { note({ ...entry, action: 'no address' }); return; }
+      await api.tabs.sendMessage(from, { type: 'framedPopup', url, toast: !!cap.toast }); // first: a page that is not listening keeps its tab
+      if (cap.close) await api.tabs.remove(tab.id);
+      note({ ...entry, url, action: cap.close ? 'caught, tab closed' : 'caught, tab left open' });
+    } catch (e) {
+      note({ ...entry, action: `could not: ${e?.message || e}` });
+    }
+  }
+  api.tabs?.onRemoved?.addListener((id) => framed.delete(id));
+  api.tabs?.onCreated?.addListener((tab) => { caught(tab); });
+  api.windows?.onCreated?.addListener(async (win) => {
+    if (!cap.windows) return;
+    try {
+      const tabs = await api.tabs.query({ windowId: win.id });
+      for (const t of tabs) await caught(t);
+    } catch { /* the window went */ }
   });
+  function devGet() { return { ok: true, settings: { ...cap }, code: DEV.encode(cap) }; }
+  async function devSet(settings) {
+    cap = { ...DEV.SHIPPED, ...settings };
+    await api.storage.local.set({ [DEV.KEY]: cap });
+    return { ok: true, settings: { ...cap }, code: DEV.encode(cap) };
+  }
+  function devLog(clear) {
+    const rows = seen.slice();
+    if (clear) seen.length = 0;
+    return { ok: true, rows, code: DEV.encode(cap), open: [...framed.entries()].filter(([, st]) => st.open).map(([id]) => id) };
+  }
 
   // ---- one-shot messages --------------------------------------------------
   api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
@@ -97,6 +156,15 @@ if (typeof importScripts === 'function' && !self.BCV?.settings) {
         return true;
       case 'framedAllowTab': // our own Open in new tab, about to make one on purpose
         reply(allowTab(sender));
+        return true;
+      case 'devGet': // the Developer section: what the catch is set to
+        reply(devGet());
+        return true;
+      case 'devSet':
+        reply(devSet(msg.settings));
+        return true;
+      case 'devLog':
+        reply(devLog(msg.clear));
         return true;
       case 'closeSetupTab': // the page after install, once the setup is under way on a Canvas tab
         reply(sender?.tab?.id != null ? api.tabs.remove(sender.tab.id).then(() => ({ ok: true })) : { ok: false });

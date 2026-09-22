@@ -76,9 +76,11 @@
   const allowTab = () => { try { BCV.api?.runtime?.sendMessage?.({ type: 'framedAllowTab' }); } catch { /* nothing to tell */ } };
   try {
     BCV.api?.runtime?.onMessage?.addListener?.((msg) => {
-      if (msg?.type !== 'framedPopup' || !msg.url || !isOpen()) return undefined;
+      if (msg?.type !== 'framedPopup' || !msg.url) return undefined;
       let title = 'Opened by the tool';
       try { title = new URL(msg.url).hostname.replace(/^www\./, ''); } catch { /* keep the plain words */ }
+      if (msg.toast) U.toast(`Caught: ${title}`, { ms: 4000 }); // (the Developer section's own running commentary)
+      if (!isOpen()) return undefined; // (nothing to put it over: the browser keeps its window)
       open({ title, url: msg.url, newTab: msg.url, icon: IC.external });
       return undefined;
     });

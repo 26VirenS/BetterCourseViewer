@@ -685,5 +685,98 @@
   }
   paintAll();
   S.onChange((s) => { settings = s; paintAll(); });
-  showSection(location.hash ? location.hash.slice(1) : NAV[0][0]); // (This Mac in the app's window, General everywhere else)
+
+  // ---- Developer: catching a tool's own window ------------------------------------------------
+  // Hidden until asked for — five presses on the version, or #dev — because it is for finding out
+  // what a browser reports about a new tab, not for using Canvas. Everything it sets is one code.
+  const DEV = BCV.devcode;
+  const devAsk = (msg) => api.runtime.sendMessage(msg).catch(() => null);
+  let devNow = { ...DEV.SHIPPED };
+  function devPaintFields() {
+    $('devFields').replaceChildren(...DEV.FIELDS.map((f) => {
+      const opts = f.words.map((w, i) => {
+        const b2 = document.createElement('button');
+        b2.type = 'button';
+        b2.className = `devopt${devNow[f.key] === i ? ' is-on' : ''}`;
+        b2.textContent = w;
+        b2.onclick = () => devApply({ ...devNow, [f.key]: i });
+        return b2;
+      });
+      const row = document.createElement('div');
+      row.className = 'devfield';
+      row.innerHTML = `<span class="devfield__body"><span class="row__t row__t--med"></span></span>`;
+      row.querySelector('.row__t').textContent = f.label;
+      const wrap = document.createElement('span');
+      wrap.className = 'devfield__opts';
+      wrap.append(...opts);
+      row.append(wrap);
+      return row;
+    }));
+  }
+  function devPaint() {
+    $('devCode').value = DEV.encode(devNow);
+    devPaintFields();
+  }
+  async function devApply(settingsNext) {
+    const r = await devAsk({ type: 'devSet', settings: settingsNext });
+    devNow = r?.settings || settingsNext;
+    devPaint();
+    $('devMsg').textContent = `Now ${DEV.encode(devNow)} — ${DEV.explain(devNow).join(' · ')}`;
+  }
+  function devRows(r) {
+    if (!r?.rows?.length) return 'Nothing yet. Open a tool, press the button that wants a new window, then Refresh.';
+    const t0 = r.rows[0].at;
+    return r.rows.map((x) => {
+      const secs = `${((x.at - t0) / 1000).toFixed(1)}s`.padStart(7);
+      if (x.kind === 'popup') return `${secs}  popup ${x.open ? 'opened' : 'closed'} on tab ${x.tabId}`;
+      if (x.kind === 'allow') return `${secs}  our own new tab coming from tab ${x.tabId}`;
+      return `${secs}  new tab ${x.tabId} opener=${x.openerTabId ?? '—'} window=${x.windowId} url=${x.url || '—'} pending=${x.pendingUrl || '—'}\n         → ${x.action}`;
+    }).join('\n');
+  }
+  async function devShow(clear = false) {
+    const r = await devAsk({ type: 'devLog', clear });
+    $('devLog').textContent = devRows(r);
+    $('devSeenSub').textContent = r ? `Code ${r.code} · framed popups open on ${r.open?.length ? `tab ${r.open.join(', ')}` : 'no tab'}.` : 'The background is not answering.';
+  }
+  async function devInit() {
+    const r = await devAsk({ type: 'devGet' });
+    devNow = r?.settings || { ...DEV.SHIPPED };
+    devPaint();
+    devShow();
+  }
+  $('devUse').onclick = () => {
+    const parsed = DEV.decode($('devCode').value);
+    if (!parsed.ok) { $('devMsg').textContent = parsed.message; return; }
+    devApply(parsed.settings);
+  };
+  $('devEverything').onclick = () => devApply({ ...DEV.EVERYTHING });
+  $('devShipped').onclick = () => devApply({ ...DEV.SHIPPED });
+  $('devRefresh').onclick = () => devShow();
+  $('devClear').onclick = () => devShow(true);
+  $('devCopy').onclick = async () => {
+    const text = `${DEV.encode(devNow)}\n${DEV.explain(devNow).join('\n')}\n\n${$('devLog').textContent}`;
+    try { await navigator.clipboard.writeText(text); $('devMsg').textContent = 'Copied — paste it where it is wanted.'; } catch { $('devMsg').textContent = 'Could not copy; select the log and copy it by hand.'; }
+  };
+  let devTaps = 0;
+  let devTapAt = 0;
+  function revealDev() {
+    if ($('dev').hidden) {
+      $('dev').hidden = false;
+      NAV_KEYS.add('dev'); // (showSection only opens what the nav knows about)
+      const tile = h('span', { class: 'navlink__tile' });
+      tile.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 7l-5 5 5 5M15 7l5 5-5 5"/></svg>';
+      nav.append(h('button', { type: 'button', class: 'navlink', dataset: { section: 'dev' }, onclick: () => { history.replaceState(null, '', '#dev'); showSection('dev'); } }, [tile, h('span', { class: 'navlink__label', text: 'Developer' }), h('span', { class: 'navlink__dot', id: 'dot-dev', hidden: true })]));
+      devInit();
+    }
+    showSection('dev');
+  }
+  $('version').addEventListener('click', () => {
+    const now = Date.now();
+    devTaps = now - devTapAt > 1200 ? 1 : devTaps + 1;
+    devTapAt = now;
+    if (devTaps >= 5) { devTaps = 0; revealDev(); }
+  });
+  if (location.hash === '#dev') revealDev();
+
+  showSection(location.hash === '#dev' ? 'dev' : (location.hash ? location.hash.slice(1) : NAV[0][0])); // (This Mac in the app's window, General everywhere else)
 })();
