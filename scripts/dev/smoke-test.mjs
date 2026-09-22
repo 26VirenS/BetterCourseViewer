@@ -202,14 +202,22 @@ try {
   await eventually(async () => !!toolFrame() && (await toolFrame().$('#popout')) !== null, 10000);
   const tabsBefore = context.pages().length;
   await toolFrame().click('#popout');
-  const stackedUp = await eventually(async () => (await page.$$('.bcv-ext-ov')).length === 2, 5000);
+  // the bar says what is happening before the window is even there, and asks for no more windows
+  const said = await eventually(() => page.$eval('.bcv-ext-ov .bcv-ext__busy', (e) => !e.hidden).catch(() => false), 4000);
+  const busyLook = await page.evaluate(() => {
+    const ov = document.querySelector('.bcv-ext-ov');
+    const bar = ov?.querySelector('.bcv-ext__busy');
+    return { on: ov?.classList.contains('is-busy'), says: bar?.querySelector('.bcv-ext__busytext')?.textContent || '', bg: bar ? getComputedStyle(bar).backgroundColor : '', head: ov ? getComputedStyle(ov.querySelector('.bcv-ext__head')).backgroundColor : '' };
+  });
+  check(said && busyLook.on && /Authenticating\. Don’t open any new tabs or windows/.test(busyLook.says) && busyLook.bg === 'rgb(122, 20, 25)' && busyLook.head === 'rgb(92, 15, 19)', `while the tool's window is out there the bar goes dark red and says so (${JSON.stringify(busyLook)})`);
+  const stackedUp = await eventually(async () => (await page.$$('.bcv-ext-ov')).length === 2, 20000);
   const outcome = await page.evaluate(() => {
     const ovs = [...document.querySelectorAll('.bcv-ext-ov')];
     return { n: ovs.length, top: ovs[ovs.length - 1]?.querySelector('.bcv-sheet__title')?.textContent, src: ovs[ovs.length - 1]?.querySelector('.bcv-ext__frame')?.getAttribute('src'), under: ovs[0]?.classList.contains('is-under') };
   });
-  check(stackedUp && outcome.n === 2 && /tool-window/.test(outcome.src || '') && outcome.under && context.pages().length === tabsBefore, `a window the tool asks for opens over it, with no tab made at all (${JSON.stringify(outcome)}, ${context.pages().length} tab(s))`);
-  const blocked = await toolFrame().evaluate(() => !!window.bcvOpened && window.bcvOpened.closed === false);
-  check(blocked, 'window.open still answers the tool, so one checking whether it was blocked is satisfied');
+  check(stackedUp && outcome.n === 2 && /tool-window/.test(outcome.src || '') && outcome.under && context.pages().length === tabsBefore, `once it has settled the window is brought back over the popup, and its tab is gone (${JSON.stringify(outcome)}, ${context.pages().length} tab(s))`);
+  const barOff = await page.evaluate(() => { const ov = document.querySelector('.bcv-ext-ov.is-busy'); return !ov; });
+  check(barOff, 'and the notice comes down with it');
   await page.keyboard.press('Escape');
   await page.waitForTimeout(400);
   check((await page.$$('.bcv-ext-ov')).length === 1, 'Escape takes it off and gives the tool back');
@@ -1207,18 +1215,21 @@ try {
   await shot(page, '11b-tool-popup');
   await page.keyboard.press('Escape');
   check(await eventually(() => page.$('.bcv-ext-ov').then((e) => !e), 3000) && page.url() === `${BASE}/courses/101`, 'Escape closes the popup and the course page is still there');
-  // a tool that never comes: after five seconds the popup gives up and the tool gets a tab of its own
+  // a tool that never comes is waited for, not given up on: no tab is forced, no card says it will
+  // not open, and the bar keeps Reload and Open in new tab for whoever wants them
   const hangTool = /\/courses\/101\/external_tools\/9\b/;
   await page.route(hangTool, () => {}); // answered by nobody: the frame stays blank
+  const tabsBeforeHang = context.pages().length;
   await page.click('.bcv-rail__ext');
   await page.waitForSelector('.bcv-ext-ov .bcv-ext__frame', { timeout: 5000 });
-  const slowAt = Date.now();
-  const toolTab = await context.waitForEvent('page', { timeout: 15000 });
-  await toolTab.waitForLoadState('domcontentloaded').catch(() => {});
-  const waited = Date.now() - slowAt;
-  const gone = await eventually(() => page.$('.bcv-ext-ov').then((e) => !e), 4000);
-  check(/\/courses\/101\/external_tools\/9/.test(toolTab.url()) && waited >= 9000 && gone, `a tool that will not open lands in a tab of its own after ten seconds, and the popup goes (${waited} ms, ${toolTab.url()})`);
-  await toolTab.close();
+  await page.waitForTimeout(12000); // (longer than the give-up ever was)
+  const stillWaiting = await page.evaluate(() => {
+    const ov = document.querySelector('.bcv-ext-ov');
+    return { up: !!ov, fail: !!ov?.querySelector('.bcv-ext__fail'), says: ov?.querySelector('.bcv-ext__waittext')?.textContent || '', acts: [...(ov?.querySelectorAll('.bcv-ext__acts .bcv-btn') || [])].map((b2) => b2.textContent.trim()).join(',') };
+  });
+  check(stillWaiting.up && !stillWaiting.fail && stillWaiting.says === 'Opening…' && /Reload/.test(stillWaiting.acts) && /Open in new tab/.test(stillWaiting.acts) && context.pages().length === tabsBeforeHang, `a tool that will not open is waited for: the popup stays, no card gives up on it and no tab is forced (${JSON.stringify(stillWaiting)}, ${context.pages().length} tab(s))`);
+  await page.keyboard.press('Escape');
+  await eventually(() => page.$('.bcv-ext-ov').then((e) => !e), 3000);
   await page.unroute(hangTool);
   const railGlyph = await page.evaluate(() => ({ active: getComputedStyle(document.querySelector('.bcv-rail__item.is-active .bcv-rail__tile svg')), idle: getComputedStyle(document.querySelector('.bcv-rail__item:not(.is-active) .bcv-rail__tile svg')), tile: getComputedStyle(document.querySelector('.bcv-rail__item.is-active .bcv-rail__tile')).backgroundColor }));
   check(await page.$('.bcv-rail__item[data-tab="home"].is-active') && railGlyph.active.stroke === 'rgb(23, 112, 171)' && railGlyph.active.opacity === '1' && railGlyph.idle.stroke === 'rgb(23, 112, 171)' && railGlyph.idle.opacity === '0.6' && railGlyph.tile === 'rgba(0, 0, 0, 0)', `rail glyphs take the course colour (the one picked earlier), no tile, dimmed unless active: ${railGlyph.active.stroke} / ${railGlyph.idle.opacity}`);

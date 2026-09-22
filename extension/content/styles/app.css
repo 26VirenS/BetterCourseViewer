@@ -2896,7 +2896,7 @@ html[data-bcv-theme="dark"] .bcv-conv__delta.is-more, html[data-bcv-theme="dark"
 @media (prefers-reduced-motion: reduce) {
   .bcv-tool-card, .bcv-tool-card__tile, .bcv-tool-card__chev, .bcv-pomo__ind, .bcv-pomo__arc, .bcv-pomo__cap, .bcv-fc__flipper, .bcv-pomo__marker, .bcv-pomo__strip, .bcv-pomo__tick, .bcv-pomo__label, .bcv-pin.bcv-island, .bcv-island__face, .bcv-island .bcv-pin__btn, .bcv-island .bcv-pin__ic, .bcv-island__glyph, .bcv-island__body, .bcv-island__arc, .bcv-island__hand { transition: none; }
   .bcv-tool-card:hover { transform: none; }
-  .bcv-pin.is-new, .bcv-conv__drop.is-drag, .bcv-conv__run.is-busy, .bcv-conv__delta, .bcv-conv__outlabel, .bcv-cite__preview.is-fresh, .bcv-fc__fb, .bcv-fc__tilecard.is-wrong, .bcv-pin.is-out, .bcv-island.is-paused .bcv-island__glyph, .bcv-pomo.is-paused .bcv-pomo__marker, .bcv-tool-ov.is-closing, .bcv-tool-ov.is-closing .bcv-sheet { animation: none; }
+  .bcv-ext__busy, .bcv-pin.is-new, .bcv-conv__drop.is-drag, .bcv-conv__run.is-busy, .bcv-conv__delta, .bcv-conv__outlabel, .bcv-cite__preview.is-fresh, .bcv-fc__fb, .bcv-fc__tilecard.is-wrong, .bcv-pin.is-out, .bcv-island.is-paused .bcv-island__glyph, .bcv-pomo.is-paused .bcv-pomo__marker, .bcv-tool-ov.is-closing, .bcv-tool-ov.is-closing .bcv-sheet { animation: none; }
 }
 
 /* the welcome's Dashboard stage: three counters at the top, the middle one pressed, the sheet behind
@@ -3305,10 +3305,6 @@ html.bcv-ext-open:not(.bcv-phone) .bcv-ext__acts { margin-right: calc(var(--bcv-
 .bcv-ext__wait { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 20px; text-align: center; }
 .bcv-ext__waittext { max-width: 420px; font: 500 13px/1.45 var(--bcv-font); color: var(--bcv-ink3); }
 .bcv-ext__body.is-loaded .bcv-ext__wait { display: none; }
-.bcv-ext__fail { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 40px 30px; text-align: center; background: var(--bcv-bg); }
-.bcv-ext__failtitle { font: 600 15px/1.3 var(--bcv-font); color: var(--bcv-ink); }
-.bcv-ext__failtext { max-width: 320px; font: 400 13px/1.5 var(--bcv-font); color: var(--bcv-ink3); }
-.bcv-ext__fail .bcv-btn { text-decoration: none !important; }
 .bcv-chip--full { cursor: pointer; }
 /* the pins and the look switch slide into the popup's bar, beside the X, and back out when it closes */
 #bcv-tray { transition: opacity .18s ease, top .38s cubic-bezier(.32,.72,0,1), right .38s cubic-bezier(.32,.72,0,1); }
@@ -3406,3 +3402,14 @@ html.bcv-ext-open:not(.bcv-phone) #bcv-look { top: 15px; right: 62px; }
 .bcv-qpt__cell:focus-visible { outline: none; box-shadow: 0 0 0 1.5px #fff; z-index: 1; }
 .bcv-qpt__cell.is-match { box-shadow: 0 0 0 1.5px #fff; }
 .bcv-qpt__cell.is-dim { opacity: .22; }
+
+/* ---- a tool signing in somewhere of its own ------------------------------------------------- */
+/* While a window the tool opened is out there, the bar goes dark red and says so: closing it, or
+   opening anything else, is what loses the sign-in half way through. */
+.bcv-ext-ov.is-busy .bcv-ext__head { background: #5c0f13; }
+.bcv-ext-ov.is-busy .bcv-ext__head .bcv-sheet__title, .bcv-ext-ov.is-busy .bcv-ext__head .bcv-sheet__note { color: #ffd9d6; }
+.bcv-ext__busy { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 16px 22px; background: #7a1419; color: #fff; text-align: center; animation: bcv-busy-in .25s cubic-bezier(.32,.72,0,1) both; }
+.bcv-ext__busy[hidden] { display: none; }
+.bcv-ext__busytext { font: 700 20px/1.25 var(--bcv-display); letter-spacing: -.01em; text-wrap: pretty; }
+@keyframes bcv-busy-in { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
+@media (max-width: 700px) { .bcv-ext__busytext { font-size: 16px; } }

@@ -77,18 +77,53 @@ if (typeof importScripts === 'function' && !self.BCV?.devcode) {
     }
     return '';
   }
+  /** Wait until the window has finished doing whatever it opened to do.
+   *
+   *  A window a tool opens is usually a sign-in, and a sign-in is several pages: the tool, the
+   *  school's identity provider, a code, a redirect back. Taking its first address and closing it
+   *  breaks the whole thing in the middle — which is what taking it at once did. So it is left to
+   *  run, watched, and only reclaimed once it has settled: loaded, and at the same address for a
+   *  quiet stretch. Cut short by a cap, in case it never settles, and given up if the tab closes
+   *  itself first, which a sign-in that hands back to its opener usually does.
+   */
+  async function settled(tabId) {
+    const quiet = DEV.SETTLE_MS[cap.settle] ?? 2000;
+    const CAP = 120000;
+    const until = Date.now() + CAP;
+    let last = '';
+    let since = 0;
+    while (Date.now() < until) {
+      await new Promise((r) => setTimeout(r, 300));
+      let t = null;
+      try { t = await api.tabs.get(tabId); } catch { return { gone: true, url: '' }; } // it closed itself: the sign-in is done and handed back
+      const url = t.pendingUrl || t.url || '';
+      if (url !== last || t.status !== 'complete') { last = url; since = t.status === 'complete' ? Date.now() : 0; continue; }
+      if (!since) { since = Date.now(); continue; }
+      if (!quiet || Date.now() - since >= quiet) return { gone: false, url };
+    }
+    let t = null;
+    try { t = await api.tabs.get(tabId); } catch { return { gone: true, url: '' }; }
+    return { gone: false, url: t.pendingUrl || t.url || '', capped: true };
+  }
   async function caught(tab) {
     const entry = { kind: 'tab', tabId: tab.id, openerTabId: tab.openerTabId ?? null, windowId: tab.windowId, url: tab.url || '', pendingUrl: tab.pendingUrl || '' };
     try {
       const from = opener(tab);
       if (from == null) { note({ ...entry, action: 'no match' }); return; }
       if (Date.now() < (framed.get(from)?.allowUntil || 0)) { note({ ...entry, action: 'ours, left alone' }); return; }
-      const url = await addressOf(tab.id, tab);
-      if (!url) { note({ ...entry, action: 'no address' }); return; }
-      await api.tabs.sendMessage(from, { type: 'framedPopup', url, toast: !!cap.toast }); // first: a page that is not listening keeps its tab
+      const first = await addressOf(tab.id, tab);
+      if (!first) { note({ ...entry, action: 'no address' }); return; }
+      // the popup says what is going on and asks for no more windows while it does
+      try { await api.tabs.sendMessage(from, { type: 'framedBusy', on: true, url: first }); } catch { /* the page is not listening */ }
+      const end = await settled(tab.id);
+      try { await api.tabs.sendMessage(from, { type: 'framedBusy', on: false }); } catch { /* the page went */ }
+      if (end.gone) { note({ ...entry, url: first, action: 'closed itself while signing in: nothing to bring back' }); return; }
+      if (!/^https?:\/\//i.test(end.url)) { note({ ...entry, url: end.url, action: 'settled on no address' }); return; }
+      await api.tabs.sendMessage(from, { type: 'framedPopup', url: end.url, toast: !!cap.toast }); // first: a page that is not listening keeps its tab
       if (cap.close) await api.tabs.remove(tab.id);
-      note({ ...entry, url, action: cap.close ? 'caught, tab closed' : 'caught, tab left open' });
+      note({ ...entry, url: end.url, action: `${end.capped ? 'never settled, taken anyway' : 'settled'}; ${cap.close ? 'tab closed' : 'tab left open'}` });
     } catch (e) {
+      try { await api.tabs.sendMessage(opener(tab), { type: 'framedBusy', on: false }); } catch { /* nothing to tell */ }
       note({ ...entry, action: `could not: ${e?.message || e}` });
     }
   }
@@ -162,9 +197,6 @@ if (typeof importScripts === 'function' && !self.BCV?.devcode) {
       case 'syncApp': // a Canvas page loading on a Mac: the settings the app holds, taken now
         reply(syncApp().then(() => ({ ok: true })));
         return true;
-      case 'openTab': // an external tool that would not open in its popup: it gets a tab of its own
-        reply(openTab(msg.url));
-        return true;
       case 'framedPopup': // a framed tool is up on this tab, or has gone: see catchOpenedTab below
         reply(notePopup(sender, msg));
         return true;
@@ -228,18 +260,6 @@ if (typeof importScripts === 'function' && !self.BCV?.devcode) {
       } catch { /* not a Canvas tab */ }
     }));
     return { ok: true, cleared };
-  }
-
-  /** A tab for a web address, opened from here: a content script's own window.open would be the
-   *  browser's idea of a popup once the press that started it is seconds old. */
-  async function openTab(url) {
-    if (!/^https?:\/\//i.test(String(url || ''))) return { ok: false };
-    try {
-      await api.tabs.create({ url });
-      return { ok: true };
-    } catch (e) {
-      return { ok: false, message: e?.message || String(e) };
-    }
   }
 
   async function openOptions() {

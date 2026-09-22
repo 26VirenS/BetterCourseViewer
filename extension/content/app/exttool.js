@@ -3,9 +3,11 @@
  * or sends them to a new tab. Here they open in a popup that fills the tab — the tool framed inside
  * it, through Canvas's own borderless launch for the tools Canvas launches, the site itself for a
  * plain link — so the page underneath and the pinned tools beside the switch stay where they are.
- * It fills the screen but for its bar: the title, Open in new tab (for a site that refuses to be
- * framed), and — sliding in from where they sit over the page — the pinned tools and the look
- * switch, with the X always at the far right. Escape closes it. */
+ * It fills the screen but for its bar: the title, Reload, Open in new tab, and — sliding in from
+ * where they sit over the page — the pinned tools and the look switch, with the X always at the far
+ * right. Escape closes it.
+ * Nothing here gives up on a tool. One that is slow to arrive is waited for; the two buttons in the
+ * bar are how anyone who would rather not wait gets on with it. */
 (function () {
   const BCV = (self.BCV = self.BCV || {});
   const { h } = BCV.utils;
@@ -23,8 +25,6 @@
     if (i < 0) return;
     stack.splice(i, 1);
     if (entry.token) tokens.delete(entry.token);
-    entry.stopWaiting?.();
-    document.removeEventListener('securitypolicyviolation', entry.onCsp);
     entry.ov.classList.add('is-closing');
     setTimeout(() => entry.ov.remove(), 180);
     const under = top();
@@ -75,7 +75,8 @@
   // Failing that the background sees the tab afterwards and hands the address back, which works
   // wherever the browser will say a tab was opened, at the cost of the tab being there first.
   const HELLO = 'bcv:popout:hello';
-  const OPEN = 'bcv:popout:open';
+  const ASK = 'bcv:popout:ask';
+  const OPENING = 'bcv:popout:opening';
   const tellBackground = (open) => { try { BCV.api?.runtime?.sendMessage?.({ type: 'framedPopup', open }); } catch { /* no background to tell */ } };
   /** Open what a tool asked for, over the popup it asked from. */
   function fromTool(url) {
@@ -83,13 +84,27 @@
     try { title = new URL(url).hostname.replace(/^www\./, ''); } catch { /* keep the plain words */ }
     open({ title, url, newTab: url, icon: IC.external });
   }
-  // The hello carries a token and comes back on the address, which is what stands in for knowing
+  /** While a tool's own window is out there signing in, the bar says so and asks for quiet. */
+  function busy(on) {
+    const t = top();
+    if (!t) return;
+    t.ov.classList.toggle('is-busy', !!on);
+    const bar = t.ov.querySelector('.bcv-ext__busy');
+    if (bar) bar.hidden = !on;
+  }
+  // The hello carries a token and comes back on anything said, which is what stands in for knowing
   // which frame a message came from: a page we never greeted cannot say it. One token per popup,
   // and a token is only good while its popup is open.
   const tokens = new Set();
   window.addEventListener('message', (e) => {
-    if (e.data?.type !== OPEN || !e.data.url || !tokens.has(e.data.token) || !isOpen()) return;
-    fromTool(String(e.data.url));
+    // a frame asking to be armed — the one that loaded after the hellos stopped
+    if (e.data?.type === ASK && e.source && e.source !== window) {
+      const t = top();
+      if (t?.token) { try { e.source.postMessage({ type: HELLO, token: t.token }, '*'); } catch { /* it will ask again */ } }
+      return;
+    }
+    if (e.data?.type !== OPENING || !tokens.has(e.data.token) || !isOpen()) return;
+    busy(true); // (the background turns it off again once the window has settled, or gone)
   });
   /** Greet the frame, again as it loads: a tool that navigates itself has a new document each time. */
   function greet(frame, token) {
@@ -103,6 +118,7 @@
   const allowTab = () => { try { BCV.api?.runtime?.sendMessage?.({ type: 'framedAllowTab' }); } catch { /* nothing to tell */ } };
   try {
     BCV.api?.runtime?.onMessage?.addListener?.((msg) => {
+      if (msg?.type === 'framedBusy') { busy(!!msg.on); return undefined; } // signing in out there, or done
       if (msg?.type !== 'framedPopup' || !msg.url) return undefined;
       if (msg.toast) U.toast(`Caught a tab: ${msg.url}`, { ms: 4000 }); // (the Developer section's own running commentary)
       if (!isOpen()) return undefined; // (nothing to put it over: the browser keeps its window)
@@ -117,7 +133,6 @@
     if (u.origin === location.origin && /\/external_tools\//.test(u.pathname) && !u.searchParams.has('display')) u.searchParams.set('display', 'borderless');
     return u.href;
   }
-  const sameOrigin = (href) => { try { return new URL(href, location.origin).origin === location.origin; } catch { return false; } };
 
   /** The popup. `url` is what gets framed; `newTab` what a new tab gets (else `page`, Canvas's own page for it, else the url). */
   function open({ title = 'External tool', url, page = null, newTab = null, note = '', from = null, icon = null } = {}) {
@@ -127,47 +142,19 @@
     let entry = null;
     const alive = () => stack.includes(entry);
     const tabUrl = newTab || page || url;
-    const foreign = !sameOrigin(url);
     const ov = U.el('bcv-sheet-ov bcv-ext-ov', null, { role: 'dialog', 'aria-label': title, tabindex: '-1' });
     const frame = h('iframe', { class: 'bcv-ext__frame', src: url, title, allow: 'fullscreen; microphone; camera; display-capture; autoplay; clipboard-write; geolocation; publickey-credentials-get; identity-credentials-get', referrerpolicy: 'strict-origin-when-cross-origin' }); // (no sandbox: a tool signs in, sets its cookies and opens its windows as it would on Canvas's own page)
-    const wait = U.el('bcv-ext__wait', [U.text('bcv-ext__waittext', foreign ? 'Opening… if it stays blank, the site does not allow this: open it in a new tab.' : 'Opening…')]);
+    const wait = U.el('bcv-ext__wait', [U.text('bcv-ext__waittext', 'Opening…')]);
     const body = U.el('bcv-ext__body', [wait, frame]);
-    // A tool that never arrives: after ten seconds the popup gives up and the tool gets a tab of its
-    // own, which is where Canvas would have sent it anyway. (A tab opened this late is not the
-    // browser's idea of a press, so the background opens it; window.open is the fallback, and the
-    // card below is what is left when the browser refuses both.)
-    const SLOW = 10000;
-    let late = 0;
-    const stopWaiting = () => { clearTimeout(late); late = 0; };
-    const fail = () => {
-      stopWaiting();
-      if (!alive()) return;
-      body.replaceChildren(U.el('bcv-ext__fail', [
-        U.svg(IC.warn, { size: 26, stroke: 'var(--bcv-orange)', width: 1.9 }),
-        U.text('bcv-ext__failtitle', 'This one will not open in a popup'),
-        U.text('bcv-ext__failtext bcv-pretty', 'Your school’s Canvas does not allow it to be framed. Open it in a new tab instead.'),
-        h('a', { class: 'bcv-btn bcv-btn--primary', href: tabUrl, target: '_blank', rel: 'noopener', text: 'Open in new tab', onclick: allowTab }),
-      ]));
-    };
-    const toTab = async () => {
-      if (!alive()) return;
-      stopWaiting();
-      let opened = false;
-      try { opened = !!(await BCV.api?.runtime?.sendMessage?.({ type: 'openTab', url: tabUrl }))?.ok; } catch { opened = false; }
-      if (!opened) { allowTab(); opened = !!window.open(tabUrl, '_blank', 'noopener'); }
-      if (opened) closeOne(entry);
-      else fail();
-    };
-    const waitOn = () => { stopWaiting(); late = setTimeout(toTab, SLOW); };
-    const onCsp = (e) => { const b = String(e.blockedURI || ''); if (b && (url.startsWith(b) || b.startsWith(url.slice(0, 40)))) fail(); };
-    document.addEventListener('securitypolicyviolation', onCsp);
+    // Nothing here decides a tool has failed. It used to: a tool still blank after a while was given
+    // a tab of its own, and one whose site refused the frame got a card saying so. Both took the
+    // choice away — a slow tool is slow, not lost — so the popup waits, and Open in new tab and
+    // Reload in the bar are there for whoever wants them.
     frame.addEventListener('load', () => {
       if (frame.getAttribute('src') === 'about:blank') return; // (the blank page on the way through a reload: the tool is still to come)
-      stopWaiting();
       frame.classList.add('is-in');
       body.classList.add('is-loaded');
     });
-    frame.addEventListener('error', fail);
     const closeBtn = h('button', { type: 'button', class: 'bcv-sheet__close', 'aria-label': 'Close', onclick: () => closeOne(entry) }, U.svg(IC.close, { size: 13, stroke: 'var(--bcv-ink2)', width: 2.3 }));
     const tab = h('a', { class: 'bcv-btn bcv-ext__tab', href: tabUrl, target: '_blank', rel: 'noopener', title: 'Open in a new tab', onclick: allowTab }, [U.svg(IC.external, { size: 13, stroke: 'currentColor', width: 1.9 }), h('span', { text: 'Open in new tab' })]);
     // Reload: the launch again from the start (a tool that timed out, a sign-in that went round in circles)
@@ -177,8 +164,12 @@
       body.classList.remove('is-loaded'); // "Opening…" again until the tool is back
       frame.src = 'about:blank'; // through a blank page, so the launch starts over rather than the browser answering from what it had
       setTimeout(() => { if (alive()) frame.src = url; }, 30);
-      waitOn(); // (the second try gets the same five seconds)
     });
+    // shown while a window the tool opened is out there: the bar goes dark red and says to leave it be
+    const busyBar = U.el('bcv-ext__busy', [
+      U.svg(IC.warn, { size: 20, stroke: 'currentColor', width: 2 }),
+      U.text('bcv-ext__busytext', 'Authenticating. Don’t open any new tabs or windows'),
+    ], { hidden: true });
     const head = U.el('bcv-sheet__head bcv-ext__head', [
       U.tile(icon || IC.shield, { color: 'var(--bcv-blue)', tint: 'var(--bcv-blue-soft)', size: 32, iconSize: 16 }),
       U.el('bcv-sheet__titles', [U.text('bcv-sheet__title', title), note ? U.text('bcv-sheet__note', note) : null]), // (the bar carries the tool's name and nothing more)
@@ -186,16 +177,15 @@
       closeBtn,
     ]);
     closeBtn.classList.add('bcv-ext__close');
-    const sheet = U.el('bcv-sheet bcv-ext', [head, body]);
+    const sheet = U.el('bcv-sheet bcv-ext', [head, busyBar, body]);
     ov.append(sheet);
     ov.addEventListener('click', (e) => { if (e.target === ov) closeOne(entry); });
     ov.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.stopPropagation(); closeOne(entry); } }); // (only the one in front has the focus, so a stack comes apart one at a time)
-    entry = { ov, onCsp, stopWaiting, restore: under ? null : (from && from.focus ? from : document.activeElement) };
+    entry = { ov, restore: under ? null : (from && from.focus ? from : document.activeElement) };
     stack.push(entry);
     entry.token = `bcv${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`;
     greet(frame, entry.token); // (the frame's own window.open is taken over from here: no tab is made at all)
     tellBackground(true); // (and where that cannot reach, the background catches the tab instead)
-    waitOn();
     document.body.append(ov);
     paintTheme(); // (the sun or the moon in this bar, named for what pressing it does)
     document.documentElement.classList.add('bcv-ext-open'); // the pins and the look switch slide into the bar, beside the X

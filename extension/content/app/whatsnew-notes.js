@@ -24,6 +24,13 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.53.0', date: '2026-09-22', notes: [
+      { kind: 'improved', title: 'Sign-ins finish first', body: 'A tool’s window runs to the end before it is brought back.', icon: P.clock },
+      { kind: 'new', title: 'It says when to wait', body: 'The bar goes red while a tool is signing in somewhere else.', icon: P.eye },
+    ] },
+    { version: '2.52.0', date: '2026-09-22', notes: [
+      { kind: 'improved', title: 'No tool is given up on', body: 'A slow one is waited for, not pushed into a tab.', icon: P.clock },
+    ] },
     { version: '2.51.0', date: '2026-09-22', notes: [
       { kind: 'improved', title: 'No tab at all', body: 'A window a tool opens is taken before the browser makes one.', icon: P.layers },
     ] },
