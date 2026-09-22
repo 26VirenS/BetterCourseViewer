@@ -11,6 +11,7 @@ import { spawn, execSync } from 'node:child_process';
 import { cpSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { afterMigration } from './harness.mjs';
 const require = createRequire(import.meta.url);
 let chromium;
 try { ({ chromium } = require('playwright')); } catch { const p = execSync('npm root -g').toString().trim(); ({ chromium } = createRequire(join(p, 'x.js'))('playwright')); }
@@ -34,6 +35,7 @@ const context = await chromium.launchPersistentContext(userDataDir, { channel: '
 try {
   let [sw] = context.serviceWorkers();
   if (!sw) sw = await context.waitForEvent('serviceworker', { timeout: 15000 });
+  await afterMigration(sw); // (the background's setup migration first, or it clears the flags written next)
   await sw.evaluate((v) => self.BCV.api.storage.local.set({ 'setup:offered': true, 'setup:done': true, 'setup:flow': 3, 'whatsnew:seen': v }), manifest.version); // the flow marker too: the background's migration clears the flags for an older flow, and may run after this
   const page = await context.newPage();
   page.on('pageerror', (e) => failures.push(`page error: ${e.message}`));

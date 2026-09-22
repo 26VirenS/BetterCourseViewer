@@ -10,6 +10,7 @@ import { mkdirSync, cpSync, readFileSync, writeFileSync, rmSync } from 'node:fs'
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
+import { TIMERS, shortenTimers, secs, reportSlow, afterMigration } from './harness.mjs';
 
 const require = createRequire(import.meta.url);
 let chromium;
@@ -23,7 +24,7 @@ try {
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const out = join(root, 'scripts', 'dev', 'out');
 mkdirSync(out, { recursive: true });
-const PORT = 8791;
+const PORT = 8792; // (its own: the smoke suite's tool site is on 8791, and the two run side by side under test-all.mjs)
 const BASE = `http://localhost:${PORT}`;
 
 // 1. temp copy of the extension whose content scripts also match localhost
@@ -33,16 +34,24 @@ const manifest = JSON.parse(readFileSync(join(extDir, 'manifest.json'), 'utf8'))
 for (const cs of manifest.content_scripts) cs.matches.push(`${BASE}/*`);
 manifest.host_permissions.push(`${BASE}/*`);
 writeFileSync(join(extDir, 'manifest.json'), JSON.stringify(manifest, null, 2));
+const timers = shortenTimers(extDir); // the product's longest waits run short in this copy (harness.mjs)
 
 // 2. mock server
 const server = spawn(process.execPath, [join(root, 'scripts', 'dev', 'mock-canvas.mjs'), String(PORT)], { stdio: 'inherit' });
 await new Promise((r) => setTimeout(r, 600));
 
 const failures = [];
-const check = (cond, label) => {
-  console.log(`${cond ? '  ✓' : '  ✗'} ${label}`);
+const startedAt = Date.now();
+let lastCheckAt = startedAt;
+const check = (cond, label) => { // a check long after the one before says so, in seconds
+  const now = Date.now();
+  const gap = now - lastCheckAt;
+  lastCheckAt = now;
+  console.log(`${cond ? '  ✓' : '  ✗'} ${label}${gap >= 1500 ? `  (+${secs(gap)})` : ''}`);
   if (!cond) failures.push(label);
 };
+console.log('harness');
+check(timers.missing.length === 0 && timers.done.length === 10, `the copy runs the product's longest timers short, the shipped values found exactly (${timers.done.length} rewritten${timers.missing.length ? `; not found: ${timers.missing.join(' | ')}` : ''})`);
 
 const userDataDir = join(tmpdir(), `bcv-phone-profile-${Date.now()}`);
 // an iPhone-sized viewport with touch; the layout switches on width (≤700px) before first paint
@@ -58,6 +67,7 @@ const context = await chromium.launchPersistentContext(userDataDir, {
 try {
   let [sw] = context.serviceWorkers();
   if (!sw) sw = await context.waitForEvent('serviceworker', { timeout: 15000 });
+  await afterMigration(sw); // (the background's setup migration first, or it clears the flags written next)
   const setSettings = (patch) => sw.evaluate(async (p) => self.BCV.settings.update(p), patch);
   // until it is done every page opens the setup; it is exercised on its own below. The flow marker goes with the flags: the
   // background's one-time migration clears them when it finds an older flow, and it may run after this.
@@ -71,6 +81,7 @@ try {
   const __goto = page.goto.bind(page);
   page.gotoRaw = __goto;
   page.goto = async (...a) => { const r = await __goto(...a); await settled(); await rolled(); return r; };
+  reportSlow(page); // any one wait of three seconds or more is named in the log
   const errors = [];
   page.on('pageerror', (e) => { errors.push(e.message); console.log('  page error:', e.message); });
   // the mock answers one calendar context with 401 on purpose (the retry path); a failed resource load is not a script error
@@ -84,7 +95,7 @@ try {
     const t = Date.now();
     while (Date.now() - t < ms) {
       if (await fn()) return true;
-      await new Promise((r) => setTimeout(r, 150));
+      await new Promise((r) => setTimeout(r, 60));
     }
     return false;
   };
@@ -656,7 +667,7 @@ try {
   const noContinueYet = (await page.$('.bcv-welcome__next:not([hidden])')) === null;
   const welcomeInfo = await page.$eval('#bcv-welcome', (e) => { const r = e.getBoundingClientRect(); const pill = e.querySelector('.bcv-welcome__away'); const p = pill?.getBoundingClientRect(); return { stage: e.dataset.stage, bg: getComputedStyle(e).backgroundColor, full: r.width === innerWidth && r.height === innerHeight, look: !!e.querySelector('.bcv-welcome__look'), pill: !!pill, fits: !!p && p.left >= 0 && p.right <= innerWidth, ring: pill ? getComputedStyle(pill.querySelector('.bcv-away__ring')).animationDuration : null, lines: ['.bcv-welcome__kicker', '.bcv-welcome__title', '.bcv-welcome__hint'].map((s) => e.querySelector(s)?.textContent) }; });
   check((await page.$('#bcv-setup')) === null && page.url() === `${BASE}/` && /^(reload|navigate)$/.test(await page.evaluate(() => performance.getEntriesByType('navigation')[0]?.type)) && welcomeInfo.stage === 'away' && welcomeInfo.bg === 'rgb(0, 0, 0)' && welcomeInfo.full && !welcomeInfo.look && welcomeInfo.pill && welcomeInfo.fits && welcomeInfo.ring === '12s' && welcomeInfo.lines.join(' | ') === 'Away Refresh | Click to cancel | Away refresh prevents errors that show up after you’ve been gone for a while' && await noOverflow(), `Open Canvas reloads the page, which comes back black with the Away Refresh pointer alone, no tour: ${JSON.stringify(welcomeInfo)}`);
-  check(noContinueYet && await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000) && Date.now() - welcomeAt >= 2200, 'Continue comes in after three seconds');
+  check(noContinueYet && await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000) && Date.now() - welcomeAt >= TIMERS.welcomeWait - 500, 'Continue comes in only after the wait (three seconds shipped)');
   await page.waitForTimeout(400);
   await page.screenshot({ path: join(out, 'phone-12-welcome.png') }); // (not shot(): the mock dial loops for ever, and shot() waits for every animation to end)
   await page.click('.bcv-welcome__next');
@@ -683,7 +694,7 @@ try {
   await page.waitForSelector('#bcv-welcome[data-stage="toolsIntro"]', { timeout: 20000 });
   const twAt = Date.now();
   check(page.url() === `${BASE}/#tools` && (await page.$eval('#bcv-welcome', (e) => getComputedStyle(e).backgroundColor)) === 'rgb(0, 0, 0)' && (await texts('.bcv-welcome__title'))[0] === 'Some helpful things' && (await texts('.bcv-welcome__hint'))[0] === 'some tools to help you do more, quickly.' && await noOverflow(), 'the first press on Tools: black, the title and the gray line under it');
-  check(await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000) && Date.now() - twAt >= 2200, 'Continue comes in after three seconds');
+  check(await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000) && Date.now() - twAt >= TIMERS.welcomeWait - 500, 'Continue comes in only after the wait (three seconds shipped)');
   await page.waitForTimeout(400);
   await page.screenshot({ path: join(out, 'phone-13-tools-welcome.png') });
   await page.click('.bcv-welcome__next');
@@ -724,4 +735,5 @@ try {
   rmSync(userDataDir, { recursive: true, force: true });
 }
 console.log(failures.length ? `\n${failures.length} check(s) failed:\n - ${failures.join('\n - ')}` : '\nAll checks passed.');
+console.log(`(${secs(Date.now() - startedAt)})`);
 process.exit(failures.length ? 1 : 0);

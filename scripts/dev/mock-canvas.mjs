@@ -2,10 +2,13 @@
 // A fake Canvas for local testing: Canvas-like HTML pages plus the REST
 // endpoints the redesigned interface reads. Dates are relative to "now" so
 // the dashboard always has something due today.
-// Usage: node scripts/dev/mock-canvas.mjs [port]
+// Usage: node scripts/dev/mock-canvas.mjs [port] [sim-port]
+//   (the second port is where a module's external link points: a site of somebody else's, which the
+//   smoke suite serves beside the mock)
 import http from 'node:http';
 
 const port = Number(process.argv[2] || process.env.PORT || 8787);
+const simPort = Number(process.argv[3] || process.env.SIM_PORT || 8791);
 const now = new Date();
 const H = 3600e3;
 const D = 24 * H;
@@ -346,7 +349,7 @@ const subQuestions = (s) => {
 const modules = {
   102: [
     { id: 'm1', name: 'Week 1: Kinematics', state: 'completed', position: 1, items: [{ id: 'i1', type: 'Page', title: 'Big picture', html_url: '/courses/102/pages/big-picture', completion_requirement: { type: 'must_view', completed: true } }, { id: 'i2', type: 'Assignment', title: 'Lab 1 report', html_url: '/courses/102/assignments/2001', content_details: { due_at: at(-7, 23, 59), points_possible: 20 }, completion_requirement: { type: 'must_submit', completed: true } }] },
-    { id: 'm2', name: 'Week 2: Forces', state: 'started', position: 2, items: [{ id: 'i3', type: 'SubHeader', title: 'Before class' }, { id: 'i4', type: 'Page', title: 'Newton’s laws', html_url: '/courses/102/pages/newtons-laws', indent: 1, completion_requirement: { type: 'must_view', completed: true } }, { id: 'i5', type: 'Assignment', title: 'W2 HW', html_url: '/courses/102/assignments/2002', indent: 1, content_details: { due_at: at(-1, 23, 59), points_possible: 15 }, completion_requirement: { type: 'must_submit', completed: false } }, { id: 'i6', type: 'ExternalUrl', title: 'PhET simulation', external_url: 'http://localhost:8791/sim', html_url: 'http://localhost:8791/sim' /* a site of somebody else's, on an origin of its own: the suite answers for it */ }] },
+    { id: 'm2', name: 'Week 2: Forces', state: 'started', position: 2, items: [{ id: 'i3', type: 'SubHeader', title: 'Before class' }, { id: 'i4', type: 'Page', title: 'Newton’s laws', html_url: '/courses/102/pages/newtons-laws', indent: 1, completion_requirement: { type: 'must_view', completed: true } }, { id: 'i5', type: 'Assignment', title: 'W2 HW', html_url: '/courses/102/assignments/2002', indent: 1, content_details: { due_at: at(-1, 23, 59), points_possible: 15 }, completion_requirement: { type: 'must_submit', completed: false } }, { id: 'i6', type: 'ExternalUrl', title: 'PhET simulation', external_url: `http://localhost:${simPort}/sim`, html_url: `http://localhost:${simPort}/sim` /* a site of somebody else's, on an origin of its own: the suite answers for it */ }] },
     { id: 'm3', name: 'Week 3: Energy', state: 'locked', position: 3, unlock_at: at(5, 8, 0), items: [] },
     // built last, due first: the one module whose course order and date order disagree
     { id: 'm4', name: 'Week 0: Orientation', state: 'completed', position: 4, items: [{ id: 'i7', type: 'Assignment', title: 'Safety quiz', html_url: '/courses/102/assignments/2001', content_details: { due_at: at(-21, 23, 59), points_possible: 5 } }] },

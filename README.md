@@ -219,6 +219,8 @@ scripts/
   chrome-manifest.py           the Chrome build's manifest: Chrome's keys alone, and every site from the start
   make-icons.mjs               regenerates the PNG icons
   dev/mock-canvas.mjs          a fake Canvas (pages + the API endpoints the app reads)
+  dev/test-all.mjs             every suite below in three lanes at once (the smoke suite's two halves, and the rest in turn); one line per suite
+  dev/harness.mjs              what the browser suites share: their copy of the extension runs the product's longest timers short
   dev/smoke-test.mjs           walks every screen in headless Chromium against the mock
   dev/phone-test.mjs           the same at an iPhone viewport: the phone layout (tab bar, sheets, course, item, quiz)
   dev/mac-window-test.mjs      the Mac app's window: the settings page over the app's bridge, This Mac first, updates, a wipe
@@ -237,10 +239,14 @@ PRIVACY.md                     the privacy policy the store listing links to
 The generated Xcode project copies the extension's top-level folders (`content/`, `lib/`, `popup/`, `options/`, `setup/`, `icons/`) into the app as folder references, so new files inside them are picked up by the next build. A **new top-level folder** is not: add it to `project.pbxproj` next to the others (the smoke test fails until every top-level entry of `extension/` is listed there), or delete `macos/` and regenerate the project.
 
 ```bash
-node scripts/dev/mock-canvas.mjs        # http://localhost:8787
-node scripts/dev/smoke-test.mjs         # screenshots in scripts/dev/out/
+node scripts/dev/test-all.mjs           # every suite, under five minutes; each suite's output in scripts/dev/out/logs/
+node scripts/dev/test-all.mjs --serial  # one suite at a time (--only smoke,phone and --skip chrome-setup narrow it)
+node scripts/dev/mock-canvas.mjs        # http://localhost:8787, to poke at by hand
+node scripts/dev/smoke-test.mjs         # the whole smoke suite on its own (--part 1 or --part 2 for one half); screenshots in scripts/dev/out/
 node scripts/dev/phone-test.mjs         # the phone layout; screenshots in scripts/dev/out/phone-*.png
 ```
+
+The runner keeps three lanes going at once: the smoke suite's two halves (the screens; the setup, the tools and getting unstuck), each on ports of its own, and the other suites one after another beside them. The suites load a copy of `extension/` in which the product's longest waits are short — the welcome's three seconds before Continue, the word-marks, the fifteen-second screen patience, the Away Refresh count, a tray island's stay, a counter's roll — so a run watches the same events in the same order without sitting through the timers (`scripts/dev/harness.mjs` holds the table; every shipped value is asserted exactly, so changing one fails the suite until the table follows). A check that comes long after the one before prints the gap (`(+4.2s)`), and any single wait of three seconds or more is named in the log, so a slow run says where its time went.
 
 ### Releasing
 
@@ -248,7 +254,7 @@ Every release, in this order:
 
 1. Bump the version in all six places: `extension/manifest.json`, `ios/project.yml`, the four `MARKETING_VERSION` lines in `macos/Simpl Courses/Simpl Courses.xcodeproj/project.pbxproj` and the two in `ios/SimplCourses.xcodeproj/project.pbxproj`. The smoke suite fails when they disagree.
 2. Add the release's **What's new** entry at the top of `extension/content/app/whatsnew-notes.js`: the version, the date, and a note per change in plain words (a kind, a title of two to four words, one short line under 90 characters; the suite holds both limits). The smoke suite fails when the newest entry is not the manifest's version, so a release cannot ship without its notes.
-3. Run the suites (`scripts/dev/*-test.mjs`), commit, push. The Package workflow tags the commit and publishes the release with the Safari and Chrome zips.
+3. Run the suites (`node scripts/dev/test-all.mjs`), commit, push. The Package workflow tags the commit and publishes the release with the Safari and Chrome zips.
 
 ## Privacy
 

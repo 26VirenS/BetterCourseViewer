@@ -8,6 +8,7 @@ import { mkdirSync, cpSync, readFileSync, writeFileSync, rmSync } from 'node:fs'
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
+import { TIMERS, shortenTimers, secs, reportSlow, afterMigration } from './harness.mjs';
 
 const require = createRequire(import.meta.url);
 let chromium;
@@ -21,24 +22,32 @@ try {
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const out = join(root, 'scripts', 'dev', 'out');
 mkdirSync(out, { recursive: true });
-const PORT = 8787;
+// The suite is two halves that share nothing but the harness: the screens (dashboard … the look
+// off and on), and the setup, the tools, getting unstuck and the extension's own pages.
+// `--part 1` or `--part 2` runs one of them — on ports of its own, so the two run side by side
+// (test-all.mjs does that); no part runs both.
+const partAt = process.argv.indexOf('--part');
+const PART = partAt >= 0 ? Number(process.argv[partAt + 1]) : 0;
+if (![0, 1, 2].includes(PART)) { console.error('usage: smoke-test.mjs [--part 1|2]'); process.exit(2); }
+const PORT = PART === 2 ? 8788 : 8787;
 const BASE = `http://localhost:${PORT}`;
 // A tool is somebody else's site, on an origin of its own. One is served here so the tab a tool
 // opens into is a real cross-origin page — which is what decides whether the bar and the tray have
 // to be put in from outside, rather than already being there as the Canvas site's own scripts.
-const SIM_PORT = 8791;
+const SIM_PORT = PART === 2 ? 8793 : 8791;
 const SIM = `http://localhost:${SIM_PORT}`;
 
 // 1. temp copy of the extension whose content scripts also match localhost
-const extDir = join(tmpdir(), `bcv-ext-${Date.now()}`);
+const extDir = join(tmpdir(), `bcv-ext-${PART}-${process.pid}`);
 cpSync(join(root, 'extension'), extDir, { recursive: true });
 const manifest = JSON.parse(readFileSync(join(extDir, 'manifest.json'), 'utf8'));
 for (const cs of manifest.content_scripts) cs.matches.push(`${BASE}/*`);
 manifest.host_permissions.push(`${BASE}/*`, `${SIM}/*`); // (a shipped build has the run of every site, or is given it a site at a time)
 writeFileSync(join(extDir, 'manifest.json'), JSON.stringify(manifest, null, 2));
+const timers = shortenTimers(extDir); // the product's longest waits run short in this copy (harness.mjs); the shipped values are checked below
 
 // 2. mock server
-const server = spawn(process.execPath, [join(root, 'scripts', 'dev', 'mock-canvas.mjs'), String(PORT)], { stdio: 'inherit' });
+const server = spawn(process.execPath, [join(root, 'scripts', 'dev', 'mock-canvas.mjs'), String(PORT), String(SIM_PORT)], { stdio: 'inherit' });
 const { createServer } = await import('node:http');
 const sim = createServer((req, res) => {
   res.writeHead(200, { 'content-type': 'text/html' });
@@ -48,14 +57,27 @@ await new Promise((r) => sim.listen(SIM_PORT, r));
 await new Promise((r) => setTimeout(r, 600));
 
 const failures = [];
+const startedAt = Date.now();
+let lastCheckAt = startedAt;
+// a check that comes long after the one before says so, in seconds: where the run's time goes
 const check = (cond, label) => {
-  console.log(`${cond ? '  ✓' : '  ✗'} ${label}`);
+  const now = Date.now();
+  const gap = now - lastCheckAt;
+  lastCheckAt = now;
+  console.log(`${cond ? '  ✓' : '  ✗'} ${label}${gap >= 1500 ? `  (+${secs(gap)})` : ''}`);
   if (!cond) failures.push(label);
 };
 const shot = (page, name) => page.screenshot({ path: join(out, `${name}.png`) });
 
-// 3. the native projects ship every top-level entry of extension/ and carry the same version
+// the copy this suite loads runs the product's longest timers short; every shipped value it rewrites
+// has to be there, exactly, or a timer changed under the suite without the table in harness.mjs
 {
+  console.log('\nharness');
+  check(timers.missing.length === 0 && timers.done.length === 10, `the copy runs the welcome's wait, the word-marks, the screen patience, the Away Refresh count, the island, the counter roll and the grade poll short, the shipped values found exactly (${timers.done.length} rewritten${timers.missing.length ? `; not found: ${timers.missing.join(' | ')}` : ''})`);
+}
+
+// 3. the native projects ship every top-level entry of extension/ and carry the same version
+if (PART !== 2) {
   const { readdirSync } = await import('node:fs');
   const pbx = readFileSync(join(root, 'macos', 'Simpl Courses', 'Simpl Courses.xcodeproj', 'project.pbxproj'), 'utf8');
   const iosYml = readFileSync(join(root, 'ios', 'project.yml'), 'utf8');
@@ -71,7 +93,7 @@ const shot = (page, name) => page.screenshot({ path: join(out, `${name}.png`) })
 // page after an update shows them, so a version without an entry is a version with nothing to say
 const cmpVer = (a, b) => { const x = String(a).split('.').map(Number); const y = String(b).split('.').map(Number); for (let i = 0; i < Math.max(x.length, y.length); i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d; } return 0; };
 const whatsNew = new Function('self', `${readFileSync(join(extDir, 'content', 'app', 'whatsnew-notes.js'), 'utf8')}; return self.BCV_WHATS_NEW;`)({});
-{
+if (PART !== 2) {
   console.log("\nwhat's new notes");
   const newest = whatsNew[0];
   check(!!newest && newest.version === manifest.version, `the newest What's New entry is this version (${manifest.version}): ${newest?.version}`);
@@ -81,7 +103,7 @@ const whatsNew = new Function('self', `${readFileSync(join(extDir, 'content', 'a
   check(whatsNew.every((v, i) => i === 0 || cmpVer(whatsNew[i - 1].version, v.version) > 0), 'the entries are newest first, no version twice');
 }
 
-const userDataDir = join(tmpdir(), `bcv-profile-${Date.now()}`);
+const userDataDir = join(tmpdir(), `bcv-profile-${PART}-${process.pid}`);
 const context = await chromium.launchPersistentContext(userDataDir, {
   channel: 'chromium',
   headless: true,
@@ -92,6 +114,7 @@ let page; // hoisted so a crash can say what the page was doing
 try {
   let [sw] = context.serviceWorkers();
   if (!sw) sw = await context.waitForEvent('serviceworker', { timeout: 15000 });
+  await afterMigration(sw); // (the background's setup migration first: it clears the flags written below when it runs late)
   const extId = new URL(sw.url()).host;
   console.log('extension id', extId);
   const setSettings = (patch) => sw.evaluate(async (p) => self.BCV.settings.update(p), patch);
@@ -128,6 +151,7 @@ try {
   // …and no counter is still rolling to its value (mockup 11 entry motion, under a second)
   const rolled = () => page.waitForFunction(() => !document.querySelector('[data-rolling]'), null, { timeout: 5000 }).catch(() => {});
   page.goto = async (...a) => { const r = await __goto(...a); await page.waitForFunction(() => { const c = document.documentElement.classList; return !c.contains('bcv-on') || c.contains('bcv-settled'); }, null, { timeout: 20000 }).catch(() => {}); await rolled(); return r; };
+  reportSlow(page); // any one wait of three seconds or more is named in the log
   page.on('pageerror', (e) => console.log('  page error:', e.message));
   page.on('console', (m) => { if (m.type() === 'error') console.log('  console:', m.text()); });
   const texts = (sel) => page.$$eval(sel, (els) => els.map((e) => (e.innerText || e.textContent).replace(/\s+/g, ' ').trim()));
@@ -147,12 +171,34 @@ try {
     const t = Date.now();
     while (Date.now() - t < ms) {
       if (await fn()) return true;
-      await new Promise((r) => setTimeout(r, 150));
+      await new Promise((r) => setTimeout(r, 60));
     }
     return false;
   };
   const nav = (id) => clickScreen(`.bcv-nav__item[data-nav="${id}"]`);
+  // the mock's answers read straight (its while(1); prefix off), and the site's preferences as the extension keeps them
+  const apiGet = (p) => fetch(`${BASE}${p}`).then((r) => r.text()).then((t) => JSON.parse(t.replace(/^while\(1\);/, '')));
+  const prefsOf = async () => { const all = await sw.evaluate(() => self.BCV.api.storage.local.get(null)); return all[`prefs:localhost:${PORT}`] || {}; };
+  // the mock's own switches (a calendar context that fails, a session that has ended…), from the extension's side
+  const mockConfig = (cfg) => sw.evaluate(async ([base, c]) => (await fetch(`${base}/__mock/config`, { method: 'POST', body: JSON.stringify(c) })).ok, [BASE, cfg]);
+  // the bar over a tool's own tab lives in a shadow root of its own, so the tool's styling cannot
+  // reach it — and it is read here the same way, through the host element
+  const barState = (p2) => p2.evaluate(() => document.querySelector('bcv-tool-bar')?.dataset.state || '');
+  const barRead = (p2) => p2.evaluate(() => {
+    const r = document.querySelector('bcv-tool-bar')?.shadowRoot;
+    if (!r) return null;
+    const auth = r.querySelector('.auth');
+    return {
+      title: r.querySelector('.title')?.textContent || '', note: r.querySelector('.note')?.textContent || '',
+      acts: [...r.querySelectorAll('.acts .btn')].map((b) => b.textContent.trim()).filter(Boolean).join(','),
+      x: !!r.querySelector('.x'), top: r.querySelector('.bar')?.getBoundingClientRect().top,
+      head: getComputedStyle(r.querySelector('.bar')).backgroundColor,
+      authOn: getComputedStyle(auth).display !== 'none', says: auth.textContent.trim(), authBg: getComputedStyle(auth).backgroundColor,
+      pushed: document.documentElement.style.marginTop,
+    };
+  }).catch(() => null);
 
+  if (PART !== 2) { // ================= part 1: the screens =================
   // ---- dashboard --------------------------------------------------------------------
   console.log('dashboard');
   await page.goto(`${BASE}/`);
@@ -213,20 +259,6 @@ try {
   // styling cannot reach it — and it is read here the same way, through the host element.
   const toolPage = await context.waitForEvent('page', { timeout: 20000 });
   await toolPage.waitForLoadState('domcontentloaded');
-  const barState = (p2) => p2.evaluate(() => document.querySelector('bcv-tool-bar')?.dataset.state || '');
-  const barRead = (p2) => p2.evaluate(() => {
-    const r = document.querySelector('bcv-tool-bar')?.shadowRoot;
-    if (!r) return null;
-    const auth = r.querySelector('.auth');
-    return {
-      title: r.querySelector('.title')?.textContent || '', note: r.querySelector('.note')?.textContent || '',
-      acts: [...r.querySelectorAll('.acts .btn')].map((b) => b.textContent.trim()).filter(Boolean).join(','),
-      x: !!r.querySelector('.x'), top: r.querySelector('.bar')?.getBoundingClientRect().top,
-      head: getComputedStyle(r.querySelector('.bar')).backgroundColor,
-      authOn: getComputedStyle(auth).display !== 'none', says: auth.textContent.trim(), authBg: getComputedStyle(auth).backgroundColor,
-      pushed: document.documentElement.style.marginTop,
-    };
-  }).catch(() => null);
   await eventually(async () => !!(await barRead(toolPage)), 20000);
   const acct = await barRead(toolPage);
   check(toolPage.url() === `${BASE}/accounts/1/external_tools/77?launch_type=global_navigation&display=borderless&bcv=tool`
@@ -482,7 +514,7 @@ try {
   await shot(page, '02b-course-colour');
   await page.click('.bcv-swatch[data-color="#1770AB"]');
   await page.waitForFunction(() => getComputedStyle(document.querySelector('.bcv-ccard__hero')).backgroundColor === 'rgb(23, 112, 171)' && getComputedStyle(document.querySelector('.bcv-fav__dot')).backgroundColor === 'rgb(23, 112, 171)', null, { timeout: 5000 });
-  check(await eventually(() => sw.evaluate(async () => (await (await fetch('http://localhost:8787/api/v1/users/self/colors')).text()).includes('"course_101":"#1770AB"'))), 'picking a colour recolours the card and the sidebar at once and saves it to Canvas');
+  check(await eventually(() => sw.evaluate(async (base) => (await (await fetch(`${base}/api/v1/users/self/colors`)).text()).includes('"course_101":"#1770AB"'), BASE)), 'picking a colour recolours the card and the sidebar at once and saves it to Canvas');
   await page.click('.bcv-seg__btn[data-value="activity"]');
   await page.waitForSelector('.bcv-act__title', { timeout: 5000 });
   const acts = await texts('.bcv-act__kind');
@@ -490,7 +522,7 @@ try {
   const dots = () => page.$$eval('.bcv-act__dot', (els) => els.filter((e) => getComputedStyle(e).backgroundColor === 'rgb(10, 132, 255)').length);
   check((await dots()) === 3, `unread dots: ${await dots()} (the announcement read a moment ago has none)`);
   await shot(page, '03-dashboard-activity');
-  check(await sw.evaluate(async () => (await fetch('http://localhost:8787/dashboard/view').then((r) => r.text())).includes('activity')), 'dashboard view persisted to Canvas');
+  check(await sw.evaluate(async (base) => (await fetch(`${base}/dashboard/view`).then((r) => r.text())).includes('activity'), BASE), 'dashboard view persisted to Canvas');
   // an activity row previews too; reading it there counts as opening it, so its dot clears
   await (await page.$$('.bcv-body .bcv-row--top'))[1].click();
   await page.waitForFunction(() => document.querySelector('.bcv-pv') && !document.querySelector('.bcv-pv .bcv-skel'), null, { timeout: 10000 });
@@ -584,7 +616,7 @@ try {
   await page.waitForFunction(() => document.querySelectorAll('.bcv-ccard').length === 6, null, { timeout: 5000 });
   check(true, 'starring a course adds it to the dashboard (favourites API)');
   await page.waitForFunction(() => document.querySelectorAll('.bcv-fav').length === 6, null, { timeout: 5000 });
-  check(await eventually(() => sw.evaluate(async () => (await (await fetch('http://localhost:8787/api/v1/courses')).text()).includes('"is_favorite":true'))), 'the card moved at once; the favourite is saved to Canvas in the background');
+  check(await eventually(() => sw.evaluate(async (base) => (await (await fetch(`${base}/api/v1/courses`)).text()).includes('"is_favorite":true'), BASE)), 'the card moved at once; the favourite is saved to Canvas in the background');
   await (await page.$$('.bcv-ccard .bcv-ccard__star'))[5].click();
   await page.waitForFunction(() => document.querySelectorAll('.bcv-ccard').length === 5, null, { timeout: 5000 });
 
@@ -643,7 +675,7 @@ try {
   check(notes.length === 1 && notes[0].title === 'Email Prof. Lei about office hours' && /T\d\d:\d\d/.test(notes[0].todo_date) && !('priority' in notes[0]), `the task is a Canvas planner note with today as its todo_date, and no priority ever reaches Canvas: ${JSON.stringify(notes[0])}`);
   check(/My task/.test(noteText) && /High/.test(noteText) && /11:59 PM|Today/.test(noteText) && (await noteRow.locator('.bcv-todo__del').count()) === 1 && (await page.$$('.bcv-todo__del')).length === 1 && !(await noteRow.locator('.bcv-btn--xs').count()), `the row: My task, High, due today, the only row with a delete button and no Submit: ${noteText}`);
   const subAfter = (await texts('.bcv-head__sub'))[0];
-  await page.waitForFunction((n) => Number(document.querySelector('.bcv-nav__item[data-nav="todo"] .bcv-nav__count').textContent) === n + 1, badgeBefore, { timeout: 5000 });
+  await page.waitForFunction((n) => Number(document.querySelector('.bcv-nav__item[data-nav="todo"] .bcv-nav__count').textContent) === n + 1, badgeBefore, { timeout: 10000 }); // (the badge is asked of Canvas again, through the gate)
   const subM = subBefore.match(/^(\d+) items across (\d+) courses$/);
   check(!!subM && subAfter === `${Number(subM[1]) + 1} items across ${subM[2]} courses · one of your own`, `the header counts the task but not as a course, and the badge follows the same list: ${subBefore} → ${subAfter}`);
   // a Canvas assignment gets a priority too; it survives a reload, keyed by the item's id
@@ -663,12 +695,14 @@ try {
   const tabB = await context.newPage();
   await tabB.goto(`${BASE}/`);
   await tabB.waitForSelector('.bcv-stat', { timeout: 15000 }); // tab B has read the preferences by now
+  await page.bringToFront(); // (a tab behind another answers a click seconds late: its frames are throttled)
   const secondWork = page.locator('.bcv-row', { hasNot: page.locator('.bcv-todo__del') }).filter({ has: page.locator('.bcv-pri') }).nth(1);
   const secondId = await secondWork.getAttribute('data-item');
   await secondWork.locator('.bcv-pri').click();
   await page.waitForSelector('.bcv-menu', { timeout: 3000 });
   await page.click('.bcv-menu__item:nth-child(1)'); // High, set in tab A after tab B loaded
   await page.waitForFunction((id) => document.querySelector(`.bcv-row[data-item="${id}"] .bcv-pri`)?.textContent.trim() === 'High', secondId, { timeout: 5000 });
+  await tabB.bringToFront();
   await tabB.click('.bcv-nav__item[data-nav="todo"]');
   await tabB.waitForSelector('.bcv-todo__done', { timeout: 15000 });
   await tabB.click('.bcv-todo__done'); // tab B writes a preference of its own (show completed)
@@ -677,7 +711,9 @@ try {
   check(priAfterB?.todoPriority?.[workId] === 1 && priAfterB?.todoPriority?.[secondId] === 3 && priAfterB?.todoShowDone === true, `a preference written in another tab keeps the priorities set here (both tabs' changes are in storage): ${JSON.stringify(priAfterB?.todoPriority)}, showDone ${priAfterB?.todoShowDone}`);
   await tabB.click('.bcv-todo__done'); // and back, so the later checks start from hidden
   await tabB.waitForFunction(() => !document.querySelector('.bcv-body .bcv-row--done'), null, { timeout: 5000 });
+  await eventually(async () => (await sw.evaluate(async () => Object.entries(await chrome.storage.local.get(null)).find(([k]) => k.startsWith('prefs:'))?.[1]?.todoShowDone)) === false); // (the write has landed before the tab goes: a tab closed on a pending write loses it)
   await tabB.close();
+  await page.bringToFront();
   await page.reload();
   await page.waitForSelector('.bcv-row[data-item] .bcv-pri', { timeout: 10000 });
   check((await page.$eval(`.bcv-row[data-item="${secondId}"] .bcv-pri`, (e) => e.textContent.trim())) === 'High' && (await page.$eval(`.bcv-row[data-item="${workId}"] .bcv-pri`, (e) => e.textContent.trim())) === 'Low', 'and both priorities are still on the rows after a reload');
@@ -790,7 +826,6 @@ try {
   await page.waitForTimeout(300);
   check((await texts('.bcv-mini__range-label'))[0].includes(' – '), `picked range: ${(await texts('.bcv-mini__range-label'))[0]}`);
   // the calendar API failing outright: planner items fill in, with a note
-  const mockConfig = (cfg) => sw.evaluate(async (c) => (await fetch('http://localhost:8787/__mock/config', { method: 'POST', body: JSON.stringify(c) })).ok, cfg);
   await mockConfig({ calendarFail: true });
   await page.click('.bcv-seg__btn[data-value="month"]');
   // The month either side is already warmed and answers from the memo, so the first Next says
@@ -844,7 +879,7 @@ try {
   const gLines = () => page.$$eval('#bcv-welcome .bcv-welcome__kicker, #bcv-welcome .bcv-welcome__title, #bcv-welcome .bcv-welcome__hint', (els) => els.map((e) => e.textContent));
   const hoverDemo = await page.$eval('#bcv-welcome', (e) => ({ card: !!e.querySelector('.bcv-welcome__gcard'), rings: e.querySelectorAll('.bcv-welcome__gcat').length, cursor: !!e.querySelector('.bcv-welcome__cursor--hover'), anim: getComputedStyle(e.querySelector('.bcv-welcome__gcat')).animationName, loops: getComputedStyle(e.querySelector('.bcv-welcome__gcat')).animationIterationCount, groups: [...e.querySelectorAll('.bcv-welcome__gtxt')].map((x) => x.textContent).join(','), black: getComputedStyle(e).backgroundColor }));
   check(gwNoCont && (await gLines()).join(' | ') === 'Grades | Hover over a card to see a quick breakdown | The ring opens into the groups behind the grade; leave it and it folds back.' && hoverDemo.black === 'rgb(0, 0, 0)' && hoverDemo.card && hoverDemo.rings === 3 && hoverDemo.cursor && hoverDemo.anim === 'bcv-welcome-hovercat' && hoverDemo.loops === 'infinite' && hoverDemo.groups === 'Homework,Quizzes,Midterms', `the first opening of Grades: black, a card whose ring is hovered for its breakdown, round and round (${JSON.stringify(hoverDemo)})`);
-  check(await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000) && Date.now() - gwAt >= 2200, 'Continue comes in after three seconds');
+  check(await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000) && Date.now() - gwAt >= TIMERS.welcomeWait - 500, 'Continue comes in only after the wait (three seconds shipped)');
   await page.waitForTimeout(400);
   await shot(page, '09c0-grades-welcome-hover');
   await page.click('.bcv-welcome__next');
@@ -852,7 +887,7 @@ try {
   const wfDemo = await page.$eval('#bcv-welcome', (e) => ({ sheet: !!e.querySelector('.bcv-welcome__wsheet'), btn: e.querySelector('.bcv-welcome__wbtn .bcv-welcome__wval--real')?.textContent, rows: e.querySelectorAll('.bcv-welcome__wrow').length, banner: e.querySelector('.bcv-welcome__wbanner')?.textContent, cursor: !!e.querySelector('.bcv-welcome__cursor--whatif'), anim: getComputedStyle(e.querySelector('.bcv-welcome__wbtn')).animationName }));
   check((await gLines()).join(' | ') === 'Grades | What if? Grades | Open a course’s Details, press “Try what-if scores” and change any score to see where the grade would land. Nothing is saved.' && wfDemo.sheet && wfDemo.btn === 'Try what-if scores' && wfDemo.rows === 3 && wfDemo.banner === 'This is not your actual score.' && wfDemo.cursor && wfDemo.anim === 'bcv-welcome-wfbtn', `then what-if scores, shown: a Details sheet, the button pressed, a score changed and the total going red with it (${JSON.stringify(wfDemo)})`);
   await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000);
-  await page.waitForTimeout(1800);
+  await page.waitForTimeout(700); // (the show a little way in, for the picture)
   await shot(page, '09c1-grades-welcome-whatif');
   await page.click('.bcv-welcome__next');
   await page.waitForFunction(() => !document.querySelector('#bcv-welcome'), null, { timeout: 5000 });
@@ -871,7 +906,7 @@ try {
   // a course saved as pass/fail (the setup's switch, P/F in place of a letter): its card says so, its score still shows, and the GPA leaves it out
   const pfCourse = await page.$eval('.bcv-gpa__card', (e) => e.dataset.course);
   const gpaBefore = (await texts('.bcv-gpa__value'))[0];
-  const setTarget = (id, v) => sw.evaluate(async ([id, v]) => { const k = 'prefs:localhost:8787'; const all = await self.BCV.api.storage.local.get(k); const p = all[k] || {}; p.gradeTargets = { ...(p.gradeTargets || {}) }; if (v) p.gradeTargets[id] = v; else delete p.gradeTargets[id]; await self.BCV.api.storage.local.set({ [k]: p }); }, [id, v]);
+  const setTarget = (id, v) => sw.evaluate(async ([id, v, port]) => { const k = `prefs:localhost:${port}`; const all = await self.BCV.api.storage.local.get(k); const p = all[k] || {}; p.gradeTargets = { ...(p.gradeTargets || {}) }; if (v) p.gradeTargets[id] = v; else delete p.gradeTargets[id]; await self.BCV.api.storage.local.set({ [k]: p }); }, [id, v, PORT]);
   await setTarget(pfCourse, 'P/F');
   await page.reload();
   await page.waitForSelector('.bcv-gpa__value', { timeout: 15000 });
@@ -889,6 +924,8 @@ try {
   check(ringAtRest === 82 && ringHovered === 82, `the course ring is one size at rest and expanded (the group rings nest inside it): ${ringAtRest}px → ${ringHovered}px`);
   const hoverCard = (await texts('.bcv-gpa__card'))[0];
   check(/^by group 92\.4% .*Discussion Quizzes \d+%/i.test(hoverCard) && (await page.$$('.bcv-gpa__card.is-hover .bcv-gpa__ringsvg circle')).length >= 6 && Math.abs((await page.$eval('.bcv-gpa__card', (el) => el.getBoundingClientRect().height)) - cardHeight) < 1, `hovering the ring shows the group rings + breakdown without resizing the card: ${hoverCard}`);
+  // (the group rings' sweep in has finished before the pointer leaves: a leave mid-sweep sends an extra ring back out)
+  await page.waitForFunction(() => [...document.querySelectorAll('.bcv-gpa__card.is-hover .bcv-gpa__ringsvg')].every((s) => s.getAnimations({ subtree: true }).every((a) => a.playState === 'finished' || a.playState === 'idle')), null, { timeout: 3000 }).catch(() => {});
   await page.mouse.move(5, 5);
   await page.waitForFunction(() => !document.querySelector('.bcv-gpa__card.is-hover'), null, { timeout: 5000 });
   // leaving: the group rings sweep back out, last in first out, their tracks fading; the letter comes back once they have gone
@@ -1347,7 +1384,7 @@ try {
   const hangOpening = context.waitForEvent('page', { timeout: 20000 });
   await page.click('.bcv-rail__ext');
   const hung = await hangOpening;
-  await hung.waitForTimeout(12000); // (longer than the give-up ever was)
+  await hung.waitForTimeout(6000); // (longer than the bar's own asking — five seconds of it — and than the give-up ever was)
   const stillWaiting = { closed: hung.isClosed(), tabs: context.pages().length, here: page.url() };
   check(!stillWaiting.closed && stillWaiting.here === `${BASE}/courses/101`, `a tool that will not answer is waited for: its tab stays, nothing gives up on it, and the course page is where it was (${JSON.stringify(stillWaiting)})`);
   await hung.close();
@@ -2161,13 +2198,10 @@ try {
   await waitText('.bcv-qz__qnum', /Question 7/);
   check((await page.$eval('.bcv-textarea', (e) => e.value)) === 'Pros:\n\n• Ability to work together\n• Divide and conquer group work\n\nCons\n\n• Unreliable group mates', 'and comes back into the box as readable text, the list as bullets');
   // Canvas kept them: its own take page comes back with the same picks set
-  const kept = await sw.evaluate(async () => {
-    const html = await (await fetch('http://localhost:8787/courses/101/quizzes/9001/take')).text();
-    return (html.match(/<option value="[^"]*" selected>[^<]*<\/option>/g) || []).map((m) => m.replace(/.*selected>/, '').replace('</option>', ''));
-  });
+  const takePage = () => fetch(`${BASE}/courses/101/quizzes/9001/take`).then((r) => r.text()); // (the mock's page, read from here: no session to carry)
+  const kept = (await takePage().then((html) => html.match(/<option value="[^"]*" selected>[^<]*<\/option>/g) || [])).map((m) => m.replace(/.*selected>/, '').replace('</option>', ''));
   check(kept.length === 5 && kept.join(' | ') === 'Acceleration due to gravity | Speed of light | Gravitational constant | rate of change | position', `Canvas's own page comes back with every pick set, in its own shapes: ${kept.join(' | ')}`);
-  const inText = await sw.evaluate(async () => {
-    const html = await (await fetch('http://localhost:8787/courses/101/quizzes/9001/take')).text();
+  const inText = await takePage().then((html) => {
     const block = html.slice(html.indexOf('id="question_90016"')).split('after_answers')[0];
     const cut = block.indexOf('class="answers"');
     return { text: (block.slice(0, cut).match(/<select/g) || []).length, under: (block.slice(cut).match(/<select/g) || []).length };
@@ -2443,11 +2477,14 @@ try {
     holdFeed = false;
     await waitText('.bcv-stats > :nth-child(3) .bcv-stat__value', /^\d+$/);
     check(true, 'and that counter fills in when the feed lands');
-    await page.waitForTimeout(2500); // the page went idle: the other screens' first requests are made now
+    // the page went idle: the other screens' first requests are made now — waited for, then a moment more for the rest of the wave
+    const warmedNow = () => api.filter((u) => /\/api\/v1\/conversations$|\/api\/v1\/courses\/\d+\/assignment_groups$/.test(u));
+    await eventually(() => warmedNow().some((u) => /conversations$/.test(u)) && warmedNow().some((u) => /assignment_groups$/.test(u)), 4000);
+    await page.waitForTimeout(500);
     // the Dashboard itself never asks for the inbox or for assignment groups: those are the Inbox's
     // and the Grades' first requests, made in the background (the timing is not pinned — the
     // warming starts the moment the screen settles, before the harness can look)
-    const warmed = api.filter((u) => /\/api\/v1\/conversations$|\/api\/v1\/courses\/\d+\/assignment_groups$/.test(u));
+    const warmed = warmedNow();
     const has = (re) => warmed.some((u) => re.test(u));
     check(has(/\/api\/v1\/conversations$/) && has(/\/assignment_groups$/), `once it settled, the Inbox and the Grades asked for their data without a press (${warmed.length} such requests, ${api.length} in all)`);
     check(peak <= 10 && peak >= 5, `never more than ten requests in flight, however many were asked for at once (peak ${peak})`);
@@ -2463,7 +2500,8 @@ try {
     // inside a course, hovering a tab's rail row starts its data; the press then lands from the memo
     await page.click('.bcv-fav');
     await page.waitForSelector('.bcv-rail [data-tab="quizzes"]', { timeout: 10000 });
-    await page.waitForTimeout(2500); // every other tab warms on idle; quizzes among them
+    await eventually(() => api.some((u) => /\/api\/v1\/courses\/\d+\/quizzes(\?|$)/.test(u)), 4000); // every other tab warms on idle; quizzes among them
+    await page.waitForTimeout(600); // (the rest of the wave)
     const beforeTab = api.length;
     await tab('quizzes');
     check(api.length === beforeTab && (await page.$$('.bcv-body .bcv-row')).length > 0, `a course tab warmed on idle opens with no request (${api.length - beforeTab} made)`);
@@ -2517,7 +2555,7 @@ try {
   }));
   check(workAnim.bars.slice(0, 2).join(',') === 'bcv-grow@0.14s,bcv-grow@0.23s' && workAnim.rows.slice(0, 2).join(',') === 'bcv-fade-up@0.09s,bcv-fade-up@0.16s' && /^0px/.test(workAnim.origin), `workload bars wipe from the left 90ms apart, rows float in 70ms apart: ${JSON.stringify(workAnim)}`);
   const dueNow = (await texts('.bcv-stat__value'))[0]; // the real count at this point of the run (items were ticked earlier)
-  await page.gotoRaw(`${BASE}/`); // raw: the roll itself is what is being checked
+  await page.gotoRaw(`${BASE}/`, { waitUntil: 'commit' }); // raw, and from the first byte: the roll itself is what is being checked, and it is short
   await page.waitForSelector('.bcv-stat__value[data-rolling]', { timeout: 10000 });
   const midRoll = await page.evaluate(() => [...document.querySelectorAll('.bcv-stat__value')].map((e) => e.textContent));
   await page.waitForFunction(() => !document.querySelector('[data-rolling]'), null, { timeout: 5000 });
@@ -2702,7 +2740,7 @@ try {
   await page.waitForSelector('#application', { timeout: 10000 });
   await setSettings({ appearance: { skin: true } });
   await page.waitForSelector('.bcv-detail__title', { timeout: 20000 });
-  await sw.evaluate(async () => (await fetch('http://localhost:8787/__mock/reopen-quiz', { method: 'POST', body: JSON.stringify({ quizId: '9001' }) })).ok);
+  await sw.evaluate(async (base) => (await fetch(`${base}/__mock/reopen-quiz`, { method: 'POST', body: JSON.stringify({ quizId: '9001' }) })).ok, BASE);
   await sw.evaluate(async (base) => {
     const [tab] = await chrome.tabs.query({ url: `${base}/*` });
     await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'ISOLATED', func: () => { self.BCV.app.state.quizOpen = true; } });
@@ -2715,25 +2753,26 @@ try {
   await page.waitForSelector('#application', { timeout: 10000 });
   await setSettings({ appearance: { skin: true } });
   await page.waitForSelector('#bcv-app .bcv-nav__item', { timeout: 10000 });
+  } // ================= end of part 1 =================
 
+  if (PART !== 1) { // ================= part 2: the setup, the tools, getting unstuck =================
   // ---- guided setup + the welcome --------------------------------------------------------------------------
   console.log('guided setup');
-  const apiGet = (p) => fetch(`${BASE}${p}`).then((r) => r.text()).then((t) => JSON.parse(t.replace(/^while\(1\);/, '')));
-  const prefsOf = async () => { const all = await sw.evaluate(() => self.BCV.api.storage.local.get(null)); return all['prefs:localhost:8787'] || {}; };
   const su = (sel) => `#bcv-setup ${sel}`; // the setup's card lives in a shadow root under #bcv-setup
   const sStep = () => page.$eval(su('#stepLabel'), (e) => e.textContent.trim()).catch(() => '');
   const sNext = async (waitFor) => { await page.click(su('#next')); await page.waitForSelector(su(waitFor), { timeout: 15000 }); await page.waitForTimeout(450); };
   // a fresh student: the Grades checks above left a goal and a record behind
-  await sw.evaluate(async () => { const k = 'prefs:localhost:8787'; const all = await self.BCV.api.storage.local.get(k); const p = all[k] || {}; for (const key of ['gpaGoal', 'gpaTracking', 'gradeTargets', 'setupDone', 'tour']) delete p[key]; await self.BCV.api.storage.local.set({ [k]: p }); await self.BCV.api.storage.local.remove(['setup:done', 'welcome:pending']); });
+  await sw.evaluate(async (port) => { const k = `prefs:localhost:${port}`; const all = await self.BCV.api.storage.local.get(k); const p = all[k] || {}; for (const key of ['gpaGoal', 'gpaTracking', 'gradeTargets', 'setupDone', 'tour']) delete p[key]; await self.BCV.api.storage.local.set({ [k]: p }); await self.BCV.api.storage.local.remove(['setup:done', 'welcome:pending']); }, PORT);
   await page.goto(`${BASE}/?bcv=setup`);
   await page.waitForSelector(su('.row'), { timeout: 20000 });
-  await page.waitForTimeout(500);
-  // the word-mark plays first (about two seconds), then the setup rises under it
-  check(page.url() === `${BASE}/` && (await page.$('.bcv-stat')) !== null && (await page.$(su('.intro'))) !== null && (await page.$$(su('.rail__item'))).length === 5 && (await sStep()) === '1 of 5' && (await page.$eval('html', (e) => getComputedStyle(e).overflow)) === 'hidden', 'the setup opens over the dashboard on its own ground: the address cleaned, a word-mark, a rail of five steps, the page held still');
   // the dot after "Simpl" sits where the word ends in this system's font (here a Windows-like one,
-  // wider than the Mac's: drawn at the design's fixed place it would land on the l)
+  // wider than the Mac's: drawn at the design's fixed place it would land on the l) — read while the
+  // word-mark is still up (it is short here: harness.mjs)
   const dotOf = (hostSel) => page.evaluate((sel) => { const r = document.querySelector(sel).shadowRoot; const t = r.querySelector('.intro text'); const d = r.querySelector('.intro__dot'); const b = t.getBBox(); const vb = r.querySelector('.intro svg').getAttribute('viewBox').split(' ').map(Number); return { gap: Math.round(Number(d.getAttribute('cx')) - (b.x + b.width)), end: Math.round(b.x + b.width), cx: Number(d.getAttribute('cx')), fits: vb[2] >= Number(d.getAttribute('cx')) + 9 }; }, hostSel);
   const setupDot = await dotOf('#bcv-setup');
+  const introUp = (await page.$(su('.intro:not([hidden])'))) !== null;
+  // the word-mark plays first (about two seconds), then the setup rises under it
+  check(page.url() === `${BASE}/` && (await page.$('.bcv-stat')) !== null && introUp && (await page.$$(su('.rail__item'))).length === 5 && (await sStep()) === '1 of 5' && (await page.$eval('html', (e) => getComputedStyle(e).overflow)) === 'hidden', 'the setup opens over the dashboard on its own ground: the address cleaned, a word-mark, a rail of five steps, the page held still');
   check(setupDot.gap >= 10 && setupDot.gap <= 18 && setupDot.fits, `the dot after Simpl sits just past the word as drawn here, inside the drawing: ${JSON.stringify(setupDot)}`);
   await page.waitForFunction(() => document.querySelector('#bcv-setup')?.shadowRoot.querySelector('.intro')?.hidden === true, null, { timeout: 8000 });
   await page.waitForTimeout(500);
@@ -2880,7 +2919,7 @@ try {
   const LOOK_LINES = 'There’s a new Simpl switch. | Hover it: three buttons float down | Green: Activate — Simpl on, and active on this page Gray: Deactivate — stock Canvas on this page, Simpl still on Red: Turn off Simpl — off on every page until you turn it back on';
   check(s0.top === 10 && s0.rightGap === 12 && s0.cursor && !s0.arrow && (await stageLines()) === LOOK_LINES && (await page.$$eval('.bcv-welcome__stoprow', (els) => els.map((e) => { const sw = e.querySelector('.bcv-welcome__stopsw'); return `${sw.dataset.stop}:${sw.querySelector('.bcv-look__optlbl').textContent}:${Math.round(sw.getBoundingClientRect().width) === 24 && getComputedStyle(sw).backgroundColor !== 'rgba(0, 0, 0, 0)'}:${e.querySelector('b').textContent}`; }))).join(' ') === '1:Activate:true:Green: 0:Deactivate:true:Gray: -1:Turn off Simpl:true:Red:', `stage one shows a copy of the switch at the top right, a pointer, and the lines: a grey one above, the white one, and one per button, each with the button itself — the round disc in its colour — before it (${JSON.stringify(s0)} | ${await stageLines()})`);
   check(await eventually(async () => { const st = await showAt(); return st.open && st.cursorShown === '1' && st.menu === 'visible'; }, 3000), 'the pointer comes to the disc and the three buttons float down');
-  check(noContinueYet && await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000) && Date.now() - welcomeAt >= 2200 && (await texts('.bcv-welcome__next'))[0] === 'Continue', 'Continue is not there at first, and comes in after three seconds');
+  check(noContinueYet && await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000) && Date.now() - welcomeAt >= TIMERS.welcomeWait - 500 && (await texts('.bcv-welcome__next'))[0] === 'Continue', 'Continue is not there at first, and comes in only after the wait (three seconds shipped)');
   check(await eventually(async () => { const st = await showAt(); return st.hover === '0' && /^Deactivate/.test(st.hoverWords || ''); }, 5000) && (await stageLines()) === LOOK_LINES, 'the pointer comes to the grey one and it opens out to the left: Deactivate — and the lines hold still');
   check(await eventually(async () => (await showAt()).pos === '0', 5000), 'pressed: Deactivated');
   check(await eventually(async () => (await showAt()).pos === '-1', 7000), 'then the red one, Turn off Simpl, pressed: Simpl is off');
@@ -2895,7 +2934,7 @@ try {
   const awayCopy = await page.$eval('.bcv-welcome__away', (e) => { const r = e.getBoundingClientRect(); return { top: Math.round(r.top), centred: Math.abs((r.left + r.right) / 2 - innerWidth / 2) < 2, title: e.querySelector('.bcv-away__title').textContent, hint: e.querySelector('.bcv-away__hint').textContent, ring: getComputedStyle(e.querySelector('.bcv-away__ring')).animationDuration, hand: getComputedStyle(e.querySelector('.bcv-away__hand')).animationDuration, loops: getComputedStyle(e.querySelector('.bcv-away__ring')).animationIterationCount }; }).catch(() => null);
   check((await welcomeBox()).bg === 'rgb(0, 0, 0)' && !!awayCopy && awayCopy.top === 10 && awayCopy.centred && awayCopy.title === 'Away Refresh' && awayCopy.hint === 'Click to cancel' && awayCopy.ring === '12s' && awayCopy.hand === '12s' && awayCopy.loops === 'infinite' && (await page.$('#bcv-away')) === null, `stage two: the switch and its words are gone, the screen is still black, and a mock Away Refresh pill counts down in slow motion at the top (${JSON.stringify(awayCopy)})`);
   check((await welcomeLines()).join(' | ') === 'Away Refresh | Click to cancel | Away refresh prevents errors that show up after you’ve been gone for a while' && (await page.$eval('.bcv-welcome__stage[data-stage="away"] .bcv-welcome__arrow', (e) => e.getBoundingClientRect().height >= 120)), `an arrow up at the pill and the three lines (${(await welcomeLines()).join(' | ')})`);
-  check(noContinueYet2 && await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000) && Date.now() - awayAt >= 2200, 'Continue comes in after three seconds here too');
+  check(noContinueYet2 && await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000) && Date.now() - awayAt >= TIMERS.welcomeWait - 500, 'Continue comes in only after the wait here too');
   await page.waitForTimeout(400);
   await shot(page, '31b-welcome-away');
   await page.keyboard.press('Enter'); // Enter is Continue too
@@ -2933,8 +2972,8 @@ try {
   const noContinueYet3 = (await page.$('.bcv-welcome__next:not([hidden])')) === null;
   const peek = await page.$eval('#bcv-welcome', (e) => ({ stats: e.querySelectorAll('.bcv-welcome__stat').length, mid: e.querySelector('.bcv-welcome__stat:nth-child(2)')?.classList.contains('bcv-welcome__stat--mid'), midLabel: e.querySelector('.bcv-welcome__stat--mid .bcv-welcome__statlabel')?.textContent, sheet: !!e.querySelector('.bcv-welcome__sheetmock'), rows: e.querySelectorAll('.bcv-welcome__row').length, pv: !!e.querySelector('.bcv-welcome__pvmock'), cursor: !!e.querySelector('.bcv-welcome__cursor--peek'), loops: getComputedStyle(e.querySelector('.bcv-welcome__sheetmock')).animationIterationCount, away: !!e.querySelector('.bcv-welcome__away') }));
   check((await welcomeBox()).bg === 'rgb(0, 0, 0)' && peek.stats === 3 && peek.mid && peek.midLabel === 'Due this week' && peek.sheet && peek.rows === 3 && peek.pv && peek.cursor && peek.loops === 'infinite' && !peek.away && (await welcomeLines()).join(' | ') === 'Dashboard | Click any of the dashboard cards to see more | Click an assignment, announcement, etc. to preview it.', `stage three: the Dashboard's way in, shown round and round — the middle counter pressed, the sheet behind it, an item previewed beside the list (${JSON.stringify(peek)})`);
-  check(noContinueYet3 && await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000) && Date.now() - peekAt >= 2200, 'Continue comes in after three seconds here too');
-  await page.waitForTimeout(1200);
+  check(noContinueYet3 && await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000) && Date.now() - peekAt >= TIMERS.welcomeWait - 500, 'Continue comes in only after the wait here too');
+  await page.waitForTimeout(600);
   await shot(page, '31c-welcome-peek');
   await page.click('.bcv-welcome__next');
   await page.waitForFunction(() => !document.querySelector('#bcv-welcome'), null, { timeout: 5000 });
@@ -3122,7 +3161,7 @@ try {
   const noContT = (await page.$('.bcv-welcome__next:not([hidden])')) === null;
   const tLines = () => page.$$eval('#bcv-welcome .bcv-welcome__kicker, #bcv-welcome .bcv-welcome__title, #bcv-welcome .bcv-welcome__hint', (els) => els.map((e) => e.textContent));
   check((await page.$eval('#bcv-welcome', (e) => getComputedStyle(e).backgroundColor)) === 'rgb(0, 0, 0)' && (await tLines()).join(' | ') === 'Some helpful things | some tools to help you do more, quickly.' && (await page.$eval('.bcv-welcome__hint', (e) => getComputedStyle(e).color)) === 'rgba(255, 255, 255, 0.68)' && (await page.$('.bcv-welcome__arrow')) === null, `the first press on Tools: black, the title and the gray line under it (${(await tLines()).join(' | ')})`);
-  check(noContT && await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000) && Date.now() - twAt >= 2200, 'Continue comes in after three seconds');
+  check(noContT && await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000) && Date.now() - twAt >= TIMERS.welcomeWait - 500, 'Continue comes in only after the wait (three seconds shipped)');
   await page.waitForTimeout(400);
   await shot(page, '36-tools-welcome');
   await page.click('.bcv-welcome__next');
@@ -3130,7 +3169,7 @@ try {
   const demo = await page.$eval('#bcv-welcome', (e) => ({ look: !!e.querySelector('.bcv-welcome__look--folded'), card: e.querySelector('.bcv-welcome__democard .bcv-tool-card__name')?.textContent, pin: !!e.querySelector('.bcv-welcome__demopin .bcv-pin__btn'), cursor: !!e.querySelector('.bcv-welcome__cursor'), anim: getComputedStyle(e.querySelector('.bcv-welcome__democard')).animationName, loops: getComputedStyle(e.querySelector('.bcv-welcome__democard')).animationIterationCount }));
   check(demo.look && demo.card === 'Focus timer' && demo.pin && demo.cursor && demo.anim === 'bcv-welcome-drag' && demo.loops === 'infinite' && (await tLines()).join(' | ') === 'Tools | Drag a tool to the top | It becomes a small button next to the Simpl Courses switch, on every page.', `then the drag is shown, round and round: a card pulled to the top turning into a pin beside the folded switch (${JSON.stringify(demo)})`);
   await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000);
-  await page.waitForTimeout(1800);
+  await page.waitForTimeout(700); // (the drag a little way in, for the picture)
   await shot(page, '36b-tools-welcome-pin');
   await page.click('.bcv-welcome__next');
   await page.waitForFunction(() => !document.querySelector('#bcv-welcome'), null, { timeout: 5000 });
@@ -3248,7 +3287,7 @@ try {
   await eventually(async () => (await page.$eval('#bcv-pins .bcv-island', (e) => e.classList.contains('is-open') && Math.round(e.getBoundingClientRect().width) === 250 && Math.round(e.getBoundingClientRect().height) === 78)), 3000);
   const island = await page.$eval('#bcv-pins .bcv-island', (e) => { const r = e.getBoundingClientRect(); return { w: Math.round(r.width), h: Math.round(r.height), time: e.querySelector('.bcv-island__time').textContent, label: e.querySelector('.bcv-island__label').textContent, main: e.querySelector('.bcv-island__main').getAttribute('aria-label'), cancel: e.querySelector('.bcv-island__cancel').getAttribute('aria-label'), sw: e.querySelector('.bcv-island__switch').textContent, swHidden: e.querySelector('.bcv-island__switch').hidden, color: getComputedStyle(e.querySelector('.bcv-island__time')).color, expanded: e.getAttribute('aria-expanded') }; });
   check(island.w === 250 && island.h === 78 && /^2[45]:\d\d$/.test(island.time) && island.label === 'Focus' && island.main === 'Pause' && island.cancel === 'End' && island.sw === 'Break' && !island.swHidden && island.color === 'rgb(255, 149, 0)' && island.expanded === 'true', `the pointer over the pin swells it into the island, no press needed: End and Pause, the phase with Break beside it, the count large in orange (${JSON.stringify(island)})`);
-  await page.waitForTimeout(7000); // (longer than the island would stay up on its own after a press)
+  await page.waitForTimeout(TIMERS.island + 1000); // (longer than the island would stay up on its own after a press)
   check(await page.$eval('#bcv-pins .bcv-island', (e) => e.classList.contains('is-open')), 'under the pointer it stays up, past the time a pressed one would have folded');
   await shot(page, '38b-tools-island');
   await page.mouse.move(400, 400);
@@ -4228,7 +4267,7 @@ try {
   await page.waitForNavigation({ timeout: 30000 }); // the reload
   const stalledFor = Date.now() - stallStart;
   const reloadMark = await page.evaluate(() => JSON.parse(sessionStorage.getItem('bcv:reloaded') || 'null'));
-  check(stalledFor >= 14000 && stalledFor <= 26000 && reloadMark && reloadMark.path === '/courses/101/quizzes', `a screen still waiting after 15s is loaded once more (after ${Math.round(stalledFor / 1000)}s), and the reload is remembered for the page: ${JSON.stringify(reloadMark)}`);
+  check(stalledFor >= TIMERS.patience - 1000 && stalledFor <= TIMERS.patience + 11000 && reloadMark && reloadMark.path === '/courses/101/quizzes', `a screen still waiting past the patience (15s shipped, ${TIMERS.patience / 1000}s here) is loaded once more (after ${(stalledFor / 1000).toFixed(1)}s), and the reload is remembered for the page: ${JSON.stringify(reloadMark)}`);
   // the hold is still on, so the fresh page stalls too: this time it is shown (Canvas's own page,
   // with the note) and not reloaded again — the reload a minute ago is remembered
   await page.waitForSelector('.bcv-toast', { timeout: 25000 });
@@ -4265,7 +4304,7 @@ try {
   await page.waitForSelector('.bcv-toast', { timeout: 20000 });
   const sessionMark = await page.evaluate(() => JSON.parse(sessionStorage.getItem('bcv:reloaded') || 'null'));
   const atNote = apiCalls.length; // the shell's first wave was already out when the first answer came; nothing may follow it
-  await page.waitForTimeout(1500);
+  await page.waitForTimeout(900);
   page.off('request', countApi);
   check(/Your Canvas session has ended\. Reload the page to continue\./.test((await texts('.bcv-toast')).join(' ')) && sessionMark?.path === '/' && apiCalls.length === atNote, `a session that has ended is noticed at the first answer: one reload, then the note, and nothing more is asked of Canvas (${apiCalls.length - atNote} requests after the note): ${(await texts('.bcv-toast')).join(' | ')}`);
   await mockConfig({ sessionLost: false });
@@ -4282,13 +4321,16 @@ try {
   }, [BASE, ms]);
   await page.evaluate(() => sessionStorage.removeItem('bcv:reloaded')); // the checks above already reloaded this path
   await windBack(0); // wide awake
-  const awakeNav = page.waitForNavigation({ timeout: 2500 }).then(() => true).catch(() => false);
+  // (a reload that is coming comes AWAY_COUNT after the press — TIMERS.awayCount here — so a wait a
+  // little longer than that is proof of none; a page that counts as awake would not start one at all)
+  const NO_RELOAD = TIMERS.awayCount + 700;
+  const awakeNav = page.waitForNavigation({ timeout: 1200 }).then(() => true).catch(() => false);
   await page.click('.bcv-stat');
   check(!(await awakeNav) && !!(await page.$('.bcv-sheet-ov')), 'a press while the page is awake does what it says, and reloads nothing');
   // with a sheet, a tool's popup or a preview open, Away Refresh stands down: nothing is reloaded out from under it, and the page counts as awake again
   const awayAge = () => sw.evaluate(async (base) => { const [tab] = await chrome.tabs.query({ url: `${base}/*` }); const [{ result }] = await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'ISOLATED', func: () => Date.now() - self.BCV.app.state.lastHere }); return result; }, BASE);
   await windBack(4 * 60 * 1000);
-  const sheetNav = page.waitForNavigation({ timeout: 2500 }).then(() => true).catch(() => false);
+  const sheetNav = page.waitForNavigation({ timeout: 1200 }).then(() => true).catch(() => false);
   await page.click('.bcv-sheet', { position: { x: 24, y: 24 } });
   await page.waitForTimeout(400);
   check(!(await sheetNav) && (await page.$('#bcv-away')) === null && !!(await page.$('.bcv-sheet-ov')) && (await awayAge()) < 60 * 1000, 'with a sheet, a popup or a preview open, Away Refresh stands down: no pill, no reload, and the page counts as awake again');
@@ -4304,7 +4346,7 @@ try {
   const pill = await page.$eval('#bcv-away', (e) => { const ring = getComputedStyle(e.querySelector('.bcv-away__ring')); const hand = getComputedStyle(e.querySelector('.bcv-away__hand')); const r = e.getBoundingClientRect(); return { title: e.querySelector('.bcv-away__title').textContent, hint: e.querySelector('.bcv-away__hint').textContent, hintDim: getComputedStyle(e.querySelector('.bcv-away__hint')).color !== getComputedStyle(e.querySelector('.bcv-away__title')).color, ring: ring.stroke, ringAnim: `${ring.animationName}@${ring.animationDuration}`, handFill: hand.fill, handAnim: `${hand.animationName}@${hand.animationDuration}`, ticks: e.querySelectorAll('.bcv-away__tick, .bcv-away__pin').length, hands: e.querySelectorAll('.bcv-away__hand').length, top: Math.round(r.top), centred: Math.abs((r.left + r.right) / 2 - window.innerWidth / 2) < 2, fixed: getComputedStyle(e).position === 'fixed' }; });
   check(pill.title === 'Away Refresh' && pill.hint === 'Click to cancel' && pill.hintDim && pill.ring === 'rgb(255, 159, 10)' && pill.ringAnim === 'bcv-away-ring@3s' && pill.handFill === 'rgb(255, 159, 10)' && pill.handAnim === 'bcv-away-sweep@3s' && pill.ticks === 0 && pill.hands === 1 && pill.fixed && pill.top >= 0 && pill.top < 40 && pill.centred && !(await page.$('.bcv-sheet-ov')), `after three minutes away the first press is swallowed and a pill floats down at the top, its dial counting three seconds down in orange: ${JSON.stringify(pill)}`);
   await shot(page, '35-away-refresh');
-  check((await awayNav) && Date.now() - pressedAt >= 2800, `and the page reloads when the count runs out, not before (${Date.now() - pressedAt} ms after the press)`);
+  check((await awayNav) && Date.now() - pressedAt >= TIMERS.awayCount - 200, `and the page reloads when the count runs out (three seconds shipped, ${TIMERS.awayCount} ms here), not before (${Date.now() - pressedAt} ms after the press)`);
   await page.waitForSelector('.bcv-stat', { timeout: 20000 });
   check((await page.evaluate(() => JSON.parse(sessionStorage.getItem('bcv:reloaded') || 'null')))?.path === '/' && !(await page.$('.bcv-sheet-ov')), 'the reload is remembered (so it cannot loop) and the press it swallowed opened nothing');
   // and coming back to the tab is enough on its own: no press has to be spent on it — the same pill, then the reload
@@ -4322,12 +4364,12 @@ try {
   // a press on the pill stands the reload down, and the page counts as awake again: the next press acts as itself
   await page.evaluate(() => sessionStorage.removeItem('bcv:reloaded'));
   await windBack(4 * 60 * 1000);
-  const cancelNav = page.waitForNavigation({ timeout: 4500 }).then(() => true).catch(() => false);
+  const cancelNav = page.waitForNavigation({ timeout: NO_RELOAD }).then(() => true).catch(() => false);
   await comeBack();
   await page.waitForSelector('#bcv-away.is-in', { timeout: 3000 });
   await page.click('#bcv-away .bcv-away__btn');
   check((await eventually(async () => !(await page.$('#bcv-away')))) && !(await cancelNav), 'Click to cancel: the pill goes and nothing reloads');
-  const afterCancelNav = page.waitForNavigation({ timeout: 2500 }).then(() => true).catch(() => false);
+  const afterCancelNav = page.waitForNavigation({ timeout: 1200 }).then(() => true).catch(() => false);
   await page.click('.bcv-stat');
   check(!(await afterCancelNav) && !!(await page.$('.bcv-sheet-ov')) && !(await page.$('#bcv-away')), 'and the press after a cancel does what it says');
   await page.click('.bcv-sheet-ov', { position: { x: 5, y: 5 } });
@@ -4338,7 +4380,7 @@ try {
   await sw.evaluate(async (base) => { const [tab] = await chrome.tabs.query({ url: `${base}/*` }); await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'ISOLATED', files: chrome.runtime.getManifest().content_scripts[1].js }); }, BASE);
   await page.evaluate(() => sessionStorage.removeItem('bcv:reloaded'));
   await windBack(4 * 60 * 1000);
-  const twiceNav = page.waitForNavigation({ timeout: 4500 }).then(() => true).catch(() => false);
+  const twiceNav = page.waitForNavigation({ timeout: NO_RELOAD }).then(() => true).catch(() => false);
   await comeBack();
   await page.waitForSelector('#bcv-away.is-in', { timeout: 3000 });
   await page.waitForTimeout(400);
@@ -4362,7 +4404,7 @@ try {
   await page.waitForSelector('.bcv-qz__begin', { timeout: 15000 });
   await page.evaluate(() => sessionStorage.removeItem('bcv:reloaded'));
   await windBack(4 * 60 * 1000);
-  const quizNav = page.waitForNavigation({ timeout: 4000 }).then(() => true).catch(() => false);
+  const quizNav = page.waitForNavigation({ timeout: NO_RELOAD }).then(() => true).catch(() => false);
   await sw.evaluate(async (base) => {
     const [tab] = await chrome.tabs.query({ url: `${base}/*` });
     await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'ISOLATED', func: () => document.dispatchEvent(new Event('visibilitychange')) });
@@ -4379,8 +4421,13 @@ try {
   await loopNav; // the one that is allowed, and leaves its mark
   await page.waitForSelector('.bcv-stat', { timeout: 20000 });
   await windBack(4 * 60 * 1000);
-  await page.click('.bcv-stat');
-  check((await eventually(async () => /You were away for a while\. Reload the page to continue\./.test((await texts('.bcv-toast')).join(' ')))) && !(await page.$('#bcv-away')), 'a second stale press within the minute asks rather than reloading again, and no pill counts down to nothing');
+  const ageBefore = await awayAge();
+  const focusBefore = await inPage('focusActive');
+  const statAt = await page.$eval('.bcv-stat', (e) => { const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
+  await page.mouse.click(statAt.x, statAt.y); // (the press itself, with no scrolling first: a scroll would count as reading, and wake the page)
+  const secondPress = await eventually(async () => /You were away for a while\. Reload the page to continue\./.test((await texts('.bcv-toast')).join(' ')));
+  const secondState = secondPress ? '' : JSON.stringify({ ageBefore, focusBefore, ageAfter: await awayAge(), focusAfter: await inPage('focusActive'), ...(await page.evaluate(() => ({ toasts: [...document.querySelectorAll('.bcv-toast')].map((t) => t.textContent), away: !!document.querySelector('#bcv-away'), sheet: !!document.querySelector('.bcv-sheet-ov'), welcome: !!document.querySelector('#bcv-welcome'), whatsnew: !!document.querySelector('#bcv-whatsnew'), reloaded: sessionStorage.getItem('bcv:reloaded'), nav: performance.getEntriesByType('navigation')[0]?.type, scrollY: window.scrollY, visibility: document.visibilityState, quiz: document.documentElement.className }))) });
+  check(secondPress && !(await page.$('#bcv-away')), `a second stale press within the minute asks rather than reloading again, and no pill counts down to nothing${secondState ? ` — instead: ${secondState}` : ''}`);
   await page.evaluate(() => sessionStorage.removeItem('bcv:reloaded'));
   await windBack(0);
   await page.goto(`${BASE}/`);
@@ -4391,7 +4438,7 @@ try {
   await windBack(4 * 60 * 1000);
   await page.evaluate(() => window.dispatchEvent(new Event('scroll')));
   await new Promise((r) => setTimeout(r, 150));
-  const scrolledNav = page.waitForNavigation({ timeout: 2500 }).then(() => true).catch(() => false);
+  const scrolledNav = page.waitForNavigation({ timeout: 1200 }).then(() => true).catch(() => false);
   await page.click('.bcv-stat');
   check(!(await scrolledNav) && !!(await page.$('.bcv-sheet-ov')), 'reading keeps the page awake: a scroll stands the stale reload down');
   await page.click('.bcv-sheet-ov', { position: { x: 5, y: 5 } });
@@ -4590,8 +4637,8 @@ try {
   await options.click('.navlink[data-section="general"]');
   check((await options.$('#openSetup')) !== null && (await options.$('#runWelcome')) !== null, 'General offers Reopen setup and See the welcome again');
   // before the guided setup has run (or been skipped) the popup is nothing but a setup button
-  await sw.evaluate(async () => {
-    const k = 'prefs:localhost:8787';
+  await sw.evaluate(async (port) => {
+    const k = `prefs:localhost:${port}`;
     const all = await self.BCV.api.storage.local.get(k);
     const p = all[k] || {};
     delete p.setupDone;
@@ -4641,7 +4688,7 @@ try {
   await popupPage.waitForTimeout(300);
   check((await popupPage.$eval('#setup-msg', (e) => e.textContent)) === 'Open your Canvas courses page first, then press Set up.' && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('setup:done'))['setup:done'])) === undefined, 'off a Canvas tab, Set up says where to go and nothing is marked done');
   // only this flow's own flag counts: preferences from the older in-page setup do not
-  await sw.evaluate(async () => { const k = 'prefs:localhost:8787'; const all = await self.BCV.api.storage.local.get(k); await self.BCV.api.storage.local.set({ [k]: { ...(all[k] || {}), setupDone: true } }); });
+  await sw.evaluate(async (port) => { const k = `prefs:localhost:${port}`; const all = await self.BCV.api.storage.local.get(k); await self.BCV.api.storage.local.set({ [k]: { ...(all[k] || {}), setupDone: true } }); }, PORT);
   popupPage = await context.newPage();
   await popupPage.goto(`chrome-extension://${extId}/popup/popup.html`);
   await popupPage.waitForTimeout(400);
@@ -4675,6 +4722,7 @@ try {
 
   // ---- the setup cannot be skipped (last: finishing it here writes the site's preferences afresh) ----
   console.log('setup cannot be skipped');
+  await page.bringToFront(); // (the extension's own pages were in front)
   // The card cannot be skipped: there is no Skip, Escape does nothing, and leaving the page does
   // not get past it — until its steps are done, every page with the interface on opens it again.
   await sw.evaluate(() => self.BCV.api.storage.local.remove('setup:done'));
@@ -4727,6 +4775,7 @@ try {
   await page.waitForFunction(() => localStorage.getItem('bcv:early') === null, null, { timeout: 5000 }).catch(() => {});
   const afterReset = await sw.evaluate(async () => Object.keys(await self.BCV.api.storage.local.get(null)));
   check((await page.evaluate(() => localStorage.getItem('bcv:early'))) === null && !afterReset.some((k) => k.startsWith('prefs:')), `Reset everything clears the note on the open Canvas tab and the extension's own storage (left: ${afterReset.join(', ') || 'nothing'})`);
+  } // ================= end of part 2 =================
 } catch (e) {
   console.error('smoke test crashed:', e?.stack || e);
   failures.push('crash: ' + e.message);
@@ -4741,4 +4790,5 @@ try {
   rmSync(userDataDir, { recursive: true, force: true });
 }
 console.log(failures.length ? `\n${failures.length} check(s) failed:\n - ${failures.join('\n - ')}` : '\nAll checks passed.');
+console.log(`(${secs(Date.now() - startedAt)})`);
 process.exit(failures.length ? 1 : 0);

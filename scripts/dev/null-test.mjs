@@ -10,6 +10,7 @@ import { cpSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
+import { afterMigration } from './harness.mjs';
 
 const require = createRequire(import.meta.url);
 let chromium;
@@ -62,6 +63,7 @@ const context = await chromium.launchPersistentContext(join(tmpdir(), `bcv-profi
 try {
   let [sw] = context.serviceWorkers();
   if (!sw) sw = await context.waitForEvent('serviceworker', { timeout: 15000 });
+  await afterMigration(sw); // (the background's setup migration first, or it clears the flags written next)
   await new Promise((r) => setTimeout(r, 1200));
   for (const t of context.pages()) if (t.url().endsWith('/setup/setup.html')) await t.close();
   await sw.evaluate((v) => self.BCV.api.storage.local.set({ 'setup:offered': true, 'setup:done': true, 'setup:flow': 3, 'whatsnew:seen': v }), manifest.version);

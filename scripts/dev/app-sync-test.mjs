@@ -13,6 +13,7 @@ import { execSync } from 'node:child_process';
 import { cpSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { afterMigration } from './harness.mjs';
 const require = createRequire(import.meta.url);
 let chromium;
 try { ({ chromium } = require('playwright')); } catch { const p = execSync('npm root -g').toString().trim(); ({ chromium } = createRequire(join(p, 'x.js'))('playwright')); }
@@ -31,6 +32,7 @@ const context = await chromium.launchPersistentContext(userDataDir, { channel: '
 try {
   let [sw] = context.serviceWorkers();
   if (!sw) sw = await context.waitForEvent('serviceworker', { timeout: 15000 });
+  await afterMigration(sw); // (the background's setup migration first, or it clears the flags written next)
   for (const p of context.pages()) if (p.url().endsWith('/setup/setup.html')) await p.close();
   await sw.evaluate((v) => self.BCV.api.storage.local.set({ 'setup:offered': true, 'setup:done': true, 'setup:flow': 3, 'whatsnew:seen': v, 'prefs:canvas.test': { gpaGoal: 3.5 }, 'site:last': { host: 'canvas.test', origin: 'https://canvas.test' } }), manifest.version);
   check((await sw.evaluate(() => self.BCV.background.app.on)) === false, 'in Chromium there is no app to ask: the sync is off');
