@@ -206,8 +206,8 @@ try {
   check(await visible('#bcv-app'), 'app shell visible');
   // the widgets' own bar: a strip across the top holding the look switch and the pinned tools, the
   // interface (its sidebar, its sticky heads, the preview panel) starting under it
-  const barInfo = await page.evaluate(() => { const bar = document.getElementById('bcv-bar'); const r = bar?.getBoundingClientRect(); const look = document.getElementById('bcv-look')?.getBoundingClientRect(); const side = document.querySelector('.bcv-side')?.getBoundingClientRect(); return { shown: !!bar && getComputedStyle(bar).display !== 'none', top: r ? Math.round(r.top) : null, h: r ? Math.round(r.height) : null, w: r ? Math.round(r.width) : null, pad: getComputedStyle(document.getElementById('bcv-app')).paddingTop, lookIn: !!look && look.top >= 0 && look.bottom <= (r?.height || 0), sideTop: side ? Math.round(side.top) : null, sideH: side ? Math.round(side.height) : null, vh: window.innerHeight, headTop: getComputedStyle(document.querySelector('.bcv-head')).top }; });
-  check(barInfo.shown && barInfo.top === 0 && barInfo.h === 44 && barInfo.w === 1400 && barInfo.pad === '44px' && barInfo.lookIn && barInfo.sideTop === 44 && barInfo.sideH === barInfo.vh - 44 && barInfo.headTop === '44px', `the widgets have a bar of their own across the top, the interface starting under it: ${JSON.stringify(barInfo)}`);
+  const barInfo = await page.evaluate(() => { const bar = document.getElementById('bcv-bar'); const r = bar?.getBoundingClientRect(); const look = document.getElementById('bcv-look')?.getBoundingClientRect(); const side = document.querySelector('.bcv-side')?.getBoundingClientRect(); return { shown: !!bar && getComputedStyle(bar).display !== 'none', top: r ? Math.round(r.top) : null, left: r ? Math.round(r.left) : null, h: r ? Math.round(r.height) : null, w: r ? Math.round(r.width) : null, pad: getComputedStyle(document.getElementById('bcv-main')).paddingTop, appPad: getComputedStyle(document.getElementById('bcv-app')).paddingTop, lookIn: !!look && look.top >= 0 && look.bottom <= (r?.height || 0), sideTop: side ? Math.round(side.top) : null, sideRight: side ? Math.round(side.right) : null, sideH: side ? Math.round(side.height) : null, vh: window.innerHeight, headTop: getComputedStyle(document.querySelector('.bcv-head')).top }; });
+  check(barInfo.shown && barInfo.top === 0 && barInfo.h === 44 && barInfo.left === barInfo.sideRight && barInfo.w === 1400 - barInfo.sideRight && barInfo.pad === '44px' && barInfo.appPad === '0px' && barInfo.lookIn && barInfo.sideTop === 0 && barInfo.sideH === barInfo.vh && barInfo.headTop === '44px', `the widgets have a bar of their own beside the sidebar, over the page alone: the sidebar runs from the very top, the page starts under the bar: ${JSON.stringify(barInfo)}`);
   check(!(await visible('#application')), 'stock Canvas hidden');
   const lookBtn = await page.$eval('#bcv-look', (e) => { const r = e.getBoundingClientRect(); const m = e.querySelector('.bcv-look__main'); const mk = m.querySelector('.bcv-look__mark'); const opts = [...e.querySelectorAll('.bcv-look__opt')]; return { fixed: getComputedStyle(e).position === 'fixed', top: Math.round(r.top), right: Math.round(window.innerWidth - r.right), w: Math.round(r.width), h: Math.round(r.height), disc: `${Math.round(m.getBoundingClientRect().width)}x${Math.round(m.getBoundingClientRect().height)}`, radius: getComputedStyle(m).borderRadius, role: m.getAttribute('role'), pos: m.getAttribute('aria-valuenow'), markImg: getComputedStyle(mk).backgroundImage.startsWith('linear-gradient'), text: m.querySelector('.bcv-look__text').textContent.trim(), textShown: m.querySelector('.bcv-look__text').getBoundingClientRect().width, menu: getComputedStyle(e.querySelector('.bcv-look__menu')).visibility, opts: opts.map((b) => `${b.dataset.pos}:${b.querySelector('.bcv-look__optlbl').textContent}:${getComputedStyle(b).opacity}:${b.classList.contains('is-selected')}`).join(' '), colors: opts.map((b) => getComputedStyle(b).backgroundColor).join(' ') }; }).catch(() => null);
   check(!!lookBtn && lookBtn.fixed && lookBtn.top < 40 && lookBtn.right < 24 && lookBtn.w === 24 && lookBtn.h === 24 && lookBtn.disc === '24x24' && lookBtn.radius === '12px' && lookBtn.role === 'slider' && lookBtn.pos === '1' && lookBtn.markImg && lookBtn.text === 'Active' && lookBtn.textShown === 0 && lookBtn.menu === 'hidden' && lookBtn.opts === '1:Active:0:true 0:Deactivate:0:false -1:Turn off Simpl:0:false' && lookBtn.colors === 'rgb(52, 199, 89) rgb(142, 142, 147) rgb(255, 69, 58)', `the switch sits at the top right, folded to a disc with the mark; its three buttons — green Activate (the state, so it reads Active), grey Deactivate, red Turn off Simpl — folded away out of sight: ${JSON.stringify(lookBtn)}`);
@@ -3829,7 +3829,7 @@ try {
     // the annotator
     console.log('annotator');
     await openTool('mark');
-    check((await texts('.bcv-conv__droptitle'))[0] === 'Drop a PDF to mark up' && (await page.$$('.bcv-mark__recent')).length === 0 && (await toolSub()) === 'Highlights, drawings, text and notes, kept on this device per file.', 'the annotator opens on a drop zone with nothing marked up before');
+    check(await eventually(async () => (await texts('.bcv-conv__droptitle'))[0] === 'Drop a PDF to mark up' && (await toolSub()) === 'Highlights, drawings, text and notes, kept on this device per file.') && (await page.$$('.bcv-mark__recent')).length === 0, `the annotator opens on a drop zone with nothing marked up before (${(await texts('.bcv-conv__droptitle'))[0]} · ${await toolSub()})`);
     await page.setInputFiles('.bcv-mark__drop input[type=file]', [{ name: 'Chapter.pdf', mimeType: 'application/pdf', buffer: ntTwo }]);
     check(await eventually(() => page.$$('.bcv-mark__page').then((r) => r.length === 2), 10000) && await eventually(() => page.$$('.bcv-mark__page[data-page="1"] .bcv-mark__text span').then((r) => r.length >= 3), 15000) && (await texts('.bcv-tool__title'))[0] === 'Chapter.pdf' && (await texts('.bcv-mark__pageno'))[0] === 'Page 1 of 2' && (await texts('.bcv-mark__count'))[0] === 'Nothing marked yet' && (await page.$eval('.bcv-mark__page[data-page="1"] canvas', (e) => e.width > 600 && e.height > 800)), 'the PDF draws page by page with a text layer over each, the panel empty');
     const ntSel = await page.evaluate(() => { const span = [...document.querySelectorAll('.bcv-mark__page[data-page="1"] .bcv-mark__text span')].find((s) => /mitochondria/.test(s.textContent)); if (!span) return ''; const r = document.createRange(); r.selectNodeContents(span); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); return sel.toString(); });
@@ -4329,6 +4329,8 @@ try {
   check(!(await awakeNav) && !!(await page.$('.bcv-sheet-ov')), 'a press while the page is awake does what it says, and reloads nothing');
   // with a sheet, a tool's popup or a preview open, Away Refresh stands down: nothing is reloaded out from under it, and the page counts as awake again
   const awayAge = () => sw.evaluate(async (base) => { const [tab] = await chrome.tabs.query({ url: `${base}/*` }); const [{ result }] = await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'ISOLATED', func: () => Date.now() - self.BCV.app.state.lastHere }); return result; }, BASE);
+  // a stale press is the press itself, at the card's centre: a click's scrolling into view first would count as reading, and wake the page
+  const pressStat = async () => { const at = await page.$eval('.bcv-stat', (e) => { const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }); await page.mouse.click(at.x, at.y); };
   await windBack(4 * 60 * 1000);
   const sheetNav = page.waitForNavigation({ timeout: 1200 }).then(() => true).catch(() => false);
   await page.click('.bcv-sheet', { position: { x: 24, y: 24 } });
@@ -4339,7 +4341,7 @@ try {
   await windBack(4 * 60 * 1000); // away since before the three minutes
   const awayNav = page.waitForNavigation({ timeout: 15000 }).then(() => true).catch(() => false);
   const pressedAt = Date.now();
-  await page.click('.bcv-stat');
+  await pressStat();
   // the reload is announced first: a pill floats down at the top — a dial counting three seconds down in orange, "Away Refresh", "Click to cancel"
   await page.waitForSelector('#bcv-away.is-in', { timeout: 3000 });
   await page.waitForFunction(() => { const e = document.querySelector('#bcv-away'); return !!e && e.getBoundingClientRect().top >= 0; }, null, { timeout: 2000 }); // the float-down settles
@@ -4416,15 +4418,14 @@ try {
   // and it never loops: away again within the minute says so instead of reloading again
   await page.evaluate(() => sessionStorage.removeItem('bcv:reloaded'));
   await windBack(4 * 60 * 1000);
-  const loopNav = page.waitForNavigation({ timeout: 15000 }).then(() => true).catch(() => false);
-  await page.click('.bcv-stat');
-  await loopNav; // the one that is allowed, and leaves its mark
+  await pressStat();
+  // the one that is allowed, seen from the document it produced (a wait for the navigation itself can miss a quick one, or take a sheet's address for it)
+  await page.waitForFunction(() => performance.getEntriesByType('navigation')[0]?.type === 'reload' && !!sessionStorage.getItem('bcv:reloaded'), null, { timeout: 15000 });
   await page.waitForSelector('.bcv-stat', { timeout: 20000 });
   await windBack(4 * 60 * 1000);
   const ageBefore = await awayAge();
   const focusBefore = await inPage('focusActive');
-  const statAt = await page.$eval('.bcv-stat', (e) => { const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
-  await page.mouse.click(statAt.x, statAt.y); // (the press itself, with no scrolling first: a scroll would count as reading, and wake the page)
+  await pressStat();
   const secondPress = await eventually(async () => /You were away for a while\. Reload the page to continue\./.test((await texts('.bcv-toast')).join(' ')));
   const secondState = secondPress ? '' : JSON.stringify({ ageBefore, focusBefore, ageAfter: await awayAge(), focusAfter: await inPage('focusActive'), ...(await page.evaluate(() => ({ toasts: [...document.querySelectorAll('.bcv-toast')].map((t) => t.textContent), away: !!document.querySelector('#bcv-away'), sheet: !!document.querySelector('.bcv-sheet-ov'), welcome: !!document.querySelector('#bcv-welcome'), whatsnew: !!document.querySelector('#bcv-whatsnew'), reloaded: sessionStorage.getItem('bcv:reloaded'), nav: performance.getEntriesByType('navigation')[0]?.type, scrollY: window.scrollY, visibility: document.visibilityState, quiz: document.documentElement.className }))) });
   check(secondPress && !(await page.$('#bcv-away')), `a second stale press within the minute asks rather than reloading again, and no pill counts down to nothing${secondState ? ` — instead: ${secondState}` : ''}`);

@@ -24,6 +24,10 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.59.0', date: '2026-09-22', notes: [
+      { kind: 'improved', title: 'Sidebar to the top', body: 'The widgets’ bar now sits beside it, over the page alone.', icon: P.layers },
+      { kind: 'fixed', title: 'Quick flashcard marks', body: 'Fast presses each mark their own card, none twice.', icon: P.check },
+    ] },
     { version: '2.58.0', date: '2026-09-22', notes: [
       { kind: 'new', title: 'A new Simpl switch', body: 'Hover the disc: Activate, Deactivate and Turn off drop down.', icon: P.toggle },
       { kind: 'new', title: 'Widgets get a bar', body: 'The switch and your pins sit in a strip above the page.', icon: P.pin },

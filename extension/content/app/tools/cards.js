@@ -219,14 +219,17 @@
         ])];
       }
       st.idx = cards.findIndex((c) => c.id === ids[r.i]);
-      const mark = async (know) => {
+      // the round moves on at once and the card is saved after: two quick presses (a key held, Know
+      // then the arrow) each mark their own card, rather than the same one twice while the first save is out
+      const mark = (know) => {
         const id = ids[r.i];
+        if (id === undefined) return;
         r.history.push({ id, know });
         (know ? r.know : r.learning).push(id);
-        await patchCard(id, (c) => ({ ...c, know }));
         r.i++;
         st.flip = false;
         paint();
+        patchCard(id, (c) => ({ ...c, know })).catch(() => {});
       };
       const undo = () => {
         const last = r.history.pop();

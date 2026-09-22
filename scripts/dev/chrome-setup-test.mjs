@@ -94,6 +94,7 @@ try {
   const gone = setup.waitForEvent('close', { timeout: 20000 }).then(() => true, () => false);
   await page.goto(`${BASE}/`);
   await page.waitForSelector('#bcv-setup', { state: 'attached', timeout: 20000 }); // (a shadow host of no size: attached, not visible)
+  for (let i = 0; i < 40 && loads < 3; i++) await page.waitForTimeout(150); // (the card can be up before its own document's load event)
   check((await domains()).join(',') === BASE, `found and saved as a site of its own: ${JSON.stringify(await domains())}`);
   const regs = await registered();
   check(regs.length === 2 && regs.every((r) => r.startsWith('bcv-http---localhost-8809-') && r.endsWith(`:${BASE}/*`)), `the interface's two scripts are registered for it, and neither the sniffer nor the frame script: ${regs.join(' | ')}`);
@@ -108,7 +109,8 @@ try {
   again.on('load', () => { loads2++; });
   await again.goto(`${BASE}/courses`);
   await again.waitForSelector('#bcv-setup', { state: 'attached', timeout: 20000 });
-  await again.waitForTimeout(1500);
+  for (let i = 0; i < 40 && loads2 < 2; i++) await again.waitForTimeout(150); // (the second load comes on its own time on a busy machine)
+  await again.waitForTimeout(600); // (and no third one follows)
   check(loads2 === 2 && (await domains()).length === 1, `loads with the interface on it from the start, and once more for the setup's address — never for the sniffer (${loads2} loads)`);
 
   console.log("Canvas's sign-in page");
