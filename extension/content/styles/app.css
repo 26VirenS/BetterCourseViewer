@@ -50,7 +50,7 @@ html[data-bcv-ext-theme="dark"] .bcv-graph__frame { filter: invert(1) hue-rotate
 @keyframes bcv-ring-fill { from { stroke-dasharray: 0 999; } }
 @keyframes bcv-ring-unfill { to { stroke-dasharray: 0 999; } }
 @keyframes bcv-fade-out { to { opacity: 0; } }
-@keyframes bcv-line-draw { from { stroke-dashoffset: 420; } to { stroke-dashoffset: 0; } }
+@keyframes bcv-line-draw { from { -webkit-clip-path: inset(-10px 100% -10px -5px); clip-path: inset(-10px 100% -10px -5px); } to { -webkit-clip-path: inset(-10px -5px -10px -5px); clip-path: inset(-10px -5px -10px -5px); } } /* (a clip sliding open, in the line's own units: a dash the line's length stayed a dash pattern in Safari) */
 /* screens rise in; sheets grow over a blurring scrim; popovers pop */
 .bcv-main > .bcv-screen, .bcv-main > .bcv-qz, .bcv-main > .bcv-sb { animation: bcv-fade-up .34s cubic-bezier(.32,.72,0,1) both; }
 .bcv-main > .bcv-screen--skel { animation: none; } /* the placeholder does not rise; the real screen does when it lands */
@@ -73,7 +73,7 @@ html.bcv-phone .bcv-sheet { animation: bcv-sheet .26s cubic-bezier(.32,.72,0,1) 
 .bcv-ring--unfill { animation: bcv-ring-unfill .4s cubic-bezier(.4,0,.6,1) var(--bcv-delay, 0ms) forwards; }
 .bcv-ring--track-out { animation: bcv-fade-out .4s ease var(--bcv-delay, 0ms) forwards; }
 .bcv-gpa__ringletter.is-back { animation: bcv-fade-in .22s ease-out both; }
-.bcv-gpa__line--draw { stroke-dasharray: 420; animation: bcv-line-draw 1.05s cubic-bezier(.32,.72,0,1) .2s both; }
+.bcv-gpa__line--draw { animation: bcv-line-draw 1.05s cubic-bezier(.32,.72,0,1) .2s backwards; } /* (backwards: hidden until it starts, and nothing left on the line once it has drawn) */
 .bcv-gpa__pt--in { animation: bcv-pop .25s cubic-bezier(.32,.72,0,1) var(--bcv-delay, 0ms) backwards; }
 /* hover and press: cards lift, buttons give (transitions stay on pseudo-state only, mockup 8 rule) */
 .bcv-stat, .bcv-gpa__card, .bcv-ccard { transition: transform .22s cubic-bezier(.32,.72,0,1), box-shadow .22s ease, background .2s ease; }
@@ -125,45 +125,39 @@ html[data-bcv-theme="dark"] .bcv-skel { --bcv-skel: linear-gradient(90deg, rgba(
 /* Folded, it is the mark and the switch alone; under the pointer (or the keyboard's focus) the name
  * comes out and a second row opens: Persistent, what a press of the look switch does. */
 /* (.bcv-look-pill is the same pill without the place: the welcome after the setup shows an opened copy) */
-#bcv-look, .bcv-look-pill { position: fixed; top: 6px; right: 10px; z-index: 2147482000; display: flex; flex-direction: column; align-items: stretch; margin: 0; padding: 0; border: 1px solid rgba(255,255,255,.14); border-radius: 12px; background: rgba(28,28,30,.86); -webkit-backdrop-filter: blur(16px) saturate(1.4); backdrop-filter: blur(16px) saturate(1.4); box-shadow: 0 2px 10px rgba(0,0,0,.2); color: #fff; font: 600 10.5px/1 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif; letter-spacing: -.01em; line-height: 1; text-transform: none; overflow: hidden; transition: box-shadow .18s ease, opacity .2s ease, border-radius .18s ease, top .38s cubic-bezier(.32,.72,0,1), right .38s cubic-bezier(.32,.72,0,1); }
-/* (the keyboard's focus opens it too; a press with the pointer leaves focus behind, so that alone does not hold it open) */
-/* folded it is a 24px disc with the mark alone (the mark in the stop's colour: blue on, grey off for
- * this page, orange locked); under the pointer the disc's glass goes and the mark grows into the
- * slider alone, in its place — no capsule around it, no name beside it */
-#bcv-look:hover, #bcv-look:has(:focus-visible), .bcv-look-pill.is-open { background: transparent; border-color: transparent; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
+#bcv-look, .bcv-look-pill { position: fixed; top: 6px; right: 10px; z-index: 2147482000; display: flex; flex-direction: column; align-items: flex-end; margin: 0; padding: 0; color: #fff; font: 600 11px/1 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif; letter-spacing: -.01em; line-height: 1; text-transform: none; transition: opacity .2s ease, top .38s cubic-bezier(.32,.72,0,1), right .38s cubic-bezier(.32,.72,0,1); }
 #bcv-look.is-busy { opacity: .6; }
-#bcv-look.is-busy .bcv-look__main { pointer-events: none; } /* (no second press while the page loads afresh; the pill itself still opens under the pointer) */
+#bcv-look.is-busy button { pointer-events: none; } /* (no second press while the page loads afresh) */
 #bcv-look button, .bcv-look-pill button { margin: 0; border: 0; background: transparent; color: inherit; cursor: pointer; font: inherit; letter-spacing: inherit; text-align: left; }
-#bcv-look button:focus-visible { outline: 2px solid #0a84ff; outline-offset: 2px; border-radius: 18px; }
-.bcv-look__main { --bcv-look-pad: 4px; position: relative; display: flex; align-items: center; justify-content: flex-end; gap: 0; box-sizing: border-box; width: 22px; height: 22px; padding: 0 var(--bcv-look-pad); user-select: none; -webkit-user-select: none; touch-action: none; transition: width .28s cubic-bezier(.32,.72,0,1), height .28s cubic-bezier(.32,.72,0,1), padding .28s cubic-bezier(.32,.72,0,1); }
-/* (never narrower than the disc while it opens: width jumps to auto with the name and the slider still at nothing, and a pill that shrank away from under the pointer would lose the hover and fold, frame after frame) */
-#bcv-look:hover .bcv-look__main, #bcv-look:has(:focus-visible) .bcv-look__main, .bcv-look-pill.is-open .bcv-look__main { --bcv-look-pad: 0px; width: auto; min-width: 22px; height: 36px; padding: 0; }
+#bcv-look button:focus-visible { outline: 2px solid #0a84ff; outline-offset: 2px; }
+/* the disc: 24px of glass with the mark in the state's colour — green active, grey deactivated, red off */
+.bcv-look__main { position: relative; flex: none; display: flex; align-items: center; justify-content: center; box-sizing: border-box; width: 24px; height: 24px; padding: 0; border: 1px solid rgba(255,255,255,.14); border-radius: 12px; background: rgba(28,28,30,.86); -webkit-backdrop-filter: blur(16px) saturate(1.4); backdrop-filter: blur(16px) saturate(1.4); box-shadow: 0 2px 10px rgba(0,0,0,.2); user-select: none; -webkit-user-select: none; transition: transform .16s cubic-bezier(.34,1.3,.42,1), box-shadow .18s ease; }
+#bcv-look:hover .bcv-look__main, #bcv-look:has(:focus-visible) .bcv-look__main, .bcv-look-pill.is-open .bcv-look__main { transform: scale(1.1); box-shadow: 0 6px 20px rgba(0,0,0,.3); }
 .bcv-look__main:active { opacity: .9; }
-.bcv-look__mark { position: absolute; top: 50%; right: var(--bcv-look-pad); width: 14px; height: 14px; margin-top: -7px; border-radius: 4px; background: linear-gradient(158deg, #0a84ff, #0a4fd6); display: flex; align-items: center; justify-content: center; transform-origin: 100% 50%; transition: transform .28s cubic-bezier(.32,.72,0,1), opacity .16s ease, right .28s cubic-bezier(.32,.72,0,1), background .2s ease; }
+.bcv-look__mark { width: 14px; height: 14px; border-radius: 4px; background: linear-gradient(158deg, #34c759, #1f9d45); display: flex; align-items: center; justify-content: center; transition: background .2s ease; }
 .bcv-look__mark svg { display: block; width: 12px; height: 12px; }
-.bcv-look__main.is-off .bcv-look__mark { background: #8e8e93; }
-.bcv-look__main.is-lock .bcv-look__mark { background: #ff4f1f; }
-#bcv-look:hover .bcv-look__mark, #bcv-look:has(:focus-visible) .bcv-look__mark, .bcv-look-pill.is-open .bcv-look__mark { transform: scale(2.6); opacity: 0; pointer-events: none; }
-.bcv-look__text { flex: none; max-width: 0; opacity: 0; overflow: hidden; white-space: nowrap; } /* (the stop's words, for the accessibility tree and the tests: never shown) */
-/* the slider, drawn at its own size — a 208 by 48 track, a white knob of 40 with a glyph in it (a
- * tick, a dash, a lock), the colour running out from the middle stop as far as the knob (green to
- * the right, orange to the left), a dot at each stop, LOCKED and ACTIVE in the room the knob
- * leaves — and scaled to the pill: a quarter folded, three quarters under the pointer. app.js
- * places the knob (its left: 4, 84 or 164) and everything that follows it, frame by frame. */
-.bcv-look__sw { --bcv-look-scale: .07; position: relative; flex: none; width: 0; height: 14px; transition: width .28s cubic-bezier(.32,.72,0,1), height .28s cubic-bezier(.32,.72,0,1); }
-#bcv-look:hover .bcv-look__sw, #bcv-look:has(:focus-visible) .bcv-look__sw, .bcv-look-pill.is-open .bcv-look__sw { --bcv-look-scale: .75; width: 156px; height: 36px; }
-/* (glued to the right end, where the mark is, and scaled about that end: it grows out of the mark) */
-.bcv-look__slider { position: absolute; right: 0; top: 50%; width: 208px; height: 48px; margin-top: -24px; border-radius: 24px; background: rgba(118,118,128,.32); box-shadow: inset 0 0 0 1px rgba(255,255,255,.07); opacity: 0; transform: scale(var(--bcv-look-scale)); transform-origin: 100% 50%; transition: transform .28s cubic-bezier(.32,.72,0,1), opacity .16s ease .04s; }
-#bcv-look:hover .bcv-look__slider, #bcv-look:has(:focus-visible) .bcv-look__slider, .bcv-look-pill.is-open .bcv-look__slider { opacity: 1; }
-.bcv-look__fill { position: absolute; top: 4px; height: 40px; }
-.bcv-look__tick { position: absolute; top: 22px; width: 4px; height: 4px; border-radius: 2px; background: rgba(255,255,255,.22); }
-.bcv-look__lbl { position: absolute; top: 0; height: 48px; display: flex; align-items: center; transform: translateX(-50%); font: 700 10px/1 -apple-system, BlinkMacSystemFont, "SF Pro Text", Helvetica, Arial, sans-serif; letter-spacing: .09em; color: #fff; white-space: nowrap; pointer-events: none; }
-.bcv-look__knob { position: absolute; top: 4px; width: 40px; height: 40px; border-radius: 20px; background: #fff; box-shadow: 0 2px 6px rgba(0,0,0,.28), 0 0 0 .5px rgba(0,0,0,.06); display: flex; align-items: center; justify-content: center; }
-.bcv-look__glyph { display: flex; }
-.bcv-look__glyph svg { display: block; width: 17px; height: 17px; fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.bcv-look__main.is-off .bcv-look__mark { background: linear-gradient(158deg, #a1a1a6, #7c7c82); }
+.bcv-look__main.is-lock .bcv-look__mark { background: linear-gradient(158deg, #ff6b62, #e0352b); }
+.bcv-look__text { position: absolute; width: 0; height: 0; overflow: hidden; opacity: 0; white-space: nowrap; } /* (the state's words, for the accessibility tree and the tests: never shown) */
+/* the three buttons: folded away under the disc; under the pointer (or the keyboard's focus, or the
+ * welcome's is-open) they float down one after the other, each a 24px disc in its colour. The one
+ * under the pointer opens out to the left with its words, its right end staying put; the one that is
+ * the state has a white ring. */
+.bcv-look__menu { position: absolute; top: 24px; right: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; padding-top: 6px; visibility: hidden; transition: visibility 0s linear .32s; }
+#bcv-look:hover .bcv-look__menu, #bcv-look:has(:focus-visible) .bcv-look__menu, .bcv-look-pill.is-open .bcv-look__menu { visibility: visible; transition-delay: 0s; }
+.bcv-look__opt { position: relative; display: flex; align-items: center; justify-content: flex-end; box-sizing: border-box; height: 24px; width: auto; max-width: 24px; padding: 0; border-radius: 12px; background: var(--bcv-opt); color: #fff; box-shadow: 0 2px 10px rgba(0,0,0,.25); overflow: hidden; white-space: nowrap; opacity: 0; transform: translateY(-10px) scale(.6); pointer-events: none; transition: max-width .24s cubic-bezier(.32,.72,0,1), opacity .18s ease, transform .28s cubic-bezier(.32,.72,0,1), box-shadow .18s ease; }
+#bcv-look:hover .bcv-look__opt, #bcv-look:has(:focus-visible) .bcv-look__opt, .bcv-look-pill.is-open .bcv-look__opt { opacity: 1; transform: none; pointer-events: auto; transition-delay: 0s, calc(var(--bcv-i) * 55ms), calc(var(--bcv-i) * 55ms), 0s; }
+.bcv-look__opt:hover, .bcv-look__opt:focus-visible, .bcv-look__opt.is-hover { max-width: 220px; box-shadow: 0 6px 20px rgba(0,0,0,.3); }
+.bcv-look__opt.is-selected { box-shadow: 0 0 0 2px #fff, 0 2px 10px rgba(0,0,0,.25); }
+.bcv-look__optlbl { max-width: 0; padding: 0; opacity: 0; overflow: hidden; transition: max-width .24s cubic-bezier(.32,.72,0,1), opacity .15s ease, padding .24s cubic-bezier(.32,.72,0,1); }
+.bcv-look__opt:hover .bcv-look__optlbl, .bcv-look__opt:focus-visible .bcv-look__optlbl, .bcv-look__opt.is-hover .bcv-look__optlbl { max-width: 180px; padding: 0 2px 0 11px; opacity: 1; }
+.bcv-look__optdot { flex: none; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; }
+.bcv-look__optdot svg { display: block; width: 13px; height: 13px; fill: none; stroke: #fff; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+/* (the reset above — #bcv-look button — outranks a class: the disc's glass and the buttons' colours said again at its weight) */
+#bcv-look .bcv-look__main, .bcv-look-pill .bcv-look__main { border: 1px solid rgba(255,255,255,.14); background: rgba(28,28,30,.86); }
+#bcv-look .bcv-look__opt, .bcv-look-pill .bcv-look__opt { background: var(--bcv-opt); }
 /* the phone layout's own header has the corner; the setup covers the page */
 html.bcv-phone.bcv-on #bcv-look, html.bcv-setup-open #bcv-look { display: none; }
-@media (max-width: 700px) { #bcv-look .bcv-look__text, .bcv-look-pill .bcv-look__text { display: none; } }
 
 /* ---- Away Refresh: the stale-page reload, announced first. A pill floats down from the top — a
  * dial counting three seconds down in orange, the iPhone's timer (a dim ring, a bright arc of the
@@ -195,7 +189,8 @@ html.bcv-phone.bcv-on #bcv-look, html.bcv-setup-open #bcv-look { display: none; 
 #bcv-welcome:focus { outline: none; }
 html.bcv-welcome { overflow: hidden; }
 /* the thing pointed at, where it will really be: the switch at the top right, larger; the pill at the top, larger */
-.bcv-welcome__look { position: absolute; top: 10px; right: 12px; z-index: auto; transform: scale(1.25); transform-origin: top right; pointer-events: none; box-shadow: 0 0 0 1px rgba(255,255,255,.22), 0 0 44px rgba(255,255,255,.24); animation: bcv-welcome-fade .5s ease both; }
+.bcv-welcome__look { position: absolute; top: 10px; right: 12px; z-index: auto; transform: scale(1.25); transform-origin: top right; pointer-events: none; animation: bcv-welcome-fade .5s ease both; }
+.bcv-welcome__look .bcv-look__main { box-shadow: 0 0 0 1px rgba(255,255,255,.22), 0 0 44px rgba(255,255,255,.24); }
 .bcv-welcome__away { --bcv-welcome-scale: 1.35; position: absolute; top: calc(10px + env(safe-area-inset-top, 0px)); left: 50%; pointer-events: none; transform: translate(-50%, 0) scale(var(--bcv-welcome-scale)); transform-origin: top center; animation: bcv-welcome-drop .5s cubic-bezier(.2,1.1,.3,1) both; }
 .bcv-welcome__away .bcv-away__btn { cursor: default; }
 .bcv-welcome__away .bcv-away__ring, .bcv-welcome__away .bcv-away__hand { animation-duration: 12s; animation-iteration-count: infinite; }
@@ -220,9 +215,9 @@ html.bcv-welcome { overflow: hidden; }
 .bcv-welcome__stoprow { display: flex; align-items: center; gap: 12px; } /* (block rows: read out one per line) */
 .bcv-welcome__stoptext b { font-weight: 600; color: #fff; }
 /* each row's switch is the real one (the page's own DOM), small and still, its knob at that stop */
-.bcv-welcome__stopsw.bcv-look__sw { --bcv-look-scale: .46; flex: none; width: 96px; height: 22px; transition: none; }
-.bcv-welcome__stopsw .bcv-look__slider { opacity: 1; transition: none; }
-.bcv-welcome__stopsw .bcv-look__lbl { display: none; } /* (LOCKED / ACTIVE: illegible this small, and they would be read out as part of the line) */
+.bcv-welcome__stopsw.bcv-look__opt { position: static; flex: none; opacity: 1; transform: none; pointer-events: none; transition: none; } /* (a row's button: the round disc in its colour, still; the line beside it has the words) */
+.bcv-welcome__stopsw .bcv-look__optlbl { display: none; }
+#bcv-welcome .bcv-welcome__stopsw { width: 24px; max-width: 24px; height: 24px; border-radius: 12px; background: var(--bcv-opt); box-shadow: 0 2px 10px rgba(0,0,0,.25); } /* (said at the welcome's own weight: its resets outrank a class) */
 /* the switch shown working: a copy of it at the top right and a pointer that app.js/welcome.js moves about it (--cx/--cy, over --cms) */
 .bcv-welcome__lookshow { position: absolute; inset: 0; pointer-events: none; animation: bcv-welcome-fade .4s ease both; }
 .bcv-welcome__lookshow.is-out { animation: bcv-welcome-out .25s ease both; }
@@ -1252,7 +1247,7 @@ html.bcv-phone .bcv-rubg__cellpts { font-size: 19px; }
 .bcv-gpa__catpct { flex: none; font: 600 11.5px/1.2 var(--bcv-mono); color: var(--bcv-ink2); }
 .bcv-gpa__cbar { position: relative; height: 6px; border-radius: 3px; background: var(--bcv-fill); }
 .bcv-gpa__cfill { position: absolute; left: 0; top: 0; height: 6px; border-radius: 3px; }
-.bcv-gpa__tick { position: absolute; top: -3px; width: 2.5px; height: 12px; border-radius: 2px; background: var(--bcv-ink); opacity: .75; transform: translateX(-50%); }
+.bcv-gpa__bartick { position: absolute; top: -3px; width: 2.5px; height: 12px; border-radius: 2px; background: var(--bcv-ink); opacity: .75; transform: translateX(-50%); } /* the target mark on a card's bar (the trend's axis ticks are .bcv-gpa__tick, a different thing) */
 .bcv-gpa__need { margin-top: 6px; font: 500 11.5px/1.4 var(--bcv-font); color: var(--bcv-ink3); }
 .bcv-gpa__need--met { color: #1e7a37; }
 .bcv-gpa__need--no { color: #c01d43; }
@@ -1310,7 +1305,7 @@ html[data-bcv-theme="dark"] .bcv-gpa__need--no { color: #ff8098; }
 .bcv-gpa-detail__aname { font: 600 13.5px/1.35 var(--bcv-font); }
 .bcv-gpa-detail__agroup { margin-top: 2px; font: 400 11.5px/1.3 var(--bcv-font); color: var(--bcv-ink3); }
 .bcv-gpa-detail__ascore { flex: none; min-width: 66px; text-align: right; font: 600 13px/1.2 var(--bcv-mono); }
-.bcv-gpa-detail__go { align-self: flex-start; margin-top: 2px; }
+.bcv-gpa-detail__go { flex: none; white-space: nowrap; } /* up in the head, beside the X */
 /* 2.57.0: the sheet is one steady size and scrolls inside; wide screens split it — the breakdown and the
    weights on the left, the assignments on the right, each side scrolling on its own */
 .bcv-gpa-detail__cols { display: flex; flex-direction: column; height: 100%; overflow: auto; }
@@ -1319,7 +1314,7 @@ html[data-bcv-theme="dark"] .bcv-gpa__need--no { color: #ff8098; }
 .bcv-gpa-detail .bcv-whatif-btn { margin: 0 0 0 10px; flex: none; }
 .bcv-gpa-detail__pct.is-hyp { color: var(--bcv-red); }
 .bcv-gpa-detail__letter.is-hyp { background: rgba(255,69,58,.12); color: var(--bcv-red); }
-.bcv-banner--sm { padding: 12px 16px; border-radius: 16px; gap: 12px; }
+.bcv-banner--sm { flex: none; padding: 12px 16px; border-radius: 16px; gap: 12px; } /* (flex: none — in a column it would grow to the column's height) */
 .bcv-banner--sm .bcv-banner__title { font-size: 15px; }
 .bcv-banner--sm .bcv-banner__sub { font-size: 12px; }
 @media (min-width: 1000px) {
@@ -2352,6 +2347,17 @@ html.bcv-dragpin #bcv-tray { opacity: 0; }
 /* the tray beside the switch: live activities (a running timer), then the pins. The opened switch
  * grows leftwards over it, so it hides while the switch is under the pointer; and it goes with the
  * switch: the phone layout, the setup, the welcome, stock Canvas. */
+/* 2.58.0: the widgets' own bar — a strip across the top of the page that the look switch and the pinned
+   tools sit in, the interface starting under it, so nothing on the page is ever under them. The switch
+   and the tray keep their own fixed places (and their own layers, over the sheets): the bar is the
+   ground under them. A phone has no switch; a tool's tab and a stock Canvas page have bars of their own. */
+html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) { --bcv-bar-h: 44px; }
+#bcv-bar { display: none; }
+html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) #bcv-bar { display: block; position: fixed; top: 0; left: 0; right: 0; height: var(--bcv-bar-h); z-index: 39; box-sizing: border-box; background: var(--bcv-chrome); -webkit-backdrop-filter: var(--bcv-blur-chrome); backdrop-filter: var(--bcv-blur-chrome); border-bottom: 1px solid var(--bcv-edge); }
+html.bcv-setup-open #bcv-bar, html.bcv-welcome #bcv-bar { display: none !important; }
+html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) #bcv-app { padding-top: var(--bcv-bar-h); }
+html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) .bcv-side { top: var(--bcv-bar-h); height: calc(100vh - var(--bcv-bar-h)); }
+html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) .bcv-head, html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) .bcv-qz__head, html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) .bcv-pv { top: var(--bcv-bar-h); }
 #bcv-tray { position: fixed; top: 6px; right: 42px; z-index: 2147481999; display: flex; align-items: flex-start; gap: 8px; margin: 0; padding: 0; transition: opacity .18s ease; }
 #bcv-look:hover ~ #bcv-tray, #bcv-look:has(:focus-visible) ~ #bcv-tray { opacity: 0; pointer-events: none; }
 html.bcv-phone.bcv-on #bcv-tray, html.bcv-setup-open #bcv-tray, html.bcv-welcome #bcv-tray, html:not(.bcv-on):not(.bcv-tooltab) #bcv-tray { display: none; }
@@ -2852,10 +2858,10 @@ html[data-bcv-theme="dark"] .bcv-conv__delta.is-more, html[data-bcv-theme="dark"
  * a pin beside the switch */
 /* a row of the sidebar, seen through a hole in the black (the mask is the black; the overlay goes clear) */
 #bcv-welcome.bcv-welcome--holes { background: transparent; }
-.bcv-welcome__spot { position: absolute; inset: 0; pointer-events: none; animation: bcv-welcome-fade .3s ease both; }
+.bcv-welcome__spot { position: absolute; inset: 0; pointer-events: none; } /* (no fade in: the black under it is already off, and a fading mask showed the page — the rings fade instead) */
 .bcv-welcome__spot.is-out { animation: bcv-welcome-out .25s ease both; }
 .bcv-welcome__mask { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-.bcv-welcome__ring { fill: none; stroke: rgba(255,255,255,.4); stroke-width: 1.5; }
+.bcv-welcome__ring { fill: none; stroke: rgba(255,255,255,.4); stroke-width: 1.5; animation: bcv-welcome-fade .3s ease both; }
 .bcv-welcome__stage[data-stage="side"] { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; column-gap: 22px; row-gap: 12px; right: 16px; max-width: 720px; }
 .bcv-welcome__stage[data-stage="side"] .bcv-welcome__arrowbox { grid-row: 1 / 3; }
 .bcv-welcome__stage[data-stage="side"] .bcv-welcome__next { grid-column: 2; justify-self: start; margin: 0; }

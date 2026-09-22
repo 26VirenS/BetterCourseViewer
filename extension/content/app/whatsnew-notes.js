@@ -24,6 +24,16 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.58.0', date: '2026-09-22', notes: [
+      { kind: 'new', title: 'A new Simpl switch', body: 'Hover the disc: Activate, Deactivate and Turn off drop down.', icon: P.toggle },
+      { kind: 'new', title: 'Widgets get a bar', body: 'The switch and your pins sit in a strip above the page.', icon: P.pin },
+      { kind: 'fixed', title: 'No flash between steps', body: 'The welcome stays black from one pointer to the next.', icon: P.eye },
+      { kind: 'fixed', title: 'Arrows on their rows', body: 'A pointer at a sidebar row now sits level with it.', icon: P.arrows },
+      { kind: 'improved', title: 'Course page, up top', body: 'The button to the course’s Grades page now sits by the X.', icon: P.arrows },
+      { kind: 'fixed', title: 'What-if banner sized', body: 'The red note in Details no longer fills the column.', icon: P.check },
+      { kind: 'fixed', title: 'One solid trend line', body: 'The line no longer breaks into dashes on the Mac.', icon: P.steps },
+      { kind: 'fixed', title: 'Clean trend labels', body: 'No mark drawn through the numbers under the line.', icon: P.check },
+    ] },
     { version: '2.57.0', date: '2026-09-22', notes: [
       { kind: 'new', title: 'What-if on Grades', body: 'Try scores in a course’s Details and see the total move.', icon: P.pen },
       { kind: 'improved', title: 'Details, side by side', body: 'Breakdown on the left, assignments on the right, one size.', icon: P.layers },

@@ -17,9 +17,9 @@
   const { h } = BCV.utils;
   const html = document.documentElement;
   const KEY = 'welcome:pending'; // the setup's run, armed for the reloaded page
-  const KEY2 = 'welcome:look4'; // the switch's show seen (with the setup's run, or alone after an update); a new key when the show is redrawn, so everyone sees the new one once
-  const OLD_KEYS = ['welcome:look2', 'welcome:look3']; // the marks of the shows before it, cleared when this one is seen
-  const LOOK2_SINCE = '2.35.1'; // the show's own version: a What's New mark from before it means the show is owed
+  const KEY2 = 'welcome:look5'; // the switch's show seen (with the setup's run, or alone after an update); a new key when the show is redrawn, so everyone sees the new one once
+  const OLD_KEYS = ['welcome:look2', 'welcome:look3', 'welcome:look4']; // the marks of the shows before it, cleared when this one is seen
+  const LOOK2_SINCE = '2.58.0'; // the show's own version: a What's New mark from before it means the show is owed
   const CURSOR = '<svg viewBox="0 0 24 24" width="26" height="26"><path d="M5 3l14 9-6 1.5 3.5 6.5-2.5 1.5-3.5-6.5L6 19z" fill="#fff" stroke="#1c1c1e" stroke-width="1.4" stroke-linejoin="round"/></svg>';
   const WAIT = 3000; // Continue comes in after this long, on each stage: time to take the pointer in first
   const LEAVE = 260; // a stage's fade-out (app.css: bcv-welcome-out)
@@ -28,7 +28,7 @@
   // (viewBox size, the line, the head) and the thing pointed at, built when the stage opens
   const STAGES = {
     look: {
-      layout: 'look', kicker: 'There’s a new Simpl switch.', title: 'Press different parts for different things', hint: ['Left: Simpl is off', 'Middle: Simpl is inactive', 'Right: Simpl is on & active.'], stops: [-1, 0, 1],
+      layout: 'look', kicker: 'There’s a new Simpl switch.', title: 'Hover it: three buttons float down', hint: ['Green: Activate — Simpl on, and active on this page', 'Gray: Deactivate — stock Canvas on this page, Simpl still on', 'Red: Turn off Simpl — off on every page until you turn it back on'], stops: [1, 0, -1],
       prop: (app, ctx) => lookShow(app, ctx),
     },
     away: {
@@ -47,7 +47,8 @@
       spot: () => navRow('courses'), also: () => { const g = favsGroup(); return g ? { el: g, text: 'See your current classes here' } : null; },
     },
     tools: {
-      layout: 'side', kicker: 'Tools', title: 'Some tools, and some widgets', hint: 'Here you’ll find calculators, PDF converters and editors, a periodic table and more.',
+      layout: 'side', kicker: 'Tools', title: 'Some tools, and some widgets',
+      hint: { parts: [['Find a ', null], ['PDF Editor, ', '#ff9f0a'], ['File Converter, ', '#34c759'], ['Calculators, ', '#bf5af2'], ['Flashcards, ', '#2f7cf6'], ['Citation Generator', '#64d2ff'], [' & more.', '#ffffff']] }, // (each kind in a colour of its own)
       spot: () => navRow('tools'),
     },
     toolsIntro: { layout: 'center', title: 'Some helpful things', hint: 'some tools to help you do more, quickly.' },
@@ -78,10 +79,15 @@
   function stopSwitch(app, stop) {
     const demo = app?.lookDemo?.();
     if (!demo) return null;
-    demo.setPos(stop, { glide: false });
-    demo.slider.el.classList.add('bcv-welcome__stopsw');
-    demo.slider.el.dataset.stop = String(stop);
-    return demo.slider.el;
+    const i = [1, 0, -1].indexOf(stop); // the switch's buttons, top to bottom: Activate, Deactivate, Turn off Simpl
+    const b = demo.opts[i]?.cloneNode(true);
+    if (!b) return null;
+    b.classList.add('bcv-welcome__stopsw', 'is-hover'); // opened out with its words, as it is under the pointer
+    b.classList.remove('is-selected');
+    b.querySelector('.bcv-look__optlbl').textContent = ['Activate', 'Deactivate', 'Turn off Simpl'][i];
+    b.dataset.stop = String(stop);
+    b.tabIndex = -1;
+    return b;
   }
 
   /** The sidebar's list of starred courses, when they are listed there (not kept in a panel off the
@@ -152,45 +158,37 @@
     const wrap = h('div', { class: 'bcv-welcome__lookshow', 'aria-hidden': 'true' }, [demo.el, cursor]);
     if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) { demo.open(true); return wrap; }
     const alive = () => wrap.isConnected && !wrap.classList.contains('is-out');
-    const point = (nx) => { const r = demo.slider.el.getBoundingClientRect(); return { x: r.left + (nx / 208) * r.width, y: r.top + r.height / 2 }; }; // the slider's own x, on the page
-    const disc = () => { const r = demo.el.getBoundingClientRect(); return { x: r.right - r.height / 2, y: r.top + r.height / 2 }; };
-    const away = () => { const d = disc(); return { x: d.x - 150, y: d.y + 130 }; };
+    // the round end of a button (it stays put as the button opens out to the left), or the disc
+    const at = (el) => { const r = el.getBoundingClientRect(); return { x: r.right - r.height / 2, y: r.top + r.height / 2 }; };
+    const disc = () => at(demo.el.querySelector('.bcv-look__main'));
+    const opt = (i) => at(demo.opts[i]);
+    const away = () => { const d = disc(); return { x: d.x - 150, y: d.y + 170 }; };
     const cursorTo = ({ x, y }, ms) => { cursor.style.setProperty('--cms', `${ms}ms`); cursor.style.setProperty('--cx', `${x - 5}px`); cursor.style.setProperty('--cy', `${y - 3}px`); };
     const q = (ms, fn) => setTimeout(() => { if (alive()) fn(); }, ms);
     const press = () => { cursor.classList.add('is-press'); q(180, () => cursor.classList.remove('is-press')); };
-    const drag = (fromC, toC, ms) => { // the knob and the pointer together, frame by frame
-      const t0 = performance.now();
-      const step = () => {
-        if (!alive()) return;
-        const k = Math.min(1, (performance.now() - t0) / ms);
-        const e = k < 0.5 ? 2 * k * k : 1 - ((-2 * k + 2) ** 2) / 2;
-        const c = fromC + (toC - fromC) * e;
-        demo.slider.paint(c - 20);
-        cursorTo(point(c), 0);
-        if (k < 1) requestAnimationFrame(step);
-      };
-      requestAnimationFrame(step);
-    };
+    // the pointer comes to the disc (the three float down), goes to the grey one (it opens out:
+    // Deactivate) and presses it, then the red (Turn off Simpl), then the green (Activate), and leaves
     const loop = () => {
       if (!alive()) return;
-      demo.setPos(1, { glide: false });
+      demo.setPos(1);
       demo.open(false);
+      demo.hover(-1);
       cursor.style.opacity = '0';
       cursorTo(away(), 0);
       q(250, () => { cursor.style.opacity = '1'; cursorTo(disc(), 800); });
       q(1150, () => demo.open(true));
-      q(2100, () => cursorTo(point(104), 600));
-      q(2800, () => { press(); demo.setPos(0); });
-      q(4500, () => cursorTo(point(173), 600));
-      q(5200, () => { press(); demo.setPos(1); });
-      q(6900, () => cursorTo(point(184), 600));
-      q(7600, () => { cursor.classList.add('is-press'); drag(184, 24, 1100); });
-      q(8800, () => { cursor.classList.remove('is-press'); demo.setPos(-1); });
-      q(10400, () => cursorTo(point(173), 600));
-      q(11100, () => { press(); demo.setPos(1); });
-      q(12300, () => { cursorTo(away(), 700); cursor.style.opacity = '0'; });
-      q(12700, () => demo.open(false));
-      q(13500, loop);
+      q(1900, () => cursorTo(opt(1), 500));
+      q(2400, () => demo.hover(1));
+      q(3300, () => { press(); demo.setPos(0); });
+      q(4600, () => { demo.hover(-1); cursorTo(opt(2), 500); });
+      q(5100, () => demo.hover(2));
+      q(6000, () => { press(); demo.setPos(-1); });
+      q(7300, () => { demo.hover(-1); cursorTo(opt(0), 500); });
+      q(7800, () => demo.hover(0));
+      q(8700, () => { press(); demo.setPos(1); });
+      q(10000, () => { demo.hover(-1); cursorTo(away(), 700); cursor.style.opacity = '0'; });
+      q(10500, () => demo.open(false));
+      q(11400, loop);
     };
     q(60, loop); // (once the stage is on the page, so the copy can be measured)
     return wrap;
@@ -310,6 +308,7 @@
     const [h1] = holes;
     box.style.left = `${Math.round(h1.x + h1.w + 30)}px`;
     box.style.top = `${Math.max(16, Math.round(h1.y + h1.h / 2 - 40))}px`;
+    box.dataset.centreY = String(Math.round(h1.y + h1.h / 2)); // (the stage is centred on the hole once it is on the page: the arrow then points level with the thing)
     const wrap = h('div', { class: 'bcv-welcome__spot', 'aria-hidden': 'true' }, [svg]);
     if (also?.el) {
       const h2 = holes[1];
@@ -341,7 +340,8 @@
             stopSwitch(app, stop),
             h('span', { class: 'bcv-welcome__stoptext' }, at > 0 ? [h('b', { text: line.slice(0, at + 1) }), line.slice(at + 1)] : [line]),
           ]);
-        })) : hint ? h('div', { class: 'bcv-welcome__hint', text: hint }) : null,
+        })) : hint && typeof hint === 'object' && Array.isArray(hint.parts) ? h('div', { class: 'bcv-welcome__hint bcv-welcome__hint--rich' }, hint.parts.map(([t, c]) => h('span', { class: 'bcv-welcome__hue', style: c ? { color: c } : null, text: t }))) // (a line in several colours: one per part)
+          : hint ? h('div', { class: 'bcv-welcome__hint', text: hint }) : null,
       ]),
       next,
     ]);
@@ -350,10 +350,20 @@
     ui.el.dataset.stage = key;
     ui.el.replaceChildren(...[prop, box].filter(Boolean));
     ui.stage = { key, box, prop, next };
+    // a stage at a hole is centred on the hole (its words and Continue as a block), so the arrow —
+    // across the block — points level with the thing; again once Continue has come in and the block grew
+    const level = () => {
+      const cy = Number(box.dataset.centreY);
+      if (!cy) return;
+      const r = box.getBoundingClientRect();
+      box.style.top = `${Math.max(16, Math.min(window.innerHeight - r.height - 16, Math.round(cy - r.height / 2)))}px`;
+    };
+    level();
     clearTimeout(ui.timer);
     ui.timer = setTimeout(() => {
       if (ui?.stage?.next !== next) return;
       next.hidden = false;
+      level();
       if (!ui.el.contains(document.activeElement)) ui.el.focus({ preventScroll: true });
     }, WAIT);
     return new Promise((resolve) => next.addEventListener('click', () => resolve(), { once: true }));

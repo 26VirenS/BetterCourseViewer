@@ -235,9 +235,10 @@
         const coords = pts.map((s, i) => ({ x: 7 + i * (86 / (pts.length - 1)), y: yAt(s.gpa), s }));
         const svg = svgEl('svg', { viewBox: '0 0 100 100', preserveAspectRatio: 'none' });
         if (hasGoal()) svg.append(svgEl('line', { x1: '0', y1: yAt(goal).toFixed(2), x2: '100', y2: yAt(goal).toFixed(2), stroke: '#5856d6', 'stroke-width': '1.5', 'stroke-dasharray': '4 4', 'vector-effect': 'non-scaling-stroke', opacity: '.8' }));
-        // on entry the line strokes itself on from left to right (pathLength 420 → one dash the line's length) and the dots follow it
+        // on entry the line is revealed from left to right (a clip sliding open: a dash the line's
+        // length would stay a dash pattern in Safari, which does not scale it) and the dots follow it
         svg.append(
-          svgEl('polyline', { points: coords.map((p) => `${p.x.toFixed(2)},${p.y.toFixed(2)}`).join(' '), fill: 'none', stroke: '#0a84ff', 'stroke-width': '3', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'vector-effect': 'non-scaling-stroke', pathLength: '420', class: !entered ? 'bcv-gpa__line--draw' : '' }),
+          svgEl('polyline', { points: coords.map((p) => `${p.x.toFixed(2)},${p.y.toFixed(2)}`).join(' '), fill: 'none', stroke: '#0a84ff', 'stroke-width': '3', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'vector-effect': 'non-scaling-stroke', class: !entered ? 'bcv-gpa__line--draw' : '' }),
         );
         const label = (s) => (s.date === dayKey() ? 'Today' : U.fmtShort(`${s.date}T12:00:00`));
         chart = [
@@ -342,7 +343,7 @@
         h('div', {}, [
           U.el('bcv-gpa__cbar', [
             h('div', { class: 'bcv-gpa__cfill', style: { width: `${ungraded ? 0 : clamp(pct, 0, 100)}%`, background: c.color } }),
-            ungraded || pf ? null : h('span', { class: 'bcv-gpa__tick', title: `Target ${r.target[0]}`, style: { left: `${Math.min(100, r.target[1])}%` } }),
+            ungraded || pf ? null : h('span', { class: 'bcv-gpa__bartick', title: `Target ${r.target[0]}`, style: { left: `${Math.min(100, r.target[1])}%` } }), // (its own name: the trend's axis ticks are .bcv-gpa__tick)
           ]),
           U.text(`bcv-gpa__need bcv-pretty ${ungraded || pf ? '' : needClass(r)}`, ungraded ? 'Nothing graded yet — no score to project from' : pf ? 'Pass/Fail — no letter to aim at' : needText(r)),
           U.text('bcv-gpa__cnote', ungraded ? 'Canvas has not computed a score, so it counts for nothing here' : pf ? 'Counts for nothing in the GPA' : r.m.known ? `${store.fmtPts(r.m.earned)} pts earned so far` : 'Score as Canvas reports it'),
@@ -463,6 +464,8 @@
         const cats = gm.legend;
         const hyp = wf.on && gm.total !== null && gm.total !== undefined ? gm.total : null;
         const shownPct = hyp !== null ? hyp : r ? r.pct : pfPct;
+        // the way through to the course's own Grades page: a proper button, up by the X
+        const go = U.btn('Open the course’s Grades page', { kind: 'primary', icon: IC.external, iconColor: '#fff', cls: 'bcv-gpa-detail__go', onClick: () => { close(); ctx.app.go(`${c.url}/grades`); } });
         const head = U.el('bcv-sheet__head bcv-gpa-detail__head', [
           h('div', { class: 'bcv-gpa-detail__ring' }, ringSvg(c, shownPct, cats, true)),
           U.el('bcv-sheet__titles', [
@@ -481,6 +484,7 @@
               ]) : null,
             ]),
           ]),
+          go,
           h('button', { type: 'button', class: 'bcv-sheet__close', 'aria-label': 'Close', onclick: close }, U.svg(IC.close, { size: 13, stroke: 'var(--bcv-ink2)', width: 2.3 })),
         ]);
         const groupRows = cats.map((ct) => U.el('bcv-gpa-detail__grow', [
@@ -514,8 +518,6 @@
             U.text('bcv-gpa__kicker2', 'How the grade is weighted', 'span'),
             U.text('bcv-gpa-detail__note bcv-pretty', 'This course does not weight its groups — the total is points earned over points possible.'),
           ]);
-        // the way through to the course's own Grades page: a proper button, not a line at the bottom
-        const go = U.btn('Open the course’s Grades page', { kind: 'primary', icon: IC.external, iconColor: '#fff', cls: 'bcv-gpa-detail__go', onClick: () => { close(); ctx.app.go(`${c.url}/grades`); } });
         const whatIfBtn = whatIfAllowed ? h('button', { type: 'button', class: `bcv-whatif-btn ${wf.on ? 'is-on' : ''}`, text: wf.on ? 'Exit what-if mode' : 'Try what-if scores', onclick: () => { wf.on = !wf.on; focusId = null; paint(); } }) : null;
         const banner = wf.on ? U.el('bcv-banner bcv-banner--sm', [
           U.svg(IC.warn, { size: 20, stroke: 'var(--bcv-red)', width: 2, style: { flex: 'none' } }),
@@ -563,7 +565,7 @@
         // A repaint (a what-if typed, a target stepped) keeps each side where it was scrolled to.
         const scrolled = ['.bcv-gpa-detail__cols', '.bcv-gpa-detail__col--left', '.bcv-gpa-detail__col--right'].map((sel) => [sel, sheet.querySelector(sel)?.scrollTop || 0]);
         sheet.replaceChildren(head, U.el('bcv-sheet__list bcv-gpa-detail__body', U.el('bcv-gpa-detail__cols', [
-          U.el('bcv-gpa-detail__col bcv-gpa-detail__col--left', [byGroup, weights, go]),
+          U.el('bcv-gpa-detail__col bcv-gpa-detail__col--left', [byGroup, weights]),
           U.el('bcv-gpa-detail__col bcv-gpa-detail__col--right', [list]),
         ])));
         for (const [sel, top] of scrolled) if (top) { const el = sheet.querySelector(sel); if (el) el.scrollTop = top; }
