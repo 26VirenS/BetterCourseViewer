@@ -30,8 +30,10 @@
     { key: 'toast', max: 1, label: 'Say on the page what was seen', words: ['No', 'Yes'] },
   ];
   const WAIT_MS = [0, 250, 500, 1000, 2000, 4000];
-  // what ships: only a tab that names this one as its opener, closed once its address is handed over
-  const SHIPPED = { mode: 1, windows: 0, wait: 0, blank: 0, close: 1, log: 0, toast: 0 };
+  // What ships. Not the opener: Safari does not always name the tab that opened a window, so a new
+  // tab in the same window while a framed popup is up is what counts, closed once its address is
+  // handed over. A framed popup fills the screen, so little else is opening a tab just then.
+  const SHIPPED = { mode: 2, windows: 1, wait: 2, blank: 0, close: 1, log: 0, toast: 0 };
   // what to turn on to find out what a browser actually reports: catch everything, close nothing
   const EVERYTHING = { mode: 3, windows: 1, wait: 5, blank: 1, close: 0, log: 1, toast: 1 };
 

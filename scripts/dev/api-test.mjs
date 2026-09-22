@@ -147,14 +147,14 @@ devBox.self = devBox;
 vm.createContext(devBox);
 vm.runInContext(devSrc, devBox);
 const D = devBox.BCV.devcode;
-check(D.encode(D.SHIPPED) === 'SC1-1000100' && D.encode(D.EVERYTHING) === 'SC1-3151011', `the two codes worth knowing: ${D.encode(D.SHIPPED)} ships, ${D.encode(D.EVERYTHING)} catches everything`);
+check(D.encode(D.SHIPPED) === 'SC1-2120100' && D.encode(D.EVERYTHING) === 'SC1-3151011', `the two codes worth knowing: ${D.encode(D.SHIPPED)} ships, ${D.encode(D.EVERYTHING)} catches everything`);
 const back = D.decode('SC1-3151011');
 check(back.ok && back.settings.mode === 3 && back.settings.wait === 5 && back.settings.close === 0 && back.settings.toast === 1, `a code reads back as the settings it stands for: ${JSON.stringify(back.settings)}`);
 check(D.encode(D.decode(D.encode(D.EVERYTHING)).settings) === D.encode(D.EVERYTHING), 'a code typed back in means what it meant');
 const loose = D.decode('sc1 3 1 5 1 0 1 1');
 check(loose.ok && D.encode(loose.settings) === 'SC1-3151011', 'spaces, lower case and a missing dash are all read the same');
 const bad = D.decode('SC1-999');
-check(!bad.ok && D.encode(bad.settings) === 'SC1-1000100' && /7 digits/.test(bad.message), `a code that is not one says so and changes nothing: ${bad.message}`);
+check(!bad.ok && D.encode(bad.settings) === D.encode(D.SHIPPED) && /7 digits/.test(bad.message), `a code that is not one says so and changes nothing: ${bad.message}`);
 const over = D.decode('SC1-9999999');
 check(D.encode(over.settings) === 'SC1-3151111', `digits past the end of a setting come back to its last value, never past it: ${D.encode(over.settings)}`);
 

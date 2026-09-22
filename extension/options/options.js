@@ -736,7 +736,16 @@
   async function devShow(clear = false) {
     const r = await devAsk({ type: 'devLog', clear });
     $('devLog').textContent = devRows(r);
-    $('devSeenSub').textContent = r ? `Code ${r.code} · framed popups open on ${r.open?.length ? `tab ${r.open.join(', ')}` : 'no tab'}.` : 'The background is not answering.';
+    if (!r) { $('devSeenSub').textContent = 'The background is not answering.'; return; }
+    const can = r.can || {};
+    const says = [
+      `tabs ${can.tabs ? 'yes' : 'NO'}`,
+      `onCreated ${can.onCreated ? 'yes' : 'NO'}`,
+      `heard one ${can.heardATab ? 'yes' : 'NOT YET'}`,
+      `windows ${can.windows ? 'yes' : 'no'}`,
+      `webNavigation ${can.webNavigation ? 'yes' : 'no'}`,
+    ].join(' · ');
+    $('devSeenSub').textContent = `Code ${r.code} · open on ${r.open?.length ? `tab ${r.open.join(', ')}` : 'no tab'} · this browser: ${says}`;
   }
   async function devInit() {
     const r = await devAsk({ type: 'devGet' });

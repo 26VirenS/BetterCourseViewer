@@ -92,8 +92,17 @@ if (typeof importScripts === 'function' && !self.BCV?.devcode) {
       note({ ...entry, action: `could not: ${e?.message || e}` });
     }
   }
+  // What this browser will even say. A log that shows nothing is otherwise two different stories —
+  // nothing opened, or nothing was reported — and those want opposite fixes.
+  const CAN = {
+    tabs: !!api.tabs,
+    onCreated: !!api.tabs?.onCreated,
+    windows: !!api.windows?.onCreated,
+    webNavigation: !!api.webNavigation?.onCreatedNavigationTarget,
+  };
+  let heardATab = false;
   api.tabs?.onRemoved?.addListener((id) => framed.delete(id));
-  api.tabs?.onCreated?.addListener((tab) => { caught(tab); });
+  api.tabs?.onCreated?.addListener((tab) => { heardATab = true; caught(tab); });
   api.windows?.onCreated?.addListener(async (win) => {
     if (!cap.windows) return;
     try {
@@ -110,7 +119,7 @@ if (typeof importScripts === 'function' && !self.BCV?.devcode) {
   function devLog(clear) {
     const rows = seen.slice();
     if (clear) seen.length = 0;
-    return { ok: true, rows, code: DEV.encode(cap), open: [...framed.entries()].filter(([, st]) => st.open).map(([id]) => id) };
+    return { ok: true, rows, code: DEV.encode(cap), can: { ...CAN, heardATab }, open: [...framed.entries()].filter(([, st]) => st.open).map(([id]) => id) };
   }
 
   // ---- one-shot messages --------------------------------------------------
