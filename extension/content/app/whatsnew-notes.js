@@ -24,6 +24,12 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.75.0', date: '2026-09-23', notes: [
+      { kind: 'improved', title: 'Scenes redrawn', body: 'Ridges, waves, trees and dunes, in clean lines.', icon: P.pen },
+      { kind: 'new', title: 'A drawing per card', body: 'Every counter and header wears its own variation.', icon: P.pic },
+      { kind: 'fixed', title: 'Picker in place', body: 'The colour picker opens on the Custom swatch.', icon: P.tool },
+      { kind: 'improved', title: 'Continue in view', body: 'The first screen fits shorter windows.', icon: P.arrows },
+    ] },
     // invite: the first page after this update shows the theme invitation (whatsnew.js) in the notes' place; the notes wait in Settings
     { version: '2.74.0', date: '2026-09-23', invite: true, notes: [
       { kind: 'new', title: 'Try a theme', body: 'This update invites you to pick one, or a colour.', icon: P.pic },

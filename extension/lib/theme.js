@@ -233,72 +233,79 @@
   // turbulence for cloud, water and grain rather than stripes — and a few kilobytes each, kept in
   // storage like a photo would be (a data URL) so the page treats them the same.
   const scene = (body, defs) => `data:image/svg+xml;charset=utf-8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice"><defs>${defs}</defs>${body}</svg>`.replace(/\n\s*/g, ''))}`;
-  const SCENES = {
-    dusk: scene(`<rect width="1600" height="900" fill="url(#sky)"/>
-<rect width="1600" height="560" filter="url(#cloud)" opacity=".5"/>
-<circle cx="1090" cy="548" r="330" fill="url(#glow)"/>
-<circle cx="1090" cy="548" r="92" fill="#ffd9a4" opacity=".45" filter="url(#soft)"/>
-<circle cx="1090" cy="548" r="76" fill="#ffe4b3"/>
-<rect y="560" width="1600" height="340" fill="url(#sea)"/>
-<rect y="560" width="1600" height="6" fill="#ffb98a" opacity=".55"/>
-<rect x="1030" y="560" width="120" height="260" fill="url(#refl)" filter="url(#soft)"/>
-<path d="M0 640 Q400 618 800 640 T1600 634" stroke="#ff9e7a" stroke-opacity=".16" stroke-width="7" fill="none" filter="url(#soft2)"/>
-<path d="M0 712 Q400 690 800 712 T1600 706" stroke="#ff9e7a" stroke-opacity=".12" stroke-width="9" fill="none" filter="url(#soft2)"/>
-<path d="M0 800 Q400 780 800 800 T1600 792" stroke="#c96a7c" stroke-opacity=".14" stroke-width="12" fill="none" filter="url(#soft2)"/>`, `<linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1e1748"/><stop offset=".32" stop-color="#5f2f6b"/><stop offset=".52" stop-color="#c8645f"/><stop offset=".62" stop-color="#f4b06a"/></linearGradient>
-<linearGradient id="sea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6a3358"/><stop offset=".45" stop-color="#2b1a42"/><stop offset="1" stop-color="#100b20"/></linearGradient>
-<radialGradient id="glow"><stop offset="0" stop-color="#ffd7a0" stop-opacity=".9"/><stop offset=".45" stop-color="#ff9a6a" stop-opacity=".3"/><stop offset="1" stop-color="#ff9a6a" stop-opacity="0"/></radialGradient>
-<linearGradient id="refl" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffcf8f" stop-opacity=".7"/><stop offset="1" stop-color="#ffcf8f" stop-opacity="0"/></linearGradient>
-<filter id="soft" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="16"/></filter>
-<filter id="soft2" x="-5%" y="-100%" width="110%" height="300%"><feGaussianBlur stdDeviation="5"/></filter>
-<filter id="cloud" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.0016 0.005" numOctaves="3" seed="4"/><feColorMatrix values="0 0 0 0 1  0 0 0 0 .8  0 0 0 0 .84  0 0 0 1.5 -0.62"/><feGaussianBlur stdDeviation="2"/></filter>`),
-    ocean: scene(`<rect width="1600" height="900" fill="url(#sky)"/>
-<rect width="1600" height="470" filter="url(#cloud)" opacity=".8"/>
-<circle cx="420" cy="220" r="260" fill="url(#glow)"/>
-<circle cx="420" cy="220" r="64" fill="#fff8dc"/>
-<rect y="470" width="1600" height="430" fill="url(#sea)"/>
-<rect y="470" width="1600" height="5" fill="#bfe9ff" opacity=".7"/>
-<rect y="470" width="1600" height="430" filter="url(#glint)" opacity=".5"/>
-<path d="M0 560 Q300 540 600 560 T1200 560 T1600 552" stroke="#dff4ff" stroke-opacity=".3" stroke-width="6" fill="none" filter="url(#soft2)"/>
-<path d="M0 660 Q300 636 600 660 T1200 660 T1600 650" stroke="#dff4ff" stroke-opacity=".22" stroke-width="9" fill="none" filter="url(#soft2)"/>
-<path d="M0 780 Q300 752 600 780 T1200 780 T1600 770" stroke="#dff4ff" stroke-opacity=".16" stroke-width="12" fill="none" filter="url(#soft2)"/>
-<rect x="340" y="470" width="160" height="300" fill="url(#refl)" filter="url(#soft)"/>`, `<linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#cfeafc"/><stop offset=".52" stop-color="#63b3ec"/></linearGradient>
-<linearGradient id="sea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3ea3e6"/><stop offset=".4" stop-color="#1a6fb8"/><stop offset="1" stop-color="#062f57"/></linearGradient>
-<radialGradient id="glow"><stop offset="0" stop-color="#fff9e0" stop-opacity=".95"/><stop offset=".4" stop-color="#fff2c4" stop-opacity=".3"/><stop offset="1" stop-color="#fff2c4" stop-opacity="0"/></radialGradient>
-<linearGradient id="refl" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff" stop-opacity=".5"/><stop offset="1" stop-color="#ffffff" stop-opacity="0"/></linearGradient>
-<filter id="soft" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="16"/></filter>
-<filter id="soft2" x="-5%" y="-100%" width="110%" height="300%"><feGaussianBlur stdDeviation="4"/></filter>
-<filter id="cloud" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.0014 0.004" numOctaves="4" seed="11"/><feColorMatrix values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 1.7 -0.72"/><feGaussianBlur stdDeviation="3"/></filter>
-<filter id="glint" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.02 0.09" numOctaves="2" seed="3"/><feColorMatrix values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 1.4 -0.9"/></filter>`),
-    forest: scene(`<rect width="1600" height="900" fill="url(#sky)"/>
-<circle cx="1240" cy="150" r="320" fill="url(#glow)"/>
-<path d="M0 470 C200 420 320 400 520 440 S900 520 1100 460 S1420 400 1600 430 V900 H0Z" fill="#9dcfae"/>
-<rect y="440" width="1600" height="200" fill="url(#mist)"/>
-<path d="M0 560 C240 500 420 540 640 560 S980 600 1200 550 S1460 500 1600 540 V900 H0Z" fill="#5fa877"/>
-<rect y="540" width="1600" height="220" fill="url(#mist)"/>
-<path d="M0 680 C180 620 380 660 560 680 S860 720 1040 670 S1360 620 1600 660 V900 H0Z" fill="#2f7f4e"/>
-<path d="M0 680 C180 620 380 660 560 680 S860 720 1040 670 S1360 620 1600 660 V900 H0Z" filter="url(#leaf)" opacity=".35"/>
-<path d="M0 800 C260 760 520 800 780 790 S1300 760 1600 790 V900 H0Z" fill="#1b4d31"/>
-<path d="M0 800 C260 760 520 800 780 790 S1300 760 1600 790 V900 H0Z" filter="url(#leaf)" opacity=".4"/>`, `<linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e8f5ec"/><stop offset=".55" stop-color="#b9e0c6"/></linearGradient>
-<radialGradient id="glow"><stop offset="0" stop-color="#fffbe6" stop-opacity=".9"/><stop offset=".5" stop-color="#fff6cc" stop-opacity=".25"/><stop offset="1" stop-color="#fff6cc" stop-opacity="0"/></radialGradient>
-<linearGradient id="mist" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff" stop-opacity="0"/><stop offset=".5" stop-color="#ffffff" stop-opacity=".42"/><stop offset="1" stop-color="#ffffff" stop-opacity="0"/></linearGradient>
-<filter id="leaf" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.02 0.03" numOctaves="3" seed="9"/><feColorMatrix values="0 0 0 0 .05  0 0 0 0 .25  0 0 0 0 .12  0 0 0 1.3 -0.5"/></filter>`),
-    sand: scene(`<rect width="1600" height="900" fill="url(#sky)"/>
-<circle cx="1230" cy="240" r="300" fill="url(#glow)"/>
-<circle cx="1230" cy="240" r="70" fill="#fff6dc"/>
-<path d="M0 520 C300 470 560 500 820 480 S1300 430 1600 470 V900 H0Z" fill="url(#dune1)"/>
-<path d="M0 640 C260 590 520 640 800 610 S1240 560 1600 600 V900 H0Z" fill="url(#dune2)"/>
-<path d="M0 640 C260 590 520 640 800 610 S1240 560 1600 600" stroke="#fff0cf" stroke-opacity=".55" stroke-width="3" fill="none"/>
-<path d="M0 790 C240 740 560 780 900 750 S1320 720 1600 760 V900 H0Z" fill="url(#dune3)"/>
-<path d="M0 790 C240 740 560 780 900 750 S1320 720 1600 760" stroke="#ffe3b8" stroke-opacity=".5" stroke-width="3" fill="none"/>
-<rect y="470" width="1600" height="430" filter="url(#grain)" opacity=".28"/>`, `<linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fdedd2"/><stop offset=".5" stop-color="#f6cd93"/></linearGradient>
-<radialGradient id="glow"><stop offset="0" stop-color="#fff8e4" stop-opacity=".95"/><stop offset=".5" stop-color="#ffe9b8" stop-opacity=".3"/><stop offset="1" stop-color="#ffe9b8" stop-opacity="0"/></radialGradient>
-<linearGradient id="dune1" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#f0c98c"/><stop offset=".55" stop-color="#e9b672"/><stop offset="1" stop-color="#f3d09a"/></linearGradient>
-<linearGradient id="dune2" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#d9995a"/><stop offset=".5" stop-color="#e8ad6c"/><stop offset="1" stop-color="#cf8a4b"/></linearGradient>
-<linearGradient id="dune3" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#b8703c"/><stop offset=".5" stop-color="#cf8a4b"/><stop offset="1" stop-color="#a9602f"/></linearGradient>
-<filter id="grain" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.6" numOctaves="1" seed="2"/><feColorMatrix values="0 0 0 0 .4  0 0 0 0 .2  0 0 0 0 .05  0 0 0 .9 -0.35"/></filter>`),
+  // The four drawn scenes — Dusk, Ocean, Forest, Sand — each in nine variations (k = 0..8): lines and
+  // shapes that ink well (ridges, rings, waves, rows of trees, dune contours, rays), no filters (they
+  // rasterise once, fast). A variation moves the sun, turns the composition round for odd k, and
+  // jitters the shapes from k, so a set of counters or headers each wears its own drawing of one scene.
+  const rng = (seed) => { let s = (Math.imul(seed + 1, 2654435761) + 40503) >>> 0; return () => { s = (Math.imul(s ^ (s >>> 15), 2246822519) + 0x9e3779b9) >>> 0; return ((s >>> 8) & 0xffffff) / 0x1000000; }; };
+  const turn = (k, inner) => (k % 2 ? `<g transform="translate(1600 0) scale(-1 1)">${inner}</g>` : inner);
+  const SUN_X = [1180, 420, 800];
+  const P = (x, y) => `${Math.round(x)} ${Math.round(y)}`;
+  const ticks = (cx, cy, r1, r2, n) => Array.from({ length: n }, (_, i) => { const a = (i * 2 * Math.PI) / n; return `<line x1="${P(cx + r1 * Math.cos(a), cy + r1 * Math.sin(a)).replace(' ', '" y1="')}" x2="${P(cx + r2 * Math.cos(a), cy + r2 * Math.sin(a)).replace(' ', '" y2="')}"/>`; }).join('');
+  const birdsAt = (spots, n, ink) => `<g stroke="${ink}" stroke-width="5" fill="none" stroke-linecap="round">${spots.slice(0, n).map(([x, y]) => `<path d="M${x} ${y}q20-22 40 0q20-22 40 0"/>`).join('')}</g>`;
+  const DEFS = {
+    dusk: '<linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1e1748"/><stop offset=".35" stop-color="#5f2f6b"/><stop offset=".55" stop-color="#c8645f"/><stop offset=".67" stop-color="#f4b06a"/></linearGradient><linearGradient id="sea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6a3358"/><stop offset=".5" stop-color="#2b1a42"/><stop offset="1" stop-color="#100b20"/></linearGradient>',
+    ocean: '<linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#cfeafc"/><stop offset=".55" stop-color="#7cc0f0"/></linearGradient>',
+    forest: '<linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e8f5ec"/><stop offset=".55" stop-color="#b9e0c6"/></linearGradient>',
+    sand: '<linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fdedd2"/><stop offset=".5" stop-color="#f6cd93"/></linearGradient>',
   };
+  const SKY = '<rect width="1600" height="900" fill="url(#sky)"/>';
+  const DRAW = {
+    /** A sun low over the water inside rings of light, a ridge across the horizon dipping under it, a dark near ridge, its light in bars on the water, birds. */
+    dusk(k) {
+      const r = rng(k); const sx = SUN_X[k % 3], sy = 470 - Math.round(r() * 60);
+      const rings = [140, 220, 310, 410].slice(0, 3 + (k % 2)).map((rad) => `<circle cx="${sx}" cy="${sy}" r="${rad}"/>`).join('');
+      const pts = []; for (let x = 0; x <= 1600; x += 140) pts.push(P(x, Math.abs(x - sx) < 220 ? 565 + r() * 30 : 380 + r() * 170));
+      const bars = [0, 1, 2, 3, 4, 5].map((i) => `<rect x="${Math.round(sx - 110 + r() * 60)}" y="${630 + i * 34}" width="${Math.round(120 + r() * 140)}" height="${6 + (i % 2) * 2}" rx="4"/>`).join('');
+      const near = sx > 800 ? 'M0 700L120 640L260 690L420 620L560 680L680 650L780 720' : 'M1600 700L1480 640L1340 690L1180 620L1040 680L920 650L820 720';
+      return scene(`${SKY}${turn(k, `<g stroke="#ffd9a6" stroke-opacity=".4" stroke-width="4" fill="none">${rings}</g><circle cx="${sx}" cy="${sy}" r="${80 + (k % 3) * 10}" fill="#ffe6b0"/>${birdsAt([[560, 250], [650, 300], [500, 330], [1100, 240]], 2 + (k % 3), '#2a1440')}<path d="M0 600L${pts.join('L')}L1600 600Z" fill="#3b1f4f"/><path d="M${pts.join('L')}" stroke="#ff9e7a" stroke-opacity=".7" stroke-width="4" fill="none"/><rect y="600" width="1600" height="300" fill="url(#sea)"/><rect y="598" width="1600" height="4" fill="#ffb98a" opacity=".8"/><g fill="#ffb27a" fill-opacity=".7">${bars}</g><path d="${near}V900H${sx > 800 ? 0 : 1600}Z" fill="#1a0d2a"/><path d="${near}" stroke="#6b3d78" stroke-width="4" fill="none"/>`)}`, DEFS.dusk);
+    },
+    /** A sun with short rays, rows of scalloped waves with a light crest each, a sailing boat, birds. */
+    ocean(k) {
+      const r = rng(k + 9); const sx = SUN_X[(k + 1) % 3], sy = 200 + Math.round(r() * 60);
+      const amp = 40 + Math.round(r() * 16);
+      const wave = (y, p, f) => { const d = `M${p} ${y} ${Array(9).fill(`q100 -${amp} 200 0`).join(' ')}`; return `<path d="${d} V900 H${p} Z" fill="${f}"/><path d="${d}" stroke="#eaf7ff" stroke-opacity=".85" stroke-width="5" fill="none"/>`; };
+      const waves = [[500, '#5db8ee'], [590, '#3494dc'], [680, '#2273c2'], [770, '#164f9a'], [850, '#0d356e']].map(([y, f], i) => wave(y + Math.round(r() * 20 - 10), (i + k) % 2 ? -100 : 0, f)).join('');
+      const bx = sx < 800 ? 1240 : 300;
+      const boat = k % 3 === 1 ? '' : `<path d="M${bx} 420l60-150 30 150z" fill="#fff6d6"/><path d="M${bx + 105} 420l-40-110v110z" fill="#e6eef5"/><rect x="${bx - 20}" y="420" width="150" height="16" rx="6" fill="#2b5f8e"/>`;
+      return scene(`${SKY}${turn(k, `<circle cx="${sx}" cy="${sy}" r="72" fill="#fff6d6"/><g stroke="#fff6d6" stroke-width="6" stroke-linecap="round">${ticks(sx, sy, 100, 132, 8)}</g>${birdsAt([[bx - 340, 180], [bx - 250, 240], [bx - 150, 200], [bx + 60, 150]], 2 + (k % 3), '#2b5f8e')}${boat}${waves}`)}`, DEFS.ocean);
+    },
+    /** A moon in a ring, hills with a light contour each, two rows of pines — small ones far, tall ones near — and the ground's lines. */
+    forest(k) {
+      const r = rng(k + 18); const mx = [1230, 300, 800][k % 3];
+      const trees = (y, xs, w, hs, fill, trunk) => xs.map((x, i) => { const xx = Math.round(x + r() * 80 - 40), hh = Math.round(hs[i % hs.length] + r() * 40 - 20); return `<path d="M${xx} ${y}l${w} ${-hh}l${w} ${hh}z" fill="${fill}"/>${trunk ? `<rect x="${xx + w - 5}" y="${y}" width="10" height="${trunk}" fill="${fill}"/>` : ''}`; }).join('');
+      const j = () => Math.round(r() * 50 - 25);
+      const back = `M0 ${520 + j()}C260 ${430 + j()} 420 ${470 + j()} 640 ${500 + j()}S1000 ${560 + j()} 1200 ${480 + j()} 1460 ${420 + j()} 1600 ${470 + j()}`;
+      const mid = `M0 ${640 + j()}C240 ${590 + j()} 480 ${630 + j()} 700 ${620 + j()}S1100 ${590 + j()} 1600 ${640 + j()}`;
+      const front = `M0 ${780 + j()}C300 ${740 + j()} 600 ${800 + j()} 900 ${760 + j()}S1300 ${730 + j()} 1600 ${790 + j()}`;
+      return scene(`${SKY}${turn(k, `<circle cx="${mx}" cy="190" r="86" fill="#fff9e0"/><circle cx="${mx}" cy="190" r="118" stroke="#fff9e0" stroke-opacity=".6" stroke-width="4" fill="none"/><path d="${back}V900H0Z" fill="#a6d5b4"/><path d="${back}" stroke="#fff" stroke-opacity=".6" stroke-width="4" fill="none"/>${trees(560, [40, 150, 250, 380, 470, 590, 700, 820, 910, 1040, 1150, 1270, 1380, 1500], 36, [110, 140, 90, 130, 100], '#4f9e6b')}<path d="${mid}V900H0Z" fill="#3f8a5c"/><path d="${mid}" stroke="#d6f0dd" stroke-opacity=".6" stroke-width="4" fill="none"/>${trees(700, [-20, 140, 300, 470, 640, 820, 990, 1160, 1330, 1500], 62, [190, 150, 220, 170], '#1f5a38', 24)}<path d="${front}V900H0Z" fill="#15402a"/><path d="${front}" stroke="#5fb07f" stroke-opacity=".7" stroke-width="4" fill="none"/><path d="${front.replace(/(\d+)(?=[CS ]|$)/g, (m) => String(Number(m) + 50)).replace(/^M0 (\d+)/, (m, y) => `M0 ${Number(y)}`)}" stroke="#5fb07f" stroke-opacity=".4" stroke-width="3" fill="none"/>`)}`, DEFS.forest);
+    },
+    /** A sun with a ring of ticks, wind in dashed lines, three dunes with a light crest and parallel contours each. */
+    sand(k) {
+      const r = rng(k + 27); const sx = SUN_X[(k + 2) % 3], sy = 230 + Math.round(r() * 50);
+      const j = () => Math.round(r() * 40 - 20);
+      const d1 = `M0 ${540 + j()}C300 ${470 + j()} 560 ${520 + j()} 820 ${470 + j()}S1300 ${420 + j()} 1600 ${480 + j()}`;
+      const d2 = `M0 ${660 + j()}C260 ${600 + j()} 520 ${660 + j()} 800 ${610 + j()}S1240 ${570 + j()} 1600 ${640 + j()}`;
+      const d3 = `M0 ${800 + j()}C240 ${740 + j()} 560 ${790 + j()} 900 ${750 + j()}S1320 ${720 + j()} 1600 ${780 + j()}`;
+      const lower = (d, by) => d.replace(/(-?\d+) (-?\d+)/g, (m, x, y) => `${x} ${Number(y) + by}`);
+      const contours = (d, off, n, ink) => Array.from({ length: n }, (_, i) => `<path d="${lower(d, off * (i + 1))}" stroke="${ink}" stroke-opacity=".55" stroke-width="3" fill="none"/>`).join('');
+      const wx = sx > 800 ? 120 : 900;
+      return scene(`${SKY}${turn(k, `<circle cx="${sx}" cy="${sy}" r="80" fill="#fff4d6"/><g stroke="#f5c27a" stroke-width="6" stroke-linecap="round">${ticks(sx, sy, 110, 150, 12)}</g><g stroke="#fff" stroke-opacity=".6" stroke-width="4" stroke-dasharray="30 22" stroke-linecap="round" fill="none"><path d="M${wx} 300q120-30 260 0t260 0"/><path d="M${wx + 100} 380q100-26 220 0t220 0"/>${k % 2 ? `<path d="M${wx + 40} 450q90-22 200 0t200 0"/>` : ''}</g><path d="${d1}V900H0Z" fill="#f1c88e"/>${contours(d1, 26, 2 + (k % 3), '#d9a05e')}<path d="${d2}V900H0Z" fill="#dfa161"/><path d="${d2}" stroke="#fff0cf" stroke-width="4" fill="none"/>${contours(d2, 30, 2 + ((k + 1) % 3), '#c48542')}<path d="${d3}V900H0Z" fill="#c07a3c"/><path d="${d3}" stroke="#ffe3b8" stroke-width="4" fill="none"/>${contours(d3, 32, 2, '#a9602f')}`)}`, DEFS.sand);
+    },
+  };
+  const SCENE_VARIANTS = 9;
+  const SCENE_TONES = { Dusk: '#b8527a', Ocean: '#3a8fd6', Forest: '#2f8f4e', Sand: '#e8a767' };
+  const SCENE_NAMES = Object.keys(SCENE_TONES);
+  // every drawing, built once: 'Dusk' is the first variation, 'Dusk#3' the fourth
+  const SCENE_URLS = new Map();
+  for (const name of SCENE_NAMES) for (let k = 0; k < SCENE_VARIANTS; k++) SCENE_URLS.set(k ? `${name}#${k}` : name, DRAW[name.toLowerCase()](k));
+  /** A scene's drawing: `name` alone is its first variation, or a variation k (wrapped round the nine). */
+  const sceneUrl = (name, k = 0) => { const n = ((k % SCENE_VARIANTS) + SCENE_VARIANTS) % SCENE_VARIANTS; return SCENE_URLS.get(n ? `${name}#${n}` : name) || null; };
+  /** The drawing a scene key stands for ('Dusk', 'Dusk#3'), or null for anything else. */
+  const sceneUrlOf = (key) => (key ? SCENE_URLS.get(key) || null : null);
+  const SCENES = { dusk: sceneUrl('Dusk'), ocean: sceneUrl('Ocean'), forest: sceneUrl('Forest'), sand: sceneUrl('Sand') };
   /** [name, picture, tone]: the tone is what the veils warm to, as a read photo's would be. */
-  const PRESET_PHOTOS = [['Dusk', SCENES.dusk, '#b8527a'], ['Ocean', SCENES.ocean, '#3a8fd6'], ['Forest', SCENES.forest, '#2f8f4e'], ['Sand', SCENES.sand, '#e8a767']];
+  const PRESET_PHOTOS = SCENE_NAMES.map((n) => [n, sceneUrl(n), SCENE_TONES[n]]);
 
   // ---- the photos: read here, scaled here, kept here ------------------------------------------------
   /** Where a photo can go: the six counters of the Dashboard, and the sidebar. */
@@ -372,7 +379,8 @@
   // scene, the scene's name, so Personalize can show it as the scene it is.
   const ASSET = /^asset:/;
   const hashOf = (str) => { let h = 2166136261; const step = Math.max(1, Math.floor(str.length / 4096)); for (let i = 0; i < str.length; i += step) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0).toString(16) + str.length.toString(36); };
-  const sceneNameOf = (v) => (PRESET_PHOTOS.find((p) => p[1] === v) || [])[0] || null;
+  /** The scene key a raw drawing is ('Dusk', 'Dusk#3'), or null for a photo. */
+  const sceneNameOf = (v) => { if (!v || !v.startsWith('data:image/svg+xml')) return null; for (const [key, url] of SCENE_URLS) if (url === v) return key; return null; };
   /** A box blur over RGBA pixels, clamped at the edges: across, then down. */
   function boxBlur(d, w, h, r) {
     const tmp = new Float32Array(d.length);
@@ -489,7 +497,7 @@
         const a = out.assets[v.slice(6)];
         if (!a) return null;
         if (a.ink || !canDraw) return v;
-        try { const raw = a.scene ? (PRESET_PHOTOS.find((x) => x[0] === a.scene) || [])[1] || a.sharp : a.sharp; const { ink, inkBlur } = await inkFor(raw); delete a.blur; Object.assign(a, { ink, inkBlur }); } catch { /* kept as it is */ }
+        try { const raw = a.scene ? sceneUrlOf(a.scene) || a.sharp : a.sharp; const { ink, inkBlur } = await inkFor(raw); delete a.blur; Object.assign(a, { ink, inkBlur }); } catch { /* kept as it is */ }
         return v;
       }
       if (!canDraw) return v;
@@ -519,7 +527,7 @@
     return { sharp: v, ink: null, inkBlur: null, scene: sceneNameOf(v) };
   };
   /** The raw value a slot stands for, for editing: a scene's own drawing, or the picture itself. */
-  const rawOf = (images, v) => { const p = picOf(images, v); if (!p) return null; return p.scene ? (PRESET_PHOTOS.find((x) => x[0] === p.scene) || [])[1] || p.sharp : p.sharp; };
+  const rawOf = (images, v) => { const p = picOf(images, v); if (!p) return null; return p.scene ? sceneUrlOf(p.scene) || p.sharp : p.sharp; };
   const hasRaw = (images) => [images?.side, ...Object.values(images?.cards || {}), ...Object.values(images?.headers || {})].some((v) => v && (!ASSET.test(v) || !images?.assets?.[v.slice(6)]?.ink));
 
   const emptyImages = () => ({ side: null, cards: {}, headers: {}, tones: {}, assets: {} });
@@ -536,7 +544,7 @@
 
   BCV.theme = {
     hexToRgb, rgbToHex, rgbToHsl, hslToRgb, hslToHex, luminance, contrast, normalize,
-    GROUND, MIN_SAT, ICON_RATIO, TEXT_RATIO, PRESETS, REGULAR, PRESET_PHOTOS, CARD_SLOTS, HEADER_SLOTS, IMAGES_KEY,
+    GROUND, MIN_SAT, ICON_RATIO, TEXT_RATIO, PRESETS, REGULAR, PRESET_PHOTOS, SCENE_VARIANTS, sceneUrl, sceneNameOf, CARD_SLOTS, HEADER_SLOTS, IMAGES_KEY,
     palette, shades, shadeSet, cssVars, apply, readable, readableOn, fillFor, mix, tint, customHex, controlsOf, veilBase, picCss, band, nearest, fromControls, toControls,
     resizeImage, readImage, imageTone, fillTones, loadImages, saveImages, countImages, countHeaders, emptyImages, packImages, picOf, rawOf, CAST, INK_LIFT, inkOn, inkFor, inkCached,
   };

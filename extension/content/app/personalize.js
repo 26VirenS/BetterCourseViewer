@@ -298,10 +298,12 @@
       render('photo');
     } catch (e) { /* not a picture: nothing changes */ }
   };
+  /** A scene put on a set of things: each gets its own variation of it (a photo goes as it is). */
+  const variantOf = (v, i) => { const n = (T().sceneNameOf(v) || '').split('#')[0]; return n ? T().sceneUrl(n, i) : v; };
   function photoChoices(key, { onEvery = null } = {}) {
     const cur = photoAt(key);
     const choice = (name, bg, on, pick, raw = null) => { const ink = raw ? inkOf(raw) : null; return h('button', { type: 'button', class: `pz__choice ${on ? 'is-on' : ''}`, title: name, 'aria-label': name, dataset: { photo: name }, onclick: pick }, [h('i', { class: `pz__choicepic ${name === 'None' ? 'pz__choicepic--none' : ''} ${ink ? 'pz__choicepic--inked' : ''}`, style: ink ? { '--ink': T().picCss(ink.ink) } : bg ? { background: bg } : null }), h('span', { class: 'pz__choicename', text: name })]); };
-    const isPreset = (p) => !!cur && cur === p[1];
+      const isPreset = (p) => !!cur && (cur === p[1] || (T().sceneNameOf(cur) || '').split('#')[0] === p[0]); // (any variation of the scene counts as it)
     return [
       choice('None', null, !cur, () => { setPhoto(key, null); render('photo'); }),
       ...PRESET_PHOTOS.map((p) => choice(p[0], T().picCss(p[1]), isPreset(p), () => { setPhoto(key, p[1], p[2]); render('photo'); }, p[1])),
@@ -316,7 +318,7 @@
     return h('div', { class: 'pz__bar2', id: 'pzPhotoBar', dataset: { for: key } }, [
       h('span', { class: 'pz__bartitle', text: title }),
       h('i', { class: 'pz__vr' }),
-      ...photoChoices(key, isCard ? { onEvery: { label: 'All cards', go: (cur) => { for (const [slot] of CARDS) setPhoto(slot, cur, toneAt(key)); } } } : {}),
+      ...photoChoices(key, isCard ? { onEvery: { label: 'All cards', go: (cur) => { CARDS.forEach(([slot], i) => setPhoto(slot, variantOf(cur, i + 1), toneAt(key))); } } } : {}),
       h('button', { type: 'button', class: 'pz__barok', title: 'Done', 'aria-label': 'Done', onclick: () => { st.target = null; render(); } }, svg(IC.check, { size: 13, width: 2.8 })),
     ]);
   }
@@ -325,7 +327,7 @@
     return h('div', { class: 'pz__hcontrols' }, [
       h('span', { class: 'pz__hfor', text: `Photo for ${title}` }),
       h('div', { class: 'pz__choices' }, photoChoices(`head:${st.page}`, {})),
-      h('button', { type: 'button', class: 'pz__textbtn', id: 'pzEvery', disabled: !photoAt(`head:${st.page}`) || null, text: 'Use on every page', onclick: () => { const cur = photoAt(`head:${st.page}`); if (!cur) return; for (const [k] of T().HEADER_SLOTS) setPhoto(`head:${k}`, cur, toneAt(`head:${st.page}`)); render('photo'); } }),
+      h('button', { type: 'button', class: 'pz__textbtn', id: 'pzEvery', disabled: !photoAt(`head:${st.page}`) || null, text: 'Use on every page', onclick: () => { const cur = photoAt(`head:${st.page}`); if (!cur) return; T().HEADER_SLOTS.forEach(([k], i) => setPhoto(`head:${k}`, variantOf(cur, i + 1), toneAt(`head:${st.page}`))); render('photo'); } }),
     ]);
   }
 
@@ -334,14 +336,15 @@
     const t = T();
     const names = [['Regular', 'conic-gradient(#ff453a,#ff9f0a,#30d158,#40c8e0,#0a84ff,#bf5af2,#ff453a)'], ...t.PRESETS.map(([hex, name]) => [name, hex]), ['Custom', null]];
     const custom = t.customHex(st.theme.h, st.theme.s, st.theme.depth);
-    const picOf = (name) => (name ? sceneOf(name)[1] : null);
-    const readyOn = (r) => st.theme.name === r.colour && (st.images.side || null) === picOf(r.side) && t.CARD_SLOTS.every((k) => (st.images.cards[k] || null) === picOf(r.cards)) && t.HEADER_SLOTS.every(([k]) => (st.images.headers[k] || null) === picOf(r.heads));
+    // a ready-made theme: the sidebar wears its scene's first drawing, every counter and every header a variation of theirs — no two the same
+    const picOf = (name, i = 0) => (name ? t.sceneUrl(name, i) : null);
+    const readyOn = (r) => st.theme.name === r.colour && (st.images.side || null) === picOf(r.side) && t.CARD_SLOTS.every((k, i) => (st.images.cards[k] || null) === picOf(r.cards, i + 1)) && t.HEADER_SLOTS.every(([k], i) => (st.images.headers[k] || null) === picOf(r.heads, i + 1));
     const applyReady = (r) => {
       st.theme.name = r.colour; closePicker(true);
-      const side = r.side ? sceneOf(r.side) : [null, null, null], cards = r.cards ? sceneOf(r.cards) : [null, null, null], heads = r.heads ? sceneOf(r.heads) : [null, null, null];
-      setPhoto('side', side[1], side[2]);
-      for (const k of t.CARD_SLOTS) setPhoto(k, cards[1], cards[2]);
-      for (const [k] of t.HEADER_SLOTS) setPhoto(`head:${k}`, heads[1], heads[2]);
+      const tone = (name) => (name ? sceneOf(name)[2] : null);
+      setPhoto('side', picOf(r.side), tone(r.side));
+      t.CARD_SLOTS.forEach((k, i) => setPhoto(k, picOf(r.cards, i + 1), tone(r.cards)));
+      t.HEADER_SLOTS.forEach(([k], i) => setPhoto(`head:${k}`, picOf(r.heads, i + 1), tone(r.heads)));
       st.target = null;
       render('photo');
     };

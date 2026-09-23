@@ -493,7 +493,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
 .pz__head { width: 100%; display: flex; flex-direction: column; align-items: center; animation: omRise .36s var(--ease) both; }
 .pz__h1 { margin: 0; font: 700 24px/1.15 var(--display); letter-spacing: -.03em; color: var(--pz-ink); text-align: center; }
 .pz__lead { margin: 5px 0 0; font: 400 14px/1.45 var(--font); color: var(--pz-ink3); text-align: center; }
-.pz__pvwrap { position: relative; width: 100%; height: min(430px, 46vw); margin-top: 14px; overflow: hidden; }
+.pz__pvwrap { position: relative; width: 100%; height: min(430px, 46vw, max(170px, calc(100vh - 500px))); margin-top: 14px; overflow: hidden; } /* (short windows: the preview gives way, so the foot stays in view) */
+@media (max-height: 760px) { .pz__h1 { font-size: 19px; } .pz__pvwrap { margin-top: 8px; } .pz__foot { margin-top: 6px; padding: 6px 0 8px; } }
 .pz__pv { position: absolute; left: 50%; top: 0; width: 980px; height: 430px; transform: translateX(-50%); transform-origin: top center; border-radius: 22px; overflow: hidden; border: 1px solid var(--pz-hair); background: var(--pv-main); display: flex; box-shadow: 0 30px 70px rgba(0,0,0,var(--pv-shadow)); }
 .pz__side { position: relative; flex: none; width: 190px; overflow: hidden; background: var(--pv-side); border-radius: 22px 0 0 22px; outline: 2px solid transparent; outline-offset: -2px; transition: outline-color .2s ease; }
 .pz__side.is-pickable { cursor: pointer; }
@@ -642,7 +643,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
 .pz__swwrap--course { width: 30px; height: 30px; }
 .pz__empty { font: 400 14px/1.4 var(--font); color: var(--pz-ink3); text-align: center; }
 /* the radial picker */
-.pz__pk { position: absolute; left: 26px; top: -150px; z-index: 30; width: 272px; height: 272px; border-radius: 50%; background: var(--pk-bg); border: 1px solid var(--pz-hair); box-shadow: 0 24px 60px rgba(0,0,0,.4); touch-action: none; cursor: pointer; transform: translate(-50%, -50%); animation: omMorphIn .44s var(--ease) both; }
+.pz__pk { position: absolute; left: 26px; top: 26px; z-index: 30; width: 272px; height: 272px; border-radius: 50%; background: var(--pk-bg); border: 1px solid var(--pz-hair); box-shadow: 0 24px 60px rgba(0,0,0,.4); touch-action: none; cursor: pointer; transform: translate(-50%, -50%); animation: omMorphIn .44s var(--ease) both; }
 .pz__pk.is-closing { animation: omMorphOut .2s cubic-bezier(.4,0,1,1) both; }
 .pz__pk--course { left: 15px; top: 15px; }
 .pz__pkring { position: absolute; inset: 8px; border-radius: 50%; animation: omPkSpin .6s var(--ease) .1s both; background: conic-gradient(#ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000); -webkit-mask-image: radial-gradient(circle, transparent 107px, #000 108px, #000 127px, transparent 128px); mask-image: radial-gradient(circle, transparent 107px, #000 108px, #000 127px, transparent 128px); }
