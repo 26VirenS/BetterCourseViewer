@@ -82,15 +82,18 @@
     const url = new URL(location.href);
     // Personalize on its own (?bcv=personalize, and the older ?bcv=setup&step=theme): the look, the colour, the photos, for a change later
     const only = url.searchParams.get('bcv') === 'personalize' || (url.searchParams.get('bcv') === 'setup' && url.searchParams.get('step') === 'theme') ? 'personalize' : null;
+    // then=appearance (the theme invitation's Personalize): the page after the editor points at the sidebar's Appearance button (welcome.js)
+    const then = only && url.searchParams.get('then') === 'appearance' ? 'appearance' : null;
     if (url.searchParams.get('bcv') === 'setup' || url.searchParams.get('bcv') === 'personalize') {
       url.searchParams.delete('bcv');
       url.searchParams.delete('step');
+      url.searchParams.delete('then');
       history.replaceState({ bcv: true }, '', url.pathname + url.search + url.hash);
       app.state.route = app.parseRoute();
     }
     const settings = await S.get();
     st = {
-      app, settings, step: 0, visited: new Set([0]), only,
+      app, settings, step: 0, visited: new Set([0]), only, then,
       scanning: false, scanError: null, courses: [], favs: new Set(), nicks: {},
       tracking: true, goal: 4, targets: {}, letters: {},
       dashView: 'list', // the list to start with, whatever Canvas has: the pick here is the student's
@@ -527,7 +530,11 @@
    *  it followed the setup. */
   function personalize({ standalone }) {
     const page = ui.overlay.querySelector('.page--fr');
-    return BCV.personalize.open({ app: st.app, host: ui.host, page, standalone, onDone: () => reloadClean() });
+    const then = st.then; // (the pointer at Appearance, when the theme invitation asked for it: armed as the editor's Open Canvas reloads)
+    return BCV.personalize.open({ app: st.app, host: ui.host, page, standalone, onDone: async () => {
+      if (then === 'appearance') { try { await BCV.welcome?.arm?.('appearance'); } catch { /* the page reloads all the same */ } }
+      reloadClean();
+    } });
   }
   /** A fresh load of this page, without the setup's own parameter (which would open the card again):
    *  a navigation to the address itself, and a plain reload after it should the first not take. */
@@ -535,7 +542,7 @@
     let next = location.href;
     try {
       const u = new URL(location.href);
-      u.searchParams.delete('bcv'); u.searchParams.delete('step');
+      u.searchParams.delete('bcv'); u.searchParams.delete('step'); u.searchParams.delete('then');
       next = u.pathname + u.search + u.hash;
       history.replaceState(null, '', next);
     } catch { /* the address is left as it is */ }

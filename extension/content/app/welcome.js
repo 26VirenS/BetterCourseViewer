@@ -17,6 +17,7 @@
   const { h } = BCV.utils;
   const html = document.documentElement;
   const KEY = 'welcome:pending'; // the setup's run, armed for the reloaded page
+  const KEY3 = 'welcome:appearance'; // the pointer at the sidebar's Appearance button, armed by the theme invitation (whatsnew.js) for the page after Personalize
   const KEY2 = 'welcome:look5'; // the switch's show seen (with the setup's run, or alone after an update); a new key when the show is redrawn, so everyone sees the new one once
   const OLD_KEYS = ['welcome:look2', 'welcome:look3', 'welcome:look4']; // the marks of the shows before it, cleared when this one is seen
   const LOOK2_SINCE = '2.58.0'; // the show's own version: a What's New mark from before it means the show is owed
@@ -46,6 +47,11 @@
       hint: () => (favsGroup() ? '' : 'Hover it to reach any course; the ones you star come first.'),
       spot: () => navRow('courses'), also: () => { const g = favsGroup(); return g ? { el: g, text: 'See your current classes here' } : null; },
     },
+    // the sidebar's Appearance button, after Personalize was tried from the theme invitation: where the themes live from now on
+    appearance: {
+      layout: 'side', kicker: 'Appearance', title: 'Themes can be accessed here', hint: 'Press Appearance any time to change the colour, the photos or the look.',
+      spot: () => { const el = themeBtn(); el?.scrollIntoView({ block: 'nearest' }); return el; }, // (at the sidebar's foot: brought into its view when the rows above run past it)
+    },
     tools: {
       layout: 'side', kicker: 'Tools', title: 'Some tools, and some widgets',
       hint: { parts: [['Find a ', null], ['PDF Editor, ', '#ff9f0a'], ['File Converter, ', '#34c759'], ['Calculators, ', '#bf5af2'], ['Flashcards, ', '#2f7cf6'], ['Citation Generator', '#64d2ff'], [' & more.', '#ffffff']] }, // (each kind in a colour of its own)
@@ -74,6 +80,8 @@
 
   /** A row of the sidebar's nav, when it is on the page and drawn (a phone has none). */
   const navRow = (key) => { const el = document.querySelector(`#bcv-side .bcv-nav__item[data-nav="${key}"]`); return el && el.getBoundingClientRect().width > 0 ? el : null; };
+  /** The sidebar's Appearance button, when it is on the page and drawn (a phone has none). */
+  const themeBtn = () => { const el = document.getElementById('bcv-theme-btn'); return el && el.getBoundingClientRect().width > 0 ? el : null; };
   /** A row under the switch's show: the switch itself, small and still, its knob at that stop — the
    *  same DOM the page carries (app.lookDemo), with nothing wired, rather than a drawing of it. */
   function stopSwitch(app, stop) {
@@ -98,21 +106,24 @@
   const active = () => !!ui;
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
-  /** The setup arms it just before reloading the page. */
-  async function arm() {
-    try { await BCV.api.storage.local.set({ [KEY]: true }); } catch { /* nothing to arm with */ }
+  /** The setup arms its run just before reloading the page; the theme invitation arms the pointer at
+   *  Appearance ('appearance') as it opens Personalize, whose Open Canvas reloads the page. */
+  async function arm(run = 'setup') {
+    try { await BCV.api.storage.local.set({ [run === 'appearance' ? KEY3 : KEY]: true }); } catch { /* nothing to arm with */ }
   }
-  async function clear() {
-    try { await BCV.api.storage.local.remove(KEY); } catch { /* already gone */ }
+  async function clear(run = 'setup') {
+    try { await BCV.api.storage.local.remove(run === 'appearance' ? KEY3 : KEY); } catch { /* already gone */ }
   }
   const older = (a, b) => { const x = String(a).split('.').map(Number), y = String(b).split('.').map(Number); for (let i = 0; i < 3; i++) { if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) < (y[i] || 0); } return false; };
-  /** Which run this page owes: 'setup' (the setup's, armed), 'look' (the switch's show alone, once,
-   *  for anyone who had Simpl before the slider), or none. */
+  /** Which run this page owes: 'setup' (the setup's, armed), 'appearance' (the pointer at the
+   *  Appearance button, armed by the theme invitation), 'look' (the switch's show alone, once, for
+   *  anyone who had Simpl before the slider), or none. */
   async function due() {
-    if (self.BCVBridge?.native) { await clear(); return false; } // the app: no switch, no Away Refresh
+    if (self.BCVBridge?.native) { await clear(); await clear('appearance'); return false; } // the app: no switch, no Away Refresh, no sidebar
     try {
-      const f = await BCV.api.storage.local.get([KEY, KEY2, 'setup:done', 'whatsnew:seen']);
+      const f = await BCV.api.storage.local.get([KEY, KEY2, KEY3, 'setup:done', 'whatsnew:seen']);
       if (f[KEY] === true) return 'setup';
+      if (f[KEY3] === true) return 'appearance';
       if (f['setup:done'] && !f[KEY2] && typeof f['whatsnew:seen'] === 'string' && older(f['whatsnew:seen'], LOOK2_SINCE)) return 'look';
     } catch { /* nothing to read: nothing owed */ }
     return false;
@@ -292,12 +303,16 @@
 
   /** The black with holes in it: the things named are seen as they are, the page under them, each
    *  with a thin ring; a second thing (the starred courses under the Courses row) gets a small arrow
-   *  and a line of its own. Where the stage's words go is set on the stage from the first hole. */
+   *  and a line of its own. Where the stage's words go is set on the stage from the first hole. The
+   *  holes follow the things while the stage is up (`follow`, polled by the stage): the sidebar
+   *  fills in after the first draw, and a row at its foot moves as the rows above it land. */
   function spotProp(s, app, box) {
     const first = s.spot(app);
     if (!first) return null;
     const also = s.also?.(app);
-    const holes = [holeOf(first), also?.el ? holeOf(also.el) : null].filter(Boolean);
+    // the things looked up afresh each time: the sidebar is drawn again as its rows land, and the element measured first is then gone
+    const measure = () => { const el = s.spot(app); const a = s.also?.(app); return el ? [holeOf(el), a?.el ? holeOf(a.el) : null].filter(Boolean) : null; };
+    const holes = measure();
     const id = `bcv-welcome-mask-${Date.now()}`;
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.setAttribute('class', 'bcv-welcome__mask');
@@ -305,18 +320,36 @@
     svg.innerHTML = `<defs><mask id="${id}"><rect width="100%" height="100%" fill="#fff"/>${holes.map((r) => `<rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" rx="12" fill="#000"/>`).join('')}</mask></defs>`
       + `<rect width="100%" height="100%" fill="#000" mask="url(#${id})"/>`
       + holes.map((r) => `<rect class="bcv-welcome__ring" x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" rx="12"/>`).join('');
-    const [h1] = holes;
-    box.style.left = `${Math.round(h1.x + h1.w + 30)}px`;
-    box.style.top = `${Math.max(16, Math.round(h1.y + h1.h / 2 - 40))}px`;
-    box.dataset.centreY = String(Math.round(h1.y + h1.h / 2)); // (the stage is centred on the hole once it is on the page: the arrow then points level with the thing)
     const wrap = h('div', { class: 'bcv-welcome__spot', 'aria-hidden': 'true' }, [svg]);
+    let side2 = null;
     if (also?.el) {
-      const h2 = holes[1];
-      wrap.append(h('div', { class: 'bcv-welcome__side2', style: { left: `${Math.round(h2.x + h2.w + 30)}px`, top: `${Math.round(h2.y + h2.h / 2 - 20)}px` } }, [
+      side2 = h('div', { class: 'bcv-welcome__side2' }, [
         arrowOf({ w: 80, ht: 40, line: 'M72 20L10 20', head: 'M26 6L10 20L26 34' }),
         h('span', { class: 'bcv-welcome__side2text', text: also.text }),
-      ]));
+      ]);
+      wrap.append(side2);
     }
+    const cut = [...svg.querySelectorAll('mask rect')].slice(1); // (the first is the mask's white ground)
+    const rings = [...svg.querySelectorAll('.bcv-welcome__ring')];
+    const keyOf = (hs) => hs.map((r) => [r.x, r.y, r.w, r.h].map(Math.round).join(',')).join(';');
+    /** The holes, the rings, the words and the second line put at the things as they are now. */
+    const place = (hs) => {
+      hs.forEach((r, i) => { for (const el of [cut[i], rings[i]]) { if (!el) continue; el.setAttribute('x', r.x); el.setAttribute('y', r.y); el.setAttribute('width', r.w); el.setAttribute('height', r.h); } });
+      const [h1, h2] = hs;
+      box.style.left = `${Math.round(h1.x + h1.w + 30)}px`;
+      box.style.top = `${Math.max(16, Math.round(h1.y + h1.h / 2 - 40))}px`;
+      box.dataset.centreY = String(Math.round(h1.y + h1.h / 2)); // (the stage is centred on the hole once it is on the page: the arrow then points level with the thing)
+      if (side2 && h2) { side2.style.left = `${Math.round(h2.x + h2.w + 30)}px`; side2.style.top = `${Math.round(h2.y + h2.h / 2 - 20)}px`; }
+      wrap.dataset.at = keyOf(hs);
+    };
+    place(holes);
+    wrap.follow = () => { // true when something moved (or was drawn again) and the holes moved with it
+      if (!wrap.isConnected) return false;
+      const now = measure(); // (a thing scrolled into view when it is looked for stays in view)
+      if (!now || now.length !== holes.length || keyOf(now) === wrap.dataset.at) return false;
+      place(now);
+      return true;
+    };
     return wrap;
   }
 
@@ -359,6 +392,7 @@
       box.style.top = `${Math.max(16, Math.min(window.innerHeight - r.height - 16, Math.round(cy - r.height / 2)))}px`;
     };
     level();
+    if (prop?.follow) ui.stage.follow = setInterval(() => { if (prop.follow()) level(); }, 200); // (the holes keep to the things as the page fills in under the black)
     clearTimeout(ui.timer);
     ui.timer = setTimeout(() => {
       if (ui?.stage?.next !== next) return;
@@ -372,6 +406,7 @@
   async function leave() {
     const st = ui?.stage;
     if (!st) return;
+    clearInterval(st.follow);
     ui.stage = null;
     ui.el.classList.remove('bcv-welcome--holes'); // (the plain black is back under the mask before the mask fades: the page never shows through)
     st.box.classList.add('is-out');
@@ -383,9 +418,11 @@
 
   /** The whole run, from black to the page: the stages named, in turn, then the black fades. With
    *  no keys it is the setup's run (the switch where there is one, then Away Refresh, then the
-   *  Dashboard's way in), and its flag goes; another run says what to do when it ends. */
+   *  Dashboard's way in), and its flag goes; another run says what to do when it ends. The pointer
+   *  at Appearance drops its flag as it starts: shown once, whatever closes the page. */
   async function open(app, keys = null, { onDone = null } = {}) {
     const el = cover();
+    if (keys?.includes('appearance')) clear('appearance').catch(() => {});
     // the switch is looked for as each stage starts (a page's first draw comes before it is mounted);
     // a phone's header has none, so the stages that point at it are left out there
     const lookNow = () => { const l = document.getElementById('bcv-look'); return l && getComputedStyle(l).display !== 'none' ? l : null; };

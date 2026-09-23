@@ -24,6 +24,11 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    // invite: the first page after this update shows the theme invitation (whatsnew.js) in the notes' place; the notes wait in Settings
+    { version: '2.74.0', date: '2026-09-23', invite: true, notes: [
+      { kind: 'new', title: 'Try a theme', body: 'This update invites you to pick one, or a colour.', icon: P.pic },
+      { kind: 'new', title: 'Themes, pointed out', body: 'After Personalize, the Appearance button is shown.', icon: P.eye },
+    ] },
     { version: '2.73.0', date: '2026-09-23', notes: [
       { kind: 'improved', title: 'Appearance opens it', body: 'The sidebar’s Appearance button opens the editor.', icon: P.toggle },
       { kind: 'improved', title: 'Account panel, trimmed', body: 'Canvas’s own settings, and a link to Simpl’s.', icon: P.list },

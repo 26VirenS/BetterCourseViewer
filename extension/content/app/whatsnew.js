@@ -7,7 +7,13 @@
  * the next update. The releases before that sit behind one Earlier versions button at the foot of
  * the list. Never on a fresh install (the setup marks its own version seen), never over the setup
  * or a quiz. Reachable again from Settings → General (?bcv=whatsnew; the account sheet on a phone),
- * for this version alone. The notes themselves are data: whatsnew-notes.js. */
+ * for this version alone. The notes themselves are data: whatsnew-notes.js.
+ *
+ * A release can put an invitation in the notes' place (its entry carries `invite`): the first page
+ * after that update invites a theme — the four scenes and the colours in a strip, Personalize and
+ * Not now — instead of listing what changed. Personalize opens the editor, whose Open Canvas then
+ * brings the page back with the sidebar's Appearance button pointed out (welcome.js); the notes
+ * wait in Settings. */
 (function () {
   const BCV = (self.BCV = self.BCV || {});
   const { h } = BCV.utils;
@@ -59,7 +65,7 @@
     if (flags[SEEN_KEY] === to) return null;
     const from = flags[FROM_KEY] || flags[SEEN_KEY] || null;
     if (from === to) return null;
-    return { from: from && cmp(from, to) < 0 ? from : null, to };
+    return { from: from && cmp(from, to) < 0 ? from : null, to, invite: !!NOTES().find((v) => v.version === to)?.invite };
   }
 
   /** The versions the page lists, newest first: after an update, every one newer than the version
@@ -81,34 +87,76 @@
     } catch { /* it shows again next time, no worse */ }
   }
 
-  async function open(app, { from = null, to = version(), manual = false } = {}) {
-    if (ui) return;
-    const shown = since(from, to);
-    if (!shown.length) return;
-    st = { app, from: from && shown.length > 1 ? from : null, to: shown[0].version, shown, oldest: shown[shown.length - 1].version, manual, closing: false };
+  /** The overlay both pages share: the setup's ground, the word-mark first, a card with the brand
+   *  row at its top, a body and a foot. Opening marks the version seen. */
+  function mount(app, { label, kind, ariaLabel }) {
     const host = h('div', { id: 'bcv-whatsnew' });
     host.setAttribute('data-theme', app?.isDark?.() ? 'dark' : 'light');
     const shadow = host.attachShadow({ mode: 'open' });
     const intro = h('div', { class: 'intro', 'aria-hidden': 'true', html: INTRO });
     const body = h('div', { class: 'fr__body', id: 'body' });
     const foot = h('div', { class: 'fr__foot', id: 'foot' });
-    const main = h('div', { class: 'fr wn', id: 'card' }, [
+    const main = h('div', { class: `fr wn ${kind}`, id: 'card' }, [
       h('div', { class: 'fr__top' }, [
-        h('button', { type: 'button', class: 'fr__brand', title: 'Replay', onclick: () => playIntro(), html: `${BRAND}<span>What’s new</span>` }),
+        h('button', { type: 'button', class: 'fr__brand', title: 'Replay', onclick: () => playIntro(), html: `${BRAND}<span>${label}</span>` }),
       ]),
       body,
       foot,
     ]);
-    const overlay = h('div', { class: 'overlay overlay--solid', role: 'dialog', 'aria-label': 'What’s new in Simpl Courses' }, [h('main', { class: 'page page--fr' }, [main]), intro]);
+    const overlay = h('div', { class: 'overlay overlay--solid', role: 'dialog', 'aria-label': ariaLabel }, [h('main', { class: 'page page--fr' }, [main]), intro]);
     shadow.append(h('style', { text: self.BCV_SETUP_CSS || '' }), overlay);
     ui = { host, overlay, intro, main, body, foot, timers: [] };
     html.classList.add('bcv-setup-open'); // the page underneath holds still (and the look switch steps aside)
     (document.body || html).append(host);
     document.addEventListener('keydown', onKey, true);
     markSeen(st.to);
+  }
+
+  async function open(app, { from = null, to = version(), manual = false } = {}) {
+    if (ui) return;
+    const shown = since(from, to);
+    if (!shown.length) return;
+    // an update to a version that carries an invitation shows it in the notes' place (Settings still opens the notes)
+    if (!manual && shown[0].invite) return invite(app, shown[0].version);
+    st = { app, from: from && shown.length > 1 ? from : null, to: shown[0].version, shown, oldest: shown[shown.length - 1].version, manual, closing: false };
+    mount(app, { label: 'What’s new', kind: '', ariaLabel: 'What’s new in Simpl Courses' });
     paintList();
     paintFoot();
     playIntro();
+  }
+
+  /** The invitation: the four scenes and the seven colours in a strip, a title, a line, then Not
+   *  now and Personalize. Personalize arms the pointer at the sidebar's Appearance button for the
+   *  page after the editor (welcome.js) and opens the editor over this page. Shown once, like the
+   *  notes: this version is seen the moment it is up. */
+  function invite(app, to) {
+    if (ui) return;
+    const T = BCV.theme;
+    st = { app, from: null, to, shown: [], oldest: to, manual: false, closing: false, invite: true };
+    mount(app, { label: 'New in Simpl', kind: 'inv', ariaLabel: 'New in Simpl Courses: themes' });
+    const scenes = (T?.PRESET_PHOTOS || []).map(([name, pic]) => h('span', { class: 'inv__scene', title: name, style: { backgroundImage: `url("${pic}")` } }));
+    const dots = (T?.PRESETS || []).map(([hex, name]) => h('span', { class: 'inv__dot', title: name, style: { background: hex } }));
+    ui.body.replaceChildren(
+      h('div', { class: 'inv__strip', 'aria-hidden': 'true' }, [...scenes, h('span', { class: 'inv__dots' }, dots)]),
+      h('h1', { class: 'fr__h1', text: 'Make it yours' }),
+      h('p', { class: 'fr__blurb', text: 'Simpl now has themes: four ready-made scenes, a colour of your own, and photos on the sidebar, the counters and the page headers. Try a theme, or change the colour.' }),
+    );
+    ui.foot.replaceChildren(
+      h('button', { type: 'button', class: 'btn btn--ghost fr__back', id: 'later', text: 'Not now', onclick: dismiss }),
+      h('span', { class: 'fr__spacer' }),
+      h('button', { type: 'button', class: 'btn fr__next', id: 'personalize', onclick: personalize }, [h('span', { text: 'Personalize' }), svg('M9 6l6 6-6 6', { size: 15, width: 2.4 })]),
+    );
+    playIntro();
+  }
+  /** Personalize: the invitation goes and the editor opens over the page (?bcv=personalize is a real
+   *  load of the page, on which content/app/setup.js opens the editor on its own); then=appearance
+   *  asks the editor to arm the pointer at Appearance (welcome.js) as its Open Canvas reloads. */
+  async function personalize() {
+    if (!st || st.closing) return;
+    st.closing = true;
+    const app = st.app;
+    await close();
+    app?.go?.('/?bcv=personalize&then=appearance');
   }
   function onKey(e) {
     if (e.key === 'Escape' && ui) { e.stopPropagation(); dismiss(); }
@@ -198,5 +246,5 @@
     );
   }
 
-  BCV.whatsnew = { open, close, dismiss, due, active, version };
+  BCV.whatsnew = { open, invite, close, dismiss, due, active, version };
 })();

@@ -722,6 +722,23 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
 .wn__more:hover { text-decoration: underline; }
 .wn .fr__foot { padding-top: 22px; }
 
+/* ==== the theme invitation (a release whose entry carries invite, in the notes' place): the four
+ * scenes and the seven colours in a strip, a title, a line, then Not now and Personalize ==== */
+.inv .fr__body { display: block; }
+.inv__strip { display: flex; align-items: center; gap: 10px; margin-bottom: 28px; animation: frRise .34s var(--ease) both; }
+.inv__scene { flex: none; width: 104px; height: 68px; border-radius: 14px; background: var(--tile) center / cover no-repeat; box-shadow: inset 0 0 0 1px rgba(0,0,0,.06); }
+.inv__dots { display: flex; align-items: center; gap: 8px; margin-left: 12px; }
+.inv__dot { width: 18px; height: 18px; border-radius: 9px; }
+.inv .fr__h1 { font-size: 42px; animation: frRise .34s var(--ease) .06s both; }
+.inv .fr__blurb { max-width: 620px; animation: frRise .34s var(--ease) .12s both; }
+.inv .fr__foot { padding-top: 30px; }
+@media (max-width: 700px) {
+  .inv__strip { gap: 8px; margin-bottom: 20px; }
+  .inv__scene { width: 0; flex: 1 1 0; height: 52px; border-radius: 10px; } /* (the four across the phone's width) */
+  .inv__dots { display: none; }
+  .inv .fr__h1 { font-size: 30px; }
+}
+
 @media (max-width: 700px) {
   .wn__list { max-height: 56vh; }
 }

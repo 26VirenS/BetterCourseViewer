@@ -723,16 +723,56 @@ try {
 
   // ---- what's new after an update, on a phone ---------------------------------------------------
   console.log("what's new");
-  await sw.evaluate(async () => { await self.BCV.api.storage.local.set({ 'whatsnew:from': '2.7.5' }); await self.BCV.api.storage.local.remove('whatsnew:seen'); });
+  const whatsNew = new Function('self', `${readFileSync(join(extDir, 'content', 'app', 'whatsnew-notes.js'), 'utf8')}; return self.BCV_WHATS_NEW;`)({});
+  const introDone = () => page.waitForFunction(() => document.querySelector('#bcv-whatsnew')?.shadowRoot.querySelector('.intro')?.hidden === true, null, { timeout: 8000 });
+  const flag = async (key) => (await sw.evaluate((k) => self.BCV.api.storage.local.get(k), key))[key];
+  await sw.evaluate(async () => { await self.BCV.api.storage.local.set({ 'whatsnew:from': '2.7.5' }); await self.BCV.api.storage.local.remove(['whatsnew:seen', 'welcome:appearance']); });
   await page.goto(`${BASE}/`);
-  await page.waitForSelector('#bcv-whatsnew .wn__note', { timeout: 20000 });
-  await page.waitForFunction(() => document.querySelector('#bcv-whatsnew')?.shadowRoot.querySelector('.intro')?.hidden === true, null, { timeout: 8000 });
-  await page.waitForTimeout(400);
-  check((await page.$$('#bcv-whatsnew .wn__vh')).length > 1 && (await page.$eval('#bcv-whatsnew .wn__vnum', (e) => e.textContent)) === manifest.version && (await page.$('#bcv-whatsnew .wn__filter')) === null && (await page.$('#bcv-whatsnew #earlier')) !== null && await noOverflow(), 'what’s new fits the phone: one list, this version first, Earlier versions at its foot');
-  await shot('13-whats-new');
-  await page.click('#bcv-whatsnew #dismiss');
-  await page.waitForFunction(() => !document.querySelector('#bcv-whatsnew'), null, { timeout: 5000 });
-  check(!(await page.$('#bcv-whatsnew')) && (await sw.evaluate(async (v) => (await self.BCV.api.storage.local.get('whatsnew:seen'))['whatsnew:seen'] === v, manifest.version)), 'Back to Canvas closes it and marks the version seen');
+  if (whatsNew[0].invite) {
+    // this version puts an invitation in the notes' place: the four scenes across the phone's width
+    // (the colour dots step aside), Not now and Personalize
+    await page.waitForSelector('#bcv-whatsnew .inv', { timeout: 20000 });
+    await introDone();
+    await page.waitForTimeout(400);
+    const inv = await page.evaluate(() => { const r = document.querySelector('#bcv-whatsnew').shadowRoot; const w = window.innerWidth; return { h1: r.querySelector('.fr__h1').textContent, scenes: [...r.querySelectorAll('.inv__scene')].filter((s) => s.getBoundingClientRect().width > 40).length, dots: getComputedStyle(r.querySelector('.inv__dots')).display, fits: [...r.querySelectorAll('.inv__strip, .fr__foot, .fr__h1')].every((e) => e.getBoundingClientRect().right <= w + 1), foot: [...r.querySelectorAll('.fr__foot button')].map((b) => b.textContent.trim()).join(','), notes: r.querySelectorAll('.wn__note').length }; });
+    check(inv.h1 === 'Make it yours' && inv.scenes === 4 && inv.dots === 'none' && inv.fits && inv.foot === 'Not now,Personalize' && inv.notes === 0 && await noOverflow(), `the invitation fits the phone: four scenes across, no colour dots, Not now and Personalize, no notes: ${JSON.stringify(inv)}`);
+    await shot('13-invite');
+    await page.click('#bcv-whatsnew #later');
+    await page.waitForFunction(() => !document.querySelector('#bcv-whatsnew'), null, { timeout: 5000 });
+    check(!(await page.$('#bcv-whatsnew')) && (await flag('whatsnew:seen')) === manifest.version && (await flag('welcome:appearance')) === undefined, 'Not now closes it, the version marked seen, nothing armed');
+    // Personalize opens the editor; its Open Canvas arms the pointer and reloads the page, which comes
+    // back plain: a phone has no Appearance button to point at, so the pointer armed for it is dropped
+    await sw.evaluate(async () => { await self.BCV.api.storage.local.set({ 'whatsnew:from': '2.12.0' }); await self.BCV.api.storage.local.remove('whatsnew:seen'); });
+    await page.goto(`${BASE}/`);
+    await page.waitForSelector('#bcv-whatsnew #personalize', { timeout: 20000 });
+    await introDone();
+    await page.click('#bcv-whatsnew #personalize');
+    await page.waitForSelector('#bcv-setup .pz', { timeout: 20000 });
+    check(!(await page.$('#bcv-whatsnew')) && !(await page.$('#bcv-welcome')) && (await flag('welcome:appearance')) === undefined, 'Personalize opens the editor over the page, nothing armed yet');
+    for (let i = 0; i < 4 && !(await page.$('#bcv-setup #pzOpen')); i++) { await page.click('#bcv-setup #pzNext'); await page.waitForTimeout(400); }
+    await page.waitForSelector('#bcv-setup #pzOpen', { timeout: 10000 });
+    await Promise.all([page.waitForNavigation({ timeout: 20000 }), page.click('#bcv-setup #pzOpen')]);
+    await page.waitForSelector('.bcv-ph-stat', { timeout: 20000 });
+    await page.waitForTimeout(600);
+    check(!(await page.$('#bcv-welcome')) && !(await page.$('#bcv-whatsnew')) && (await flag('welcome:appearance')) === undefined, 'the page after the editor comes back plain on a phone — no pointer, its flag dropped — and the invitation does not return');
+    // the notes themselves wait behind Settings (and the account sheet's What's new row): this version alone
+    await page.goto(`${BASE}/?bcv=whatsnew`);
+    await page.waitForSelector('#bcv-whatsnew .wn__note', { timeout: 20000 });
+    await introDone();
+    check((await page.$eval('#bcv-whatsnew .wn__vnum', (e) => e.textContent)) === manifest.version && (await page.$('#bcv-whatsnew #earlier')) !== null && !/bcv=/.test(page.url()) && await noOverflow(), 'the notes open on their own from Settings, this version first, Earlier versions at their foot');
+    await page.click('#bcv-whatsnew #dismiss');
+    await page.waitForFunction(() => !document.querySelector('#bcv-whatsnew'), null, { timeout: 5000 });
+    check(!(await page.$('#bcv-whatsnew')), 'Back to Canvas closes them');
+  } else {
+    await page.waitForSelector('#bcv-whatsnew .wn__note', { timeout: 20000 });
+    await introDone();
+    await page.waitForTimeout(400);
+    check((await page.$$('#bcv-whatsnew .wn__vh')).length > 1 && (await page.$eval('#bcv-whatsnew .wn__vnum', (e) => e.textContent)) === manifest.version && (await page.$('#bcv-whatsnew .wn__filter')) === null && (await page.$('#bcv-whatsnew #earlier')) !== null && await noOverflow(), 'what’s new fits the phone: one list, this version first, Earlier versions at its foot');
+    await shot('13-whats-new');
+    await page.click('#bcv-whatsnew #dismiss');
+    await page.waitForFunction(() => !document.querySelector('#bcv-whatsnew'), null, { timeout: 5000 });
+    check(!(await page.$('#bcv-whatsnew')) && (await flag('whatsnew:seen')) === manifest.version, 'Back to Canvas closes it and marks the version seen');
+  }
 
   check(errors.length === 0, `no page errors${errors.length ? `: ${errors.slice(0, 3).join(' | ')}` : ''}`);
 } catch (e) {
