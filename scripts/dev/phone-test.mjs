@@ -628,7 +628,7 @@ try {
   await page.waitForSelector('#bcv-setup .row', { timeout: 20000 });
   await page.waitForFunction(() => document.querySelector('#bcv-setup')?.shadowRoot.querySelector('.intro')?.hidden === true, null, { timeout: 8000 }); // the word-mark first
   await page.waitForTimeout(400);
-  check((await page.$$('#bcv-setup .row.is-on')).length === 0 && (await page.$$('#bcv-setup .row[data-course]')).length >= 8 && (await page.$eval('#bcv-setup #next', (e) => e.disabled)) && (await page.$eval('#bcv-setup .fr', (e) => e.getBoundingClientRect().right <= window.innerWidth + 1 && e.getBoundingClientRect().left >= 0)) && !(await page.locator('#bcv-setup .rail').isVisible()) && (await page.$eval('#bcv-setup #stepLabel', (e) => e.textContent)) === '1 of 5' && await noOverflow(), 'the setup fits the phone screen without the rail and lists the courses, none ticked for you');
+  check((await page.$$('#bcv-setup .row.is-on')).length === 0 && (await page.$$('#bcv-setup .row[data-course]')).length >= 8 && (await page.$eval('#bcv-setup #next', (e) => e.disabled)) && (await page.$eval('#bcv-setup .fr', (e) => e.getBoundingClientRect().right <= window.innerWidth + 1 && e.getBoundingClientRect().left >= 0)) && !(await page.locator('#bcv-setup .rail').isVisible()) && (await page.$eval('#bcv-setup #stepLabel', (e) => e.textContent)) === '1 of 2' && await noOverflow(), 'the setup fits the phone screen without the rail and lists the courses, none ticked for you');
   check(await page.$eval('#bcv-setup .fr__blurb--strong', (e) => { const cs = getComputedStyle(e); return e.textContent === 'Only select the courses that count towards your GPA.' && parseInt(cs.fontWeight, 10) >= 700 && parseFloat(cs.fontSize) >= 16 && cs.color === 'rgb(10, 132, 255)'; }), 'the line about the GPA is big, bold and blue');
   await shot('11-setup');
   // start from none (Clear all), then pick five by hand
@@ -642,42 +642,34 @@ try {
   await page.waitForSelector('#bcv-setup #track', { timeout: 10000 });
   check(await noOverflow() && (await page.$$('#bcv-setup .target')).length === 5, 'the grades step keeps to the screen with a target row per course');
   await shot('11b-setup-grades');
-  // a phone has no sidebar and no dashboard views to choose between: after the grades comes the
-  // look (light, dark or the device's), then the theme, and that is the last step here
-  check((await page.$eval('#bcv-setup #stepLabel', (e) => e.textContent)) === '2 of 5' && (await page.$eval('#bcv-setup #next', (e) => e.textContent.trim())) === 'Continue', 'a phone gets five steps');
-  await page.click('#bcv-setup #next');
-  await page.waitForSelector('#bcv-setup .tile[data-look]', { timeout: 10000 });
-  const looks = await page.$$eval('#bcv-setup .tile[data-look]', (els) => els.map((e) => `${e.dataset.look}${e.classList.contains('is-on') ? '*' : ''}`));
-  const lookOn = (looks.find((l) => l.endsWith('*')) || '').replace('*', ''); // the setting's own choice comes selected (Automatic on a fresh install)
-  check(looks.join(' ') === ['light', 'dark', 'system'].map((v) => `${v}${v === lookOn ? '*' : ''}`).join(' ') && !!lookOn && (await page.$eval('#bcv-setup #stepLabel', (e) => e.textContent)) === '3 of 5' && (await page.$eval('#bcv-setup #next', (e) => e.textContent.trim())) === 'Continue' && await noOverflow(), `the appearance step offers light, dark and automatic, the setting's own choice picked: ${looks.join(' ')}`);
-  await page.click('#bcv-setup .tile[data-look="dark"]');
-  check(await eventually(async () => (await page.$eval('#bcv-setup', (e) => e.getAttribute('data-theme'))) === 'dark' && (await page.$eval('#bcv-setup .tile[data-look="dark"]', (e) => e.classList.contains('is-on')))), 'picking Dark turns the card dark at once, as a preview');
-  await page.click(`#bcv-setup .tile[data-look="${lookOn}"]`); // back to what was set: the pages after this read it
-  await page.click('#bcv-setup #next');
-  await page.waitForSelector('#bcv-setup #tpv', { timeout: 10000 });
-  // the theme: the colour alone on a phone (the photos go on the desktop's Dashboard), the
-  // miniature saying it is a preview, the picker held to readable colours
-  const phTheme = await page.evaluate(() => { const r = document.querySelector('#bcv-setup').shadowRoot; return { step: r.querySelector('#stepLabel').textContent, next: r.querySelector('#next').textContent.trim(), kicker: r.querySelector('.tpv__kicker').textContent, cards: r.querySelectorAll('.tpv__card').length, zones: r.querySelectorAll('.tpv__drop').length, chips: [...r.querySelectorAll('.chip')].map((c) => `${c.textContent.trim()}${c.classList.contains('is-on') ? '*' : ''}`).join(' '), foot: r.querySelector('.tpick__foot').textContent, wheel: Math.round(r.querySelector('#wheel').getBoundingClientRect().width), fits: [...r.querySelectorAll('#tpv, .tpick, .tpick__range, #wheel')].every((e) => e.getBoundingClientRect().right <= window.innerWidth + 1) }; });
-  check(phTheme.step === '4 of 5' && phTheme.next === 'Continue' && phTheme.kicker === 'Preview · not your real numbers' && phTheme.cards === 6 && phTheme.zones === 0 && phTheme.chips === 'Regular* Pink Red Amber Green Teal Indigo Purple' && /Photos go on the desktop/.test(phTheme.foot) && phTheme.wheel >= 150 && phTheme.fits && await noOverflow(), `the theme step on a phone: the preview, the wheel and the colour, no photo zones, everything inside the screen: ${JSON.stringify(phTheme)}`);
-  await page.click('#bcv-setup .chip[data-preset="#d63b7a"]');
-  const phPink = await page.evaluate(() => { const r = document.querySelector('#bcv-setup').shadowRoot; return { icon: r.querySelector('#tpv').style.getPropertyValue('--p-icon'), hex: r.querySelector('#hex').value, isDefault: r.querySelector('#tpv').classList.contains('is-default') }; });
-  check(phPink.hex === '#d63b7a' && phPink.icon === '#d63b7a' && !phPink.isDefault, `Pink goes on the preview at once: ${JSON.stringify(phPink)}`);
-  await shot('11b2-setup-theme');
-  await page.click('#bcv-setup .chip[data-preset=""]'); // back to the regular colours: the pages after this read it
-  await page.waitForFunction(() => document.querySelector('#bcv-setup').shadowRoot.querySelector('#tpv').classList.contains('is-default'), null, { timeout: 3000 });
-  await page.click('#bcv-setup #next');
-  await page.waitForSelector('#bcv-setup #cc', { timeout: 10000 });
-  // the courses' colours, the last step here: a row per course with the swatches, all inside the screen
-  const phColours = await page.evaluate(() => { const r = document.querySelector('#bcv-setup').shadowRoot; return { step: r.querySelector('#stepLabel').textContent, next: r.querySelector('#next').textContent.trim(), rows: r.querySelectorAll('.cc__row').length, swatches: r.querySelectorAll('.cc__row:first-child .cc__swatch').length, fits: [...r.querySelectorAll('.cc__row')].every((e) => e.getBoundingClientRect().right <= window.innerWidth + 1) }; });
-  check(phColours.step === '5 of 5' && phColours.next === 'Finish' && phColours.rows === 5 && phColours.swatches === 16 && phColours.fits && await noOverflow(), `the colours step on a phone: ${JSON.stringify(phColours)}`);
-  await shot('11b3-setup-colours');
+  // a phone has no sidebar and no dashboard views to choose between: the grades are the last step,
+  // then the read-back, then Continue to appearance leads into Personalize
+  check((await page.$eval('#bcv-setup #stepLabel', (e) => e.textContent)) === '2 of 2' && (await page.$eval('#bcv-setup #next', (e) => e.textContent.trim())) === 'Finish', 'a phone gets two steps');
   await page.click('#bcv-setup #next');
   await page.waitForSelector('#bcv-setup .summary__row', { timeout: 10000 });
   const readBack = await page.$$eval('#bcv-setup .summary__k', (els) => els.map((e) => e.textContent));
-  const readVals = await page.$$eval('#bcv-setup .summary__v', (els) => els.map((e) => e.textContent));
-  check((await page.$eval('#bcv-setup #stepLabel', (e) => e.textContent)) === 'Ready' && readBack.join(' | ') === 'Courses shown | Grade history | Appearance | Theme | Course colours' && readVals[2] === { light: 'Light', dark: 'Dark', system: 'Automatic' }[lookOn] && readVals[3] === 'Regular' && readVals[4] === 'As they are' && (await page.$eval('#bcv-setup #next', (e) => e.textContent.trim())) === 'Open Canvas' && await noOverflow(), `then a read-back of those five answers alone, and Open Canvas: ${readBack.join(' | ')} / ${readVals.join(' | ')}`);
+  check((await page.$eval('#bcv-setup #stepLabel', (e) => e.textContent)) === 'Ready' && readBack.join(' | ') === 'Courses shown | Grade history' && (await page.$eval('#bcv-setup #next', (e) => e.textContent.trim())) === 'Continue to appearance' && await noOverflow(), `then a read-back of those two answers alone, and Continue to appearance: ${readBack.join(' | ')}`);
   await shot('11c-setup-ready');
-  await Promise.all([page.waitForNavigation({ timeout: 20000 }), page.click('#bcv-setup #next')]); // Open Canvas: the page reloads
+  await page.click('#bcv-setup #next');
+  await page.waitForSelector('#bcv-setup .pz', { timeout: 20000 });
+  await page.waitForTimeout(500);
+  // Personalize on a phone: the look, the preview scaled to the screen, the themes; the photos and
+  // the headers are the desktop's, so its steps are the colour and the courses' colours
+  const phPz = await page.evaluate(() => { const r = document.querySelector('#bcv-setup').shadowRoot; const pv = r.querySelector('.pz__pv'); const w = window.innerWidth; return { looks: r.querySelectorAll('#pzLook .pz__segbtn').length, bars: r.querySelectorAll('#pzBars .pz__bar').length, h1: r.querySelector('.pz__h1').textContent, pvFits: pv.getBoundingClientRect().left >= -1 && pv.getBoundingClientRect().right <= w + 1, themes: r.querySelectorAll('#pzThemes .pz__sw').length, badges: r.querySelectorAll('.pz__badge').length, next: r.querySelector('#pzNext').textContent, fits: [...r.querySelectorAll('.pz__top, .pz__swatches, .pz__foot')].every((e) => e.getBoundingClientRect().right <= w + 1) }; });
+  check(phPz.looks === 3 && phPz.bars === 2 && phPz.h1 === 'Click any part of the preview to personalize' && phPz.pvFits && phPz.themes === 9 && phPz.badges === 0 && phPz.next === 'Continue' && phPz.fits && await noOverflow(), `Personalize on a phone: the look, two bars, the preview inside the screen, nine themes, no photo badges: ${JSON.stringify(phPz)}`);
+  await page.click('#bcv-setup .pz__sw[data-theme="Pink"]');
+  check(await eventually(async () => (await page.$eval('#bcv-setup .pz', (e) => e.style.getPropertyValue('--A'))) === '#ff375f'), 'Pink goes on the preview at once');
+  await shot('11d-personalize');
+  await page.click('#bcv-setup .pz__sw[data-theme="Regular"]'); // back to the regular colours: the pages after this read them
+  await page.click('#bcv-setup #pzNext');
+  await page.waitForSelector('#bcv-setup #pzCourses', { timeout: 10000 });
+  const phColours = await page.evaluate(() => { const r = document.querySelector('#bcv-setup').shadowRoot; return { tabs: r.querySelectorAll('#pzCourses .pz__tab').length, swatches: r.querySelectorAll('#pzPal .pz__palsw').length, next: r.querySelector('#pzNext').textContent, fits: [...r.querySelectorAll('.pz__tabs, .pz__pal')].every((e) => e.getBoundingClientRect().right <= window.innerWidth + 1) }; });
+  check(phColours.tabs === 5 && phColours.swatches === 16 && phColours.next === 'Save' && phColours.fits && await noOverflow(), `the courses' colours on a phone, Save at the end: ${JSON.stringify(phColours)}`);
+  await shot('11e-personalize-courses');
+  await page.click('#bcv-setup #pzNext'); // Save
+  await page.waitForSelector('#bcv-setup #pzOpen', { timeout: 10000 });
+  check((await page.$eval('#bcv-setup .pz__doneh1', (e) => e.textContent)) === 'Saved' && (await sw.evaluate(async () => (await self.BCV.settings.get()).appearance.theme?.name)) === 'Regular', 'Saved, with Regular kept');
+  await Promise.all([page.waitForNavigation({ timeout: 20000 }), page.click('#bcv-setup #pzOpen')]); // Open Canvas: the page reloads
   // …and comes back black, with the welcome on it. A phone's header has no look switch to point at,
   // so the welcome here is the second pointer alone: the mock Away Refresh pill, in slow motion
   await page.waitForSelector('#bcv-welcome[data-stage]', { timeout: 20000 });

@@ -295,7 +295,7 @@
       const slot = STAT_SLOT[lbl] || null;
       const pic = slot ? app.state?.themeImages?.cards?.[slot] || null : null;
       // the label and the number share the top row (the number on the right, large); the note and the chevron sit below
-      return U.enter(h('button', { type: 'button', class: `bcv-card bcv-stat ${pic ? 'bcv-stat--pic' : ''}`, dataset: slot ? { stat: slot } : {}, style: pic ? { '--bcv-pic': `url("${pic}")`, ...(app.state?.themeImages?.tones?.[slot] ? { '--bcv-pic-tone': app.state.themeImages.tones[slot] } : {}) } : null, onclick: (e) => onOpen(e.currentTarget) }, [
+      return U.enter(h('button', { type: 'button', class: `bcv-card bcv-stat ${pic ? 'bcv-stat--pic' : ''}`, dataset: slot ? { stat: slot } : {}, style: pic ? { '--bcv-pic': BCV.theme.picCss(pic), '--bcv-veil': BCV.theme.veilBase(app.state?.settings?.appearance?.theme?.accent || '', app.state?.themeImages?.tones?.[slot], 0.4) } : null, onclick: (e) => onOpen(e.currentTarget) }, [
         ...(pic ? [h('span', { class: 'bcv-stat__pic', 'aria-hidden': 'true' }), h('span', { class: 'bcv-stat__pic bcv-stat__pic--blur', 'aria-hidden': 'true' }), h('span', { class: 'bcv-stat__pic bcv-stat__pic--veil', 'aria-hidden': 'true' })] : []),
         U.el('bcv-stat__head', [U.svg(icon, { size: 14, stroke: color, width: 1.9 }), U.text('bcv-label bcv-label--inline', lbl, 'span'), valueEl]),
         U.el('bcv-stat__noterow', [U.text('bcv-stat__note', note, 'span'), U.svg(IC.chevron, { size: 13, stroke: 'var(--bcv-ink3)', width: 2, cls: 'bcv-stat__chev' })]),

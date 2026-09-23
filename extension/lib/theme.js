@@ -89,12 +89,12 @@
     if (!seed) return null;
     const ground = dark ? GROUND.dark : GROUND.light;
     const icon = reach(seed, ground, ICON_RATIO, dark);
-    const text = reach(seed, ground, TEXT_RATIO, dark);
-    const fill = reach(seed, '#ffffff', TEXT_RATIO, false); // white words on it, in either mode
+    const text = readableOn(seed, ground);
+    const fill = fillFor(seed); // white words on it, in either mode
     return {
       accent: seed, icon, text, fill,
       hover: shift(fill, dark ? 0.08 : -0.08),
-      soft: alpha(seed, dark ? 0.2 : 0.12),
+      soft: alpha(seed, dark ? 0.22 : 0.14),
       ring: alpha(seed, dark ? 0.45 : 0.32),
     };
   }
@@ -106,17 +106,9 @@
     const seed = normalize(accent);
     if (!seed || !(n > 0)) return [];
     const ground = dark ? GROUND.dark : GROUND.light;
-    const [h, s] = rgbToHsl(hexToRgb(seed));
+    const set = shadeSet(seed);
     const out = [];
-    for (let i = 0; i < n; i++) {
-      const t = n === 1 ? 0.5 : i / (n - 1);
-      const hue = (h + (t - 0.5) * 36 + 360) % 360; // ±18° across the rows
-      const sat = clamp(s + (t - 0.5) * 0.16, MIN_SAT, 1);
-      const [lo, hi] = band(hue, sat);
-      const l = dark ? lo + (hi - lo) * (0.85 - t * 0.7) : lo + (hi - lo) * (0.75 - t * 0.6); // lighter rows first, deeper below
-      const base = hslToHex([hue, sat, l]);
-      out.push({ icon: reach(base, ground, ICON_RATIO, dark), text: reach(base, ground, TEXT_RATIO, dark) });
-    }
+    for (let i = 0; i < n; i++) { const base = set[i % set.length]; out.push({ icon: reach(base, ground, ICON_RATIO, dark), text: readableOn(base, ground) }); }
     return out;
   }
   /** The CSS custom properties the stylesheet reads (app.css: html.bcv-themed). */
@@ -179,7 +171,41 @@
     return { h, s: sat, tone: hi === lo ? 0.5 : clamp((hi - l) / (hi - lo), 0, 1) };
   }
   // a few starting points, each readable as it is
-  const PRESETS = [['#0a6cff', 'Blue'], ['#d63b7a', 'Pink'], ['#c8401f', 'Red'], ['#b76b00', 'Amber'], ['#1e8f4e', 'Green'], ['#0f8a9c', 'Teal'], ['#5e5ce6', 'Indigo'], ['#9347b3', 'Purple']];
+  // the themes on offer (the system's own colours); Regular is not one of them — it is the interface's
+  // blue with every sidebar glyph in its own hue
+  const PRESETS = [['#ff375f', 'Pink'], ['#ff453a', 'Red'], ['#ff9f0a', 'Amber'], ['#30d158', 'Green'], ['#40c8e0', 'Teal'], ['#5e5ce6', 'Indigo'], ['#bf5af2', 'Purple']];
+  const REGULAR = '#0a84ff';
+  /** A mix of two colours, t of the way from a to b. */
+  const mix = (a, b, t) => { const A = hexToRgb(a) || [0, 0, 0], B = hexToRgb(b) || [0, 0, 0]; return rgbToHex(A.map((v, i) => v + (B[i] - v) * t)); };
+  /** The colour as words on `on`: stepped towards black (a light ground) or white (a dark one), 4%
+   *  at a time, until it reads 4.5:1 — readability enforced, not hoped for. */
+  function readableOn(hex, on) {
+    const toward = luminance(hexToRgb(on)) < 0.2 ? '#ffffff' : '#000000';
+    for (let t = 0; t <= 1.0001; t += 0.04) { const c = mix(hex, toward, t); if (contrast(hexToRgb(c), on) >= 4.5) return c; }
+    return toward;
+  }
+  /** The colour as a button with white words on it: darkened until they read 3:1. */
+  function fillFor(hex) {
+    for (let t = 0; t <= 1.0001; t += 0.04) { const c = mix(hex, '#000000', t); if (contrast(hexToRgb(c), '#ffffff') >= 3) return c; }
+    return '#000000';
+  }
+  /** The tint: the colour at 14% by day, 22% by night, over whatever is under it. */
+  const tint = (hex, dark) => `color-mix(in srgb, ${hex} ${dark ? 22 : 14}%, transparent)`;
+  /** The custom colour from the picker's controls: hue, saturation, and a depth that maps to lightness (0.72 down to 0.32). */
+  const customHex = (h, s, depth) => hslToHex([Number(h) || 0, Math.max(0, Math.min(1, Number(s) || 0)), (72 - Math.max(0, Math.min(100, Number(depth) || 0)) * 0.4) / 100]);
+  /** The picker's controls for a colour (the depth clamped to what the picker reaches). */
+  function controlsOf(hex) {
+    const rgb = hexToRgb(hex);
+    if (!rgb) return { h: 211, s: 1, depth: 40 };
+    const [h, s, l] = rgbToHsl(rgb);
+    return { h, s, depth: Math.max(0, Math.min(100, (72 - l * 100) / 0.4)) };
+  }
+  /** The sidebar's five shades of one accent: the accent, then lighter and deeper mixes of it. */
+  const shadeSet = (A) => [A, mix(A, '#ffffff', 0.28), mix(A, '#000000', 0.22), mix(A, '#ffffff', 0.5), mix(A, '#000000', 0.4)];
+  /** The colour a photo's veil is made of: the accent deepened by `k`, warmed by the photo's own tone where one is known. */
+  const veilBase = (A, tone, k) => { const base = mix(A || REGULAR, '#000000', k); return tone ? mix(base, tone, 0.35) : base; };
+  /** A kept photo as a CSS image: a data URL wrapped, a drawn one (a gradient) as it is. */
+  const picCss = (v) => (!v ? 'none' : /^data:|^https?:|^blob:/.test(v) ? `url("${v}")` : v);
 
   // ---- the photos: read here, scaled here, kept here ------------------------------------------------
   /** Where a photo can go: the six counters of the Dashboard, and the sidebar. */
@@ -259,8 +285,8 @@
 
   BCV.theme = {
     hexToRgb, rgbToHex, rgbToHsl, hslToRgb, hslToHex, luminance, contrast, normalize,
-    GROUND, MIN_SAT, ICON_RATIO, TEXT_RATIO, PRESETS, CARD_SLOTS, HEADER_SLOTS, IMAGES_KEY,
-    palette, shades, cssVars, apply, readable, band, nearest, fromControls, toControls,
+    GROUND, MIN_SAT, ICON_RATIO, TEXT_RATIO, PRESETS, REGULAR, CARD_SLOTS, HEADER_SLOTS, IMAGES_KEY,
+    palette, shades, shadeSet, cssVars, apply, readable, readableOn, fillFor, mix, tint, customHex, controlsOf, veilBase, picCss, band, nearest, fromControls, toControls,
     resizeImage, readImage, imageTone, fillTones, loadImages, saveImages, countImages, countHeaders, emptyImages,
   };
 })();

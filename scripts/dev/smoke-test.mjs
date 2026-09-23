@@ -2790,13 +2790,13 @@ try {
   const setupDot = await dotOf('#bcv-setup');
   const introUp = (await page.$(su('.intro:not([hidden])'))) !== null;
   // the word-mark plays first (about two seconds), then the setup rises under it
-  check(page.url() === `${BASE}/` && (await page.$('.bcv-stat')) !== null && introUp && (await page.$$(su('.rail__item'))).length === 8 && (await sStep()) === '1 of 8' && (await page.$eval('html', (e) => getComputedStyle(e).overflow)) === 'hidden', 'the setup opens over the dashboard on its own ground: the address cleaned, a word-mark, a rail of eight steps, the page held still');
+  check(page.url() === `${BASE}/` && (await page.$('.bcv-stat')) !== null && introUp && (await page.$$(su('.rail__item'))).length === 4 && (await sStep()) === '1 of 4' && (await page.$eval('html', (e) => getComputedStyle(e).overflow)) === 'hidden', 'the setup opens over the dashboard on its own ground: the address cleaned, a word-mark, a rail of four steps, the page held still');
   check(setupDot.gap >= 10 && setupDot.gap <= 18 && setupDot.fits, `the dot after Simpl sits just past the word as drawn here, inside the drawing: ${JSON.stringify(setupDot)}`);
   await page.waitForFunction(() => document.querySelector('#bcv-setup')?.shadowRoot.querySelector('.intro')?.hidden === true, null, { timeout: 8000 });
   await page.waitForTimeout(500);
   await shot(page, '32-setup-over-page');
   const railNow = () => page.$$eval(su('.rail__item'), (els) => els.map((e) => `${e.querySelector('.rail__name').textContent}: ${e.querySelector('.rail__answer').textContent}${e.classList.contains('is-done') ? ' ✓' : ''}${e.disabled ? ' (locked)' : ''}`));
-  check((await railNow()).join(' | ') === 'Your courses: None yet | Grades: Not yet (locked) | Appearance: Not yet (locked) | Theme: Not yet (locked) | Course colours: Not yet (locked) | Headers: Not yet (locked) | Dashboard: Not yet (locked) | Sidebar: Not yet (locked)', `the rail names every step and really locks the ones ahead: ${(await railNow()).join(' | ')}`);
+  check((await railNow()).join(' | ') === 'Your courses: None yet | Grades: Not yet (locked) | Dashboard: Not yet (locked) | Sidebar: Not yet (locked)', `the rail names every step and really locks the ones ahead: ${(await railNow()).join(' | ')}`);
   const scrollHint = await page.$eval(su('.scrollhint'), (e) => ({ text: e.textContent, color: getComputedStyle(e).color, weight: getComputedStyle(e).fontWeight, below: e.getBoundingClientRect().top >= e.getRootNode().querySelector('.rows').getBoundingClientRect().bottom - 1 }));
   check(scrollHint.text === 'Scroll down to see more courses' && ['rgb(180, 35, 24)', 'rgb(249, 112, 102)'].includes(scrollHint.color) && scrollHint.weight === '700' && scrollHint.below, `a bold red line under the list says there is more to scroll to: ${JSON.stringify(scrollHint)}`);
   const scanned = await texts(su('.row__code'));
@@ -2846,8 +2846,8 @@ try {
   await shot(page, '32c-setup-courses');
   await sNext('#track');
   const firstTargets = await page.$$eval(su('.target .seg button.is-on'), (bs) => bs.map((b) => b.textContent));
-  check((await sStep()) === '2 of 8' && (await page.$eval(su('#track'), (e) => e.classList.contains('is-on'))) && (await texts(su('#goal')))[0] === '4.00' && (await page.$$(su('.target'))).length === 5 && firstTargets.join(',') === 'A+,A+,A+,A+,A+' && (await page.$$eval(su('.target:first-child .seg button'), (bs) => bs.map((b) => b.textContent))).join(' ') === 'C B B+ A- A A+', `step 2: tracking on, a 4.00 goal, every course aiming at A+, letters low to high: ${firstTargets.join(',')}`);
-  check((await railNow()).join(' | ') === `Your courses: 5 courses ✓ | Grades: Tracking · goal 4.00 | Appearance: Not yet (locked) | Theme: Not yet (locked) | Course colours: Not yet (locked) | Headers: Not yet (locked) | Dashboard: Not yet (locked) | Sidebar: Not yet (locked)` && (await texts(su('.target__code'))).includes('Setup nick'), `the rail ticks step 1 with its answer, and the target rows carry the nickname typed there: ${(await railNow()).join(' | ')}`);
+  check((await sStep()) === '2 of 4' && (await page.$eval(su('#track'), (e) => e.classList.contains('is-on'))) && (await texts(su('#goal')))[0] === '4.00' && (await page.$$(su('.target'))).length === 5 && firstTargets.join(',') === 'A+,A+,A+,A+,A+' && (await page.$$eval(su('.target:first-child .seg button'), (bs) => bs.map((b) => b.textContent))).join(' ') === 'C B B+ A- A A+', `step 2: tracking on, a 4.00 goal, every course aiming at A+, letters low to high: ${firstTargets.join(',')}`);
+  check((await railNow()).join(' | ') === `Your courses: 5 courses ✓ | Grades: Tracking · goal 4.00 | Dashboard: Not yet (locked) | Sidebar: Not yet (locked)` && (await texts(su('.target__code'))).includes('Setup nick'), `the rail ticks step 1 with its answer, and the target rows carry the nickname typed there: ${(await railNow()).join(' | ')}`);
   await page.click(su('.stepper button:last-child')); // already at the top of the scale: it stays there
   check((await texts(su('#goal')))[0] === '4.00', `the goal does not climb past 4.00: ${(await texts(su('#goal')))[0]}`);
   await page.click(su('.stepper button:first-child'));
@@ -2867,115 +2867,15 @@ try {
   await page.click(su('.target:nth-child(3) .target__pf')); // the third course stays pass/fail: it is saved as P/F
   check((await railAnswer('grades')) === 'Tracking · goal 3.90 · 1 pass/fail', `one course left pass/fail: ${await railAnswer('grades')}`);
   await shot(page, '32d-setup-grades');
-  await sNext('.tile[data-look]');
-  // step 3: light or dark — three tiles, the setting's own choice selected (Automatic to start with);
-  // a pick turns the card itself over as a preview, and writes nothing until the end
   const LOOK_OF = { off: 'light', on: 'dark', system: 'system' };
-  const LOOK_NAME = { light: 'Light', dark: 'Dark', system: 'Automatic' };
   const lookBefore = LOOK_OF[(await sw.evaluate(async () => (await self.BCV.settings.get()).appearance.darkMode))] || 'system';
-  const lookTiles = () => page.$$eval(su('.tile[data-look]'), (els) => els.map((t) => `${t.dataset.look}${t.classList.contains('is-on') ? ' *' : ''} [${t.querySelector('.tile__label').textContent}]`));
-  const lookWords = await page.$$eval(su('.tile[data-look]'), (els) => els.map((t) => `${t.querySelector('.tile__t').textContent} — ${t.querySelector('.tile__s').textContent}`));
-  const themeBefore = await page.$eval('#bcv-setup', (e) => e.getAttribute('data-theme'));
-  check((await sStep()) === '3 of 8' && (await texts(su('.fr__h1')))[0] === 'Light or dark?' && lookWords.join(' | ') === 'Light — Bright, all day. | Dark — Easy on the eyes. | Automatic — Follows your device, light by day and dark at night.' && (await lookTiles()).join(' | ') === ['light', 'dark', 'system'].map((v) => `${v}${v === lookBefore ? ' * [Selected]' : ' [Choose]'}`).join(' | ') && (await railAnswer('appearance')) === LOOK_NAME[lookBefore], `step 3 asks light or dark, the setting's own choice (${lookBefore}) selected: ${(await lookTiles()).join(' | ')}`);
-  await page.click(su('.tile[data-look="dark"]'));
-  check((await eventually(async () => (await page.$eval('#bcv-setup', (e) => e.getAttribute('data-theme'))) === 'dark' && (await page.$$(su('.tile[data-look].is-on'))).length === 1 && (await railAnswer('appearance')) === 'Dark')) && ((await sw.evaluate(async () => (await self.BCV.settings.get()).appearance.darkMode)) !== 'on' || lookBefore === 'dark'), 'picking Dark turns the card dark at once as a preview, the rail says Dark, and nothing is written yet');
-  await shot(page, '32e0-setup-appearance');
-  await page.click(su('.tile[data-look="light"]'));
-  check(await eventually(async () => (await page.$eval('#bcv-setup', (e) => e.getAttribute('data-theme'))) === 'light' && (await railAnswer('appearance')) === 'Light'), 'and Light turns it light again');
-  await page.click(su(`.tile[data-look="${lookBefore}"]`)); // back to the setting's own: the pages after this read it
-  check(await eventually(async () => (await page.$eval('#bcv-setup', (e) => e.getAttribute('data-theme'))) === themeBefore && (await railAnswer('appearance')) === LOOK_NAME[lookBefore]), `back to ${lookBefore}: the card is as it opened (${themeBefore})`);
-  await sNext('#tpv');
-  // step 4: the theme — a miniature Dashboard that says it is one, a colour picked from readable
-  // colours only, photos dropped on the counters and the sidebar; nothing written until the end
-  const tpvVars = () => page.$eval(su('#tpv'), (e) => ({ icon: e.style.getPropertyValue('--p-icon'), text: e.style.getPropertyValue('--p-text'), fill: e.style.getPropertyValue('--p-fill'), isDefault: e.classList.contains('is-default'), dark: e.getRootNode().host.getAttribute('data-theme') === 'dark' }));
-  const chipsNow = () => page.$$eval(su('.chip'), (els) => els.map((c) => `${c.textContent.trim()}${c.classList.contains('is-on') ? '*' : ''}`));
-  const themeOpen = await page.evaluate(() => { const r = document.querySelector('#bcv-setup').shadowRoot; return { h1: r.querySelector('.fr__h1').textContent, kicker: r.querySelector('.tpv__kicker').textContent, h1pv: r.querySelector('.tpv__h1').textContent, cards: [...r.querySelectorAll('.tpv__card')].map((c) => c.dataset.slot), labels: [...r.querySelectorAll('.tpv__clabel')].map((e) => e.textContent), nav: [...r.querySelectorAll('.tpv__row')].map((e) => e.textContent), zones: r.querySelectorAll('.tpv__drop input[type=file]').length, note: r.querySelector('#hexNote').textContent, hex: r.querySelector('#hex').value, ranges: [...r.querySelectorAll('.tpick__range')].map((e) => `${e.id} ${e.min}-${e.max}`), shades: r.querySelectorAll('.tpick__shade').length, wheel: !!r.querySelector('#wheel'), wheelSize: Math.round(r.querySelector('#wheel').getBoundingClientRect().width), mode: r.querySelector('#pickMode').textContent, shown: ['hue', 'depth', 'sat'].map((id) => getComputedStyle(r.querySelector(`#${id}`)).display !== 'none' && r.querySelector(`#${id}`).getBoundingClientRect().width > 0), rowIcons: [...r.querySelectorAll('.tpv__row')].map((e) => e.style.getPropertyValue('--row-icon')), h1Color: getComputedStyle(r.querySelector('.tpv__h1')).color, pvHeight: Math.round(r.querySelector('#tpv').getBoundingClientRect().height), frWidth: Math.round(r.querySelector('.fr').getBoundingClientRect().width), sideShare: r.querySelector('.tpv__side').getBoundingClientRect().width / r.querySelector('#tpv').getBoundingClientRect().width, cardShape: r.querySelector('.tpv__card').getBoundingClientRect().width / r.querySelector('.tpv__card').getBoundingClientRect().height, parts: ['.tpv__bar', '.tpv__seg', '.tpv__ghost'].map((c) => !!r.querySelector(c)), seg: [...r.querySelectorAll('.tpv__segbtn')].map((e) => `${e.textContent}${e.classList.contains('is-on') ? '*' : ''}`).join('|') }; });
-  check((await sStep()) === '4 of 8' && themeOpen.h1 === 'Make it yours' && themeOpen.kicker === 'Preview · not your real numbers' && themeOpen.h1pv === 'Dashboard' && themeOpen.cards.join(',') === 'today,week,unread,overdue,tomorrow,graded' && themeOpen.labels.join(' | ') === 'Due today | Due this week | Unread announcements | Overdue | Due tomorrow | Graded this week' && themeOpen.nav.join(',') === 'Dashboard,Courses,To Do,Calendar,Grades' && themeOpen.zones === 7 && themeOpen.note === 'The interface’s regular colours.' && themeOpen.hex === '#0a6cff' && themeOpen.ranges.slice().sort().join(' | ') === 'depth 0-100 | hue 0-360 | sat 25-100' && themeOpen.shades === 8 && (await railAnswer('theme')) === 'Regular', `step 4 shows a miniature Dashboard that says it is a preview, a zone per counter and one for the sidebar, and the picker on the regular colours: ${JSON.stringify(themeOpen)}`);
-  // the regular look is the default: the preview's rows wear their own colours and the title is ink; the picker is a wheel first, with Depth beside it and the sliders behind a switch
-  check(themeOpen.rowIcons.join(',') === '#0a6cff,#ff9500,#34c759,#5856d6,#af52de' && themeOpen.h1Color === 'rgb(28, 28, 30)' && themeOpen.wheel && themeOpen.wheelSize >= 150 && themeOpen.wheelSize <= 170 && themeOpen.mode === 'Use sliders' && themeOpen.shown.join(',') === 'false,true,false' && themeOpen.pvHeight >= 340 && themeOpen.frWidth >= 1000, `the Regular theme is the interface's own colourful look, and the picker opens as a compact wheel: ${JSON.stringify({ rowIcons: themeOpen.rowIcons, h1: themeOpen.h1Color, wheel: themeOpen.wheelSize, mode: themeOpen.mode, shown: themeOpen.shown, pv: themeOpen.pvHeight, fr: themeOpen.frWidth })}`);
-  // the miniature is the real page to scale: the sidebar 242 of 1400 wide, the widgets' bar and the header row with the view switcher over the page, the counters at the real shape
-  check(Math.abs(themeOpen.sideShare - 242 / 1400) < 0.02 && themeOpen.cardShape >= 3 && themeOpen.cardShape <= 4.4 && themeOpen.parts.every(Boolean) && themeOpen.seg === 'Cards|List*|Recent activity', `the preview is the Dashboard to scale: sidebar ${(themeOpen.sideShare * 100).toFixed(1)}% wide, counters ${themeOpen.cardShape.toFixed(2)}:1, the bar, the switcher (${themeOpen.seg}) and a card below`);
-  check((await chipsNow()).join(' | ') === 'Regular* | Pink | Red | Amber | Green | Teal | Indigo | Purple' && THEME.PRESETS.every(([hex]) => THEME.readable(hex)) && (await tpvVars()).isDefault, `Regular first and on, then seven presets, every one readable in light and in dark: ${(await chipsNow()).join(' | ')}`);
-  await page.click(su('.chip[data-preset="#d63b7a"]'));
-  const pinkNow = await tpvVars();
-  const pinkPal = THEME.palette('#d63b7a', pinkNow.dark);
-  check(pinkNow.icon === pinkPal.icon && pinkNow.text === pinkPal.text && pinkNow.fill === pinkPal.fill && !pinkNow.isDefault && (await page.$eval(su('#hex'), (e) => e.value)) === '#d63b7a' && (await chipsNow())[1] === 'Pink*' && (await railAnswer('theme')) === 'Pink' && (await sw.evaluate(async () => (await self.BCV.settings.get()).appearance.theme?.accent || '')) === '', `Pink: the preview takes the shades derived for this mode (${JSON.stringify(pinkPal)}), the rail says Pink, nothing written yet`);
-  // a shade per row, not one flat colour: each row's glyph and words are that row's own shade, lighter at the top and deeper below, and the title is the text shade
-  const pinkRows = THEME.shades('#d63b7a', pinkNow.dark, 5);
-  const pinkRowsNow = await page.$$eval(su('.tpv__row'), (els) => els.map((e) => ({ icon: e.style.getPropertyValue('--row-icon'), stroke: getComputedStyle(e.querySelector('.tpv__ic')).stroke, color: getComputedStyle(e.querySelector('span')).color })));
-  check(pinkRowsNow.length === 5 && pinkRowsNow.every((r, i) => r.icon === pinkRows[i].icon && r.stroke === rgbOf(pinkRows[i].icon) && r.color === rgbOf(pinkRows[i].text)) && new Set(pinkRowsNow.map((r) => r.icon)).size === 5 && (await page.$eval(su('.tpv__h1'), (e) => getComputedStyle(e).color)) === rgbOf(pinkPal.text), `every row of the preview's sidebar wears its own shade of pink, and the title the text shade: ${pinkRowsNow.map((r) => r.icon).join(' ')}`);
-  // a hex typed by hand is moved to the nearest colour that reads — and the note says where it went
-  await page.fill(su('#hex'), '#ffff00');
-  const moved = await page.evaluate(() => { const r = document.querySelector('#bcv-setup').shadowRoot; return { note: r.querySelector('#hexNote').textContent, flagged: r.querySelector('#hexNote').classList.contains('is-moved'), typed: r.querySelector('#hex').value, icon: r.querySelector('#tpv').style.getPropertyValue('--p-icon'), chips: r.querySelectorAll('.chip.is-on').length }; });
-  const yellowNear = THEME.nearest('#ffff00');
-  check(moved.note === `Moved to ${yellowNear}, the nearest colour that reads in light and dark.` && moved.flagged && moved.typed === '#ffff00' && THEME.readable(yellowNear) && !THEME.readable('#ffff00') && moved.icon === THEME.palette(yellowNear, pinkNow.dark).icon && moved.chips === 0, `a yellow no one could read is moved to ${yellowNear}, and the note says so: ${JSON.stringify(moved)}`);
-  await page.fill(su('#hex'), '#12');
-  check((await page.$eval(su('#hexNote'), (e) => e.textContent)) === 'Six hex digits, like #d63b7a.' && (await page.$eval(su('#tpv'), (e) => e.style.getPropertyValue('--p-icon'))) === moved.icon, 'half a hex is asked for the rest, and the preview keeps the last colour');
-  await page.click(su('.chip[data-preset="#d63b7a"]')); // back to Pink for what follows
-  await page.waitForFunction(() => document.querySelector('#bcv-setup').shadowRoot.querySelector('#hex').value === '#d63b7a', null, { timeout: 3000 });
-  // the wheel: a press to the right of its centre is a hue of 90° (round from the top) at that much saturation; the knob follows
-  const wb = await page.$eval(su('#wheel'), (e) => e.getBoundingClientRect().toJSON());
-  await page.mouse.click(wb.x + wb.width / 2, wb.y + wb.height / 2 + wb.height * 0.4);
-  const wheeled = await page.evaluate(() => { const r = document.querySelector('#bcv-setup').shadowRoot; const k = r.querySelector('.tpick__knob'); return { hex: r.querySelector('#hex').value, hue: Number(r.querySelector('#hue').value), sat: Number(r.querySelector('#sat').value), knobLeft: k.style.left, knobTop: k.style.top, chips: r.querySelectorAll('.chip.is-on').length }; });
-  check(THEME.readable(wheeled.hex) && Math.abs(wheeled.hue - 180) <= 2 && Math.abs(wheeled.sat - 80) <= 3 && /^50(\.\d+)?%$/.test(wheeled.knobLeft) && /^9\d(\.\d+)?%$/.test(wheeled.knobTop) && wheeled.chips === 0 && (await railAnswer('theme')) === 'Teal', `a press at the foot of the wheel is a hue of 180° at that much saturation, readable, the knob at the press: ${JSON.stringify(wheeled)}`);
-  await page.click(su('#pickMode'));
-  const slidersNow = await page.evaluate(() => { const r = document.querySelector('#bcv-setup').shadowRoot; return { mode: r.querySelector('#pickMode').textContent, wheel: r.querySelector('#wheel').getBoundingClientRect().width, shown: ['hue', 'depth', 'sat'].map((id) => r.querySelector(`#${id}`).getBoundingClientRect().width > 0), depthAmong: !!r.querySelector('.tpick__sl--depth #depth') }; });
-  check(slidersNow.mode === 'Use the wheel' && slidersNow.wheel === 0 && slidersNow.shown.join(',') === 'true,true,true' && slidersNow.depthAmong, `Use sliders puts the wheel away and brings the three sliders, the one Depth slider among them: ${JSON.stringify(slidersNow)}`);
-  // the sliders reach readable colours only: the depth track is the band the hue can be read at
-  await page.$eval(su('#hue'), (e) => { e.value = '200'; e.dispatchEvent(new Event('input', { bubbles: true })); });
-  const slid = await page.evaluate(() => { const r = document.querySelector('#bcv-setup').shadowRoot; return { hex: r.querySelector('#hex').value, note: r.querySelector('#hexNote').textContent, track: r.querySelector('#depth').style.getPropertyValue('--track').length > 20 }; });
-  check(THEME.readable(slid.hex) && Math.abs(THEME.rgbToHsl(THEME.hexToRgb(slid.hex))[0] - 200) < 2 && slid.note === 'Readable in light and dark.' && slid.track, `the hue slider lands on a readable colour of that hue: ${slid.hex}`);
-  await page.click(su('.chip[data-preset="#d63b7a"]'));
-  await page.click(su('#pickMode')); // back to the wheel: the shots below show it
-  // photos: dropped on a counter and on the sidebar, scaled here, shown at once — sharp at the
-  // bottom right, blurred as they climb, the card's own colour at the top left
-  const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
-  await page.setInputFiles(su('.tpv__card[data-slot="today"] input[type=file]'), { name: 'sky.png', mimeType: 'image/png', buffer: PNG });
-  await page.waitForSelector(su('.tpv__card[data-slot="today"].has-pic'), { timeout: 10000 });
-  await page.setInputFiles(su('.tpv__side input[type=file]'), { name: 'hills.png', mimeType: 'image/png', buffer: PNG });
-  await page.waitForSelector(su('.tpv__side.has-pic'), { timeout: 10000 });
-  const picsNow = await page.evaluate(() => { const r = document.querySelector('#bcv-setup').shadowRoot; const card = r.querySelector('.tpv__card[data-slot="today"]'); const side = r.querySelector('.tpv__side'); const layer = (el, cls) => getComputedStyle(el.querySelector(cls)); return { cardTone: card.style.getPropertyValue('--pic-tone'), sideTone: side.style.getPropertyValue('--pic-tone'), veil: getComputedStyle(card).getPropertyValue('--veil'), cardUrl: card.style.getPropertyValue('--pic').slice(0, 27), cardLayers: card.querySelectorAll('.tpv__pic').length, cardBlur: layer(card, '.tpv__pic--blur').filter, cardMask: layer(card, '.tpv__pic--blur').maskImage || layer(card, '.tpv__pic--blur').webkitMaskImage, cardPos: layer(card, '.tpv__pic--sharp').backgroundPosition, sideLayers: side.querySelectorAll('.tpv__pic').length, sideMask: layer(side, '.tpv__pic--blur').maskImage || layer(side, '.tpv__pic--blur').webkitMaskImage, zone: card.querySelector('.tpv__droplabel span').textContent, x: !!card.querySelector('.tpv__x'), filled: r.querySelectorAll('.tpv__drop.is-filled').length }; });
-  check(/^#[0-9a-f]{6}$/.test(picsNow.cardTone) && picsNow.sideTone === picsNow.cardTone && picsNow.veil.includes('color-mix') && picsNow.veil.includes(picsNow.cardTone) && picsNow.cardUrl === 'url("data:image/jpeg;base64' && picsNow.cardLayers === 3 && /blur\(10px\)/.test(picsNow.cardBlur) && /radial-gradient/.test(picsNow.cardMask) && /100% 100%/.test(picsNow.cardPos) && picsNow.sideLayers === 3 && /linear-gradient\(to top/.test(picsNow.sideMask) && picsNow.zone === 'Change' && picsNow.x && picsNow.filled === 2 && (await railAnswer('theme')) === 'Pink · 2 photos', `two photos, scaled to JPEG here, each with its tone read (${picsNow.cardTone}) for a veil in its own colour: three layers each, the counter's blur masked from its bottom-right corner, the sidebar's up its side: ${JSON.stringify({ ...picsNow, veil: picsNow.veil.slice(0, 40) })}`);
-  // the Depth slider dragged with the keys: the colour follows, the slider keeps its place and its focus (never moved mid-drag), the preview is tinted in place rather than built again
-  await page.focus(su('#depth'));
-  const depthBefore = await page.evaluate(() => { const r = document.querySelector('#bcv-setup').shadowRoot; r.querySelector('.tpv__card[data-slot="week"]').dataset.mark = 'kept'; return { value: r.querySelector('#depth').value, hex: r.querySelector('#hex').value, parent: r.querySelector('#depth').parentElement.className }; });
-  for (let i = 0; i < 5; i++) await page.keyboard.press('ArrowRight');
-  const depthAfter = await page.evaluate(() => { const r = document.querySelector('#bcv-setup').shadowRoot; return { value: r.querySelector('#depth').value, hex: r.querySelector('#hex').value, parent: r.querySelector('#depth').parentElement.className, focused: r.activeElement === r.querySelector('#depth'), kept: r.querySelector('.tpv__card[data-slot="week"]').dataset.mark === 'kept', pics: r.querySelectorAll('.tpv__pic').length, icon: r.querySelector('#tpv').style.getPropertyValue('--p-icon') }; });
-  check(Number(depthAfter.value) === Number(depthBefore.value) + 5 && depthAfter.hex !== depthBefore.hex && THEME.readable(depthAfter.hex) && depthAfter.focused && depthAfter.parent === depthBefore.parent && depthAfter.kept && depthAfter.pics === 6 && depthAfter.icon === THEME.palette(depthAfter.hex, pinkNow.dark).icon, `five steps of Depth: a deeper readable colour, the slider still focused where it was, the preview tinted in place with its photos: ${JSON.stringify({ before: depthBefore, after: depthAfter })}`);
-  await page.click(su('.chip[data-preset="#d63b7a"]')); // back to Pink for what follows
-  await shot(page, '32e1-setup-theme');
-  await page.click(su('.tpv__card[data-slot="today"] .tpv__x'));
-  await page.waitForFunction(() => !document.querySelector('#bcv-setup').shadowRoot.querySelector('.tpv__card[data-slot="today"].has-pic'), null, { timeout: 3000 });
-  check((await railAnswer('theme')) === 'Pink · 1 photo', 'the × takes a photo off again');
-  await page.setInputFiles(su('.tpv__card[data-slot="graded"] input[type=file]'), { name: 'gold.png', mimeType: 'image/png', buffer: PNG });
-  await page.waitForSelector(su('.tpv__card[data-slot="graded"].has-pic'), { timeout: 10000 });
-  check((await railAnswer('theme')) === 'Pink · 2 photos' && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('theme:images'))['theme:images'])) === undefined, 'a photo on another counter; still nothing written');
-  await sNext('#cc');
-  // step 5: the courses' colours — a row per course chosen, Canvas's fifteen colours and one of your own beside it
-  const colourRows = await page.$$eval(su('.cc__row'), (els) => els.map((e) => ({ id: e.dataset.course, code: e.querySelector('.cc__code').textContent, swatches: e.querySelectorAll('.cc__swatch').length, custom: !!e.querySelector('.cc__custom'), on: e.querySelectorAll('.cc__swatch.is-on').length })));
-  const ccId = colourRows[0].id; // the first course chosen, whichever it is
-  const colourWas = (await apiGet('/api/v1/users/self/colors')).custom_colors?.[`course_${ccId}`] || null;
-  const colourNow = async () => (await apiGet('/api/v1/users/self/colors')).custom_colors?.[`course_${ccId}`] || null;
-  check((await sStep()) === '5 of 8' && (await texts(su('.fr__h1')))[0] === 'Colour your courses' && colourRows.length === 5 && colourRows.every((r) => r.swatches === 16 && r.custom) && colourRows[0].on === 0 && (await railAnswer('colours')) === 'As they are', `step 5 lists the five courses chosen with sixteen swatches each (none lit: the mock's colours are its own): ${JSON.stringify(colourRows[0])} · Canvas has ${colourWas} for it`);
-  await page.click(su(`.cc__row[data-course="${ccId}"] .cc__swatch[data-color="#E71F63"]`));
-  check((await page.$eval(su(`.cc__row[data-course="${ccId}"] .cc__swatch.is-on`), (e) => e.dataset.color)) === '#E71F63' && (await page.$eval(su(`.cc__row[data-course="${ccId}"] .mini__dot`), (e) => e.style.background)) === 'rgb(231, 31, 99)' && (await railAnswer('colours')) === '1 changed' && (await colourNow()) === colourWas, 'a swatch pressed lights, the row\'s dot takes it, the rail counts one change, and Canvas is not told yet');
-  await shot(page, '32e2-setup-colours');
-  await sNext('#thd');
-  // step 6: photos on the headers — every page with a header as a row, the title in the colour chosen
-  const headRows = await page.$$eval(su('.thd__row'), (els) => els.map((e) => ({ screen: e.dataset.screen, title: e.querySelector('.thd__title').textContent, color: getComputedStyle(e.querySelector('.thd__title')).color, zone: !!e.querySelector('input[type=file]') })));
-  check((await sStep()) === '6 of 8' && headRows.map((r) => r.title).join(' | ') === 'Dashboard | All Courses | Groups | To Do | Calendar | Notifications | Inbox | Grades | Tools' && headRows.map((r) => r.screen).join(',') === 'dashboard,courses,groups,todo,calendar,notifications,inbox,gpa,tools' && headRows.every((r) => r.zone && r.color === rgbOf(pinkPal.text)) && (await railAnswer('headers')) === 'None', `step 6 lists every header with its title in the pink text shade and a photo zone each: ${headRows.map((r) => r.title).join(', ')}`);
-  await page.setInputFiles(su('.thd__row[data-screen="dashboard"] input[type=file]'), { name: 'ridge.png', mimeType: 'image/png', buffer: PNG });
-  await page.waitForSelector(su('.thd__row[data-screen="dashboard"].has-pic'), { timeout: 10000 });
-  const headPic = await page.$eval(su('.thd__row[data-screen="dashboard"]'), (e) => ({ layers: e.querySelectorAll('.tpv__pic').length, pos: getComputedStyle(e.querySelector('.tpv__pic--sharp')).backgroundPosition, mask: (getComputedStyle(e.querySelector('.tpv__pic--blur')).maskImage || '').slice(0, 23), veil: getComputedStyle(e.querySelector('.tpv__pic--veil')).backgroundImage.slice(0, 24), zone: e.querySelector('.tpv__droplabel span').textContent }));
-  check(headPic.layers === 3 && /100% 50%/.test(headPic.pos) && headPic.mask === 'linear-gradient(to left' && headPic.veil === 'linear-gradient(to right' && headPic.zone === 'Change' && (await railAnswer('headers')) === '1 photo' && (await railAnswer('theme')) === 'Pink · 2 photos', `a photo on the Dashboard header: sharp at the right, blurred as it comes left, veiled where the title is; counted apart from the theme's own: ${JSON.stringify(headPic)}`);
-  await shot(page, '32e3-setup-headers');
   await sNext('.tile[data-view]');
-  // step 7: what the Dashboard shows first — three preview tiles drawn in the chosen courses' colours, List chosen to start with
+  // step 3: what the Dashboard shows first — three preview tiles drawn in the chosen courses' colours, List chosen to start with
   const VIEW_OF = { cards: 'cards', planner: 'list', activity: 'activity' };
   const viewBefore = VIEW_OF[(await apiGet('/dashboard/view')).dashboard_view] || 'list';
   const dashTiles = () => page.$$eval(su('.tile[data-view]'), (els) => els.map((t) => `${t.dataset.view}${t.classList.contains('is-on') ? ' *' : ''} [${t.querySelector('.tile__label').textContent}]`));
   const tileWords = await page.$$eval(su('.tile[data-view]'), (els) => els.map((t) => `${t.querySelector('.tile__t').textContent} — ${t.querySelector('.tile__s').textContent}`));
-  check((await sStep()) === '7 of 8' && tileWords.join(' | ') === 'Cards — Courses as tiles, with what is due next. | List — Everything due, day by day, with a tick. | Activity — Announcements, replies and grades as they arrive.' && (await dashTiles()).join(' | ') === ['cards', 'list', 'activity'].map((v) => `${v}${v === 'list' ? ' * [Selected]' : ' [Choose]'}`).join(' | '), `step 7 asks what the Dashboard shows first, List selected to start with whatever Canvas has (${viewBefore}): ${(await dashTiles()).join(' | ')}`);
+  check((await sStep()) === '3 of 4' && tileWords.join(' | ') === 'Cards — Courses as tiles, with what is due next. | List — Everything due, day by day, with a tick. | Activity — Announcements, replies and grades as they arrive.' && (await dashTiles()).join(' | ') === ['cards', 'list', 'activity'].map((v) => `${v}${v === 'list' ? ' * [Selected]' : ' [Choose]'}`).join(' | '), `step 3 asks what the Dashboard shows first, List selected to start with whatever Canvas has (${viewBefore}): ${(await dashTiles()).join(' | ')}`);
   check((await page.$$(su('.tile[data-view="cards"] .mini__card'))).length === 4 && (await page.$eval(su('.tile[data-view="cards"] .mini__card'), (e) => e.style.background)) === firstColour && (await page.$$(su('.tile[data-view="list"] .mini__row'))).length === 4 && (await page.$$(su('.tile[data-view="activity"] .mini__row'))).length === 3, `the tiles are miniatures of the real layouts in the chosen courses' own colours (${firstColour})`);
   const other = viewBefore === 'cards' ? 'activity' : 'cards';
   await page.click(su(`.tile[data-view="${other}"]`));
@@ -2983,10 +2883,10 @@ try {
   await shot(page, '32e-setup-dashboard');
   await page.click(su(`.tile[data-view="${viewBefore}"]`)); // back to what Canvas had: the pages after this read it
   await sNext('.tile[data-value]');
-  // step 8: where the courses chosen in step 1 should sit
+  // step 4: where the courses chosen in step 1 should sit
   const sideBefore = (await sw.evaluate(async () => (await self.BCV.settings.get()).appearance.sideCourses)) === 'always' ? 'always' : 'hover';
   const sideTiles = () => page.$$eval(su('.tile[data-value]'), (els) => els.map((t) => `${t.querySelector('.tile__t').textContent}${t.classList.contains('is-on') ? ' *' : ''}`));
-  check((await sStep()) === '8 of 8' && (await sideTiles()).join(' | ') === `Always listed${sideBefore === 'always' ? ' *' : ''} | On hover${sideBefore === 'hover' ? ' *' : ''}` && (await page.$eval(su('#next'), (e) => e.textContent.trim())) === 'Finish', `step 8 asks where the courses live, the setting's own choice selected (${sideBefore}): ${(await sideTiles()).join(' | ')}`);
+  check((await sStep()) === '4 of 4' && (await sideTiles()).join(' | ') === `Always listed${sideBefore === 'always' ? ' *' : ''} | On hover${sideBefore === 'hover' ? ' *' : ''}` && (await page.$eval(su('#next'), (e) => e.textContent.trim())) === 'Finish', `step 4 asks where the courses live, the setting's own choice selected (${sideBefore}): ${(await sideTiles()).join(' | ')}`);
   await shot(page, '32f-setup-sidebar');
   const pickSide = async (v) => {
     await page.click(su(`.tile[data-value="${v}"]`));
@@ -2998,19 +2898,112 @@ try {
   await sNext('.summary__row');
   // Ready: a read-back of every answer, then Open Canvas writes them all at once
   const summary = await page.$$eval(su('.summary__row'), (els) => els.map((r) => `${r.querySelector('.summary__k').textContent}: ${r.querySelector('.summary__v').textContent}`));
-  check((await sStep()) === 'Ready' && (await texts(su('.fr__h1')))[0] === 'You’re set' && summary.join(' | ') === `Courses shown: 5 of ${total} | Grade history: On · goal 3.90 | Appearance: ${LOOK_NAME[lookBefore]} | Theme: Pink · 2 photos | Course colours: 1 changed | Headers: 1 photo | Dashboard: ${{ cards: 'Cards', list: 'List', activity: 'Activity' }[viewBefore]} | Sidebar: Always listed` && (await page.$eval(su('#next'), (e) => e.textContent.trim())) === 'Open Canvas' && (await page.$(su('#back'))) !== null && (await page.$$(su('.rail__item.is-done'))).length === 8, `Finish shows the read-back with every rail step ticked: ${summary.join(' | ')}`);
+  check((await sStep()) === 'Ready' && (await texts(su('.fr__h1')))[0] === 'You’re set' && summary.join(' | ') === `Courses shown: 5 of ${total} | Grade history: On · goal 3.90 | Dashboard: ${{ cards: 'Cards', list: 'List', activity: 'Activity' }[viewBefore]} | Sidebar: Always listed` && (await page.$eval(su('#next'), (e) => e.textContent.trim())) === 'Continue to appearance' && (await page.$(su('#back'))) !== null && (await page.$$(su('.rail__item.is-done'))).length === 4, `Finish shows the read-back with every rail step ticked, and Continue to appearance: ${summary.join(' | ')}`);
   await shot(page, '32g-setup-ready');
   await page.click(su('#back'));
   await page.waitForSelector(su('.tile[data-value]'), { timeout: 10000 });
-  check((await sStep()) === '8 of 8' && (await railNow()).filter((r) => r.includes('(locked)')).length === 0, 'Back from the read-back returns to the last step, nothing locked behind');
+  check((await sStep()) === '4 of 4' && (await railNow()).filter((r) => r.includes('(locked)')).length === 0, 'Back from the read-back returns to the last step, nothing locked behind');
   await page.click(su('.rail__item[data-step="courses"]'));
   await page.waitForSelector(su('.row[data-course]'), { timeout: 10000 });
-  check((await sStep()) === '1 of 8' && (await page.$$(su('.row.is-on'))).length === 5 && (await page.$eval(su(`.row[data-course="${nickId}"] .row__nick`), (e) => e.value)) === 'Setup nick' && (await railNow()).join(' | ') === `Your courses: 5 courses | Grades: Tracking · goal 3.90 · 1 pass/fail ✓ | Appearance: ${LOOK_NAME[lookBefore]} ✓ | Theme: Pink · 2 photos ✓ | Course colours: 1 changed ✓ | Headers: 1 photo ✓ | Dashboard: ${{ cards: 'Cards', list: 'List', activity: 'Activity' }[viewBefore]} ✓ | Sidebar: Always listed ✓`, `the rail goes back to any step done, with its answers kept: ${(await railNow()).join(' | ')}`);
-  for (const s of ['#track', '.tile[data-look]', '#tpv', '#cc', '#thd', '.tile[data-view]', '.tile[data-value]', '.summary__row']) await sNext(s);
+  check((await sStep()) === '1 of 4' && (await page.$$(su('.row.is-on'))).length === 5 && (await page.$eval(su(`.row[data-course="${nickId}"] .row__nick`), (e) => e.value)) === 'Setup nick' && (await railNow()).join(' | ') === `Your courses: 5 courses | Grades: Tracking · goal 3.90 · 1 pass/fail ✓ | Dashboard: ${{ cards: 'Cards', list: 'List', activity: 'Activity' }[viewBefore]} ✓ | Sidebar: Always listed ✓`, `the rail goes back to any step done, with its answers kept: ${(await railNow()).join(' | ')}`);
+  for (const s of ['#track', '.tile[data-view]', '.tile[data-value]', '.summary__row']) await sNext(s);
   check((await sStep()) === 'Ready' && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('setup:done'))['setup:done'])) === undefined, 'forward again to the read-back: still nothing marked done');
   // Open Canvas writes everything and reloads the page: it comes back black, with the choices in place
   // and the welcome on it — two pointers in turn, each with a Continue that comes in after three seconds
-  await Promise.all([page.waitForNavigation({ timeout: 20000 }), page.click(su('#next'))]);
+  // Continue to appearance writes the steps and leads into Personalize, in the card's place: the
+  // appearance switch at the top, three bars, a preview of the Dashboard the choices go on
+  await page.click(su('#next'));
+  await page.waitForSelector(su('.pz'), { timeout: 20000 });
+  await page.waitForTimeout(500);
+  const pz = (sel) => su(`.pz ${sel}`);
+  const pzVar = (name) => page.$eval(su('.pz'), (e, n) => e.style.getPropertyValue(n), name);
+  const pzOpen = await page.evaluate(() => { const r = document.querySelector('#bcv-setup').shadowRoot; const pv = r.querySelector('.pz__pv'); return { rail: !!r.querySelector('.rail'), looks: [...r.querySelectorAll('#pzLook .pz__segbtn')].map((b) => `${b.dataset.look}${b.classList.contains('is-on') ? '*' : ''}`).join(' '), bars: [...r.querySelectorAll('#pzBars .pz__bar')].map((b) => (b.classList.contains('is-on') ? 'on' : b.classList.contains('is-done') ? 'done' : 'off')).join(' '), h1: r.querySelector('.pz__h1').textContent, pvWidth: Math.round(pv.getBoundingClientRect().width), pvScale: pv.style.transform, rows: r.querySelectorAll('.pz__row').length, cards: r.querySelectorAll('.pz__card').length, crows: r.querySelectorAll('.pz__crow').length, themes: [...r.querySelectorAll('#pzThemes .pz__sw')].map((b) => `${b.dataset.theme}${b.classList.contains('is-on') ? '*' : ''}`).join(' '), next: r.querySelector('#pzNext').textContent, back: !!r.querySelector('#pzBack'), note: r.querySelector('#pzNote').textContent, A: r.querySelector('.pz').style.getPropertyValue('--A'), strokes: [...r.querySelectorAll('.pz__rowic')].map((e) => getComputedStyle(e).stroke) }; });
+  check(!pzOpen.rail && pzOpen.looks === `light${lookBefore === 'light' ? '*' : ''} dark${lookBefore === 'dark' ? '*' : ''} system${lookBefore === 'system' ? '*' : ''}` && pzOpen.bars === 'on off off' && pzOpen.h1 === 'Click any part of the preview to personalize' && pzOpen.pvWidth >= 560 && pzOpen.pvWidth <= 980 && /scale\(/.test(pzOpen.pvScale) && pzOpen.rows === 5 && pzOpen.cards === 6 && pzOpen.crows === 5 && pzOpen.themes === 'Regular* Pink Red Amber Green Teal Indigo Purple Custom' && pzOpen.next === 'Continue' && !pzOpen.back && pzOpen.note === 'Regular' && pzOpen.A === '#0a84ff' && pzOpen.strokes.join(',') === 'rgb(10, 132, 255),rgb(255, 159, 10),rgb(48, 209, 88),rgb(94, 92, 230),rgb(191, 90, 242)', `Personalize opens in the card's place: the look at the top with the setting's own choice, three bars, the preview scaled to fit, Regular with every glyph in its own colour: ${JSON.stringify(pzOpen)}`);
+  await shot(page, '32e1-personalize');
+  // appearance first: Dark turns the whole flow over as a preview, and nothing is written
+  await page.click(pz('#pzLook [data-look="dark"]'));
+  check(await eventually(async () => (await page.$eval('#bcv-setup', (e) => e.getAttribute('data-theme'))) === 'dark') && (await sw.evaluate(async () => (await self.BCV.settings.get()).appearance.darkMode)) !== 'on' || lookBefore === 'dark', 'Dark turns the flow over at once, and writes nothing yet');
+  await page.click(pz(`#pzLook [data-look="${lookBefore}"]`));
+  await eventually(async () => (await page.$eval('#bcv-setup', (e) => e.getAttribute('data-theme'))) === (lookBefore === 'dark' ? 'dark' : 'light'));
+  const pzDark = (await page.$eval('#bcv-setup', (e) => e.getAttribute('data-theme'))) === 'dark';
+  // a theme: one accent, derived everywhere — the words readable, the button fill under white, the five shades on the rows
+  await page.click(pz('.pz__sw[data-theme="Pink"]'));
+  const pinkA = '#ff375f';
+  const pinkOn = await page.evaluate(() => { const r = document.querySelector('#bcv-setup').shadowRoot; const root = r.querySelector('.pz'); return { A: root.style.getPropertyValue('--A'), read: root.style.getPropertyValue('--A-read'), btn: root.style.getPropertyValue('--A-btn'), strokes: [...r.querySelectorAll('.pz__rowic')].map((e) => getComputedStyle(e).stroke), num: getComputedStyle(r.querySelector('.pz__cn')).color, on: r.querySelector('.pz__sw.is-on').dataset.theme, note: r.querySelector('#pzNote').textContent, tile: getComputedStyle(r.querySelector('.pz__tile')).backgroundColor, next: getComputedStyle(r.querySelector('#pzNext')).backgroundColor }; });
+  const rgbOfHex = rgbOf;
+  check(pinkOn.A === pinkA && pinkOn.read === THEME.readableOn(pinkA, pzDark ? '#1c1c1e' : '#ffffff') && pinkOn.btn === THEME.fillFor(pinkA) && pinkOn.strokes.join(',') === THEME.shadeSet(pinkA).map(rgbOfHex).join(',') && pinkOn.num === rgbOfHex(pinkOn.read) && pinkOn.on === 'Pink' && pinkOn.note === 'Pink' && pinkOn.tile === rgbOfHex(pinkOn.btn) && pinkOn.next === rgbOfHex(pinkOn.btn), `Pink: the accent, the words stepped to 4.5:1, the fill to 3:1 under white, the rows in five shades of it, the brand tile and Continue in the fill: ${JSON.stringify(pinkOn)}`);
+  // Custom opens the radial picker: the hue ring, the two arcs, the core that shows how it reads; a press on the ring is a hue
+  await page.click(pz('.pz__sw[data-theme="Custom"]'));
+  await page.waitForSelector(pz('[data-pk]'), { timeout: 5000 });
+  await page.waitForTimeout(600);
+  const pk = await page.$eval(pz('[data-pk]'), (e) => { const r = e.getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width, h: r.height, knobs: e.querySelectorAll('.pz__pkknob').length, labels: [...e.querySelectorAll('.pz__pklabel')].map((t) => t.textContent).join(','), core: !!e.querySelector('.pz__pkcore'), done: e.querySelector('.pz__pkdone')?.textContent }; });
+  const pkK = pk.w / 272, pkCx = pk.x + pk.w / 2, pkCy = pk.y + pk.h / 2;
+  await page.mouse.click(pkCx, pkCy - 118 * pkK); // the hue ring, at the top: hue 0
+  const hueTop = await page.evaluate(() => { const r = document.querySelector('#bcv-setup').shadowRoot; return { A: r.querySelector('.pz').style.getPropertyValue('--A'), hex: r.querySelector('[data-pk]').dataset.hex, on: r.querySelector('.pz__sw.is-on').dataset.theme }; });
+  check(Math.round(pk.w) === Math.round(272 * pkK) && pk.knobs === 3 && pk.labels === 'SATURATION,DEPTH' && pk.core && pk.done === 'Done' && hueTop.on === 'Custom' && hueTop.A === THEME.customHex(0, 1, 40) && hueTop.hex === hueTop.A, `Custom opens the radial picker, and a press at the top of its ring is hue 0 at the controls' saturation and depth: ${JSON.stringify({ ...pk, x: undefined, y: undefined, hueTop })}`);
+  await page.mouse.click(pkCx + 86 * pkK, pkCy); // the depth arc, at its middle: depth 50
+  const depMid = await pzVar('--A');
+  check(depMid === THEME.customHex(0, 1, 50), `a press on the depth arc's middle is depth 50: ${depMid}`);
+  await page.mouse.click(pkCx - 86 * pkK, pkCy); // the saturation arc, at its middle: saturation .5
+  const satMid = await pzVar('--A');
+  check(satMid === THEME.customHex(0, 0.5, 50) && (await page.$eval(pz('.pz__pkaa--light'), (e) => getComputedStyle(e).color)) === rgbOfHex(THEME.readableOn(satMid, '#ffffff')), `and on the saturation arc's middle, half saturation; the core reads the colour on white as words would: ${satMid}`);
+  await page.click(pz('.pz__pkdone'));
+  check(await eventually(async () => (await page.$(pz('[data-pk]'))) === null, 3000) && (await pzVar('--A')) === satMid, 'Done shrinks the picker away and keeps the colour');
+  await shot(page, '32e2-personalize-custom');
+  // photos: a press on a counter opens the bar under the preview — None, four drawn photos, Upload, All cards, Done
+  await page.click(pz('.pz__card[data-target="today"]'));
+  await page.waitForSelector(pz('#pzPhotoBar'), { timeout: 5000 });
+  const barOpen = await page.evaluate(() => { const r = document.querySelector('#bcv-setup').shadowRoot; const b = r.querySelector('#pzPhotoBar'); return { title: b.querySelector('.pz__bartitle').textContent, choices: [...b.querySelectorAll('.pz__choice')].map((c) => c.title).join(','), every: b.querySelector('#pzEvery')?.textContent, ok: !!b.querySelector('.pz__barok'), target: r.querySelector('.pz__card.is-target')?.dataset.target }; });
+  check(barOpen.title === 'Due today' && barOpen.choices === 'None,Dusk,Ocean,Forest,Sand,Upload' && barOpen.every === 'All cards' && barOpen.ok && barOpen.target === 'today', `a counter pressed opens the photo bar for it: ${JSON.stringify(barOpen)}`);
+  await page.click(pz('#pzPhotoBar [data-photo="Dusk"]'));
+  const dusk = await page.$eval(pz('.pz__card[data-target="today"]'), (e) => ({ pic: e.classList.contains('has-pic'), layers: e.querySelectorAll('.pz__pic').length, bg: e.querySelector('.pz__pic--sharp').style.getPropertyValue('--pic').slice(0, 15), veil: e.style.getPropertyValue('--veil-card'), num: getComputedStyle(e.querySelector('.pz__cn')).color, mask: (getComputedStyle(e.querySelector('.pz__pic--blur')).maskImage || '').slice(0, 33) }));
+  check(dusk.pic && dusk.layers === 3 && dusk.bg === 'radial-gradient' && /^#[0-9a-f]{6}$/.test(dusk.veil) && dusk.num === 'rgb(255, 255, 255)' && dusk.mask === 'radial-gradient(150% 150% at 100%' && (await page.$eval(pz('#pzNote'), (e) => e.textContent)) === 'Custom · 1 photo', `Dusk goes on the counter in three layers — sharp at the bottom right, blurred away from it, a veil in the accent — with white words over it: ${JSON.stringify(dusk)}`);
+  await page.click(pz('.pz__side'));
+  await page.waitForFunction(() => document.querySelector('#bcv-setup').shadowRoot.querySelector('#pzPhotoBar .pz__bartitle')?.textContent === 'Sidebar', null, { timeout: 5000 });
+  const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
+  await page.setInputFiles(pz('#pzPhotoBar input[type=file]'), { name: 'sky.png', mimeType: 'image/png', buffer: PNG });
+  await page.waitForSelector(pz('.pz__side.has-pic'), { timeout: 10000 });
+  const sideUp = await page.evaluate(() => { const r = document.querySelector('#bcv-setup').shadowRoot; const s = r.querySelector('.pz__side'); return { url: s.querySelector('.pz__pic--sharp').style.getPropertyValue('--pic').slice(0, 27), veil: r.querySelector('.pz').style.getPropertyValue('--veil-side'), ink: getComputedStyle(s.querySelector('.pz__row span')).color, note: r.querySelector('#pzNote').textContent, upOn: r.querySelector('#pzPhotoBar .pz__choice--up').classList.contains('is-on') }; });
+  check(sideUp.url === 'url("data:image/jpeg;base64' && /^#[0-9a-f]{6}$/.test(sideUp.veil) && sideUp.ink === 'rgb(255, 255, 255)' && sideUp.note === 'Custom · 2 photos' && sideUp.upOn, `an uploaded photo goes on the sidebar, scaled here, its rows in white over the veil: ${JSON.stringify(sideUp)}`);
+  await page.click(pz('#pzPhotoBar .pz__barok'));
+  check(await eventually(async () => (await page.$(pz('#pzPhotoBar'))) === null) && !(await page.$(pz('.is-target'))), 'Done closes the bar and drops the target');
+  await page.click(pz('.pz__sw[data-theme="Pink"]')); // Pink for what follows: the page's checks read its shades
+  await shot(page, '32e3-personalize-photos');
+  // step 2: the courses' colours — a course, then its colour; Canvas is told on Save, not before
+  await page.click(pz('#pzNext'));
+  await page.waitForSelector(pz('#pzCourses'), { timeout: 5000 });
+  const ccId = await page.$eval(pz('#pzCourses .pz__tab.is-on'), (e) => e.dataset.course);
+  const colourWas = (await apiGet('/api/v1/users/self/colors')).custom_colors?.[`course_${ccId}`] || null;
+  const colourNow = async () => (await apiGet('/api/v1/users/self/colors')).custom_colors?.[`course_${ccId}`] || null;
+  const step2 = await page.evaluate(() => { const r = document.querySelector('#bcv-setup').shadowRoot; return { h1: r.querySelector('.pz__h1').textContent, bars: [...r.querySelectorAll('#pzBars .pz__bar')].map((b) => (b.classList.contains('is-on') ? 'on' : b.classList.contains('is-done') ? 'done' : 'off')).join(' '), tabs: r.querySelectorAll('#pzCourses .pz__tab').length, swatches: r.querySelectorAll('#pzPal .pz__palsw').length, any: !!r.querySelector('#pzAny'), reset: r.querySelector('#pzReset').textContent, resetOff: r.querySelector('#pzReset').disabled, back: !!r.querySelector('#pzBack'), note: r.querySelector('#pzNote').textContent }; });
+  check(step2.h1 === 'Colour your courses' && step2.bars === 'done on off' && step2.tabs === 5 && step2.swatches === 16 && step2.any && step2.reset === 'Canvas colour' && step2.resetOff && step2.back && step2.note === 'As they are', `step 2: the five courses as tabs, fifteen colours and Any colour, the reset waiting: ${JSON.stringify(step2)}`);
+  await page.click(pz('#pzPal [data-color="#e91e63"]'));
+  const picked = await page.evaluate((id) => { const r = document.querySelector('#bcv-setup').shadowRoot; return { on: r.querySelector('#pzPal .pz__palsw.is-on')?.dataset.color, dot: getComputedStyle(r.querySelector(`#pzCourses .pz__tab[data-course="${id}"] .pz__tabdot`)).backgroundColor, crow: getComputedStyle(r.querySelector('.pz__crow.is-on .pz__cdot')).backgroundColor, reset: r.querySelector('#pzReset').textContent, note: r.querySelector('#pzNote').textContent }; }, ccId);
+  check(picked.on === '#e91e63' && picked.dot === 'rgb(233, 30, 99)' && picked.crow === 'rgb(233, 30, 99)' && picked.reset === 'Use the Canvas colour' && picked.note === '1 changed' && (await colourNow()) === colourWas, `a swatch pressed colours the course everywhere on the preview, the note counts it, and Canvas is not told yet: ${JSON.stringify(picked)}`);
+  await page.click(pz('#pzAny'));
+  await page.waitForSelector(pz('[data-pk].pz__pk--course'), { timeout: 5000 });
+  check((await page.$eval(pz('[data-pk]'), (e) => e.dataset.hex)) === '#e91e63' && (await pzVar('--A')) === pinkA, 'Any colour opens the same picker for the course, seeded with its colour, and the theme does not move');
+  await page.click(pz('.pz__pkdone'));
+  await eventually(async () => (await page.$(pz('[data-pk]'))) === null, 3000);
+  await shot(page, '32e4-personalize-courses');
+  // step 3: the headers — a card per page, its photo chosen under them
+  await page.click(pz('#pzNext'));
+  await page.waitForSelector(pz('.pz__heads'), { timeout: 5000 });
+  const step3 = await page.evaluate(() => { const r = document.querySelector('#bcv-setup').shadowRoot; return { h1: r.querySelector('.pz__h1').textContent, cards: [...r.querySelectorAll('.pz__hcard')].map((b) => `${b.dataset.page}${b.classList.contains('is-on') ? '*' : ''}`).join(' '), titles: [...r.querySelectorAll('.pz__htitle')].map((e) => e.textContent).join(' | '), forWho: r.querySelector('.pz__hfor').textContent, choices: [...r.querySelectorAll('.pz__choices .pz__choice')].map((c) => c.title).join(','), every: r.querySelector('#pzEvery').textContent, everyOff: r.querySelector('#pzEvery').disabled, next: r.querySelector('#pzNext').textContent, note: r.querySelector('#pzNote').textContent }; });
+  check(step3.h1 === 'Page headers' && step3.cards === 'dashboard* courses groups todo calendar notifications inbox gpa tools' && step3.titles === 'Dashboard | All Courses | Groups | To Do | Calendar | Notifications | Inbox | Grades | Tools' && step3.forWho === 'Photo for Dashboard' && step3.choices === 'None,Dusk,Ocean,Forest,Sand,Upload' && step3.every === 'Use on every page' && step3.everyOff && step3.next === 'Save' && step3.note === 'None', `step 3: every header as a card, the Dashboard's chosen, its photo under them, Save at the end: ${JSON.stringify(step3)}`);
+  await page.click(pz('.pz__choices [data-photo="Ocean"]'));
+  const ocean = await page.evaluate(() => { const r = document.querySelector('#bcv-setup').shadowRoot; const c = r.querySelector('.pz__hcard[data-page="dashboard"]'); return { pic: c.classList.contains('has-pic'), layers: c.querySelectorAll('.pz__pic').length, title: getComputedStyle(c.querySelector('.pz__htitle')).color, chip: c.querySelector('.pz__hchip').textContent, every: r.querySelector('#pzEvery').disabled, note: r.querySelector('#pzNote').textContent, mask: (getComputedStyle(c.querySelector('.pz__pic--blur')).maskImage || '').slice(0, 23) }; });
+  check(ocean.pic && ocean.layers === 3 && ocean.title === 'rgb(255, 255, 255)' && ocean.chip === 'Change' && !ocean.every && ocean.note === '1 of 9' && ocean.mask === 'linear-gradient(to left', `Ocean goes on the Dashboard's header, blurred towards the words, the title in white: ${JSON.stringify(ocean)}`);
+  await shot(page, '32e5-personalize-headers');
+  // Save means commit: the theme, the photos and the course colour in one go, then Saved and its summary
+  await page.click(pz('#pzNext'));
+  await page.waitForSelector(pz('#pzDone'), { timeout: 10000 });
+  const saved = await page.evaluate(() => { const r = document.querySelector('#bcv-setup').shadowRoot; return { h1: r.querySelector('.pz__doneh1').textContent, rows: [...r.querySelectorAll('.pz__srow')].map((e) => `${e.querySelector('.pz__sk').textContent}: ${e.querySelector('.pz__sv').textContent}`).join(' | '), btns: [...r.querySelectorAll('.pz__donebtns button')].map((b) => b.textContent).join(',') }; });
+  const savedTheme = await sw.evaluate(async () => (await self.BCV.settings.get()).appearance.theme);
+  const savedImages = await sw.evaluate(async () => { const v = (await self.BCV.api.storage.local.get('theme:images'))['theme:images']; return { side: (v?.side || '').slice(0, 15), today: (v?.cards?.today || '').slice(0, 15), head: (v?.headers?.dashboard || '').slice(0, 15), tones: Object.keys(v?.tones || {}).sort().join(',') }; });
+  check(saved.h1 === 'Saved' && saved.rows === 'Colour: Pink · 2 photos | Course colours: 1 changed | Page headers: 1 of 9' && saved.btns === 'Edit,Open Canvas' && savedTheme.accent === pinkA && savedTheme.name === 'Pink' && savedImages.side === 'data:image/jpeg' && savedImages.today === 'radial-gradient' && savedImages.head === 'radial-gradient' && savedImages.tones === 'head:dashboard,side,today' && ((await colourNow()) || '').toLowerCase() === '#e91e63', `Save writes it all at once — the theme, the photos with their tones, the course's colour to Canvas — and says so: ${JSON.stringify({ saved, savedTheme, savedImages })}`);
+  await shot(page, '32e6-personalize-saved');
+  await Promise.all([page.waitForNavigation({ timeout: 20000 }), page.click(pz('#pzOpen'))]);
   await page.waitForSelector('#bcv-welcome[data-stage="look"]', { timeout: 20000 });
   const welcomeAt = Date.now();
   const noContinueYet = (await page.$('.bcv-welcome__next:not([hidden])')) === null;
@@ -3101,13 +3094,13 @@ try {
   await page.waitForSelector('#bcv-app .bcv-nav__item', { timeout: 20000 });
   await page.waitForTimeout(600);
   check((await page.$('#bcv-welcome')) === null, 'and it does not come back');
-  // the theme chosen in step 4 is on the page: the accent's shades on the sidebar's glyphs and words
-  // (the grounds keep their greys), the photos on the sidebar and on the one counter they were put on
-  const themedNow = await page.evaluate(() => ({ themed: document.documentElement.classList.contains('bcv-themed'), dark: document.documentElement.getAttribute('data-bcv-theme') === 'dark', stroke: getComputedStyle(document.querySelector('.bcv-nav__ic svg')).stroke, navColor: getComputedStyle(document.querySelectorAll('.bcv-nav__item')[1]).color, tabIcons: [...document.querySelectorAll('.bcv-nav .bcv-nav__item')].map((e) => e.style.getPropertyValue('--bcv-tab-icon')), strokes: [...document.querySelectorAll('.bcv-nav .bcv-nav__ic svg')].map((e) => getComputedStyle(e).stroke), h1: getComputedStyle(document.querySelector('.bcv-h1')).color, headPic: !!document.querySelector('.bcv-head.bcv-head--pic'), headLayers: document.querySelectorAll('.bcv-head__pic > i').length, headMask: (getComputedStyle(document.querySelector('.bcv-head__pic-blur') || document.body).maskImage || '').slice(0, 23), headUrl: (document.querySelector('.bcv-head--pic')?.style.getPropertyValue('--bcv-pic') || '').slice(0, 27), sideBg: getComputedStyle(document.querySelector('.bcv-side')).backgroundColor, sideLayers: document.querySelectorAll('.bcv-side__pic > i').length, sideVeil: getComputedStyle(document.querySelector('.bcv-side__pic-veil')).backgroundImage.slice(0, 15), sideBlurMask: getComputedStyle(document.querySelector('.bcv-side__pic-blur')).maskImage.slice(0, 22), sideUrl: (document.querySelector('.bcv-side__pic')?.style.getPropertyValue('--bcv-pic') || '').slice(0, 27), note: JSON.parse(localStorage.getItem('bcv:early') || '{}').accent }));
-  const livePal = THEME.palette('#d63b7a', themedNow.dark);
-  const liveRows = THEME.shades('#d63b7a', themedNow.dark, 9);
-  check(themedNow.themed && themedNow.tabIcons.join(',') === liveRows.map((r) => r.icon).join(',') && new Set(themedNow.tabIcons).size === 9 && themedNow.strokes.every((c, i) => c === rgbOf(liveRows[i].icon)) && [rgbOf(liveRows[1].text), rgbOf(liveRows[1].icon)].includes(themedNow.navColor) && themedNow.h1 === rgbOf(livePal.text) && themedNow.headPic && themedNow.headLayers === 3 && themedNow.headMask === 'linear-gradient(to left' && themedNow.headUrl === 'url("data:image/jpeg;base64' && !/214, 59, 122/.test(themedNow.sideBg) && themedNow.sideLayers === 3 && themedNow.sideVeil === 'linear-gradient' && themedNow.sideBlurMask === 'linear-gradient(to top' && themedNow.sideUrl === 'url("data:image/jpeg;base64' && themedNow.note === '#d63b7a', `the page wears the theme: a shade of pink per row, the title in the text shade, the Dashboard header's photo blurring towards it, the sidebar's ground untouched, the photo up its side, the colour in the first-paint note: ${JSON.stringify(themedNow)}`);
-  check(((await colourNow()) || '').toUpperCase() === '#E71F63' && (await page.$eval(`.bcv-fav[data-load="fav:${ccId}"] .bcv-fav__dot`, (e) => getComputedStyle(e).backgroundColor)) === 'rgb(231, 31, 99)', 'the course colour picked in step 5 reached Canvas, and the sidebar wears it');
+  // the theme chosen in Personalize is on the page: the accent's five shades on the sidebar's rows,
+  // white words on the sidebar over its photo, the header's photo blurring towards its white title,
+  // the counter's photo under a veil in the accent; the course's colour from Canvas
+  const themedNow = await page.evaluate(() => ({ themed: document.documentElement.classList.contains('bcv-themed'), dark: document.documentElement.getAttribute('data-bcv-theme') === 'dark', tabIcons: [...document.querySelectorAll('.bcv-nav .bcv-nav__item')].map((e) => e.style.getPropertyValue('--bcv-tab-icon')), navColor: getComputedStyle(document.querySelectorAll('.bcv-nav .bcv-nav__item')[1]).color, h1: getComputedStyle(document.querySelector('.bcv-h1')).color, headPic: !!document.querySelector('.bcv-head.bcv-head--pic'), headLayers: document.querySelectorAll('.bcv-head__pic > i').length, headMask: (getComputedStyle(document.querySelector('.bcv-head__pic-blur') || document.body).maskImage || '').slice(0, 23), headPicVal: (document.querySelector('.bcv-head--pic')?.style.getPropertyValue('--bcv-pic') || '').slice(0, 15), headVeil: document.querySelector('.bcv-head--pic')?.style.getPropertyValue('--bcv-veil'), sideLayers: document.querySelectorAll('.bcv-side__pic > i').length, sideUrl: (document.querySelector('.bcv-side__pic')?.style.getPropertyValue('--bcv-pic') || '').slice(0, 27), sideVeil: document.querySelector('.bcv-side__pic')?.style.getPropertyValue('--bcv-veil'), sideBg: getComputedStyle(document.querySelector('.bcv-side')).backgroundColor, note: JSON.parse(localStorage.getItem('bcv:early') || '{}').accent }));
+  const liveRows = THEME.shades(pinkA, themedNow.dark, 9);
+  check(themedNow.themed && themedNow.tabIcons.join(',') === liveRows.map((r) => r.icon).join(',') && new Set(themedNow.tabIcons).size === 5 && themedNow.navColor === 'rgb(255, 255, 255)' && themedNow.h1 === 'rgb(255, 255, 255)' && themedNow.headPic && themedNow.headLayers === 3 && themedNow.headMask === 'linear-gradient(to left' && themedNow.headPicVal === 'radial-gradient' && /^#[0-9a-f]{6}$/.test(themedNow.headVeil) && themedNow.sideLayers === 3 && themedNow.sideUrl === 'url("data:image/jpeg;base64' && /^#[0-9a-f]{6}$/.test(themedNow.sideVeil) && themedNow.note === pinkA, `the page wears the theme: five shades of pink cycling down the rail, white words over the sidebar's photo, the Dashboard header's drawn photo blurring towards its white title, the colour in the first-paint note: ${JSON.stringify(themedNow)}`);
+  check(((await colourNow()) || '').toUpperCase() === '#E91E63' && (await page.$eval(`.bcv-fav[data-load="fav:${ccId}"] .bcv-fav__dot`, (e) => getComputedStyle(e).backgroundColor)) === 'rgb(233, 30, 99)', 'the course colour picked in Personalize reached Canvas, and the sidebar wears it');
   // a header with a photo is still the sticky header: at the bar's foot before a scroll and after one, the first card row clear of it
   const headAt = () => page.evaluate(() => { const h = document.querySelector('.bcv-head--pic'); const r = h.getBoundingClientRect(); return { pos: getComputedStyle(h).position, top: Math.round(r.top), bottom: Math.round(r.bottom), firstCard: Math.round(document.querySelector('.bcv-stat').getBoundingClientRect().top), bar: Math.round(document.querySelector('#bcv-bar').getBoundingClientRect().bottom) }; });
   const headBefore = await headAt();
@@ -3118,29 +3111,37 @@ try {
   await page.mouse.wheel(0, -400);
   await page.waitForTimeout(300);
   await waitText('.bcv-stat__value', /^\d+$/);
-  const picCard = await page.$eval('.bcv-stat[data-stat="graded"]', (e) => ({ pic: e.classList.contains('bcv-stat--pic'), layers: e.querySelectorAll('.bcv-stat__pic').length, url: e.style.getPropertyValue('--bcv-pic').slice(0, 27), tone: e.style.getPropertyValue('--bcv-pic-tone'), sideTone: document.querySelector('.bcv-side__pic')?.style.getPropertyValue('--bcv-pic-tone'), headTone: document.querySelector('.bcv-head--pic')?.style.getPropertyValue('--bcv-pic-tone'), blur: getComputedStyle(e.querySelector('.bcv-stat__pic--blur')).filter, mask: getComputedStyle(e.querySelector('.bcv-stat__pic--blur')).maskImage, withPics: document.querySelectorAll('.bcv-stat--pic').length, loadWash: getComputedStyle(document.querySelector('.bcv-nav__item.is-active') || document.body).backgroundColor }));
-  check(picCard.pic && picCard.layers === 3 && picCard.url === 'url("data:image/jpeg;base64' && /^#[0-9a-f]{6}$/.test(picCard.tone) && picCard.sideTone === picCard.tone && picCard.headTone === picCard.tone && /blur\(14px\)/.test(picCard.blur) && /radial-gradient/.test(picCard.mask) && picCard.withPics === 1, `the Graded counter carries its photo in three layers, blurred from the bottom-right corner, the veil in the photo's tone (${picCard.tone}), as do the sidebar and the header; the other five are plain: ${JSON.stringify({ ...picCard, loadWash: undefined })}`);
+  const picCard = await page.$eval('.bcv-stat[data-stat="today"]', (e) => ({ pic: e.classList.contains('bcv-stat--pic'), layers: e.querySelectorAll('.bcv-stat__pic').length, val: e.style.getPropertyValue('--bcv-pic').slice(0, 15), veil: e.style.getPropertyValue('--bcv-veil'), label: getComputedStyle(e.querySelector('.bcv-label')).color, mask: getComputedStyle(e.querySelector('.bcv-stat__pic--blur')).maskImage.slice(0, 15), withPics: document.querySelectorAll('.bcv-stat--pic').length }));
+  check(picCard.pic && picCard.layers === 3 && picCard.val === 'radial-gradient' && /^#[0-9a-f]{6}$/.test(picCard.veil) && picCard.label === 'rgb(255, 255, 255)' && picCard.mask === 'radial-gradient' && picCard.withPics === 1, `the Due today counter carries Dusk in three layers under a veil in the accent, its words white; the other five are plain: ${JSON.stringify(picCard)}`);
   await shot(page, '32h-themed-dashboard');
-  // the step comes back on its own — the account panel's Theme, Settings → Appearance → Choose —
-  // as one step with Save, everything as it was left; Save writes it at once
-  await page.goto(`${BASE}/?bcv=setup&step=theme`);
-  await page.waitForSelector(su('#tpv'), { timeout: 20000 });
-  await page.waitForTimeout(450);
-  check(page.url() === `${BASE}/` && (await sStep()) === '1 of 3' && (await page.$eval(su('#next'), (e) => e.textContent.trim())) === 'Continue' && (await railNow()).join(' | ') === 'Theme: Pink · 2 photos | Course colours: Not yet (locked) | Headers: Not yet (locked)' && (await page.$eval(su('.chip.is-on'), (e) => e.dataset.preset)) === '#d63b7a' && (await page.$$eval(su('.tpv__drop.is-filled'), (els) => els.map((e) => e.dataset.slot))).join(',') === 'side,graded', `the theme on its own: its three steps, the colour and the photos as they were left: ${(await railNow()).join(' | ')}`);
-  await page.click(su('.chip[data-preset=""]'));
-  for (const slot of ['side', 'graded']) await page.click(su(`[data-slot="${slot}"] .tpv__x`));
-  check(await eventually(async () => (await railAnswer('theme')) === 'Regular' && (await page.$$(su('.tpv__drop.is-filled'))).length === 0 && (await page.$eval(su('#tpv'), (e) => e.classList.contains('is-default')))), 'back to Regular with no photos: the preview follows');
-  await sNext('#cc');
-  await page.waitForSelector(su(`.cc__row[data-course="${ccId}"] .cc__custom`), { timeout: 10000 }); // (the favourites are read now: the courses step did not run)
-  await page.$eval(su(`.cc__row[data-course="${ccId}"] .cc__custom`), (e, hex) => { e.value = hex; e.dispatchEvent(new Event('change', { bubbles: true })); }, colourWas);
-  check((await sStep()) === '2 of 3' && (await railAnswer('colours')) === '1 changed' && (await page.$eval(su(`.cc__row[data-course="${ccId}"] .mini__dot`), (e) => e.style.background)) === `rgb(${[1, 3, 5].map((i) => parseInt(colourWas.slice(i, i + 2), 16)).join(', ')})`, `the colour of your own field takes the course back to ${colourWas}`);
-  await sNext('#thd');
-  await page.click(su('.thd__row[data-screen="dashboard"] .tpv__x'));
-  check(await eventually(async () => (await sStep()) === '3 of 3' && (await page.$eval(su('#next'), (e) => e.textContent.trim())) === 'Save' && (await railAnswer('headers')) === 'None' && !(await page.$(su('.thd__row.has-pic')))), 'the last of the three ends in Save; the header photo taken off');
-  await Promise.all([page.waitForNavigation({ timeout: 20000 }), page.click(su('#next'))]);
+  // Personalize comes back on its own — the account panel, Settings → Appearance → Open — with
+  // everything as it was left; Regular, the photos off, the course put back, then Save and Open Canvas
+  await page.goto(`${BASE}/?bcv=personalize`);
+  await page.waitForSelector(su('.pz'), { timeout: 20000 });
+  await page.waitForTimeout(500);
+  const again = await page.evaluate(() => { const r = document.querySelector('#bcv-setup').shadowRoot; return { rail: !!r.querySelector('.rail'), on: r.querySelector('.pz__sw.is-on').dataset.theme, side: r.querySelector('.pz__side').classList.contains('has-pic'), today: r.querySelector('.pz__card[data-target="today"]').classList.contains('has-pic'), note: r.querySelector('#pzNote').textContent }; });
+  check(page.url() === `${BASE}/` && !again.rail && again.on === 'Pink' && again.side && again.today && again.note === 'Pink · 2 photos', `Personalize on its own, as it was left: ${JSON.stringify(again)}`);
+  await page.click(pz('.pz__sw[data-theme="Regular"]'));
+  for (const target of ['today', 'side']) {
+    await page.click(pz(`[data-target="${target}"]`));
+    await page.waitForSelector(pz('#pzPhotoBar'), { timeout: 5000 });
+    await page.click(pz('#pzPhotoBar [data-photo="None"]'));
+  }
+  await page.click(pz('#pzPhotoBar .pz__barok'));
+  check(await eventually(async () => (await page.$eval(pz('#pzNote'), (e) => e.textContent)) === 'Regular' && !(await page.$(pz('.has-pic')))), 'back to Regular with no photos: the preview follows');
+  await page.click(pz('#pzNext'));
+  await page.waitForSelector(pz('#pzCourses'), { timeout: 5000 });
+  await page.click(pz('#pzNext'));
+  await page.waitForSelector(pz('.pz__heads'), { timeout: 5000 });
+  await page.click(pz('.pz__choices [data-photo="None"]'));
+  check(await eventually(async () => (await page.$eval(pz('#pzNote'), (e) => e.textContent)) === 'None' && !(await page.$(pz('.pz__hcard.has-pic')))), 'the header photo taken off');
+  await page.click(pz('#pzNext'));
+  await page.waitForSelector(pz('#pzDone'), { timeout: 10000 });
+  await fetch(`${BASE}/api/v1/users/self/colors/course_${ccId}`, { method: 'PUT', headers: { 'content-type': 'application/json', 'x-csrf-token': 'mock+csrf/token=' }, body: JSON.stringify({ hexcode: colourWas }) }); // the course's own colour back, for what follows
+  await Promise.all([page.waitForNavigation({ timeout: 20000 }), page.click(pz('#pzOpen'))]);
   await page.waitForSelector('#bcv-app .bcv-nav__item', { timeout: 20000 });
-  const themeReset = await sw.evaluate(async () => ({ accent: (await self.BCV.settings.get()).appearance.theme?.accent, images: (await self.BCV.api.storage.local.get('theme:images'))['theme:images'] }));
-  check(await eventually(async () => !(await page.$('html.bcv-themed')) && !(await page.$('.bcv-side__pic')) && !(await page.$('.bcv-head--pic')), 5000) && themeReset.accent === '' && !themeReset.images?.side && !Object.keys(themeReset.images?.cards || {}).length && !Object.keys(themeReset.images?.headers || {}).length && (await page.evaluate(() => JSON.parse(localStorage.getItem('bcv:early') || '{}').accent)) === '' && ((await colourNow()) || '').toLowerCase() === colourWas.toLowerCase() && (await page.$eval('.bcv-h1', (e) => getComputedStyle(e).color)) === 'rgb(28, 28, 30)', `Save writes it all and reloads: the regular colours, no photos, the course's colour back, the title ink again: ${JSON.stringify({ ...themeReset, images: undefined })}`);
+  const themeReset = await sw.evaluate(async () => ({ accent: (await self.BCV.settings.get()).appearance.theme?.accent, name: (await self.BCV.settings.get()).appearance.theme?.name, images: (await self.BCV.api.storage.local.get('theme:images'))['theme:images'] }));
+  check(await eventually(async () => !(await page.$('html.bcv-themed')) && !(await page.$('.bcv-side__pic')) && !(await page.$('.bcv-head--pic')), 5000) && themeReset.accent === '' && themeReset.name === 'Regular' && !themeReset.images?.side && !Object.keys(themeReset.images?.cards || {}).length && !Object.keys(themeReset.images?.headers || {}).length && (await page.evaluate(() => JSON.parse(localStorage.getItem('bcv:early') || '{}').accent)) === '' && ((await colourNow()) || '').toLowerCase() === colourWas.toLowerCase() && (await page.$eval('.bcv-h1', (e) => getComputedStyle(e).color)) === 'rgb(28, 28, 30)', `Save writes it all and Open Canvas reloads: the regular colours, no photos, the course's colour back, the title ink again: ${JSON.stringify({ ...themeReset, images: undefined })}`);
   check((await sw.evaluate(async () => (await self.BCV.settings.get()).appearance.sideCourses)) === 'always' && VIEW_OF[(await apiGet('/dashboard/view')).dashboard_view] === viewBefore && (await sw.evaluate(async () => (await self.BCV.settings.get()).appearance.darkMode)) === { light: 'off', dark: 'on', system: 'system' }[lookBefore], 'the sidebar, appearance and dashboard choices were written on the way out');
   const favAfter = (await apiGet('/api/v1/courses?per_page=100')).filter((c) => c.is_favorite).map((c) => c.course_code || c.name);
   check(!favAfter.includes(offCode) && favAfter.includes(onCode) && favAfter.length === 5, `the chosen courses became the Canvas favourites: −${offCode} +${onCode}`);
@@ -3273,7 +3274,7 @@ try {
   await page.click('#bcv-account');
   await page.waitForSelector('.bcv-menu--account', { timeout: 5000 });
   const acctItems = await texts('.bcv-menu--account .bcv-menu__item');
-  check(acctItems.map((t) => t.split('\n')[0].trim()).join(' | ') === 'Dark appearance | Simpl Courses settings Look, courses and grades | Guided setup Courses, grades and the welcome | Theme A colour of your own, photos on the cards | Welcome again The pointers, on black | What’s new What changed in this version | Canvas profile | All Canvas settings Profile, notifications, integrations | Notification preferences | Log out' && (await page.$eval('.bcv-menu--account', (m) => m.getBoundingClientRect().bottom <= window.innerHeight)), `the profile row opens a panel above itself: ${acctItems.join(' | ')}`);
+  check(acctItems.map((t) => t.split('\n')[0].trim()).join(' | ') === 'Dark appearance | Simpl Courses settings Look, courses and grades | Guided setup Courses, grades and the welcome | Personalize The look, a colour of your own, photos | Welcome again The pointers, on black | What’s new What changed in this version | Canvas profile | All Canvas settings Profile, notifications, integrations | Notification preferences | Log out' && (await page.$eval('.bcv-menu--account', (m) => m.getBoundingClientRect().bottom <= window.innerHeight)), `the profile row opens a panel above itself: ${acctItems.join(' | ')}`);
   await shot(page, '34-account-panel');
   // the mock keeps the token in the _csrf_token cookie only, like Canvas (no meta tag), and its /logout
   // accepts a DELETE carrying exactly that token; anything else lands on Canvas's "Page Error"
@@ -4877,10 +4878,10 @@ try {
   check((await page.$(su('#skip'))) === null && (await page.$(su('.top__skip'))) === null, 'the card has no Skip');
   await page.keyboard.press('Escape');
   await page.waitForTimeout(300);
-  check((await page.$('#bcv-setup')) !== null && (await sStep()) === '1 of 8', 'Escape does not close it');
+  check((await page.$('#bcv-setup')) !== null && (await sStep()) === '1 of 4', 'Escape does not close it');
   await page.goto(`${BASE}/courses`); // walking away: the next page opens it again, over the Dashboard
   await page.waitForSelector(su('.row'), { timeout: 20000 });
-  check(page.url() === `${BASE}/` && (await sStep()) === '1 of 8' && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('setup:done'))['setup:done'])) === undefined, `leaving the page does not get past it: the next page opens the card again, unfinished (${await sStep()})`);
+  check(page.url() === `${BASE}/` && (await sStep()) === '1 of 4' && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('setup:done'))['setup:done'])) === undefined, `leaving the page does not get past it: the next page opens the card again, unfinished (${await sStep()})`);
   // the only way out is through: the steps, then the welcome (the favourites already starred are the
   // ones picked, so finishing here changes nothing in Canvas for the sections that follow)
   const keepStarred = (await apiGet('/api/v1/courses?per_page=100')).filter((c) => c.is_favorite).map((c) => String(c.id));
@@ -4889,20 +4890,20 @@ try {
   await page.click(su('#next'));
   await page.waitForSelector(su('#track'), { timeout: 10000 });
   await page.click(su('#next'));
-  await page.waitForSelector(su('.tile[data-look]'), { timeout: 10000 });
-  await page.click(su('#next'));
-  await page.waitForSelector(su('#tpv'), { timeout: 10000 });
-  await page.click(su('#next'));
-  await page.waitForSelector(su('#cc'), { timeout: 10000 });
-  await page.click(su('#next'));
-  await page.waitForSelector(su('#thd'), { timeout: 10000 });
-  await page.click(su('#next'));
   await page.waitForSelector(su('.tile[data-view]'), { timeout: 10000 });
   await page.click(su('#next'));
   await page.waitForSelector(su('.tile[data-value]'), { timeout: 10000 });
   await page.click(su('#next')); // Finish
   await page.waitForSelector(su('.summary__row'), { timeout: 10000 });
-  await Promise.all([page.waitForNavigation({ timeout: 20000 }), page.click(su('#next'))]); // Open Canvas: the page reloads
+  await page.click(su('#next')); // Continue to appearance: Personalize, its three steps left as they are
+  await page.waitForSelector(su('.pz #pzNext'), { timeout: 20000 });
+  await page.click(su('.pz #pzNext'));
+  await page.waitForSelector(su('.pz #pzCourses'), { timeout: 10000 });
+  await page.click(su('.pz #pzNext'));
+  await page.waitForSelector(su('.pz .pz__heads'), { timeout: 10000 });
+  await page.click(su('.pz #pzNext')); // Save
+  await page.waitForSelector(su('.pz #pzOpen'), { timeout: 10000 });
+  await Promise.all([page.waitForNavigation({ timeout: 20000 }), page.click(su('.pz #pzOpen'))]); // Open Canvas: the page reloads
   await page.waitForSelector('#bcv-welcome[data-stage="look"]', { timeout: 20000 });
   check((await page.$('#bcv-setup')) === null && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('setup:done'))['setup:done'])) === true, 'finishing the steps is what marks the setup done, and the welcome follows the reload');
   for (const st of ['away', 'grades', 'courses', 'tools', 'peek', null]) { // Continue, six times: the pointers in turn, then the page

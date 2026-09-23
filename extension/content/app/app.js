@@ -601,7 +601,7 @@
     side.classList.toggle('bcv-side--pic', !!sidePic);
     side.replaceChildren(...[
       // the theme's photo, under everything: sharp at the foot, blurred up the side (app.css: .bcv-side__pic)
-      sidePic ? h('div', { class: 'bcv-side__pic', 'aria-hidden': 'true', style: { '--bcv-pic': `url("${sidePic}")`, ...(state.themeImages?.tones?.side ? { '--bcv-pic-tone': state.themeImages.tones.side } : {}) } }, [h('i', { class: 'bcv-side__pic-sharp' }), h('i', { class: 'bcv-side__pic-blur' }), h('i', { class: 'bcv-side__pic-veil' })]) : null,
+      sidePic ? h('div', { class: 'bcv-side__pic', 'aria-hidden': 'true', style: { '--bcv-pic': BCV.theme.picCss(sidePic), '--bcv-veil': BCV.theme.veilBase(state.settings?.appearance?.theme?.accent || '', state.themeImages?.tones?.side, 0.66) } }, [h('i', { class: 'bcv-side__pic-sharp' }), h('i', { class: 'bcv-side__pic-blur' }), h('i', { class: 'bcv-side__pic-veil' })]) : null,
       brandRow(name),
       // mockup 11: the glyph in its own colour, no tile behind it; full strength on the active row, dimmed elsewhere
       // under a theme each row takes its own shade of the colour (lib/theme.js shades()), lighter at
@@ -610,7 +610,7 @@
         type: 'button',
         class: `bcv-nav__item ${r.screen === key || (key === 'groups' && r.screen === 'group') ? 'is-active' : ''}`,
         dataset: { nav: key, load: key, loadColor: glyphColor },
-        style: tabShades(all.length)[i] ? { '--bcv-tab-icon': tabShades(all.length)[i].icon, '--bcv-tab-text': tabShades(all.length)[i].text } : null,
+        style: tabShades(all.length)[i] ? { '--bcv-tab-icon': tabShades(all.length)[i].icon, '--bcv-tab-text': tabShades(all.length)[i].text } : { '--bcv-tab-icon': glyphColor }, // (the glyph's colour as a variable either way: a photo behind the rail lightens it)
         ...(key === 'courses' && hoverCourses() ? { 'aria-haspopup': 'true', 'aria-expanded': 'false' } : {}),
         onclick: () => { if (state.loadKey === key && !loadStuck()) return; closeQuickNav(); progress(true, key); go(href); }, // a second press on the loading row is a no-op, until that load is plainly stuck
         onpointerenter: (e) => { warm(key); quickNavHover(key, e.currentTarget); }, // the pointer arrives before the press: the screen's own data starts loading now
@@ -675,7 +675,7 @@
       item(state.dark ? IC.sun : IC.moon, state.dark ? 'Light appearance' : 'Dark appearance', null, toggleTheme),
       item(IC.settings, 'Simpl Courses settings', 'Look, courses and grades', openSettings),
       item(IC.sparkle, 'Guided setup', 'Courses, grades and the welcome', () => go('/?bcv=setup')),
-      item(IC.image, 'Theme', 'A colour of your own, photos on the cards', () => go('/?bcv=setup&step=theme')),
+      item(IC.image, 'Personalize', 'The look, a colour of your own, photos', () => go('/?bcv=personalize')),
       item(IC.cal, 'Welcome again', 'The pointers, on black', () => go('/?bcv=welcome')),
       item(IC.star, 'What’s new', 'What changed in this version', () => BCV.whatsnew?.open(BCV.app, { manual: true })),
       U.el('bcv-menu__sep'),
@@ -1032,7 +1032,7 @@
     // ?bcv=setup (the popup's Set up button, the account sheet, the app's first launch): the guided
     // setup over this page, which drops the parameter and reloads the page when it is done (the
     // welcome, two pointers on black, is the first thing the reloaded page shows: see boot())
-    if (r.params.get('bcv') === 'setup' && BCV.setup && !BCV.setup.active()) BCV.setup.open(BCV.app);
+    if ((r.params.get('bcv') === 'setup' || r.params.get('bcv') === 'personalize') && BCV.setup && !BCV.setup.active()) BCV.setup.open(BCV.app);
     else if (r.params.get('bcv') === 'welcome' && BCV.welcome && !BCV.welcome.active()) welcomeHere();
   }
 
@@ -1046,9 +1046,8 @@
     head.querySelector('.bcv-head__pic')?.remove();
     head.classList.toggle('bcv-head--pic', !!pic);
     if (!pic) { head.style.removeProperty('--bcv-pic'); return; }
-    head.style.setProperty('--bcv-pic', `url("${pic}")`);
-    const tone = state.themeImages?.tones?.[`head:${screen}`];
-    if (tone) head.style.setProperty('--bcv-pic-tone', tone); else head.style.removeProperty('--bcv-pic-tone');
+    head.style.setProperty('--bcv-pic', BCV.theme.picCss(pic));
+    head.style.setProperty('--bcv-veil', BCV.theme.veilBase(state.settings?.appearance?.theme?.accent || '', state.themeImages?.tones?.[`head:${screen}`], 0.6));
     head.prepend(h('div', { class: 'bcv-head__pic', 'aria-hidden': 'true' }, [h('i', { class: 'bcv-head__pic-sharp' }), h('i', { class: 'bcv-head__pic-blur' }), h('i', { class: 'bcv-head__pic-veil' })]));
   }
 
