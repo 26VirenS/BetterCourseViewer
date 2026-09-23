@@ -1814,7 +1814,9 @@ html.bcv-themed #bcv-app .bcv-btn--primary:hover { background: var(--bcv-accent-
 html.bcv-quiz .bcv-side__pic { display: none; }
 /* a header's photo: sharp at the right, blurred as it comes left, the chrome's ground veiling the
  * left where the title and the controls sit */
-.bcv-head--pic { position: relative; overflow: hidden; }
+/* (the header stays sticky under the bar: sticky is positioned, so the layers sit inside it; a
+ * `position: relative` here would turn its sticky top into a shift down the page) */
+.bcv-head--pic { isolation: isolate; }
 .bcv-head--pic > .bcv-head__in { position: relative; z-index: 1; }
 .bcv-head__pic { position: absolute; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
 .bcv-head__pic > i { position: absolute; inset: 0; display: block; }

@@ -508,10 +508,13 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
 .tpv__side .tpv__drop { margin-top: auto; padding-top: 0; }
 .tpv__droplabel { position: relative; display: inline-flex; align-items: center; gap: 4px; height: 17px; padding: 0 7px; border-radius: 9px; background: color-mix(in srgb, var(--pv-card) 78%, transparent); border: 1px dashed var(--pv-ink3); font: 500 8px/1 var(--font); color: var(--pv-ink3); cursor: pointer; transition: color .18s ease, border-color .18s ease, background .18s ease; }
 .tpv__droplabel svg { display: block; width: 9px; height: 9px; }
-.tpv__droplabel input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+/* (the pill clips its file input: Safari draws the input's own control at a size of its own, which would
+ * overflow the pill and sit over the × beside it) */
+.tpv__droplabel { overflow: hidden; }
+.tpv__droplabel input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; font-size: 0; }
 .tpv__drop.is-filled .tpv__droplabel { border-style: solid; border-color: transparent; background: rgba(0,0,0,.42); color: #fff; }
 .tpv__droplabel:hover, [data-slot].is-over .tpv__droplabel { color: var(--p-icon); border-color: var(--p-icon); background: var(--pv-card); }
-.tpv__x { flex: none; width: 17px; height: 17px; padding: 0; border: 0; border-radius: 9px; background: rgba(0,0,0,.42); color: #fff; cursor: pointer; font: 500 11px/17px var(--font); text-align: center; transition: background .18s ease; }
+.tpv__x { position: relative; z-index: 2; flex: none; width: 17px; height: 17px; padding: 0; border: 0; border-radius: 9px; background: rgba(0,0,0,.42); color: #fff; cursor: pointer; font: 500 11px/17px var(--font); text-align: center; transition: background .18s ease; }
 .tpv__x:hover { background: rgba(0,0,0,.7); }
 [data-slot].is-over { box-shadow: inset 0 0 0 2px var(--p-icon); }
 /* the picker */
