@@ -52,12 +52,17 @@
     ['graded', 'Graded this week', '4', '96 / 100 points', 'M4 19h16M7 16V9M12 16V5M17 16v-4', '#5e5ce6'],
   ];
   // the ready-made photos: drawn, not fetched, so they weigh nothing and are the same on every device
-  const PRESET_PHOTOS = [
-    ['Dusk', 'radial-gradient(circle at 70% 56%, #ffd28a 0 10%, transparent 10.5%), linear-gradient(180deg, #3a2a6e 0%, #b8527a 44%, #f39a62 57%, #2a1d3d 57.6%, #140f26 100%)', '#b8527a'],
-    ['Ocean', 'radial-gradient(circle at 26% 30%, #fff7d6 0 8%, transparent 8.5%), repeating-linear-gradient(0deg, rgba(255,255,255,.18) 0 2px, transparent 2px 10px), linear-gradient(180deg, #8fd0f5 0%, #3a8fd6 50%, #0d4f8a 50.6%, #05233f 100%)', '#3a8fd6'],
-    ['Forest', 'linear-gradient(180deg, transparent 58%, #0c2e1a 58.6%), conic-gradient(from 200deg at 32% 62%, #1f6b3a, #3a9a58, #144d2b, #2f8f4e, #1f6b3a), linear-gradient(180deg, #c7ecd0, #6fbf8a)', '#2f8f4e'],
-    ['Sand', 'radial-gradient(circle at 78% 28%, #fff4cf 0 9%, transparent 9.5%), repeating-linear-gradient(115deg, rgba(110,60,20,.2) 0 5px, transparent 5px 15px), linear-gradient(180deg, #f7d9a8 0%, #e8a767 58%, #b0663a 100%)', '#e8a767'],
+  const PRESET_PHOTOS = BCV.theme.PRESET_PHOTOS; // [name, picture, tone]: the four drawn scenes (lib/theme.js)
+  // Ready-made: a colour and the scenes placed — one on the sidebar, one on the counters, one on the
+  // headers, never the same one twice — each led by the scene it is named for. The veils wash every
+  // scene in the colour, so three scenes read as one look.
+  const READY = [
+    { name: 'Dusk', colour: 'Pink', side: 'Dusk', cards: 'Sand', heads: 'Ocean' },
+    { name: 'Ocean', colour: 'Teal', side: 'Ocean', cards: 'Forest', heads: 'Dusk' },
+    { name: 'Forest', colour: 'Green', side: 'Forest', cards: 'Ocean', heads: 'Sand' },
+    { name: 'Sand', colour: 'Amber', side: 'Sand', cards: 'Dusk', heads: 'Forest' },
   ];
+  const sceneOf = (name) => PRESET_PHOTOS.find((p) => p[0] === name);
   const PAL = ['#c2410c', '#ff3b30', '#e91e63', '#8e44ad', '#6f42c1', '#3f51b5', '#1976d2', '#03a9f4', '#00acc1', '#009688', '#22a822', '#9aa31a', '#e08a00', '#ff6a13', '#f06292'];
   const LOOKS = [['light', 'Light'], ['dark', 'Dark'], ['system', 'System']];
   const LOOK_OF = { off: 'light', on: 'dark', system: 'system' };
@@ -149,6 +154,9 @@
     };
     shades.forEach((c, i) => { vars[`--s${i}`] = c; vars[`--s${i}-lit`] = t.mix(c, '#ffffff', 0.45); });
     for (const [k, v] of Object.entries(vars)) ui.root.style.setProperty(k, v);
+    // the preview's grounds take the same soft cast the page will (lib/theme.js palette): Regular keeps its greys
+    const PV = d ? { main: ['#0b0b0d', 0.05], side: ['#151517', 0.07], card: ['#1c1c1e', 0.06], head: ['#111113', 0.07] } : { main: ['#fbfbfd', 0.05], side: ['#f0f0f4', 0.07], card: ['#ffffff', 0.025], head: ['#f0f0f4', 0.07] };
+    for (const [k, [base, kk]] of Object.entries(PV)) { if (st.theme.name === 'Regular') ui.root.style.removeProperty(`--pv-${k}`); else ui.root.style.setProperty(`--pv-${k}`, t.mix(base, A, kk)); }
     ui.root.classList.toggle('is-regular', st.theme.name === 'Regular');
     ui.host.setAttribute('data-theme', d ? 'dark' : 'light');
     ui.root.querySelectorAll('[data-veil-card]').forEach((el) => el.style.setProperty('--veil-card', t.veilBase(A, toneAt(el.dataset.veilCard), 0.4)));
@@ -164,6 +172,7 @@
     // does not replay the entry; a photo render fades the new photo in and nothing else
     root.classList.toggle('is-still', kind !== 'full');
     root.classList.toggle('is-photo', kind === 'photo');
+    root.dataset.step = st.done ? 'done' : String(st.step);
     const barWas = root.querySelector('#pzPhotoBar')?.dataset.for;
     root.replaceChildren(...[top(), st.done ? doneScreen() : stage(), st.done ? null : foot()].filter(Boolean));
     const bar = root.querySelector('#pzPhotoBar');
@@ -273,7 +282,7 @@
     const isPreset = (p) => !!cur && cur === p[1];
     return [
       choice('None', null, !cur, () => { setPhoto(key, null); render('photo'); }),
-      ...PRESET_PHOTOS.map((p) => choice(p[0], p[1], isPreset(p), () => { setPhoto(key, p[1], p[2]); render('photo'); })),
+      ...PRESET_PHOTOS.map((p) => choice(p[0], T().picCss(p[1]), isPreset(p), () => { setPhoto(key, p[1], p[2]); render('photo'); })),
       h('label', { class: `pz__choice pz__choice--up ${cur && !PRESET_PHOTOS.some(isPreset) ? 'is-on' : ''}`, title: 'Upload' }, [h('i', { class: 'pz__choicepic pz__choicepic--up' }, svg(IC.up, { size: 15, width: 2.1 })), h('span', { class: 'pz__choicename', text: 'Upload' }), h('input', { type: 'file', accept: 'image/*', 'aria-label': 'Upload a photo', onchange: (e) => { const f = e.target.files?.[0]; if (f) readFile(f, key); e.target.value = ''; } })]),
       onEvery ? h('button', { type: 'button', class: 'pz__textbtn', id: 'pzEvery', disabled: !cur || null, text: onEvery.label, onclick: () => { if (cur) { onEvery.go(cur); render('photo'); } } }) : null,
     ];
@@ -303,7 +312,25 @@
     const t = T();
     const names = [['Regular', 'conic-gradient(#ff453a,#ff9f0a,#30d158,#40c8e0,#0a84ff,#bf5af2,#ff453a)'], ...t.PRESETS.map(([hex, name]) => [name, hex]), ['Custom', null]];
     const custom = t.customHex(st.theme.h, st.theme.s, st.theme.depth);
+    const readyOn = (r) => st.theme.name === r.colour && st.images.side === sceneOf(r.side)[1] && t.CARD_SLOTS.every((k) => st.images.cards[k] === sceneOf(r.cards)[1]) && t.HEADER_SLOTS.every(([k]) => st.images.headers[k] === sceneOf(r.heads)[1]);
+    const applyReady = (r) => {
+      st.theme.name = r.colour; closePicker(true);
+      const side = sceneOf(r.side), cards = sceneOf(r.cards), heads = sceneOf(r.heads);
+      setPhoto('side', side[1], side[2]);
+      for (const k of t.CARD_SLOTS) setPhoto(k, cards[1], cards[2]);
+      for (const [k] of t.HEADER_SLOTS) setPhoto(`head:${k}`, heads[1], heads[2]);
+      st.target = null;
+      render('photo');
+    };
+    const ready = phone() ? null : h('div', { class: 'pz__ready', id: 'pzReady' }, [
+      h('span', { class: 'pz__readyttl', text: 'Ready-made' }),
+      ...READY.map((r) => h('button', { type: 'button', class: `pz__theme ${readyOn(r) ? 'is-on' : ''}`, dataset: { ready: r.name }, title: `${r.name}: ${r.colour}, ${r.side} on the sidebar, ${r.cards} on the counters, ${r.heads} on the headers`, 'aria-pressed': readyOn(r) ? 'true' : 'false', onclick: () => applyReady(r) }, [
+        h('span', { class: 'pz__thumb', style: { '--pic-side': t.picCss(sceneOf(r.side)[1]), '--pic-head': t.picCss(sceneOf(r.heads)[1]), '--pic-card': t.picCss(sceneOf(r.cards)[1]), '--c': (t.PRESETS.find(([, n]) => n === r.colour) || [REGULAR])[0] } }, [h('i', { class: 'pz__thumb-side' }), h('i', { class: 'pz__thumb-head' }), h('i', { class: 'pz__thumb-card' }), h('i', { class: 'pz__thumb-dot' })]),
+        h('span', { text: r.name }),
+      ])),
+    ]);
     return h('div', { class: 'pz__colour' }, [
+      ready,
       h('div', { class: 'pz__swatches', id: 'pzThemes' }, names.map(([name, bg]) => h('div', { class: 'pz__swwrap' }, [
         h('button', { type: 'button', class: `pz__sw ${st.theme.name === name ? 'is-on' : ''}`, title: name, dataset: { theme: name }, 'aria-pressed': st.theme.name === name ? 'true' : 'false', onclick: () => {
           if (name === 'Custom') { st.theme.name = 'Custom'; openPicker('theme'); return; }
@@ -502,5 +529,5 @@
     onDone?.({ changedLook });
   }
 
-  BCV.personalize = { open, active, close: teardown, PRESET_PHOTOS, PAL, NAV, CARDS };
+  BCV.personalize = { open, active, close: teardown, PRESET_PHOTOS, READY, PAL, NAV, CARDS };
 })();

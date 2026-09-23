@@ -1814,12 +1814,9 @@ html.bcv-themed #bcv-app .bcv-btn--primary:hover { background: var(--bcv-accent-
 .bcv-side--pic { --bcv-veil: #1c1c1e; }
 .bcv-side--pic .bcv-nav__item, .bcv-side--pic .bcv-nav__count, .bcv-side--pic .bcv-side__label, .bcv-side--pic .bcv-fav, .bcv-side--pic .bcv-fav__name, .bcv-side--pic .bcv-brand__name { color: #fff !important; }
 .bcv-side--pic .bcv-nav__ic svg { stroke: color-mix(in srgb, var(--bcv-tab-icon, currentColor) 55%, #fff) !important; opacity: 1; }
-.bcv-side--pic .bcv-nav__item.is-active { background: rgba(255,255,255,.2); box-shadow: none; }
 .bcv-side--pic .bcv-side__label { opacity: .78; }
 /* the foot over a photo: glass rows with white words, so the appearance switch and the account read */
-.bcv-side--pic .bcv-theme-btn, .bcv-side--pic .bcv-account { background: rgba(255,255,255,.16); color: #fff; }
-.bcv-side--pic .bcv-theme-btn:hover, .bcv-side--pic .bcv-account:hover { background: rgba(255,255,255,.24); }
-.bcv-side--pic .bcv-theme-btn__ic { background: rgba(255,255,255,.18); color: #fff; }
+.bcv-side--pic .bcv-theme-btn__ic { background: rgba(255,255,255,.2); color: #fff; }
 .bcv-side--pic .bcv-account__name { color: #fff; }
 .bcv-side--pic .bcv-account__sub { color: rgba(255,255,255,.72); }
 .bcv-side__pic { position: absolute; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
@@ -1841,8 +1838,23 @@ html.bcv-quiz .bcv-side__pic { display: none; }
 .bcv-head__pic-sharp, .bcv-head__pic-blur { background: var(--bcv-pic) right center / cover no-repeat; }
 .bcv-head__pic-blur { filter: blur(16px) saturate(1.05); transform: scale(1.08); -webkit-mask-image: linear-gradient(to left, transparent 28%, #000 58%); mask-image: linear-gradient(to left, transparent 28%, #000 58%); }
 .bcv-head__pic-veil { background: linear-gradient(to left, rgba(0,0,0,.08) 0%, color-mix(in srgb, var(--bcv-veil) 74%, transparent) 72%); }
-/* the controls at the header's right sit on the sharp part of the photo: a solid ground under them */
-.bcv-head--pic .bcv-seg, .bcv-head--pic .bcv-head__row .bcv-btn, .bcv-head--pic .bcv-chips { background: var(--bcv-card); box-shadow: 0 1px 6px rgba(0,0,0,.18); }
+/* a header's photo runs on up through the widgets' bar: the bar goes clear over it, and the photo's
+ * layers reach up under the bar by its height — one picture across the two, the pins sitting on it */
+html.bcv-head-pic.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) #bcv-bar { background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; border-bottom-color: transparent; }
+html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) .bcv-head--pic .bcv-head__pic { top: calc(-1 * var(--bcv-bar-h)); }
+/* the controls over a photo — the header's switcher and buttons, the sidebar's active row, the
+ * appearance switch and the account — are frosted glass in the veil's own colour, a hairline of
+ * light round them, white words on them: darkened where the photo is light, lightened where it is dark */
+.bcv-head--pic .bcv-seg, .bcv-head--pic .bcv-head__row .bcv-btn:not(.bcv-btn--primary), .bcv-head--pic .bcv-chips, .bcv-side--pic .bcv-nav__item.is-active, .bcv-side--pic .bcv-theme-btn, .bcv-side--pic .bcv-account {
+  background: color-mix(in srgb, var(--bcv-veil) 40%, rgba(255,255,255,.16)); -webkit-backdrop-filter: blur(18px) saturate(1.4); backdrop-filter: blur(18px) saturate(1.4);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.16), 0 1px 8px rgba(0,0,0,.16); color: #fff; }
+.bcv-head--pic .bcv-chips { padding: 4px; border-radius: 16px; }
+/* (the rows and the switcher's stops are buttons: `#bcv-app button { color: inherit }` would take their white back) */
+#bcv-app .bcv-side--pic .bcv-theme-btn, #bcv-app .bcv-side--pic .bcv-account, #bcv-app .bcv-head--pic .bcv-head__row .bcv-btn:not(.bcv-btn--primary), #bcv-app .bcv-head--pic .bcv-seg__btn.is-active { color: #fff; }
+#bcv-app .bcv-head--pic .bcv-seg__btn { color: rgba(255,255,255,.84); }
+#bcv-app .bcv-head--pic .bcv-seg__btn.is-active { background: rgba(255,255,255,.26); color: #fff; box-shadow: none; }
+.bcv-head--pic .bcv-head__row .bcv-btn:not(.bcv-btn--primary):hover, .bcv-side--pic .bcv-theme-btn:hover, .bcv-side--pic .bcv-account:hover { background: color-mix(in srgb, var(--bcv-veil) 34%, rgba(255,255,255,.28)); }
+.bcv-head--pic .bcv-head__row .bcv-btn:not(.bcv-btn--primary) svg { stroke: #fff; }
 
 /* ---- toast ---------------------------------------------------------------- */
 .bcv-toast { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); z-index: 60; padding: 10px 16px; border-radius: 14px; background: var(--bcv-glass); -webkit-backdrop-filter: var(--bcv-blur-glass); backdrop-filter: var(--bcv-blur-glass); box-shadow: var(--bcv-shadow-hi); border: 1px solid var(--bcv-edge); font: 500 13px/1.3 var(--bcv-font); color: var(--bcv-ink); max-width: 480px; }

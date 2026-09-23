@@ -91,11 +91,19 @@
     const icon = reach(seed, ground, ICON_RATIO, dark);
     const text = readableOn(seed, ground);
     const fill = fillFor(seed); // white words on it, in either mode
+    // the greys around the colour take a soft cast of it — the ground, the cards, the fills, the
+    // hairlines, the secondary inks — so nothing sits apart from the colour: a few percent, never more
+    const G = dark
+      ? { bg: ['#000000', 0.05], card: ['#1c1c1e', 0.06], hover: ['#2c2c2e', 0.06], ink2: ['#c7c7cc', 0.1], ink3: ['#8e8e93', 0.14], glass: ['#1c1c1e', 0.06], glassA: 0.74, line: '#ffffff', sepA: 0.08, edgeA: 0.1, fillA: 0.28, fill2A: 0.14, chromeA: 0.6 }
+      : { bg: ['#f2f2f6', 0.06], card: ['#ffffff', 0.025], hover: ['#fafafc', 0.04], ink2: ['#3c3c43', 0.1], ink3: ['#8e8e93', 0.14], glass: ['#ffffff', 0.025], glassA: 0.78, line: '#3c3c43', sepA: 0.09, edgeA: 0.1, fillA: 0.12, fill2A: 0.06, chromeA: 0.7 };
+    const cast = ([base, k]) => mix(base, seed, k);
+    const line = mix(G.line, seed, 0.35), fillBase = mix('#767680', seed, 0.35);
     return {
       accent: seed, icon, text, fill,
       hover: shift(fill, dark ? 0.08 : -0.08),
       soft: alpha(seed, dark ? 0.22 : 0.14),
       ring: alpha(seed, dark ? 0.45 : 0.32),
+      ground: { bg: cast(G.bg), card: cast(G.card), hover: cast(G.hover), ink2: cast(G.ink2), ink3: cast(G.ink3), sep: alpha(line, G.sepA), edge: alpha(line, G.edgeA), fill: alpha(fillBase, G.fillA), fill2: alpha(fillBase, G.fill2A), chrome: alpha(cast(G.bg), G.chromeA), glass: alpha(cast(G.glass), G.glassA) },
     };
   }
   /** One shade per sidebar row, so the rail is not a single flat colour: the accent's hue drifts a
@@ -112,8 +120,9 @@
     return out;
   }
   /** The CSS custom properties the stylesheet reads (app.css: html.bcv-themed). */
-  const cssVars = (p) => ({ '--bcv-accent': p.accent, '--bcv-accent-icon': p.icon, '--bcv-accent-text': p.text, '--bcv-accent-fill': p.fill, '--bcv-accent-hover': p.hover, '--bcv-accent-soft': p.soft, '--bcv-accent-ring': p.ring });
-  const VAR_NAMES = ['--bcv-accent', '--bcv-accent-icon', '--bcv-accent-text', '--bcv-accent-fill', '--bcv-accent-hover', '--bcv-accent-soft', '--bcv-accent-ring'];
+  const GROUND_VARS = { bg: '--bcv-bg', card: '--bcv-card', hover: '--bcv-hover', ink2: '--bcv-ink2', ink3: '--bcv-ink3', sep: '--bcv-sep', edge: '--bcv-edge', fill: '--bcv-fill', fill2: '--bcv-fill2', chrome: '--bcv-chrome', glass: '--bcv-glass' };
+  const cssVars = (p) => ({ '--bcv-accent': p.accent, '--bcv-accent-icon': p.icon, '--bcv-accent-text': p.text, '--bcv-accent-fill': p.fill, '--bcv-accent-hover': p.hover, '--bcv-accent-soft': p.soft, '--bcv-accent-ring': p.ring, ...Object.fromEntries(Object.entries(GROUND_VARS).map(([k, v]) => [v, p.ground[k]])) });
+  const VAR_NAMES = ['--bcv-accent', '--bcv-accent-icon', '--bcv-accent-text', '--bcv-accent-fill', '--bcv-accent-hover', '--bcv-accent-soft', '--bcv-accent-ring', ...Object.values(GROUND_VARS)];
   /** Puts the accent on an element (the page's <html>): the variables for this mode and the class
    *  the stylesheet keys on. No accent: takes them off. */
   function apply(el, accent, dark) {
@@ -207,6 +216,78 @@
   /** A kept photo as a CSS image: a data URL wrapped, a drawn one (a gradient) as it is. */
   const picCss = (v) => (!v ? 'none' : /^data:|^https?:|^blob:/.test(v) ? `url("${v}")` : v);
 
+  // ---- the four drawn photos ---------------------------------------------------------------------
+  // Drawn, not photographed: SVG scenes, so they are vector — crisp at any size on any screen, with
+  // turbulence for cloud, water and grain rather than stripes — and a few kilobytes each, kept in
+  // storage like a photo would be (a data URL) so the page treats them the same.
+  const scene = (body, defs) => `data:image/svg+xml;charset=utf-8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice"><defs>${defs}</defs>${body}</svg>`.replace(/\n\s*/g, ''))}`;
+  const SCENES = {
+    dusk: scene(`<rect width="1600" height="900" fill="url(#sky)"/>
+<rect width="1600" height="560" filter="url(#cloud)" opacity=".5"/>
+<circle cx="1090" cy="548" r="330" fill="url(#glow)"/>
+<circle cx="1090" cy="548" r="92" fill="#ffd9a4" opacity=".45" filter="url(#soft)"/>
+<circle cx="1090" cy="548" r="76" fill="#ffe4b3"/>
+<rect y="560" width="1600" height="340" fill="url(#sea)"/>
+<rect y="560" width="1600" height="6" fill="#ffb98a" opacity=".55"/>
+<rect x="1030" y="560" width="120" height="260" fill="url(#refl)" filter="url(#soft)"/>
+<path d="M0 640 Q400 618 800 640 T1600 634" stroke="#ff9e7a" stroke-opacity=".16" stroke-width="7" fill="none" filter="url(#soft2)"/>
+<path d="M0 712 Q400 690 800 712 T1600 706" stroke="#ff9e7a" stroke-opacity=".12" stroke-width="9" fill="none" filter="url(#soft2)"/>
+<path d="M0 800 Q400 780 800 800 T1600 792" stroke="#c96a7c" stroke-opacity=".14" stroke-width="12" fill="none" filter="url(#soft2)"/>`, `<linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1e1748"/><stop offset=".32" stop-color="#5f2f6b"/><stop offset=".52" stop-color="#c8645f"/><stop offset=".62" stop-color="#f4b06a"/></linearGradient>
+<linearGradient id="sea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6a3358"/><stop offset=".45" stop-color="#2b1a42"/><stop offset="1" stop-color="#100b20"/></linearGradient>
+<radialGradient id="glow"><stop offset="0" stop-color="#ffd7a0" stop-opacity=".9"/><stop offset=".45" stop-color="#ff9a6a" stop-opacity=".3"/><stop offset="1" stop-color="#ff9a6a" stop-opacity="0"/></radialGradient>
+<linearGradient id="refl" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffcf8f" stop-opacity=".7"/><stop offset="1" stop-color="#ffcf8f" stop-opacity="0"/></linearGradient>
+<filter id="soft" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="16"/></filter>
+<filter id="soft2" x="-5%" y="-100%" width="110%" height="300%"><feGaussianBlur stdDeviation="5"/></filter>
+<filter id="cloud" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.0016 0.005" numOctaves="3" seed="4"/><feColorMatrix values="0 0 0 0 1  0 0 0 0 .8  0 0 0 0 .84  0 0 0 1.5 -0.62"/><feGaussianBlur stdDeviation="2"/></filter>`),
+    ocean: scene(`<rect width="1600" height="900" fill="url(#sky)"/>
+<rect width="1600" height="470" filter="url(#cloud)" opacity=".8"/>
+<circle cx="420" cy="220" r="260" fill="url(#glow)"/>
+<circle cx="420" cy="220" r="64" fill="#fff8dc"/>
+<rect y="470" width="1600" height="430" fill="url(#sea)"/>
+<rect y="470" width="1600" height="5" fill="#bfe9ff" opacity=".7"/>
+<rect y="470" width="1600" height="430" filter="url(#glint)" opacity=".5"/>
+<path d="M0 560 Q300 540 600 560 T1200 560 T1600 552" stroke="#dff4ff" stroke-opacity=".3" stroke-width="6" fill="none" filter="url(#soft2)"/>
+<path d="M0 660 Q300 636 600 660 T1200 660 T1600 650" stroke="#dff4ff" stroke-opacity=".22" stroke-width="9" fill="none" filter="url(#soft2)"/>
+<path d="M0 780 Q300 752 600 780 T1200 780 T1600 770" stroke="#dff4ff" stroke-opacity=".16" stroke-width="12" fill="none" filter="url(#soft2)"/>
+<rect x="340" y="470" width="160" height="300" fill="url(#refl)" filter="url(#soft)"/>`, `<linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#cfeafc"/><stop offset=".52" stop-color="#63b3ec"/></linearGradient>
+<linearGradient id="sea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3ea3e6"/><stop offset=".4" stop-color="#1a6fb8"/><stop offset="1" stop-color="#062f57"/></linearGradient>
+<radialGradient id="glow"><stop offset="0" stop-color="#fff9e0" stop-opacity=".95"/><stop offset=".4" stop-color="#fff2c4" stop-opacity=".3"/><stop offset="1" stop-color="#fff2c4" stop-opacity="0"/></radialGradient>
+<linearGradient id="refl" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff" stop-opacity=".5"/><stop offset="1" stop-color="#ffffff" stop-opacity="0"/></linearGradient>
+<filter id="soft" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="16"/></filter>
+<filter id="soft2" x="-5%" y="-100%" width="110%" height="300%"><feGaussianBlur stdDeviation="4"/></filter>
+<filter id="cloud" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.0014 0.004" numOctaves="4" seed="11"/><feColorMatrix values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 1.7 -0.72"/><feGaussianBlur stdDeviation="3"/></filter>
+<filter id="glint" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.02 0.09" numOctaves="2" seed="3"/><feColorMatrix values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 1.4 -0.9"/></filter>`),
+    forest: scene(`<rect width="1600" height="900" fill="url(#sky)"/>
+<circle cx="1240" cy="150" r="320" fill="url(#glow)"/>
+<path d="M0 470 C200 420 320 400 520 440 S900 520 1100 460 S1420 400 1600 430 V900 H0Z" fill="#9dcfae"/>
+<rect y="440" width="1600" height="200" fill="url(#mist)"/>
+<path d="M0 560 C240 500 420 540 640 560 S980 600 1200 550 S1460 500 1600 540 V900 H0Z" fill="#5fa877"/>
+<rect y="540" width="1600" height="220" fill="url(#mist)"/>
+<path d="M0 680 C180 620 380 660 560 680 S860 720 1040 670 S1360 620 1600 660 V900 H0Z" fill="#2f7f4e"/>
+<path d="M0 680 C180 620 380 660 560 680 S860 720 1040 670 S1360 620 1600 660 V900 H0Z" filter="url(#leaf)" opacity=".35"/>
+<path d="M0 800 C260 760 520 800 780 790 S1300 760 1600 790 V900 H0Z" fill="#1b4d31"/>
+<path d="M0 800 C260 760 520 800 780 790 S1300 760 1600 790 V900 H0Z" filter="url(#leaf)" opacity=".4"/>`, `<linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e8f5ec"/><stop offset=".55" stop-color="#b9e0c6"/></linearGradient>
+<radialGradient id="glow"><stop offset="0" stop-color="#fffbe6" stop-opacity=".9"/><stop offset=".5" stop-color="#fff6cc" stop-opacity=".25"/><stop offset="1" stop-color="#fff6cc" stop-opacity="0"/></radialGradient>
+<linearGradient id="mist" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff" stop-opacity="0"/><stop offset=".5" stop-color="#ffffff" stop-opacity=".42"/><stop offset="1" stop-color="#ffffff" stop-opacity="0"/></linearGradient>
+<filter id="leaf" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.02 0.03" numOctaves="3" seed="9"/><feColorMatrix values="0 0 0 0 .05  0 0 0 0 .25  0 0 0 0 .12  0 0 0 1.3 -0.5"/></filter>`),
+    sand: scene(`<rect width="1600" height="900" fill="url(#sky)"/>
+<circle cx="1230" cy="240" r="300" fill="url(#glow)"/>
+<circle cx="1230" cy="240" r="70" fill="#fff6dc"/>
+<path d="M0 520 C300 470 560 500 820 480 S1300 430 1600 470 V900 H0Z" fill="url(#dune1)"/>
+<path d="M0 640 C260 590 520 640 800 610 S1240 560 1600 600 V900 H0Z" fill="url(#dune2)"/>
+<path d="M0 640 C260 590 520 640 800 610 S1240 560 1600 600" stroke="#fff0cf" stroke-opacity=".55" stroke-width="3" fill="none"/>
+<path d="M0 790 C240 740 560 780 900 750 S1320 720 1600 760 V900 H0Z" fill="url(#dune3)"/>
+<path d="M0 790 C240 740 560 780 900 750 S1320 720 1600 760" stroke="#ffe3b8" stroke-opacity=".5" stroke-width="3" fill="none"/>
+<rect y="470" width="1600" height="430" filter="url(#grain)" opacity=".28"/>`, `<linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fdedd2"/><stop offset=".5" stop-color="#f6cd93"/></linearGradient>
+<radialGradient id="glow"><stop offset="0" stop-color="#fff8e4" stop-opacity=".95"/><stop offset=".5" stop-color="#ffe9b8" stop-opacity=".3"/><stop offset="1" stop-color="#ffe9b8" stop-opacity="0"/></radialGradient>
+<linearGradient id="dune1" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#f0c98c"/><stop offset=".55" stop-color="#e9b672"/><stop offset="1" stop-color="#f3d09a"/></linearGradient>
+<linearGradient id="dune2" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#d9995a"/><stop offset=".5" stop-color="#e8ad6c"/><stop offset="1" stop-color="#cf8a4b"/></linearGradient>
+<linearGradient id="dune3" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#b8703c"/><stop offset=".5" stop-color="#cf8a4b"/><stop offset="1" stop-color="#a9602f"/></linearGradient>
+<filter id="grain" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.6" numOctaves="1" seed="2"/><feColorMatrix values="0 0 0 0 .4  0 0 0 0 .2  0 0 0 0 .05  0 0 0 .9 -0.35"/></filter>`),
+  };
+  /** [name, picture, tone]: the tone is what the veils warm to, as a read photo's would be. */
+  const PRESET_PHOTOS = [['Dusk', SCENES.dusk, '#b8527a'], ['Ocean', SCENES.ocean, '#3a8fd6'], ['Forest', SCENES.forest, '#2f8f4e'], ['Sand', SCENES.sand, '#e8a767']];
+
   // ---- the photos: read here, scaled here, kept here ------------------------------------------------
   /** Where a photo can go: the six counters of the Dashboard, and the sidebar. */
   const CARD_SLOTS = ['today', 'week', 'unread', 'overdue', 'tomorrow', 'graded'];
@@ -285,7 +366,7 @@
 
   BCV.theme = {
     hexToRgb, rgbToHex, rgbToHsl, hslToRgb, hslToHex, luminance, contrast, normalize,
-    GROUND, MIN_SAT, ICON_RATIO, TEXT_RATIO, PRESETS, REGULAR, CARD_SLOTS, HEADER_SLOTS, IMAGES_KEY,
+    GROUND, MIN_SAT, ICON_RATIO, TEXT_RATIO, PRESETS, REGULAR, PRESET_PHOTOS, CARD_SLOTS, HEADER_SLOTS, IMAGES_KEY,
     palette, shades, shadeSet, cssVars, apply, readable, readableOn, fillFor, mix, tint, customHex, controlsOf, veilBase, picCss, band, nearest, fromControls, toControls,
     resizeImage, readImage, imageTone, fillTones, loadImages, saveImages, countImages, countHeaders, emptyImages,
   };

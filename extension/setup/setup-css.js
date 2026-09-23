@@ -584,6 +584,21 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
 /* the controls under the preview */
 .pz__controls { flex: none; width: 100%; margin-top: 14px; display: flex; flex-direction: column; align-items: center; }
 .pz__colour, .pz__courses, .pz__hcontrols { display: flex; flex-direction: column; align-items: center; gap: 10px; animation: omRise .34s var(--ease) .05s both; }
+/* ready-made: four tiles, each the three scenes as they are placed (the sidebar down the left, the header over the counter) with the colour's dot */
+.pz__ready { display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; }
+.pz__readyttl { font: 600 10.5px/1 var(--font); letter-spacing: .1em; text-transform: uppercase; color: var(--pz-ink3); margin-right: 4px; }
+.pz__theme { display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 0; border: 0; background: transparent; cursor: pointer; font: 500 11.5px/1 var(--font); color: var(--pz-ink2); }
+.pz__theme.is-on { color: var(--pz-ink); font-weight: 600; }
+.pz__thumb { position: relative; display: grid; grid-template-columns: 26px 1fr; grid-template-rows: 1fr 1fr; gap: 2px; width: 92px; height: 56px; padding: 2px; box-sizing: border-box; border-radius: 12px; overflow: hidden; background: var(--pz-tile); box-shadow: 0 0 0 2px transparent; transition: box-shadow .2s ease, transform .2s ease; }
+.pz__theme:hover .pz__thumb { transform: translateY(-1px); }
+.pz__theme.is-on .pz__thumb { box-shadow: 0 0 0 2px var(--c); }
+.pz__thumb i { display: block; border-radius: 6px; background: var(--pic) center / cover no-repeat; }
+.pz__thumb-side { grid-row: 1 / 3; --pic: var(--pic-side); background-position: center bottom !important; }
+.pz__thumb-head { --pic: var(--pic-head); background-position: right center !important; }
+.pz__thumb-card { --pic: var(--pic-card); background-position: right bottom !important; }
+.pz__thumb-dot { position: absolute; right: 6px; bottom: 6px; width: 10px; height: 10px; border-radius: 50%; background: var(--c); box-shadow: 0 0 0 2px rgba(255,255,255,.9); }
+/* the first screen's preview sits a little to the left where the window has the room, so the eye lands on it before the controls */
+@media (min-width: 1240px) { .pz[data-step="0"] .pz__pvwrap { transform: translateX(-40px); } } /* (the whole frame moves, so nothing is clipped) */
 .pz__courses, .pz__hcontrols { gap: 20px; }
 .pz__hfor { font: 600 13px/1.2 var(--font); color: var(--pz-ink); }
 .pz__swatches { display: flex; flex-wrap: wrap; justify-content: center; gap: 14px; }

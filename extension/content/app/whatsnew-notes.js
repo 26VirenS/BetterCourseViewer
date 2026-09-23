@@ -24,6 +24,13 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.67.0', date: '2026-09-23', notes: [
+      { kind: 'new', title: 'Ready-made looks', body: 'Dusk, Ocean, Forest, Sand: a colour and scenes at once.', icon: P.sparkle },
+      { kind: 'improved', title: 'Drawn scenes, crisp', body: 'The four scenes are drawn as vectors: sharp at any size.', icon: P.pic },
+      { kind: 'improved', title: 'A soft cast of colour', body: 'The greys take a little of your colour, so nothing jars.', icon: P.pen },
+      { kind: 'improved', title: 'Frosted controls', body: 'Over a photo, buttons and rows are frosted glass.', icon: P.layers },
+      { kind: 'fixed', title: 'Photo to the top', body: 'A header photo runs on up under the widgets’ bar.', icon: P.pin },
+    ] },
     { version: '2.66.0', date: '2026-09-23', notes: [
       { kind: 'improved', title: 'Windows text', body: 'Segoe UI on Windows, so titles and numbers sit right.', icon: P.pen },
       { kind: 'improved', title: 'Bar over tools', body: 'On a school’s own Canvas too, asking once for a tool’s site.', icon: P.layers },

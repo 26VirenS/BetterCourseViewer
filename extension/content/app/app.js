@@ -1041,8 +1041,9 @@
    *  (app.css: .bcv-head--pic). Drawn again in place when the photos change. */
   function dressHead(el, screen) {
     const head = el?.querySelector?.('.bcv-head:not(.bcv-head--course)');
+    const pic = head ? state.themeImages?.headers?.[screen] || null : null;
+    html.classList.toggle('bcv-head-pic', !!pic); // (the widgets' bar goes clear and the photo runs up under it: app.css)
     if (!head) return;
-    const pic = state.themeImages?.headers?.[screen] || null;
     head.querySelector('.bcv-head__pic')?.remove();
     head.classList.toggle('bcv-head--pic', !!pic);
     if (!pic) { head.style.removeProperty('--bcv-pic'); return; }
