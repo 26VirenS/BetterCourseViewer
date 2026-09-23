@@ -57,6 +57,7 @@
   // headers, never the same one twice — each led by the scene it is named for. The veils wash every
   // scene in the colour, so three scenes read as one look.
   const READY = [
+    { name: 'Default', colour: 'Regular', side: null, cards: null, heads: null }, // the interface as it comes: Regular, no photos
     { name: 'Dusk', colour: 'Pink', side: 'Dusk', cards: 'Sand', heads: 'Ocean' },
     { name: 'Ocean', colour: 'Teal', side: 'Ocean', cards: 'Forest', heads: 'Dusk' },
     { name: 'Forest', colour: 'Green', side: 'Forest', cards: 'Ocean', heads: 'Sand' },
@@ -312,10 +313,11 @@
     const t = T();
     const names = [['Regular', 'conic-gradient(#ff453a,#ff9f0a,#30d158,#40c8e0,#0a84ff,#bf5af2,#ff453a)'], ...t.PRESETS.map(([hex, name]) => [name, hex]), ['Custom', null]];
     const custom = t.customHex(st.theme.h, st.theme.s, st.theme.depth);
-    const readyOn = (r) => st.theme.name === r.colour && st.images.side === sceneOf(r.side)[1] && t.CARD_SLOTS.every((k) => st.images.cards[k] === sceneOf(r.cards)[1]) && t.HEADER_SLOTS.every(([k]) => st.images.headers[k] === sceneOf(r.heads)[1]);
+    const picOf = (name) => (name ? sceneOf(name)[1] : null);
+    const readyOn = (r) => st.theme.name === r.colour && (st.images.side || null) === picOf(r.side) && t.CARD_SLOTS.every((k) => (st.images.cards[k] || null) === picOf(r.cards)) && t.HEADER_SLOTS.every(([k]) => (st.images.headers[k] || null) === picOf(r.heads));
     const applyReady = (r) => {
       st.theme.name = r.colour; closePicker(true);
-      const side = sceneOf(r.side), cards = sceneOf(r.cards), heads = sceneOf(r.heads);
+      const side = r.side ? sceneOf(r.side) : [null, null, null], cards = r.cards ? sceneOf(r.cards) : [null, null, null], heads = r.heads ? sceneOf(r.heads) : [null, null, null];
       setPhoto('side', side[1], side[2]);
       for (const k of t.CARD_SLOTS) setPhoto(k, cards[1], cards[2]);
       for (const [k] of t.HEADER_SLOTS) setPhoto(`head:${k}`, heads[1], heads[2]);
@@ -324,8 +326,8 @@
     };
     const ready = phone() ? null : h('div', { class: 'pz__ready', id: 'pzReady' }, [
       h('span', { class: 'pz__readyttl', text: 'Ready-made' }),
-      ...READY.map((r) => h('button', { type: 'button', class: `pz__theme ${readyOn(r) ? 'is-on' : ''}`, dataset: { ready: r.name }, title: `${r.name}: ${r.colour}, ${r.side} on the sidebar, ${r.cards} on the counters, ${r.heads} on the headers`, 'aria-pressed': readyOn(r) ? 'true' : 'false', onclick: () => applyReady(r) }, [
-        h('span', { class: 'pz__thumb', style: { '--pic-side': t.picCss(sceneOf(r.side)[1]), '--pic-head': t.picCss(sceneOf(r.heads)[1]), '--pic-card': t.picCss(sceneOf(r.cards)[1]), '--c': (t.PRESETS.find(([, n]) => n === r.colour) || [REGULAR])[0] } }, [h('i', { class: 'pz__thumb-side' }), h('i', { class: 'pz__thumb-head' }), h('i', { class: 'pz__thumb-card' }), h('i', { class: 'pz__thumb-dot' })]),
+      ...READY.map((r) => h('button', { type: 'button', class: `pz__theme ${readyOn(r) ? 'is-on' : ''}`, dataset: { ready: r.name }, title: r.side ? `${r.name}: ${r.colour}, ${r.side} on the sidebar, ${r.cards} on the counters, ${r.heads} on the headers` : 'Default: Regular, no photos', 'aria-pressed': readyOn(r) ? 'true' : 'false', onclick: () => applyReady(r) }, [
+        h('span', { class: `pz__thumb ${r.side ? '' : 'pz__thumb--plain'}`, style: { '--pic-side': t.picCss(picOf(r.side)), '--pic-head': t.picCss(picOf(r.heads)), '--pic-card': t.picCss(picOf(r.cards)), '--c': r.colour === 'Regular' ? 'conic-gradient(#ff453a,#ff9f0a,#30d158,#40c8e0,#0a84ff,#bf5af2,#ff453a)' : (t.PRESETS.find(([, n]) => n === r.colour) || [REGULAR])[0], '--ring': r.colour === 'Regular' ? REGULAR : (t.PRESETS.find(([, n]) => n === r.colour) || [REGULAR])[0] } }, [h('i', { class: 'pz__thumb-side' }), h('i', { class: 'pz__thumb-head' }), h('i', { class: 'pz__thumb-card' }), h('i', { class: 'pz__thumb-dot' })]),
         h('span', { text: r.name }),
       ])),
     ]);

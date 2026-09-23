@@ -591,7 +591,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
 .pz__theme.is-on { color: var(--pz-ink); font-weight: 600; }
 .pz__thumb { position: relative; display: grid; grid-template-columns: 26px 1fr; grid-template-rows: 1fr 1fr; gap: 2px; width: 92px; height: 56px; padding: 2px; box-sizing: border-box; border-radius: 12px; overflow: hidden; background: var(--pz-tile); box-shadow: 0 0 0 2px transparent; transition: box-shadow .2s ease, transform .2s ease; }
 .pz__theme:hover .pz__thumb { transform: translateY(-1px); }
-.pz__theme.is-on .pz__thumb { box-shadow: 0 0 0 2px var(--c); }
+.pz__theme.is-on .pz__thumb { box-shadow: 0 0 0 2px var(--ring, var(--c)); }
+.pz__thumb--plain i:not(.pz__thumb-dot) { background: var(--pz-field); } /* (Default: the plain grounds, no photo anywhere) */
 .pz__thumb i { display: block; border-radius: 6px; background: var(--pic) center / cover no-repeat; }
 .pz__thumb-side { grid-row: 1 / 3; --pic: var(--pic-side); background-position: center bottom !important; }
 .pz__thumb-head { --pic: var(--pic-head); background-position: right center !important; }

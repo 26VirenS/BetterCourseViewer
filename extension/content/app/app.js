@@ -634,7 +634,7 @@
       U.el('bcv-side__bottom', [
         h('button', { type: 'button', class: 'bcv-theme-btn', id: 'bcv-theme-btn', onclick: toggleTheme }, [
           h('span', { class: 'bcv-theme-btn__ic' }, U.svg(state.dark ? IC.sun : IC.moon, { size: 14, width: 1.8 })),
-          h('span', { text: state.dark ? 'Light appearance' : 'Dark appearance' }),
+          h('span', { text: 'Appearance' }), // (the glyph says which way it goes: a moon on a light look, a sun on a dark one)
         ]),
         h('button', { type: 'button', class: 'bcv-account', id: 'bcv-account', onclick: (e) => { e.stopPropagation(); accountMenu(e.currentTarget); }, title: 'Account', 'aria-haspopup': 'menu' }, [
           U.avatar(state.me?.avatar, state.me?.name, 30),

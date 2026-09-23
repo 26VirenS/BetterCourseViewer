@@ -1819,8 +1819,12 @@ html.bcv-themed #bcv-app .bcv-btn--primary:hover { background: var(--bcv-accent-
 .bcv-side--pic .bcv-theme-btn__ic { background: rgba(255,255,255,.2); color: #fff; }
 .bcv-side--pic .bcv-account__name { color: #fff; }
 .bcv-side--pic .bcv-account__sub { color: rgba(255,255,255,.72); }
-.bcv-side__pic { position: absolute; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
-.bcv-side__pic > i { position: absolute; inset: 0; display: block; }
+/* The sidebar scrolls when it is taller than the window, and the photo must not scroll with it: the
+ * layer is sticky at the top of the sidebar's flow, of no height (its margins cancel the padding and
+ * the gap, so the rows sit where they did), and the pictures hang off it the height of the window —
+ * so they stay put behind the rows as the rows go by. (An absolute layer would scroll away with them.) */
+.bcv-side__pic { position: sticky; top: 0; z-index: 0; flex: none; height: 0; margin: 0 -12px -18px; pointer-events: none; overflow: visible; }
+.bcv-side__pic > i { position: absolute; left: 0; right: 0; top: -14px; height: 100vh; display: block; } /* (the box sits at the padding's edge, so the pictures start 14px above it) */
 .bcv-side__pic-sharp, .bcv-side__pic-blur { background: var(--bcv-pic) center bottom / cover no-repeat; }
 .bcv-side__pic-blur { inset: -24px; }
 .bcv-side__pic-blur { filter: blur(18px) saturate(1.05); transform: scale(1.1); -webkit-mask-image: linear-gradient(to top, transparent 20%, #000 56%); mask-image: linear-gradient(to top, transparent 20%, #000 56%); }
@@ -1869,7 +1873,7 @@ html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) .bcv-head--pic .bc
 @media (max-width: 640px) {
   #bcv-app { flex-direction: column; }
   .bcv-side { position: static; width: auto; height: auto; flex-direction: row; flex-wrap: wrap; gap: 8px; border-right: 0; border-bottom: 1px solid var(--bcv-edge); }
-  .bcv-side__group, .bcv-side__bottom { display: none; }
+  .bcv-side__group, .bcv-side__bottom, .bcv-side__pic { display: none; }
   .bcv-nav { flex-direction: row; flex-wrap: wrap; }
   .bcv-nav__item { width: auto; }
 }

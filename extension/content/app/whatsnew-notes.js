@@ -24,6 +24,11 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.68.0', date: '2026-09-23', notes: [
+      { kind: 'fixed', title: 'Sidebar photo stays', body: 'The photo holds still while the sidebar scrolls.', icon: P.pin },
+      { kind: 'improved', title: 'Appearance', body: 'The sidebar’s switch just says Appearance.', icon: P.toggle },
+      { kind: 'new', title: 'Default, ready-made', body: 'A tile that puts everything back: Regular, no photos.', icon: P.sparkle },
+    ] },
     { version: '2.67.0', date: '2026-09-23', notes: [
       { kind: 'new', title: 'Ready-made looks', body: 'Dusk, Ocean, Forest, Sand: a colour and scenes at once.', icon: P.sparkle },
       { kind: 'improved', title: 'Drawn scenes, crisp', body: 'The four scenes are drawn as vectors: sharp at any size.', icon: P.pic },
