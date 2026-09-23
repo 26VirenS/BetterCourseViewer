@@ -138,9 +138,11 @@
     await Promise.all([...new Set([st.images.side, ...Object.values(st.images.cards), ...Object.values(st.images.headers)].filter(Boolean))].map((v) => T().inkFor(v).catch(() => null)));
     if (!st || !ui) return; // (closed while the inks were drawn)
     render('full');
+    peekShow();
   }
   function teardown() {
     if (!ui) return;
+    ui.peek?.stop();
     try { ui.mq?.removeEventListener('change', ui.onMq); } catch { /* gone */ }
     window.removeEventListener('resize', ui.onResize);
     ui.host.removeEventListener('keydown', ui.onKey, true);
@@ -228,6 +230,47 @@
     st.pvScale = s;
     pv.style.transform = `translateX(-50%) scale(${s})`;
     pv.style.top = `${Math.max(0, Math.round((r.height - 430 * s) / 2))}px`; // (centred in the room it has)
+  }
+
+  // ---- the cursor's show: what can be pressed ----------------------------------------------------
+  const CURSOR = '<svg viewBox="0 0 24 24" width="26" height="26"><path d="M5 3l14 9-6 1.5 3.5 6.5-2.5 1.5-3.5-6.5L6 19z" fill="#fff" stroke="#1c1c1e" stroke-width="1.4" stroke-linejoin="round"/></svg>';
+  /** Once, as the first screen opens: a cursor comes to the sidebar and presses it, then two of the
+   *  counters, each lighting up as it is pressed, then leaves — the parts of the preview that open the
+   *  photo bar, shown rather than told. Any press or key of the student's own ends it at once. The
+   *  cursor lives outside the frame, so a redraw underneath does not take it. */
+  function peekShow() {
+    if (!ui || !st || st.step !== 0 || st.done || ui.peek) return;
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+    const cursor = h('span', { class: 'pz__cursor', 'aria-hidden': 'true', dataset: { demo: '1' }, html: CURSOR });
+    (ui.page.parentElement || ui.page).append(cursor);
+    const u = ui;
+    const timers = [];
+    const stop = () => {
+      if (!u.peek) return;
+      u.peek = null;
+      timers.forEach(clearTimeout);
+      u.root.querySelectorAll('.is-peek').forEach((e) => e.classList.remove('is-peek'));
+      cursor.remove();
+      for (const ev of ['pointerdown', 'keydown', 'click']) u.host.removeEventListener(ev, stop, true);
+    };
+    u.peek = { stop };
+    for (const ev of ['pointerdown', 'keydown', 'click']) u.host.addEventListener(ev, stop, true);
+    const q = (ms, fn) => timers.push(setTimeout(() => { if (u.peek) fn(); }, ms));
+    // the things pressed, looked up as each is reached (a redraw underneath swaps the elements)
+    const spot = (i) => { const el = i === 0 ? u.root.querySelector('.pz__side') : u.root.querySelectorAll('.pz__card')[i === 1 ? 0 : 2]; if (!el) return null; const r = el.getBoundingClientRect(); return { el, x: r.left + r.width * 0.5, y: r.top + r.height * 0.55 }; };
+    const moveTo = (p, ms) => { if (!p) return; cursor.style.setProperty('--cms', `${ms}ms`); cursor.style.setProperty('--cx', `${Math.round(p.x - 5)}px`); cursor.style.setProperty('--cy', `${Math.round(p.y - 3)}px`); };
+    const press = (p) => { if (!p) return; cursor.classList.add('is-press'); p.el.classList.add('is-peek'); q(200, () => cursor.classList.remove('is-press')); q(800, () => p.el.classList.remove('is-peek')); };
+    const first = spot(0);
+    if (!first) { stop(); return; }
+    moveTo({ x: first.x + 260, y: first.y + 220 }, 0);
+    q(350, () => { cursor.style.opacity = '1'; moveTo(spot(0), 700); });
+    q(1150, () => press(spot(0)));
+    q(1950, () => moveTo(spot(1), 650));
+    q(2650, () => press(spot(1)));
+    q(3450, () => moveTo(spot(2), 650));
+    q(4150, () => press(spot(2)));
+    q(4950, () => { const p = spot(2); cursor.style.opacity = '0'; if (p) moveTo({ x: p.x + 140, y: p.y + 180 }, 600); });
+    q(5700, stop);
   }
 
   // ---- the Dashboard preview ---------------------------------------------------------------------
@@ -552,6 +595,7 @@
     const theme = { name: st.theme.name, accent: st.theme.name === 'Regular' ? '' : A, h: Math.round(st.theme.h * 10) / 10, s: Math.round(st.theme.s * 1000) / 1000, depth: Math.round(st.theme.depth * 10) / 10 };
     try {
       await Promise.all([S.update({ appearance: { theme } }), t.saveImages(st.images)]);
+      BCV.api.storage.local.set({ 'themes:tried': true }).catch(() => {}); // (a theme tried: the invitation after an update is for those who have not)
       for (const [id, hex] of Object.entries(st.courseColors)) await store.setColor(id, hex).catch(() => {});
     } catch (e) { console.error('[Simpl Courses personalize]', e); }
     st.saving = false;

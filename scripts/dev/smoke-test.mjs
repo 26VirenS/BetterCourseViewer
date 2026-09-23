@@ -3145,11 +3145,15 @@ try {
   // every counter, one on every header — and the first screen's preview sits a little to the left of centre
   await page.goto(`${BASE}/?bcv=personalize`);
   await page.waitForSelector(su('.pz'), { timeout: 20000 });
+  // the cursor's show: a pointer comes to the sidebar and presses it (it lights up), then two counters — until a press of one's own
+  check((await page.$('#bcv-setup .pz__cursor[data-demo]')) !== null, 'a cursor appears over the first screen as it opens');
+  check(await eventually(() => page.$(su('.pz__side.is-peek')), 3000), 'it comes to the sidebar and presses it: the sidebar lights up');
   await page.waitForTimeout(500);
   const readyRow = await page.evaluate(() => { const r = document.querySelector('#bcv-setup').shadowRoot; const pv = r.querySelector('.pz__pv'); const wrap = r.querySelector('#pzPv'); return { tiles: [...r.querySelectorAll('#pzReady .pz__theme')].map((b) => b.dataset.ready).join(','), thumbs: r.querySelectorAll('#pzReady .pz__thumb i').length, title: r.querySelector('.pz__readyttl').textContent, on: r.querySelectorAll('#pzReady .is-on').length, pvLeft: Math.round(pv.getBoundingClientRect().left + pv.getBoundingClientRect().width / 2 - (r.querySelector('.pz').getBoundingClientRect().left + r.querySelector('.pz').getBoundingClientRect().width / 2)), listRight: r.querySelector('#pzReady').getBoundingClientRect().left >= pv.getBoundingClientRect().right - 1, column: (() => { const b = [...r.querySelectorAll('#pzReady .pz__theme')].map((e) => e.getBoundingClientRect()); return b.length > 1 && b.every((x, i) => !i || x.top >= b[i - 1].bottom - 1); })(), footIn: r.querySelector('.pz__foot').getBoundingClientRect().bottom <= innerHeight + 1, pvBig: Math.round(pv.getBoundingClientRect().width), clipped: pv.getBoundingClientRect().left < wrap.getBoundingClientRect().left - 1, step: r.querySelector('.pz').dataset.step }; });
   check(readyRow.tiles === 'Default,Dusk,Ocean,Forest,Sand' && readyRow.thumbs === 20 && readyRow.title === 'Ready-made' && readyRow.on === 0 && readyRow.pvLeft < -60 && readyRow.listRight && readyRow.column && readyRow.footIn && readyRow.pvBig >= 900 && !readyRow.clipped && readyRow.step === '0', `five ready-made tiles over the swatches — Default and the four scenes — none on yet, the preview large and left of centre with the ready-made list down its right, top to bottom, Continue's bar in view at the foot, nothing clipped: ${JSON.stringify(readyRow)}`);
   // Default: Regular and no photos anywhere — the interface as it comes
   await page.click(pz('#pzReady [data-ready="Default"]'));
+  check(await eventually(async () => !(await page.$('#bcv-setup .pz__cursor')), 2000) && !(await page.$(su('.is-peek'))), 'a press of one’s own ends the show at once');
   await page.waitForTimeout(500);
   const readyDefault = await page.evaluate(() => { const r = document.querySelector('#bcv-setup').shadowRoot; return { on: r.querySelector('#pzReady .is-on')?.dataset.ready, colour: r.querySelector('.pz__sw.is-on').dataset.theme, pics: r.querySelectorAll('.pz__pv .has-pic').length, note: r.querySelector('#pzNote').textContent, pvMain: r.querySelector('.pz').style.getPropertyValue('--pv-main'), ring: getComputedStyle(r.querySelector('#pzReady .is-on .pz__thumb')).boxShadow }; });
   check(readyDefault.on === 'Default' && readyDefault.colour === 'Regular' && readyDefault.pics === 0 && readyDefault.note === 'Regular' && readyDefault.pvMain === '' && /rgb\(10, 132, 255\)/.test(readyDefault.ring), `Default pressed: Regular, not a photo anywhere, the preview's greys back, the tile ringed in blue: ${JSON.stringify(readyDefault)}`);
@@ -3222,7 +3226,8 @@ try {
   const cur = whatsNew[0];
   const wnPage = () => page.evaluate(() => { const r = document.querySelector('#bcv-whatsnew').shadowRoot; return { since: r.querySelector('.wn__since')?.textContent ?? null, versions: [...r.querySelectorAll('.wn__vh')].map((v) => v.querySelector('.wn__vnum').textContent), dates: [...r.querySelectorAll('.wn__vdate')].map((d) => d.textContent), notes: [...r.querySelectorAll('.wn__note')].map((n) => `${n.dataset.version} ${n.dataset.kind}: ${n.querySelector('.wn__title').textContent}`), clutter: r.querySelectorAll('.wn__kind, .wn__where, .wn__filter, .wn__rail, .wn__jump, .fr__hint').length, more: r.querySelector('#earlier')?.textContent ?? null, foot: [...r.querySelectorAll('.fr__foot button')].map((b) => b.textContent.trim()), scroll: (() => { const l = r.querySelector('#notes'); return { over: l.scrollHeight > l.clientHeight, bar: getComputedStyle(l, '::-webkit-scrollbar').width }; })() }; });
   // an update from 2.7.5 (the background notes the version left behind), this version not yet seen
-  await sw.evaluate(async () => { await self.BCV.api.storage.local.set({ 'whatsnew:from': '2.7.5' }); await self.BCV.api.storage.local.remove(['whatsnew:seen', 'welcome:appearance']); });
+  // (a theme not yet tried: the invitation is for those — the flag, and the name every save writes)
+  await sw.evaluate(async () => { await self.BCV.api.storage.local.set({ 'whatsnew:from': '2.7.5' }); await self.BCV.api.storage.local.remove(['whatsnew:seen', 'welcome:appearance', 'themes:tried']); await self.BCV.settings.update({ appearance: { theme: { name: '' } } }); });
   await page.goto(`${BASE}/`);
   const introDone = () => page.waitForFunction(() => document.querySelector('#bcv-whatsnew')?.shadowRoot.querySelector('.intro')?.hidden === true, null, { timeout: 8000 }); // the word-mark first
   const flags = (...keys) => sw.evaluate((k) => self.BCV.api.storage.local.get(k), keys);
@@ -3279,6 +3284,14 @@ try {
     await page.waitForSelector('#bcv-app .bcv-nav__item', { timeout: 10000 });
     await page.waitForTimeout(600);
     check(!(await page.$('#bcv-welcome')) && !(await page.$('#bcv-whatsnew')), 'nor on the next page');
+    check((await flags('themes:tried'))['themes:tried'] === true, 'Save marked the theme tried');
+    // a student who has tried a theme is not invited: the next update shows the notes instead
+    await sw.evaluate(async () => { await self.BCV.api.storage.local.set({ 'whatsnew:from': '2.12.0' }); await self.BCV.api.storage.local.remove('whatsnew:seen'); });
+    await page.goto(`${BASE}/`);
+    await page.waitForSelector(wn('.wn__note'), { timeout: 20000 });
+    check(!(await page.$(wn('.inv'))) && (await page.$(wn('#dismiss'))) !== null, 'a student who has already tried a theme is not invited again: the notes show instead');
+    await page.keyboard.press('Escape');
+    await page.waitForFunction(() => !document.querySelector('#bcv-whatsnew'), null, { timeout: 5000 });
   } else {
     // one page lists every version since, newest first — a few skipped updates make one page, not one each
     const sinceOld = whatsNew.filter((v) => cmpVer(v.version, '2.7.5') > 0);

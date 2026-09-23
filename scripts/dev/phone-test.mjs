@@ -726,7 +726,7 @@ try {
   const whatsNew = new Function('self', `${readFileSync(join(extDir, 'content', 'app', 'whatsnew-notes.js'), 'utf8')}; return self.BCV_WHATS_NEW;`)({});
   const introDone = () => page.waitForFunction(() => document.querySelector('#bcv-whatsnew')?.shadowRoot.querySelector('.intro')?.hidden === true, null, { timeout: 8000 });
   const flag = async (key) => (await sw.evaluate((k) => self.BCV.api.storage.local.get(k), key))[key];
-  await sw.evaluate(async () => { await self.BCV.api.storage.local.set({ 'whatsnew:from': '2.7.5' }); await self.BCV.api.storage.local.remove(['whatsnew:seen', 'welcome:appearance']); });
+  await sw.evaluate(async () => { await self.BCV.api.storage.local.set({ 'whatsnew:from': '2.7.5' }); await self.BCV.api.storage.local.remove(['whatsnew:seen', 'welcome:appearance', 'themes:tried']); await self.BCV.settings.update({ appearance: { theme: { name: '' } } }); }); // (a theme not yet tried: the invitation is for those)
   await page.goto(`${BASE}/`);
   if (whatsNew[0].invite) {
     // this version puts an invitation in the notes' place: the four scenes across the phone's width

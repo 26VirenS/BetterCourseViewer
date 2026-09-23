@@ -24,6 +24,11 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    // invite: the invitation again (whatsnew.js), for anyone who has not tried a theme yet; the notes wait in Settings
+    { version: '2.77.0', date: '2026-09-23', invite: true, notes: [
+      { kind: 'new', title: 'A cursor shows the way', body: 'It presses the sidebar and two counters, once.', icon: P.eye },
+      { kind: 'improved', title: 'Try a theme, again', body: 'The invitation comes back for anyone who has not.', icon: P.pic },
+    ] },
     { version: '2.76.0', date: '2026-09-23', notes: [
       { kind: 'improved', title: 'Personalize, laid out', body: 'A larger preview, the ready-made themes down its right.', icon: P.layers },
       { kind: 'improved', title: 'Continue at the foot', body: 'A bar at the bottom of the screen, on any device.', icon: P.arrows },

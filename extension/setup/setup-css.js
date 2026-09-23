@@ -559,6 +559,11 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
 .pz__card.is-pickable { cursor: pointer; }
 .pz__card.is-pickable:hover { outline: 2px dashed var(--hover-ring); }
 .pz__card.is-target { outline: 2px solid var(--A) !important; }
+/* the cursor's show at the first screen: a pointer that presses the sidebar and two counters, each lit as it is pressed (personalize.js peekShow) */
+.pz__side.is-peek, .pz__card.is-peek { outline: 2px dashed var(--hover-ring); }
+.pz__cursor { position: absolute; left: 0; top: 0; z-index: 40; pointer-events: none; opacity: 0; transform: translate(var(--cx, 0px), var(--cy, 0px)); transition: transform var(--cms, 600ms) cubic-bezier(.4,0,.2,1), opacity .25s ease; filter: drop-shadow(0 2px 4px rgba(0,0,0,.35)); }
+.pz__cursor.is-press { transform: translate(var(--cx, 0px), var(--cy, 0px)) scale(.8); transition-duration: .12s, .25s; }
+.pz__cursor svg { display: block; }
 .pz__cardin { position: relative; height: 100%; box-sizing: border-box; padding: 12px 13px; display: flex; flex-direction: column; }
 .pz__chead { display: flex; align-items: flex-start; gap: 6px; }
 .pz__cic { flex: none; margin-top: 1px; stroke: var(--ic); transition: stroke .3s ease; }

@@ -53,6 +53,16 @@
   let st = null;
   const active = () => !!ui;
 
+  /** Whether a theme has been tried: Personalize saved (its flag from 2.77 on; before that, a theme
+   *  with a name in the settings — every save writes one). The invitation is for everyone else. */
+  async function tried() {
+    try {
+      const f = await BCV.api.storage.local.get('themes:tried');
+      if (f['themes:tried'] === true) return true;
+      const s = await BCV.settings?.get?.();
+      return !!s?.appearance?.theme?.name;
+    } catch { return false; }
+  }
   /** Due when this version has notes that have not been shown, the setup is done, and the version
    *  is not the one the setup itself installed. `from` is the version left behind, when known and
    *  older than this one. */
@@ -65,7 +75,8 @@
     if (flags[SEEN_KEY] === to) return null;
     const from = flags[FROM_KEY] || flags[SEEN_KEY] || null;
     if (from === to) return null;
-    return { from: from && cmp(from, to) < 0 ? from : null, to, invite: !!NOTES().find((v) => v.version === to)?.invite };
+    const invite = !!NOTES().find((v) => v.version === to)?.invite && !(await tried()); // (an invitation, unless a theme has been tried already)
+    return { from: from && cmp(from, to) < 0 ? from : null, to, invite };
   }
 
   /** The versions the page lists, newest first: after an update, every one newer than the version
@@ -112,12 +123,12 @@
     markSeen(st.to);
   }
 
-  async function open(app, { from = null, to = version(), manual = false } = {}) {
+  async function open(app, { from = null, to = version(), manual = false, invite: asked = false } = {}) {
     if (ui) return;
     const shown = since(from, to);
     if (!shown.length) return;
-    // an update to a version that carries an invitation shows it in the notes' place (Settings still opens the notes)
-    if (!manual && shown[0].invite) return invite(app, shown[0].version);
+    // an update that due() says invites (the version carries an invitation, and no theme has been tried) shows it in the notes' place; Settings still opens the notes
+    if (!manual && asked) return invite(app, shown[0].version);
     st = { app, from: from && shown.length > 1 ? from : null, to: shown[0].version, shown, oldest: shown[shown.length - 1].version, manual, closing: false };
     mount(app, { label: 'What’s new', kind: '', ariaLabel: 'What’s new in Simpl Courses' });
     paintList();
