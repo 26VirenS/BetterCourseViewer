@@ -105,6 +105,18 @@
       soft: alpha(seed, dark ? 0.22 : 0.14),
       ring: alpha(seed, dark ? 0.45 : 0.32),
       ground: { bg: cast(G.bg), card: cast(G.card), hover: cast(G.hover), ink2: cast(G.ink2), ink3: cast(G.ink3), sep: alpha(line, G.sepA), edge: alpha(line, G.edgeA), fill: alpha(fillBase, G.fillA), fill2: alpha(fillBase, G.fill2A), chrome: alpha(cast(G.bg), G.chromeA), glass: alpha(cast(G.glass), G.glassA) },
+      ink: inkPair(seed, dark),
+    };
+  }
+  /** The two inks a photo is drawn in: the colour itself as the ink — deepened a little on the light
+   *  look, lifted on the dark — and its complement as the paper, pale on the light look and deep on
+   *  the dark, so the look's own words read on it. Regular draws in the interface's blue. */
+  function inkPair(accent, dark) {
+    const seed = normalize(accent) || REGULAR;
+    const [h, s] = rgbToHsl(hexToRgb(seed));
+    return {
+      a: hslToHex([h, Math.max(0.5, s), dark ? 0.62 : 0.46]),
+      b: hslToHex([(h + 180) % 360, Math.min(0.5, s * 0.6 + 0.1), dark ? 0.16 : 0.9]),
     };
   }
   /** One shade per sidebar row, so the rail is not a single flat colour: the accent's hue drifts a
@@ -128,8 +140,8 @@
     dark: { bg: 0.1, card: 0.11, hover: 0.1, ink2: 0.14, ink3: 0.2, glass: 0.1, line: 0.4, fill: 0.5 },
   };
   const GROUND_VARS = { bg: '--bcv-bg', card: '--bcv-card', hover: '--bcv-hover', ink2: '--bcv-ink2', ink3: '--bcv-ink3', sep: '--bcv-sep', edge: '--bcv-edge', fill: '--bcv-fill', fill2: '--bcv-fill2', chrome: '--bcv-chrome', glass: '--bcv-glass' };
-  const cssVars = (p) => ({ '--bcv-accent': p.accent, '--bcv-accent-icon': p.icon, '--bcv-accent-text': p.text, '--bcv-accent-fill': p.fill, '--bcv-accent-hover': p.hover, '--bcv-accent-soft': p.soft, '--bcv-accent-ring': p.ring, ...Object.fromEntries(Object.entries(GROUND_VARS).map(([k, v]) => [v, p.ground[k]])) });
-  const VAR_NAMES = ['--bcv-accent', '--bcv-accent-icon', '--bcv-accent-text', '--bcv-accent-fill', '--bcv-accent-hover', '--bcv-accent-soft', '--bcv-accent-ring', ...Object.values(GROUND_VARS)];
+  const cssVars = (p) => ({ '--bcv-accent': p.accent, '--bcv-accent-icon': p.icon, '--bcv-accent-text': p.text, '--bcv-accent-fill': p.fill, '--bcv-accent-hover': p.hover, '--bcv-accent-soft': p.soft, '--bcv-accent-ring': p.ring, '--bcv-ink-a': p.ink.a, '--bcv-ink-b': p.ink.b, ...Object.fromEntries(Object.entries(GROUND_VARS).map(([k, v]) => [v, p.ground[k]])) });
+  const VAR_NAMES = ['--bcv-accent', '--bcv-accent-icon', '--bcv-accent-text', '--bcv-accent-fill', '--bcv-accent-hover', '--bcv-accent-soft', '--bcv-accent-ring', '--bcv-ink-a', '--bcv-ink-b', ...Object.values(GROUND_VARS)];
   /** Puts the accent on an element (the page's <html>): the variables for this mode and the class
    *  the stylesheet keys on. No accent: takes them off. */
   function apply(el, accent, dark) {
@@ -387,6 +399,84 @@
     cx.putImageData(id, 0, 0);
     return cv.toDataURL('image/jpeg', 0.8);
   }
+  /** A blur over one channel of RGBA pixels (the alpha of a mask), clamped at the edges. */
+  function boxBlurAlpha(d, w, h, r) {
+    const tmp = new Float32Array(w * h);
+    const n = 2 * r + 1;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { let A = 0; for (let k = -r; k <= r; k++) A += d[(y * w + Math.min(w - 1, Math.max(0, x + k))) * 4 + 3]; tmp[y * w + x] = A / n; }
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { let A = 0; for (let k = -r; k <= r; k++) A += tmp[Math.min(h - 1, Math.max(0, y + k)) * w + x]; const o = (y * w + x) * 4; d[o] = 255; d[o + 1] = 255; d[o + 2] = 255; d[o + 3] = A / n; }
+  }
+  /** Otsu's threshold over a grey image (0–255): the split that keeps the two tones most apart. */
+  function otsu(g) {
+    const hist = new Float64Array(256);
+    for (let i = 0; i < g.length; i++) hist[Math.min(255, Math.max(0, Math.round(g[i])))]++;
+    const total = g.length;
+    let sum = 0; for (let t = 0; t < 256; t++) sum += t * hist[t];
+    let sumB = 0, wB = 0, best = 0, T = 128;
+    for (let t = 0; t < 256; t++) {
+      wB += hist[t]; if (!wB) continue;
+      const wF = total - wB; if (!wF) break;
+      sumB += t * hist[t];
+      const mB = sumB / wB, mF = (sum - sumB) / wF;
+      const v = wB * wF * (mB - mF) * (mB - mF);
+      if (v > best) { best = v; T = t; }
+    }
+    return T;
+  }
+  /** A photo inked down to two tones: the darker half of it (Otsu's split) and its outlines (Sobel)
+   *  are the ink, the rest the paper — kept as a mask (white where the ink goes, clear elsewhere)
+   *  the page colours in the two inks of the moment, with a small blurred copy for the blurred layer. */
+  function inkOf(img, w = 800) {
+    const ratio = img.naturalWidth ? img.naturalHeight / img.naturalWidth : 0.5625;
+    const h = Math.max(8, Math.round(w * ratio));
+    const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+    const cx = cv.getContext('2d');
+    cx.drawImage(img, 0, 0, w, h);
+    const src = cx.getImageData(0, 0, w, h).data;
+    const n = w * h;
+    const lum = new Float32Array(n);
+    for (let i = 0; i < n; i++) lum[i] = 0.2126 * src[i * 4] + 0.7152 * src[i * 4 + 1] + 0.0722 * src[i * 4 + 2];
+    // a light blur first: grain is not an outline
+    const sm = new Float32Array(n);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { let a = 0; for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) a += lum[Math.min(h - 1, Math.max(0, y + dy)) * w + Math.min(w - 1, Math.max(0, x + dx))]; sm[y * w + x] = a / 9; }
+    const T = otsu(sm);
+    const out = cx.createImageData(w, h);
+    const d = out.data;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const i = y * w + x;
+      const x0 = Math.max(0, x - 1), x1 = Math.min(w - 1, x + 1), y0 = Math.max(0, y - 1), y1 = Math.min(h - 1, y + 1);
+      const gx = -sm[y0 * w + x0] - 2 * sm[y * w + x0] - sm[y1 * w + x0] + sm[y0 * w + x1] + 2 * sm[y * w + x1] + sm[y1 * w + x1];
+      const gy = -sm[y0 * w + x0] - 2 * sm[y0 * w + x] - sm[y0 * w + x1] + sm[y1 * w + x0] + 2 * sm[y1 * w + x] + sm[y1 * w + x1];
+      const edge = Math.min(255, Math.max(0, (Math.hypot(gx, gy) - 22) * 3.5)); // (gentle horizons and dune lines count too)
+      const deep = T * 0.8; // the darkest part alone is filled, not the whole darker half: outlines carry the rest, and the paper stays
+      const shape = sm[i] < deep ? Math.min(255, (deep - sm[i]) * 24) : 0; // (soft at the split, so the shapes are not jagged)
+      d[i * 4] = 255; d[i * 4 + 1] = 255; d[i * 4 + 2] = 255; d[i * 4 + 3] = Math.max(shape, edge);
+    }
+    cx.putImageData(out, 0, 0);
+    const ink = cv.toDataURL('image/png');
+    // the blurred copy: the mask drawn small and blurred twice — scaled up by the page, it is the soft side
+    const bw = 96, bh = Math.max(8, Math.round(bw * ratio));
+    const bc = document.createElement('canvas'); bc.width = bw; bc.height = bh;
+    const bx = bc.getContext('2d');
+    bx.drawImage(cv, 0, 0, bw, bh);
+    const bd = bx.getImageData(0, 0, bw, bh);
+    boxBlurAlpha(bd.data, bw, bh, 3); boxBlurAlpha(bd.data, bw, bh, 3);
+    bx.putImageData(bd, 0, 0);
+    return { ink, inkBlur: bc.toDataURL('image/png') };
+  }
+  /** The ink of a raw picture (a data URL: an upload or a drawn scene), computed once and kept in memory, keyed by the picture. */
+  const inks = new Map();
+  const inking = new Map(); // in hand: the same picture asked for twice at once is inked once
+  const inkCached = (v) => (v ? inks.get(hashOf(v)) || null : null);
+  async function inkFor(v) {
+    if (!v) return null;
+    const id = hashOf(v);
+    if (inks.has(id)) return inks.get(id);
+    if (inking.has(id)) return inking.get(id);
+    const p = loadPicture(v, false).then((img) => { const r = inkOf(img); inks.set(id, r); inking.delete(id); return r; }).catch((e) => { inking.delete(id); throw e; });
+    inking.set(id, p);
+    return p;
+  }
   /** A drawn scene as a picture, rasterised once at a size that stays crisp on a wide header. */
   async function rasterOf(svgUrl, w = 1600) {
     const img = await loadPicture(svgUrl, false);
@@ -402,16 +492,23 @@
     const canDraw = typeof document !== 'undefined' && !!document.createElement;
     const put = async (v) => {
       if (!v) return null;
-      if (ASSET.test(v)) return out.assets[v.slice(6)] ? v : null;
+      if (ASSET.test(v)) {
+        const a = out.assets[v.slice(6)];
+        if (!a) return null;
+        if (a.ink || !canDraw) return v;
+        try { const raw = a.scene ? (PRESET_PHOTOS.find((x) => x[0] === a.scene) || [])[1] || a.sharp : a.sharp; const { ink, inkBlur } = await inkFor(raw); delete a.blur; Object.assign(a, { ink, inkBlur }); } catch { /* kept as it is */ }
+        return v;
+      }
       if (!canDraw) return v;
       const id = hashOf(v);
-      if (!out.assets[id]) {
+      if (!out.assets[id]?.ink) {
         try {
           const scene = sceneNameOf(v);
-          let sharp = v, img;
-          if (/^data:image\/svg\+xml/.test(v)) { const r = await rasterOf(v); sharp = r.data; img = r.img; } else img = await loadPicture(v, false);
-          out.assets[id] = { sharp, blur: blurredOf(img), ...(scene ? { scene } : {}) };
-        } catch { return v; } // (a picture that will not draw is kept as it is: the page blurs it itself)
+          let sharp = v;
+          if (/^data:image\/svg\+xml/.test(v)) sharp = (await rasterOf(v)).data;
+          const { ink, inkBlur } = await inkFor(v);
+          out.assets[id] = { sharp, ink, inkBlur, ...(scene ? { scene } : {}) };
+        } catch { return v; } // (a picture that will not draw is kept as it is: the page shows it plain)
       }
       return `asset:${id}`;
     };
@@ -425,12 +522,12 @@
   /** What a slot wears, resolved: { sharp, blur, scene } — a picture kept raw (from before assets) has no blur, and the page blurs it itself. */
   const picOf = (images, v) => {
     if (!v) return null;
-    if (ASSET.test(v)) { const a = images?.assets?.[v.slice(6)]; return a?.sharp ? { sharp: a.sharp, blur: a.blur || null, scene: a.scene || null } : null; }
-    return { sharp: v, blur: null, scene: sceneNameOf(v) };
+    if (ASSET.test(v)) { const a = images?.assets?.[v.slice(6)]; return a?.sharp ? { sharp: a.sharp, ink: a.ink || null, inkBlur: a.inkBlur || null, scene: a.scene || null } : null; }
+    return { sharp: v, ink: null, inkBlur: null, scene: sceneNameOf(v) };
   };
   /** The raw value a slot stands for, for editing: a scene's own drawing, or the picture itself. */
   const rawOf = (images, v) => { const p = picOf(images, v); if (!p) return null; return p.scene ? (PRESET_PHOTOS.find((x) => x[0] === p.scene) || [])[1] || p.sharp : p.sharp; };
-  const hasRaw = (images) => [images?.side, ...Object.values(images?.cards || {}), ...Object.values(images?.headers || {})].some((v) => v && !ASSET.test(v));
+  const hasRaw = (images) => [images?.side, ...Object.values(images?.cards || {}), ...Object.values(images?.headers || {})].some((v) => v && (!ASSET.test(v) || !images?.assets?.[v.slice(6)]?.ink));
 
   const emptyImages = () => ({ side: null, cards: {}, headers: {}, tones: {}, assets: {} });
   async function loadImages() {
@@ -448,6 +545,6 @@
     hexToRgb, rgbToHex, rgbToHsl, hslToRgb, hslToHex, luminance, contrast, normalize,
     GROUND, MIN_SAT, ICON_RATIO, TEXT_RATIO, PRESETS, REGULAR, PRESET_PHOTOS, CARD_SLOTS, HEADER_SLOTS, IMAGES_KEY,
     palette, shades, shadeSet, cssVars, apply, readable, readableOn, fillFor, mix, tint, customHex, controlsOf, veilBase, picCss, band, nearest, fromControls, toControls,
-    resizeImage, readImage, imageTone, fillTones, loadImages, saveImages, countImages, countHeaders, emptyImages, packImages, picOf, rawOf, CAST,
+    resizeImage, readImage, imageTone, fillTones, loadImages, saveImages, countImages, countHeaders, emptyImages, packImages, picOf, rawOf, CAST, inkPair, inkFor, inkCached,
   };
 })();

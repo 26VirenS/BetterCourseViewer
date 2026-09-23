@@ -160,6 +160,7 @@
       '--hover-ring': t.mix(A, d ? '#000000' : '#ffffff', 0.2),
     };
     shades.forEach((c, i) => { vars[`--s${i}`] = c; vars[`--s${i}-lit`] = t.mix(c, '#ffffff', 0.45); });
+    const inkPair = t.inkPair(st.theme.name === 'Regular' ? '' : A, d); vars['--ink-a'] = inkPair.a; vars['--ink-b'] = inkPair.b; // the two inks every photo is drawn in
     for (const [k, v] of Object.entries(vars)) ui.root.style.setProperty(k, v);
     // the preview's grounds take the same soft cast the page will (lib/theme.js palette): Regular keeps its greys
     const PV = d ? { main: ['#0b0b0d', 0.1], side: ['#151517', 0.14], card: ['#1c1c1e', 0.11], head: ['#111113', 0.14] } : { main: ['#fbfbfd', 0.1], side: ['#f0f0f4', 0.14], card: ['#ffffff', 0.05], head: ['#f0f0f4', 0.14] };
@@ -223,11 +224,27 @@
   }
 
   // ---- the Dashboard preview ---------------------------------------------------------------------
-  const layers = (pic, veilVar) => (pic ? [
-    h('i', { class: 'pz__pic pz__pic--sharp', style: { '--pic': T().picCss(pic) } }),
-    h('i', { class: 'pz__pic pz__pic--blur', style: { '--pic': T().picCss(pic) } }),
-    h('i', { class: `pz__pic pz__pic--veil pz__pic--veil-${veilVar}` }),
-  ] : []);
+  /** A picture's ink, if it is drawn yet; not yet, it is drawn now and the preview redrawn when it lands. */
+  const inkOf = (pic) => {
+    const ink = T().inkCached(pic);
+    if (!ink) T().inkFor(pic).then(() => { if (st && ui) render('still'); }).catch(() => {});
+    return ink;
+  };
+  /** A photo's layers: the paper in the complement, the ink in the colour (its mask), the blurred ink under the fade, the veil — or the plain picture while its ink is drawn. */
+  const layers = (pic, veilVar) => {
+    if (!pic) return [];
+    const ink = inkOf(pic);
+    return ink ? [
+      h('i', { class: 'pz__pic pz__pic--paper' }),
+      h('i', { class: 'pz__pic pz__pic--sharp pz__pic--inked', style: { '--ink': T().picCss(ink.ink) } }),
+      h('i', { class: 'pz__pic pz__pic--blur pz__pic--inked', style: { '--ink': T().picCss(ink.inkBlur) } }),
+      h('i', { class: `pz__pic pz__pic--veil pz__pic--veil-${veilVar}` }),
+    ] : [
+      h('i', { class: 'pz__pic pz__pic--sharp', style: { '--pic': T().picCss(pic) } }),
+      h('i', { class: 'pz__pic pz__pic--blur', style: { '--pic': T().picCss(pic) } }),
+      h('i', { class: `pz__pic pz__pic--veil pz__pic--veil-${veilVar}` }),
+    ];
+  };
   const badge = (target, has) => (st.step === 0 && !phone() ? h('span', { class: `pz__badge ${has ? 'has-pic' : ''} ${st.target === target ? 'is-on' : ''}` }, [svg(IC.camera, { size: 12, width: 2.2 }), h('span', { text: has ? 'Change' : 'Photo' })]) : null);
   function preview() {
     const sidePic = st.images.side;
@@ -285,11 +302,11 @@
   };
   function photoChoices(key, { onEvery = null } = {}) {
     const cur = photoAt(key);
-    const choice = (name, bg, on, pick) => h('button', { type: 'button', class: `pz__choice ${on ? 'is-on' : ''}`, title: name, 'aria-label': name, dataset: { photo: name }, onclick: pick }, [h('i', { class: `pz__choicepic ${name === 'None' ? 'pz__choicepic--none' : ''}`, style: bg ? { background: bg } : null }), h('span', { class: 'pz__choicename', text: name })]);
+    const choice = (name, bg, on, pick, raw = null) => { const ink = raw ? inkOf(raw) : null; return h('button', { type: 'button', class: `pz__choice ${on ? 'is-on' : ''}`, title: name, 'aria-label': name, dataset: { photo: name }, onclick: pick }, [h('i', { class: `pz__choicepic ${name === 'None' ? 'pz__choicepic--none' : ''} ${ink ? 'pz__choicepic--inked' : ''}`, style: ink ? { '--ink': T().picCss(ink.ink) } : bg ? { background: bg } : null }), h('span', { class: 'pz__choicename', text: name })]); };
     const isPreset = (p) => !!cur && cur === p[1];
     return [
       choice('None', null, !cur, () => { setPhoto(key, null); render('photo'); }),
-      ...PRESET_PHOTOS.map((p) => choice(p[0], T().picCss(p[1]), isPreset(p), () => { setPhoto(key, p[1], p[2]); render('photo'); })),
+      ...PRESET_PHOTOS.map((p) => choice(p[0], T().picCss(p[1]), isPreset(p), () => { setPhoto(key, p[1], p[2]); render('photo'); }, p[1])),
       h('label', { class: `pz__choice pz__choice--up ${cur && !PRESET_PHOTOS.some(isPreset) ? 'is-on' : ''}`, title: 'Upload' }, [h('i', { class: 'pz__choicepic pz__choicepic--up' }, svg(IC.up, { size: 15, width: 2.1 })), h('span', { class: 'pz__choicename', text: 'Upload' }), h('input', { type: 'file', accept: 'image/*', 'aria-label': 'Upload a photo', onchange: (e) => { const f = e.target.files?.[0]; if (f) readFile(f, key); e.target.value = ''; } })]),
       onEvery ? h('button', { type: 'button', class: 'pz__textbtn', id: 'pzEvery', disabled: !cur || null, text: onEvery.label, onclick: () => { if (cur) { onEvery.go(cur); render('photo'); } } }) : null,
     ];
@@ -333,7 +350,12 @@
     const ready = phone() ? null : h('div', { class: 'pz__ready', id: 'pzReady' }, [
       h('span', { class: 'pz__readyttl', text: 'Ready-made' }),
       ...READY.map((r) => h('button', { type: 'button', class: `pz__theme ${readyOn(r) ? 'is-on' : ''}`, dataset: { ready: r.name }, title: r.side ? `${r.name}: ${r.colour}, ${r.side} on the sidebar, ${r.cards} on the counters, ${r.heads} on the headers` : 'Default: Regular, no photos', 'aria-pressed': readyOn(r) ? 'true' : 'false', onclick: () => applyReady(r) }, [
-        h('span', { class: `pz__thumb ${r.side ? '' : 'pz__thumb--plain'}`, style: { '--pic-side': t.picCss(picOf(r.side)), '--pic-head': t.picCss(picOf(r.heads)), '--pic-card': t.picCss(picOf(r.cards)), '--c': r.colour === 'Regular' ? 'conic-gradient(#ff453a,#ff9f0a,#30d158,#40c8e0,#0a84ff,#bf5af2,#ff453a)' : (t.PRESETS.find(([, n]) => n === r.colour) || [REGULAR])[0], '--ring': r.colour === 'Regular' ? REGULAR : (t.PRESETS.find(([, n]) => n === r.colour) || [REGULAR])[0] } }, [h('i', { class: 'pz__thumb-side' }), h('i', { class: 'pz__thumb-head' }), h('i', { class: 'pz__thumb-card' }), h('i', { class: 'pz__thumb-dot' })]),
+        (() => {
+          const hex = r.colour === 'Regular' ? '' : (t.PRESETS.find(([, n]) => n === r.colour) || [REGULAR])[0];
+          const pair = t.inkPair(hex, dark());
+          const cell = (cls, name) => { const raw = picOf(name); const ink = raw ? inkOf(raw) : null; return h('i', { class: `${cls} ${ink ? 'is-inked' : ''}`, style: ink ? { '--ink': t.picCss(ink.ink) } : { '--pic': t.picCss(raw) } }); };
+          return h('span', { class: `pz__thumb ${r.side ? '' : 'pz__thumb--plain'}`, style: { '--ink-a': pair.a, '--ink-b': pair.b, '--c': r.colour === 'Regular' ? 'conic-gradient(#ff453a,#ff9f0a,#30d158,#40c8e0,#0a84ff,#bf5af2,#ff453a)' : hex, '--ring': hex || REGULAR } }, [cell('pz__thumb-side', r.side), cell('pz__thumb-head', r.heads), cell('pz__thumb-card', r.cards), h('i', { class: 'pz__thumb-dot' })]);
+        })(),
         h('span', { text: r.name }),
       ])),
     ]);
