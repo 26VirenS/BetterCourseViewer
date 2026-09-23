@@ -24,6 +24,10 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.76.0', date: '2026-09-23', notes: [
+      { kind: 'improved', title: 'Personalize, laid out', body: 'A larger preview, the ready-made themes down its right.', icon: P.layers },
+      { kind: 'improved', title: 'Continue at the foot', body: 'A bar at the bottom of the screen, on any device.', icon: P.arrows },
+    ] },
     { version: '2.75.0', date: '2026-09-23', notes: [
       { kind: 'improved', title: 'Scenes redrawn', body: 'Ridges, waves, trees and dunes, in clean lines.', icon: P.pen },
       { kind: 'new', title: 'A drawing per card', body: 'Every counter and header wears its own variation.', icon: P.pic },

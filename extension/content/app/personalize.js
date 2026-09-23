@@ -207,10 +207,14 @@
     const titles = [['Click any part of the preview to personalize', ''], ['Colour your courses', 'Pick a course, then its colour.'], ['Page headers', 'Click a header, then pick its photo.']];
     const [t1, t2] = titles[st.step];
     const wrap = h('div', { class: 'pz__pvwrap', id: 'pzPv', dataset: { pv: '1' } }, [st.step === 2 ? headGrid() : preview(), st.step === 0 && st.target ? photoBar() : null]);
+    // the preview and its controls in a column that takes the room the window has; on the first
+    // screen the ready-made themes down the right of it, top to bottom (a phone has no list)
     return h('div', { class: `pz__stage pz__stage--${st.step}` }, [
       h('div', { class: 'pz__head' }, [h('h1', { class: 'pz__h1', text: t1 }), t2 ? h('p', { class: 'pz__lead', text: t2 }) : null]),
-      wrap,
-      h('div', { class: 'pz__controls' }, [st.step === 0 ? colourControls() : st.step === 1 ? courseControls() : headerControls()]),
+      h('div', { class: 'pz__layout' }, [
+        h('div', { class: 'pz__left' }, [wrap, h('div', { class: 'pz__controls' }, [st.step === 0 ? colourControls() : st.step === 1 ? courseControls() : headerControls()])]),
+        st.step === 0 ? readyList() : null,
+      ]),
     ]);
   }
   /** The preview scaled to the room it has (980 × 430 at full size). */
@@ -220,9 +224,10 @@
     if (!wrap || !pv) return;
     const r = wrap.getBoundingClientRect();
     if (!r.width || !r.height) return;
-    const s = Math.min(1, r.width / 980, r.height / 430);
+    const s = Math.min(1.3, r.width / 980, r.height / 430); // (a wide, tall window gets it larger than life)
     st.pvScale = s;
     pv.style.transform = `translateX(-50%) scale(${s})`;
+    pv.style.top = `${Math.max(0, Math.round((r.height - 430 * s) / 2))}px`; // (centred in the room it has)
   }
 
   // ---- the Dashboard preview ---------------------------------------------------------------------
@@ -332,10 +337,9 @@
   }
 
   // ---- step 1: the theme swatches, and the radial picker for Custom -------------------------------
-  function colourControls() {
+  /** The ready-made themes, a list down the right of the preview: Default and the four scenes, each a tile of its three scenes as they are placed, with the colour's dot. */
+  function readyList() {
     const t = T();
-    const names = [['Regular', 'conic-gradient(#ff453a,#ff9f0a,#30d158,#40c8e0,#0a84ff,#bf5af2,#ff453a)'], ...t.PRESETS.map(([hex, name]) => [name, hex]), ['Custom', null]];
-    const custom = t.customHex(st.theme.h, st.theme.s, st.theme.depth);
     // a ready-made theme: the sidebar wears its scene's first drawing, every counter and every header a variation of theirs — no two the same
     const picOf = (name, i = 0) => (name ? t.sceneUrl(name, i) : null);
     const readyOn = (r) => st.theme.name === r.colour && (st.images.side || null) === picOf(r.side) && t.CARD_SLOTS.every((k, i) => (st.images.cards[k] || null) === picOf(r.cards, i + 1)) && t.HEADER_SLOTS.every(([k], i) => (st.images.headers[k] || null) === picOf(r.heads, i + 1));
@@ -348,7 +352,8 @@
       st.target = null;
       render('photo');
     };
-    const ready = phone() ? null : h('div', { class: 'pz__ready', id: 'pzReady' }, [
+    if (phone()) return null; // (a phone gets the colour alone: no room for the list)
+    return h('div', { class: 'pz__ready', id: 'pzReady' }, [
       h('span', { class: 'pz__readyttl', text: 'Ready-made' }),
       ...READY.map((r) => h('button', { type: 'button', class: `pz__theme ${readyOn(r) ? 'is-on' : ''}`, dataset: { ready: r.name }, title: r.side ? `${r.name}: ${r.colour}, ${r.side} on the sidebar, ${r.cards} on the counters, ${r.heads} on the headers` : 'Default: Regular, no photos', 'aria-pressed': readyOn(r) ? 'true' : 'false', onclick: () => applyReady(r) }, [
         (() => {
@@ -359,8 +364,12 @@
         h('span', { text: r.name }),
       ])),
     ]);
+  }
+  function colourControls() {
+    const t = T();
+    const names = [['Regular', 'conic-gradient(#ff453a,#ff9f0a,#30d158,#40c8e0,#0a84ff,#bf5af2,#ff453a)'], ...t.PRESETS.map(([hex, name]) => [name, hex]), ['Custom', null]];
+    const custom = t.customHex(st.theme.h, st.theme.s, st.theme.depth);
     return h('div', { class: 'pz__colour' }, [
-      ready,
       h('div', { class: 'pz__swatches', id: 'pzThemes' }, names.map(([name, bg]) => h('div', { class: 'pz__swwrap' }, [
         h('button', { type: 'button', class: `pz__sw ${st.theme.name === name ? 'is-on' : ''}`, title: name, dataset: { theme: name }, 'aria-pressed': st.theme.name === name ? 'true' : 'false', onclick: () => {
           if (name === 'Custom') { st.theme.name = 'Custom'; openPicker('theme'); return; }

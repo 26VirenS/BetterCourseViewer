@@ -279,6 +279,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
   background: var(--bg);
 }
 .overlay .page--fr { height: auto; min-height: 100%; overflow: visible; padding: 40px 32px; align-items: center; justify-content: center; gap: 0; }
+.overlay .page--fr:has(.pz) { height: 100%; min-height: 0; padding: 14px 24px 0; overflow: hidden; align-items: stretch; justify-content: flex-start; } /* (Personalize fills the screen: its own frame scrolls, its foot stays at the bottom) */
 
 /* the word-mark: three bands of "Simpl" slide in, the dot pops, then the veil goes */
 .intro { position: fixed; inset: 0; z-index: 6; display: flex; align-items: center; justify-content: center; background: var(--bg); }
@@ -465,7 +466,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
 :host([data-theme="dark"]) .overlay .page--fr:has(.pz), html[data-theme="dark"] .overlay .page--fr:has(.pz) { background: #000; }
 .pz { --pz-bg: #f2f2f6; --pz-tile: #e6e6eb; --pz-field: #fff; --pz-glass: rgba(255,255,255,.82); --pz-ink: #1c1c1e; --pz-ink2: #3c3c43; --pz-ink3: #6c6c70; --pz-hair: rgba(60,60,67,.12); --pz-hair2: #c7c7cc; --pz-seg-on: #fff;
   --pv-main: #fbfbfd; --pv-side: #f0f0f4; --pv-card: #fff; --pv-head: #f0f0f4; --pv-ink: #1c1c1e; --pv-hair: rgba(60,60,67,.08); --pv-shadow: .12;
-  width: 100%; max-width: 980px; display: flex; flex-direction: column; animation: omFade .3s ease both; font-family: var(--font); color: var(--pz-ink); }
+  width: 100%; max-width: 1480px; height: 100%; min-height: 0; overflow: auto; overscroll-behavior: contain; display: flex; flex-direction: column; animation: omFade .3s ease both; font-family: var(--font); color: var(--pz-ink); }
 :host([data-theme="dark"]) .pz, html[data-theme="dark"] .pz { --pz-bg: #000; --pz-tile: #161618; --pz-field: #2a2a2d; --pz-glass: rgba(30,30,32,.78); --pz-ink: #f5f5f7; --pz-ink2: #c7c7cc; --pz-ink3: #8e8e93; --pz-hair: rgba(255,255,255,.09); --pz-hair2: #48484a; --pz-seg-on: #2c2c2e;
   --pv-main: #0b0b0d; --pv-side: #151517; --pv-card: #1c1c1e; --pv-head: #111113; --pv-ink: #f2f2f7; --pv-hair: rgba(255,255,255,.06); --pv-shadow: .5; }
 .pz button { font-family: inherit; }
@@ -489,12 +490,15 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
 .pz__lookpv--dark { background: #000; } .pz__lookpv--dark > b { background: #1c1c1e; }
 .pz__lookpv--system { background: linear-gradient(110deg, #f2f2f6 50%, #000 50%); } .pz__lookpv--system > b { background: rgba(128,128,134,.4); }
 /* the stage: the heading, the preview, the controls */
-.pz__stage { min-height: 480px; display: flex; flex-direction: column; align-items: center; padding-top: 14px; }
+.pz__stage { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: stretch; padding-top: 8px; }
+.pz__layout { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; align-items: stretch; }
+.pz__stage--0 .pz__layout:has(.pz__ready) { grid-template-columns: minmax(0, 1fr) 216px; } /* (the first screen: the ready-made list down the right) */
+.pz__left { min-width: 0; min-height: 0; display: flex; flex-direction: column; }
 .pz__head { width: 100%; display: flex; flex-direction: column; align-items: center; animation: omRise .36s var(--ease) both; }
 .pz__h1 { margin: 0; font: 700 24px/1.15 var(--display); letter-spacing: -.03em; color: var(--pz-ink); text-align: center; }
 .pz__lead { margin: 5px 0 0; font: 400 14px/1.45 var(--font); color: var(--pz-ink3); text-align: center; }
-.pz__pvwrap { position: relative; width: 100%; height: min(430px, 46vw, max(170px, calc(100vh - 500px))); margin-top: 14px; overflow: hidden; } /* (short windows: the preview gives way, so the foot stays in view) */
-@media (max-height: 760px) { .pz__h1 { font-size: 19px; } .pz__pvwrap { margin-top: 8px; } .pz__foot { margin-top: 6px; padding: 6px 0 8px; } }
+.pz__pvwrap { position: relative; width: 100%; flex: 1 1 auto; min-height: 200px; margin-top: 10px; overflow: hidden; } /* (the preview takes the room the window has: measure() scales it to fit, larger than life in a big window) */
+.pz__stage--2 .pz__pvwrap { flex: none; min-height: 0; overflow: visible; }
 .pz__pv { position: absolute; left: 50%; top: 0; width: 980px; height: 430px; transform: translateX(-50%); transform-origin: top center; border-radius: 22px; overflow: hidden; border: 1px solid var(--pz-hair); background: var(--pv-main); display: flex; box-shadow: 0 30px 70px rgba(0,0,0,var(--pv-shadow)); }
 .pz__side { position: relative; flex: none; width: 190px; overflow: hidden; background: var(--pv-side); border-radius: 22px 0 0 22px; outline: 2px solid transparent; outline-offset: -2px; transition: outline-color .2s ease; }
 .pz__side.is-pickable { cursor: pointer; }
@@ -600,14 +604,15 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
 .pz__bar2 .pz__textbtn { height: 30px; padding: 0 12px; border-radius: 15px; background: var(--pz-field); }
 .pz__choices { display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-start; gap: 12px; }
 /* the controls under the preview */
-.pz__controls { flex: none; width: 100%; margin-top: 14px; display: flex; flex-direction: column; align-items: center; }
+.pz__controls { flex: none; width: 100%; margin-top: 10px; display: flex; flex-direction: column; align-items: center; }
 .pz__colour, .pz__courses, .pz__hcontrols { display: flex; flex-direction: column; align-items: center; gap: 10px; animation: omRise .34s var(--ease) .05s both; }
-/* ready-made: four tiles, each the three scenes as they are placed (the sidebar down the left, the header over the counter) with the colour's dot */
-.pz__ready { display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; }
-.pz__readyttl { font: 600 10.5px/1 var(--font); letter-spacing: .1em; text-transform: uppercase; color: var(--pz-ink3); margin-right: 4px; }
-.pz__theme { display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 0; border: 0; background: transparent; cursor: pointer; font: 500 11.5px/1 var(--font); color: var(--pz-ink2); }
-.pz__theme.is-on { color: var(--pz-ink); font-weight: 600; }
-.pz__thumb { position: relative; display: grid; grid-template-columns: 26px 1fr; grid-template-rows: 1fr 1fr; gap: 2px; width: 92px; height: 56px; padding: 2px; box-sizing: border-box; border-radius: 12px; overflow: hidden; background: var(--pz-tile); box-shadow: 0 0 0 2px transparent; transition: box-shadow .2s ease, transform .2s ease; }
+/* ready-made: a list down the right of the preview — Default and the four scenes, each a tile of the three scenes as they are placed (the sidebar down the left, the header over the counter) with the colour's dot and its name beside it */
+.pz__ready { display: flex; flex-direction: column; align-items: stretch; gap: 6px; min-height: 0; overflow: auto; padding: 2px; animation: omRise .34s var(--ease) .05s both; }
+.pz__readyttl { font: 600 10.5px/1 var(--font); letter-spacing: .1em; text-transform: uppercase; color: var(--pz-ink3); margin: 6px 0 4px 8px; }
+.pz__theme { display: flex; align-items: center; gap: 12px; padding: 6px; border: 0; border-radius: 14px; background: transparent; cursor: pointer; text-align: left; font: 500 13px/1.2 var(--font); color: var(--pz-ink2); transition: background .2s ease; }
+.pz__theme:hover { background: var(--pz-tile); }
+.pz__theme.is-on { color: var(--pz-ink); font-weight: 600; background: var(--pz-tile); }
+.pz__thumb { position: relative; display: grid; grid-template-columns: 26px 1fr; grid-template-rows: 1fr 1fr; gap: 2px; flex: none; width: 96px; height: 58px; padding: 2px; box-sizing: border-box; border-radius: 12px; overflow: hidden; background: var(--pz-tile); box-shadow: 0 0 0 2px transparent; transition: box-shadow .2s ease, transform .2s ease; }
 .pz__theme:hover .pz__thumb { transform: translateY(-1px); }
 .pz__theme.is-on .pz__thumb { box-shadow: 0 0 0 2px var(--ring, var(--c)); }
 .pz__thumb--plain i:not(.pz__thumb-dot) { background: var(--pz-field); } /* (Default: the plain grounds, no photo anywhere) */
@@ -616,8 +621,6 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
 .pz__thumb-head { --pic: var(--pic-head); background-position: right center !important; }
 .pz__thumb-card { --pic: var(--pic-card); background-position: right bottom !important; }
 .pz__thumb-dot { position: absolute; right: 6px; bottom: 6px; width: 10px; height: 10px; border-radius: 50%; background: var(--c); box-shadow: 0 0 0 2px rgba(255,255,255,.9); }
-/* the first screen's preview sits a little to the left where the window has the room, so the eye lands on it before the controls */
-@media (min-width: 1240px) { .pz[data-step="0"] .pz__pvwrap { transform: translateX(-40px); } } /* (the whole frame moves, so nothing is clipped) */
 .pz__courses, .pz__hcontrols { gap: 20px; }
 .pz__hfor { font: 600 13px/1.2 var(--font); color: var(--pz-ink); }
 .pz__swatches { display: flex; flex-wrap: wrap; justify-content: center; gap: 14px; }
@@ -659,7 +662,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
 .pz__pkaa--dark { bottom: 0; background: #1c1c1e; align-items: flex-end; padding-bottom: 14px; }
 .pz__pkdone { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); height: 26px; padding: 0 13px; border: 0; border-radius: 13px; background: var(--hex); color: var(--ink); cursor: pointer; font: 600 11.5px/1 var(--font); box-shadow: 0 2px 8px rgba(0,0,0,.28); }
 /* the foot, and Saved */
-.pz__foot { flex: none; width: 100%; margin-top: 12px; padding: 10px 0 14px; border-top: 1px solid var(--pz-hair); display: flex; align-items: center; gap: 10px; }
+.pz__foot { position: sticky; bottom: 0; z-index: 8; flex: none; width: 100%; margin-top: auto; padding: 10px 0 max(12px, env(safe-area-inset-bottom, 0px)); border-top: 1px solid var(--pz-hair); background: var(--bg); display: flex; align-items: center; gap: 10px; } /* (a bar at the foot of the screen whatever the window's height: the frame scrolls under it) */
 .pz__back { height: 42px; padding: 0 18px; border: 0; border-radius: 21px; background: transparent; color: var(--pz-ink2); cursor: pointer; font: 600 14px/1 var(--font); transition: background .2s ease; }
 .pz__back:hover { background: var(--pz-tile); }
 .pz__back--tile { background: var(--pz-tile); color: var(--pz-ink); padding: 0 20px; }
@@ -681,7 +684,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
   .overlay .page--fr:has(.pz) { padding: 12px 14px 0; }
   .pz__name { display: none; }
   .pz__h1 { font-size: 20px; }
-  .pz__pvwrap { height: min(430px, 44vw); }
+  .pz__pvwrap { flex: none; height: min(430px, 44vw); min-height: 0; }
   .pz__pk { left: 50%; top: 160px; }
   .pz__pk--course { left: 15px; top: 160px; }
 }
