@@ -504,19 +504,23 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
 .pz__pic--blur { inset: -24px; background: var(--pic) center / cover no-repeat; filter: blur(16px); }
 .pz__side .pz__pic--blur { -webkit-mask-image: linear-gradient(to top, transparent 10%, #000 62%); mask-image: linear-gradient(to top, transparent 10%, #000 62%); }
 /* inked, as the page draws it (app.css): the paper in the complement, the ink's mask in the colour, the blurred mask under the fade */
-.pz__pic--paper { background: var(--ink-b); }
-.pz__pic--sharp.pz__pic--inked { background: var(--ink-a); -webkit-mask: var(--ink) center / cover no-repeat; mask: var(--ink) center / cover no-repeat; }
-.pz__pic--blur.pz__pic--inked { inset: 0; filter: none; background: var(--ink-a); -webkit-mask-size: cover, auto; -webkit-mask-position: center, 0 0; -webkit-mask-repeat: no-repeat; -webkit-mask-composite: source-in; mask-size: cover, auto; mask-position: center, 0 0; mask-repeat: no-repeat; mask-composite: intersect; }
+.pz { --pz-ink-lift: #000000; --pz-ink-k: 93%; }
+:host([data-theme="dark"]) .pz, html[data-theme="dark"] .pz { --pz-ink-lift: #ffffff; --pz-ink-k: 90%; }
+.pz__side { --paper: var(--pv-side); } .pz__card { --paper: var(--pv-card); } .pz__hcard { --paper: var(--pv-head); }
+.pz__pic--paper { background: var(--paper); }
+.pz__pic--sharp.pz__pic--inked { background: color-mix(in srgb, var(--paper) var(--pz-ink-k), var(--pz-ink-lift)); -webkit-mask: var(--ink) center / cover no-repeat; mask: var(--ink) center / cover no-repeat; }
+.pz__pic--blur.pz__pic--inked { inset: 0; filter: none; background: color-mix(in srgb, var(--paper) var(--pz-ink-k), var(--pz-ink-lift)); -webkit-mask-size: cover, auto; -webkit-mask-position: center, 0 0; -webkit-mask-repeat: no-repeat; -webkit-mask-composite: source-in; mask-size: cover, auto; mask-position: center, 0 0; mask-repeat: no-repeat; mask-composite: intersect; }
 .pz__side .pz__pic--blur.pz__pic--inked { -webkit-mask-image: var(--ink), linear-gradient(to top, transparent 10%, #000 62%); mask-image: var(--ink), linear-gradient(to top, transparent 10%, #000 62%); }
 .pz__card .pz__pic--blur.pz__pic--inked { -webkit-mask-image: var(--ink), radial-gradient(150% 150% at 100% 100%, transparent 30%, #000 70%); mask-image: var(--ink), radial-gradient(150% 150% at 100% 100%, transparent 30%, #000 70%); }
 .pz__hcard .pz__pic--blur.pz__pic--inked { -webkit-mask-image: var(--ink), linear-gradient(to left, transparent 8%, #000 60%); mask-image: var(--ink), linear-gradient(to left, transparent 8%, #000 60%); }
-.pz__choicepic--inked { background: var(--ink-b) !important; position: relative; overflow: hidden; }
-.pz__choicepic--inked::after { content: ""; position: absolute; inset: 0; background: var(--ink-a); -webkit-mask: var(--ink) center / cover no-repeat; mask: var(--ink) center / cover no-repeat; }
-.pz__thumb i.is-inked { background: var(--ink-b); position: relative; }
-.pz__thumb i.is-inked::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: var(--ink-a); -webkit-mask: var(--ink) center / cover no-repeat; mask: var(--ink) center / cover no-repeat; }
+.pz__choicepic--inked { background: var(--pz-field) !important; position: relative; overflow: hidden; }
+.pz__choicepic--inked::after { content: ""; position: absolute; inset: 0; background: color-mix(in srgb, var(--pz-field) calc(var(--pz-ink-k) - 4%), var(--pz-ink-lift)); -webkit-mask: var(--ink) center / cover no-repeat; mask: var(--ink) center / cover no-repeat; }
+.pz__thumb i.is-inked { background: var(--pz-field); position: relative; }
+.pz__thumb i.is-inked::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: color-mix(in srgb, var(--pz-field) calc(var(--pz-ink-k) - 4%), var(--pz-ink-lift)); -webkit-mask: var(--ink) center / cover no-repeat; mask: var(--ink) center / cover no-repeat; }
 .pz { --pz-wash: rgba(255,255,255,.3); --pz-photo-ink: #1c1c1e; --pz-photo-ink2: rgba(28,28,30,.66); --pz-photo-on: rgba(0,0,0,.08); --pz-photo-chip: rgba(0,0,0,.08); --pz-veil-k: 26%; --pz-edge: rgba(255,255,255,.2); --pz-icon-k: 100%; } /* the photo surfaces as the page has them (app.css --bcv-photo-*): washed heavily in the look's ground, the look's own ink over them */
 :host([data-theme="dark"]) .pz, html[data-theme="dark"] .pz { --pz-wash: rgba(0,0,0,.3); --pz-photo-ink: #ffffff; --pz-photo-ink2: rgba(255,255,255,.72); --pz-photo-on: rgba(255,255,255,.18); --pz-photo-chip: rgba(255,255,255,.22); --pz-veil-k: 34%; --pz-edge: rgba(0,0,0,.3); --pz-icon-k: 45%; }
 .pz__pic--veil-side { background: linear-gradient(to top, var(--pz-edge) 0%, color-mix(in srgb, var(--veil-side) var(--pz-veil-k), transparent) 70%), var(--pz-wash); }
+.pz__pic--inked ~ .pz__pic--veil { background: none; } /* (tone on tone: no veil, no wash) */
 .pz__card .pz__pic--blur { inset: -20px; filter: blur(14px); -webkit-mask-image: radial-gradient(150% 150% at 100% 100%, transparent 30%, #000 70%); mask-image: radial-gradient(150% 150% at 100% 100%, transparent 30%, #000 70%); }
 .pz__pic--veil-card { background: radial-gradient(150% 150% at 100% 100%, transparent 26%, color-mix(in srgb, var(--veil-card) var(--pz-veil-k), transparent) 70%), var(--pz-wash); }
 .pz__hcard .pz__pic--blur { inset: -24px; filter: blur(18px); -webkit-mask-image: linear-gradient(to left, transparent 8%, #000 60%); mask-image: linear-gradient(to left, transparent 8%, #000 60%); }

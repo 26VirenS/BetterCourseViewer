@@ -105,20 +105,13 @@
       soft: alpha(seed, dark ? 0.22 : 0.14),
       ring: alpha(seed, dark ? 0.45 : 0.32),
       ground: { bg: cast(G.bg), card: cast(G.card), hover: cast(G.hover), ink2: cast(G.ink2), ink3: cast(G.ink3), sep: alpha(line, G.sepA), edge: alpha(line, G.edgeA), fill: alpha(fillBase, G.fillA), fill2: alpha(fillBase, G.fill2A), chrome: alpha(cast(G.bg), G.chromeA), glass: alpha(cast(G.glass), G.glassA) },
-      ink: inkPair(seed, dark),
     };
   }
-  /** The two inks a photo is drawn in: the colour itself as the ink — deepened a little on the light
-   *  look, lifted on the dark — and its complement as the paper, pale on the light look and deep on
-   *  the dark, so the look's own words read on it. Regular draws in the interface's blue. */
-  function inkPair(accent, dark) {
-    const seed = normalize(accent) || REGULAR;
-    const [h, s] = rgbToHsl(hexToRgb(seed));
-    return {
-      a: hslToHex([h, Math.max(0.5, s), dark ? 0.62 : 0.46]),
-      b: hslToHex([(h + 180) % 360, Math.min(0.5, s * 0.6 + 0.1), dark ? 0.16 : 0.9]),
-    };
-  }
+  /** The ink a photo is drawn in on a surface: the surface's own colour lifted a shade — a touch of
+   *  white on the dark look, a touch of black on the light — so the picture sits tone on tone in it
+   *  (app.css --bcv-ink-lift, --bcv-ink-k say the same to the page). */
+  const INK_LIFT = { dark: ['#ffffff', 0.1], light: ['#000000', 0.07] };
+  const inkOn = (paper, dark) => mix(paper, INK_LIFT[dark ? 'dark' : 'light'][0], INK_LIFT[dark ? 'dark' : 'light'][1]);
   /** One shade per sidebar row, so the rail is not a single flat colour: the accent's hue drifts a
    *  little across the rows and its lightness walks the readable band from lighter to deeper (the
    *  band is readable in both modes, so the walk is the same in each), and every glyph shade is
@@ -140,8 +133,8 @@
     dark: { bg: 0.1, card: 0.11, hover: 0.1, ink2: 0.14, ink3: 0.2, glass: 0.1, line: 0.4, fill: 0.5 },
   };
   const GROUND_VARS = { bg: '--bcv-bg', card: '--bcv-card', hover: '--bcv-hover', ink2: '--bcv-ink2', ink3: '--bcv-ink3', sep: '--bcv-sep', edge: '--bcv-edge', fill: '--bcv-fill', fill2: '--bcv-fill2', chrome: '--bcv-chrome', glass: '--bcv-glass' };
-  const cssVars = (p) => ({ '--bcv-accent': p.accent, '--bcv-accent-icon': p.icon, '--bcv-accent-text': p.text, '--bcv-accent-fill': p.fill, '--bcv-accent-hover': p.hover, '--bcv-accent-soft': p.soft, '--bcv-accent-ring': p.ring, '--bcv-ink-a': p.ink.a, '--bcv-ink-b': p.ink.b, ...Object.fromEntries(Object.entries(GROUND_VARS).map(([k, v]) => [v, p.ground[k]])) });
-  const VAR_NAMES = ['--bcv-accent', '--bcv-accent-icon', '--bcv-accent-text', '--bcv-accent-fill', '--bcv-accent-hover', '--bcv-accent-soft', '--bcv-accent-ring', '--bcv-ink-a', '--bcv-ink-b', ...Object.values(GROUND_VARS)];
+  const cssVars = (p) => ({ '--bcv-accent': p.accent, '--bcv-accent-icon': p.icon, '--bcv-accent-text': p.text, '--bcv-accent-fill': p.fill, '--bcv-accent-hover': p.hover, '--bcv-accent-soft': p.soft, '--bcv-accent-ring': p.ring, ...Object.fromEntries(Object.entries(GROUND_VARS).map(([k, v]) => [v, p.ground[k]])) });
+  const VAR_NAMES = ['--bcv-accent', '--bcv-accent-icon', '--bcv-accent-text', '--bcv-accent-fill', '--bcv-accent-hover', '--bcv-accent-soft', '--bcv-accent-ring', ...Object.values(GROUND_VARS)];
   /** Puts the accent on an element (the page's <html>): the variables for this mode and the class
    *  the stylesheet keys on. No accent: takes them off. */
   function apply(el, accent, dark) {
@@ -545,6 +538,6 @@
     hexToRgb, rgbToHex, rgbToHsl, hslToRgb, hslToHex, luminance, contrast, normalize,
     GROUND, MIN_SAT, ICON_RATIO, TEXT_RATIO, PRESETS, REGULAR, PRESET_PHOTOS, CARD_SLOTS, HEADER_SLOTS, IMAGES_KEY,
     palette, shades, shadeSet, cssVars, apply, readable, readableOn, fillFor, mix, tint, customHex, controlsOf, veilBase, picCss, band, nearest, fromControls, toControls,
-    resizeImage, readImage, imageTone, fillTones, loadImages, saveImages, countImages, countHeaders, emptyImages, packImages, picOf, rawOf, CAST, inkPair, inkFor, inkCached,
+    resizeImage, readImage, imageTone, fillTones, loadImages, saveImages, countImages, countHeaders, emptyImages, packImages, picOf, rawOf, CAST, INK_LIFT, inkOn, inkFor, inkCached,
   };
 })();

@@ -160,7 +160,6 @@
       '--hover-ring': t.mix(A, d ? '#000000' : '#ffffff', 0.2),
     };
     shades.forEach((c, i) => { vars[`--s${i}`] = c; vars[`--s${i}-lit`] = t.mix(c, '#ffffff', 0.45); });
-    const inkPair = t.inkPair(st.theme.name === 'Regular' ? '' : A, d); vars['--ink-a'] = inkPair.a; vars['--ink-b'] = inkPair.b; // the two inks every photo is drawn in
     for (const [k, v] of Object.entries(vars)) ui.root.style.setProperty(k, v);
     // the preview's grounds take the same soft cast the page will (lib/theme.js palette): Regular keeps its greys
     const PV = d ? { main: ['#0b0b0d', 0.1], side: ['#151517', 0.14], card: ['#1c1c1e', 0.11], head: ['#111113', 0.14] } : { main: ['#fbfbfd', 0.1], side: ['#f0f0f4', 0.14], card: ['#ffffff', 0.05], head: ['#f0f0f4', 0.14] };
@@ -352,9 +351,8 @@
       ...READY.map((r) => h('button', { type: 'button', class: `pz__theme ${readyOn(r) ? 'is-on' : ''}`, dataset: { ready: r.name }, title: r.side ? `${r.name}: ${r.colour}, ${r.side} on the sidebar, ${r.cards} on the counters, ${r.heads} on the headers` : 'Default: Regular, no photos', 'aria-pressed': readyOn(r) ? 'true' : 'false', onclick: () => applyReady(r) }, [
         (() => {
           const hex = r.colour === 'Regular' ? '' : (t.PRESETS.find(([, n]) => n === r.colour) || [REGULAR])[0];
-          const pair = t.inkPair(hex, dark());
           const cell = (cls, name) => { const raw = picOf(name); const ink = raw ? inkOf(raw) : null; return h('i', { class: `${cls} ${ink ? 'is-inked' : ''}`, style: ink ? { '--ink': t.picCss(ink.ink) } : { '--pic': t.picCss(raw) } }); };
-          return h('span', { class: `pz__thumb ${r.side ? '' : 'pz__thumb--plain'}`, style: { '--ink-a': pair.a, '--ink-b': pair.b, '--c': r.colour === 'Regular' ? 'conic-gradient(#ff453a,#ff9f0a,#30d158,#40c8e0,#0a84ff,#bf5af2,#ff453a)' : hex, '--ring': hex || REGULAR } }, [cell('pz__thumb-side', r.side), cell('pz__thumb-head', r.heads), cell('pz__thumb-card', r.cards), h('i', { class: 'pz__thumb-dot' })]);
+          return h('span', { class: `pz__thumb ${r.side ? '' : 'pz__thumb--plain'}`, style: { '--c': r.colour === 'Regular' ? 'conic-gradient(#ff453a,#ff9f0a,#30d158,#40c8e0,#0a84ff,#bf5af2,#ff453a)' : hex, '--ring': hex || REGULAR } }, [cell('pz__thumb-side', r.side), cell('pz__thumb-head', r.heads), cell('pz__thumb-card', r.cards), h('i', { class: 'pz__thumb-dot' })]);
         })(),
         h('span', { text: r.name }),
       ])),
