@@ -41,6 +41,9 @@ const SIM = `http://localhost:${SIM_PORT}`;
 const extDir = join(tmpdir(), `bcv-ext-${PART}-${process.pid}`);
 cpSync(join(root, 'extension'), extDir, { recursive: true });
 const manifest = JSON.parse(readFileSync(join(extDir, 'manifest.json'), 'utf8'));
+// lib/theme.js as the page runs it: the shades a colour derives, and which colours are readable
+const THEME = (() => { const self = {}; new Function('self', readFileSync(join(extDir, 'lib', 'theme.js'), 'utf8'))(self); return self.BCV.theme; })();
+const rgbOf = (hex) => `rgb(${[1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)).join(', ')})`;
 for (const cs of manifest.content_scripts) cs.matches.push(`${BASE}/*`);
 manifest.host_permissions.push(`${BASE}/*`, `${SIM}/*`); // (a shipped build has the run of every site, or is given it a site at a time)
 writeFileSync(join(extDir, 'manifest.json'), JSON.stringify(manifest, null, 2));
@@ -1297,7 +1300,22 @@ try {
   await page.click('.bcv-sb__donebtns .bcv-sb__btn--primary');
   await page.waitForFunction(() => !document.querySelector('.bcv-sb__done'), null, { timeout: 10000 });
   await page.waitForSelector('.bcv-detail__actions .bcv-btn--primary', { timeout: 10000 });
-  check(page.url() === `${BASE}/courses/104/assignments/4002` && (await texts('.bcv-detail__actions .bcv-btn--primary'))[0] === 'Resubmit' && (await texts('.bcv-badge')).includes('Submitted'), 'Done reloads the assignment page: status Submitted, button Resubmit');
+  // Handed in and waiting: the chip beside the title is there before a mark is, in the plain fill,
+  // and it opens what was handed in — attempt by attempt — the way a graded one opens the mark. The
+  // side card that used to repeat the facts (and showed nothing of the work) is gone.
+  const subChip = await page.$eval('.bcv-detail__grade', (e) => ({ sub: e.classList.contains('bcv-detail__grade--sub'), text: e.innerText.replace(/\s+/g, ' ').trim(), sideCards: document.querySelectorAll('.bcv-body--course-cols > .bcv-col').length }));
+  check(page.url() === `${BASE}/courses/104/assignments/4002` && (await texts('.bcv-detail__actions .bcv-btn--primary'))[0] === 'Resubmit' && subChip.sub && /^Submitted [A-Z][a-z]{2} \d+ at \d+:\d\d ?(am|pm|AM|PM) · Attempt 2$/.test(subChip.text) && subChip.sideCards === 1, `Done reloads the assignment page: a Submitted chip with the time and the attempt, Resubmit, and no side card: ${JSON.stringify(subChip)}`);
+  await page.click('.bcv-detail__grade');
+  await page.waitForSelector('.bcv-fb__scorecard', { timeout: 10000 });
+  const subFb = await page.evaluate(() => ({
+    url: location.search, score: document.querySelector('.bcv-fb__big').textContent, summary: document.querySelector('.bcv-fb__summary').textContent,
+    cards: [...document.querySelectorAll('.bcv-fb__q .bcv-fb__qn')].map((e) => e.textContent), scores: [...document.querySelectorAll('.bcv-fb__q .bcv-fb__score')].map((e) => e.textContent),
+    body: document.querySelector('.bcv-fb__q .bcv-fb__body')?.innerText.replace(/\s+/g, ' ').trim(), files: [...document.querySelectorAll('.bcv-fb__file')].map((e) => e.innerText.replace(/\s+/g, ' ').trim()),
+  }));
+  check(/bcv=feedback/.test(subFb.url) && subFb.score === '—' && /awaiting your instructor’s mark$/.test(subFb.summary) && subFb.cards.join(' | ') === 'Attempt 2 | Attempt 1' && subFb.scores.every((t) => t === 'Not graded') && subFb.body === 'Clean water for all. Three sources follow.' && subFb.files.length === 2 && /grand-challenge-notes\.docx/.test(subFb.files[0]) && /GC-articles-Sharma\.pdf/.test(subFb.files[1]), `an ungraded submission opens the same screen, with every attempt's work on show: ${JSON.stringify(subFb)}`);
+  await shot(page, '09h-submitted-ungraded');
+  await page.goto(`${BASE}/courses/104/assignments/4002`);
+  await page.waitForSelector('.bcv-detail__grade', { timeout: 10000 });
   // To Do rows land on the block and the page's back link returns there
   await nav('todo');
   await page.waitForSelector('.bcv-row', { timeout: 10000 });
@@ -2355,10 +2373,10 @@ try {
   check(knewton.isClosed() && page.url().endsWith('/courses/104/assignments/4003'), 'and the X hands the assignment page back');
   // a grade the tool posts after its launch lands on the page by itself: the submission is asked for
   // again once the tool has loaded, and again for a while, and the mark is drawn when it changes
-  check((await page.$('.bcv-detail__grade')) === null && (await texts('.bcv-stat__value'))[0] === '—', 'the tool assignment starts ungraded');
+  check((await page.$('.bcv-detail__grade')) === null, 'the tool assignment starts with no chip: nothing handed in, nothing marked');
   await mockScore({ assignmentId: 4003, score: 17 });
   await page.waitForSelector('.bcv-detail__grade', { timeout: 15000 });
-  check((await texts('.bcv-detail__gradescore'))[0] === '17' && (await texts('.bcv-detail__gradeof'))[0] === '/ 20' && (await texts('.bcv-stat__value'))[0] === '17 / 20' && (await texts('.bcv-badge')).includes('Graded') && page.url().endsWith('/courses/104/assignments/4003'), `a grade the tool passes back after the launch shows without a reload: ${(await texts('.bcv-detail__gradescore'))[0]} ${(await texts('.bcv-detail__gradeof'))[0]}`);
+  check((await texts('.bcv-detail__gradescore'))[0] === '17' && (await texts('.bcv-detail__gradeof'))[0] === '/ 20' && !(await page.$('.bcv-detail__grade--sub')) && page.url().endsWith('/courses/104/assignments/4003'), `a grade the tool passes back after the launch shows without a reload: ${(await texts('.bcv-detail__gradescore'))[0]} ${(await texts('.bcv-detail__gradeof'))[0]}`);
   await mockScore({ assignmentId: 4003, score: null });
   await shot(page, '14b-assignment-tool');
 
@@ -2772,13 +2790,13 @@ try {
   const setupDot = await dotOf('#bcv-setup');
   const introUp = (await page.$(su('.intro:not([hidden])'))) !== null;
   // the word-mark plays first (about two seconds), then the setup rises under it
-  check(page.url() === `${BASE}/` && (await page.$('.bcv-stat')) !== null && introUp && (await page.$$(su('.rail__item'))).length === 5 && (await sStep()) === '1 of 5' && (await page.$eval('html', (e) => getComputedStyle(e).overflow)) === 'hidden', 'the setup opens over the dashboard on its own ground: the address cleaned, a word-mark, a rail of five steps, the page held still');
+  check(page.url() === `${BASE}/` && (await page.$('.bcv-stat')) !== null && introUp && (await page.$$(su('.rail__item'))).length === 6 && (await sStep()) === '1 of 6' && (await page.$eval('html', (e) => getComputedStyle(e).overflow)) === 'hidden', 'the setup opens over the dashboard on its own ground: the address cleaned, a word-mark, a rail of six steps, the page held still');
   check(setupDot.gap >= 10 && setupDot.gap <= 18 && setupDot.fits, `the dot after Simpl sits just past the word as drawn here, inside the drawing: ${JSON.stringify(setupDot)}`);
   await page.waitForFunction(() => document.querySelector('#bcv-setup')?.shadowRoot.querySelector('.intro')?.hidden === true, null, { timeout: 8000 });
   await page.waitForTimeout(500);
   await shot(page, '32-setup-over-page');
   const railNow = () => page.$$eval(su('.rail__item'), (els) => els.map((e) => `${e.querySelector('.rail__name').textContent}: ${e.querySelector('.rail__answer').textContent}${e.classList.contains('is-done') ? ' ✓' : ''}${e.disabled ? ' (locked)' : ''}`));
-  check((await railNow()).join(' | ') === 'Your courses: None yet | Grades: Not yet (locked) | Appearance: Not yet (locked) | Dashboard: Not yet (locked) | Sidebar: Not yet (locked)', `the rail names every step and really locks the ones ahead: ${(await railNow()).join(' | ')}`);
+  check((await railNow()).join(' | ') === 'Your courses: None yet | Grades: Not yet (locked) | Appearance: Not yet (locked) | Theme: Not yet (locked) | Dashboard: Not yet (locked) | Sidebar: Not yet (locked)', `the rail names every step and really locks the ones ahead: ${(await railNow()).join(' | ')}`);
   const scanned = await texts(su('.row__code'));
   const total = scanned.length;
   const railAnswer = (step) => page.$eval(su(`.rail__item[data-step="${step}"] .rail__answer`), (e) => e.textContent);
@@ -2826,8 +2844,8 @@ try {
   await shot(page, '32c-setup-courses');
   await sNext('#track');
   const firstTargets = await page.$$eval(su('.target .seg button.is-on'), (bs) => bs.map((b) => b.textContent));
-  check((await sStep()) === '2 of 5' && (await page.$eval(su('#track'), (e) => e.classList.contains('is-on'))) && (await texts(su('#goal')))[0] === '4.00' && (await page.$$(su('.target'))).length === 5 && firstTargets.join(',') === 'A+,A+,A+,A+,A+' && (await page.$$eval(su('.target:first-child .seg button'), (bs) => bs.map((b) => b.textContent))).join(' ') === 'C B B+ A- A A+', `step 2: tracking on, a 4.00 goal, every course aiming at A+, letters low to high: ${firstTargets.join(',')}`);
-  check((await railNow()).join(' | ') === `Your courses: 5 courses ✓ | Grades: Tracking · goal 4.00 | Appearance: Not yet (locked) | Dashboard: Not yet (locked) | Sidebar: Not yet (locked)` && (await texts(su('.target__code'))).includes('Setup nick'), `the rail ticks step 1 with its answer, and the target rows carry the nickname typed there: ${(await railNow()).join(' | ')}`);
+  check((await sStep()) === '2 of 6' && (await page.$eval(su('#track'), (e) => e.classList.contains('is-on'))) && (await texts(su('#goal')))[0] === '4.00' && (await page.$$(su('.target'))).length === 5 && firstTargets.join(',') === 'A+,A+,A+,A+,A+' && (await page.$$eval(su('.target:first-child .seg button'), (bs) => bs.map((b) => b.textContent))).join(' ') === 'C B B+ A- A A+', `step 2: tracking on, a 4.00 goal, every course aiming at A+, letters low to high: ${firstTargets.join(',')}`);
+  check((await railNow()).join(' | ') === `Your courses: 5 courses ✓ | Grades: Tracking · goal 4.00 | Appearance: Not yet (locked) | Theme: Not yet (locked) | Dashboard: Not yet (locked) | Sidebar: Not yet (locked)` && (await texts(su('.target__code'))).includes('Setup nick'), `the rail ticks step 1 with its answer, and the target rows carry the nickname typed there: ${(await railNow()).join(' | ')}`);
   await page.click(su('.stepper button:last-child')); // already at the top of the scale: it stays there
   check((await texts(su('#goal')))[0] === '4.00', `the goal does not climb past 4.00: ${(await texts(su('#goal')))[0]}`);
   await page.click(su('.stepper button:first-child'));
@@ -2856,7 +2874,7 @@ try {
   const lookTiles = () => page.$$eval(su('.tile[data-look]'), (els) => els.map((t) => `${t.dataset.look}${t.classList.contains('is-on') ? ' *' : ''} [${t.querySelector('.tile__label').textContent}]`));
   const lookWords = await page.$$eval(su('.tile[data-look]'), (els) => els.map((t) => `${t.querySelector('.tile__t').textContent} — ${t.querySelector('.tile__s').textContent}`));
   const themeBefore = await page.$eval('#bcv-setup', (e) => e.getAttribute('data-theme'));
-  check((await sStep()) === '3 of 5' && (await texts(su('.fr__h1')))[0] === 'Light or dark?' && lookWords.join(' | ') === 'Light — Bright, all day. | Dark — Easy on the eyes. | Automatic — Follows your device, light by day and dark at night.' && (await lookTiles()).join(' | ') === ['light', 'dark', 'system'].map((v) => `${v}${v === lookBefore ? ' * [Selected]' : ' [Choose]'}`).join(' | ') && (await railAnswer('appearance')) === LOOK_NAME[lookBefore], `step 3 asks light or dark, the setting's own choice (${lookBefore}) selected: ${(await lookTiles()).join(' | ')}`);
+  check((await sStep()) === '3 of 6' && (await texts(su('.fr__h1')))[0] === 'Light or dark?' && lookWords.join(' | ') === 'Light — Bright, all day. | Dark — Easy on the eyes. | Automatic — Follows your device, light by day and dark at night.' && (await lookTiles()).join(' | ') === ['light', 'dark', 'system'].map((v) => `${v}${v === lookBefore ? ' * [Selected]' : ' [Choose]'}`).join(' | ') && (await railAnswer('appearance')) === LOOK_NAME[lookBefore], `step 3 asks light or dark, the setting's own choice (${lookBefore}) selected: ${(await lookTiles()).join(' | ')}`);
   await page.click(su('.tile[data-look="dark"]'));
   check((await eventually(async () => (await page.$eval('#bcv-setup', (e) => e.getAttribute('data-theme'))) === 'dark' && (await page.$$(su('.tile[data-look].is-on'))).length === 1 && (await railAnswer('appearance')) === 'Dark')) && ((await sw.evaluate(async () => (await self.BCV.settings.get()).appearance.darkMode)) !== 'on' || lookBefore === 'dark'), 'picking Dark turns the card dark at once as a preview, the rail says Dark, and nothing is written yet');
   await shot(page, '32e0-setup-appearance');
@@ -2864,13 +2882,55 @@ try {
   check(await eventually(async () => (await page.$eval('#bcv-setup', (e) => e.getAttribute('data-theme'))) === 'light' && (await railAnswer('appearance')) === 'Light'), 'and Light turns it light again');
   await page.click(su(`.tile[data-look="${lookBefore}"]`)); // back to the setting's own: the pages after this read it
   check(await eventually(async () => (await page.$eval('#bcv-setup', (e) => e.getAttribute('data-theme'))) === themeBefore && (await railAnswer('appearance')) === LOOK_NAME[lookBefore]), `back to ${lookBefore}: the card is as it opened (${themeBefore})`);
+  await sNext('#tpv');
+  // step 4: the theme — a miniature Dashboard that says it is one, a colour picked from readable
+  // colours only, photos dropped on the counters and the sidebar; nothing written until the end
+  const tpvVars = () => page.$eval(su('#tpv'), (e) => ({ icon: e.style.getPropertyValue('--p-icon'), text: e.style.getPropertyValue('--p-text'), fill: e.style.getPropertyValue('--p-fill'), isDefault: e.classList.contains('is-default'), dark: e.getRootNode().host.getAttribute('data-theme') === 'dark' }));
+  const chipsNow = () => page.$$eval(su('.chip'), (els) => els.map((c) => `${c.textContent.trim()}${c.classList.contains('is-on') ? '*' : ''}`));
+  const themeOpen = await page.evaluate(() => { const r = document.querySelector('#bcv-setup').shadowRoot; return { h1: r.querySelector('.fr__h1').textContent, kicker: r.querySelector('.tpv__kicker').textContent, h1pv: r.querySelector('.tpv__h1').textContent, cards: [...r.querySelectorAll('.tpv__card')].map((c) => c.dataset.slot), labels: [...r.querySelectorAll('.tpv__clabel')].map((e) => e.textContent), nav: [...r.querySelectorAll('.tpv__row')].map((e) => e.textContent), zones: r.querySelectorAll('.tpv__drop input[type=file]').length, note: r.querySelector('#hexNote').textContent, hex: r.querySelector('#hex').value, ranges: [...r.querySelectorAll('.tpick__range')].map((e) => `${e.id} ${e.min}-${e.max}`), shades: r.querySelectorAll('.tpick__shade').length }; });
+  check((await sStep()) === '4 of 6' && themeOpen.h1 === 'Make it yours' && themeOpen.kicker === 'Preview · not your real numbers' && themeOpen.h1pv === 'Dashboard' && themeOpen.cards.join(',') === 'today,week,unread,overdue,tomorrow,graded' && themeOpen.labels.join(' | ') === 'Due today | Due this week | Unread announcements | Overdue | Due tomorrow | Graded this week' && themeOpen.nav.join(',') === 'Dashboard,Courses,To Do,Calendar,Grades' && themeOpen.zones === 7 && themeOpen.note === 'The interface’s own blue.' && themeOpen.hex === '#0a6cff' && themeOpen.ranges.join(' | ') === 'hue 0-360 | depth 0-100 | sat 25-100' && themeOpen.shades === 8 && (await railAnswer('theme')) === 'Default', `step 4 shows a miniature Dashboard that says it is a preview, a zone per counter and one for the sidebar, and the picker on the interface's blue: ${JSON.stringify(themeOpen)}`);
+  check((await chipsNow()).join(' | ') === 'Default* | Pink | Red | Amber | Green | Teal | Indigo | Purple' && THEME.PRESETS.every(([hex]) => THEME.readable(hex)) && (await tpvVars()).isDefault, `Default first and on, then seven presets, every one readable in light and in dark: ${(await chipsNow()).join(' | ')}`);
+  await page.click(su('.chip[data-preset="#d63b7a"]'));
+  const pinkNow = await tpvVars();
+  const pinkPal = THEME.palette('#d63b7a', pinkNow.dark);
+  check(pinkNow.icon === pinkPal.icon && pinkNow.text === pinkPal.text && pinkNow.fill === pinkPal.fill && !pinkNow.isDefault && (await page.$eval(su('#hex'), (e) => e.value)) === '#d63b7a' && (await chipsNow())[1] === 'Pink*' && (await railAnswer('theme')) === 'Pink' && (await page.$eval(su('.tpv__ic'), (e) => getComputedStyle(e).stroke)) === rgbOf(pinkPal.icon) && (await page.$eval(su('.tpv__row span'), (e) => getComputedStyle(e).color)) === rgbOf(pinkPal.text) && (await sw.evaluate(async () => (await self.BCV.settings.get()).appearance.theme?.accent || '')) === '', `Pink: the preview's glyphs and words take the shades derived for this mode (${JSON.stringify(pinkPal)}), the rail says Pink, nothing written yet`);
+  // a hex typed by hand is moved to the nearest colour that reads — and the note says where it went
+  await page.fill(su('#hex'), '#ffff00');
+  const moved = await page.evaluate(() => { const r = document.querySelector('#bcv-setup').shadowRoot; return { note: r.querySelector('#hexNote').textContent, flagged: r.querySelector('#hexNote').classList.contains('is-moved'), typed: r.querySelector('#hex').value, icon: r.querySelector('#tpv').style.getPropertyValue('--p-icon'), chips: r.querySelectorAll('.chip.is-on').length }; });
+  const yellowNear = THEME.nearest('#ffff00');
+  check(moved.note === `Moved to ${yellowNear}, the nearest colour that reads in light and dark.` && moved.flagged && moved.typed === '#ffff00' && THEME.readable(yellowNear) && !THEME.readable('#ffff00') && moved.icon === THEME.palette(yellowNear, pinkNow.dark).icon && moved.chips === 0, `a yellow no one could read is moved to ${yellowNear}, and the note says so: ${JSON.stringify(moved)}`);
+  await page.fill(su('#hex'), '#12');
+  check((await page.$eval(su('#hexNote'), (e) => e.textContent)) === 'Six hex digits, like #d63b7a.' && (await page.$eval(su('#tpv'), (e) => e.style.getPropertyValue('--p-icon'))) === moved.icon, 'half a hex is asked for the rest, and the preview keeps the last colour');
+  await page.click(su('.chip[data-preset="#d63b7a"]')); // back to Pink for what follows
+  await page.waitForFunction(() => document.querySelector('#bcv-setup').shadowRoot.querySelector('#hex').value === '#d63b7a', null, { timeout: 3000 });
+  // the sliders reach readable colours only: the depth track is the band the hue can be read at
+  await page.$eval(su('#hue'), (e) => { e.value = '200'; e.dispatchEvent(new Event('input', { bubbles: true })); });
+  const slid = await page.evaluate(() => { const r = document.querySelector('#bcv-setup').shadowRoot; return { hex: r.querySelector('#hex').value, note: r.querySelector('#hexNote').textContent, track: r.querySelector('#depth').style.getPropertyValue('--track').length > 20 }; });
+  check(THEME.readable(slid.hex) && Math.abs(THEME.rgbToHsl(THEME.hexToRgb(slid.hex))[0] - 200) < 2 && slid.note === 'Readable in light and dark.' && slid.track, `the hue slider lands on a readable colour of that hue: ${slid.hex}`);
+  await page.click(su('.chip[data-preset="#d63b7a"]'));
+  // photos: dropped on a counter and on the sidebar, scaled here, shown at once — sharp at the
+  // bottom right, blurred as they climb, the card's own colour at the top left
+  const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
+  await page.setInputFiles(su('.tpv__card[data-slot="today"] input[type=file]'), { name: 'sky.png', mimeType: 'image/png', buffer: PNG });
+  await page.waitForSelector(su('.tpv__card[data-slot="today"].has-pic'), { timeout: 10000 });
+  await page.setInputFiles(su('.tpv__side input[type=file]'), { name: 'hills.png', mimeType: 'image/png', buffer: PNG });
+  await page.waitForSelector(su('.tpv__side.has-pic'), { timeout: 10000 });
+  const picsNow = await page.evaluate(() => { const r = document.querySelector('#bcv-setup').shadowRoot; const card = r.querySelector('.tpv__card[data-slot="today"]'); const side = r.querySelector('.tpv__side'); const layer = (el, cls) => getComputedStyle(el.querySelector(cls)); return { cardUrl: card.style.getPropertyValue('--pic').slice(0, 27), cardLayers: card.querySelectorAll('.tpv__pic').length, cardBlur: layer(card, '.tpv__pic--blur').filter, cardMask: layer(card, '.tpv__pic--blur').maskImage || layer(card, '.tpv__pic--blur').webkitMaskImage, cardPos: layer(card, '.tpv__pic--sharp').backgroundPosition, sideLayers: side.querySelectorAll('.tpv__pic').length, sideMask: layer(side, '.tpv__pic--blur').maskImage || layer(side, '.tpv__pic--blur').webkitMaskImage, zone: card.querySelector('.tpv__droplabel span').textContent, x: !!card.querySelector('.tpv__x'), filled: r.querySelectorAll('.tpv__drop.is-filled').length }; });
+  check(picsNow.cardUrl === 'url("data:image/jpeg;base64' && picsNow.cardLayers === 3 && /blur\(8px\)/.test(picsNow.cardBlur) && /radial-gradient/.test(picsNow.cardMask) && /100% 100%/.test(picsNow.cardPos) && picsNow.sideLayers === 3 && /linear-gradient\(to top/.test(picsNow.sideMask) && picsNow.zone === 'Change' && picsNow.x && picsNow.filled === 2 && (await railAnswer('theme')) === 'Pink · 2 photos', `two photos, scaled to JPEG here: three layers each, the counter's blur masked from its bottom-right corner, the sidebar's up its side: ${JSON.stringify(picsNow)}`);
+  await shot(page, '32e1-setup-theme');
+  await page.click(su('.tpv__card[data-slot="today"] .tpv__x'));
+  await page.waitForFunction(() => !document.querySelector('#bcv-setup').shadowRoot.querySelector('.tpv__card[data-slot="today"].has-pic'), null, { timeout: 3000 });
+  check((await railAnswer('theme')) === 'Pink · 1 photo', 'the × takes a photo off again');
+  await page.setInputFiles(su('.tpv__card[data-slot="graded"] input[type=file]'), { name: 'gold.png', mimeType: 'image/png', buffer: PNG });
+  await page.waitForSelector(su('.tpv__card[data-slot="graded"].has-pic'), { timeout: 10000 });
+  check((await railAnswer('theme')) === 'Pink · 2 photos' && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('theme:images'))['theme:images'])) === undefined, 'a photo on another counter; still nothing written');
   await sNext('.tile[data-view]');
-  // step 4: what the Dashboard shows first — three preview tiles drawn in the chosen courses' colours, List chosen to start with
+  // step 5: what the Dashboard shows first — three preview tiles drawn in the chosen courses' colours, List chosen to start with
   const VIEW_OF = { cards: 'cards', planner: 'list', activity: 'activity' };
   const viewBefore = VIEW_OF[(await apiGet('/dashboard/view')).dashboard_view] || 'list';
   const dashTiles = () => page.$$eval(su('.tile[data-view]'), (els) => els.map((t) => `${t.dataset.view}${t.classList.contains('is-on') ? ' *' : ''} [${t.querySelector('.tile__label').textContent}]`));
   const tileWords = await page.$$eval(su('.tile[data-view]'), (els) => els.map((t) => `${t.querySelector('.tile__t').textContent} — ${t.querySelector('.tile__s').textContent}`));
-  check((await sStep()) === '4 of 5' && tileWords.join(' | ') === 'Cards — Courses as tiles, with what is due next. | List — Everything due, day by day, with a tick. | Activity — Announcements, replies and grades as they arrive.' && (await dashTiles()).join(' | ') === ['cards', 'list', 'activity'].map((v) => `${v}${v === 'list' ? ' * [Selected]' : ' [Choose]'}`).join(' | '), `step 4 asks what the Dashboard shows first, List selected to start with whatever Canvas has (${viewBefore}): ${(await dashTiles()).join(' | ')}`);
+  check((await sStep()) === '5 of 6' && tileWords.join(' | ') === 'Cards — Courses as tiles, with what is due next. | List — Everything due, day by day, with a tick. | Activity — Announcements, replies and grades as they arrive.' && (await dashTiles()).join(' | ') === ['cards', 'list', 'activity'].map((v) => `${v}${v === 'list' ? ' * [Selected]' : ' [Choose]'}`).join(' | '), `step 5 asks what the Dashboard shows first, List selected to start with whatever Canvas has (${viewBefore}): ${(await dashTiles()).join(' | ')}`);
   check((await page.$$(su('.tile[data-view="cards"] .mini__card'))).length === 4 && (await page.$eval(su('.tile[data-view="cards"] .mini__card'), (e) => e.style.background)) === firstColour && (await page.$$(su('.tile[data-view="list"] .mini__row'))).length === 4 && (await page.$$(su('.tile[data-view="activity"] .mini__row'))).length === 3, `the tiles are miniatures of the real layouts in the chosen courses' own colours (${firstColour})`);
   const other = viewBefore === 'cards' ? 'activity' : 'cards';
   await page.click(su(`.tile[data-view="${other}"]`));
@@ -2878,10 +2938,10 @@ try {
   await shot(page, '32e-setup-dashboard');
   await page.click(su(`.tile[data-view="${viewBefore}"]`)); // back to what Canvas had: the pages after this read it
   await sNext('.tile[data-value]');
-  // step 4: where the courses chosen in step 1 should sit
+  // step 6: where the courses chosen in step 1 should sit
   const sideBefore = (await sw.evaluate(async () => (await self.BCV.settings.get()).appearance.sideCourses)) === 'always' ? 'always' : 'hover';
   const sideTiles = () => page.$$eval(su('.tile[data-value]'), (els) => els.map((t) => `${t.querySelector('.tile__t').textContent}${t.classList.contains('is-on') ? ' *' : ''}`));
-  check((await sStep()) === '5 of 5' && (await sideTiles()).join(' | ') === `Always listed${sideBefore === 'always' ? ' *' : ''} | On hover${sideBefore === 'hover' ? ' *' : ''}` && (await page.$eval(su('#next'), (e) => e.textContent.trim())) === 'Finish', `step 5 asks where the courses live, the setting's own choice selected (${sideBefore}): ${(await sideTiles()).join(' | ')}`);
+  check((await sStep()) === '6 of 6' && (await sideTiles()).join(' | ') === `Always listed${sideBefore === 'always' ? ' *' : ''} | On hover${sideBefore === 'hover' ? ' *' : ''}` && (await page.$eval(su('#next'), (e) => e.textContent.trim())) === 'Finish', `step 6 asks where the courses live, the setting's own choice selected (${sideBefore}): ${(await sideTiles()).join(' | ')}`);
   await shot(page, '32f-setup-sidebar');
   const pickSide = async (v) => {
     await page.click(su(`.tile[data-value="${v}"]`));
@@ -2893,15 +2953,15 @@ try {
   await sNext('.summary__row');
   // Ready: a read-back of every answer, then Open Canvas writes them all at once
   const summary = await page.$$eval(su('.summary__row'), (els) => els.map((r) => `${r.querySelector('.summary__k').textContent}: ${r.querySelector('.summary__v').textContent}`));
-  check((await sStep()) === 'Ready' && (await texts(su('.fr__h1')))[0] === 'You’re set' && summary.join(' | ') === `Courses shown: 5 of ${total} | Grade history: On · goal 3.90 | Appearance: ${LOOK_NAME[lookBefore]} | Dashboard: ${{ cards: 'Cards', list: 'List', activity: 'Activity' }[viewBefore]} | Sidebar: Always listed` && (await page.$eval(su('#next'), (e) => e.textContent.trim())) === 'Open Canvas' && (await page.$(su('#back'))) !== null && (await page.$$(su('.rail__item.is-done'))).length === 5, `Finish shows the read-back with every rail step ticked: ${summary.join(' | ')}`);
+  check((await sStep()) === 'Ready' && (await texts(su('.fr__h1')))[0] === 'You’re set' && summary.join(' | ') === `Courses shown: 5 of ${total} | Grade history: On · goal 3.90 | Appearance: ${LOOK_NAME[lookBefore]} | Theme: Pink · 2 photos | Dashboard: ${{ cards: 'Cards', list: 'List', activity: 'Activity' }[viewBefore]} | Sidebar: Always listed` && (await page.$eval(su('#next'), (e) => e.textContent.trim())) === 'Open Canvas' && (await page.$(su('#back'))) !== null && (await page.$$(su('.rail__item.is-done'))).length === 6, `Finish shows the read-back with every rail step ticked: ${summary.join(' | ')}`);
   await shot(page, '32g-setup-ready');
   await page.click(su('#back'));
   await page.waitForSelector(su('.tile[data-value]'), { timeout: 10000 });
-  check((await sStep()) === '5 of 5' && (await railNow()).filter((r) => r.includes('(locked)')).length === 0, 'Back from the read-back returns to the last step, nothing locked behind');
+  check((await sStep()) === '6 of 6' && (await railNow()).filter((r) => r.includes('(locked)')).length === 0, 'Back from the read-back returns to the last step, nothing locked behind');
   await page.click(su('.rail__item[data-step="courses"]'));
   await page.waitForSelector(su('.row[data-course]'), { timeout: 10000 });
-  check((await sStep()) === '1 of 5' && (await page.$$(su('.row.is-on'))).length === 5 && (await page.$eval(su(`.row[data-course="${nickId}"] .row__nick`), (e) => e.value)) === 'Setup nick' && (await railNow()).join(' | ') === `Your courses: 5 courses | Grades: Tracking · goal 3.90 · 1 pass/fail ✓ | Appearance: ${LOOK_NAME[lookBefore]} ✓ | Dashboard: ${{ cards: 'Cards', list: 'List', activity: 'Activity' }[viewBefore]} ✓ | Sidebar: Always listed ✓`, `the rail goes back to any step done, with its answers kept: ${(await railNow()).join(' | ')}`);
-  for (const s of ['#track', '.tile[data-look]', '.tile[data-view]', '.tile[data-value]', '.summary__row']) await sNext(s);
+  check((await sStep()) === '1 of 6' && (await page.$$(su('.row.is-on'))).length === 5 && (await page.$eval(su(`.row[data-course="${nickId}"] .row__nick`), (e) => e.value)) === 'Setup nick' && (await railNow()).join(' | ') === `Your courses: 5 courses | Grades: Tracking · goal 3.90 · 1 pass/fail ✓ | Appearance: ${LOOK_NAME[lookBefore]} ✓ | Theme: Pink · 2 photos ✓ | Dashboard: ${{ cards: 'Cards', list: 'List', activity: 'Activity' }[viewBefore]} ✓ | Sidebar: Always listed ✓`, `the rail goes back to any step done, with its answers kept: ${(await railNow()).join(' | ')}`);
+  for (const s of ['#track', '.tile[data-look]', '#tpv', '.tile[data-view]', '.tile[data-value]', '.summary__row']) await sNext(s);
   check((await sStep()) === 'Ready' && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('setup:done'))['setup:done'])) === undefined, 'forward again to the read-back: still nothing marked done');
   // Open Canvas writes everything and reloads the page: it comes back black, with the choices in place
   // and the welcome on it — two pointers in turn, each with a Continue that comes in after three seconds
@@ -2996,6 +3056,28 @@ try {
   await page.waitForSelector('#bcv-app .bcv-nav__item', { timeout: 20000 });
   await page.waitForTimeout(600);
   check((await page.$('#bcv-welcome')) === null, 'and it does not come back');
+  // the theme chosen in step 4 is on the page: the accent's shades on the sidebar's glyphs and words
+  // (the grounds keep their greys), the photos on the sidebar and on the one counter they were put on
+  const themedNow = await page.evaluate(() => ({ themed: document.documentElement.classList.contains('bcv-themed'), dark: document.documentElement.getAttribute('data-bcv-theme') === 'dark', stroke: getComputedStyle(document.querySelector('.bcv-nav__ic svg')).stroke, navColor: getComputedStyle(document.querySelectorAll('.bcv-nav__item')[1]).color, sideBg: getComputedStyle(document.querySelector('.bcv-side')).backgroundColor, sideLayers: document.querySelectorAll('.bcv-side__pic > i').length, sideVeil: getComputedStyle(document.querySelector('.bcv-side__pic-veil')).backgroundImage.slice(0, 15), sideBlurMask: getComputedStyle(document.querySelector('.bcv-side__pic-blur')).maskImage.slice(0, 22), sideUrl: (document.querySelector('.bcv-side__pic')?.style.getPropertyValue('--bcv-pic') || '').slice(0, 27), note: JSON.parse(localStorage.getItem('bcv:early') || '{}').accent }));
+  const livePal = THEME.palette('#d63b7a', themedNow.dark);
+  check(themedNow.themed && themedNow.stroke === rgbOf(livePal.icon) && [rgbOf(livePal.text), rgbOf(livePal.icon)].includes(themedNow.navColor) && !/214, 59, 122/.test(themedNow.sideBg) && themedNow.sideLayers === 3 && themedNow.sideVeil === 'linear-gradient' && themedNow.sideBlurMask === 'linear-gradient(to top' && themedNow.sideUrl === 'url("data:image/jpeg;base64' && themedNow.note === '#d63b7a', `the page wears the theme: pink glyphs and words in this mode's shades, the sidebar's ground untouched, the photo up its side, the colour in the first-paint note: ${JSON.stringify(themedNow)}`);
+  await waitText('.bcv-stat__value', /^\d+$/);
+  const picCard = await page.$eval('.bcv-stat[data-stat="graded"]', (e) => ({ pic: e.classList.contains('bcv-stat--pic'), layers: e.querySelectorAll('.bcv-stat__pic').length, url: e.style.getPropertyValue('--bcv-pic').slice(0, 27), blur: getComputedStyle(e.querySelector('.bcv-stat__pic--blur')).filter, mask: getComputedStyle(e.querySelector('.bcv-stat__pic--blur')).maskImage, withPics: document.querySelectorAll('.bcv-stat--pic').length, loadWash: getComputedStyle(document.querySelector('.bcv-nav__item.is-active') || document.body).backgroundColor }));
+  check(picCard.pic && picCard.layers === 3 && picCard.url === 'url("data:image/jpeg;base64' && /blur\(14px\)/.test(picCard.blur) && /radial-gradient/.test(picCard.mask) && picCard.withPics === 1, `the Graded counter carries its photo in three layers, blurred from the bottom-right corner; the other five are plain: ${JSON.stringify({ ...picCard, loadWash: undefined })}`);
+  await shot(page, '32h-themed-dashboard');
+  // the step comes back on its own — the account panel's Theme, Settings → Appearance → Choose —
+  // as one step with Save, everything as it was left; Save writes it at once
+  await page.goto(`${BASE}/?bcv=setup&step=theme`);
+  await page.waitForSelector(su('#tpv'), { timeout: 20000 });
+  await page.waitForTimeout(450);
+  check(page.url() === `${BASE}/` && (await sStep()) === '1 of 1' && (await page.$eval(su('#next'), (e) => e.textContent.trim())) === 'Save' && (await page.$$(su('.rail__item'))).length === 1 && (await page.$eval(su('.chip.is-on'), (e) => e.dataset.preset)) === '#d63b7a' && (await page.$$eval(su('.tpv__drop.is-filled'), (els) => els.map((e) => e.dataset.slot))).join(',') === 'side,graded', 'the Theme step on its own: one step, Save, the colour and the photos as they were left');
+  await page.click(su('.chip[data-preset=""]'));
+  for (const slot of ['side', 'graded']) await page.click(su(`[data-slot="${slot}"] .tpv__x`));
+  check(await eventually(async () => (await railAnswer('theme')) === 'Default' && (await page.$$(su('.tpv__drop.is-filled'))).length === 0 && (await page.$eval(su('#tpv'), (e) => e.classList.contains('is-default')))), 'back to Default with no photos: the preview follows');
+  await Promise.all([page.waitForNavigation({ timeout: 20000 }), page.click(su('#next'))]);
+  await page.waitForSelector('#bcv-app .bcv-nav__item', { timeout: 20000 });
+  const themeReset = await sw.evaluate(async () => ({ accent: (await self.BCV.settings.get()).appearance.theme?.accent, images: (await self.BCV.api.storage.local.get('theme:images'))['theme:images'] }));
+  check(await eventually(async () => !(await page.$('html.bcv-themed')) && !(await page.$('.bcv-side__pic')), 5000) && themeReset.accent === '' && !themeReset.images?.side && !Object.keys(themeReset.images?.cards || {}).length && (await page.evaluate(() => JSON.parse(localStorage.getItem('bcv:early') || '{}').accent)) === '', `Save writes the theme and reloads: the interface's own blue, no photos: ${JSON.stringify({ ...themeReset, images: undefined })}`);
   check((await sw.evaluate(async () => (await self.BCV.settings.get()).appearance.sideCourses)) === 'always' && VIEW_OF[(await apiGet('/dashboard/view')).dashboard_view] === viewBefore && (await sw.evaluate(async () => (await self.BCV.settings.get()).appearance.darkMode)) === { light: 'off', dark: 'on', system: 'system' }[lookBefore], 'the sidebar, appearance and dashboard choices were written on the way out');
   const favAfter = (await apiGet('/api/v1/courses?per_page=100')).filter((c) => c.is_favorite).map((c) => c.course_code || c.name);
   check(!favAfter.includes(offCode) && favAfter.includes(onCode) && favAfter.length === 5, `the chosen courses became the Canvas favourites: −${offCode} +${onCode}`);
@@ -3128,7 +3210,7 @@ try {
   await page.click('#bcv-account');
   await page.waitForSelector('.bcv-menu--account', { timeout: 5000 });
   const acctItems = await texts('.bcv-menu--account .bcv-menu__item');
-  check(acctItems.map((t) => t.split('\n')[0].trim()).join(' | ') === 'Dark appearance | Simpl Courses settings Look, courses and grades | Guided setup Courses, grades and the welcome | Welcome again The pointers, on black | What’s new What changed in this version | Canvas profile | All Canvas settings Profile, notifications, integrations | Notification preferences | Log out' && (await page.$eval('.bcv-menu--account', (m) => m.getBoundingClientRect().bottom <= window.innerHeight)), `the profile row opens a panel above itself: ${acctItems.join(' | ')}`);
+  check(acctItems.map((t) => t.split('\n')[0].trim()).join(' | ') === 'Dark appearance | Simpl Courses settings Look, courses and grades | Guided setup Courses, grades and the welcome | Theme A colour of your own, photos on the cards | Welcome again The pointers, on black | What’s new What changed in this version | Canvas profile | All Canvas settings Profile, notifications, integrations | Notification preferences | Log out' && (await page.$eval('.bcv-menu--account', (m) => m.getBoundingClientRect().bottom <= window.innerHeight)), `the profile row opens a panel above itself: ${acctItems.join(' | ')}`);
   await shot(page, '34-account-panel');
   // the mock keeps the token in the _csrf_token cookie only, like Canvas (no meta tag), and its /logout
   // accepts a DELETE carrying exactly that token; anything else lands on Canvas's "Page Error"
@@ -4732,10 +4814,10 @@ try {
   check((await page.$(su('#skip'))) === null && (await page.$(su('.top__skip'))) === null, 'the card has no Skip');
   await page.keyboard.press('Escape');
   await page.waitForTimeout(300);
-  check((await page.$('#bcv-setup')) !== null && (await sStep()) === '1 of 5', 'Escape does not close it');
+  check((await page.$('#bcv-setup')) !== null && (await sStep()) === '1 of 6', 'Escape does not close it');
   await page.goto(`${BASE}/courses`); // walking away: the next page opens it again, over the Dashboard
   await page.waitForSelector(su('.row'), { timeout: 20000 });
-  check(page.url() === `${BASE}/` && (await sStep()) === '1 of 5' && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('setup:done'))['setup:done'])) === undefined, `leaving the page does not get past it: the next page opens the card again, unfinished (${await sStep()})`);
+  check(page.url() === `${BASE}/` && (await sStep()) === '1 of 6' && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('setup:done'))['setup:done'])) === undefined, `leaving the page does not get past it: the next page opens the card again, unfinished (${await sStep()})`);
   // the only way out is through: the steps, then the welcome (the favourites already starred are the
   // ones picked, so finishing here changes nothing in Canvas for the sections that follow)
   const keepStarred = (await apiGet('/api/v1/courses?per_page=100')).filter((c) => c.is_favorite).map((c) => String(c.id));
@@ -4745,6 +4827,8 @@ try {
   await page.waitForSelector(su('#track'), { timeout: 10000 });
   await page.click(su('#next'));
   await page.waitForSelector(su('.tile[data-look]'), { timeout: 10000 });
+  await page.click(su('#next'));
+  await page.waitForSelector(su('#tpv'), { timeout: 10000 });
   await page.click(su('#next'));
   await page.waitForSelector(su('.tile[data-view]'), { timeout: 10000 });
   await page.click(su('#next'));

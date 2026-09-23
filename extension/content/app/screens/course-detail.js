@@ -167,14 +167,17 @@
         U.text('bcv-detail__gradewhen', 'Your instructor has not released it', 'span'),
       ]),
       U.chev(),
+    // handed in and waiting: the same chip, in the plain fill, and the same way in — what was handed
+    // in is there to be looked at before a mark exists, not only after
+    ]) : x.submitted_at || x.excused ? h('button', { type: 'button', class: 'bcv-detail__grade bcv-detail__grade--sub', title: 'What you handed in, and comments', onclick: () => openMark(ctx, c, a, x) }, [
+      h('div', { class: 'bcv-detail__gradeside' }, [
+        U.text('bcv-detail__gradepc', statusOf(x), 'span'),
+        U.text('bcv-detail__gradewhen', [x.submitted_at ? U.fmtAt(x.submitted_at) : null, x.attempt ? `Attempt ${x.attempt}` : null].filter(Boolean).join(' · ') || 'Nothing to hand in', 'span'),
+      ]),
+      U.chev(),
     ]) : null);
     const titleEl = h('h2', { class: 'bcv-detail__title bcv-pretty', text: a.name });
     const headEl = U.el('bcv-detail__head', [titleEl, gradeChip(s)]);
-    const sideLine = (x) => [
-      h('span', { class: 'bcv-stat__value', text: gradedOf(x) ? `${store.fmtPts(x.score)} / ${a.points_possible ?? '—'}` : '—' }),
-      U.badge(statusOf(x), statusOf(x) === 'Graded' ? 'green' : /Missing|Not/.test(statusOf(x)) ? 'red' : /late/.test(statusOf(x)) ? 'orange' : ''),
-    ];
-    const sideLineEl = h('div', { style: { display: 'flex', alignItems: 'baseline', gap: '10px', flexWrap: 'wrap' } }, sideLine(s));
     // replaceChildren() would print a literal "null" for a missing block, so drop them first
     main.replaceChildren(...[
       backBtn(app, back.href, back.label),
@@ -214,7 +217,7 @@
     // without touching the tool's frame.
     if (isTool) {
       let shown = s, tries = 0, timer = 0, started = false;
-      const changed = (x) => !!x && (x.score !== shown.score || x.workflow_state !== shown.workflow_state || x.posted_at !== shown.posted_at || x.grade !== shown.grade);
+      const changed = (x) => !!x && (x.score !== shown.score || x.workflow_state !== shown.workflow_state || x.posted_at !== shown.posted_at || x.grade !== shown.grade || x.submitted_at !== shown.submitted_at || x.attempt !== shown.attempt);
       const poll = async () => {
         timer = 0;
         if (!ctx.alive()) return;
@@ -224,7 +227,6 @@
           if (changed(fresh)) {
             shown = fresh;
             headEl.replaceChildren(titleEl, gradeChip(fresh));
-            sideLineEl.replaceChildren(...sideLine(fresh));
             store.invalidateGrades().catch(() => {}); // every other screen with a score asks again
           }
           tries++;
@@ -236,12 +238,10 @@
       setTimeout(start, 8000); // a tool never opened still gets its looks: a grade can land from an earlier sitting
       ctx.onLeave?.(() => clearTimeout(timer));
     }
-    // side: submission + rubric
-    side.append(h('div', {}, [U.label('Submission'), U.card(U.el('bcv-detail', [
-      sideLineEl,
-      meta([['Submitted', s.submitted_at ? U.fmtAt(s.submitted_at) : null], ['Grade', s.grade && String(s.grade) !== String(s.score) ? s.grade : null], ['Graded', s.graded_at ? U.fmtAt(s.graded_at) : null], ['Attempt', s.attempt || null]]),
-      (s.submission_comments || []).length ? h('div', {}, [U.label('Comments'), ...s.submission_comments.map((cm) => U.el('bcv-comment', [U.el('bcv-comment__head', [U.text('bcv-comment__author', cm.author_name || cm.author?.display_name || 'Comment', 'span'), U.text('bcv-comment__date', U.fmtAt(cm.created_at), 'span')]), U.text('bcv-comment__body', cm.comment || '')]))]) : null,
-    ]), 'bcv-card--22')]));
+    // The side card that used to repeat the submission's facts (a status badge, the dates, the
+    // attempt, an unfiltered copy of the comments) is gone: the chip beside the title carries the
+    // state, and what was handed in is behind it, attempt by attempt, whether or not it is marked.
+    side.remove();
     return b;
   };
 

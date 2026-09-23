@@ -588,7 +588,11 @@
       return;
     }
     // (filtered: a null left by a section that is not drawn would land as the text "null")
+    const sidePic = state.themeImages?.side || null;
+    side.classList.toggle('bcv-side--pic', !!sidePic);
     side.replaceChildren(...[
+      // the theme's photo, under everything: sharp at the foot, blurred up the side (app.css: .bcv-side__pic)
+      sidePic ? h('div', { class: 'bcv-side__pic', 'aria-hidden': 'true', style: { '--bcv-pic': `url("${sidePic}")` } }, [h('i', { class: 'bcv-side__pic-sharp' }), h('i', { class: 'bcv-side__pic-blur' }), h('i', { class: 'bcv-side__pic-veil' })]) : null,
       brandRow(name),
       // mockup 11: the glyph in its own colour, no tile behind it; full strength on the active row, dimmed elsewhere
       h('nav', { class: 'bcv-nav' }, navDef().map(([key, label, icon, glyphColor, href, count]) => h('button', {
@@ -659,6 +663,7 @@
       item(state.dark ? IC.sun : IC.moon, state.dark ? 'Light appearance' : 'Dark appearance', null, toggleTheme),
       item(IC.settings, 'Simpl Courses settings', 'Look, courses and grades', openSettings),
       item(IC.sparkle, 'Guided setup', 'Courses, grades and the welcome', () => go('/?bcv=setup')),
+      item(IC.image, 'Theme', 'A colour of your own, photos on the cards', () => go('/?bcv=setup&step=theme')),
       item(IC.cal, 'Welcome again', 'The pointers, on black', () => go('/?bcv=welcome')),
       item(IC.star, 'What’s new', 'What changed in this version', () => BCV.whatsnew?.open(BCV.app, { manual: true })),
       U.el('bcv-menu__sep'),
@@ -1289,6 +1294,7 @@
     let welcome = state.lookOn && BCV.welcome ? await BCV.welcome.due() : false;
     if (welcome === 'look' && html.classList.contains('bcv-phone')) welcome = false;
     if (welcome) BCV.welcome.cover();
+    state.themeImages = await BCV.theme?.loadImages?.().catch(() => null); // the theme's photos (lib/theme.js), for the sidebar and the Dashboard's counters
     await applySkin(state.lookOn);
     mountLookToggle();
     if (state.lookOn) { BCV.tools?.mountTray?.(); BCV.tools?.focusLoad?.().catch(() => {}); } // the tray beside the switch (live activities, pinned tools); the focus timer's clock, so a session going is known
@@ -1304,6 +1310,13 @@
     // Settings reads this site, and writes to Canvas with the session's token the page can see (Settings cannot read the cookie itself)
     const token = BCV.canvas.csrfToken();
     BCV.api.storage.local.set({ 'site:last': { host: location.host, origin: location.origin, at: Date.now() }, ...(token ? { [`csrf:${location.host}`]: token } : {}) }).catch(() => {});
+    // the theme's photos changed (the Theme step, in this tab or another): the sidebar and a Dashboard on show take them up
+    try {
+      BCV.api.storage.onChanged.addListener((changes, area) => {
+        if (area !== 'local' || !changes[BCV.theme?.IMAGES_KEY]) return;
+        BCV.theme.loadImages().then((images) => { state.themeImages = images; if (state.lookOn && document.getElementById('bcv-app')) { renderSide(); if (state.route?.screen === 'dashboard') render({ quiet: true }); } }).catch(() => {});
+      });
+    } catch { /* no storage events here: the next page reads them */ }
     BCV.early?.onChange((st, settings) => {
       const wasDark = state.dark;
       const wasSkin = state.lookOn; // the look this page shows (a one-page note may differ from the saved look)

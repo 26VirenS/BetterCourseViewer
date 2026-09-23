@@ -1218,11 +1218,12 @@
   /** The mark, as the phone's version of the desktop chip: it sits in the title's row, it carries the
    *  number and nothing else, and pressing it is the way in to every attempt and the thread. Where
    *  Canvas has marked but not posted, there is no number to carry — only the fact that one is held. */
-  function gradeChip(ctx, c, a, s, { posted, held }) {
-    if (!posted && !held) return null;
+  function gradeChip(ctx, c, a, s, { posted, held, status }) {
+    const handed = !posted && !held && !!(s.submitted_at || s.excused);
+    if (!posted && !held && !handed) return null;
     const pc = a.points_possible ? `${Math.round((Number(s.score) / Number(a.points_possible)) * 100)}%` : (s.grade ? String(s.grade) : '');
     return h('button', {
-      type: 'button', class: `bcv-ph-grade ${held ? 'bcv-ph-grade--held' : ''}`,
+      type: 'button', class: `bcv-ph-grade ${held ? 'bcv-ph-grade--held' : ''} ${handed ? 'bcv-ph-grade--sub' : ''}`,
       'aria-label': 'Submission details and comments',
       onclick: () => BCV.screens.courseDetail.openMark(ctx, c, a, s),
     }, [
@@ -1232,6 +1233,10 @@
           h('span', { class: 'bcv-ph-grade__of', text: `/ ${a.points_possible ?? '—'}` }),
         ]),
         U.text('bcv-ph-grade__side', [pc, s.graded_at ? U.fmtAt(s.graded_at) : 'Marked'].filter(Boolean).join(' · '), 'span'),
+      ] : handed ? [
+        // handed in and waiting: the same chip, and the same way in to what was handed in
+        U.text('bcv-ph-grade__held', status, 'span'),
+        U.text('bcv-ph-grade__side', [s.submitted_at ? U.fmtAt(s.submitted_at) : null, s.attempt ? `Attempt ${s.attempt}` : null].filter(Boolean).join(' · ') || 'Nothing to hand in', 'span'),
       ] : [
         U.text('bcv-ph-grade__held', 'Not yet posted', 'span'),
         U.text('bcv-ph-grade__side', 'Not released yet', 'span'),
@@ -1267,7 +1272,7 @@
       // the chip is absent and the title has the row to itself.
       U.el('bcv-ph-item__head', [
         h('h1', { class: 'bcv-ph-item__title bcv-pretty', text: a.name }),
-        gradeChip(ctx, c, a, s, { posted, held }),
+        gradeChip(ctx, c, a, s, { posted, held, status }),
       ]),
       phFacts([
         ['Due', a.due_at ? dueText(U.parse(a.due_at)) : 'No due date'],
@@ -1276,12 +1281,9 @@
         ['Available', available],
         ['Attempts', BCV.screens.courseDetail.attemptsFact(a, s)],
       ]),
-      // The banner is what is true before a mark exists: handed in and waiting, or not handed in at
-      // all. Once there is a mark the chip above carries it, and a second copy would only repeat it.
-      !graded && s.submitted_at ? U.el(`bcv-ph-banner ${status === 'Missing' ? 'bcv-ph-banner--warn' : ''}`, [
-        U.svg(CHECK, { size: 20, stroke: 'var(--bcv-green-text)', width: 2.6, style: { flex: 'none' } }),
-        h('div', { style: { flex: '1', minWidth: '0' } }, [U.text('bcv-ph-banner__t', status), U.text('bcv-ph-banner__s', `${U.fmtAt(s.submitted_at)} · awaiting grade`)]),
-      ]) : (status === 'Missing' ? U.el('bcv-ph-banner bcv-ph-banner--warn', [U.svg(IC.warn, { size: 20, stroke: 'var(--bcv-red-text)', width: 2.2, style: { flex: 'none' } }), h('div', {}, [U.text('bcv-ph-banner__t', 'Missing'), U.text('bcv-ph-banner__s', 'Canvas marked this as missing')])]) : null),
+      // The banner is what is true where there is no chip: not handed in, and Canvas says it is
+      // missing. Handed in (marked or not), the chip above carries the state and is the way in.
+      status === 'Missing' && !s.submitted_at ? U.el('bcv-ph-banner bcv-ph-banner--warn', [U.svg(IC.warn, { size: 20, stroke: 'var(--bcv-red-text)', width: 2.2, style: { flex: 'none' } }), h('div', {}, [U.text('bcv-ph-banner__t', 'Missing'), U.text('bcv-ph-banner__s', 'Canvas marked this as missing')])]) : null,
       // and the rubric keeps its own button, where the marks are decided rather than reported
       graded ? rubricButton(a, s, { cls: 'bcv-ph-bigbtn', label: 'See breakdown' }) : null,
       U.el('bcv-ph-card bcv-ph-instr', [U.text('bcv-ph-kicker', 'Instructions', 'span'), a.description ? CS.prose(a.description, { cls: 'bcv-ph-prose' }) : U.text('bcv-ph-load__none', 'No description.'), types ? U.text('bcv-ph-instr__note', `Accepts ${types}`) : null]),
@@ -1297,7 +1299,7 @@
       // Only where there is no chip to open: comments carry the attempt they belong to, and the sheet
       // is the one place that filters them. An unfiltered list beside it shows a first draft's
       // feedback as feedback on the final hand-in.
-      !posted && !held && (s.submission_comments || []).length ? h('div', {}, [groupHead('Comments'), listCard(s.submission_comments.map((cm) => U.el('bcv-ph-comment', [U.el('bcv-ph-comment__head', [U.text('bcv-ph-comment__who', cm.author_name || cm.author?.display_name || 'Comment', 'span'), U.text('bcv-ph-comment__when', U.fmtAt(cm.created_at), 'span')]), U.text('bcv-ph-comment__body bcv-pretty', cm.comment || '')])))]) : null,
+      !posted && !held && !s.submitted_at && !s.excused && (s.submission_comments || []).length ? h('div', {}, [groupHead('Comments'), listCard(s.submission_comments.map((cm) => U.el('bcv-ph-comment', [U.el('bcv-ph-comment__head', [U.text('bcv-ph-comment__who', cm.author_name || cm.author?.display_name || 'Comment', 'span'), U.text('bcv-ph-comment__when', U.fmtAt(cm.created_at), 'span')]), U.text('bcv-ph-comment__body bcv-pretty', cm.comment || '')])))]) : null,
       block,
       // the assignments either side, last: where to go once this one is read or handed in
       (() => { const el = slot('bcv-ph-navslot'); fill(el, ({ nav }) => BCV.screens.courseDetail.navRow(app, c, nav, 'bcv-ph-nav')); return el; })(),

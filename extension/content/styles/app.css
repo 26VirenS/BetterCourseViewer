@@ -970,7 +970,7 @@ html[data-bcv-theme="dark"] .bcv-rubg__cell--part.is-got { box-shadow: inset 0 0
 #bcv-app .bcv-detail__grade:hover { transform: translateY(-1px); }
 html[data-bcv-theme="dark"] #bcv-app .bcv-detail__grade { background: rgba(52,199,89,.16); border-color: rgba(52,199,89,.32); }
 /* a mark Canvas has not posted carries no number at all */
-#bcv-app .bcv-detail__grade--held { background: var(--bcv-fill); border-color: var(--bcv-edge); padding: 11px 14px 11px 16px; }
+#bcv-app .bcv-detail__grade--held, #bcv-app .bcv-detail__grade--sub { background: var(--bcv-fill); border-color: var(--bcv-edge); padding: 11px 14px 11px 16px; }
 .bcv-detail__gradev { display: flex; align-items: baseline; gap: 3px; }
 .bcv-detail__gradescore { font: 700 28px/1 var(--bcv-display); letter-spacing: -.035em; color: var(--bcv-green-text); font-variant-numeric: tabular-nums; }
 .bcv-detail__gradeof { font: 500 14px/1 var(--bcv-font); color: var(--bcv-ink3); font-variant-numeric: tabular-nums; }
@@ -1780,6 +1780,37 @@ html.bcv-preview #bcv-app { padding-right: var(--bcv-pv-w); }
 .bcv-ph-sheet--pv .bcv-pv__body { max-height: min(56vh, 460px); padding: 4px 18px 6px; }
 .bcv-ph-sheet--pv .bcv-pv__title { font-size: 19px; }
 
+/* ---- the theme: the student's own colour where the interface's blue was (lib/theme.js puts the
+ * variables on <html> before first paint — one set per mode, each shade standing far enough from
+ * that mode's grounds), and photos on the Dashboard's counters and the sidebar. The grounds keep
+ * their greys: only the glyphs, the words beside them, the washes, the buttons take the colour. ---- */
+html.bcv-themed[data-bcv-theme] { --bcv-blue: var(--bcv-accent-icon); --bcv-blue-soft: var(--bcv-accent-soft); }
+html.bcv-themed .bcv-nav__ic svg { stroke: var(--bcv-accent-icon); }
+html.bcv-themed #bcv-app .bcv-nav__item, html.bcv-themed .bcv-nav__count { color: var(--bcv-accent-text); } /* (the row is a button: #bcv-app button { color: inherit } would take it back) */
+html.bcv-themed .bcv-side__label { color: var(--bcv-accent-text); opacity: .8; }
+html.bcv-themed .bcv-stat__head > svg, html.bcv-themed .bcv-sheet__tile svg { stroke: var(--bcv-accent-icon); }
+html.bcv-themed .bcv-load { background: var(--bcv-accent-soft) !important; } /* (the wash is lit in the row's own colour inline) */
+html.bcv-themed #bcv-app .bcv-btn--primary { background: var(--bcv-accent-fill); }
+html.bcv-themed #bcv-app .bcv-btn--primary:hover { background: var(--bcv-accent-hover); }
+/* a counter's photo: sharp in its bottom-right corner, and blurred by a curve from there — a copy of it
+ * under a Gaussian blur, masked to nothing at the corner and to full a little way out — with the card's
+ * own colour veiling the top-left, where the words and the number are */
+.bcv-stat--pic { position: relative; overflow: hidden; }
+.bcv-stat--pic > .bcv-stat__head, .bcv-stat--pic > .bcv-stat__noterow { position: relative; z-index: 1; }
+.bcv-stat__pic { position: absolute; inset: 0; z-index: 0; pointer-events: none; background: var(--bcv-pic) right bottom / cover no-repeat; }
+.bcv-stat__pic--blur { filter: blur(14px) saturate(1.05); transform: scale(1.12); -webkit-mask-image: radial-gradient(farthest-side at 100% 100%, transparent 36%, #000 72%); mask-image: radial-gradient(farthest-side at 100% 100%, transparent 36%, #000 72%); }
+.bcv-stat__pic--veil { background: linear-gradient(to bottom right, var(--bcv-card) 28%, color-mix(in srgb, var(--bcv-card) 74%, transparent) 56%, color-mix(in srgb, var(--bcv-card) 34%, transparent) 78%, transparent 92%); } /* (the note at the foot reads; the corner stays clear) */
+.bcv-stat--pic .bcv-stat__note { text-shadow: 0 0 8px var(--bcv-card); }
+/* the sidebar's photo: sharp along the bottom, blurred as it goes up the side, the chrome's own ground
+ * veiling the top so the navigation reads as it always did */
+.bcv-side--pic > :not(.bcv-side__pic) { position: relative; z-index: 1; }
+.bcv-side__pic { position: absolute; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+.bcv-side__pic > i { position: absolute; inset: 0; display: block; }
+.bcv-side__pic-sharp, .bcv-side__pic-blur { background: var(--bcv-pic) center bottom / cover no-repeat; }
+.bcv-side__pic-blur { filter: blur(18px) saturate(1.05); transform: scale(1.1); -webkit-mask-image: linear-gradient(to top, transparent 20%, #000 56%); mask-image: linear-gradient(to top, transparent 20%, #000 56%); }
+.bcv-side__pic-veil { background: linear-gradient(to bottom, var(--bcv-bg) 0%, var(--bcv-bg) 32%, color-mix(in srgb, var(--bcv-bg) 78%, transparent) 58%, color-mix(in srgb, var(--bcv-bg) 46%, transparent) 80%, color-mix(in srgb, var(--bcv-bg) 26%, transparent) 100%); } /* (a thin wash stays over the foot so the rows there read) */
+html.bcv-quiz .bcv-side__pic { display: none; }
+
 /* ---- toast ---------------------------------------------------------------- */
 .bcv-toast { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); z-index: 60; padding: 10px 16px; border-radius: 14px; background: var(--bcv-glass); -webkit-backdrop-filter: var(--bcv-blur-glass); backdrop-filter: var(--bcv-blur-glass); box-shadow: var(--bcv-shadow-hi); border: 1px solid var(--bcv-edge); font: 500 13px/1.3 var(--bcv-font); color: var(--bcv-ink); max-width: 480px; }
 .bcv-toast--error { color: var(--bcv-red-text); }
@@ -2117,7 +2148,7 @@ html[data-bcv-theme="dark"] .bcv-ph-notice { color: #ffb44d; }
 .bcv-ph-item__head .bcv-ph-item__title { flex: 1 1 auto; min-width: 0; }
 #bcv-app .bcv-ph-grade { flex: none; max-width: 46%; display: flex; align-items: center; gap: 6px; margin-top: 1px; padding: 8px 8px 8px 12px; border: 0; border-radius: 15px; background: rgba(52,199,89,.14); color: var(--bcv-ink); cursor: pointer; text-align: left; -webkit-appearance: none; appearance: none; }
 html[data-bcv-theme="dark"] .bcv-ph-grade { background: rgba(52,199,89,.2); }
-#bcv-app .bcv-ph-grade--held { background: var(--bcv-fill); }
+#bcv-app .bcv-ph-grade--held, #bcv-app .bcv-ph-grade--sub { background: var(--bcv-fill); }
 .bcv-ph-grade__body { min-width: 0; }
 .bcv-ph-grade__v { display: flex; align-items: baseline; gap: 3px; }
 .bcv-ph-grade__score { font: 700 19px/1.05 var(--bcv-display); letter-spacing: -.02em; color: var(--bcv-green-text); }

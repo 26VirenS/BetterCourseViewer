@@ -286,12 +286,17 @@
       return U.el('bcv-stats', cards);
     }
     let statIndex = 0;
+    // each counter's slot for the theme's photo (lib/theme.js CARD_SLOTS): sharp at its bottom-right corner, blurred by a curve from there (app.css)
+    const STAT_SLOT = { 'Due today': 'today', 'Due this week': 'week', 'Unread announcements': 'unread', Overdue: 'overdue', 'Due tomorrow': 'tomorrow', 'Graded this week': 'graded' };
     function stat(lbl, value, note, icon, color, onOpen) {
       const valueEl = U.el('bcv-stat__value', value);
       const i = statIndex++;
       if (!entered && /^\d+$/.test(value)) U.roll(valueEl, Number(value), { seed: i * 2.3 }); // the counter scrambles briefly, then lands on the real count
+      const slot = STAT_SLOT[lbl] || null;
+      const pic = slot ? app.state?.themeImages?.cards?.[slot] || null : null;
       // the label and the number share the top row (the number on the right, large); the note and the chevron sit below
-      return U.enter(h('button', { type: 'button', class: 'bcv-card bcv-stat', onclick: (e) => onOpen(e.currentTarget) }, [
+      return U.enter(h('button', { type: 'button', class: `bcv-card bcv-stat ${pic ? 'bcv-stat--pic' : ''}`, dataset: slot ? { stat: slot } : {}, style: pic ? { '--bcv-pic': `url("${pic}")` } : null, onclick: (e) => onOpen(e.currentTarget) }, [
+        ...(pic ? [h('span', { class: 'bcv-stat__pic', 'aria-hidden': 'true' }), h('span', { class: 'bcv-stat__pic bcv-stat__pic--blur', 'aria-hidden': 'true' }), h('span', { class: 'bcv-stat__pic bcv-stat__pic--veil', 'aria-hidden': 'true' })] : []),
         U.el('bcv-stat__head', [U.svg(icon, { size: 14, stroke: color, width: 1.9 }), U.text('bcv-label bcv-label--inline', lbl, 'span'), valueEl]),
         U.el('bcv-stat__noterow', [U.text('bcv-stat__note', note, 'span'), U.svg(IC.chevron, { size: 13, stroke: 'var(--bcv-ink3)', width: 2, cls: 'bcv-stat__chev' })]),
       ]), 0); // no stagger: the six land together

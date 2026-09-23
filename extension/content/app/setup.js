@@ -1,14 +1,16 @@
 /* The guided setup, drawn over the Canvas page the student is on (the "First-Run Setup" mockup, in
  * a shadow root so Canvas's styles never reach it). An opaque ground, not a scrim: the page behind
- * is not yet configured, so showing it is noise. A word-mark plays first, then four steps with a
+ * is not yet configured, so showing it is noise. A word-mark plays first, then six steps with a
  * rail down the left that shows every step and the answer given so far — back is always open,
  * forward is Continue alone, steps ahead read "Not yet" and are really disabled:
  *   1 the courses, read from the enrolments (nothing ticked to start with — the student picks;
  *     unchecked ones stay hidden everywhere: they become the Canvas favourites, the one list every
  *     screen follows) ·
  *   2 grades (a history kept on this device, a goal, a target letter per course) ·
- *   3 what the Dashboard shows first, chosen by looking at miniatures of the real layouts ·
- *   4 where those courses sit, on the sidebar or in a panel off the Courses row ·
+ *   3 the look: light, dark or the device's ·
+ *   4 the theme: a colour of the student's own and photos, chosen on a miniature Dashboard ·
+ *   5 what the Dashboard shows first, chosen by looking at miniatures of the real layouts ·
+ *   6 where those courses sit, on the sidebar or in a panel off the Courses row ·
  * then a read-back of what was chosen, and Open Canvas writes it all at once and reloads the page,
  * which comes back black, with everything in place and the welcome on it (content/app/welcome.js:
  * two pointers, the look switch and Away Refresh). Opened by ?bcv=setup (the toolbar popup's Set
@@ -30,15 +32,18 @@
     { key: 'courses', name: 'Your courses', build: courses },
     { key: 'grades', name: 'Grades', build: grades },
     { key: 'appearance', name: 'Appearance', build: appearance },
+    { key: 'theme', name: 'Theme', build: theme },
     { key: 'dashboard', name: 'Dashboard', build: dashboard },
     { key: 'sidebar', name: 'Sidebar', build: sidebar },
   ];
   let STEPS = ALL;
-  const settleSteps = () => { STEPS = BCV.phone?.active() ? ALL.filter((s) => ['courses', 'grades', 'appearance'].includes(s.key)) : ALL; }; // (a phone has no sidebar and no dashboard views to choose between)
+  // (a phone has no sidebar and no dashboard views to choose between; ?bcv=setup&step=theme is the theme step alone, for changing it later)
+  const settleSteps = () => { STEPS = st.only ? ALL.filter((s) => s.key === st.only) : BCV.phone?.active() ? ALL.filter((s) => ['courses', 'grades', 'appearance', 'theme'].includes(s.key)) : ALL; };
   const COPY = {
     courses: ['Which classes are you in?', 'Only select the courses that count towards your GPA.'],
     grades: ['Grades', 'Canvas keeps no history. Simpl Courses can, on this device.'],
     appearance: ['Light or dark?', 'Pick the look. Automatic follows your device.'],
+    theme: ['Make it yours', 'A colour of your own, and photos on the counters and the sidebar. All optional.'],
     dashboard: ['What you see first', 'Pick the shape of your dashboard.'],
     sidebar: ['Where your courses live', 'Either way it is the same list.'],
     done: ['You’re set', 'Open Canvas and Simpl Courses takes over.'],
@@ -81,6 +86,7 @@
     // The ?bcv=setup that opened this is dropped from the address at once: a reload lands on the
     // page itself, and the welcome comes up on the reloaded page when the steps are done.
     const url = new URL(location.href);
+    const only = url.searchParams.get('bcv') === 'setup' && url.searchParams.get('step') === 'theme' ? 'theme' : null; // the one step, on its own, for a change later
     if (url.searchParams.get('bcv') === 'setup') {
       url.searchParams.delete('bcv');
       url.searchParams.delete('step');
@@ -88,8 +94,10 @@
       app.state.route = app.parseRoute();
     }
     const settings = await S.get();
+    const images = await (BCV.theme?.loadImages?.() || Promise.resolve(null)).catch(() => null);
     st = {
-      app, settings, step: 0, visited: new Set([0]),
+      app, settings, step: 0, visited: new Set([0]), only,
+      theme: { accent: BCV.theme?.normalize?.(settings.appearance?.theme?.accent) || '', images: images || { side: null, cards: {} } }, // the colour and the photos (lib/theme.js)
       scanning: false, scanError: null, courses: [], favs: new Set(), nicks: {},
       tracking: true, goal: 4, targets: {}, letters: {},
       dashView: 'list', // the list to start with, whatever Canvas has: the pick here is the student's
@@ -188,6 +196,7 @@
       case 'courses': return picked ? `${picked} ${picked === 1 ? 'course' : 'courses'}` : 'None yet';
       case 'grades': { const pf = st.courses.filter((c) => st.favs.has(c.id) && st.targets[c.id] === PASS_FAIL).length; return `${st.tracking ? `Tracking · goal ${gpa2(st.goal)}` : 'Not tracking'}${pf ? ` · ${pf} pass/fail` : ''}`; }
       case 'appearance': return LOOKS.find(([k]) => k === st.look)[1];
+      case 'theme': { const n = BCV.theme?.countImages?.(st.theme.images) || 0; const photos = n ? `${n} ${n === 1 ? 'photo' : 'photos'}` : ''; const colour = st.theme.accent ? colourName(st.theme.accent) : ''; return [colour, photos].filter(Boolean).join(' · ') || 'Default'; }
       case 'dashboard': return VIEWS.find(([k]) => k === st.dashView)[1];
       case 'sidebar': return st.sideCourses === 'always' ? 'Always listed' : 'On hover';
       default: return '';
@@ -497,6 +506,151 @@
     if (ui) ui.host.setAttribute('data-theme', wantsDark() ? 'dark' : 'light');
   }
 
+  // ---- 4 · the theme: a colour, and photos -----------------------------------------------------------
+  // A miniature of the Dashboard — the sidebar and the six counters, with made-up numbers that say
+  // they are made up — wearing the colour and the photos as they are chosen, so the step is seen
+  // rather than described. The colour is picked from a hue, a depth and a saturation whose ranges
+  // only reach colours the interface can draw its shades from (lib/theme.js: readable in light and
+  // in dark); a typed hex outside them is moved to the nearest one, and says so. The photos are
+  // scaled down here and kept on this device, never sent anywhere.
+  const T = () => BCV.theme;
+  const DEFAULT_ACCENT = '#0a6cff';
+  const hueOf = (hex) => T().rgbToHsl(T().hexToRgb(hex))[0];
+  /** The nearest preset's name, for the rail and the read-back. */
+  function colourName(hex) {
+    const h = hueOf(hex);
+    let best = null;
+    for (const [phex, name] of T().PRESETS) { const d = Math.min(Math.abs(hueOf(phex) - h), 360 - Math.abs(hueOf(phex) - h)); if (!best || d < best[0]) best = [d, name]; }
+    return best ? best[1] : 'Custom';
+  }
+  const PREVIEW_CARDS = [['today', 'Due today', '3', '25 points total', 'clock'], ['week', 'Due this week', '12', 'Across 4 courses', 'cal'], ['unread', 'Unread announcements', '2', 'Preview'], ['overdue', 'Overdue', '0', 'Nothing overdue', 'clock'], ['tomorrow', 'Due tomorrow', '1', 'Preview'], ['graded', 'Graded this week', '4', 'Preview', 'chart']];
+  const PREVIEW_NAV = [['Dashboard', 'M3 3h8v8H3zM13 3h8v8h-8zM3 13h8v8H3zM13 13h8v8h-8z', true], ['Courses', 'M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5zM4 18.5A2.5 2.5 0 0 1 6.5 16H20'], ['To Do', 'M3 4h18v16H3zM8 12l3 3 5-6'], ['Calendar', 'M3 5h18v16H3zM3 10h18M8 3v4M16 3v4'], ['Grades', 'M4 20V10M10 20V4M16 20v-8M22 20H2']];
+  const ICON_D = { clock: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 7v5l3 2', cal: 'M3 5h18v16H3zM3 10h18M8 3v4M16 3v4', chart: 'M4 20V10M10 20V4M16 20v-8M22 20H2', bell: 'M6 16V11a6 6 0 0 1 12 0v5l2 2H4zM10 20a2 2 0 0 0 4 0' };
+  function theme() {
+    const { body, hint } = ui;
+    const th = st.theme;
+    const phone = !!BCV.phone?.active();
+    const dark = () => ui.host.getAttribute('data-theme') === 'dark';
+    // ---- the preview
+    const pv = h('div', { class: 'tpv', id: 'tpv' });
+    const paintPreview = () => {
+      const p = T().palette(th.accent || DEFAULT_ACCENT, dark());
+      for (const [k, v] of Object.entries({ '--p-icon': p.icon, '--p-text': p.text, '--p-fill': p.fill, '--p-soft': p.soft })) pv.style.setProperty(k, v);
+      pv.classList.toggle('is-default', !th.accent);
+      const zone = (slot, filled) => h('span', { class: `tpv__drop ${filled ? 'is-filled' : ''}`, dataset: { slot } }, [
+        h('label', { class: 'tpv__droplabel', title: filled ? 'Change the photo' : 'Add a photo' }, [svg('M4 16l4-5 3 4 3-3 6 7H4zM19 5v4M17 7h4', { size: 12, width: 2 }),h('span', { text: filled ? 'Change' : 'Add a photo' }), h('input', { type: 'file', accept: 'image/*', 'aria-label': `A photo for ${slot === 'side' ? 'the sidebar' : 'this counter'}`, onchange: (e) => { const f = e.target.files?.[0]; if (f) setImage(slot, f); e.target.value = ''; } })]),
+        filled ? h('button', { type: 'button', class: 'tpv__x', 'aria-label': 'Remove the photo', text: '×', onclick: (e) => { e.stopPropagation(); setImage(slot, null); } }) : null,
+      ]);
+      const layers = (pic) => (pic ? [h('i', { class: 'tpv__pic tpv__pic--sharp' }), h('i', { class: 'tpv__pic tpv__pic--blur' }), h('i', { class: 'tpv__pic tpv__pic--veil' })] : []);
+      const side = h('div', { class: `tpv__side ${th.images.side ? 'has-pic' : ''}`, style: th.images.side ? { '--pic': `url("${th.images.side}")` } : null, dataset: { slot: 'side' } }, [
+        ...layers(th.images.side),
+        h('span', { class: 'tpv__brand' }, [h('i', { class: 'tpv__tile' }), h('b', { text: 'Preview' })]),
+        h('span', { class: 'tpv__nav' }, PREVIEW_NAV.map(([label, d, on]) => h('span', { class: `tpv__row ${on ? 'is-on' : ''}` }, [svg(d, { size: 12, width: 1.9, cls: 'tpv__ic' }), h('span', { text: label })]))),
+        h('span', { class: 'tpv__favs' }, swatches().slice(0, 3).map((col) => h('span', { class: 'tpv__fav' }, [dot(col, 6), h('span', { class: 'tpv__favbar' })]))),
+        phone ? null : zone('side', !!th.images.side),
+      ]);
+      const main = h('div', { class: 'tpv__main' }, [
+        h('span', { class: 'tpv__kicker', text: 'Preview · not your real numbers' }),
+        h('span', { class: 'tpv__h1', text: 'Dashboard' }),
+        h('span', { class: 'tpv__cards' }, PREVIEW_CARDS.map(([slot, label, n, note, icon]) => {
+          const pic = th.images.cards[slot] || null;
+          return h('span', { class: `tpv__card ${pic ? 'has-pic' : ''}`, dataset: { slot }, style: pic ? { '--pic': `url("${pic}")` } : null }, [
+            ...layers(pic),
+            h('span', { class: 'tpv__chead' }, [icon ? svg(ICON_D[icon], { size: 10, width: 2, cls: 'tpv__cic' }) : h('i', { class: 'tpv__cdot' }), h('span', { class: 'tpv__clabel', text: label }), h('span', { class: 'tpv__cn', text: n })]),
+            h('span', { class: 'tpv__cnote', text: note }),
+            phone ? null : zone(slot, !!pic),
+          ]);
+        })),
+      ]);
+      pv.replaceChildren(side, main);
+    };
+    // a photo dropped on a counter or the sidebar (or chosen from the zone's own picker): scaled here, kept here
+    const setImage = async (slot, file) => {
+      if (!file) { if (slot === 'side') th.images.side = null; else delete th.images.cards[slot]; paintPreview(); paintChrome(); return; }
+      hint.textContent = 'Reading the photo…';
+      try {
+        const data = await T().resizeImage(file, slot === 'side' ? 1280 : 900);
+        if (slot === 'side') th.images.side = data; else th.images.cards[slot] = data;
+        hint.textContent = '';
+      } catch (e) { hint.textContent = e?.message || 'That file is not a picture.'; }
+      if (!ui || STEPS[st.step]?.key !== 'theme') return;
+      paintPreview();
+      paintChrome();
+    };
+    pv.addEventListener('dragover', (e) => { const z = e.target.closest?.('[data-slot]'); if (!z || phone) return; e.preventDefault(); z.classList.add('is-over'); });
+    pv.addEventListener('dragleave', (e) => { e.target.closest?.('[data-slot]')?.classList.remove('is-over'); });
+    pv.addEventListener('drop', (e) => { const z = e.target.closest?.('[data-slot]'); if (!z || phone) return; e.preventDefault(); z.classList.remove('is-over'); const f = e.dataTransfer?.files?.[0]; if (f) setImage(z.dataset.slot, f); });
+    // ---- the picker
+    let ctl = T().toControls(th.accent || DEFAULT_ACCENT); // { h, s, tone }
+    const hue = h('input', { type: 'range', class: 'tpick__range tpick__range--hue', id: 'hue', min: '0', max: '360', step: '1', 'aria-label': 'Hue' });
+    const depth = h('input', { type: 'range', class: 'tpick__range', id: 'depth', min: '0', max: '100', step: '1', 'aria-label': 'Depth' });
+    const sat = h('input', { type: 'range', class: 'tpick__range', id: 'sat', min: '25', max: '100', step: '1', 'aria-label': 'Saturation' });
+    const hex = h('input', { type: 'text', class: 'tpick__hex', id: 'hex', maxlength: '7', spellcheck: 'false', autocomplete: 'off', 'aria-label': 'Hex colour' });
+    const hexNote = h('span', { class: 'tpick__note', id: 'hexNote' });
+    const chips = h('div', { class: 'chips', id: 'chips' });
+    const shades = h('div', { class: 'tpick__shades', id: 'shades' });
+    const tracks = () => {
+      const t = T();
+      hue.style.setProperty('--track', `linear-gradient(to right, ${[0, 60, 120, 180, 240, 300, 360].map((d) => t.hslToHex([d, 0.85, 0.5])).join(', ')})`);
+      const [lo, hi] = t.band(ctl.h, ctl.s);
+      depth.style.setProperty('--track', `linear-gradient(to right, ${t.hslToHex([ctl.h, ctl.s, hi])}, ${t.hslToHex([ctl.h, ctl.s, lo])})`);
+      const l = hi - (hi - lo) * ctl.tone;
+      sat.style.setProperty('--track', `linear-gradient(to right, ${t.hslToHex([ctl.h, t.MIN_SAT, l])}, ${t.hslToHex([ctl.h, 1, l])})`);
+    };
+    const paintPicker = ({ typed = false } = {}) => {
+      const t = T();
+      const seed = th.accent || DEFAULT_ACCENT;
+      hue.value = String(Math.round(ctl.h)); depth.value = String(Math.round(ctl.tone * 100)); sat.value = String(Math.round(ctl.s * 100));
+      if (!typed) hex.value = seed;
+      tracks();
+      // (the chips are built once and marked in place: a chip rebuilt under the pointer — the hex
+      // field's blur repaints — would take the press with it)
+      if (!chips.childElementCount) chips.append(h('button', { type: 'button', class: 'chip', dataset: { preset: '' }, onclick: () => pick('') }, [h('i', { class: 'chip__dot chip__dot--default' }), h('span', { text: 'Default' })]),
+        ...t.PRESETS.slice(1).map(([phex, name]) => h('button', { type: 'button', class: 'chip', dataset: { preset: phex }, onclick: () => pick(phex) }, [h('i', { class: 'chip__dot', style: { background: phex } }), h('span', { text: name })])));
+      for (const c of chips.children) { const on = (c.dataset.preset || '') === (th.accent || ''); c.classList.toggle('is-on', on); c.setAttribute('aria-pressed', on ? 'true' : 'false'); }
+      const row = (label, isDark) => { const p = t.palette(seed, isDark); return h('div', { class: `tpick__shaderow ${isDark ? 'is-dark' : ''}` }, [h('span', { class: 'tpick__shadelabel', text: label }), ...[['Icons', p.icon], ['Words', p.text], ['Buttons', p.fill], ['Tint', p.soft]].map(([n, c]) => h('span', { class: 'tpick__shade', title: n, style: { background: c } }))]); };
+      shades.replaceChildren(row('Light', false), row('Dark', true));
+      pv.dataset.accent = seed;
+    };
+    const pick = (accent) => { th.accent = accent; ctl = T().toControls(accent || DEFAULT_ACCENT); hexNote.textContent = accent ? 'Readable in light and dark.' : 'The interface’s own blue.'; hexNote.classList.remove('is-moved'); paintPicker(); paintPreview(); paintChrome(); };
+    const slide = () => { ctl = { h: Number(hue.value), s: Number(sat.value) / 100, tone: Number(depth.value) / 100 }; th.accent = T().fromControls(ctl.h, ctl.s, ctl.tone); hexNote.textContent = 'Readable in light and dark.'; hexNote.classList.remove('is-moved'); paintPicker(); paintPreview(); paintChrome(); };
+    for (const r of [hue, depth, sat]) r.addEventListener('input', slide);
+    hex.addEventListener('input', () => {
+      const raw = hex.value.trim();
+      const norm = T().normalize(raw.startsWith('#') ? raw : `#${raw}`);
+      if (!norm) { hexNote.textContent = raw ? 'Six hex digits, like #d63b7a.' : ''; return; }
+      const near = T().nearest(norm);
+      const moved = near !== norm;
+      th.accent = near;
+      ctl = T().toControls(near);
+      hexNote.textContent = moved ? `Moved to ${near}, the nearest colour that reads in light and dark.` : 'Readable in light and dark.';
+      hexNote.classList.toggle('is-moved', moved);
+      paintPicker({ typed: true });
+      paintPreview();
+      paintChrome();
+    });
+    hex.addEventListener('blur', () => paintPicker());
+    const picker = h('div', { class: 'tpick', id: 'tpick' }, [
+      h('span', { class: 'kicker kicker--tight', text: 'Colour' }),
+      chips,
+      h('div', { class: 'tpick__cols' }, [
+        h('div', { class: 'tpick__sliders' }, [
+          h('label', { class: 'tpick__sl' }, [h('span', { text: 'Hue' }), hue]),
+          h('label', { class: 'tpick__sl' }, [h('span', { text: 'Depth' }), depth]),
+          h('label', { class: 'tpick__sl' }, [h('span', { text: 'Saturation' }), sat]),
+          h('div', { class: 'tpick__hexrow' }, [hex, hexNote]),
+        ]),
+        h('div', { class: 'tpick__reads' }, [h('span', { class: 'tpick__readslabel', text: 'How it reads' }), shades]),
+      ]),
+      h('span', { class: 'tpick__foot', text: phone ? 'Photos go on the desktop’s Dashboard; the colour is yours everywhere.' : 'Every shade here passes contrast checks in light and dark. Photos stay on this device.' }),
+    ]);
+    body.append(...heading('theme'), h('div', { class: 'theme' }, [pv, picker]));
+    hexNote.textContent = th.accent ? 'Readable in light and dark.' : 'The interface’s own blue.';
+    paintPicker();
+    paintPreview();
+    footer({ next: st.only ? 'Save' : st.step === STEPS.length - 1 ? 'Finish' : 'Continue', onNext: () => (st.only ? finish() : go(st.step + 1)) });
+  }
+
   // ---- 5 · where the courses live --------------------------------------------------------------------
   function sidebar() {
     const { body } = ui;
@@ -529,6 +683,7 @@
       ['Courses shown', `${picked} of ${st.courses.length}`],
       ['Grade history', st.tracking ? `On · goal ${gpa2(st.goal)}` : 'Off'],
       ['Appearance', answer('appearance')],
+      ['Theme', answer('theme')],
       ...(STEPS.some((s) => s.key === 'dashboard') ? [['Dashboard', answer('dashboard')]] : []),
       ...(STEPS.some((s) => s.key === 'sidebar') ? [['Sidebar', answer('sidebar')]] : []),
     ];
@@ -537,6 +692,15 @@
       h('div', { class: 'summary' }, rows.map(([k, v]) => h('div', { class: 'summary__row' }, [h('span', { class: 'summary__k', text: k }), h('span', { class: 'summary__v', text: v })]))),
     );
     footer({ next: 'Open Canvas', back: true, onNext: () => finish() });
+  }
+  /** The theme step on its own (?bcv=setup&step=theme): Save writes the colour and the photos, and the page loads afresh with them. */
+  async function finishTheme() {
+    if (!st || st.closing) return;
+    st.closing = true;
+    try {
+      await Promise.all([S.update({ appearance: { theme: { accent: st.theme.accent || '' } } }), BCV.theme?.saveImages?.(st.theme.images)]);
+    } catch (e) { console.error('[Simpl Courses setup]', e); }
+    location.reload();
   }
 
   /** Everything the steps decided, written at once, where the screens read it: favourites through
@@ -548,6 +712,7 @@
    *  There is no other way out: the card is only done when the steps are. */
   async function finish() {
     if (!st || st.closing) return;
+    if (st.only === 'theme') return finishTheme();
     st.closing = true;
     const { app } = st;
     try {
@@ -559,7 +724,8 @@
         store.setPref('gpaGoal', st.goal),
         store.setPref('gpaTracking', st.tracking ? { priorGpa: null, priorCourses: 0, since: new Date().toISOString().slice(0, 10) } : null),
         store.setPref('gradeTargets', targets),
-        S.update({ appearance: { sideCourses: st.sideCourses } }).catch(() => {}),
+        S.update({ appearance: { sideCourses: st.sideCourses, theme: { accent: st.theme.accent || '' } } }).catch(() => {}),
+        BCV.theme?.saveImages?.(st.theme.images).catch(() => {}),
         STEPS.some((s) => s.key === 'dashboard') ? store.setDashboardView(st.dashView).catch(() => {}) : Promise.resolve(),
       ]);
       const changes = st.courses.filter((c) => c.favorite !== st.favs.has(c.id));

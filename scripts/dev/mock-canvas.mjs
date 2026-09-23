@@ -804,6 +804,8 @@ on('POST', /^\/api\/v1\/courses\/(\w+)\/assignments\/(\w+)\/submissions$/, (url,
     body: s.body || null, url: s.url || null, attachments: (s.file_ids || []).map((id) => storedFiles.get(String(id))), late: when > new Date(a.due_at), score: null, grade: null, graded_at: null,
     submission_comments: [...(a.submission.submission_comments || []), ...(body.comment?.text_comment ? [{ author_name: 'Sam Student', created_at: when.toISOString(), comment: body.comment.text_comment }] : [])],
   };
+  // Canvas keeps every attempt in submission_history; each hand-in adds its own
+  sub.submission_history = [...(a.submission.submission_history || []).filter((x) => x && x.attempt), { attempt: sub.attempt, submitted_at: sub.submitted_at, submission_type: sub.submission_type, body: sub.body, url: sub.url, attachments: sub.attachments, score: null, late: sub.late }];
   apiSubmissions.set(a.id, sub);
   return sub;
 });

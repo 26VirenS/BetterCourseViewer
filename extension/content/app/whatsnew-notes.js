@@ -24,6 +24,11 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.60.0', date: '2026-09-23', notes: [
+      { kind: 'new', title: 'Themes', body: 'Your own colour, and photos on the counters and sidebar.', icon: P.pic },
+      { kind: 'new', title: 'Readable colours only', body: 'A picker that stops at colours you can read, day and night.', icon: P.eye },
+      { kind: 'improved', title: 'See what you handed in', body: 'The chip by the title opens your work before it is graded.', icon: P.clip },
+    ] },
     { version: '2.59.0', date: '2026-09-22', notes: [
       { kind: 'improved', title: 'Sidebar to the top', body: 'The widgets’ bar now sits beside it, over the page alone.', icon: P.layers },
       { kind: 'fixed', title: 'Quick flashcard marks', body: 'Fast presses each mark their own card, none twice.', icon: P.check },

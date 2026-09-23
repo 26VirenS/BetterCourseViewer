@@ -206,6 +206,7 @@
   };
   $('runWelcome').addEventListener('click', () => openOnCanvas('welcome'));
   $('openSetup').addEventListener('click', () => openOnCanvas('setup'));
+  $('openTheme').addEventListener('click', () => openOnCanvas('setup&step=theme'));
 
   // ---- This Mac (the app's window only) --------------------------------------------------------------
   if (inApp) {
@@ -677,6 +678,7 @@
     for (const [id, path] of TEXT) { const el = $(id); if (document.activeElement !== el) el.value = getPath(settings, path) ?? ''; }
     [...$('themes').querySelectorAll('.theme')].forEach((b) => b.classList.toggle('is-on', b.dataset.value === (settings.appearance.darkMode || 'system')));
     setSeg($('sideCourses'), settings.appearance.sideCourses || 'always');
+    $('themeSub').textContent = settings.appearance.theme?.accent ? `Your own colour, ${settings.appearance.theme.accent}. Photos are kept on the device they were added on.` : 'A colour of your own, and photos on the Dashboard’s counters and the sidebar.';
     for (const [id, key] of DASH) setSwitch($(id), settings.appearance.dashboard?.[key] !== false);
     renderDomains();
     paintStatus();

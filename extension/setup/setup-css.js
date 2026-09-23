@@ -447,6 +447,85 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
 .mini__lookbar.mini__lookrow--dark { background: #f2f2f7; }
 .mini__lookrow.mini__lookrow--dark { background: rgba(255,255,255,.22); }
 
+/* 4 · the theme: a miniature Dashboard wearing the colour and the photos, then the picker.
+ * --p-icon/--p-text/--p-fill/--p-soft are the shades lib/theme.js derives, set on .tpv by the step. */
+.theme { margin-top: 22px; display: flex; flex-direction: column; gap: 4px; }
+.tpv { --pv-bg: #f2f2f7; --pv-card: #fff; --pv-ink: #1c1c1e; --pv-ink3: #6c6c70; --pv-hair: rgba(60,60,67,.12); position: relative; display: flex; align-items: stretch; height: 236px; border: 1px solid var(--hair); border-radius: 14px; background: var(--pv-bg); color: var(--pv-ink); overflow: hidden; font-family: var(--font); animation: frRise .32s var(--ease) both; }
+:host([data-theme="dark"]) .tpv, html[data-theme="dark"] .tpv { --pv-bg: #000; --pv-card: #1c1c1e; --pv-ink: #f2f2f7; --pv-ink3: #8e8e93; --pv-hair: rgba(255,255,255,.1); }
+.tpv__side { position: relative; flex: none; width: 138px; padding: 12px 10px 10px; border-right: 1px solid var(--pv-hair); display: flex; flex-direction: column; gap: 10px; overflow: hidden; }
+.tpv__side > :not(.tpv__pic) { position: relative; z-index: 1; }
+.tpv__brand { display: flex; align-items: center; gap: 7px; font: 600 11.5px/1 var(--font); letter-spacing: -.01em; color: var(--pv-ink); }
+.tpv__tile { display: block; width: 16px; height: 16px; border-radius: 5px; background: var(--p-fill); }
+.tpv__nav { display: flex; flex-direction: column; gap: 2px; }
+.tpv__row { display: flex; align-items: center; gap: 7px; padding: 4px 6px; border-radius: 6px; font: 500 10.5px/1.2 var(--font); color: var(--p-text); }
+.tpv__row.is-on { background: var(--p-soft); }
+.tpv.is-default .tpv__row { color: var(--pv-ink); }
+.tpv__ic { display: block; flex: none; stroke: var(--p-icon); }
+.tpv__favs { display: flex; flex-direction: column; gap: 6px; padding: 6px 6px 0; border-top: 1px solid var(--pv-hair); }
+.tpv__fav { display: flex; align-items: center; gap: 6px; }
+.tpv__favbar { display: block; flex: 1; height: 4px; border-radius: 2px; background: var(--pv-hair); }
+.tpv__main { position: relative; flex: 1; min-width: 0; padding: 12px 14px; display: flex; flex-direction: column; gap: 3px; }
+.tpv__kicker { font: 500 9.5px/1.2 var(--font); letter-spacing: .04em; text-transform: uppercase; color: var(--pv-ink3); }
+.tpv__h1 { font: 700 17px/1.15 var(--display); letter-spacing: -.03em; color: var(--pv-ink); }
+.tpv__cards { flex: 1; min-height: 0; margin-top: 7px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 8px; }
+.tpv__card { position: relative; display: flex; flex-direction: column; gap: 2px; padding: 8px 9px; border-radius: 9px; background: var(--pv-card); box-shadow: 0 1px 2px rgba(0,0,0,.05); overflow: hidden; }
+.tpv__card > :not(.tpv__pic) { position: relative; z-index: 1; }
+.tpv__chead { display: flex; align-items: center; gap: 5px; min-width: 0; }
+.tpv__cic { display: block; flex: none; stroke: var(--p-icon); }
+.tpv__cdot { display: block; flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--p-icon); }
+.tpv__clabel { flex: 1; min-width: 0; font: 500 9.5px/1.2 var(--font); color: var(--pv-ink3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tpv__cn { flex: none; font: 700 15px/1 var(--display); letter-spacing: -.03em; color: var(--pv-ink); }
+.tpv__cnote { font: 400 9px/1.3 var(--font); color: var(--pv-ink3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* the photo: sharp at the bottom right, blurred as it climbs, then the card's own colour at the top left */
+.tpv__pic { position: absolute; inset: 0; z-index: 0; display: block; pointer-events: none; }
+.tpv__card .tpv__pic--sharp, .tpv__card .tpv__pic--blur { background: var(--pic) right bottom / cover no-repeat; }
+.tpv__card .tpv__pic--blur { filter: blur(8px) saturate(1.05); transform: scale(1.12); -webkit-mask-image: radial-gradient(farthest-side at 100% 100%, transparent 36%, #000 72%); mask-image: radial-gradient(farthest-side at 100% 100%, transparent 36%, #000 72%); }
+.tpv__card .tpv__pic--veil { background: linear-gradient(to bottom right, var(--pv-card) 28%, color-mix(in srgb, var(--pv-card) 74%, transparent) 56%, color-mix(in srgb, var(--pv-card) 34%, transparent) 78%, transparent 92%); }
+.tpv__side .tpv__pic--sharp, .tpv__side .tpv__pic--blur { background: var(--pic) center bottom / cover no-repeat; }
+.tpv__side .tpv__pic--blur { filter: blur(10px) saturate(1.05); transform: scale(1.1); -webkit-mask-image: linear-gradient(to top, transparent 20%, #000 56%); mask-image: linear-gradient(to top, transparent 20%, #000 56%); }
+.tpv__side .tpv__pic--veil { background: linear-gradient(to bottom, var(--pv-bg) 0%, var(--pv-bg) 32%, color-mix(in srgb, var(--pv-bg) 78%, transparent) 58%, color-mix(in srgb, var(--pv-bg) 46%, transparent) 80%, color-mix(in srgb, var(--pv-bg) 26%, transparent) 100%); }
+/* the drop zones: a small pill at the foot of each counter and of the sidebar; the whole slot takes a drop */
+.tpv__drop { display: flex; align-items: center; gap: 4px; margin-top: auto; }
+.tpv__side .tpv__drop { margin-top: auto; }
+.tpv__droplabel { position: relative; display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 8px; border-radius: 10px; background: color-mix(in srgb, var(--pv-card) 78%, transparent); border: 1px dashed var(--pv-ink3); font: 500 9.5px/1 var(--font); color: var(--pv-ink3); cursor: pointer; transition: color .18s ease, border-color .18s ease, background .18s ease; }
+.tpv__droplabel svg { display: block; }
+.tpv__droplabel input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+.tpv__drop.is-filled .tpv__droplabel { border-style: solid; border-color: transparent; background: rgba(0,0,0,.42); color: #fff; }
+.tpv__droplabel:hover, [data-slot].is-over .tpv__droplabel { color: var(--p-icon); border-color: var(--p-icon); background: var(--pv-card); }
+.tpv__x { flex: none; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 10px; background: rgba(0,0,0,.42); color: #fff; cursor: pointer; font: 500 13px/20px var(--font); text-align: center; transition: background .18s ease; }
+.tpv__x:hover { background: rgba(0,0,0,.7); }
+[data-slot].is-over { box-shadow: inset 0 0 0 2px var(--p-icon); }
+/* the picker */
+.tpick { display: flex; flex-direction: column; gap: 10px; }
+.tpick .kicker--tight { padding-top: 18px; }
+.chips { display: flex; flex-wrap: wrap; gap: 7px; }
+.chip { display: inline-flex; align-items: center; gap: 7px; height: 30px; padding: 0 12px 0 8px; border: 1px solid var(--hair); border-radius: 15px; background: transparent; cursor: pointer; font: 500 12.5px/1 var(--font); color: var(--ink2); transition: border-color .18s ease, background .18s ease, color .18s ease; }
+.chip:hover { background: var(--tile); }
+.chip.is-on { border-color: var(--ink); color: var(--ink); font-weight: 600; }
+.chip__dot { display: block; width: 14px; height: 14px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(0,0,0,.12); }
+.chip__dot--default { background: #0a6cff; }
+.tpick__cols { display: flex; gap: 26px; align-items: flex-start; }
+.tpick__sliders { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 9px; }
+.tpick__sl { display: grid; grid-template-columns: 74px 1fr; align-items: center; gap: 12px; font: 400 12.5px/1.2 var(--font); color: var(--ink3); }
+.tpick__range { -webkit-appearance: none; appearance: none; width: 100%; height: 14px; margin: 0; border-radius: 7px; background: var(--track, var(--tile)); box-shadow: inset 0 0 0 1px rgba(0,0,0,.08); cursor: pointer; outline-offset: 4px; }
+.tpick__range::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; border-radius: 50%; background: #fff; border: 1px solid rgba(0,0,0,.14); box-shadow: 0 1px 4px rgba(0,0,0,.28); cursor: grab; }
+.tpick__range::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: #fff; border: 1px solid rgba(0,0,0,.14); box-shadow: 0 1px 4px rgba(0,0,0,.28); cursor: grab; }
+.tpick__range::-moz-range-track { background: transparent; }
+.tpick__hexrow { display: flex; align-items: center; gap: 10px; margin-top: 2px; padding-left: 86px; min-width: 0; }
+.tpick__hex { flex: none; width: 92px; height: 30px; padding: 0 9px; border: 1px solid var(--hair); border-radius: 9px; background: var(--panel); font: 500 12.5px/1 var(--mono); color: var(--ink); outline: none; }
+.tpick__hex:focus { border-color: var(--blue); }
+.tpick__note { flex: 1; min-width: 0; font: 400 11.5px/1.35 var(--font); color: var(--ink4); text-wrap: pretty; }
+.tpick__note.is-moved { color: var(--warn); }
+.tpick__reads { flex: none; width: 196px; display: flex; flex-direction: column; gap: 6px; }
+.tpick__readslabel { font: 400 12.5px/1.2 var(--font); color: var(--ink3); }
+.tpick__shades { display: flex; flex-direction: column; gap: 5px; }
+.tpick__shaderow { display: flex; align-items: center; gap: 6px; padding: 7px 9px; border-radius: 10px; background: #fff; border: 1px solid rgba(60,60,67,.14); }
+.tpick__shaderow.is-dark { background: #1c1c1e; border-color: rgba(255,255,255,.12); }
+.tpick__shadelabel { flex: 1; font: 500 10.5px/1.2 var(--font); color: #6c6c70; }
+.tpick__shaderow.is-dark .tpick__shadelabel { color: #8e8e93; }
+.tpick__shade { display: block; width: 22px; height: 22px; border-radius: 6px; box-shadow: inset 0 0 0 1px rgba(0,0,0,.08); }
+.tpick__foot { margin-top: 2px; font: 400 11.5px/1.4 var(--font); color: var(--ink4); text-wrap: pretty; }
+
 /* ready: the read-back */
 .page--fr .summary { margin-top: 22px; max-width: 420px; gap: 0; }
 .page--fr .summary__row { align-items: baseline; gap: 16px; padding: 13px 0; border-top: 1px solid var(--hair); animation: frRise .32s var(--ease) both; }
@@ -500,6 +579,16 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
   .page--fr .targets { max-height: 40vh; }
   .page--fr .seg button { min-width: 26px; }
   .intro__svg { width: 250px; height: auto; }
+  /* the theme step: the preview two counters wide, the picker in one column */
+  .tpv { height: auto; min-height: 250px; }
+  .tpv__side { width: 112px; padding: 10px 8px 8px; }
+  .tpv__main { padding: 10px 10px 12px; }
+  .tpv__cards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+  .tpv__card { min-height: 54px; padding: 7px 8px; }
+  .tpick__cols { flex-direction: column; gap: 14px; }
+  .tpick__reads { width: 100%; }
+  .tpick__sl { grid-template-columns: 66px 1fr; }
+  .tpick__hexrow { padding-left: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }

@@ -15,6 +15,7 @@
       logoUrl: '',                // sidebar tile image; blank = the school's own mark from Canvas's theme
       sideCourses: 'always',      // where the favourite courses live: 'always' on the sidebar, or 'hover' off the Courses row
       dashboard: { cards: true, list: true, activity: true }, // which of the Dashboard's views are offered; at least one stays on
+      theme: { accent: '' },   // the colour of the student's own (lib/theme.js); blank = the interface's blue. The photos are in storage.local under theme:images
     },
     domains: [],                  // extra Canvas origins, e.g. "https://canvas.myschool.edu"
   };

@@ -58,10 +58,12 @@
   // kept for the page's life so a screen never re-flows into the other layout mid-way.
   const phone = () => !!window.matchMedia?.('(max-width: 700px)').matches;
 
-  function apply({ skin, dark }) {
+  function apply({ skin, dark, accent }) {
     html.classList.toggle('bcv-on', skin !== false);
     html.classList.toggle('bcv-phone', phone());
     html.setAttribute('data-bcv-theme', dark ? 'dark' : 'light');
+    // the student's colour, with the shades this mode draws from it (lib/theme.js), on the page before it paints
+    try { BCV.theme?.apply(html, skin !== false ? accent || '' : '', !!dark); } catch { /* the interface's own blue */ }
   }
 
   // 1. Instant: cached values from the page origin's localStorage (the one-page note wins for the look).
@@ -83,12 +85,12 @@
     const stored = current.appearance.skin !== false;
     if (lastStored !== null && stored !== lastStored) override = null; // a saved change beats the one-page note
     lastStored = stored;
-    const state = { skin: override ?? stored, dark: S.isDark(current, systemDark()) };
+    const state = { skin: override ?? stored, dark: S.isDark(current, systemDark()), accent: current.appearance?.theme?.accent || '' };
     const flipped = !!shown && shown.skin !== state.skin;
     apply(state);
     shown = state;
     try {
-      if (!wiped) localStorage.setItem(CACHE_KEY, JSON.stringify({ skin: stored, dark: state.dark })); // the saved look, never the one-page note
+      if (!wiped) localStorage.setItem(CACHE_KEY, JSON.stringify({ skin: stored, dark: state.dark, accent: state.accent })); // the saved look, never the one-page note
     } catch {
       /* ignore */
     }
