@@ -24,6 +24,10 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.62.0', date: '2026-09-23', notes: [
+      { kind: 'improved', title: 'A preview to scale', body: 'The theme’s Dashboard is the real page, made small.', icon: P.eye },
+      { kind: 'improved', title: 'A tidier colour picker', body: 'The wheel and swatches take less room on the step.', icon: P.layers },
+    ] },
     { version: '2.61.0', date: '2026-09-23', notes: [
       { kind: 'new', title: 'A colour wheel', body: 'Pick your colour on a wheel; sliders are one press away.', icon: P.pen },
       { kind: 'new', title: 'Colour your courses', body: 'A setup step gives each course its colour.', icon: P.sparkle },

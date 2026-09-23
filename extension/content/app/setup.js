@@ -587,12 +587,15 @@
         ...layers(th.images.side),
         h('span', { class: 'tpv__brand' }, [h('i', { class: 'tpv__tile' }), h('b', { text: 'Preview' })]),
         h('span', { class: 'tpv__nav' }, PREVIEW_NAV.map(([label, d, on, colour], i) => h('span', { class: `tpv__row ${on ? 'is-on' : ''}`, style: { '--row-icon': rowShades[i]?.icon || colour, '--row-text': rowShades[i]?.text || 'var(--pv-ink)' } }, [svg(d, { size: 14, width: 1.9, cls: 'tpv__ic' }), h('span', { text: label })]))),
-        h('span', { class: 'tpv__favs' }, swatches().slice(0, 3).map((col) => h('span', { class: 'tpv__fav' }, [dot(col, 7), h('span', { class: 'tpv__favbar' })]))),
+        h('span', { class: 'tpv__favs' }, [h('i', { class: 'tpv__favlabel', text: 'Favorite courses' }), ...swatches().slice(0, 4).map((col) => h('span', { class: 'tpv__fav' }, [dot(col, 5), h('span', { class: 'tpv__favbar' })]))]),
         phone ? null : zone('side', !!th.images.side, setImage, 'the sidebar'),
       ]);
       const main = h('div', { class: 'tpv__main' }, [
-        h('span', { class: 'tpv__kicker', text: 'Preview · not your real numbers' }),
-        h('span', { class: 'tpv__h1', text: 'Dashboard' }),
+        h('span', { class: 'tpv__bar' }, [h('i', { class: 'tpv__switch' })]),
+        h('span', { class: 'tpv__head' }, [
+          h('span', { class: 'tpv__headl' }, [h('span', { class: 'tpv__kicker', text: 'Preview · not your real numbers' }), h('span', { class: 'tpv__h1', text: 'Dashboard' })]),
+          h('span', { class: 'tpv__seg' }, ['Cards', 'List', 'Recent activity'].map((t, i) => h('i', { class: `tpv__segbtn ${i === 1 ? 'is-on' : ''}`, text: t }))),
+        ]),
         h('span', { class: 'tpv__cards' }, PREVIEW_CARDS.map(([slot, label, n, note, icon]) => {
           const pic = th.images.cards[slot] || null;
           return h('span', { class: `tpv__card ${pic ? 'has-pic' : ''}`, dataset: { slot }, style: pic ? { '--pic': `url("${pic}")` } : null }, [
@@ -602,6 +605,7 @@
             phone ? null : zone(slot, !!pic, setImage, 'this counter'),
           ]);
         })),
+        h('span', { class: 'tpv__ghost' }, [h('i', { class: 'tpv__ghostk' }), ...swatches().slice(0, 3).map((col) => h('span', { class: 'tpv__ghostrow' }, [dot(col, 5), h('i', { class: 'tpv__ghostbar' })]))]),
       ]);
       pv.replaceChildren(side, main);
     };
