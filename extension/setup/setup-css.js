@@ -499,10 +499,12 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
 .tpv__pic { position: absolute; inset: 0; z-index: 0; display: block; pointer-events: none; }
 .tpv__card .tpv__pic--sharp, .tpv__card .tpv__pic--blur { background: var(--pic) right bottom / cover no-repeat; }
 .tpv__card .tpv__pic--blur { filter: blur(10px) saturate(1.05); transform: scale(1.12); -webkit-mask-image: radial-gradient(farthest-side at 100% 100%, transparent 36%, #000 72%); mask-image: radial-gradient(farthest-side at 100% 100%, transparent 36%, #000 72%); }
-.tpv__card .tpv__pic--veil { background: linear-gradient(to bottom right, var(--pv-card) 28%, color-mix(in srgb, var(--pv-card) 74%, transparent) 56%, color-mix(in srgb, var(--pv-card) 34%, transparent) 78%, transparent 92%); }
+.tpv__card { --veil: color-mix(in srgb, var(--pic-tone, var(--pv-card)) 34%, var(--pv-card)); } /* the veil in the photo's own colour, mixed with the card */
+.tpv__card .tpv__pic--veil { background: linear-gradient(to bottom right, var(--veil) 28%, color-mix(in srgb, var(--veil) 74%, transparent) 56%, color-mix(in srgb, var(--veil) 34%, transparent) 78%, transparent 92%); }
 .tpv__side .tpv__pic--sharp, .tpv__side .tpv__pic--blur { background: var(--pic) center bottom / cover no-repeat; }
 .tpv__side .tpv__pic--blur { filter: blur(10px) saturate(1.05); transform: scale(1.1); -webkit-mask-image: linear-gradient(to top, transparent 20%, #000 56%); mask-image: linear-gradient(to top, transparent 20%, #000 56%); }
-.tpv__side .tpv__pic--veil { background: linear-gradient(to bottom, var(--pv-bg) 0%, var(--pv-bg) 32%, color-mix(in srgb, var(--pv-bg) 78%, transparent) 58%, color-mix(in srgb, var(--pv-bg) 46%, transparent) 80%, color-mix(in srgb, var(--pv-bg) 26%, transparent) 100%); }
+.tpv__side { --veil: color-mix(in srgb, var(--pic-tone, var(--pv-bg)) 30%, var(--pv-bg)); }
+.tpv__side .tpv__pic--veil { background: linear-gradient(to bottom, var(--veil) 0%, var(--veil) 32%, color-mix(in srgb, var(--veil) 78%, transparent) 58%, color-mix(in srgb, var(--veil) 46%, transparent) 80%, color-mix(in srgb, var(--veil) 26%, transparent) 100%); }
 /* the drop zones: a small pill at the foot of each counter and of the sidebar; the whole slot takes a drop */
 .tpv__drop { display: flex; align-items: center; gap: 3px; margin-top: auto; padding-top: 3px; }
 .tpv__side .tpv__drop { margin-top: auto; padding-top: 0; }
@@ -588,7 +590,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
 .thd.is-default .thd__title { color: var(--ink); }
 .thd__row .tpv__pic--sharp, .thd__row .tpv__pic--blur { background: var(--pic) right center / cover no-repeat; }
 .thd__row .tpv__pic--blur { filter: blur(12px) saturate(1.05); transform: scale(1.08); -webkit-mask-image: linear-gradient(to left, transparent 28%, #000 58%); mask-image: linear-gradient(to left, transparent 28%, #000 58%); }
-.thd__row .tpv__pic--veil { background: linear-gradient(to right, var(--tile) 0%, var(--tile) 30%, color-mix(in srgb, var(--tile) 78%, transparent) 52%, color-mix(in srgb, var(--tile) 30%, transparent) 74%, transparent 100%); }
+.thd__row { --veil: color-mix(in srgb, var(--pic-tone, var(--tile)) 32%, var(--tile)); }
+.thd__row .tpv__pic--veil { background: linear-gradient(to right, var(--veil) 0%, var(--veil) 30%, color-mix(in srgb, var(--veil) 78%, transparent) 52%, color-mix(in srgb, var(--veil) 30%, transparent) 74%, transparent 100%); }
 .thd__row .tpv__drop { margin-top: 0; }
 .thd__row .tpv__droplabel { background: color-mix(in srgb, var(--panel) 82%, transparent); border-color: var(--ink4); color: var(--ink3); }
 .thd__row .tpv__drop.is-filled .tpv__droplabel { border-color: transparent; background: rgba(0,0,0,.42); color: #fff; }

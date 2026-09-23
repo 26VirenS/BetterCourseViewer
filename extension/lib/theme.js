@@ -189,34 +189,71 @@
   const IMAGES_KEY = 'theme:images'; // storage.local: { side: dataURL | null, cards: { [slot]: dataURL }, headers: { [screen]: dataURL } } — never in the settings, which the Mac app carries
   /** A picture file scaled to fit `max` on its longer side and encoded as a JPEG data URL, so a
    *  phone's photo does not sit in storage at twelve megapixels. Needs a document (a content script). */
-  function resizeImage(file, max = 1280, quality = 0.84) {
+  /** An image element for a file or a data URL, once it has loaded. */
+  function loadPicture(src, isFile) {
     return new Promise((resolve, reject) => {
-      if (!file || !/^image\//.test(file.type)) { reject(new Error('Not a picture')); return; }
-      const url = URL.createObjectURL(file);
+      const url = isFile ? URL.createObjectURL(src) : src;
       const img = new Image();
-      img.onload = () => {
-        try {
-          const scale = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
-          const cv = document.createElement('canvas');
-          cv.width = Math.max(1, Math.round(img.naturalWidth * scale));
-          cv.height = Math.max(1, Math.round(img.naturalHeight * scale));
-          cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
-          resolve(cv.toDataURL('image/jpeg', quality));
-        } catch (e) { reject(e); } finally { URL.revokeObjectURL(url); }
-      };
-      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('The picture could not be read')); };
+      img.onload = () => { if (isFile) URL.revokeObjectURL(url); resolve(img); };
+      img.onerror = () => { if (isFile) URL.revokeObjectURL(url); reject(new Error('The picture could not be read')); };
       img.src = url;
     });
   }
-  const emptyImages = () => ({ side: null, cards: {}, headers: {} });
+  /** The photo's own colour: its pixels averaged over a small copy, the vivid ones counting for
+   *  more than the grey, so a photo of a sky gives its blue rather than the grey of its clouds.
+   *  The blur fades into a mix of this and the ground (app.css), never into plain black or white. */
+  function toneOf(img) {
+    const cv = document.createElement('canvas');
+    cv.width = 24; cv.height = 24;
+    const cx = cv.getContext('2d');
+    cx.drawImage(img, 0, 0, 24, 24);
+    const d = cx.getImageData(0, 0, 24, 24).data;
+    let r = 0, g = 0, b = 0, w = 0;
+    for (let i = 0; i < d.length; i += 4) {
+      const [, s, l] = rgbToHsl([d[i], d[i + 1], d[i + 2]]);
+      const k = (0.2 + s) * (1 - Math.abs(l - 0.5) * 0.8); // vivid and mid-toned pixels count most
+      r += d[i] * k; g += d[i + 1] * k; b += d[i + 2] * k; w += k;
+    }
+    return w ? rgbToHex([r / w, g / w, b / w]) : '#808080';
+  }
+  /** A file scaled to `max` on its longer side as a JPEG data URL, with its tone. */
+  async function readImage(file, max = 1280, quality = 0.84) {
+    if (!file || !/^image\//.test(file.type)) throw new Error('Not a picture');
+    const img = await loadPicture(file, true);
+    const scale = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+    const cv = document.createElement('canvas');
+    cv.width = Math.max(1, Math.round(img.naturalWidth * scale));
+    cv.height = Math.max(1, Math.round(img.naturalHeight * scale));
+    cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+    return { data: cv.toDataURL('image/jpeg', quality), tone: toneOf(img) };
+  }
+  const resizeImage = (file, max, quality) => readImage(file, max, quality).then((r) => r.data);
+  /** The tone of a photo already kept (a data URL). */
+  const imageTone = (data) => loadPicture(data, false).then(toneOf);
+  // the keys the tones are kept under: 'side', a counter's slot, 'head:<screen>'
+  const toneKeys = (images) => [...(images?.side ? ['side'] : []), ...Object.keys(images?.cards || {}).filter((k) => images.cards[k]), ...Object.keys(images?.headers || {}).filter((k) => images.headers[k]).map((k) => `head:${k}`)];
+  const imageAt = (images, key) => (key === 'side' ? images.side : key.startsWith('head:') ? images.headers?.[key.slice(5)] : images.cards?.[key]);
+  /** Photos kept before tones were (2.60–2.63) get theirs read now, and saved; the images come back with them. */
+  async function fillTones(images) {
+    if (!images) return images;
+    images.tones = images.tones || {};
+    let added = 0;
+    for (const key of toneKeys(images)) {
+      if (images.tones[key]) continue;
+      try { images.tones[key] = await imageTone(imageAt(images, key)); added++; } catch { /* left without a tone: the ground colour serves */ }
+    }
+    if (added) await saveImages(images).catch(() => {});
+    return images;
+  }
+  const emptyImages = () => ({ side: null, cards: {}, headers: {}, tones: {} });
   async function loadImages() {
     try {
       const r = await BCV.api.storage.local.get(IMAGES_KEY);
       const v = r?.[IMAGES_KEY];
-      return v && typeof v === 'object' ? { side: v.side || null, cards: { ...(v.cards || {}) }, headers: { ...(v.headers || {}) } } : emptyImages();
+      return v && typeof v === 'object' ? { side: v.side || null, cards: { ...(v.cards || {}) }, headers: { ...(v.headers || {}) }, tones: { ...(v.tones || {}) } } : emptyImages();
     } catch { return emptyImages(); }
   }
-  const saveImages = (images) => BCV.api.storage.local.set({ [IMAGES_KEY]: { side: images?.side || null, cards: { ...(images?.cards || {}) }, headers: { ...(images?.headers || {}) } } });
+  const saveImages = (images) => BCV.api.storage.local.set({ [IMAGES_KEY]: { side: images?.side || null, cards: { ...(images?.cards || {}) }, headers: { ...(images?.headers || {}) }, tones: Object.fromEntries(toneKeys(images).filter((k) => images?.tones?.[k]).map((k) => [k, images.tones[k]])) } });
   const countImages = (images) => (images?.side ? 1 : 0) + Object.values(images?.cards || {}).filter(Boolean).length + Object.values(images?.headers || {}).filter(Boolean).length;
   const countHeaders = (images) => Object.values(images?.headers || {}).filter(Boolean).length;
 
@@ -224,6 +261,6 @@
     hexToRgb, rgbToHex, rgbToHsl, hslToRgb, hslToHex, luminance, contrast, normalize,
     GROUND, MIN_SAT, ICON_RATIO, TEXT_RATIO, PRESETS, CARD_SLOTS, HEADER_SLOTS, IMAGES_KEY,
     palette, shades, cssVars, apply, readable, band, nearest, fromControls, toControls,
-    resizeImage, loadImages, saveImages, countImages, countHeaders, emptyImages,
+    resizeImage, readImage, imageTone, fillTones, loadImages, saveImages, countImages, countHeaders, emptyImages,
   };
 })();

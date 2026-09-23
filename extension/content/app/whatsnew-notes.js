@@ -24,6 +24,10 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.64.0', date: '2026-09-23', notes: [
+      { kind: 'improved', title: 'Blur in its own colour', body: 'A photo fades into a colour of its own, not black or white.', icon: P.pic },
+      { kind: 'fixed', title: 'Depth slider', body: 'Dragging Depth no longer trips the Theme step in Safari.', icon: P.check },
+    ] },
     { version: '2.63.0', date: '2026-09-23', notes: [
       { kind: 'fixed', title: 'Headers stay put', body: 'A header with a photo sits at the top again, and sticks.', icon: P.pin },
       { kind: 'fixed', title: 'The × on a photo', body: 'Taking a photo off a counter works in Safari too.', icon: P.check },

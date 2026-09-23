@@ -546,6 +546,8 @@
     ]);
   }
   const layers = (pic) => (pic ? [h('i', { class: 'tpv__pic tpv__pic--sharp' }), h('i', { class: 'tpv__pic tpv__pic--blur' }), h('i', { class: 'tpv__pic tpv__pic--veil' })] : []);
+  /** The inline style for a slot with a photo: the picture, and its tone for the veil (lib/theme.js). */
+  const picStyle = (pic, key) => (pic ? { '--pic': `url("${pic}")`, ...(st.theme.images.tones?.[key] ? { '--pic-tone': st.theme.images.tones[key] } : {}) } : null);
   /** Drops on any [data-slot] inside `root` go to setImage; the zone lights while a file is over it. */
   function dropsOn(root, setImage) {
     root.addEventListener('dragover', (e) => { const z = e.target.closest?.('[data-slot]'); if (!z) return; e.preventDefault(); z.classList.add('is-over'); });
@@ -557,12 +559,13 @@
   function imageSetter(stepKey, after) {
     return async (slot, file) => {
       const th = st.theme;
-      const put = (data) => { if (slot === 'side') th.images.side = data; else if (slot.startsWith('head:')) th.images.headers[slot.slice(5)] = data; else th.images.cards[slot] = data; };
-      const drop = () => { if (slot === 'side') th.images.side = null; else if (slot.startsWith('head:')) delete th.images.headers[slot.slice(5)]; else delete th.images.cards[slot]; };
+      th.images.tones = th.images.tones || {};
+      const put = ({ data, tone }) => { if (slot === 'side') th.images.side = data; else if (slot.startsWith('head:')) th.images.headers[slot.slice(5)] = data; else th.images.cards[slot] = data; th.images.tones[slot] = tone; };
+      const drop = () => { if (slot === 'side') th.images.side = null; else if (slot.startsWith('head:')) delete th.images.headers[slot.slice(5)]; else delete th.images.cards[slot]; delete th.images.tones[slot]; };
       if (!file) { drop(); after(); paintChrome(); return; }
       ui.hint.textContent = 'Reading the photo…';
       try {
-        put(await T().resizeImage(file, slot === 'side' ? 1280 : slot.startsWith('head:') ? 1400 : 900));
+        put(await T().readImage(file, slot === 'side' ? 1280 : slot.startsWith('head:') ? 1400 : 900));
         ui.hint.textContent = '';
       } catch (e) { ui.hint.textContent = e?.message || 'That file is not a picture.'; }
       if (!ui || STEPS[st.step]?.key !== stepKey) return;
@@ -576,14 +579,23 @@
     const phone = !!BCV.phone?.active();
     // ---- the preview
     const pv = h('div', { class: 'tpv', id: 'tpv' });
-    const setImage = imageSetter('theme', () => paintPreview());
-    const paintPreview = () => {
+    const setImage = imageSetter('theme', () => paintPreview({ rebuild: true }));
+    // The colour goes on in place — the variables and the rows' shades — and the preview is only
+    // built again when a photo comes or goes: a slider fires many times a second, and a rebuild
+    // with three photos in it each time is more than Safari will take.
+    const tintPreview = () => {
       const p = T().palette(th.accent || DEFAULT_ACCENT, dark());
       for (const [k, v] of Object.entries({ '--p-icon': p.icon, '--p-text': p.text, '--p-fill': p.fill, '--p-soft': p.soft })) pv.style.setProperty(k, v);
       pv.classList.toggle('is-default', !th.accent);
       // the rows: the regular look's own colours by default; under a colour, a shade per row
       const rowShades = th.accent ? T().shades(th.accent, dark(), PREVIEW_NAV.length) : [];
-      const side = h('div', { class: `tpv__side ${th.images.side ? 'has-pic' : ''}`, style: th.images.side ? { '--pic': `url("${th.images.side}")` } : null, dataset: { slot: 'side' } }, [
+      pv.querySelectorAll('.tpv__row').forEach((row, i) => { row.style.setProperty('--row-icon', rowShades[i]?.icon || PREVIEW_NAV[i][3]); row.style.setProperty('--row-text', rowShades[i]?.text || 'var(--pv-ink)'); });
+      pv.dataset.accent = th.accent || DEFAULT_ACCENT;
+    };
+    const paintPreview = ({ rebuild = false } = {}) => {
+      if (!rebuild && pv.childElementCount) { tintPreview(); return; }
+      const rowShades = th.accent ? T().shades(th.accent, dark(), PREVIEW_NAV.length) : [];
+      const side = h('div', { class: `tpv__side ${th.images.side ? 'has-pic' : ''}`, style: picStyle(th.images.side, 'side'), dataset: { slot: 'side' } }, [
         ...layers(th.images.side),
         h('span', { class: 'tpv__brand' }, [h('i', { class: 'tpv__tile' }), h('b', { text: 'Preview' })]),
         h('span', { class: 'tpv__nav' }, PREVIEW_NAV.map(([label, d, on, colour], i) => h('span', { class: `tpv__row ${on ? 'is-on' : ''}`, style: { '--row-icon': rowShades[i]?.icon || colour, '--row-text': rowShades[i]?.text || 'var(--pv-ink)' } }, [svg(d, { size: 14, width: 1.9, cls: 'tpv__ic' }), h('span', { text: label })]))),
@@ -598,7 +610,7 @@
         ]),
         h('span', { class: 'tpv__cards' }, PREVIEW_CARDS.map(([slot, label, n, note, icon]) => {
           const pic = th.images.cards[slot] || null;
-          return h('span', { class: `tpv__card ${pic ? 'has-pic' : ''}`, dataset: { slot }, style: pic ? { '--pic': `url("${pic}")` } : null }, [
+          return h('span', { class: `tpv__card ${pic ? 'has-pic' : ''}`, dataset: { slot }, style: picStyle(pic, slot) }, [
             ...layers(pic),
             h('span', { class: 'tpv__chead' }, [icon ? svg(ICON_D[icon], { size: 12, width: 2, cls: 'tpv__cic' }) : h('i', { class: 'tpv__cdot' }), h('span', { class: 'tpv__clabel', text: label }), h('span', { class: 'tpv__cn', text: n })]),
             h('span', { class: 'tpv__cnote', text: note }),
@@ -608,6 +620,7 @@
         h('span', { class: 'tpv__ghost' }, [h('i', { class: 'tpv__ghostk' }), ...swatches().slice(0, 3).map((col) => h('span', { class: 'tpv__ghostrow' }, [dot(col, 5), h('i', { class: 'tpv__ghostbar' })]))]),
       ]);
       pv.replaceChildren(side, main);
+      tintPreview();
     };
     if (!phone) dropsOn(pv, setImage);
     // ---- the picker: a wheel (hue round it, saturation out from the centre) with the depth beside
@@ -654,9 +667,11 @@
       shades.replaceChildren(row('Light', false), row('Dark', true));
       picker.classList.toggle('tpick--sliders', th.mode === 'sliders');
       modeBtn.textContent = th.mode === 'sliders' ? 'Use the wheel' : 'Use sliders';
-      (th.mode === 'sliders' ? depthSlot : wheelDepth).append(depth); // the one Depth slider, beside the wheel or among the sliders
-      pv.dataset.accent = seed;
     };
+    // the one Depth slider sits beside the wheel or among the sliders: moved only when the mode
+    // changes (moved on every tick, mid-drag, it would lose the drag)
+    const placeDepth = () => (th.mode === 'sliders' ? depthSlot : wheelDepth).append(depth);
+    placeDepth();
     const settled = () => { hexNote.textContent = th.accent ? 'Readable in light and dark.' : 'The interface’s regular colours.'; hexNote.classList.remove('is-moved'); paintPicker(); paintPreview(); paintChrome(); };
     const pick = (accent) => { th.accent = accent; ctl = T().toControls(accent || DEFAULT_ACCENT); settled(); };
     const slide = () => { ctl = { h: Number(hue.value), s: Number(sat.value) / 100, tone: Number(depth.value) / 100 }; th.accent = T().fromControls(ctl.h, ctl.s, ctl.tone); settled(); };
@@ -682,7 +697,7 @@
       th.accent = T().fromControls(ctl.h, ctl.s, ctl.tone);
       settled();
     });
-    modeBtn.addEventListener('click', () => { th.mode = th.mode === 'sliders' ? 'wheel' : 'sliders'; paintPicker(); });
+    modeBtn.addEventListener('click', () => { th.mode = th.mode === 'sliders' ? 'wheel' : 'sliders'; placeDepth(); paintPicker(); });
     hex.addEventListener('input', () => {
       const raw = hex.value.trim();
       const norm = T().normalize(raw.startsWith('#') ? raw : `#${raw}`);
@@ -768,7 +783,7 @@
       list.classList.toggle('is-default', !th.accent);
       list.replaceChildren(...T().HEADER_SLOTS.map(([key, title]) => {
         const pic = th.images.headers[key] || null;
-        return h('div', { class: `thd__row ${pic ? 'has-pic' : ''}`, dataset: { slot: `head:${key}`, screen: key }, style: pic ? { '--pic': `url("${pic}")` } : null }, [
+        return h('div', { class: `thd__row ${pic ? 'has-pic' : ''}`, dataset: { slot: `head:${key}`, screen: key }, style: picStyle(pic, `head:${key}`) }, [
           ...layers(pic),
           h('span', { class: 'thd__title', text: title }),
           zone(`head:${key}`, !!pic, setImage, `the ${title} header`),

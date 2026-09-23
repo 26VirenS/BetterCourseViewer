@@ -1797,32 +1797,35 @@ html.bcv-themed #bcv-app .bcv-btn--primary:hover { background: var(--bcv-accent-
 /* a counter's photo: sharp in its bottom-right corner, and blurred by a curve from there — a copy of it
  * under a Gaussian blur, masked to nothing at the corner and to full a little way out — with the card's
  * own colour veiling the top-left, where the words and the number are */
-.bcv-stat--pic { position: relative; overflow: hidden; }
+/* the veil's colour: the photo's own tone (lib/theme.js toneOf), mixed with the ground — the card by day,
+ * the dark card by night — so the blur fades into a colour of the photo's and the words still read */
+.bcv-stat--pic { position: relative; overflow: hidden; --bcv-veil: color-mix(in srgb, var(--bcv-pic-tone, var(--bcv-card)) 34%, var(--bcv-card)); }
 .bcv-stat--pic > .bcv-stat__head, .bcv-stat--pic > .bcv-stat__noterow { position: relative; z-index: 1; }
 .bcv-stat__pic { position: absolute; inset: 0; z-index: 0; pointer-events: none; background: var(--bcv-pic) right bottom / cover no-repeat; }
 .bcv-stat__pic--blur { filter: blur(14px) saturate(1.05); transform: scale(1.12); -webkit-mask-image: radial-gradient(farthest-side at 100% 100%, transparent 36%, #000 72%); mask-image: radial-gradient(farthest-side at 100% 100%, transparent 36%, #000 72%); }
-.bcv-stat__pic--veil { background: linear-gradient(to bottom right, var(--bcv-card) 28%, color-mix(in srgb, var(--bcv-card) 74%, transparent) 56%, color-mix(in srgb, var(--bcv-card) 34%, transparent) 78%, transparent 92%); } /* (the note at the foot reads; the corner stays clear) */
-.bcv-stat--pic .bcv-stat__note { text-shadow: 0 0 8px var(--bcv-card); }
+.bcv-stat__pic--veil { background: linear-gradient(to bottom right, var(--bcv-veil) 28%, color-mix(in srgb, var(--bcv-veil) 74%, transparent) 56%, color-mix(in srgb, var(--bcv-veil) 34%, transparent) 78%, transparent 92%); } /* (the note at the foot reads; the corner stays clear) */
+.bcv-stat--pic .bcv-stat__note { text-shadow: 0 0 8px var(--bcv-veil); }
 /* the sidebar's photo: sharp along the bottom, blurred as it goes up the side, the chrome's own ground
  * veiling the top so the navigation reads as it always did */
 .bcv-side--pic > :not(.bcv-side__pic) { position: relative; z-index: 1; }
+.bcv-side--pic { --bcv-veil: color-mix(in srgb, var(--bcv-pic-tone, var(--bcv-bg)) 30%, var(--bcv-bg)); }
 .bcv-side__pic { position: absolute; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
 .bcv-side__pic > i { position: absolute; inset: 0; display: block; }
 .bcv-side__pic-sharp, .bcv-side__pic-blur { background: var(--bcv-pic) center bottom / cover no-repeat; }
 .bcv-side__pic-blur { filter: blur(18px) saturate(1.05); transform: scale(1.1); -webkit-mask-image: linear-gradient(to top, transparent 20%, #000 56%); mask-image: linear-gradient(to top, transparent 20%, #000 56%); }
-.bcv-side__pic-veil { background: linear-gradient(to bottom, var(--bcv-bg) 0%, var(--bcv-bg) 32%, color-mix(in srgb, var(--bcv-bg) 78%, transparent) 58%, color-mix(in srgb, var(--bcv-bg) 46%, transparent) 80%, color-mix(in srgb, var(--bcv-bg) 26%, transparent) 100%); } /* (a thin wash stays over the foot so the rows there read) */
+.bcv-side__pic-veil { background: linear-gradient(to bottom, var(--bcv-veil) 0%, var(--bcv-veil) 32%, color-mix(in srgb, var(--bcv-veil) 78%, transparent) 58%, color-mix(in srgb, var(--bcv-veil) 46%, transparent) 80%, color-mix(in srgb, var(--bcv-veil) 26%, transparent) 100%); } /* (a thin wash stays over the foot so the rows there read) */
 html.bcv-quiz .bcv-side__pic { display: none; }
 /* a header's photo: sharp at the right, blurred as it comes left, the chrome's ground veiling the
  * left where the title and the controls sit */
 /* (the header stays sticky under the bar: sticky is positioned, so the layers sit inside it; a
  * `position: relative` here would turn its sticky top into a shift down the page) */
-.bcv-head--pic { isolation: isolate; }
+.bcv-head--pic { isolation: isolate; --bcv-veil: color-mix(in srgb, var(--bcv-pic-tone, var(--bcv-bg)) 32%, var(--bcv-bg)); }
 .bcv-head--pic > .bcv-head__in { position: relative; z-index: 1; }
 .bcv-head__pic { position: absolute; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
 .bcv-head__pic > i { position: absolute; inset: 0; display: block; }
 .bcv-head__pic-sharp, .bcv-head__pic-blur { background: var(--bcv-pic) right center / cover no-repeat; }
 .bcv-head__pic-blur { filter: blur(16px) saturate(1.05); transform: scale(1.08); -webkit-mask-image: linear-gradient(to left, transparent 28%, #000 58%); mask-image: linear-gradient(to left, transparent 28%, #000 58%); }
-.bcv-head__pic-veil { background: linear-gradient(to right, var(--bcv-bg) 0%, var(--bcv-bg) 30%, color-mix(in srgb, var(--bcv-bg) 78%, transparent) 52%, color-mix(in srgb, var(--bcv-bg) 30%, transparent) 74%, transparent 100%); }
+.bcv-head__pic-veil { background: linear-gradient(to right, var(--bcv-veil) 0%, var(--bcv-veil) 30%, color-mix(in srgb, var(--bcv-veil) 78%, transparent) 52%, color-mix(in srgb, var(--bcv-veil) 30%, transparent) 74%, transparent 100%); }
 /* the controls at the header's right sit on the sharp part of the photo: a solid ground under them */
 .bcv-head--pic .bcv-seg, .bcv-head--pic .bcv-head__row .bcv-btn, .bcv-head--pic .bcv-chips { background: var(--bcv-card); box-shadow: 0 1px 6px rgba(0,0,0,.18); }
 

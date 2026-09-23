@@ -601,7 +601,7 @@
     side.classList.toggle('bcv-side--pic', !!sidePic);
     side.replaceChildren(...[
       // the theme's photo, under everything: sharp at the foot, blurred up the side (app.css: .bcv-side__pic)
-      sidePic ? h('div', { class: 'bcv-side__pic', 'aria-hidden': 'true', style: { '--bcv-pic': `url("${sidePic}")` } }, [h('i', { class: 'bcv-side__pic-sharp' }), h('i', { class: 'bcv-side__pic-blur' }), h('i', { class: 'bcv-side__pic-veil' })]) : null,
+      sidePic ? h('div', { class: 'bcv-side__pic', 'aria-hidden': 'true', style: { '--bcv-pic': `url("${sidePic}")`, ...(state.themeImages?.tones?.side ? { '--bcv-pic-tone': state.themeImages.tones.side } : {}) } }, [h('i', { class: 'bcv-side__pic-sharp' }), h('i', { class: 'bcv-side__pic-blur' }), h('i', { class: 'bcv-side__pic-veil' })]) : null,
       brandRow(name),
       // mockup 11: the glyph in its own colour, no tile behind it; full strength on the active row, dimmed elsewhere
       // under a theme each row takes its own shade of the colour (lib/theme.js shades()), lighter at
@@ -1047,6 +1047,8 @@
     head.classList.toggle('bcv-head--pic', !!pic);
     if (!pic) { head.style.removeProperty('--bcv-pic'); return; }
     head.style.setProperty('--bcv-pic', `url("${pic}")`);
+    const tone = state.themeImages?.tones?.[`head:${screen}`];
+    if (tone) head.style.setProperty('--bcv-pic-tone', tone); else head.style.removeProperty('--bcv-pic-tone');
     head.prepend(h('div', { class: 'bcv-head__pic', 'aria-hidden': 'true' }, [h('i', { class: 'bcv-head__pic-sharp' }), h('i', { class: 'bcv-head__pic-blur' }), h('i', { class: 'bcv-head__pic-veil' })]));
   }
 
@@ -1322,6 +1324,7 @@
     if (welcome === 'look' && html.classList.contains('bcv-phone')) welcome = false;
     if (welcome) BCV.welcome.cover();
     state.themeImages = await BCV.theme?.loadImages?.().catch(() => null); // the theme's photos (lib/theme.js), for the sidebar and the Dashboard's counters
+    if (state.themeImages) BCV.theme?.fillTones?.(state.themeImages).catch(() => {}); // photos kept before tones were: read now, saved, drawn again by the listener below
     await applySkin(state.lookOn);
     mountLookToggle();
     if (state.lookOn) { BCV.tools?.mountTray?.(); BCV.tools?.focusLoad?.().catch(() => {}); } // the tray beside the switch (live activities, pinned tools); the focus timer's clock, so a session going is known
