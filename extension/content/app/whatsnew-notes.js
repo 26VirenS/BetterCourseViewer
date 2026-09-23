@@ -24,6 +24,14 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.61.0', date: '2026-09-23', notes: [
+      { kind: 'new', title: 'A colour wheel', body: 'Pick your colour on a wheel; sliders are one press away.', icon: P.pen },
+      { kind: 'new', title: 'Colour your courses', body: 'A setup step gives each course its colour.', icon: P.sparkle },
+      { kind: 'new', title: 'Photos on headers', body: 'Any page title can carry a photo, blurred towards it.', icon: P.pic },
+      { kind: 'improved', title: 'A shade per row', body: 'Under a theme, each sidebar row wears its own shade.', icon: P.layers },
+      { kind: 'improved', title: 'Titles in your colour', body: 'Page titles take the colour you chose.', icon: P.pen },
+      { kind: 'improved', title: 'A roomier setup', body: 'Every step is larger, with a note to scroll for more.', icon: P.scroll },
+    ] },
     { version: '2.60.0', date: '2026-09-23', notes: [
       { kind: 'new', title: 'Themes', body: 'Your own colour, and photos on the counters and sidebar.', icon: P.pic },
       { kind: 'new', title: 'Readable colours only', body: 'A picker that stops at colours you can read, day and night.', icon: P.eye },

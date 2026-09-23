@@ -1785,8 +1785,10 @@ html.bcv-preview #bcv-app { padding-right: var(--bcv-pv-w); }
  * that mode's grounds), and photos on the Dashboard's counters and the sidebar. The grounds keep
  * their greys: only the glyphs, the words beside them, the washes, the buttons take the colour. ---- */
 html.bcv-themed[data-bcv-theme] { --bcv-blue: var(--bcv-accent-icon); --bcv-blue-soft: var(--bcv-accent-soft); }
-html.bcv-themed .bcv-nav__ic svg { stroke: var(--bcv-accent-icon); }
-html.bcv-themed #bcv-app .bcv-nav__item, html.bcv-themed .bcv-nav__count { color: var(--bcv-accent-text); } /* (the row is a button: #bcv-app button { color: inherit } would take it back) */
+html.bcv-themed .bcv-nav__ic svg { stroke: var(--bcv-tab-icon, var(--bcv-accent-icon)); } /* (each row its own shade: app.js tabShades) */
+html.bcv-themed #bcv-app .bcv-nav__item, html.bcv-themed .bcv-nav__count { color: var(--bcv-tab-text, var(--bcv-accent-text)); }
+/* the screens' titles take the colour too (a course's title keeps the course's own) */
+html.bcv-themed .bcv-head:not(.bcv-head--course) .bcv-h1 { color: var(--bcv-accent-text); } /* (the row is a button: #bcv-app button { color: inherit } would take it back) */
 html.bcv-themed .bcv-side__label { color: var(--bcv-accent-text); opacity: .8; }
 html.bcv-themed .bcv-stat__head > svg, html.bcv-themed .bcv-sheet__tile svg { stroke: var(--bcv-accent-icon); }
 html.bcv-themed .bcv-load { background: var(--bcv-accent-soft) !important; } /* (the wash is lit in the row's own colour inline) */
@@ -1810,6 +1812,17 @@ html.bcv-themed #bcv-app .bcv-btn--primary:hover { background: var(--bcv-accent-
 .bcv-side__pic-blur { filter: blur(18px) saturate(1.05); transform: scale(1.1); -webkit-mask-image: linear-gradient(to top, transparent 20%, #000 56%); mask-image: linear-gradient(to top, transparent 20%, #000 56%); }
 .bcv-side__pic-veil { background: linear-gradient(to bottom, var(--bcv-bg) 0%, var(--bcv-bg) 32%, color-mix(in srgb, var(--bcv-bg) 78%, transparent) 58%, color-mix(in srgb, var(--bcv-bg) 46%, transparent) 80%, color-mix(in srgb, var(--bcv-bg) 26%, transparent) 100%); } /* (a thin wash stays over the foot so the rows there read) */
 html.bcv-quiz .bcv-side__pic { display: none; }
+/* a header's photo: sharp at the right, blurred as it comes left, the chrome's ground veiling the
+ * left where the title and the controls sit */
+.bcv-head--pic { position: relative; overflow: hidden; }
+.bcv-head--pic > .bcv-head__in { position: relative; z-index: 1; }
+.bcv-head__pic { position: absolute; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+.bcv-head__pic > i { position: absolute; inset: 0; display: block; }
+.bcv-head__pic-sharp, .bcv-head__pic-blur { background: var(--bcv-pic) right center / cover no-repeat; }
+.bcv-head__pic-blur { filter: blur(16px) saturate(1.05); transform: scale(1.08); -webkit-mask-image: linear-gradient(to left, transparent 28%, #000 58%); mask-image: linear-gradient(to left, transparent 28%, #000 58%); }
+.bcv-head__pic-veil { background: linear-gradient(to right, var(--bcv-bg) 0%, var(--bcv-bg) 30%, color-mix(in srgb, var(--bcv-bg) 78%, transparent) 52%, color-mix(in srgb, var(--bcv-bg) 30%, transparent) 74%, transparent 100%); }
+/* the controls at the header's right sit on the sharp part of the photo: a solid ground under them */
+.bcv-head--pic .bcv-seg, .bcv-head--pic .bcv-head__row .bcv-btn, .bcv-head--pic .bcv-chips { background: var(--bcv-card); box-shadow: 0 1px 6px rgba(0,0,0,.18); }
 
 /* ---- toast ---------------------------------------------------------------- */
 .bcv-toast { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); z-index: 60; padding: 10px 16px; border-radius: 14px; background: var(--bcv-glass); -webkit-backdrop-filter: var(--bcv-blur-glass); backdrop-filter: var(--bcv-blur-glass); box-shadow: var(--bcv-shadow-hi); border: 1px solid var(--bcv-edge); font: 500 13px/1.3 var(--bcv-font); color: var(--bcv-ink); max-width: 480px; }

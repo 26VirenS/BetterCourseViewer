@@ -33,17 +33,23 @@
     { key: 'grades', name: 'Grades', build: grades },
     { key: 'appearance', name: 'Appearance', build: appearance },
     { key: 'theme', name: 'Theme', build: theme },
+    { key: 'colours', name: 'Course colours', build: colours },
+    { key: 'headers', name: 'Headers', build: headers },
     { key: 'dashboard', name: 'Dashboard', build: dashboard },
     { key: 'sidebar', name: 'Sidebar', build: sidebar },
   ];
   let STEPS = ALL;
   // (a phone has no sidebar and no dashboard views to choose between; ?bcv=setup&step=theme is the theme step alone, for changing it later)
-  const settleSteps = () => { STEPS = st.only ? ALL.filter((s) => s.key === st.only) : BCV.phone?.active() ? ALL.filter((s) => ['courses', 'grades', 'appearance', 'theme'].includes(s.key)) : ALL; };
+  const PHONE_STEPS = ['courses', 'grades', 'appearance', 'theme', 'colours']; // no sidebar, no dashboard views, no headers to photograph
+  const settleSteps = () => { STEPS = st.only ? ALL.filter((s) => st.only.includes(s.key)) : BCV.phone?.active() ? ALL.filter((s) => PHONE_STEPS.includes(s.key)) : ALL; };
+  const lastOnly = () => !!st.only && st.step === STEPS.length - 1; // the last step of the theme on its own: Save
   const COPY = {
     courses: ['Which classes are you in?', 'Only select the courses that count towards your GPA.'],
     grades: ['Grades', 'Canvas keeps no history. Simpl Courses can, on this device.'],
     appearance: ['Light or dark?', 'Pick the look. Automatic follows your device.'],
     theme: ['Make it yours', 'A colour of your own, and photos on the counters and the sidebar. All optional.'],
+    colours: ['Colour your courses', 'Each course wears its colour everywhere: the sidebar, the cards, the calendar.'],
+    headers: ['Photos on the headers', 'A photo behind the title of any page. It blurs towards the words, so they stay easy to read.'],
     dashboard: ['What you see first', 'Pick the shape of your dashboard.'],
     sidebar: ['Where your courses live', 'Either way it is the same list.'],
     done: ['You’re set', 'Open Canvas and Simpl Courses takes over.'],
@@ -86,7 +92,8 @@
     // The ?bcv=setup that opened this is dropped from the address at once: a reload lands on the
     // page itself, and the welcome comes up on the reloaded page when the steps are done.
     const url = new URL(location.href);
-    const only = url.searchParams.get('bcv') === 'setup' && url.searchParams.get('step') === 'theme' ? 'theme' : null; // the one step, on its own, for a change later
+    // the theme's own steps, on their own, for a change later (?bcv=setup&step=theme): the colour and photos, the course colours, the headers
+    const only = url.searchParams.get('bcv') === 'setup' && url.searchParams.get('step') === 'theme' ? (BCV.phone?.active() ? ['theme', 'colours'] : ['theme', 'colours', 'headers']) : null;
     if (url.searchParams.get('bcv') === 'setup') {
       url.searchParams.delete('bcv');
       url.searchParams.delete('step');
@@ -97,7 +104,8 @@
     const images = await (BCV.theme?.loadImages?.() || Promise.resolve(null)).catch(() => null);
     st = {
       app, settings, step: 0, visited: new Set([0]), only,
-      theme: { accent: BCV.theme?.normalize?.(settings.appearance?.theme?.accent) || '', images: images || { side: null, cards: {} } }, // the colour and the photos (lib/theme.js)
+      theme: { accent: BCV.theme?.normalize?.(settings.appearance?.theme?.accent) || '', images: images || { side: null, cards: {}, headers: {} }, mode: 'wheel' }, // the colour and the photos (lib/theme.js)
+      colours: {}, // course id → the colour picked here (only the ones changed)
       scanning: false, scanError: null, courses: [], favs: new Set(), nicks: {},
       tracking: true, goal: 4, targets: {}, letters: {},
       dashView: 'list', // the list to start with, whatever Canvas has: the pick here is the student's
@@ -196,7 +204,9 @@
       case 'courses': return picked ? `${picked} ${picked === 1 ? 'course' : 'courses'}` : 'None yet';
       case 'grades': { const pf = st.courses.filter((c) => st.favs.has(c.id) && st.targets[c.id] === PASS_FAIL).length; return `${st.tracking ? `Tracking · goal ${gpa2(st.goal)}` : 'Not tracking'}${pf ? ` · ${pf} pass/fail` : ''}`; }
       case 'appearance': return LOOKS.find(([k]) => k === st.look)[1];
-      case 'theme': { const n = BCV.theme?.countImages?.(st.theme.images) || 0; const photos = n ? `${n} ${n === 1 ? 'photo' : 'photos'}` : ''; const colour = st.theme.accent ? colourName(st.theme.accent) : ''; return [colour, photos].filter(Boolean).join(' · ') || 'Default'; }
+      case 'theme': { const n = (BCV.theme?.countImages?.(st.theme.images) || 0) - (BCV.theme?.countHeaders?.(st.theme.images) || 0); const photos = n ? `${n} ${n === 1 ? 'photo' : 'photos'}` : ''; const colour = st.theme.accent ? colourName(st.theme.accent) : ''; return [colour, photos].filter(Boolean).join(' · ') || 'Regular'; }
+      case 'colours': { const n = Object.keys(st.colours).length; return n ? `${n} changed` : 'As they are'; }
+      case 'headers': { const n = BCV.theme?.countHeaders?.(st.theme.images) || 0; return n ? `${n} ${n === 1 ? 'photo' : 'photos'}` : 'None'; }
       case 'dashboard': return VIEWS.find(([k]) => k === st.dashView)[1];
       case 'sidebar': return st.sideCourses === 'always' ? 'Always listed' : 'On hover';
       default: return '';
@@ -348,7 +358,7 @@
       head.textContent = COPY.courses[0];
       sub.textContent = COPY.courses[1];
       sub.classList.add('fr__blurb--strong'); // the one thing to get right on this step, said big, bold and blue
-      wrap.replaceChildren(h('div', { class: 'listhead' }, [count, allBtn]), rows);
+      wrap.replaceChildren(h('div', { class: 'listhead' }, [count, allBtn]), rows, st.courses.length > 5 ? h('p', { class: 'scrollhint', text: 'Scroll down to see more courses' }) : null);
       nextBtn.disabled = st.favs.size === 0;
       sayHint();
       paintChrome();
@@ -524,30 +534,61 @@
     return best ? best[1] : 'Custom';
   }
   const PREVIEW_CARDS = [['today', 'Due today', '3', '25 points total', 'clock'], ['week', 'Due this week', '12', 'Across 4 courses', 'cal'], ['unread', 'Unread announcements', '2', 'Preview'], ['overdue', 'Overdue', '0', 'Nothing overdue', 'clock'], ['tomorrow', 'Due tomorrow', '1', 'Preview'], ['graded', 'Graded this week', '4', 'Preview', 'chart']];
-  const PREVIEW_NAV = [['Dashboard', 'M3 3h8v8H3zM13 3h8v8h-8zM3 13h8v8H3zM13 13h8v8h-8z', true], ['Courses', 'M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5zM4 18.5A2.5 2.5 0 0 1 6.5 16H20'], ['To Do', 'M3 4h18v16H3zM8 12l3 3 5-6'], ['Calendar', 'M3 5h18v16H3zM3 10h18M8 3v4M16 3v4'], ['Grades', 'M4 20V10M10 20V4M16 20v-8M22 20H2']];
-  const ICON_D = { clock: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 7v5l3 2', cal: 'M3 5h18v16H3zM3 10h18M8 3v4M16 3v4', chart: 'M4 20V10M10 20V4M16 20v-8M22 20H2', bell: 'M6 16V11a6 6 0 0 1 12 0v5l2 2H4zM10 20a2 2 0 0 0 4 0' };
+  // the rows of the real sidebar, each with the colour its glyph has in the interface's regular look
+  const PREVIEW_NAV = [['Dashboard', 'M3 3h8v8H3zM13 3h8v8h-8zM3 13h8v8H3zM13 13h8v8h-8z', true, '#0a6cff'], ['Courses', 'M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5zM4 18.5A2.5 2.5 0 0 1 6.5 16H20', false, '#ff9500'], ['To Do', 'M3 4h18v16H3zM8 12l3 3 5-6', false, '#34c759'], ['Calendar', 'M3 5h18v16H3zM3 10h18M8 3v4M16 3v4', false, '#5856d6'], ['Grades', 'M4 20V10M10 20V4M16 20v-8M22 20H2', false, '#af52de']];
+  const ICON_D = { clock: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 7v5l3 2', cal: 'M3 5h18v16H3zM3 10h18M8 3v4M16 3v4', chart: 'M4 20V10M10 20V4M16 20v-8M22 20H2', bell: 'M6 16V11a6 6 0 0 1 12 0v5l2 2H4zM10 20a2 2 0 0 0 4 0', photo: 'M4 16l4-5 3 4 3-3 6 7H4zM19 5v4M17 7h4' };
+  const dark = () => ui.host.getAttribute('data-theme') === 'dark';
+  /** A drop zone: a pill with the file picker in it, and × once there is a photo. */
+  function zone(slot, filled, setImage, what) {
+    return h('span', { class: `tpv__drop ${filled ? 'is-filled' : ''}`, dataset: { slot } }, [
+      h('label', { class: 'tpv__droplabel', title: filled ? 'Change the photo' : 'Add a photo' }, [svg(ICON_D.photo, { size: 12, width: 2 }), h('span', { text: filled ? 'Change' : 'Add a photo' }), h('input', { type: 'file', accept: 'image/*', 'aria-label': `A photo for ${what}`, onchange: (e) => { const f = e.target.files?.[0]; if (f) setImage(slot, f); e.target.value = ''; } })]),
+      filled ? h('button', { type: 'button', class: 'tpv__x', 'aria-label': 'Remove the photo', text: '×', onclick: (e) => { e.stopPropagation(); setImage(slot, null); } }) : null,
+    ]);
+  }
+  const layers = (pic) => (pic ? [h('i', { class: 'tpv__pic tpv__pic--sharp' }), h('i', { class: 'tpv__pic tpv__pic--blur' }), h('i', { class: 'tpv__pic tpv__pic--veil' })] : []);
+  /** Drops on any [data-slot] inside `root` go to setImage; the zone lights while a file is over it. */
+  function dropsOn(root, setImage) {
+    root.addEventListener('dragover', (e) => { const z = e.target.closest?.('[data-slot]'); if (!z) return; e.preventDefault(); z.classList.add('is-over'); });
+    root.addEventListener('dragleave', (e) => { e.target.closest?.('[data-slot]')?.classList.remove('is-over'); });
+    root.addEventListener('drop', (e) => { const z = e.target.closest?.('[data-slot]'); if (!z) return; e.preventDefault(); z.classList.remove('is-over'); const f = e.dataTransfer?.files?.[0]; if (f) setImage(z.dataset.slot, f); });
+  }
+  /** A photo read from a file, scaled here and kept in the step's state under its slot ('side', a
+   *  counter's slot, or 'head:<screen>'); null takes it away. `after` redraws. */
+  function imageSetter(stepKey, after) {
+    return async (slot, file) => {
+      const th = st.theme;
+      const put = (data) => { if (slot === 'side') th.images.side = data; else if (slot.startsWith('head:')) th.images.headers[slot.slice(5)] = data; else th.images.cards[slot] = data; };
+      const drop = () => { if (slot === 'side') th.images.side = null; else if (slot.startsWith('head:')) delete th.images.headers[slot.slice(5)]; else delete th.images.cards[slot]; };
+      if (!file) { drop(); after(); paintChrome(); return; }
+      ui.hint.textContent = 'Reading the photo…';
+      try {
+        put(await T().resizeImage(file, slot === 'side' ? 1280 : slot.startsWith('head:') ? 1400 : 900));
+        ui.hint.textContent = '';
+      } catch (e) { ui.hint.textContent = e?.message || 'That file is not a picture.'; }
+      if (!ui || STEPS[st.step]?.key !== stepKey) return;
+      after();
+      paintChrome();
+    };
+  }
   function theme() {
-    const { body, hint } = ui;
+    const { body } = ui;
     const th = st.theme;
     const phone = !!BCV.phone?.active();
-    const dark = () => ui.host.getAttribute('data-theme') === 'dark';
     // ---- the preview
     const pv = h('div', { class: 'tpv', id: 'tpv' });
+    const setImage = imageSetter('theme', () => paintPreview());
     const paintPreview = () => {
       const p = T().palette(th.accent || DEFAULT_ACCENT, dark());
       for (const [k, v] of Object.entries({ '--p-icon': p.icon, '--p-text': p.text, '--p-fill': p.fill, '--p-soft': p.soft })) pv.style.setProperty(k, v);
       pv.classList.toggle('is-default', !th.accent);
-      const zone = (slot, filled) => h('span', { class: `tpv__drop ${filled ? 'is-filled' : ''}`, dataset: { slot } }, [
-        h('label', { class: 'tpv__droplabel', title: filled ? 'Change the photo' : 'Add a photo' }, [svg('M4 16l4-5 3 4 3-3 6 7H4zM19 5v4M17 7h4', { size: 12, width: 2 }),h('span', { text: filled ? 'Change' : 'Add a photo' }), h('input', { type: 'file', accept: 'image/*', 'aria-label': `A photo for ${slot === 'side' ? 'the sidebar' : 'this counter'}`, onchange: (e) => { const f = e.target.files?.[0]; if (f) setImage(slot, f); e.target.value = ''; } })]),
-        filled ? h('button', { type: 'button', class: 'tpv__x', 'aria-label': 'Remove the photo', text: '×', onclick: (e) => { e.stopPropagation(); setImage(slot, null); } }) : null,
-      ]);
-      const layers = (pic) => (pic ? [h('i', { class: 'tpv__pic tpv__pic--sharp' }), h('i', { class: 'tpv__pic tpv__pic--blur' }), h('i', { class: 'tpv__pic tpv__pic--veil' })] : []);
+      // the rows: the regular look's own colours by default; under a colour, a shade per row
+      const rowShades = th.accent ? T().shades(th.accent, dark(), PREVIEW_NAV.length) : [];
       const side = h('div', { class: `tpv__side ${th.images.side ? 'has-pic' : ''}`, style: th.images.side ? { '--pic': `url("${th.images.side}")` } : null, dataset: { slot: 'side' } }, [
         ...layers(th.images.side),
         h('span', { class: 'tpv__brand' }, [h('i', { class: 'tpv__tile' }), h('b', { text: 'Preview' })]),
-        h('span', { class: 'tpv__nav' }, PREVIEW_NAV.map(([label, d, on]) => h('span', { class: `tpv__row ${on ? 'is-on' : ''}` }, [svg(d, { size: 12, width: 1.9, cls: 'tpv__ic' }), h('span', { text: label })]))),
-        h('span', { class: 'tpv__favs' }, swatches().slice(0, 3).map((col) => h('span', { class: 'tpv__fav' }, [dot(col, 6), h('span', { class: 'tpv__favbar' })]))),
-        phone ? null : zone('side', !!th.images.side),
+        h('span', { class: 'tpv__nav' }, PREVIEW_NAV.map(([label, d, on, colour], i) => h('span', { class: `tpv__row ${on ? 'is-on' : ''}`, style: { '--row-icon': rowShades[i]?.icon || colour, '--row-text': rowShades[i]?.text || 'var(--pv-ink)' } }, [svg(d, { size: 14, width: 1.9, cls: 'tpv__ic' }), h('span', { text: label })]))),
+        h('span', { class: 'tpv__favs' }, swatches().slice(0, 3).map((col) => h('span', { class: 'tpv__fav' }, [dot(col, 7), h('span', { class: 'tpv__favbar' })]))),
+        phone ? null : zone('side', !!th.images.side, setImage, 'the sidebar'),
       ]);
       const main = h('div', { class: 'tpv__main' }, [
         h('span', { class: 'tpv__kicker', text: 'Preview · not your real numbers' }),
@@ -556,31 +597,17 @@
           const pic = th.images.cards[slot] || null;
           return h('span', { class: `tpv__card ${pic ? 'has-pic' : ''}`, dataset: { slot }, style: pic ? { '--pic': `url("${pic}")` } : null }, [
             ...layers(pic),
-            h('span', { class: 'tpv__chead' }, [icon ? svg(ICON_D[icon], { size: 10, width: 2, cls: 'tpv__cic' }) : h('i', { class: 'tpv__cdot' }), h('span', { class: 'tpv__clabel', text: label }), h('span', { class: 'tpv__cn', text: n })]),
+            h('span', { class: 'tpv__chead' }, [icon ? svg(ICON_D[icon], { size: 12, width: 2, cls: 'tpv__cic' }) : h('i', { class: 'tpv__cdot' }), h('span', { class: 'tpv__clabel', text: label }), h('span', { class: 'tpv__cn', text: n })]),
             h('span', { class: 'tpv__cnote', text: note }),
-            phone ? null : zone(slot, !!pic),
+            phone ? null : zone(slot, !!pic, setImage, 'this counter'),
           ]);
         })),
       ]);
       pv.replaceChildren(side, main);
     };
-    // a photo dropped on a counter or the sidebar (or chosen from the zone's own picker): scaled here, kept here
-    const setImage = async (slot, file) => {
-      if (!file) { if (slot === 'side') th.images.side = null; else delete th.images.cards[slot]; paintPreview(); paintChrome(); return; }
-      hint.textContent = 'Reading the photo…';
-      try {
-        const data = await T().resizeImage(file, slot === 'side' ? 1280 : 900);
-        if (slot === 'side') th.images.side = data; else th.images.cards[slot] = data;
-        hint.textContent = '';
-      } catch (e) { hint.textContent = e?.message || 'That file is not a picture.'; }
-      if (!ui || STEPS[st.step]?.key !== 'theme') return;
-      paintPreview();
-      paintChrome();
-    };
-    pv.addEventListener('dragover', (e) => { const z = e.target.closest?.('[data-slot]'); if (!z || phone) return; e.preventDefault(); z.classList.add('is-over'); });
-    pv.addEventListener('dragleave', (e) => { e.target.closest?.('[data-slot]')?.classList.remove('is-over'); });
-    pv.addEventListener('drop', (e) => { const z = e.target.closest?.('[data-slot]'); if (!z || phone) return; e.preventDefault(); z.classList.remove('is-over'); const f = e.dataTransfer?.files?.[0]; if (f) setImage(z.dataset.slot, f); });
-    // ---- the picker
+    if (!phone) dropsOn(pv, setImage);
+    // ---- the picker: a wheel (hue round it, saturation out from the centre) with the depth beside
+    // it, or the three sliders — the same colour either way
     let ctl = T().toControls(th.accent || DEFAULT_ACCENT); // { h, s, tone }
     const hue = h('input', { type: 'range', class: 'tpick__range tpick__range--hue', id: 'hue', min: '0', max: '360', step: '1', 'aria-label': 'Hue' });
     const depth = h('input', { type: 'range', class: 'tpick__range', id: 'depth', min: '0', max: '100', step: '1', 'aria-label': 'Depth' });
@@ -589,6 +616,12 @@
     const hexNote = h('span', { class: 'tpick__note', id: 'hexNote' });
     const chips = h('div', { class: 'chips', id: 'chips' });
     const shades = h('div', { class: 'tpick__shades', id: 'shades' });
+    const knob = h('i', { class: 'tpick__knob' });
+    const wheel = h('div', { class: 'tpick__wheel', id: 'wheel', role: 'slider', tabindex: '0', 'aria-label': 'Hue and saturation', 'aria-valuetext': '' }, [h('i', { class: 'tpick__wheelcore' }), knob]);
+    const modeBtn = h('button', { type: 'button', class: 'tpick__mode', id: 'pickMode' });
+    const depthSlot = h('span', { class: 'tpick__slslot' });
+    const wheelDepth = h('span', { class: 'tpick__slslot' });
+    const picker = h('div', { class: 'tpick', id: 'tpick' });
     const tracks = () => {
       const t = T();
       hue.style.setProperty('--track', `linear-gradient(to right, ${[0, 60, 120, 180, 240, 300, 360].map((d) => t.hslToHex([d, 0.85, 0.5])).join(', ')})`);
@@ -596,6 +629,11 @@
       depth.style.setProperty('--track', `linear-gradient(to right, ${t.hslToHex([ctl.h, ctl.s, hi])}, ${t.hslToHex([ctl.h, ctl.s, lo])})`);
       const l = hi - (hi - lo) * ctl.tone;
       sat.style.setProperty('--track', `linear-gradient(to right, ${t.hslToHex([ctl.h, t.MIN_SAT, l])}, ${t.hslToHex([ctl.h, 1, l])})`);
+      // the knob: the hue is the angle round from the top, the saturation the distance out
+      const r = 50 * ctl.s; const a = (ctl.h * Math.PI) / 180;
+      knob.style.left = `${50 + r * Math.sin(a)}%`; knob.style.top = `${50 - r * Math.cos(a)}%`;
+      knob.style.background = th.accent || DEFAULT_ACCENT;
+      wheel.setAttribute('aria-valuetext', `hue ${Math.round(ctl.h)}°, saturation ${Math.round(ctl.s * 100)}%`);
     };
     const paintPicker = ({ typed = false } = {}) => {
       const t = T();
@@ -605,16 +643,42 @@
       tracks();
       // (the chips are built once and marked in place: a chip rebuilt under the pointer — the hex
       // field's blur repaints — would take the press with it)
-      if (!chips.childElementCount) chips.append(h('button', { type: 'button', class: 'chip', dataset: { preset: '' }, onclick: () => pick('') }, [h('i', { class: 'chip__dot chip__dot--default' }), h('span', { text: 'Default' })]),
+      if (!chips.childElementCount) chips.append(h('button', { type: 'button', class: 'chip', dataset: { preset: '' }, onclick: () => pick('') }, [h('i', { class: 'chip__dot chip__dot--default' }), h('span', { text: 'Regular' })]),
         ...t.PRESETS.slice(1).map(([phex, name]) => h('button', { type: 'button', class: 'chip', dataset: { preset: phex }, onclick: () => pick(phex) }, [h('i', { class: 'chip__dot', style: { background: phex } }), h('span', { text: name })])));
       for (const c of chips.children) { const on = (c.dataset.preset || '') === (th.accent || ''); c.classList.toggle('is-on', on); c.setAttribute('aria-pressed', on ? 'true' : 'false'); }
       const row = (label, isDark) => { const p = t.palette(seed, isDark); return h('div', { class: `tpick__shaderow ${isDark ? 'is-dark' : ''}` }, [h('span', { class: 'tpick__shadelabel', text: label }), ...[['Icons', p.icon], ['Words', p.text], ['Buttons', p.fill], ['Tint', p.soft]].map(([n, c]) => h('span', { class: 'tpick__shade', title: n, style: { background: c } }))]); };
       shades.replaceChildren(row('Light', false), row('Dark', true));
+      picker.classList.toggle('tpick--sliders', th.mode === 'sliders');
+      modeBtn.textContent = th.mode === 'sliders' ? 'Use the wheel' : 'Use sliders';
+      (th.mode === 'sliders' ? depthSlot : wheelDepth).append(depth); // the one Depth slider, beside the wheel or among the sliders
       pv.dataset.accent = seed;
     };
-    const pick = (accent) => { th.accent = accent; ctl = T().toControls(accent || DEFAULT_ACCENT); hexNote.textContent = accent ? 'Readable in light and dark.' : 'The interface’s own blue.'; hexNote.classList.remove('is-moved'); paintPicker(); paintPreview(); paintChrome(); };
-    const slide = () => { ctl = { h: Number(hue.value), s: Number(sat.value) / 100, tone: Number(depth.value) / 100 }; th.accent = T().fromControls(ctl.h, ctl.s, ctl.tone); hexNote.textContent = 'Readable in light and dark.'; hexNote.classList.remove('is-moved'); paintPicker(); paintPreview(); paintChrome(); };
+    const settled = () => { hexNote.textContent = th.accent ? 'Readable in light and dark.' : 'The interface’s regular colours.'; hexNote.classList.remove('is-moved'); paintPicker(); paintPreview(); paintChrome(); };
+    const pick = (accent) => { th.accent = accent; ctl = T().toControls(accent || DEFAULT_ACCENT); settled(); };
+    const slide = () => { ctl = { h: Number(hue.value), s: Number(sat.value) / 100, tone: Number(depth.value) / 100 }; th.accent = T().fromControls(ctl.h, ctl.s, ctl.tone); settled(); };
     for (const r of [hue, depth, sat]) r.addEventListener('input', slide);
+    // the wheel: a press or a drag anywhere on it is a hue and a saturation (never under the readable floor)
+    const fromWheel = (e) => {
+      const r = wheel.getBoundingClientRect();
+      const dx = (e.clientX - (r.left + r.width / 2)) / (r.width / 2), dy = (e.clientY - (r.top + r.height / 2)) / (r.height / 2);
+      const h2 = ((Math.atan2(dx, -dy) * 180) / Math.PI + 360) % 360;
+      const s2 = Math.min(1, Math.max(T().MIN_SAT, Math.hypot(dx, dy)));
+      ctl = { h: h2, s: s2, tone: ctl.tone };
+      th.accent = T().fromControls(ctl.h, ctl.s, ctl.tone);
+      settled();
+    };
+    wheel.addEventListener('pointerdown', (e) => { e.preventDefault(); wheel.setPointerCapture?.(e.pointerId); wheel.classList.add('is-held'); fromWheel(e); });
+    wheel.addEventListener('pointermove', (e) => { if (wheel.classList.contains('is-held')) fromWheel(e); });
+    for (const ev of ['pointerup', 'pointercancel']) wheel.addEventListener(ev, () => wheel.classList.remove('is-held'));
+    wheel.addEventListener('keydown', (e) => {
+      const step = { ArrowLeft: [-5, 0], ArrowRight: [5, 0], ArrowUp: [0, 0.05], ArrowDown: [0, -0.05] }[e.key];
+      if (!step) return;
+      e.preventDefault();
+      ctl = { h: (ctl.h + step[0] + 360) % 360, s: Math.min(1, Math.max(T().MIN_SAT, ctl.s + step[1])), tone: ctl.tone };
+      th.accent = T().fromControls(ctl.h, ctl.s, ctl.tone);
+      settled();
+    });
+    modeBtn.addEventListener('click', () => { th.mode = th.mode === 'sliders' ? 'wheel' : 'sliders'; paintPicker(); });
     hex.addEventListener('input', () => {
       const raw = hex.value.trim();
       const norm = T().normalize(raw.startsWith('#') ? raw : `#${raw}`);
@@ -630,25 +694,87 @@
       paintChrome();
     });
     hex.addEventListener('blur', () => paintPicker());
-    const picker = h('div', { class: 'tpick', id: 'tpick' }, [
-      h('span', { class: 'kicker kicker--tight', text: 'Colour' }),
+    picker.append(
+      h('div', { class: 'tpick__head' }, [h('span', { class: 'kicker kicker--tight', text: 'Colour' }), modeBtn]),
       chips,
       h('div', { class: 'tpick__cols' }, [
+        h('div', { class: 'tpick__wheelwrap' }, [wheel, h('label', { class: 'tpick__sl tpick__sl--wheeldepth' }, [h('span', { text: 'Depth' }), wheelDepth])]),
         h('div', { class: 'tpick__sliders' }, [
-          h('label', { class: 'tpick__sl' }, [h('span', { text: 'Hue' }), hue]),
-          h('label', { class: 'tpick__sl' }, [h('span', { text: 'Depth' }), depth]),
-          h('label', { class: 'tpick__sl' }, [h('span', { text: 'Saturation' }), sat]),
+          h('label', { class: 'tpick__sl tpick__sl--hue' }, [h('span', { text: 'Hue' }), hue]),
+          h('label', { class: 'tpick__sl tpick__sl--depth' }, [h('span', { text: 'Depth' }), depthSlot]),
+          h('label', { class: 'tpick__sl tpick__sl--sat' }, [h('span', { text: 'Saturation' }), sat]),
           h('div', { class: 'tpick__hexrow' }, [hex, hexNote]),
         ]),
         h('div', { class: 'tpick__reads' }, [h('span', { class: 'tpick__readslabel', text: 'How it reads' }), shades]),
       ]),
       h('span', { class: 'tpick__foot', text: phone ? 'Photos go on the desktop’s Dashboard; the colour is yours everywhere.' : 'Every shade here passes contrast checks in light and dark. Photos stay on this device.' }),
-    ]);
+    );
     body.append(...heading('theme'), h('div', { class: 'theme' }, [pv, picker]));
-    hexNote.textContent = th.accent ? 'Readable in light and dark.' : 'The interface’s own blue.';
+    hexNote.textContent = th.accent ? 'Readable in light and dark.' : 'The interface’s regular colours.';
     paintPicker();
     paintPreview();
-    footer({ next: st.only ? 'Save' : st.step === STEPS.length - 1 ? 'Finish' : 'Continue', onNext: () => (st.only ? finish() : go(st.step + 1)) });
+    footer({ next: lastOnly() ? 'Save' : st.step === STEPS.length - 1 ? 'Finish' : 'Continue', onNext: () => (lastOnly() ? finish() : go(st.step + 1)) });
+  }
+
+  // ---- 5 · the courses' colours ----------------------------------------------------------------------
+  // Each course chosen in step 1, with Canvas's fifteen colours (and one of your own) beside it; the
+  // colour is the course's own in Canvas, so it goes everywhere Canvas and this interface draw it.
+  function colours() {
+    const { body } = ui;
+    const COLS = BCV.ui?.COURSE_COLORS || [];
+    const list = h('div', { class: 'cc', id: 'cc' });
+    const colourOf = (c) => st.colours[c.id] || c.color || '#8e8e93';
+    // on its own (the theme's steps for a change later) the courses step has not run: the courses
+    // shown are Canvas's favourites, read now
+    const loading = st.only && !st.courses.length;
+    if (loading) scan().then(() => { if (!ui || STEPS[st.step]?.key !== 'colours') return; st.favs = new Set(st.courses.filter((c) => c.favorite).map((c) => c.id)); draw(); paintChrome(); });
+    const draw = () => {
+      const picked = chosen();
+      if (!picked.length && loading && st.scanning) { list.replaceChildren(h('div', { class: 'ghosts' }, [0, 1, 2].map(() => h('span', { class: 'ghost' })))); return; }
+      if (!picked.length) { list.replaceChildren(h('div', { class: 'empty' }, [h('span', { text: st.only ? 'No favourite courses to colour yet.' : 'Pick your courses in the first step to colour them.' })])); return; }
+      list.replaceChildren(...picked.map((c) => {
+        const cur = colourOf(c).toLowerCase();
+        const custom = h('input', { type: 'color', class: 'cc__custom', value: /^#[0-9a-f]{6}$/i.test(cur) ? cur : '#8e8e93', 'aria-label': `A colour of your own for ${label(c)}` });
+        custom.addEventListener('change', () => { st.colours[c.id] = custom.value.toUpperCase(); draw(); paintChrome(); });
+        return h('div', { class: 'cc__row', dataset: { course: c.id } }, [
+          h('span', { class: 'cc__who' }, [dot(colourOf(c), 12), h('span', { class: 'cc__body' }, [h('b', { class: 'cc__code', text: label(c) }), h('span', { class: 'cc__name', text: c.name })])]),
+          h('span', { class: 'cc__sw' }, [
+            ...COLS.map(([hx, name]) => h('button', { type: 'button', class: `cc__swatch ${hx.toLowerCase() === cur ? 'is-on' : ''}`, title: name, 'aria-label': name, 'aria-pressed': hx.toLowerCase() === cur ? 'true' : 'false', dataset: { color: hx }, style: { background: hx }, onclick: () => { if (hx.toLowerCase() === String(c.color || '').toLowerCase()) delete st.colours[c.id]; else st.colours[c.id] = hx; draw(); paintChrome(); } }, hx.toLowerCase() === cur ? svg(CHECK, { size: 11, stroke: '#fff', width: 2.8 }) : null)),
+            h('label', { class: 'cc__swatch cc__swatch--custom', title: 'A colour of your own' }, custom),
+          ]),
+        ]);
+      }));
+    };
+    draw();
+    body.append(...heading('colours'), list);
+    footer({ next: lastOnly() ? 'Save' : st.step === STEPS.length - 1 ? 'Finish' : 'Continue', onNext: () => (lastOnly() ? finish() : go(st.step + 1)) });
+  }
+
+  // ---- 6 · photos on the headers ---------------------------------------------------------------------
+  // Every page with a header, as a list: the title as the page draws it (in the colour chosen, if
+  // one was), and a zone for a photo, which sits at the right and blurs as it comes left.
+  function headers() {
+    const { body } = ui;
+    const th = st.theme;
+    const list = h('div', { class: 'thd', id: 'thd' });
+    const setImage = imageSetter('headers', () => draw());
+    const draw = () => {
+      const p = T().palette(th.accent || DEFAULT_ACCENT, dark());
+      list.style.setProperty('--p-text', p.text);
+      list.classList.toggle('is-default', !th.accent);
+      list.replaceChildren(...T().HEADER_SLOTS.map(([key, title]) => {
+        const pic = th.images.headers[key] || null;
+        return h('div', { class: `thd__row ${pic ? 'has-pic' : ''}`, dataset: { slot: `head:${key}`, screen: key }, style: pic ? { '--pic': `url("${pic}")` } : null }, [
+          ...layers(pic),
+          h('span', { class: 'thd__title', text: title }),
+          zone(`head:${key}`, !!pic, setImage, `the ${title} header`),
+        ]);
+      }));
+    };
+    dropsOn(list, setImage);
+    draw();
+    body.append(...heading('headers'), list);
+    footer({ next: lastOnly() ? 'Save' : st.step === STEPS.length - 1 ? 'Finish' : 'Continue', onNext: () => (lastOnly() ? finish() : go(st.step + 1)) });
   }
 
   // ---- 5 · where the courses live --------------------------------------------------------------------
@@ -684,6 +810,8 @@
       ['Grade history', st.tracking ? `On · goal ${gpa2(st.goal)}` : 'Off'],
       ['Appearance', answer('appearance')],
       ['Theme', answer('theme')],
+      ['Course colours', answer('colours')],
+      ...(STEPS.some((s) => s.key === 'headers') ? [['Headers', answer('headers')]] : []),
       ...(STEPS.some((s) => s.key === 'dashboard') ? [['Dashboard', answer('dashboard')]] : []),
       ...(STEPS.some((s) => s.key === 'sidebar') ? [['Sidebar', answer('sidebar')]] : []),
     ];
@@ -699,6 +827,7 @@
     st.closing = true;
     try {
       await Promise.all([S.update({ appearance: { theme: { accent: st.theme.accent || '' } } }), BCV.theme?.saveImages?.(st.theme.images)]);
+      await writeColours();
     } catch (e) { console.error('[Simpl Courses setup]', e); }
     location.reload();
   }
@@ -710,9 +839,13 @@
    *  in place (the shell, the sidebar list and the dashboard view are all read at boot) and the
    *  welcome, armed before the reload, on it. The card stays up until the new page arrives.
    *  There is no other way out: the card is only done when the steps are. */
+  /** The course colours picked in the Colours step, written to Canvas one by one (each is the course's own colour there). */
+  async function writeColours() {
+    for (const [id, hex] of Object.entries(st.colours)) await store.setColor(id, hex).catch(() => {});
+  }
   async function finish() {
     if (!st || st.closing) return;
-    if (st.only === 'theme') return finishTheme();
+    if (st.only) return finishTheme();
     st.closing = true;
     const { app } = st;
     try {
@@ -732,6 +865,7 @@
       for (const c of changes) await store.setFavorite(c.id, st.favs.has(c.id)).catch(() => {});
       const renamed = st.courses.filter((c) => c.id in st.nicks && String(st.nicks[c.id]).trim() !== (c.nickname || ''));
       for (const c of renamed) await store.setNickname(c.id, st.nicks[c.id]).catch(() => {});
+      await writeColours();
       // the version installed is seen: What's new is for updates, never for a fresh install
       let installed = null;
       try { installed = BCV.api.runtime.getManifest().version || null; } catch { /* no version to note */ }

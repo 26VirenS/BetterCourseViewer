@@ -98,6 +98,27 @@
       ring: alpha(seed, dark ? 0.45 : 0.32),
     };
   }
+  /** One shade per sidebar row, so the rail is not a single flat colour: the accent's hue drifts a
+   *  little across the rows and its lightness walks the readable band from lighter to deeper (the
+   *  band is readable in both modes, so the walk is the same in each), and every glyph shade is
+   *  then pushed to this mode's icon contrast, its words to the text contrast. */
+  function shades(accent, dark, n) {
+    const seed = normalize(accent);
+    if (!seed || !(n > 0)) return [];
+    const ground = dark ? GROUND.dark : GROUND.light;
+    const [h, s] = rgbToHsl(hexToRgb(seed));
+    const out = [];
+    for (let i = 0; i < n; i++) {
+      const t = n === 1 ? 0.5 : i / (n - 1);
+      const hue = (h + (t - 0.5) * 36 + 360) % 360; // ±18° across the rows
+      const sat = clamp(s + (t - 0.5) * 0.16, MIN_SAT, 1);
+      const [lo, hi] = band(hue, sat);
+      const l = dark ? lo + (hi - lo) * (0.85 - t * 0.7) : lo + (hi - lo) * (0.75 - t * 0.6); // lighter rows first, deeper below
+      const base = hslToHex([hue, sat, l]);
+      out.push({ icon: reach(base, ground, ICON_RATIO, dark), text: reach(base, ground, TEXT_RATIO, dark) });
+    }
+    return out;
+  }
   /** The CSS custom properties the stylesheet reads (app.css: html.bcv-themed). */
   const cssVars = (p) => ({ '--bcv-accent': p.accent, '--bcv-accent-icon': p.icon, '--bcv-accent-text': p.text, '--bcv-accent-fill': p.fill, '--bcv-accent-hover': p.hover, '--bcv-accent-soft': p.soft, '--bcv-accent-ring': p.ring });
   const VAR_NAMES = ['--bcv-accent', '--bcv-accent-icon', '--bcv-accent-text', '--bcv-accent-fill', '--bcv-accent-hover', '--bcv-accent-soft', '--bcv-accent-ring'];
@@ -163,7 +184,9 @@
   // ---- the photos: read here, scaled here, kept here ------------------------------------------------
   /** Where a photo can go: the six counters of the Dashboard, and the sidebar. */
   const CARD_SLOTS = ['today', 'week', 'unread', 'overdue', 'tomorrow', 'graded'];
-  const IMAGES_KEY = 'theme:images'; // storage.local: { side: dataURL | null, cards: { [slot]: dataURL } } — never in the settings, which the Mac app carries
+  /** The screens whose header can carry a photo (the route's screen key, and the title it shows). */
+  const HEADER_SLOTS = [['dashboard', 'Dashboard'], ['courses', 'All Courses'], ['groups', 'Groups'], ['todo', 'To Do'], ['calendar', 'Calendar'], ['notifications', 'Notifications'], ['inbox', 'Inbox'], ['gpa', 'Grades'], ['tools', 'Tools']];
+  const IMAGES_KEY = 'theme:images'; // storage.local: { side: dataURL | null, cards: { [slot]: dataURL }, headers: { [screen]: dataURL } } — never in the settings, which the Mac app carries
   /** A picture file scaled to fit `max` on its longer side and encoded as a JPEG data URL, so a
    *  phone's photo does not sit in storage at twelve megapixels. Needs a document (a content script). */
   function resizeImage(file, max = 1280, quality = 0.84) {
@@ -185,21 +208,22 @@
       img.src = url;
     });
   }
-  const emptyImages = () => ({ side: null, cards: {} });
+  const emptyImages = () => ({ side: null, cards: {}, headers: {} });
   async function loadImages() {
     try {
       const r = await BCV.api.storage.local.get(IMAGES_KEY);
       const v = r?.[IMAGES_KEY];
-      return v && typeof v === 'object' ? { side: v.side || null, cards: { ...(v.cards || {}) } } : emptyImages();
+      return v && typeof v === 'object' ? { side: v.side || null, cards: { ...(v.cards || {}) }, headers: { ...(v.headers || {}) } } : emptyImages();
     } catch { return emptyImages(); }
   }
-  const saveImages = (images) => BCV.api.storage.local.set({ [IMAGES_KEY]: { side: images?.side || null, cards: { ...(images?.cards || {}) } } });
-  const countImages = (images) => (images?.side ? 1 : 0) + Object.values(images?.cards || {}).filter(Boolean).length;
+  const saveImages = (images) => BCV.api.storage.local.set({ [IMAGES_KEY]: { side: images?.side || null, cards: { ...(images?.cards || {}) }, headers: { ...(images?.headers || {}) } } });
+  const countImages = (images) => (images?.side ? 1 : 0) + Object.values(images?.cards || {}).filter(Boolean).length + Object.values(images?.headers || {}).filter(Boolean).length;
+  const countHeaders = (images) => Object.values(images?.headers || {}).filter(Boolean).length;
 
   BCV.theme = {
     hexToRgb, rgbToHex, rgbToHsl, hslToRgb, hslToHex, luminance, contrast, normalize,
-    GROUND, MIN_SAT, ICON_RATIO, TEXT_RATIO, PRESETS, CARD_SLOTS, IMAGES_KEY,
-    palette, cssVars, apply, readable, band, nearest, fromControls, toControls,
-    resizeImage, loadImages, saveImages, countImages, emptyImages,
+    GROUND, MIN_SAT, ICON_RATIO, TEXT_RATIO, PRESETS, CARD_SLOTS, HEADER_SLOTS, IMAGES_KEY,
+    palette, shades, cssVars, apply, readable, band, nearest, fromControls, toControls,
+    resizeImage, loadImages, saveImages, countImages, countHeaders, emptyImages,
   };
 })();

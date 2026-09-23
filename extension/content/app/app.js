@@ -373,6 +373,15 @@
     try { Promise.resolve(screen.prefetch()).catch(() => {}); } catch { /* nothing to do */ }
   }
 
+  /** The rows' shades under the theme in force, memoised per accent, mode and count. */
+  let shadesMemo = null;
+  function tabShades(n) {
+    const accent = state.settings?.appearance?.theme?.accent || '';
+    const key = `${accent}|${state.dark ? 1 : 0}|${n}`;
+    if (!accent || !BCV.theme?.shades) return [];
+    if (shadesMemo?.key !== key) shadesMemo = { key, list: BCV.theme.shades(accent, state.dark, n) };
+    return shadesMemo.list;
+  }
   const navDef = () => [
     ['dashboard', 'Dashboard', IC.dash, '#0a6cff', '/', ''],
     ['courses', 'Courses', IC.book, '#ff9500', '/courses', ''],
@@ -595,10 +604,13 @@
       sidePic ? h('div', { class: 'bcv-side__pic', 'aria-hidden': 'true', style: { '--bcv-pic': `url("${sidePic}")` } }, [h('i', { class: 'bcv-side__pic-sharp' }), h('i', { class: 'bcv-side__pic-blur' }), h('i', { class: 'bcv-side__pic-veil' })]) : null,
       brandRow(name),
       // mockup 11: the glyph in its own colour, no tile behind it; full strength on the active row, dimmed elsewhere
-      h('nav', { class: 'bcv-nav' }, navDef().map(([key, label, icon, glyphColor, href, count]) => h('button', {
+      // under a theme each row takes its own shade of the colour (lib/theme.js shades()), lighter at
+      // the top and deeper below, so the rail is never one flat colour
+      h('nav', { class: 'bcv-nav' }, navDef().map(([key, label, icon, glyphColor, href, count], i, all) => h('button', {
         type: 'button',
         class: `bcv-nav__item ${r.screen === key || (key === 'groups' && r.screen === 'group') ? 'is-active' : ''}`,
         dataset: { nav: key, load: key, loadColor: glyphColor },
+        style: tabShades(all.length)[i] ? { '--bcv-tab-icon': tabShades(all.length)[i].icon, '--bcv-tab-text': tabShades(all.length)[i].text } : null,
         ...(key === 'courses' && hoverCourses() ? { 'aria-haspopup': 'true', 'aria-expanded': 'false' } : {}),
         onclick: () => { if (state.loadKey === key && !loadStuck()) return; closeQuickNav(); progress(true, key); go(href); }, // a second press on the loading row is a no-op, until that load is plainly stuck
         onpointerenter: (e) => { warm(key); quickNavHover(key, e.currentTarget); }, // the pointer arrives before the press: the screen's own data starts loading now
@@ -1009,6 +1021,7 @@
     }
     clearTimeout(skeleton);
     if (!alive()) return;
+    dressHead(el, r.screen); // the theme's photo on this screen's header, if it has one
     if (el.parentNode !== main) main.replaceChildren(el); // a screen that kept its shell (a course's rail) stays put
     progress(false);
     html.classList.add('bcv-settled'); // drawn, from Canvas's answer (the harness waits for this)
@@ -1021,6 +1034,20 @@
     // welcome, two pointers on black, is the first thing the reloaded page shows: see boot())
     if (r.params.get('bcv') === 'setup' && BCV.setup && !BCV.setup.active()) BCV.setup.open(BCV.app);
     else if (r.params.get('bcv') === 'welcome' && BCV.welcome && !BCV.welcome.active()) welcomeHere();
+  }
+
+  /** The theme's photo behind a root screen's header (the Theme step's Headers): sharp at the right,
+   *  blurred as it comes left, the chrome's own ground veiling the left where the title sits
+   *  (app.css: .bcv-head--pic). Drawn again in place when the photos change. */
+  function dressHead(el, screen) {
+    const head = el?.querySelector?.('.bcv-head:not(.bcv-head--course)');
+    if (!head) return;
+    const pic = state.themeImages?.headers?.[screen] || null;
+    head.querySelector('.bcv-head__pic')?.remove();
+    head.classList.toggle('bcv-head--pic', !!pic);
+    if (!pic) { head.style.removeProperty('--bcv-pic'); return; }
+    head.style.setProperty('--bcv-pic', `url("${pic}")`);
+    head.prepend(h('div', { class: 'bcv-head__pic', 'aria-hidden': 'true' }, [h('i', { class: 'bcv-head__pic-sharp' }), h('i', { class: 'bcv-head__pic-blur' }), h('i', { class: 'bcv-head__pic-veil' })]));
   }
 
   /** ?bcv=welcome (Settings → General → See it again, the account panel): the parameter is dropped,
@@ -1314,7 +1341,7 @@
     try {
       BCV.api.storage.onChanged.addListener((changes, area) => {
         if (area !== 'local' || !changes[BCV.theme?.IMAGES_KEY]) return;
-        BCV.theme.loadImages().then((images) => { state.themeImages = images; if (state.lookOn && document.getElementById('bcv-app')) { renderSide(); if (state.route?.screen === 'dashboard') render({ quiet: true }); } }).catch(() => {});
+        BCV.theme.loadImages().then((images) => { state.themeImages = images; if (state.lookOn && document.getElementById('bcv-app')) { renderSide(); dressHead(document.getElementById('bcv-main'), state.route?.screen); if (state.route?.screen === 'dashboard') render({ quiet: true }); } }).catch(() => {});
       });
     } catch { /* no storage events here: the next page reads them */ }
     BCV.early?.onChange((st, settings) => {
