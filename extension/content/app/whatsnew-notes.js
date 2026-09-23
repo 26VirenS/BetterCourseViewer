@@ -24,6 +24,10 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.70.0', date: '2026-09-23', notes: [
+      { kind: 'improved', title: 'Photos, a hint', body: 'Washed heavily in the look’s ground, its ink over them.', icon: P.pic },
+      { kind: 'improved', title: 'Wide windows', body: 'The page fills a zoomed-out window instead of a band.', icon: P.arrows },
+    ] },
     { version: '2.69.0', date: '2026-09-23', notes: [
       { kind: 'improved', title: 'Lighter on memory', body: 'Photos blur as pictures, not filters; Desmos lets go.', icon: P.tool },
       { kind: 'improved', title: 'Bolder colour', body: 'The greys take more of your colour.', icon: P.pen },

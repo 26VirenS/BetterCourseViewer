@@ -503,28 +503,28 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
 .pz__pic--sharp { background: var(--pic) center / cover no-repeat; animation: omFade .35s ease both; }
 .pz__pic--blur { inset: -24px; background: var(--pic) center / cover no-repeat; filter: blur(16px); }
 .pz__side .pz__pic--blur { -webkit-mask-image: linear-gradient(to top, transparent 10%, #000 62%); mask-image: linear-gradient(to top, transparent 10%, #000 62%); }
-.pz { --pz-wash: rgba(255,255,255,.12); } /* the mode's wash under every veil, as the page has it (app.css --bcv-photo-wash) */
-:host([data-theme="dark"]) .pz, html[data-theme="dark"] .pz { --pz-wash: rgba(0,0,0,.28); }
-.pz__pic--veil-side { background: linear-gradient(to top, rgba(0,0,0,.34) 0%, color-mix(in srgb, var(--veil-side) 76%, transparent) 70%), var(--pz-wash); }
+.pz { --pz-wash: rgba(255,255,255,.74); --pz-photo-ink: #1c1c1e; --pz-photo-ink2: rgba(28,28,30,.66); --pz-photo-on: rgba(0,0,0,.08); --pz-photo-chip: rgba(0,0,0,.08); --pz-veil-k: 26%; --pz-edge: rgba(255,255,255,.2); --pz-icon-k: 100%; } /* the photo surfaces as the page has them (app.css --bcv-photo-*): washed heavily in the look's ground, the look's own ink over them */
+:host([data-theme="dark"]) .pz, html[data-theme="dark"] .pz { --pz-wash: rgba(0,0,0,.72); --pz-photo-ink: #ffffff; --pz-photo-ink2: rgba(255,255,255,.72); --pz-photo-on: rgba(255,255,255,.18); --pz-photo-chip: rgba(255,255,255,.22); --pz-veil-k: 34%; --pz-edge: rgba(0,0,0,.3); --pz-icon-k: 45%; }
+.pz__pic--veil-side { background: linear-gradient(to top, var(--pz-edge) 0%, color-mix(in srgb, var(--veil-side) var(--pz-veil-k), transparent) 70%), var(--pz-wash); }
 .pz__card .pz__pic--blur { inset: -20px; filter: blur(14px); -webkit-mask-image: radial-gradient(150% 150% at 100% 100%, transparent 30%, #000 70%); mask-image: radial-gradient(150% 150% at 100% 100%, transparent 30%, #000 70%); }
-.pz__pic--veil-card { background: radial-gradient(150% 150% at 100% 100%, rgba(0,0,0,.12) 26%, color-mix(in srgb, var(--veil-card) 80%, transparent) 70%), var(--pz-wash); }
+.pz__pic--veil-card { background: radial-gradient(150% 150% at 100% 100%, transparent 26%, color-mix(in srgb, var(--veil-card) var(--pz-veil-k), transparent) 70%), var(--pz-wash); }
 .pz__hcard .pz__pic--blur { inset: -24px; filter: blur(18px); -webkit-mask-image: linear-gradient(to left, transparent 8%, #000 60%); mask-image: linear-gradient(to left, transparent 8%, #000 60%); }
-.pz__pic--veil-head { background: linear-gradient(to left, rgba(0,0,0,.08) 0%, color-mix(in srgb, var(--veil-head) 74%, transparent) 72%), var(--pz-wash); }
+.pz__pic--veil-head { background: linear-gradient(to left, transparent 0%, color-mix(in srgb, var(--veil-head) var(--pz-veil-k), transparent) 72%), var(--pz-wash); }
 .pz__sidein { position: relative; padding: 18px 11px; display: flex; flex-direction: column; gap: 2px; }
 .pz__pvbrand { display: flex; align-items: center; gap: 8px; padding: 0 8px 16px; font: 600 13px/1 var(--font); color: var(--pv-ink); }
 .pz__pvtile { display: block; width: 18px; height: 18px; border-radius: 5px; background: var(--A-btn); transition: background .3s ease; }
 .pz__row { display: flex; align-items: center; gap: 10px; padding: 7px 9px; border-radius: 9px; font: 500 12.5px/1.1 var(--font); color: var(--pv-ink); transition: background .3s ease, color .3s ease; }
 .pz__row.is-on { background: var(--A-tint); color: var(--A-read); font-weight: 600; }
 .pz__rowic { flex: none; stroke: var(--row); transition: stroke .3s ease; }
-.has-pic .pz__pvbrand, .has-pic .pz__row, .has-pic .pz__row.is-on, .has-pic .pz__crow { color: #fff; }
-.has-pic .pz__row.is-on { background: rgba(255,255,255,.2); }
-.has-pic .pz__rowic { stroke: var(--row-lit); }
+.has-pic .pz__pvbrand, .has-pic .pz__row, .has-pic .pz__row.is-on, .has-pic .pz__crow { color: var(--pz-photo-ink); }
+.has-pic .pz__row.is-on { background: var(--pz-photo-on); }
+.has-pic .pz__rowic { stroke: color-mix(in srgb, var(--row) var(--pz-icon-k), #fff); }
 .pz__courselabel { padding: 18px 9px 7px; font: 600 9.5px/1 var(--font); letter-spacing: .07em; color: var(--pz-ink3); }
-.has-pic .pz__courselabel { color: rgba(255,255,255,.7); }
+.has-pic .pz__courselabel { color: var(--pz-photo-ink2); }
 .pz__crow { display: flex; align-items: center; gap: 10px; padding: 6px 9px; border-radius: 8px; font: 500 12px/1.1 var(--font); color: var(--pv-ink); transition: background .3s ease; }
 .pz__crow span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pz__crow.is-on { background: color-mix(in srgb, var(--c) 14%, transparent); font-weight: 600; }
-.has-pic .pz__crow.is-on { background: rgba(255,255,255,.18); }
+.has-pic .pz__crow.is-on { background: var(--pz-photo-on); }
 .pz__cdot { flex: none; display: block; width: 8px; height: 8px; border-radius: 4px; background: var(--c); transition: background .3s ease; }
 .pz__badge { position: absolute; right: 12px; top: 16px; z-index: 2; display: flex; align-items: center; gap: 5px; height: 24px; padding: 0 9px 0 7px; border-radius: 15px; background: var(--pz-field); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); font: 600 9.5px/1 var(--font); color: var(--pz-ink2); pointer-events: none; animation: omFade .3s ease both; }
 .pz__badge svg { display: block; }
@@ -545,7 +545,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
 .pz__clabel { flex: 1; min-width: 0; font: 600 10.5px/1.25 var(--font); color: var(--pz-ink2); }
 .pz__cn { flex: none; font: 700 24px/1 var(--display); letter-spacing: -.03em; color: var(--A-read); transition: color .3s ease; }
 .pz__cnote { margin-top: auto; font: 400 10px/1.2 var(--font); color: var(--pz-ink3); }
-.pz__card.has-pic .pz__cic { stroke: #fff; } .pz__card.has-pic .pz__clabel { color: rgba(255,255,255,.92); } .pz__card.has-pic .pz__cn { color: #fff; } .pz__card.has-pic .pz__cnote { color: rgba(255,255,255,.78); }
+.pz__card.has-pic .pz__cic { stroke: var(--pz-photo-ink); } .pz__card.has-pic .pz__clabel { color: var(--pz-photo-ink); } .pz__card.has-pic .pz__cn { color: var(--pz-photo-ink); } .pz__card.has-pic .pz__cnote { color: var(--pz-photo-ink2); }
 .pz__list { border-radius: 14px; background: var(--pv-card); overflow: hidden; }
 .pz__lrow { display: flex; align-items: center; gap: 10px; padding: 10px 13px; border-top: 1px solid var(--pv-hair); }
 .pz__ring { flex: none; display: block; width: 12px; height: 12px; border-radius: 6px; box-sizing: border-box; border: 1.6px solid var(--A); transition: border-color .3s ease; }
@@ -558,11 +558,11 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
 .pz__hcard.is-on { outline: 2px solid var(--A) !important; }
 .pz__hin { position: relative; height: 100%; box-sizing: border-box; padding: 10px 12px 12px 16px; display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; }
 .pz__htitle { flex: 1; min-width: 0; font: 700 17px/1.2 var(--display); letter-spacing: -.025em; color: var(--pv-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pz__hcard.has-pic .pz__htitle { color: #fff; }
+.pz__hcard.has-pic .pz__htitle { color: var(--pz-photo-ink); }
 .pz__hchip { flex: none; align-self: flex-start; display: flex; align-items: center; gap: 6px; height: 24px; padding: 0 10px 0 9px; border-radius: 12px; white-space: nowrap; background: var(--pz-field); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); font: 600 11.5px/1 var(--font); color: var(--pz-ink2); }
 .pz__hchip svg { display: block; }
 .pz__hcard.is-on .pz__hchip { background: var(--A-btn); color: #fff; }
-.pz__hcard.has-pic .pz__hchip { background: rgba(255,255,255,.22); color: #fff; }
+.pz__hcard.has-pic .pz__hchip { background: var(--pz-photo-chip); color: var(--pz-photo-ink); }
 /* the photo bar, and the photo choices */
 .pz__bar2 { position: absolute; left: 50%; bottom: 16px; z-index: 5; display: flex; align-items: center; gap: 12px; padding: 10px 12px 10px 16px; border-radius: 20px; background: var(--pz-glass); -webkit-backdrop-filter: blur(24px) saturate(1.5); backdrop-filter: blur(24px) saturate(1.5); border: 1px solid var(--pz-hair); box-shadow: 0 18px 44px rgba(0,0,0,.34); animation: omPop .26s var(--ease) both; transform: translateX(-50%); white-space: nowrap; }
 .pz__bartitle { font: 600 12.5px/1.2 var(--font); color: var(--pz-ink); }
