@@ -83,12 +83,14 @@ try {
 
   await page.goto(`${BASE}/`);
   await page.waitForSelector('.bcv-stat', { timeout: 15000 });
-  await page.click('#bcv-theme-btn');
+  // the look is switched in Settings (the popup, the options page): written there, and the page loaded afresh (the sidebar's Appearance opens the editor)
+  const toggleLook = async (to) => { await sw.evaluate((patch) => self.BCV.settings.update(patch), { appearance: { darkMode: to } }); await page.waitForTimeout(300); await page.goto(`${BASE}/`); await page.waitForSelector('.bcv-stat', { timeout: 15000 }); };
+  await toggleLook('on');
   await page.waitForFunction(() => document.documentElement.getAttribute('data-bcv-theme') === 'dark', null, { timeout: 5000 });
   await page.waitForTimeout(300); // the theme switch redraws the screen; wait for that entrance too
   await settle(page, 600);
   await shot('05-dark');
-  await page.click('#bcv-theme-btn'); // leave the profile light again
+  await toggleLook('off'); // leave the profile light again
 
   // promo tiles: the icon and a screenshot inset, drawn by the browser
   const icon = `data:image/png;base64,${readFileSync(join(root, 'extension', 'icons', 'icon-256.png')).toString('base64')}`;

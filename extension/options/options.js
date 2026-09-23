@@ -205,6 +205,7 @@
     }
   };
   $('runWelcome').addEventListener('click', () => openOnCanvas('welcome'));
+  $('openWhatsNew').addEventListener('click', () => openOnCanvas('whatsnew'));
   $('openSetup').addEventListener('click', () => openOnCanvas('setup'));
   $('openTheme').addEventListener('click', () => openOnCanvas('personalize'));
 

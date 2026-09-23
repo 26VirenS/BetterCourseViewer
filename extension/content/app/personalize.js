@@ -1,7 +1,7 @@
 /* Personalize: the look, a colour, the courses' colours and photos, chosen on a preview of the
  * Dashboard (the "Personalize" mockup). It follows the guided setup — its read-back ends in
- * Continue to appearance — and opens on its own from the account panel and Settings → Appearance
- * (?bcv=personalize), ending in Save.
+ * Continue to appearance — and opens on its own from the sidebar's Appearance button and Settings →
+ * Appearance (?bcv=personalize), ending in Save.
  *
  * The rules it keeps (the mockup's developer notes):
  *   · Appearance is chosen first — Light, Dark or System, the control at the top — because every
@@ -134,6 +134,9 @@
     window.addEventListener('resize', ui.onResize);
     ui.onKey = (e) => { if (e.key === 'Escape' && st.picker.open) { e.stopPropagation(); closePicker(); } };
     host.addEventListener('keydown', ui.onKey, true);
+    // every kept picture inked before the first draw, so the preview never shows a raw photo where the page shows ink
+    await Promise.all([...new Set([st.images.side, ...Object.values(st.images.cards), ...Object.values(st.images.headers)].filter(Boolean))].map((v) => T().inkFor(v).catch(() => null)));
+    if (!st || !ui) return; // (closed while the inks were drawn)
     render('full');
   }
   function teardown() {
@@ -238,11 +241,7 @@
       h('i', { class: 'pz__pic pz__pic--sharp pz__pic--inked', style: { '--ink': T().picCss(ink.ink) } }),
       h('i', { class: 'pz__pic pz__pic--blur pz__pic--inked', style: { '--ink': T().picCss(ink.inkBlur) } }),
       h('i', { class: `pz__pic pz__pic--veil pz__pic--veil-${veilVar}` }),
-    ] : [
-      h('i', { class: 'pz__pic pz__pic--sharp', style: { '--pic': T().picCss(pic) } }),
-      h('i', { class: 'pz__pic pz__pic--blur', style: { '--pic': T().picCss(pic) } }),
-      h('i', { class: `pz__pic pz__pic--veil pz__pic--veil-${veilVar}` }),
-    ];
+    ] : [h('i', { class: 'pz__pic pz__pic--paper' })]; // (its paper alone until its ink lands — a moment — never the raw photo)
   };
   const badge = (target, has) => (st.step === 0 && !phone() ? h('span', { class: `pz__badge ${has ? 'has-pic' : ''} ${st.target === target ? 'is-on' : ''}` }, [svg(IC.camera, { size: 12, width: 2.2 }), h('span', { text: has ? 'Change' : 'Photo' })]) : null);
   function preview() {

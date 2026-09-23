@@ -2390,10 +2390,15 @@ try {
   console.log('appearance');
   await page.goto(`${BASE}/`);
   await page.waitForSelector('#bcv-theme-btn', { timeout: 10000 });
+  // the sidebar's Appearance button opens the appearance editor (which drops its ?bcv=personalize from the address at once); the light/dark switch is in the popup and Settings
   await page.click('#bcv-theme-btn');
+  check(await eventually(() => page.$('#bcv-setup .pz'), 8000) && page.url() === `${BASE}/` && (await texts('#bcv-theme-btn'))[0] === 'Appearance', `the sidebar's Appearance button opens the appearance editor (Personalize), the address left clean: ${page.url()}`);
+  // the look is switched in Settings (the popup, the options page): written there, and the page loaded afresh
+  const toggleLook = async (to) => { await setSettings({ appearance: { darkMode: to } }); await page.waitForTimeout(300); await page.goto(page.url().replace(/[?&]bcv=[^&]*/, '')); };
+  await toggleLook('on');
   await page.waitForFunction(() => document.documentElement.getAttribute('data-bcv-theme') === 'dark', null, { timeout: 5000 });
   await page.waitForSelector('.bcv-stat', { timeout: 10000 });
-  check((await texts('#bcv-theme-btn'))[0] === 'Appearance' && !!(await page.$('#bcv-theme-btn .bcv-theme-btn__ic svg')), 'dark appearance toggled from the sidebar: the switch says Appearance, its glyph the way it goes');
+  check(!!(await page.$('#bcv-theme-btn .bcv-theme-btn__ic svg')), 'dark appearance switched on in Settings, the page loaded afresh');
   check(await page.$eval('#bcv-app', (el) => getComputedStyle(el).backgroundColor === 'rgb(0, 0, 0)'), 'dark background');
   await shot(page, '25-dark-dashboard');
   await page.goto(`${BASE}/courses/101/grades`);
@@ -2460,7 +2465,7 @@ try {
   // quiet, or the reload's own requests would still be out when the counter below goes in and
   // count against the next page's ten
   await page.evaluate(() => { window.__bcvOldDoc = true; });
-  await page.click('#bcv-theme-btn');
+  await toggleLook('off');
   await page.waitForFunction(() => !window.__bcvOldDoc && document.documentElement.getAttribute('data-bcv-theme') === 'light' && !!document.querySelector('.bcv-front'), null, { timeout: 15000 });
   await page.waitForLoadState('networkidle', { timeout: 15000 });
 
@@ -3253,16 +3258,11 @@ try {
   await page.waitForSelector('#bcv-app .bcv-nav__item', { timeout: 10000 });
   await page.waitForTimeout(600);
   check(!(await page.$('#bcv-whatsnew')), 'a page reloaded while it was up does not show it again either');
-  // reachable again from the account menu, for this version alone
-  await page.waitForSelector('#bcv-account', { timeout: 15000 });
-  const openAccount = async () => { await page.click('#bcv-account'); return page.waitForSelector('.bcv-menu--account', { timeout: 3000 }).then(() => true, () => false); };
-  if (!(await openAccount())) { await page.waitForTimeout(800); await openAccount(); } // a sidebar redraw can close a menu just opened
-  const menuItems = await texts('.bcv-menu--account .bcv-menu__item');
-  check(menuItems.some((t) => /What.s new/.test(t)), `the account menu has What’s new: ${menuItems.map((t) => t.split('\n')[0]).join(' | ')}`);
-  await page.locator('.bcv-menu--account .bcv-menu__item').filter({ hasText: /What.s new/ }).click();
+  // reachable again from Settings → General (What's new → Open: the page with ?bcv=whatsnew), for this version alone
+  await page.goto(`${BASE}/?bcv=whatsnew`);
   await page.waitForSelector(wn('.wn__note'), { timeout: 10000 });
   const wn3 = await wnPage();
-  check(wn3.since === null && wn3.versions.join(' | ') === manifest.version && wn3.notes.length === cur.notes.length && wn3.more === 'Earlier versions', `the account menu opens it again, for this version alone: ${JSON.stringify(wn3.versions)}`);
+  check(wn3.since === null && wn3.versions.join(' | ') === manifest.version && wn3.notes.length === cur.notes.length && wn3.more === 'Earlier versions' && !/bcv=/.test(page.url()), `Settings opens it again, for this version alone, and the address is clean: ${JSON.stringify(wn3.versions)}`);
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('#bcv-whatsnew'), null, { timeout: 5000 });
   check(!(await page.$('#bcv-whatsnew')), 'Escape closes it too');
@@ -3317,7 +3317,7 @@ try {
   await page.click('#bcv-account');
   await page.waitForSelector('.bcv-menu--account', { timeout: 5000 });
   const acctItems = await texts('.bcv-menu--account .bcv-menu__item');
-  check(acctItems.map((t) => t.split('\n')[0].trim()).join(' | ') === 'Dark appearance | Simpl Courses settings Look, courses and grades | Guided setup Courses, grades and the welcome | Personalize The look, a colour of your own, photos | Welcome again The pointers, on black | What’s new What changed in this version | Canvas profile | All Canvas settings Profile, notifications, integrations | Notification preferences | Log out' && (await page.$eval('.bcv-menu--account', (m) => m.getBoundingClientRect().bottom <= window.innerHeight)), `the profile row opens a panel above itself: ${acctItems.join(' | ')}`);
+  check(acctItems.map((t) => t.split('\n')[0].trim()).join(' | ') === 'Simpl Courses settings Look, courses and grades | Canvas profile | All Canvas settings Profile, notifications, integrations | Notification preferences | Log out' && (await page.$eval('.bcv-menu--account', (m) => m.getBoundingClientRect().bottom <= window.innerHeight)), `the profile row opens a panel above itself: ${acctItems.join(' | ')}`);
   await shot(page, '34-account-panel');
   // the mock keeps the token in the _csrf_token cookie only, like Canvas (no meta tag), and its /logout
   // accepts a DELETE carrying exactly that token; anything else lands on Canvas's "Page Error"

@@ -633,9 +633,10 @@
       ]),
       BCV.extras?.sideGroup?.(BCV.app), // what the school added to Canvas's own nav (tools, History, Help)
       U.el('bcv-side__bottom', [
-        h('button', { type: 'button', class: 'bcv-theme-btn', id: 'bcv-theme-btn', onclick: toggleTheme }, [
-          h('span', { class: 'bcv-theme-btn__ic' }, U.svg(state.dark ? IC.sun : IC.moon, { size: 14, width: 1.8 })),
-          h('span', { text: 'Appearance' }), // (the glyph says which way it goes: a moon on a light look, a sun on a dark one)
+        // Appearance opens the appearance editor (Personalize); the light/dark switch itself is in the popup and Settings
+        h('button', { type: 'button', class: 'bcv-theme-btn', id: 'bcv-theme-btn', title: 'Personalize: the look, a colour of your own, photos', onclick: () => go('/?bcv=personalize') }, [
+          h('span', { class: 'bcv-theme-btn__ic' }, U.svg(IC.image, { size: 14, width: 1.8 })),
+          h('span', { text: 'Appearance' }),
         ]),
         h('button', { type: 'button', class: 'bcv-account', id: 'bcv-account', onclick: (e) => { e.stopPropagation(); accountMenu(e.currentTarget); }, title: 'Account', 'aria-haspopup': 'menu' }, [
           U.avatar(state.me?.avatar, state.me?.name, 30),
@@ -673,12 +674,8 @@
     ]);
     const m = U.el('bcv-menu bcv-menu--account', [
       U.el('bcv-menu__head', [U.avatar(me?.avatar, me?.name, 34), h('div', { style: { minWidth: '0' } }, [U.text('bcv-menu__name bcv-ellip', me?.name || 'Account'), U.text('bcv-menu__sub bcv-ellip', me?.email || me?.login_id || siteName())])]),
-      item(state.dark ? IC.sun : IC.moon, state.dark ? 'Light appearance' : 'Dark appearance', null, toggleTheme),
+      // Canvas's own settings, and one link to Simpl's (the look, the setup, Personalize, the welcome and What's new all live there or in the sidebar)
       item(IC.settings, 'Simpl Courses settings', 'Look, courses and grades', openSettings),
-      item(IC.sparkle, 'Guided setup', 'Courses, grades and the welcome', () => go('/?bcv=setup')),
-      item(IC.image, 'Personalize', 'The look, a colour of your own, photos', () => go('/?bcv=personalize')),
-      item(IC.cal, 'Welcome again', 'The pointers, on black', () => go('/?bcv=welcome')),
-      item(IC.star, 'What’s new', 'What changed in this version', () => BCV.whatsnew?.open(BCV.app, { manual: true })),
       U.el('bcv-menu__sep'),
       item(IC.people, 'Canvas profile', null, () => go('/profile')),
       item(IC.external, 'All Canvas settings', 'Profile, notifications, integrations', () => go('/profile/settings')),
@@ -1035,6 +1032,7 @@
     // welcome, two pointers on black, is the first thing the reloaded page shows: see boot())
     if ((r.params.get('bcv') === 'setup' || r.params.get('bcv') === 'personalize') && BCV.setup && !BCV.setup.active()) BCV.setup.open(BCV.app);
     else if (r.params.get('bcv') === 'welcome' && BCV.welcome && !BCV.welcome.active()) welcomeHere();
+    else if (r.params.get('bcv') === 'whatsnew' && BCV.whatsnew) whatsnewHere();
   }
 
   /** The theme's photo behind a root screen's header (the Theme step's Headers): sharp at the right,
@@ -1055,7 +1053,16 @@
     head.prepend(h('div', { class: `bcv-head__pic ${pic.ink ? 'has-ink' : ''}`, 'aria-hidden': 'true' }, [h('i', { class: 'bcv-head__pic-sharp' }), h('i', { class: 'bcv-head__pic-blur' }), h('i', { class: 'bcv-head__pic-veil' })]));
   }
 
-  /** ?bcv=welcome (Settings → General → See it again, the account panel): the parameter is dropped,
+  /** ?bcv=whatsnew (Settings → General → What's new): the parameter is dropped, the page drawn, and What's new opened over it for this version. */
+  async function whatsnewHere() {
+    const url = new URL(location.href);
+    url.searchParams.delete('bcv');
+    history.replaceState({ bcv: true }, '', url.pathname + url.search + url.hash);
+    state.route = parseRoute();
+    await render();
+    BCV.whatsnew?.open(BCV.app, { manual: true });
+  }
+  /** ?bcv=welcome (Settings → General → See it again): the parameter is dropped,
    *  the page drawn, and the welcome — the pointers on black that follow the setup — runs over it again. */
   async function welcomeHere() {
     const url = new URL(location.href);

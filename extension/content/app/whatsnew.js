@@ -6,8 +6,8 @@
  * however it is closed (Back to Canvas, Escape, a reload, a closed tab) it does not come back until
  * the next update. The releases before that sit behind one Earlier versions button at the foot of
  * the list. Never on a fresh install (the setup marks its own version seen), never over the setup
- * or a quiz. Reachable again from the account menu (the account sheet on a phone), for this version
- * alone. The notes themselves are data: whatsnew-notes.js. */
+ * or a quiz. Reachable again from Settings → General (?bcv=whatsnew; the account sheet on a phone),
+ * for this version alone. The notes themselves are data: whatsnew-notes.js. */
 (function () {
   const BCV = (self.BCV = self.BCV || {});
   const { h } = BCV.utils;
