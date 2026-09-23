@@ -93,6 +93,12 @@
   // ---- open / close ----------------------------------------------------------------------------
   /** Mounts the flow into the setup's overlay (`page`: the overlay's main element, whose card it
    *  replaces). `onDone` runs when Open Canvas is pressed. */
+  /** The kept set, raw for editing: every slot's asset resolved to the drawing it stands for (a scene) or the picture itself. */
+  const unpack = (kept) => {
+    const raw = (v) => T().rawOf(kept, v);
+    const map = (o) => Object.fromEntries(Object.entries(o || {}).map(([k, v]) => [k, raw(v)]).filter(([, v]) => v));
+    return { side: raw(kept.side), cards: map(kept.cards), headers: map(kept.headers), tones: { ...(kept.tones || {}) } };
+  };
   async function open({ app, host, page, onDone, standalone = false }) {
     const settings = await S.get();
     const images = await (T().loadImages?.() || Promise.resolve(null)).catch(() => null);
@@ -103,7 +109,7 @@
     st = {
       app, onDone, standalone, step: 0, done: false, target: null, page: 'dashboard', saving: false,
       look: LOOK_OF[settings.appearance?.darkMode] || 'system', settings,
-      theme: { name, ...ctl }, images: images || T().emptyImages(),
+      theme: { name, ...ctl }, images: unpack(images || T().emptyImages()),
       courses: [], selCourse: null, courseColors: {}, originalColors: {},
       picker: { open: false, owner: null, closing: false }, cHue: 0, cSat: 0, cDepth: 0,
       pvScale: 1,
@@ -156,7 +162,7 @@
     shades.forEach((c, i) => { vars[`--s${i}`] = c; vars[`--s${i}-lit`] = t.mix(c, '#ffffff', 0.45); });
     for (const [k, v] of Object.entries(vars)) ui.root.style.setProperty(k, v);
     // the preview's grounds take the same soft cast the page will (lib/theme.js palette): Regular keeps its greys
-    const PV = d ? { main: ['#0b0b0d', 0.05], side: ['#151517', 0.07], card: ['#1c1c1e', 0.06], head: ['#111113', 0.07] } : { main: ['#fbfbfd', 0.05], side: ['#f0f0f4', 0.07], card: ['#ffffff', 0.025], head: ['#f0f0f4', 0.07] };
+    const PV = d ? { main: ['#0b0b0d', 0.1], side: ['#151517', 0.14], card: ['#1c1c1e', 0.11], head: ['#111113', 0.14] } : { main: ['#fbfbfd', 0.1], side: ['#f0f0f4', 0.14], card: ['#ffffff', 0.05], head: ['#f0f0f4', 0.14] };
     for (const [k, [base, kk]] of Object.entries(PV)) { if (st.theme.name === 'Regular') ui.root.style.removeProperty(`--pv-${k}`); else ui.root.style.setProperty(`--pv-${k}`, t.mix(base, A, kk)); }
     ui.root.classList.toggle('is-regular', st.theme.name === 'Regular');
     ui.host.setAttribute('data-theme', d ? 'dark' : 'light');

@@ -503,11 +503,13 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
 .pz__pic--sharp { background: var(--pic) center / cover no-repeat; animation: omFade .35s ease both; }
 .pz__pic--blur { inset: -24px; background: var(--pic) center / cover no-repeat; filter: blur(16px); }
 .pz__side .pz__pic--blur { -webkit-mask-image: linear-gradient(to top, transparent 10%, #000 62%); mask-image: linear-gradient(to top, transparent 10%, #000 62%); }
-.pz__pic--veil-side { background: linear-gradient(to top, rgba(0,0,0,.34) 0%, color-mix(in srgb, var(--veil-side) 76%, transparent) 70%); }
+.pz { --pz-wash: rgba(255,255,255,.12); } /* the mode's wash under every veil, as the page has it (app.css --bcv-photo-wash) */
+:host([data-theme="dark"]) .pz, html[data-theme="dark"] .pz { --pz-wash: rgba(0,0,0,.28); }
+.pz__pic--veil-side { background: linear-gradient(to top, rgba(0,0,0,.34) 0%, color-mix(in srgb, var(--veil-side) 76%, transparent) 70%), var(--pz-wash); }
 .pz__card .pz__pic--blur { inset: -20px; filter: blur(14px); -webkit-mask-image: radial-gradient(150% 150% at 100% 100%, transparent 30%, #000 70%); mask-image: radial-gradient(150% 150% at 100% 100%, transparent 30%, #000 70%); }
-.pz__pic--veil-card { background: radial-gradient(150% 150% at 100% 100%, rgba(0,0,0,.12) 26%, color-mix(in srgb, var(--veil-card) 80%, transparent) 70%); }
+.pz__pic--veil-card { background: radial-gradient(150% 150% at 100% 100%, rgba(0,0,0,.12) 26%, color-mix(in srgb, var(--veil-card) 80%, transparent) 70%), var(--pz-wash); }
 .pz__hcard .pz__pic--blur { inset: -24px; filter: blur(18px); -webkit-mask-image: linear-gradient(to left, transparent 8%, #000 60%); mask-image: linear-gradient(to left, transparent 8%, #000 60%); }
-.pz__pic--veil-head { background: linear-gradient(to left, rgba(0,0,0,.08) 0%, color-mix(in srgb, var(--veil-head) 74%, transparent) 72%); }
+.pz__pic--veil-head { background: linear-gradient(to left, rgba(0,0,0,.08) 0%, color-mix(in srgb, var(--veil-head) 74%, transparent) 72%), var(--pz-wash); }
 .pz__sidein { position: relative; padding: 18px 11px; display: flex; flex-direction: column; gap: 2px; }
 .pz__pvbrand { display: flex; align-items: center; gap: 8px; padding: 0 8px 16px; font: 600 13px/1 var(--font); color: var(--pv-ink); }
 .pz__pvtile { display: block; width: 18px; height: 18px; border-radius: 5px; background: var(--A-btn); transition: background .3s ease; }
@@ -567,10 +569,10 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
 .pz__vr { display: block; width: 1px; height: 26px; background: var(--pz-hair); }
 .pz__choice { position: relative; display: flex; flex-direction: column; align-items: center; gap: 7px; padding: 0; border: 0; background: transparent; cursor: pointer; overflow: hidden; }
 .pz__choicepic { display: block; width: 68px; height: 46px; border-radius: 11px; background-size: cover; background-position: center; box-shadow: inset 0 0 0 1px var(--pz-hair); transition: box-shadow .2s ease; }
-.pz__choice.is-on .pz__choicepic { box-shadow: var(--A-ring); }
+.pz__choice.is-on .pz__choicepic { box-shadow: inset 0 0 0 2px var(--A), inset 0 0 0 4px var(--pz-bg); } /* (inset: the choice clips its overflow for the file input, and a ring outside showed along the bottom alone) */
 .pz__choicepic--none { background: linear-gradient(135deg, var(--pz-bg) 47%, var(--pz-hair2) 48%, var(--pz-hair2) 52%, var(--pz-bg) 53%); }
 .pz__choicepic--up { box-sizing: border-box; border: 1.5px dashed var(--pz-ink3); box-shadow: none; display: flex; align-items: center; justify-content: center; color: var(--pz-ink3); }
-.pz__choice.is-on .pz__choicepic--up { border-color: var(--A); color: var(--A-read); }
+.pz__choice.is-on .pz__choicepic--up { border-color: var(--A); color: var(--A-read); box-shadow: none; }
 .pz__choice--up input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; font-size: 0; }
 .pz__choicename { font: 500 11.5px/1.2 var(--font); color: var(--pz-ink3); }
 .pz__choice.is-on .pz__choicename { color: var(--pz-ink); font-weight: 600; }

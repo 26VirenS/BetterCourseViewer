@@ -24,6 +24,15 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.69.0', date: '2026-09-23', notes: [
+      { kind: 'improved', title: 'Lighter on memory', body: 'Photos blur as pictures, not filters; Desmos lets go.', icon: P.tool },
+      { kind: 'improved', title: 'Bolder colour', body: 'The greys take more of your colour.', icon: P.pen },
+      { kind: 'improved', title: 'Photos washed', body: 'Darker on the dark look, lighter on the light.', icon: P.pic },
+      { kind: 'improved', title: 'Sidebar reads', body: 'A soft halo behind the words, a hover you can see.', icon: P.eye },
+      { kind: 'improved', title: 'Solid sheets', body: 'A counter’s sheet is solid, not glass.', icon: P.layers },
+      { kind: 'improved', title: 'Clearer pins', body: 'The tray’s glyphs are bigger and brighter.', icon: P.sparkle },
+      { kind: 'fixed', title: 'Selection ring', body: 'A photo choice shows its whole ring.', icon: P.check },
+    ] },
     { version: '2.68.0', date: '2026-09-23', notes: [
       { kind: 'fixed', title: 'Sidebar photo stays', body: 'The photo holds still while the sidebar scrolls.', icon: P.pin },
       { kind: 'improved', title: 'Appearance', body: 'The sidebar’s switch just says Appearance.', icon: P.toggle },

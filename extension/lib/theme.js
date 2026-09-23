@@ -93,11 +93,12 @@
     const fill = fillFor(seed); // white words on it, in either mode
     // the greys around the colour take a soft cast of it — the ground, the cards, the fills, the
     // hairlines, the secondary inks — so nothing sits apart from the colour: a few percent, never more
+    const C = dark ? CAST.dark : CAST.light;
     const G = dark
-      ? { bg: ['#000000', 0.05], card: ['#1c1c1e', 0.06], hover: ['#2c2c2e', 0.06], ink2: ['#c7c7cc', 0.1], ink3: ['#8e8e93', 0.14], glass: ['#1c1c1e', 0.06], glassA: 0.74, line: '#ffffff', sepA: 0.08, edgeA: 0.1, fillA: 0.28, fill2A: 0.14, chromeA: 0.6 }
-      : { bg: ['#f2f2f6', 0.06], card: ['#ffffff', 0.025], hover: ['#fafafc', 0.04], ink2: ['#3c3c43', 0.1], ink3: ['#8e8e93', 0.14], glass: ['#ffffff', 0.025], glassA: 0.78, line: '#3c3c43', sepA: 0.09, edgeA: 0.1, fillA: 0.12, fill2A: 0.06, chromeA: 0.7 };
+      ? { bg: ['#000000', C.bg], card: ['#1c1c1e', C.card], hover: ['#2c2c2e', C.hover], ink2: ['#c7c7cc', C.ink2], ink3: ['#8e8e93', C.ink3], glass: ['#1c1c1e', C.glass], glassA: 0.74, line: '#ffffff', sepA: 0.08, edgeA: 0.1, fillA: 0.28, fill2A: 0.14, chromeA: 0.6 }
+      : { bg: ['#f2f2f6', C.bg], card: ['#ffffff', C.card], hover: ['#fafafc', C.hover], ink2: ['#3c3c43', C.ink2], ink3: ['#8e8e93', C.ink3], glass: ['#ffffff', C.glass], glassA: 0.78, line: '#3c3c43', sepA: 0.09, edgeA: 0.1, fillA: 0.12, fill2A: 0.06, chromeA: 0.7 };
     const cast = ([base, k]) => mix(base, seed, k);
-    const line = mix(G.line, seed, 0.35), fillBase = mix('#767680', seed, 0.35);
+    const line = mix(G.line, seed, C.line), fillBase = mix('#767680', seed, C.fill);
     return {
       accent: seed, icon, text, fill,
       hover: shift(fill, dark ? 0.08 : -0.08),
@@ -120,6 +121,12 @@
     return out;
   }
   /** The CSS custom properties the stylesheet reads (app.css: html.bcv-themed). */
+  /** How much of the seed the greys take, per mode: the ground, the cards, the hover, the secondary
+   *  inks, the glass, the hairlines and the fills. (The Personalize preview casts its grounds the same.) */
+  const CAST = {
+    light: { bg: 0.12, card: 0.05, hover: 0.08, ink2: 0.16, ink3: 0.2, glass: 0.05, line: 0.5, fill: 0.5 },
+    dark: { bg: 0.1, card: 0.11, hover: 0.1, ink2: 0.14, ink3: 0.2, glass: 0.1, line: 0.4, fill: 0.5 },
+  };
   const GROUND_VARS = { bg: '--bcv-bg', card: '--bcv-card', hover: '--bcv-hover', ink2: '--bcv-ink2', ink3: '--bcv-ink3', sep: '--bcv-sep', edge: '--bcv-edge', fill: '--bcv-fill', fill2: '--bcv-fill2', chrome: '--bcv-chrome', glass: '--bcv-glass' };
   const cssVars = (p) => ({ '--bcv-accent': p.accent, '--bcv-accent-icon': p.icon, '--bcv-accent-text': p.text, '--bcv-accent-fill': p.fill, '--bcv-accent-hover': p.hover, '--bcv-accent-soft': p.soft, '--bcv-accent-ring': p.ring, ...Object.fromEntries(Object.entries(GROUND_VARS).map(([k, v]) => [v, p.ground[k]])) });
   const VAR_NAMES = ['--bcv-accent', '--bcv-accent-icon', '--bcv-accent-text', '--bcv-accent-fill', '--bcv-accent-hover', '--bcv-accent-soft', '--bcv-accent-ring', ...Object.values(GROUND_VARS)];
@@ -347,20 +354,93 @@
     let added = 0;
     for (const key of toneKeys(images)) {
       if (images.tones[key]) continue;
-      try { images.tones[key] = await imageTone(imageAt(images, key)); added++; } catch { /* left without a tone: the ground colour serves */ }
+      try { images.tones[key] = await imageTone(picOf(images, imageAt(images, key))?.sharp); added++; } catch { /* left without a tone: the ground colour serves */ }
     }
-    if (added) await saveImages(images).catch(() => {});
+    if (added || hasRaw(images)) await saveImages(images).catch(() => {}); // (pictures kept before assets are packed now, once)
     return images;
   }
-  const emptyImages = () => ({ side: null, cards: {}, headers: {}, tones: {} });
+  // ---- kept as assets --------------------------------------------------------------------------
+  // A photo is kept once however many places wear it: a slot holds `asset:<id>` and `assets[id]`
+  // holds the picture — a raster (a drawn scene is rasterised here, once, so the page never renders
+  // SVG filters) and a small pre-blurred copy of it (so the page draws its blur as a picture scaled
+  // up, not as a filter: filtered layers are what cost Safari the memory and the frames) and, for a
+  // scene, the scene's name, so Personalize can show it as the scene it is.
+  const ASSET = /^asset:/;
+  const hashOf = (str) => { let h = 2166136261; const step = Math.max(1, Math.floor(str.length / 4096)); for (let i = 0; i < str.length; i += step) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0).toString(16) + str.length.toString(36); };
+  const sceneNameOf = (v) => (PRESET_PHOTOS.find((p) => p[1] === v) || [])[0] || null;
+  /** A box blur over RGBA pixels, clamped at the edges: across, then down. */
+  function boxBlur(d, w, h, r) {
+    const tmp = new Float32Array(d.length);
+    const n = 2 * r + 1;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { let R = 0, G = 0, B = 0; for (let k = -r; k <= r; k++) { const i = (y * w + Math.min(w - 1, Math.max(0, x + k))) * 4; R += d[i]; G += d[i + 1]; B += d[i + 2]; } const o = (y * w + x) * 4; tmp[o] = R / n; tmp[o + 1] = G / n; tmp[o + 2] = B / n; }
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { let R = 0, G = 0, B = 0; for (let k = -r; k <= r; k++) { const i = (Math.min(h - 1, Math.max(0, y + k)) * w + x) * 4; R += tmp[i]; G += tmp[i + 1]; B += tmp[i + 2]; } const o = (y * w + x) * 4; d[o] = R / n; d[o + 1] = G / n; d[o + 2] = B / n; d[o + 3] = 255; }
+  }
+  /** A picture's blurred copy: drawn tiny, blurred twice, and scaled up by the page — soft, at no cost per frame. */
+  function blurredOf(img, w = 96) {
+    const ratio = img.naturalWidth ? img.naturalHeight / img.naturalWidth : 0.5625;
+    const h = Math.max(8, Math.round(w * ratio));
+    const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+    const cx = cv.getContext('2d');
+    cx.drawImage(img, 0, 0, w, h);
+    const id = cx.getImageData(0, 0, w, h);
+    boxBlur(id.data, w, h, 3); boxBlur(id.data, w, h, 3);
+    cx.putImageData(id, 0, 0);
+    return cv.toDataURL('image/jpeg', 0.8);
+  }
+  /** A drawn scene as a picture, rasterised once at a size that stays crisp on a wide header. */
+  async function rasterOf(svgUrl, w = 1600) {
+    const img = await loadPicture(svgUrl, false);
+    const h = Math.round((w * (img.naturalHeight || 900)) / (img.naturalWidth || 1600));
+    const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+    cv.getContext('2d').drawImage(img, 0, 0, w, h);
+    return { data: cv.toDataURL('image/jpeg', 0.86), img };
+  }
+  /** Every raw picture in `images` (a data URL: an upload, or a drawn scene) becomes an asset, kept once;
+   *  assets nothing wears any more go. Needs a document (a canvas): elsewhere the pictures are kept as they are. */
+  async function packImages(images) {
+    const out = { side: null, cards: {}, headers: {}, tones: { ...(images?.tones || {}) }, assets: { ...(images?.assets || {}) } };
+    const canDraw = typeof document !== 'undefined' && !!document.createElement;
+    const put = async (v) => {
+      if (!v) return null;
+      if (ASSET.test(v)) return out.assets[v.slice(6)] ? v : null;
+      if (!canDraw) return v;
+      const id = hashOf(v);
+      if (!out.assets[id]) {
+        try {
+          const scene = sceneNameOf(v);
+          let sharp = v, img;
+          if (/^data:image\/svg\+xml/.test(v)) { const r = await rasterOf(v); sharp = r.data; img = r.img; } else img = await loadPicture(v, false);
+          out.assets[id] = { sharp, blur: blurredOf(img), ...(scene ? { scene } : {}) };
+        } catch { return v; } // (a picture that will not draw is kept as it is: the page blurs it itself)
+      }
+      return `asset:${id}`;
+    };
+    out.side = await put(images?.side);
+    for (const [k, v] of Object.entries(images?.cards || {})) { const a = await put(v); if (a) out.cards[k] = a; }
+    for (const [k, v] of Object.entries(images?.headers || {})) { const a = await put(v); if (a) out.headers[k] = a; }
+    const used = new Set([out.side, ...Object.values(out.cards), ...Object.values(out.headers)].filter((v) => v && ASSET.test(v)).map((v) => v.slice(6)));
+    for (const id of Object.keys(out.assets)) if (!used.has(id)) delete out.assets[id];
+    return out;
+  }
+  /** What a slot wears, resolved: { sharp, blur, scene } — a picture kept raw (from before assets) has no blur, and the page blurs it itself. */
+  const picOf = (images, v) => {
+    if (!v) return null;
+    if (ASSET.test(v)) { const a = images?.assets?.[v.slice(6)]; return a?.sharp ? { sharp: a.sharp, blur: a.blur || null, scene: a.scene || null } : null; }
+    return { sharp: v, blur: null, scene: sceneNameOf(v) };
+  };
+  /** The raw value a slot stands for, for editing: a scene's own drawing, or the picture itself. */
+  const rawOf = (images, v) => { const p = picOf(images, v); if (!p) return null; return p.scene ? (PRESET_PHOTOS.find((x) => x[0] === p.scene) || [])[1] || p.sharp : p.sharp; };
+  const hasRaw = (images) => [images?.side, ...Object.values(images?.cards || {}), ...Object.values(images?.headers || {})].some((v) => v && !ASSET.test(v));
+
+  const emptyImages = () => ({ side: null, cards: {}, headers: {}, tones: {}, assets: {} });
   async function loadImages() {
     try {
       const r = await BCV.api.storage.local.get(IMAGES_KEY);
       const v = r?.[IMAGES_KEY];
-      return v && typeof v === 'object' ? { side: v.side || null, cards: { ...(v.cards || {}) }, headers: { ...(v.headers || {}) }, tones: { ...(v.tones || {}) } } : emptyImages();
+      return v && typeof v === 'object' ? { side: v.side || null, cards: { ...(v.cards || {}) }, headers: { ...(v.headers || {}) }, tones: { ...(v.tones || {}) }, assets: { ...(v.assets || {}) } } : emptyImages();
     } catch { return emptyImages(); }
   }
-  const saveImages = (images) => BCV.api.storage.local.set({ [IMAGES_KEY]: { side: images?.side || null, cards: { ...(images?.cards || {}) }, headers: { ...(images?.headers || {}) }, tones: Object.fromEntries(toneKeys(images).filter((k) => images?.tones?.[k]).map((k) => [k, images.tones[k]])) } });
+  const saveImages = async (images) => { const p = await packImages(images || emptyImages()); return BCV.api.storage.local.set({ [IMAGES_KEY]: { side: p.side, cards: p.cards, headers: p.headers, tones: Object.fromEntries(toneKeys(p).filter((k) => p.tones?.[k]).map((k) => [k, p.tones[k]])), assets: p.assets } }); };
   const countImages = (images) => (images?.side ? 1 : 0) + Object.values(images?.cards || {}).filter(Boolean).length + Object.values(images?.headers || {}).filter(Boolean).length;
   const countHeaders = (images) => Object.values(images?.headers || {}).filter(Boolean).length;
 
@@ -368,6 +448,6 @@
     hexToRgb, rgbToHex, rgbToHsl, hslToRgb, hslToHex, luminance, contrast, normalize,
     GROUND, MIN_SAT, ICON_RATIO, TEXT_RATIO, PRESETS, REGULAR, PRESET_PHOTOS, CARD_SLOTS, HEADER_SLOTS, IMAGES_KEY,
     palette, shades, shadeSet, cssVars, apply, readable, readableOn, fillFor, mix, tint, customHex, controlsOf, veilBase, picCss, band, nearest, fromControls, toControls,
-    resizeImage, readImage, imageTone, fillTones, loadImages, saveImages, countImages, countHeaders, emptyImages,
+    resizeImage, readImage, imageTone, fillTones, loadImages, saveImages, countImages, countHeaders, emptyImages, packImages, picOf, rawOf, CAST,
   };
 })();

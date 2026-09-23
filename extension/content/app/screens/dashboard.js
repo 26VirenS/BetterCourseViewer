@@ -293,9 +293,9 @@
       const i = statIndex++;
       if (!entered && /^\d+$/.test(value)) U.roll(valueEl, Number(value), { seed: i * 2.3 }); // the counter scrambles briefly, then lands on the real count
       const slot = STAT_SLOT[lbl] || null;
-      const pic = slot ? app.state?.themeImages?.cards?.[slot] || null : null;
+      const pic = slot ? BCV.theme.picOf(app.state?.themeImages, app.state?.themeImages?.cards?.[slot]) : null; // { sharp, blur } (lib/theme.js assets)
       // the label and the number share the top row (the number on the right, large); the note and the chevron sit below
-      return U.enter(h('button', { type: 'button', class: `bcv-card bcv-stat ${pic ? 'bcv-stat--pic' : ''}`, dataset: slot ? { stat: slot } : {}, style: pic ? { '--bcv-pic': BCV.theme.picCss(pic), '--bcv-veil': BCV.theme.veilBase(app.state?.settings?.appearance?.theme?.accent || '', app.state?.themeImages?.tones?.[slot], 0.4) } : null, onclick: (e) => onOpen(e.currentTarget) }, [
+      return U.enter(h('button', { type: 'button', class: `bcv-card bcv-stat ${pic ? 'bcv-stat--pic' : ''} ${pic?.blur ? 'has-preblur' : ''}`, dataset: slot ? { stat: slot } : {}, style: pic ? { '--bcv-pic': BCV.theme.picCss(pic.sharp), ...(pic.blur ? { '--bcv-pic-blur': BCV.theme.picCss(pic.blur) } : {}), '--bcv-veil': BCV.theme.veilBase(app.state?.settings?.appearance?.theme?.accent || '', app.state?.themeImages?.tones?.[slot], 0.4) } : null, onclick: (e) => onOpen(e.currentTarget) }, [
         ...(pic ? [h('span', { class: 'bcv-stat__pic', 'aria-hidden': 'true' }), h('span', { class: 'bcv-stat__pic bcv-stat__pic--blur', 'aria-hidden': 'true' }), h('span', { class: 'bcv-stat__pic bcv-stat__pic--veil', 'aria-hidden': 'true' })] : []),
         U.el('bcv-stat__head', [U.svg(icon, { size: 14, stroke: color, width: 1.9 }), U.text('bcv-label bcv-label--inline', lbl, 'span'), valueEl]),
         U.el('bcv-stat__noterow', [U.text('bcv-stat__note', note, 'span'), U.svg(IC.chevron, { size: 13, stroke: 'var(--bcv-ink3)', width: 2, cls: 'bcv-stat__chev' })]),

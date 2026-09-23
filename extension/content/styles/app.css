@@ -283,7 +283,8 @@ html.bcv-on #bcv-app { display: flex; }
 .bcv-brand__sub { font: 400 11px/1.2 var(--bcv-font); color: var(--bcv-ink3); }
 .bcv-nav { display: flex; flex-direction: column; gap: 2px; }
 .bcv-nav__item { display: flex; align-items: center; gap: 11px; width: 100%; padding: 7px 10px; border: 0; border-radius: 10px; cursor: pointer; text-align: left; font: 600 14px/1.2 var(--bcv-font); color: var(--bcv-ink); background: transparent; box-shadow: none; }
-.bcv-nav__item:hover { background: var(--bcv-fill2); }
+.bcv-nav__item:hover { background: var(--bcv-fill); }
+html.bcv-themed .bcv-nav__item:hover, html.bcv-themed .bcv-fav:hover { background: var(--bcv-accent-soft); } /* (under a colour, the hover is the colour's own tint) */
 .bcv-nav__item.is-active { background: var(--bcv-card); box-shadow: var(--bcv-shadow); }
 /* mockup 11: bare glyphs in their own colour — full strength on the active row, dimmed on the rest */
 .bcv-nav__ic { width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; flex: none; }
@@ -293,7 +294,7 @@ html.bcv-on #bcv-app { display: flex; }
 .bcv-side__group { display: flex; flex-direction: column; gap: 2px; }
 .bcv-side__label { padding: 6px 10px; font: 600 11px/1.2 var(--bcv-font); color: var(--bcv-ink3); text-transform: uppercase; letter-spacing: .05em; }
 .bcv-fav { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border: 0; background: transparent; border-radius: 10px; font: 400 13.5px/1.2 var(--bcv-font); color: var(--bcv-ink); cursor: pointer; text-align: left; width: 100%; }
-.bcv-fav:hover { background: var(--bcv-fill2); }
+.bcv-fav:hover { background: var(--bcv-fill); }
 .bcv-fav.is-active { background: var(--bcv-fill2); font-weight: 600; }
 .bcv-fav__dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
 /* the courses in a panel beside the Courses row, when they are not listed down the sidebar */
@@ -497,7 +498,7 @@ html[data-bcv-theme="dark"] .bcv-badge--orange { color: #ffb44d; }
 /* The sheet behind a counter is one size from the start (the width the split would have given it,
    a height that does not follow the list), with a pane on the right that says what it is for until
    a row is pressed and the preview takes it. Nothing about it grows or shrinks. */
-.bcv-sheet--steady { width: min(980px, 100%); height: min(640px, calc(100vh - 56px)); display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 380px); grid-template-rows: auto minmax(0, 1fr); transition: none; }
+.bcv-sheet--steady { background: var(--bcv-card); -webkit-backdrop-filter: none; backdrop-filter: none; width: min(980px, 100%); height: min(640px, calc(100vh - 56px)); display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 380px); grid-template-rows: auto minmax(0, 1fr); transition: none; }
 .bcv-sheet--steady > .bcv-sheet__head { grid-column: 1; grid-row: 1; }
 .bcv-sheet--steady > .bcv-sheet__list { grid-column: 1; grid-row: 2; }
 .bcv-sheet--steady > .bcv-sheet__pvhint { grid-column: 2; grid-row: 1 / span 2; border-left: 1px solid var(--bcv-sep); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 24px; text-align: center; }
@@ -1806,8 +1807,15 @@ html.bcv-themed #bcv-app .bcv-btn--primary:hover { background: var(--bcv-accent-
 .bcv-stat--pic > .bcv-stat__head, .bcv-stat--pic > .bcv-stat__noterow { position: relative; z-index: 1; }
 .bcv-stat__pic { position: absolute; inset: 0; z-index: 0; pointer-events: none; background: var(--bcv-pic) right bottom / cover no-repeat; }
 .bcv-stat__pic--blur { filter: blur(14px) saturate(1.05); transform: scale(1.12); -webkit-mask-image: radial-gradient(farthest-side at 100% 100%, transparent 36%, #000 72%); mask-image: radial-gradient(farthest-side at 100% 100%, transparent 36%, #000 72%); }
-.bcv-stat__pic--veil { background: radial-gradient(150% 150% at 100% 100%, rgba(0,0,0,.12) 26%, color-mix(in srgb, var(--bcv-veil) 80%, transparent) 70%); } /* (the note at the foot reads; the corner stays clear) */
+.bcv-stat__pic--veil { background: radial-gradient(150% 150% at 100% 100%, rgba(0,0,0,.12) 26%, color-mix(in srgb, var(--bcv-veil) 80%, transparent) 70%), var(--bcv-photo-wash); } /* (the note at the foot reads; the corner stays clear) */
 .bcv-stat--pic .bcv-stat__note { text-shadow: 0 1px 6px rgba(0,0,0,.35); }
+/* A photo kept as an asset (lib/theme.js) comes with its blur drawn small: the blurred layer is that
+ * picture scaled up — no filter, no scaled layer — since filtered layers are what cost Safari the
+ * memory and the frames. A picture kept before assets has none, and is blurred here as before. */
+.bcv-stat--pic.has-preblur > .bcv-stat__pic--blur, .bcv-side__pic.has-preblur > .bcv-side__pic-blur, .bcv-head__pic.has-preblur > .bcv-head__pic-blur { background-image: var(--bcv-pic-blur); filter: none; transform: none; }
+/* every photo takes the mode's wash under its veil — darkened on the dark look, lightened a little on the light — for the words over it and for the look */
+html[data-bcv-theme] { --bcv-photo-wash: rgba(255,255,255,.12); }
+html[data-bcv-theme="dark"] { --bcv-photo-wash: rgba(0,0,0,.28); }
 /* the sidebar's photo: sharp along the bottom, blurred as it goes up the side, the chrome's own ground
  * veiling the top so the navigation reads as it always did */
 .bcv-side--pic > :not(.bcv-side__pic) { position: relative; z-index: 1; }
@@ -1815,6 +1823,11 @@ html.bcv-themed #bcv-app .bcv-btn--primary:hover { background: var(--bcv-accent-
 .bcv-side--pic .bcv-nav__item, .bcv-side--pic .bcv-nav__count, .bcv-side--pic .bcv-side__label, .bcv-side--pic .bcv-fav, .bcv-side--pic .bcv-fav__name, .bcv-side--pic .bcv-brand__name { color: #fff !important; }
 .bcv-side--pic .bcv-nav__ic svg { stroke: color-mix(in srgb, var(--bcv-tab-icon, currentColor) 55%, #fff) !important; opacity: 1; }
 .bcv-side--pic .bcv-side__label { opacity: .78; }
+/* over a photo: a hover that shows, and a soft dark halo behind every word and glyph that fades out
+ * smoothly (no edge round the words), so the rows read on a light photo as on a dark one */
+#bcv-app .bcv-side--pic .bcv-nav__item:hover, #bcv-app .bcv-side--pic .bcv-fav:hover { background: rgba(255,255,255,.18); }
+.bcv-side--pic .bcv-nav__item, .bcv-side--pic .bcv-fav, .bcv-side--pic .bcv-side__label, .bcv-side--pic .bcv-nav__count, .bcv-side--pic .bcv-brand__name, .bcv-side--pic .bcv-theme-btn, .bcv-side--pic .bcv-account__name, .bcv-side--pic .bcv-account__sub { text-shadow: 0 1px 2px rgba(0,0,0,.35), 0 0 10px rgba(0,0,0,.45), 0 0 22px rgba(0,0,0,.35); }
+.bcv-side--pic .bcv-nav__ic svg, .bcv-side--pic .bcv-fav__dot { filter: drop-shadow(0 1px 3px rgba(0,0,0,.45)); }
 /* the foot over a photo: glass rows with white words, so the appearance switch and the account read */
 .bcv-side--pic .bcv-theme-btn__ic { background: rgba(255,255,255,.2); color: #fff; }
 .bcv-side--pic .bcv-account__name { color: #fff; }
@@ -1828,7 +1841,7 @@ html.bcv-themed #bcv-app .bcv-btn--primary:hover { background: var(--bcv-accent-
 .bcv-side__pic-sharp, .bcv-side__pic-blur { background: var(--bcv-pic) center bottom / cover no-repeat; }
 .bcv-side__pic-blur { inset: -24px; }
 .bcv-side__pic-blur { filter: blur(18px) saturate(1.05); transform: scale(1.1); -webkit-mask-image: linear-gradient(to top, transparent 20%, #000 56%); mask-image: linear-gradient(to top, transparent 20%, #000 56%); }
-.bcv-side__pic-veil { background: linear-gradient(to top, rgba(0,0,0,.34) 0%, color-mix(in srgb, var(--bcv-veil) 76%, transparent) 70%); } /* (a thin wash stays over the foot so the rows there read) */
+.bcv-side__pic-veil { background: linear-gradient(to top, rgba(0,0,0,.34) 0%, color-mix(in srgb, var(--bcv-veil) 76%, transparent) 70%), var(--bcv-photo-wash); } /* (a thin wash stays over the foot so the rows there read) */
 html.bcv-quiz .bcv-side__pic { display: none; }
 /* a header's photo: sharp at the right, blurred as it comes left, the chrome's ground veiling the
  * left where the title and the controls sit */
@@ -1841,7 +1854,7 @@ html.bcv-quiz .bcv-side__pic { display: none; }
 .bcv-head__pic > i { position: absolute; inset: 0; display: block; }
 .bcv-head__pic-sharp, .bcv-head__pic-blur { background: var(--bcv-pic) right center / cover no-repeat; }
 .bcv-head__pic-blur { filter: blur(16px) saturate(1.05); transform: scale(1.08); -webkit-mask-image: linear-gradient(to left, transparent 28%, #000 58%); mask-image: linear-gradient(to left, transparent 28%, #000 58%); }
-.bcv-head__pic-veil { background: linear-gradient(to left, rgba(0,0,0,.08) 0%, color-mix(in srgb, var(--bcv-veil) 74%, transparent) 72%); }
+.bcv-head__pic-veil { background: linear-gradient(to left, rgba(0,0,0,.08) 0%, color-mix(in srgb, var(--bcv-veil) 74%, transparent) 72%), var(--bcv-photo-wash); }
 /* a header's photo runs on up through the widgets' bar: the bar goes clear over it, and the photo's
  * layers reach up under the bar by its height — one picture across the two, the pins sitting on it */
 html.bcv-head-pic.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) #bcv-bar { background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; border-bottom-color: transparent; }

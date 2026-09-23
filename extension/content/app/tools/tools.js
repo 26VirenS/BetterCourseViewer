@@ -311,13 +311,8 @@
       const bar = h('div', { id: 'bcv-pins', class: 'bcv-pins', hidden: true, role: 'toolbar', 'aria-label': 'Pinned tools' });
       tray = h('div', { id: 'bcv-tray', class: 'bcv-tray' }, bar);
       overlayRoot().append(tray);
-      // how wide the tray is at this moment, for anything that has to keep out of its way: the
-      // external tool popup's own buttons sit under it, and move aside as a widget opens and folds
-      try {
-        const say = () => document.documentElement.style.setProperty('--bcv-tray-w', `${Math.round(tray.getBoundingClientRect().width)}px`);
-        new ResizeObserver(say).observe(tray);
-        say();
-      } catch { /* no observer here: the buttons keep their place */ }
+      // (nothing reads the tray's width any more: the observer that wrote it onto <html> on every frame of
+      // a widget opening — a style recalculation of the whole page each time — is gone)
       setTimeout(() => { bar.dataset.settled = '1'; }, 1200); // (what lands after this pops in; what the page loads with does not)
       pinsLoad().then(paintPins).catch(() => {});
       try { api.storage.onChanged?.addListener((changes, area) => { if ((!area || area === 'local') && changes[PINS_KEY]) pinsLoad().then(paintPins).catch(() => {}); }); } catch { /* no change events */ }
@@ -712,6 +707,7 @@
       item.classList.add('is-folding'); // (no X on the way down: it belongs to the pin)
       setTimeout(() => item.classList.remove('is-folding'), 480);
       item.setAttribute('aria-expanded', 'false');
+      panel?.onFold?.();
     };
     /** Back to the tray, folded: the red light, and Escape while it is out. */
     const dock = () => {
@@ -723,6 +719,7 @@
       item.classList.add('is-folding');
       setTimeout(() => item.classList.remove('is-folding'), 480);
       item.setAttribute('aria-expanded', 'false');
+      panel?.onFold?.();
     };
     const openQ = () => {
       if (!panel) {
@@ -1048,8 +1045,13 @@
     const onCsp = (e) => { if (/desmos\.com/.test(e.blockedURI || '')) fail(); };
     frame.addEventListener('error', fail);
     frame.addEventListener('load', () => frame.classList.add('is-in'));
-    const onOpen = () => { if (loaded) return; loaded = true; document.addEventListener('securitypolicyviolation', onCsp); frame.src = DESMOS; };
-    return { els: [root], onOpen };
+    // Desmos is a whole page of its own (WebGL and all), and every Canvas tab with the pin would carry
+    // one for as long as the tab lived: it is let go five minutes after the pin folds, and loaded
+    // afresh on the next open — the memory is what Safari reloads tabs for.
+    let letGo = 0;
+    const onOpen = () => { clearTimeout(letGo); if (loaded) return; loaded = true; document.addEventListener('securitypolicyviolation', onCsp); frame.src = DESMOS; };
+    const onFold = () => { clearTimeout(letGo); letGo = setTimeout(() => { if (!loaded) return; loaded = false; frame.classList.remove('is-in'); frame.src = 'about:blank'; document.removeEventListener('securitypolicyviolation', onCsp); }, 5 * 60 * 1000); };
+    return { els: [root], onOpen, onFold };
   }
   /** Periodic table: the whole table, small — every element in its place, coloured by its kind, in
    *  a panel the size of the calculator's — with a search that lights the matches as you type and a
@@ -1250,13 +1252,15 @@
     return { els: [quickPane('Flashcards', go, 'Open Flashcards', 'Your sets, ready to study.', [list])], onOpen };
   }
 
+  /** A tool's colour lifted toward white, for its glyph on the dark disc. */
+  const lift = (c) => (/^#[0-9a-f]{6}$/i.test(c || '') && BCV.theme?.mix ? BCV.theme.mix(c, '#ffffff', 0.34) : c);
   /** One pin: a round dark button with the tool's glyph, and its X. */
   function pinEl(t, { demo = false } = {}) {
     const live = t.key === 'pomo' && !demo; // (the timer's pin is also its live activity)
     const el = h('span', { class: 'bcv-pin', dataset: { tool: t.key } });
     const btn = h('button', { type: 'button', class: 'bcv-pin__btn', title: t.name, 'aria-label': t.name, tabindex: demo ? '-1' : '0',
       onclick: demo ? null : (e) => { if (el.classList.contains('is-live')) islandOpen(el, 6000, e.detail === 0); else if (live) islandSet(el, e.detail === 0); else open(t.key, { from: e.currentTarget, over: true }); } }, [
-      h('span', { class: 'bcv-pin__ic' }, U.svg(t.icon, { size: 13, stroke: t.color, width: 2 })),
+      h('span', { class: 'bcv-pin__ic' }, U.svg(t.icon, { size: 15, stroke: lift(t.color), width: 2.3 })), // (larger, heavier, the colour lifted toward white: easy to see on the dark disc)
       live ? islandGlyph() : null,
     ]);
     if (live) {
