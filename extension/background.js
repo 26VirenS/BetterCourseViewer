@@ -83,10 +83,50 @@ if (typeof importScripts === 'function' && !self.BCV?.devcode) {
     note({ kind: 'settled', tabId, url: end.url, action: end.capped ? 'never settled, said so anyway' : 'settled' });
     try { await api.tabs.sendMessage(tabId, { type: 'toolState', state: 'ready' }); } catch { /* no bar on it */ }
   }
+  /** The quiet Chrome build has the run of Canvas's own domain and nothing else, so the bar cannot
+   *  be drawn over the tool's own site until that site has been said yes to. The launch page names
+   *  the site (the form Canvas posts to the tool), so it is read and asked for on the press that
+   *  opens the tool, once per site — a build with the run of every site never asks. A no is kept,
+   *  and never asked again. */
+  const TOOL_SITES = 'tool:sites'; // origin -> 'yes' | 'no'
+  async function allSites() {
+    try { return await api.permissions.contains({ origins: ['*://*/*'] }); } catch { return true; } // (a browser that cannot say has the bar everywhere it is allowed)
+  }
+  async function toolOriginOf(url) {
+    try {
+      const r = await fetch(url, { credentials: 'include', redirect: 'follow' });
+      const html = await r.text();
+      const m = html.match(/<form[^>]+action\s*=\s*["']([^"']+)["']/i);
+      const origin = m ? new URL(m[1], url).origin : null;
+      return origin && origin !== new URL(url).origin && /^https?:/.test(origin) ? origin : null;
+    } catch { return null; }
+  }
+  async function toolSiteReady(url) {
+    if (await allSites()) return;
+    const origin = await toolOriginOf(url);
+    if (!origin) return;
+    const kept = (await api.storage.local.get(TOOL_SITES).catch(() => ({})))?.[TOOL_SITES] || {};
+    if (kept[origin] === 'no') return;
+    let ok = false;
+    try { ok = await api.permissions.contains({ origins: [`${origin}/*`] }); } catch { return; }
+    if (!ok) {
+      try { ok = await api.permissions.request({ origins: [`${origin}/*`] }); } catch { return; } // (no gesture reached here: nothing to ask with)
+      kept[origin] = ok ? 'yes' : 'no';
+      api.storage.local.set({ [TOOL_SITES]: kept }).catch(() => {});
+    }
+    if (!ok || !api.scripting?.registerContentScripts) return;
+    const id = `bcv-toolbar-${origin.replace(/[^a-z0-9]/gi, '-')}`;
+    try {
+      const all = await api.scripting.getRegisteredContentScripts().catch(() => []);
+      if ((all || []).some((sc) => sc.id === id)) return;
+      await api.scripting.registerContentScripts([{ id, matches: [`${origin}/*`], js: ['content/toolbar.js'], runAt: 'document_start', persistAcrossSessions: true }]);
+    } catch { /* the bar stays off that site */ }
+  }
   /** A tool link pressed in the interface: a tab for it, remembering the tab it was opened from. */
   async function openTool(sender, msg) {
     const from = sender?.tab?.id;
     if (from == null || !msg?.url) return { ok: false };
+    await toolSiteReady(msg.url);
     // openerTabId is what makes the browser put the tool's tab beside the one it came from; a
     // browser that will not take it still gets the tab, and the way home is remembered here anyway.
     let tab = null;
@@ -345,9 +385,9 @@ if (typeof importScripts === 'function' && !self.BCV?.devcode) {
   }
 
   /** Build registerContentScripts entries by mirroring the manifest: the interface's own scripts and
-   *  nothing else. The sniffer already runs on every site it may look at, and content/toolbar.js
-   *  belongs on a tool's own page, which is never the Canvas site being added here. */
-  const NOT_THE_INTERFACE = ['content/sniff.js', 'content/toolbar.js'];
+   *  the bar over a tool's tab (a tool launches from a page of the Canvas site being added, and the
+   *  bar says Authenticating on it). The sniffer already runs on every site it may look at. */
+  const NOT_THE_INTERFACE = ['content/sniff.js'];
   function scriptsFor(origin) {
     const manifest = api.runtime.getManifest();
     const match = `${origin}/*`;

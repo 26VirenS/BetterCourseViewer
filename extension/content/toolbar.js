@@ -19,6 +19,8 @@
   const api = (typeof browser !== 'undefined' && browser.runtime) ? browser : (typeof chrome !== 'undefined' && chrome.runtime ? chrome : null);
   if (!api?.runtime?.sendMessage) return;
   if (window.top !== window.self) return; // the bar belongs to the tab, not to a frame inside it
+  if (self.__bcvToolbar) return; // once: a site's own registration and the manifest's match can both bring it
+  self.__bcvToolbar = true;
 
   const H = 52; // the bar's height, which the page is pushed down by
   const THEME_KEY = 'ext:theme';

@@ -24,7 +24,7 @@
     const body = U.el('bcv-body bcv-body--cols', [listCol, reader]);
     screen.append(
       U.el('bcv-head bcv-head--tight', U.el('bcv-head__in', U.el('bcv-head__row bcv-head__row--inbox', [
-        h('h1', { class: 'bcv-h1 bcv-h1--30', text: 'Inbox' }),
+        h('h1', { class: 'bcv-h1', text: 'Inbox' }),
         coursePill, scopePill,
         U.search('Search messages', (q) => { query = q.toLowerCase(); drawList(); }, 'bcv-search--180'),
         U.btn('Compose', { icon: IC.compose, kind: 'primary', iconColor: '#fff', onClick: () => { mode = 'compose'; drawReader(); } }),

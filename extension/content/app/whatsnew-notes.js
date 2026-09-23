@@ -24,6 +24,11 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.66.0', date: '2026-09-23', notes: [
+      { kind: 'improved', title: 'Windows text', body: 'Segoe UI on Windows, so titles and numbers sit right.', icon: P.pen },
+      { kind: 'improved', title: 'Bar over tools', body: 'On a school’s own Canvas too, asking once for a tool’s site.', icon: P.layers },
+      { kind: 'fixed', title: 'Page titles', body: 'Calendar and Inbox titles are the size of the rest.', icon: P.check },
+    ] },
     { version: '2.65.0', date: '2026-09-23', notes: [
       { kind: 'new', title: 'Personalize', body: 'A new look step: colour, course colours and page photos.', icon: P.sparkle },
       { kind: 'improved', title: 'A round colour picker', body: 'Pick a hue on the ring, then its saturation and depth.', icon: P.pen },

@@ -25,7 +25,7 @@
     if (savedRange && U.parse(savedRange.start)) range = { start: U.startOfDay(U.parse(savedRange.start)), end: savedRange.end ? U.startOfDay(U.parse(savedRange.end)) : null, picking: false };
     const wantCourse = ctx.route.params.get('include_contexts');
 
-    const titleEl = h('h1', { class: 'bcv-h1 bcv-h1--30' });
+    const titleEl = h('h1', { class: 'bcv-h1' }); // (the same size as every other page's title)
     const segWrap = h('div');
     // the calendars (which courses' events show) live in a sheet off this button, counting the ones
     // on, so the month has the width of the page rather than a column beside it

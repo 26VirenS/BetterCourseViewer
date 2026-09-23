@@ -77,9 +77,11 @@
     const target = launched(url);
     if (from) try { from.blur?.(); } catch { /* it went */ }
     try {
+      if (!BCV.api.runtime?.id) throw new Error('gone'); // (the extension was updated under this page: its runtime is gone until the page reloads)
       BCV.api.runtime.sendMessage({ type: 'openTool', url: target, title, note });
     } catch {
       window.open(newTab || page || url, '_blank', 'noopener'); // no background to ask: the browser's own new tab, bare
+      try { BCV.ui?.toast?.('Simpl Courses was updated. Reload this page for its bar over tools.'); } catch { /* the tab is open anyway */ }
     }
     return null;
   }

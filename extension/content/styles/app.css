@@ -13,8 +13,8 @@ html[data-bcv-theme] {
   --bcv-shadow: 0 1px 2px rgba(0,0,0,.05); --bcv-shadow-hi: 0 6px 18px rgba(0,0,0,.09); --bcv-shadow-lift: 0 8px 20px rgba(0,0,0,.1);
   --bcv-red: #ff453a; --bcv-red-soft: rgba(255,69,58,.16); --bcv-red-text: #c1271d;
   --bcv-green: #34c759; --bcv-green-text: #1a6b30; --bcv-orange: #ff9500; --bcv-indigo: #5856d6; --bcv-dash: rgba(60,60,67,.28);
-  --bcv-font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif;
-  --bcv-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --bcv-font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text", "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif; /* (Windows: Segoe, never Arial) */
+  --bcv-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI Variable Display", "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif;
   --bcv-mono: ui-monospace, Menlo, monospace;
 }
 html[data-bcv-theme="dark"] {

@@ -97,7 +97,8 @@ try {
   for (let i = 0; i < 40 && loads < 3; i++) await page.waitForTimeout(150); // (the card can be up before its own document's load event)
   check((await domains()).join(',') === BASE, `found and saved as a site of its own: ${JSON.stringify(await domains())}`);
   const regs = await registered();
-  check(regs.length === 2 && regs.every((r) => r.startsWith('bcv-http---localhost-8809-') && r.endsWith(`:${BASE}/*`)), `the interface's two scripts are registered for it, and neither the sniffer nor the frame script: ${regs.join(' | ')}`);
+  const regFiles = await sw.evaluate(async () => (await self.BCV.api.scripting.getRegisteredContentScripts()).map((s) => s.js.join('+')));
+  check(regs.length === 3 && regs.every((r) => r.startsWith('bcv-http---localhost-8809-') && r.endsWith(`:${BASE}/*`)) && regFiles.some((f) => f === 'content/toolbar.js') && !regFiles.some((f) => f.includes('sniff.js')), `the interface's two scripts and the bar over a tool's tab are registered for it, the sniffer not: ${regs.join(' | ')}`);
   check(loads === 3 && page.url() === `${BASE}/`, `the tab loaded again on its own, then once more for the setup's own address, and the setup opened over it (${loads} loads, ${page.url()})`);
   check(await gone, 'and the page after install closed itself once the setup had begun');
   await page.screenshot({ path: join(root, 'scripts', 'dev', 'out', 'chrome-setup-found.png') });
