@@ -2,7 +2,7 @@
  * API, a start–end range picker for the agenda, and per-calendar switches. */
 (function () {
   const BCV = (self.BCV = self.BCV || {});
-  const { h } = BCV.utils;
+  const { h, htmlToText } = BCV.utils;
   const U = BCV.ui;
   const IC = BCV.IC;
   const store = BCV.store;
@@ -31,6 +31,12 @@
     // on, so the month has the width of the page rather than a column beside it
     const calCount = h('span', { class: 'bcv-cal__calcount', text: '0' });
     const calBtn = h('button', { type: 'button', class: 'bcv-roundbtn bcv-cal__calbtn', title: 'Choose which calendars show', 'aria-haspopup': 'dialog', onclick: (e) => openCalendars(e.currentTarget) }, [U.svg(IC.filter, { size: 13, stroke: 'var(--bcv-blue)', width: 2.1 }), h('span', { text: 'Calendars' }), calCount]);
+    // Canvas's Scheduler — office hours, conferences, sign-ups with a time to reserve — behind a
+    // button that counts the groups open to the student. Canvas puts every open time on the month;
+    // here they wait in a sheet, and only the time reserved goes on the grid.
+    const apptCount = h('span', { class: 'bcv-cal__calcount bcv-cal__apptcount', text: '' });
+    apptCount.hidden = true;
+    const apptBtn = h('button', { type: 'button', class: 'bcv-roundbtn bcv-cal__apptbtn', title: 'Office hours, conferences and sign-ups with a time to reserve', 'aria-haspopup': 'dialog', onclick: (e) => openAppointments(e.currentTarget) }, [U.svg(IC.calendarPlus, { size: 13, stroke: 'var(--bcv-blue)', width: 2.1 }), h('span', { text: 'Find appointment' }), apptCount]);
     const body = U.el('bcv-body bcv-body--cols');
     const mainCol = h('div', { style: { flex: '1 1 720px', minWidth: '0' } });
     const sideCol = U.el('bcv-cal__side'); // the agenda's range picker; nothing else lives beside the grid now
@@ -44,7 +50,7 @@
           U.iconbtn(IC.chevron, { size: 30, iconSize: 14, stroke: 'var(--bcv-blue)', width: 2.1, title: 'Next', onClick: () => shift(1) }),
           h('button', { type: 'button', class: 'bcv-roundbtn', text: 'Today', onclick: () => { anchor = U.startOfDay(now); miniMonth = new Date(now.getFullYear(), now.getMonth(), 1); if (view === 'agenda') range = { start: U.startOfDay(now), end: U.addDays(U.startOfDay(now), 20), picking: false }; load(); } }),
         ]),
-        U.el('bcv-cal__tools bcv-ml-auto', [calBtn, segWrap]),
+        U.el('bcv-cal__tools bcv-ml-auto', [apptBtn, calBtn, segWrap]),
       ]))),
       body,
     );
@@ -54,7 +60,8 @@
     // Only the calendars are waited for: they say which events to ask Canvas for. The planner is a
     // second multi-page read that nothing on screen needs to appear, so it arrives on its own and
     // strikes through what is already submitted when it does.
-    const contexts = await store.calendarContexts().catch(() => []);
+    const [contexts, my] = await Promise.all([store.calendarContexts().catch(() => []), store.me().catch(() => null)]);
+    const myId = my?.id != null ? String(my.id) : null;
     let submittedIds = new Set(); // assignment/quiz ids handed in (calendar events do not carry it)
     let selected = await store.selectedContexts(contexts);
     if (wantCourse && contexts.some((c) => c.code === wantCourse) && !selected.includes(wantCourse)) selected = [...selected.slice(0, 9), wantCourse];
@@ -102,14 +109,18 @@
     function normalize(raw) {
       const out = [];
       for (const e of raw) {
-        const cc = ctxMap.get(e.context_code) || null;
+        // an appointment group's open times (its own events, never asked for here) stay off the
+        // grid: only a time reserved — the student's own event, on the course's calendar — shows
+        const appt = !!e.appointment_group_id;
+        if (appt && !e.parent_event_id) continue;
+        const cc = (appt ? ctxMap.get(e.effective_context_code) : null) || ctxMap.get(e.context_code) || ctxMap.get(e.effective_context_code) || null;
         const isAssignment = e.type === 'assignment' || !!e.assignment;
         const a = e.assignment || null;
         const start = U.parse(isAssignment ? (a?.due_at || e.start_at) : e.start_at);
         if (!start) continue;
         const end = U.parse(e.end_at);
         const types = a?.submission_types || [];
-        const icon = isAssignment ? (types.includes('online_quiz') || a?.is_quiz_assignment ? IC.bolt : types.includes('discussion_topic') ? IC.disc : IC.doc) : IC.book;
+        const icon = isAssignment ? (types.includes('online_quiz') || a?.is_quiz_assignment ? IC.bolt : types.includes('discussion_topic') ? IC.disc : IC.doc) : appt ? IC.calendarPlus : IC.book;
         const sub = a?.submission;
         // the keys the planner would use for this piece of work, kept so the strike-through can be
         // re-applied when the planner lands (it is read after the events, not before them)
@@ -394,6 +405,179 @@
       load();
     }
 
+    // ---- Find appointment: Canvas's Scheduler in a sheet ----------------------------------------
+    // Canvas answers Find Appointment by pouring every open time onto the month, thirty chips with
+    // the same name. Here each group is a card: its course, place and length, the time the student
+    // holds (with Cancel) and the open times as chips by day; a press reserves. The month carries
+    // only the time reserved.
+    let groups = null; // null until Canvas answers; [] when there is nothing to sign up for
+    let apptErr = null;
+    let apptSheet = null; // { ov, list } while the sheet is up
+    let apptSeq = 0;
+    function shapeGroup(g) {
+      const held = g.reserved_times || [];
+      const slots = (g.appointments || []).map((s) => {
+        const start = U.parse(s.start_at);
+        if (!start) return null;
+        const end = U.parse(s.end_at);
+        // the student's own reservation of this time: a child event (only their own are shown to
+        // them), else the group's reserved_times by its start
+        const mine = (s.child_events || []).find((c) => myId == null || c.user == null || String(c.user.id ?? c.user) === myId) || null;
+        const heldHere = held.find((r) => r.start_at === s.start_at) || null;
+        const reserved = !!s.reserved || !!mine || !!heldHere;
+        const left = s.available_slots == null ? Infinity : Number(s.available_slots);
+        return { id: String(s.id), start, end, left, reserved, reservationId: mine ? String(mine.id) : heldHere?.id != null ? String(heldHere.id) : null, url: s.html_url || null };
+      }).filter(Boolean).sort((a, b) => a.start - b.start);
+      const codes = g.context_codes || [];
+      const ctxs = codes.map((c) => ctxMap.get(c)).filter(Boolean);
+      return {
+        id: String(g.id), title: g.title || 'Appointments', description: htmlToText(g.description || '', 300).trim(), location: g.location_name || '',
+        contextName: ctxs.map((c) => c.name).join(', ') || codes.join(', '), color: ctxs[0]?.color || '#8e8e93',
+        max: Number(g.max_appointments_per_participant) || 0, groupSignup: g.participant_type === 'Group', url: g.html_url || '/calendar',
+        slots, mine: slots.filter((s) => s.reserved),
+      };
+    }
+    async function loadAppointments({ force = false } = {}) {
+      const seq = ++apptSeq;
+      let list = null;
+      try {
+        list = await store.appointmentGroups({ force });
+        if (!ctx.alive() || seq !== apptSeq) return;
+        groups = (Array.isArray(list) ? list : []).map(shapeGroup);
+        apptErr = null;
+      } catch (err) {
+        if (!ctx.alive() || seq !== apptSeq) return;
+        if (groups === null) groups = [];
+        apptErr = err;
+      }
+      apptCount.textContent = String(groups.length);
+      apptCount.hidden = !groups.length;
+      if (apptSheet) {
+        apptSheet.list.replaceChildren(...appointmentsBody());
+        apptSheet.list.dataset.fresh = '1';
+        if (!apptSheet.ov.contains(document.activeElement)) apptSheet.ov.focus();
+      }
+    }
+    function appointmentsBody() {
+      if (groups === null) return [U.loading()];
+      const out = [];
+      if (apptErr) out.push(U.errorBox(`Appointments could not be loaded: ${apptErr.message}`));
+      if (!groups.length) {
+        if (!apptErr) out.push(U.emptyCard('Nothing to sign up for right now. Office hours and conferences your teachers open will wait here.'));
+        return out;
+      }
+      for (const g of groups) out.push(groupCard(g));
+      out.push(U.hint('A time you reserve goes on the calendar; the open ones wait here.'));
+      return out;
+    }
+    function groupCard(g) {
+      const days = new Map();
+      for (const s of g.slots) {
+        const k = U.startOfDay(s.start).getTime();
+        if (!days.has(k)) days.set(k, []);
+        days.get(k).push(s);
+      }
+      const full = g.max > 0 && g.mine.length >= g.max; // every time allowed is held: the rest wait until one is given back
+      const first = g.slots[0];
+      const mins = first?.end ? Math.round((first.end - first.start) / 60000) : 0;
+      const meta = [g.contextName, g.location, mins ? `${mins} min each` : null, g.max ? `${g.max === 1 ? 'one time' : `${g.max} times`} each` : null].filter(Boolean).join(' · ');
+      const head = U.el('bcv-appt__head', [
+        U.dot(g.color, 'bcv-dot--sq'),
+        h('div', { class: 'bcv-appt__titles' }, [
+          h('div', { class: 'bcv-appt__title bcv-pretty', text: g.title }),
+          h('div', { class: 'bcv-appt__meta', text: meta }),
+        ]),
+      ]);
+      const desc = g.description ? h('p', { class: 'bcv-appt__desc', text: g.description }) : null;
+      if (g.groupSignup) {
+        return U.el('bcv-appt__group', [head, desc, U.hint('A sign-up for your group: reserve it as the group in Canvas.'), h('a', { class: 'bcv-btn bcv-btn--xs', href: g.url, target: '_blank', rel: 'noopener', text: 'Open in Canvas' })], { 'data-id': g.id });
+      }
+      const mine = g.mine.map((s) => U.el('bcv-appt__mine', [
+        U.svg(IC.calendarPlus, { size: 14, stroke: 'currentColor', width: 2 }),
+        h('span', { class: 'bcv-appt__minetext', text: `Your time: ${U.fmtDow(s.start)} at ${U.fmtTimeLower(s.start)}` }),
+        U.btn('Cancel', { kind: 'xs', cls: 'bcv-appt__cancel', onClick: (e) => cancel(g, s, e.currentTarget) }),
+      ]));
+      const rows = [...days.entries()].map(([k, list]) => {
+        const d = new Date(k);
+        const rel = U.sameDay(d, now) ? 'Today' : U.dayDiff(d, now) === 1 ? 'Tomorrow' : U.DAYS[d.getDay()];
+        return U.el('bcv-appt__day', [
+          h('div', { class: 'bcv-appt__dayname' }, [h('b', { text: rel }), h('span', { text: U.fmtShort(d) })]),
+          U.el('bcv-appt__slots', list.map((s) => slotChip(g, s, full))),
+        ]);
+      });
+      return U.el('bcv-appt__group', [head, desc, ...mine, ...(rows.length ? rows : [U.el('bcv-appt__empty', 'No open times left.')])], { 'data-id': g.id });
+    }
+    function slotChip(g, s, full) {
+      const gone = s.left <= 0 && !s.reserved;
+      const past = s.start < now;
+      const label = U.fmtTimeLower(s.start);
+      const title = s.reserved ? 'Your time' : gone ? 'Taken' : past ? 'Past' : full ? 'Cancel your time first to pick another' : `Reserve ${U.fmtDow(s.start)} at ${label}`;
+      const btn = h('button', { type: 'button', class: `bcv-chip bcv-appt__slot ${s.reserved ? 'is-mine' : ''} ${gone ? 'is-gone' : ''}`, text: label, title, disabled: (s.reserved || gone || past || full) || null, onclick: () => reserve(g, s, btn) });
+      return btn;
+    }
+    async function reserve(g, s, btn) {
+      btn.disabled = true;
+      btn.classList.add('is-busy');
+      try {
+        await store.reserveAppointment(s.id);
+      } catch (err) {
+        if (!ctx.alive()) return;
+        btn.disabled = false;
+        btn.classList.remove('is-busy');
+        U.toast(`Canvas would not reserve that time: ${err.message}`, { error: true });
+        loadAppointments({ force: true }); // someone else may have taken it meanwhile
+        return;
+      }
+      if (!ctx.alive()) return;
+      U.toast(`Reserved: ${U.fmtDow(s.start)} at ${U.fmtTimeLower(s.start)}`);
+      await loadAppointments({ force: true });
+      loadedRange = null; // the reservation is an event of the student's own: the grid reads it
+      load();
+    }
+    async function cancel(g, s, btn) {
+      if (!s.reservationId) { // Canvas said the time is held but not by which event: its own page can undo it
+        window.open(g.url, '_blank', 'noopener');
+        return;
+      }
+      btn.disabled = true;
+      try {
+        await store.cancelReservation(s.reservationId);
+      } catch (err) {
+        if (!ctx.alive()) return;
+        btn.disabled = false;
+        U.toast(`Canvas would not cancel it: ${err.message}`, { error: true });
+        return;
+      }
+      if (!ctx.alive()) return;
+      U.toast('Your time is given back.');
+      await loadAppointments({ force: true });
+      loadedRange = null;
+      load();
+    }
+    function openAppointments(from = null) {
+      document.querySelector('.bcv-sheet-ov')?.remove();
+      const ov = U.el('bcv-sheet-ov', null, { role: 'dialog', 'aria-label': 'Find appointment' });
+      const close = () => { ov.remove(); apptSheet = null; };
+      ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
+      ov.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+      const sub = U.text('bcv-sheet__note', 'Office hours, conferences and sign-ups your courses offer. Press a time to reserve it.');
+      const list = U.el('bcv-sheet__list', appointmentsBody());
+      const sheet = U.el('bcv-sheet bcv-cal__sheet bcv-appt', [
+        U.el('bcv-sheet__head', [
+          U.el('bcv-sheet__titles', [U.text('bcv-sheet__line', 'Find appointment'), sub]),
+          h('button', { type: 'button', class: 'bcv-sheet__close', 'aria-label': 'Close', onclick: close }, U.svg(IC.close, { size: 13, stroke: 'var(--bcv-ink2)', width: 2.3 })),
+        ]),
+        list,
+      ]);
+      ov.append(sheet);
+      apptSheet = { ov, list };
+      document.body.append(ov);
+      U.morphFrom(sheet, from);
+      ov.tabIndex = -1;
+      ov.focus();
+      loadAppointments({ force: groups !== null }); // asked afresh on every open: a time can be taken meanwhile
+    }
+
     function draw() {
       const noticeEl = loading ? U.el('bcv-cal__notice bcv-cal__notice--hint', 'Loading events…')
         : !notice ? null : notice.kind === 'error' ? U.errorBox(notice.text) : U.el(`bcv-cal__notice bcv-cal__notice--${notice.kind}`, notice.text);
@@ -432,6 +616,7 @@
     // The screen is handed over as soon as the grid can be drawn; the events land in it when Canvas
     // answers. Waiting here would keep the whole month behind the slowest calendar request.
     load().catch(() => {});
+    loadAppointments(); // in its own time: the button's count fills in when Canvas answers
     return screen;
   }
 

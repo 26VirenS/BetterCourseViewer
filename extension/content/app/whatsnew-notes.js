@@ -24,6 +24,10 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.80.0', date: '2026-09-24', notes: [
+      { kind: 'new', title: 'Find appointment', body: 'Office hours and sign-ups: a sheet of times to reserve.', icon: P.clock },
+      { kind: 'improved', title: 'Month, uncluttered', body: 'Only the time you reserve goes on the calendar.', icon: P.eye },
+    ] },
     { version: '2.79.0', date: '2026-09-24', notes: [
       { kind: 'fixed', title: 'Search box, tidied', body: 'One pill, level with the view switcher.', icon: P.check },
       { kind: 'fixed', title: 'Pages and files found', body: 'Every starred course is asked, a few at a time.', icon: P.pic },

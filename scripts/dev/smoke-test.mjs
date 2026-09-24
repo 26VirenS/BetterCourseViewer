@@ -801,6 +801,38 @@ try {
   await (await page.$$('.bcv-cal__sheet .bcv-cal__own .bcv-switch'))[0].click(); // …and on again: the week and agenda checks below read its events
   await page.waitForFunction((n) => document.querySelectorAll('.bcv-ev').length >= n, evs.length, { timeout: 10000 });
   await closeCals();
+  // ---- Find appointment: Canvas's Scheduler in a sheet, the month never flooded with its open times ----
+  const openAppt = async () => { await page.click('.bcv-cal__apptbtn'); await page.waitForSelector('.bcv-appt .bcv-sheet__list[data-fresh] .bcv-appt__group', { timeout: 10000 }); await page.waitForTimeout(350); };
+  const closeAppt = async () => { await page.keyboard.press('Escape'); await page.waitForFunction(() => !document.querySelector('.bcv-appt'), null, { timeout: 3000 }); };
+  await page.waitForFunction(() => /^Find appointment\s*1$/.test(document.querySelector('.bcv-cal__apptbtn')?.textContent || ''), null, { timeout: 10000 });
+  check(!(await texts('.bcv-ev')).some((t) => /Research Proposal/.test(t)), 'the group\'s open times never sit on the month; the button beside Calendars counts the groups open');
+  await openAppt();
+  const apptTitle = (await texts('.bcv-appt__title'))[0];
+  const apptMeta = (await texts('.bcv-appt__meta'))[0];
+  const apptDays = await texts('.bcv-appt__dayname');
+  const apptSlots = await texts('.bcv-appt__slot');
+  const apptOpen = (await page.$$('.bcv-appt__slot:not(:disabled)')).length;
+  const apptGone = await texts('.bcv-appt__slot.is-gone');
+  check(apptTitle === 'Research Proposal Feedback Conferences (Online Option)' && apptMeta === 'F26-MATH 021 20 · Online (the Zoom link is in the course) · 15 min each · one time each'
+    && apptDays.length === 2 && apptSlots.length === 12 && apptSlots[0] === '11:15am' && apptSlots[5] === '12:30pm' && apptOpen === 11 && apptGone.length === 1 && apptGone[0] === '11:45am' && !(await page.$('.bcv-appt__mine')) && /A time you reserve goes on the calendar/.test((await texts('.bcv-appt .bcv-hint'))[0]),
+  `the sheet: the group as a card with its course, place and length, two days of times as chips, one taken (struck through), none held: ${JSON.stringify({ apptTitle, apptMeta, apptDays, apptSlots, apptOpen, apptGone })}`);
+  await shot(page, '06b-calendar-appointments');
+  await page.click('.bcv-appt__slot:not(:disabled)');
+  await page.waitForSelector('.bcv-appt__mine', { timeout: 10000 });
+  await page.waitForFunction(() => document.querySelectorAll('.bcv-appt__slot:not(:disabled)').length === 0, null, { timeout: 5000 });
+  const mineText = (await texts('.bcv-appt__minetext'))[0];
+  check(/^Your time: [A-Z][a-z]{2}, [A-Z][a-z]{2} \d{1,2} at 11:15am$/.test(mineText) && (await texts('.bcv-appt__slot.is-mine')).join() === '11:15am' && (await page.$$('.bcv-appt__slot:disabled')).length === 12 && (await texts('.bcv-appt__cancel'))[0] === 'Cancel',
+    `a press reserves the time: it is held at the top with Cancel, its chip filled, every other chip waiting (one time each): "${mineText}"`);
+  await shot(page, '06c-calendar-appointment-held');
+  await closeAppt();
+  await page.waitForFunction(() => [...document.querySelectorAll('.bcv-ev')].some((e) => /Research Proposal/.test(e.textContent)), null, { timeout: 10000 });
+  check((await texts('.bcv-ev')).filter((t) => /Research Proposal/.test(t)).length === 1 && (await texts('.bcv-ev')).length === evs.length + 1 && /^Find appointment\s*1$/.test((await texts('.bcv-cal__apptbtn'))[0]), 'the time reserved is the one appointment on the month, with the course\'s colour');
+  await openAppt();
+  await page.click('.bcv-appt__cancel');
+  await page.waitForFunction(() => !document.querySelector('.bcv-appt__mine') && document.querySelectorAll('.bcv-appt__slot:not(:disabled)').length === 11, null, { timeout: 10000 });
+  check(!(await page.$('.bcv-appt__mine')) && (await page.$$('.bcv-appt__slot:not(:disabled)')).length === 11 && !(await page.$('.bcv-appt__slot.is-mine')), 'Cancel gives the time back: the chips open again');
+  await closeAppt();
+  await page.waitForFunction((n) => document.querySelectorAll('.bcv-ev').length === n && ![...document.querySelectorAll('.bcv-ev')].some((e) => /Research Proposal/.test(e.textContent)), evs.length, { timeout: 10000 });
   // an assignment on the grid opens in the preview panel beside the month rather than leaving the page
   const chipTitle = await page.$eval('.bcv-ev[href*="/assignments/"]', (e) => e.querySelector('.bcv-ev__label').textContent);
   await page.click('.bcv-ev[href*="/assignments/"]');

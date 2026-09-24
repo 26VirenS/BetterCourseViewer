@@ -622,6 +622,40 @@ on('POST', /^\/__mock\/reopen-quiz$/, (url, m, body) => {
   s.workflow_state = 'untaken';
   return { ok: true };
 });
+// ---- appointments (Canvas's Scheduler) ---------------------------------------------------------
+// one appointment group open to MATH 021: six fifteen-minute times on each of two days, one student
+// a time and one time a student. Another student holds one already; Sam holds none until the sheet
+// reserves one. A reservation is a child event of its time: Sam's own, on the course's calendar.
+const apptGroup = { id: 'ag1', title: 'Research Proposal Feedback Conferences (Online Option)', description: 'Fifteen minutes to go over your research proposal draft before it is due. Bring your outline.', location_name: 'Online (the Zoom link is in the course)', context_codes: ['course_101'] };
+const apptSlots = [];
+for (const day of [2, 3]) for (let i = 0; i < 6; i++) { const m = 15 * (i + 1); apptSlots.push({ id: `slot${day}_${i}`, start_at: at(day, 11 + Math.floor(m / 60), m % 60), end_at: at(day, 11 + Math.floor((m + 15) / 60), (m + 15) % 60), taken: [] }); }
+apptSlots[8].taken.push({ id: 'res_other', user: '9' }); // the third time of the second day, another student's
+let resSeq = 0;
+const apptChildJson = (s, t) => ({ id: t.id, title: apptGroup.title, start_at: s.start_at, end_at: s.end_at, all_day: false, context_code: `user_${t.user}`, effective_context_code: 'course_101', context_name: t.user === '7' ? 'Sam Student' : 'Another Student', type: 'event', appointment_group_id: apptGroup.id, appointment_group_url: `/api/v1/appointment_groups/${apptGroup.id}`, parent_event_id: s.id, user: { id: t.user, name: t.user === '7' ? 'Sam Student' : 'Another Student' }, workflow_state: 'active', html_url: `/calendar?event_id=${t.id}` });
+const apptSlotJson = (s) => ({ id: s.id, title: apptGroup.title, start_at: s.start_at, end_at: s.end_at, all_day: false, context_code: `appointment_group_${apptGroup.id}`, effective_context_code: 'course_101', type: 'event', appointment_group_id: apptGroup.id, appointment_group_url: `/api/v1/appointment_groups/${apptGroup.id}`, participants_per_appointment: 1, available_slots: Math.max(0, 1 - s.taken.length), reserved: s.taken.some((t) => t.user === '7'), child_events_count: s.taken.length, child_events: s.taken.filter((t) => t.user === '7').map((t) => apptChildJson(s, t)), workflow_state: 'active', html_url: `/calendar?event_id=${s.id}` });
+const ownReservations = () => apptSlots.flatMap((s) => s.taken.filter((t) => t.user === '7').map((t) => [s, t]));
+on('GET', /^\/api\/v1\/appointment_groups$/, () => [{
+  ...apptGroup, location_address: '', participants_per_appointment: 1, max_appointments_per_participant: 1, min_appointments_per_participant: 1, participant_type: 'User', participant_visibility: 'private',
+  workflow_state: 'active', requiring_action: !ownReservations().length, appointments_count: apptSlots.length, appointments: apptSlots.map(apptSlotJson),
+  reserved_times: ownReservations().map(([s, t]) => ({ id: t.id, start_at: s.start_at, end_at: s.end_at })), start_at: apptSlots[0].start_at, end_at: apptSlots[apptSlots.length - 1].end_at,
+  url: `/api/v1/appointment_groups/${apptGroup.id}`, html_url: `/appointment_groups/${apptGroup.id}`, sub_context_codes: [],
+}]);
+on('POST', /^\/api\/v1\/calendar_events\/(\w+)\/reservations$/, (url, m) => {
+  const s = apptSlots.find((x) => x.id === m[1]);
+  if (!s) return { __status: 404, errors: [{ message: 'The specified resource does not exist.' }] };
+  if (s.taken.length >= 1) return { __status: 400, errors: [{ message: 'Appointment is full' }] };
+  if (ownReservations().length >= 1) return { __status: 400, errors: [{ message: 'You have already reserved the maximum number of appointments' }] };
+  const t = { id: `res${++resSeq}`, user: '7' };
+  s.taken.push(t);
+  return apptChildJson(s, t);
+});
+on('DELETE', /^\/api\/v1\/calendar_events\/(\w+)$/, (url, m) => {
+  for (const s of apptSlots) {
+    const i = s.taken.findIndex((t) => t.id === m[1] && t.user === '7');
+    if (i >= 0) { const [t] = s.taken.splice(i, 1); return { ...apptChildJson(s, t), workflow_state: 'deleted' }; }
+  }
+  return { __status: 404, errors: [{ message: 'The specified resource does not exist.' }] };
+});
 on('GET', /^\/api\/v1\/calendar_events$/, (url) => {
   const codes = url.searchParams.getAll('context_codes[]');
   const type = url.searchParams.get('type') || 'event';
@@ -636,6 +670,8 @@ on('GET', /^\/api\/v1\/calendar_events$/, (url) => {
     if (codes.includes('course_102')) out.push({ id: 'ev3', title: 'Week 2 lab', start_at: at(-2, 10, 30), end_at: at(-2, 13, 0), all_day: false, context_code: 'course_102', context_name: 'F26-PHYS 008 01', type: 'event', html_url: '/calendar?event_id=ev3' });
     if (codes.includes('course_104')) out.push({ id: 'ev5', title: 'SPRK 010 seminar', start_at: at(0, 15, 0), end_at: at(0, 16, 15), all_day: false, context_code: 'course_104', context_name: 'F26-SPRK 010 103', type: 'event', html_url: '/calendar?event_id=ev5' }); // a class today, on the calendar (never counted as work due)
     if (codes.includes('course_202')) out.push({ id: 'e1', title: 'Chemistry placement closes', start_at: at(6, 0, 0), end_at: at(6, 23, 59), all_day: true, context_code: 'course_202', context_name: 'Placement Exam: Chemistry', type: 'event', html_url: '/calendar?event_id=e1' });
+    // like Canvas: a reservation is the student's own event, returned with the course it is for (effective_context_code) as well as with the personal calendar
+    if (codes.includes('course_101') || codes.includes('user_7')) for (const [s2, t] of ownReservations()) out.push(apptChildJson(s2, t));
     if (codes.includes('user_7')) out.push({ id: 'ev4', title: 'Dentist', start_at: at(2, 15, 0), end_at: at(2, 16, 0), all_day: false, context_code: 'user_7', context_name: 'Sam Student', type: 'event', html_url: '/calendar?event_id=ev4' });
   }
   return filterDates(out, url, 'start_at');

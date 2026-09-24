@@ -704,6 +704,34 @@
     }, { force, refresh });
   }
 
+  // ---- appointments (Canvas's Scheduler) ------------------------------------------------------
+  /** The appointment groups the student can sign up for — office hours, conferences, any set of
+   *  times a teacher opened — each with its times, how many places each has left, and the times
+   *  this student already holds (child_events and reserved_times). Kept only briefly: a place can
+   *  be taken by someone else at any moment, so the sheet asks again each time it opens. */
+  function appointmentGroups({ force = false, refresh = false } = {}) {
+    return C.cached('appointments', 2 * MIN, () =>
+      C.get('/api/v1/appointment_groups', { params: { scope: 'reservable', include: ['appointments', 'child_events', 'participant_count', 'reserved_times'], include_past_appointments: false, per_page: 50 }, all: true, maxPages: 3 }), { force, refresh });
+  }
+  /** Reserve a time (a calendar event of an appointment group). Canvas answers with the
+   *  reservation: an event of the student's own, on the course's calendar. */
+  async function reserveAppointment(slotId, { comments = '' } = {}) {
+    const r = await C.post(`/api/v1/calendar_events/${slotId}/reservations`, comments ? { comments } : {});
+    await invalidateAppointments();
+    return r;
+  }
+  /** Give a time back: the reservation is the student's own event, deleted. */
+  async function cancelReservation(reservationId, { reason = '' } = {}) {
+    const r = await C.del(`/api/v1/calendar_events/${reservationId}`, reason ? { params: { cancel_reason: reason } } : undefined);
+    await invalidateAppointments();
+    return r;
+  }
+  /** After a reservation either way: the groups and every month read so far (the reservation is
+   *  an event on the calendar) are asked for afresh. */
+  async function invalidateAppointments() {
+    await Promise.all([C.invalidate('appointments'), C.invalidatePrefix('cal:')]);
+  }
+
   // ---- inbox ----------------------------------------------------------------------------------
   function conversations({ scope = 'inbox', filter = null, force = false, refresh = false } = {}) {
     const params = { per_page: 50 };
@@ -1250,7 +1278,7 @@
     env, pref, setPref, mergePref, me, account, colors, courses, favorites, cards, setFavorite, setNickname, currentTerm, dashboardView, setDashboardView, freshness, invalidateGrades,
     planner, classify, todo, todoWindow, setComplete, dismiss, restore, invalidatePlanner, plannerOverrides, createNote, deleteNote, activity, activitySummary, unreadCount, groups, group,
     announcementsFeed, streamSeen, markStreamSeen, setColor, history, helpLinks,
-    calendarContexts, ownContexts, selectedContexts, setSelectedContexts, calendarEvents, plannerRange,
+    calendarContexts, ownContexts, selectedContexts, setSelectedContexts, calendarEvents, plannerRange, appointmentGroups, reserveAppointment, cancelReservation,
     conversations, conversation, markRead, setStarred, replyTo, compose, searchRecipients, invalidateInbox,
     course, tabs, frontPage, syllabus, courseTodo, ignoreTodo, courseStream, assignments, assignment, submission, assignmentGroups, progress,
     announcements, discussions, discussion, discussionView, postEntry, markTopicRead, people, sections, courseGroups, pages, page,
