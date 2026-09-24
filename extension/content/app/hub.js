@@ -380,7 +380,7 @@
     const subEl = U.text('bcv-hub-pop__sub bcv-ellip', 'Loading…');
     const body = U.el('bcv-hub-pop__body', U.loading('rows', 3));
     const gone = () => { if (!live) return; live = false; A.state.submitOpen = false; };
-    const leave = () => { gone(); U.dismiss(ov); }; // (out on its spring, from wherever it had got to)
+    const leave = () => { gone(); ov.classList.add('is-closing'); setTimeout(() => ov.remove(), 180); };
     const close = () => {
       if (!live) return;
       if (A.state.submitOpen && !window.confirm('Your submission has not been sent yet. Close anyway?\n\nAttached files are dropped; a text entry stays as a draft on this device.')) return;

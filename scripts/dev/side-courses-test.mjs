@@ -110,7 +110,7 @@ try {
   await page.hover('.bcv-nav__item[data-nav="courses"]');
   await page.waitForSelector('.bcv-quicknav', { timeout: 12000 }); // (the hover's own delay, and a starved machine: three suites run side by side)
   await page.hover('.bcv-nav__item[data-nav="dashboard"]');
-  await page.waitForFunction(() => !document.querySelector('.bcv-quicknav'), null, { timeout: 2500 }).catch(() => {}); // (the leave's grace, then its spring out)
+  await page.waitForTimeout(400);
   check(!(await page.$('.bcv-quicknav')), 'hover: the pointer leaving both closes it');
 
   // keyboard: the row opens it and Escape closes it
@@ -120,7 +120,7 @@ try {
   const focused = await page.evaluate(() => document.activeElement?.className || '');
   check(/bcv-fav/.test(focused), `keyboard: the arrow opens the panel and lands on the first course (${focused})`);
   await page.keyboard.press('Escape');
-  await page.waitForFunction(() => !document.querySelector('.bcv-quicknav'), null, { timeout: 2500 }).catch(() => {}); // (its spring out)
+  await page.waitForTimeout(200);
   const back = await page.evaluate(() => document.activeElement?.dataset?.nav || document.activeElement?.tagName);
   const stillOpen = !!(await page.$('.bcv-quicknav'));
   check(!stillOpen, `keyboard: Escape closes the panel (open after Escape: ${stillOpen})`);

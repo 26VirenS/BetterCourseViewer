@@ -117,7 +117,6 @@
   function afterRender(app, r, el) {
     const isRoot = (ROOT.has(r.screen) && r.params.get('bcv') !== 'native') || r.params.get('bcv') === 'setup';
     html.classList.toggle('bcv-ph-root', isRoot);
-    if (isRoot && el?.classList) { el.classList.remove('bcv-screen--fwd', 'bcv-screen--back'); el.classList.add('bcv-screen--tab'); } // (a tab change fades in place; only a pushed screen slides)
     paintTabs(app);
     closeSwipes();
     if (!topbarEl) return;
@@ -244,34 +243,16 @@
       body,
       actions.filter(Boolean).length ? U.el('bcv-ph-sheet__actions', actions.filter(Boolean).map((a) => h('button', { type: 'button', class: `bcv-ph-bigbtn ${a.primary ? 'is-primary' : ''} ${a.cls || ''}`, text: a.label, onclick: () => { if (!a.keep) close(); a.onSelect?.(); } }))) : null,
     ]);
-    // the drag lives on the handle only: a scrolling list inside must scroll, not drag the sheet.
-    // The finger tracks 1:1; on release the sheet springs back (or away) at the speed it was let go
-    let y0 = null, lastY = 0, lastT = 0, vy = 0;
-    handle.addEventListener('pointerdown', (e) => { y0 = e.clientY; lastY = e.clientY; lastT = e.timeStamp; vy = 0; try { handle.setPointerCapture(e.pointerId); } catch { /* fine */ } sheet.style.transition = 'none'; for (const a of sheet.getAnimations()) a.cancel(); });
-    handle.addEventListener('pointermove', (e) => {
-      if (y0 === null) return;
-      const dt = e.timeStamp - lastT;
-      if (dt > 0) vy = 0.7 * vy + 0.3 * ((e.clientY - lastY) / dt) * 1000; // px/s, smoothed
-      lastY = e.clientY; lastT = e.timeStamp;
-      sheet.style.transform = `translateY(${Math.max(0, e.clientY - y0)}px)`;
-    });
+    // the drag lives on the handle only: a scrolling list inside must scroll, not drag the sheet
+    let y0 = null;
+    handle.addEventListener('pointerdown', (e) => { y0 = e.clientY; try { handle.setPointerCapture(e.pointerId); } catch { /* fine */ } sheet.style.transition = 'none'; });
+    handle.addEventListener('pointermove', (e) => { if (y0 !== null) sheet.style.transform = `translateY(${Math.max(0, e.clientY - y0)}px)`; });
     const up = (e) => {
       if (y0 === null) return;
       const dy = Math.max(0, e.clientY - y0);
       y0 = null;
-      const M = BCV.motion;
-      if (dy > 110 || vy > 700) {
-        // let go past the line or thrown: it goes on down the way it was moving, then the scrim leaves
-        if (M && !U.reducedMotion()) {
-          ov.classList.add('is-closing', 'bcv-sprung');
-          const h = sheet.offsetHeight + 40;
-          const p = 1 - dy / h; // progress "here" (1) → "gone" (0), as the exit spring counts it
-          Promise.all([M.run(sheet, { y: [h, 0] }, 'phone', { from: p, to: 0, v0: -Math.max(0, vy) / h }).finished, M.exit(ov, 'scrim').finished]).then(() => ov.remove());
-        } else close();
-      } else if (M && !U.reducedMotion()) {
-        sheet.style.transform = '';
-        M.run(sheet, { y: [dy, 0] }, 'phone', { v0: Math.max(0, -vy) / Math.max(1, dy), fill: 'backwards' }); // (a finger moving back up hands its speed to the return)
-      } else { sheet.style.transition = 'transform .25s cubic-bezier(.32,.72,0,1)'; sheet.style.transform = 'translateY(0)'; }
+      if (dy > 110) close();
+      else { sheet.style.transition = 'transform .25s cubic-bezier(.32,.72,0,1)'; sheet.style.transform = 'translateY(0)'; }
     };
     handle.addEventListener('pointerup', up);
     handle.addEventListener('pointercancel', up);
