@@ -626,7 +626,7 @@ on('POST', /^\/__mock\/reopen-quiz$/, (url, m, body) => {
 // one appointment group open to MATH 021: six fifteen-minute times on each of two days, one student
 // a time and one time a student. Another student holds one already; Sam holds none until the sheet
 // reserves one. A reservation is a child event of its time: Sam's own, on the course's calendar.
-const apptGroup = { id: 'ag1', title: 'Research Proposal Feedback Conferences (Online Option)', description: 'Fifteen minutes to go over your research proposal draft before it is due. Bring your outline.', location_name: 'Online (the Zoom link is in the course)', context_codes: ['course_101'] };
+const apptGroup = { id: 'ag1', title: 'Research Proposal Feedback Conferences (Online Option)', description: 'Fifteen minutes to go over your research proposal draft before it is due. Bring your outline.', location_name: 'Online (the Zoom link is in the course)', context_codes: ['course_101', 'course_40777'] }; // (attached to another section too, one the student is not in: like Canvas, its code is listed all the same)
 const apptSlots = [];
 for (const day of [2, 3]) for (let i = 0; i < 6; i++) { const m = 15 * (i + 1); apptSlots.push({ id: `slot${day}_${i}`, start_at: at(day, 11 + Math.floor(m / 60), m % 60), end_at: at(day, 11 + Math.floor((m + 15) / 60), (m + 15) % 60), taken: [] }); }
 apptSlots[8].taken.push({ id: 'res_other', user: '9' }); // the third time of the second day, another student's

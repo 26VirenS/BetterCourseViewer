@@ -24,6 +24,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.82.0', date: '2026-09-24', notes: [
+      { kind: 'fixed', title: 'Your classes only', body: 'Sections you are not in no longer show as course numbers.', icon: P.check },
+    ] },
     { version: '2.81.0', date: '2026-09-24', notes: [
       { kind: 'fixed', title: 'The bar over a tool', body: 'Comes back after a reload. Blocked? Press the Simpl icon.', icon: P.layers },
       { kind: 'new', title: 'Keep the bar here', body: 'The popup asks the browser once for the tool’s site.', icon: P.check },

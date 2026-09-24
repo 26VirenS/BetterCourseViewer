@@ -461,7 +461,19 @@
     // The sheet's own state, kept across repaints (a reservation repaints it): the class chosen,
     // and which days are open to their hours.
     const apptUi = { course: null, open: new Set() };
-    const coursesOf = () => { const seen = new Map(); for (const g of groups || []) for (const c of g.codes) if (!seen.has(c)) seen.set(c, ctxMap.get(c)?.name || c); return [...seen.entries()]; };
+    // The classes to choose from: the student's own courses that have something to sign up for, in the
+    // calendar's own order. A group's context_codes name every section the teacher attached it to,
+    // sections the student is not in included, and those are not classes of theirs to pick — they are
+    // left out (a group none of whose courses is the student's own is kept under its first, as named).
+    const coursesOf = () => {
+      const have = new Set();
+      for (const g of groups || []) for (const c of g.codes) have.add(c);
+      const known = contexts.filter((c) => have.has(c.code)).map((c) => [c.code, c.name]);
+      for (const g of groups || []) if (!g.codes.some((c) => ctxMap.has(c)) && g.codes[0] && !known.some(([k]) => k === g.codes[0])) known.push([g.codes[0], g.contextName || g.codes[0]]);
+      return known;
+    };
+    /** Words with any web address in them made a link (a place that is a Zoom link, say). */
+    const linkify = (str) => String(str).split(/(https?:\/\/[^\s]+)/g).map((part, i) => (i % 2 ? h('a', { class: 'bcv-appt__link', href: part, target: '_blank', rel: 'noopener', text: part.replace(/^https?:\/\//, '') }) : part));
     function appointmentsBody() {
       if (groups === null) return [U.loading()];
       const out = [];
@@ -493,12 +505,13 @@
       const full = g.max > 0 && g.mine.length >= g.max; // every time allowed is held: the rest wait until one is given back
       const first = g.slots[0];
       const mins = first?.end ? Math.round((first.end - first.start) / 60000) : 0;
-      const meta = [g.location, mins ? `${mins} min each` : null, g.max ? `${g.max === 1 ? 'one time' : `${g.max} times`} each` : null].filter(Boolean).join(' · ');
+      const metaParts = [g.location ? linkify(g.location) : null, mins ? `${mins} min each` : null, g.max ? `${g.max === 1 ? 'one time' : `${g.max} times`} each` : null].filter(Boolean);
+      const meta = metaParts.length ? metaParts.flatMap((part, i) => (i ? [' · ', ...[].concat(part)] : [].concat(part))) : null;
       const head = U.el('bcv-appt__head', [
         U.dot(g.color, 'bcv-dot--sq'),
         h('div', { class: 'bcv-appt__titles' }, [
           h('div', { class: 'bcv-appt__title bcv-pretty', text: g.title }),
-          meta ? h('div', { class: 'bcv-appt__meta', text: meta }) : null,
+          meta ? h('div', { class: 'bcv-appt__meta' }, meta) : null,
         ]),
       ]);
       // a long description is folded to three lines, with More to read the rest

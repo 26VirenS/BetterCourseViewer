@@ -3745,3 +3745,5 @@ html[data-bcv-theme="dark"] .bcv-pdfx { --px-row: #0f0f11; --px-page: #1f1f22; -
 /* 2.81.0: the Appearance button expands into a menu above itself — Light, Dark, Personalize */
 .bcv-menu--theme { width: 224px; max-height: none; padding: 8px; }
 .bcv-menu--theme .bcv-menu__item.is-active .bcv-menu__ic { background: var(--bcv-blue); color: #fff; }
+.bcv-appt__link { color: var(--bcv-blue); text-decoration: none; overflow-wrap: anywhere; }
+.bcv-appt__link:hover { text-decoration: underline; }
