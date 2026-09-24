@@ -17,6 +17,7 @@
       siteName: '',               // shown in the sidebar brand row; blank = derived from the host
       logoUrl: '',                // sidebar tile image; blank = the school's own mark from Canvas's theme
       sideCourses: 'always',      // where the favourite courses live: 'always' on the sidebar, or 'hover' off the Courses row
+      awayRefresh: true,          // a page left three minutes reloads itself when you come back (content/app/app.js); off = never — a hold on the pill, or the switch under General
       dashboard: { cards: true, list: true, activity: true }, // which of the Dashboard's views are offered; at least one stays on
       theme: { accent: '' },   // the colour of the student's own (lib/theme.js); blank = the interface's blue. The photos are in storage.local under theme:images
     },

@@ -98,7 +98,7 @@ const shot = async (page, name) => { await settleShot(page); await page.screensh
 // has to be there, exactly, or a timer changed under the suite without the table in harness.mjs
 {
   console.log('\nharness');
-  check(timers.missing.length === 0 && timers.done.length === 10, `the copy runs the welcome's wait, the word-marks, the screen patience, the Away Refresh count, the island, the counter roll and the grade poll short, the shipped values found exactly (${timers.done.length} rewritten${timers.missing.length ? `; not found: ${timers.missing.join(' | ')}` : ''})`);
+  check(timers.missing.length === 0 && timers.done.length === 12, `the copy runs the welcome's wait, the word-marks, the screen patience, the Away Refresh count, its hold and its off-stay, the island, the counter roll and the grade poll short, the shipped values found exactly (${timers.done.length} rewritten${timers.missing.length ? `; not found: ${timers.missing.join(' | ')}` : ''})`);
 }
 
 // 3. the native projects ship every top-level entry of extension/ and carry the same version
@@ -3669,8 +3669,8 @@ try {
   await page.waitForFunction(() => !document.querySelector('.bcv-welcome__look') && !document.querySelector('.bcv-welcome__stage[data-stage="look"]'), null, { timeout: 3000 });
   await eventually(() => page.$eval('.bcv-welcome__away', (e) => e.getAnimations().every((a) => a.playState === 'finished') && Math.round(e.getBoundingClientRect().top) === 10).catch(() => false), 3000); // the pill floats down first (and overshoots a little on the way)
   const awayCopy = await page.$eval('.bcv-welcome__away', (e) => { const r = e.getBoundingClientRect(); return { top: Math.round(r.top), centred: Math.abs((r.left + r.right) / 2 - innerWidth / 2) < 2, title: e.querySelector('.bcv-away__title').textContent, hint: e.querySelector('.bcv-away__hint').textContent, ring: getComputedStyle(e.querySelector('.bcv-away__ring')).animationDuration, hand: getComputedStyle(e.querySelector('.bcv-away__hand')).animationDuration, loops: getComputedStyle(e.querySelector('.bcv-away__ring')).animationIterationCount }; }).catch(() => null);
-  check((await welcomeBox()).bg === 'rgb(0, 0, 0)' && !!awayCopy && awayCopy.top === 10 && awayCopy.centred && awayCopy.title === 'Away Refresh' && awayCopy.hint === 'Click to cancel' && awayCopy.ring === '12s' && awayCopy.hand === '12s' && awayCopy.loops === 'infinite' && (await page.$('#bcv-away')) === null, `stage two: the switch and its words are gone, the screen is still black, and a mock Away Refresh pill counts down in slow motion at the top (${JSON.stringify(awayCopy)})`);
-  check((await welcomeLines()).join(' | ') === 'Away Refresh | Click to cancel | Away refresh prevents errors that show up after you’ve been gone for a while' && (await page.$eval('.bcv-welcome__stage[data-stage="away"] .bcv-welcome__arrow', (e) => e.getBoundingClientRect().height >= 120)), `an arrow up at the pill and the three lines (${(await welcomeLines()).join(' | ')})`);
+  check((await welcomeBox()).bg === 'rgb(0, 0, 0)' && !!awayCopy && awayCopy.top === 10 && awayCopy.centred && awayCopy.title === 'Away Refresh' && awayCopy.hint === 'Click to cancel, or hold to disable' && awayCopy.ring === '12s' && awayCopy.hand === '12s' && awayCopy.loops === 'infinite' && (await page.$('#bcv-away')) === null, `stage two: the switch and its words are gone, the screen is still black, and a mock Away Refresh pill counts down in slow motion at the top (${JSON.stringify(awayCopy)})`);
+  check((await welcomeLines()).join(' | ') === 'Away Refresh | Click to cancel, or hold to disable | Away refresh prevents errors that show up after you’ve been gone for a while' && (await page.$eval('.bcv-welcome__stage[data-stage="away"] .bcv-welcome__arrow', (e) => e.getBoundingClientRect().height >= 120)), `an arrow up at the pill and the three lines (${(await welcomeLines()).join(' | ')})`);
   check(noContinueYet2 && await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000) && Date.now() - awayAt >= TIMERS.welcomeWait - 500, 'Continue comes in only after the wait here too');
   await page.waitForTimeout(400);
   await shot(page, '31b-welcome-away');
@@ -5368,11 +5368,11 @@ try {
   const awayNav = page.waitForNavigation({ timeout: 15000 }).then(() => true).catch(() => false);
   const pressedAt = Date.now();
   await pressStat();
-  // the reload is announced first: a pill floats down at the top — a dial counting three seconds down in orange, "Away Refresh", "Click to cancel"
+  // the reload is announced first: a pill floats down at the top — a dial counting three seconds down in orange, "Away Refresh", "Click to cancel, or hold to disable" (the hold's red ring and wash unseen until a hold)
   await page.waitForSelector('#bcv-away.is-in', { timeout: 3000 });
   await page.waitForFunction(() => { const e = document.querySelector('#bcv-away'); return !!e && e.getBoundingClientRect().top >= 0; }, null, { timeout: 2000 }); // the float-down settles
-  const pill = await page.$eval('#bcv-away', (e) => { const ring = getComputedStyle(e.querySelector('.bcv-away__ring')); const hand = getComputedStyle(e.querySelector('.bcv-away__hand')); const r = e.getBoundingClientRect(); return { title: e.querySelector('.bcv-away__title').textContent, hint: e.querySelector('.bcv-away__hint').textContent, hintDim: getComputedStyle(e.querySelector('.bcv-away__hint')).color !== getComputedStyle(e.querySelector('.bcv-away__title')).color, ring: ring.stroke, ringAnim: `${ring.animationName}@${ring.animationDuration}`, handFill: hand.fill, handAnim: `${hand.animationName}@${hand.animationDuration}`, ticks: e.querySelectorAll('.bcv-away__tick, .bcv-away__pin').length, hands: e.querySelectorAll('.bcv-away__hand').length, top: Math.round(r.top), centred: Math.abs((r.left + r.right) / 2 - window.innerWidth / 2) < 2, fixed: getComputedStyle(e).position === 'fixed' }; });
-  check(pill.title === 'Away Refresh' && pill.hint === 'Click to cancel' && pill.hintDim && pill.ring === 'rgb(255, 159, 10)' && pill.ringAnim === 'bcv-away-ring@3s' && pill.handFill === 'rgb(255, 159, 10)' && pill.handAnim === 'bcv-away-sweep@3s' && pill.ticks === 0 && pill.hands === 1 && pill.fixed && pill.top >= 0 && pill.top < 40 && pill.centred && !(await page.$('.bcv-sheet-ov')), `after three minutes away the first press is swallowed and a pill floats down at the top, its dial counting three seconds down in orange: ${JSON.stringify(pill)}`);
+  const pill = await page.$eval('#bcv-away', (e) => { const ring = getComputedStyle(e.querySelector('.bcv-away__ring')); const hand = getComputedStyle(e.querySelector('.bcv-away__hand')); const r = e.getBoundingClientRect(); return { title: e.querySelector('.bcv-away__title').textContent, hint: e.querySelector('.bcv-away__hint').textContent, hintDim: getComputedStyle(e.querySelector('.bcv-away__hint')).color !== getComputedStyle(e.querySelector('.bcv-away__title')).color, ring: ring.stroke, ringAnim: `${ring.animationName}@${ring.animationDuration}`, handFill: hand.fill, handAnim: `${hand.animationName}@${hand.animationDuration}`, ticks: e.querySelectorAll('.bcv-away__tick, .bcv-away__pin').length, hands: e.querySelectorAll('.bcv-away__hand').length, holdHidden: getComputedStyle(e.querySelector('.bcv-away__hold')).opacity === '0' && getComputedStyle(e.querySelector('.bcv-away__wash')).opacity === '0', top: Math.round(r.top), centred: Math.abs((r.left + r.right) / 2 - window.innerWidth / 2) < 2, fixed: getComputedStyle(e).position === 'fixed' }; });
+  check(pill.title === 'Away Refresh' && pill.hint === 'Click to cancel, or hold to disable' && pill.hintDim && pill.ring === 'rgb(255, 159, 10)' && pill.ringAnim === 'bcv-away-ring@3s' && pill.handFill === 'rgb(255, 159, 10)' && pill.handAnim === 'bcv-away-sweep@3s' && pill.ticks === 0 && pill.hands === 1 && pill.holdHidden && pill.fixed && pill.top >= 0 && pill.top < 40 && pill.centred && !(await page.$('.bcv-sheet-ov')), `after three minutes away the first press is swallowed and a pill floats down at the top, its dial counting three seconds down in orange: ${JSON.stringify(pill)}`);
   await shot(page, '35-away-refresh');
   check((await awayNav) && Date.now() - pressedAt >= TIMERS.awayCount - 200, `and the page reloads when the count runs out (three seconds shipped, ${TIMERS.awayCount} ms here), not before (${Date.now() - pressedAt} ms after the press)`);
   await page.waitForSelector('.bcv-stat', { timeout: 20000 });
@@ -5402,6 +5402,72 @@ try {
   check(!(await afterCancelNav) && !!(await page.$('.bcv-sheet-ov')) && !(await page.$('#bcv-away')), 'and the press after a cancel does what it says');
   await page.click('.bcv-sheet-ov', { position: { x: 5, y: 5 } });
   await page.waitForFunction(() => !document.querySelector('.bcv-sheet-ov'), null, { timeout: 5000 });
+  // A press HELD on the pill turns Away Refresh off for good: the count waits under the finger while a
+  // red ring closes round the dial and a wash crosses the pill (let go early, and it was the click:
+  // cancelled, as above); held to the end, the pill says it is off and where to turn it back on, and
+  // floats away; the setting is written, so a stale page is left alone from then on — a press acts as
+  // itself, coming back to the tab does nothing — until Settings turns it back on
+  const holdState = () => page.$eval('#bcv-away', (e) => { const cs = (s) => getComputedStyle(e.querySelector(s)); return { holding: e.classList.contains('is-holding'), off: e.classList.contains('is-off'), in: e.classList.contains('is-in'), ring: `${cs('.bcv-away__hold').animationName}@${cs('.bcv-away__hold').animationDuration}`, ringOn: cs('.bcv-away__hold').opacity, ringStroke: cs('.bcv-away__hold').stroke, ringOffset: Math.round(parseFloat(cs('.bcv-away__hold').strokeDashoffset)), wash: `${cs('.bcv-away__wash').animationName}@${cs('.bcv-away__wash').animationDuration}`, washOn: cs('.bcv-away__wash').opacity, countPaused: cs('.bcv-away__ring').animationPlayState === 'paused' && cs('.bcv-away__hand').animationPlayState === 'paused', arc: cs('.bcv-away__ring').opacity, title: e.querySelector('.bcv-away__title').textContent, hint: e.querySelector('.bcv-away__hint').textContent, w: Math.round(e.querySelector('.bcv-away__btn').getBoundingClientRect().width) }; });
+  const pillCentre = () => page.$eval('#bcv-away .bcv-away__btn', (e) => { const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, w: Math.round(r.width) }; });
+  const floatDown = async () => { await page.waitForSelector('#bcv-away.is-in', { timeout: 3000 }); await page.waitForFunction(() => { const e = document.querySelector('#bcv-away'); return !!e && e.getBoundingClientRect().top >= 0; }, null, { timeout: 2000 }); };
+  // a short press first: let go before the hold is up, it is the click — cancelled — and the setting stands
+  await page.evaluate(() => sessionStorage.removeItem('bcv:reloaded'));
+  await windBack(4 * 60 * 1000);
+  const shortNav = page.waitForNavigation({ timeout: NO_RELOAD }).then(() => true).catch(() => false);
+  await comeBack();
+  await floatDown();
+  const at1 = await pillCentre();
+  await page.mouse.move(at1.x, at1.y);
+  await page.mouse.down();
+  await page.waitForTimeout(Math.round(TIMERS.awayHold * 0.35));
+  const early = await holdState();
+  await page.mouse.up();
+  check(early.holding && !early.off && early.ring === `bcv-away-hold@${TIMERS.awayHold / 1000}s` && early.ringOn === '1' && early.ringStroke === 'rgb(255, 69, 58)' && early.wash === `bcv-away-wash@${TIMERS.awayHold / 1000}s` && early.washOn === '1' && early.countPaused && early.title === 'Away Refresh' && (await eventually(async () => !(await page.$('#bcv-away')))) && (await sw.evaluate(() => self.BCV.settings.get())).appearance.awayRefresh !== false, `pressed and held a moment: the count waits, a red ring starts to close round the dial and a wash starts across the pill — let go early, it was the click: the pill goes and the setting stands (${JSON.stringify(early)})`);
+  check(!(await shortNav), 'and nothing reloads');
+  // held to the end
+  await page.evaluate(() => sessionStorage.removeItem('bcv:reloaded'));
+  await windBack(4 * 60 * 1000);
+  const offNav = page.waitForNavigation({ timeout: NO_RELOAD + TIMERS.awayHold + TIMERS.awayOffStay }).then(() => true).catch(() => false);
+  await comeBack();
+  await floatDown();
+  const at2 = await pillCentre();
+  await page.mouse.move(at2.x, at2.y);
+  const downAt = Date.now();
+  await page.mouse.down();
+  await page.waitForTimeout(Math.round(TIMERS.awayHold * 0.45));
+  await page.screenshot({ path: join(out, '35b-away-hold.png') }); // (not shot(): the count's own animations are paused under the hold, and shot() waits for every animation to end)
+  await page.waitForSelector('#bcv-away.is-off', { timeout: TIMERS.awayHold + 2000 });
+  const heldFor = Date.now() - downAt;
+  await page.waitForTimeout(260); // (the arc and the hand fade out)
+  await page.mouse.up();
+  await page.waitForTimeout(60);
+  const off = await holdState();
+  check(heldFor >= TIMERS.awayHold - 60 && off.off && !off.holding && off.in && off.ringOffset === 0 && off.ringOn === '1' && off.washOn === '1' && off.arc === '0' && off.countPaused && off.title === 'Away Refresh off' && off.hint === 'Turn it back on in Settings' && Math.abs(off.w - at2.w) <= 1, `held to the end (${heldFor} ms; ${TIMERS.awayHold} here, 900 shipped): the ring is whole, the pill washed, the count's arc gone, and the words say Away Refresh is off and where to turn it back on — the pill the same width, and the release changing nothing (${JSON.stringify(off)})`);
+  await page.screenshot({ path: join(out, '35c-away-off.png') });
+  check((await eventually(async () => !(await page.$('#bcv-away')), TIMERS.awayOffStay + 2500)) && (await sw.evaluate(() => self.BCV.settings.get())).appearance.awayRefresh === false && !(await offNav), 'then the pill floats away, the setting is off, and nothing reloads');
+  // with Away Refresh off, a stale page is left alone: a press acts as itself and no pill comes, the page counts as awake, and coming back to the tab does nothing
+  await windBack(4 * 60 * 1000);
+  const stalePress = page.waitForNavigation({ timeout: 1200 }).then(() => true).catch(() => false);
+  await pressStat();
+  await page.waitForTimeout(300);
+  check(!(await stalePress) && (await page.$('#bcv-away')) === null && !!(await page.$('.bcv-sheet-ov')) && (await awayAge()) < 60 * 1000, 'with Away Refresh off, a stale press does what it says: no pill, no reload, and the page counts as awake');
+  await page.click('.bcv-sheet-ov', { position: { x: 5, y: 5 } });
+  await page.waitForFunction(() => !document.querySelector('.bcv-sheet-ov'), null, { timeout: 5000 });
+  await windBack(4 * 60 * 1000);
+  const staleBack = page.waitForNavigation({ timeout: 1200 }).then(() => true).catch(() => false);
+  await comeBack();
+  await page.waitForTimeout(400);
+  check(!(await staleBack) && (await page.$('#bcv-away')) === null, 'and coming back to the tab after three minutes does nothing either');
+  // Settings is the way back on (its switch is pressed in the extension-pages block below); written there, the open page hears it and the pill is itself again
+  await sw.evaluate(() => self.BCV.settings.update({ appearance: { awayRefresh: true } }));
+  await page.waitForTimeout(400);
+  await page.evaluate(() => sessionStorage.removeItem('bcv:reloaded'));
+  await windBack(4 * 60 * 1000);
+  const onAgainNav = page.waitForNavigation({ timeout: NO_RELOAD }).then(() => true).catch(() => false);
+  await comeBack();
+  await page.waitForSelector('#bcv-away.is-in', { timeout: 3000 });
+  await page.click('#bcv-away .bcv-away__btn');
+  check((await eventually(async () => !(await page.$('#bcv-away')))) && !(await onAgainNav), 'turned back on in Settings, the open page hears it: a stale tab floats the pill down again, and a click still cancels');
   // The scripts in the page a second time (Safari puts them back when the extension looks at its
   // permissions — opening the popup — and again when it updates) wire nothing twice: the second copy
   // has no Away Refresh of its own, so a stale tab floats one pill, not a stack, and the one press clears it
@@ -5630,6 +5696,14 @@ try {
   // the count is Canvas's own host plus every site allowed since (the mock, registered when the page after install found it)
   const siteN = 1 + ((await sw.evaluate(() => self.BCV.settings.get())).domains || []).length;
   check(/^Version \d+\.\d+/.test(await options.$eval('#version', (el) => el.textContent)) && (await oTexts('#statusText'))[0] === `${siteN} site${siteN === 1 ? '' : 's'}`, `settings show the version and the site count: ${await options.$eval('#version', (el) => el.textContent)} · ${(await oTexts('#statusText'))[0]}`);
+  // General: the Away Refresh switch — the way back on after a hold on the pill (Getting unstuck, above)
+  check(await options.$eval('#awayRefresh', (b) => b.classList.contains('is-on') && b.getAttribute('aria-checked') === 'true' && !!b.closest('#general') && b.closest('.row').querySelector('.row__t').textContent === 'Away Refresh'), 'General has the Away Refresh switch, on');
+  await options.click('#awayRefresh');
+  await options.waitForTimeout(250);
+  check((await sw.evaluate(() => self.BCV.settings.get())).appearance.awayRefresh === false && !(await options.$eval('#awayRefresh', (b) => b.classList.contains('is-on'))), 'off saves (what a hold on the pill writes)');
+  await options.click('#awayRefresh');
+  await options.waitForTimeout(250);
+  check((await sw.evaluate(() => self.BCV.settings.get())).appearance.awayRefresh === true && (await options.$eval('#awayRefresh', (b) => b.classList.contains('is-on'))), 'and on again');
   await options.screenshot({ path: join(out, '29-options-general.png') });
   await options.click('.navlink[data-section="courses"]');
   await options.waitForSelector('.course', { timeout: 15000 });

@@ -51,7 +51,7 @@ const check = (cond, label) => { // a check long after the one before says so, i
   if (!cond) failures.push(label);
 };
 console.log('harness');
-check(timers.missing.length === 0 && timers.done.length === 10, `the copy runs the product's longest timers short, the shipped values found exactly (${timers.done.length} rewritten${timers.missing.length ? `; not found: ${timers.missing.join(' | ')}` : ''})`);
+check(timers.missing.length === 0 && timers.done.length === 12, `the copy runs the product's longest timers short, the shipped values found exactly (${timers.done.length} rewritten${timers.missing.length ? `; not found: ${timers.missing.join(' | ')}` : ''})`);
 
 const userDataDir = join(tmpdir(), `bcv-phone-profile-${Date.now()}`);
 // an iPhone-sized viewport with touch; the layout switches on width (≤700px) before first paint
@@ -707,7 +707,7 @@ try {
   const welcomeAt = Date.now();
   const noContinueYet = (await page.$('.bcv-welcome__next:not([hidden])')) === null;
   const welcomeInfo = await page.$eval('#bcv-welcome', (e) => { const r = e.getBoundingClientRect(); const pill = e.querySelector('.bcv-welcome__away'); const p = pill?.getBoundingClientRect(); return { stage: e.dataset.stage, bg: getComputedStyle(e).backgroundColor, full: r.width === innerWidth && r.height === innerHeight, look: !!e.querySelector('.bcv-welcome__look'), pill: !!pill, fits: !!p && p.left >= 0 && p.right <= innerWidth, ring: pill ? getComputedStyle(pill.querySelector('.bcv-away__ring')).animationDuration : null, lines: ['.bcv-welcome__kicker', '.bcv-welcome__title', '.bcv-welcome__hint'].map((s) => e.querySelector(s)?.textContent) }; });
-  check((await page.$('#bcv-setup')) === null && page.url() === `${BASE}/` && /^(reload|navigate)$/.test(await page.evaluate(() => performance.getEntriesByType('navigation')[0]?.type)) && welcomeInfo.stage === 'away' && welcomeInfo.bg === 'rgb(0, 0, 0)' && welcomeInfo.full && !welcomeInfo.look && welcomeInfo.pill && welcomeInfo.fits && welcomeInfo.ring === '12s' && welcomeInfo.lines.join(' | ') === 'Away Refresh | Click to cancel | Away refresh prevents errors that show up after you’ve been gone for a while' && await noOverflow(), `Open Canvas reloads the page, which comes back black with the Away Refresh pointer alone, no tour: ${JSON.stringify(welcomeInfo)}`);
+  check((await page.$('#bcv-setup')) === null && page.url() === `${BASE}/` && /^(reload|navigate)$/.test(await page.evaluate(() => performance.getEntriesByType('navigation')[0]?.type)) && welcomeInfo.stage === 'away' && welcomeInfo.bg === 'rgb(0, 0, 0)' && welcomeInfo.full && !welcomeInfo.look && welcomeInfo.pill && welcomeInfo.fits && welcomeInfo.ring === '12s' && welcomeInfo.lines.join(' | ') === 'Away Refresh | Click to cancel, or hold to disable | Away refresh prevents errors that show up after you’ve been gone for a while' && await noOverflow(), `Open Canvas reloads the page, which comes back black with the Away Refresh pointer alone, no tour: ${JSON.stringify(welcomeInfo)}`);
   check(noContinueYet && await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000) && Date.now() - welcomeAt >= TIMERS.welcomeWait - 500, 'Continue comes in only after the wait (three seconds shipped)');
   await page.waitForTimeout(400);
   await page.screenshot({ path: join(out, 'phone-12-welcome.png') }); // (not shot(): the mock dial loops for ever, and shot() waits for every animation to end)

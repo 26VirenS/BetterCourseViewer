@@ -19,6 +19,8 @@ export const TIMERS = {
   introDone: 900, // …and the card rises under it (2340 shipped)
   patience: 4000, // app.js SCREEN_PATIENCE: a screen still not drawn after this gives way (15000 shipped)
   awayCount: 1500, // app.js AWAY_COUNT: the Away Refresh pill's count (3000 shipped)
+  awayHold: 1200, // app.js AWAY_HOLD: held this long, the pill turns Away Refresh off (900 shipped; longer here, so a read mid-hold lands inside it under load)
+  awayOffStay: 1000, // app.js AWAY_OFF_STAY: the pill says it is off for this long before it goes (1600 shipped)
   island: 1500, // tools.js islandOpen: a pressed island stays up this long (6000 shipped)
   rollMs: 10, // ui.js ROLL_MS: a counter's step (52 shipped; 16 steps either way)
   gradePoll: 800, // course-detail.js: how often a tool assignment's grade is asked for after a launch (2500 shipped)
@@ -33,6 +35,8 @@ const PATCHES = [
   ['content/app/whatsnew.js', "ui.main.classList.add('is-in'); } }, 2340));", `ui.main.classList.add('is-in'); } }, ${TIMERS.introDone}));`],
   ['content/app/app.js', 'const SCREEN_PATIENCE = 15000;', `const SCREEN_PATIENCE = ${TIMERS.patience};`],
   ['content/app/app.js', 'const AWAY_COUNT = 3000;', `const AWAY_COUNT = ${TIMERS.awayCount};`],
+  ['content/app/app.js', 'const AWAY_HOLD = 900;', `const AWAY_HOLD = ${TIMERS.awayHold};`],
+  ['content/app/app.js', 'const AWAY_OFF_STAY = 1600;', `const AWAY_OFF_STAY = ${TIMERS.awayOffStay};`],
   ['content/app/tools/tools.js', 'function islandOpen(item, ms = 6000, focusMain = false) {', `function islandOpen(item, ms = ${TIMERS.island}, focusMain = false) {`],
   ['content/app/ui.js', 'const ROLL_MS = 52;', `const ROLL_MS = ${TIMERS.rollMs};`],
   ['content/app/screens/course-detail.js', 'timer = setTimeout(poll, 2500);', `timer = setTimeout(poll, ${TIMERS.gradePoll});`],

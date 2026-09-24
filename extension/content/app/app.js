@@ -864,6 +864,7 @@
   /** The stale-page reload, wherever it is noticed from. A quiz is left completely alone. */
   function wakeStale() {
     if (self.BCVBridge?.native) return false; // the app holds its own session
+    if (awayOff()) { here(); return false; } // turned off (the pill held, or the switch under General in Settings): the page is never reloaded from under them, and counts as awake
     if (inQuiz() || quizHere()) { here(); return false; } // never on a quiz, and no note either
     if (BCV.welcome?.active()) { here(); return false; } // the welcome after the setup is not reloaded out from under
     if (BCV.tools?.focusActive()) { here(); return false; } // a focus session is going: no reload under it (it ends by itself, so this holds for one phase at most)
@@ -872,51 +873,113 @@
   }
   // The reload is announced before it happens: a pill floats down from the top of the page — a dial
   // counting three seconds down in orange (a dim ring, a bright arc of the time left that shrinks, a
-  // short hand riding its end), "Away Refresh", "Click to cancel" — and the page reloads when the
-  // count runs out. A press on the pill (or Escape) stands the reload down, and the page counts as awake
-  // again, so the next press acts as itself. Where a reload would lose work or has just been tried
-  // there is no pill: the note says so, as before. Returns whether a reload is coming.
+  // short hand riding its end), "Away Refresh", "Click to cancel, or hold to disable" — and the page
+  // reloads when the count runs out. A press on the pill (or Escape) stands the reload down, and the
+  // page counts as awake again, so the next press acts as itself. A press HELD on the pill turns
+  // Away Refresh off for good: the count waits under the finger, a red ring fills round the dial and
+  // a wash crosses the pill for as long as it is held (let go short of the end, it was the press:
+  // cancelled), and when the ring closes the pill says so — "Away Refresh off", "Turn it back on in
+  // Settings" — and floats away; the switch under General in Settings is the way back. Where a
+  // reload would lose work or has just been tried there is no pill: the note says so, as before.
+  // Returns whether a reload is coming.
   const AWAY_COUNT = 3000;
+  const AWAY_HOLD = 900; // held this long, the pill turns Away Refresh off (the ring and the wash take the same time)
+  const AWAY_OFF_STAY = 1600; // …and says so for this long before it goes
   const AWAY_WHY = 'You were away for a while';
-  let away = null; // the pill on show: { el, timer }
-  function awayCancel() {
-    if (!away) return;
-    const { el, timer } = away;
-    away = null;
-    clearTimeout(timer);
-    here();
+  const awayOff = () => state.settings?.appearance?.awayRefresh === false;
+  let away = null; // the pill on show: { el, timer, hold, done, left, started }
+  const awayLeave = (el) => {
     el.classList.remove('is-in');
     el.classList.add('is-out');
     setTimeout(() => el.remove(), 400);
+  };
+  function awayCancel() {
+    if (!away) return;
+    const { el, timer, hold } = away;
+    away = null;
+    clearTimeout(timer);
+    clearTimeout(hold);
+    here();
+    awayLeave(el);
   }
   /** The pill's button — the dial and its two lines — with nothing wired: awayRefresh() wires the
-   *  press, and the welcome after the setup shows a copy counting down in slow motion. */
+   *  press and the hold, and the welcome after the setup shows a copy counting down in slow motion. */
   function awayPill() {
     // the dial is the iPhone's timer: a dim ring, a bright arc of the time left that shrinks back to
     // twelve o'clock, and a hand pivoting at the centre that points at the arc's end and turns with
     // it — widest at the pivot, tapering to a slim tip short of the ring, both ends round (two
-    // circles, r 2.1 at the centre and r 1.3 at (18,9), and the tangents between them)
-    const dial = '<svg viewBox="0 0 36 36" aria-hidden="true"><circle class="bcv-away__track" cx="18" cy="18" r="13"/><circle class="bcv-away__ring" cx="18" cy="18" r="13"/><path class="bcv-away__hand" d="M15.91 17.81A2.1 2.1 0 1 0 20.09 17.81L19.3 8.88A1.3 1.3 0 0 0 16.7 8.88Z"/></svg>';
-    return h('button', { type: 'button', class: 'bcv-away__btn', 'aria-label': 'Away refresh in three seconds. Press to cancel.' }, [
+    // circles, r 2.1 at the centre and r 1.3 at (18,9), and the tangents between them); round the
+    // outside, unseen until a hold, the red ring that closes as the pill is held
+    const dial = '<svg viewBox="0 0 36 36" aria-hidden="true"><circle class="bcv-away__track" cx="18" cy="18" r="13"/><circle class="bcv-away__ring" cx="18" cy="18" r="13"/><path class="bcv-away__hand" d="M15.91 17.81A2.1 2.1 0 1 0 20.09 17.81L19.3 8.88A1.3 1.3 0 0 0 16.7 8.88Z"/><circle class="bcv-away__hold" cx="18" cy="18" r="16.5"/></svg>';
+    return h('button', { type: 'button', class: 'bcv-away__btn', 'aria-label': 'Away refresh in three seconds. Press to cancel, or press and hold to turn it off.' }, [
+      h('span', { class: 'bcv-away__wash', 'aria-hidden': 'true' }),
       h('span', { class: 'bcv-away__dial', html: dial }),
-      h('span', { class: 'bcv-away__body' }, [h('span', { class: 'bcv-away__title', text: 'Away Refresh' }), h('span', { class: 'bcv-away__hint', text: 'Click to cancel' })]),
+      h('span', { class: 'bcv-away__body' }, [h('span', { class: 'bcv-away__title', text: 'Away Refresh' }), h('span', { class: 'bcv-away__hint', text: 'Click to cancel, or hold to disable' })]),
     ]);
+  }
+  /** Held to the end: Away Refresh is off from here on — the setting is written (the switch under
+   *  General in Settings turns it back on, and every open Canvas tab is told), and the pill says so
+   *  for a moment before it goes. */
+  function awayDisable(rec) {
+    if (away !== rec) return;
+    const { el } = rec;
+    rec.done = true;
+    clearTimeout(rec.timer);
+    here();
+    state.settings = S.deepMerge(state.settings || {}, { appearance: { awayRefresh: false } });
+    S.update({ appearance: { awayRefresh: false } }).then(() => BCV.api?.runtime?.sendMessage?.({ type: 'pushSettings' })).catch(() => {});
+    const btn = el.querySelector('.bcv-away__btn');
+    if (btn) btn.style.minWidth = `${Math.ceil(btn.getBoundingClientRect().width)}px`; // the words change; the pill's width does not
+    el.classList.remove('is-holding');
+    el.classList.add('is-off');
+    el.querySelector('.bcv-away__title').textContent = 'Away Refresh off';
+    el.querySelector('.bcv-away__hint').textContent = 'Turn it back on in Settings';
+    btn?.setAttribute('aria-label', 'Away Refresh is off. The switch under General in Settings turns it back on.');
+    rec.timer = setTimeout(() => { if (away === rec) { away = null; awayLeave(el); } }, AWAY_OFF_STAY);
   }
   function awayRefresh() {
     if (away || document.getElementById('bcv-away')) return true; // already counting (a pill from any copy of these scripts counts: never two)
     if (inQuiz() || quizHere() || state.submitOpen || typing() || recentlyReloaded()) return recover(AWAY_WHY); // the note, and no reload
     const btn = awayPill();
-    btn.addEventListener('click', awayCancel);
     const el = h('div', { id: 'bcv-away', class: 'bcv-away', role: 'status' }, btn);
+    el.style.setProperty('--bcv-away-hold', `${AWAY_HOLD}ms`); // the ring and the wash take the hold's own length (app.css)
+    const rec = { el, timer: 0, hold: 0, done: false, left: AWAY_COUNT, started: Date.now() };
+    const arm = (ms) => {
+      rec.started = Date.now();
+      rec.left = ms;
+      rec.timer = setTimeout(() => {
+        if (away !== rec) return;
+        away = null;
+        if (!recover(AWAY_WHY)) el.remove(); // the reload takes the pill with it; a note does not
+      }, ms);
+    };
+    // The press. Let go short of the hold, it is the click, and cancels; held to the end, it turns
+    // Away Refresh off. The count waits under the finger meanwhile, so no reload lands mid-hold.
+    btn.addEventListener('pointerdown', (e) => {
+      if (away !== rec || rec.done || rec.hold || (e.button !== undefined && e.button !== 0)) return;
+      clearTimeout(rec.timer);
+      rec.left = Math.max(0, rec.left - (Date.now() - rec.started));
+      try { btn.setPointerCapture(e.pointerId); } catch { /* no capture: the release still lands on the button */ }
+      el.classList.add('is-holding');
+      rec.hold = setTimeout(() => { rec.hold = 0; awayDisable(rec); }, AWAY_HOLD);
+    });
+    const release = (e) => {
+      if (away !== rec || !rec.hold) return;
+      clearTimeout(rec.hold);
+      rec.hold = 0;
+      el.classList.remove('is-holding');
+      if (e.type === 'pointerup') awayCancel(); // let go short of the hold: the press, as ever (the click that follows finds no pill)
+      else arm(rec.left); // the press was taken away (a scroll, a lost pointer): the count carries on from where it waited
+    };
+    btn.addEventListener('pointerup', release);
+    btn.addEventListener('pointercancel', release);
+    btn.addEventListener('click', (e) => { if (rec.done) { e.preventDefault(); return; } awayCancel(); }); // (Enter and Space cancel too; the click after a hold is spent)
+    btn.addEventListener('contextmenu', (e) => e.preventDefault()); // a long press on a phone is the hold, not the menu
     document.body.append(el);
     void el.offsetWidth; // so the float-down is a transition from off the top, not a first paint
     el.classList.add('is-in');
-    const timer = setTimeout(() => {
-      if (!away || away.el !== el) return;
-      away = null;
-      if (!recover(AWAY_WHY)) el.remove(); // the reload takes the pill with it; a note does not
-    }, AWAY_COUNT);
-    away = { el, timer };
+    away = rec;
+    arm(AWAY_COUNT);
     return true;
   }
   document.addEventListener('visibilitychange', () => {
@@ -932,7 +995,7 @@
   // has said what is coming, and it is the one place to stop it.
   let swallowClick = false;
   function wake(e) {
-    if (e.target?.closest?.('#bcv-away')) return; // the pill's own press: Click to cancel
+    if (e.target?.closest?.('#bcv-away')) return; // the pill's own press: Click to cancel, or hold to disable (wired on the pill)
     if (away && e.key === 'Escape') { awayCancel(); e.preventDefault(); e.stopPropagation(); return; }
     if (e.type === 'pointerdown') swallowClick = false;
     if (away) { here(); return; }

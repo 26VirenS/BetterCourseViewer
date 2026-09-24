@@ -24,6 +24,10 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.97.0', date: '2026-09-24', notes: [
+      { kind: 'new', title: 'Hold to switch it off', body: 'Hold the Away Refresh pill and it never reloads again.', icon: P.clock },
+      { kind: 'new', title: 'Away Refresh switch', body: 'Under General in Settings: on or off, any time.', icon: P.toggle },
+    ] },
     { version: '2.96.0', date: '2026-09-24', notes: [
       { kind: 'improved', title: 'Motion on springs', body: 'Every sheet, menu and screen moves like a real thing.', icon: P.arrows },
       { kind: 'improved', title: 'Softer corners', body: 'Panes wear the continuous curve of an iPhone’s.', icon: P.layers },
