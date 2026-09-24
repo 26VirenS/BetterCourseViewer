@@ -74,3 +74,24 @@ The rules for bringing the features back:
 4. **No document-wide observers for decoration.** A pane that wants a computed shape asks for it
    when it is drawn; nothing watches the whole tree.
 5. **The lint is green, the suites are green, and the change is read against §4 before it ships.**
+
+## 5. After an update: Safari keeps the files it has
+
+The Mac app's updater swaps the app on disk and relaunches itself; Safari is not told, and keeps
+the extension's files it has until it is opened afresh — and can mix them: one version's script
+with another version's stylesheet (2.98.10 was shipped for a calculator drawn by 2.98.7's script
+under a stylesheet without that script's rules, its KaTeX never injected). Nothing in the page's
+own logic can mend that, so the page tells:
+
+- `lib/settings.js` stamps the scripts' version (`BCV_VERSION`); `content/styles/app.css` stamps the
+  stylesheet's (`--bcv-version` on the theme root); both are bumped with the manifest on every
+  release, and the smoke suite fails when one is left behind.
+- `content/app/app.js` compares the two with the manifest's version a moment after the page loads.
+  When they disagree it says, on every load until it is done: *Simpl Courses X is installed, but
+  Safari is still running an older copy of it. Quit Safari (⌘Q) and open it again.*
+- The app's settings window says the same under the update title on its first look after an
+  update.
+
+Rule: never assume a page runs one version. A file added in a release is not there for a Safari
+that has not been reopened, and a style a new script relies on may be missing; the stamps make the
+state visible instead of letting the interface half-work.

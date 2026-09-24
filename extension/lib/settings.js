@@ -5,6 +5,10 @@
 (function () {
   const BCV = (self.BCV = self.BCV || {});
   const api = (BCV.api = BCV.api || (typeof browser !== 'undefined' ? browser : chrome));
+  // The scripts' own version, stamped: content/app/app.js compares it with the stylesheet's
+  // (--bcv-version) and the manifest's, because Safari can run one version's script with
+  // another's stylesheet after the Mac app has updated under it. Bumped with every release.
+  self.BCV_VERSION = '2.98.10';
 
   const DEFAULTS = {
     version: 2,

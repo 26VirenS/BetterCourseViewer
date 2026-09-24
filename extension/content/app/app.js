@@ -807,6 +807,32 @@
   document.addEventListener('visibilitychange', checkContext);
   window.addEventListener('focus', checkContext);
   window.addEventListener('pageshow', checkContext);
+  // Safari can serve a page one version's script with another's stylesheet after the Mac app has
+  // updated under it: the updater swaps the app on disk while Safari keeps the files it has until
+  // it is opened afresh, and the interface then half-works (a strip drawn by a script whose styles
+  // are gone, a display that never typesets). Three stamps tell: the script's own version
+  // (lib/settings.js), the stylesheet's (--bcv-version) and the manifest's. When they disagree no
+  // reload can mend it; the page says what will, plainly, on every load until it is done.
+  const verNewer = (a, b) => { const x = String(a).split('.').map(Number), y = String(b).split('.').map(Number); for (let i = 0; i < 3; i++) { if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0) ? a : b; } return a; };
+  function versionsDisagree() {
+    const js = String(self.BCV_VERSION || '');
+    let css = '';
+    try { css = getComputedStyle(document.documentElement).getPropertyValue('--bcv-version').trim().replace(/^["']|["']$/g, ''); } catch { css = ''; }
+    let man = '';
+    try { man = String(BCV.api?.runtime?.getManifest?.()?.version || ''); } catch { man = ''; }
+    const seen = [js, css, man].filter(Boolean);
+    if (seen.length < 2 || seen.every((v) => v === seen[0])) return null;
+    return { js, css, man, newest: seen.reduce(verNewer) };
+  }
+  function checkVersions() {
+    if (self.BCVBridge?.native) return null;
+    const d = versionsDisagree();
+    if (!d) return null;
+    console.warn('[Simpl Courses] Safari is running files from more than one version of the extension', d);
+    U.toast(`Simpl Courses ${d.newest} is installed, but Safari is still running an older copy of it. Quit Safari (⌘Q) and open it again.`, { error: true, ms: 20000 });
+    return d;
+  }
+  setTimeout(checkVersions, 1500);
   // The Canvas session ending under the page (signed out elsewhere, expired overnight): the first
   // request Canvas answers with "unauthenticated" sends the page to sign in again — a reload lands
   // on Canvas's sign-in, which brings the page back afterwards — and nothing else stalls on it.
@@ -1501,6 +1527,7 @@
     holds: () => !!(state.submitOpen || state.quizOpen), // something on the page would be lost by a reload (a hand-in being written, a quiz attempt): the layout tier waits (early.js)
     openSettings,
     recover, // (the suite checks that a quiz is never reloaded out from under)
+    checkVersions, versionsDisagree, // (the suite makes the stamps disagree and reads what the page says)
     awayPill, // (the welcome after the setup shows a copy of the pill)
     syncQuizFlag, // (the quiz screen says when an attempt opens and closes)
     lookDemo, // (the welcome shows the switch working, on a copy of it)

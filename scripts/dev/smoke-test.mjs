@@ -112,6 +112,10 @@ if (PART !== 2) {
   }
   check(pbx.split(`MARKETING_VERSION = ${manifest.version};`).length === 5, `Mac app version is ${manifest.version}`);
   check(iosYml.includes(`MARKETING_VERSION: "${manifest.version}"`), `iOS app version is ${manifest.version}`);
+  // the two stamps the page compares with the manifest (Safari can run one version's script with another's stylesheet after an update): bumped with the rest
+  const settingsJs = readFileSync(join(extDir, 'lib', 'settings.js'), 'utf8');
+  const appCss = readFileSync(join(extDir, 'content', 'styles', 'app.css'), 'utf8');
+  check(settingsJs.includes(`self.BCV_VERSION = '${manifest.version}';`) && appCss.includes(`--bcv-version: "${manifest.version}";`), `the script's stamp (lib/settings.js) and the stylesheet's (--bcv-version) are ${manifest.version} too`);
 }
 
 // 4. every release ships its What's New notes (content/app/whatsnew-notes.js): the first Canvas
@@ -4432,6 +4436,9 @@ try {
   await eventually(async () => (await texts('.bcv-pomo__main'))[0] === 'Start Timer', 3000);
   await closeTool();
   check(await eventually(async () => (await page.$('#bcv-pins .bcv-island')) === null && (await page.$eval('#bcv-pins', (e) => e.hidden)), 3000) && (await inPage('focusActive')) === false, 'Cancel ends the session: the borrowed pin goes from the tray');
+  // Safari can run one version's script with another's stylesheet after the Mac app has updated under it: the page compares three stamps (its script's, its stylesheet's, the manifest's) and, made to disagree here, says to quit Safari and open it again — in its world, where BCV.app lives
+  const verGuard = await sw.evaluate(async (base) => { const [tab] = await chrome.tabs.query({ url: `${base}/*` }); const [r] = await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'ISOLATED', func: () => { const agree = self.BCV.app.versionsDisagree(); document.documentElement.style.setProperty('--bcv-version', '"99.0.0"'); const d = self.BCV.app.checkVersions(); document.documentElement.style.removeProperty('--bcv-version'); const t = document.querySelector('.bcv-toast'); const out = { agree, d, toast: t?.textContent || '', error: !!t?.classList.contains('bcv-toast--error'), after: self.BCV.app.versionsDisagree() }; document.querySelectorAll('.bcv-toast').forEach((x) => x.remove()); return out; } }); return r.result; }, BASE);
+  check(verGuard.agree === null && verGuard.after === null && verGuard.d?.newest === '99.0.0' && verGuard.d?.js === verGuard.d?.man && /^Simpl Courses 99\.0\.0 is installed, but Safari is still running an older copy of it\. Quit Safari \(⌘Q\) and open it again\.$/.test(verGuard.toast) && verGuard.error, `the script's, the stylesheet's and the manifest's versions agree on this build; made to disagree, the page says to quit Safari and open it again (${JSON.stringify(verGuard)})`);
   // the graphing calculator: Desmos in a frame, the way out beside it
   await page.goto(`${BASE}/#tools`);
   await openTool('graph');

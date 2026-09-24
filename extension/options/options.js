@@ -226,6 +226,7 @@
       unknown: ['Reading Safari…', ''],
     };
     const when = (t) => (t ? new Date(t * 1000).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) : '');
+    let reopenNote = null; // the first look at this window after an update: Safari keeps the extension's files it has until it is opened afresh, so the new version is not in it yet — said here, once
     const paintApp = (st) => {
       const e = st.extension || {};
       const p = st.placement || {};
@@ -239,7 +240,8 @@
       const u = st.update || {};
       const act = $('updAction');
       act.hidden = true;
-      const checked = u.checked ? `Checked at ${when(u.checked)} · checks every 4 hours` : 'Checks every 4 hours.';
+      if (reopenNote === null && st.version) { try { const was = localStorage.getItem('app:version'); localStorage.setItem('app:version', st.version); reopenNote = !!was && was !== st.version; } catch { reopenNote = false; } }
+      const checked = reopenNote ? 'Updated. Quit Safari (⌘Q) and open it again, so it loads this version.' : u.checked ? `Checked at ${when(u.checked)} · checks every 4 hours` : 'Checks every 4 hours.';
       switch (u.state) {
         case 'checking': $('updTitle').textContent = 'Checking for updates…'; $('updSub').textContent = `Version ${st.version}`; break;
         case 'available': $('updTitle').textContent = `Version ${u.available} is ready`; $('updSub').textContent = `You have ${st.version}.${u.automatic === false ? '' : ' It installs by itself in a moment.'}`; act.hidden = false; break;
