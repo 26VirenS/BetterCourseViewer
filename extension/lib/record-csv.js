@@ -109,5 +109,73 @@
     if (m === 'empty') return 'That file is empty.';
     return `The file could not be read${m ? `: ${m}` : '.'}`;
   }
-  BCV.recordCsv = { points, cells, parse, summarize, record, csv, readText, explain, TEMPLATE };
+  // ---- the history: past points for the trend --------------------------------------------------
+  // A date and a GPA a line — the shape Export CSV writes (date,term_gpa), a header optional, and
+  // friendlier dates too: 5/15/2026, May 15 2026, or a term (Fall 2025, Spring 2026), which lands
+  // on the day that term is over. A row with no date or no GPA that counts is skipped; a file with
+  // no row that counts is not a history.
+  const TERM_END = { winter: [1, 31], spring: [5, 15], summer: [8, 1], fall: [12, 15], autumn: [12, 15] };
+  const pad2 = (n) => String(n).padStart(2, '0');
+  /** A cell as a day, YYYY-MM-DD, or null. */
+  function dayOf(raw) {
+    const t = String(raw || '').trim().replace(/^"|"$/g, '');
+    if (!t) return null;
+    let m = /^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T ].*)?$/.exec(t);
+    if (m) return `${m[1]}-${pad2(m[2])}-${pad2(m[3])}`;
+    m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(t);
+    if (m) return `${m[3]}-${pad2(m[1])}-${pad2(m[2])}`;
+    m = /^(\d{4})\/(\d{1,2})\/(\d{1,2})$/.exec(t);
+    if (m) return `${m[1]}-${pad2(m[2])}-${pad2(m[3])}`;
+    m = /^(winter|spring|summer|fall|autumn)\s*'?(\d{2}|\d{4})$/i.exec(t);
+    if (m) { const [mo, d] = TERM_END[m[1].toLowerCase()]; const y = m[2].length === 2 ? 2000 + Number(m[2]) : Number(m[2]); return `${y}-${pad2(mo)}-${pad2(d)}`; }
+    // a written month (May 15 2026, 15 May 2026, Sept 1, 2026) — and only that: the engine's own
+    // parser would take "1" or "hello 2026" for a day, and a file of anything would be a history
+    if (/^(?:\d{1,2}\s+)?(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?,?\s+(?:\d{1,2}(?:st|nd|rd|th)?,?\s+)?\d{4}$/i.test(t)) {
+      const ms = Date.parse(t.replace(/(\d)(?:st|nd|rd|th)\b/i, '$1'));
+      if (Number.isFinite(ms)) { const d = new Date(ms); return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; }
+    }
+    return null;
+  }
+  /** A cell as a GPA on the 4.0 scale, or null (a blank cell is no GPA, not a 0). */
+  function gpaOf(raw) {
+    const t = String(raw ?? '').trim().replace(/^"|"$/g, '');
+    if (!t) return null;
+    const n = Number(t);
+    return Number.isFinite(n) && n >= 0 && n <= 4 ? Math.round(n * 1000) / 1000 : null;
+  }
+  const HIST_COLS = { date: /^(date|day|when|term|semester|as\s*of)$/i, gpa: /^(gpa|term[\s_]*gpa|value|cumulative)$/i };
+  /** The rows of a history as { date, gpa }, one a day, in date order. Throws when none counts. */
+  function history(text) {
+    const lines = String(text).replace(/^\ufeff/, '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    if (!lines.length) throw new Error('empty');
+    const head = cells(lines[0]);
+    let di = head.findIndex((h2) => HIST_COLS.date.test(h2.replace(/[_-]/g, ' ').trim()));
+    let gi = head.findIndex((h2) => HIST_COLS.gpa.test(h2.replace(/[_-]/g, ' ').trim()));
+    const hasHeader = di >= 0 || gi >= 0;
+    if (di < 0) di = 0;
+    if (gi < 0) gi = di === 0 ? 1 : 0;
+    const out = new Map();
+    for (const line of lines.slice(hasHeader ? 1 : 0)) {
+      const cs = cells(line);
+      const date = dayOf(cs[di]);
+      const gpa = gpaOf(cs[gi]);
+      if (!date || gpa === null) continue;
+      out.set(date, { date, gpa });
+    }
+    if (!out.size) throw new Error('not history');
+    return [...out.values()].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+  }
+  /** Rows brought into a history: a day already recorded is kept as it is (or replaced, when asked),
+   *  the rest added, the whole in date order. */
+  function mergeHistory(snaps, rows, { replace = false } = {}) {
+    const by = new Map((snaps || []).map((s) => [s.date, s]));
+    let added = 0;
+    for (const r of rows) {
+      if (by.has(r.date) && !replace) continue;
+      if (!by.has(r.date)) added += 1;
+      by.set(r.date, { ...(by.get(r.date) || {}), date: r.date, gpa: r.gpa, manual: true });
+    }
+    return { snaps: [...by.values()].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0)), added };
+  }
+  BCV.recordCsv = { points, cells, parse, summarize, record, csv, readText, explain, dayOf, gpaOf, history, mergeHistory, TEMPLATE };
 })();

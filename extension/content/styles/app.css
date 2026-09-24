@@ -3767,3 +3767,7 @@ html[data-bcv-theme="dark"] .bcv-pdfx { --px-row: #0f0f11; --px-page: #1f1f22; -
 .bcv-gpa-set__csv .bcv-gpa-set__from { flex: 1; min-width: 0; margin: 0; padding-top: 4px; }
 .bcv-gpa-set__csvbtn { flex: none; }
 .bcv-gpa-set__csvbtns { flex: none; display: flex; flex-direction: column; gap: 6px; align-items: stretch; }
+/* 2.87.0: past points on the trend — the sheet's History section: a day (or a term) and a GPA, Add point, Import CSV */
+.bcv-gpa-set__date { width: 150px; text-align: left; font-weight: 500; }
+.bcv-gpa-set__field--date { flex: 1 1 220px; }
+.bcv-gpa-set__hist { flex: 1; min-width: 0; margin: 0; padding-top: 4px; }

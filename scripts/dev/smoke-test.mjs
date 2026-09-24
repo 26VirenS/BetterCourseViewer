@@ -1108,6 +1108,52 @@ try {
   const readPrefs = () => sw.evaluate(async () => Object.entries(await chrome.storage.local.get(null)).find(([k]) => k.startsWith('prefs:'))?.[1] || null);
   check(await eventually(async () => { const p = await readPrefs(); return Array.isArray(p?.gpaSnapshots) && p.gpaSnapshots.length === 1 && typeof p.gpaSnapshots[0].gpa === 'number' && /^\d{4}-\d{2}-\d{2}$/.test(p.gpaSnapshots[0].date) && p.gpaTracking?.priorCourses === 8 && p.gpaGoal === 3.95; }), `a first snapshot is recorded the day tracking starts: ${JSON.stringify((await readPrefs())?.gpaSnapshots)}`);
   check(!(await readPrefs())?.gpaTracking?.record, 'numbers typed over the file\'s are the record: its rows are not kept with them');
+  // ---- past points on the trend: a day (or a term) and a GPA by hand, or a CSV of them, on the sheet ----
+  // tracking keeps one snapshot a day from today; what came before goes on the chart from the sheet's
+  // own History section, and the chart then spreads eight points across the whole, the first and the last always
+  const toastHas = (re) => page.waitForFunction((src) => [...document.querySelectorAll('.bcv-toast')].some((t) => new RegExp(src).test(t.textContent)), re.source, { timeout: 5000 });
+  await page.click('.bcv-gpa__gear');
+  await page.waitForSelector('.bcv-gpa-set__sec--hist', { timeout: 5000 });
+  check(/^1 point on the chart, since [A-Z][a-z]{2} \d{1,2}\.$/.test((await texts('.bcv-gpa-set__hist'))[0]) && (await page.$eval('#bcv-gpa-point-date', (e) => e.type === 'date' && /^\d{4}-\d{2}-\d{2}$/.test(e.max))) && (await page.$eval('.bcv-gpa-set__sec--hist .bcv-gpa-set__k', (e) => e.textContent)) === 'Past points on the trend',
+    `the sheet's History section counts the points on the chart and takes a day no later than today: ${(await texts('.bcv-gpa-set__hist'))[0]}`);
+  // a GPA past the scale, a day yet to come: refused, nothing saved
+  await page.fill('#bcv-gpa-point-date', '2026-05-15');
+  await page.fill('#bcv-gpa-point-gpa', '5');
+  await page.click('.bcv-gpa-set__addpt');
+  await toastHas(/Give the point a day and a GPA from 0 to 4/);
+  await page.fill('#bcv-gpa-point-date', '2031-01-01');
+  await page.fill('#bcv-gpa-point-gpa', '3.6');
+  await page.click('.bcv-gpa-set__addpt');
+  await toastHas(/A past point: pick a day that has been/);
+  check((await readPrefs()).gpaSnapshots.length === 1, 'a GPA past 4 and a day yet to come are refused, nothing saved');
+  // a point by hand: last term's GPA on the term's last day, before today's own
+  await page.fill('#bcv-gpa-point-date', '2026-05-15');
+  await page.fill('#bcv-gpa-point-gpa', '3.6');
+  await page.click('.bcv-gpa-set__addpt');
+  await toastHas(/3\.60 on May 15 is on the chart/);
+  check(await eventually(async () => { const s = (await readPrefs()).gpaSnapshots; return s.length === 2 && s[0].date === '2026-05-15' && s[0].gpa === 3.6 && s[0].manual === true && s[1].date > s[0].date; }) && /^2 points on the chart, since May 15\.$/.test((await texts('.bcv-gpa-set__hist'))[0]) && (await page.$eval('#bcv-gpa-point-gpa', (e) => e.value)) === '',
+    `Add point puts a day and a GPA on the chart before today's own, and the section counts them: ${(await texts('.bcv-gpa-set__hist'))[0]}`);
+  // a CSV of dates and GPAs: no header needed, a term's name lands on its last day, a day already on
+  // the chart is kept as it is, a row with no date or no GPA is skipped
+  const histLines = ['Fall 2025,3.5', '5/1/2026,3.55', '2026-05-15,1.0', ...[1, 2, 3, 4, 5, 6].map((d) => `2026-06-0${d},3.${60 + d}`), 'not a date,3.0', '2026-07-01,'];
+  await page.setInputFiles('.bcv-gpa-set__histfile', { name: 'history.csv', mimeType: 'text/csv', buffer: Buffer.from(histLines.join('\n')) });
+  await toastHas(/8 points added to the chart/);
+  const histSnaps = (await readPrefs()).gpaSnapshots;
+  check(histSnaps.length === 10 && histSnaps.map((s) => s.date).join(',').startsWith('2025-12-15,2026-05-01,2026-05-15,2026-06-01,2026-06-02,2026-06-03,2026-06-04,2026-06-05,2026-06-06,') && histSnaps[0].gpa === 3.5 && histSnaps[2].gpa === 3.6 && histSnaps[8].gpa === 3.66 && /^10 points on the chart, since Dec 15 2025\.$/.test((await texts('.bcv-gpa-set__hist'))[0]),
+    `Import CSV: a term lands on its last day, a day already on the chart is kept, a row with no date or GPA is skipped: ${histSnaps.map((s) => `${s.date}=${s.gpa}`).join(' ')}`);
+  await page.setInputFiles('.bcv-gpa-set__histfile', { name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('not a csv at all\nnothing,here\n1,2') });
+  await toastHas(/That file needs a date and a GPA a line/);
+  check((await readPrefs()).gpaSnapshots.length === 10, 'a file with no date and GPA in it is refused and the chart stays');
+  await shot(page, '09f-grades-history-sheet');
+  // closing the sheet (the X, not Done) draws the chart again: eight of the ten spread across the whole,
+  // the first and today at the ends, the older year marked, the note saying how many it holds
+  await page.click('.bcv-gpa-set .bcv-sheet__close');
+  await page.waitForFunction(() => document.querySelectorAll('.bcv-gpa__tick').length === 8, null, { timeout: 5000 });
+  const tickL = await texts('.bcv-gpa__tick-l');
+  const tickV = await texts('.bcv-gpa__tick-v');
+  check(tickL[0] === 'Dec 15 ’25' && tickL[1] === 'May 1' && tickL[7] === 'Today' && tickV[0] === '3.50' && tickV[1] === '3.55' && /^10 snapshots since Dec 15 2025, 8 of them shown, spread across the whole — Canvas keeps no grade history; past points can be added in settings\.$/.test((await texts('.bcv-gpa__note'))[0]),
+    `the trend spreads eight of ten points across the whole history, the first and today at the ends, the older year marked: ${tickL.join(' | ')} · ${(await texts('.bcv-gpa__note'))[0]}`);
+  await page.waitForTimeout(1600); // (the page was drawn again: let the hero and the line's entry finish before the picture)
   await shot(page, '09e-grades-panel-tracking');
   page.once('dialog', (d) => d.accept());
   await page.click('.bcv-gpa__linkbtn');
@@ -5111,8 +5157,13 @@ try {
   const snapsAfter = (await prefsOf()).gpaSnapshots;
   check(snapsAfter.length === snapsBefore.length + 2 && snapsAfter.map((s) => s.date).join(',') === ['2026-09-01', '2026-09-02', ...snapsBefore.map((s) => s.date)].join(',') && snapsAfter[0].gpa === 3.25 && (!todaySnap || snapsAfter.find((s) => s.date === todaySnap).gpa === snapsBefore[0].gpa) && /^\d+ days recorded$/.test((await oTexts('#historyLabel'))[0]), `Import CSV adds the days it did not have, in date order, keeps today's own and skips an empty row: ${snapsAfter.map((s) => `${s.date}=${s.gpa}`).join(' ')}`);
   await options.setInputFiles('#importCsvFile', { name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('not a csv at all') });
-  await options.waitForFunction(() => /not a GPA export/.test(document.querySelector('#savedText')?.textContent || ''), null, { timeout: 5000 });
-  check((await prefsOf()).gpaSnapshots.length === snapsBefore.length + 2, 'a file that is not a GPA export is refused and changes nothing');
+  await options.waitForFunction(() => /not a GPA history/.test(document.querySelector('#savedText')?.textContent || ''), null, { timeout: 5000 });
+  check((await prefsOf()).gpaSnapshots.length === snapsBefore.length + 2, 'a file that is not a GPA history is refused and changes nothing');
+  // Import CSV reads friendlier files too: no header, a term's name (its last day), a written month
+  await options.setInputFiles('#importCsvFile', { name: 'terms.csv', mimeType: 'text/csv', buffer: Buffer.from('Fall 2025,3.5\nMay 15 2026,3.6\n') });
+  await options.waitForFunction(() => /^Imported 2 days$/.test(document.querySelector('#savedText')?.textContent || ''), null, { timeout: 5000 });
+  const termSnaps = (await prefsOf()).gpaSnapshots;
+  check(termSnaps.length === snapsBefore.length + 4 && termSnaps[0].date === '2025-12-15' && termSnaps[0].gpa === 3.5 && termSnaps[1].date === '2026-05-15' && termSnaps[1].gpa === 3.6, `Import CSV takes a term's name and a written month for dates, no header needed: ${termSnaps.slice(0, 2).map((s) => `${s.date}=${s.gpa}`).join(' ')}`);
   // Upload CSV: the record before this term from a CSV of past courses — letters, a percentage and 4.0
   // points all read, credits weight the GPA, a P/NP row is skipped and said so; the rows are kept
   const recordBefore = (await prefsOf()).gpaTracking;
@@ -5134,7 +5185,7 @@ try {
   check((await prefsOf()).gpaTracking.priorGpa === 3.571, 'a file with no course and grade in it is refused and the record stays');
   await options.setInputFiles('#recordCsvFile', { name: 'simpl-courses-gpa.csv', mimeType: 'text/csv', buffer: Buffer.from('date,term_gpa\n2026-08-30,3.100') });
   await options.waitForFunction(() => /^Imported 1 day$/.test(document.querySelector('#savedText')?.textContent || ''), null, { timeout: 5000 });
-  check((await prefsOf()).gpaSnapshots.length === snapsBefore.length + 3 && (await prefsOf()).gpaTracking.priorGpa === 3.571, 'a history export dropped on Upload CSV goes to the history, the record untouched');
+  check((await prefsOf()).gpaSnapshots.length === snapsBefore.length + 5 && (await prefsOf()).gpaTracking.priorGpa === 3.571, 'a history export dropped on Upload CSV goes to the history, the record untouched');
   // the Grades page reads the record and says where it came from
   await page.goto(`${BASE}/grades`);
   await page.waitForSelector('.bcv-gpa__hero-sub', { timeout: 20000 });

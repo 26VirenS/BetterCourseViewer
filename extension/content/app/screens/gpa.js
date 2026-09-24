@@ -226,8 +226,16 @@
       ]);
     }
 
+    /** Up to eight of the snapshots, spread across the whole history — the first and the last always —
+     *  so a point added from a past term stays on the chart as the days pile up after it. */
+    const spread = (all, n = 8) => {
+      if (all.length <= n) return all;
+      const idx = new Set();
+      for (let i = 0; i < n; i++) idx.add(Math.round((i * (all.length - 1)) / (n - 1)));
+      return [...idx].sort((a, b) => a - b).map((i) => all[i]);
+    };
     function trend() {
-      const pts = snaps.slice(-8);
+      const pts = spread(snaps);
       const enough = tracking && pts.length >= 2;
       const yAt = (v) => 92 - ((clamp(v, MIN_Y, MAX_Y) - MIN_Y) / (MAX_Y - MIN_Y)) * 84;
       let chart = null;
@@ -240,16 +248,17 @@
         svg.append(
           svgEl('polyline', { points: coords.map((p) => `${p.x.toFixed(2)},${p.y.toFixed(2)}`).join(' '), fill: 'none', stroke: '#0a84ff', 'stroke-width': '3', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'vector-effect': 'non-scaling-stroke', class: !entered ? 'bcv-gpa__line--draw' : '' }),
         );
-        const label = (s) => (s.date === dayKey() ? 'Today' : U.fmtShort(`${s.date}T12:00:00`));
+        const thisYear = String(new Date().getFullYear());
+        const label = (s) => (s.date === dayKey() ? 'Today' : `${U.fmtShort(`${s.date}T12:00:00`)}${s.date.slice(0, 4) === thisYear ? '' : ` ’${s.date.slice(2, 4)}`}`);
         chart = [
           U.el('bcv-gpa__chart', [svg, ...coords.map((p, i) => h('span', { class: `bcv-gpa__pt ${!entered ? 'bcv-gpa__pt--in' : ''}`, style: { left: `${p.x.toFixed(2)}%`, top: `${p.y.toFixed(2)}%`, '--bcv-delay': `${Math.round(200 + 1050 * (i / Math.max(1, coords.length - 1)))}ms` } }))]),
           U.el('bcv-gpa__axis', coords.map((p) => h('span', { class: 'bcv-gpa__tick', style: { left: `${p.x.toFixed(2)}%` } }, [U.text('bcv-gpa__tick-v', gpa2(p.s.gpa), 'span'), U.text('bcv-gpa__tick-l', label(p.s), 'span')]))),
-          h('p', { class: 'bcv-gpa__note bcv-pretty', text: `${U.plural(snaps.length, 'snapshot')} since ${U.fmtShort(`${snaps[0].date}T12:00:00`)} — Canvas keeps no grade history, so tracking starts the day you turn it on.` }),
+          h('p', { class: 'bcv-gpa__note bcv-pretty', text: `${U.plural(snaps.length, 'snapshot')} since ${U.fmtShort(`${snaps[0].date}T12:00:00`)}${snaps[0].date.slice(0, 4) === thisYear ? '' : ` ${snaps[0].date.slice(0, 4)}`}${snaps.length > pts.length ? `, ${pts.length} of them shown, spread across the whole` : ''} — Canvas keeps no grade history; past points can be added in settings.` }),
         ];
       } else {
         chart = [U.el('bcv-gpa__empty', [
           U.svg(TREND, { size: 22, stroke: 'var(--bcv-ink3)', width: 1.8 }),
-          h('span', { class: 'bcv-pretty', text: !tracking ? 'No history yet. Tracking records one snapshot a day from the moment you turn it on — nothing can be back-filled.' : 'One snapshot so far. The line appears with the second, on the next day you open this page.' }),
+          h('span', { class: 'bcv-pretty', text: !tracking ? 'No history yet. Tracking records one snapshot a day from the moment you turn it on; past points can be added in settings.' : 'One snapshot so far. The line appears with the second — on the next day you open this page, or a past point added in settings.' }),
         ])];
       }
       return U.el('bcv-gpa__trend', [
@@ -613,7 +622,13 @@
         if (!file) return;
         let rec;
         try {
-          rec = BCV.recordCsv.record(await BCV.recordCsv.readText(file), file.name); // (read first: Safari lets go of the file once the input is cleared)
+          const text = await BCV.recordCsv.readText(file); // (read first: Safari lets go of the file once the input is cleared)
+          if (/^\s*(\ufeff)?date\s*,\s*term_gpa/i.test(text)) { // a history export dropped here is a history: past points for the chart
+            const added = await putHistory(BCV.recordCsv.history(text));
+            U.toast(added ? `${U.plural(added, 'point')} added to the chart (that file is a history, not a record of courses).` : 'That file is a history, and every day in it is on the chart already.');
+            return;
+          }
+          rec = BCV.recordCsv.record(text, file.name);
         } catch (err) {
           U.toast(BCV.recordCsv.explain(err), { error: true });
           return;
@@ -626,6 +641,56 @@
         sayFrom();
         U.toast(`${gpa2(rec.priorGpa)} across ${U.plural(rec.priorCourses, 'course')} read from ${file.name}. Press Done to keep it.`);
       });
+      // ---- History: past points for the trend, by hand or from a CSV ----
+      // Tracking keeps one snapshot a day from the day it is turned on; what came before it — last
+      // term's GPA, a figure from a transcript — can be put on the chart here: a day (or a term) and a
+      // GPA, or a CSV of them (lib/record-csv.js history). A day already recorded is replaced by the
+      // one typed, kept as it is on an import.
+      const pointDate = h('input', { class: 'bcv-input bcv-gpa-set__input bcv-gpa-set__date', id: 'bcv-gpa-point-date', type: 'date', max: dayKey() });
+      const pointGpa = h('input', { class: 'bcv-input bcv-gpa-set__input', id: 'bcv-gpa-point-gpa', type: 'number', min: '0', max: '4', step: '0.01', placeholder: '3.60' });
+      const histNote = U.text('bcv-gpa-set__s bcv-pretty bcv-gpa-set__hist', '');
+      const sayHist = () => { histNote.textContent = snaps.length ? `${U.plural(snaps.length, 'point')} on the chart, since ${U.fmtShort(`${snaps[0].date}T12:00:00`)}${snaps[0].date.slice(0, 4) === String(new Date().getFullYear()) ? '' : ` ${snaps[0].date.slice(0, 4)}`}.` : 'No points yet.'; };
+      sayHist();
+      let histTouched = false; // a point added or imported: the chart is drawn again when the sheet goes, Done or not
+      const putHistory = async (rows, { replace = false } = {}) => {
+        const r = BCV.recordCsv.mergeHistory(snaps, rows, { replace });
+        snaps = r.snaps.slice(-400);
+        await store.setPref('gpaSnapshots', snaps);
+        histTouched = true;
+        sayHist();
+        return r.added;
+      };
+      const addPoint = async () => {
+        const date = BCV.recordCsv.dayOf(pointDate.value);
+        const g = BCV.recordCsv.gpaOf(pointGpa.value);
+        if (!date || g === null) { U.toast('Give the point a day and a GPA from 0 to 4.', { error: true }); (date ? pointGpa : pointDate).focus(); return; }
+        if (date > dayKey()) { U.toast('A past point: pick a day that has been.', { error: true }); pointDate.focus(); return; }
+        await putHistory([{ date, gpa: g }], { replace: true });
+        pointGpa.value = '';
+        U.toast(`${gpa2(g)} on ${U.fmtShort(`${date}T12:00:00`)} is on the chart.`);
+      };
+      pointGpa.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); addPoint(); } });
+      const histInput = h('input', { type: 'file', accept: '.csv,text/csv,text/plain', hidden: true, class: 'bcv-gpa-set__histfile' });
+      histInput.addEventListener('change', async () => {
+        const file = histInput.files?.[0];
+        if (!file) return;
+        let rows;
+        try { rows = BCV.recordCsv.history(await BCV.recordCsv.readText(file)); } catch (err) { U.toast(String(err?.message) === 'not history' ? 'That file needs a date and a GPA a line (a term such as Fall 2025 counts as a date).' : BCV.recordCsv.explain(err), { error: true }); return; } finally { histInput.value = ''; }
+        const added = await putHistory(rows);
+        U.toast(added ? `${U.plural(added, 'point')} added to the chart.` : 'Nothing new: every day in that file is on the chart already.');
+      });
+      const histBody = U.el('bcv-gpa-set__fields', [
+        h('label', { class: 'bcv-gpa-set__field bcv-gpa-set__field--date' }, [h('span', { text: 'A day (or a term)' }), pointDate]),
+        h('label', { class: 'bcv-gpa-set__field' }, [h('span', { text: 'GPA then' }), pointGpa]),
+        U.el('bcv-gpa-set__csv', [
+          U.el('bcv-gpa-set__csvbtns', [
+            U.btn('Add point', { kind: 'sm', cls: 'bcv-gpa-set__addpt', onClick: addPoint }),
+            U.btn('Import CSV', { kind: 'sm', cls: 'bcv-gpa-set__histbtn', onClick: () => histInput.click() }),
+          ]),
+          histInput,
+          histNote,
+        ]),
+      ]);
       const trackBody = U.el('bcv-gpa-set__fields', [
         h('label', { class: 'bcv-gpa-set__field' }, [h('span', { text: 'GPA before this term' }), priorGpa]),
         h('label', { class: 'bcv-gpa-set__field' }, [h('span', { text: 'Courses it covers' }), priorN]),
@@ -649,7 +714,7 @@
       ]);
       trackBody.hidden = !on;
       const trackSwitch = U.switchEl(on, (v) => { on = v; trackBody.hidden = !on; }, 'Track GPA over time');
-      const close = () => ov.remove();
+      const close = () => { ov.remove(); if (histTouched) { histTouched = false; refresh(); } };
       const done = async () => {
         goal = clamp(pendingGoal, 0, 4);
         if (on) {
@@ -667,6 +732,7 @@
           tracking = blank ? { priorGpa: null, priorCourses: 0, since: tracking?.since || dayKey() } : { priorGpa: g, priorCourses: n, since: tracking?.since || dayKey(), ...keepRecord };
         } else tracking = null;
         await save();
+        histTouched = false;
         close();
         await refresh();
       };
@@ -690,6 +756,10 @@
             U.el('bcv-gpa-set__body', [U.text('bcv-gpa-set__k', 'Track GPA over time'), U.text('bcv-gpa-set__s bcv-pretty', 'Canvas stores no GPA and no history. With your record before this term, this page shows a cumulative GPA and keeps one snapshot a day from now on.')]),
             trackSwitch,
             trackBody,
+          ]),
+          U.el('bcv-gpa-set__sec bcv-gpa-set__sec--hist', [
+            U.el('bcv-gpa-set__body', [U.text('bcv-gpa-set__k', 'Past points on the trend'), U.text('bcv-gpa-set__s bcv-pretty', 'The chart holds one snapshot a day from the day tracking came on. Put what came before it on the chart too: a day (or a term’s end) and the GPA you had then, or a CSV of dates and GPAs.')]),
+            histBody,
           ]),
         ]),
         U.el('bcv-gpa-set__foot', [
