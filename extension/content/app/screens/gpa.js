@@ -211,7 +211,7 @@
           tracking
             ? h('div', {}, [
               U.el('bcv-gpa__line', [U.text('bcv-gpa__line-k', 'Cumulative', 'span'), gpaFigure('bcv-gpa__line-v', hasPrior() ? m.cum : m.termGpa, 1.3)]),
-              U.text('bcv-gpa__hero-sub', hasPrior() ? `${gpa2(tracking.priorGpa)} across ${U.plural(tracking.priorCourses, 'course')} before this term` : 'This term so far; add your record before this term in settings'),
+              U.text('bcv-gpa__hero-sub', hasPrior() ? `${gpa2(tracking.priorGpa)} across ${U.plural(tracking.priorCourses, 'course')} before this term${tracking.record?.name ? ` · from ${tracking.record.name}` : ''}` : 'This term so far; add your record before this term in settings, or upload a CSV of past courses there'),
             ])
             : U.text('bcv-gpa__hero-hint bcv-pretty', 'Cumulative GPA needs your past record — turn on tracking above.'),
           U.el('bcv-gpa__line', [U.text('bcv-gpa__line-k bcv-gpa__line-k--sm', `If ungraded work lands ${LOWER_BY} pts lower`, 'span'), U.text('bcv-gpa__line-v bcv-gpa__line-v--sm', m.termGpa === null ? '—' : `${gpa2(m.lowGpa)} – ${gpa2(m.termGpa)}`, 'span')]),
@@ -600,6 +600,9 @@
       const trackBody = U.el('bcv-gpa-set__fields', [
         h('label', { class: 'bcv-gpa-set__field' }, [h('span', { text: 'GPA before this term' }), priorGpa]),
         h('label', { class: 'bcv-gpa-set__field' }, [h('span', { text: 'Courses it covers' }), priorN]),
+        U.text('bcv-gpa-set__s bcv-pretty bcv-gpa-set__from', tracking?.record?.name
+          ? `From ${tracking.record.name} (${U.plural(tracking.record.courses?.length || tracking.priorCourses, 'course')}), uploaded in Settings → Grades. Numbers typed here replace it.`
+          : 'Or upload a CSV of your past courses in Settings → Grades and these fill in from it.'),
       ]);
       trackBody.hidden = !on;
       const trackSwitch = U.switchEl(on, (v) => { on = v; trackBody.hidden = !on; }, 'Track GPA over time');
@@ -615,7 +618,9 @@
             priorGpa.focus();
             return;
           }
-          tracking = blank ? { priorGpa: null, priorCourses: 0, since: tracking?.since || dayKey() } : { priorGpa: g, priorCourses: n, since: tracking?.since || dayKey() };
+          // the rows of a CSV uploaded in Settings stay with the numbers they gave; numbers typed over them are the record now
+          const keepRecord = !blank && tracking?.record && g === tracking.priorGpa && n === tracking.priorCourses ? { record: tracking.record } : {};
+          tracking = blank ? { priorGpa: null, priorCourses: 0, since: tracking?.since || dayKey() } : { priorGpa: g, priorCourses: n, since: tracking?.since || dayKey(), ...keepRecord };
         } else tracking = null;
         await save();
         close();

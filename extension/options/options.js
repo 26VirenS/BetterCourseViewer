@@ -401,6 +401,21 @@
     $('historyLabel').textContent = grades.tracking ? (n ? `${n} ${n === 1 ? 'day' : 'days'} recorded` : 'Recording from today') : (n ? 'History paused' : 'No history yet');
     $('historyNote').textContent = grades.tracking ? (since ? `Since ${fmtDate(since)}` : '') : (n ? 'Existing snapshots kept.' : 'Turn tracking on to keep one snapshot a day.');
     $('exportCsv').disabled = !n;
+    paintRecord();
+  }
+  /** The record before this term, as the Grades page reads it: its GPA and course count, and the
+   *  rows of the CSV it came from when it came from one. */
+  function paintRecord() {
+    const t = grades.tracking;
+    const has = !!t && Number.isFinite(t.priorGpa) && t.priorCourses > 0;
+    const rec = has && t.record && Array.isArray(t.record.courses) ? t.record : null;
+    $('recordLabel').textContent = has ? `${gpa2(t.priorGpa)} across ${t.priorCourses} ${t.priorCourses === 1 ? 'course' : 'courses'} before this term` : 'No record before this term';
+    $('recordNote').textContent = rec
+      ? `From ${rec.name || 'a CSV'}${Number.isFinite(rec.credits) ? ` · ${rec.credits} credits, so the GPA is credit-weighted` : ' · every course counts equally'}${rec.skipped ? ` · ${rec.skipped} ${rec.skipped === 1 ? 'row' : 'rows'} skipped (no letter grade)` : ''}`
+      : has ? 'Entered by hand on the Grades page. Upload a CSV of your past courses to replace it.'
+        : 'Upload a CSV of your past courses — a header row, then one course a line: course, grade, and credits and term if you have them. Letters (A−, B+), percentages and 4.0 points all read; P/NP, W and the like are skipped. The Grades page shows a cumulative GPA from it.';
+    $('recordRow').hidden = !has;
+    $('recordList').textContent = rec ? rec.courses.slice(0, 40).map((c) => [c.term, c.course, c.grade, Number.isFinite(c.credits) ? `${c.credits} cr` : null].filter(Boolean).join(' · ')).join('\n') + (rec.courses.length > 40 ? `\n… and ${rec.courses.length - 40} more` : '') : '';
   }
   onSwitch($('tracking'), async (on) => {
     grades.tracking = on ? (grades.tracking || { priorGpa: null, priorCourses: 0, since: new Date().toISOString().slice(0, 10) }) : null;
@@ -424,9 +439,12 @@
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
+    importHistory(await file.text());
+  });
+  async function importHistory(text) {
     let rows;
     try {
-      rows = parseGpaCsv(await file.text());
+      rows = parseGpaCsv(text);
     } catch {
       flash('That file is not a GPA export', true);
       return;
@@ -439,7 +457,7 @@
       paintGrades();
     }
     flash(added.length ? `Imported ${added.length} ${added.length === 1 ? 'day' : 'days'}` : 'Nothing new to import');
-  });
+  }
   /** The rows of a GPA export: a date and a term GPA on the 4.0 scale; a row with no GPA carries
    *  nothing and is skipped; anything else is not a GPA export. */
   function parseGpaCsv(text) {
@@ -457,6 +475,121 @@
     if (!out.size) throw new Error('not a GPA export');
     return [...out.values()];
   }
+  // Upload CSV (the record before this term): a CSV of past courses — course, grade, and credits and
+  // term when the file has them — read into the GPA before this term and the courses it covers, the
+  // way the Grades page's own fields take them, with the rows kept so the page can say where the
+  // numbers came from. Letters, percentages and 4.0 points all read; a row whose grade is not one
+  // (P/NP, W, I, CR) is skipped and counted as such. Credits, when given, weight the GPA the way a
+  // transcript does. Tracking comes on with it. A history export (date,term_gpa) dropped here goes
+  // to the history instead.
+  const RECORD_POINTS = { 'A+': 4, A: 4, 'A-': 3.7, 'B+': 3.3, B: 3, 'B-': 2.7, 'C+': 2.3, C: 2, 'C-': 1.7, 'D+': 1.3, D: 1, 'D-': 0.7, F: 0 };
+  const RECORD_SCALE = [[97, 4], [93, 4], [90, 3.7], [87, 3.3], [83, 3], [80, 2.7], [77, 2.3], [73, 2], [70, 1.7], [60, 1], [0, 0]];
+  /** The points a grade cell is worth, or null when it carries none (P, W, blank). */
+  function recordPoints(raw) {
+    const g = String(raw || '').trim().toUpperCase().replace(/[−–]/g, '-').replace(/\s+/g, '');
+    if (!g) return null;
+    if (g in RECORD_POINTS) return RECORD_POINTS[g];
+    const pct = /^(\d+(?:\.\d+)?)%$/.exec(g);
+    if (pct) { const n = Number(pct[1]); return Number.isFinite(n) ? (RECORD_SCALE.find(([at]) => n >= at) || [0, 0])[1] : null; }
+    const n = Number(g);
+    if (!Number.isFinite(n) || n < 0) return null;
+    if (n <= 4.3) return Math.min(4, n); // 4.0-scale points as they are
+    if (n <= 100) return (RECORD_SCALE.find(([at]) => n >= at) || [0, 0])[1]; // a percentage without its sign
+    return null;
+  }
+  /** One CSV line as cells: quotes and quoted commas handled; a tab-separated line reads too. */
+  function csvCells(line) {
+    const out = [];
+    let cell = '';
+    let q = false;
+    const sep = line.includes('\t') && !line.includes(',') ? '\t' : ',';
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (q) {
+        if (ch === '"') { if (line[i + 1] === '"') { cell += '"'; i++; } else q = false; }
+        else cell += ch;
+      } else if (ch === '"') q = true;
+      else if (ch === sep) { out.push(cell); cell = ''; }
+      else cell += ch;
+    }
+    out.push(cell);
+    return out.map((c) => c.trim());
+  }
+  const RECORD_COLS = {
+    course: /^(course|class|name|title|subject|code|course\s*(name|code|title))$/i,
+    grade: /^(grade|letter|final(\s*grade)?|mark|score|result)$/i,
+    credits: /^(credits?|units?|hours?|credit\s*hours?|cr)$/i,
+    term: /^(term|semester|quarter|session|period|year)$/i,
+  };
+  /** A record CSV as rows: { course, term, grade, points, credits }. The header names the columns
+   *  (matched loosely: course/class/name, grade/letter/score, credits/units/hours, term/semester);
+   *  with a grade column but no course one, the first column is the course. Throws without a
+   *  header, or when no row has a grade that counts. */
+  function parseRecordCsv(text) {
+    const lines = String(text).split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    if (!lines.length) throw new Error('empty');
+    const head = csvCells(lines[0]);
+    const idx = {};
+    for (const [k, re] of Object.entries(RECORD_COLS)) { const i = head.findIndex((h2) => re.test(h2.replace(/[_-]/g, ' ').trim())); if (i >= 0) idx[k] = i; }
+    if (idx.course == null && idx.grade == null) throw new Error('no header'); // (a file with no header cannot say which column is which)
+    if (idx.course == null) idx.course = 0;
+    const rows = [];
+    let skipped = 0;
+    for (const line of lines.slice(1)) {
+      const cells = csvCells(line);
+      if (!cells.some(Boolean)) continue;
+      const course = (cells[idx.course] || '').trim();
+      let gradeCell = idx.grade != null ? cells[idx.grade] : cells.slice(1).find((c) => recordPoints(c) !== null || /^[A-F][+-]?$/i.test(c));
+      const points = recordPoints(gradeCell);
+      const credits = idx.credits != null && cells[idx.credits] !== '' ? Number(cells[idx.credits]) : null;
+      const term = idx.term != null ? (cells[idx.term] || '').trim() : '';
+      if (!course && points === null) continue;
+      if (points === null) { skipped += 1; continue; }
+      rows.push({ course: course || 'Course', term, grade: String(gradeCell).trim().replace(/-/g, '−'), points, credits: Number.isFinite(credits) && credits > 0 ? credits : null });
+    }
+    if (!rows.length) throw new Error('no rows');
+    return { rows, skipped };
+  }
+  $('recordCsv').addEventListener('click', () => $('recordCsvFile').click());
+  $('recordCsvFile').addEventListener('change', async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    const text = await file.text();
+    // a history export dropped here is a history: it goes where Import CSV would have put it
+    if (/^\s*date\s*,\s*term_gpa/i.test(text)) { importHistory(text); return; }
+    let parsed;
+    try {
+      parsed = parseRecordCsv(text);
+    } catch {
+      flash('That file needs a header with course and grade columns (credits and term optional)', true);
+      return;
+    }
+    const { rows, skipped } = parsed;
+    const weighted = rows.some((r) => r.credits !== null);
+    const w = (r) => (weighted ? (r.credits ?? 1) : 1);
+    const total = rows.reduce((s2, r) => s2 + w(r), 0);
+    const gpa = Math.round((rows.reduce((s2, r) => s2 + r.points * w(r), 0) / total) * 1000) / 1000;
+    grades.tracking = {
+      ...(grades.tracking || {}),
+      priorGpa: gpa, priorCourses: rows.length, since: grades.tracking?.since || new Date().toISOString().slice(0, 10),
+      record: { name: file.name, at: new Date().toISOString(), courses: rows, credits: weighted ? Math.round(total * 100) / 100 : null, skipped },
+    };
+    try { await setPref('gpaTracking', grades.tracking); } catch { flash('Could not save the record', true); return; }
+    paintGrades();
+    flash(`${gpa2(gpa)} across ${rows.length} ${rows.length === 1 ? 'course' : 'courses'}${skipped ? `, ${skipped} skipped` : ''}`);
+  });
+  $('recordTemplate').addEventListener('click', () => {
+    download('simpl-courses-record-template.csv', ['term,course,grade,credits', 'Fall 2025,MATH 021,A-,4', 'Fall 2025,WRI 010,B+,4', 'Spring 2026,PHYS 008,A,4', 'Spring 2026,SPRK 010,P,1'].join('\n'), 'text/csv');
+  });
+  $('recordClear').addEventListener('click', async () => {
+    if (!grades.tracking) return;
+    grades.tracking = { ...grades.tracking, priorGpa: null, priorCourses: 0 };
+    delete grades.tracking.record;
+    try { await setPref('gpaTracking', grades.tracking); } catch { flash('Could not save', true); return; }
+    paintGrades();
+    flash('Record cleared; tracking stays on');
+  });
   function download(name, text, type) {
     if (inApp) { self.SimplApp.saveFile(name, text).then((r) => { if (r && r.ok) flash('Saved'); else if (r && !r.cancelled) flash(r.message || 'Could not save', true); }); return; }
     const a = document.createElement('a');

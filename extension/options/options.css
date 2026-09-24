@@ -225,3 +225,5 @@ html[data-theme="dark"] .docs__warn { color: #ffb44d; }
 .devfield__opts { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
 .devopt { height: 28px; padding: 0 11px; border: 0; border-radius: 14px; background: var(--fill); color: var(--ink3); cursor: pointer; font: 600 12px/1 var(--font); transition: background .2s ease, color .2s ease; }
 .devopt.is-on { background: var(--blue); color: #fff; }
+/* 2.83.0: the record before this term, uploaded as a CSV: its rows listed one a line */
+#recordList { white-space: pre-line; font-variant-numeric: tabular-nums; }

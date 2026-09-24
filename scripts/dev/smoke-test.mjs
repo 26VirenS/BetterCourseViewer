@@ -5071,7 +5071,34 @@ try {
   await options.setInputFiles('#importCsvFile', { name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('not a csv at all') });
   await options.waitForFunction(() => /not a GPA export/.test(document.querySelector('#savedText')?.textContent || ''), null, { timeout: 5000 });
   check((await prefsOf()).gpaSnapshots.length === snapsBefore.length + 2, 'a file that is not a GPA export is refused and changes nothing');
+  // Upload CSV: the record before this term from a CSV of past courses — letters, a percentage and 4.0
+  // points all read, credits weight the GPA, a P/NP row is skipped and said so; the rows are kept
+  const recordBefore = (await prefsOf()).gpaTracking;
+  const transcript = ['Term,Course,Grade,Units', 'Fall 2025,MATH 021,A-,4', '"Fall 2025","WRI 010","B+",4', 'Spring 2026,PHYS 008,93%,4', 'Spring 2026,SPRK 010,P,1', 'Spring 2026,CHEM 002,3.0,2'];
+  await options.setInputFiles('#recordCsvFile', { name: 'transcript.csv', mimeType: 'text/csv', buffer: Buffer.from(transcript.join('\n')) });
+  await options.waitForFunction(() => /across 4 courses, 1 skipped/.test(document.querySelector('#savedText')?.textContent || ''), null, { timeout: 5000 });
+  const rec = (await prefsOf()).gpaTracking;
+  // (3.7×4 + 3.3×4 + 4×4 + 3×2) / 14 = 3.571
+  check(rec && rec.priorGpa === 3.571 && rec.priorCourses === 4 && rec.since === recordBefore.since && rec.record?.name === 'transcript.csv' && rec.record.credits === 14 && rec.record.skipped === 1 && rec.record.courses.map((c) => `${c.term}|${c.course}|${c.grade}|${c.points}|${c.credits}`).join(' ') === 'Fall 2025|MATH 021|A−|3.7|4 Fall 2025|WRI 010|B+|3.3|4 Spring 2026|PHYS 008|93%|4|4 Spring 2026|CHEM 002|3.0|3|2'
+    && (await oTexts('#recordLabel'))[0] === '3.57 across 4 courses before this term' && /^From transcript\.csv · 14 credits, so the GPA is credit-weighted · 1 row skipped \(no letter grade\)$/.test((await oTexts('#recordNote'))[0]) && !(await options.$eval('#recordRow', (e) => e.hidden)) && (await options.$eval('#recordList', (e) => e.textContent.split('\n').length)) === 4,
+  `Upload CSV reads a transcript into the record before this term — quoted cells, a letter, a percentage and points, credits weighting the GPA, a P row skipped — and lists its rows: ${JSON.stringify({ gpa: rec?.priorGpa, n: rec?.priorCourses, label: (await oTexts('#recordLabel'))[0], note: (await oTexts('#recordNote'))[0], rows: rec?.record?.courses?.length })}`);
   await options.screenshot({ path: join(out, '29-options-grades.png') });
+  await options.setInputFiles('#recordCsvFile', { name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('nothing,here\n1,2') });
+  await options.waitForFunction(() => /needs a header with course and grade columns/.test(document.querySelector('#savedText')?.textContent || ''), null, { timeout: 5000 });
+  check((await prefsOf()).gpaTracking.priorGpa === 3.571, 'a file with no course and grade in it is refused and the record stays');
+  await options.setInputFiles('#recordCsvFile', { name: 'simpl-courses-gpa.csv', mimeType: 'text/csv', buffer: Buffer.from('date,term_gpa\n2026-08-30,3.100') });
+  await options.waitForFunction(() => /^Imported 1 day$/.test(document.querySelector('#savedText')?.textContent || ''), null, { timeout: 5000 });
+  check((await prefsOf()).gpaSnapshots.length === snapsBefore.length + 3 && (await prefsOf()).gpaTracking.priorGpa === 3.571, 'a history export dropped on Upload CSV goes to the history, the record untouched');
+  // the Grades page reads the record and says where it came from
+  await page.goto(`${BASE}/grades`);
+  await page.waitForSelector('.bcv-gpa__hero-sub', { timeout: 20000 });
+  check(/^3\.57 across 4 courses before this term · from transcript\.csv$/.test((await texts('.bcv-gpa__hero-sub'))[0]), `the Grades page's cumulative GPA reads the uploaded record and names the file: ${(await texts('.bcv-gpa__hero-sub'))[0]}`);
+  await options.bringToFront();
+  await options.click('#recordClear');
+  await options.waitForFunction(() => /Record cleared/.test(document.querySelector('#savedText')?.textContent || ''), null, { timeout: 5000 });
+  const cleared = (await prefsOf()).gpaTracking;
+  check(cleared && cleared.priorGpa === null && cleared.priorCourses === 0 && !cleared.record && cleared.since === recordBefore.since && (await oTexts('#recordLabel'))[0] === 'No record before this term' && (await options.$eval('#recordRow', (e) => e.hidden)), 'Clear forgets the record and its rows, tracking staying on');
+  await sw.evaluate(async ([port, t]) => { const k = `prefs:localhost:${port}`; const all = await self.BCV.api.storage.local.get(k); await self.BCV.api.storage.local.set({ [k]: { ...(all[k] || {}), gpaTracking: t } }); }, [PORT, recordBefore]); // (the record the setup entered, back for the checks after)
   // Appearance: theme tiles
   await options.click('.navlink[data-section="appearance"]');
   await options.click('.theme[data-value="on"]');
