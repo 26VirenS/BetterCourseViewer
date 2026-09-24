@@ -8,6 +8,7 @@
 import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { spawnSync } from 'node:child_process';
 import vm from 'node:vm';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -191,6 +192,19 @@ check(!bad.ok && D.encode(bad.settings) === D.encode(D.SHIPPED) && /3 digits/.te
 const over = D.decode('SC3-999');
 check(D.encode(over.settings) === 'SC3-511', `digits past the end of a setting come back to its last value, never past it: ${D.encode(over.settings)}`);
 check(!D.FIELDS.some((f) => ['mode', 'windows', 'wait', 'blank', 'close'].includes(f.key)), `nothing is caught any more, so nothing is left to tune about catching: ${D.FIELDS.map((f) => f.key).join(', ')}`);
+
+// ---- Safari (scripts/dev/safari-lint.mjs, docs/SAFARI.md) -------------------------------------
+// The suites run in Chromium and the product is a Safari extension: every script API and CSS feature
+// Safari lacks, or got after the floor the Mac app supports, is checked against a table — a script
+// line without a guard, a backdrop-filter without its prefix, a rule that needs what Safari has not
+// got, all fail here.
+console.log('Safari');
+const lint = spawnSync(process.execPath, [join(root, 'scripts', 'dev', 'safari-lint.mjs'), join(root, 'extension'), '--json'], { encoding: 'utf8' });
+let lintOut = null;
+try { lintOut = JSON.parse(lint.stdout); } catch { lintOut = null; }
+check(!!lintOut && lintOut.files > 40, `the lint read the extension (${lintOut ? `${lintOut.files} files, floor Safari ${lintOut.floor}` : `no report: ${(lint.stderr || lint.stdout || '').slice(0, 200)}`})`);
+check(!!lintOut && lintOut.fails.length === 0 && lint.status === 0, lintOut && lintOut.fails.length ? `${lintOut.fails.length} line(s) Safari cannot run: ${lintOut.fails.map((f) => `${f.file}:${f.line} ${f.rule}`).join(' | ')}` : 'nothing Safari cannot do: no unguarded API below the floor, every backdrop-filter prefixed, no rule that needs what Safari lacks');
+check(!!lintOut && lintOut.notes.some((n) => /requestIdleCallback/.test(n.rule) && /guarded/.test(n.fix)), 'and the APIs Safari lacks are on guarded lines (requestIdleCallback falls back to setTimeout)');
 
 console.log(fails ? `\n${fails} check(s) failed` : '\nAll checks passed.');
 process.exit(fails ? 1 : 0);

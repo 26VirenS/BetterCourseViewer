@@ -240,9 +240,11 @@ scripts/
   dev/group-late-test.mjs      a group drawn before its course list lands, and the course folded in afterwards
   dev/side-courses-test.mjs    the favourite courses listed on the sidebar, and in the panel that opens off Courses
   dev/chrome-setup-test.mjs    the Chrome build finding a school's own Canvas on its own, and the page after install
+  dev/safari-lint.mjs          what Safari cannot do, checked by table: script APIs Safari lacks must be guarded, backdrop-filter prefixed, no rule that needs a feature Safari has not got (run by the api suite; docs/SAFARI.md)
   dev/store-shots.mjs          renders the Chrome Web Store screenshots and promo tiles into docs/store/
 docs/chrome-web-store.md       how to publish: listing text, permission justifications, release automation
 docs/mac-app.md                the Mac app: settings in the app, the extension following it, hourly updates, signing secrets
+docs/SAFARI.md                 Safari: the floor (17.0), the lint, the engine the suites lack, what broke in 2.96–2.97 and the rules that follow
 docs/store/                    the store's screenshots and promo tiles
 PRIVACY.md                     the privacy policy the store listing links to
 .github/workflows/package.yml  builds the zips on every push; a v* tag makes a GitHub Release and publishes to the store
