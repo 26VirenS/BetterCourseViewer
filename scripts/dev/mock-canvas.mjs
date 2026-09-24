@@ -77,7 +77,7 @@ const A = {
     ['2020', 'EXTRA POINTS 1', 'Homework', 2, null, 10, 12.5, null, { quiz: true, survey: 'graded_survey' }], // a graded survey: points for taking part
     ['2022', 'Lec09-PreQuiz', 'Homework', 20, null, 9, 10.5, null, { quiz: true, code: 'PHYS9', codeHidden: true }], // an access code Canvas does not even announce
     ['2003', 'Lab 2', 'Labs', 20, null, 2, 23.98, null, {}],
-    ['2004', 'W3 HW', 'Homework', 15, null, 6, 23.98, null, {}],
+    ['2004', 'W3 HW', 'Homework', 15, null, 6, 23.98, null, { description: `<p>Work the set on <a href="http://localhost:${simPort}/sim?from=webassign">WebAssign</a>, then upload your written solutions here. The <a href="/courses/102/files/f21">formula sheet</a> is in Files.</p>` }], // (a site the instructions send you to — on the suite's own second origin — and a same-site file link, which is no tool)
   ],
   103: [
     ['3001', 'Prelab 2', 'Prelabs', 15, 15, -4, 23.98, -5, {}],

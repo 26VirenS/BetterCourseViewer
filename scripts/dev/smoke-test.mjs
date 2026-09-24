@@ -2795,7 +2795,7 @@ try {
   const due = await omniState();
   const rowsOf = () => page.evaluate(() => [...document.querySelectorAll('.bcv-omni__item')].map((e) => ({ t: e.querySelector('.bcv-omni__t')?.textContent, s: e.querySelector('.bcv-omni__s')?.textContent, acts: [...e.querySelectorAll('.bcv-omni__act')].map((b) => b.textContent.trim()) })));
   const dueRows = await rowsOf();
-  check(due.value === '/submit ' && due.groups.join(',') === 'Hand an assignment in, right here' && due.rows[0] === 'W2 HW' && due.rows.includes('Dis01') && due.rows.length === 8 && !due.rows.includes('Lab 1 report') && dueRows[0].acts.join() === 'Submit', `Tab completes it and lists what is due with nothing handed in, soonest first, eight at most (nothing submitted), Submit on the row: ${due.rows.join(' · ')}`);
+  check(due.value === '/submit ' && due.groups.join(',') === 'Hand in' && due.rows[0] === 'W2 HW' && due.rows.includes('Dis01') && due.rows.length === 8 && !due.rows.includes('Lab 1 report') && dueRows[0].acts.join() === 'Submit', `Tab completes it and lists what is due with nothing handed in, soonest first, eight at most (nothing submitted), Submit on the row: ${due.rows.join(' · ')}`);
   // a quiz is taken on its page, not handed in from a box: the row says so — the why-not line — and Enter takes you there
   const qzRow = dueRows.find((r) => /PreQuiz/.test(r.t));
   check(!!qzRow && /· Take it on its page$/.test(qzRow.s) && qzRow.acts.length === 0, `a quiz in the list says why the box cannot hand it in: ${qzRow?.t} — ${qzRow?.s}`);
@@ -2841,18 +2841,56 @@ try {
   await hubTool.waitForLoadState('domcontentloaded').catch(() => {});
   check(openRows.rows[0] === 'Resources & Policy' && hubTool.url() === `${BASE}/courses/101/external_tools/9?display=borderless&bcv=tool` && page.url() === `${BASE}/`, `/open lists the campus tools of your courses and Enter launches the one chosen in a tab of its own, with the bar: ${hubTool.url()}`);
   await hubTool.close().catch(() => {});
-  // /open reaches an assignment's tool too (Knewton, Mastering: the assignment IS the tool) and a tool placed in a module, launched the way Canvas's own pages launch them
+  // /open reaches an assignment's tool too — the tool by its own name (Knewton Alta, opened through the assignment nearest its due) and the assignment that IS the tool — a tool placed in a module, a link written into an assignment's instructions, a link placed in a module; each launched the way Canvas's own pages launch them
   const findRows = async (text) => { await page.click('#bcv-omni'); await page.fill('#bcv-omni', text); await page.waitForSelector('.bcv-omni__item', { timeout: 10000 }); await eventually(async () => !(await page.$('.bcv-omni__more')), 10000); return rowsOf(); };
+  const gtitle = () => page.$eval('.bcv-omni__gtitle', (e) => e.textContent);
   const knewRows = await findRows('/open knew');
+  const knewTitle = await gtitle();
   const [knewTab] = await Promise.all([context.waitForEvent('page', { timeout: 10000 }), page.keyboard.press('Enter')]);
   await knewTab.waitForLoadState('domcontentloaded').catch(() => {});
-  check(knewRows.length === 1 && knewRows[0].t === 'Knewton Alta: Unit 2' && /^SPRK-010-103 · Assignment tool · due /.test(knewRows[0].s) && knewRows[0].acts.join() === 'Open tool,Assignment' && knewTab.url() === `${BASE}/courses/104/external_tools/retrieve?assignment_id=4003&display=borderless&url=${encodeURIComponent('https://tool.example.com/launch')}&bcv=tool`, `/open finds an assignment that is a tool and Enter launches it in a tab of its own, by Canvas's own launch route: ${JSON.stringify(knewRows)} → ${knewTab.url()}`);
+  check(knewTitle === 'Open a tool' && knewRows.length === 2 && knewRows[0].t === 'Knewton Alta' && knewRows[0].s === 'SPRK-010-103 · Tool · via Knewton Alta: Unit 2' && knewRows[0].acts.join() === 'Open tool,Assignment' && knewRows[1].t === 'Knewton Alta: Unit 2' && /^SPRK-010-103 · Assignment tool · due /.test(knewRows[1].s) && knewTab.url() === `${BASE}/courses/104/external_tools/retrieve?assignment_id=4003&display=borderless&url=${encodeURIComponent('https://tool.example.com/launch')}&bcv=tool`, `/open lists the tool behind an assignment by its own name, then the assignment that is the tool, under a short title; Enter launches the tool in a tab of its own by Canvas's own launch route: “${knewTitle}” ${JSON.stringify(knewRows)} → ${knewTab.url()}`);
   await knewTab.close().catch(() => {});
   const modRows = await findRows('/open mastering');
   const [modTab] = await Promise.all([context.waitForEvent('page', { timeout: 10000 }), page.keyboard.press('Enter')]);
   await modTab.waitForLoadState('domcontentloaded').catch(() => {});
   check(modRows.length === 1 && modRows[0].t === 'Mastering Physics' && modRows[0].s === 'PHYS-008-01 · Week 2: Forces · Module tool' && modTab.url() === `${BASE}/courses/102/external_tools/retrieve?display=borderless&url=${encodeURIComponent('https://tool.example.com/mastering')}&bcv=tool`, `and a tool placed in a module: ${JSON.stringify(modRows)} → ${modTab.url()}`);
   await modTab.close().catch(() => {});
+  const waRows = await findRows('/open webassign');
+  const [waTab] = await Promise.all([context.waitForEvent('page', { timeout: 10000 }), page.keyboard.press('Enter')]);
+  await waTab.waitForLoadState('domcontentloaded').catch(() => {});
+  check(waRows.length === 1 && waRows[0].t === 'WebAssign' && /^PHYS-008-01 · Link in W3 HW · due /.test(waRows[0].s) && waRows[0].acts.join() === 'Open link,Assignment' && waTab.url() === `${SIM}/sim?from=webassign`, `a site an assignment's own instructions send you to — no tool assignment, a link in the text — is listed as a tool and opens in a tab of its own: ${JSON.stringify(waRows)} → ${waTab.url()}`);
+  await waTab.close().catch(() => {});
+  const phetRows = await findRows('/open phet');
+  const [phetTab] = await Promise.all([context.waitForEvent('page', { timeout: 10000 }), page.keyboard.press('Enter')]);
+  await phetTab.waitForLoadState('domcontentloaded').catch(() => {});
+  check(phetRows.length === 1 && phetRows[0].t === 'PhET simulation' && phetRows[0].s === 'PHYS-008-01 · Week 2: Forces · Module link' && phetTab.url() === `${SIM}/sim`, `and a link placed in a module: ${JSON.stringify(phetRows)} → ${phetTab.url()}`);
+  await phetTab.close().catch(() => {});
+  // plain words: a verb, a course, a day, a kind — read, listed best first, and read back as the list's title (hub.js understand/resolve)
+  const startRows = await findRows("/start today's math quiz");
+  const startTitle = await gtitle();
+  check(startTitle === 'Start a quiz · in MATH-021-20 · today' && startRows[0]?.t === 'Qz01' && /· Enter starts it$/.test(startRows[0].s), `"/start today's math quiz" reads the verb, the course and the day, and lists the quiz due today first, the reading as the title: “${startTitle}” ${JSON.stringify(startRows)}`);
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(() => /bcv=take/.test(location.search), null, { timeout: 10000 });
+  check(page.url() === `${BASE}/courses/101/quizzes/9010?bcv=take`, `and Enter opens it to take: ${page.url()}`);
+  await page.goto(`${BASE}/`);
+  await page.waitForSelector('#bcv-omni', { timeout: 10000 });
+  const physQz = await findRows('/start physics quiz');
+  check((await gtitle()) === 'Start a quiz · in PHYS-008-01, PHYS-008HL' && physQz[0]?.t === 'Lec08-PreQuiz' && physQz.length === 3 && physQz.every((r) => /^PHYS-008/.test(r.s)), `"/start physics quiz": the quizzes of both physics courses, the nearest due first: ${JSON.stringify(physQz.map((r) => r.t))}`);
+  const qzTm = await findRows('/quiz math tomorrow');
+  check((await gtitle()) === 'Find a quiz · in MATH-021-20 · tomorrow' && qzTm.length === 1 && qzTm[0].t === 'Lec06-PreQuiz', `a finder's own argument reads the same way — "/quiz math tomorrow": ${JSON.stringify(qzTm)}`);
+  const whatRows = await findRows("/what's due tomorrow");
+  check((await gtitle()) === 'Find work · tomorrow' && whatRows[0]?.t === 'Lec06-PreQuiz' && whatRows.map((r) => r.t).sort().join(' · ') === 'Composition of Functions · Journal #2 · Lec06-PreQuiz', `"/what's due tomorrow" (the possessive read, /what a name of /find): everything due tomorrow across the courses, the soonest first, a quiz listed once: ${JSON.stringify(whatRows.map((r) => r.t))}`);
+  const routed = await findRows('/physics quiz tomorrow');
+  check((await gtitle()) === 'Find a quiz · in PHYS-008-01, PHYS-008HL · tomorrow' && routed[0]?.t === 'Lec08-PreQuiz' && routed.length === 3, `words after "/" that name no command are read as a phrase (nothing due tomorrow: the nearest, with the title still saying what was asked): ${JSON.stringify(routed.map((r) => r.t))}`);
+  const labRows = await findRows('physics lab due this week');
+  const labGroup = await page.evaluate(() => { const g = document.querySelector('.bcv-omni__group[data-group="Best match"]'); return { title: g?.querySelector('.bcv-omni__gtitle')?.textContent, rows: [...(g?.querySelectorAll('.bcv-omni__t') || [])].map((t) => t.textContent), first: !!g && g === document.querySelector('.bcv-omni__group'), groups: [...document.querySelectorAll('.bcv-omni__group')].map((x) => x.dataset.group) }; });
+  check(labGroup.title === 'Find work · “lab” · in PHYS-008-01, PHYS-008HL · this week' && labGroup.rows[0] === 'Lab 2' && labGroup.first && labGroup.groups.includes('Courses') === false && labRows.length >= 1, `a plain search with the same shape gets a Best match group at the top, the phrase read back as its title, the other sources under it: ${JSON.stringify(labGroup)}`);
+  const tomRows = await findRows("what's due tomorrow");
+  const tmGroup = await page.evaluate(() => { const g = document.querySelector('.bcv-omni__group[data-group="Best match"]'); return { title: g?.querySelector('.bcv-omni__gtitle')?.textContent, rows: [...(g?.querySelectorAll('.bcv-omni__t') || [])].map((t) => t.textContent) }; });
+  check(tmGroup.title === 'Find work · tomorrow' && tmGroup.rows[0] === 'Lec06-PreQuiz' && tmGroup.rows.slice().sort().join(' · ') === 'Composition of Functions · Journal #2 · Lec06-PreQuiz' && tomRows.length >= 3, `"what's due tomorrow" with no slash: the same answer under Best match: ${JSON.stringify(tmGroup)}`);
+  await shot(page, '15f-hub-plain-words');
+  await findRows('lab 2');
+  check(!(await page.$('.bcv-omni__group[data-group="Best match"]')), 'a plain name ("lab 2") is searched as before: no phrase read into it, no Best match group');
   // the finders: each row says where the thing stands, and carries what can be done with it
   const asg = await findRows('/assignment lab 2');
   check(asg[0]?.t === 'Lab 2' && /^PHYS-008-01 · due \w{3} \d+ · Not submitted$/.test(asg[0].s) && asg[0].acts.join() === 'Submit' && asg.every((r) => /lab 2/i.test(r.t)), `/assignment finds them across the courses, the nearest due first — course, due, where it stands, Submit on the row: ${JSON.stringify(asg)}`);
@@ -2964,7 +3002,7 @@ try {
   await page.waitForFunction(() => document.getElementById('bcv-omni').value === '/due ', null, { timeout: 5000 });
   await page.waitForFunction(() => document.querySelectorAll('.bcv-omni__group:not([data-group="Commands"]) .bcv-omni__item').length > 0, null, { timeout: 10000 });
   const dueList = await omniState();
-  check(dueList.groups.join(',') === 'What is due: today, tomorrow, this week, or by name' && dueList.rows[0] === 'Dis01' && dueList.rows.some((r) => /PreQuiz/.test(r)) && !dueList.rows.includes('W2 HW') && dueList.rows.length === 8, `Enter completes it and lists what is coming, quizzes too, soonest first (what is past due waits under /overdue): ${dueList.rows.join(' · ')}`);
+  check(dueList.groups.join(',') === 'Due' && dueList.rows[0] === 'Dis01' && dueList.rows.some((r) => /PreQuiz/.test(r)) && !dueList.rows.includes('W2 HW') && dueList.rows.length === 8, `Enter completes it and lists what is coming, quizzes too, soonest first (what is past due waits under /overdue): ${dueList.rows.join(' · ')}`);
   await page.keyboard.press('Escape');
   check(await page.$eval('#bcv-omni-panel', (e) => e.hidden) && (await page.inputValue('#bcv-omni')) === '/due ', 'Escape closes the panel, the words kept');
   // "/" (or ⌘K) on another screen brings the Dashboard up with the box focused, the letters typed on the way kept

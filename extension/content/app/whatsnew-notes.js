@@ -24,6 +24,11 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.98.3', date: '2026-09-24', notes: [
+      { kind: 'new', title: 'Say it in plain words', body: 'Type “/start today’s quiz” or “what’s due tomorrow”.', icon: P.sparkle },
+      { kind: 'new', title: 'Tools inside work', body: '/open lists the tool an assignment uses, by its name.', icon: P.tool },
+      { kind: 'improved', title: 'Shorter command titles', body: 'A command’s list is headed by a few words, not a line.', icon: P.list },
+    ] },
     { version: '2.98.2', date: '2026-09-24', notes: [
       { kind: 'improved', title: 'Motion on springs', body: 'Every sheet, menu and screen moves like a real thing.', icon: P.arrows },
       { kind: 'improved', title: 'Cut short, not snapped', body: 'Close a sheet mid-way and it turns back from there.', icon: P.toggle },

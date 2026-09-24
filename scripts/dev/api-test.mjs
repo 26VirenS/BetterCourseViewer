@@ -234,5 +234,86 @@ check(!!lintOut && lintOut.files > 40, `the lint read the extension (${lintOut ?
 check(!!lintOut && lintOut.fails.length === 0 && lint.status === 0, lintOut && lintOut.fails.length ? `${lintOut.fails.length} line(s) Safari cannot run: ${lintOut.fails.map((f) => `${f.file}:${f.line} ${f.rule}`).join(' | ')}` : 'nothing Safari cannot do: no unguarded API below the floor, every backdrop-filter prefixed, no rule that needs what Safari lacks');
 check(!!lintOut && lintOut.notes.some((n) => /requestIdleCallback/.test(n.rule) && /guarded/.test(n.fix)), 'and the APIs Safari lacks are on guarded lines (requestIdleCallback falls back to setTimeout)');
 
+// ---- plain words (content/app/hub.js: understand, resolve, readingLabel, toolNameOf) ------------
+// The hub stood up with no browser — a stub store holding two courses' work — and phrases read into
+// a verb, a kind, courses, a span and title words, resolved against the rows and scored.
+console.log('plain words');
+const at = (d, hh = 23, mm = 59) => { const x = new Date(); x.setDate(x.getDate() + d); x.setHours(hh, mm, 0, 0); return x.toISOString(); };
+const hubCalls = [];
+const hubCourses = [{ id: 101, name: 'F26-MATH 021 20', code: 'MATH-021-20', state: 'current' }, { id: 102, name: 'F26-PHYS 008 01', code: 'PHYS-008-01', state: 'current' }];
+const hubData = {
+  assignments: {
+    101: [
+      { id: 1010, name: 'Qz01', due_at: at(0), submission_types: ['online_quiz'], is_quiz_assignment: true, quiz_id: 9010, submission: {} },
+      { id: 1011, name: 'Lec06-PreQuiz', due_at: at(1, 10, 30), submission_types: ['online_quiz'], is_quiz_assignment: true, quiz_id: 9011, submission: {} },
+      { id: 1012, name: 'Composition of Functions', due_at: at(1), submission_types: ['online_upload'], submission: {} },
+      { id: 1009, name: 'Dis01', due_at: at(0), submission_types: ['online_text_entry'], submission: {} },
+    ],
+    102: [
+      { id: 2003, name: 'Lab 2', due_at: at(2), submission_types: ['online_upload'], submission: {} },
+      { id: 2001, name: 'Lab 1 report', due_at: at(-7), submission_types: ['online_upload'], submission: { submitted_at: at(-8) } },
+      { id: 2004, name: 'W3 HW', due_at: at(6), submission_types: ['online_upload'], submission: {}, description: '<p>Work the set on <a href="https://webassign.example.com/w3">WebAssign</a> and the <a href="/courses/102/files/1">sheet</a>.</p>' },
+      { id: 2050, name: 'Knewton Alta: Unit 2', due_at: at(5), submission_types: ['external_tool'], external_tool_tag_attributes: { url: 'https://tool.example.com/launch' }, submission: {} },
+    ],
+  },
+  quizzes: { 101: [{ id: 9010, title: 'Qz01', due_at: at(0), assignment_id: 1010 }, { id: 9011, title: 'Lec06-PreQuiz', due_at: at(1, 10, 30), assignment_id: 1011 }], 102: [{ id: 9019, title: 'Lec08-PreQuiz', due_at: at(8), assignment_id: 2019 }] },
+  discussions: { 101: [], 102: [{ id: 7001, title: 'Intro thread', posted_at: at(-3), last_reply_at: at(-1) }] },
+  modules: { 101: [], 102: [{ id: 'm2', name: 'Week 2: Forces', items: [{ id: 'i8', type: 'ExternalTool', title: 'Mastering Physics', external_url: 'https://tool.example.com/mastering' }, { id: 'i6', type: 'ExternalUrl', title: 'PhET simulation', external_url: 'http://sim.test/sim' }] }] },
+};
+const hubU = {
+  dayDiff: (d, now = new Date()) => Math.round((new Date(d.getFullYear(), d.getMonth(), d.getDate()) - new Date(now.getFullYear(), now.getMonth(), now.getDate())) / 864e5),
+  fmtShort: (d) => d.toDateString().slice(4, 10), fmtLong: (d) => d.toDateString(), fmtTime: () => '11:59 PM', fmtRecent: () => 'yesterday', whenShort: () => 'soon', parse: (s) => (s ? new Date(s) : null), plural: (n, w, p) => `${n} ${n === 1 ? w : p || `${w}s`}`,
+};
+const hubStore = {
+  assignments: async (id) => hubData.assignments[id] || [], quizzes: async (id) => hubData.quizzes[id] || [], discussions: async (id) => hubData.discussions[id] || [], modules: async (id) => hubData.modules[id] || [], tabs: async () => [], announcementsFeed: async () => [], courses: async () => hubCourses, people: async () => [],
+  workStatus: (a, s) => ({ word: (s || a.submission || {}).submitted_at ? 'Submitted' : 'Not submitted' }), fmtPts: (n) => String(n),
+};
+const hubSelf = { BCV: { utils: { h: () => null, overlayRoot: () => null }, ui: hubU, IC: new Proxy({}, { get: (_, k) => k }), store: hubStore, app: { go: (h) => hubCalls.push(h) }, exttool: { open: (o) => hubCalls.push(`tool:${o.url}`) } } };
+new Function('self', 'location', readFileSync(join(root, 'extension', 'content', 'app', 'hub.js'), 'utf8'))(hubSelf, { origin: 'https://canvas.test', host: 'canvas.test' });
+const hub = hubSelf.BCV.hub;
+const read = (raw, opts) => hub.understand(raw, hubCourses, opts);
+const rowsFor = async (raw, opts) => { const r = read(raw, opts); const rows = await hub.resolve(r, { cs: hubCourses }); return { r, rows, titles: rows.map((x) => x.title), label: rows.label }; };
+let p = read("today's math quiz", { verb: 'start' });
+check(p.verb === 'start' && p.kind === 'quiz' && p.courses.join() === '101' && p.span?.lo === 0 && p.span?.hi === 0 && p.words.length === 0 && hub.readingLabel(p, hubCourses) === 'Start a quiz · in MATH-021-20 · today', `"today's math quiz" under /start: the kind, the course by a word of its name, the day, no title words, read back as "${hub.readingLabel(p, hubCourses)}"`);
+p = read('physics lab due this week');
+const dow = new Date().getDay();
+check(p.courses.join() === '102' && p.words.join() === 'lab' && p.courseWords.join() === 'physics' && p.span?.lo === 0 && p.span?.hi === 6 - dow && p.span.label === 'this week' && p.strong, `"physics lab due this week": the course, "lab" left as the title word, the week to its end (${JSON.stringify(p.span)}), strong enough for a plain search`);
+p = read("what's due tomorrow");
+check(p.verb === 'find' && p.span?.lo === 1 && p.span?.hi === 1 && p.strong && !p.kind, `"what's due tomorrow": the possessive dropped, "what" the verb, tomorrow the span`);
+check(!read('dis01').strong && !read('dis01').natural && !read('lab 2').strong && read('physics').natural && !read('physics').strong && read('open').natural && !read('open').strong && read('tomorrow').strong, 'a name alone, a course alone, a verb alone read as nothing more than words (a plain search stays as it was); a day alone is a phrase');
+p = read('i want to open the lab tool');
+check(p.verb === 'open' && p.kind === 'tool' && p.words.join() === 'lab' && p.kindWords.join() === 'tool', `"i want to open the lab tool": fillers dropped, the verb, the kind, the word: ${JSON.stringify({ verb: p.verb, kind: p.kind, words: p.words })}`);
+p = read('what do i have due friday');
+const fri = (5 - dow + 7) % 7;
+check(p.verb === 'find' && p.span?.lo === fri && p.span?.hi === fri && p.span.label === 'Friday' && read('in 3 days').span?.lo === 3 && read('next week').span?.lo === 7 - dow && read('overdue physics work').span?.hi === -1 && read('oct 3').span?.label.startsWith('Oct'), `days in words: friday (${fri} days off), in 3 days, next week, overdue, a date`);
+p = read('the lab tool', { kind: 'tool' });
+check(p.natural && p.kind === 'tool' && p.words.join() === 'lab' && !read('knew', { kind: 'tool' }).natural && read('knewton unit 2', { kind: 'tool' }).words.join() === 'knewton,unit,2', 'under /open: "the lab tool" is a phrase (fillers, the kind), "knew" is a name for the finder as before, "unit" stays a title word when the kind is forced');
+let got = await rowsFor("what's due tomorrow");
+check(got.titles.join(' · ') === 'Lec06-PreQuiz · Composition of Functions' && got.label === 'Find work · tomorrow', `resolved: everything due tomorrow, the soonest first, the quiz listed once though it is an assignment too: ${got.titles.join(' · ')}`);
+got = await rowsFor("today's math quiz", { verb: 'start' });
+got.rows[0]?.run?.();
+check(got.titles.join() === 'Qz01' && /· Enter starts it$/.test(got.rows[0].sub) && hubCalls.at(-1) === '/courses/101/quizzes/9010?bcv=take', `resolved under /start: the quiz due today, alone (the course's other quiz is tomorrow), Enter opening it to take (${hubCalls.at(-1)})`);
+got = await rowsFor('physics lab due this week');
+check(got.titles[0] === 'Lab 2' && got.titles.every((t) => /lab/i.test(t)) && (2 <= 6 - dow ? got.titles.join() === 'Lab 2' : got.titles.length >= 2), `resolved: the lab due in two days first, only rows holding "lab" (${got.titles.join(' · ')}${2 <= 6 - dow ? ', the one in the week alone' : ', none in what is left of the week, so the nearest'})`);
+got = await rowsFor('mastering physics', { kind: 'tool' });
+check(got.titles.join() === 'Mastering Physics' && got.label === 'Find a tool · “mastering” · in PHYS-008-01', `under /open, "mastering physics": the module's tool, the course read from "physics": ${got.titles.join()}`);
+got = await rowsFor('the lab tool', { kind: 'tool' });
+check(got.titles.length === 0 && got.label === 'Find a tool · “lab”', 'under /open, "the lab tool" with no tool by that word lists nothing rather than everything');
+got = await rowsFor('', { kind: 'tool' });
+check(got.titles.join(' · ') === 'Knewton Alta · Knewton Alta: Unit 2 · WebAssign · Mastering Physics · PhET simulation', `every tool: the one behind an assignment by its own name, the assignment that is the tool, a link in an assignment's instructions, a module's tool and its link: ${got.titles.join(' · ')}`);
+check(got.rows[0].sub === 'PHYS-008-01 · Tool · via Knewton Alta: Unit 2' && got.rows[2].sub.startsWith('PHYS-008-01 · Link in W3 HW · due '), `each saying where it came from: “${got.rows[0].sub}”, “${got.rows[2].sub}”`);
+got = await rowsFor('math', { verb: 'find' });
+check(got.titles.length === 4 && new Set(got.titles).size === 4 && got.titles.includes('Dis01') && got.titles.includes('Qz01'), `"/find math": the course's quizzes and assignments, each once: ${got.titles.join(' · ')}`);
+got = await rowsFor('overdue physics work');
+check(got.titles.join() === 'Lab 1 report' && got.label === 'Find an assignment · in PHYS-008-01 · overdue', `"overdue physics work": the one past due: ${got.titles.join()}`);
+got = await rowsFor('check my physics grades');
+check(got.rows[0]?.href === '/courses/102/grades' && got.label === 'Find grades · in PHYS-008-01', `"check my physics grades" goes to that course's grades: ${got.rows[0]?.href}`);
+got = await rowsFor('calendar friday');
+got.rows[0]?.run?.();
+check(got.rows.length === 1 && /^\/calendar\?date=\d{4}-\d{2}-\d{2}$/.test(hubCalls.at(-1)), `"calendar friday" opens the calendar on that day: ${hubCalls.at(-1)}`);
+check(hub.toolNameOf({ name: 'Knewton Alta: Unit 2', external_tool_tag_attributes: { url: 'https://tool.example.com/launch' } }) === 'Knewton Alta' && hub.toolNameOf({ name: 'Ch 5 HW', external_tool_tag_attributes: { url: 'https://session.masteringphysics.com/x' } }) === 'Mastering' && hub.toolNameOf({ name: 'Unit 4 - Homework', external_tool_tag_attributes: { url: 'https://app.knewton.com/lti' } }) === 'Knewton Alta' && hub.toolNameOf({ name: 'Week 3: Forces', external_tool_tag_attributes: { url: 'https://tool.example.com/x' } }) === null && hub.toolNameOf({ name: 'Lec08-PreQuiz', external_tool_tag_attributes: {} }) === null, 'a tool\'s name: the publisher behind a known launch address, else the words before the colon unless they only say which unit or week');
+check(hub.parse("/what's due tomorrow").cmd?.name === 'find' && hub.parse('/take physics quiz').cmd?.name === 'start' && hub.parse('/physics quiz tomorrow').cmd === null && hub.matchCommands('physics').length === 0 && hub.byName('launch')?.name === 'open', '"/what\'s" is /what (a name of /find), /take is /start, "/physics …" names no command (search.js reads it as a phrase)');
+check(hub.COMMANDS.every((c) => (c.label || c.hint).length <= 32) && hub.byName('open').hint === 'Open a tool in its own tab', `every command heads its list with a short title (the longest: ${Math.max(...hub.COMMANDS.map((c) => (c.label || c.hint).length))} characters), /open's line under it one clause`);
+
 console.log(fails ? `\n${fails} check(s) failed` : '\nAll checks passed.');
 process.exit(fails ? 1 : 0);

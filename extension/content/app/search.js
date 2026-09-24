@@ -70,8 +70,8 @@
       return r?.ok ? (r.hits || []).slice(0, PER).map((w) => ({ icon: IC.globe, title: w.title, sub: w.text || 'Wikipedia', url: w.url })) : [];
     } catch { return []; }
   }
-  // the groups in the order they are shown: what the page holds first, then Canvas, then Wikipedia
-  const ORDER = ['Answer', 'Commands', 'Courses', 'Assignments', 'Announcements', 'Pages', 'Discussions', 'Files', 'People', 'Wikipedia'];
+  // the groups in the order they are shown: what the page holds first, then a phrase read as one, then Canvas, then Wikipedia
+  const ORDER = ['Answer', 'Best match', 'Commands', 'Courses', 'Assignments', 'Announcements', 'Pages', 'Discussions', 'Files', 'People', 'Wikipedia'];
   const NET = [
     ['Assignments', (q, cs, lane) => assignmentHits(q, cs, lane)],
     ['Announcements', (q, cs, lane) => announcementHits(q, cs, lane)],
@@ -87,7 +87,7 @@
     if (!ui) return;
     const seq = ++ui.seq;
     clearTimeout(ui.timer);
-    ui.raw = raw; ui.q = norm(raw); ui.groups = new Map(); ui.items = []; ui.pending = 0; ui.cursor = 0; ui.cmd = null; ui.arg = ''; ui.mode = 'plain'; // (the rows of the last search are no answer to this one: Enter meanwhile does nothing)
+    ui.raw = raw; ui.q = norm(raw); ui.groups = new Map(); ui.items = []; ui.pending = 0; ui.cursor = 0; ui.cmd = null; ui.arg = ''; ui.mode = 'plain'; ui.reading = ''; // (the rows of the last search are no answer to this one: Enter meanwhile does nothing)
     if (String(raw).trimStart().startsWith('/')) { commandMode(String(raw).trimStart(), seq); return; }
     const q = ui.q;
     if (!q) { close(); return; }
@@ -108,6 +108,19 @@
     const cs = ui.cs || (ui.cs = await favs());
     if (!ui || ui.seq !== seq) return;
     const lane = limiter(LANES);
+    // the words read as a phrase — "physics lab due this week", "what's due tomorrow" — answered under Best match, the phrase read back as its title (hub.js understand/resolve)
+    if (!BCV.hub) { try { await hubReady(); } catch { /* the hub is not here: the sources below answer */ } if (!ui || ui.seq !== seq) return; }
+    const phrase = BCV.hub ? BCV.hub.understand(ui.raw, cs) : null;
+    if (phrase?.strong) {
+      ui.pending += 1;
+      Promise.resolve().then(() => BCV.hub.resolve(phrase, { cs, lane, q: ui.raw })).catch(() => []).then((items) => {
+        if (!ui || ui.seq !== seq) return;
+        ui.groups.set('Best match', items || []);
+        ui.reading = items?.label || '';
+        ui.pending -= 1;
+        paint();
+      });
+    }
     for (const [name, fn] of NET) {
       Promise.resolve().then(() => fn(q, cs, lane)).catch(() => []).then((items) => {
         if (!ui || ui.seq !== seq) return;
@@ -130,21 +143,26 @@
       ui.pending = 0;
     }
     const hub = BCV.hub;
-    const p = hub.parse(raw);
-    if (!p.cmd) { // the list, narrowed by the name so far
-      ui.groups = new Map([['Commands', hub.matchCommands(p.name).map(commandRow)]]);
-      paint();
-      return;
+    let p = hub.parse(raw);
+    if (!p.cmd) { // the list, narrowed by the name so far — or, no command starting so and the words reading as a phrase ("/physics quiz tomorrow"), the phrase found
+      const cmds = hub.matchCommands(p.name);
+      if (!cmds.length && /\s/.test(raw.trim()) && hub.understand(raw.slice(1), ui.cs || []).natural) p = { cmd: hub.byName('find'), name: 'find', arg: raw.slice(1).trim() };
+      else {
+        ui.groups = new Map([['Commands', cmds.map(commandRow)]]);
+        paint();
+        return;
+      }
     }
     const cmd = p.cmd;
+    const title = cmd.label || cmd.hint;
     ui.cmd = cmd; ui.arg = p.arg;
     if (cmd.text) { // a command that takes words: the one row is the words typed
-      ui.groups = new Map([[cmd.hint, [{ icon: cmd.icon, title: p.arg ? `${cmd.verb || 'Go'}: ${p.arg}` : `Type ${cmd.takes}…`, sub: p.arg ? cmd.hint : `/${cmd.name} ${cmd.takes}`, act: true }]]]);
+      ui.groups = new Map([[title, [{ icon: cmd.icon, title: p.arg ? `${cmd.verb || 'Go'}: ${p.arg}` : `Type ${cmd.takes}…`, sub: p.arg ? cmd.hint : `/${cmd.name} ${cmd.takes}`, act: true }]]]);
       paint();
       return;
     }
     if (!cmd.args) { // a command that takes nothing: the one row is the command, Enter runs it
-      ui.groups = new Map([[cmd.hint, [{ icon: cmd.icon, title: `/${cmd.name}`, sub: cmd.hint, act: true }]]]);
+      ui.groups = new Map([[title, [{ icon: cmd.icon, title: `/${cmd.name}`, sub: cmd.hint, act: true }]]]);
       paint();
       return;
     }
@@ -157,7 +175,7 @@
       try { items = await cmd.args(p.arg, { cs, lane: limiter(LANES), q: p.arg }); } catch { items = []; }
       if (!ui || ui.seq !== seq) return;
       ui.pending = 0;
-      ui.groups = new Map([[cmd.hint, items || []]]);
+      ui.groups = new Map([[items?.label || title, items || []]]); // (a phrase's list is headed by the phrase read back)
       paint();
     };
     if (cmd.net && p.arg) ui.timer = setTimeout(go, PAUSE); else go(); // (a list Canvas is asked for waits for the typing to pause; the page's own answer at once)
@@ -172,7 +190,7 @@
       const list = ui.groups.get(name);
       if (!list || !list.length) continue;
       const rows = list.map((it) => { items.push(it); return row(it, items.length - 1); });
-      blocks.push(h('div', { class: 'bcv-omni__group', dataset: { group: name } }, [h('div', { class: 'bcv-omni__gtitle', text: name }), ...rows]));
+      blocks.push(h('div', { class: 'bcv-omni__group', dataset: { group: name } }, [h('div', { class: 'bcv-omni__gtitle', text: name === 'Best match' && ui.reading ? ui.reading : name }), ...rows]));
     }
     ui.items = items;
     ui.cursor = items.length ? Math.min(Math.max(ui.cursor, 0), items.length - 1) : -1;
@@ -303,7 +321,7 @@
       else { ui.items = []; ui.groups = new Map(); ui.q = ''; } // (results kept from before: dropped, so a focus does not bring them back as they were)
     } });
     const root = h('div', { class: 'bcv-omni', id: 'bcv-omni-root' }, [wiki, box, panel]);
-    ui = { app, root, input, panel, wiki: wikiOn, seq: 0, q: '', raw: '', groups: new Map(), pending: 0, cursor: -1, items: [], timer: 0, mode: 'plain', cmd: null, arg: '', cs: null };
+    ui = { app, root, input, panel, wiki: wikiOn, seq: 0, q: '', raw: '', groups: new Map(), pending: 0, cursor: -1, items: [], timer: 0, mode: 'plain', cmd: null, arg: '', cs: null, reading: '' };
     input.addEventListener('input', () => { if (ui) run(input.value); });
     input.addEventListener('focus', () => {
       if (!ui) return;
