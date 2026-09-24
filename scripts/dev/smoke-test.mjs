@@ -2707,11 +2707,16 @@ try {
   check(/^https:\/\/en\.wikipedia\.org\/wiki\/kinematics/.test(wikiTab.url()) && page.url() === `${BASE}/`, `a Wikipedia result opens the article in a new tab, the page staying put: ${wikiTab.url()}`);
   await wikiTab.close().catch(() => {});
   await context.unroute('https://en.wikipedia.org/**').catch(() => {});
-  // the W to the left of the box turns Wikipedia off, and on again: kept in the settings, the search on show asked again
-  const wikiBtn = await page.evaluate(() => { const w = document.getElementById('bcv-omni-wiki').getBoundingClientRect(); const b = document.getElementById('bcv-omni-box').getBoundingClientRect(); return { left: w.right <= b.left && w.right >= b.left - 12, level: Math.abs(w.height - b.height) <= 1 && Math.abs(w.top - b.top) <= 1, pressed: document.getElementById('bcv-omni-wiki').getAttribute('aria-pressed'), text: document.getElementById('bcv-omni-wiki').textContent }; });
-  check(wikiBtn.left && wikiBtn.level && wikiBtn.pressed === 'true' && wikiBtn.text === 'W', `a W to the left of the box, level with it, Wikipedia on: ${JSON.stringify(wikiBtn)}`);
+  // the Wikipedia switch sits inside the box at its right and is there only while the box has the cursor; it turns Wikipedia off, and on again: kept in the settings, the search on show asked again
+  const wikiRead = () => page.evaluate(() => { const el = document.querySelector('.bcv-omni__wiki'); const shown = !!el && getComputedStyle(el).display !== 'none'; const w = el?.getBoundingClientRect(); const b = document.getElementById('bcv-omni-box').getBoundingClientRect(); const s = document.getElementById('bcv-omni-wiki'); return { shown, inside: shown && w.left > b.left + 40 && w.right <= b.right - 4 && w.top >= b.top && w.bottom <= b.bottom, role: s?.getAttribute('role'), checked: s?.getAttribute('aria-checked'), label: el?.textContent.trim(), key: getComputedStyle(document.querySelector('.bcv-omni__key')).display, active: document.activeElement?.id }; });
+  await page.mouse.click(700, 500); // (the cursor out of the box)
+  const wikiHidden = await wikiRead();
+  check(!wikiHidden.shown && wikiHidden.key !== 'none', `with the cursor out of the box there is no switch, only the "/" hint: ${JSON.stringify(wikiHidden)}`);
+  await page.click('#bcv-omni');
+  const wikiShown = await wikiRead();
+  check(wikiShown.shown && wikiShown.inside && wikiShown.role === 'switch' && wikiShown.checked === 'true' && wikiShown.label === 'Wikipedia' && wikiShown.key === 'none', `pressing the box brings a real switch, labelled Wikipedia, inside the box at its right in the hint's place, on: ${JSON.stringify(wikiShown)}`);
   await page.click('#bcv-omni-wiki');
-  check(await eventually(async () => (await sw.evaluate(async () => (await self.BCV.settings.get()).search?.wikipedia)) === false) && (await page.$eval('#bcv-omni-wiki', (e) => e.getAttribute('aria-pressed'))) === 'false', 'pressed, Wikipedia is off, and the setting says so');
+  check(await eventually(async () => (await sw.evaluate(async () => (await self.BCV.settings.get()).search?.wikipedia)) === false) && (await page.$eval('#bcv-omni-wiki', (e) => e.getAttribute('aria-checked'))) === 'false' && (await wikiRead()).active === 'bcv-omni', 'pressed, Wikipedia is off, the setting says so, and the cursor is still in the box');
   await page.fill('#bcv-omni', 'kinema');
   await page.waitForSelector('#bcv-omni-panel:not([hidden])', { timeout: 10000 });
   await eventually(async () => (await page.$('.bcv-omni__more')) === null, 12000);
@@ -2719,7 +2724,7 @@ try {
   await page.click('#bcv-omni-wiki');
   await eventually(async () => (await sw.evaluate(async () => (await self.BCV.settings.get()).search?.wikipedia)) === true);
   await page.waitForSelector('.bcv-omni__group[data-group="Wikipedia"] .bcv-omni__item', { timeout: 10000 });
-  check((await page.$eval('#bcv-omni-wiki', (e) => e.getAttribute('aria-pressed'))) === 'true', 'pressed again, Wikipedia is back: the same search asked again');
+  check((await page.$eval('#bcv-omni-wiki', (e) => e.getAttribute('aria-checked'))) === 'true', 'pressed again, Wikipedia is back: the same search asked again');
   await page.fill('#bcv-omni', 'xy');
   await page.waitForSelector('#bcv-omni-panel:not([hidden])', { timeout: 10000 });
   await page.keyboard.press('Escape');

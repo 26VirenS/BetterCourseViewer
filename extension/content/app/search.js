@@ -64,7 +64,7 @@
     } catch { return []; }
   }
   async function wikiHits(q) {
-    if (!ui?.wiki) return []; // (the W beside the box, off)
+    if (!ui?.wiki) return []; // (the Wikipedia switch in the box, off)
     try {
       const r = await Promise.resolve(BCV.api.runtime.sendMessage({ type: 'wiki', q }));
       return r?.ok ? (r.hits || []).slice(0, PER).map((w) => ({ icon: IC.globe, title: w.title, sub: w.text || 'Wikipedia', url: w.url })) : [];
@@ -302,25 +302,27 @@
     const input = h('input', { type: 'search', class: 'bcv-omni__in', id: 'bcv-omni', placeholder: 'Search everything', autocomplete: 'off', spellcheck: 'false', 'aria-label': 'Search everything: courses, assignments, pages, files, people and Wikipedia — or type / for a command', 'aria-controls': 'bcv-omni-panel', 'aria-autocomplete': 'list' });
     const panel = h('div', { class: 'bcv-omni__panel', id: 'bcv-omni-panel', role: 'listbox', 'aria-label': 'Results' });
     panel.hidden = true;
+    // the Wikipedia switch, inside the box at its right where the "/" hint sits: shown while the box has
+    // the cursor (the hint goes as it comes), Wikipedia's articles among the results or not, kept in the settings
+    const wikiOn = app?.state?.settings?.search?.wikipedia !== false;
+    const wikiSw = U.switchEl(wikiOn, (next) => {
+      if (!ui) return;
+      ui.wiki = next;
+      BCV.settings?.update?.({ search: { wikipedia: next } }).catch(() => {});
+      if (app?.state?.settings) app.state.settings.search = { ...(app.state.settings.search || {}), wikipedia: next };
+      if (!ui.panel.hidden && ui.mode === 'plain' && ui.q.length >= NET_MIN) run(ui.input.value); // (the search on show, asked again with or without it)
+      else { ui.items = []; ui.groups = new Map(); ui.q = ''; } // (results kept from before: dropped, so a focus does not bring them back as they were)
+    }, 'Wikipedia results');
+    wikiSw.id = 'bcv-omni-wiki';
+    const wiki = h('span', { class: 'bcv-omni__wiki' }, [h('span', { class: 'bcv-omni__wikit', text: 'Wikipedia', onclick: () => wikiSw.click() }), wikiSw]);
+    wiki.addEventListener('pointerdown', (e) => e.preventDefault()); // (the press leaves the cursor in the box: Safari gives a pressed button no focus, and the switch is only there while the box has it)
     const box = h('div', { class: 'bcv-omni__box', id: 'bcv-omni-box' }, [
       h('span', { class: 'bcv-omni__ic', 'aria-hidden': 'true' }, U.svg(IC.search, { size: 15, width: 2 })),
       input,
+      wiki,
       h('kbd', { class: 'bcv-omni__key', text: '/', 'aria-hidden': 'true' }),
     ]);
-    // the W to the left of the box: Wikipedia's articles among the results, or not (kept in the settings)
-    const wikiOn = app?.state?.settings?.search?.wikipedia !== false;
-    const wiki = h('button', { type: 'button', class: `bcv-omni__wiki ${wikiOn ? 'is-on' : ''}`, id: 'bcv-omni-wiki', text: 'W', 'aria-pressed': wikiOn ? 'true' : 'false', title: wikiOn ? 'Wikipedia results: on — press to turn off' : 'Wikipedia results: off — press to turn on', onclick: () => {
-      if (!ui) return;
-      ui.wiki = !ui.wiki;
-      wiki.classList.toggle('is-on', ui.wiki);
-      wiki.setAttribute('aria-pressed', ui.wiki ? 'true' : 'false');
-      wiki.title = ui.wiki ? 'Wikipedia results: on — press to turn off' : 'Wikipedia results: off — press to turn on';
-      BCV.settings?.update?.({ search: { wikipedia: ui.wiki } }).catch(() => {});
-      if (app?.state?.settings) app.state.settings.search = { ...(app.state.settings.search || {}), wikipedia: ui.wiki };
-      if (!ui.panel.hidden && ui.mode === 'plain' && ui.q.length >= NET_MIN) run(ui.input.value); // (the search on show, asked again with or without it)
-      else { ui.items = []; ui.groups = new Map(); ui.q = ''; } // (results kept from before: dropped, so a focus does not bring them back as they were)
-    } });
-    const root = h('div', { class: 'bcv-omni', id: 'bcv-omni-root' }, [wiki, box, panel]);
+    const root = h('div', { class: 'bcv-omni', id: 'bcv-omni-root' }, [box, panel]);
     ui = { app, root, input, panel, wiki: wikiOn, seq: 0, q: '', raw: '', groups: new Map(), pending: 0, cursor: -1, items: [], timer: 0, mode: 'plain', cmd: null, arg: '', cs: null, reading: '' };
     input.addEventListener('input', () => { if (ui) run(input.value); });
     input.addEventListener('focus', () => {

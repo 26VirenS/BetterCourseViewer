@@ -11,11 +11,16 @@ critically- and over-damped cases), so a motion is physics and not an eased gues
 
 | preset | for | settle | overshoot |
 |---|---|---|---|
-| snappy | pins, ticks, toggles, menus, toasts, presses | ~240 ms | ~5% (small and playful) |
-| gentle | sheets, popups, screens, the preview panel | ~390 ms | none visible |
-| settle | rows and blocks arriving, staggered | ~300 ms | none |
-| scrim | opacity only | ~340 ms | none |
-| phone | push and pop, the bottom sheet | ~320 ms | none |
+| snappy | pins, ticks, toggles, menus, toasts, presses | ~290 ms | ~3.5% (small and playful) |
+| gentle | sheets, popups, screens, the preview panel | ~460 ms | none visible |
+| settle | rows and blocks arriving, staggered | ~350 ms | none |
+| scrim | opacity only | ~400 ms | none |
+| phone | push and pop, the bottom sheet | ~390 ms | none |
+
+(2.98.4 slowed each preset by about a fifth and softened the turn: smoother over speed. The
+curves are sampled every ~5 ms for CSS — up to 192 stops — and every 4 ms for script keyframes,
+finer than a frame at 120 Hz, so what the display draws is the spring itself and never a straight
+line between two of its points.)
 
 The engine has no view of the page beyond two things it is asked for:
 
@@ -61,7 +66,7 @@ The engine has no view of the page beyond two things it is asked for:
 2. **Every scripted removal has a watchdog.** A promise that waits on motion is raced against a
    timer; the element leaves either way.
 3. Only `transform` and `opacity` move; a size change is measured first and played as a transform.
-4. Duration follows distance and size: a menu 160–240 ms, a sheet 300–400 ms, a screen 260–390 ms.
+4. Duration follows distance and size: a menu ~290 ms, a sheet or a screen ~460 ms, a row ~350 ms.
 5. Overshoot only on small, playful things; never on a pane that carries text.
 6. Scrims fade; they never move. A parent and its child never animate the same property at once.
 7. A redraw is not an arrival (`ui.still`). Focus moves after the motion. Reduced motion is honoured

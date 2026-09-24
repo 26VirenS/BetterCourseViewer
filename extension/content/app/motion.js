@@ -22,12 +22,12 @@
   // stiffness k (N/m), damping c (N·s/m), mass m (kg): the ratio c / 2√(km) says how it settles —
   // under 1 it overshoots a little, at 1 it lands as fast as it can without, over 1 it creeps in
   const PRESETS = {
-    snappy: { stiffness: 1100, damping: 46, mass: 1 }, // pins, ticks, toggles, menus: ~230 ms, a small overshoot (ζ ≈ .69)
-    gentle: { stiffness: 260, damping: 30, mass: 1 }, // sheets, popups, screens: ~350 ms, no visible overshoot (ζ ≈ .93)
-    settle: { stiffness: 400, damping: 36, mass: 1 }, // rows and blocks arriving, staggered: ~290 ms (ζ ≈ .9)
-    scrim: { stiffness: 420, damping: 40, mass: 1 }, // opacity only: ~260 ms (ζ ≈ .98)
-    phone: { stiffness: 380, damping: 36, mass: 1 }, // push and pop, bottom sheets: ~290 ms (ζ ≈ .92)
-  };
+    snappy: { stiffness: 750, damping: 40, mass: 1 }, // pins, ticks, toggles, menus: ~290 ms, a small overshoot (ζ ≈ .73)
+    gentle: { stiffness: 200, damping: 27, mass: 1 }, // sheets, popups, screens: ~460 ms, no visible overshoot (ζ ≈ .95)
+    settle: { stiffness: 280, damping: 30, mass: 1 }, // rows and blocks arriving, staggered: ~350 ms (ζ ≈ .9)
+    scrim: { stiffness: 300, damping: 34, mass: 1 }, // opacity only: ~400 ms (ζ ≈ .98)
+    phone: { stiffness: 260, damping: 30, mass: 1 }, // push and pop, bottom sheets: ~390 ms (ζ ≈ .93)
+  }; // (2.98.4: each a fifth slower than before and softer at the turn — smoother over speed)
   const REST_DIST = 0.01; // of the travel: at rest once within this and slower than REST_SPEED (a pixel of a hundred: the eye's threshold)
   const REST_SPEED = 0.1; // travel per second
   const MAX_T = 1.2; // s: nothing rings for longer than this, whatever the numbers
@@ -82,12 +82,13 @@
 
   const caches = { easing: new Map(), duration: new Map() };
   /** The preset from rest to rest, sampled into a CSS linear() easing — the same curve a rule can
-   *  play with no script. Steps every ~10 ms of its settle time, at most 96 stops. */
+   *  play with no script. Steps every ~5 ms of its settle time, at most 192 stops: finer than any
+   *  display's frame, so the curve between stops is never seen as straight. */
   function easing(preset) {
     const key = typeof preset === 'string' ? preset : JSON.stringify(preset);
     if (caches.easing.has(key)) return caches.easing.get(key);
     const sp = spring(preset);
-    const n = Math.min(96, Math.max(12, Math.round(sp.settle / 0.01)));
+    const n = Math.min(192, Math.max(24, Math.round(sp.settle / 0.005)));
     const stops = [];
     for (let i = 0; i <= n; i++) {
       const t = (sp.settle * i) / n;
@@ -143,7 +144,7 @@
     return f;
   }
   /** Plays a spec on an element along a spring, from progress `from` (0) to `to` (1), with an initial
-   *  velocity in progress per second; every ~8 ms a keyframe. The handle's now() reads the spring at
+   *  velocity in progress per second; every ~4 ms a keyframe. The handle's now() reads the spring at
    *  the animation's current time, so a motion cut short can hand its position and speed on. */
   function run(el, spec, preset = 'gentle', { from = 0, to = 1, v0 = 0, fill = 'both', delay = 0, composite = 'replace' } = {}) {
     if (!el || typeof el.animate !== 'function') return { finished: Promise.resolve(), cancel() {}, now: () => ({ p: to, v: 0 }), done: true };
@@ -155,7 +156,7 @@
       return { anim, finished: anim.finished.catch(() => {}), cancel: () => anim.cancel(), now: () => ({ p: to, v: 0 }), get done() { return anim.playState === 'finished'; } };
     }
     const dur = sp.settle;
-    const n = Math.max(6, Math.round(dur / 0.008));
+    const n = Math.max(12, Math.round(dur / 0.004)); // (a keyframe every 4 ms: past a 120 Hz frame, so the browser draws the spring, not a line between two of its points)
     const frames = [];
     for (let i = 0; i <= n; i++) {
       const t = (dur * i) / n;

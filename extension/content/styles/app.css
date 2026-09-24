@@ -35,8 +35,8 @@ html[data-bcv-theme] {
   /* motion: one easing and three lengths — the exits are the fast one, an entrance the middle, a sheet's rise the slow */
   --bcv-ease: cubic-bezier(.32,.72,0,1); --bcv-t-fast: .18s; --bcv-t: .28s; --bcv-t-slow: .34s;
   /* the springs (content/app/motion.js writes each preset's exact curve and settle time over these as a linear() easing; docs/MOTION.md) */
-  --bcv-spring-snappy: cubic-bezier(.34,1.2,.42,1); --bcv-t-snappy: .24s; --bcv-spring-gentle: cubic-bezier(.32,.72,0,1); --bcv-t-gentle: .36s;
-  --bcv-spring-settle: cubic-bezier(.32,.72,0,1); --bcv-t-settle: .3s; --bcv-spring-scrim: ease; --bcv-t-scrim: .3s; --bcv-spring-phone: cubic-bezier(.32,.72,0,1); --bcv-t-phone: .32s;
+  --bcv-spring-snappy: cubic-bezier(.34,1.15,.42,1); --bcv-t-snappy: .29s; --bcv-spring-gentle: cubic-bezier(.32,.72,0,1); --bcv-t-gentle: .46s;
+  --bcv-spring-settle: cubic-bezier(.32,.72,0,1); --bcv-t-settle: .35s; --bcv-spring-scrim: ease; --bcv-t-scrim: .4s; --bcv-spring-phone: cubic-bezier(.32,.72,0,1); --bcv-t-phone: .39s;
   /* the corners: one scale by size — tiles, menus, panels, rows, cards, sheets — every pane reads these */
   --bcv-r-tile: 9px; --bcv-r-tile-lg: 12px; --bcv-r-menu: 14px; --bcv-r-panel: 16px; --bcv-r-row: 18px; --bcv-r-card: 20px; --bcv-r-card-lg: 22px; --bcv-r-sheet: 26px;
 }
@@ -3607,10 +3607,13 @@ html[data-bcv-theme="dark"] .bcv-pdfx { --px-row: #0f0f11; --px-page: #1f1f22; -
  * title and the view switcher; its results in groups on a panel under it ==== */
 .bcv-omni { position: relative; flex: 1 1 260px; max-width: 480px; min-width: 240px; margin-left: auto; align-self: flex-end; display: flex; align-items: center; gap: 8px; }
 .bcv-omni__box { flex: 1; min-width: 0; }
-/* the W to the left of the box: Wikipedia among the results, or not */
-.bcv-omni__wiki { flex: none; width: 29px; height: 29px; padding: 0; border: 1px solid transparent; border-radius: 15px; background: var(--bcv-fill); color: var(--bcv-ink3); cursor: pointer; display: flex; align-items: center; justify-content: center; font: 700 14px/1 Georgia, "Times New Roman", serif; text-decoration: line-through; text-decoration-thickness: 1.5px; transition: background .2s ease, color .2s ease; }
-.bcv-omni__wiki.is-on { color: var(--bcv-ink); text-decoration: none; }
-.bcv-omni__wiki:hover { background: var(--bcv-hover); }
+/* the Wikipedia switch at the box's right: there only while the box has the cursor, in the "/" hint's place */
+@keyframes bcv-omni-wiki-in { from { opacity: 0; transform: translateX(4px); } to { opacity: 1; transform: none; } }
+.bcv-omni__wiki { display: none; flex: none; align-items: center; gap: 6px; padding-left: 4px; cursor: pointer; animation: bcv-omni-wiki-in .18s ease-out both; }
+.bcv-omni__box:focus-within .bcv-omni__wiki { display: flex; }
+.bcv-omni__wikit { font: 500 11px/1 var(--bcv-font); color: var(--bcv-ink3); white-space: nowrap; }
+.bcv-omni__wiki .bcv-switch { width: 28px; height: 16px; padding: 2px; }
+.bcv-omni__wiki .bcv-switch__knob { width: 12px; height: 12px; }
 .bcv-omni + .bcv-ml-auto { margin-left: 0; }
 .bcv-omni__box { display: flex; align-items: center; gap: 8px; height: 29px; padding: 0 8px 0 11px; border-radius: 15px; background: var(--bcv-fill); border: 1px solid transparent; transition: background .2s ease, border-color .2s ease, box-shadow .2s ease; }
 .bcv-omni__box:focus-within { background: var(--bcv-card); border-color: var(--bcv-edge); box-shadow: 0 6px 20px rgba(0,0,0,.08); }
@@ -3623,7 +3626,7 @@ html[data-bcv-theme="dark"] .bcv-pdfx { --px-row: #0f0f11; --px-page: #1f1f22; -
 .bcv-omni__key { flex: none; padding: 2px 5px; border-radius: 5px; border: 1px solid var(--bcv-sep); font: 600 10.5px/1 var(--bcv-font); color: var(--bcv-ink3); }
 .bcv-omni__box:focus-within .bcv-omni__key { display: none; }
 @keyframes bcv-omni-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
-.bcv-omni__panel { position: absolute; left: 37px; right: 0; top: calc(100% + 8px); z-index: var(--bcv-z-menu); max-height: min(60vh, 520px); overflow: auto; padding: 8px; border-radius: var(--bcv-r-panel); background: var(--bcv-card); border: 1px solid var(--bcv-edge); box-shadow: 0 24px 60px rgba(0,0,0,.18); animation: bcv-omni-in var(--bcv-t-snappy) var(--bcv-spring-snappy) both; }
+.bcv-omni__panel { position: absolute; left: 0; right: 0; top: calc(100% + 8px); z-index: var(--bcv-z-menu); max-height: min(60vh, 520px); overflow: auto; padding: 8px; border-radius: var(--bcv-r-panel); background: var(--bcv-card); border: 1px solid var(--bcv-edge); box-shadow: 0 24px 60px rgba(0,0,0,.18); animation: bcv-omni-in var(--bcv-t-snappy) var(--bcv-spring-snappy) both; }
 .bcv-omni__panel[hidden] { display: none; }
 .bcv-omni__gtitle { padding: 8px 10px 4px; font: 600 10.5px/1 var(--bcv-font); letter-spacing: .08em; text-transform: uppercase; color: var(--bcv-ink3); }
 .bcv-omni__item { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; border: 0; border-radius: 10px; background: transparent; cursor: pointer; text-align: left; color: var(--bcv-ink); font-family: var(--bcv-font); }

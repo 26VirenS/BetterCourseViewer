@@ -9,7 +9,7 @@
   const DEFAULTS = {
     version: 2,
     search: {
-      wikipedia: true,           // Search everything: Wikipedia's articles among the results (the W beside the box)
+      wikipedia: true,           // Search everything: Wikipedia's articles among the results (the switch in the box)
     },
     appearance: {
       skin: true,                 // the redesigned interface; off = stock Canvas
