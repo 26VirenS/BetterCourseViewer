@@ -97,7 +97,8 @@
           ]),
         ]),
         U.el('bcv-ccard__body bcv-ccard__body--term', [
-          h('div', {}, [U.text('bcv-ccard__code bcv-ccard__code--term', c.name), U.text('bcv-ccard__section bcv-ccard__section--125', `Enrolled as ${c.role}`)]),
+          // who teaches it and its code, as the card in Canvas's own list says — the role is on the row below
+          h('div', {}, [U.text('bcv-ccard__code bcv-ccard__code--term', c.name), U.text('bcv-ccard__section bcv-ccard__section--125', [c.teachers?.[0], c.code && c.code !== c.name ? c.code : null].filter(Boolean).join(' · ') || `Enrolled as ${c.role}`)]),
           progress,
           U.el('bcv-ccard__foot bcv-ccard__foot--term', [U.dot(next.color, 'bcv-dot--7'), U.text('bcv-ccard__next bcv-ellip', next.text, 'span')]),
         ]),
@@ -116,7 +117,8 @@
       return U.row([
         h('button', { type: 'button', class: 'bcv-ccard__star', title: 'Add to dashboard', 'aria-label': 'Add to dashboard', onclick: (e) => { e.stopPropagation(); toggleFav(c, true); } }, U.star(false)),
         U.dot(c.color, 'bcv-dot--10'),
-        U.el('bcv-row__body', [U.text('bcv-row__title bcv-ellip', c.name), U.text('bcv-course-row__nick', c.nickname ? `Nickname · ${c.originalName}` : 'No nickname')]),
+        // under a nickname the real name; otherwise who teaches it and its code (never "No nickname": that is not about the course)
+        U.el('bcv-row__body', [U.text('bcv-row__title bcv-ellip', c.name), U.text('bcv-course-row__nick', c.nickname ? `Nickname · ${c.originalName}` : [c.teachers?.[0], c.code && c.code !== c.name ? c.code : null, c.term].filter(Boolean).join(' · ') || 'Course')]),
         U.iconbtn(IC.pencil, { title: 'Nickname', onClick: (e) => { e.stopPropagation(); nicknameSheet(c, e.currentTarget); } }),
         U.badge(c.role),
         U.chev(),

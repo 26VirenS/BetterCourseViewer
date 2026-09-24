@@ -119,7 +119,7 @@
         const dotEl = h('span', { class: 'bcv-dot bcv-dot--7', style: { background: g.earned !== null ? '#0a84ff' : 'transparent' } });
         let scoreEl;
         if (!st.on) {
-          scoreEl = h('span', { class: 'bcv-grade__score', title: 'Double-click to test a what-if score', text: `${g.earned === null ? '—' : store.fmtPts(g.earned)} / ${store.fmtPts(g.possible)}` });
+          scoreEl = h('span', { class: 'bcv-grade__score', title: 'Double-click to test a what-if score', text: `${g.grade ? `${g.grade} · ` : ''}${g.earned === null ? '—' : store.fmtPts(g.earned)} / ${store.fmtPts(g.possible)}` }); // (a letter or pass/fail grade first, as Canvas names it)
           // the row opens the assignment, so the score has to keep its own presses: otherwise the
           // first half of the double-click that starts a what-if would navigate away instead
           scoreEl.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); });
@@ -137,7 +137,8 @@
         return U.row([
           U.el('bcv-row__body', [
             h('div', { style: { display: 'flex', alignItems: 'baseline', gap: '8px', flexWrap: 'wrap' } }, [U.text('bcv-grade__name bcv-pretty', g.name, 'span'), g.badge ? U.badge(g.badge, g.badge === 'Late' ? 'orange' : g.badge === 'Missing' ? 'red' : '', 'bcv-badge--xs') : null]),
-            U.text('bcv-row__sub', `${g.group} · due ${g.due ? U.fmtBy(g.due) : '—'} · submitted ${g.submitted ? U.fmtAt(g.submitted) : '—'}`),
+            // the group, the dates, and — on a marked assignment — how the class did (Canvas's own mean, high and low)
+            U.text('bcv-row__sub', [g.group, g.due ? `due ${U.fmtBy(g.due)}` : 'no due date', g.submitted ? `submitted ${U.fmtAt(g.submitted)}` : (g.due && U.parse(g.due) > new Date() ? 'not due yet' : 'not submitted'), g.stats && g.earned !== null ? `class mean ${store.fmtPts(g.stats.mean)} · high ${store.fmtPts(g.stats.max)} · low ${store.fmtPts(g.stats.min)}` : null].filter(Boolean).join(' · ')),
           ]),
           dotEl,
           scoreEl,

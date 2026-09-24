@@ -56,6 +56,11 @@ its own. Use these:
   header's height, the focus island's strip and the welcome's look stage use it.
 - `anchor(el, at, { side, gap, margin, align, minWidth })`, `keepOnScreen(el)`, `boundsOf(el)` — the
   placement above.
+- `still(fn)` — a redraw is not an arrival. Runs fn (sync or async, nested as deep as it likes) with
+  entrances off: `enter()` hands nodes back untouched, and `app.render({ quiet })` lands its root
+  with `bcv-screen--still` (no rise). A list drawn again because one row changed (To Do's tick,
+  priority, grouping; the Dashboard's Hide completed) and a screen drawn again silently (back to the
+  tab after a while, a page from the cache) land in place; only a screen arriving staggers in.
 
 ## The stacking ladder
 

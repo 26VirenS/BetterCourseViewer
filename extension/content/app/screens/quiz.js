@@ -474,7 +474,7 @@
       return U.el('bcv-qz__intro', [
         h('div', {}, [
           h('h1', { class: 'bcv-qz__h1 bcv-pretty', text: quiz.title }),
-          h('p', { class: 'bcv-qz__lead', text: `${course.name} · ${U.plural(quiz.question_count || 0, 'question')} · ${ptsLine} · ${quiz.due_at ? `Due ${U.fmtTime(quiz.due_at)}, ${U.fmtShort(quiz.due_at)}` : 'No due date'}` }),
+          h('p', { class: 'bcv-qz__lead', text: `${course.name} · ${U.plural(quiz.question_count || 0, 'question')} · ${ptsLine} · ${quiz.due_at ? `Due ${U.fmtAtUpper(quiz.due_at)}` : 'No due date'}` }), // ("Sep 25 at 10:30 AM", the day first, as every other due line reads)
         ]),
         U.card(U.el('bcv-qz__before', [
           U.text('bcv-qz__kicker', 'Before you start'),

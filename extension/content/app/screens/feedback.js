@@ -52,18 +52,25 @@
   /** The comments filed against one attempt. Canvas pins each comment to the attempt it was written
    *  on; unfiltered, feedback on a first draft comes back as feedback on the final hand-in. A
    *  comment with no attempt at all belongs to the latest. */
+  // (a comment that is a voice or video note, or files alone, is a comment too)
   const commentsFor = (s, attempt, isLatest) => (s.submission_comments || [])
-    .filter((cm) => cm && cm.comment)
+    .filter((cm) => cm && (cm.comment || cm.media_comment || (cm.attachments || []).length))
     .filter((cm) => (cm.attempt ? Number(cm.attempt) === Number(attempt || 1) : isLatest));
 
   function commentRow(cm, me) {
     const who = cm.author_name || cm.author?.display_name || (String(cm.author_id ?? '') === me ? 'You' : 'Comment');
     const mine = me && String(cm.author_id ?? '') === me;
+    const media = cm.media_comment || null;
+    const files = cm.attachments || [];
     return U.el(`bcv-fb__comment ${mine ? 'is-mine' : ''}`, [
       h('span', { class: 'bcv-fb__avatar', text: U.initials(who) || '·' }),
       U.el('bcv-fb__cbody', [
         U.text('bcv-fb__ctitle', `${mine ? 'You' : who}${cm.created_at ? ` · ${U.fmtAt(cm.created_at)}` : ''}`),
-        h('p', { class: 'bcv-fb__ctext bcv-pretty', text: cm.comment || '' }),
+        cm.comment ? h('p', { class: 'bcv-fb__ctext bcv-pretty', text: cm.comment }) : null,
+        // a voice or video note: played where it is, or opened in a tab when the browser cannot
+        media ? (media.url ? h(media.media_type === 'video' ? 'video' : 'audio', { class: 'bcv-fb__media', controls: '', preload: 'none', src: media.url }) : null) : null,
+        media ? h('a', { class: 'bcv-fb__medialink', href: media.url || '#', target: '_blank', rel: 'noopener', text: `${media.media_type === 'video' ? 'Video' : 'Voice'} comment${media.display_name ? ` · ${media.display_name}` : ''}` }) : null,
+        files.length ? U.el('bcv-fb__files', files.map(fileRow)) : null,
       ]),
     ]);
   }
@@ -90,7 +97,7 @@
     const dark = ctx.app.isDark();
     const score = cur.score === null || cur.score === undefined ? null : Number(cur.score);
     const possible = a.points_possible;
-    const marked = score !== null && isLatest && graded;
+    const marked = score !== null && (isLatest ? graded : true); // (an earlier attempt keeps the score it got; the latest counts only once posted)
     const [ink, tint] = marked ? (dark ? ['#5ddb7d', 'rgba(52,199,89,.2)'] : ['#1e7a37', 'rgba(52,199,89,.14)'])
       : ['var(--bcv-ink3)', 'var(--bcv-fill)'];
     const files = cur.attachments || [];
@@ -106,7 +113,8 @@
       U.el('bcv-fb__facts', [
         ['Submitted', cur.submitted_at ? U.fmtAt(cur.submitted_at) : 'Not submitted'],
         ['Type', type],
-        ['Graded', marked && s.graded_at ? U.fmtAt(s.graded_at) : null],
+        ['Graded', marked && isLatest && s.graded_at ? U.fmtAt(s.graded_at) : null],
+        ['Late', cur.late ? (isLatest && s.points_deducted ? `${s.seconds_late ? `${Math.max(1, Math.round(s.seconds_late / 86400))} days · ` : ''}−${store.fmtPts(s.points_deducted)} pts` : 'Yes') : null], // (Canvas's late penalty, where it took one)
       ].filter(([, v]) => v).map(([k, v]) => U.el('bcv-fb__fact', [U.text('bcv-fb__factk', k, 'span'), U.text('bcv-fb__factv', v, 'span')]))),
       files.length ? U.el('bcv-fb__files', files.map(fileRow)) : null,
       // a text entry or a URL is the hand-in itself: it is shown, not described

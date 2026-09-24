@@ -72,6 +72,14 @@
     const mod = { red: 'bcv-badge--red', blue: 'bcv-badge--blue', green: 'bcv-badge--green', orange: 'bcv-badge--orange' }[kind] || '';
     return h('span', { class: `bcv-badge ${mod} ${size}`, text: str });
   }
+  /** A status word as a small badge, coloured by its kind (store.workStatus / store.workFlags):
+   *  bad red, warn orange, good green, info blue, muted or none the plain fill. */
+  function statusBadge(st, size = 'bcv-badge--xs') {
+    if (!st || !st.word) return null;
+    const b = badge(st.word, { bad: 'red', warn: 'orange', good: 'green', info: 'blue' }[st.kind] || '', size);
+    b.classList.add('bcv-status');
+    return b;
+  }
 
   function seg(options, value, onChange, { wide = false } = {}) {
     const wrap = el(`bcv-seg ${wide ? 'bcv-seg--wide' : ''}`);
@@ -644,8 +652,30 @@
     } catch { /* the design's place */ }
   }
 
+  // ---- a redraw is not an arrival ------------------------------------------------------------------
+  // Entrances (the stagger below, the screen root's rise) belong to a screen arriving under the
+  // student. A list drawn again because one row changed, or a screen drawn again silently because
+  // the tab was away, must land in place, still: the same rows must not vanish and fade back in.
+  // still(fn) runs fn — sync or async, nested as deep as it likes — with entrances off; enter() then
+  // hands the node back untouched, and app.render({ quiet }) lands its root with bcv-screen--still.
+  let stillDepth = 0;
+  const isStill = () => stillDepth > 0;
+  function still(fn) {
+    stillDepth += 1;
+    let out;
+    try {
+      out = fn();
+    } catch (e) {
+      stillDepth -= 1;
+      throw e;
+    }
+    if (out && typeof out.then === 'function') return out.finally(() => { stillDepth -= 1; });
+    stillDepth -= 1;
+    return out;
+  }
+
   function enter(node, i = 0, step = 55, dur = 380) {
-    if (!node) return node;
+    if (!node || isStill()) return node;
     node.classList.add('bcv-enter');
     node.style.setProperty('--bcv-delay', `${Math.min((i || 0) * step, 420)}ms`);
     if (dur !== 380) node.style.setProperty('--bcv-dur', `${dur}ms`);
@@ -868,11 +898,11 @@
   }
 
   BCV.ui = {
-    svg, star, chev, el, text, tile, dot, card, row, label, h2, groupHead, badge, seg, search, switchEl, btn, iconbtn, pill, placeDot,
+    svg, star, chev, el, text, tile, dot, card, row, label, h2, groupHead, badge, statusBadge, seg, search, switchEl, btn, iconbtn, pill, placeDot,
     empty, emptyCard, loading, errorBox, hint, avatar, toast, menu, closeMenus, picker, colorMenu, COURSE_COLORS, fmtDay, datePop, dateField, promptSheet, askSheet,
     DAY, startOfDay, addDays, sameDay, dayDiff, startOfWeek, parse, MONTHS, MONTHS_LONG, DAYS, DAYS_LONG,
     fmtTime, fmtTimeLower, fmtShort, fmtLong, fmtDateComma, fmtAt, fmtAtUpper, fmtBy, dayTitle, fmtDow, fmtRecent, whenShort, plural,
-    hexToRgb, rgba, palette, FALLBACK_COLORS, initials, enter, roll, morphFrom, reducedMotion, dismiss,
+    hexToRgb, rgba, palette, FALLBACK_COLORS, initials, enter, still, isStill, roll, morphFrom, reducedMotion, dismiss,
     afterMotion, onGone, watchLayout, anchor, keepOnScreen, boundsOf,
   };
 })();

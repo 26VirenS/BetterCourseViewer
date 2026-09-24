@@ -51,7 +51,7 @@
     let items = await store.todoWindow().catch(() => null);
     if (!ctx.alive()) return screen;
 
-    const isOpen = (it) => !it.complete && !it.dismissed && !it.submitted;
+    const isOpen = (it) => !it.complete && !it.dismissed && !it.submitted && !it.excused; // (excused work is nothing to do)
     const isDone = (it) => it.complete || it.submitted;
     const priOf = (it) => Number(pri[it.id]) || 0;
     // one entry changed against the latest map in storage (another tab may have set others since
@@ -78,7 +78,24 @@
       sub.textContent = list.length ? `${U.plural(list.length, 'item')} across ${U.plural(courses.size, 'course')}${mine ? ` · ${mine === 1 ? 'one' : mine} of your own` : ''}` : 'Nothing on your list';
     }
 
-    async function change(it, fn, rowEl) {
+    /** The row's done look, painted in place — the circle's tick, the row dimmed — which is what a
+     *  tick shows before Canvas has answered, and what is painted back if Canvas refuses. */
+    function paintDone(rowEl, done) {
+      if (!rowEl) return;
+      rowEl.classList.toggle('bcv-row--done', done);
+      const circle = rowEl.querySelector('.bcv-circle');
+      if (!circle) return;
+      circle.classList.toggle('is-done', done);
+      circle.replaceChildren(...(done ? [U.svg('M6 12l4 4 8-8', { size: 12, stroke: '#fff', width: 2.4 })] : []));
+      circle.title = done ? 'Mark not done' : 'Mark done';
+    }
+    /** A change to one row: its own look painted on the row at once (`look`, when the change has
+     *  one), the row held at 40% while Canvas answers, then the list drawn again in place — still,
+     *  no entrance (ui.still) — since the row may have left its group or the list. Refused: the row
+     *  is painted back as it was. */
+    async function change(it, fn, rowEl, look = null) {
+      const before = isDone(it);
+      if (look) look();
       rowEl.style.opacity = '.4';
       try {
         await fn();
@@ -88,6 +105,7 @@
         draw();
       } catch (e) {
         rowEl.style.opacity = '';
+        if (look) paintDone(rowEl, before);
         U.toast(`Could not update it: ${e.message}`, { error: true });
       }
     }
@@ -126,7 +144,7 @@
       const meta = it.custom ? 'My task' : `${it.kind}${it.points !== null && it.points !== undefined ? ` · ${store.fmtPts(it.points)} pts` : ''}${it.submitted ? ' · submitted' : ''}`;
       const done = isDone(it);
       let rowEl;
-      const circle = h('button', { type: 'button', class: `bcv-circle ${done ? 'is-done' : ''}`, title: done ? 'Mark not done' : 'Mark done', 'aria-label': `${done ? 'Mark not done' : 'Mark done'}: ${it.title}`, onclick: () => change(it, () => store.setComplete(it, !it.complete), rowEl) }, done ? U.svg('M6 12l4 4 8-8', { size: 12, stroke: '#fff', width: 2.4 }) : null);
+      const circle = h('button', { type: 'button', class: `bcv-circle ${done ? 'is-done' : ''}`, title: done ? 'Mark not done' : 'Mark done', 'aria-label': `${done ? 'Mark not done' : 'Mark done'}: ${it.title}`, onclick: () => change(it, () => store.setComplete(it, !it.complete), rowEl, () => paintDone(rowEl, !it.complete)) }, done ? U.svg('M6 12l4 4 8-8', { size: 12, stroke: '#fff', width: 2.4 }) : null);
       const subText = it.custom ? meta : withCourse ? `${it.courseName} · ${meta}` : `${it.courseName} · ${meta}`;
       const bodyEl = it.custom
         ? h('div', { class: 'bcv-row__body' }, [U.text('bcv-row__title bcv-ellip', it.title), U.text('bcv-row__sub bcv-row__sub--3', subText)])
@@ -135,6 +153,8 @@
         circle,
         U.tile(it.icon, { color: pal.text, tint: pal.tint }),
         bodyEl,
+        // where the work stands — Missing, Late, Submitted, Graded, Excused; Feedback, New — in the same words as everywhere else
+        ...store.workFlags(it).map((st) => U.statusBadge(st)),
         priChip(it),
         it.dismissed ? U.badge('Dismissed') : U.badge(U.whenShort(it.date)),
         // plain assignments hand in from here; the assignment page hosts the block
@@ -144,7 +164,7 @@
           : it.dismissed
             ? U.btn('Restore', { kind: 'xs', onClick: () => change(it, () => store.restore(it), rowEl) })
             : U.iconbtn(IC.close, { size: 24, title: 'Dismiss', onClick: () => change(it, () => store.dismiss(it), rowEl) }),
-      ], { mod: done || it.dismissed ? 'bcv-row--done' : '' });
+      ], { mod: done || it.dismissed || it.excused ? 'bcv-row--done' : '' });
       rowEl.dataset.item = it.id;
       return rowEl;
     }
@@ -170,7 +190,7 @@
     const canAdd = () => !!draft.title.trim() && !draft.busy;
     function composer() {
       if (!draft.open) {
-        return h('button', { type: 'button', class: 'bcv-todo__add', onclick: () => { draft.open = true; draw(); setTimeout(() => body.querySelector('.bcv-todo__title')?.focus(), 30); } }, [
+        return h('button', { type: 'button', class: 'bcv-todo__add', onclick: () => { draft.open = true; draw(); body.querySelector('.bcv-todo__title')?.focus(); } }, [
           h('span', { class: 'bcv-todo__addic' }, U.svg(IC.plus, { size: 14, stroke: 'var(--bcv-blue)', width: 2.4 })),
           h('span', { class: 'bcv-todo__addlabel', text: 'Add your own task' }),
         ]);
@@ -220,7 +240,12 @@
 
     // ---- draw ---------------------------------------------------------------------------------------
     const groupCard = (title, subText, list, opts) => h('div', {}, [U.groupHead(title, subText, 'bcv-group__head--10'), U.card(list.map((it) => itemRow(it, opts)), 'bcv-card--list')]);
-    function draw() {
+    // The first draw is the screen arriving: its groups stagger in. Every draw after it — a tick, a
+    // priority, the grouping, Show completed, the composer — is the same list with one thing changed,
+    // and lands in place, still (ui.still: the stagger is off and the rows do not fade back in).
+    let drawn = false;
+    const draw = () => (drawn ? U.still(paint) : paint());
+    function paint() {
       if (!items) {
         body.replaceChildren(U.errorBox('Your planner could not be loaded.'));
         return;
@@ -255,12 +280,15 @@
       } else {
         const now = new Date();
         if (mine.length) push(groupCard('My tasks', openIn(mine), mine));
-        const today = [], tomorrow = [], later = [];
+        // past due with nothing handed in comes first: it is the list's most urgent group, and Canvas's
+        // own To Do keeps it in view the same way (the planner window reaches a week back for it)
+        const overdue = [], today = [], tomorrow = [], later = [];
         for (const it of work) {
           const d = U.dayDiff(it.date, now);
-          (d <= 0 ? today : d === 1 ? tomorrow : later).push(it);
+          (d < 0 ? overdue : d === 0 ? today : d === 1 ? tomorrow : later).push(it);
         }
         const sorted = (l) => l.sort((a, b) => a.date - b.date);
+        if (overdue.length) push(groupCard('Overdue', `${U.plural(overdue.filter(isOpen).length, 'item')} past due with nothing handed in`, sorted(overdue)));
         if (today.length) push(groupCard('Today', U.fmtLong(now), sorted(today)));
         if (tomorrow.length) push(groupCard('Tomorrow', U.fmtLong(U.addDays(now, 1)), sorted(tomorrow)));
         if (later.length) {
@@ -270,6 +298,7 @@
       }
       parts.push(U.hint('Ticking an item marks it done in your Canvas planner. Dismissing removes it from your To Do list only — neither submits or completes the work. Priority is yours alone and is never sent to Canvas.', 'bcv-hint--narrow'));
       body.replaceChildren(...parts);
+      drawn = true;
     }
 
     setSeg();

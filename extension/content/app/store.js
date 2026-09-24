@@ -122,12 +122,13 @@
   function me({ force = false, refresh = false } = {}) {
     return C.cached('me', 60 * MIN, async () => {
       try {
-        const u = await C.get('/api/v1/users/self');
-        return { id: String(u.id), name: u.name || u.short_name, shortName: u.short_name || u.name, avatar: u.avatar_url || null, pronouns: u.pronouns || null };
+        // the user record, and the profile beside it: the e-mail and the login are only on the profile
+        const [u, p] = await Promise.all([C.get('/api/v1/users/self'), C.get('/api/v1/users/self/profile').catch(() => null)]);
+        return { id: String(u.id), name: u.name || u.short_name, shortName: u.short_name || u.name, avatar: u.avatar_url || p?.avatar_url || null, pronouns: u.pronouns || p?.pronouns || null, email: p?.primary_email || u.email || null, loginId: p?.login_id || u.login_id || null };
       } catch {
         const e = env();
         const cu = e.current_user || {};
-        return { id: String(e.current_user_id || ''), name: cu.display_name || 'Account', shortName: cu.display_name || 'Account', avatar: cu.avatar_image_url || null, pronouns: null };
+        return { id: String(e.current_user_id || ''), name: cu.display_name || 'Account', shortName: cu.display_name || 'Account', avatar: cu.avatar_image_url || null, pronouns: null, email: null, loginId: null };
       }
     }, { force, refresh });
   }
@@ -216,12 +217,16 @@
         code: c.course_code || c.name,
         term: c.term?.name || '',
         termId: c.term?.id ? String(c.term.id) : null,
+        termStart: c.term?.start_at || null, // (the term's dates, for the course header)
+        termEnd: c.term?.end_at || null,
         favorite: !!c.is_favorite,
         state: courseState(c),
         role: roleLabel(enr.type || enr.role),
         score: enr.computed_current_score ?? null,
         grade: enr.computed_current_grade ?? null,
-        finalScore: enr.computed_final_score ?? null,
+        finalScore: enr.computed_final_score ?? null, // (ungraded work counted as zero: what the term would end on today)
+        finalGrade: enr.computed_final_grade ?? null,
+        hideFinal: !!c.hide_final_grades, // (the teacher withholds the total: Canvas sends no current score then)
         teachers: (c.teachers || []).map((t) => t.display_name).filter(Boolean),
         sections: (c.sections || []).map((s) => s.name).filter(Boolean),
         image: c.image_download_url || null,
@@ -332,7 +337,7 @@
   }
   function rawPlanner(days = 21, { force = false, refresh = false } = {}) {
     return C.cached(`planner:${days}`, 1.5 * MIN, () => // (what is due changes under a tab left open: short-lived)
-      C.get('/api/v1/planner/items', { params: { start_date: isoDays(-7), end_date: isoDays(days), per_page: 100 }, all: true, maxPages: 5 }), { force, refresh });
+      C.get('/api/v1/planner/items', { params: { start_date: isoDays(-14), end_date: isoDays(days), per_page: 100 }, all: true, maxPages: 5 }), { force, refresh }); // (two weeks back: what is overdue, on To Do and in Notifications alike)
   }
 
   /** Normalise a planner item: what it is, whether it is actually due, and its state. */
@@ -376,6 +381,9 @@
       missing: !!subs.missing,
       late: !!subs.late,
       excused: !!subs.excused,
+      feedback: !!subs.has_feedback, // (the teacher wrote back: a comment, a rubric)
+      newActivity: !!item.new_activity, // (something happened since you last looked, as Canvas's own list marks it)
+      redo: !!subs.redo_request,
       complete: !!item.planner_override?.marked_complete,
       dismissed: !!item.planner_override?.dismissed,
       url: item.html_url || (custom ? '/#todo' : courseId ? `/courses/${courseId}` : '/'),
@@ -421,13 +429,16 @@
     const start = U.startOfDay(t);
     const end = U.addDays(start, 8);
     const inWindow = (it) => it.date >= start && it.date < end;
+    // past due with nothing handed in stays on the list until it is done or dismissed, as Canvas's
+    // own To Do keeps it (the planner is read from a week back for it)
+    const overdueOpen = (it) => it.isDue && it.date < start && !it.submitted && !it.complete && !it.dismissed && !it.excused;
     const seen = new Set(items.map((it) => it.id));
     const mine = (mineRaw || []).map((it) => classify(it)).filter((it) => it.date && it.custom && !seen.has(it.id));
-    return [...items.filter((it) => it.type !== 'announcement' && (it.custom || inWindow(it))), ...mine].sort((a, b) => a.date - b.date);
+    return [...items.filter((it) => it.type !== 'announcement' && (it.custom || inWindow(it) || overdueOpen(it))), ...mine].sort((a, b) => a.date - b.date);
   }
-  /** Items still open on the To Do list: not done, not dismissed. */
+  /** Items still open on the To Do list: not done, not dismissed, not handed in, not excused. */
   async function todo(opts = {}) {
-    return (await todoWindow(opts)).filter((it) => !it.complete && !it.dismissed && !it.submitted);
+    return (await todoWindow(opts)).filter((it) => !it.complete && !it.dismissed && !it.submitted && !it.excused);
   }
 
   async function override(item, patch) {
@@ -520,8 +531,9 @@
   }
   /** Overdue and Due soon from the planner (due items with nothing submitted: the last 14 days, the
    *  next 48 hours); Graded and Feedback from Submission items in the activity stream (a score, a
-   *  comment); Announcements from the unread ones; System from Canvas's notification messages and
-   *  the local grade snapshot. Each carries the URL Canvas gave it. */
+   *  comment); Messages and Discussions from its unread Conversation and DiscussionTopic items (a
+   *  new message, new replies); Announcements from the unread ones; System from Canvas's
+   *  notification messages and the local grade snapshot. Each carries the URL Canvas gave it. */
   async function notifications({ force = false, refresh = false } = {}) {
     const t = now();
     const [items, stream, anns, cs, snaps] = await Promise.all([
@@ -533,22 +545,25 @@
     ]);
     const byId = new Map(cs.map((c) => [c.id, c]));
     const courseOf = (id) => (id === null || id === undefined ? null : byId.get(String(id))) || null;
+    const label = (c) => c?.shortName || c?.name || ''; // (the course list carries no nickname field: its name is the label)
     const H = 3600e3;
     const out = [];
     for (const it of items || []) {
       if (!it.isDue || it.submitted || it.complete || it.dismissed || it.excused || !it.date) continue;
       const ms = it.date - t;
       const pts = it.points !== null && it.points !== undefined ? ` · ${it.points} pts` : '';
-      const base = { title: it.title, courseId: it.courseId, course: it.course?.shortName || it.courseName || '', color: it.course?.color || null, when: it.date, whenText: `Due ${U.fmtAt(it.date)}`, url: it.url, action: it.type === 'quiz' ? 'Start quiz' : 'Submit now' };
+      const base = { title: it.title, courseId: it.courseId, course: label(it.course) || it.courseName || '', color: it.course?.color || null, when: it.date, whenText: `Due ${U.fmtAt(it.date)}`, url: it.url, action: it.type === 'quiz' ? 'Start quiz' : 'Submit now' };
       if (ms < 0 && ms > -14 * 24 * H) out.push({ ...base, id: `planner:${it.id}`, cat: 'overdue', note: `${it.missing ? 'Marked missing' : 'Nothing submitted'} · ${pastText(it.date, t)}${pts}` });
       else if (ms >= 0 && ms < 48 * H) out.push({ ...base, id: `planner:${it.id}`, cat: 'soon', note: `${it.kind}${pts} · ${it.type === 'quiz' ? 'not started' : 'no submission'}` });
     }
     for (const a of stream || []) {
       const when = U.parse(a.updated_at || a.created_at);
       const c = courseOf(a.course_id);
-      const base = { courseId: c?.id || (a.course_id ? String(a.course_id) : null), course: c?.shortName || a.context_name || '', color: c?.color || null, when, url: a.html_url || (a.course_id ? `/courses/${a.course_id}` : '/') };
+      const base = { courseId: c?.id || (a.course_id ? String(a.course_id) : null), course: label(c) || a.context_name || '', color: c?.color || null, when, url: a.html_url || (a.course_id ? `/courses/${a.course_id}` : '/') };
       if (a.type === 'Submission') {
-        const scored = (a.score !== undefined && a.score !== null) || (a.grade !== undefined && a.grade !== null && a.grade !== '');
+        // a score the teacher has not posted yet is not a grade to announce (posted_at null; absent means posted)
+        const posted = a.posted_at === undefined || a.posted_at !== null;
+        const scored = posted && ((a.score !== undefined && a.score !== null) || (a.grade !== undefined && a.grade !== null && a.grade !== ''));
         const comments = Array.isArray(a.submission_comments) ? a.submission_comments.filter((x) => x && x.comment) : [];
         const name = a.assignment?.name || String(a.title || 'Submission').replace(/\s+graded\b.*$/i, '');
         const possible = a.assignment?.points_possible;
@@ -558,14 +573,23 @@
           out.push({ ...base, id: `stream:${a.id}:comment`, cat: 'feedback', when: U.parse(last.created_at) || when, title: `${last.author_name || 'Your instructor'} left a comment on ${name}`, note: `“${stripHtml(last.comment).slice(0, 140)}”`, action: 'Read comment' });
         }
       } else if (a.type === 'Message') {
-        out.push({ ...base, id: `stream:${a.id}`, cat: 'system', title: a.title || a.notification_category || 'Notification', note: stripHtml(a.message).slice(0, 140) || a.notification_category || '', action: 'Open' });
+        // Canvas's own notification: its category is always said (Due Date, Grading, Course Content…), then its words
+        out.push({ ...base, id: `stream:${a.id}`, cat: 'system', title: a.title || a.notification_category || 'Notification', note: [a.notification_category, stripHtml(a.message).slice(0, 140)].filter(Boolean).join(' · '), action: 'Open' });
+      } else if (a.type === 'Conversation' && a.read_state === false) {
+        // a message in the Inbox not read yet: the subject, and how it starts
+        const preview = stripHtml(a.message).slice(0, 140);
+        out.push({ ...base, id: `stream:${a.id}`, cat: 'message', title: a.title || 'New message', note: preview ? `“${preview}”` : `${U.plural(a.participant_count || 2, 'person')} in the conversation`, action: 'Read', url: a.conversation_id ? `/conversations?id=${a.conversation_id}` : (a.html_url || '/conversations') });
+      } else if (a.type === 'DiscussionTopic' && a.read_state === false) {
+        // a discussion with something new in it: how many replies it has grown to
+        const n = a.total_root_discussion_entries;
+        out.push({ ...base, id: `stream:${a.id}`, cat: 'discuss', title: a.title || 'Discussion', note: [n !== undefined && n !== null ? U.plural(n, 'reply', 'replies') : '', stripHtml(a.message).slice(0, 100)].filter(Boolean).join(' · '), action: 'Open' });
       }
     }
     for (const an of anns || []) {
       if (an.read_state && an.read_state !== 'unread') continue;
       const cid = String(an.context_code || '').replace(/^course_/, '') || (an.course_id ? String(an.course_id) : '');
       const c = courseOf(cid);
-      out.push({ id: `ann:${an.id}`, cat: 'announce', title: an.title || 'Announcement', courseId: c?.id || cid || null, course: c?.shortName || c?.name || an.context_name || '', color: c?.color || null, when: U.parse(an.posted_at || an.created_at), note: an.author?.display_name ? `From ${an.author.display_name}` : 'Announcement', action: 'Read', url: an.html_url || (cid ? `/courses/${cid}/announcements/${an.id}` : '/') });
+      out.push({ id: `ann:${an.id}`, cat: 'announce', title: an.title || 'Announcement', courseId: c?.id || cid || null, course: label(c) || an.context_name || '', color: c?.color || null, when: U.parse(an.posted_at || an.created_at), note: an.author?.display_name ? `From ${an.author.display_name}` : 'Announcement', action: 'Read', url: an.html_url || (cid ? `/courses/${cid}/announcements/${an.id}` : '/') });
     }
     if (Array.isArray(snaps) && snaps.length) {
       const last = snaps[snaps.length - 1];
@@ -573,7 +597,7 @@
     }
     // by kind, then within a kind: due soon soonest first, everything else newest first (a comparator
     // that returned 0 across kinds was no order at all, and the engine was free to shuffle a kind's items)
-    const RANK = { overdue: 0, soon: 1, graded: 2, feedback: 3, announce: 4, system: 5 };
+    const RANK = { overdue: 0, soon: 1, graded: 2, feedback: 3, message: 4, discuss: 5, announce: 6, system: 7 };
     const dir = (n) => (n.cat === 'soon' ? 1 : -1);
     return out.sort((a, b) => ((RANK[a.cat] ?? 9) - (RANK[b.cat] ?? 9)) || dir(a) * ((a.when?.getTime() || 0) - (b.when?.getTime() || 0)));
   }
@@ -875,7 +899,7 @@
   }
   function assignmentGroups(id, { force = false, refresh = false, maxAge = 0 } = {}) {
     return C.cached(`agroups:${id}`, 10 * MIN, () =>
-      C.get(`/api/v1/courses/${id}/assignment_groups`, { params: { per_page: 50, include: ['assignments', 'submission'], exclude_assignment_submission_types: ['wiki_page'] }, all: true, maxPages: 3 }), { force, refresh, maxAge });
+      C.get(`/api/v1/courses/${id}/assignment_groups`, { params: { per_page: 50, include: ['assignments', 'submission', 'score_statistics'], exclude_assignment_submission_types: ['wiki_page'] }, all: true, maxPages: 3 }), { force, refresh, maxAge }); // (score_statistics: the class's mean, high and low on each marked assignment)
   }
   // ---- grades change behind the page's back ------------------------------------------------------
   // A grade lands in Canvas while this page keeps what it read: a tool (an LTI plugin marking work
@@ -983,9 +1007,10 @@
   /** Submitted ÷ total assignments for the progress bars. */
   async function progress(id) {
     try {
-      const list = await assignments(id);
-      const total = (list || []).length;
-      const done = (list || []).filter((a) => ['submitted', 'graded', 'pending_review'].includes(a.submission?.workflow_state) && (a.submission?.submitted_at || a.submission?.workflow_state === 'graded')).length;
+      // what can be handed in and is not excused: paper, in-class and ungraded items would keep the bar from ever filling
+      const list = (await assignments(id) || []).filter((a) => a.published !== false && !a.submission?.excused && !(a.submission_types || []).some((t) => ['none', 'on_paper', 'not_graded'].includes(t)));
+      const total = list.length;
+      const done = list.filter((a) => ['submitted', 'graded', 'pending_review'].includes(a.submission?.workflow_state) && (a.submission?.submitted_at || a.submission?.workflow_state === 'graded')).length;
       return { done, total };
     } catch {
       return { done: 0, total: 0 };
@@ -993,7 +1018,7 @@
   }
   function announcements(id, { force = false, refresh = false, kind = 'courses' } = {}) {
     return C.cached(`ann:${kind}:${id}`, 5 * MIN, () =>
-      C.get(`/api/v1/${kind}/${id}/discussion_topics`, { params: { only_announcements: true, per_page: 50 }, all: true, maxPages: 2 }), { force, refresh });
+      C.get(`/api/v1/${kind}/${id}/discussion_topics`, { params: { only_announcements: true, per_page: 50, include: ['sections'] }, all: true, maxPages: 2 }), { force, refresh }); // (sections: which sections a section-only post went to)
   }
   function discussions(id, { force = false, refresh = false, kind = 'courses' } = {}) {
     return C.cached(`disc:${kind}:${id}`, 5 * MIN, () =>
@@ -1193,7 +1218,7 @@
       for (const a of g.assignments) {
         if (a.published === false) continue;
         const s = a.submission || {};
-        const graded = s.workflow_state === 'graded' && s.score !== null && s.score !== undefined && !s.excused;
+        const graded = s.workflow_state === 'graded' && s.score !== null && s.score !== undefined && !s.excused && s.posted_at !== null; // (a mark the teacher holds back is not a grade yet)
         const key = String(a.id);
         const raw = whatIf?.[key];
         const hypNum = whatIfOn && raw !== undefined && raw !== '' ? Number(raw) : NaN;
@@ -1208,6 +1233,8 @@
         rows.push({
           id: key, name: a.name, group: g.name, groupId: g.id, possible: Number(a.points_possible) || 0, earned: graded ? Number(s.score) : null,
           counted: !a.omit_from_final_grade && !s.excused, due: a.due_at, submitted: s.submitted_at, badge: badgeText, gradingType: a.grading_type,
+          grade: graded && s.grade !== null && s.grade !== undefined && a.grading_type && a.grading_type !== 'points' ? String(s.grade) : null, // (a letter, pass/fail, percent: the grade as Canvas names it)
+          stats: graded && a.score_statistics ? a.score_statistics : null, // (the class's mean, high and low)
           hypothetical: hyp !== null && (!graded || hyp !== Number(s.score)), effective, url: a.html_url, graded,
         });
       }
@@ -1244,24 +1271,29 @@
       };
     });
     const scored = groupStats.filter((g) => g.graded);
+    const round1 = (x) => Math.round(x * 10) / 10; // (one decimal, as Canvas shows a total: 89.5 is not 90)
     let total = null;
     let note = '';
     if (weighted) {
       const denom = scored.reduce((s, g) => s + g.weight, 0);
-      total = denom > 0 ? Math.round(scored.reduce((s, g) => s + g.weight * g.pct, 0) / denom) : null;
+      total = denom > 0 ? round1(scored.reduce((s, g) => s + g.weight * g.pct, 0) / denom) : null;
       note = denom > 0 ? 'Weighted across the groups that have graded work.' : 'No weighted group has graded work yet.';
     } else {
       const earned = scored.reduce((s, g) => s + g.earned, 0);
       const possible = scored.reduce((s, g) => s + g.possible, 0);
-      total = possible > 0 ? Math.round((earned / possible) * 100) : null;
+      total = possible > 0 ? round1((earned / possible) * 100) : null;
       note = possible > 0 ? `${fmtPts(earned)} / ${fmtPts(possible)} pts, graded work only.` : 'Nothing graded yet.';
     }
     if (whatIfOn) note = `What-if ${note.charAt(0).toLowerCase()}${note.slice(1)}`;
-    const canvasTotal = courseInfo.score !== null && courseInfo.score !== undefined ? Math.round(Number(courseInfo.score)) : null;
+    const canvasTotal = courseInfo.score !== null && courseInfo.score !== undefined ? round1(Number(courseInfo.score)) : null;
     if (!whatIfOn && canvasTotal !== null) {
       total = canvasTotal;
       note = `As shown in Canvas${courseInfo.grade ? ` · ${courseInfo.grade}` : ''}. ${weighted ? 'Weighted across the groups that have graded work.' : 'Graded work only.'}`;
+    } else if (!whatIfOn && courseInfo.hideFinal) {
+      note = `${total === null ? 'Nothing graded yet. ' : ''}Canvas hides the total for this course${total === null ? '' : ': this one is worked out from the graded work'}.`;
     }
+    // what the term would end on today, with every ungraded piece counted as zero (Canvas's "final" score)
+    const finalScore = !whatIfOn && courseInfo.finalScore !== null && courseInfo.finalScore !== undefined && !courseInfo.hideFinal ? round1(Number(courseInfo.finalScore)) : null;
     const gray = dark ? ['#8e8e93', '#7c7c82', '#6b6b71', '#5a5a60', '#96969c'] : ['#8e8e93', '#a0a0a6', '#b0b0b6', '#78787e', '#c0c0c6'];
     const colorOf = (i, color) => (whatIfOn ? gray[Math.min(i, gray.length - 1)] : color);
     // rings: outer = total, then one per group with graded work (five at most; the rest are legend only)
@@ -1306,7 +1338,7 @@
     return {
       rows, total, weighted, rings, legend, ungraded, weightBar, weightNote,
       stipples: rings.filter((r) => r.zero).map((r) => ({ id: r.patternId, color: r.color })),
-      center: { label: whatIfOn ? 'What-if total' : 'Total', value: total === null ? '—' : `${total}%`, color: whatIfOn ? gray[0] : '#34c759', note },
+      center: { label: whatIfOn ? 'What-if total' : 'Total', value: total === null ? '—' : `${fmtPts(total)}%`, color: whatIfOn ? gray[0] : '#34c759', note, final: finalScore !== null && (total === null || finalScore !== total) ? `Final so far ${fmtPts(finalScore)}%${courseInfo.finalGrade ? ` · ${courseInfo.finalGrade}` : ''} — ungraded work counted as zero` : '' },
       weightSum: bearing.reduce((s, g) => s + g.weight, 0),
       weights: groups.map((g) => ({ name: g.name, pct: weighted ? `${g.weight}%` : '—', zero: weighted && g.weight === 0 })),
     };
@@ -1314,10 +1346,56 @@
   function fmtPts(n) {
     return Number.isInteger(n) ? String(n) : Number(n).toFixed(1).replace(/\.0$/, '');
   }
+  /** Where a planner item stands (a To Do row, the Dashboard's list, the phone's), in the same words
+   *  workStatus() uses for an assignment: [{ word, kind }] — the state first (Excused, Graded,
+   *  Submitted, Late, Missing), then what is new (Feedback, Redo, New). Nothing for plain open work
+   *  that is not yet due: the row's date says that. */
+  function workFlags(it) {
+    const out = [];
+    if (!it || it.custom) return out;
+    if (it.excused) out.push({ word: 'Excused', kind: 'muted' });
+    else if (it.graded) out.push({ word: 'Graded', kind: 'good' });
+    else if (it.submitted) out.push({ word: it.late ? 'Submitted late' : 'Submitted', kind: it.late ? 'warn' : 'good' });
+    else if (it.missing) out.push({ word: 'Missing', kind: 'bad' });
+    else if (it.late) out.push({ word: 'Late', kind: 'warn' });
+    else if (it.isDue && it.date && it.date < now()) out.push({ word: 'Missing', kind: 'bad' });
+    if (it.redo) out.push({ word: 'Redo asked', kind: 'warn' });
+    else if (it.feedback) out.push({ word: 'Feedback', kind: 'info' });
+    if (it.newActivity && !it.feedback) out.push({ word: 'New', kind: 'info' });
+    return out;
+  }
+  /** Where a piece of work stands, in the words every screen and the search hub use, from its
+   *  assignment and its submission: { word, kind, graded } — kind is '' | 'good' | 'warn' | 'bad' |
+   *  'muted' for a badge's colour. A score counts only once the teacher has posted it (posted_at
+   *  null means held back, as Canvas's own pages read it); a letter, pass/fail or percent grade is
+   *  the grade itself rather than points; a lock window says Opens or Closed; past due with nothing
+   *  in is Missing, as Canvas's own lists say. */
+  function workStatus(a, s = a?.submission) {
+    const sub = s && typeof s === 'object' ? s : {};
+    const now = Date.now();
+    const scored = sub.workflow_state === 'graded' && sub.score !== null && sub.score !== undefined && sub.posted_at !== null;
+    const types = a?.submission_types || [];
+    const gradeText = () => {
+      const t = a?.grading_type;
+      if (sub.grade !== null && sub.grade !== undefined && t && t !== 'points') return String(sub.grade); // letter, pass/fail, complete/incomplete, GPA scale, percent
+      return `${fmtPts(sub.score)}${a?.points_possible !== null && a?.points_possible !== undefined ? `/${fmtPts(a.points_possible)}` : ''}`;
+    };
+    if (sub.excused) return { word: 'Excused', kind: 'muted' };
+    if (scored) return { word: `${gradeText()}${sub.late ? ' · late' : ''}`, kind: 'good', graded: true, late: !!sub.late };
+    if (sub.submitted_at || sub.workflow_state === 'submitted' || sub.workflow_state === 'pending_review') return sub.late ? { word: 'Submitted late', kind: 'warn' } : { word: 'Submitted', kind: 'good' };
+    if (sub.missing) return { word: 'Missing', kind: 'bad' };
+    if (a?.unlock_at && U.parse(a.unlock_at) > now) return { word: `Opens ${U.whenShort(U.parse(a.unlock_at))}`, kind: 'muted' };
+    if (a?.lock_at && U.parse(a.lock_at) < now) return { word: 'Closed', kind: 'muted' };
+    if (types.includes('not_graded')) return { word: 'Not graded', kind: 'muted' };
+    if (types.includes('on_paper')) return { word: 'On paper', kind: 'muted' };
+    if (types.includes('none')) return { word: 'Nothing to hand in', kind: 'muted' };
+    if (a?.due_at && U.parse(a.due_at) < now) return { word: 'Missing', kind: 'bad' };
+    return { word: 'Not submitted', kind: '' };
+  }
 
   BCV.store = {
     env, pref, setPref, mergePref, me, account, colors, courses, favorites, cards, setFavorite, setNickname, currentTerm, dashboardView, setDashboardView, freshness, invalidateGrades,
-    planner, classify, todo, todoWindow, setComplete, dismiss, restore, invalidatePlanner, plannerOverrides, createNote, deleteNote, activity, activitySummary, unreadCount, groups, group,
+    planner, classify, todo, todoWindow, setComplete, dismiss, restore, invalidatePlanner, plannerOverrides, createNote, deleteNote, activity, activitySummary, unreadCount, groups, group, workStatus, workFlags,
     announcementsFeed, streamSeen, markStreamSeen, setColor, history, helpLinks,
     calendarContexts, ownContexts, selectedContexts, setSelectedContexts, calendarEvents, plannerRange, appointmentGroups, reserveAppointment, cancelReservation,
     conversations, conversation, markRead, setStarred, replyTo, compose, searchRecipients, invalidateInbox,

@@ -248,6 +248,7 @@ try {
   console.log('account sheet');
   await page.click('.bcv-ph-avatar');
   await sheet();
+  check((await texts('.bcv-ph-me__name'))[0] === 'Sam Student (they/them)' && (await texts('.bcv-ph-me__sub'))[0] === 'sstudent@ucmerced.edu', `the sheet's head carries the pronouns and the e-mail Canvas holds: ${(await texts('.bcv-ph-me__name'))[0]} · ${(await texts('.bcv-ph-me__sub'))[0]}`);
   const acct = await texts('.bcv-ph-srow__label');
   check(acct.join(',') === 'Inbox,Groups,Tools,History,My Materials,Help,Dark appearance,Settings,Guided setup,What’s new,Profile,All Canvas settings,Log out', `account sheet rows, with Tools and the school's own nav entries: ${acct.join(', ')} (no Sign out outside the app)`);
   check((await texts('.bcv-ph-srow__note'))[0] === 'No unread messages' || /unread message/.test((await texts('.bcv-ph-srow__note'))[0]), `Inbox row carries the unread count: ${(await texts('.bcv-ph-srow__note'))[0]}`);
@@ -315,7 +316,8 @@ try {
   check(/^\d+%$/.test((await texts('.bcv-ph-progress__pct'))[0]) && /\d+ of \d+ done/.test((await texts('.bcv-ph-progress__note'))[0]), `progress card: ${(await texts('.bcv-ph-progress__line'))[0]}`);
   check((await texts('.bcv-seg__btn, .bcv-seg button')).join(',') === 'Date,Priority,Course', 'group switch: Date / Priority / Course');
   check((await texts('.bcv-ph-switchrow__t'))[0] === 'Completed hidden' && (await texts('.bcv-ph-todo__add'))[0] === 'Add your own task', 'the completed switch and the "Add your own task" row above the list');
-  check((await texts('.bcv-ph-ghead__t')).some((t) => /^(Today|Tomorrow|Next 7 days|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)$/.test(t)) && (await texts('.bcv-ph-row__time')).length > 0, `grouped by date with times: ${(await texts('.bcv-ph-ghead__t')).join(', ')}`);
+  check((await texts('.bcv-ph-ghead__t'))[0] === 'Overdue' && (await texts('.bcv-ph-ghead__t')).some((t) => /^(Today|Tomorrow|Next 7 days|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)$/.test(t)) && (await texts('.bcv-ph-row__time')).length > 0, `grouped by date with times, past due with nothing in first: ${(await texts('.bcv-ph-ghead__t')).join(', ')}`);
+  check((await page.locator('.bcv-ph-trow', { hasText: 'W2 HW' }).first().locator('.bcv-status').allTextContents()).join() === 'Missing', 'an overdue row says Missing, the same word as the desktop');
   await shot('03-todo');
   // a tap opens the task sheet; a priority chosen there shows on the row
   const taskId = await page.$eval('.bcv-ph-trow', (e) => e.dataset.item);
@@ -338,6 +340,8 @@ try {
   await shot('03c-todo-swipe');
   await page.click('.bcv-ph-swipe.is-open .bcv-ph-swipe__act:last-child');
   check(await eventually(async () => !(await page.$(`.bcv-ph-trow[data-item="${taskId}"]`))), 'Done marks the task complete and it leaves the open list');
+  const phStill = await page.evaluate(() => ({ running: document.getAnimations().filter((a) => a.animationName === 'bcv-fade-up' && a.playState === 'running').length, entering: document.querySelectorAll('.bcv-ph-body .bcv-enter').length, rows: document.querySelectorAll('.bcv-ph-trow').length }));
+  check(phStill.running === 0 && phStill.entering === 0 && phStill.rows > 0, `the list is drawn again in place after Done — no entrance runs, nothing fades back in (${JSON.stringify(phStill)})`);
   await page.click('.bcv-ph-switchrow .bcv-switch');
   check(await eventually(async () => (await texts('.bcv-ph-switchrow__t'))[0] === 'Showing completed' && (await page.$eval(`.bcv-ph-trow[data-item="${taskId}"]`, (e) => e.classList.contains('is-done')).catch(() => false))), 'Showing completed brings it back, done');
   await page.click(`.bcv-ph-trow[data-item="${taskId}"] .bcv-ph-circle`);
@@ -427,6 +431,15 @@ try {
   if (dotted) {
     await page.evaluate((el) => el.closest('.bcv-ph-day').click(), dotted);
     check(await eventually(async () => (await page.$$('.bcv-ph-ev')).length > 0), 'tapping a dotted day lists its items');
+    check((await texts('.bcv-ph-ev__sub')).every((t) => /· (Assignment|Quiz|Discussion|Event|Appointment)( ·|$)/.test(t)), `every row says its course and what it is, then the points or the place: ${(await texts('.bcv-ph-ev__sub')).slice(0, 3).join(' | ')}`);
+  }
+  // yesterday's W2 HW: past its due date with nothing in — not struck through as if done, but marked missing
+  const yday = new Date(); yday.setDate(yday.getDate() - 1);
+  if (yday.getMonth() === new Date().getMonth()) {
+    await page.click(`.bcv-ph-day:not(.is-off)[aria-label$=" ${yday.getDate()}"]`);
+    await eventually(async () => (await page.locator('.bcv-ph-ev', { hasText: 'W2 HW' }).count()) === 1);
+    const w2 = page.locator('.bcv-ph-ev', { hasText: 'W2 HW' });
+    check(!(await w2.evaluate((e) => e.classList.contains('is-done'))) && (await w2.locator('.bcv-status').allTextContents()).join() === 'Missing' && /PHYS 008 .* · Assignment · 15 pts$/.test((await w2.locator('.bcv-ph-ev__sub').textContent())), `missing work stays legible on the calendar and says Missing: ${(await w2.locator('.bcv-ph-ev__sub').textContent())}`);
   }
   await page.click('.bcv-ph-linkrow');
   await sheet();
@@ -435,6 +448,10 @@ try {
   await closeSheet();
   await page.click('.bcv-seg button:nth-child(3)');
   check(await eventually(async () => (await texts('.bcv-ph-h1'))[0] === 'Upcoming' && (await page.$$('.bcv-ph-ev')).length > 0), 'List view: three weeks of items by day');
+  // an all-day event lands on the day Canvas names for it (all_day_date), not on the day its maker's midnight falls in this zone
+  const plus4 = new Date(); plus4.setDate(plus4.getDate() + 4);
+  const readingDay = await page.$$eval('.bcv-ph-body > div', (blocks) => { const b = blocks.find((x) => [...x.querySelectorAll('.bcv-ph-ev')].some((e) => /Reading day/.test(e.textContent))); return b ? { head: b.querySelector('.bcv-ph-ghead__t')?.textContent, time: [...b.querySelectorAll('.bcv-ph-ev')].find((e) => /Reading day/.test(e.textContent))?.querySelector('.bcv-ph-ev__time')?.textContent } : null; });
+  check(readingDay?.head === `${['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][plus4.getDay()]} ${plus4.getDate()}` && readingDay?.time === 'All day', `an all-day event made in another time zone sits on the day it names, marked All day: ${JSON.stringify(readingDay)}`);
   await shot('05c-calendar-list');
   await page.click('.bcv-seg button:nth-child(2)');
   await eventually(async () => (await page.$$('.bcv-ph-cal__grid')).length === 1);

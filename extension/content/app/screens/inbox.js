@@ -8,6 +8,16 @@
   const store = BCV.store;
 
   const SCOPES = [['inbox', 'Inbox'], ['unread', 'Unread'], ['starred', 'Starred'], ['sent', 'Sent'], ['archived', 'Archived']];
+  const CLIP = 'M21.4 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48'; // a paperclip: the conversation carries a file or a recording
+  /** A recording left in a message (Canvas's media comment): the player, and the file itself for another one. */
+  function mediaBlock(mc) {
+    if (!mc || !mc.url) return null;
+    const video = /^video/.test(mc.media_type || mc.content_type || '');
+    return U.el('bcv-reader__media', [
+      h(video ? 'video' : 'audio', { class: 'bcv-reader__player', controls: true, preload: 'none', src: mc.url }),
+      h('a', { href: mc.url, target: '_blank', rel: 'noopener', class: 'bcv-chip', text: mc.display_name || (video ? 'Video comment' : 'Audio comment') }),
+    ]);
+  }
 
   async function render(ctx) {
     const { app } = ctx;
@@ -16,7 +26,10 @@
     let courseFilter = null; // context code
     let query = '';
     let selectedId = ctx.route.params.get('id');
-    let mode = selectedId ? 'read' : 'empty'; // empty | read | compose
+    // "Message" on a person (the search hub, a People row): the compose form, with them in To
+    const toId = ctx.route.params.get('to');
+    const toName = ctx.route.params.get('to_name') || '';
+    let mode = toId ? 'compose' : selectedId ? 'read' : 'empty'; // empty | read | compose
     const coursePill = U.pill('All Courses', (e) => courseMenu(e.currentTarget));
     const scopePill = U.pill('Inbox', (e) => scopeMenu(e.currentTarget));
     const listCol = U.el('bcv-inbox__list');
@@ -34,6 +47,17 @@
     listCol.append(U.loading());
     const courses = await store.courses().catch(() => []);
     const courseMap = new Map(courses.map((c) => [c.id, c]));
+    const dark = app.isDark();
+    const courseOfCode = (code) => (code && /^course_/.test(code) ? courseMap.get(code.slice(7)) : null) || null;
+    /** The course a conversation belongs to, as a pill in its colour (Canvas's context_name when the course is not one of yours). */
+    const courseTag = (c) => {
+      const course = courseOfCode(c.context_code);
+      const name = course?.name || c.context_name;
+      if (!name) return null;
+      const pal = U.palette(course?.color || '#8e8e93', dark);
+      return h('span', { class: 'bcv-msg__course bcv-ellip', style: { background: pal.tint, color: pal.text }, text: name });
+    };
+    const hasFiles = (c) => (c.properties || []).some((p) => p === 'attachments' || p === 'media_objects');
     let convs = null;
 
     function courseMenu(anchor) {
@@ -96,12 +120,20 @@
           U.toast(`Could not update: ${err.message}`, { error: true });
         }
       } }, c.starred ? U.svg(IC.star, { size: 16, fill: '#ff9500' }) : U.svg(IC.star, { size: 16, stroke: 'var(--bcv-ink3)', width: 1.7, cap: 'butt' }));
+      // who, how many messages, a paperclip when one carries a file or a recording, and when the
+      // last one came (the day is the group's heading: a time today, a weekday this week, else the date)
       return U.row([
         U.dot(unread ? '#0a84ff' : 'transparent', 'bcv-dot--9 bcv-msg__dot'),
         U.el('bcv-row__body', [
-          U.el('bcv-row__head', [U.text('bcv-msg__from bcv-ellip', names(c) || 'Conversation', 'span'), U.text('bcv-row__when', U.fmtDateComma(c.last_message_at), 'span')]),
+          U.el('bcv-row__head', [
+            U.text('bcv-msg__from bcv-ellip', names(c) || 'Conversation', 'span'),
+            c.message_count > 1 ? h('span', { class: 'bcv-msg__count', title: U.plural(c.message_count, 'message'), text: String(c.message_count) }) : null,
+            hasFiles(c) ? h('span', { class: 'bcv-msg__clip', title: 'Has an attachment' }, U.svg(CLIP, { size: 12, stroke: 'var(--bcv-ink3)', width: 2 })) : null,
+            U.text('bcv-row__when', U.whenShort(c.last_message_at), 'span'),
+          ]),
           U.text('bcv-msg__subject bcv-pretty', c.subject || '(no subject)'),
           U.text('bcv-msg__preview bcv-pretty', (c.last_message || '').replace(/\s+/g, ' ').slice(0, 140)),
+          courseTag(c),
         ]),
         starBtn,
       ], { mod: `bcv-row--p15 bcv-row--top ${String(c.id) === String(selectedId) ? 'is-selected' : ''}`, onClick: () => open(c) });
@@ -166,12 +198,21 @@
         ]),
         U.el('bcv-reader__msgs', (conv.messages || []).map((m) => {
           const author = pmap.get(String(m.author_id));
+          const nameOf = (id) => pmap.get(String(id))?.name || 'Unknown';
           return U.el('bcv-reader__msg', [
             U.avatar(author?.avatar_url, author?.name, 38),
             h('div', { style: { flex: '1', minWidth: '0' } }, [
               U.el('bcv-row__head', [U.text('bcv-reader__author', author?.name || 'Unknown', 'span'), U.text('bcv-reader__date', U.fmtAtUpper(m.created_at), 'span')]),
-              U.text('bcv-reader__body', m.body || ''),
+              m.body ? U.text('bcv-reader__body', m.body) : null,
+              mediaBlock(m.media_comment), // a recording left instead of (or as well as) words
               ...(m.attachments || []).map((att) => h('a', { href: att.url, target: '_blank', rel: 'noopener', class: 'bcv-chip', style: { marginTop: '8px' }, text: att.display_name || att.filename })),
+              // a message forwarded along with this one: quoted under it, with its own author and time
+              ...(m.forwarded_messages || []).map((f) => U.el('bcv-reader__fwd', [
+                U.el('bcv-row__head', [U.text('bcv-reader__author', `Forwarded · ${nameOf(f.author_id)}`, 'span'), U.text('bcv-reader__date', U.fmtAtUpper(f.created_at), 'span')]),
+                f.body ? U.text('bcv-reader__body', f.body) : null,
+                mediaBlock(f.media_comment),
+                ...(f.attachments || []).map((att) => h('a', { href: att.url, target: '_blank', rel: 'noopener', class: 'bcv-chip', style: { marginTop: '8px' }, text: att.display_name || att.filename })),
+              ])),
             ]),
           ]);
         })),
@@ -180,7 +221,7 @@
     }
 
     function composeForm() {
-      let recipients = [];
+      let recipients = toId ? [{ id: String(toId), name: toName || 'Recipient' }] : [];
       let contextCode = courseFilter;
       const chipsWrap = U.el('bcv-recips');
       const input = h('input', { type: 'text', placeholder: 'Type a name…', 'aria-label': 'To' });
@@ -205,13 +246,16 @@
         timer = setTimeout(async () => {
           const found = await store.searchRecipients(q, contextCode).catch(() => []);
           if (input.value.trim() !== q) return; // (typed on since: a shorter search's answer is not the list)
+          // a person's row says which of your courses you share (Canvas's common_courses); a course
+          // or a group's, how many people it reaches
+          const shared = (r) => Object.keys(r.common_courses || {}).map((id) => courseMap.get(String(id))?.name).filter(Boolean).join(', ');
           results.replaceChildren(...(found || []).slice(0, 12).map((r) => h('button', { type: 'button', class: 'bcv-menu__item', onclick: () => {
             if (!recipients.some((x) => x.id === String(r.id))) recipients.push({ id: String(r.id), name: r.name });
             input.value = '';
             results.style.display = 'none';
             drawChips();
             input.focus();
-          } }, [h('span', { class: 'bcv-ellip', text: r.name }), r.user_count ? U.text('bcv-menu__sub', `${r.user_count} people`, 'span') : null])));
+          } }, [h('span', { class: 'bcv-ellip', text: r.name }), r.user_count ? U.text('bcv-menu__sub', `${r.user_count} people`, 'span') : shared(r) ? U.text('bcv-menu__sub bcv-ellip', shared(r), 'span') : null])));
           results.style.display = found?.length ? '' : 'none';
         }, 250);
       });

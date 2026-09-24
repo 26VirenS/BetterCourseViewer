@@ -72,6 +72,7 @@ html[data-bcv-ext-theme="dark"] .bcv-graph__frame { filter: invert(1) hue-rotate
 /* screens rise in; sheets grow over a blurring scrim; popovers pop */
 .bcv-main > .bcv-screen, .bcv-main > .bcv-qz, .bcv-main > .bcv-sb { animation: bcv-fade-up .34s cubic-bezier(.32,.72,0,1) both; }
 .bcv-main > .bcv-screen--skel { animation: none; } /* the placeholder does not rise; the real screen does when it lands */
+.bcv-main > .bcv-screen--still { animation: none; } /* a screen drawn again in place (ui.still): it is already here, so it does not arrive */
 /* staggered entry: major blocks and list items follow the screen root, index × step, capped at 420ms (U.enter).
    The fill is backwards only: the end state is the element's own, so a hover lift can move it once it has landed. */
 .bcv-enter { animation: bcv-fade-up var(--bcv-dur, 240ms) cubic-bezier(.32,.72,0,1) var(--bcv-delay, 0ms) backwards; }
@@ -451,6 +452,15 @@ html[data-bcv-theme="dark"] .bcv-badge--orange { color: #ffb44d; }
 .bcv-row__sub--3 { margin-top: 3px; line-height: 1.3; }
 .bcv-row__sub--115 { font-size: 11.5px; }
 .bcv-row__over { font: 400 11.5px/1.3 var(--bcv-font); color: var(--bcv-ink3); letter-spacing: .01em; }
+/* where the work stands, as a small badge beside the course line (Dashboard list) or in the row (To Do, the phone): store.workFlags / store.workStatus through ui.statusBadge */
+.bcv-row__over--flags { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.bcv-status { flex: none; }
+/* the course header's line of facts: teacher · code · section · term dates */
+.bcv-course__detail { margin: 2px 0 0 34px; font: 400 13px/1.4 var(--bcv-font); color: var(--bcv-ink2); }
+/* the class's numbers under the mark on an assignment page; a voice or video comment in a feedback thread */
+.bcv-detail__gradestats { display: block; font: 400 11.5px/1.3 var(--bcv-font); color: var(--bcv-ink3); }
+.bcv-fb__media { display: block; width: min(320px, 100%); margin: 6px 0 4px; }
+.bcv-fb__medialink { font: 500 12px/1.4 var(--bcv-font); color: var(--bcv-blue); text-decoration: none; }
 .bcv-row__preview { margin-top: 6px; font: 400 13.5px/1.45 var(--bcv-font); color: var(--bcv-ink2); }
 .bcv-row__preview--13 { margin-top: 5px; font-size: 13px; line-height: 1.45; }
 .bcv-row__when { flex: none; font: 400 12px/1.3 var(--bcv-font); color: var(--bcv-ink3); }
@@ -706,6 +716,8 @@ html[data-bcv-theme="dark"] .bcv-badge--orange { color: #ffb44d; }
 .bcv-wev { border-radius: 7px; padding: 3px 6px; cursor: pointer; min-width: 0; border: 0; text-align: left; width: 100%; }
 .bcv-wev__time { font: 600 9.5px/1.2 var(--bcv-font); }
 .bcv-wev__title { margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 500 10.5px/1.25 var(--bcv-font); }
+.bcv-wev__facts { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 400 9.5px/1.25 var(--bcv-font); opacity: .78; }
+.bcv-agenda__title + .bcv-status { flex: none; }
 .bcv-agenda { flex: 1 1 560px; min-width: 0; display: flex; flex-direction: column; gap: 20px; }
 .bcv-agenda__due { flex: none; font: 500 12.5px/1.2 var(--bcv-font); color: var(--bcv-ink3); min-width: 104px; }
 .bcv-agenda__title { flex: 1; min-width: 0; font: 600 14.5px/1.35 var(--bcv-font); letter-spacing: -.01em; }
@@ -758,6 +770,12 @@ html[data-bcv-theme="dark"] .bcv-cal__notice--warn { color: #ffb44d; }
 .bcv-msg__subject { margin-top: 3px; font: 500 13.5px/1.4 var(--bcv-font); }
 .bcv-msg__preview { margin-top: 2px; font: 400 13px/1.4 var(--bcv-font); color: var(--bcv-ink3); }
 .bcv-msg__dot { margin-top: 6px; }
+.bcv-msg__count { flex: none; min-width: 18px; padding: 0 5px; border-radius: 9px; background: var(--bcv-fill); color: var(--bcv-ink2); font: 600 11px/18px var(--bcv-font); text-align: center; }
+.bcv-msg__clip { flex: none; display: inline-flex; align-items: center; }
+.bcv-msg__course { display: inline-block; max-width: 100%; margin-top: 6px; padding: 2px 8px; border-radius: 8px; font: 600 11px/1.5 var(--bcv-font); }
+.bcv-reader__media { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+.bcv-reader__player { width: min(320px, 100%); }
+.bcv-reader__fwd { margin-top: 10px; padding: 8px 0 8px 12px; border-left: 3px solid var(--bcv-sep); }
 .bcv-reader { display: flex; flex-direction: column; }
 .bcv-reader__head { padding: 20px 22px 14px; border-bottom: 1px solid var(--bcv-sep); display: flex; gap: 12px; align-items: flex-start; }
 .bcv-reader__subject { font: 700 19px/1.25 var(--bcv-display); letter-spacing: -.02em; }
@@ -2089,7 +2107,10 @@ html[data-bcv-theme="dark"] .bcv-ph-day.is-off .bcv-ph-day__n { color: #48484a; 
 .bcv-ph-ev { display: flex; align-items: center; gap: 12px; padding: 12px 15px; min-height: 52px; border-top: 1px solid var(--bcv-sep); color: inherit !important; text-decoration: none; }
 .bcv-ph-card--list > .bcv-ph-ev:first-child { border-top: 0; }
 .bcv-ph-ev__bar { flex: none; width: 4px; height: 30px; border-radius: 2px; }
-.bcv-ph-ev__title { flex: 1; min-width: 0; font: 600 14px/1.3 var(--bcv-font); color: var(--bcv-ink); }
+.bcv-ph-ev__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.bcv-ph-ev__title { display: block; min-width: 0; font: 600 14px/1.3 var(--bcv-font); color: var(--bcv-ink); }
+.bcv-ph-ev__sub { display: block; min-width: 0; font: 400 12px/1.3 var(--bcv-font); color: var(--bcv-ink3); }
+.bcv-ph-ev .bcv-status { flex: none; }
 .bcv-ph-ev.is-done .bcv-ph-ev__title { color: var(--bcv-ink3); text-decoration: line-through; font-weight: 500; }
 .bcv-ph-ev__time { flex: none; font: 400 11.5px/1.2 var(--bcv-font); color: var(--bcv-ink3); }
 .bcv-ph-linkrow { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 50px; padding: 13px 15px; border: 0; border-radius: 18px; background: var(--bcv-card); box-shadow: var(--bcv-shadow); cursor: pointer; text-align: left; font: 500 14.5px/1.3 var(--bcv-font); color: var(--bcv-ink); }

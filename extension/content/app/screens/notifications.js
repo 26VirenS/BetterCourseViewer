@@ -10,12 +10,14 @@
   const IC = BCV.IC;
   const store = BCV.store;
 
-  const ORDER = ['overdue', 'soon', 'graded', 'feedback', 'announce', 'system'];
+  const ORDER = ['overdue', 'soon', 'graded', 'feedback', 'message', 'discuss', 'announce', 'system'];
   const META = (dark) => ({
     overdue: { label: 'Overdue', color: '#ff453a', ink: dark ? '#ff8098' : '#c01d43', tint: 'rgba(255,69,58,.16)', icon: IC.clock },
     soon: { label: 'Due soon', color: '#ff9500', ink: dark ? '#ffb44d' : '#8a5200', tint: 'rgba(255,149,0,.18)', icon: IC.bolt },
     graded: { label: 'Graded', color: '#34c759', ink: dark ? '#5ddb7d' : '#1a6b30', tint: 'rgba(52,199,89,.16)', icon: IC.chart },
     feedback: { label: 'Feedback', color: '#0a84ff', ink: dark ? '#7ab8ff' : '#0a5dc2', tint: 'rgba(10,132,255,.14)', icon: IC.disc },
+    message: { label: 'Messages', color: '#30b0c7', ink: dark ? '#7dd3e6' : '#0e6f80', tint: 'rgba(48,176,199,.16)', icon: IC.mail },
+    discuss: { label: 'Discussions', color: '#af52de', ink: dark ? '#d29bf0' : '#6b2f8c', tint: 'rgba(175,82,222,.16)', icon: IC.people },
     announce: { label: 'Announcements', color: '#5856d6', ink: dark ? '#a9a7f5' : '#3f3ea8', tint: 'rgba(88,86,214,.16)', icon: IC.bell },
     system: { label: 'System', color: '#8e8e93', ink: dark ? '#c7c7cc' : '#3c3c43', tint: 'rgba(118,118,128,.18)', icon: IC.shield },
   });

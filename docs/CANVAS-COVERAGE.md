@@ -10,21 +10,22 @@ endpoints the extension calls, the screens it draws, the fields it shows). Three
 
 ## 0. The short list, by how often a student meets it
 
-1. **Grades, per row** — the instructor's comment, the rubric, the class mean/high/low, the late
-   penalty, final vs current score. Missing, and most of the data is already fetched
-   (`score_statistics`, `computed_final_score`, `submission_comments`).
+1. **Grades, per row** — the rubric and the instructor's comment itself. Missing. (Since 2.95.0 the
+   rows carry the class mean/high/low, the comment count, the late penalty, the letter grade, and
+   the total says final vs current; a score the teacher has not posted is "Not graded" until it is.)
 2. **Global announcements** — what the school posts to everyone (outages, deadlines). Missing:
    `account_notifications` is never called.
-3. **To Do row flags** — Missing / Late labels, "new activity" and "feedback" marks. Missing; the
-   planner already returns `new_activity` and `has_feedback`.
-4. **Inbox actions** — archive, delete, mark unread, forward, attachments. Missing.
-5. **Discussions** — like, subscribe, edit or delete your own post, attach a file. Missing.
-6. **Quizzes list** — your score and status on each row. Missing (the quiz page has it).
-7. **Modules** — prerequisites, sequential locks, the requirement type per item ("view", "submit",
-   "score ≥ x"). Missing; `completion_requirement` is already fetched.
-8. **Calendar** — create or edit a personal event, planner notes on the grid. Missing.
-9. **Account** — your email and pronouns in the menu (`users/self/profile`). Missing.
-10. **Files** — upload, sort, the locked/hidden state. Missing.
+3. **Inbox actions** — archive, delete, mark unread, forward, attach a file to a reply. Missing.
+   (Reading is complete: attachments, voice and video notes, and forwarded messages are drawn.)
+4. **Discussions** — like, subscribe, edit or delete your own post, attach a file. Missing.
+5. **Calendar** — create or edit a personal event, planner notes on the grid. Missing.
+6. **Files** — upload, sort. Missing (the locked/hidden state and the uploader are drawn).
+7. **Grading periods** — a term split into periods, with a score per period. Missing.
+8. **Peer reviews** — the ones assigned to you. Missing.
+
+Drawn since 2.95.0, and so off this list: To Do row flags (Missing / Late / Excused / Feedback / New),
+the quiz list's score and status, the modules' prerequisites, sequential locks and per-item
+requirement, the account menu's e-mail and pronouns, and every row's status words.
 
 ## 1. Coverage by area
 
@@ -32,24 +33,24 @@ endpoints the extension calls, the screens it draws, the fields it shows). Three
 
 | Canvas | Simpl | Notes |
 |---|---|---|
-| Dashboard: card view, list (planner) view, recent activity | **Drawn** | Six counters, weekly workload, cards/list/activity, Search everything |
-| Dashboard: card reordering, nickname on the card, unread counts on the card's quick-link icons | Missing | Nicknames can be set (All Courses, setup, Settings, phone); the card does not show them |
+| Dashboard: card view, list (planner) view, recent activity | **Drawn** | Six counters, weekly workload, cards/list/activity, Search everything; the list keeps to the favourites like the cards; activity rows read the posted score, the comment, posted_at |
+| Dashboard: card reordering, unread counts on the card's quick-link icons | Missing | Cards carry the nickname, code · term, the teacher and the grade chip |
 | Global announcements (account notifications) | Missing | `accounts/:id/account_notifications` never called |
 | Recent Feedback (dashboard sidebar) | Missing | Notifications derives "Graded"/"Feedback" from the activity stream instead |
 | Coming Up (dashboard sidebar) | Partial | Due today / this week / tomorrow counters cover it |
 | All Courses (favourites, terms, past/future enrollments) | **Drawn** | |
 | Groups list | **Drawn** | |
-| Calendar: week/month/agenda, course/group/personal calendars | **Drawn** | Ten-calendar limit enforced |
+| Calendar: week/month/agenda, course/group/personal calendars | **Drawn** | Ten-calendar limit enforced; handed-in work struck through, missing work marked, points and place on rows |
 | Calendar: Scheduler / Find appointment (reserve, cancel) | **Drawn** | Group sign-ups open Canvas's page |
 | Calendar: create/edit personal events, planner notes on the grid, undated list, iCal feed, `?event_id=` deep links | Missing | |
-| To Do (planner) with personal tasks | **Drawn** | Window starts today: past-due items only on the Dashboard's Overdue card |
-| To Do: edit a task, task notes, planner "new activity"/"feedback" flags, Missing/Late labels on rows | Missing | `has_feedback`, `new_activity` never read; no PUT for planner notes |
-| Inbox: inbox/unread/starred/sent/archived, course filter, reader, reply, compose with recipient search | **Drawn** | First 50 conversations only (no paging) |
-| Inbox: archive/unarchive, delete, mark unread, forward, attachments and media on compose/reply, media comments in the reader, bulk actions, address book browsing | Missing | |
-| Notifications (Canvas has no page; Simpl's own feed) | **Drawn** | Overdue, Due soon, Graded, Feedback, Announcements, System |
+| To Do (planner) with personal tasks | **Drawn** | An Overdue group two weeks back, then today onward; rows say Missing / Late / Excused / Feedback / New (planner `submissions` flags, `new_activity`) |
+| To Do: edit a task, task notes | Missing | No PUT for planner notes |
+| Inbox: inbox/unread/starred/sent/archived, course filter, reader, reply, compose with recipient search | **Drawn** | Rows: course, message count, attachment mark, time; reader: attachments, voice/video notes, forwarded messages; recipients say the course you share. First 50 conversations only (no paging) |
+| Inbox: archive/unarchive, delete, mark unread, forward, attachments and media on compose/reply, bulk actions, address book browsing | Missing | |
+| Notifications (Canvas has no page; Simpl's own feed) | **Drawn** | Overdue (two weeks back), Due soon, Graded (posted only), Feedback, Messages, Discussions, Announcements, System (with its category) |
 | History | **Drawn** (sheet) | |
 | Help menu | **Drawn** (sheet) | Report a problem is Canvas's form |
-| Account: profile (bio, links, pronouns), settings (language, time zone, feature options, tokens, registered services), notification preferences | Canvas's page | Links from the account menu; the menu's second line meant to show your email never does (the profile is not fetched) |
+| Account: profile (bio, links), settings (language, time zone, feature options, tokens, registered services), notification preferences | Canvas's page | Links from the account menu; the row and the menu show your pronouns and e-mail (`users/self/profile`) |
 | Account: personal files (My Files, quota), ePortfolios, QR for mobile login, Shared content, Observing | Missing | Canvas's left nav is hidden on those pages, and no Simpl link exists |
 | Search everything | **Drawn** | Courses, assignments, announcements, pages, discussions, files, people, Wikipedia; "/" commands (submit, download, convert, open a tool, todo…), a row's actions, sums, ⌘K from any screen — Canvas has no equivalent |
 
@@ -59,24 +60,24 @@ endpoints the extension calls, the screens it draws, the fields it shows). Three
 |---|---|---|
 | Home (front page / modules / assignments / syllabus / stream, as the course chose) | **Drawn** | Right column: stream/calendar/notifications links, course To Do with Ignore |
 | Home: Coming Up, Recent Feedback, announcements on the home page | Missing | |
-| Announcements list and detail | **Drawn** | Replies/likes on an announcement: missing |
-| Assignments list (sections, by type with weights, search, status badges) | **Drawn** | |
-| Assignment page (due, points, availability, attempts, rubric, mark as done, previous/next, external-tool launch) | **Drawn** | |
+| Announcements list and detail | **Drawn** | Rows: author, reply and unread counts, sections. Likes on an announcement: missing |
+| Assignments list (sections, by type with weights, search, status badges) | **Drawn** | "10 pts" until scored; Missing / Late / Excused / Submitted / Graded (posted only); letter and pass-fail grades; Opens / Closed from the lock window |
+| Assignment page (due, points, availability, attempts, rubric, mark as done, previous/next, external-tool launch) | **Drawn** | Class mean/high/low, comment count, late penalty, letter grade, extra attempts, the lock reason for every type |
 | Hand in: file upload (with conversion), text entry (local draft), website URL, homework LTI tools, comment, receipt | **Drawn** | Also from the search box (/submit, or Submit on a result row) in a sheet over any page |
 | Hand in: media recording, student annotation | Canvas's page | Rows send you there |
-| Peer reviews, group-assignment flag, Turnitin/originality report, late-penalty deduction (`points_deducted`) | Missing | |
-| Submission feedback: score, attempts, files, text, URL, comments per attempt, comment composer | **Drawn** | Attachments on comments: missing |
+| Peer reviews, group-assignment flag, Turnitin/originality report | Missing | |
+| Submission feedback: score, attempts, files, text, URL, comments per attempt (words, files, voice and video notes), late penalty, comment composer | **Drawn** | |
 | Submission details page (DocViewer annotations) | Canvas's page | |
-| Discussions list (pinned/open/closed, unread, replies, last post, search) | **Drawn** | New discussion opens Canvas's editor |
+| Discussions list (pinned/open/closed, unread, replies, last post, points, to-do date, open until / closed, search) | **Drawn** | New discussion opens Canvas's editor |
 | Discussion thread (replies threaded, reply, must-post-first, auto mark read) | **Drawn** | Depth shown to two levels |
 | Discussions: like/rate, subscribe, per-entry unread, edit/delete own post, attachments or rich text in replies, group discussions (child topics), graded-discussion rubric, checkpoints | Missing | |
-| Grades (total, group rings, legend, weights, rows with status, what-if) | **Drawn** | |
-| Grades: per-row comments and rubric, score details (mean/high/low), grading periods, final vs current, "graded only" toggle, late penalty, unposted icon, sorting | Missing | `score_statistics` and `computed_final_score` are fetched and never shown |
-| People (roles, search, sections, pronouns), Groups sub-view | **Drawn** | Join/leave a self-sign-up group: missing; person page: Canvas's |
-| Pages list and page (front page, dates, body, mark as done, links) | **Drawn** | Revision history, edit, search on the tab: missing |
-| Files (folders, viewer, download, open in tab) | **Drawn** | Upload, usage rights, locked/hidden state, sort, recursive search: missing |
-| Quizzes list, quiz page, taking (classic), feedback | **Drawn** | Your score/status in the list: missing; calculated/file-upload questions, LockDown: Canvas's page; New Quizzes are LTI tools |
-| Modules (requirements done, locked until, items, sort, open/close all, mark as done) | **Drawn** | Prerequisites, sequential progress, per-item requirement type, per-item lock, module prev/next: missing |
+| Grades (total to the decimal, final vs current, group rings, legend, weights, rows with status, letter and pass-fail grades, class mean/high/low, what-if) | **Drawn** | Posted scores only; a hidden total is said to be hidden |
+| Grades: per-row comments and rubric, grading periods, "graded only" toggle, sorting | Missing | |
+| People (roles as the course names them, search, sections, pronouns), Groups sub-view | **Drawn** | Join/leave a self-sign-up group: missing; person page: Canvas's |
+| Pages list and page (front page, dates, body, mark as done, links, lock explanation) | **Drawn** | Revision history, edit, search on the tab: missing |
+| Files (folders with counts, viewer, download, open in tab, uploader, locked/hidden/opens badges) | **Drawn** | Upload, usage rights, sort, recursive search: missing |
+| Quizzes list (score and status per row, time limit, attempts, lock window, New Quizzes as rows), quiz page, taking (classic), feedback | **Drawn** | Calculated/file-upload questions, LockDown: Canvas's page; New Quizzes are LTI tools |
+| Modules (requirements done, locked until, items, sort, open/close all, mark as done, prerequisites, sequential progress, per-item requirement and lock reason) | **Drawn** | Module prev/next: missing |
 | Syllabus (body + course summary of dated assignments) | **Drawn** | Events and undated items in the summary: missing |
 | Outcomes (mastery), Rubrics, Conferences, Collaborations, Chat, Attendance | Canvas's page / campus tools | In the rail; Canvas draws them |
 | Course notifications settings | Canvas's page | |
@@ -95,25 +96,20 @@ tools are Canvas's page. Joining or leaving a group (`groups/:id/memberships`) i
 
 | Data | Endpoint / field | Where it would fit |
 |---|---|---|
-| Class score statistics (mean, high, low) | `assignments/:id?include[]=score_statistics` (already fetched) | Assignment page grade chip; Grades rows |
-| Final vs current score, letter grade | `computed_final_score`, `computed_current_grade` (already mapped) | Grades header |
-| Your pronouns, email, login id, bio, time zone | `users/self/profile` | Account menu (the second line), setup |
+| Your bio and time zone | `users/self/profile` (fetched since 2.95.0 for the e-mail and pronouns) | Account menu |
 | Global announcements | `accounts/self/account_notifications` | Dashboard banner / Notifications "System" |
 | Missing submissions | `users/self/missing_submissions?include[]=planner_overrides,course` | Overdue card (one request instead of one per course) |
 | Upcoming events | `users/self/upcoming_events` | Dashboard "Coming up" |
-| Planner flags | `planner/items` → `new_activity`, `has_feedback`, `submissions.needs_grading` | To Do rows, Notifications |
 | Grading periods and per-period scores | `courses/:id/grading_periods`, `enrollments?include[]=grading_periods` | Grades period picker |
-| Late policy and deductions | `courses/:id/late_policy`, `submission.points_deducted`, `seconds_late` | Grades rows, feedback screen |
-| Rubric per row, submission comments count | `assignment_groups?include[]=rubric`, `submission.submission_comments` | Grades rows (comment/rubric icons) |
-| Module item requirements, prerequisites, sequence | `modules?include[]=items,content_details` (already fetched: `completion_requirement`, `prerequisite_module_ids`), `module_item_sequence` | Modules: "View / Submit / Score ≥ x" per item, prev/next |
+| The late policy itself | `courses/:id/late_policy` (the deduction and the days late are shown from the submission) | Assignment page: "x% a day" |
+| Rubric per row | `assignment_groups?include[]=rubric` | Grades rows (rubric icon) |
+| Module item sequence | `module_item_sequence` | Modules: prev/next |
 | Discussion ratings, subscription, per-entry read state | `discussion_topics/:id/view` (already fetched: `read_state`, `rating_sum`), `entries/:id/rating`, `subscribed` | Thread |
 | Group discussion children | `discussion_topics/:id` → `group_topic_children` | Thread ("your group's copy") |
 | Page revisions | `pages/:slug/revisions` | Page view |
-| File usage rights, locked/hidden | `files?include[]=usage_rights` (fields on the file) | Files rows |
+| File usage rights | `files?include[]=usage_rights` | Files rows |
 | Personal files and quota | `users/self/folders/root`, `users/self/files/quota` | A "My files" section |
-| Quiz score/status in the list | `quizzes/:id/submissions` (already used on the quiz page) | Quizzes list |
 | Conversation paging, archive, delete | `conversations?page=`, `PUT conversations/:id {workflow_state}`, `DELETE` | Inbox |
-| Card term, teachers, current term | `dashboard_cards.term`, `courses.teachers`, `enrollment_term` (already mapped) | Course cards, course header |
 | Course card positions | `users/self/dashboard_positions` | Card reordering |
 | Calendar event id deep links, undated events | `?event_id=`, `calendar_events?undated=true` | Calendar |
 | Content shares, ePortfolios | `users/self/content_shares`, `users/self/eportfolios` | Account |
@@ -121,7 +117,7 @@ tools are Canvas's page. Joining or leaving a group (`groups/:id/memberships`) i
 ## 3. Endpoints never called
 
 `accounts/:id/account_notifications`, `users/self/upcoming_events`, `users/self/todo`,
-`users/self/missing_submissions`, `users/self/dashboard_positions`, `users/self/profile`,
+`users/self/missing_submissions`, `users/self/dashboard_positions`,
 `users/self/settings`, `communication_channels`, notification preferences, `users/self/files`,
 `users/self/folders`, `users/self/files/quota`, `eportfolios`, `content_shares`, `media_objects`,
 `grading_periods`, `enrollments`, `outcome_results`, `outcome_rollups`, `rubrics`, `peer_reviews`,

@@ -24,7 +24,7 @@
 
     const rowFor = ({ g, c }) => U.row([
       U.tile(IC.people, { color: c?.color || '#5856d6', tint: c ? U.rgba(c.color, 0.16) : 'rgba(88,86,214,.16)' }),
-      U.el('bcv-row__body', [U.text('bcv-row__title', g.name), U.text('bcv-row__sub', c ? c.name : (g.context_type === 'Account' ? 'Account group' : g.group_category?.name || 'Group'))]),
+      U.el('bcv-row__body', [U.text('bcv-row__title', g.name), U.text('bcv-row__sub', [c ? c.name : (g.context_type === 'Account' ? 'Account group' : g.group_category?.name || 'Group'), g.members_count ? U.plural(g.members_count, 'member') : null].filter(Boolean).join(' · '))]), // (how many are in it, as the group's own page says)
       c?.term ? U.badge(c.term) : (g.group_category?.name ? U.badge(g.group_category.name) : null),
       U.chev(),
     ], { mod: 'bcv-row--p15', href: `/groups/${g.id}` });

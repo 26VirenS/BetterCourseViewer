@@ -42,7 +42,7 @@ const nicknames = new Map(); // course id → the student's nickname; Canvas the
 const courseById = (id) => courses.find((c) => c.id === String(id));
 const fullCourse = (c) => ({
   id: c.id, name: nicknames.get(c.id) || c.name, course_code: c.code, original_name: nicknames.has(c.id) ? c.name : undefined, term: c.term || term, is_favorite: favorites.has(c.id), default_view: c.default_view || 'wiki',
-  workflow_state: c.past ? 'completed' : 'available', start_at: null, end_at: null, apply_assignment_group_weights: !!c.weighted,
+  workflow_state: c.past ? 'completed' : 'available', start_at: null, end_at: null, apply_assignment_group_weights: !!c.weighted, hide_final_grades: c.id === '103', // (PHYS 008HL: the teacher hides the total, so Canvas sends no score for it)
   enrollments: [{ type: 'student', role: 'StudentEnrollment', enrollment_state: c.past ? 'completed' : 'active', computed_current_score: c.score, computed_current_grade: c.grade, computed_final_score: c.score }],
   teachers: [{ id: `t${c.id}`, display_name: c.teacher }], sections: [{ id: `s${c.id}`, name: c.section }], image_download_url: null,
 });
@@ -90,7 +90,7 @@ const A = {
     ['4003', 'Knewton Alta: Unit 2', 'Assignments', 20, null, 5, 23.98, null, { tool: 'https://tool.example.com/launch' }],
   ],
   105: [
-    ['5001', 'Journal #1', 'Journals', 5, 5, -6, 23.98, -6, {}],
+    ['5001', 'Journal #1', 'Journals', 5, 5, -6, 23.98, -6, { gradingType: 'pass_fail' }], // (marked complete/incomplete: the grade is the word, not the points)
     ['5002', 'Research Day Activity: Choosing a Field Site', 'Activities', 5, null, 0, 23.98, null, {}],
     ['5003', 'Journal #2', 'Journals', 5, null, 1, 23.98, null, { discussion: '7503' }], // a graded discussion, in its module as the topic (with a must_mark_done requirement)
   ],
@@ -113,18 +113,20 @@ function assignmentObj(courseId, row) {
   const due = at(dueDay, Math.floor(dueHour), Math.round((dueHour % 1) * 60));
   const submitted = subDay !== null || earned !== null;
   const submission = {
-    id: `s${id}`, assignment_id: id, workflow_state: earned !== null ? 'graded' : submitted ? 'submitted' : 'unsubmitted', score: earned, grade: earned === null ? null : String(earned),
+    id: `s${id}`, assignment_id: id, workflow_state: earned !== null ? 'graded' : submitted ? 'submitted' : 'unsubmitted', score: earned, grade: earned === null ? null : extra.gradingType === 'pass_fail' ? (earned > 0 ? 'complete' : 'incomplete') : String(earned),
     submitted_at: subDay !== null ? at(subDay, 15, 52) : (earned !== null ? at(dueDay - 1, 16, 1) : null), graded_at: earned !== null ? at(extra.gradedDay ?? dueDay, 8, 0) : null,
     // Canvas posts a grade separately from marking it; one assignment here is marked but held back
     posted_at: earned !== null ? (extra.held ? null : at(dueDay, 8, 5)) : null,
-    late: !!extra.late, missing: false, excused: false, attempt: submitted ? 1 : null,
+    late: !!extra.late, missing: !submitted && new Date(due) < now, excused: !!extra.excused || !!(mockConfig.excused || []).includes(String(id)), attempt: submitted ? 1 : null, // (POST /__mock/config {"excused": ["4002"]} excuses an assignment for a test)
+    // a late hand-in Canvas docked (its late policy), and extra attempts a teacher granted on one assignment
+    points_deducted: extra.late ? 3 : undefined, seconds_late: extra.late ? 2 * 86400 + 600 : 0, extra_attempts: id === '2004' ? 1 : undefined,
     // 4001 is the worked example for the submission sheet: two attempts, and comments filed against
     // each of them, so the thread shown has to be the selected attempt's rather than all of them
     submission_comments: id === '4001'
       ? [{ author_id: `t${courseId}`, author_name: c.teacher, created_at: at(dueDay - 2, 9, 0), attempt: 1, comment: 'This is only a first pass — attach the working before the deadline and I will mark it.' }, { author_id: `t${courseId}`, author_name: c.teacher, created_at: at(dueDay + 1, 9, 0), attempt: 2, comment: 'Nice work on the derivative questions. Watch the difference between an instantaneous reading and an interval total — that cost you question 2.' }, { author_id: '7', author_name: 'Sam Student', created_at: at(dueDay + 1, 10, 0), attempt: 2, comment: 'Thanks, I see it now.' }]
       : extra.rubric ? [] : id === '1001'
         ? [{ author_id: `t${courseId}`, author_name: c.teacher, created_at: at(dueDay + 1, 9, 0), comment: 'Nice work on the derivative questions. Watch the difference between an instantaneous reading and an interval total — that cost you question 2.' }, { author_id: '7', author_name: 'Sam Student', created_at: at(dueDay + 1, 10, 0), comment: 'Thanks, I see it now.' }]
-        : (earned !== null && id === '1002' ? [{ author_id: `t${courseId}`, author_name: c.teacher, created_at: at(dueDay + 1, 9, 0), attempt: 2, comment: 'Check the domain restrictions in question 3 — the rest was solid.' }] : []),
+        : (earned !== null && id === '1002' ? [{ author_id: `t${courseId}`, author_name: c.teacher, created_at: at(dueDay + 1, 9, 0), attempt: 2, comment: 'Check the domain restrictions in question 3 — the rest was solid.' }, { author_id: `t${courseId}`, author_name: c.teacher, created_at: at(dueDay + 1, 9, 5), attempt: 2, comment: '', media_comment: { media_id: 'm-1002', media_type: 'audio', content_type: 'audio/mp4', display_name: 'Voice note on question 3', url: '/media_objects/m-1002/audio.mp4' } }] : []), // (a voice note: a comment with no words of its own)
     rubric_assessment: extra.rubric && earned !== null ? { c1: { points: 4, rating_id: 'r2', comments: 'Sign error in part b.' }, c2: { points: 4, rating_id: 'r3' } } : undefined,
     // quiz assignments: Canvas keeps each attempt's per-question grading in submission_history
     submission_history: extra.quiz ? (quizSubs.get(String(Number(id) + 8000)) || []).filter((s) => s.workflow_state === 'complete').map((s) => ({ attempt: s.attempt, score: s.score, submission_data: quizQuestionBank(s.quiz_id).map((q) => ({ question_id: q.id, correct: gradeQuestion(q, s.state[q.id]?.answer), points: gradeQuestion(q, s.state[q.id]?.answer) ? q.points_possible : 0, ...histFields(q, s.state[q.id]?.answer) })) }))
@@ -138,7 +140,9 @@ function assignmentObj(courseId, row) {
   };
   return {
     id, name, description: extra.description || `<p>Complete <strong>${name}</strong> as described in lecture. Show all work and submit a single PDF.</p><ul><li>Use the chain rule where appropriate.</li><li>Label each step.</li></ul>${extra.rubric ? '<p>See the rubric for how points are awarded.</p>' : ''}`,
-    due_at: due, lock_at: extra.window ? at(dueDay, 23, 59) : null, unlock_at: extra.window ? at(dueDay - 7, 0, 0) : null, points_possible: possible, grading_type: 'points', published: true, html_url: `/courses/${courseId}/assignments/${id}`,
+    due_at: due, lock_at: extra.window ? at(dueDay, 23, 59) : null, unlock_at: extra.window ? at(dueDay - 7, 0, 0) : null, points_possible: possible, grading_type: extra.gradingType || 'points', published: true, html_url: `/courses/${courseId}/assignments/${id}`,
+    // the class's numbers on a marked assignment (include[]=score_statistics): what Canvas's own grade page shows as mean, high and low
+    score_statistics: earned !== null ? { mean: Math.round(possible * 0.78 * 10) / 10, min: Math.round(possible * 0.4), max: possible, median: Math.round(possible * 0.8 * 10) / 10, lower_q: Math.round(possible * 0.65 * 10) / 10, upper_q: Math.round(possible * 0.92 * 10) / 10 } : undefined,
     submission_types: extra.quiz ? ['online_quiz'] : extra.tool ? ['external_tool'] : extra.types || ['online_upload', 'online_text_entry'], is_quiz_assignment: !!extra.quiz, quiz_id: extra.quiz ? String(Number(id) + 8000) : undefined,
     allowed_extensions: mockConfig.ext?.[id] || extra.ext || [], locked_for_user: false, // (POST /__mock/config {"ext": {"4002": ["pdf"]}} narrows an assignment's types for a test)
     quiz_access_code: extra.code || null, quiz_ip_filter: extra.ip || null, quiz_lockdown: !!extra.lockdown, quiz_survey: extra.survey || null, quiz_code_hidden: !!extra.codeHidden, // (the mock's own notes: what the quiz built from this is restricted by)
@@ -178,7 +182,9 @@ function plannerItems() {
       items.push({
         context_type: 'Course', course_id: c.id, context_name: c.name, plannable_id: a.is_quiz_assignment ? a.quiz_id : a.id, plannable_type: a.is_quiz_assignment ? 'quiz' : 'assignment', plannable_date: a.due_at,
         plannable: { id: a.id, title: a.name, due_at: a.due_at, points_possible: a.points_possible }, planner_override: overrides.get(key) || null,
-        submissions: { submitted: !!a.submission.submitted_at, graded: a.submission.workflow_state === 'graded', missing: false, late: a.submission.late, excused: false, needs_grading: false },
+        // the flags Canvas's planner carries: missing (past due, nothing in), late, excused, graded, feedback (a comment on it), and new activity on one item
+        submissions: { submitted: !!a.submission.submitted_at, graded: a.submission.workflow_state === 'graded', missing: !a.submission.submitted_at && due < now, late: a.submission.late, excused: !!a.submission.excused, needs_grading: false, has_feedback: (a.submission.submission_comments || []).length > 0 },
+        new_activity: a.id === '1012',
         html_url: a.html_url,
       });
     }
@@ -203,7 +209,7 @@ const discussions = {
 };
 const announcements = {
   101: [
-    { id: '8001', title: 'Prerequisite Skills Test', posted_at: ago(6 * D), read_state: 'unread', author: { display_name: 'Yue Lei' }, message: '<p>Good morning everyone, the results from the Skills_Check test have been posted. Please review them before Friday.</p>' },
+    { id: '8001', title: 'Prerequisite Skills Test', posted_at: ago(6 * D), read_state: 'unread', author: { display_name: 'Yue Lei' }, discussion_subentry_count: 3, unread_count: 1, message: '<p>Good morning everyone, the results from the Skills_Check test have been posted. Please review them before Friday.</p>' }, // (three comments under it, one unread)
     { id: '8002', title: 'Awesome opportunity for first-year students', posted_at: ago(15 * D), read_state: 'unread', author: { display_name: 'Yue Lei' }, message: '<p>Good morning everyone, I just learned about a wonderful opportunity for first-year students interested in research.</p>' },
     { id: '8003', title: 'Important: University Store Inclusive ACCESS Instructions', posted_at: ago(15 * D + 2 * H), read_state: 'read', author: { display_name: 'Campus Store' }, message: '<p>Dear students, at your instructor\'s request this course is participating in Inclusive ACCESS.</p>' },
     { id: '8004', title: 'Welcome to MATH 021', posted_at: ago(18 * D), read_state: 'read', author: { display_name: 'Yue Lei' }, message: '<p>Please read the Course Syllabus before our first lecture.</p>' },
@@ -351,12 +357,12 @@ const subQuestions = (s) => {
 const modules = {
   102: [
     { id: 'm1', name: 'Week 1: Kinematics', state: 'completed', position: 1, items: [{ id: 'i1', type: 'Page', title: 'Big picture', html_url: '/courses/102/pages/big-picture', completion_requirement: { type: 'must_view', completed: true } }, { id: 'i2', type: 'Assignment', title: 'Lab 1 report', html_url: '/courses/102/assignments/2001', content_details: { due_at: at(-7, 23, 59), points_possible: 20 }, completion_requirement: { type: 'must_submit', completed: true } }] },
-    { id: 'm2', name: 'Week 2: Forces', state: 'started', position: 2, items: [{ id: 'i3', type: 'SubHeader', title: 'Before class' }, { id: 'i4', type: 'Page', title: 'Newton’s laws', html_url: '/courses/102/pages/newtons-laws', indent: 1, completion_requirement: { type: 'must_view', completed: true } }, { id: 'i5', type: 'Assignment', title: 'W2 HW', html_url: '/courses/102/assignments/2002', indent: 1, content_details: { due_at: at(-1, 23, 59), points_possible: 15 }, completion_requirement: { type: 'must_submit', completed: false } }, { id: 'i6', type: 'ExternalUrl', title: 'PhET simulation', external_url: `http://localhost:${simPort}/sim`, html_url: `http://localhost:${simPort}/sim` /* a site of somebody else's, on an origin of its own: the suite answers for it */ }] },
-    { id: 'm3', name: 'Week 3: Energy', state: 'locked', position: 3, unlock_at: at(5, 8, 0), items: [] },
+    { id: 'm2', name: 'Week 2: Forces', state: 'started', position: 2, require_sequential_progress: true, items: [{ id: 'i3', type: 'SubHeader', title: 'Before class' }, { id: 'i4', type: 'Page', title: 'Newton’s laws', html_url: '/courses/102/pages/newtons-laws', indent: 1, completion_requirement: { type: 'must_view', completed: true } }, { id: 'i5', type: 'Assignment', title: 'W2 HW', html_url: '/courses/102/assignments/2002', indent: 1, content_details: { due_at: at(-1, 23, 59), points_possible: 15 }, completion_requirement: { type: 'must_submit', completed: false } }, { id: 'i6', type: 'ExternalUrl', title: 'PhET simulation', external_url: `http://localhost:${simPort}/sim`, html_url: `http://localhost:${simPort}/sim` /* a site of somebody else's, on an origin of its own: the suite answers for it */ }, { id: 'i8', type: 'ExternalTool', title: 'Mastering Physics', external_url: 'https://tool.example.com/mastering', html_url: '/courses/102/modules/items/i8' /* a publisher's tool placed in the module: Canvas launches it */ }] },
+    { id: 'm3', name: 'Week 3: Energy', state: 'locked', position: 3, unlock_at: at(5, 8, 0), prerequisite_module_ids: ['m2'], items: [] }, // (locked behind Week 2, as Canvas says it)
     // built last, due first: the one module whose course order and date order disagree
     { id: 'm4', name: 'Week 0: Orientation', state: 'completed', position: 4, items: [{ id: 'i7', type: 'Assignment', title: 'Safety quiz', html_url: '/courses/102/assignments/2001', content_details: { due_at: at(-21, 23, 59), points_possible: 5 } }] },
   ],
-  101: [{ id: 'm11', name: 'Unit 1: Functions', state: 'started', position: 1, items: [{ id: 'i11', type: 'Page', title: 'Course Information', html_url: '/courses/101/pages/course-information' }, { id: 'i14', type: 'Page', page_url: 'chapter-4-notes', title: 'Chapter 4 notes', html_url: '/courses/101/pages/chapter-4-notes', completion_requirement: { type: 'must_mark_done', completed: false } },{ id: 'i12', type: 'Quiz', title: 'Lec06-PreQuiz', html_url: '/courses/101/quizzes/9011', content_details: { due_at: at(1, 10, 30), points_possible: 17 } },
+  101: [{ id: 'm11', name: 'Unit 1: Functions', state: 'started', position: 1, items: [{ id: 'i11', type: 'Page', title: 'Course Information', html_url: '/courses/101/pages/course-information' }, { id: 'i14', type: 'Page', page_url: 'chapter-4-notes', title: 'Chapter 4 notes', html_url: '/courses/101/pages/chapter-4-notes', completion_requirement: { type: 'must_mark_done', completed: false } },{ id: 'i12', type: 'Quiz', title: 'Lec06-PreQuiz', html_url: '/courses/101/quizzes/9011', content_details: { due_at: at(1, 10, 30), points_possible: 17 }, completion_requirement: { type: 'min_score', min_score: 12, completed: false } },
     // an assignment with nothing to hand in: the module asks for a mark instead, as Canvas's "Mark as done"
     { id: 'i13', type: 'Assignment', content_id: '1003', title: 'Dis00', html_url: '/courses/101/assignments/1003', completion_requirement: { type: 'must_mark_done', completed: false } }] }],
   // a graded discussion sits in its module as the topic, not as its assignment: the sequence asked for
@@ -388,8 +394,13 @@ const sections = (courseId) => [...new Set(people(courseId).flatMap((u) => u.enr
 
 // ---- inbox ----------------------------------------------------------------------------------
 const conversations = [
-  { id: 'c1', subject: 'No submission for Acknowledge the UC Merced Student Attestation', workflow_state: 'unread', last_message: 'Hello Bobcat! You are receiving this message because our records show no submission yet.', last_message_at: ago(9 * D), starred: false, context_name: 'Student Rights & Responsibilities', context_code: 'course_201', participants: [{ id: '20', name: 'Halley Smith' }, { id: '7', name: 'Sam Student' }], messages: [{ id: 'm1', author_id: '20', created_at: ago(9 * D), body: 'Hello Bobcat!\n\nYou are receiving this message because our records show no submission for the Student Attestation. Please complete it by Friday.' }] },
-  { id: 'c2', subject: 'Office hours this week', workflow_state: 'read', last_message: 'Office hours move to Thursday 2–4pm this week only.', last_message_at: ago(2 * D), starred: true, context_name: 'F26-MATH 021 20', context_code: 'course_101', participants: [{ id: 't101', name: 'Yue Lei' }, { id: '7', name: 'Sam Student' }], messages: [{ id: 'm2', author_id: 't101', created_at: ago(2 * D), body: 'Office hours move to Thursday 2–4pm this week only.' }] },
+  // like Canvas's list: message_count, and `properties` naming what the messages carry (attachments, media_objects)
+  { id: 'c1', subject: 'No submission for Acknowledge the UC Merced Student Attestation', workflow_state: 'unread', last_message: 'Hello Bobcat! You are receiving this message because our records show no submission yet.', last_message_at: ago(9 * D), starred: false, message_count: 1, properties: ['attachments'], context_name: 'Academic Success Resource Site (2026-27)', context_code: 'course_201', participants: [{ id: '20', name: 'Halley Smith' }, { id: '7', name: 'Sam Student' }], messages: [{ id: 'm1', author_id: '20', created_at: ago(9 * D), body: 'Hello Bobcat!\n\nYou are receiving this message because our records show no submission for the Student Attestation. Please complete it by Friday.', attachments: [{ id: 'att1', display_name: 'Attestation instructions.pdf', filename: 'attestation.pdf', 'content-type': 'application/pdf', size: 20480, url: '/files/att1/download?download_frd=1' }] }] },
+  // the teacher's answer carries a voice note and the student's question forwarded along with it
+  { id: 'c2', subject: 'Office hours this week', workflow_state: 'read', last_message: 'Office hours move to Thursday 2–4pm this week only.', last_message_at: ago(2 * D), starred: true, message_count: 2, properties: ['media_objects'], context_name: 'F26-MATH 021 20', context_code: 'course_101', participants: [{ id: 't101', name: 'Yue Lei' }, { id: '7', name: 'Sam Student' }], messages: [
+    { id: 'm2', author_id: 't101', created_at: ago(2 * D), body: 'Office hours move to Thursday 2–4pm this week only.', media_comment: { media_id: 'm-c2', media_type: 'audio', content_type: 'audio/mp4', display_name: 'Voice note on office hours', url: '/media_objects/m-c2/audio.mp4' }, forwarded_messages: [{ id: 'fm1', author_id: '7', created_at: ago(3 * D), body: 'Would Thursday work for office hours this week? I have a lab on Wednesday.' }] },
+    { id: 'm2a', author_id: '7', created_at: ago(3 * D), body: 'Would Thursday work for office hours this week? I have a lab on Wednesday.' },
+  ] },
 ];
 
 // ---- HTML pages -------------------------------------------------------------------------------
@@ -534,7 +545,9 @@ const filterDates = (list, url, field) => {
   return list.filter((x) => (!s || new Date(x[field]) >= new Date(s)) && (!e || new Date(x[field]) <= new Date(e)));
 };
 
-on('GET', /^\/api\/v1\/users\/self$/, () => ({ id: '7', name: 'Sam Student', short_name: 'Sam', avatar_url: null }));
+on('GET', /^\/api\/v1\/users\/self$/, () => ({ id: '7', name: 'Sam Student', short_name: 'Sam', avatar_url: null, pronouns: 'they/them' }));
+// the profile is where Canvas keeps the e-mail and the login (the user record carries neither)
+on('GET', /^\/api\/v1\/users\/self\/profile$/, () => ({ id: '7', name: 'Sam Student', short_name: 'Sam', sortable_name: 'Student, Sam', primary_email: 'sstudent@ucmerced.edu', login_id: 'sstudent', pronouns: 'they/them', avatar_url: null, time_zone: 'America/Los_Angeles', locale: null }));
 on('GET', /^\/api\/v1\/accounts\/1$/, () => ({ id: '1', name: 'Example University' }));
 let dashboardView = 'planner';
 on('GET', /^\/dashboard\/view$/, () => ({ dashboard_view: dashboardView }));
@@ -574,7 +587,9 @@ on('GET', /^\/api\/v1\/users\/self\/activity_stream\/summary$/, () => [{ type: '
 on('GET', /^\/api\/v1\/users\/self\/activity_stream$/, () => [
   { id: 'a1', type: 'Announcement', announcement_id: '8001', title: 'Prerequisite Skills Test', message: '<p>Good morning everyone, the results from the Skills_Check test have been posted…</p>', course_id: '101', context_type: 'Course', read_state: false, updated_at: ago(6 * D), html_url: '/courses/101/announcements/8001' },
   { id: 'a2', type: 'DiscussionTopic', discussion_topic_id: '7003', title: 'Is there any discussion happening this week?', message: '<p>Last post by Alan Aguilar.</p>', course_id: '101', context_type: 'Course', read_state: false, updated_at: ago(18 * H), total_root_discussion_entries: 23, html_url: '/courses/101/discussion_topics/7003' },
-  { id: 'a3', type: 'Submission', title: 'Lec05-PreQuiz graded — 19 / 19', message: '<p>Effort group.</p>', course_id: '101', context_type: 'Course', read_state: true, updated_at: ago(D), html_url: '/courses/101/assignments/1007', assignment_id: '1007', score: 19, grade: '19', assignment: { id: '1007', name: 'Lec05-PreQuiz', points_possible: 19 } },
+  { id: 'a3', type: 'Submission', title: 'Lec05-PreQuiz graded — 19 / 19', message: '<p>Effort group.</p>', course_id: '101', context_type: 'Course', read_state: true, updated_at: ago(D), html_url: '/courses/101/assignments/1007', assignment_id: '1007', score: 19, grade: '19', posted_at: ago(D), workflow_state: 'graded', assignment: { id: '1007', name: 'Lec05-PreQuiz', points_possible: 19 } },
+  // marked but held back (posted_at null, like the assignment's own submission): the score is not news yet
+  { id: 'a8', type: 'Submission', title: 'Functions and Their Representations', message: '', course_id: '101', context_type: 'Course', read_state: true, updated_at: ago(2 * D), html_url: '/courses/101/assignments/1006', assignment_id: '1006', score: 30, grade: '30', posted_at: null, workflow_state: 'graded', assignment: { id: '1006', name: 'Functions and Their Representations', points_possible: 30 } },
   { id: 'a6', type: 'Submission', title: 'Dis00', message: '', course_id: '101', context_type: 'Course', read_state: true, updated_at: ago(D + 2 * H), html_url: '/courses/101/assignments/1001', assignment_id: '1001', score: null, grade: null, assignment: { id: '1001', name: 'Dis00', points_possible: 10 }, submission_comments: [{ author_name: 'Joon', comment: 'Good use of interval notation here.', created_at: ago(D + 2 * H) }] },
   { id: 'a7', type: 'Message', title: 'Chemistry placement window closes Sep 16', message: '<p>One attempt remaining.</p>', notification_category: 'Due Date', course_id: '101', context_type: 'Course', read_state: true, updated_at: ago(3 * D), html_url: '/courses/101' },
   { id: 'a4', type: 'Conversation', title: 'No submission for Acknowledge the UC Merced Student Attestation', message: '<p>Hello Bobcat! You are receiving this message because our records show…</p>', conversation_id: 'c1', read_state: false, updated_at: ago(9 * D), html_url: '/conversations?id=c1' },
@@ -594,9 +609,10 @@ on('GET', /^\/api\/v1\/conversations\/unread_count$/, () => ({ unread_count: Str
 on('GET', /^\/api\/v1\/conversations$/, (url) => { const scope = url.searchParams.get('scope'); const f = url.searchParams.getAll('filter[]')[0]; return conversations.filter((c) => (!scope || (scope === 'unread' ? c.workflow_state === 'unread' : scope === 'starred' ? c.starred : true)) && (!f || c.context_code === f)).map(({ messages, ...c }) => c); });
 on('GET', /^\/api\/v1\/conversations\/(\w+)$/, (url, m) => conversations.find((c) => c.id === m[1]) || null);
 on('PUT', /^\/api\/v1\/conversations\/(\w+)$/, (url, m, body) => { const c = conversations.find((x) => x.id === m[1]); if (c && body.conversation) Object.assign(c, body.conversation); return c; });
-on('POST', /^\/api\/v1\/conversations\/(\w+)\/add_message$/, (url, m, body) => { const c = conversations.find((x) => x.id === m[1]); c.messages.unshift({ id: `m${Date.now()}`, author_id: '7', created_at: new Date().toISOString(), body: body.body }); c.last_message = body.body; c.last_message_at = new Date().toISOString(); return c; });
+on('POST', /^\/api\/v1\/conversations\/(\w+)\/add_message$/, (url, m, body) => { const c = conversations.find((x) => x.id === m[1]); c.messages.unshift({ id: `m${Date.now()}`, author_id: '7', created_at: new Date().toISOString(), body: body.body }); c.last_message = body.body; c.last_message_at = new Date().toISOString(); c.message_count = c.messages.length; return c; });
 on('POST', /^\/api\/v1\/conversations$/, (url, m, body) => { const c = { id: `c${conversations.length + 1}`, subject: body.subject || '(no subject)', workflow_state: 'read', last_message: body.body, last_message_at: new Date().toISOString(), starred: false, context_code: body.context_code, participants: [{ id: '7', name: 'Sam Student' }, ...(body.recipients || []).map((r) => ({ id: r, name: `User ${r}` }))], messages: [{ id: 'mx', author_id: '7', created_at: new Date().toISOString(), body: body.body }] }; conversations.unshift(c); return [c]; });
-on('GET', /^\/api\/v1\/search\/recipients$/, (url) => { const q = (url.searchParams.get('search') || '').toLowerCase(); return [{ id: 't101', name: 'Yue Lei', common_courses: {} }, { id: 'u2', name: 'Alan Aguilar' }, { id: 'course_101', name: 'F26-MATH 021 20', user_count: 120 }].filter((r) => r.name.toLowerCase().includes(q)); });
+// like Canvas: a person's row says which courses you share (common_courses, by course id); a course's how many people it reaches
+on('GET', /^\/api\/v1\/search\/recipients$/, (url) => { const q = (url.searchParams.get('search') || '').toLowerCase(); return [{ id: 't101', name: 'Yue Lei', common_courses: { 101: ['TeacherEnrollment'] } }, { id: 'u2', name: 'Alan Aguilar', common_courses: { 101: ['StudentEnrollment'], 102: ['StudentEnrollment'] } }, { id: 'course_101', name: 'F26-MATH 021 20', user_count: 120, type: 'context' }].filter((r) => r.name.toLowerCase().includes(q)); });
 const groupList = [{ id: '66729', name: 'Attestation Fall 2026 1', course_id: '201', members_count: 4, group_category: { name: 'Attestation' }, description: '<p>Complete the student attestation with your group.</p>', context_type: 'Course' }, { id: '66730', name: 'Study group B', course_id: '301', members_count: 5, context_type: 'Course' }];
 on('GET', /^\/api\/v1\/users\/self\/groups$/, () => (mockConfig.groupsFail ? { __status: 500, errors: [{ message: 'groups are having a moment' }] } : groupList));
 on('GET', /^\/api\/v1\/groups\/(\w+)\/tabs$/, (url, m) => [['home', 'Home', ''], ['announcements', 'Announcements', '/announcements'], ['pages', 'Pages', '/pages'], ['people', 'People', '/users'], ['discussions', 'Discussions', '/discussion_topics'], ['files', 'Files', '/files'], ['conferences', 'BigBlueButton', '/conferences'], ['collaborations', 'Collaborations', '/collaborations']].map(([id, label, seg], i) => ({ id, label, html_url: `/groups/${m[1]}${seg}`, type: 'internal', position: i + 1, visibility: 'public' })));
@@ -673,7 +689,7 @@ on('GET', /^\/api\/v1\/calendar_events$/, (url) => {
   if (type === 'assignment') {
     for (const c of courses) if (codes.includes(`course_${c.id}`)) for (const a of allAssignments(c.id)) out.push({ id: `assignment_${a.id}`, title: a.name, start_at: a.due_at, end_at: a.due_at, all_day: false, context_code: `course_${c.id}`, context_name: c.name, type: 'assignment', html_url: a.html_url, assignment: { ...a, submission: a.submission } });
   } else {
-    if (codes.includes('course_101')) { out.push({ id: 'ev1', title: 'Lec05 lecture', description: '<p>Composition of functions, <b>section 1.4</b>.</p>', location_name: 'COB2 140', location_address: '5200 N Lake Rd', start_at: at(-1, 10, 30), end_at: at(-1, 11, 45), all_day: false, context_code: 'course_101', context_name: 'F26-MATH 021 20', type: 'event', html_url: '/calendar?event_id=ev1' }); out.push({ id: 'ev2', title: 'Midterm 1 review', start_at: at(13, 10, 30), end_at: at(13, 11, 45), all_day: false, context_code: 'course_101', context_name: 'F26-MATH 021 20', type: 'event', html_url: '/calendar?event_id=ev2' }); }
+    if (codes.includes('course_101')) { out.push({ id: 'ev1', title: 'Lec05 lecture', description: '<p>Composition of functions, <b>section 1.4</b>.</p>', location_name: 'COB2 140', location_address: '5200 N Lake Rd', start_at: at(-1, 10, 30), end_at: at(-1, 11, 45), all_day: false, context_code: 'course_101', context_name: 'F26-MATH 021 20', type: 'event', html_url: '/calendar?event_id=ev1' }); out.push({ id: 'ev2', title: 'Midterm 1 review', location_name: 'COB2 140', start_at: at(13, 10, 30), end_at: at(13, 11, 45), all_day: false, context_code: 'course_101', context_name: 'F26-MATH 021 20', type: 'event', html_url: '/calendar?event_id=ev2' }); }
     if (codes.includes('course_102')) out.push({ id: 'ev3', title: 'Week 2 lab', start_at: at(-2, 10, 30), end_at: at(-2, 13, 0), all_day: false, context_code: 'course_102', context_name: 'F26-PHYS 008 01', type: 'event', html_url: '/calendar?event_id=ev3' });
     if (codes.includes('course_104')) out.push({ id: 'ev5', title: 'SPRK 010 seminar', start_at: at(0, 15, 0), end_at: at(0, 16, 15), all_day: false, context_code: 'course_104', context_name: 'F26-SPRK 010 103', type: 'event', html_url: '/calendar?event_id=ev5' }); // a class today, on the calendar (never counted as work due)
     if (codes.includes('course_202')) out.push({ id: 'e1', title: 'Chemistry placement closes', start_at: at(6, 0, 0), end_at: at(6, 23, 59), all_day: true, all_day_date: ymd(6), context_code: 'course_202', context_name: 'Placement Exam: Chemistry', type: 'event', html_url: '/calendar?event_id=e1' });
@@ -940,7 +956,8 @@ const server = http.createServer((req, res) => {
       return json(res, data);
     }
     if (path.startsWith('/api/') || path === '/dashboard/view') return json(res, { errors: [{ message: 'not found' }] }, 404);
-    if (path.startsWith('/courses/101/external_tools/retrieve')) {
+    if (/^\/courses\/\w+\/external_tools\/retrieve/.test(path)) { // Canvas's launch of a tool (a course's, an assignment's, a module's): the tool's own page framed, here a line of text
+
       res.writeHead(200, { 'content-type': 'text/html' });
       return res.end('<html><body style="font-family:sans-serif;padding:20px">Embedded tool content</body></html>');
     }

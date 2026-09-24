@@ -8,7 +8,7 @@
   const IC = BCV.IC;
   /** How a quiz is restricted, in words: an access code, an IP filter, Respondus LockDown Browser. */
   const restrictions = (q) => [q.has_access_code || q.access_code ? 'Access code' : null, q.ip_filter ? 'Allowed networks only' : null, q.require_lockdown_browser ? 'LockDown Browser' : null].filter(Boolean);
-  const hasGrade = (a) => { const s = a?.submission || {}; return s.workflow_state === 'graded' && s.score !== null && s.score !== undefined; };
+  const hasGrade = (a) => { const s = a?.submission || {}; return s.workflow_state === 'graded' && s.score !== null && s.score !== undefined && s.posted_at !== null; }; // (marked and posted: a held mark is not yours to see yet)
   const store = BCV.store;
   const CS = () => BCV.screens.course;
 
@@ -123,7 +123,7 @@
     // lists for handing work in); media recordings and annotations stay on Canvas's page.
     const nativeSubmit = (a.submission_types || []).some((t) => ['online_upload', 'online_text_entry', 'online_url'].includes(t));
     const canvasOnly = !nativeSubmit && (a.submission_types || []).some((t) => ['media_recording', 'student_annotation'].includes(t));
-    const attemptsLeft = !(a.allowed_attempts > 0) || (s.attempt || 0) < a.allowed_attempts;
+    const attemptsLeft = !(a.allowed_attempts > 0) || (s.attempt || 0) < a.allowed_attempts + (s.extra_attempts || 0); // (extra attempts the teacher granted count)
     const statusOf = (x) => (x.excused ? 'Excused' : x.workflow_state === 'graded' ? 'Graded' : x.submitted_at ? (x.late ? 'Submitted late' : 'Submitted') : x.missing ? 'Missing' : 'Not submitted');
     const gradedOf = (x) => x.workflow_state === 'graded' && x.score !== null && x.score !== undefined;
     // Canvas posts a grade separately from marking it: posted_at === null means the instructor is
@@ -145,14 +145,21 @@
     const toBlock = (behavior = 'smooth') => block?.scrollIntoView({ behavior, block: 'start' });
     // The mark beside the title: the way in to what is behind it. Ungraded, no chip at all; a score
     // Canvas has not posted shows no number, because an unposted 0 reads exactly like a real one.
+    // (the comments on it, a late penalty, and how the class did — Canvas's own mean, high and low
+    // on a marked assignment — are said on the chip, not left in the answer)
+    const commentsN = (x) => (x.submission_comments || []).length;
+    const letterOf = (x) => (a.grading_type && a.grading_type !== 'points' && x.grade !== null && x.grade !== undefined ? String(x.grade) : null);
+    const lateWord = (x) => (x.late ? `late${x.points_deducted ? ` · −${store.fmtPts(x.points_deducted)} pts` : ''}` : null);
+    const stats = a.score_statistics && a.score_statistics.mean !== null && a.score_statistics.mean !== undefined ? `Class mean ${store.fmtPts(a.score_statistics.mean)} · high ${store.fmtPts(a.score_statistics.max)} · low ${store.fmtPts(a.score_statistics.min)}` : null;
     const gradeChip = (x) => (postedOf(x) ? h('button', { type: 'button', class: 'bcv-detail__grade', title: 'Feedback, attempts and comments', onclick: () => openMark(ctx, c, a, x) }, [
       U.el('bcv-detail__gradev', [
         h('span', { class: 'bcv-detail__gradescore', text: store.fmtPts(x.score) }),
         h('span', { class: 'bcv-detail__gradeof', text: `/ ${a.points_possible ?? '—'}` }),
       ]),
       h('div', { class: 'bcv-detail__gradeside' }, [
-        U.text('bcv-detail__gradepc', a.points_possible ? `${Math.round((Number(x.score) / Number(a.points_possible)) * 100)}%` : (x.grade ? String(x.grade) : ''), 'span'),
-        U.text('bcv-detail__gradewhen', x.graded_at ? U.fmtAt(x.graded_at) : 'Marked', 'span'),
+        U.text('bcv-detail__gradepc', letterOf(x) || (a.points_possible ? `${Math.round((Number(x.score) / Number(a.points_possible)) * 100)}%` : ''), 'span'),
+        U.text('bcv-detail__gradewhen', [x.graded_at ? U.fmtAt(x.graded_at) : 'Marked', lateWord(x), commentsN(x) ? U.plural(commentsN(x), 'comment') : null].filter(Boolean).join(' · '), 'span'),
+        stats ? U.text('bcv-detail__gradestats', stats, 'span') : null,
       ]),
       U.chev(),
     ]) : heldOf(x) ? h('button', { type: 'button', class: 'bcv-detail__grade bcv-detail__grade--held', title: 'Feedback, attempts and comments', onclick: () => openMark(ctx, c, a, x) }, [
@@ -166,12 +173,14 @@
     ]) : x.submitted_at || x.excused ? h('button', { type: 'button', class: 'bcv-detail__grade bcv-detail__grade--sub', title: 'What you handed in, and comments', onclick: () => openMark(ctx, c, a, x) }, [
       h('div', { class: 'bcv-detail__gradeside' }, [
         U.text('bcv-detail__gradepc', statusOf(x), 'span'),
-        U.text('bcv-detail__gradewhen', [x.submitted_at ? U.fmtAt(x.submitted_at) : null, x.attempt ? `Attempt ${x.attempt}` : null].filter(Boolean).join(' · ') || 'Nothing to hand in', 'span'),
+        U.text('bcv-detail__gradewhen', [x.submitted_at ? U.fmtAt(x.submitted_at) : null, x.attempt ? `Attempt ${x.attempt}` : null, commentsN(x) ? U.plural(commentsN(x), 'comment') : null].filter(Boolean).join(' · ') || 'Nothing to hand in', 'span'),
       ]),
       U.chev(),
     ]) : null);
     const titleEl = h('h2', { class: 'bcv-detail__title bcv-pretty', text: a.name });
-    const headEl = U.el('bcv-detail__head', [titleEl, gradeChip(s)]);
+    // nothing handed in: where it stands beside the title — Missing (past due), Opens …, Closed — in the same words as every list
+    const standing = (() => { if (gradeChip(s)) return null; const st = store.workStatus(a, s); return st.kind ? U.statusBadge(st, '') : null; })();
+    const headEl = U.el('bcv-detail__head', [titleEl, gradeChip(s) || standing]);
     // replaceChildren() would print a literal "null" for a missing block, so drop them first
     main.replaceChildren(...[
       backBtn(app, back.href, back.label),
@@ -184,11 +193,13 @@
         headEl,
         meta([['Due', a.due_at ? U.fmtAt(a.due_at) : 'No due date'], ['Points', a.points_possible ?? '—'], ['Submitting', types], ['Available', available], ['Attempts', attemptsFact(a, s)]]),
         U.el('bcv-detail__actions', [
-          isTool ? U.btn(s.submitted_at || (s.attempt || 0) > 0 ? 'Continue assignment' : 'Start assignment', { kind: 'primary', icon: IC.play, iconColor: '#fff', cls: 'bcv-detail__tool', onClick: (e) => { launchTool(e?.currentTarget || null); } })
-            : nativeSubmit ? (a.locked_for_user ? U.badge(a.lock_explanation ? htmlToText(a.lock_explanation, 120) : 'Locked', 'orange')
-              : attemptsLeft ? U.btn(s.submitted_at ? 'Resubmit' : 'Submit assignment', { kind: 'primary', icon: IC.send, iconColor: '#fff', onClick: () => toBlock() })
-                : U.badge(`No attempts left · ${a.allowed_attempts} allowed`, 'orange'))
-              : canvasOnly ? U.btn(s.submitted_at ? 'Resubmit in Canvas' : 'Submit in Canvas', { kind: 'primary', icon: IC.external, iconColor: '#fff', onClick: () => app.go(nativeHref(`${c.url}/assignments/${a.id}`)) }) : null,
+          // a lock (a prerequisite, a date) holds every kind of hand-in back, and says why in Canvas's words
+          a.locked_for_user && (isTool || nativeSubmit || canvasOnly) ? U.badge(a.lock_explanation ? htmlToText(a.lock_explanation, 120) : 'Locked', 'orange')
+            : isTool ? U.btn(s.submitted_at || (s.attempt || 0) > 0 ? 'Continue assignment' : 'Start assignment', { kind: 'primary', icon: IC.play, iconColor: '#fff', cls: 'bcv-detail__tool', onClick: (e) => { launchTool(e?.currentTarget || null); } })
+              : nativeSubmit ? (a.can_submit === false ? U.badge('Submissions are closed', 'orange')
+                : attemptsLeft ? U.btn(s.submitted_at ? 'Resubmit' : 'Submit assignment', { kind: 'primary', icon: IC.send, iconColor: '#fff', onClick: () => toBlock() })
+                  : U.badge(`No attempts left · ${a.allowed_attempts + (s.extra_attempts || 0)} allowed`, 'orange'))
+                : canvasOnly ? U.btn(s.submitted_at ? 'Resubmit in Canvas' : 'Submit in Canvas', { kind: 'primary', icon: IC.external, iconColor: '#fff', onClick: () => app.go(nativeHref(`${c.url}/assignments/${a.id}`)) }) : null,
           a.quiz_id ? U.btn('Open quiz', { icon: IC.bolt, onClick: () => app.go(`${c.url}/quizzes/${a.quiz_id}`) }) : null,
           a.discussion_topic?.id ? U.btn('Open discussion', { icon: IC.disc, onClick: () => app.go(`${c.url}/discussion_topics/${a.discussion_topic.id}`) }) : null,
           // how the marks are decided, beside the decision to hand work in
@@ -296,11 +307,11 @@
           h('h2', { class: 'bcv-detail__title bcv-pretty', text: t.title }),
           U.el('bcv-row__head', [
             U.avatar(t.author?.avatar_image_url, t.author?.display_name, 38),
-            h('div', { style: { flex: '1', minWidth: '0' } }, [U.text('bcv-entry__author', t.author?.display_name || 'Instructor'), U.text('bcv-entry__date', [
+            h('div', { style: { flex: '1', minWidth: '0' } }, [U.text('bcv-entry__author', t.author?.display_name || t.user_name || (announcement ? 'Announcement' : 'Discussion')), U.text('bcv-entry__date', [
               U.fmtAtUpper(t.posted_at || t.delayed_post_at),
               pts(t.assignment?.points_possible), // a graded discussion Canvas gave no points for says nothing, not "null pts"
-              t.assignment?.due_at ? `due ${U.fmtAtUpper(t.assignment.due_at)}` : null,
-              t.lock_at ? `available until ${U.fmtAtUpper(t.lock_at)}` : null,
+              t.assignment?.due_at ? `due ${U.fmtAtUpper(t.assignment.due_at)}` : t.todo_date ? `to do ${U.fmtAtUpper(t.todo_date)}` : null,
+              t.lock_at ? (U.parse(t.lock_at) > new Date() ? `open until ${U.fmtAtUpper(t.lock_at)}` : `closed ${U.fmtAtUpper(t.lock_at)}`) : null, // (a window that has passed is closed, not "available until")
             ].filter(Boolean).join(' · '))]),
             t.locked ? U.badge('Closed for comments') : null,
           ]),
@@ -445,7 +456,7 @@
     );
     const dated = (list || []).filter((a) => a.due_at).sort((x, y) => U.parse(x.due_at) - U.parse(y.due_at));
     side.append(h('div', {}, [U.label('Course summary'), dated.length ? U.card(dated.slice(0, 40).map((a) => U.row([
-      U.el('bcv-row__body', [U.text('bcv-row__title bcv-row__title--14 bcv-ellip', a.name), U.text('bcv-row__sub bcv-row__sub--115', `${hasGrade(a) ? 'Graded' : `Due ${U.fmtAt(a.due_at)}`} · ${a.points_possible ?? 0} pts`)]),
+      U.el('bcv-row__body', [U.text('bcv-row__title bcv-row__title--14 bcv-ellip', a.name), U.text('bcv-row__sub bcv-row__sub--115', `${hasGrade(a) ? 'Graded' : `Due ${U.fmtAt(a.due_at)}`} · ${a.points_possible !== null && a.points_possible !== undefined ? `${store.fmtPts(a.points_possible)} pts` : 'no points'}`)]),
       U.chev(),
     ], { mod: 'bcv-row--p12-16', href: `${c.url}/assignments/${a.id}` })), 'bcv-card--list') : U.emptyCard('No dated assignments.')]));
     return b;

@@ -635,7 +635,8 @@
         ]),
         h('button', { type: 'button', class: 'bcv-account', id: 'bcv-account', onclick: (e) => { e.stopPropagation(); accountMenu(e.currentTarget); }, title: 'Account', 'aria-haspopup': 'menu' }, [
           U.avatar(state.me?.avatar, state.me?.name, 30),
-          h('div', { style: { minWidth: '0' } }, [U.text('bcv-account__name bcv-ellip', state.me?.name || 'Account'), U.text('bcv-account__sub', 'Account')]),
+          // the pronouns Canvas holds and the e-mail under the name (the login when there is no e-mail; "Account" until it is known)
+          h('div', { style: { minWidth: '0' } }, [U.text('bcv-account__name bcv-ellip', state.me?.name || 'Account'), U.text('bcv-account__sub bcv-ellip', [state.me?.pronouns, state.me?.email || state.me?.loginId].filter(Boolean).join(' · ') || 'Account')]),
         ]),
       ]),
     ].filter(Boolean));
@@ -668,7 +669,7 @@
       h('span', { style: { flex: '1', minWidth: '0' } }, [h('span', { class: 'bcv-ellip', style: { display: 'block' }, text: label }), sub ? h('span', { class: 'bcv-menu__sub', text: sub }) : null]),
     ]);
     const m = U.el('bcv-menu bcv-menu--account', [
-      U.el('bcv-menu__head', [U.avatar(me?.avatar, me?.name, 34), h('div', { style: { minWidth: '0' } }, [U.text('bcv-menu__name bcv-ellip', me?.name || 'Account'), U.text('bcv-menu__sub bcv-ellip', me?.email || me?.login_id || siteName())])]),
+      U.el('bcv-menu__head', [U.avatar(me?.avatar, me?.name, 34), h('div', { style: { minWidth: '0' } }, [U.text('bcv-menu__name bcv-ellip', `${me?.name || 'Account'}${me?.pronouns ? ` (${me.pronouns})` : ''}`), U.text('bcv-menu__sub bcv-ellip', me?.email || me?.loginId || siteName())])]),
       // Canvas's own settings, and one link to Simpl's (the look, the setup, Personalize, the welcome and What's new all live there or in the sidebar)
       item(IC.settings, 'Simpl Courses settings', 'Look, courses and grades', openSettings),
       U.el('bcv-menu__sep'),
@@ -1007,7 +1008,10 @@
     let el = null;
     let gaveWay = null;
     try {
-      const res = await (nativeWanted ? draw() : Promise.race([draw(), new Promise((resolve) => setTimeout(() => resolve('__slow__'), SCREEN_PATIENCE))]));
+      // a quiet render is the same screen drawn again under the student (back to the tab, a page
+      // from the cache): it lands still — no stagger inside it, no rise of its root (ui.still)
+      const drawn = () => (quiet ? U.still(draw) : draw());
+      const res = await (nativeWanted ? drawn() : Promise.race([drawn(), new Promise((resolve) => setTimeout(() => resolve('__slow__'), SCREEN_PATIENCE))]));
       if (res === '__slow__') gaveWay = 'it took too long';
       else el = res;
     } catch (e) {
@@ -1046,6 +1050,7 @@
     clearTimeout(skeleton);
     if (!alive()) return;
     dressHead(el, r.screen); // the theme's photo on this screen's header, if it has one
+    if (quiet) el.classList.add('bcv-screen--still'); // (drawn again in place: no rise)
     if (el.parentNode !== main) main.replaceChildren(el); // a screen that kept its shell (a course's rail) stays put
     progress(false);
     html.classList.add('bcv-settled'); // drawn, from Canvas's answer (the harness waits for this)

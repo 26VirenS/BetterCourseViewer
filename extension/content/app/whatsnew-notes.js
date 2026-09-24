@@ -24,6 +24,12 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.95.0', date: '2026-09-24', notes: [
+      { kind: 'improved', title: 'Where work stands', body: 'Missing, Late, Excused, Graded: the same words on every row.', icon: P.list },
+      { kind: 'improved', title: 'Nothing left blank', body: 'Grades, quizzes, modules, files, inbox: every field shown.', icon: P.eye },
+      { kind: 'new', title: 'Deeper commands', body: '/open, /assignment, /quiz, /due and more, with a why-not.', icon: P.sparkle },
+      { kind: 'fixed', title: 'To Do holds still', body: 'Rows no longer flash in and out; a redraw lands in place.', icon: P.check },
+    ] },
     { version: '2.94.0', date: '2026-09-24', notes: [
       { kind: 'improved', title: 'Zoom in, zoom out', body: 'Every screen fits from 50% to 200%, and with OS scaling.', icon: P.eye },
       { kind: 'improved', title: 'Steadier layout', body: 'Popups, menus and panels place themselves, on screen.', icon: P.pin },

@@ -23,6 +23,9 @@
     let range = { start: U.startOfDay(now), end: U.addDays(U.startOfDay(now), 20), picking: false };
     const savedRange = await store.pref('agendaRange');
     if (savedRange && U.parse(savedRange.start)) range = { start: U.startOfDay(U.parse(savedRange.start)), end: savedRange.end ? U.startOfDay(U.parse(savedRange.end)) : null, picking: false };
+    // a day asked for (the hub's "/calendar tomorrow", "/calendar oct 3"): the month, the week or the agenda opens on it
+    const wantDay = (() => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ctx.route.params.get('date') || ''); const d = m ? new Date(+m[1], +m[2] - 1, +m[3]) : null; return d && !Number.isNaN(d.getTime()) ? d : null; })();
+    if (wantDay) { anchor = U.startOfDay(wantDay); miniMonth = new Date(anchor.getFullYear(), anchor.getMonth(), 1); range = { start: anchor, end: U.addDays(anchor, 20), picking: false }; }
     const wantCourse = ctx.route.params.get('include_contexts');
 
     const titleEl = h('h1', { class: 'bcv-h1' }); // (the same size as every other page's title)
@@ -131,12 +134,16 @@
         const keys = a ? [`assignment:${a.id}`, a.quiz_id ? `quiz:${a.quiz_id}` : null].filter(Boolean) : [];
         const submitted = !!(sub && (sub.submitted_at || sub.workflow_state === 'graded' || sub.workflow_state === 'submitted'))
           || keys.some((k) => submittedIds.has(k));
+        const excused = !!sub?.excused;
         const past = (isAssignment ? start : (end || start)) < now;
+        // an event that has happened is struck through; an assignment only once it is handed in (or
+        // excused) — one past its due date with nothing in is missing work, and stays legible as such
+        const submittable = !!types.length && !types.some((t) => t === 'none' || t === 'on_paper' || t === 'not_graded' || t === 'external_tool');
         const color = cc?.color || '#8e8e93';
         const pal = U.palette(color, dark);
         out.push({
           id: String(e.id), title: e.title || a?.name || 'Untitled', date: start, end, allDay: !!e.all_day && !isAssignment,
-          isAssignment, icon, done: submitted || past, submitted, keys, contextCode: e.context_code, contextName: cc?.name || e.context_name || '',
+          isAssignment, icon, done: isAssignment ? submitted || excused : past, submitted, excused, missing: isAssignment && past && !submitted && !excused && (submittable || !!sub?.missing), keys, contextCode: e.context_code, contextName: cc?.name || e.context_name || '',
           color: pal.text, tint: pal.tint, url: e.html_url || a?.html_url || '/calendar', points: a?.points_possible ?? null,
           // what an event's own sheet shows (an assignment opens in the preview panel instead)
           kind: appt ? 'appointment' : 'event', description: e.description || '', location: e.location_name || '', address: e.location_address || '',
@@ -150,7 +157,7 @@
     function markSubmitted(list) {
       for (const ev of list) {
         if (ev.submitted || !ev.keys?.length) continue;
-        if (ev.keys.some((k) => submittedIds.has(k))) { ev.submitted = true; ev.done = true; }
+        if (ev.keys.some((k) => submittedIds.has(k))) { ev.submitted = true; ev.done = true; ev.missing = false; }
       }
       return list;
     }
@@ -167,8 +174,9 @@
         const pal = U.palette(cc?.color || '#8e8e93', dark);
         out.push({
           id: `planner:${it.id}`, title: it.title, date: it.date, end: U.parse(r.plannable?.end_at), allDay: !!r.plannable?.all_day && !isAssignment,
-          isAssignment, icon: it.type === 'calendar_event' ? IC.book : it.icon, done: it.submitted || it.complete || it.date < now, submitted: it.submitted,
-          contextCode: code, contextName: cc?.name || it.courseName, color: pal.text, tint: pal.tint, url: it.url, points: it.points,
+          isAssignment, icon: it.type === 'calendar_event' ? IC.book : it.icon, done: isAssignment ? it.submitted || it.complete || it.excused : it.date < now, submitted: it.submitted, excused: it.excused,
+          missing: isAssignment && !it.submitted && !it.excused && (it.missing || it.date < now),
+          contextCode: code, contextName: cc?.name || it.courseName, color: pal.text, tint: pal.tint, url: it.url, points: it.points, location: r.plannable?.location_name || '',
         });
       }
       return out.sort((x, y) => x.date - y.date);
@@ -234,8 +242,10 @@
     /** A press on an event (not an assignment: the preview panel takes those) opens its sheet rather than
      *  following its Canvas address, which is the calendar page itself and would only draw it again. */
     const onEvent = (ev) => (ev.isAssignment ? null : (e) => { e.preventDefault(); e.stopPropagation(); openEvent(ev, e.currentTarget); });
+    /** What a row says after the course: the points an assignment is worth, where an event is. */
+    const facts = (ev) => [ev.points !== null && ev.points !== undefined ? `${store.fmtPts(ev.points)} pts` : '', ev.location || ''].filter(Boolean);
     function chip(ev, small = true) {
-      return h('a', { class: 'bcv-ev', href: ev.url, style: { background: ev.tint, color: ev.color }, title: `${ev.title} · ${ev.contextName}`, onclick: onEvent(ev) }, [
+      return h('a', { class: 'bcv-ev', href: ev.url, style: { background: ev.tint, color: ev.color }, title: [ev.title, ev.contextName, ...facts(ev), ev.missing ? 'Missing' : ''].filter(Boolean).join(' · '), onclick: onEvent(ev) }, [
         U.svg(ev.icon, { size: 10, stroke: ev.color, width: 2.1, style: { flex: 'none' } }),
         h('span', { class: `bcv-ev__label ${ev.done ? 'bcv-strike' : ''}`, style: { color: ev.color }, text: ev.title }),
       ]);
@@ -273,9 +283,10 @@
         grid.append(U.text('bcv-week__hour', hourLabel(hh)));
         for (const d of days) {
           const evs = eventsOn(d).filter((ev) => !ev.allDay && (ev.date.getHours() === hh || (hh === 8 && ev.date.getHours() < 8)));
-          grid.append(U.el(`bcv-week__cell ${U.sameDay(d, now) ? 'bcv-week__cell--today' : ''}`, evs.map((ev) => h('a', { class: 'bcv-wev', href: ev.url, style: { background: ev.tint }, title: `${ev.title} · ${ev.contextName}`, onclick: onEvent(ev) }, [
+          grid.append(U.el(`bcv-week__cell ${U.sameDay(d, now) ? 'bcv-week__cell--today' : ''}`, evs.map((ev) => h('a', { class: 'bcv-wev', href: ev.url, style: { background: ev.tint }, title: [ev.title, ev.contextName, ...facts(ev), ev.missing ? 'Missing' : ''].filter(Boolean).join(' · '), onclick: onEvent(ev) }, [
             h('div', { class: 'bcv-wev__time', style: { color: ev.color }, text: U.fmtTimeLower(ev.date).replace(/m$/, '') }),
             h('div', { class: `bcv-wev__title ${ev.done ? 'bcv-strike' : ''}`, style: { color: ev.color }, text: ev.title }),
+            facts(ev).length ? h('div', { class: 'bcv-wev__facts', style: { color: ev.color }, text: facts(ev).join(' · ') }) : null,
           ]))));
         }
       }
@@ -302,7 +313,8 @@
             U.tile(ev.icon, { color: ev.color, tint: ev.tint }),
             U.text('bcv-agenda__due', ev.allDay ? 'All day' : `${ev.isAssignment ? 'Due' : 'At'} ${U.fmtTimeLower(ev.date)}`, 'span'),
             h('span', { class: `bcv-agenda__title bcv-pretty ${ev.done ? 'bcv-strike' : ''}`, text: ev.title }),
-            U.text('bcv-agenda__course', ev.contextName, 'span'),
+            ev.missing ? U.statusBadge({ word: 'Missing', kind: 'bad' }) : ev.excused ? U.statusBadge({ word: 'Excused', kind: 'muted' }) : null,
+            U.text('bcv-agenda__course', [ev.contextName, ...facts(ev)].filter(Boolean).join(' · '), 'span'),
           ], ev.isAssignment ? { href: ev.url } : { onClick: (e) => openEvent(ev, e.currentTarget) })), 'bcv-card--list'),
         ]));
       }

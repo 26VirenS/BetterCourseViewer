@@ -86,7 +86,7 @@
     const favIds = new Set(favs.map((c) => String(c.id)));
     const inSel = (it) => it.custom || !it.courseId || favIds.has(String(it.courseId));
     const live = (planner || []).filter((it) => !it.complete && !it.dismissed && it.type !== 'announcement' && inSel(it));
-    const dueItems = live.filter((it) => it.isDue);
+    const dueItems = live.filter((it) => it.isDue && !it.excused); // (excused work is not due: it counts nowhere)
     // Overdue and Graded this week read each selected course's assignments (their submissions carry
     // Canvas's own late / missing / graded_at flags). A card whose fetch fails is dropped rather than
     // shown as 0 (a false 0 on Overdue reads as "fine").
@@ -95,7 +95,7 @@
     const dueToday = dueItems.filter((it) => U.sameDay(it.date, now) && !it.submitted);
     const dueTomorrow = dueItems.filter((it) => U.sameDay(it.date, tomorrowStart) && !it.submitted);
     const dueWeek = dueItems.filter((it) => it.date >= weekStart && it.date < weekEnd && !it.submitted);
-    const weekAll = (planner || []).filter((it) => it.isDue && it.date >= weekStart && it.date < weekEnd && (it.points === null || it.points > 0) && it.type !== 'announcement');
+    const weekAll = (planner || []).filter((it) => it.isDue && !it.excused && it.date >= weekStart && it.date < weekEnd && (it.points === null || it.points > 0) && it.type !== 'announcement');
 
     // ---- stats -------------------------------------------------------------------
     // Each counter opens a sheet listing exactly the items it counted.
@@ -142,7 +142,9 @@
         const valueEl = unreadCard.querySelector('.bcv-stat__value');
         if (first && Date.now() - t0 < 2500) U.roll(valueEl, count, { seed: 4.6 });
         else valueEl.textContent = String(count);
-        unreadCard.querySelector('.bcv-stat__note').textContent = top || (count ? 'Not all listed' : 'All caught up');
+        // one phrase for the card and its sheet, so they never disagree: "All from MATH 021", "From 2 courses"
+        const phrase = !count ? 'All caught up' : !perCourse.size ? 'Not all listed' : perCourse.size === 1 ? `${unread.length === 2 ? 'Both' : unread.length === 1 ? 'One' : 'All'} from ${top}` : `From ${U.plural(perCourse.size, 'course')}`;
+        unreadCard.querySelector('.bcv-stat__note').textContent = phrase;
         const items = unread.map((u) => {
           const c = courseMap.get(String(u.courseId));
           const pal = c ? c.palette : U.palette('#5856d6', dark);
@@ -150,7 +152,7 @@
         });
         unreadSheet = {
           label: 'Unread announcements', value: String(count), icon: IC.bell, color: '#ff9500', items, empty: 'All caught up.', more,
-          note: !count ? 'Nothing unread' : perCourse.size === 1 ? `${unread.length === 2 ? 'Both' : unread.length === 1 ? 'One' : 'All'} from ${top}` : `From ${U.plural(perCourse.size, 'course')}`,
+          note: phrase,
         };
       };
       feedP.then((feed) => {
@@ -222,13 +224,18 @@
         for (const { c, list } of byCourse) {
           for (const a of list || []) {
             const s = a.submission;
-            if (!s || !s.late || s.excused || (s.score !== null && s.score !== undefined)) continue;
+            if (!s || s.excused) continue;
+            // handed in late and not yet marked — or never handed in at all and past due (Canvas's own
+            // "missing"), which the planner's week-long window no longer holds once it is older than that
+            const lateOpen = s.late && s.submitted_at && (s.score === null || s.score === undefined);
+            const missing = !s.submitted_at && (s.missing || (a.due_at && U.parse(a.due_at) < now)) && (a.submission_types || []).some((t) => !['none', 'on_paper', 'not_graded'].includes(t));
+            if (!lateOpen && !missing) continue;
             if (seen.has(`assignment:${a.id}`) || (a.quiz_id && seen.has(`quiz:${a.quiz_id}`))) continue;
             seen.add(`assignment:${a.id}`);
             const key = a.quiz_id ? `quiz:${a.quiz_id}` : `assignment:${a.id}`;
             if (dismissedKeys.has(key) || dismissedKeys.has(`assignment:${a.id}`) || plannerByKey.get(key)?.dismissed) continue;
             const item = plannerByKey.get(key) || { type: a.quiz_id ? 'quiz' : 'assignment', raw: { plannable_id: a.quiz_id || a.id, planner_override: null } };
-            overdue.push({ key, late: true, item, title: a.name, meta: [kindOf(a), a.points_possible !== null && a.points_possible !== undefined ? `${store.fmtPts(a.points_possible)} pts` : null, a.due_at ? `due ${U.fmtShort(a.due_at)}` : null, 'submitted late · ungraded'].filter(Boolean).join(' · '), course: c.shortName || c.name, color: c.palette.text, tint: c.palette.tint, url: a.html_url || `${c.url}/assignments/${a.id}`, date: U.parse(a.due_at) || now });
+            overdue.push({ key, late: lateOpen, item, title: a.name, meta: [kindOf(a), a.points_possible !== null && a.points_possible !== undefined ? `${store.fmtPts(a.points_possible)} pts` : null, a.due_at ? `due ${U.fmtShort(a.due_at)}` : null, lateOpen ? 'submitted late · ungraded' : 'not submitted'].filter(Boolean).join(' · '), course: c.shortName || c.name, color: c.palette.text, tint: c.palette.tint, url: a.html_url || `${c.url}/assignments/${a.id}`, date: U.parse(a.due_at) || now });
           }
         }
         overdue.sort(byDate);
@@ -416,9 +423,10 @@
           h('div', { class: 'bcv-ccard__hero', style: c.image ? { background: `${c.color} url(${JSON.stringify(c.image)}) center/cover` } : { background: c.color } },
             h('button', { type: 'button', class: 'bcv-ccard__more', title: 'Course options', onclick: (e) => { e.stopPropagation(); courseMenu(e.currentTarget, c); } }, U.svg(IC.dots, { size: 13, stroke: '#fff', width: 2 }))),
           U.el('bcv-ccard__body', [
-            h('div', {}, [h('div', { class: 'bcv-ccard__code bcv-ellip', text: c.shortName || c.name, style: { color: c.palette.text } }), U.text('bcv-ccard__section', c.subtitle || c.sections[0] || c.code)]),
+            // the code, the term and who teaches it (Canvas's card subtitle is only "Enrolled as: Student"); the current score beside the quick links
+            h('div', {}, [h('div', { class: 'bcv-ccard__code bcv-ellip', text: c.shortName || c.name, style: { color: c.palette.text } }), U.text('bcv-ccard__section bcv-ellip', [c.code && c.code !== c.name ? c.code : null, c.cardTerm || c.term, c.teachers?.[0]].filter(Boolean).join(' · ') || c.sections[0] || '')]),
             progress,
-            U.el('bcv-ccard__foot', [...quick, badgeEl]),
+            U.el('bcv-ccard__foot', [...quick, c.score !== null && c.score !== undefined ? U.badge(`${store.fmtPts(c.score)}%${c.grade ? ` · ${c.grade}` : ''}`, 'green', 'bcv-badge--sm bcv-ccard__grade') : null, badgeEl]),
           ]),
         ]);
         grid.append(first ? U.enter(card) : card); // the cards float in beneath the workload, once, all on the same beat
@@ -496,7 +504,8 @@
       if (!planner) return U.emptyCard('Your planner could not be loaded.');
       // Completed and submitted items stay in the list, ticked, so they can be unticked — unless
       // the list is asked to hide them, which one small button at its top does and undoes.
-      const upcoming = (planner || []).filter((it) => !it.dismissed && it.type !== 'announcement' && it.date >= todayStart).sort((a, b) => a.date - b.date);
+      // the same courses as the cards above (the favourites): a course kept off the dashboard stays off its list too
+      const upcoming = (planner || []).filter((it) => !it.dismissed && it.type !== 'announcement' && it.date >= todayStart && inSel(it)).sort((a, b) => a.date - b.date);
       if (!upcoming.length) return U.emptyCard('Nothing coming up in the next three weeks.');
       const doneOf = (it) => !!(it.complete || it.submitted);
       const doneN = upcoming.filter(doneOf).length;
@@ -515,13 +524,15 @@
       }
       const out = [];
       let shown = 0;
+      const first = !entered; // the day groups follow the stat cards in, once; a list drawn again (Hide completed, the view switched back) lands in place
       for (const [k, items] of days) {
         if (shown++ >= 8) break;
         const d = new Date(k);
-        out.push(U.enter(U.el('bcv-day', [
+        const day = U.el('bcv-day', [
           U.el('bcv-day__head', [U.h2(U.dayTitle(d), 'bcv-h2--19'), U.text('bcv-day__date', U.fmtLong(d), 'span')]),
           U.card(items.map((it) => plannerRow(it)), 'bcv-card--list'),
-        ]), out.length, 70, 420)); // day groups follow the stat cards
+        ]);
+        out.push(first ? U.enter(day, out.length, 70, 420) : day);
       }
       return U.el('bcv-col', [tools, ...out].filter(Boolean), { style: { gap: '26px' } });
     }
@@ -555,7 +566,8 @@
         circle,
         U.tile(it.icon, { color: pal.text, tint: pal.tint }),
         U.el('bcv-row__body', [
-          U.text('bcv-row__over', `${it.courseName} · ${it.kind}${it.isDue ? '' : ' · to-do date'}${it.graded ? ' · graded' : it.submitted ? ' · submitted' : ''}`),
+          // the course and the kind, then where the work stands (Missing, Late, Graded, Feedback, New) in the same words as To Do
+          h('div', { class: 'bcv-row__over bcv-row__over--flags' }, [h('span', { text: `${it.courseName} · ${it.kind}${it.isDue ? '' : ' · to-do date'}` }), ...store.workFlags(it).map((st) => U.statusBadge(st))]),
           U.text('bcv-row__title bcv-ellip', it.title),
         ]),
         U.el('bcv-row__right', [
@@ -579,7 +591,7 @@
       wrap.replaceChildren(...stream.slice(0, 30).map((a) => {
         const course = courseMap.get(String(a.course_id));
         const pal = course ? course.palette : U.palette('#5856d6', dark);
-        const kind = ACTIVITY_KIND[a.type] || a.type;
+        const kind = a.type === 'Submission' ? submissionKind(a) : ACTIVITY_KIND[a.type] || a.type;
         const extra = a.type === 'DiscussionTopic' && a.total_root_discussion_entries ? ` · ${a.total_root_discussion_entries} replies` : '';
         const preview = BCV.utils.htmlToText(a.message || a.latest_messages?.[0]?.message || '', 160).replace(/\s+/g, ' ');
         const url = activityUrl(a);
@@ -605,6 +617,21 @@
         return rowEl;
       }));
       return wrap;
+    }
+    /** What a submission item is about: the score once it is posted (a held grade is not news yet),
+     *  the teacher's comment when that is all there is, else the hand-in itself. */
+    function submissionKind(a) {
+      const posted = a.posted_at === undefined || a.posted_at !== null;
+      const hasScore = (a.score !== null && a.score !== undefined) || (a.grade !== null && a.grade !== undefined && a.grade !== '');
+      const comments = Array.isArray(a.submission_comments) ? a.submission_comments.filter((x) => x && (x.comment || x.media_comment)) : [];
+      if (posted && hasScore) {
+        const possible = a.assignment?.points_possible;
+        const score = a.score !== null && a.score !== undefined ? store.fmtPts(a.score) : a.grade;
+        const letter = a.grade && a.score !== null && a.score !== undefined && String(a.grade) !== String(a.score) ? ` · ${a.grade}` : '';
+        return `Graded · ${score}${possible !== null && possible !== undefined ? ` / ${store.fmtPts(possible)}` : ''}${letter}`;
+      }
+      if (comments.length) return comments.length === 1 ? 'Comment' : `${comments.length} comments`;
+      return 'Submitted';
     }
     function activityUrl(a) {
       if (a.html_url) return a.html_url;

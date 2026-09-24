@@ -118,7 +118,8 @@
     }
   }
   /** A command as a row: its name and what it takes, the line under it; Enter runs one that takes nothing, completes one that does. */
-  const commandRow = (c) => ({ icon: c.icon, title: `/${c.name}${c.takes ? ` ${c.takes}` : ''}`, sub: c.hint, cmd: c, fill: c.args || c.text ? `/${c.name} ` : null });
+  // (a `quick` command runs on Enter as it stands — /grades opens the overview — and lists what it takes once a space follows its name)
+  const commandRow = (c) => ({ icon: c.icon, title: `/${c.name}${c.takes && !c.quick ? ` ${c.takes}` : ''}`, sub: c.hint, cmd: c, fill: (c.args || c.text) && !c.quick ? `/${c.name} ` : null });
   /** "/" and what follows: the commands the name typed could mean, or — the name complete — what the command takes, as a list that narrows with the rest. */
   async function commandMode(raw, seq) {
     ui.mode = 'cmd';

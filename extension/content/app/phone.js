@@ -41,6 +41,7 @@
   const native = () => self.BCVBridge?.native || null;
   /** Rows stagger 70ms apart, capped at 280ms: tighter than the desktop, the travel is shorter. */
   const enter = (node, i, dur = 360) => {
+    if (U.isStill?.()) return node; // (a list drawn again in place: no entrance — ui.still)
     node.classList.add('bcv-enter');
     node.style.setProperty('--bcv-delay', `${Math.min(i * 70, 280)}ms`);
     node.style.setProperty('--bcv-dur', `${dur}ms`);
@@ -268,7 +269,8 @@
     const dark = app.isDark();
     openSheet({
       label: 'Account',
-      body: U.el('bcv-ph-me', [U.avatar(me?.avatar, me?.name, 38), h('div', { style: { minWidth: '0' } }, [U.text('bcv-ph-me__name bcv-ellip', me?.name || 'Account'), U.text('bcv-ph-me__sub', app.siteName())])]),
+      // the name with the pronouns Canvas holds, then the e-mail (the login, or the school, when there is none)
+      body: U.el('bcv-ph-me', [U.avatar(me?.avatar, me?.name, 38), h('div', { style: { minWidth: '0' } }, [U.text('bcv-ph-me__name bcv-ellip', `${me?.name || 'Account'}${me?.pronouns ? ` (${me.pronouns})` : ''}`), U.text('bcv-ph-me__sub bcv-ellip', me?.email || me?.loginId || app.siteName())])]),
       rows: [
         { icon: IC.mail, label: 'Inbox', note: app.state.unread ? U.plural(app.state.unread, 'unread message') : 'No unread messages', badge: app.state.unread || null, href: '/conversations' },
         { icon: IC.people, label: 'Groups', href: '/groups' },
@@ -320,6 +322,7 @@
         U.text('bcv-ph-row__title bcv-ellip', it.title),
         time ? null : U.text('bcv-ph-row__sub bcv-ellip', it.custom ? 'My task' : `${it.kind}${pts}${it.isDue ? '' : ' · to-do date'}`),
       ]),
+      U.statusBadge(store.workFlags(it)[0]), // Missing, Late, Excused, Feedback, New — the same words as everywhere else
       chip && (it.course || it.courseName) ? h('span', { class: 'bcv-ph-chip', style: { background: pal.tint, color: pal.text }, text: it.course?.shortName || it.courseName }) : null,
       time ? U.text('bcv-ph-row__time', U.fmtTime(it.date), 'span') : null,
       chev(),
@@ -423,10 +426,12 @@
     soon: { label: 'Due soon', ink: dark ? '#ffb44d' : '#8a5200', tint: 'rgba(255,149,0,.18)', icon: IC.clock },
     graded: { label: 'Graded', ink: dark ? '#5ddb7d' : '#1a6b30', tint: dark ? 'rgba(52,199,89,.2)' : 'rgba(52,199,89,.14)', icon: IC.chart },
     feedback: { label: 'Feedback', ink: dark ? '#7ab8ff' : '#0a5dc2', tint: dark ? 'rgba(10,132,255,.22)' : 'rgba(10,132,255,.12)', icon: IC.disc },
+    message: { label: 'Messages', ink: dark ? '#7dd3e6' : '#0e6f80', tint: dark ? 'rgba(48,176,199,.22)' : 'rgba(48,176,199,.13)', icon: IC.mail },
+    discuss: { label: 'Discussions', ink: dark ? '#d29bf0' : '#6b2f8c', tint: dark ? 'rgba(175,82,222,.22)' : 'rgba(175,82,222,.13)', icon: IC.people },
     announce: { label: 'News', ink: dark ? '#a9a7f5' : '#3f3ea8', tint: dark ? 'rgba(88,86,214,.22)' : 'rgba(88,86,214,.13)', icon: BELL },
     system: { label: 'System', ink: dark ? '#c7c7cc' : '#3c3c43', tint: 'rgba(118,118,128,.18)', icon: IC.shield },
   });
-  const NF_ORDER = ['overdue', 'soon', 'graded', 'feedback', 'announce', 'system'];
+  const NF_ORDER = ['overdue', 'soon', 'graded', 'feedback', 'message', 'discuss', 'announce', 'system'];
   function relDay(d) {
     if (!d) return 'Earlier';
     const diff = U.dayDiff(d);
@@ -613,7 +618,7 @@
       body.replaceChildren(U.errorBox('Your planner could not be loaded.'));
       return screen;
     }
-    const isOpen = (it) => !it.complete && !it.dismissed && !it.submitted;
+    const isOpen = (it) => !it.complete && !it.dismissed && !it.submitted && !it.excused; // (excused work is nothing to do)
     const isDone = (it) => it.complete || it.submitted;
     const priOf = (it) => Number(pri[it.id]) || 0;
     const setPri = (it, lv) => { // one entry, merged against the latest map in storage
@@ -695,6 +700,7 @@
           U.text('bcv-ph-row__title bcv-ellip', it.title),
           U.text('bcv-ph-row__sub bcv-ellip', withCourse ? `${courseOf(it)} · ${metaOf(it)}` : metaOf(it)),
         ]),
+        U.statusBadge(store.workFlags(it)[0]), // where the work stands — Missing, Late, Excused, Feedback, New — the same words as everywhere else
         lv ? h('span', { class: 'bcv-ph-pri', style: { background: pm.tint, color: pm.color } }, [U.svg(IC.flag, { size: 9, stroke: pm.color, width: 2.4 }), h('span', { text: pm.short })]) : null,
         U.text('bcv-ph-row__time', U.fmtTime(it.date), 'span'),
       ]);
@@ -711,7 +717,7 @@
     const canAdd = () => !!draft.title.trim() && !draft.busy;
     function composer() {
       if (!draft.open) {
-        return h('button', { type: 'button', class: 'bcv-ph-todo__add', onclick: () => { draft.open = true; draw(); setTimeout(() => body.querySelector('.bcv-ph-composer__title')?.focus(), 30); } }, [
+        return h('button', { type: 'button', class: 'bcv-ph-todo__add', onclick: () => { draft.open = true; draw(); body.querySelector('.bcv-ph-composer__title')?.focus(); } }, [
           h('span', { class: 'bcv-ph-todo__addic' }, U.svg(IC.plus, { size: 14, stroke: 'var(--bcv-blue)', width: 2.4 })),
           h('span', { class: 'bcv-ph-todo__addlabel', text: 'Add your own task' }),
         ]);
@@ -751,7 +757,11 @@
       }
     }
 
-    function draw() {
+    // the first draw is the screen arriving (the groups stagger in); every draw after it is the
+    // same list with one thing changed, and lands in place, still (ui.still)
+    let drawn = false;
+    const draw = () => (drawn ? U.still(paint) : paint());
+    function paint() {
       closeSwipes();
       const all = visibleItems();
       const done = all.filter(isDone).length;
@@ -788,13 +798,14 @@
         const days = new Map();
         for (const it of shown.sort(byDate)) {
           const d = U.dayDiff(it.date, now);
-          const k = d <= 0 ? 'Today' : d === 1 ? 'Tomorrow' : d < 7 ? U.DAYS_LONG[it.date.getDay()] : U.fmtShort(it.date);
+          const k = d < 0 ? 'Overdue' : d === 0 ? 'Today' : d === 1 ? 'Tomorrow' : d < 7 ? U.DAYS_LONG[it.date.getDay()] : U.fmtShort(it.date); // (past due, a task of your own past its day: Overdue, first)
           if (!days.has(k)) days.set(k, []);
           days.get(k).push(it);
         }
         for (const [k, list] of days) groups.push(block(k, list));
       }
       body.replaceChildren(...[enter(progress, 0), seg, showRow, composer(), ...groups.filter(Boolean).map((g, i) => enter(g, i + 1)), U.hint('Tap a task to edit it. Swipe left for quick actions. Priority is yours alone and never reaches Canvas.', 'bcv-ph-foot')]);
+      drawn = true;
     }
     draw();
     return screen;
@@ -884,7 +895,7 @@
       barFill.style.width = `${g === null ? 0 : Math.round((g / 4) * 100)}%`;
       const diff = g === null ? null : g - goal;
       diffIcon.replaceChildren(U.svg(diff === null || diff >= 0 ? 'M12 19V5M6 11l6-6 6 6' : 'M12 5v14M6 13l6 6 6-6', { size: 13, stroke: '#fff', width: 2.4 }));
-      diffText.textContent = diff === null ? 'no score to compare yet' : diff >= 0 ? `+${gpa2(diff)} above goal` : `${gpa2(diff)} below goal`;
+      diffText.textContent = diff === null ? 'no score to compare yet' : diff >= 0 ? `+${gpa2(diff)} above goal` : `${gpa2(Math.abs(diff))} below goal`; // (below says it: no minus sign doubling it)
       goalNote.textContent = `goal ${gpa2(goal)}${whatIf ? ' · what-if' : ''}`;
     }
 
@@ -1017,12 +1028,21 @@
         const cc = ctxMap.get(e.context_code) || null;
         const a = e.assignment || null;
         const isAssignment = e.type === 'assignment' || !!a;
-        const date = U.parse(isAssignment ? (a?.due_at || e.start_at) : e.start_at);
+        // an all-day event is a day, not an instant: Canvas names the day (all_day_date); its start_at
+        // is that day's midnight in the maker's zone, which is the evening before in another
+        const allDay = !isAssignment && !!e.all_day && /^\d{4}-\d{2}-\d{2}$/.test(String(e.all_day_date || ''));
+        const date = allDay ? (([y, mo, d]) => new Date(y, mo - 1, d))(e.all_day_date.split('-').map(Number)) : U.parse(isAssignment ? (a?.due_at || e.start_at) : e.start_at);
         if (!date) continue;
         const sub = a?.submission;
         const submitted = !!(sub && (sub.submitted_at || sub.workflow_state === 'graded' || sub.workflow_state === 'submitted')) || (a && (submittedIds.has(`assignment:${a.id}`) || (a.quiz_id && submittedIds.has(`quiz:${a.quiz_id}`))));
+        const excused = !!sub?.excused;
+        const types = a?.submission_types || [];
+        const submittable = !!types.length && !types.some((t) => t === 'none' || t === 'on_paper' || t === 'not_graded' || t === 'external_tool');
+        const kind = !isAssignment ? (e.appointment_group_id ? 'Appointment' : 'Event') : types.includes('online_quiz') || a?.is_quiz_assignment ? 'Quiz' : types.includes('discussion_topic') ? 'Discussion' : 'Assignment';
         const pal = U.palette(cc?.color || '#8e8e93', dark);
-        out.push({ id: String(e.id), title: e.title || a?.name || 'Untitled', date, allDay: !!e.all_day && !isAssignment, isAssignment, done: submitted || date < now, color: pal.text, dot: cc?.color || '#8e8e93', contextName: cc?.name || e.context_name || '', url: e.html_url || a?.html_url || '/calendar' });
+        // an event that has happened is struck through; an assignment only once it is handed in — one
+        // past its due date with nothing in is missing work, and says so
+        out.push({ id: String(e.id), title: e.title || a?.name || 'Untitled', date, allDay: !!e.all_day && !isAssignment, isAssignment, kind, done: isAssignment ? submitted || excused : date < now, missing: isAssignment && date < now && !submitted && !excused && (submittable || !!sub?.missing), excused, points: a?.points_possible ?? null, location: e.location_name || '', color: pal.text, dot: cc?.color || '#8e8e93', contextName: cc?.name || e.context_name || '', url: e.html_url || a?.html_url || '/calendar' });
       }
       return out.sort(byDate);
     }
@@ -1051,7 +1071,12 @@
     const eventsOn = (d) => events.filter((ev) => U.sameDay(ev.date, d));
     const evRow = (ev) => h('a', { class: `bcv-ph-ev ${ev.done ? 'is-done' : ''}`, href: ev.url, onclick: (e) => { e.preventDefault(); app.go(ev.url); } }, [
       h('span', { class: 'bcv-ph-ev__bar', style: { background: ev.dot } }),
-      U.text('bcv-ph-ev__title bcv-ellip', ev.title, 'span'),
+      U.el('bcv-ph-ev__body', [
+        U.text('bcv-ph-ev__title bcv-ellip', ev.title, 'span'),
+        // the course, what it is, what it is worth, where it is — the same facts as the desktop's agenda
+        U.text('bcv-ph-ev__sub bcv-ellip', [ev.contextName, ev.kind, ev.points !== null && ev.points !== undefined ? `${store.fmtPts(ev.points)} pts` : '', ev.location].filter(Boolean).join(' · '), 'span'),
+      ]),
+      ev.missing ? U.statusBadge({ word: 'Missing', kind: 'bad' }) : ev.excused ? U.statusBadge({ word: 'Excused', kind: 'muted' }) : null,
       U.text('bcv-ph-ev__time', ev.allDay ? 'All day' : U.fmtTime(ev.date), 'span'),
     ]);
     const dayBlock = (d, rel = '') => {
@@ -1146,17 +1171,22 @@
     if (!ctx.alive()) return b;
     const now = new Date();
     const list = (asg || []).filter((a) => a.published !== false);
-    const open = list.filter((a) => !submittedA(a) && !(a.submission_types || []).some((t) => ['none', 'on_paper', 'not_graded'].includes(t)) && (!a.due_at || U.parse(a.due_at) >= U.addDays(now, -1)))
+    // every piece of work still open — past due included, with its Missing flag, rather than dropped after a day
+    const open = list.filter((a) => !submittedA(a) && !a.submission?.excused && !(a.submission_types || []).some((t) => ['none', 'on_paper', 'not_graded'].includes(t)))
       .sort((x, y) => (U.parse(x.due_at)?.getTime() || Infinity) - (U.parse(y.due_at)?.getTime() || Infinity));
     const turned = list.filter(submittedA).sort((x, y) => (U.parse(y.submission?.submitted_at)?.getTime() || 0) - (U.parse(x.submission?.submitted_at)?.getTime() || 0)).slice(0, 5);
     const kindOf = (a) => (isQuizA(a) ? 'Quiz' : (a.submission_types || []).includes('discussion_topic') ? 'Discussion' : 'Assignment');
     const hrefOf = (a) => (isQuizA(a) && a.quiz_id ? `${c.url}/quizzes/${a.quiz_id}` : `${c.url}/assignments/${a.id}`);
 
-    const workRowA = (a) => h('a', { class: 'bcv-ph-row', href: hrefOf(a), onclick: (e) => { e.preventDefault(); openItem(app, hrefOf(a)); } }, [
-      h('span', { class: 'bcv-ph-row__tile', style: { background: c.palette.tint } }, U.svg(isQuizA(a) ? IC.bolt : IC.doc, { size: 15, stroke: c.palette.text, width: 1.9 })),
-      U.el('bcv-ph-row__body', [U.text('bcv-ph-row__title bcv-ellip', a.name), U.text('bcv-ph-row__sub bcv-ellip', `${kindOf(a)} · ${a.points_possible !== null && a.points_possible !== undefined ? `${store.fmtPts(a.points_possible)} pts` : 'no points'}${a.due_at ? ` · ${dueText(U.parse(a.due_at))}` : ''}`)]),
-      chev(),
-    ]);
+    const workRowA = (a) => {
+      const st = store.workStatus(a); // (Missing, Opens …, Closed: said on the row; plain open work carries nothing)
+      return h('a', { class: 'bcv-ph-row', href: hrefOf(a), onclick: (e) => { e.preventDefault(); openItem(app, hrefOf(a)); } }, [
+        h('span', { class: 'bcv-ph-row__tile', style: { background: c.palette.tint } }, U.svg(isQuizA(a) ? IC.bolt : IC.doc, { size: 15, stroke: c.palette.text, width: 1.9 })),
+        U.el('bcv-ph-row__body', [U.text('bcv-ph-row__title bcv-ellip', a.name), U.text('bcv-ph-row__sub bcv-ellip', `${kindOf(a)} · ${a.points_possible !== null && a.points_possible !== undefined ? `${store.fmtPts(a.points_possible)} pts` : 'no points'}${a.due_at ? ` · ${dueText(U.parse(a.due_at))}` : ''}`)]),
+        st.kind && st.kind !== 'good' ? U.statusBadge(st) : null,
+        chev(),
+      ]);
+    };
     const doneRowA = (a) => h('a', { class: 'bcv-ph-row is-done', href: hrefOf(a), onclick: (e) => { e.preventDefault(); openItem(app, hrefOf(a)); } }, [
       circleBox(true),
       U.el('bcv-ph-row__body', [U.text('bcv-ph-row__title bcv-ellip', a.name), U.text('bcv-ph-row__sub bcv-ellip', `${kindOf(a)} · submitted${a.submission?.submitted_at ? ` ${U.fmtAt(a.submission.submitted_at)}` : ''}${a.submission?.workflow_state === 'graded' && a.submission.score !== null && a.submission.score !== undefined ? ` · ${store.fmtPts(a.submission.score)}/${a.points_possible ?? '–'}` : ''}`)]),
@@ -1196,7 +1226,7 @@
     }
 
     b.replaceChildren(...[
-      open.length ? enter(h('div', {}, [groupHead('Open work', U.plural(open.length, 'item')), listCard(open.slice(0, 6).map(workRowA))]), 0) : null,
+      open.length ? enter(h('div', {}, [groupHead('Open work', U.plural(open.length, 'item')), listCard(open.map(workRowA))]), 0) : null, // (every item the head counts: none held back)
       turned.length ? enter(h('div', {}, [groupHead('Turned in'), listCard(turned.map(doneRowA))]), 1) : null,
       links.length ? enter(listCard(links, 'bcv-ph-links'), 2) : null,
       front ? enter(front, 3) : null,

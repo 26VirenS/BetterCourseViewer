@@ -407,6 +407,7 @@ try {
   await page.waitForSelector('.bcv-sheet', { timeout: 5000 });
   const annRows = await texts('.bcv-sheet__row');
   check((await texts('.bcv-sheet__line'))[0] === '3 Unread announcements' && annRows.length === 3 && /^Field site sign-ups Posted \w+ \d+ · unread F26-SPRK 010 103$/.test(annRows[0]) && !(await page.$('.bcv-sheet__more')), `the number and the rows come from the same list (Announcements API): ${annRows.join(' | ')}`);
+  check((await texts('.bcv-sheet__note'))[0] === 'From 2 courses' && (await page.$eval('.bcv-stats .bcv-stat:nth-child(3) .bcv-stat__note', (e) => e.textContent)) === 'From 2 courses', `the card and its sheet say the same thing about where the unread ones are: ${(await texts('.bcv-sheet__note'))[0]}`);
   // a sheet row previews inside the sheet: the sheet is one steady size from the start (the right
   // side says a press previews there) and the preview takes that side, the list staying
   await page.waitForTimeout(500); // the sheet's morph out of the card settles before it is measured
@@ -544,7 +545,10 @@ try {
   await page.click('.bcv-seg__btn[data-value="activity"]');
   await page.waitForSelector('.bcv-act__title', { timeout: 5000 });
   const acts = await texts('.bcv-act__kind');
-  check(acts.length === 7 && /Announcement · F26-MATH 021 20/.test(acts[0]) && /Discussion · 23 replies/.test(acts[1]), `recent activity: ${acts.slice(0, 2).join(' | ')}`);
+  check(acts.length === 8 && /Announcement · F26-MATH 021 20/.test(acts[0]) && /Discussion · 23 replies/.test(acts[1]), `recent activity: ${acts.slice(0, 2).join(' | ')}`);
+  // a submission row says what it is about: the posted score, a comment when that is all there is, and
+  // only "Submitted" for a score the teacher is still holding back (posted_at null)
+  check(acts.includes('Graded · 19 / 19 · F26-MATH 021 20') && acts.includes('Comment · F26-MATH 021 20') && acts.includes('Submitted · F26-MATH 021 20') && !acts.some((t) => /30 \/ 30/.test(t)), `submission rows read the score, the comment and posted_at: ${acts.filter((t) => /Graded|Comment|Submitted/.test(t)).join(' | ')}`);
   const dots = () => page.$$eval('.bcv-act__dot', (els) => els.filter((e) => getComputedStyle(e).backgroundColor === 'rgb(10, 132, 255)').length);
   check((await dots()) === 3, `unread dots: ${await dots()} (the announcement read a moment ago has none)`);
   await shot(page, '03-dashboard-activity');
@@ -567,6 +571,10 @@ try {
   const dashAllRows = () => page.$$eval('.bcv-day .bcv-row', (els) => els.length);
   const [doneBefore, allBefore] = [await dashDoneRows(), await dashAllRows()];
   check(doneBefore > 0 && (await texts('.bcv-dash__done'))[0] === 'Hide completed' && (await page.$eval('.bcv-dash__done', (e) => e.getBoundingClientRect().height <= 32)), `the list shows its done rows, ticked, with a small Hide completed above them (${doneBefore} of ${allBefore} done)`);
+  // the list keeps to the courses on the dashboard (the favourites), like the cards above it: the
+  // placement exam's event (a course kept off the dashboard) is not in it
+  const listOver = await texts('.bcv-day .bcv-row__over');
+  check(listOver.length === allBefore && !listOver.some((t) => /Placement Exam|Chemistry placement/.test(t)) && listOver.filter((t) => /^F26-/.test(t)).every((t) => /^F26-(MATH 021|PHYS 008|SPRK 010|WRI 010|CHEM 002)/.test(t)), `the list covers the same courses as the cards: ${[...new Set(listOver.map((t) => t.split(' · ')[0]))].join(', ')}`);
   await shot(page, '01d-dashboard-hide-done');
   await page.click('.bcv-dash__done');
   check(await eventually(async () => (await dashDoneRows()) === 0 && (await dashAllRows()) === allBefore - doneBefore), 'Hide completed takes exactly the done rows out');
@@ -596,7 +604,7 @@ try {
   await page.waitForSelector('.bcv-ccard__hero--term', { timeout: 10000 });
   check(page.url() === `${BASE}/courses` && (await page.evaluate(() => window.__bcvSpa === 1)) && (await page.$eval('.bcv-nav__item[data-nav="courses"]', (e) => e.classList.contains('is-active'))), 'sidebar navigation moves the address and draws the screen in place, no reload; the sidebar follows');
   const termCards = await texts('.bcv-ccard');
-  check(termCards.length === 5 && /Fall 2026/.test(termCards[0]) && /Enrolled as Student/.test(termCards[0]), `favourite course cards: ${termCards.length}`);
+  check(termCards.length === 5 && /Fall 2026/.test(termCards[0]) && /Yue Lei · MATH-021-20/.test(termCards[0]), `favourite course cards say who teaches them and their code: ${termCards[0]}`);
   const groupLabels = await texts('.bcv-body .bcv-group__head--reorder .bcv-label');
   check(groupLabels.some((l) => /collaboration team/i.test(l)), `term groups: ${groupLabels.join(', ')}`);
   const terms = await page.$$eval('[data-term]', (els) => els.map((e) => e.dataset.term));
@@ -605,7 +613,7 @@ try {
   check((await page.$$eval('[data-term]', (els) => els.map((e) => e.dataset.term)))[1] === terms[0], 'term groups can be moved down (order saved)');
   await page.click(`[data-term="${terms[0]}"] .bcv-reorder__up`);
   await page.waitForFunction((first) => document.querySelector('[data-term]').dataset.term === first, terms[0], { timeout: 5000 });
-  check((await texts('.bcv-body .bcv-row')).some((t) => /Placement Exam: Chemistry.*No nickname.*Student/.test(t)), 'non-favourite rows with role badge');
+  check((await texts('.bcv-body .bcv-row')).some((t) => /Placement Exam: Chemistry.*Placement Office · PLACE-CHEM · Collaboration team.*Student/.test(t)), 'non-favourite rows: the teacher, the code and the term, with the role badge');
   // a nickname, Canvas's own: the pencil on a card opens a one-field sheet; the card, the sidebar and Canvas follow
   const coursesJson = () => fetch(`${BASE}/api/v1/courses?per_page=100`).then((r) => r.text()).then((t) => JSON.parse(t.replace(/^while\(1\);/, '')));
   const mathCard = page.locator('.bcv-ccard', { hasText: 'F26-MATH 021 20' }).first();
@@ -654,15 +662,30 @@ try {
   const todoSub = (await texts('.bcv-head__sub'))[0];
   check(/^\d+ items across \d+ courses$/.test(todoSub), `to do header: ${todoSub}`);
   const todoGroups = await texts('.bcv-group__head');
-  check(todoGroups[0].startsWith('Today') && todoGroups[1].startsWith('Tomorrow') && todoGroups[2].startsWith('Next 7 days'), `to do groups: ${todoGroups.join(' | ')}`);
+  check(todoGroups[0].startsWith('Overdue') && todoGroups[1].startsWith('Today') && todoGroups[2].startsWith('Tomorrow') && todoGroups[3].startsWith('Next 7 days'), `to do groups — past due with nothing handed in first, as Canvas's own list keeps it: ${todoGroups.join(' | ')}`);
   check((await texts('.bcv-body .bcv-row')).some((t) => /Qz01.*F26-MATH 021 20 · Quiz · 10 pts.*11:59 PM/.test(t)), 'to do rows show course · kind · pts and time');
+  // where the work stands, on the row, in the same words as everywhere else: past due with nothing in is Missing; something new on an item says New; plain open work carries nothing
+  const flagOf = async (title) => (await page.locator('.bcv-body .bcv-row', { hasText: title }).first().locator('.bcv-status').allTextContents()).join();
+  check((await flagOf('W2 HW')) === 'Missing' && (await flagOf('Composition of Functions')) === 'New' && (await flagOf('Dis01')) === '', `rows carry Missing / New where Canvas says so, nothing on plain open work: W2 HW "${await flagOf('W2 HW')}", Composition "${await flagOf('Composition of Functions')}", Dis01 "${await flagOf('Dis01')}"`);
   await shot(page, '05-todo');
   const todoRows = (await page.$$('.bcv-body .bcv-card--list .bcv-row:not(.bcv-row--first)')).length;
-  await page.click('.bcv-body .bcv-row .bcv-iconbtn');
+  const todayGroup = page.locator('.bcv-body > div', { has: page.locator('.bcv-group__head', { hasText: /^Today/ }) });
+  await todayGroup.locator('.bcv-row .bcv-iconbtn').first().click();
   await page.waitForFunction((n) => document.querySelectorAll('.bcv-body .bcv-card--list .bcv-row:not(.bcv-row--first)').length === n - 1, todoRows, { timeout: 5000 });
   check(true, 'dismissing removes the item (planner override dismissed)');
-  await page.click('.bcv-body .bcv-row .bcv-circle');
+  await todayGroup.locator('.bcv-row .bcv-circle').first().click();
   await page.waitForFunction((n) => document.querySelectorAll('.bcv-body .bcv-card--list .bcv-row:not(.bcv-row--first)').length === n - 2, todoRows, { timeout: 5000 });
+  // a redraw is not an arrival (ui.still): a tick draws the list again in place — no group vanishes and fades back in
+  const stillAfter = await page.evaluate(() => ({ running: document.getAnimations().filter((a) => a.animationName === 'bcv-fade-up' && a.playState === 'running').length, entering: document.querySelectorAll('.bcv-main .bcv-enter').length, rows: document.querySelectorAll('.bcv-body .bcv-card--list .bcv-row').length }));
+  check(stillAfter.running === 0 && stillAfter.entering === 0 && stillAfter.rows > 0, `after a tick the list is drawn again in place: no entrance runs, nothing fades back in (${JSON.stringify(stillAfter)})`);
+  // the same screen drawn again silently (back to the tab after a while, a page from the cache) lands still: no rise of its root, no stagger inside it
+  await sw.evaluate(async ([base]) => { // (the app lives in the content scripts' world: reached through the extension, as the override above is)
+    const [tab] = await chrome.tabs.query({ url: `${base}/*` });
+    await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'ISOLATED', func: () => self.BCV.app.render({ quiet: true }) });
+  }, [BASE]);
+  await page.waitForSelector('.bcv-main > .bcv-screen.bcv-screen--still .bcv-todo__add', { timeout: 10000 });
+  const quietDraw = await page.evaluate(() => ({ still: !!document.querySelector('.bcv-main > .bcv-screen.bcv-screen--still'), running: document.getAnimations().filter((a) => a.animationName === 'bcv-fade-up' && a.playState === 'running').length, entering: document.querySelectorAll('.bcv-main .bcv-enter').length }));
+  check(quietDraw.still && quietDraw.running === 0 && quietDraw.entering === 0, `a quiet re-render lands the screen still — no rise, no stagger (${JSON.stringify(quietDraw)})`);
   // ---- mockup 12: a task of your own (a Canvas planner note), priority on every row, By priority ----
   console.log('to do: own tasks + priority');
   const badgeBefore = Number((await texts('.bcv-nav__item[data-nav="todo"] .bcv-nav__count'))[0]);
@@ -799,7 +822,10 @@ try {
   const readingDay = await page.$$eval('.bcv-cal__day', (cells) => { const c = cells.find((x) => [...x.querySelectorAll('.bcv-ev')].some((e) => /Reading day/.test(e.textContent))); return c ? c.querySelector('.bcv-cal__num')?.textContent.trim() : null; });
   const dayPlus4 = (() => { const d = new Date(); d.setDate(d.getDate() + 4); return String(d.getDate()); })();
   check(readingDay === dayPlus4, `an all-day event made in another time zone sits on the day it names (${dayPlus4}), not the evening before: on ${readingDay}`);
-  check(await page.$('.bcv-ev__label.bcv-strike'), 'submitted/past events are struck through');
+  // handed-in work is struck through; work past its due date with nothing in (W2 HW, yesterday) stays
+  // legible — it is missing, not done — and the chip's tip says so, with the points it is worth
+  const calMarks = await page.$$eval('.bcv-ev', (els) => ({ struck: els.filter((e) => e.querySelector('.bcv-ev__label.bcv-strike')).map((e) => e.querySelector('.bcv-ev__label').textContent), w2: els.filter((e) => /W2 HW/.test(e.textContent)).map((e) => ({ struck: !!e.querySelector('.bcv-strike'), tip: e.title })) }));
+  check(calMarks.struck.some((t) => /Lec05-PreQuiz/.test(t)) && calMarks.w2.length === 1 && !calMarks.w2[0].struck && /^W2 HW · .+ · 15 pts · Missing$/.test(calMarks.w2[0].tip), `handed-in work is struck through, missing work is not (its tip says so): ${JSON.stringify(calMarks)}`);
   // the calendars live in a sheet off the Calendars button (which counts the ones on), so the month
   // has the width of the page to itself
   const calWide = await page.$eval('.bcv-cal', (e) => Math.round(e.getBoundingClientRect().width));
@@ -917,6 +943,9 @@ try {
   check(mini.n === 42 && mini.start && (mini.end || mini.lastInside), `agenda range picker mini calendar (${JSON.stringify(mini)})`);
   const agendaHeads = await texts('.bcv-agenda .bcv-group__head');
   check(agendaHeads[0].includes('Today ·') && /\d items?/.test(agendaHeads[0]), `agenda day heads: ${agendaHeads[0]}`);
+  // a row says the course, then what the work is worth or where the event is
+  const agendaCourse = await texts('.bcv-agenda .bcv-agenda__course');
+  check(agendaCourse.some((t) => /^F26-MATH 021 20 · 10 pts$/.test(t)) && agendaCourse.some((t) => /· COB2 140$/.test(t) || /· Online \(the Zoom link is in the course\)$/.test(t)), `agenda rows carry the points and the place: ${agendaCourse.slice(0, 4).join(' | ')}`);
   await shot(page, '08-calendar-agenda');
   // pick a range
   await (await page.$$('.bcv-mini__day:not(.bcv-mini__day--off)'))[2].click();
@@ -944,6 +973,10 @@ try {
   await page.waitForSelector('.bcv-inbox__list .bcv-row', { timeout: 10000 });
   const msgs = await texts('.bcv-inbox__list .bcv-row');
   check(msgs.length === 2 && /Halley Smith.*No submission for Acknowledge/.test(msgs[0]) && !/Sam Student/.test(msgs[0]), `inbox rows name who the conversation is with, never yourself: ${msgs[0].slice(0, 60)}`);
+  // the course in its colour, a count once there is more than one message, a paperclip for a file or a
+  // recording, and when the last message came (the day is the group's heading: a date, a weekday, a time today)
+  const inboxRows = await page.$$eval('.bcv-inbox__list .bcv-row', (els) => els.map((e) => ({ count: e.querySelector('.bcv-msg__count')?.textContent || null, clip: !!e.querySelector('.bcv-msg__clip'), when: e.querySelector('.bcv-row__when')?.textContent, course: e.querySelector('.bcv-msg__course')?.textContent || null })));
+  check(inboxRows[0].course === 'Academic Success Resource Site (2026-27)' && inboxRows[0].clip && inboxRows[0].count === null && /^[A-Z][a-z]{2} \d+$/.test(inboxRows[0].when) && inboxRows[1].course === 'F26-MATH 021 20' && inboxRows[1].clip && inboxRows[1].count === '2', `rows carry the course, the message count, an attachment mark and the time: ${JSON.stringify(inboxRows)}`);
   check((await texts('.bcv-inbox__reader'))[0].includes('No conversation selected'), 'empty reader state');
   await shot(page, '09-inbox');
   await page.click('.bcv-inbox__list .bcv-row');
@@ -953,11 +986,18 @@ try {
   await page.click('.bcv-reader__reply .bcv-btn--primary');
   await page.waitForFunction(() => document.querySelectorAll('.bcv-reader__msg').length === 2, null, { timeout: 5000 });
   check(true, 'reply posted through the conversations API');
+  check((await page.$$eval('.bcv-reader__msg .bcv-chip', (els) => els.map((e) => e.textContent))).includes('Attestation instructions.pdf') && (await eventually(async () => (await page.$$eval('.bcv-inbox__list .bcv-row', (els) => els.map((e) => e.querySelector('.bcv-msg__count')?.textContent || null)))[0] === '2')), 'the file on the message is a chip; the row counts the reply once it lands');
   await shot(page, '09b-inbox-reader');
+  // a recording left in a message plays in place; a message forwarded with it is quoted under it
+  await (await page.$$('.bcv-inbox__list .bcv-row'))[1].click();
+  await page.waitForSelector('.bcv-reader__fwd', { timeout: 5000 });
+  const mediaMsg = await page.$eval('.bcv-reader__msgs', (e) => ({ n: e.querySelectorAll('.bcv-reader__msg').length, audio: !!e.querySelector('.bcv-reader__media audio.bcv-reader__player[src="/media_objects/m-c2/audio.mp4"]'), chip: e.querySelector('.bcv-reader__media .bcv-chip')?.textContent, fwd: e.querySelector('.bcv-reader__fwd')?.innerText.replace(/\s+/g, ' ').trim() }));
+  check(mediaMsg.n === 2 && mediaMsg.audio && mediaMsg.chip === 'Voice note on office hours' && /^Forwarded · Sam Student .* Would Thursday work for office hours this week\?/.test(mediaMsg.fwd), `a voice note plays in the message and a forwarded message is quoted under it: ${JSON.stringify(mediaMsg)}`);
   await page.click('.bcv-head .bcv-btn--primary');
   await page.waitForSelector('.bcv-compose', { timeout: 5000 });
   await page.fill('.bcv-recips input', 'yue');
   await page.waitForSelector('.bcv-compose .bcv-menu__item', { timeout: 5000 });
+  check(/^Yue Lei\s+F26-MATH 021 20$/.test((await texts('.bcv-compose .bcv-menu__item'))[0]), `a person found says which course you share: ${(await texts('.bcv-compose .bcv-menu__item'))[0]}`);
   await page.click('.bcv-compose .bcv-menu__item');
   check((await texts('.bcv-recip'))[0] === 'Yue Lei', 'recipient search adds a chip');
   // Escape (which closes every menu on the page) must not take the results box with it: a second search still lists people
@@ -1008,7 +1048,7 @@ try {
   const gpaStats = await texts('.bcv-gpa__stat');
   check(gpaStats.length === 3 && /^Momentum.*Turn on tracking to compare snapshots$/i.test(gpaStats[0]) && /On-time submissions \d+% \d+ of \d+ submitted before the due time/i.test(gpaStats[1]) && (await page.$$('.bcv-gpa__chip')).length === 4 && /Highest .* at \d+% · lowest .* at \d+%/.test(gpaStats[2]), `stats: ${gpaStats.join(' | ')}`);
   const gpaCards = await texts('.bcv-gpa__card');
-  check(gpaCards.length === 5 && /^A− F26-MATH 021 20 MATH-021-20 92\.4% 3\.7 pts Needs \d+% of the remaining 507 pts 93 pts earned so far Target A− Details$/.test(gpaCards[0]) && gpaCards.filter((t) => /^N\/A .*N\/A — pts Nothing graded yet — no score to project from .*No grade yet Details$/.test(t)).length === 1, `course cards: ${gpaCards[0]} || ${gpaCards[4]}`);
+  check(gpaCards.length === 5 && /^A− F26-MATH 021 20 MATH-021-20 92\.4% 3\.7 GPA Needs \d+% of the remaining 507 pts 93 pts earned so far Target A− Details$/.test(gpaCards[0]) && gpaCards.filter((t) => /^N\/A .*N\/A no GPA The teacher hides the total — no score to project from Canvas sends no score while the total is hidden.*No grade yet Details$/.test(t)).length === 1, `course cards (grade points said as GPA; a hidden total says why there is no score): ${gpaCards[0]} || ${gpaCards[4]}`);
   // a course saved as pass/fail (the setup's switch, P/F in place of a letter): its card says so, its score still shows, and the GPA leaves it out
   const pfCourse = await page.$eval('.bcv-gpa__card', (e) => e.dataset.course);
   const gpaBefore = (await texts('.bcv-gpa__value'))[0];
@@ -1017,7 +1057,7 @@ try {
   await page.reload();
   await page.waitForSelector('.bcv-gpa__value', { timeout: 15000 });
   const pfCard = (await texts(`.bcv-gpa__card[data-course="${pfCourse}"]`))[0];
-  check((await texts('.bcv-head__sub'))[0] === 'Fall 2026 · 5 courses · 3 with grades so far' && /^P\/F F26-MATH 021 20 MATH-021-20 92\.4% — pts Pass\/Fail — no letter to aim at Counts for nothing in the GPA Pass\/Fail Details$/.test(pfCard) && (await texts('.bcv-gpa__value'))[0] !== gpaBefore, `a pass/fail course shows its score without points, says so instead of a target, and stays out of the GPA (${pfCard} · ${gpaBefore} → ${(await texts('.bcv-gpa__value'))[0]})`);
+  check((await texts('.bcv-head__sub'))[0] === 'Fall 2026 · 5 courses · 3 with grades so far' && /^P\/F F26-MATH 021 20 MATH-021-20 92\.4% no GPA Pass\/Fail — no letter to aim at Counts for nothing in the GPA Pass\/Fail Details$/.test(pfCard) && (await texts('.bcv-gpa__value'))[0] !== gpaBefore, `a pass/fail course shows its score without points, says so instead of a target, and stays out of the GPA (${pfCard} · ${gpaBefore} → ${(await texts('.bcv-gpa__value'))[0]})`);
   await setTarget(pfCourse, null);
   await page.reload();
   await page.waitForSelector('.bcv-gpa__value', { timeout: 15000 });
@@ -1466,7 +1506,7 @@ try {
   // and it opens what was handed in — attempt by attempt — the way a graded one opens the mark. The
   // side card that used to repeat the facts (and showed nothing of the work) is gone.
   const subChip = await page.$eval('.bcv-detail__grade', (e) => ({ sub: e.classList.contains('bcv-detail__grade--sub'), text: e.innerText.replace(/\s+/g, ' ').trim(), sideCards: document.querySelectorAll('.bcv-body--course-cols > .bcv-col').length }));
-  check(page.url() === `${BASE}/courses/104/assignments/4002` && (await texts('.bcv-detail__actions .bcv-btn--primary'))[0] === 'Resubmit' && subChip.sub && /^Submitted [A-Z][a-z]{2} \d+ at \d+:\d\d ?(am|pm|AM|PM) · Attempt 2$/.test(subChip.text) && subChip.sideCards === 1, `Done reloads the assignment page: a Submitted chip with the time and the attempt, Resubmit, and no side card: ${JSON.stringify(subChip)}`);
+  check(page.url() === `${BASE}/courses/104/assignments/4002` && (await texts('.bcv-detail__actions .bcv-btn--primary'))[0] === 'Resubmit' && subChip.sub && /^Submitted [A-Z][a-z]{2} \d+ at \d+:\d\d ?(am|pm|AM|PM) · Attempt 2 · 1 comment$/.test(subChip.text) && subChip.sideCards === 1, `Done reloads the assignment page: a Submitted chip with the time, the attempt and the comment left with attempt 1, Resubmit, and no side card: ${JSON.stringify(subChip)}`);
   await page.click('.bcv-detail__grade');
   await page.waitForSelector('.bcv-fb__scorecard', { timeout: 10000 });
   const subFb = await page.evaluate(() => ({
@@ -1636,7 +1676,7 @@ try {
   const aEnter = await page.$$eval('.bcv-body .bcv-card--list .bcv-row', (els) => els.map((e) => [e.classList.contains('bcv-enter'), e.style.getPropertyValue('--bcv-delay'), e.style.getPropertyValue('--bcv-dur')]));
   check(aEnter.length >= 6 && aEnter.every(([on, , dur], i) => on && dur === '200ms' && aEnter[i][1] === `${Math.min(i * 20, 420)}ms`), `assignment rows fade in one at a time, 20ms apart: ${aEnter.slice(0, 4).map((a) => a[1]).join(',')}…`);
   const arows = await texts('.bcv-body .bcv-row');
-  check(arows.some((t) => /Qz01.*Due .* at 11:59pm · –\/10 pts.*Not submitted/.test(t)) && arows.some((t) => /Lec05-PreQuiz.*19\/19 pts.*Graded/.test(t)), 'assignment rows: due, points, status badge');
+  check(arows.some((t) => /Qz01.*Due .* at 11:59pm · 10 pts.*Not submitted/.test(t)) && arows.some((t) => /Lec05-PreQuiz.*19\/19 pts.*Graded/.test(t)) && !arows.some((t) => /–\//.test(t)), 'assignment rows: due, what it is worth (no dash standing in for a score), status badge');
   await shot(page, '13-course-assignments');
   await page.click('.bcv-seg__btn[data-value="type"]');
   await page.waitForFunction(() => [...document.querySelectorAll('.bcv-group__head')].some((e) => /Discussion Quizzes/.test(e.textContent)), null, { timeout: 5000 });
@@ -1713,9 +1753,9 @@ try {
   await tab('grades');
   await page.waitForSelector('.bcv-rings__svg', { timeout: 10000 });
   check((await page.$$('.bcv-rings__svg > circle')).length === 8 && (await page.$$('.bcv-rings__svg pattern')).length === 2 && (await page.$$eval('.bcv-rings__svg > circle', (els) => els.filter((e) => /^url\(#bcv-stipple/.test(e.getAttribute('stroke'))).length)) === 2, 'four rings (total + 3 graded groups); the two 0%-weight rings are stippled');
-  check((await texts('.bcv-gr__label'))[0].toLowerCase() === 'total' && (await texts('.bcv-gr__total'))[0] === '92%' && /^As shown in Canvas · A-\. Weighted across the groups that have graded work\.$/.test((await texts('.bcv-gr__note'))[0]), `total beside the rings: ${(await texts('.bcv-gr__total'))[0]} · ${(await texts('.bcv-gr__note'))[0]}`);
+  check((await texts('.bcv-gr__label'))[0].toLowerCase() === 'total' && (await texts('.bcv-gr__total'))[0] === '92.4%' && /^As shown in Canvas · A-\. Weighted across the groups that have graded work\.$/.test((await texts('.bcv-gr__note'))[0]), `total beside the rings, to the decimal Canvas shows: ${(await texts('.bcv-gr__total'))[0]} · ${(await texts('.bcv-gr__note'))[0]}`);
   const legend = await texts('.bcv-legend__row');
-  check(legend[0] === 'Discussion Quizzes 10 / 10 pts · Skills_Check excluded 18% of grade 100%' && /^Effort \d+ \/ \d+ pts not weighted 65%$/.test(legend[1]) && /^Collaboration .* not weighted 100%$/.test(legend[2]), `by group, weighted groups first: ${legend.slice(0, 2).join(' | ')}`);
+  check(legend[0] === 'Discussion Quizzes 10 / 10 pts · Skills_Check excluded 18% of grade 100%' && legend[1] === 'Effort 43 / 82 pts not weighted 52%' && /^Collaboration .* not weighted 100%$/.test(legend[2]), `by group, weighted groups first; a score the teacher has not posted yet (Functions, 30/30) counts for nothing: ${legend.slice(0, 2).join(' | ')}`);
   check((await texts('.bcv-ungraded__name')).join(',') === 'Midterms,Final,Coursework (Knewton Alta)' && legend.some((t) => t === 'Midterms Nothing graded yet — no ring 57% —'), 'ungraded groups listed under the legend without a ring');
   const wbar = await texts('.bcv-wbar__row');
   check((await page.$$('.bcv-wbar__seg')).length === 3 && (await page.$$('.bcv-wbar__seg--ungraded')).length === 2 && wbar.join(' | ') === 'Discussion Quizzes 18% of grade 100% | Midterms 57% of grade ungraded | Final 25% of grade ungraded' && (await texts('.bcv-gr__hsub'))[0] === '100% of final grade', `weight bar: ${wbar.join(' | ')}`);
@@ -1744,7 +1784,7 @@ try {
   await page.locator('.bcv-whatif__input').first().press('Enter');
   await page.waitForTimeout(300);
   const wfTexts = [...(await texts('.bcv-gr__total')), ...(await texts('.bcv-legend__row')), ...(await texts('.bcv-gr__note'))].join(' | ');
-  check(!/NaN/.test(wfTexts) && /^\d+%|—/.test((await texts('.bcv-gr__total'))[0] || ''), `a score that is not a number is treated as cleared, not NaN: ${(await texts('.bcv-gr__total'))[0]}`);
+  check(!/NaN/.test(wfTexts) && (await texts('.bcv-gr__total'))[0] === '84.8%', `a score that is not a number is treated as cleared, not NaN — the Midterms what-if still stands: ${(await texts('.bcv-gr__total'))[0]}`);
   // the grade model applies a group's drop rules the way Canvas does (a dropped zero no longer drags the group down), and what-if junk is cleared
   const dropModel = await sw.evaluate(async (base) => { const [t] = await chrome.tabs.query({ url: `${base}/*` }); const [{ result }] = await chrome.scripting.executeScript({ target: { tabId: t.id }, world: 'ISOLATED', func: () => { const S = self.BCV.store; const g = [{ id: 'g1', name: 'Homework', group_weight: 0, position: 1, rules: { drop_lowest: 1, never_drop: ['a3'] }, assignments: [1, 2, 3].map((i) => ({ id: `a${i}`, name: `HW ${i}`, points_possible: 100, submission: { workflow_state: 'graded', score: i === 1 ? 50 : i === 3 ? 60 : 100 } })) }]; const m = S.gradeModel(g, { id: 'x', weighted: false, score: null }, {}, false, false); const nan = S.gradeModel(g, { id: 'x', weighted: false, score: null }, { a2: '1.2.3' }, true, false); return { total: m.total, legend: m.legend[0]?.detail || '', nanTotal: nan.total }; } }); return result; }, BASE);
   check(dropModel.total === 80 && /HW 1 dropped/.test(dropModel.legend) && Number.isFinite(dropModel.nanTotal), `drop_lowest drops the lowest scored item (never_drop held): total ${dropModel.total} (100 + 60 of 200), legend "${dropModel.legend}", junk what-if total ${dropModel.nanTotal}`);
@@ -2032,7 +2072,7 @@ try {
   const dayAt = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return d; };
   const mdOf = (n) => { const d = dayAt(n); return `${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][d.getMonth()]} ${d.getDate()}`; };
   const dowOf = (n) => ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][dayAt(n).getDay()];
-  check((await texts('.bcv-module__due')).join(' | ') === `Last due ${mdOf(-7)} | Last due ${mdOf(-1)} | Next due ${dowOf(5)} | Last due ${mdOf(-21)}` && (await page.$$('.bcv-module__due.is-next')).length === 1, `each module says when it next wants something: ${(await texts('.bcv-module__due')).join(' | ')}`);
+  check((await texts('.bcv-module__due')).join(' | ') === `Last due ${mdOf(-7)} | Last due ${mdOf(-1)} | Opens ${dowOf(5)} | Last due ${mdOf(-21)}` && (await page.$$('.bcv-module__due.is-next')).length === 1, `each module says when it next wants something — and a locked one when it opens, not "next due": ${(await texts('.bcv-module__due')).join(' | ')}`);
   check((await page.$$('.bcv-circle.is-done')).length === 3 && (await page.$('.bcv-indent-1')), 'completion marks and indents');
   // by date is the order the work has to be done in, not the order the course was built in
   const names = () => texts('.bcv-module__name');
@@ -2753,7 +2793,12 @@ try {
   await page.keyboard.press('Tab');
   await page.waitForSelector('.bcv-omni__group:not([data-group="Commands"]) .bcv-omni__item', { timeout: 10000 });
   const due = await omniState();
-  check(due.value === '/submit ' && due.groups.join(',') === 'Hand an assignment in, right here' && due.rows[0] === 'W2 HW' && due.rows.includes('Dis01') && due.rows.includes('Prelab 3') && due.rows.length === 8 && !due.rows.includes('Qz01') && !due.rows.includes('Lab 1 report'), `Tab completes it and lists what is due with nothing handed in, soonest first, eight at most (no quiz, nothing submitted): ${due.rows.join(' · ')}`);
+  const rowsOf = () => page.evaluate(() => [...document.querySelectorAll('.bcv-omni__item')].map((e) => ({ t: e.querySelector('.bcv-omni__t')?.textContent, s: e.querySelector('.bcv-omni__s')?.textContent, acts: [...e.querySelectorAll('.bcv-omni__act')].map((b) => b.textContent.trim()) })));
+  const dueRows = await rowsOf();
+  check(due.value === '/submit ' && due.groups.join(',') === 'Hand an assignment in, right here' && due.rows[0] === 'W2 HW' && due.rows.includes('Dis01') && due.rows.length === 8 && !due.rows.includes('Lab 1 report') && dueRows[0].acts.join() === 'Submit', `Tab completes it and lists what is due with nothing handed in, soonest first, eight at most (nothing submitted), Submit on the row: ${due.rows.join(' · ')}`);
+  // a quiz is taken on its page, not handed in from a box: the row says so — the why-not line — and Enter takes you there
+  const qzRow = dueRows.find((r) => /PreQuiz/.test(r.t));
+  check(!!qzRow && /· Take it on its page$/.test(qzRow.s) && qzRow.acts.length === 0, `a quiz in the list says why the box cannot hand it in: ${qzRow?.t} — ${qzRow?.s}`);
   await page.keyboard.type('w3');
   await eventually(async () => (await omniState()).rows.join() === 'W3 HW', 5000);
   check((await omniState()).rows.join() === 'W3 HW', 'the list narrows as the argument is typed');
@@ -2796,6 +2841,83 @@ try {
   await hubTool.waitForLoadState('domcontentloaded').catch(() => {});
   check(openRows.rows[0] === 'Resources & Policy' && hubTool.url() === `${BASE}/courses/101/external_tools/9?display=borderless&bcv=tool` && page.url() === `${BASE}/`, `/open lists the campus tools of your courses and Enter launches the one chosen in a tab of its own, with the bar: ${hubTool.url()}`);
   await hubTool.close().catch(() => {});
+  // /open reaches an assignment's tool too (Knewton, Mastering: the assignment IS the tool) and a tool placed in a module, launched the way Canvas's own pages launch them
+  const findRows = async (text) => { await page.click('#bcv-omni'); await page.fill('#bcv-omni', text); await page.waitForSelector('.bcv-omni__item', { timeout: 10000 }); await eventually(async () => !(await page.$('.bcv-omni__more')), 10000); return rowsOf(); };
+  const knewRows = await findRows('/open knew');
+  const [knewTab] = await Promise.all([context.waitForEvent('page', { timeout: 10000 }), page.keyboard.press('Enter')]);
+  await knewTab.waitForLoadState('domcontentloaded').catch(() => {});
+  check(knewRows.length === 1 && knewRows[0].t === 'Knewton Alta: Unit 2' && /^SPRK-010-103 · Assignment tool · due /.test(knewRows[0].s) && knewRows[0].acts.join() === 'Open tool,Assignment' && knewTab.url() === `${BASE}/courses/104/external_tools/retrieve?assignment_id=4003&display=borderless&url=${encodeURIComponent('https://tool.example.com/launch')}&bcv=tool`, `/open finds an assignment that is a tool and Enter launches it in a tab of its own, by Canvas's own launch route: ${JSON.stringify(knewRows)} → ${knewTab.url()}`);
+  await knewTab.close().catch(() => {});
+  const modRows = await findRows('/open mastering');
+  const [modTab] = await Promise.all([context.waitForEvent('page', { timeout: 10000 }), page.keyboard.press('Enter')]);
+  await modTab.waitForLoadState('domcontentloaded').catch(() => {});
+  check(modRows.length === 1 && modRows[0].t === 'Mastering Physics' && modRows[0].s === 'PHYS-008-01 · Week 2: Forces · Module tool' && modTab.url() === `${BASE}/courses/102/external_tools/retrieve?display=borderless&url=${encodeURIComponent('https://tool.example.com/mastering')}&bcv=tool`, `and a tool placed in a module: ${JSON.stringify(modRows)} → ${modTab.url()}`);
+  await modTab.close().catch(() => {});
+  // the finders: each row says where the thing stands, and carries what can be done with it
+  const asg = await findRows('/assignment lab 2');
+  check(asg[0]?.t === 'Lab 2' && /^PHYS-008-01 · due \w{3} \d+ · Not submitted$/.test(asg[0].s) && asg[0].acts.join() === 'Submit' && asg.every((r) => /lab 2/i.test(r.t)), `/assignment finds them across the courses, the nearest due first — course, due, where it stands, Submit on the row: ${JSON.stringify(asg)}`);
+  const handed = await findRows('/assignment w3');
+  check(handed.length === 1 && handed[0].t === 'W3 HW' && /· Submitted$/.test(handed[0].s) && handed[0].acts.length === 0, `one handed in (from the box above) says Submitted, with no Submit to press: ${JSON.stringify(handed)}`);
+  const qz = await findRows('/quiz qz01');
+  check(qz.length === 1 && qz[0].t === 'Qz01' && qz[0].s === 'MATH-021-20 · due today 11:59 PM · 20 min · 1 attempt · Not submitted', `/quiz: due, the time limit, the attempts, where it stands: ${JSON.stringify(qz)}`);
+  const disc = await findRows('/discussion hello');
+  check(disc.length === 1 && disc[0].t === 'Intro thread: say hello (ungraded)' && /^PHYS-008-01 · 12 replies · 4 new · last reply /.test(disc[0].s), `/discussion: replies, what is new, the last reply: ${JSON.stringify(disc)}`);
+  const ann = await findRows('/announcement field');
+  check(ann.length === 1 && ann[0].t === 'Field site sign-ups' && /^SPRK-010-103 · \w+( · Unread)?$/.test(ann[0].s), `/announcement: the course, when posted (and Unread while it is): ${JSON.stringify(ann)}`);
+  const modFinds = await findRows('/module journal');
+  check(modFinds.map((r) => r.t).join(' · ') === 'Journals · Journal #2' && modFinds[0].s === 'WRI-010-20 · 0 of 1 requirements done · 1 item' && modFinds[1].s === 'WRI-010-20 · Journals · Discussion · mark it done', `/module finds the module and the item in it, with the requirement: ${JSON.stringify(modFinds)}`);
+  const ppl = await findRows('/people alan');
+  check(ppl[0]?.t === 'Alan Aguilar' && ppl[0].s === 'MATH-021-20 · Student · He/Him/His' && ppl[0].acts.join() === 'Message', `/people: the course, the role, the pronouns, Message on the row: ${JSON.stringify(ppl[0])}`);
+  await page.click('.bcv-omni__item.is-cur .bcv-omni__act');
+  await page.waitForSelector('.bcv-compose .bcv-recip', { timeout: 10000 });
+  check(page.url() === `${BASE}/conversations?to=u2&to_name=Alan%20Aguilar` && (await texts('.bcv-compose .bcv-recip'))[0] === 'Alan Aguilar', `Message opens the Inbox's compose form with them in To: ${page.url()}`);
+  await page.goto(`${BASE}/`);
+  await page.waitForSelector('#bcv-omni', { timeout: 10000 });
+  // deeper navigation: a course's grades, a course's tab, the calendar on a day, what is due today, what is overdue
+  await findRows('/grades math');
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(() => location.pathname === '/courses/101/grades', null, { timeout: 10000 });
+  check(page.url() === `${BASE}/courses/101/grades`, '/grades <course> opens that course’s grades');
+  await page.goto(`${BASE}/`);
+  await page.waitForSelector('#bcv-omni', { timeout: 10000 });
+  const tabRows = await findRows('/course phys files');
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(() => location.pathname === '/courses/102/files', null, { timeout: 10000 });
+  check(tabRows[0]?.s === 'Files of PHYS-008-01' && page.url() === `${BASE}/courses/102/files`, `/course <name> <tab> opens that tab of the course: ${tabRows[0]?.s} → ${page.url()}`);
+  await page.goto(`${BASE}/`);
+  await page.waitForSelector('#bcv-omni', { timeout: 10000 });
+  await findRows('/calendar month');
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(() => location.pathname === '/calendar', null, { timeout: 10000 });
+  await page.goto(`${BASE}/`);
+  await page.waitForSelector('#bcv-omni', { timeout: 10000 });
+  const octRows = await findRows('/calendar october');
+  const octYear = (() => { const n = new Date(); const y = n.getFullYear(); return new Date(y, 9, 1) < new Date(y, n.getMonth(), n.getDate() - 60) ? y + 1 : y; })();
+  await page.keyboard.press('Enter');
+  await page.waitForFunction((y) => location.pathname === '/calendar' && location.search === `?date=${y}-10-01` && document.querySelector('.bcv-h1')?.textContent === `October ${y}`, octYear, { timeout: 10000 });
+  check(octRows[0]?.t === 'October 1' && octRows[0].s === 'The calendar on that day', `/calendar takes a day in words and opens the month on it: ${octRows[0]?.t} → ${page.url()} · ${(await texts('.bcv-h1'))[0]}`);
+  await page.goto(`${BASE}/`);
+  await page.waitForSelector('#bcv-omni', { timeout: 10000 });
+  const dueToday = await findRows('/due today');
+  check(dueToday.length >= 2 && dueToday.every((r) => /· due today /.test(r.s)) && dueToday.some((r) => r.t === 'Dis01'), `/due today lists what is due today: ${dueToday.map((r) => r.t).join(' · ')}`);
+  const over = await findRows('/overdue');
+  check(over[0]?.t === 'W2 HW' && /· was due /.test(over[0].s) && over[0].acts.join() === 'Submit', `/overdue lists what is past due with nothing handed in, Submit on the row: ${JSON.stringify(over[0])}`);
+  // /file opens a course file in the viewer; /pin and /unpin the tray
+  await findRows('/file syll');
+  await page.keyboard.press('Enter');
+  await page.waitForSelector('.bcv-viewer .bcv-sheet__title', { timeout: 15000 });
+  check((await texts('.bcv-viewer .bcv-sheet__title'))[0] === 'Course Syllabus.pdf', '/file opens the course file in the viewer over the page');
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !document.querySelector('.bcv-viewer-ov'), null, { timeout: 5000 });
+  const pinRows = await findRows('/pin');
+  const pinName = pinRows[0]?.t;
+  await page.keyboard.press('Enter');
+  await page.waitForFunction((n) => [...document.querySelectorAll('.bcv-toast')].some((t) => t.textContent.includes(`${n} pinned beside the switch.`)), pinName, { timeout: 5000 });
+  const unpinRows = await findRows('/unpin');
+  check(!!pinName && unpinRows.some((r) => r.t === pinName && r.s === 'Unpin it'), `/pin pins a tool and /unpin lists the pinned ones: ${pinName}`);
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(() => [...document.querySelectorAll('.bcv-toast')].some((t) => /unpinned\./.test(t.textContent)), null, { timeout: 5000 });
+  check(true, 'Enter unpins it');
   // commands that take nothing run on Enter (the name need not be finished); one that takes words shows them as its row
   await page.click('#bcv-omni');
   await page.fill('#bcv-omni', '/gr');
@@ -2823,7 +2945,9 @@ try {
   await page.waitForSelector('.bcv-omni__item', { timeout: 8000 });
   check((await omniState()).rows[0] === 'Add: read chapter 4', 'a command that takes words shows them as its one row');
   await page.keyboard.press('Enter');
+  check(await page.$eval('#bcv-omni-panel', (p) => p.hidden), 'Enter closes the list at once — a search typed while the task is still saving is not closed under the typist');
   check(await eventually(async () => (await readNotes()).some((n) => n.title === 'read chapter 4' && /T09:00/.test(n.todo_date || '')), 8000), '/note adds a task for today to the planner');
+  await page.waitForFunction(() => [...document.querySelectorAll('.bcv-toast')].some((t) => /Added to To Do: read chapter 4/.test(t.textContent)), null, { timeout: 5000 });
   // a sum typed plain is worked out on the spot; a word that starts a command's name offers the command
   await page.fill('#bcv-omni', '2*(3+4)');
   await page.waitForSelector('.bcv-omni__group[data-group="Answer"] .bcv-omni__item', { timeout: 5000 });
@@ -2835,14 +2959,14 @@ try {
   await page.fill('#bcv-omni', 'due');
   await page.waitForSelector('.bcv-omni__group[data-group="Commands"] .bcv-omni__item', { timeout: 5000 });
   const dueWord = await omniState();
-  check(dueWord.groups[0] === 'Commands' && dueWord.rows[0] === '/todo' && dueWord.cur === 0, `"due" typed plain offers /todo first: ${dueWord.rows.slice(0, 2).join(' · ')}`);
+  check(dueWord.groups[0] === 'Commands' && dueWord.rows[0] === '/due today, tomorrow, week or a name' && dueWord.cur === 0, `"due" typed plain offers /due first: ${dueWord.rows.slice(0, 2).join(' · ')}`);
   await page.keyboard.press('Enter');
-  await page.waitForFunction(() => document.getElementById('bcv-omni').value === '/todo ', null, { timeout: 5000 });
+  await page.waitForFunction(() => document.getElementById('bcv-omni').value === '/due ', null, { timeout: 5000 });
   await page.waitForFunction(() => document.querySelectorAll('.bcv-omni__group:not([data-group="Commands"]) .bcv-omni__item').length > 0, null, { timeout: 10000 });
-  const todoList = await omniState();
-  check(todoList.groups.join(',') === 'What is due — or open To Do' && todoList.rows[0] === 'W2 HW' && todoList.rows.some((r) => /PreQuiz/.test(r)) && todoList.rows.length === 8, `Enter completes it and lists what is due, quizzes too, soonest first: ${todoList.rows.join(' · ')}`);
+  const dueList = await omniState();
+  check(dueList.groups.join(',') === 'What is due: today, tomorrow, this week, or by name' && dueList.rows[0] === 'Dis01' && dueList.rows.some((r) => /PreQuiz/.test(r)) && !dueList.rows.includes('W2 HW') && dueList.rows.length === 8, `Enter completes it and lists what is coming, quizzes too, soonest first (what is past due waits under /overdue): ${dueList.rows.join(' · ')}`);
   await page.keyboard.press('Escape');
-  check(await page.$eval('#bcv-omni-panel', (e) => e.hidden) && (await page.inputValue('#bcv-omni')) === '/todo ', 'Escape closes the panel, the words kept');
+  check(await page.$eval('#bcv-omni-panel', (e) => e.hidden) && (await page.inputValue('#bcv-omni')) === '/due ', 'Escape closes the panel, the words kept');
   // "/" (or ⌘K) on another screen brings the Dashboard up with the box focused, the letters typed on the way kept
   await page.goto(`${BASE}/courses`);
   await page.waitForSelector('[data-term]', { timeout: 10000 });
@@ -3897,6 +4021,7 @@ try {
   await page.waitForSelector('.bcv-menu--account', { timeout: 5000 });
   const acctItems = await texts('.bcv-menu--account .bcv-menu__item');
   check(acctItems.map((t) => t.split('\n')[0].trim()).join(' | ') === 'Simpl Courses settings Look, courses and grades | Canvas profile | All Canvas settings Profile, notifications, integrations | Notification preferences | Log out' && (await page.$eval('.bcv-menu--account', (m) => m.getBoundingClientRect().bottom <= window.innerHeight)), `the profile row opens a panel above itself: ${acctItems.join(' | ')}`);
+  check((await texts('.bcv-menu--account .bcv-menu__name'))[0] === 'Sam Student (they/them)' && (await texts('.bcv-menu--account .bcv-menu__sub'))[0] === 'sstudent@ucmerced.edu' && (await texts('#bcv-account .bcv-account__sub'))[0] === 'they/them · sstudent@ucmerced.edu', `the row and the panel carry the pronouns and the e-mail Canvas holds (the profile's): ${(await texts('.bcv-menu--account .bcv-menu__name'))[0]} · ${(await texts('#bcv-account .bcv-account__sub'))[0]}`);
   await shot(page, '34-account-panel');
   // the mock keeps the token in the _csrf_token cookie only, like Canvas (no meta tag), and its /logout
   // accepts a DELETE carrying exactly that token; anything else lands on Canvas's "Page Error"
@@ -5025,8 +5150,10 @@ try {
   check(stacked.n === 2 && stacked.top === 'ptable' && stacked.under === 'cite' && stacked.scrim === 'rgba(0, 0, 0, 0)' && stacked.reach === 'none', `the table opens on top of the citation popup, which waits underneath out of reach with its scrim off, so the page is not dimmed twice (${JSON.stringify(stacked)})`);
   await shot(page, '45e-widget-over-popup');
   await page.keyboard.press('Escape');
-  await page.waitForTimeout(400);
-  const back = await page.evaluate(() => { const ovs = [...document.querySelectorAll('.bcv-sheet-ov')]; return { n: ovs.length, tool: ovs[0]?.querySelector('.bcv-sheet')?.dataset.tool, under: ovs[0]?.classList.contains('is-under') }; });
+  // (the top one leaves with its motion, then the one under comes back: waited for, not timed — a loaded machine takes longer than the motion itself)
+  const backState = () => page.evaluate(() => { const ovs = [...document.querySelectorAll('.bcv-sheet-ov')]; return { n: ovs.length, tool: ovs[0]?.querySelector('.bcv-sheet')?.dataset.tool, under: ovs[0]?.classList.contains('is-under') }; });
+  await eventually(async () => { const b = await backState(); return b.n === 1 && !b.under; }, 4000);
+  const back = await backState();
   check(back.n === 1 && back.tool === 'cite' && !back.under, `closing the top one gives the citation popup back, itself again (${JSON.stringify(back)})`);
   await closeTool();
   await page.mouse.move(700, 500);
@@ -5389,16 +5516,22 @@ try {
   console.log('notifications');
   await page.goto(`${BASE}/#notifications`);
   await page.waitForSelector('.bcv-nf__row', { timeout: 15000 });
-  const nfOrder = ['Overdue', 'Due soon', 'Graded', 'Feedback', 'Announcements', 'System'];
+  const nfOrder = ['Overdue', 'Due soon', 'Graded', 'Feedback', 'Messages', 'Discussions', 'Announcements', 'System'];
   const nfGroups = await texts('.bcv-nf__group-t');
   const nfTotal = (await page.$$('.bcv-nf__row')).length;
-  check(nfGroups.every((g, i) => i === 0 || nfOrder.indexOf(g) > nfOrder.indexOf(nfGroups[i - 1])) && ['Graded', 'Feedback', 'Announcements', 'System'].every((g) => nfGroups.includes(g)) && (await page.title()).startsWith('Notifications'), `notifications grouped by kind, in order: ${nfGroups.join(' | ')} (${nfTotal} rows)`);
+  check(nfGroups.every((g, i) => i === 0 || nfOrder.indexOf(g) > nfOrder.indexOf(nfGroups[i - 1])) && ['Graded', 'Feedback', 'Messages', 'Discussions', 'Announcements', 'System'].every((g) => nfGroups.includes(g)) && (await page.title()).startsWith('Notifications'), `notifications grouped by kind, in order: ${nfGroups.join(' | ')} (${nfTotal} rows)`);
   check((await texts('.bcv-head__sub'))[0] === `${nfTotal} unread · ${nfTotal} total` && (await texts('.bcv-nav')).some((t) => new RegExp(`Notifications\\s*${nfTotal}\\b`).test(t)), `the subtitle and the sidebar badge count the unread alerts: ${(await texts('.bcv-head__sub'))[0]}`);
   const graded = await texts('.bcv-nf__row[data-cat="graded"]');
   const feedback = await texts('.bcv-nf__row[data-cat="feedback"]');
   const system = await texts('.bcv-nf__row[data-cat="system"]');
   const announce = await texts('.bcv-nf__row[data-cat="announce"]');
   check(graded.some((t) => /Lec05-PreQuiz graded/.test(t) && /19 \/ 19/.test(t) && /See grades/.test(t)) && feedback.some((t) => /Joon left a comment on Dis00/.test(t) && /Good use of interval notation here/.test(t) && /Read comment/.test(t)) && system.some((t) => /Chemistry placement window closes Sep 16/.test(t) && /One attempt remaining/.test(t)) && announce.length >= 1 && announce.every((t) => /Read/.test(t)), `graded, feedback, system and announcement rows carry the Canvas facts: ${graded[0]} | ${feedback[0]} | system: ${system.join(' || ')} | announce (${announce.length}): ${announce[0]}`);
+  // every row names its course (the stream's items carry only a course id); a Canvas notification
+  // always says its category; an unread message and a discussion with new replies are alerts too
+  const nfCourses = await page.$$eval('.bcv-nf__row[data-cat="graded"], .bcv-nf__row[data-cat="feedback"], .bcv-nf__row[data-cat="announce"], .bcv-nf__row[data-cat="system"]', (els) => els.map((e) => e.querySelector('.bcv-nf__course')?.textContent || ''));
+  const nfMessages = await texts('.bcv-nf__row[data-cat="message"]');
+  const nfDiscuss = await texts('.bcv-nf__row[data-cat="discuss"]');
+  check(nfCourses.length >= 4 && nfCourses.every((c) => /MATH 021|SPRK 010|PHYS 008|Placement|Attestation/.test(c)) && system.some((t) => /Due Date · One attempt remaining/.test(t)) && nfMessages.some((t) => /No submission for Acknowledge/.test(t) && /“Hello Bobcat!/.test(t) && /Read/.test(t)) && nfDiscuss.some((t) => /Is there any discussion happening this week\?/.test(t) && /23 replies/.test(t) && /MATH 021/.test(t)), `rows name the course, the category is always said, a new message and new replies are alerts: courses ${nfCourses.join(' | ')} · message: ${nfMessages[0]} · discussion: ${nfDiscuss[0]}`);
   await shot(page, '33-notifications');
   await page.click('.bcv-nf__chip[data-cat="graded"]');
   check((await texts('.bcv-nf__group-t')).join(',') === 'Graded' && (await page.$eval('.bcv-nf__chip[data-cat="graded"]', (e) => e.classList.contains('is-on'))), 'a chip narrows the list to one kind');

@@ -320,27 +320,25 @@
     if (t.includes('discussion_topic') || a.discussion_topic) return { icon: IC.disc, quiz: false };
     return { icon: IC.doc, quiz: false };
   }
-  /** Whether the assignment already has a grade: then it is done, whatever its due date says. */
-  const hasGrade = (a) => { const s = a?.submission || {}; return s.workflow_state === 'graded' && s.score !== null && s.score !== undefined; };
+  /** Whether the assignment already has a grade the student may see (marked, and posted — Canvas
+   *  holds a mark back until the teacher posts it): then it is done, whatever its due date says. */
+  const hasGrade = (a) => { const s = a?.submission || {}; return s.workflow_state === 'graded' && s.score !== null && s.score !== undefined && s.posted_at !== null; };
+  /** "13/16 pts" once graded (a letter, pass/fail or percent grade as the grade itself), else what
+   *  it is worth: "10 pts", or "no points". Never a dash standing in for a score. */
   function ptsLabel(a) {
     const s = a.submission || {};
     const poss = a.points_possible;
-    if (s.workflow_state === 'graded' && s.score !== null && s.score !== undefined) return `${store.fmtPts(s.score)}/${poss ?? '–'} pts`;
-    return `–/${poss ?? '–'} pts`;
+    const worth = poss === null || poss === undefined ? 'no points' : `${store.fmtPts(poss)} pts`;
+    if (!hasGrade(a)) return worth;
+    if (s.grade !== null && s.grade !== undefined && a.grading_type && a.grading_type !== 'points') return `${s.grade} · ${worth}`;
+    return `${store.fmtPts(s.score)}/${poss ?? '–'} pts`;
   }
-  function statusBadge(a, dark) {
-    const s = a.submission || {};
-    const due = U.parse(a.due_at);
-    const now = new Date();
-    if (s.excused) return U.badge('Excused');
-    if (s.workflow_state === 'graded' && s.score !== null && s.score !== undefined) return U.badge('Graded', 'green');
-    if (s.missing) return U.badge('Missing', 'red');
-    if (s.submitted_at || s.workflow_state === 'submitted' || s.workflow_state === 'pending_review') return U.badge(s.late ? 'Late' : 'Submitted', s.late ? 'orange' : '');
-    const t = a.submission_types || [];
-    if (t.includes('none') || t.includes('on_paper') || t.includes('not_graded')) return U.badge(t.includes('not_graded') ? 'Not graded' : 'In class');
-    if (due && due < now) return U.badge('Not submitted', 'red');
-    if (typeIcon(a).quiz && !(due && due - now < 24 * 3600e3)) return U.badge('Quiz', 'blue');
-    return U.badge(due ? 'Not submitted' : 'No due date', due ? 'red' : '');
+  /** Where the work stands, as a badge — the same words as the To Do list, the Dashboard and the
+   *  search hub (store.workStatus): Missing, Late, Submitted, Graded (late), Excused, Opens …, Closed,
+   *  On paper, Not submitted. */
+  function statusBadge(a) {
+    const st = store.workStatus(a);
+    return U.statusBadge(st.graded ? { word: st.late ? 'Graded · late' : 'Graded', kind: 'good' } : st, '');
   }
 
   // ---- reader overlay ("Immersive Reader") ---------------------------------------
@@ -483,6 +481,13 @@
     const syncReader = () => { readerBtn.hidden = !(readerVal && String(readerVal.html || '').trim()) || !!BCV.phone?.active(); }; // no Immersive Reader on the phone
     Object.defineProperty(shell, 'reader', { configurable: true, enumerable: true, get: () => readerVal, set: (v) => { readerVal = v; syncReader(); } });
     syncReader();
+    // under the title: who teaches it, its code (or its real name under a nickname), the sections,
+    // and the term's dates — the facts Canvas's own course page keeps in its header
+    if (!BCV.phone?.active() && shell.kind === 'courses') {
+      const termDates = c.termStart && c.termEnd ? `${U.fmtShort(c.termStart)} – ${U.fmtShort(c.termEnd)}` : null;
+      const detail = [(c.teachers || []).join(', ') || null, c.nickname ? c.originalName : (c.code && c.code !== c.name ? c.code : null), ...(c.sections || []), termDates].filter(Boolean).join(' · ');
+      if (detail) head.querySelector('.bcv-course__title-row').after(U.text('bcv-course__detail bcv-ellip', detail));
+    }
     // on a phone the rail folds into a chip row under the title on the tabs below Home (Home lists
     // them instead), with one line of detail: the course code (or its real name), the term, the section
     if (BCV.phone?.active()) {
@@ -863,7 +868,8 @@
         U.avatar(a.author?.avatar_image_url, a.author?.display_name, 38),
         U.el('bcv-row__body', [
           U.el('bcv-row__head', [U.text('bcv-row__title bcv-pretty', a.title, 'span'), U.text('bcv-row__when', U.fmtAtUpper(a.posted_at || a.delayed_post_at), 'span')]),
-          U.text('bcv-row__sub bcv-row__sub--3', `${a.author?.display_name || 'Instructor'} · ${a.is_section_specific && a.sections?.length ? a.sections.map((s) => s.name).join(', ') : 'All sections'}`),
+          // who posted it as Canvas names them (never a word of ours standing in), which sections, and the comments under it
+          U.text('bcv-row__sub bcv-row__sub--3', [a.author?.display_name || a.user_name || null, a.is_section_specific && a.sections?.length ? a.sections.map((s) => s.name).join(', ') : 'All sections', a.discussion_subentry_count ? `${U.plural(a.discussion_subentry_count, 'comment')}${a.unread_count ? ` · ${a.unread_count} new` : ''}` : null].filter(Boolean).join(' · ')),
           U.text('bcv-row__preview bcv-pretty', htmlToText(a.message || '', 180).replace(/\s+/g, ' ')),
         ]),
       ], { mod: 'bcv-row--p16 bcv-row--top', onClick: () => app.go(`${c.url}/announcements/${a.id}`) })), 'bcv-card--list'));
@@ -892,7 +898,7 @@
           U.text('bcv-row__title bcv-row__title--145 bcv-ellip', a.name),
           U.text('bcv-row__sub', `${hasGrade(a) ? 'Graded' : a.due_at ? `Due ${U.fmtAt(a.due_at)}` : 'No due date'} · ${ptsLabel(a)}`), // (a grade ends "due", whatever the date)
         ]),
-        statusBadge(a, shell.dark),
+        statusBadge(a),
         U.chev(),
       ], { onClick: () => app.go(quiz && a.quiz_id ? `${c.url}/quizzes/${a.quiz_id}` : `${c.url}/assignments/${a.id}`) });
       return enter ? U.enter(rowEl, n++, 20, 200) : rowEl;
@@ -976,7 +982,9 @@
         const unread = Number(d.unread_count) || 0;
         const replies = Number(d.discussion_subentry_count) || 0;
         const lastPost = d.last_reply_at && (U.parse(d.last_reply_at)?.getTime() || 0) >= (U.parse(d.posted_at)?.getTime() || 0);
-        const meta = [lastPost ? `Last post ${U.fmtAtUpper(d.last_reply_at)}` : `Posted ${U.fmtAtUpper(d.posted_at || d.created_at)}`, d.lock_at && U.parse(d.lock_at) > new Date() ? `available until ${U.fmtAtUpper(d.lock_at)}` : null, d.assignment?.due_at ? `due ${U.fmtAtUpper(d.assignment.due_at)}` : null].filter(Boolean).join(' · ');
+        // the points a graded topic carries, a to-do date the teacher set, and the window: open until, or closed since
+        const lockAt = U.parse(d.lock_at);
+        const meta = [lastPost ? `Last post ${U.fmtAtUpper(d.last_reply_at)}` : `Posted ${U.fmtAtUpper(d.posted_at || d.created_at)}`, d.assignment?.points_possible !== null && d.assignment?.points_possible !== undefined ? `${store.fmtPts(d.assignment.points_possible)} pts` : null, d.assignment?.due_at ? `due ${U.fmtAtUpper(d.assignment.due_at)}` : d.todo_date ? `to do ${U.fmtAtUpper(d.todo_date)}` : null, lockAt ? (lockAt > new Date() ? `open until ${U.fmtAtUpper(d.lock_at)}` : `closed ${U.fmtShort(d.lock_at)}`) : null].filter(Boolean).join(' · ');
         return U.row([
           U.dot(unread > 0 || d.read_state === 'unread' ? '#0a84ff' : 'transparent'),
           U.tile(IC.disc, { color: 'var(--bcv-ink3)', tint: 'var(--bcv-fill2)' }),
@@ -1014,6 +1022,7 @@
     const secName = new Map((sections || []).map((s) => [String(s.id), s.name]));
     const roleOf = (u) => {
       const e = (u.enrollments || [])[0] || {};
+      if (e.role && !/Enrollment$/.test(e.role)) return e.role; // (a role the school named itself — "Lab TA", "Tutor" — is shown as named)
       const t = e.type || e.role || '';
       return t.includes('Teacher') ? 'Teacher' : t.includes('Ta') ? 'TA' : t.includes('Observer') ? 'Observer' : t.includes('Designer') ? 'Designer' : 'Student';
     };
@@ -1032,7 +1041,7 @@
       if (!items.length) return wrap.replaceChildren(U.emptyCard('Nobody matches.'));
       wrap.replaceChildren(U.card(items.map((u) => U.row([
         U.avatar(u.avatar_url, u.name, 38),
-        U.el('bcv-row__body', [U.text('bcv-row__title bcv-row__title--145 bcv-ellip', u.name || u.sortable_name), U.text('bcv-row__sub', u.pronouns || '—')]),
+        U.el('bcv-row__body', [U.text('bcv-row__title bcv-row__title--145 bcv-ellip', u.name || u.sortable_name), u.pronouns ? U.text('bcv-row__sub', u.pronouns) : null]), // (no dash where someone set no pronouns)
         U.text('bcv-people__sections', [...new Set((u.enrollments || []).map((e) => secName.get(String(e.course_section_id))).filter(Boolean))].join(' · '), 'span'),
         U.badge(isGroup ? 'Member' : roleOf(u)),
       ], { mod: 'bcv-row--p12', href: `${c.url}/users/${u.id}` })), 'bcv-card--list'));
@@ -1055,7 +1064,7 @@
         U.tile(IC.doc, { color: 'var(--bcv-blue)', tint: 'var(--bcv-blue-soft)' }),
         U.el('bcv-row__body', [
           h('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' } }, [U.text('bcv-row__title', p.title, 'span'), p.front_page ? U.badge('Front page', 'green', 'bcv-badge--sm') : null]),
-          U.text('bcv-row__sub bcv-row__sub--3', `Created ${U.fmtDateComma(p.created_at)} · last edited ${U.fmtDateComma(p.updated_at)}${p.last_edited_by?.display_name ? ` by ${p.last_edited_by.display_name}` : ''}`),
+          U.text('bcv-row__sub bcv-row__sub--3', [p.created_at ? `Created ${U.fmtDateComma(p.created_at)}` : null, p.updated_at ? `last edited ${U.fmtDateComma(p.updated_at)}${p.last_edited_by?.display_name ? ` by ${p.last_edited_by.display_name}` : ''}` : null].filter(Boolean).join(' · ') || 'Page'), // (a page Canvas gives no dates for says nothing, not a bare "·")
         ]),
         U.chev(),
       ], { mod: 'bcv-row--p15', onClick: () => app.go(`${c.url}/pages/${p.url}`) })), 'bcv-card--list') : U.emptyCard('No pages published yet.'),
@@ -1096,8 +1105,9 @@
       const rows = [
         ...folders.map((f) => U.row([
           U.tile(IC.folder, { color: '#0a84ff', tint: 'var(--bcv-blue-soft)' }),
-          U.el('bcv-row__body', [U.text('bcv-row__title bcv-row__title--145 bcv-ellip', f.name), U.text('bcv-row__sub', `Folder · modified ${U.fmtRecent(f.updated_at)}`)]),
-          U.text('bcv-files__size', '—', 'span'),
+          U.el('bcv-row__body', [U.text('bcv-row__title bcv-row__title--145 bcv-ellip', f.name), U.text('bcv-row__sub', `Folder · modified ${U.fmtRecent(f.updated_at)}${f.locked || f.hidden ? ` · ${f.locked ? 'locked' : 'hidden'}` : ''}`)]),
+          // what is in it, where Canvas says (files_count / folders_count), rather than a dash for a size
+          U.text('bcv-files__size', [f.files_count ? U.plural(f.files_count, 'file') : null, f.folders_count ? U.plural(f.folders_count, 'folder') : null].filter(Boolean).join(' · ') || (f.files_count === 0 && f.folders_count === 0 ? 'empty' : ''), 'span'),
           U.chev(),
         ], { onClick: () => app.go(`${c.url}/files/folder/${f.full_name.split('/').slice(1).map(encodeURIComponent).join('/')}`) })),
         ...files.map((f) => {
@@ -1107,7 +1117,9 @@
           // there), never in a new tab; the row is still a link to the file's page for a new-tab click
           const rowEl = U.row([
             U.tile(kind[2], { color: pal.text, tint: pal.tint }),
-            U.el('bcv-row__body', [U.text('bcv-row__title bcv-row__title--145 bcv-ellip', f.display_name || f.filename), U.text('bcv-row__sub', `${kind[1]} · modified ${U.fmtRecent(f.updated_at || f.modified_at)}`)]),
+            // the kind, when it changed, who put it there (include[]=user), and a lock or a hidden mark where Canvas set one
+            U.el('bcv-row__body', [U.text('bcv-row__title bcv-row__title--145 bcv-ellip', f.display_name || f.filename), U.text('bcv-row__sub', [kind[1], `modified ${U.fmtRecent(f.updated_at || f.modified_at)}`, f.user?.display_name ? `by ${f.user.display_name}` : null].filter(Boolean).join(' · '))]),
+            f.locked || f.hidden || f.locked_for_user ? U.badge(f.locked_for_user || f.locked ? (f.unlock_at && U.parse(f.unlock_at) > new Date() ? `Opens ${U.fmtShort(f.unlock_at)}` : 'Locked') : 'Hidden', 'orange', 'bcv-badge--xs') : null,
             U.text('bcv-files__size', fmtSize(f.size), 'span'),
             U.chev(),
           ], { href: `${c.url}/files/${f.id}` });
@@ -1137,20 +1149,41 @@
     const wrap = h('div');
     b.append(U.el('bcv-head__tools', [U.search('Search quizzes', (q) => { query = q.toLowerCase(); draw(); })]), wrap); // (the same row as Files: the box spans it)
     wrap.append(U.loading());
-    const list = await store.quizzes(c.id).catch(() => null);
+    // the quizzes, and the course's assignments beside them: a quiz's score and state live on the
+    // assignment behind it (the list Grades and Assignments already read), and New Quizzes are
+    // assignments with no classic quiz at all
+    const [list, asg] = await Promise.all([store.quizzes(c.id).catch(() => null), store.assignments(c.id).catch(() => [])]);
     if (!ctx.alive()) return b;
     const TYPES = [['assignment', 'Assignment quizzes'], ['practice_quiz', 'Practice quizzes'], ['graded_survey', 'Graded surveys'], ['survey', 'Surveys']];
+    const assignmentOf = (q) => (asg || []).find((a) => String(a.id) === String(q.assignment_id) || (a.is_quiz_assignment && String(a.quiz_id) === String(q.id))) || null;
+    const newQuizzes = (asg || []).filter((a) => a.is_quiz_lti_assignment);
+    const attemptsOf = (q) => (q.allowed_attempts === -1 ? 'unlimited attempts' : q.allowed_attempts > 0 ? U.plural(q.allowed_attempts, 'attempt') : null);
     function draw() {
       if (!list) return wrap.replaceChildren(U.errorBox('Quizzes could not be loaded.'));
       const items = list.filter((q) => !query || q.title.toLowerCase().includes(query)).sort((x, y) => (U.parse(x.due_at) || Infinity) - (U.parse(y.due_at) || Infinity));
+      const quizRow = (q) => {
+        const a = assignmentOf(q);
+        const st = a ? store.workStatus(a) : null;
+        const bits = [q.due_at ? `Due ${U.fmtAt(q.due_at)}` : 'No due date', a && hasGrade(a) ? ptsLabel(a) : `${store.fmtPts(q.points_possible || 0)} pts`, U.plural(q.question_count || 0, 'question'), q.time_limit ? `${q.time_limit} min` : null, attemptsOf(q), q.has_access_code ? 'Access code' : null, q.require_lockdown_browser ? 'LockDown Browser' : null].filter(Boolean);
+        return U.row([
+          U.tile(IC.bolt, { color: '#7d7bef', tint: 'rgba(88,86,214,.16)' }),
+          U.el('bcv-row__body', [U.text('bcv-row__title bcv-row__title--145', q.title), U.text('bcv-row__sub', bits.join(' · '))]),
+          st ? U.statusBadge(st.graded ? { word: st.late ? 'Graded · late' : 'Graded', kind: 'good' } : st, '') : null, // (where you stand: taken, graded, missing — from the assignment behind the quiz)
+          U.chev(),
+        ], { onClick: () => app.go(`${c.url}/quizzes/${q.id}`) });
+      };
       const parts = TYPES.map(([type, lbl]) => {
         const arr = items.filter((q) => (q.quiz_type || 'assignment') === type);
-        return arr.length ? h('div', {}, [U.label(lbl), U.card(arr.map((q) => U.row([
-          U.tile(IC.bolt, { color: '#7d7bef', tint: 'rgba(88,86,214,.16)' }),
-          U.el('bcv-row__body', [U.text('bcv-row__title bcv-row__title--145', q.title), U.text('bcv-row__sub', `${q.due_at ? `Due ${U.fmtAt(q.due_at)}` : 'No due date'} · ${store.fmtPts(q.points_possible || 0)} pts · ${U.plural(q.question_count || 0, 'question')}${q.has_access_code ? ' · Access code' : ''}${q.require_lockdown_browser ? ' · LockDown Browser' : ''}`)]),
-          U.chev(),
-        ], { onClick: () => app.go(`${c.url}/quizzes/${q.id}`) })), 'bcv-card--list')]) : null;
+        return arr.length ? h('div', {}, [U.label(lbl), U.card(arr.map(quizRow), 'bcv-card--list')]) : null;
       }).filter(Boolean);
+      // New Quizzes (a tool of Canvas's own): rows of their own, opened on the assignment page that launches them
+      const lti = newQuizzes.filter((a) => !query || a.name.toLowerCase().includes(query)).sort((x, y) => (U.parse(x.due_at) || Infinity) - (U.parse(y.due_at) || Infinity));
+      if (lti.length) parts.push(h('div', {}, [U.label('New Quizzes'), U.card(lti.map((a) => U.row([
+        U.tile(IC.bolt, { color: '#7d7bef', tint: 'rgba(88,86,214,.16)' }),
+        U.el('bcv-row__body', [U.text('bcv-row__title bcv-row__title--145', a.name), U.text('bcv-row__sub', `${a.due_at ? `Due ${U.fmtAt(a.due_at)}` : 'No due date'} · ${ptsLabel(a)}`)]),
+        statusBadge(a),
+        U.chev(),
+      ], { onClick: () => app.go(`${c.url}/assignments/${a.id}`) })), 'bcv-card--list')]));
       wrap.replaceChildren(parts.length ? U.el('bcv-col bcv-col--18', parts) : U.emptyCard(query ? 'No quizzes match.' : 'No quizzes yet.'));
     }
     draw();
@@ -1170,9 +1203,15 @@
       if (v >= now) { if (next === null || v < next) next = v; } else if (past === null || v > past) past = v;
     };
     for (const it of m.items || []) see(U.parse(it.content_details?.due_at));
-    see(U.parse(m.unlock_at));
-    return { next, past };
+    // a locked module's unlock date sorts it among what is coming — but it is when the module opens,
+    // not when anything in it is due, and the head says so (Opens, not Next due)
+    const opensAt = m.state === 'locked' ? U.parse(m.unlock_at) : null;
+    if (opensAt && +opensAt >= now && (next === null || +opensAt < next)) return { next: +opensAt, past, opens: true };
+    return { next, past, opens: false };
   }
+  /** What a module item asks for, in words: the requirement Canvas set on it (view it, hand it in,
+   *  post, mark it done, a score to reach), or Done once it is met. */
+  const requirementWord = (cr) => (!cr ? null : cr.completed ? 'Done' : ({ must_view: 'View to complete', must_submit: 'Hand in to complete', must_contribute: 'Post to complete', must_mark_done: 'Mark done to complete', min_score: `Score ${cr.min_score ?? ''} or more to complete`.replace(/\s+/g, ' ') }[cr.type] || null));
 
   T.modulesBlock = async (ctx, shell) => {
     const c = shell.course;
@@ -1185,11 +1224,18 @@
       const items = m.items || [];
       const req = items.filter((it) => it.completion_requirement);
       const done = req.filter((it) => it.completion_requirement.completed).length;
-      const stateText = m.state === 'locked' ? `Locked${m.unlock_at ? ` until ${U.fmtAt(m.unlock_at)}` : ''}` : req.length ? `${done} of ${req.length} requirements done` : U.plural(items.length, 'item');
+      // why a module is locked: the modules it waits for (by name), or the day it opens; a module
+      // that must be done in order says so beside its count
+      const prereqs = (m.prerequisite_module_ids || []).map((id) => list.find((x) => String(x.id) === String(id))?.name).filter(Boolean);
+      const stateText = m.state === 'locked'
+        ? `Locked${prereqs.length ? ` until ${prereqs.join(' and ')} ${prereqs.length > 1 ? 'are' : 'is'} complete` : m.unlock_at ? ` until ${U.fmtAt(m.unlock_at)}` : ''}`
+        : `${req.length ? `${done} of ${req.length} requirements done` : U.plural(items.length, 'item')}${m.require_sequential_progress ? ' · in order' : ''}`;
       const itemsEl = U.el('bcv-module__items', items.map((it) => {
         if (it.type === 'SubHeader') return U.label(it.title, `bcv-module__item bcv-indent-${Math.min(it.indent || 0, 3)}`);
         const cd = it.content_details || {};
-        const sub = [cd.due_at ? `Due ${U.fmtAt(cd.due_at)}` : null, cd.points_possible ? `${store.fmtPts(cd.points_possible)} pts` : null, it.type === 'ExternalUrl' ? 'Link' : it.type === 'ExternalTool' ? 'External tool' : it.type === 'File' ? 'File' : it.type === 'Page' ? 'Page' : null].filter(Boolean).join(' · ');
+        // an item Canvas holds back (a prerequisite, a date) says why, in Canvas's own words
+        const lockedWhy = cd.locked_for_user ? (String(cd.lock_explanation || '').replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim() || 'Locked') : null;
+        const sub = [cd.due_at ? `Due ${U.fmtAt(cd.due_at)}` : null, cd.points_possible ? `${store.fmtPts(cd.points_possible)} pts` : null, it.type === 'ExternalUrl' ? 'Link' : it.type === 'ExternalTool' ? 'External tool' : it.type === 'File' ? 'File' : it.type === 'Page' ? 'Page' : null, lockedWhy || requirementWord(it.completion_requirement)].filter(Boolean).join(' · ');
         const completed = it.completion_requirement?.completed;
         // the item's own address (Canvas's html_url is a /modules/items/N redirect, which only a page load can follow)
         const itemHref = (() => {
@@ -1204,9 +1250,9 @@
         const rowEl = U.row([
           U.tile(ITEM_ICON[it.type] || IC.doc, { color: c.palette.text, tint: c.palette.tint }),
           U.el('bcv-row__body', [U.text('bcv-row__title bcv-row__title--145 bcv-ellip', it.title), sub ? U.text('bcv-row__sub', sub) : null]),
-          it.completion_requirement ? h('span', { class: `bcv-circle ${completed ? 'is-done' : ''}`, title: completed ? 'Done' : 'Not done', style: { cursor: 'default' } }, completed ? U.svg('M6 12l4 4 8-8', { size: 12, stroke: '#fff', width: 2.4 }) : null) : null,
+          it.completion_requirement ? h('span', { class: `bcv-circle ${completed ? 'is-done' : ''}`, title: requirementWord(it.completion_requirement) || (completed ? 'Done' : 'Not done'), style: { cursor: 'default' } }, completed ? U.svg('M6 12l4 4 8-8', { size: 12, stroke: '#fff', width: 2.4 }) : null) : null,
           U.chev(),
-        ], { mod: `bcv-module__item bcv-indent-${Math.min(it.indent || 0, 3)}`, href: itemHref });
+        ], { mod: `bcv-module__item bcv-indent-${Math.min(it.indent || 0, 3)}${lockedWhy ? ' bcv-row--done' : ''}`, href: itemHref });
         // a file in a module opens in the viewer over the page, like one in Files
         if (it.type === 'File' && it.content_id) rowEl.addEventListener('click', (e) => {
           if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
@@ -1228,7 +1274,7 @@
       const wrap = U.el('bcv-module__wrap', itemsEl);
       // when the module next wants something, on the head where it can be read without opening it
       const due = moduleDue(m);
-      const dueText = due.next !== null ? `Next due ${U.whenShort(new Date(due.next))}` : due.past !== null ? `Last due ${U.fmtShort(new Date(due.past))}` : '';
+      const dueText = due.opens ? `Opens ${U.whenShort(new Date(due.next))}` : due.next !== null ? `Next due ${U.whenShort(new Date(due.next))}` : due.past !== null ? `Last due ${U.fmtShort(new Date(due.past))}` : '';
       const head = h('button', { type: 'button', class: 'bcv-module__head', 'aria-expanded': String(open.has(String(m.id))) }, [
         U.svg(IC.chevron, { size: 15, stroke: 'var(--bcv-ink3)', width: 2, cls: 'bcv-module__toggle' }),
         U.text('bcv-module__name', m.name, 'span'),

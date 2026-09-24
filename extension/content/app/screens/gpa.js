@@ -358,8 +358,9 @@
             h('div', { class: 'bcv-gpa__cfill', style: { width: `${ungraded ? 0 : clamp(pct, 0, 100)}%`, background: c.color } }),
             ungraded || pf ? null : h('span', { class: 'bcv-gpa__bartick', title: `Target ${r.target[0]}`, style: { left: `${Math.min(100, r.target[1])}%` } }), // (its own name: the trend's axis ticks are .bcv-gpa__tick)
           ]),
-          U.text(`bcv-gpa__need bcv-pretty ${ungraded || pf ? '' : needClass(r)}`, ungraded ? 'Nothing graded yet — no score to project from' : pf ? 'Pass/Fail — no letter to aim at' : needText(r)),
-          U.text('bcv-gpa__cnote', ungraded ? 'Canvas has not computed a score, so it counts for nothing here' : pf ? 'Counts for nothing in the GPA' : r.m.known ? `${store.fmtPts(r.m.earned)} pts earned so far` : 'Score as Canvas reports it'),
+          // (no score from Canvas: the teacher hides the total, or nothing is marked yet — said which)
+          U.text(`bcv-gpa__need bcv-pretty ${ungraded || pf ? '' : needClass(r)}`, ungraded ? (c.hideFinal ? 'The teacher hides the total — no score to project from' : 'Nothing graded yet — no score to project from') : pf ? 'Pass/Fail — no letter to aim at' : needText(r)),
+          U.text('bcv-gpa__cnote', ungraded ? (c.hideFinal ? 'Canvas sends no score while the total is hidden, so it counts for nothing here' : 'Canvas has not computed a score, so it counts for nothing here') : pf ? 'Counts for nothing in the GPA' : r.m.known ? `${store.fmtPts(r.m.earned)} pts earned so far` : 'Score as Canvas reports it'),
         ]),
         U.el('bcv-gpa__cfoot', [
           targetChip,
@@ -406,7 +407,7 @@
           : U.el('bcv-gpa__cbody', [
             U.text('bcv-gpa__ccode bcv-ellip', c.shortName || c.name),
             U.text('bcv-gpa__cname bcv-ellip', c.nickname ? c.originalName : (c.code || c.name)),
-            U.el('bcv-gpa__cscore', [U.text('bcv-gpa__cpct', ungraded ? 'N/A' : `${store.fmtPts(pct)}%`, 'span'), U.text('bcv-gpa__cpts', ungraded || pf ? '— pts' : `${r.pts.toFixed(1)} pts`, 'span')]),
+            U.el('bcv-gpa__cscore', [U.text('bcv-gpa__cpct', ungraded ? 'N/A' : `${store.fmtPts(pct)}%`, 'span'), U.text('bcv-gpa__cpts', ungraded || pf ? 'no GPA' : `${r.pts.toFixed(1)} GPA`, 'span')]), // (grade points, not assignment points: said so)
           ]));
         hideSlot.hidden = hover;
         targetChip.hidden = hover && !ungraded;
