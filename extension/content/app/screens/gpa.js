@@ -610,10 +610,16 @@
       const csvInput = h('input', { type: 'file', accept: '.csv,text/csv,text/plain', hidden: true, class: 'bcv-gpa-set__csvfile' });
       csvInput.addEventListener('change', async () => {
         const file = csvInput.files?.[0];
-        csvInput.value = '';
         if (!file) return;
         let rec;
-        try { rec = BCV.recordCsv.record(await file.text(), file.name); } catch { U.toast('That file needs a header with course and grade columns (credits and term optional).', { error: true }); return; }
+        try {
+          rec = BCV.recordCsv.record(await BCV.recordCsv.readText(file), file.name); // (read first: Safari lets go of the file once the input is cleared)
+        } catch (err) {
+          U.toast(BCV.recordCsv.explain(err), { error: true });
+          return;
+        } finally {
+          csvInput.value = '';
+        }
         priorGpa.value = String(rec.priorGpa);
         priorN.value = String(rec.priorCourses);
         pendingRecord = rec.record;

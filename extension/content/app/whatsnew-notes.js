@@ -24,6 +24,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.86.0', date: '2026-09-24', notes: [
+      { kind: 'fixed', title: 'CSV upload, on Safari', body: 'The file is read before the picker is cleared.', icon: P.check },
+    ] },
     { version: '2.85.0', date: '2026-09-24', notes: [
       { kind: 'new', title: 'Grades, on the Mac', body: 'The app’s window has the Grades section now.', icon: P.list },
       { kind: 'new', title: 'Download CSV', body: 'Your record, and this term’s courses, as one file.', icon: P.steps },

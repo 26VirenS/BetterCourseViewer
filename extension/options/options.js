@@ -437,10 +437,12 @@
   // is sorted by date. Tracking itself is left as it was.
   $('importCsv').addEventListener('click', () => $('importCsvFile').click());
   $('importCsvFile').addEventListener('change', async (e) => {
-    const file = e.target.files?.[0];
-    e.target.value = '';
+    const input = e.target;
+    const file = input.files?.[0];
     if (!file) return;
-    importHistory(await file.text());
+    let text;
+    try { text = await self.BCV.recordCsv.readText(file); } catch (err) { flash(self.BCV.recordCsv.explain(err), true); return; } finally { input.value = ''; } // (read first: Safari lets go of the file once the input is cleared)
+    importHistory(text);
   });
   async function importHistory(text) {
     let rows;
@@ -482,17 +484,18 @@
   // (date,term_gpa) dropped here goes to the history instead.
   $('recordCsv').addEventListener('click', () => $('recordCsvFile').click());
   $('recordCsvFile').addEventListener('change', async (e) => {
-    const file = e.target.files?.[0];
-    e.target.value = '';
+    const input = e.target;
+    const file = input.files?.[0];
     if (!file) return;
-    const text = await file.text();
+    let text;
+    try { text = await self.BCV.recordCsv.readText(file); } catch (err) { flash(self.BCV.recordCsv.explain(err), true); return; } finally { input.value = ''; } // (read first: Safari lets go of the file once the input is cleared)
     // a history export dropped here is a history: it goes where Import CSV would have put it
     if (/^\s*date\s*,\s*term_gpa/i.test(text)) { importHistory(text); return; }
     let rec;
     try {
       rec = self.BCV.recordCsv.record(text, file.name); // (lib/record-csv.js, shared with the Grades page's own sheet)
-    } catch {
-      flash('That file needs a header with course and grade columns (credits and term optional)', true);
+    } catch (err) {
+      flash(self.BCV.recordCsv.explain(err), true);
       return;
     }
     grades.tracking = { ...(grades.tracking || {}), ...rec, since: grades.tracking?.since || new Date().toISOString().slice(0, 10) };

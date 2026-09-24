@@ -94,5 +94,20 @@
     const cell = (v) => { const t = String(v ?? '').replace(/−/g, '-'); return /[",\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t; };
     return ['term,course,grade,credits', ...rows.map((r) => [r.term || '', r.course || '', r.grade || '', Number.isFinite(r.credits) ? r.credits : ''].map(cell).join(','))].join('\n');
   }
-  BCV.recordCsv = { points, cells, parse, summarize, record, csv, TEMPLATE };
+  /** A File's text. Read before the input it came from is cleared: Safari lets go of the file the
+   *  moment the input is reset, and a read after that fails. Older engines without Blob.text read it
+   *  the long way. */
+  function readText(file) {
+    if (file && typeof file.text === 'function') return file.text();
+    return new Promise((resolve, reject) => { const r = new FileReader(); r.onload = () => resolve(String(r.result || '')); r.onerror = () => reject(r.error || new Error('could not read')); r.readAsText(file); });
+  }
+  /** What to tell someone whose file did not go in. */
+  function explain(err) {
+    const m = String(err?.message || err || '');
+    if (m === 'no header') return 'That file needs a header with course and grade columns (credits and term optional).';
+    if (m === 'no rows') return 'No row in that file has a grade that counts (P/NP, W and blank grades are skipped).';
+    if (m === 'empty') return 'That file is empty.';
+    return `The file could not be read${m ? `: ${m}` : '.'}`;
+  }
+  BCV.recordCsv = { points, cells, parse, summarize, record, csv, readText, explain, TEMPLATE };
 })();
