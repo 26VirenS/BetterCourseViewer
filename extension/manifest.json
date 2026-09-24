@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Simpl Courses",
-  "version": "2.98.6",
+  "version": "2.98.7",
   "description": "Canvas with navigation that actually makes sense and a UI that you can actually use.",
   "author": "Simpl Courses contributors",
   "icons": {
@@ -54,7 +54,8 @@
     {
       "resources": [
         "lib/ocr/reader.html",
-        "lib/vendor/pdf.worker.min.js"
+        "lib/vendor/pdf.worker.min.js",
+        "lib/vendor/katex/fonts/*.woff2"
       ],
       "matches": [
         "<all_urls>"
@@ -110,6 +111,7 @@
         "content/app/screens/course-detail.js",
         "content/app/screens/grades.js",
         "content/app/screens/gpa.js",
+        "content/app/tools/calc-latex.js",
         "content/app/tools/tools.js",
         "content/app/screens/tools.js",
         "content/app/whatsnew.js",

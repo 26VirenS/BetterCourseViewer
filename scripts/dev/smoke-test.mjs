@@ -4436,6 +4436,21 @@ try {
   await page.keyboard.press('Enter');
   const calcTyped = { expr: (await texts('.bcv-tool[data-tool="calc"] .bcv-calc__expr'))[0], sub: (await texts('.bcv-tool[data-tool="calc"] .bcv-calc__sub'))[0], key: await page.$eval('.bcv-tool[data-tool="calc"] .bcv-calc__key[data-key="7"]', (e) => Math.round(e.getBoundingClientRect().height)), width: await page.$eval('.bcv-tool[data-tool="calc"]', (e) => Math.round(e.getBoundingClientRect().width)), active: await page.evaluate(() => document.activeElement?.className || document.activeElement?.tagName) };
   check(calcTyped.expr === '42' && calcTyped.sub === '7×6 =' && calcTyped.key === 54 && calcTyped.width === 720, `typed on the keyboard, 7 × 6 Enter shows 42, on keys 54 tall in a popup 720 wide: ${JSON.stringify(calcTyped)}`);
+  // the sum as an equation under the keys: typeset by KaTeX (vendored, put on the page when the tool opened, its fonts the extension's own files), the LaTeX itself on LaTeX, copied by Copy
+  await page.waitForFunction(() => !!document.querySelector('.bcv-calc__texview .katex'), null, { timeout: 15000 });
+  const texRead = () => page.evaluate(async () => { const strip = document.querySelector('.bcv-calc__tex'); const view = strip.querySelector('.bcv-calc__texview'); let fonts = 0; try { fonts = (await document.fonts.load('16px KaTeX_Main')).length; } catch { fonts = -1; } return { latex: strip.dataset.latex, katex: !!view.querySelector('.katex'), text: view.textContent.replace(/\s+/g, ' ').trim(), src: view.classList.contains('is-src'), fonts, fontUrl: [...document.styleSheets].some((s) => { try { return [...s.cssRules].some((r) => r.cssText.includes('KaTeX_Main') && /extension:\/\//.test(r.cssText)); } catch { return false; } }), inside: view.getBoundingClientRect().right <= document.querySelector('.bcv-tool[data-tool="calc"]').getBoundingClientRect().right }; });
+  const tex1 = await texRead();
+  check(tex1.latex === '7 \\times 6 = 42' && tex1.katex && !tex1.src && tex1.fonts > 0 && tex1.fontUrl && tex1.inside, `the sum is typeset as an equation under the keys — KaTeX, loaded when the tool opened, its fonts from the extension's own files: ${JSON.stringify(tex1)}`);
+  await page.click('.bcv-calc__tex .bcv-calc__texbtn:first-of-type');
+  const tex2 = await texRead();
+  check(tex2.src && tex2.text === '7 \\times 6 = 42' && (await page.$eval('.bcv-calc__tex .bcv-calc__texbtn:first-of-type', (b) => b.getAttribute('aria-pressed'))) === 'true', `LaTeX shows the source itself: ${tex2.text}`);
+  await page.click('.bcv-calc__tex .bcv-calc__texbtn:first-of-type');
+  await page.click('.bcv-calc__tex .bcv-calc__texbtn:last-of-type');
+  check(await eventually(async () => (await texts('.bcv-toast')).some((t) => /LaTeX copied/.test(t)), 3000) && (await texRead()).katex, 'Copy puts the LaTeX on the clipboard and says so, the equation still typeset');
+  // a richer sum by the keys — √(16) ÷ 2 — typesets as a fraction over a root, its result after it
+  for (const k of ['ac', 'sqrt', '1', '6', ')', '/', '2']) await page.click(`.bcv-tool[data-tool="calc"] .bcv-calc__key[data-key="${k}"]`);
+  const tex3 = await texRead();
+  check(tex3.latex === '\\frac{\\sqrt{16}}{2} = 2' && tex3.katex && (await texts('.bcv-tool[data-tool="calc"] .bcv-calc__sub'))[0] === '= 2', `√(16) ÷ 2 typesets as a fraction over a root with its result: ${tex3.latex}`);
   await shot(page, '19b-calculator-tool');
   await closeTool();
   // the periodic table: every element in place, a card for the one pressed, search, legend, arrow keys

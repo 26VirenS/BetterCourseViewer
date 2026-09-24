@@ -315,5 +315,47 @@ check(hub.toolNameOf({ name: 'Knewton Alta: Unit 2', external_tool_tag_attribute
 check(hub.parse("/what's due tomorrow").cmd?.name === 'find' && hub.parse('/take physics quiz').cmd?.name === 'start' && hub.parse('/physics quiz tomorrow').cmd === null && hub.matchCommands('physics').length === 0 && hub.byName('launch')?.name === 'open', '"/what\'s" is /what (a name of /find), /take is /start, "/physics …" names no command (search.js reads it as a phrase)');
 check(hub.COMMANDS.every((c) => (c.label || c.hint).length <= 32) && hub.byName('open').hint === 'Open a tool in its own tab', `every command heads its list with a short title (the longest: ${Math.max(...hub.COMMANDS.map((c) => (c.label || c.hint).length))} characters), /open's line under it one clause`);
 
+// ---- the calculator's line as LaTeX (content/app/tools/calc-latex.js) ----------------------------
+// Pure: the line the calculator shows, read with its own grammar into a tree and written out as
+// LaTeX — what the calculator tool typesets under its display and copies.
+console.log('calculator LaTeX');
+const texSelf = {};
+new Function('self', readFileSync(join(root, 'extension', 'content', 'app', 'tools', 'calc-latex.js'), 'utf8'))(texSelf);
+const TX = texSelf.BCV.calcTex;
+const texIs = (src, want, why) => check(TX.latex(src) === want, `${why}: ${src || '(nothing)'} → ${TX.latex(src)}`);
+texIs('7×6', '7 \\times 6', 'a product');
+texIs('2÷3', '\\frac{2}{3}', 'a division is a fraction');
+texIs('3×4÷5', '\\frac{3 \\times 4}{5}', 'a fraction takes what came before it, as the calculator works it');
+texIs('√(16)', '\\sqrt{16}', 'a square root');
+texIs('∛(27)', '\\sqrt[3]{27}', 'a cube root');
+texIs('8^(1÷3)', '\\sqrt[3]{8}', 'the y-th root key (x^(1÷y)) is a root, not a power');
+texIs('8^(1÷', '\\sqrt[\\square]{8}', 'a root still wanting its index shows a square there');
+texIs('sin(30)+cos⁻¹(0.5)', '\\sin\\left(30\\right) + \\cos^{-1}\\left(0.5\\right)', 'trig and its inverse');
+texIs('sinh⁻¹(1)', '\\sinh^{-1}\\left(1\\right)', 'hyperbolic');
+texIs('e^(2)', 'e^{2}', 'e to the x: the key\'s bracket is the braces');
+texIs('10^(3)', '10^{3}', '10 to the x');
+texIs('2^3^2', '2^{3^{2}}', 'a power from the right');
+texIs('(2+3)²', '\\left(2 + 3\\right)^{2}', 'squared, over a bracket');
+texIs('5!', '5!', 'a factorial');
+texIs('50%', '50\\%', 'a percent');
+texIs('4⁻¹', '4^{-1}', 'one over x');
+texIs('2π', '2 \\pi', 'pi, side by side with a number');
+texIs('2(3+4)', '2 \\left(3 + 4\\right)', 'a number against a bracket');
+texIs('ln(e)', '\\ln\\left(e\\right)', 'ln and e');
+texIs('log(100)', '\\log_{10}\\left(100\\right)', 'log is base ten');
+texIs('log(8,2)', '\\log_{2}\\left(8\\right)', 'log with a base');
+texIs('log₂(8)', '\\log_{2}\\left(8\\right)', 'log base two');
+texIs('2E−3', '2 \\times 10^{-3}', 'EE is times ten to the');
+texIs('1.5E12', '1.5 \\times 10^{12}', 'and a positive exponent');
+texIs('−5×2', '-5 \\times 2', 'a minus in front');
+texIs('2×−3', '2 \\times -3', 'a minus after an operator');
+texIs('2+', '2 + \\square', 'a number still wanted is a square');
+texIs('√(', '\\sqrt{\\square}', 'inside a root too');
+texIs('2×(3+', '2 \\times \\left(3 + \\square\\right)', 'a bracket left open is closed for it');
+texIs('.5', '0.5', 'a leading point gets its zero');
+texIs('2.', '2', 'a trailing point goes');
+check(TX.latex('2E') === null && TX.latex('') !== null, 'a line that cannot be read yet (an exponent with no digits) is null, an empty line is not');
+check(TX.numTex(42) === '42' && TX.numTex(-0.5) === '-0.5' && TX.numTex(1.2e15) === '1.2 \\times 10^{15}' && TX.numTex(2e-12) === '2 \\times 10^{-12}' && TX.numTex(1 / 3) === '0.333333333333' && TX.numTex(NaN) === '\\text{Error}', `a result as LaTeX: plain digits, the display's own cut-offs as a × 10 to a power: ${[42, -0.5, 1.2e15, 2e-12, 1 / 3].map(TX.numTex).join(' | ')}`);
+
 console.log(fails ? `\n${fails} check(s) failed` : '\nAll checks passed.');
 process.exit(fails ? 1 : 0);

@@ -189,8 +189,18 @@
     pdf: { files: ['lib/vendor/pdf.min.js'], has: () => !!self.pdfjsLib?.getDocument, then: pdfWorker }, // (the worker runs off the page's thread; see pdfWorker)
     pdflib: { files: ['lib/vendor/pdf-lib.min.js'], has: () => !!self.PDFLib?.PDFDocument }, // (writing PDFs: pages copied, annotations added)
     office: { files: ['content/app/tools/office.js'], has: () => !!self.BCV?.office?.docxToPdf }, // (ours: Word ⇄ PDF, beside the libraries it uses)
+    katex: { files: ['lib/vendor/katex/katex.min.js', 'lib/vendor/katex/katex-css.js'], has: () => !!self.katex?.render && typeof self.BCV_KATEX_CSS === 'string', then: katexStyle }, // (the calculator's typeset sums)
   };
   const loading = {};
+  /** KaTeX's stylesheet on the page, once, its fonts pointed at the extension's own copies (web-accessible, so the page may load them). */
+  let katexStyled = false;
+  function katexStyle() {
+    if (katexStyled || typeof self.BCV_KATEX_CSS !== 'string') return;
+    katexStyled = true;
+    let base = '';
+    try { base = api.runtime.getURL('lib/vendor/katex/fonts/'); } catch { base = ''; }
+    (document.head || document.documentElement).append(h('style', { id: 'bcv-katex-css', text: self.BCV_KATEX_CSS.replace(/url\(fonts\//g, `url(${base}`) }));
+  }
   /** pdf.js's worker, off the page's thread: a worker of the page's own that imports the
    *  extension's worker script (a worker cannot be made from the extension's address itself). Its
    *  parsing and drawing then leave the page free — a forty-page scan no longer holds the tab. Where
@@ -674,13 +684,47 @@
     U.onGone(p.ov, () => document.removeEventListener('securitypolicyviolation', onCsp));
   }
 
-  /** The calculator as a tool of its own: the same scientific calculator, larger, the keyboard on it. */
+  /** The calculator as a tool of its own: the same scientific calculator, larger, the keyboard on it,
+   *  and under the display the sum as an equation — typeset by KaTeX (vendored, loaded when the tool
+   *  opens; until then, and where it cannot load, the LaTeX itself stands) from the line as it is typed
+   *  (content/app/tools/calc-latex.js), the result after it; LaTeX shows the source, Copy copies it. */
   function openCalc(app, { from = null } = {}) {
     const tool = toolOf('calc');
-    const built = quickCalc({ popup: true });
-    const body = U.el('bcv-calc-tool', built.els);
+    const T = BCV.calcTex;
+    const view = h('div', { class: 'bcv-calc__texview', 'aria-label': 'The sum as an equation' });
+    const srcBtn = h('button', { type: 'button', class: 'bcv-calc__texbtn', text: 'LaTeX', title: 'Show the LaTeX itself', 'aria-pressed': 'false' });
+    const copyBtn = h('button', { type: 'button', class: 'bcv-calc__texbtn', text: 'Copy', title: 'Copy the LaTeX' });
+    const strip = h('div', { class: 'bcv-calc__tex', dataset: { latex: '' } }, [view, srcBtn, copyBtn]);
+    let showSrc = false;
+    // the line as LaTeX: a result with the sum it came from before it; otherwise the line as it stands, and its result so far after it
+    const texOf = (eng) => {
+      const st = eng.st;
+      if (!T) return null;
+      if (!st.expr) return '0';
+      if (st.fresh) { const sum = T.latex(st.sub.replace(/\s*=\s*$/, '')); const v = T.numTex(Number(st.expr.replace(/−/g, '-').replace(/E/g, 'e'))); return sum ? `${sum} = ${v}` : v; }
+      const line = T.latex(st.expr);
+      if (line === null) return null;
+      const r = calcEval(st.expr, st.deg);
+      return r.state === 'ok' ? `${line} = ${T.numTex(r.value)}` : line;
+    };
+    const paintTex = (eng) => {
+      const tex = texOf(eng);
+      strip.dataset.latex = tex || '';
+      const raw = showSrc || !self.katex?.render;
+      view.classList.toggle('is-src', raw || tex === null);
+      if (tex === null) { view.textContent = eng.st.expr; return; }
+      if (raw) { view.textContent = tex; return; }
+      try { self.katex.render(tex, view, { throwOnError: false, displayMode: false, strict: 'ignore' }); } catch { view.textContent = tex; view.classList.add('is-src'); }
+      view.scrollLeft = view.scrollWidth;
+    };
+    const built = quickCalc({ popup: true, onPaint: paintTex });
+    srcBtn.addEventListener('click', () => { showSrc = !showSrc; srcBtn.classList.toggle('is-on', showSrc); srcBtn.setAttribute('aria-pressed', showSrc ? 'true' : 'false'); paintTex(built.eng); built.els[0].focus({ preventScroll: true }); });
+    copyBtn.addEventListener('click', () => { copyText(strip.dataset.latex); U.toast('LaTeX copied.'); built.els[0].focus({ preventScroll: true }); });
+    const body = U.el('bcv-calc-tool', [...built.els, strip]);
     const p = popup({ tool, title: 'Calculator', sub: 'Scientific · the keyboard works too', width: 720, cls: 'bcv-tool--calc', body, from });
     setTimeout(() => { if (p.alive()) built.els[0].focus({ preventScroll: true }); }, 60);
+    paintTex(built.eng);
+    vendor('katex').then(() => { if (p.alive()) paintTex(built.eng); }).catch(() => { /* the LaTeX stands as text */ });
     return p;
   }
 
@@ -1048,7 +1092,7 @@
   }
   /** The calculator pin's panel: the display over the keys, the way the Calculator app lays them out.
    *  (The calculator tool's popup is the same, larger: `popup`.) */
-  function quickCalc({ go = null, popup: big = false } = {}) {
+  function quickCalc({ go = null, popup: big = false, onPaint = null } = {}) {
     const eng = calcEngine();
     const root = h('div', { class: `bcv-calc${big ? ' bcv-calc--big' : ''}`, tabindex: '0', role: 'application', 'aria-label': 'Scientific calculator' });
     const sub = h('div', { class: 'bcv-calc__sub', 'aria-live': 'polite' });
@@ -1090,10 +1134,11 @@
         if (base === 'rad') { b.textContent = eng.st.deg ? 'Rad' : 'Deg'; b.title = eng.st.deg ? 'Switch to radians' : 'Switch to degrees'; }
         b.classList.toggle('is-on', base === 'second' && eng.st.second);
       }
+      if (onPaint) onPaint(eng, s);
     }
     root.append(head, display, U.el('bcv-calc__keys', rows));
     paint();
-    return { els: [root] };
+    return { els: [root], eng, paint };
   }
   /** The graphing calculator's pin: a small Desmos, portrait, loaded on the first hover and kept —
    *  the graph survives the pin folding — with the way out to desmos.com where the frame is refused. */

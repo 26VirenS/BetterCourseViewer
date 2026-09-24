@@ -3485,6 +3485,15 @@ html[data-bcv-theme="dark"] .bcv-pdfx { --px-row: #0f0f11; --px-page: #1f1f22; -
 /* the calculator as a tool of its own, and the graphing pin's small Desmos (2.39.0) */
 .bcv-tool--calc .bcv-tool__body { padding: 16px; }
 .bcv-calc-tool { background: #1c1c1e; border-radius: 22px; padding: 16px 16px 16px; }
+/* the sum as an equation under the keys: typeset (KaTeX) or, on LaTeX, the source itself; Copy takes the source */
+.bcv-calc__tex { display: flex; align-items: center; gap: 8px; margin-top: 12px; padding: 10px 8px 10px 14px; border-radius: 14px; background: #2c2c2e; color: #fff; min-height: 52px; }
+.bcv-calc__texview { flex: 1; min-width: 0; overflow-x: auto; overflow-y: hidden; font-size: 22px; line-height: 1.35; white-space: nowrap; scrollbar-width: none; }
+.bcv-calc__texview::-webkit-scrollbar { display: none; }
+.bcv-calc__texview .katex { font-size: 1em; color: #fff; }
+.bcv-calc__texview.is-src { font: 500 13px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: rgba(255,255,255,.88); }
+.bcv-calc__texbtn { flex: none; height: 28px; padding: 0 11px; border: 0; border-radius: 14px; background: #3a3a3c; color: #fff; font: 600 12px/1 var(--bcv-font); cursor: pointer; transition: background .12s ease, color .12s ease; }
+.bcv-calc__texbtn:hover { background: #48484a; }
+.bcv-calc__texbtn.is-on { background: #ff9f0a; color: #1c1c1e; }
 .bcv-calc__title { font: 600 11px/1 var(--bcv-font); color: rgba(255,255,255,.55); letter-spacing: .02em; }
 .bcv-calc--big .bcv-calc__head { height: 22px; padding: 0 6px; }
 .bcv-calc--big .bcv-calc__mode, .bcv-calc--big .bcv-calc__mem { font-size: 11px; }
