@@ -109,6 +109,8 @@ try {
   // pointer away closes it
   await page.hover('.bcv-nav__item[data-nav="courses"]');
   await page.waitForSelector('.bcv-quicknav', { timeout: 12000 }); // (the hover's own delay, and a starved machine: three suites run side by side)
+  const qnAnim = await page.$eval('.bcv-quicknav', (e) => ({ name: getComputedStyle(e).animationName, ease: getComputedStyle(e).animationTimingFunction.slice(0, 7) }));
+  check(qnAnim.name === 'bcv-qn-in' && /^(linear\(|cubic-b)/.test(qnAnim.ease), `the panel's entrance parses (2.96 had two easings in the one shorthand, and the parser dropped it) and runs on the snappy spring: ${JSON.stringify(qnAnim)}`);
   await page.hover('.bcv-nav__item[data-nav="dashboard"]');
   const leftClosed = await page.waitForFunction(() => !document.querySelector('.bcv-quicknav'), null, { timeout: 2500 }).then(() => true).catch(() => false); // (the leave has its own grace, then the panel pops out)
   check(leftClosed && !(await page.$('.bcv-quicknav')), 'hover: the pointer leaving both closes it');

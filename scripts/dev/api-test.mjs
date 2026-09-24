@@ -193,6 +193,34 @@ const over = D.decode('SC3-999');
 check(D.encode(over.settings) === 'SC3-511', `digits past the end of a setting come back to its last value, never past it: ${D.encode(over.settings)}`);
 check(!D.FIELDS.some((f) => ['mode', 'windows', 'wait', 'blank', 'close'].includes(f.key)), `nothing is caught any more, so nothing is left to tune about catching: ${D.FIELDS.map((f) => f.key).join(', ')}`);
 
+// ---- the springs (content/app/motion.js, docs/MOTION.md) -----------------------------------------
+// The motion is a damped spring solved exactly; what the interface relies on is that every preset
+// settles in the time its rule is given, overshoots only where that is wanted, hands its position
+// and speed on when cut short, and reads the same as a CSS linear() easing. The engine is loaded
+// with no document at all: it must stand up on its own, and install nothing where it cannot.
+console.log('the springs');
+const motionSrc = readFileSync(join(root, 'extension', 'content', 'app', 'motion.js'), 'utf8');
+const mbox = { self: {}, console, Math, Map, Number, Object, String, JSON, Promise, Array };
+vm.createContext(mbox);
+vm.runInContext(motionSrc, mbox);
+const M = mbox.self.BCV.motion;
+check(!!M && typeof M.spring === 'function' && M.supportsLinear === false && M.installTokens() === false, 'the engine stands up with no window and no CSS, and installs no tokens where linear() is unknown');
+const peakOf = (sp) => { let peak = -Infinity; for (let t = 0; t <= sp.settle; t += 0.002) peak = Math.max(peak, sp.at(t)); return peak; };
+const times = Object.fromEntries(Object.keys(M.PRESETS).map((k) => [k, Math.round(M.spring(k).settle * 1000)]));
+check(Object.values(times).every((ms) => ms >= 180 && ms <= 420) && times.snappy < times.gentle, `every preset settles within a beat — snappy under gentle: ${JSON.stringify(times)}`);
+check(peakOf(M.spring('snappy')) > 1.02 && peakOf(M.spring('snappy')) < 1.08, `snappy overshoots a little (pins, ticks): ${((peakOf(M.spring('snappy')) - 1) * 100).toFixed(1)}%`);
+check(['gentle', 'settle', 'scrim', 'phone'].every((k) => Math.abs(peakOf(M.spring(k)) - 1) < 0.006), 'gentle, settle, scrim and phone land without a visible overshoot (nothing that carries text bounces)');
+check(['gentle', 'snappy'].every((k) => { const sp = M.spring(k); return Math.abs(sp.at(sp.settle) - 1) < 0.011 && Math.abs(sp.at(0)) < 1e-9; }), 'each starts at rest and is at its end when it settles');
+const cutSp = M.spring('gentle'); const tc = 0.06; const pc = cutSp.at(tc), vc = cutSp.velocity(tc);
+const turned = M.spring('gentle', { from: pc, to: 0, v0: vc });
+check(vc > 0 && Math.abs(turned.at(0) - pc) < 1e-9 && turned.at(0.02) > pc && turned.at(0.12) < pc && turned.at(turned.settle) < 0.011, `a motion cut short carries on from where it is at the speed it had, and only then turns back: at ${pc.toFixed(2)} moving ${vc.toFixed(1)}/s, still ${turned.at(0.02).toFixed(2)} after 20 ms, ${turned.at(0.12).toFixed(2)} after 120 ms`);
+const ease = M.easing('gentle');
+check(/^linear\(0, [\d.]+ [\d.]+%, .* 1\)$/.test(ease) && ease.split(',').length >= 12 && ease.split(',').length <= 97 && Math.round(M.duration('gentle') * 1000) === times.gentle, `a preset reads as a CSS linear() easing over its own settle time: ${ease.split(',').length} stops, ${times.gentle}ms`);
+const heavy = M.spring({ stiffness: 400, damping: 50, mass: 1 });
+check(heavy.zeta > 1 && peakOf(heavy) <= 1 + 1e-9 && heavy.at(heavy.settle) > 0.985 && heavy.settle < 0.7, `an over-damped spring creeps in without ever passing its end (ζ ${heavy.zeta.toFixed(2)}, ${Math.round(heavy.settle * 1000)}ms)`);
+const noEl = M.run(null, { opacity: [1, 0] }, 'scrim');
+check(noEl.done === true && typeof noEl.cancel === 'function', 'run() on nothing is a finished no-op, never a throw');
+
 // ---- Safari (scripts/dev/safari-lint.mjs, docs/SAFARI.md) -------------------------------------
 // The suites run in Chromium and the product is a Safari extension: every script API and CSS feature
 // Safari lacks, or got after the floor the Mac app supports, is checked against a table — a script

@@ -161,7 +161,7 @@
     const t = el(`bcv-toast ${error ? 'bcv-toast--error' : ''}`, str, { role: 'status' });
     overlayRoot().append(t);
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => t.remove(), ms);
+    toastTimer = setTimeout(() => dismiss(t), ms); // (it leaves the way it came, on its spring)
     return t;
   }
 
@@ -402,6 +402,11 @@
     }
     el.style.left = `${Math.round(Math.max(margin, Math.min(left, vw - m.width - margin)))}px`;
     el.style.top = `${Math.round(Math.max(margin, Math.min(top, vh - m.height - margin)))}px`;
+    // it grows out of the edge it hangs from (the entrance scales from the transform origin): under
+    // its button from the top, above it from the bottom, beside it from the near side
+    const ox = side === 'right' ? 'left' : side === 'left' ? 'right' : align === 'center' ? 'center' : align === 'end' ? 'right' : 'left';
+    const oy = side === 'right' || side === 'left' ? (align === 'center' ? 'center' : align === 'end' ? 'bottom' : 'top') : (top < r.top ? 'bottom' : 'top');
+    el.style.transformOrigin = `${ox} ${oy}`;
   }
   /** Keeps a fixed element that was placed by other means inside the viewport. */
   function keepOnScreen(el, margin = 16) {
@@ -428,10 +433,42 @@
 
   /** Closes an overlay, a menu or a sheet with its exit: is-closing starts the CSS's animation, and
    *  the element goes when that has ended (at once under reduced motion). */
+  /** Which spring an element leaves on (docs/MOTION.md): a scrim fades while its sheet shrinks (a
+   *  phone sheet slides down), a menu or a toast pops out, anything else fades. */
+  function exitKindOf(ov) {
+    const c = ov.classList;
+    if (c.contains('bcv-sheet-ov')) return document.documentElement.classList.contains('bcv-phone') ? 'down' : 'shrink';
+    if (c.contains('bcv-toast')) return 'toast';
+    if (c.contains('bcv-quicknav')) return 'left';
+    if (c.contains('bcv-menu')) return 'pop';
+    return 'fade';
+  }
+  const EXIT_CAP = 700; // ms: the longest exit spring settles well inside this, and an element has left by then whatever its animations do
+  /** Closes an overlay, a menu or a sheet with its exit, and resolves once it has gone. On the springs
+   *  (BCV.motion) the exit plays from wherever the entrance had got to — a sheet closed while still
+   *  growing shrinks back from there; the springs start before the closing class goes on, because that
+   *  class stands the stylesheet's motion down and the entrance is read for its progress while it
+   *  runs. Without the springs, or under reduced motion, is-closing starts the stylesheet's exit and
+   *  afterMotion sees it end. Either way the element is removed by EXIT_CAP: a promise that waits on
+   *  an animation is raced against the clock, so nothing that never finishes leaves a scrim on the
+   *  page (docs/SAFARI.md §4), and a spring that throws hands over to the stylesheet's exit. */
   function dismiss(ov) {
-    if (!ov || !ov.isConnected || ov.classList.contains('is-closing')) return;
+    if (!ov || !ov.isConnected || ov.classList.contains('is-closing')) return Promise.resolve();
+    const gone = () => { try { ov.remove(); } catch { /* already gone */ } };
+    const cap = new Promise((resolve) => setTimeout(resolve, EXIT_CAP));
+    const M = BCV.motion;
+    if (M && !reducedMotion()) {
+      try {
+        const kind = exitKindOf(ov);
+        const sheet = ov.classList.contains('bcv-sheet-ov') ? ov.querySelector(':scope > .bcv-sheet') : null;
+        const parts = [M.exit(ov, sheet ? 'scrim' : kind)];
+        if (sheet) parts.push(M.exit(sheet, kind));
+        ov.classList.add('is-closing', 'bcv-sprung');
+        return Promise.race([Promise.all(parts.map((p) => p.finished)), cap]).then(gone);
+      } catch { ov.classList.remove('is-closing', 'bcv-sprung'); } // (the stylesheet's exit instead)
+    }
     ov.classList.add('is-closing');
-    afterMotion(ov).then(() => ov.remove());
+    return Promise.race([afterMotion(ov), cap]).then(gone);
   }
   function closeMenus() {
     document.querySelectorAll('.bcv-menu:not([data-keep]):not(.is-closing)').forEach((m) => dismiss(m)); // (a box that only wears a menu's look stays: the inbox's recipient results)

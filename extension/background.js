@@ -250,7 +250,7 @@ if (typeof importScripts === 'function' && !self.BCV?.devcode) {
    * no API, no screens, no shell. */
   const TRAY_JS = [ // (tools.js before the tool modules, as the manifest has it: each takes `BCV.tools` as it loads)
     'lib/settings.js', 'lib/utils.js',
-    'content/app/icons.js', 'content/app/ui.js',
+    'content/app/icons.js', 'content/app/motion.js', 'content/app/ui.js',
     'content/app/tools/tools.js', 'content/app/tools/widgets.js',
     'content/app/tools/ptable-data.js', 'content/app/tools/ptable.js',
     'content/app/tools/cite.js', 'content/app/tools/cards.js', 'content/app/tools/convert.js',
