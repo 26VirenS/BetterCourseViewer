@@ -24,6 +24,11 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.98.5', date: '2026-09-24', notes: [
+      { kind: 'fixed', title: 'Graded is not overdue', body: 'Work marked without a hand-in no longer counts as overdue.', icon: P.check },
+      { kind: 'fixed', title: 'Locked work left off', body: 'Past-due work you can no longer open stays off Overdue.', icon: P.clock },
+      { kind: 'fixed', title: 'Clearing overdue rows', body: 'The X clears a row you had cleared and put back before.', icon: P.list },
+    ] },
     { version: '2.98.4', date: '2026-09-24', notes: [
       { kind: 'improved', title: 'Smoother motion', body: 'Every move a touch slower and drawn finer, never rushed.', icon: P.arrows },
       { kind: 'improved', title: 'Wikipedia switch', body: 'A real switch in the box, there while you are typing.', icon: P.toggle },

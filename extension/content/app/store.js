@@ -443,9 +443,20 @@
 
   async function override(item, patch) {
     const ov = item.raw.planner_override;
-    const result = ov?.id
-      ? await C.put(`/api/v1/planner/overrides/${ov.id}`, patch)
-      : await C.post('/api/v1/planner/overrides', { plannable_type: item.type, plannable_id: item.raw.plannable_id, ...patch });
+    let result;
+    if (ov?.id) result = await C.put(`/api/v1/planner/overrides/${ov.id}`, patch);
+    else {
+      try {
+        result = await C.post('/api/v1/planner/overrides', { plannable_type: item.type, plannable_id: item.raw.plannable_id, ...patch });
+      } catch (e) {
+        // Canvas keeps one override per item and refuses a second (one written before — undone, or from
+        // another device — the item did not carry): it is looked up and changed instead
+        const list = await plannerOverrides({ force: true }).catch(() => []);
+        const had = (Array.isArray(list) ? list : []).find((o) => o && String(o.plannable_type) === String(item.type) && String(o.plannable_id) === String(item.raw.plannable_id));
+        if (!had?.id) throw e;
+        result = await C.put(`/api/v1/planner/overrides/${had.id}`, patch);
+      }
+    }
     item.raw.planner_override = result && result.id ? result : { ...(ov || {}), ...patch };
     item.complete = !!item.raw.planner_override.marked_complete;
     item.dismissed = !!item.raw.planner_override.dismissed;

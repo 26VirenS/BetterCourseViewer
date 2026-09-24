@@ -52,7 +52,8 @@
       store.pref('dashHideDone', false).catch(() => false),
       store.plannerOverrides().catch(() => []), // what the X on the Overdue list wrote, on any device (see below)
     ]);
-    const dismissedKeys = new Set((Array.isArray(overrides) ? overrides : []).filter((o) => o?.dismissed).map((o) => `${o.plannable_type}:${o.plannable_id}`));
+    const overrideByKey = new Map((Array.isArray(overrides) ? overrides : []).filter((o) => o && o.id).map((o) => [`${o.plannable_type}:${o.plannable_id}`, o])); // (every override, dismissed or not: an item's X changes the one it has rather than writing a second, which Canvas refuses)
+    const dismissedKeys = new Set([...overrideByKey].filter(([, o]) => o.dismissed).map(([k]) => k));
     if (!ctx.alive()) return screen;
     const wanted = settings?.appearance?.dashboard || {};
     views = ALL_VIEWS.filter(([k]) => wanted[k] !== false);
@@ -215,26 +216,38 @@
         const seen = new Set();
         const overdue = [];
         const plannerByKey = new Map((planner || []).map((it) => [it.id, it]));
+        // an assignment's planner key: the quiz's for a quiz, the topic's for a graded discussion (as Canvas's planner names them), else its own
+        const keyOf = (a) => (a.quiz_id ? `quiz:${a.quiz_id}` : a.discussion_topic?.id ? `discussion_topic:${a.discussion_topic.id}` : `assignment:${a.id}`);
+        const aByKey = new Map();
+        for (const { list } of byCourse) for (const a of list || []) { aByKey.set(keyOf(a), a); aByKey.set(`assignment:${a.id}`, a); }
+        // marked is marked, whether or not anything was ever handed in (a tool sends a score back with
+        // no submission; a teacher enters one): never overdue. Locked or closed work cannot be fixed:
+        // it is left off the list rather than counted against you.
+        const scored = (s) => !!s && (s.workflow_state === 'graded' || (s.score !== null && s.score !== undefined));
+        const closed = (a) => !!(a.locked_for_user || (a.lock_at && U.parse(a.lock_at) < now));
         for (const it of live) {
           if (!it.isDue || it.submitted || it.excused || !(it.missing || it.date < now)) continue;
           const key = `${it.type}:${it.raw.plannable_id}`;
+          const a = aByKey.get(key);
+          if (a && (scored(a.submission) || closed(a))) continue;
           seen.add(key);
           overdue.push({ key, late: false, item: it, title: it.title, meta: [it.kind, it.points !== null ? `${store.fmtPts(it.points)} pts` : null, `due ${U.fmtShort(it.date)}`, 'not submitted'].filter(Boolean).join(' · '), course: it.course?.shortName || it.courseName || '—', color: palOf(it.course).text, tint: palOf(it.course).tint, url: it.url, date: it.date });
         }
         for (const { c, list } of byCourse) {
           for (const a of list || []) {
             const s = a.submission;
-            if (!s || s.excused) continue;
+            if (!s || s.excused || scored(s)) continue;
             // handed in late and not yet marked — or never handed in at all and past due (Canvas's own
             // "missing"), which the planner's week-long window no longer holds once it is older than that
             const lateOpen = s.late && s.submitted_at && (s.score === null || s.score === undefined);
-            const missing = !s.submitted_at && (s.missing || (a.due_at && U.parse(a.due_at) < now)) && (a.submission_types || []).some((t) => !['none', 'on_paper', 'not_graded'].includes(t));
+            const missing = !s.submitted_at && (s.missing || (a.due_at && U.parse(a.due_at) < now)) && (a.submission_types || []).some((t) => !['none', 'on_paper', 'not_graded'].includes(t)) && !closed(a);
             if (!lateOpen && !missing) continue;
-            if (seen.has(`assignment:${a.id}`) || (a.quiz_id && seen.has(`quiz:${a.quiz_id}`))) continue;
+            const key = keyOf(a);
+            if (seen.has(key) || seen.has(`assignment:${a.id}`)) continue;
+            seen.add(key);
             seen.add(`assignment:${a.id}`);
-            const key = a.quiz_id ? `quiz:${a.quiz_id}` : `assignment:${a.id}`;
             if (dismissedKeys.has(key) || dismissedKeys.has(`assignment:${a.id}`) || plannerByKey.get(key)?.dismissed) continue;
-            const item = plannerByKey.get(key) || { type: a.quiz_id ? 'quiz' : 'assignment', raw: { plannable_id: a.quiz_id || a.id, planner_override: null } };
+            const item = plannerByKey.get(key) || { type: key.split(':')[0], raw: { plannable_id: key.split(':')[1], planner_override: overrideByKey.get(key) || overrideByKey.get(`assignment:${a.id}`) || null } };
             overdue.push({ key, late: lateOpen, item, title: a.name, meta: [kindOf(a), a.points_possible !== null && a.points_possible !== undefined ? `${store.fmtPts(a.points_possible)} pts` : null, a.due_at ? `due ${U.fmtShort(a.due_at)}` : null, lateOpen ? 'submitted late · ungraded' : 'not submitted'].filter(Boolean).join(' · '), course: c.shortName || c.name, color: c.palette.text, tint: c.palette.tint, url: a.html_url || `${c.url}/assignments/${a.id}`, date: U.parse(a.due_at) || now });
           }
         }

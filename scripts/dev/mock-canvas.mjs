@@ -111,10 +111,10 @@ function assignmentObj(courseId, row) {
   const groups = (GROUPS[courseId] || [[Object.keys(groupNames(courseId))[0], 0]]);
   const gIdx = groups.findIndex(([g]) => g === group);
   const due = at(dueDay, Math.floor(dueHour), Math.round((dueHour % 1) * 60));
-  const submitted = subDay !== null || earned !== null;
+  const submitted = subDay !== null || (earned !== null && !extra.noSub); // (noSub: marked with nothing ever handed in — a tool's score sent back, a teacher's entry — as Canvas then reports it: graded, no submitted_at, missing)
   const submission = {
     id: `s${id}`, assignment_id: id, workflow_state: earned !== null ? 'graded' : submitted ? 'submitted' : 'unsubmitted', score: earned, grade: earned === null ? null : extra.gradingType === 'pass_fail' ? (earned > 0 ? 'complete' : 'incomplete') : String(earned),
-    submitted_at: subDay !== null ? at(subDay, 15, 52) : (earned !== null ? at(dueDay - 1, 16, 1) : null), graded_at: earned !== null ? at(extra.gradedDay ?? dueDay, 8, 0) : null,
+    submitted_at: subDay !== null ? at(subDay, 15, 52) : (earned !== null && !extra.noSub ? at(dueDay - 1, 16, 1) : null), graded_at: earned !== null ? at(extra.gradedDay ?? dueDay, 8, 0) : null,
     // Canvas posts a grade separately from marking it; one assignment here is marked but held back
     posted_at: earned !== null ? (extra.held ? null : at(dueDay, 8, 5)) : null,
     late: !!extra.late, missing: !submitted && new Date(due) < now, excused: !!extra.excused || !!(mockConfig.excused || []).includes(String(id)), attempt: submitted ? 1 : null, // (POST /__mock/config {"excused": ["4002"]} excuses an assignment for a test)
@@ -140,11 +140,11 @@ function assignmentObj(courseId, row) {
   };
   return {
     id, name, description: extra.description || `<p>Complete <strong>${name}</strong> as described in lecture. Show all work and submit a single PDF.</p><ul><li>Use the chain rule where appropriate.</li><li>Label each step.</li></ul>${extra.rubric ? '<p>See the rubric for how points are awarded.</p>' : ''}`,
-    due_at: due, lock_at: extra.window ? at(dueDay, 23, 59) : null, unlock_at: extra.window ? at(dueDay - 7, 0, 0) : null, points_possible: possible, grading_type: extra.gradingType || 'points', published: true, html_url: `/courses/${courseId}/assignments/${id}`,
+    due_at: due, lock_at: extra.lockAt !== undefined ? at(extra.lockAt, 23, 59) : extra.window ? at(dueDay, 23, 59) : null, unlock_at: extra.window ? at(dueDay - 7, 0, 0) : null, points_possible: possible, grading_type: extra.gradingType || 'points', published: true, html_url: `/courses/${courseId}/assignments/${id}`,
     // the class's numbers on a marked assignment (include[]=score_statistics): what Canvas's own grade page shows as mean, high and low
     score_statistics: earned !== null ? { mean: Math.round(possible * 0.78 * 10) / 10, min: Math.round(possible * 0.4), max: possible, median: Math.round(possible * 0.8 * 10) / 10, lower_q: Math.round(possible * 0.65 * 10) / 10, upper_q: Math.round(possible * 0.92 * 10) / 10 } : undefined,
     submission_types: extra.quiz ? ['online_quiz'] : extra.tool ? ['external_tool'] : extra.types || ['online_upload', 'online_text_entry'], is_quiz_assignment: !!extra.quiz, quiz_id: extra.quiz ? String(Number(id) + 8000) : undefined,
-    allowed_extensions: mockConfig.ext?.[id] || extra.ext || [], locked_for_user: false, // (POST /__mock/config {"ext": {"4002": ["pdf"]}} narrows an assignment's types for a test)
+    allowed_extensions: mockConfig.ext?.[id] || extra.ext || [], locked_for_user: extra.lockAt !== undefined && extra.lockAt < 0, lock_explanation: extra.lockAt !== undefined && extra.lockAt < 0 ? `This assignment was locked ${at(extra.lockAt, 23, 59)}.` : undefined, // (POST /__mock/config {"ext": {"4002": ["pdf"]}} narrows an assignment's types for a test; lockAt: a lock date in days, closed once past)
     quiz_access_code: extra.code || null, quiz_ip_filter: extra.ip || null, quiz_lockdown: !!extra.lockdown, quiz_survey: extra.survey || null, quiz_code_hidden: !!extra.codeHidden, // (the mock's own notes: what the quiz built from this is restricted by)
     external_tool_tag_attributes: extra.tool ? { url: extra.tool, new_tab: false, resource_link_id: 'rl1' } : undefined,
     discussion_topic: extra.discussion ? { id: extra.discussion, title: name, html_url: `/courses/${courseId}/discussion_topics/${extra.discussion}` } : undefined, // a graded discussion: the assignment behind a topic
@@ -161,7 +161,14 @@ function assignmentGroups(courseId) {
   const defs = GROUPS[courseId] || Object.keys(groupNames(courseId)).map((g) => [g, 0]);
   return defs.map(([name, weight], i) => ({ id: `g${courseId}-${i}`, name, position: i + 1, group_weight: weight, rules: {}, assignments: (A[courseId] || []).filter((r) => r[2] === name).map((r) => assignmentObj(courseId, r)) }));
 }
-const allAssignments = (courseId) => (A[courseId] || []).map((r) => assignmentObj(courseId, r));
+// two more past-due assignments in PHYS, for a test (POST /__mock/config {"overdueExtras": true}): one marked
+// 20/20 with nothing ever handed in (a tool sent the score back: graded, no submitted_at, Canvas's missing flag
+// still up), one never handed in and locked since — neither is overdue work the student can do anything about
+const OVERDUE_EXTRAS = [
+  ['2090', 'Lab 0 tool check', 'Labs', 20, 20, -10, 23.98, null, { tool: 'https://tool.example.com/lab0', noSub: true }],
+  ['2091', 'W1 warm-up', 'Homework', 5, null, -12, 23.98, null, { lockAt: -5 }],
+];
+const allAssignments = (courseId) => [...(A[courseId] || []), ...(mockConfig.overdueExtras && courseId === '102' ? OVERDUE_EXTRAS : [])].map((r) => assignmentObj(courseId, r));
 const apiSubmissions = new Map(); // assignment id -> the submission made through the API
 
 // ---- planner ------------------------------------------------------------------------------
@@ -581,7 +588,12 @@ on('GET', /^\/api\/v1\/planner_notes$/, () => notes.slice());
 on('POST', /^\/api\/v1\/planner_notes$/, (url, m, body) => { const n = { id: `note${++noteSeq}`, title: String(body.title || ''), todo_date: body.todo_date || null, course_id: body.course_id || null, details: body.details || '', workflow_state: 'active', user_id: 'self' }; notes.push(n); return n; });
 on('DELETE', /^\/api\/v1\/planner_notes\/(\w+)$/, (url, m) => { const i = notes.findIndex((n) => n.id === m[1]); if (i < 0) return {}; const [n] = notes.splice(i, 1); return n; });
 on('GET', /^\/api\/v1\/planner\/overrides$/, () => [...overrides.values()]);
-on('POST', /^\/api\/v1\/planner\/overrides$/, (url, m, body) => { const ov = { id: `ov${overrides.size + 1}`, plannable_type: body.plannable_type, plannable_id: body.plannable_id, marked_complete: !!body.marked_complete, dismissed: !!body.dismissed }; overrides.set(`${body.plannable_type}:${body.plannable_id}`, ov); return ov; });
+on('POST', /^\/api\/v1\/planner\/overrides$/, (url, m, body) => {
+  if (overrides.has(`${body.plannable_type}:${body.plannable_id}`)) return { __status: 400, errors: { plannable_id: [{ message: 'has already been taken' }] } }; // (Canvas keeps one override per item: a second is refused, whatever its flags)
+  const ov = { id: `ov${overrides.size + 1}`, plannable_type: body.plannable_type, plannable_id: body.plannable_id, marked_complete: !!body.marked_complete, dismissed: !!body.dismissed };
+  overrides.set(`${body.plannable_type}:${body.plannable_id}`, ov);
+  return ov;
+});
 on('PUT', /^\/api\/v1\/planner\/overrides\/(\w+)$/, (url, m, body) => { for (const ov of overrides.values()) if (ov.id === m[1]) { Object.assign(ov, body); return ov; } return {}; });
 on('GET', /^\/api\/v1\/users\/self\/activity_stream\/summary$/, () => [{ type: 'Announcement', unread_count: 3, count: 5 }, { type: 'Conversation', unread_count: 1, count: 2 }, { type: 'DiscussionTopic', unread_count: 4, count: 6 }]);
 on('GET', /^\/api\/v1\/users\/self\/activity_stream$/, () => [

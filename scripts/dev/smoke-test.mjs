@@ -369,6 +369,39 @@ try {
   await page.waitForSelector('.bcv-stat', { timeout: 20000 });
   await waitText('.bcv-stats > :nth-child(4) .bcv-stat__value', /^1$/);
   check(/^Overdue\s*1\s*1 not submitted$/i.test((await texts('.bcv-stat'))[3]), `restored on Canvas, it counts again: ${(await texts('.bcv-stat'))[3]}`);
+  // marked work with nothing ever handed in (a tool's score sent back, a teacher's entry: graded, no submitted_at, Canvas's
+  // missing flag still up) is not overdue, and past-due work locked since is left off: neither can be done anything about
+  // (the page's own client, in its world: the caches live in storage.local and outlast a reload)
+  const dropCaches = () => sw.evaluate(async (base) => { const [tab] = await chrome.tabs.query({ url: `${base}/*` }); await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'ISOLATED', func: async () => { await self.BCV.canvas.invalidatePrefix('assignments:'); await self.BCV.canvas.invalidatePrefix('planner:'); } }); }, BASE);
+  await mockConfig({ overdueExtras: true });
+  await dropCaches();
+  await page.goto(`${BASE}/`);
+  await page.waitForSelector('.bcv-stat', { timeout: 20000 });
+  await page.waitForFunction(() => { const els = [...document.querySelectorAll('.bcv-stat__value')]; return els.length === 6 && els.every((e) => /^\d+$/.test(e.textContent) && !e.dataset.rolling); }, null, { timeout: 15000 });
+  const extraPhys = await sw.evaluate(async (base) => { const [tab] = await chrome.tabs.query({ url: `${base}/*` }); const [r] = await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'ISOLATED', func: async () => (await self.BCV.store.assignments('102')).filter((a) => ['2090', '2091'].includes(String(a.id))).map((a) => ({ id: a.id, graded: a.submission?.workflow_state, sub: a.submission?.submitted_at, missing: a.submission?.missing, locked: a.locked_for_user })) }); return r?.result; }, BASE);
+  check(extraPhys.length === 2 && extraPhys[0].graded === 'graded' && extraPhys[0].sub === null && extraPhys[0].missing === true && extraPhys[1].locked === true, `two more past-due assignments in PHYS, as Canvas reports them — one marked 20/20 with no submission and the missing flag up, one locked: ${JSON.stringify(extraPhys)}`);
+  check(/^Overdue\s*1\s*1 not submitted$/i.test((await texts('.bcv-stat'))[3]), `neither counts as overdue: ${(await texts('.bcv-stat'))[3]}`);
+  await page.click('.bcv-stats .bcv-stat:nth-child(4)');
+  await page.waitForSelector('.bcv-sheet', { timeout: 5000 });
+  const extraRows = await texts('.bcv-sheet__row');
+  check(extraRows.length === 1 && /^W2 HW /.test(extraRows[0]), `and the sheet leaves both off: ${extraRows.join(' | ')}`);
+  // the X on an item that has an override already (the one undone above): Canvas keeps one per item and refuses a second, so the one it has is changed — the row clears, no "Couldn't clear that"
+  await page.click('.bcv-sheet__item .bcv-sheet__x');
+  check(await eventually(async () => (await page.$$('.bcv-sheet__row')).length === 0 && (await texts('.bcv-sheet__line'))[0] === '0 Overdue'), 'cleared again after being put back: the override it already had is changed rather than a second one written');
+  check(!(await texts('.bcv-toast')).some((t) => /Couldn/.test(t)), 'and nothing says it could not');
+  const overrideAgain = await page.evaluate(async () => { const r = await fetch('/api/v1/planner/overrides'); const list = JSON.parse((await r.text()).replace(/^while\(1\);/, '')); return list.filter((o) => o.plannable_type === 'assignment' && String(o.plannable_id) === '2002').map((o) => ({ id: o.id, dismissed: o.dismissed })); });
+  check(overrideAgain.length === 1 && overrideAgain[0].dismissed === true && overrideAgain[0].id === dismissedOnCanvas.ovId, `Canvas holds the one override, now dismissed again: ${JSON.stringify(overrideAgain)}`);
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !document.querySelector('.bcv-sheet'), null, { timeout: 3000 });
+  await sw.evaluate(async ([base, ovId]) => {
+    const [tab] = await chrome.tabs.query({ url: `${base}/*` });
+    await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'ISOLATED', args: [ovId], func: (id) => self.BCV.canvas.put(`/api/v1/planner/overrides/${id}`, { dismissed: false }) });
+  }, [BASE, dismissedOnCanvas.ovId]);
+  await mockConfig({ overdueExtras: false });
+  await dropCaches();
+  await page.goto(`${BASE}/`);
+  await page.waitForSelector('.bcv-stat', { timeout: 20000 });
+  await waitText('.bcv-stats > :nth-child(4) .bcv-stat__value', /^1$/);
   // Graded this week: graded_at inside the week, points earned over points possible
   check(/^Graded this week\s*\d+\s*(\d+(\.\d+)? \/ \d+(\.\d+)? points|No grades posted this week)$/i.test(stats[5]), `Graded this week with its points ratio: ${stats[5]}`);
   await page.click('.bcv-stats .bcv-stat:nth-child(6)');
