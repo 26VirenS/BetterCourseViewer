@@ -42,7 +42,7 @@
   /** The flow on its own (the phone), or — `embed` — the block the assignment page hosts at the
    *  end of its own scroll (mockup 11): the assignment already on the page is reused, never
    *  refetched, the instructions stay above, and the mode chosen is remembered per assignment. */
-  async function render(ctx, course, { embed = false, a: aGiven = null, sub: subGiven = null, back: backGiven = null, title: kicker = 'Hand in', aside = null } = {}) {
+  async function render(ctx, course, { embed = false, a: aGiven = null, sub: subGiven = null, back: backGiven = null, title: kicker = 'Hand in', aside = null, onDone = null } = {}) {
     const { app, route } = ctx;
     const cid = course.id, aid = route.arg;
     const fromTodo = route.params.get('from') === 'todo';
@@ -509,8 +509,8 @@
           ['Grade', graded ? `${store.fmtPts(s.score)} / ${store.fmtPts(a.points_possible ?? 0)}` : 'Not graded yet'],
         ].map(([k, v]) => U.el('bcv-sb__rrow', [U.text('bcv-sb__rlabel', k, 'span'), U.text('bcv-sb__rvalue', v, 'span')]))),
         U.el('bcv-sb__donebtns', [
-          // embedded with nowhere to go back to, Done reloads the assignment so its status and grade column catch up
-          h('button', { type: 'button', class: 'bcv-sb__btn bcv-sb__btn--primary', text: embed && !fromTodo ? 'Done' : `Back to ${back.label}`, onclick: () => app.go(embed && !fromTodo ? `${course.url}/assignments/${aid}` : back.href, { confirmed: true }) }),
+          // embedded with nowhere to go back to, Done reloads the assignment so its status and grade column catch up (in the search hub's box, it closes the box: `onDone`)
+          h('button', { type: 'button', class: 'bcv-sb__btn bcv-sb__btn--primary', text: embed && !fromTodo ? 'Done' : `Back to ${back.label}`, onclick: () => { if (embed && onDone) { onDone(); return; } app.go(embed && !fromTodo ? `${course.url}/assignments/${aid}` : back.href, { confirmed: true }); } }),
           canAgain ? h('button', { type: 'button', class: 'bcv-sb__btn', text: 'Resubmit', onclick: () => {
             st.stage = 'edit';
             st.urlOpen = false;

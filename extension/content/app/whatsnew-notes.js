@@ -24,6 +24,13 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.91.0', date: '2026-09-24', notes: [
+      { kind: 'new', title: 'Search does things', body: 'Type / for commands: submit, download, convert, open…', icon: P.sparkle },
+      { kind: 'new', title: 'Hand in from the box', body: '/submit opens the assignment’s hand-in block over the page.', icon: P.pen },
+      { kind: 'improved', title: 'Instant results', body: 'From the first letter, the top hit chosen as you type.', icon: P.list },
+      { kind: 'new', title: '/ from any screen', body: 'Press / or ⌘K anywhere: the Dashboard opens on the box.', icon: P.arrows },
+      { kind: 'new', title: 'Sums in the box', body: '2*(3+4) or 15% of 80: the answer appears, Enter copies it.', icon: P.tool },
+    ] },
     { version: '2.90.0', date: '2026-09-24', notes: [
       { kind: 'improved', title: 'Lighter pages', body: 'A page parses far less code; the rest loads when used.', icon: P.sparkle },
       { kind: 'improved', title: 'Photos, as needed', body: 'A tab reads only the pictures its own screen shows.', icon: P.pic },

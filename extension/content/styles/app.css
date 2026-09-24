@@ -3553,6 +3553,26 @@ html[data-bcv-theme="dark"] .bcv-pdfx { --px-row: #0f0f11; --px-page: #1f1f22; -
 .bcv-omni__ext { flex: none; display: flex; color: var(--bcv-ink3); }
 .bcv-omni__empty, .bcv-omni__more { padding: 12px 10px; font: 400 13px/1.4 var(--bcv-font); color: var(--bcv-ink3); }
 @media (max-width: 900px) { .bcv-omni { flex-basis: 100%; max-width: none; order: 9; margin-left: 0; } }
+/* the hub: what a row can do (small buttons at its right, on the row chosen or under the pointer), a command's Tab hint, an answer's big number, and the hand-in box */
+.bcv-omni__item { outline: none; }
+.bcv-omni__acts { flex: none; display: none; gap: 4px; margin-left: 4px; }
+.bcv-omni__item:hover .bcv-omni__acts, .bcv-omni__item.is-cur .bcv-omni__acts, .bcv-omni__item:focus-within .bcv-omni__acts { display: flex; }
+.bcv-omni__act { display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 8px; border-radius: 7px; border: 1px solid var(--bcv-sep); background: var(--bcv-card); color: var(--bcv-ink2); font: 600 11px/1 var(--bcv-font); cursor: pointer; white-space: nowrap; }
+.bcv-omni__act:hover, .bcv-omni__act:focus-visible { background: var(--bcv-fill); border-color: var(--bcv-edge); color: var(--bcv-ink); outline: none; }
+.bcv-omni__hint { flex: none; display: none; padding: 2px 5px; border-radius: 5px; border: 1px solid var(--bcv-sep); font: 600 10px/1 var(--bcv-font); color: var(--bcv-ink3); }
+.bcv-omni__item.is-cur .bcv-omni__hint { display: inline-block; }
+.bcv-omni__item--ans .bcv-omni__t { font: 700 20px/1.2 var(--bcv-display); letter-spacing: -.02em; }
+.bcv-omni__item--ans .bcv-omni__iic { color: var(--bcv-blue); }
+.bcv-hub-pop { width: 600px; }
+.bcv-hub-pop__head { align-items: center; gap: 12px; padding: 16px 22px; }
+.bcv-hub-pop__tile { background: var(--bcv-blue); }
+.bcv-hub-pop__title { font: 600 16px/1.25 var(--bcv-display); letter-spacing: -.02em; }
+.bcv-hub-pop__sub { margin-top: 2px; font: 400 12px/1.3 var(--bcv-font); color: var(--bcv-ink3); }
+.bcv-hub-pop__sub:empty { display: none; }
+.bcv-hub-pop__body { flex: 1; min-height: 0; overflow-y: auto; padding: 18px 22px 22px; }
+.bcv-hub-pop__body .bcv-sb--embed { scroll-margin-top: 0; }
+.bcv-hub-ov.is-closing { animation: bcv-tool-ovout .18s ease both; }
+.bcv-hub-ov.is-closing .bcv-sheet { animation: bcv-tool-out .18s ease both; }
 /* the welcome's stage under a thing seen through a hole (the search box): an arrow up at it, the words under, centred on it */
 .bcv-welcome__stage[data-stage="below"] { align-items: center; text-align: center; max-width: 620px; }
 .bcv-welcome__stage[data-stage="below"] .bcv-welcome__title { font-size: clamp(28px, 4vw, 40px); }

@@ -725,6 +725,8 @@ on('GET', /^\/api\/v1\/courses\/(\w+)\/folders\/root$/, (url, m) => folders[`r${
 on('GET', /^\/api\/v1\/courses\/(\w+)\/folders\/by_path\/(.+)$/, (url, m) => { const path = `course files/${decodeURIComponent(m[2])}`; const f = Object.values(folders).find((x) => x.full_name === path); return f ? [folders[`r${m[1]}`], f] : { errors: [{ message: 'not found' }] }; });
 on('GET', /^\/api\/v1\/folders\/(\w+)\/folders$/, (url, m) => Object.values(folders).filter((f) => f.parent_folder_id === m[1]));
 on('GET', /^\/api\/v1\/folders\/(\w+)\/files$/, (url, m) => files[m[1]] || []);
+// a course's files as one list (the search box, /download and /convert), narrowed by search_term the way Canvas narrows it
+on('GET', /^\/api\/v1\/courses\/(\w+)\/files$/, (url, m) => { const term = (url.searchParams.get('search_term') || '').toLowerCase(); return Object.values(folders).filter((f) => f.context_id === m[1]).flatMap((f) => files[f.id] || []).filter((f) => !term || `${f.display_name} ${f.filename}`.toLowerCase().includes(term)); });
 // one file by id, as the File API gives it (folder_id, and a preview_url only where Canvadocs would provide one: none here)
 on('GET', /^\/api\/v1\/files\/(\w+)$/, (url, m) => { for (const [fid, list] of Object.entries(files)) { const f = list.find((x) => x.id === m[1]); if (f) return { ...f, folder_id: fid, preview_url: null, mime_class: (f['content-type'] || '').split('/')[0] }; } return { __status: 404, errors: [{ message: 'not found' }] }; });
 on('GET', /^\/api\/v1\/courses\/(\w+)\/quizzes\/(\w+)\/submissions$/, (url, m) => ({ quiz_submissions: (quizSubs.get(m[2]) || []).map(pubSub) }));

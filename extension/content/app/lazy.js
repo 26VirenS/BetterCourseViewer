@@ -23,6 +23,7 @@
     submit: { files: ['content/app/screens/submit.js', 'content/app/screens/feedback.js'], has: () => !!BCV.screens.submit && !BCV.screens.submit.__stub && !!BCV.screens.feedback && !BCV.screens.feedback.__stub },
     phone: { files: ['content/app/phone.js'], has: () => !!BCV.phone },
     notes: { needs: ['setupcss'], files: ['content/app/whatsnew-notes.js'], has: () => Array.isArray(self.BCV_WHATS_NEW) },
+    hub: { files: ['content/app/hub.js'], has: () => !!BCV.hub }, // the search box's commands, answers and row actions: loaded when the box is focused
     'tool:cite': { files: ['content/app/tools/cite.js'], has: () => !!BCV.toolsCite },
     'tool:fc': { files: ['content/app/tools/cards.js'], has: () => !!BCV.toolsCards },
     'tool:conv': { files: ['content/app/tools/convert.js'], has: () => !!BCV.toolsConvert },
