@@ -156,10 +156,9 @@
     };
     window.addEventListener('message', onMsg);
     live.set(frame, w);
-    let mo = null;
-    const detach = () => { window.removeEventListener('message', onMsg); live.delete(frame); mo?.disconnect(); };
-    mo = new MutationObserver(() => { if (!frame.isConnected) detach(); });
-    mo.observe(BCV.utils.overlayRoot(), { childList: true });
+    let forget = () => {};
+    const detach = () => { window.removeEventListener('message', onMsg); live.delete(frame); forget(); };
+    forget = BCV.ui.onGone(frame, detach);
     return detach;
   }
   // a look change repaints the app's page in place: every live frame hears of it

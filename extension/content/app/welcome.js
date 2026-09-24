@@ -419,6 +419,12 @@
     };
     level();
     if (prop?.follow) ui.stage.follow = setInterval(() => { if (prop.follow()) level(); }, 200); // (the holes keep to the things as the page fills in under the black)
+    // the look stage sits under the switch's show — the switch and the pill that pops out of it — wherever their box ends (ui.watchLayout: measured as the show moves, at any zoom)
+    const look = s.layout === 'look' ? prop?.querySelector?.('.bcv-welcome__look') : null;
+    if (look) {
+      const stopLook = BCV.ui.watchLayout(look, () => { box.style.top = `${Math.round(BCV.ui.boundsOf(look).bottom + 22)}px`; }, { within: ui.el });
+      BCV.ui.onGone(box, stopLook);
+    }
     clearTimeout(ui.timer);
     ui.timer = setTimeout(() => {
       if (ui?.stage?.next !== next) return;

@@ -167,8 +167,7 @@
     if (from) U.morphFrom(pop, from);
     ov.tabIndex = -1;
     ov.focus({ preventScroll: true });
-    const mo = new MutationObserver(() => { if (!ov.isConnected) { mo.disconnect(); gone(); } }); // (swept away by the next screen, or a popup taking its place)
-    mo.observe(overlayRoot(), { childList: true });
+    U.onGone(ov, gone); // (closed, swept away by the next screen, or a popup taking its place)
     try {
       const course = await S.course(String(courseId));
       if (!live) return null;

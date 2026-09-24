@@ -577,10 +577,8 @@
 
     const cmain = U.el('bcv-cmain');
     screen.append(head, U.el('bcv-cwrap', [rail, cmain]));
-    // keep the rail just below the sticky header, whatever height the title wraps to
-    const measure = () => screen.style.setProperty('--bcv-chead', `${head.offsetHeight}px`);
-    if (typeof ResizeObserver !== 'undefined') new ResizeObserver(measure).observe(head);
-    setTimeout(measure, 0);
+    // the rail starts just below the sticky header, whatever height the title wraps to (ui.watchLayout: measured as it lands and whenever it changes)
+    U.watchLayout(head, (r) => screen.style.setProperty('--bcv-chead', `${Math.round(r.height)}px`), { within: screen });
     return { screen, content: cmain, head };
   }
 

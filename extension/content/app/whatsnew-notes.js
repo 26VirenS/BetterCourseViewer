@@ -24,6 +24,11 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.94.0', date: '2026-09-24', notes: [
+      { kind: 'improved', title: 'Zoom in, zoom out', body: 'Every screen fits from 50% to 200%, and with OS scaling.', icon: P.eye },
+      { kind: 'improved', title: 'Steadier layout', body: 'Popups, menus and panels place themselves, on screen.', icon: P.pin },
+      { kind: 'improved', title: 'One layout rule', body: 'A laptop zoomed to 200% gets the phone layout, live.', icon: P.toggle },
+    ] },
     { version: '2.93.0', date: '2026-09-24', notes: [
       { kind: 'improved', title: 'Smoother motion', body: 'Sheets and menus ease out; rows and cards press in.', icon: P.arrows },
       { kind: 'fixed', title: 'Tidier corners', body: 'Welcome text centred, quiz search full width, upload arrow.', icon: P.eye },

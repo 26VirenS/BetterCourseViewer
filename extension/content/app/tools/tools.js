@@ -89,19 +89,18 @@
       if (onClose && onClose() === false) return;
       closed = true;
       ov.classList.add('is-closing');
-      setTimeout(() => {
+      U.afterMotion(ov).then(() => {
         ov.remove();
         const under = [...document.querySelectorAll('.bcv-sheet-ov.is-under')].pop(); // (the nearest one below, back to itself)
         if (under) { under.classList.remove('is-under'); under.focus?.({ preventScroll: true }); }
-      }, 180);
+      });
     };
     ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
     // Escape from anywhere on the page (a download click leaves the focus on the page's body), and
     // only from the top one: a stack comes apart one at a time.
     const onKey = (e) => { if (e.key !== 'Escape' || !ov.isConnected || closed || ov.classList.contains('is-under')) return; e.stopPropagation(); close(); };
     document.addEventListener('keydown', onKey, true);
-    const mo = new MutationObserver(() => { if (!ov.isConnected) { document.removeEventListener('keydown', onKey, true); mo.disconnect(); } });
-    mo.observe(overlayRoot(), { childList: true }); // (where the popup is put — the document element on a tool's own tab, where body would never see it go)
+    U.onGone(ov, () => document.removeEventListener('keydown', onKey, true)); // (however it goes: closed, swept away by a screen, replaced by another popup)
     const back = h('button', { type: 'button', class: 'bcv-sheet__close bcv-tool__back', 'aria-label': 'Back', hidden: true }, U.svg('M15 5l-7 7 7 7', { size: 14, stroke: 'var(--bcv-ink2)', width: 2.2 }));
     const titleEl = U.text('bcv-tool__title bcv-ellip', title || tool.name);
     const subEl = U.text('bcv-tool__sub', sub);
@@ -117,7 +116,7 @@
       bodyEl,
       foot ? U.text('bcv-sheet__foot bcv-pretty', foot) : null,
     ]);
-    sheet.style.width = `${width}px`;
+    sheet.style.setProperty('--bcv-tool-w', `${width}px`); // (the tool's own width; the CSS keeps it inside the window)
     sheet.dataset.tool = tool.key;
     ov.append(sheet);
     overlayRoot().append(ov);
@@ -464,8 +463,10 @@
     item.classList.add('is-set');
     paintSetter(item, focus);
     islandOpen(item, 8000);
-    for (const ms of [120, 320, 560]) setTimeout(() => { if (item.classList.contains('is-set')) paintSetter(item, focus); }, ms); // (the strip is laid out in pixels: again as the island swells to its width)
-    if (focusKb) setTimeout(() => item.querySelector('.bcv-island__scale')?.focus(), 200);
+    // the strip is laid out in pixels: painted again as the island swells to its width, until it stands still (ui.watchLayout)
+    const stopFollow = U.watchLayout(item, () => { if (item.classList.contains('is-set')) paintSetter(item, focus); else stopFollow(); }, { within: item });
+    U.onGone(item, stopFollow);
+    if (focusKb) U.afterMotion(item).then(() => item.querySelector('.bcv-island__scale')?.focus());
   }
   function islandOpen(item, ms = 6000, focusMain = false) {
     item.classList.add('is-open');
@@ -640,8 +641,7 @@
     const stop = watch(paint);
     const ro = new ResizeObserver(() => { if (p.alive()) paint(focus); else ro.disconnect(); }); // (the strip is laid out in pixels: a card that changes width lays it out again)
     ro.observe(scale);
-    const mo = new MutationObserver(() => { if (!p.alive()) { stop(); mo.disconnect(); } });
-    mo.observe(overlayRoot(), { childList: true });
+    U.onGone(p.ov, stop);
     if (!focusRead) focusLoad().then(paintAll).catch(() => {});
     return p;
   }
@@ -673,8 +673,7 @@
     document.addEventListener('securitypolicyviolation', onCsp);
     frame.addEventListener('error', fail);
     frame.addEventListener('load', () => frame.classList.add('is-in'));
-    const mo = new MutationObserver(() => { if (!p.alive()) { document.removeEventListener('securitypolicyviolation', onCsp); mo.disconnect(); } });
-    mo.observe(overlayRoot(), { childList: true });
+    U.onGone(p.ov, () => document.removeEventListener('securitypolicyviolation', onCsp));
   }
 
   /** The calculator as a tool of its own: the same scientific calculator, larger, the keyboard on it. */
@@ -1359,7 +1358,7 @@
     });
     for (const [k, el] of have) {
       if (keys.includes(k)) continue;
-      if (el.classList.contains('is-live')) { islandClose(el); el.classList.add('is-out'); setTimeout(() => { el.remove(); bar.hidden = !bar.querySelector('.bcv-pin'); }, 320); }
+      if (el.classList.contains('is-live')) { islandClose(el); el.classList.add('is-out'); U.afterMotion(el).then(() => { el.remove(); bar.hidden = !bar.querySelector('.bcv-pin'); }); }
       else el.remove();
     }
     next.forEach((el, i) => { const ref = [...bar.children].filter((c) => !c.classList.contains('is-out'))[i] || null; if (ref !== el) bar.insertBefore(el, ref); });

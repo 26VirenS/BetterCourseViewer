@@ -268,12 +268,11 @@
       if (replace) history.replaceState({ bcv: true }, '', url.pathname + url.search + url.hash);
       else history.pushState({ bcv: true }, '', url.pathname + url.search + url.hash);
       window.scrollTo(0, 0);
-      render();
-      return;
+      return render(); // (an in-place move resolves once the screen is drawn: a caller can wait for what it put there)
     }
     if (samePage) {
       // the screen you are on, asked for again: a fresh draw from Canvas (the memo starts over), in place
-      if (inPlaceHop(url)) { BCV.canvas.clearAll(); window.scrollTo(0, 0); render(); return; }
+      if (inPlaceHop(url)) { BCV.canvas.clearAll(); window.scrollTo(0, 0); return render(); }
       progress(true, state.loadKey || loadKeyFor(parseRoute(url.href)));
       location.reload();
       return;
@@ -281,8 +280,7 @@
     if (!replace && inPlaceHop(url)) {
       history.pushState({ bcv: true }, '', url.pathname + url.search + url.hash);
       window.scrollTo(0, 0);
-      render();
-      return;
+      return render();
     }
     progress(true, state.loadKey || loadKeyFor(parseRoute(url.href))); // the pressed row (or the next page's own row) fills until that page has drawn its screen
     if (replace) location.replace(url.href);
@@ -497,7 +495,7 @@
     if (!quickNav) return;
     clearTimeout(quickNav.closeTimer);
     quickNav.anchor.setAttribute('aria-expanded', 'false');
-    U.dismiss(quickNav.el, 140);
+    U.dismiss(quickNav.el);
     quickNav = null;
   }
   const quickNavLeave = (key) => {
@@ -550,12 +548,10 @@
       if (next < 0) anchor.focus(); // back out of the top of the list onto the row it came from
       else items[Math.min(next, items.length - 1)].focus();
     });
-    // fixed to the row, and nudged up if the panel would run off the bottom of the window
-    const r = anchor.getBoundingClientRect();
-    Object.assign(el.style, { position: 'fixed', left: `${r.right + 8}px`, top: `${r.top}px`, visibility: 'hidden' });
+    // beside the row, level with it, kept on screen (ui.anchor: to its left when the window has no room to the right)
+    el.style.visibility = 'hidden';
     document.body.append(el);
-    const over = el.getBoundingClientRect().bottom - (window.innerHeight - 12);
-    if (over > 0) el.style.top = `${Math.max(12, r.top - over)}px`;
+    U.anchor(el, anchor, { side: 'right', gap: 8, margin: 12 });
     el.style.visibility = '';
     anchor.setAttribute('aria-expanded', 'true');
     quickNav = { el, key, anchor, closeTimer: null };
@@ -1166,41 +1162,25 @@
   // other embeds, and Canvas's own scripts keep working. Our shell becomes a fixed
   // overlay that only catches clicks on the sidebar, header and rail; Canvas's
   // #main is laid out into the hole our screen leaves for it (measured live).
-  let punchHole = null;
-  let punchRO = null;
-  let punchWatched = null; // the hole whose surroundings are already observed
-  function punchMeasure() {
-    if (!punchHole || !punchHole.isConnected) return;
-    const r = punchHole.getBoundingClientRect();
-    if (!r.width) return;
-    if (punchWatched !== punchHole) { // the first measure with the hole in the page: what sits above it moves it without
-      punchWatched = punchHole;       // resizing it — the header (a breadcrumb row arrives with the course), the note bar
-      const screen = punchHole.closest('.bcv-screen'); // (it wraps) and the screen's entrance slide, which ends after this
-      for (const el of screen ? screen.querySelectorAll('.bcv-head, .bcv-native__bar') : []) punchRO?.observe(el);
-      screen?.addEventListener('animationend', punchMeasure);
-    }
-    html.style.setProperty('--bcv-hole-top', `${Math.round(r.top)}px`);
-    html.style.setProperty('--bcv-hole-left', `${Math.round(r.left)}px`);
-    html.style.setProperty('--bcv-hole-width', `${Math.round(r.width)}px`);
-  }
+  let punchStop = null; // stops following the hole (ui.watchLayout)
   function punchIn(hole) {
-    punchHole = hole;
+    punchStop?.();
     html.classList.add('bcv-punch');
     const side = document.getElementById('right-side');
     html.classList.toggle('bcv-punch--noside', !(side && side.textContent.trim()));
-    if (!punchRO && typeof ResizeObserver !== 'undefined') punchRO = new ResizeObserver(punchMeasure);
-    punchRO?.observe(hole);
-    if (root) punchRO?.observe(root);
-    window.addEventListener('resize', punchMeasure);
-    punchMeasure();
-    setTimeout(punchMeasure, 60);
-    setTimeout(punchMeasure, 500);
+    // the hole's place, kept current: the header growing (a breadcrumb row arriving with the course),
+    // the note bar wrapping, the screen's entrance slide ending, a zoom or a resize — every one of
+    // them is a measure, and each measure holds until the box has stood still
+    punchStop = U.watchLayout(hole, (r) => {
+      if (!r.width) return;
+      html.style.setProperty('--bcv-hole-top', `${Math.round(r.top)}px`);
+      html.style.setProperty('--bcv-hole-left', `${Math.round(r.left)}px`);
+      html.style.setProperty('--bcv-hole-width', `${Math.round(r.width)}px`);
+    }, { within: root || undefined });
   }
   function punchOut() {
-    punchHole = null;
-    punchWatched = null;
-    punchRO?.disconnect();
-    window.removeEventListener('resize', punchMeasure);
+    punchStop?.();
+    punchStop = null;
     html.classList.remove('bcv-punch', 'bcv-punch--noside', 'bcv-punch-light');
     for (const v of ['--bcv-hole-top', '--bcv-hole-left', '--bcv-hole-width']) html.style.removeProperty(v);
   }
@@ -1448,6 +1428,7 @@
     state, go, render, renderSide, parseRoute, refreshCounts, loadShellData, punchIn, punchOut, siteName, toggleTheme, logout, backTo, nameHere, markBack,
     rawQuizUrl, // (the look switch turns the look off mid-quiz by going there, see early.js)
     isDark: () => state.dark,
+    holds: () => !!(state.submitOpen || state.quizOpen), // something on the page would be lost by a reload (a hand-in being written, a quiz attempt): the layout tier waits (early.js)
     openSettings,
     recover, // (the suite checks that a quiz is never reloaded out from under)
     awayPill, // (the welcome after the setup shows a copy of the pill)

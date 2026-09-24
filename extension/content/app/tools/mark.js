@@ -101,8 +101,7 @@
     };
     const stopAll = () => { document.removeEventListener('selectionchange', onSel); document.removeEventListener('keydown', onKey, true); hideBubble(); io?.disconnect(); };
     const letGo = () => { try { st.doc?.destroy?.(); } catch { /* gone */ } st.doc = null; st.bytes = null; }; // (the document's fonts and buffers: pdf.js keeps them until told)
-    const mo = new MutationObserver(() => { if (!alive()) { stopAll(); letGo(); mo.disconnect(); } });
-    mo.observe((BCV.utils?.overlayRoot?.() || document.body), { childList: true });
+    U.onGone(p.ov, () => { stopAll(); letGo(); });
 
     // ---- home: a PDF in, and the ones marked up before -------------------------------------------
     function home() {
@@ -446,9 +445,8 @@
       ]);
       bubble.addEventListener('pointerdown', (e) => e.preventDefault()); // (the press must not drop the selection)
       p.sheet.append(bubble);
-      const w = 330;
-      bubble.style.left = `${Math.max(8, Math.min(innerWidth - w - 8, at.left + at.width / 2 - w / 2))}px`;
-      bubble.style.top = `${at.top > 70 ? at.top - 46 : at.bottom + 10}px`;
+      U.anchor(bubble, at, { side: 'above', gap: 10, align: 'center' }); // (over the words, or under them near the top; on screen either way)
+      bubble.style.maxHeight = '';
     }
     function hideBubble() { bubble?.remove(); bubble = null; }
     function markSel(kind, color, withNote) {

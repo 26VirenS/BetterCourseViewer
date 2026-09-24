@@ -86,8 +86,7 @@
 
     const body = U.el('bcv-fc');
     const p = T.popup({ tool, title: 'Flashcards', sub: '', width: 660, body, from, stack });
-    const mo = new MutationObserver(() => { if (!p.alive()) { mo.disconnect(); if (waiting.length) writeNow(); } });
-    mo.observe(T.overlayRoot(), { childList: true });
+    U.onGone(p.ov, () => { if (waiting.length) writeNow(); }); // (closed with a save pending: written now)
     const csvInput = h('input', { type: 'file', accept: '.csv,text/csv', hidden: true });
     csvInput.addEventListener('change', async () => { const f = csvInput.files?.[0]; if (f) await importCsv(f); csvInput.value = ''; }); // (read first: Safari lets go of the file once the input is cleared)
     body.append(csvInput);

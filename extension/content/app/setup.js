@@ -193,7 +193,7 @@
     if (!reduced() && body.childElementCount) {
       body.style.setProperty('--leave', `${-14 * dir}px`);
       body.classList.add('is-leaving');
-      await new Promise((r) => setTimeout(r, 150));
+      await BCV.ui.afterMotion(body);
       if (!ui) return;
     }
     body.classList.remove('is-leaving');

@@ -199,10 +199,8 @@
     st = null;
     document.removeEventListener('keydown', onKey, true);
     html.classList.remove('bcv-setup-open');
-    if (!reduced()) {
-      overlay.classList.add('is-closing');
-      await new Promise((r) => setTimeout(r, 280));
-    }
+    overlay.classList.add('is-closing');
+    await BCV.ui.afterMotion(overlay); // (its own exit's timing; at once under reduced motion)
     host.remove();
   }
   /** Back to Canvas (or Escape): the page goes. It was marked seen when it opened. */

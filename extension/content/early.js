@@ -54,19 +54,40 @@
   } catch { /* no runtime here */ }
 
   const systemDark = () => !!window.matchMedia?.('(prefers-color-scheme: dark)').matches;
-  // The phone layout (the iPhone mockup) for narrow viewports, decided before first paint and
-  // kept for the page's life so a screen never re-flows into the other layout mid-way.
-  // Decided once the document is parsed and kept for the page's life: a sync later (a look change
-  // in the popup, a settings push) must not flip the layout under a drawn screen. Before the
-  // viewport meta is read, a phone's layout viewport can still be the 980px default, so the answer
-  // is only trusted once the document is past loading.
+
+  // ---- the layout tiers: the one place for the widths the CSS's media queries repeat ------------
+  // phone: at most 700 CSS px across (the iPhone layout, content/app/phone.js); compact: at most
+  // 1100 (the sidebar and the course rail narrow, columns stack); regular above that. A CSS pixel is
+  // whatever the browser's zoom and the OS's scaling make of it, so a laptop zoomed to 200% is a
+  // phone here, and one at 150% is compact. The tier is read once the document is parsed and kept
+  // for the page's life — the two shells are different code, and a screen is never re-flowed into
+  // the other under the student. When a zoom crosses the phone line while the interface is up, the
+  // page is loaded afresh into the other layout once the zoom has settled, unless something on it
+  // would be lost (a hand-in being written, a quiz attempt: app.holds).
+  const LAYOUT = { PHONE_MAX: 700, COMPACT_MAX: 1100 };
+  const tierOf = (w = window.innerWidth) => (w <= LAYOUT.PHONE_MAX ? 'phone' : w <= LAYOUT.COMPACT_MAX ? 'compact' : 'regular');
+  BCV.layout = { ...LAYOUT, tier: tierOf };
+  const phoneQuery = () => window.matchMedia?.(`(max-width: ${LAYOUT.PHONE_MAX}px)`);
+  // (before the viewport meta is read, a phone's layout viewport can still be the 980px default, so
+  // the answer is only trusted once the document is past loading)
   let phoneDecided = null;
   const phone = () => {
     if (phoneDecided !== null) return phoneDecided;
-    const now = !!window.matchMedia?.('(max-width: 700px)').matches;
+    const now = !!phoneQuery()?.matches;
     if (document.readyState !== 'loading') phoneDecided = now;
     return now;
   };
+  let retierT = 0;
+  const onTierChange = () => {
+    clearTimeout(retierT);
+    retierT = setTimeout(() => { // (the zoom settled: Ctrl and + pressed three times is one change)
+      if (!html.classList.contains('bcv-on') || !document.getElementById('bcv-app') || self.BCVBridge?.native) return;
+      if ((tierOf() === 'phone') === html.classList.contains('bcv-phone')) return; // (back where it was, or never crossed)
+      if (BCV.app?.holds?.()) return;
+      location.reload();
+    }, 600);
+  };
+  try { phoneQuery()?.addEventListener('change', onTierChange); } catch { /* no media queries here */ }
 
   function apply({ skin, dark, accent }) {
     html.classList.toggle('bcv-on', skin !== false);

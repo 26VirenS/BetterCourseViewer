@@ -223,7 +223,7 @@
   function openSheet({ title = '', note = '', rows = [], body = null, actions = [], label = title, cls = '' }) {
     document.querySelector('.bcv-sheet-ov')?.remove();
     const ov = U.el('bcv-sheet-ov', null, { role: 'dialog', 'aria-label': label || 'Sheet' });
-    const close = () => BCV.ui.dismiss(ov, 220); // (it slides down the way it rose)
+    const close = () => BCV.ui.dismiss(ov); // (it slides down the way it rose: the CSS's own timing)
     ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
     ov.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
     const handle = h('div', { class: 'bcv-ph-sheet__handle' }, h('span'));

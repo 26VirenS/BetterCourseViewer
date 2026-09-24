@@ -23,7 +23,7 @@ mkdirSync(logs, { recursive: true });
 const LANES = [
   ['smoke:1'],
   ['smoke:2'],
-  ['phone', 'chrome-setup', 'mac-window', 'side-courses', 'app-sync', 'group-late', 'null', 'api'],
+  ['phone', 'zoom', 'chrome-setup', 'mac-window', 'side-courses', 'app-sync', 'group-late', 'null', 'api'],
 ];
 const args = process.argv.slice(2);
 const opt = (name) => { const i = args.indexOf(name); return i >= 0 ? (args[i + 1] || '') : null; };

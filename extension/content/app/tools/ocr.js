@@ -94,8 +94,7 @@
       if (f) { e.preventDefault(); take(f); }
     };
     document.addEventListener('paste', onPaste);
-    const mo = new MutationObserver(() => { if (!p.alive()) { document.removeEventListener('paste', onPaste); mo.disconnect(); } });
-    mo.observe(overlayRoot(), { childList: true });
+    U.onGone(p.ov, () => document.removeEventListener('paste', onPaste));
     // the work view's parts, made once
     const preview = h('img', { class: 'bcv-ocr__preview', alt: 'The picture being read' });
     const nameEl = U.text('bcv-ocr__name', '');

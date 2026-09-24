@@ -87,8 +87,15 @@
     try {
       document.documentElement.style.setProperty('margin-top', `${H + authH}px`, 'important');
       document.documentElement.style.setProperty('--bcv-toolbar-h', `${H + authH}px`); // (what the tray's own popups start below)
+      // where the bar's own buttons begin, from its right edge: the tray (the pinned tools) sits just left of them, whatever the window's width
+      const bar = root?.querySelector('.bar'), acts = root?.querySelector('.acts'), x = root?.querySelector('.x');
+      if (bar && acts && x) {
+        const left = Math.min(acts.getBoundingClientRect().left || Infinity, x.getBoundingClientRect().left || Infinity);
+        if (Number.isFinite(left)) document.documentElement.style.setProperty('--bcv-toolbar-right', `${Math.round(bar.getBoundingClientRect().right - left + 14)}px`);
+      }
     } catch { /* the page went */ }
   }
+  try { window.addEventListener('resize', () => { if (host) push(); }); } catch { /* no window to watch */ }
 
   // The look switch turns the tool's page over rather than the whole document: the bar lives outside
   // <body>, so it keeps its own colours while the page inside goes dark. An inversion is not the
@@ -195,6 +202,9 @@
     const auth = el('div', 'auth');
     auth.append(svg(IC.warn, { size: 20, width: 2 }), el('span', '', 'Authenticating. Don’t open any new tabs or windows'));
 
+    // the state is on the host before the bar is first laid out (attach measures it), so the bar's
+    // first paint is already its colour for that state rather than a transition into it
+    host.dataset.state = tool.state === 'auth' ? 'auth' : 'ready';
     root.append(style, bar, auth);
     attach();
     paint();

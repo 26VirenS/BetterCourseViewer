@@ -223,13 +223,9 @@
           : text('bcv-picker__opttext', o.text || BCV.utils.htmlToText(o.html || '', 120) || String(o.value), 'span'),
         svg('M20 6L9 17l-5-5', { size: 14, stroke: 'var(--bcv-blue)', width: 2.4, cls: 'bcv-picker__tick' }),
       ])), { role: 'listbox', ...(label ? { 'aria-label': label } : {}) });
-      // over everything, placed under the button — or above it when the room is below
-      const below = window.innerHeight - r.bottom;
-      list.style.left = `${Math.max(8, Math.min(r.left, window.innerWidth - Math.max(r.width, 220) - 8))}px`;
-      list.style.minWidth = `${Math.max(r.width, 220)}px`;
-      if (below < 220 && r.top > below) { list.style.bottom = `${window.innerHeight - r.top + 6}px`; list.style.maxHeight = `${Math.max(120, r.top - 16)}px`; }
-      else { list.style.top = `${r.bottom + 6}px`; list.style.maxHeight = `${Math.max(120, below - 16)}px`; }
+      // over everything, under the button — or above it when the room is above (anchor)
       overlayRoot().append(list);
+      anchor(list, r, { side: 'below', minWidth: 220 });
       btn.setAttribute('aria-expanded', 'true');
       (list.querySelector('.bcv-picker__opt.is-on') || list.firstElementChild)?.focus({ preventScroll: true });
       document.addEventListener('keydown', listKeys, true); // (the list's keys, for as long as it is open — not one more listener per picker for the page's life)
@@ -275,7 +271,7 @@
   }
 
   /** Dropdown menu anchored under `anchor`. items: [{label, sub, active, onSelect}] */
-  function menu(anchor, items) {
+  function menu(at, items) {
     closeMenus();
     const m = el('bcv-menu', items.map((it) => h('button', {
       type: 'button',
@@ -291,21 +287,146 @@
         it.sub ? h('span', { class: 'bcv-menu__sub', text: it.sub }) : null,
       ]),
     ])));
-    const r = anchor.getBoundingClientRect();
-    Object.assign(m.style, { position: 'fixed', top: `${r.bottom + 6}px`, left: `${Math.min(r.left, window.innerWidth - 260)}px` });
     overlayRoot().append(m);
+    anchor(m, at, { side: 'below' }); // (under its button, or above it when the room is above; on screen either way)
     setTimeout(() => document.addEventListener('click', closeMenus, { once: true }), 0);
     return m;
   }
-  /** An overlay put away with its exit (the stylesheet's is-closing: a sheet shrinks and fades, a menu
-   *  pops out, a bottom sheet slides down), then removed. Under reduced motion it goes at once. */
-  function dismiss(ov, ms = 180) {
+  // ---- the mechanisms every floating or moving thing uses -----------------------------------------
+  // One way to wait for motion, one way to know an element has gone, one way to follow a box's
+  // place on the page, one way to put a floating element beside another and keep it on screen.
+  // Nothing waits a guessed number of milliseconds, measures once and hopes, or carries its own
+  // observer: a change to a duration in the CSS, a slower machine, a zoomed window or a font that
+  // arrives late are all answered here, once.
+
+  /** Resolves when the element's (and its direct children's) running animations and transitions
+   *  have ended — their own timing, read from the page — capped so a stuck one never holds a caller;
+   *  at once under reduced motion. Call it right after setting the class that starts the motion. */
+  function afterMotion(el, cap = 450) {
+    return new Promise((resolve) => {
+      if (!el || reducedMotion()) { resolve(); return; }
+      const t = setTimeout(resolve, cap);
+      const done = () => { clearTimeout(t); resolve(); };
+      let list = [];
+      try {
+        list = [el, ...el.children].flatMap((n) => n.getAnimations()).filter((a) => a.playState !== 'finished' && a.playState !== 'idle' && a.effect?.getTiming?.().iterations !== Infinity);
+      } catch { list = []; }
+      if (!list.length) { requestAnimationFrame(() => requestAnimationFrame(done)); return; } // (two frames: a class set this turn starts its motion on the next)
+      Promise.all(list.map((a) => a.finished.catch(() => {}))).then(done);
+    });
+  }
+
+  /** Calls fn once the element has left the document (swept away by a screen change, closed by
+   *  another path, removed by a caller). One observer serves every registration. Returns forget(). */
+  const goneList = new Map(); // element → { fn, armed }: armed once it has been seen on the page (registered before its append, it is not "gone" yet)
+  let goneMo = null;
+  function sweepGone() {
+    for (const [el, w] of goneList) {
+      if (!w.armed) { if (el.isConnected) w.armed = true; continue; }
+      if (!el.isConnected) { goneList.delete(el); try { w.fn(); } catch { /* the caller's own */ } }
+    }
+    if (!goneList.size && goneMo) { goneMo.disconnect(); goneMo = null; }
+  }
+  function onGone(el, fn) {
+    if (!el) return () => {};
+    goneList.set(el, { fn, armed: el.isConnected });
+    if (!goneMo) { goneMo = new MutationObserver(sweepGone); goneMo.observe(document.documentElement, { childList: true, subtree: true }); }
+    return () => goneList.delete(el);
+  }
+
+  /** Follows an element's box: fn(rect) when it is first measured and whenever it may have moved —
+   *  its own or the page's size changing, something around it (not inside it) drawn or restyled, an
+   *  animation or a transition ending, the fonts arriving, the window resizing or zooming — and
+   *  then again each frame until it has held still for three, so a slide that is still going at the
+   *  first measure is measured at its end. Returns stop(). */
+  function watchLayout(el, fn, { within = null, frames = 3, limit = 240 } = {}) {
+    let last = '', quiet = 0, n = 0, raf = 0, stopped = false;
+    const tick = () => {
+      raf = 0;
+      if (stopped || !el.isConnected) return;
+      const r = el.getBoundingClientRect();
+      const key = `${Math.round(r.top)},${Math.round(r.left)},${Math.round(r.width)},${Math.round(r.height)}`;
+      if (key !== last) { last = key; quiet = 0; try { fn(r); } catch { /* the caller's own */ } } else quiet++;
+      if (quiet < frames && n++ < limit) raf = requestAnimationFrame(tick);
+    };
+    const kick = () => { if (stopped) return; quiet = 0; n = 0; if (!raf) raf = requestAnimationFrame(tick); };
+    const scope = within || el.closest('.bcv-screen') || document.body;
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(kick) : null;
+    ro?.observe(el);
+    ro?.observe(document.documentElement);
+    if (scope !== el) ro?.observe(scope);
+    const mo = new MutationObserver((recs) => { if (recs.some((m) => m.target !== el && !el.contains(m.target))) kick(); });
+    mo.observe(scope, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'style', 'hidden'] });
+    scope.addEventListener('animationend', kick, true);
+    scope.addEventListener('transitionend', kick, true);
+    window.addEventListener('resize', kick);
+    document.fonts?.ready?.then(kick).catch(() => {});
+    kick();
+    return () => { stopped = true; ro?.disconnect(); mo.disconnect(); scope.removeEventListener('animationend', kick, true); scope.removeEventListener('transitionend', kick, true); window.removeEventListener('resize', kick); if (raf) cancelAnimationFrame(raf); };
+  }
+
+  /** Puts a floating element (already in the document, so it has a size) beside a rect or an
+   *  element and keeps it on screen: below it — or above when the room is above — or to its right —
+   *  or left; aligned to its start, centre or end; clamped to the viewport by a margin; a list placed
+   *  above or below gets a maxHeight so it scrolls rather than runs off the edge. Call again after
+   *  the element grows. */
+  function anchor(el, at, { side = 'below', gap = 6, margin = 8, align = 'start', minWidth = 0 } = {}) {
+    const r = at && at.getBoundingClientRect ? at.getBoundingClientRect() : at;
+    if (!el || !r) return;
+    const vw = window.innerWidth, vh = window.innerHeight;
+    el.style.position = 'fixed';
+    el.style.bottom = '';
+    if (minWidth) el.style.minWidth = `${Math.max(r.width, minWidth)}px`;
+    let m = el.getBoundingClientRect();
+    let top, left;
+    if (side === 'right' || side === 'left') {
+      const roomRight = vw - r.right - gap - margin, roomLeft = r.left - gap - margin;
+      const goRight = side === 'right' ? (m.width <= roomRight || roomRight >= roomLeft) : !(m.width <= roomLeft || roomLeft >= roomRight);
+      left = goRight ? r.right + gap : r.left - gap - m.width;
+      top = align === 'center' ? r.top + r.height / 2 - m.height / 2 : align === 'end' ? r.bottom - m.height : r.top;
+    } else {
+      const below = vh - r.bottom - gap - margin, above = r.top - gap - margin;
+      const goBelow = side === 'below' ? (m.height <= below || below >= above) : !(m.height <= above || above >= below);
+      el.style.maxHeight = `${Math.max(120, Math.floor(goBelow ? below : above))}px`;
+      m = el.getBoundingClientRect();
+      top = goBelow ? r.bottom + gap : r.top - gap - m.height;
+      left = align === 'center' ? r.left + r.width / 2 - m.width / 2 : align === 'end' ? r.right - m.width : r.left;
+    }
+    el.style.left = `${Math.round(Math.max(margin, Math.min(left, vw - m.width - margin)))}px`;
+    el.style.top = `${Math.round(Math.max(margin, Math.min(top, vh - m.height - margin)))}px`;
+  }
+  /** Keeps a fixed element that was placed by other means inside the viewport. */
+  function keepOnScreen(el, margin = 16) {
+    const m = el.getBoundingClientRect();
+    const left = Math.max(margin, Math.min(m.left, window.innerWidth - m.width - margin));
+    const top = Math.max(margin, Math.min(m.top, window.innerHeight - m.height - margin));
+    if (Math.round(left) !== Math.round(m.left)) el.style.left = `${Math.round(left)}px`;
+    if (Math.round(top) !== Math.round(m.top)) el.style.top = `${Math.round(top)}px`;
+  }
+  /** The box an element and everything drawn in it take up (a switch with a pill popped out of it). */
+  function boundsOf(el) {
+    const r = el.getBoundingClientRect();
+    let left = r.left, top = r.top, right = r.right, bottom = r.bottom, n = 0;
+    for (const c of el.querySelectorAll('*')) {
+      if (n++ > 400) break;
+      const cs = getComputedStyle(c);
+      if (cs.display === 'none' || cs.visibility === 'hidden' || cs.opacity === '0') continue;
+      const q = c.getBoundingClientRect();
+      if (!q.width || !q.height) continue;
+      left = Math.min(left, q.left); top = Math.min(top, q.top); right = Math.max(right, q.right); bottom = Math.max(bottom, q.bottom);
+    }
+    return { left, top, right, bottom, width: right - left, height: bottom - top };
+  }
+
+  /** Closes an overlay, a menu or a sheet with its exit: is-closing starts the CSS's animation, and
+   *  the element goes when that has ended (at once under reduced motion). */
+  function dismiss(ov) {
     if (!ov || !ov.isConnected || ov.classList.contains('is-closing')) return;
     ov.classList.add('is-closing');
-    setTimeout(() => ov.remove(), reducedMotion() ? 0 : ms);
+    afterMotion(ov).then(() => ov.remove());
   }
   function closeMenus() {
-    document.querySelectorAll('.bcv-menu:not([data-keep]):not(.is-closing)').forEach((m) => dismiss(m, 140)); // (a box that only wears a menu's look stays: the inbox's recipient results)
+    document.querySelectorAll('.bcv-menu:not([data-keep]):not(.is-closing)').forEach((m) => dismiss(m)); // (a box that only wears a menu's look stays: the inbox's recipient results)
   }
 
   /** Canvas's own course colour palette (the picker on its dashboard cards), plus a custom colour. */
@@ -613,7 +734,7 @@
   }
   /** A calendar popover under `anchor`: a month grid (today marked, the chosen day filled), ‹ › for
    *  the months, Today / Tomorrow / Next Monday shortcuts. Picking a day closes it and calls onPick(date). */
-  function datePop(anchor, value, onPick) {
+  function datePop(at, value, onPick) {
     closeMenus();
     const now = new Date();
     const sel = parse(value) ? startOfDay(parse(value)) : null;
@@ -648,11 +769,9 @@
       );
     }
     draw();
-    const r = anchor.getBoundingClientRect();
-    Object.assign(m.style, { position: 'fixed', top: `${r.bottom + 6}px`, left: `${Math.max(8, Math.min(r.left, window.innerWidth - 304))}px` });
     overlayRoot().append(m);
-    const mr = m.getBoundingClientRect(); // above the field when there is no room below
-    if (mr.bottom > window.innerHeight - 8 && r.top - mr.height - 6 > 8) m.style.top = `${r.top - mr.height - 6}px`;
+    anchor(m, at, { side: 'below' }); // (under the field, or above it when the room is above; on screen either way)
+    m.style.maxHeight = ''; // (a calendar is not a list: it is never cut, it moves)
     setTimeout(() => document.addEventListener('click', closeMenus, { once: true }), 0);
     m.querySelector('.bcv-datepop__day.is-on, .bcv-datepop__day.is-today')?.focus();
     return m;
@@ -754,5 +873,6 @@
     DAY, startOfDay, addDays, sameDay, dayDiff, startOfWeek, parse, MONTHS, MONTHS_LONG, DAYS, DAYS_LONG,
     fmtTime, fmtTimeLower, fmtShort, fmtLong, fmtDateComma, fmtAt, fmtAtUpper, fmtBy, dayTitle, fmtDow, fmtRecent, whenShort, plural,
     hexToRgb, rgba, palette, FALLBACK_COLORS, initials, enter, roll, morphFrom, reducedMotion, dismiss,
+    afterMotion, onGone, watchLayout, anchor, keepOnScreen, boundsOf,
   };
 })();

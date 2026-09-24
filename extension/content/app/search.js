@@ -32,6 +32,7 @@
   const when = (iso) => { try { return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }); } catch { return ''; } };
   const favs = async () => { try { return (await store.favorites() || []).filter((c) => c.state !== 'past'); } catch { return []; } }; // (the starred courses as the Dashboard has them; every current course when none is starred)
   const LANES = 4; // requests in flight at once across the starred courses (a burst of forty at Canvas trips its rate limit)
+  const SUMMON_MS = 8000; // how long keys pressed on the way to a summoned box are kept for it
   /** A queue that runs `n` jobs at a time. */
   const limiter = (n) => { let busy = 0; const queue = []; const next = () => { if (busy >= n || !queue.length) return; busy += 1; queue.shift()().finally(() => { busy -= 1; next(); }); }; return (fn) => new Promise((resolve, reject) => { queue.push(() => Promise.resolve().then(fn).then(resolve, reject)); next(); }); };
   /** The hub — the commands, the answers, a row's actions — loaded the first time the box is focused (content/app/lazy.js). */
@@ -310,20 +311,7 @@
     });
     input.addEventListener('keydown', onKey);
     panel.addEventListener('keydown', onActKey);
-    // summoned from another screen ("/" or ⌘K there): the words typed on the way, and the cursor
-    if (wanted) {
-      const w = wanted; // (left in place until the box has landed: the keys keep coming here meanwhile — the box is built before the Dashboard's lists are read)
-      const land = (n) => {
-        if (w.done) return;
-        if (!ui || ui.input !== input) return; // (a newer box took over: a second draw — it lands the words itself)
-        if (!input.isConnected) { if (n < 160) setTimeout(() => land(n + 1), 50); else w.stop(); return; } // (the Dashboard lands once its lists are read: a few seconds on a slow day)
-        input.value = w.text;
-        w.stop(); // (from here the keys go to the box itself)
-        input.focus();
-        if (w.text) run(w.text);
-      };
-      setTimeout(() => land(0), 0);
-    }
+    // (summoned from another screen: summon() lands the words typed on the way once the Dashboard's draw resolves)
     return root;
   }
   // a press anywhere else closes the panel; "/" (or ⌘K, Ctrl+K) from anywhere on the page puts the cursor in the box — on another screen, the Dashboard comes up with the box focused and whatever is typed meanwhile kept
@@ -344,8 +332,16 @@
     w.stop = () => { w.done = true; if (wanted === w) wanted = null; document.removeEventListener('keydown', keep, true); };
     document.addEventListener('keydown', keep, true);
     wanted = w;
-    setTimeout(() => { if (!w.done) w.stop(); }, 8000); // (a Dashboard that never came: the keys go back to the page)
-    BCV.app.go('/');
+    setTimeout(() => { if (!w.done) w.stop(); }, SUMMON_MS); // (a Dashboard that never came: the keys go back to the page)
+    // in place, the Dashboard's draw is a promise that resolves with its box on the page; a page
+    // load instead (from a Canvas-drawn page) takes the keys with it, and the wait above ends it
+    Promise.resolve(BCV.app.go('/')).then(() => {
+      if (w.done || !ui || !ui.input.isConnected) return;
+      ui.input.value = w.text;
+      w.stop(); // (from here the keys go to the box itself)
+      ui.input.focus();
+      if (w.text) run(w.text);
+    }).catch(() => w.stop());
   }
   document.addEventListener('keydown', (e) => {
     const t = e.target;
