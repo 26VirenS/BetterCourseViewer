@@ -90,7 +90,8 @@
       </section>
 
       <!-- Grades -->
-      <section class="section" id="grades" data-title="Grades" data-sub="History and goals." data-words="grades gpa goal tracking history snapshot what-if csv export import">
+      <section class="section" id="grades" data-title="Grades" data-sub="History and goals." data-words="grades gpa goal tracking history snapshot what-if csv export import record transcript upload download">
+        <p class="muted small" id="gradesAppNote" hidden>Set here, these reach Canvas within a few seconds while Safari is open, or when you next open it.</p>
         <div class="card">
           <div class="row row--pad">
             <span class="row__body"><span class="row__t">Track grades over time</span><span class="row__s">One snapshot a day, stored locally.</span></span>
@@ -110,7 +111,7 @@
         </div>
         <div class="card card--pad">
           <div class="row"><span class="row__body"><span class="row__t" id="recordLabel">No record before this term</span><span class="row__s" id="recordNote">Upload a CSV of your past courses — a header row, then one course a line: course, grade, and credits and term if you have them. Letters (A−, B+), percentages and 4.0 points all read; P/NP, W and the like are skipped. The Grades page shows a cumulative GPA from it.</span></span><span style="display:flex;gap:8px;flex:none"><button class="btn btn--sm" id="recordTemplate" type="button" title="A small CSV in the shape this reads">Template</button><button class="btn btn--sm btn--primary" id="recordCsv" type="button">Upload CSV</button></span><input type="file" id="recordCsvFile" accept=".csv,text/csv,text/plain" hidden></div>
-          <div class="row row--line" id="recordRow" hidden><span class="row__body"><span class="row__s" id="recordList"></span></span><button class="btn btn--sm" id="recordClear" type="button">Clear</button></div>
+          <div class="row row--line" id="recordRow" hidden><span class="row__body"><span class="row__s" id="recordList"></span></span><span style="display:flex;gap:8px;flex:none"><button class="btn btn--sm" id="recordDownload" type="button" title="The record as it stands, in the shape Upload CSV reads">Download CSV</button><button class="btn btn--sm" id="recordClear" type="button">Clear</button></span></div>
         </div>
       </section>
 

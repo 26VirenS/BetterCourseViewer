@@ -624,7 +624,19 @@
         h('label', { class: 'bcv-gpa-set__field' }, [h('span', { text: 'GPA before this term' }), priorGpa]),
         h('label', { class: 'bcv-gpa-set__field' }, [h('span', { text: 'Courses it covers' }), priorN]),
         U.el('bcv-gpa-set__csv', [
-          U.btn('Upload CSV', { kind: 'sm', cls: 'bcv-gpa-set__csvbtn', onClick: () => csvInput.click() }),
+          U.el('bcv-gpa-set__csvbtns', [
+            U.btn('Upload CSV', { kind: 'sm', cls: 'bcv-gpa-set__csvbtn', onClick: () => csvInput.click() }),
+            // Download CSV: the record's rows and this term's courses with the letters Canvas shows now, in the
+            // shape Upload CSV reads — next term's record is this file, brought back
+            U.btn('Download CSV', { kind: 'sm', cls: 'bcv-gpa-set__dlbtn', onClick: () => {
+              const rows = [...(pendingRecord?.courses || []), ...m.rows.map((r) => ({ term: term || 'This term', course: r.c.name, grade: r.letter, credits: null }))];
+              if (!rows.length) { U.toast('Nothing to download yet.', { error: true }); return; }
+              const a = h('a', { href: URL.createObjectURL(new Blob([BCV.recordCsv.csv(rows)], { type: 'text/csv' })), download: 'simpl-courses-record.csv', hidden: true });
+              document.body.append(a);
+              a.click();
+              setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+            } }),
+          ]),
           csvInput,
           fromNote,
         ]),

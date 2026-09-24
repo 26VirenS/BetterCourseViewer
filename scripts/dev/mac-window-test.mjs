@@ -41,23 +41,25 @@ const check = (ok, label) => { console.log(`  ${ok ? '✓' : '✗'} ${label}`); 
 
 // the fake app: the shared store, the app's state, and every message the page sends
 const FAKE_APP = () => {
-  const store = { settings: null, commands: [], site: { host: 'canvas.school.test', origin: 'https://canvas.school.test' }, setupDone: true };
+  const store = { settings: null, commands: [], site: { host: 'canvas.school.test', origin: 'https://canvas.school.test' }, setupDone: true, prefs: { gpaGoal: 3.5, gpaTracking: { priorGpa: null, priorCourses: 0, since: '2026-09-01' }, gpaSnapshots: [{ date: '2026-09-01', gpa: 3.2 }], whatIfScores: true }, prefsHost: 'canvas.school.test' };
   window.__store = store;
   window.__calls = [];
   window.__appState = { version: '9.9.9', extension: { state: 'on', detail: '' }, update: { state: 'upToDate', checked: 1700000000, automatic: true, version: '9.9.9', feed: 'https://simplcourses.com/app/latest.json' }, loginItem: true, setupDone: true, site: store.site };
-  const all = () => { const o = {}; if (store.settings) o.settings = store.settings; if (store.site) o['site:last'] = store.site; if (store.setupDone) o['setup:done'] = true; return o; };
+  const all = () => { const o = {}; if (store.settings) o.settings = store.settings; if (store.site) o['site:last'] = store.site; if (store.setupDone) o['setup:done'] = true; if (store.prefs && store.prefsHost) o[`prefs:${store.prefsHost}`] = store.prefs; return o; };
+  // the app's storage.set for a site's preferences: the copy kept, the keys that changed queued for the extension as a command
+  const setPrefs = (key, next) => { const host = key.slice(6); const before = store.prefsHost === host ? (store.prefs || {}) : {}; const patch = {}; for (const [k, v] of Object.entries(next)) if (JSON.stringify(before[k]) !== JSON.stringify(v)) patch[k] = v; for (const k of Object.keys(before)) if (!(k in next)) patch[k] = null; store.prefs = clone(next); store.prefsHost = host; if (Object.keys(patch).length) store.commands.push({ id: `p${store.commands.length + 1}`, type: 'setPrefs', host, patch }); };
   const clone = (v) => JSON.parse(JSON.stringify(v));
   window.webkit = { messageHandlers: { simpl: { postMessage: async (m) => {
     window.__calls.push(clone(m));
     switch (m.cmd) {
       case 'storage.get': {
-        const a = all(); const k = m.keys;
+        const a = clone(all()); const k = m.keys; // (a copy, as the real bridge hands one over: the page must not reach the store itself)
         if (k == null) return a;
         if (typeof k === 'string') return k in a ? { [k]: a[k] } : {};
         if (Array.isArray(k)) { const o = {}; for (const x of k) if (x in a) o[x] = a[x]; return o; }
         const o = {}; for (const [x, d] of Object.entries(k)) o[x] = x in a ? a[x] : d; return o;
       }
-      case 'storage.set': if (m.items && m.items.settings) store.settings = clone(m.items.settings); return { ok: true };
+      case 'storage.set': if (m.items && m.items.settings) store.settings = clone(m.items.settings); for (const [k, v] of Object.entries(m.items || {})) if (k.startsWith('prefs:') && v && typeof v === 'object') setPrefs(k, v); return { ok: true };
       case 'storage.remove': if ((m.keys || []).includes('settings')) store.settings = null; return { ok: true };
       case 'storage.clear': store.settings = null; store.commands.push({ id: 'w1', type: 'wipe' }); return { ok: true };
       case 'runtime.sendMessage': {
@@ -96,11 +98,35 @@ try {
 
   console.log('the window');
   const nav = await texts('.navlink');
-  check(nav.join(' | ') === 'This Mac | General | Appearance | Canvas sites | Data & about', `the sections the app's window shows, This Mac first, with no Courses & targets or Grades (those live on Canvas's pages): ${nav.join(' | ')}`);
+  check(nav.join(' | ') === 'This Mac | General | Grades | Appearance | Canvas sites | Data & about', `the sections the app's window shows, This Mac first, Grades among them (from the copy of the site's preferences the extension sends), no Courses & targets (that needs the browser's Canvas session): ${nav.join(' | ')}`);
   check((await page.$eval('.section.is-active', (e) => e.id)) === 'app' && (await text('#title')) === 'This Mac' && (await text('#version')) === 'Version 9.9.9', `it opens on This Mac, with the app's version in the corner (${await text('#title')}, ${await text('#version')})`);
   check((await text('#extTitle')) === 'Simpl Courses is on in Safari' && /Settings → Extensions/.test(await text('#extSub')) && (await page.$eval('#extSteps', (e) => e.hidden)), `Safari's word, from the app's state: ${await text('#extTitle')}`);
   check((await text('#updTitle')) === 'Version 9.9.9 is the newest' && /Checked at .* · checks every 4 hours/.test(await text('#updSub')) && (await page.$eval('#updAction', (e) => e.hidden)) && (await page.$eval('#autoUpdate', (e) => e.classList.contains('is-on'))) && (await page.$eval('#loginItem', (e) => e.classList.contains('is-on'))), `the update line: the newest, checked at a time, every hour; both switches on (${await text('#updTitle')} · ${await text('#updSub')})`);
   await page.screenshot({ path: join(root, 'scripts', 'dev', 'out', 'mac-window-app.png') });
+
+  console.log('Grades, in the window');
+  await page.click('.navlink[data-section="grades"]');
+  await page.waitForTimeout(300);
+  check(!(await page.$eval('#gradesAppNote', (e) => e.hidden)) && /reach Canvas within a few seconds/.test(await text('#gradesAppNote')) && (await text('#gpaGoal')) === '3.50' && (await page.$eval('#tracking', (e) => e.classList.contains('is-on'))) && /1 day recorded/.test(await text('#historyLabel')) && (await text('#recordLabel')) === 'No record before this term',
+    `the Grades section reads the site's preferences from the app's copy and says when a change reaches Canvas: goal ${await text('#gpaGoal')}, ${await text('#historyLabel')}, ${await text('#recordLabel')}`);
+  await page.setInputFiles('#recordCsvFile', { name: 'transcript.csv', mimeType: 'text/csv', buffer: Buffer.from(['term,course,grade,credits', 'Fall 2025,MATH 021,A-,4', 'Fall 2025,WRI 010,B+,4', 'Spring 2026,PHYS 008,93%,4', 'Spring 2026,SPRK 010,P,1', 'Spring 2026,CHEM 002,3.0,2'].join('\n')) });
+  await page.waitForFunction(() => /across 4 courses/.test(document.querySelector('#recordLabel')?.textContent || ''), null, { timeout: 5000 });
+  const cmds = await page.evaluate(() => window.__store.commands);
+  const kept = await page.evaluate(() => window.__store.prefs);
+  check(cmds.length === 1 && cmds[0].type === 'setPrefs' && cmds[0].host === 'canvas.school.test' && Object.keys(cmds[0].patch).join() === 'gpaTracking' && cmds[0].patch.gpaTracking.priorGpa === 3.571 && cmds[0].patch.gpaTracking.priorCourses === 4 && cmds[0].patch.gpaTracking.since === '2026-09-01' && cmds[0].patch.gpaTracking.record.courses.length === 4 && kept.gpaGoal === 3.5 && kept.gpaSnapshots.length === 1 && (await text('#recordLabel')) === '3.57 across 4 courses before this term',
+    `Upload CSV here: the record lands on the app's copy and goes to the extension as one command naming only the key that changed: ${JSON.stringify(cmds.map((c) => [c.type, Object.keys(c.patch)]))}`);
+  await page.click('#recordDownload');
+  await page.waitForTimeout(300);
+  const recSaved = (await calls('file.save')).pop();
+  check(recSaved && recSaved.name === 'simpl-courses-record-canvas.school.test.csv' && recSaved.text.split('\n').join('|') === 'term,course,grade,credits|Fall 2025,MATH 021,A-,4|Fall 2025,WRI 010,B+,4|Spring 2026,PHYS 008,93%,4|Spring 2026,CHEM 002,3.0,2',
+    `Download CSV hands the record to the app to save, in the shape Upload reads (a plain hyphen in A-): ${recSaved ? recSaved.name : 'nothing saved'}`);
+  // the extension's copy landing afresh (a snapshot recorded on the page): the section follows
+  await page.evaluate(() => { window.__store.prefs = { ...window.__store.prefs, gpaGoal: 3.75, gpaSnapshots: [{ date: '2026-09-01', gpa: 3.2 }, { date: '2026-09-02', gpa: 3.3 }] }; window.__simplStorageChanged({ 'prefs:canvas.school.test': { newValue: window.__store.prefs } }); });
+  await page.waitForFunction(() => document.querySelector('#gpaGoal')?.textContent === '3.75', null, { timeout: 5000 });
+  check((await text('#gpaGoal')) === '3.75' && /2 days recorded/.test(await text('#historyLabel')), `a change from the extension's side repaints the section: goal ${await text('#gpaGoal')}, ${await text('#historyLabel')}`);
+  await page.screenshot({ path: join(root, 'scripts', 'dev', 'out', 'mac-window-grades.png') });
+  await page.click('.navlink[data-section="app"]');
+  await page.waitForTimeout(200);
 
   console.log("Safari's states and the update's");
   await push({ extension: { state: 'off', detail: '' } });
@@ -143,7 +169,7 @@ try {
   await page.click('.navlink[data-section="general"]');
   await page.click('#skin');
   await page.waitForTimeout(250);
-  const sets = await calls('storage.set');
+  const sets = (await calls('storage.set')).filter((m) => m.items && m.items.settings); // (the Grades section's own writes are the site's preferences, not the settings)
   check(sets.length === 1 && sets[0].items.settings.appearance.skin === false && (await calls('runtime.sendMessage')).some((m) => m.message.type === 'pushSettings') && (await flashed()) === 'Saved', `the look switch writes the settings to the app's store (and asks for them pushed): skin ${sets[0]?.items.settings.appearance.skin}`);
   await page.evaluate(() => { window.__store.settings = { appearance: { skin: true, darkMode: 'on' } }; window.__simplStorageChanged({ settings: { newValue: window.__store.settings } }); }); // (the store changed under the page, as the app reports)
   await page.waitForTimeout(200);
@@ -174,14 +200,14 @@ try {
   check(unin.length === 2 && /Applications folder/.test(unin[1]) && /Mac/.test(await text('#uninstallSub')), `the uninstall steps are the Mac's: ${unin[1]?.slice(0, 60)}`);
   await page.click('#exportSettings');
   await page.waitForTimeout(200);
-  const saved = await calls('file.save');
+  const saved = (await calls('file.save')).filter((m) => m.name === 'simpl-courses-settings.json'); // (the Grades section's Download CSV saved a file of its own above)
   check(saved.length === 1 && saved[0].name === 'simpl-courses-settings.json' && JSON.parse(saved[0].text).appearance.darkMode === 'on' && (await flashed()) === 'Saved', 'Export settings goes through the app\'s save panel');
   await page.click('#importSettings');
   await page.waitForTimeout(250);
   check((await calls('file.open')).length === 1 && (await flashed()) === 'Imported' && (await page.evaluate(() => window.__store.settings.appearance.sideCourses)) === 'hover', 'Import settings goes through the app\'s open panel and lands in the store');
   await page.click('#resetSettings');
   await page.waitForTimeout(300);
-  check((await calls('storage.clear')).length === 1 && (await page.evaluate(() => window.__store.commands.map((c) => c.type).join(','))) === 'wipe' && (await calls('runtime.sendMessage')).some((m) => m.message.type === 'wipeSiteNotes') && (await flashed()) === 'Reset', 'Reset everything clears the store, which leaves the extension a wipe to do');
+  check((await calls('storage.clear')).length === 1 && (await page.evaluate(() => window.__store.commands.map((c) => c.type).join(','))) === 'setPrefs,wipe' && (await calls('runtime.sendMessage')).some((m) => m.message.type === 'wipeSiteNotes') && (await flashed()) === 'Reset', 'Reset everything clears the store, which leaves the extension a wipe to do');
   await page.screenshot({ path: join(root, 'scripts', 'dev', 'out', 'mac-window-data.png') });
 
   // ---- Developer: the rollback (the app's window alone) — the releases listed, one picked, installed in this copy's place

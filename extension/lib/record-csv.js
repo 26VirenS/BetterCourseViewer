@@ -89,5 +89,10 @@
     return { priorGpa: sum.gpa, priorCourses: sum.courses, record: { name: name || 'a CSV', at: new Date().toISOString(), courses: rows, credits: sum.credits, skipped } };
   }
   const TEMPLATE = ['term,course,grade,credits', 'Fall 2025,MATH 021,A-,4', 'Fall 2025,WRI 010,B+,4', 'Spring 2026,PHYS 008,A,4', 'Spring 2026,SPRK 010,P,1'].join('\n');
-  BCV.recordCsv = { points, cells, parse, summarize, record, TEMPLATE };
+  /** Rows written back out in the shape parse reads: term, course, grade (a plain hyphen), credits. */
+  function csv(rows) {
+    const cell = (v) => { const t = String(v ?? '').replace(/−/g, '-'); return /[",\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t; };
+    return ['term,course,grade,credits', ...rows.map((r) => [r.term || '', r.course || '', r.grade || '', Number.isFinite(r.credits) ? r.credits : ''].map(cell).join(','))].join('\n');
+  }
+  BCV.recordCsv = { points, cells, parse, summarize, record, csv, TEMPLATE };
 })();

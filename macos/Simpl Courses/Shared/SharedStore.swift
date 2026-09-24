@@ -10,7 +10,10 @@
 //  extension (a wipe after Reset everything), each removed once the extension says it is done.
 //  `site` and `setupDone` are the extension's word on which Canvas it last drew and whether the
 //  guided setup has run, kept here so the app's window can say so and open Canvas at the right
-//  address.
+//  address. `prefs` is the extension's copy of that site's own preferences (the grade goal, the
+//  record before this term, the history), handed over on every sync when they change, so the
+//  app's window can show the Grades section; a change made there goes back as a `setPrefs`
+//  command, which the extension applies to the preferences it keeps.
 //
 
 import Foundation
@@ -24,6 +27,8 @@ final class SharedStore {
         var commands: [[String: Any]] = []
         var site: [String: Any]? = nil
         var setupDone: Bool = false
+        var prefs: [String: Any]? = nil
+        var prefsHost: String? = nil
 
         init() {}
 
@@ -34,12 +39,16 @@ final class SharedStore {
             commands = d["commands"] as? [[String: Any]] ?? []
             site = d["site"] as? [String: Any]
             setupDone = d["setupDone"] as? Bool ?? false
+            prefs = d["prefs"] as? [String: Any]
+            prefsHost = d["prefsHost"] as? String
         }
 
         var dictionary: [String: Any] {
             var d: [String: Any] = ["revision": revision, "updatedAt": updatedAt, "commands": commands, "setupDone": setupDone]
             if let settings = settings { d["settings"] = settings }
             if let site = site { d["site"] = site }
+            if let prefs = prefs { d["prefs"] = prefs }
+            if let prefsHost = prefsHost { d["prefsHost"] = prefsHost }
             return d
         }
     }

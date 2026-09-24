@@ -34,11 +34,15 @@ class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling {
             // the extension says what it knows (site, setup) as it asks; that is bookkeeping, not a change to the settings
             let site = message["site"] as? [String: Any]
             let setupDone = message["setupDone"] as? Bool
+            // the site's own preferences, sent when they changed since the last ask: the app's window shows Grades from them
+            let prefs = message["prefs"] as? [String: Any]
+            let prefsHost = message["prefsHost"] as? String
             var snap = store.read()
-            if site != nil || setupDone != nil {
+            if site != nil || setupDone != nil || prefs != nil {
                 snap = store.update(bump: false) { s in
                     if let site = site { s.site = site }
                     if let done = setupDone { s.setupDone = done }
+                    if let prefs = prefs { s.prefs = prefs; s.prefsHost = prefsHost }
                 }
             }
             let known = message["revision"] as? Int ?? -1

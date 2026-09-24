@@ -732,6 +732,7 @@ if (typeof importScripts === 'function' && !self.BCV?.devcode) {
     on: (() => { try { return typeof api.runtime.sendNativeMessage === 'function' && /Mac/.test(navigator.platform || '') && /apple/i.test(navigator.vendor || ''); } catch { return false; } })(),
     revision: -1, // the store's revision as last taken (or written)
     lastJSON: null, // the settings as last taken or written, so a change that is only ours coming back is not written up again
+    lastPrefsJSON: null, // the site's preferences as last sent up, so they go up only when they changed
     syncing: null,
     native: (msg) => api.runtime.sendNativeMessage('application.id', msg),
   };
@@ -746,7 +747,16 @@ if (typeof importScripts === 'function' && !self.BCV?.devcode) {
   async function syncOnce() {
     try {
       const extra = await api.storage.local.get(['site:last', 'setup:done']).catch(() => ({}));
-      const r = await app.native({ type: 'getSettings', revision: app.revision, site: extra['site:last'] || null, setupDone: !!extra['setup:done'] });
+      // the site's own preferences go up with the ask when they changed since last time, so the app's
+      // window can show the Grades section (a change made there comes back as a setPrefs command)
+      const host = extra['site:last']?.host || '';
+      let prefs = null;
+      if (host) {
+        const p = (await api.storage.local.get(`prefs:${host}`).catch(() => ({})))?.[`prefs:${host}`] || {};
+        const json = JSON.stringify(p);
+        if (json !== app.lastPrefsJSON) { prefs = p; app.lastPrefsJSON = json; }
+      }
+      const r = await app.native({ type: 'getSettings', revision: app.revision, site: extra['site:last'] || null, setupDone: !!extra['setup:done'], ...(prefs ? { prefs, prefsHost: host } : {}) });
       if (!r || typeof r.revision !== 'number') return null;
       // what the app asked for comes first (a wipe changes what there is to exchange below)
       const commands = Array.isArray(r.commands) ? r.commands.filter((c) => c && typeof c === 'object') : [];
@@ -806,6 +816,14 @@ if (typeof importScripts === 'function' && !self.BCV?.devcode) {
       app.lastJSON = null;
     } else if (c.type === 'wipeSiteNotes') {
       await wipeSiteNotes().catch(() => {});
+    } else if (c.type === 'setPrefs' && c.host && c.patch && typeof c.patch === 'object') {
+      // the app's window changed the site's preferences (the Grades section): the keys it names land
+      // on the copy kept here, a null taking a key away; the rest — a snapshot recorded meanwhile — stays
+      const key = `prefs:${c.host}`;
+      const prefs = (await api.storage.local.get(key).catch(() => ({})))?.[key] || {};
+      for (const [k, v] of Object.entries(c.patch)) { if (v === null || v === undefined) delete prefs[k]; else prefs[k] = v; }
+      await api.storage.local.set({ [key]: prefs }).catch(() => {});
+      app.lastPrefsJSON = null; // sent up afresh on the next ask, so the app's copy is the whole
     }
   }
   if (app.on) {

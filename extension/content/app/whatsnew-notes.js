@@ -24,6 +24,10 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.85.0', date: '2026-09-24', notes: [
+      { kind: 'new', title: 'Grades, on the Mac', body: 'The app’s window has the Grades section now.', icon: P.list },
+      { kind: 'new', title: 'Download CSV', body: 'Your record, and this term’s courses, as one file.', icon: P.steps },
+    ] },
     { version: '2.84.0', date: '2026-09-24', notes: [
       { kind: 'new', title: 'Events open a sheet', body: 'When, place, details; un-reserve an appointment.', icon: P.eye },
       { kind: 'new', title: 'Upload, on the page', body: 'The Grades page’s settings take the transcript CSV too.', icon: P.steps },

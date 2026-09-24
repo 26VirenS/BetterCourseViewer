@@ -18,16 +18,16 @@
   });
 
   // In the Mac app's window (the page over its bridge, Resources/Bridge.js) the app comes first —
-  // Safari's word on the extension, updates, open at login — and the two sections that need the
-  // browser's Canvas session (courses, grades) are not here: those are set on Canvas's own pages.
+  // Safari's word on the extension, updates, open at login — and the section that needs the
+  // browser's Canvas session (courses) is not here: that is set on Canvas's own pages. Grades is:
+  // the extension sends the app a copy of the site's preferences on every sync, and a change made
+  // here goes back as a command it applies (SharedStore.swift, the app's storage.set).
   const inApp = !!self.SimplApp;
   const NAV = [
     ...(inApp ? [['app', 'This Mac', 'M4 5h16v11H4zM8 20h8M12 16v4']] : []),
     ['general', 'General', 'M12 3l7 4v6c0 4-3 7-7 8-4-1-7-4-7-8V7z'],
-    ...(inApp ? [] : [
-      ['courses', 'Courses & targets', 'M5 4h13v16H5zM5 17h13M9 8h5'],
-      ['grades', 'Grades', 'M4 19h16M7 16V9M12 16V5M17 16v-4'],
-    ]),
+    ...(inApp ? [] : [['courses', 'Courses & targets', 'M5 4h13v16H5zM5 17h13M9 8h5']]), // (needs the browser's Canvas session)
+    ['grades', 'Grades', 'M4 19h16M7 16V9M12 16V5M17 16v-4'], // (the site's own preferences: in the app's window from the copy the extension sends it)
     ['appearance', 'Appearance', 'M12 3a9 9 0 100 18c1.1 0 2-.9 2-2 0-1.5 1-2 2-2h1a4 4 0 004-4c0-5-4.5-10-9-10z'],
     ['sites', 'Canvas sites', 'M12 3a9 9 0 100 18 9 9 0 000-18zM3 12h18M12 3a15 15 0 010 18a15 15 0 010-18'],
     ['data', 'Data & about', 'M4 7c0-1.7 3.6-3 8-3s8 1.3 8 3-3.6 3-8 3-8-1.3-8-3zM4 7v10c0 1.7 3.6 3 8 3s8-1.3 8-3V7'],
@@ -415,6 +415,7 @@
       : has ? 'Entered by hand on the Grades page. Upload a CSV of your past courses to replace it.'
         : 'Upload a CSV of your past courses — a header row, then one course a line: course, grade, and credits and term if you have them. Letters (A−, B+), percentages and 4.0 points all read; P/NP, W and the like are skipped. The Grades page shows a cumulative GPA from it.';
     $('recordRow').hidden = !has;
+    $('recordDownload').hidden = !rec;
     $('recordList').textContent = rec ? rec.courses.slice(0, 40).map((c) => [c.term, c.course, c.grade, Number.isFinite(c.credits) ? `${c.credits} cr` : null].filter(Boolean).join(' · ')).join('\n') + (rec.courses.length > 40 ? `\n… and ${rec.courses.length - 40} more` : '') : '';
   }
   onSwitch($('tracking'), async (on) => {
@@ -502,6 +503,12 @@
   $('recordTemplate').addEventListener('click', () => {
     download('simpl-courses-record-template.csv', self.BCV.recordCsv.TEMPLATE, 'text/csv');
   });
+  // Download CSV: the record as it stands, in the shape Upload CSV reads, so it can be kept, edited and brought back
+  $('recordDownload').addEventListener('click', () => {
+    const rows = grades.tracking?.record?.courses;
+    if (!Array.isArray(rows) || !rows.length) { flash('No rows to download: the record was typed in, not uploaded', true); return; }
+    download(`simpl-courses-record-${site.host || 'canvas'}.csv`, self.BCV.recordCsv.csv(rows), 'text/csv');
+  });
   $('recordClear').addEventListener('click', async () => {
     if (!grades.tracking) return;
     grades.tracking = { ...grades.tracking, priorGpa: null, priorCourses: 0 };
@@ -519,6 +526,10 @@
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   }
   if (site.host) loadGrades();
+  $('gradesAppNote').hidden = !inApp;
+  // the preferences changing under this page — a snapshot the Grades page recorded, a record uploaded
+  // there, the extension's copy landing in the app — repaint the section
+  try { api.storage?.onChanged?.addListener((changes) => { if (changes && site.host && changes[prefKey()]) loadGrades(); }); } catch { /* no changes to hear */ }
 
   // ---- text fields shared by the sections below ----------------------------------------------------
   const TEXT = [['siteName', 'appearance.siteName'], ['logoUrl', 'appearance.logoUrl']];

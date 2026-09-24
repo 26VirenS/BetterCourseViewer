@@ -1088,6 +1088,12 @@ try {
   await page.waitForFunction(() => document.querySelector('#bcv-gpa-prior')?.value === '3.571', null, { timeout: 5000 });
   check((await page.$eval('#bcv-gpa-prior-n', (e) => e.value)) === '4' && /^From transcript\.csv: 4 courses, 14 credits \(the GPA credit-weighted\), 1 row skipped \(no letter grade\)\. Numbers typed over these replace it\.$/.test((await texts('.bcv-gpa-set__from'))[0]) && /3\.57 across 4 courses read from transcript\.csv/.test((await texts('.bcv-toast')).join(' ')),
     `Upload CSV on the sheet fills the fields in from the file and says what it read: ${(await texts('.bcv-gpa-set__from'))[0]}`);
+  // Download CSV on the sheet: the record's rows, then this term's courses with the letters Canvas shows now — next term's upload
+  const [shDl] = await Promise.all([page.waitForEvent('download', { timeout: 10000 }), page.click('.bcv-gpa-set__dlbtn')]);
+  const shCsv = readFileSync(await shDl.path(), 'utf8').split('\n');
+  const thisTerm = shCsv.slice(5);
+  check(shDl.suggestedFilename() === 'simpl-courses-record.csv' && shCsv[0] === 'term,course,grade,credits' && shCsv[1] === 'Fall 2025,MATH 021,A-,4' && shCsv[4] === 'Spring 2026,CHEM 002,3.0,2' && thisTerm.length >= 3 && thisTerm.every((l) => /^Fall 2026,F26-[^,]+,[A-F][+-]?,$/.test(l)),
+    `Download CSV on the sheet: the file's rows, then this term's courses with their letters and the term's name, credits blank: ${thisTerm.join(' | ')}`);
   await page.fill('#bcv-gpa-prior', '3.42');
   await page.fill('#bcv-gpa-prior-n', '8');
   await page.click('.bcv-gpa-set__ctl .bcv-gpa-set__step:last-child'); // + at the 4.00 default: already at the top of the scale
@@ -5119,6 +5125,10 @@ try {
     && (await oTexts('#recordLabel'))[0] === '3.57 across 4 courses before this term' && /^From transcript\.csv · 14 credits, so the GPA is credit-weighted · 1 row skipped \(no letter grade\)$/.test((await oTexts('#recordNote'))[0]) && !(await options.$eval('#recordRow', (e) => e.hidden)) && (await options.$eval('#recordList', (e) => e.textContent.split('\n').length)) === 4,
   `Upload CSV reads a transcript into the record before this term — quoted cells, a letter, a percentage and points, credits weighting the GPA, a P row skipped — and lists its rows: ${JSON.stringify({ gpa: rec?.priorGpa, n: rec?.priorCourses, label: (await oTexts('#recordLabel'))[0], note: (await oTexts('#recordNote'))[0], rows: rec?.record?.courses?.length })}`);
   await options.screenshot({ path: join(out, '29-options-grades.png') });
+  // Download CSV writes the record back out in the shape Upload reads (a plain hyphen), so it can be kept and brought back
+  const [recDl] = await Promise.all([options.waitForEvent('download', { timeout: 10000 }), options.click('#recordDownload')]);
+  const recCsv = readFileSync(await recDl.path(), 'utf8').split('\n');
+  check(/^simpl-courses-record-localhost/.test(recDl.suggestedFilename()) && recCsv.join('|') === 'term,course,grade,credits|Fall 2025,MATH 021,A-,4|Fall 2025,WRI 010,B+,4|Spring 2026,PHYS 008,93%,4|Spring 2026,CHEM 002,3.0,2', `Download CSV writes the record's rows back out, re-uploadable: ${recDl.suggestedFilename()} · ${recCsv.length} lines`);
   await options.setInputFiles('#recordCsvFile', { name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('nothing,here\n1,2') });
   await options.waitForFunction(() => /needs a header with course and grade columns/.test(document.querySelector('#savedText')?.textContent || ''), null, { timeout: 5000 });
   check((await prefsOf()).gpaTracking.priorGpa === 3.571, 'a file with no course and grade in it is refused and the record stays');

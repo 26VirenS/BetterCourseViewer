@@ -28,6 +28,7 @@ class ViewController: NSViewController, WKNavigationDelegate, WKUIDelegate, WKSc
     private var watcher: Timer?
     private var lastModified: Double = -1
     private var lastRevision: Int = -1
+    private var lastPrefsJSON = ""
     private var extensionState: [String: Any] = ["state": "unknown", "detail": ""]
     private var pageReady = false
     private var welcome: WelcomeView?
@@ -243,6 +244,15 @@ class ViewController: NSViewController, WKNavigationDelegate, WKUIDelegate, WKSc
                 webView.evaluateJavaScript("window.__simplStorageChanged && window.__simplStorageChanged(\(Self.json(change)))", completionHandler: nil)
             }
         }
+        // the site's preferences the extension sent afresh (a snapshot recorded, a record uploaded on the page): the Grades section follows
+        let prefsJSON = Self.json(snap.prefs ?? [:])
+        if prefsJSON != lastPrefsJSON {
+            lastPrefsJSON = prefsJSON
+            if pageReady, let host = snap.prefsHost {
+                let change: [String: Any] = ["prefs:\(host)": ["newValue": snap.prefs ?? [:]]]
+                webView.evaluateJavaScript("window.__simplStorageChanged && window.__simplStorageChanged(\(Self.json(change)))", completionHandler: nil)
+            }
+        }
         pushState()
     }
 
@@ -261,6 +271,25 @@ class ViewController: NSViewController, WKNavigationDelegate, WKUIDelegate, WKSc
                 let snap = store.update { $0.settings = settings }
                 lastRevision = snap.revision
                 lastModified = store.modified
+            }
+            // the site's preferences written from the Grades section: kept here for the window, and the
+            // keys that changed sent to the extension as a command, so its own copy follows
+            if let items = body["items"] as? [String: Any] {
+                for (key, value) in items where key.hasPrefix("prefs:") {
+                    guard let next = value as? [String: Any] else { continue }
+                    let host = String(key.dropFirst("prefs:".count))
+                    let snap = store.update(bump: false) { s in
+                        let before = s.prefsHost == host ? (s.prefs ?? [:]) : [:]
+                        var patch: [String: Any] = [:]
+                        for (k, v) in next where !Self.same(before[k], v) { patch[k] = v }
+                        for (k, _) in before where next[k] == nil { patch[k] = NSNull() }
+                        s.prefs = next
+                        s.prefsHost = host
+                        if !patch.isEmpty { s.commands.append(["id": UUID().uuidString, "type": "setPrefs", "host": host, "patch": patch]) }
+                    }
+                    lastModified = store.modified
+                    lastPrefsJSON = Self.json(snap.prefs ?? [:])
+                }
             }
             replyHandler(["ok": true], nil)
         case "storage.remove":
@@ -332,14 +361,23 @@ class ViewController: NSViewController, WKNavigationDelegate, WKUIDelegate, WKSc
         }
     }
 
+    /// Two JSON values the same? (the preferences' keys, before and after a write from the window)
+    private static func same(_ a: Any?, _ b: Any?) -> Bool {
+        guard let a = a else { return b == nil }
+        guard let b = b else { return false }
+        return json(a) == json(b)
+    }
+
     /// storage.local.get in Chrome's shapes: nothing = everything, a key, a list, or {key: default}.
-    /// The store holds the settings; the site and the setup flag are the extension's word, read-only here.
+    /// The store holds the settings; the site and the setup flag are the extension's word, read-only
+    /// here; the site's preferences are the extension's copy, written back through a command.
     private func storageGet(_ keys: Any?) -> [String: Any] {
         let snap = store.read()
         var all: [String: Any] = [:]
         if let s = snap.settings { all["settings"] = s }
         if let site = snap.site { all["site:last"] = site }
         if snap.setupDone { all["setup:done"] = true }
+        if let prefs = snap.prefs, let host = snap.prefsHost { all["prefs:\(host)"] = prefs }
         guard let keys = keys, !(keys is NSNull) else { return all }
         if let key = keys as? String { return all[key].map { [key: $0] } ?? [:] }
         if let list = keys as? [String] {
