@@ -24,6 +24,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.88.0', date: '2026-09-24', notes: [
+      { kind: 'fixed', title: 'The search box', body: 'No stray white field inside the pill any more.', icon: P.check },
+    ] },
     { version: '2.87.0', date: '2026-09-24', notes: [
       { kind: 'new', title: 'Past points, charted', body: 'Add a day (or a term) and a GPA in GPA settings.', icon: P.steps },
       { kind: 'improved', title: 'The trend, whole', body: 'Eight points spread across all of it, not the last week.', icon: P.clock },

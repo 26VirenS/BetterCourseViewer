@@ -2600,8 +2600,13 @@ try {
   await page.waitForSelector('#bcv-omni', { timeout: 10000 });
   const sBox = await page.evaluate(() => { const row = document.querySelector('.bcv-head__row'); const s = row.querySelector('#bcv-omni-box').getBoundingClientRect(); const h1 = row.querySelector('.bcv-h1').getBoundingClientRect(); const seg = row.querySelector('.bcv-seg').getBoundingClientRect(); return { placeholder: document.getElementById('bcv-omni').placeholder, between: s.left > h1.right && s.right <= seg.left + 1, level: Math.abs(s.bottom - seg.bottom) < 1.5 && Math.abs(s.height - seg.height) <= 1, pills: getComputedStyle(document.getElementById('bcv-omni-root')).backgroundColor === 'rgba(0, 0, 0, 0)', key: document.querySelector('.bcv-omni__key')?.textContent, panelHidden: document.getElementById('bcv-omni-panel').hidden }; });
   check(sBox.placeholder === 'Search everything' && sBox.between && sBox.level && sBox.pills && sBox.key === '/' && sBox.panelHidden, `the Dashboard's header carries a search box between the title and the view switcher — one pill, level with the switcher — its panel closed: ${JSON.stringify(sBox)}`);
+  // the input draws nothing of its own: Canvas styles input[type=search] as a white field with a border, a shadow on focus
+  const bare = () => page.evaluate(() => { const c = getComputedStyle(document.getElementById('bcv-omni')); const box = document.getElementById('bcv-omni-box').getBoundingClientRect(); return { bg: c.backgroundColor, border: c.borderTopWidth, shadow: c.boxShadow, outline: c.outlineStyle, pad: c.paddingLeft, inside: document.getElementById('bcv-omni').getBoundingClientRect().height <= box.height - 1 }; });
+  const bareOff = await bare();
   await page.keyboard.press('/');
   check(await page.evaluate(() => document.activeElement?.id === 'bcv-omni'), '/ puts the cursor in it');
+  const bareOn = await bare();
+  check([bareOff, bareOn].every((b) => b.bg === 'rgba(0, 0, 0, 0)' && b.border === '0px' && b.shadow === 'none' && b.outline === 'none' && b.pad === '0px' && b.inside), `the input draws no field of its own inside the pill, focused or not, whatever Canvas says of search inputs: ${JSON.stringify({ bareOff, bareOn })}`);
   await page.keyboard.type('dis01');
   await page.waitForSelector('#bcv-omni-panel:not([hidden]) .bcv-omni__item', { timeout: 10000 });
   await eventually(async () => (await page.$('.bcv-omni__more')) === null && (await page.$$('.bcv-omni__group')).length >= 2, 12000); // (every source answered)

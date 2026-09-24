@@ -407,6 +407,9 @@ function page({ title, path = '', courseId, body }) {
   #menu{list-style:none;margin:0;padding:0}.ic-app-header__menu-list-link{display:block;padding:12px 4px;color:#fff;text-decoration:none;font-size:11px;text-align:center}
   .ic-Layout-wrapper{margin-left:84px}#main{display:flex}#not_right_side{flex:1;padding:0 24px}#right-side-wrapper{width:300px;padding:24px}
   .btn{padding:6px 12px;border:1px solid #c7cdd1;background:#f5f5f5;border-radius:3px}
+  /* Canvas's own field styles, weightier than one class: a white box with a border and a focus shadow (the search box's input showed one inside its pill) */
+  input[type="text"],input[type="search"]{background:#fff;border:1px solid #c7cdd1;border-radius:3px;padding:6px 8px;box-shadow:inset 0 1px 1px rgba(0,0,0,.075);height:38px;margin:0 0 6px}
+  input[type="text"]:focus,input[type="search"]:focus{border-color:#0374b5;box-shadow:0 0 0 2px #0374b5;outline:none}
 </style></head>
 <body>
 <div id="application" class="ic-app">
