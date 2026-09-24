@@ -89,7 +89,7 @@
   /** The sidebar's Appearance button, when it is on the page and drawn (a phone has none). */
   const themeBtn = () => { const el = document.getElementById('bcv-theme-btn'); return el && el.getBoundingClientRect().width > 0 ? el : null; };
   /** The Dashboard's search box, when it is on the page (the Dashboard alone has it; a phone has none). */
-  const searchBox = () => { const el = document.getElementById('bcv-search-box'); return el && el.getBoundingClientRect().width > 0 ? el : null; };
+  const searchBox = () => { const el = document.getElementById('bcv-omni-box'); return el && el.getBoundingClientRect().width > 0 ? el : null; };
   /** A row under the switch's show: the switch itself, small and still, its knob at that stop — the
    *  same DOM the page carries (app.lookDemo), with nothing wired, rather than a drawing of it. */
   function stopSwitch(app, stop) {

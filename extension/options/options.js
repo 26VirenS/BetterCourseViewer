@@ -231,7 +231,7 @@
       const u = st.update || {};
       const act = $('updAction');
       act.hidden = true;
-      const checked = u.checked ? `Checked at ${when(u.checked)} · checks every hour` : 'Checks every hour.';
+      const checked = u.checked ? `Checked at ${when(u.checked)} · checks every 4 hours` : 'Checks every 4 hours.';
       switch (u.state) {
         case 'checking': $('updTitle').textContent = 'Checking for updates…'; $('updSub').textContent = `Version ${st.version}`; break;
         case 'available': $('updTitle').textContent = `Version ${u.available} is ready`; $('updSub').textContent = `You have ${st.version}.${u.automatic === false ? '' : ' It installs by itself in a moment.'}`; act.hidden = false; break;

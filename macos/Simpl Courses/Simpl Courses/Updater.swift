@@ -2,7 +2,8 @@
 //  Updater.swift
 //  Simpl Courses
 //
-//  Keeps the app up to date on its own. Every hour (and at launch, and on Check now) it reads the
+//  Keeps the app up to date on its own. Every four hours (and at launch when the last check is older
+//  than that, and on Check now) it reads the
 //  feed on simplcourses.com — one small JSON file naming the newest version, where its zip is and
 //  the zip's SHA-256 — and when that version is newer than this one, on Update now (or at once,
 //  when updates are set to install themselves) downloads the zip, checks the hash, unpacks it,
@@ -47,7 +48,8 @@ final class Updater {
         let s = (Bundle.main.object(forInfoDictionaryKey: "SimplUpdateFeed") as? String) ?? ""
         return URL(string: s.isEmpty || s.hasPrefix("$(") ? "https://simplcourses.com/app/latest.json" : s)!
     }()
-    let interval: TimeInterval = 3600
+    let interval: TimeInterval = 4 * 3600 // (four times a day: a check is one small request, and an update rarely waits on the hour)
+    private let lastKey = "lastUpdateCheck" // when the feed was last read, kept across launches: a relaunch inside the four hours does not read it again
     let currentVersion: String = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"
 
     private(set) var state: State = .idle { didSet { onChange?(state) } }
@@ -63,9 +65,26 @@ final class Updater {
     }
 
     func start() {
-        check()
-        let t = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in self?.check() }
-        t.tolerance = 120
+        let last = UserDefaults.standard.double(forKey: lastKey)
+        let since = Date().timeIntervalSince1970 - last
+        if last > 0, since >= 0, since < interval {
+            lastCheck = Date(timeIntervalSince1970: last) // (checked within the last four hours: the next check when they are up)
+            schedule(after: interval - since)
+        } else {
+            check()
+            schedule(after: interval)
+        }
+    }
+
+    /// The next check after `delay`, and every four hours from then on.
+    private func schedule(after delay: TimeInterval) {
+        timer?.invalidate()
+        let t = Timer.scheduledTimer(withTimeInterval: max(60, delay), repeats: false) { [weak self] _ in
+            guard let self = self else { return }
+            self.check()
+            self.schedule(after: self.interval)
+        }
+        t.tolerance = 300
         timer = t
     }
 
@@ -83,6 +102,7 @@ final class Updater {
             DispatchQueue.main.async {
                 guard let self = self else { return }
                 self.lastCheck = Date()
+                UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: self.lastKey)
                 guard error == nil, let data = data,
                       let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                       let version = json["version"] as? String,

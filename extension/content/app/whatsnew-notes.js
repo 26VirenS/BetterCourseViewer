@@ -24,6 +24,12 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.79.0', date: '2026-09-24', notes: [
+      { kind: 'fixed', title: 'Search box, tidied', body: 'One pill, level with the view switcher.', icon: P.check },
+      { kind: 'fixed', title: 'Pages and files found', body: 'Every starred course is asked, a few at a time.', icon: P.pic },
+      { kind: 'new', title: 'Wikipedia, a switch', body: 'The W beside the box turns it off, or on again.', icon: P.toggle },
+      { kind: 'improved', title: 'Updates, every 4 hours', body: 'The Mac app checks four times a day, not hourly.', icon: P.clock },
+    ] },
     { version: '2.78.0', date: '2026-09-24', notes: [
       { kind: 'new', title: 'Search everything', body: 'One box on the Dashboard: all of Canvas, and Wikipedia.', icon: P.sparkle },
       { kind: 'new', title: 'Shown once', body: 'A pointer at the box the first time, on black.', icon: P.eye },

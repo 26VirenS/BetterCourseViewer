@@ -2390,49 +2390,62 @@ try {
   console.log('search');
   await sw.evaluate((base) => self.BCV.api.storage.local.set({ 'dev:wikiBase': base }), BASE); // (Wikipedia stands in the mock)
   await page.goto(`${BASE}/`);
-  await page.waitForSelector('#bcv-search', { timeout: 10000 });
-  const sBox = await page.evaluate(() => { const row = document.querySelector('.bcv-head__row'); const s = row.querySelector('#bcv-search-box').getBoundingClientRect(); const h1 = row.querySelector('.bcv-h1').getBoundingClientRect(); const seg = row.querySelector('.bcv-seg').getBoundingClientRect(); return { placeholder: document.getElementById('bcv-search').placeholder, between: s.left > h1.right && s.right <= seg.left + 1, key: document.querySelector('.bcv-search__key')?.textContent, panelHidden: document.getElementById('bcv-search-panel').hidden }; });
-  check(sBox.placeholder === 'Search everything' && sBox.between && sBox.key === '/' && sBox.panelHidden, `the Dashboard's header carries a search box between the title and the view switcher, its panel closed: ${JSON.stringify(sBox)}`);
+  await page.waitForSelector('#bcv-omni', { timeout: 10000 });
+  const sBox = await page.evaluate(() => { const row = document.querySelector('.bcv-head__row'); const s = row.querySelector('#bcv-omni-box').getBoundingClientRect(); const h1 = row.querySelector('.bcv-h1').getBoundingClientRect(); const seg = row.querySelector('.bcv-seg').getBoundingClientRect(); return { placeholder: document.getElementById('bcv-omni').placeholder, between: s.left > h1.right && s.right <= seg.left + 1, level: Math.abs(s.bottom - seg.bottom) < 1.5 && Math.abs(s.height - seg.height) <= 1, pills: getComputedStyle(document.getElementById('bcv-omni-root')).backgroundColor === 'rgba(0, 0, 0, 0)', key: document.querySelector('.bcv-omni__key')?.textContent, panelHidden: document.getElementById('bcv-omni-panel').hidden }; });
+  check(sBox.placeholder === 'Search everything' && sBox.between && sBox.level && sBox.pills && sBox.key === '/' && sBox.panelHidden, `the Dashboard's header carries a search box between the title and the view switcher — one pill, level with the switcher — its panel closed: ${JSON.stringify(sBox)}`);
   await page.keyboard.press('/');
-  check(await page.evaluate(() => document.activeElement?.id === 'bcv-search'), '/ puts the cursor in it');
+  check(await page.evaluate(() => document.activeElement?.id === 'bcv-omni'), '/ puts the cursor in it');
   await page.keyboard.type('dis01');
-  await page.waitForSelector('#bcv-search-panel:not([hidden]) .bcv-search__item', { timeout: 10000 });
-  await eventually(async () => (await page.$('.bcv-search__more')) === null && (await page.$$('.bcv-search__group')).length >= 2, 12000); // (every source answered)
-  const sRes = await page.$$eval('.bcv-search__group', (gs) => gs.map((g) => `${g.dataset.group}: ${[...g.querySelectorAll('.bcv-search__t')].map((t) => t.textContent).join(' | ')}`));
+  await page.waitForSelector('#bcv-omni-panel:not([hidden]) .bcv-omni__item', { timeout: 10000 });
+  await eventually(async () => (await page.$('.bcv-omni__more')) === null && (await page.$$('.bcv-omni__group')).length >= 2, 12000); // (every source answered)
+  const sRes = await page.$$eval('.bcv-omni__group', (gs) => gs.map((g) => `${g.dataset.group}: ${[...g.querySelectorAll('.bcv-omni__t')].map((t) => t.textContent).join(' | ')}`));
   check(sRes.some((g) => /^Assignments: /.test(g) && /Dis01/.test(g)) && sRes.some((g) => g === 'Wikipedia: dis01 (article) | Theory of dis01') && sRes.every((g) => g.split(': ')[1].split(' | ').every((t) => /dis01/i.test(t))) && sRes[sRes.length - 1].startsWith('Wikipedia:'), `typing lists what Canvas has that matches, in groups, Wikipedia's articles last: ${sRes.join(' · ')}`);
   await page.keyboard.press('ArrowDown');
   await page.keyboard.press('ArrowDown');
-  check((await page.$$eval('.bcv-search__item', (els) => els.findIndex((e) => e.classList.contains('is-cur')))) === 1, 'the arrows walk the results');
+  check((await page.$$eval('.bcv-omni__item', (els) => els.findIndex((e) => e.classList.contains('is-cur')))) === 1, 'the arrows walk the results');
   await page.keyboard.press('ArrowUp');
   await page.keyboard.press('Enter');
   await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
-  check(/\/courses\/\d+\/assignments\/\d+$/.test(page.url()) && /Dis01/.test((await texts('.bcv-detail__title'))[0]) && !(await page.$('#bcv-search-panel:not([hidden])')), `Enter opens the one chosen, the assignment, in place: ${page.url()}`);
+  check(/\/courses\/\d+\/assignments\/\d+$/.test(page.url()) && /Dis01/.test((await texts('.bcv-detail__title'))[0]) && !(await page.$('#bcv-omni-panel:not([hidden])')), `Enter opens the one chosen, the assignment, in place: ${page.url()}`);
   // a Wikipedia article opens in a new tab; Escape closes the panel; a press elsewhere closes it too
   await page.goto(`${BASE}/`);
-  await page.waitForSelector('#bcv-search', { timeout: 10000 });
-  await page.click('#bcv-search');
+  await page.waitForSelector('#bcv-omni', { timeout: 10000 });
+  await page.click('#bcv-omni');
   await page.keyboard.type('kinematics');
-  await page.waitForSelector('.bcv-search__group[data-group="Wikipedia"] .bcv-search__item', { timeout: 10000 });
+  await page.waitForSelector('.bcv-omni__group[data-group="Wikipedia"] .bcv-omni__item', { timeout: 10000 });
   await context.route('https://en.wikipedia.org/**', (r) => r.fulfill({ status: 200, contentType: 'text/html', body: '<title>Wikipedia</title><p>stands in</p>' })); // (no network here: the article's page stands in)
-  const [wikiTab] = await Promise.all([context.waitForEvent('page', { timeout: 8000 }), page.click('.bcv-search__group[data-group="Wikipedia"] .bcv-search__item')]);
+  const [wikiTab] = await Promise.all([context.waitForEvent('page', { timeout: 8000 }), page.click('.bcv-omni__group[data-group="Wikipedia"] .bcv-omni__item')]);
   await wikiTab.waitForLoadState('load').catch(() => {});
   check(/^https:\/\/en\.wikipedia\.org\/wiki\/kinematics/.test(wikiTab.url()) && page.url() === `${BASE}/`, `a Wikipedia result opens the article in a new tab, the page staying put: ${wikiTab.url()}`);
   await wikiTab.close().catch(() => {});
   await context.unroute('https://en.wikipedia.org/**').catch(() => {});
-  await page.fill('#bcv-search', 'xy');
-  await page.waitForSelector('#bcv-search-panel:not([hidden])', { timeout: 10000 });
+  // the W to the left of the box turns Wikipedia off, and on again: kept in the settings, the search on show asked again
+  const wikiBtn = await page.evaluate(() => { const w = document.getElementById('bcv-omni-wiki').getBoundingClientRect(); const b = document.getElementById('bcv-omni-box').getBoundingClientRect(); return { left: w.right <= b.left && w.right >= b.left - 12, level: Math.abs(w.height - b.height) <= 1 && Math.abs(w.top - b.top) <= 1, pressed: document.getElementById('bcv-omni-wiki').getAttribute('aria-pressed'), text: document.getElementById('bcv-omni-wiki').textContent }; });
+  check(wikiBtn.left && wikiBtn.level && wikiBtn.pressed === 'true' && wikiBtn.text === 'W', `a W to the left of the box, level with it, Wikipedia on: ${JSON.stringify(wikiBtn)}`);
+  await page.click('#bcv-omni-wiki');
+  check(await eventually(async () => (await sw.evaluate(async () => (await self.BCV.settings.get()).search?.wikipedia)) === false) && (await page.$eval('#bcv-omni-wiki', (e) => e.getAttribute('aria-pressed'))) === 'false', 'pressed, Wikipedia is off, and the setting says so');
+  await page.fill('#bcv-omni', 'kinema');
+  await page.waitForSelector('#bcv-omni-panel:not([hidden])', { timeout: 10000 });
+  await eventually(async () => (await page.$('.bcv-omni__more')) === null, 12000);
+  check((await page.$('.bcv-omni__group[data-group="Wikipedia"]')) === null, 'and a search lists no Wikipedia');
+  await page.click('#bcv-omni-wiki');
+  await eventually(async () => (await sw.evaluate(async () => (await self.BCV.settings.get()).search?.wikipedia)) === true);
+  await page.waitForSelector('.bcv-omni__group[data-group="Wikipedia"] .bcv-omni__item', { timeout: 10000 });
+  check((await page.$eval('#bcv-omni-wiki', (e) => e.getAttribute('aria-pressed'))) === 'true', 'pressed again, Wikipedia is back: the same search asked again');
+  await page.fill('#bcv-omni', 'xy');
+  await page.waitForSelector('#bcv-omni-panel:not([hidden])', { timeout: 10000 });
   await page.keyboard.press('Escape');
-  check(await page.$eval('#bcv-search-panel', (e) => e.hidden), 'Escape closes the panel');
+  check(await page.$eval('#bcv-omni-panel', (e) => e.hidden), 'Escape closes the panel');
   await page.keyboard.press('Enter');
-  await page.waitForSelector('#bcv-search-panel:not([hidden])', { timeout: 10000 });
+  await page.waitForSelector('#bcv-omni-panel:not([hidden])', { timeout: 10000 });
   await page.click('.bcv-h1'); // (a press elsewhere: the title)
-  const sAfter = await page.evaluate(() => ({ hidden: document.getElementById('bcv-search-panel').hidden, value: document.getElementById('bcv-search').value, roots: document.querySelectorAll('#bcv-search-root').length, active: document.activeElement?.id || document.activeElement?.tagName }));
+  const sAfter = await page.evaluate(() => ({ hidden: document.getElementById('bcv-omni-panel').hidden, value: document.getElementById('bcv-omni').value, roots: document.querySelectorAll('#bcv-omni-root').length, active: document.activeElement?.id || document.activeElement?.tagName }));
   check(sAfter.hidden && sAfter.value === 'xy', `Enter searches again, and a press elsewhere closes the panel, the words kept: ${JSON.stringify(sAfter)}`);
   // the black screen, once, for anyone who had Simpl before the box: the box seen through a hole, "Search Everything." under it with an arrow up at it
   await sw.evaluate(() => self.BCV.api.storage.local.remove('welcome:search'));
   await page.goto(`${BASE}/`);
   await page.waitForSelector('#bcv-welcome[data-stage="search"]', { timeout: 20000 });
-  const sPtrRead = () => page.evaluate(() => { const e = document.querySelector('#bcv-welcome'); const b = document.getElementById('bcv-search-box').getBoundingClientRect(); const ring = e.querySelector('.bcv-welcome__ring'); const num = (a) => Number(ring.getAttribute(a)); const st = e.querySelector('.bcv-welcome__stage'); const box = st.getBoundingClientRect(); return { holes: e.classList.contains('bcv-welcome--holes'), ringAt: ring ? [num('x') - (b.left - 6), num('y') - (b.top - 6), num('width') - (b.width + 12), num('height') - (b.height + 12)].every((d) => Math.abs(d) < 1.5) : false, below: box.top >= b.bottom + 10, centred: Math.abs((box.left + box.width / 2) - (b.left + b.width / 2)) < 30, layout: st.dataset.stage, arrowAt: (() => { const a = e.querySelector('.bcv-welcome__spot .bcv-welcome__arrowbox')?.getBoundingClientRect(); return !!a && Math.abs((a.left + a.width / 2) - (b.left + b.width / 2)) < 2 && a.top >= b.bottom + 4 && a.top <= b.bottom + 22 && box.top >= a.bottom + 4; })(), lines: [...e.querySelectorAll('.bcv-welcome__kicker, .bcv-welcome__title, .bcv-welcome__hint')].map((x) => x.textContent).join(' | '), black: getComputedStyle(e).backgroundColor }; });
+  const sPtrRead = () => page.evaluate(() => { const e = document.querySelector('#bcv-welcome'); const b = document.getElementById('bcv-omni-box').getBoundingClientRect(); const ring = e.querySelector('.bcv-welcome__ring'); const num = (a) => Number(ring.getAttribute(a)); const st = e.querySelector('.bcv-welcome__stage'); const box = st.getBoundingClientRect(); return { holes: e.classList.contains('bcv-welcome--holes'), ringAt: ring ? [num('x') - (b.left - 6), num('y') - (b.top - 6), num('width') - (b.width + 12), num('height') - (b.height + 12)].every((d) => Math.abs(d) < 1.5) : false, below: box.top >= b.bottom + 10, centred: Math.abs((box.left + box.width / 2) - (b.left + b.width / 2)) < 30, layout: st.dataset.stage, arrowAt: (() => { const a = e.querySelector('.bcv-welcome__spot .bcv-welcome__arrowbox')?.getBoundingClientRect(); return !!a && Math.abs((a.left + a.width / 2) - (b.left + b.width / 2)) < 2 && a.top >= b.bottom + 4 && a.top <= b.bottom + 22 && box.top >= a.bottom + 4; })(), lines: [...e.querySelectorAll('.bcv-welcome__kicker, .bcv-welcome__title, .bcv-welcome__hint')].map((x) => x.textContent).join(' | '), black: getComputedStyle(e).backgroundColor }; });
   await eventually(async () => { const p = await sPtrRead(); return p.ringAt && p.centred && p.arrowAt; }, 4000);
   const sPtr = await sPtrRead();
   check(sPtr.holes && sPtr.ringAt && sPtr.below && sPtr.centred && sPtr.layout === 'below' && sPtr.arrowAt && sPtr.lines === 'Search Everything. | Courses, assignments, pages, discussions, files, people — and Wikipedia — from one box.', `the page comes back black with the search box seen through a hole, an arrow up at it (centred on the box, right under it) and "Search Everything." under the arrow: ${JSON.stringify(sPtr)}`);
@@ -2442,7 +2455,7 @@ try {
   await page.waitForFunction(() => !document.querySelector('#bcv-welcome'), null, { timeout: 5000 });
   check((await sw.evaluate(() => self.BCV.api.storage.local.get('welcome:search')))['welcome:search'] === true, 'Continue takes the black away and marks it seen');
   await page.goto(`${BASE}/`);
-  await page.waitForSelector('#bcv-search', { timeout: 10000 });
+  await page.waitForSelector('#bcv-omni', { timeout: 10000 });
   await page.waitForTimeout(500);
   check(!(await page.$('#bcv-welcome')), 'and it does not come back');
 
