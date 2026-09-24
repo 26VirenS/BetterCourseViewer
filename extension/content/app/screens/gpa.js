@@ -583,6 +583,8 @@
     }
 
     // ---- settings sheet ----------------------------------------------------------------------
+    /** Do the numbers in the fields still say what the file's rows said? (then the rows stay with them) */
+    const rowsMatch = (rec, g, n) => { const sum = BCV.recordCsv?.summarize?.(rec.courses || []); return !!sum && Math.abs(sum.gpa - g) < 0.0005 && sum.courses === n; };
     function openSettings(m, { wantTracking = false, from = null } = {}) {
       document.querySelector('.bcv-sheet-ov')?.remove();
       const ov = U.el('bcv-sheet-ov', null, { role: 'dialog', 'aria-label': 'GPA settings' });
@@ -597,12 +599,35 @@
         goalGap.textContent = m.termGpa === null ? 'Set the term GPA you are aiming for' : m.termGpa >= pendingGoal ? `You are ${gpa2(m.termGpa - pendingGoal)} above this goal` : `You are ${gpa2(pendingGoal - m.termGpa)} below this goal`;
       };
       syncGoal();
+      // Upload CSV: a CSV of past courses (lib/record-csv.js says what it reads) fills the two fields in
+      // and, kept through Done, travels with them as the record's rows; a file that cannot be read says so
+      let pendingRecord = tracking?.record || null; // the rows behind the numbers in the fields, if a file gave them
+      const fromNote = U.text('bcv-gpa-set__s bcv-pretty bcv-gpa-set__from', '');
+      const sayFrom = () => { fromNote.textContent = pendingRecord?.name
+        ? `From ${pendingRecord.name}: ${U.plural(pendingRecord.courses?.length || 0, 'course')}${Number.isFinite(pendingRecord.credits) ? `, ${pendingRecord.credits} credits (the GPA credit-weighted)` : ''}${pendingRecord.skipped ? `, ${U.plural(pendingRecord.skipped, 'row')} skipped (no letter grade)` : ''}. Numbers typed over these replace it.`
+        : 'Or upload a CSV of your past courses — a header row, then course, grade, and credits and term if you have them — and these fill in from it. Letters, percentages and 4.0 points all read; P/NP and W are skipped.'; };
+      sayFrom();
+      const csvInput = h('input', { type: 'file', accept: '.csv,text/csv,text/plain', hidden: true, class: 'bcv-gpa-set__csvfile' });
+      csvInput.addEventListener('change', async () => {
+        const file = csvInput.files?.[0];
+        csvInput.value = '';
+        if (!file) return;
+        let rec;
+        try { rec = BCV.recordCsv.record(await file.text(), file.name); } catch { U.toast('That file needs a header with course and grade columns (credits and term optional).', { error: true }); return; }
+        priorGpa.value = String(rec.priorGpa);
+        priorN.value = String(rec.priorCourses);
+        pendingRecord = rec.record;
+        sayFrom();
+        U.toast(`${gpa2(rec.priorGpa)} across ${U.plural(rec.priorCourses, 'course')} read from ${file.name}. Press Done to keep it.`);
+      });
       const trackBody = U.el('bcv-gpa-set__fields', [
         h('label', { class: 'bcv-gpa-set__field' }, [h('span', { text: 'GPA before this term' }), priorGpa]),
         h('label', { class: 'bcv-gpa-set__field' }, [h('span', { text: 'Courses it covers' }), priorN]),
-        U.text('bcv-gpa-set__s bcv-pretty bcv-gpa-set__from', tracking?.record?.name
-          ? `From ${tracking.record.name} (${U.plural(tracking.record.courses?.length || tracking.priorCourses, 'course')}), uploaded in Settings → Grades. Numbers typed here replace it.`
-          : 'Or upload a CSV of your past courses in Settings → Grades and these fill in from it.'),
+        U.el('bcv-gpa-set__csv', [
+          U.btn('Upload CSV', { kind: 'sm', cls: 'bcv-gpa-set__csvbtn', onClick: () => csvInput.click() }),
+          csvInput,
+          fromNote,
+        ]),
       ]);
       trackBody.hidden = !on;
       const trackSwitch = U.switchEl(on, (v) => { on = v; trackBody.hidden = !on; }, 'Track GPA over time');
@@ -618,8 +643,9 @@
             priorGpa.focus();
             return;
           }
-          // the rows of a CSV uploaded in Settings stay with the numbers they gave; numbers typed over them are the record now
-          const keepRecord = !blank && tracking?.record && g === tracking.priorGpa && n === tracking.priorCourses ? { record: tracking.record } : {};
+          // the rows of a CSV — uploaded here or in Settings — stay with the numbers they gave; numbers typed over them are the record now
+          const fromFile = pendingRecord && rowsMatch(pendingRecord, g, n);
+          const keepRecord = !blank && fromFile ? { record: pendingRecord } : {};
           tracking = blank ? { priorGpa: null, priorCourses: 0, since: tracking?.since || dayKey() } : { priorGpa: g, priorCourses: n, since: tracking?.since || dayKey(), ...keepRecord };
         } else tracking = null;
         await save();

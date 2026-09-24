@@ -134,6 +134,9 @@
           id: String(e.id), title: e.title || a?.name || 'Untitled', date: start, end, allDay: !!e.all_day && !isAssignment,
           isAssignment, icon, done: submitted || past, submitted, keys, contextCode: e.context_code, contextName: cc?.name || e.context_name || '',
           color: pal.text, tint: pal.tint, url: e.html_url || a?.html_url || '/calendar', points: a?.points_possible ?? null,
+          // what an event's own sheet shows (an assignment opens in the preview panel instead)
+          kind: appt ? 'appointment' : 'event', description: e.description || '', location: e.location_name || '', address: e.location_address || '',
+          reservationId: appt ? String(e.id) : null, groupId: appt ? String(e.appointment_group_id) : null, contextColor: cc?.color || '#8e8e93',
         });
       }
       return out.sort((x, y) => x.date - y.date);
@@ -223,8 +226,11 @@
 
     const eventsOn = (d) => events.filter((ev) => U.sameDay(ev.date, d));
 
+    /** A press on an event (not an assignment: the preview panel takes those) opens its sheet rather than
+     *  following its Canvas address, which is the calendar page itself and would only draw it again. */
+    const onEvent = (ev) => (ev.isAssignment ? null : (e) => { e.preventDefault(); e.stopPropagation(); openEvent(ev, e.currentTarget); });
     function chip(ev, small = true) {
-      return h('a', { class: 'bcv-ev', href: ev.url, style: { background: ev.tint, color: ev.color }, title: `${ev.title} · ${ev.contextName}` }, [
+      return h('a', { class: 'bcv-ev', href: ev.url, style: { background: ev.tint, color: ev.color }, title: `${ev.title} · ${ev.contextName}`, onclick: onEvent(ev) }, [
         U.svg(ev.icon, { size: 10, stroke: ev.color, width: 2.1, style: { flex: 'none' } }),
         h('span', { class: `bcv-ev__label ${ev.done ? 'bcv-strike' : ''}`, style: { color: ev.color }, text: ev.title }),
       ]);
@@ -262,7 +268,7 @@
         grid.append(U.text('bcv-week__hour', hourLabel(hh)));
         for (const d of days) {
           const evs = eventsOn(d).filter((ev) => !ev.allDay && (ev.date.getHours() === hh || (hh === 8 && ev.date.getHours() < 8)));
-          grid.append(U.el(`bcv-week__cell ${U.sameDay(d, now) ? 'bcv-week__cell--today' : ''}`, evs.map((ev) => h('a', { class: 'bcv-wev', href: ev.url, style: { background: ev.tint }, title: `${ev.title} · ${ev.contextName}` }, [
+          grid.append(U.el(`bcv-week__cell ${U.sameDay(d, now) ? 'bcv-week__cell--today' : ''}`, evs.map((ev) => h('a', { class: 'bcv-wev', href: ev.url, style: { background: ev.tint }, title: `${ev.title} · ${ev.contextName}`, onclick: onEvent(ev) }, [
             h('div', { class: 'bcv-wev__time', style: { color: ev.color }, text: U.fmtTimeLower(ev.date).replace(/m$/, '') }),
             h('div', { class: `bcv-wev__title ${ev.done ? 'bcv-strike' : ''}`, style: { color: ev.color }, text: ev.title }),
           ]))));
@@ -292,7 +298,7 @@
             U.text('bcv-agenda__due', ev.allDay ? 'All day' : `${ev.isAssignment ? 'Due' : 'At'} ${U.fmtTimeLower(ev.date)}`, 'span'),
             h('span', { class: `bcv-agenda__title bcv-pretty ${ev.done ? 'bcv-strike' : ''}`, text: ev.title }),
             U.text('bcv-agenda__course', ev.contextName, 'span'),
-          ], { href: ev.url })), 'bcv-card--list'),
+          ], ev.isAssignment ? { href: ev.url } : { onClick: (e) => openEvent(ev, e.currentTarget) })), 'bcv-card--list'),
         ]));
       }
       return wrap;
@@ -345,6 +351,62 @@
       }
       store.setPref('agendaRange', { start: range.start.toISOString(), end: range.end ? range.end.toISOString() : null });
       load();
+    }
+
+    // ---- an event's own sheet ------------------------------------------------------------------
+    // Canvas answers a press on an event with a popover — the title, the time, the calendar, the
+    // place, the details, Un-reserve for an appointment. Its address is the calendar page itself,
+    // which the interface would only draw again, so the same things are shown here, in a sheet.
+    function openEvent(ev, from = null) {
+      document.querySelector('.bcv-sheet-ov')?.remove();
+      const ov = U.el('bcv-sheet-ov', null, { role: 'dialog', 'aria-label': ev.title });
+      const close = () => ov.remove();
+      ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
+      ov.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+      const appt = ev.kind === 'appointment';
+      const when = ev.allDay ? `${U.fmtDow(ev.date)} · all day` : `${U.fmtDow(ev.date)} · ${U.fmtTimeLower(ev.date)}${ev.end && ev.end > ev.date ? ` – ${U.fmtTimeLower(ev.end)}` : ''}`;
+      const row = (k, v) => (v == null || v === '' || (Array.isArray(v) && !v.length) ? null : U.el('bcv-evsheet__row', [U.text('bcv-evsheet__k', k, 'span'), h('span', { class: 'bcv-evsheet__v' }, v)]));
+      const prose = ev.description ? BCV.screens.course?.prose?.(ev.description, { cls: 'bcv-evsheet__prose' }) || h('p', { text: htmlToText(ev.description, 2000) }) : null;
+      let busy = false;
+      const unreserve = async (btn) => {
+        if (busy || !ev.reservationId) return;
+        busy = true;
+        btn.disabled = true;
+        try {
+          await store.cancelReservation(ev.reservationId);
+        } catch (err) {
+          busy = false;
+          btn.disabled = false;
+          U.toast(`Canvas would not cancel it: ${err.message}`, { error: true });
+          return;
+        }
+        if (!ctx.alive()) return;
+        close();
+        U.toast('Your time is given back.');
+        loadedRange = null;
+        load();
+        loadAppointments({ force: true });
+      };
+      const foot = appt
+        ? [U.btn('Un-reserve', { kind: 'danger', cls: 'bcv-evsheet__unreserve', onClick: (e) => unreserve(e.currentTarget) }), U.btn('Other times', { cls: 'bcv-evsheet__times', onClick: (e) => { close(); openAppointments(e.currentTarget); } })]
+        : [];
+      ov.append(U.el('bcv-sheet bcv-evsheet', [
+        U.el('bcv-sheet__head', [
+          h('div', { style: { flex: '1', minWidth: '0' } }, [U.text('bcv-evsheet__kicker', appt ? 'Appointment' : 'Event'), U.text('bcv-sheet__title bcv-evsheet__title bcv-pretty', ev.title)]),
+          h('button', { type: 'button', class: 'bcv-sheet__close', 'aria-label': 'Close', onclick: close }, U.svg(IC.close, { size: 13, stroke: 'var(--bcv-ink2)', width: 2.3 })),
+        ]),
+        U.el('bcv-sheet__list bcv-evsheet__list', [
+          row('When', when),
+          row('Calendar', [U.dot(ev.contextColor, 'bcv-dot--9'), h('span', { text: ev.contextName || '—' })]),
+          row('Where', [ev.location ? linkify(ev.location) : null, ev.location && ev.address ? ' ' : null, ev.address ? h('span', { class: 'bcv-evsheet__addr', text: ev.address }) : null].flat().filter(Boolean)),
+          prose ? row('Details', prose) : null,
+        ].filter(Boolean)),
+        foot.length ? U.el('bcv-evsheet__foot', foot) : null,
+      ].filter(Boolean)));
+      document.body.append(ov);
+      U.morphFrom(ov.firstElementChild, from);
+      ov.tabIndex = -1;
+      ov.focus();
     }
 
     // The user's own calendars (the favourite courses) are on by default; the personal calendar,

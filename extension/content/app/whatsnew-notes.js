@@ -24,6 +24,10 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.84.0', date: '2026-09-24', notes: [
+      { kind: 'new', title: 'Events open a sheet', body: 'When, place, details; un-reserve an appointment.', icon: P.eye },
+      { kind: 'new', title: 'Upload, on the page', body: 'The Grades page’s settings take the transcript CSV too.', icon: P.steps },
+    ] },
     { version: '2.83.0', date: '2026-09-24', notes: [
       { kind: 'new', title: 'Upload your transcript', body: 'A CSV of past courses in Settings → Grades sets your record.', icon: P.steps },
     ] },

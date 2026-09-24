@@ -3748,3 +3748,21 @@ html[data-bcv-theme="dark"] .bcv-pdfx { --px-row: #0f0f11; --px-page: #1f1f22; -
 .bcv-appt__link { color: var(--bcv-blue); text-decoration: none; overflow-wrap: anywhere; }
 .bcv-appt__link:hover { text-decoration: underline; }
 .bcv-gpa-set__from { flex: 1 1 100%; margin: 0; }
+/* 2.84.0: an event's own sheet — what Canvas's popover shows, here: the kicker and title, then When / Calendar /
+   Where / Details as rows, and for an appointment Un-reserve and Other times at the foot */
+.bcv-evsheet { width: 520px; }
+.bcv-evsheet__kicker { font: 600 11px/1.2 var(--bcv-font); letter-spacing: .06em; text-transform: uppercase; color: var(--bcv-ink3); margin-bottom: 4px; }
+.bcv-evsheet__title { font: 700 18px/1.25 var(--bcv-display); letter-spacing: -.02em; }
+.bcv-evsheet__list { padding: 6px 22px 16px; display: flex; flex-direction: column; gap: 12px; }
+.bcv-evsheet__row { display: grid; grid-template-columns: 84px minmax(0, 1fr); gap: 12px; align-items: start; font: 400 13.5px/1.45 var(--bcv-font); }
+.bcv-evsheet__k { font: 600 12.5px/1.45 var(--bcv-font); color: var(--bcv-ink3); padding-top: 1px; }
+.bcv-evsheet__v { min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; overflow-wrap: anywhere; }
+.bcv-evsheet__v .bcv-appt__link { color: var(--bcv-blue); }
+.bcv-evsheet__addr { color: var(--bcv-ink2); }
+.bcv-evsheet__prose { font-size: 13.5px; }
+.bcv-evsheet__foot { padding: 14px 22px 18px; border-top: 1px solid var(--bcv-sep); display: flex; align-items: center; gap: 10px; }
+.bcv-evsheet__times { margin-left: auto; }
+/* 2.84.0: Upload CSV on the GPA settings sheet, beside the two fields */
+.bcv-gpa-set__csv { flex: 1 1 100%; display: flex; align-items: flex-start; gap: 12px; }
+.bcv-gpa-set__csv .bcv-gpa-set__from { flex: 1; min-width: 0; margin: 0; padding-top: 4px; }
+.bcv-gpa-set__csvbtn { flex: none; }

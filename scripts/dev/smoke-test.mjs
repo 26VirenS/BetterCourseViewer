@@ -850,12 +850,41 @@ try {
   await closeAppt();
   await page.waitForFunction(() => [...document.querySelectorAll('.bcv-ev')].some((e) => /Research Proposal/.test(e.textContent)), null, { timeout: 10000 });
   check((await texts('.bcv-ev')).filter((t) => /Research Proposal/.test(t)).length === 1 && (await texts('.bcv-ev')).length === evs.length + 1 && /^Find appointment\s*1$/.test((await texts('.bcv-cal__apptbtn'))[0]), 'the time reserved is the one appointment on the month, with the course\'s colour');
+  // a press on the reservation opens its sheet — what Canvas's popover shows — rather than drawing the calendar again
+  const evSheet = () => page.evaluate(() => { const sh = document.querySelector('.bcv-evsheet'); if (!sh) return null; const rows = Object.fromEntries([...sh.querySelectorAll('.bcv-evsheet__row')].map((r) => [r.querySelector('.bcv-evsheet__k').textContent, r.querySelector('.bcv-evsheet__v').textContent.replace(/\s+/g, ' ').trim()])); return { kicker: sh.querySelector('.bcv-evsheet__kicker')?.textContent, title: sh.querySelector('.bcv-evsheet__title')?.textContent, rows, foot: [...sh.querySelectorAll('.bcv-evsheet__foot .bcv-btn')].map((b) => b.textContent.trim()), bold: !!sh.querySelector('.bcv-evsheet__prose b'), grid: !!document.querySelector('.bcv-cal__grid') }; });
+  await page.click('.bcv-ev:has-text("Research Proposal")');
+  await page.waitForSelector('.bcv-evsheet', { timeout: 5000 });
+  const apptSheet = await evSheet();
+  check(apptSheet.kicker === 'Appointment' && apptSheet.title === 'Research Proposal Feedback Conferences (Online Option)' && /^[A-Z][a-z]{2}, [A-Z][a-z]{2} \d{1,2} · 11:15am – 11:30am$/.test(apptSheet.rows.When) && apptSheet.rows.Calendar === 'F26-MATH 021 20' && apptSheet.rows.Where === 'Online (the Zoom link is in the course)' && /Fifteen minutes to go over your research proposal/.test(apptSheet.rows.Details) && apptSheet.foot.join('|') === 'Un-reserve|Other times' && apptSheet.grid && /\/calendar$/.test(page.url()),
+    `a press on the reservation opens its sheet — Appointment, the title, when, the calendar, the place, the details, Un-reserve and Other times — the month still behind it: ${JSON.stringify(apptSheet)}`);
+  await shot(page, '06d-calendar-event-sheet');
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !document.querySelector('.bcv-evsheet'), null, { timeout: 3000 });
   await openAppt();
   await page.click('.bcv-appt__cancel');
   await page.waitForFunction(() => !document.querySelector('.bcv-appt__mine') && document.querySelectorAll('.bcv-appt__slot:not(:disabled)').length === 11, null, { timeout: 10000 });
   check(!(await page.$('.bcv-appt__mine')) && (await page.$$('.bcv-appt__slot:not(:disabled)')).length === 11 && !(await page.$('.bcv-appt__slot.is-mine')), 'Cancel gives the time back: the chips open again');
   await closeAppt();
   await page.waitForFunction((n) => document.querySelectorAll('.bcv-ev').length === n && ![...document.querySelectorAll('.bcv-ev')].some((e) => /Research Proposal/.test(e.textContent)), evs.length, { timeout: 10000 });
+  // reserved again, Un-reserve on the sheet gives the time back too: the reservation leaves the month, the sheet closes
+  await openAppt();
+  await page.click('.bcv-appt__day:nth-child(1) .bcv-appt__slot:not(:disabled)');
+  await page.waitForSelector('.bcv-appt__mine', { timeout: 10000 });
+  await closeAppt();
+  await page.waitForFunction(() => [...document.querySelectorAll('.bcv-ev')].some((e) => /Research Proposal/.test(e.textContent)), null, { timeout: 10000 });
+  await page.click('.bcv-ev:has-text("Research Proposal")');
+  await page.waitForSelector('.bcv-evsheet__unreserve', { timeout: 5000 });
+  await page.click('.bcv-evsheet__unreserve');
+  await page.waitForFunction((n) => !document.querySelector('.bcv-evsheet') && document.querySelectorAll('.bcv-ev').length === n && ![...document.querySelectorAll('.bcv-ev')].some((e) => /Research Proposal/.test(e.textContent)), evs.length, { timeout: 10000 });
+  check(!(await page.$('.bcv-evsheet')) && !(await texts('.bcv-ev')).some((t) => /Research Proposal/.test(t)) && /given back/.test((await texts('.bcv-toast')).join(' ')), 'Un-reserve on the sheet gives the time back: the reservation leaves the month, the sheet closes, a toast says so');
+  // a plain event's sheet: Event, when, the calendar, the place with its address, the details as rich text, nothing to un-reserve
+  await page.click('.bcv-ev:has-text("Lec05 lecture")');
+  await page.waitForSelector('.bcv-evsheet', { timeout: 5000 });
+  const lecSheet = await evSheet();
+  check(lecSheet.kicker === 'Event' && lecSheet.title === 'Lec05 lecture' && /· 10:30am – 11:45am$/.test(lecSheet.rows.When) && lecSheet.rows.Calendar === 'F26-MATH 021 20' && lecSheet.rows.Where === 'COB2 140 5200 N Lake Rd' && lecSheet.rows.Details === 'Composition of functions, section 1.4.' && lecSheet.bold && lecSheet.foot.length === 0,
+    `a lecture opens its sheet too — Event, when, the calendar, the room and its address, the details as rich text, nothing to un-reserve: ${JSON.stringify(lecSheet)}`);
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !document.querySelector('.bcv-evsheet'), null, { timeout: 3000 });
   // an assignment on the grid opens in the preview panel beside the month rather than leaving the page
   const chipTitle = await page.$eval('.bcv-ev[href*="/assignments/"]', (e) => e.querySelector('.bcv-ev__label').textContent);
   await page.click('.bcv-ev[href*="/assignments/"]');
@@ -1053,6 +1082,12 @@ try {
   check(!(await page.$('.bcv-gpa__tray')) && (await page.$$('.bcv-gpa__card')).length === 5, 'Show returns it to the overview and the GPA');
   await page.click('.bcv-gpa__banner .bcv-btn');
   await page.waitForSelector('.bcv-gpa-set', { timeout: 5000 });
+  // Upload CSV on the sheet itself (the Mac app's window has no Grades section): the file fills the two
+  // fields in and says what it read; numbers typed over them are the record instead
+  await page.setInputFiles('.bcv-gpa-set__csvfile', { name: 'transcript.csv', mimeType: 'text/csv', buffer: Buffer.from(['term,course,grade,credits', 'Fall 2025,MATH 021,A-,4', 'Fall 2025,WRI 010,B+,4', 'Spring 2026,PHYS 008,93%,4', 'Spring 2026,SPRK 010,P,1', 'Spring 2026,CHEM 002,3.0,2'].join('\n')) });
+  await page.waitForFunction(() => document.querySelector('#bcv-gpa-prior')?.value === '3.571', null, { timeout: 5000 });
+  check((await page.$eval('#bcv-gpa-prior-n', (e) => e.value)) === '4' && /^From transcript\.csv: 4 courses, 14 credits \(the GPA credit-weighted\), 1 row skipped \(no letter grade\)\. Numbers typed over these replace it\.$/.test((await texts('.bcv-gpa-set__from'))[0]) && /3\.57 across 4 courses read from transcript\.csv/.test((await texts('.bcv-toast')).join(' ')),
+    `Upload CSV on the sheet fills the fields in from the file and says what it read: ${(await texts('.bcv-gpa-set__from'))[0]}`);
   await page.fill('#bcv-gpa-prior', '3.42');
   await page.fill('#bcv-gpa-prior-n', '8');
   await page.click('.bcv-gpa-set__ctl .bcv-gpa-set__step:last-child'); // + at the 4.00 default: already at the top of the scale
@@ -1066,6 +1101,7 @@ try {
   // prefs live in chrome.storage.local under `prefs:<canvas host>`; the first snapshot lands the day tracking starts
   const readPrefs = () => sw.evaluate(async () => Object.entries(await chrome.storage.local.get(null)).find(([k]) => k.startsWith('prefs:'))?.[1] || null);
   check(await eventually(async () => { const p = await readPrefs(); return Array.isArray(p?.gpaSnapshots) && p.gpaSnapshots.length === 1 && typeof p.gpaSnapshots[0].gpa === 'number' && /^\d{4}-\d{2}-\d{2}$/.test(p.gpaSnapshots[0].date) && p.gpaTracking?.priorCourses === 8 && p.gpaGoal === 3.95; }), `a first snapshot is recorded the day tracking starts: ${JSON.stringify((await readPrefs())?.gpaSnapshots)}`);
+  check(!(await readPrefs())?.gpaTracking?.record, 'numbers typed over the file\'s are the record: its rows are not kept with them');
   await shot(page, '09e-grades-panel-tracking');
   page.once('dialog', (d) => d.accept());
   await page.click('.bcv-gpa__linkbtn');
