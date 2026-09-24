@@ -27,6 +27,7 @@
     settle: { stiffness: 280, damping: 30, mass: 1 }, // rows and blocks arriving, staggered: ~350 ms (ζ ≈ .9)
     scrim: { stiffness: 300, damping: 34, mass: 1 }, // opacity only: ~400 ms (ζ ≈ .98)
     phone: { stiffness: 260, damping: 30, mass: 1 }, // push and pop, bottom sheets: ~390 ms (ζ ≈ .93)
+    island: { stiffness: 150, damping: 22.8, mass: 1 }, // the timer's island and every pin capsule or panel swelling under the pointer: ~490 ms, no overshoot (ζ ≈ .93)
   }; // (2.98.4: each a fifth slower than before and softer at the turn — smoother over speed)
   const REST_DIST = 0.01; // of the travel: at rest once within this and slower than REST_SPEED (a pixel of a hundred: the eye's threshold)
   const REST_SPEED = 0.1; // travel per second

@@ -25,6 +25,10 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.98.9', date: '2026-09-24', notes: [
+      { kind: 'improved', title: 'Break, one press away', body: 'A Focus | Break switch and an Open button on the island.', icon: P.clock },
+      { kind: 'improved', title: 'Capsules in step', body: 'Every pin opens over the island’s half second, smoother.', icon: P.toggle },
+    ] },
     { version: '2.98.8', date: '2026-09-24', notes: [
       { kind: 'improved', title: 'The display, typeset', body: 'The line is the equation itself, in the pin’s panel too.', icon: P.pen },
     ] },

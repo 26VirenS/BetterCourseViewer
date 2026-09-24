@@ -410,9 +410,8 @@
     main.replaceChildren(U.svg(paused ? IC.play : IC.pause, { size: 18, stroke: 'currentColor', width: 2.4 }));
     main.setAttribute('aria-label', paused ? 'Resume' : 'Pause');
     main.title = paused ? 'Resume' : 'Pause';
-    const sw = item.querySelector('.bcv-island__switch');
-    sw.hidden = paused;
-    sw.textContent = f.phase === 'focus' ? 'Break' : 'Focus';
+    // the switch under the count: the segment of the phase we are in is lit (a break of either length is Break)
+    for (const b of item.querySelectorAll('.bcv-island__segbtn')) { const on = b.dataset.phase === 'focus' ? f.phase === 'focus' : f.phase !== 'focus'; b.classList.toggle('is-on', on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); }
     btn.title = `Focus timer: ${mmss(left)} left${paused ? ', paused' : ''}`;
     btn.setAttribute('aria-label', btn.title);
     // a phase that began by itself (or on a press elsewhere): the island opens to say so, briefly
@@ -428,27 +427,38 @@
     );
     return glyph;
   }
-  /** The island's body, shown once the pin has swelled: End and Pause, the phase and its switch, the count. */
+  const EXPAND = 'M14 4h6v6M20 4l-7 7M10 20H4v-6M4 20l7-7'; // two arrows out of the corners: opens the timer itself, larger
+  /** The island's body, shown once the pin has swelled: End and Pause; on the right the phase with
+   *  an Open button beside it, the count large, and under the count the Focus | Break switch. */
   function islandBody(item) {
+    const openBtn = h('button', { type: 'button', class: 'bcv-island__open', title: 'Open the timer', onclick: (e) => { e.stopPropagation(); open('pomo', { from: item, over: true }); } }, [U.svg(EXPAND, { size: 10, stroke: 'currentColor', width: 2.6 }), h('span', { text: 'Open' })]);
+    const segBtn = (phase, text, title) => h('button', { type: 'button', class: 'bcv-island__segbtn', dataset: { phase }, text, title, 'aria-pressed': 'false', onclick: (e) => { e.stopPropagation(); islandSwitch(item, phase); } });
     return U.el('bcv-island__body', [
       U.el('bcv-island__btns', [
         h('button', { type: 'button', class: 'bcv-island__btn bcv-island__cancel', title: 'End the session', 'aria-label': 'End', onclick: (e) => { e.stopPropagation(); focusReset(); } }, U.svg(IC.close, { size: 16, stroke: 'currentColor', width: 2.4 })),
         h('button', { type: 'button', class: 'bcv-island__btn bcv-island__main', onclick: (e) => { e.stopPropagation(); islandOpen(item); if (running()) focusPause(); else focusStart(); } }),
       ]),
       U.el('bcv-island__right', [
-        U.el('bcv-island__meta', [
-          U.text('bcv-island__label', '', 'span'),
-          h('button', { type: 'button', class: 'bcv-island__switch', hidden: true, onclick: (e) => { e.stopPropagation(); islandOpen(item); focusPhase(nextPhase(focus), { keepRunning: true }); } }),
-        ]),
+        U.el('bcv-island__meta', [U.text('bcv-island__label', '', 'span'), openBtn]),
         U.text('bcv-island__time', '', 'span'),
+        h('div', { class: 'bcv-island__seg', role: 'group', 'aria-label': 'Phase' }, [segBtn('focus', 'Focus', 'Switch to a focus block'), segBtn('break', 'Break', 'Switch to a break')]),
       ]),
     ]);
   }
+  /** The switch: the other phase at once — still going if it was going, or waiting with its full
+   *  time, still paused, if it was paused. The break is the one the cycle is at (a long one every
+   *  fourth block); a press on the segment already lit does nothing. */
+  function islandSwitch(item, want) {
+    const p = want === 'focus' ? 'focus' : focus.phase === 'focus' ? nextPhase(focus) : focus.phase;
+    if (p === focus.phase) return;
+    islandOpen(item);
+    if (running()) focusPhase(p, { keepRunning: true }); else focusWrite({ phase: p, left: phaseLen(focus, p), endAt: null, ended: null });
+  }
   /** The pinned timer's island while nothing is going: the strip and Start alone — set, and go. A
-   *  press on the minutes opens the timer itself. */
+   *  press on the minutes (an arrow after them says so) opens the timer itself. */
   function islandSetter(item) {
     const scale = scaleEl('bcv-island__scale');
-    const mins = h('button', { type: 'button', class: 'bcv-island__mins', title: 'Open the timer', onclick: (e) => { e.stopPropagation(); open('pomo', { from: item, over: true }); } });
+    const mins = h('button', { type: 'button', class: 'bcv-island__mins', title: 'Open the timer', onclick: (e) => { e.stopPropagation(); open('pomo', { from: item, over: true }); } }, [h('span', { class: 'bcv-island__minstext' }), U.svg(EXPAND, { size: 9, stroke: 'currentColor', width: 2.6 })]);
     const go = h('button', { type: 'button', class: 'bcv-island__btn bcv-island__go', title: 'Start', 'aria-label': 'Start', onclick: (e) => { e.stopPropagation(); focusStart(); islandOpen(item, 5000); } }, U.svg(IC.play, { size: 18, stroke: 'currentColor', width: 2.4 }));
     scaleHands(scale, { idle: () => !focusOn(), mins: () => Math.round(phaseLen(focus) / 60), set: (v, persist) => {
       const m = { ...focus.mins, [focus.phase]: v };
@@ -465,7 +475,7 @@
     paintScale(scale, scaleMax(f.phase), m);
     scale.setAttribute('aria-valuenow', String(m));
     scale.setAttribute('aria-valuetext', U.plural(m, 'minute'));
-    item.querySelector('.bcv-island__mins').textContent = `${m} min`;
+    item.querySelector('.bcv-island__minstext').textContent = `${m} min`;
   }
   function islandSet(item, focusKb = false) {
     item.classList.add('is-set');
@@ -704,7 +714,11 @@
   let pins = [];
   let pinsRead = false;
   /** A pinned tool's body is fetched ahead: its capsule under the pointer draws from it. */
-  const preloadPinned = () => { for (const k of pins) { const mod = BCV.lazy?.toolModule?.(k); if (mod && !BCV.lazy.has(mod)) BCV.lazy.load(mod).catch(() => {}); } };
+  const preloadPinned = () => {
+    for (const k of pins) { const mod = BCV.lazy?.toolModule?.(k); if (mod && !BCV.lazy.has(mod)) BCV.lazy.load(mod).catch(() => {}); }
+    // the calculator's pin typesets its display: KaTeX is put on the page once the page has settled, not on the first hover (a script parsed while the panel swells is a frame dropped)
+    if (pins.includes('calc')) setTimeout(() => { if (!self.katex?.render) vendor('katex').catch(() => {}); }, 2500);
+  };
   async function pinsLoad() {
     const [raw, custom] = await Promise.all([load(PINS_KEY, []), load('widgets:custom', [])]);
     // widgets of your own (content/app/tools/widgets.js) are tools too: listed before the pins are read, so a pinned one is found
@@ -768,7 +782,7 @@
       if (!item.classList.contains('is-open')) return;
       item.classList.remove('is-open');
       item.classList.add('is-folding'); // (no X on the way down: it belongs to the pin)
-      setTimeout(() => item.classList.remove('is-folding'), 480);
+      setTimeout(() => item.classList.remove('is-folding'), 520); // (the island spring's half second, and a little)
       item.setAttribute('aria-expanded', 'false');
       panel?.onFold?.();
     };
@@ -780,7 +794,7 @@
       item.querySelector(':focus')?.blur();
       item.classList.remove('is-open');
       item.classList.add('is-folding');
-      setTimeout(() => item.classList.remove('is-folding'), 480);
+      setTimeout(() => item.classList.remove('is-folding'), 520); // (the island spring's half second, and a little)
       item.setAttribute('aria-expanded', 'false');
       panel?.onFold?.();
     };
@@ -1148,10 +1162,12 @@
     }
     root.append(head, display, U.el('bcv-calc__keys', rows));
     paint();
-    // KaTeX, packaged with the extension, is put on the page as the calculator is built — the pin's
-    // first hover, the tool opening — and the display is drawn again the moment it lands; until
-    // then, and wherever it cannot load, the line stands as typed.
-    vendor('katex').then(() => paint()).catch(() => { /* the line stands as typed */ });
+    // KaTeX, packaged with the extension, is put on the page for the calculator — ahead, once the
+    // page has settled, where its pin is in the tray (preloadPinned); otherwise once the panel or
+    // popup has finished swelling, never during it — and the display is drawn again the moment it
+    // lands; until then, and wherever it cannot load, the line stands as typed.
+    const typeset = () => vendor('katex').then(() => paint()).catch(() => { /* the line stands as typed */ });
+    if (self.katex?.render && typeof self.BCV_KATEX_CSS === 'string') typeset(); else setTimeout(typeset, 560);
     return { els: [root], eng, paint };
   }
   /** The graphing calculator's pin: a small Desmos, portrait, loaded on the first hover and kept —

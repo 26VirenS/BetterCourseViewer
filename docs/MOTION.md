@@ -16,6 +16,7 @@ critically- and over-damped cases), so a motion is physics and not an eased gues
 | settle | rows and blocks arriving, staggered | ~350 ms | none |
 | scrim | opacity only | ~400 ms | none |
 | phone | push and pop, the bottom sheet | ~390 ms | none |
+| island | the timer's island and every pin capsule or panel swelling under the pointer | ~500 ms | none |
 
 (2.98.4 slowed each preset by about a fifth and softened the turn: smoother over speed. The
 curves are sampled every ~5 ms for CSS — up to 192 stops — and every 4 ms for script keyframes,
@@ -56,7 +57,11 @@ The engine has no view of the page beyond two things it is asked for:
   side it chose; the account and appearance menus grow up out of their row.
 - Toasts rise from the bottom on the snappy spring and sit centred (`translate: -50% 0` keeps the
   centring under the entrance's transform).
-- Pins, islands, the quick menus, hover lifts and presses transition on the snappy spring.
+- Hover lifts and presses transition on the snappy spring. The timer's island and every pin capsule
+  or panel swell on the island spring — the same half second for all of them — with their contents
+  arriving on snappy once the box is most of the way there. Their big shadow is a layer of its own
+  under the pin, hidden until the box stands still (a shadow redrawn on every frame of a resize is
+  what dropped frames), then faded in.
 - Two entrances 2.96 had written with two easings in one shorthand (the quick nav, the search panel)
   — invalid, so they never played — now play.
 
