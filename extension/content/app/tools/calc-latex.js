@@ -96,14 +96,18 @@
   }
   /** The line as LaTeX; null where it cannot be read. */
   const latex = (src) => { const n = ast(src); return n ? emit(n) : null; };
-  /** A worked-out number as LaTeX: plain digits, a very large or small one as a × 10 to a power (the display's own cut-offs). */
+  /** A worked-out number as LaTeX: digits grouped in thousands the way the display groups them (the
+   *  comma braced, so TeX sets no space after it), a very large or small one as a × 10 to a power
+   *  (the display's own cut-offs). */
   function numTex(v) {
     if (!Number.isFinite(v)) return '\\text{Error}';
     if (Object.is(v, -0)) v = 0;
     const abs = Math.abs(v);
     const s = abs >= 1e15 || (abs > 0 && abs < 1e-9) ? v.toExponential(8).replace(/\.?0+e/, 'e') : String(Number(v.toPrecision(12)));
     const m = /^(-?[\d.]+)e([+-]?)(\d+)$/.exec(s);
-    return m ? `${m[1]} \\times 10^{${m[2] === '-' ? '-' : ''}${m[3]}}` : s;
+    if (m) return `${m[1]} \\times 10^{${m[2] === '-' ? '-' : ''}${m[3]}}`;
+    const g = /^(-?)(\d*)(.*)$/.exec(s);
+    return `${g[1]}${g[2].replace(/\B(?=(\d{3})+(?!\d))/g, '{,}')}${g[3]}`;
   }
   BCV.calcTex = { tokens, ast, latex, numTex };
 })();

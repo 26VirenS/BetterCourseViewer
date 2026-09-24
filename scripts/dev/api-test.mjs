@@ -317,7 +317,7 @@ check(hub.COMMANDS.every((c) => (c.label || c.hint).length <= 32) && hub.byName(
 
 // ---- the calculator's line as LaTeX (content/app/tools/calc-latex.js) ----------------------------
 // Pure: the line the calculator shows, read with its own grammar into a tree and written out as
-// LaTeX — what the calculator tool typesets under its display and copies.
+// LaTeX — what the calculator's display typesets (in the tool and in the pin's panel) and copies.
 console.log('calculator LaTeX');
 const texSelf = {};
 new Function('self', readFileSync(join(root, 'extension', 'content', 'app', 'tools', 'calc-latex.js'), 'utf8'))(texSelf);
@@ -355,7 +355,7 @@ texIs('2×(3+', '2 \\times \\left(3 + \\square\\right)', 'a bracket left open is
 texIs('.5', '0.5', 'a leading point gets its zero');
 texIs('2.', '2', 'a trailing point goes');
 check(TX.latex('2E') === null && TX.latex('') !== null, 'a line that cannot be read yet (an exponent with no digits) is null, an empty line is not');
-check(TX.numTex(42) === '42' && TX.numTex(-0.5) === '-0.5' && TX.numTex(1.2e15) === '1.2 \\times 10^{15}' && TX.numTex(2e-12) === '2 \\times 10^{-12}' && TX.numTex(1 / 3) === '0.333333333333' && TX.numTex(NaN) === '\\text{Error}', `a result as LaTeX: plain digits, the display's own cut-offs as a × 10 to a power: ${[42, -0.5, 1.2e15, 2e-12, 1 / 3].map(TX.numTex).join(' | ')}`);
+check(TX.numTex(42) === '42' && TX.numTex(-0.5) === '-0.5' && TX.numTex(1e9) === '1{,}000{,}000{,}000' && TX.numTex(-1234.5) === '-1{,}234.5' && TX.numTex(1.2e15) === '1.2 \\times 10^{15}' && TX.numTex(2e-12) === '2 \\times 10^{-12}' && TX.numTex(1 / 3) === '0.333333333333' && TX.numTex(NaN) === '\\text{Error}', `a result as LaTeX: digits grouped in thousands as the display groups them, the display's own cut-offs as a × 10 to a power: ${[42, -0.5, 1e9, -1234.5, 1.2e15, 2e-12, 1 / 3].map(TX.numTex).join(' | ')}`);
 
 console.log(fails ? `\n${fails} check(s) failed` : '\nAll checks passed.');
 process.exit(fails ? 1 : 0);

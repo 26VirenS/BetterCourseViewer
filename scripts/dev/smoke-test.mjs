@@ -4431,26 +4431,32 @@ try {
   // the calculator: a tool of its own, the same scientific calculator larger, the keyboard on it
   await openTool('calc');
   await page.waitForFunction(() => { const t = document.querySelector('.bcv-tool[data-tool="calc"]'); return !!t && getComputedStyle(t).transform === 'none' && t.getAnimations({ subtree: true }).every((a) => a.playState !== 'running'); }, null, { timeout: 5000 }); // (the popup grows in from the card on a spring: measured once it is at rest)
-  check((await toolSub()) === 'Scientific · the keyboard works too' && (await page.$$('.bcv-tool[data-tool="calc"] .bcv-calc__key')).length === 49 && (await page.$eval('.bcv-tool[data-tool="calc"] .bcv-calc', (e) => e.classList.contains('bcv-calc--big') && document.activeElement === e)) && (await texts('.bcv-tool[data-tool="calc"] .bcv-calc__display'))[0] === '0', 'the calculator is a tool of its own: the scientific keys, larger, with the focus on them');
+  const calcLine = (sel) => page.$eval(`.bcv-tool[data-tool="calc"] ${sel}`, (e) => e.dataset.line); // (the line as text: the display itself is typeset)
+  check((await toolSub()) === 'Scientific · the keyboard works too' && (await page.$$('.bcv-tool[data-tool="calc"] .bcv-calc__key')).length === 49 && (await page.$eval('.bcv-tool[data-tool="calc"] .bcv-calc', (e) => e.classList.contains('bcv-calc--big') && document.activeElement === e)) && (await calcLine('.bcv-calc__expr')) === '0', 'the calculator is a tool of its own: the scientific keys, larger, with the focus on them');
   await page.keyboard.type('7*6');
   await page.keyboard.press('Enter');
-  const calcTyped = { expr: (await texts('.bcv-tool[data-tool="calc"] .bcv-calc__expr'))[0], sub: (await texts('.bcv-tool[data-tool="calc"] .bcv-calc__sub'))[0], key: await page.$eval('.bcv-tool[data-tool="calc"] .bcv-calc__key[data-key="7"]', (e) => Math.round(e.getBoundingClientRect().height)), width: await page.$eval('.bcv-tool[data-tool="calc"]', (e) => Math.round(e.getBoundingClientRect().width)), active: await page.evaluate(() => document.activeElement?.className || document.activeElement?.tagName) };
+  const calcTyped = { expr: await calcLine('.bcv-calc__expr'), sub: await calcLine('.bcv-calc__sub'), key: await page.$eval('.bcv-tool[data-tool="calc"] .bcv-calc__key[data-key="7"]', (e) => Math.round(e.getBoundingClientRect().height)), width: await page.$eval('.bcv-tool[data-tool="calc"]', (e) => Math.round(e.getBoundingClientRect().width)), active: await page.evaluate(() => document.activeElement?.className || document.activeElement?.tagName) };
   check(calcTyped.expr === '42' && calcTyped.sub === '7×6 =' && calcTyped.key === 54 && calcTyped.width === 720, `typed on the keyboard, 7 × 6 Enter shows 42, on keys 54 tall in a popup 720 wide: ${JSON.stringify(calcTyped)}`);
-  // the sum as an equation under the keys: typeset by KaTeX (vendored, put on the page when the tool opened, its fonts the extension's own files), the LaTeX itself on LaTeX, copied by Copy
-  await page.waitForFunction(() => !!document.querySelector('.bcv-calc__texview .katex'), null, { timeout: 15000 });
-  const texRead = () => page.evaluate(async () => { const strip = document.querySelector('.bcv-calc__tex'); const view = strip.querySelector('.bcv-calc__texview'); let fonts = 0; try { fonts = (await document.fonts.load('16px KaTeX_Main')).length; } catch { fonts = -1; } return { latex: strip.dataset.latex, katex: !!view.querySelector('.katex'), text: view.textContent.replace(/\s+/g, ' ').trim(), src: view.classList.contains('is-src'), fonts, fontUrl: [...document.styleSheets].some((s) => { try { return [...s.cssRules].some((r) => r.cssText.includes('KaTeX_Main') && /extension:\/\//.test(r.cssText)); } catch { return false; } }), inside: view.getBoundingClientRect().right <= document.querySelector('.bcv-tool[data-tool="calc"]').getBoundingClientRect().right }; });
+  // the display is the equation itself: both of its lines typeset by KaTeX (vendored, put on the page as the tool opened, its fonts the extension's own files), the text kept in data-line; no strip under the keys; the LaTeX button in the head copies the whole sum
+  await page.waitForFunction(() => !!document.querySelector('.bcv-tool[data-tool="calc"] .bcv-calc__expr .katex'), null, { timeout: 15000 });
+  const texRead = () => page.evaluate(async () => {
+    const root = document.querySelector('.bcv-tool[data-tool="calc"] .bcv-calc');
+    const display = root.querySelector('.bcv-calc__display');
+    const line = root.querySelector('.bcv-calc__expr');
+    const sub = root.querySelector('.bcv-calc__sub');
+    let fonts = 0;
+    try { fonts = (await document.fonts.load('16px KaTeX_Main')).length; } catch { fonts = -1; }
+    const d = display.getBoundingClientRect();
+    return { latex: root.dataset.latex, line: line.dataset.line, sub: sub.dataset.line, katex: !!line.querySelector('.katex'), subKatex: !!sub.querySelector('.katex'), frac: !!line.querySelector('.katex .mfrac'), sqrt: !!line.querySelector('.katex .sqrt'), strip: !!document.querySelector('.bcv-calc__tex'), fonts, fontUrl: [...document.styleSheets].some((s) => { try { return [...s.cssRules].some((r) => r.cssText.includes('KaTeX_Main') && /extension:\/\//.test(r.cssText)); } catch { return false; } }), fits: sub.getBoundingClientRect().top >= d.top - 0.5 && line.getBoundingClientRect().bottom <= d.bottom + 0.5 && line.scrollWidth <= line.clientWidth + 1, size: parseFloat(getComputedStyle(line).fontSize), button: root.querySelector('.bcv-calc__head .bcv-calc__copytex')?.textContent || '' };
+  });
   const tex1 = await texRead();
-  check(tex1.latex === '7 \\times 6 = 42' && tex1.katex && !tex1.src && tex1.fonts > 0 && tex1.fontUrl && tex1.inside, `the sum is typeset as an equation under the keys — KaTeX, loaded when the tool opened, its fonts from the extension's own files: ${JSON.stringify(tex1)}`);
-  await page.click('.bcv-calc__tex .bcv-calc__texbtn:first-of-type');
-  const tex2 = await texRead();
-  check(tex2.src && tex2.text === '7 \\times 6 = 42' && (await page.$eval('.bcv-calc__tex .bcv-calc__texbtn:first-of-type', (b) => b.getAttribute('aria-pressed'))) === 'true', `LaTeX shows the source itself: ${tex2.text}`);
-  await page.click('.bcv-calc__tex .bcv-calc__texbtn:first-of-type');
-  await page.click('.bcv-calc__tex .bcv-calc__texbtn:last-of-type');
-  check(await eventually(async () => (await texts('.bcv-toast')).some((t) => /LaTeX copied/.test(t)), 3000) && (await texRead()).katex, 'Copy puts the LaTeX on the clipboard and says so, the equation still typeset');
-  // a richer sum by the keys — √(16) ÷ 2 — typesets as a fraction over a root, its result after it
+  check(tex1.latex === '7 \\times 6 = 42' && tex1.line === '42' && tex1.sub === '7×6 =' && tex1.katex && tex1.subKatex && !tex1.strip && tex1.fonts > 0 && tex1.fontUrl && tex1.fits && tex1.button === 'LaTeX', `the display is the equation itself: 42 typeset on the line, 7 × 6 = small above it — KaTeX, loaded as the tool opened, its fonts from the extension's own files, no strip under the keys, a LaTeX button in the head: ${JSON.stringify(tex1)}`);
+  await page.click('.bcv-tool[data-tool="calc"] .bcv-calc__copytex');
+  check(await eventually(async () => (await texts('.bcv-toast')).some((t) => /LaTeX copied/.test(t)), 3000) && (await page.evaluate(() => document.activeElement?.classList.contains('bcv-calc'))) && (await texRead()).katex, 'the LaTeX button puts the whole sum on the clipboard and says so, the focus back on the keys, the display still typeset');
+  // a richer sum by the keys — √(16) ÷ 2 — is a fraction over a root on the line itself, its result small above it, at full size: the display is tall enough for a fraction
   for (const k of ['ac', 'sqrt', '1', '6', ')', '/', '2']) await page.click(`.bcv-tool[data-tool="calc"] .bcv-calc__key[data-key="${k}"]`);
   const tex3 = await texRead();
-  check(tex3.latex === '\\frac{\\sqrt{16}}{2} = 2' && tex3.katex && (await texts('.bcv-tool[data-tool="calc"] .bcv-calc__sub'))[0] === '= 2', `√(16) ÷ 2 typesets as a fraction over a root with its result: ${tex3.latex}`);
+  check(tex3.latex === '\\frac{\\sqrt{16}}{2} = 2' && tex3.line === '√(16)÷2' && tex3.frac && tex3.sqrt && tex3.sub === '= 2' && tex3.subKatex && tex3.fits && tex3.size === 50, `√(16) ÷ 2 is a fraction over a root on the line, = 2 above it, at full size in the display: ${JSON.stringify(tex3)}`);
   await shot(page, '19b-calculator-tool');
   await closeTool();
   // the periodic table: every element in place, a card for the one pressed, search, legend, arrow keys
@@ -5109,13 +5115,16 @@ try {
   await page.waitForTimeout(600);
   const q2 = await quickOpen('calc', 282);
   const calcKey = async (k) => { await page.click(`.bcv-calc__key[data-key="${k}"]`); };
-  const calcShown = () => texts('.bcv-calc__expr').then((t) => t[0]);
-  const calcSub = () => texts('.bcv-calc__sub').then((t) => t[0]);
+  const calcShown = () => page.$eval('.bcv-calc__expr', (e) => e.dataset.line); // (the line as text: the display itself is typeset)
+  const calcSub = () => page.$eval('.bcv-calc__sub', (e) => e.dataset.line);
+  const calcTex = () => page.$eval('.bcv-calc', (root) => { const display = root.querySelector('.bcv-calc__display'); const line = root.querySelector('.bcv-calc__expr'); const sub = root.querySelector('.bcv-calc__sub'); const d = display.getBoundingClientRect(); return { latex: root.dataset.latex, katex: !!line.querySelector('.katex'), subKatex: !!sub.querySelector('.katex'), frac: !!line.querySelector('.katex .mfrac'), fits: sub.getBoundingClientRect().top >= d.top - 0.5 && line.getBoundingClientRect().bottom <= d.bottom + 0.5 && line.scrollWidth <= line.clientWidth + 1, size: parseFloat(getComputedStyle(line).fontSize), button: !!root.querySelector('.bcv-calc__head .bcv-calc__copytex') }; });
   check(q2.w === 408 && q2.h === 282 && q2.radius === '26px' && q2.name === 'Calculator' && q2.btnGone && (await page.$$('.bcv-calc__key')).length === 49 && (await calcShown()) === '0' && (await page.$$eval('.bcv-calc__row:first-child .bcv-calc__key', (els) => els.map((e) => e.textContent))).join(' ') === '( ) mc m+ m− mr AC +/− % ÷' && (await page.$eval('.bcv-calc__key[data-key="/"]', (e) => getComputedStyle(e).backgroundColor)) === 'rgb(255, 159, 10)' && (await page.$eval('.bcv-calc__key[data-key="7"]', (e) => getComputedStyle(e).backgroundColor)) === 'rgb(92, 92, 95)' && (await page.$eval('.bcv-calc__key[data-key="ac"]', (e) => getComputedStyle(e).backgroundColor)) === 'rgb(165, 165, 165)', `the calculator pin opens into a panel: the whole scientific calculator, Apple's keys in Apple's colours, 49 of them under a display (${JSON.stringify(q2)})`);
+  // the panel's display is typeset too: KaTeX lands on the pin's first hover and the line is the equation itself, with the LaTeX button in its head
+  await page.waitForFunction(() => !!document.querySelector('.bcv-calc__expr .katex'), null, { timeout: 15000 });
   for (const k of ['2', '+', '3', '*', '4']) await calcKey(k);
-  const calcLive = { line: await calcShown(), sub: await calcSub() };
+  const calcLive = { line: await calcShown(), sub: await calcSub(), ...(await calcTex()) };
   await calcKey('=');
-  check(calcLive.line === '2+3×4' && calcLive.sub === '= 14' && (await calcShown()) === '14' && (await calcSub()) === '2+3×4 =', `algebraic: the whole sum stays on the line as it is typed, worked out underneath (${calcLive.line} · ${calcLive.sub}); = makes the result the line, the sum kept small above it (${await calcSub()})`);
+  check(calcLive.line === '2+3×4' && calcLive.sub === '= 14' && calcLive.latex === '2 + 3 \\times 4 = 14' && calcLive.katex && calcLive.subKatex && calcLive.fits && calcLive.size === 27 && calcLive.button && (await calcShown()) === '14' && (await calcSub()) === '2+3×4 =' && (await calcTex()).subKatex, `algebraic, and typeset in the panel too: the whole sum stays on the line as it is typed, worked out underneath (${calcLive.line} · ${calcLive.sub} · ${calcLive.latex}); = makes the result the line, the sum kept small above it (${await calcSub()})`);
   await calcKey('ac'); for (const k of ['(', '2', '+', '3', ')', 'x2']) await calcKey(k);
   const calcSq = { line: await calcShown(), sub: await calcSub() };
   await calcKey('=');
@@ -5137,9 +5146,10 @@ try {
   await calcKey('ac'); for (const k of ['8', '/']) await calcKey(k);
   const calcHalf = { line: await calcShown(), sub: await calcSub() };
   await calcKey('2');
-  const calcWhole = { line: await calcShown(), sub: await calcSub() };
+  const calcWhole = { line: await calcShown(), sub: await calcSub(), ...(await calcTex()) };
+  await shot(page, '45b-calculator-panel-typeset'); // (the panel with a fraction on its line)
   for (const k of ['+', '2', 'pi', '=']) await calcKey(k);
-  check(calcHalf.line === '8÷' && calcHalf.sub === '' && calcWhole.line === '8÷2' && calcWhole.sub === '= 4' && /^10\.2831853/.test(await calcShown()), `a sum still wanting a number says nothing underneath (${calcHalf.line}); the result appears as the number lands (${calcWhole.line} ${calcWhole.sub}); 2π multiplies side by side (${await calcShown()})`);
+  check(calcHalf.line === '8÷' && calcHalf.sub === '' && calcWhole.line === '8÷2' && calcWhole.sub === '= 4' && calcWhole.frac && calcWhole.fits && /^10\.2831853/.test(await calcShown()), `a sum still wanting a number says nothing underneath (${calcHalf.line}); the result appears as the number lands (${calcWhole.line} ${calcWhole.sub}), the division a fraction on the panel's line, shrunk only as far as its display needs (${calcWhole.size}px); 2π multiplies side by side (${await calcShown()})`);
   await calcKey('ac'); for (const k of ['2', '+', '3']) await calcKey(k);
   await page.focus('.bcv-calc'); await page.keyboard.press('Backspace'); await page.keyboard.press('Backspace');
   await calcKey('sin'); await page.focus('.bcv-calc'); await page.keyboard.press('Backspace');

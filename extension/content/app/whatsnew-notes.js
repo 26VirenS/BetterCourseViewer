@@ -25,6 +25,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.98.8', date: '2026-09-24', notes: [
+      { kind: 'improved', title: 'The display, typeset', body: 'The line is the equation itself, in the pin’s panel too.', icon: P.pen },
+    ] },
     { version: '2.98.7', date: '2026-09-24', notes: [
       { kind: 'new', title: 'LaTeX in calculator', body: 'Every sum typeset as an equation, its LaTeX a press away.', icon: P.pen },
     ] },

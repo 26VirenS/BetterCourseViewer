@@ -12,9 +12,10 @@ pdf.worker.min.js      — pdf.js 3.11.174, Apache-2.0     — (loaded beside pd
                          the main thread: a content script cannot start a worker from the extension)
 pdf-lib.min.js         — pdf-lib 1.17.1, MIT             — https://github.com/Hopding/pdf-lib
 katex/                 — KaTeX 0.16.11, MIT              — https://github.com/KaTeX/KaTeX (the calculator's
-                         typeset sums: katex.min.js, its stylesheet as a string in katex-css.js with the
-                         woff2 fonts alone under fonts/, pointed at the extension's own copies when put
-                         on the page; injected when the calculator tool opens)
+                         display, typeset: katex.min.js, its stylesheet as a string in katex-css.js with
+                         the woff2 fonts alone under fonts/, pointed at the extension's own copies when
+                         put on the page; injected as the calculator is built — the tool opening, the
+                         pin's first hover)
                          (merging and splitting PDFs page for page, and writing highlight and note
                          annotations into a marked-up copy)
 paddleocr/             — the Image to text engine: PaddleOCR's PP-OCRv6 models run by ONNX Runtime

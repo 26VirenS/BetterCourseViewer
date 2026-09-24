@@ -690,41 +690,10 @@
    *  (content/app/tools/calc-latex.js), the result after it; LaTeX shows the source, Copy copies it. */
   function openCalc(app, { from = null } = {}) {
     const tool = toolOf('calc');
-    const T = BCV.calcTex;
-    const view = h('div', { class: 'bcv-calc__texview', 'aria-label': 'The sum as an equation' });
-    const srcBtn = h('button', { type: 'button', class: 'bcv-calc__texbtn', text: 'LaTeX', title: 'Show the LaTeX itself', 'aria-pressed': 'false' });
-    const copyBtn = h('button', { type: 'button', class: 'bcv-calc__texbtn', text: 'Copy', title: 'Copy the LaTeX' });
-    const strip = h('div', { class: 'bcv-calc__tex', dataset: { latex: '' } }, [view, srcBtn, copyBtn]);
-    let showSrc = false;
-    // the line as LaTeX: a result with the sum it came from before it; otherwise the line as it stands, and its result so far after it
-    const texOf = (eng) => {
-      const st = eng.st;
-      if (!T) return null;
-      if (!st.expr) return '0';
-      if (st.fresh) { const sum = T.latex(st.sub.replace(/\s*=\s*$/, '')); const v = T.numTex(Number(st.expr.replace(/−/g, '-').replace(/E/g, 'e'))); return sum ? `${sum} = ${v}` : v; }
-      const line = T.latex(st.expr);
-      if (line === null) return null;
-      const r = calcEval(st.expr, st.deg);
-      return r.state === 'ok' ? `${line} = ${T.numTex(r.value)}` : line;
-    };
-    const paintTex = (eng) => {
-      const tex = texOf(eng);
-      strip.dataset.latex = tex || '';
-      const raw = showSrc || !self.katex?.render;
-      view.classList.toggle('is-src', raw || tex === null);
-      if (tex === null) { view.textContent = eng.st.expr; return; }
-      if (raw) { view.textContent = tex; return; }
-      try { self.katex.render(tex, view, { throwOnError: false, displayMode: false, strict: 'ignore' }); } catch { view.textContent = tex; view.classList.add('is-src'); }
-      view.scrollLeft = view.scrollWidth;
-    };
-    const built = quickCalc({ popup: true, onPaint: paintTex });
-    srcBtn.addEventListener('click', () => { showSrc = !showSrc; srcBtn.classList.toggle('is-on', showSrc); srcBtn.setAttribute('aria-pressed', showSrc ? 'true' : 'false'); paintTex(built.eng); built.els[0].focus({ preventScroll: true }); });
-    copyBtn.addEventListener('click', () => { copyText(strip.dataset.latex); U.toast('LaTeX copied.'); built.els[0].focus({ preventScroll: true }); });
-    const body = U.el('bcv-calc-tool', [...built.els, strip]);
+    const built = quickCalc({ popup: true });
+    const body = U.el('bcv-calc-tool', built.els);
     const p = popup({ tool, title: 'Calculator', sub: 'Scientific · the keyboard works too', width: 720, cls: 'bcv-tool--calc', body, from });
     setTimeout(() => { if (p.alive()) built.els[0].focus({ preventScroll: true }); }, 60);
-    paintTex(built.eng);
-    vendor('katex').then(() => { if (p.alive()) paintTex(built.eng); }).catch(() => { /* the LaTeX stands as text */ });
     return p;
   }
 
@@ -1092,14 +1061,17 @@
   }
   /** The calculator pin's panel: the display over the keys, the way the Calculator app lays them out.
    *  (The calculator tool's popup is the same, larger: `popup`.) */
-  function quickCalc({ go = null, popup: big = false, onPaint = null } = {}) {
+  function quickCalc({ go = null, popup: big = false } = {}) {
     const eng = calcEngine();
-    const root = h('div', { class: `bcv-calc${big ? ' bcv-calc--big' : ''}`, tabindex: '0', role: 'application', 'aria-label': 'Scientific calculator' });
-    const sub = h('div', { class: 'bcv-calc__sub', 'aria-live': 'polite' });
-    const line = h('div', { class: 'bcv-calc__expr', 'aria-live': 'polite' });
+    const T = BCV.calcTex; // the line as LaTeX (content/app/tools/calc-latex.js)
+    const root = h('div', { class: `bcv-calc${big ? ' bcv-calc--big' : ''}`, tabindex: '0', role: 'application', 'aria-label': 'Scientific calculator', dataset: { latex: '' } });
+    const sub = h('div', { class: 'bcv-calc__sub', 'aria-live': 'polite', dataset: { line: '' } });
+    const line = h('div', { class: 'bcv-calc__expr', 'aria-live': 'polite', dataset: { line: '' } });
     const display = U.el('bcv-calc__display', [sub, line]);
     const mode = h('span', { class: 'bcv-calc__mode', text: '' });
-    const head = U.el('bcv-calc__head', [go ? quickName('Calculator', go, 'Open the calculator, larger') : U.text('bcv-calc__title', 'Scientific', 'span'), mode, U.text('bcv-calc__mem', '', 'span')]);
+    const copyTex = h('button', { type: 'button', class: 'bcv-calc__copytex', text: 'LaTeX', title: 'Copy the sum as LaTeX', 'aria-label': 'Copy the sum as LaTeX' });
+    copyTex.addEventListener('click', () => { copyText(root.dataset.latex || ''); U.toast('LaTeX copied.'); root.focus({ preventScroll: true }); });
+    const head = U.el('bcv-calc__head', [go ? quickName('Calculator', go, 'Open the calculator, larger') : U.text('bcv-calc__title', 'Scientific', 'span'), mode, U.text('bcv-calc__mem', '', 'span'), copyTex]);
     const keys = [];
     const rows = CALC_ROWS.map((row) => U.el('bcv-calc__row', row.map(([key, label, cls = 'fn']) => {
       const b = h('button', { type: 'button', class: `bcv-calc__key bcv-calc__key--${cls.split(' ')[0]} ${cls.includes('wide') ? 'bcv-calc__key--wide' : ''}`, dataset: { key, base: key }, html: label, title: CALC_TITLES[key] || label });
@@ -1117,14 +1089,53 @@
       eng.press(k);
       paint();
     });
+    /** The display's two lines as LaTeX — the line as typed (a result as its number) and, small
+     *  above it, the result so far or the sum a result came from — and the whole as one equation
+     *  for the LaTeX button. A line the translator cannot read is null: it shows as typed. */
+    const tex = () => {
+      const st = eng.st;
+      if (!T) return { line: null, sub: null, whole: st.expr };
+      if (!st.expr) return { line: '0', sub: null, whole: '0' };
+      if (st.fresh) {
+        const sum = T.latex(st.sub.replace(/\s*=\s*$/, ''));
+        const v = T.numTex(Number(st.expr.replace(/−/g, '-').replace(/E/g, 'e')));
+        return { line: v, sub: sum === null ? null : `${sum} =`, whole: sum === null ? v : `${sum} = ${v}` };
+      }
+      const l = T.latex(st.expr);
+      if (l === null) return { line: null, sub: null, whole: st.expr };
+      const r = calcEval(st.expr, st.deg);
+      const v = r.state === 'ok' ? T.numTex(r.value) : null;
+      return { line: l, sub: v === null ? null : `= ${v}`, whole: v === null ? l : `${l} = ${v}` };
+    };
+    /** One line put on the page: typeset by KaTeX where it has landed and the line reads as a sum,
+     *  the text itself otherwise (and always in data-line, for a reader of the DOM). */
+    const put = (el, text, latex) => {
+      el.dataset.line = text;
+      if (latex !== null && self.katex?.render) {
+        try { self.katex.render(latex, el, { throwOnError: false, displayMode: false, strict: 'ignore' }); el.classList.add('is-tex'); return; } catch { /* as text, below */ }
+      }
+      el.classList.remove('is-tex');
+      el.textContent = text;
+    };
+    /** The line shrinks in two steps to fit the display — sideways, and upwards: a fraction stands
+     *  taller than a line of digits — and past that keeps its end in view. Measured, not counted:
+     *  a typeset line's width is not its characters'. */
+    const fit = () => {
+      line.classList.remove('is-long', 'is-longer');
+      const top = display.getBoundingClientRect().top;
+      const over = () => line.scrollWidth > line.clientWidth + 1 || sub.getBoundingClientRect().top < top - 0.5;
+      if (over()) line.classList.add('is-long');
+      if (over()) line.classList.add('is-longer');
+      line.scrollLeft = line.scrollWidth;
+      sub.scrollLeft = sub.scrollWidth;
+    };
     function paint() {
       const s = eng.shown();
-      line.textContent = s.line;
-      sub.textContent = s.sub;
-      line.classList.toggle('is-long', s.line.length > 13);
-      line.classList.toggle('is-longer', s.line.length > 18);
-      line.scrollLeft = line.scrollWidth; // a long line keeps its end in view
-      sub.scrollLeft = sub.scrollWidth;
+      const t = tex();
+      root.dataset.latex = t.whole;
+      put(line, s.line, t.line);
+      put(sub, s.sub, t.sub);
+      fit();
       mode.textContent = eng.st.deg ? '' : 'Rad';
       head.querySelector('.bcv-calc__mem').textContent = eng.st.mem ? 'M' : '';
       for (const b of keys) {
@@ -1134,10 +1145,13 @@
         if (base === 'rad') { b.textContent = eng.st.deg ? 'Rad' : 'Deg'; b.title = eng.st.deg ? 'Switch to radians' : 'Switch to degrees'; }
         b.classList.toggle('is-on', base === 'second' && eng.st.second);
       }
-      if (onPaint) onPaint(eng, s);
     }
     root.append(head, display, U.el('bcv-calc__keys', rows));
     paint();
+    // KaTeX, packaged with the extension, is put on the page as the calculator is built — the pin's
+    // first hover, the tool opening — and the display is drawn again the moment it lands; until
+    // then, and wherever it cannot load, the line stands as typed.
+    vendor('katex').then(() => paint()).catch(() => { /* the line stands as typed */ });
     return { els: [root], eng, paint };
   }
   /** The graphing calculator's pin: a small Desmos, portrait, loaded on the first hover and kept —
