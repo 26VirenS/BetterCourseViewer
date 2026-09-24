@@ -17,7 +17,7 @@
     const segWrap = h('div', { class: 'bcv-ml-auto' });
     const body = U.el('bcv-body');
     screen.append(
-      U.el('bcv-head', U.el('bcv-head__in', U.el('bcv-head__row', [h('h1', { class: 'bcv-h1', text: 'Dashboard' }), segWrap]))),
+      U.el('bcv-head', U.el('bcv-head__in', U.el('bcv-head__row', [h('h1', { class: 'bcv-h1', text: 'Dashboard' }), BCV.search?.field?.(app) || null, segWrap]))),
       body,
     );
     body.append(U.loading('rows', 6)); // list-row skeletons hold the place until the planner lands

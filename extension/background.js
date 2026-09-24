@@ -238,6 +238,17 @@ if (typeof importScripts === 'function' && !self.BCV?.devcode) {
   }
 
   // ---- one-shot messages --------------------------------------------------
+  /** Wikipedia's opensearch, for the Search everything box (content/app/search.js): the titles, a
+   *  line each, the links. From here rather than the page, so the page's own rules never block it.
+   *  (dev:wikiBase: the suites point it at the mock.) */
+  async function wiki(q) {
+    const base = (await api.storage.local.get('dev:wikiBase'))['dev:wikiBase'] || 'https://en.wikipedia.org';
+    const res = await fetch(`${base}/w/api.php?action=opensearch&format=json&origin=*&namespace=0&limit=6&search=${encodeURIComponent(String(q || ''))}`);
+    if (!res.ok) throw new Error(`Wikipedia ${res.status}`);
+    const data = JSON.parse((await res.text()).replace(/^while\(1\);/, ''));
+    const [, titles = [], descs = [], urls = []] = Array.isArray(data) ? data : [];
+    return { ok: true, hits: titles.map((t, i) => ({ title: t, text: descs[i] || '', url: urls[i] || `https://en.wikipedia.org/wiki/${encodeURIComponent(t)}` })) };
+  }
   api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (!msg || typeof msg !== 'object') return false;
     const reply = (p) => Promise.resolve(p).then(sendResponse, (e) => sendResponse({ ok: false, message: e?.message || String(e) }));
@@ -283,6 +294,9 @@ if (typeof importScripts === 'function' && !self.BCV?.devcode) {
         return true;
       case 'toolWidgets': // the pinned tools, into the tool's own tab
         reply(toolWidgets(sender));
+        return true;
+      case 'wiki': // Search everything: a Wikipedia lookup
+        reply(wiki(msg.q));
         return true;
       case 'devGet': // the Developer section: what the catch is set to
         reply(devGet());

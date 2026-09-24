@@ -71,7 +71,7 @@ try {
   const setSettings = (patch) => sw.evaluate(async (p) => self.BCV.settings.update(p), patch);
   // until it is done every page opens the setup; it is exercised on its own below. The flow marker goes with the flags: the
   // background's one-time migration clears them when it finds an older flow, and it may run after this.
-  await sw.evaluate((v) => self.BCV.api.storage.local.set({ 'setup:offered': true, 'setup:done': true, 'setup:flow': 3, 'whatsnew:seen': v }), manifest.version);
+  await sw.evaluate((v) => self.BCV.api.storage.local.set({ 'setup:offered': true, 'setup:done': true, 'welcome:search': true, 'setup:flow': 3, 'whatsnew:seen': v }), manifest.version);
 
   const page = await context.newPage();
   // a page is ready to poke once it is drawn, nothing painted from the cache is still waiting on
@@ -113,7 +113,7 @@ try {
   // the page again. Every check still runs against the app itself; only the card is cleared.
   const noSetup = async () => {
     if (!(await page.$('#bcv-setup'))) return false;
-    await sw.evaluate((v) => self.BCV.api.storage.local.set({ 'setup:offered': true, 'setup:done': true, 'setup:flow': 3, 'whatsnew:seen': v }), manifest.version);
+    await sw.evaluate((v) => self.BCV.api.storage.local.set({ 'setup:offered': true, 'setup:done': true, 'welcome:search': true, 'setup:flow': 3, 'whatsnew:seen': v }), manifest.version);
     await page.goto(page.url());
     return true;
   };

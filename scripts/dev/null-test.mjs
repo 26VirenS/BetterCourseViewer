@@ -66,7 +66,7 @@ try {
   await afterMigration(sw); // (the background's setup migration first, or it clears the flags written next)
   await new Promise((r) => setTimeout(r, 1200));
   for (const t of context.pages()) if (t.url().endsWith('/setup/setup.html')) await t.close();
-  await sw.evaluate((v) => self.BCV.api.storage.local.set({ 'setup:offered': true, 'setup:done': true, 'setup:flow': 3, 'whatsnew:seen': v }), manifest.version);
+  await sw.evaluate((v) => self.BCV.api.storage.local.set({ 'setup:offered': true, 'setup:done': true, 'welcome:search': true, 'setup:flow': 3, 'whatsnew:seen': v }), manifest.version);
 
   const page = await context.newPage();
   await page.route('**/api/v1/**', async (route) => {

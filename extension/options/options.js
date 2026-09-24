@@ -773,6 +773,28 @@
   };
   let devTaps = 0;
   let devTapAt = 0;
+  // ---- the Mac app: roll back to a version published (Updater.rollback): the releases listed, one picked, installed in this copy's place ----
+  function devRollInit() {
+    if (!inApp || !self.SimplApp.releases) return;
+    const card = $('devRoll'), sel = $('devVersions'), msg = $('devRollMsg');
+    card.hidden = false;
+    let list = [];
+    const say = (t) => { msg.hidden = false; msg.textContent = t; };
+    self.SimplApp.releases().then((r) => {
+      list = (r && r.releases) || [];
+      const mine = (self.SimplApp.state() || {}).version || '';
+      sel.replaceChildren(...list.map((x) => h('option', { value: x.version, text: `${x.version}${x.version === mine ? ' (this one)' : ''}` })));
+      $('devRollback').disabled = !list.length;
+      if (!list.length) say('No releases could be read.');
+    }).catch(() => say('The releases could not be read.'));
+    $('devRollback').addEventListener('click', async () => {
+      const r = list.find((x) => x.version === sel.value);
+      if (!r) return;
+      if (!confirm(`Install Simpl Courses ${r.version} in place of this one?\n\nAutomatic updates go off, so it stays until you turn them back on.`)) return;
+      const res = await self.SimplApp.rollback(r).catch(() => null);
+      say(res && res.ok ? `Installing ${r.version}: the app relaunches once it is in place.` : (res && res.message) || 'The rollback could not start.');
+    });
+  }
   function revealDev() {
     if ($('dev').hidden) {
       $('dev').hidden = false;
@@ -781,6 +803,7 @@
       tile.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 7l-5 5 5 5M15 7l5 5-5 5"/></svg>';
       nav.append(h('button', { type: 'button', class: 'navlink', dataset: { section: 'dev' }, onclick: () => { history.replaceState(null, '', '#dev'); showSection('dev'); } }, [tile, h('span', { class: 'navlink__label', text: 'Developer' }), h('span', { class: 'navlink__dot', id: 'dot-dev', hidden: true })]));
       devInit();
+      devRollInit();
     }
     showSection('dev');
   }

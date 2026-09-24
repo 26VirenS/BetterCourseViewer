@@ -67,6 +67,8 @@ const FAKE_APP = () => {
         return { ok: true };
       }
       case 'app.state': return window.__appState;
+      case 'app.releases': return { ok: true, releases: [{ version: '9.9.9', url: 'https://example.test/Simpl-Courses-Mac-9.9.9.zip', sha256: 'abc' }, { version: '9.9.8', url: 'https://example.test/Simpl-Courses-Mac-9.9.8.zip', sha256: 'def' }, { version: '9.9.7', url: 'https://example.test/Simpl-Courses-Mac-9.9.7.zip' }] };
+      case 'app.rollback': return { ok: true };
       case 'app.openSafariSettings': return { ok: false, message: 'Safari is not running.' };
       case 'app.moveToApplications': return { ok: false, message: 'The Applications folder cannot be written. Drag the app to the Applications folder in the Finder, then open it again.' };
       case 'file.save': return { ok: true, path: '/tmp/settings.json' };
@@ -181,6 +183,20 @@ try {
   await page.waitForTimeout(300);
   check((await calls('storage.clear')).length === 1 && (await page.evaluate(() => window.__store.commands.map((c) => c.type).join(','))) === 'wipe' && (await calls('runtime.sendMessage')).some((m) => m.message.type === 'wipeSiteNotes') && (await flashed()) === 'Reset', 'Reset everything clears the store, which leaves the extension a wipe to do');
   await page.screenshot({ path: join(root, 'scripts', 'dev', 'out', 'mac-window-data.png') });
+
+  // ---- Developer: the rollback (the app's window alone) — the releases listed, one picked, installed in this copy's place
+  console.log('developer: roll back');
+  for (let i = 0; i < 5; i++) await page.click('#version');
+  await page.waitForSelector('#dev:not([hidden])', { timeout: 5000 });
+  await page.waitForFunction(() => document.querySelectorAll('#devVersions option').length === 3, null, { timeout: 5000 });
+  const roll = await page.evaluate(() => ({ card: !document.getElementById('devRoll').hidden, options: [...document.querySelectorAll('#devVersions option')].map((o) => o.textContent).join(','), sub: document.getElementById('devRollSub').textContent }));
+  check(roll.card && roll.options === '9.9.9 (this one),9.9.8,9.9.7' && /Automatic updates go off/.test(roll.sub), `the Developer section lists the versions published, this one marked: ${JSON.stringify(roll)}`);
+  await page.selectOption('#devVersions', '9.9.8');
+  await page.click('#devRollback');
+  await page.waitForTimeout(300);
+  const rolled = await calls('app.rollback');
+  check(rolled.length === 1 && rolled[0].version === '9.9.8' && rolled[0].url === 'https://example.test/Simpl-Courses-Mac-9.9.8.zip' && rolled[0].sha256 === 'def' && (await text('#devRollMsg')) === 'Installing 9.9.8: the app relaunches once it is in place.', `Install asks the app for that version, its zip and its checksum, and says so: ${JSON.stringify(rolled)}`);
+  await page.screenshot({ path: join(root, 'scripts', 'dev', 'out', 'mac-window-rollback.png') });
 } catch (e) {
   console.error('mac window test crashed:', e?.stack || e);
   failures.push('crash: ' + e.message);

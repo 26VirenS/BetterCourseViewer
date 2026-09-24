@@ -1333,6 +1333,7 @@
     let welcome = state.lookOn && BCV.welcome ? await BCV.welcome.due() : false;
     if (welcome === 'look' && html.classList.contains('bcv-phone')) welcome = false;
     if (welcome === 'appearance' && html.classList.contains('bcv-phone')) { BCV.welcome.clear('appearance').catch(() => {}); welcome = false; } // (no sidebar, no Appearance button to point at)
+    if (welcome === 'search' && (html.classList.contains('bcv-phone') || parseRoute().screen !== 'dashboard')) welcome = false; // (the search box is the Dashboard's, and a phone has none: it waits for the Dashboard)
     if (welcome) BCV.welcome.cover();
     state.themeImages = await BCV.theme?.loadImages?.().catch(() => null); // the theme's photos (lib/theme.js), for the sidebar and the Dashboard's counters
     if (state.themeImages) BCV.theme?.fillTones?.(state.themeImages).catch(() => {}); // photos kept before tones were: read now, saved, drawn again by the listener below
@@ -1341,7 +1342,7 @@
     if (state.lookOn) { BCV.tools?.mountTray?.(); BCV.tools?.focusLoad?.().catch(() => {}); } // the tray beside the switch (live activities, pinned tools); the focus timer's clock, so a session going is known
     // (an update's own run: the switch's show, and the Tools row — everyone sees those once; after
     // Personalize from the theme invitation: the Appearance button alone, where the themes live now)
-    if (welcome) BCV.welcome.open(BCV.app, welcome === 'look' ? ['look', 'tools'] : welcome === 'appearance' ? ['appearance'] : null).catch(() => {});
+    if (welcome) BCV.welcome.open(BCV.app, welcome === 'look' ? ['look', 'tools'] : welcome === 'appearance' ? ['appearance'] : welcome === 'search' ? ['search'] : null).catch(() => {});
     // The first Canvas page after an update shows what changed: once per version, never over the
     // setup, the welcome or a quiz attempt, and never on a fresh install (the setup marks its version seen).
     // (a release can put an invitation in the notes' place — whatsnew.js — which opens the same way)

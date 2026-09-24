@@ -200,6 +200,45 @@ final class Updater {
         Placement.relaunch(target) // the new copy opens once this one has quit
     }
 
+    /// The releases published on GitHub, newest first, each with its Mac zip: for the Developer
+    /// section's rollback. A release without a Mac zip is left out.
+    func releases(_ completion: @escaping ([[String: Any]]) -> Void) {
+        var request = URLRequest(url: URL(string: "https://api.github.com/repos/26VirenS/BetterCourseViewer/releases?per_page=40")!)
+        request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+        request.timeoutInterval = 20
+        request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+        URLSession.shared.dataTask(with: request) { data, _, _ in
+            var out: [[String: Any]] = []
+            if let data = data, let list = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] {
+                for r in list {
+                    guard let tag = r["tag_name"] as? String, let assets = r["assets"] as? [[String: Any]] else { continue }
+                    let version = tag.hasPrefix("v") ? String(tag.dropFirst()) : tag
+                    guard let asset = assets.first(where: { ($0["name"] as? String) == "Simpl-Courses-Mac-\(version).zip" }),
+                          let url = asset["browser_download_url"] as? String else { continue }
+                    var d: [String: Any] = ["version": version, "url": url]
+                    if let s = asset["size"] as? Int { d["size"] = s }
+                    if let p = r["published_at"] as? String { d["published"] = p }
+                    if let digest = asset["digest"] as? String, digest.hasPrefix("sha256:") { d["sha256"] = String(digest.dropFirst(7)) }
+                    out.append(d)
+                }
+            }
+            DispatchQueue.main.async { completion(out) }
+        }.resume()
+    }
+
+    /// The Developer section's rollback: the version named, put in this copy's place — the same
+    /// download, checks and relaunch as an update — with automatic updates turned off first, or the
+    /// next hourly check would put the newest straight back.
+    func rollback(to version: String, url: URL, sha256: String?) {
+        switch state {
+        case .downloading, .installing: return
+        default: break
+        }
+        automatic = false
+        state = .available(Release(version: version, url: url, sha256: (sha256 ?? "").isEmpty ? nil : sha256, notes: nil, size: nil))
+        install()
+    }
+
     /// The state as the settings window shows it.
     var report: [String: Any] {
         var d: [String: Any] = ["version": currentVersion, "feed": feedURL.absoluteString, "automatic": automatic, "checked": lastCheck?.timeIntervalSince1970 ?? 0]

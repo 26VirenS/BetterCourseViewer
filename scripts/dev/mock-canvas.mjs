@@ -574,6 +574,8 @@ on('GET', /^\/api\/v1\/users\/self\/activity_stream$/, () => [
   { id: 'a5', type: 'Announcement', announcement_id: '8005', title: 'Field site sign-ups', message: '<p>Sign up for a field site by Friday.</p>', course_id: '104', context_type: 'Course', read_state: false, updated_at: ago(D), html_url: '/courses/104/announcements/8005' },
 ]);
 // the Announcements API: every announcement across the given courses, with its read state
+// Wikipedia's opensearch, standing in for the Search everything box (the background is pointed here by dev:wikiBase)
+on('GET', /^\/w\/api\.php$/, (url) => { const q = url.searchParams.get('search') || ''; return [q, [`${q} (article)`, `Theory of ${q}`], ['An article.', 'A theory.'], [`https://en.wikipedia.org/wiki/${encodeURIComponent(q)}`, `https://en.wikipedia.org/wiki/Theory_of_${encodeURIComponent(q)}`]]; });
 on('GET', /^\/api\/v1\/announcements$/, (url) => {
   const codes = url.searchParams.getAll('context_codes[]');
   const out = [];

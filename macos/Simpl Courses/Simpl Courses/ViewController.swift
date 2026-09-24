@@ -306,6 +306,16 @@ class ViewController: NSViewController, WKNavigationDelegate, WKUIDelegate, WKSc
             Updater.shared.automatic = body["on"] as? Bool ?? true
             replyHandler(["ok": true], nil)
             pushState()
+        case "app.releases": // the Developer section: the versions published, for a rollback
+            Updater.shared.releases { replyHandler(["ok": true, "releases": $0], nil) }
+        case "app.rollback": // the Developer section: another version put in this one's place
+            if let version = body["version"] as? String, let s = body["url"] as? String, let url = URL(string: s), !version.isEmpty {
+                Updater.shared.rollback(to: version, url: url, sha256: body["sha256"] as? String)
+                replyHandler(["ok": true], nil)
+                pushState()
+            } else {
+                replyHandler(["ok": false, "message": "No version named."], nil)
+            }
         case "app.setLoginItem":
             let problem = LoginItem.set(body["on"] as? Bool ?? true)
             replyHandler(["ok": problem == nil, "message": problem ?? ""], nil)

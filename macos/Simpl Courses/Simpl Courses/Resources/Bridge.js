@@ -74,6 +74,8 @@
     setAutoUpdate: (on) => call('app.setAutoUpdate', { on: !!on }),
     setLoginItem: (on) => call('app.setLoginItem', { on: !!on }),
     openStore: () => call('app.openStore'),
+    releases: () => call('app.releases'), // (the Developer section: the versions published)
+    rollback: (r) => call('app.rollback', { version: r.version, url: r.url, sha256: r.sha256 || '' }),
     saveFile: (name, text) => call('file.save', { name, text }),
     openFile: (types) => call('file.open', { types: types || [] }),
   };

@@ -17,7 +17,8 @@
   const { h } = BCV.utils;
   const html = document.documentElement;
   const KEY = 'welcome:pending'; // the setup's run, armed for the reloaded page
-  const KEY3 = 'welcome:appearance'; // the pointer at the sidebar's Appearance button, armed by the theme invitation (whatsnew.js) for the page after Personalize
+  const KEY3 = 'welcome:appearance';
+  const KEY4 = 'welcome:search'; // the Dashboard's search box pointed out, once (with the setup's run, or alone for anyone who had Simpl before it) // the pointer at the sidebar's Appearance button, armed by the theme invitation (whatsnew.js) for the page after Personalize
   const KEY2 = 'welcome:look5'; // the switch's show seen (with the setup's run, or alone after an update); a new key when the show is redrawn, so everyone sees the new one once
   const OLD_KEYS = ['welcome:look2', 'welcome:look3', 'welcome:look4']; // the marks of the shows before it, cleared when this one is seen
   const LOOK2_SINCE = '2.58.0'; // the show's own version: a What's New mark from before it means the show is owed
@@ -29,7 +30,7 @@
   // (viewBox size, the line, the head) and the thing pointed at, built when the stage opens
   const STAGES = {
     look: {
-      layout: 'look', kicker: 'There’s a new Simpl switch.', title: 'Hover it: three buttons float down', hint: ['Green: Activate — Simpl on, and active on this page', 'Gray: Deactivate — stock Canvas on this page, Simpl still on', 'Red: Turn off Simpl — off on every page until you turn it back on'], stops: [1, 0, -1],
+      layout: 'look', title: 'Just in case:', hint: ['To turn on Simpl, press green.', 'To turn off Simpl for 1 page, press gray.', 'To turn off Simpl as long as you need, press red.'], stops: [1, 0, -1],
       prop: (app, ctx) => lookShow(app, ctx),
     },
     away: {
@@ -51,6 +52,11 @@
     appearance: {
       layout: 'side', kicker: 'Appearance', title: 'Themes can be accessed here', hint: 'Press Appearance any time to change the colour, the photos or the look.',
       spot: () => { const el = themeBtn(); el?.scrollIntoView({ block: 'nearest' }); return el; }, // (at the sidebar's foot: brought into its view when the rows above run past it)
+    },
+    // the Dashboard's search box (content/app/search.js), seen through a hole with the words under it
+    search: {
+      layout: 'below', title: 'Search Everything.', hint: 'Courses, assignments, pages, discussions, files, people — and Wikipedia — from one box.',
+      spot: () => searchBox(),
     },
     tools: {
       layout: 'side', kicker: 'Tools', title: 'Some tools, and some widgets',
@@ -82,6 +88,8 @@
   const navRow = (key) => { const el = document.querySelector(`#bcv-side .bcv-nav__item[data-nav="${key}"]`); return el && el.getBoundingClientRect().width > 0 ? el : null; };
   /** The sidebar's Appearance button, when it is on the page and drawn (a phone has none). */
   const themeBtn = () => { const el = document.getElementById('bcv-theme-btn'); return el && el.getBoundingClientRect().width > 0 ? el : null; };
+  /** The Dashboard's search box, when it is on the page (the Dashboard alone has it; a phone has none). */
+  const searchBox = () => { const el = document.getElementById('bcv-search-box'); return el && el.getBoundingClientRect().width > 0 ? el : null; };
   /** A row under the switch's show: the switch itself, small and still, its knob at that stop — the
    *  same DOM the page carries (app.lookDemo), with nothing wired, rather than a drawing of it. */
   function stopSwitch(app, stop) {
@@ -121,10 +129,11 @@
   async function due() {
     if (self.BCVBridge?.native) { await clear(); await clear('appearance'); return false; } // the app: no switch, no Away Refresh, no sidebar
     try {
-      const f = await BCV.api.storage.local.get([KEY, KEY2, KEY3, 'setup:done', 'whatsnew:seen']);
+      const f = await BCV.api.storage.local.get([KEY, KEY2, KEY3, KEY4, 'setup:done', 'whatsnew:seen']);
       if (f[KEY] === true) return 'setup';
       if (f[KEY3] === true) return 'appearance';
       if (f['setup:done'] && !f[KEY2] && typeof f['whatsnew:seen'] === 'string' && older(f['whatsnew:seen'], LOOK2_SINCE)) return 'look';
+      if (f['setup:done'] && !f[KEY4]) return 'search'; // (the setup's run marks it; anyone set up before the box gets it once, on the Dashboard)
     } catch { /* nothing to read: nothing owed */ }
     return false;
   }
@@ -298,6 +307,7 @@
   const arrowOf = ({ w, ht, line, head }) => h('span', { class: 'bcv-welcome__arrowbox', 'aria-hidden': 'true', html:
     `<svg class="bcv-welcome__arrow" viewBox="0 0 ${w} ${ht}" width="${w}" height="${ht}"><path class="bcv-welcome__line" pathLength="1" d="${line}"/><path class="bcv-welcome__head" d="${head}"/></svg>` });
   const LEFT_ARROW = { w: 130, ht: 80, line: 'M120 40L14 40', head: 'M38 18L14 40L38 62' }; // at something to the left
+  const UP_ARROW = { w: 100, ht: 110, line: 'M50 100L50 14', head: 'M28 38L50 14L72 38' }; // at something above
   const PAD = 6; // around a thing shown through the black
   const holeOf = (el) => { const r = el.getBoundingClientRect(); return { x: r.left - PAD, y: r.top - PAD, w: r.width + PAD * 2, h: r.height + PAD * 2 }; };
 
@@ -320,7 +330,11 @@
     svg.innerHTML = `<defs><mask id="${id}"><rect width="100%" height="100%" fill="#fff"/>${holes.map((r) => `<rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" rx="12" fill="#000"/>`).join('')}</mask></defs>`
       + `<rect width="100%" height="100%" fill="#000" mask="url(#${id})"/>`
       + holes.map((r) => `<rect class="bcv-welcome__ring" x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" rx="12"/>`).join('');
-    const wrap = h('div', { class: 'bcv-welcome__spot', 'aria-hidden': 'true' }, [svg]);
+    // the arrow at the thing itself — level with it to its right, or under it — wherever the window puts the words (they keep inside it; the arrow keeps to the thing)
+    const ARROW = s.layout === 'below' ? UP_ARROW : LEFT_ARROW;
+    const arrow = arrowOf(ARROW);
+    arrow.classList.add('bcv-welcome__arrowbox--spot');
+    const wrap = h('div', { class: 'bcv-welcome__spot', 'aria-hidden': 'true' }, [svg, arrow]);
     let side2 = null;
     if (also?.el) {
       side2 = h('div', { class: 'bcv-welcome__side2' }, [
@@ -336,9 +350,18 @@
     const place = (hs) => {
       hs.forEach((r, i) => { for (const el of [cut[i], rings[i]]) { if (!el) continue; el.setAttribute('x', r.x); el.setAttribute('y', r.y); el.setAttribute('width', r.w); el.setAttribute('height', r.h); } });
       const [h1, h2] = hs;
-      box.style.left = `${Math.round(h1.x + h1.w + 30)}px`;
-      box.style.top = `${Math.max(16, Math.round(h1.y + h1.h / 2 - 40))}px`;
-      box.dataset.centreY = String(Math.round(h1.y + h1.h / 2)); // (the stage is centred on the hole once it is on the page: the arrow then points level with the thing)
+      if (s.layout === 'below') { // the arrow up at the thing, the words under the arrow, centred on it (the stage is centred once it is on the page and measured)
+        arrow.style.left = `${Math.round(h1.x + h1.w / 2 - ARROW.w / 2)}px`;
+        arrow.style.top = `${Math.round(h1.y + h1.h + 10)}px`;
+        box.style.top = `${Math.round(h1.y + h1.h + 10 + ARROW.ht + 12)}px`;
+        box.dataset.centreX = String(Math.round(h1.x + h1.w / 2));
+      } else { // the arrow level with the thing at its right, the words after the arrow, centred on the thing where the window allows
+        arrow.style.left = `${Math.round(h1.x + h1.w + 14)}px`;
+        arrow.style.top = `${Math.round(h1.y + h1.h / 2 - ARROW.ht / 2)}px`;
+        box.style.left = `${Math.round(h1.x + h1.w + 14 + ARROW.w + 22)}px`;
+        box.style.top = `${Math.max(16, Math.round(h1.y + h1.h / 2 - 40))}px`;
+        box.dataset.centreY = String(Math.round(h1.y + h1.h / 2)); // (the stage is centred on the hole once it is on the page)
+      }
       if (side2 && h2) { side2.style.left = `${Math.round(h2.x + h2.w + 30)}px`; side2.style.top = `${Math.round(h2.y + h2.h / 2 - 20)}px`; }
       wrap.dataset.at = keyOf(hs);
     };
@@ -362,16 +385,17 @@
     const hint = typeof s.hint === 'function' ? s.hint(app) : s.hint;
     const lines = Array.isArray(hint); // (a hint of several lines: one per stop)
     const box = h('div', { class: 'bcv-welcome__stage', dataset: { stage: s.layout } }, [
-      s.arrow ? arrowOf(s.arrow) : s.spot ? arrowOf(LEFT_ARROW) : null,
+      s.arrow ? arrowOf(s.arrow) : null, // (a hole stage's arrow is placed at the hole itself: spotProp)
       h('div', { class: 'bcv-welcome__text' }, [
         s.kicker ? h('div', { class: 'bcv-welcome__kicker', text: s.kicker }) : null,
         h('div', { class: 'bcv-welcome__title', text: s.title }),
         lines ? h('div', { class: 'bcv-welcome__hint bcv-welcome__hint--rows' }, hint.map((line, i) => { // (a row per stop, with a small slider showing where it is)
+          const colour = line.match(/^(.*\bpress )(green|gray|red)(\.?)$/i); // ("…press green.": the colour in bold)
           const at = line.indexOf(':');
           const stop = s.stops?.[i] ?? 0;
           return h('div', { class: 'bcv-welcome__stoprow' }, [
             stopSwitch(app, stop),
-            h('span', { class: 'bcv-welcome__stoptext' }, at > 0 ? [h('b', { text: line.slice(0, at + 1) }), line.slice(at + 1)] : [line]),
+            h('span', { class: 'bcv-welcome__stoptext' }, colour ? [colour[1], h('b', { text: colour[2] }), colour[3]] : at > 0 ? [h('b', { text: line.slice(0, at + 1) }), line.slice(at + 1)] : [line]),
           ]);
         })) : hint && typeof hint === 'object' && Array.isArray(hint.parts) ? h('div', { class: 'bcv-welcome__hint bcv-welcome__hint--rich' }, hint.parts.map(([t, c]) => h('span', { class: 'bcv-welcome__hue', style: c ? { color: c } : null, text: t }))) // (a line in several colours: one per part)
           : hint ? h('div', { class: 'bcv-welcome__hint', text: hint }) : null,
@@ -386,6 +410,8 @@
     // a stage at a hole is centred on the hole (its words and Continue as a block), so the arrow —
     // across the block — points level with the thing; again once Continue has come in and the block grew
     const level = () => {
+      const cx = Number(box.dataset.centreX);
+      if (cx) { const r = box.getBoundingClientRect(); box.style.left = `${Math.max(16, Math.min(window.innerWidth - r.width - 16, Math.round(cx - r.width / 2)))}px`; }
       const cy = Number(box.dataset.centreY);
       if (!cy) return;
       const r = box.getBoundingClientRect();
@@ -427,15 +453,16 @@
     // a phone's header has none, so the stages that point at it are left out there
     const lookNow = () => { const l = document.getElementById('bcv-look'); return l && getComputedStyle(l).display !== 'none' ? l : null; };
     const setupRun = !keys;
-    for (const key of (keys || ['look', 'away', 'grades', 'courses', 'tools', 'peek']).filter((k) => STAGES[k])) {
+    for (const key of (keys || ['look', 'away', 'grades', 'courses', 'tools', 'peek', 'search']).filter((k) => STAGES[k])) {
       const look = lookNow();
       if (!look && (key === 'look' || key === 'pin')) continue;
       if (STAGES[key].spot && !STAGES[key].spot(app)) continue; // (no sidebar row to point at: a phone)
       await stage(app, key, { look });
       if (key === 'look') { try { await BCV.api.storage.local.set({ [KEY2]: true }); await BCV.api.storage.local.remove(OLD_KEYS); } catch { /* shown all the same */ } } // (seen: not owed again after an update; the old shows' marks go)
+      if (key === 'search') { try { await BCV.api.storage.local.set({ [KEY4]: true }); } catch { /* shown all the same */ } }
       await leave();
     }
-    if (setupRun) await clear();
+    if (setupRun) { await clear(); try { await BCV.api.storage.local.set({ [KEY4]: true }); } catch { /* the box is found on its own */ } } // (the setup's run counts the search box as pointed out, on the Dashboard or not)
     else if (onDone) await Promise.resolve(onDone()).catch(() => {});
     el.classList.add('is-out');
     html.classList.remove('bcv-welcome');

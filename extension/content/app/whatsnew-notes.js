@@ -24,6 +24,10 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.78.0', date: '2026-09-24', notes: [
+      { kind: 'new', title: 'Search everything', body: 'One box on the Dashboard: all of Canvas, and Wikipedia.', icon: P.sparkle },
+      { kind: 'new', title: 'Shown once', body: 'A pointer at the box the first time, on black.', icon: P.eye },
+    ] },
     // invite: the invitation again (whatsnew.js), for anyone who has not tried a theme yet; the notes wait in Settings
     { version: '2.77.0', date: '2026-09-23', invite: true, notes: [
       { kind: 'new', title: 'A cursor shows the way', body: 'It presses the sidebar and two counters, once.', icon: P.eye },
