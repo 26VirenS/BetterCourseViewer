@@ -680,7 +680,7 @@
       item(IC.external, 'Log out', null, logout, 'bcv-menu__item--danger'),
     ]);
     const r = anchor.getBoundingClientRect();
-    Object.assign(m.style, { position: 'fixed', left: `${Math.max(8, r.left)}px`, bottom: `${Math.max(8, window.innerHeight - r.top + 6)}px`, top: 'auto' });
+    Object.assign(m.style, { position: 'fixed', left: `${Math.max(8, r.left)}px`, bottom: `${Math.max(8, window.innerHeight - r.top + 6)}px`, top: 'auto', transformOrigin: 'left bottom' }); // (it grows up out of the row it hangs from)
     document.body.append(m);
     setTimeout(() => document.addEventListener('click', U.closeMenus, { once: true }), 0);
   }
@@ -712,7 +712,7 @@
       item(IC.image, 'Personalize', 'Colour, photos, themes', false, () => go('/?bcv=personalize')),
     ], { role: 'menu', 'aria-label': 'Appearance' });
     const r = anchor.getBoundingClientRect();
-    Object.assign(m.style, { position: 'fixed', left: `${Math.max(8, r.left)}px`, bottom: `${Math.max(8, window.innerHeight - r.top + 6)}px`, top: 'auto' });
+    Object.assign(m.style, { position: 'fixed', left: `${Math.max(8, r.left)}px`, bottom: `${Math.max(8, window.innerHeight - r.top + 6)}px`, top: 'auto', transformOrigin: 'left bottom' }); // (it grows up out of the row it hangs from)
     document.body.append(m);
     setTimeout(() => document.addEventListener('click', U.closeMenus, { once: true }), 0);
   }
@@ -964,6 +964,7 @@
     const r = parseRoute();
     state.route = r;
     if (toolish(prev) && !toolish(r)) store.invalidateGrades();
+    const nav = state.navKind || 'push'; // (which way the screen arrives from: forward rises, back settles down; the phone slides)
     noteArrival(r); // the trail, and state.from: what every Back on this screen names
     const id = ++state.renderId;
     const alive = () => id === state.renderId;
@@ -1051,6 +1052,7 @@
     if (!alive()) return;
     dressHead(el, r.screen); // the theme's photo on this screen's header, if it has one
     if (quiet) el.classList.add('bcv-screen--still'); // (drawn again in place: no rise)
+    else el.classList.add(nav === 'pop' ? 'bcv-screen--back' : 'bcv-screen--fwd'); // (the way it arrives: see the motion rules in app.css)
     if (el.parentNode !== main) main.replaceChildren(el); // a screen that kept its shell (a course's rail) stays put
     progress(false);
     html.classList.add('bcv-settled'); // drawn, from Canvas's answer (the harness waits for this)

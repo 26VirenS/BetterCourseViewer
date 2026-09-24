@@ -24,6 +24,12 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.96.0', date: '2026-09-24', notes: [
+      { kind: 'improved', title: 'Motion on springs', body: 'Every sheet, menu and screen moves like a real thing.', icon: P.arrows },
+      { kind: 'improved', title: 'Softer corners', body: 'Panes wear the continuous curve of an iPhone’s.', icon: P.layers },
+      { kind: 'improved', title: 'Cut short, not snapped', body: 'Close a sheet mid-way and it turns back from there.', icon: P.toggle },
+      { kind: 'fixed', title: 'Centred toasts', body: 'A message at the bottom sits in the middle again.', icon: P.check },
+    ] },
     { version: '2.95.0', date: '2026-09-24', notes: [
       { kind: 'improved', title: 'Where work stands', body: 'Missing, Late, Excused, Graded: the same words on every row.', icon: P.list },
       { kind: 'improved', title: 'Nothing left blank', body: 'Grades, quizzes, modules, files, inbox: every field shown.', icon: P.eye },

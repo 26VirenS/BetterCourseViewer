@@ -88,9 +88,7 @@
       if (closed) return;
       if (onClose && onClose() === false) return;
       closed = true;
-      ov.classList.add('is-closing');
-      U.afterMotion(ov).then(() => {
-        ov.remove();
+      U.dismiss(ov).then(() => { // (its spring out: the scrim fades, the sheet shrinks from wherever its entrance had got to)
         const under = [...document.querySelectorAll('.bcv-sheet-ov.is-under')].pop(); // (the nearest one below, back to itself)
         if (under) { under.classList.remove('is-under'); under.focus?.({ preventScroll: true }); }
       });

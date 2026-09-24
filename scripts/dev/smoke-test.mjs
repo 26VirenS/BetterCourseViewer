@@ -3231,8 +3231,8 @@ try {
   await page.waitForSelector('.bcv-stat', { timeout: 10000 });
   await page.click('.bcv-stat');
   await page.waitForSelector('.bcv-sheet', { timeout: 5000 });
-  const sheetAnim = await page.evaluate(() => [getComputedStyle(document.querySelector('.bcv-sheet-ov')).animationName, getComputedStyle(document.querySelector('.bcv-sheet')).animationName, getComputedStyle(document.querySelector('.bcv-sheet')).animationDuration, document.querySelector('.bcv-sheet').style.transformOrigin]);
-  check(sheetAnim[0] === 'bcv-scrim' && sheetAnim[1] === 'bcv-morph' && sheetAnim[2] === '0.34s' && /^-?\d+px -?\d+px$/.test(sheetAnim[3]), `a sheet grows out of the counter that opened it, over a scrim that blurs in: ${sheetAnim.join(' / ')}`);
+  const sheetAnim = await page.evaluate(() => [getComputedStyle(document.querySelector('.bcv-sheet-ov')).animationName, getComputedStyle(document.querySelector('.bcv-sheet')).animationName, getComputedStyle(document.querySelector('.bcv-sheet')).animationDuration, document.querySelector('.bcv-sheet').style.transformOrigin, getComputedStyle(document.documentElement).getPropertyValue('--bcv-t-gentle').trim()]);
+  check(sheetAnim[0] === 'bcv-scrim' && sheetAnim[1] === 'bcv-morph' && Math.round(parseFloat(sheetAnim[2]) * 1000) === parseInt(sheetAnim[4], 10) && /^-?\d+px -?\d+px$/.test(sheetAnim[3]), `a sheet grows out of the counter that opened it, over a scrim that blurs in, for the gentle spring's settle time: ${sheetAnim.join(' / ')}`);
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('.bcv-sheet-ov'), null, { timeout: 5000 });
   // a slow response: the bar keeps sweeping and skeleton rows hold the place; both leave when the data lands
@@ -5581,6 +5581,44 @@ try {
   await page.waitForSelector('.bcv-nf__row', { timeout: 15000 });
   await clickScreen('.bcv-nf__row[data-cat="graded"] .bcv-nf__act');
   check(page.url() === `${BASE}/courses/101/assignments/1007` && !!(await page.$('.bcv-detail__title, .bcv-sb--embed')), `the action opens the item, in place: ${page.url()}`);
+
+  // ---- motion on springs, panes with continuous corners (docs/MOTION.md) ------------------------------
+  console.log('springs and squircles');
+  await page.goto(`${BASE}/`);
+  await page.waitForSelector('.bcv-stats .bcv-stat', { timeout: 15000 });
+  // (a named action run in the page's content-script world: the worker's CSP allows no built function)
+  const runInApp = (name) => sw.evaluate(async ([base, n]) => { const [t] = await chrome.tabs.query({ url: `${base}/*` }); await chrome.scripting.executeScript({ target: { tabId: t.id }, world: 'ISOLATED', func: (what) => { if (what === 'toast') self.BCV.ui.toast('Springs'); else if (what === 'force') self.BCV.shape.force(true); }, args: [n] }); }, [BASE, name]);
+  const springs = await page.evaluate(() => { const cs = getComputedStyle(document.documentElement); const screen = getComputedStyle(document.querySelector('.bcv-main > .bcv-screen')); return { cls: document.documentElement.classList.contains('bcv-springs'), gentle: cs.getPropertyValue('--bcv-spring-gentle').trim().slice(0, 9), t: cs.getPropertyValue('--bcv-t-gentle').trim(), screenEase: screen.animationTimingFunction.slice(0, 7), screenDur: screen.animationDuration, stops: cs.getPropertyValue('--bcv-spring-gentle').split(',').length }; });
+  check(springs.cls && springs.gentle === 'linear(0,' && /^\d{3}ms$/.test(springs.t) && springs.screenEase === 'linear(' && Math.round(parseFloat(springs.screenDur) * 1000) === parseInt(springs.t, 10) && springs.stops >= 12, `the springs are the stylesheet's easings: the root carries each preset as a linear() curve with its own settle time, and a screen's rise runs on it: ${JSON.stringify(springs)}`);
+  const cornerShape = await page.$eval('.bcv-card', (e) => getComputedStyle(e).getPropertyValue('corner-shape'));
+  check(/^superellipse\(1\.7\)$/.test(cornerShape) && (await page.evaluate(() => document.documentElement.classList.contains('bcv-sq-native'))), `panes wear the continuous corner where the browser draws it (corner-shape): ${cornerShape}`);
+  // a sheet closed while it is still growing shrinks back from where it got to, on one spring — not
+  // from full size, and not a restart: Escape at a third of the way in
+  await page.click('.bcv-stats .bcv-stat:nth-child(1)');
+  await page.waitForSelector('.bcv-sheet-ov > .bcv-sheet', { timeout: 5000 });
+  await page.waitForTimeout(70);
+  const mid = await page.$eval('.bcv-sheet-ov > .bcv-sheet', (e) => { const a = e.getAnimations()[0]; return { p: a ? Number(a.currentTime) / Number(a.effect.getTiming().duration) : null, scale: new DOMMatrix(getComputedStyle(e).transform).a, name: a?.animationName }; });
+  await page.keyboard.press('Escape');
+  const cut = await page.$eval('.bcv-sheet-ov > .bcv-sheet', (e) => ({ closing: e.parentElement.classList.contains('is-closing') && e.parentElement.classList.contains('bcv-sprung'), anims: e.getAnimations().length, scale: new DOMMatrix(getComputedStyle(e).transform).a, scrimAnims: e.parentElement.getAnimations().length }));
+  check(mid.name === 'bcv-morph' && mid.p > 0.05 && mid.p < 0.9 && mid.scale < 0.995 && cut.closing && cut.anims === 1 && cut.scrimAnims === 1 && Math.abs(cut.scale - mid.scale) < 0.06 && cut.scale < 0.995, `Escape on a sheet still growing (at ${(mid.p * 100).toFixed(0)}%, scale ${mid.scale.toFixed(3)}) turns it back from there (scale ${cut.scale.toFixed(3)}) on one spring, the scrim on its own — never from full size: ${JSON.stringify(cut)}`);
+  check(await eventually(async () => !(await page.$('.bcv-sheet-ov')), 3000), 'and it is gone once the spring has settled');
+  // a menu grows out of the edge it hangs from; a toast rises from the bottom and sits centred (it used to land with its left edge at the middle)
+  await page.click('#bcv-account');
+  await page.waitForSelector('.bcv-menu--account', { timeout: 5000 });
+  const menuOrigin = await page.$eval('.bcv-menu--account', (e) => ({ origin: e.style.transformOrigin, ease: getComputedStyle(e).animationTimingFunction.slice(0, 7), name: getComputedStyle(e).animationName }));
+  check(/^(left|center|right) (top|bottom)$/.test(menuOrigin.origin) && menuOrigin.ease === 'linear(' && menuOrigin.name === 'bcv-pop', `a menu scales from the edge it hangs from, on the snappy spring: ${JSON.stringify(menuOrigin)}`);
+  await page.keyboard.press('Escape');
+  await runInApp('toast');
+  await page.waitForSelector('.bcv-toast', { timeout: 3000 });
+  const toastBox = await page.$eval('.bcv-toast', (e) => { const r = e.getBoundingClientRect(); return { centre: Math.round(r.left + r.width / 2), mid: Math.round(window.innerWidth / 2), name: getComputedStyle(e).animationName, ease: getComputedStyle(e).animationTimingFunction.slice(0, 7) }; });
+  check(Math.abs(toastBox.centre - toastBox.mid) <= 2 && toastBox.name === 'bcv-toast-in' && toastBox.ease === 'linear(', `a toast rises on the snappy spring and sits centred: ${JSON.stringify(toastBox)}`);
+  // where the browser has no corner-shape (Safari), the exact path is written per pane as it is sized: forced here to see it
+  await runInApp('force');
+  check(await eventually(async () => page.$eval('.bcv-card', (e) => e.style.getPropertyValue('--bcv-sq').startsWith('path("M ')), 4000), 'forced onto the path way, every card carries its own squircle path');
+  const sq = await page.$eval('.bcv-stats .bcv-stat, .bcv-card', (e) => { const card = e.closest('.bcv-card') || document.querySelector('.bcv-card'); const r = card.getBoundingClientRect(); const d = card.style.getPropertyValue('--bcv-sq'); const before = getComputedStyle(card, '::before'); return { w: Math.round(r.width), h: Math.round(r.height), path: d.slice(0, 60), clip: before.clipPath.slice(0, 9), bg: before.backgroundColor, sizeOk: d.includes(` L ${Math.round(r.width)} `) || d.includes(` L ${(Math.round(r.width * 100) / 100)} `), html: document.documentElement.classList.contains('bcv-sq-path') }; });
+  check(sq.html && sq.clip.startsWith('path("M ') && sq.sizeOk && sq.bg !== 'rgba(0, 0, 0, 0)', `the pane draws its shape on a layer under its content, clipped to a path of its own size (${sq.w}×${sq.h}): ${JSON.stringify(sq)}`);
+  await page.goto(`${BASE}/`); // (the path way stays forced only for the page's life)
+  await page.waitForSelector('.bcv-stats .bcv-stat', { timeout: 15000 });
 
   // ---- extension pages ---------------------------------------------------------------------------------
   console.log('extension pages');

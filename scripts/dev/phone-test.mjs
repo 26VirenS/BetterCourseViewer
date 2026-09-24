@@ -283,6 +283,8 @@ try {
   console.log('Courses');
   await tab('courses');
   await page.waitForSelector('.bcv-ph-crow', { timeout: 15000 });
+  const tabbed = await page.$eval('.bcv-main > .bcv-screen', (e) => ({ tab: e.classList.contains('bcv-screen--tab'), slid: e.classList.contains('bcv-screen--fwd') || e.classList.contains('bcv-screen--back'), name: getComputedStyle(e).animationName }));
+  check(tabbed.tab && !tabbed.slid && tabbed.name === 'bcv-fade-in', `a tab change fades in place — nothing slides between root tabs: ${JSON.stringify(tabbed)}`);
   check((await page.$eval('.bcv-tabbar__item.is-active', (e) => e.dataset.tab)) === 'courses' && (await texts('.bcv-ph-h1'))[0] === 'Courses', 'Courses tab lands with its large title');
   check(/(\d+ enrolled|\d+ of \d+ selected)$/.test((await texts('.bcv-ph-title__sub'))[0]), `subtitle counts the selection: ${(await texts('.bcv-ph-title__sub'))[0]}`);
   const selN = Number(((await texts('.bcv-ph-title__sub'))[0].match(/(\d+) (enrolled|of)/) || [])[1]);
@@ -464,6 +466,9 @@ try {
   await page.waitForSelector('.bcv-ph-body--course .bcv-ph-card', { timeout: 15000 });
   l = await layout();
   check(!l.root && l.topbarHidden === false && l.glass && !l.rail, `a pushed screen: glass top bar shown, the rail hidden (${JSON.stringify(l)})`);
+  // a pushed screen slides in from the right on the phone spring (a root tab only fades: see the Courses tab above)
+  const pushed = await page.$eval('.bcv-main > .bcv-screen', (e) => ({ fwd: e.classList.contains('bcv-screen--fwd'), name: getComputedStyle(e).animationName, ease: getComputedStyle(e).animationTimingFunction.slice(0, 7) }));
+  check(pushed.fwd && pushed.name === 'bcv-push-in' && pushed.ease === 'linear(', `a pushed screen slides in from the right on the phone spring: ${JSON.stringify(pushed)}`);
   check(/^MATH-021-20 · Fall 2026/.test((await texts('.bcv-ph-head__sub'))[0]) && !(await visible('.bcv-head .bcv-reader-btn')) && !(await visible('.bcv-pill--term')), `course header: dot, name, one detail line (${(await texts('.bcv-ph-head__sub'))[0]})`);
   check((await texts('.bcv-topbar__title'))[0] === '' && (await page.$('.bcv-topbar__btn')) === null, 'the back bar carries no title under a large title, and no reader button');
   check((await texts('.bcv-topbar__back'))[0] === 'Courses', `back bar: ‹ ${(await texts('.bcv-topbar__back'))[0]}`);
