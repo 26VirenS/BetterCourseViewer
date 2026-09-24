@@ -3688,30 +3688,60 @@ html[data-bcv-theme="dark"] .bcv-pdfx { --px-row: #0f0f11; --px-page: #1f1f22; -
 /* the welcome's stage under a thing seen through a hole (the search box): an arrow up at it, the words under, centred on it */
 .bcv-welcome__stage[data-stage="below"] { align-items: center; text-align: center; max-width: 620px; }
 .bcv-welcome__stage[data-stage="below"] .bcv-welcome__title { font-size: clamp(28px, 4vw, 40px); }
-/* 2.80.0: Find appointment — Canvas's Scheduler in a sheet off a button beside Calendars. Each group is a card:
-   its course, place and length, the time held (with Cancel), the open times as chips by day; a taken one is
-   struck through, the one held is filled. The month carries only the time reserved. */
+/* 2.80.0: Find appointment — Canvas's Scheduler in a sheet off a button beside Calendars. The class first (a chip a
+   course), then each group as a card: its place and length, the time held (with Cancel), and its days as rows —
+   the date, how many times are open, the span — each opening to a table of hours: one row an hour, a small cell a
+   time. Taken times are struck through, the one held is filled. The month carries only the time reserved. */
 .bcv-cal__apptbtn { gap: 7px; }
 .bcv-cal__sheet.bcv-appt { width: 560px; }
 .bcv-appt .bcv-sheet__list { gap: 12px; }
-.bcv-appt__group { background: var(--bcv-card); border: 1px solid var(--bcv-edge); border-radius: 18px; padding: 14px 16px 13px; display: flex; flex-direction: column; gap: 11px; }
+.bcv-appt__courses { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 0 2px; }
+.bcv-appt__courselbl { font: 600 11.5px/1 var(--bcv-font); color: var(--bcv-ink3); text-transform: uppercase; letter-spacing: .04em; margin-right: 4px; }
+.bcv-appt__course { gap: 7px; background: var(--bcv-fill); color: var(--bcv-ink); }
+.bcv-appt__course.is-on { background: var(--bcv-blue); color: #fff; }
+.bcv-appt__course.is-on .bcv-dot { box-shadow: 0 0 0 1.5px rgba(255,255,255,.7); }
+.bcv-appt__group { background: var(--bcv-card); border: 1px solid var(--bcv-edge); border-radius: 18px; padding: 14px 16px 14px; display: flex; flex-direction: column; gap: 11px; }
 .bcv-appt__head { display: flex; align-items: flex-start; gap: 10px; }
 .bcv-appt__head .bcv-dot { flex: none; margin-top: 4px; }
 .bcv-appt__titles { flex: 1; min-width: 0; }
 .bcv-appt__title { font: 600 14.5px/1.3 var(--bcv-font); letter-spacing: -.01em; }
-.bcv-appt__meta { margin-top: 3px; font: 400 12.5px/1.4 var(--bcv-font); color: var(--bcv-ink3); }
+.bcv-appt__meta { margin-top: 3px; font: 400 12.5px/1.4 var(--bcv-font); color: var(--bcv-ink3); overflow-wrap: anywhere; }
 .bcv-appt__desc { margin: 0; font: 400 13px/1.45 var(--bcv-font); color: var(--bcv-ink2); }
+.bcv-appt__desc.is-folded { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.bcv-appt__descwrap { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+.bcv-appt__more { border: 0; background: transparent; padding: 0; font: 600 12.5px/1.4 var(--bcv-font); color: var(--bcv-blue); cursor: pointer; }
 .bcv-appt__mine { display: flex; align-items: center; gap: 9px; padding: 8px 10px 8px 12px; border-radius: 12px; background: var(--bcv-blue-soft); color: var(--bcv-blue); font: 600 13px/1.3 var(--bcv-font); }
 .bcv-appt__mine > svg { flex: none; }
 .bcv-appt__minetext { flex: 1; min-width: 0; }
-.bcv-appt__day { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 8px 12px; align-items: start; }
-.bcv-appt__dayname { display: flex; flex-direction: column; gap: 1px; padding-top: 5px; font: 400 12px/1.3 var(--bcv-font); color: var(--bcv-ink3); }
-.bcv-appt__dayname b { font: 600 13px/1.3 var(--bcv-font); color: var(--bcv-ink); }
-.bcv-appt__slots { display: flex; flex-wrap: wrap; gap: 6px; }
-.bcv-appt__slot { height: 28px; padding: 0 11px; font-variant-numeric: tabular-nums; transition: background .18s ease, opacity .18s ease; }
+.bcv-appt__days { display: flex; flex-direction: column; border: 1px solid var(--bcv-sep); border-radius: 13px; overflow: hidden; }
+.bcv-appt__day + .bcv-appt__day { border-top: 1px solid var(--bcv-sep); }
+.bcv-appt__dayrow { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 12px; border: 0; background: transparent; color: var(--bcv-ink); text-align: left; cursor: pointer; font: 400 12.5px/1.3 var(--bcv-font); }
+.bcv-appt__dayrow:hover { background: var(--bcv-hover); }
+.bcv-appt__dayname { flex: none; min-width: 96px; }
+.bcv-appt__dayname b { font: 600 13px/1.3 var(--bcv-font); }
+.bcv-appt__daysub { flex: 1; min-width: 0; color: var(--bcv-ink3); font-variant-numeric: tabular-nums; }
+.bcv-appt__dayrow.is-held .bcv-appt__daysub { color: var(--bcv-blue); font-weight: 600; }
+.bcv-appt__dayrow.is-full .bcv-appt__daysub { text-decoration: line-through; }
+.bcv-appt__chev { flex: none; transition: transform .18s ease; }
+.bcv-appt__day.is-open .bcv-appt__chev { transform: rotate(90deg); }
+.bcv-appt__hours { display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 6px 10px; align-items: center; padding: 2px 12px 12px; }
+.bcv-appt__hourlbl { font: 600 12px/1 var(--bcv-font); color: var(--bcv-ink3); text-align: right; font-variant-numeric: tabular-nums; }
+.bcv-appt__cells { display: flex; flex-wrap: wrap; gap: 5px; }
+.bcv-appt__slot { height: 26px; min-width: 46px; padding: 0 8px; border: 0; border-radius: 8px; background: var(--bcv-blue-soft); color: var(--bcv-blue); font: 600 12px/1 var(--bcv-font); font-variant-numeric: tabular-nums; cursor: pointer; transition: background .18s ease, opacity .18s ease; }
 .bcv-appt__slot:not(:disabled):hover { background: var(--bcv-blue); color: #fff; }
 .bcv-appt__slot:disabled { cursor: default; background: var(--bcv-fill); color: var(--bcv-ink3); }
 .bcv-appt__slot.is-gone { text-decoration: line-through; }
 .bcv-appt__slot.is-mine, .bcv-appt__slot.is-mine:disabled { background: var(--bcv-blue); color: #fff; }
 .bcv-appt__slot.is-busy { opacity: .5; }
 .bcv-appt__empty { font: 400 13px/1.4 var(--bcv-font); color: var(--bcv-ink3); }
+/* 2.81.0: the calendar's head at a narrower window — the buttons shorten to their glyph and count rather than
+   wrapping the whole row under the title, and a row that does wrap sits close under it */
+.bcv-head__row--center { row-gap: 8px; }
+@container bcv-main (max-width: 1080px) {
+  .bcv-cal__tools { gap: 6px; }
+  .bcv-cal__apptbtn > span:not(.bcv-cal__calcount), .bcv-cal__calbtn > span:not(.bcv-cal__calcount) { display: none; }
+  .bcv-cal__apptbtn, .bcv-cal__calbtn { padding: 0 8px 0 10px; gap: 6px; }
+}
+/* 2.81.0: the Appearance button expands into a menu above itself — Light, Dark, Personalize */
+.bcv-menu--theme { width: 224px; max-height: none; padding: 8px; }
+.bcv-menu--theme .bcv-menu__item.is-active .bcv-menu__ic { background: var(--bcv-blue); color: #fff; }

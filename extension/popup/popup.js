@@ -193,6 +193,45 @@
     status.textContent = 'Open a Canvas page to use it.';
     return;
   }
+  // A tool's own tab (opened from the interface, the bar over it). Where the browser has not let the
+  // extension onto the tool's site, nothing of ours runs there and the bar is gone with the pinned
+  // tools; the one thing that brings them back is the site being allowed — from a press here.
+  const toolHere = (await send({ type: 'toolTabOf', tabId: tab?.id }))?.tool || null;
+  if (toolHere) {
+    status.textContent = `A tool’s tab · ${toolHere.title || url.hostname}`;
+    if (granted) {
+      if (toolHere.barOff) send({ type: 'toolSite', origin, tabId: tab.id }); // allowed since, and no bar yet: put it in now
+      return;
+    }
+    $('tool-card').hidden = false;
+    $('tool-host').textContent = url.hostname;
+    $('tool-host2').textContent = url.hostname;
+    $('tool-site').addEventListener('click', async () => {
+      const msg = $('tool-msg');
+      msg.textContent = 'Asking for permission…';
+      // Chrome closes this popup when its permission dialog opens: the background finishes from this
+      // note (continuePending). Written without waiting, and nothing awaited before the request —
+      // Safari only takes it while the press is still a user gesture.
+      api.storage.local.set({ 'tool:pending': { origin, tabId: tab?.id ?? null, at: Date.now() } }).catch(() => {});
+      let ok = false;
+      try {
+        ok = await api.permissions.request({ origins: [`${origin}/*`] });
+      } catch (e) {
+        await api.storage.local.remove('tool:pending').catch(() => {});
+        msg.textContent = `Permission request failed: ${e?.message || e}`;
+        return;
+      }
+      await api.storage.local.remove('tool:pending').catch(() => {}); // still here: this popup finishes it
+      if (!ok) {
+        msg.textContent = 'Not allowed. Simpl’s bar stays off on this site.';
+        return;
+      }
+      const r = await send({ type: 'toolSite', origin, tabId: tab.id });
+      msg.textContent = r?.ok ? 'Done. The bar is back over the page.' : `Allowed, but the bar could not be put in${r?.message ? `: ${r.message}` : '. Reload the page.'}`;
+      if (r?.ok) setTimeout(() => window.close(), 900);
+    });
+    return;
+  }
   if (granted) {
     status.textContent = `On for ${url.hostname}`;
     // Self-heal: a saved custom site re-registers its scripts from the

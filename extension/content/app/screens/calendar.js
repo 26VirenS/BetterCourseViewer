@@ -432,7 +432,7 @@
       const ctxs = codes.map((c) => ctxMap.get(c)).filter(Boolean);
       return {
         id: String(g.id), title: g.title || 'Appointments', description: htmlToText(g.description || '', 300).trim(), location: g.location_name || '',
-        contextName: ctxs.map((c) => c.name).join(', ') || codes.join(', '), color: ctxs[0]?.color || '#8e8e93',
+        codes, contextName: ctxs.map((c) => c.name).join(', ') || codes.join(', '), color: ctxs[0]?.color || '#8e8e93',
         max: Number(g.max_appointments_per_participant) || 0, groupSignup: g.participant_type === 'Group', url: g.html_url || '/calendar',
         slots, mine: slots.filter((s) => s.reserved),
       };
@@ -458,6 +458,10 @@
         if (!apptSheet.ov.contains(document.activeElement)) apptSheet.ov.focus();
       }
     }
+    // The sheet's own state, kept across repaints (a reservation repaints it): the class chosen,
+    // and which days are open to their hours.
+    const apptUi = { course: null, open: new Set() };
+    const coursesOf = () => { const seen = new Map(); for (const g of groups || []) for (const c of g.codes) if (!seen.has(c)) seen.set(c, ctxMap.get(c)?.name || c); return [...seen.entries()]; };
     function appointmentsBody() {
       if (groups === null) return [U.loading()];
       const out = [];
@@ -466,10 +470,19 @@
         if (!apptErr) out.push(U.emptyCard('Nothing to sign up for right now. Office hours and conferences your teachers open will wait here.'));
         return out;
       }
-      for (const g of groups) out.push(groupCard(g));
+      // the class first, as Canvas asks: one chip a course with something to sign up for, the first chosen
+      const courses = coursesOf();
+      if (!apptUi.course || !courses.some(([c]) => c === apptUi.course)) apptUi.course = courses[0]?.[0] || null;
+      out.push(U.el('bcv-appt__courses', [
+        U.text('bcv-appt__courselbl', 'Class', 'span'),
+        ...courses.map(([code, name]) => h('button', { type: 'button', class: `bcv-chip bcv-appt__course ${code === apptUi.course ? 'is-on' : ''}`, 'aria-pressed': code === apptUi.course ? 'true' : 'false', onclick: () => { apptUi.course = code; apptSheet?.list.replaceChildren(...appointmentsBody()); } }, [U.dot(ctxMap.get(code)?.color || '#8e8e93', 'bcv-dot--9'), h('span', { text: name })])),
+      ]));
+      for (const g of groups.filter((x) => x.codes.includes(apptUi.course))) out.push(groupCard(g));
       out.push(U.hint('A time you reserve goes on the calendar; the open ones wait here.'));
       return out;
     }
+    const hourWord = (hh) => (hh === 0 ? '12 am' : hh === 12 ? '12 pm' : hh < 12 ? `${hh} am` : `${hh - 12} pm`);
+    const dayKey = (g, d) => `${g.id}:${U.startOfDay(d).getTime()}`;
     function groupCard(g) {
       const days = new Map();
       for (const s of g.slots) {
@@ -480,15 +493,24 @@
       const full = g.max > 0 && g.mine.length >= g.max; // every time allowed is held: the rest wait until one is given back
       const first = g.slots[0];
       const mins = first?.end ? Math.round((first.end - first.start) / 60000) : 0;
-      const meta = [g.contextName, g.location, mins ? `${mins} min each` : null, g.max ? `${g.max === 1 ? 'one time' : `${g.max} times`} each` : null].filter(Boolean).join(' · ');
+      const meta = [g.location, mins ? `${mins} min each` : null, g.max ? `${g.max === 1 ? 'one time' : `${g.max} times`} each` : null].filter(Boolean).join(' · ');
       const head = U.el('bcv-appt__head', [
         U.dot(g.color, 'bcv-dot--sq'),
         h('div', { class: 'bcv-appt__titles' }, [
           h('div', { class: 'bcv-appt__title bcv-pretty', text: g.title }),
-          h('div', { class: 'bcv-appt__meta', text: meta }),
+          meta ? h('div', { class: 'bcv-appt__meta', text: meta }) : null,
         ]),
       ]);
-      const desc = g.description ? h('p', { class: 'bcv-appt__desc', text: g.description }) : null;
+      // a long description is folded to three lines, with More to read the rest
+      let desc = null;
+      if (g.description) {
+        desc = h('p', { class: 'bcv-appt__desc', text: g.description });
+        if (g.description.length > 180) {
+          desc.classList.add('is-folded');
+          const more = h('button', { type: 'button', class: 'bcv-appt__more', text: 'More', onclick: () => { const folded = desc.classList.toggle('is-folded'); more.textContent = folded ? 'More' : 'Less'; } });
+          desc = h('div', { class: 'bcv-appt__descwrap' }, [desc, more]);
+        }
+      }
       if (g.groupSignup) {
         return U.el('bcv-appt__group', [head, desc, U.hint('A sign-up for your group: reserve it as the group in Canvas.'), h('a', { class: 'bcv-btn bcv-btn--xs', href: g.url, target: '_blank', rel: 'noopener', text: 'Open in Canvas' })], { 'data-id': g.id });
       }
@@ -497,22 +519,59 @@
         h('span', { class: 'bcv-appt__minetext', text: `Your time: ${U.fmtDow(s.start)} at ${U.fmtTimeLower(s.start)}` }),
         U.btn('Cancel', { kind: 'xs', cls: 'bcv-appt__cancel', onClick: (e) => cancel(g, s, e.currentTarget) }),
       ]));
-      const rows = [...days.entries()].map(([k, list]) => {
+      // the days as rows — the date, how many times are open and the span — each opening to its hours;
+      // the first day with a time open (or the day held) is open to begin with
+      const keys = [...days.keys()];
+      const openOf = (list) => list.filter((s) => !s.reserved && s.left > 0 && s.start >= now).length;
+      if (!keys.some((k) => apptUi.open.has(dayKey(g, new Date(k))))) {
+        const held = keys.find((k) => days.get(k).some((s) => s.reserved));
+        const firstOpen = keys.find((k) => openOf(days.get(k)) > 0);
+        const pick = held ?? firstOpen ?? keys[0];
+        if (pick != null) apptUi.open.add(dayKey(g, new Date(pick)));
+      }
+      const rows = keys.map((k) => {
         const d = new Date(k);
+        const list = days.get(k);
+        const key = dayKey(g, d);
+        const isOpen = apptUi.open.has(key);
+        const held = list.find((s) => s.reserved);
+        const open = openOf(list);
         const rel = U.sameDay(d, now) ? 'Today' : U.dayDiff(d, now) === 1 ? 'Tomorrow' : U.DAYS[d.getDay()];
-        return U.el('bcv-appt__day', [
-          h('div', { class: 'bcv-appt__dayname' }, [h('b', { text: rel }), h('span', { text: U.fmtShort(d) })]),
-          U.el('bcv-appt__slots', list.map((s) => slotChip(g, s, full))),
+        const sub = held ? `Your time · ${U.fmtTimeLower(held.start)}` : open ? `${U.plural(open, 'time')} open · ${U.fmtTimeLower(list[0].start)} – ${U.fmtTimeLower(list[list.length - 1].start)}` : 'Full';
+        const row = h('button', { type: 'button', class: `bcv-appt__dayrow ${held ? 'is-held' : ''} ${!open && !held ? 'is-full' : ''}`, 'aria-expanded': isOpen ? 'true' : 'false', onclick: () => {
+          if (apptUi.open.has(key)) apptUi.open.delete(key); else apptUi.open.add(key);
+          apptSheet?.list.replaceChildren(...appointmentsBody());
+        } }, [
+          h('span', { class: 'bcv-appt__dayname' }, [h('b', { text: `${rel}, ${U.fmtShort(d)}` })]),
+          h('span', { class: 'bcv-appt__daysub', text: sub }),
+          U.svg(IC.chevron, { size: 12, stroke: 'var(--bcv-ink3)', width: 2.2, cls: 'bcv-appt__chev' }),
         ]);
+        return U.el(`bcv-appt__day ${isOpen ? 'is-open' : ''}`, [row, isOpen ? hourTable(g, list, full) : null]);
       });
-      return U.el('bcv-appt__group', [head, desc, ...mine, ...(rows.length ? rows : [U.el('bcv-appt__empty', 'No open times left.')])], { 'data-id': g.id });
+      return U.el('bcv-appt__group', [head, desc, ...mine, rows.length ? U.el('bcv-appt__days', rows) : U.el('bcv-appt__empty', 'No open times left.')], { 'data-id': g.id });
     }
-    function slotChip(g, s, full) {
+    /** A day's times as a table: one row an hour, a small cell a time (its minutes), so twenty-five
+     *  quarter-hours read as six rows rather than a wall of pills. */
+    function hourTable(g, list, full) {
+      const hours = new Map();
+      for (const s of list) {
+        const hh = s.start.getHours();
+        if (!hours.has(hh)) hours.set(hh, []);
+        hours.get(hh).push(s);
+      }
+      const rows = [];
+      for (const [hh, slots] of hours) {
+        rows.push(h('span', { class: 'bcv-appt__hourlbl', text: hourWord(hh) }));
+        rows.push(U.el('bcv-appt__cells', slots.map((s) => slotCell(g, s, full))));
+      }
+      return U.el('bcv-appt__hours', rows);
+    }
+    function slotCell(g, s, full) {
       const gone = s.left <= 0 && !s.reserved;
       const past = s.start < now;
-      const label = U.fmtTimeLower(s.start);
-      const title = s.reserved ? 'Your time' : gone ? 'Taken' : past ? 'Past' : full ? 'Cancel your time first to pick another' : `Reserve ${U.fmtDow(s.start)} at ${label}`;
-      const btn = h('button', { type: 'button', class: `bcv-chip bcv-appt__slot ${s.reserved ? 'is-mine' : ''} ${gone ? 'is-gone' : ''}`, text: label, title, disabled: (s.reserved || gone || past || full) || null, onclick: () => reserve(g, s, btn) });
+      const when = U.fmtTimeLower(s.start);
+      const title = s.reserved ? `Your time, ${when}` : gone ? `${when}: taken` : past ? `${when}: past` : full ? 'Cancel your time first to pick another' : `Reserve ${U.fmtDow(s.start)} at ${when}`;
+      const btn = h('button', { type: 'button', class: `bcv-appt__slot ${s.reserved ? 'is-mine' : ''} ${gone ? 'is-gone' : ''}`, text: `:${String(s.start.getMinutes()).padStart(2, '0')}`, title, 'aria-label': title, disabled: (s.reserved || gone || past || full) || null, onclick: () => reserve(g, s, btn) });
       return btn;
     }
     async function reserve(g, s, btn) {

@@ -82,6 +82,96 @@ if (typeof importScripts === 'function' && !self.BCV?.devcode) {
     save();
     note({ kind: 'settled', tabId, url: end.url, action: end.capped ? 'never settled, said so anyway' : 'settled' });
     try { await api.tabs.sendMessage(tabId, { type: 'toolState', state: 'ready' }); } catch { /* no bar on it */ }
+    ensureBar(tabId, t, end.url);
+  }
+
+  /* The bar has to survive the tool's own moves.
+   *
+   * A tool's tab rarely stays on one page: Canvas's launch page posts to the tool's site, the tool
+   * signs in through another, and any of them may load again. Every one of those is a new document,
+   * and the bar has to be put over each. Where the browser lets the extension onto the site, the
+   * manifest's own script does that before the page paints; where it does not yet — Safari asks for
+   * every site one at a time, the quiet Chrome build has Canvas's domain alone — nothing of ours can
+   * run there, and the bar and the pinned tools are simply gone. So every navigation of a tool's tab
+   * is followed here: the bar is asked whether it is there, put in when it is not, and when it cannot
+   * be, the tab is marked (the toolbar icon's badge and title say the bar is off on this site) and the
+   * popup offers to keep it there — the one press the browser needs to allow the site. */
+  const actionApi = () => api.action || api.browserAction || null;
+  async function injectBar(tabId) {
+    if (!api.scripting?.executeScript) return false;
+    try { await api.scripting.executeScript({ target: { tabId }, files: ['content/toolbar.js'] }); return true; } catch { return false; }
+  }
+  /** Is the bar on this tab? 'on', 'waking' (the script is there and building it), or 'none'. */
+  async function barState(tabId) {
+    try { const r = await api.tabs.sendMessage(tabId, { type: 'toolPing' }); return r?.ok ? (r.bar ? 'on' : 'waking') : 'none'; } catch { return 'none'; }
+  }
+  /** The bar over a tool's tab, after a move: there already, put in now, or marked off for this site. */
+  async function ensureBar(tabId, t, url = '') {
+    let s = await barState(tabId);
+    if (s === 'none' && (await injectBar(tabId))) s = await barState(tabId);
+    if (!tools.has(tabId)) return;
+    await markBar(tabId, t, s !== 'none', url);
+  }
+  /** Remember whether the bar is off on the tab's site, and say so on the toolbar icon for that tab. */
+  async function markBar(tabId, t, on, url = '') {
+    let origin = '';
+    try { const u = new URL(url); if (/^https?:$/.test(u.protocol)) origin = u.origin; } catch { /* no address to speak of */ }
+    const was = t.barOff || '';
+    t.barOff = on || !origin ? '' : origin;
+    if (t.barOff !== was) { save(); note({ kind: 'bar', tabId, url, action: t.barOff ? `off on ${origin}` : 'on' }); }
+    const action = actionApi();
+    if (!action?.setBadgeText) return;
+    try {
+      if (t.barOff) {
+        await action.setBadgeText({ tabId, text: '!' });
+        await action.setBadgeBackgroundColor?.({ tabId, color: '#ff9f0a' });
+        await action.setTitle?.({ tabId, title: `Simpl Courses — its bar is off on ${new URL(origin).hostname}. Press to keep it here.` });
+      } else if (was) {
+        // the tab's own badge cleared (null), so the global count shows again; a browser that will not take null gets a blank
+        try { await action.setBadgeText({ tabId, text: null }); } catch { await action.setBadgeText({ tabId, text: '' }); }
+        try { await action.setTitle?.({ tabId, title: null }); } catch { await action.setTitle?.({ tabId, title: 'Simpl Courses' }); }
+      }
+    } catch { /* no badge to set here */ }
+  }
+  api.tabs?.onUpdated?.addListener(async (tabId, info) => {
+    if (!info?.status) return; // (a title or a favicon changing is not a move)
+    await loaded;
+    const t = tools.get(tabId);
+    if (!t) return;
+    if (info.status === 'loading') { injectBar(tabId).catch(() => {}); return; } // early, so the bar is up before the page paints where it can be
+    let url = '';
+    try { url = (await api.tabs.get(tabId))?.url || ''; } catch { return; }
+    ensureBar(tabId, t, url);
+  });
+  /** The bar-only script registered for a site, so the next load there has it before the page paints. */
+  async function registerBarScript(origin) {
+    if (!api.scripting?.registerContentScripts) return false;
+    const id = `bcv-toolbar-${origin.replace(/[^a-z0-9]/gi, '-')}`;
+    try {
+      const all = await api.scripting.getRegisteredContentScripts().catch(() => []);
+      if ((all || []).some((sc) => sc.id === id)) return true;
+      await api.scripting.registerContentScripts([{ id, matches: [`${origin}/*`], js: ['content/toolbar.js'], runAt: 'document_start', persistAcrossSessions: true }]);
+      return true;
+    } catch { return false; }
+  }
+  /** The popup, on a tool's tab whose site the browser has just allowed (from a press there): the
+   *  bar-only script registered for the site, and the bar put over the page now. */
+  async function toolSite(msg) {
+    await loaded;
+    const tabId = Number(msg?.tabId);
+    let origin = '';
+    try { origin = new URL(msg?.origin).origin; } catch { return { ok: false, message: 'No site given.' }; }
+    await registerBarScript(origin);
+    const t = tools.get(tabId);
+    if (!t) return { ok: false, message: 'That tab is not a tool’s.' };
+    await ensureBar(tabId, t, `${origin}/`);
+    return { ok: !t.barOff, barOff: t.barOff || '' };
+  }
+  /** What the popup wants to know about the tab it is over: a tool's, and is its bar there? */
+  async function toolTabOf(tabId) {
+    await loaded;
+    const t = tools.get(Number(tabId));
+    return { ok: true, tool: t ? { title: t.title, note: t.note, state: t.state, barOff: t.barOff || '' } : null };
   }
   /** The quiet Chrome build has the run of Canvas's own domain and nothing else, so the bar cannot
    *  be drawn over the tool's own site until that site has been said yes to. The launch page names
@@ -114,13 +204,7 @@ if (typeof importScripts === 'function' && !self.BCV?.devcode) {
       kept[origin] = ok ? 'yes' : 'no';
       api.storage.local.set({ [TOOL_SITES]: kept }).catch(() => {});
     }
-    if (!ok || !api.scripting?.registerContentScripts) return;
-    const id = `bcv-toolbar-${origin.replace(/[^a-z0-9]/gi, '-')}`;
-    try {
-      const all = await api.scripting.getRegisteredContentScripts().catch(() => []);
-      if ((all || []).some((sc) => sc.id === id)) return;
-      await api.scripting.registerContentScripts([{ id, matches: [`${origin}/*`], js: ['content/toolbar.js'], runAt: 'document_start', persistAcrossSessions: true }]);
-    } catch { /* the bar stays off that site */ }
+    if (ok) await registerBarScript(origin);
   }
   /** A tool link pressed in the interface: a tab for it, remembering the tab it was opened from. */
   async function openTool(sender, msg) {
@@ -288,6 +372,12 @@ if (typeof importScripts === 'function' && !self.BCV?.devcode) {
         return true;
       case 'toolTab': // the bar asking whether this tab is a tool's
         reply(toolTab(sender));
+        return true;
+      case 'toolTabOf': // the popup asking about the tab it is over
+        reply(toolTabOf(msg.tabId));
+        return true;
+      case 'toolSite': // the popup: the tool's site allowed from a press there — the bar registered for it and put in now
+        reply(toolSite(msg));
         return true;
       case 'closeTool': // the X in that bar
         reply(closeTool(sender));
@@ -603,6 +693,14 @@ if (typeof importScripts === 'function' && !self.BCV?.devcode) {
    *  permission lands, the rest happens here: the site registered, then the setup over that tab
    *  (or the tab reloaded). The note expires, and the popup clears it itself when it survives. */
   async function continuePending(added) {
+    try {
+      // the popup on a tool's tab asked for the tool's site: the bar registered for it and put over the page
+      const tp = (await api.storage.local.get('tool:pending'))?.['tool:pending'];
+      if (tp?.origin && Date.now() - (tp.at || 0) < 3 * 60 * 1000 && (!(added?.origins || []).length || added.origins.some((o) => o.startsWith(tp.origin)))) {
+        await api.storage.local.remove('tool:pending');
+        await toolSite(tp);
+      }
+    } catch { /* the popup may still be alive and finish it itself */ }
     try {
       const all = await api.storage.local.get('setup:pending');
       const p = all && all['setup:pending'];

@@ -36,6 +36,14 @@ const BASE = `http://localhost:${PORT}`;
 // to be put in from outside, rather than already being there as the Canvas site's own scripts.
 const SIM_PORT = PART === 2 ? 8793 : 8791;
 const SIM = `http://localhost:${SIM_PORT}`;
+// Two more sites a tool's tab may move on to. FAR is one the extension may reach (host permission)
+// but has no script of its own registered for — Safari after "Always allow", the quiet Chrome build
+// after Enable — where the bar has to be put in from the background; NOPE is one it may not reach at
+// all, where nothing of ours can run and the toolbar icon has to say so.
+const FAR_PORT = PART === 2 ? 8796 : 8795;
+const FAR = `http://localhost:${FAR_PORT}`;
+const NOPE_PORT = PART === 2 ? 8798 : 8797;
+const NOPE = `http://localhost:${NOPE_PORT}`;
 
 // 1. temp copy of the extension whose content scripts also match localhost
 const extDir = join(tmpdir(), `bcv-ext-${PART}-${process.pid}`);
@@ -45,7 +53,9 @@ const manifest = JSON.parse(readFileSync(join(extDir, 'manifest.json'), 'utf8'))
 const THEME = (() => { const self = {}; new Function('self', readFileSync(join(extDir, 'lib', 'theme.js'), 'utf8'))(self); return self.BCV.theme; })();
 const rgbOf = (hex) => `rgb(${[1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)).join(', ')})`;
 for (const cs of manifest.content_scripts) cs.matches.push(`${BASE}/*`);
-manifest.host_permissions.push(`${BASE}/*`, `${SIM}/*`); // (a shipped build has the run of every site, or is given it a site at a time)
+manifest.host_permissions.push(`${BASE}/*`, `${SIM}/*`, `${FAR}/*`); // (a shipped build has the run of every site, or is given it a site at a time)
+// the bar's script as the quiet build ships it: Canvas's domain and the sites said yes to, not every site — so FAR has none of its own
+for (const cs of manifest.content_scripts) if ((cs.js || []).includes('content/toolbar.js')) cs.matches = ['*://*.instructure.com/*', `${BASE}/*`, `${SIM}/*`];
 writeFileSync(join(extDir, 'manifest.json'), JSON.stringify(manifest, null, 2));
 const timers = shortenTimers(extDir); // the product's longest waits run short in this copy (harness.mjs); the shipped values are checked below
 
@@ -54,9 +64,14 @@ const server = spawn(process.execPath, [join(root, 'scripts', 'dev', 'mock-canva
 const { createServer } = await import('node:http');
 const sim = createServer((req, res) => {
   res.writeHead(200, { 'content-type': 'text/html' });
-  res.end('<!DOCTYPE html><html><head><title>Wave simulation</title></head><body style="font-family:sans-serif;padding:24px"><h1 id="sim">Wave simulation</h1><p>Somebody else\'s site.</p></body></html>');
+  if (req.url.startsWith('/sim2')) res.end(`<!DOCTYPE html><html><head><title>Wave simulation, page two</title></head><body style="font-family:sans-serif;padding:24px"><h1 id="sim2">Wave simulation, page two</h1><a id="far" href="${FAR}/far">Elsewhere</a></body></html>`);
+  else res.end(`<!DOCTYPE html><html><head><title>Wave simulation</title></head><body style="font-family:sans-serif;padding:24px"><h1 id="sim">Wave simulation</h1><p>Somebody else's site.</p><a id="next" href="/sim2">Next page</a></body></html>`);
 });
 await new Promise((r) => sim.listen(SIM_PORT, r));
+const far = createServer((req, res) => { res.writeHead(200, { 'content-type': 'text/html' }); res.end(`<!DOCTYPE html><html><head><title>Further</title></head><body style="font-family:sans-serif;padding:24px"><h1 id="far">A site the extension may reach</h1><a id="nope" href="${NOPE}/nope">Further still</a></body></html>`); });
+await new Promise((r) => far.listen(FAR_PORT, r));
+const nope = createServer((req, res) => { res.writeHead(200, { 'content-type': 'text/html' }); res.end(`<!DOCTYPE html><html><head><title>Out of reach</title></head><body style="font-family:sans-serif;padding:24px"><h1 id="nope">A site it may not reach</h1><a id="home" href="${SIM}/sim">Back to the simulation</a></body></html>`); });
+await new Promise((r) => nope.listen(NOPE_PORT, r));
 await new Promise((r) => setTimeout(r, 600));
 
 const failures = [];
@@ -809,20 +824,28 @@ try {
   await openAppt();
   const apptTitle = (await texts('.bcv-appt__title'))[0];
   const apptMeta = (await texts('.bcv-appt__meta'))[0];
-  const apptDays = await texts('.bcv-appt__dayname');
-  const apptSlots = await texts('.bcv-appt__slot');
+  const apptClass = await page.$$eval('.bcv-appt__course', (els) => els.map((e) => `${e.textContent.trim()}${e.classList.contains('is-on') ? '*' : ''}`));
+  const apptDays = await page.$$eval('.bcv-appt__day', (els) => els.map((e) => `${e.querySelector('.bcv-appt__dayname').textContent.trim()} · ${e.querySelector('.bcv-appt__daysub').textContent.trim()}${e.classList.contains('is-open') ? ' [open]' : ''}`));
+  const apptHours = await texts('.bcv-appt__hourlbl');
+  const apptCells = await texts('.bcv-appt__slot');
   const apptOpen = (await page.$$('.bcv-appt__slot:not(:disabled)')).length;
-  const apptGone = await texts('.bcv-appt__slot.is-gone');
-  check(apptTitle === 'Research Proposal Feedback Conferences (Online Option)' && apptMeta === 'F26-MATH 021 20 · Online (the Zoom link is in the course) · 15 min each · one time each'
-    && apptDays.length === 2 && apptSlots.length === 12 && apptSlots[0] === '11:15am' && apptSlots[5] === '12:30pm' && apptOpen === 11 && apptGone.length === 1 && apptGone[0] === '11:45am' && !(await page.$('.bcv-appt__mine')) && /A time you reserve goes on the calendar/.test((await texts('.bcv-appt .bcv-hint'))[0]),
-  `the sheet: the group as a card with its course, place and length, two days of times as chips, one taken (struck through), none held: ${JSON.stringify({ apptTitle, apptMeta, apptDays, apptSlots, apptOpen, apptGone })}`);
+  check(apptTitle === 'Research Proposal Feedback Conferences (Online Option)' && apptMeta === 'Online (the Zoom link is in the course) · 15 min each · one time each'
+    && apptClass.join('|') === 'F26-MATH 021 20*' && apptDays.length === 2 && /^[A-Z][a-z]{2}, [A-Z][a-z]{2} \d{1,2} · 6 times open · 11:15am – 12:30pm \[open\]$/.test(apptDays[0]) && /5 times open · 11:15am – 12:30pm$/.test(apptDays[1]) && !/\[open\]/.test(apptDays[1])
+    && apptHours.join('|') === '11 am|12 pm' && apptCells.join('|') === ':15|:30|:45|:00|:15|:30' && apptOpen === 6 && !(await page.$('.bcv-appt__mine')) && /A time you reserve goes on the calendar/.test((await texts('.bcv-appt .bcv-hint'))[0]),
+  `the sheet: the class first, the group as a card with its place and length, its days as rows (how many times open, the span), the first open to its hours — a row an hour, a cell a time: ${JSON.stringify({ apptTitle, apptMeta, apptClass, apptDays, apptHours, apptCells, apptOpen })}`);
   await shot(page, '06b-calendar-appointments');
-  await page.click('.bcv-appt__slot:not(:disabled)');
+  // the second day opens to its hours too, the time another student holds struck through
+  await page.click('.bcv-appt__day:nth-child(2) .bcv-appt__dayrow');
+  await page.waitForFunction(() => document.querySelectorAll('.bcv-appt__day.is-open').length === 2, null, { timeout: 5000 });
+  const gone = await page.$$eval('.bcv-appt__day:nth-child(2) .bcv-appt__slot', (els) => els.map((e) => `${e.textContent}${e.classList.contains('is-gone') ? '-' : ''}${e.disabled ? '!' : ''}`));
+  check(gone.join('|') === ':15|:30|:45-!|:00|:15|:30' && (await page.$$('.bcv-appt__slot')).length === 12, `a day row opens to its hours, the taken time struck through: ${gone.join(' ')}`);
+  await page.click('.bcv-appt__day:nth-child(1) .bcv-appt__slot:not(:disabled)');
   await page.waitForSelector('.bcv-appt__mine', { timeout: 10000 });
   await page.waitForFunction(() => document.querySelectorAll('.bcv-appt__slot:not(:disabled)').length === 0, null, { timeout: 5000 });
   const mineText = (await texts('.bcv-appt__minetext'))[0];
-  check(/^Your time: [A-Z][a-z]{2}, [A-Z][a-z]{2} \d{1,2} at 11:15am$/.test(mineText) && (await texts('.bcv-appt__slot.is-mine')).join() === '11:15am' && (await page.$$('.bcv-appt__slot:disabled')).length === 12 && (await texts('.bcv-appt__cancel'))[0] === 'Cancel',
-    `a press reserves the time: it is held at the top with Cancel, its chip filled, every other chip waiting (one time each): "${mineText}"`);
+  const heldRow = (await texts('.bcv-appt__dayrow.is-held .bcv-appt__daysub'))[0];
+  check(/^Your time: [A-Z][a-z]{2}, [A-Z][a-z]{2} \d{1,2} at 11:15am$/.test(mineText) && (await texts('.bcv-appt__slot.is-mine')).join() === ':15' && (await page.$$('.bcv-appt__slot:disabled')).length === 12 && heldRow === 'Your time · 11:15am' && (await texts('.bcv-appt__cancel'))[0] === 'Cancel',
+    `a press reserves the time: held at the top with Cancel, its cell filled, its day row saying so, every other cell waiting (one time each): "${mineText}" / "${heldRow}"`);
   await shot(page, '06c-calendar-appointment-held');
   await closeAppt();
   await page.waitForFunction(() => [...document.querySelectorAll('.bcv-ev')].some((e) => /Research Proposal/.test(e.textContent)), null, { timeout: 10000 });
@@ -1789,6 +1812,70 @@ try {
   check(phet.url() === `${SIM}/sim` && (await phet.$('#sim')) !== null && phetBar.title === 'PhET simulation' && phetBar.note === 'localhost'
     && context.pages().length === hereBefore + 1 && page.url().endsWith('/courses/102/modules'),
   `a module's link opens the site in a tab of its own — another origin entirely, with the bar put in over it — and the modules page stays put: ${JSON.stringify({ url: phet.url(), title: phetBar.title })}`);
+  // ---- the bar survives the tool's own moves: a reload, another page, another site ----
+  // A tool's tab rarely stays on one page (a launch posts to the tool, a sign-in is several sites),
+  // and every one is a new document the bar has to be put over again — with the pinned tools in it.
+  const phetId = await sw.evaluate(async (u) => (await chrome.tabs.query({ url: `${u}*` }))[0]?.id, `${SIM}/`);
+  const toolOf = (id) => sw.evaluate(async (tabId) => { const r = await chrome.storage.session.get('tool:tabs'); return (r['tool:tabs'] || []).find(([k]) => Number(k) === tabId)?.[1] || null; }, phetId);
+  const badgeOf = (id) => sw.evaluate(async (tabId) => ({ tab: await chrome.action.getBadgeText({ tabId }), all: await chrome.action.getBadgeText({}), title: await chrome.action.getTitle({ tabId }) }), id);
+  await phet.reload();
+  await phet.waitForLoadState('domcontentloaded');
+  await eventually(async () => (await barRead(phet))?.title === 'PhET simulation', 20000);
+  check((await barRead(phet))?.title === 'PhET simulation' && (await phet.$('#sim')) !== null, 'the bar is back after the tool\'s page loads again');
+  await phet.click('#next');
+  await phet.waitForURL(`${SIM}/sim2`, { timeout: 15000 });
+  await eventually(async () => (await barRead(phet))?.title === 'PhET simulation', 20000);
+  const b1 = await badgeOf(phetId);
+  check((await barRead(phet))?.title === 'PhET simulation' && (await phet.$('#sim2')) !== null && b1.tab === b1.all && !(await toolOf(phetId))?.barOff, `and after the tool moves to another of its pages; nothing marked on the toolbar icon: ${JSON.stringify(b1)}`);
+  // a site the extension may reach but has no script registered for: the background puts the bar in
+  await phet.click('#far');
+  await phet.waitForURL(`${FAR}/far`, { timeout: 15000 });
+  await eventually(async () => (await barRead(phet))?.title === 'PhET simulation', 20000);
+  const farTray = await eventually(async () => phet.evaluate(() => !!document.querySelector('#bcv-tray')).catch(() => false), 20000);
+  const b2 = await badgeOf(phetId);
+  check((await barRead(phet))?.title === 'PhET simulation' && (await barRead(phet))?.note === 'localhost' && farTray && b2.tab === b2.all && !(await toolOf(phetId))?.barOff, `on a site the extension may reach but has no script of its own on (Safari after Always allow, the quiet build after Enable), the background puts the bar in, the pinned tools with it: ${JSON.stringify({ bar: await barRead(phet), tray: farTray, badge: b2 })}`);
+  // a site it may not reach: nothing of ours can run there — the tab is marked, the toolbar icon says so
+  await phet.click('#nope');
+  await phet.waitForURL(`${NOPE}/nope`, { timeout: 15000 });
+  await eventually(async () => (await toolOf(phetId))?.barOff === NOPE, 20000);
+  const b3 = await badgeOf(phetId);
+  check((await barRead(phet)) === null && (await toolOf(phetId))?.barOff === NOPE && b3.tab === '!' && /its bar is off on localhost\. Press to keep it here\./.test(b3.title), `on a site it may not reach the bar cannot be put in: the tab is marked and the toolbar icon says so, with a badge: ${JSON.stringify({ tool: await toolOf(phetId), badge: b3 })}`);
+  // the popup over that tab offers the one press that brings it back: the site allowed (the browser's
+  // own dialog, answered yes by a stub here), then the bar registered for the site and put in
+  const toolPop = await context.newPage();
+  await toolPop.addInitScript(({ id, url }) => {
+    window.__asked = [];
+    for (const o of [self.chrome, self.browser]) {
+      if (!o) continue;
+      if (o.permissions) o.permissions.request = (req) => { window.__asked.push(req); return Promise.resolve(true); };
+      if (o.tabs) { const q = o.tabs.query.bind(o.tabs); o.tabs.query = (f) => (f && f.active ? Promise.resolve([{ id, url, active: true }]) : q(f)); }
+    }
+  }, { id: phetId, url: `${NOPE}/nope` });
+  await toolPop.goto(`chrome-extension://${extId}/popup/popup.html`);
+  await toolPop.waitForSelector('#tool-card:not([hidden])', { timeout: 8000 });
+  const popSeen = await toolPop.evaluate(() => ({ status: document.getElementById('status').textContent, host: document.getElementById('tool-host').textContent, button: document.getElementById('tool-site').textContent.trim(), enable: document.getElementById('enable-card').hidden, title: document.querySelector('#tool-card .card__title').textContent }));
+  check(popSeen.status === 'A tool’s tab · PhET simulation' && popSeen.host === 'localhost' && popSeen.button === 'Keep the bar on localhost' && popSeen.enable && popSeen.title === 'Simpl’s bar is off on this site', `the popup over that tab says whose tab it is and offers to keep the bar on the site (the Canvas Enable card kept out of it): ${JSON.stringify(popSeen)}`);
+  await toolPop.screenshot({ path: join(out, '11d-popup-tool-tab.png') });
+  await toolPop.click('#tool-site');
+  await eventually(async () => /Done|Allowed|Not allowed|failed/.test(await toolPop.$eval('#tool-msg', (e) => e.textContent)), 15000);
+  const popAsked = await toolPop.evaluate(() => ({ asked: window.__asked, msg: document.getElementById('tool-msg').textContent }));
+  const pendingLeft = await sw.evaluate(async () => (await self.BCV.api.storage.local.get('tool:pending'))['tool:pending'] || null);
+  // (Chromium cannot be given the site here — the stub answers yes but grants nothing — so the honest end of that branch is what is checked)
+  check(JSON.stringify(popAsked.asked) === JSON.stringify([{ origins: [`${NOPE}/*`] }]) && /^Allowed, but the bar could not be put in/.test(popAsked.msg) && !pendingLeft, `the press asks the browser for the tool's site alone, then has the bar put in — and says so when it still cannot be: ${JSON.stringify({ ...popAsked, pendingLeft })}`);
+  {
+    const src = readFileSync(join(root, 'extension', 'popup', 'popup.js'), 'utf8');
+    const from = src.indexOf("'tool:pending'");
+    const to = src.indexOf('permissions.request(', from);
+    const code = src.slice(from, to).split('\n').filter((l) => !l.trim().startsWith('//')).join('\n').replace(/await api\.$/, ''); // (the comments aside, and the await of the request itself)
+    check(from >= 0 && to > from && !code.includes('await'), 'and asks straight from the press, awaiting nothing first (Safari refuses otherwise)');
+  }
+  await toolPop.close();
+  // back on a site it may reach: the bar again, the mark gone
+  await phet.click('#home');
+  await phet.waitForURL(`${SIM}/sim`, { timeout: 15000 });
+  await eventually(async () => (await barRead(phet))?.title === 'PhET simulation' && !(await toolOf(phetId))?.barOff, 20000);
+  const b4 = await badgeOf(phetId);
+  check((await barRead(phet))?.title === 'PhET simulation' && !(await toolOf(phetId))?.barOff && b4.tab === b4.all && !/off on/.test(b4.title), `back on a site it may reach, the bar is there again and the mark is gone: ${JSON.stringify(b4)}`);
   await phet.close();
   await page.bringToFront();
   await page.goto(`${BASE}/courses/101/modules`);
@@ -2495,9 +2582,28 @@ try {
   console.log('appearance');
   await page.goto(`${BASE}/`);
   await page.waitForSelector('#bcv-theme-btn', { timeout: 10000 });
-  // the sidebar's Appearance button opens the appearance editor (which drops its ?bcv=personalize from the address at once); the light/dark switch is in the popup and Settings
+  // the sidebar's Appearance button expands into a menu above itself: Light, Dark and Personalize (the editor,
+  // which drops its ?bcv=personalize from the address at once); the one in effect is marked
   await page.click('#bcv-theme-btn');
-  check(await eventually(() => page.$('#bcv-setup .pz'), 8000) && page.url() === `${BASE}/` && (await texts('#bcv-theme-btn'))[0] === 'Appearance', `the sidebar's Appearance button opens the appearance editor (Personalize), the address left clean: ${page.url()}`);
+  await page.waitForSelector('.bcv-menu--theme', { timeout: 5000 });
+  const themeMenu = await page.evaluate(() => { const m = document.querySelector('.bcv-menu--theme'); const b = document.getElementById('bcv-theme-btn').getBoundingClientRect(); const r = m.getBoundingClientRect(); return { items: [...m.querySelectorAll('.bcv-menu__item')].map((it) => `${it.querySelector('.bcv-ellip').textContent}${it.classList.contains('is-active') ? '*' : ''}`).join(' | '), above: r.bottom <= b.top, inView: r.top >= 0, icons: m.querySelectorAll('.bcv-menu__ic svg').length }; });
+  check(themeMenu.items === 'Light* | Dark | Personalize' && themeMenu.above && themeMenu.inView && themeMenu.icons === 3 && (await texts('#bcv-theme-btn'))[0] === 'Appearance', `the sidebar's Appearance button expands into a menu above itself — Light (in effect, marked), Dark, Personalize — each with a glyph: ${JSON.stringify(themeMenu)}`);
+  await shot(page, '24-appearance-menu');
+  await page.click('.bcv-menu--theme .bcv-menu__item:has-text("Personalize")');
+  check(await eventually(() => page.$('#bcv-setup .pz'), 8000) && page.url() === `${BASE}/` && !(await page.$('.bcv-menu--theme')), `Personalize opens the appearance editor, the menu gone, the address left clean: ${page.url()}`);
+  await page.goto(`${BASE}/`);
+  await page.waitForSelector('#bcv-theme-btn', { timeout: 10000 });
+  await page.click('#bcv-theme-btn');
+  await page.waitForSelector('.bcv-menu--theme', { timeout: 5000 });
+  await page.click('.bcv-menu--theme .bcv-menu__item:has-text("Dark")');
+  await page.waitForFunction(() => document.documentElement.getAttribute('data-bcv-theme') === 'dark', null, { timeout: 8000 });
+  await page.waitForSelector('#bcv-theme-btn', { timeout: 10000 });
+  await page.click('#bcv-theme-btn');
+  await page.waitForSelector('.bcv-menu--theme', { timeout: 5000 });
+  check((await sw.evaluate(async () => (await self.BCV.settings.get()).appearance.darkMode)) === 'on' && (await page.$$eval('.bcv-menu--theme .bcv-menu__item', (els) => els.map((it) => `${it.querySelector('.bcv-ellip').textContent}${it.classList.contains('is-active') ? '*' : ''}`).join(' | '))) === 'Light | Dark* | Personalize', 'Dark is saved (the page loaded afresh in it) and the menu marks it now');
+  await page.click('.bcv-menu--theme .bcv-menu__item:has-text("Light")');
+  await page.waitForFunction(() => document.documentElement.getAttribute('data-bcv-theme') === 'light', null, { timeout: 8000 });
+  check((await sw.evaluate(async () => (await self.BCV.settings.get()).appearance.darkMode)) === 'off', 'and Light brings it back');
   // the look is switched in Settings (the popup, the options page): written there, and the page loaded afresh
   const toggleLook = async (to) => { await setSettings({ appearance: { darkMode: to } }); await page.waitForTimeout(300); await page.goto(page.url().replace(/[?&]bcv=[^&]*/, '')); };
   await toggleLook('on');
@@ -5167,6 +5273,8 @@ try {
   await context.close();
   server.kill();
   sim.close();
+  far.close();
+  nope.close();
   rmSync(extDir, { recursive: true, force: true });
   rmSync(userDataDir, { recursive: true, force: true });
 }

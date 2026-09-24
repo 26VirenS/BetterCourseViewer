@@ -209,30 +209,44 @@
     push();
   }
 
-  (async () => {
-    // Asking once is asking too early. This runs before the page paints, and the background may not
-    // have written the session down yet — the tab it just made, or the one it is about to adopt from
-    // whatever opened it. So it asks again for a couple of seconds and then gives up quietly, which
-    // is what every page that is not a tool's does.
+  // Asking once is asking too early. This runs before the page paints, and the background may not
+  // have written the session down yet — the tab it just made, or the one it is about to adopt from
+  // whatever opened it. So it asks again for a couple of seconds and then gives up quietly, which
+  // is what every page that is not a tool's does. The background can ask it to try again (toolPing,
+  // after a move of the tab it knows to be a tool's), so a copy that gave up is not the end of it.
+  let asking = false;
+  async function wake() {
+    if (host || asking) return;
+    asking = true;
     let tool = null;
-    for (const ms of [0, 120, 300, 700, 1400, 2500]) {
-      if (ms) await new Promise((r) => setTimeout(r, ms));
-      try { tool = (await api.runtime.sendMessage({ type: 'toolTab' }))?.tool || null; } catch { return; } // no background to ask
-      if (tool) break;
-    }
-    if (!tool) return;
-    try { const r = await api.storage.local.get(THEME_KEY); if (r?.[THEME_KEY]) theme = r[THEME_KEY] === 'light' ? 'light' : 'dark'; } catch { /* it stays dark */ }
-    const start = () => { if (!host) build(tool); else attach(); paint(); };
-    if (document.documentElement) start();
-    document.addEventListener('DOMContentLoaded', start);
-    window.addEventListener('load', start);
-    const t = setInterval(attach, 1000);
-    setTimeout(() => clearInterval(t), 15000);
     try {
-      api.runtime.onMessage.addListener((msg) => {
-        if (msg?.type === 'toolState') setState(msg.state);
-        return undefined;
-      });
-    } catch { /* nothing to hear from */ }
-  })();
+      for (const ms of [0, 120, 300, 700, 1400, 2500]) {
+        if (ms) await new Promise((r) => setTimeout(r, ms));
+        try { tool = (await api.runtime.sendMessage({ type: 'toolTab' }))?.tool || null; } catch { return; } // no background to ask
+        if (tool) break;
+      }
+      if (!tool) return;
+      try { const r = await api.storage.local.get(THEME_KEY); if (r?.[THEME_KEY]) theme = r[THEME_KEY] === 'light' ? 'light' : 'dark'; } catch { /* it stays dark */ }
+      const start = () => { if (!host) build(tool); else attach(); paint(); };
+      if (document.documentElement) start();
+      document.addEventListener('DOMContentLoaded', start);
+      window.addEventListener('load', start);
+      const t = setInterval(attach, 1000);
+      setTimeout(() => clearInterval(t), 15000);
+    } finally {
+      asking = false;
+    }
+  }
+  try {
+    api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+      if (msg?.type === 'toolState') { setState(msg.state); return false; }
+      if (msg?.type === 'toolPing') { // the background, after a move: is the bar here? (and if not, ask again)
+        sendResponse({ ok: true, bar: !!host });
+        if (!host) wake();
+        return false;
+      }
+      return false;
+    });
+  } catch { /* nothing to hear from: the bar is still built once, below */ }
+  wake();
 })();

@@ -24,6 +24,13 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.81.0', date: '2026-09-24', notes: [
+      { kind: 'fixed', title: 'The bar over a tool', body: 'Comes back after a reload. Blocked? Press the Simpl icon.', icon: P.layers },
+      { kind: 'new', title: 'Keep the bar here', body: 'The popup asks the browser once for the tool’s site.', icon: P.check },
+      { kind: 'improved', title: 'Appearance, expanded', body: 'Light, Dark or Personalize, off the sidebar button.', icon: P.toggle },
+      { kind: 'improved', title: 'Appointments, tidier', body: 'The class first; a day opens to its hours, not pills.', icon: P.list },
+      { kind: 'fixed', title: 'Calendar head fits', body: 'Its buttons shorten on a narrower window, no wrapped row.', icon: P.arrows },
+    ] },
     { version: '2.80.0', date: '2026-09-24', notes: [
       { kind: 'new', title: 'Find appointment', body: 'Office hours and sign-ups: a sheet of times to reserve.', icon: P.clock },
       { kind: 'improved', title: 'Month, uncluttered', body: 'Only the time you reserve goes on the calendar.', icon: P.eye },

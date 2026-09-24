@@ -633,8 +633,8 @@
       ]),
       BCV.extras?.sideGroup?.(BCV.app), // what the school added to Canvas's own nav (tools, History, Help)
       U.el('bcv-side__bottom', [
-        // Appearance opens the appearance editor (Personalize); the light/dark switch itself is in the popup and Settings
-        h('button', { type: 'button', class: 'bcv-theme-btn', id: 'bcv-theme-btn', title: 'Personalize: the look, a colour of your own, photos', onclick: () => go('/?bcv=personalize') }, [
+        // Appearance expands into a menu above itself: Light, Dark, and Personalize (the editor)
+        h('button', { type: 'button', class: 'bcv-theme-btn', id: 'bcv-theme-btn', title: 'Appearance: light, dark, or Personalize', 'aria-haspopup': 'menu', onclick: (e) => { e.stopPropagation(); appearanceMenu(e.currentTarget); } }, [
           h('span', { class: 'bcv-theme-btn__ic' }, U.svg(IC.image, { size: 14, width: 1.8 })),
           h('span', { text: 'Appearance' }),
         ]),
@@ -692,6 +692,33 @@
   async function toggleTheme() {
     const next = state.dark ? 'off' : 'on';
     await S.update({ appearance: { darkMode: next } });
+  }
+  /** The look, one press away: light or dark saved for every page (the page loads afresh in it), and
+   *  Personalize for the rest — the colour, the photos, the ready-made themes. */
+  async function setLook(mode) {
+    const cur = (await S.get()).appearance?.darkMode || 'system';
+    if (cur === mode) return;
+    await S.update({ appearance: { darkMode: mode } });
+  }
+  /** The menu over the Appearance button: Light, Dark (the one in effect marked) and Personalize. */
+  function appearanceMenu(anchor) {
+    if (document.querySelector('.bcv-menu--theme')) { U.closeMenus(); return; }
+    U.closeMenus();
+    const item = (icon, label, sub, active, onSelect) => h('button', { type: 'button', class: `bcv-menu__item ${active ? 'is-active' : ''}`, role: 'menuitemradio', 'aria-checked': active ? 'true' : 'false', onclick: () => { U.closeMenus(); onSelect(); } }, [
+      h('span', { class: 'bcv-menu__ic' }, U.svg(icon, { size: 14, width: 1.9 })),
+      h('span', { style: { flex: '1', minWidth: '0' } }, [h('span', { class: 'bcv-ellip', style: { display: 'block' }, text: label }), sub ? h('span', { class: 'bcv-menu__sub', text: sub }) : null]),
+    ]);
+    const dark = !!state.dark;
+    const m = U.el('bcv-menu bcv-menu--theme', [
+      item(IC.sun, 'Light', null, !dark, () => setLook('off')),
+      item(IC.moon, 'Dark', null, dark, () => setLook('on')),
+      U.el('bcv-menu__sep'),
+      item(IC.image, 'Personalize', 'Colour, photos, themes', false, () => go('/?bcv=personalize')),
+    ], { role: 'menu', 'aria-label': 'Appearance' });
+    const r = anchor.getBoundingClientRect();
+    Object.assign(m.style, { position: 'fixed', left: `${Math.max(8, r.left)}px`, bottom: `${Math.max(8, window.innerHeight - r.top + 6)}px`, top: 'auto' });
+    document.body.append(m);
+    setTimeout(() => document.addEventListener('click', U.closeMenus, { once: true }), 0);
   }
 
   /** Simpl Courses settings, opened by the background (a content script cannot open it itself). */
