@@ -34,7 +34,7 @@
       prop: (app, ctx) => lookShow(app, ctx),
     },
     away: {
-      layout: 'away', kicker: 'Away Refresh', title: 'Click to cancel', hint: 'Away refresh prevents errors that show up after you’ve been gone for a while',
+      layout: 'away', kicker: 'Away Refresh', title: 'Click to cancel, or hold to disable', hint: 'Away refresh prevents errors that show up after you’ve been gone for a while',
       arrow: { w: 100, ht: 150, line: 'M50 140L50 14', head: 'M28 38L50 14L72 38' },
       prop: (app) => awayMock(app),
     },
