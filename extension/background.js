@@ -251,7 +251,7 @@ if (typeof importScripts === 'function' && !self.BCV?.devcode) {
   const TRAY_JS = [ // (tools.js before the tool modules, as the manifest has it: each takes `BCV.tools` as it loads)
     'lib/settings.js', 'lib/utils.js',
     'content/app/icons.js', 'content/app/ui.js',
-    'content/app/tools/tools.js',
+    'content/app/tools/tools.js', 'content/app/tools/widgets.js',
     'content/app/tools/ptable-data.js', 'content/app/tools/ptable.js',
     'content/app/tools/cite.js', 'content/app/tools/cards.js', 'content/app/tools/convert.js',
     'content/app/tools/need.js', 'content/app/tools/pdfs.js', 'content/app/tools/mark.js',
@@ -334,6 +334,20 @@ if (typeof importScripts === 'function' && !self.BCV?.devcode) {
     const [, titles = [], descs = [], urls = []] = Array.isArray(data) ? data : [];
     return { ok: true, hits: titles.map((t, i) => ({ title: t, text: descs[i] || '', url: urls[i] || `https://en.wikipedia.org/wiki/${encodeURIComponent(t)}` })) };
   }
+  /** A text file from an http(s) address, small enough for a widget (content/app/tools/widgets.js). */
+  const FETCH_MAX = 300 * 1024;
+  async function fetchText(url) {
+    let u;
+    try { u = new URL(String(url || '')); } catch { throw new Error('That is not an address.'); }
+    if (!/^https?:$/.test(u.protocol)) throw new Error('Only an http or https address.');
+    const res = await fetch(u.href, { redirect: 'follow', credentials: 'omit' });
+    if (!res.ok) throw new Error(`The site answered ${res.status}.`);
+    const tooBig = `That file is too big for a widget (${Math.round(FETCH_MAX / 1024)} KB at most).`;
+    if (Number(res.headers.get('content-length') || 0) > FETCH_MAX) throw new Error(tooBig);
+    const text = await res.text();
+    if (text.length > FETCH_MAX) throw new Error(tooBig);
+    return { ok: true, text, type: res.headers.get('content-type') || '' };
+  }
   api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (!msg || typeof msg !== 'object') return false;
     const reply = (p) => Promise.resolve(p).then(sendResponse, (e) => sendResponse({ ok: false, message: e?.message || String(e) }));
@@ -385,6 +399,9 @@ if (typeof importScripts === 'function' && !self.BCV?.devcode) {
         return true;
       case 'wiki': // Search everything: a Wikipedia lookup
         reply(wiki(msg.q));
+        return true;
+      case 'fetchText': // the widget importer: a widget's file from an address (the page's own rules never block it)
+        reply(fetchText(msg.url));
         return true;
       case 'devGet': // the Developer section: what the catch is set to
         reply(devGet());

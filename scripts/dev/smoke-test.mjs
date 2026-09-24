@@ -3942,6 +3942,132 @@ try {
   await shot(page, '36c-tools');
   const closeTool = async () => { await page.keyboard.press('Escape'); await page.waitForFunction(() => !document.querySelector('.bcv-tool-ov'), null, { timeout: 5000 }); };
   const openTool = async (key) => { await page.click(`.bcv-tool-card[data-tool="${key}"]`); await page.waitForSelector(`.bcv-tool[data-tool="${key}"]`, { timeout: 5000 }); };
+
+  // ---- widgets of your own: the Add card, the importer (paste, an address, a starter), the sandbox, the store, the pin, remove ----
+  console.log('widgets');
+  const probeWidget = `<!doctype html>
+<meta name="simpl-widget" content='{"name":"Probe","note":"Tries every door.","icon":"shield","size":"S","color":"#ff375f"}'>
+<style>.ink { color: var(--bcv-ink); }</style>
+<p id="out" class="ink">probing</p>
+<script>
+  var r = {};
+  try { r.parent = parent.document ? 'reached' : 'no'; } catch (e) { r.parent = 'blocked'; }
+  try { r.top = window.top === window ? 'self' : (window.top.document ? 'reached' : 'no'); } catch (e) { r.top = 'blocked'; }
+  try { localStorage.setItem('x', '1'); r.storage = 'reached'; } catch (e) { r.storage = 'blocked'; }
+  try { r.cookie = document.cookie === '' ? 'empty' : 'has'; } catch (e) { r.cookie = 'blocked'; }
+  r.origin = location.origin;
+  simpl.ready(function (t) {
+    r.hello = t && t.name; r.dark = !!(t && t.dark);
+    r.ink = getComputedStyle(document.documentElement).getPropertyValue('--bcv-ink').trim();
+    r.theme = document.documentElement.getAttribute('data-theme');
+    var done = function () { simpl.storage.set('probe', r).then(function () { document.getElementById('out').textContent = 'probed'; simpl.resize(220); }); };
+    fetch('${BASE}/api/v1/users/self').then(function (x) { r.fetch = 'answered ' + x.status; done(); }, function () { r.fetch = 'blocked'; done(); });
+  });
+</script>`;
+  const widgetsKept = () => sw.evaluate(async () => (await self.BCV.api.storage.local.get('widgets:custom'))['widgets:custom'] || []);
+  const widgetData = (id) => sw.evaluate(async (k) => (await self.BCV.api.storage.local.get(k))[k], `widgets:data:${id}`);
+  check((await page.$$('.bcv-tool-card')).length === 11 && (await texts('.bcv-tool-add__name'))[0] === 'Add a widget' && (await page.$eval('.bcv-tools', (g) => g.lastElementChild.classList.contains('bcv-tool-add'))), 'after the eleven tools, a dashed card: Add a widget');
+  await page.click('.bcv-tool-add');
+  await page.waitForSelector('.bcv-tool[data-tool="widgets"]', { timeout: 8000 });
+  check((await texts('.bcv-tool__title'))[0] === 'Add a widget' && (await texts('.bcv-tool--wimp .bcv-seg__btn')).join(' | ') === 'Paste | A file | An address | Starters', 'it opens the importer: Paste, A file, An address, Starters');
+  // a file with no header is told the line to add; every problem in a file comes at once, in plain words
+  await page.fill('.bcv-wimp__ta', '<p>hello</p>');
+  await page.click('.bcv-wimp__row .bcv-btn--primary');
+  await page.waitForSelector('.bcv-wimp__errs li', { timeout: 5000 });
+  const noHead = (await texts('.bcv-wimp__errs li'))[0];
+  check(/^No widget header/.test(noHead) && /<meta name="simpl-widget"/.test(noHead), `a file without the header is told the line to add: ${noHead.slice(0, 70)}…`);
+  await page.fill('.bcv-wimp__ta', '<meta name="simpl-widget" content=\'{"name":"X","icon":"nope","size":"XL"}\'><script src="https://x.invalid/a.js"></script>');
+  await page.click('.bcv-wimp__row .bcv-btn--primary');
+  await eventually(async () => (await page.$$('.bcv-wimp__errs li')).length >= 3, 5000);
+  const wErrs = await texts('.bcv-wimp__errs li');
+  check(wErrs.length === 3 && /No icon called "nope"/.test(wErrs[0]) && /S, M or L/.test(wErrs[1]) && /<script src/.test(wErrs[2]), `every problem at once, each with its fix: ${wErrs.map((e) => e.slice(0, 44)).join(' · ')}`);
+  // a good file: its card, and the widget running in a sandboxed frame, before it is kept
+  await page.fill('.bcv-wimp__ta', probeWidget);
+  await page.click('.bcv-wimp__row .bcv-btn--primary');
+  await page.waitForSelector('.bcv-wimp__preview .bcv-widget__frame', { timeout: 8000 });
+  const wPrev = await page.evaluate(() => { const f = document.querySelector('.bcv-wimp__preview .bcv-widget__frame'); const doc = f.getAttribute('srcdoc') || ''; return { sandbox: f.getAttribute('sandbox'), srcdoc: doc.length > 0, src: f.getAttribute('src'), card: document.querySelector('.bcv-wimp__preview .bcv-tool-card__name')?.textContent, note: document.querySelector('.bcv-wimp__preview .bcv-tool-card__note')?.textContent, csp: /Content-Security-Policy/.test(doc) && /connect-src 'none'/.test(doc) && /frame-src 'none'/.test(doc), runtime: /window\.simpl = /.test(doc) }; });
+  check(wPrev.sandbox === 'allow-scripts' && wPrev.srcdoc && !wPrev.src && wPrev.card === 'Probe' && wPrev.note === 'Tries every door.' && wPrev.csp && wPrev.runtime, `a good file shows its card and runs in a sandboxed frame — scripts only, no origin, a policy with no network, the runtime first: ${JSON.stringify(wPrev)}`);
+  const preFrame = await (await page.$('.bcv-wimp__preview .bcv-widget__frame')).contentFrame();
+  await preFrame.waitForFunction(() => document.getElementById('out')?.textContent === 'probed', null, { timeout: 8000 });
+  await page.waitForTimeout(300);
+  check((await widgetsKept()).length === 0 && (await page.evaluate(() => Math.round(document.querySelector('.bcv-wimp__preview .bcv-widget__frame').getBoundingClientRect().height))) === 220, 'the preview runs the widget (resize took) but keeps nothing of it yet');
+  await shot(page, '36d-widget-import');
+  await page.click('.bcv-wimp__foot .bcv-btn--primary');
+  await page.waitForFunction(() => !document.querySelector('.bcv-tool-ov') && document.querySelectorAll('.bcv-tool-card').length === 12, null, { timeout: 8000 });
+  const wKept = await widgetsKept();
+  check(wKept.length === 1 && wKept[0].name === 'Probe' && wKept[0].size === 'S' && wKept[0].icon === 'shield' && wKept[0].color === '#ff375f' && /^w/.test(wKept[0].id) && wKept[0].html === probeWidget && (await texts('.bcv-tool-card__name')).slice(-1)[0] === 'Probe', `Add to Tools keeps it — name, icon, size, colour, its whole file — and its card joins the grid after the built-in tools: ${JSON.stringify({ name: wKept[0].name, size: wKept[0].size, icon: wKept[0].icon })}`);
+  const wKey = `w:${wKept[0].id}`;
+  // open: the popup every tool has; the widget's probes all come back blocked; the theme reached it; resize took; a store of its own
+  await page.click(`.bcv-tool-card[data-tool="${wKey}"]`);
+  await page.waitForSelector(`.bcv-tool[data-tool="${wKey}"] .bcv-widget__frame`, { timeout: 8000 });
+  check(await eventually(async () => !!(await widgetData(wKept[0].id))?.probe?.fetch, 10000), 'the widget wrote to its store (widgets:data:<id>)');
+  const wProbe = (await widgetData(wKept[0].id))?.probe || {};
+  check(wProbe.parent === 'blocked' && wProbe.top === 'blocked' && wProbe.storage === 'blocked' && wProbe.fetch === 'blocked' && wProbe.origin === 'null' && (wProbe.cookie === 'empty' || wProbe.cookie === 'blocked'), `a widget cannot reach the page, the window above, the page's storage, its cookies or the network: ${JSON.stringify(wProbe)}`);
+  check(wProbe.hello === 'Probe' && wProbe.dark === false && /^#/.test(wProbe.ink) && wProbe.theme === 'light', `and it gets the theme: its own name, the look, the ink as a variable: ${JSON.stringify({ hello: wProbe.hello, ink: wProbe.ink, theme: wProbe.theme })}`);
+  await eventually(async () => (await page.$eval(`.bcv-tool[data-tool="${wKey}"] .bcv-widget__frame`, (f) => f.offsetHeight)) === 220, 5000); // (the frame eases to the height asked for)
+  const wPop = await page.evaluate((k) => { const t = document.querySelector(`.bcv-tool[data-tool="${k}"]`); const f = t.querySelector('.bcv-widget__frame'); return { width: t.offsetWidth, height: f.offsetHeight, title: t.querySelector('.bcv-tool__title')?.textContent, sub: t.querySelector('.bcv-tool__sub')?.textContent, acts: t.querySelectorAll('.bcv-widget__acts button').length, tile: !!t.querySelector('.bcv-tool__tile svg'), close: !!t.querySelector('.bcv-sheet__close:not(.bcv-widget__save):not(.bcv-widget__remove)') }; }, wKey);
+  check(wPop.width === 400 && wPop.height === 220 && wPop.title === 'Probe' && wPop.sub === 'Tries every door.' && wPop.acts === 2 && wPop.tile && wPop.close, `the popup is the tools' own — the tile, the name, the line, close — with save and remove in its head, at the S width, and simpl.resize(220) took: ${JSON.stringify(wPop)}`);
+  await shot(page, '36e-widget-open');
+  const [wDl] = await Promise.all([page.waitForEvent('download', { timeout: 10000 }), page.click(`.bcv-tool[data-tool="${wKey}"] .bcv-widget__save`)]);
+  check(wDl.suggestedFilename() === 'probe.html', `the save button hands the widget's own file back: ${wDl.suggestedFilename()}`);
+  await closeTool();
+  // pinned beside the switch, kept across a reload (the tray lists widgets before it reads the pins), the pin opens it; the search box lists it
+  await sw.evaluate(async ([base, key]) => { const [tab] = await chrome.tabs.query({ url: `${base}/*` }); await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'ISOLATED', args: [key], func: (k) => self.BCV.tools.pin(k) }); }, [BASE, wKey]);
+  await page.waitForSelector(`#bcv-pins .bcv-pin[data-tool="${wKey}"]`, { timeout: 5000 });
+  await page.reload();
+  await page.waitForSelector('.bcv-tool-add', { timeout: 15000 });
+  await page.waitForSelector(`#bcv-pins .bcv-pin[data-tool="${wKey}"]`, { timeout: 10000 });
+  check((await page.$$('.bcv-tool-card')).length === 12 && (await page.$eval(`.bcv-tool-card[data-tool="${wKey}"]`, (e) => e.classList.contains('is-pinned'))), 'pinned beside the switch, and still there after a reload, its card marked');
+  await page.click(`#bcv-pins .bcv-pin[data-tool="${wKey}"] .bcv-pin__btn`);
+  await page.waitForSelector(`.bcv-tool[data-tool="${wKey}"] .bcv-widget__frame`, { timeout: 8000 });
+  check(true, 'the pin opens it');
+  await closeTool();
+  await page.goto(`${BASE}/`);
+  await page.waitForSelector('#bcv-omni', { timeout: 10000 });
+  await page.click('#bcv-omni');
+  await page.fill('#bcv-omni', '/tool prob');
+  await page.waitForSelector('.bcv-omni__item', { timeout: 8000 });
+  check((await texts('.bcv-omni__item .bcv-omni__t'))[0] === 'Probe', '/tool in the search box lists it with the built-in tools');
+  await page.keyboard.press('Escape');
+  await page.goto(`${BASE}/#tools`);
+  await page.waitForSelector('.bcv-tool-add', { timeout: 15000 });
+  // an address: fetched through the background; a starter: runs before it is added
+  await page.click('.bcv-tool-add');
+  await page.waitForSelector('.bcv-tool--wimp', { timeout: 8000 });
+  await page.click('.bcv-tool--wimp .bcv-seg__btn[data-value="url"]');
+  await page.fill('.bcv-wimp__url', `${BASE}/dev/widget.html`);
+  await page.click('.bcv-wimp__row .bcv-btn--primary');
+  await page.waitForSelector('.bcv-wimp__preview', { timeout: 10000 });
+  check((await texts('.bcv-wimp__preview .bcv-tool-card__name'))[0] === 'Fetched widget', 'an address: the file is fetched through the background and checked');
+  await page.click('.bcv-wimp__foot .bcv-btn--primary');
+  await page.waitForFunction(() => !document.querySelector('.bcv-tool-ov') && document.querySelectorAll('.bcv-tool-card').length === 13, null, { timeout: 8000 });
+  await page.click('.bcv-tool-add');
+  await page.waitForSelector('.bcv-tool--wimp', { timeout: 8000 });
+  await page.click('.bcv-tool--wimp .bcv-seg__btn[data-value="starters"]');
+  await page.waitForSelector('.bcv-wimp__starter', { timeout: 8000 });
+  check((await texts('.bcv-wimp__starter .bcv-omni__t')).join(' | ') === 'Countdown | Notes pad | Unit converter | Word counter', 'four starters to begin from');
+  await page.click('.bcv-wimp__starter[data-starter="unit-converter"]');
+  await page.waitForSelector('.bcv-wimp__preview .bcv-widget__frame', { timeout: 8000 });
+  const stFrame = await (await page.$('.bcv-wimp__preview .bcv-widget__frame')).contentFrame();
+  await stFrame.waitForFunction(() => document.querySelectorAll('#ua option').length > 3, null, { timeout: 8000 });
+  await stFrame.fill('#a', '3');
+  check((await stFrame.inputValue('#b')) === '0.003' && (await stFrame.$$eval('#kinds button', (bs) => bs.map((b) => b.textContent))).join(' ') === 'Length Mass Volume Speed Temperature', 'the starter works in its frame: 3 m is 0.003 km');
+  await shot(page, '36f-widget-starter');
+  await page.click('.bcv-wimp__foot .bcv-btn--primary');
+  await page.waitForFunction(() => !document.querySelector('.bcv-tool-ov') && document.querySelectorAll('.bcv-tool-card').length === 14, null, { timeout: 8000 });
+  check((await widgetsKept()).map((w) => w.name).join(' | ') === 'Probe | Fetched widget | Unit converter', 'three widgets kept');
+  // remove: from the popup (asked first), its card, pin and store go
+  await page.click(`.bcv-tool-card[data-tool="${wKey}"]`);
+  await page.waitForSelector(`.bcv-tool[data-tool="${wKey}"]`, { timeout: 8000 });
+  await page.click(`.bcv-tool[data-tool="${wKey}"] .bcv-widget__remove`);
+  await page.waitForSelector('.bcv-sheet--ask .bcv-ask__ok', { timeout: 5000 });
+  check((await texts('.bcv-sheet--ask .bcv-sheet__title'))[0] === 'Remove Probe?', 'the bin asks first');
+  await page.click('.bcv-sheet--ask .bcv-ask__ok');
+  await page.waitForFunction(() => !document.querySelector('.bcv-sheet-ov') && document.querySelectorAll('.bcv-tool-card').length === 13, null, { timeout: 8000 });
+  check((await widgetsKept()).length === 2 && (await widgetData(wKept[0].id)) === undefined && !(await page.$(`#bcv-pins .bcv-pin[data-tool="${wKey}"]`)) && JSON.stringify(await sw.evaluate(async () => (await self.BCV.api.storage.local.get('tools:pins'))['tools:pins'])) === '[]', 'removed: the card, the pin and its store all go');
+  await sw.evaluate(async (base) => { const [tab] = await chrome.tabs.query({ url: `${base}/*` }); await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'ISOLATED', func: async () => { for (const w of await self.BCV.widgets.all()) await self.BCV.widgets.remove(w.id); self.BCV.app.render(); } }); }, BASE);
+  await page.waitForFunction(() => document.querySelectorAll('.bcv-tool-card').length === 11, null, { timeout: 8000 });
+  check((await widgetsKept()).length === 0, 'the others removed too: the eleven built-in tools again');
   // every tool opens clean: nothing empty spelled out as a word in it
   for (const key of ['cite', 'pomo', 'calc', 'graph', 'ptable', 'need', 'conv', 'pdfx', 'mark', 'ocr', 'fc']) {
     await openTool(key);

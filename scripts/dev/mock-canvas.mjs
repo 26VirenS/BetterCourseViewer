@@ -427,6 +427,8 @@ function page({ title, path = '', courseId, body }) {
 const htmlPages = {
   '/': () => page({ title: 'Dashboard', body: '<h1 class="ic-Dashboard-header__title">Dashboard</h1><div id="dashboard">stock dashboard</div>' }),
   '/courses/101/external_tools/9': () => page({ title: 'Resources & Policy', courseId: '101', body: '<h2>Resources & Policy</h2><iframe id="tool_content" src="/courses/101/external_tools/retrieve?url=x" width="600" height="300" title="Tool"></iframe>' }),
+  // a widget's file at an address (the importer's "An address" pane fetches it through the background)
+  '/dev/widget.html': () => `<!doctype html>\n<meta name="simpl-widget" content='{"name":"Fetched widget","note":"Came from an address.","icon":"globe","size":"S"}'>\n<p id="hi">Hello from an address.</p>\n<script>simpl.ready(function (t) { document.getElementById('hi').textContent = 'Hello from an address, ' + (t.dark ? 'dark' : 'light') + '.'; });</script>`,
   '/profile': () => page({ title: 'User Profile', body: '<h1>Sam Student</h1><p class="profile">Profile page rendered by Canvas.</p>' }),
   '/accounts/1/external_tools/77': () => page({ title: 'My Materials', body: '<h2 id="account-tool">My Materials (an account-level tool, launched by Canvas)</h2><iframe id="tool_content" title="My Materials" src="/courses/104/external_tools/t1/resource_selection"></iframe>' }),
   // a homework-submission tool's own picker, framed by the assignment page exactly as Canvas frames it;

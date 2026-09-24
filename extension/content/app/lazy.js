@@ -24,6 +24,8 @@
     phone: { files: ['content/app/phone.js'], has: () => !!BCV.phone },
     notes: { needs: ['setupcss'], files: ['content/app/whatsnew-notes.js'], has: () => Array.isArray(self.BCV_WHATS_NEW) },
     hub: { files: ['content/app/hub.js'], has: () => !!BCV.hub }, // the search box's commands, answers and row actions: loaded when the box is focused
+    widgets: { files: ['content/app/tools/widgets.js'], has: () => !!BCV.widgets }, // widgets of your own: the frame, the importer (loaded by Tools, and by the tray when one is kept)
+    starters: { files: ['content/app/tools/widget-starters.js'], has: () => Array.isArray(self.BCV_WIDGET_STARTERS) }, // the example widgets the importer offers
     'tool:cite': { files: ['content/app/tools/cite.js'], has: () => !!BCV.toolsCite },
     'tool:fc': { files: ['content/app/tools/cards.js'], has: () => !!BCV.toolsCards },
     'tool:conv': { files: ['content/app/tools/convert.js'], has: () => !!BCV.toolsConvert },

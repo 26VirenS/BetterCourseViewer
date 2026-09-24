@@ -696,7 +696,11 @@
   /** A pinned tool's body is fetched ahead: its capsule under the pointer draws from it. */
   const preloadPinned = () => { for (const k of pins) { const mod = BCV.lazy?.toolModule?.(k); if (mod && !BCV.lazy.has(mod)) BCV.lazy.load(mod).catch(() => {}); } };
   async function pinsLoad() {
-    const raw = await load(PINS_KEY, []);
+    const [raw, custom] = await Promise.all([load(PINS_KEY, []), load('widgets:custom', [])]);
+    // widgets of your own (content/app/tools/widgets.js) are tools too: listed before the pins are read, so a pinned one is found
+    if (Array.isArray(custom) && custom.length) {
+      try { if (!BCV.widgets && BCV.lazy?.load) await BCV.lazy.load('widgets'); await BCV.widgets?.all?.(); } catch { /* the widgets sit this page out */ }
+    }
     pins = Array.isArray(raw) ? raw.filter((k) => toolOf(k)) : [];
     pinsRead = true;
     preloadPinned();

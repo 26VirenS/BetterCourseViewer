@@ -24,6 +24,11 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.92.0', date: '2026-09-24', notes: [
+      { kind: 'new', title: 'Widgets of your own', body: 'Tools → Add a widget: one HTML file becomes a tool.', icon: P.layers },
+      { kind: 'new', title: 'Four starters', body: 'A countdown, a notes pad, a unit converter, a word counter.', icon: P.list },
+      { kind: 'new', title: 'Safe by design', body: 'A widget runs in a sandbox: no page, no session, no network.', icon: P.check },
+    ] },
     { version: '2.91.0', date: '2026-09-24', notes: [
       { kind: 'new', title: 'Search does things', body: 'Type / for commands: submit, download, convert, open…', icon: P.sparkle },
       { kind: 'new', title: 'Hand in from the box', body: '/submit opens the assignment’s hand-in block over the page.', icon: P.pen },

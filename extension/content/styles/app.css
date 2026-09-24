@@ -3573,6 +3573,41 @@ html[data-bcv-theme="dark"] .bcv-pdfx { --px-row: #0f0f11; --px-page: #1f1f22; -
 .bcv-hub-pop__body .bcv-sb--embed { scroll-margin-top: 0; }
 .bcv-hub-ov.is-closing { animation: bcv-tool-ovout .18s ease both; }
 .bcv-hub-ov.is-closing .bcv-sheet { animation: bcv-tool-out .18s ease both; }
+/* ---- widgets of your own (content/app/tools/widgets.js): the frame in the tool popup, the card that adds one, the importer ---- */
+.bcv-tool--widget .bcv-tool__body { padding: 0; gap: 0; overflow: hidden; }
+.bcv-widget { display: flex; }
+.bcv-widget__frame { display: block; width: 100%; border: 0; background: transparent; opacity: 0; transition: height .2s ease, opacity .25s ease; }
+.bcv-widget__frame.is-in { opacity: 1; }
+.bcv-widget__acts { display: flex; gap: 6px; }
+.bcv-tool-add { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; box-sizing: border-box; margin: 0; padding: 18px 20px; border: 1.5px dashed var(--bcv-edge); border-radius: 20px; background: transparent; cursor: pointer; text-align: left; color: var(--bcv-ink); font-family: var(--bcv-font); transition: background .2s ease, border-color .2s ease, transform .22s cubic-bezier(.32,.72,0,1); }
+.bcv-tool-add:hover { background: var(--bcv-hover); border-color: var(--bcv-ink3); transform: translateY(-2px); }
+.bcv-tool-add:active { transform: scale(.985); }
+.bcv-tool-add__tile { flex: none; width: 40px; height: 40px; border-radius: 13px; background: var(--bcv-fill); display: flex; align-items: center; justify-content: center; color: var(--bcv-ink2); }
+.bcv-tool-add__text { display: block; }
+.bcv-tool-add__name { font: 600 15.5px/1.3 var(--bcv-font); letter-spacing: -.016em; }
+.bcv-tool-add__note { margin-top: 4px; font: 400 12.5px/1.5 var(--bcv-font); color: var(--bcv-ink3); }
+.bcv-wimp { display: flex; flex-direction: column; gap: 14px; }
+.bcv-wimp__pane { display: flex; flex-direction: column; gap: 10px; }
+.bcv-wimp__ta { width: 100%; min-height: 150px; resize: vertical; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--bcv-edge); background: var(--bcv-card); color: var(--bcv-ink); font: 12.5px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; box-sizing: border-box; }
+.bcv-wimp__ta:focus { outline: none; border-color: var(--bcv-blue); }
+.bcv-wimp__row { display: flex; gap: 8px; align-items: center; justify-content: flex-end; }
+.bcv-wimp__url { flex: 1; min-width: 0; height: 36px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--bcv-edge); background: var(--bcv-card); color: var(--bcv-ink); font: 13.5px/1 var(--bcv-font); box-sizing: border-box; }
+.bcv-wimp__url:focus { outline: none; border-color: var(--bcv-blue); }
+.bcv-wimp__drop { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 26px 16px; border: 1.5px dashed var(--bcv-edge); border-radius: 14px; cursor: pointer; text-align: center; color: var(--bcv-ink2); font: 500 13.5px/1.4 var(--bcv-font); transition: background .2s ease, border-color .2s ease; }
+.bcv-wimp__drop:hover, .bcv-wimp__drop.is-drag { border-color: var(--bcv-blue); background: var(--bcv-hover); }
+.bcv-wimp__result:empty { display: none; }
+.bcv-wimp__result { display: flex; flex-direction: column; gap: 12px; }
+.bcv-wimp__errs { margin: 0; padding: 12px 14px 12px 30px; border-radius: 12px; background: color-mix(in srgb, #ff3b30 10%, transparent); color: var(--bcv-ink); font: 13px/1.5 var(--bcv-font); overflow-wrap: anywhere; }
+.bcv-wimp__errs li + li { margin-top: 6px; }
+.bcv-wimp__preview { display: grid; grid-template-columns: 258px minmax(0, 1fr); gap: 14px; align-items: start; }
+.bcv-wimp__preview .bcv-tool-card { pointer-events: none; }
+.bcv-wimp__stage { border: 1px solid var(--bcv-sep); border-radius: 16px; overflow: hidden; background: var(--bcv-bg); }
+.bcv-wimp__starters { display: flex; flex-direction: column; gap: 8px; }
+.bcv-wimp__starter { display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--bcv-sep); background: var(--bcv-card); cursor: pointer; text-align: left; color: var(--bcv-ink); font-family: var(--bcv-font); transition: background .18s ease; }
+.bcv-wimp__starter:hover { background: var(--bcv-hover); }
+.bcv-wimp__starter .bcv-tool-card__open { margin: 0 0 0 auto; }
+.bcv-wimp__foot { display: flex; gap: 8px; justify-content: flex-end; }
+@media (max-width: 700px) { .bcv-wimp__preview { grid-template-columns: 1fr; } }
 /* the welcome's stage under a thing seen through a hole (the search box): an arrow up at it, the words under, centred on it */
 .bcv-welcome__stage[data-stage="below"] { align-items: center; text-align: center; max-width: 620px; }
 .bcv-welcome__stage[data-stage="below"] .bcv-welcome__title { font-size: clamp(28px, 4vw, 40px); }

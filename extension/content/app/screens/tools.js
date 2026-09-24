@@ -18,12 +18,19 @@
     );
     const welcome = T().welcomeIfFirst(app).catch(() => false); // the black goes up now, over the page drawing under it
     await T().pinsLoad().catch(() => {});
+    // widgets of your own (content/app/tools/widgets.js): their cards after the built-in tools, and the card that adds one
+    try { if (!BCV.widgets && BCV.lazy?.load) await BCV.lazy.load('widgets'); await BCV.widgets?.all?.(); } catch { /* the built-in tools alone */ }
     if (!ctx.alive()) return screen;
     T().TOOLS.forEach((t, i) => {
       const card = T().cardEl(t, { dark });
       U.enter(card, i, 35, 300);
       grid.append(card);
     });
+    if (BCV.widgets) {
+      const add = BCV.widgets.addCard(app, { dark });
+      U.enter(add, T().TOOLS.length, 35, 300);
+      grid.append(add);
+    }
     void welcome;
     return screen;
   }
