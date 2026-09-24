@@ -61,8 +61,13 @@
     // the flag is read by popup() on the way in — and handed over as `stack` too, for a tool that
     // reads its storage before it builds its popup (the citations, the flashcards): by then the
     // flag is down again, and the sheet under would have been swept away rather than kept
-    t.open(BCV.app, { ...opts, stack: stackNext });
+    const stack = stackNext;
     stackNext = false;
+    const go = () => { stackNext = stack; try { t.open(BCV.app, { ...opts, stack }); } finally { stackNext = false; } };
+    // a tool's body is loaded the first time it is opened (content/app/lazy.js); the ones built in here open at once
+    const mod = BCV.lazy?.toolModule?.(key);
+    if (mod && !BCV.lazy.has(mod)) BCV.lazy.load(mod).then(go).catch((e) => U.toast(`${t.name} could not be loaded: ${e?.message || e}`, { error: true }));
+    else go();
     return true;
   }
 
@@ -688,14 +693,18 @@
   const PINS_KEY = 'tools:pins';
   let pins = [];
   let pinsRead = false;
+  /** A pinned tool's body is fetched ahead: its capsule under the pointer draws from it. */
+  const preloadPinned = () => { for (const k of pins) { const mod = BCV.lazy?.toolModule?.(k); if (mod && !BCV.lazy.has(mod)) BCV.lazy.load(mod).catch(() => {}); } };
   async function pinsLoad() {
     const raw = await load(PINS_KEY, []);
     pins = Array.isArray(raw) ? raw.filter((k) => toolOf(k)) : [];
     pinsRead = true;
+    preloadPinned();
     return pins;
   }
   async function setPins(next) {
     pins = next.filter((k, i) => toolOf(k) && next.indexOf(k) === i);
+    preloadPinned();
     await save(PINS_KEY, pins);
     paintPins();
   }

@@ -497,6 +497,25 @@
 
   /** Staggered entry (mockup 8/9): the element rises in after index × step ms, capped at
    *  420ms so a long list never crawls. A keyframe with a both fill; reduced motion drops it. */
+  /** The word-mark's dot (the setup's and What's New's intro): placed where the word "Simpl" ends
+   *  as this system's font draws it, and the drawing widened to hold it. */
+  function placeDot(intro) {
+    try {
+      const svg = intro.querySelector('svg');
+      const text = intro.querySelector('text');
+      const dot = intro.querySelector('.intro__dot');
+      if (!svg || !text || !dot) return;
+      const b = text.getBBox();
+      if (!(b.width > 0)) return;
+      const cx = Math.round(b.x + b.width + 14);
+      dot.setAttribute('cx', String(cx));
+      dot.style.transformOrigin = `${cx}px 90px`;
+      const w = Math.max(304, cx + 16);
+      svg.setAttribute('viewBox', `0 0 ${w} 142`);
+      svg.setAttribute('width', String(Math.round(w * (356 / 304))));
+    } catch { /* the design's place */ }
+  }
+
   function enter(node, i = 0, step = 55, dur = 380) {
     if (!node) return node;
     node.classList.add('bcv-enter');
@@ -723,7 +742,7 @@
   }
 
   BCV.ui = {
-    svg, star, chev, el, text, tile, dot, card, row, label, h2, groupHead, badge, seg, search, switchEl, btn, iconbtn, pill,
+    svg, star, chev, el, text, tile, dot, card, row, label, h2, groupHead, badge, seg, search, switchEl, btn, iconbtn, pill, placeDot,
     empty, emptyCard, loading, errorBox, hint, avatar, toast, menu, closeMenus, picker, colorMenu, COURSE_COLORS, fmtDay, datePop, dateField, promptSheet, askSheet,
     DAY, startOfDay, addDays, sameDay, dayDiff, startOfWeek, parse, MONTHS, MONTHS_LONG, DAYS, DAYS_LONG,
     fmtTime, fmtTimeLower, fmtShort, fmtLong, fmtDateComma, fmtAt, fmtAtUpper, fmtBy, dayTitle, fmtDow, fmtRecent, whenShort, plural,

@@ -7,6 +7,7 @@
  * uploaded. */
 (function () {
   const BCV = (self.BCV = self.BCV || {});
+  if (BCV.toolsOcr) return; // loaded once: asked for on demand (content/app/lazy.js), and a second copy would listen for the reader's frame twice
   const { h, overlayRoot } = BCV.utils;
   const U = BCV.ui;
   const IC = BCV.IC;

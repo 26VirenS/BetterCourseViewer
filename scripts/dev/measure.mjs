@@ -28,7 +28,7 @@ const BASE = `http://localhost:${PORT}`;
 const extDir = join(tmpdir(), `bcv-measure-${process.pid}`);
 cpSync(join(root, 'extension'), extDir, { recursive: true });
 const manifest = JSON.parse(readFileSync(join(extDir, 'manifest.json'), 'utf8'));
-for (const cs of manifest.content_scripts) cs.matches.push(`${BASE}/*`);
+for (const cs of manifest.content_scripts) if (!cs.matches.includes('https://lazy.simplcourses.invalid/*')) cs.matches.push(`${BASE}/*`); // (the on-demand modules keep their never-matching group: a page asks for them, as it does in a browser)
 manifest.host_permissions.push(`${BASE}/*`);
 writeFileSync(join(extDir, 'manifest.json'), JSON.stringify(manifest, null, 2));
 shortenTimers(extDir);
@@ -36,18 +36,23 @@ shortenTimers(extDir);
 const groups = manifest.content_scripts.filter((cs) => cs.matches.some((m) => /instructure|<all_urls>|\*:\/\/\*\/\*/.test(m))).map((cs) => ({ run_at: cs.run_at || 'document_idle', js: (cs.js || []).map((f) => ({ f, bytes: statSync(join(extDir, f)).size })), css: (cs.css || []).map((f) => ({ f, bytes: statSync(join(extDir, f)).size })) }));
 const parsed = { js: groups.flatMap((g) => g.js).reduce((s, x) => s + x.bytes, 0), css: groups.flatMap((g) => g.css).reduce((s, x) => s + x.bytes, 0), files: groups.flatMap((g) => [...g.js, ...g.css]).length };
 
+const step = (s) => console.log(`  … ${s}`);
 const server = spawn(process.execPath, [join(root, 'scripts', 'dev', 'mock-canvas.mjs'), String(PORT), String(SIM_PORT)], { stdio: 'ignore' });
 await new Promise((r) => setTimeout(r, 700));
+step('mock up');
 const userDataDir = join(tmpdir(), `bcv-measure-profile-${process.pid}`);
 const context = await chromium.launchPersistentContext(userDataDir, { channel: 'chromium', headless: true, viewport: { width: 1400, height: 900 }, args: [`--disable-extensions-except=${extDir}`, `--load-extension=${extDir}`, '--js-flags=--expose-gc'] });
+step('browser up');
 const result = { label, at: new Date().toISOString(), version: manifest.version, parsed, screens: [], idle: [], storage: null, errors: [] };
 try {
   let [sw] = context.serviceWorkers();
   if (!sw) sw = await context.waitForEvent('serviceworker', { timeout: 15000 });
+  step('service worker up');
   await afterMigration(sw);
   await new Promise((r) => setTimeout(r, 800));
   for (const p of context.pages()) if (p.url().endsWith('/setup/setup.html')) await p.close();
-  await sw.evaluate((v) => self.BCV.api.storage.local.set({ 'setup:offered': true, 'setup:done': true, 'welcome:search': true, 'tools:welcomed': true, 'whatsnew:seen': v }), manifest.version);
+  await sw.evaluate((v) => self.BCV.api.storage.local.set({ 'setup:offered': true, 'setup:done': true, 'welcome:search': true, 'tools:welcomed': true, 'setup:flow': 3, 'whatsnew:seen': v }), manifest.version);
+  step('storage seeded');
   const page = await context.newPage();
   page.on('pageerror', (e) => result.errors.push(e.message));
   let reqs = 0; let reqBytes = 0;
@@ -73,7 +78,7 @@ try {
   await measure('dashboard (first load)');
   const navs = await page.$$eval('.bcv-nav__item[data-nav]', (els) => els.map((e) => e.dataset.nav));
   for (const id of navs.filter((n) => n !== 'dashboard')) {
-    await page.click(`.bcv-nav__item[data-nav="${id}"]`).catch(() => {});
+    await page.click(`.bcv-nav__item[data-nav="${id}"]`, { timeout: 4000 }).catch(() => {});
     await settled();
     await new Promise((r) => setTimeout(r, 1200));
     await measure(id);
@@ -90,8 +95,8 @@ try {
   await settled();
   await new Promise((r) => setTimeout(r, 1200));
   await measure('dashboard (again)');
-  for (let round = 0; round < 2; round++) for (const id of navs) { await page.click(`.bcv-nav__item[data-nav="${id}"]`).catch(() => {}); await settled(); await new Promise((r) => setTimeout(r, 400)); }
-  await page.click('.bcv-nav__item[data-nav="dashboard"]').catch(() => {});
+  for (let round = 0; round < 2; round++) for (const id of navs) { await page.click(`.bcv-nav__item[data-nav="${id}"]`, { timeout: 4000 }).catch(() => {}); await settled(); await new Promise((r) => setTimeout(r, 400)); }
+  await page.click('.bcv-nav__item[data-nav="dashboard"]', { timeout: 4000 }).catch(() => {});
   await settled();
   await new Promise((r) => setTimeout(r, 1200));
   await measure('dashboard (after 2 rounds)');

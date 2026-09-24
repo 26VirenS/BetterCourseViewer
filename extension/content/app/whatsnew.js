@@ -65,15 +65,19 @@
   /** Due when this version has notes that have not been shown, the setup is done, and the version
    *  is not the one the setup itself installed. `from` is the version left behind, when known and
    *  older than this one. */
+  /** The notes travel with the build but are read on demand (content/app/lazy.js), with the setup's
+   *  stylesheet the page draws with: asked for only once a page has something to show. */
+  const notesReady = async () => { try { await BCV.lazy?.load?.('notes'); } catch { /* none to show, then */ } return NOTES().length > 0 && typeof self.BCV_SETUP_CSS === 'string'; };
   async function due() {
     const to = version();
-    if (!to || !NOTES().some((v) => v.version === to)) return null;
+    if (!to) return null;
     let flags = {};
     try { flags = await BCV.api.storage.local.get(['setup:done', SEEN_KEY, FROM_KEY]); } catch { return null; }
     if (!flags['setup:done']) return null; // a fresh install gets the setup, never both
     if (flags[SEEN_KEY] === to) return null;
     const from = flags[FROM_KEY] || flags[SEEN_KEY] || null;
     if (from === to) return null;
+    if (!(await notesReady()) || !NOTES().some((v) => v.version === to)) return null;
     const invite = !!NOTES().find((v) => v.version === to)?.invite && !(await tried()); // (an invitation, unless a theme has been tried already)
     return { from: from && cmp(from, to) < 0 ? from : null, to, invite };
   }
@@ -124,6 +128,7 @@
 
   async function open(app, { from = null, to = version(), manual = false, invite: asked = false } = {}) {
     if (ui) return;
+    if (!(await notesReady()) || ui) return;
     const shown = since(from, to);
     if (!shown.length) return;
     // an update that due() says invites (the version carries an invitation, and no theme has been tried) shows it in the notes' place; Settings still opens the notes
@@ -181,7 +186,7 @@
     intro.hidden = false;
     intro.classList.remove('is-fading');
     main.classList.remove('is-in');
-    BCV.setup?.placeDot?.(intro); // the dot where the word ends, in this system's font
+    BCV.ui?.placeDot?.(intro); // the dot where the word ends, in this system's font
     void intro.offsetWidth;
     timers.push(setTimeout(() => { if (ui) ui.intro.classList.add('is-fading'); }, 1900));
     timers.push(setTimeout(() => { if (ui) { ui.intro.hidden = true; ui.main.classList.add('is-in'); } }, 2340));

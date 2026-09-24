@@ -72,8 +72,10 @@
     const toolRows = (can.file || can.url) && Array.isArray(tools) ? tools.filter((t) => t && t.id && (!t.homework_submission || t.homework_submission.enabled !== false)) : [];
     const toolsFailed = (can.file || can.url) && tools === null;
     const allowedExt = (a.allowed_extensions || []).map((e) => String(e).toLowerCase().replace(/^\./, '').trim()).filter(Boolean);
-    // what else the drop zone takes: the types the converter turns into one of those (a Word file where only PDF is allowed)
-    const conv = allowedExt.length ? await (BCV.toolsConvert?.convertible?.(allowedExt) || Promise.resolve(null)).catch(() => null) : null;
+    // what else the drop zone takes: the types the converter turns into one of those (a Word file where
+    // only PDF is allowed) — the converter's own code is loaded on demand (content/app/lazy.js), so it is asked for first
+    const withConverter = async (fn) => { try { await BCV.lazy?.load?.('tool:conv'); } catch { /* without it: the accepted types alone */ } return fn(); };
+    const conv = allowedExt.length ? await withConverter(() => BCV.toolsConvert?.convertible?.(allowedExt) || null).catch(() => null) : null;
     if (!ctx.alive()) return screen;
     const extWords = () => listWords(allowedExt.map((e) => e.toUpperCase()));
     const typesLine = allowedExt.length ? `${extWords()} only` : 'Any file type';
@@ -231,7 +233,7 @@
           continue;
         }
         if (allowedExt.length && !allowedExt.includes(extOf(file.name))) {
-          const p = await (BCV.toolsConvert?.plan?.(file, allowedExt) || Promise.resolve(null)).catch(() => null);
+          const p = await withConverter(() => BCV.toolsConvert?.plan?.(file, allowedExt) || null).catch(() => null);
           if (!p) {
             await U.askSheet({ title: `“${file.name}” can’t be attached`, note: `This assignment only takes ${extWords()}. A ${(extOf(file.name) || 'file').toUpperCase()} file can’t be turned into any of those here.`, okLabel: 'OK', cancelLabel: null });
             continue;
@@ -381,11 +383,13 @@
         if (!items) return;
         window.removeEventListener('message', onMsg);
         ov?.remove();
+        store.invalidateGrades?.().catch?.(() => {}); // the tool's frame may have left a grade behind: every screen with a score asks again
         takeItems(items, name);
       };
       const close = () => {
         window.removeEventListener('message', onMsg);
         ov?.remove();
+        store.invalidateGrades?.().catch?.(() => {});
       };
       ov = h('div', { class: 'bcv-sheet-ov', tabindex: '-1', onclick: (e) => { if (e.target === ov) close(); }, onkeydown: (e) => { if (e.key === 'Escape') close(); } }, U.el('bcv-sheet bcv-sheet--tool', [
         U.el('bcv-sheet__head', [

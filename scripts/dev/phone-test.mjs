@@ -31,7 +31,7 @@ const BASE = `http://localhost:${PORT}`;
 const extDir = join(tmpdir(), `bcv-phone-ext-${Date.now()}`);
 cpSync(join(root, 'extension'), extDir, { recursive: true });
 const manifest = JSON.parse(readFileSync(join(extDir, 'manifest.json'), 'utf8'));
-for (const cs of manifest.content_scripts) cs.matches.push(`${BASE}/*`);
+for (const cs of manifest.content_scripts) if (!cs.matches.includes('https://lazy.simplcourses.invalid/*')) cs.matches.push(`${BASE}/*`); // (the on-demand modules keep their never-matching group: a page asks for them, as it does in a browser)
 manifest.host_permissions.push(`${BASE}/*`);
 writeFileSync(join(extDir, 'manifest.json'), JSON.stringify(manifest, null, 2));
 const timers = shortenTimers(extDir); // the product's longest waits run short in this copy (harness.mjs)
@@ -468,7 +468,8 @@ try {
   await shot('06c-course-assignments');
   // the edge swipe pops the stack like Back
   await page.mouse.move(8, 500); await page.mouse.down(); await page.mouse.move(140, 505, { steps: 8 }); await page.mouse.up();
-  check(await eventually(async () => page.url() === `${BASE}/courses/101` && !!(await page.$('.bcv-ph-body--course'))), 'an edge swipe from the left pops back to the course');
+  const popped = await eventually(async () => page.url() === `${BASE}/courses/101` && !!(await page.$('.bcv-ph-body--course')));
+  check(popped, `an edge swipe from the left pops back to the course${popped ? '' : ` (${page.url().replace(BASE, '')}, main: ${await page.evaluate(() => [...document.querySelectorAll('#bcv-main > *')].map((e) => e.className).join(' | '))}, sheet: ${await page.evaluate(() => !!document.querySelector('.bcv-sheet-ov'))}, root: ${await page.evaluate(() => document.documentElement.className)})`}`);
   check(await eventually(async () => (await texts('.bcv-topbar__back'))[0] === 'Courses'), `and the pop leaves the course's Back at Courses again (‹ ${(await texts('.bcv-topbar__back'))[0]})`);
   // an item opened from the Today tab says Back to Today, not to the list it belongs to
   await tab('dashboard');

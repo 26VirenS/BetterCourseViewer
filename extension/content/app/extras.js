@@ -36,14 +36,20 @@
     return items;
   }
 
-  /** What to show now: this page's menu, else the last one seen. */
+  /** What to show now: this page's menu, else the last one seen. The menu is written down for the
+   *  pages without one — once it differs from what is written, not on every page load. */
+  let saved; // the preference as last read or written (undefined until read once)
   function items() {
     const live = parseMenu();
     if (live.length) {
       const json = JSON.stringify(live);
       if (JSON.stringify(memo) !== json) {
         memo = live;
-        store.setPref('globalNav', live).catch(() => {});
+        (saved === undefined ? store.pref('globalNav', null).catch(() => null) : Promise.resolve(saved)).then((prev) => {
+          saved = prev;
+          if (JSON.stringify(prev) !== json) { saved = live; return store.setPref('globalNav', live); }
+          return null;
+        }).catch(() => {});
       }
       return live;
     }

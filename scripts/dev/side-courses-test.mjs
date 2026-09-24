@@ -24,7 +24,7 @@ const BASE = `http://localhost:${PORT}`;
 const extDir = join(tmpdir(), `bcv-qn-ext-${Date.now()}`);
 cpSync(join(root, 'extension'), extDir, { recursive: true });
 const manifest = JSON.parse(readFileSync(join(extDir, 'manifest.json'), 'utf8'));
-for (const cs of manifest.content_scripts) cs.matches.push(`${BASE}/*`);
+for (const cs of manifest.content_scripts) if (!cs.matches.includes('https://lazy.simplcourses.invalid/*')) cs.matches.push(`${BASE}/*`); // (the on-demand modules keep their never-matching group: a page asks for them, as it does in a browser)
 manifest.host_permissions.push(`${BASE}/*`);
 writeFileSync(join(extDir, 'manifest.json'), JSON.stringify(manifest, null, 2));
 const server = spawn(process.execPath, [join(root, 'scripts', 'dev', 'mock-canvas.mjs'), String(PORT)], { stdio: 'ignore' });
@@ -107,7 +107,7 @@ try {
 
   // pointer away closes it
   await page.hover('.bcv-nav__item[data-nav="courses"]');
-  await page.waitForSelector('.bcv-quicknav', { timeout: 5000 });
+  await page.waitForSelector('.bcv-quicknav', { timeout: 12000 }); // (the hover's own delay, and a starved machine: three suites run side by side)
   await page.hover('.bcv-nav__item[data-nav="dashboard"]');
   await page.waitForTimeout(400);
   check(!(await page.$('.bcv-quicknav')), 'hover: the pointer leaving both closes it');

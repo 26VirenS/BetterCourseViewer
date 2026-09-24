@@ -32,7 +32,7 @@ const manifest = JSON.parse(readFileSync(join(extDir, 'manifest.json'), 'utf8'))
 delete manifest.background.scripts;
 delete manifest.background.persistent;
 delete manifest.author;
-for (const cs of manifest.content_scripts) cs.matches.push(`${BASE}/*`);
+for (const cs of manifest.content_scripts) if (!cs.matches.includes('https://lazy.simplcourses.invalid/*')) cs.matches.push(`${BASE}/*`); // (the on-demand modules keep their never-matching group: a page asks for them, as it does in a browser)
 manifest.host_permissions.push(`${BASE}/*`);
 writeFileSync(join(extDir, 'manifest.json'), JSON.stringify(manifest, null, 2));
 

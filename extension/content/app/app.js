@@ -196,7 +196,9 @@
   /** While an attempt is going the page says so, and the pinned tools are put away: nothing opens over a quiz. */
   function syncQuizFlag() { html.classList.toggle('bcv-in-quiz', inQuiz()); }
   let quizFlagT = 0;
-  new MutationObserver(() => { clearTimeout(quizFlagT); quizFlagT = setTimeout(syncQuizFlag, 250); }).observe(document.documentElement, { childList: true, subtree: true }); // (a quiz tool's frame lands after the page does)
+  // (a quiz tool's frame lands after the page does) — watched on Canvas's own root, not the whole
+  // document: the interface's every redraw under #bcv-app is not a mutation worth a record here
+  new MutationObserver(() => { clearTimeout(quizFlagT); quizFlagT = setTimeout(syncQuizFlag, 250); }).observe(document.getElementById('application') || document.body || document.documentElement, { childList: true, subtree: true });
   const confirmLeave = () => window.confirm('You are in the middle of a quiz. Leave it anyway?\n\nCanvas keeps your answers so far, but a timer keeps running and some quizzes allow only one attempt.');
 
   /** Is a quiz of ours on this page at all — the intro, an attempt, the review, the feedback?
@@ -323,16 +325,8 @@
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') U.closeMenus();
     });
-    // A tool's frame going away (Box or Office 365 in the submit sheet, any framed LTI tool) may
-    // have left a grade behind: the scores are asked for again on the next draw. The sheets that
-    // hold such frames hang off the body, not the shell, so that is what is watched.
-    new MutationObserver((muts) => {
-      for (const m of muts) {
-        for (const n of m.removedNodes) {
-          if (n.nodeType === 1 && (n.matches?.('iframe.bcv-sb__frame') || n.querySelector?.('iframe.bcv-sb__frame'))) { store.invalidateGrades(); return; }
-        }
-      }
-    }).observe(document.body, { childList: true, subtree: true });
+    // (a tool's frame going away — Box or Office 365 in the hand-in block — may have left a grade
+    // behind: the block itself asks for the scores again as it closes that sheet, screens/submit.js)
     // Every plain link inside a screen (a module item, a link in a page's prose, a row) navigates the
     // way the sidebar does: in place when the interface draws that address, a real load otherwise.
     main.addEventListener('click', (e) => {
@@ -362,8 +356,11 @@
     const later = (fn) => (window.requestIdleCallback ? window.requestIdleCallback(fn, { timeout: 1200 }) : setTimeout(fn, 500));
     later(() => {
       if (id !== state.renderId) return;
-      if (r.screen === 'course' || r.screen === 'group') { BCV.screens.course.warmTabs?.(r); return; }
-      for (const key of ROOT_WARM) if (key !== r.screen) warm(key);
+      if (r.screen === 'course' || r.screen === 'group') { BCV.screens.course.warmTabs?.(r, () => id === state.renderId); return; }
+      // one screen per idle moment, not all seven at once: the page stays responsive between them
+      const queue = ROOT_WARM.filter((key) => key !== r.screen && !warmed.has(key));
+      const next = () => { if (id !== state.renderId) return; const key = queue.shift(); if (!key) return; warm(key); later(next); };
+      next();
     });
   }
   const warmed = new Set();
@@ -1001,6 +998,7 @@
       if (alive() && !quiet && !keepsShell()) main.replaceChildren(U.el('bcv-screen bcv-screen--skel', U.el('bcv-body', U.loading(r.screen === 'gpa' ? 'cards' : 'rows', 6))));
     }, 150);
     const nativeWanted = r.params.get('bcv') === 'native' || (!screens[r.screen] && !(phone() && BCV.phone.screens[r.screen])) || r.screen === 'native';
+    if (state.themeImages && !nativeWanted) await BCV.theme?.ensureAssets?.(state.themeImages, picSlots(r.screen))?.catch?.(() => {}); // this screen's pictures, read in before it draws (nothing to read once they are here)
     const draw = async () => {
       if (nativeWanted) return screens.native.render(ctx);
       if (r.screen === 'course') return screens.course.render(ctx);
@@ -1070,6 +1068,8 @@
   /** The theme's photo behind a root screen's header (the Theme step's Headers): sharp at the right,
    *  blurred as it comes left, the chrome's own ground veiling the left where the title sits
    *  (app.css: .bcv-head--pic). Drawn again in place when the photos change. */
+  /** The photo slots a screen draws: the sidebar's, its own header's, and the Dashboard's six counters (lib/theme.js). */
+  const picSlots = (screen) => ['side', `head:${screen}`, ...(screen === 'dashboard' ? (BCV.theme?.CARD_SLOTS || []).map((k) => `card:${k}`) : [])];
   function dressHead(el, screen) {
     const head = el?.querySelector?.('.bcv-head:not(.bcv-head--course)');
     const pic = head ? BCV.theme.picOf(state.themeImages, state.themeImages?.headers?.[screen]) : null; // { sharp, blur }
@@ -1350,6 +1350,8 @@
       html.classList.remove('bcv-on');
       return;
     }
+    // the phone layout's code is loaded on demand: only a page narrow enough to draw it asks for it
+    if (html.classList.contains('bcv-phone') && !BCV.phone) { try { await BCV.lazy?.load?.('phone'); } catch { /* the desktop layout, then */ } }
     // Until the guided setup has been finished (a flag in the extension's storage, shared by every
     // site), every Canvas page with the interface on opens it over the Dashboard.
     state.lookOn = BCV.early?.isOn?.() ?? state.settings.appearance.skin !== false; // the page's own look: the saved one, or this page's one-page note
@@ -1367,7 +1369,7 @@
     if (welcome === 'appearance' && html.classList.contains('bcv-phone')) { BCV.welcome.clear('appearance').catch(() => {}); welcome = false; } // (no sidebar, no Appearance button to point at)
     if (welcome === 'search' && (html.classList.contains('bcv-phone') || parseRoute().screen !== 'dashboard')) welcome = false; // (the search box is the Dashboard's, and a phone has none: it waits for the Dashboard)
     if (welcome) BCV.welcome.cover();
-    state.themeImages = await BCV.theme?.loadImages?.().catch(() => null); // the theme's photos (lib/theme.js), for the sidebar and the Dashboard's counters
+    state.themeImages = await BCV.theme?.loadImages?.({ need: picSlots(parseRoute().screen) }).catch(() => null); // the theme's photos (lib/theme.js): the index, and the pictures this page shows
     if (state.themeImages) BCV.theme?.fillTones?.(state.themeImages).catch(() => {}); // photos kept before tones were: read now, saved, drawn again by the listener below
     await applySkin(state.lookOn);
     mountLookToggle();
@@ -1384,14 +1386,20 @@
       if (change && !busy()) BCV.whatsnew.open(BCV.app, change);
     }
     BCV.extras?.prime?.(BCV.app);
-    // Settings reads this site, and writes to Canvas with the session's token the page can see (Settings cannot read the cookie itself)
+    // Settings reads this site, and writes to Canvas with the session's token the page can see (Settings cannot read the cookie itself).
+    // Written when it changed, or once an hour — not on every page load.
     const token = BCV.canvas.csrfToken();
-    BCV.api.storage.local.set({ 'site:last': { host: location.host, origin: location.origin, at: Date.now() }, ...(token ? { [`csrf:${location.host}`]: token } : {}) }).catch(() => {});
+    BCV.api.storage.local.get(['site:last', `csrf:${location.host}`]).then((r) => {
+      const last = r?.['site:last'];
+      const same = last && last.host === location.host && last.origin === location.origin && Date.now() - (last.at || 0) < 60 * 60 * 1000;
+      if (same && (!token || r?.[`csrf:${location.host}`] === token)) return;
+      return BCV.api.storage.local.set({ 'site:last': { host: location.host, origin: location.origin, at: Date.now() }, ...(token ? { [`csrf:${location.host}`]: token } : {}) });
+    }).catch(() => {});
     // the theme's photos changed (the Theme step, in this tab or another): the sidebar and a Dashboard on show take them up
     try {
       BCV.api.storage.onChanged.addListener((changes, area) => {
         if (area !== 'local' || !changes[BCV.theme?.IMAGES_KEY]) return;
-        BCV.theme.loadImages().then((images) => { state.themeImages = images; if (state.lookOn && document.getElementById('bcv-app')) { renderSide(); dressHead(document.getElementById('bcv-main'), state.route?.screen); if (state.route?.screen === 'dashboard') render({ quiet: true }); } }).catch(() => {});
+        BCV.theme.loadImages({ need: picSlots(state.route?.screen || parseRoute().screen) }).then((images) => { state.themeImages = images; if (state.lookOn && document.getElementById('bcv-app')) { renderSide(); dressHead(document.getElementById('bcv-main'), state.route?.screen); if (state.route?.screen === 'dashboard') render({ quiet: true }); } }).catch(() => {});
       });
     } catch { /* no storage events here: the next page reads them */ }
     BCV.early?.onChange((st, settings) => {

@@ -52,7 +52,7 @@ const manifest = JSON.parse(readFileSync(join(extDir, 'manifest.json'), 'utf8'))
 // lib/theme.js as the page runs it: the shades a colour derives, and which colours are readable
 const THEME = (() => { const self = {}; new Function('self', readFileSync(join(extDir, 'lib', 'theme.js'), 'utf8'))(self); return self.BCV.theme; })();
 const rgbOf = (hex) => `rgb(${[1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)).join(', ')})`;
-for (const cs of manifest.content_scripts) cs.matches.push(`${BASE}/*`);
+for (const cs of manifest.content_scripts) if (!cs.matches.includes('https://lazy.simplcourses.invalid/*')) cs.matches.push(`${BASE}/*`); // (the on-demand modules keep their never-matching group: a page asks for them, as it does in a browser)
 manifest.host_permissions.push(`${BASE}/*`, `${SIM}/*`, `${FAR}/*`); // (a shipped build has the run of every site, or is given it a site at a time)
 // the bar's script as the quiet build ships it: Canvas's domain and the sites said yes to, not every site — so FAR has none of its own
 for (const cs of manifest.content_scripts) if ((cs.js || []).includes('content/toolbar.js')) cs.matches = ['*://*.instructure.com/*', `${BASE}/*`, `${SIM}/*`];
@@ -3346,8 +3346,16 @@ try {
   await page.waitForSelector(pz('#pzDone'), { timeout: 10000 });
   const saved = await page.evaluate(() => { const r = document.querySelector('#bcv-setup').shadowRoot; return { h1: r.querySelector('.pz__doneh1').textContent, rows: [...r.querySelectorAll('.pz__srow')].map((e) => `${e.querySelector('.pz__sk').textContent}: ${e.querySelector('.pz__sv').textContent}`).join(' | '), btns: [...r.querySelectorAll('.pz__donebtns button')].map((b) => b.textContent).join(',') }; });
   const savedTheme = await sw.evaluate(async () => (await self.BCV.settings.get()).appearance.theme);
-  const savedImages = await sw.evaluate(async () => { const v = (await self.BCV.api.storage.local.get('theme:images'))['theme:images']; return { side: (v?.side || '').slice(0, 15), today: (v?.cards?.today || '').slice(0, 15), head: (v?.headers?.dashboard || '').slice(0, 15), tones: Object.keys(v?.tones || {}).sort().join(','), assets: Object.values(v?.assets || {}).map((a) => `${a.scene || 'photo'}:${(a.sharp || '').slice(0, 15)}:${!!a.ink && !!a.inkBlur && !a.blur}`).sort().join('|') }; });
-  check(saved.h1 === 'Saved' && saved.rows === 'Colour: Pink · 2 photos | Course colours: 1 changed | Page headers: 1 of 9' && saved.btns === 'Edit,Open Canvas' && savedTheme.accent === pinkA && savedTheme.name === 'Pink' && savedImages.side.startsWith('asset:') && savedImages.today.startsWith('asset:') && savedImages.head.startsWith('asset:') && savedImages.assets === 'Dusk:data:image/jpeg:true|Ocean:data:image/jpeg:true|photo:data:image/jpeg:true' && savedImages.tones === 'head:dashboard,side,today' && ((await colourNow()) || '').toLowerCase() === '#e91e63', `Save writes it all at once — the theme, the photos with their tones, the course's colour to Canvas — and says so: ${JSON.stringify({ saved, savedTheme, savedImages })}`);
+  // the index under theme:images says what each slot wears and lists the pictures kept; the pictures
+  // themselves live under a key each (theme:asset:<id>), read by a page as it needs them, never inline
+  const savedImages = await sw.evaluate(async () => {
+    const v = (await self.BCV.api.storage.local.get('theme:images'))['theme:images'];
+    const ids = v?.assetIds || [];
+    const got = await self.BCV.api.storage.local.get(ids.map((id) => `theme:asset:${id}`));
+    const assets = ids.map((id) => got[`theme:asset:${id}`]).filter(Boolean);
+    return { side: (v?.side || '').slice(0, 15), today: (v?.cards?.today || '').slice(0, 15), head: (v?.headers?.dashboard || '').slice(0, 15), tones: Object.keys(v?.tones || {}).sort().join(','), inline: 'assets' in (v || {}), kept: ids.length, assets: assets.map((a) => `${a.scene || 'photo'}:${(a.sharp || '').slice(0, 15)}:${!!a.ink && !!a.inkBlur && !a.blur}`).sort().join('|') };
+  });
+  check(saved.h1 === 'Saved' && saved.rows === 'Colour: Pink · 2 photos | Course colours: 1 changed | Page headers: 1 of 9' && saved.btns === 'Edit,Open Canvas' && savedTheme.accent === pinkA && savedTheme.name === 'Pink' && savedImages.side.startsWith('asset:') && savedImages.today.startsWith('asset:') && savedImages.head.startsWith('asset:') && !savedImages.inline && savedImages.kept === 3 && savedImages.assets === 'Dusk:data:image/jpeg:true|Ocean:data:image/jpeg:true|photo:data:image/jpeg:true' && savedImages.tones === 'head:dashboard,side,today' && ((await colourNow()) || '').toLowerCase() === '#e91e63', `Save writes it all at once — the theme, the photos (a key each, the index naming them) with their tones, the course's colour to Canvas — and says so: ${JSON.stringify({ saved, savedTheme, savedImages })}`);
   await shot(page, '32e6-personalize-saved');
   await Promise.all([page.waitForNavigation({ timeout: 20000 }), page.click(pz('#pzOpen'))]);
   await page.waitForSelector('#bcv-welcome[data-stage="look"]', { timeout: 20000 });

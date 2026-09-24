@@ -283,6 +283,18 @@
   const inflight = new Map();
   const generation = new Map();
   const cacheKey = (key) => `${location.host}:${key}`;
+  /** The memo is bounded: a long session in one tab (every course's every tab warmed, then the
+   *  next course's) would otherwise hold every answer it ever had. Past the cap the expired go
+   *  first, then the oldest; nothing on screen is lost, since a screen holds what it drew from. */
+  const MEMO_MAX = 400;
+  function trim() {
+    if (memory.size <= MEMO_MAX) return;
+    const now = Date.now();
+    for (const [k, v] of memory) if (v.until && v.until <= now) memory.delete(k);
+    if (memory.size <= MEMO_MAX) return;
+    const oldest = [...memory.entries()].sort((a, b) => (a[1].at || 0) - (b[1].at || 0)).slice(0, memory.size - MEMO_MAX);
+    for (const [k] of oldest) memory.delete(k);
+  }
   async function cached(key, ttlMs, loader, { force = false, refresh = false, maxAge = 0 } = {}) {
     const k = cacheKey(key);
     if (!force && !refresh) {
@@ -303,7 +315,7 @@
     try {
       run = (async () => {
         const value = await loader();
-        if ((generation.get(k) || 0) === gen) memory.set(k, { value, at: Date.now(), until: ttlMs > 0 ? Date.now() + ttlMs : 0 });
+        if ((generation.get(k) || 0) === gen) { memory.set(k, { value, at: Date.now(), until: ttlMs > 0 ? Date.now() + ttlMs : 0 }); trim(); }
         return value;
       })();
     } finally {

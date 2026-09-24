@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Simpl Courses",
-  "version": "2.89.0",
+  "version": "2.90.0",
   "description": "Canvas with navigation that actually makes sense and a UI that you can actually use.",
   "author": "Simpl Courses contributors",
   "icons": {
@@ -91,8 +91,8 @@
         "content/app/icons.js",
         "content/app/ui.js",
         "content/app/store.js",
+        "content/app/lazy.js",
         "content/app/search.js",
-        "content/app/quiz-page.js",
         "content/app/preview.js",
         "content/app/viewer.js",
         "content/app/exttool.js",
@@ -105,14 +105,28 @@
         "content/app/screens/calendar.js",
         "content/app/screens/inbox.js",
         "content/app/screens/group.js",
-        "content/app/screens/quiz.js",
-        "content/app/screens/feedback.js",
-        "content/app/screens/submit.js",
         "content/app/screens/course.js",
         "content/app/screens/course-detail.js",
         "content/app/screens/grades.js",
         "content/app/screens/gpa.js",
         "content/app/tools/tools.js",
+        "content/app/screens/tools.js",
+        "content/app/whatsnew.js",
+        "content/app/welcome.js",
+        "content/app/extras.js",
+        "content/app/app.js"
+      ]
+    },
+    {
+      "matches": [
+        "https://lazy.simplcourses.invalid/*"
+      ],
+      "run_at": "document_end",
+      "js": [
+        "content/app/quiz-page.js",
+        "content/app/screens/quiz.js",
+        "content/app/screens/feedback.js",
+        "content/app/screens/submit.js",
         "content/app/tools/cite.js",
         "content/app/tools/cards.js",
         "content/app/tools/convert.js",
@@ -122,16 +136,11 @@
         "content/app/tools/ocr.js",
         "content/app/tools/ptable-data.js",
         "content/app/tools/ptable.js",
-        "content/app/screens/tools.js",
         "setup/setup-css.js",
         "content/app/personalize.js",
         "content/app/setup.js",
         "content/app/whatsnew-notes.js",
-        "content/app/whatsnew.js",
-        "content/app/welcome.js",
-        "content/app/extras.js",
-        "content/app/phone.js",
-        "content/app/app.js"
+        "content/app/phone.js"
       ]
     },
     {

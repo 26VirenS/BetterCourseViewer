@@ -14,6 +14,7 @@
  * same Canvas reads the desktop uses. */
 (function () {
   const BCV = (self.BCV = self.BCV || {});
+  if (BCV.phone) return; // loaded once: this file is asked for on demand (content/app/lazy.js), and a second copy would listen to the page twice
   const { h, htmlToText } = BCV.utils;
   const U = BCV.ui;
   const IC = BCV.IC;
@@ -163,10 +164,15 @@
     const wrap = U.el('bcv-ph-swipe', [tray, front]);
     let x0 = 0, y0 = 0, dx = 0, base = 0, dragging = false, moved = false;
     const set = (x, animate) => { front.style.transition = animate ? 'transform .22s cubic-bezier(.32,.72,0,1)' : 'none'; front.style.transform = `translateX(${x}px)`; };
-    const api = { el: wrap, close: () => { base = 0; set(0, true); wrap.classList.remove('is-open'); } };
+    // a row is promoted to its own layer only while a finger is on it (will-change on every row of
+    // a long list is a layer per row, held for the page's life)
+    let layerT = 0;
+    const layer = (on) => { clearTimeout(layerT); if (on) front.style.willChange = 'transform'; else layerT = setTimeout(() => { front.style.willChange = ''; }, 260); };
+    const api = { el: wrap, close: () => { base = 0; set(0, true); wrap.classList.remove('is-open'); layer(false); } };
     front.addEventListener('pointerdown', (e) => {
       if (e.pointerType === 'mouse' && e.button !== 0) return;
       x0 = e.clientX; y0 = e.clientY; dragging = true; moved = false;
+      layer(true);
     });
     front.addEventListener('pointermove', (e) => {
       if (!dragging) return;
@@ -184,9 +190,10 @@
     const end = () => {
       if (!dragging) return;
       dragging = false;
-      if (!moved) return;
+      if (!moved) { layer(false); return; }
       if (dx < -W / 2) { base = -W; set(-W, true); wrap.classList.add('is-open'); openSwipe = api; }
       else { base = 0; set(0, true); wrap.classList.remove('is-open'); if (openSwipe === api) openSwipe = null; }
+      layer(false);
     };
     front.addEventListener('pointerup', end);
     front.addEventListener('pointercancel', end);

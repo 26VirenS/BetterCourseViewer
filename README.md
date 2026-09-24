@@ -206,12 +206,13 @@ The same extension runs inside an iOS app: a full-screen web view of your school
 extension/
   manifest.json                Manifest V3 (Safari, Chrome, Firefox)
   background.js                badge, custom sites (and the sniffer's report), the page after install
-  lib/                         settings, Canvas REST helper (with the request gate), markdown, utils, the OCR reader, vendored libraries
+  lib/                         settings, Canvas REST helper (with the request gate), theme, utils, the OCR reader, vendored libraries
   content/early.js             document_start: applies skin + appearance before first paint
   content/styles/app.css       the whole design system (light/dark variables, every component)
   content/app/icons.js         icon paths
   content/app/ui.js            components, date formatting, colour math
   content/app/store.js         every Canvas API loader + the grade model
+  content/app/lazy.js          code on demand: the quiz, hand-in, tools, setup and phone files (a manifest group that never matches) load on first use
   content/app/app.js           shell (sidebar), router, punch-through for Canvas-drawn pages
   content/app/screens/         dashboard, courses, todo, groups, calendar, inbox, gpa (the Grades page),
                                course (shell + tabs), course-detail, grades (course grade card), quiz, submit, native

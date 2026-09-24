@@ -1928,7 +1928,7 @@ html[data-bcv-theme="dark"] .bcv-ph-circle { border-color: rgba(255,255,255,.28)
 .bcv-ph-swipe .bcv-ph-row, .bcv-ph-swipe .bcv-ph-nfrow { border-top: 0; }
 .bcv-ph-swipe__acts { position: absolute; inset: 0; display: flex; justify-content: flex-end; }
 .bcv-ph-swipe__act { width: 76px; border: 0; cursor: pointer; color: #fff; font: 600 12px/1.2 var(--bcv-font); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; }
-.bcv-ph-swipe__front { position: relative; background: var(--bcv-card); touch-action: pan-y; will-change: transform; }
+.bcv-ph-swipe__front { position: relative; background: var(--bcv-card); touch-action: pan-y; }
 /* courses */
 .bcv-ph-clist { display: flex; flex-direction: column; gap: 10px; }
 .bcv-ph-swipe--card { border-top: 0; border-radius: 18px; box-shadow: var(--bcv-shadow); }

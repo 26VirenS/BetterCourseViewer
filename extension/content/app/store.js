@@ -190,9 +190,13 @@
     return 'current';
   }
 
-  /** All courses, decorated with colour, palette, favourite flag and state. */
+  /** All courses, decorated with colour, palette, favourite flag and state. Decorated once per
+   *  answer: the same list, colours and mode give the same objects back (every screen asks for
+   *  the courses, some several times a draw, and each ask used to build the whole set anew). */
+  let coursesMemo = null; // { list, cols, dark, out }
   async function courses({ force = false, refresh = false, maxAge = 0 } = {}) {
     const [list, cols, dark] = await Promise.all([rawCourses({ force, refresh, maxAge }), colors({ force, refresh }), Promise.resolve(BCV.early?.isDark?.() ?? false)]);
+    if (coursesMemo && coursesMemo.list === list && coursesMemo.cols === cols && coursesMemo.dark === dark) return coursesMemo.out;
     const seen = new Set();
     const out = [];
     let fallbackIdx = 0;
@@ -228,6 +232,7 @@
         url: `/courses/${id}`,
       });
     }
+    coursesMemo = { list, cols, dark, out };
     return out;
   }
   function roleLabel(type) {

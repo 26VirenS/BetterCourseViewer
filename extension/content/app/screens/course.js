@@ -106,15 +106,23 @@
     const light = Math.min(0.94, Math.max(0.72, 1 - l));
     return `hsl(${hue}, ${Math.round(sat * 100)}%, ${Math.round(light * 100)}%)`;
   }
+  // Only the elements that can carry a colour of the page's own are measured: anything with a style,
+  // a colour or a class of its own, a table cell, a span, a link (Canvas blue) — a plain paragraph
+  // or list item inherits ours and is skipped, which is most of a page. Each computed style is read
+  // once and kept for the pass (they are live objects, read before anything is written).
+  const COLOURED = '[style], [bgcolor], [color], [class], font, a, table, td, th, span, div, section, blockquote, pre, code, mark';
   function fitDark(wrap) {
     if (!BCV.app?.isDark?.()) return;
     let tries = 0;
     const pass = () => {
       if (!wrap.isConnected) { if (tries++ < 10) requestAnimationFrame(pass); return; }
-      const all = Array.from(wrap.querySelectorAll('*'));
+      const all = Array.from(wrap.querySelectorAll(COLOURED));
+      if (!all.length) return;
+      const styles = new Map();
+      const styleOf = (el) => { let s = styles.get(el); if (!s) { s = getComputedStyle(el); styles.set(el, s); } return s; };
       const plates = new Map(); // element → how light the page paints it, for the text pass below
       for (const el of all) {
-        const bg = rgbOf(getComputedStyle(el).backgroundColor);
+        const bg = rgbOf(styleOf(el).backgroundColor);
         if (!bg || !(bg.a > 0.5)) continue; // see-through: our own background is what shows
         plates.set(el, bg.lum);
         if (bg.lum > LIGHT_BG) el.classList.add('bcv-onlight');
@@ -124,16 +132,17 @@
       const fixes = [];
       for (const el of all) {
         if (el.closest('.bcv-onlight')) continue; // dark ink is the right ink there
-        const mine = rgbOf(getComputedStyle(el).color);
+        const colour = styleOf(el).color;
+        const mine = rgbOf(colour);
         if (!mine || mine.lum > TOO_DARK) continue;
         const parent = el.parentElement;
-        if (parent && getComputedStyle(parent).color === getComputedStyle(el).color) continue; // inherited, not set here
+        if (parent && styleOf(parent).color === colour) continue; // inherited, not set here
         let plate = null; // the nearest background the page paints behind this text
         for (let p = el; p && p !== wrap.parentElement; p = p.parentElement) if (plates.has(p)) { plate = plates.get(p); break; }
         if (plate !== null && plate > OWN_BG) continue;
-        fixes.push(el);
+        fixes.push([el, mine]);
       }
-      for (const el of fixes) el.style.setProperty('color', flip(rgbOf(getComputedStyle(el).color)), 'important');
+      for (const [el, mine] of fixes) el.style.setProperty('color', flip(mine), 'important');
     };
     requestAnimationFrame(pass);
   }
@@ -422,10 +431,15 @@
       /* nothing to warm */
     }
   }
-  /** Every other tab of the course (or group) on screen, once it has landed and the page is idle. */
-  function warmTabs(r) {
+  /** Every other tab of the course (or group) on screen, once it has landed and the page is idle —
+   *  one tab per idle moment, in the rail's order, and only while `still()` says the screen is the
+   *  one on show (a hop to another course stops the warming of the one left behind). */
+  function warmTabs(r, still = () => true) {
     const kind = r.screen === 'group' ? 'groups' : 'courses';
-    for (const tab of kind === 'groups' ? GROUP_TABS : Object.keys(TAB_WARM)) if (tab !== r.tab) warmTab(kind, r.courseId, tab);
+    const queue = (kind === 'groups' ? GROUP_TABS : Object.keys(TAB_WARM)).filter((tab) => tab !== r.tab);
+    const later = (fn) => (window.requestIdleCallback ? window.requestIdleCallback(fn, { timeout: 1500 }) : setTimeout(fn, 400));
+    const next = () => { if (!still()) return; const tab = queue.shift(); if (!tab) return; warmTab(kind, r.courseId, tab); later(next); };
+    next();
   }
 
   /** Header (back link, colour, title, pills, Immersive Reader) plus the

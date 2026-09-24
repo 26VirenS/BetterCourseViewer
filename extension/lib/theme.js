@@ -281,15 +281,18 @@
   const SCENE_VARIANTS = 9;
   const SCENE_TONES = { Dusk: '#b8527a', Ocean: '#3a8fd6', Forest: '#2f8f4e', Sand: '#e8a767' };
   const SCENE_NAMES = Object.keys(SCENE_TONES);
-  // every drawing, built once: 'Dusk' is the first variation, 'Dusk#3' the fourth
+  // every drawing, built once — the first time one is asked for: 'Dusk' is the first variation,
+  // 'Dusk#3' the fourth. (This file runs before every Canvas page paints; a page that shows no
+  // scene never draws the thirty-six of them, a few hundred kilobytes of text.)
   const SCENE_URLS = new Map();
-  for (const name of SCENE_NAMES) for (let k = 0; k < SCENE_VARIANTS; k++) SCENE_URLS.set(k ? `${name}#${k}` : name, DRAW[name.toLowerCase()](k));
+  const scenes = () => { if (!SCENE_URLS.size) for (const name of SCENE_NAMES) for (let k = 0; k < SCENE_VARIANTS; k++) SCENE_URLS.set(k ? `${name}#${k}` : name, DRAW[name.toLowerCase()](k)); return SCENE_URLS; };
   /** A scene's drawing: `name` alone is its first variation, or a variation k (wrapped round the nine). */
-  const sceneUrl = (name, k = 0) => { const n = ((k % SCENE_VARIANTS) + SCENE_VARIANTS) % SCENE_VARIANTS; return SCENE_URLS.get(n ? `${name}#${n}` : name) || null; };
+  const sceneUrl = (name, k = 0) => { const n = ((k % SCENE_VARIANTS) + SCENE_VARIANTS) % SCENE_VARIANTS; return scenes().get(n ? `${name}#${n}` : name) || null; };
   /** The drawing a scene key stands for ('Dusk', 'Dusk#3'), or null for anything else. */
-  const sceneUrlOf = (key) => (key ? SCENE_URLS.get(key) || null : null);
-  /** [name, picture, tone]: the tone is what the veils warm to, as a read photo's would be. */
-  const PRESET_PHOTOS = SCENE_NAMES.map((n) => [n, sceneUrl(n), SCENE_TONES[n]]);
+  const sceneUrlOf = (key) => (key ? scenes().get(key) || null : null);
+  /** [name, picture, tone]: the tone is what the veils warm to, as a read photo's would be. Built when first asked for. */
+  let presetPhotos = null;
+  const presetPhotosOf = () => (presetPhotos ||= SCENE_NAMES.map((n) => [n, sceneUrl(n), SCENE_TONES[n]]));
 
   // ---- the photos: read here, scaled here, kept here ------------------------------------------------
   /** Where a photo can go: the six counters of the Dashboard, and the sidebar. */
@@ -346,13 +349,15 @@
   async function fillTones(images) {
     if (!images) return images;
     images.tones = images.tones || {};
+    const missing = toneKeys(images).filter((key) => !images.tones[key]);
+    // pictures kept before assets are packed now, once — and a set that would not pack (a picture
+    // that will not draw) is not packed again on every page load, each time rewriting the whole set
+    if (!missing.length && !(hasRaw(images) && !images.packStuck)) return images;
+    await ensureAssets(images); // every slot's picture: the tones are read off them, and a save packs them all
     let added = 0;
-    for (const key of toneKeys(images)) {
-      if (images.tones[key]) continue;
+    for (const key of missing) {
       try { images.tones[key] = await imageTone(picOf(images, imageAt(images, key))?.sharp); added++; } catch { /* left without a tone: the ground colour serves */ }
     }
-    // pictures kept before assets are packed now, once — and a set that would not pack (a picture
-    // that will not draw) is not packed again on every page load, each time rewriting the whole blob
     if (added || (hasRaw(images) && !images.packStuck)) await saveImages(images).catch(() => {});
     return images;
   }
@@ -365,7 +370,7 @@
   const ASSET = /^asset:/;
   const hashOf = (str) => { let h = 2166136261; const step = Math.max(1, Math.floor(str.length / 4096)); for (let i = 0; i < str.length; i += step) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0).toString(16) + str.length.toString(36); };
   /** The scene key a raw drawing is ('Dusk', 'Dusk#3'), or null for a photo. */
-  const sceneNameOf = (v) => { if (!v || !v.startsWith('data:image/svg+xml')) return null; for (const [key, url] of SCENE_URLS) if (url === v) return key; return null; };
+  const sceneNameOf = (v) => { if (!v || !v.startsWith('data:image/svg+xml')) return null; for (const [key, url] of scenes()) if (url === v) return key; return null; };
   /** A blur over one channel of RGBA pixels (the alpha of a mask), clamped at the edges. */
   function boxBlurAlpha(d, w, h, r) {
     const tmp = new Float32Array(w * h);
@@ -494,21 +499,71 @@
   };
   /** The raw value a slot stands for, for editing: a scene's own drawing, or the picture itself. */
   const rawOf = (images, v) => { const p = picOf(images, v); if (!p) return null; return p.scene ? sceneUrlOf(p.scene) || p.sharp : p.sharp; };
-  const hasRaw = (images) => [images?.side, ...Object.values(images?.cards || {}), ...Object.values(images?.headers || {})].some((v) => v && (!ASSET.test(v) || (!images?.assets?.[v.slice(6)]?.ink && !images?.assets?.[v.slice(6)]?.inkFailed)));
+  /** Is anything still raw — a picture not packed into an asset, or an asset in hand that has no ink and
+   *  did not fail to take one? (an asset not read into memory is taken as packed: it was, to be kept) */
+  const hasRaw = (images) => [images?.side, ...Object.values(images?.cards || {}), ...Object.values(images?.headers || {})].some((v) => { if (!v) return false; if (!ASSET.test(v)) return true; const a = images?.assets?.[v.slice(6)]; return !!a && !a.ink && !a.inkFailed; });
 
   const emptyImages = () => ({ side: null, cards: {}, headers: {}, tones: {}, assets: {} });
-  async function loadImages() {
+  // ---- kept in storage: the index under theme:images, the pictures under a key each --------------
+  // A tab used to read the whole set at boot — every picture, sharp and inked, for every slot: a few
+  // megabytes held by every Canvas tab for the one or two pictures its page shows. The index says
+  // what each slot wears and lists the pictures kept; the pictures live under their own keys and
+  // are read as a page needs them (the sidebar's, this screen's header's, the Dashboard's counters').
+  const ASSET_KEY = (id) => `theme:asset:${id}`;
+  /** The value a slot wears: 'side', 'card:<slot>' (or the bare slot), 'head:<screen>'. */
+  const slotValue = (images, slot) => (slot === 'side' ? images?.side : slot.startsWith('head:') ? images?.headers?.[slot.slice(5)] : images?.cards?.[slot.startsWith('card:') ? slot.slice(5) : slot]);
+  const allSlots = (images) => ['side', ...Object.keys(images?.cards || {}).map((k) => `card:${k}`), ...Object.keys(images?.headers || {}).map((k) => `head:${k}`)];
+  /** The pictures the slots wear, read into `images.assets` where they are not there yet (no slots: every slot's). */
+  async function ensureAssets(images, slots = null) {
+    if (!images) return images;
+    images.assets = images.assets || {};
+    const want = new Set();
+    for (const s of slots || allSlots(images)) { const v = slotValue(images, s); if (v && ASSET.test(v) && !images.assets[v.slice(6)]) want.add(v.slice(6)); }
+    if (!want.size) return images;
+    try {
+      const r = await BCV.api.storage.local.get([...want].map(ASSET_KEY));
+      for (const id of want) { const a = r?.[ASSET_KEY(id)]; if (a && typeof a === 'object') images.assets[id] = a; }
+    } catch { /* drawn without them */ }
+    return images;
+  }
+  /** The index as written: the slots, the tones, the ids of the pictures kept (those go under their keys). */
+  const indexOf = (p) => ({ side: p.side, cards: p.cards, headers: p.headers, tones: Object.fromEntries(toneKeys(p).filter((k) => p.tones?.[k]).map((k) => [k, p.tones[k]])), assetIds: Object.keys(p.assets || {}), ...(hasRaw(p) ? { packStuck: true } : {}) });
+  /** The set, with the pictures of `need` (an array of slots) read in — or of every slot ('all'). */
+  async function loadImages({ need = 'all' } = {}) {
     try {
       const r = await BCV.api.storage.local.get(IMAGES_KEY);
       const v = r?.[IMAGES_KEY];
-      return v && typeof v === 'object' ? { side: v.side || null, cards: { ...(v.cards || {}) }, headers: { ...(v.headers || {}) }, tones: { ...(v.tones || {}) }, assets: { ...(v.assets || {}) }, ...(v.packStuck ? { packStuck: true } : {}) } : emptyImages();
+      if (!v || typeof v !== 'object') return emptyImages();
+      const images = { side: v.side || null, cards: { ...(v.cards || {}) }, headers: { ...(v.headers || {}) }, tones: { ...(v.tones || {}) }, assets: {}, ...(v.packStuck ? { packStuck: true } : {}) };
+      if (v.assets && typeof v.assets === 'object' && Object.keys(v.assets).length) {
+        // kept as one blob until 2.90: the pictures are moved out to a key each, once
+        images.assets = { ...v.assets };
+        try {
+          await BCV.api.storage.local.set(Object.fromEntries(Object.entries(v.assets).map(([id, a]) => [ASSET_KEY(id), a])));
+          await BCV.api.storage.local.set({ [IMAGES_KEY]: indexOf(images) });
+        } catch { /* read whole next time too */ }
+        return images;
+      }
+      return await ensureAssets(images, need === 'all' ? null : need);
     } catch { return emptyImages(); }
   }
-  const saveImages = async (images) => { const p = await packImages(images || emptyImages()); return BCV.api.storage.local.set({ [IMAGES_KEY]: { side: p.side, cards: p.cards, headers: p.headers, tones: Object.fromEntries(toneKeys(p).filter((k) => p.tones?.[k]).map((k) => [k, p.tones[k]])), assets: p.assets, ...(hasRaw(p) ? { packStuck: true } : {}) } }); };
+  /** Writes the set: every raw picture packed into an asset, the pictures under their keys first and the
+   *  index last (a tab that reads the index finds its pictures there already), pictures nothing wears any more removed. */
+  async function saveImages(images) {
+    const p = await packImages(images || emptyImages());
+    let before = [];
+    try { before = (await BCV.api.storage.local.get(IMAGES_KEY))?.[IMAGES_KEY]?.assetIds || []; } catch { /* none known */ }
+    const ids = Object.keys(p.assets);
+    if (ids.length) await BCV.api.storage.local.set(Object.fromEntries(ids.map((id) => [ASSET_KEY(id), p.assets[id]])));
+    await BCV.api.storage.local.set({ [IMAGES_KEY]: indexOf(p) });
+    const gone = before.filter((id) => !ids.includes(id));
+    if (gone.length) await BCV.api.storage.local.remove(gone.map(ASSET_KEY)).catch(() => {});
+  }
   BCV.theme = {
     hexToRgb, rgbToHex, rgbToHsl, hslToRgb, hslToHex, luminance, contrast, normalize,
-    GROUND, MIN_SAT, ICON_RATIO, PRESETS, REGULAR, PRESET_PHOTOS, SCENE_VARIANTS, sceneUrl, sceneNameOf, CARD_SLOTS, HEADER_SLOTS, IMAGES_KEY,
+    GROUND, MIN_SAT, ICON_RATIO, PRESETS, REGULAR, SCENE_VARIANTS, sceneUrl, sceneNameOf, CARD_SLOTS, HEADER_SLOTS, IMAGES_KEY,
     palette, shades, shadeSet, cssVars, apply, readable, readableOn, fillFor, mix, tint, customHex, controlsOf, veilBase, picCss, band, nearest,
-    readImage, imageTone, fillTones, loadImages, saveImages, emptyImages, packImages, picOf, rawOf, CAST, INK_LIFT, inkOn, inkFor, inkCached,
+    readImage, imageTone, fillTones, loadImages, ensureAssets, saveImages, emptyImages, packImages, picOf, rawOf, CAST, INK_LIFT, inkOn, inkFor, inkCached,
+    get PRESET_PHOTOS() { return presetPhotosOf(); }, // (the drawings, made on the first ask)
   };
 })();

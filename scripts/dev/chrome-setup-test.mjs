@@ -38,10 +38,13 @@ const sniffer = manifest.content_scripts.find((cs) => (cs.js || []).includes('co
 // content/toolbar.js is the other that looks past Canvas: it sleeps on every page until the
 // background says this tab is a tool's, and then puts the interface's bar over it
 const toolbar = manifest.content_scripts.find((cs) => (cs.js || []).includes('content/toolbar.js'));
-const own = manifest.content_scripts.filter((cs) => cs !== sniffer && cs !== toolbar);
+// the on-demand modules (content/app/lazy.js) sit in a group whose match never fires: a browser parses none of them until a page asks
+const lazy = manifest.content_scripts.find((cs) => (cs.matches || []).includes('https://lazy.simplcourses.invalid/*'));
+const own = manifest.content_scripts.filter((cs) => cs !== sniffer && cs !== toolbar && cs !== lazy);
 check(JSON.stringify(manifest.host_permissions) === '["*://*/*"]' && !manifest.optional_host_permissions, `the Chrome build has the run of every site, and no optional sites left to ask for: ${JSON.stringify(manifest.host_permissions)}`);
 check(!!sniffer && JSON.stringify(sniffer.matches) === '["*://*/*"]' && JSON.stringify(sniffer.exclude_matches) === '["*://*.instructure.com/*"]' && sniffer.js.length === 1 && sniffer.run_at === 'document_idle', `the sniffer alone runs on every site but Canvas's own, at idle: ${JSON.stringify(sniffer)}`);
 check(own.length === 2 && own.every((cs) => JSON.stringify(cs.matches) === '["*://*.instructure.com/*"]'), `the interface's own scripts still match Canvas's domain alone (${own.map((cs) => cs.matches.join(',')).join(' | ')})`);
+check(!!lazy && lazy.matches.length === 1 && lazy.js.length >= 10 && lazy.js.includes('content/app/phone.js') && lazy.js.includes('content/app/screens/quiz.js') && !lazy.css, `the on-demand modules keep their never-matching group in the Chrome build (${lazy?.js.length} files)`);
 check(!!toolbar && JSON.stringify(toolbar.matches) === '["*://*/*"]' && toolbar.js.length === 1 && toolbar.run_at === 'document_start', `the tool bar runs on every site, early enough to be there before the tool's page paints: ${JSON.stringify(toolbar)}`);
 check(!manifest.background.scripts && !('persistent' in manifest.background) && !manifest.author && manifest.action.default_icon['128'] === 'icons/icon-128.png', 'the Firefox/Safari keys are gone and the toolbar icon is the blue tile');
 
@@ -94,7 +97,7 @@ try {
   const gone = setup.waitForEvent('close', { timeout: 20000 }).then(() => true, () => false);
   await page.goto(`${BASE}/`);
   await page.waitForSelector('#bcv-setup', { state: 'attached', timeout: 20000 }); // (a shadow host of no size: attached, not visible)
-  for (let i = 0; i < 40 && loads < 3; i++) await page.waitForTimeout(150); // (the card can be up before its own document's load event)
+  for (let i = 0; i < 80 && loads < 3; i++) await page.waitForTimeout(150); // (the card can be up before its own document's load event; a busy machine takes its time over the reload)
   check((await domains()).join(',') === BASE, `found and saved as a site of its own: ${JSON.stringify(await domains())}`);
   const regs = await registered();
   const regFiles = await sw.evaluate(async () => (await self.BCV.api.scripting.getRegisteredContentScripts()).map((s) => s.js.join('+')));
@@ -110,7 +113,7 @@ try {
   again.on('load', () => { loads2++; });
   await again.goto(`${BASE}/courses`);
   await again.waitForSelector('#bcv-setup', { state: 'attached', timeout: 20000 });
-  for (let i = 0; i < 40 && loads2 < 2; i++) await again.waitForTimeout(150); // (the second load comes on its own time on a busy machine)
+  for (let i = 0; i < 80 && loads2 < 2; i++) await again.waitForTimeout(150); // (the second load comes on its own time on a busy machine: three suites run side by side)
   await again.waitForTimeout(600); // (and no third one follows)
   check(loads2 === 2 && (await domains()).length === 1, `loads with the interface on it from the start, and once more for the setup's address — never for the sniffer (${loads2} loads)`);
 

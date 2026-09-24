@@ -24,6 +24,11 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.90.0', date: '2026-09-24', notes: [
+      { kind: 'improved', title: 'Lighter pages', body: 'A page parses far less code; the rest loads when used.', icon: P.sparkle },
+      { kind: 'improved', title: 'Photos, as needed', body: 'A tab reads only the pictures its own screen shows.', icon: P.pic },
+      { kind: 'improved', title: 'Less busy work', body: 'Fewer writes and watchers; warm-ups one at a time.', icon: P.clock },
+    ] },
     { version: '2.89.0', date: '2026-09-24', notes: [
       { kind: 'fixed', title: 'Dropped scores count', body: 'A drop-lowest rule is applied to the total and the rings.', icon: P.steps },
       { kind: 'fixed', title: 'All-day events', body: 'An all-day event sits on its own day, not the day before.', icon: P.clock },

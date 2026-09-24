@@ -356,6 +356,9 @@ if (typeof importScripts === 'function' && !self.BCV?.devcode) {
       case 'inject': // a bundled library, into the tab that asks for it (the Tools tab's file converter)
         reply(injectVendor(sender, msg.files));
         return true;
+      case 'load': // one of the interface's own on-demand modules (content/app/lazy.js), into the page that asks
+        reply(injectLazy(sender, msg.files));
+        return true;
       case 'canvasSeen': // the Chrome build's sniffer found Canvas on a site of the school's own
         reply(canvasSeen(sender, msg));
         return true;
@@ -412,6 +415,20 @@ if (typeof importScripts === 'function' && !self.BCV?.devcode) {
     await api.scripting.executeScript({ target: { tabId: sender.tab.id, frameIds: [sender.frameId || 0] }, files: list });
     return { ok: true, files: list };
   }
+  // The interface's own on-demand modules (content/app/lazy.js): the manifest lists them in a
+  // content-script group whose match never fires, so a page parses none of them until it asks —
+  // and nothing outside that group can be asked for.
+  const LAZY_MATCH = 'https://lazy.simplcourses.invalid/*';
+  let lazyOk = null;
+  const lazyFiles = () => (lazyOk ||= new Set((api.runtime.getManifest().content_scripts || []).filter((cs) => (cs.matches || []).includes(LAZY_MATCH)).flatMap((cs) => cs.js || [])));
+  async function injectLazy(sender, files) {
+    const ok = lazyFiles();
+    const list = Array.isArray(files) ? files.filter((f) => ok.has(f)) : [];
+    if (!list.length || list.length !== files.length) throw new Error('Nothing to load');
+    if (!sender?.tab?.id || !api.scripting?.executeScript) throw new Error('Not available here');
+    await api.scripting.executeScript({ target: { tabId: sender.tab.id, frameIds: [sender.frameId || 0] }, files: list });
+    return { ok: true, files: list };
+  }
 
   // A settings change has to reach the open Canvas tabs, and storage.onChanged is not a reliable way
   // to get it there: in Safari a content script often never hears a change written by the popup or
@@ -421,8 +438,7 @@ if (typeof importScripts === 'function' && !self.BCV?.devcode) {
   // none of ours in it never answers.
   S.onChange((settings) => { pushSettings(settings); writeUp(settings); });
   async function pushSettings(settings) {
-    let tabs = [];
-    try { tabs = await api.tabs.query({}); } catch { return; }
+    const tabs = await canvasTabs(); // the Canvas tabs alone: every other site's tab has nothing of ours to tell
     await Promise.all(tabs.map((t) => api.tabs.sendMessage(t.id, { type: 'settingsPush', settings }).catch(() => {})));
   }
 
@@ -477,7 +493,8 @@ if (typeof importScripts === 'function' && !self.BCV?.devcode) {
   function scriptsFor(origin) {
     const manifest = api.runtime.getManifest();
     const match = `${origin}/*`;
-    return (manifest.content_scripts || []).filter((cs) => !NOT_THE_INTERFACE.some((f) => (cs.js || []).includes(f))).map((cs, i) => ({
+    // (the on-demand modules' group is not registered for a site: a page asks for those as it needs them)
+    return (manifest.content_scripts || []).filter((cs) => !NOT_THE_INTERFACE.some((f) => (cs.js || []).includes(f)) && !(cs.matches || []).includes(LAZY_MATCH)).map((cs, i) => ({
       id: `${scriptIdFor(origin)}-${i}`,
       matches: [match],
       js: cs.js || [],
@@ -826,7 +843,7 @@ if (typeof importScripts === 'function' && !self.BCV?.devcode) {
     // the interface's own scripts alone: the sniffer and the tool bar run on every site, and their
     // matches would make every open tab in the browser a "Canvas tab" — reloaded, work and all
     const NOT_THE_INTERFACE = ['content/sniff.js', 'content/toolbar.js'];
-    const manifestScripts = (api.runtime.getManifest().content_scripts || []).filter((cs) => !NOT_THE_INTERFACE.some((f) => (cs.js || []).includes(f)));
+    const manifestScripts = (api.runtime.getManifest().content_scripts || []).filter((cs) => !NOT_THE_INTERFACE.some((f) => (cs.js || []).includes(f)) && !(cs.matches || []).includes(LAZY_MATCH));
     const registered = (await api.scripting?.getRegisteredContentScripts?.().catch(() => []) || []).filter((s) => !String(s.id || '').startsWith('bcv-toolbar-'));
     const res = [...manifestScripts, ...registered].flatMap((cs) => cs.matches || []).map(matchRe).filter(Boolean);
     return tabs.filter((t) => typeof t.url === 'string' && /^https?:/.test(t.url) && res.some((re) => re.test(t.url)));

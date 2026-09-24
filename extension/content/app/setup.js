@@ -137,22 +137,7 @@
    *  word is set in the system's font, and Windows (Segoe UI, Arial) and Linux draw it wider than
    *  the Mac's SF Pro, where the design's 288 sat just past the l and elsewhere lands on it. The
    *  drawing widens to fit, so the mark stays centred. The What's New page shares this. */
-  function placeDot(intro) {
-    try {
-      const svg = intro.querySelector('svg');
-      const text = intro.querySelector('text');
-      const dot = intro.querySelector('.intro__dot');
-      if (!svg || !text || !dot) return;
-      const b = text.getBBox();
-      if (!(b.width > 0)) return;
-      const cx = Math.round(b.x + b.width + 14);
-      dot.setAttribute('cx', String(cx));
-      dot.style.transformOrigin = `${cx}px 90px`;
-      const w = Math.max(304, cx + 16);
-      svg.setAttribute('viewBox', `0 0 ${w} 142`);
-      svg.setAttribute('width', String(Math.round(w * (356 / 304))));
-    } catch { /* the design's place */ }
-  }
+  const placeDot = (intro) => BCV.ui?.placeDot?.(intro); // (the one drawing, in ui.js: What's New is always here, the setup is loaded on demand)
   /** The word-mark, then the setup rises under it. Reduced motion goes straight to the setup. */
   function playIntro() {
     if (!ui) return;
