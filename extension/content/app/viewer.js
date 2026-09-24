@@ -72,18 +72,18 @@
   }
 
   let current = null; // { ov, restore }
-  function close() {
+  function close({ now = false } = {}) {
     if (!current) return;
     const { ov, restore } = current;
     current = null;
-    ov.remove();
+    if (now) ov.remove(); else U.dismiss(ov); // (a file opened over another: the old sheet goes at once, the new one rises in its place)
     try { restore?.focus?.(); } catch { /* it may be gone */ }
   }
   /** Opens `file` — an API File object, or just `{ id }`, fetched here — over the page. `context`
    *  is the course or group it belongs to (its Canvas addresses hang off that); `from` is the
    *  control that was pressed, which the sheet grows out of and hands focus back to. */
   async function open(file, { context = null, from = null } = {}) {
-    close();
+    close({ now: true });
     const dark = !!BCV.app?.isDark?.();
     const ov = U.el('bcv-sheet-ov bcv-viewer-ov', null, { role: 'dialog', 'aria-label': 'File', tabindex: '-1' });
     const sheet = U.el('bcv-sheet bcv-viewer');

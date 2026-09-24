@@ -73,7 +73,7 @@
     globe: 'M12 3.5a8.5 8.5 0 1 0 0 17 8.5 8.5 0 0 0 0-17zM3.5 12h17M12 3.5c2.5 2.3 2.5 14.2 0 17-2.5-2.8-2.5-14.7 0-17z',
     journal: 'M6 3.5h9l4 4v13H6zM15 3.5v4h4M9.5 13h6M9.5 16.5h4',
     slides: 'M4 5h16v10H4zM12 15v4M8.5 19h7',
-    upload: 'M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19.5h14',
+    upload: 'M12 15V4M7.5 8.5 12 4l4.5 4.5M5 19.5h14', // (up, out of the tray: download is the same arrow pointing down)
     play: 'M8 5l11 7-11 7z',
     pause: 'M9 6v12M15 6v12',
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',

@@ -382,13 +382,13 @@
         const items = contentItems(e);
         if (!items) return;
         window.removeEventListener('message', onMsg);
-        ov?.remove();
+        BCV.ui.dismiss(ov);
         store.invalidateGrades?.().catch?.(() => {}); // the tool's frame may have left a grade behind: every screen with a score asks again
         takeItems(items, name);
       };
       const close = () => {
         window.removeEventListener('message', onMsg);
-        ov?.remove();
+        BCV.ui.dismiss(ov);
         store.invalidateGrades?.().catch?.(() => {});
       };
       ov = h('div', { class: 'bcv-sheet-ov', tabindex: '-1', onclick: (e) => { if (e.target === ov) close(); }, onkeydown: (e) => { if (e.key === 'Escape') close(); } }, U.el('bcv-sheet bcv-sheet--tool', [

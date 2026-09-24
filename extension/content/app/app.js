@@ -497,7 +497,7 @@
     if (!quickNav) return;
     clearTimeout(quickNav.closeTimer);
     quickNav.anchor.setAttribute('aria-expanded', 'false');
-    quickNav.el.remove();
+    U.dismiss(quickNav.el, 140);
     quickNav = null;
   }
   const quickNavLeave = (key) => {
@@ -664,7 +664,7 @@
   /** The panel over the account row: quick settings, the guided setup and the welcome, Canvas's own
    *  profile and settings pages, and Log out. */
   function accountMenu(anchor) {
-    if (document.querySelector('.bcv-menu--account')) { U.closeMenus(); return; }
+    if (document.querySelector('.bcv-menu--account:not(.is-closing)')) { U.closeMenus(); return; }
     U.closeMenus();
     const me = state.me;
     const item = (icon, label, sub, onSelect, cls = '') => h('button', { type: 'button', class: `bcv-menu__item ${cls}`, onclick: () => { U.closeMenus(); onSelect(); } }, [
@@ -701,7 +701,7 @@
   }
   /** The menu over the Appearance button: Light, Dark (the one in effect marked) and Personalize. */
   function appearanceMenu(anchor) {
-    if (document.querySelector('.bcv-menu--theme')) { U.closeMenus(); return; }
+    if (document.querySelector('.bcv-menu--theme:not(.is-closing)')) { U.closeMenus(); return; }
     U.closeMenus();
     const item = (icon, label, sub, active, onSelect) => h('button', { type: 'button', class: `bcv-menu__item ${active ? 'is-active' : ''}`, role: 'menuitemradio', 'aria-checked': active ? 'true' : 'false', onclick: () => { U.closeMenus(); onSelect(); } }, [
       h('span', { class: 'bcv-menu__ic' }, U.svg(icon, { size: 14, width: 1.9 })),
@@ -1168,10 +1168,17 @@
   // #main is laid out into the hole our screen leaves for it (measured live).
   let punchHole = null;
   let punchRO = null;
+  let punchWatched = null; // the hole whose surroundings are already observed
   function punchMeasure() {
     if (!punchHole || !punchHole.isConnected) return;
     const r = punchHole.getBoundingClientRect();
     if (!r.width) return;
+    if (punchWatched !== punchHole) { // the first measure with the hole in the page: what sits above it moves it without
+      punchWatched = punchHole;       // resizing it — the header (a breadcrumb row arrives with the course), the note bar
+      const screen = punchHole.closest('.bcv-screen'); // (it wraps) and the screen's entrance slide, which ends after this
+      for (const el of screen ? screen.querySelectorAll('.bcv-head, .bcv-native__bar') : []) punchRO?.observe(el);
+      screen?.addEventListener('animationend', punchMeasure);
+    }
     html.style.setProperty('--bcv-hole-top', `${Math.round(r.top)}px`);
     html.style.setProperty('--bcv-hole-left', `${Math.round(r.left)}px`);
     html.style.setProperty('--bcv-hole-width', `${Math.round(r.width)}px`);
@@ -1191,6 +1198,7 @@
   }
   function punchOut() {
     punchHole = null;
+    punchWatched = null;
     punchRO?.disconnect();
     window.removeEventListener('resize', punchMeasure);
     html.classList.remove('bcv-punch', 'bcv-punch--noside', 'bcv-punch-light');

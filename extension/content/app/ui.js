@@ -297,8 +297,15 @@
     setTimeout(() => document.addEventListener('click', closeMenus, { once: true }), 0);
     return m;
   }
+  /** An overlay put away with its exit (the stylesheet's is-closing: a sheet shrinks and fades, a menu
+   *  pops out, a bottom sheet slides down), then removed. Under reduced motion it goes at once. */
+  function dismiss(ov, ms = 180) {
+    if (!ov || !ov.isConnected || ov.classList.contains('is-closing')) return;
+    ov.classList.add('is-closing');
+    setTimeout(() => ov.remove(), reducedMotion() ? 0 : ms);
+  }
   function closeMenus() {
-    document.querySelectorAll('.bcv-menu:not([data-keep])').forEach((m) => m.remove()); // (a box that only wears a menu's look stays: the inbox's recipient results)
+    document.querySelectorAll('.bcv-menu:not([data-keep]):not(.is-closing)').forEach((m) => dismiss(m, 140)); // (a box that only wears a menu's look stays: the inbox's recipient results)
   }
 
   /** Canvas's own course colour palette (the picker on its dashboard cards), plus a custom colour. */
@@ -670,7 +677,7 @@
   function promptSheet({ label = '', title, note = '', value = '', placeholder = '', maxLength = 120, saveLabel = 'Save', clearLabel = null, onSave, from = null }) {
     document.querySelector('.bcv-sheet-ov')?.remove();
     const ov = el('bcv-sheet-ov', null, { role: 'dialog', 'aria-label': label || title });
-    const close = () => ov.remove();
+    const close = () => dismiss(ov);
     ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
     ov.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
     const input = h('input', { class: 'bcv-input bcv-prompt__input', type: 'text', value, placeholder, maxlength: String(maxLength), 'aria-label': title });
@@ -720,7 +727,7 @@
     return new Promise((resolve) => {
       const ov = el('bcv-sheet-ov', null, { role: 'dialog', 'aria-label': label || title });
       let settled = false;
-      const done = (v) => { if (settled) return; settled = true; ov.remove(); resolve(v); };
+      const done = (v) => { if (settled) return; settled = true; dismiss(ov); resolve(v); };
       ov.addEventListener('click', (e) => { if (e.target === ov) done(false); });
       ov.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.stopPropagation(); done(false); } });
       const ok = btn(okLabel, { kind: danger ? 'dangerSolid' : 'primary', cls: 'bcv-ask__ok', onClick: () => done(true) });
@@ -746,6 +753,6 @@
     empty, emptyCard, loading, errorBox, hint, avatar, toast, menu, closeMenus, picker, colorMenu, COURSE_COLORS, fmtDay, datePop, dateField, promptSheet, askSheet,
     DAY, startOfDay, addDays, sameDay, dayDiff, startOfWeek, parse, MONTHS, MONTHS_LONG, DAYS, DAYS_LONG,
     fmtTime, fmtTimeLower, fmtShort, fmtLong, fmtDateComma, fmtAt, fmtAtUpper, fmtBy, dayTitle, fmtDow, fmtRecent, whenShort, plural,
-    hexToRgb, rgba, palette, FALLBACK_COLORS, initials, enter, roll, morphFrom, reducedMotion,
+    hexToRgb, rgba, palette, FALLBACK_COLORS, initials, enter, roll, morphFrom, reducedMotion, dismiss,
   };
 })();

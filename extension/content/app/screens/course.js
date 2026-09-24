@@ -281,7 +281,7 @@
     }
     document.querySelector('.bcv-sheet-ov')?.remove();
     const ov = U.el('bcv-sheet-ov', null, { role: 'dialog', 'aria-label': 'Rubric' });
-    const close = () => ov.remove();
+    const close = () => BCV.ui.dismiss(ov);
     ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
     ov.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
     ov.append(U.el('bcv-sheet bcv-sheet--rub', [
@@ -354,11 +354,11 @@
         U.text('bcv-reader-ov__title', title, 'span'),
         U.btn('A−', { kind: 'xs', onClick: () => { size = Math.max(14, size - 2); doc.style.setProperty('--bcv-reader-size', `${size}px`); } }),
         U.btn('A+', { kind: 'xs', onClick: () => { size = Math.min(32, size + 2); doc.style.setProperty('--bcv-reader-size', `${size}px`); } }),
-        U.iconbtn(IC.close, { title: 'Close reader', onClick: () => ov.remove() }),
+        U.iconbtn(IC.close, { title: 'Close reader', onClick: () => BCV.ui.dismiss(ov) }),
       ]),
       doc,
     ]);
-    ov.addEventListener('keydown', (e) => { if (e.key === 'Escape') ov.remove(); });
+    ov.addEventListener('keydown', (e) => { if (e.key === 'Escape') BCV.ui.dismiss(ov); });
     document.body.append(ov);
     ov.tabIndex = -1;
     ov.focus();
@@ -1137,7 +1137,7 @@
     const b = body();
     let query = '';
     const wrap = h('div');
-    b.append(U.search('Search for quiz', (q) => { query = q.toLowerCase(); draw(); }, 'bcv-search--320'), wrap);
+    b.append(U.el('bcv-head__tools', [U.search('Search quizzes', (q) => { query = q.toLowerCase(); draw(); })]), wrap); // (the same row as Files: the box spans it)
     wrap.append(U.loading());
     const list = await store.quizzes(c.id).catch(() => null);
     if (!ctx.alive()) return b;

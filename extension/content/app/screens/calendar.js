@@ -365,7 +365,7 @@
     function openEvent(ev, from = null) {
       document.querySelector('.bcv-sheet-ov')?.remove();
       const ov = U.el('bcv-sheet-ov', null, { role: 'dialog', 'aria-label': ev.title });
-      const close = () => ov.remove();
+      const close = () => BCV.ui.dismiss(ov);
       ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
       ov.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
       const appt = ev.kind === 'appointment';
@@ -440,7 +440,7 @@
     function openCalendars(from = null) {
       document.querySelector('.bcv-sheet-ov')?.remove();
       const ov = U.el('bcv-sheet-ov', null, { role: 'dialog', 'aria-label': 'Calendars' });
-      const close = () => { ov.remove(); calSheet = null; };
+      const close = () => { BCV.ui.dismiss(ov); calSheet = null; };
       ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
       ov.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
       const sub = U.text('bcv-sheet__note', calSub());
@@ -696,7 +696,7 @@
     function openAppointments(from = null) {
       document.querySelector('.bcv-sheet-ov')?.remove();
       const ov = U.el('bcv-sheet-ov', null, { role: 'dialog', 'aria-label': 'Find appointment' });
-      const close = () => { ov.remove(); apptSheet = null; };
+      const close = () => { BCV.ui.dismiss(ov); apptSheet = null; };
       ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
       ov.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
       const sub = U.text('bcv-sheet__note', 'Office hours, conferences and sign-ups your courses offer. Press a time to reserve it.');

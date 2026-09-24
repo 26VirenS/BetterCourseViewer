@@ -63,7 +63,7 @@
       hint: { parts: [['Find a ', null], ['PDF Editor, ', '#ff9f0a'], ['File Converter, ', '#34c759'], ['Calculators, ', '#bf5af2'], ['Flashcards, ', '#2f7cf6'], ['Citation Generator', '#64d2ff'], [' & more.', '#ffffff']] }, // (each kind in a colour of its own)
       spot: () => navRow('tools'),
     },
-    toolsIntro: { layout: 'center', title: 'Some helpful things', hint: 'some tools to help you do more, quickly.' },
+    toolsIntro: { layout: 'center', title: 'Some helpful things', hint: 'Some tools to help you do more, quickly.' },
     pin: {
       layout: 'demo', kicker: 'Tools', title: 'Drag a tool to the top', hint: 'It becomes a small button next to the Simpl Courses switch, on every page.',
       prop: (app, ctx) => pinDemo(app, ctx.look),

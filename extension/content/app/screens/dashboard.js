@@ -299,7 +299,7 @@
     function openSheet(def, from = null) {
       document.querySelector('.bcv-sheet-ov')?.remove();
       const ov = U.el('bcv-sheet-ov', null, { role: 'dialog', 'aria-label': def.label });
-      const close = () => ov.remove();
+      const close = () => BCV.ui.dismiss(ov);
       ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
       ov.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
       ov.append(U.el('bcv-sheet bcv-sheet--steady', [

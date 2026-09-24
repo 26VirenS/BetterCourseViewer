@@ -107,7 +107,7 @@
     }
     document.querySelector('.bcv-sheet-ov')?.remove();
     const ov = U.el('bcv-sheet-ov', null, { role: 'dialog', 'aria-label': label });
-    const close = () => ov.remove();
+    const close = () => BCV.ui.dismiss(ov);
     ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
     ov.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
     const list = U.el('bcv-sheet__list', rows.length

@@ -103,6 +103,7 @@ try {
   await page.click('.bcv-quicknav .bcv-fav');
   await page.waitForSelector('.bcv-rail__item', { timeout: 20000 });
   check(/\/courses\/\d+/.test(page.url()), `hover: a course in the panel opens it (${page.url().replace(BASE, '')} — ${first})`);
+  await page.waitForFunction(() => !document.querySelector('.bcv-quicknav'), null, { timeout: 3000 }).catch(() => {}); // (it pops out over a moment)
   check(!(await page.$('.bcv-quicknav')), 'hover: and the panel closes behind it');
 
   // pointer away closes it

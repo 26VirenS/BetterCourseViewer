@@ -24,6 +24,11 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.93.0', date: '2026-09-24', notes: [
+      { kind: 'improved', title: 'Smoother motion', body: 'Sheets and menus ease out; rows and cards press in.', icon: P.arrows },
+      { kind: 'fixed', title: 'Tidier corners', body: 'Welcome text centred, quiz search full width, upload arrow.', icon: P.eye },
+      { kind: 'fixed', title: 'Canvas pages on phones', body: 'The To Do column sits under the page, not over it.', icon: P.steps },
+    ] },
     { version: '2.92.0', date: '2026-09-24', notes: [
       { kind: 'new', title: 'Widgets of your own', body: 'Tools → Add a widget: one HTML file becomes a tool.', icon: P.layers },
       { kind: 'new', title: 'Four starters', body: 'A countdown, a notes pad, a unit converter, a word counter.', icon: P.list },

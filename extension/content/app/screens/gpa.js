@@ -448,7 +448,7 @@
     function openDetail(c, from = null) {
       document.querySelector('.bcv-sheet-ov')?.remove();
       const ov = U.el('bcv-sheet-ov', null, { role: 'dialog', 'aria-label': `${c.shortName || c.name} grade details` });
-      const close = () => ov.remove();
+      const close = () => BCV.ui.dismiss(ov);
       ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
       ov.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
       const sheet = U.el('bcv-sheet bcv-gpa-detail');
@@ -718,7 +718,7 @@
       ]);
       trackBody.hidden = !on;
       const trackSwitch = U.switchEl(on, (v) => { on = v; trackBody.hidden = !on; }, 'Track GPA over time');
-      const close = () => { ov.remove(); if (histTouched) { histTouched = false; refresh(); } };
+      const close = () => { BCV.ui.dismiss(ov); if (histTouched) { histTouched = false; refresh(); } };
       const done = async () => {
         goal = clamp(pendingGoal, 0, 4);
         if (on) {

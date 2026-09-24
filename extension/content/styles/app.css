@@ -16,6 +16,8 @@ html[data-bcv-theme] {
   --bcv-font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text", "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif; /* (Windows: Segoe, never Arial) */
   --bcv-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI Variable Display", "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif;
   --bcv-mono: ui-monospace, Menlo, monospace;
+  /* motion: one easing and three lengths — the exits are the fast one, an entrance the middle, a sheet's rise the slow */
+  --bcv-ease: cubic-bezier(.32,.72,0,1); --bcv-t-fast: .18s; --bcv-t: .28s; --bcv-t-slow: .34s;
 }
 html[data-bcv-theme="dark"] {
   --bcv-bg: #000; --bcv-card: #1c1c1e; --bcv-ink: #f2f2f7; --bcv-ink2: #c7c7cc; --bcv-ink3: #8e8e93;
@@ -58,11 +60,26 @@ html[data-bcv-ext-theme="dark"] .bcv-graph__frame { filter: invert(1) hue-rotate
    The fill is backwards only: the end state is the element's own, so a hover lift can move it once it has landed. */
 .bcv-enter { animation: bcv-fade-up var(--bcv-dur, 240ms) cubic-bezier(.32,.72,0,1) var(--bcv-delay, 0ms) backwards; }
 .bcv-reader-btn[hidden] { display: none; } /* the Immersive Reader button only exists where there is a body to read */
-.bcv-sheet-ov { animation: bcv-scrim .28s cubic-bezier(.32,.72,0,1) both; }
-.bcv-sheet { animation: bcv-morph .34s cubic-bezier(.32,.72,0,1) backwards; transform-origin: 50% 50%; }
-html.bcv-phone .bcv-sheet { animation: bcv-sheet .26s cubic-bezier(.32,.72,0,1) both; } /* the phone's bottom sheets keep their rise */
- .bcv-menu, .bcv-toast, .bcv-gpa__pop { animation: bcv-pop .2s cubic-bezier(.32,.72,0,1) both; }
+.bcv-sheet-ov { animation: bcv-scrim var(--bcv-t) var(--bcv-ease) both; }
+.bcv-sheet { animation: bcv-morph var(--bcv-t-slow) var(--bcv-ease) backwards; transform-origin: 50% 50%; }
+html.bcv-phone .bcv-sheet { animation: bcv-sheet .26s var(--bcv-ease) both; } /* the phone's bottom sheets keep their rise */
+ .bcv-menu, .bcv-toast, .bcv-gpa__pop { animation: bcv-pop .2s var(--bcv-ease) both; }
 .bcv-reader-ov { animation: bcv-fade-in .2s ease both; }
+/* Exits (ui.js dismiss): a sheet shrinks and fades with its scrim, a bottom sheet slides down, a menu or panel pops out. */
+@keyframes bcv-leave { to { opacity: 0; } }
+@keyframes bcv-leave-shrink { to { opacity: 0; transform: scale(.97); } }
+@keyframes bcv-leave-down { to { opacity: 0; transform: translateY(28px); } }
+@keyframes bcv-leave-pop { to { opacity: 0; transform: scale(.96); } }
+.bcv-sheet-ov.is-closing { animation: bcv-leave var(--bcv-t-fast) ease both; pointer-events: none; }
+.bcv-sheet-ov.is-closing > .bcv-sheet { animation: bcv-leave-shrink var(--bcv-t-fast) ease both; }
+html.bcv-phone .bcv-sheet-ov.is-closing > .bcv-sheet { animation: bcv-leave-down .22s var(--bcv-ease) both; }
+.bcv-menu.is-closing, .bcv-quicknav.is-closing { animation: bcv-leave-pop .14s ease both; pointer-events: none; }
+.bcv-reader-ov.is-closing { animation: bcv-leave var(--bcv-t-fast) ease both; pointer-events: none; }
+@media (prefers-reduced-motion: reduce) { .bcv-sheet-ov.is-closing, .bcv-sheet-ov.is-closing > .bcv-sheet, .bcv-menu.is-closing, .bcv-quicknav.is-closing, .bcv-reader-ov.is-closing { animation: none; opacity: 0; } }
+/* A press is felt: a row or an item dips while the pointer is down, a card darkens a touch. */
+.bcv-row:active, .bcv-sheet__row:active, .bcv-menu__item:active, .bcv-ph-srow:active, .bcv-omni__item:active { background: var(--bcv-fill); }
+.bcv-nav__item:active { background: var(--bcv-fill2); }
+.bcv-ccard:active, .bcv-gpa__card:active { filter: brightness(.97); }
 /* Dashboard entry: workload rows float in and their bars wipe from the left, staggered down the list */
 .bcv-work__row--in { animation: bcv-fade-up .42s cubic-bezier(.32,.72,0,1) var(--bcv-delay, 0ms) backwards; }
 .bcv-work__fill--grow { transform-origin: left; animation: bcv-grow .8s cubic-bezier(.32,.72,0,1) var(--bcv-delay, 0ms) both; }
@@ -198,7 +215,7 @@ html.bcv-welcome { overflow: hidden; }
 /* the stage: the arrow, the three lines, Continue — under the switch, right-aligned; under the pill, centred */
 .bcv-welcome__stage { position: absolute; display: flex; flex-direction: column; gap: 14px; animation: bcv-welcome-in .5s ease both; }
 .bcv-welcome__stage.is-out { animation: bcv-welcome-out .25s ease both; }
-.bcv-welcome__stage[data-stage="look"] { top: 112px; right: 40px; left: 16px; align-items: flex-end; text-align: right; }
+.bcv-welcome__stage[data-stage="look"] { top: 172px; right: 40px; left: 16px; align-items: flex-end; text-align: right; } /* (below the demo switch and the pill that pops out under it) */
 .bcv-welcome__stage[data-stage="away"] { top: calc(104px + env(safe-area-inset-top, 0px)); left: 16px; right: 16px; align-items: center; text-align: center; }
 .bcv-welcome__arrowbox { display: block; flex: none; }
 .bcv-welcome__arrow { display: block; overflow: visible; }
@@ -206,7 +223,7 @@ html.bcv-welcome { overflow: hidden; }
 /* the arrow draws itself (pathLength="1" on the line: the dash is the whole of it), then the head comes in at its tip */
 .bcv-welcome__line { stroke-dasharray: 1 2; stroke-dashoffset: 1.05; animation: bcv-welcome-draw .6s ease-out .2s forwards; }
 .bcv-welcome__head { opacity: 0; animation: bcv-welcome-fade .25s ease .72s forwards; }
-.bcv-welcome__text { display: flex; flex-direction: column; gap: 8px; max-width: 560px; }
+.bcv-welcome__text { display: flex; flex-direction: column; gap: 8px; max-width: 560px; align-items: inherit; } /* (the lines follow the stage's alignment: a hint narrower than the title sits under its middle, not its left edge) */
 /* the switch's stage: a row per stop, each with a small copy of the slider showing where that stop is */
 .bcv-welcome__stage[data-stage="look"] .bcv-welcome__title { font-size: clamp(24px, 3vw, 32px); max-width: 440px; text-wrap: balance; }
 .bcv-welcome__stage[data-stage="look"] .bcv-welcome__kicker { font-size: 16px; }
@@ -1456,6 +1473,7 @@ html[data-bcv-theme="dark"].bcv-punch:not(.bcv-punch-light) #content img, html[d
 .bcv-native__light { gap: 6px; }
 @media (max-width: 1100px) {
   html.bcv-punch #main { flex-direction: column; }
+  html.bcv-punch #not_right_side { flex: none !important; } /* (stacked, its height is its content's: the row's basis of 0 left Canvas's page spilling over the To Do column) */
   html.bcv-punch #right-side-wrapper { flex: none !important; width: auto !important; max-width: none !important; }
 }
 /* on a phone the hole has to clear the glass tab bar, or Canvas's last rows sit under it */

@@ -712,7 +712,7 @@ try {
   await page.click('.bcv-ph-srow:has-text("Tools")');
   await page.waitForSelector('#bcv-welcome[data-stage="toolsIntro"]', { timeout: 20000 });
   const twAt = Date.now();
-  check(page.url() === `${BASE}/#tools` && (await page.$eval('#bcv-welcome', (e) => getComputedStyle(e).backgroundColor)) === 'rgb(0, 0, 0)' && (await texts('.bcv-welcome__title'))[0] === 'Some helpful things' && (await texts('.bcv-welcome__hint'))[0] === 'some tools to help you do more, quickly.' && await noOverflow(), 'the first press on Tools: black, the title and the gray line under it');
+  check(page.url() === `${BASE}/#tools` && (await page.$eval('#bcv-welcome', (e) => getComputedStyle(e).backgroundColor)) === 'rgb(0, 0, 0)' && (await texts('.bcv-welcome__title'))[0] === 'Some helpful things' && (await texts('.bcv-welcome__hint'))[0] === 'Some tools to help you do more, quickly.' && await noOverflow(), 'the first press on Tools: black, the title and the gray line under it');
   check(await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000) && Date.now() - twAt >= TIMERS.welcomeWait - 500, 'Continue comes in only after the wait (three seconds shipped)');
   await page.waitForTimeout(400);
   await page.screenshot({ path: join(out, 'phone-13-tools-welcome.png') });

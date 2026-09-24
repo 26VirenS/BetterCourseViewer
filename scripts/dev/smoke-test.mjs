@@ -85,7 +85,14 @@ const check = (cond, label) => {
   console.log(`${cond ? '  ✓' : '  ✗'} ${label}${gap >= 1500 ? `  (+${secs(gap)})` : ''}`);
   if (!cond) failures.push(label);
 };
-const shot = (page, name) => page.screenshot({ path: join(out, `${name}.png`) });
+// a picture waits for the page's animations to end first (a sheet fading in, a screen sliding into place), so it shows the
+// settled screen and not a frame of the transition; spinners run for ever and are not waited for, and a cap keeps a stuck one
+// from holding the suite
+const settleShot = (page) => page.evaluate(() => Promise.race([
+  Promise.all(document.getAnimations().filter((a) => a.playState === 'running' && a.effect?.getTiming?.().iterations !== Infinity).map((a) => a.finished.catch(() => {}))),
+  new Promise((r) => setTimeout(r, 900)),
+]).then(() => new Promise((r) => requestAnimationFrame(() => setTimeout(r, 20))))).catch(() => {});
+const shot = async (page, name) => { await settleShot(page); await page.screenshot({ path: join(out, `${name}.png`) }); };
 
 // the copy this suite loads runs the product's longest timers short; every shipped value it rewrites
 // has to be there, exactly, or a timer changed under the suite without the table in harness.mjs
@@ -1426,6 +1433,7 @@ try {
   check((await page.frameLocator('.bcv-sb__frame').locator('#tool-title').innerText()) === "Box picker (the tool's own page)" && !(await page.frameLocator('.bcv-sb__frame').locator('#bcv-app').count()), 'the tool\'s page is framed untouched (no skin inside the frame)');
   await page.frameLocator('.bcv-sb__frame').locator('#pick').click();
   await waitText('.bcv-sb__count', /^2 files attached$/);
+  await page.waitForFunction(() => !document.querySelector('.bcv-sheet--tool'), null, { timeout: 3000 }); // (the sheet eases out)
   check(!(await page.$('.bcv-sheet--tool')) && (await texts('.bcv-sb__file'))[1].replace(/\s+/g, ' ') === 'PDF GC-articles-Sharma.pdf from Box · ready to submit', `the file the tool handed back joins the list: ${(await texts('.bcv-sb__file'))[1].replace(/\s+/g, ' ')}`);
   await page.fill('.bcv-sb__comment', 'Three sources, APA.');
   await page.click('.bcv-sb__btn--primary');
@@ -1596,8 +1604,9 @@ try {
   check((await texts('.bcv-reader-ov h1'))[0] === 'Course Information', 'Immersive Reader overlay opens the front page');
   await shot(page, '11b-immersive-reader');
   await page.keyboard.press('Escape');
-  await page.waitForTimeout(100);
-  if (await page.$('.bcv-reader-ov')) await page.click('.bcv-reader-ov .bcv-iconbtn');
+  const readerGone = await page.waitForFunction(() => !document.querySelector('.bcv-reader-ov'), null, { timeout: 3000 }).then(() => true, () => false); // (it fades out)
+  check(readerGone, 'Escape closes the reader');
+  if (!readerGone) await page.click('.bcv-reader-ov .bcv-iconbtn');
 
   // announcements
   await tab('announcements');
@@ -3919,7 +3928,7 @@ try {
   const twAt = Date.now();
   const noContT = (await page.$('.bcv-welcome__next:not([hidden])')) === null;
   const tLines = () => page.$$eval('#bcv-welcome .bcv-welcome__kicker, #bcv-welcome .bcv-welcome__title, #bcv-welcome .bcv-welcome__hint', (els) => els.map((e) => e.textContent));
-  check((await page.$eval('#bcv-welcome', (e) => getComputedStyle(e).backgroundColor)) === 'rgb(0, 0, 0)' && (await tLines()).join(' | ') === 'Some helpful things | some tools to help you do more, quickly.' && (await page.$eval('.bcv-welcome__hint', (e) => getComputedStyle(e).color)) === 'rgba(255, 255, 255, 0.68)' && (await page.$('.bcv-welcome__arrow')) === null, `the first press on Tools: black, the title and the gray line under it (${(await tLines()).join(' | ')})`);
+  check((await page.$eval('#bcv-welcome', (e) => getComputedStyle(e).backgroundColor)) === 'rgb(0, 0, 0)' && (await tLines()).join(' | ') === 'Some helpful things | Some tools to help you do more, quickly.' && (await page.$eval('.bcv-welcome__hint', (e) => getComputedStyle(e).color)) === 'rgba(255, 255, 255, 0.68)' && (await page.$('.bcv-welcome__arrow')) === null, `the first press on Tools: black, the title and the gray line under it (${(await tLines()).join(' | ')})`);
   check(noContT && await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000) && Date.now() - twAt >= TIMERS.welcomeWait - 500, 'Continue comes in only after the wait (three seconds shipped)');
   await page.waitForTimeout(400);
   await shot(page, '36-tools-welcome');
