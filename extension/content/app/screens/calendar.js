@@ -68,6 +68,7 @@
     const ctxMap = new Map(contexts.map((c) => [c.code, c]));
     let events = [];
     let loadedRange = null;
+    let loadSeq = 0; // the load asked for last: an earlier one still answering paints nothing
     let refused = new Set(); // calendars Canvas would not return (401/403)
     let notice = null; // { kind: 'error' | 'warn' | 'hint', text }
     let loading = false; // the grid is up, its events are still on the way
@@ -116,7 +117,10 @@
         const cc = (appt ? ctxMap.get(e.effective_context_code) : null) || ctxMap.get(e.context_code) || ctxMap.get(e.effective_context_code) || null;
         const isAssignment = e.type === 'assignment' || !!e.assignment;
         const a = e.assignment || null;
-        const start = U.parse(isAssignment ? (a?.due_at || e.start_at) : e.start_at);
+        // an all-day event is a day, not an instant: Canvas names the day (all_day_date), and its
+        // start_at is that day's midnight in the maker's zone — a day off, read in another zone
+        const allDay = !isAssignment && !!e.all_day && /^\d{4}-\d{2}-\d{2}$/.test(String(e.all_day_date || ''));
+        const start = allDay ? (([y, mo, d]) => new Date(y, mo - 1, d))(e.all_day_date.split('-').map(Number)) : U.parse(isAssignment ? (a?.due_at || e.start_at) : e.start_at);
         if (!start) continue;
         const end = U.parse(e.end_at);
         const types = a?.submission_types || [];
@@ -179,6 +183,7 @@
         // The grid needs no data to be drawn: it goes up at once and the events land in it, rather
         // than a spinner standing in for the whole month.
         loading = true;
+        const seq = ++loadSeq; // (two ranges asked for in quick succession: only the last asked for lands)
         draw();
         let res;
         try {
@@ -186,14 +191,14 @@
         } catch (err) {
           res = { error: err };
         }
-        if (!ctx.alive()) return;
+        if (!ctx.alive() || seq !== loadSeq) return;
         notice = null;
         refused = new Set();
         if (res.error) {
           // Canvas would not answer the calendar API at all: the planner covers the same
           // courses (it is what the dashboard reads), minus plain course events.
           const items = await store.plannerRange(s, e).catch(() => null);
-          if (!ctx.alive()) return;
+          if (!ctx.alive() || seq !== loadSeq) return;
           if (items) {
             events = fromPlanner(items);
             notice = { kind: 'warn', text: `Canvas would not return calendar events (${res.error.message}). Showing what the planner knows for the selected calendars instead; plain course events may be missing.` };

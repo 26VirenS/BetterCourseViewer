@@ -52,7 +52,6 @@
     document.removeEventListener('pointerdown', onDown, true);
     cur = null;
   }
-  const isOpen = () => !!cur;
   function onKey(e) {
     if (e.key !== 'Escape' || !cur) return;
     e.stopPropagation();
@@ -214,5 +213,5 @@
     });
   }
 
-  BCV.preview = { open, close, isOpen, previewable, attach };
+  BCV.preview = { open, close, previewable, attach };
 })();

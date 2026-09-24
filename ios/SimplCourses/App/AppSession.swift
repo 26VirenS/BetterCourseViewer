@@ -4,7 +4,7 @@ import SwiftUI
 import WebKit
 
 extension Notification.Name {
-    /// Posted by the bridge when a page asks for the settings (the smart panel's "add a key" button).
+    /// Posted by the bridge when a page asks for the settings (runtime.openOptionsPage).
     static let simplOpenSettings = Notification.Name("SimplCourses.openSettings")
     /// Posted by the bridge when the page asks to sign out (the account sheet).
     static let simplSignOutRequested = Notification.Name("SimplCourses.signOutRequested")

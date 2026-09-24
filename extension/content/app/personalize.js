@@ -72,14 +72,12 @@
 
   let st = null; // the draft
   let ui = null; // { root, top, stage, foot, host }
-  const active = () => !!ui;
   const reduced = () => !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
   const dark = () => st.look === 'dark' || (st.look === 'system' && !!window.matchMedia?.('(prefers-color-scheme: dark)').matches);
   const phone = () => !!BCV.phone?.active();
   /** The accent in force: the interface's blue for Regular, the preset's, or the custom one from its controls. */
   const accent = () => (st.theme.name === 'Regular' ? REGULAR : st.theme.name === 'Custom' ? T().customHex(st.theme.h, st.theme.s, st.theme.depth) : (T().PRESETS.find(([, n]) => n === st.theme.name) || [REGULAR])[0]);
   const ground = () => (dark() ? '#1c1c1e' : '#ffffff');
-  const photoKey = (target) => target; // 'side', a counter's slot, 'head:<screen>'
   const photoAt = (key) => (key === 'side' ? st.images.side : key.startsWith('head:') ? st.images.headers[key.slice(5)] : st.images.cards[key]) || null;
   const toneAt = (key) => st.images.tones?.[key] || null;
   const setPhoto = (key, value, tone) => {
@@ -344,7 +342,7 @@
       const { data, tone } = await T().readImage(file, key === 'side' ? 1280 : key.startsWith('head:') ? 1400 : 900);
       setPhoto(key, data, tone);
       render('photo');
-    } catch (e) { /* not a picture: nothing changes */ }
+    } catch (e) { BCV.ui?.toast?.(`That picture could not be read${/heic|heif/i.test(file?.name || file?.type || '') ? ' — HEIC photos need converting to JPEG first' : ''}.`, { error: true, ms: 4200 }); } // (said, rather than nothing happening)
   };
   /** A scene put on a set of things: each gets its own variation of it (a photo goes as it is). */
   const variantOf = (v, i) => { const n = (T().sceneNameOf(v) || '').split('#')[0]; return n ? T().sceneUrl(n, i) : v; };
@@ -505,10 +503,14 @@
       const clamp = (v) => Math.max(0, Math.min(1, v));
       const apply = (x, y) => { const q = read(x, y); if (mode === 'hue') putPick({ h: q.a }); else if (mode === 'sat') putPick({ s: clamp((q.a - 200) / 140) }); else putPick({ depth: clamp((q.a - 20) / 140) * 100 }); };
       apply(e.clientX, e.clientY);
+      // the pointer is held by the wheel until it lifts — or is taken away (a touch that turns into a
+      // scroll, a gesture): both let go, so a later move on the page does not keep turning the colour
+      try { el.setPointerCapture(e.pointerId); } catch { /* a pointer that cannot be held */ }
       const mv = (ev) => apply(ev.clientX, ev.clientY);
-      const up = () => { window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); };
-      window.addEventListener('pointermove', mv);
-      window.addEventListener('pointerup', up);
+      const up = () => { el.removeEventListener('pointermove', mv); el.removeEventListener('pointerup', up); el.removeEventListener('pointercancel', up); try { el.releasePointerCapture(e.pointerId); } catch { /* released already */ } };
+      el.addEventListener('pointermove', mv);
+      el.addEventListener('pointerup', up);
+      el.addEventListener('pointercancel', up);
     });
     const ns = (tag, attrs) => { const n = document.createElementNS(NS, tag); for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v); return n; };
     const svgEl = ns('svg', { viewBox: '0 0 272 272', width: '272', height: '272', class: 'pz__pksvg' });
@@ -597,9 +599,15 @@
       await Promise.all([S.update({ appearance: { theme } }), t.saveImages(st.images)]);
       BCV.api.storage.local.set({ 'themes:tried': true }).catch(() => {}); // (a theme tried: the invitation after an update is for those who have not)
       for (const [id, hex] of Object.entries(st.courseColors)) await store.setColor(id, hex).catch(() => {});
-    } catch (e) { console.error('[Simpl Courses personalize]', e); }
+      st.done = true;
+    } catch (e) {
+      // not kept (the pictures past the browser's storage room, most likely): said so, the sheet
+      // stays with everything as it was chosen — a "Saved" over nothing saved would be a lie
+      console.error('[Simpl Courses personalize]', e);
+      const quota = /quota|QUOTA_BYTES|exceeded/i.test(String(e?.message || e));
+      BCV.ui?.toast?.(quota ? 'Could not save: the photos take more room than the browser allows. Use fewer photos, then save again.' : `Could not save: ${e?.message || e}`, { error: true, ms: 6000 });
+    }
     st.saving = false;
-    st.done = true;
     render('full');
   }
   async function finish() {
@@ -612,5 +620,5 @@
     onDone?.({ changedLook });
   }
 
-  BCV.personalize = { open, active, close: teardown, PRESET_PHOTOS, READY, PAL, NAV, CARDS };
+  BCV.personalize = { open, close: teardown, PRESET_PHOTOS, READY, PAL, NAV, CARDS };
 })();

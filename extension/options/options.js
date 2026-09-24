@@ -89,11 +89,18 @@
   const site = { host: '', origin: '' };
   const prefKey = () => `prefs:${site.host}`;
   const readPrefs = async () => { const all = await api.storage.local.get(prefKey()); return (all && all[prefKey()]) || {}; };
-  const setPref = async (key, value) => {
-    if (!site.host) return;
-    const prefs = await readPrefs();
-    if (value === null || value === undefined) delete prefs[key]; else prefs[key] = value;
-    await api.storage.local.set({ [prefKey()]: prefs });
+  // one write at a time: each is a read of the whole object, a change, a write — two at once
+  // (the goal stepper twice, a target and the goal) would lose whichever read first
+  let writing = Promise.resolve();
+  const setPref = (key, value) => {
+    if (!site.host) return Promise.resolve();
+    const run = writing.then(async () => {
+      const prefs = await readPrefs();
+      if (value === null || value === undefined) delete prefs[key]; else prefs[key] = value;
+      await api.storage.local.set({ [prefKey()]: prefs });
+    });
+    writing = run.catch(() => {});
+    return run;
   };
   const savePref = async (key, value) => {
     try {
@@ -522,14 +529,14 @@
   const patchFor = (path, value) => path.split('.').reverse().reduce((acc, k) => ({ [k]: acc }), value);
   for (const [id, path] of TEXT) {
     const el = $(id);
-    const commit = () => {
+    const commit = (final = true) => {
       const value = el.value.trim();
-      if (id === 'logoUrl' && value && !/^https:\/\//i.test(value)) { flash('The logo must be an https address', true); return; }
+      if (id === 'logoUrl' && value && !/^https:\/\//i.test(value)) { if (final) flash('The logo must be an https address', true); return; } // (said once the field is left, not while "https://" is still being typed)
       if (value === (getPath(settings, path) ?? '')) return;
       save(patchFor(path, value));
     };
-    el.addEventListener('input', debounce(commit, 400));
-    el.addEventListener('change', commit);
+    el.addEventListener('input', debounce(() => commit(false), 400));
+    el.addEventListener('change', () => commit(true));
   }
   document.querySelectorAll('[data-reveal]').forEach((btn) => btn.addEventListener('click', () => {
     const input = $(btn.dataset.reveal);

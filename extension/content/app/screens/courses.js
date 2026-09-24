@@ -88,7 +88,7 @@
       const next = nextFor(c);
       const progress = U.el('bcv-ccard__progress');
       // staggered entry: 55ms per card, capped at 420ms
-      const el = h('div', { class: 'bcv-ccard bcv-enter', style: { '--bcv-delay': `${Math.min(i * 55, 420)}ms` }, role: 'link', tabindex: '0', onclick: () => app.go(c.url), onkeydown: (e) => { if (e.key === 'Enter') app.go(c.url); } }, [
+      const el = h('div', { class: 'bcv-ccard bcv-enter', style: { '--bcv-delay': `${Math.min(i * 55, 420)}ms` }, role: 'link', tabindex: '0', onclick: () => app.go(c.url), onkeydown: (e) => { if (e.key === 'Enter' && e.target === e.currentTarget) app.go(c.url); } }, [
         h('div', { class: 'bcv-ccard__hero bcv-ccard__hero--term', style: { background: c.color } }, [
           U.text('bcv-ccard__term', c.term || 'No term', 'span'),
           U.el('bcv-ccard__tools', [

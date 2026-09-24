@@ -340,8 +340,6 @@
     cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
     return { dataUrl: cv.toDataURL('image/png'), fmt: 'PNG', w: cv.width, h: cv.height };
   }
-  const dataBytes = (dataUrl) => { const b64 = dataUrl.slice(dataUrl.indexOf(',') + 1); const bin = atob(b64); const u8 = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i); return u8; };
-
   // ---- the Word document, laid out with jsPDF --------------------------------------------------
   // The built-in fonts know WinAnsi: Latin letters, accents, the typographic quotes, dashes, bullet
   // and ellipsis. Anything else is turned into its nearest Latin form or a ?.
@@ -850,5 +848,5 @@
     return { bytes, pages: n, pictures: media.length };
   }
 
-  BCV.office = { unzip, zip, readDocx, imageOf, dataBytes, xmlText, docxToPdf, pdfToDocx };
+  BCV.office = { unzip, zip, readDocx, imageOf, xmlText, docxToPdf, pdfToDocx };
 })();

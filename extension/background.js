@@ -248,13 +248,14 @@ if (typeof importScripts === 'function' && !self.BCV?.devcode) {
    * every page in the world — so they are put in when the bar asks, on the tab the bar is on and
    * nowhere else. The list is the interface's own, less everything that is about Canvas: no store,
    * no API, no screens, no shell. */
-  const TRAY_JS = [
+  const TRAY_JS = [ // (tools.js before the tool modules, as the manifest has it: each takes `BCV.tools` as it loads)
     'lib/settings.js', 'lib/utils.js',
     'content/app/icons.js', 'content/app/ui.js',
+    'content/app/tools/tools.js',
     'content/app/tools/ptable-data.js', 'content/app/tools/ptable.js',
     'content/app/tools/cite.js', 'content/app/tools/cards.js', 'content/app/tools/convert.js',
     'content/app/tools/need.js', 'content/app/tools/pdfs.js', 'content/app/tools/mark.js',
-    'content/app/tools/ocr.js', 'content/app/tools/tools.js',
+    'content/app/tools/ocr.js',
   ];
   async function toolWidgets(sender) {
     const id = sender?.tab?.id;
@@ -295,7 +296,7 @@ if (typeof importScripts === 'function' && !self.BCV?.devcode) {
   // nothing opened, or nothing was reported — and those want opposite fixes.
   const CAN = { tabs: !!api.tabs, onCreated: !!api.tabs?.onCreated, session: !!api.storage?.session };
   let heardATab = false;
-  api.tabs?.onRemoved?.addListener((id) => { if (tools.delete(id)) save(); });
+  api.tabs?.onRemoved?.addListener(async (id) => { await loaded; if (tools.delete(id)) save(); }); // (after the restore: a close that wakes the worker would otherwise be undone by it)
   // A window the tool opens for itself is the tool still: same session, same way home, same bar.
   api.tabs?.onCreated?.addListener(async (tab) => {
     heardATab = true;
@@ -340,17 +341,11 @@ if (typeof importScripts === 'function' && !self.BCV?.devcode) {
       case 'openOptions':
         reply(openOptions());
         return true;
-      case 'setBadge':
-        reply(setBadge(msg.count));
-        return true;
       case 'registerDomain':
         reply(registerDomain(msg.origin));
         return true;
       case 'unregisterDomain':
         reply(unregisterDomain(msg.origin));
-        return true;
-      case 'listDomains':
-        reply(listRegistered());
         return true;
       case 'wipeSiteNotes':
         reply(wipeSiteNotes());
@@ -461,19 +456,6 @@ if (typeof importScripts === 'function' && !self.BCV?.devcode) {
     }
   }
 
-  async function setBadge(count) {
-    try {
-      const n = Number(count) || 0;
-      await api.action.setBadgeText({ text: n > 0 ? String(n) : '' });
-      if (n > 0 && api.action.setBadgeBackgroundColor) {
-        await api.action.setBadgeBackgroundColor({ color: '#dc2626' });
-      }
-      return { ok: true };
-    } catch (e) {
-      return { ok: false, message: e?.message };
-    }
-  }
-
   // ---- custom Canvas domains ---------------------------------------------
   function normalizeOrigin(input) {
     try {
@@ -576,15 +558,6 @@ if (typeof importScripts === 'function' && !self.BCV?.devcode) {
     seenTabs.set(tabId, Date.now());
     try { await api.tabs.reload(tabId); } catch { /* the tab went */ }
     return { ok: true, origin, reloaded: true };
-  }
-
-  async function listRegistered() {
-    try {
-      const scripts = await api.scripting.getRegisteredContentScripts();
-      return { ok: true, scripts: scripts.map((s) => ({ id: s.id, matches: s.matches })) };
-    } catch (e) {
-      return { ok: false, message: e?.message };
-    }
   }
 
   /** Identifies the content-script set of this build; changes whenever the
@@ -850,8 +823,11 @@ if (typeof importScripts === 'function' && !self.BCV?.devcode) {
   async function canvasTabs() {
     let tabs = [];
     try { tabs = await api.tabs.query({}); } catch { return []; }
-    const manifestScripts = (api.runtime.getManifest().content_scripts || []).filter((cs) => !(cs.js || []).includes('content/sniff.js'));
-    const registered = await api.scripting?.getRegisteredContentScripts?.().catch(() => []) || [];
+    // the interface's own scripts alone: the sniffer and the tool bar run on every site, and their
+    // matches would make every open tab in the browser a "Canvas tab" — reloaded, work and all
+    const NOT_THE_INTERFACE = ['content/sniff.js', 'content/toolbar.js'];
+    const manifestScripts = (api.runtime.getManifest().content_scripts || []).filter((cs) => !NOT_THE_INTERFACE.some((f) => (cs.js || []).includes(f)));
+    const registered = (await api.scripting?.getRegisteredContentScripts?.().catch(() => []) || []).filter((s) => !String(s.id || '').startsWith('bcv-toolbar-'));
     const res = [...manifestScripts, ...registered].flatMap((cs) => cs.matches || []).map(matchRe).filter(Boolean);
     return tabs.filter((t) => typeof t.url === 'string' && /^https?:/.test(t.url) && res.some((re) => re.test(t.url)));
   }

@@ -122,6 +122,39 @@ while (pending.length) { pending.shift().resolve(); await tick(); }
 await Promise.all([...queued, wanted]);
 check(opened === 0 && finished.filter((u) => /memo11$/.test(u)).length === 1, 'and it was asked for once, shared by both');
 
+// ---- the memo after a write ---------------------------------------------------------------------
+// A key forgotten while its loader is still answering: the next caller asks afresh rather than
+// joining the run from before the write (a star pressed while the course list loads showed unset).
+{
+  console.log('the memo after a write');
+  const first = C.cached('after-write', 60000, () => C.get('/api/v1/after-write?n=1'));
+  await tick();
+  await C.invalidate('after-write');
+  const second = C.cached('after-write', 60000, () => C.get('/api/v1/after-write?n=2'));
+  await tick();
+  const asked = pending.filter((p) => /after-write/.test(p.url)).map(path);
+  check(asked.length === 2 && asked[1].endsWith('n=2'), `a caller after the invalidation starts its own request (${asked.join(', ')})`);
+  for (const p of pending.filter((x) => /after-write/.test(x.url))) { pending.splice(pending.indexOf(p), 1); p.resolve(200, '[]'); }
+  await first; await second;
+}
+
+// ---- the record CSV reader (extension/lib/record-csv.js) ------------------------------------------
+{
+  console.log('the record CSV reader');
+  const csvSrc = readFileSync(join(root, 'extension', 'lib', 'record-csv.js'), 'utf8');
+  const csvBox = { self: {} };
+  csvBox.self = csvBox;
+  vm.createContext(csvBox);
+  vm.runInContext(csvSrc, csvBox);
+  const R = csvBox.BCV.recordCsv;
+  const tsv = R.parse('course\tgrade\tcredits\nCalculus I, Honors\tA-\t4\nWriting\tB+\t3');
+  check(tsv.rows.length === 2 && tsv.rows[0].course === 'Calculus I, Honors' && tsv.rows[0].points === 3.7 && tsv.rows[0].credits === 4, `a tab-separated file keeps a comma inside a course name: ${tsv.rows.map((r) => `${r.course}=${r.grade}`).join(' | ')}`);
+  const guessed = R.parse('Course,Credits,Percentage\nPhysics,4,92%\nChemistry,3,B+');
+  check(guessed.rows.length === 2 && guessed.rows[0].points === 3.7 && guessed.rows[1].points === 3.3, `without a grade column named, the grade is never read off the credits: ${guessed.rows.map((r) => `${r.course}=${r.grade}→${r.points}`).join(' | ')}`);
+  const hist = R.history('Fall 2025,3.5\nMay 15 2026,3.6\n2026-06-01,\nhello 2026,3.0\n1,2');
+  check(hist.length === 2 && hist[0].date === '2025-12-15' && hist[1].date === '2026-05-15', `a history reads terms and written months, and skips a blank GPA, a word before a year and a bare number: ${hist.map((r) => `${r.date}=${r.gpa}`).join(' | ')}`);
+}
+
 console.log('a session that has ended');
 let lostCalls = 0;
 C.onSessionLost(() => { lostCalls++; });

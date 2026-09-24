@@ -161,7 +161,7 @@
   const STYLE_KEY = 'tools:cite:style'; // the style last chosen, in the tool or its pin: the one the next citation starts in
   /** The popup. `url` fills the URL; `type` picks the source; `fields` fills what is known (a page's
    *  title, a course, an instructor); `style` picks the style, else the one last used. */
-  async function open(app, { from = null, url = '', type = '', fields = null, style = '' } = {}) {
+  async function open(app, { from = null, url = '', type = '', fields = null, style = '', stack = false } = {}) {
     const tool = T.toolOf('cite');
     const [raw, lastStyle] = await Promise.all([T.load(KEY, []), T.load(STYLE_KEY, 'mla')]);
     const pick = STYLES.some(([k]) => k === style) ? style : STYLES.some(([k]) => k === lastStyle) ? lastStyle : 'mla';
@@ -170,7 +170,7 @@
     st.saved = Array.isArray(raw) ? raw.filter((x) => x && Array.isArray(x.parts)) : [];
 
     const body = U.el('bcv-cite');
-    const p = T.popup({ tool, title: 'Citation generator', sub: '', width: 980, body, from });
+    const p = T.popup({ tool, title: 'Citation generator', sub: '', width: 980, body, from, stack }); // (stack: asked to rise over the sheet up, kept through the storage read above)
 
     // across the top: the style, and the kind of source
     const styleSeg = T.seg(STYLES, st.style, (k) => { st.style = k; T.save(STYLE_KEY, k); paint(); });

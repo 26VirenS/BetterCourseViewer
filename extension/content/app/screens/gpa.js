@@ -74,6 +74,8 @@
       earned: groups.reduce((s, g) => s + g.earned, 0),
       remaining: groups.reduce((s, g) => s + g.rem, 0),
       needed: (targetPct) => (slope > 0 ? ((targetPct / 100 - base) / slope) * 100 : null), // % of the remaining points
+      project: (fraction) => (base + slope * Math.max(0, Math.min(1, fraction))) * 100, // the course's final % when the remaining work scores this fraction
+      slope,
     };
   }
 
@@ -151,7 +153,9 @@
       });
       const n = rows.length;
       const termGpa = n ? rows.reduce((s, r) => s + r.pts, 0) / n : null;
-      const lowGpa = n ? rows.reduce((s, r) => s + pointsFor(null, Math.max(0, r.pct - LOWER_BY)), 0) / n : null;
+      // the range's low end: the remaining work of each course landing LOWER_BY points under its
+      // current score (a course with nothing left to grade stays where it is)
+      const lowGpa = n ? rows.reduce((s, r) => s + pointsFor(null, r.m.known && r.m.slope > 0 ? r.m.project(Math.max(0, r.pct - LOWER_BY) / 100) : r.pct), 0) / n : null;
       const cum = hasPrior() && termGpa !== null ? (tracking.priorGpa * tracking.priorCourses + termGpa * n) / (tracking.priorCourses + n) : null;
       // on-time: every submitted, dated assignment across the shown courses; Canvas's own `late` flag decides
       let submitted = 0, onTime = 0;

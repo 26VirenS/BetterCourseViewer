@@ -67,7 +67,7 @@
     const pass = (n) => (filter === 'all' || n.cat === filter) && (!unreadOnly || !state.read[n.id]);
     const visible = () => live().filter(pass);
     const persist = async () => {
-      await store.setNotifState(state).catch(() => {});
+      await store.setNotifState(state, new Set(feed.map((n) => n.id))).catch(() => {}); // (marks for alerts gone from the feed go with them)
       app.refreshCounts();
     };
 
@@ -92,7 +92,7 @@
         if (!state.read[n.id]) { state.read[n.id] = true; await persist(); }
         app.go(n.url || '/');
       };
-      const el = h('div', { class: `bcv-nf__row bcv-nf__enter ${isRead ? 'is-read' : ''}`, dataset: { id: n.id, cat: n.cat }, role: 'link', tabindex: '0', style: { animationDelay: `${Math.min(i * 45, 240)}ms` }, onclick: open, onkeydown: (e) => { if (e.key === 'Enter') open(); } }, [
+      const el = h('div', { class: `bcv-nf__row bcv-nf__enter ${isRead ? 'is-read' : ''}`, dataset: { id: n.id, cat: n.cat }, role: 'link', tabindex: '0', style: { animationDelay: `${Math.min(i * 45, 240)}ms` }, onclick: open, onkeydown: (e) => { if (e.key === 'Enter' && e.target === e.currentTarget) open(); } }, [
         h('span', { class: 'bcv-nf__dot', 'aria-hidden': 'true' }),
         h('span', { class: 'bcv-nf__body' }, [
           h('span', { class: 'bcv-nf__title', text: n.title }),

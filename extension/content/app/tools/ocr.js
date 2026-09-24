@@ -20,9 +20,31 @@
 
   // ---- the reader frame: the engine's page, once per tab ---------------------------------------------
   let frame = null;
-  let ready = null;
+  let ready = null; // → the port the jobs travel on
   let seq = 0;
+  let idleT = 0;
+  const IDLE_MS = 5 * 60e3; // the engine (its models, tens of MB) is let go after this long with nothing to read
   const jobs = new Map();
+  // What comes back — the words off the picture — travels over a channel of its own, handed to the
+  // frame once: a message posted to the page's window would be seen by every script on the page
+  // (Canvas's own, an LTI tool's), and a student's scanned notes are nobody else's business.
+  const onPort = (e) => {
+    const m = e.data;
+    if (!m || m.bcv !== 'ocr') return;
+    const j = jobs.get(m.id);
+    if (!j) return;
+    if (m.type === 'progress') j.onProgress?.(m);
+    else if (m.type === 'done') { jobs.delete(m.id); j.resolve(m); }
+    else if (m.type === 'error') { jobs.delete(m.id); j.reject(new Error(m.message || 'The text could not be read.')); }
+    if (!jobs.size) armIdle();
+  };
+  const letGo = () => { clearTimeout(idleT); idleT = 0; try { ready?.then?.((port) => port.close()); } catch { /* gone */ } ready = null; frame?.remove(); frame = null; };
+  const armIdle = () => { clearTimeout(idleT); idleT = setTimeout(() => { if (!jobs.size) letGo(); }, IDLE_MS); };
+  const onReady = (e) => {
+    if (!frame || e.source !== frame.contentWindow || !e.data || e.data.bcv !== 'ocr' || e.data.type !== 'ready') return;
+    frame.dispatchEvent(new CustomEvent('bcv-ready'));
+  };
+  window.addEventListener('message', onReady); // (once, for the tab: a reader that is rebuilt after a failure is not one more listener)
   function readerFrame() {
     if (self.BCVBridge?.native) return Promise.reject(new Error('Reading the words off a picture needs the browser extension.'));
     if (ready) return ready;
@@ -30,29 +52,27 @@
       const url = BCV.api.runtime.getURL('lib/ocr/reader.html');
       frame = h('iframe', { class: 'bcv-ocr__frame', src: url, title: 'Simpl Courses text reader', tabindex: '-1', 'aria-hidden': 'true' });
       const t = setTimeout(() => reject(new Error('The text reader did not start.')), 30000);
-      window.addEventListener('message', (e) => {
-        if (!frame || e.source !== frame.contentWindow || !e.data || e.data.bcv !== 'ocr') return;
-        const m = e.data;
-        if (m.type === 'ready') { clearTimeout(t); resolve(frame); return; }
-        const j = jobs.get(m.id);
-        if (!j) return;
-        if (m.type === 'progress') j.onProgress?.(m);
-        else if (m.type === 'done') { jobs.delete(m.id); j.resolve(m); }
-        else if (m.type === 'error') { jobs.delete(m.id); j.reject(new Error(m.message || 'The text could not be read.')); }
-      });
+      frame.addEventListener('bcv-ready', () => {
+        clearTimeout(t);
+        const ch = new MessageChannel();
+        ch.port1.onmessage = onPort;
+        try { frame.contentWindow.postMessage({ bcv: 'ocr', type: 'hello' }, new URL(url).origin, [ch.port2]); } catch (err) { reject(err); return; }
+        resolve(ch.port1);
+      }, { once: true });
       frame.addEventListener('error', () => reject(new Error('The text reader could not load.')));
       overlayRoot().append(frame);
     });
-    ready.catch(() => { ready = null; frame?.remove(); frame = null; });
+    ready.catch(() => letGo());
     return ready;
   }
   /** One picture (a Blob) → { text, confidence }, with progress on the way. */
   async function recognize(blob, onProgress) {
-    const f = await readerFrame();
+    const port = await readerFrame();
+    clearTimeout(idleT);
     const id = `j${++seq}`;
     return new Promise((resolve, reject) => {
       jobs.set(id, { resolve, reject, onProgress });
-      f.contentWindow.postMessage({ bcv: 'ocr', type: 'read', id, blob }, '*');
+      port.postMessage({ bcv: 'ocr', type: 'read', id, blob });
     });
   }
 
@@ -62,11 +82,19 @@
     const body = U.el('bcv-ocr');
     const p = T.popup({ tool, title: 'Image to text', sub: 'Runs on this device. Nothing is uploaded.', width: 760, body, from, foot: 'English, Chinese and Japanese, printed or handwritten. Clear, straight-on pictures read best.' });
     const fileInput = h('input', { type: 'file', accept: 'image/*,.pdf,application/pdf', hidden: true });
-    fileInput.addEventListener('change', () => { const f = fileInput.files?.[0]; fileInput.value = ''; if (f) take(f); });
-    const onPaste = (e) => { if (!p.alive()) { document.removeEventListener('paste', onPaste); return; } const f = Array.from(e.clipboardData?.files || []).find((x) => isImage(x) || isPdf(x)); if (f) { e.preventDefault(); take(f); } };
+    fileInput.addEventListener('change', async () => { const f = fileInput.files?.[0]; if (f) await take(f); fileInput.value = ''; }); // (read first: Safari lets go of the file once the input is cleared)
+    // a picture pasted while the popup has the keyboard — not one pasted into an editor under it
+    const onPaste = (e) => {
+      if (!p.alive()) { document.removeEventListener('paste', onPaste); return; }
+      const a = document.activeElement;
+      const editing = a && a !== document.body && (/^(INPUT|TEXTAREA)$/.test(a.tagName) || a.isContentEditable) && !p.ov.contains(a);
+      if (editing) return;
+      const f = Array.from(e.clipboardData?.files || []).find((x) => isImage(x) || isPdf(x));
+      if (f) { e.preventDefault(); take(f); }
+    };
     document.addEventListener('paste', onPaste);
     const mo = new MutationObserver(() => { if (!p.alive()) { document.removeEventListener('paste', onPaste); mo.disconnect(); } });
-    mo.observe(document.body, { childList: true });
+    mo.observe(overlayRoot(), { childList: true });
     // the work view's parts, made once
     const preview = h('img', { class: 'bcv-ocr__preview', alt: 'The picture being read' });
     const nameEl = U.text('bcv-ocr__name', '');
@@ -130,6 +158,7 @@
           const buf = await T.readAs(f, 'readAsArrayBuffer');
           await T.vendor('pdf');
           const pdf = await self.pdfjsLib.getDocument({ data: buf.slice(0) }).promise;
+          try {
           if (!p.alive() || st.file !== f) return;
           const n = Math.min(pdf.numPages, MAX_PAGES);
           const own = [];
@@ -145,10 +174,11 @@
             paintWork();
             return;
           }
-          const blobs = [];
-          for (let i = 1; i <= n; i++) { const page = await pdf.getPage(i); blobs.push(await drawBlob(page, 2)); }
-          if (!p.alive() || st.file !== f) return;
-          await readAll(blobs, 'pdf');
+          // a page is drawn as its turn comes (thirty pages drawn up front held thirty pictures at once)
+          const pages = [];
+          for (let i = 1; i <= n; i++) pages.push(() => pdf.getPage(i).then((page) => drawBlob(page, 2)));
+          await readAll(pages, 'pdf');
+          } finally { try { pdf.destroy?.(); } catch { /* gone */ } } // (the document's buffers and fonts: pdf.js keeps them until told)
         }
       } catch (e) {
         if (!p.alive() || st.file !== f) return;
@@ -180,7 +210,9 @@
         st.progress = 0;
         paintWork();
         const here = blobs.length > 1 ? `page ${i + 1} of ${blobs.length}` : '';
-        const r = await recognize(blobs[i], (m) => { if (!p.alive() || st.file !== f) return; st.status = m.status === 'loading' ? 'Loading the reader…' : m.status === 'finding' ? `Finding the text${here ? ` on ${here}` : ''}…` : m.status === 'reading' ? `Reading ${here ? `${here}` : 'the lines'}…` : st.status; st.progress = m.status === 'reading' ? m.progress : m.status === 'loading' ? m.progress : 0; paintWork(); });
+        const blob = typeof blobs[i] === 'function' ? await blobs[i]() : blobs[i]; // (a page still to be drawn, or a picture as it is)
+        if (!p.alive() || st.file !== f) return;
+        const r = await recognize(blob, (m) => { if (!p.alive() || st.file !== f) return; st.status = m.status === 'loading' ? 'Loading the reader…' : m.status === 'finding' ? `Finding the text${here ? ` on ${here}` : ''}…` : m.status === 'reading' ? `Reading ${here ? `${here}` : 'the lines'}…` : st.status; st.progress = m.status === 'reading' ? m.progress : m.status === 'loading' ? m.progress : 0; paintWork(); });
         if (!p.alive() || st.file !== f) return;
         parts.push(r.text.trim());
         confSum += r.confidence || 0;

@@ -40,7 +40,8 @@ const bridge = readFileSync(join(root, 'ios', 'SimplCourses', 'Web', 'bridge.js'
   .split('__MANIFEST__').join(JSON.stringify(manifest)); // every occurrence, as the app does
 const start = [`(function(){${guardJS}\n${bridge}\n})();\n`];
 const end = [];
-for (const rel of ['lib/settings.js', 'lib/providers.js', 'background.js']) start.push(wrap(rel));
+// the background script and what it needs, as the manifest lists them (the app reads the same list)
+for (const rel of manifest.background?.scripts || ['lib/settings.js', 'lib/devcode.js', 'background.js']) start.push(wrap(rel));
 const css = [];
 for (const cs of manifest.content_scripts || []) {
   if ((cs.js || []).includes('content/sniff.js')) continue; // (the browsers' finder of a school's Canvas: the app chooses the school natively, as ScriptBundle.swift skips it)
@@ -70,11 +71,15 @@ const check = (cond, label) => {
 };
 const browser = await chromium.launch({ channel: 'chromium' });
 const context = await browser.newContext({ viewport: { width: 1200, height: 800 } });
-await context.addInitScript(() => { try { if (!localStorage.getItem('bcv:storage')) localStorage.setItem('bcv:storage', JSON.stringify({ 'setup:offered': true })); } catch { /* ignore */ } }); // a fresh profile would open the guided setup first
+// a fresh profile would open the guided setup, What's New, the search welcome and the Tools welcome first (the suites seed
+// the same marks); the setup's flow number comes from background.js, whose migration clears the marks of an older flow
+const setupFlow = Number((file('background.js').match(/const SETUP_FLOW = (\d+)/) || [])[1]) || 0;
+await context.addInitScript(({ v, flow }) => { try { if (!localStorage.getItem('bcv:storage')) localStorage.setItem('bcv:storage', JSON.stringify({ 'setup:flow': flow, 'setup:offered': true, 'setup:done': true, 'welcome:search': true, 'tools:welcomed': true, 'whatsnew:seen': v })); } catch { /* ignore */ } }, { v: manifest.version, flow: setupFlow });
 await context.addInitScript(initScript);
+let page = null;
+const errors = [];
 try {
-  const page = await context.newPage();
-  const errors = [];
+  page = await context.newPage();
   page.on('pageerror', (e) => errors.push(e.message));
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
   const texts = (sel) => page.$$eval(sel, (els) => els.map((e) => (e.innerText || e.textContent).replace(/\s+/g, ' ').trim()));
@@ -86,12 +91,12 @@ try {
   check((await texts('.bcv-stat')).length === 6 && (await texts('.bcv-nav__item')).some((t) => /Dashboard/.test(t)), 'dashboard data loads through the page\'s own Canvas session');
   const api = await page.evaluate(async () => {
     const m = browser.runtime.getManifest();
-    const status = await browser.runtime.sendMessage({ type: 'providerStatus' });
+    const status = await browser.runtime.sendMessage({ type: 'devGet' }); // the Developer section's read of the tool-tab settings: answered by background.js alone
     const none = await browser.runtime.sendMessage({ type: 'nobody-handles-this' });
     return { name: m.name, version: m.version, status, none };
   });
   check(api.name === 'Simpl Courses' && /^\d+\.\d+\.\d+$/.test(api.version), `runtime.getManifest comes from the bundled manifest: ${api.name} ${api.version}`);
-  check(api.status && api.status.configured === false && api.status.label === 'Not set up' && api.none === undefined, `one-shot messages reach background.js inside the page: ${JSON.stringify(api.status)}`);
+  check(api.status && api.status.ok === true && api.status.normal === true && typeof api.status.code === 'string' && api.none === undefined, `one-shot messages reach background.js inside the page: ${JSON.stringify(api.status)}`);
   check(errors.length === 0, `no page errors while mounting${errors.length ? `: ${errors.slice(0, 3).join(' | ')}` : ''}`);
 
   console.log('storage + onChanged');
@@ -129,6 +134,15 @@ try {
 } catch (e) {
   console.error('hybrid test crashed:', e);
   failures.push(`crash: ${e.message}`);
+  // what the page was showing when it happened, so a stuck screen can be read from the log alone
+  const state = await page?.evaluate(() => ({
+    url: location.href, html: document.documentElement.className, h1: document.querySelector('h1')?.textContent?.trim() || null,
+    main: [...document.querySelectorAll('#bcv-main > *')].map((e) => e.className).join(' | ') || null,
+    rail: [...document.querySelectorAll('.bcv-rail__item')].length, toasts: [...document.querySelectorAll('.bcv-toast')].map((e) => e.textContent.trim()),
+    over: [...document.body.children].filter((e) => e.id !== 'bcv-app').map((e) => e.id || e.className || e.tagName).slice(0, 12),
+    storage: (() => { try { return Object.keys(JSON.parse(localStorage.getItem('bcv:storage') || '{}')); } catch { return null; } })(),
+  })).catch((err) => `unreadable: ${err.message}`);
+  console.error('page state at the crash:', JSON.stringify(state), 'errors:', JSON.stringify(errors.slice(0, 5)));
 } finally {
   await browser.close();
   server.kill();

@@ -618,6 +618,7 @@
     // changes hands (the rail's entrance plays once; its collapse state and its counts carry over).
     const kept = keptShell('courses', id, course, dark);
     const shell = kept ? liveShell.shell : { course, reader: null, dark, kind: 'courses' };
+    shell.course = course; // (the kept shell carries the course as it is now: its score moves between tabs, and the Grades total with it)
     shell.tabs = tabs;
     shell.activeId = activeId;
     shell.reader = null;
@@ -1271,7 +1272,6 @@
   T.modules = async (ctx, shell) => {
     const b = body();
     b.append(await T.modulesBlock(ctx, shell));
-    const list = await store.modules(shell.course.id).catch(() => []);
     return b;
   };
 

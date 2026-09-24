@@ -180,9 +180,12 @@
   function courseState(c, t = now()) {
     const term = c.term || {};
     const enr = (c.enrollments || [])[0] || {};
-    const start = U.parse(c.start_at || term.start_at);
-    const end = U.parse(c.end_at || term.end_at);
-    if (c.workflow_state === 'completed' || enr.enrollment_state === 'completed' || (end && end < t && c.restrict_enrollments_to_course_dates !== false && end < t)) return 'past';
+    // a course's own dates govern only when it says so (restrict_enrollments_to_course_dates); the
+    // term's otherwise — and a term that has ended is a past course, whatever the course's own say
+    const own = c.restrict_enrollments_to_course_dates === true;
+    const start = U.parse((own && c.start_at) || term.start_at);
+    const end = U.parse((own && c.end_at) || term.end_at);
+    if (c.workflow_state === 'completed' || enr.enrollment_state === 'completed' || (end && end < t)) return 'past';
     if (enr.enrollment_state === 'invited' || enr.enrollment_state === 'creation_pending' || (start && start > t)) return 'future';
     return 'current';
   }
@@ -259,7 +262,15 @@
         for (const k of shown || []) if (String(k.id) !== String(courseId)) await C.post(`/api/v1/users/self/favorites/courses/${k.id}`, {}).catch(() => {});
       }
       await C.post(`/api/v1/users/self/favorites/courses/${courseId}`, {});
-    } else await C.del(`/api/v1/users/self/favorites/courses/${courseId}`);
+    } else {
+      // with nothing starred, Canvas shows every current course and none is a favourite to
+      // delete: taking one off the dashboard means starring all the others, so the rest stay
+      const all = await courses().catch(() => []);
+      if (all.length && !all.some((c) => c.favorite)) {
+        const shown = await cards().catch(() => []);
+        for (const k of shown || []) if (String(k.id) !== String(courseId)) await C.post(`/api/v1/users/self/favorites/courses/${k.id}`, {}).catch(() => {});
+      } else await C.del(`/api/v1/users/self/favorites/courses/${courseId}`);
+    }
     await Promise.all([C.invalidate('courses:all'), C.invalidate('cards')]);
   }
 
@@ -429,7 +440,7 @@
   const dismiss = (item) => override(item, { dismissed: true });
   const restore = (item) => override(item, { dismissed: false, marked_complete: false });
   async function invalidatePlanner() {
-    await Promise.all([C.invalidate('planner:21'), C.invalidate('planner:14'), C.invalidate('planner:60'), C.invalidate('planner:mine'), C.invalidate('planner:overrides')]);
+    await C.invalidatePrefix('planner:'); // (the windows, the student's own tasks, the overrides, and the calendar's ranges)
   }
   /** Every planner override of the student's (marked complete, dismissed), whatever the item's date:
    *  what the Overdue card reads for late work, which comes from the course's assignments rather
@@ -496,8 +507,11 @@
     const st = (await pref(NOTIF_STATE)) || {};
     return { read: st.read && typeof st.read === 'object' ? st.read : {}, gone: st.gone && typeof st.gone === 'object' ? st.gone : {} };
   }
-  async function setNotifState(next) {
-    await setPref(NOTIF_STATE, { read: next.read || {}, gone: next.gone || {} });
+  /** Saves the read and dismissed marks — only for alerts still in the feed when `liveIds` is
+   *  given, so the maps do not grow for the life of the account. */
+  async function setNotifState(next, liveIds = null) {
+    const keep = (m) => (liveIds ? Object.fromEntries(Object.entries(m || {}).filter(([id]) => liveIds.has(id))) : (m || {}));
+    await setPref(NOTIF_STATE, { read: keep(next.read), gone: keep(next.gone) });
   }
   /** Overdue and Due soon from the planner (due items with nothing submitted: the last 14 days, the
    *  next 48 hours); Graded and Feedback from Submission items in the activity stream (a score, a
@@ -552,8 +566,11 @@
       const last = snaps[snaps.length - 1];
       if (last?.date === localDay(t)) out.push({ id: `local:snapshot:${last.date}`, cat: 'system', title: 'Grade snapshot recorded', courseId: null, course: 'Simpl Courses', color: '#8e8e93', when: U.startOfDay(t), whenText: 'Today', note: `${U.plural(snaps.length, 'day')} of history stored locally`, action: 'See trend', url: '/grades' });
     }
-    const dir = (n) => (n.cat === 'soon' ? 1 : -1); // due soon: soonest first; everything else: newest first
-    return out.sort((a, b) => (a.cat === b.cat ? dir(a) * ((a.when?.getTime() || 0) - (b.when?.getTime() || 0)) : 0));
+    // by kind, then within a kind: due soon soonest first, everything else newest first (a comparator
+    // that returned 0 across kinds was no order at all, and the engine was free to shuffle a kind's items)
+    const RANK = { overdue: 0, soon: 1, graded: 2, feedback: 3, announce: 4, system: 5 };
+    const dir = (n) => (n.cat === 'soon' ? 1 : -1);
+    return out.sort((a, b) => ((RANK[a.cat] ?? 9) - (RANK[b.cat] ?? 9)) || dir(a) * ((a.when?.getTime() || 0) - (b.when?.getTime() || 0)));
   }
   /** The badge on the sidebar: alerts neither read nor dismissed. */
   async function notifUnread(opts = {}) {
@@ -1174,8 +1191,9 @@
         const graded = s.workflow_state === 'graded' && s.score !== null && s.score !== undefined && !s.excused;
         const key = String(a.id);
         const raw = whatIf?.[key];
-        const hyp = whatIfOn && raw !== undefined && raw !== '' ? Number(raw) : null;
-        const cleared = whatIfOn && raw === '';
+        const hypNum = whatIfOn && raw !== undefined && raw !== '' ? Number(raw) : NaN;
+        const hyp = Number.isFinite(hypNum) ? hypNum : null; // ("." or "1.2.3" typed: no score, not NaN through every ring)
+        const cleared = whatIfOn && (raw === '' || (raw !== undefined && !Number.isFinite(hypNum)));
         const effective = hyp !== null ? hyp : (cleared ? null : (graded ? Number(s.score) : null));
         let badgeText = '';
         if (a.omit_from_final_grade) badgeText = 'Not counted toward final grade';
@@ -1193,13 +1211,30 @@
     // Groups that carry weight come first (in Canvas's order), then the 0% ones.
     const ordered = [...groups].sort((a, b) => (weighted ? Number(b.weight > 0) - Number(a.weight > 0) : 0) || (a.position || 0) - (b.position || 0));
     const GROUP_COLORS = ['#0a84ff', '#5856d6', '#ff2d55', '#ff9500', '#30b0c7', '#af52de', '#ff6b22', '#c8901c'];
+    // A group's rules (drop the lowest N, the highest N, never drop these) are applied the way
+    // Canvas applies them: the scored items sorted by their fraction, the drops taken from the
+    // ends, the never-drop ones held. Without this a group with a dropped zero read too low.
+    const applyRules = (items, rules) => {
+      const dropLow = Math.max(0, Number(rules?.drop_lowest) || 0);
+      const dropHigh = Math.max(0, Number(rules?.drop_highest) || 0);
+      if (!dropLow && !dropHigh) return { kept: items, dropped: [] };
+      const never = new Set((rules?.never_drop || []).map(String));
+      const cands = items.filter((r) => !never.has(String(r.id))).sort((a, b) => (a.effective / a.possible) - (b.effective / b.possible));
+      const low = cands.slice(0, Math.min(dropLow, Math.max(0, cands.length - 1)));
+      const rest = cands.slice(low.length);
+      const high = dropHigh ? rest.slice(Math.max(0, rest.length - Math.min(dropHigh, Math.max(0, rest.length - 1)))) : [];
+      const dropped = new Set([...low, ...high]);
+      return { kept: items.filter((r) => !dropped.has(r)), dropped: [...dropped] };
+    };
     const groupStats = ordered.map((g, i) => {
-      const items = rows.filter((r) => r.groupId === g.id && r.counted && r.possible > 0 && r.effective !== null);
+      const scoredItems = rows.filter((r) => r.groupId === g.id && r.counted && r.possible > 0 && r.effective !== null);
+      const { kept: items, dropped } = applyRules(scoredItems, g.rules);
+      for (const r of dropped) r.dropped = true;
       const omitted = rows.filter((r) => r.groupId === g.id && !r.counted).map((r) => r.name);
       const earned = items.reduce((s, r) => s + r.effective, 0);
       const possible = items.reduce((s, r) => s + r.possible, 0);
       return {
-        ...g, color: GROUP_COLORS[i % GROUP_COLORS.length], graded: items.length > 0, earned, possible, omitted,
+        ...g, color: GROUP_COLORS[i % GROUP_COLORS.length], graded: items.length > 0, earned, possible, omitted, dropped: dropped.map((r) => r.name),
         pct: possible > 0 ? Math.round((earned / possible) * 100) : null, hypothetical: items.some((r) => r.hypothetical), zero: weighted && g.weight === 0,
       };
     });
@@ -1249,7 +1284,8 @@
       if (g.hypothetical) bits.push('includes what-if');
       if (g.omitted.length === 1) bits.push(`${g.omitted[0]} excluded`);
       else if (g.omitted.length > 1) bits.push(`${g.omitted.length} not counted`);
-      if (g.rules?.drop_lowest) bits.push(`Canvas drops lowest ${g.rules.drop_lowest}`);
+      if (g.dropped?.length) bits.push(g.dropped.length === 1 ? `${g.dropped[0]} dropped` : `${g.dropped.length} lowest dropped`);
+      else if (g.rules?.drop_lowest) bits.push(`Canvas drops lowest ${g.rules.drop_lowest}`);
       if (!ringed) bits.push('legend only');
       return { id: g.id, label: g.name, detail: bits.join(' · '), weightText: weightText(g), value: g.pct === null ? '—' : `${g.pct}%`, pct: g.pct, weight: g.weight, color: colorOf(i + 1, g.color), ringed, zero: g.zero };
     });

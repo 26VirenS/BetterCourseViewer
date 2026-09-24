@@ -66,35 +66,42 @@
     { key: 'match', name: 'Match', icon: IC.grid, color: '#34c759' },
   ];
 
-  async function open(app, { from = null, deck: startDeck = null, mode = null } = {}) {
+  async function open(app, { from = null, deck: startDeck = null, mode = null, stack = false } = {}) {
     const tool = T.toolOf('fc');
     const raw = await T.load(KEY, []);
     const st = { decks: Array.isArray(raw) ? raw.filter((d) => d && d.id) : [], view: 'sets', deck: null, idx: 0, flip: false, typed: '', fb: null, last: '', note: '', round: null, test: null, match: null, pasteOpen: false, paste: '' };
     if (startDeck && st.decks.some((d) => d.id === startDeck)) { st.deck = startDeck; st.view = 'set'; } // (opened straight at a set: the quick menu on the pin)
-    const persist = () => T.save(KEY, st.decks);
+    // a change is written at once — except typing in the editor, where every keystroke was a write
+    // of every set: those are written once a pause comes, and whatever is still waiting when the
+    // popup goes is written then
+    let saveT = 0;
+    let waiting = [];
+    const writeNow = async () => { const w = waiting; waiting = []; clearTimeout(saveT); try { await T.save(KEY, st.decks); } finally { for (const r of w) r(); } };
+    const persist = () => writeNow();
+    const persistLater = () => new Promise((resolve) => { waiting.push(resolve); clearTimeout(saveT); saveT = setTimeout(writeNow, 350); });
     const deck = () => st.decks.find((d) => d.id === st.deck) || null;
-    const patchDeck = (fn) => { st.decks = st.decks.map((d) => (d.id === st.deck ? fn(d) : d)); return persist(); };
-    const patchCard = (id, fn) => patchDeck((x) => ({ ...x, cards: cardsOf(x).map((c) => (c.id === id ? fn(c) : c)) }));
+    const patchDeck = (fn, { later = false } = {}) => { st.decks = st.decks.map((d) => (d.id === st.deck ? fn(d) : d)); return later ? persistLater() : persist(); };
+    const patchCard = (id, fn, opts) => patchDeck((x) => ({ ...x, cards: cardsOf(x).map((c) => (c.id === id ? fn(c) : c)) }), opts);
     const dark = !!app?.isDark?.();
 
     const body = U.el('bcv-fc');
-    const p = T.popup({ tool, title: 'Flashcards', sub: '', width: 660, body, from });
+    const p = T.popup({ tool, title: 'Flashcards', sub: '', width: 660, body, from, stack });
+    const mo = new MutationObserver(() => { if (!p.alive()) { mo.disconnect(); if (waiting.length) writeNow(); } });
+    mo.observe(T.overlayRoot(), { childList: true });
     const csvInput = h('input', { type: 'file', accept: '.csv,text/csv', hidden: true });
-    csvInput.addEventListener('change', () => { const f = csvInput.files?.[0]; if (f) importCsv(f); csvInput.value = ''; });
+    csvInput.addEventListener('change', async () => { const f = csvInput.files?.[0]; if (f) await importCsv(f); csvInput.value = ''; }); // (read first: Safari lets go of the file once the input is cleared)
     body.append(csvInput);
     let ticker = 0; // the match clock
 
-    function importCsv(file) {
-      const r = new FileReader();
-      r.onload = () => {
-        const cards = cardsFromCsv(r.result);
-        if (!cards.length) { st.note = 'No cards found. Use two columns: term, definition.'; paint(); return; }
-        const d = { id: T.uid('d'), name: file.name.replace(/\.csv$/i, ''), cards };
-        st.decks = [...st.decks, d];
-        persist();
-        go('edit', { deck: d.id, note: `${countOf(cards.length, 'card')} imported.` });
-      };
-      r.readAsText(file);
+    async function importCsv(file) {
+      let text;
+      try { text = await T.readAs(file, 'readAsText'); } catch { st.note = 'That file could not be read.'; paint(); return; }
+      const cards = cardsFromCsv(text);
+      if (!cards.length) { st.note = 'No cards found. Use two columns: term, definition.'; paint(); return; }
+      const d = { id: T.uid('d'), name: file.name.replace(/\.csv$/i, ''), cards };
+      st.decks = [...st.decks, d];
+      persist();
+      go('edit', { deck: d.id, note: `${countOf(cards.length, 'card')} imported.` });
     }
     const go = (view, patch = {}) => { clearInterval(ticker); Object.assign(st, { view, flip: false, fb: null, typed: '', last: '', note: '', pasteOpen: false, paste: '' }, patch); paint(); };
     const back = () => go(st.view === 'set' || st.view === 'edit' ? 'sets' : 'set');
@@ -262,14 +269,14 @@
     // ---- the editor: a title, the cards, paste or import ------------------------------------
     function editView(d, cards) {
       const name = T.input({ value: d?.name || '', placeholder: 'Title', 'aria-label': 'Title', class: 'bcv-input bcv-tool__input bcv-fc__name' });
-      name.addEventListener('input', () => { patchDeck((x) => ({ ...x, name: name.value })); p.setTitle(name.value || 'Untitled set'); });
+      name.addEventListener('input', () => { patchDeck((x) => ({ ...x, name: name.value }), { later: true }); p.setTitle(name.value || 'Untitled set'); });
       const desc = T.input({ value: d?.desc || '', placeholder: 'Description (optional)', 'aria-label': 'Description', class: 'bcv-input bcv-tool__input bcv-fc__desc' });
-      desc.addEventListener('input', () => patchDeck((x) => ({ ...x, desc: desc.value })));
+      desc.addEventListener('input', () => patchDeck((x) => ({ ...x, desc: desc.value }), { later: true }));
       const rows = cards.map((c, i) => {
         const term = T.input({ value: c.term, placeholder: 'Term', 'aria-label': `Term ${i + 1}`, class: 'bcv-input bcv-tool__input bcv-fc__term' });
         const def = T.input({ value: c.def, placeholder: 'Definition', 'aria-label': `Definition ${i + 1}`, class: 'bcv-input bcv-tool__input bcv-fc__def' });
-        term.addEventListener('input', () => patchCard(c.id, (y) => ({ ...y, term: term.value })));
-        def.addEventListener('input', () => patchCard(c.id, (y) => ({ ...y, def: def.value })));
+        term.addEventListener('input', () => patchCard(c.id, (y) => ({ ...y, term: term.value }), { later: true }));
+        def.addEventListener('input', () => patchCard(c.id, (y) => ({ ...y, def: def.value }), { later: true }));
         const row = U.el('bcv-fc__editrow', [
           U.el('bcv-fc__edithead', [U.text('bcv-fc__n', String(i + 1)), ibtn(IC.close, { size: 28, iconSize: 11, title: 'Delete card', cls: 'bcv-fc__remove', onClick: async () => { await patchDeck((x) => ({ ...x, cards: cardsOf(x).filter((y) => y.id !== c.id) })); paint(); } })]),
           U.el('bcv-fc__editfields', [U.el('bcv-fc__field', [term, U.text('bcv-fc__fieldlabel', 'Term')]), U.el('bcv-fc__field', [def, U.text('bcv-fc__fieldlabel', 'Definition')])]),
@@ -495,6 +502,7 @@
       if (!p.alive()) { document.removeEventListener('keydown', onKey, true); return; }
       const inField = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target?.tagName || '');
       if (inField) return;
+      if (e.key === ' ' && e.target?.tagName === 'BUTTON' && !e.target.classList.contains('bcv-fc__face')) return; // (Space on Edit or Share presses that button, as it should)
       if (st.view === 'cards' && st.round && st.round.i < st.round.ids.length) {
         if (e.key === ' ' || e.key === 'ArrowUp' || e.key === 'ArrowDown') { e.preventDefault(); body.querySelector('.bcv-fc__face')?.click(); }
         else if (e.key === 'ArrowLeft') { e.preventDefault(); body.querySelector('.bcv-fc__mark--learn')?.click(); }

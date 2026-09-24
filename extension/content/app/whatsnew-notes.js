@@ -24,6 +24,16 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.89.0', date: '2026-09-24', notes: [
+      { kind: 'fixed', title: 'Dropped scores count', body: 'A drop-lowest rule is applied to the total and the rings.', icon: P.steps },
+      { kind: 'fixed', title: 'All-day events', body: 'An all-day event sits on its own day, not the day before.', icon: P.clock },
+      { kind: 'fixed', title: 'Inbox names', body: 'A conversation is named after the other people in it.', icon: P.list },
+      { kind: 'fixed', title: 'Alerts in order', body: 'Overdue first, then due soon, graded, feedback, news.', icon: P.check },
+      { kind: 'fixed', title: 'Reply to an entry', body: 'Reply-to can be cancelled; the reply lands where you chose.', icon: P.pen },
+      { kind: 'fixed', title: 'Sheets and moves', body: 'A sheet left open closes when the screen changes under it.', icon: P.layers },
+      { kind: 'fixed', title: 'iPhone app start', body: 'The app’s background script loads on the phone again.', icon: P.tool },
+      { kind: 'improved', title: 'A lighter build', body: 'Old screens and styles nobody could reach are gone.', icon: P.sparkle },
+    ] },
     { version: '2.88.0', date: '2026-09-24', notes: [
       { kind: 'fixed', title: 'The search box', body: 'No stray white field inside the pill any more.', icon: P.check },
     ] },

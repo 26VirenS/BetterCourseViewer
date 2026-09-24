@@ -88,7 +88,7 @@
     const body = U.el('bcv-mark');
     const p = T.popup({ tool, title: 'PDF annotator', sub: 'Highlights, drawings, text and notes, kept on this device per file.', width: 1040, cls: 'bcv-tool--taller', body, from });
     const fileInput = h('input', { type: 'file', accept: '.pdf,application/pdf', hidden: true });
-    fileInput.addEventListener('change', () => { const f = fileInput.files?.[0]; fileInput.value = ''; if (f) take(f); });
+    fileInput.addEventListener('change', async () => { const f = fileInput.files?.[0]; if (f) await take(f); fileInput.value = ''; }); // (read first: Safari lets go of the file once the input is cleared)
     let saveT = 0, selT = 0, io = null, bubble = null, draft = null, moving = null;
     let pagesEl = null, col = null, panel = null, bar = null, pageNo = null, zoomEl = null, sizesEl = null, undoBtn = null, redoBtn = null;
     const alive = () => p.alive();
@@ -100,8 +100,9 @@
       if (e.key === 'Escape' && st.tool !== 'select' && !typing) { e.stopPropagation(); setTool('select'); }
     };
     const stopAll = () => { document.removeEventListener('selectionchange', onSel); document.removeEventListener('keydown', onKey, true); hideBubble(); io?.disconnect(); };
-    const mo = new MutationObserver(() => { if (!alive()) { stopAll(); mo.disconnect(); } });
-    mo.observe(document.body, { childList: true });
+    const letGo = () => { try { st.doc?.destroy?.(); } catch { /* gone */ } st.doc = null; st.bytes = null; }; // (the document's fonts and buffers: pdf.js keeps them until told)
+    const mo = new MutationObserver(() => { if (!alive()) { stopAll(); letGo(); mo.disconnect(); } });
+    mo.observe((BCV.utils?.overlayRoot?.() || document.body), { childList: true });
 
     // ---- home: a PDF in, and the ones marked up before -------------------------------------------
     function home() {
@@ -139,10 +140,11 @@
       try {
         const buf = await T.readAs(f, 'readAsArrayBuffer');
         await T.vendor('pdf');
-        const doc = await self.pdfjsLib.getDocument({ data: buf.slice(0) }).promise;
         const hash = await sha(buf);
+        const doc = await self.pdfjsLib.getDocument({ data: buf.slice(0) }).promise; // (a copy: the worker takes the buffer for its own; Save PDF reads st.bytes)
         const saved = await T.load(KEY + hash, null);
-        if (!alive()) return;
+        if (!alive()) { doc.destroy?.(); return; }
+        letGo(); // (the one open before, if any)
         Object.assign(st, { file: f, bytes: buf, doc, hash, note: '', active: null, tool: 'select', history: [], future: [], sel: null });
         st.marks = Array.isArray(saved?.marks) ? saved.marks.filter((m) => m && m.id && m.page && (Array.isArray(m.rects) || Array.isArray(m.points))) : [];
         st.pages = [];
@@ -177,7 +179,7 @@
       panel = U.el('bcv-mark__panel');
       body.replaceChildren(fileInput, bar, U.el('bcv-mark__main', [col, panel]));
       p.setTitle(st.file.name, '');
-      p.setBack(() => { st.file = null; stopAll(); home(); });
+      p.setBack(() => { flush(); st.file = null; stopAll(); letGo(); home(); }); // (a note typed a moment ago is saved before the file is put down)
       for (const pg of st.pages) {
         pg.canvas = h('canvas');
         pg.text = h('div', { class: 'bcv-mark__text' });
@@ -202,13 +204,17 @@
       const ro = new ResizeObserver(() => { if (!alive()) { ro.disconnect(); return; } relayout(); });
       ro.observe(col);
     }
-    const scaleOf = (pg) => ((Math.max(200, (col?.clientWidth || 640) - 40)) / pg.w) * st.zoom;
+    // the column's width is read once per layout: page by page, a scrollbar arriving between two
+    // reads gave the pages two widths, and the first page was drawn again over its own drawing
+    const scaleOf = (pg, w = col?.clientWidth || 640) => ((Math.max(200, w - 40)) / pg.w) * st.zoom;
     function relayout() {
+      const w = col?.clientWidth || 640;
       for (const pg of st.pages) {
-        const s = scaleOf(pg);
-        if (pg.drawn && Math.abs(s - pg.vp.scale) < 0.001) continue;
+        const s = scaleOf(pg, w);
+        if (pg.drawn && pg.vp && Math.abs(s - pg.vp.scale) < 0.001) continue;
         pg.el.style.width = `${Math.round(pg.w * s)}px`;
         pg.el.style.height = `${Math.round(pg.h * s)}px`;
+        if (pg.task) { try { pg.task.cancel(); } catch { /* done already */ } pg.task = null; } // (a drawing under way at the old size is stopped, not drawn over)
         if (pg.drawn) { pg.drawn = false; pg.text.replaceChildren(); pg.canvas.getContext('2d').clearRect(0, 0, pg.canvas.width, pg.canvas.height); }
         io.unobserve(pg.el);
         io.observe(pg.el);
@@ -226,14 +232,22 @@
       pg.canvas.height = Math.round(vp.height * dpr);
       pg.canvas.style.width = `${Math.round(vp.width)}px`;
       pg.canvas.style.height = `${Math.round(vp.height)}px`;
+      const task = pg.page.render({ canvasContext: pg.canvas.getContext('2d'), viewport: vp, transform: dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : null });
+      pg.task = task;
       try {
-        await pg.page.render({ canvasContext: pg.canvas.getContext('2d'), viewport: vp, transform: dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : null }).promise;
+        await task.promise;
         if (!alive() || pg.vp !== vp) return;
         const tc = await pg.page.getTextContent();
         pg.text.style.setProperty('--scale-factor', String(vp.scale));
         pg.text.replaceChildren();
         await self.pdfjsLib.renderTextLayer({ textContentSource: tc, container: pg.text, viewport: vp, textDivs: [] }).promise;
-      } catch { /* a page that will not draw stays blank; the marks still show */ }
+      } catch (e) {
+        // stopped by a re-layout: drawn again at the new size when it comes into view (a page that
+        // will not draw at all stays blank; the marks still show)
+        if (e?.name === 'RenderingCancelledException' && pg.vp === vp) { pg.drawn = false; io?.unobserve(pg.el); io?.observe(pg.el); }
+      } finally {
+        if (pg.task === task) pg.task = null;
+      }
     }
     function zoom(d) { st.zoom = Math.max(0.5, Math.min(3, Math.round((st.zoom + d) * 100) / 100)); zoomEl.textContent = `${Math.round(st.zoom * 100)}%`; relayout(); }
     function setTool(k) {
@@ -352,18 +366,25 @@
       item?.scrollIntoView({ block: 'nearest' });
       if (edit) setTimeout(() => (m.kind === 'text' ? pg.layer.querySelector(`.bcv-mark__textbox[data-id="${id}"] textarea`) : item?.querySelector('textarea'))?.focus(), 30);
     }
+    // saving waits out a burst of changes; what it saves is captured when it is asked for, so a
+    // Back pressed in the meantime (st.file gone) still writes the file it was about
+    let pendingSave = null;
     function persist() {
       clearTimeout(saveT);
-      saveT = setTimeout(async () => {
-        const c = counts(st.marks);
-        const rec = { name: st.file.name, size: st.file.size, pages: st.pages.length, marks: st.marks, updated: Date.now() };
-        if (st.marks.length) await T.save(KEY + st.hash, rec);
-        else { try { await BCV.api.storage.local.remove(KEY + st.hash); } catch { /* nothing kept */ } }
-        const idx = (await T.load(INDEX, [])).filter((r) => r && r.hash !== st.hash);
-        if (st.marks.length) idx.unshift({ hash: st.hash, name: st.file.name, size: st.file.size, pages: st.pages.length, hl: c.hl, notes: c.notes, ink: c.ink, text: c.text, line: c.line, updated: rec.updated });
-        st.recent = idx.slice(0, 30);
-        await T.save(INDEX, st.recent);
-      }, 300);
+      pendingSave = { file: st.file, hash: st.hash, pages: st.pages.length, marks: st.marks };
+      saveT = setTimeout(() => { const s = pendingSave; pendingSave = null; persistNow(s); }, 300);
+    }
+    function flush() { clearTimeout(saveT); if (pendingSave) { const s = pendingSave; pendingSave = null; persistNow(s); } }
+    async function persistNow({ file, hash, pages, marks }) {
+      if (!file || !hash) return;
+      const c = counts(marks);
+      const rec = { name: file.name, size: file.size, pages, marks, updated: Date.now() };
+      if (marks.length) await T.save(KEY + hash, rec);
+      else { try { await BCV.api.storage.local.remove(KEY + hash); } catch { /* nothing kept */ } }
+      const idx = (await T.load(INDEX, [])).filter((r) => r && r.hash !== hash);
+      if (marks.length) idx.unshift({ hash, name: file.name, size: file.size, pages, hl: c.hl, notes: c.notes, ink: c.ink, text: c.text, line: c.line, updated: rec.updated });
+      st.recent = idx.slice(0, 30);
+      await T.save(INDEX, st.recent);
     }
     // ---- the panel ------------------------------------------------------------------------------
     function paintPanel() {

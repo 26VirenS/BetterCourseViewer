@@ -48,14 +48,19 @@
       U.menu(anchor, SCOPES.map(([k, l]) => ({ label: l, active: scope === k, onSelect: () => { scope = k; scopePill.textContent = l; load(); } })));
     }
 
+    let loadSeq = 0; // (a scope switched twice: the list asked for last is the one painted)
     async function load({ force = false } = {}) {
-      convs = await store.conversations({ scope, filter: courseFilter, force }).catch(() => null);
-      if (!ctx.alive()) return;
+      const seq = ++loadSeq;
+      const got = await store.conversations({ scope, filter: courseFilter, force }).catch(() => null);
+      if (!ctx.alive() || seq !== loadSeq) return;
+      convs = got;
       drawList();
       drawReader();
     }
 
-    const names = (c) => (c.participants || []).filter((p) => String(p.id) !== String(c.audience?.[0] && false)).map((p) => p.name).join(', ');
+    // who a conversation is with: everyone in it but yourself
+    const me = String(store.env?.()?.current_user_id || '');
+    const names = (c) => (c.participants || []).filter((p) => !me || String(p.id) !== me).map((p) => p.name).join(', ') || (c.participants || []).map((p) => p.name).join(', ');
 
     function drawList() {
       if (!convs) {
@@ -126,8 +131,9 @@
       }
       reader.className = 'bcv-inbox__reader bcv-reader';
       reader.replaceChildren(U.loading());
+      const wanted = selectedId; // (two rows pressed in a row: the one pressed last is the one read)
       const conv = await store.conversation(selectedId).catch(() => null);
-      if (!ctx.alive() || mode !== 'read') return;
+      if (!ctx.alive() || mode !== 'read' || selectedId !== wanted) return;
       if (!conv) {
         reader.replaceChildren(U.errorBox('This conversation could not be loaded.'));
         return;
@@ -178,7 +184,8 @@
       let contextCode = courseFilter;
       const chipsWrap = U.el('bcv-recips');
       const input = h('input', { type: 'text', placeholder: 'Type a name…', 'aria-label': 'To' });
-      const results = U.el('bcv-menu', null, { style: { display: 'none', position: 'absolute', left: '0', right: '0', top: '100%', marginTop: '4px' } });
+      // a menu's look, not its class: closeMenus() (Escape, another menu) removes every .bcv-menu, and this box has to stay for the next search
+      const results = U.el('bcv-menu bcv-recips__results', null, { style: { display: 'none', position: 'absolute', left: '0', right: '0', top: '100%', marginTop: '4px' }, dataset: { keep: '1' } });
       const anchor = U.el('bcv-anchor', [chipsWrap, results]);
       const courseSel = h('select', { class: 'bcv-select' }, [h('option', { value: '', text: 'No course (direct message)' }), ...courses.filter((c) => c.state !== 'past').map((c) => h('option', { value: `course_${c.id}`, text: c.name, selected: contextCode === `course_${c.id}` || null }))]);
       courseSel.addEventListener('change', () => { contextCode = courseSel.value || null; });
@@ -197,6 +204,7 @@
         }
         timer = setTimeout(async () => {
           const found = await store.searchRecipients(q, contextCode).catch(() => []);
+          if (input.value.trim() !== q) return; // (typed on since: a shorter search's answer is not the list)
           results.replaceChildren(...(found || []).slice(0, 12).map((r) => h('button', { type: 'button', class: 'bcv-menu__item', onclick: () => {
             if (!recipients.some((x) => x.id === String(r.id))) recipients.push({ id: String(r.id), name: r.name });
             input.value = '';

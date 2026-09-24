@@ -118,7 +118,6 @@
     return h('button', { type: 'button', class: `bcv-iconbtn ${mod}`, onclick: onClick, title: title || null, 'aria-label': title || null }, svg(icon, { size: iconSize, stroke, width }));
   }
 
-  const chip = (lbl, onClick, icon = null) => h('button', { type: 'button', class: 'bcv-chip', onclick: onClick }, [icon ? svg(icon, { size: 13, width: 1.9 }) : null, lbl]);
   const pill = (lbl, onClick, mod = '') => h('button', { type: 'button', class: `bcv-pill ${mod}`, onclick: onClick, text: lbl });
   const empty = (str) => el('bcv-empty', str);
   const emptyCard = (str) => card(str, 'bcv-card--empty');
@@ -196,6 +195,7 @@
       list = null;
       btn.setAttribute('aria-expanded', 'false');
       document.removeEventListener('pointerdown', onAway, true);
+      document.removeEventListener('keydown', listKeys, true);
       window.removeEventListener('resize', close);
       window.removeEventListener('scroll', onScroll, true);
     }
@@ -232,6 +232,7 @@
       overlayRoot().append(list);
       btn.setAttribute('aria-expanded', 'true');
       (list.querySelector('.bcv-picker__opt.is-on') || list.firstElementChild)?.focus({ preventScroll: true });
+      document.addEventListener('keydown', listKeys, true); // (the list's keys, for as long as it is open — not one more listener per picker for the page's life)
       requestAnimationFrame(() => {
         if (!list) return;
         document.addEventListener('pointerdown', onAway, true);
@@ -259,7 +260,7 @@
     });
     btn.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
     // the list's own keys: the buttons in it have focus while it is open
-    const listKeys = (e) => {
+    function listKeys(e) {
       if (!list || !list.contains(e.target)) return;
       if (e.key === 'ArrowDown') { e.preventDefault(); move(e.target, 1); }
       else if (e.key === 'ArrowUp') { e.preventDefault(); move(e.target, -1); }
@@ -267,8 +268,7 @@
       else if (e.key === 'Escape') { e.preventDefault(); close(); btn.focus(); }
       else if (e.key === 'Tab') close();
       else if (e.key.length === 1) jump(e.key);
-    };
-    document.addEventListener('keydown', listKeys, true);
+    }
     drawFace();
     btn.bcvPicker = { set: (v) => { cur = v === null || v === undefined ? '' : String(v); drawFace(); }, get value() { return cur; }, close };
     return btn;
@@ -298,7 +298,7 @@
     return m;
   }
   function closeMenus() {
-    document.querySelectorAll('.bcv-menu').forEach((m) => m.remove());
+    document.querySelectorAll('.bcv-menu:not([data-keep])').forEach((m) => m.remove()); // (a box that only wears a menu's look stays: the inbox's recipient results)
   }
 
   /** Canvas's own course colour palette (the picker on its dashboard cards), plus a custom colour. */
@@ -723,7 +723,7 @@
   }
 
   BCV.ui = {
-    svg, star, chev, el, text, tile, dot, card, row, label, h2, groupHead, badge, seg, search, switchEl, btn, iconbtn, chip, pill,
+    svg, star, chev, el, text, tile, dot, card, row, label, h2, groupHead, badge, seg, search, switchEl, btn, iconbtn, pill,
     empty, emptyCard, loading, errorBox, hint, avatar, toast, menu, closeMenus, picker, colorMenu, COURSE_COLORS, fmtDay, datePop, dateField, promptSheet, askSheet,
     DAY, startOfDay, addDays, sameDay, dayDiff, startOfWeek, parse, MONTHS, MONTHS_LONG, DAYS, DAYS_LONG,
     fmtTime, fmtTimeLower, fmtShort, fmtLong, fmtDateComma, fmtAt, fmtAtUpper, fmtBy, dayTitle, fmtDow, fmtRecent, whenShort, plural,

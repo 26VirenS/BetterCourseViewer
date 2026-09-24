@@ -176,6 +176,22 @@
     await T.vendor('pdf');
     return self.pdfjsLib.getDocument({ data: buf.slice(0) }).promise;
   }
+  /** A small copy of a picture for a row (96px on its long side), a JPEG data URL; '' when it will not draw. */
+  const thumbOf = (data) => new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const s = 96 / Math.max(img.naturalWidth, img.naturalHeight, 1);
+        const cv = h('canvas');
+        cv.width = Math.max(1, Math.round(img.naturalWidth * s));
+        cv.height = Math.max(1, Math.round(img.naturalHeight * s));
+        cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+        resolve(cv.toDataURL('image/jpeg', 0.72));
+      } catch { resolve(''); }
+    };
+    img.onerror = () => resolve('');
+    img.src = data;
+  });
   const rasterize = (rec, to, max) => new Promise((resolve) => {
     const img = new Image();
     img.onload = () => {
@@ -220,7 +236,7 @@
       if (rec.kind === 'docx') {
         const { blocks, html } = await docxBlocks(rec.data);
         if (to === 'txt') { const blob = new Blob([blocks.map((b) => b.text).join('\n\n')], { type: 'text/plain;charset=utf-8' }); return { ok: true, bytes: download ? T.saveFile(`${base(rec.name)}.txt`, blob) : blob.size, label: U.plural(blocks.length, 'block'), blob, name: `${base(rec.name)}.txt` }; }
-        if (to === 'html') { const blob = new Blob([`<!doctype html><meta charset="utf-8"><title>${base(rec.name)}</title>${html}`], { type: 'text/html;charset=utf-8' }); return { ok: true, bytes: download ? T.saveFile(`${base(rec.name)}.html`, blob) : blob.size, label: 'HTML', blob, name: `${base(rec.name)}.html` }; }
+        if (to === 'html') { const blob = new Blob([`<!doctype html><meta charset="utf-8"><title>${BCV.utils.escapeHtml(base(rec.name))}</title>${html}`], { type: 'text/html;charset=utf-8' }); return { ok: true, bytes: download ? T.saveFile(`${base(rec.name)}.html`, blob) : blob.size, label: 'HTML', blob, name: `${base(rec.name)}.html` }; }
         await T.vendor('jspdf');
         await T.vendor('office');
         const doc = await BCV.office.docxToPdf(rec.data, self.jspdf.jsPDF);
@@ -229,6 +245,7 @@
       }
       if (rec.kind === 'pdf') {
         const pdf = await pdfDoc(rec.data);
+        try { // (the document is let go whatever way this ends: pdf.js keeps its buffers and fonts until told)
         const n = Math.min(pdf.numPages, MAX_PAGES);
         if (to === 'docx') {
           await T.vendor('office');
@@ -253,6 +270,7 @@
           if (download) { clickDownload(url, `${base(rec.name)}-p${i}.png`); await new Promise((r) => setTimeout(r, 120)); } // (or the browser keeps the first alone)
         }
         return { ok: true, bytes: total, label: U.plural(n, 'image') };
+        } finally { try { pdf.destroy?.(); } catch { /* gone */ } }
       }
       if (rec.kind === 'text') {
         const blocks = String(rec.data).split(/\n{2,}/).map((t) => { const s = t.trim(); const m = s.match(/^(#{1,3})\s+(.*)$/); return m ? { text: m[2], h: m[1].length === 1 ? 1 : 2 } : { text: s, h: 0 }; }).filter((b) => b.text);
@@ -299,7 +317,7 @@
     const connected = () => !!st.cc.key;
     const cloudOn = () => connected() && st.cc.use !== false;
     const fileInput = h('input', { type: 'file', accept: '.docx,.pptx,.xlsx,.pdf,.txt,.md,.csv,.json,.heic,.heif,image/*', multiple: true, hidden: true });
-    fileInput.addEventListener('change', () => { addFiles(fileInput.files); fileInput.value = ''; });
+    fileInput.addEventListener('change', async () => { const held = await T.holdFiles(fileInput.files); fileInput.value = ''; addFiles(held); }); // (copies first: Safari lets go of the files once the input is cleared)
     const dropSub = U.text('bcv-conv__dropsub', '');
     const drop = h('label', { class: 'bcv-conv__drop' }, [
       U.svg(IC.upload, { size: 24, stroke: 'var(--bcv-ink3)', width: 1.8 }),
@@ -383,8 +401,9 @@
           const how = x.kind === 'image' ? 'readAsDataURL' : x.kind === 'docx' || x.kind === 'pdf' ? 'readAsArrayBuffer' : x.kind === 'text' || x.kind === 'csv' || x.kind === 'json' ? 'readAsText' : null;
           const data = how ? await readAs(x.f, how) : null; // (what only the service takes is not read here: it goes up as it is)
           const size = x.kind === 'image' ? await imageSize(data) : { w: 0, h: 0 };
+          const thumb = x.kind === 'image' ? await thumbOf(data) : ''; // (a small picture for the row: the full one, redrawn on every repaint, held the slider)
           if (!p.alive()) return;
-          st.files = [...st.files, { id: T.uid('f'), name: x.f.name, size: x.f.size, kind: x.kind, data, file: x.f, w: size.w, h: size.h, out: null }];
+          st.files = [...st.files, { id: T.uid('f'), name: x.f.name, size: x.f.size, kind: x.kind, data, thumb, file: x.f, w: size.w, h: size.h, out: null }];
           paint();
         } catch (e) {
           st.note = e?.message || 'A file could not be read.';
@@ -436,7 +455,7 @@
           const done = f.out?.ok, bad = f.out && !f.out.ok;
           const delta = done ? Math.round((1 - f.out.bytes / f.size) * 100) : 0;
           const row = U.el('bcv-conv__row', [
-            f.kind === 'image' ? h('span', { class: 'bcv-conv__thumb', role: 'img', 'aria-label': 'preview', style: { backgroundImage: `url("${f.data}")` } }) : h('span', { class: 'bcv-conv__ext', text: (f.name.split('.').pop() || '').toUpperCase().slice(0, 4) }),
+            f.kind === 'image' && f.thumb ? h('span', { class: 'bcv-conv__thumb', role: 'img', 'aria-label': 'preview', style: { backgroundImage: `url("${f.thumb}")` } }) : h('span', { class: 'bcv-conv__ext', text: (f.name.split('.').pop() || '').toUpperCase().slice(0, 4) }),
             U.el('bcv-conv__rowbody', [U.text('bcv-conv__name bcv-ellip', f.name), U.text('bcv-conv__meta', `${f.kind === 'image' && f.w ? `${f.w} × ${f.h} · ` : ''}${kb(f.size)}`)]),
             st.stage[f.id] ? U.text('bcv-conv__stage', st.stage[f.id], 'span') : null,
             done ? U.el('bcv-conv__out', [

@@ -19,6 +19,8 @@ const at = (dayOffset, hour = 23, minute = 59) => {
   return d.toISOString();
 };
 const ago = (ms) => new Date(now.getTime() - ms).toISOString();
+// a day as Canvas names an all-day event's day (all_day_date), local to the maker
+const ymd = (dayOffset) => { const d = new Date(now); d.setDate(d.getDate() + dayOffset); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 // the session's CSRF token, as Canvas keeps it: in the _csrf_token cookie, URL-encoded (base64 has + / =)
 const CSRF = 'mock+csrf/token=';
 
@@ -672,7 +674,9 @@ on('GET', /^\/api\/v1\/calendar_events$/, (url) => {
     if (codes.includes('course_101')) { out.push({ id: 'ev1', title: 'Lec05 lecture', description: '<p>Composition of functions, <b>section 1.4</b>.</p>', location_name: 'COB2 140', location_address: '5200 N Lake Rd', start_at: at(-1, 10, 30), end_at: at(-1, 11, 45), all_day: false, context_code: 'course_101', context_name: 'F26-MATH 021 20', type: 'event', html_url: '/calendar?event_id=ev1' }); out.push({ id: 'ev2', title: 'Midterm 1 review', start_at: at(13, 10, 30), end_at: at(13, 11, 45), all_day: false, context_code: 'course_101', context_name: 'F26-MATH 021 20', type: 'event', html_url: '/calendar?event_id=ev2' }); }
     if (codes.includes('course_102')) out.push({ id: 'ev3', title: 'Week 2 lab', start_at: at(-2, 10, 30), end_at: at(-2, 13, 0), all_day: false, context_code: 'course_102', context_name: 'F26-PHYS 008 01', type: 'event', html_url: '/calendar?event_id=ev3' });
     if (codes.includes('course_104')) out.push({ id: 'ev5', title: 'SPRK 010 seminar', start_at: at(0, 15, 0), end_at: at(0, 16, 15), all_day: false, context_code: 'course_104', context_name: 'F26-SPRK 010 103', type: 'event', html_url: '/calendar?event_id=ev5' }); // a class today, on the calendar (never counted as work due)
-    if (codes.includes('course_202')) out.push({ id: 'e1', title: 'Chemistry placement closes', start_at: at(6, 0, 0), end_at: at(6, 23, 59), all_day: true, context_code: 'course_202', context_name: 'Placement Exam: Chemistry', type: 'event', html_url: '/calendar?event_id=e1' });
+    if (codes.includes('course_202')) out.push({ id: 'e1', title: 'Chemistry placement closes', start_at: at(6, 0, 0), end_at: at(6, 23, 59), all_day: true, all_day_date: ymd(6), context_code: 'course_202', context_name: 'Placement Exam: Chemistry', type: 'event', html_url: '/calendar?event_id=e1' });
+    // an all-day event made in another time zone: its start_at is that zone's midnight (the evening before, here); the day it names is all_day_date
+    if (codes.includes('course_101')) out.push({ id: 'ev6', title: 'Reading day', start_at: at(3, 20, 0), end_at: at(4, 19, 59), all_day: true, all_day_date: ymd(4), context_code: 'course_101', context_name: 'F26-MATH 021 20', type: 'event', html_url: '/calendar?event_id=ev6' });
     // like Canvas: a reservation is the student's own event, returned with the course it is for (effective_context_code) as well as with the personal calendar
     if (codes.includes('course_101') || codes.includes('user_7')) for (const [s2, t] of ownReservations()) out.push(apptChildJson(s2, t));
     if (codes.includes('user_7')) out.push({ id: 'ev4', title: 'Dentist', start_at: at(2, 15, 0), end_at: at(2, 16, 0), all_day: false, context_code: 'user_7', context_name: 'Sam Student', type: 'event', html_url: '/calendar?event_id=ev4' });

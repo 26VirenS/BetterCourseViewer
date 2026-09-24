@@ -413,14 +413,11 @@ class ViewController: NSViewController, WKNavigationDelegate, WKUIDelegate, WKSc
             lastRevision = snap.revision
             lastModified = store.modified
             return ["ok": true, "origin": origin, "message": adding ? "Enabled on \(origin). Safari asks for the site when you open it." : ""]
-        case "listDomains":
-            let domains = (store.read().settings?["domains"] as? [String]) ?? []
-            return ["ok": true, "scripts": domains.map { ["id": $0, "matches": ["\($0)/*"]] }]
         case "wipeSiteNotes":
             store.update(bump: false) { $0.commands.append(["id": UUID().uuidString, "type": "wipeSiteNotes"]) }
             lastModified = store.modified
             return ["ok": true, "cleared": 0]
-        case "pushSettings", "openOptions", "setBadge":
+        case "pushSettings", "openOptions":
             return ["ok": true]
         default:
             return ["ok": false, "message": "Not here"]

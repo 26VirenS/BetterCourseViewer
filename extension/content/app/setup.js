@@ -169,20 +169,6 @@
     timers.push(setTimeout(() => { if (ui) { ui.intro.hidden = true; ui.main.classList.add('is-in'); } }, 2340));
   }
 
-  async function close() {
-    if (!ui) return;
-    const { host, overlay, timers } = ui;
-    timers.forEach(clearTimeout);
-    ui = null;
-    st = null;
-    html.classList.remove('bcv-setup-open');
-    if (!reduced()) {
-      overlay.classList.add('is-closing');
-      await new Promise((r) => setTimeout(r, 280));
-    }
-    host.remove();
-  }
-
   // ---- the shell: the rail, the count, the footer, transitions -----------------------------------
   const isDone = () => st.step === STEPS.length;
   /** What each step has answered so far, in the rail's own words. */
@@ -583,5 +569,5 @@
     await personalize({ standalone: false });
   }
 
-  BCV.setup = { open, close, active, placeDot };
+  BCV.setup = { open, active, placeDot };
 })();

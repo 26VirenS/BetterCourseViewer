@@ -243,7 +243,7 @@ try {
   const brand = await page.evaluate(() => {
     const img = document.querySelector('.bcv-brand__logo img');
     const cs = img ? getComputedStyle(img) : {};
-    return { src: img?.getAttribute('src')?.slice(0, 18), radius: cs.borderRadius, fit: cs.objectFit, height: img?.getBoundingClientRect().height, text: document.querySelector('.bcv-brand')?.textContent.trim(), name: !!document.querySelector('.bcv-brand__name, .bcv-brand__sub') };
+    return { src: img?.getAttribute('src')?.slice(0, 18), radius: cs.borderRadius, fit: cs.objectFit, height: img?.getBoundingClientRect().height, text: document.querySelector('.bcv-brand')?.textContent.trim(), name: !!document.querySelector('.bcv-brand__name') };
   });
   const tile = await page.$eval('.bcv-brand__logo', (el) => { const r = el.getBoundingClientRect(); return { w: Math.round(r.width), h: Math.round(r.height), radius: getComputedStyle(el).borderRadius }; });
   check(brand.src === 'data:image/svg+xml' && brand.radius === '0px' && brand.fit === 'contain' && brand.height <= 30 && tile.w === 40 && tile.h === 40 && tile.radius === '11px' && brand.name && brand.text.length > 0, `brand row: the school's mark whole inside a 40px rounded tile, the site name beside it: ${JSON.stringify({ ...brand, tile })}`);
@@ -610,7 +610,7 @@ try {
   await page.click('.bcv-prompt__save');
   await page.waitForFunction(() => !document.querySelector('.bcv-sheet--prompt') && [...document.querySelectorAll('.bcv-ccard__code')].some((e) => e.textContent.trim() === 'Calc'), null, { timeout: 10000 });
   const nicked = (await coursesJson()).find((c) => String(c.id) === '101');
-  check(nicked.name === 'Calc' && nicked.original_name === 'F26-MATH 021 20' && (await texts('.bcv-fav')).includes('Calc'), `Save writes the nickname to Canvas (name Calc, the real name kept as original_name) and the sidebar follows: ${(await texts('.bcv-fav')).join(', ')}`);
+  check(nicked.name === 'Calc' && nicked.original_name === 'F26-MATH 021 20' && (await texts('.bcv-fav')).includes('Calc'), `Save writes the nickname to Canvas (name Calc, the real name kept as original_name) and the sidebar follows: ${(await texts('.bcv-fav')).join(', ')} (Canvas: ${JSON.stringify({ name: nicked.name, original: nicked.original_name })})`);
   await shot(page, '04b-courses-nickname');
   const calcCard = page.locator('.bcv-ccard', { hasText: 'Calc' }).first();
   await calcCard.hover();
@@ -788,6 +788,10 @@ try {
   await page.waitForSelector('.bcv-ev', { timeout: 10000 });
   const evs = await texts('.bcv-ev');
   check(evs.length >= 10 && evs.some((t) => /Dis01/.test(t)), `month view events: ${evs.length}`);
+  // an all-day event lands on the day Canvas names for it (all_day_date), not on the day its maker's midnight falls in this zone
+  const readingDay = await page.$$eval('.bcv-cal__day', (cells) => { const c = cells.find((x) => [...x.querySelectorAll('.bcv-ev')].some((e) => /Reading day/.test(e.textContent))); return c ? c.querySelector('.bcv-cal__num')?.textContent.trim() : null; });
+  const dayPlus4 = (() => { const d = new Date(); d.setDate(d.getDate() + 4); return String(d.getDate()); })();
+  check(readingDay === dayPlus4, `an all-day event made in another time zone sits on the day it names (${dayPlus4}), not the evening before: on ${readingDay}`);
   check(await page.$('.bcv-ev__label.bcv-strike'), 'submitted/past events are struck through');
   // the calendars live in a sheet off the Calendars button (which counts the ones on), so the month
   // has the width of the page to itself
@@ -932,7 +936,7 @@ try {
   await nav('inbox');
   await page.waitForSelector('.bcv-inbox__list .bcv-row', { timeout: 10000 });
   const msgs = await texts('.bcv-inbox__list .bcv-row');
-  check(msgs.length === 2 && /Halley Smith, Sam Student.*No submission for Acknowledge/.test(msgs[0]), `inbox rows: ${msgs[0].slice(0, 60)}`);
+  check(msgs.length === 2 && /Halley Smith.*No submission for Acknowledge/.test(msgs[0]) && !/Sam Student/.test(msgs[0]), `inbox rows name who the conversation is with, never yourself: ${msgs[0].slice(0, 60)}`);
   check((await texts('.bcv-inbox__reader'))[0].includes('No conversation selected'), 'empty reader state');
   await shot(page, '09-inbox');
   await page.click('.bcv-inbox__list .bcv-row');
@@ -949,6 +953,13 @@ try {
   await page.waitForSelector('.bcv-compose .bcv-menu__item', { timeout: 5000 });
   await page.click('.bcv-compose .bcv-menu__item');
   check((await texts('.bcv-recip'))[0] === 'Yue Lei', 'recipient search adds a chip');
+  // Escape (which closes every menu on the page) must not take the results box with it: a second search still lists people
+  await page.keyboard.press('Escape');
+  await page.fill('.bcv-recips input', 'yue');
+  await page.waitForSelector('.bcv-compose .bcv-menu__item', { timeout: 5000 });
+  check((await page.$$('.bcv-compose .bcv-menu__item')).length >= 1 && (await page.$('.bcv-compose .bcv-recips__results')) !== null, 'the recipient results box survives Escape, so the next search still lists people');
+  await page.keyboard.press('Escape');
+  await page.fill('.bcv-recips input', '');
   await page.fill('.bcv-compose .bcv-input', 'Question about Dis01');
   await page.fill('.bcv-compose textarea', 'Could you clarify part b?');
   await shot(page, '09c-inbox-compose');
@@ -1177,24 +1188,23 @@ try {
   await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
   const heldChip = await page.$eval('.bcv-detail__grade', (e) => ({ held: e.classList.contains('bcv-detail__grade--held'), text: e.innerText.replace(/\s+/g, ' ').trim(), digits: /\d/.test(e.innerText) }));
   check(heldChip.held && /^Not yet posted/.test(heldChip.text) && !heldChip.digits, `a held grade says so and shows no number: ${JSON.stringify(heldChip)}`);
-  // The mark opens the feedback screen — the same shape as a quiz's, in the course's own column.
-  // The sheet it replaced is kept in the build, off behind SUB_SHEET, because the preview it framed
-  // is Canvas's own document service and that service answers "service unavailable" often enough
-  // that a sheet built around it reads as broken.
+  // The mark opens the feedback screen — the same shape as a quiz's, in the course's own column
+  // (the sheet it replaced is gone from the build: the preview it framed was Canvas's own document
+  // service, which answers "service unavailable" often enough that a sheet built around it read as broken).
   await page.goto(`${BASE}/courses/104/assignments/4001`);
   await page.waitForSelector('.bcv-detail__grade', { timeout: 10000 });
   await page.click('.bcv-detail__grade');
   await page.waitForSelector('.bcv-fb__scorecard', { timeout: 10000 });
-  const asScreen = await page.evaluate(() => ({ embedded: !!document.querySelector('.bcv-fb')?.closest('.bcv-qz.is-embedded'), sheet: !!document.querySelector('.bcv-sheet--sub') }));
+  const asScreen = await page.evaluate(() => ({ embedded: !!document.querySelector('.bcv-fb')?.closest('.bcv-qz.is-embedded'), sheet: !!document.querySelector('.bcv-sheet-ov') }));
   check(page.url().includes('bcv=feedback') && asScreen.embedded && !asScreen.sheet, `the mark opens a screen, not a sheet: ${page.url()} ${JSON.stringify(asScreen)}`);
-  const sheetKept = await sw.evaluate(async (base) => {
+  const sheetGone = await sw.evaluate(async (base) => {
     const [tab] = await chrome.tabs.query({ url: `${base}/*` });
     const [{ result }] = await chrome.scripting.executeScript({
-      target: { tabId: tab.id }, world: 'ISOLATED', func: () => typeof self.BCV.screens.courseDetail.openSubmissions === 'function',
+      target: { tabId: tab.id }, world: 'ISOLATED', func: () => self.BCV.screens.courseDetail.openSubmissions === undefined && !document.querySelector('.bcv-sheet--sub'),
     });
     return result;
   }, BASE);
-  check(sheetKept, 'and the sheet it replaced is still in the build, off rather than gone');
+  check(sheetGone, 'and the sheet it replaced is gone from the build, not merely switched off');
   const fbTop = await page.evaluate(() => ({
     score: document.querySelector('.bcv-fb__big').textContent,
     pct: document.querySelector('.bcv-fb__pct')?.textContent,
@@ -1681,6 +1691,13 @@ try {
   await page.click('.bcv-reply .bcv-btn--primary');
   await page.waitForFunction(() => document.querySelectorAll('.bcv-entry').length === 3, null, { timeout: 10000 });
   check(true, 'reply posted to the discussion entries API');
+  // a reply aimed at one post can be aimed at the thread again: Reply on an entry names it, Cancel reply-to takes it back
+  await page.click('.bcv-entry .bcv-entry__action');
+  const replyAimed = (await texts('.bcv-reply__title'))[0];
+  const cancelBtn = page.locator('.bcv-reply .bcv-btn', { hasText: 'Cancel reply-to' });
+  check(/^Reply to /.test(replyAimed) && (await cancelBtn.isVisible()), `Reply on a post aims the box at it and offers Cancel reply-to: ${replyAimed}`);
+  await cancelBtn.click();
+  check((await texts('.bcv-reply__title'))[0] === 'Reply' && !(await cancelBtn.isVisible()), 'Cancel reply-to aims the box at the thread again and folds away');
   await shot(page, '15b-discussion-thread');
 
   // grades
@@ -1713,6 +1730,15 @@ try {
   check((await texts('.bcv-gr__label'))[0].toLowerCase() === 'what-if total' && /^What-if weighted/.test((await texts('.bcv-gr__note'))[0]) && legend2.some((t) => t === 'Midterms 80 / 100 pts · includes what-if 57% of grade 80%') && (await texts('.bcv-wbar__row')).some((t) => t === 'Midterms 57% of grade 80%') && (await page.$('.bcv-whatif-btn.is-on')), `what-if recomputes: ${(await texts('.bcv-gr__total'))[0]} | ${legend2.find((t) => /Midterms/.test(t))}`);
   check((await page.$$('.bcv-rings__svg > circle')).length === 10 && (await page.$$eval('.bcv-rings__svg > circle', (els) => els.every((e) => !/#(0a84ff|34c759|ff9500|30b0c7)/i.test(e.getAttribute('stroke') || '')))), 'what-if adds the Midterms ring and greys every ring');
   await shot(page, '17-grades-whatif');
+  // a stray "." (or "1.2.3") typed as a score is no score at all, never NaN through the rings and the total
+  await page.locator('.bcv-whatif__input').first().fill('.');
+  await page.locator('.bcv-whatif__input').first().press('Enter');
+  await page.waitForTimeout(300);
+  const wfTexts = [...(await texts('.bcv-gr__total')), ...(await texts('.bcv-legend__row')), ...(await texts('.bcv-gr__note'))].join(' | ');
+  check(!/NaN/.test(wfTexts) && /^\d+%|—/.test((await texts('.bcv-gr__total'))[0] || ''), `a score that is not a number is treated as cleared, not NaN: ${(await texts('.bcv-gr__total'))[0]}`);
+  // the grade model applies a group's drop rules the way Canvas does (a dropped zero no longer drags the group down), and what-if junk is cleared
+  const dropModel = await sw.evaluate(async (base) => { const [t] = await chrome.tabs.query({ url: `${base}/*` }); const [{ result }] = await chrome.scripting.executeScript({ target: { tabId: t.id }, world: 'ISOLATED', func: () => { const S = self.BCV.store; const g = [{ id: 'g1', name: 'Homework', group_weight: 0, position: 1, rules: { drop_lowest: 1, never_drop: ['a3'] }, assignments: [1, 2, 3].map((i) => ({ id: `a${i}`, name: `HW ${i}`, points_possible: 100, submission: { workflow_state: 'graded', score: i === 1 ? 50 : i === 3 ? 60 : 100 } })) }]; const m = S.gradeModel(g, { id: 'x', weighted: false, score: null }, {}, false, false); const nan = S.gradeModel(g, { id: 'x', weighted: false, score: null }, { a2: '1.2.3' }, true, false); return { total: m.total, legend: m.legend[0]?.detail || '', nanTotal: nan.total }; } }); return result; }, BASE);
+  check(dropModel.total === 80 && /HW 1 dropped/.test(dropModel.legend) && Number.isFinite(dropModel.nanTotal), `drop_lowest drops the lowest scored item (never_drop held): total ${dropModel.total} (100 + 60 of 200), legend "${dropModel.legend}", junk what-if total ${dropModel.nanTotal}`);
   await page.click('.bcv-banner .bcv-btn');
   await page.click('.bcv-whatif-btn');
   await page.waitForFunction(() => !document.querySelector('.bcv-banner'), null, { timeout: 5000 });
@@ -4855,13 +4881,18 @@ try {
   const otherTab = await context.newPage();
   await otherTab.goto(`chrome-extension://${extId}/options/options.html`);
   await otherTab.evaluate(() => { window.__stays = 1; });
+  // …and any other website (one the bar's script matches, even): the tool bar runs on every site, and its matches must not make every tab in the browser a Canvas tab
+  const siteTab = await context.newPage();
+  await siteTab.goto(`${SIM}/sim`);
+  await siteTab.evaluate(() => { window.__stays = 1; });
   await page.evaluate(() => { window.__beforeUpdate = 1; });
   const canvasTabsSeen = await sw.evaluate(async () => (await self.BCV.background.canvasTabs()).map((t) => t.url));
   const upd = await sw.evaluate(() => self.BCV.background.afterUpdate('2.0.0'));
   await page.waitForFunction(() => !window.__beforeUpdate, null, { timeout: 15000 });
   await page.waitForSelector('.bcv-body .bcv-row', { timeout: 20000 });
   const updAgain = await sw.evaluate(() => self.BCV.background.afterUpdate('2.0.0'));
-  check(canvasTabsSeen.length === 1 && canvasTabsSeen[0].startsWith(`${BASE}/`) && upd.reloaded === 1 && (await page.evaluate(() => performance.getEntriesByType('navigation')[0]?.type)) === 'reload' && (await otherTab.evaluate(() => window.__stays)) === 1 && updAgain.already === true, `after an update the Canvas tab is loaded again and the other tab is not, once per version (${JSON.stringify({ canvasTabsSeen, upd, updAgain })})`);
+  check(canvasTabsSeen.length === 1 && canvasTabsSeen[0].startsWith(`${BASE}/`) && upd.reloaded === 1 && (await page.evaluate(() => performance.getEntriesByType('navigation')[0]?.type)) === 'reload' && (await otherTab.evaluate(() => window.__stays)) === 1 && (await siteTab.evaluate(() => window.__stays)) === 1 && updAgain.already === true, `after an update the Canvas tab is loaded again and no other tab is — not the settings page, not another website — once per version (${JSON.stringify({ canvasTabsSeen, upd, updAgain })})`);
+  await siteTab.close();
   await otherTab.close();
   // a Canvas session that has ended: the first "unauthenticated" answer sends the page to sign in
   // again (a reload, once — it lands on Canvas's sign-in on a real site), every other request is
@@ -5049,6 +5080,16 @@ try {
   }, BASE)) === null), 'coming back puts out a wash that was left sweeping while the tab was away');
   await page.goto(`${BASE}/`);
   await page.waitForSelector('.bcv-stat', { timeout: 20000 });
+  // a sheet belongs to the screen it was opened over: moving to another screen in place takes it away (scrim and all)
+  await page.click('.bcv-stat');
+  await page.waitForSelector('.bcv-sheet-ov', { timeout: 5000 });
+  // the scrim takes every press, so the move comes from the app itself (a shortcut, a toast's link, a tool's row)
+  await sw.evaluate(async (base) => {
+    const [tab] = await chrome.tabs.query({ url: `${base}/*` });
+    await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'ISOLATED', func: () => { self.BCV.app.go('/courses'); } });
+  }, BASE);
+  await page.waitForSelector('[data-term]', { timeout: 15000 });
+  check(!(await page.$('.bcv-sheet-ov')) && page.url().endsWith('/courses'), 'a sheet left open does not survive an in-place move to another screen');
   // ---- notifications ------------------------------------------------------------------------------------
   console.log('notifications');
   await page.goto(`${BASE}/#notifications`);
@@ -5079,6 +5120,13 @@ try {
   await page.click('#bcv-nf-restore');
   await page.waitForFunction(() => !document.querySelector('.bcv-nf__gone'), null, { timeout: 5000 });
   check((await page.$$('.bcv-nf__row')).length === nfTotal, 'Restore brings it back');
+  // Enter on a row's Dismiss button dismisses — and does not also open the alert (the row's own Enter is for the row)
+  await page.focus('.bcv-nf__row[data-cat="announce"] .bcv-nf__ib--x');
+  await page.keyboard.press('Enter');
+  await page.waitForSelector('.bcv-nf__gone', { timeout: 5000 });
+  check(page.url().endsWith('/#notifications') && (await page.$$('.bcv-nf__row')).length === nfTotal - 1, `Enter on a row's Dismiss button dismisses without opening the row: ${page.url()}`);
+  await page.click('#bcv-nf-restore');
+  await page.waitForFunction(() => !document.querySelector('.bcv-nf__gone'), null, { timeout: 5000 });
   await page.click('#bcv-nf-readall');
   await page.waitForFunction((n) => document.querySelector('.bcv-head__sub')?.textContent === `${n} alerts · all read`, nfTotal, { timeout: 5000 });
   check(!(await texts('.bcv-nav')).some((t) => /Notifications\s*\d/.test(t)), 'Mark all read clears the sidebar badge');

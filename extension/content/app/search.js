@@ -209,5 +209,5 @@
     input.select();
   });
 
-  BCV.search = { field, close, active: () => !!ui && !ui.panel.hidden };
+  BCV.search = { field, close };
 })();

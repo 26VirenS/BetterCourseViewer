@@ -69,7 +69,6 @@
   const GROUND = { light: '#ffffff', dark: '#1c1c1e' };
   const MIN_SAT = 0.25;
   const ICON_RATIO = 3; // WCAG 1.4.11: graphics and interface parts
-  const TEXT_RATIO = 4.5; // WCAG 1.4.3: words
 
   /** The colour moved along lightness — darker on a light ground, lighter on a dark one — until it
    *  stands `ratio` against the ground; the hue and the saturation are kept. Already there: itself. */
@@ -176,20 +175,6 @@
     const [lo, hi] = band(h, s);
     l = clamp(l, lo, hi);
     return hslToHex([h, s, l]);
-  }
-  /** A seed from the picker's three controls: the hue, the saturation, and the tone (0 lightest to
-   *  1 deepest) along the readable band for them. */
-  function fromControls(h, s, tone) {
-    const sat = clamp(s, MIN_SAT, 1);
-    const [lo, hi] = band(h, sat);
-    return hslToHex([h, sat, hi - (hi - lo) * clamp(tone, 0, 1)]);
-  }
-  /** The picker's controls for a seed: { h, s, tone }. */
-  function toControls(hex) {
-    const [h, s, l] = rgbToHsl(hexToRgb(nearest(hex) || '#0a6cff'));
-    const sat = Math.max(s, MIN_SAT);
-    const [lo, hi] = band(h, sat);
-    return { h, s: sat, tone: hi === lo ? 0.5 : clamp((hi - l) / (hi - lo), 0, 1) };
   }
   // a few starting points, each readable as it is
   // the themes on offer (the system's own colours); Regular is not one of them — it is the interface's
@@ -303,7 +288,6 @@
   const sceneUrl = (name, k = 0) => { const n = ((k % SCENE_VARIANTS) + SCENE_VARIANTS) % SCENE_VARIANTS; return SCENE_URLS.get(n ? `${name}#${n}` : name) || null; };
   /** The drawing a scene key stands for ('Dusk', 'Dusk#3'), or null for anything else. */
   const sceneUrlOf = (key) => (key ? SCENE_URLS.get(key) || null : null);
-  const SCENES = { dusk: sceneUrl('Dusk'), ocean: sceneUrl('Ocean'), forest: sceneUrl('Forest'), sand: sceneUrl('Sand') };
   /** [name, picture, tone]: the tone is what the veils warm to, as a read photo's would be. */
   const PRESET_PHOTOS = SCENE_NAMES.map((n) => [n, sceneUrl(n), SCENE_TONES[n]]);
 
@@ -353,7 +337,6 @@
     cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
     return { data: cv.toDataURL('image/jpeg', quality), tone: toneOf(img) };
   }
-  const resizeImage = (file, max, quality) => readImage(file, max, quality).then((r) => r.data);
   /** The tone of a photo already kept (a data URL). */
   const imageTone = (data) => loadPicture(data, false).then(toneOf);
   // the keys the tones are kept under: 'side', a counter's slot, 'head:<screen>'
@@ -368,7 +351,9 @@
       if (images.tones[key]) continue;
       try { images.tones[key] = await imageTone(picOf(images, imageAt(images, key))?.sharp); added++; } catch { /* left without a tone: the ground colour serves */ }
     }
-    if (added || hasRaw(images)) await saveImages(images).catch(() => {}); // (pictures kept before assets are packed now, once)
+    // pictures kept before assets are packed now, once — and a set that would not pack (a picture
+    // that will not draw) is not packed again on every page load, each time rewriting the whole blob
+    if (added || (hasRaw(images) && !images.packStuck)) await saveImages(images).catch(() => {});
     return images;
   }
   // ---- kept as assets --------------------------------------------------------------------------
@@ -381,25 +366,6 @@
   const hashOf = (str) => { let h = 2166136261; const step = Math.max(1, Math.floor(str.length / 4096)); for (let i = 0; i < str.length; i += step) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0).toString(16) + str.length.toString(36); };
   /** The scene key a raw drawing is ('Dusk', 'Dusk#3'), or null for a photo. */
   const sceneNameOf = (v) => { if (!v || !v.startsWith('data:image/svg+xml')) return null; for (const [key, url] of SCENE_URLS) if (url === v) return key; return null; };
-  /** A box blur over RGBA pixels, clamped at the edges: across, then down. */
-  function boxBlur(d, w, h, r) {
-    const tmp = new Float32Array(d.length);
-    const n = 2 * r + 1;
-    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { let R = 0, G = 0, B = 0; for (let k = -r; k <= r; k++) { const i = (y * w + Math.min(w - 1, Math.max(0, x + k))) * 4; R += d[i]; G += d[i + 1]; B += d[i + 2]; } const o = (y * w + x) * 4; tmp[o] = R / n; tmp[o + 1] = G / n; tmp[o + 2] = B / n; }
-    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { let R = 0, G = 0, B = 0; for (let k = -r; k <= r; k++) { const i = (Math.min(h - 1, Math.max(0, y + k)) * w + x) * 4; R += tmp[i]; G += tmp[i + 1]; B += tmp[i + 2]; } const o = (y * w + x) * 4; d[o] = R / n; d[o + 1] = G / n; d[o + 2] = B / n; d[o + 3] = 255; }
-  }
-  /** A picture's blurred copy: drawn tiny, blurred twice, and scaled up by the page — soft, at no cost per frame. */
-  function blurredOf(img, w = 96) {
-    const ratio = img.naturalWidth ? img.naturalHeight / img.naturalWidth : 0.5625;
-    const h = Math.max(8, Math.round(w * ratio));
-    const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
-    const cx = cv.getContext('2d');
-    cx.drawImage(img, 0, 0, w, h);
-    const id = cx.getImageData(0, 0, w, h);
-    boxBlur(id.data, w, h, 3); boxBlur(id.data, w, h, 3);
-    cx.putImageData(id, 0, 0);
-    return cv.toDataURL('image/jpeg', 0.8);
-  }
   /** A blur over one channel of RGBA pixels (the alpha of a mask), clamped at the edges. */
   function boxBlurAlpha(d, w, h, r) {
     const tmp = new Float32Array(w * h);
@@ -496,8 +462,8 @@
       if (ASSET.test(v)) {
         const a = out.assets[v.slice(6)];
         if (!a) return null;
-        if (a.ink || !canDraw) return v;
-        try { const raw = a.scene ? sceneUrlOf(a.scene) || a.sharp : a.sharp; const { ink, inkBlur } = await inkFor(raw); delete a.blur; Object.assign(a, { ink, inkBlur }); } catch { /* kept as it is */ }
+        if (a.ink || a.inkFailed || !canDraw) return v;
+        try { const raw = a.scene ? sceneUrlOf(a.scene) || a.sharp : a.sharp; const { ink, inkBlur } = await inkFor(raw); delete a.blur; Object.assign(a, { ink, inkBlur }); } catch { a.inkFailed = true; } // (a picture that will not ink is kept plain, and not tried again on every page)
         return v;
       }
       if (!canDraw) return v;
@@ -528,24 +494,21 @@
   };
   /** The raw value a slot stands for, for editing: a scene's own drawing, or the picture itself. */
   const rawOf = (images, v) => { const p = picOf(images, v); if (!p) return null; return p.scene ? sceneUrlOf(p.scene) || p.sharp : p.sharp; };
-  const hasRaw = (images) => [images?.side, ...Object.values(images?.cards || {}), ...Object.values(images?.headers || {})].some((v) => v && (!ASSET.test(v) || !images?.assets?.[v.slice(6)]?.ink));
+  const hasRaw = (images) => [images?.side, ...Object.values(images?.cards || {}), ...Object.values(images?.headers || {})].some((v) => v && (!ASSET.test(v) || (!images?.assets?.[v.slice(6)]?.ink && !images?.assets?.[v.slice(6)]?.inkFailed)));
 
   const emptyImages = () => ({ side: null, cards: {}, headers: {}, tones: {}, assets: {} });
   async function loadImages() {
     try {
       const r = await BCV.api.storage.local.get(IMAGES_KEY);
       const v = r?.[IMAGES_KEY];
-      return v && typeof v === 'object' ? { side: v.side || null, cards: { ...(v.cards || {}) }, headers: { ...(v.headers || {}) }, tones: { ...(v.tones || {}) }, assets: { ...(v.assets || {}) } } : emptyImages();
+      return v && typeof v === 'object' ? { side: v.side || null, cards: { ...(v.cards || {}) }, headers: { ...(v.headers || {}) }, tones: { ...(v.tones || {}) }, assets: { ...(v.assets || {}) }, ...(v.packStuck ? { packStuck: true } : {}) } : emptyImages();
     } catch { return emptyImages(); }
   }
-  const saveImages = async (images) => { const p = await packImages(images || emptyImages()); return BCV.api.storage.local.set({ [IMAGES_KEY]: { side: p.side, cards: p.cards, headers: p.headers, tones: Object.fromEntries(toneKeys(p).filter((k) => p.tones?.[k]).map((k) => [k, p.tones[k]])), assets: p.assets } }); };
-  const countImages = (images) => (images?.side ? 1 : 0) + Object.values(images?.cards || {}).filter(Boolean).length + Object.values(images?.headers || {}).filter(Boolean).length;
-  const countHeaders = (images) => Object.values(images?.headers || {}).filter(Boolean).length;
-
+  const saveImages = async (images) => { const p = await packImages(images || emptyImages()); return BCV.api.storage.local.set({ [IMAGES_KEY]: { side: p.side, cards: p.cards, headers: p.headers, tones: Object.fromEntries(toneKeys(p).filter((k) => p.tones?.[k]).map((k) => [k, p.tones[k]])), assets: p.assets, ...(hasRaw(p) ? { packStuck: true } : {}) } }); };
   BCV.theme = {
     hexToRgb, rgbToHex, rgbToHsl, hslToRgb, hslToHex, luminance, contrast, normalize,
-    GROUND, MIN_SAT, ICON_RATIO, TEXT_RATIO, PRESETS, REGULAR, PRESET_PHOTOS, SCENE_VARIANTS, sceneUrl, sceneNameOf, CARD_SLOTS, HEADER_SLOTS, IMAGES_KEY,
-    palette, shades, shadeSet, cssVars, apply, readable, readableOn, fillFor, mix, tint, customHex, controlsOf, veilBase, picCss, band, nearest, fromControls, toControls,
-    resizeImage, readImage, imageTone, fillTones, loadImages, saveImages, countImages, countHeaders, emptyImages, packImages, picOf, rawOf, CAST, INK_LIFT, inkOn, inkFor, inkCached,
+    GROUND, MIN_SAT, ICON_RATIO, PRESETS, REGULAR, PRESET_PHOTOS, SCENE_VARIANTS, sceneUrl, sceneNameOf, CARD_SLOTS, HEADER_SLOTS, IMAGES_KEY,
+    palette, shades, shadeSet, cssVars, apply, readable, readableOn, fillFor, mix, tint, customHex, controlsOf, veilBase, picCss, band, nearest,
+    readImage, imageTone, fillTones, loadImages, saveImages, emptyImages, packImages, picOf, rawOf, CAST, INK_LIFT, inkOn, inkFor, inkCached,
   };
 })();

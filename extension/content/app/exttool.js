@@ -99,7 +99,6 @@
 
   BCV.exttool = {
     open, openLink, isToolHref, isToolTab, borderless, launched,
-    close: () => {}, isOpen: () => false, // (nothing is framed over the page any more)
     theme: { get: () => theme, set: setTheme, button: themeButton },
   };
 })();

@@ -51,7 +51,6 @@
 
   let ui = null;
   let st = null;
-  const active = () => !!ui;
 
   /** Whether a theme has been tried: Personalize saved (its flag from 2.77 on; before that, a theme
    *  with a name in the settings — every save writes one). The invitation is for everyone else. */
@@ -257,5 +256,5 @@
     );
   }
 
-  BCV.whatsnew = { open, invite, close, dismiss, due, active, version };
+  BCV.whatsnew = { open, invite, close, dismiss, due, version };
 })();

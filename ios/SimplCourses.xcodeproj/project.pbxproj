@@ -7,7 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		1493CEA55006B1052441BB27 /* FetchProxy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49A8756AB2C5DCF70B3D3EDD /* FetchProxy.swift */; };
 		1C925D881554BE71A9B14321 /* CookieJar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11F8ABC65325789350307D00 /* CookieJar.swift */; };
 		29FA9BD8912FDACD3BE2B9F8 /* BridgeStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 619AE3110ACAD8FA07A13897 /* BridgeStore.swift */; };
 		2C9206E01EDAD1D07FC3380C /* WebController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A29721466E551DA05644A62 /* WebController.swift */; };
@@ -33,7 +32,6 @@
 		2F942AF3601A741AF03F417E /* SettingsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsSheet.swift; sourceTree = "<group>"; };
 		33F9BBF8AC209FF1AAE47318 /* BrowserScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserScreen.swift; sourceTree = "<group>"; };
 		3A0FECBE6AB83372178D20E8 /* bridge.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = bridge.js; sourceTree = "<group>"; };
-		49A8756AB2C5DCF70B3D3EDD /* FetchProxy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FetchProxy.swift; sourceTree = "<group>"; };
 		5BCA8AD6A8AC5D5A3011403B /* SchoolPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SchoolPickerView.swift; sourceTree = "<group>"; };
 		60417CC937A16F34325C247F /* CanvasWebView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasWebView.swift; sourceTree = "<group>"; };
 		619AE3110ACAD8FA07A13897 /* BridgeStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BridgeStore.swift; sourceTree = "<group>"; };
@@ -106,7 +104,6 @@
 				60417CC937A16F34325C247F /* CanvasWebView.swift */,
 				CB97C35721F98A64BF310C10 /* ContentRules.swift */,
 				11F8ABC65325789350307D00 /* CookieJar.swift */,
-				49A8756AB2C5DCF70B3D3EDD /* FetchProxy.swift */,
 				2A1C06CE6062D5F89A393051 /* ScriptBundle.swift */,
 				7A29721466E551DA05644A62 /* WebController.swift */,
 			);
@@ -201,7 +198,6 @@
 				F47B1E6E27EAF7D283656E0A /* ContentRules.swift in Sources */,
 				B68EF346FFCD7A3DE8A61AA3 /* ContentView.swift in Sources */,
 				1C925D881554BE71A9B14321 /* CookieJar.swift in Sources */,
-				1493CEA55006B1052441BB27 /* FetchProxy.swift in Sources */,
 				E87481CD4B0A70BF5422DBB7 /* SchoolPickerView.swift in Sources */,
 				CE782850F95C710FAC0E113F /* ScriptBundle.swift in Sources */,
 				BB26A260BED650E07132CA16 /* SettingsSheet.swift in Sources */,
@@ -267,7 +263,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
-				MARKETING_VERSION = 2.88.0;
+				MARKETING_VERSION = 2.89.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -363,7 +359,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
-				MARKETING_VERSION = 2.88.0;
+				MARKETING_VERSION = 2.89.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";

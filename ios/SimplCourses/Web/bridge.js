@@ -4,16 +4,14 @@
  *
  *   storage.local get/set/remove/clear + storage.onChanged  → the app's storage file (native)
  *   runtime.sendMessage/onMessage, connect/onConnect        → an in-page message bus: background.js runs
- *                                                            in the same page, so the smart panel streams
- *                                                            exactly as it does from the extension
+ *                                                            in the same page, so its ports work exactly
+ *                                                            as they do from the extension
  *   runtime.getManifest / openOptionsPage                    → the embedded manifest / the app's settings
  *   action, permissions, tabs                                → inert stubs (no badge, no extra sites)
  *
- * Cross-origin requests to the smart-panel providers go through the app (a native URLSession streams
- * the reply back), so the page's CORS rules never apply; every other fetch is the page's own, with the
- * Canvas session. Without a native side (tests, other hosts) storage falls back to localStorage and
- * fetch stays direct. The manifest placeholder on the first line below is filled in by the app
- * (never mention it up here: the manifest's host patterns contain the characters that end a comment). */
+ * Every fetch is the page's own, with the Canvas session. Without a native side (tests, other hosts)
+ * storage falls back to localStorage. The manifest placeholder on the first line below is filled in by
+ * the app (never mention it up here: the manifest's host patterns contain the characters that end a comment). */
 (function () {
   'use strict';
   if (self.browser && self.browser.__simpl) return;
@@ -167,79 +165,11 @@
   // `scripting` is deliberately absent: the school is chosen in the app, not registered per site.
   self.browser = { __simpl: true, storage, runtime, action, permissions, tabs };
 
-  // ---- fetch: the smart-panel providers go through the app; everything else stays the page's own -----
-  const PROXY_HOSTS = new Set(['api.anthropic.com', 'api.openai.com']);
-  const NO_BODY = new Set([101, 204, 205, 304]);
-  const pending = new Map();
-  let seq = 0;
-  const bytes = (b64) => {
-    const bin = atob(b64);
-    const out = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-    return out;
-  };
+  // ---- what the app calls back into the page ------------------------------------------------------
   const BCVBridge = {
     /** What only the app can do (null in a browser or the test harness): the account sheet's "Sign out". */
     native: native ? { signOut: () => call({ op: 'signOut' }).then(noop) } : null,
     storageChanged: (changes) => emitChanged(changes),
-    fetchHead(id, status, statusText, headers) {
-      const job = pending.get(id);
-      if (!job) return;
-      job.headed = true;
-      const body = NO_BODY.has(status) ? null : new ReadableStream({
-        start(controller) { job.ctrl = controller; },
-        cancel() { call({ op: 'fetch.abort', id }).catch(noop); },
-      });
-      try { job.resolve(new Response(body, { status, statusText: statusText || '', headers: headers || {} })); } catch (e) { job.reject(e); }
-    },
-    fetchChunk(id, b64) {
-      const job = pending.get(id);
-      if (job && job.ctrl) { try { job.ctrl.enqueue(bytes(b64)); } catch { /* stream already closed */ } }
-    },
-    fetchDone(id, error) {
-      const job = pending.get(id);
-      if (!job) return;
-      pending.delete(id);
-      if (error) {
-        const e = new TypeError(String(error));
-        if (!job.headed) job.reject(e);
-        else if (job.ctrl) { try { job.ctrl.error(e); } catch { /* closed */ } }
-      } else if (job.ctrl) {
-        try { job.ctrl.close(); } catch { /* closed */ }
-      }
-    },
   };
   self.BCVBridge = BCVBridge;
-  if (native && typeof self.fetch === 'function') {
-    const pageFetch = self.fetch.bind(self);
-    self.fetch = function (input, init) {
-      let url;
-      try { url = new URL(typeof input === 'string' ? input : input.url, location.href); } catch { return pageFetch(input, init); }
-      if (!PROXY_HOSTS.has(url.host)) return pageFetch(input, init);
-      const opts = init || {};
-      const id = ++seq;
-      const headers = {};
-      try { new Headers(opts.headers || (typeof input !== 'string' ? input.headers : undefined) || {}).forEach((v, k) => { headers[k] = v; }); } catch { /* ignore */ }
-      let body = opts.body;
-      if (body !== undefined && body !== null && typeof body !== 'string') body = String(body);
-      const method = String(opts.method || (typeof input !== 'string' && input.method) || 'GET').toUpperCase();
-      return new Promise((resolve, reject) => {
-        const job = { resolve, reject, ctrl: null, headed: false };
-        pending.set(id, job);
-        const abortError = () => new DOMException('The operation was aborted.', 'AbortError');
-        if (opts.signal) {
-          if (opts.signal.aborted) { pending.delete(id); reject(abortError()); return; }
-          opts.signal.addEventListener('abort', () => {
-            if (pending.get(id) !== job) return;
-            pending.delete(id);
-            call({ op: 'fetch.abort', id }).catch(noop);
-            if (!job.headed) reject(abortError());
-            else if (job.ctrl) { try { job.ctrl.error(abortError()); } catch { /* closed */ } }
-          });
-        }
-        call({ op: 'fetch', id, url: url.href, method, headers, body: body === undefined ? null : body })
-          .catch((e) => { if (pending.get(id) === job) { pending.delete(id); reject(new TypeError(String((e && e.message) || e))); } });
-      });
-    };
-  }
 })();

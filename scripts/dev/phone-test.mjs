@@ -252,6 +252,14 @@ try {
   check(acct.join(',') === 'Inbox,Groups,Tools,History,My Materials,Help,Dark appearance,Settings,Guided setup,What’s new,Profile,All Canvas settings,Log out', `account sheet rows, with Tools and the school's own nav entries: ${acct.join(', ')} (no Sign out outside the app)`);
   check((await texts('.bcv-ph-srow__note'))[0] === 'No unread messages' || /unread message/.test((await texts('.bcv-ph-srow__note'))[0]), `Inbox row carries the unread count: ${(await texts('.bcv-ph-srow__note'))[0]}`);
   await shot('01c-account-sheet');
+  // the Settings row opens Simpl's settings (it called a function that never existed, and did nothing)
+  await sw.evaluate(async (base) => { const [t] = await chrome.tabs.query({ url: `${base}/*` }); await chrome.scripting.executeScript({ target: { tabId: t.id }, world: 'ISOLATED', func: () => { self.__settingsOpened = 0; self.BCV.app.openSettings = () => { self.__settingsOpened += 1; }; } }); }, BASE);
+  await page.click('.bcv-ph-srow:has-text("Settings")');
+  await page.waitForFunction(() => !document.querySelector('.bcv-sheet-ov'), null, { timeout: 5000 });
+  const settingsOpened = await sw.evaluate(async (base) => { const [t] = await chrome.tabs.query({ url: `${base}/*` }); const [{ result }] = await chrome.scripting.executeScript({ target: { tabId: t.id }, world: 'ISOLATED', func: () => self.__settingsOpened }); return result; }, BASE);
+  check(settingsOpened === 1, 'the account sheet’s Settings row opens Simpl settings');
+  await page.click('.bcv-ph-avatar');
+  await sheet();
   await page.evaluate(() => { window.__bcvMarker = 1; });
   await page.click('.bcv-ph-srow:has-text("Dark appearance")');
   await page.waitForFunction(() => document.documentElement.getAttribute('data-bcv-theme') === 'dark' && window.__bcvMarker === undefined && document.querySelector('.bcv-ph-stat'), null, { timeout: 15000 });
@@ -543,11 +551,11 @@ try {
   check(phFacts.length === 4 && /^Due /.test(phFacts[0]) && phFacts[1] === `Points ${webFacts.points}` && phFacts[3] === `Attempts ${webFacts.attempts}` && !webFacts.available && !phFacts.some((t) => /^Available/.test(t)), `the phone draws the same facts, and none Canvas has no value for: ${phFacts.join(' | ')}`);
   await shot('08c-assignment-graded');
   // and the chip opens what is behind the mark: the feedback screen, the same shape as a quiz's,
-  // in the course column rather than as a sheet (the sheet is kept in the build, off)
+  // in the course column rather than as a sheet
   await page.click('.bcv-ph-grade');
   await page.waitForSelector('.bcv-fb__scorecard', { timeout: 10000 });
   const phFb = await page.evaluate(() => ({
-    url: location.search, sheet: !!document.querySelector('.bcv-sheet--sub'),
+    url: location.search, sheet: !!document.querySelector('.bcv-sheet-ov'),
     score: document.querySelector('.bcv-fb__big').textContent,
     cards: [...document.querySelectorAll('.bcv-fb__q .bcv-fb__qn')].map((e) => e.textContent),
     files: [...document.querySelectorAll('.bcv-fb__file')].map((e) => e.innerText.replace(/\s+/g, ' ').trim()),

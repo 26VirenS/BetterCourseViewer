@@ -135,7 +135,7 @@
   // Edge-swipe from the left screen edge pops the stack, exactly like the Back button; not during a quiz attempt.
   let edge = null;
   document.addEventListener('pointerdown', (e) => {
-    if (!active() || html.classList.contains('bcv-ph-root') || html.classList.contains('bcv-quiz') || e.clientX > 24) { edge = null; return; }
+    if (!active() || html.classList.contains('bcv-ph-root') || html.classList.contains('bcv-quiz') || e.clientX > 24 || document.querySelector('.bcv-sheet-ov')) { edge = null; return; } // (a sheet up: the swipe is the sheet's, not the screen's)
     edge = { x: e.clientX, y: e.clientY, done: false };
   }, true);
   document.addEventListener('pointermove', (e) => {
@@ -268,7 +268,7 @@
         { icon: IC.tool, label: 'Tools', note: 'Citations, a focus timer, flashcards and more', href: '/#tools' },
         ...(BCV.extras?.phoneRows?.(app) || []), // what the school added to Canvas's own nav
         { icon: dark ? IC.sun : IC.moon, label: dark ? 'Light appearance' : 'Dark appearance', onSelect: () => app.toggleTheme() },
-        { icon: IC.settings, label: 'Settings', note: 'Look, courses and grades', onSelect: () => BCV.settingsLink?.() },
+        { icon: IC.settings, label: 'Settings', note: 'Look, courses and grades', onSelect: () => app.openSettings?.() },
         // the one setting that has to be reachable without the options page: the app has no tab to open one in
         { icon: IC.sparkle, label: 'Guided setup', note: 'Courses, grades and the welcome', href: '/?bcv=setup' },
         { icon: IC.star, label: 'What’s new', note: 'What changed in this version', onSelect: () => BCV.whatsnew?.open(app, { manual: true }) },
@@ -959,7 +959,6 @@
     paintHero();
     drawList();
     body.replaceChildren(enter(hero, 0, 380), whatIfRow, warn, list, U.hint('Term GPA is computed here from the scores Canvas reports, on a 4.0 scale with every course counting equally. It is not your school’s official GPA. Tap a course for its category rings and target.', 'bcv-ph-foot'));
-    const rows0 = rowsFor();
     return screen;
   }
 

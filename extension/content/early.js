@@ -56,7 +56,17 @@
   const systemDark = () => !!window.matchMedia?.('(prefers-color-scheme: dark)').matches;
   // The phone layout (the iPhone mockup) for narrow viewports, decided before first paint and
   // kept for the page's life so a screen never re-flows into the other layout mid-way.
-  const phone = () => !!window.matchMedia?.('(max-width: 700px)').matches;
+  // Decided once the document is parsed and kept for the page's life: a sync later (a look change
+  // in the popup, a settings push) must not flip the layout under a drawn screen. Before the
+  // viewport meta is read, a phone's layout viewport can still be the 980px default, so the answer
+  // is only trusted once the document is past loading.
+  let phoneDecided = null;
+  const phone = () => {
+    if (phoneDecided !== null) return phoneDecided;
+    const now = !!window.matchMedia?.('(max-width: 700px)').matches;
+    if (document.readyState !== 'loading') phoneDecided = now;
+    return now;
+  };
 
   function apply({ skin, dark, accent }) {
     html.classList.toggle('bcv-on', skin !== false);
@@ -199,7 +209,6 @@
     settings: () => current,
     isDark: () => html.getAttribute('data-bcv-theme') === 'dark',
     isOn: () => html.classList.contains('bcv-on'),
-    isOnce: () => override !== null, // this page view shows the look the other way round from the saved one
     lookPos,
     setLook,
     flipLook,

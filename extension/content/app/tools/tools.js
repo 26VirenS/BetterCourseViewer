@@ -58,7 +58,10 @@
     // an assignment, another tool — is still there underneath when you are done with the big one.
     const up = document.querySelector('.bcv-sheet-ov:not(.is-under) > .bcv-sheet');
     stackNext = opts.over === true && !!up && up.dataset.tool !== key; // (the same tool again takes its own place rather than piling on itself)
-    t.open(BCV.app, opts);
+    // the flag is read by popup() on the way in — and handed over as `stack` too, for a tool that
+    // reads its storage before it builds its popup (the citations, the flashcards): by then the
+    // flag is down again, and the sheet under would have been swept away rather than kept
+    t.open(BCV.app, { ...opts, stack: stackNext });
     stackNext = false;
     return true;
   }
@@ -67,11 +70,13 @@
   /** One popup over the page: a head (the tool's tile, a title and a line under it, Back where a
    *  tool has views, Close), then the tool's own body, scrolling; what the body holds rises in,
    *  one thing after another. Escape (from anywhere) and the scrim close it. */
-  function popup({ tool, title, sub = '', width = 620, body, foot = null, cls = '', onClose = null, from = null, head = null }) {
+  function popup({ tool, title, sub = '', width = 620, body, foot = null, cls = '', onClose = null, from = null, head = null, stack = stackNext }) {
     // Stacking: the one already up is pushed under (its scrim goes, the new one's covers for both)
-    // and comes back when this one closes; otherwise this popup takes its place, as it always has.
-    if (stackNext) document.querySelector('.bcv-sheet-ov:not(.is-under)')?.classList.add('is-under');
-    else for (const old of document.querySelectorAll('.bcv-sheet-ov')) old.remove();
+    // and comes back when this one closes; otherwise this popup takes the top one's place — the
+    // ones already under stay under, and come back in their turn (the same tool pressed again
+    // used to sweep the whole stack away).
+    if (stack) document.querySelector('.bcv-sheet-ov:not(.is-under)')?.classList.add('is-under');
+    else document.querySelector('.bcv-sheet-ov:not(.is-under)')?.remove();
     const ov = U.el('bcv-sheet-ov bcv-tool-ov', null, { role: 'dialog', 'aria-label': title || tool.name });
     let closed = false;
     const close = () => {
@@ -91,7 +96,7 @@
     const onKey = (e) => { if (e.key !== 'Escape' || !ov.isConnected || closed || ov.classList.contains('is-under')) return; e.stopPropagation(); close(); };
     document.addEventListener('keydown', onKey, true);
     const mo = new MutationObserver(() => { if (!ov.isConnected) { document.removeEventListener('keydown', onKey, true); mo.disconnect(); } });
-    mo.observe(document.body, { childList: true });
+    mo.observe(overlayRoot(), { childList: true }); // (where the popup is put — the document element on a tool's own tab, where body would never see it go)
     const back = h('button', { type: 'button', class: 'bcv-sheet__close bcv-tool__back', 'aria-label': 'Back', hidden: true }, U.svg('M15 5l-7 7 7 7', { size: 14, stroke: 'var(--bcv-ink2)', width: 2.2 }));
     const titleEl = U.text('bcv-tool__title bcv-ellip', title || tool.name);
     const subEl = U.text('bcv-tool__sub', sub);
@@ -179,20 +184,55 @@
   const VENDOR = {
     mammoth: { files: ['lib/vendor/mammoth.browser.min.js'], has: () => !!self.mammoth },
     jspdf: { files: ['lib/vendor/jspdf.umd.min.js'], has: () => !!self.jspdf?.jsPDF },
-    pdf: { files: ['lib/vendor/pdf.min.js', 'lib/vendor/pdf.worker.min.js'], has: () => !!self.pdfjsLib?.getDocument },
+    pdf: { files: ['lib/vendor/pdf.min.js'], has: () => !!self.pdfjsLib?.getDocument, then: pdfWorker }, // (the worker runs off the page's thread; see pdfWorker)
     pdflib: { files: ['lib/vendor/pdf-lib.min.js'], has: () => !!self.PDFLib?.PDFDocument }, // (writing PDFs: pages copied, annotations added)
     office: { files: ['content/app/tools/office.js'], has: () => !!self.BCV?.office?.docxToPdf }, // (ours: Word ⇄ PDF, beside the libraries it uses)
   };
   const loading = {};
+  /** pdf.js's worker, off the page's thread: a worker of the page's own that imports the
+   *  extension's worker script (a worker cannot be made from the extension's address itself). Its
+   *  parsing and drawing then leave the page free — a forty-page scan no longer holds the tab. Where
+   *  the import cannot be made (a build without the file reachable), the worker script is put on
+   *  the page instead and pdf.js runs it there, as it always did. */
+  let pdfWorkerP = null;
+  function pdfWorker() {
+    if (pdfWorkerP) return pdfWorkerP;
+    pdfWorkerP = (async () => {
+      const lib = self.pdfjsLib;
+      if (!lib?.GlobalWorkerOptions || lib.GlobalWorkerOptions.workerSrc || lib.GlobalWorkerOptions.workerPort) return;
+      let url = '';
+      try { url = api.runtime.getURL('lib/vendor/pdf.worker.min.js'); } catch { url = ''; }
+      const probe = () => new Promise((resolve) => {
+        let w;
+        const done = (ok) => { try { w?.terminate(); } catch { /* gone */ } resolve(ok); };
+        try {
+          const src = URL.createObjectURL(new Blob([`try { importScripts(${JSON.stringify(url)}); postMessage('ok'); } catch (e) { postMessage('no'); }`], { type: 'text/javascript' }));
+          w = new Worker(src);
+          const t = setTimeout(() => done(false), 4000);
+          w.onmessage = (e) => { clearTimeout(t); done(e.data === 'ok'); };
+          w.onerror = () => { clearTimeout(t); done(false); };
+        } catch { done(false); }
+      });
+      if (url && await probe()) {
+        lib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(new Blob([`importScripts(${JSON.stringify(url)});`], { type: 'text/javascript' }));
+        return;
+      }
+      // the fallback: the worker's code on the page, where pdf.js finds it (globalThis.pdfjsWorker)
+      const r = await Promise.resolve(api.runtime.sendMessage({ type: 'inject', files: ['lib/vendor/pdf.worker.min.js'] })).catch(() => null);
+      if (r && r.ok === false) throw new Error(r.message || 'The PDF engine did not load.');
+    })();
+    return pdfWorkerP;
+  }
   async function vendor(name) {
     const v = VENDOR[name];
     if (!v) throw new Error(`No such library: ${name}`);
-    if (v.has()) return true;
+    if (v.has()) { if (v.then) await v.then(); return true; }
     if (self.BCVBridge?.native) throw new Error('This conversion needs the browser extension.');
     if (!loading[name]) {
-      loading[name] = Promise.resolve(api.runtime.sendMessage({ type: 'inject', files: v.files })).then((r) => {
+      loading[name] = Promise.resolve(api.runtime.sendMessage({ type: 'inject', files: v.files })).then(async (r) => {
         if (r && r.ok === false) throw new Error(r.message || 'The engine did not load.');
         if (!v.has()) throw new Error('The engine did not load.');
+        if (v.then) await v.then();
         return true;
       }).catch((e) => { delete loading[name]; throw e; });
     }
@@ -596,7 +636,7 @@
     const ro = new ResizeObserver(() => { if (p.alive()) paint(focus); else ro.disconnect(); }); // (the strip is laid out in pixels: a card that changes width lays it out again)
     ro.observe(scale);
     const mo = new MutationObserver(() => { if (!p.alive()) { stop(); mo.disconnect(); } });
-    mo.observe(document.body, { childList: true });
+    mo.observe(overlayRoot(), { childList: true });
     if (!focusRead) focusLoad().then(paintAll).catch(() => {});
     return p;
   }
@@ -629,7 +669,7 @@
     frame.addEventListener('error', fail);
     frame.addEventListener('load', () => frame.classList.add('is-in'));
     const mo = new MutationObserver(() => { if (!p.alive()) { document.removeEventListener('securitypolicyviolation', onCsp); mo.disconnect(); } });
-    mo.observe(document.body, { childList: true });
+    mo.observe(overlayRoot(), { childList: true });
   }
 
   /** The calculator as a tool of its own: the same scientific calculator, larger, the keyboard on it. */
@@ -779,11 +819,22 @@
     U.text('bcv-quick__name', name, 'span'),
   ]);
   const quickGo = (icon, title, onclick) => h('button', { type: 'button', class: 'bcv-quick__go', title, 'aria-label': title, onclick }, U.svg(icon, { size: 14, stroke: '#fff', width: 2.3 }));
+  /** The files a picker holds, as copies of their own that outlive the picker: Safari lets go of a
+   *  File the moment the input it came from is reset, and a tool reads its files after that. */
+  async function holdFiles(list) {
+    const out = [];
+    for (const f of Array.from(list || [])) {
+      try { out.push(new File([await f.arrayBuffer()], f.name, { type: f.type, lastModified: f.lastModified })); } catch { out.push(f); }
+    }
+    return out;
+  }
   /** A drop target that is also a picker: files dropped or chosen go to the tool. */
   function quickDrop({ go, text, accept, multiple = false, key = 'files', label }) {
     const input = h('input', { type: 'file', multiple: multiple || null, hidden: true, accept, 'aria-label': label });
     const hand = (list) => { const files = Array.from(list || []); if (!files.length) return; go(multiple ? { [key]: files } : { [key]: files[0] }); };
-    input.addEventListener('change', () => { hand(input.files); input.value = ''; });
+    // the files' bytes are taken before the picker is cleared: Safari lets go of a File the moment
+    // its input is reset, and the tool reads it a moment later
+    input.addEventListener('change', async () => { const held = await holdFiles(input.files); input.value = ''; hand(held); });
     const drop = h('button', { type: 'button', class: 'bcv-quick__drop', text, onclick: () => input.click() });
     drop.addEventListener('dragover', (e) => { e.preventDefault(); drop.classList.add('is-drag'); });
     drop.addEventListener('dragleave', () => drop.classList.remove('is-drag'));
@@ -1302,9 +1353,6 @@
     bar.hidden = !bar.querySelector('.bcv-pin');
     for (const c of document.querySelectorAll('.bcv-tool-card')) c.classList.toggle('is-pinned', pins.includes(c.dataset.tool));
   }
-  /** (kept for callers that ask for the pins alone: the tray holds them) */
-  const mountPins = () => mountTray();
-
   /** The drag: press a card and pull it up; a ghost of it follows the pointer, the top of the page
    *  says "Pin here", and letting go there pins the tool (the ghost flies into its new spot). A press
    *  that never moved is the card's own click. Mouse and pen only: a finger on a card scrolls. */
@@ -1412,8 +1460,8 @@
   }
 
   BCV.tools = {
-    TOOLS, toolOf, tintOf, open, popup, seg, note, hint, card, label, stepper, input, rise, saveFile, copyText, parseCsv, csvCell, readAs, kb, fileBase, uid, load, save, vendor, evalSum,
+    TOOLS, toolOf, tintOf, open, popup, seg, note, hint, card, label, stepper, input, rise, saveFile, copyText, parseCsv, csvCell, readAs, holdFiles, overlayRoot, kb, fileBase, uid, load, save, vendor, evalSum,
     focusActive, focusLoad, remaining, running, mmss,
-    mountTray, mountPins, pinsLoad, pin, unpin, pinned, pinEl, cardEl, paintPins, welcomeIfFirst,
+    mountTray, pinsLoad, pin, unpin, pinned, pinEl, cardEl, paintPins, welcomeIfFirst,
   };
 })();

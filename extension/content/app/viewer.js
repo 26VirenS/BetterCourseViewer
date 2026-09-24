@@ -79,8 +79,6 @@
     ov.remove();
     try { restore?.focus?.(); } catch { /* it may be gone */ }
   }
-  const isOpen = () => !!current;
-
   /** Opens `file` — an API File object, or just `{ id }`, fetched here — over the page. `context`
    *  is the course or group it belongs to (its Canvas addresses hang off that); `from` is the
    *  control that was pressed, which the sheet grows out of and hands focus back to. */
@@ -179,5 +177,5 @@
     open({ id: hit.id }, { context: hit.context, from: a });
   }, true);
 
-  BCV.viewer = { open, close, isOpen, kindOf, fmtSize, linkToFile };
+  BCV.viewer = { open, close, kindOf, fmtSize, linkToFile };
 })();

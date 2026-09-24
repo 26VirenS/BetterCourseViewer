@@ -261,8 +261,10 @@
     state.navKind = replace ? 'replace' : (state.backPress && Date.now() - state.backPress < 1500 ? 'pop' : 'push');
     state.backPress = 0;
     if (samePage && (url.hash || location.hash)) {
+      // a fragment move: pushed as any other in-place hop (setting location.hash would fire
+      // popstate, and the screen was built twice — once for it, once for this — and counted as a back)
       if (replace) history.replaceState({ bcv: true }, '', url.pathname + url.search + url.hash);
-      else location.hash = url.hash;
+      else history.pushState({ bcv: true }, '', url.pathname + url.search + url.hash);
       window.scrollTo(0, 0);
       render();
       return;
@@ -984,6 +986,9 @@
     punchOut(); // a native screen punches back in while it builds
     closeQuickNav(); // the courses panel belongs to the row it came from, not to the next screen
     BCV.preview?.close(); // a preview beside the list belongs to the list it was opened from
+    // a sheet (a counter's list, the calendars, a rubric, GPA settings) belongs to the screen it
+    // was opened over: a Back with one up would otherwise leave it, scrim and all, over the next
+    for (const ov of document.querySelectorAll('.bcv-sheet-ov, .bcv-viewer-ov')) ov.remove();
     syncSide(); // the sidebar follows the route in place; it is rebuilt only when what it shows changes
     const ctx = { app: BCV.app, route: r, alive, dark: state.dark };
     // Screens build off-DOM and land whole. A screen still fetching after 150ms gets a

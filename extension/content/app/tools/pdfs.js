@@ -57,9 +57,9 @@
     paintSeg();
     const p = T.popup({ tool, title: 'Merge & split PDFs', sub: 'Runs on this device. Nothing is uploaded.', width: 760, body, from, cls: 'bcv-tool--pdfx', head: segBox });
     const fileInput = h('input', { type: 'file', accept: '.pdf,application/pdf', multiple: true, hidden: true });
-    fileInput.addEventListener('change', () => { addFiles(fileInput.files); fileInput.value = ''; });
+    fileInput.addEventListener('change', async () => { const held = await T.holdFiles(fileInput.files); fileInput.value = ''; addFiles(held); }); // (copies first: Safari lets go of the files once the input is cleared)
     const replaceInput = h('input', { type: 'file', accept: '.pdf,application/pdf', hidden: true });
-    replaceInput.addEventListener('change', () => { addFiles(replaceInput.files, { replace: true }); replaceInput.value = ''; });
+    replaceInput.addEventListener('change', async () => { const held = await T.holdFiles(replaceInput.files); replaceInput.value = ''; addFiles(held, { replace: true }); });
     body.append(fileInput, replaceInput);
     // files dropped anywhere on the sheet
     p.sheet.addEventListener('dragover', (e) => { if (!e.dataTransfer?.types?.includes('Files')) return; e.preventDefault(); p.sheet.classList.add('is-drag'); });

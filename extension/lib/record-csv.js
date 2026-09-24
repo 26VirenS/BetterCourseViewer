@@ -29,12 +29,14 @@
     if (n <= 100) return (SCALE.find(([at]) => n >= at) || [0, 0])[1]; // a percentage without its sign
     return null;
   }
+  /** The separator a file uses, from its first line: tabs when it has any, else commas (decided
+   *  once for the whole file — a tab-separated row with a comma in a course's name is still tabs). */
+  const sepOf = (first) => (String(first || '').includes('\t') ? '\t' : ',');
   /** One CSV line as cells: quotes and quoted commas handled; a tab-separated line reads too. */
-  function cells(line) {
+  function cells(line, sep = sepOf(line)) {
     const out = [];
     let cell = '';
     let q = false;
-    const sep = line.includes('\t') && !line.includes(',') ? '\t' : ',';
     for (let i = 0; i < line.length; i++) {
       const ch = line[i];
       if (q) {
@@ -52,18 +54,23 @@
   function parse(text) {
     const lines = String(text).split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
     if (!lines.length) throw new Error('empty');
-    const head = cells(lines[0]);
+    const sep = sepOf(lines[0]);
+    const head = cells(lines[0], sep);
     const idx = {};
     for (const [k, re] of Object.entries(COLS)) { const i = head.findIndex((h2) => re.test(h2.replace(/[_-]/g, ' ').trim())); if (i >= 0) idx[k] = i; }
     if (idx.course == null && idx.grade == null) throw new Error('no header');
     if (idx.course == null) idx.course = 0;
+    // without a grade column named: the grade is the first cell that reads as a letter or a percentage,
+    // else the first that reads as points — never the credits or term cell, which would read as an A
+    const taken = new Set([idx.course, idx.credits, idx.term].filter((i) => i != null));
+    const guessGrade = (cs) => { const free = cs.map((c, i) => (taken.has(i) ? null : c)); return free.find((c) => c && /^[A-F][+-]?$|%$/i.test(c.trim())) ?? free.find((c) => c && points(c) !== null); };
     const rows = [];
     let skipped = 0;
     for (const line of lines.slice(1)) {
-      const cs = cells(line);
+      const cs = cells(line, sep);
       if (!cs.some(Boolean)) continue;
       const course = (cs[idx.course] || '').trim();
-      const gradeCell = idx.grade != null ? cs[idx.grade] : cs.slice(1).find((c) => points(c) !== null || /^[A-F][+-]?$/i.test(c));
+      const gradeCell = idx.grade != null ? cs[idx.grade] : guessGrade(cs);
       const pts = points(gradeCell);
       const credits = idx.credits != null && cs[idx.credits] !== '' ? Number(cs[idx.credits]) : null;
       const term = idx.term != null ? (cs[idx.term] || '').trim() : '';
@@ -148,7 +155,8 @@
   function history(text) {
     const lines = String(text).replace(/^\ufeff/, '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
     if (!lines.length) throw new Error('empty');
-    const head = cells(lines[0]);
+    const sep = sepOf(lines[0]);
+    const head = cells(lines[0], sep);
     let di = head.findIndex((h2) => HIST_COLS.date.test(h2.replace(/[_-]/g, ' ').trim()));
     let gi = head.findIndex((h2) => HIST_COLS.gpa.test(h2.replace(/[_-]/g, ' ').trim()));
     const hasHeader = di >= 0 || gi >= 0;
@@ -156,7 +164,7 @@
     if (gi < 0) gi = di === 0 ? 1 : 0;
     const out = new Map();
     for (const line of lines.slice(hasHeader ? 1 : 0)) {
-      const cs = cells(line);
+      const cs = cells(line, sep);
       const date = dayOf(cs[di]);
       const gpa = gpaOf(cs[gi]);
       if (!date || gpa === null) continue;

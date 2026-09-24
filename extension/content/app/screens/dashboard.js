@@ -97,17 +97,6 @@
     const dueWeek = dueItems.filter((it) => it.date >= weekStart && it.date < weekEnd && !it.submitted);
     const weekAll = (planner || []).filter((it) => it.isDue && it.date >= weekStart && it.date < weekEnd && (it.points === null || it.points > 0) && it.type !== 'announcement');
 
-    const todayCourses = new Set(dueToday.map((i) => i.courseName));
-
-    function contextText(items, favList) {
-      const lines = ['Upcoming planner items (next 3 weeks):'];
-      for (const it of items.slice(0, 60)) {
-        lines.push(`- ${U.fmtAt(it.date)} · ${it.courseName} · ${it.kind} · ${it.title}${it.points !== null ? ` · ${it.points} pts` : ''}${it.submitted ? ' · submitted' : ''}${it.missing ? ' · missing' : ''}${it.isDue ? '' : ' · (to-do date, not a due date)'}`);
-      }
-      lines.push('', 'Favorite courses: ' + favList.map((c) => `${c.name}${c.score !== null ? ` (current score ${c.score}%)` : ''}`).join('; '));
-      return lines.join('\n');
-    }
-
     // ---- stats -------------------------------------------------------------------
     // Each counter opens a sheet listing exactly the items it counted.
     // Entry motion (mockup 11) plays once, on the first draw: counters roll to their value, workload
@@ -423,7 +412,7 @@
         badgeEl.style.maxWidth = '55%';
         const quick = quickLinks(c);
         const progress = U.el('bcv-ccard__progress');
-        const card = h('div', { class: 'bcv-ccard', role: 'link', tabindex: '0', onclick: () => app.go(c.url), onkeydown: (e) => { if (e.key === 'Enter') app.go(c.url); } }, [
+        const card = h('div', { class: 'bcv-ccard', role: 'link', tabindex: '0', onclick: () => app.go(c.url), onkeydown: (e) => { if (e.key === 'Enter' && e.target === e.currentTarget) app.go(c.url); } }, [
           h('div', { class: 'bcv-ccard__hero', style: c.image ? { background: `${c.color} url(${JSON.stringify(c.image)}) center/cover` } : { background: c.color } },
             h('button', { type: 'button', class: 'bcv-ccard__more', title: 'Course options', onclick: (e) => { e.stopPropagation(); courseMenu(e.currentTarget, c); } }, U.svg(IC.dots, { size: 13, stroke: '#fff', width: 2 }))),
           U.el('bcv-ccard__body', [
@@ -623,14 +612,16 @@
       return '/';
     }
 
+    let bodyGen = 0; // (the activity view lands after a wait: a view switched to meanwhile is not painted over)
     async function renderBody() {
+      const gen = ++bodyGen;
       const stats = statsBlock();
       const work = workloadBlock();
       let viewEl;
       if (view === 'cards') viewEl = cardsBlock();
       else if (view === 'activity') viewEl = await activityBlock();
       else viewEl = listBlock();
-      if (!ctx.alive()) return;
+      if (!ctx.alive() || gen !== bodyGen) return;
       body.replaceChildren(...[stats, work, viewEl].filter(Boolean));
       entered = true;
     }

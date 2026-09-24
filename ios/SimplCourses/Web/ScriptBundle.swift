@@ -2,8 +2,8 @@ import Foundation
 import WebKit
 
 /// Turns the bundled `extension/` folder into WKUserScripts, mirroring the manifest's content_scripts:
-/// the bridge first, then the background script (it answers the smart panel and the settings page from
-/// inside the same page), then each content script at its run_at, then the stylesheet.
+/// the bridge first, then the background script (it answers the page's messages and the settings page
+/// from inside the same page), then each content script at its run_at, then the stylesheet.
 enum ScriptBundle {
     enum Mode {
         case canvas(host: String)
@@ -46,8 +46,11 @@ enum ScriptBundle {
         bridge = bridge.replacingOccurrences(of: "__MANIFEST__", with: JS.literal(manifest) ?? "{}")
         scripts.append(WKUserScript(source: "(function(){\(guardJS)\n\(bridge)\n})();\n//# sourceURL=simpl-courses/bridge.js", injectionTime: .atDocumentStart, forMainFrameOnly: true, in: world))
 
-        // 2. the background script and what it needs
-        for path in ["lib/settings.js", "lib/providers.js", "background.js"] { add(path, at: .atDocumentStart) }
+        // 2. the background script and what it needs, in the order the manifest lists them (background.scripts:
+        //    settings, the tool-tab settings code, then background.js itself — a library it comes to need is
+        //    added there, so the app never has to know)
+        let backgroundScripts = (manifest["background"] as? [String: Any])?["scripts"] as? [String] ?? ["lib/settings.js", "lib/devcode.js", "background.js"]
+        for path in backgroundScripts { add(path, at: .atDocumentStart) }
 
         switch mode {
         case .canvas:
@@ -71,9 +74,8 @@ enum ScriptBundle {
                 scripts.append(WKUserScript(source: "(function(){var s=document.getElementById('bcv-css');if(s&&document.body)document.body.appendChild(s);})();", injectionTime: .atDocumentEnd, forMainFrameOnly: true, in: world))
             }
         case .settings:
-            // the settings page's "Sites" section does not apply (the school is chosen natively), nor its
-            // guided-setup opener (the setup runs on the Canvas page; the account sheet opens it)
-            scripts.append(WKUserScript(source: "(function(){var s=document.createElement('style');s.textContent='#sites,.navlink[data-section=\"sites\"],#setup,.navlink[data-section=\"setup\"]{display:none!important}';document.documentElement.appendChild(s);})();", injectionTime: .atDocumentEnd, forMainFrameOnly: true, in: world))
+            // the settings page's "Sites" section does not apply (the school is chosen natively)
+            scripts.append(WKUserScript(source: "(function(){var s=document.createElement('style');s.textContent='#sites,.navlink[data-section=\"sites\"]{display:none!important}';document.documentElement.appendChild(s);})();", injectionTime: .atDocumentEnd, forMainFrameOnly: true, in: world))
         }
         return scripts
     }

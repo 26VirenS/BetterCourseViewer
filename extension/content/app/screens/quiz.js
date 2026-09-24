@@ -238,6 +238,11 @@
     const toTop = () => window.scrollTo(0, 0);
 
     function tick() {
+      if (!ctx.alive()) { // the screen was left in place (a sidebar row): the clock stops with it, and no "1 minute left" lands on the Dashboard
+        clearInterval(st.timer);
+        window.removeEventListener('beforeunload', onUnload);
+        return;
+      }
       const sub = st.sub;
       if (!sub) {
         timerLabel.textContent = timed ? `${quiz.time_limit} min` : '0:00';
@@ -896,6 +901,7 @@
       if (!window.confirm(`Submit this attempt now?${blanks ? `\n\n${U.plural(blanks, 'question is', 'questions are')} still blank.` : ''}`)) return;
       body.replaceChildren(h('p', { class: 'bcv-qz__starting', text: 'Submitting…' })); // inside the attempt nothing is a skeleton
       try {
+        await settled(); // (an answer typed a moment ago is still on its pause, or on its way: it goes in before the attempt closes)
         st.done = await store.quizApi.complete(cid, qid, st.sub, codeFor());
         st.stage = 'done';
         clearInterval(st.timer);
@@ -1055,10 +1061,14 @@
       // per-question points, when the assignment submission's history carries this attempt's grading
       const hist = (asub?.submission_history || []).find((x) => Number(x.attempt) === Number(sub.attempt)) || null;
       const graded = new Map((hist?.submission_data || []).map((d) => [String(d.question_id), d]));
+      // Canvas's questions carry the latest attempt's answers and marks alone: an earlier attempt
+      // asked for is read from the graded history, its own answers and its own ticks
+      const live = (subs || [])[0];
+      const older = !!live && Number(sub.attempt) !== Number(live.attempt);
       const rows = qs.map((q, k) => {
         const d = graded.get(String(q.id)) || null;
-        if (d && !answered(q.answer)) q.answer = histAnswer(q, d); // a one-at-a-time quiz: its answers come from the graded history
-        const correct = parseCorrect(q.correct) ?? (d ? parseCorrect(d.correct) : null);
+        if (d && (older || !answered(q.answer))) q.answer = histAnswer(q, d); // (a one-at-a-time quiz's answers come from the graded history too)
+        const correct = older && d ? parseCorrect(d.correct) : (parseCorrect(q.correct) ?? (d ? parseCorrect(d.correct) : null));
         const possible = Number(q.points_possible) || 0;
         const earned = d && d.points !== undefined && d.points !== null ? Number(d.points) : correct === true ? possible : correct === false ? 0 : null;
         return { q, k, correct, possible, earned, text: htmlToText(noFields(q.question_text, q) || q.question_name || '', 400).replace(/\s+/g, ' ').trim(), yours: answerParts(q), right: fbRight(q), sol: fbSolution(q, correct === true), info: INFO.has(q.question_type) };

@@ -104,7 +104,8 @@
     // ---- leave guard: attached files are lost on navigation, the text entry is not ----
     const dirty = () => st.stage === 'edit' && !!(st.files.length || st.link);
     const onUnload = (e) => {
-      if (!app.state.submitOpen || !ctx.alive()) return;
+      if (!ctx.alive()) { window.removeEventListener('beforeunload', onUnload); return; } // (this screen was left in place: its guard goes with it)
+      if (!app.state.submitOpen) return;
       e.preventDefault();
       e.returnValue = '';
     };
@@ -375,6 +376,7 @@
       const src = `${course.url}/external_tools/${tool.id}/resource_selection?launch_type=homework_submission&assignment_id=${encodeURIComponent(aid)}`;
       let ov = null;
       const onMsg = (e) => {
+        if (!ctx.alive() || (ov && !ov.isConnected)) { window.removeEventListener('message', onMsg); return; } // (the picker went with its screen)
         const items = contentItems(e);
         if (!items) return;
         window.removeEventListener('message', onMsg);
@@ -468,6 +470,7 @@
           st.text = '';
           store.setPref(draftKey, '');
         }
+        for (const f of st.files) if (f.objectUrl) { URL.revokeObjectURL(f.objectUrl); f.objectUrl = null; } // (the previews' copies go with the files sent)
         st.files = [];
         st.link = null;
         app.refreshCounts?.();
@@ -522,11 +525,6 @@
       paintChips();
       paintFoot();
       setOpen();
-      const checkAction = { label: 'Check what I am handing in', note: st.files.length ? U.plural(st.files.length, 'file') + ' attached' : st.tab === 'text' ? 'My text entry' : 'Nothing attached yet', icon: IC.check, prompt: 'From the instructions, list what should be handed in and compare it with what I have attached or written. Point out anything missing or in the wrong format. Do not write the work for me.' };
-      const attached = () => [`Attached: ${st.files.map((f) => f.name).join(', ') || 'nothing'}`, st.link ? `Link: ${st.link.url}` : '', st.tab === 'text' ? `Text entry so far:\n${st.text.slice(0, 6000)}` : ''].filter(Boolean).join('\n');
-      if (embed) { // the page keeps its own suggestions and adds this one
-        return;
-      }
     }
     draw();
     return screen;

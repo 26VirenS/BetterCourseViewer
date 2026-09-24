@@ -14,7 +14,10 @@
  * models are loaded once and kept. */
 (function () {
   const base = new URL('../vendor/paddleocr/', location.href).href;
-  const post = (msg) => window.parent.postMessage({ bcv: 'ocr', ...msg }, '*');
+  // the words go back over the port the extension hands this frame (a message to the parent
+  // window would be readable by every script on that page); until it arrives, only "ready" is said
+  let port = null;
+  const post = (msg) => { if (port) port.postMessage({ bcv: 'ocr', ...msg }); else if (msg.type === 'ready') window.parent.postMessage({ bcv: 'ocr', ...msg }, '*'); };
   const DET = { limit: 736, cap: 1280, thresh: 0.3, boxThresh: 0.5, unclip: 1.6, minSize: 3, maxBoxes: 1000 };
   const REC = { h: 48, maxW: 2400, minScore: 0.5 };
   const CLS = { w: 192, thresh: 0.9 };
@@ -299,9 +302,8 @@
   }
 
   let chain = Promise.resolve();
-  window.addEventListener('message', (e) => {
-    const m = e.data;
-    if (!m || m.bcv !== 'ocr' || m.type !== 'read' || e.source !== window.parent) return;
+  const onJob = (m) => {
+    if (!m || m.bcv !== 'ocr' || m.type !== 'read') return;
     chain = chain.then(async () => {
       current = m.id;
       try {
@@ -312,6 +314,12 @@
       }
       current = null;
     });
+  };
+  window.addEventListener('message', (e) => {
+    const m = e.data;
+    if (!m || m.bcv !== 'ocr' || e.source !== window.parent) return;
+    if (m.type === 'hello' && e.ports?.[0]) { port = e.ports[0]; port.onmessage = (ev) => onJob(ev.data); return; } // the channel, once
+    if (m.type === 'read' && !port) onJob(m); // (an older extension page, before the channel)
   });
   post({ type: 'ready' });
 })();
