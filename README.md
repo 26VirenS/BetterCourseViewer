@@ -267,7 +267,7 @@ The runner keeps three lanes going at once: the smoke suite's two halves (the sc
 Every release, in this order:
 
 1. Bump the version in all six places: `extension/manifest.json`, `ios/project.yml`, the four `MARKETING_VERSION` lines in `macos/Simpl Courses/Simpl Courses.xcodeproj/project.pbxproj` and the two in `ios/SimplCourses.xcodeproj/project.pbxproj`. The smoke suite fails when they disagree.
-2. Add the release's **What's new** entry at the top of `extension/content/app/whatsnew-notes.js`: the version, the date, and a note per change in plain words (a kind, a title of 22 characters at most, one short line of 60 at most; the suite holds both limits). The smoke suite fails when the newest entry is not the manifest's version, so a release cannot ship without its notes.
+2. Add the release's **What's new** entry at the top of `extension/content/app/whatsnew-notes.js`: the version, the date, and a note per change in plain words (a kind, a title of 22 characters and five words at most — the page shows the title alone, one line per change — and a short line of 60 at most, kept as the line's tooltip; the suite holds both limits). The smoke suite fails when the newest entry is not the manifest's version, so a release cannot ship without its notes.
 3. Run the suites (`node scripts/dev/test-all.mjs`), commit, push. The Package workflow tags the commit and publishes the release with the Safari and Chrome zips.
 
 ## Privacy

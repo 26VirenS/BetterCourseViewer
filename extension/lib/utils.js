@@ -66,7 +66,11 @@
     doc.querySelectorAll('h1, h2, h3, h4').forEach((el) => el.prepend('## '));
     let text = doc.body.textContent || '';
     text = text.replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').replace(/[ \t]{2,}/g, ' ').trim();
-    if (text.length > maxLen) text = text.slice(0, maxLen) + '\n...[truncated]';
+    if (text.length > maxLen) { // cut at a word, an ellipsis after it: a preview reads as a preview, never as a marker
+      const cut = text.slice(0, maxLen);
+      const at = cut.lastIndexOf(' ');
+      text = `${(at > maxLen * 0.6 ? cut.slice(0, at) : cut).replace(/[\s,;:.!?\-–—(]+$/, '')}…`;
+    }
     return text;
   }
 

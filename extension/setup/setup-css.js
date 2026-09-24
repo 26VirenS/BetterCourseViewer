@@ -713,23 +713,24 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
 .wn__list::-webkit-scrollbar-thumb { background: var(--thumb); border-radius: 4px; border: 0; }
 .wn__list::-webkit-scrollbar-thumb:hover { background: var(--thumb-hot); }
 .wn__list::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
-.wn__since { padding-bottom: 16px; font: 400 13px/1.4 var(--font); color: var(--ink4); }
-.wn__vh { display: flex; align-items: baseline; gap: 10px; padding: 26px 0 8px; animation: frRise .34s var(--ease) both; }
+/* the notes: one narrow card, a version and a line per change (its icon, a few words), nothing else */
+.wn.fr:not(.inv) { max-width: 420px; gap: 14px; }
+.wn.fr:not(.inv).is-in { animation-duration: .3s; }
+.wn__since { padding-bottom: 8px; font: 400 12px/1.3 var(--font); color: var(--ink4); }
+.wn__vh { display: flex; align-items: baseline; gap: 8px; padding: 18px 0 6px; animation: frRise .3s var(--ease) both; }
 .wn__vh:first-child, .wn__since + .wn__vh { padding-top: 0; }
-.wn__vnum { font: 600 20px/1.2 var(--display); letter-spacing: -.024em; color: var(--ink); }
-.wn__vdate { font: 400 12px/1.3 var(--font); color: var(--ink4); }
-.wn__note { display: flex; gap: 16px; padding: 16px 0; border-top: 1px solid var(--hair); animation: frRise .34s var(--ease) both; --hue: var(--ink3); --tint: var(--tile); }
+.wn__vnum { font: 600 15px/1.2 var(--display); letter-spacing: -.02em; color: var(--ink); }
+.wn__vdate { font: 400 11.5px/1.3 var(--font); color: var(--ink4); }
+.wn__note { display: flex; align-items: center; gap: 10px; padding: 6px 0; animation: frRise .3s var(--ease) both; --hue: var(--ink3); --tint: var(--tile); }
 .wn__note[data-kind="new"] { --hue: var(--hue-new); --tint: var(--tint-new); }
 .wn__note[data-kind="improved"] { --hue: var(--hue-improved); --tint: var(--tint-improved); }
 .wn__note[data-kind="fixed"] { --hue: var(--hue-fixed); --tint: var(--tint-fixed); }
-.wn__ic { flex: none; width: 34px; height: 34px; border-radius: 10px; background: var(--tint); color: var(--hue); display: flex; align-items: center; justify-content: center; }
+.wn__ic { flex: none; width: 24px; height: 24px; border-radius: 7px; background: var(--tint); color: var(--hue); display: flex; align-items: center; justify-content: center; }
 .wn__ic svg { display: block; }
-.wn__nbody { flex: 1; min-width: 0; }
-.wn__title { display: block; font: 600 15.5px/1.3 var(--font); letter-spacing: -.016em; color: var(--ink); }
-.wn__text { display: block; margin-top: 4px; font: 400 13px/1.55 var(--font); color: var(--ink3); text-wrap: pretty; }
-.wn__more { display: block; width: 100%; margin-top: 4px; padding: 14px 0 6px; border: 0; border-top: 1px solid var(--hair); background: transparent; cursor: pointer; text-align: left; font: 500 13px/1.3 var(--font); color: var(--blue); }
+.wn__title { flex: 1; min-width: 0; font: 500 14px/1.3 var(--font); letter-spacing: -.01em; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wn__more { display: block; width: 100%; margin-top: 6px; padding: 10px 0 4px; border: 0; border-top: 1px solid var(--hair); background: transparent; cursor: pointer; text-align: left; font: 500 12.5px/1.3 var(--font); color: var(--blue); }
 .wn__more:hover { text-decoration: underline; }
-.wn .fr__foot { padding-top: 22px; }
+.wn .fr__foot { padding-top: 12px; }
 
 /* ==== the theme invitation (a release whose entry carries invite, in the notes' place): the four
  * scenes and the seven colours in a strip, a title, a line, then Not now and Personalize ==== */

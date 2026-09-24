@@ -1,13 +1,14 @@
 /* What's new after an update: the first Canvas page after the extension updates shows what changed,
- * once, over the page, on the same ground as the guided setup and with the same word-mark first.
- * One list, nothing else: a heading per version and its notes, newest first — every version since
- * the one the update left behind (the background notes it), so a student who skipped a few updates
- * reads them all on one page. And reads it once: opening the page marks this version seen, so
- * however it is closed (Back to Canvas, Escape, a reload, a closed tab) it does not come back until
- * the next update. The releases before that sit behind one Earlier versions button at the foot of
- * the list. Never on a fresh install (the setup marks its own version seen), never over the setup
- * or a quiz. Reachable again from Settings → General (?bcv=whatsnew; the account sheet on a phone),
- * for this version alone. The notes themselves are data: whatsnew-notes.js.
+ * once, over the page, on the same ground as the guided setup. One short list and nothing else, up
+ * at once (no word-mark first): a version, then a line per change — its icon and a few words, five
+ * at most — newest first, every version since the one the update left behind (the background
+ * notes it), so a student who skipped a few updates reads them all in one glance; Done takes it
+ * away. And reads it once: opening the page marks this version seen, so however it is closed
+ * (Done, Escape, a reload, a closed tab) it does not come back until the next update. The releases
+ * before that sit behind one Earlier versions button at the foot of the list. Never on a fresh
+ * install (the setup marks its own version seen), never over the setup or a quiz. Reachable again
+ * from Settings → General (?bcv=whatsnew; the account sheet on a phone), for this version alone.
+ * The notes themselves are data: whatsnew-notes.js (the page shows each note's title alone).
  *
  * A release can put an invitation in the notes' place (its entry carries `invite`): the first page
  * after that update invites a theme — the four scenes and the colours in a strip, Personalize and
@@ -46,8 +47,10 @@
   const fmtDate = (iso) => {
     const [y, m, d] = String(iso || '').split('-').map(Number);
     if (!y || !m || !d) return iso || '';
-    try { return new Date(y, m - 1, d).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' }); } catch { return iso; }
+    try { return new Date(y, m - 1, d).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }); } catch { return iso; }
   };
+  /** A note's line: its title, five words at most (an older, longer one is cut there, with an ellipsis). */
+  const fiveWords = (s) => { const w = String(s || '').trim().split(/\s+/); return w.length > 5 ? `${w.slice(0, 5).join(' ')}…` : w.join(' '); };
 
   let ui = null;
   let st = null;
@@ -101,9 +104,10 @@
     } catch { /* it shows again next time, no worse */ }
   }
 
-  /** The overlay both pages share: the setup's ground, the word-mark first, a card with the brand
-   *  row at its top, a body and a foot. Opening marks the version seen. */
-  function mount(app, { label, kind, ariaLabel }) {
+  /** The overlay both pages share: the setup's ground, a card with the brand row at its top, a body
+   *  and a foot. The invitation plays the word-mark first; the notes (`quick`) are up at once, the
+   *  brand row a plain label. Opening marks the version seen. */
+  function mount(app, { label, kind, ariaLabel, quick = false }) {
     const host = h('div', { id: 'bcv-whatsnew' });
     host.setAttribute('data-theme', app?.isDark?.() ? 'dark' : 'light');
     const shadow = host.attachShadow({ mode: 'open' });
@@ -112,7 +116,7 @@
     const foot = h('div', { class: 'fr__foot', id: 'foot' });
     const main = h('div', { class: `fr wn ${kind}`, id: 'card' }, [
       h('div', { class: 'fr__top' }, [
-        h('button', { type: 'button', class: 'fr__brand', title: 'Replay', onclick: () => playIntro(), html: `${BRAND}<span>${label}</span>` }),
+        quick ? h('span', { class: 'fr__brand', html: `${BRAND}<span>${label}</span>` }) : h('button', { type: 'button', class: 'fr__brand', title: 'Replay', onclick: () => playIntro(), html: `${BRAND}<span>${label}</span>` }),
       ]),
       body,
       foot,
@@ -123,6 +127,7 @@
     html.classList.add('bcv-setup-open'); // the page underneath holds still (and the look switch steps aside)
     (document.body || html).append(host);
     document.addEventListener('keydown', onKey, true);
+    if (quick) { intro.hidden = true; main.classList.add('is-in'); }
     markSeen(st.to);
   }
 
@@ -134,10 +139,9 @@
     // an update that due() says invites (the version carries an invitation, and no theme has been tried) shows it in the notes' place; Settings still opens the notes
     if (!manual && asked) return invite(app, shown[0].version);
     st = { app, from: from && shown.length > 1 ? from : null, to: shown[0].version, shown, oldest: shown[shown.length - 1].version, manual, closing: false };
-    mount(app, { label: 'What’s new', kind: '', ariaLabel: 'What’s new in Simpl Courses' });
+    mount(app, { label: 'What’s new', kind: '', ariaLabel: 'What’s new in Simpl Courses', quick: true });
     paintList();
     paintFoot();
-    playIntro();
   }
 
   /** The invitation: the four scenes and the seven colours in a strip, a title, a line, then Not
@@ -203,15 +207,15 @@
     await BCV.ui.afterMotion(overlay); // (its own exit's timing; at once under reduced motion)
     host.remove();
   }
-  /** Back to Canvas (or Escape): the page goes. It was marked seen when it opened. */
+  /** Done (or Escape): the page goes. It was marked seen when it opened. */
   async function dismiss() {
     if (!st || st.closing) return;
     st.closing = true;
     await close();
   }
 
-  /** A version's block: its heading (number and date), then a row per note — the icon, the title
-   *  and the one sentence. */
+  /** A version's block: its heading (number and date), then a line per note — the icon and the
+   *  title, five words at most, nothing more. */
   function rowsFor(versions) {
     const rows = [];
     for (const v of versions) {
@@ -220,9 +224,9 @@
         h('span', { class: 'wn__vdate', text: fmtDate(v.date) }),
       ]));
       for (const n of v.notes) {
-        rows.push(h('div', { class: 'wn__note', dataset: { kind: n.kind, version: v.version } }, [
-          h('span', { class: 'wn__ic' }, svg(n.icon, { size: 17, width: 1.9 })),
-          h('span', { class: 'wn__nbody' }, [h('span', { class: 'wn__title', text: n.title }), h('span', { class: 'wn__text', text: n.body })]),
+        rows.push(h('div', { class: 'wn__note', dataset: { kind: n.kind, version: v.version }, title: n.body || '' }, [
+          h('span', { class: 'wn__ic' }, svg(n.icon, { size: 13, width: 2 })),
+          h('span', { class: 'wn__title', text: fiveWords(n.title) }),
         ]));
       }
     }
@@ -232,9 +236,9 @@
    *  next few older ones in place (the list keeps its scroll) until there are none left. */
   function paintList() {
     const list = h('div', { class: 'wn__list mscroll', id: 'notes' });
-    if (st.from) list.append(h('div', { class: 'wn__since', text: `Everything since ${st.from}` }));
+    if (st.from) list.append(h('div', { class: 'wn__since', text: `Since ${st.from}` }));
     const rows = rowsFor(st.shown);
-    stagger(rows);
+    stagger(rows, 22, 180);
     list.append(...rows);
     ui.body.replaceChildren(list);
     paintMore(list);
@@ -247,7 +251,7 @@
       const batch = older.slice(0, EARLIER_MAX);
       st.oldest = batch[batch.length - 1].version;
       const rows = rowsFor(batch);
-      stagger(rows);
+      stagger(rows, 22, 180);
       list.querySelector('#earlier')?.remove();
       list.append(...rows);
       paintMore(list);
@@ -255,7 +259,7 @@
   }
   function paintFoot() {
     ui.foot.replaceChildren(
-      h('button', { type: 'button', class: 'btn fr__next', id: 'dismiss', onclick: dismiss }, [h('span', { text: 'Back to Canvas' }), svg('M9 6l6 6-6 6', { size: 15, width: 2.4 })]),
+      h('button', { type: 'button', class: 'btn fr__next', id: 'dismiss', onclick: dismiss }, [h('span', { text: 'Done' })]),
     );
   }
 

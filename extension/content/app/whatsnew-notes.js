@@ -1,10 +1,11 @@
 /* What changed in each release: the data behind the What's New page (content/app/whatsnew.js),
  * newest first. Every release ships its entry here — the suite fails when the newest entry is not
- * the manifest's version. A note is a kind (new | improved | fixed), a title of two to four plain
- * words (22 characters at most), ONE short plain line (60 at most — the suite holds both limits),
- * and an icon path. Write it short: the fewest plain words that say what changed, no clause you
- * can cut, no cleverness, nothing internal. If it does not change what the student sees, leave it
- * out. Nothing is fetched: the notes travel with the build. */
+ * the manifest's version. A note is a kind (new | improved | fixed), a title of two to five plain
+ * words (22 characters at most) — the page shows the title alone, one line per change — an icon
+ * path, and a short plain line (60 at most; kept for the record and the row's tooltip, never on
+ * the page; the suite holds both limits). Write it short: the fewest plain words that say what
+ * changed, no clause you can cut, no cleverness, nothing internal. If it does not change what the
+ * student sees, leave it out. Nothing is fetched: the notes travel with the build. */
 (function () {
   const P = {
     sparkle: 'M12 3l1.9 4.1L18 9l-4.1 1.9L12 15l-1.9-4.1L6 9l4.1-1.9z',
@@ -24,6 +25,10 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.98.6', date: '2026-09-24', notes: [
+      { kind: 'improved', title: 'Quicker What’s new', body: 'A line per change, up at once, Done to close.', icon: P.sparkle },
+      { kind: 'fixed', title: 'Clean previews', body: 'A long announcement ends with … not “[truncated]”.', icon: P.eye },
+    ] },
     { version: '2.98.5', date: '2026-09-24', notes: [
       { kind: 'fixed', title: 'Graded is not overdue', body: 'Work marked without a hand-in no longer counts as overdue.', icon: P.check },
       { kind: 'fixed', title: 'Locked work left off', body: 'Past-due work you can no longer open stays off Overdue.', icon: P.clock },

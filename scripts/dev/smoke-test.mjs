@@ -4000,14 +4000,17 @@ try {
   } else {
     // one page lists every version since, newest first — a few skipped updates make one page, not one each
     const sinceOld = whatsNew.filter((v) => cmpVer(v.version, '2.7.5') > 0);
+    const wnAt = Date.now();
     await page.waitForSelector(wn('.wn__note'), { timeout: 20000 });
-    const wnDot = await dotOf('#bcv-whatsnew');
-    check(wnDot.gap >= 10 && wnDot.gap <= 18 && wnDot.fits, `its word-mark's dot sits just past the word too: ${JSON.stringify(wnDot)}`);
+    // quick: no word-mark first — the list is up as soon as the page is, its card narrow, a line per change and nothing more
+    const quick = await page.evaluate(() => { const r = document.querySelector('#bcv-whatsnew').shadowRoot; const card = r.querySelector('#card'); const note = r.querySelector('.wn__note'); return { intro: r.querySelector('.intro').hidden, shown: card.classList.contains('is-in'), width: card.getBoundingClientRect().width, noteH: note.getBoundingClientRect().height, bodies: r.querySelectorAll('.wn__text').length, words: Math.max(...[...r.querySelectorAll('.wn__title')].map((t) => t.textContent.replace(/…$/, '').split(/\s+/).length)), replay: r.querySelector('.fr__brand').tagName }; });
+    check(quick.intro && quick.shown && Date.now() - wnAt < 1500 && quick.width <= 420 && quick.noteH <= 40 && quick.bodies === 0 && quick.words <= 5 && quick.replay === 'SPAN', `up at once with no word-mark to wait through, a narrow card, a one-line note of five words at most and no sentence under it: ${JSON.stringify(quick)}`);
     await introDone();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(400);
     const wn1 = await wnPage();
-    const expectNotes = sinceOld.flatMap((v) => v.notes.map((n) => `${v.version} ${n.kind}: ${n.title}`));
-    check(wn1.since === 'Everything since 2.7.5' && sinceOld.length > 1 && wn1.versions.join(' | ') === sinceOld.map((v) => v.version).join(' | ') && wn1.dates.length === sinceOld.length && wn1.dates.every((d) => /\d{4}/.test(d)) && wn1.notes.join(' | ') === expectNotes.join(' | ') && wn1.clutter === 0 && wn1.more === 'Earlier versions' && wn1.foot.join(',') === 'Back to Canvas' && wn1.scroll.over && wn1.scroll.bar === '8px', `the first page after an update lists every version since the one left behind, newest first, with one button and a scrollbar for the rest: ${JSON.stringify(wn1)}`);
+    const five = (s) => { const w = s.trim().split(/\s+/); return w.length > 5 ? `${w.slice(0, 5).join(' ')}…` : w.join(' '); };
+    const expectNotes = sinceOld.flatMap((v) => v.notes.map((n) => `${v.version} ${n.kind}: ${five(n.title)}`));
+    check(wn1.since === 'Since 2.7.5' && sinceOld.length > 1 && wn1.versions.join(' | ') === sinceOld.map((v) => v.version).join(' | ') && wn1.dates.length === sinceOld.length && wn1.dates.every((d) => /\d{4}/.test(d)) && wn1.notes.join(' | ') === expectNotes.join(' | ') && wn1.clutter === 0 && wn1.more === 'Earlier versions' && wn1.foot.join(',') === 'Done' && wn1.scroll.over && wn1.scroll.bar === '8px', `the first page after an update lists every version since the one left behind, newest first, with one button and a scrollbar for the rest: ${JSON.stringify(wn1)}`);
     check(page.url() === `${BASE}/` && (await page.$('.bcv-stat')) !== null && (await page.$eval('html', (e) => getComputedStyle(e).overflow)) === 'hidden', 'it sits over the page, which is drawn underneath and held still');
     await shot(page, '33-whats-new');
     // shown once: opening it is what marks the version seen, not closing it
@@ -4022,7 +4025,7 @@ try {
     // Back to Canvas lets the page go; the next page does not show it again
     await page.click(wn('#dismiss'));
     await page.waitForFunction(() => !document.querySelector('#bcv-whatsnew'), null, { timeout: 5000 });
-    check(!(await page.$('html.bcv-setup-open')), 'Back to Canvas lets the page go');
+    check(!(await page.$('html.bcv-setup-open')), 'Done lets the page go');
     await page.goto(`${BASE}/`);
     await page.waitForSelector('#bcv-app .bcv-nav__item', { timeout: 10000 });
     await page.waitForTimeout(600);
@@ -4427,11 +4430,12 @@ try {
   await closeTool();
   // the calculator: a tool of its own, the same scientific calculator larger, the keyboard on it
   await openTool('calc');
-  await page.waitForTimeout(350);
+  await page.waitForFunction(() => { const t = document.querySelector('.bcv-tool[data-tool="calc"]'); return !!t && getComputedStyle(t).transform === 'none' && t.getAnimations({ subtree: true }).every((a) => a.playState !== 'running'); }, null, { timeout: 5000 }); // (the popup grows in from the card on a spring: measured once it is at rest)
   check((await toolSub()) === 'Scientific · the keyboard works too' && (await page.$$('.bcv-tool[data-tool="calc"] .bcv-calc__key')).length === 49 && (await page.$eval('.bcv-tool[data-tool="calc"] .bcv-calc', (e) => e.classList.contains('bcv-calc--big') && document.activeElement === e)) && (await texts('.bcv-tool[data-tool="calc"] .bcv-calc__display'))[0] === '0', 'the calculator is a tool of its own: the scientific keys, larger, with the focus on them');
   await page.keyboard.type('7*6');
   await page.keyboard.press('Enter');
-  check((await texts('.bcv-tool[data-tool="calc"] .bcv-calc__expr'))[0] === '42' && (await texts('.bcv-tool[data-tool="calc"] .bcv-calc__sub'))[0] === '7×6 =' && (await page.$eval('.bcv-tool[data-tool="calc"] .bcv-calc__key[data-key="7"]', (e) => Math.round(e.getBoundingClientRect().height))) === 54 && (await page.$eval('.bcv-tool[data-tool="calc"]', (e) => Math.round(e.getBoundingClientRect().width))) === 720, 'typed on the keyboard, 7 × 6 Enter shows 42, on keys 54 tall in a popup 720 wide');
+  const calcTyped = { expr: (await texts('.bcv-tool[data-tool="calc"] .bcv-calc__expr'))[0], sub: (await texts('.bcv-tool[data-tool="calc"] .bcv-calc__sub'))[0], key: await page.$eval('.bcv-tool[data-tool="calc"] .bcv-calc__key[data-key="7"]', (e) => Math.round(e.getBoundingClientRect().height)), width: await page.$eval('.bcv-tool[data-tool="calc"]', (e) => Math.round(e.getBoundingClientRect().width)), active: await page.evaluate(() => document.activeElement?.className || document.activeElement?.tagName) };
+  check(calcTyped.expr === '42' && calcTyped.sub === '7×6 =' && calcTyped.key === 54 && calcTyped.width === 720, `typed on the keyboard, 7 × 6 Enter shows 42, on keys 54 tall in a popup 720 wide: ${JSON.stringify(calcTyped)}`);
   await shot(page, '19b-calculator-tool');
   await closeTool();
   // the periodic table: every element in place, a card for the one pressed, search, legend, arrow keys

@@ -793,7 +793,7 @@ try {
     check((await page.$eval('#bcv-whatsnew .wn__vnum', (e) => e.textContent)) === manifest.version && (await page.$('#bcv-whatsnew #earlier')) !== null && !/bcv=/.test(page.url()) && await noOverflow(), 'the notes open on their own from Settings, this version first, Earlier versions at their foot');
     await page.click('#bcv-whatsnew #dismiss');
     await page.waitForFunction(() => !document.querySelector('#bcv-whatsnew'), null, { timeout: 5000 });
-    check(!(await page.$('#bcv-whatsnew')), 'Back to Canvas closes them');
+    check(!(await page.$('#bcv-whatsnew')), 'Done closes them');
   } else {
     await page.waitForSelector('#bcv-whatsnew .wn__note', { timeout: 20000 });
     await introDone();
@@ -802,7 +802,7 @@ try {
     await shot('13-whats-new');
     await page.click('#bcv-whatsnew #dismiss');
     await page.waitForFunction(() => !document.querySelector('#bcv-whatsnew'), null, { timeout: 5000 });
-    check(!(await page.$('#bcv-whatsnew')) && (await flag('whatsnew:seen')) === manifest.version, 'Back to Canvas closes it and marks the version seen');
+    check(!(await page.$('#bcv-whatsnew')) && (await flag('whatsnew:seen')) === manifest.version, 'Done closes it and marks the version seen');
   }
 
   check(errors.length === 0, `no page errors${errors.length ? `: ${errors.slice(0, 3).join(' | ')}` : ''}`);
