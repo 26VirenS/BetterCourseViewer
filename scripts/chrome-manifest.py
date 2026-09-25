@@ -34,6 +34,14 @@ m['permissions'] = [p for p in m.get('permissions', []) if p != 'nativeMessaging
 if sniffer:
     m['host_permissions'] = ['*://*/*']
     m.pop('optional_host_permissions', None)
+    # The tabs permission is what lets Safari and Firefox (and the quiet build) see a tab arrive on a
+    # Canvas the extension is not yet allowed on — the page after install watches for one. With the
+    # run of every site, this build reads a tab's address anyway, so the permission adds nothing but
+    # Chrome's "Read your browsing history" warning — and a permission that brings a new warning is
+    # what makes Chrome switch every installed copy OFF at an update until its owner accepts it again
+    # (2.98.14, after exactly that). Nothing with a warning goes in here without that in mind:
+    # scripts/dev/chrome-setup-test.mjs holds this build's permission list exactly.
+    m['permissions'] = [p for p in m['permissions'] if p != 'tabs']
     if not any('content/sniff.js' in (cs.get('js') or []) for cs in m.get('content_scripts', [])):
         m.setdefault('content_scripts', []).append({
             'matches': ['*://*/*'],

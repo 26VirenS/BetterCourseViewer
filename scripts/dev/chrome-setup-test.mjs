@@ -42,6 +42,11 @@ const toolbar = manifest.content_scripts.find((cs) => (cs.js || []).includes('co
 const lazy = manifest.content_scripts.find((cs) => (cs.matches || []).includes('https://lazy.simplcourses.invalid/*'));
 const own = manifest.content_scripts.filter((cs) => cs !== sniffer && cs !== toolbar && cs !== lazy);
 check(JSON.stringify(manifest.host_permissions) === '["*://*/*"]' && !manifest.optional_host_permissions, `the Chrome build has the run of every site, and no optional sites left to ask for: ${JSON.stringify(manifest.host_permissions)}`);
+// Held exactly: a permission that brings a new warning switches every installed copy OFF at an update until its owner
+// accepts it again (2.98.14 followed one such update). tabs stays out — "Read your browsing history" — since the run of
+// every site already lets this build read a tab's address; storage, unlimitedStorage, scripting and activeTab carry no
+// warning. A change here is a deliberate one, made knowing what it does to the copies out there.
+check(JSON.stringify(manifest.permissions) === '["storage","unlimitedStorage","scripting","activeTab"]', `the Chrome build asks for exactly storage, unlimitedStorage, scripting and activeTab — nothing that reads as browsing history, and nothing new to be accepted at an update: ${JSON.stringify(manifest.permissions)}`);
 check(!!sniffer && JSON.stringify(sniffer.matches) === '["*://*/*"]' && JSON.stringify(sniffer.exclude_matches) === '["*://*.instructure.com/*"]' && sniffer.js.length === 1 && sniffer.run_at === 'document_idle', `the sniffer alone runs on every site but Canvas's own, at idle: ${JSON.stringify(sniffer)}`);
 check(own.length === 2 && own.every((cs) => JSON.stringify(cs.matches) === '["*://*.instructure.com/*"]'), `the interface's own scripts still match Canvas's domain alone (${own.map((cs) => cs.matches.join(',')).join(' | ')})`);
 check(!!lazy && lazy.matches.length === 1 && lazy.js.length >= 10 && lazy.js.includes('content/app/phone.js') && lazy.js.includes('content/app/screens/quiz.js') && !lazy.css, `the on-demand modules keep their never-matching group in the Chrome build (${lazy?.js.length} files)`);

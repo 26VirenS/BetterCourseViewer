@@ -8,7 +8,7 @@
   // The scripts' own version, stamped: content/app/app.js compares it with the stylesheet's
   // (--bcv-version) and the manifest's, because Safari can run one version's script with
   // another's stylesheet after the Mac app has updated under it. Bumped with every release.
-  self.BCV_VERSION = '2.98.13';
+  self.BCV_VERSION = '2.98.14';
 
   const DEFAULTS = {
     version: 3, // (3: Away Refresh off unless turned on — settings written before carry it on, and the one-time step in getSettings turns it off for everyone)
@@ -49,7 +49,7 @@
   }
 
   /** Settings written by an earlier version, brought up to this one — once, and written back so it
-   *  is not done again. Version 3 (2.98.13): Away Refresh is off unless turned on; every write
+   *  is not done again. Version 3 (2.98.14): Away Refresh is off unless turned on; every write
    *  before then kept it on (the default was on), so it is turned off for everyone here, and the
    *  switch under General is the way on. */
   async function migrate(stored) {
