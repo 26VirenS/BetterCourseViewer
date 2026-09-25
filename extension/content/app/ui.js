@@ -909,11 +909,23 @@
   /** A question with two answers, or a note with one (cancelLabel null): resolves true for the main
    *  button, false for Cancel, Escape, the scrim or the X. */
   function askSheet({ label = '', title, note = '', okLabel = 'OK', cancelLabel = 'Cancel', danger = false, from = null } = {}) {
-    document.querySelector('.bcv-sheet-ov')?.remove();
+    // A question asked from inside another sheet — the hand-in box asking whether to convert a file —
+    // rises over it rather than taking its place: the sheet below steps back (is-under, as it does
+    // under a tool's popup) and comes forward again, with the focus, once the question is answered.
+    // An earlier question still up is replaced.
+    document.querySelector('.bcv-sheet-ov.bcv-ask-ov')?.remove();
+    const under = document.querySelector('.bcv-sheet-ov:not(.is-under)');
+    under?.classList.add('is-under');
     return new Promise((resolve) => {
-      const ov = el('bcv-sheet-ov', null, { role: 'dialog', 'aria-label': label || title });
+      const ov = el('bcv-sheet-ov bcv-ask-ov', null, { role: 'dialog', 'aria-label': label || title });
       let settled = false;
-      const done = (v) => { if (settled) return; settled = true; dismiss(ov); resolve(v); };
+      const done = (v) => {
+        if (settled) return;
+        settled = true;
+        dismiss(ov);
+        if (under?.isConnected) { under.classList.remove('is-under'); under.focus?.({ preventScroll: true }); }
+        resolve(v);
+      };
       ov.addEventListener('click', (e) => { if (e.target === ov) done(false); });
       ov.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.stopPropagation(); done(false); } });
       const ok = btn(okLabel, { kind: danger ? 'dangerSolid' : 'primary', cls: 'bcv-ask__ok', onClick: () => done(true) });

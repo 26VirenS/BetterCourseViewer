@@ -2825,11 +2825,27 @@ try {
   const backIn = await omniState();
   check(backIn.active === 'bcv-omni' && !backIn.hidden, 'Escape there goes back to the box, the panel still up');
   await shot(page, '15b-hub-actions');
+  // (Dis01 narrowed to PDF for what follows, so a text file has to be converted; the caches dropped so the box reads that)
+  const dropAssignmentCaches = () => sw.evaluate(async (base) => { const [tab] = await chrome.tabs.query({ url: `${base}/*` }); await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'ISOLATED', func: async () => { await self.BCV.canvas.invalidatePrefix('assignments:'); await self.BCV.canvas.invalidatePrefix('assignment:'); } }); }, BASE);
+  await mockConfig({ ext: { 1009: ['pdf'] } });
+  await dropAssignmentCaches();
   await page.click('.bcv-omni__item.is-cur .bcv-omni__act');
   await page.waitForSelector('.bcv-hub-ov .bcv-sb--embed .bcv-sb__tabs', { timeout: 15000 });
   const hubBox = await page.evaluate(() => ({ title: document.querySelector('.bcv-hub-pop__title')?.textContent, sub: document.querySelector('.bcv-hub-pop__sub')?.textContent, panel: document.getElementById('bcv-omni-panel').hidden, path: location.pathname, tabs: [...document.querySelectorAll('.bcv-hub-ov .bcv-sb__tab')].map((t) => t.textContent.trim()).join(' | '), sheets: document.querySelectorAll('.bcv-sheet-ov').length }));
   check(hubBox.title === 'Dis01' && hubBox.sub === 'F26-MATH 021 20' && hubBox.panel && hubBox.path === '/' && hubBox.tabs.includes('Text entry') && hubBox.sheets === 1, `Submit on the row opens the hand-in box over the Dashboard — the assignment’s own block, the page staying put: ${JSON.stringify(hubBox)}`);
   await shot(page, '15c-hub-submit-box');
+  // a file the assignment does not take as it is asks whether to convert it — over the box, which steps back and stays (it used to be swept away by the question), and comes forward again once answered
+  if (await page.$('.bcv-hub-ov .bcv-sb__pane input[type=file]')) {
+    await page.setInputFiles('.bcv-hub-ov .bcv-sb__pane input[type=file]', { name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('# Notes\n\nhello there') });
+    await page.waitForSelector('.bcv-sheet--ask', { timeout: 5000 });
+    const askOver = await page.evaluate(() => ({ box: !!document.querySelector('.bcv-hub-ov'), under: document.querySelector('.bcv-hub-ov')?.classList.contains('is-under'), title: document.querySelector('.bcv-sheet--ask .bcv-sheet__title')?.textContent, sheets: document.querySelectorAll('.bcv-sheet-ov').length, askLast: document.querySelector('.bcv-sheet-ov:last-of-type')?.classList.contains('bcv-ask-ov') }));
+    await page.click('.bcv-ask__cancel');
+    await eventually(async () => !(await page.$('.bcv-sheet--ask')), 5000);
+    const askGone = await page.evaluate(() => ({ box: !!document.querySelector('.bcv-hub-ov'), under: document.querySelector('.bcv-hub-ov')?.classList.contains('is-under'), focusIn: !!document.activeElement?.closest?.('.bcv-hub-ov') || document.activeElement?.classList.contains('bcv-hub-ov') }));
+    check(askOver.box && askOver.under && askOver.title === 'Convert to PDF?' && askOver.sheets === 2 && askOver.askLast && askGone.box && !askGone.under && askGone.focusIn, `a file to convert asks over the hand-in box, which steps back and stays, then comes forward with the focus when the question is answered (${JSON.stringify({ askOver, askGone })})`);
+  } else check(false, 'the hand-in box from the hub has a file pane to drop a file on');
+  await mockConfig({ ext: {} });
+  await dropAssignmentCaches();
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('.bcv-hub-ov'), null, { timeout: 5000 });
   check(page.url() === `${BASE}/`, 'Escape closes it, the Dashboard still there');
