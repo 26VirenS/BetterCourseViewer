@@ -3769,19 +3769,11 @@ try {
   check(await eventually(async () => (await showAt()).pos === '-1', 7000), 'then the red one, Turn off Simpl, pressed: Simpl is off');
   await shot(page, '31-welcome-look');
   check(await eventually(async () => (await showAt()).pos === '1', 6000), 'and the green one: Active again');
-  await page.click('.bcv-welcome__next');
-  await page.waitForSelector('#bcv-welcome[data-stage="away"]', { timeout: 5000 });
-  const awayAt = Date.now();
-  const noContinueYet2 = (await page.$('.bcv-welcome__next:not([hidden])')) === null;
-  await page.waitForFunction(() => !document.querySelector('.bcv-welcome__look') && !document.querySelector('.bcv-welcome__stage[data-stage="look"]'), null, { timeout: 3000 });
-  await eventually(() => page.$eval('.bcv-welcome__away', (e) => e.getAnimations().every((a) => a.playState === 'finished') && Math.round(e.getBoundingClientRect().top) === 10).catch(() => false), 3000); // the pill floats down first (and overshoots a little on the way)
-  const awayCopy = await page.$eval('.bcv-welcome__away', (e) => { const r = e.getBoundingClientRect(); return { top: Math.round(r.top), centred: Math.abs((r.left + r.right) / 2 - innerWidth / 2) < 2, title: e.querySelector('.bcv-away__title').textContent, hint: e.querySelector('.bcv-away__hint').textContent, ring: getComputedStyle(e.querySelector('.bcv-away__ring')).animationDuration, hand: getComputedStyle(e.querySelector('.bcv-away__hand')).animationDuration, loops: getComputedStyle(e.querySelector('.bcv-away__ring')).animationIterationCount }; }).catch(() => null);
-  check((await welcomeBox()).bg === 'rgb(0, 0, 0)' && !!awayCopy && awayCopy.top === 10 && awayCopy.centred && awayCopy.title === 'Away Refresh' && awayCopy.hint === 'Click to cancel, or hold to disable' && awayCopy.ring === '12s' && awayCopy.hand === '12s' && awayCopy.loops === 'infinite' && (await page.$('#bcv-away')) === null, `stage two: the switch and its words are gone, the screen is still black, and a mock Away Refresh pill counts down in slow motion at the top (${JSON.stringify(awayCopy)})`);
-  check((await welcomeLines()).join(' | ') === 'Away Refresh | Click to cancel, or hold to disable | Away refresh prevents errors that show up after you’ve been gone for a while' && (await page.$eval('.bcv-welcome__stage[data-stage="away"] .bcv-welcome__arrow', (e) => e.getBoundingClientRect().height >= 120)), `an arrow up at the pill and the three lines (${(await welcomeLines()).join(' | ')})`);
-  check(noContinueYet2 && await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000) && Date.now() - awayAt >= TIMERS.welcomeWait - 500, 'Continue comes in only after the wait here too');
-  await page.waitForTimeout(400);
-  await shot(page, '31b-welcome-away');
   await page.keyboard.press('Enter'); // Enter is Continue too
+  // Away Refresh is off unless turned on (2.98.13), so the welcome has no pill to point at: the switch's stage goes straight to the sidebar's rows
+  await page.waitForSelector('#bcv-welcome[data-stage="grades"]', { timeout: 5000 });
+  await page.waitForFunction(() => !document.querySelector('.bcv-welcome__look') && !document.querySelector('.bcv-welcome__stage[data-stage="look"]'), null, { timeout: 3000 });
+  check((await page.$('.bcv-welcome__away')) === null && (await page.$('.bcv-welcome__stage[data-stage="away"]')) === null && (await sw.evaluate(() => self.BCV.settings.get())).appearance.awayRefresh === false, 'no Away Refresh stage: it is off unless turned on, so the welcome goes from the switch to the sidebar (the pill\'s stage is kept for a setting that is on)');
   // three rows of the sidebar in turn, each seen through a hole in the black with an arrow at it
   const holes = () => page.$eval('#bcv-welcome', (e) => {
     const rects = [...e.querySelectorAll('.bcv-welcome__mask mask rect')].slice(1).map((r) => ({ x: +r.getAttribute('x'), y: +r.getAttribute('y'), w: +r.getAttribute('width'), h: +r.getAttribute('height') }));
@@ -3948,13 +3940,33 @@ try {
   await page.goto(`${BASE}/?bcv=welcome`);
   await page.waitForSelector('#bcv-welcome[data-stage="look"]', { timeout: 20000 });
   check(page.url() === `${BASE}/` && (await welcomeBox()).bg === 'rgb(0, 0, 0)' && (await page.evaluate(() => performance.getEntriesByType('navigation')[0]?.type)) === 'navigate' && (await page.$('.bcv-stat')) !== null, 'asked for again, the welcome starts over the Dashboard and drops its parameter, with no reload');
-  for (const st of ['away', 'grades', 'courses', 'tools', 'peek', 'search', null]) {
+  for (const st of ['grades', 'courses', 'tools', 'peek', 'search', null]) { // (no Away Refresh stage: off unless turned on)
     await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000);
     await page.click('.bcv-welcome__next');
     if (st) await page.waitForSelector(`#bcv-welcome[data-stage="${st}"]`, { timeout: 5000 });
     else await page.waitForFunction(() => !document.querySelector('#bcv-welcome'), null, { timeout: 5000 });
   }
   check((await page.$('#bcv-welcome')) === null && (await visible('#bcv-look')), 'and its last Continue takes the black away again');
+  // with Away Refresh turned on, the welcome asked for again does show the pill's stage, after the switch's
+  await sw.evaluate(() => self.BCV.settings.update({ appearance: { awayRefresh: true } }));
+  await page.goto(`${BASE}/?bcv=welcome`);
+  await page.waitForSelector('#bcv-welcome[data-stage="look"]', { timeout: 20000 });
+  await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000);
+  await page.click('.bcv-welcome__next');
+  await page.waitForSelector('#bcv-welcome[data-stage="away"]', { timeout: 5000 });
+  await eventually(() => page.$eval('.bcv-welcome__away', (e) => e.getAnimations().every((a) => a.playState === 'finished') && Math.round(e.getBoundingClientRect().top) === 10).catch(() => false), 3000); // the pill floats down first (and overshoots a little on the way)
+  const awayCopy = await page.$eval('.bcv-welcome__away', (e) => { const r = e.getBoundingClientRect(); return { top: Math.round(r.top), centred: Math.abs((r.left + r.right) / 2 - innerWidth / 2) < 2, title: e.querySelector('.bcv-away__title').textContent, hint: e.querySelector('.bcv-away__hint').textContent, ring: getComputedStyle(e.querySelector('.bcv-away__ring')).animationDuration, hand: getComputedStyle(e.querySelector('.bcv-away__hand')).animationDuration, loops: getComputedStyle(e.querySelector('.bcv-away__ring')).animationIterationCount }; }).catch(() => null);
+  check((await welcomeBox()).bg === 'rgb(0, 0, 0)' && !!awayCopy && awayCopy.top === 10 && awayCopy.centred && awayCopy.title === 'Away Refresh' && awayCopy.hint === 'Click to cancel, or hold to disable' && awayCopy.ring === '12s' && awayCopy.hand === '12s' && awayCopy.loops === 'infinite' && (await welcomeLines()).join(' | ') === 'Away Refresh | Click to cancel, or hold to disable | Away refresh prevents errors that show up after you’ve been gone for a while' && (await page.$('#bcv-away')) === null, `with Away Refresh on, the welcome's second stage is the mock pill counting down in slow motion at the top, with its three lines (${JSON.stringify(awayCopy)})`);
+  await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000);
+  await page.waitForTimeout(400);
+  await shot(page, '31b-welcome-away');
+  for (const st of ['grades', 'courses', 'tools', 'peek', 'search', null]) {
+    await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000);
+    await page.click('.bcv-welcome__next');
+    if (st) await page.waitForSelector(`#bcv-welcome[data-stage="${st}"]`, { timeout: 5000 });
+    else await page.waitForFunction(() => !document.querySelector('#bcv-welcome'), null, { timeout: 5000 });
+  }
+  await sw.evaluate(() => self.BCV.settings.update({ appearance: { awayRefresh: false } }));
 
   // ---- what's new after an update ----------------------------------------------------------------
   console.log("what's new");
@@ -5499,6 +5511,10 @@ try {
     const [tab] = await chrome.tabs.query({ url: `${base}/*` });
     await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'ISOLATED', args: [back], func: (b) => { self.BCV.app.state.lastHere = Date.now() - b; } });
   }, [BASE, ms]);
+  // Away Refresh is off unless turned on (2.98.13): the default is checked, then it is turned on for the checks that are about it (the page hears the setting)
+  check((await sw.evaluate(() => self.BCV.settings.get())).appearance.awayRefresh === false, 'Away Refresh is off unless turned on');
+  await sw.evaluate(() => self.BCV.settings.update({ appearance: { awayRefresh: true } }));
+  await page.waitForTimeout(400);
   await page.evaluate(() => sessionStorage.removeItem('bcv:reloaded')); // the checks above already reloaded this path
   await windBack(0); // wide awake
   // (a reload that is coming comes AWAY_COUNT after the press — TIMERS.awayCount here — so a wait a
@@ -5732,6 +5748,7 @@ try {
   }, BASE);
   await page.waitForSelector('[data-term]', { timeout: 15000 });
   check(!(await page.$('.bcv-sheet-ov')) && page.url().endsWith('/courses'), 'a sheet left open does not survive an in-place move to another screen');
+  await sw.evaluate(() => self.BCV.settings.update({ appearance: { awayRefresh: false } })); // (back to the default — off unless turned on — for what follows: Settings' switch, the setup's welcome)
   // ---- notifications ------------------------------------------------------------------------------------
   console.log('notifications');
   await page.goto(`${BASE}/#notifications`);
@@ -5863,13 +5880,13 @@ try {
   const siteN = 1 + ((await sw.evaluate(() => self.BCV.settings.get())).domains || []).length;
   check(/^Version \d+\.\d+/.test(await options.$eval('#version', (el) => el.textContent)) && (await oTexts('#statusText'))[0] === `${siteN} site${siteN === 1 ? '' : 's'}`, `settings show the version and the site count: ${await options.$eval('#version', (el) => el.textContent)} · ${(await oTexts('#statusText'))[0]}`);
   // General: the Away Refresh switch — the way back on after a hold on the pill (Getting unstuck, above)
-  check(await options.$eval('#awayRefresh', (b) => b.classList.contains('is-on') && b.getAttribute('aria-checked') === 'true' && !!b.closest('#general') && b.closest('.row').querySelector('.row__t').textContent === 'Away Refresh'), 'General has the Away Refresh switch, on');
+  check(await options.$eval('#awayRefresh', (b) => !b.classList.contains('is-on') && b.getAttribute('aria-checked') === 'false' && !!b.closest('#general') && b.closest('.row').querySelector('.row__t').textContent === 'Away Refresh'), 'General has the Away Refresh switch, off (off unless turned on, since 2.98.13)');
   await options.click('#awayRefresh');
   await options.waitForTimeout(250);
-  check((await sw.evaluate(() => self.BCV.settings.get())).appearance.awayRefresh === false && !(await options.$eval('#awayRefresh', (b) => b.classList.contains('is-on'))), 'off saves (what a hold on the pill writes)');
+  check((await sw.evaluate(() => self.BCV.settings.get())).appearance.awayRefresh === true && (await options.$eval('#awayRefresh', (b) => b.classList.contains('is-on'))), 'on saves: the way to have a stale page reload itself');
   await options.click('#awayRefresh');
   await options.waitForTimeout(250);
-  check((await sw.evaluate(() => self.BCV.settings.get())).appearance.awayRefresh === true && (await options.$eval('#awayRefresh', (b) => b.classList.contains('is-on'))), 'and on again');
+  check((await sw.evaluate(() => self.BCV.settings.get())).appearance.awayRefresh === false && !(await options.$eval('#awayRefresh', (b) => b.classList.contains('is-on'))), 'and off again (what a hold on the pill writes)');
   await options.screenshot({ path: join(out, '29-options-general.png') });
   await options.click('.navlink[data-section="courses"]');
   await options.waitForSelector('.course', { timeout: 15000 });
@@ -6123,7 +6140,7 @@ try {
   await Promise.all([page.waitForNavigation({ timeout: 20000 }), page.click(su('.pz #pzOpen'))]); // Open Canvas: the page reloads
   await page.waitForSelector('#bcv-welcome[data-stage="look"]', { timeout: 20000 });
   check((await page.$('#bcv-setup')) === null && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('setup:done'))['setup:done'])) === true, 'finishing the steps is what marks the setup done, and the welcome follows the reload');
-  for (const st of ['away', 'grades', 'courses', 'tools', 'peek', 'search', null]) { // Continue, seven times: the pointers in turn (the search box last, on the Dashboard), then the page
+  for (const st of ['grades', 'courses', 'tools', 'peek', 'search', null]) { // Continue, six times: the pointers in turn (no Away Refresh stage: off unless turned on; the search box last, on the Dashboard), then the page
     await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000);
     await page.click('.bcv-welcome__next');
     if (st) await page.waitForSelector(`#bcv-welcome[data-stage="${st}"]`, { timeout: 5000 });

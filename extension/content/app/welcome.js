@@ -462,6 +462,7 @@
     for (const key of (keys || ['look', 'away', 'grades', 'courses', 'tools', 'peek', 'search']).filter((k) => STAGES[k])) {
       const look = lookNow();
       if (!look && (key === 'look' || key === 'pin')) continue;
+      if (key === 'away' && app?.state?.settings?.appearance?.awayRefresh === false) continue; // (off unless turned on: nothing to point at)
       if (STAGES[key].spot && !STAGES[key].spot(app)) continue; // (no sidebar row to point at: a phone)
       await stage(app, key, { look });
       if (key === 'look') { try { await BCV.api.storage.local.set({ [KEY2]: true }); await BCV.api.storage.local.remove(OLD_KEYS); } catch { /* shown all the same */ } } // (seen: not owed again after an update; the old shows' marks go)

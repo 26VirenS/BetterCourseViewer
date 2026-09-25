@@ -25,6 +25,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.98.13', date: '2026-09-25', notes: [
+      { kind: 'improved', title: 'Away Refresh, opt-in', body: 'Off for everyone now; the switch under General turns it on.', icon: P.toggle },
+    ] },
     { version: '2.98.12', date: '2026-09-25', notes: [
       { kind: 'fixed', title: 'Hand-in box stays put', body: 'Convert to PDF? asks over the box instead of closing it.', icon: P.check },
     ] },

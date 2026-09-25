@@ -357,5 +357,14 @@ texIs('2.', '2', 'a trailing point goes');
 check(TX.latex('2E') === null && TX.latex('') !== null, 'a line that cannot be read yet (an exponent with no digits) is null, an empty line is not');
 check(TX.numTex(42) === '42' && TX.numTex(-0.5) === '-0.5' && TX.numTex(1e9) === '1{,}000{,}000{,}000' && TX.numTex(-1234.5) === '-1{,}234.5' && TX.numTex(1.2e15) === '1.2 \\times 10^{15}' && TX.numTex(2e-12) === '2 \\times 10^{-12}' && TX.numTex(1 / 3) === '0.333333333333' && TX.numTex(NaN) === '\\text{Error}', `a result as LaTeX: digits grouped in thousands as the display groups them, the display's own cut-offs as a × 10 to a power: ${[42, -0.5, 1e9, -1234.5, 1.2e15, 2e-12, 1 / 3].map(TX.numTex).join(' | ')}`);
 
+// ---- settings (lib/settings.js): Away Refresh off unless turned on, and settings written before 2.98.13 brought up to that once ----
+console.log('settings');
+const fakeStore = (init) => { let data = init; return { storage: { local: { get: async () => ({ settings: data }), set: async (o) => { data = o.settings; } }, onChanged: { addListener() {}, removeListener() {} } }, read: () => data }; };
+const loadSettings = (init) => { const s = {}; const c = fakeStore(init); new Function('self', 'chrome', readFileSync(join(root, 'extension', 'lib', 'settings.js'), 'utf8'))(s, c); return { S: s.BCV.settings, c }; };
+{ const { S, c } = loadSettings(undefined); const got = await S.get(); check(got.appearance.awayRefresh === false && got.version === 3 && c.read() === undefined, 'a fresh install has Away Refresh off, and nothing is written for it'); }
+{ const { S, c } = loadSettings({ version: 2, appearance: { awayRefresh: true, darkMode: 'on' }, domains: ['https://canvas.test'] }); const got = await S.get(); check(got.appearance.awayRefresh === false && got.appearance.darkMode === 'on' && got.domains.join() === 'https://canvas.test' && c.read().version === 3 && c.read().appearance.awayRefresh === false, `settings written before 2.98.13 (version 2, Away Refresh on) come up with it off, once, written back as version 3, the rest kept: ${JSON.stringify(c.read())}`); }
+{ const { S, c } = loadSettings({ version: 3, appearance: { awayRefresh: true } }); check((await S.get()).appearance.awayRefresh === true && c.read().appearance.awayRefresh === true, 'turned on since (version 3), it stays on'); }
+{ const { S, c } = loadSettings({ appearance: { awayRefresh: true } }); check((await S.get()).appearance.awayRefresh === false && c.read().version === 3, 'a record with no version at all counts as before: off once, and versioned'); }
+
 console.log(fails ? `\n${fails} check(s) failed` : '\nAll checks passed.');
 process.exit(fails ? 1 : 0);
