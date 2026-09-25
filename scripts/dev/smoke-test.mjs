@@ -316,10 +316,10 @@ try {
   check(/\/tool-window$/.test(win.url()) && winBar.title === 'My Materials' && winBar.x && (await win.$('#tool-window')) !== null,
     `a window the tool opens for itself is the tool still: its own tab, the same bar over it: ${JSON.stringify({ url: win.url(), title: winBar.title })}`);
   const had = context.pages().length;
-  await win.locator('bcv-tool-bar .x').click();
+  await win.locator('bcv-tool-bar .x').click().catch(() => { /* the tab closes under the click, which is the point: the check after is that it did */ });
   await eventually(async () => win.isClosed(), 10000);
   check(win.isClosed() && context.pages().length === had - 1, 'the X closes that tab');
-  await toolPage.locator('bcv-tool-bar .x').click();
+  await toolPage.locator('bcv-tool-bar .x').click().catch(() => { /* the tab closes under the click, which is the point: the check after is that it did */ });
   await eventually(async () => toolPage.isClosed(), 10000);
   await page.bringToFront();
   check(toolPage.isClosed() && page.url() === `${BASE}/` && (await page.$('#bcv-app')) !== null,
@@ -1631,7 +1631,7 @@ try {
     && (await extTab.$('#tool_content')) !== null && !(await extTab.$('#bcv-app')) && page.url() === `${BASE}/courses/101`,
   `a campus tool opens in a tab of its own, Canvas's launch on it, the course page staying where it was: ${JSON.stringify({ url: extTab.url(), title: ext.title })}`);
   await shot(extTab, '11b-tool-tab');
-  await extTab.locator('bcv-tool-bar .x').click();
+  await extTab.locator('bcv-tool-bar .x').click().catch(() => { /* the tab closes under the click, which is the point: the check after is that it did */ });
   await eventually(async () => extTab.isClosed(), 10000);
   await page.bringToFront();
   check(extTab.isClosed() && page.url() === `${BASE}/courses/101`, 'the X closes it and the course page is still there');
@@ -2053,8 +2053,8 @@ try {
   }, { id: phetId, url: `${NOPE}/nope` });
   await toolPop.goto(`chrome-extension://${extId}/popup/popup.html`);
   await toolPop.waitForSelector('#tool-card:not([hidden])', { timeout: 8000 });
-  const popSeen = await toolPop.evaluate(() => ({ status: document.getElementById('status').textContent, host: document.getElementById('tool-host').textContent, button: document.getElementById('tool-site').textContent.trim(), enable: document.getElementById('enable-card').hidden, title: document.querySelector('#tool-card .card__title').textContent }));
-  check(popSeen.status === 'A tool’s tab · PhET simulation' && popSeen.host === 'localhost' && popSeen.button === 'Keep the bar on localhost' && popSeen.enable && popSeen.title === 'Simpl’s bar is off on this site', `the popup over that tab says whose tab it is and offers to keep the bar on the site (the Canvas Enable card kept out of it): ${JSON.stringify(popSeen)}`);
+  const popSeen = await toolPop.evaluate(() => ({ status: document.getElementById('status').textContent, host: document.getElementById('tool-host').textContent, button: document.getElementById('tool-site').textContent.trim(), all: document.getElementById('tool-all').textContent.trim(), enable: document.getElementById('enable-card').hidden, title: document.querySelector('#tool-card .card__title').textContent }));
+  check(popSeen.status === 'A tool’s tab · PhET simulation' && popSeen.host === 'localhost' && popSeen.button === 'Keep the bar on localhost' && popSeen.all === 'Keep it on every site' && popSeen.enable && popSeen.title === 'Simpl’s bar is off on this site', `the popup over that tab says whose tab it is and offers to keep the bar on the site, or on every site (the Canvas Enable card kept out of it): ${JSON.stringify(popSeen)}`);
   await toolPop.screenshot({ path: join(out, '11d-popup-tool-tab.png') });
   await toolPop.click('#tool-site');
   await eventually(async () => /Done|Allowed|Not allowed|failed/.test(await toolPop.$eval('#tool-msg', (e) => e.textContent)), 15000);
@@ -2069,6 +2069,17 @@ try {
     const code = src.slice(from, to).split('\n').filter((l) => !l.trim().startsWith('//')).join('\n').replace(/await api\.$/, ''); // (the comments aside, and the await of the request itself)
     check(from >= 0 && to > from && !code.includes('await'), 'and asks straight from the press, awaiting nothing first (Safari refuses otherwise)');
   }
+  // the other press: every site, for a tool that moves between sites — asked for as *://*/*, then the bar registered for every site and put in
+  await toolPop.reload();
+  await toolPop.waitForSelector('#tool-card:not([hidden])', { timeout: 8000 });
+  await toolPop.click('#tool-all');
+  await eventually(async () => /Done|Allowed|Not allowed|failed/.test(await toolPop.$eval('#tool-msg', (e) => e.textContent)), 15000);
+  const popAll = await toolPop.evaluate(() => ({ asked: window.__asked, msg: document.getElementById('tool-msg').textContent }));
+  const pendingLeft2 = await sw.evaluate(async () => (await self.BCV.api.storage.local.get('tool:pending'))['tool:pending'] || null);
+  check(JSON.stringify(popAll.asked) === JSON.stringify([{ origins: ['*://*/*'] }]) && /^(Done\. The bar follows the tool to any site now\.|Allowed, but the bar could not be put in)/.test(popAll.msg) && !pendingLeft2, `Keep it on every site asks the browser for every site, then has the bar put in: ${JSON.stringify({ ...popAll, pendingLeft2 })}`);
+  // what a launch asks for: the tool's whole domain, so a move between a tool's own hosts (secure.aleks.com to another aleks.com host) needs no press at all
+  const sitePatterns = await sw.evaluate(() => ['https://secure.aleks.com', 'https://www.aleks.co.uk', 'http://localhost:8791', 'https://10.0.0.5', 'https://tool.example.com/launch', 'ftp://x.y'].map((o) => self.BCV.background.toolSitePatterns(o)));
+  check(JSON.stringify(sitePatterns) === JSON.stringify([['https://secure.aleks.com/*', '*://*.aleks.com/*'], ['https://www.aleks.co.uk/*', '*://*.aleks.co.uk/*'], ['http://localhost:8791/*'], ['https://10.0.0.5/*'], ['https://tool.example.com/*', '*://*.example.com/*'], []]), `a launch asks for the tool's whole domain (secure.aleks.com → every aleks.com host; co.uk kept whole; localhost and an IP as they are; nothing that is not http): ${JSON.stringify(sitePatterns)}`);
   await toolPop.close();
   // back on a site it may reach: the bar again, the mark gone
   await phet.click('#home');
@@ -2687,7 +2698,7 @@ try {
   await knewton.locator('bcv-tool-bar .theme').click();
   await knewton.waitForTimeout(200);
   await shot(knewton, '14c-tool-dark');
-  await knewton.locator('bcv-tool-bar .x').click();
+  await knewton.locator('bcv-tool-bar .x').click().catch(() => { /* the tab closes under the click, which is the point: the check after is that it did */ });
   await eventually(async () => knewton.isClosed(), 10000);
   await page.bringToFront();
   check(knewton.isClosed() && page.url().endsWith('/courses/104/assignments/4003'), 'and the X hands the assignment page back');
@@ -5389,7 +5400,7 @@ try {
   });
   check(pop.outsideBody && pop.top === 52 && pop.z === '2147483646' && pop.filter === 'none' && pop.title === 'Calculator',
     `a tool opened there rises over the tool's page and under the bar, its own colours intact: ${JSON.stringify(pop)}`);
-  await wTab.locator('bcv-tool-bar .x').click();
+  await wTab.locator('bcv-tool-bar .x').click().catch(() => { /* the tab closes under the click, which is the point: the check after is that it did */ });
   await eventually(async () => wTab.isClosed(), 10000);
   await page.bringToFront();
   await sw.evaluate((prev) => self.BCV.api.storage.local.set({ 'tools:pins': prev }), pinsBefore);

@@ -241,8 +241,21 @@
       if (document.documentElement) start();
       document.addEventListener('DOMContentLoaded', start);
       window.addEventListener('load', start);
-      const t = setInterval(attach, 1000);
-      setTimeout(() => clearInterval(t), 15000);
+      // A tool that rewrites its document takes the bar with it — at any time, not only while it
+      // loads (an app that redraws its whole page on a move). The root's own children are watched,
+      // nothing deeper, and the bar is put back the moment it goes; a root replaced whole (a
+      // document written over) is caught on a slow beat, which also renews the watch.
+      let watched = null;
+      const guard = () => {
+        const rootEl = document.documentElement;
+        if (!rootEl) return;
+        if (watched !== rootEl) {
+          try { new MutationObserver(() => { if (host && !host.isConnected) attach(); }).observe(rootEl, { childList: true }); watched = rootEl; } catch { /* the beat below stands in */ }
+        }
+        if (host && !host.isConnected) attach();
+      };
+      guard();
+      setInterval(guard, 3000);
     } finally {
       asking = false;
     }

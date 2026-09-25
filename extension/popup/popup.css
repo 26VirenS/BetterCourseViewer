@@ -36,3 +36,6 @@ p { margin: 0 0 8px; }
 .foot__row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .foot__links { display: flex; gap: 14px; white-space: nowrap; }
 .foot a { color: var(--blue); text-decoration: none; font-weight: 600; }
+
+/* the tool card: its two presses side by side, wrapping where the popup is narrow */
+.btns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 2px; }

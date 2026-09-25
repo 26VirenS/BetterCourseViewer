@@ -143,25 +143,28 @@ if (typeof importScripts === 'function' && !self.BCV?.devcode) {
     try { url = (await api.tabs.get(tabId))?.url || ''; } catch { return; }
     ensureBar(tabId, t, url);
   });
-  /** The bar-only script registered for a site, so the next load there has it before the page paints. */
-  async function registerBarScript(origin) {
+  /** The bar-only script registered for a site — an origin, a whole domain's pattern (every aleks.com
+   *  host), or the pattern for every site — so the next load there has it before the page paints. */
+  async function registerBarScript(site) {
     if (!api.scripting?.registerContentScripts) return false;
-    const id = `bcv-toolbar-${origin.replace(/[^a-z0-9]/gi, '-')}`;
+    const match = /\*/.test(site) ? site : `${site}/*`;
+    const id = `bcv-toolbar-${site.replace(/[^a-z0-9]/gi, '-')}`;
     try {
       const all = await api.scripting.getRegisteredContentScripts().catch(() => []);
       if ((all || []).some((sc) => sc.id === id)) return true;
-      await api.scripting.registerContentScripts([{ id, matches: [`${origin}/*`], js: ['content/toolbar.js'], runAt: 'document_start', persistAcrossSessions: true }]);
+      await api.scripting.registerContentScripts([{ id, matches: [match], js: ['content/toolbar.js'], runAt: 'document_start', persistAcrossSessions: true }]);
       return true;
     } catch { return false; }
   }
   /** The popup, on a tool's tab whose site the browser has just allowed (from a press there): the
-   *  bar-only script registered for the site, and the bar put over the page now. */
+   *  bar-only script registered for the site — or for every site, when that is what was allowed —
+   *  and the bar put over the page now. */
   async function toolSite(msg) {
     await loaded;
     const tabId = Number(msg?.tabId);
     let origin = '';
     try { origin = new URL(msg?.origin).origin; } catch { return { ok: false, message: 'No site given.' }; }
-    await registerBarScript(origin);
+    await registerBarScript(msg?.all ? '*://*/*' : origin);
     const t = tools.get(tabId);
     if (!t) return { ok: false, message: 'That tab is not a tool’s.' };
     await ensureBar(tabId, t, `${origin}/`);
@@ -191,20 +194,43 @@ if (typeof importScripts === 'function' && !self.BCV?.devcode) {
       return origin && origin !== new URL(url).origin && /^https?:/.test(origin) ? origin : null;
     } catch { return null; }
   }
+  /** What a tool's origin is asked for as: the origin itself and, for a real domain, every host under
+   *  its registrable domain (secure.aleks.com asks for *://*.aleks.com/*) — a tool moves between its
+   *  own hosts after a launch (a sign-in, a redirect to the app's own server), and each would
+   *  otherwise need a press of its own. A two-letter country code after co, com, ac, org, net, gov
+   *  or edu keeps three labels (aleks.co.uk); an IP address or a bare host (localhost) is asked for
+   *  as it is. The last pattern is the widest. */
+  function toolSitePatterns(origin) {
+    let u = null;
+    try { u = new URL(origin); } catch { return []; }
+    if (!/^https?:$/.test(u.protocol)) return [];
+    const out = [`${u.origin}/*`];
+    const host = u.hostname;
+    const labels = host.split('.');
+    const ip = /^\d+$/.test(labels[labels.length - 1]) || host.startsWith('[');
+    if (labels.length >= 2 && !ip) {
+      const n = labels.length >= 3 && labels[labels.length - 1].length === 2 && /^(co|com|ac|org|net|gov|edu)$/.test(labels[labels.length - 2]) ? 3 : 2;
+      out.push(`*://*.${labels.slice(-n).join('.')}/*`);
+    }
+    return out;
+  }
   async function toolSiteReady(url) {
     if (await allSites()) return;
     const origin = await toolOriginOf(url);
     if (!origin) return;
+    const patterns = toolSitePatterns(origin);
+    if (!patterns.length) return;
+    const site = patterns[patterns.length - 1]; // (the whole domain where there is one, the origin alone otherwise)
     const kept = (await api.storage.local.get(TOOL_SITES).catch(() => ({})))?.[TOOL_SITES] || {};
-    if (kept[origin] === 'no') return;
+    if (kept[site] === 'no' || kept[origin] === 'no') return;
     let ok = false;
-    try { ok = await api.permissions.contains({ origins: [`${origin}/*`] }); } catch { return; }
+    try { ok = await api.permissions.contains({ origins: [site] }); } catch { return; }
     if (!ok) {
-      try { ok = await api.permissions.request({ origins: [`${origin}/*`] }); } catch { return; } // (no gesture reached here: nothing to ask with)
-      kept[origin] = ok ? 'yes' : 'no';
+      try { ok = await api.permissions.request({ origins: [site] }); } catch { return; } // (no gesture reached here: nothing to ask with)
+      kept[site] = ok ? 'yes' : 'no';
       api.storage.local.set({ [TOOL_SITES]: kept }).catch(() => {});
     }
-    if (ok) await registerBarScript(origin);
+    if (ok) await registerBarScript(site);
   }
   /** A tool link pressed in the interface: a tab for it, remembering the tab it was opened from. */
   async function openTool(sender, msg) {
@@ -701,9 +727,9 @@ if (typeof importScripts === 'function' && !self.BCV?.devcode) {
    *  (or the tab reloaded). The note expires, and the popup clears it itself when it survives. */
   async function continuePending(added) {
     try {
-      // the popup on a tool's tab asked for the tool's site: the bar registered for it and put over the page
+      // the popup on a tool's tab asked for the tool's site (or for every site): the bar registered for it and put over the page
       const tp = (await api.storage.local.get('tool:pending'))?.['tool:pending'];
-      if (tp?.origin && Date.now() - (tp.at || 0) < 3 * 60 * 1000 && (!(added?.origins || []).length || added.origins.some((o) => o.startsWith(tp.origin)))) {
+      if (tp?.origin && Date.now() - (tp.at || 0) < 3 * 60 * 1000 && (!(added?.origins || []).length || added.origins.some((o) => o.startsWith(tp.origin) || o === '*://*/*' || o === '<all_urls>'))) {
         await api.storage.local.remove('tool:pending');
         await toolSite(tp);
       }
@@ -902,5 +928,5 @@ if (typeof importScripts === 'function' && !self.BCV?.devcode) {
   ensureDomains();
   offerSetup();
   noteVersion();
-  BCV.background = { offerSetup, ensureDomains, app, syncApp, openOptions, afterUpdate, canvasTabs }; // the harness drives these directly
+  BCV.background = { offerSetup, ensureDomains, app, syncApp, openOptions, afterUpdate, canvasTabs, toolSitePatterns }; // the harness drives these directly
 })();

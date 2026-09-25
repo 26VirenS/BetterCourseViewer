@@ -25,6 +25,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.98.11', date: '2026-09-25', notes: [
+      { kind: 'improved', title: 'The bar keeps up', body: 'A tool’s whole domain allowed at once, or every site, once.', icon: P.pin },
+    ] },
     { version: '2.98.10', date: '2026-09-24', notes: [
       { kind: 'fixed', title: 'Updates finish cleanly', body: 'A Safari still on an old copy after an update says so.', icon: P.tool },
     ] },

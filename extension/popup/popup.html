@@ -28,8 +28,11 @@
 
   <section class="card" id="tool-card" hidden>
     <div class="card__title">Simpl’s bar is off on this site</div>
-    <p class="muted">This tab is a tool opened from Canvas. The browser has not let Simpl Courses onto <span id="tool-host"></span>, so its bar — and your pinned tools — cannot be over the page. Allow it once and they follow, here and every time.</p>
-    <button class="btn btn--primary" id="tool-site">Keep the bar on <span id="tool-host2"></span></button>
+    <p class="muted">This tab is a tool opened from Canvas. The browser has not let Simpl Courses onto <span id="tool-host"></span>, so its bar — and your pinned tools — cannot be over the page. Allow it once and they follow, here and every time. A tool that moves between sites (a sign-in through another, an app on another address) keeps the bar everywhere with the second press.</p>
+    <div class="btns">
+      <button class="btn btn--primary" id="tool-site">Keep the bar on <span id="tool-host2"></span></button>
+      <button class="btn" id="tool-all" title="One press for good: the bar follows a tool to any site it moves to">Keep it on every site</button>
+    </div>
     <p class="muted small" id="tool-msg"></p>
   </section>
 

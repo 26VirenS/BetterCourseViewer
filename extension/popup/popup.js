@@ -206,16 +206,18 @@
     $('tool-card').hidden = false;
     $('tool-host').textContent = url.hostname;
     $('tool-host2').textContent = url.hostname;
-    $('tool-site').addEventListener('click', async () => {
+    // the two presses: this site alone, or every site — for a tool that moves between sites (a sign-in
+    // through another, an app on another address), so the bar follows wherever it goes, for good
+    const keep = async (all) => {
       const msg = $('tool-msg');
       msg.textContent = 'Asking for permission…';
       // Chrome closes this popup when its permission dialog opens: the background finishes from this
       // note (continuePending). Written without waiting, and nothing awaited before the request —
       // Safari only takes it while the press is still a user gesture.
-      api.storage.local.set({ 'tool:pending': { origin, tabId: tab?.id ?? null, at: Date.now() } }).catch(() => {});
+      api.storage.local.set({ 'tool:pending': { origin, tabId: tab?.id ?? null, at: Date.now(), all } }).catch(() => {});
       let ok = false;
       try {
-        ok = await api.permissions.request({ origins: [`${origin}/*`] });
+        ok = await api.permissions.request({ origins: [all ? '*://*/*' : `${origin}/*`] });
       } catch (e) {
         await api.storage.local.remove('tool:pending').catch(() => {});
         msg.textContent = `Permission request failed: ${e?.message || e}`;
@@ -223,13 +225,15 @@
       }
       await api.storage.local.remove('tool:pending').catch(() => {}); // still here: this popup finishes it
       if (!ok) {
-        msg.textContent = 'Not allowed. Simpl’s bar stays off on this site.';
+        msg.textContent = all ? 'Not allowed. Simpl’s bar stays off on sites it has not been allowed on.' : 'Not allowed. Simpl’s bar stays off on this site.';
         return;
       }
-      const r = await send({ type: 'toolSite', origin, tabId: tab.id });
-      msg.textContent = r?.ok ? 'Done. The bar is back over the page.' : `Allowed, but the bar could not be put in${r?.message ? `: ${r.message}` : '. Reload the page.'}`;
+      const r = await send({ type: 'toolSite', origin, tabId: tab.id, all });
+      msg.textContent = r?.ok ? (all ? 'Done. The bar follows the tool to any site now.' : 'Done. The bar is back over the page.') : `Allowed, but the bar could not be put in${r?.message ? `: ${r.message}` : '. Reload the page.'}`;
       if (r?.ok) setTimeout(() => window.close(), 900);
-    });
+    };
+    $('tool-site').addEventListener('click', () => keep(false));
+    $('tool-all').addEventListener('click', () => keep(true));
     return;
   }
   if (granted) {
