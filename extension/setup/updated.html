@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Simpl has updated</title>
+  <style>
+    /* The page after this update (2.98.15), opened once by the Chrome build on its first run after it:
+       Chrome keeps an updated extension running but withholds site access it did not have before, until
+       the puzzle piece's prompt is accepted. Black, like the setup's splash; the arrow at the top right
+       points at that puzzle piece; the line in red is the promise. */
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body { background: #000; color: #fff; font: 16px/1.45 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased; display: flex; align-items: center; justify-content: center; padding: 24px; animation: fadeIn .4s ease both; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+    @keyframes nudge { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(6px, -6px); } }
+    .text { display: flex; flex-direction: column; align-items: center; gap: 14px; max-width: 640px; text-align: center; }
+    .word { font: 700 22px/1 -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif; letter-spacing: -.03em; color: rgba(255,255,255,.55); animation: fadeUp .5s ease both; }
+    h1 { margin: 0; font: 700 56px/1.05 -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif; letter-spacing: -.04em; animation: fadeUp .5s ease .1s both; }
+    .ask { margin: 0; font: 500 24px/1.3 inherit; color: #fff; animation: fadeUp .5s ease .2s both; }
+    .where { margin: 0; font: 500 15px/1.45 inherit; color: rgba(255,255,255,.62); max-width: 460px; animation: fadeUp .5s ease .25s both; }
+    .never { margin: 4px 0 0; font: 600 17px/1.4 inherit; color: #ff453a; animation: fadeUp .5s ease .3s both; }
+    .btn { margin-top: 12px; height: 44px; padding: 0 22px; border: 0; border-radius: 22px; background: #0a84ff; color: #fff; font: 600 16px/1 inherit; cursor: pointer; animation: fadeUp .5s ease .4s both; transition: background .2s ease, transform .16s ease; }
+    .btn:hover { background: #2b93ff; }
+    .btn:active { transform: scale(.97); }
+    .btn:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+    .msg { margin: 0; min-height: 20px; font: 500 14px/1.45 inherit; color: rgba(255,255,255,.72); max-width: 460px; }
+    .arrow { position: fixed; top: 14px; right: 18px; display: flex; align-items: center; gap: 10px; color: #ff9f0a; font: 600 14px/1.3 inherit; text-align: right; animation: fadeUp .5s ease .5s both; }
+    .arrow svg { flex: none; width: 44px; height: 44px; animation: nudge 1.6s ease-in-out infinite; }
+    html[data-state="ok"] .arrow { display: none; }
+    html[data-state="ok"] .btn { background: rgba(255,255,255,.14); }
+    html[data-state="ok"] .btn:hover { background: rgba(255,255,255,.22); }
+    @media (prefers-reduced-motion: reduce) { body, .word, h1, .ask, .where, .never, .btn, .arrow, .arrow svg { animation: none; } }
+  </style>
+</head>
+<body>
+  <div class="arrow" id="arrow" aria-hidden="true">
+    <span>The puzzle piece, up here:<br>press it, then Accept</span>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19L19 5M10 5h9v9"/></svg>
+  </div>
+  <main class="text">
+    <div class="word">Simpl.</div>
+    <h1 id="title">Simpl has updated.</h1>
+    <p class="ask" id="ask">Please accept the permissions.</p>
+    <p class="where" id="where">Chrome asks with the puzzle piece at the top right of the window: press it, then Accept. Or press the button below.</p>
+    <p class="never" id="never">Simpl never stores your data. These permissions are for functionality.</p>
+    <button class="btn" id="allow" type="button">Allow Simpl to run</button>
+    <p class="msg" id="msg" aria-live="polite"></p>
+  </main>
+  <script src="updated.js"></script>
+</body>
+</html>

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Simpl Courses",
-  "version": "2.98.14",
+  "version": "2.98.15",
   "description": "Canvas with navigation that actually makes sense and a UI that you can actually use.",
   "author": "Simpl Courses contributors",
   "icons": {

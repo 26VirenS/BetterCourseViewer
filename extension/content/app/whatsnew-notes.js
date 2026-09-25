@@ -25,6 +25,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.98.15', date: '2026-09-25', notes: [
+      { kind: 'improved', title: 'After an update, a tab', body: 'Where to accept Chrome’s permissions, and why they’re asked.', icon: P.pin },
+    ] },
     { version: '2.98.14', date: '2026-09-25', notes: [
       { kind: 'improved', title: 'Chrome asks for less', body: 'The Chrome build no longer asks to read browsing history.', icon: P.toggle },
     ] },

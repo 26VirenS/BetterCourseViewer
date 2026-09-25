@@ -908,11 +908,33 @@ if (typeof importScripts === 'function' && !self.BCV?.devcode) {
     } catch { /* nothing to note it in */ }
   }
 
+  // ---- the page after this update: "Simpl has updated. Please accept the permissions." ---------
+  // Chrome keeps an updated extension running but withholds site access it did not have before,
+  // until the puzzle piece's prompt is accepted (an API permission with a new warning switches it
+  // off instead, and then nothing here can run at all). So the Chrome build's first run after an
+  // update from before 2.98.15 opens one tab that says so, points at the puzzle piece, and offers
+  // the press that asks (setup/updated.html). Once: the version it was shown for is kept. Other
+  // builds (Safari, Firefox, the quiet build) have no run of every site to have withheld.
+  const UPDATED_FOR = '2.98.15';
+  const olderThan = (a, b) => { const x = String(a).split('.').map(Number), y = String(b).split('.').map(Number); for (let i = 0; i < 3; i++) { if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) < (y[i] || 0); } return false; };
+  function updatedPageDue(previous, hostPerms = api.runtime.getManifest().host_permissions || []) {
+    return !!previous && olderThan(previous, UPDATED_FOR) && (hostPerms || []).includes('*://*/*');
+  }
+  async function openUpdated(previous) {
+    if (!updatedPageDue(previous)) return false;
+    try {
+      const r = await api.storage.local.get('updated:shown');
+      if (r['updated:shown'] === UPDATED_FOR) return false;
+      await api.storage.local.set({ 'updated:shown': UPDATED_FOR });
+    } catch { /* shown all the same */ }
+    try { await api.tabs.create({ url: api.runtime.getURL('setup/updated.html'), active: true }); return true; } catch { return false; }
+  }
+
   // ---- lifecycle ----------------------------------------------------------
   api.runtime.onInstalled.addListener(async (details) => {
     await ensureDomains({ force: true });
     if (details.reason === 'install') await offerSetup();
-    if (details.reason === 'update') await afterUpdate(details.previousVersion || null);
+    if (details.reason === 'update') { await afterUpdate(details.previousVersion || null); await openUpdated(details.previousVersion || null); }
     // An update: the first Canvas page after it shows what changed (content/app/whatsnew.js), from
     // the version left behind — the oldest one still unread, when several updates go by unseen.
     if (details.reason === 'update' && details.previousVersion) {
@@ -928,5 +950,5 @@ if (typeof importScripts === 'function' && !self.BCV?.devcode) {
   ensureDomains();
   offerSetup();
   noteVersion();
-  BCV.background = { offerSetup, ensureDomains, app, syncApp, openOptions, afterUpdate, canvasTabs, toolSitePatterns }; // the harness drives these directly
+  BCV.background = { offerSetup, ensureDomains, app, syncApp, openOptions, afterUpdate, canvasTabs, toolSitePatterns, updatedPageDue, openUpdated }; // the harness drives these directly
 })();
