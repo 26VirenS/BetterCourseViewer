@@ -1,10 +1,10 @@
 {
-  "version": "2.98.13",
+  "version": "2.98.14",
   "url": "https://simplcourses.com/download/mac",
-  "download": "https://github.com/26VirenS/BetterCourseViewer/releases/download/v2.98.13/Simpl-Courses-Mac-2.98.13.zip",
-  "sha256": "f62b936cb9841ada97726925bbd7e38d08ff99777f8e2b2c0d6813a863ce19a6",
-  "size": 33736700,
+  "download": "https://github.com/26VirenS/BetterCourseViewer/releases/download/v2.98.14/Simpl-Courses-Mac-2.98.14.zip",
+  "sha256": "eefbc6284ac35c9254ac2f3a59b867377f760e6947613524e146fdc3763a1a99",
+  "size": 33736746,
   "minimumOS": "13.0",
-  "notes": "https://github.com/26VirenS/BetterCourseViewer/releases/tag/v2.98.13",
-  "published": "2026-09-25T17:15:34Z"
+  "notes": "https://github.com/26VirenS/BetterCourseViewer/releases/tag/v2.98.14",
+  "published": "2026-09-25T18:57:27Z"
 }
