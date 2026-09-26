@@ -1,13 +1,22 @@
 {
-  // A Worker with no code: it serves the files in public/ and nothing else. This is what the
-  // dashboard's "Import a repository" flow deploys with `npx wrangler deploy`.
+  // The site as a Worker: the files in public/ served as they are, and /api/* — the one path sent to
+  // the code first — answered by src/worker.js (Report a bug's endpoint, src/report.js). This is what
+  // the dashboard's "Import a repository" flow deploys with `npx wrangler deploy`.
+  //
+  // No bindings on purpose: a binding needs a resource made first, and a deploy that cannot find
+  // one fails whole — the Mac app's update feed with it. Reports go where the REPORT_WEBHOOK secret
+  // points (Settings → Variables and Secrets → Add → Secret); a secret outlives every deploy.
   "name": "simpl-courses",
+  "main": "src/worker.js",
   "compatibility_date": "2026-09-12",
   "assets": {
     "directory": "./public",
-    // /privacy serves privacy.html, so the policy has one clean address to give the stores
+    "binding": "ASSETS",
+    // /privacy serves privacy.html, and /report serves report/index.html, so each has one clean address
     "html_handling": "auto-trailing-slash",
     // anything else gets the 404 page rather than a bare Cloudflare error
-    "not_found_handling": "404-page"
+    "not_found_handling": "404-page",
+    // the code sees /api/* alone; everything else is a file, served without waking it
+    "run_worker_first": ["/api/*"]
   }
 }
