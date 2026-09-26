@@ -25,6 +25,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.98.17', date: '2026-09-26', notes: [
+      { kind: 'fixed', title: 'Handed in, not overdue', body: 'Late work you handed in no longer counts as overdue.', icon: P.check },
+    ] },
     { version: '2.98.16', date: '2026-09-26', notes: [
       { kind: 'fixed', title: 'Updates keep Chrome on', body: 'An update asks Chrome for nothing new, so it stays on.', icon: P.check },
     ] },

@@ -161,12 +161,14 @@ function assignmentGroups(courseId) {
   const defs = GROUPS[courseId] || Object.keys(groupNames(courseId)).map((g) => [g, 0]);
   return defs.map(([name, weight], i) => ({ id: `g${courseId}-${i}`, name, position: i + 1, group_weight: weight, rules: {}, assignments: (A[courseId] || []).filter((r) => r[2] === name).map((r) => assignmentObj(courseId, r)) }));
 }
-// two more past-due assignments in PHYS, for a test (POST /__mock/config {"overdueExtras": true}): one marked
+// three more past-due assignments in PHYS, for a test (POST /__mock/config {"overdueExtras": true}): one marked
 // 20/20 with nothing ever handed in (a tool sent the score back: graded, no submitted_at, Canvas's missing flag
-// still up), one never handed in and locked since — neither is overdue work the student can do anything about
+// still up), one never handed in and locked since, one handed in two days late and still waiting on a grade
+// (submitted, no score, Canvas's late flag) — none is overdue work the student can do anything about
 const OVERDUE_EXTRAS = [
   ['2090', 'Lab 0 tool check', 'Labs', 20, 20, -10, 23.98, null, { tool: 'https://tool.example.com/lab0', noSub: true }],
   ['2091', 'W1 warm-up', 'Homework', 5, null, -12, 23.98, null, { lockAt: -5 }],
+  ['2092', 'Journal 3 draft', 'Homework', 10, null, -3, 23.98, -1, { late: true }],
 ];
 const allAssignments = (courseId) => [...(A[courseId] || []), ...(mockConfig.overdueExtras && courseId === '102' ? OVERDUE_EXTRAS : [])].map((r) => assignmentObj(courseId, r));
 const apiSubmissions = new Map(); // assignment id -> the submission made through the API

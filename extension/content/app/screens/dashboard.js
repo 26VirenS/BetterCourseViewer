@@ -207,12 +207,14 @@
       assignmentsP.then((byCourse) => {
         if (!ctx.alive()) return;
         if (!byCourse || !planner) { overdueCard.remove(); gradedCard.remove(); return; }
-        // Overdue: past due with nothing submitted (Canvas's missing flag, or the due time passed), plus
-        // work handed in late that still has no score. It counts as 0 until it is graded.
+        // Overdue: past due with nothing handed in (Canvas's missing flag, or the due time passed) and
+        // still open to a late hand-in. Work handed in late and awaiting a grade is not overdue: it is
+        // out of the student's hands, and Canvas counts nothing as 0 for it (2.98.17, after a late
+        // hand-in sat on this list as "submitted late · ungraded").
         // Each row has an X: the item is dismissed on Canvas's planner — the same call as the To Do
-        // screen's X, so it leaves that list too and every device agrees. Late work is read from the
-        // course's assignments rather than the planner window, so its dismissal is looked up in the
-        // student's own list of overrides.
+        // screen's X, so it leaves that list too and every device agrees. Older missing work is read
+        // from the course's assignments rather than the planner window, so its dismissal is looked up
+        // in the student's own list of overrides.
         const seen = new Set();
         const overdue = [];
         const plannerByKey = new Map((planner || []).map((it) => [it.id, it]));
@@ -231,35 +233,31 @@
           const a = aByKey.get(key);
           if (a && (scored(a.submission) || closed(a))) continue;
           seen.add(key);
-          overdue.push({ key, late: false, item: it, title: it.title, meta: [it.kind, it.points !== null ? `${store.fmtPts(it.points)} pts` : null, `due ${U.fmtShort(it.date)}`, 'not submitted'].filter(Boolean).join(' · '), course: it.course?.shortName || it.courseName || '—', color: palOf(it.course).text, tint: palOf(it.course).tint, url: it.url, date: it.date });
+          overdue.push({ key, item: it, title: it.title, meta: [it.kind, it.points !== null ? `${store.fmtPts(it.points)} pts` : null, `due ${U.fmtShort(it.date)}`, 'not submitted'].filter(Boolean).join(' · '), course: it.course?.shortName || it.courseName || '—', color: palOf(it.course).text, tint: palOf(it.course).tint, url: it.url, date: it.date });
         }
         for (const { c, list } of byCourse) {
           for (const a of list || []) {
             const s = a.submission;
-            if (!s || s.excused || scored(s)) continue;
-            // handed in late and not yet marked — or never handed in at all and past due (Canvas's own
-            // "missing"), which the planner's week-long window no longer holds once it is older than that
-            const lateOpen = s.late && s.submitted_at && (s.score === null || s.score === undefined);
-            const missing = !s.submitted_at && (s.missing || (a.due_at && U.parse(a.due_at) < now)) && (a.submission_types || []).some((t) => !['none', 'on_paper', 'not_graded'].includes(t)) && !closed(a);
-            if (!lateOpen && !missing) continue;
+            if (!s || s.excused || scored(s) || s.submitted_at) continue; // (handed in, late or not: waiting on a grade, not overdue)
+            // never handed in and past due (Canvas's own "missing"), which the planner's window no
+            // longer holds once it is older than that
+            const missing = (s.missing || (a.due_at && U.parse(a.due_at) < now)) && (a.submission_types || []).some((t) => !['none', 'on_paper', 'not_graded'].includes(t)) && !closed(a);
+            if (!missing) continue;
             const key = keyOf(a);
             if (seen.has(key) || seen.has(`assignment:${a.id}`)) continue;
             seen.add(key);
             seen.add(`assignment:${a.id}`);
             if (dismissedKeys.has(key) || dismissedKeys.has(`assignment:${a.id}`) || plannerByKey.get(key)?.dismissed) continue;
             const item = plannerByKey.get(key) || { type: key.split(':')[0], raw: { plannable_id: key.split(':')[1], planner_override: overrideByKey.get(key) || overrideByKey.get(`assignment:${a.id}`) || null } };
-            overdue.push({ key, late: lateOpen, item, title: a.name, meta: [kindOf(a), a.points_possible !== null && a.points_possible !== undefined ? `${store.fmtPts(a.points_possible)} pts` : null, a.due_at ? `due ${U.fmtShort(a.due_at)}` : null, lateOpen ? 'submitted late · ungraded' : 'not submitted'].filter(Boolean).join(' · '), course: c.shortName || c.name, color: c.palette.text, tint: c.palette.tint, url: a.html_url || `${c.url}/assignments/${a.id}`, date: U.parse(a.due_at) || now });
+            overdue.push({ key, item, title: a.name, meta: [kindOf(a), a.points_possible !== null && a.points_possible !== undefined ? `${store.fmtPts(a.points_possible)} pts` : null, a.due_at ? `due ${U.fmtShort(a.due_at)}` : null, 'not submitted'].filter(Boolean).join(' · '), course: c.shortName || c.name, color: c.palette.text, tint: c.palette.tint, url: a.html_url || `${c.url}/assignments/${a.id}`, date: U.parse(a.due_at) || now });
           }
         }
         overdue.sort(byDate);
         const paintOverdue = () => {
-          const lateN = overdue.filter((o) => o.late).length;
-          const missingN = overdue.length - lateN;
-          const parts = [missingN ? U.plural(missingN, 'not submitted', 'not submitted') : null, lateN ? `${lateN} late, still open` : null].filter(Boolean);
-          if (overdueCard.isConnected) land(overdueCard, overdue.length, overdue.length ? parts.join(' · ') : 'Nothing overdue', 6.9);
+          if (overdueCard.isConnected) land(overdueCard, overdue.length, overdue.length ? U.plural(overdue.length, 'not submitted', 'not submitted') : 'Nothing overdue', 6.9);
           Object.assign(overdueSheet, {
             value: String(overdue.length), items: overdue, empty: 'Nothing is overdue.',
-            note: overdue.length ? `${lateN ? 'Still accepting late work · ' : ''}counts as 0 until graded` : 'Nothing past its due date without a submission',
+            note: overdue.length ? 'Past due with nothing handed in' : 'Nothing past its due date without a submission',
           });
         };
         const clearOverdue = async (o) => {

@@ -344,12 +344,12 @@ try {
   check(statLabel.size >= 13 && statLabel.tt === 'none', `a card is named in sentence case at a readable size, not a small capital label: ${JSON.stringify(statLabel)}`);
   check((await page.$eval('.bcv-stats', (e) => getComputedStyle(e).gridTemplateColumns.split(' ').length)) === 3 && (await page.$$eval('.bcv-stat', (els) => els.map((e) => Math.round(e.getBoundingClientRect().top)))).filter((t, i, a) => a.indexOf(t) === i).length === 2, 'a fixed 2×3 grid: three columns, two rows');
   await waitText('.bcv-stats > :nth-child(3) .bcv-stat__value', /^3$/);
-  // Overdue: past due with nothing in (Canvas's missing flag) plus late work still without a score; the number matches its sheet
-  check(/^Overdue\s*1\s*1 not submitted$/i.test(stats[3]), `Overdue counts work past its due date with nothing in (late work already scored is not overdue): ${stats[3]}`);
+  // Overdue: past due with nothing handed in (Canvas's missing flag); work handed in late, scored or still waiting on a grade, is not overdue; the number matches its sheet
+  check(/^Overdue\s*1\s*1 not submitted$/i.test(stats[3]), `Overdue counts work past its due date with nothing handed in (late work, scored or awaiting a grade, is not overdue): ${stats[3]}`);
   await page.click('.bcv-stats .bcv-stat:nth-child(4)');
   await page.waitForSelector('.bcv-sheet', { timeout: 5000 });
   const overdueRows = await texts('.bcv-sheet__row');
-  check((await texts('.bcv-sheet__line'))[0] === '1 Overdue' && /counts as 0 until graded$/.test((await texts('.bcv-sheet__note'))[0]) && overdueRows.length === 1 && /^W2 HW Assignment · 15 pts · due \w+ \d+ · not submitted F26-PHYS 008 01$/.test(overdueRows[0]), `the Overdue sheet lists exactly what it counted: ${overdueRows.join(' | ')}`);
+  check((await texts('.bcv-sheet__line'))[0] === '1 Overdue' && /^Past due with nothing handed in$/.test((await texts('.bcv-sheet__note'))[0]) && overdueRows.length === 1 && /^W2 HW Assignment · 15 pts · due \w+ \d+ · not submitted F26-PHYS 008 01$/.test(overdueRows[0]), `the Overdue sheet lists exactly what it counted: ${overdueRows.join(' | ')}`);
   // an X beside each row clears it, one at a time: dismissed on Canvas's planner, the row goes, the counts follow
   const xInfo = await page.$$eval('.bcv-sheet__item .bcv-sheet__x', (els) => els.map((e) => ({ tag: e.tagName, label: e.getAttribute('aria-label'), title: e.title })));
   check(xInfo.length === 1 && xInfo[0].label === 'Clear: W2 HW' && xInfo[0].title === 'Clear', `each overdue row has an X to clear it: ${JSON.stringify(xInfo)}`);
@@ -374,21 +374,22 @@ try {
   await waitText('.bcv-stats > :nth-child(4) .bcv-stat__value', /^1$/);
   check(/^Overdue\s*1\s*1 not submitted$/i.test((await texts('.bcv-stat'))[3]), `restored on Canvas, it counts again: ${(await texts('.bcv-stat'))[3]}`);
   // marked work with nothing ever handed in (a tool's score sent back, a teacher's entry: graded, no submitted_at, Canvas's
-  // missing flag still up) is not overdue, and past-due work locked since is left off: neither can be done anything about
-  // (the page's own client, in its world: the caches live in storage.local and outlast a reload)
+  // missing flag still up) is not overdue, past-due work locked since is left off, and work handed in late that is still
+  // waiting on a grade is not overdue either (2.98.17: a real late hand-in sat on the list as "submitted late · ungraded"):
+  // none can be done anything about (the page's own client, in its world: the caches live in storage.local and outlast a reload)
   const dropCaches = () => sw.evaluate(async (base) => { const [tab] = await chrome.tabs.query({ url: `${base}/*` }); await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'ISOLATED', func: async () => { await self.BCV.canvas.invalidatePrefix('assignments:'); await self.BCV.canvas.invalidatePrefix('planner:'); } }); }, BASE);
   await mockConfig({ overdueExtras: true });
   await dropCaches();
   await page.goto(`${BASE}/`);
   await page.waitForSelector('.bcv-stat', { timeout: 20000 });
   await page.waitForFunction(() => { const els = [...document.querySelectorAll('.bcv-stat__value')]; return els.length === 6 && els.every((e) => /^\d+$/.test(e.textContent) && !e.dataset.rolling); }, null, { timeout: 15000 });
-  const extraPhys = await sw.evaluate(async (base) => { const [tab] = await chrome.tabs.query({ url: `${base}/*` }); const [r] = await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'ISOLATED', func: async () => (await self.BCV.store.assignments('102')).filter((a) => ['2090', '2091'].includes(String(a.id))).map((a) => ({ id: a.id, graded: a.submission?.workflow_state, sub: a.submission?.submitted_at, missing: a.submission?.missing, locked: a.locked_for_user })) }); return r?.result; }, BASE);
-  check(extraPhys.length === 2 && extraPhys[0].graded === 'graded' && extraPhys[0].sub === null && extraPhys[0].missing === true && extraPhys[1].locked === true, `two more past-due assignments in PHYS, as Canvas reports them — one marked 20/20 with no submission and the missing flag up, one locked: ${JSON.stringify(extraPhys)}`);
-  check(/^Overdue\s*1\s*1 not submitted$/i.test((await texts('.bcv-stat'))[3]), `neither counts as overdue: ${(await texts('.bcv-stat'))[3]}`);
+  const extraPhys = await sw.evaluate(async (base) => { const [tab] = await chrome.tabs.query({ url: `${base}/*` }); const [r] = await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'ISOLATED', func: async () => (await self.BCV.store.assignments('102')).filter((a) => ['2090', '2091', '2092'].includes(String(a.id))).sort((a, b) => String(a.id).localeCompare(String(b.id))).map((a) => ({ id: a.id, state: a.submission?.workflow_state, sub: a.submission?.submitted_at, score: a.submission?.score, late: a.submission?.late, missing: a.submission?.missing, locked: a.locked_for_user })) }); return r?.result; }, BASE);
+  check(extraPhys.length === 3 && extraPhys[0].state === 'graded' && extraPhys[0].sub === null && extraPhys[0].missing === true && extraPhys[1].locked === true && extraPhys[2].state === 'submitted' && !!extraPhys[2].sub && extraPhys[2].score === null && extraPhys[2].late === true && extraPhys[2].missing === false, `three more past-due assignments in PHYS, as Canvas reports them — one marked 20/20 with no submission and the missing flag up, one locked, one handed in late and still waiting on a grade: ${JSON.stringify(extraPhys)}`);
+  check(/^Overdue\s*1\s*1 not submitted$/i.test((await texts('.bcv-stat'))[3]), `none of the three counts as overdue: ${(await texts('.bcv-stat'))[3]}`);
   await page.click('.bcv-stats .bcv-stat:nth-child(4)');
   await page.waitForSelector('.bcv-sheet', { timeout: 5000 });
   const extraRows = await texts('.bcv-sheet__row');
-  check(extraRows.length === 1 && /^W2 HW /.test(extraRows[0]), `and the sheet leaves both off: ${extraRows.join(' | ')}`);
+  check(extraRows.length === 1 && /^W2 HW /.test(extraRows[0]) && !extraRows.some((r) => /Journal 3 draft|submitted late/.test(r)), `and the sheet leaves all three off — the late hand-in is not "submitted late · ungraded" on it: ${extraRows.join(' | ')}`);
   // the X on an item that has an override already (the one undone above): Canvas keeps one per item and refuses a second, so the one it has is changed — the row clears, no "Couldn't clear that"
   await page.click('.bcv-sheet__item .bcv-sheet__x');
   check(await eventually(async () => (await page.$$('.bcv-sheet__row')).length === 0 && (await texts('.bcv-sheet__line'))[0] === '0 Overdue'), 'cleared again after being put back: the override it already had is changed rather than a second one written');
