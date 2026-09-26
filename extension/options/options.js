@@ -195,7 +195,7 @@
   const onSeg = (el, fn) => el.addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) fn(b.dataset.value); });
 
   // ---- General --------------------------------------------------------------------------------------
-  onSwitch($('skin'), (on) => save({ appearance: { skin: on } }));
+  onSwitch($('skin'), (on) => save(S.lookPatch(on))); // (off here is until turned on again)
   onSwitch($('awayRefresh'), (on) => save({ appearance: { awayRefresh: on } })); // (off by a hold on the pill; this is the way back on)
   const openOnCanvas = async (param) => {
     const msg = $('generalMsg');
@@ -205,7 +205,7 @@
       if (!inApp) await api.tabs.create({ url: api.runtime.getURL('setup/setup.html') }).catch(() => {});
       return;
     }
-    if (settings.appearance.skin === false) await save({ appearance: { skin: true } });
+    if (!S.lookOn(settings)) await save(S.lookPatch(true));
     try {
       await api.tabs.create({ url: `${site.origin}/?bcv=${param}` });
     } catch {
@@ -734,7 +734,7 @@
 
   // ---- paint everything from the settings ----------------------------------------------------------
   function paintAll() {
-    setSwitch($('skin'), settings.appearance.skin !== false);
+    setSwitch($('skin'), S.lookOn(settings));
     setSwitch($('awayRefresh'), settings.appearance.awayRefresh !== false);
     for (const [id, path] of TEXT) { const el = $(id); if (document.activeElement !== el) el.value = getPath(settings, path) ?? ''; }
     [...$('themes').querySelectorAll('.theme')].forEach((b) => b.classList.toggle('is-on', b.dataset.value === (settings.appearance.darkMode || 'system')));

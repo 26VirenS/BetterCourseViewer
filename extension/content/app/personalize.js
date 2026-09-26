@@ -272,10 +272,21 @@
   }
 
   // ---- the Dashboard preview ---------------------------------------------------------------------
-  /** A picture's ink, if it is drawn yet; not yet, it is drawn now and the preview redrawn when it lands. */
+  /** A picture's ink, if it is drawn yet; not yet, it is drawn now and the preview redrawn when it lands —
+   *  once: a picture already being waited for is not waited for again by every redraw (each wait was a
+   *  redraw of its own when the ink landed, and each of those redraws waited again: the redraws doubled
+   *  with every ink), and inks landing together are one redraw. */
+  const waiting = new Set();
+  let redraw = null;
   const inkOf = (pic) => {
     const ink = T().inkCached(pic);
-    if (!ink) T().inkFor(pic).then(() => { if (st && ui) render('still'); }).catch(() => {});
+    if (!ink && !waiting.has(pic)) {
+      waiting.add(pic);
+      T().inkFor(pic).then(() => {
+        waiting.delete(pic);
+        redraw ||= setTimeout(() => { redraw = null; if (st && ui) render('still'); }, 0);
+      }).catch(() => waiting.delete(pic));
+    }
     return ink;
   };
   /** A photo's layers: the paper in the complement, the ink in the colour (its mask), the blurred ink under the fade, the veil — or the plain picture while its ink is drawn. */

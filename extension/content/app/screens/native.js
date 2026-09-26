@@ -59,7 +59,7 @@
       h('span', { class: 'bcv-ml-auto' }),
       lightButton(ctx),
       // the same move as the switch at the top right: saved, or this page only (the popup's Persistent switch decides)
-      U.btn('Open in stock Canvas', { icon: IC.external, kind: 'xs', cls: 'bcv-native__stock', onClick: async () => (BCV.early?.flipLook ? BCV.early.flipLook(false) : BCV.settings.update({ appearance: { skin: false } })) }),
+      U.btn('Open in stock Canvas', { icon: IC.external, kind: 'xs', cls: 'bcv-native__stock', onClick: async () => (BCV.early?.flipLook ? BCV.early.flipLook(false) : BCV.settings.update(BCV.settings.lookPatch(false))) }),
     ]);
     const hole = U.el('bcv-native__hole', hasContent ? null : U.emptyCard('Canvas did not render anything for this page.'));
     if (hasContent) app.punchIn(hole);

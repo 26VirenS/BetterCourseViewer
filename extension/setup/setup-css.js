@@ -674,7 +674,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
 .pz__note { flex: 1; text-align: center; font: 400 12px/1.3 var(--font); color: var(--pz-ink3); }
 .pz__next { min-width: 120px; height: 42px; padding: 0 22px; border: 0; border-radius: 21px; background: var(--A-btn); color: #fff; cursor: pointer; font: 600 14px/1 var(--font); transition: background .3s ease; animation: omRise .4s var(--ease) both; }
 /* a still render (a swatch, a tab, the picker) redraws without the entry; a photo render fades the photo in alone */
-.pz.is-still .pz__head, .pz.is-still .pz__colour, .pz.is-still .pz__courses, .pz.is-still .pz__hcontrols, .pz.is-still .pz__next, .pz.is-still .pz__hcard, .pz.is-still .pz__badge, .pz.is-still .pz__pic--sharp, .pz__bar2.is-kept { animation: none; }
+.pz.is-still .pz__head, .pz.is-still .pz__colour, .pz.is-still .pz__ready, .pz.is-still .pz__courses, .pz.is-still .pz__hcontrols, .pz.is-still .pz__next, .pz.is-still .pz__hcard, .pz.is-still .pz__badge, .pz.is-still .pz__pic--sharp, .pz__bar2.is-kept { animation: none; }
 .pz.is-still.is-photo .pz__pic--sharp { animation: omFade .35s ease both; }
 .pz__done { align-self: center; width: 100%; max-width: 400px; padding: 80px 0 40px; display: flex; flex-direction: column; align-items: center; text-align: center; animation: omRise .4s var(--ease) both; }
 .pz__donemark { width: 56px; height: 56px; border-radius: 28px; background: var(--A-btn); display: flex; align-items: center; justify-content: center; }

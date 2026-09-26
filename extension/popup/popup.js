@@ -34,7 +34,7 @@
 
   let settings = await S.get();
   const bind = () => {
-    $('skin').checked = settings.appearance.skin !== false;
+    $('skin').checked = S.lookOn(settings); // (a turn-off for a while whose time has come reads as on)
     $('darkMode').value = settings.appearance.darkMode;
   };
   bind();
@@ -45,7 +45,7 @@
   const push = () => api.runtime.sendMessage({ type: 'pushSettings' }).catch(() => {});
   const saveAppearance = async (patch) => { await S.update(patch); await push(); };
   // the saved look, for every page: off here is the lock on the switch at the top right of a page
-  $('skin').addEventListener('change', (e) => saveAppearance({ appearance: { skin: e.target.checked } }));
+  $('skin').addEventListener('change', (e) => saveAppearance(S.lookPatch(e.target.checked))); // (off here is until turned on again)
   $('darkMode').addEventListener('change', (e) => saveAppearance({ appearance: { darkMode: e.target.value } }));
   S.onChange((s) => {
     settings = s;
@@ -153,7 +153,7 @@
     if (!(await askSite(msg, 'setup'))) return;
     if (!(await canvasHere(msg))) return;
     msg.textContent = 'Opening the setup…';
-    await S.update({ appearance: { skin: true } });
+    await S.update(S.lookPatch(true));
     try {
       await api.tabs.update(tab.id, { url: `${origin}/?bcv=setup` });
     } catch {

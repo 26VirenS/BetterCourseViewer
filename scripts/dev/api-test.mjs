@@ -395,6 +395,16 @@ const loadSettings = (init) => { const s = {}; const c = fakeStore(init); new Fu
 { const { S, c } = loadSettings({ version: 2, appearance: { awayRefresh: true, darkMode: 'on' }, domains: ['https://canvas.test'] }); const got = await S.get(); check(got.appearance.awayRefresh === false && got.appearance.darkMode === 'on' && got.domains.join() === 'https://canvas.test' && c.read().version === 3 && c.read().appearance.awayRefresh === false, `settings written before 2.98.13 (version 2, Away Refresh on) come up with it off, once, written back as version 3, the rest kept: ${JSON.stringify(c.read())}`); }
 { const { S, c } = loadSettings({ version: 3, appearance: { awayRefresh: true } }); check((await S.get()).appearance.awayRefresh === true && c.read().appearance.awayRefresh === true, 'turned on since (version 3), it stays on'); }
 { const { S, c } = loadSettings({ appearance: { awayRefresh: true } }); check((await S.get()).appearance.awayRefresh === false && c.read().version === 3, 'a record with no version at all counts as before: off once, and versioned'); }
+// the switch's red list (2.98.18): off for a while is saved as the time it ends; on is read through lookOn, written through lookPatch
+{
+  const { S } = loadSettings({});
+  const now = 1_000_000;
+  check(S.DEFAULTS.appearance.offUntil === 0 && S.lookOn({}, now) && S.lookOn({ appearance: { skin: true } }, now) && !S.lookOn({ appearance: { skin: false, offUntil: 0 } }, now) && !S.lookOn({ appearance: { skin: false, offUntil: now + 1 } }, now) && S.lookOn({ appearance: { skin: false, offUntil: now } }, now) && S.lookOn({ appearance: { skin: true, offUntil: now + 5 } }, now), 'on unless turned off; off indefinitely stays off; off for a while is over the moment its time comes (nothing has to write that back)');
+  check(JSON.stringify(S.lookPatch(true, 123)) === '{"appearance":{"skin":true,"offUntil":0}}' && JSON.stringify(S.lookPatch(false)) === '{"appearance":{"skin":false,"offUntil":0}}' && JSON.stringify(S.lookPatch(false, 5000)) === '{"appearance":{"skin":false,"offUntil":5000}}' && JSON.stringify(S.lookPatch(false, -3)) === '{"appearance":{"skin":false,"offUntil":0}}', 'the patch that saves the look: on clears any end, so an old one can never turn Simpl on later; off carries its end, or none for indefinitely');
+  const saved = await S.update(S.lookPatch(false, now + 60000));
+  const back = await S.update(S.lookPatch(true));
+  check(saved.appearance.skin === false && saved.appearance.offUntil === now + 60000 && back.appearance.skin === true && back.appearance.offUntil === 0, 'written through the store: off with its end, then on with the end cleared');
+}
 
 console.log(fails ? `\n${fails} check(s) failed` : '\nAll checks passed.');
 process.exit(fails ? 1 : 0);

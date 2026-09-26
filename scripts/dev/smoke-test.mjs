@@ -238,18 +238,25 @@ try {
   const barInfo = await page.evaluate(() => { const bar = document.getElementById('bcv-bar'); const r = bar?.getBoundingClientRect(); const look = document.getElementById('bcv-look')?.getBoundingClientRect(); const side = document.querySelector('.bcv-side')?.getBoundingClientRect(); return { shown: !!bar && getComputedStyle(bar).display !== 'none', top: r ? Math.round(r.top) : null, left: r ? Math.round(r.left) : null, h: r ? Math.round(r.height) : null, w: r ? Math.round(r.width) : null, pad: getComputedStyle(document.getElementById('bcv-main')).paddingTop, appPad: getComputedStyle(document.getElementById('bcv-app')).paddingTop, lookIn: !!look && look.top >= 0 && look.bottom <= (r?.height || 0), sideTop: side ? Math.round(side.top) : null, sideRight: side ? Math.round(side.right) : null, sideH: side ? Math.round(side.height) : null, vh: window.innerHeight, headTop: getComputedStyle(document.querySelector('.bcv-head')).top }; });
   check(barInfo.shown && barInfo.top === 0 && barInfo.h === 44 && barInfo.left === barInfo.sideRight && barInfo.w === 1400 - barInfo.sideRight && barInfo.pad === '44px' && barInfo.appPad === '0px' && barInfo.lookIn && barInfo.sideTop === 0 && barInfo.sideH === barInfo.vh && barInfo.headTop === '44px', `the widgets have a bar of their own beside the sidebar, over the page alone: the sidebar runs from the very top, the page starts under the bar: ${JSON.stringify(barInfo)}`);
   check(!(await visible('#application')), 'stock Canvas hidden');
-  const lookBtn = await page.$eval('#bcv-look', (e) => { const r = e.getBoundingClientRect(); const m = e.querySelector('.bcv-look__main'); const mk = m.querySelector('.bcv-look__mark'); const opts = [...e.querySelectorAll('.bcv-look__opt')]; return { fixed: getComputedStyle(e).position === 'fixed', top: Math.round(r.top), right: Math.round(window.innerWidth - r.right), w: Math.round(r.width), h: Math.round(r.height), disc: `${Math.round(m.getBoundingClientRect().width)}x${Math.round(m.getBoundingClientRect().height)}`, radius: getComputedStyle(m).borderRadius, role: m.getAttribute('role'), pos: m.getAttribute('aria-valuenow'), markImg: getComputedStyle(mk).backgroundImage.startsWith('linear-gradient'), text: m.querySelector('.bcv-look__text').textContent.trim(), textShown: m.querySelector('.bcv-look__text').getBoundingClientRect().width, menu: getComputedStyle(e.querySelector('.bcv-look__menu')).visibility, opts: opts.map((b) => `${b.dataset.pos}:${b.querySelector('.bcv-look__optlbl').textContent}:${getComputedStyle(b).opacity}:${b.classList.contains('is-selected')}`).join(' '), colors: opts.map((b) => getComputedStyle(b).backgroundColor).join(' ') }; }).catch(() => null);
-  check(!!lookBtn && lookBtn.fixed && lookBtn.top < 40 && lookBtn.right < 24 && lookBtn.w === 24 && lookBtn.h === 24 && lookBtn.disc === '24x24' && lookBtn.radius === '12px' && lookBtn.role === 'slider' && lookBtn.pos === '1' && lookBtn.markImg && lookBtn.text === 'Active' && lookBtn.textShown === 0 && lookBtn.menu === 'hidden' && lookBtn.opts === '1:Active:0:true 0:Deactivate:0:false -1:Turn off Simpl:0:false' && lookBtn.colors === 'rgb(52, 199, 89) rgb(142, 142, 147) rgb(255, 69, 58)', `the switch sits at the top right, folded to a disc with the mark; its three buttons — green Activate (the state, so it reads Active), grey Deactivate, red Turn off Simpl — folded away out of sight: ${JSON.stringify(lookBtn)}`);
-  // under the pointer the three buttons float down under the disc, one under the other; the one hovered opens out to the left with its words
+  const lookBtn = await page.$eval('#bcv-look', (e) => { const r = e.getBoundingClientRect(); const m = e.querySelector('.bcv-look__main'); const mk = m.querySelector('.bcv-look__mark'); const opts = [...e.querySelectorAll('.bcv-look__opt')]; const lbl = (b) => (b.querySelector('.bcv-look__offhead .bcv-look__optlbl') || b.querySelector('.bcv-look__optlbl')).textContent; const colour = (b) => { const cs = getComputedStyle(b); return cs.backgroundImage !== 'none' ? (cs.backgroundImage.match(/rgb\([^)]+\)/) || [''])[0] : cs.backgroundColor; }; return { fixed: getComputedStyle(e).position === 'fixed', top: Math.round(r.top), right: Math.round(window.innerWidth - r.right), w: Math.round(r.width), h: Math.round(r.height), disc: `${Math.round(m.getBoundingClientRect().width)}x${Math.round(m.getBoundingClientRect().height)}`, radius: getComputedStyle(m).borderRadius, popup: m.getAttribute('aria-haspopup'), label: m.getAttribute('aria-label'), pos: e.dataset.pos, markImg: getComputedStyle(mk).backgroundImage.startsWith('linear-gradient'), text: m.querySelector('.bcv-look__text').textContent.trim(), textShown: m.querySelector('.bcv-look__text').getBoundingClientRect().width, menu: getComputedStyle(e.querySelector('.bcv-look__menu')).visibility, opts: opts.map((b) => `${b.dataset.pos}:${lbl(b)}:${getComputedStyle(b).opacity}:${b.classList.contains('is-selected')}`).join(' '), colors: opts.map(colour).join(' '), fors: [...e.querySelectorAll('.bcv-look__forbtn')].map((b) => b.textContent).join(' | ') }; }).catch(() => null);
+  check(!!lookBtn && lookBtn.fixed && lookBtn.top < 40 && lookBtn.right < 24 && lookBtn.w === 24 && lookBtn.h === 24 && lookBtn.disc === '24x24' && lookBtn.radius === '12px' && lookBtn.popup === 'true' && lookBtn.label === 'Simpl Courses switch: Active' && lookBtn.pos === '1' && lookBtn.markImg && lookBtn.text === 'Active' && lookBtn.textShown === 0 && lookBtn.menu === 'hidden' && lookBtn.opts === '1:Active:0:true -1:Turn off Simpl:0:false' && lookBtn.colors === 'rgb(52, 199, 89) rgb(255, 69, 58)' && lookBtn.fors === 'This page only | For 30 minutes | For 1 hour | For 4 hours | For 1 day | Indefinitely', `the switch sits at the top right, folded to a disc with the mark; its two buttons — green (the state, so it reads Active) and red Turn off Simpl, with how long folded inside it — out of sight: ${JSON.stringify(lookBtn)}`);
+  // under the pointer the two buttons float down under the disc, one under the other; the one hovered opens out to the left with its words
   await page.hover('#bcv-look');
-  const menuOpen = await eventually(() => page.$eval('#bcv-look', (e) => { const m = e.querySelector('.bcv-look__menu'); const opts = [...e.querySelectorAll('.bcv-look__opt')]; const d = e.querySelector('.bcv-look__main').getBoundingClientRect(); return getComputedStyle(m).visibility === 'visible' && opts.length === 3 && opts.every((b) => getComputedStyle(b).opacity === '1' && Math.round(b.getBoundingClientRect().width) === 24 && Math.abs(b.getBoundingClientRect().right - d.right) < 2 && b.querySelector('.bcv-look__optlbl').getBoundingClientRect().width === 0) && opts.every((b, i) => i === 0 || b.getBoundingClientRect().top > opts[i - 1].getBoundingClientRect().bottom) && opts[0].getBoundingClientRect().top > d.bottom; }));
-  check(menuOpen, 'hovering the disc floats the three buttons down under it, one under the other on its right edge, each a round disc with its words folded');
-  await page.hover('#bcv-look .bcv-look__opt--off');
-  const optOpen = await eventually(() => page.$eval('#bcv-look .bcv-look__opt--off', (b) => { const r = b.getBoundingClientRect(); const l = b.querySelector('.bcv-look__optlbl'); const d = document.querySelector('#bcv-look .bcv-look__main').getBoundingClientRect(); return r.width > 90 && l.getBoundingClientRect().width > 50 && Math.abs(r.right - d.right) < 2 && getComputedStyle(l).opacity === '1' && Math.round(r.height) === 24; }));
-  check(optOpen && (await texts('#bcv-look .bcv-look__opt--off'))[0] === 'Turn off Simpl' && (await page.$eval('#bcv-look .bcv-look__opt--on', (b) => Math.round(b.getBoundingClientRect().width))) === 24, 'hovering a button opens it out to the left with its words — Turn off Simpl — its right end staying put, the others still round');
+  const menuOpen = await eventually(() => page.$eval('#bcv-look', (e) => { const m = e.querySelector('.bcv-look__menu'); const opts = [...e.querySelectorAll('.bcv-look__opt')]; const d = e.querySelector('.bcv-look__main').getBoundingClientRect(); return getComputedStyle(m).visibility === 'visible' && opts.length === 2 && opts.every((b) => getComputedStyle(b).opacity === '1' && Math.round(b.getBoundingClientRect().width) === 24 && Math.round(b.getBoundingClientRect().height) === 24 && Math.abs(b.getBoundingClientRect().right - d.right) < 2 && b.querySelector('.bcv-look__optlbl').getBoundingClientRect().width === 0) && opts[1].getBoundingClientRect().top > opts[0].getBoundingClientRect().bottom && opts[0].getBoundingClientRect().top > d.bottom; }));
+  check(menuOpen, 'hovering the disc floats the two buttons down under it, green over red, on its right edge, each a round disc with its words folded');
+  await page.hover('#bcv-look .bcv-look__offhead');
+  const optOpen = await eventually(() => page.$eval('#bcv-look .bcv-look__opt--off', (b) => { const r = b.getBoundingClientRect(); const l = b.querySelector('.bcv-look__offhead .bcv-look__optlbl'); const d = document.querySelector('#bcv-look .bcv-look__main').getBoundingClientRect(); return r.width > 90 && l.getBoundingClientRect().width > 50 && Math.abs(r.right - d.right) < 2 && getComputedStyle(l).opacity === '1' && Math.round(r.height) === 24; }));
+  check(optOpen && (await texts('#bcv-look .bcv-look__offhead'))[0] === 'Turn off Simpl' && (await page.$eval('#bcv-look .bcv-look__opt--on', (b) => Math.round(b.getBoundingClientRect().width))) === 24, 'hovering red opens it out to the left with its words — Turn off Simpl — its right end staying put, green still round');
+  // pressed, red grows down into how long, on the island's spring: the six rows come in one after the other; nothing is turned off yet
+  await page.click('#bcv-look .bcv-look__offhead');
+  const growing = await page.$eval('#bcv-look .bcv-look__opt--off', (b) => Math.round(b.getBoundingClientRect().height));
+  const listOpen = await eventually(() => page.$eval('#bcv-look', (e) => { const b = e.querySelector('.bcv-look__opt--off'); const r = b.getBoundingClientRect(); const rows = [...b.querySelectorAll('.bcv-look__forbtn')]; const d = e.querySelector('.bcv-look__main').getBoundingClientRect(); return e.classList.contains('is-expanded') && Math.round(r.height) === 212 && Math.round(r.width) === 164 && Math.abs(r.right - d.right) < 2 && rows.length === 6 && rows.every((x, i) => getComputedStyle(x).opacity === '1' && (i === 0 || x.getBoundingClientRect().top > rows[i - 1].getBoundingClientRect().top)) && b.querySelector('.bcv-look__offhead').getAttribute('aria-expanded') === 'true'; }), 3000);
+  check(growing < 212 && listOpen && (await visible('#bcv-app')) && (await page.$eval('#bcv-look', (e) => e.dataset.pos)) === '1', `pressed, red grows (${growing}px on its way) into its list — six rows, one under the other — and nothing is turned off yet`);
+  await page.hover('#bcv-look .bcv-look__forbtn[data-for="1h"]');
+  await page.waitForTimeout(250);
   await shot(page, '01d-look-switch-open');
   await page.mouse.move(700, 500);
-  check(await eventually(() => page.$eval('#bcv-look', (e) => { const r = e.getBoundingClientRect(); return Math.round(r.width) === 24 && Math.round(r.height) === 24 && getComputedStyle(e.querySelector('.bcv-look__menu')).visibility === 'hidden' && getComputedStyle(e.querySelector('.bcv-look__opt')).opacity === '0'; })), 'it folds back to the disc alone when the pointer leaves');
+  check(await eventually(() => page.$eval('#bcv-look', (e) => { const r = e.getBoundingClientRect(); return !e.classList.contains('is-expanded') && Math.round(r.width) === 24 && Math.round(r.height) === 24 && getComputedStyle(e.querySelector('.bcv-look__menu')).visibility === 'hidden' && getComputedStyle(e.querySelector('.bcv-look__opt')).opacity === '0'; })), 'it folds back to the disc alone when the pointer leaves, the list folded into red');
   await page.waitForSelector('.bcv-nav__item', { timeout: 10000 });
   const brand = await page.evaluate(() => {
     const img = document.querySelector('.bcv-brand__logo img');
@@ -3406,70 +3413,97 @@ try {
 
   // ---- the look off and on: the three-stop switch at the top right, "Open in stock Canvas", the lock ----
   console.log('the look off and on');
-  const lookSaved = async () => (await sw.evaluate(async () => (await self.BCV.settings.get()).appearance)).skin !== false;
-  const lookAt = () => page.$eval('#bcv-look', (e) => { const m = e.querySelector('.bcv-look__main'); const sel = e.querySelector('.bcv-look__opt.is-selected'); return { pos: m.getAttribute('aria-valuenow'), text: m.querySelector('.bcv-look__text').textContent, mark: getComputedStyle(m.querySelector('.bcv-look__mark')).backgroundImage, selected: sel ? `${sel.dataset.pos}:${sel.querySelector('.bcv-look__optlbl').textContent}` : null, words: [...e.querySelectorAll('.bcv-look__optlbl')].map((l) => l.textContent).join(' | ') }; }).catch(() => null);
+  const lookSaved = () => sw.evaluate(async () => self.BCV.settings.lookOn(await self.BCV.settings.get())); // (on by the saved settings: a turn-off for a while whose time has come counts as on)
+  const lookAt = () => page.$eval('#bcv-look', (e) => { const m = e.querySelector('.bcv-look__main'); const sel = e.querySelector('.bcv-look__opt.is-selected'); const lbl = (b) => (b.querySelector('.bcv-look__offhead .bcv-look__optlbl') || b.querySelector('.bcv-look__optlbl')).textContent; return { pos: e.dataset.pos, text: m.querySelector('.bcv-look__text').textContent, mark: getComputedStyle(m.querySelector('.bcv-look__mark')).backgroundImage, selected: sel ? `${sel.dataset.pos}:${lbl(sel)}` : null, words: [...e.querySelectorAll('.bcv-look__opt')].map(lbl).join(' | '), current: e.querySelector('.bcv-look__forbtn.is-current')?.dataset.for || null }; }).catch(() => null);
   const lookSettled = async () => { await page.waitForTimeout(350); return lookAt(); };
   const stockShown = async () => { await page.waitForFunction(() => !document.documentElement.classList.contains('bcv-on') && !!document.querySelector('#bcv-look') && !!document.querySelector('#application'), null, { timeout: 15000 }); await page.waitForTimeout(300); };
   const lookShown = async () => { await page.waitForSelector('#bcv-app .bcv-nav__item', { timeout: 15000 }); await page.waitForTimeout(200); };
-  // a press on one of the three buttons: the disc hovered so they float down, the button hovered so it opens out, then the press
-  const pressLook = async (key) => { await page.hover('#bcv-look'); await eventually(() => page.$eval(`#bcv-look .bcv-look__opt--${key}`, (b) => getComputedStyle(b).opacity === '1'), 4000); await page.hover(`#bcv-look .bcv-look__opt--${key}`); await page.waitForTimeout(300); await page.click(`#bcv-look .bcv-look__opt--${key}`); };
+  // green: the disc hovered so the two float down, green hovered, then the press
+  const pressOn = async () => { await page.hover('#bcv-look'); await eventually(() => page.$eval('#bcv-look .bcv-look__opt--on', (b) => getComputedStyle(b).opacity === '1'), 4000); await page.hover('#bcv-look .bcv-look__opt--on'); await page.waitForTimeout(300); await page.click('#bcv-look .bcv-look__opt--on'); };
+  // red, for how long: the disc hovered, red pressed (it grows into its list), then the row
+  const pressOff = async (key) => { await page.hover('#bcv-look'); await eventually(() => page.$eval('#bcv-look .bcv-look__opt--off', (b) => getComputedStyle(b).opacity === '1'), 4000); await page.hover('#bcv-look .bcv-look__offhead'); await page.waitForTimeout(250); await page.click('#bcv-look .bcv-look__offhead'); await eventually(() => page.$eval(`#bcv-look .bcv-look__forbtn[data-for="${key}"]`, (b) => getComputedStyle(b).opacity === '1'), 3000); await page.hover(`#bcv-look .bcv-look__forbtn[data-for="${key}"]`); await page.click(`#bcv-look .bcv-look__forbtn[data-for="${key}"]`); };
+  const RED = /rgb\(255, 107, 98\)/, GREEN = /rgb\(52, 199, 89\)/;
   await page.goto(`${BASE}/courses/101/external_tools/9`);
   await page.waitForSelector('html.bcv-punch #content', { timeout: 10000 });
-  // "Open in stock Canvas" is Deactivate: this page view only
+  // "Open in stock Canvas" is This page only
   await page.click('.bcv-native__stock');
   await stockShown();
   let look = await lookSettled();
-  check(await visible('#application') && !(await page.$('#bcv-app')) && look.pos === '0' && look.selected === '0:Deactivated' && look.text === 'Deactivated' && /rgb\(161, 161, 166\)/.test(look.mark) && (await lookSaved()) === true, `"Open in stock Canvas" shows stock Canvas with the switch at the top right on Deactivated — the grey button the one selected, the folded mark grey — and the saved look untouched (${JSON.stringify(look)})`);
+  check(await visible('#application') && !(await page.$('#bcv-app')) && look.pos === '0' && look.selected === '-1:Off for this page' && look.text === 'Off for this page' && look.current === 'page' && RED.test(look.mark) && (await lookSaved()) === true, `"Open in stock Canvas" shows stock Canvas with the switch at the top right red, off for this page — red the one selected, its list marking This page only, the folded mark red — and the saved look untouched (${JSON.stringify(look)})`);
   check(!(await page.$('html.bcv-punch')) && (await visible('#header')) && (await page.$eval('#content', (el) => el.getBoundingClientRect().left < 200)), 'turning the look off ends the punch-through: Canvas lays its page out itself again');
   await shot(page, '28-skin-off');
   await page.goto(`${BASE}/`);
   await lookShown();
   look = await lookSettled();
-  check(await visible('#bcv-app') && look.pos === '1' && look.selected === '1:Active' && look.words === 'Active | Deactivate | Turn off Simpl' && /rgb\(52, 199, 89\)/.test(look.mark), `the next page brings the look back: Active, the green button the one selected, the folded mark green again (${JSON.stringify(look)})`);
-  // Enter on the disc: Deactivate — stock Canvas for this page — and a reload brings the look back
+  check(await visible('#bcv-app') && look.pos === '1' && look.selected === '1:Active' && look.words === 'Active | Turn off Simpl' && GREEN.test(look.mark), `the next page brings the look back: Active, green the one selected, the folded mark green again (${JSON.stringify(look)})`);
+  // Enter on the disc while Simpl is on opens red's list with its first row in focus (nothing turns off by a stray press); Enter on that row is off for this page
   await page.focus('#bcv-look .bcv-look__main');
+  await page.keyboard.press('Enter');
+  const kOpen = await eventually(() => page.evaluate(() => document.getElementById('bcv-look').classList.contains('is-expanded') && document.activeElement?.dataset?.for === 'page'), 3000);
+  await page.keyboard.press('ArrowDown');
+  const kDown = await page.evaluate(() => document.activeElement?.dataset?.for || null);
+  await page.keyboard.press('Escape');
+  const kFold = await eventually(() => page.evaluate(() => !document.getElementById('bcv-look').classList.contains('is-expanded') && document.activeElement?.classList.contains('bcv-look__offhead')), 3000);
+  check(kOpen && kDown === '30m' && kFold && (await visible('#bcv-app')), `the keyboard: Enter on the disc opens red's list at This page only, ArrowDown walks it (${kDown}), Escape folds it back onto red — and Simpl is still on`);
+  await page.focus('#bcv-look .bcv-look__main');
+  await page.keyboard.press('Enter');
+  await eventually(() => page.evaluate(() => document.activeElement?.dataset?.for === 'page'), 3000);
   await page.keyboard.press('Enter');
   await stockShown();
   look = await lookSettled();
-  check(await visible('#application') && !(await page.$('#bcv-app')) && look.pos === '0' && look.text === 'Deactivated' && (await lookSaved()) === true, `Enter on the disc deactivates for this page: the words saying so, the saved look untouched (${JSON.stringify(look)})`);
+  check(await visible('#application') && !(await page.$('#bcv-app')) && look.pos === '0' && look.text === 'Off for this page' && (await lookSaved()) === true, `Enter on This page only turns it off for this page: the words saying so, the saved look untouched (${JSON.stringify(look)})`);
   await page.reload();
   await lookShown();
   check(await visible('#bcv-app') && (await lookAt()).pos === '1', 'and a reload brings the look back');
-  // the red button turns Simpl off: the look saved off, and every page is stock Canvas until it is turned on again
-  await pressLook('off');
+  // red, Indefinitely: the look saved off, and every page is stock Canvas until it is turned on again
+  await pressOff('ever');
   await stockShown();
   await eventually(async () => (await lookSaved()) === false);
   look = await lookSettled();
-  check(await visible('#application') && (await lookSaved()) === false && look.pos === '-1' && look.selected === '-1:Simpl is off' && look.text === 'Simpl is off' && /rgb\(255, 107, 98\)/.test(look.mark), `Turn off Simpl: stock Canvas, the look saved off, the red button reading Simpl is off, the folded mark red (${JSON.stringify(look)})`);
+  const offEver = await sw.evaluate(async () => (await self.BCV.settings.get()).appearance);
+  check(await visible('#application') && (await lookSaved()) === false && offEver.skin === false && offEver.offUntil === 0 && look.pos === '-1' && look.selected === '-1:Simpl is off' && look.text === 'Simpl is off' && look.current === 'ever' && RED.test(look.mark), `Indefinitely: stock Canvas, the look saved off with no end, red reading Simpl is off, its list marking Indefinitely (${JSON.stringify({ look, offEver })})`);
   await shot(page, '28b-look-locked');
   await page.goto(`${BASE}/`);
   await page.waitForSelector('#application', { timeout: 10000 });
   look = await lookSettled();
   check(!(await page.$('#bcv-app')) && look.pos === '-1' && look.selected === '-1:Simpl is off', `off, the look stays off on the next page load, the switch still red (${JSON.stringify(look)})`);
-  // the green button turns it on again, saved
-  await pressLook('on');
+  // green turns it on again, saved
+  await pressOn();
   await lookShown();
-  check(await visible('#bcv-app') && (await lookSaved()) === true && (await lookAt()).pos === '1', 'Activate turns it on again: the look back, saved');
-  // and the grey one deactivates for this page alone
-  await pressLook('idle');
+  check(await visible('#bcv-app') && (await lookSaved()) === true && (await lookAt()).pos === '1', 'green turns it on again: the look back, saved');
+  // red, This page only: stock Canvas for this page alone
+  await pressOff('page');
   await stockShown();
-  check((await lookAt()).pos === '0' && (await lookSaved()) === true, 'Deactivate is stock Canvas for this page, the saved look untouched');
+  check((await lookAt()).pos === '0' && (await lookSaved()) === true, 'This page only is stock Canvas for this page, the saved look untouched');
   await page.reload();
   await lookShown();
   check(await visible('#bcv-app') && (await lookAt()).pos === '1', 'and the next page has the look');
-  // the keyboard: the arrows step it along, End is on
-  await page.focus('#bcv-look .bcv-look__main');
-  await page.keyboard.press('ArrowLeft');
+  // red, For 30 minutes: saved off with its end; the switch says until when; the next page is still off — and once the time has come, Simpl is back by itself, nothing written
+  const at30 = Date.now();
+  await pressOff('30m');
   await stockShown();
-  check((await lookAt()).pos === '0' && (await lookSaved()) === true, 'ArrowLeft steps it to the middle: stock Canvas for this page');
-  await page.focus('#bcv-look .bcv-look__main');
-  await page.keyboard.press('ArrowLeft');
   await eventually(async () => (await lookSaved()) === false);
-  check((await lookAt()).pos === '-1', 'ArrowLeft again is the lock');
-  await page.focus('#bcv-look .bcv-look__main');
-  await page.keyboard.press('End');
+  look = await lookSettled();
+  const off30 = await sw.evaluate(async () => (await self.BCV.settings.get()).appearance);
+  const mins30 = Math.round((off30.offUntil - at30) / 60000);
+  check(off30.skin === false && mins30 === 30 && look.pos === '-1' && /^Off until (\w{3} )?\d{1,2}:\d{2} [AP]M$/.test(look.text) && look.selected === `-1:${look.text}` && look.current === null && RED.test(look.mark), `For 30 minutes: stock Canvas, saved off until half an hour on (${mins30} min), the switch saying until when (${JSON.stringify(look)})`);
+  await shot(page, '28c-look-30m');
+  await page.goto(`${BASE}/courses`);
+  await page.waitForSelector('#application', { timeout: 10000 });
+  check(!(await page.$('#bcv-app')) && (await lookAt()).pos === '-1', 'the next page is still stock Canvas inside the half hour');
+  await setSettings({ appearance: { offUntil: Date.now() - 1000 } }); // (the half hour over: as the clock would have it)
+  await page.waitForTimeout(1200); // (that write is a settings change the stock tab hears: it loads as Simpl again)
+  await page.goto(`${BASE}/`).catch(() => null);
   await lookShown();
-  check(await visible('#bcv-app') && (await lookSaved()) === true && (await lookAt()).pos === '1', 'End brings it back on, saved');
+  const after30 = await sw.evaluate(async () => (await self.BCV.settings.get()).appearance);
+  check(await visible('#bcv-app') && (await lookAt()).pos === '1' && (await lookSaved()) === true && after30.skin === false && after30.offUntil > 0, `once the half hour is over the page loads as Simpl again by itself — the switch green — with nothing written back (another tab still on stock Canvas is never reloaded under someone): ${JSON.stringify(after30)}`);
+  // the popup and Settings' saved switch read the same: on
+  const popLook = await context.newPage();
+  await popLook.goto(`chrome-extension://${extId}/popup/popup.html`);
+  await popLook.waitForSelector('#skin', { state: 'attached', timeout: 8000 });
+  check(await popLook.$eval('#skin', (e) => e.checked), 'the popup\'s switch reads on too, the half hour being over');
+  await popLook.close();
+  await setSettings({ appearance: { skin: true, offUntil: 0 } }); // (the saved look put straight for what follows)
   await page.mouse.move(700, 500);
   await page.waitForTimeout(300);
   // ...and it comes back even when the copy that hears the change has no listener. Safari re-injects
@@ -3774,18 +3808,20 @@ try {
   const welcomeLines = () => Promise.all(['.bcv-welcome__kicker', '.bcv-welcome__title', '.bcv-welcome__hint'].map((s) => texts(s).then((t) => t[0] || '')));
   check(page.url() === `${BASE}/` && /^(reload|navigate)$/.test(await page.evaluate(() => performance.getEntriesByType('navigation')[0]?.type)) && (await page.$('#bcv-setup')) === null && !(await page.$('html.bcv-setup-open')) && (await page.$('.bcv-tour__card')) === null && (await welcomeBox()).bg === 'rgb(0, 0, 0)' && (await welcomeBox()).full, 'Open Canvas loads the page afresh, and it comes back black: no setup, no tour, the welcome over everything');
   // stage one: the switch shown working — a copy of it at the top right, a pointer that comes to it, presses its stops and drags its knob, the lines saying what each move does
-  const showAt = () => page.$eval('#bcv-welcome', (e) => { const p = e.querySelector('.bcv-welcome__look'); const r = p.getBoundingClientRect(); const c = e.querySelector('.bcv-welcome__cursor--look'); const hov = p.querySelector('.bcv-look__opt.is-hover'); return { top: Math.round(r.top), rightGap: Math.round(innerWidth - r.right), open: p.classList.contains('is-open'), pos: p.querySelector('.bcv-look__main').getAttribute('aria-valuenow'), hover: hov ? hov.dataset.pos : null, hoverWords: hov ? hov.querySelector('.bcv-look__optlbl').textContent : null, cursor: !!c, cursorShown: c ? getComputedStyle(c).opacity : null, arrow: !!e.querySelector('.bcv-welcome__arrow'), menu: getComputedStyle(p.querySelector('.bcv-look__menu')).visibility }; });
+  const showAt = () => page.$eval('#bcv-welcome', (e) => { const p = e.querySelector('.bcv-welcome__look'); const r = p.getBoundingClientRect(); const c = e.querySelector('.bcv-welcome__cursor--look'); const hov = p.querySelector('.bcv-look__opt.is-hover'); const disc = p.querySelector('.bcv-look__main').getBoundingClientRect(); const a = e.querySelector('.bcv-welcome__bigarrow'); const [tx, ty] = (a?.dataset.tip || '').split(',').map(Number); const t = e.querySelector('.bcv-welcome__stage[data-stage="look"] .bcv-welcome__text')?.getBoundingClientRect(); return { top: Math.round(r.top), rightGap: Math.round(innerWidth - r.right), open: p.classList.contains('is-open'), pos: p.dataset.pos, hover: hov ? hov.dataset.pos : null, hoverWords: hov ? (hov.querySelector('.bcv-look__offhead .bcv-look__optlbl') || hov.querySelector('.bcv-look__optlbl')).textContent : null, expanded: p.querySelector('.bcv-look__opt--off').classList.contains('is-expanded'), hoverFor: p.querySelector('.bcv-look__forbtn.is-hover')?.dataset.for || null, cursor: !!c, cursorShown: c ? getComputedStyle(c).opacity : null, bigArrow: !!a && tx < disc.left && tx > disc.left - 40 && Math.abs(ty - (disc.top + disc.height / 2)) < 3 && !!t && Number(a.querySelector('.bcv-welcome__line').getAttribute('d').split(' ')[1]) < t.top, centred: !!t && Math.abs(t.left + t.width / 2 - innerWidth / 2) < 4 && Math.abs(t.top + t.height / 2 - innerHeight / 2) < 90, smallArrow: !!e.querySelector('.bcv-welcome__arrowbox'), menu: getComputedStyle(p.querySelector('.bcv-look__menu')).visibility }; });
   const s0 = await showAt();
   const stageLines = async () => (await welcomeLines()).map((t) => t.replace(/\s+/g, ' ').trim()).join(' | ');
-  const LOOK_LINES = ' | Just in case: | To turn on Simpl, press green. To turn off Simpl for 1 page, press gray. To turn off Simpl as long as you need, press red.';
-  check(s0.top === 10 && s0.rightGap === 12 && s0.cursor && !s0.arrow && (await stageLines()) === LOOK_LINES && (await page.$$eval('.bcv-welcome__stoprow', (els) => els.map((e) => { const sw = e.querySelector('.bcv-welcome__stopsw'); return `${sw.dataset.stop}:${sw.querySelector('.bcv-look__optlbl').textContent}:${Math.round(sw.getBoundingClientRect().width) === 24 && getComputedStyle(sw).backgroundColor !== 'rgba(0, 0, 0, 0)'}:${e.querySelector('b').textContent}`; }))).join(' ') === '1:Activate:true:green 0:Deactivate:true:gray -1:Turn off Simpl:true:red', `stage one shows a copy of the switch at the top right, a pointer, and the lines: a grey one above, the white one, and one per button, each with the button itself — the round disc in its colour — before it (${JSON.stringify(s0)} | ${await stageLines()})`);
-  check(await eventually(async () => { const st = await showAt(); return st.open && st.cursorShown === '1' && st.menu === 'visible'; }, 3000), 'the pointer comes to the disc and the three buttons float down');
+  const LOOK_LINES = ' | Just in case: | To turn on Simpl, press green. To turn off Simpl, press red.';
+  await page.waitForTimeout(700); // (the words come in rising: the arrow is drawn where they settle)
+  const s0b = await showAt();
+  check(s0.top === 10 && s0.rightGap === 12 && s0.cursor && !s0.smallArrow && s0b.bigArrow && s0b.centred && (await stageLines()) === LOOK_LINES && (await texts('.bcv-welcome__sub'))[0] === 'Red asks how long: this page only, 30 minutes, 1 hour, 4 hours, 1 day, or indefinitely.' && (await page.$$eval('.bcv-welcome__stoprow', (els) => els.map((e) => { const sw = e.querySelector('.bcv-welcome__stopsw'); return `${sw.dataset.stop}:${Math.round(sw.getBoundingClientRect().width) === 24 && getComputedStyle(sw).backgroundColor !== 'rgba(0, 0, 0, 0)' && !!sw.querySelector('svg')}:${e.querySelector('b').textContent}`; }))).join(' ') === '1:true:green -1:true:red', `stage one: the words in the middle of the screen — Just in case:, a row for green and one for red, each with the button's round face before it, and how long red asks — a copy of the switch at the top right, and a big arrow from the words up to it, its tip just left of the disc (${JSON.stringify(s0b)} | ${await stageLines()})`);
+  check(await eventually(async () => { const st = await showAt(); return st.open && st.cursorShown === '1' && st.menu === 'visible'; }, 3000), 'the pointer comes to the disc and the two buttons float down');
   check(noContinueYet && await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000) && Date.now() - welcomeAt >= TIMERS.welcomeWait - 500 && (await texts('.bcv-welcome__next'))[0] === 'Continue', 'Continue is not there at first, and comes in only after the wait (three seconds shipped)');
-  check(await eventually(async () => { const st = await showAt(); return st.hover === '0' && /^Deactivate/.test(st.hoverWords || ''); }, 5000) && (await stageLines()) === LOOK_LINES, 'the pointer comes to the grey one and it opens out to the left: Deactivate — and the lines hold still');
-  check(await eventually(async () => (await showAt()).pos === '0', 5000), 'pressed: Deactivated');
-  check(await eventually(async () => (await showAt()).pos === '-1', 7000), 'then the red one, Turn off Simpl, pressed: Simpl is off');
+  check(await eventually(async () => { const st = await showAt(); return st.hover === '-1' && st.hoverWords === 'Turn off Simpl'; }, 6000) && (await stageLines()) === LOOK_LINES, 'the pointer comes to red and it opens out to the left: Turn off Simpl — and the lines hold still');
+  check(await eventually(async () => { const st = await showAt(); return st.expanded && st.hoverFor === '1h'; }, 5000), 'pressed, red grows into its list, and the pointer rests on For 1 hour');
   await shot(page, '31-welcome-look');
-  check(await eventually(async () => (await showAt()).pos === '1', 6000), 'and the green one: Active again');
+  check(await eventually(async () => { const st = await showAt(); return st.pos === '-1' && !st.expanded; }, 4000), 'pressed: off for the hour, the list folded back into red');
+  check(await eventually(async () => (await showAt()).pos === '1', 6000), 'and green pressed: Active again');
   await page.keyboard.press('Enter'); // Enter is Continue too
   // Away Refresh is off unless turned on (2.98.13), so the welcome has no pill to point at: the switch's stage goes straight to the sidebar's rows
   await page.waitForSelector('#bcv-welcome[data-stage="grades"]', { timeout: 5000 });
@@ -3824,19 +3860,24 @@ try {
   await page.waitForSelector('#bcv-welcome[data-stage="peek"]', { timeout: 5000 });
   const peekAt = Date.now();
   const noContinueYet3 = (await page.$('.bcv-welcome__next:not([hidden])')) === null;
-  const peek = await page.$eval('#bcv-welcome', (e) => ({ stats: e.querySelectorAll('.bcv-welcome__stat').length, mid: e.querySelector('.bcv-welcome__stat:nth-child(2)')?.classList.contains('bcv-welcome__stat--mid'), midLabel: e.querySelector('.bcv-welcome__stat--mid .bcv-welcome__statlabel')?.textContent, sheet: !!e.querySelector('.bcv-welcome__sheetmock'), rows: e.querySelectorAll('.bcv-welcome__row').length, pv: !!e.querySelector('.bcv-welcome__pvmock'), cursor: !!e.querySelector('.bcv-welcome__cursor--peek'), loops: getComputedStyle(e.querySelector('.bcv-welcome__sheetmock')).animationIterationCount, away: !!e.querySelector('.bcv-welcome__away') }));
-  check((await welcomeBox()).bg === 'rgb(0, 0, 0)' && peek.stats === 3 && peek.mid && peek.midLabel === 'Due this week' && peek.sheet && peek.rows === 3 && peek.pv && peek.cursor && peek.loops === 'infinite' && !peek.away && (await welcomeLines()).join(' | ') === 'Dashboard | Click any of the dashboard cards to see more | Click an assignment, announcement, etc. to preview it.', `stage three: the Dashboard's way in, shown round and round — the middle counter pressed, the sheet behind it, an item previewed beside the list (${JSON.stringify(peek)})`);
-  check(noContinueYet3 && await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000) && Date.now() - peekAt >= TIMERS.welcomeWait - 500, 'Continue comes in only after the wait here too');
-  await page.waitForTimeout(600);
+  // the Dashboard's way in, for real: its own Due this week card through a hole in the black, a pointer pressing it, the card's sheet opening, a row previewed
+  const peekRead = () => page.$eval('#bcv-welcome', (e) => { const hole = e.querySelectorAll('.bcv-welcome__mask mask rect')[1]; const sp = e.querySelector('.bcv-welcome__peekreal'); return { holes: e.classList.contains('bcv-welcome--holes'), bg: getComputedStyle(e).backgroundColor, stage: e.querySelector('.bcv-welcome__stage')?.dataset.stage, on: sp?.dataset.on || null, hole: hole ? { x: +hole.getAttribute('x'), y: +hole.getAttribute('y'), w: +hole.getAttribute('width'), h: +hole.getAttribute('height') } : null, cursor: !!sp?.querySelector('.bcv-welcome__cursor--peekreal'), drawing: !!e.querySelector('.bcv-welcome__sheetmock, .bcv-welcome__stat'), sheet: document.querySelector('.bcv-sheet-ov')?.getAttribute('aria-label') || null, pv: !!document.querySelector('.bcv-sheet-ov .bcv-pv'), focus: e.contains(document.activeElement) }; });
+  check(await eventually(async () => { const p = await peekRead(); return p.holes && p.bg === 'rgba(0, 0, 0, 0)' && p.stage === 'peek' && p.on === 'card' && p.cursor && !p.drawing && !p.sheet && (await holeCovers(p.hole, '.bcv-stat[data-stat="week"]')); }, 3000) && (await welcomeLines()).join(' | ') === 'Dashboard | Click any of the dashboard cards to see more | Click an assignment, announcement, etc. to preview it.', `the Dashboard's own Due this week card through a hole in the black, a pointer on its way to it — the real card, not a drawing (${JSON.stringify(await peekRead())})`);
+  check(await eventually(async () => { const p = await peekRead(); return p.sheet === 'Due this week' && p.on === 'sheet' && p.focus && (await holeCovers(p.hole, '.bcv-sheet-ov .bcv-sheet')); }, 5000), `the pointer presses it: the card's own sheet opens, the hole grown round it, the black keeping the focus (${JSON.stringify(await peekRead())})`);
+  check(await eventually(async () => { const p = await peekRead(); return p.pv && p.on === 'sheet' && p.focus; }, 5000), 'then its first row pressed: the preview opens beside the list');
+  await page.waitForTimeout(300);
   await shot(page, '31c-welcome-peek');
+  check(noContinueYet3 && await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000) && Date.now() - peekAt >= TIMERS.welcomeWait - 500, 'Continue comes in only after the wait here too');
+  check(await eventually(async () => { const p = await peekRead(); return !p.sheet && p.on === 'card'; }, 7000), 'a while later the sheet\'s X: closed, the hole back round the card, and round again');
   await page.click('.bcv-welcome__next');
+  check(await eventually(async () => (await page.$('#bcv-welcome[data-stage="search"]')) !== null && !(await page.$('.bcv-sheet-ov')), 5000), 'Continue takes the show with it: no sheet left open under the next stage');
   // then the Dashboard's search box, seen through a hole with "Search Everything." under it — the last pointer
   await page.waitForSelector('#bcv-welcome[data-stage="search"]', { timeout: 5000 });
   check((await page.$eval('#bcv-welcome', (e) => e.classList.contains('bcv-welcome--holes') && !!e.querySelector('.bcv-welcome__mask'))) && (await welcomeLines()).join(' | ') === ' | Search Everything. | Courses, assignments, pages, discussions, files, people — and Wikipedia — from one box.', `the last pointer: the search box through a hole in the black, Search Everything. under it (${(await welcomeLines()).join(' | ')})`);
   await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000);
   await page.click('.bcv-welcome__next');
   await page.waitForFunction(() => !document.querySelector('#bcv-welcome'), null, { timeout: 5000 });
-  check(!(await page.$('html.bcv-welcome')) && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('welcome:pending'))['welcome:pending'])) === undefined && (await visible('#bcv-look')) && (await page.$('.bcv-stat')) !== null, 'the last Continue takes the black away: the Dashboard, the real switch, and the welcome does not come back');
+  check(!(await page.$('html.bcv-welcome')) && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('welcome:pending'))['welcome:pending'])) === undefined && (await visible('#bcv-look')) && (await page.$('.bcv-stat')) !== null && !(await page.$('.bcv-sheet-ov')), 'the last Continue takes the black away: the Dashboard, the real switch, and the welcome does not come back');
   // people who had Simpl before the switch became a slider get its show alone, once: their What's New mark is from before it
   await sw.evaluate(async () => { await self.BCV.api.storage.local.remove('welcome:look5'); await self.BCV.api.storage.local.set({ 'whatsnew:seen': '2.35.0', 'welcome:look4': true }); });
   await page.reload();
@@ -3902,8 +3943,18 @@ try {
   await page.waitForTimeout(500);
   const readyDefault = await page.evaluate(() => { const r = document.querySelector('#bcv-setup').shadowRoot; return { on: r.querySelector('#pzReady .is-on')?.dataset.ready, colour: r.querySelector('.pz__sw.is-on').dataset.theme, pics: r.querySelectorAll('.pz__pv .has-pic').length, note: r.querySelector('#pzNote').textContent, pvMain: r.querySelector('.pz').style.getPropertyValue('--pv-main'), ring: getComputedStyle(r.querySelector('#pzReady .is-on .pz__thumb')).boxShadow }; });
   check(readyDefault.on === 'Default' && readyDefault.colour === 'Regular' && readyDefault.pics === 0 && readyDefault.note === 'Regular' && readyDefault.pvMain === '' && /rgb\(10, 132, 255\)/.test(readyDefault.ring), `Default pressed: Regular, not a photo anywhere, the preview's greys back, the tile ringed in blue: ${JSON.stringify(readyDefault)}`);
-  await page.click(pz('#pzReady [data-ready="Dusk"]'));
-  await page.waitForTimeout(500);
+  // Dusk pressed: its drawings are inked one by one, and each redraws Personalize once — not a storm of redraws doubling with every
+  // ink (2.98.18: the presets flashed in and out on Chrome, the page frozen for seconds) — and no redraw replays the list's entrance
+  const flashes = await page.evaluate(() => new Promise((res) => {
+    const r = document.querySelector('#bcv-setup').shadowRoot;
+    const n = { redraws: 0, rises: 0 };
+    const mo = new MutationObserver((recs) => { n.redraws += recs.length; });
+    mo.observe(r.querySelector('.pz'), { childList: true });
+    r.addEventListener('animationstart', (e) => { if (e.target.id === 'pzReady') n.rises++; });
+    r.querySelector('#pzReady [data-ready="Dusk"]').click();
+    setTimeout(() => { mo.disconnect(); res(n); }, 5000);
+  }));
+  check(flashes.redraws <= 8 && flashes.rises === 0, `a ready-made pressed redraws Personalize once, then at most once per drawing inked, and no redraw replays the Ready-made list's entrance: ${JSON.stringify(flashes)}`);
   const readyOn = await page.evaluate(() => { const r = document.querySelector('#bcv-setup').shadowRoot; const root = r.querySelector('.pz'); const pics = (sel) => [...r.querySelectorAll(sel)].map((e) => { const l = e.querySelector('.pz__pic--sharp'); return (l?.style.getPropertyValue('--ink') || l?.style.getPropertyValue('--pic') || '').slice(0, 15); }); return { on: r.querySelector('#pzReady .is-on')?.dataset.ready, colour: r.querySelector('.pz__sw.is-on').dataset.theme, A: root.style.getPropertyValue('--A'), side: pics('.pz__side').join(''), cards: pics('.pz__card'), heads: r.querySelectorAll('.pz__hcard.has-pic').length, note: r.querySelector('#pzNote').textContent, pvMain: root.style.getPropertyValue('--pv-main'), pvCard: getComputedStyle(r.querySelector('.pz__card:not(.has-pic)') || r.querySelector('.pz__list')).backgroundColor }; });
   const readyPink = '#ff375f';
   check(readyOn.on === 'Dusk' && readyOn.colour === 'Pink' && readyOn.A === readyPink && readyOn.side === 'url("data:image' && readyOn.cards.length === 6 && readyOn.cards.every((c) => c === 'url("data:image') && readyOn.note === 'Pink · 7 photos' && readyOn.pvMain === THEME.mix('#fbfbfd', readyPink, 0.1) && readyOn.pvCard === rgbOf(THEME.mix('#ffffff', readyPink, 0.05)), `Dusk pressed: Pink, the sidebar and all six counters with a scene each, the tile on, and the preview's grounds cast softly in pink: ${JSON.stringify(readyOn)}`);

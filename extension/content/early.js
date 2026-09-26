@@ -97,11 +97,13 @@
     try { BCV.theme?.apply(html, skin !== false ? accent || '' : '', !!dark); } catch { /* the interface's own blue */ }
   }
 
-  // 1. Instant: cached values from the page origin's localStorage (the one-page note wins for the look).
+  // 1. Instant: cached values from the page origin's localStorage (the one-page note wins for the look;
+  // a turn-off for a while is over once its time has come — the cache carries the time, `until`).
   try {
     const cached = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null');
     const base = cached && typeof cached === 'object' ? cached : { skin: true, dark: systemDark() };
-    apply({ ...base, skin: override ?? base.skin });
+    const cachedOn = base.skin !== false || (Number(base.until) > 0 && Date.now() >= Number(base.until));
+    apply({ ...base, skin: override ?? cachedOn });
   } catch {
     apply({ skin: override ?? true, dark: systemDark() });
   }
@@ -113,7 +115,10 @@
   const listeners = new Set();
   async function sync(settings) {
     current = settings || (await S.get());
-    const stored = current.appearance.skin !== false;
+    // (on by the saved settings — S.lookOn: a turn-off for a while whose time has come counts as on.
+    // Nothing is written back when it does: another tab still showing stock Canvas is left as it is,
+    // never reloaded under someone, and picks Simpl up at its own next page)
+    const stored = S.lookOn(current);
     if (lastStored !== null && stored !== lastStored) override = null; // a saved change beats the one-page note
     lastStored = stored;
     const state = { skin: override ?? stored, dark: S.isDark(current, systemDark()), accent: current.appearance?.theme?.accent || '' };
@@ -121,7 +126,7 @@
     apply(state);
     shown = state;
     try {
-      if (!wiped) localStorage.setItem(CACHE_KEY, JSON.stringify({ skin: stored, dark: state.dark, accent: state.accent })); // the saved look, never the one-page note
+      if (!wiped) localStorage.setItem(CACHE_KEY, JSON.stringify({ skin: current.appearance.skin !== false, until: Number(current.appearance.offUntil) || 0, dark: state.dark, accent: state.accent })); // the saved look (and when a turn-off for a while ends), never the one-page note
     } catch {
       /* ignore */
     }
@@ -169,23 +174,31 @@
     }
     location.reload();
   }
-  /** The switch at the top right has three positions. 1: the look on. 0: stock Canvas for this
-   *  page view only (flipLook's one-page note). -1: locked off — saved, so every page is stock
-   *  Canvas until it is unlocked (Settings and the popup show the same saved switch). Unlocking
-   *  saves the look on again; unlocked to 0, this page stays stock Canvas on a one-page note and
-   *  the look is back on the next page. */
-  const locked = () => !!current && current.appearance?.skin === false;
+  /** The switch at the top right: green on, red off (2.98.18). Three states under it. 1: the look
+   *  on. 0: stock Canvas for this page view only (flipLook's one-page note: the red list's "This
+   *  page only"). -1: turned off — saved, so every page is stock Canvas until it is turned on again
+   *  or, for a turn-off for a while, until its time comes (Settings and the popup show the same
+   *  saved switch). Turning on saves the look on again; set to 0 from there, this page stays stock
+   *  Canvas on a one-page note and the look is back on the next page. */
+  const locked = () => !!current && !S.lookOn(current);
   const lookPos = () => (locked() ? -1 : html.classList.contains('bcv-on') ? 1 : 0);
+  /** When a turn-off for a while ends (ms), while it is still running; 0 otherwise. */
+  const offUntil = () => (locked() ? Number(current.appearance.offUntil) || 0 : 0);
+  /** Off: 'page' for this page view alone, a length of time (ms) for a while, or null (or 0) until
+   *  turned on again. Saved but for 'page'; the page loads afresh as stock Canvas. */
+  async function offFor(what) {
+    if (!current) await ready;
+    if (what === 'page') return setLook(0);
+    const ms = Number(what) || 0;
+    const next = await S.update(S.lookPatch(false, ms > 0 ? Date.now() + ms : 0));
+    await sync(next); // a storage change may never reach this page (Safari): applied here, the reload follows (already off before: the new length saved, the page left as it is)
+  }
   async function setLook(pos) {
     if (!current) await ready;
     if (pos === lookPos()) return;
-    if (pos === -1) {
-      const next = await S.update({ appearance: { skin: false } });
-      await sync(next); // a storage change may never reach this page (Safari): applied here, the reload follows
-      return;
-    }
+    if (pos === -1) return offFor(null);
     if (locked()) {
-      const next = await S.update({ appearance: { skin: true } });
+      const next = await S.update(S.lookPatch(true));
       if (pos === 0 && !self.BCVBridge?.native) {
         try {
           sessionStorage.setItem(ONCE_KEY, 'off');
@@ -232,6 +245,8 @@
     isOn: () => html.classList.contains('bcv-on'),
     lookPos,
     setLook,
+    offFor,
+    offUntil,
     flipLook,
     onChange: (fn) => {
       listeners.add(fn);

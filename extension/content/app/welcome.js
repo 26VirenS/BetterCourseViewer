@@ -2,12 +2,13 @@
  * with a Continue that comes in after a few seconds; the last Continue takes the black away.
  * Two runs use it. After the setup, the reloaded page comes back black (the flag is read before
  * the page draws, so the Dashboard is never seen first) and points at the look switch at the top
- * right — a copy of the real one, shown working: a pointer comes to it, presses its stops and
- * drags its knob, the lines under it saying what each part does — then at a mock Away Refresh
+ * right — a copy of the real one, shown working: a pointer comes to it, rests on green, presses red
+ * (it grows into how long) and picks an hour, then green again, the words in the middle of the
+ * screen with a big arrow up to it — then at a mock Away Refresh
  * pill counting its three seconds down in slow motion, then at three rows of the sidebar in turn
  * — Grades, Courses (and the starred courses listed under it, when they are), Tools — each seen
- * through a hole in the black with an arrow at it, then at the Dashboard's way in: a
- * counter pressed, the list behind it, an item previewed beside the list. The first time Tools
+ * through a hole in the black with an arrow at it, then at the Dashboard's way in: the
+ * real Due this week card pressed, its sheet opening, an item previewed beside the list. The first time Tools
  * opens, it says what Tools is, then shows the drag: a card pulled to the top turning into a pin
  * beside the switch. A phone has no switch in its header, so it gets the pointers that need none; the app
  * (no switch, no Away Refresh) never sees the setup's. Anyone who had Simpl before the switch
@@ -30,7 +31,8 @@
   // (viewBox size, the line, the head) and the thing pointed at, built when the stage opens
   const STAGES = {
     look: {
-      layout: 'look', title: 'Just in case:', hint: ['To turn on Simpl, press green.', 'To turn off Simpl for 1 page, press gray.', 'To turn off Simpl as long as you need, press red.'], stops: [1, 0, -1],
+      layout: 'look', title: 'Just in case:', hint: ['To turn on Simpl, press green.', 'To turn off Simpl, press red.'], stops: [1, -1],
+      sub: 'Red asks how long: this page only, 30 minutes, 1 hour, 4 hours, 1 day, or indefinitely.',
       prop: (app, ctx) => lookShow(app, ctx),
     },
     away: {
@@ -68,9 +70,11 @@
       layout: 'demo', kicker: 'Tools', title: 'Drag a tool to the top', hint: 'It becomes a small button next to the Simpl Courses switch, on every page.',
       prop: (app, ctx) => pinDemo(app, ctx.look),
     },
+    // the Dashboard's way in, on the Dashboard itself (2.98.18): the real Due this week card pressed, its real sheet
+    // opening, a row of it previewed beside the list — seen through a hole that follows them; the drawing where there is no card
     peek: {
-      layout: 'demo', kicker: 'Dashboard', title: 'Click any of the dashboard cards to see more', hint: 'Click an assignment, announcement, etc. to preview it.',
-      prop: () => peekDemo(),
+      layout: () => (weekCard() ? 'peek' : 'demo'), holes: () => !!weekCard(), kicker: 'Dashboard', title: 'Click any of the dashboard cards to see more', hint: 'Click an assignment, announcement, etc. to preview it.',
+      prop: () => (weekCard() ? peekReal() : peekDemo()),
     },
     // the Grades page's first opening (screens/gpa.js): a card's ring hovered for its breakdown,
     // then what-if scores in a course's Details
@@ -88,22 +92,20 @@
   const navRow = (key) => { const el = document.querySelector(`#bcv-side .bcv-nav__item[data-nav="${key}"]`); return el && el.getBoundingClientRect().width > 0 ? el : null; };
   /** The sidebar's Appearance button, when it is on the page and drawn (a phone has none). */
   const themeBtn = () => { const el = document.getElementById('bcv-theme-btn'); return el && el.getBoundingClientRect().width > 0 ? el : null; };
+  /** The Dashboard's Due this week card, when it is on the page and drawn (the Dashboard alone has it). */
+  const weekCard = () => { const el = document.querySelector('#bcv-app .bcv-stat[data-stat="week"]'); return el && el.getBoundingClientRect().width > 0 ? el : null; };
   /** The Dashboard's search box, when it is on the page (the Dashboard alone has it; a phone has none). */
   const searchBox = () => { const el = document.getElementById('bcv-omni-box'); return el && el.getBoundingClientRect().width > 0 ? el : null; };
-  /** A row under the switch's show: the switch itself, small and still, its knob at that stop — the
-   *  same DOM the page carries (app.lookDemo), with nothing wired, rather than a drawing of it. */
+  /** A row under the switch's show: the switch's own button for that stop — the round face in its
+   *  colour with its glyph, the same classes the page's switch wears (app.lookDemo) — small and still. */
   function stopSwitch(app, stop) {
     const demo = app?.lookDemo?.();
     if (!demo) return null;
-    const i = [1, 0, -1].indexOf(stop); // the switch's buttons, top to bottom: Activate, Deactivate, Turn off Simpl
-    const b = demo.opts[i]?.cloneNode(true);
-    if (!b) return null;
-    b.classList.add('bcv-welcome__stopsw', 'is-hover'); // opened out with its words, as it is under the pointer
-    b.classList.remove('is-selected');
-    b.querySelector('.bcv-look__optlbl').textContent = ['Activate', 'Deactivate', 'Turn off Simpl'][i];
-    b.dataset.stop = String(stop);
-    b.tabIndex = -1;
-    return b;
+    const i = [1, -1].indexOf(stop); // the switch's buttons, top to bottom: green on, red off
+    const src = demo.opts[i];
+    if (!src) return null;
+    const dot = (src.matches('button') ? src : src.querySelector('.bcv-look__offhead'))?.querySelector('.bcv-look__optdot')?.cloneNode(true);
+    return h('span', { class: 'bcv-look__opt bcv-welcome__stopsw', dataset: { stop: String(stop) }, style: { '--bcv-opt': src.style.getPropertyValue('--bcv-opt') }, 'aria-hidden': 'true' }, dot ? [dot] : []);
   }
 
   /** The sidebar's list of starred courses, when they are listed there (not kept in a panel off the
@@ -166,10 +168,10 @@
     for (const b of copy.querySelectorAll('button')) { b.tabIndex = -1; b.removeAttribute('title'); }
     return copy;
   }
-  /** The switch, shown working: a copy of it at the top right (app.lookDemo: the same DOM, its knob
-   *  put where the show says), and a pointer that comes to it (it opens into the slider), presses
-   *  its middle (off for this page), its right (on), drags its knob to the left stop (locked) and
-   *  presses its right again (unlocked), round and round. With reduced motion: the opened copy, still. */
+  /** The switch, shown working: a copy of it at the top right (app.lookDemo: the same DOM) and a
+   *  pointer that comes to it (the green and the red float down), rests on green (Active), goes to
+   *  red and presses it — red grows into its list — picks For 1 hour (red now, Off until…), then
+   *  presses green again (Active), round and round. With reduced motion: the copy opened, still. */
   function lookShow(app) {
     const demo = app.lookDemo?.();
     if (!demo) return null;
@@ -178,37 +180,41 @@
     const wrap = h('div', { class: 'bcv-welcome__lookshow', 'aria-hidden': 'true' }, [demo.el, cursor]);
     if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) { demo.open(true); return wrap; }
     const alive = () => wrap.isConnected && !wrap.classList.contains('is-out');
-    // the round end of a button (it stays put as the button opens out to the left), or the disc
+    // the round end of a button (it stays put as the button opens out to the left), the disc, or a row of the red list (near its start)
     const at = (el) => { const r = el.getBoundingClientRect(); return { x: r.right - r.height / 2, y: r.top + r.height / 2 }; };
     const disc = () => at(demo.el.querySelector('.bcv-look__main'));
-    const opt = (i) => at(demo.opts[i]);
+    const green = () => at(demo.opts[0]);
+    const red = () => at(demo.opts[1].querySelector('.bcv-look__offhead'));
+    const row = (j) => { const r = demo.fors[j].getBoundingClientRect(); return { x: r.left + Math.min(56, r.width / 2), y: r.top + r.height / 2 }; };
     const away = () => { const d = disc(); return { x: d.x - 150, y: d.y + 170 }; };
     const cursorTo = ({ x, y }, ms) => { cursor.style.setProperty('--cms', `${ms}ms`); cursor.style.setProperty('--cx', `${x - 5}px`); cursor.style.setProperty('--cy', `${y - 3}px`); };
     const q = (ms, fn) => setTimeout(() => { if (alive()) fn(); }, ms);
     const press = () => { cursor.classList.add('is-press'); q(180, () => cursor.classList.remove('is-press')); };
-    // the pointer comes to the disc (the three float down), goes to the grey one (it opens out:
-    // Deactivate) and presses it, then the red (Turn off Simpl), then the green (Activate), and leaves
     const loop = () => {
       if (!alive()) return;
       demo.setPos(1);
+      demo.expand(false);
       demo.open(false);
       demo.hover(-1);
+      demo.hoverFor(-1);
       cursor.style.opacity = '0';
       cursorTo(away(), 0);
       q(250, () => { cursor.style.opacity = '1'; cursorTo(disc(), 800); });
       q(1150, () => demo.open(true));
-      q(1900, () => cursorTo(opt(1), 500));
-      q(2400, () => demo.hover(1));
-      q(3300, () => { press(); demo.setPos(0); });
-      q(4600, () => { demo.hover(-1); cursorTo(opt(2), 500); });
-      q(5100, () => demo.hover(2));
-      q(6000, () => { press(); demo.setPos(-1); });
-      q(7300, () => { demo.hover(-1); cursorTo(opt(0), 500); });
-      q(7800, () => demo.hover(0));
-      q(8700, () => { press(); demo.setPos(1); });
-      q(10000, () => { demo.hover(-1); cursorTo(away(), 700); cursor.style.opacity = '0'; });
-      q(10500, () => demo.open(false));
-      q(11400, loop);
+      q(1900, () => cursorTo(green(), 500));
+      q(2400, () => demo.hover(0));
+      q(3300, () => { demo.hover(-1); cursorTo(red(), 500); });
+      q(3800, () => demo.hover(1));
+      q(4700, () => { press(); demo.expand(true); });
+      q(5500, () => cursorTo(row(2), 600));
+      q(6100, () => demo.hoverFor(2));
+      q(7000, () => { press(); demo.setPos(-1, Date.now() + 60 * 60000); demo.hoverFor(-1); demo.expand(false); });
+      q(8300, () => { demo.hover(-1); cursorTo(green(), 500); });
+      q(8800, () => demo.hover(0));
+      q(9700, () => { press(); demo.setPos(1); });
+      q(11000, () => { demo.hover(-1); cursorTo(away(), 700); cursor.style.opacity = '0'; });
+      q(11500, () => demo.open(false));
+      q(12400, loop);
     };
     q(60, loop); // (once the stage is on the page, so the copy can be measured)
     return wrap;
@@ -254,6 +260,62 @@
       h('div', { class: 'bcv-welcome__pvmock' }, [bar('bcv-welcome__bar--title'), bar('bcv-welcome__bar--line'), bar('bcv-welcome__bar--line'), bar('bcv-welcome__bar--line bcv-welcome__bar--short'), h('span', { class: 'bcv-welcome__pvbtn', text: 'Open' })]),
       h('span', { class: 'bcv-welcome__cursor bcv-welcome__cursor--peek', html: '<svg viewBox="0 0 24 24" width="26" height="26"><path d="M5 3l14 9-6 1.5 3.5 6.5-2.5 1.5-3.5-6.5L6 19z" fill="#fff" stroke="#1c1c1e" stroke-width="1.4" stroke-linejoin="round"/></svg>' }),
     ]);
+  }
+  /** The Dashboard's way in, for real: the black with one hole in it, round the Due this week card; a
+   *  pointer comes to the card and presses it — the card's own sheet opens, and the hole follows it as it
+   *  grows — then presses the sheet's first row, whose preview opens beside the list; a while later the
+   *  sheet's X, and round again. Everything pressed is the page's own, pressed by the show; the black
+   *  keeps the focus (Enter is still Continue), and the sheet goes with the stage (cleanup). */
+  function peekReal() {
+    const NS = 'http://www.w3.org/2000/svg';
+    const id = `bcv-welcome-mask-${Date.now()}`;
+    const svg = document.createElementNS(NS, 'svg');
+    svg.setAttribute('class', 'bcv-welcome__mask');
+    svg.setAttribute('aria-hidden', 'true');
+    svg.innerHTML = `<defs><mask id="${id}"><rect width="100%" height="100%" fill="#fff"/><rect rx="18" fill="#000"/></mask></defs><rect width="100%" height="100%" fill="#000" mask="url(#${id})"/><rect class="bcv-welcome__ring" rx="18"/>`;
+    const hole = svg.querySelectorAll('mask rect')[1];
+    const ring = svg.querySelector('.bcv-welcome__ring');
+    const cursor = h('span', { class: 'bcv-welcome__cursor bcv-welcome__cursor--peekreal', 'aria-hidden': 'true', html: CURSOR });
+    const wrap = h('div', { class: 'bcv-welcome__spot bcv-welcome__peekreal', 'aria-hidden': 'true' }, [svg, cursor]);
+    const alive = () => wrap.isConnected && !wrap.classList.contains('is-out');
+    const sheetOv = () => document.querySelector('.bcv-sheet-ov');
+    const sheet = () => { const el = sheetOv()?.querySelector('.bcv-sheet'); return el && el.getBoundingClientRect().width > 0 ? el : null; };
+    // the hole: round the sheet while it is up, round the card otherwise — kept to them every frame (the sheet grows out of the card)
+    const place = () => {
+      const el = sheet() || weekCard();
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      for (const x of [hole, ring]) { x.setAttribute('x', r.left - PAD); x.setAttribute('y', r.top - PAD); x.setAttribute('width', r.width + PAD * 2); x.setAttribute('height', r.height + PAD * 2); }
+      wrap.dataset.on = sheet() ? 'sheet' : 'card';
+    };
+    let raf = 0;
+    const frame = () => { if (!alive()) return; place(); raf = requestAnimationFrame(frame); };
+    const centre = (el) => { const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; };
+    const cursorTo = ({ x, y }, ms) => { cursor.style.setProperty('--cms', `${ms}ms`); cursor.style.setProperty('--cx', `${x - 5}px`); cursor.style.setProperty('--cy', `${y - 3}px`); };
+    const q = (ms, fn) => setTimeout(() => { if (alive()) fn(); }, ms);
+    const press = () => { cursor.classList.add('is-press'); q(180, () => cursor.classList.remove('is-press')); };
+    // the sheet takes the focus as it opens: the black takes it back, so Enter is still Continue and Escape stays the black's
+    const refocus = () => { const w = document.getElementById('bcv-welcome'); if (w && !w.contains(document.activeElement)) w.focus({ preventScroll: true }); };
+    const firstRow = () => sheetOv()?.querySelector('.bcv-sheet__row') || null;
+    const loop = () => {
+      const card = weekCard();
+      if (!alive() || !card) return;
+      const c = centre(card);
+      cursor.style.opacity = '0';
+      cursorTo({ x: c.x - 170, y: c.y + 230 }, 0);
+      q(300, () => { const k = weekCard(); if (!k) return; cursor.style.opacity = '1'; cursorTo(centre(k), 800); });
+      q(1400, () => { const k = weekCard(); if (!k) return; press(); k.click(); setTimeout(refocus, 0); });
+      q(2700, () => { const row = firstRow(); if (row) { const r = row.getBoundingClientRect(); cursorTo({ x: r.left + Math.min(120, r.width / 3), y: r.top + r.height / 2 }, 650); } });
+      q(3500, () => { const row = firstRow(); if (!row) return; press(); row.click(); setTimeout(refocus, 0); });
+      q(7000, () => { const x = sheetOv()?.querySelector('.bcv-sheet__close'); if (x) cursorTo(centre(x), 600); });
+      q(7700, () => { const x = sheetOv()?.querySelector('.bcv-sheet__close'); if (!x) return; press(); x.click(); setTimeout(refocus, 0); });
+      q(8600, () => { cursor.style.opacity = '0'; });
+      q(9400, loop);
+    };
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) { q(60, place); wrap.cleanup = () => {}; return wrap; } // (still: the card through its hole, nothing pressed)
+    q(60, () => { frame(); loop(); });
+    wrap.cleanup = () => { cancelAnimationFrame(raf); const ov = sheetOv(); if (ov) ov.remove(); };
+    return wrap;
   }
   /** A course card of the Grades page, shown: a cursor comes to its ring, the group rings sweep in
    *  and the breakdown takes the place of the target line beside it, then the cursor leaves and it
@@ -303,6 +365,35 @@
       ]),
       h('span', { class: 'bcv-welcome__cursor bcv-welcome__cursor--whatif', html: CURSOR }),
     ]);
+  }
+  /** A big arrow across the black, from the top of a stage's words up to a thing (the switch at the top
+   *  right): it leaves the words going up, bends, and arrives level with the thing from its left, the
+   *  head pointing at it. Drawn in (the line, then the head), over the whole screen, measured afresh on
+   *  each draw(). */
+  function bigArrow() {
+    const NS = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(NS, 'svg');
+    svg.setAttribute('class', 'bcv-welcome__bigarrow');
+    svg.setAttribute('aria-hidden', 'true');
+    const line = document.createElementNS(NS, 'path');
+    line.setAttribute('class', 'bcv-welcome__line');
+    line.setAttribute('pathLength', '1');
+    const head = document.createElementNS(NS, 'path');
+    head.setAttribute('class', 'bcv-welcome__head');
+    svg.append(line, head);
+    const draw = (from, to) => {
+      if (!svg.isConnected || !from?.isConnected || !to?.isConnected) return;
+      const a = from.getBoundingClientRect(), b = to.getBoundingClientRect();
+      if (!a.width || !b.width) return;
+      const ex = Math.round(b.left - 16), ey = Math.round(b.top + b.height / 2); // (the tip: just left of the switch, level with it)
+      const sx = Math.round(Math.min(a.right - 24, Math.max(a.left + a.width * 0.72, ex - 420))), sy = Math.round(a.top - 18); // (the tail: over the words' right-hand part)
+      if (sy - ey < 60 || ex - sx < 40) { line.setAttribute('d', ''); head.setAttribute('d', ''); return; } // (no room between them: no arrow rather than a tangle)
+      const bend = Math.max(60, Math.min(220, (ex - sx) * 0.55));
+      line.setAttribute('d', `M${sx} ${sy} C${sx} ${Math.round(ey + (sy - ey) * 0.35)} ${Math.round(ex - bend)} ${ey} ${ex} ${ey}`);
+      head.setAttribute('d', `M${ex - 24} ${ey - 20}L${ex} ${ey}L${ex - 24} ${ey + 20}`);
+      svg.dataset.tip = `${ex},${ey}`;
+    };
+    return { el: svg, draw };
   }
   const arrowOf = ({ w, ht, line, head }) => h('span', { class: 'bcv-welcome__arrowbox', 'aria-hidden': 'true', html:
     `<svg class="bcv-welcome__arrow" viewBox="0 0 ${w} ${ht}" width="${w}" height="${ht}"><path class="bcv-welcome__line" pathLength="1" d="${line}"/><path class="bcv-welcome__head" d="${head}"/></svg>` });
@@ -384,13 +475,14 @@
     next.hidden = true;
     const hint = typeof s.hint === 'function' ? s.hint(app) : s.hint;
     const lines = Array.isArray(hint); // (a hint of several lines: one per stop)
-    const box = h('div', { class: 'bcv-welcome__stage', dataset: { stage: s.layout } }, [
+    const layout = typeof s.layout === 'function' ? s.layout(app) : s.layout; // (the Dashboard's way in: on the Dashboard, the real card; elsewhere, the drawing)
+    const box = h('div', { class: 'bcv-welcome__stage', dataset: { stage: layout } }, [
       s.arrow ? arrowOf(s.arrow) : null, // (a hole stage's arrow is placed at the hole itself: spotProp)
       h('div', { class: 'bcv-welcome__text' }, [
         s.kicker ? h('div', { class: 'bcv-welcome__kicker', text: s.kicker }) : null,
         h('div', { class: 'bcv-welcome__title', text: s.title }),
         lines ? h('div', { class: 'bcv-welcome__hint bcv-welcome__hint--rows' }, hint.map((line, i) => { // (a row per stop, with a small slider showing where it is)
-          const colour = line.match(/^(.*\bpress )(green|gray|red)(\.?)$/i); // ("…press green.": the colour in bold)
+          const colour = line.match(/^(.*\bpress )(green|gray|red)(\b.*)$/i); // ("…press green.": the colour in bold)
           const at = line.indexOf(':');
           const stop = s.stops?.[i] ?? 0;
           return h('div', { class: 'bcv-welcome__stoprow' }, [
@@ -399,11 +491,12 @@
           ]);
         })) : hint && typeof hint === 'object' && Array.isArray(hint.parts) ? h('div', { class: 'bcv-welcome__hint bcv-welcome__hint--rich' }, hint.parts.map(([t, c]) => h('span', { class: 'bcv-welcome__hue', style: c ? { color: c } : null, text: t }))) // (a line in several colours: one per part)
           : hint ? h('div', { class: 'bcv-welcome__hint', text: hint }) : null,
+        s.sub ? h('div', { class: 'bcv-welcome__sub', text: s.sub }) : null,
       ]),
       next,
     ]);
     const prop = s.spot ? spotProp(s, app, box) : s.prop ? s.prop(app, ctx) : null;
-    ui.el.classList.toggle('bcv-welcome--holes', !!(s.spot && prop)); // (the black is the mask's, with the holes in it)
+    ui.el.classList.toggle('bcv-welcome--holes', !!((s.spot || (typeof s.holes === 'function' ? s.holes(app) : s.holes)) && prop)); // (the black is the mask's, with the holes in it)
     ui.el.dataset.stage = key;
     ui.el.replaceChildren(...[prop, box].filter(Boolean));
     ui.stage = { key, box, prop, next };
@@ -419,11 +512,19 @@
     };
     level();
     if (prop?.follow) ui.stage.follow = setInterval(() => { if (prop.follow()) level(); }, 200); // (the holes keep to the things as the page fills in under the black)
-    // the look stage sits under the switch's show — the switch and the pill that pops out of it — wherever their box ends (ui.watchLayout: measured as the show moves, at any zoom)
-    const look = s.layout === 'look' ? prop?.querySelector?.('.bcv-welcome__look') : null;
+    // the look stage sits in the middle of the screen (app.css), and a big arrow runs from its words up
+    // to the switch's copy at the top right — drawn again whenever the window or the copy moves
+    const look = s.layout === 'look' ? prop?.querySelector?.('.bcv-welcome__look .bcv-look__main') : null;
     if (look) {
-      const stopLook = BCV.ui.watchLayout(look, () => { box.style.top = `${Math.round(BCV.ui.boundsOf(look).bottom + 22)}px`; }, { within: ui.el });
-      BCV.ui.onGone(box, stopLook);
+      const arrow = bigArrow();
+      ui.el.insertBefore(arrow.el, box);
+      ui.stage.arrow = arrow.el;
+      const draw = () => arrow.draw(box.querySelector('.bcv-welcome__text') || box, look);
+      draw();
+      box.addEventListener('animationend', draw); // (the words come in rising 12px: drawn again where they settle)
+      const stopLook = BCV.ui.watchLayout(look, draw, { within: ui.el });
+      window.addEventListener('resize', draw);
+      BCV.ui.onGone(box, () => { stopLook?.(); window.removeEventListener('resize', draw); });
     }
     clearTimeout(ui.timer);
     ui.timer = setTimeout(() => {
@@ -443,9 +544,12 @@
     ui.el.classList.remove('bcv-welcome--holes'); // (the plain black is back under the mask before the mask fades: the page never shows through)
     st.box.classList.add('is-out');
     st.prop?.classList.add('is-out');
+    st.arrow?.classList.add('is-out');
     await wait(LEAVE);
     st.box.remove();
+    st.prop?.cleanup?.(); // (the real card's show: its sheet goes with it)
     st.prop?.remove();
+    st.arrow?.remove();
   }
 
   /** The whole run, from black to the page: the stages named, in turn, then the black fades. With

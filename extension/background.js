@@ -752,7 +752,7 @@ if (typeof importScripts === 'function' && !self.BCV_LAZY_MODULES) {
       const r = await registerDomain(p.origin);
       if (r && r.ok === false) return;
       if (p.next === 'setup') {
-        await S.update({ appearance: { skin: true } });
+        await S.update(S.lookPatch(true));
         await api.tabs.update(p.tabId, { url: `${p.origin}/?bcv=setup` });
       } else if (p.tabId != null) await api.tabs.reload(p.tabId);
     } catch {

@@ -8,7 +8,7 @@
   // The scripts' own version, stamped: content/app/app.js compares it with the stylesheet's
   // (--bcv-version) and the manifest's, because Safari can run one version's script with
   // another's stylesheet after the Mac app has updated under it. Bumped with every release.
-  self.BCV_VERSION = '2.98.17';
+  self.BCV_VERSION = '2.98.18';
 
   const DEFAULTS = {
     version: 3, // (3: Away Refresh off unless turned on — settings written before carry it on, and the one-time step in getSettings turns it off for everyone)
@@ -17,6 +17,7 @@
     },
     appearance: {
       skin: true,                 // the redesigned interface; off = stock Canvas
+      offUntil: 0,                // turned off for a while (the switch's red list, 2.98.18): the time (ms) it comes back on by itself; 0 = until turned on again. Read through lookOn(), written through lookPatch()
       darkMode: 'system',         // 'off' | 'on' | 'system'
       siteName: '',               // shown in the sidebar brand row; blank = derived from the host
       logoUrl: '',                // sidebar tile image; blank = the school's own mark from Canvas's theme
@@ -97,6 +98,21 @@
     return mode === 'on' || (mode === 'system' && !!systemDark);
   }
 
+  /** Is Simpl on, by the saved settings? On unless turned off — and a turn-off for a while (the
+   *  switch's red list: 30 minutes, an hour, four hours, a day) is over once its time has come,
+   *  whether or not anything has written that back yet. Every reader of the saved look asks this. */
+  function lookOn(settings, now = Date.now()) {
+    const a = settings?.appearance || {};
+    if (a.skin !== false) return true;
+    const until = Number(a.offUntil) || 0;
+    return until > 0 && now >= until;
+  }
+  /** The patch that saves the look: on, or off until a time (ms) — 0 for until turned on again.
+   *  Every writer goes through it, so an old time is never left behind to turn Simpl on later. */
+  function lookPatch(on, until = 0) {
+    return { appearance: { skin: !!on, offUntil: on ? 0 : Math.max(0, Number(until) || 0) } };
+  }
+
   BCV.settings = {
     DEFAULTS,
     STORAGE_KEY,
@@ -107,5 +123,7 @@
     replace: replaceSettings,
     onChange: onSettingsChange,
     isDark,
+    lookOn,
+    lookPatch,
   };
 })();

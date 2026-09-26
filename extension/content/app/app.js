@@ -233,7 +233,7 @@
     return r.screen !== 'native' && !!(screens[r.screen] || (BCV.phone?.active() && BCV.phone.screens[r.screen]));
   }
   function inPlaceHop(url) {
-    if (!document.getElementById('bcv-app') || state.settings?.appearance?.skin === false) return false; // the shell must be up
+    if (!document.getElementById('bcv-app') || !BCV.settings.lookOn(state.settings)) return false; // the shell must be up
 
     return drawnRoute(state.route || parseRoute()) && drawnRoute(parseRoute(url.href));
   }
@@ -1281,103 +1281,152 @@
     for (const v of ['--bcv-hole-top', '--bcv-hole-left', '--bcv-hole-width']) html.style.removeProperty(v);
   }
 
-  // ---- the switch at the top right: the look on, off for this page, or locked off ------------------
+  // ---- the switch at the top right: Simpl on (green) or off (red), and for how long --------------
   // Over our own shell and over stock Canvas alike — it lives outside #bcv-app, so a page drawn
-  // without the shell has it too. One slider with three stops: on the right, green, the look on;
-  // in the middle, grey, stock Canvas for this page view only (a press toggles between these two,
-  // and a reload or the next page brings the look back — BCV.early.flipLook's one-page note); on
-  // the left, orange, the lock — the look saved off, so every page is stock Canvas until it is
-  // unlocked (BCV.early.setLook). The slider is drawn at its own size — a 208 by 48 track, a white
-  // knob of 40 with a glyph in it (a tick, a dash, a lock), the colour running out from the middle
-  // stop as far as the knob, a dot at each stop, LOCKED and ACTIVE in the room the knob leaves —
-  // and shown at three quarters of that. Folded, the pill is a disc with the mark alone, in the
-  // stop's colour (blue on, grey off for this page, orange locked); under the pointer (or the
-  // keyboard's focus) it opens into a capsule, the mark growing into the slider in its place and
-  // the name coming out on the left, saying which. A press on the slider goes to the stop in that
-  // third of it — its left third the lock, its right third on — and the knob can be dragged,
-  // gliding to the nearest stop when let go; a press elsewhere on the pill toggles on and off for
-  // this page, as do Enter and Space, and the arrow keys step it. The popup and Settings → General
-  // have the saved switch, the same as the lock; "Open in stock Canvas" on a Canvas-drawn page is
-  // the middle stop.
+  // without the shell has it too. Folded, it is a disc with the mark, in the state's colour: green
+  // on, red off. Under the pointer (or the keyboard's focus) two buttons float down under it: green
+  // turns Simpl on; red turns it off, and a press on red opens it out, on the island's spring (the
+  // capsules' timing), into how long: This page only (a one-page note: the next page is Simpl
+  // again), for 30 minutes, 1 hour, 4 hours or 1 day (saved: Simpl comes back at the next page
+  // after that — settings.lookOn), or indefinitely (until turned on again). The one that is the
+  // state wears a white ring and says so: Active, Off for this page, Off until 3:42 PM, Simpl is
+  // off. A press on the disc itself opens the red list while Simpl is on and turns it on while it
+  // is off; Enter and Space do the same, the arrows walk the buttons and the list, Escape folds the
+  // list. The popup and Settings → General have the saved switch; "Open in stock Canvas" on a
+  // Canvas-drawn page is This page only. (2.98.18: before it, three stops — green, a grey one for
+  // this page, red for good.)
   const LOOK_MARK = '<svg viewBox="0 0 120 120" width="18" height="18" aria-hidden="true"><rect x="16" y="18" width="53" height="84" rx="14" fill="rgba(255,255,255,.35)"/><path d="M28 30 H69 A30 30 0 0 1 69 90 H28" fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><path d="M35 42 H69 A18 18 0 0 1 69 78 H35" fill="none" stroke="rgba(255,255,255,.72)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><path d="M42 54 H69 A6 6 0 0 1 69 66 H42" fill="none" stroke="rgba(255,255,255,.46)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-  // the three things the switch does, in the order they float down: green Activate (Simpl on, and
-  // active on this page), grey Deactivate (stock Canvas for this page, Simpl still on), red Turn off
-  // Simpl (off on every page until it is turned on again — the lock the settings know)
+  // the two buttons, in the order they float down: green on, red off (its list under it)
   const LOOK_OPTS = [
-    { pos: 1, key: 'on', color: '#34c759', label: 'Activate', selected: 'Active', title: 'Simpl Courses on, and active on this page', glyph: 'M20 6L9 17l-5-5' },
-    { pos: 0, key: 'idle', color: '#8e8e93', label: 'Deactivate', selected: 'Deactivated', title: 'Stock Canvas for this page; Simpl Courses stays on', glyph: 'M6 12h12' },
-    { pos: -1, key: 'off', color: '#ff453a', label: 'Turn off Simpl', selected: 'Simpl is off', title: 'Simpl Courses off on every page, until it is turned on again', glyph: 'M12 4v8M6.3 7.3a8 8 0 1011.4 0' },
+    { pos: 1, key: 'on', color: '#34c759', label: 'Turn on Simpl', title: 'Simpl Courses on', glyph: 'M20 6L9 17l-5-5' },
+    { pos: -1, key: 'off', color: '#ff453a', label: 'Turn off Simpl', title: 'Turn Simpl Courses off: for this page, for a while, or indefinitely', glyph: 'M12 4v8M6.3 7.3a8 8 0 1011.4 0' },
   ];
-  const LOOK_WORDS = { '1': 'Active', '0': 'Deactivated', '-1': 'Simpl is off' };
-  const LOOK_TITLES = {
-    '1': 'Simpl Courses is active. Hover for Activate, Deactivate and Turn off Simpl; press for stock Canvas on this page.',
-    '0': 'Stock Canvas for this page. Hover for Activate, Deactivate and Turn off Simpl; press for Simpl Courses.',
-    '-1': 'Simpl Courses is off. Hover for Activate, Deactivate and Turn off Simpl; press to turn it on.',
-  };
-  /** The switch's DOM: the disc with the mark, and under it the three buttons (folded away until the
-   *  pointer or the keyboard's focus is on it), and the classes, words and ARIA of a state put on
-   *  it; nothing wired. The page's own and the welcome's show of it share it. */
+  // how long red turns it off for: 'page' is this page view alone; a number is that long (ms); null is until turned on again
+  const LOOK_FOR = [
+    { key: 'page', label: 'This page only', ms: 'page' },
+    { key: '30m', label: 'For 30 minutes', ms: 30 * 60000 },
+    { key: '1h', label: 'For 1 hour', ms: 60 * 60000 },
+    { key: '4h', label: 'For 4 hours', ms: 4 * 60 * 60000 },
+    { key: '1d', label: 'For 1 day', ms: 24 * 60 * 60000 },
+    { key: 'ever', label: 'Indefinitely', ms: null },
+  ];
+  /** When a turn-off for a while ends, in words: the time today, the day and time after that. */
+  const untilWords = (t) => { const d = new Date(t); return U.sameDay(d, new Date()) ? U.fmtTime(d) : `${U.DAYS[d.getDay()]} ${U.fmtTime(d)}`; };
+  /** The state in words: 1 on, 0 off for this page, -1 off (until a time, or until turned on). */
+  const lookWords = (p, until = 0) => (p === 1 ? 'Active' : p === 0 ? 'Off for this page' : until ? `Off until ${untilWords(until)}` : 'Simpl is off');
+  const lookTitle = (p, until = 0) => (p === 1 ? 'Simpl Courses is active. Hover for Turn on and Turn off; press to choose how long to turn it off.' : `${lookWords(p, until)}. Hover for Turn on and Turn off; press to turn it on.`);
+  /** The switch's DOM: the disc with the mark, and under it the two buttons — red with its list of
+   *  lengths — folded away until the pointer or the keyboard's focus is on it, and the classes,
+   *  words and ARIA of a state put on it; nothing wired. The page's own and the welcome's show of
+   *  it share it. */
   function lookSwitch() {
-    const text = h('span', { class: 'bcv-look__text', text: LOOK_WORDS['1'] });
-    const main = h('button', { type: 'button', class: 'bcv-look__main', role: 'slider', 'aria-label': 'Simpl Courses switch', 'aria-orientation': 'vertical', 'aria-valuemin': '-1', 'aria-valuemax': '1' }, [
+    const text = h('span', { class: 'bcv-look__text', text: lookWords(1) });
+    const main = h('button', { type: 'button', class: 'bcv-look__main', 'aria-label': 'Simpl Courses switch', 'aria-haspopup': 'true' }, [
       h('span', { class: 'bcv-look__mark', 'aria-hidden': 'true', html: LOOK_MARK }),
       text,
     ]);
-    const opts = LOOK_OPTS.map((o, i) => h('button', { type: 'button', class: `bcv-look__opt bcv-look__opt--${o.key}`, dataset: { pos: String(o.pos) }, style: { '--bcv-opt': o.color, '--bcv-i': String(i) }, title: o.title, 'aria-pressed': 'false' }, [
-      h('span', { class: 'bcv-look__optlbl', text: o.label }),
-      h('span', { class: 'bcv-look__optdot', 'aria-hidden': 'true', html: `<svg viewBox="0 0 24 24"><path d="${o.glyph}"/></svg>` }),
-    ]));
-    const menu = h('div', { class: 'bcv-look__menu', role: 'group', 'aria-label': 'Activate, Deactivate or Turn off Simpl' }, opts);
+    const dot = (o) => h('span', { class: 'bcv-look__optdot', 'aria-hidden': 'true', html: `<svg viewBox="0 0 24 24"><path d="${o.glyph}"/></svg>` });
+    const [ON, OFF] = LOOK_OPTS;
+    const onBtn = h('button', { type: 'button', class: 'bcv-look__opt bcv-look__opt--on', dataset: { pos: '1' }, style: { '--bcv-opt': ON.color, '--bcv-i': '0' }, title: ON.title, 'aria-pressed': 'false' }, [
+      h('span', { class: 'bcv-look__optlbl', text: ON.label }), dot(ON),
+    ]);
+    const offHead = h('button', { type: 'button', class: 'bcv-look__offhead', title: OFF.title, 'aria-expanded': 'false', 'aria-pressed': 'false' }, [
+      h('span', { class: 'bcv-look__optlbl', text: OFF.label }), dot(OFF),
+    ]);
+    const fors = LOOK_FOR.map((o, j) => h('button', { type: 'button', class: 'bcv-look__forbtn', dataset: { for: o.key }, style: { '--bcv-j': String(j) }, tabIndex: -1, text: o.label }));
+    const list = h('div', { class: 'bcv-look__for', role: 'group', 'aria-label': 'Turn Simpl off for how long' }, fors);
+    const offBox = h('div', { class: 'bcv-look__opt bcv-look__opt--off', dataset: { pos: '-1' }, style: { '--bcv-opt': OFF.color, '--bcv-i': '1' } }, [offHead, list]);
+    const opts = [onBtn, offBox];
+    const menu = h('div', { class: 'bcv-look__menu', role: 'group', 'aria-label': 'Turn Simpl Courses on or off' }, opts);
     const box = h('div', { class: 'bcv-look' }, [main, menu]);
-    const show = (p) => {
-      for (const el of [box, main]) { el.classList.toggle('is-on', p === 1); el.classList.toggle('is-off', p === 0); el.classList.toggle('is-lock', p === -1); }
-      main.setAttribute('aria-valuenow', String(p));
-      main.setAttribute('aria-valuetext', LOOK_WORDS[String(p)]);
-      main.title = LOOK_TITLES[String(p)];
-      text.textContent = LOOK_WORDS[String(p)];
-      opts.forEach((b, i) => {
-        const o = LOOK_OPTS[i], sel = o.pos === p;
-        b.classList.toggle('is-selected', sel);
-        b.setAttribute('aria-pressed', sel ? 'true' : 'false');
-        b.querySelector('.bcv-look__optlbl').textContent = sel ? o.selected : o.label;
-      });
+    /** The red one opened out into its list (true), or folded back into its disc. */
+    const expand = (yes) => {
+      offBox.classList.toggle('is-expanded', !!yes);
+      box.classList.toggle('is-expanded', !!yes);
+      offHead.setAttribute('aria-expanded', yes ? 'true' : 'false');
+      for (const b of fors) b.tabIndex = yes ? 0 : -1;
     };
-    return { box, main, opts, text, show };
+    const show = (p, until = 0) => {
+      for (const el of [box, main]) { el.classList.toggle('is-on', p === 1); el.classList.toggle('is-off', p !== 1); el.classList.toggle('is-page', p === 0); el.classList.toggle('is-lock', p === -1); }
+      box.dataset.pos = String(p);
+      const words = lookWords(p, until);
+      main.setAttribute('aria-label', `Simpl Courses switch: ${words}`);
+      main.title = lookTitle(p, until);
+      text.textContent = words;
+      onBtn.classList.toggle('is-selected', p === 1);
+      onBtn.setAttribute('aria-pressed', p === 1 ? 'true' : 'false');
+      onBtn.querySelector('.bcv-look__optlbl').textContent = p === 1 ? 'Active' : ON.label;
+      offBox.classList.toggle('is-selected', p !== 1);
+      offHead.setAttribute('aria-pressed', p !== 1 ? 'true' : 'false');
+      offHead.querySelector('.bcv-look__optlbl').textContent = p === 1 ? OFF.label : words;
+      const cur = p === 0 ? 'page' : p === -1 ? (until ? null : 'ever') : null; // (a timed one's own row is not known after the fact: none marked)
+      for (const b of fors) b.classList.toggle('is-current', b.dataset.for === cur);
+    };
+    return { box, main, opts, onBtn, offBox, offHead, fors, list, text, show, expand };
   }
   /** A switch for the welcome's show: the same, nothing wired, put at a state, its buttons floated
-   *  down or folded and any one of them opened out on demand. */
+   *  down or folded, one of them opened out, the red one's list opened and a row of it lit. */
   function lookDemo() {
-    const { box, main, opts, show } = lookSwitch();
+    const sw = lookSwitch();
+    const { box, main, opts, fors, show, expand } = sw;
     box.className = 'bcv-look-pill';
     box.setAttribute('aria-hidden', 'true');
-    main.tabIndex = -1;
-    for (const b of opts) { b.tabIndex = -1; b.removeAttribute('title'); }
-    const setPos = (p) => { show(p); main.removeAttribute('title'); };
+    for (const b of box.querySelectorAll('button')) { b.tabIndex = -1; b.removeAttribute('title'); }
+    const setPos = (p, until = 0) => { show(p, until); main.removeAttribute('title'); };
     setPos(1);
-    return { el: box, opts, setPos, open: (yes) => box.classList.toggle('is-open', yes), hover: (i) => opts.forEach((b, k) => b.classList.toggle('is-hover', k === i)) };
+    return {
+      el: box, opts, fors, setPos,
+      open: (yes) => box.classList.toggle('is-open', yes),
+      hover: (i) => opts.forEach((b, k) => b.classList.toggle('is-hover', k === i)),
+      expand: (yes) => { expand(yes); for (const b of fors) b.tabIndex = -1; },
+      hoverFor: (j) => fors.forEach((b, k) => b.classList.toggle('is-hover', k === j)),
+    };
   }
   function mountLookToggle() {
     if (self.BCVBridge?.native || document.getElementById('bcv-look')) return; // the app has its own settings sheet
-    const pos = () => (BCV.early?.lookPos ? BCV.early.lookPos() : BCV.early?.isOn?.() ? 1 : 0);
-    const clamp = (p) => Math.max(-1, Math.min(1, p));
-    const { box, main: mainBtn, opts, show } = lookSwitch();
+    const E = () => BCV.early;
+    const pos = () => (E()?.lookPos ? E().lookPos() : E()?.isOn?.() ? 1 : 0);
+    const until = () => E()?.offUntil?.() || 0;
+    const { box, main: mainBtn, onBtn, offBox, offHead, fors, show, expand } = lookSwitch();
     box.id = 'bcv-look';
-    const paint = () => show(pos());
-    const go = (p) => {
-      if (p === pos()) return;
+    const paint = () => show(pos(), until());
+    const busy = (p) => {
       box.classList.add('is-busy'); // the page loads afresh; until then the press is not repeated
-      Promise.resolve(BCV.early?.setLook?.(p)).finally(() => { box.classList.remove('is-busy'); paint(); });
+      Promise.resolve(p).finally(() => { box.classList.remove('is-busy'); paint(); });
     };
-    // the buttons do what they say; a press on the disc itself (or Enter, Space) toggles active and
-    // deactivated for this page, and the arrow keys step it — Home is off, End is active
-    for (const b of opts) b.addEventListener('click', () => go(Number(b.dataset.pos)));
-    mainBtn.addEventListener('click', () => go(pos() === 1 ? 0 : 1));
-    mainBtn.addEventListener('keydown', (e) => {
-      const p = e.key === 'ArrowLeft' || e.key === 'ArrowDown' ? pos() - 1 : e.key === 'ArrowRight' || e.key === 'ArrowUp' ? pos() + 1 : e.key === 'Home' ? -1 : e.key === 'End' ? 1 : null;
-      if (p === null) return;
+    const turnOn = () => { expand(false); if (pos() !== 1) busy(E()?.setLook?.(1)); };
+    const turnOff = (what) => { expand(false); busy(E()?.offFor ? E().offFor(what) : E()?.setLook?.(what === 'page' ? 0 : -1)); };
+    const isOpen = () => offBox.classList.contains('is-expanded');
+    const openList = (focusFirst) => { expand(true); if (focusFirst) fors[0].focus({ preventScroll: true }); };
+    // the buttons do what they say; red opens its list (a second press folds it); a row of the list turns Simpl off for that long
+    onBtn.addEventListener('click', turnOn);
+    offHead.addEventListener('click', (e) => { if (isOpen()) expand(false); else openList(e.detail === 0); }); // (e.detail 0: the keyboard's press — the first row takes the focus)
+    for (const b of fors) b.addEventListener('click', () => turnOff(LOOK_FOR.find((o) => o.key === b.dataset.for)?.ms ?? null));
+    // the disc: on, it opens the red list (nothing turns off by a stray press); off, it turns Simpl on
+    mainBtn.addEventListener('click', (e) => { if (pos() === 1) openList(e.detail === 0); else turnOn(); });
+    // the keyboard: the arrows walk the disc, the two buttons and the list (when it is open); Escape folds the list, then leaves
+    const stops = () => [mainBtn, onBtn, offHead, ...(isOpen() ? fors : [])];
+    box.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        if (isOpen()) { e.preventDefault(); expand(false); offHead.focus({ preventScroll: true }); }
+        else if (box.contains(document.activeElement)) { e.preventDefault(); document.activeElement.blur(); }
+        return;
+      }
+      const dir = e.key === 'ArrowDown' ? 1 : e.key === 'ArrowUp' ? -1 : 0;
+      if (!dir) return;
+      const all = stops();
+      const i = all.indexOf(document.activeElement);
+      if (i < 0) return;
       e.preventDefault();
-      go(clamp(p));
+      all[Math.max(0, Math.min(all.length - 1, i + dir))].focus({ preventScroll: true });
     });
+    // the list folds when the pointer has left the switch (a moment's grace to come back) — unless the keyboard is walking it
+    // (a press with the pointer leaves the focus on red, which is no reason to keep the list up) — or the focus has gone elsewhere
+    let foldT = 0;
+    const keyboardIn = () => { try { return box.matches(':has(:focus-visible)'); } catch { return false; } };
+    box.addEventListener('pointerleave', () => { clearTimeout(foldT); foldT = setTimeout(() => { if (!box.matches(':hover') && !keyboardIn()) expand(false); }, 260); });
+    box.addEventListener('pointerenter', () => clearTimeout(foldT));
+    box.addEventListener('focusout', (e) => { if (!box.contains(e.relatedTarget) && !box.matches(':hover')) expand(false); });
     paint();
     // the widgets' own bar (2.58.0): a strip across the top of the page that the switch and the pinned
     // tools sit in, the interface starting under it (app.css decides where it shows: the shell's pages)
@@ -1438,7 +1487,7 @@
     if (html.classList.contains('bcv-phone') && !BCV.phone) { try { await BCV.lazy?.load?.('phone'); } catch { /* the desktop layout, then */ } }
     // Until the guided setup has been finished (a flag in the extension's storage, shared by every
     // site), every Canvas page with the interface on opens it over the Dashboard.
-    state.lookOn = BCV.early?.isOn?.() ?? state.settings.appearance.skin !== false; // the page's own look: the saved one, or this page's one-page note
+    state.lookOn = BCV.early?.isOn?.() ?? BCV.settings.lookOn(state.settings); // the page's own look: the saved one, or this page's one-page note
     if (state.lookOn && await needsSetup()) {
       go('/?bcv=setup', { replace: true });
       return;

@@ -13,7 +13,7 @@
  * min(their own, the viewport less a margin). */
 
 html[data-bcv-theme] {
-  --bcv-version: "2.98.17"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.98.18"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -180,14 +180,13 @@ html[data-bcv-theme="dark"] .bcv-skel { --bcv-skel: linear-gradient(90deg, rgba(
 #bcv-look.is-busy button { pointer-events: none; } /* (no second press while the page loads afresh) */
 #bcv-look button, .bcv-look-pill button { margin: 0; border: 0; background: transparent; color: inherit; cursor: pointer; font: inherit; letter-spacing: inherit; text-align: left; }
 #bcv-look button:focus-visible { outline: 2px solid #0a84ff; outline-offset: 2px; }
-/* the disc: 24px of glass with the mark in the state's colour — green active, grey deactivated, red off */
+/* the disc: 24px of glass with the mark in the state's colour — green on, red off */
 .bcv-look__main { position: relative; flex: none; display: flex; align-items: center; justify-content: center; box-sizing: border-box; width: 24px; height: 24px; padding: 0; border: 1px solid rgba(255,255,255,.14); border-radius: 12px; background: rgba(28,28,30,.86); -webkit-backdrop-filter: blur(16px) saturate(1.4); backdrop-filter: blur(16px) saturate(1.4); box-shadow: 0 2px 10px rgba(0,0,0,.2); user-select: none; -webkit-user-select: none; transition: transform .16s var(--bcv-spring-snappy), box-shadow .18s ease; }
 #bcv-look:hover .bcv-look__main, #bcv-look:has(:focus-visible) .bcv-look__main, .bcv-look-pill.is-open .bcv-look__main { transform: scale(1.1); box-shadow: 0 6px 20px rgba(0,0,0,.3); }
 .bcv-look__main:active { opacity: .9; }
 .bcv-look__mark { width: 14px; height: 14px; border-radius: 4px; background: linear-gradient(158deg, #34c759, #1f9d45); display: flex; align-items: center; justify-content: center; transition: background .2s ease; }
 .bcv-look__mark svg { display: block; width: 12px; height: 12px; }
-.bcv-look__main.is-off .bcv-look__mark { background: linear-gradient(158deg, #a1a1a6, #7c7c82); }
-.bcv-look__main.is-lock .bcv-look__mark { background: linear-gradient(158deg, #ff6b62, #e0352b); }
+.bcv-look__main.is-off .bcv-look__mark { background: linear-gradient(158deg, #ff6b62, #e0352b); } /* (off — for this page, for a while or indefinitely — is red; on is green) */
 .bcv-look__text { position: absolute; width: 0; height: 0; overflow: hidden; opacity: 0; white-space: nowrap; } /* (the state's words, for the accessibility tree and the tests: never shown) */
 /* the three buttons: folded away under the disc; under the pointer (or the keyboard's focus, or the
  * welcome's is-open) they float down one after the other, each a 24px disc in its colour. The one
@@ -206,6 +205,31 @@ html[data-bcv-theme="dark"] .bcv-skel { --bcv-skel: linear-gradient(90deg, rgba(
 /* (the reset above — #bcv-look button — outranks a class: the disc's glass and the buttons' colours said again at its weight) */
 #bcv-look .bcv-look__main, .bcv-look-pill .bcv-look__main { border: 1px solid rgba(255,255,255,.14); background: rgba(28,28,30,.86); }
 #bcv-look .bcv-look__opt, .bcv-look-pill .bcv-look__opt { background: var(--bcv-opt); }
+/* red, and how long (2.98.18): the red one is a box — its head the round button, its list under it.
+ * Hovered, it opens out to the left to the list's width with its words; pressed (is-expanded), it
+ * grows down into the list on the island's spring (the capsules' timing, content/app/motion.js), its
+ * corners easing out, the rows coming in one after the other once it is on its way. The list is laid
+ * out at its full size all along — clipped, not squeezed — so nothing inside it reflows as it grows. */
+#bcv-look .bcv-look__opt--off, .bcv-look-pill .bcv-look__opt--off { --bcv-for-w: 164px; --bcv-for-h: 212px; flex-direction: column; align-items: stretch; justify-content: flex-start; height: 24px; background: linear-gradient(180deg, #ff453a, #e8372d); transition: max-width var(--bcv-t-island) var(--bcv-spring-island), height var(--bcv-t-island) var(--bcv-spring-island), border-radius var(--bcv-t-island) var(--bcv-spring-island), opacity .18s ease, transform .28s cubic-bezier(.32,.72,0,1), box-shadow .18s ease; }
+#bcv-look:hover .bcv-look__opt--off, #bcv-look:has(:focus-visible) .bcv-look__opt--off, .bcv-look-pill.is-open .bcv-look__opt--off { transition-delay: 0s, 0s, 0s, 55ms, 55ms, 0s; }
+.bcv-look__opt--off:hover, .bcv-look__opt--off:has(:focus-visible), .bcv-look__opt--off.is-hover, .bcv-look__opt--off.is-expanded { max-width: var(--bcv-for-w); }
+.bcv-look__opt--off:hover .bcv-look__optlbl, .bcv-look__opt--off:has(:focus-visible) .bcv-look__optlbl, .bcv-look__opt--off.is-hover .bcv-look__optlbl, .bcv-look__opt--off.is-expanded .bcv-look__optlbl { max-width: 180px; padding: 0 2px 0 11px; opacity: 1; }
+#bcv-look .bcv-look__opt--off.is-expanded, .bcv-look-pill .bcv-look__opt--off.is-expanded { height: var(--bcv-for-h); border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,.34); }
+#bcv-look .bcv-look__offhead, .bcv-look-pill .bcv-look__offhead { flex: none; display: flex; align-items: center; justify-content: flex-end; width: 100%; height: 24px; padding: 0; border-radius: 12px; background: transparent; color: #fff; white-space: nowrap; }
+#bcv-look .bcv-look__offhead:focus-visible { outline-offset: -2px; }
+.bcv-look__for { flex: none; box-sizing: border-box; width: var(--bcv-for-w); display: flex; flex-direction: column; gap: 2px; padding: 4px 5px 6px; }
+#bcv-look .bcv-look__forbtn, .bcv-look-pill .bcv-look__forbtn { flex: none; box-sizing: border-box; display: flex; align-items: center; width: 100%; height: 28px; padding: 0 10px; border-radius: 9px; background: transparent; color: #fff; font: 600 12px/1 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif; letter-spacing: -.01em; white-space: nowrap; opacity: 0; transform: translateY(-6px); transition: background .15s ease, opacity .16s ease, transform .3s cubic-bezier(.32,.72,0,1); }
+#bcv-look .bcv-look__opt--off.is-expanded .bcv-look__forbtn, .bcv-look-pill .bcv-look__opt--off.is-expanded .bcv-look__forbtn { opacity: 1; transform: none; transition-delay: 0s, calc(80ms + var(--bcv-j) * 28ms), calc(80ms + var(--bcv-j) * 28ms); } /* (at the id's weight: the rows' resting rule above is said there) */
+#bcv-look .bcv-look__forbtn:hover, #bcv-look .bcv-look__forbtn:focus-visible, .bcv-look-pill .bcv-look__forbtn.is-hover { background: rgba(255,255,255,.22); }
+#bcv-look .bcv-look__forbtn:focus-visible { outline: 2px solid #fff; outline-offset: -2px; }
+.bcv-look__forbtn.is-current::after { content: ''; width: 6px; height: 6px; margin-left: auto; border-radius: 50%; background: #fff; } /* (the one in force: a dot at its end) */
+.bcv-look__forbtn:active { background: rgba(255,255,255,.32); }
+/* the red box keeps its list up while it is open, whatever the pointer does over the rest of the switch */
+#bcv-look.is-expanded .bcv-look__menu { visibility: visible; transition-delay: 0s; }
+#bcv-look.is-expanded .bcv-look__opt { opacity: 1; transform: none; pointer-events: auto; }
+@media (prefers-reduced-motion: reduce) {
+  #bcv-look .bcv-look__opt--off, .bcv-look-pill .bcv-look__opt--off, #bcv-look .bcv-look__forbtn, .bcv-look-pill .bcv-look__forbtn { transition-duration: .01s; transition-delay: 0s; }
+}
 /* the phone layout's own header has the corner; the setup covers the page */
 html.bcv-phone.bcv-on #bcv-look, html.bcv-setup-open #bcv-look { display: none; }
 
@@ -273,7 +297,14 @@ html.bcv-welcome { overflow: hidden; }
 /* the stage: the arrow, the three lines, Continue — under the switch, right-aligned; under the pill, centred */
 .bcv-welcome__stage { position: absolute; display: flex; flex-direction: column; gap: 14px; animation: bcv-welcome-in .5s ease both; }
 .bcv-welcome__stage.is-out { animation: bcv-welcome-out .25s ease both; }
-.bcv-welcome__stage[data-stage="look"] { top: 172px; right: 40px; left: 16px; align-items: flex-end; text-align: right; } /* (top: under the switch's show — welcome.js measures the switch and its pill and sets it; this is the first frame's) */
+.bcv-welcome__stage[data-stage="look"] { inset: 0; box-sizing: border-box; padding: 24px 16px; justify-content: center; align-items: center; text-align: center; pointer-events: none; } /* (2.98.18: in the middle of the screen, a big arrow from its words up to the switch — welcome.js bigArrow) */
+.bcv-welcome__stage[data-stage="look"] > * { pointer-events: auto; }
+.bcv-welcome__stage[data-stage="look"] .bcv-welcome__hint--rows { align-items: flex-start; } /* (the rows as a block in the middle, each row's disc under the one above) */
+.bcv-welcome__sub { max-width: 460px; margin-top: 6px; font-size: 14px; font-weight: 500; line-height: 1.4; color: rgba(255,255,255,.5); text-wrap: balance; }
+/* the big arrow: across the whole black, from the words up to the switch, drawn in like the others */
+.bcv-welcome__bigarrow { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.bcv-welcome__bigarrow path { fill: none; stroke: #fff; stroke-width: 9; stroke-linecap: round; stroke-linejoin: round; }
+.bcv-welcome__bigarrow.is-out { animation: bcv-welcome-out .25s ease both; }
 .bcv-welcome__stage[data-stage="away"] { top: calc(104px + env(safe-area-inset-top, 0px)); left: 16px; right: 16px; align-items: center; text-align: center; }
 .bcv-welcome__stage[data-stage="away"] .bcv-welcome__title { max-width: 480px; text-wrap: balance; } /* ("Click to cancel, or hold to disable" breaks as two even lines, not a word left on the second) */
 .bcv-welcome__arrowbox { display: block; flex: none; }
@@ -2443,7 +2474,7 @@ html.bcv-setup-open #bcv-bar, html.bcv-welcome #bcv-bar { display: none !importa
 html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) .bcv-main { padding-top: var(--bcv-bar-h); }
 html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) .bcv-head, html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) .bcv-qz__head, html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) .bcv-pv { top: var(--bcv-bar-h); }
 #bcv-tray { position: fixed; top: 6px; right: 42px; z-index: var(--bcv-z-tray); display: flex; align-items: flex-start; gap: 8px; margin: 0; padding: 0; transition: opacity .18s ease; }
-#bcv-look:hover ~ #bcv-tray, #bcv-look:has(:focus-visible) ~ #bcv-tray { opacity: 0; pointer-events: none; }
+#bcv-look:hover ~ #bcv-tray, #bcv-look:has(:focus-visible) ~ #bcv-tray, #bcv-look.is-expanded ~ #bcv-tray { opacity: 0; pointer-events: none; }
 html.bcv-phone.bcv-on #bcv-tray, html.bcv-setup-open #bcv-tray, html.bcv-welcome #bcv-tray, html:not(.bcv-on):not(.bcv-tooltab) #bcv-tray { display: none; }
 /* On a tool's own tab the tray is the only part of the interface there, and it sits in the bar over
    the tool — beside the X, where the pins used to slide when a tool was framed. It is outside
@@ -2970,6 +3001,15 @@ html[data-bcv-theme="dark"] .bcv-conv__delta.is-more, html[data-bcv-theme="dark"
 .bcv-welcome__stage[data-stage="center"] .bcv-welcome__title { font-size: clamp(30px, 5vw, 48px); }
 .bcv-welcome__stage[data-stage="center"] .bcv-welcome__hint { font-size: 19px; }
 .bcv-welcome__stage[data-stage="demo"] { top: 56%; left: 16px; right: 16px; align-items: center; text-align: center; }
+/* the Dashboard's way in, for real (2.98.18): the words at the foot of the screen on a black ground of their own (the sheet rises over the
+ * middle, seen through its hole), and a pointer that welcome.js moves about the real card and sheet (--cx/--cy, over --cms) */
+.bcv-welcome__stage[data-stage="peek"] { left: 16px; right: 16px; bottom: 20px; width: fit-content; max-width: min(640px, calc(100vw - 32px)); margin: 0 auto; box-sizing: border-box; padding: 14px 24px 16px; border-radius: 22px; background: #000; align-items: center; text-align: center; }
+.bcv-welcome__stage[data-stage="peek"] { gap: 10px; }
+.bcv-welcome__stage[data-stage="peek"] .bcv-welcome__title { font-size: 24px; line-height: 1.2; max-width: 600px; text-wrap: balance; } /* (a line, not a headline: the sheet it is about stays in view above it) */
+.bcv-welcome__stage[data-stage="peek"] .bcv-welcome__next { margin-top: 2px; }
+.bcv-welcome__peekreal .bcv-welcome__cursor--peekreal { left: 0; top: 0; z-index: 1; animation: none; opacity: 0; transform: translate(var(--cx, -40px), var(--cy, -40px)); transition: transform var(--cms, .6s) cubic-bezier(.4,0,.2,1), opacity .3s ease; }
+.bcv-welcome__peekreal .bcv-welcome__cursor--peekreal svg { transform-origin: 5px 3px; transition: transform .15s ease; }
+.bcv-welcome__peekreal .bcv-welcome__cursor--peekreal.is-press svg { transform: scale(.8); }
 .bcv-welcome__pindemo { position: absolute; inset: 0; pointer-events: none; animation: bcv-welcome-fade .4s ease both; }
 .bcv-welcome__pindemo.is-out { animation: bcv-welcome-out .25s ease both; }
 .bcv-welcome__democard { position: absolute; width: 258px; left: calc(50% - 129px); top: 24%; transform-origin: top right; animation: bcv-welcome-drag 5.2s cubic-bezier(.4,0,.2,1) infinite; }
