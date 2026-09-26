@@ -73,6 +73,18 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: ./scripts/release-mac-app.sh
 
+  # The website's sources kept here (site/: the Report a bug page and the Worker that answers it)
+  # laid over the site branch, which Cloudflare deploys (scripts/publish-site.sh). After the Mac
+  # app's job, whether or not it published, so the two never push the site branch at once.
+  site:
+    needs: [package, mac-app]
+    if: ${{ !cancelled() && (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Publish site/ to the site branch
+        run: ./scripts/publish-site.sh
+
   chrome-web-store:
     needs: package
     if: startsWith(github.ref, 'refs/tags/v')

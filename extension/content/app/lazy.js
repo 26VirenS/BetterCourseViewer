@@ -53,9 +53,10 @@
       try {
         for (const dep of m.needs || []) await load(dep); // what it draws with, first
         let r = null;
-        try { r = await api.runtime.sendMessage({ type: 'load', files: m.files }); } catch (e) { throw new Error(`Could not load ${name}: ${e?.message || e}`); }
-        if (!r?.ok) throw new Error(r?.message || `Could not load ${name}`);
-        if (!m.has()) throw new Error(`${name} did not load`);
+        const fail = (msg) => { BCV.errors?.failed?.('LOAD'); return Object.assign(new Error(msg), { kind: 'LOAD' }); }; // (lib/errors.js: SC-…-LOAD)
+        try { r = await api.runtime.sendMessage({ type: 'load', files: m.files }); } catch (e) { throw fail(`Could not load ${name}: ${e?.message || e}`); }
+        if (!r?.ok) throw fail(r?.message || `Could not load ${name}`);
+        if (!m.has()) throw fail(`${name} did not load`);
         return true;
       } finally { delete loading[name]; }
     })();

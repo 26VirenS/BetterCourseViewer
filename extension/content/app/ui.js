@@ -145,7 +145,14 @@
       : el('bcv-skel__row', [b('bcv-skel__tile'), el('bcv-skel__lines', [b('bcv-skel__l1', { width: widths[i % 6] }), b('bcv-skel__l2')]), b('bcv-skel__badge')])));
     return el(`bcv-skel ${kind === 'cards' ? 'bcv-skel--cards' : kind === 'inset' ? 'bcv-skel--inset' : ''}`, items, { 'aria-hidden': 'true', role: 'presentation' });
   }
-  const errorBox = (str) => el('bcv-error', str);
+  /** A block saying something could not be loaded, with its error code (lib/errors.js) at its end —
+   *  drawn from data-code (app.css), so the words stay the words; the code is kept for a report. */
+  const errorBox = (str, err = null) => {
+    const box = el('bcv-error', str);
+    const c = BCV.errors?.codeFor?.(err);
+    if (c) { box.dataset.code = c; BCV.errors.note(c); }
+    return box;
+  };
   const hint = (str, mod = '') => h('p', { class: `bcv-hint ${mod}`, text: str });
 
   function avatar(url, name, size = 38) {
@@ -156,9 +163,12 @@
   }
 
   let toastTimer = null;
-  function toast(str, { error = false, ms = 2600 } = {}) {
+  function toast(str, { error = false, ms = 2600, code = null, err = null } = {}) {
     document.querySelectorAll('.bcv-toast').forEach((t) => t.remove());
     const t = el(`bcv-toast ${error ? 'bcv-toast--error' : ''}`, str, { role: 'status' });
+    // an error says its code (lib/errors.js) after its words — drawn from data-code, and kept for a report — and stays a little longer to be read
+    const c = error ? code || BCV.errors?.codeFor?.(err) : null;
+    if (c) { t.dataset.code = c; BCV.errors.note(c); ms = Math.max(ms, 4200); }
     overlayRoot().append(t);
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => dismiss(t), ms); // (it leaves the way it came, on its spring)

@@ -244,19 +244,54 @@ try {
   await page.hover('#bcv-look');
   const menuOpen = await eventually(() => page.$eval('#bcv-look', (e) => { const m = e.querySelector('.bcv-look__menu'); const opts = [...e.querySelectorAll('.bcv-look__opt')]; const d = e.querySelector('.bcv-look__main').getBoundingClientRect(); return getComputedStyle(m).visibility === 'visible' && opts.length === 2 && opts.every((b) => getComputedStyle(b).opacity === '1' && Math.round(b.getBoundingClientRect().width) === 24 && Math.round(b.getBoundingClientRect().height) === 24 && Math.abs(b.getBoundingClientRect().right - d.right) < 2 && b.querySelector('.bcv-look__optlbl').getBoundingClientRect().width === 0) && opts[1].getBoundingClientRect().top > opts[0].getBoundingClientRect().bottom && opts[0].getBoundingClientRect().top > d.bottom; }));
   check(menuOpen, 'hovering the disc floats the two buttons down under it, green over red, on its right edge, each a round disc with its words folded');
+  // the pointer on red for a moment grows it into how long, on the island's spring — no press needed — and it widens
+  // only as its list opens: its words alone need no more than their own width (2.98.19)
+  const redAt = () => page.$eval('#bcv-look .bcv-look__opt--off', (b) => { const r = b.getBoundingClientRect(); const d = document.querySelector('#bcv-look .bcv-look__main').getBoundingClientRect(); return { w: Math.round(r.width), h: Math.round(r.height), right: Math.abs(r.right - d.right) < 2, open: b.classList.contains('is-expanded'), fitW: b.style.getPropertyValue('--bcv-off-w') }; });
   await page.hover('#bcv-look .bcv-look__offhead');
-  const optOpen = await eventually(() => page.$eval('#bcv-look .bcv-look__opt--off', (b) => { const r = b.getBoundingClientRect(); const l = b.querySelector('.bcv-look__offhead .bcv-look__optlbl'); const d = document.querySelector('#bcv-look .bcv-look__main').getBoundingClientRect(); return r.width > 90 && l.getBoundingClientRect().width > 50 && Math.abs(r.right - d.right) < 2 && getComputedStyle(l).opacity === '1' && Math.round(r.height) === 24; }));
-  check(optOpen && (await texts('#bcv-look .bcv-look__offhead'))[0] === 'Turn off Simpl' && (await page.$eval('#bcv-look .bcv-look__opt--on', (b) => Math.round(b.getBoundingClientRect().width))) === 24, 'hovering red opens it out to the left with its words — Turn off Simpl — its right end staying put, green still round');
-  // pressed, red grows down into how long, on the island's spring: the six rows come in one after the other; nothing is turned off yet
+  const redEarly = await redAt();
+  const widths = [];
+  const listOpen = await eventually(async () => { const r = await redAt(); widths.push(r.w); return page.$eval('#bcv-look', (e) => { const b = e.querySelector('.bcv-look__opt--off'); const r = b.getBoundingClientRect(); const rows = [...b.querySelectorAll('.bcv-look__forbtn')]; const d = e.querySelector('.bcv-look__main').getBoundingClientRect(); return e.classList.contains('is-expanded') && Math.round(r.height) === 212 && Math.round(r.width) === 164 && Math.abs(r.right - d.right) < 2 && rows.length === 6 && rows.every((x, i) => getComputedStyle(x).opacity === '1' && (i === 0 || x.getBoundingClientRect().top > rows[i - 1].getBoundingClientRect().top)) && b.querySelector('.bcv-look__offhead').getAttribute('aria-expanded') === 'true' && (b.querySelector('.bcv-look__offhead .bcv-look__optlbl').textContent === 'Turn off Simpl'); }); }, 3000);
+  const fitW = parseInt(redEarly.fitW, 10);
+  check(listOpen && !redEarly.open && redEarly.w < 164 && fitW > 90 && fitW < 140 && (await visible('#bcv-app')) && (await page.$eval('#bcv-look', (e) => e.dataset.pos)) === '1' && (await page.$eval('#bcv-look .bcv-look__opt--on', (b) => Math.round(b.getBoundingClientRect().width))) === 24, `the pointer on red grows it into its list — six rows, one under the other, under Turn off Simpl — with no press, and nothing is turned off yet; before the list opens red is only as wide as its words (${redEarly.w}px on its way, its words' width ${redEarly.fitW}; ${widths.slice(0, 6).join(', ')}…)`);
+  // a press with the pointer while it is open leaves it open (the pointer opened it a moment before)
   await page.click('#bcv-look .bcv-look__offhead');
-  const growing = await page.$eval('#bcv-look .bcv-look__opt--off', (b) => Math.round(b.getBoundingClientRect().height));
-  const listOpen = await eventually(() => page.$eval('#bcv-look', (e) => { const b = e.querySelector('.bcv-look__opt--off'); const r = b.getBoundingClientRect(); const rows = [...b.querySelectorAll('.bcv-look__forbtn')]; const d = e.querySelector('.bcv-look__main').getBoundingClientRect(); return e.classList.contains('is-expanded') && Math.round(r.height) === 212 && Math.round(r.width) === 164 && Math.abs(r.right - d.right) < 2 && rows.length === 6 && rows.every((x, i) => getComputedStyle(x).opacity === '1' && (i === 0 || x.getBoundingClientRect().top > rows[i - 1].getBoundingClientRect().top)) && b.querySelector('.bcv-look__offhead').getAttribute('aria-expanded') === 'true'; }), 3000);
-  check(growing < 212 && listOpen && (await visible('#bcv-app')) && (await page.$eval('#bcv-look', (e) => e.dataset.pos)) === '1', `pressed, red grows (${growing}px on its way) into its list — six rows, one under the other — and nothing is turned off yet`);
+  await page.waitForTimeout(300);
+  check((await redAt()).open, 'a press on red\'s head while its list is open leaves it open');
   await page.hover('#bcv-look .bcv-look__forbtn[data-for="1h"]');
   await page.waitForTimeout(250);
   await shot(page, '01d-look-switch-open');
   await page.mouse.move(700, 500);
   check(await eventually(() => page.$eval('#bcv-look', (e) => { const r = e.getBoundingClientRect(); return !e.classList.contains('is-expanded') && Math.round(r.width) === 24 && Math.round(r.height) === 24 && getComputedStyle(e.querySelector('.bcv-look__menu')).visibility === 'hidden' && getComputedStyle(e.querySelector('.bcv-look__opt')).opacity === '0'; })), 'it folds back to the disc alone when the pointer leaves, the list folded into red');
+  // ---- Report a bug (2.98.19): a purple disc left of the switch; under the pointer it opens out to the
+  // left with its words; a press opens simplcourses.com/report/ in a new tab, carrying the version, the
+  // browser and the page's path — and, once Simpl has shown an error, its code
+  const reportBtn = await page.$eval('#bcv-report', (b) => { const r = b.getBoundingClientRect(); const l = document.getElementById('bcv-look').getBoundingClientRect(); const cs = getComputedStyle(b); return { fixed: cs.position === 'fixed', top: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height), gap: Math.round(l.left - r.right), purple: (cs.backgroundImage.match(/rgb\([^)]+\)/g) || []).join(' '), label: b.getAttribute('aria-label'), lbl: Math.round(b.querySelector('.bcv-report__lbl').getBoundingClientRect().width), icon: !!b.querySelector('.bcv-report__dot svg'), sibling: b.previousElementSibling?.id }; }).catch(() => null);
+  check(!!reportBtn && reportBtn.fixed && reportBtn.top === 6 && reportBtn.w === 24 && reportBtn.h === 24 && reportBtn.gap === 8 && reportBtn.purple === 'rgb(165, 92, 242) rgb(123, 47, 224)' && reportBtn.label === 'Report a bug' && reportBtn.lbl === 0 && reportBtn.icon && reportBtn.sibling === 'bcv-look', `a purple disc with a bug in it sits just left of the switch, its words folded: ${JSON.stringify(reportBtn)}`);
+  await page.hover('#bcv-report');
+  const reportOpen = await eventually(() => page.$eval('#bcv-report', (b) => { const r = b.getBoundingClientRect(); const l = b.querySelector('.bcv-report__lbl'); return r.width > 90 && Math.round(document.getElementById('bcv-look').getBoundingClientRect().left - r.right) === 8 && getComputedStyle(l).opacity === '1' && l.textContent === 'Report a bug'; }));
+  check(reportOpen, 'hovered, it opens out to the left with its words — Report a bug — its right end staying put beside the switch');
+  await page.waitForTimeout(250);
+  await shot(page, '01e-report-button');
+  await page.hover('#bcv-look');
+  check(await eventually(() => page.$eval('#bcv-report', (b) => getComputedStyle(b).opacity === '0' && getComputedStyle(b).pointerEvents === 'none')), 'while the switch is open it steps out of the way (red\'s list reaches left under it)');
+  await page.mouse.move(700, 500);
+  await context.route('https://simplcourses.com/**', (r) => r.fulfill({ status: 200, contentType: 'text/html', body: '<title>Report</title><p>stands in</p>' })); // (no network here: the report page stands in)
+  const version = await sw.evaluate(() => chrome.runtime.getManifest().version);
+  const reportOpens = async () => { await eventually(() => page.$eval('#bcv-report', (b) => getComputedStyle(b).opacity === '1')); const [tab] = await Promise.all([context.waitForEvent('page', { timeout: 8000 }), page.click('#bcv-report')]); await tab.waitForLoadState('load').catch(() => {}); const u = tab.url(); await tab.close().catch(() => {}); return new URL(u); };
+  const ru = await reportOpens();
+  check(ru.origin + ru.pathname === 'https://simplcourses.com/report/' && ru.searchParams.get('c') === 'Bug' && ru.searchParams.get('v') === version && /^Chrome \d+$/.test(ru.searchParams.get('b') || '') && ru.searchParams.get('p') === '/' && !ru.searchParams.has('codes') && page.url() === `${BASE}/`, `pressed, it opens simplcourses.com/report/ in a new tab — a bug, this version, the browser, the page's path, no codes yet — the page staying put: ${ru.href}`);
+  // an error Simpl shows carries its code (lib/errors.js): an assignment Canvas says is not there is SC-C-404, drawn after the words, not in them
+  await page.goto(`${BASE}/courses/101/assignments/77777`);
+  await page.waitForSelector('#bcv-app .bcv-error', { timeout: 10000 });
+  const errShown = await page.$eval('#bcv-app .bcv-error', (e) => ({ code: e.dataset.code, words: e.textContent, after: getComputedStyle(e, '::after').content, font: getComputedStyle(e, '::after').fontFamily }));
+  check(errShown.code === 'SC-C-404' && errShown.after === '"SC-C-404"' && !/SC-/.test(errShown.words) && /monospace|Menlo|SFMono/i.test(errShown.font), `an assignment Canvas says is not there: the error block carries SC-C-404 (a course's page, Canvas's 404), drawn after its words in a small tag: ${JSON.stringify(errShown)}`);
+  await shot(page, '01f-error-code');
+  const ru2 = await reportOpens();
+  check(ru2.searchParams.get('c') === 'Error' && ru2.searchParams.get('codes') === 'SC-C-404' && ru2.searchParams.get('p') === '/courses/101/assignments/77777', `and the report it opens carries it: the kind Error, codes=SC-C-404, the page's path: ${ru2.search}`);
+  const keptCodes = await sw.evaluate(async () => (await chrome.storage.local.get('errors:recent'))['errors:recent']);
+  check(Array.isArray(keptCodes) && keptCodes[0]?.code === 'SC-C-404', `the code is kept in extension storage for a report from another page: ${JSON.stringify(keptCodes)}`);
+  await context.unroute('https://simplcourses.com/**').catch(() => {});
+  await page.goto(`${BASE}/`);
   await page.waitForSelector('.bcv-nav__item', { timeout: 10000 });
   const brand = await page.evaluate(() => {
     const img = document.querySelector('.bcv-brand__logo img');
@@ -3444,7 +3479,9 @@ try {
   const kDown = await page.evaluate(() => document.activeElement?.dataset?.for || null);
   await page.keyboard.press('Escape');
   const kFold = await eventually(() => page.evaluate(() => !document.getElementById('bcv-look').classList.contains('is-expanded') && document.activeElement?.classList.contains('bcv-look__offhead')), 3000);
-  check(kOpen && kDown === '30m' && kFold && (await visible('#bcv-app')), `the keyboard: Enter on the disc opens red's list at This page only, ArrowDown walks it (${kDown}), Escape folds it back onto red — and Simpl is still on`);
+  const kRed = await eventually(() => page.$eval('#bcv-look .bcv-look__opt--off', (b) => { const w = Math.round(b.getBoundingClientRect().width); const fit = parseInt(b.style.getPropertyValue('--bcv-off-w'), 10); return Math.round(b.getBoundingClientRect().height) === 24 && Math.abs(w - fit) <= 1 && w < 164 ? w : false; }), 3000);
+  const kRedW = await page.$eval('#bcv-look .bcv-look__opt--off', (b) => Math.round(b.getBoundingClientRect().width));
+  check(kOpen && kDown === '30m' && kFold && kRed && (await visible('#bcv-app')), `the keyboard: Enter on the disc opens red's list at This page only, ArrowDown walks it (${kDown}), Escape folds it back onto red — its words out at their own width (${kRedW}px), not the list's — and Simpl is still on`);
   await page.focus('#bcv-look .bcv-look__main');
   await page.keyboard.press('Enter');
   await eventually(() => page.evaluate(() => document.activeElement?.dataset?.for === 'page'), 3000);
@@ -3813,12 +3850,13 @@ try {
   const stageLines = async () => (await welcomeLines()).map((t) => t.replace(/\s+/g, ' ').trim()).join(' | ');
   const LOOK_LINES = ' | Just in case: | To turn on Simpl, press green. To turn off Simpl, press red.';
   await page.waitForTimeout(700); // (the words come in rising: the arrow is drawn where they settle)
+  await eventually(async () => (await showAt()).bigArrow, 4000); // (a busy machine: the rise can take longer than its 700 ms)
   const s0b = await showAt();
   check(s0.top === 10 && s0.rightGap === 12 && s0.cursor && !s0.smallArrow && s0b.bigArrow && s0b.centred && (await stageLines()) === LOOK_LINES && (await texts('.bcv-welcome__sub'))[0] === 'Red asks how long: this page only, 30 minutes, 1 hour, 4 hours, 1 day, or indefinitely.' && (await page.$$eval('.bcv-welcome__stoprow', (els) => els.map((e) => { const sw = e.querySelector('.bcv-welcome__stopsw'); return `${sw.dataset.stop}:${Math.round(sw.getBoundingClientRect().width) === 24 && getComputedStyle(sw).backgroundColor !== 'rgba(0, 0, 0, 0)' && !!sw.querySelector('svg')}:${e.querySelector('b').textContent}`; }))).join(' ') === '1:true:green -1:true:red', `stage one: the words in the middle of the screen — Just in case:, a row for green and one for red, each with the button's round face before it, and how long red asks — a copy of the switch at the top right, and a big arrow from the words up to it, its tip just left of the disc (${JSON.stringify(s0b)} | ${await stageLines()})`);
   check(await eventually(async () => { const st = await showAt(); return st.open && st.cursorShown === '1' && st.menu === 'visible'; }, 3000), 'the pointer comes to the disc and the two buttons float down');
   check(noContinueYet && await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000) && Date.now() - welcomeAt >= TIMERS.welcomeWait - 500 && (await texts('.bcv-welcome__next'))[0] === 'Continue', 'Continue is not there at first, and comes in only after the wait (three seconds shipped)');
-  check(await eventually(async () => { const st = await showAt(); return st.hover === '-1' && st.hoverWords === 'Turn off Simpl'; }, 6000) && (await stageLines()) === LOOK_LINES, 'the pointer comes to red and it opens out to the left: Turn off Simpl — and the lines hold still');
-  check(await eventually(async () => { const st = await showAt(); return st.expanded && st.hoverFor === '1h'; }, 5000), 'pressed, red grows into its list, and the pointer rests on For 1 hour');
+  check(await eventually(async () => { const st = await showAt(); return st.hover === '-1' && st.hoverWords === 'Turn off Simpl'; }, 6000) && (await stageLines()) === LOOK_LINES, 'the pointer comes to red: Turn off Simpl — and the lines hold still');
+  check(await eventually(async () => { const st = await showAt(); return st.expanded && st.hoverFor === '1h'; }, 5000), 'with the pointer on it red grows into its list — no press — and the pointer rests on For 1 hour');
   await shot(page, '31-welcome-look');
   check(await eventually(async () => { const st = await showAt(); return st.pos === '-1' && !st.expanded; }, 4000), 'pressed: off for the hour, the list folded back into red');
   check(await eventually(async () => (await showAt()).pos === '1', 6000), 'and green pressed: Active again');
@@ -4877,7 +4915,7 @@ try {
   await page.waitForSelector('#bcv-pins .bcv-pin[data-tool="pomo"]', { timeout: 5000 });
   await page.waitForFunction(() => !document.querySelector('.bcv-tool-card--ghost'), null, { timeout: 3000 }); // the ghost flies into the pin's spot, then goes
   await page.waitForFunction(() => { const p = document.querySelector('#bcv-pins .bcv-pin'); return !!p && p.getAnimations({ subtree: true }).every((a) => a.playState === 'finished'); }, null, { timeout: 3000 }); // (and the pin has finished popping in)
-  const pinBox = await page.$eval('#bcv-pins .bcv-pin', (e) => { const r = e.getBoundingClientRect(); const l = document.getElementById('bcv-look').getBoundingClientRect(); return { top: Math.round(r.top), gap: Math.round(l.left - r.right), h: Math.round(r.height) }; });
+  const pinBox = await page.$eval('#bcv-pins .bcv-pin', (e) => { const r = e.getBoundingClientRect(); const l = document.getElementById('bcv-report').getBoundingClientRect(); return { top: Math.round(r.top), gap: Math.round(l.left - r.right), h: Math.round(r.height) }; }); // (2.98.19: the purple Report a bug button sits between the pins and the switch)
   const pinsStored = await sw.evaluate(async () => (await self.BCV.api.storage.local.get('tools:pins'))['tools:pins']);
   check(pinBox.top === 6 && pinBox.gap === 8 && pinBox.h === 24 && JSON.stringify(pinsStored) === '["pomo"]' && (await page.$eval('.bcv-tool-card[data-tool="pomo"]', (e) => e.classList.contains('is-pinned'))) && (await page.$('.bcv-tool-ov')) === null && (await page.$('.bcv-tool-card--ghost.is-over')) === null, `letting go pins it: a small button beside the switch, the card marked, nothing opened (${JSON.stringify(pinBox)})`);
   await page.waitForTimeout(500);

@@ -13,7 +13,7 @@
  * min(their own, the viewport less a margin). */
 
 html[data-bcv-theme] {
-  --bcv-version: "2.98.18"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.98.19"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -212,7 +212,10 @@ html[data-bcv-theme="dark"] .bcv-skel { --bcv-skel: linear-gradient(90deg, rgba(
  * out at its full size all along — clipped, not squeezed — so nothing inside it reflows as it grows. */
 #bcv-look .bcv-look__opt--off, .bcv-look-pill .bcv-look__opt--off { --bcv-for-w: 164px; --bcv-for-h: 212px; flex-direction: column; align-items: stretch; justify-content: flex-start; height: 24px; background: linear-gradient(180deg, #ff453a, #e8372d); transition: max-width var(--bcv-t-island) var(--bcv-spring-island), height var(--bcv-t-island) var(--bcv-spring-island), border-radius var(--bcv-t-island) var(--bcv-spring-island), opacity .18s ease, transform .28s cubic-bezier(.32,.72,0,1), box-shadow .18s ease; }
 #bcv-look:hover .bcv-look__opt--off, #bcv-look:has(:focus-visible) .bcv-look__opt--off, .bcv-look-pill.is-open .bcv-look__opt--off { transition-delay: 0s, 0s, 0s, 55ms, 55ms, 0s; }
-.bcv-look__opt--off:hover, .bcv-look__opt--off:has(:focus-visible), .bcv-look__opt--off.is-hover, .bcv-look__opt--off.is-expanded { max-width: var(--bcv-for-w); }
+/* red's words out, its list folded (the pointer's moment of intent, the keyboard's focus): just as wide as its words and disc —
+ * --bcv-off-w, measured from the words (app.js fit()); the list's width only once the list opens */
+.bcv-look__opt--off:hover, .bcv-look__opt--off:has(:focus-visible), .bcv-look__opt--off.is-hover { max-width: var(--bcv-off-w, 116px); }
+.bcv-look__opt--off.is-expanded { max-width: var(--bcv-for-w); }
 .bcv-look__opt--off:hover .bcv-look__optlbl, .bcv-look__opt--off:has(:focus-visible) .bcv-look__optlbl, .bcv-look__opt--off.is-hover .bcv-look__optlbl, .bcv-look__opt--off.is-expanded .bcv-look__optlbl { max-width: 180px; padding: 0 2px 0 11px; opacity: 1; }
 #bcv-look .bcv-look__opt--off.is-expanded, .bcv-look-pill .bcv-look__opt--off.is-expanded { height: var(--bcv-for-h); border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,.34); }
 #bcv-look .bcv-look__offhead, .bcv-look-pill .bcv-look__offhead { flex: none; display: flex; align-items: center; justify-content: flex-end; width: 100%; height: 24px; padding: 0; border-radius: 12px; background: transparent; color: #fff; white-space: nowrap; }
@@ -232,6 +235,20 @@ html[data-bcv-theme="dark"] .bcv-skel { --bcv-skel: linear-gradient(90deg, rgba(
 }
 /* the phone layout's own header has the corner; the setup covers the page */
 html.bcv-phone.bcv-on #bcv-look, html.bcv-setup-open #bcv-look { display: none; }
+/* Report a bug (2.98.19): a purple disc left of the switch (the pinned tools' tray moves one place along for it);
+ * under the pointer or the keyboard's focus it opens out to the left with its words, its right end staying put */
+#bcv-report { position: fixed; top: 6px; right: 42px; z-index: var(--bcv-z-float); display: flex; align-items: center; justify-content: flex-end; box-sizing: border-box; height: 24px; max-width: 24px; margin: 0; padding: 0; border: 0; border-radius: 12px; background: linear-gradient(158deg, #a55cf2, #7b2fe0); color: #fff; box-shadow: 0 2px 10px rgba(0,0,0,.2); overflow: hidden; white-space: nowrap; cursor: pointer; font: 600 11px/1 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif; letter-spacing: -.01em; text-transform: none; transition: max-width .24s cubic-bezier(.32,.72,0,1), box-shadow .18s ease, transform .16s var(--bcv-spring-snappy), opacity .2s ease; }
+#bcv-report:hover, #bcv-report:focus-visible { max-width: 140px; box-shadow: 0 6px 20px rgba(123,47,224,.4); }
+#bcv-report:active { transform: scale(.96); }
+#bcv-report:focus-visible { outline: 2px solid #0a84ff; outline-offset: 2px; }
+.bcv-report__lbl { max-width: 0; padding: 0; opacity: 0; overflow: hidden; transition: max-width .24s cubic-bezier(.32,.72,0,1), opacity .15s ease, padding .24s cubic-bezier(.32,.72,0,1); }
+#bcv-report:hover .bcv-report__lbl, #bcv-report:focus-visible .bcv-report__lbl { max-width: 110px; padding: 0 2px 0 11px; opacity: 1; }
+.bcv-report__dot { flex: none; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; }
+.bcv-report__dot svg { display: block; width: 14px; height: 14px; fill: none; stroke: #fff; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+/* out of the way while the switch is open (its red list reaches left under it), and where the switch is not */
+#bcv-look:hover ~ #bcv-report, #bcv-look.is-expanded ~ #bcv-report { opacity: 0; pointer-events: none; }
+html.bcv-phone.bcv-on #bcv-report, html.bcv-setup-open #bcv-report, html.bcv-welcome #bcv-report, html.bcv-in-quiz #bcv-report { display: none; }
+@media (prefers-reduced-motion: reduce) { #bcv-report, .bcv-report__lbl { transition-duration: .01s; } }
 
 /* ---- Away Refresh: the stale-page reload, announced first. A pill floats down from the top — a
  * dial counting three seconds down in orange, the iPhone's timer (a dim ring, a bright arc of the
@@ -1905,6 +1922,8 @@ html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) .bcv-head--pic .bc
 .bcv-head--pic .bcv-head__row .bcv-btn:not(.bcv-btn--primary) svg { stroke: var(--bcv-photo-ink); }
 
 /* ---- toast ---------------------------------------------------------------- */
+/* an error's code (lib/errors.js), after its words: a small grey tag drawn from data-code, so it is never part of the words themselves */
+.bcv-toast[data-code]::after, .bcv-error[data-code]::after { content: attr(data-code); display: inline-block; margin-left: 8px; padding: 2px 6px; border-radius: 6px; background: var(--bcv-fill2, rgba(120,120,128,.16)); color: var(--bcv-ink2); font: 600 11px/1.3 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: 0; vertical-align: 1px; white-space: nowrap; }
 .bcv-toast { position: fixed; left: 50%; bottom: 22px; translate: -50% 0; z-index: var(--bcv-z-toast); padding: 10px 16px; border-radius: var(--bcv-r-menu); background: var(--bcv-glass); -webkit-backdrop-filter: var(--bcv-blur-glass); backdrop-filter: var(--bcv-blur-glass); box-shadow: var(--bcv-shadow-hi); border: 1px solid var(--bcv-edge); font: 500 13px/1.3 var(--bcv-font); color: var(--bcv-ink); max-width: min(480px, calc(100vw - 32px)); box-sizing: border-box; }
 .bcv-toast--error { color: var(--bcv-red-text); }
 
@@ -2473,7 +2492,7 @@ html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) #bcv-bar { display
 html.bcv-setup-open #bcv-bar, html.bcv-welcome #bcv-bar { display: none !important; }
 html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) .bcv-main { padding-top: var(--bcv-bar-h); }
 html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) .bcv-head, html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) .bcv-qz__head, html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) .bcv-pv { top: var(--bcv-bar-h); }
-#bcv-tray { position: fixed; top: 6px; right: 42px; z-index: var(--bcv-z-tray); display: flex; align-items: flex-start; gap: 8px; margin: 0; padding: 0; transition: opacity .18s ease; }
+#bcv-tray { position: fixed; top: 6px; right: 74px; z-index: var(--bcv-z-tray); display: flex; align-items: flex-start; gap: 8px; margin: 0; padding: 0; transition: opacity .18s ease; }
 #bcv-look:hover ~ #bcv-tray, #bcv-look:has(:focus-visible) ~ #bcv-tray, #bcv-look.is-expanded ~ #bcv-tray { opacity: 0; pointer-events: none; }
 html.bcv-phone.bcv-on #bcv-tray, html.bcv-setup-open #bcv-tray, html.bcv-welcome #bcv-tray, html:not(.bcv-on):not(.bcv-tooltab) #bcv-tray { display: none; }
 /* On a tool's own tab the tray is the only part of the interface there, and it sits in the bar over

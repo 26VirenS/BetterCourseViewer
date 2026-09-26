@@ -223,6 +223,40 @@ const lz = lzBox.BCV.lazy;
 check(JSON.stringify(Object.keys(lz.MODULES)) === JSON.stringify(Object.keys(lazyTable)) && Object.values(lz.MODULES).every((m) => typeof m.has === 'function' && Array.isArray(m.files) && m.files.length > 0), `lazy.js knows every module in the table and how to tell each is here: ${Object.keys(lz.MODULES).join(', ')}`);
 check(lz.toolModule('ptable') === 'tool:ptable' && lz.toolModule('calc') === null && !lz.has('setup') && !lz.has('setupcss') && lzBox.BCV.setup?.__stub === true, 'a tool’s module by its key, a built-in tool none; nothing loaded yet, the setup a stub');
 
+// ---- error codes (lib/errors.js, docs/ERROR-CODES.md) --------------------------------------------
+// Every error shown carries SC-<screen>-<what>: the screen's letter, and Canvas's own answer, NET, LOAD
+// or APP. A failure reported just before (the request layer, the loader) gives an error shown now its
+// kind; the codes shown are kept for the Report a bug button, newest first, each once.
+console.log('error codes');
+{
+  let clock = 1_000_000;
+  const stored = {};
+  const eBox = { self: {}, Date: { now: () => clock }, document: { getElementById: () => null, documentElement: { classList: { contains: () => false } } } };
+  eBox.self = eBox;
+  eBox.BCV = { app: { state: { route: { screen: 'gpa' } } }, api: { storage: { local: { get: async (k) => ({ [k]: stored[k] }), set: async (o) => Object.assign(stored, o) } } } };
+  vm.createContext(eBox);
+  vm.runInContext(readFileSync(join(root, 'extension', 'lib', 'errors.js'), 'utf8'), eBox);
+  const E = eBox.BCV.errors;
+  const kinds = [404, 0, 503, 599, 401, { status: 403 }, { kind: 'LOAD' }, Object.assign(new Error('Failed to fetch'), { name: 'TypeError' }), 'net', {}, null].map((k) => E.kindOf(k));
+  check(JSON.stringify(kinds) === '["404","NET","503","500","401","403","LOAD","NET","NET",null,null]', `what failed, read from Canvas's status, an error or a word: ${JSON.stringify(kinds)}`);
+  const plain = E.codeFor();
+  E.failed(403);
+  const after = E.codeFor();
+  const own = E.codeFor({ status: 404 });
+  clock += 16000;
+  const later = E.codeFor();
+  eBox.BCV.app.state.quizOpen = true;
+  const quiz = E.codeFor({ status: 0 });
+  eBox.BCV.app.state.quizOpen = false;
+  eBox.BCV.app.state.route = { screen: 'course', tab: 'assignments' };
+  const course = E.codeFor({ kind: 'LOAD' });
+  check(plain === 'SC-G-APP' && after === 'SC-G-403' && own === 'SC-G-404' && later === 'SC-G-APP' && quiz === 'SC-Q-NET' && course === 'SC-C-LOAD', `the code: the screen's letter, then a failure of the last few seconds (or the error's own), APP when nothing failed underneath: ${[plain, after, own, later, quiz, course].join(' ')}`);
+  for (const c of ['SC-G-403', 'SC-C-404', 'SC-G-403', 'nonsense', 'SC-Q-NET']) E.note(c);
+  await new Promise((r) => setTimeout(r, 20));
+  const carried = await E.recent();
+  check(JSON.stringify(carried) === '["SC-Q-NET","SC-G-403","SC-C-404"]' && stored['errors:recent']?.length === 4 && stored['errors:recent'].every((x) => E.PATTERN.test(x.code)), `the codes kept for a report: newest first, each once, nothing that is not a code (${JSON.stringify(carried)}; ${stored['errors:recent']?.length} kept)`);
+}
+
 // ---- the springs (content/app/motion.js, docs/MOTION.md) -----------------------------------------
 // The motion is a damped spring solved exactly; what the interface relies on is that every preset
 // settles in the time its rule is given, overshoots only where that is wanted, hands its position

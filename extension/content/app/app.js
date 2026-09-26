@@ -1285,8 +1285,9 @@
   // Over our own shell and over stock Canvas alike — it lives outside #bcv-app, so a page drawn
   // without the shell has it too. Folded, it is a disc with the mark, in the state's colour: green
   // on, red off. Under the pointer (or the keyboard's focus) two buttons float down under it: green
-  // turns Simpl on; red turns it off, and a press on red opens it out, on the island's spring (the
-  // capsules' timing), into how long: This page only (a one-page note: the next page is Simpl
+  // turns Simpl on; red turns it off: the pointer on it a moment (a tap, the keyboard's press) grows it,
+  // on the island's spring (the capsules' timing), into how long — no wider than its words until
+  // then, the list's width only as the list opens (2.98.19): This page only (a one-page note: the next page is Simpl
   // again), for 30 minutes, 1 hour, 4 hours or 1 day (saved: Simpl comes back at the next page
   // after that — settings.lookOn), or indefinitely (until turned on again). The one that is the
   // state wears a white ring and says so: Active, Off for this page, Off until 3:42 PM, Simpl is
@@ -1346,6 +1347,13 @@
       offHead.setAttribute('aria-expanded', yes ? 'true' : 'false');
       for (const b of fors) b.tabIndex = yes ? 0 : -1;
     };
+    /** Red's width with its words out and its list folded: just its words and its disc (the list's
+     *  width only once the list opens). Measured from the words as drawn; app.css has a stand-in. */
+    const fit = () => {
+      const lbl = offHead.querySelector('.bcv-look__optlbl');
+      const w = lbl.scrollWidth;
+      if (w > 0) offBox.style.setProperty('--bcv-off-w', `${Math.min(164, Math.ceil(w) + 13 + 24)}px`); // (the words' padding, 11 + 2, and the 24px disc)
+    };
     const show = (p, until = 0) => {
       for (const el of [box, main]) { el.classList.toggle('is-on', p === 1); el.classList.toggle('is-off', p !== 1); el.classList.toggle('is-page', p === 0); el.classList.toggle('is-lock', p === -1); }
       box.dataset.pos = String(p);
@@ -1361,8 +1369,9 @@
       offHead.querySelector('.bcv-look__optlbl').textContent = p === 1 ? OFF.label : words;
       const cur = p === 0 ? 'page' : p === -1 ? (until ? null : 'ever') : null; // (a timed one's own row is not known after the fact: none marked)
       for (const b of fors) b.classList.toggle('is-current', b.dataset.for === cur);
+      fit();
     };
-    return { box, main, opts, onBtn, offBox, offHead, fors, list, text, show, expand };
+    return { box, main, opts, onBtn, offBox, offHead, fors, list, text, show, expand, fit };
   }
   /** A switch for the welcome's show: the same, nothing wired, put at a state, its buttons floated
    *  down or folded, one of them opened out, the red one's list opened and a row of it lit. */
@@ -1377,7 +1386,7 @@
     return {
       el: box, opts, fors, setPos,
       open: (yes) => box.classList.toggle('is-open', yes),
-      hover: (i) => opts.forEach((b, k) => b.classList.toggle('is-hover', k === i)),
+      hover: (i) => { if (i === 1) sw.fit(); opts.forEach((b, k) => b.classList.toggle('is-hover', k === i)); }, // (red's words measured now it is drawn)
       expand: (yes) => { expand(yes); for (const b of fors) b.tabIndex = -1; },
       hoverFor: (j) => fors.forEach((b, k) => b.classList.toggle('is-hover', k === j)),
     };
@@ -1387,7 +1396,7 @@
     const E = () => BCV.early;
     const pos = () => (E()?.lookPos ? E().lookPos() : E()?.isOn?.() ? 1 : 0);
     const until = () => E()?.offUntil?.() || 0;
-    const { box, main: mainBtn, onBtn, offBox, offHead, fors, show, expand } = lookSwitch();
+    const { box, main: mainBtn, onBtn, offBox, offHead, fors, show, expand, fit } = lookSwitch();
     box.id = 'bcv-look';
     const paint = () => show(pos(), until());
     const busy = (p) => {
@@ -1398,9 +1407,28 @@
     const turnOff = (what) => { expand(false); busy(E()?.offFor ? E().offFor(what) : E()?.setLook?.(what === 'page' ? 0 : -1)); };
     const isOpen = () => offBox.classList.contains('is-expanded');
     const openList = (focusFirst) => { expand(true); if (focusFirst) fors[0].focus({ preventScroll: true }); };
-    // the buttons do what they say; red opens its list (a second press folds it); a row of the list turns Simpl off for that long
+    // the buttons do what they say; red opens its list — under the pointer (a moment's intent, so a
+    // pointer passing over it does not), or pressed (a touch, the keyboard) — and a row of the list
+    // turns Simpl off for that long. The keyboard's second press folds it; the pointer's leaves it
+    // open (the pointer opened it a moment before), and leaving red folds it.
     onBtn.addEventListener('click', turnOn);
-    offHead.addEventListener('click', (e) => { if (isOpen()) expand(false); else openList(e.detail === 0); }); // (e.detail 0: the keyboard's press — the first row takes the focus)
+    offHead.addEventListener('click', (e) => { if (!isOpen()) openList(e.detail === 0); else if (e.detail === 0) expand(false); }); // (e.detail 0: the keyboard's press — the first row takes the focus)
+    let hoverT = 0;
+    let leaveT = 0;
+    offBox.addEventListener('pointerenter', (e) => {
+      clearTimeout(leaveT);
+      if (e.pointerType === 'touch' || isOpen()) return; // (a touch opens it by its press)
+      fit();
+      clearTimeout(hoverT);
+      hoverT = setTimeout(() => { if (offBox.matches(':hover') && !box.classList.contains('is-busy')) expand(true); }, 90);
+    });
+    offBox.addEventListener('pointerleave', (e) => {
+      clearTimeout(hoverT);
+      if (e.pointerType === 'touch') return;
+      clearTimeout(leaveT);
+      leaveT = setTimeout(() => { if (!offBox.matches(':hover') && !keyboardIn()) expand(false); }, 220);
+    });
+    offHead.addEventListener('focus', fit);
     for (const b of fors) b.addEventListener('click', () => turnOff(LOOK_FOR.find((o) => o.key === b.dataset.for)?.ms ?? null));
     // the disc: on, it opens the red list (nothing turns off by a stray press); off, it turns Simpl on
     mainBtn.addEventListener('click', (e) => { if (pos() === 1) openList(e.detail === 0); else turnOn(); });
@@ -1433,6 +1461,44 @@
     if (!document.getElementById('bcv-bar')) document.body.append(h('div', { id: 'bcv-bar', class: 'bcv-bar', 'aria-hidden': 'true' }));
     document.body.append(box);
     BCV.early?.onChange?.(paint);
+  }
+
+  // ---- Report a bug (2.98.19): the purple button left of the switch --------------------------------
+  // A disc like the switch's, purple, with a bug in it; under the pointer it opens out to the left
+  // with its words. A press opens simplcourses.com/report/ in a new tab, carrying what the page there
+  // shows before anything is sent: Simpl's version, the browser, the Canvas page's path (no query,
+  // nothing else of the page), and the error codes Simpl showed lately (lib/errors.js) — the kind
+  // set to Error when there are any, Bug otherwise. The report itself is written, and sent, there.
+  // Over our shell and over stock Canvas alike, wherever the switch is (a report can be why it is off).
+  const REPORT_URL = 'https://simplcourses.com/report/';
+  const BUG_MARK = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 7a4 4 0 018 0M6 11h12v3a6 6 0 01-12 0zM12 11v9M3 13h3M18 13h3M4 8l2.5 2M20 8l-2.5 2M4.5 19l2.5-2M19.5 19l-2.5-2"/></svg>';
+  /** The browser, in two words: its name and its major version. */
+  function browserName() {
+    const ua = navigator.userAgent || '';
+    const m = ua.match(/Edg\/(\d+)/) ? ['Edge', ua.match(/Edg\/(\d+)/)[1]] : ua.match(/Firefox\/(\d+)/) ? ['Firefox', ua.match(/Firefox\/(\d+)/)[1]] : ua.match(/Chrome\/(\d+)/) ? ['Chrome', ua.match(/Chrome\/(\d+)/)[1]] : ua.match(/Version\/(\d+)[.\d]* .*Safari/) ? ['Safari', ua.match(/Version\/(\d+)/)[1]] : null;
+    return m ? `${m[0]} ${m[1]}` : 'Another browser';
+  }
+  /** Where the purple button goes: the report page, with what it will show before sending. */
+  async function reportUrl() {
+    let codes = [];
+    try { codes = (await BCV.errors?.recent?.()) || []; } catch { /* none to carry */ }
+    const q = new URLSearchParams({ c: codes.length ? 'Error' : 'Bug', v: self.BCV_VERSION || BCV.api?.runtime?.getManifest?.()?.version || '', b: browserName(), p: location.pathname.slice(0, 300) });
+    if (codes.length) q.set('codes', codes.join(','));
+    return `${REPORT_URL}?${q}`;
+  }
+  function mountReportButton() {
+    if (self.BCVBridge?.native || document.getElementById('bcv-report')) return; // (the app: its own settings sheet has the way in)
+    const btn = h('button', { type: 'button', id: 'bcv-report', class: 'bcv-report', title: 'Report a bug, an error, or an idea (opens simplcourses.com)', 'aria-label': 'Report a bug' }, [
+      h('span', { class: 'bcv-report__lbl', text: 'Report a bug' }),
+      h('span', { class: 'bcv-report__dot', 'aria-hidden': 'true', html: BUG_MARK }),
+    ]);
+    btn.addEventListener('click', async () => {
+      const url = await reportUrl();
+      btn.dataset.opened = url; // (what was opened, for the tests to read)
+      window.open(url, '_blank', 'noopener');
+    });
+    const look = document.getElementById('bcv-look');
+    if (look) look.after(btn); else document.body.append(btn); // (right after the switch, its sibling: the switch's "step aside while open" rules reach it)
   }
 
   // ---- boot ---------------------------------------------------------------------------------------
@@ -1506,6 +1572,7 @@
     if (state.themeImages) BCV.theme?.fillTones?.(state.themeImages).catch(() => {}); // photos kept before tones were: read now, saved, drawn again by the listener below
     await applySkin(state.lookOn);
     mountLookToggle();
+    mountReportButton(); // (the purple button, left of the switch: Report a bug)
     if (state.lookOn) { BCV.tools?.mountTray?.(); BCV.tools?.focusLoad?.().catch(() => {}); } // the tray beside the switch (live activities, pinned tools); the focus timer's clock, so a session going is known
     // (an update's own run: the switch's show, and the Tools row — everyone sees those once; after
     // Personalize from the theme invitation: the Appearance button alone, where the themes live now)
@@ -1580,6 +1647,7 @@
     awayPill, // (the welcome after the setup shows a copy of the pill)
     syncQuizFlag, // (the quiz screen says when an attempt opens and closes)
     lookDemo, // (the welcome shows the switch working, on a copy of it)
+    reportUrl, // (the purple button's address, for the tests)
     main: () => main,
   };
 

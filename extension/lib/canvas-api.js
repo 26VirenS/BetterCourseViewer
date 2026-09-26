@@ -47,6 +47,7 @@
     constructor(message, status) {
       super(message);
       this.status = status;
+      self.BCV?.errors?.failed?.(status); // (lib/errors.js: an error shown now takes this one's kind — Canvas's status, or NET for no answer)
     }
   }
 
@@ -189,7 +190,7 @@
         });
         text = await res.text();
       } catch (e) {
-        if (!(ac && ac.signal.aborted)) throw e;
+        if (!(ac && ac.signal.aborted)) { self.BCV?.errors?.failed?.('NET'); throw e; } // (no answer at all: offline, or the connection dropped)
         if (slot.yielded) {
           again = true; // its slot went to the screen being drawn: asked again once a slot is free
         } else {

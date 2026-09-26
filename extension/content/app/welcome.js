@@ -2,8 +2,8 @@
  * with a Continue that comes in after a few seconds; the last Continue takes the black away.
  * Two runs use it. After the setup, the reloaded page comes back black (the flag is read before
  * the page draws, so the Dashboard is never seen first) and points at the look switch at the top
- * right — a copy of the real one, shown working: a pointer comes to it, rests on green, presses red
- * (it grows into how long) and picks an hour, then green again, the words in the middle of the
+ * right — a copy of the real one, shown working: a pointer comes to it, rests on green, moves onto
+ * red (it grows into how long under the pointer) and picks an hour, then green again, the words in the middle of the
  * screen with a big arrow up to it — then at a mock Away Refresh
  * pill counting its three seconds down in slow motion, then at three rows of the sidebar in turn
  * — Grades, Courses (and the starred courses listed under it, when they are), Tools — each seen
@@ -170,7 +170,7 @@
   }
   /** The switch, shown working: a copy of it at the top right (app.lookDemo: the same DOM) and a
    *  pointer that comes to it (the green and the red float down), rests on green (Active), goes to
-   *  red and presses it — red grows into its list — picks For 1 hour (red now, Off until…), then
+   *  red — which grows into its list under the pointer — picks For 1 hour (red now, Off until…), then
    *  presses green again (Active), round and round. With reduced motion: the copy opened, still. */
   function lookShow(app) {
     const demo = app.lookDemo?.();
@@ -205,16 +205,16 @@
       q(2400, () => demo.hover(0));
       q(3300, () => { demo.hover(-1); cursorTo(red(), 500); });
       q(3800, () => demo.hover(1));
-      q(4700, () => { press(); demo.expand(true); });
-      q(5500, () => cursorTo(row(2), 600));
-      q(6100, () => demo.hoverFor(2));
-      q(7000, () => { press(); demo.setPos(-1, Date.now() + 60 * 60000); demo.hoverFor(-1); demo.expand(false); });
-      q(8300, () => { demo.hover(-1); cursorTo(green(), 500); });
-      q(8800, () => demo.hover(0));
-      q(9700, () => { press(); demo.setPos(1); });
-      q(11000, () => { demo.hover(-1); cursorTo(away(), 700); cursor.style.opacity = '0'; });
-      q(11500, () => demo.open(false));
-      q(12400, loop);
+      q(3890, () => demo.expand(true)); // (the pointer on red is enough: it grows into its list, no press)
+      q(4900, () => cursorTo(row(2), 600));
+      q(5500, () => demo.hoverFor(2));
+      q(6400, () => { press(); demo.setPos(-1, Date.now() + 60 * 60000); demo.hoverFor(-1); demo.expand(false); });
+      q(7700, () => { demo.hover(-1); cursorTo(green(), 500); });
+      q(8200, () => demo.hover(0));
+      q(9100, () => { press(); demo.setPos(1); });
+      q(10400, () => { demo.hover(-1); cursorTo(away(), 700); cursor.style.opacity = '0'; });
+      q(10900, () => demo.open(false));
+      q(11800, loop);
     };
     q(60, loop); // (once the stage is on the page, so the copy can be measured)
     return wrap;

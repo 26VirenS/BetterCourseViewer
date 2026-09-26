@@ -736,7 +736,7 @@ on('PUT', /^\/api\/v1\/courses\/(\w+)\/assignments\/(\w+)\/submissions\/self$/, 
   ownComments.set(key, list);
   return (allAssignments(m[1]).find((a) => a.id === m[2]) || {}).submission || {};
 });
-on('GET', /^\/api\/v1\/courses\/(\w+)\/assignments\/(\w+)$/, (url, m) => allAssignments(m[1]).find((a) => a.id === m[2]) || null);
+on('GET', /^\/api\/v1\/courses\/(\w+)\/assignments\/(\w+)$/, (url, m) => allAssignments(m[1]).find((a) => a.id === m[2]) || { __status: 404, errors: [{ message: 'The specified resource does not exist.' }] }); // (as Canvas answers for one that is not there)
 on('GET', /^\/api\/v1\/courses\/(\w+)\/assignments$/, (url, m) => allAssignments(m[1]));
 on('GET', /^\/api\/v1\/courses\/(\w+)\/assignment_groups$/, (url, m) => assignmentGroups(m[1]));
 on('GET', /^\/api\/v1\/courses\/(\w+)\/discussion_topics\/(\w+)\/view$/, (url, m) => viewFor(m[2]));

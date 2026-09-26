@@ -25,6 +25,11 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.98.19', date: '2026-09-26', notes: [
+      { kind: 'new', title: 'Report a bug', body: 'The purple button beside the switch sends us a report.', icon: P.pen },
+      { kind: 'new', title: 'Errors have codes', body: 'Each error ends in a short code to quote in a report.', icon: P.list },
+      { kind: 'improved', title: 'Red opens on hover', body: 'Point at red to see how long; no press needed.', icon: P.toggle },
+    ] },
     { version: '2.98.18', date: '2026-09-26', notes: [
       { kind: 'new', title: 'Off for a while', body: 'Red asks how long: this page, 30 min to a day, or for good.', icon: P.clock },
       { kind: 'improved', title: 'Green on, red off', body: 'The switch is two colours now: green on, red off.', icon: P.toggle },

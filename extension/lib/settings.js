@@ -8,7 +8,7 @@
   // The scripts' own version, stamped: content/app/app.js compares it with the stylesheet's
   // (--bcv-version) and the manifest's, because Safari can run one version's script with
   // another's stylesheet after the Mac app has updated under it. Bumped with every release.
-  self.BCV_VERSION = '2.98.18';
+  self.BCV_VERSION = '2.98.19';
 
   const DEFAULTS = {
     version: 3, // (3: Away Refresh off unless turned on — settings written before carry it on, and the one-time step in getSettings turns it off for everyone)
