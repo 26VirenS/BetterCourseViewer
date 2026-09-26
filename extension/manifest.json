@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Simpl Courses",
-  "version": "2.98.15",
+  "version": "2.98.16",
   "description": "Canvas with navigation that actually makes sense and a UI that you can actually use.",
   "author": "Simpl Courses contributors",
   "icons": {
@@ -32,6 +32,7 @@
     "scripts": [
       "lib/settings.js",
       "lib/devcode.js",
+      "content/app/lazy-modules.js",
       "background.js"
     ],
     "persistent": false
@@ -93,6 +94,7 @@
         "content/app/motion.js",
         "content/app/ui.js",
         "content/app/store.js",
+        "content/app/lazy-modules.js",
         "content/app/lazy.js",
         "content/app/search.js",
         "content/app/preview.js",
@@ -128,11 +130,11 @@
       "js": [
         "content/app/quiz-page.js",
         "content/app/screens/quiz.js",
+        "content/app/screens/submit.js",
         "content/app/screens/feedback.js",
         "content/app/hub.js",
         "content/app/tools/widgets.js",
         "content/app/tools/widget-starters.js",
-        "content/app/screens/submit.js",
         "content/app/tools/cite.js",
         "content/app/tools/cards.js",
         "content/app/tools/convert.js",

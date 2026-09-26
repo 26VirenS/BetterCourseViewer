@@ -5,7 +5,7 @@
 // and asked again later, a queued warm-up the new screen wants moved up to its place — a
 // throttled 403 asked again rather than thrown, a refusal still thrown, and a request that never
 // answers given up, asked once more, then failed.
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
@@ -192,6 +192,36 @@ check(!bad.ok && D.encode(bad.settings) === D.encode(D.SHIPPED) && /3 digits/.te
 const over = D.decode('SC3-999');
 check(D.encode(over.settings) === 'SC3-511', `digits past the end of a setting come back to its last value, never past it: ${D.encode(over.settings)}`);
 check(!D.FIELDS.some((f) => ['mode', 'windows', 'wait', 'blank', 'close'].includes(f.key)), `nothing is caught any more, so nothing is left to tune about catching: ${D.FIELDS.map((f) => f.key).join(', ')}`);
+
+// ---- the on-demand modules' one list (content/app/lazy-modules.js) ------------------------------
+// The page (lazy.js) and the background read the same table: a module's files, in order, and what it
+// needs first. The source manifest names the same files in the group whose match never fires (Safari
+// parses none until asked; the iPhone app injects the group whole), and the Chrome builds leave that
+// group out (Chrome would list its host as a site the extension reads) — so the two have to be one list.
+console.log('the on-demand modules');
+const lazyBox = { self: {} };
+lazyBox.self = lazyBox;
+vm.createContext(lazyBox);
+vm.runInContext(readFileSync(join(root, 'extension', 'content', 'app', 'lazy-modules.js'), 'utf8'), lazyBox);
+const lazyTable = lazyBox.BCV_LAZY_MODULES;
+const lazyFlat = Object.values(lazyTable).flatMap((m) => m.files);
+const srcManifest = JSON.parse(readFileSync(join(root, 'extension', 'manifest.json'), 'utf8'));
+const lazyGroup = srcManifest.content_scripts.find((cs) => (cs.matches || []).includes('https://lazy.simplcourses.invalid/*'));
+check(!!lazyGroup && JSON.stringify(lazyGroup.js) === JSON.stringify(lazyFlat), `the manifest's never-matching group names the table's files, in the table's order (${lazyFlat.length} files)`);
+check(new Set(lazyFlat).size === lazyFlat.length && lazyFlat.every((f) => existsSync(join(root, 'extension', f))), 'every file once, and every one in the build');
+check(Object.values(lazyTable).every((m) => (m.needs || []).every((n) => lazyTable[n] && lazyFlat.indexOf(lazyTable[n].files[0]) < lazyFlat.indexOf(m.files[0]))), 'what a module needs first is a module, listed before it (the iPhone app injects the group in that order)');
+const bgScripts = srcManifest.background.scripts;
+check(bgScripts.indexOf('content/app/lazy-modules.js') >= 0 && bgScripts.indexOf('content/app/lazy-modules.js') < bgScripts.indexOf('background.js') && srcManifest.content_scripts.some((cs) => (cs.js || []).indexOf('content/app/lazy-modules.js') >= 0 && cs.js.indexOf('content/app/lazy-modules.js') < cs.js.indexOf('content/app/lazy.js')), 'the table loads before the background, and before lazy.js on a page');
+// lazy.js itself, with the table and nothing else: every module has a way to tell it is here
+const lzBox = { self: {} };
+lzBox.self = lzBox;
+lzBox.BCV = { api: {} };
+lzBox.BCV_LAZY_MODULES = lazyTable;
+vm.createContext(lzBox);
+vm.runInContext(readFileSync(join(root, 'extension', 'content', 'app', 'lazy.js'), 'utf8'), lzBox);
+const lz = lzBox.BCV.lazy;
+check(JSON.stringify(Object.keys(lz.MODULES)) === JSON.stringify(Object.keys(lazyTable)) && Object.values(lz.MODULES).every((m) => typeof m.has === 'function' && Array.isArray(m.files) && m.files.length > 0), `lazy.js knows every module in the table and how to tell each is here: ${Object.keys(lz.MODULES).join(', ')}`);
+check(lz.toolModule('ptable') === 'tool:ptable' && lz.toolModule('calc') === null && !lz.has('setup') && !lz.has('setupcss') && lzBox.BCV.setup?.__stub === true, 'a tool’s module by its key, a built-in tool none; nothing loaded yet, the setup a stub');
 
 // ---- the springs (content/app/motion.js, docs/MOTION.md) -----------------------------------------
 // The motion is a damped spring solved exactly; what the interface relies on is that every preset

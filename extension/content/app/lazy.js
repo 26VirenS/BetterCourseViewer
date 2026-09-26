@@ -5,42 +5,48 @@
  * is asked for; the first call loads the real module — the background lands its files in this
  * page's isolated world, the way the converter's libraries arrive — and hands over to it.
  *
- * The manifest lists these files in a content-script group of their own whose match never fires
- * (lazy.simplcourses.invalid), so a browser parses none of them until asked, and the background
- * loads only what that group names. Where the whole extension goes in at once — the iPhone app has
- * no scripting API, so it injects every group from the manifest — the real modules land right after
- * these stubs and replace them, and load() finds them already here. */
+ * The list of modules — each name, its files in order, what it needs first — is content/app/
+ * lazy-modules.js, a data script the background reads too: it lands the files in this page's
+ * isolated world, and loads nothing outside that list. The source manifest names the same files in
+ * a content-script group whose match never fires (lazy.simplcourses.invalid), so Safari parses none
+ * of them until asked; where the whole extension goes in at once — the iPhone app has no scripting
+ * API, so it injects every group from the manifest — the real modules land right after these stubs
+ * and replace them, and load() finds them already here. The Chrome builds leave that group out
+ * (Chrome would list its host as a site the extension reads) and load from the list alone. */
 (function () {
   const BCV = (self.BCV = self.BCV || {});
   const api = BCV.api;
   BCV.screens = BCV.screens || {};
 
-  /** name → its files, in order, and how to tell the module is here. */
-  const MODULES = {
-    setupcss: { files: ['setup/setup-css.js'], has: () => typeof self.BCV_SETUP_CSS === 'string' }, // the setup's stylesheet: the setup, Personalize and What's New draw with it
-    setup: { needs: ['setupcss'], files: ['content/app/personalize.js', 'content/app/setup.js'], has: () => !!BCV.setup && !BCV.setup.__stub },
-    quiz: { files: ['content/app/quiz-page.js', 'content/app/screens/quiz.js'], has: () => !!BCV.screens.quiz && !BCV.screens.quiz.__stub },
-    submit: { files: ['content/app/screens/submit.js', 'content/app/screens/feedback.js'], has: () => !!BCV.screens.submit && !BCV.screens.submit.__stub && !!BCV.screens.feedback && !BCV.screens.feedback.__stub },
-    phone: { files: ['content/app/phone.js'], has: () => !!BCV.phone },
-    notes: { needs: ['setupcss'], files: ['content/app/whatsnew-notes.js'], has: () => Array.isArray(self.BCV_WHATS_NEW) },
-    hub: { files: ['content/app/hub.js'], has: () => !!BCV.hub }, // the search box's commands, answers and row actions: loaded when the box is focused
-    widgets: { files: ['content/app/tools/widgets.js'], has: () => !!BCV.widgets }, // widgets of your own: the frame, the importer (loaded by Tools, and by the tray when one is kept)
-    starters: { files: ['content/app/tools/widget-starters.js'], has: () => Array.isArray(self.BCV_WIDGET_STARTERS) }, // the example widgets the importer offers
-    'tool:cite': { files: ['content/app/tools/cite.js'], has: () => !!BCV.toolsCite },
-    'tool:fc': { files: ['content/app/tools/cards.js'], has: () => !!BCV.toolsCards },
-    'tool:conv': { files: ['content/app/tools/convert.js'], has: () => !!BCV.toolsConvert },
-    'tool:need': { files: ['content/app/tools/need.js'], has: () => !!BCV.toolsNeed },
-    'tool:pdfx': { files: ['content/app/tools/pdfs.js'], has: () => !!BCV.toolsPdfs },
-    'tool:mark': { files: ['content/app/tools/mark.js'], has: () => !!BCV.toolsMark },
-    'tool:ocr': { files: ['content/app/tools/ocr.js'], has: () => !!BCV.toolsOcr },
-    'tool:ptable': { files: ['content/app/tools/ptable-data.js', 'content/app/tools/ptable.js'], has: () => !!BCV.toolsPtable },
+  /** How to tell a module is here, by name; its files and what it needs first are lazy-modules.js's. */
+  const HAS = {
+    setupcss: () => typeof self.BCV_SETUP_CSS === 'string',
+    setup: () => !!BCV.setup && !BCV.setup.__stub,
+    quiz: () => !!BCV.screens.quiz && !BCV.screens.quiz.__stub,
+    submit: () => !!BCV.screens.submit && !BCV.screens.submit.__stub && !!BCV.screens.feedback && !BCV.screens.feedback.__stub,
+    phone: () => !!BCV.phone,
+    notes: () => Array.isArray(self.BCV_WHATS_NEW),
+    hub: () => !!BCV.hub,
+    widgets: () => !!BCV.widgets,
+    starters: () => Array.isArray(self.BCV_WIDGET_STARTERS),
+    'tool:cite': () => !!BCV.toolsCite,
+    'tool:fc': () => !!BCV.toolsCards,
+    'tool:conv': () => !!BCV.toolsConvert,
+    'tool:need': () => !!BCV.toolsNeed,
+    'tool:pdfx': () => !!BCV.toolsPdfs,
+    'tool:mark': () => !!BCV.toolsMark,
+    'tool:ocr': () => !!BCV.toolsOcr,
+    'tool:ptable': () => !!BCV.toolsPtable,
   };
+  /** name → its files, in order, what it needs first, and how to tell the module is here. */
+  const MODULES = {};
+  for (const [name, m] of Object.entries(self.BCV_LAZY_MODULES || {})) MODULES[name] = { needs: m.needs || [], files: m.files || [], has: HAS[name] };
   const loading = {};
   /** The module, loaded if it is not here yet: resolves once its globals are in place. Rejects when
    *  the page cannot ask for it (no background to ask) and it is not here. */
   function load(name) {
     const m = MODULES[name];
-    if (!m) return Promise.reject(new Error(`No such module: ${name}`));
+    if (!m || !m.has) return Promise.reject(new Error(`No such module: ${name}`));
     if (m.has()) return Promise.resolve(true);
     if (loading[name]) return loading[name];
     loading[name] = (async () => {
@@ -55,7 +61,7 @@
     })();
     return loading[name];
   }
-  const has = (name) => !!MODULES[name]?.has();
+  const has = (name) => !!MODULES[name]?.has?.();
   /** The module a tool's key lives in, if its body is one of the on-demand ones. */
   const toolModule = (key) => (MODULES[`tool:${key}`] ? `tool:${key}` : null);
 

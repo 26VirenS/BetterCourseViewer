@@ -29,6 +29,12 @@ const extDir = join(tmpdir(), `bcv-chrome-ext-${Date.now()}`);
 cpSync(join(root, 'extension'), extDir, { recursive: true });
 execSync(`python3 ${JSON.stringify(join(root, 'scripts', 'chrome-manifest.py'))} ${JSON.stringify(join(extDir, 'manifest.json'))}`);
 const manifest = JSON.parse(readFileSync(join(extDir, 'manifest.json'), 'utf8'));
+// the quiet build too (--no-sniffer): the same trims, Canvas's own domain alone — its manifest is checked below; the full build is the one loaded
+const quietDir = join(tmpdir(), `bcv-chrome-quiet-${Date.now()}`);
+cpSync(join(root, 'extension'), quietDir, { recursive: true });
+execSync(`python3 ${JSON.stringify(join(root, 'scripts', 'chrome-manifest.py'))} ${JSON.stringify(join(quietDir, 'manifest.json'))} --no-sniffer`);
+const quiet = JSON.parse(readFileSync(join(quietDir, 'manifest.json'), 'utf8'));
+rmSync(quietDir, { recursive: true, force: true });
 
 const failures = [];
 const check = (ok, label) => { console.log(`  ${ok ? '✓' : '✗'} ${label}`); if (!ok) failures.push(label); };
@@ -38,8 +44,13 @@ const sniffer = manifest.content_scripts.find((cs) => (cs.js || []).includes('co
 // content/toolbar.js is the other that looks past Canvas: it sleeps on every page until the
 // background says this tab is a tool's, and then puts the interface's bar over it
 const toolbar = manifest.content_scripts.find((cs) => (cs.js || []).includes('content/toolbar.js'));
-// the on-demand modules (content/app/lazy.js) sit in a group whose match never fires: a browser parses none of them until a page asks
-const lazy = manifest.content_scripts.find((cs) => (cs.matches || []).includes('https://lazy.simplcourses.invalid/*'));
+// the on-demand modules (content/app/lazy.js) sit, in the source manifest, in a group whose match never fires; Chrome would list that
+// host among the sites the extension reads — a new site at an update — so the Chrome builds leave the group out, and the background
+// loads the modules from the list in content/app/lazy-modules.js instead
+const LAZY = 'https://lazy.simplcourses.invalid/*';
+const lazyOf = (mf) => mf.content_scripts.find((cs) => (cs.matches || []).includes(LAZY));
+const lazy = lazyOf(manifest);
+const lazyFiles = (() => { const s = {}; new Function('self', readFileSync(join(root, 'extension', 'content', 'app', 'lazy-modules.js'), 'utf8'))(s); return Object.values(s.BCV_LAZY_MODULES).flatMap((m) => m.files); })();
 const own = manifest.content_scripts.filter((cs) => cs !== sniffer && cs !== toolbar && cs !== lazy);
 check(JSON.stringify(manifest.host_permissions) === '["*://*/*"]' && !manifest.optional_host_permissions, `the Chrome build has the run of every site, and no optional sites left to ask for: ${JSON.stringify(manifest.host_permissions)}`);
 // Held exactly: a permission that brings a new warning switches every installed copy OFF at an update until its owner
@@ -49,9 +60,13 @@ check(JSON.stringify(manifest.host_permissions) === '["*://*/*"]' && !manifest.o
 check(JSON.stringify(manifest.permissions) === '["storage","unlimitedStorage","scripting","activeTab"]', `the Chrome build asks for exactly storage, unlimitedStorage, scripting and activeTab — nothing that reads as browsing history, and nothing new to be accepted at an update: ${JSON.stringify(manifest.permissions)}`);
 check(!!sniffer && JSON.stringify(sniffer.matches) === '["*://*/*"]' && JSON.stringify(sniffer.exclude_matches) === '["*://*.instructure.com/*"]' && sniffer.js.length === 1 && sniffer.run_at === 'document_idle', `the sniffer alone runs on every site but Canvas's own, at idle: ${JSON.stringify(sniffer)}`);
 check(own.length === 2 && own.every((cs) => JSON.stringify(cs.matches) === '["*://*.instructure.com/*"]'), `the interface's own scripts still match Canvas's domain alone (${own.map((cs) => cs.matches.join(',')).join(' | ')})`);
-check(!!lazy && lazy.matches.length === 1 && lazy.js.length >= 10 && lazy.js.includes('content/app/phone.js') && lazy.js.includes('content/app/screens/quiz.js') && !lazy.css, `the on-demand modules keep their never-matching group in the Chrome build (${lazy?.js.length} files)`);
+check(!lazy && !lazyOf(quiet) && lazyFiles.length >= 10 && ![manifest, quiet].some((mf) => mf.content_scripts.some((cs) => (cs.js || []).some((f) => lazyFiles.includes(f)))), `the on-demand modules’ never-matching group is left out of both Chrome builds (its host would be listed as a site the extension reads), and none of their ${lazyFiles.length} files is a content script there`);
 check(!!toolbar && JSON.stringify(toolbar.matches) === '["*://*/*"]' && toolbar.js.length === 1 && toolbar.run_at === 'document_start', `the tool bar runs on every site, early enough to be there before the tool's page paints: ${JSON.stringify(toolbar)}`);
 check(!manifest.background.scripts && !('persistent' in manifest.background) && !manifest.author && manifest.action.default_icon['128'] === 'icons/icon-128.png', 'the Firefox/Safari keys are gone and the toolbar icon is the blue tile');
+// The quiet build's manifest: the same four permissions, and every host it names is Canvas's own domain — a review sees nothing
+// broad, and an update brings no new site and nothing with a warning. Held exactly, like the full build's list above.
+const quietHosts = [...quiet.host_permissions, ...quiet.content_scripts.flatMap((cs) => cs.matches || [])];
+check(JSON.stringify(quiet.permissions) === '["storage","unlimitedStorage","scripting","activeTab"]' && JSON.stringify(quiet.host_permissions) === '["*://*.instructure.com/*"]' && JSON.stringify(quiet.optional_host_permissions) === '["*://*/*"]' && quietHosts.every((h) => h === '*://*.instructure.com/*') && quiet.content_scripts.length === 3 && !quiet.content_scripts.some((cs) => (cs.js || []).includes('content/sniff.js')) && quiet.content_scripts.some((cs) => (cs.js || []).includes('content/toolbar.js')) && !quiet.background.scripts, `the quiet build asks for the same four permissions and Canvas's own domain alone (every other site optional, asked for one at a time), no sniffer, the bar over a tool's tab on that domain — nothing Chrome would list as new at an update: ${JSON.stringify({ permissions: quiet.permissions, hosts: quietHosts })}`);
 
 // a site that is not Canvas — with a csrf meta and an #application of its own, as many sites have —
 // and, at /login/canvas, a page shaped like Canvas's sign-in page (Canvas's wrapper, no user in ENV)

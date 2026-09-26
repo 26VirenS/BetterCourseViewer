@@ -10,6 +10,9 @@ if (typeof importScripts === 'function' && !self.BCV?.settings) {
 if (typeof importScripts === 'function' && !self.BCV?.devcode) {
   importScripts('lib/devcode.js');
 }
+if (typeof importScripts === 'function' && !self.BCV_LAZY_MODULES) {
+  importScripts('content/app/lazy-modules.js'); // the on-demand modules' files: what a page may ask to have loaded
+}
 
 (function () {
   const BCV = self.BCV;
@@ -117,15 +120,18 @@ if (typeof importScripts === 'function' && !self.BCV?.devcode) {
     let origin = '';
     try { const u = new URL(url); if (/^https?:$/.test(u.protocol)) origin = u.origin; } catch { /* no address to speak of */ }
     const was = t.barOff || '';
-    t.barOff = on || !origin ? '' : origin;
-    if (t.barOff !== was) { save(); note({ kind: 'bar', tabId, url, action: t.barOff ? `off on ${origin}` : 'on' }); }
+    // ('?': the browser would not say where the tab is — without the tabs permission, a site this
+    // build may not reach has no address to read — so the badge says "this site", and the popup,
+    // which reads the tab it is over from the press itself, names the site and offers it)
+    t.barOff = on ? '' : (origin || '?');
+    if (t.barOff !== was) { save(); note({ kind: 'bar', tabId, url, action: t.barOff ? `off on ${origin || 'a site it cannot see'}` : 'on' }); }
     const action = actionApi();
     if (!action?.setBadgeText) return;
     try {
       if (t.barOff) {
         await action.setBadgeText({ tabId, text: '!' });
         await action.setBadgeBackgroundColor?.({ tabId, color: '#ff9f0a' });
-        await action.setTitle?.({ tabId, title: `Simpl Courses — its bar is off on ${new URL(origin).hostname}. Press to keep it here.` });
+        await action.setTitle?.({ tabId, title: `Simpl Courses — its bar is off on ${origin ? new URL(origin).hostname : 'this site'}. Press to keep it here.` });
       } else if (was) {
         // the tab's own badge cleared (null), so the global count shows again; a browser that will not take null gets a blank
         try { await action.setBadgeText({ tabId, text: null }); } catch { await action.setBadgeText({ tabId, text: '' }); }
@@ -458,12 +464,14 @@ if (typeof importScripts === 'function' && !self.BCV?.devcode) {
     await api.scripting.executeScript({ target: { tabId: sender.tab.id, frameIds: [sender.frameId || 0] }, files: list });
     return { ok: true, files: list };
   }
-  // The interface's own on-demand modules (content/app/lazy.js): the manifest lists them in a
-  // content-script group whose match never fires, so a page parses none of them until it asks —
-  // and nothing outside that group can be asked for.
-  const LAZY_MATCH = 'https://lazy.simplcourses.invalid/*';
+  // The interface's own on-demand modules (content/app/lazy.js): a page may ask for the files that
+  // content/app/lazy-modules.js names, and nothing outside that list. The source manifest lists the
+  // same files in a content-script group whose match never fires — Safari parses none of them until
+  // asked, the iPhone app injects the group whole — and the Chrome builds leave that group out, since
+  // Chrome would list its host among the sites the extension reads.
+  const LAZY_MATCH = 'https://lazy.simplcourses.invalid/*'; // (that group, where the manifest has it: not the interface's script for a site)
   let lazyOk = null;
-  const lazyFiles = () => (lazyOk ||= new Set((api.runtime.getManifest().content_scripts || []).filter((cs) => (cs.matches || []).includes(LAZY_MATCH)).flatMap((cs) => cs.js || [])));
+  const lazyFiles = () => (lazyOk ||= new Set(Object.values(self.BCV_LAZY_MODULES || {}).flatMap((m) => m.files || [])));
   async function injectLazy(sender, files) {
     const ok = lazyFiles();
     const list = Array.isArray(files) ? files.filter((f) => ok.has(f)) : [];
