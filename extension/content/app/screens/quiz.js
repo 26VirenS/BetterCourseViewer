@@ -548,6 +548,7 @@
           }
         }
         if (st.paged) applyPage(await QP().fetchPage(quizUrl, { accessCode: codeFor() }));
+        else pointsFromPage(); // (not waited for: the questions show at once, their points follow)
         // Question ids arrive as strings (our Accept header); Canvas wants numeric answer ids back.
         for (const q of st.questions) q.flagged = !!q.flagged;
         if (!st.paged) st.idx = noBack ? Math.max(0, st.questions.findIndex((q) => !isAnswered(q))) : 0;
@@ -578,6 +579,23 @@
         U.toast(`Could not start the attempt: ${msg}`, { error: true });
       }
     }
+    /** The points each question is worth. Canvas's API keeps them from a student — it censors every
+     *  question it hands one — so they are read off Canvas's own take page for this attempt, the same
+     *  numbers ("4 pts") it shows beside each question there. Asked for with the attempt already open,
+     *  that page only draws it. Quietly: if it will not come, the questions simply go without. */
+    async function pointsFromPage() {
+      if (st.paged || !st.questions.some((q) => !hasNum(q.points_possible))) return;
+      const pg = await QP().fetchPage(quizUrl, { accessCode: codeFor() }).catch(() => null);
+      if (!ctx.alive() || !pg?.ok) return;
+      const pts = new Map(pg.questions.filter((q) => hasNum(q.points_possible)).map((q) => [String(q.id), Number(q.points_possible)]));
+      for (const q of st.questions) if (!hasNum(q.points_possible) && pts.has(String(q.id))) q.points_possible = pts.get(String(q.id));
+      // painted in place: a redraw would take the cursor out of an answer being typed
+      for (const el of screen.querySelectorAll('.bcv-qz__qof[data-qid]')) {
+        const q = st.questions.find((x) => String(x.id) === el.dataset.qid);
+        if (q) el.textContent = qofText(q);
+      }
+    }
+    const qofText = (q) => `of ${st.questions.length}${hasNum(q.points_possible) ? ` · ${store.fmtPts(q.points_possible)} ${Number(q.points_possible) === 1 ? 'point' : 'points'}` : ''}`;
     /** A page of Canvas's quiz page folded into the attempt: its question list is the spine (every
      *  question in order, with what Canvas knows of each) and the question shown is filled in; the
      *  others keep what was read of them before, or stay stubs until their turn. */
@@ -631,10 +649,9 @@
      *  videos at the size their author gave), the flag in the right rail instead of here. */
     function questionBlock(q, k, { compact = false, side = false } = {}) {
       const flagBtn = side ? null : h('button', { type: 'button', class: `bcv-qz__flag ${q.flagged ? 'is-on' : ''}`, onclick: () => toggleFlag(q) }, [U.svg(FLAG, { size: compact ? 12 : 13, width: 2 }), h('span', { text: q.flagged ? (compact ? 'Flagged' : 'Flagged for review') : (compact ? 'Flag' : 'Flag for review') })]);
-      const pts = q.points_possible !== undefined && q.points_possible !== null ? `${store.fmtPts(q.points_possible)} ${Number(q.points_possible) === 1 ? 'point' : 'points'}` : '';
       const headRow = U.el(`bcv-qz__qhead ${side ? 'bcv-qz__qhead--side' : ''}`, [
         h('span', { class: 'bcv-qz__qnum', text: `Question ${k + 1}` }),
-        h('span', { class: 'bcv-qz__qof', text: `of ${st.questions.length}${pts ? ` · ${pts}` : ''}` }),
+        h('span', { class: 'bcv-qz__qof', dataset: { qid: String(q.id) }, text: qofText(q) }),
         INFO.has(q.question_type) ? null : flagBtn,
       ]);
       const text = BCV.screens.course.prose(q.question_text || q.question_name || '', { cls: `bcv-qz__qtext ${side ? 'bcv-qz__qtext--canvas' : compact ? 'bcv-qz__qtext--compact' : ''}` });

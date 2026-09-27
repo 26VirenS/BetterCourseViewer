@@ -13,7 +13,7 @@
  * min(their own, the viewport less a margin). */
 
 html[data-bcv-theme] {
-  --bcv-version: "2.98.27"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.98.28"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -95,8 +95,8 @@ html.bcv-phone .bcv-main > .bcv-screen--tab { animation: bcv-fade-in var(--bcv-t
 .bcv-sheet { animation: bcv-morph var(--bcv-t-gentle) var(--bcv-spring-gentle) backwards; transform-origin: 50% 50%; }
 html.bcv-phone .bcv-sheet { animation: bcv-sheet var(--bcv-t-phone) var(--bcv-spring-phone) both; } /* the phone's bottom sheets keep their rise */
  .bcv-menu, .bcv-gpa__pop { animation: bcv-pop var(--bcv-t-snappy) var(--bcv-spring-snappy) both; } /* (a menu grows out of the edge it hangs from: ui.anchor sets its transform origin) */
-@keyframes bcv-toast-in { from { opacity: 0; transform: translateY(12px) scale(.96); } to { opacity: 1; transform: none; } }
-.bcv-toast { animation: bcv-toast-in var(--bcv-t-snappy) var(--bcv-spring-snappy) both; }
+@keyframes bcv-toast-in { from { opacity: 0; transform: translateY(calc(-100% - 28px)) scale(.94); } to { opacity: 1; transform: none; } }
+.bcv-toast { animation: bcv-toast-in var(--bcv-t-gentle) var(--bcv-spring-snappy) both; } /* (floats down from above the window, on the snappy spring's overshoot, over the gentle beat) */
 .bcv-reader-ov { animation: bcv-fade-in .2s ease both; }
 /* Exits (ui.js dismiss): a sheet shrinks and fades with its scrim, a bottom sheet slides down, a menu or panel pops out. */
 @keyframes bcv-leave { to { opacity: 0; } }
@@ -166,7 +166,7 @@ html[data-bcv-theme="dark"] .bcv-skel { --bcv-skel: linear-gradient(90deg, rgba(
   /* entrances go (data lands on its final value at once); the loading indicators (the row wash, the shimmer) stay */
   .bcv-main > .bcv-screen, .bcv-main > .bcv-qz, .bcv-main > .bcv-sb, .bcv-sheet-ov, .bcv-sheet, .bcv-menu, .bcv-toast, .bcv-gpa__pop, .bcv-reader-ov, .bcv-pv, .bcv-skel, .bcv-enter, .bcv-fb__fill,
   .bcv-work__row--in, .bcv-work__fill--grow, .bcv-ring--fill, .bcv-ring--unfill, .bcv-ring--track-out, .bcv-gpa__ringletter.is-back, .bcv-gpa__line--draw, .bcv-gpa__pt--in { animation: none; }
-  .bcv-stat, .bcv-gpa__card, .bcv-ccard, .bcv-btn, .bcv-sb__btn, .bcv-side, .bcv-head--course, .bcv-rail, #bcv-app { transition: none; }
+  .bcv-stat, .bcv-gpa__card, .bcv-ccard, .bcv-btn, .bcv-sb__btn, .bcv-side, .bcv-head--course, .bcv-rail, #bcv-app, #bcv-app::before { transition: none; }
 }
 
 /* ---- take over the page ------------------------------------------------ */
@@ -175,7 +175,7 @@ html[data-bcv-theme="dark"] .bcv-skel { --bcv-skel: linear-gradient(90deg, rgba(
 /* Folded, it is the mark and the switch alone; under the pointer (or the keyboard's focus) the name
  * comes out and a second row opens: Persistent, what a press of the look switch does. */
 /* (.bcv-look-pill is the same pill without the place: the welcome after the setup shows an opened copy) */
-#bcv-look, .bcv-look-pill { position: fixed; top: 6px; right: 10px; z-index: var(--bcv-z-float); display: flex; flex-direction: column; align-items: flex-end; margin: 0; padding: 0; color: #fff; font: 600 11px/1 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif; letter-spacing: -.01em; line-height: 1; text-transform: none; transition: opacity .2s ease, top .38s cubic-bezier(.32,.72,0,1), right .38s cubic-bezier(.32,.72,0,1); }
+#bcv-look, .bcv-look-pill { position: fixed; top: 6px; right: 10px; z-index: var(--bcv-z-float); display: flex; flex-direction: column; align-items: flex-end; margin: 0; padding: 0; color: #fff; font: 600 11px/1 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif; letter-spacing: -.01em; line-height: 1; text-transform: none; transition: opacity .2s ease, top .38s cubic-bezier(.32,.72,0,1), right .38s cubic-bezier(.32,.72,0,1), translate .45s cubic-bezier(.32,.72,0,1); }
 #bcv-look.is-busy { opacity: .6; }
 #bcv-look.is-busy button { pointer-events: none; } /* (no second press while the page loads afresh) */
 #bcv-look button, .bcv-look-pill button { margin: 0; border: 0; background: transparent; color: inherit; cursor: pointer; font: inherit; letter-spacing: inherit; text-align: left; }
@@ -239,7 +239,7 @@ html.bcv-phone.bcv-on #bcv-look, html.bcv-setup-open #bcv-look { display: none; 
 /* Report a bug (2.98.19): a purple disc left of the switch (the pinned tools' tray moves one place along for it);
  * under the pointer or the keyboard's focus it opens out to the left with its words, its right end staying put */
 #bcv-report { position: fixed; top: 6px; right: 42px; z-index: var(--bcv-z-float); }
-#bcv-report, .bcv-report-pill { display: flex; align-items: center; justify-content: flex-end; box-sizing: border-box; height: 24px; max-width: 24px; margin: 0; padding: 0; border: 0; border-radius: 12px; background: linear-gradient(158deg, #a55cf2, #7b2fe0); color: #fff; box-shadow: 0 2px 10px rgba(0,0,0,.2); overflow: hidden; white-space: nowrap; cursor: pointer; font: 600 11px/1 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif; letter-spacing: -.01em; text-transform: none; transition: max-width .24s cubic-bezier(.32,.72,0,1), box-shadow .18s ease, transform .16s var(--bcv-spring-snappy), opacity .2s ease; }
+#bcv-report, .bcv-report-pill { display: flex; align-items: center; justify-content: flex-end; box-sizing: border-box; height: 24px; max-width: 24px; margin: 0; padding: 0; border: 0; border-radius: 12px; background: linear-gradient(158deg, #a55cf2, #7b2fe0); color: #fff; box-shadow: 0 2px 10px rgba(0,0,0,.2); overflow: hidden; white-space: nowrap; cursor: pointer; font: 600 11px/1 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif; letter-spacing: -.01em; text-transform: none; transition: max-width .24s cubic-bezier(.32,.72,0,1), box-shadow .18s ease, transform .16s var(--bcv-spring-snappy), opacity .2s ease, translate .45s cubic-bezier(.32,.72,0,1); }
 #bcv-report:hover, #bcv-report:focus-visible, .bcv-report-pill.is-open { max-width: 140px; box-shadow: 0 6px 20px rgba(123,47,224,.4); }
 #bcv-report:active, .bcv-report-pill.is-press { transform: scale(.96); }
 #bcv-report:focus-visible { outline: 2px solid #0a84ff; outline-offset: 2px; }
@@ -305,7 +305,6 @@ html.bcv-phone.bcv-on #bcv-report, html.bcv-setup-open #bcv-report, html.bcv-wel
 #bcv-welcome { position: fixed; inset: 0; z-index: var(--bcv-z-welcome); margin: 0; padding: 0; background: #000; color: #fff; font: 400 15px/1.35 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif; letter-spacing: -.01em; text-transform: none; overflow: hidden; transition: opacity .35s ease; }
 #bcv-welcome.is-out { opacity: 0; pointer-events: none; }
 #bcv-welcome:focus { outline: none; }
-html.bcv-welcome { overflow: hidden; }
 /* the thing pointed at, where it will really be: the switch at the top right, larger; the pill at the top, larger */
 .bcv-welcome__look { position: absolute; top: 10px; right: 12px; z-index: auto; transform: scale(1.25); transform-origin: top right; pointer-events: none; animation: bcv-welcome-fade .5s ease both; }
 .bcv-welcome__look .bcv-look__main { box-shadow: 0 0 0 1px rgba(255,255,255,.22), 0 0 44px rgba(255,255,255,.24); }
@@ -382,6 +381,12 @@ html.bcv-welcome { overflow: hidden; }
 
 html.bcv-on { background: var(--bcv-bg) !important; }
 html.bcv-on body { margin: 0 !important; padding: 0 !important; background: var(--bcv-bg) !important; overflow: auto !important; min-height: 100vh; }
+/* The window is what scrolls, always. <html> stays overflow-visible so the body's own setting passes to the
+ * window: were <html> ever hidden (a scroll lock put there, or a page script), the body would become a scroll
+ * container of its own — one that never scrolls — and everything sticky (the page heads, the course rail)
+ * would be carried off with the page. A scroll lock goes on <body> instead, which locks the window. */
+html.bcv-on { overflow: visible !important; }
+html.bcv-on.bcv-welcome body, html.bcv-on.bcv-setup-open body { overflow: hidden !important; }
 html.bcv-on #application, html.bcv-on body > .ic-app, html.bcv-on #flash_message_holder, html.bcv-on #flash_screenreader_holder, html.bcv-on #immersive_reader_mount_point, html.bcv-on #nav-tray-portal, html.bcv-on #header, html.bcv-on #wrapper { display: none !important; }
 html.bcv-on #bcv-app { display: flex; }
 
@@ -401,7 +406,12 @@ html.bcv-on #bcv-app { display: flex; }
 #bcv-app .bcv-pretty { text-wrap: pretty; }
 
 /* ---- sidebar ------------------------------------------------------------ */
-.bcv-side { flex: none; width: 242px; padding: 14px 12px; background: var(--bcv-chrome); -webkit-backdrop-filter: var(--bcv-blur-chrome); backdrop-filter: var(--bcv-blur-chrome); border-right: 1px solid var(--bcv-edge); display: flex; flex-direction: column; gap: 18px; position: sticky; top: 0; height: 100vh; overflow: auto; }
+.bcv-side { flex: none; width: 242px; padding: 14px 12px; background: var(--bcv-chrome); -webkit-backdrop-filter: var(--bcv-blur-chrome); backdrop-filter: var(--bcv-blur-chrome); border-right: 1px solid var(--bcv-edge); display: flex; flex-direction: column; gap: 18px; position: fixed; top: 0; left: 0; bottom: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; }
+/* The sidebar is pinned to the window and scrolls on its own, apart from the page: a page scroll never moves
+ * it, and scrolling it never moves the page. Out of the row as it is, this holds its place there, at its
+ * width in every tier (and folding with it when a quiz takes the page). */
+html.bcv-on:not(.bcv-phone) #bcv-app:has(> .bcv-side)::before { content: ''; flex: none; order: -1; width: 242px; transition: width .45s cubic-bezier(.32,.72,0,1); }
+html.bcv-on.bcv-quiz:not(.bcv-phone) #bcv-app:has(> .bcv-side)::before { width: 0; }
 .bcv-brand { display: flex; align-items: center; gap: 10px; padding: 6px 8px 2px; }
 .bcv-brand__tile { width: 30px; height: 30px; border-radius: 9px; background: linear-gradient(160deg, #1b3f76, #12305c); display: flex; align-items: center; justify-content: center; font: 700 14px/1 var(--bcv-font); color: #f0b429; flex: none; overflow: hidden; }
 /* the school's logo, whole: never cropped, no rounded corners, no name or term beside it */
@@ -617,18 +627,33 @@ html[data-bcv-theme="dark"] .bcv-badge--orange { color: #ffb44d; }
 /* A row previewed from a counter's sheet opens inside the sheet: it widens and the preview takes
  * the right of it, the list staying where it is. Nothing else on the page moves. */
 .bcv-sheet { transition: width .3s cubic-bezier(.32,.72,0,1), transform .3s cubic-bezier(.32,.72,0,1), opacity .3s ease; }
-.bcv-sheet.is-split { width: min(980px, 100%); display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 380px); grid-template-rows: auto minmax(0, 1fr); }
+.bcv-sheet.is-split { width: min(1080px, 100%); display: grid; grid-template-columns: minmax(300px, 360px) minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
 .bcv-sheet.is-split > .bcv-sheet__head { grid-column: 1; grid-row: 1; }
 .bcv-sheet.is-split > .bcv-sheet__list { grid-column: 1; grid-row: 2; }
 .bcv-sheet.is-split > .bcv-pv--in { grid-column: 2; grid-row: 1 / span 2; }
 /* The sheet behind a counter is one size from the start (the width the split would have given it,
    a height that does not follow the list), with a pane on the right that says what it is for until
    a row is pressed and the preview takes it. Nothing about it grows or shrinks. */
-.bcv-sheet--steady { background: var(--bcv-card); -webkit-backdrop-filter: none; backdrop-filter: none; width: min(980px, 100%); height: min(640px, calc(100vh - 56px)); display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 380px); grid-template-rows: auto minmax(0, 1fr); transition: none; }
+.bcv-sheet--steady { background: var(--bcv-card); -webkit-backdrop-filter: none; backdrop-filter: none; width: min(1080px, 100%); height: min(680px, calc(100vh - 56px)); display: grid; grid-template-columns: minmax(300px, 360px) minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); transition: none; }
 .bcv-sheet--steady > .bcv-sheet__head { grid-column: 1; grid-row: 1; }
 .bcv-sheet--steady > .bcv-sheet__list { grid-column: 1; grid-row: 2; }
 .bcv-sheet--steady > .bcv-sheet__pvhint { grid-column: 2; grid-row: 1 / span 2; border-left: 1px solid var(--bcv-sep); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 24px; text-align: center; }
 .bcv-sheet__pvhint-t { font: 500 13px/1.4 var(--bcv-font); color: var(--bcv-ink3); max-width: 200px; text-wrap: pretty; }
+/* (2.98.28) The preview is the big pane and the list the narrow one: in a column that narrow a row stacks — the
+ * dot, then the title and its line, then the course under them. The list comes in two: what wants attention
+ * (not done, unread) under its label, then, set back in grey, what else there is from the same span — a press
+ * away all the same, and full strength under the pointer. */
+.bcv-sheet--steady .bcv-sheet__row, .bcv-sheet--steady .bcv-sheet__qrow { display: grid; grid-template-columns: 9px minmax(0, 1fr); column-gap: 12px; row-gap: 7px; align-items: start; padding: 12px 18px; }
+.bcv-sheet--steady .bcv-sheet__dot { margin-top: 6px; }
+.bcv-sheet--steady .bcv-sheet__course { grid-column: 2; justify-self: start; max-width: 100%; }
+.bcv-sheet__sec { padding: 12px 18px 6px; font: 700 11px/1.2 var(--bcv-font); letter-spacing: .06em; text-transform: uppercase; color: var(--bcv-ink2); }
+.bcv-sheet__recent { margin-top: 14px; padding-top: 4px; border-top: 1px solid var(--bcv-sep); background: var(--bcv-fill2, rgba(120,120,128,.06)); }
+.bcv-sheet__sec--quiet { color: var(--bcv-ink3); }
+.bcv-sheet__qrow { display: flex; align-items: center; gap: 13px; padding: 10px 22px; border-top: 1px solid var(--bcv-sep); cursor: pointer; color: inherit; text-decoration: none; opacity: .62; filter: saturate(.35); transition: opacity .18s ease, filter .18s ease, background .18s ease; }
+.bcv-sheet__sec--quiet + .bcv-sheet__qrow { border-top: 0; }
+.bcv-sheet__qrow:hover, .bcv-sheet__qrow:focus-visible { opacity: 1; filter: none; background: var(--bcv-hover); }
+.bcv-sheet__qrow .bcv-sheet__title { font-weight: 500; }
+.bcv-sheet__sec + .bcv-sheet__row, .bcv-sheet__sec + .bcv-sheet__item > .bcv-sheet__row { border-top: 0; }
 .bcv-sheet--steady:has(> .bcv-pv--in) > .bcv-sheet__pvhint { display: none; }
 .bcv-sheet .bcv-pv--in { position: static; width: auto; min-width: 0; max-width: none; z-index: auto; border-left: 1px solid var(--bcv-sep); border-radius: 0; box-shadow: none; background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; animation: bcv-pv-in .3s cubic-bezier(.32,.72,0,1) both; }
 @media (max-width: 1100px) {
@@ -936,7 +961,10 @@ html[data-bcv-theme="dark"] .bcv-cal__notice--warn { color: #ffb44d; }
 
 /* ---- course / group shell: header + grouped rail (mockup) ------------------- */
 .bcv-cwrap { display: flex; align-items: flex-start; gap: 0; }
-.bcv-rail { flex: none; width: 234px; padding: 18px 14px 24px; position: sticky; top: var(--bcv-chead, 89px); max-height: calc(100vh - var(--bcv-chead, 89px)); overflow: auto; display: flex; flex-direction: column; gap: 18px; align-self: flex-start; }
+.bcv-rail { flex: none; width: 234px; padding: 18px 14px 24px; position: sticky; top: calc(var(--bcv-bar-h, 0px) + var(--bcv-chead, 89px)); max-height: calc(100vh - var(--bcv-bar-h, 0px) - var(--bcv-chead, 89px) - 64px); overflow: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 18px; align-self: flex-start; }
+/* (the rail sticks under the course's own head, which sticks under the top bar; it scrolls on its own, and is kept
+   short of the page's bottom padding — the row it sits in ends there, and a sticky box that reaches past its row's
+   end is pushed up with the page at the bottom) */
 .bcv-rail__group { display: flex; flex-direction: column; }
 .bcv-rail__title { padding: 0 10px 6px; font: 600 10.5px/1.2 var(--bcv-font); color: var(--bcv-ink3); text-transform: uppercase; letter-spacing: .06em; }
 .bcv-rail__list { display: flex; flex-direction: column; gap: 2px; }
@@ -2094,11 +2122,20 @@ html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) .bcv-head--pic .bc
 /* ---- toast ---------------------------------------------------------------- */
 /* an error's code (lib/errors.js), after its words: a small grey tag drawn from data-code, so it is never part of the words themselves */
 .bcv-toast[data-code]::after, .bcv-error[data-code]::after { content: attr(data-code); display: inline-block; margin-left: 8px; padding: 2px 6px; border-radius: 6px; background: var(--bcv-fill2, rgba(120,120,128,.16)); color: var(--bcv-ink2); font: 600 11px/1.3 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: 0; vertical-align: 1px; white-space: nowrap; }
-.bcv-toast { position: fixed; left: 50%; bottom: 22px; translate: -50% 0; z-index: var(--bcv-z-toast); padding: 10px 16px; border-radius: var(--bcv-r-menu); background: var(--bcv-glass); -webkit-backdrop-filter: var(--bcv-blur-glass); backdrop-filter: var(--bcv-blur-glass); box-shadow: var(--bcv-shadow-hi); border: 1px solid var(--bcv-edge); font: 500 13px/1.3 var(--bcv-font); color: var(--bcv-ink); max-width: min(480px, calc(100vw - 32px)); box-sizing: border-box; }
-.bcv-toast--error { color: var(--bcv-red-text); }
+.bcv-toast { position: fixed; left: 50%; top: calc(10px + env(safe-area-inset-top, 0px)); translate: -50% 0; z-index: var(--bcv-z-toast); display: flex; align-items: center; gap: 10px; box-sizing: border-box; min-height: 44px; padding: 6px 18px 6px 7px; border-radius: 999px; background: rgba(28,28,30,.9); -webkit-backdrop-filter: blur(18px) saturate(1.4); backdrop-filter: blur(18px) saturate(1.4); border: 1px solid rgba(255,255,255,.14); box-shadow: 0 10px 34px rgba(0,0,0,.34); font: 500 13.5px/1.3 var(--bcv-font); color: #fff; max-width: min(540px, calc(100vw - 32px)); pointer-events: auto; }
+/* Notifications are the Away Refresh pill's kind (#bcv-away): a dark pill that floats down from the top centre
+ * of the window and goes back up, the same in both appearances — a mark in a disc (a bell; on an error a red
+ * "!"), the words, and an error's code in a tag after them. Under the Away Refresh pill when that is out. */
+.bcv-toast__ic { flex: none; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: rgba(10,132,255,.24); color: #7cc0ff; }
+.bcv-toast--error .bcv-toast__ic { background: rgba(255,69,58,.26); color: #ff8a80; }
+.bcv-toast__text { min-width: 0; overflow-wrap: anywhere; }
+.bcv-toast[data-code]::after { flex: none; margin-left: 2px; background: rgba(255,255,255,.12); color: rgba(255,255,255,.72); }
+#bcv-away.is-in ~ .bcv-toast { top: calc(72px + env(safe-area-inset-top, 0px)); }
+.bcv-toast--error { color: #fff; } /* (the red is the mark's; the words stay readable on the dark pill) */
 
 @media (max-width: 1100px) {
   .bcv-side { width: 200px; padding: 12px 8px; }
+  html.bcv-on:not(.bcv-quiz):not(.bcv-phone) #bcv-app:has(> .bcv-side)::before { width: 200px; }
   .bcv-rail { width: 72px; }
   .bcv-rail .bcv-rail__title, .bcv-rail .bcv-rail__label, .bcv-rail .bcv-rail__count, .bcv-rail .bcv-rail__group--ext { display: none; }
   .bcv-rail .bcv-rail__item, .bcv-rail .bcv-rail__toggle { justify-content: center; }
@@ -2161,7 +2198,7 @@ html.bcv-phone .bcv-sheet { width: 100%; max-width: none; max-height: 88vh; bord
 .bcv-ph-sheet__handle { flex: none; padding: 8px 0 10px; display: flex; justify-content: center; cursor: grab; touch-action: none; }
 .bcv-ph-sheet__handle span { width: 38px; height: 5px; border-radius: 3px; background: var(--bcv-fill); }
 html.bcv-phone .bcv-menu { position: fixed; left: 12px !important; right: 12px !important; top: auto !important; bottom: calc(var(--bcv-ph-tabbar) + var(--bcv-ph-bottom) + 12px); min-width: 0; }
-html.bcv-phone .bcv-toast { bottom: calc(var(--bcv-ph-tabbar) + var(--bcv-ph-bottom) + 14px); max-width: calc(100vw - 32px); }
+html.bcv-phone .bcv-toast { max-width: calc(100vw - 24px); }
 /* course shell: no rail; a chip row of the tabs on the tabs below Home */
 html.bcv-phone .bcv-rail { display: none; }
 html.bcv-phone .bcv-cwrap { display: block; }
@@ -2519,7 +2556,7 @@ html.bcv-phone .bcv-ph-head__sub { font: 400 13px/1.35 var(--bcv-font); color: v
 .bcv-topbar__right { display: flex; justify-content: flex-end; align-items: center; }
 
 /* ---- guided setup: drawn over the page from content/app/setup.js (its own shadow root) ---- */
-html.bcv-setup-open { overflow: hidden; }
+/* (the setup's scroll lock: with the page rules, on <body>) */
 
 /* ---- "More from Canvas": what the school added to Canvas's own nav ---- */
 .bcv-side__group--more { margin-top: 2px; }
@@ -2656,9 +2693,16 @@ html.bcv-dragpin #bcv-tray { opacity: 0; }
  * nothing in a quiz, where the sidebar folds away — and the bar's left edge eases with it). */
 html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) { --bcv-bar-h: 44px; --bcv-side-w: 242px; }
 html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab).bcv-quiz { --bcv-side-w: 0px; }
+/* (2.98.28) A quiz takes the whole window: the top bar goes up and out of view, and the pins, the switch and the
+ * report button with it — the quiz's own head keeps the way out to Canvas's page. The heads that stuck under the
+ * bar stick to the top instead, and the page rises into the space as the bar leaves. */
+html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab).bcv-quiz { --bcv-bar-h: 0px; }
+html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab).bcv-quiz #bcv-bar { height: 44px; translate: 0 -100%; opacity: 0; pointer-events: none; }
+html.bcv-on:not(.bcv-phone):not(.bcv-tooltab).bcv-quiz #bcv-tray, html.bcv-on:not(.bcv-phone):not(.bcv-tooltab).bcv-quiz #bcv-look, html.bcv-on:not(.bcv-phone):not(.bcv-tooltab).bcv-quiz #bcv-report { translate: 0 -64px; opacity: 0; pointer-events: none; }
+html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) .bcv-main { transition: padding-top .45s cubic-bezier(.32,.72,0,1); }
 @media (max-width: 1100px) { html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) { --bcv-side-w: 200px; } }
 #bcv-bar { display: none; }
-html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) #bcv-bar { display: block; position: fixed; top: 0; left: var(--bcv-side-w); right: 0; height: var(--bcv-bar-h); z-index: var(--bcv-z-bar); box-sizing: border-box; background: var(--bcv-chrome); -webkit-backdrop-filter: var(--bcv-blur-chrome); backdrop-filter: var(--bcv-blur-chrome); border-bottom: 1px solid var(--bcv-edge); transition: left .45s cubic-bezier(.32,.72,0,1); }
+html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) #bcv-bar { display: block; position: fixed; top: 0; left: var(--bcv-side-w); right: 0; height: var(--bcv-bar-h); z-index: var(--bcv-z-bar); box-sizing: border-box; background: var(--bcv-chrome); -webkit-backdrop-filter: var(--bcv-blur-chrome); backdrop-filter: var(--bcv-blur-chrome); border-bottom: 1px solid var(--bcv-edge); transition: left .45s cubic-bezier(.32,.72,0,1), translate .45s cubic-bezier(.32,.72,0,1), opacity .3s ease; }
 html.bcv-setup-open #bcv-bar, html.bcv-welcome #bcv-bar { display: none !important; }
 html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) .bcv-main { padding-top: var(--bcv-bar-h); }
 html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) .bcv-head, html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) .bcv-qz__head, html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) .bcv-pv { top: var(--bcv-bar-h); }
@@ -2676,6 +2720,7 @@ html.bcv-tooltab { --bcv-font: -apple-system, BlinkMacSystemFont, "SF Pro Text",
    popup starts below the bar rather than under it. */
 html.bcv-tooltab .bcv-sheet-ov { top: var(--bcv-toolbar-h, 52px); z-index: var(--bcv-z-under-top); }
 html.bcv-tooltab .bcv-toast, html.bcv-tooltab .bcv-picker__list, html.bcv-tooltab .bcv-menu { z-index: var(--bcv-z-under-top); }
+html.bcv-tooltab .bcv-toast { top: calc(var(--bcv-toolbar-h, 52px) + 8px); } /* (under the tool's bar, not behind it) */
 html.bcv-tooltab .bcv-pin.bcv-quick.is-free { z-index: var(--bcv-z-top); }
 #bcv-pins { display: flex; align-items: flex-start; gap: 6px; }
 #bcv-pins[hidden] { display: none !important; }
@@ -3781,7 +3826,7 @@ html[data-bcv-theme="dark"] .bcv-pdfx { --px-row: #0f0f11; --px-page: #1f1f22; -
 .bcv-qgraph__failtext { font: 500 12px/1.4 var(--bcv-font); color: rgba(255,255,255,.7); }
 .bcv-qgraph__link { padding: 8px 12px; border-radius: 12px; background: var(--bcv-quick-color); font: 600 12px/1 var(--bcv-font); color: #fff !important; text-decoration: none !important; }
 
-#bcv-tray { transition: opacity .18s ease, top .38s cubic-bezier(.32,.72,0,1), right .38s cubic-bezier(.32,.72,0,1); }
+#bcv-tray { transition: opacity .18s ease, top .38s cubic-bezier(.32,.72,0,1), right .38s cubic-bezier(.32,.72,0,1), translate .45s cubic-bezier(.32,.72,0,1); }
 
 /* the periodic table (2.41.0): every element in place, a card in the table's corner, a line under it */
 .bcv-tool--pt .bcv-tool__body { padding: 14px 18px 18px; gap: 12px; }

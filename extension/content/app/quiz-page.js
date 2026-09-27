@@ -54,7 +54,7 @@
     const textEl = el.querySelector('.question_text');
     const q = {
       id, question_name: el.querySelector('.question_name')?.textContent.trim() || '', question_type: type,
-      points_possible: num(el.querySelector('.question_points_holder .points')?.textContent) ?? 0,
+      points_possible: num(el.querySelector('.question_points_holder .points')?.textContent), // (none shown: none said — never a 0 made up)
       question_text: textEl ? textEl.innerHTML.trim() : '', flagged: el.classList.contains('marked'), answers: [], answer: null, loaded: true,
     };
     const scope = el.querySelector('.answers') || el;

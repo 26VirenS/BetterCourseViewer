@@ -392,13 +392,16 @@ try {
   await page.waitForSelector('.bcv-sheet', { timeout: 5000 });
   const overdueRows = await texts('.bcv-sheet__row');
   check((await texts('.bcv-sheet__line'))[0] === '1 Overdue' && /^Past due with nothing handed in$/.test((await texts('.bcv-sheet__note'))[0]) && overdueRows.length === 1 && /^W2 HW Assignment · 15 pts · due \w+ \d+ · not submitted F26-PHYS 008 01$/.test(overdueRows[0]), `the Overdue sheet lists exactly what it counted: ${overdueRows.join(' | ')}`);
+  // (2.98.28) under it, quieter: past-due work handed in late in the last two weeks — no X, it is not overdue
+  const lateRows = await page.$$eval('.bcv-sheet__recent .bcv-sheet__qrow', (els) => els.map((e) => e.innerText.replace(/\s+/g, ' ').trim()));
+  check((await page.$$eval('.bcv-sheet__sec', (els) => els.map((e) => e.textContent))).join('|') === 'Not handed in|Handed in late' && lateRows.length >= 1 && lateRows.every((t) => /· handed in \w+ \d+ · (graded|waiting for a grade)/.test(t)) && !(await page.$('.bcv-sheet__recent .bcv-sheet__x')), `the overdue sheet keeps late hand-ins below, set back: ${lateRows.join(' | ')}`);
   // an X beside each row clears it, one at a time: dismissed on Canvas's planner, the row goes, the counts follow
   const xInfo = await page.$$eval('.bcv-sheet__item .bcv-sheet__x', (els) => els.map((e) => ({ tag: e.tagName, label: e.getAttribute('aria-label'), title: e.title })));
   check(xInfo.length === 1 && xInfo[0].label === 'Clear: W2 HW' && xInfo[0].title === 'Clear', `each overdue row has an X to clear it: ${JSON.stringify(xInfo)}`);
   await page.waitForTimeout(450); // the sheet's morph settles before the shot
   await shot(page, '02b-overdue-sheet');
   await page.click('.bcv-sheet__item .bcv-sheet__x');
-  check(await eventually(async () => (await page.$$('.bcv-sheet__row')).length === 0 && (await texts('.bcv-sheet__line'))[0] === '0 Overdue' && (await texts('.bcv-sheet__list .bcv-empty')).join('') === 'Nothing is overdue.'), 'the X clears the row, the sheet counts down to 0 and says so');
+  check(await eventually(async () => (await page.$$('.bcv-sheet__row')).length === 0 && (await texts('.bcv-sheet__line'))[0] === '0 Overdue' && (await texts('.bcv-sheet__list .bcv-empty')).join('') === 'Nothing is overdue.' && (await page.$eval('.bcv-sheet__list .bcv-empty', (e) => e.previousElementSibling?.className || '')) === 'bcv-sheet__sec'), 'the X clears the row, the sheet counts down to 0 and says so');
   check(await eventually(async () => /^Overdue\s*0\s*Nothing overdue$/i.test((await texts('.bcv-stat'))[3])), `the card behind the sheet reads 0 too: ${(await texts('.bcv-stat'))[3]}`);
   const dismissedOnCanvas = await page.evaluate(async () => { const r = await fetch(`/api/v1/planner/items?start_date=${new Date(Date.now() - 14 * 864e5).toISOString()}&end_date=${new Date(Date.now() + 21 * 864e5).toISOString()}&per_page=100`); const items = JSON.parse((await r.text()).replace(/^while\(1\);/, '')); const it = items.find((i) => i.plannable_type === 'assignment' && String(i.plannable_id) === '2002'); return it ? { title: it.plannable?.title, dismissed: !!it.planner_override?.dismissed, complete: !!it.planner_override?.marked_complete, ovId: it.planner_override?.id || null } : null; });
   check(dismissedOnCanvas?.title === 'W2 HW' && dismissedOnCanvas.dismissed === true && dismissedOnCanvas.complete === false && !!dismissedOnCanvas.ovId, `Canvas's planner carries the dismissal (not a completion), so the To Do list and every device agree: ${JSON.stringify(dismissedOnCanvas)}`);
@@ -481,6 +484,18 @@ try {
   const weekLine = (await texts('.bcv-sheet__line'))[0];
   const weekRows = await texts('.bcv-sheet__row');
   check(/^\d+ Due this week$/.test(weekLine) && Number(weekLine.split(' ')[0]) === weekRows.length && /^Week of \w+ \d+ · \d courses?$/.test((await texts('.bcv-sheet__note'))[0]) && weekRows.every((t) => /·/.test(t)) && weekRows.some((t) => /· \d+ pts ·/.test(t)), `Due this week sheet: ${weekLine} / ${(await texts('.bcv-sheet__note'))[0]} / ${weekRows.length} rows, e.g. ${weekRows[0] || '(none)'}`);
+  // (2.98.28) the list in two: what is still to do under its label, then — set back in grey, a press away all the
+  // same — the week's work already handed in; and the preview is the big pane, the list the narrow one
+  await page.waitForTimeout(500);
+  const sheetSplit = await page.evaluate(() => {
+    const sh = document.querySelector('.bcv-sheet');
+    const q = document.querySelector('.bcv-sheet__qrow');
+    const cols = getComputedStyle(sh).gridTemplateColumns.split(' ').map(parseFloat);
+    return { secs: [...sh.querySelectorAll('.bcv-sheet__sec')].map((e) => e.textContent).join('|'), quiet: sh.querySelectorAll('.bcv-sheet__qrow').length, quietOp: q ? Number(getComputedStyle(q).opacity) : null, quietMeta: q ? q.innerText.replace(/\s+/g, ' ') : '', cols, afterRows: !!q && !!sh.querySelector('.bcv-sheet__row') && (sh.querySelector('.bcv-sheet__row').compareDocumentPosition(q) & Node.DOCUMENT_POSITION_FOLLOWING) > 0 };
+  });
+  check(sheetSplit.secs === 'Still to do|Already done' && sheetSplit.quiet >= 1 && sheetSplit.quietOp < 0.8 && /· (graded|handed in|marked done)\b/.test(sheetSplit.quietMeta) && sheetSplit.afterRows && sheetSplit.cols.length === 2 && sheetSplit.cols[1] > sheetSplit.cols[0] * 1.5 && sheetSplit.cols[0] <= 360, `the sheet: what is still to do, then the done ones quieter below; the preview pane the wide one: ${JSON.stringify(sheetSplit)}`);
+  await page.hover('.bcv-sheet__qrow');
+  check(await eventually(async () => Number(await page.$eval('.bcv-sheet__qrow', (e) => getComputedStyle(e).opacity)) > 0.95, 2000), 'a quiet row comes up to full strength under the pointer');
   await page.click('.bcv-sheet-ov', { position: { x: 5, y: 5 } });
   await page.waitForFunction(() => !document.querySelector('.bcv-sheet'), null, { timeout: 3000 });
   await page.click('.bcv-stats .bcv-stat:nth-child(3)');
@@ -741,6 +756,21 @@ try {
   await waitText('.bcv-head__sub', /items across/);
   const todoSub = (await texts('.bcv-head__sub'))[0];
   check(/^\d+ items across \d+ courses$/.test(todoSub), `to do header: ${todoSub}`);
+  // (2.98.28) the sidebar is pinned to the window as a scroll area of its own: a page scroll never carries it,
+  // not even while a scroll lock (a welcome stage) is on — the lock sits on <body>, never on <html>
+  const sidePin = async () => page.evaluate(async () => {
+    window.scrollTo(0, document.documentElement.scrollHeight);
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    const b = document.querySelector('.bcv-side').getBoundingClientRect();
+    const cs = getComputedStyle(document.querySelector('.bcv-side'));
+    return { y: Math.round(scrollY), top: Math.round(b.top), bottom: Math.round(b.bottom), vh: innerHeight, pos: cs.position, os: cs.overscrollBehaviorY, main: Math.round(document.querySelector('.bcv-main').getBoundingClientRect().left) };
+  });
+  const pinned = await sidePin();
+  await page.evaluate(() => document.documentElement.classList.add('bcv-welcome'));
+  const pinnedLocked = await sidePin();
+  const lockOv = await page.evaluate(() => [getComputedStyle(document.documentElement).overflow, getComputedStyle(document.body).overflow]);
+  await page.evaluate(() => { document.documentElement.classList.remove('bcv-welcome'); window.scrollTo(0, 0); });
+  check(pinned.y > 100 && pinned.top === 0 && pinned.bottom === pinned.vh && pinned.pos === 'fixed' && pinned.os === 'contain' && pinned.main === 242 && pinnedLocked.top === 0 && pinnedLocked.bottom === pinnedLocked.vh && lockOv.join() === 'visible,hidden', `the sidebar stays put at the bottom of a long page, and under a scroll lock too; the page starts beside it: ${JSON.stringify({ pinned, pinnedLocked, lockOv })}`);
   const todoGroups = await texts('.bcv-group__head');
   check(todoGroups[0].startsWith('Overdue') && todoGroups[1].startsWith('Today') && todoGroups[2].startsWith('Tomorrow') && todoGroups[3].startsWith('Next 7 days'), `to do groups — past due with nothing handed in first, as Canvas's own list keeps it: ${todoGroups.join(' | ')}`);
   check((await texts('.bcv-body .bcv-row')).some((t) => /Qz01.*F26-MATH 021 20 · Quiz · 10 pts.*11:59 PM/.test(t)), 'to do rows show course · kind · pts and time');
@@ -1665,6 +1695,19 @@ try {
   // dense screens fill the column up to 1180 (mockup 7 layout notes): 1400 viewport − 242 sidebar − 80 padding = 1078 here
   check(await page.$eval('.bcv-screen--ctx .bcv-head__in', (el) => Math.round(el.getBoundingClientRect().width) === 1078), `course screens fill the column (capped at 1180): ${await page.$eval('.bcv-screen--ctx .bcv-head__in', (el) => Math.round(el.getBoundingClientRect().width))}px`);
   check((await texts('.bcv-rail__ext')).join(',') === 'Resources & Policy', 'external tools are plain links under Campus tools');
+  // (2.98.28) the course rail sticks under the course's head, which sticks under the top bar — never tucked under it
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  await eventually(() => page.evaluate(() => Math.abs(document.querySelector('.bcv-rail').getBoundingClientRect().top - document.querySelector('.bcv-screen--ctx .bcv-head').getBoundingClientRect().bottom) <= 1), 3000);
+  const railAt = await page.evaluate(async () => {
+    window.scrollTo(0, document.documentElement.scrollHeight);
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    const head = document.querySelector('.bcv-screen--ctx .bcv-head').getBoundingClientRect();
+    const rail = document.querySelector('.bcv-rail').getBoundingClientRect();
+    const r = { y: Math.round(scrollY), headBottom: Math.round(head.bottom), railTop: Math.round(rail.top), os: getComputedStyle(document.querySelector('.bcv-rail')).overscrollBehaviorY };
+    window.scrollTo(0, 0);
+    return r;
+  });
+  check(railAt.y > 0 && Math.abs(railAt.railTop - railAt.headBottom) <= 1 && railAt.os === 'contain', `the course rail sits just under the course head at the bottom of the page, a scroll area of its own: ${JSON.stringify(railAt)}`);
   const railOpening = context.waitForEvent('page', { timeout: 20000 });
   await page.click('.bcv-rail__ext');
   const extTab = await railOpening;
@@ -2245,6 +2288,14 @@ try {
   await page.waitForSelector('.bcv-qz__opt', { timeout: 10000 });
   await noteApi('POST', '/__mock/config', { quizMedia: false });
   check((await page.$$('.bcv-qz__pill')).length === 4 && (await page.$('.bcv-qz__pill:first-child.is-current')) && (await texts('.bcv-qz__qnum'))[0] === 'Question 1', 'attempt started through the API: progress pills and question 1');
+  // (2.98.28) each question's points: Canvas's API keeps them from a student (the mock censors them too), so
+  // they are read off Canvas's own take page for the attempt, and painted in once it comes
+  check(await eventually(async () => (await texts('.bcv-qz__qof'))[0] === 'of 4 · 4 points', 6000), `a question shows the points it is worth, from Canvas's take page: ${(await texts('.bcv-qz__qof'))[0]}`);
+  // (2.98.28) the attempt takes the whole window: the top bar, its pins, the switch and the report button go up and
+  // out of view (the quiz's own head keeps the way to Canvas's page), and the quiz head sits at the very top
+  let quizChrome = null;
+  const quizChromeOk = await eventually(async () => { const r = quizChrome = await page.evaluate(() => ({ bar: Math.round(document.querySelector('#bcv-bar')?.getBoundingClientRect().bottom ?? -1), look: getComputedStyle(document.querySelector('#bcv-look')).opacity, lookPe: getComputedStyle(document.querySelector('#bcv-look')).pointerEvents, report: document.querySelector('#bcv-report') ? getComputedStyle(document.querySelector('#bcv-report')).opacity : '0', head: Math.round(document.querySelector('.bcv-qz__head').getBoundingClientRect().top), raw: !!document.querySelector('.bcv-qz__raw') })); return r.bar <= 0 && r.look === '0' && r.lookPe === 'none' && r.report === '0' && r.head === 0 && r.raw; }, 3000);
+  check(quizChromeOk, `a quiz takes the whole window: the top bar and its widgets leave, the Canvas page button stays: ${JSON.stringify(quizChrome)}`);
   // (2.98.24) the side layout, the default: the questions down the left, the question in the middle with
   // its number large on top and its text at Canvas's own size, every control down the right
   const sideL = await page.evaluate(() => {
@@ -3708,7 +3759,7 @@ try {
   const setupDot = await dotOf('#bcv-setup');
   const introUp = (await page.$(su('.intro:not([hidden])'))) !== null;
   // the word-mark plays first (about two seconds), then the setup rises under it
-  check(page.url() === `${BASE}/` && (await page.$('.bcv-stat')) !== null && introUp && (await page.$$(su('.rail__item'))).length === 4 && (await sStep()) === '1 of 4' && (await page.$eval('html', (e) => getComputedStyle(e).overflow)) === 'hidden', 'the setup opens over the dashboard on its own ground: the address cleaned, a word-mark, a rail of four steps, the page held still');
+  check(page.url() === `${BASE}/` && (await page.$('.bcv-stat')) !== null && introUp && (await page.$$(su('.rail__item'))).length === 4 && (await sStep()) === '1 of 4' && (await page.$eval('body', (e) => getComputedStyle(e).overflow)) === 'hidden' && (await page.$eval('html', (e) => getComputedStyle(e).overflow)) === 'visible', 'the setup opens over the dashboard on its own ground: the address cleaned, a word-mark, a rail of four steps, the page held still');
   check(setupDot.gap >= 10 && setupDot.gap <= 18 && setupDot.fits, `the dot after Simpl sits just past the word as drawn here, inside the drawing: ${JSON.stringify(setupDot)}`);
   await page.waitForFunction(() => document.querySelector('#bcv-setup')?.shadowRoot.querySelector('.intro')?.hidden === true, null, { timeout: 8000 });
   await page.waitForTimeout(500);
@@ -4230,7 +4281,7 @@ try {
     await page.waitForTimeout(500);
     const inv = await page.evaluate(() => { const r = document.querySelector('#bcv-whatsnew').shadowRoot; return { notes: r.querySelectorAll('.wn__note, .wn__vh, #earlier').length, brand: r.querySelector('.fr__brand span').textContent, h1: r.querySelector('.fr__h1').textContent, blurb: r.querySelector('.fr__blurb').textContent, scenes: [...r.querySelectorAll('.inv__scene')].map((s) => s.title).join(','), scenePics: [...r.querySelectorAll('.inv__scene')].every((s) => /^url\("data:image\/svg\+xml/.test(getComputedStyle(s).backgroundImage) && s.getBoundingClientRect().width > 90), dots: [...r.querySelectorAll('.inv__dot')].map((d) => d.title).join(','), foot: [...r.querySelectorAll('.fr__foot button')].map((b) => `${b.id}:${b.textContent.trim()}`).join(',') }; });
     check(inv.notes === 0 && inv.brand === 'New in Simpl' && inv.h1 === 'Make it yours' && /themes/.test(inv.blurb) && /Try a theme, or change the colour\.$/.test(inv.blurb) && inv.scenes === 'Dusk,Ocean,Forest,Sand' && inv.scenePics && inv.dots === 'Pink,Red,Amber,Green,Teal,Indigo,Purple' && inv.foot === 'later:Not now,personalize:Personalize', `the first page after this update invites a theme or a colour instead of listing the notes — the scenes and the colours in a strip, Not now and Personalize: ${JSON.stringify(inv)}`);
-    check(page.url() === `${BASE}/` && (await page.$('.bcv-stat')) !== null && (await page.$eval('html', (e) => getComputedStyle(e).overflow)) === 'hidden', 'it sits over the page, which is drawn underneath and held still');
+    check(page.url() === `${BASE}/` && (await page.$('.bcv-stat')) !== null && (await page.$eval('body', (e) => getComputedStyle(e).overflow)) === 'hidden' && (await page.$eval('html', (e) => getComputedStyle(e).overflow)) === 'visible', 'it sits over the page, which is drawn underneath and held still');
     await shot(page, '33-invite');
     // shown once: its opening is what marks the version seen, not its closing
     check(await eventually(async () => { const f = await flags('whatsnew:seen', 'whatsnew:from'); return f['whatsnew:seen'] === manifest.version && f['whatsnew:from'] === undefined; }), 'opening it marks the version seen at once');
@@ -4295,7 +4346,7 @@ try {
     const five = (s) => { const w = s.trim().split(/\s+/); return w.length > 5 ? `${w.slice(0, 5).join(' ')}…` : w.join(' '); };
     const expectNotes = sinceOld.flatMap((v) => v.notes.map((n) => `${v.version} ${n.kind}: ${five(n.title)}`));
     check(wn1.since === 'Since 2.7.5' && sinceOld.length > 1 && wn1.versions.join(' | ') === sinceOld.map((v) => v.version).join(' | ') && wn1.dates.length === sinceOld.length && wn1.dates.every((d) => /\d{4}/.test(d)) && wn1.notes.join(' | ') === expectNotes.join(' | ') && wn1.clutter === 0 && wn1.more === 'Earlier versions' && wn1.foot.join(',') === 'Done' && wn1.scroll.over && wn1.scroll.bar === '8px', `the first page after an update lists every version since the one left behind, newest first, with one button and a scrollbar for the rest: ${JSON.stringify(wn1)}`);
-    check(page.url() === `${BASE}/` && (await page.$('.bcv-stat')) !== null && (await page.$eval('html', (e) => getComputedStyle(e).overflow)) === 'hidden', 'it sits over the page, which is drawn underneath and held still');
+    check(page.url() === `${BASE}/` && (await page.$('.bcv-stat')) !== null && (await page.$eval('body', (e) => getComputedStyle(e).overflow)) === 'hidden' && (await page.$eval('html', (e) => getComputedStyle(e).overflow)) === 'visible', 'it sits over the page, which is drawn underneath and held still');
     await shot(page, '33-whats-new');
     // shown once: opening it is what marks the version seen, not closing it
     check(await eventually(async () => { const f = await flags('whatsnew:seen', 'whatsnew:from'); return f['whatsnew:seen'] === manifest.version && f['whatsnew:from'] === undefined; }), 'opening it marks the version seen at once');
@@ -6097,8 +6148,9 @@ try {
   await page.keyboard.press('Escape');
   await runInApp('toast');
   await page.waitForSelector('.bcv-toast', { timeout: 3000 });
-  const toastBox = await page.$eval('.bcv-toast', (e) => { const r = e.getBoundingClientRect(); return { centre: Math.round(r.left + r.width / 2), mid: Math.round(window.innerWidth / 2), name: getComputedStyle(e).animationName, ease: getComputedStyle(e).animationTimingFunction.slice(0, 7) }; });
-  check(Math.abs(toastBox.centre - toastBox.mid) <= 2 && toastBox.name === 'bcv-toast-in' && toastBox.ease === 'linear(', `a toast rises on the snappy spring and sits centred: ${JSON.stringify(toastBox)}`);
+  await page.waitForTimeout(600); // (landed)
+  const toastBox = await page.$eval('.bcv-toast', (e) => { const r = e.getBoundingClientRect(); const cs = getComputedStyle(e); return { centre: Math.round(r.left + r.width / 2), mid: Math.round(window.innerWidth / 2), top: Math.round(r.top), h: Math.round(r.height), radius: parseFloat(cs.borderTopLeftRadius), mark: !!e.querySelector('.bcv-toast__ic svg'), text: e.querySelector('.bcv-toast__text')?.textContent, name: cs.animationName, ease: cs.animationTimingFunction.slice(0, 7) }; });
+  check(Math.abs(toastBox.centre - toastBox.mid) <= 2 && toastBox.top >= 4 && toastBox.top <= 20 && toastBox.h >= 40 && toastBox.radius >= toastBox.h / 2 && toastBox.mark && toastBox.text === 'Springs' && toastBox.name === 'bcv-toast-in' && toastBox.ease === 'linear(', `(2.98.28) a notification is a pill that floats down to the top centre, on the spring, its mark beside the words: ${JSON.stringify(toastBox)}`);
   // the watchdog: an exit whose animations never finish still leaves — the wait on them is raced
   // against the clock, so nothing can leave a scrim on the page (docs/SAFARI.md §4): the sheet is
   // dismissed and every animation on it frozen at once

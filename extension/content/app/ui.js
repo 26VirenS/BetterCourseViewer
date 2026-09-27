@@ -165,7 +165,13 @@
   let toastTimer = null;
   function toast(str, { error = false, ms = 2600, code = null, err = null } = {}) {
     document.querySelectorAll('.bcv-toast').forEach((t) => t.remove());
-    const t = el(`bcv-toast ${error ? 'bcv-toast--error' : ''}`, str, { role: 'status' });
+    // a pill that floats down from the top centre, the Away Refresh pill's kind: a mark (a bell, or on an
+    // error a red "!") and the words beside it
+    const mark = error ? 'M12 7.5v6M12 16.8v.2' : 'M6.5 16.5h11l-1.4-2V10a4.1 4.1 0 00-8.2 0v4.5zM10.3 18.6a1.8 1.8 0 003.4 0';
+    const t = el(`bcv-toast ${error ? 'bcv-toast--error' : ''}`, [
+      h('span', { class: 'bcv-toast__ic', 'aria-hidden': 'true' }, svg(mark, { size: 16, width: error ? 2.8 : 2.2 })),
+      h('span', { class: 'bcv-toast__text', text: str }),
+    ], { role: 'status' });
     // an error says its code (lib/errors.js) after its words — drawn from data-code, and kept for a report — and stays a little longer to be read
     const c = error ? code || BCV.errors?.codeFor?.(err) : null;
     if (c) { t.dataset.code = c; BCV.errors.note(c); ms = Math.max(ms, 4200); }

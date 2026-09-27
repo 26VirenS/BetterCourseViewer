@@ -25,6 +25,13 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.98.28', date: '2026-09-27', notes: [
+      { kind: 'new', title: 'Points per question', body: 'A quiz question shows the points it is worth.', icon: P.check },
+      { kind: 'improved', title: 'Notifications drop in', body: 'Messages float down from the top as a pill.', icon: P.pin },
+      { kind: 'improved', title: 'Bigger card previews', body: 'Card sheets preview wide; done items sit below in grey.', icon: P.layers },
+      { kind: 'fixed', title: 'Sidebar stays put', body: 'The sidebar never scrolls away with the page.', icon: P.scroll },
+      { kind: 'improved', title: 'Full-screen quizzes', body: 'The top bar slides away during a quiz.', icon: P.eye },
+    ] },
     { version: '2.98.27', date: '2026-09-27', notes: [
       { kind: 'new', title: 'Clearer quiz feedback', body: 'Questions beside a rail you can jump around with J and K.', icon: P.list },
       { kind: 'fixed', title: 'Points per question', body: 'Each question shows its points, like 2 / 4, not 2 / 0.', icon: P.check },

@@ -1120,7 +1120,7 @@ const server = http.createServer((req, res) => {
     const handler = htmlPages[path];
     let qm;
     const slow = (fn) => setTimeout(fn, mockConfig.quizPageDelay || 0); // test-only: a slow quiz page, to watch the progress fill
-    if (!handler && req.method === 'GET' && (qm = path.match(/^\/courses\/(\w+)\/quizzes\/(\w+)\/take(?:\/questions\/(\w+))?$/))) { // Canvas's own quiz-taking page
+    if (req.method === 'GET' && (qm = path.match(/^\/courses\/(\w+)\/quizzes\/(\w+)\/take(?:\/questions\/(\w+))?$/)) && (!handler || (quizSubs.get(qm[2]) || []).some((x) => x.workflow_state === 'untaken'))) { // Canvas's own quiz-taking page (a fixed page of our own stands in only while no attempt is open)
       const [cid, quizId, qid] = [qm[1], qm[2], qm[3] || url.searchParams.get('question_id')];
       return slow(() => {
         const html = takePage(cid, quizId, qid);

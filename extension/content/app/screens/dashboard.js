@@ -97,6 +97,9 @@
     const dueTomorrow = dueItems.filter((it) => U.sameDay(it.date, tomorrowStart) && !it.submitted);
     const dueWeek = dueItems.filter((it) => it.date >= weekStart && it.date < weekEnd && !it.submitted);
     const weekAll = (planner || []).filter((it) => it.isDue && !it.excused && it.date >= weekStart && it.date < weekEnd && (it.points === null || it.points > 0) && it.type !== 'announcement');
+    // (2.98.28) what a sheet shows under its list, quieter: work of the same span already handed in or marked done
+    const doneIn = (from, to) => (planner || []).filter((it) => it.isDue && !it.excused && !it.dismissed && it.type !== 'announcement' && inSel(it) && (it.submitted || it.complete) && it.date >= from && it.date < to);
+    const RECENT_MAX = 8;
 
     // ---- stats -------------------------------------------------------------------
     // Each counter opens a sheet listing exactly the items it counted.
@@ -111,6 +114,9 @@
       const when = U.sameDay(it.date, now) ? `due ${U.fmtTime(it.date)}` : `${U.DAYS[it.date.getDay()]} ${U.fmtTime(it.date)}`;
       return { title: it.title, meta: [it.kind, it.points !== null ? `${store.fmtPts(it.points)} pts` : null, when].filter(Boolean).join(' · '), course: c?.shortName || it.courseName || '—', color: pal.text, tint: pal.tint, url: it.url };
     };
+    // a done row says how it was done: graded, handed in, or marked done on the planner
+    const doneRow = (it) => { const r = dueRow(it); r.meta = `${r.meta} · ${it.graded ? 'graded' : it.submitted ? 'handed in' : 'marked done'}`; return r; };
+    const recentOf = (label, items) => (items.length ? { label, items: items.slice(0, RECENT_MAX) } : null);
     const courseCount = (items) => new Set(items.map((it) => it.courseId || it.courseName)).size;
 
     function statsBlock() {
@@ -121,12 +127,14 @@
         cards.push(stat('Due today', String(dueToday.length), `${store.fmtPts(pts)} points total`, IC.clock, '#ff453a', (from) => openSheet({
           label: 'Due today', value: String(dueToday.length), icon: IC.clock, color: '#ff453a',
           note: `${store.fmtPts(pts)} points across ${U.plural(courseCount(dueToday), 'course')} · ${U.DAYS_LONG[now.getDay()]}, ${U.MONTHS_LONG[now.getMonth()]} ${now.getDate()}`,
-          items: [...dueToday].sort(byDate).map(dueRow), empty: 'Nothing is due today.',
+          items: [...dueToday].sort(byDate).map(dueRow), empty: 'Nothing is due today.', lead: 'Still to do',
+          recent: recentOf('Already done', doneIn(todayStart, tomorrowStart).sort(byDate).map(doneRow)),
         }, from)));
         cards.push(stat('Due this week', String(dueWeek.length), `Across ${U.plural(courseCount(dueWeek), 'course')}`, IC.cal, '#34c759', (from) => openSheet({
           label: 'Due this week', value: String(dueWeek.length), icon: IC.cal, color: '#34c759',
           note: `Week of ${U.fmtShort(weekStart)} · ${U.plural(courseCount(dueWeek), 'course')}`,
-          items: [...dueWeek].sort(byDate).map(dueRow), empty: 'Nothing is due this week.',
+          items: [...dueWeek].sort(byDate).map(dueRow), empty: 'Nothing is due this week.', lead: 'Still to do',
+          recent: recentOf('Already done', doneIn(weekStart, weekEnd).sort(byDate).map(doneRow)),
         }, from)));
       }
       let unreadSheet = { label: 'Unread announcements', value: '…', icon: IC.bell, color: '#ff9500', note: 'Loading…', items: [] };
@@ -134,7 +142,7 @@
       cards.push(unreadCard);
       // unread = [{ title, when, courseId, courseName, url }]; count is what the number shows
       const nameOf = (u) => courseMap.get(String(u.courseId))?.shortName || courseMap.get(String(u.courseId))?.name || u.courseName || '';
-      const finish = (unread, count, more = '') => {
+      const finish = (unread, count, more = '', read = []) => {
         const perCourse = new Map();
         for (const u of unread) perCourse.set(nameOf(u), (perCourse.get(nameOf(u)) || 0) + 1);
         let top = '';
@@ -151,17 +159,26 @@
           const pal = c ? c.palette : U.palette('#5856d6', dark);
           return { title: u.title || 'Announcement', meta: `Posted ${U.fmtShort(u.when)} · unread`, course: nameOf(u) || '—', color: pal.text, tint: pal.tint, url: u.url };
         });
+        const readItems = read.map((u) => {
+          const c = courseMap.get(String(u.courseId));
+          const pal = c ? c.palette : U.palette('#5856d6', dark);
+          return { title: u.title || 'Announcement', meta: `Posted ${U.fmtShort(u.when)} · read`, course: nameOf(u) || '—', color: pal.text, tint: pal.tint, url: u.url };
+        });
         unreadSheet = {
           label: 'Unread announcements', value: String(count), icon: IC.bell, color: '#ff9500', items, empty: 'All caught up.', more,
-          note: phrase,
+          note: phrase, lead: 'Unread', recent: recentOf('Read recently', readItems),
         };
       };
       feedP.then((feed) => {
         if (!ctx.alive()) return;
         if (feed) {
           // the Announcements API knows every announcement and whether you have read it
-          const unread = feed.filter((a) => a.read_state === 'unread').map((a) => ({ title: a.title, when: a.posted_at, courseId: String(a.context_code || '').replace(/^course_/, ''), courseName: a.context_name || '', url: a.html_url }));
-          finish(unread, unread.length);
+          const shape = (a) => ({ title: a.title, when: a.posted_at, courseId: String(a.context_code || '').replace(/^course_/, ''), courseName: a.context_name || '', url: a.html_url });
+          const unread = feed.filter((a) => a.read_state === 'unread').map(shape);
+          // (the ones already read from the last two weeks, newest first, for the quiet list under them)
+          const since = U.addDays(todayStart, -14);
+          const read = feed.filter((a) => a.read_state !== 'unread' && U.parse(a.posted_at) >= since).sort((x, y) => U.parse(y.posted_at) - U.parse(x.posted_at)).map(shape);
+          finish(unread, unread.length, '', read);
           return;
         }
         // fallback: the activity stream's summary count and whatever unread announcements the stream still carries
@@ -200,7 +217,8 @@
         cards.push(stat('Due tomorrow', String(dueTomorrow.length), dueTomorrow.length ? `${store.fmtPts(tmPts)} points total` : 'Nothing due tomorrow', IC.clock, '#ff9f0a', (from) => openSheet({
           label: 'Due tomorrow', value: String(dueTomorrow.length), icon: IC.clock, color: '#ff9f0a',
           note: `${store.fmtPts(tmPts)} points across ${U.plural(courseCount(dueTomorrow), 'course')} · ${U.DAYS_LONG[tomorrowStart.getDay()]}, ${U.MONTHS_LONG[tomorrowStart.getMonth()]} ${tomorrowStart.getDate()}`,
-          items: [...dueTomorrow].sort(byDate).map(dueRow), empty: 'Nothing is due tomorrow.',
+          items: [...dueTomorrow].sort(byDate).map(dueRow), empty: 'Nothing is due tomorrow.', lead: 'Still to do',
+          recent: recentOf('Already done', doneIn(tomorrowStart, U.addDays(tomorrowStart, 1)).sort(byDate).map(doneRow)),
         }, from)));
       }
       cards.push(gradedCard);
@@ -253,10 +271,24 @@
           }
         }
         overdue.sort(byDate);
+        // (2.98.28) under them, quieter: past-due work handed in late in the last two weeks — no longer
+        // overdue, out of the student's hands, but still there to look back at
+        const lateIn = [];
+        const since = U.addDays(todayStart, -14);
+        for (const { c, list } of byCourse) {
+          for (const a of list || []) {
+            const s = a.submission;
+            const at = s && U.parse(s.submitted_at);
+            const due = U.parse(a.due_at);
+            if (!at || at < since || !(s.late || (due && at > due))) continue;
+            lateIn.push({ title: a.name, meta: [kindOf(a), due ? `due ${U.fmtShort(due)}` : null, `handed in ${U.fmtShort(at)}`, scored(s) ? 'graded' : 'waiting for a grade'].filter(Boolean).join(' · '), course: c.shortName || c.name, color: c.palette.text, tint: c.palette.tint, url: a.html_url || `${c.url}/assignments/${a.id}`, date: at });
+          }
+        }
+        lateIn.sort((x, y) => y.date - x.date);
         const paintOverdue = () => {
           if (overdueCard.isConnected) land(overdueCard, overdue.length, overdue.length ? U.plural(overdue.length, 'not submitted', 'not submitted') : 'Nothing overdue', 6.9);
           Object.assign(overdueSheet, {
-            value: String(overdue.length), items: overdue, empty: 'Nothing is overdue.',
+            value: String(overdue.length), items: overdue, empty: 'Nothing is overdue.', lead: 'Not handed in', recent: recentOf('Handed in late', lateIn),
             note: overdue.length ? 'Past due with nothing handed in' : 'Nothing past its due date without a submission',
           });
         };
@@ -271,22 +303,27 @@
         // Graded this week: submissions graded inside this week (graded_at, never due_at); excused
         // ones count but carry no score, so they stay out of the points ratio
         const graded = [];
+        const earlier = []; // (the two weeks before this one: the quiet list under this week's)
+        const before = U.addDays(weekStart, -14);
         let earned = 0, possible = 0;
         for (const { c, list } of byCourse) {
           for (const a of list || []) {
             const s = a.submission;
             const g = s && U.parse(s.graded_at);
-            if (!g || g < weekStart || g >= weekEnd) continue;
+            if (!g || g < before || g >= weekEnd) continue;
             const scored = !s.excused && s.score !== null && s.score !== undefined;
             if (!scored && !s.excused) continue;
+            const row = { title: a.name, meta: `${kindOf(a)} · ${s.excused ? 'excused' : `${store.fmtPts(s.score)} / ${store.fmtPts(a.points_possible ?? 0)}`} · posted ${U.fmtShort(g)}`, course: c.shortName || c.name, color: c.palette.text, tint: c.palette.tint, url: a.html_url || `${c.url}/assignments/${a.id}`, date: g };
+            if (g < weekStart) { earlier.push(row); continue; }
             if (scored) { earned += Number(s.score) || 0; possible += Number(a.points_possible) || 0; }
-            graded.push({ title: a.name, meta: `${kindOf(a)} · ${s.excused ? 'excused' : `${store.fmtPts(s.score)} / ${store.fmtPts(a.points_possible ?? 0)}`} · posted ${U.fmtShort(g)}`, course: c.shortName || c.name, color: c.palette.text, tint: c.palette.tint, url: a.html_url || `${c.url}/assignments/${a.id}`, date: g });
+            graded.push(row);
           }
         }
         graded.sort((x, y) => y.date - x.date);
+        earlier.sort((x, y) => y.date - x.date);
         land(gradedCard, graded.length, graded.length ? `${store.fmtPts(earned)} / ${store.fmtPts(possible)} points` : 'No grades posted this week', 9.2);
         gradedSheet = {
-          label: 'Graded this week', value: String(graded.length), icon: IC.chart, color: '#5856d6', items: graded, empty: 'Nothing has been graded this week.',
+          label: 'Graded this week', value: String(graded.length), icon: IC.chart, color: '#5856d6', items: graded, empty: 'Nothing has been graded this week.', lead: 'This week', recent: recentOf('Earlier', earlier),
           note: graded.length ? `${store.fmtPts(earned)} of ${store.fmtPts(possible)} points earned · week of ${U.fmtShort(weekStart)}` : `Week of ${U.fmtShort(weekStart)}`,
         };
       });
@@ -329,22 +366,25 @@
           ]),
           h('button', { type: 'button', class: 'bcv-sheet__close', 'aria-label': 'Close', onclick: close }, U.svg(IC.close, { size: 13, stroke: 'var(--bcv-ink2)', width: 2.3 })),
         ]),
+        // (2.98.28) the list in two: what wants attention (not done, unread) under its own label, then —
+        // quieter, set back in grey but still a press away — what else there is from the same span
         U.el('bcv-sheet__list', [
-          // the sheet itself makes room: it widens and the preview opens on its right, the list beside it
+          def.recent ? U.text('bcv-sheet__sec', def.lead || def.label, 'div') : null,
           ...(def.items.length ? def.items.map((i) => rowFor(i)) : [U.empty(def.empty || 'Nothing here.')]),
           def.more ? U.text('bcv-sheet__more', def.more) : null,
+          def.recent ? U.el('bcv-sheet__recent', [U.text('bcv-sheet__sec bcv-sheet__sec--quiet', def.recent.label, 'div'), ...def.recent.items.map((i) => rowFor(i, true))]) : null,
         ]),
         U.el('bcv-sheet__pvhint', [U.svg(IC.doc, { size: 22, stroke: 'var(--bcv-ink3)', width: 1.7 }), U.text('bcv-sheet__pvhint-t', 'Press an item to preview it here', 'span')]),
       ]));
       /** A row, and — where the item can be cleared (the Overdue list) — an X beside it: the item goes
        *  one press at a time, the header counts down with it, and a failure leaves the row and says so. */
-      function rowFor(i) {
-        const row = h('a', { class: 'bcv-sheet__row', href: i.url, onclick: (e) => { e.preventDefault(); if (!BCV.preview?.open(i.url, { host: ov.firstElementChild })) { close(); app.go(i.url); } } }, [
+      function rowFor(i, quiet = false) {
+        const row = h('a', { class: quiet ? 'bcv-sheet__qrow' : 'bcv-sheet__row', href: i.url, onclick: (e) => { e.preventDefault(); if (!BCV.preview?.open(i.url, { host: ov.firstElementChild })) { close(); app.go(i.url); } } }, [
           h('span', { class: 'bcv-sheet__dot', style: { background: i.color } }),
           U.el('bcv-sheet__body', [U.text('bcv-sheet__title bcv-pretty', i.title), U.text('bcv-sheet__meta', i.meta)]),
           h('span', { class: 'bcv-sheet__course bcv-ellip', style: { background: i.tint, color: i.color }, text: i.course }),
         ]);
-        if (!i.clear) return row;
+        if (!i.clear || quiet) return row;
         const x = U.iconbtn(IC.close, { size: 24, title: 'Clear', onClick: async (e) => {
           e.preventDefault();
           e.stopPropagation();
@@ -364,7 +404,7 @@
             const list = ov.querySelector('.bcv-sheet__list');
             ov.querySelector('.bcv-sheet__value').textContent = def.value;
             ov.querySelector('.bcv-sheet__note').textContent = def.note;
-            if (list && !list.querySelector('.bcv-sheet__row')) list.prepend(U.empty(def.empty || 'Nothing here.'));
+            if (list && !list.querySelector('.bcv-sheet__row')) { const lead = list.querySelector(':scope > .bcv-sheet__sec'); const e = U.empty(def.empty || 'Nothing here.'); if (lead) lead.after(e); else list.prepend(e); }
             ov.focus(); // the press took the focus with it; Escape still closes the sheet
           }, 220);
         } });

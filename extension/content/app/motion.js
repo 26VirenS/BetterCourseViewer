@@ -190,7 +190,7 @@
     pop: { spec: { scale: [1, 0.94], opacity: [1, 0] }, preset: 'snappy' },
     down: { spec: { y: [0, 40], opacity: [1, 0] }, preset: 'phone' },
     fade: { spec: { opacity: [1, 0] }, preset: 'scrim' },
-    toast: { spec: { y: [0, 10], opacity: [1, 0] }, preset: 'snappy' },
+    toast: { spec: { y: [0, -64], opacity: [1, 0] }, preset: 'snappy' }, // (back up the way it came)
     left: { spec: { x: [0, -8], opacity: [1, 0] }, preset: 'snappy' },
   };
   /** The progress an element's running entrance has reached (1 when none is running): read from its
