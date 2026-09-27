@@ -384,6 +384,9 @@ if (typeof importScripts === 'function' && !self.BCV_LAZY_MODULES) {
     if (!msg || typeof msg !== 'object') return false;
     const reply = (p) => Promise.resolve(p).then(sendResponse, (e) => sendResponse({ ok: false, message: e?.message || String(e) }));
     switch (msg.type) {
+      case 'ping': // a page making sure the extension still answers it (lib/settings.js: the lifeline)
+        sendResponse({ ok: true });
+        return false;
       case 'openOptions':
         reply(openOptions());
         return true;

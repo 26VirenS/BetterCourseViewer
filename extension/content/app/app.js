@@ -253,6 +253,15 @@
       window.open(url.href, '_blank', 'noopener');
       return;
     }
+    // cut off from the extension (updated while the page was open, and not yet reloaded — something is being typed, say):
+    // the page asked for is loaded for real, which runs the new version, rather than drawn by the old one here
+    if (BCV.life?.orphaned && !inQuiz()) {
+      progress(true);
+      if (url.pathname === location.pathname && url.search === location.search) { history.replaceState(history.state, '', url.href); location.reload(); } // (a screen of this page — /#todo — is a load of it all the same)
+      else if (replace) location.replace(url.href);
+      else location.assign(url.href);
+      return;
+    }
     // a tool Canvas launches (a course's campus tool, a link in a page to one): a tab of its own with the interface's bar over it
     if (BCV.exttool?.isToolHref(url.href) && !inQuiz()) { BCV.exttool.openLink({ title: label || 'External tool', href: url.href }); return; }
     if (!confirmed && inQuiz() && url.pathname !== location.pathname && !confirmLeave()) return;
@@ -785,9 +794,9 @@
   }
   const typing = () => { const a = document.activeElement; return !!a && (a.tagName === 'TEXTAREA' || (a.tagName === 'INPUT' && a.value) || a.isContentEditable); };
   /** Reloads to get unstuck when that loses nothing and has not just been tried; otherwise a note. Returns whether it reloaded. */
-  function recover(why) {
+  function recover(why, { ms = 8000 } = {}) {
     if (inQuiz() || quizHere() || state.submitOpen || typing() || recentlyReloaded()) {
-      U.toast(`${why}. Reload the page to continue.`, { error: true, ms: 8000 });
+      U.toast(`${why}. Reload the page to continue.`, { error: true, ms });
       return false;
     }
     try { sessionStorage.setItem(RELOAD_MARK, JSON.stringify({ path: location.pathname + location.search, at: Date.now() })); } catch { /* checked above */ }
@@ -798,11 +807,32 @@
   // The extension updated or was reloaded while this page was open: its scripts are orphaned (no
   // storage, no background), so nothing it saves or asks for would land. Noticed when the page
   // is looked at again, and mended with a fresh load, which runs the new scripts.
+  //
+  // (2.98.22) Safari does not say so: a cut-off page's calls to the extension simply never come back,
+  // and a screen waiting on one (Tools reading its pins, a module loading) waited for ever. So every
+  // such call goes through the lifeline (lib/settings.js), which finds the page cut off — a call
+  // Chrome refuses, or one unanswered while the background does not answer a ping either — and
+  // says so here: the page is loaded afresh at once where that loses nothing; otherwise a note,
+  // and the next page asked for is loaded for real (go(), above) rather than drawn by the old copy.
+  // Coming back to the tab pings the background too (at most every five seconds), so a page left
+  // open across an update is found out when it is looked at, before anything is pressed.
   const hadContext = (() => { try { return !!BCV.api?.runtime?.id; } catch { return false; } })();
   const contextGone = () => { try { return !BCV.api?.runtime?.id; } catch { return true; } };
+  const UPDATED = 'Simpl Courses was updated';
+  let orphanNoted = false;
+  function onCutOff() {
+    if (self.BCVBridge?.native) return;
+    if (document.visibilityState !== 'visible') return; // (looked at again: checkContext)
+    if (orphanNoted) return;
+    orphanNoted = true;
+    if (!recover(UPDATED, { ms: 30000 })) setTimeout(() => { orphanNoted = false; }, 30000); // (not reloaded — work on the page: said again later)
+  }
+  BCV.life?.onOrphaned(onCutOff);
+  let probedAt = 0;
   function checkContext() {
-    if (!hadContext || self.BCVBridge?.native || document.visibilityState !== 'visible' || !contextGone()) return;
-    recover('Simpl Courses was updated');
+    if (!hadContext || self.BCVBridge?.native || document.visibilityState !== 'visible') return;
+    if (contextGone() || BCV.life?.orphaned) { onCutOff(); return; }
+    if (BCV.life && Date.now() - probedAt > 5000) { probedAt = Date.now(); BCV.life.probe().catch(() => {}); } // (cut off: onOrphaned answers)
   }
   document.addEventListener('visibilitychange', checkContext);
   window.addEventListener('focus', checkContext);

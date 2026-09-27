@@ -25,6 +25,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.98.22', date: '2026-09-27', notes: [
+      { kind: 'fixed', title: 'No freeze on updates', body: 'A tab open during an update reloads itself, no spinning.', icon: P.check },
+    ] },
     { version: '2.98.21', date: '2026-09-27', notes: [
       { kind: 'improved', title: 'A fuller switch', body: 'The switch is its colour edge to edge, like the purple one.', icon: P.toggle },
     ] },

@@ -4,11 +4,94 @@
  * Attaches to `self.BCV`. */
 (function () {
   const BCV = (self.BCV = self.BCV || {});
-  const api = (BCV.api = BCV.api || (typeof browser !== 'undefined' ? browser : chrome));
+  BCV.api = BCV.api || (typeof browser !== 'undefined' ? browser : chrome);
+
+  // ---- the lifeline (2.98.22) --------------------------------------------------------------------
+  // When the extension updates, the scripts already running in an open Canvas tab are cut off from
+  // it: Chrome makes every call to the extension throw ("Extension context invalidated"), Safari
+  // simply never answers — and a screen waiting on storage or on a module to load (Tools, the
+  // setup, a quiz) waited for ever, a skeleton that never filled. In a page, every storage call
+  // and every message to the background now goes through here: one that throws that way, or that
+  // is still unanswered after a few seconds while the background does not answer a ping either,
+  // marks the page cut off. From then on calls fail at once instead of hanging, and whoever
+  // listens (content/app/app.js) loads the page afresh, which runs the new version. Only in a
+  // Canvas page: the background, the popup and the settings page are replaced with the update.
+  const inPage = typeof location !== 'undefined' && /^https?:$/.test(location.protocol) && !self.BCVBridge?.native;
+  if (inPage && !BCV.life && BCV.api?.runtime && BCV.api?.storage?.local) {
+    const raw = BCV.api;
+    const SLOW_MS = 3000; // a call unanswered this long has the background pinged
+    const PING_MS = 5000; // and a ping unanswered this long means the page is cut off (a background page asleep wakes well inside it)
+    const life = (BCV.life = { orphaned: false });
+    const listeners = [];
+    const GONE = 'Simpl Courses was updated while this page was open';
+    const goneErr = () => Object.assign(new Error(GONE), { kind: 'LOAD', orphaned: true });
+    const idGone = () => { try { return !raw.runtime?.id; } catch { return true; } };
+    const deadErr = (e) => /context invalidated|extension context|invalid call to runtime|no such extension/i.test(String(e?.message || e || ''));
+    function orphan() {
+      if (life.orphaned) return;
+      life.orphaned = true;
+      try { self.BCV?.errors?.failed?.('LOAD'); } catch { /* no codes here */ } // (lib/errors.js: an error shown now reads SC-…-LOAD)
+      for (const fn of listeners.splice(0)) { try { fn(); } catch { /* the others still hear */ } }
+    }
+    /** Called once the page is found cut off (at once when it already is). */
+    life.onOrphaned = (fn) => { if (life.orphaned) setTimeout(fn, 0); else listeners.push(fn); };
+    let probing = null;
+    /** Whether the extension still answers this page: a ping to the background. False marks it cut off. */
+    life.probe = () => {
+      if (life.orphaned) return Promise.resolve(false);
+      if (idGone()) { orphan(); return Promise.resolve(false); }
+      if (probing) return probing;
+      probing = new Promise((resolve) => {
+        let done = false;
+        const end = (ok) => { if (done) return; done = true; clearTimeout(t); probing = null; if (!ok) orphan(); resolve(ok); };
+        const t = setTimeout(() => end(false), PING_MS);
+        try {
+          Promise.resolve(raw.runtime.sendMessage({ type: 'ping' })).then(() => end(true), (e) => end(!deadErr(e) && !idGone())); // (a background that answers with an error is still there)
+        } catch (e) { end(!deadErr(e) && !idGone()); }
+      });
+      return probing;
+    };
+    /** A call to the extension that cannot hang the page: it answers, fails, or is found cut off. */
+    const guard = (owner, name) => (...args) => {
+      if (life.orphaned) return Promise.reject(goneErr());
+      let p;
+      try { p = Promise.resolve(owner()[name](...args)); } catch (e) {
+        if (deadErr(e) || idGone()) { orphan(); return Promise.reject(goneErr()); }
+        return Promise.reject(e);
+      }
+      return new Promise((resolve, reject) => {
+        let settled = false;
+        const settle = (fn, v) => { if (settled) return; settled = true; clearTimeout(slow); fn(v); };
+        const slow = setTimeout(() => { life.probe().then((ok) => { if (!ok) settle(reject, goneErr()); }); }, SLOW_MS); // (alive, it keeps waiting: a big module can take a while)
+        p.then((v) => settle(resolve, v), (e) => {
+          if (deadErr(e) || idGone()) { orphan(); settle(reject, goneErr()); } else settle(reject, e);
+        });
+      });
+    };
+    const bindOf = (t, k) => { const v = t[k]; return typeof v === 'function' ? v.bind(t) : v; };
+    // (the proxy stands on an empty object of its own, so the browser's own objects — whose
+    // properties a proxy over them would have to report unchanged — are only ever read, never wrapped)
+    const wrap = (target, own) => new Proxy({}, {
+      get: (_, k) => (Object.prototype.hasOwnProperty.call(own, k) ? own[k] : bindOf(target, k)),
+      has: (_, k) => k in own || k in target,
+      set: (_, k, v) => { target[k] = v; return true; }, // (a test that swaps a call does so on the real object; the guard still stands in front of it)
+    });
+    const local = wrap(raw.storage.local, {
+      get: guard(() => raw.storage.local, 'get'),
+      set: guard(() => raw.storage.local, 'set'),
+      remove: guard(() => raw.storage.local, 'remove'),
+      clear: guard(() => raw.storage.local, 'clear'),
+    });
+    const storage = wrap(raw.storage, { local });
+    const runtime = wrap(raw.runtime, { sendMessage: guard(() => raw.runtime, 'sendMessage') });
+    BCV.api = wrap(raw, { runtime, storage });
+    life.raw = raw; // (the tests reach past the guard with this)
+  }
+  const api = BCV.api;
   // The scripts' own version, stamped: content/app/app.js compares it with the stylesheet's
   // (--bcv-version) and the manifest's, because Safari can run one version's script with
   // another's stylesheet after the Mac app has updated under it. Bumped with every release.
-  self.BCV_VERSION = '2.98.21';
+  self.BCV_VERSION = '2.98.22';
 
   const DEFAULTS = {
     version: 3, // (3: Away Refresh off unless turned on — settings written before carry it on, and the one-time step in getSettings turns it off for everyone)
