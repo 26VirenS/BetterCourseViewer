@@ -2343,22 +2343,28 @@ try {
   console.log('quiz feedback');
   check((await texts('.bcv-qz__donebtns .bcv-qz__big')).join('|') === 'See feedback|Back to F26-MATH 021 20|Quiz page', `receipt offers the feedback once Canvas releases results: ${(await texts('.bcv-qz__donebtns .bcv-qz__big')).join('|')}`);
   await page.click('.bcv-qz__donebtns .bcv-qz__big--primary');
-  await page.waitForSelector('.bcv-fb__q', { timeout: 10000 });
-  const unfolded = await page.waitForFunction(() => !document.documentElement.classList.contains('bcv-quiz') && getComputedStyle(document.querySelector('.bcv-side')).width === '242px' && getComputedStyle(document.querySelector('.bcv-rail')).width !== '0px', null, { timeout: 5000 }).then(() => true).catch(() => false);
-  check(unfolded && !!(await page.$('.bcv-cmain .bcv-qz.is-embedded .bcv-fb')), 'the feedback sits back in the course column: the sidebar, header and rail return');
+  await page.waitForSelector('.bcv-qfb__q', { timeout: 10000 });
+  // (2.98.27) the feedback takes the page, as the attempt did: a rail of its own down the left (the score,
+  // the filter, a square per question, the ways out), the questions beside it at Canvas's reading size
+  const fbFrame = await page.evaluate(() => ({ quiz: document.documentElement.classList.contains('bcv-quiz'), own: !!document.querySelector('.bcv-qz.is-feedback:not(.is-embedded) .bcv-qfb'), railW: Math.round(document.querySelector('.bcv-qfb__rail')?.getBoundingClientRect().width || 0), mainL: Math.round(document.querySelector('.bcv-qfb__main')?.getBoundingClientRect().left || 0), btns: !!document.querySelector('.bcv-qfb__rail .bcv-fb__btns') }));
+  check(fbFrame.quiz && fbFrame.own && fbFrame.railW > 200 && fbFrame.mainL >= fbFrame.railW && fbFrame.btns, `the feedback takes the page: its rail on the left with the ways out, the questions beside it: ${JSON.stringify(fbFrame)}`);
   const fbLine = (await texts('.bcv-fb__scoreline'))[0];
-  check(/^13 \/ 17 76% 3 of 4 correct · graded /.test(fbLine) && (await page.$$('.bcv-fb__q')).length === 4 && !(await page.$('.bcv-fb__comment')), `score card from the attempt's own numbers: ${fbLine}`);
-  const fbCards = await texts('.bcv-fb__q');
-  check(/^Question 1 4 \/ 4 What is the velocity at t = 5\? You: -3\.15 m\/s Show all 5 options worked solution/i.test(fbCards[0]) && !/Correct:/.test(fbCards[0]) && (await page.$('.bcv-fb__q:nth-of-type(2) img.equation_image')), `a correct question: points, Explain, your answer, the instructor's solution with Canvas's equation image: ${fbCards[0]}`);
-  check(/^Question 2 0 \/ 4 .*You: -2 m Correct: -3\.15 m Show all 5 options worked solution 17\.68 m is the position reading/i.test(fbCards[1]), `a wrong question shows the correct answer (show_correct_answers) and the incorrect-answer comment: ${fbCards[1]}`);
-  check(/Question 3 4 \/ 4 .*Your instructor left no worked solution/i.test(fbCards[2]) && /Question 4 5 \/ 5 .*You: 3\.15 .*Only one root/i.test(fbCards[3]), `no solution says so; plain-text comments render too: ${fbCards[2]} | ${fbCards[3]}`);
+  check(/^13 \/ 17 76% 3 of 4 correct · graded /.test(fbLine) && (await page.$$('.bcv-qfb__q')).length === 4 && !(await page.$('.bcv-fb__comment')), `score card from the attempt's own numbers: ${fbLine}`);
+  // what the question API keeps from a student (Canvas censors it: no points, weights or comments — the
+  // mock too) is read from Canvas's own results page: each question's points, never "/ 0", the correct
+  // answers and the comments
+  const fbScores = await texts('.bcv-qfb__q .bcv-fb__score');
+  check(fbScores.join('|') === '4 / 4|0 / 4|4 / 4|5 / 5', `each question's points come from Canvas's results page, the API handing a student none: ${fbScores.join(' | ')}`);
+  const fbCards = await texts('.bcv-qfb__q');
+  check(/^Question 1 Correct 4 \/ 4 What is the velocity at t = 5\? Your answer -3\.15 m\/s Show all 5 options Worked solution/i.test(fbCards[0]) && !/Correct answer/i.test(fbCards[0]) && (await page.$('.bcv-qfb__q[data-k="0"] .bcv-fb__solbody img.equation_image')), `a correct question: points, your answer, the instructor's solution with Canvas's equation image: ${fbCards[0]}`);
+  check(/^Question 2 Incorrect 0 \/ 4 .*Your answer -2 m Correct answer -3\.15 m Show all 5 options Worked solution 17\.68 m is the position reading/i.test(fbCards[1]), `a wrong question shows the correct answer beside yours (show_correct_answers) and the incorrect-answer comment: ${fbCards[1]}`);
+  check(/Question 3 Correct 4 \/ 4 .*Your instructor left no worked solution/i.test(fbCards[2]) && /Question 4 Correct 5 \/ 5 .*Your answer 3\.15 .*Only one root/i.test(fbCards[3]), `no solution says so; plain-text comments render too: ${fbCards[2]} | ${fbCards[3]}`);
+  // the question itself as Canvas has it: a formula in the sentence is Canvas's image, not a gap
+  check((await page.$$('.bcv-qfb__q[data-k="2"] .bcv-qfb__qtext img.equation_image')).length === 1 && /such as\s*\?$/.test((await texts('.bcv-qfb__q[data-k="2"] .bcv-qfb__qtext'))[0]), 'a formula in the question text shows as Canvas\'s equation image, where it was a blank gap');
   // an answer that is nothing but a formula: Canvas leaves its text empty and holds the equation as
-  // an image, so the chip shows the equation rather than the blank it used to ("You: ,")
-  const q3eq = await page.$$eval('.bcv-fb__q', (els) => {
-    const chip = els[2].querySelector('.bcv-fb__chip');
-    return { eqs: [...chip.querySelectorAll('img.equation_image')].map((e) => e.getAttribute('data-equation-content')), label: chip.firstChild.textContent };
-  });
-  check(q3eq.eqs.length === 2 && q3eq.eqs[0] === '\\vec{v}' && q3eq.label === 'You: ', `an answer that is only a formula shows the formula in the feedback: ${JSON.stringify(q3eq)}`);
+  // an image, so the answer shows the equation rather than a blank
+  const q3eq = await page.$eval('.bcv-qfb__q[data-k="2"] .bcv-qfb__ans.is-yours', (box) => ({ eqs: [...box.querySelectorAll('.bcv-qfb__ansval img.equation_image')].map((e) => e.getAttribute('data-equation-content')), label: box.querySelector('.bcv-qfb__anslbl').textContent }));
+  check(q3eq.eqs.length === 2 && q3eq.eqs[0] === '\\vec{v}' && q3eq.label === 'Your answer', `an answer that is only a formula shows the formula in the feedback: ${JSON.stringify(q3eq)}`);
   // the equation service sizes its picture in points at its own text size, so left alone a formula
   // towers over the sentence holding it; it is sized to that text instead, and sits on the line
   const eqFit = await page.$eval('.bcv-fb__solbody img.equation_image', (img) => {
@@ -2367,17 +2373,17 @@ try {
   });
   check(/em$/.test(eqFit.set) && eqFit.w === 'auto' && !eqFit.attrs && eqFit.h < eqFit.natural && eqFit.h > eqFit.fs && eqFit.h <= eqFit.fs * 4 && eqFit.va === 'middle' && eqFit.display === 'inline-block', `a formula is sized to the text it sits in and reads on the line: ${JSON.stringify(eqFit)}`);
   // every option the question offered, for checking the rest — folded away until asked for
-  const optsBtn = await page.$$('.bcv-fb__q .bcv-fb__more');
-  check(optsBtn.length === 3 && (await page.$eval('.bcv-fb__q .bcv-fb__more .bcv-fb__morelbl', (e) => e.textContent)) === 'Show all 5 options' && (await page.$eval('.bcv-fb__q .bcv-fb__opts', (e) => e.hidden)), 'each choice question offers its full list of options, folded away');
+  const optsBtn = await page.$$('.bcv-qfb__q .bcv-fb__more');
+  check(optsBtn.length === 3 && (await page.$eval('.bcv-qfb__q .bcv-fb__more .bcv-fb__morelbl', (e) => e.textContent)) === 'Show all 5 options' && (await page.$eval('.bcv-qfb__q .bcv-fb__opts', (e) => e.hidden)), 'each choice question offers its full list of options, folded away');
   await optsBtn[0].click();
-  const shownOpts = await page.$$eval('.bcv-fb__q:nth-of-type(2) .bcv-fb__opt', (els) => els.map((e) => e.textContent.trim().replace(/\s+/g, ' ')));
-  check(shownOpts.length === 5 && shownOpts[0] === 'A-3.15 m/sYour answerCorrect' && (await page.$eval('.bcv-fb__q .bcv-fb__more .bcv-fb__morelbl', (e) => e.textContent)) === 'Hide the options', `the options open with your pick marked: ${shownOpts.join(' | ')}`);
+  const shownOpts = await page.$$eval('.bcv-qfb__q[data-k="0"] .bcv-fb__opt', (els) => els.map((e) => e.textContent.trim().replace(/\s+/g, ' ')));
+  check(shownOpts.length === 5 && shownOpts[0] === 'A-3.15 m/sYour answerCorrect' && (await page.$eval('.bcv-qfb__q .bcv-fb__more .bcv-fb__morelbl', (e) => e.textContent)) === 'Hide the options', `the options open with your pick marked, the right one from Canvas's results page: ${shownOpts.join(' | ')}`);
   // a wrong question marks the right one as well, since this quiz shows correct answers
-  await (await page.$$('.bcv-fb__q .bcv-fb__more'))[1].click();
-  const wrongOpts = await page.$$eval('.bcv-fb__q:nth-of-type(3) .bcv-fb__opt', (els) => els.map((e) => `${e.textContent.trim().replace(/\s+/g, ' ')}${e.classList.contains('is-right') ? ' [right]' : ''}${e.classList.contains('is-mine') ? ' [mine]' : ''}`));
+  await (await page.$$('.bcv-qfb__q .bcv-fb__more'))[1].click();
+  const wrongOpts = await page.$$eval('.bcv-qfb__q[data-k="1"] .bcv-fb__opt', (els) => els.map((e) => `${e.textContent.trim().replace(/\s+/g, ' ')}${e.classList.contains('is-right') ? ' [right]' : ''}${e.classList.contains('is-mine') ? ' [mine]' : ''}`));
   check(wrongOpts.length === 5 && wrongOpts.filter((t) => t.includes('[right]')).length === 1 && wrongOpts.filter((t) => t.includes('[mine]')).length === 1 && wrongOpts.some((t) => /Correct.*\[right\]/.test(t)), `a wrong question marks both your pick and the right one: ${wrongOpts.join(' | ')}`);
-  await (await page.$$('.bcv-fb__q .bcv-fb__more'))[0].click();
-  check(await page.$eval('.bcv-fb__q .bcv-fb__opts', (e) => e.hidden), 'pressing it again folds the options away');
+  await (await page.$$('.bcv-qfb__q .bcv-fb__more'))[0].click();
+  check(await page.$eval('.bcv-qfb__q .bcv-fb__opts', (e) => e.hidden), 'pressing it again folds the options away');
   const eqText = await sw.evaluate(async (base) => {
     const [tab] = await chrome.tabs.query({ url: `${base}/*` });
     const [{ result }] = await chrome.scripting.executeScript({
@@ -2390,7 +2396,38 @@ try {
     return result;
   }, BASE);
   check(eqText[0] === '\\vec{v}' && eqText[1] === 'A diagram: the free-body diagram', `a formula Canvas keeps as an image reads as the formula, and any image as its alt text: ${JSON.stringify(eqText)}`);
-  check((await page.$$eval('.bcv-fb > .bcv-enter', (els) => els.map((e) => e.style.getPropertyValue('--bcv-delay')))).join(',') === '0ms,45ms,90ms,135ms,180ms', 'feedback cards arrive on a 45ms stagger');
+  check([...(await page.$$eval('.bcv-qfb > .bcv-enter, .bcv-qfb__main > .bcv-enter', (els) => els.map((e) => e.style.getPropertyValue('--bcv-delay'))))].join(',') === '0ms,45ms,90ms,135ms,180ms', 'the rail and then each question arrive on a 45ms stagger');
+  // getting about: a square per question coloured by how it went, the one being read outlined; a square
+  // goes to its question, J and K to the next and the one before, and the filter narrows to what needs another look
+  check((await page.$$eval('.bcv-qfb__sq', (els) => els.map((e) => `${e.textContent}:${[...e.classList].find((c) => /^is-(right|wrong|partial|none)$/.test(c))}`))).join(',') === '1:is-right,2:is-wrong,3:is-right,4:is-right', 'a square per question, coloured by how it went');
+  // (brought up to just under the head — or, for the last few of a short attempt, as far as the page
+  // goes with the question in view — and its square stays lit either way)
+  const wentTo = (k) => page.evaluate((k2) => {
+    const top = document.querySelector(`.bcv-qfb__q[data-k="${k2}"]`).getBoundingClientRect().top;
+    const at = document.querySelector('.bcv-qz__head').getBoundingClientRect().bottom + 14;
+    const end = window.scrollY >= document.documentElement.scrollHeight - window.innerHeight - 2;
+    return document.querySelector('.bcv-qfb__sq.is-here')?.dataset.k === String(k2) && (Math.abs(top - at) < 6 || (end && top > at - 6 && top < window.innerHeight - 60));
+  }, k);
+  await page.click('.bcv-qfb__sq[data-k="1"]');
+  check(await eventually(() => wentTo(1), 4000), 'a square takes the page to its question, just under the head, and lights');
+  await page.keyboard.press('j');
+  check(await eventually(() => wentTo(2), 4000), 'J goes on to the next question');
+  await page.keyboard.press('j');
+  await page.waitForTimeout(900);
+  check(await wentTo(3), 'the last question, which the page cannot bring up to the head, is gone to and stays lit');
+  await page.keyboard.press('k');
+  await page.waitForTimeout(700);
+  await page.keyboard.press('k');
+  check(await eventually(() => wentTo(1), 4000), 'K goes back');
+  await page.click('.bcv-qfb__filter[data-filter="wrong"]');
+  const reviewOnly = await page.$$eval('.bcv-qfb__q:not([hidden]) .bcv-fb__qn', (els) => els.map((e) => e.textContent));
+  const outSq = await page.$$eval('.bcv-qfb__sq.is-out', (els) => els.map((e) => e.textContent));
+  check(reviewOnly.join(',') === 'Question 2' && outSq.join(',') === '1,3,4' && (await texts('.bcv-qfb__filter')).join('|') === 'All 4|To review 1|Correct 3', `To review keeps the question missed, the others dimmed on the rail: ${reviewOnly.join(',')} · out ${outSq.join(',')}`);
+  await page.click('.bcv-qfb__filter[data-filter="right"]');
+  check((await page.$$eval('.bcv-qfb__q:not([hidden]) .bcv-fb__qn', (els) => els.map((e) => e.textContent))).join(',') === 'Question 1,Question 3,Question 4', 'Correct keeps the ones got right');
+  await page.click('.bcv-qfb__sq[data-k="1"]');
+  check(await eventually(async () => (await page.$$('.bcv-qfb__q:not([hidden])')).length === 4 && (await page.$eval('.bcv-qfb__filter.is-on', (e) => e.dataset.filter)) === 'all', 3000), 'a square of a question filtered away brings every question back and goes to it');
+  await page.evaluate(() => window.scrollTo(0, 0));
   await shot(page, '22h-quiz-feedback');
   await page.click('.bcv-fb__btns .bcv-qz__big:first-child');
   await page.waitForSelector('.bcv-qz__done', { timeout: 5000 });
@@ -2403,9 +2440,15 @@ try {
   await page.goto(`${BASE}/courses/101/quizzes/9011?bcv=take`);
   await page.waitForSelector('.bcv-qz__begin', { timeout: 10000 });
   check((await texts('.bcv-qz__begin'))[0] === 'See your feedback' && (await texts('.bcv-qz__bullet')).some((t) => /No attempts left — this quiz allows 1 attempt\./.test(t)) && (await texts('.bcv-qz__note'))[0] === '1 attempt used of 1', 'the intro cannot start another attempt either; it offers the feedback');
+  // (and when Canvas's results page cannot be read, nothing is made up in its place: a question's points
+  // are the ones it earned, never "/ 0", and nothing claims the instructor left no solution)
+  await mockConfig({ quizHistory: false });
   await page.click('.bcv-qz__begin');
-  await page.waitForSelector('.bcv-fb__q', { timeout: 10000 });
+  await page.waitForSelector('.bcv-qfb__q', { timeout: 10000 });
   check((await texts('.bcv-fb__btns .bcv-qz__big')).join('|') === 'Quiz overview|Back to F26-MATH 021 20', 'feedback opened from the intro links back to it');
+  const bareScores = await texts('.bcv-qfb__q .bcv-fb__score');
+  check(bareScores.join('|') === '4 pts|0 pts|4 pts|5 pts' && !(await page.$('.bcv-qfb__nosol')) && !(await page.$('.bcv-qfb__ans.is-right')), `without the results page a question shows the points it earned — never "/ 0" — and claims nothing it cannot know: ${bareScores.join(' | ')}`);
+  await mockConfig({ quizHistory: true });
   // one question at a time + no going back. Canvas's API refuses to list these questions ("Cannot receive one
   // question at a time questions in the API"; the mock refuses too), so each one is read from Canvas's own quiz
   // page and every move goes through that page's record-answer form — which is also how Canvas enforces no
@@ -2475,18 +2518,19 @@ try {
   await page.waitForSelector('.bcv-qz__done', { timeout: 10000 });
   check((await texts('.bcv-qz__h1'))[0] === 'Attempt submitted' && /Score \d+ \/ 20/.test((await texts('.bcv-qz__donecard'))[1] || ''), `submitted through the API, with the score Canvas returned: ${(await texts('.bcv-qz__donecard')).join(' | ')}`);
   await page.click('.bcv-qz__donebtns .bcv-qz__big--primary');
-  await page.waitForSelector('.bcv-fb__q', { timeout: 10000 });
-  check((await page.$$('.bcv-fb__q')).length === 4 && (await texts('.bcv-fb__chip')).some((t) => t === 'You: -3.15 m/s') && (await texts('.bcv-fb__chip')).some((t) => t === 'You: 3.15'), `feedback for a one-at-a-time quiz: the attempt's own question set, the answers from the graded history: ${(await texts('.bcv-fb__chip')).join(' | ')}`);
+  await page.waitForSelector('.bcv-qfb__q', { timeout: 10000 });
+  const oneYours = await texts('.bcv-qfb__ans.is-yours .bcv-qfb__ansval');
+  check((await page.$$('.bcv-qfb__q')).length === 4 && oneYours.includes('-3.15 m/s') && oneYours.includes('3.15'), `feedback for a one-at-a-time quiz: the attempt's own question set, the answers from the graded history: ${oneYours.join(' | ')}`);
   // a quiz graded before today (seeded): its attempt row opens the feedback, with the instructor's comment
   await page.goto(`${BASE}/courses/101/quizzes/9001`);
   await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
   check((await texts('.bcv-detail__actions .bcv-btn--primary'))[0] === 'See feedback' && (await texts('.bcv-detail__actions .bcv-badge'))[0] === 'No attempts left · 1 attempt allowed' && (await page.$eval('.bcv-col .bcv-row[href]', (a) => a.getAttribute('href'))) === '/courses/101/quizzes/9001?bcv=feedback&attempt=1', 'a used-up quiz leads to its feedback from the button and the attempt row');
   await page.click('.bcv-col .bcv-row[href]');
-  await page.waitForSelector('.bcv-fb__q', { timeout: 10000 });
+  await page.waitForSelector('.bcv-qfb__q', { timeout: 10000 });
   const fbLine2 = (await texts('.bcv-fb__scoreline'))[0];
   const fbComments = await texts('.bcv-fb__ctext');
   check(/^13 \/ 16 81% 3 of 4 correct · graded /.test(fbLine2) && fbComments.length === 1 && /^Nice work on the derivative questions/.test(fbComments[0]) && (await texts('.bcv-fb__avatar'))[0] === 'YL' && (await texts('.bcv-fb__btns .bcv-qz__big')).join('|') === 'Back to F26-MATH 021 20', `feedback from the quiz page: the instructor's comment (never your own reply): ${fbLine2} · ${fbComments.join(' | ')}`);
-  check(/Question 2 0 \/ 4 .*You: 17\.68 m Correct: -3\.15 m/i.test((await texts('.bcv-fb__q'))[1]), `the seeded wrong answer with the correct one beside it: ${(await texts('.bcv-fb__q'))[1]}`);
+  check(/Question 2 Incorrect 0 \/ 4 .*Your answer 17\.68 m Correct answer -3\.15 m/i.test((await texts('.bcv-qfb__q'))[1]), `the seeded wrong answer with the correct one beside it: ${(await texts('.bcv-qfb__q'))[1]}`);
   await shot(page, '22j-quiz-feedback-seeded');
 
   // ---- a restricted quiz: an access code Canvas does not tell the student -------------------------
@@ -2718,15 +2762,20 @@ try {
   // and the earlier one opens, with its own score rather than the best so far
   await page.click('.bcv-col .bcv-row[href*="attempt=1"]');
   await page.waitForSelector('.bcv-fb__scoreline', { timeout: 15000 });
-  check(/^13 \/ 16 /.test((await texts('.bcv-fb__scoreline'))[0]) && (await page.$$('.bcv-fb__q')).length >= 4, `an earlier attempt opens its own feedback: ${(await texts('.bcv-fb__scoreline'))[0]}`);
+  check(/^13 \/ 16 /.test((await texts('.bcv-fb__scoreline'))[0]) && (await page.$$('.bcv-qfb__q')).length >= 4, `an earlier attempt opens its own feedback: ${(await texts('.bcv-fb__scoreline'))[0]}`);
+  // its points and marks from its own results page: Canvas's page opens on the latest attempt, and an
+  // earlier one is the version its attempt list links to
+  const oldScores = await texts('.bcv-qfb__q .bcv-fb__score');
+  check(oldScores.join('|') === '4 / 4|0 / 4|4 / 4|5 / 5|0 / 3|2 / 2|2 / 2', `an earlier attempt's points come from its own results page: ${oldScores.join(' | ')}`);
   // (2.98.26) a finished matching answer and a finished pair of blanks are read from the graded history —
   // answer_<id> the match each value was set to, answer_for_<blank> — not shown as "no answer"
-  const fbChip = (n) => page.$$eval('.bcv-fb__q', (els, n2) => els.find((e) => e.querySelector('.bcv-fb__qn')?.textContent === `Question ${n2}`)?.querySelector('.bcv-fb__chip')?.textContent.replace(/\s+/g, ' ').trim() || null, n);
-  const matchChip = await fbChip(5), blankChip = await fbChip(6);
-  check(matchChip === 'You: 9.8 → Acceleration due to gravity, 3.0 × 10⁸ → Speed of light' && blankChip === 'You: rate: rate of change, what: position', `the feedback reads a matching answer and the blanks from the graded history — the pairs set and each blank's pick, not "no answer": ${matchChip} | ${blankChip}`);
+  // (2.98.27) a matching answer is a table: each value, the match set, and the one that was right
+  const matchRows = await page.$$eval('.bcv-qfb__q[data-k="4"] .bcv-qfb__match tbody tr', (els) => els.map((tr) => `${[...tr.cells].map((c) => c.textContent.replace(/\s+/g, ' ').trim()).join(' / ')}${tr.classList.contains('is-right') ? ' [right]' : tr.classList.contains('is-wrong') ? ' [wrong]' : ''}`));
+  const blankAns = (await texts('.bcv-qfb__q[data-k="5"] .bcv-qfb__ans.is-yours .bcv-qfb__ansval'))[0];
+  check(matchRows.join(' | ') === '9.8 / Acceleration due to gravity / Acceleration due to gravity [right] | 3.0 × 10⁸ / Speed of light / Speed of light [right] | 6.67 × 10⁻¹¹ / No match set / Gravitational constant [wrong]' && blankAns === 'rate: rate of change, what: position', `the feedback reads a matching answer and the blanks from the graded history — each pair set, the right match from Canvas's results page, each blank's pick: ${matchRows.join(' | ')} || ${blankAns}`);
   // an essay written in Canvas's own editor shows as its paragraphs and lists, under the question, never as tags
-  const essayFb = await page.$eval('.bcv-fb__essay', (e) => ({ items: [...e.querySelectorAll('li')].map((li) => li.textContent.trim()), paras: e.querySelectorAll('p').length, raw: /<(p|ul|li)>/.test(e.textContent), chip: e.closest('.bcv-fb__q')?.querySelector('.bcv-fb__chip')?.textContent })).catch(() => null);
-  check(!!essayFb && essayFb.items.join(' | ') === 'Ability to work together | Divide and conquer assignments/group work | Ideate together & create better ideas. | Unreliable group mates cause a more stressful workload | Have to set times to meet up outside of class' && essayFb.paras === 2 && !essayFb.raw && essayFb.chip === 'Your answer, below', `the feedback shows a written answer as formatting, the chip pointing to it: ${JSON.stringify(essayFb)}`);
+  const essayFb = await page.$eval('.bcv-fb__essay', (e) => ({ items: [...e.querySelectorAll('li')].map((li) => li.textContent.trim()), paras: e.querySelectorAll('p').length, raw: /<(p|ul|li)>/.test(e.textContent), label: e.closest('.bcv-qfb__ans')?.querySelector('.bcv-qfb__anslbl')?.textContent })).catch(() => null);
+  check(!!essayFb && essayFb.items.join(' | ') === 'Ability to work together | Divide and conquer assignments/group work | Ideate together & create better ideas. | Unreliable group mates cause a more stressful workload | Have to set times to meet up outside of class' && essayFb.paras === 2 && !essayFb.raw && essayFb.label === 'Your answer', `the feedback shows a written answer as formatting, under Your answer: ${JSON.stringify(essayFb)}`);
   // and the same question read from Canvas's own page, which is where the field really is: a quiz
   // taken one question at a time has no API to list its questions, so the markup that arrives is
   // Canvas's own — a dropdown sitting in the middle of the sentence. It is taken over, not left

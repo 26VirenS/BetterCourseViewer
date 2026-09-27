@@ -13,7 +13,7 @@
  * min(their own, the viewport less a margin). */
 
 html[data-bcv-theme] {
-  --bcv-version: "2.98.26"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.98.27"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -1579,6 +1579,89 @@ html[data-bcv-theme="dark"] .bcv-fb__opttag--right { color: #5ddb7d; }
 #bcv-app .bcv-fb__send { flex: none; height: 44px; padding: 0 20px; border: 0; border-radius: 22px; background: var(--bcv-blue); color: #fff; font: 600 14px/1 var(--bcv-font); cursor: pointer; }
 #bcv-app .bcv-fb__send:disabled { opacity: .5; cursor: default; }
 .bcv-fb__perm { font: 400 11.5px/1.45 var(--bcv-font); color: var(--bcv-ink3); }
+/* ---- a quiz's feedback (2.98.27): the rail and the questions, on the attempt's own page ---------- */
+.bcv-qz.is-feedback:not(.is-embedded) { --bcv-qz-headh: 63px; --bcv-qz-stick: calc(var(--bcv-bar-h, 0px) + var(--bcv-qz-headh)); }
+.bcv-qz.is-feedback:not(.is-embedded) .bcv-qz__headrow { max-width: 1320px; padding-left: 24px; padding-right: 24px; }
+.bcv-qfb { flex: 1; display: grid; grid-template-columns: 284px minmax(0, 1fr); align-items: start; width: 100%; max-width: 1320px; margin: 0 auto; background: linear-gradient(var(--bcv-sep), var(--bcv-sep)) no-repeat 284px 0 / 1px 100%; } /* (the rail's edge, on the grid: see .bcv-qz__side) */
+.bcv-qfb__rail { position: sticky; top: var(--bcv-qz-stick, 63px); box-sizing: border-box; max-height: calc(100vh - var(--bcv-qz-stick, 63px)); overflow: auto; padding: 26px 22px 30px; display: flex; flex-direction: column; gap: 14px; }
+.bcv-qfb__score { display: flex; flex-direction: column; gap: 10px; padding: 16px 16px 15px; border-radius: 18px; background: var(--bcv-card); box-shadow: var(--bcv-shadow); }
+.bcv-qfb__score .bcv-fb__scoreline { gap: 8px 10px; }
+.bcv-qfb__score .bcv-fb__big { font-size: 30px; }
+.bcv-qfb__score .bcv-fb__summary { margin-left: 0; flex-basis: 100%; font-size: 12px; }
+.bcv-qfb__filters { display: flex; gap: 3px; padding: 3px; border-radius: 12px; background: var(--bcv-fill); }
+#bcv-app .bcv-qfb__filter { flex: 1; min-width: 0; display: inline-flex; align-items: center; justify-content: center; gap: 5px; height: 30px; padding: 0 6px; border: 0; border-radius: 9px; background: transparent; color: var(--bcv-ink2); font: 600 12px/1 var(--bcv-font); cursor: pointer; white-space: nowrap; }
+#bcv-app .bcv-qfb__filter.is-on { background: var(--bcv-card); color: var(--bcv-ink); box-shadow: var(--bcv-shadow); }
+.bcv-qfb__count { font-weight: 500; color: var(--bcv-ink3); font-variant-numeric: tabular-nums; }
+.bcv-qfb__nav { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+#bcv-app .bcv-qfb__sq { height: 36px; margin: 0; padding: 0; border: 1.5px solid transparent; border-radius: 10px; font: 600 12.5px/1 var(--bcv-font); cursor: pointer; background: var(--bcv-fill); color: var(--bcv-ink2); transition: transform .15s ease, opacity .15s ease, border-color .15s ease; }
+#bcv-app .bcv-qfb__sq.is-right { background: rgba(52,199,89,.16); color: #1e7a37; }
+#bcv-app .bcv-qfb__sq.is-wrong { background: rgba(255,45,85,.13); color: #c01d43; }
+#bcv-app .bcv-qfb__sq.is-partial { background: rgba(255,149,0,.16); color: #9a5a00; }
+html[data-bcv-theme="dark"] #bcv-app .bcv-qfb__sq.is-right { background: rgba(52,199,89,.22); color: #5ddb7d; }
+html[data-bcv-theme="dark"] #bcv-app .bcv-qfb__sq.is-wrong { background: rgba(255,45,85,.22); color: #ff8098; }
+html[data-bcv-theme="dark"] #bcv-app .bcv-qfb__sq.is-partial { background: rgba(255,149,0,.22); color: #ffb44d; }
+#bcv-app .bcv-qfb__sq.is-here { border-color: currentColor; }
+#bcv-app .bcv-qfb__sq.is-out { opacity: .35; }
+#bcv-app .bcv-qfb__sq:hover { transform: translateY(-1px); }
+.bcv-qfb__keys { font: 500 11.5px/1.4 var(--bcv-font); color: var(--bcv-ink3); }
+.bcv-qfb__rail .bcv-fb__btns { flex-direction: column; margin-top: 4px; }
+.bcv-qfb__rail .bcv-fb__btns .bcv-qz__big { flex: none; height: 44px; font-size: 14.5px; }
+.bcv-qfb__main { box-sizing: border-box; width: 100%; max-width: 900px; justify-self: center; padding: 26px 40px 120px; display: flex; flex-direction: column; gap: 18px; }
+.bcv-qfb__comments { display: flex; flex-direction: column; gap: 12px; padding: 16px 18px; border-radius: 18px; background: var(--bcv-card); box-shadow: var(--bcv-shadow); }
+.bcv-qfb__comments .bcv-fb__comment:first-child { padding-top: 0; border-top: 0; }
+.bcv-qfb__q { padding: 20px 24px 20px; gap: 14px; border-radius: 20px; scroll-margin-top: calc(var(--bcv-qz-stick, 63px) + 14px); }
+.bcv-qfb__q:focus { outline: none; }
+.bcv-qfb__q .bcv-fb__qhead { gap: 10px; padding-bottom: 12px; border-bottom: 1px solid var(--bcv-sep); }
+.bcv-qfb__q .bcv-fb__qn { font: 700 17px/1.2 var(--bcv-display); letter-spacing: -.02em; }
+.bcv-qfb__verdict { font: 600 12.5px/1 var(--bcv-font); }
+.bcv-qfb__q .bcv-fb__score { font-size: 13.5px; }
+/* the question as Canvas lays it out: its reading size, its own lines, pictures at the size given */
+.bcv-fb__qtext.bcv-qfb__qtext { font: 400 16px/1.5 var(--bcv-font); letter-spacing: normal; text-wrap: wrap; }
+.bcv-qfb__qtext p { margin: 0 0 10px; }
+.bcv-qfb__qtext > :last-child { margin-bottom: 0; }
+.bcv-qfb__qtext img:not(.equation_image) { border-radius: 0; }
+.bcv-qfb__qtext table { width: auto; max-width: 100%; font-size: inherit; }
+.bcv-qfb__qtext table[border]:not([border="0"]) th, .bcv-qfb__qtext table[border]:not([border="0"]) td { border: 1px solid var(--bcv-edge); }
+.bcv-qfb__answers { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
+.bcv-qfb__answers--two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.bcv-qfb__ans { display: flex; flex-direction: column; gap: 5px; padding: 11px 14px 12px; border-radius: 13px; background: var(--bcv-fill2); min-width: 0; }
+.bcv-qfb__ans.is-right { background: rgba(52,199,89,.12); }
+.bcv-qfb__anslbl { font: 700 10.5px/1.2 var(--bcv-font); letter-spacing: .06em; text-transform: uppercase; color: var(--bcv-ink3); }
+.bcv-qfb__ansval { font: 600 15px/1.4 var(--bcv-font); color: var(--bcv-ink); overflow-wrap: anywhere; }
+.bcv-qfb__ans.is-right .bcv-qfb__ansval { color: #1e7a37; }
+html[data-bcv-theme="dark"] .bcv-qfb__ans.is-right .bcv-qfb__ansval { color: #5ddb7d; }
+.bcv-qfb__noans { font-weight: 500; font-style: italic; opacity: .85; }
+.bcv-qfb__ans .bcv-fb__essay { padding: 0; background: transparent; font-size: 14.5px; }
+/* a matching answer: a row per value */
+.bcv-qfb__match { width: 100%; border-collapse: separate; border-spacing: 0; border-radius: 13px; overflow: hidden; background: var(--bcv-fill2); font: 400 14.5px/1.4 var(--bcv-font); }
+.bcv-qfb__match th { padding: 9px 14px; text-align: left; font: 700 10.5px/1.2 var(--bcv-font); letter-spacing: .06em; text-transform: uppercase; color: var(--bcv-ink3); border-bottom: 1px solid var(--bcv-sep); }
+.bcv-qfb__match td { padding: 9px 14px; vertical-align: top; border-bottom: 1px solid var(--bcv-sep); }
+.bcv-qfb__match tr:last-child td { border-bottom: 0; }
+.bcv-qfb__mleft { width: 34%; font-weight: 600; color: var(--bcv-ink); }
+.bcv-qfb__mmine { color: var(--bcv-ink); }
+.bcv-qfb__mmine.is-empty { color: var(--bcv-ink3); font-style: italic; }
+.bcv-qfb__match tr.is-right .bcv-qfb__mmine { color: #1e7a37; }
+.bcv-qfb__match tr.is-wrong .bcv-qfb__mmine { color: #c01d43; }
+html[data-bcv-theme="dark"] .bcv-qfb__match tr.is-right .bcv-qfb__mmine { color: #5ddb7d; }
+html[data-bcv-theme="dark"] .bcv-qfb__match tr.is-wrong .bcv-qfb__mmine { color: #ff8098; }
+.bcv-qfb__mright { color: #1e7a37; font-weight: 600; }
+html[data-bcv-theme="dark"] .bcv-qfb__mright { color: #5ddb7d; }
+.bcv-qfb__nosol { font-size: 12.5px; }
+.bcv-qfb__empty { margin: 30px 0; text-align: center; font: 500 14px/1.5 var(--bcv-font); color: var(--bcv-ink3); }
+/* narrower than the two columns take: the rail folds into a band over the questions */
+@media (max-width: 1100px) {
+  .bcv-qfb { grid-template-columns: minmax(0, 1fr); background: none; }
+  .bcv-qfb__rail { position: static; max-height: none; overflow: visible; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; gap: 12px 18px; padding: 18px 28px; border-right: 0; border-bottom: 1px solid var(--bcv-sep); }
+  .bcv-qfb__rail > .bcv-qz__railh, .bcv-qfb__keys { display: none; }
+  .bcv-qfb__nav { grid-template-columns: repeat(auto-fill, minmax(36px, 1fr)); grid-column: 1 / -1; }
+  .bcv-qfb__rail .bcv-fb__btns { grid-column: 1 / -1; flex-direction: row; flex-wrap: wrap; }
+  .bcv-qfb__rail .bcv-fb__btns .bcv-qz__big { flex: 1 1 180px; }
+  .bcv-qfb__main { padding: 22px 28px 70px; }
+}
+html.bcv-phone .bcv-qfb__rail { grid-template-columns: minmax(0, 1fr); padding: 14px 16px; }
+html.bcv-phone .bcv-qfb__main { padding: 14px 16px 30px; gap: 13px; }
+html.bcv-phone .bcv-qfb__q { padding: 16px; }
+html.bcv-phone .bcv-qfb__answers--two { grid-template-columns: minmax(0, 1fr); }
 html.bcv-phone .bcv-fb { padding: 14px 16px 24px; gap: 13px; }
 html.bcv-phone .bcv-fb__summary { margin-left: 0; flex-basis: 100%; }
 
@@ -1769,13 +1852,13 @@ html[data-bcv-theme="dark"] #bcv-app .bcv-qz__opt.is-selected { color: #7ab8ff; 
 /* ---- the side layout (2.98.24): the list of questions down the left, the question in the middle at
    Canvas's own reading size, every control down the right. The head keeps the title, the layout
    switch and the clock; the rails stay in view under it as the question scrolls. ---------------- */
-.bcv-qz.is-side { --bcv-qz-headh: 63px; } /* (the head's height with its pills moved into the rail: 14 + 34 + 14 and its edge) */
+.bcv-qz.is-side { --bcv-qz-headh: 63px; --bcv-qz-stick: calc(var(--bcv-bar-h, 0px) + var(--bcv-qz-headh)); } /* (the head's height with its pills moved into the rail: 14 + 34 + 14 and its edge; the rails stick under it, and under the bar the head itself sticks under) */
 .bcv-qz.is-side .bcv-qz__headrow { max-width: 1480px; padding-left: 24px; padding-right: 24px; }
 .bcv-qz__side { flex: 1; display: grid; grid-template-columns: 232px minmax(0, 1fr) 260px; align-items: start; width: 100%; max-width: 1480px; margin: 0 auto; }
-.bcv-qz__lrail, .bcv-qz__foot.bcv-qz__rrail { position: sticky; top: var(--bcv-qz-headh); bottom: auto; z-index: 1; box-sizing: border-box; max-height: calc(100vh - var(--bcv-qz-headh)); overflow: auto; padding: 26px 22px 30px; display: flex; flex-direction: column; gap: 12px; background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; border-top: 0; }
-.bcv-qz__lrail, .bcv-qz__foot.bcv-qz__rrail { min-height: calc(100vh - var(--bcv-qz-headh)); } /* (their edges run the height of the window) */
-.bcv-qz__lrail { border-right: 1px solid var(--bcv-sep); }
-.bcv-qz__foot.bcv-qz__rrail { border-left: 1px solid var(--bcv-sep); }
+.bcv-qz__lrail, .bcv-qz__foot.bcv-qz__rrail { position: sticky; top: var(--bcv-qz-stick, 63px); bottom: auto; z-index: 1; box-sizing: border-box; max-height: calc(100vh - var(--bcv-qz-stick, 63px)); overflow: auto; padding: 26px 22px 30px; display: flex; flex-direction: column; gap: 12px; background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; border-top: 0; }
+/* The rails' edges are drawn on the grid, the full height of the page: a rail made as tall as the
+   window to carry its own edge was pushed up under the head whenever the question was short. */
+.bcv-qz__side { background: linear-gradient(var(--bcv-sep), var(--bcv-sep)) no-repeat 232px 0 / 1px 100%, linear-gradient(var(--bcv-sep), var(--bcv-sep)) no-repeat calc(100% - 260px) 0 / 1px 100%; }
 .bcv-qz__railh { font: 700 11px/1.2 var(--bcv-font); letter-spacing: .06em; text-transform: uppercase; color: var(--bcv-ink3); }
 .bcv-qz__progress.bcv-qz__progress--side { max-width: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
 .bcv-qz__progress--side .bcv-qz__pill { flex: none; width: auto; height: 34px; border-radius: 10px; font-size: 12.5px; }
@@ -1814,7 +1897,7 @@ html[data-bcv-theme="dark"] #bcv-app .bcv-qz__opt.is-selected { color: #7ab8ff; 
    the controls in a bar along the bottom — the one-at-a-time layout's places, the side layout's parts */
 @media (max-width: 1100px) {
   .bcv-qz__side { grid-template-columns: minmax(0, 1fr); }
-  .bcv-qz__lrail, .bcv-qz__foot.bcv-qz__rrail { min-height: 0; }
+  .bcv-qz__side { background: none; }
   .bcv-qz__lrail { position: static; max-height: none; overflow: visible; padding: 14px 28px 12px; border-right: 0; border-bottom: 1px solid var(--bcv-sep); }
   .bcv-qz__lrail .bcv-qz__railh, .bcv-qz__legend { display: none; }
   .bcv-qz__progress.bcv-qz__progress--side { grid-template-columns: repeat(auto-fill, minmax(34px, 1fr)); }

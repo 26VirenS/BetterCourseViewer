@@ -220,9 +220,10 @@
       type: 'button', class: 'bcv-qz__instrbtn', onclick: openInstructions,
       title: "Show this quiz's instructions. Nothing about your attempt changes.",
     }, [U.svg(IC.book, { size: 13, width: 2 }), h('span', { text: 'Instructions' })]);
+    const exitBtn = h('button', { type: 'button', class: 'bcv-qz__exit', title: 'Save and exit', 'aria-label': 'Save and exit', onclick: leave }, U.svg(IC.close, { size: 16, width: 2.2 }));
     const head = U.el('bcv-qz__head', [
       U.el('bcv-qz__headrow', [
-        h('button', { type: 'button', class: 'bcv-qz__exit', title: 'Save and exit', 'aria-label': 'Save and exit', onclick: leave }, U.svg(IC.close, { size: 16, width: 2.2 })),
+        exitBtn,
         h('div', { class: 'bcv-qz__titles' }, [U.text('bcv-qz__title bcv-ellip', quiz.title), U.text('bcv-qz__sub', `${course.name} · ${dueDay}`)]),
         modeWrap,
         instrBtn,
@@ -404,7 +405,9 @@
         window.removeEventListener('beforeunload', onUnload);
         return;
       }
-      const embedded = st.stage === 'intro' || st.stage === 'feedback'; // in the column, under the course header
+      // The intro sits in the course's column, under its header; the attempt, the receipt and (2.98.27)
+      // the feedback take the page — the feedback's own rail and cards need the width a column leaves.
+      const embedded = st.stage === 'intro';
       const switchable = st.stage === 'take' && !phone; // (a phone shows one question a screen, always)
       modeWrap.replaceChildren(...(switchable ? [
         modeBtn('side', 'Controls at the sides', MODE_SIDE),
@@ -415,7 +418,11 @@
       const side = st.stage === 'take' && st.mode === 'side';
       if (!side && progressWrap.parentElement !== head) head.append(progressWrap); // (the side layout keeps the pills in its left rail)
       screen.classList.toggle('is-side', side);
-      instrBtn.hidden = st.stage === 'intro'; // the intro card already has them in front of you
+      instrBtn.hidden = st.stage === 'intro' || st.stage === 'feedback'; // the intro card already has them in front of you; the feedback is about the answers
+      rawBtn.hidden = st.stage === 'feedback';
+      const closeWord = st.stage === 'feedback' ? 'Back to the quiz' : 'Save and exit';
+      exitBtn.title = closeWord;
+      exitBtn.setAttribute('aria-label', closeWord);
       paintProgress();
       body.classList.toggle('is-busy', st.loadingIdx !== null && st.stage === 'take');
       if (st.stage === 'intro') body.replaceChildren(intro());
@@ -1047,19 +1054,6 @@
     // quiz's settings allow it, the instructor's worked solution. Everything comes from the attempt's own question data
     // and the assignment submission's comments; nothing is fetched beyond that.
     const CS = () => BCV.screens.course;
-    /** A chip's contents: the label, then each answer — its own words where it has them, and Canvas's
-     *  own content where it does not, so an answer that is a formula shows the formula. */
-    function chipBody(label, parts) {
-      const out = [h('span', { text: label })];
-      if (!parts?.length) return [...out, h('span', { text: 'no answer' })];
-      parts.forEach((p, i) => {
-        if (i) out.push(h('span', { text: ', ' }));
-        if (String(p.text || '').trim()) out.push(h('span', { text: p.text }));
-        else if (String(p.html || '').trim()) out.push(CS().prose(p.html, { cls: 'bcv-fb__chiprich' }));
-        else out.push(h('span', { text: '—' }));
-      });
-      return out;
-    }
     const CROSS = 'M6 6l12 12M18 6L6 18';
     function finished(s) {
       return !!s && (s.workflow_state === 'complete' || s.workflow_state === 'pending_review');
@@ -1164,30 +1158,49 @@
       const text = q.neutral_comments || (ok ? q.correct_comments : q.incorrect_comments);
       return text && String(text).trim() ? { text: String(text).trim() } : null;
     }
+    /** The correct answer(s) as Canvas's results page marks them, in the pieces answerParts gives: an
+     *  option's own words from the question where it has them (the page's otherwise). */
+    function pageRight(q, pq) {
+      if (!pq?.right?.length) return null;
+      const opts = new Map((q.answers || []).map((a) => [String(a.id), a]));
+      const parts = pq.right.map((x) => {
+        const o = opts.get(String(x.id));
+        const own = o && (String(o.text || '').trim() || String(o.html || '').trim()) ? { text: o.text || '', html: o.html || '' } : { text: x.text || '', html: x.html || '' };
+        return String(own.text).trim() || String(own.html).trim() ? { ...own, text: x.blank && BLANKS.has(q.question_type) && String(own.text).trim() ? `${x.blank}: ${own.text}` : own.text } : null;
+      }).filter(Boolean);
+      return parts.length ? parts : null;
+    }
+    const hasNum = (v) => v !== null && v !== undefined && v !== '' && Number.isFinite(Number(v));
     async function loadFeedback(sub) {
-      const [qs, asub] = await Promise.all([
+      // Canvas's questions carry the latest attempt's answers and marks alone: an earlier attempt
+      // asked for is read from the graded history, its own answers and its own ticks
+      const live = (subs || [])[0];
+      const older = !!live && Number(sub.attempt) !== Number(live.attempt);
+      const [qs, asub, page] = await Promise.all([
         store.quizApi.questions(sub, { courseId: cid, quizId: qid }),
         quiz.assignment_id ? store.submission(cid, quiz.assignment_id, { force: true }).catch(() => null) : Promise.resolve(null),
+        // what the API keeps from a student (each question's points, the right answers, the comments): Canvas's own results page
+        QP().results(cid, qid, sub).catch(() => null),
       ]);
       const me = String(store.env().current_user_id || '');
       const comments = (asub?.submission_comments || []).filter((c) => !me || String(c.author_id ?? '') !== me);
       // per-question points, when the assignment submission's history carries this attempt's grading
       const hist = (asub?.submission_history || []).find((x) => Number(x.attempt) === Number(sub.attempt)) || null;
       const graded = new Map((hist?.submission_data || []).map((d) => [String(d.question_id), d]));
-      // Canvas's questions carry the latest attempt's answers and marks alone: an earlier attempt
-      // asked for is read from the graded history, its own answers and its own ticks
-      const live = (subs || [])[0];
-      const older = !!live && Number(sub.attempt) !== Number(live.attempt);
       const rows = qs.map(tidy).map((q, k) => { // (tidy: a matching answer of empty rows, or blanks all empty, is no answer — so the graded history is read instead)
         const d = graded.get(String(q.id)) || null;
+        const pq = page?.get(String(q.id)) || null;
         if (d && (older || !answered(q.answer))) q.answer = histAnswer(q, d); // (a one-at-a-time quiz's answers come from the graded history too)
         const correct = older && d ? parseCorrect(d.correct) : (parseCorrect(q.correct) ?? (d ? parseCorrect(d.correct) : null));
-        const possible = Number(q.points_possible) || 0;
-        const earned = d && d.points !== undefined && d.points !== null ? Number(d.points) : correct === true ? possible : correct === false ? 0 : null;
-        return { q, k, correct, possible, earned, text: htmlToText(noFields(q.question_text, q) || q.question_name || '', 400).replace(/\s+/g, ' ').trim(), yours: answerParts(q), right: fbRight(q), sol: fbSolution(q, correct === true), info: INFO.has(q.question_type) };
+        // the points a question was worth: the API's where it gives them (it never does to a student), else the results page's
+        const possible = hasNum(q.points_possible) ? Number(q.points_possible) : hasNum(pq?.possible) ? Number(pq.possible) : null;
+        const earned = d && hasNum(d.points) ? Number(d.points) : correct === true ? possible : correct === false ? 0 : null;
+        const rightIds = new Set([...(q.answers || []).filter((a) => Number(a.weight) === 100).map((a) => String(a.id)), ...(pq?.right || []).map((x) => String(x.id))]);
+        const sol = fbSolution(q, correct === true) || (pq?.comment ? { html: pq.comment } : null);
+        return { q, k, correct, possible, earned, yours: answerParts(q), right: fbRight(q) || pageRight(q, pq), rightIds, shown: correctVisible() || !!pq?.shown, match: pq?.match || null, sol, read: !!pq, info: INFO.has(q.question_type) };
       }).filter((r) => !r.info);
       const released = rows.some((r) => r.correct !== null);
-      const possible = Number(quiz.points_possible) || rows.reduce((s, r) => s + r.possible, 0);
+      const possible = Number(quiz.points_possible) || rows.reduce((s, r) => s + (r.possible || 0), 0);
       const score = hist?.score ?? sub.score ?? sub.kept_score; // that attempt's own score, not the best so far
       return { sub, rows, released, comments, possible, score: score === null || score === undefined ? null : Number(score), gradedAt: asub?.graded_at || sub.finished_at };
     }
@@ -1201,10 +1214,10 @@
       if (!(CHOICE.has(q.question_type) || MULTI.has(q.question_type)) || !opts.length) return null;
       const a = q.answer;
       const mine = new Set((Array.isArray(a) ? a : answered(a) ? [a] : []).map(String));
-      const marksRight = correctVisible() && r.correct !== null;
+      const marksRight = r.shown && r.correct !== null;
       const list = U.el('bcv-fb__opts', opts.map((o, j) => {
         const picked = mine.has(String(o.id));
-        const right = marksRight && Number(o.weight) === 100;
+        const right = marksRight && r.rightIds.has(String(o.id));
         const body = String(o.text || '').trim()
           ? h('span', { class: 'bcv-fb__opttext', text: o.text })
           : String(o.html || '').trim()
@@ -1232,83 +1245,258 @@
       return U.el('bcv-fb__optwrap', [btn, list]);
     }
 
-    function fbCard(r, i) {
+    /* ---- the feedback screen (2.98.27) ----------------------------------------------
+     * The page is the attempt's, as the attempt itself had it. Down the left, a rail that stays in view:
+     * the score, a filter (every question, the ones to look at again, the ones got right) and every
+     * question as a numbered square coloured by how it went, the one being read outlined — press one
+     * to go to it; J and K go on and back. On the right the questions themselves, at Canvas's reading
+     * size: what the question asked, then your answer and the correct one side by side (a matching
+     * question as a table, a row per value), the options, the worked solution. */
+    const verdictOf = (r) => (r.correct === true ? 'right' : r.correct === false ? 'wrong' : r.correct === 'partial' ? 'partial' : 'none');
+    const VERDICT = { right: 'Correct', wrong: 'Incorrect', partial: 'Partly right', none: 'Not marked yet' };
+    const MARK = { right: CHECK, wrong: CROSS, partial: 'M5 12h14', none: 'M12 17h.01M9.5 9.5a2.5 2.5 0 015 0c0 1.6-2.5 2-2.5 4' };
+    const inkOf = (v) => {
       const dark = app.isDark();
-      const ok = r.correct === true, part = r.correct === 'partial', bad = r.correct === false;
-      const [ink, tint] = ok ? (dark ? ['#5ddb7d', 'rgba(52,199,89,.2)'] : ['#1e7a37', 'rgba(52,199,89,.14)'])
-        : bad ? (dark ? ['#ff8098', 'rgba(255,45,85,.2)'] : ['#c01d43', 'rgba(255,45,85,.12)'])
-          : part ? ['#ff9500', 'rgba(255,149,0,.16)'] : ['var(--bcv-ink3)', 'var(--bcv-fill)'];
-      const mark = ok ? CHECK : bad ? CROSS : part ? 'M5 12h14' : 'M12 17h.01M9.5 9.5a2.5 2.5 0 015 0c0 1.6-2.5 2-2.5 4';
-      const scoreLbl = r.earned !== null ? `${store.fmtPts(r.earned)} / ${store.fmtPts(r.possible)}` : part ? `Partial · ${store.fmtPts(r.possible)} pts` : `${store.fmtPts(r.possible)} pts`;
-      const showRight = !ok && r.correct !== null && correctVisible() && !!r.right?.length;
+      return v === 'right' ? (dark ? ['#5ddb7d', 'rgba(52,199,89,.2)'] : ['#1e7a37', 'rgba(52,199,89,.14)'])
+        : v === 'wrong' ? (dark ? ['#ff8098', 'rgba(255,45,85,.2)'] : ['#c01d43', 'rgba(255,45,85,.12)'])
+          : v === 'partial' ? ['#ff9500', 'rgba(255,149,0,.16)'] : ['var(--bcv-ink3)', 'var(--bcv-fill)'];
+    };
+    /** An answer's pieces, one after another: its own words, or Canvas's own content where it has none. */
+    function ansBody(parts) {
+      if (!parts?.length) return [h('span', { class: 'bcv-qfb__noans', text: 'No answer' })];
+      const out = [];
+      parts.forEach((p, i) => {
+        if (i) out.push(h('span', { class: 'bcv-qfb__sep', text: ', ' }));
+        if (String(p.text || '').trim()) out.push(h('span', { text: p.text }));
+        else if (String(p.html || '').trim()) out.push(CS().prose(p.html, { cls: 'bcv-fb__chiprich' }));
+        else out.push(h('span', { text: '—' }));
+      });
+      return out;
+    }
+    /** A matching answer as a table: each value, the match you set, and — where the quiz shows correct
+     *  answers and one was missed — the right match, each row marked. */
+    function fbMatchTable(r, wantRight) {
+      const q = r.q;
+      const set = new Map(pairsOf(q.answer).map((p) => [String(p.answer_id), String(p.match_id)]));
+      const nameOf = (mid) => (q.matches || []).find((m) => String(m.match_id) === String(mid))?.text ?? null;
+      const rows = (q.answers || []).map((a) => {
+        const mid = set.get(String(a.id));
+        const mine = mid === undefined ? null : (nameOf(mid) ?? mid);
+        // the right match: the question's own where it has one (a student's never does), else the results page's —
+        // a row it marks right was matched right, and under a wrong one it writes the match that was
+        const pr = r.match?.get(String(a.id)) || null;
+        const right = wantRight ? (String(a.right || '').trim() || (hasId(a.match_id) ? nameOf(a.match_id) : null) || pr?.right || (pr?.ok === true ? mine : null)) : null;
+        return { a, mine, right, ok: pr?.ok ?? null };
+      });
+      const showRight = rows.some((x) => x.right !== null);
+      return h('table', { class: 'bcv-qfb__match' }, [
+        h('thead', {}, h('tr', {}, [h('th', { text: 'Item' }), h('th', { text: 'Your match' }), showRight ? h('th', { text: 'Correct match' }) : null])),
+        h('tbody', {}, rows.map(({ a, mine, right, ok: marked }) => {
+          const ok = !showRight ? null : marked !== null ? marked : right !== null && mine !== null ? String(mine).trim() === String(right).trim() : null;
+          return h('tr', { class: ok === true ? 'is-right' : ok === false || (showRight && mine === null) ? 'is-wrong' : '' }, [
+            h('td', { class: 'bcv-qfb__mleft' }, a.html ? CS().prose(a.html, { cls: 'bcv-fb__chiprich' }) : h('span', { text: a.text || a.left || '—' })),
+            h('td', { class: `bcv-qfb__mmine ${mine === null ? 'is-empty' : ''}`, text: mine ?? 'No match set' }),
+            showRight ? h('td', { class: 'bcv-qfb__mright', text: right ?? '—' }) : null,
+          ]);
+        })),
+      ]);
+    }
+    /** What you answered, and — when the quiz shows it and you missed it — the correct answer beside it. */
+    function fbAnswers(r) {
+      const q = r.q;
+      const v = verdictOf(r);
+      const reveal = v !== 'right' && r.correct !== null && r.shown;
+      if (MATCH.has(q.question_type) && (q.answers || []).length) return U.el('bcv-qfb__answers', fbMatchTable(r, reveal));
+      const showRight = reveal && !!r.right?.length;
+      const essay = r.yours?.some((p) => p.block);
+      const [ink, tint] = inkOf(v);
+      const yours = U.el('bcv-qfb__ans is-yours', [
+        U.text('bcv-qfb__anslbl', 'Your answer', 'span'),
+        essay ? U.el('bcv-fb__essay', r.yours.map((p) => (p.html ? CS().prose(p.html, { cls: 'bcv-fb__essaybody bcv-prose' }) : h('p', { class: 'bcv-fb__essaybody', text: p.text }))))
+          : h('div', { class: 'bcv-qfb__ansval', style: { color: v === 'none' ? '' : ink } }, ansBody(r.yours)),
+      ]);
+      if (!essay && v !== 'none') yours.style.background = tint;
+      return U.el(`bcv-qfb__answers ${showRight ? 'bcv-qfb__answers--two' : ''}`, [
+        yours,
+        showRight ? U.el('bcv-qfb__ans is-right', [U.text('bcv-qfb__anslbl', 'Correct answer', 'span'), h('div', { class: 'bcv-qfb__ansval' }, ansBody(r.right))]) : null,
+      ]);
+    }
+    function fbCard(r, i) {
+      const v = verdictOf(r);
+      const [ink, tint] = inkOf(v);
+      const part = v === 'partial';
+      // (the points a question was worth come from Canvas or are left out — never a "/ 0" standing in for them)
+      const worth = r.possible !== null ? `${store.fmtPts(r.possible)} pts` : '';
+      const scoreLbl = r.earned !== null ? (r.possible !== null ? `${store.fmtPts(r.earned)} / ${store.fmtPts(r.possible)}` : `${store.fmtPts(r.earned)} ${Number(r.earned) === 1 ? 'pt' : 'pts'}`) : part ? (worth ? `Partial · ${worth}` : 'Partial') : worth;
       const sol = r.sol;
-      return U.enter(U.el('bcv-fb__q', [
+      const card = U.el(`bcv-fb__q bcv-qfb__q is-${v}`, [
         U.el('bcv-fb__qhead', [
-          h('span', { class: 'bcv-fb__mark', style: { background: tint } }, U.svg(mark, { size: 13, stroke: ink, width: 2.8 })),
+          h('span', { class: 'bcv-fb__mark', style: { background: tint } }, U.svg(MARK[v], { size: 13, stroke: ink, width: 2.8 })),
           h('span', { class: 'bcv-fb__qn', text: `Question ${r.k + 1}` }),
+          h('span', { class: 'bcv-qfb__verdict', style: { color: ink }, text: VERDICT[v] }),
           h('span', { class: 'bcv-fb__score', style: { color: ink }, text: scoreLbl }),
         ]),
-        CS().prose(noFields(r.q.question_text, r.q) || r.q.question_name || '', { cls: 'bcv-fb__qtext' }),
-        U.el('bcv-fb__chips', [
-          h('span', { class: 'bcv-fb__chip', style: { background: tint, color: ink } }, r.yours?.some((p) => p.block) ? [h('span', { text: 'Your answer, below' })] : chipBody('You: ', r.yours)),
-          showRight ? h('span', { class: 'bcv-fb__chip bcv-fb__chip--right' }, chipBody('Correct: ', r.right)) : null,
-        ]),
-        r.yours?.some((p) => p.block) ? U.el('bcv-fb__essay', r.yours.map((p) => (p.html ? CS().prose(p.html, { cls: 'bcv-fb__essaybody bcv-prose' }) : h('p', { class: 'bcv-fb__essaybody', text: p.text })))) : null,
+        CS().prose(noFields(r.q.question_text, r.q) || r.q.question_name || '', { cls: 'bcv-fb__qtext bcv-qfb__qtext' }),
+        fbAnswers(r),
         fbOptions(r),
-        U.el('bcv-fb__sol', [
+        sol ? U.el('bcv-fb__sol', [
           U.text('bcv-fb__kicker', 'Worked solution', 'span'),
-          sol ? (sol.html ? CS().prose(sol.html, { cls: 'bcv-fb__solbody' }) : h('p', { class: 'bcv-fb__solbody', text: sol.text })) : U.text('bcv-fb__none', 'Your instructor left no worked solution for this question.'),
-        ]),
-      ]), i, 45);
+          sol.html ? CS().prose(sol.html, { cls: 'bcv-fb__solbody' }) : h('p', { class: 'bcv-fb__solbody', text: sol.text }),
+        ]) : r.read ? U.text('bcv-fb__none bcv-qfb__nosol', 'Your instructor left no worked solution for this question.') : null, // (said only once Canvas's results page was read: the API never hands a student the comments)
+      ]);
+      card.id = `bcv-fbq-${r.k}`;
+      card.dataset.k = String(r.k);
+      card.dataset.verdict = v;
+      card.tabIndex = -1;
+      return U.enter(card, i, 45);
     }
-    function feedbackParts(fb) {
+    const toReviewAgain = (v) => v === 'wrong' || v === 'partial';
+    /** The rail: the score, the filter, a square per question, and the ways out. */
+    function fbRail(fb, btns) {
       const { sub, rows } = fb;
       const pct = fb.possible > 0 && fb.score !== null ? Math.round((fb.score / fb.possible) * 100) : null;
       const nRight = rows.filter((r) => r.correct === true).length;
       const when = sub.workflow_state === 'pending_review' ? 'awaiting your instructor’s review' : `graded ${U.fmtAtUpper(fb.gradedAt)}`;
-      const scoreCard = U.el('bcv-fb__scorecard', [
-        U.el('bcv-fb__scoreline', [
-          h('span', { class: 'bcv-fb__big', text: `${fb.score !== null ? store.fmtPts(fb.score) : '—'} / ${store.fmtPts(fb.possible)}` }),
-          pct !== null ? h('span', { class: 'bcv-fb__pct', text: `${pct}%` }) : null,
-          h('span', { class: 'bcv-fb__summary', text: `${fb.released ? `${nRight} of ${rows.length} correct · ` : ''}${when}` }),
+      const counts = { all: rows.length, wrong: rows.filter((r) => toReviewAgain(verdictOf(r))).length, right: nRight };
+      const filters = fb.released ? U.el('bcv-qfb__filters', [['all', 'All'], ['wrong', 'To review'], ['right', 'Correct']].map(([key, label]) => h('button', {
+        type: 'button', class: `bcv-qfb__filter ${key === 'all' ? 'is-on' : ''}`, dataset: { filter: key }, 'aria-pressed': key === 'all' ? 'true' : 'false',
+      }, [h('span', { text: label }), h('span', { class: 'bcv-qfb__count', text: String(counts[key]) })]))) : null;
+      return h('aside', { class: 'bcv-qfb__rail', 'aria-label': 'Your results' }, [
+        U.el('bcv-qfb__score', [
+          U.text('bcv-qz__railh', `Attempt ${sub.attempt || 1}`, 'div'),
+          U.el('bcv-fb__scoreline', [
+            h('span', { class: 'bcv-fb__big', text: `${fb.score !== null ? store.fmtPts(fb.score) : '—'} / ${store.fmtPts(fb.possible)}` }),
+            pct !== null ? h('span', { class: 'bcv-fb__pct', text: `${pct}%` }) : null,
+            h('span', { class: 'bcv-fb__summary', text: `${fb.released ? `${nRight} of ${rows.length} correct · ` : ''}${when}` }),
+          ]),
+          U.el('bcv-fb__bar', h('div', { class: 'bcv-fb__fill', style: { width: `${pct ?? 0}%` } })),
         ]),
-        U.el('bcv-fb__bar', h('div', { class: 'bcv-fb__fill', style: { width: `${pct ?? 0}%` } })),
-        ...fb.comments.map((c) => U.el('bcv-fb__comment', [
-          h('span', { class: 'bcv-fb__avatar', text: U.initials(c.author_name || c.author?.display_name || '') || '·' }),
-          U.el('bcv-fb__cbody', [U.text('bcv-fb__ctitle', `Instructor comment${c.author_name ? ` · ${c.author_name}` : ''}`), h('p', { class: 'bcv-fb__ctext', text: c.comment || '' })]),
-        ])),
+        filters,
+        U.text('bcv-qz__railh', 'Questions', 'div'),
+        U.el('bcv-qfb__nav', rows.map((r) => {
+          const v = verdictOf(r);
+          return h('button', { type: 'button', class: `bcv-qfb__sq is-${v}`, dataset: { k: String(r.k) }, title: `Question ${r.k + 1} · ${VERDICT[v]}`, 'aria-label': `Question ${r.k + 1}, ${VERDICT[v]}` }, h('span', { text: String(r.k + 1) }));
+        })),
+        U.text('bcv-qfb__keys', 'J and K go to the next and previous question.', 'div'),
+        btns,
       ]);
+    }
+    /** The rail and the questions, and what moves between them: the squares, the filter, J and K, and
+     *  the square of the question being read kept lit as the page scrolls. */
+    function feedbackView(fb, btns) {
+      const comments = fb.comments.map((c) => U.el('bcv-fb__comment', [
+        h('span', { class: 'bcv-fb__avatar', text: U.initials(c.author_name || c.author?.display_name || '') || '·' }),
+        U.el('bcv-fb__cbody', [U.text('bcv-fb__ctitle', `Instructor comment${c.author_name ? ` · ${c.author_name}` : ''}`), h('p', { class: 'bcv-fb__ctext', text: c.comment || '' })]),
+      ]));
       const notice = fb.released ? null : U.hint('Canvas has not released the question results for this attempt yet — your score and the questions are shown as they stand.', 'bcv-hint--narrow');
-      return [U.enter(scoreCard, 0, 45), notice, ...rows.map((r, i) => fbCard(r, i + 1))].filter(Boolean);
+      let n = 1;
+      const main = h('div', { class: 'bcv-qfb__main' }, [
+        comments.length ? U.enter(U.el('bcv-qfb__comments', comments), n++, 45) : null,
+        notice,
+        ...fb.rows.map((r) => fbCard(r, n++)),
+        h('p', { class: 'bcv-qfb__empty', hidden: true, text: 'Nothing here — every question in this attempt was answered correctly.' }),
+      ]);
+      const view = U.el('bcv-qfb', [U.enter(fbRail(fb, btns), 0, 45), main]);
+      const cards = () => [...main.querySelectorAll('.bcv-qfb__q')];
+      const squares = () => [...view.querySelectorAll('.bcv-qfb__sq')];
+      const reduce = () => !!self.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+      const line = () => (screen.querySelector('.bcv-qz__head')?.getBoundingClientRect().bottom || 0) + 14;
+      const here = (k) => { for (const sq of squares()) sq.classList.toggle('is-here', sq.dataset.k === String(k)); };
+      // a question gone to stays lit while the page is on its way there and once it has arrived, even
+      // where the page cannot bring it up to the line (the last few of a short attempt); moving the
+      // page yourself, or a trip cut short, hands the light back to whichever question is at the line
+      let pin = null;
+      const spy = () => {
+        if (pin && main.querySelector(`#bcv-fbq-${pin.k}`)?.hidden !== false) pin = null; // (filtered away)
+        if (pin) {
+          const d = Math.abs(window.scrollY - pin.y);
+          if (d < 3) pin.there = true;
+          if (d < 3 || (!pin.there && Date.now() - pin.t < 1500)) { here(pin.k); return; }
+          pin = null;
+        }
+        const at = line();
+        const c = cards().find((x) => !x.hidden && x.getBoundingClientRect().bottom > at + 40);
+        if (c) here(c.dataset.k);
+      };
+      function setFilter(key) {
+        view.dataset.filter = key;
+        for (const b of view.querySelectorAll('.bcv-qfb__filter')) { const on = b.dataset.filter === key; b.classList.toggle('is-on', on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); }
+        let shown = 0;
+        for (const c of cards()) {
+          const v = c.dataset.verdict;
+          c.hidden = !(key === 'all' || (key === 'wrong' && toReviewAgain(v)) || (key === 'right' && v === 'right'));
+          if (!c.hidden) shown++;
+        }
+        for (const sq of squares()) sq.classList.toggle('is-out', !!main.querySelector(`#bcv-fbq-${sq.dataset.k}`)?.hidden);
+        const empty = main.querySelector('.bcv-qfb__empty');
+        empty.hidden = shown > 0;
+        empty.textContent = key === 'right' ? 'No question in this attempt was answered correctly.' : 'Nothing to review — every question in this attempt was answered correctly.';
+        spy();
+      }
+      function goTo(k) {
+        const c = main.querySelector(`#bcv-fbq-${k}`);
+        if (!c) return;
+        if (c.hidden) setFilter('all');
+        const y = Math.round(Math.max(0, Math.min(document.documentElement.scrollHeight - window.innerHeight, window.scrollY + c.getBoundingClientRect().top - line())));
+        pin = { k: String(k), y, t: Date.now(), there: Math.abs(window.scrollY - y) < 3 };
+        window.scrollTo({ top: y, behavior: reduce() ? 'auto' : 'smooth' });
+        here(k);
+        c.focus({ preventScroll: true });
+      }
+      view.addEventListener('click', (e) => {
+        const sq = e.target.closest('.bcv-qfb__sq');
+        if (sq) { goTo(sq.dataset.k); return; }
+        const f = e.target.closest('.bcv-qfb__filter');
+        if (f) setFilter(f.dataset.filter);
+      });
+      const onKey = (e) => {
+        if (e.metaKey || e.ctrlKey || e.altKey || (e.key !== 'j' && e.key !== 'k')) return;
+        if (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target?.tagName || '') || e.target?.isContentEditable || document.querySelector('.bcv-sheet-ov')) return;
+        const vis = cards().filter((c) => !c.hidden);
+        if (!vis.length) return;
+        const cur = vis.findIndex((c) => squares().find((sq) => sq.dataset.k === c.dataset.k)?.classList.contains('is-here'));
+        const next = vis[Math.max(0, Math.min(vis.length - 1, (cur < 0 ? -1 : cur) + (e.key === 'j' ? 1 : -1)))];
+        if (!next) return;
+        e.preventDefault();
+        goTo(next.dataset.k);
+      };
+      let raf = 0;
+      const onScroll = () => { if (!raf) raf = requestAnimationFrame(() => { raf = 0; spy(); }); };
+      document.addEventListener('keydown', onKey);
+      window.addEventListener('scroll', onScroll, { passive: true });
+      U.onGone(view, () => { document.removeEventListener('keydown', onKey); window.removeEventListener('scroll', onScroll); cancelAnimationFrame(raf); });
+      requestAnimationFrame(spy);
+      return view;
     }
     function feedback() {
       const sub = st.fbSub;
-      const wrap = U.el('bcv-fb');
+      const wrap = U.el('bcv-qz__stage');
+      const plain = (...kids) => U.el('bcv-fb', kids); // (the states before there is anything to review: one column, as before)
       const btns = () => U.el('bcv-fb__btns', [
         st.fbFrom === 'done' ? h('button', { type: 'button', class: 'bcv-qz__big', text: 'Back to receipt', onclick: () => { st.stage = 'done'; draw(); toTop(); } }) : null,
         st.fbFrom === 'intro' ? h('button', { type: 'button', class: 'bcv-qz__big', text: 'Quiz overview', onclick: () => { st.stage = 'intro'; draw(); toTop(); } }) : null,
         h('button', { type: 'button', class: 'bcv-qz__big bcv-qz__big--primary', text: `Back to ${course.name}`, onclick: () => exitTo(course.url) }),
       ]);
       if (!sub) {
-        wrap.append(U.emptyCard('No finished attempts yet — feedback appears here once one is submitted.'), btns());
+        wrap.append(plain(U.emptyCard('No finished attempts yet — feedback appears here once one is submitted.'), btns()));
         return wrap;
       }
       const hidden = resultsHidden(sub);
       if (hidden) {
-        wrap.append(U.card(U.el('bcv-detail', [h('h2', { class: 'bcv-detail__title', text: 'Results not released' }), U.text('bcv-hint', hidden)]), 'bcv-card--22'), btns());
+        wrap.append(plain(U.card(U.el('bcv-detail', [h('h2', { class: 'bcv-detail__title', text: 'Results not released' }), U.text('bcv-hint', hidden)]), 'bcv-card--22'), btns()));
         return wrap;
       }
       if (st.fb && st.fb.sub === sub) {
-        wrap.append(...feedbackParts(st.fb), btns());
+        wrap.append(feedbackView(st.fb, btns()));
         return wrap;
       }
-      wrap.append(U.loading('rows', 4));
+      wrap.append(plain(U.loading('rows', 4)));
       loadFeedback(sub).then((fb) => {
         if (!ctx.alive() || st.stage !== 'feedback' || st.fbSub !== sub) return;
         st.fb = fb;
-        wrap.replaceChildren(...feedbackParts(fb), btns());
+        wrap.replaceChildren(feedbackView(fb, btns()));
       }).catch((e) => {
-        if (ctx.alive()) wrap.replaceChildren(U.errorBox(`The feedback could not be loaded: ${e.message}`), btns());
+        if (ctx.alive()) wrap.replaceChildren(plain(U.errorBox(`The feedback could not be loaded: ${e.message}`), btns()));
       });
       return wrap;
     }

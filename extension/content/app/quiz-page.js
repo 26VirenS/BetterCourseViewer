@@ -158,5 +158,96 @@
   /** Why a page did not carry a question, as a message. */
   const notShown = (pg) => new Error(pg.accessCode ? 'Canvas asks for the access code before showing this quiz.' : pg.signIn ? 'Canvas asks you to sign in again.' : 'Canvas did not show the question — open the quiz page to check the attempt.');
 
-  BCV.quizPage = { parse, fetchPage, advance, notShown };
+  /* ---- the results page ---------------------------------------------------------------------
+   * Canvas's question API censors what it hands a student (Api::V1::QuizQuestion#censor): no points
+   * per question, no answer weights, no comments — ever, finished attempt or not. Its own results
+   * page (quizzes/:id/history, display_question / display_answer) is where a student sees them, so
+   * a finished attempt's are read from there: each question's points ("2 / 4 pts"), the answers it
+   * marks correct and the rows of a matching question it marks right or wrong (drawn only where the
+   * quiz shows correct answers — Canvas decides, by drawing the mark or not), and the comment it
+   * shows for how the question went. */
+  /** A score as Canvas writes one: "4", "0.5", "1,000", or "2,5" where the decimal mark is a comma. */
+  const score = (s) => {
+    let t = String(s ?? '').replace(/[^\d.,-]/g, '');
+    if (!/\d/.test(t)) return null;
+    t = /^-?\d{1,3}(,\d{3})+(\.\d+)?$/.test(t) ? t.replace(/,/g, '') : t.includes('.') ? t.replace(/,/g, '') : t.replace(',', '.');
+    const n = Number(t);
+    return Number.isFinite(n) ? n : null;
+  };
+  const shownText = (el) => (el ? el.textContent.replace(/\s+/g, ' ').trim() : '');
+  /** An answer as the page draws it: its words or its rich content, or a numerical answer's value. */
+  function answerOf(a) {
+    const html = a.querySelector(':scope .answer_html')?.innerHTML.trim() || '';
+    const text = shownText(a.querySelector(':scope .answer_text'));
+    const kind = shownText(a.querySelector('.numerical_answer_type'));
+    if (kind && !text && !html) {
+      const exact = shownText(a.querySelector('.answer_exact'));
+      const margin = score(a.querySelector('.answer_error_margin')?.textContent);
+      if (kind === 'range_answer' && a.querySelector('.answer_range_start')) return { text: `${shownText(a.querySelector('.answer_range_start'))} – ${shownText(a.querySelector('.answer_range_end'))}`, html: '' };
+      if (kind === 'precision_answer' && a.querySelector('.answer_approximate')) return { text: shownText(a.querySelector('.answer_approximate')), html: '' };
+      if (exact) return { text: margin ? `${exact} ± ${shownText(a.querySelector('.answer_error_margin'))}` : exact, html: '' };
+    }
+    if (html && (/<(img|math|sup|sub|table)\b/i.test(html) || !text)) return { text: '', html }; // (a formula is Canvas's own image: kept as the page has it)
+    return { text, html: '' };
+  }
+  function parseResults(html) {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const out = new Map();
+    for (const el of doc.querySelectorAll('.display_question.question[id^="question_"]')) {
+      const id = idOf(el, 'question_');
+      if (!/^\d+$/.test(id || '')) continue;
+      const pts = el.querySelector('.question_points_holder .user_points .question_points') || el.querySelector('.question_points_holder .question_points');
+      const rows = [...el.querySelectorAll('.answer[id^="answer_"]')].filter((a) => /^answer_\d+$/.test(a.id));
+      const right = rows.filter((a) => a.classList.contains('correct_answer')).map((a) => ({ id: a.id.slice(7), blank: [...a.classList].find((c) => c.startsWith('answer_for_') && c.length > 11)?.slice(11) || null, ...answerOf(a) }));
+      // a matching question: each row marked right or wrong, a wrong one followed by the match that was right
+      const match = el.classList.contains('matching_question') ? new Map(rows.map((a) => {
+        const ok = a.classList.contains('correct_answer') ? true : a.classList.contains('wrong_answer') ? false : null;
+        const next = a.nextElementSibling;
+        const was = ok === false && next && !next.id ? shownText(next.querySelector('.correct_answer .answer_text')) : '';
+        return [a.id.slice(7), { ok, right: was || null }];
+      })) : null;
+      // the comment Canvas shows for how it went (QuizzesHelper#question_comment): its paragraphs, the empty ones dropped
+      const box = [...el.querySelectorAll('.quiz_comment')].find((c) => c.querySelector('.correct_comments, .incorrect_comments, .neutral_comments') && !c.closest('.answer, .question_comments'));
+      let comment = null;
+      if (box) {
+        const c = box.cloneNode(true);
+        c.querySelectorAll('p').forEach((p) => { if (!p.textContent.trim() && !p.querySelector('img, math, iframe, video')) p.remove(); });
+        comment = c.innerHTML.trim() || null;
+      }
+      out.set(id, { possible: score(String(pts?.textContent || '').split('/').pop()), shown: !!el.querySelector('.answer.correct_answer, .answer.wrong_answer'), right, match, comment });
+    }
+    return out;
+  }
+  /** One attempt's results page, read (null when Canvas shows none: results hidden, a lockdown browser
+   *  wanted). Which attempt the page opens on is Canvas's choice (the current one, or the first finished
+   *  one while another is in progress), so the page is asked for plainly and its attempt list read: the
+   *  one it shows is marked selected, each link says its attempt ("Attempt 2: 8"), in attempt order —
+   *  and if the one shown is not the one wanted, its link (a version) is followed. */
+  async function results(courseId, quizId, sub) {
+    const base = abs(`/courses/${courseId}/quizzes/${quizId}/history`);
+    const get = async (params) => {
+      const u = new URL(base);
+      for (const [k, v] of Object.entries(params)) u.searchParams.set(k, String(v));
+      const res = await fetch(u.toString(), { credentials: 'same-origin', headers: { accept: 'text/html' }, cache: 'no-store' });
+      if (!res.ok) throw new Error(`Canvas would not show the results (${res.status}).`);
+      return res.text();
+    };
+    let html = await get({ quiz_submission_id: sub.id });
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const listed = [...doc.querySelectorAll('#quiz_versions li')].map((li, i) => {
+      const a = li.querySelector('a[href*="version="]');
+      return { attempt: Number((/(\d+)\s*:/.exec(a?.textContent || '') || [])[1]) || i + 1, selected: li.classList.contains('selected'), version: a ? new URL(a.getAttribute('href'), base).searchParams.get('version') : null };
+    });
+    const want = Number(sub.attempt);
+    const shown = listed.find((x) => x.selected);
+    if (listed.length && want && (!shown || shown.attempt !== want)) {
+      const v = listed.find((x) => x.attempt === want)?.version;
+      if (!v) return null; // (Canvas lists no such attempt: nothing is read rather than another attempt's results)
+      html = await get({ quiz_submission_id: sub.id, version: v });
+    }
+    const map = parseResults(html);
+    return map.size ? map : null;
+  }
+
+  BCV.quizPage = { parse, fetchPage, advance, notShown, results, parseResults };
 })();

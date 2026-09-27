@@ -382,13 +382,24 @@ const canvasAnswer = (q, a) => {
   }
   return a ?? null;
 };
+// what Canvas's question API hands a student (Api::V1::QuizQuestion#censor) — always, a finished attempt
+// included: no points, no answer weights, no comments; answers only for the kinds that need them to be
+// answered, each only its id, words and blank. The rest is on its results page (historyPage).
+const CENSOR_KEEP = new Set(['id', 'position', 'quiz_group_id', 'quiz_id', 'assessment_question_id', 'question_name', 'question_type', 'question_text', 'answers', 'matches', 'formulas', 'variables', 'answer_tolerance', 'formula_decimal_places']);
+const CENSOR_ANSWERS = new Set(['multiple_choice_question', 'true_false_question', 'multiple_answers_question', 'matching_question', 'multiple_dropdowns_question', 'calculated_question']);
+const censor = (q) => {
+  const out = Object.fromEntries(Object.entries(q).filter(([k]) => CENSOR_KEEP.has(k)));
+  if (!CENSOR_ANSWERS.has(q.question_type)) delete out.answers;
+  else out.answers = (q.answers || []).map((a) => Object.fromEntries(Object.entries(a).filter(([k]) => ['id', 'text', 'html', 'blank_id', 'variables'].includes(k))));
+  return out;
+};
 const subQuestions = (s) => {
   const done = s.workflow_state === 'complete';
   const bank = quizQuestionBank(s.quiz_id);
   return {
     // like Canvas: `correct`, answer weights and the question comments only appear once the attempt is complete
     quiz_submission_questions: bank.map((q) => ({ id: q.id, position: q.position, flagged: !!s.state[q.id]?.flagged, answer: canvasAnswer(q, done && (q.question_type === 'matching_question' || BLANK_KINDS.has(q.question_type)) ? null : s.state[q.id]?.answer), ...(done ? { correct: gradeQuestion(q, s.state[q.id]?.answer) } : {}) })),
-    quiz_questions: bank.map((q) => ({ ...(done ? q : { ...q, neutral_comments_html: undefined, correct_comments_html: undefined, incorrect_comments_html: undefined, neutral_comments: undefined, answers: q.answers.map(({ weight, ...a }) => a) }), question_text: blankFields(q) })), // (the fields rendered in, with nothing picked: Canvas's own page sets those with a script of its own)
+    quiz_questions: bank.map((q) => ({ ...censor(q), question_text: blankFields(q) })), // (the fields rendered in, with nothing picked: Canvas's own page sets those with a script of its own)
   };
 };
 const modules = {
@@ -515,6 +526,60 @@ const takeQuestionHtml = (q, s) => {
   else answers = `<fieldset><legend class="screenreader-only">Group of answer choices</legend>${q.answers.map((ans) => `<div class="answer"><label class="answer_row user_content"><span class="answer_input"><input type="radio" class="question_input" name="question_${q.id}" value="${ans.id}" id="question_${q.id}_answer_${ans.id}"${String(a) === String(ans.id) ? ' checked' : ''} aria-labelledby="question_${q.id}_answer_${ans.id}_label" /></span>${label(ans)}</label></div>`).join('')}</fieldset>`;
   return `<div role="region" aria-label="Question" class="quiz_sortable question_holder"><div style="display: block; height: 1px; overflow: hidden;">&nbsp;</div><a name="question_${q.id}"></a><div class="display_question question ${q.question_type}${st.flagged ? ' marked' : ''}" id="question_${q.id}"><a href="#" class="flag_question" role="checkbox" aria-checked="${st.flagged ? 'true' : 'false'}"><span class="screenreader-only">Flag question: ${q.question_name}</span></a><div class="header"><span class="name question_name" role="heading" aria-level="2">${q.question_name}</span><span class="question_points_holder"><span class="points question_points">${q.points_possible}</span> pts</span></div><div style="display: none;"><span class="question_type">${q.question_type}</span><span class="answer_selection_type"></span></div><div class="text"><div class="original_question_text" style="display: none;"><textarea disabled style="display: none;" name="question_text" class="textarea_question_text">${q.question_text.replace(/</g, '&lt;')}</textarea></div><div id="question_${q.id}_question_text" class="question_text user_content">${blankFields(q, a && typeof a === 'object' && !Array.isArray(a) ? a : {})}</div><div class="answers">${answers}</div><div class="after_answers"></div></div><div class="clear"></div></div></div>`;
 };
+// ---- Canvas's results page for an attempt (quizzes/:id/history) ----------------------------------
+// What the questions API keeps from a student is here, in the markup of display_question and
+// display_answer: each question's "points / possible", the answers marked correct_answer or
+// wrong_answer (only where the quiz shows correct answers: unspecified_answer otherwise), the match
+// a wrong matching row should have had, and the comment for how the question went.
+const escHtml = (t) => String(t ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+function historyQuestion(q, s, show) {
+  const a = s.state[q.id]?.answer;
+  const ok = gradeQuestion(q, a);
+  const pts = ok ? q.points_possible : 0;
+  const cls = (picked, right) => [picked ? 'selected_answer' : '', show ? (right ? 'correct_answer' : picked ? 'wrong_answer' : '') : 'unspecified_answer'].filter(Boolean).join(' ');
+  const hiddenBits = (ans) => `<div style="display: none;"><span class="numerical_answer_type">${ans.numerical_answer_type || 'exact_answer'}</span><span class="blank_id">${ans.blank_id || 'none'}</span><span class="question_id">${q.id}</span><span class="id">${ans.id}</span><span class="match_id"></span></div>`;
+  const option = (ans, picked, blank = '') => `<div class="answer answer_for_${blank} ${cls(picked, ans.weight === 100)}" id="answer_${ans.id}" title="${escHtml(ans.text)}."><span class='hidden id'>${ans.id}</span><div class="select_answer answer_type"><input id="answer-${ans.id}" type="radio" ${picked ? 'checked' : ''} class="question_input" disabled />&nbsp;<label for="answer-${ans.id}"><div class="answer_text"${ans.html ? ' style="display: none;"' : ''}>${escHtml(ans.text)}</div><div class="answer_html">${ans.html || ''}</div></label></div>${hiddenBits(ans)}<div class="clear"></div></div>`;
+  let answers = '';
+  if (q.question_type === 'matching_question') {
+    const got = new Map((Array.isArray(a) ? a : []).map((p2) => [String(p2.answer_id), p2.match_id]));
+    answers = q.answers.map((ans) => {
+      const mid = got.get(String(ans.id));
+      const right = mid !== undefined && mid !== null && String(mid) === String(ans.match_id);
+      const mine = q.matches.find((m) => String(m.match_id) === String(mid))?.text || '';
+      const truth = q.matches.find((m) => String(m.match_id) === String(ans.match_id))?.text || '';
+      return `<div class="answer answer_for_ selected_answer ${show ? (right ? 'correct_answer' : 'wrong_answer') : 'unspecified_answer'}" id="answer_${ans.id}"><span class='hidden id'>${ans.id}</span><div class="answer_match matching_answer answer_type"><div class="answer_match_left">${escHtml(ans.text)}</div><div class="answer_match_middle">&nbsp;</div><div class="answer_match_right"><select class="question_input" readonly="readonly"><option value="" selected>${escHtml(mine)}</option></select></div><div class="clear"></div></div>${hiddenBits(ans)}<div class="clear"></div></div>${show && !right ? `<div class="answer full-opacity"><div class="answer_match matching_answer answer_type"><div class="answer_match_left">&nbsp;</div><div class="answer_match_left_html"></div><div class="answer_match_middle">&nbsp;</div><div class="answer_match_right"><div class='answer correct_answer'><div class='answer_text'>${escHtml(truth)}</div></div></div><div class="clear"></div></div></div>` : ''}<div class="clear"></div>`;
+    }).join('');
+  } else if (BLANK_KINDS.has(q.question_type)) {
+    const held = a && typeof a === 'object' && !Array.isArray(a) ? a : {};
+    answers = [...new Set(q.answers.map((x) => x.blank_id))].map((b, i) => `<div class="answer_group"><b class="answer-group-heading">Answer ${i + 1}:</b>${q.answers.filter((x) => x.blank_id === b).map((ans) => option(ans, String(held[b]) === String(ans.id), b)).join('')}</div>`).join('');
+  } else if (q.question_type === 'essay_question') {
+    answers = `<div>Your Answer:<div class="user_content quiz_response_text">${a || ''}</div></div>`;
+  } else if (q.question_type === 'numerical_question') {
+    // the answer given, then (where correct answers show) the accepted values — a number's own spans, no words
+    answers = `<div><div class='answer selected_answer ${show ? (ok ? 'correct_answer' : 'wrong_answer') : ''}'><div class="answer_type short_answer"><input type="text" disabled value="${escHtml(a ?? '')}"/></div></div></div>${show ? `<div class="answers_wrapper">${q.answers.map((ans) => `<div class="answer answer_for_ ${ans.weight === 100 ? 'correct_answer' : ''}" id="answer_${ans.id}"><span class='hidden id'>${ans.id}</span><div class="select_answer answer_type" style="display: none;"><label><div class="answer_text"></div><div class="answer_html"></div></label></div>${hiddenBits(ans)}<div class="numerical_exact_answer answer_type"><span class="answer_exact">${ans.exact}</span> (with margin <span class="answer_error_margin">${ans.margin || 0}</span>)</div><div class="clear"></div></div>`).join('')}</div>` : ''}`;
+  } else {
+    const picked = new Set((Array.isArray(a) ? a : a === null || a === undefined ? [] : [a]).map(String));
+    answers = `<div class="answers_wrapper">${q.answers.map((ans) => option(ans, picked.has(String(ans.id)))).join('')}</div>`;
+  }
+  const html = (k) => (q[`${k}_html`] ? q[`${k}_html`] : escHtml(q[k] || ''));
+  const said = [ok && (q.correct_comments_html || q.correct_comments) ? `<p class="correct_comments">${html('correct_comments')}</p>` : '', !ok && (q.incorrect_comments_html || q.incorrect_comments) ? `<p class="incorrect_comments">${html('incorrect_comments')}</p>` : '', q.neutral_comments_html || q.neutral_comments ? `<p class="neutral_comments">${html('neutral_comments')}</p>` : ''].join('');
+  return `<div role="region" aria-label="Question" class="quiz_sortable question_holder"><a name="question_${q.id}"></a><div class="display_question question ${q.question_type} ${ok && show ? 'correct' : ''} ${ok ? '' : 'incorrect'}" id="question_${q.id}"><div class="header"><span class="name question_name" role="heading" aria-level="2">${q.question_name}</span><span class="question_points_holder"><div class="user_points">${pts}<span class="points question_points"> / ${q.points_possible}</span> pts</div></span></div><div class="text"><div id="question_${q.id}_question_text" class="question_text user_content">${q.question_text}</div><div class="answers">${answers}</div><div class="after_answers"></div></div>${said ? `<div class="quiz_comment">${said}</div>` : ''}<div class="clear"></div></div></div>`;
+}
+/** The page for an attempt, an earlier one by its version (here, its attempt number). Asked for plainly
+ *  it opens where Canvas's QuizzesController#history does: on the current attempt, or — while one is in
+ *  progress — on the first finished one; every finished attempt listed as a link, the one shown selected.
+ *  Nothing when there is nothing to show (the quiz page instead, as Canvas redirects). */
+function historyPage(courseId, quizId, subId, version) {
+  const q = quizzes(courseId).find((x) => x.id === quizId);
+  const all = quizSubs.get(quizId) || [];
+  const done = all.filter((x) => x.workflow_state === 'complete');
+  if (!q || !done.length || mockConfig.quizHistory === false) return null;
+  const s = version ? done.find((x) => String(x.attempt) === String(version)) : all[all.length - 1].workflow_state === 'untaken' ? done[0] : done[done.length - 1];
+  if (!s || (subId && !all.some((x) => x.id === subId))) return null;
+  const versions = `<ul id="quiz_versions">${done.map((x) => `<li class="quiz_version ${x === s ? 'selected' : ''}"><a class="no-hover" href="?version=${x.attempt}">Attempt ${x.attempt}: ${x.score}</a></li>`).join('')}</ul>`;
+  const body = `<div id="quiz_versions_holder">${versions}</div><div id="questions" class="show_correct_answers">${quizQuestionBank(quizId).map((x) => historyQuestion(x, s, q.show_correct_answers !== false)).join('')}</div>`;
+  return page({ title: `${q.title}: History`, courseId, body });
+}
 function takePage(courseId, quizId, questionId) {
   const q = quizzes(courseId).find((x) => x.id === quizId);
   const s = (quizSubs.get(quizId) || []).find((x) => x.workflow_state === 'untaken');
@@ -844,7 +909,7 @@ on('GET', /^\/api\/v1\/courses\/(\w+)\/quizzes\/(\w+)\/questions$/, (url, m) => 
   const s = url.searchParams.get('quiz_submission_id') ? findSub(url.searchParams.get('quiz_submission_id')) : null;
   if (!s) return { __status: 401, errors: [{ message: 'user not authorized to perform that action' }] };
   if (s.workflow_state !== 'complete') return { __status: 401, errors: [{ message: 'Cannot view questions due to quiz settings' }] };
-  return quizQuestionBank(m[2]);
+  return quizQuestionBank(m[2]).map(censor);
 });
 // test-only: what the mock holds for an attempt (its read marks, answers and flags)
 on('GET', /^\/__mock\/quizsub\/([\w-]+)$/, (url, m) => { const s = findSub(m[1]); return s ? { read: s.read || {}, answers: Object.fromEntries(Object.entries(s.state).map(([k, v]) => [k, v.answer ?? null])), flags: Object.fromEntries(Object.entries(s.state).map(([k, v]) => [k, !!v.flagged])) } : null; });
@@ -1063,6 +1128,12 @@ const server = http.createServer((req, res) => {
         res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'set-cookie': `_csrf_token=${encodeURIComponent(CSRF)}; Path=/` });
         res.end(html);
       });
+    }
+    if (!handler && req.method === 'GET' && (qm = path.match(/^\/courses\/(\w+)\/quizzes\/(\w+)\/history$/))) { // Canvas's results page for an attempt
+      const html = historyPage(qm[1], qm[2], url.searchParams.get('quiz_submission_id'), url.searchParams.get('version'));
+      if (!html) { res.writeHead(302, { location: `/courses/${qm[1]}/quizzes/${qm[2]}` }); return res.end(); } // (no results to show: back to the quiz page, as Canvas does)
+      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+      return res.end(html);
     }
     if (req.method === 'POST' && (qm = path.match(/^\/courses\/(\w+)\/quizzes\/(\w+)\/submissions\/([\w-]+)\/record_answer$/))) { // its Next / Previous
       const [cid, quizId, sid] = [qm[1], qm[2], qm[3]];
