@@ -480,7 +480,6 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
 .pz__bar { width: 14px; height: 5px; border: 0; padding: 0; border-radius: 3px; cursor: pointer; background: var(--pz-hair); transition: width .35s var(--ease), background .3s ease; }
 .pz__bar.is-done { background: var(--A-btn); }
 .pz__bar.is-on { width: 36px; }
-.pz__seg { flex: 1; min-width: 0; display: flex; justify-content: flex-end; }
 .pz__seg { display: flex; padding: 2px; border-radius: 10px; background: var(--pz-tile); gap: 2px; margin-left: auto; flex: none; }
 .pz__segbtn { display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border: 0; border-radius: 8px; cursor: pointer; background: transparent; font: 500 12px/1 var(--font); color: var(--pz-ink3); transition: background .2s ease; }
 .pz__segbtn.is-on { background: var(--pz-seg-on); box-shadow: 0 1px 3px rgba(0,0,0,.18); color: var(--pz-ink); font-weight: 600; }
@@ -497,8 +496,12 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
 .pz__head { width: 100%; display: flex; flex-direction: column; align-items: center; animation: omRise .36s var(--ease) both; }
 .pz__h1 { margin: 0; font: 700 24px/1.15 var(--display); letter-spacing: -.03em; color: var(--pz-ink); text-align: center; }
 .pz__lead { margin: 5px 0 0; font: 400 14px/1.45 var(--font); color: var(--pz-ink3); text-align: center; }
-.pz__pvwrap { position: relative; width: 100%; flex: 1 1 auto; min-height: 200px; margin-top: 10px; overflow: hidden; } /* (the preview takes the room the window has: measure() scales it to fit, larger than life in a big window) */
-.pz__stage--2 .pz__pvwrap { flex: none; min-height: 0; overflow: visible; }
+.pz__pvbox { position: relative; width: 100%; flex: 1 1 auto; min-height: 200px; margin-top: 10px; display: flex; flex-direction: column; }
+.pz__pvwrap { position: relative; width: 100%; flex: 1 1 auto; min-height: 0; overflow: hidden; } /* (the preview takes the room the window has: measure() scales it to fit, larger than life in a big window) */
+/* Light, Dark, System: a glass bar floating at the foot of the preview */
+.pz__lookbar { position: absolute; left: 50%; bottom: max(12px, calc(var(--pv-gap, 0px) - 21px)); z-index: 6; transform: translateX(-50%); margin: 0; padding: 4px; gap: 3px; border-radius: 14px; background: var(--pz-glass); -webkit-backdrop-filter: blur(24px) saturate(1.5); backdrop-filter: blur(24px) saturate(1.5); border: 1px solid var(--pz-hair); box-shadow: 0 14px 36px rgba(0,0,0,.26); animation: omPop .3s var(--ease) both; }
+.pz__lookbar .pz__segbtn { height: 30px; padding: 0 12px; border-radius: 10px; }
+.pz.is-still .pz__lookbar { animation: none; }
 .pz__pv { position: absolute; left: 50%; top: 0; width: 980px; height: 430px; transform: translateX(-50%); transform-origin: top center; border-radius: 22px; overflow: hidden; border: 1px solid var(--pz-hair); background: var(--pv-main); display: flex; box-shadow: 0 30px 70px rgba(0,0,0,var(--pv-shadow)); }
 .pz__side { position: relative; flex: none; width: 190px; overflow: hidden; background: var(--pv-side); border-radius: 22px 0 0 22px; outline: 2px solid transparent; outline-offset: -2px; transition: outline-color .2s ease; }
 .pz__side.is-pickable { cursor: pointer; }
@@ -511,13 +514,13 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
 /* inked, as the page draws it (app.css): the paper in the complement, the ink's mask in the colour, the blurred mask under the fade */
 .pz { --pz-ink-lift: #000000; --pz-ink-k: 93%; }
 :host([data-theme="dark"]) .pz, html[data-theme="dark"] .pz { --pz-ink-lift: #ffffff; --pz-ink-k: 90%; }
-.pz__side { --paper: var(--pv-side); } .pz__card { --paper: var(--pv-card); } .pz__hcard { --paper: var(--pv-head); }
+.pz__side { --paper: var(--pv-side); } .pz__card { --paper: var(--pv-card); } .pz__phead { --paper: var(--pv-head); }
 .pz__pic--paper { background: var(--paper); }
 .pz__pic--sharp.pz__pic--inked { background: color-mix(in srgb, var(--paper) var(--pz-ink-k), var(--pz-ink-lift)); -webkit-mask: var(--ink) center / cover no-repeat; mask: var(--ink) center / cover no-repeat; }
 .pz__pic--blur.pz__pic--inked { inset: 0; filter: none; background: color-mix(in srgb, var(--paper) var(--pz-ink-k), var(--pz-ink-lift)); -webkit-mask-size: cover, auto; -webkit-mask-position: center, 0 0; -webkit-mask-repeat: no-repeat; -webkit-mask-composite: source-in; mask-size: cover, auto; mask-position: center, 0 0; mask-repeat: no-repeat; mask-composite: intersect; }
 .pz__side .pz__pic--blur.pz__pic--inked { -webkit-mask-image: var(--ink), linear-gradient(to top, transparent 10%, #000 62%); mask-image: var(--ink), linear-gradient(to top, transparent 10%, #000 62%); }
 .pz__card .pz__pic--blur.pz__pic--inked { -webkit-mask-image: var(--ink), radial-gradient(150% 150% at 100% 100%, transparent 30%, #000 70%); mask-image: var(--ink), radial-gradient(150% 150% at 100% 100%, transparent 30%, #000 70%); }
-.pz__hcard .pz__pic--blur.pz__pic--inked { -webkit-mask-image: var(--ink), linear-gradient(to left, transparent 8%, #000 60%); mask-image: var(--ink), linear-gradient(to left, transparent 8%, #000 60%); }
+.pz__phead .pz__pic--blur.pz__pic--inked { -webkit-mask-image: var(--ink), linear-gradient(to left, transparent 8%, #000 60%); mask-image: var(--ink), linear-gradient(to left, transparent 8%, #000 60%); }
 .pz__choicepic--inked { background: var(--pz-field) !important; position: relative; overflow: hidden; }
 .pz__choicepic--inked::after { content: ""; position: absolute; inset: 0; background: color-mix(in srgb, var(--pz-field) calc(var(--pz-ink-k) - 4%), var(--pz-ink-lift)); -webkit-mask: var(--ink) center / cover no-repeat; mask: var(--ink) center / cover no-repeat; }
 .pz__thumb i.is-inked { background: var(--pz-field); position: relative; }
@@ -528,7 +531,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
 .pz__pic--inked ~ .pz__pic--veil { background: none; } /* (tone on tone: no veil, no wash) */
 .pz__card .pz__pic--blur { inset: -20px; filter: blur(14px); -webkit-mask-image: radial-gradient(150% 150% at 100% 100%, transparent 30%, #000 70%); mask-image: radial-gradient(150% 150% at 100% 100%, transparent 30%, #000 70%); }
 .pz__pic--veil-card { background: radial-gradient(150% 150% at 100% 100%, transparent 26%, color-mix(in srgb, var(--veil-card) var(--pz-veil-k), transparent) 70%), var(--pz-wash); }
-.pz__hcard .pz__pic--blur { inset: -24px; filter: blur(18px); -webkit-mask-image: linear-gradient(to left, transparent 8%, #000 60%); mask-image: linear-gradient(to left, transparent 8%, #000 60%); }
+.pz__phead .pz__pic--blur { inset: -24px; filter: blur(18px); -webkit-mask-image: linear-gradient(to left, transparent 8%, #000 60%); mask-image: linear-gradient(to left, transparent 8%, #000 60%); }
 .pz__pic--veil-head { background: linear-gradient(to left, transparent 0%, color-mix(in srgb, var(--veil-head) var(--pz-veil-k), transparent) 72%), var(--pz-wash); }
 .pz__sidein { position: relative; padding: 18px 11px; display: flex; flex-direction: column; gap: 2px; }
 .pz__pvbrand { display: flex; align-items: center; gap: 8px; padding: 0 8px 16px; font: 600 13px/1 var(--font); color: var(--pv-ink); }
@@ -559,11 +562,22 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
 .pz__card.is-pickable { cursor: pointer; }
 .pz__card.is-pickable:hover { outline: 2px dashed var(--hover-ring); }
 .pz__card.is-target { outline: 2px solid var(--A) !important; }
+/* a picture carried over the preview: the parts that take one outlined, the one under it filled */
+.pz__pv.is-dropping .is-pickable { outline: 2px dashed var(--A); }
+.pz__pv.is-dropping .is-pickable.is-drop { outline: 2.5px solid var(--A); }
+.pz__pv.is-dropping .is-drop .pz__badge { background: var(--A-btn); color: #fff; }
 /* the cursor's show at the first screen: a pointer that presses the sidebar and two counters, each lit as it is pressed (personalize.js peekShow) */
-.pz__side.is-peek, .pz__card.is-peek { outline: 2px dashed var(--hover-ring); }
+.pz__side.is-peek, .pz__card.is-peek, .pz__phead.is-peek { outline: 2.5px solid var(--A); }
+.is-peek .pz__badge { background: var(--A-btn); color: #fff; animation: omBadge .6s var(--ease) both; }
+@keyframes omBadge { 0% { transform: scale(1); } 40% { transform: scale(1.22); } 100% { transform: scale(1.08); } }
 .pz__cursor { position: absolute; left: 0; top: 0; z-index: 40; pointer-events: none; opacity: 0; transform: translate(var(--cx, 0px), var(--cy, 0px)); transition: transform var(--cms, 600ms) cubic-bezier(.4,0,.2,1), opacity .25s ease; filter: drop-shadow(0 2px 4px rgba(0,0,0,.35)); }
-.pz__cursor.is-press { transform: translate(var(--cx, 0px), var(--cy, 0px)) scale(.8); transition-duration: .12s, .25s; }
+.pz__cursor.is-press .pz__cursorpt { transform: scale(.78); }
+.pz__cursorpt { display: block; transition: transform .16s ease; transform-origin: 5px 3px; }
 .pz__cursor svg { display: block; }
+.pz__cursorlabel { position: absolute; left: 26px; top: 30px; white-space: nowrap; padding: 7px 12px; border-radius: 14px; background: rgba(28,28,30,.9); color: #fff; font: 600 12.5px/1 var(--font); box-shadow: 0 8px 22px rgba(0,0,0,.3); opacity: 0; transform: translateY(4px) scale(.96); transition: opacity .25s ease, transform .3s var(--ease); }
+.pz__cursorlabel.is-on { opacity: 1; transform: none; }
+.pz__ripple { position: absolute; z-index: 39; width: 56px; height: 56px; margin: -28px 0 0 -28px; border-radius: 50%; border: 2.5px solid var(--A, #0a84ff); pointer-events: none; animation: omRipple .8s cubic-bezier(.2,.7,.3,1) both; }
+@keyframes omRipple { from { opacity: .9; transform: scale(.25); } to { opacity: 0; transform: scale(1.5); } }
 .pz__cardin { position: relative; height: 100%; box-sizing: border-box; padding: 12px 13px; display: flex; flex-direction: column; }
 .pz__chead { display: flex; align-items: flex-start; gap: 6px; }
 .pz__cic { flex: none; margin-top: 1px; stroke: var(--ic); transition: stroke .3s ease; }
@@ -576,21 +590,19 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
 .pz__ring { flex: none; display: block; width: 12px; height: 12px; border-radius: 6px; box-sizing: border-box; border: 1.6px solid var(--A); transition: border-color .3s ease; }
 .pz__lt { flex: 1; min-width: 0; font: 500 12px/1.2 var(--font); color: var(--pv-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pz__chip { flex: none; padding: 3px 8px; border-radius: 7px; background: color-mix(in srgb, var(--c) 14%, transparent); font: 600 10.5px/1.2 var(--font); color: var(--c-read, var(--c)); transition: color .3s ease, background .3s ease; }
-/* the headers, as cards */
-.pz__heads { height: 100%; box-sizing: border-box; overflow-y: auto; padding: 4px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 92px; align-content: start; gap: 10px; }
-.pz__hcard { position: relative; display: block; width: 100%; height: 92px; padding: 0; border: 0; border-radius: 14px; overflow: hidden; cursor: pointer; text-align: left; background: var(--pv-head); outline: 2px solid transparent; outline-offset: 2px; transition: outline-color .2s ease; animation: omRise .32s var(--ease) both; color: inherit; }
-.pz__hcard:hover { outline: 2px dashed var(--hover-ring); }
-.pz__hcard.is-on { outline: 2px solid var(--A) !important; }
-.pz__hin { position: relative; height: 100%; box-sizing: border-box; padding: 10px 12px 12px 16px; display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; }
-.pz__htitle { flex: 1; min-width: 0; font: 700 17px/1.2 var(--display); letter-spacing: -.025em; color: var(--pv-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pz__hcard.has-pic .pz__htitle { color: var(--pz-photo-ink); }
-.pz__hchip { flex: none; align-self: flex-start; display: flex; align-items: center; gap: 6px; height: 24px; padding: 0 10px 0 9px; border-radius: 12px; white-space: nowrap; background: var(--pz-field); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); font: 600 11.5px/1 var(--font); color: var(--pz-ink2); }
-.pz__hchip svg { display: block; }
-.pz__hcard.is-on .pz__hchip { background: var(--A-btn); color: #fff; }
-.pz__hcard.has-pic .pz__hchip { background: var(--pz-photo-chip); color: var(--pz-photo-ink); }
+/* the header: one photo for every page's, pressed like the sidebar and the counters */
+.pz__phead { position: relative; margin: -22px -22px 0; padding: 22px 22px 12px; overflow: hidden; border-radius: 0 22px 0 0; outline: 2px solid transparent; outline-offset: -2px; transition: outline-color .2s ease; }
+.pz__phead.is-pickable { cursor: pointer; }
+.pz__phead.is-pickable:hover { outline: 2px dashed var(--hover-ring); }
+.pz__phead.is-target { outline: 2px solid var(--A) !important; }
+.pz__pheadin { position: relative; }
+.pz__phead.has-pic .pz__title { color: var(--pz-photo-ink); }
+.pz__phead.has-pic .pz__date { color: var(--pz-photo-ink2); }
 /* the photo bar, and the photo choices */
-.pz__bar2 { position: absolute; left: 50%; bottom: 16px; z-index: 5; display: flex; align-items: center; gap: 12px; padding: 10px 12px 10px 16px; border-radius: 20px; background: var(--pz-glass); -webkit-backdrop-filter: blur(24px) saturate(1.5); backdrop-filter: blur(24px) saturate(1.5); border: 1px solid var(--pz-hair); box-shadow: 0 18px 44px rgba(0,0,0,.34); animation: omPop .26s var(--ease) both; transform: translateX(-50%); white-space: nowrap; }
+.pz__bar2 { position: absolute; left: 50%; bottom: max(12px, calc(var(--pv-gap, 0px) - 26px)); z-index: 5; display: flex; align-items: center; gap: 12px; padding: 10px 12px 10px 16px; border-radius: 20px; background: var(--pz-glass); -webkit-backdrop-filter: blur(24px) saturate(1.5); backdrop-filter: blur(24px) saturate(1.5); border: 1px solid var(--pz-hair); box-shadow: 0 18px 44px rgba(0,0,0,.34); animation: omPop .26s var(--ease) both; transform: translateX(-50%); white-space: nowrap; }
+.pz__bartitles { display: flex; flex-direction: column; gap: 2px; }
 .pz__bartitle { font: 600 12.5px/1.2 var(--font); color: var(--pz-ink); }
+.pz__barsub { font: 500 10.5px/1.2 var(--font); color: var(--pz-ink3); }
 .pz__vr { display: block; width: 1px; height: 26px; background: var(--pz-hair); }
 .pz__choice { position: relative; display: flex; flex-direction: column; align-items: center; gap: 7px; padding: 0; border: 0; background: transparent; cursor: pointer; overflow: hidden; }
 .pz__choicepic { display: block; width: 68px; height: 46px; border-radius: 11px; background-size: cover; background-position: center; box-shadow: inset 0 0 0 1px var(--pz-hair); transition: box-shadow .2s ease; }
@@ -602,7 +614,13 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
 .pz__choicename { font: 500 11.5px/1.2 var(--font); color: var(--pz-ink3); }
 .pz__choice.is-on .pz__choicename { color: var(--pz-ink); font-weight: 600; }
 .pz__bar2 .pz__choicename { display: none; }
-.pz__bar2 .pz__choicepic { width: 42px; height: 30px; border-radius: 8px; }
+/* Upload, first and in words: a pill in the colour's tint (the bar's other choices are pictures) */
+.pz__bar2 .pz__choice--up { flex-direction: row; gap: 7px; height: 32px; padding: 0 13px 0 9px; border-radius: 16px; background: var(--A-tint); color: var(--A-read); }
+.pz__bar2 .pz__choice--up .pz__choicename { display: block; font: 600 12px/1 var(--font); color: inherit; }
+.pz__bar2 .pz__choicepic--up { width: 18px; height: 18px; border: 0; border-radius: 0; background: none; color: inherit; }
+.pz__bar2 .pz__choice--up:hover { filter: brightness(.96); }
+.pz__bar2 .pz__choice--up.is-on { box-shadow: inset 0 0 0 2px var(--A); }
+.pz__bar2 .pz__choicepic:not(.pz__choicepic--up) { width: 42px; height: 30px; border-radius: 8px; }
 .pz__barok { flex: none; width: 30px; height: 30px; border: 0; border-radius: 15px; background: var(--pz-field); cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--pz-ink2); }
 .pz__textbtn { height: 28px; padding: 0 13px; border: 0; border-radius: 14px; background: transparent; cursor: pointer; font: 600 12px/1 var(--font); color: var(--A-read); transition: color .2s ease; }
 .pz__textbtn:disabled { color: var(--pz-ink3); cursor: default; }
@@ -610,7 +628,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
 .pz__choices { display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-start; gap: 12px; }
 /* the controls under the preview */
 .pz__controls { flex: none; width: 100%; margin-top: 10px; display: flex; flex-direction: column; align-items: center; }
-.pz__colour, .pz__courses, .pz__hcontrols { display: flex; flex-direction: column; align-items: center; gap: 10px; animation: omRise .34s var(--ease) .05s both; }
+.pz__colour, .pz__courses { display: flex; flex-direction: column; align-items: center; gap: 10px; animation: omRise .34s var(--ease) .05s both; }
 /* ready-made: a list down the right of the preview — Default and the four scenes, each a tile of the three scenes as they are placed (the sidebar down the left, the header over the counter) with the colour's dot and its name beside it */
 .pz__ready { display: flex; flex-direction: column; align-items: stretch; gap: 6px; min-height: 0; overflow: auto; padding: 2px; animation: omRise .34s var(--ease) .05s both; }
 .pz__readyttl { font: 600 10.5px/1 var(--font); letter-spacing: .1em; text-transform: uppercase; color: var(--pz-ink3); margin: 6px 0 4px 8px; }
@@ -626,8 +644,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
 .pz__thumb-head { --pic: var(--pic-head); background-position: right center !important; }
 .pz__thumb-card { --pic: var(--pic-card); background-position: right bottom !important; }
 .pz__thumb-dot { position: absolute; right: 6px; bottom: 6px; width: 10px; height: 10px; border-radius: 50%; background: var(--c); box-shadow: 0 0 0 2px rgba(255,255,255,.9); }
-.pz__courses, .pz__hcontrols { gap: 20px; }
-.pz__hfor { font: 600 13px/1.2 var(--font); color: var(--pz-ink); }
+.pz__courses { gap: 20px; }
 .pz__swatches { display: flex; flex-wrap: wrap; justify-content: center; gap: 14px; }
 .pz__swwrap { position: relative; width: 52px; }
 .pz__sw { display: flex; flex-direction: column; align-items: center; gap: 8px; border: 0; background: transparent; cursor: pointer; padding: 0; width: 52px; font: 500 11.5px/1.2 var(--font); color: var(--pz-ink3); transition: color .2s ease; }
@@ -674,7 +691,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
 .pz__note { flex: 1; text-align: center; font: 400 12px/1.3 var(--font); color: var(--pz-ink3); }
 .pz__next { min-width: 120px; height: 42px; padding: 0 22px; border: 0; border-radius: 21px; background: var(--A-btn); color: #fff; cursor: pointer; font: 600 14px/1 var(--font); transition: background .3s ease; animation: omRise .4s var(--ease) both; }
 /* a still render (a swatch, a tab, the picker) redraws without the entry; a photo render fades the photo in alone */
-.pz.is-still .pz__head, .pz.is-still .pz__colour, .pz.is-still .pz__ready, .pz.is-still .pz__courses, .pz.is-still .pz__hcontrols, .pz.is-still .pz__next, .pz.is-still .pz__hcard, .pz.is-still .pz__badge, .pz.is-still .pz__pic--sharp, .pz__bar2.is-kept { animation: none; }
+.pz.is-still .pz__head, .pz.is-still .pz__colour, .pz.is-still .pz__ready, .pz.is-still .pz__courses, .pz.is-still .pz__next, .pz.is-still .pz__badge, .pz.is-still .pz__pic--sharp, .pz__bar2.is-kept { animation: none; }
 .pz.is-still.is-photo .pz__pic--sharp { animation: omFade .35s ease both; }
 .pz__done { align-self: center; width: 100%; max-width: 400px; padding: 80px 0 40px; display: flex; flex-direction: column; align-items: center; text-align: center; animation: omRise .4s var(--ease) both; }
 .pz__donemark { width: 56px; height: 56px; border-radius: 28px; background: var(--A-btn); display: flex; align-items: center; justify-content: center; }
@@ -689,7 +706,9 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
   .overlay .page--fr:has(.pz) { padding: 12px 14px 0; }
   .pz__name { display: none; }
   .pz__h1 { font-size: 20px; }
+  .pz__pvbox { flex: none; min-height: 0; }
   .pz__pvwrap { flex: none; height: min(430px, 44vw); min-height: 0; }
+  .pz__lookbar { position: static; align-self: center; transform: none; margin-top: 10px; box-shadow: none; animation: none; }
   .pz__pk { left: 50%; top: 160px; }
   .pz__pk--course { left: 15px; top: 160px; }
 }

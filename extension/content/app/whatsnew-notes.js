@@ -25,6 +25,13 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.98.29', date: '2026-09-27', notes: [
+      { kind: 'improved', title: 'One header, every page', body: 'Pick one header photo in step one; every page wears it.', icon: P.layers },
+      { kind: 'improved', title: 'Clearer photo hints', body: 'A slower, labelled cursor shows what takes a photo.', icon: P.steps },
+      { kind: 'new', title: 'Upload your own photo', body: 'Upload leads the bar, or drop a picture on the preview.', icon: P.pic },
+      { kind: 'improved', title: 'Look bar moved', body: 'Light, Dark and System float at the foot of the preview.', icon: P.toggle },
+      { kind: 'improved', title: 'Sample preview', body: 'The preview shows made-up courses, not yours.', icon: P.eye },
+    ] },
     { version: '2.98.28', date: '2026-09-27', notes: [
       { kind: 'new', title: 'Points per question', body: 'A quiz question shows the points it is worth.', icon: P.check },
       { kind: 'improved', title: 'Notifications drop in', body: 'Messages float down from the top as a pill.', icon: P.pin },

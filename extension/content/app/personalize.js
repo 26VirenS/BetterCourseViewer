@@ -4,8 +4,10 @@
  * Appearance (?bcv=personalize), ending in Save.
  *
  * The rules it keeps (the mockup's developer notes):
- *   · Appearance is chosen first — Light, Dark or System, the control at the top — because every
- *     preview after it (how the colour reads, the veils on the photos) depends on it.
+ *   · Appearance is always at hand — Light, Dark or System, a bar floating at the foot of the
+ *     preview — because every preview (how the colour reads, the veils on the photos) depends on it.
+ *   · Two steps: the colour and the photos (the sidebar, each counter, and one header that every
+ *     page wears), then the courses' colours. The preview is made-up data, not the student's.
  *   · One accent. Regular is not a colour: each sidebar glyph keeps its own hue and the accent is
  *     the interface's blue. Any other theme is one accent, and everything else is derived from it
  *     at draw time (lib/theme.js): the words in it stepped towards black or white until they read
@@ -68,7 +70,11 @@
   const LOOKS = [['light', 'Light'], ['dark', 'Dark'], ['system', 'System']];
   const LOOK_OF = { off: 'light', on: 'dark', system: 'system' };
   const DARK_OF = { light: 'off', dark: 'on', system: 'system' };
-  const STEPS = ['Colour', 'Course colours', 'Page headers'];
+  const STEPS = ['Colour', 'Course colours'];
+  // the preview's courses on the first screen: made up, like its numbers (the second screen shows the real ones, as it colours them)
+  const SAMPLE = [['s1', 'Biology 101', '#009688'], ['s2', 'World History', '#e08a00'], ['s3', 'Calculus I', '#1976d2'], ['s4', 'Chemistry', '#8e44ad'], ['s5', 'English Lit', '#e91e63']].map(([id, name, color]) => ({ id, name, color }));
+  // one header photo, worn by every page's header (lib/theme.js HEADER_SLOTS): read from the Dashboard's, written to them all
+  const HEAD = 'head:dashboard';
 
   let st = null; // the draft
   let ui = null; // { root, top, stage, foot, host }
@@ -78,14 +84,17 @@
   /** The accent in force: the interface's blue for Regular, the preset's, or the custom one from its controls. */
   const accent = () => (st.theme.name === 'Regular' ? REGULAR : st.theme.name === 'Custom' ? T().customHex(st.theme.h, st.theme.s, st.theme.depth) : (T().PRESETS.find(([, n]) => n === st.theme.name) || [REGULAR])[0]);
   const ground = () => (dark() ? '#1c1c1e' : '#ffffff');
-  const photoAt = (key) => (key === 'side' ? st.images.side : key.startsWith('head:') ? st.images.headers[key.slice(5)] : st.images.cards[key]) || null;
-  const toneAt = (key) => st.images.tones?.[key] || null;
+  const photoAt = (key) => (key === 'side' ? st.images.side : key === 'head' ? st.images.headers.dashboard : key.startsWith('head:') ? st.images.headers[key.slice(5)] : st.images.cards[key]) || null;
+  const toneAt = (key) => st.images.tones?.[key === 'head' ? HEAD : key] || null;
   const setPhoto = (key, value, tone) => {
     st.images.tones = st.images.tones || {};
+    if (key === 'head') { for (const [k] of T().HEADER_SLOTS) setPhoto(`head:${k}`, value, tone); return; } // (the one header: every page's, the same picture — kept once, as one asset)
     if (key === 'side') st.images.side = value; else if (key.startsWith('head:')) { if (value) st.images.headers[key.slice(5)] = value; else delete st.images.headers[key.slice(5)]; } else if (value) st.images.cards[key] = value; else delete st.images.cards[key];
     if (value && tone) st.images.tones[key] = tone; else delete st.images.tones[key];
   };
   const courseColour = (c) => st.courseColors[c.id] || c.color || '#8e8e93';
+  /** The courses the preview draws: made up on the first screen, the real ones on the second (it colours them). */
+  const pvCourses = () => (st.step === 1 && st.courses.length ? st.courses : SAMPLE);
   const selCourse = () => st.courses.find((c) => c.id === st.selCourse) || st.courses[0] || null;
 
   // ---- open / close ----------------------------------------------------------------------------
@@ -105,7 +114,7 @@
     // the picker's controls: the saved ones, else the saved colour read back, else the mockup's own start (a blue at depth 40)
     const ctl = th.h != null ? { h: Number(th.h) || 0, s: Number(th.s) || 0, depth: Number(th.depth) || 0 } : th.accent ? T().controlsOf(th.accent) : { h: 211, s: 1, depth: 40 };
     st = {
-      app, onDone, standalone, step: 0, done: false, target: null, page: 'dashboard', saving: false,
+      app, onDone, standalone, step: 0, done: false, target: null, saving: false,
       look: LOOK_OF[settings.appearance?.darkMode] || 'system', settings,
       theme: { name, ...ctl }, images: unpack(images || T().emptyImages()),
       courses: [], selCourse: null, courseColors: {}, originalColors: {},
@@ -159,7 +168,7 @@
     const vars = {
       '--A': A, '--A-read': readA, '--A-btn': btn, '--A-tint': t.tint(A, d), '--A-ring': `0 0 0 2px var(--pz-bg), 0 0 0 4px ${A}`,
       '--A-read-light': t.readableOn(A, '#ffffff'), '--A-read-dark': t.readableOn(A, '#1c1c1e'), '--pk-bg': d ? '#1c1c1e' : '#ffffff',
-      '--veil-side': t.veilBase(A, toneAt('side'), 0.66), '--veil-head': t.veilBase(A, toneAt(`head:${st.page}`), 0.6),
+      '--veil-side': t.veilBase(A, toneAt('side'), 0.66), '--veil-head': t.veilBase(A, toneAt('head'), 0.6),
       '--hover-ring': t.mix(A, d ? '#000000' : '#ffffff', 0.2),
     };
     shades.forEach((c, i) => { vars[`--s${i}`] = c; vars[`--s${i}-lit`] = t.mix(c, '#ffffff', 0.45); });
@@ -171,7 +180,7 @@
     ui.host.setAttribute('data-theme', d ? 'dark' : 'light');
     ui.root.querySelectorAll('[data-veil-card]').forEach((el) => el.style.setProperty('--veil-card', t.veilBase(A, toneAt(el.dataset.veilCard), 0.4)));
     ui.root.querySelectorAll('[data-veil-head]').forEach((el) => el.style.setProperty('--veil-head', t.veilBase(A, toneAt(`head:${el.dataset.veilHead}`), 0.6)));
-    for (const c of st.courses) { ui.root.style.setProperty(`--course-${c.id}`, courseColour(c)); ui.root.style.setProperty(`--course-${c.id}-read`, t.readableOn(courseColour(c), ground())); }
+    for (const c of [...st.courses, ...SAMPLE]) { ui.root.style.setProperty(`--course-${c.id}`, courseColour(c)); ui.root.style.setProperty(`--course-${c.id}-read`, t.readableOn(courseColour(c), ground())); }
   }
 
   // ---- render -----------------------------------------------------------------------------------
@@ -192,27 +201,32 @@
     measure();
     requestAnimationFrame(() => measure());
   }
-  /** The row at the top: the brand, the three bars, the appearance switch. */
+  /** The row at the top: the brand and the steps' bars. */
   function top() {
     return h('div', { class: 'pz__top' }, [
       h('span', { class: 'pz__brand' }, [h('i', { class: 'pz__tile', html: '<svg viewBox="0 0 120 120" width="18" height="18" aria-hidden="true"><path d="M28 30 H69 A30 30 0 0 1 69 90 H28" fill="none" stroke="#fff" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/><path d="M35 42 H69 A18 18 0 0 1 69 78 H35" fill="none" stroke="rgba(255,255,255,.7)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/><path d="M42 54 H69 A6 6 0 0 1 69 66 H42" fill="none" stroke="rgba(255,255,255,.45)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/></svg>' }), h('span', { class: 'pz__name', text: 'Simpl Courses' })]),
-      st.done ? h('span', { class: 'pz__bars' }) : h('span', { class: 'pz__bars', id: 'pzBars' }, STEPS.slice(0, phone() ? 2 : 3).map((label, i) => h('button', { type: 'button', class: `pz__bar ${i === st.step ? 'is-on' : ''} ${i <= st.step ? 'is-done' : ''}`, title: label, 'aria-label': label, dataset: { bar: String(i) }, onclick: () => { st.step = i; st.target = null; closePicker(true); render('full'); } }))),
-      h('span', { class: 'pz__seg', id: 'pzLook', role: 'radiogroup', 'aria-label': 'Appearance' }, LOOKS.map(([key, label]) => h('button', { type: 'button', class: `pz__segbtn ${st.look === key ? 'is-on' : ''}`, dataset: { look: key }, role: 'radio', 'aria-checked': st.look === key ? 'true' : 'false', title: `${label} appearance`, onclick: () => { st.look = key; render(); } }, [
-        h('i', { class: `pz__lookpv pz__lookpv--${key}` }, [h('b')]),
-        h('span', { text: label }),
-      ]))),
+      st.done ? h('span', { class: 'pz__bars' }) : h('span', { class: 'pz__bars', id: 'pzBars' }, STEPS.map((label, i) => h('button', { type: 'button', class: `pz__bar ${i === st.step ? 'is-on' : ''} ${i <= st.step ? 'is-done' : ''}`, title: label, 'aria-label': label, dataset: { bar: String(i) }, onclick: () => { st.step = i; st.target = null; closePicker(true); render('full'); } }))),
     ]);
   }
+  /** Light, Dark, System: a bar floating at the foot of the preview (under it on a phone), turning the whole flow over as it is pressed.
+   *  It gives its place to the photo bar while that is open. */
+  function lookBar() {
+    return h('span', { class: 'pz__seg pz__lookbar', id: 'pzLook', role: 'radiogroup', 'aria-label': 'Appearance' }, LOOKS.map(([key, label]) => h('button', { type: 'button', class: `pz__segbtn ${st.look === key ? 'is-on' : ''}`, dataset: { look: key }, role: 'radio', 'aria-checked': st.look === key ? 'true' : 'false', title: `${label} appearance`, onclick: () => { st.look = key; render(); } }, [
+      h('i', { class: `pz__lookpv pz__lookpv--${key}` }, [h('b')]),
+      h('span', { text: label }),
+    ])));
+  }
   function stage() {
-    const titles = [['Click any part of the preview to personalize', ''], ['Colour your courses', 'Pick a course, then its colour.'], ['Page headers', 'Click a header, then pick its photo.']];
+    const titles = [['Click any part of the preview to personalize', phone() ? '' : 'The sidebar, a counter or the header takes a photo: one of ours, or upload your own.'], ['Colour your courses', 'Pick a course, then its colour.']];
     const [t1, t2] = titles[st.step];
-    const wrap = h('div', { class: 'pz__pvwrap', id: 'pzPv', dataset: { pv: '1' } }, [st.step === 2 ? headGrid() : preview(), st.step === 0 && st.target ? photoBar() : null]);
+    const photoOpen = st.step === 0 && !!st.target;
+    const wrap = h('div', { class: 'pz__pvwrap', id: 'pzPv', dataset: { pv: '1' } }, [preview(), photoOpen ? photoBar() : null]);
     // the preview and its controls in a column that takes the room the window has; on the first
     // screen the ready-made themes down the right of it, top to bottom (a phone has no list)
     return h('div', { class: `pz__stage pz__stage--${st.step}` }, [
       h('div', { class: 'pz__head' }, [h('h1', { class: 'pz__h1', text: t1 }), t2 ? h('p', { class: 'pz__lead', text: t2 }) : null]),
       h('div', { class: 'pz__layout' }, [
-        h('div', { class: 'pz__left' }, [wrap, h('div', { class: 'pz__controls' }, [st.step === 0 ? colourControls() : st.step === 1 ? courseControls() : headerControls()])]),
+        h('div', { class: 'pz__left' }, [h('div', { class: 'pz__pvbox' }, [wrap, photoOpen ? null : lookBar()]), h('div', { class: 'pz__controls' }, [st.step === 0 ? colourControls() : courseControls()])]),
         st.step === 0 ? readyList() : null,
       ]),
     ]);
@@ -226,21 +240,28 @@
     if (!r.width || !r.height) return;
     const s = Math.min(1.3, r.width / 980, r.height / 430); // (a wide, tall window gets it larger than life)
     st.pvScale = s;
+    const top = Math.max(0, Math.round((r.height - 430 * s) / 2)); // (centred in the room it has)
     pv.style.transform = `translateX(-50%) scale(${s})`;
-    pv.style.top = `${Math.max(0, Math.round((r.height - 430 * s) / 2))}px`; // (centred in the room it has)
+    pv.style.top = `${top}px`;
+    // the bars at its foot (the look, the photos) ride on the preview's bottom edge, wherever the centring leaves it
+    wrap.parentElement?.style.setProperty('--pv-gap', `${Math.max(0, Math.round(r.height - top - 430 * s))}px`);
   }
 
   // ---- the cursor's show: what can be pressed ----------------------------------------------------
-  const CURSOR = '<svg viewBox="0 0 24 24" width="26" height="26"><path d="M5 3l14 9-6 1.5 3.5 6.5-2.5 1.5-3.5-6.5L6 19z" fill="#fff" stroke="#1c1c1e" stroke-width="1.4" stroke-linejoin="round"/></svg>';
-  /** Once, as the first screen opens: a cursor comes to the sidebar and presses it, then two of the
-   *  counters, each lighting up as it is pressed, then leaves — the parts of the preview that open the
-   *  photo bar, shown rather than told. Any press or key of the student's own ends it at once. The
-   *  cursor lives outside the frame, so a redraw underneath does not take it. */
+  const CURSOR = '<svg viewBox="0 0 24 24" width="30" height="30"><path d="M5 3l14 9-6 1.5 3.5 6.5-2.5 1.5-3.5-6.5L6 19z" fill="#fff" stroke="#1c1c1e" stroke-width="1.4" stroke-linejoin="round"/></svg>';
+  /** Once, as the first screen opens: a cursor with a label comes to the sidebar, then a counter,
+   *  then the header, and presses each — a ripple where it clicks, the part outlined in the colour
+   *  and its photo badge lit while the label says what the press does — then leaves. The parts of
+   *  the preview that take a photo, shown rather than told, slowly enough to follow. Any press or key
+   *  of the student's own ends it at once. The cursor lives outside the frame, so a redraw underneath
+   *  does not take it. */
   function peekShow() {
-    if (!ui || !st || st.step !== 0 || st.done || ui.peek) return;
+    if (!ui || !st || st.step !== 0 || st.done || ui.peek || phone()) return;
     if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
-    const cursor = h('span', { class: 'pz__cursor', 'aria-hidden': 'true', dataset: { demo: '1' }, html: CURSOR });
-    (ui.page.parentElement || ui.page).append(cursor);
+    const label = h('span', { class: 'pz__cursorlabel' });
+    const cursor = h('span', { class: 'pz__cursor', 'aria-hidden': 'true', dataset: { demo: '1' } }, [h('span', { class: 'pz__cursorpt', html: CURSOR }), label]);
+    const layer = ui.page.parentElement || ui.page;
+    layer.append(cursor);
     const u = ui;
     const timers = [];
     const stop = () => {
@@ -248,6 +269,7 @@
       u.peek = null;
       timers.forEach(clearTimeout);
       u.root.querySelectorAll('.is-peek').forEach((e) => e.classList.remove('is-peek'));
+      layer.querySelectorAll('.pz__ripple').forEach((e) => e.remove());
       cursor.remove();
       for (const ev of ['pointerdown', 'keydown', 'click']) u.host.removeEventListener(ev, stop, true);
     };
@@ -255,20 +277,34 @@
     for (const ev of ['pointerdown', 'keydown', 'click']) u.host.addEventListener(ev, stop, true);
     const q = (ms, fn) => timers.push(setTimeout(() => { if (u.peek) fn(); }, ms));
     // the things pressed, looked up as each is reached (a redraw underneath swaps the elements)
-    const spot = (i) => { const el = i === 0 ? u.root.querySelector('.pz__side') : u.root.querySelectorAll('.pz__card')[i === 1 ? 0 : 2]; if (!el) return null; const r = el.getBoundingClientRect(); return { el, x: r.left + r.width * 0.5, y: r.top + r.height * 0.55 }; };
+    const STOPS = [['.pz__side', 'Click the sidebar', 0.5, 0.62], ['.pz__card', 'Click a counter', 0.5, 0.55], ['.pz__phead', 'Click the header', 0.3, 0.55]];
+    const spot = (i) => { const [sel, , fx, fy] = STOPS[i]; const el = u.root.querySelector(sel); if (!el) return null; const r = el.getBoundingClientRect(); return { el, x: r.left + r.width * fx, y: r.top + r.height * fy }; };
     const moveTo = (p, ms) => { if (!p) return; cursor.style.setProperty('--cms', `${ms}ms`); cursor.style.setProperty('--cx', `${Math.round(p.x - 5)}px`); cursor.style.setProperty('--cy', `${Math.round(p.y - 3)}px`); };
-    const press = (p) => { if (!p) return; cursor.classList.add('is-press'); p.el.classList.add('is-peek'); q(200, () => cursor.classList.remove('is-press')); q(800, () => p.el.classList.remove('is-peek')); };
+    const say = (text) => { label.textContent = text; label.classList.toggle('is-on', !!text); };
+    const press = (p) => {
+      if (!p) return;
+      cursor.classList.add('is-press');
+      p.el.classList.add('is-peek');
+      const ring = h('span', { class: 'pz__ripple', 'aria-hidden': 'true', style: { left: `${Math.round(p.x)}px`, top: `${Math.round(p.y)}px`, '--A': u.root.style.getPropertyValue('--A') } }); // (outside the flow's root: the colour handed over)
+      layer.append(ring);
+      say('It takes a photo');
+      q(260, () => cursor.classList.remove('is-press'));
+      q(900, () => ring.remove());
+      q(1500, () => p.el.classList.remove('is-peek'));
+    };
     const first = spot(0);
     if (!first) { stop(); return; }
-    moveTo({ x: first.x + 260, y: first.y + 220 }, 0);
-    q(350, () => { cursor.style.opacity = '1'; moveTo(spot(0), 700); });
-    q(1150, () => press(spot(0)));
-    q(1950, () => moveTo(spot(1), 650));
-    q(2650, () => press(spot(1)));
-    q(3450, () => moveTo(spot(2), 650));
-    q(4150, () => press(spot(2)));
-    q(4950, () => { const p = spot(2); cursor.style.opacity = '0'; if (p) moveTo({ x: p.x + 140, y: p.y + 180 }, 600); });
-    q(5700, stop);
+    moveTo({ x: first.x + 300, y: first.y + 240 }, 0);
+    // each stop: come to it saying what to do (1s), press (the part lit 1.5s), then on to the next
+    let t = 400;
+    q(t, () => { cursor.style.opacity = '1'; });
+    STOPS.forEach((s, i) => {
+      q(t, () => { say(s[1]); moveTo(spot(i), 1000); });
+      q(t + 1200, () => press(spot(i)));
+      t += 2900;
+    });
+    q(t, () => { const p = spot(STOPS.length - 1); say(''); cursor.style.opacity = '0'; if (p) moveTo({ x: p.x + 160, y: p.y + 200 }, 800); });
+    q(t + 900, stop);
   }
 
   // ---- the Dashboard preview ---------------------------------------------------------------------
@@ -300,24 +336,54 @@
       h('i', { class: `pz__pic pz__pic--veil pz__pic--veil-${veilVar}` }),
     ] : [h('i', { class: 'pz__pic pz__pic--paper' })]; // (its paper alone until its ink lands — a moment — never the raw photo)
   };
-  const badge = (target, has) => (st.step === 0 && !phone() ? h('span', { class: `pz__badge ${has ? 'has-pic' : ''} ${st.target === target ? 'is-on' : ''}` }, [svg(IC.camera, { size: 12, width: 2.2 }), h('span', { text: has ? 'Change' : 'Photo' })]) : null);
+  const badge = (target, has) => (st.step === 0 && !phone() ? h('span', { class: `pz__badge ${has ? 'has-pic' : ''} ${st.target === target ? 'is-on' : ''}` }, [svg(IC.camera, { size: 12, width: 2.2 }), h('span', { text: has ? 'Change' : 'Add photo' })]) : null);
+  /** A picture dragged from the desktop onto a part of the preview goes on it: the parts that take one are outlined while it is carried over them. */
+  function armDrop(pv) {
+    if (st.step !== 0 || phone()) return;
+    const files = (e) => [...(e.dataTransfer?.items || [])].some((i) => i.kind === 'file');
+    const over = (e) => {
+      if (!files(e)) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'copy';
+      pv.classList.add('is-dropping');
+      const t = e.target.closest?.('[data-target]');
+      pv.querySelectorAll('.is-drop').forEach((x) => { if (x !== t) x.classList.remove('is-drop'); });
+      t?.classList.add('is-drop');
+    };
+    const leave = (e) => { if (!pv.contains(e.relatedTarget)) { pv.classList.remove('is-dropping'); pv.querySelectorAll('.is-drop').forEach((x) => x.classList.remove('is-drop')); } };
+    pv.addEventListener('dragenter', over);
+    pv.addEventListener('dragover', over);
+    pv.addEventListener('dragleave', leave);
+    pv.addEventListener('drop', (e) => {
+      pv.classList.remove('is-dropping');
+      const t = e.target.closest?.('[data-target]');
+      const f = [...(e.dataTransfer?.files || [])].find((x) => /^image\//.test(x.type) || /\.(heic|heif)$/i.test(x.name));
+      if (!files(e)) return;
+      e.preventDefault();
+      if (!t || !f) return;
+      st.target = t.dataset.target;
+      readFile(f, st.target);
+    });
+  }
   function preview() {
     const sidePic = st.images.side;
+    const headPic = photoAt('head');
     const pickable = st.step === 0 && !phone();
-    const side = h('div', { class: `pz__side ${sidePic ? 'has-pic' : ''} ${st.target === 'side' ? 'is-target' : ''} ${pickable ? 'is-pickable' : ''}`, dataset: { target: 'side' }, onclick: () => { if (pickable) { st.target = 'side'; render(); } } }, [
+    const pick = (target) => () => { if (pickable) { st.target = target; render(); } };
+    const side = h('div', { class: `pz__side ${sidePic ? 'has-pic' : ''} ${st.target === 'side' ? 'is-target' : ''} ${pickable ? 'is-pickable' : ''}`, dataset: { target: 'side' }, onclick: pick('side') }, [
       ...layers(sidePic, 'side'),
       h('div', { class: 'pz__sidein' }, [
         h('span', { class: 'pz__pvbrand' }, [h('i', { class: 'pz__pvtile' }), h('b', { text: 'Simpl' })]),
         ...NAV.map(([label, d], i) => h('span', { class: `pz__row ${i === 0 ? 'is-on' : ''}`, style: { '--row': `var(--s${i})`, '--row-lit': `var(--s${i}-lit)` } }, [svg(d, { size: 15, cls: 'pz__rowic' }), h('span', { text: label })])),
         h('span', { class: 'pz__courselabel', text: 'COURSES' }),
-        ...st.courses.slice(0, 5).map((c) => h('span', { class: `pz__crow ${st.step === 1 && st.selCourse === c.id ? 'is-on' : ''}`, style: { '--c': `var(--course-${c.id})` } }, [h('i', { class: 'pz__cdot' }), h('span', { text: c.name })])),
+        ...pvCourses().slice(0, 5).map((c) => h('span', { class: `pz__crow ${st.step === 1 && st.selCourse === c.id ? 'is-on' : ''}`, style: { '--c': `var(--course-${c.id})` } }, [h('i', { class: 'pz__cdot' }), h('span', { text: c.name })])),
       ]),
       badge('side', !!sidePic),
     ]);
     const today = new Date();
     const cards = CARDS.map(([slot, label, n, note, d, colour], i) => {
       const pic = st.images.cards[slot] || null;
-      return h('div', { class: `pz__card ${pic ? 'has-pic' : ''} ${st.target === slot ? 'is-target' : ''} ${pickable ? 'is-pickable' : ''}`, dataset: { target: slot, veilCard: slot }, style: { '--ic': st.theme.name === 'Regular' ? colour : `var(--s${i % 5})` }, onclick: () => { if (pickable) { st.target = slot; render(); } } }, [
+      return h('div', { class: `pz__card ${pic ? 'has-pic' : ''} ${st.target === slot ? 'is-target' : ''} ${pickable ? 'is-pickable' : ''}`, dataset: { target: slot, veilCard: slot }, style: { '--ic': st.theme.name === 'Regular' ? colour : `var(--s${i % 5})` }, onclick: pick(slot) }, [
         ...layers(pic, 'card'),
         h('div', { class: 'pz__cardin' }, [
           h('span', { class: 'pz__chead' }, [svg(d, { size: 11, width: 2.2, cls: 'pz__cic' }), h('span', { class: 'pz__clabel', text: label }), h('span', { class: 'pz__cn', text: n })]),
@@ -326,31 +392,30 @@
         badge(slot, !!pic),
       ]);
     });
-    const rows = [['Dis01', 0], ['Lab report draft', 1], ['Journal #2', 2]].map(([t, i]) => { const c = st.courses[i] || st.courses[0]; return h('span', { class: 'pz__lrow' }, [h('i', { class: 'pz__ring' }), h('span', { class: 'pz__lt', text: t }), c ? h('span', { class: 'pz__chip', style: { '--c': `var(--course-${c.id})`, '--c-read': `var(--course-${c.id}-read)` }, text: c.name }) : null]); });
-    return h('div', { class: 'pz__pv', style: { transform: `translateX(-50%) scale(${st.pvScale || 1})` } }, [
+    const cs = pvCourses();
+    const rows = [['Lab report draft', 0], ['Essay outline', 1], ['Problem set 4', 2]].map(([t, i]) => { const c = cs[i] || cs[0]; return h('span', { class: 'pz__lrow' }, [h('i', { class: 'pz__ring' }), h('span', { class: 'pz__lt', text: t }), c ? h('span', { class: 'pz__chip', style: { '--c': `var(--course-${c.id})`, '--c-read': `var(--course-${c.id}-read)` }, text: c.name }) : null]); });
+    // the header: one photo for every page's, pressed here like the sidebar and the counters
+    const head = h('div', { class: `pz__phead ${headPic ? 'has-pic' : ''} ${st.target === 'head' ? 'is-target' : ''} ${pickable ? 'is-pickable' : ''}`, dataset: { target: 'head', veilHead: 'dashboard' }, onclick: pick('head') }, [
+      ...layers(headPic, 'head'),
+      h('div', { class: 'pz__pheadin' }, [h('span', { class: 'pz__date', text: today.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' }) }), h('span', { class: 'pz__title', text: 'Dashboard' })]),
+      badge('head', !!headPic),
+    ]);
+    const pv = h('div', { class: 'pz__pv', style: { transform: `translateX(-50%) scale(${st.pvScale || 1})` } }, [
       side,
       h('div', { class: 'pz__main' }, [
-        h('div', {}, [h('span', { class: 'pz__date', text: today.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' }) }), h('span', { class: 'pz__title', text: 'Dashboard' })]),
+        head,
         h('div', { class: 'pz__cards' }, cards),
         h('div', { class: 'pz__list' }, rows),
       ]),
     ]);
-  }
-  /** Step 3: every page's header as a card, its photo on it, pressed to choose it. */
-  function headGrid() {
-    return h('div', { class: 'pz__heads' }, T().HEADER_SLOTS.map(([key, title], i) => {
-      const pic = st.images.headers[key] || null;
-      return h('button', { type: 'button', class: `pz__hcard ${pic ? 'has-pic' : ''} ${st.page === key ? 'is-on' : ''}`, dataset: { page: key, veilHead: key }, style: { animationDelay: `${Math.min(i * 40, 240)}ms` }, onclick: () => { st.page = key; render(); } }, [
-        ...layers(pic, 'head'),
-        h('span', { class: 'pz__hin' }, [h('span', { class: 'pz__htitle', text: title }), h('span', { class: 'pz__hchip' }, [svg(IC.camera, { size: 13, width: 2.2 }), h('span', { text: pic ? 'Change' : 'Add photo' })])]),
-      ]);
-    }));
+    armDrop(pv);
+    return pv;
   }
 
-  // ---- photos: the bar under the preview (step 1) and the choices (step 3) ----------------------
+  // ---- photos: the bar under the preview ---------------------------------------------------------
   const readFile = async (file, key) => {
     try {
-      const { data, tone } = await T().readImage(file, key === 'side' ? 1280 : key.startsWith('head:') ? 1400 : 900);
+      const { data, tone } = await T().readImage(file, key === 'side' ? 1280 : key.startsWith('head') ? 1400 : 900);
       setPhoto(key, data, tone);
       render('photo');
     } catch (e) { BCV.ui?.toast?.(`That picture could not be read${/heic|heif/i.test(file?.name || file?.type || '') ? ' — HEIC photos need converting to JPEG first' : ''}.`, { error: true, ms: 4200 }); } // (said, rather than nothing happening)
@@ -361,30 +426,23 @@
     const cur = photoAt(key);
     const choice = (name, bg, on, pick, raw = null) => { const ink = raw ? inkOf(raw) : null; return h('button', { type: 'button', class: `pz__choice ${on ? 'is-on' : ''}`, title: name, 'aria-label': name, dataset: { photo: name }, onclick: pick }, [h('i', { class: `pz__choicepic ${name === 'None' ? 'pz__choicepic--none' : ''} ${ink ? 'pz__choicepic--inked' : ''}`, style: ink ? { '--ink': T().picCss(ink.ink) } : bg ? { background: bg } : null }), h('span', { class: 'pz__choicename', text: name })]); };
       const isPreset = (p) => !!cur && (cur === p[1] || (T().sceneNameOf(cur) || '').split('#')[0] === p[0]); // (any variation of the scene counts as it)
+    // your own photo first, and said in words: the drawn scenes after it (a picture can also be dragged onto the preview)
     return [
+      h('label', { class: `pz__choice pz__choice--up ${cur && !PRESET_PHOTOS.some(isPreset) ? 'is-on' : ''}`, title: 'Upload' }, [h('i', { class: 'pz__choicepic pz__choicepic--up' }, svg(IC.up, { size: 15, width: 2.1 })), h('span', { class: 'pz__choicename', text: 'Upload photo' }), h('input', { type: 'file', accept: 'image/*', 'aria-label': 'Upload a photo', onchange: (e) => { const f = e.target.files?.[0]; if (f) readFile(f, key); e.target.value = ''; } })]),
       choice('None', null, !cur, () => { setPhoto(key, null); render('photo'); }),
       ...PRESET_PHOTOS.map((p) => choice(p[0], T().picCss(p[1]), isPreset(p), () => { setPhoto(key, p[1], p[2]); render('photo'); }, p[1])),
-      h('label', { class: `pz__choice pz__choice--up ${cur && !PRESET_PHOTOS.some(isPreset) ? 'is-on' : ''}`, title: 'Upload' }, [h('i', { class: 'pz__choicepic pz__choicepic--up' }, svg(IC.up, { size: 15, width: 2.1 })), h('span', { class: 'pz__choicename', text: 'Upload' }), h('input', { type: 'file', accept: 'image/*', 'aria-label': 'Upload a photo', onchange: (e) => { const f = e.target.files?.[0]; if (f) readFile(f, key); e.target.value = ''; } })]),
       onEvery ? h('button', { type: 'button', class: 'pz__textbtn', id: 'pzEvery', disabled: !cur || null, text: onEvery.label, onclick: () => { if (cur) { onEvery.go(cur); render('photo'); } } }) : null,
     ];
   }
   function photoBar() {
     const key = st.target;
-    const isCard = key !== 'side';
-    const title = key === 'side' ? 'Sidebar' : (CARDS.find(([s]) => s === key) || [])[1] || '';
+    const isCard = key !== 'side' && key !== 'head';
+    const [title, sub] = key === 'side' ? ['Sidebar', ''] : key === 'head' ? ['Page header', 'Every page'] : [(CARDS.find(([s]) => s === key) || [])[1] || '', ''];
     return h('div', { class: 'pz__bar2', id: 'pzPhotoBar', dataset: { for: key } }, [
-      h('span', { class: 'pz__bartitle', text: title }),
+      h('span', { class: 'pz__bartitles' }, [h('span', { class: 'pz__bartitle', text: title }), sub ? h('span', { class: 'pz__barsub', text: sub }) : null]),
       h('i', { class: 'pz__vr' }),
       ...photoChoices(key, isCard ? { onEvery: { label: 'All cards', go: (cur) => { CARDS.forEach(([slot], i) => setPhoto(slot, variantOf(cur, i + 1), toneAt(key))); } } } : {}),
       h('button', { type: 'button', class: 'pz__barok', title: 'Done', 'aria-label': 'Done', onclick: () => { st.target = null; render(); } }, svg(IC.check, { size: 13, width: 2.8 })),
-    ]);
-  }
-  function headerControls() {
-    const title = (T().HEADER_SLOTS.find(([k]) => k === st.page) || [])[1] || '';
-    return h('div', { class: 'pz__hcontrols' }, [
-      h('span', { class: 'pz__hfor', text: `Photo for ${title}` }),
-      h('div', { class: 'pz__choices' }, photoChoices(`head:${st.page}`, {})),
-      h('button', { type: 'button', class: 'pz__textbtn', id: 'pzEvery', disabled: !photoAt(`head:${st.page}`) || null, text: 'Use on every page', onclick: () => { const cur = photoAt(`head:${st.page}`); if (!cur) return; T().HEADER_SLOTS.forEach(([k], i) => setPhoto(`head:${k}`, variantOf(cur, i + 1), toneAt(`head:${st.page}`))); render('photo'); } }),
     ]);
   }
 
@@ -392,15 +450,15 @@
   /** The ready-made themes, a list down the right of the preview: Default and the four scenes, each a tile of its three scenes as they are placed, with the colour's dot. */
   function readyList() {
     const t = T();
-    // a ready-made theme: the sidebar wears its scene's first drawing, every counter and every header a variation of theirs — no two the same
+    // a ready-made theme: the sidebar wears its scene's first drawing, every counter a variation of theirs — no two the same — and the one header its own
     const picOf = (name, i = 0) => (name ? t.sceneUrl(name, i) : null);
-    const readyOn = (r) => st.theme.name === r.colour && (st.images.side || null) === picOf(r.side) && t.CARD_SLOTS.every((k, i) => (st.images.cards[k] || null) === picOf(r.cards, i + 1)) && t.HEADER_SLOTS.every(([k], i) => (st.images.headers[k] || null) === picOf(r.heads, i + 1));
+    const readyOn = (r) => st.theme.name === r.colour && (st.images.side || null) === picOf(r.side) && t.CARD_SLOTS.every((k, i) => (st.images.cards[k] || null) === picOf(r.cards, i + 1)) && t.HEADER_SLOTS.every(([k]) => (st.images.headers[k] || null) === picOf(r.heads, 1));
     const applyReady = (r) => {
       st.theme.name = r.colour; closePicker(true);
       const tone = (name) => (name ? sceneOf(name)[2] : null);
       setPhoto('side', picOf(r.side), tone(r.side));
       t.CARD_SLOTS.forEach((k, i) => setPhoto(k, picOf(r.cards, i + 1), tone(r.cards)));
-      t.HEADER_SLOTS.forEach(([k], i) => setPhoto(`head:${k}`, picOf(r.heads, i + 1), tone(r.heads)));
+      setPhoto('head', picOf(r.heads, 1), tone(r.heads));
       st.target = null;
       render('photo');
     };
@@ -569,17 +627,15 @@
 
   // ---- the foot, and Saved ----------------------------------------------------------------------
   function summary() {
-    const photoN = (st.images.side ? 1 : 0) + Object.values(st.images.cards).filter(Boolean).length;
+    const photoN = (st.images.side ? 1 : 0) + Object.values(st.images.cards).filter(Boolean).length + (photoAt('head') ? 1 : 0); // (the header counts once: one photo, every page)
     const changedN = Object.keys(st.courseColors).length;
-    const pageN = Object.values(st.images.headers).filter(Boolean).length;
     return [
       ['Colour', st.theme.name + (photoN ? ` · ${photoN} ${photoN === 1 ? 'photo' : 'photos'}` : '')],
       ['Course colours', changedN ? `${changedN} changed` : 'As they are'],
-      ['Page headers', pageN ? `${pageN} of ${T().HEADER_SLOTS.length}` : 'None'],
     ];
   }
   function foot() {
-    const last = st.step === 2 || (phone() && st.step === 1);
+    const last = st.step === STEPS.length - 1;
     return h('div', { class: 'pz__foot' }, [
       st.step > 0 ? h('button', { type: 'button', class: 'pz__back', id: 'pzBack', text: 'Back', onclick: () => { st.step -= 1; st.target = null; closePicker(true); render('full'); } }) : null,
       h('span', { class: 'pz__note', id: 'pzNote', text: summary()[st.step][1] }),
