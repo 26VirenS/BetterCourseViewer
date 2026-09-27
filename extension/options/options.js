@@ -831,6 +831,95 @@
     const text = `${DEV.encode(devNow)}\n${DEV.explain(devNow).join('\n')}\n\n${$('devLog').textContent}`;
     try { await navigator.clipboard.writeText(text); $('devMsg').textContent = 'Copied — paste it where it is wanted.'; } catch { $('devMsg').textContent = 'Could not copy; select the log and copy it by hand.'; }
   };
+  // ---- Developer: the panes — Simulate, Quiz, State, Storage, Tool tabs (the last one kept, per device) ----
+  const DEV_PANES = ['sim', 'quiz', 'state', 'storage', 'tool'];
+  const devSay = (id, text) => { const el = $(id); el.hidden = !text; el.textContent = text || ''; };
+  function devPane(name) {
+    const pane = DEV_PANES.includes(name) ? name : 'sim';
+    for (const b of document.querySelectorAll('#devTabs .devtab')) {
+      const on = b.dataset.pane === pane;
+      b.classList.toggle('is-on', on);
+      b.setAttribute('aria-selected', on ? 'true' : 'false');
+    }
+    for (const p of document.querySelectorAll('#dev .devpane')) p.hidden = p.dataset.pane !== pane;
+    try { localStorage.setItem('bcv:devPane', pane); } catch { /* the first pane next time */ }
+    const fill = { sim: devSimInit, quiz: devQuizPaint, state: devErrorsShow, storage: devStorage, tool: devShow }[pane];
+    Promise.resolve().then(fill).catch((e) => console.warn('[Simpl Courses developer]', e)); // (a pane that cannot fill here — the app's window has no background to ask — never keeps the section shut)
+  }
+  $('devTabs').addEventListener('click', (e) => { const b = e.target.closest('.devtab'); if (b) devPane(b.dataset.pane); });
+
+  // Simulate: an update from any version to this one, played again by the background (the flags an
+  // update leaves, every Canvas tab loaded again); the versions offered are the ones What's New has notes for
+  function devSimInit() {
+    const mine = api.runtime.getManifest?.()?.version || '';
+    const older = (Array.isArray(self.BCV_WHATS_NEW) ? self.BCV_WHATS_NEW : []).map((n) => n.version).filter((v) => v && v !== mine);
+    $('devFromList').replaceChildren(...older.map((v) => h('option', { value: v })));
+    if (!$('devFrom').value) $('devFrom').value = older[0] || '';
+  }
+  $('devSimRun').addEventListener('click', async () => {
+    devSay('devSimMsg', 'Simulating…');
+    $('devSimRun').disabled = true;
+    const r = await devAsk({ type: 'devSimUpdate', from: $('devFrom').value });
+    $('devSimRun').disabled = false;
+    if (!r?.ok) { devSay('devSimMsg', r?.message || 'The background is not answering.'); return; }
+    const tabs = r.reloaded ? `${r.reloaded} Canvas ${r.reloaded === 1 ? 'tab' : 'tabs'} loaded again` : 'no Canvas tab is open: the next one opened shows it';
+    devSay('devSimMsg', `Updated from ${r.from} to ${r.to}: ${tabs}${r.updatedPage ? ', and the updated page opened' : ''}.`);
+  });
+  $('devRuns').addEventListener('click', (e) => { const b = e.target.closest('[data-run]'); if (b) openOnCanvas(b.dataset.run); });
+
+  // Quiz: the Import answers button on a quiz being taken (content/app/screens/quiz.js reads the flag as an attempt opens)
+  async function devQuizPaint() {
+    const on = ((await api.storage.local.get('dev:quizImport').catch(() => ({})))['dev:quizImport']) === true;
+    $('devQuizImport').classList.toggle('is-on', on);
+    $('devQuizImport').setAttribute('aria-checked', on ? 'true' : 'false');
+  }
+  $('devQuizImport').addEventListener('click', async () => {
+    const on = !$('devQuizImport').classList.contains('is-on');
+    try { await api.storage.local.set({ 'dev:quizImport': on }); flash(); } catch (e) { flash(`Not saved: ${e?.message || e}`, true); }
+    devQuizPaint();
+  });
+
+  // State: the flags the setup, the welcome and What's New leave (settings, courses and photos are not flags), and the error codes kept for a report
+  const FLAG_KEY = /^(setup:|welcome:|whatsnew:|updated:shown$|tools:welcomed$|themes:tried$)/;
+  $('devResetFlags').addEventListener('click', async () => {
+    if (!confirm('Reset the setup, the welcome and What’s New?\n\nThe next Canvas page runs the setup again. Settings, courses and photos stay.')) return;
+    const keys = Object.keys(await api.storage.local.get(null)).filter((k) => FLAG_KEY.test(k));
+    await api.storage.local.remove(keys).catch(() => {});
+    devSay('devStateMsg', `${keys.length} ${keys.length === 1 ? 'flag' : 'flags'} cleared. The next Canvas page runs the setup.`);
+  });
+  $('devClearErrors').addEventListener('click', async () => {
+    await api.storage.local.remove('errors:recent').catch(() => {});
+    devSay('devStateMsg', 'Error codes cleared.');
+    devErrorsShow();
+  });
+  async function devErrorsShow() {
+    const kept = ((await api.storage.local.get('errors:recent').catch(() => ({})))['errors:recent']) || [];
+    $('devErrors').textContent = kept.length ? kept.map((x) => `${new Date(x.at).toLocaleString()}  ${x.code}`).join('\n') : 'None yet.';
+  }
+
+  // Storage: every key this device keeps, its size, and what is in it — filtered by name, opened in place, removed one at a time
+  const kb = (n) => (n < 1024 ? `${n} B` : `${(n / 1024).toFixed(n < 10240 ? 1 : 0)} KB`);
+  async function devStorage() {
+    const all = await api.storage.local.get(null).catch(() => ({}));
+    const q = $('devStoreQuery').value.trim().toLowerCase();
+    const rows = Object.keys(all).sort().map((k) => ({ k, v: all[k], n: new Blob([JSON.stringify(all[k]) ?? '']).size }));
+    const total = rows.reduce((s, r) => s + r.n, 0);
+    const shown = rows.filter((r) => !q || r.k.toLowerCase().includes(q));
+    $('devStoreSub').textContent = `${rows.length} ${rows.length === 1 ? 'key' : 'keys'} · ${kb(total)}${q ? ` · ${shown.length} shown` : ''}`;
+    $('devKeys').replaceChildren(...(shown.length ? shown.map((r) => {
+      const body = h('pre', { class: 'devlog devkey__val', hidden: true });
+      const open = () => { if (body.hidden) { const t = JSON.stringify(r.v, null, 2) ?? String(r.v); body.textContent = t.length > 6000 ? `${t.slice(0, 6000)}\n… ${kb(r.n)} in all` : t; } body.hidden = !body.hidden; row.classList.toggle('is-open', !body.hidden); };
+      const row = h('div', { class: 'devkey', dataset: { key: r.k } }, [
+        h('button', { type: 'button', class: 'devkey__head', onclick: open }, [h('span', { class: 'devkey__k', text: r.k }), h('span', { class: 'devkey__n', text: kb(r.n) })]),
+        h('button', { type: 'button', class: 'btn btn--xs devkey__rm', text: 'Remove', onclick: async () => { if (!confirm(`Remove ${r.k}?`)) return; await api.storage.local.remove(r.k).catch(() => {}); devStorage(); } }),
+        body,
+      ]);
+      return row;
+    }) : [h('p', { class: 'empty', text: q ? 'No key matches.' : 'Nothing stored.' })]));
+  }
+  $('devStoreQuery').addEventListener('input', () => devStorage());
+  $('devStoreRefresh').addEventListener('click', () => devStorage());
+
   let devTaps = 0;
   let devTapAt = 0;
   // ---- the Mac app: roll back to a version published (Updater.rollback): the releases listed, one picked, installed in this copy's place ----
@@ -864,6 +953,9 @@
       nav.append(h('button', { type: 'button', class: 'navlink', dataset: { section: 'dev' }, onclick: () => { history.replaceState(null, '', '#dev'); showSection('dev'); } }, [tile, h('span', { class: 'navlink__label', text: 'Developer' }), h('span', { class: 'navlink__dot', id: 'dot-dev', hidden: true })]));
       devInit();
       devRollInit();
+      let last = 'sim';
+      try { last = localStorage.getItem('bcv:devPane') || 'sim'; } catch { /* the first pane */ }
+      devPane(last);
     }
     showSection('dev');
   }

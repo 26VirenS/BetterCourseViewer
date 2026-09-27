@@ -83,7 +83,11 @@
   };
   const CHOICE = new Set(['multiple_choice_question', 'true_false_question']);
   const MULTI = new Set(['multiple_answers_question']);
-  const TEXT = new Set(['short_answer_question', 'essay_question', 'numerical_question']);
+  const TEXT = new Set(['short_answer_question', 'essay_question', 'numerical_question', 'calculated_question']);
+  // a number to give: numerical, and formula (calculated) — its variables already put in the question for this attempt by Canvas
+  const NUMERIC = new Set(['numerical_question', 'calculated_question']);
+  // a file to hand in: uploaded to the student's quiz files, the answer naming it
+  const FILE = new Set(['file_upload_question']);
   const MATCH = new Set(['matching_question']);
   // one field per blank: a dropdown of that blank's own list, or a line to type in
   const DROPS = new Set(['multiple_dropdowns_question']);
@@ -133,7 +137,7 @@
     // header and the rail away so the questions take the page. app.js clears it on the next render.
 
     // fbSub: the finished attempt the feedback stage shows; fbFrom: 'done' when it was opened from the receipt
-    const st = { stage: 'intro', idx: 0, mode: 'one', quiz: null, sub: null, questions: [], flags: {}, saving: 0, savedAt: 0, timer: null, warned: {}, done: null, code: '', fbSub: null, fbFrom: null, fb: null, page: null, paged: false, inflight: new Set(), loadingIdx: null };
+    const st = { stage: 'intro', idx: 0, mode: 'one', quiz: null, sub: null, questions: [], flags: {}, files: {}, saving: 0, savedAt: 0, timer: null, warned: {}, done: null, code: '', fbSub: null, fbFrom: null, fb: null, page: null, paged: false, inflight: new Set(), loadingIdx: null };
     const screen = U.el('bcv-qz');
     screen.append(U.loading('Loading the quiz…'));
 
@@ -221,11 +225,20 @@
       title: "Show this quiz's instructions. Nothing about your attempt changes.",
     }, [U.svg(IC.book, { size: 13, width: 2 }), h('span', { text: 'Instructions' })]);
     const exitBtn = h('button', { type: 'button', class: 'bcv-qz__exit', title: 'Save and exit', 'aria-label': 'Save and exit', onclick: leave }, U.svg(IC.close, { size: 16, width: 2.2 }));
+    // Developer (Settings → Developer → Quiz): the answers of an earlier attempt, filled in and saved,
+    // for trying a quiz again without typing it all out. Never there unless it was turned on there.
+    const devImport = await BCV.api.storage.local.get('dev:quizImport').then((r) => r['dev:quizImport'] === true).catch(() => false);
+    if (!ctx.alive()) return screen;
+    const devBtn = h('button', {
+      type: 'button', class: 'bcv-qz__devimport', hidden: true, onclick: () => importEarlier(),
+      title: 'Developer: fill in and save the answers from your last graded attempt',
+    }, [U.svg('M12 4v11M7 10l5 5 5-5M5 20h14', { size: 13, width: 2 }), h('span', { text: 'Import answers' })]);
     const head = U.el('bcv-qz__head', [
       U.el('bcv-qz__headrow', [
         exitBtn,
         h('div', { class: 'bcv-qz__titles' }, [U.text('bcv-qz__title bcv-ellip', quiz.title), U.text('bcv-qz__sub', `${course.name} · ${dueDay}`)]),
         modeWrap,
+        devBtn,
         instrBtn,
         rawBtn,
         U.el('bcv-qz__timer', [U.svg('M12 5a8 8 0 100 16 8 8 0 000-16zM12 9v4l3 2', { size: 13, stroke: 'var(--bcv-ink3)', width: 2 }), timerLabel]),
@@ -384,6 +397,39 @@
       }
       if (st.inflight.size) await Promise.allSettled([...st.inflight]);
     }
+    /** Developer: the answers of the latest earlier attempt with any, read from the graded history as
+     *  the feedback reads them, put on this attempt's questions and saved to Canvas one by one, as a
+     *  press would save each. */
+    async function importEarlier() {
+      if (!quiz.assignment_id) { U.toast('This quiz keeps no graded history to import from.', { error: true }); return; }
+      devBtn.disabled = true;
+      try {
+        const asub = await store.submission(cid, quiz.assignment_id, { force: true });
+        if (!ctx.alive()) return;
+        const earlier = (asub?.submission_history || [])
+          .filter((x) => Array.isArray(x.submission_data) && x.submission_data.length && Number(x.attempt) !== Number(st.sub?.attempt))
+          .sort((a, b) => Number(b.attempt) - Number(a.attempt))[0];
+        if (!earlier) { U.toast('No earlier attempt with answers to import.', { error: true }); return; }
+        const by = new Map(earlier.submission_data.map((d) => [String(d.question_id), d]));
+        let n = 0;
+        for (const q of st.questions) {
+          const d = by.get(String(q.id));
+          if (!d || INFO.has(q.question_type)) continue;
+          const answer = histAnswer(q, d);
+          if (answer === null || answer === undefined) continue;
+          n++;
+          save(q, answer);
+        }
+        await settled();
+        if (!ctx.alive()) return;
+        draw();
+        U.toast(n ? `Imported ${n} ${n === 1 ? 'answer' : 'answers'} from attempt ${earlier.attempt}.` : `Attempt ${earlier.attempt} has no answers these questions take.`);
+      } catch (e) {
+        U.toast(`Could not import the answers: ${e.message}`, { error: true });
+      } finally {
+        devBtn.disabled = false;
+      }
+    }
     async function toggleFlag(q) {
       const on = !q.flagged;
       q.flagged = on;
@@ -415,6 +461,7 @@
         forcedOne ? null : modeBtn('all', 'Scroll through all questions', MODE_ALL),
       ].filter(Boolean) : []));
       modeWrap.hidden = !switchable;
+      devBtn.hidden = !(devImport && st.stage === 'take' && st.sub);
       const side = st.stage === 'take' && st.mode === 'side';
       if (!side && progressWrap.parentElement !== head) head.append(progressWrap); // (the side layout keeps the pills in its left rail)
       screen.classList.toggle('is-side', side);
@@ -765,9 +812,11 @@
         const isEssay = type === 'essay_question';
         const field = isEssay
           ? h('textarea', { class: 'bcv-textarea', rows: 6, placeholder: 'Your answer…', oninput: (e) => { const v = e.target.value; saveText(q, looksHtml(q.answer) || /\n/.test(v) || /^\s*([•\-*]|\d+[.)])\s+/.test(v) ? plainToHtml(v) : v); } })
-          : h('input', { class: 'bcv-input', type: type === 'numerical_question' ? 'number' : 'text', step: 'any', placeholder: type === 'numerical_question' ? 'Number' : 'Your answer', oninput: (e) => saveText(q, type === 'numerical_question' && e.target.value !== '' ? Number(e.target.value) : e.target.value) });
+          : h('input', { class: 'bcv-input', type: NUMERIC.has(type) ? 'number' : 'text', step: 'any', placeholder: NUMERIC.has(type) ? 'Number' : 'Your answer', oninput: (e) => saveText(q, NUMERIC.has(type) && e.target.value !== '' ? Number(e.target.value) : e.target.value) });
         field.value = q.answer === null || q.answer === undefined ? '' : isEssay && looksHtml(q.answer) ? htmlToPlain(q.answer) : String(q.answer);
-        return U.el('bcv-qz__text', field);
+        // a formula question says how precise the answer is to be, where the quiz says so
+        const places = type === 'calculated_question' && Number.isInteger(Number(q.formula_decimal_places)) && q.formula_decimal_places !== null && q.formula_decimal_places !== '' ? Number(q.formula_decimal_places) : null;
+        return U.el('bcv-qz__text', [field, places !== null ? U.text('bcv-qz__texthint', places ? `Give the answer to ${places} decimal ${places === 1 ? 'place' : 'places'}.` : 'Give the answer as a whole number.', 'span') : null]);
       }
       // Matching: each left-hand value with the same list of right-hand ones beside it. Canvas takes
       // the picks as pairs — the answer's own id against the match it was set to.
@@ -828,8 +877,45 @@
         wrap.bcvBlanks = holds; // the sentence takes what it names (see weave)
         return wrap;
       }
+      // A file: chosen here, uploaded to the student's own quiz files on Canvas (the three steps an
+      // assignment's file takes), and the answer set to name it. Replaced by choosing another; taken
+      // off with Remove. Canvas's own page is one press away for anyone who wants it there instead.
+      if (FILE.has(type)) {
+        const ids = (Array.isArray(q.answer) ? q.answer : []).map(String).filter(Boolean);
+        const shownName = ids.length ? (st.files[ids[0]] || `File ${ids[0]}`) : '';
+        const status = h('span', { class: 'bcv-qz__filename', text: ids.length ? shownName : 'No file yet' });
+        const box = U.el(`bcv-qz__file ${ids.length ? 'has-file' : ''}`);
+        const pick = async (f) => {
+          if (!f) return;
+          box.classList.add('is-busy');
+          status.textContent = `Uploading ${f.name}…`;
+          try {
+            const id = await store.quizApi.uploadFile(cid, qid, f, (p) => { if (Number.isFinite(p)) status.textContent = `Uploading ${f.name}… ${Math.round(Math.min(1, p) * 100)}%`; });
+            if (!ctx.alive()) return;
+            st.files[String(id)] = f.name;
+            await save(q, [whole(id)]);
+            draw();
+          } catch (err) {
+            status.textContent = ids.length ? shownName : 'No file yet';
+            U.toast(`Could not upload ${f.name}: ${err.message}`, { error: true });
+          } finally {
+            box.classList.remove('is-busy');
+          }
+        };
+        const input = h('input', { type: 'file', class: 'bcv-qz__fileinput', 'aria-label': ids.length ? 'Replace the file' : 'Choose a file', onchange: (e) => { const f = e.target.files?.[0]; e.target.value = ''; pick(f); } });
+        box.addEventListener('dragover', (e) => { if ([...(e.dataTransfer?.items || [])].some((i) => i.kind === 'file')) { e.preventDefault(); box.classList.add('is-over'); } });
+        box.addEventListener('dragleave', () => box.classList.remove('is-over'));
+        box.addEventListener('drop', (e) => { const f = e.dataTransfer?.files?.[0]; if (!f) return; e.preventDefault(); box.classList.remove('is-over'); pick(f); });
+        box.append(...[
+          U.svg('M12 16V5M7 10l5-5 5 5M5 19h14', { size: 20, width: 2, cls: 'bcv-qz__fileic' }),
+          h('div', { class: 'bcv-qz__filebody' }, [status, U.text('bcv-qz__filehint', ids.length ? 'Handed in with this attempt when you submit.' : 'Choose a file, or drop one here.', 'span')]),
+          h('label', { class: 'bcv-qz__filepick' }, [h('span', { text: ids.length ? 'Replace' : 'Choose file' }), input]),
+          ids.length ? h('button', { type: 'button', class: 'bcv-qz__fileclear', text: 'Remove', onclick: async () => { await save(q, []); draw(); } }) : null,
+        ].filter(Boolean)); // (append writes a null out as the word)
+        return box;
+      }
       if (INFO.has(type)) return null;
-      // Matching, fill-in-the-blanks, dropdowns, file upload, calculated…: Canvas's own page handles these on the same attempt.
+      // Any other kind (a question type Canvas adds later): Canvas's own page handles it on the same attempt.
       return U.card(U.el('bcv-detail', [
         U.text('bcv-hint', `This ${type.replace(/_/g, ' ').replace(' question', '')} question is answered on Canvas's quiz page. Your other answers are already saved there.`),
         U.btn('Answer in Canvas', { kind: 'primary', icon: IC.external, iconColor: '#fff', onClick: () => { setOpen(false); app.go(st.paged && !noBack ? `${quizUrl}/take/questions/${q.id}?bcv=native` : `${quizUrl}/take?bcv=native`, { confirmed: true }); } }),
@@ -960,6 +1046,7 @@
           return { text: `${named ? `${blank}: ` : ''}${o ? (o.text || htmlToText(o.html || '', 60)) : v}`, html: '' };
         });
       }
+      if (FILE.has(q.question_type)) return a.map((id) => ({ text: st.files[String(id)] || `File ${id}`, html: '' })); // (the name, where it was uploaded here)
       if (Array.isArray(a)) return a.map(one);
       if (CHOICE.has(q.question_type)) return [one(a)];
       if (looksHtml(a)) return [{ text: '', html: String(a), block: true }]; // (an essay written in Canvas's editor: formatting, not tags)
@@ -1132,6 +1219,7 @@
      *  option ticked (multiple answers) or the match each left-hand value was set to (matching) —
      *  answer_for_<blank> and answer_id_for_<blank> (the blank kinds), or text. */
     function histAnswer(q, d) {
+      if (FILE.has(q.question_type)) { const ids = (Array.isArray(d.attachment_ids) ? d.attachment_ids : []).filter(hasId).map(whole); return ids.length ? ids : null; }
       if (MULTI.has(q.question_type)) {
         const on = Object.keys(d).filter((k) => /^answer_\d+$/.test(k) && String(d[k]) === '1').map((k) => Number(k.slice(7)));
         return on.length ? on : null;

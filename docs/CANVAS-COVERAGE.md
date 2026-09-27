@@ -76,7 +76,7 @@ requirement, the account menu's e-mail and pronouns, and every row's status word
 | People (roles as the course names them, search, sections, pronouns), Groups sub-view | **Drawn** | Join/leave a self-sign-up group: missing; person page: Canvas's |
 | Pages list and page (front page, dates, body, mark as done, links, lock explanation) | **Drawn** | Revision history, edit, search on the tab: missing |
 | Files (folders with counts, viewer, download, open in tab, uploader, locked/hidden/opens badges) | **Drawn** | Upload, usage rights, sort, recursive search: missing |
-| Quizzes list (score and status per row, time limit, attempts, lock window, New Quizzes as rows), quiz page, taking (classic), feedback | **Drawn** | Calculated/file-upload questions, LockDown: Canvas's page; New Quizzes are LTI tools |
+| Quizzes list (score and status per row, time limit, attempts, lock window, New Quizzes as rows), quiz page, taking (classic), feedback | **Drawn** | LockDown: Canvas's page; New Quizzes are LTI tools (no student API) |
 | Modules (requirements done, locked until, items, sort, open/close all, mark as done, prerequisites, sequential progress, per-item requirement and lock reason) | **Drawn** | Module prev/next: missing |
 | Syllabus (body + course summary of dated assignments) | **Drawn** | Events and undated items in the summary: missing |
 | Outcomes (mastery), Rubrics, Conferences, Collaborations, Chat, Attendance | Canvas's page / campus tools | In the rail; Canvas draws them |

@@ -447,6 +447,9 @@ if (typeof importScripts === 'function' && !self.BCV_LAZY_MODULES) {
       case 'devLog':
         reply(devLog(msg.clear));
         return true;
+      case 'devSimUpdate': // the Developer section: an update from any version, played again (the flags it leaves, the tabs reloaded)
+        reply(devSimUpdate(msg.from));
+        return true;
       case 'closeSetupTab': // the page after install, once the setup is under way on a Canvas tab
         reply(sender?.tab?.id != null ? api.tabs.remove(sender.tab.id).then(() => ({ ok: true })) : { ok: false });
         return true;
@@ -939,6 +942,26 @@ if (typeof importScripts === 'function' && !self.BCV_LAZY_MODULES) {
       await api.storage.local.set({ 'updated:shown': UPDATED_FOR });
     } catch { /* shown all the same */ }
     try { await api.tabs.create({ url: api.runtime.getURL('setup/updated.html'), active: true }); return true; } catch { return false; }
+  }
+
+  /** Settings → Developer → Simulate an update: what an update from `from` to this version does,
+   *  done again on purpose — the flags an update leaves (What's New from that version, the welcome
+   *  stages it owes, the updated page not yet shown), then every Canvas tab loaded again and the
+   *  updated page opened where this build has one — so the black stages and the notes can be seen as
+   *  someone updating from that version sees them. */
+  async function devSimUpdate(from) {
+    const v = String(from || '').trim();
+    const now = api.runtime.getManifest().version;
+    if (!/^\d+\.\d+(\.\d+)?$/.test(v)) return { ok: false, message: 'A version looks like 2.98.12.' };
+    if (!olderThan(v, now)) return { ok: false, message: `Pick a version before this one (${now}).` };
+    try {
+      await api.storage.local.remove(['welcome:look5', 'welcome:report1', 'updated:shown']);
+      await api.storage.local.set({ 'whatsnew:seen': v, 'whatsnew:from': v, [VERSION_KEY]: now });
+    } catch (e) { return { ok: false, message: `The flags could not be written: ${e?.message || e}` }; }
+    reloadedFor = null; // (an update's reload is once per version a run; this one is asked for)
+    const r = await afterUpdate(v);
+    const updatedPage = await openUpdated(v);
+    return { ok: true, from: v, to: now, reloaded: r.reloaded, updatedPage };
   }
 
   // ---- lifecycle ----------------------------------------------------------

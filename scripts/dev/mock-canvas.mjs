@@ -258,7 +258,7 @@ const files = {
   f101b: [{ id: 'f4', display_name: 'Dis01 worksheet.pdf', filename: 'dis01.pdf', 'content-type': 'application/pdf', size: 80000, updated_at: ago(3 * D), url: '/files/f4/download' }],
   f101c: [],
 };
-const quizzes = (courseId) => allAssignments(courseId).filter((a) => a.is_quiz_assignment).map((a, i) => ({ id: a.quiz_id, title: a.name, due_at: a.due_at, points_possible: a.points_possible, question_count: mockConfig.richQuestions ? 7 : 4, quiz_type: a.quiz_survey || (a.name === 'Skills_Check' ? 'practice_quiz' : 'assignment'), time_limit: 20, allowed_attempts: mockConfig.richQuestions ? 5 : 1, description: `<p>${a.name}: four questions on the pre-lecture reading.</p>`, html_url: `/courses/${courseId}/quizzes/${a.quiz_id}`, locked_for_user: false, assignment_id: a.id, one_question_at_a_time: a.name === 'Lec07-PreQuiz', cant_go_back: a.name === 'Lec07-PreQuiz', hide_results: null, show_correct_answers: true, shuffle_answers: false, has_access_code: !!a.quiz_access_code && !a.quiz_code_hidden, ip_filter: a.quiz_ip_filter || null, require_lockdown_browser: !!a.quiz_lockdown }));
+const quizzes = (courseId) => allAssignments(courseId).filter((a) => a.is_quiz_assignment).map((a, i) => ({ id: a.quiz_id, title: a.name, due_at: a.due_at, points_possible: a.points_possible, question_count: (mockConfig.richQuestions ? 7 : 4) + (mockConfig.moreTypes ? 2 : 0), quiz_type: a.quiz_survey || (a.name === 'Skills_Check' ? 'practice_quiz' : 'assignment'), time_limit: 20, allowed_attempts: mockConfig.richQuestions ? 5 : 1, description: `<p>${a.name}: four questions on the pre-lecture reading.</p>`, html_url: `/courses/${courseId}/quizzes/${a.quiz_id}`, locked_for_user: false, assignment_id: a.id, one_question_at_a_time: a.name === 'Lec07-PreQuiz', cant_go_back: a.name === 'Lec07-PreQuiz', hide_results: null, show_correct_answers: true, shuffle_answers: false, has_access_code: !!a.quiz_access_code && !a.quiz_code_hidden, ip_filter: a.quiz_ip_filter || null, require_lockdown_browser: !!a.quiz_lockdown }));
 
 // ---- quiz attempts (stateful, like Canvas's quiz submission API) --------------------------
 // quiz 9001 was taken once: q1 right, q2 wrong (17.68 m), q3 right, q4 right = 13 of 16
@@ -291,6 +291,11 @@ const quizQuestionBank = (quizId) => {
       ] },
     // an essay: Canvas keeps the answer as the editor's HTML (paragraphs, lists), which is what comes back
     { id: `${quizId}7`, position: 7, question_name: 'Question 7', question_type: 'essay_question', question_text: '<p>What are the pros and cons of group work?</p>', points_possible: 2, answers: [] }] : []),
+    // (moreTypes, test-only) a formula question — its variables already put in the text for this student, as Canvas does — and a file to hand in
+    ...(mockConfig.moreTypes ? [
+      { id: `${quizId}8`, position: 8, question_name: 'Question 8', question_type: 'calculated_question', question_text: '<p>A cart travels 12 m in 4 s. What is its speed in m/s?</p>', points_possible: 2, answer_tolerance: 0.05, formula_decimal_places: 1, variables: [{ name: 'd', min: 10, max: 20, scale: 0 }, { name: 't', min: 2, max: 5, scale: 0 }], formulas: [{ formula: 'd/t' }], answers: [{ id: Number(`${quizId}81`), variables: [{ name: 'd', value: 12 }, { name: 't', value: 4 }], answer: 3 }] },
+      { id: `${quizId}9`, position: 9, question_name: 'Question 9', question_type: 'file_upload_question', question_text: '<p>Upload your lab sheet.</p>', points_possible: 2, answers: [] },
+    ] : []),
     { id: `${quizId}4`, position: 4, question_name: 'Question 4', question_type: 'numerical_question', question_text: '<p>At what time (in seconds) is the object momentarily at rest? See the <a href="/courses/101/pages/chapter-4-notes">chapter 4 notes</a>.</p>', points_possible: 5, answers: [{ id: Number(`${quizId}41`), text: '3.15', weight: 100, exact: 3.15 }], neutral_comments: 'Only one root in the interval: v(t) = 0 at t = 3.15 s.' },
   ];
 };
@@ -298,6 +303,8 @@ const gradeQuestion = (q, a) => {
   if (a === null || a === undefined || a === '') return false;
   if (q.question_type === 'essay_question') return String(a).replace(/<[^>]+>/g, '').trim().length > 0; // (anything written earns the points here)
   if (q.question_type === 'numerical_question') return Number(a) === q.answers[0].exact;
+  if (q.question_type === 'calculated_question') return Math.abs(Number(a) - q.answers[0].answer) <= (q.answer_tolerance || 0);
+  if (q.question_type === 'file_upload_question') return false; // (marked by hand: nothing earned until then)
   // matching: every left-hand value set against the match it was written with
   if (q.question_type === 'matching_question') {
     const want = new Map(q.answers.map((x) => [String(x.id), String(x.match_id)]));
@@ -333,7 +340,8 @@ const histFields = (q, a) => {
   }
   if (a === null || a === undefined || a === '') return {};
   if (q.question_type === 'multiple_answers_question') return Object.fromEntries((Array.isArray(a) ? a : [a]).map((id) => [`answer_${id}`, '1']));
-  if (q.question_type === 'numerical_question') return { text: String(a) };
+  if (q.question_type === 'numerical_question' || q.question_type === 'calculated_question') return { text: String(a) };
+  if (q.question_type === 'file_upload_question') return { attachment_ids: (Array.isArray(a) ? a : [a]).map(String) };
   return { answer_id: a, text: String(a) };
 };
 const findSub = (id) => [...quizSubs.values()].flat().find((s) => s.id === id) || null;
@@ -889,6 +897,10 @@ on('POST', /^\/api\/v1\/quiz_submissions\/([\w-]+)\/questions$/, (url, m, body) 
     if (asked?.question_type === 'matching_question' && Array.isArray(q.answer) && q.answer.some((p2) => !whole(p2?.match_id) || !whole(p2?.answer_id))) {
       return { __status: 400, errors: [{ message: 'match_id must be of type Integer' }] };
     }
+    // a file answer names files the student uploaded to their quiz files; anything else is refused
+    if (asked?.question_type === 'file_upload_question' && Array.isArray(q.answer) && q.answer.some((id) => !storedFiles.has(String(id)))) {
+      return { __status: 400, errors: [{ message: 'invalid attachment' }] };
+    }
     s.state[String(q.id)] = { ...(s.state[String(q.id)] || {}), answer: unhash(asked, q.answer) };
   }
   return subQuestions(s);
@@ -944,6 +956,13 @@ on('POST', /^\/api\/v1\/courses\/(\w+)\/assignments\/(\w+)\/submissions\/self\/f
   const token = `tok${++fileSeq}`;
   pendingUploads.set(token, { name: body.name, size: body.size, content_type: body.content_type });
   return { upload_url: `http://localhost:${port}/__upload/${token}`, upload_params: { key: `submissions/${token}`, acl: 'private', success_action_status: '201' }, file_param: 'file' };
+});
+// a file for a quiz's file-upload question: the student's own quiz files, the same preflight and storage step
+on('POST', /^\/api\/v1\/courses\/(\w+)\/quizzes\/(\w+)\/quiz_submissions\/self\/files$/, (url, m, body) => {
+  if (!quizzes(m[1]).some((q) => q.id === m[2])) return null;
+  const token = `tok${++fileSeq}`;
+  pendingUploads.set(token, { name: body.name, size: body.size, content_type: body.content_type });
+  return { upload_url: `http://localhost:${port}/__upload/${token}`, upload_params: { key: `quiz_submissions/${token}`, acl: 'private', success_action_status: '201' }, file_param: 'file' };
 });
 // the storage step: a multipart POST with no CSRF token, like S3 or inst-fs; the file is the last field
 on('POST', /^\/__upload\/(\w+)$/, (url, m, body, raw) => {

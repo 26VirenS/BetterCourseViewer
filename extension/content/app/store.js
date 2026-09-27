@@ -1154,6 +1154,20 @@
     answer(sub, questionId, answer, accessCode) {
       return C.post(`/api/v1/quiz_submissions/${sub.id}/questions`, { attempt: sub.attempt, validation_token: sub.validation_token, ...(accessCode ? { access_code: accessCode } : {}), quiz_questions: [{ id: questionId, answer }] });
     },
+    /** A file for a file-upload question: Canvas's quiz file upload (the student's own quiz files; the
+     *  same three steps a submission's file takes). Returns the attachment id the answer names. */
+    async uploadFile(courseId, quizId, file, onProgress) {
+      const pre = await C.post(`/api/v1/courses/${courseId}/quizzes/${quizId}/quiz_submissions/self/files`, { name: file.name, size: file.size, content_type: file.type || undefined, on_duplicate: 'rename' });
+      if (!pre?.upload_url) throw new Error('Canvas did not return an upload URL');
+      const form = new FormData();
+      for (const [k, v] of Object.entries(pre.upload_params || {})) form.append(k, v);
+      form.append(pre.file_param || 'file', file, file.name); // the file must be the last field
+      let done = await C.upload(pre.upload_url, form, { onProgress });
+      if (done?.location) done = await C.get(done.location);
+      const id = attachmentId(done);
+      if (!id) throw new Error('the upload did not finish');
+      return String(id);
+    },
     flag(sub, questionId, on, accessCode) {
       return C.put(`/api/v1/quiz_submissions/${sub.id}/questions/${questionId}/${on ? 'flag' : 'unflag'}`, { attempt: sub.attempt, validation_token: sub.validation_token, ...(accessCode ? { access_code: accessCode } : {}) });
     },

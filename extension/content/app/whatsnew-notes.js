@@ -25,6 +25,10 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.98.30', date: '2026-09-27', notes: [
+      { kind: 'new', title: 'Formula questions', body: 'Answer formula questions here, to the places asked.', icon: P.pen },
+      { kind: 'new', title: 'File upload questions', body: 'Upload a file for a quiz question without leaving.', icon: P.clip },
+    ] },
     { version: '2.98.29', date: '2026-09-27', notes: [
       { kind: 'improved', title: 'One header, every page', body: 'Pick one header photo in step one; every page wears it.', icon: P.layers },
       { kind: 'improved', title: 'Clearer photo hints', body: 'A slower, labelled cursor shows what takes a photo.', icon: P.steps },

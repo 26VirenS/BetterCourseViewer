@@ -213,7 +213,38 @@ html[data-theme="dark"] .docs__warn { color: #ffb44d; }
 .steps--app { margin: 0 18px 16px; }
 .steps[hidden] { display: none; } /* (the flex above would otherwise beat the attribute) */
 
+/* ---- Developer: tabs over the panes (Simulate, Quiz, State, Storage, Tool tabs) ---------------- */
+.devtabs { display: flex; gap: 2px; margin-top: 22px; padding: 3px; border-radius: 13px; background: var(--fill); }
+#devRoll:not([hidden]) + .devtabs { margin-top: 14px; }
+.devtab { flex: 1; min-width: 0; height: 32px; padding: 0 10px; border: 0; border-radius: 10px; background: transparent; color: var(--ink2); cursor: pointer; font: 600 12.5px/1 var(--font); white-space: nowrap; transition: background .2s ease, color .2s ease, box-shadow .2s ease; }
+.devtab:hover { color: var(--ink); }
+.devtab.is-on { background: var(--seg-on); color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,.14); }
+.devpane { animation: fadeIn .2s ease both; }
+.devpane[hidden] { display: none; }
+.devpane > .card:first-child { margin-top: 12px; }
+/* Storage: a key per row, its size, opened in place */
+.devkeys { display: flex; flex-direction: column; margin: 0 -18px -17px; border-top: 1px solid var(--sep); max-height: 460px; overflow: auto; }
+.devkey { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 0 10px; padding: 0 12px 0 0; border-bottom: 1px solid var(--sep); }
+.devkey:last-child { border-bottom: 0; }
+.devkey__head { display: flex; align-items: baseline; gap: 12px; min-width: 0; padding: 11px 0 11px 18px; border: 0; background: transparent; cursor: pointer; text-align: left; color: var(--ink); }
+.devkey__k { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 500 12.5px/1.3 var(--mono); }
+.devkey__n { flex: none; font: 400 11.5px/1.3 var(--font); color: var(--ink3); font-variant-numeric: tabular-nums; }
+.devkey__rm { background: var(--fill); }
+.devkey.is-open .devkey__k { font-weight: 700; }
+.devkey .devkey__val { grid-column: 1 / -1; margin: 0 0 12px 18px; max-height: 260px; } /* (above .devlog's own margin) */
+.card--pad > .chips { margin-top: 0; }
+.card--pad > .devlog { margin-top: 0; }
+#dev .note--msg:empty { display: none; } /* (a message line with nothing to say takes no room) */
+.devkey__val[hidden] { display: none; }
+.devkeys .empty { padding: 18px; }
+
 /* ---- Developer: catching a tool's own window ------------------------------------------------ */
+/* (a plain field: the Developer section's code, version and filter boxes, and the app's version picker) */
+.input { height: 36px; padding: 0 12px; border: 1px solid var(--edge); border-radius: 11px; background: var(--fill2); color: var(--ink); font: 400 13px/1.2 var(--font); outline: none; transition: border-color .2s ease, background .2s ease; }
+.input:focus { border-color: var(--blue); background: var(--card); }
+.input::placeholder { color: var(--ink3); }
+.addrow .input { flex: 1; min-width: 0; }
+input[type="search"].input { width: 100%; }
 .input--mono { font-family: var(--mono, ui-monospace, Menlo, monospace); letter-spacing: .06em; }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 .chip { height: 30px; padding: 0 13px; border: 0; border-radius: 15px; background: var(--fill); color: var(--ink2); cursor: pointer; font: 600 12.5px/1 var(--font); transition: background .2s ease; }

@@ -180,35 +180,101 @@
       </section>
 
       <!-- Hidden until it is asked for: press the version at the top left five times, or open this
-           page at #dev. It is here to find out what a browser actually reports about a tool's own
-           tab as it arrives, which is the one thing that cannot be worked out from here. -->
-      <section class="section" id="dev" data-title="Developer" data-sub="A tool&rsquo;s own tab." data-words="developer dev debug tool tab window code log" hidden>
-        <div class="card card--pad">
-          <div class="row"><span class="row__body"><span class="row__t">Settings code</span><span class="row__s">Every setting below in one code. Read it out, or type one in and press Use.</span></span></div>
-          <div class="addrow">
-            <input type="text" id="devCode" class="input input--mono" placeholder="SC3-200" autocomplete="off" spellcheck="false" aria-label="Tool tab settings code">
-            <button type="button" class="btn" id="devUse">Use</button>
-          </div>
-          <p class="note note--msg" id="devMsg"></p>
-          <div class="chips">
-            <button type="button" class="chip" id="devEverything">Say everything</button>
-            <button type="button" class="chip" id="devShipped">Back to normal</button>
-          </div>
-        </div>
-        <div class="card card--list" id="devFields"></div>
-        <div class="card card--pad">
-          <div class="row"><span class="row__body"><span class="row__t">What was seen</span><span class="row__s" id="devSeenSub">Every tool tab opened, and what happened to it.</span></span></div>
-          <pre class="devlog" id="devLog">Nothing yet.</pre>
-          <div class="chips">
-            <button type="button" class="chip" id="devRefresh">Refresh</button>
-            <button type="button" class="chip" id="devCopy">Copy</button>
-            <button type="button" class="chip" id="devClear">Clear</button>
-          </div>
-        </div>
-        <!-- the app's window alone: another version of Simpl Courses put in this one's place -->
+           page at #dev. Tools for testing Simpl the way it is used — an update played again, a quiz
+           filled in from an earlier attempt, the flags and the storage behind it all — and the catch
+           for a tool's own tab, which is the one thing that cannot be worked out from here. -->
+      <section class="section" id="dev" data-title="Developer" data-sub="Test Simpl the way it is used." data-words="developer dev debug test simulate update version quiz import answers storage state reset error codes tool tab window code log" hidden>
+        <!-- the app's window alone: another version of Simpl Courses put in this one's place (first: never behind a tab) -->
         <div class="card card--list" id="devRoll" hidden>
           <div class="row"><span class="row__body"><span class="row__t">Roll back the app</span><span class="row__s" id="devRollSub">Another version, put in this one&rsquo;s place. Automatic updates go off, so it stays.</span></span><select class="input" id="devVersions" aria-label="Version"></select><button type="button" class="btn" id="devRollback">Install</button></div>
           <p class="note note--msg" id="devRollMsg" hidden></p>
+        </div>
+        <div class="devtabs" id="devTabs" role="tablist" aria-label="Developer tools">
+          <button type="button" class="devtab" role="tab" data-pane="sim">Simulate</button>
+          <button type="button" class="devtab" role="tab" data-pane="quiz">Quiz</button>
+          <button type="button" class="devtab" role="tab" data-pane="state">State</button>
+          <button type="button" class="devtab" role="tab" data-pane="storage">Storage</button>
+          <button type="button" class="devtab" role="tab" data-pane="tool">Tool tabs</button>
+        </div>
+
+        <!-- Simulate: an update from any version, played again; the runs that open over a Canvas page -->
+        <div class="devpane" data-pane="sim" role="tabpanel">
+          <div class="card card--pad">
+            <div class="row"><span class="row__body"><span class="row__t">Simulate an update</span><span class="row__s">Updates from an older version to this one again: What&rsquo;s New from that version, the black stages it owes, and every open Canvas tab loaded again, as someone updating sees it.</span></span></div>
+            <div class="addrow">
+              <input type="text" id="devFrom" class="input input--mono" list="devFromList" placeholder="2.97.0" autocomplete="off" spellcheck="false" aria-label="The version to update from">
+              <datalist id="devFromList"></datalist>
+              <button type="button" class="btn btn--primary" id="devSimRun">Simulate</button>
+            </div>
+            <p class="note note--msg" id="devSimMsg" hidden></p>
+          </div>
+          <div class="card card--pad">
+            <div class="row"><span class="row__body"><span class="row__t">Run on a Canvas page</span><span class="row__s">Each opens a Canvas tab with it running over the page. Nothing is reset.</span></span></div>
+            <div class="chips" id="devRuns">
+              <button type="button" class="chip" data-run="whatsnew">What&rsquo;s New</button>
+              <button type="button" class="chip" data-run="welcome">The welcome</button>
+              <button type="button" class="chip" data-run="setup">The setup</button>
+              <button type="button" class="chip" data-run="personalize">Appearance</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quiz: an earlier attempt's answers, one press away while taking a quiz -->
+        <div class="devpane" data-pane="quiz" role="tabpanel" hidden>
+          <div class="card card--list">
+            <div class="row row--pad"><span class="row__body"><span class="row__t">Import answers from an earlier attempt</span><span class="row__s">Puts an Import answers button on a quiz you are taking. It fills in and saves the answers from your last graded attempt.</span></span><button type="button" class="switch" id="devQuizImport" role="switch" aria-checked="false" aria-label="Import answers from an earlier attempt"><span class="switch__knob"></span></button></div>
+          </div>
+        </div>
+
+        <!-- State: the flags behind the setup and the welcome, and the error codes kept for a report -->
+        <div class="devpane" data-pane="state" role="tabpanel" hidden>
+          <div class="card card--pad">
+            <div class="row"><span class="row__body"><span class="row__t">Start over</span><span class="row__s">Clears the flags the setup, the welcome and What&rsquo;s New leave, so the next Canvas page runs the setup again. Settings, courses and photos stay.</span></span></div>
+            <div class="chips">
+              <button type="button" class="chip" id="devResetFlags">Reset the setup and welcome</button>
+              <button type="button" class="chip" id="devClearErrors">Clear error codes</button>
+            </div>
+            <p class="note note--msg" id="devStateMsg" hidden></p>
+          </div>
+          <div class="card card--pad">
+            <div class="row"><span class="row__body"><span class="row__t">Error codes</span><span class="row__s" id="devErrorsSub">The codes shown in the last day, newest first. Report a bug carries them.</span></span></div>
+            <pre class="devlog" id="devErrors">None yet.</pre>
+          </div>
+        </div>
+
+        <!-- Storage: every key this device keeps, its size, and what is in it -->
+        <div class="devpane" data-pane="storage" role="tabpanel" hidden>
+          <div class="card card--pad">
+            <div class="row"><span class="row__body"><span class="row__t">Stored on this device</span><span class="row__s" id="devStoreSub">Every key Simpl keeps here.</span></span><button type="button" class="btn btn--sm" id="devStoreRefresh">Refresh</button></div>
+            <input type="search" id="devStoreQuery" class="input" placeholder="Filter keys" autocomplete="off" spellcheck="false" aria-label="Filter keys">
+            <div class="devkeys" id="devKeys"></div>
+          </div>
+        </div>
+
+        <!-- Tool tabs: what a browser reports about a tool's own tab as it arrives, and the catch's settings, as one code -->
+        <div class="devpane" data-pane="tool" role="tabpanel" hidden>
+          <div class="card card--pad">
+            <div class="row"><span class="row__body"><span class="row__t">Settings code</span><span class="row__s">Every setting below in one code. Read it out, or type one in and press Use.</span></span></div>
+            <div class="addrow">
+              <input type="text" id="devCode" class="input input--mono" placeholder="SC3-200" autocomplete="off" spellcheck="false" aria-label="Tool tab settings code">
+              <button type="button" class="btn" id="devUse">Use</button>
+            </div>
+            <p class="note note--msg" id="devMsg"></p>
+            <div class="chips">
+              <button type="button" class="chip" id="devEverything">Say everything</button>
+              <button type="button" class="chip" id="devShipped">Back to normal</button>
+            </div>
+          </div>
+          <div class="card card--list" id="devFields"></div>
+          <div class="card card--pad">
+            <div class="row"><span class="row__body"><span class="row__t">What was seen</span><span class="row__s" id="devSeenSub">Every tool tab opened, and what happened to it.</span></span></div>
+            <pre class="devlog" id="devLog">Nothing yet.</pre>
+            <div class="chips">
+              <button type="button" class="chip" id="devRefresh">Refresh</button>
+              <button type="button" class="chip" id="devCopy">Copy</button>
+              <button type="button" class="chip" id="devClear">Clear</button>
+            </div>
+          </div>
         </div>
       </section>
     </main>
@@ -218,6 +284,7 @@
   <script src="../lib/devcode.js"></script>
   <script src="../lib/utils.js"></script>
   <script src="../lib/record-csv.js"></script>
+  <script src="../content/app/whatsnew-notes.js"></script> <!-- (Developer: the versions an update can be simulated from) -->
   <script src="options.js"></script>
 </body>
 </html>

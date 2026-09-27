@@ -6440,6 +6440,102 @@ try {
   await page.waitForSelector('.bcv-gpa__hero', { timeout: 15000 });
   check((await page.$('#bcv-setup')) === null && (await texts('.bcv-gpa__hero-sub'))[0]?.includes('This term so far') && (await texts('.bcv-gpa__goal-s'))[0] === 'Goal 4.00 · set it in settings', 'once done the card stays away, and the Grades page tracks with the goal the setup set');
 
+  // ---- Developer (2.98.30): tabs over Simulate, Quiz, State, Storage and Tool tabs ------------------------------
+  console.log('developer');
+  await options.bringToFront();
+  await options.goto(`chrome-extension://${extId}/options/options.html#dev`); // (only the hash changes when the settings are already open: the reload is what reads it)
+  await options.evaluate(() => { try { localStorage.removeItem('bcv:devPane'); } catch { /* */ } });
+  await options.reload();
+  await options.waitForSelector('#dev.is-active', { timeout: 5000 });
+  const devOpen = await options.evaluate(() => ({ tabs: [...document.querySelectorAll('#devTabs .devtab')].map((b) => `${b.textContent}${b.classList.contains('is-on') ? '*' : ''}`).join(','), shown: [...document.querySelectorAll('#dev .devpane')].filter((p) => !p.hidden).map((p) => p.dataset.pane).join(','), from: document.getElementById('devFrom').value, froms: document.querySelectorAll('#devFromList option').length, nav: !!document.querySelector('.navlink[data-section="dev"].is-active') }));
+  check(devOpen.tabs === 'Simulate*,Quiz,State,Storage,Tool tabs' && devOpen.shown === 'sim' && /^\d+\.\d+\.\d+$/.test(devOpen.from) && devOpen.froms > 20 && devOpen.nav, `the Developer section opens on its tabs, Simulate first, offering every version What's New has notes for: ${JSON.stringify(devOpen)}`);
+  // Quiz: a switch writes the flag a quiz reads as an attempt opens
+  await options.click('#devTabs [data-pane="quiz"]');
+  await options.click('#devQuizImport');
+  check(await eventually(async () => (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('dev:quizImport'))['dev:quizImport'])) === true && await options.$eval('#devQuizImport', (b) => b.classList.contains('is-on') && b.getAttribute('aria-checked') === 'true')), 'the Quiz tab turns on Import answers from an earlier attempt');
+  await options.screenshot({ path: join(out, '29b-options-dev-quiz.png') });
+  // the quiz: a new attempt, Import answers — attempt 1's answers filled in and saved to Canvas
+  await page.bringToFront();
+  await mockConfig({ richQuestions: true, moreTypes: true }); // (attempts to spare, the rich kinds to import, and a formula question and a file to hand in: the kinds 2.98.30 takes here)
+  await page.goto(`${BASE}/courses/101/quizzes/9001?bcv=take`);
+  await page.waitForSelector('.bcv-qz__begin[data-begin]:not([disabled])', { timeout: 15000 });
+  check(await page.$eval('.bcv-qz__devimport', (b) => b.hidden), 'the button is not on the intro: an attempt has to be open');
+  await page.click('.bcv-qz__begin');
+  await page.waitForSelector('.bcv-qz__devimport:not([hidden])', { timeout: 15000 });
+  await page.click('.bcv-qz__devimport');
+  check(await eventually(async () => /Imported \d+ answers from attempt 1\./.test((await texts('.bcv-toast')).join(' ')), 10000), `Import answers says what it took and from which attempt: ${(await texts('.bcv-toast')).join(' | ')}`);
+  const openSub = ((await apiGet('/api/v1/courses/101/quizzes/9001/submissions')).quiz_submissions || []).find((s) => s.workflow_state === 'untaken');
+  const importedQs = openSub ? await apiGet(`/api/v1/quiz_submissions/${openSub.id}/questions`) : null;
+  const ansOf = (id) => (importedQs?.quiz_submission_questions || []).find((q) => String(q.id) === String(id))?.answer;
+  const imported = { attempt: openSub?.attempt, q1: ansOf(90011), q2: ansOf(90012), q3: [...(ansOf(90013) || [])].map(Number).sort().join(','), q4: Number(ansOf(90014)) };
+  check(imported.attempt === 2 && Number(imported.q1) === 900111 && Number(imported.q2) === 900124 && imported.q3 === '900131,900133' && imported.q4 === 3.15, `and Canvas has them on the new attempt, attempt 1's answer to each question: ${JSON.stringify(imported)}`);
+  check((await page.$$('.bcv-qz__opt.is-selected')).length >= 1, 'the question on screen shows its imported answer');
+  // Formula and File Upload questions, answered here: a number to the places the quiz asks for; a file uploaded to the student's quiz files and named as the answer
+  const pillOf = (id) => page.locator('.bcv-qz__pill').nth(Number((importedQs?.quiz_submission_questions || []).find((q) => String(q.id) === String(id))?.position) - 1); // (the squares run in the questions' positions)
+  const liveAnswer = async (id) => ((await apiGet(`/api/v1/quiz_submissions/${openSub.id}/questions`)).quiz_submission_questions || []).find((q) => String(q.id) === String(id))?.answer;
+  await pillOf(90018).click();
+  const formula = page.locator('.bcv-qz__text:has(.bcv-qz__texthint)');
+  await formula.waitFor({ timeout: 8000 });
+  const formulaView = await formula.evaluate((e) => ({ type: e.querySelector('input')?.type, hint: e.querySelector('.bcv-qz__texthint').textContent }));
+  await formula.locator('input').fill('3');
+  check(formulaView.type === 'number' && formulaView.hint === 'Give the answer to 1 decimal place.' && await eventually(async () => Number(await liveAnswer(90018)) === 3, 8000), `a formula question takes a number, says the places the quiz asks for, and Canvas gets the number: ${JSON.stringify({ ...formulaView, answer: await liveAnswer(90018) })}`);
+  await pillOf(90019).click();
+  await page.waitForSelector('.bcv-qz__file', { timeout: 8000 });
+  const fileBefore = await page.$eval('.bcv-qz__file', (e) => ({ name: e.querySelector('.bcv-qz__filename').textContent, pick: e.querySelector('.bcv-qz__filepick').textContent.trim(), clear: !!e.querySelector('.bcv-qz__fileclear'), stray: [...e.childNodes].filter((n) => n.nodeType === 3 && n.textContent.trim()).map((n) => n.textContent).join('') }));
+  await page.setInputFiles('.bcv-qz__fileinput', { name: 'lab-sheet.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 lab sheet') });
+  await eventually(async () => (await page.$eval('.bcv-qz__filename', (e) => e.textContent).catch(() => '')) === 'lab-sheet.pdf', 10000);
+  const fileAfter = await page.$eval('.bcv-qz__file', (e) => ({ name: e.querySelector('.bcv-qz__filename').textContent, has: e.classList.contains('has-file'), pick: e.querySelector('.bcv-qz__filepick').textContent.trim(), clear: !!e.querySelector('.bcv-qz__fileclear') }));
+  const fileAnswer = await liveAnswer(90019);
+  check(fileBefore.name === 'No file yet' && fileBefore.pick === 'Choose file' && !fileBefore.clear && !fileBefore.stray && fileAfter.name === 'lab-sheet.pdf' && fileAfter.has && fileAfter.pick === 'Replace' && fileAfter.clear && Array.isArray(fileAnswer) && fileAnswer.length === 1 && /^uf\d+$/.test(String(fileAnswer[0])), `a file upload question uploads the chosen file to the quiz's files and the answer names it: ${JSON.stringify({ fileBefore, fileAfter, fileAnswer })}`);
+  await page.screenshot({ path: join(out, '29e-quiz-file-question.png') });
+  await page.click('.bcv-qz__fileclear');
+  check(await eventually(async () => (await page.$eval('.bcv-qz__filename', (e) => e.textContent).catch(() => '')) === 'No file yet' && !((await liveAnswer(90019)) || []).length, 8000), 'Remove takes the file off the answer');
+  await page.click('.bcv-qz__exit');
+  await page.waitForSelector('.bcv-qz__intro, .bcv-detail__title', { timeout: 15000 });
+  await mockConfig({ richQuestions: false, moreTypes: false });
+  // Storage: every key, its size, opened in place, filtered
+  await options.bringToFront();
+  await options.click('#devTabs [data-pane="storage"]');
+  await options.waitForSelector('.devkey[data-key="setup:done"]', { timeout: 5000 });
+  await options.fill('#devStoreQuery', 'dev:quiz');
+  const storeRowsNow = () => options.evaluate(() => ({ keys: [...document.querySelectorAll('.devkey')].map((r) => r.dataset.key).join(','), sub: document.getElementById('devStoreSub').textContent }));
+  await eventually(async () => (await storeRowsNow()).keys === 'dev:quizImport', 5000);
+  const storeRows = await storeRowsNow();
+  await options.click('.devkey[data-key="dev:quizImport"] .devkey__head');
+  const storeVal = await options.$eval('.devkey[data-key="dev:quizImport"] .devkey__val', (e) => ({ shown: !e.hidden, text: e.textContent }));
+  check(storeRows.keys === 'dev:quizImport' && /^\d+ keys · [\d.]+ (B|KB) · 1 shown$/.test(storeRows.sub) && storeVal.shown && storeVal.text === 'true', `the Storage tab lists every key with its size, filters by name and opens a value in place: ${JSON.stringify({ ...storeRows, storeVal })}`);
+  await options.fill('#devStoreQuery', '');
+  // State: the error codes kept for a report, cleared on a press
+  await sw.evaluate(() => self.BCV.api.storage.local.set({ 'errors:recent': [{ code: 'SC-C-404', at: Date.now() - 1000 }] }));
+  await options.click('#devTabs [data-pane="state"]');
+  check(await eventually(async () => /SC-C-404/.test(await options.$eval('#devErrors', (e) => e.textContent))), 'the State tab lists the error codes kept for a report');
+  await options.click('#devClearErrors');
+  check(await eventually(async () => (await options.$eval('#devErrors', (e) => e.textContent)) === 'None yet.' && !(await sw.evaluate(async () => (await self.BCV.api.storage.local.get('errors:recent'))['errors:recent']))), 'Clear error codes empties the list');
+  // Simulate: an update from 2.98.19 played again — the flags an update leaves, the Canvas tab loaded again, the black stage and What's New on it (after 2.98.15, so no updated page opens)
+  await page.bringToFront();
+  await page.goto(`${BASE}/`);
+  await page.waitForSelector('.bcv-stat', { timeout: 15000 });
+  await options.bringToFront();
+  await options.click('#devTabs [data-pane="sim"]');
+  await options.fill('#devFrom', '2.98.19');
+  const reloaded = page.waitForEvent('load', { timeout: 15000 }).then(() => true).catch(() => false);
+  await options.click('#devSimRun');
+  check(await eventually(async () => /^Updated from 2\.98\.19 to \d+\.\d+\.\d+: \d+ Canvas tabs? loaded again/.test(await options.$eval('#devSimMsg', (e) => e.textContent)), 8000), `Simulate says what it did: ${await options.$eval('#devSimMsg', (e) => e.textContent)}`);
+  const simFlags = await sw.evaluate(async () => { const f = await self.BCV.api.storage.local.get(['whatsnew:from', 'welcome:report1', 'welcome:look5']); return { from: f['whatsnew:from'], report: 'welcome:report1' in f, look: 'welcome:look5' in f }; });
+  check((await reloaded) && simFlags.from === '2.98.19' && !simFlags.report && !simFlags.look, `and the update is played again: the Canvas tab loads again with the flags an update from 2.98.19 leaves: ${JSON.stringify(simFlags)}`);
+  await page.bringToFront();
+  check(await eventually(async () => !!(await page.$('#bcv-welcome, #bcv-whatsnew')), 15000), 'what someone updating from 2.98.19 sees comes up on it: the black stage it owes, or What\'s New');
+  await page.screenshot({ path: join(out, '29c-dev-simulated-update.png') });
+  await options.click('#devFrom').catch(() => {});
+  await options.fill('#devFrom', '9.9.9');
+  await options.click('#devSimRun');
+  check(await eventually(async () => /^Pick a version before this one/.test(await options.$eval('#devSimMsg', (e) => e.textContent))), 'a version that is not older is refused, and says why');
+  // (put back: nothing owed, the flag off, the page as it was)
+  await sw.evaluate(async () => { const v = self.BCV.api.runtime.getManifest().version; await self.BCV.api.storage.local.set({ 'whatsnew:seen': v, 'welcome:report1': true, 'welcome:look5': true, 'dev:quizImport': false }); await self.BCV.api.storage.local.remove('whatsnew:from'); });
+  await page.goto(`${BASE}/`);
+  await page.waitForSelector('.bcv-stat', { timeout: 15000 });
+  await options.screenshot({ path: join(out, '29d-options-dev.png') });
+
   // ---- Reset everything reaches the site: the one-line note a Canvas tab keeps in its own storage goes too ----
   console.log('reset');
   await page.goto(`${BASE}/`);
