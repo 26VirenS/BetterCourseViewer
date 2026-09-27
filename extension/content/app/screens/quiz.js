@@ -1117,11 +1117,27 @@
       return true;
     }
     const parseCorrect = (v) => (v === true || v === 'true' ? true : v === false || v === 'false' ? false : v === 'partial' ? 'partial' : null);
-    /** The student's answer as the graded history records it (answer_id, answer_<id> flags, or text). */
+    /** The student's answer as the graded history records it: answer_id, answer_<id> — a "1" per
+     *  option ticked (multiple answers) or the match each left-hand value was set to (matching) —
+     *  answer_for_<blank> and answer_id_for_<blank> (the blank kinds), or text. */
     function histAnswer(q, d) {
       if (MULTI.has(q.question_type)) {
         const on = Object.keys(d).filter((k) => /^answer_\d+$/.test(k) && String(d[k]) === '1').map((k) => Number(k.slice(7)));
         return on.length ? on : null;
+      }
+      if (MATCH.has(q.question_type)) {
+        const pairs = Object.keys(d).filter((k) => /^answer_\d+$/.test(k) && hasId(d[k])).map((k) => ({ answer_id: whole(k.slice(7)), match_id: whole(d[k]) }));
+        return pairs.length ? pairs : null;
+      }
+      if (BLANKS.has(q.question_type)) {
+        const out = {};
+        for (const k of Object.keys(d)) {
+          const blank = /^answer_for_(.+)$/.exec(k)?.[1];
+          if (!blank) continue;
+          const v = DROPS.has(q.question_type) && hasId(d[`answer_id_for_${blank}`]) ? d[`answer_id_for_${blank}`] : d[k];
+          if (hasId(v)) out[blank] = v;
+        }
+        return Object.keys(out).length ? out : null;
       }
       const text = d.text === undefined || d.text === null || d.text === '' ? null : d.text;
       if (CHOICE.has(q.question_type)) return d.answer_id ?? (text !== null && Number.isFinite(Number(text)) ? Number(text) : null);
@@ -1162,7 +1178,7 @@
       // asked for is read from the graded history, its own answers and its own ticks
       const live = (subs || [])[0];
       const older = !!live && Number(sub.attempt) !== Number(live.attempt);
-      const rows = qs.map((q, k) => {
+      const rows = qs.map(tidy).map((q, k) => { // (tidy: a matching answer of empty rows, or blanks all empty, is no answer — so the graded history is read instead)
         const d = graded.get(String(q.id)) || null;
         if (d && (older || !answered(q.answer))) q.answer = histAnswer(q, d); // (a one-at-a-time quiz's answers come from the graded history too)
         const correct = older && d ? parseCorrect(d.correct) : (parseCorrect(q.correct) ?? (d ? parseCorrect(d.correct) : null));

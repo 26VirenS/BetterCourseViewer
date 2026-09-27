@@ -262,7 +262,7 @@ const quizzes = (courseId) => allAssignments(courseId).filter((a) => a.is_quiz_a
 
 // ---- quiz attempts (stateful, like Canvas's quiz submission API) --------------------------
 // quiz 9001 was taken once: q1 right, q2 wrong (17.68 m), q3 right, q4 right = 13 of 16
-const quizSubs = new Map([['9001', [{ id: 'qs1', quiz_id: '9001', attempt: 1, score: 13, kept_score: 13, started_at: at(-14, 15, 30), finished_at: at(-14, 15, 52), workflow_state: 'complete', validation_token: 'tok-1', state: { 90011: { answer: 900111 }, 90012: { answer: 900124 }, 90013: { answer: [900131, 900133] }, 90014: { answer: 3.15 }, 90017: { answer: '<p>Pros:&nbsp;</p>\n<ul>\n<li>Ability to work together</li>\n<li>Divide and conquer assignments/group work&nbsp;</li>\n<li>Ideate together &amp; create better ideas.&nbsp;</li>\n</ul>\n<p>Cons</p>\n<ul>\n<li>Unreliable group mates cause a more stressful workload</li>\n<li>Have to set times to meet up outside of class&nbsp;</li>\n</ul>' } } }]]]); // (the essay, the way Canvas's editor keeps one, counts only when the rich set is on)
+const quizSubs = new Map([['9001', [{ id: 'qs1', quiz_id: '9001', attempt: 1, score: 13, kept_score: 13, started_at: at(-14, 15, 30), finished_at: at(-14, 15, 52), workflow_state: 'complete', validation_token: 'tok-1', state: { 90011: { answer: 900111 }, 90012: { answer: 900124 }, 90013: { answer: [900131, 900133] }, 90014: { answer: 3.15 }, 90015: { answer: [{ answer_id: 900151, match_id: 0 }, { answer_id: 900152, match_id: 902 }] }, 90016: { answer: { rate: 900161, what: 900163 } }, 90017: { answer: '<p>Pros:&nbsp;</p>\n<ul>\n<li>Ability to work together</li>\n<li>Divide and conquer assignments/group work&nbsp;</li>\n<li>Ideate together &amp; create better ideas.&nbsp;</li>\n</ul>\n<p>Cons</p>\n<ul>\n<li>Unreliable group mates cause a more stressful workload</li>\n<li>Have to set times to meet up outside of class&nbsp;</li>\n</ul>' } } }]]]); // (the essay, the way Canvas's editor keeps one, counts only when the rich set is on)
 const quizQuestionBank = (quizId) => {
   const mc = (n, text, opts, extra = {}) => ({ id: `${quizId}${n}`, position: n, question_name: `Question ${n}`, question_type: 'multiple_choice_question', question_text: `<p>${text}</p>`, points_possible: 4, answers: opts.map((t, i) => ({ id: Number(`${quizId}${n}${i + 1}`), text: t, html: '', weight: i === 0 ? 100 : 0 })), ...extra });
   return [
@@ -320,6 +320,17 @@ const gradeQuestion = (q, a) => {
 const pubSub = ({ state, read, ...s }) => s;
 // the student's answer the way Canvas's graded history records it (answer_id / answer_<id> flags / text)
 const histFields = (q, a) => {
+  // matching: answer_<id> holds the match each left-hand value was set to ('' where none); the blank
+  // kinds: answer_for_<blank> the value (a dropdown's answer id), and answer_id_for_<blank> a dropdown's id
+  if (q.question_type === 'matching_question') {
+    const got = new Map((Array.isArray(a) ? a : []).map((p2) => [String(p2.answer_id), p2.match_id]));
+    return Object.fromEntries(q.answers.map((x) => [`answer_${x.id}`, got.has(String(x.id)) && got.get(String(x.id)) !== null ? String(got.get(String(x.id))) : '']));
+  }
+  if (BLANK_KINDS.has(q.question_type)) {
+    const held = a && typeof a === 'object' && !Array.isArray(a) ? a : {};
+    const drops = q.question_type === 'multiple_dropdowns_question';
+    return Object.fromEntries([...new Set(q.answers.map((x) => x.blank_id))].flatMap((bl) => [[`answer_for_${bl}`, held[bl] === undefined || held[bl] === null ? '' : String(held[bl])], ...(drops ? [[`answer_id_for_${bl}`, held[bl] === undefined || held[bl] === null ? null : Number(held[bl])]] : [])]));
+  }
   if (a === null || a === undefined || a === '') return {};
   if (q.question_type === 'multiple_answers_question') return Object.fromEntries((Array.isArray(a) ? a : [a]).map((id) => [`answer_${id}`, '1']));
   if (q.question_type === 'numerical_question') return { text: String(a) };
@@ -358,6 +369,8 @@ const unhash = (q, answer) => {
 /** An answer as Canvas's questions endpoint hands it back (AnswerSerializers#deserialize, full: true):
  *  a matching answer lists every left-hand value, its ids as strings and a null match where none is
  *  picked yet; a blank kind lists every blank, null where it is empty. Only what was picked is kept. */
+// (a finished attempt's matching and blank answers come back from this endpoint as rows and blanks
+// with nothing in them: the graded history is where they are — as a real attempt showed)
 const canvasAnswer = (q, a) => {
   if (q.question_type === 'matching_question') {
     const got = new Map((Array.isArray(a) ? a : []).map((p2) => [String(p2.answer_id), p2.match_id]));
@@ -374,7 +387,7 @@ const subQuestions = (s) => {
   const bank = quizQuestionBank(s.quiz_id);
   return {
     // like Canvas: `correct`, answer weights and the question comments only appear once the attempt is complete
-    quiz_submission_questions: bank.map((q) => ({ id: q.id, position: q.position, flagged: !!s.state[q.id]?.flagged, answer: canvasAnswer(q, s.state[q.id]?.answer), ...(done ? { correct: gradeQuestion(q, s.state[q.id]?.answer) } : {}) })),
+    quiz_submission_questions: bank.map((q) => ({ id: q.id, position: q.position, flagged: !!s.state[q.id]?.flagged, answer: canvasAnswer(q, done && (q.question_type === 'matching_question' || BLANK_KINDS.has(q.question_type)) ? null : s.state[q.id]?.answer), ...(done ? { correct: gradeQuestion(q, s.state[q.id]?.answer) } : {}) })),
     quiz_questions: bank.map((q) => ({ ...(done ? q : { ...q, neutral_comments_html: undefined, correct_comments_html: undefined, incorrect_comments_html: undefined, neutral_comments: undefined, answers: q.answers.map(({ weight, ...a }) => a) }), question_text: blankFields(q) })), // (the fields rendered in, with nothing picked: Canvas's own page sets those with a script of its own)
   };
 };

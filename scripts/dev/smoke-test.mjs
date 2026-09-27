@@ -2719,6 +2719,11 @@ try {
   await page.click('.bcv-col .bcv-row[href*="attempt=1"]');
   await page.waitForSelector('.bcv-fb__scoreline', { timeout: 15000 });
   check(/^13 \/ 16 /.test((await texts('.bcv-fb__scoreline'))[0]) && (await page.$$('.bcv-fb__q')).length >= 4, `an earlier attempt opens its own feedback: ${(await texts('.bcv-fb__scoreline'))[0]}`);
+  // (2.98.26) a finished matching answer and a finished pair of blanks are read from the graded history —
+  // answer_<id> the match each value was set to, answer_for_<blank> — not shown as "no answer"
+  const fbChip = (n) => page.$$eval('.bcv-fb__q', (els, n2) => els.find((e) => e.querySelector('.bcv-fb__qn')?.textContent === `Question ${n2}`)?.querySelector('.bcv-fb__chip')?.textContent.replace(/\s+/g, ' ').trim() || null, n);
+  const matchChip = await fbChip(5), blankChip = await fbChip(6);
+  check(matchChip === 'You: 9.8 → Acceleration due to gravity, 3.0 × 10⁸ → Speed of light' && blankChip === 'You: rate: rate of change, what: position', `the feedback reads a matching answer and the blanks from the graded history — the pairs set and each blank's pick, not "no answer": ${matchChip} | ${blankChip}`);
   // an essay written in Canvas's own editor shows as its paragraphs and lists, under the question, never as tags
   const essayFb = await page.$eval('.bcv-fb__essay', (e) => ({ items: [...e.querySelectorAll('li')].map((li) => li.textContent.trim()), paras: e.querySelectorAll('p').length, raw: /<(p|ul|li)>/.test(e.textContent), chip: e.closest('.bcv-fb__q')?.querySelector('.bcv-fb__chip')?.textContent })).catch(() => null);
   check(!!essayFb && essayFb.items.join(' | ') === 'Ability to work together | Divide and conquer assignments/group work | Ideate together & create better ideas. | Unreliable group mates cause a more stressful workload | Have to set times to meet up outside of class' && essayFb.paras === 2 && !essayFb.raw && essayFb.chip === 'Your answer, below', `the feedback shows a written answer as formatting, the chip pointing to it: ${JSON.stringify(essayFb)}`);
