@@ -1154,6 +1154,11 @@
     answer(sub, questionId, answer, accessCode) {
       return C.post(`/api/v1/quiz_submissions/${sub.id}/questions`, { attempt: sub.attempt, validation_token: sub.validation_token, ...(accessCode ? { access_code: accessCode } : {}), quiz_questions: [{ id: questionId, answer }] });
     },
+    /** Several answers in one save: Canvas rewrites the attempt's whole record on each save, so answers
+     *  sent side by side can overwrite each other; one request keeps them together. */
+    answerMany(sub, items, accessCode) {
+      return C.post(`/api/v1/quiz_submissions/${sub.id}/questions`, { attempt: sub.attempt, validation_token: sub.validation_token, ...(accessCode ? { access_code: accessCode } : {}), quiz_questions: items.map(({ id, answer }) => ({ id, answer })) });
+    },
     /** A file for a file-upload question: Canvas's quiz file upload (the student's own quiz files; the
      *  same three steps a submission's file takes). Returns the attachment id the answer names. */
     async uploadFile(courseId, quizId, file, onProgress) {

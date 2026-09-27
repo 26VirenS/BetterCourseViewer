@@ -129,7 +129,7 @@ function assignmentObj(courseId, row) {
         : (earned !== null && id === '1002' ? [{ author_id: `t${courseId}`, author_name: c.teacher, created_at: at(dueDay + 1, 9, 0), attempt: 2, comment: 'Check the domain restrictions in question 3 — the rest was solid.' }, { author_id: `t${courseId}`, author_name: c.teacher, created_at: at(dueDay + 1, 9, 5), attempt: 2, comment: '', media_comment: { media_id: 'm-1002', media_type: 'audio', content_type: 'audio/mp4', display_name: 'Voice note on question 3', url: '/media_objects/m-1002/audio.mp4' } }] : []), // (a voice note: a comment with no words of its own)
     rubric_assessment: extra.rubric && earned !== null ? { c1: { points: 4, rating_id: 'r2', comments: 'Sign error in part b.' }, c2: { points: 4, rating_id: 'r3' } } : undefined,
     // quiz assignments: Canvas keeps each attempt's per-question grading in submission_history
-    submission_history: extra.quiz ? (quizSubs.get(String(Number(id) + 8000)) || []).filter((s) => s.workflow_state === 'complete').map((s) => ({ attempt: s.attempt, score: s.score, submission_data: quizQuestionBank(s.quiz_id).map((q) => ({ question_id: q.id, correct: gradeQuestion(q, s.state[q.id]?.answer), points: gradeQuestion(q, s.state[q.id]?.answer) ? q.points_possible : 0, ...histFields(q, s.state[q.id]?.answer) })) }))
+    submission_history: extra.quiz ? (quizSubs.get(String(Number(id) + 8000)) || []).filter((s) => s.workflow_state === 'complete').map((s) => ({ attempt: s.attempt, score: s.score, submission_data: quizQuestionBank(s.quiz_id).map((q) => ({ question_id: q.id, correct: flagOf(q, s.state[q.id]?.answer), points: gradeQuestion(q, s.state[q.id]?.answer) ? q.points_possible : 0, ...histFields(q, s.state[q.id]?.answer) })) }))
       // everything else keeps what was handed in, attempt by attempt
       : (submitted ? [
         { attempt: 1, submitted_at: at(dueDay - 3, 14, 20), submission_type: 'online_text_entry', score: null, late: false, body: `<p>First pass at <strong>${name}</strong>. I will attach the working before the deadline.</p>` },
@@ -401,12 +401,15 @@ const censor = (q) => {
   else out.answers = (q.answers || []).map((a) => Object.fromEntries(Object.entries(a).filter(([k]) => ['id', 'text', 'html', 'blank_id', 'variables'].includes(k))));
   return out;
 };
+// test-only (staleFlag): the right/wrong flag Canvas kept from before a regrade — every answer flagged
+// wrong, its points as graded (a right one's full)
+const flagOf = (q, answer) => (mockConfig.staleFlag ? false : gradeQuestion(q, answer));
 const subQuestions = (s) => {
   const done = s.workflow_state === 'complete';
   const bank = quizQuestionBank(s.quiz_id);
   return {
     // like Canvas: `correct`, answer weights and the question comments only appear once the attempt is complete
-    quiz_submission_questions: bank.map((q) => ({ id: q.id, position: q.position, flagged: !!s.state[q.id]?.flagged, answer: canvasAnswer(q, done && (q.question_type === 'matching_question' || BLANK_KINDS.has(q.question_type)) ? null : s.state[q.id]?.answer), ...(done ? { correct: gradeQuestion(q, s.state[q.id]?.answer) } : {}) })),
+    quiz_submission_questions: bank.map((q) => ({ id: q.id, position: q.position, flagged: !!s.state[q.id]?.flagged, answer: canvasAnswer(q, done && (q.question_type === 'matching_question' || BLANK_KINDS.has(q.question_type)) ? null : s.state[q.id]?.answer), ...(done ? { correct: flagOf(q, s.state[q.id]?.answer) } : {}) })),
     quiz_questions: bank.map((q) => ({ ...censor(q), question_text: blankFields(q) })), // (the fields rendered in, with nothing picked: Canvas's own page sets those with a script of its own)
   };
 };
@@ -883,11 +886,22 @@ on('GET', /^\/api\/v1\/quiz_submissions\/([\w-]+)\/questions$/, (url, m) => {
   if (oneAtATime(s)) return { __status: 400, errors: [{ message: 'Cannot receive one question at a time questions in the API' }] };
   return subQuestions(s);
 });
+/** A save to the attempt's record (an answer, a flag). Canvas reads the whole record, changes it and
+ *  writes it back whole; test-only `saveRace` holds each save between that read and that write, as a
+ *  busy server does, so two saves side by side lose the first one's change — as they do on Canvas. */
+function backup(s, change) {
+  if (!mockConfig.saveRace) { change(s.state); return subQuestions(s); }
+  const read = structuredClone(s.state);
+  change(read);
+  return new Promise((done) => setTimeout(() => { s.state = read; done(subQuestions(s)); }, 150));
+}
 on('POST', /^\/api\/v1\/quiz_submissions\/([\w-]+)\/questions$/, (url, m, body) => {
   const s = findSub(m[1]);
   if (!s || body.validation_token !== s.validation_token) return null;
   const refused = codeRefused(s, body);
   if (refused) return refused;
+  // like Canvas: every answer is checked before any is kept, and one it refuses turns the whole request away
+  const kept = [];
   for (const q of body.quiz_questions || []) {
     const asked = quizQuestionBank(s.quiz_id).find((x) => String(x.id) === String(q.id));
     // Canvas is strict about the shape of a matching answer and says so rather than saving it: a
@@ -901,12 +915,14 @@ on('POST', /^\/api\/v1\/quiz_submissions\/([\w-]+)\/questions$/, (url, m, body) 
     if (asked?.question_type === 'file_upload_question' && Array.isArray(q.answer) && q.answer.some((id) => !storedFiles.has(String(id)))) {
       return { __status: 400, errors: [{ message: 'invalid attachment' }] };
     }
-    s.state[String(q.id)] = { ...(s.state[String(q.id)] || {}), answer: unhash(asked, q.answer) };
+    kept.push([String(q.id), unhash(asked, q.answer)]);
   }
-  return subQuestions(s);
+  return backup(s, (state) => { for (const [id, answer] of kept) state[id] = { ...(state[id] || {}), answer }; });
 });
-on('PUT', /^\/api\/v1\/quiz_submissions\/([\w-]+)\/questions\/(\w+)\/(flag|unflag)$/, (url, m, body) => { const s = findSub(m[1]); if (!s) return null; const refused = codeRefused(s, body); if (refused) return refused; s.state[m[2]] = { ...(s.state[m[2]] || {}), flagged: m[3] === 'flag' }; return subQuestions(s); });
+on('PUT', /^\/api\/v1\/quiz_submissions\/([\w-]+)\/questions\/(\w+)\/(flag|unflag)$/, (url, m, body) => { const s = findSub(m[1]); if (!s) return null; const refused = codeRefused(s, body); if (refused) return refused; return backup(s, (state) => { state[m[2]] = { ...(state[m[2]] || {}), flagged: m[3] === 'flag' }; }); });
 on('GET', /^\/api\/v1\/courses\/(\w+)\/quizzes\/(\w+)\/submissions\/([\w-]+)\/time$/, (url, m) => { const s = findSub(m[3]); return s ? { end_at: s.end_at, time_left: s.end_at ? Math.round((new Date(s.end_at) - Date.now()) / 1000) : null } : null; });
+// test-only: an answer the attempt lost (a save written over by another, as Canvas's whole-record saves can be)
+on('POST', /^\/__mock\/lose-answer$/, (url, m, body) => { const s = findSub(body.subId); if (!s) return { __status: 404, errors: [{ message: 'no attempt' }] }; if (s.state[body.questionId]) delete s.state[body.questionId].answer; return { ok: true }; });
 on('POST', /^\/api\/v1\/courses\/(\w+)\/quizzes\/(\w+)\/submissions\/([\w-]+)\/complete$/, (url, m) => {
   const s = findSub(m[3]);
   if (!s) return null;
@@ -1058,7 +1074,7 @@ const server = http.createServer((req, res) => {
   const path = url.pathname.replace(/\/+$/, '') || '/';
   let raw = '';
   req.on('data', (c) => (raw += c));
-  req.on('end', () => {
+  req.on('end', async () => {
     let body = {};
     try {
       body = raw ? JSON.parse(raw) : {};
@@ -1076,7 +1092,7 @@ const server = http.createServer((req, res) => {
       if (method !== req.method) continue;
       const m = path.match(re);
       if (!m) continue;
-      const data = handler(url, m, body, raw);
+      const data = await handler(url, m, body, raw); // (a handler may answer later: a save held, as a busy Canvas does)
       if (data === null) return json(res, { errors: [{ message: 'not found' }] }, 404);
       if (data && data.__status) return json(res, { errors: data.errors || [] }, data.__status);
       return json(res, data);

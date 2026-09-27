@@ -346,6 +346,39 @@
     const remember = (code) => { try { if (code) sessionStorage.setItem(CODE_KEY, code); else sessionStorage.removeItem(CODE_KEY); } catch { /* fine without */ } };
     const codeFor = () => (st.code || '').trim() || remembered();
     const codeRefused = (e) => /access code/i.test(String(e?.message || ''));
+    /* Canvas keeps an attempt's answers as one record, read, changed and written back whole on every
+     * save (a flag too). Two saves at once each write over the other, and an answer is lost while the
+     * screen shows it saved. So every write about the attempt goes up one at a time, in the order it
+     * was made. */
+    let writeChain = Promise.resolve();
+    const inTurn = (fn) => { const run = writeChain.then(fn); writeChain = run.catch(() => {}); return run; };
+    /** An answer as something to compare: ids as text, lists in any order, an empty one as nothing. */
+    const canon = (v) => {
+      if (v === null || v === undefined || v === '') return '';
+      if (Array.isArray(v)) return JSON.stringify(v.map((x) => (x && typeof x === 'object' ? JSON.stringify(Object.entries(x).map(([k, y]) => [k, String(y)]).sort()) : String(x))).sort());
+      if (typeof v === 'object') return JSON.stringify(Object.entries(v).filter(([, y]) => hasId(y)).map(([k, y]) => [k, String(y)]).sort());
+      return String(v).trim();
+    };
+    /** The answers Canvas holds for this attempt now, by question id (as picked: tidy), or null where it cannot say. */
+    async function answersOnCanvas() {
+      if (st.paged) return null; // (Canvas lists no questions for a one-at-a-time quiz)
+      const list = await store.quizApi.questions(st.sub).catch(() => null);
+      return list ? new Map(list.map((q) => [String(q.id), tidy({ ...q }).answer])) : null;
+    }
+    /** The questions answered here that Canvas does not hold as answered here, sent again one at a
+     *  time; what is still not there after that comes back (null: Canvas could not be asked). */
+    async function mendAnswers(questions) {
+      let held = await answersOnCanvas();
+      if (!held) return null;
+      const off = (q) => canon(held.get(String(q.id))) !== canon(q.answer);
+      const want = questions.filter((q) => !INFO.has(q.question_type) && answered(q.answer));
+      const again = want.filter(off);
+      if (!again.length) return [];
+      for (const q of again) await inTurn(() => store.quizApi.answer(st.sub, q.id, q.answer, codeFor())).catch(() => {});
+      held = await answersOnCanvas();
+      if (!held) return null;
+      return want.filter((q) => !answered(held.get(String(q.id)))); // (still missing altogether: a value Canvas writes its own way is not a loss)
+    }
     let codePrompt = null; // the prompt on show, and the saves waiting on it: [q, answer][]
     function askForCode(q, answer) {
       if (codePrompt) { codePrompt.push([q, answer]); return; }
@@ -355,7 +388,7 @@
         placeholder: 'Access code', value: '', saveLabel: 'Save answer',
         onSave: async (v) => {
           if (!v) throw new Error('Enter the access code.');
-          await store.quizApi.answer(st.sub, q.id, answer, v); // (refused again: the prompt says so and stays)
+          await inTurn(() => store.quizApi.answer(st.sub, q.id, answer, v)); // (refused again: the prompt says so and stays)
           st.code = v;
           remember(v);
           st.savedAt = Date.now();
@@ -372,7 +405,7 @@
       q.answer = answer;
       st.saving++;
       paintFooter();
-      const p = store.quizApi.answer(st.sub, q.id, answer, codeFor());
+      const p = inTurn(() => store.quizApi.answer(st.sub, q.id, answer, codeFor()));
       st.inflight.add(p);
       try {
         await p;
@@ -408,8 +441,8 @@
       if (st.inflight.size) await Promise.allSettled([...st.inflight]);
     }
     /** Developer: the answers of the latest earlier attempt with any, read from the graded history as
-     *  the feedback reads them, put on this attempt's questions and saved to Canvas one by one, as a
-     *  press would save each. */
+     *  the feedback reads them, put on this attempt's questions and saved to Canvas in one request —
+     *  then read back from Canvas, what it did not keep sent again, and the count said is what Canvas holds. */
     async function importEarlier() {
       if (!quiz.assignment_id) { U.toast('This quiz keeps no graded history to import from.', { error: true }); return; }
       devBtn.disabled = true;
@@ -421,19 +454,26 @@
           .sort((a, b) => Number(b.attempt) - Number(a.attempt))[0];
         if (!earlier) { U.toast('No earlier attempt with answers to import.', { error: true }); return; }
         const by = new Map(earlier.submission_data.map((d) => [String(d.question_id), d]));
-        let n = 0;
+        const picked = [];
         for (const q of st.questions) {
           const d = by.get(String(q.id));
           if (!d || INFO.has(q.question_type)) continue;
           const answer = histAnswer(q, d);
           if (answer === null || answer === undefined) continue;
-          n++;
-          save(q, answer);
+          picked.push([q, answer]);
         }
+        if (!picked.length) { U.toast(`Attempt ${earlier.attempt} has no answers these questions take.`); return; }
         await settled();
+        for (const [q, answer] of picked) q.answer = answer;
+        const batchErr = await inTurn(() => store.quizApi.answerMany(st.sub, picked.map(([q, answer]) => ({ id: q.id, answer })), codeFor())).then(() => null, (e) => e);
+        // (one answer Canvas refuses turns the whole request away: each is then sent on its own, and only that one stays out)
+        const missing = await mendAnswers(picked.map(([q]) => q));
+        if (batchErr && missing === null) throw batchErr;
         if (!ctx.alive()) return;
         draw();
-        U.toast(n ? `Imported ${n} ${n === 1 ? 'answer' : 'answers'} from attempt ${earlier.attempt}.` : `Attempt ${earlier.attempt} has no answers these questions take.`);
+        const n = picked.length - (missing?.length || 0);
+        if (missing?.length) U.toast(`Imported ${n} of ${picked.length} answers from attempt ${earlier.attempt}. Canvas did not keep ${missing.map((q) => `Question ${st.questions.indexOf(q) + 1}`).join(', ')}.`, { error: true });
+        else U.toast(`Imported ${n} ${n === 1 ? 'answer' : 'answers'} from attempt ${earlier.attempt}.`);
       } catch (e) {
         U.toast(`Could not import the answers: ${e.message}`, { error: true });
       } finally {
@@ -445,7 +485,7 @@
       q.flagged = on;
       paintProgress();
       try {
-        await store.quizApi.flag(st.sub, q.id, on, codeFor());
+        await inTurn(() => store.quizApi.flag(st.sub, q.id, on, codeFor()));
       } catch (e) {
         q.flagged = !on;
         paintProgress();
@@ -1120,6 +1160,14 @@
       body.replaceChildren(h('p', { class: 'bcv-qz__starting', text: 'Submitting…' })); // inside the attempt nothing is a skeleton
       try {
         await settled(); // (an answer typed a moment ago is still on its pause, or on its way: it goes in before the attempt closes)
+        // and every answer given here is on Canvas: one it does not hold is sent again first, and one that
+        // will not stay is named before anything is handed in
+        const missing = await mendAnswers(st.questions);
+        if (missing?.length && !window.confirm(`${missing.map((q) => `Question ${st.questions.indexOf(q) + 1}`).join(', ')}: Canvas did not keep ${missing.length === 1 ? 'that answer' : 'those answers'}.\n\nSubmit anyway? Cancel to go back and answer ${missing.length === 1 ? 'it' : 'them'} again.`)) {
+          st.stage = 'review';
+          draw();
+          return;
+        }
         st.done = await store.quizApi.complete(cid, qid, st.sub, codeFor());
         st.stage = 'done';
         clearInterval(st.timer);
@@ -1157,8 +1205,7 @@
         U.el('bcv-qz__donebtns', [
           // feedback only once Canvas has released it (hide_results); the receipt says so otherwise. A survey has none.
           feedbackOn ? h('button', { type: 'button', class: 'bcv-qz__big bcv-qz__big--primary', text: 'See feedback', onclick: () => openFeedback(d, 'done') }) : null,
-          h('button', { type: 'button', class: `bcv-qz__big ${feedbackOn ? '' : 'bcv-qz__big--primary'}`, text: `Back to ${course.name}`, onclick: () => exitTo(course.url) }),
-          h('button', { type: 'button', class: 'bcv-qz__big', text: survey ? 'Survey page' : 'Quiz page', onclick: () => exitTo(simulated ? simHome : quizUrl) }),
+          h('button', { type: 'button', class: `bcv-qz__big ${feedbackOn ? '' : 'bcv-qz__big--primary'}`, text: survey ? 'Back to the survey' : 'Back to the quiz', onclick: () => exitTo(simulated ? simHome : quizUrl) }),
         ]),
       ]);
     }
@@ -1307,10 +1354,15 @@
         const d = graded.get(String(q.id)) || null;
         const pq = page?.get(String(q.id)) || null;
         if (d && (older || !answered(q.answer))) q.answer = histAnswer(q, d); // (a one-at-a-time quiz's answers come from the graded history too)
-        const correct = older && d ? parseCorrect(d.correct) : (parseCorrect(q.correct) ?? (d ? parseCorrect(d.correct) : null));
+        const flag = older && d ? parseCorrect(d.correct) : (parseCorrect(q.correct) ?? (d ? parseCorrect(d.correct) : null));
         // the points a question was worth: the API's where it gives them (it never does to a student), else the results page's
         const possible = hasNum(q.points_possible) ? Number(q.points_possible) : hasNum(pq?.possible) ? Number(pq.possible) : null;
-        const earned = d && hasNum(d.points) ? Number(d.points) : correct === true ? possible : correct === false ? 0 : null;
+        // the points it got decide how it went: Canvas's right/wrong flag can lag behind them (a regrade, a
+        // score the instructor changed), and an answer given full points is right whatever the flag says.
+        // An answer not graded yet (an essay: no flag, no points) stays unmarked.
+        const pts = d && hasNum(d.points) ? Number(d.points) : null;
+        const correct = pts !== null && possible > 0 && (flag !== null || pts > 0) ? (pts >= possible - 1e-9 ? true : pts > 0 ? 'partial' : false) : flag;
+        const earned = pts !== null ? pts : correct === true ? possible : correct === false ? 0 : null;
         const rightIds = new Set([...(q.answers || []).filter((a) => Number(a.weight) === 100).map((a) => String(a.id)), ...(pq?.right || []).map((x) => String(x.id))]);
         const sol = fbSolution(q, correct === true) || (pq?.comment ? { html: pq.comment } : null);
         return { q, k, correct, possible, earned, yours: answerParts(q), right: fbRight(q) || pageRight(q, pq), rightIds, shown: correctVisible() || !!pq?.shown, match: pq?.match || null, sol, read: !!pq, info: INFO.has(q.question_type) };
@@ -1591,7 +1643,7 @@
       const btns = () => U.el('bcv-fb__btns', [
         st.fbFrom === 'done' ? h('button', { type: 'button', class: 'bcv-qz__big', text: 'Back to receipt', onclick: () => { st.stage = 'done'; draw(); toTop(); } }) : null,
         st.fbFrom === 'intro' ? h('button', { type: 'button', class: 'bcv-qz__big', text: 'Quiz overview', onclick: () => { st.stage = 'intro'; draw(); toTop(); } }) : null,
-        h('button', { type: 'button', class: 'bcv-qz__big bcv-qz__big--primary', text: `Back to ${course.name}`, onclick: () => exitTo(course.url) }),
+        h('button', { type: 'button', class: 'bcv-qz__big bcv-qz__big--primary', text: /survey/.test(quiz.quiz_type || '') ? 'Back to the survey' : 'Back to the quiz', onclick: () => exitTo(simulated ? simHome : quizUrl) }),
       ]);
       if (!sub) {
         wrap.append(plain(U.emptyCard('No finished attempts yet — feedback appears here once one is submitted.'), btns()));

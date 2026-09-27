@@ -2393,7 +2393,7 @@ try {
   await shot(page, '22g-quiz-done');
   // ---- quiz feedback (mockup 9): the receipt leads to the attempt's results ------------------------
   console.log('quiz feedback');
-  check((await texts('.bcv-qz__donebtns .bcv-qz__big')).join('|') === 'See feedback|Back to F26-MATH 021 20|Quiz page', `receipt offers the feedback once Canvas releases results: ${(await texts('.bcv-qz__donebtns .bcv-qz__big')).join('|')}`);
+  check((await texts('.bcv-qz__donebtns .bcv-qz__big')).join('|') === 'See feedback|Back to the quiz', `receipt offers the feedback once Canvas releases results: ${(await texts('.bcv-qz__donebtns .bcv-qz__big')).join('|')}`);
   await page.click('.bcv-qz__donebtns .bcv-qz__big--primary');
   await page.waitForSelector('.bcv-qfb__q', { timeout: 10000 });
   // (2.98.27) the feedback takes the page, as the attempt did: a rail of its own down the left (the score,
@@ -2497,7 +2497,7 @@ try {
   await mockConfig({ quizHistory: false });
   await page.click('.bcv-qz__begin');
   await page.waitForSelector('.bcv-qfb__q', { timeout: 10000 });
-  check((await texts('.bcv-fb__btns .bcv-qz__big')).join('|') === 'Quiz overview|Back to F26-MATH 021 20', 'feedback opened from the intro links back to it');
+  check((await texts('.bcv-fb__btns .bcv-qz__big')).join('|') === 'Quiz overview|Back to the quiz', 'feedback opened from the intro links back to it');
   const bareScores = await texts('.bcv-qfb__q .bcv-fb__score');
   check(bareScores.join('|') === '4 pts|0 pts|4 pts|5 pts' && !(await page.$('.bcv-qfb__nosol')) && !(await page.$('.bcv-qfb__ans.is-right')), `without the results page a question shows the points it earned — never "/ 0" — and claims nothing it cannot know: ${bareScores.join(' | ')}`);
   await mockConfig({ quizHistory: true });
@@ -2577,13 +2577,19 @@ try {
   await page.goto(`${BASE}/courses/101/quizzes/9001`);
   await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
   check((await texts('.bcv-detail__actions .bcv-btn--primary'))[0] === 'See feedback' && (await texts('.bcv-detail__actions .bcv-badge'))[0] === 'No attempts left · 1 attempt allowed' && (await page.$eval('.bcv-col .bcv-row[href]', (a) => a.getAttribute('href'))) === '/courses/101/quizzes/9001?bcv=feedback&attempt=1', 'a used-up quiz leads to its feedback from the button and the attempt row');
+  await mockConfig({ staleFlag: true }); // (every right/wrong flag gone stale, as after a regrade: the points decide)
   await page.click('.bcv-col .bcv-row[href]');
   await page.waitForSelector('.bcv-qfb__q', { timeout: 10000 });
   const fbLine2 = (await texts('.bcv-fb__scoreline'))[0];
   const fbComments = await texts('.bcv-fb__ctext');
-  check(/^13 \/ 16 81% 3 of 4 correct · graded /.test(fbLine2) && fbComments.length === 1 && /^Nice work on the derivative questions/.test(fbComments[0]) && (await texts('.bcv-fb__avatar'))[0] === 'YL' && (await texts('.bcv-fb__btns .bcv-qz__big')).join('|') === 'Back to F26-MATH 021 20', `feedback from the quiz page: the instructor's comment (never your own reply): ${fbLine2} · ${fbComments.join(' | ')}`);
+  check(/^13 \/ 16 81% 3 of 4 correct · graded /.test(fbLine2) && fbComments.length === 1 && /^Nice work on the derivative questions/.test(fbComments[0]) && (await texts('.bcv-fb__avatar'))[0] === 'YL' && (await texts('.bcv-fb__btns .bcv-qz__big')).join('|') === 'Back to the quiz', `feedback from the quiz page: the instructor's comment (never your own reply), each question marked by its points though Canvas flags every one wrong: ${fbLine2} · ${fbComments.join(' | ')}`);
   check(/Question 2 Incorrect 0 \/ 4 .*Your answer 17\.68 m Correct answer -3\.15 m/i.test((await texts('.bcv-qfb__q'))[1]), `the seeded wrong answer with the correct one beside it: ${(await texts('.bcv-qfb__q'))[1]}`);
+  check(/^Question 1 Correct 4 \/ 4/.test((await texts('.bcv-qfb__q'))[0]) && (await page.$eval('.bcv-qfb__sq[data-k="0"]', (b) => b.classList.contains('is-right'))), `an answer given full points is marked right, whatever Canvas's flag says: ${(await texts('.bcv-qfb__q'))[0].slice(0, 40)}`);
+  await mockConfig({ staleFlag: false });
   await shot(page, '22j-quiz-feedback-seeded');
+  await page.click('.bcv-fb__btns .bcv-qz__big--primary');
+  await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
+  check(new URL(page.url()).pathname === '/courses/101/quizzes/9001' && (await texts('.bcv-detail__title'))[0] === 'Lec01-PreQuiz', `Back to the quiz goes to the quiz's own page, not the course: ${page.url()} · ${(await texts('.bcv-detail__title'))[0]}`);
 
   // ---- a restricted quiz: an access code Canvas does not tell the student -------------------------
   console.log('restricted quiz');
@@ -2676,7 +2682,7 @@ try {
   await page.click('.bcv-qz__big--primary');
   await page.waitForSelector('.bcv-qz__done', { timeout: 10000 });
   const surveyCards = await texts('.bcv-qz__donecard');
-  check((await texts('.bcv-qz__h1'))[0] === 'Responses recorded' && /Thanks for taking part/.test((await texts('.bcv-qz__lead'))[0]) && /Questions answered 3 of 4 answered/.test(surveyCards[0]) && /For taking part 2 points/.test(surveyCards[1] || '') && !surveyCards.some((t) => /^Score/.test(t)) && (await texts('.bcv-qz__donebtns .bcv-qz__big')).join('|') === 'Back to F26-PHYS 008 01|Survey page', `the receipt says the responses are in, the points for taking part, and no score or feedback: ${surveyCards.join(' | ')}`);
+  check((await texts('.bcv-qz__h1'))[0] === 'Responses recorded' && /Thanks for taking part/.test((await texts('.bcv-qz__lead'))[0]) && /Questions answered 3 of 4 answered/.test(surveyCards[0]) && /For taking part 2 points/.test(surveyCards[1] || '') && !surveyCards.some((t) => /^Score/.test(t)) && (await texts('.bcv-qz__donebtns .bcv-qz__big')).join('|') === 'Back to the survey', `the receipt says the responses are in, the points for taking part, and no score or feedback: ${surveyCards.join(' | ')}`);
   await page.click('.bcv-qz__donebtns .bcv-qz__big--primary');
   await page.waitForSelector('.bcv-screen, .bcv-cmain', { timeout: 10000 });
 
@@ -6457,7 +6463,9 @@ try {
   await options.screenshot({ path: join(out, '29b-options-dev-quiz.png') });
   // the quiz: a new attempt, Import answers — attempt 1's answers filled in and saved to Canvas
   await page.bringToFront();
-  await mockConfig({ richQuestions: true, moreTypes: true }); // (attempts to spare, the rich kinds to import, and a formula question and a file to hand in: the kinds 2.98.30 takes here)
+  // (attempts to spare, the rich kinds to import, and a formula question and a file to hand in: the kinds 2.98.30 takes here;
+  // and each save held between Canvas's read of the attempt's record and its write, so saves side by side would lose answers)
+  await mockConfig({ richQuestions: true, moreTypes: true, saveRace: true });
   await page.goto(`${BASE}/courses/101/quizzes/9001?bcv=take`);
   await page.waitForSelector('.bcv-qz__begin[data-begin]:not([disabled])', { timeout: 15000 });
   check(await page.$eval('.bcv-qz__devimport', (b) => b.hidden), 'the button is not on the intro: an attempt has to be open');
@@ -6469,7 +6477,11 @@ try {
   const importedQs = openSub ? await apiGet(`/api/v1/quiz_submissions/${openSub.id}/questions`) : null;
   const ansOf = (id) => (importedQs?.quiz_submission_questions || []).find((q) => String(q.id) === String(id))?.answer;
   const imported = { attempt: openSub?.attempt, q1: ansOf(90011), q2: ansOf(90012), q3: [...(ansOf(90013) || [])].map(Number).sort().join(','), q4: Number(ansOf(90014)) };
-  check(imported.attempt === 2 && Number(imported.q1) === 900111 && Number(imported.q2) === 900124 && imported.q3 === '900131,900133' && imported.q4 === 3.15, `and Canvas has them on the new attempt, attempt 1's answer to each question: ${JSON.stringify(imported)}`);
+  check(imported.attempt === 2 && Number(imported.q1) === 900111 && Number(imported.q2) === 900124 && imported.q3 === '900131,900133' && imported.q4 === 3.15, `and Canvas has them on the new attempt, attempt 1's answer to each question — every one kept though Canvas writes the whole record on each save: ${JSON.stringify(imported)}`);
+  const importToast = (await texts('.bcv-toast')).join(' ');
+  const keptCount = (importedQs?.quiz_submission_questions || []).filter((q) => q.answer !== null && q.answer !== undefined && q.answer !== '' && !(Array.isArray(q.answer) && !q.answer.length)).length;
+  check(Number((importToast.match(/Imported (\d+) answers/) || [])[1]) === keptCount && !/did not keep/.test(importToast), `the count said is the count Canvas holds: ${importToast} · ${keptCount} on Canvas`);
+  await mockConfig({ saveRace: false });
   check((await page.$$('.bcv-qz__opt.is-selected')).length >= 1, 'the question on screen shows its imported answer');
   // Formula and File Upload questions, answered here: a number to the places the quiz asks for; a file uploaded to the student's quiz files and named as the answer
   const pillOf = (id) => page.locator('.bcv-qz__pill').nth(Number((importedQs?.quiz_submission_questions || []).find((q) => String(q.id) === String(id))?.position) - 1); // (the squares run in the questions' positions)
@@ -6491,8 +6503,19 @@ try {
   await page.screenshot({ path: join(out, '29e-quiz-file-question.png') });
   await page.click('.bcv-qz__fileclear');
   check(await eventually(async () => (await page.$eval('.bcv-qz__filename', (e) => e.textContent).catch(() => '')) === 'No file yet' && !((await liveAnswer(90019)) || []).length, 8000), 'Remove takes the file off the answer');
-  await page.click('.bcv-qz__exit');
-  await page.waitForSelector('.bcv-qz__intro, .bcv-detail__title', { timeout: 15000 });
+  // an answer Canvas lost after it was saved (written over by another save): Submit reads the attempt
+  // back first, sends what is missing again, and only then hands the attempt in
+  await sw.evaluate(async ([base, b]) => (await fetch(`${base}/__mock/lose-answer`, { method: 'POST', body: JSON.stringify(b) })).ok, [BASE, { subId: openSub.id, questionId: '90011' }]);
+  const lostFirst = await liveAnswer(90011);
+  await page.locator('button:visible:has-text("Review answers")').first().click();
+  await page.waitForSelector('.bcv-qz__big--primary', { timeout: 8000 });
+  page.once('dialog', (d) => d.accept());
+  await page.click('.bcv-qz__big--primary');
+  const handedIn = await page.waitForSelector('.bcv-qz__done', { timeout: 15000 }).then(() => true, () => false);
+  const keptQ1 = await liveAnswer(90011);
+  check(!lostFirst && handedIn && Number(keptQ1) === 900111, `Submit sends a lost answer again before handing the attempt in: ${JSON.stringify({ lostFirst, handedIn, keptQ1 })}`);
+  await page.goto(`${BASE}/courses/101/quizzes/9001`);
+  await page.waitForSelector('.bcv-detail__title', { timeout: 15000 });
   await mockConfig({ richQuestions: false, moreTypes: false });
   // The simulation quiz (2.98.31): Open in the Quiz tab lands a Canvas tab on it — every Classic kind, nothing sent to Canvas
   await options.bringToFront();

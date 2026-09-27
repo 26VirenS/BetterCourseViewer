@@ -232,6 +232,22 @@
       keep();
       return { quiz_submission_questions: [shown(q, s)] };
     },
+    /** Several answers in one save: every one is checked before any is kept, as one request. */
+    async answerMany(sub, items) {
+      await wait(LAG);
+      const s = subOf(sub);
+      if (!s) refuse('The attempt could not be found.');
+      if (s.workflow_state !== 'untaken') refuse('This attempt is over.');
+      if (s.validation_token !== sub.validation_token || Number(s.attempt) !== Number(sub.attempt)) refuse('invalid validation token');
+      const kept = items.map(({ id, answer }) => {
+        const q = byId.get(String(id));
+        if (!q) refuse('Unknown question');
+        return [q, accept(q, answer)];
+      });
+      for (const [q, a] of kept) { if (a === null) delete s.answers[q.id]; else s.answers[q.id] = a; }
+      keep();
+      return { quiz_submission_questions: kept.map(([q]) => shown(q, s)) };
+    },
     async flag(sub, questionId, on) {
       await wait(LAG);
       const s = subOf(sub);
