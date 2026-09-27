@@ -873,6 +873,7 @@
     $('devQuizImport').classList.toggle('is-on', on);
     $('devQuizImport').setAttribute('aria-checked', on ? 'true' : 'false');
   }
+  $('devSimQuiz').addEventListener('click', () => openOnCanvas('simquiz')); // (content/app/quiz-sim.js: every Classic kind, nothing sent)
   $('devQuizImport').addEventListener('click', async () => {
     const on = !$('devQuizImport').classList.contains('is-on');
     try { await api.storage.local.set({ 'dev:quizImport': on }); flash(); } catch (e) { flash(`Not saved: ${e?.message || e}`, true); }

@@ -6493,6 +6493,61 @@ try {
   await page.click('.bcv-qz__exit');
   await page.waitForSelector('.bcv-qz__intro, .bcv-detail__title', { timeout: 15000 });
   await mockConfig({ richQuestions: false, moreTypes: false });
+  // The simulation quiz (2.98.31): Open in the Quiz tab lands a Canvas tab on it — every Classic kind, nothing sent to Canvas
+  await options.bringToFront();
+  const simBtn = await options.$eval('#devSimQuiz', (b) => ({ text: b.textContent, shown: !!b.offsetParent }));
+  const [simTab] = await Promise.all([context.waitForEvent('page', { timeout: 10000 }), options.click('#devSimQuiz')]);
+  await simTab.waitForSelector('.bcv-qz__begin[data-begin]', { timeout: 20000 });
+  check(simBtn.text === 'Open' && simBtn.shown && /\/courses\/\d+\/quizzes\/0\?bcv=take&sim=1$/.test(simTab.url()), `the Quiz tab's Open lands a Canvas tab on the simulation quiz: ${JSON.stringify({ ...simBtn, url: simTab.url() })}`);
+  await simTab.close();
+  await page.bringToFront();
+  const simHits = [];
+  const simWatch = (r) => { if (/\/api\/v1\/.*(quizzes\/0\b|quiz_submissions\/sim)/.test(r.url())) simHits.push(r.url()); }; // (Canvas's API asked about the simulation)
+  page.on('request', simWatch);
+  await page.goto(`${BASE}/?bcv=simquiz`);
+  await page.waitForSelector('.bcv-qz__begin[data-begin]:not([disabled])', { timeout: 20000 });
+  check((await texts('.bcv-qz__h1'))[0] === 'Simulation quiz' && /12 questions · 27 points/.test((await texts('.bcv-qz__lead'))[0] || ''), `the simulation's intro: every kind, 27 points: ${(await texts('.bcv-qz__lead'))[0]}`);
+  await page.click('.bcv-qz__begin');
+  await page.waitForSelector('.bcv-qz__pill', { timeout: 15000 });
+  check((await page.$$('.bcv-qz__pill')).length === 12 && (await texts('.bcv-qz__sub'))[0] === 'Simulation · nothing goes to Canvas' && !(await page.isVisible('.bcv-qz__raw')), 'twelve questions, the header says it is the simulation, and there is no Canvas page to go to');
+  const simGo = async (n) => { await page.locator('.bcv-qz__pill').nth(n - 1).click(); await page.waitForFunction((k) => document.querySelector('.bcv-qz__qnum')?.textContent === `Question ${k}`, n, { timeout: 5000 }); };
+  const simOpt = (t) => page.click(`.bcv-qz__opt:has(.bcv-qz__optlabel:text-is("${t}"))`);
+  const simPick = async (sel, t) => { await page.click(sel); await page.waitForSelector('.bcv-picker__list', { timeout: 5000 }); await page.click(`.bcv-picker__list .bcv-picker__opt:has-text("${t}")`); await page.waitForFunction(() => !document.querySelector('.bcv-picker__list'), null, { timeout: 5000 }); };
+  const drawn = {};
+  const kindHere = () => page.evaluate(() => { const b = document.querySelector('.bcv-qz__body'); return { opts: b.querySelectorAll('.bcv-qz__opt').length, text: b.querySelectorAll('.bcv-qz__text input[type="text"]').length, num: b.querySelectorAll('.bcv-qz__text input[type="number"]').length, hint: b.querySelector('.bcv-qz__texthint')?.textContent || '', blanks: b.querySelectorAll('.bcv-qz__inblank input, input.bcv-input[aria-label^="colour"]').length, sels: b.querySelectorAll('.bcv-qz__sel').length, rows: b.querySelectorAll('.bcv-qz__matchrow').length, area: b.querySelectorAll('.bcv-qz__text textarea').length, file: b.querySelectorAll('.bcv-qz__file').length, canvas: b.querySelectorAll('.bcv-detail').length }; });
+  for (let n = 1; n <= 12; n++) { await simGo(n); drawn[n] = await kindHere(); }
+  const kindsOk = drawn[1].opts + drawn[1].text + drawn[1].num + drawn[1].file === 0 && drawn[2].opts === 4 && drawn[3].opts === 2 && drawn[4].text === 1 && drawn[5].blanks === 2 && drawn[6].opts === 5 && drawn[7].sels === 2 && drawn[8].rows === 3 && drawn[9].num === 1 && !drawn[9].hint && drawn[10].num === 1 && drawn[10].hint === 'Give the answer as a whole number.' && drawn[11].area === 1 && drawn[12].file === 1 && Object.values(drawn).every((d) => !d.canvas);
+  check(kindsOk, `every Classic kind is drawn here, none handed to Canvas: text, multiple choice, true/false, fill in the blank, blanks, multiple answers, dropdowns, matching, numerical, formula, essay, file (${JSON.stringify(drawn)})`);
+  // answered right through (the essay and the file are marked by hand: nothing for them)
+  await simGo(2); await simOpt('Mercury');
+  await simGo(3); await simOpt('True');
+  await simGo(4); await page.fill('.bcv-qz__text input', 'Au');
+  await simGo(5); await page.fill('input[aria-label="colour1"]', 'red'); await page.fill('input[aria-label="colour2"]', 'blue');
+  await simGo(6); await simOpt('2'); await simOpt('7'); await simOpt('11');
+  await simGo(7); await simPick('.bcv-qz__sel >> nth=0', 'cow'); await simPick('.bcv-qz__sel >> nth=1', 'moo');
+  await simGo(8); await simPick('.bcv-qz__matchrow:nth-child(1) .bcv-qz__sel', 'Paris'); await simPick('.bcv-qz__matchrow:nth-child(2) .bcv-qz__sel', 'Tokyo'); await simPick('.bcv-qz__matchrow:nth-child(3) .bcv-qz__sel', 'Nairobi');
+  await shot(page, '29f-sim-quiz-take');
+  await simGo(9); await page.fill('.bcv-qz__text input', '56');
+  await simGo(10); await page.fill('.bcv-qz__text input', '60');
+  await simGo(11); await page.fill('.bcv-qz__text textarea', 'Answer every kind.\n\nThen submit it.');
+  await simGo(12); await page.setInputFiles('.bcv-qz__fileinput', { name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('hello') });
+  check(await eventually(async () => (await texts('.bcv-qz__filename'))[0] === 'notes.txt' && /^12 of 12 answered · Saved$/.test((await texts('.bcv-qz__answered'))[0] || ''), 10000) && !(await page.$('.bcv-toast--error')), `every answer is taken in the shape Canvas's API asks for — none refused: ${(await texts('.bcv-qz__answered'))[0]} ${(await texts('.bcv-toast')).join(' | ')}`);
+  await page.locator('button:has-text("Review answers")').first().click();
+  await page.waitForSelector('.bcv-qz__big--primary', { timeout: 5000 });
+  page.once('dialog', (d) => d.accept());
+  await page.click('.bcv-qz__big--primary');
+  await page.waitForSelector('.bcv-qz__done', { timeout: 10000 });
+  const simDone = await texts('.bcv-qz__donecard');
+  check(/Score\s*19 \/ 27/.test(simDone[1] || '') && (await texts('.bcv-qz__donebtns .bcv-qz__big'))[0] === 'See feedback', `submitted and marked here: every auto-marked kind right, the essay and the file waiting for a teacher (${simDone.join(' | ')})`);
+  await page.click('.bcv-qz__donebtns .bcv-qz__big:has-text("See feedback")');
+  await page.waitForSelector('.bcv-fb__big', { timeout: 10000 });
+  const simFb = await page.evaluate(() => ({ score: document.querySelector('.bcv-fb__big').textContent, summary: document.querySelector('.bcv-fb__summary')?.textContent || '', blanks: [...document.querySelectorAll('.bcv-fb__qtext')].map((e) => e.textContent).find((t) => /Roses/.test(t)) || '' }));
+  check(simFb.score === '19 / 27' && /^9 of 11 correct/.test(simFb.summary) && /Roses are _____, violets are _____/.test(simFb.blanks), `and its feedback, a blank's name read as a gap: ${JSON.stringify(simFb)}`);
+  await shot(page, '29g-sim-quiz-feedback');
+  page.off('request', simWatch);
+  check(!simHits.length, `and nothing of it went to Canvas: ${simHits.join(' ')}`);
+  await page.click('.bcv-qz__exit');
+  await page.waitForSelector('.bcv-qz__intro', { timeout: 15000 });
   // Storage: every key, its size, opened in place, filtered
   await options.bringToFront();
   await options.click('#devTabs [data-pane="storage"]');

@@ -23,6 +23,7 @@
     setupcss: () => typeof self.BCV_SETUP_CSS === 'string',
     setup: () => !!BCV.setup && !BCV.setup.__stub,
     quiz: () => !!BCV.screens.quiz && !BCV.screens.quiz.__stub,
+    quizsim: () => !!BCV.quizSim,
     submit: () => !!BCV.screens.submit && !BCV.screens.submit.__stub && !!BCV.screens.feedback && !BCV.screens.feedback.__stub,
     phone: () => !!BCV.phone,
     notes: () => Array.isArray(self.BCV_WHATS_NEW),

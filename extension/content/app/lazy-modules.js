@@ -11,6 +11,7 @@
  * — and load from this list alone. scripts/dev/api-test.mjs holds the group and this list equal. */
 self.BCV_LAZY_MODULES = {
   quiz: { files: ['content/app/quiz-page.js', 'content/app/screens/quiz.js'] },
+  quizsim: { needs: ['quiz'], files: ['content/app/quiz-sim.js'] }, // the simulation quiz (Settings → Developer → Quiz)
   submit: { files: ['content/app/screens/submit.js', 'content/app/screens/feedback.js'] },
   hub: { files: ['content/app/hub.js'] }, // the search box's commands, answers and row actions: loaded when the box is focused
   widgets: { files: ['content/app/tools/widgets.js'] }, // widgets of your own: the frame, the importer (loaded by Tools, and by the tray when one is kept)

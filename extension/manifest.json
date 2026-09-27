@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Simpl Courses",
-  "version": "2.98.30",
+  "version": "2.98.31",
   "description": "Canvas with navigation that actually makes sense and a UI that you can actually use.",
   "author": "Simpl Courses contributors",
   "icons": {
@@ -131,6 +131,7 @@
       "js": [
         "content/app/quiz-page.js",
         "content/app/screens/quiz.js",
+        "content/app/quiz-sim.js",
         "content/app/screens/submit.js",
         "content/app/screens/feedback.js",
         "content/app/hub.js",

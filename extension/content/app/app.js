@@ -1185,6 +1185,7 @@
     if ((r.params.get('bcv') === 'setup' || r.params.get('bcv') === 'personalize') && BCV.setup && !BCV.setup.active()) BCV.setup.open(BCV.app);
     else if (r.params.get('bcv') === 'welcome' && BCV.welcome && !BCV.welcome.active()) welcomeHere();
     else if (r.params.get('bcv') === 'whatsnew' && BCV.whatsnew) whatsnewHere();
+    else if (r.params.get('bcv') === 'simquiz') simQuizHere();
   }
 
   /** The theme's photo behind a root screen's header (the Theme step's Headers): sharp at the right,
@@ -1215,6 +1216,13 @@
     state.route = parseRoute();
     await render();
     BCV.whatsnew?.open(BCV.app, { manual: true });
+  }
+  /** ?bcv=simquiz (Settings → Developer → Quiz): the simulation quiz (content/app/quiz-sim.js), in the
+   *  first course's column — a quiz is drawn in a course's — at the address that says it is the simulation. */
+  async function simQuizHere() {
+    const c = (await BCV.store.favorites().catch(() => []))[0];
+    if (!c) { U.toast('The simulation quiz sits in a course, and no course was found.', { error: true }); return; }
+    go(`/courses/${c.id}/quizzes/0?bcv=take&sim=1`, { replace: true });
   }
   /** ?bcv=welcome (Settings → General → See it again): the parameter is dropped,
    *  the page drawn, and the welcome — the pointers on black that follow the setup — runs over it again. */

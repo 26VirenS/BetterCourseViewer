@@ -117,11 +117,15 @@
   /* The question as something to read rather than answer. Canvas's own page writes a blank's field
    * into the sentence, so the review row and the feedback would otherwise carry a live dropdown —
    * and read it as its whole list of options run together. A blank shows there as a gap instead;
-   * what was picked for it is listed beside it either way. */
+   * what was picked for it is listed beside it either way. The API's text names each blank in
+   * brackets instead ("Roses are [colour1]"): those are gaps too. */
   const noFields = (html, q) => {
     if (!BLANKS.has(q.question_type) || !html) return html;
     const doc = new DOMParser().parseFromString(String(html), 'text/html');
     for (const w of doc.querySelectorAll(`[name^="question_${q.id}_"], .question_input`)) w.replaceWith(doc.createTextNode('_____'));
+    const named = new Set(blanksOf(q).map(String));
+    const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT);
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) n.textContent = n.textContent.replace(/\[([^\]\s]+)\]/g, (m, b) => (named.has(b) ? '_____' : m));
     return doc.body.innerHTML;
   };
   const INFO = new Set(['text_only_question']);
@@ -131,6 +135,12 @@
     const cid = course.id;
     const qid = route.arg;
     const quizUrl = `${course.url}/quizzes/${qid}`;
+    // Settings → Developer → Quiz: the simulation quiz (content/app/quiz-sim.js) answers the quiz's
+    // own calls in this tab — every Classic kind, marked here — and nothing goes to Canvas
+    const simulated = route.params.get('sim') === '1' && String(qid) === '0';
+    if (simulated && !BCV.quizSim) await BCV.lazy.load('quizsim');
+    const store = simulated ? BCV.quizSim.store(BCV.store) : BCV.store;
+    const simHome = `${quizUrl}?bcv=take&sim=1`;
     const html = document.documentElement;
     // The flow lives in the course's own column. The intro and the feedback sit there like any tab
     // (the course header and rail stay); an attempt sets html.bcv-quiz, which folds the sidebar, the
@@ -195,7 +205,7 @@
     const leave = () => {
       setOpen(false);
       clearInterval(st.timer);
-      app.go(quizUrl, { confirmed: true });
+      app.go(simulated ? (st.stage === 'intro' ? course.url : simHome) : quizUrl, { confirmed: true });
     };
 
     // ---- header -------------------------------------------------------------------
@@ -236,7 +246,7 @@
     const head = U.el('bcv-qz__head', [
       U.el('bcv-qz__headrow', [
         exitBtn,
-        h('div', { class: 'bcv-qz__titles' }, [U.text('bcv-qz__title bcv-ellip', quiz.title), U.text('bcv-qz__sub', `${course.name} · ${dueDay}`)]),
+        h('div', { class: 'bcv-qz__titles' }, [U.text('bcv-qz__title bcv-ellip', quiz.title), U.text('bcv-qz__sub', simulated ? 'Simulation · nothing goes to Canvas' : `${course.name} · ${dueDay}`)]),
         modeWrap,
         devBtn,
         instrBtn,
@@ -466,7 +476,7 @@
       if (!side && progressWrap.parentElement !== head) head.append(progressWrap); // (the side layout keeps the pills in its left rail)
       screen.classList.toggle('is-side', side);
       instrBtn.hidden = st.stage === 'intro' || st.stage === 'feedback'; // the intro card already has them in front of you; the feedback is about the answers
-      rawBtn.hidden = st.stage === 'feedback';
+      rawBtn.hidden = simulated || st.stage === 'feedback'; // (the simulation has no page on Canvas)
       const closeWord = st.stage === 'feedback' ? 'Back to the quiz' : 'Save and exit';
       exitBtn.title = closeWord;
       exitBtn.setAttribute('aria-label', closeWord);
@@ -631,7 +641,7 @@
      *  numbers ("4 pts") it shows beside each question there. Asked for with the attempt already open,
      *  that page only draws it. Quietly: if it will not come, the questions simply go without. */
     async function pointsFromPage() {
-      if (st.paged || !st.questions.some((q) => !hasNum(q.points_possible))) return;
+      if (simulated || st.paged || !st.questions.some((q) => !hasNum(q.points_possible))) return;
       const pg = await QP().fetchPage(quizUrl, { accessCode: codeFor() }).catch(() => null);
       if (!ctx.alive() || !pg?.ok) return;
       const pts = new Map(pg.questions.filter((q) => hasNum(q.points_possible)).map((q) => [String(q.id), Number(q.points_possible)]));
@@ -1148,7 +1158,7 @@
           // feedback only once Canvas has released it (hide_results); the receipt says so otherwise. A survey has none.
           feedbackOn ? h('button', { type: 'button', class: 'bcv-qz__big bcv-qz__big--primary', text: 'See feedback', onclick: () => openFeedback(d, 'done') }) : null,
           h('button', { type: 'button', class: `bcv-qz__big ${feedbackOn ? '' : 'bcv-qz__big--primary'}`, text: `Back to ${course.name}`, onclick: () => exitTo(course.url) }),
-          h('button', { type: 'button', class: 'bcv-qz__big', text: survey ? 'Survey page' : 'Quiz page', onclick: () => exitTo(quizUrl) }),
+          h('button', { type: 'button', class: 'bcv-qz__big', text: survey ? 'Survey page' : 'Quiz page', onclick: () => exitTo(simulated ? simHome : quizUrl) }),
         ]),
       ]);
     }
@@ -1250,6 +1260,7 @@
         if (a.numerical_answer_type === 'range_answer' && a.start !== undefined) return { text: `${a.start} – ${a.end}`, html: '' };
         if (a.exact !== undefined && a.exact !== null) return { text: Number(a.margin) ? `${a.exact} ± ${a.margin}` : String(a.exact), html: '' };
         if (a.approximate !== undefined && a.approximate !== null) return { text: String(a.approximate), html: '' };
+        if (a.answer !== undefined && a.answer !== null && a.answer !== '') return { text: String(a.answer), html: '' }; // (a formula's result for this attempt)
         if (a.left && a.right) return { text: `${a.left} → ${a.right}`, html: '' };
         return null;
       };
@@ -1285,7 +1296,7 @@
         store.quizApi.questions(sub, { courseId: cid, quizId: qid }),
         quiz.assignment_id ? store.submission(cid, quiz.assignment_id, { force: true }).catch(() => null) : Promise.resolve(null),
         // what the API keeps from a student (each question's points, the right answers, the comments): Canvas's own results page
-        QP().results(cid, qid, sub).catch(() => null),
+        simulated ? Promise.resolve(null) : QP().results(cid, qid, sub).catch(() => null),
       ]);
       const me = String(store.env().current_user_id || '');
       const comments = (asub?.submission_comments || []).filter((c) => !me || String(c.author_id ?? '') !== me);
