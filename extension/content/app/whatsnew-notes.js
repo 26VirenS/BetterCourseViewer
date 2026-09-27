@@ -25,6 +25,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.98.20', date: '2026-09-27', notes: [
+      { kind: 'improved', title: 'Where to report a bug', body: 'A quick look at the purple button, and what it sends.', icon: P.eye },
+    ] },
     { version: '2.98.19', date: '2026-09-26', notes: [
       { kind: 'new', title: 'Report a bug', body: 'The purple button beside the switch sends us a report.', icon: P.pen },
       { kind: 'new', title: 'Errors have codes', body: 'Each error ends in a short code to quote in a report.', icon: P.list },

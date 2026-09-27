@@ -4,7 +4,8 @@
  * the page draws, so the Dashboard is never seen first) and points at the look switch at the top
  * right — a copy of the real one, shown working: a pointer comes to it, rests on green, moves onto
  * red (it grows into how long under the pointer) and picks an hour, then green again, the words in the middle of the
- * screen with a big arrow up to it — then at a mock Away Refresh
+ * screen with a big arrow up to it — then at the purple Report a bug button beside it (a copy, a
+ * pointer pressing it; shown alone, once, to anyone who updates from before it) — then at a mock Away Refresh
  * pill counting its three seconds down in slow motion, then at three rows of the sidebar in turn
  * — Grades, Courses (and the starred courses listed under it, when they are), Tools — each seen
  * through a hole in the black with an arrow at it, then at the Dashboard's way in: the
@@ -23,6 +24,8 @@
   const KEY2 = 'welcome:look5'; // the switch's show seen (with the setup's run, or alone after an update); a new key when the show is redrawn, so everyone sees the new one once
   const OLD_KEYS = ['welcome:look2', 'welcome:look3', 'welcome:look4']; // the marks of the shows before it, cleared when this one is seen
   const LOOK2_SINCE = '2.58.0'; // the show's own version: a What's New mark from before it means the show is owed
+  const KEY5 = 'welcome:report1'; // the purple button's stage seen (with the setup's run, or alone after an update)
+  const REPORT_SINCE = '2.98.20'; // its own version: a What's New mark from before it means the stage is owed (everyone who updates sees it once)
   const CURSOR = '<svg viewBox="0 0 24 24" width="26" height="26"><path d="M5 3l14 9-6 1.5 3.5 6.5-2.5 1.5-3.5-6.5L6 19z" fill="#fff" stroke="#1c1c1e" stroke-width="1.4" stroke-linejoin="round"/></svg>';
   const WAIT = 3000; // Continue comes in after this long, on each stage: time to take the pointer in first
   const LEAVE = 260; // a stage's fade-out (app.css: bcv-welcome-out)
@@ -34,6 +37,13 @@
       layout: 'look', title: 'Just in case:', hint: ['To turn on Simpl, press green.', 'To turn off Simpl, press red.'], stops: [1, -1],
       sub: 'Red asks how long: this page only, 30 minutes, 1 hour, 4 hours, 1 day, or indefinitely.',
       prop: (app, ctx) => lookShow(app, ctx),
+    },
+    // the purple button left of the switch (2.98.20): the words in the middle, a big arrow up to a copy
+    // of it beside the switch's copy, a pointer that comes to it and presses it
+    report: {
+      layout: 'look', title: 'Found a bug? Missing something?', hint: ['To report a bug or ask for a feature, press purple.'], stops: ['report'],
+      sub: 'Bug, error, crash, a reason you turned Simpl off, a missing feature, or an idea. Add screenshots if you like; the error codes Simpl showed are filled in. It opens on simplcourses.com.',
+      prop: (app) => reportShow(app), target: (prop) => prop?.querySelector?.('.bcv-welcome__report'),
     },
     away: {
       layout: 'away', kicker: 'Away Refresh', title: 'Click to cancel, or hold to disable', hint: 'Away refresh prevents errors that show up after you’ve been gone for a while',
@@ -99,6 +109,7 @@
   /** A row under the switch's show: the switch's own button for that stop — the round face in its
    *  colour with its glyph, the same classes the page's switch wears (app.lookDemo) — small and still. */
   function stopSwitch(app, stop) {
+    if (stop === 'report') return h('span', { class: 'bcv-welcome__stopsw bcv-welcome__stopsw--report', dataset: { stop: 'report' }, 'aria-hidden': 'true', html: app?.reportMark || '' }); // (the purple button's face)
     const demo = app?.lookDemo?.();
     if (!demo) return null;
     const i = [1, -1].indexOf(stop); // the switch's buttons, top to bottom: green on, red off
@@ -131,10 +142,11 @@
   async function due() {
     if (self.BCVBridge?.native) { await clear(); await clear('appearance'); return false; } // the app: no switch, no Away Refresh, no sidebar
     try {
-      const f = await BCV.api.storage.local.get([KEY, KEY2, KEY3, KEY4, 'setup:done', 'whatsnew:seen']);
+      const f = await BCV.api.storage.local.get([KEY, KEY2, KEY3, KEY4, KEY5, 'setup:done', 'whatsnew:seen']);
       if (f[KEY] === true) return 'setup';
       if (f[KEY3] === true) return 'appearance';
       if (f['setup:done'] && !f[KEY2] && typeof f['whatsnew:seen'] === 'string' && older(f['whatsnew:seen'], LOOK2_SINCE)) return 'look';
+      if (f['setup:done'] && !f[KEY5] && typeof f['whatsnew:seen'] === 'string' && older(f['whatsnew:seen'], REPORT_SINCE)) return 'report'; // (updated from before the purple button: its stage, once)
       if (f['setup:done'] && !f[KEY4]) return 'search'; // (the setup's run marks it; anyone set up before the box gets it once, on the Dashboard)
     } catch { /* nothing to read: nothing owed */ }
     return false;
@@ -215,6 +227,37 @@
       q(10400, () => { demo.hover(-1); cursorTo(away(), 700); cursor.style.opacity = '0'; });
       q(10900, () => demo.open(false));
       q(11800, loop);
+    };
+    q(60, loop); // (once the stage is on the page, so the copy can be measured)
+    return wrap;
+  }
+  /** The purple button as it will be (app.reportDemo: the same markup, nothing wired), opened out to
+   *  its words, left of a folded copy of the switch where the two really sit; a pointer comes to it
+   *  and presses it, round and round. With reduced motion: the two copies, still. */
+  function reportShow(app) {
+    const pill = app.reportDemo?.();
+    if (!pill) return null;
+    pill.classList.add('bcv-welcome__report', 'is-open');
+    const demo = app.lookDemo?.();
+    if (demo) demo.el.classList.add('bcv-welcome__look', 'bcv-welcome__look--beside');
+    const cursor = h('span', { class: 'bcv-welcome__cursor bcv-welcome__cursor--look', 'aria-hidden': 'true', html: CURSOR });
+    const wrap = h('div', { class: 'bcv-welcome__lookshow bcv-welcome__reportshow', 'aria-hidden': 'true' }, [demo?.el, pill, cursor].filter(Boolean));
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return wrap;
+    const alive = () => wrap.isConnected && !wrap.classList.contains('is-out');
+    const dot = () => { const r = pill.querySelector('.bcv-report__dot').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; };
+    const away = () => { const d = dot(); return { x: d.x - 170, y: d.y + 190 }; };
+    const cursorTo = ({ x, y }, ms) => { cursor.style.setProperty('--cms', `${ms}ms`); cursor.style.setProperty('--cx', `${x - 5}px`); cursor.style.setProperty('--cy', `${y - 3}px`); };
+    const q = (ms, fn) => setTimeout(() => { if (alive()) fn(); }, ms);
+    const press = () => { cursor.classList.add('is-press'); pill.classList.add('is-press'); q(180, () => { cursor.classList.remove('is-press'); pill.classList.remove('is-press'); }); };
+    const loop = () => {
+      if (!alive()) return;
+      cursor.style.opacity = '0';
+      cursorTo(away(), 0);
+      q(250, () => { cursor.style.opacity = '1'; cursorTo(dot(), 900); });
+      q(1500, press);
+      q(2600, press);
+      q(3800, () => { cursorTo(away(), 700); cursor.style.opacity = '0'; });
+      q(4800, loop);
     };
     q(60, loop); // (once the stage is on the page, so the copy can be measured)
     return wrap;
@@ -482,7 +525,7 @@
         s.kicker ? h('div', { class: 'bcv-welcome__kicker', text: s.kicker }) : null,
         h('div', { class: 'bcv-welcome__title', text: s.title }),
         lines ? h('div', { class: 'bcv-welcome__hint bcv-welcome__hint--rows' }, hint.map((line, i) => { // (a row per stop, with a small slider showing where it is)
-          const colour = line.match(/^(.*\bpress )(green|gray|red)(\b.*)$/i); // ("…press green.": the colour in bold)
+          const colour = line.match(/^(.*\bpress )(green|gray|red|purple)(\b.*)$/i); // ("…press green.": the colour in bold)
           const at = line.indexOf(':');
           const stop = s.stops?.[i] ?? 0;
           return h('div', { class: 'bcv-welcome__stoprow' }, [
@@ -514,7 +557,7 @@
     if (prop?.follow) ui.stage.follow = setInterval(() => { if (prop.follow()) level(); }, 200); // (the holes keep to the things as the page fills in under the black)
     // the look stage sits in the middle of the screen (app.css), and a big arrow runs from its words up
     // to the switch's copy at the top right — drawn again whenever the window or the copy moves
-    const look = s.layout === 'look' ? prop?.querySelector?.('.bcv-welcome__look .bcv-look__main') : null;
+    const look = s.target ? s.target(prop) : s.layout === 'look' ? prop?.querySelector?.('.bcv-welcome__look .bcv-look__main') : null; // (the thing the big arrow points at: the switch's copy, or the stage's own)
     if (look) {
       const arrow = bigArrow();
       ui.el.insertBefore(arrow.el, box);
@@ -563,14 +606,16 @@
     // a phone's header has none, so the stages that point at it are left out there
     const lookNow = () => { const l = document.getElementById('bcv-look'); return l && getComputedStyle(l).display !== 'none' ? l : null; };
     const setupRun = !keys;
-    for (const key of (keys || ['look', 'away', 'grades', 'courses', 'tools', 'peek', 'search']).filter((k) => STAGES[k])) {
+    for (const key of (keys || ['look', 'report', 'away', 'grades', 'courses', 'tools', 'peek', 'search']).filter((k) => STAGES[k])) {
       const look = lookNow();
-      if (!look && (key === 'look' || key === 'pin')) continue;
+      if (!look && (key === 'look' || key === 'pin' || key === 'report')) continue;
+      if (key === 'report' && !document.getElementById('bcv-report')) continue; // (no purple button on this page: nothing to point at)
       if (key === 'away' && app?.state?.settings?.appearance?.awayRefresh === false) continue; // (off unless turned on: nothing to point at)
       if (STAGES[key].spot && !STAGES[key].spot(app)) continue; // (no sidebar row to point at: a phone)
       await stage(app, key, { look });
       if (key === 'look') { try { await BCV.api.storage.local.set({ [KEY2]: true }); await BCV.api.storage.local.remove(OLD_KEYS); } catch { /* shown all the same */ } } // (seen: not owed again after an update; the old shows' marks go)
       if (key === 'search') { try { await BCV.api.storage.local.set({ [KEY4]: true }); } catch { /* shown all the same */ } }
+      if (key === 'report') { try { await BCV.api.storage.local.set({ [KEY5]: true }); } catch { /* shown all the same */ } }
       await leave();
     }
     if (setupRun) { await clear(); try { await BCV.api.storage.local.set({ [KEY4]: true }); } catch { /* the box is found on its own */ } } // (the setup's run counts the search box as pointed out, on the Dashboard or not)

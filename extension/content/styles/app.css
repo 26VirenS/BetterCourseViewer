@@ -13,7 +13,7 @@
  * min(their own, the viewport less a margin). */
 
 html[data-bcv-theme] {
-  --bcv-version: "2.98.19"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.98.20"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -237,18 +237,19 @@ html[data-bcv-theme="dark"] .bcv-skel { --bcv-skel: linear-gradient(90deg, rgba(
 html.bcv-phone.bcv-on #bcv-look, html.bcv-setup-open #bcv-look { display: none; }
 /* Report a bug (2.98.19): a purple disc left of the switch (the pinned tools' tray moves one place along for it);
  * under the pointer or the keyboard's focus it opens out to the left with its words, its right end staying put */
-#bcv-report { position: fixed; top: 6px; right: 42px; z-index: var(--bcv-z-float); display: flex; align-items: center; justify-content: flex-end; box-sizing: border-box; height: 24px; max-width: 24px; margin: 0; padding: 0; border: 0; border-radius: 12px; background: linear-gradient(158deg, #a55cf2, #7b2fe0); color: #fff; box-shadow: 0 2px 10px rgba(0,0,0,.2); overflow: hidden; white-space: nowrap; cursor: pointer; font: 600 11px/1 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif; letter-spacing: -.01em; text-transform: none; transition: max-width .24s cubic-bezier(.32,.72,0,1), box-shadow .18s ease, transform .16s var(--bcv-spring-snappy), opacity .2s ease; }
-#bcv-report:hover, #bcv-report:focus-visible { max-width: 140px; box-shadow: 0 6px 20px rgba(123,47,224,.4); }
-#bcv-report:active { transform: scale(.96); }
+#bcv-report { position: fixed; top: 6px; right: 42px; z-index: var(--bcv-z-float); }
+#bcv-report, .bcv-report-pill { display: flex; align-items: center; justify-content: flex-end; box-sizing: border-box; height: 24px; max-width: 24px; margin: 0; padding: 0; border: 0; border-radius: 12px; background: linear-gradient(158deg, #a55cf2, #7b2fe0); color: #fff; box-shadow: 0 2px 10px rgba(0,0,0,.2); overflow: hidden; white-space: nowrap; cursor: pointer; font: 600 11px/1 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif; letter-spacing: -.01em; text-transform: none; transition: max-width .24s cubic-bezier(.32,.72,0,1), box-shadow .18s ease, transform .16s var(--bcv-spring-snappy), opacity .2s ease; }
+#bcv-report:hover, #bcv-report:focus-visible, .bcv-report-pill.is-open { max-width: 140px; box-shadow: 0 6px 20px rgba(123,47,224,.4); }
+#bcv-report:active, .bcv-report-pill.is-press { transform: scale(.96); }
 #bcv-report:focus-visible { outline: 2px solid #0a84ff; outline-offset: 2px; }
 .bcv-report__lbl { max-width: 0; padding: 0; opacity: 0; overflow: hidden; transition: max-width .24s cubic-bezier(.32,.72,0,1), opacity .15s ease, padding .24s cubic-bezier(.32,.72,0,1); }
-#bcv-report:hover .bcv-report__lbl, #bcv-report:focus-visible .bcv-report__lbl { max-width: 110px; padding: 0 2px 0 11px; opacity: 1; }
+#bcv-report:hover .bcv-report__lbl, #bcv-report:focus-visible .bcv-report__lbl, .bcv-report-pill.is-open .bcv-report__lbl { max-width: 110px; padding: 0 2px 0 11px; opacity: 1; }
 .bcv-report__dot { flex: none; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; }
 .bcv-report__dot svg { display: block; width: 14px; height: 14px; fill: none; stroke: #fff; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 /* out of the way while the switch is open (its red list reaches left under it), and where the switch is not */
 #bcv-look:hover ~ #bcv-report, #bcv-look.is-expanded ~ #bcv-report { opacity: 0; pointer-events: none; }
 html.bcv-phone.bcv-on #bcv-report, html.bcv-setup-open #bcv-report, html.bcv-welcome #bcv-report, html.bcv-in-quiz #bcv-report { display: none; }
-@media (prefers-reduced-motion: reduce) { #bcv-report, .bcv-report__lbl { transition-duration: .01s; } }
+@media (prefers-reduced-motion: reduce) { #bcv-report, .bcv-report-pill, .bcv-report__lbl { transition-duration: .01s; } }
 
 /* ---- Away Refresh: the stale-page reload, announced first. A pill floats down from the top — a
  * dial counting three seconds down in orange, the iPhone's timer (a dim ring, a bright arc of the
@@ -311,6 +312,11 @@ html.bcv-welcome { overflow: hidden; }
 .bcv-welcome__away .bcv-away__btn { cursor: default; }
 .bcv-welcome__away .bcv-away__ring, .bcv-welcome__away .bcv-away__hand { animation-duration: 12s; animation-iteration-count: infinite; }
 .bcv-welcome__look.is-out, .bcv-welcome__away.is-out { animation: bcv-welcome-out .25s ease both; }
+/* the purple button's stage (2.98.20): its copy, opened out to its words, just left of the switch's copy — where the two really sit — at the same size */
+.bcv-welcome__report.bcv-report-pill { position: absolute; top: 10px; right: 52px; transform: scale(1.25); transform-origin: top right; pointer-events: none; animation: bcv-welcome-fade .5s ease both; box-shadow: 0 0 0 1px rgba(255,255,255,.22), 0 0 44px rgba(165,92,242,.5); transition: transform .16s ease; }
+.bcv-welcome__report.bcv-report-pill.is-press { transform: scale(1.18); }
+#bcv-welcome .bcv-welcome__stopsw.bcv-welcome__stopsw--report { flex: none; display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 12px; background: linear-gradient(158deg, #a55cf2, #7b2fe0); box-shadow: 0 2px 10px rgba(0,0,0,.25); }
+.bcv-welcome__stopsw--report svg { display: block; width: 14px; height: 14px; fill: none; stroke: #fff; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 /* the stage: the arrow, the three lines, Continue — under the switch, right-aligned; under the pill, centred */
 .bcv-welcome__stage { position: absolute; display: flex; flex-direction: column; gap: 14px; animation: bcv-welcome-in .5s ease both; }
 .bcv-welcome__stage.is-out { animation: bcv-welcome-out .25s ease both; }

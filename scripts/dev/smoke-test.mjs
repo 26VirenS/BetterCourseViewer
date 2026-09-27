@@ -780,7 +780,8 @@ try {
   const popMonth = (await texts('.bcv-datepop__month'))[0];
   check((await page.$$('.bcv-datepop__day')).length === 42 && (await page.$eval('.bcv-datepop', (e) => e.scrollHeight <= e.clientHeight + 1)) && (await page.$$('.bcv-datepop__day.is-today')).length === 1 && (await page.$$('.bcv-datepop__day.is-on.is-today')).length === 1 && (await texts('.bcv-datepop__q')).join(',') === 'Today,Tomorrow,Next Monday' && new Date().toLocaleString('en-US', { month: 'long' }) === popMonth, `the field opens the app's own calendar on this month (${popMonth}): six weeks, today marked and chosen, Today / Tomorrow / Next Monday shortcuts`);
   await page.click('.bcv-datepop__nav[aria-label="Next month"]');
-  check(!!(await page.$('.bcv-datepop')) && (await texts('.bcv-datepop__month'))[0] !== popMonth && (await page.$$('.bcv-datepop__day.is-today')).length === 0, `› moves a month on without closing the calendar (${(await texts('.bcv-datepop__month'))[0]})`);
+  // (today can still be in the grid near a month's end, among next month's leading days, drawn off-month: not a day of the month shown)
+  check(!!(await page.$('.bcv-datepop')) && (await texts('.bcv-datepop__month'))[0] !== popMonth && (await page.$$('.bcv-datepop__day.is-today:not(.is-off)')).length === 0, `› moves a month on without closing the calendar (${(await texts('.bcv-datepop__month'))[0]})`);
   await page.click('.bcv-datepop__q:nth-child(2)'); // Tomorrow
   await page.waitForFunction(() => !document.querySelector('.bcv-datepop'), null, { timeout: 3000 });
   check(/^Tomorrow · /.test((await texts('.bcv-todo__date'))[0]), `picking a day closes the calendar and the field says it the way people do: ${(await texts('.bcv-todo__date'))[0]}`);
@@ -3861,7 +3862,19 @@ try {
   check(await eventually(async () => { const st = await showAt(); return st.pos === '-1' && !st.expanded; }, 4000), 'pressed: off for the hour, the list folded back into red');
   check(await eventually(async () => (await showAt()).pos === '1', 6000), 'and green pressed: Active again');
   await page.keyboard.press('Enter'); // Enter is Continue too
-  // Away Refresh is off unless turned on (2.98.13), so the welcome has no pill to point at: the switch's stage goes straight to the sidebar's rows
+  // (2.98.20) then the purple button: the words in the middle, a big arrow up to a copy of it, opened out to its words, just left of the switch's copy; a pointer presses it
+  await page.waitForSelector('#bcv-welcome[data-stage="report"]', { timeout: 5000 });
+  const reportAt = () => page.$eval('#bcv-welcome', (e) => { const p = e.querySelector('.bcv-welcome__report'); const l = e.querySelector('.bcv-welcome__look'); const r = p?.getBoundingClientRect(); const lr = l?.getBoundingClientRect(); const a = e.querySelector('.bcv-welcome__bigarrow'); const [tx, ty] = (a?.dataset.tip || '').split(',').map(Number); const t = e.querySelector('.bcv-welcome__stage .bcv-welcome__text')?.getBoundingClientRect(); const row = e.querySelector('.bcv-welcome__stopsw--report'); return { pill: !!p && p.classList.contains('is-open'), words: p?.querySelector('.bcv-report__lbl')?.textContent, wordsShown: p ? getComputedStyle(p.querySelector('.bcv-report__lbl')).opacity : null, purple: p ? (getComputedStyle(p).backgroundImage.match(/rgb\([^)]+\)/g) || []).join(' ') : '', gap: r && lr ? Math.round(lr.left - r.right) : null, top: r ? Math.round(r.top) : null, arrow: !!a && !!r && tx < r.left && tx > r.left - 40 && Math.abs(ty - (r.top + r.height / 2)) < 3 && !!t && Number(a.querySelector('.bcv-welcome__line').getAttribute('d').split(' ')[1]) < t.top, centred: !!t && Math.abs(t.left + t.width / 2 - innerWidth / 2) < 4 && Math.abs(t.top + t.height / 2 - innerHeight / 2) < 90, row: !!row && !!row.querySelector('svg') && getComputedStyle(row).backgroundImage.includes('gradient'), bold: e.querySelector('.bcv-welcome__stoptext b')?.textContent, cursor: !!e.querySelector('.bcv-welcome__reportshow .bcv-welcome__cursor') }; });
+  await eventually(async () => (await reportAt()).arrow, 4000);
+  const rs = await reportAt();
+  const REPORT_LINES = ' | Found a bug? Missing something? | To report a bug or ask for a feature, press purple.';
+  check(rs.pill && rs.words === 'Report a bug' && rs.wordsShown === '1' && rs.purple === 'rgb(165, 92, 242) rgb(123, 47, 224)' && rs.gap >= 8 && rs.gap <= 12 && rs.top === 10 && rs.arrow && rs.centred && rs.row && rs.bold === 'purple' && rs.cursor && (await stageLines()) === REPORT_LINES && /^Bug, error, crash, a reason you turned Simpl off, a missing feature, or an idea\./.test((await texts('.bcv-welcome__sub'))[0] || ''), `then the purple button: the words in the middle (a row with its purple face, "press purple" in bold, what can be reported under it), a big arrow up to a copy of it opened out to Report a bug, just left of the switch's copy, a pointer that presses it: ${JSON.stringify(rs)}`);
+  await page.waitForTimeout(1600); // (the pointer at the button)
+  await shot(page, '31b-welcome-report');
+  await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000);
+  await page.click('.bcv-welcome__next');
+  check(await eventually(async () => (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('welcome:report1'))['welcome:report1'])) === true), 'its Continue marks it seen, so an update never shows it again');
+  // Away Refresh is off unless turned on (2.98.13), so the welcome has no pill to point at: the purple button's stage goes straight to the sidebar's rows
   await page.waitForSelector('#bcv-welcome[data-stage="grades"]', { timeout: 5000 });
   await page.waitForFunction(() => !document.querySelector('.bcv-welcome__look') && !document.querySelector('.bcv-welcome__stage[data-stage="look"]'), null, { timeout: 3000 });
   check((await page.$('.bcv-welcome__away')) === null && (await page.$('.bcv-welcome__stage[data-stage="away"]')) === null && (await sw.evaluate(() => self.BCV.settings.get())).appearance.awayRefresh === false, 'no Away Refresh stage: it is off unless turned on, so the welcome goes from the switch to the sidebar (the pill\'s stage is kept for a setting that is on)');
@@ -3923,17 +3936,35 @@ try {
   check((await welcomeBox()).bg === 'rgb(0, 0, 0)' && !!(await page.$('.bcv-welcome__look')) && (await texts('.bcv-welcome__title'))[0] === 'Just in case:', 'after an update from before this show, the page comes back black with the switch\'s show');
   await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000);
   await page.click('.bcv-welcome__next');
+  await page.waitForSelector('#bcv-welcome[data-stage="report"]', { timeout: 5000 });
+  check((await stageLines()) === REPORT_LINES && !!(await page.$('.bcv-welcome__report.is-open')), 'then the purple button\'s stage');
+  await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000);
+  await page.click('.bcv-welcome__next');
   await page.waitForSelector('#bcv-welcome[data-stage="tools"]', { timeout: 5000 });
   check((await texts('.bcv-welcome__hint'))[0].replace(/\s+/g, ' ').trim() === 'Find a PDF Editor, File Converter, Calculators, Flashcards, Citation Generator & more.' && (await page.$$('.bcv-welcome__hint--rich .bcv-welcome__hue')).length === 7, 'then the Tools row is pointed at, with what the tools are in their colours: everyone sees that once, not only after the setup');
   await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000);
   await page.click('.bcv-welcome__next');
   await page.waitForFunction(() => !document.querySelector('#bcv-welcome'), null, { timeout: 5000 });
-  check((await sw.evaluate(async () => { const f = await self.BCV.api.storage.local.get(['welcome:look5', 'welcome:look4']); return f['welcome:look5'] === true && !('welcome:look4' in f); })) && (await visible('#bcv-app')), 'its Continue is the last: the black goes, and the show is marked seen');
+  check((await sw.evaluate(async () => { const f = await self.BCV.api.storage.local.get(['welcome:look5', 'welcome:look4', 'welcome:report1']); return f['welcome:look5'] === true && f['welcome:report1'] === true && !('welcome:look4' in f); })) && (await visible('#bcv-app')), 'its Continue is the last: the black goes, and the show is marked seen');
   await sw.evaluate((v) => self.BCV.api.storage.local.set({ 'whatsnew:seen': v }), manifest.version);
   await page.reload();
   await page.waitForSelector('#bcv-app .bcv-nav__item', { timeout: 20000 });
   await page.waitForTimeout(600);
   check((await page.$('#bcv-welcome')) === null, 'and it does not come back');
+  // (2.98.20) anyone who updates from before the purple button gets its stage alone, once: their What's New mark is from before it
+  await sw.evaluate(async () => { await self.BCV.api.storage.local.remove('welcome:report1'); await self.BCV.api.storage.local.set({ 'whatsnew:seen': '2.98.19' }); });
+  await page.reload();
+  await page.waitForSelector('#bcv-welcome[data-stage="report"]', { timeout: 20000 });
+  check((await welcomeBox()).bg === 'rgb(0, 0, 0)' && (await welcomeBox()).full && (await stageLines()) === REPORT_LINES && !!(await page.$('.bcv-welcome__report.is-open')) && (await page.$('#bcv-whatsnew')) === null, 'after an update from 2.98.19, the page comes back black with the purple button\'s stage (What\'s New waits for the next page)');
+  await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000);
+  await page.click('.bcv-welcome__next');
+  await page.waitForFunction(() => !document.querySelector('#bcv-welcome'), null, { timeout: 5000 });
+  check((await sw.evaluate(async () => (await self.BCV.api.storage.local.get('welcome:report1'))['welcome:report1'])) === true && (await visible('#bcv-app')) && (await visible('#bcv-report')), 'its one Continue is the last: the black goes, the real purple button is there, and the stage is marked seen');
+  await sw.evaluate((v) => self.BCV.api.storage.local.set({ 'whatsnew:seen': v }), manifest.version);
+  await page.reload();
+  await page.waitForSelector('#bcv-app .bcv-nav__item', { timeout: 20000 });
+  await page.waitForTimeout(600);
+  check((await page.$('#bcv-welcome')) === null, 'and it does not come back either');
   // the theme chosen in Personalize is on the page: the accent's five shades on the sidebar's rows,
   // white words on the sidebar over its photo, the header's photo blurring towards its white title,
   // the counter's photo under a veil in the accent; the course's colour from Canvas
@@ -4046,7 +4077,7 @@ try {
   await page.goto(`${BASE}/?bcv=welcome`);
   await page.waitForSelector('#bcv-welcome[data-stage="look"]', { timeout: 20000 });
   check(page.url() === `${BASE}/` && (await welcomeBox()).bg === 'rgb(0, 0, 0)' && (await page.evaluate(() => performance.getEntriesByType('navigation')[0]?.type)) === 'navigate' && (await page.$('.bcv-stat')) !== null, 'asked for again, the welcome starts over the Dashboard and drops its parameter, with no reload');
-  for (const st of ['grades', 'courses', 'tools', 'peek', 'search', null]) { // (no Away Refresh stage: off unless turned on)
+  for (const st of ['report', 'grades', 'courses', 'tools', 'peek', 'search', null]) { // (no Away Refresh stage: off unless turned on; the purple button's after the switch's)
     await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000);
     await page.click('.bcv-welcome__next');
     if (st) await page.waitForSelector(`#bcv-welcome[data-stage="${st}"]`, { timeout: 5000 });
@@ -4057,6 +4088,9 @@ try {
   await sw.evaluate(() => self.BCV.settings.update({ appearance: { awayRefresh: true } }));
   await page.goto(`${BASE}/?bcv=welcome`);
   await page.waitForSelector('#bcv-welcome[data-stage="look"]', { timeout: 20000 });
+  await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000);
+  await page.click('.bcv-welcome__next');
+  await page.waitForSelector('#bcv-welcome[data-stage="report"]', { timeout: 5000 }); // (the purple button's, then the pill's)
   await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000);
   await page.click('.bcv-welcome__next');
   await page.waitForSelector('#bcv-welcome[data-stage="away"]', { timeout: 5000 });
@@ -6246,7 +6280,7 @@ try {
   await Promise.all([page.waitForNavigation({ timeout: 20000 }), page.click(su('.pz #pzOpen'))]); // Open Canvas: the page reloads
   await page.waitForSelector('#bcv-welcome[data-stage="look"]', { timeout: 20000 });
   check((await page.$('#bcv-setup')) === null && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('setup:done'))['setup:done'])) === true, 'finishing the steps is what marks the setup done, and the welcome follows the reload');
-  for (const st of ['grades', 'courses', 'tools', 'peek', 'search', null]) { // Continue, six times: the pointers in turn (no Away Refresh stage: off unless turned on; the search box last, on the Dashboard), then the page
+  for (const st of ['report', 'grades', 'courses', 'tools', 'peek', 'search', null]) { // Continue, seven times: the pointers in turn (the purple button's after the switch's) (no Away Refresh stage: off unless turned on; the search box last, on the Dashboard), then the page
     await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000);
     await page.click('.bcv-welcome__next');
     if (st) await page.waitForSelector(`#bcv-welcome[data-stage="${st}"]`, { timeout: 5000 });

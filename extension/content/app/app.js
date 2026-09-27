@@ -1486,6 +1486,11 @@
     if (codes.length) q.set('codes', codes.join(','));
     return `${REPORT_URL}?${q}`;
   }
+  /** The purple button for the welcome's show: the same markup and look, nothing wired. */
+  const reportDemo = () => h('span', { class: 'bcv-report-pill', 'aria-hidden': 'true' }, [
+    h('span', { class: 'bcv-report__lbl', text: 'Report a bug' }),
+    h('span', { class: 'bcv-report__dot', 'aria-hidden': 'true', html: BUG_MARK }),
+  ]);
   function mountReportButton() {
     if (self.BCVBridge?.native || document.getElementById('bcv-report')) return; // (the app: its own settings sheet has the way in)
     const btn = h('button', { type: 'button', id: 'bcv-report', class: 'bcv-report', title: 'Report a bug, an error, or an idea (opens simplcourses.com)', 'aria-label': 'Report a bug' }, [
@@ -1564,7 +1569,7 @@
     // (the setup's run, or — for anyone who had Simpl before the switch became a slider — the
     // switch's own show alone, once; a phone's header has no switch, so no show there)
     let welcome = state.lookOn && BCV.welcome ? await BCV.welcome.due() : false;
-    if (welcome === 'look' && html.classList.contains('bcv-phone')) welcome = false;
+    if ((welcome === 'look' || welcome === 'report') && html.classList.contains('bcv-phone')) welcome = false; // (a phone's header has neither the switch nor the purple button)
     if (welcome === 'appearance' && html.classList.contains('bcv-phone')) { BCV.welcome.clear('appearance').catch(() => {}); welcome = false; } // (no sidebar, no Appearance button to point at)
     if (welcome === 'search' && (html.classList.contains('bcv-phone') || parseRoute().screen !== 'dashboard')) welcome = false; // (the search box is the Dashboard's, and a phone has none: it waits for the Dashboard)
     if (welcome) BCV.welcome.cover();
@@ -1574,9 +1579,10 @@
     mountLookToggle();
     mountReportButton(); // (the purple button, left of the switch: Report a bug)
     if (state.lookOn) { BCV.tools?.mountTray?.(); BCV.tools?.focusLoad?.().catch(() => {}); } // the tray beside the switch (live activities, pinned tools); the focus timer's clock, so a session going is known
-    // (an update's own run: the switch's show, and the Tools row — everyone sees those once; after
+    // (an update's own run: the switch's show, the purple button and the Tools row — everyone sees those once;
+    // an update from before the purple button: its stage alone, once; after
     // Personalize from the theme invitation: the Appearance button alone, where the themes live now)
-    if (welcome) BCV.welcome.open(BCV.app, welcome === 'look' ? ['look', 'tools'] : welcome === 'appearance' ? ['appearance'] : welcome === 'search' ? ['search'] : null).catch(() => {});
+    if (welcome) BCV.welcome.open(BCV.app, welcome === 'look' ? ['look', 'report', 'tools'] : welcome === 'report' ? ['report'] : welcome === 'appearance' ? ['appearance'] : welcome === 'search' ? ['search'] : null).catch(() => {});
     // The first Canvas page after an update shows what changed: once per version, never over the
     // setup, the welcome or a quiz attempt, and never on a fresh install (the setup marks its version seen).
     // (a release can put an invitation in the notes' place — whatsnew.js — which opens the same way)
@@ -1648,6 +1654,7 @@
     syncQuizFlag, // (the quiz screen says when an attempt opens and closes)
     lookDemo, // (the welcome shows the switch working, on a copy of it)
     reportUrl, // (the purple button's address, for the tests)
+    reportDemo, reportMark: BUG_MARK, // (the welcome shows the purple button, on a copy of it)
     main: () => main,
   };
 
