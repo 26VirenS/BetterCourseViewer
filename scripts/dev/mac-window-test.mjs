@@ -66,6 +66,10 @@ const FAKE_APP = () => {
         const t = m.message && m.message.type;
         if (t === 'registerDomain') { const s = store.settings || {}; s.domains = [...(s.domains || []).filter((d) => d !== m.message.origin), m.message.origin]; store.settings = s; return { ok: true, origin: m.message.origin, message: `Enabled on ${m.message.origin}. Safari asks for the site when you open it.` }; }
         if (t === 'unregisterDomain') { const s = store.settings || {}; s.domains = (s.domains || []).filter((d) => d !== m.message.origin); store.settings = s; return { ok: true }; }
+        // the Developer section's asks (ViewController.runtimeMessage): each waits in the store as a 'dev' command for the
+        // extension, whose answer the window reads back by the ask's id (taken out as it is read)
+        if (t === 'devReply') { const i = (store.devReplies || []).findIndex((r) => r.id === m.message.id); if (i < 0) return { ok: true, done: false, waiting: store.commands.some((c) => c.id === m.message.id) }; const [r] = store.devReplies.splice(i, 1); return { ok: true, done: true, reply: r.reply }; }
+        if (/^dev/.test(t || '')) { const id = `dev${store.commands.length + 1}-${Date.now()}`; store.commands.push({ id, type: 'dev', message: clone(m.message) }); return { ok: true, queued: id }; }
         return { ok: true };
       }
       case 'app.state': return window.__appState;
@@ -223,6 +227,36 @@ try {
   const rolled = await calls('app.rollback');
   check(rolled.length === 1 && rolled[0].version === '9.9.8' && rolled[0].url === 'https://example.test/Simpl-Courses-Mac-9.9.8.zip' && rolled[0].sha256 === 'def' && (await text('#devRollMsg')) === 'Installing 9.9.8: the app relaunches once it is in place.', `Install asks the app for that version, its zip and its checksum, and says so: ${JSON.stringify(rolled)}`);
   await page.screenshot({ path: join(root, 'scripts', 'dev', 'out', 'mac-window-rollback.png') });
+
+  // ---- Developer: the tabs reach Safari's extension — each ask left in the store, answered by the extension on its next sync
+  console.log('developer: asks that wait for Safari');
+  // (the extension, played here: the oldest ask of that kind taken from the store and answered)
+  const answer = (kind, reply) => page.waitForFunction((k) => window.__store.commands.some((c) => c.type === 'dev' && c.message.type === k), kind, { timeout: 5000 })
+    .then(() => page.evaluate(([k, r]) => { const st = window.__store; const c = st.commands.find((x) => x.type === 'dev' && x.message.type === k); st.commands = st.commands.filter((x) => x !== c); (st.devReplies ||= []).push({ id: c.id, reply: r }); return c.message; }, [kind, reply]));
+  await page.click('#devTabs [data-pane="sim"]');
+  await page.fill('#devFrom', '2.98.28');
+  await page.click('#devSimRun');
+  await page.waitForFunction(() => document.getElementById('devSimMsg').textContent === 'Asking Safari…', null, { timeout: 3000 });
+  const simAsked = await answer('devSimUpdate', { ok: true, from: '2.98.28', to: '9.9.9', reloaded: 2, updatedPage: false });
+  await page.waitForFunction(() => /^Updated from/.test(document.getElementById('devSimMsg').textContent), null, { timeout: 5000 });
+  check(simAsked.from === '2.98.28' && (await text('#devSimMsg')) === 'Updated from 2.98.28 to 9.9.9: 2 Canvas tabs loaded again.', `Simulate is no longer "Not here": the ask waits for Safari ("Asking Safari…") and its answer is said (${await text('#devSimMsg')})`);
+  await page.click('#devTabs [data-pane="quiz"]');
+  await page.click('#devQuizImport');
+  await page.waitForFunction(() => window.__store.settings?.developer?.quizImport === true, null, { timeout: 3000 });
+  check((await page.$eval('#devQuizImport', (b) => b.classList.contains('is-on'))) && (await flashed()) === 'Saved', 'Import answers turns on: a setting, written to the store the extension takes its settings from');
+  await page.waitForTimeout(600); // (the tab's fade and the switch's travel, done)
+  await page.screenshot({ path: join(root, 'scripts', 'dev', 'out', 'mac-window-dev-quiz.png') });
+  await page.click('#devTabs [data-pane="state"]');
+  await answer('devState', { ok: true, errors: [{ code: 'SC-C-404', at: 1700000000000 }] });
+  await page.waitForFunction(() => /SC-C-404/.test(document.getElementById('devErrors').textContent), null, { timeout: 5000 });
+  check(/SC-C-404/.test(await text('#devErrors')), 'the State tab shows the error codes Safari\'s extension keeps');
+  await page.click('#devTabs [data-pane="storage"]');
+  await answer('devStorage', { ok: true, rows: [{ k: 'setup:done', n: 4, v: true }, { k: 'theme:images', n: 900000, big: true }] });
+  await page.waitForSelector('.devkey[data-key="theme:images"]', { timeout: 5000 });
+  await page.click('.devkey[data-key="theme:images"] .devkey__head');
+  const big = await page.$eval('.devkey[data-key="theme:images"] .devkey__val', (e) => e.textContent);
+  check(/^2 keys · 879 KB$/.test(await text('#devStoreSub')) && big === '879 KB — too large to show here.', `the Storage tab lists Safari's keys, a large one by its size alone (${await text('#devStoreSub')} · ${big})`);
+  await page.screenshot({ path: join(root, 'scripts', 'dev', 'out', 'mac-window-dev-storage.png') });
 } catch (e) {
   console.error('mac window test crashed:', e?.stack || e);
   failures.push('crash: ' + e.message);

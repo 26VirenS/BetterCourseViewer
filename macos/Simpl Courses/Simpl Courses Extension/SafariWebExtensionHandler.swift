@@ -8,7 +8,8 @@
 //  the app left (a wipe after Reset everything). It also writes here: the few switches the
 //  extension keeps (the look switch on a page, the popup) land in the same store, so the app's
 //  window shows them; and it reports which Canvas it last drew and whether the setup has run.
-//  "openApp" brings the app's window up, through its simplcourses:// address.
+//  "openApp" brings the app's window up, through its simplcourses:// address. "devReply" is the
+//  extension's answer to an ask of the Developer section left by the app's window as a command.
 //
 
 import SafariServices
@@ -61,6 +62,17 @@ class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling {
             if let id = message["id"] as? String {
                 let snap = store.update(bump: false) { s in s.commands.removeAll { ($0["id"] as? String) == id } }
                 reply["revision"] = snap.revision
+            }
+        case "devReply":
+            // the answer to an ask the app's window left as a `dev` command: kept by its id for the
+            // window to read (the last few only, so an answer nobody collects does not stay for ever)
+            if let id = message["id"] as? String {
+                let answer = message["reply"] as? [String: Any] ?? ["ok": false, "message": "No answer."]
+                store.update(bump: false) { s in
+                    s.devReplies.removeAll { ($0["id"] as? String) == id }
+                    s.devReplies.append(["id": id, "reply": answer])
+                    if s.devReplies.count > 8 { s.devReplies.removeFirst(s.devReplies.count - 8) }
+                }
             }
         case "openApp":
             if let url = URL(string: "simplcourses://settings") { NSWorkspace.shared.open(url) }

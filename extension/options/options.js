@@ -741,6 +741,7 @@
     setSeg($('sideCourses'), settings.appearance.sideCourses || 'always');
     $('themeSub').textContent = settings.appearance.theme?.accent ? `${settings.appearance.theme.name || 'Your own colour'} · ${settings.appearance.theme.accent}. Photos are kept on the device they were added on.` : 'The look, a colour of your own, the courses’ colours, photos on the counters, the sidebar and the page headers.';
     for (const [id, key] of DASH) setSwitch($(id), settings.appearance.dashboard?.[key] !== false);
+    devQuizPaint(); // (Developer → Quiz: a setting like the rest, so a change from the other side shows)
     renderDomains();
     paintStatus();
     paint();
@@ -753,7 +754,25 @@
   // Hidden until asked for — five presses on the version, or #dev — because it is for finding out
   // what a browser reports about a new tab, not for using Canvas. Everything it sets is one code.
   const DEV = BCV.devcode;
-  const devAsk = (msg) => api.runtime.sendMessage(msg).catch(() => null);
+  /* Every ask of the Developer section goes to the extension's background (devRpc there). In the
+   * Mac app's window the page is not the extension: the app leaves the ask in its shared store, the
+   * extension answers it on its next sync (every few seconds while Safari is open) and the answer
+   * is read back here by the ask's id — so the window waits for it, and says so. */
+  const DEV_WAIT = 20000;
+  async function devAsk(msg, { note = null } = {}) {
+    const r = await api.runtime.sendMessage(msg).catch(() => null);
+    if (!r?.queued) return r;
+    if (note) devSay(note, 'Asking Safari…');
+    const until = Date.now() + DEV_WAIT;
+    while (Date.now() < until) {
+      await new Promise((res) => setTimeout(res, 600));
+      const got = await api.runtime.sendMessage({ type: 'devReply', id: r.queued }).catch(() => null);
+      if (got?.done) { if (note) devSay(note, ''); return got.reply; }
+    }
+    const answer = { ok: false, waiting: true, message: 'Safari has not answered. Open Safari with a Canvas tab, then try again — the ask waits there until it does.' };
+    if (note) devSay(note, answer.message);
+    return answer;
+  }
   let devNow = { ...DEV.SHIPPED };
   function devPaintFields() {
     $('devFields').replaceChildren(...DEV.FIELDS.map((f) => {
@@ -859,7 +878,7 @@
   $('devSimRun').addEventListener('click', async () => {
     devSay('devSimMsg', 'Simulating…');
     $('devSimRun').disabled = true;
-    const r = await devAsk({ type: 'devSimUpdate', from: $('devFrom').value });
+    const r = await devAsk({ type: 'devSimUpdate', from: $('devFrom').value }, { note: 'devSimMsg' });
     $('devSimRun').disabled = false;
     if (!r?.ok) { devSay('devSimMsg', r?.message || 'The background is not answering.'); return; }
     const tabs = r.reloaded ? `${r.reloaded} Canvas ${r.reloaded === 1 ? 'tab' : 'tabs'} loaded again` : 'no Canvas tab is open: the next one opened shows it';
@@ -867,58 +886,69 @@
   });
   $('devRuns').addEventListener('click', (e) => { const b = e.target.closest('[data-run]'); if (b) openOnCanvas(b.dataset.run); });
 
-  // Quiz: the Import answers button on a quiz being taken (content/app/screens/quiz.js reads the flag as an attempt opens)
-  async function devQuizPaint() {
-    const on = ((await api.storage.local.get('dev:quizImport').catch(() => ({})))['dev:quizImport']) === true;
+  // Quiz: the Import answers button on a quiz being taken (content/app/screens/quiz.js reads it as an attempt opens).
+  // A setting (developer.quizImport), so the Mac app's window turns it on the way it turns on any other.
+  function devQuizPaint() {
+    const on = settings?.developer?.quizImport === true;
     $('devQuizImport').classList.toggle('is-on', on);
     $('devQuizImport').setAttribute('aria-checked', on ? 'true' : 'false');
   }
   $('devSimQuiz').addEventListener('click', () => openOnCanvas('simquiz')); // (content/app/quiz-sim.js: every Classic kind, nothing sent)
   $('devQuizImport').addEventListener('click', async () => {
-    const on = !$('devQuizImport').classList.contains('is-on');
-    try { await api.storage.local.set({ 'dev:quizImport': on }); flash(); } catch (e) { flash(`Not saved: ${e?.message || e}`, true); }
+    await save({ developer: { quizImport: !$('devQuizImport').classList.contains('is-on') } });
     devQuizPaint();
   });
 
-  // State: the flags the setup, the welcome and What's New leave (settings, courses and photos are not flags), and the error codes kept for a report
-  const FLAG_KEY = /^(setup:|welcome:|whatsnew:|updated:shown$|tools:welcomed$|themes:tried$)/;
+  // State: the flags the setup, the welcome and What's New leave (settings, courses and photos are not flags), and the error codes kept for a report — the extension's, asked for (devRpc)
+  const devErrorsPaint = (r) => {
+    if (!r?.ok) { $('devErrors').textContent = r?.message || 'The background is not answering.'; return; }
+    $('devErrors').textContent = r.errors.length ? r.errors.map((x) => `${new Date(x.at).toLocaleString()}  ${x.code}`).join('\n') : 'None yet.';
+  };
   $('devResetFlags').addEventListener('click', async () => {
     if (!confirm('Reset the setup, the welcome and What’s New?\n\nThe next Canvas page runs the setup again. Settings, courses and photos stay.')) return;
-    const keys = Object.keys(await api.storage.local.get(null)).filter((k) => FLAG_KEY.test(k));
-    await api.storage.local.remove(keys).catch(() => {});
-    devSay('devStateMsg', `${keys.length} ${keys.length === 1 ? 'flag' : 'flags'} cleared. The next Canvas page runs the setup.`);
+    const r = await devAsk({ type: 'devState', op: 'resetFlags' }, { note: 'devStateMsg' });
+    if (r?.ok) devSay('devStateMsg', `${r.cleared} ${r.cleared === 1 ? 'flag' : 'flags'} cleared. The next Canvas page runs the setup.`);
+    devErrorsPaint(r);
   });
   $('devClearErrors').addEventListener('click', async () => {
-    await api.storage.local.remove('errors:recent').catch(() => {});
-    devSay('devStateMsg', 'Error codes cleared.');
-    devErrorsShow();
+    const r = await devAsk({ type: 'devState', op: 'clearErrors' }, { note: 'devStateMsg' });
+    if (r?.ok) devSay('devStateMsg', 'Error codes cleared.');
+    devErrorsPaint(r);
   });
-  async function devErrorsShow() {
-    const kept = ((await api.storage.local.get('errors:recent').catch(() => ({})))['errors:recent']) || [];
-    $('devErrors').textContent = kept.length ? kept.map((x) => `${new Date(x.at).toLocaleString()}  ${x.code}`).join('\n') : 'None yet.';
-  }
+  async function devErrorsShow() { devErrorsPaint(await devAsk({ type: 'devState' }, { note: 'devStateMsg' })); }
 
-  // Storage: every key this device keeps, its size, and what is in it — filtered by name, opened in place, removed one at a time
+  // Storage: every key the extension keeps, its size, and what is in it — filtered by name, opened in place, removed one at a time (devRpc)
   const kb = (n) => (n < 1024 ? `${n} B` : `${(n / 1024).toFixed(n < 10240 ? 1 : 0)} KB`);
-  async function devStorage() {
-    const all = await api.storage.local.get(null).catch(() => ({}));
+  let devKept = null; // (the last answer: the filter works on it without asking again)
+  function devKeysPaint() {
+    if (!devKept) return;
     const q = $('devStoreQuery').value.trim().toLowerCase();
-    const rows = Object.keys(all).sort().map((k) => ({ k, v: all[k], n: new Blob([JSON.stringify(all[k]) ?? '']).size }));
-    const total = rows.reduce((s, r) => s + r.n, 0);
-    const shown = rows.filter((r) => !q || r.k.toLowerCase().includes(q));
-    $('devStoreSub').textContent = `${rows.length} ${rows.length === 1 ? 'key' : 'keys'} · ${kb(total)}${q ? ` · ${shown.length} shown` : ''}`;
+    const total = devKept.reduce((s, r) => s + r.n, 0);
+    const shown = devKept.filter((r) => !q || r.k.toLowerCase().includes(q));
+    $('devStoreSub').hidden = false;
+    $('devStoreSub').textContent = `${devKept.length} ${devKept.length === 1 ? 'key' : 'keys'} · ${kb(total)}${q ? ` · ${shown.length} shown` : ''}`;
     $('devKeys').replaceChildren(...(shown.length ? shown.map((r) => {
       const body = h('pre', { class: 'devlog devkey__val', hidden: true });
-      const open = () => { if (body.hidden) { const t = JSON.stringify(r.v, null, 2) ?? String(r.v); body.textContent = t.length > 6000 ? `${t.slice(0, 6000)}\n… ${kb(r.n)} in all` : t; } body.hidden = !body.hidden; row.classList.toggle('is-open', !body.hidden); };
+      const open = () => {
+        if (body.hidden) { const t = r.big ? `${kb(r.n)} — too large to show here.` : JSON.stringify(r.v, null, 2) ?? String(r.v); body.textContent = t.length > 6000 ? `${t.slice(0, 6000)}\n… ${kb(r.n)} in all` : t; }
+        body.hidden = !body.hidden;
+        row.classList.toggle('is-open', !body.hidden);
+      };
       const row = h('div', { class: 'devkey', dataset: { key: r.k } }, [
         h('button', { type: 'button', class: 'devkey__head', onclick: open }, [h('span', { class: 'devkey__k', text: r.k }), h('span', { class: 'devkey__n', text: kb(r.n) })]),
-        h('button', { type: 'button', class: 'btn btn--xs devkey__rm', text: 'Remove', onclick: async () => { if (!confirm(`Remove ${r.k}?`)) return; await api.storage.local.remove(r.k).catch(() => {}); devStorage(); } }),
+        h('button', { type: 'button', class: 'btn btn--xs devkey__rm', text: 'Remove', onclick: async () => { if (!confirm(`Remove ${r.k}?`)) return; devStorage({ op: 'remove', key: r.k }); } }),
         body,
       ]);
       return row;
     }) : [h('p', { class: 'empty', text: q ? 'No key matches.' : 'Nothing stored.' })]));
   }
-  $('devStoreQuery').addEventListener('input', () => devStorage());
+  async function devStorage(extra = {}) {
+    const r = await devAsk({ type: 'devStorage', ...extra }, { note: 'devStoreSub' });
+    if (!r?.ok) { $('devStoreSub').hidden = false; $('devStoreSub').textContent = r?.message || 'The background is not answering.'; return; }
+    devKept = r.rows;
+    devKeysPaint();
+  }
+  $('devStoreQuery').addEventListener('input', () => devKeysPaint());
   $('devStoreRefresh').addEventListener('click', () => devStorage());
 
   let devTaps = 0;

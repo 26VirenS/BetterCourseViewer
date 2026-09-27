@@ -419,7 +419,27 @@ class ViewController: NSViewController, WKNavigationDelegate, WKUIDelegate, WKSc
             return ["ok": true, "cleared": 0]
         case "pushSettings", "openOptions":
             return ["ok": true]
+        case "devReply":
+            // the window waiting on an ask it left (below): the extension's answer once it has written one, taken out as it is read
+            guard let id = msg["id"] as? String else { return ["ok": false, "message": "No ask named."] }
+            let snap = store.read()
+            if let found = snap.devReplies.first(where: { ($0["id"] as? String) == id }) {
+                store.update(bump: false) { s in s.devReplies.removeAll { ($0["id"] as? String) == id } }
+                lastModified = store.modified
+                return ["ok": true, "done": true, "reply": found["reply"] ?? [String: Any]()]
+            }
+            let waiting = snap.commands.contains { ($0["id"] as? String) == id }
+            return ["ok": true, "done": false, "waiting": waiting]
         default:
+            // The Developer section's asks (Simulate, the storage, the flags, the tool tabs' code) are the
+            // extension's to answer, and this window is not the extension: each waits in the store as a
+            // `dev` command, answered on the extension's next sync; the window asks for the answer by its id.
+            if let type = msg["type"] as? String, type.hasPrefix("dev") {
+                let id = UUID().uuidString
+                store.update(bump: false) { s in s.commands.append(["id": id, "type": "dev", "message": msg]) }
+                lastModified = store.modified
+                return ["ok": true, "queued": id]
+            }
             return ["ok": false, "message": "Not here"]
         }
     }

@@ -25,6 +25,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.98.32', date: '2026-09-27', notes: [
+      { kind: 'improved', title: 'Tidier report button', body: 'Pinned tools step aside while it opens.', icon: P.pin },
+    ] },
     { version: '2.98.31', date: '2026-09-27', notes: [
       { kind: 'improved', title: 'Blanks read as gaps', body: 'Feedback shows a blank as a gap, not its name.', icon: P.pen },
     ] },

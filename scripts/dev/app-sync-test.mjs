@@ -49,6 +49,7 @@ try {
       if (msg.type === 'setSettings') { st.settings = msg.settings; st.revision += 1; return { ok: true, revision: st.revision }; }
       if (msg.type === 'done') { st.commands = st.commands.filter((c) => c.id !== msg.id); return { ok: true }; }
       if (msg.type === 'openApp') { n.opened += 1; return { ok: true }; }
+      if (msg.type === 'devReply') { (n.replies ||= {})[msg.id] = msg.reply; return { ok: true }; }
       return { ok: false };
     };
   });
@@ -84,6 +85,19 @@ try {
   s = await settings();
   check(!left.includes('prefs:canvas.test') && !left.includes('site:last') && (await log()).includes('done:c2'), `the wipe clears the extension's storage and is reported done (${left.join(',') || 'nothing left'})`);
   check(stored.settings && stored.settings.appearance.skin === true && stored.settings.appearance.darkMode === 'system' && stored.revision === 11 && s.appearance.skin === true, `an app with no settings is handed the extension's, which are the defaults after the wipe (revision ${stored.revision})`);
+
+  console.log("the Developer section asked from the app's window");
+  // Settings → Developer in the app's window is not the extension: its asks wait in the store as 'dev'
+  // commands, answered here on the next sync, the answer written up before the command is marked done
+  await sw.evaluate(() => self.BCV.api.storage.local.set({ 'errors:recent': [{ code: 'SC-C-404', at: 1700000000000 }], 'welcome:look5': true }));
+  await sw.evaluate(() => { self.__native.log = []; self.__native.store.commands = [{ id: 'd1', type: 'dev', message: { type: 'devState' } }, { id: 'd2', type: 'dev', message: { type: 'devStorage' } }, { id: 'd3', type: 'dev', message: { type: 'devState', op: 'resetFlags' } }, { id: 'd4', type: 'dev', message: { type: 'devNothing' } }]; });
+  await sw.evaluate(() => self.BCV.background.syncApp());
+  const devLog = await log();
+  const replies = await sw.evaluate(() => self.__native.replies || {});
+  const storeRow = (replies.d2?.rows || []).find((r) => r.k === 'errors:recent');
+  check(devLog.join(',').startsWith('getSettings,devReply:d1,done:d1,devReply:d2,done:d2,devReply:d3,done:d3,devReply:d4,done:d4'), `each ask is answered, then marked done, in turn: ${devLog.slice(0, 9).join(',')}`);
+  check(replies.d1?.ok && replies.d1.errors[0]?.code === 'SC-C-404' && storeRow && storeRow.v[0].code === 'SC-C-404' && storeRow.n > 10 && replies.d3?.cleared >= 1 && !(await sw.evaluate(async () => 'welcome:look5' in (await self.BCV.api.storage.local.get('welcome:look5')))) && replies.d4?.ok === false && /no ask called devNothing/.test(replies.d4.message),
+    `the answers are the extension's own: the error codes kept, every key with its size and value, the flags reset, and an ask it does not know refused in words (${JSON.stringify({ d1: replies.d1, d3: replies.d3, d4: replies.d4 })})`);
 
   console.log('settings open the app');
   await sw.evaluate(() => self.BCV.background.openOptions());

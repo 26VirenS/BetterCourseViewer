@@ -354,6 +354,48 @@ if (typeof importScripts === 'function' && !self.BCV_LAZY_MODULES) {
     return { ok: true, rows, code: DEV.encode(cap), can: { ...CAN, heardATab }, open: [...tools.keys()] };
   }
 
+  // ---- the Developer section's asks, through one door ------------------------------------------
+  // The settings page asks here with a message; the Mac app's window cannot (it is not the
+  // extension), so its asks wait in the app's shared store as a 'dev' command, are answered here on
+  // the next sync and the answer written back for the window to read (runAppCommand). Either way
+  // the answer is the same: this is what the Developer section's tabs are drawn from.
+  const DEV_FLAGS = /^(setup:|welcome:|whatsnew:|updated:shown$|tools:welcomed$|themes:tried$)/; // what the setup, the welcome and What's New leave behind — settings, courses and photos are not flags
+  const DEV_SHOWN = 16 * 1024; // a stored value bigger than this is listed by its size alone
+  const DEV_ALL_SHOWN = 256 * 1024; // and past this much in all, the rest are too (an answer the app's store carries, not a dump)
+  const byteSize = (v) => new TextEncoder().encode(JSON.stringify(v) ?? '').length;
+  async function devRpc(msg) {
+    switch (msg?.type) {
+      case 'devGet': return devGet();
+      case 'devSet': return devSet(msg.settings);
+      case 'devLog': return devLog(msg.clear);
+      case 'devSimUpdate': return devSimUpdate(msg.from);
+      case 'devStorage': { // every key kept, its size, and its value where it is small (op 'remove': one key taken away first)
+        if (msg.op === 'remove' && msg.key) await api.storage.local.remove(String(msg.key));
+        const all = await api.storage.local.get(null);
+        let shown = 0;
+        const rows = Object.keys(all).sort().map((k) => {
+          const n = byteSize(all[k]);
+          if (n > DEV_SHOWN || shown + n > DEV_ALL_SHOWN) return { k, n, big: true };
+          shown += n;
+          return { k, n, v: all[k] };
+        });
+        return { ok: true, rows, total: rows.reduce((t, r) => t + r.n, 0) };
+      }
+      case 'devState': { // the error codes kept for a report (op 'resetFlags': the setup and welcome flags cleared; 'clearErrors': the codes)
+        let cleared = null;
+        if (msg.op === 'resetFlags') {
+          const keys = Object.keys(await api.storage.local.get(null)).filter((k) => DEV_FLAGS.test(k));
+          await api.storage.local.remove(keys);
+          cleared = keys.length;
+        }
+        if (msg.op === 'clearErrors') await api.storage.local.remove('errors:recent');
+        const errors = (await api.storage.local.get('errors:recent'))['errors:recent'];
+        return { ok: true, errors: Array.isArray(errors) ? errors : [], ...(cleared !== null ? { cleared } : {}) };
+      }
+      default: return { ok: false, message: `The Developer section has no ask called ${msg?.type}.` };
+    }
+  }
+
   // ---- one-shot messages --------------------------------------------------
   /** Wikipedia's opensearch, for the Search everything box (content/app/search.js): the titles, a
    *  line each, the links. From here rather than the page, so the page's own rules never block it.
@@ -438,17 +480,13 @@ if (typeof importScripts === 'function' && !self.BCV_LAZY_MODULES) {
       case 'fetchText': // the widget importer: a widget's file from an address (the page's own rules never block it)
         reply(fetchText(msg.url));
         return true;
-      case 'devGet': // the Developer section: what the catch is set to
-        reply(devGet());
-        return true;
+      case 'devGet': // the Developer section (options.js): every ask of its own, through the one door (devRpc)
       case 'devSet':
-        reply(devSet(msg.settings));
-        return true;
       case 'devLog':
-        reply(devLog(msg.clear));
-        return true;
-      case 'devSimUpdate': // the Developer section: an update from any version, played again (the flags it leaves, the tabs reloaded)
-        reply(devSimUpdate(msg.from));
+      case 'devSimUpdate':
+      case 'devStorage':
+      case 'devState':
+        reply(devRpc(msg));
         return true;
       case 'closeSetupTab': // the page after install, once the setup is under way on a Canvas tab
         reply(sender?.tab?.id != null ? api.tabs.remove(sender.tab.id).then(() => ({ ok: true })) : { ok: false });
@@ -851,7 +889,8 @@ if (typeof importScripts === 'function' && !self.BCV_LAZY_MODULES) {
       if (w && typeof w.revision === 'number') app.revision = w.revision;
     } catch { /* the app answers next time */ }
   }
-  /** What the app asks for: a wipe (Reset everything in its window), or the site notes cleared. */
+  /** What the app asks for: a wipe (Reset everything in its window), the site notes cleared, a site's
+   *  preferences changed, or an ask of the Developer section answered. */
   async function runAppCommand(c) {
     if (!c || typeof c !== 'object') return;
     if (c.type === 'wipe') {
@@ -863,6 +902,11 @@ if (typeof importScripts === 'function' && !self.BCV_LAZY_MODULES) {
       app.lastJSON = null;
     } else if (c.type === 'wipeSiteNotes') {
       await wipeSiteNotes().catch(() => {});
+    } else if (c.type === 'dev' && c.message && typeof c.message === 'object') {
+      // the app's window asked the Developer section something (Simulate, the storage, the flags…):
+      // answered here, and the answer written up for the window, which waits for it by the command's id
+      const reply = await devRpc(c.message).catch((e) => ({ ok: false, message: e?.message || String(e) }));
+      await app.native({ type: 'devReply', id: c.id, reply }).catch(() => {});
     } else if (c.type === 'setPrefs' && c.host && c.patch && typeof c.patch === 'object') {
       // the app's window changed the site's preferences (the Grades section): the keys it names land
       // on the copy kept here, a null taking a key away; the rest — a snapshot recorded meanwhile — stays

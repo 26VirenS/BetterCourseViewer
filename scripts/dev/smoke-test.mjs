@@ -270,6 +270,7 @@ try {
   await page.hover('#bcv-report');
   const reportOpen = await eventually(() => page.$eval('#bcv-report', (b) => { const r = b.getBoundingClientRect(); const l = b.querySelector('.bcv-report__lbl'); return r.width > 90 && Math.round(document.getElementById('bcv-look').getBoundingClientRect().left - r.right) === 8 && getComputedStyle(l).opacity === '1' && l.textContent === 'Report a bug'; }));
   check(reportOpen, 'hovered, it opens out to the left with its words — Report a bug — its right end staying put beside the switch');
+  check(await eventually(() => page.$eval('#bcv-tray', (t) => getComputedStyle(t).opacity === '0' && getComputedStyle(t).pointerEvents === 'none')), 'and the pinned tools beside it step out of the way while it is open, as they do for the switch');
   await page.waitForTimeout(250);
   await shot(page, '01e-report-button');
   await page.hover('#bcv-look');
@@ -6452,7 +6453,7 @@ try {
   // Quiz: a switch writes the flag a quiz reads as an attempt opens
   await options.click('#devTabs [data-pane="quiz"]');
   await options.click('#devQuizImport');
-  check(await eventually(async () => (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('dev:quizImport'))['dev:quizImport'])) === true && await options.$eval('#devQuizImport', (b) => b.classList.contains('is-on') && b.getAttribute('aria-checked') === 'true')), 'the Quiz tab turns on Import answers from an earlier attempt');
+  check(await eventually(async () => (await sw.evaluate(async () => (await self.BCV.settings.get()).developer?.quizImport)) === true && await options.$eval('#devQuizImport', (b) => b.classList.contains('is-on') && b.getAttribute('aria-checked') === 'true')), 'the Quiz tab turns on Import answers from an earlier attempt — a setting, so the Mac app\'s window turns it on too');
   await options.screenshot({ path: join(out, '29b-options-dev-quiz.png') });
   // the quiz: a new attempt, Import answers — attempt 1's answers filled in and saved to Canvas
   await page.bringToFront();
@@ -6552,13 +6553,13 @@ try {
   await options.bringToFront();
   await options.click('#devTabs [data-pane="storage"]');
   await options.waitForSelector('.devkey[data-key="setup:done"]', { timeout: 5000 });
-  await options.fill('#devStoreQuery', 'dev:quiz');
+  await options.fill('#devStoreQuery', 'setup:done');
   const storeRowsNow = () => options.evaluate(() => ({ keys: [...document.querySelectorAll('.devkey')].map((r) => r.dataset.key).join(','), sub: document.getElementById('devStoreSub').textContent }));
-  await eventually(async () => (await storeRowsNow()).keys === 'dev:quizImport', 5000);
+  await eventually(async () => (await storeRowsNow()).keys === 'setup:done', 5000);
   const storeRows = await storeRowsNow();
-  await options.click('.devkey[data-key="dev:quizImport"] .devkey__head');
-  const storeVal = await options.$eval('.devkey[data-key="dev:quizImport"] .devkey__val', (e) => ({ shown: !e.hidden, text: e.textContent }));
-  check(storeRows.keys === 'dev:quizImport' && /^\d+ keys · [\d.]+ (B|KB) · 1 shown$/.test(storeRows.sub) && storeVal.shown && storeVal.text === 'true', `the Storage tab lists every key with its size, filters by name and opens a value in place: ${JSON.stringify({ ...storeRows, storeVal })}`);
+  await options.click('.devkey[data-key="setup:done"] .devkey__head');
+  const storeVal = await options.$eval('.devkey[data-key="setup:done"] .devkey__val', (e) => ({ shown: !e.hidden, text: e.textContent }));
+  check(storeRows.keys === 'setup:done' && /^\d+ keys · [\d.]+ (B|KB) · 1 shown$/.test(storeRows.sub) && storeVal.shown && storeVal.text === 'true', `the Storage tab lists every key with its size, filters by name and opens a value in place: ${JSON.stringify({ ...storeRows, storeVal })}`);
   await options.fill('#devStoreQuery', '');
   // State: the error codes kept for a report, cleared on a press
   await sw.evaluate(() => self.BCV.api.storage.local.set({ 'errors:recent': [{ code: 'SC-C-404', at: Date.now() - 1000 }] }));
@@ -6586,7 +6587,7 @@ try {
   await options.click('#devSimRun');
   check(await eventually(async () => /^Pick a version before this one/.test(await options.$eval('#devSimMsg', (e) => e.textContent))), 'a version that is not older is refused, and says why');
   // (put back: nothing owed, the flag off, the page as it was)
-  await sw.evaluate(async () => { const v = self.BCV.api.runtime.getManifest().version; await self.BCV.api.storage.local.set({ 'whatsnew:seen': v, 'welcome:report1': true, 'welcome:look5': true, 'dev:quizImport': false }); await self.BCV.api.storage.local.remove('whatsnew:from'); });
+  await sw.evaluate(async () => { const v = self.BCV.api.runtime.getManifest().version; await self.BCV.api.storage.local.set({ 'whatsnew:seen': v, 'welcome:report1': true, 'welcome:look5': true }); await self.BCV.api.storage.local.remove('whatsnew:from'); await self.BCV.settings.update({ developer: { quizImport: false } }); });
   await page.goto(`${BASE}/`);
   await page.waitForSelector('.bcv-stat', { timeout: 15000 });
   await options.screenshot({ path: join(out, '29d-options-dev.png') });

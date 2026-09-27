@@ -234,7 +234,8 @@ html[data-theme="dark"] .docs__warn { color: #ffb44d; }
 .devkey .devkey__val { grid-column: 1 / -1; margin: 0 0 12px 18px; max-height: 260px; } /* (above .devlog's own margin) */
 .card--pad > .chips { margin-top: 0; }
 .card--pad > .devlog { margin-top: 0; }
-#dev .note--msg:empty { display: none; } /* (a message line with nothing to say takes no room) */
+#dev .note--msg:empty { display: none; }
+.devroll__msg { margin: -6px 18px 14px; } /* (the rollback's word, under its row inside the card, at the row's own inset) */ /* (a message line with nothing to say takes no room) */
 .devkey__val[hidden] { display: none; }
 .devkeys .empty { padding: 18px; }
 

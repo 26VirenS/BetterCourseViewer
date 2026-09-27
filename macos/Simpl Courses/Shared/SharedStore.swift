@@ -13,7 +13,9 @@
 //  address. `prefs` is the extension's copy of that site's own preferences (the grade goal, the
 //  record before this term, the history), handed over on every sync when they change, so the
 //  app's window can show the Grades section; a change made there goes back as a `setPrefs`
-//  command, which the extension applies to the preferences it keeps.
+//  command, which the extension applies to the preferences it keeps. `devReplies` are the
+//  extension's answers to the Developer section's asks from the app's window (each asked as a
+//  `dev` command), kept by the command's id until the window has read its own.
 //
 
 import Foundation
@@ -29,6 +31,7 @@ final class SharedStore {
         var setupDone: Bool = false
         var prefs: [String: Any]? = nil
         var prefsHost: String? = nil
+        var devReplies: [[String: Any]] = []
 
         init() {}
 
@@ -41,6 +44,7 @@ final class SharedStore {
             setupDone = d["setupDone"] as? Bool ?? false
             prefs = d["prefs"] as? [String: Any]
             prefsHost = d["prefsHost"] as? String
+            devReplies = d["devReplies"] as? [[String: Any]] ?? []
         }
 
         var dictionary: [String: Any] {
@@ -49,6 +53,7 @@ final class SharedStore {
             if let site = site { d["site"] = site }
             if let prefs = prefs { d["prefs"] = prefs }
             if let prefsHost = prefsHost { d["prefsHost"] = prefsHost }
+            if !devReplies.isEmpty { d["devReplies"] = devReplies }
             return d
         }
     }

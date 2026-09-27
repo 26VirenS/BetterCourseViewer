@@ -237,7 +237,7 @@
     const exitBtn = h('button', { type: 'button', class: 'bcv-qz__exit', title: 'Save and exit', 'aria-label': 'Save and exit', onclick: leave }, U.svg(IC.close, { size: 16, width: 2.2 }));
     // Developer (Settings → Developer → Quiz): the answers of an earlier attempt, filled in and saved,
     // for trying a quiz again without typing it all out. Never there unless it was turned on there.
-    const devImport = await BCV.api.storage.local.get('dev:quizImport').then((r) => r['dev:quizImport'] === true).catch(() => false);
+    const devImport = await BCV.settings.get().then((s) => s?.developer?.quizImport === true).catch(() => false);
     if (!ctx.alive()) return screen;
     const devBtn = h('button', {
       type: 'button', class: 'bcv-qz__devimport', hidden: true, onclick: () => importEarlier(),
