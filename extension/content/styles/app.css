@@ -13,7 +13,7 @@
  * min(their own, the viewport less a margin). */
 
 html[data-bcv-theme] {
-  --bcv-version: "2.98.20"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.98.21"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -181,11 +181,12 @@ html[data-bcv-theme="dark"] .bcv-skel { --bcv-skel: linear-gradient(90deg, rgba(
 #bcv-look button, .bcv-look-pill button { margin: 0; border: 0; background: transparent; color: inherit; cursor: pointer; font: inherit; letter-spacing: inherit; text-align: left; }
 #bcv-look button:focus-visible { outline: 2px solid #0a84ff; outline-offset: 2px; }
 /* the disc: 24px of glass with the mark in the state's colour — green on, red off */
-.bcv-look__main { position: relative; flex: none; display: flex; align-items: center; justify-content: center; box-sizing: border-box; width: 24px; height: 24px; padding: 0; border: 1px solid rgba(255,255,255,.14); border-radius: 12px; background: rgba(28,28,30,.86); -webkit-backdrop-filter: blur(16px) saturate(1.4); backdrop-filter: blur(16px) saturate(1.4); box-shadow: 0 2px 10px rgba(0,0,0,.2); user-select: none; -webkit-user-select: none; transition: transform .16s var(--bcv-spring-snappy), box-shadow .18s ease; }
+.bcv-look__main { position: relative; flex: none; display: flex; align-items: center; justify-content: center; box-sizing: border-box; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 12px; background: transparent; box-shadow: 0 2px 10px rgba(0,0,0,.2); user-select: none; -webkit-user-select: none; transition: transform .16s var(--bcv-spring-snappy), box-shadow .18s ease; }
 #bcv-look:hover .bcv-look__main, #bcv-look:has(:focus-visible) .bcv-look__main, .bcv-look-pill.is-open .bcv-look__main { transform: scale(1.1); box-shadow: 0 6px 20px rgba(0,0,0,.3); }
 .bcv-look__main:active { opacity: .9; }
-.bcv-look__mark { width: 14px; height: 14px; border-radius: 4px; background: linear-gradient(158deg, #34c759, #1f9d45); display: flex; align-items: center; justify-content: center; transition: background .2s ease; }
-.bcv-look__mark svg { display: block; width: 12px; height: 12px; }
+/* (2.98.21) the mark fills the disc — the state's colour edge to edge, the logo white in it — as the purple Report a bug disc beside it does */
+.bcv-look__mark { flex: none; width: 24px; height: 24px; border-radius: 12px; background: linear-gradient(158deg, #34c759, #1f9d45); display: flex; align-items: center; justify-content: center; transition: background .2s ease; }
+.bcv-look__mark svg { display: block; width: 16px; height: 16px; }
 .bcv-look__main.is-off .bcv-look__mark { background: linear-gradient(158deg, #ff6b62, #e0352b); } /* (off — for this page, for a while or indefinitely — is red; on is green) */
 .bcv-look__text { position: absolute; width: 0; height: 0; overflow: hidden; opacity: 0; white-space: nowrap; } /* (the state's words, for the accessibility tree and the tests: never shown) */
 /* the three buttons: folded away under the disc; under the pointer (or the keyboard's focus, or the
@@ -203,7 +204,7 @@ html[data-bcv-theme="dark"] .bcv-skel { --bcv-skel: linear-gradient(90deg, rgba(
 .bcv-look__optdot { flex: none; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; }
 .bcv-look__optdot svg { display: block; width: 13px; height: 13px; fill: none; stroke: #fff; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
 /* (the reset above — #bcv-look button — outranks a class: the disc's glass and the buttons' colours said again at its weight) */
-#bcv-look .bcv-look__main, .bcv-look-pill .bcv-look__main { border: 1px solid rgba(255,255,255,.14); background: rgba(28,28,30,.86); }
+#bcv-look .bcv-look__main, .bcv-look-pill .bcv-look__main { border: 0; background: transparent; }
 #bcv-look .bcv-look__opt, .bcv-look-pill .bcv-look__opt { background: var(--bcv-opt); }
 /* red, and how long (2.98.18): the red one is a box — its head the round button, its list under it.
  * Hovered, it opens out to the left to the list's width with its words; pressed (is-expanded), it
