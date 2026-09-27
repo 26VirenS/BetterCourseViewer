@@ -94,6 +94,20 @@
    * of 0, which is falsy and went as the string "0", and a missing one, which went as "undefined". */
   const whole = (v) => { const t = String(v ?? '').trim(); return /^-?\d+$/.test(t) ? Number(t) : v; };
   const hasId = (v) => v !== null && v !== undefined && String(v).trim() !== '';
+  /* Canvas hands an answer back whole, not as picked (its questions endpoint deserializes "full"): a
+   * matching answer lists every left-hand value, with a null match where nothing is picked yet, and a
+   * blank kind lists every blank, null where it is empty. Those nulls are not picks. Read as picks
+   * they were the string "null" — a row holding it, the untouched question counted as answered, and
+   * every row sent up with the first real pick, which Canvas refused whole ("match_id must be of type
+   * Integer"). So an answer is kept as what was picked, and nothing else. */
+  const pairsOf = (v) => (Array.isArray(v) ? v : []).filter((p) => p && hasId(p.answer_id) && hasId(p.match_id));
+  const filledOf = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? Object.fromEntries(Object.entries(v).filter(([, x]) => hasId(x))) : {});
+  /** A question with its answer as picked: the rows and blanks Canvas lists with nothing in them taken out. */
+  function tidy(q) {
+    if (MATCH.has(q.question_type)) { const p = pairsOf(q.answer); q.answer = p.length ? p : null; }
+    else if (BLANKS.has(q.question_type) && q.answer && typeof q.answer === 'object' && !Array.isArray(q.answer)) { const f = filledOf(q.answer); q.answer = Object.keys(f).length ? f : null; }
+    return q;
+  }
   /** The blanks a question has, as Canvas's page names them or as its own answers say. */
   const blanksOf = (q) => (q.blanks?.length ? q.blanks : [...new Set((q.answers || []).map((a) => a.blank_id).filter(Boolean))]);
   /* The question as something to read rather than answer. Canvas's own page writes a blank's field
@@ -289,7 +303,7 @@
         return bs.length ? bs.every((b) => answered(held[b])) : answered(q.answer);
       }
       if (MATCH.has(q.question_type)) {
-        const pairs = Array.isArray(q.answer) ? q.answer : [];
+        const pairs = pairsOf(q.answer);
         return (q.answers || []).length ? pairs.length >= q.answers.length : !!pairs.length;
       }
       return answered(q.answer);
@@ -518,7 +532,7 @@
         if ((st.code || '').trim()) remember(st.code.trim());
         if (!st.paged) {
           try {
-            st.questions = await store.quizApi.questions(st.sub);
+            st.questions = (await store.quizApi.questions(st.sub)).map(tidy);
           } catch (e) {
             if (!/one question at a time/i.test(e.message || '')) throw e;
             st.paged = true; // the quiz did not say so, but Canvas did
@@ -568,7 +582,7 @@
       const spine = pg.list.length ? pg.list : pg.questions.map((q) => ({ id: q.id, name: q.question_name, answered: answered(q.answer), flagged: q.flagged, textOnly: q.question_type === 'text_only_question' }));
       st.questions = spine.map((e, k) => {
         const full = shown.get(String(e.id));
-        if (full) return { ...full, position: k + 1 };
+        if (full) return tidy({ ...full, position: k + 1 });
         const old = known.get(String(e.id));
         if (old && old.loaded !== false) return { ...old, position: k + 1, flagged: !!e.flagged };
         return { id: String(e.id), position: k + 1, question_name: e.name, question_type: e.textOnly ? 'text_only_question' : 'unknown_question', question_text: '', answers: [], answer: null, answered: !!e.answered, flagged: !!e.flagged, loaded: false };
@@ -735,11 +749,14 @@
       // the picks as pairs — the answer's own id against the match it was set to.
       if (MATCH.has(type)) {
         const matches = q.matches || [];
-        const chosen = new Map((Array.isArray(q.answer) ? q.answer : []).map((p2) => [String(p2.answer_id), String(p2.match_id)]));
+        const chosen = new Map(pairsOf(q.answer).map((p2) => [String(p2.answer_id), String(p2.match_id)]));
         const rows = [];
         const send = () => {
           const pairs = [];
-          for (const [aid, sel] of rows) { const v = sel.bcvPicker ? sel.bcvPicker.value : sel.value; if (v) pairs.push({ answer_id: whole(aid), match_id: whole(v) }); }
+          for (const [aid, sel] of rows) {
+            const pair = { answer_id: whole(aid), match_id: whole(sel.bcvPicker ? sel.bcvPicker.value : sel.value) };
+            if (Number.isInteger(pair.answer_id) && Number.isInteger(pair.match_id)) pairs.push(pair); // (a row with no pick sends nothing; Canvas takes whole numbers only)
+          }
           save(q, pairs);
         };
         return U.el(`bcv-qz__match ${compact ? 'bcv-qz__match--compact' : ''}`, opts.map((a) => {
@@ -905,11 +922,15 @@
       // a pair each: the left-hand value and what it was set to
       if (MATCH.has(q.question_type)) {
         const nameOf = (mid) => (q.matches || []).find((m) => String(m.match_id) === String(mid))?.text || String(mid);
-        return a.map((p2) => ({ text: `${one(p2.answer_id).text || partText(one(p2.answer_id))} → ${nameOf(p2.match_id)}`, html: '' }));
+        const pairs = pairsOf(a);
+        if (!pairs.length) return null;
+        return pairs.map((p2) => ({ text: `${one(p2.answer_id).text || partText(one(p2.answer_id))} → ${nameOf(p2.match_id)}`, html: '' }));
       }
       // one value per blank, named for the blank it fills
       if (BLANKS.has(q.question_type)) {
-        return Object.entries(a).map(([blank, v]) => {
+        const filled = Object.entries(filledOf(a));
+        if (!filled.length) return null;
+        return filled.map(([blank, v]) => {
           const named = !/^[0-9a-f]{8,}$/i.test(blank); // a quiz read from Canvas's own page knows the blank only as a hash of its name
           const o = DROPS.has(q.question_type) ? opts.find((x) => String(x.id) === String(v) && String(x.blank_id) === String(blank)) : null;
           return { text: `${named ? `${blank}: ` : ''}${o ? (o.text || htmlToText(o.html || '', 60)) : v}`, html: '' };

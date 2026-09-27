@@ -355,12 +355,26 @@ const unhash = (q, answer) => {
   const byTag = new Map([...new Set(q.answers.map((a) => a.blank_id))].map((b) => [blankTag(b), b]));
   return Object.fromEntries(Object.entries(answer).map(([k, v]) => [byTag.get(k) || k, v]));
 };
+/** An answer as Canvas's questions endpoint hands it back (AnswerSerializers#deserialize, full: true):
+ *  a matching answer lists every left-hand value, its ids as strings and a null match where none is
+ *  picked yet; a blank kind lists every blank, null where it is empty. Only what was picked is kept. */
+const canvasAnswer = (q, a) => {
+  if (q.question_type === 'matching_question') {
+    const got = new Map((Array.isArray(a) ? a : []).map((p2) => [String(p2.answer_id), p2.match_id]));
+    return q.answers.map((x) => ({ answer_id: String(x.id), match_id: got.get(String(x.id)) === undefined || got.get(String(x.id)) === null ? null : String(got.get(String(x.id))) }));
+  }
+  if (BLANK_KINDS.has(q.question_type)) {
+    const held = a && typeof a === 'object' && !Array.isArray(a) ? a : {};
+    return Object.fromEntries([...new Set(q.answers.map((x) => x.blank_id))].map((b) => [b, held[b] === undefined || held[b] === null || held[b] === '' ? null : String(held[b])]));
+  }
+  return a ?? null;
+};
 const subQuestions = (s) => {
   const done = s.workflow_state === 'complete';
   const bank = quizQuestionBank(s.quiz_id);
   return {
     // like Canvas: `correct`, answer weights and the question comments only appear once the attempt is complete
-    quiz_submission_questions: bank.map((q) => ({ id: q.id, position: q.position, flagged: !!s.state[q.id]?.flagged, answer: s.state[q.id]?.answer ?? null, ...(done ? { correct: gradeQuestion(q, s.state[q.id]?.answer) } : {}) })),
+    quiz_submission_questions: bank.map((q) => ({ id: q.id, position: q.position, flagged: !!s.state[q.id]?.flagged, answer: canvasAnswer(q, s.state[q.id]?.answer), ...(done ? { correct: gradeQuestion(q, s.state[q.id]?.answer) } : {}) })),
     quiz_questions: bank.map((q) => ({ ...(done ? q : { ...q, neutral_comments_html: undefined, correct_comments_html: undefined, incorrect_comments_html: undefined, neutral_comments: undefined, answers: q.answers.map(({ weight, ...a }) => a) }), question_text: blankFields(q) })), // (the fields rendered in, with nothing picked: Canvas's own page sets those with a script of its own)
   };
 };

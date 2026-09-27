@@ -186,11 +186,14 @@
    *  options: [{ value, text, html }] — `html` is Canvas's own content for that option, when it has
    *  any. `value` is what onChange is given. */
   function picker(options, value, onChange, { label = '', placeholder = 'Choose…', cls = '' } = {}) {
-    let cur = value === null || value === undefined ? '' : String(value);
     let list = null;
     let typed = '';
     let typedAt = 0;
     const opt = (v) => options.find((o) => String(o.value) === String(v)) || null;
+    // only a value the list offers is a value: anything else (a null Canvas sent for "nothing picked",
+    // read as the string "null") would sit in the picker unseen, its face saying Choose…, and be handed on as a pick
+    const known = (v) => { const t = v === null || v === undefined ? '' : String(v); return t && opt(t) ? t : ''; };
+    let cur = known(value);
     const face = el('bcv-picker__face');
     const btn = h('button', {
       type: 'button', class: `bcv-picker ${cls}`, 'aria-haspopup': 'listbox', 'aria-expanded': 'false', ...(label ? { 'aria-label': label } : {}),
@@ -220,7 +223,7 @@
     // the page moving under it takes it away — but the list scrolling inside itself does not
     function onScroll(e) { if (!list?.contains(e.target)) close(); }
     const pick = (v) => {
-      cur = v === null || v === undefined ? '' : String(v);
+      cur = known(v);
       drawFace();
       close();
       btn.focus();
@@ -284,7 +287,7 @@
       else if (e.key.length === 1) jump(e.key);
     }
     drawFace();
-    btn.bcvPicker = { set: (v) => { cur = v === null || v === undefined ? '' : String(v); drawFace(); }, get value() { return cur; }, close };
+    btn.bcvPicker = { set: (v) => { cur = known(v); drawFace(); }, get value() { return cur; }, close };
     return btn;
   }
 

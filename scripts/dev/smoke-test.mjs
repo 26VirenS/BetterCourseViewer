@@ -2611,11 +2611,20 @@ try {
     await page.click(`.bcv-picker__list .bcv-picker__opt:has-text("${label}")`);
     await page.waitForFunction(() => !document.querySelector('.bcv-picker__list'), null, { timeout: 5000 });
   };
+  // (2.98.25) Canvas hands a matching answer back with every left-hand value in it, a null match where
+  // nothing is picked yet. Those nulls were read as picks ("null"), counted the untouched question as
+  // answered, and went up with the first real pick — which Canvas refused whole: "match_id must be of
+  // type Integer". Nothing picked is nothing: the first pick saves on its own.
+  const shapeBack = (await noteApi('GET', '/api/v1/quiz_submissions/qs9001-2/questions')).quiz_submission_questions.find((q) => String(q.id) === '90015')?.answer;
+  check(Array.isArray(shapeBack) && shapeBack.length === 3 && shapeBack.every((p2) => p2.match_id === null) && !(await page.$('.bcv-qz__pill:nth-child(5).is-answered')) && (await page.$$eval('.bcv-qz__matchrow .bcv-picker', (els) => els.length === 3 && els.every((e) => e.textContent.trim() === 'Choose…' && !e.querySelector('.bcv-picker__label--none')))), `a matching question nobody has touched — Canvas's answer a row each with a null match — is not answered, and every row holds the list's own empty choice — never a value the list does not have (a held "null" drew as the placeholder) (${JSON.stringify(shapeBack)})`);
   await pickIn('.bcv-qz__matchrow:nth-child(1) .bcv-qz__sel', 'Acceleration due to gravity');
+  await waitText('.bcv-qz__answered', /· Saved/);
+  const firstPick = (await noteApi('GET', '/__mock/quizsub/qs9001-2')).answers['90015'];
+  check(!(await page.$('.bcv-toast.is-error, .bcv-toast--error')) && Array.isArray(firstPick) && firstPick.length === 1 && firstPick[0].match_id === 0 && Number.isInteger(firstPick[0].answer_id) && !(await page.$('.bcv-qz__pill:nth-child(5).is-answered')), `the first pick saves on its own — one pair, whole numbers, no error — and one row of three is not an answered question (${JSON.stringify(firstPick)})`);
   await pickIn('.bcv-qz__matchrow:nth-child(2) .bcv-qz__sel', 'Speed of light');
   await pickIn('.bcv-qz__matchrow:nth-child(3) .bcv-qz__sel', 'Gravitational constant');
   await waitText('.bcv-qz__answered', /1 of 7 answered · Saved/);
-  const pairsSent = (await noteApi('GET', '/api/v1/quiz_submissions/qs9001-2/questions')).quiz_submission_questions.find((q) => String(q.id) === '90015')?.answer || [];
+  const pairsSent = (await noteApi('GET', '/__mock/quizsub/qs9001-2')).answers['90015'] || [];
   check(pairsSent.length === 3 && pairsSent.every((p2) => Number.isInteger(p2.match_id) && Number.isInteger(p2.answer_id)) && pairsSent.some((p2) => p2.match_id === 0),
     `every pair saves as it is set, and reaches Canvas as whole numbers — an id of 0 included, which Canvas refuses as a string: ${JSON.stringify(pairsSent)}`);
   await shot(page, '22i-quiz-matching');
