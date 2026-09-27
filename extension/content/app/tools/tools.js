@@ -1388,15 +1388,14 @@
     return { els: [quickPane('Flashcards', go, 'Open Flashcards', 'Your sets, ready to study.', [list])], onOpen };
   }
 
-  /** A tool's colour lifted toward white, for its glyph on the dark disc. */
-  const lift = (c) => (/^#[0-9a-f]{6}$/i.test(c || '') && BCV.theme?.mix ? BCV.theme.mix(c, '#ffffff', 0.34) : c);
-  /** One pin: a round dark button with the tool's glyph, and its X. */
+  /** One pin: a round button in the tool's colour with its glyph dark on it (2.98.23), and its X. */
   function pinEl(t, { demo = false } = {}) {
     const live = t.key === 'pomo' && !demo; // (the timer's pin is also its live activity)
     const el = h('span', { class: 'bcv-pin', dataset: { tool: t.key } });
+    el.style.setProperty('--bcv-pin-color', t.color);
     const btn = h('button', { type: 'button', class: 'bcv-pin__btn', title: t.name, 'aria-label': t.name, tabindex: demo ? '-1' : '0',
       onclick: demo ? null : (e) => { if (el.classList.contains('is-live')) islandOpen(el, 6000, e.detail === 0); else if (live) islandSet(el, e.detail === 0); else open(t.key, { from: e.currentTarget, over: true }); } }, [
-      h('span', { class: 'bcv-pin__ic' }, U.svg(t.icon, { size: 15, stroke: lift(t.color), width: 2.3 })), // (larger, heavier, the colour lifted toward white: easy to see on the dark disc)
+      h('span', { class: 'bcv-pin__ic' }, U.svg(t.icon, { size: 15, stroke: 'currentColor', width: 2.3 })), // (dark, from the stylesheet: .bcv-pin__ic)
       live ? islandGlyph() : null,
     ]);
     if (live) {

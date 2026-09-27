@@ -237,7 +237,7 @@ const viewFor = (topicId) => ({
 const pages = {
   101: [
     { url: 'course-information', title: 'Course Information', front_page: true, created_at: ago(18 * D), updated_at: ago(15 * D), last_edited_by: { display_name: 'Yue Lei' }, body: '<p><strong>Ask any question:</strong> use the <a href="/courses/101/discussion_topics">Discussions</a> page — please do not use “Ask your instructor a question.”</p><p><strong>Please read</strong> the <a href="/courses/101/files/f1">Course Syllabus</a> in Files → Course Information for all course policies, structure, materials and exam dates. A tentative schedule of lecture topics is in <a href="/courses/101/files/f2">Lecture schedule</a>.</p><p>Slides and worksheets used in lectures and discussion sections are under <a href="/courses/101/files">Files</a>. The textbook is a free online book on OpenStax, <em>Calculus Volume 1</em>. See <a href="https://example.edu/store">Knewton Alta</a> for access.</p><div style=\"background-color: #f0f0f0; padding: 16px;\"><h2>Welcome</h2><p class=\"bcv-t-onlight\">Read the syllabus before Module 1.</p></div>' },
-    { url: 'chapter-4-notes', title: 'Chapter 4 notes', front_page: false, created_at: ago(5 * D), updated_at: ago(2 * D), last_edited_by: { display_name: 'Yue Lei' }, body: '<h2>Continuity</h2><p>A function is continuous at a point when the limit equals the value.</p><ul><li>Removable discontinuity</li><li>Jump discontinuity</li></ul>' },
+    { url: 'chapter-4-notes', title: 'Chapter 4 notes', front_page: false, created_at: ago(5 * D), updated_at: ago(2 * D), last_edited_by: { display_name: 'Yue Lei' }, body: '<h2>Continuity</h2><p>A function is continuous at a point when the limit equals the value.</p><ul><li>Removable discontinuity</li><li>Jump discontinuity</li></ul><p>The video below walks through a jump. <iframe style="width: 320px; height: 240px; display: inline-block;" title="Video player for jump.mp4" data-media-type="video" src="/media_objects_iframe/m-jump?type=video" allowfullscreen="allowfullscreen" allow="fullscreen" data-media-id="m-jump"></iframe></p>' }, // (a video as Canvas's editor writes it: an iframe sized in its style, inline in the paragraph)
   ],
   103: [{ url: 'lab-safety', title: 'Lab safety', front_page: true, created_at: ago(20 * D), updated_at: ago(19 * D), body: '<p>Goggles on at all times.</p>' }],
 };
@@ -1010,6 +1010,10 @@ const server = http.createServer((req, res) => {
       const [w, hh] = tall ? [58, 34] : [30, 12];
       res.writeHead(200, { 'content-type': 'image/svg+xml' });
       return res.end(`<svg xmlns="http://www.w3.org/2000/svg" width="${w}pt" height="${hh}pt" viewBox="0 0 ${w} ${hh}"><text x="0" y="${hh - 2}" font-size="9" font-family="serif">${tex.replace(/[<>&]/g, '')}</text></svg>`);
+    }
+    if (path.startsWith('/media_objects_iframe/')) { // Canvas's player for a video its editor put in: a page of its own, framed at the size the author gave
+      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+      return res.end('<!doctype html><html><body style="margin:0;background:#000"><video controls style="width:100%;height:100vh;display:block"></video></body></html>');
     }
     if (path === '/logout') { // Canvas's logout: a DELETE (a POST with _method=delete) carrying the session's token
       const params = new URLSearchParams(raw);

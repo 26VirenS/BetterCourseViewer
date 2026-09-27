@@ -25,6 +25,11 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.98.23', date: '2026-09-27', notes: [
+      { kind: 'improved', title: 'Colored tool pins', body: 'Pinned tools are colored dots with dark icons.', icon: P.pin },
+      { kind: 'fixed', title: 'Videos show in pages', body: 'Embedded videos keep their size and their picture.', icon: P.pic },
+      { kind: 'improved', title: 'Wider bug report page', body: 'The report page uses a wide window side by side.', icon: P.layers },
+    ] },
     { version: '2.98.22', date: '2026-09-27', notes: [
       { kind: 'fixed', title: 'No freeze on updates', body: 'A tab open during an update reloads itself, no spinning.', icon: P.check },
     ] },

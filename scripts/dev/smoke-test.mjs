@@ -1973,6 +1973,11 @@ try {
   await (await page.$$('.bcv-body .bcv-row'))[1].click();
   await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
   check((await texts('.bcv-detail__title'))[0] === 'Chapter 4 notes' && (await page.$('.bcv-prose h2')), 'page view renders the body');
+  // a video Canvas's editor put in: its frame keeps the size the author gave (not stretched to the
+  // column and 420 tall), scales down with its shape kept, and is never given rounded corners — Safari
+  // clips a rounded frame's video away, the sound playing and the picture gone
+  const vid = await page.$eval('.bcv-prose iframe[data-media-type="video"]', (f) => { const cs = getComputedStyle(f); const r = f.getBoundingClientRect(); return { w: Math.round(r.width), h: Math.round(r.height), radius: cs.borderTopLeftRadius, minH: cs.minHeight, ratio: cs.aspectRatio, sized: f.classList.contains('bcv-embed--sized') }; }).catch(() => null);
+  check(!!vid && vid.w === 320 && vid.h === 240 && vid.radius === '0px' && vid.minH === '0px' && vid.sized && /320 \/ 240/.test(vid.ratio), `a video embed keeps its own size and shape, with square corners (${JSON.stringify(vid)})`);
 
   // files
   await tab('files');
@@ -4561,8 +4566,8 @@ try {
   await shot(page, '38-tools-timer');
   await closeTool();
   await page.waitForFunction(() => { const p = document.querySelector('#bcv-pins .bcv-island'); return !!p && p.getAnimations({ subtree: true }).every((a) => a.playState === 'finished' || a.playState === 'idle'); }, null, { timeout: 4000 }).catch(() => {}); // (measured once the pin has finished popping in)
-  const disc = await page.$eval('#bcv-pins .bcv-island', (e) => { const r = e.getBoundingClientRect(); const l = document.getElementById('bcv-look').getBoundingClientRect(); return { w: Math.round(r.width), h: Math.round(r.height), pins: e.parentElement.querySelectorAll('.bcv-pin').length, guest: e.classList.contains('is-guest'), leftOfSwitch: r.right < l.left, sameRow: Math.abs(r.top - l.top) < 4, open: e.classList.contains('is-open'), hand: e.querySelector('.bcv-island__hand').style.transform, bg: getComputedStyle(e.querySelector('.bcv-island__face')).backgroundColor, glyph: getComputedStyle(e.querySelector('.bcv-island__glyph')).opacity, ic: getComputedStyle(e.querySelector('.bcv-pin__ic')).opacity, x: getComputedStyle(e.querySelector('.bcv-pin__x')).display }; });
-  check(disc.w === 24 && disc.h === 24 && disc.pins === 1 && disc.guest && disc.leftOfSwitch && disc.sameRow && !disc.open && /^rotate\(3[5-9]\d/.test(disc.hand) && disc.bg === 'rgb(0, 0, 0)' && disc.glyph === '1' && disc.ic === '0' && disc.x === 'none', `the timer is not pinned, so it borrows a pin: one small black disc in the tray beside the switch, the dial's hand near the top with nearly all of the session left, no X (${JSON.stringify(disc)})`);
+  const disc = await page.$eval('#bcv-pins .bcv-island', (e) => { const r = e.getBoundingClientRect(); const l = document.getElementById('bcv-look').getBoundingClientRect(); return { w: Math.round(r.width), h: Math.round(r.height), pins: e.parentElement.querySelectorAll('.bcv-pin').length, guest: e.classList.contains('is-guest'), leftOfSwitch: r.right < l.left, sameRow: Math.abs(r.top - l.top) < 4, open: e.classList.contains('is-open'), hand: e.querySelector('.bcv-island__hand').style.transform, bg: getComputedStyle(e.querySelector('.bcv-island__face')).backgroundColor, dial: getComputedStyle(e.querySelector('.bcv-island__hand')).stroke, glyph: getComputedStyle(e.querySelector('.bcv-island__glyph')).opacity, ic: getComputedStyle(e.querySelector('.bcv-pin__ic')).opacity, x: getComputedStyle(e.querySelector('.bcv-pin__x')).display }; });
+  check(disc.w === 24 && disc.h === 24 && disc.pins === 1 && disc.guest && disc.leftOfSwitch && disc.sameRow && !disc.open && /^rotate\(3[5-9]\d/.test(disc.hand) && disc.bg === 'rgb(255, 149, 0)' && disc.dial === 'rgba(0, 0, 0, 0.8)' && disc.glyph === '1' && disc.ic === '0' && disc.x === 'none', `the timer is not pinned, so it borrows a pin: one small disc in the phase's colour in the tray beside the switch (2.98.23: the dial dark on it), the dial's hand near the top with nearly all of the session left, no X (${JSON.stringify(disc)})`);
   // the pointer over the pin swells it into the island, the way the switch beside it opens under the pointer; it folds when the pointer leaves
   await page.hover('#bcv-pins .bcv-island');
   await eventually(async () => (await page.$eval('#bcv-pins .bcv-island', (e) => e.classList.contains('is-open') && Math.round(e.getBoundingClientRect().width) === 250 && Math.round(e.getBoundingClientRect().height) === 84)), 3000);
@@ -4953,6 +4958,9 @@ try {
   const pinsStored = await sw.evaluate(async () => (await self.BCV.api.storage.local.get('tools:pins'))['tools:pins']);
   check(pinBox.top === 6 && pinBox.gap === 8 && pinBox.h === 24 && JSON.stringify(pinsStored) === '["pomo"]' && (await page.$eval('.bcv-tool-card[data-tool="pomo"]', (e) => e.classList.contains('is-pinned'))) && (await page.$('.bcv-tool-ov')) === null && (await page.$('.bcv-tool-card--ghost.is-over')) === null, `letting go pins it: a small button beside the switch, the card marked, nothing opened (${JSON.stringify(pinBox)})`);
   await page.waitForTimeout(500);
+  // (2.98.23) folded, a pin is a dot of its tool's colour with the glyph dark on it
+  const pinPaint = await page.$eval('#bcv-pins .bcv-pin[data-tool="pomo"]', (e) => ({ face: getComputedStyle(e.querySelector('.bcv-island__face')).backgroundColor, glass: getComputedStyle(e.querySelector('.bcv-island__glass')).opacity, ic: getComputedStyle(e.querySelector('.bcv-pin__ic')).color, stroke: e.querySelector('.bcv-pin__ic svg')?.getAttribute('stroke') }));
+  check(pinPaint.face === 'rgb(255, 149, 0)' && pinPaint.glass === '0' && pinPaint.ic === 'rgba(0, 0, 0, 0.8)' && pinPaint.stroke === 'currentColor', `the pin is a dot of the tool's colour (the timer's orange), its glyph dark on it, no dark glass while folded (${JSON.stringify(pinPaint)})`);
   await shot(page, '41b-tools-pinned');
   await page.goto(`${BASE}/calendar`);
   await page.waitForSelector('#bcv-pins .bcv-pin', { timeout: 10000 });

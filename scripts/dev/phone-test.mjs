@@ -452,6 +452,8 @@ try {
   check(await eventually(async () => (await texts('.bcv-ph-h1'))[0] === 'Upcoming' && (await page.$$('.bcv-ph-ev')).length > 0), 'List view: three weeks of items by day');
   // an all-day event lands on the day Canvas names for it (all_day_date), not on the day its maker's midnight falls in this zone
   const plus4 = new Date(); plus4.setDate(plus4.getDate() + 4);
+  // (the title reads Upcoming at once and the month's rows stay until the list's own load lands: wait for the list itself)
+  await eventually(async () => (await page.locator('.bcv-ph-ev', { hasText: 'Reading day' }).count()) > 0, 8000);
   const readingDay = await page.$$eval('.bcv-ph-body > div', (blocks) => { const b = blocks.find((x) => [...x.querySelectorAll('.bcv-ph-ev')].some((e) => /Reading day/.test(e.textContent))); return b ? { head: b.querySelector('.bcv-ph-ghead__t')?.textContent, time: [...b.querySelectorAll('.bcv-ph-ev')].find((e) => /Reading day/.test(e.textContent))?.querySelector('.bcv-ph-ev__time')?.textContent } : null; });
   check(readingDay?.head === `${['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][plus4.getDay()]} ${plus4.getDate()}` && readingDay?.time === 'All day', `an all-day event made in another time zone sits on the day it names, marked All day: ${JSON.stringify(readingDay)}`);
   await shot('05c-calendar-list');

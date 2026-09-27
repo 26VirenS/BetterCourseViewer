@@ -13,7 +13,7 @@
  * min(their own, the viewport less a margin). */
 
 html[data-bcv-theme] {
-  --bcv-version: "2.98.22"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.98.23"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -979,8 +979,12 @@ html[data-bcv-theme="dark"] .bcv-cal__notice--warn { color: #ffb44d; }
 .bcv-prose h1 { font-size: 22px; } .bcv-prose h2 { font-size: 19px; } .bcv-prose h3 { font-size: 16.5px; } .bcv-prose h4 { font-size: 15px; }
 .bcv-prose ul, .bcv-prose ol { margin: 0 0 14px; padding-left: 22px; }
 .bcv-prose li { margin: 4px 0; }
-.bcv-prose img, .bcv-prose video, .bcv-prose iframe { max-width: 100%; height: auto; border-radius: 12px; }
+.bcv-prose img, .bcv-prose video, .bcv-prose iframe { max-width: 100%; height: auto; }
+.bcv-prose img { border-radius: 12px; }
+/* A video, or a frame that may hold one, is never given rounded corners: Safari clips a rounded
+   frame's video layer away — the sound plays, the controls show, the picture is gone. */
 .bcv-prose iframe { border: 0; width: 100%; min-height: 420px; }
+.bcv-prose iframe.bcv-embed--sized { min-height: 0; } /* (the size its author gave, kept: see prose) */
 .bcv-prose table { border-collapse: collapse; width: 100%; margin: 0 0 14px; font-size: 14px; }
 .bcv-prose th, .bcv-prose td { border-bottom: 1px solid var(--bcv-sep); padding: 8px 10px; text-align: left; vertical-align: top; }
 .bcv-prose th { font-weight: 600; color: var(--bcv-ink2); }
@@ -2526,22 +2530,23 @@ html.bcv-tooltab .bcv-pin.bcv-quick.is-free { z-index: var(--bcv-z-top); }
 .bcv-pin.bcv-island.is-open { width: 250px; height: 84px; }
 .bcv-island__glass { position: absolute; top: 0; right: 0; width: 250px; height: 84px; -webkit-backdrop-filter: blur(22px) saturate(1.7); backdrop-filter: blur(22px) saturate(1.7); background: rgba(28,28,30,.7); pointer-events: none; }
 .bcv-island.is-live .bcv-island__glass { background: #000; -webkit-backdrop-filter: none; backdrop-filter: none; }
-.bcv-island__face { position: absolute; inset: 0; box-sizing: border-box; border: 1px solid rgba(255,255,255,.14); border-radius: 12px; background: transparent; overflow: hidden; color: #fff; font-family: var(--bcv-font); transition: border-radius var(--bcv-t-island) var(--bcv-spring-island), background .3s ease; }
+.bcv-island__face { position: absolute; inset: 0; box-sizing: border-box; border: 1px solid rgba(255,255,255,.14); border-radius: 12px; background: transparent; overflow: hidden; color: #fff; font-family: var(--bcv-font); transition: border-radius var(--bcv-t-island) var(--bcv-spring-island), background .3s ease, border-color .3s ease; }
 .bcv-island.is-live .bcv-island__face { background: #000; }
 .bcv-island.is-open .bcv-island__face { border-radius: 26px; }
 .bcv-island .bcv-pin__btn { position: absolute; top: -1px; left: -1px; border-color: transparent; background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; box-shadow: none; transition: transform .16s var(--bcv-spring-snappy), opacity .2s ease; }
 .bcv-island .bcv-pin__btn:hover { box-shadow: none; }
 .bcv-island.is-open .bcv-pin__btn { opacity: 0; transform: scale(.6); pointer-events: none; }
 .bcv-island.is-folding .bcv-pin__x, .bcv-island.is-guest .bcv-pin__x { display: none; }
-.bcv-pin__ic { display: flex; }
+.bcv-pin__ic { display: flex; color: rgba(0,0,0,.8); } /* (the glyph dark on the pin's colour, 2.98.23) */
 .bcv-island .bcv-pin__ic, .bcv-island__glyph { position: absolute; top: 50%; left: 50%; transition: opacity .3s ease, transform .4s var(--bcv-spring-snappy); }
 .bcv-island .bcv-pin__ic { width: 13px; height: 13px; margin: -6.5px 0 0 -6.5px; }
 .bcv-island__glyph { width: 16px; height: 16px; margin: -8px 0 0 -8px; overflow: visible; opacity: 0; transform: scale(.4) rotate(-90deg); }
 .bcv-island.is-live .bcv-pin__ic { opacity: 0; transform: scale(.4) rotate(90deg); }
 .bcv-island.is-live .bcv-island__glyph { opacity: 1; transform: none; }
-.bcv-island__ring { fill: none; stroke: var(--bcv-live-color); stroke-opacity: .3; stroke-width: 2; }
-.bcv-island__arc { fill: none; stroke: var(--bcv-live-color); stroke-width: 2; stroke-linecap: round; transform: rotate(-90deg); transform-origin: 10px 10px; transition: stroke-dashoffset 1s linear; }
-.bcv-island__hand { stroke: var(--bcv-live-color); stroke-width: 2; stroke-linecap: round; transform-origin: 10px 10px; transition: transform 1s linear; }
+/* (the dial is drawn dark, on the disc of the phase's colour it sits on while folded) */
+.bcv-island__ring { fill: none; stroke: rgba(0,0,0,.8); stroke-opacity: .3; stroke-width: 2; }
+.bcv-island__arc { fill: none; stroke: rgba(0,0,0,.8); stroke-width: 2; stroke-linecap: round; transform: rotate(-90deg); transform-origin: 10px 10px; transition: stroke-dashoffset 1s linear; }
+.bcv-island__hand { stroke: rgba(0,0,0,.8); stroke-width: 2; stroke-linecap: round; transform-origin: 10px 10px; transition: transform 1s linear; }
 .bcv-island.is-paused .bcv-island__glyph { animation: bcv-live-blink 1.6s ease-in-out infinite; }
 .bcv-pin.is-out { animation: bcv-live-out .3s ease both; pointer-events: none; }
 .bcv-island__body { position: absolute; inset: 0; display: flex; align-items: center; gap: 12px; padding: 0 20px 0 18px; opacity: 0; transform: scale(.92); transform-origin: 90% 20%; transition: opacity .16s ease, transform .16s ease; pointer-events: none; will-change: transform, opacity; }
@@ -2602,7 +2607,7 @@ html.bcv-tooltab .bcv-pin.bcv-quick.is-free { z-index: var(--bcv-z-top); }
  * field and a round Go, chips, a drop target, on the island's dark glass */
 .bcv-pin.bcv-quick { --bcv-quick-w: 280px; --bcv-quick-color: #0a84ff; transition: width var(--bcv-t-island) var(--bcv-spring-island), height var(--bcv-t-island) var(--bcv-spring-island); }
 .bcv-pin.bcv-quick.is-open { width: var(--bcv-quick-w); height: 44px; }
-.bcv-quick__face { position: absolute; inset: 0; box-sizing: border-box; border: 1px solid rgba(255,255,255,.14); border-radius: var(--bcv-r-tile-lg); background: transparent; overflow: hidden; color: #fff; font-family: var(--bcv-font); transition: border-radius var(--bcv-t-island) var(--bcv-spring-island); }
+.bcv-quick__face { position: absolute; inset: 0; box-sizing: border-box; border: 1px solid rgba(255,255,255,.14); border-radius: var(--bcv-r-tile-lg); background: transparent; overflow: hidden; color: #fff; font-family: var(--bcv-font); transition: border-radius var(--bcv-t-island) var(--bcv-spring-island), background .3s ease, border-color .3s ease; }
 /* The blur sits on a layer of the panel's own size, clipped by the face rather than resized with it:
    the page behind is blurred once, not on every frame of the opening, which is what used to stutter. */
 .bcv-quick__glass { position: absolute; top: 0; right: 0; width: var(--bcv-quick-w); height: var(--bcv-quick-h, 44px); -webkit-backdrop-filter: blur(22px) saturate(1.7); backdrop-filter: blur(22px) saturate(1.7); background: rgba(28,28,30,.7); pointer-events: none; }
@@ -2614,6 +2619,14 @@ html.bcv-blink .bcv-quick__glass, html.bcv-blink .bcv-island__glass { display: n
 html.bcv-blink .bcv-quick__face, html.bcv-blink .bcv-island__face { background: rgba(28,28,30,.7); -webkit-backdrop-filter: blur(22px) saturate(1.7); backdrop-filter: blur(22px) saturate(1.7); }
 html.bcv-blink .bcv-island.is-live .bcv-island__face { background: #000; -webkit-backdrop-filter: none; backdrop-filter: none; }
 .bcv-quick.is-open .bcv-quick__face { border-radius: 26px; }
+/* Folded, every pin is a dot of its tool's colour with the glyph dark on it (2.98.23) — the timer's
+   while a session is going in the phase's colour, the dial dark. The island's and the quick menu's
+   faces wear the colour until they swell; then the dark glass comes up under them as it fades. */
+.bcv-island__glass, .bcv-quick__glass { transition: opacity .2s ease; }
+.bcv-pin:not(.is-open) .bcv-island__glass, .bcv-pin:not(.is-open) .bcv-quick__glass { opacity: 0; }
+html .bcv-pin.bcv-island:not(.is-open) .bcv-island__face, html .bcv-pin.bcv-quick:not(.is-open) .bcv-quick__face { border-color: transparent; background: var(--bcv-pin-color, #8e8e93); }
+html .bcv-pin.bcv-island.is-live:not(.is-open) .bcv-island__face { background: var(--bcv-live-color); }
+html.bcv-blink .bcv-pin.bcv-island:not(.is-open) .bcv-island__face, html.bcv-blink .bcv-pin.bcv-quick:not(.is-open) .bcv-quick__face { -webkit-backdrop-filter: none; backdrop-filter: none; }
 /* the two lights a Mac window wears: red back to the tray (once it has been pulled out), green full size */
 .bcv-quick__lights { display: flex; align-items: center; gap: 6px; flex: none; }
 /* Clear of the corner: the panel's 26px radius runs diagonally past the first light, so 10px of
@@ -2656,7 +2669,7 @@ html.bcv-blink .bcv-island.is-live .bcv-island__face { background: #000; -webkit
 .bcv-quick__drop:hover, .bcv-quick__drop.is-drag { border-color: var(--bcv-quick-color); color: #fff; }
 .bcv-quick button:focus-visible, .bcv-quick input:focus-visible { outline: 2px solid #0a84ff; outline-offset: 1px; }
 .bcv-pin { position: relative; display: block; width: 24px; height: 24px; }
-.bcv-pin__btn { display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; margin: 0; padding: 0; border: 1px solid rgba(255,255,255,.14); border-radius: 12px; background: rgba(28,28,30,.86); -webkit-backdrop-filter: blur(16px) saturate(1.4); backdrop-filter: blur(16px) saturate(1.4); box-shadow: 0 2px 10px rgba(0,0,0,.2); cursor: pointer; transition: transform .16s var(--bcv-spring-snappy), box-shadow .18s ease; }
+.bcv-pin__btn { display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; margin: 0; padding: 0; border: 0; border-radius: 12px; background: var(--bcv-pin-color, #8e8e93); box-shadow: 0 2px 10px rgba(0,0,0,.2); cursor: pointer; transition: transform .16s var(--bcv-spring-snappy), box-shadow .18s ease; }
 .bcv-pin__btn:hover { transform: scale(1.1); box-shadow: 0 6px 20px rgba(0,0,0,.3); }
 .bcv-pin__btn:focus-visible { outline: 2px solid #0a84ff; outline-offset: 2px; }
 .bcv-pin__x { position: absolute; top: -5px; right: -5px; width: 14px; height: 14px; margin: 0; padding: 0; border: 0; border-radius: 7px; background: #ff453a; display: flex; align-items: center; justify-content: center; cursor: pointer; opacity: 0; transform: scale(.6); transition: opacity .15s ease, transform .15s ease; }

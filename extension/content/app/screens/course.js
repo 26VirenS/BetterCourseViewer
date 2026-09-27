@@ -35,6 +35,18 @@
       if (!f.getAttribute('src') && f.dataset.src) f.setAttribute('src', f.dataset.src);
       f.setAttribute('allowfullscreen', '');
       if (!f.getAttribute('allow')) f.setAttribute('allow', 'fullscreen; microphone; camera; display-capture; autoplay; clipboard-write');
+      // An embed its author gave a size to — Canvas's editor writes one on every video it puts in,
+      // 320 × 240 in the frame's style — keeps it, as on Canvas, rather than being stretched to the
+      // column and 420 tall; it scales down with its shape kept where the column is narrower.
+      const px = (v) => { const m = /^\s*(\d+(?:\.\d+)?)(?:px)?\s*$/.exec(String(v || '')); return m ? Number(m[1]) : 0; };
+      const w = px(f.style.width) || px(f.getAttribute('width'));
+      const tall = px(f.style.height) || px(f.getAttribute('height'));
+      if (w && tall) {
+        f.classList.add('bcv-embed--sized');
+        f.style.width = `${w}px`;
+        f.style.height = 'auto';
+        f.style.aspectRatio = `${w} / ${tall}`;
+      }
       const src = f.getAttribute('src') || '';
       const open = h('a', { class: 'bcv-chip bcv-embed-open', href: src || '#', target: '_blank', rel: 'noopener', text: 'Open in new tab' });
       f.after(open);

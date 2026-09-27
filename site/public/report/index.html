@@ -58,6 +58,21 @@ textarea:focus, input:focus { border-color: var(--accent); background: var(--car
 .thumbs img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .thumbs button { position: absolute; top: 5px; right: 5px; width: 22px; height: 22px; border: 0; border-radius: 11px; background: rgba(0,0,0,.6); color: #fff; font: 600 13px/22px -apple-system, Helvetica, sans-serif; cursor: pointer; padding: 0; }
 .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+/* the form's two columns (one on a narrow screen): what happened on the left, what goes with it on the right */
+.cols, .col { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+.contact { display: flex; flex-direction: column; gap: 8px; }
+@media (min-width: 980px) {
+  header, main, footer { max-width: 1160px; }
+  .card { padding: 36px 40px 30px; }
+  .lede { margin-bottom: 26px; }
+  .cols { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 0; align-items: stretch; }
+  .col--main { padding-right: 36px; }
+  .col--side { padding-left: 36px; border-left: 1px solid var(--line); }
+  #textField { flex: 1; } /* (the words' box runs down beside everything on the right) */
+  #textField textarea { flex: 1; min-height: 320px; }
+  .drop { min-height: 140px; }
+  .actions { padding-top: 22px; border-top: 1px solid var(--line); }
+}
 @media (max-width: 560px) { .row2 { grid-template-columns: 1fr; } .card { padding: 24px 18px 22px; border-radius: 18px; } }
 .sent { border-radius: 12px; background: var(--field); padding: 10px 13px; font-size: 13px; color: var(--ink2); }
 .sent summary { cursor: pointer; font-weight: 600; color: var(--ink2); }
@@ -92,6 +107,8 @@ footer { max-width: 760px; margin: 0 auto; padding: 0 20px 40px; font-size: 13px
     <h1><span class="bug" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 7a4 4 0 018 0M6 11h12v3a6 6 0 01-12 0zM12 11v9M3 13h3M18 13h3M4 8l2.5 2M20 8l-2.5 2M4.5 19l2.5-2M19.5 19l-2.5-2"/></svg></span>Report a bug</h1>
     <p class="lede">Tell us what went wrong, or what you would like. It goes to the people who make Simpl, and nowhere else.</p>
     <form id="report" novalidate>
+      <div class="cols">
+      <div class="col col--main">
       <fieldset class="field" id="kind">
         <legend>What kind of report?</legend>
         <div class="chips" role="radiogroup" aria-label="What kind of report?">
@@ -110,6 +127,8 @@ footer { max-width: 760px; margin: 0 auto; padding: 0 20px 40px; font-size: 13px
         <span class="count" id="count">0 / 5000</span>
         <p class="err" id="textErr"></p>
       </label>
+      </div>
+      <div class="col col--side">
       <div class="field">
         <span class="label">Screenshots <i>optional</i></span>
         <div class="drop" id="drop" tabindex="0" aria-label="Add screenshots: drop pictures here, paste them, or choose files">
@@ -126,15 +145,19 @@ footer { max-width: 760px; margin: 0 auto; padding: 0 20px 40px; font-size: 13px
         <input type="text" name="codes" id="codes" autocomplete="off" spellcheck="false" placeholder="SC-C-404, SC-D-NET">
         <p class="hint">Simpl shows a code like <span class="code">SC-C-404</span> after its error messages. The ones it showed you lately are filled in.</p>
       </label>
-      <div class="row2">
-        <label class="field" id="emailField"><span class="label">Email <i>optional</i></span><input type="email" name="email" id="email" autocomplete="email" inputmode="email" placeholder="you@school.edu"><p class="err" id="emailErr"></p></label>
-        <label class="field" id="phoneField"><span class="label">Phone <i>optional</i></span><input type="tel" name="phone" id="phone" autocomplete="tel" inputmode="tel" placeholder="+1 555 123 4567"><p class="err" id="phoneErr"></p></label>
+      <div class="contact">
+        <div class="row2">
+          <label class="field" id="emailField"><span class="label">Email <i>optional</i></span><input type="email" name="email" id="email" autocomplete="email" inputmode="email" placeholder="you@school.edu"><p class="err" id="emailErr"></p></label>
+          <label class="field" id="phoneField"><span class="label">Phone <i>optional</i></span><input type="tel" name="phone" id="phone" autocomplete="tel" inputmode="tel" placeholder="+1 555 123 4567"><p class="err" id="phoneErr"></p></label>
+        </div>
+        <p class="hint">Only if you would like an answer. Never shared, and never used for anything else.</p>
       </div>
-      <p class="hint" style="margin-top:-10px">Only if you would like an answer. Never shared, and never used for anything else.</p>
       <details class="sent" id="sent" hidden>
         <summary>Also sent with your report</summary>
         <dl id="meta"></dl>
       </details>
+      </div>
+      </div>
       <input class="hp" type="text" name="website" id="website" tabindex="-1" autocomplete="off" aria-hidden="true">
       <div class="actions">
         <button type="submit" class="send" id="send">Send report</button>
