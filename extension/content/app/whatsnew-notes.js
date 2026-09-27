@@ -25,6 +25,10 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.98.24', date: '2026-09-27', notes: [
+      { kind: 'new', title: 'Side-by-side quizzes', body: 'Questions left, controls right, text sized like Canvas.', icon: P.layers },
+      { kind: 'fixed', title: 'Quiz buttons readable', body: 'Blue quiz buttons now show white text.', icon: P.check },
+    ] },
     { version: '2.98.23', date: '2026-09-27', notes: [
       { kind: 'improved', title: 'Colored tool pins', body: 'Pinned tools are colored dots with dark icons.', icon: P.pin },
       { kind: 'fixed', title: 'Videos show in pages', body: 'Embedded videos keep their size and their picture.', icon: P.pic },

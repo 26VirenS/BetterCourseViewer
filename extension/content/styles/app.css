@@ -13,7 +13,7 @@
  * min(their own, the viewport less a margin). */
 
 html[data-bcv-theme] {
-  --bcv-version: "2.98.23"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.98.24"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -1635,7 +1635,9 @@ html.bcv-quiz .bcv-screen--ctx .bcv-cmain { border-left: 0; }
    is the pill's own background (a button gives an absolutely positioned child no box in Chromium), so it
    is one element: the number stays put and legible while the fill passes under it. background-origin is
    the border box, so the wash fills the whole rounded pill rather than a rectangle inside its border. */
-.bcv-qz__body.is-busy { pointer-events: none; opacity: .72; transition: opacity .2s ease; }
+.bcv-qz__body.is-busy { pointer-events: none; }
+/* (in the side layout the pills are inside the body, in the left rail: the one filling stays at full strength) */
+.bcv-qz__body.is-busy > :not(.bcv-qz__side), .bcv-qz__body.is-busy .bcv-qz__page--side, .bcv-qz__body.is-busy .bcv-qz__rrail { opacity: .72; transition: opacity .2s ease; }
 .bcv-qz__pill { position: relative; overflow: hidden; --bcv-pill-wash: rgba(10,132,255,.22); }
 html[data-bcv-theme="dark"] .bcv-qz__pill { --bcv-pill-wash: rgba(10,132,255,.34); }
 .bcv-qz__pill.is-current { --bcv-pill-wash: rgba(255,255,255,.32); }
@@ -1750,6 +1752,80 @@ html.bcv-phone .bcv-qz__sel, html.bcv-phone .bcv-qz__blankrow .bcv-input { width
 .bcv-qz__btn:disabled { opacity: .45; cursor: default; }
 .bcv-qz__btn--primary { padding: 0 24px; background: var(--bcv-blue); color: #fff; }
 .bcv-qz__btn--next { padding: 0 26px; }
+/* The quiz's own button colours (2.98.24). `#bcv-app button { color: inherit }` outranks a plain class,
+   so every one of these had quietly taken its parent's ink: Begin, Next and the question on screen
+   read dark on blue. Restated at that rank. */
+#bcv-app .bcv-qz__btn, #bcv-app .bcv-qz__big { color: var(--bcv-ink); }
+#bcv-app .bcv-qz__exit { color: var(--bcv-ink2); }
+#bcv-app .bcv-qz__mode, #bcv-app .bcv-qz__pill, #bcv-app .bcv-qz__flag { color: var(--bcv-ink3); }
+#bcv-app .bcv-qz__mode.is-active { color: var(--bcv-ink); }
+#bcv-app .bcv-qz__pill.is-answered, #bcv-app .bcv-qz__btn--quiet { color: var(--bcv-blue); }
+#bcv-app .bcv-qz__btn--primary, #bcv-app .bcv-qz__big--primary, #bcv-app .bcv-qz__begin, #bcv-app .bcv-qz__pill.is-current { color: #fff; }
+#bcv-app .bcv-qz__flag.is-on { color: #8a5200; }
+html[data-bcv-theme="dark"] #bcv-app .bcv-qz__flag.is-on { color: #ffb44d; }
+#bcv-app .bcv-qz__opt { color: var(--bcv-ink); }
+#bcv-app .bcv-qz__opt.is-selected { color: #0a5dc2; }
+html[data-bcv-theme="dark"] #bcv-app .bcv-qz__opt.is-selected { color: #7ab8ff; }
+/* ---- the side layout (2.98.24): the list of questions down the left, the question in the middle at
+   Canvas's own reading size, every control down the right. The head keeps the title, the layout
+   switch and the clock; the rails stay in view under it as the question scrolls. ---------------- */
+.bcv-qz.is-side { --bcv-qz-headh: 63px; } /* (the head's height with its pills moved into the rail: 14 + 34 + 14 and its edge) */
+.bcv-qz.is-side .bcv-qz__headrow { max-width: 1480px; padding-left: 24px; padding-right: 24px; }
+.bcv-qz__side { flex: 1; display: grid; grid-template-columns: 232px minmax(0, 1fr) 260px; align-items: start; width: 100%; max-width: 1480px; margin: 0 auto; }
+.bcv-qz__lrail, .bcv-qz__foot.bcv-qz__rrail { position: sticky; top: var(--bcv-qz-headh); bottom: auto; z-index: 1; box-sizing: border-box; max-height: calc(100vh - var(--bcv-qz-headh)); overflow: auto; padding: 26px 22px 30px; display: flex; flex-direction: column; gap: 12px; background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; border-top: 0; }
+.bcv-qz__lrail, .bcv-qz__foot.bcv-qz__rrail { min-height: calc(100vh - var(--bcv-qz-headh)); } /* (their edges run the height of the window) */
+.bcv-qz__lrail { border-right: 1px solid var(--bcv-sep); }
+.bcv-qz__foot.bcv-qz__rrail { border-left: 1px solid var(--bcv-sep); }
+.bcv-qz__railh { font: 700 11px/1.2 var(--bcv-font); letter-spacing: .06em; text-transform: uppercase; color: var(--bcv-ink3); }
+.bcv-qz__progress.bcv-qz__progress--side { max-width: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+.bcv-qz__progress--side .bcv-qz__pill { flex: none; width: auto; height: 34px; border-radius: 10px; font-size: 12.5px; }
+.bcv-qz__legend { display: flex; flex-direction: column; gap: 7px; margin-top: 6px; padding-top: 14px; border-top: 1px solid var(--bcv-sep); font: 500 12px/1.2 var(--bcv-font); color: var(--bcv-ink3); }
+.bcv-qz__key { display: flex; align-items: center; gap: 9px; }
+.bcv-qz__keydot { flex: none; box-sizing: border-box; width: 13px; height: 13px; border-radius: 4px; border: 1.5px solid transparent; background: var(--bcv-fill); }
+.bcv-qz__keydot.is-current { background: var(--bcv-blue); }
+.bcv-qz__keydot.is-answered { background: var(--bcv-blue-soft); }
+.bcv-qz__keydot.is-flagged { border-color: var(--bcv-orange); }
+.bcv-qz__rrail .bcv-qz__answered { flex: none; font: 600 15px/1.35 var(--bcv-font); color: var(--bcv-ink); }
+.bcv-qz__meter { height: 6px; border-radius: 3px; background: var(--bcv-fill); overflow: hidden; }
+.bcv-qz__meterfill { display: block; width: 0; height: 100%; border-radius: 3px; background: var(--bcv-blue); transition: width .35s ease; }
+.bcv-qz__railbtns { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.bcv-qz__rrail .bcv-qz__btn { width: 100%; padding: 0 16px; }
+.bcv-qz__rrail .bcv-qz__flag--side { margin: 0; width: 100%; height: 44px; justify-content: center; border-radius: 22px; background: var(--bcv-fill); font-size: 14px; }
+#bcv-app .bcv-qz__rrail .bcv-qz__flag--side:not(.is-on) { color: var(--bcv-ink2); }
+.bcv-qz__rrail .bcv-qz__flag--side:hover { background: var(--bcv-fill2); }
+.bcv-qz__rrail .bcv-qz__flag--side.is-on { background: rgba(255,149,0,.14); }
+.bcv-qz__btn--quiet { background: transparent; color: var(--bcv-blue); }
+.bcv-qz__btn--quiet:hover { background: var(--bcv-fill); }
+.bcv-qz__page.bcv-qz__page--side { max-width: 880px; padding: 30px 44px 120px; }
+/* the question's number on top, large, what it is worth beside it */
+.bcv-qz__qhead--side { flex-wrap: wrap; align-items: baseline; gap: 10px; margin-bottom: 22px; padding: 0 0 16px; border-bottom: 1px solid var(--bcv-sep); }
+.bcv-qz__qhead--side .bcv-qz__qnum { font: 700 26px/1.15 var(--bcv-display); letter-spacing: -.025em; }
+.bcv-qz__qhead--side .bcv-qz__qof { font-size: 14px; }
+/* The question as Canvas lays it out: its reading size, its own paragraphs and line breaks, pictures
+   and videos at the size their author gave (never wider than the column), tables with their lines. */
+.bcv-qz__qtext.bcv-qz__qtext--canvas { margin: 0 0 26px; font: 400 16px/1.5 var(--bcv-font); letter-spacing: normal; text-wrap: wrap; }
+.bcv-qz__qtext--canvas p { margin: 0 0 12px; }
+.bcv-qz__qtext--canvas img:not(.equation_image) { border-radius: 0; }
+.bcv-qz__qtext--canvas ul, .bcv-qz__qtext--canvas ol { margin: 0 0 12px; padding-left: 28px; }
+.bcv-qz__qtext--canvas table { width: auto; max-width: 100%; font-size: inherit; }
+.bcv-qz__qtext--canvas table[border]:not([border="0"]) th, .bcv-qz__qtext--canvas table[border]:not([border="0"]) td { border: 1px solid var(--bcv-edge); }
+.bcv-qz__qtext--canvas th, .bcv-qz__qtext--canvas td { padding: 6px 10px; }
+/* narrower than the three columns take (the compact tier): the questions in a row over the question,
+   the controls in a bar along the bottom — the one-at-a-time layout's places, the side layout's parts */
+@media (max-width: 1100px) {
+  .bcv-qz__side { grid-template-columns: minmax(0, 1fr); }
+  .bcv-qz__lrail, .bcv-qz__foot.bcv-qz__rrail { min-height: 0; }
+  .bcv-qz__lrail { position: static; max-height: none; overflow: visible; padding: 14px 28px 12px; border-right: 0; border-bottom: 1px solid var(--bcv-sep); }
+  .bcv-qz__lrail .bcv-qz__railh, .bcv-qz__legend { display: none; }
+  .bcv-qz__progress.bcv-qz__progress--side { grid-template-columns: repeat(auto-fill, minmax(34px, 1fr)); }
+  .bcv-qz__foot.bcv-qz__rrail { position: sticky; top: auto; bottom: 0; z-index: 6; max-height: none; overflow: visible; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 10px; padding: 12px 28px; border-left: 0; border-top: 1px solid var(--bcv-edge); background: var(--bcv-chrome); -webkit-backdrop-filter: var(--bcv-blur-chrome); backdrop-filter: var(--bcv-blur-chrome); }
+  .bcv-qz__rrail .bcv-qz__railh, .bcv-qz__meter { display: none; }
+  .bcv-qz__rrail .bcv-qz__answered { flex: 1; min-width: 140px; font-size: 13px; font-weight: 500; color: var(--bcv-ink3); }
+  .bcv-qz__railbtns { order: 3; flex-direction: row-reverse; margin: 0; }
+  .bcv-qz__rrail .bcv-qz__btn { width: auto; }
+  .bcv-qz__rrail .bcv-qz__flag--side { width: auto; padding: 0 16px; }
+  .bcv-qz__page.bcv-qz__page--side { padding: 26px 28px 60px; }
+}
 .bcv-qz__review { flex: 1; max-width: 700px; margin: 0 auto; width: 100%; padding: 32px 28px 60px; display: flex; flex-direction: column; gap: 16px; }
 .bcv-qz__sum { display: flex; align-items: center; gap: 13px; width: 100%; padding: 14px 18px; border: 0; border-top: 1px solid var(--bcv-sep); background: transparent; cursor: pointer; text-align: left; color: inherit; }
 .bcv-qz__sum:first-child { border-top: 0; }

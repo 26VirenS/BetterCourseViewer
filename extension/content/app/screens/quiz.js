@@ -16,6 +16,13 @@
   const CHECK = 'M20 6L9 17l-5-5';
   const MODE_ONE = 'M5 7h14v10H5z';
   const MODE_ALL = 'M4 5h16M4 10h16M4 15h16M4 20h10';
+  const MODE_SIDE = 'M3 5h18v14H3zM8 5v14M16 5v14'; // three columns: the list, the question, the controls
+  // The layouts an attempt can be drawn in. 'side' (2.98.24, the default): the question in the middle
+  // at Canvas's own reading size, the list of questions down the left and every control down the
+  // right. 'one' and 'all' are the two that came before: one question a screen with the pills over it
+  // and the buttons under it, or every question on one scroll. The choice is kept under a name of
+  // its own (quizLayout), so everyone starts on the new layout once and keeps what they pick.
+  const LAYOUTS = ['side', 'one', 'all'];
 
   const pad = (n) => String(n).padStart(2, '0');
   const clock = (ms) => {
@@ -126,7 +133,11 @@
     st.sub = (subs || []).find((s) => s.workflow_state === 'untaken') || null;
     // a phone shows one question per screen (the mockup); the scroll-through mode is a desktop choice
     const phone = !!BCV.phone?.active();
-    st.mode = quiz.one_question_at_a_time || phone ? 'one' : (await store.pref('quizMode', 'one'));
+    const picked = await store.pref('quizLayout', 'side');
+    const layout = LAYOUTS.includes(picked) ? picked : 'side';
+    // a quiz set to one question at a time can be drawn either way that shows one question: the side
+    // layout or the plain one — never all on one scroll
+    st.mode = phone ? 'one' : quiz.one_question_at_a_time && layout === 'all' ? 'side' : layout;
     let forcedOne = !!quiz.one_question_at_a_time || phone;
     // A quiz set to one question at a time cannot list its questions through the API (Canvas refuses:
     // "Cannot receive one question at a time questions in the API"), but Canvas's own page shows one
@@ -380,17 +391,22 @@
         return;
       }
       const embedded = st.stage === 'intro' || st.stage === 'feedback'; // in the column, under the course header
-      modeWrap.replaceChildren(...(st.stage === 'take' && !forcedOne ? [
+      const switchable = st.stage === 'take' && !phone; // (a phone shows one question a screen, always)
+      modeWrap.replaceChildren(...(switchable ? [
+        modeBtn('side', 'Controls at the sides', MODE_SIDE),
         modeBtn('one', 'One question at a time', MODE_ONE),
-        modeBtn('all', 'Scroll through all questions', MODE_ALL),
-      ] : []));
-      modeWrap.hidden = !(st.stage === 'take' && !forcedOne);
+        forcedOne ? null : modeBtn('all', 'Scroll through all questions', MODE_ALL),
+      ].filter(Boolean) : []));
+      modeWrap.hidden = !switchable;
+      const side = st.stage === 'take' && st.mode === 'side';
+      if (!side && progressWrap.parentElement !== head) head.append(progressWrap); // (the side layout keeps the pills in its left rail)
+      screen.classList.toggle('is-side', side);
       instrBtn.hidden = st.stage === 'intro'; // the intro card already has them in front of you
       paintProgress();
       body.classList.toggle('is-busy', st.loadingIdx !== null && st.stage === 'take');
       if (st.stage === 'intro') body.replaceChildren(intro());
       else if (st.stage === 'starting') body.replaceChildren(h('p', { class: 'bcv-qz__starting', text: st.sub ? 'Resuming your attempt…' : 'Starting your attempt…' }));
-      else if (st.stage === 'take') body.replaceChildren(st.mode === 'all' ? takeAll() : takeOne());
+      else if (st.stage === 'take') body.replaceChildren(st.mode === 'all' ? takeAll() : st.mode === 'side' ? takeSide() : takeOne());
       else if (st.stage === 'review') body.replaceChildren(review());
       else if (st.stage === 'feedback') body.replaceChildren(feedback());
       else body.replaceChildren(done());
@@ -400,7 +416,7 @@
       setOpen(st.stage === 'take' || st.stage === 'review');
     }
     function modeBtn(key, label, icon) {
-      return h('button', { type: 'button', class: `bcv-qz__mode ${st.mode === key ? 'is-active' : ''}`, title: label, 'aria-label': label, onclick: () => { st.mode = key; store.setPref('quizMode', key); draw(); } }, U.svg(icon, { size: 15, width: 1.9 }));
+      return h('button', { type: 'button', class: `bcv-qz__mode ${st.mode === key ? 'is-active' : ''}`, title: label, 'aria-label': label, 'aria-pressed': st.mode === key ? 'true' : 'false', dataset: { mode: key }, onclick: () => { if (st.mode === key) return; st.mode = key; store.setPref('quizLayout', key); draw(); if (key !== 'all') toTop(); } }, U.svg(icon, { size: 15, width: 1.9 }));
     }
 
     // The pills are the progress bar (mockup 14): the pill of a question on its way fills left to right
@@ -413,8 +429,9 @@
         return;
       }
       const all = st.mode === 'all' && !starting;
+      const side = st.mode === 'side' && !starting; // (a grid down the left rail)
       const list = st.questions.length ? st.questions : Array.from({ length: Math.max(1, Number(quiz.question_count) || 1) }, (_, k) => ({ id: `pending-${k}`, pending: true, flagged: false, answer: null }));
-      progressWrap.replaceChildren(U.el(`bcv-qz__progress ${all ? 'bcv-qz__progress--all' : ''}`, list.map((q, k) => {
+      progressWrap.replaceChildren(U.el(`bcv-qz__progress ${all ? 'bcv-qz__progress--all' : side ? 'bcv-qz__progress--side' : ''}`, list.map((q, k) => {
         const current = !starting && k === st.idx;
         const locked = !starting && noBack && k < st.idx;
         const loading = st.loadingIdx === k;
@@ -506,7 +523,7 @@
             if (!/one question at a time/i.test(e.message || '')) throw e;
             st.paged = true; // the quiz did not say so, but Canvas did
             forcedOne = true;
-            st.mode = 'one';
+            if (st.mode === 'all') st.mode = 'side';
           }
         }
         if (st.paged) applyPage(await QP().fetchPage(quizUrl, { accessCode: codeFor() }));
@@ -588,16 +605,19 @@
       }
     }
 
-    function questionBlock(q, k, { compact = false } = {}) {
-      const flagBtn = h('button', { type: 'button', class: `bcv-qz__flag ${q.flagged ? 'is-on' : ''}`, onclick: () => toggleFlag(q) }, [U.svg(FLAG, { size: compact ? 12 : 13, width: 2 }), h('span', { text: q.flagged ? (compact ? 'Flagged' : 'Flagged for review') : (compact ? 'Flag' : 'Flag for review') })]);
+    /** A question: its number on top, its text, its answers. `side`: the side layout's — the number
+     *  large over the question, the text at Canvas's own size and in its own lines (images, tables and
+     *  videos at the size their author gave), the flag in the right rail instead of here. */
+    function questionBlock(q, k, { compact = false, side = false } = {}) {
+      const flagBtn = side ? null : h('button', { type: 'button', class: `bcv-qz__flag ${q.flagged ? 'is-on' : ''}`, onclick: () => toggleFlag(q) }, [U.svg(FLAG, { size: compact ? 12 : 13, width: 2 }), h('span', { text: q.flagged ? (compact ? 'Flagged' : 'Flagged for review') : (compact ? 'Flag' : 'Flag for review') })]);
       const pts = q.points_possible !== undefined && q.points_possible !== null ? `${store.fmtPts(q.points_possible)} ${Number(q.points_possible) === 1 ? 'point' : 'points'}` : '';
-      const headRow = U.el('bcv-qz__qhead', [
+      const headRow = U.el(`bcv-qz__qhead ${side ? 'bcv-qz__qhead--side' : ''}`, [
         h('span', { class: 'bcv-qz__qnum', text: `Question ${k + 1}` }),
         h('span', { class: 'bcv-qz__qof', text: `of ${st.questions.length}${pts ? ` · ${pts}` : ''}` }),
         INFO.has(q.question_type) ? null : flagBtn,
       ]);
-      const text = BCV.screens.course.prose(q.question_text || q.question_name || '', { cls: `bcv-qz__qtext ${compact ? 'bcv-qz__qtext--compact' : ''}` });
-      const area = answerArea(q, compact);
+      const text = BCV.screens.course.prose(q.question_text || q.question_name || '', { cls: `bcv-qz__qtext ${side ? 'bcv-qz__qtext--canvas' : compact ? 'bcv-qz__qtext--compact' : ''}` });
+      const area = answerArea(q, compact || side);
       weave(text, area, q);
       const left = area && area.bcvBlanks && !area.children.length ? null : area; // (every blank went into the sentence)
       return h('div', { id: `bcv-q${k}`, class: 'bcv-qz__q' }, [headRow, text, left]);
@@ -780,6 +800,8 @@
       if (!footerEl) return;
       const lbl = footerEl.querySelector('.bcv-qz__answered');
       if (lbl) lbl.textContent = `${answeredLabel()}${saveState() ? ` · ${saveState()}` : ''}`;
+      const fill = footerEl.querySelector('.bcv-qz__meterfill'); // (the side layout's bar of what is answered)
+      if (fill) fill.style.width = `${st.questions.length ? Math.round((answeredCount() / st.questions.length) * 100) : 0}%`;
     }
     function footer(buttons) {
       footerEl = U.el('bcv-qz__foot', U.el('bcv-qz__footin', [h('span', { class: 'bcv-qz__answered' }), ...buttons]));
@@ -787,10 +809,9 @@
       return footerEl;
     }
 
-    function takeOne() {
-      const q = cur();
-      const k = st.idx;
-      if (!q) return U.el('bcv-qz__page', U.emptyCard('This quiz has no questions.'));
+    /** Moving from question k: whether it is the last, and Back and Next — through Canvas's own page
+     *  on a paged attempt, in place otherwise. */
+    function moves(k) {
       const last = st.paged ? !st.page?.form.nextAction : k === st.questions.length - 1;
       const back = () => {
         if (st.paged) { turnPage(st.page?.form.prevAction ? { action: st.page.form.prevAction, toward: -1 } : { questionId: st.questions[k - 1].id }); return; }
@@ -804,14 +825,62 @@
         draw();
         toTop();
       };
+      return { last, back, next };
+    }
+    const toReview = () => { st.stage = 'review'; draw(); toTop(); };
+
+    function takeOne() {
+      const q = cur();
+      const k = st.idx;
+      if (!q) return U.el('bcv-qz__page', U.emptyCard('This quiz has no questions.'));
+      const { last, back, next } = moves(k);
       return h('div', { class: 'bcv-qz__stage' }, [
         U.el('bcv-qz__page', questionBlock(q, k)),
         footer([
           noBack ? null : h('button', { type: 'button', class: 'bcv-qz__btn', text: 'Back', disabled: k === 0 || null, onclick: back }),
           last
-            ? h('button', { type: 'button', class: 'bcv-qz__btn bcv-qz__btn--primary', text: 'Review answers', onclick: () => { st.stage = 'review'; draw(); toTop(); } })
+            ? h('button', { type: 'button', class: 'bcv-qz__btn bcv-qz__btn--primary', text: 'Review answers', onclick: toReview })
             : h('button', { type: 'button', class: 'bcv-qz__btn bcv-qz__btn--primary bcv-qz__btn--next', text: 'Next', onclick: next }),
         ]),
+      ]);
+    }
+
+    /* The side layout (2.98.24): the page's width put to use. Down the left, every question as a
+     * numbered square — answered, flagged, the one on screen — with a key to them; in the middle, the
+     * question, its number large on top and its text as Canvas lays it out; down the right, every
+     * control: how many are answered and whether it is saved, Next (Review answers on the last), Back,
+     * the flag, and the review at any point. Both rails stay in view as the question scrolls. The same
+     * pills, buttons and saves as the one-at-a-time layout, placed differently. */
+    function takeSide() {
+      const q = cur();
+      const k = st.idx;
+      if (!q) return U.el('bcv-qz__page', U.emptyCard('This quiz has no questions.'));
+      const { last, back, next } = moves(k);
+      const key = (cls, text) => U.el('bcv-qz__key', [h('span', { class: `bcv-qz__keydot ${cls}` }), h('span', { text })]);
+      const left = h('aside', { class: 'bcv-qz__lrail', 'aria-label': 'Questions' }, [
+        U.text('bcv-qz__railh', 'Questions', 'div'),
+        progressWrap,
+        U.el('bcv-qz__legend', [key('is-current', 'On screen'), key('is-answered', 'Answered'), key('is-flagged', 'Flagged'), key('', 'Not answered')]),
+      ]);
+      const flagBtn = INFO.has(q.question_type) ? null : h('button', { type: 'button', class: `bcv-qz__flag bcv-qz__flag--side ${q.flagged ? 'is-on' : ''}`, 'aria-pressed': q.flagged ? 'true' : 'false', onclick: () => toggleFlag(q) }, [U.svg(FLAG, { size: 14, width: 2 }), h('span', { text: q.flagged ? 'Flagged for review' : 'Flag for review' })]);
+      footerEl = h('aside', { class: 'bcv-qz__foot bcv-qz__rrail', 'aria-label': 'Controls' }, [
+        U.text('bcv-qz__railh', 'Progress', 'div'),
+        h('span', { class: 'bcv-qz__answered' }),
+        h('div', { class: 'bcv-qz__meter', 'aria-hidden': 'true' }, h('span', { class: 'bcv-qz__meterfill' })),
+        U.el('bcv-qz__railbtns', [
+          last
+            ? h('button', { type: 'button', class: 'bcv-qz__btn bcv-qz__btn--primary', text: 'Review answers', onclick: toReview })
+            : h('button', { type: 'button', class: 'bcv-qz__btn bcv-qz__btn--primary bcv-qz__btn--next', text: 'Next', onclick: next }),
+          noBack ? null : h('button', { type: 'button', class: 'bcv-qz__btn', text: 'Back', disabled: k === 0 || null, onclick: back }),
+        ]),
+        flagBtn,
+        last ? null : h('button', { type: 'button', class: 'bcv-qz__btn bcv-qz__btn--quiet', text: 'Review answers', title: 'See every answer before you submit. Nothing is submitted until you say so.', onclick: toReview }),
+      ]);
+      paintFooter();
+      return h('div', { class: 'bcv-qz__stage bcv-qz__side' }, [
+        left,
+        U.el('bcv-qz__page bcv-qz__page--side', questionBlock(q, k, { side: true })),
+        footerEl,
       ]);
     }
 
@@ -857,6 +926,13 @@
       return parts ? parts.map(partText).join(', ') : null;
     }
 
+    /** The question on its one line of the review: its words and formulas, without the videos,
+     *  pictures and tables that belong to the question itself. */
+    function sumText(q) {
+      const el = BCV.screens.course.prose(noFields(q.question_text, q), { cls: 'bcv-qz__sumrich' });
+      for (const n of el.querySelectorAll('iframe, video, audio, table, .bcv-embed-open, img:not(.equation_image)')) n.remove();
+      return el;
+    }
     function review() {
       const blanks = st.questions.length - answeredCount();
       return U.el('bcv-qz__review', [
@@ -883,7 +959,7 @@
             else toTop();
           } }, [
             h('span', { class: 'bcv-qz__sumn', text: `Q${k + 1}` }),
-            h('span', { class: 'bcv-qz__sumq bcv-ellip' }, String(q.question_text || '').trim() ? BCV.screens.course.prose(noFields(q.question_text, q), { cls: 'bcv-qz__sumrich' }) : h('span', { text: q.question_name || '' })), // (the question as Canvas holds it: a formula in it is the formula, not its LaTeX)
+            h('span', { class: 'bcv-qz__sumq bcv-ellip' }, String(q.question_text || '').trim() ? sumText(q) : h('span', { text: q.question_name || '' })), // (the question as Canvas holds it: a formula in it is the formula, not its LaTeX)
             q.flagged ? U.svg(FLAG, { size: 13, stroke: '#ff9500', width: 2, style: { flex: 'none' } }) : null,
             cell,
           ]);
