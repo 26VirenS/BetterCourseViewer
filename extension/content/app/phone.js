@@ -410,7 +410,10 @@
     const badge = h('span', { class: 'bcv-ph-bell__badge', hidden: true });
     const bell = h('button', { type: 'button', class: 'bcv-ph-bell', 'aria-label': 'Notifications', onclick: () => app.go('/#notifications') }, [U.svg(BELL, { size: 17, stroke: 'var(--bcv-ink2)', width: 1.9 }), badge]);
     const avatarBtn = h('button', { type: 'button', class: 'bcv-ph-avatar', 'aria-label': 'Account', onclick: () => accountSheet(app) }, h('span', { text: '·' }));
-    screen.append(bigTitle('Today', { above: `${U.DAYS_LONG[now.getDay()]}, ${U.MONTHS_LONG[now.getMonth()]} ${now.getDate()}`, right: U.el('bcv-ph-title__right', [bell, avatarBtn]) }), body);
+    // the Dashboard's search box (content/app/search.js) under the title: courses, work, files, people and every
+    // command from one field; while it has results they take the screen (the counters and lists step aside)
+    const omni = BCV.search?.field?.(app);
+    screen.append(bigTitle('Today', { above: `${U.DAYS_LONG[now.getDay()]}, ${U.MONTHS_LONG[now.getMonth()]} ${now.getDate()}`, right: U.el('bcv-ph-title__right', [bell, avatarBtn]) }), ...(omni ? [U.el('bcv-ph-search', omni)] : []), body);
     body.append(U.loading('rows', 4));
 
     const [planner, sel, feed, me, notifs, overrides] = await Promise.all([store.planner().catch(() => null), selection(), store.announcementsFeed().catch(() => null), store.me().catch(() => null), store.notifUnread().catch(() => null), store.plannerOverrides().catch(() => [])]);

@@ -9,7 +9,9 @@
  * /convert, /open, /todo, /dark …): the list narrows as the name is typed, Tab (or →) completes
  * it, and the argument — an assignment, a file, a tool, a course — is picked from a list that
  * narrows as you type. "/" or ⌘K on any screen brings the Dashboard up with the box focused and
- * whatever was typed meanwhile kept. The Wikipedia lookup goes through the background (background.js
+ * whatever was typed meanwhile kept. On a phone the same box sits under Today's title: the results take
+ * the screen while there are any, every row's actions stay in view (nothing to hover), and the keyboard
+ * goes once a row is chosen. The Wikipedia lookup goes through the background (background.js
  * 'wiki'), so the page's own rules never block it. The first time, a black screen points at the box
  * (welcome.js: "Search Everything."). */
 (function () {
@@ -203,7 +205,9 @@
   }
   /** A result's row: its tile and words; what can be done with it as small buttons at the right (shown on the row chosen, or under the pointer). */
   function row(it, i) {
-    const acts = it.act ? [] : (BCV.hub?.actionsFor?.(it) || []);
+    let acts = it.act ? [] : (BCV.hub?.actionsFor?.(it) || []);
+    // (a phone keeps every row's actions in view: in a command's list the one the row does itself — Submit under /submit — is left off)
+    if (ui.mode === 'cmd' && ui.cmd && BCV.phone?.active?.()) acts = acts.filter((a) => !norm(a.label).startsWith(ui.cmd.name));
     const el = h('div', { class: `bcv-omni__item${it.answer ? ' bcv-omni__item--ans' : ''}`, role: 'option', tabindex: '-1', 'aria-selected': 'false', dataset: { i }, onclick: (e) => { if (e.target.closest?.('.bcv-omni__act')) return; openItem(it, el); } }, [
       h('span', { class: 'bcv-omni__iic', style: it.tint ? { color: it.tint } : null }, U.svg(it.icon, { size: 15, width: 1.9 })),
       h('span', { class: 'bcv-omni__body' }, [h('span', { class: 'bcv-omni__t', text: it.title }), it.sub ? h('span', { class: 'bcv-omni__s', text: it.sub }) : null]),
@@ -227,6 +231,11 @@
     ui.seq += 1; // (a source still answering is answering a search that is closed: it paints nothing)
     ui.pending = 0;
   }
+  /** The panel closed for good — a row chosen, a command run: on a phone the keyboard goes with it (the box keeps its words). */
+  function done() {
+    close();
+    if (ui && BCV.phone?.active?.()) ui.input.blur();
+  }
   /** The words in the box replaced (a command completed, a /help row chosen) and searched again, the cursor at the end. */
   function fill(text) {
     if (!ui) return;
@@ -241,18 +250,18 @@
     const { app } = ui;
     if (ui.mode === 'cmd' && ui.cmd) { runCommand(ui.cmd, it.act ? null : it, from); return; }
     if (it.cmd) { if (it.fill) fill(it.fill); else runCommand(it.cmd, null, from); return; }
-    close();
+    done();
     if (it.url) window.open(it.url, '_blank', 'noopener');
     else if (it.run) it.run(from);
     else if (it.href) app.go(it.href);
   }
   function runCommand(cmd, item, from) {
     if (!ui || !BCV.hub) return;
-    const ctx = { q: ui.arg, cs: ui.cs || [], lane: limiter(LANES), close, fill, from, app: ui.app };
+    const ctx = { q: ui.arg, cs: ui.cs || [], lane: limiter(LANES), close: done, fill, from, app: ui.app };
     try { const r = cmd.run(item, ctx); if (r && typeof r.catch === 'function') r.catch((e) => U.toast(`${cmd.name} failed: ${e?.message || e}`, { error: true })); } catch (e) { U.toast(`${cmd.name} failed: ${e?.message || e}`, { error: true }); }
   }
   function act(a, from) {
-    close();
+    done();
     try { const r = a.run(from); if (r && typeof r.catch === 'function') r.catch((e) => U.toast(`${a.label} failed: ${e?.message || e}`, { error: true })); } catch (e) { U.toast(`${a.label} failed: ${e?.message || e}`, { error: true }); }
   }
   const caretAtEnd = () => { try { return ui.input.selectionStart === null || ui.input.selectionStart === ui.input.value.length; } catch { return true; } };
@@ -297,9 +306,10 @@
     }
   }
 
-  /** The box, for the Dashboard's header row: the glyph, the field, the "/" hint, and the panel under it. */
+  /** The box, for the Dashboard's header row (and the phone's Today, under its title): the glyph, the field, the "/" hint, and the panel under it. */
   function field(app) {
-    const input = h('input', { type: 'search', class: 'bcv-omni__in', id: 'bcv-omni', placeholder: 'Search everything', autocomplete: 'off', spellcheck: 'false', 'aria-label': 'Search everything: courses, assignments, pages, files, people and Wikipedia — or type / for a command', 'aria-controls': 'bcv-omni-panel', 'aria-autocomplete': 'list' });
+    const phone = !!BCV.phone?.active?.();
+    const input = h('input', { type: 'search', class: 'bcv-omni__in', id: 'bcv-omni', placeholder: phone ? 'Search, or type / for a command' : 'Search everything', autocomplete: 'off', autocapitalize: 'off', autocorrect: 'off', enterkeyhint: 'go', spellcheck: 'false', 'aria-label': 'Search everything: courses, assignments, pages, files, people and Wikipedia — or type / for a command', 'aria-controls': 'bcv-omni-panel', 'aria-autocomplete': 'list' });
     const panel = h('div', { class: 'bcv-omni__panel', id: 'bcv-omni-panel', role: 'listbox', 'aria-label': 'Results' });
     panel.hidden = true;
     // the Wikipedia switch, inside the box at its right where the "/" hint sits: shown while the box has

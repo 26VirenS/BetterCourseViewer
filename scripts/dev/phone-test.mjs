@@ -221,6 +221,52 @@ try {
   await page.goto(`${BASE}/`);
   await page.waitForSelector('.bcv-ph-row', { timeout: 15000 });
 
+  // ---- the search hub on Today (2.98.37): the Dashboard's box under the title -------------------
+  console.log('search');
+  const omni = await page.evaluate(() => {
+    const box = document.querySelector('.bcv-ph-search #bcv-omni-box'), t = document.querySelector('.bcv-ph-title'), st = document.querySelector('.bcv-ph-stats'), inp = document.getElementById('bcv-omni');
+    const r = box?.getBoundingClientRect();
+    return { box: !!box, between: !!(r && t && st && r.top >= t.getBoundingClientRect().bottom && r.bottom <= st.getBoundingClientRect().top), h: Math.round(r?.height || 0), ph: inp?.placeholder, fs: inp && getComputedStyle(inp).fontSize, go: inp?.getAttribute('enterkeyhint'), key: getComputedStyle(document.querySelector('.bcv-omni__key')).display };
+  });
+  check(omni.box && omni.between && omni.h >= 40 && omni.ph === 'Search, or type / for a command' && omni.fs === '16px' && omni.go === 'go' && omni.key === 'none', `the search box sits under Today's title, above the counters: a finger's height, 16px type (iOS does not zoom in), Go on the keyboard, no "/" key hint: ${JSON.stringify(omni)}`);
+  const omniRead = () => page.evaluate(() => ({
+    panel: !document.querySelector('.bcv-omni__panel').hidden, body: getComputedStyle(document.querySelector('.bcv-ph-body')).display, focus: document.activeElement?.id || '',
+    groups: [...document.querySelectorAll('.bcv-omni__group')].map((g) => g.dataset.group),
+    rows: [...document.querySelectorAll('.bcv-omni__item')].map((e) => ({ t: e.querySelector('.bcv-omni__t')?.textContent, h: Math.round(e.getBoundingClientRect().height), acts: [...e.querySelectorAll('.bcv-omni__act')].filter((b) => b.getBoundingClientRect().height >= 30).map((b) => b.textContent.trim()) })),
+  }));
+  await page.tap('#bcv-omni');
+  await page.fill('#bcv-omni', 'dis01');
+  await page.waitForSelector('.bcv-omni__group[data-group="Files"] .bcv-omni__item', { timeout: 10000 });
+  await eventually(async () => !(await page.$('.bcv-omni__more')), 10000);
+  const found = await omniRead();
+  const rowOf = (t) => found.rows.find((r) => r.t === t);
+  check(found.panel && found.body === 'none' && found.groups.join() === 'Assignments,Files' && rowOf('Dis01')?.acts.join() === 'Submit' && rowOf('Dis01 worksheet.pdf')?.acts.join() === 'Download,Convert' && found.rows.every((r) => r.h >= 44), `a search takes the screen (the counters step aside): its rows a finger's height, each row's actions in view with nothing to hover: ${JSON.stringify(found)}`);
+  check(await noOverflow(), 'the results fit the width');
+  await shot('01g-today-search');
+  await page.tap('.bcv-ph-h1');
+  check(await eventually(async () => { const o = await omniRead(); return !o.panel && o.body === 'flex'; }, 3000), 'a tap outside the results closes them, and Today is back');
+  // a command's list: the row does the command itself, so its own action is not repeated on it; the keyboard goes once one is chosen
+  await page.tap('#bcv-omni');
+  await page.fill('#bcv-omni', '/submit ');
+  await page.waitForSelector('.bcv-omni__group[data-group="Hand in"] .bcv-omni__item', { timeout: 10000 });
+  await eventually(async () => !(await page.$('.bcv-omni__more')), 10000);
+  const handIn = await omniRead();
+  check(handIn.rows[0]?.t === 'W2 HW' && handIn.rows.every((r) => !r.acts.includes('Submit')), `/submit lists what is due, with no Submit button repeating the row: ${handIn.rows.map((r) => `${r.t} [${r.acts}]`).join(' · ')}`);
+  await (await page.$('.bcv-omni__item .bcv-omni__body')).tap();
+  await page.waitForSelector('.bcv-hub-ov .bcv-hub-pop .bcv-sb__tabs', { timeout: 15000 });
+  const afterPick = await omniRead();
+  check(!afterPick.panel && afterPick.focus !== 'bcv-omni' && (await texts('.bcv-hub-pop__title'))[0] === 'W2 HW', `a tap on W2 HW opens its hand-in box over Today, the list and the keyboard gone: ${JSON.stringify({ panel: afterPick.panel, focus: afterPick.focus })}`);
+  await page.tap('.bcv-hub-pop .bcv-sheet__close');
+  await eventually(async () => !(await page.$('.bcv-hub-ov')), 5000);
+  // a found row opens where it leads
+  await page.tap('#bcv-omni');
+  await page.fill('#bcv-omni', 'dis01');
+  await page.waitForSelector('.bcv-omni__group[data-group="Assignments"] .bcv-omni__item', { timeout: 10000 });
+  await (await page.$('.bcv-omni__group[data-group="Assignments"] .bcv-omni__item .bcv-omni__body')).tap();
+  check(await eventually(() => page.evaluate(() => /\/courses\/\d+\/assignments\/\d+$/.test(location.pathname)), 10000), `a tap on the Dis01 row opens the assignment: ${page.url()}`);
+  await page.goto(`${BASE}/`);
+  await page.waitForSelector('.bcv-ph-row', { timeout: 15000 });
+
   // ---- Notifications (from the bell) ------------------------------------------------------------
   console.log('Notifications');
   const bellBadge = (await texts('.bcv-ph-bell__badge'))[0] || '';
@@ -747,6 +793,14 @@ try {
   check(noContinueYet && await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000) && Date.now() - welcomeAt >= TIMERS.welcomeWait - 500, 'Continue comes in only after the wait (three seconds shipped)');
   await page.waitForTimeout(400);
   await page.screenshot({ path: join(out, 'phone-12b-welcome-peek.png') });
+  await page.click('.bcv-welcome__next');
+  // (2.98.37) Today has the search box now, so the setup's run points it out last, as the Dashboard's does
+  await page.waitForSelector('#bcv-welcome[data-stage="search"]', { timeout: 8000 });
+  const searchStage = await page.evaluate(() => { const box = document.getElementById('bcv-omni-box')?.getBoundingClientRect(); const w = document.getElementById('bcv-welcome'); const title = w.querySelector('.bcv-welcome__title, h1, h2'); const tr = title?.getBoundingClientRect(); return { title: title?.textContent.trim(), boxShown: !!box && box.width > 0, under: !!(box && tr && tr.top >= box.bottom), fits: document.documentElement.scrollWidth <= innerWidth + 1 }; });
+  check(searchStage.title === 'Search Everything.' && searchStage.boxShown && searchStage.under && searchStage.fits, `then the black points at Today's search box, its words under it: ${JSON.stringify(searchStage)}`);
+  await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000);
+  await page.waitForTimeout(400);
+  await page.screenshot({ path: join(out, 'phone-12c-welcome-search.png') });
   await page.click('.bcv-welcome__next');
   await page.waitForFunction(() => !document.querySelector('#bcv-welcome'), null, { timeout: 5000 });
   check(!(await page.$('html.bcv-welcome')) && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('welcome:pending'))['welcome:pending'])) === undefined && (await page.$('.bcv-ph-stats')) !== null, 'Continue takes the black away: Today, and the welcome does not come back');

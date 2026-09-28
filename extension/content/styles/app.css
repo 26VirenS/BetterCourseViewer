@@ -13,7 +13,7 @@
  * min(their own, the viewport less a margin). */
 
 html[data-bcv-theme] {
-  --bcv-version: "2.98.36"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.98.37"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -4201,3 +4201,26 @@ html[data-bcv-theme="dark"] .bcv-pdfx { --px-row: #0f0f11; --px-page: #1f1f22; -
 .bcv-sprung.is-closing, .bcv-sprung.is-closing > .bcv-sheet, .bcv-sprung.is-closing .bcv-sheet { animation: none !important; }
 html.bcv-phone .bcv-gr__bandlbl { display: none; } /* (on a phone the slider takes the row) */
 html.bcv-phone .bcv-gr__bandrow .bcv-bands { flex: 1 1 auto; }
+/* (2.98.37) the search hub on the phone's Today: the Dashboard's box, full width under the title, a finger's
+   rows; while it has results they take the screen and the counters and lists step aside until it closes.
+   16px text in the field so iOS does not zoom in on it; every row's actions stay in view (nothing to hover). */
+.bcv-ph-search { padding: 12px 16px 0; }
+html.bcv-phone .bcv-ph-search .bcv-omni { display: block; flex: none; width: 100%; max-width: none; min-width: 0; margin: 0; align-self: auto; }
+html.bcv-phone .bcv-ph-search .bcv-omni__box { height: 42px; padding: 0 12px 0 13px; gap: 9px; border-radius: 13px; background: var(--bcv-fill); }
+html.bcv-phone .bcv-ph-search .bcv-omni__box:focus-within { background: var(--bcv-card); box-shadow: var(--bcv-shadow); }
+html.bcv-phone .bcv-ph-search .bcv-omni__box input.bcv-omni__in, html.bcv-phone .bcv-ph-search .bcv-omni__box input.bcv-omni__in[type="search"] { height: 40px; font: 400 16px/1 var(--bcv-font); }
+html.bcv-phone .bcv-ph-search .bcv-omni__key, html.bcv-phone .bcv-ph-search .bcv-omni__hint { display: none !important; }
+html.bcv-phone .bcv-ph-search .bcv-omni__wiki .bcv-switch { width: 38px; height: 23px; border-radius: 12px; }
+html.bcv-phone .bcv-ph-search .bcv-omni__wiki .bcv-switch__knob { width: 19px; height: 19px; }
+html.bcv-phone .bcv-ph-search .bcv-omni__wikit { font-size: 12px; }
+html.bcv-phone .bcv-ph-search .bcv-omni__panel { position: static; margin-top: 10px; max-height: none; overflow: visible; padding: 6px; border: 0; border-radius: var(--bcv-r-row); box-shadow: var(--bcv-shadow); }
+html.bcv-phone .bcv-ph-search .bcv-omni__gtitle { padding: 12px 10px 6px; font-size: 11.5px; }
+html.bcv-phone .bcv-ph-search .bcv-omni__item { flex-wrap: wrap; min-height: 54px; gap: 12px; padding: 9px 10px; border-radius: 12px; }
+html.bcv-phone .bcv-ph-search .bcv-omni__iic { width: 34px; height: 34px; border-radius: 10px; }
+html.bcv-phone .bcv-ph-search .bcv-omni__t { font-size: 16px; }
+html.bcv-phone .bcv-ph-search .bcv-omni__s { margin-top: 2px; font-size: 13px; }
+html.bcv-phone .bcv-ph-search .bcv-omni__item--ans .bcv-omni__t { font-size: 24px; }
+html.bcv-phone .bcv-ph-search .bcv-omni__acts { display: flex; flex-wrap: wrap; flex: 0 0 100%; box-sizing: border-box; gap: 8px; margin: -2px 0 2px; padding-left: 46px; }
+html.bcv-phone .bcv-ph-search .bcv-omni__act { height: 32px; padding: 0 12px; gap: 6px; border-radius: 10px; font-size: 13px; }
+html.bcv-phone .bcv-ph-search .bcv-omni__empty, html.bcv-phone .bcv-ph-search .bcv-omni__more { padding: 14px 12px; font-size: 15px; }
+html.bcv-phone .bcv-ph-screen:has(.bcv-ph-search .bcv-omni__panel:not([hidden])) > .bcv-ph-body { display: none; }

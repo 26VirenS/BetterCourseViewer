@@ -104,7 +104,7 @@
   const themeBtn = () => { const el = document.getElementById('bcv-theme-btn'); return el && el.getBoundingClientRect().width > 0 ? el : null; };
   /** The Dashboard's Due this week card, when it is on the page and drawn (the Dashboard alone has it). */
   const weekCard = () => { const el = document.querySelector('#bcv-app .bcv-stat[data-stat="week"]'); return el && el.getBoundingClientRect().width > 0 ? el : null; };
-  /** The Dashboard's search box, when it is on the page (the Dashboard alone has it; a phone has none). */
+  /** The search box, when it is on the page (the Dashboard's header, or the phone's Today under its title). */
   const searchBox = () => { const el = document.getElementById('bcv-omni-box'); return el && el.getBoundingClientRect().width > 0 ? el : null; };
   /** A row under the switch's show: the switch's own button for that stop — the round face in its
    *  colour with its glyph, the same classes the page's switch wears (app.lookDemo) — small and still. */

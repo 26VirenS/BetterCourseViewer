@@ -25,6 +25,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.98.37', date: '2026-09-28', notes: [
+      { kind: 'new', title: 'Search on phone', body: 'Today has the search box and every command.', icon: P.sparkle },
+    ] },
     { version: '2.98.36', date: '2026-09-28', notes: [
       { kind: 'improved', title: 'Smoother grade curve', body: 'Point at the trend line to read any day.', icon: P.steps },
       { kind: 'new', title: 'Six counters on phone', body: 'Phone Today shows Overdue, Tomorrow and Graded.', icon: P.list },
