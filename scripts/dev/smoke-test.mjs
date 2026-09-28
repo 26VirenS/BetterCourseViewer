@@ -1251,9 +1251,18 @@ try {
   }
   const pctAfter = (await texts('.bcv-gpa-detail__pct'))[0];
   check(gradedWf.length > 0 && pctAfter !== pctBefore && /^\d+%$/.test(pctAfter) && (await page.$$('.bcv-gpa-detail .bcv-whatif__input.is-hyp')).length === gradedWf.length && /^A− F26-MATH 021 20 MATH-021-20 92\.4%/.test((await texts('.bcv-gpa__card'))[0]) && (await texts('.bcv-gpa-detail__letter'))[0].endsWith('· what-if'), `scores changed to 0 move the what-if total (${pctBefore} → ${pctAfter}, ${gradedWf.length} fields), marked what-if, the card behind untouched`);
+  // (2.98.38) an assignment made up and put in a group: it tops the list, marked What-if, not a link, and the group and the total move with it
+  await page.selectOption('.bcv-gpa-detail .bcv-wfadd__group', { label: 'Final · 25%' });
+  await page.fill('.bcv-gpa-detail .bcv-wfadd__name', 'Final exam');
+  await page.fill('.bcv-gpa-detail .bcv-wfadd__num >> nth=0', '100');
+  await page.fill('.bcv-gpa-detail .bcv-wfadd__num >> nth=1', '100');
+  await page.click('.bcv-gpa-detail .bcv-wfadd__add');
+  await page.waitForSelector('.bcv-gpa-detail .bcv-wfadd__rm', { timeout: 5000 });
+  const sheetAdd = await page.evaluate(() => { const r = document.querySelector('.bcv-gpa-detail__arow'); return { name: r.querySelector('.bcv-gpa-detail__aname')?.textContent, group: r.querySelector('.bcv-gpa-detail__agroup')?.textContent, tag: r.tagName, value: r.querySelector('.bcv-whatif__input')?.value, pct: document.querySelector('.bcv-gpa-detail__pct')?.textContent, final: [...document.querySelectorAll('.bcv-gpa-detail__grow')].map((e) => e.innerText.replace(/\s+/g, ' ')).find((t) => /^Final/.test(t)), note: document.querySelector('.bcv-gpa-detail .bcv-wfadd__note')?.textContent }; });
+  check(sheetAdd.name === 'Final examWhat-if' && sheetAdd.group === 'Final · made up to test' && sheetAdd.tag === 'DIV' && sheetAdd.value === '100' && sheetAdd.pct === '58.1%' && /^Final .*100%$/.test(sheetAdd.final || '') && sheetAdd.note === 'Counts in Final, 25% of the grade.', `the sheet adds a what-if assignment to the group chosen — Final at 100 with every graded score zeroed lands the total on 25 of 43 weighted points: ${JSON.stringify(sheetAdd)}`);
   await page.click('.bcv-gpa-detail .bcv-banner--sm button');
   await page.waitForFunction(() => !document.querySelector('.bcv-gpa-detail .bcv-whatif__input.is-hyp'), null, { timeout: 5000 });
-  check((await texts('.bcv-gpa-detail__pct'))[0] === pctBefore, 'Clear all puts the real scores back');
+  check((await texts('.bcv-gpa-detail__pct'))[0] === pctBefore && !(await page.$('.bcv-gpa-detail .bcv-wfadd__rm')), 'Clear all puts the real scores back, and takes the made-up assignment away');
   await page.click('.bcv-gpa-detail .bcv-whatif-btn');
   await page.waitForFunction(() => !document.querySelector('.bcv-gpa-detail .bcv-whatif__input'), null, { timeout: 5000 });
   check((await page.$$('.bcv-gpa-detail__arow.is-link')).length === 17 && (await texts('.bcv-gpa-detail__pct'))[0] === '92.4%' && (await texts('.bcv-gpa-detail .bcv-whatif-btn'))[0] === 'Try what-if scores', 'Exit what-if mode: the rows are links again and the score is Canvas’s own');
@@ -2017,7 +2026,33 @@ try {
   // the grade model applies a group's drop rules the way Canvas does (a dropped zero no longer drags the group down), and what-if junk is cleared
   const dropModel = await sw.evaluate(async (base) => { const [t] = await chrome.tabs.query({ url: `${base}/*` }); const [{ result }] = await chrome.scripting.executeScript({ target: { tabId: t.id }, world: 'ISOLATED', func: () => { const S = self.BCV.store; const g = [{ id: 'g1', name: 'Homework', group_weight: 0, position: 1, rules: { drop_lowest: 1, never_drop: ['a3'] }, assignments: [1, 2, 3].map((i) => ({ id: `a${i}`, name: `HW ${i}`, points_possible: 100, submission: { workflow_state: 'graded', score: i === 1 ? 50 : i === 3 ? 60 : 100 } })) }]; const m = S.gradeModel(g, { id: 'x', weighted: false, score: null }, {}, false, false); const nan = S.gradeModel(g, { id: 'x', weighted: false, score: null }, { a2: '1.2.3' }, true, false); return { total: m.total, legend: m.legend[0]?.detail || '', nanTotal: nan.total }; } }); return result; }, BASE);
   check(dropModel.total === 80 && /HW 1 dropped/.test(dropModel.legend) && Number.isFinite(dropModel.nanTotal), `drop_lowest drops the lowest scored item (never_drop held): total ${dropModel.total} (100 + 60 of 200), legend "${dropModel.legend}", junk what-if total ${dropModel.nanTotal}`);
+  // (2.98.38) what-if assignments put in a group of your choosing: every group offered with its weight; pressing a
+  // group points the box at it; one added counts in its group with that weight, tops the list marked What-if, and goes with its X
+  const adderOpts = await page.$$eval('.bcv-wfadd__group option', (os) => os.map((o) => o.textContent));
+  await page.click('.bcv-legend__row[data-group] >> text=Midterms');
+  const pointed = await page.$eval('.bcv-wfadd__group', (sel) => sel.options[sel.selectedIndex].textContent);
+  await page.click('.bcv-legend__row[data-group] >> text=Midterms'); // (the pick let go again)
+  check(adderOpts.join(' | ') === 'Discussion Quizzes · 18% | Midterms · 57% | Final · 25% | Effort · 0% | Collaboration · 0% | Coursework (Knewton Alta) · 0%' && pointed === 'Midterms · 57%', `what-if mode offers an assignment to add to any group, weights shown; pressing Midterms points it there: ${adderOpts.join(' | ')} → ${pointed}`);
+  await page.selectOption('.bcv-wfadd__group', { label: 'Final · 25%' });
+  await page.click('.bcv-wfadd__add');
+  const noScore = await page.$eval('.bcv-wfadd__note', (e) => ({ err: e.classList.contains('is-err'), text: e.textContent }));
+  await page.fill('.bcv-wfadd__name', 'Final exam');
+  await page.fill('.bcv-wfadd__num >> nth=0', '70');
+  await page.fill('.bcv-wfadd__num >> nth=1', '100');
+  await page.press('.bcv-wfadd__num >> nth=1', 'Enter');
+  await page.waitForSelector('.bcv-grades__main .bcv-row.is-wfadded', { timeout: 5000 });
+  const added = await page.evaluate(() => { const r = document.querySelector('.bcv-grades__main .bcv-card--list .bcv-row'); return { first: r.classList.contains('is-wfadded'), tag: r.tagName, name: r.querySelector('.bcv-grade__name')?.textContent, badge: r.querySelector('.bcv-badge')?.textContent, sub: r.querySelector('.bcv-row__sub')?.textContent, value: r.querySelector('.bcv-whatif__input')?.value, chip: r.querySelector('.bcv-bandchip')?.textContent, total: document.querySelector('.bcv-gr__total')?.textContent, final: [...document.querySelectorAll('.bcv-legend__row')].map((e) => e.innerText.replace(/\s+/g, ' ')).find((t) => /^Final/.test(t)), focus: document.activeElement?.classList.contains('bcv-wfadd__name') }; });
+  check(noScore.err && noScore.text === 'Give it a score to test.' && added.first && added.tag === 'DIV' && added.name === 'Final exam' && added.badge === 'What-if' && added.sub === 'Final · made up to test, not in Canvas' && added.value === '70' && added.chip === 'C' && added.total === '81.1%' && added.final === 'Final 70 / 100 pts · includes what-if 25% of grade 70%' && added.focus, `a what-if Final exam at 70/100 counts in Final at its 25%: the total ${added.total} (100·18 + 80·57 + 70·25 over 100), the group's ring and row, the row on top with its C (a missing score is said first: "${noScore.text}"): ${JSON.stringify(added)}`);
+  await shot(page, '17c-grades-whatif-added');
+  await page.click('.bcv-grades__main .bcv-row.is-wfadded .bcv-wfadd__rm');
+  await page.waitForFunction(() => !document.querySelector('.bcv-row.is-wfadded'), null, { timeout: 5000 });
+  check((await texts('.bcv-gr__total'))[0] === '84.8%' && !(await texts('.bcv-legend__row')).some((t) => /^Final \d/.test(t)), `its X takes it away, and the total back to ${(await texts('.bcv-gr__total'))[0]}`);
+  await page.fill('.bcv-wfadd__num >> nth=0', '5');
+  await page.press('.bcv-wfadd__num >> nth=0', 'Enter');
+  await page.waitForSelector('.bcv-grades__main .bcv-row.is-wfadded', { timeout: 5000 });
   await page.click('.bcv-banner .bcv-btn');
+  await page.waitForFunction(() => !document.querySelector('.bcv-row.is-wfadded'), null, { timeout: 5000 });
+  check(!(await page.$('.bcv-whatif__input.is-hyp')), 'Clear all takes the made-up assignments with the changed scores');
   await page.click('.bcv-whatif-btn');
   await page.waitForFunction(() => !document.querySelector('.bcv-banner'), null, { timeout: 5000 });
   // a grade is the start of a question, and the answer is on the assignment's own page: the whole

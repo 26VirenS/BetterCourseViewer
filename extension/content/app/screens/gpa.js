@@ -256,7 +256,7 @@
       return gmCache.get(c.id);
     };
     const whatIfAllowed = whatIfPref !== false; // Settings → Grades → Show what-if scores
-    const whatIfBy = new Map(); // courseId → { on, values }: a Details sheet's what-if, kept while the page lives
+    const whatIfBy = new Map(); // courseId → { on, values, added, seq, addGroup }: a Details sheet's what-if, kept while the page lives
 
     // ---- the model: every number from a Canvas field or from user input ----------------
     function model() {
@@ -602,9 +602,11 @@
       const sheet = U.el('bcv-sheet bcv-gpa-detail');
       ov.append(sheet);
       // what-if scores, the course page's own (grades.js): the real scores loaded into fields, any of
-      // them changed to test an outcome; nothing saved, nothing sent. Kept per course while the page lives.
-      const wf = whatIfBy.get(c.id) || { on: false, values: {} };
+      // them changed — or an assignment made up and put in a group — to test an outcome; nothing saved,
+      // nothing sent. Kept per course while the page lives.
+      const wf = whatIfBy.get(c.id) || { on: false, values: {}, added: [], seq: 0, addGroup: null };
       whatIfBy.set(c.id, wf);
+      const wfCats = (groupsBy.get(c.id) || []).map((g) => ({ id: String(g.id), name: g.name, weight: Number(g.group_weight) || 0 })); // (the groups a made-up assignment can go into)
       if (!whatIfAllowed) wf.on = false;
       let focusId = null; // the field to put the caret back in after a repaint (a double-click on a score starts there)
       // a group picked out (U.groupPicker): pressing a group, its weight or its ring keeps it and its
@@ -617,6 +619,9 @@
         onChange: (pick) => {
           const note = sheet.querySelector('.bcv-gpa-detail__picknote');
           if (!note) return;
+          // in what-if mode the group pressed is the one a made-up assignment goes into
+          const addSel = sheet.querySelector('.bcv-wfadd__group');
+          if (pick && addSel && addSel.value !== pick && [...addSel.options].some((o) => o.value === pick)) { addSel.value = pick; addSel.dispatchEvent(new Event('change')); }
           const name = pick && gmNow ? (gmNow.legend.find((r) => r.id === pick)?.label ?? gmNow.ungraded.find((u) => u.id === pick)?.name) : null;
           if (!name) { note.replaceChildren(wf.on ? 'Change any score to test it' : 'Blue dot means graded'); return; }
           const n = gmNow.rows.filter((r) => r.groupId === pick).length;
@@ -641,7 +646,7 @@
         const pf = isPassFail(targets[c.id]);
         const pfPct = pf && c.score !== null && c.score !== undefined ? Number(c.score) : null;
         // with a what-if on, the sheet is drawn from the hypothetical model: greyed rings, the what-if total up top
-        const gm = wf.on ? store.gradeModel(groupsBy.get(c.id) || [], c, wf.values, true, ctx.dark) : gmFor(c);
+        const gm = wf.on ? store.gradeModel(groupsBy.get(c.id) || [], c, wf.values, true, ctx.dark, wf.added) : gmFor(c);
         gmNow = gm;
         const cats = gm.legend;
         const hyp = wf.on && gm.total !== null && gm.total !== undefined ? gm.total : null;
@@ -703,8 +708,8 @@
         const whatIfBtn = whatIfAllowed ? h('button', { type: 'button', class: `bcv-whatif-btn ${wf.on ? 'is-on' : ''}`, text: wf.on ? 'Exit what-if mode' : 'Try what-if scores', onclick: () => { wf.on = !wf.on; focusId = null; paint(); } }) : null;
         const banner = wf.on ? U.el('bcv-banner bcv-banner--sm', [
           U.svg(IC.warn, { size: 20, stroke: 'var(--bcv-red)', width: 2, style: { flex: 'none' } }),
-          h('div', { style: { flex: '1', minWidth: '160px' } }, [U.text('bcv-banner__title', 'This is not your actual score.'), U.text('bcv-banner__sub', 'Your real scores are loaded in; change any of them to test an outcome. Nothing is saved or sent.')]),
-          U.btn('Clear all', { kind: 'danger', onClick: () => { wf.values = {}; focusId = null; paint(); } }),
+          h('div', { style: { flex: '1', minWidth: '160px' } }, [U.text('bcv-banner__title', 'This is not your actual score.'), U.text('bcv-banner__sub', 'Your real scores are loaded in; change any of them, or add an assignment to a category, to test an outcome. Nothing is saved or sent.')]),
+          U.btn('Clear all', { kind: 'danger', onClick: () => { wf.values = {}; wf.added = []; focusId = null; paint(); } }),
         ]) : null;
         // a row's score: the number, or — with the what-if on — a field with the number in it
         const scoreOf = (g) => {
@@ -739,9 +744,13 @@
             onclick: g.url ? () => close() : null, // the sheet belongs to the page being left
           }, [
             h('span', { class: 'bcv-gpa__catdot', style: { background: g.earned !== null ? '#0a84ff' : 'transparent' } }),
-            U.el('bcv-gpa-detail__abody', [U.text('bcv-gpa-detail__aname bcv-pretty', g.name), U.text('bcv-gpa-detail__agroup', `${g.group}${g.badge ? ` · ${g.badge}` : ''}`)]),
+            U.el('bcv-gpa-detail__abody', [
+              h('div', { class: 'bcv-gpa-detail__aname bcv-pretty' }, [g.name, g.added ? U.badge('What-if', 'red', 'bcv-badge--xs') : null]),
+              U.text('bcv-gpa-detail__agroup', g.added ? `${g.group} · made up to test` : `${g.group}${g.badge ? ` · ${g.badge}` : ''}`),
+            ]),
             U.bandChip(band, band ? `${store.fmtPts(Math.round((g.effective / g.possible) * 1000) / 10)}% · ${band}` : null),
             scoreOf(g),
+            g.added ? U.whatIfRemove(g.name, () => { wf.added = wf.added.filter((x) => x.id !== g.id); delete wf.values[g.id]; paint(); }) : null,
             g.url ? U.chev() : null,
           ]);
         });
@@ -754,6 +763,21 @@
           listEl.replaceChildren(...(shown.length ? shown : [U.text('bcv-gpa-detail__note', `No ${band} grades in this course${wf.on ? ' with these what-if scores' : ''}.`)]));
         };
         fillList();
+        // what-if: an assignment made up and put in a group of the student's choosing, counted there like the rest
+        const adder = wf.on && wfCats.length ? U.whatIfAdder(wfCats, {
+          group: wf.addGroup ?? pickSt.pick, weighted: gm.weighted, n: wf.seq + 1,
+          onGroup: (id) => { wf.addGroup = id; },
+          onAdd: ({ groupId, name, score, possible }) => {
+            wf.seq += 1;
+            const id = `wf-${wf.seq}`;
+            wf.added.push({ id, groupId, name, possible });
+            wf.values[id] = String(score);
+            wf.addGroup = groupId;
+            bandSt.band = 'all'; // (the new row in view, whatever letter it lands on)
+            paint();
+            sheet.querySelector('.bcv-wfadd__name')?.focus(); // (ready for the next)
+          },
+        }) : null;
         const list = U.el('bcv-gpa-detail__sec bcv-gpa-detail__sec--line', [
           U.el('bcv-gpa-detail__hrow', [U.text('bcv-gpa__kicker2', 'Assignments', 'span'), U.text('bcv-gpa-detail__hsub bcv-gpa-detail__picknote', wf.on ? 'Change any score to test it' : 'Blue dot means graded', 'span'), whatIfBtn]),
           Object.keys(counts).length ? U.el('bcv-gr__bandrow', [
@@ -761,6 +785,7 @@
             U.bandSlider(counts, bandSt.band, (b) => { bandSt.band = b; fillList(); picker.apply(); }),
           ]) : null,
           banner,
+          adder,
           gm.rows.length ? listEl : U.text('bcv-gpa-detail__note', 'No assignments in this course.'),
         ]);
         // one steady size, the scrolling inside it: the breakdown and the weights on the left with the

@@ -25,6 +25,10 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.98.38', date: '2026-09-28', notes: [
+      { kind: 'new', title: 'What-if assignments', body: 'Add a made-up assignment to any category to test.', icon: P.pen },
+      { kind: 'fixed', title: 'Cleaner Details rows', body: 'Assignment rows in Details read cleanly again.', icon: P.check },
+    ] },
     { version: '2.98.37', date: '2026-09-28', notes: [
       { kind: 'new', title: 'Search on phone', body: 'Today has the search box and every command.', icon: P.sparkle },
     ] },

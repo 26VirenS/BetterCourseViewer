@@ -1239,8 +1239,11 @@
   }
 
   // ---- grades model -------------------------------------------------------------------------------
-  /** Build the grade picture: one ring per group that has graded, counted work. */
-  function gradeModel(groupsRaw, courseInfo, whatIf, whatIfOn, dark) {
+  /** Build the grade picture: one ring per group that has graded, counted work. `added`: what-if
+   *  assignments made up in the page ({ id, groupId, name, possible }, their scores in whatIf by id),
+   *  counted in their group like any scored work there (its weight, its drop rules) while the what-if
+   *  is on; never on Canvas, never saved. */
+  function gradeModel(groupsRaw, courseInfo, whatIf, whatIfOn, dark, added = []) {
     const weighted = !!courseInfo.weighted;
     const rows = [];
     const groups = (groupsRaw || []).map((g) => ({ id: String(g.id), name: g.name, weight: Number(g.group_weight) || 0, position: g.position, rules: g.rules || {}, assignments: g.assignments || [] }));
@@ -1268,8 +1271,20 @@
           hypothetical: hyp !== null && (!graded || hyp !== Number(s.score)), effective, url: a.html_url, graded,
         });
       }
+      if (!whatIfOn) continue;
+      for (const [order, x] of (added || []).entries()) {
+        if (String(x.groupId) !== g.id) continue;
+        const raw = whatIf?.[x.id];
+        const n = raw !== undefined && raw !== '' ? Number(raw) : NaN;
+        const hyp = Number.isFinite(n) ? n : null;
+        rows.push({
+          id: String(x.id), name: x.name, group: g.name, groupId: g.id, possible: Number(x.possible) || 0, earned: null, counted: true, due: null, submitted: null, badge: '',
+          gradingType: 'points', grade: null, stats: null, hypothetical: hyp !== null, effective: hyp, url: null, graded: false, added: true, order,
+        });
+      }
     }
-    rows.sort((a, b) => (U.parse(a.due)?.getTime() || Infinity) - (U.parse(b.due)?.getTime() || Infinity));
+    // (what-if assignments first, the newest on top, where the student just added it; then by due date)
+    rows.sort((a, b) => (a.added || b.added ? (Number(!!b.added) - Number(!!a.added)) || (b.order - a.order) : (U.parse(a.due)?.getTime() || Infinity) - (U.parse(b.due)?.getTime() || Infinity)));
     // Groups that carry weight come first (in Canvas's order), then the 0% ones.
     const ordered = [...groups].sort((a, b) => (weighted ? Number(b.weight > 0) - Number(a.weight > 0) : 0) || (a.position || 0) - (b.position || 0));
     const GROUP_COLORS = ['#0a84ff', '#5856d6', '#ff2d55', '#ff9500', '#30b0c7', '#af52de', '#ff6b22', '#c8901c'];

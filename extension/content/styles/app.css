@@ -13,7 +13,7 @@
  * min(their own, the viewport less a margin). */
 
 html[data-bcv-theme] {
-  --bcv-version: "2.98.37"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.98.38"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -1428,7 +1428,7 @@ html[data-bcv-theme="dark"] .bcv-gpa__need--no { color: #ff8098; }
 .bcv-gpa-detail__list { border-radius: 16px; overflow: hidden; background: var(--bcv-fill2); }
 .bcv-gpa-detail__arow { display: flex; align-items: center; gap: 12px; padding: 11px 14px; border-top: 1px solid var(--bcv-sep); }
 .bcv-gpa-detail__arow:first-child { border-top: 0; }
-.bcv-gpa-detail__arow.is-link { cursor: pointer; border-radius: 10px; }
+.bcv-gpa-detail__arow.is-link { cursor: pointer; border-radius: 10px; text-decoration: none; } /* (the sheet hangs off the body, outside #bcv-app's own link rule: a row is a link, not underlined text) */
 .bcv-gpa-detail__arow.is-link:hover { background: var(--bcv-fill); }
 .bcv-gpa-detail__abody { flex: 1; min-width: 0; }
 .bcv-gpa-detail__aname { font: 600 13.5px/1.35 var(--bcv-font); }
@@ -4224,3 +4224,21 @@ html.bcv-phone .bcv-ph-search .bcv-omni__acts { display: flex; flex-wrap: wrap; 
 html.bcv-phone .bcv-ph-search .bcv-omni__act { height: 32px; padding: 0 12px; gap: 6px; border-radius: 10px; font-size: 13px; }
 html.bcv-phone .bcv-ph-search .bcv-omni__empty, html.bcv-phone .bcv-ph-search .bcv-omni__more { padding: 14px 12px; font-size: 15px; }
 html.bcv-phone .bcv-ph-screen:has(.bcv-ph-search .bcv-omni__panel:not([hidden])) > .bcv-ph-body { display: none; }
+/* (2.98.38) what-if: an assignment made up and put in a group (a category) — a dashed box over the list,
+   one row of fields that wraps; its row in the list carries a What-if tag and an X */
+.bcv-wfadd { margin: 0 0 12px; padding: 12px 14px; border: 1.5px dashed rgba(255,69,58,.45); border-radius: 16px; background: rgba(255,69,58,.05); display: flex; flex-direction: column; gap: 9px; }
+.bcv-wfadd__h { font: 600 13px/1.2 var(--bcv-font); color: var(--bcv-ink); }
+.bcv-wfadd__row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.bcv-wfadd .bcv-wfadd__group { flex: 1 1 150px; min-width: 0; max-width: 100%; }
+.bcv-wfadd .bcv-wfadd__name { flex: 1 1 120px; min-width: 0; width: auto; }
+.bcv-wfadd__pts { display: flex; align-items: center; gap: 6px; flex: none; }
+.bcv-wfadd .bcv-wfadd__num { width: 66px; padding: 0 10px; text-align: right; font-weight: 600; }
+.bcv-wfadd__of { font: 500 13px/1 var(--bcv-font); color: var(--bcv-ink3); }
+.bcv-wfadd__add { flex: none; height: 36px; }
+.bcv-wfadd__note { font: 400 12px/1.35 var(--bcv-font); color: var(--bcv-ink3); }
+.bcv-wfadd__note.is-err { color: var(--bcv-red); font-weight: 500; }
+.bcv-wfadd__rm { flex: none; width: 26px; height: 26px; border-radius: 13px; border: 0; padding: 0; display: flex; align-items: center; justify-content: center; background: var(--bcv-fill); color: var(--bcv-ink2) !important; cursor: pointer; }
+.bcv-wfadd__rm:hover, .bcv-wfadd__rm:focus-visible { background: rgba(255,69,58,.14); color: var(--bcv-red) !important; outline: none; }
+.bcv-row.is-wfadded { background: rgba(255,69,58,.04); }
+.bcv-gpa-detail__aname .bcv-badge { margin-left: 6px; vertical-align: 1px; }
+html.bcv-phone .bcv-wfadd .bcv-input, html.bcv-phone .bcv-wfadd .bcv-select { font-size: 16px; } /* (under 16px iOS zooms the page in on a tap) */

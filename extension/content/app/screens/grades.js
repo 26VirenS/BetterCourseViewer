@@ -2,7 +2,8 @@
  * total, one ring per assignment group with graded work, 0%-weight rings
  * stippled) beside the total, a By-group legend and the weight bar, then
  * the assignment list. What-if mode recolours it all gray and never leaves
- * the browser. Pressing a group (its legend row, its weight, its ring) picks
+ * the browser; in it an assignment can be made up and put in any group (a
+ * category), counted there with the group's weight. Pressing a group (its legend row, its weight, its ring) picks
  * it out: its ring, weight and assignments stay, the rest steps back. Each
  * graded assignment wears its letter, and the By letter slider (All · A · B ·
  * C · D · F) lists one letter's work alone. */
@@ -14,7 +15,7 @@
   const store = BCV.store;
   const NS = 'http://www.w3.org/2000/svg';
 
-  const whatIfState = new Map(); // courseId -> { on, values }
+  const whatIfState = new Map(); // courseId -> { on, values, added: [{ id, groupId, name, possible }], seq, addGroup }
 
   async function render(ctx, shell) {
     const c = shell.course;
@@ -24,8 +25,10 @@
     const groups = await store.assignmentGroups(c.id, { maxAge: store.freshness.grades }).catch(() => null); // never a score older than the freshness: a tool may have posted one since
     if (!ctx.alive()) return b;
     if (!groups) return b.replaceChildren(U.errorBox('Grades could not be loaded.')) || b;
-    const st = whatIfState.get(c.id) || { on: false, values: {} };
+    const st = whatIfState.get(c.id) || { on: false, values: {}, added: [], seq: 0, addGroup: null };
     whatIfState.set(c.id, st);
+    // the course's groups, as the what-if's "add an assignment" offers them (the categories the grade is weighted by)
+    const cats = groups.map((g) => ({ id: String(g.id), name: g.name, weight: Number(g.group_weight) || 0 }));
     const whatIfAllowed = (await store.pref('whatIfScores', true)) !== false; // Settings → Grades → Show what-if scores
     if (!whatIfAllowed) st.on = false;
     let focusId = null;
@@ -35,6 +38,9 @@
     let gm = null;
     const pickNote = h('span', { class: 'bcv-group__sub bcv-ml-auto bcv-gr__picknote' });
     function notePick(pick) {
+      // in what-if mode the group pressed is the one a made-up assignment goes into
+      const addSel = b.querySelector('.bcv-wfadd__group');
+      if (pick && addSel && addSel.value !== pick && [...addSel.options].some((o) => o.value === pick)) { addSel.value = pick; addSel.dispatchEvent(new Event('change')); }
       const name = pick && gm ? (gm.legend.find((r) => r.id === pick)?.label ?? gm.ungraded.find((u) => u.id === pick)?.name) : null;
       if (!name) { pickNote.replaceChildren('Arranged by due date'); return; }
       const n = gm.rows.filter((r) => r.groupId === pick).length;
@@ -48,13 +54,13 @@
     const picker = U.groupPicker(b, pickSt, { onChange: notePick });
 
     function draw() {
-      gm = store.gradeModel(groups, c, st.values, st.on, dark);
+      gm = store.gradeModel(groups, c, st.values, st.on, dark, st.added);
       const parts = [];
       if (st.on) {
         parts.push(U.el('bcv-banner', [
           U.svg(IC.warn, { size: 24, stroke: 'var(--bcv-red)', width: 2, style: { flex: 'none' } }),
-          h('div', { style: { flex: '1', minWidth: '200px' } }, [U.text('bcv-banner__title', 'This is not your actual score.'), U.text('bcv-banner__sub', 'What-if mode — your real scores are loaded in; edit any of them to test outcomes. Nothing is saved or sent to your instructor.')]),
-          U.btn('Clear all what-if scores', { kind: 'danger', onClick: () => { st.values = {}; draw(); } }),
+          h('div', { style: { flex: '1', minWidth: '200px' } }, [U.text('bcv-banner__title', 'This is not your actual score.'), U.text('bcv-banner__sub', 'What-if mode — your real scores are loaded in; edit any of them, or add an assignment to a category, to test outcomes. Nothing is saved or sent to your instructor.')]),
+          U.btn('Clear all what-if scores', { kind: 'danger', onClick: () => { st.values = {}; st.added = []; draw(); } }),
         ]));
       }
 
@@ -169,15 +175,17 @@
         const band = U.gradeBand(g.effective, g.possible, g.gradingType);
         const row = U.row([
           U.el('bcv-row__body', [
-            h('div', { style: { display: 'flex', alignItems: 'baseline', gap: '8px', flexWrap: 'wrap' } }, [U.text('bcv-grade__name bcv-pretty', g.name, 'span'), g.badge ? U.badge(g.badge, g.badge === 'Late' ? 'orange' : g.badge === 'Missing' ? 'red' : '', 'bcv-badge--xs') : null]),
+            h('div', { style: { display: 'flex', alignItems: 'baseline', gap: '8px', flexWrap: 'wrap' } }, [U.text('bcv-grade__name bcv-pretty', g.name, 'span'), g.added ? U.badge('What-if', 'red', 'bcv-badge--xs') : g.badge ? U.badge(g.badge, g.badge === 'Late' ? 'orange' : g.badge === 'Missing' ? 'red' : '', 'bcv-badge--xs') : null]),
             // the group, the dates, and — on a marked assignment — how the class did (Canvas's own mean, high and low)
-            U.text('bcv-row__sub', [g.group, g.due ? `due ${U.fmtBy(g.due)}` : 'no due date', g.submitted ? `submitted ${U.fmtAt(g.submitted)}` : (g.due && U.parse(g.due) > new Date() ? 'not due yet' : 'not submitted'), g.stats && g.earned !== null ? `class mean ${store.fmtPts(g.stats.mean)} · high ${store.fmtPts(g.stats.max)} · low ${store.fmtPts(g.stats.min)}` : null].filter(Boolean).join(' · ')),
+            U.text('bcv-row__sub', g.added ? `${g.group} · made up to test, not in Canvas` : [g.group, g.due ? `due ${U.fmtBy(g.due)}` : 'no due date', g.submitted ? `submitted ${U.fmtAt(g.submitted)}` : (g.due && U.parse(g.due) > new Date() ? 'not due yet' : 'not submitted'), g.stats && g.earned !== null ? `class mean ${store.fmtPts(g.stats.mean)} · high ${store.fmtPts(g.stats.max)} · low ${store.fmtPts(g.stats.min)}` : null].filter(Boolean).join(' · ')),
           ]),
           dotEl,
           U.bandChip(band, band ? `${store.fmtPts(Math.round((g.effective / g.possible) * 1000) / 10)}% · ${band}` : null),
           scoreEl,
+          g.added ? U.whatIfRemove(g.name, () => { st.added = st.added.filter((x) => x.id !== g.id); delete st.values[g.id]; draw(); }) : null,
           g.url ? U.chev() : null,
         ], { href: g.url || null });
+        if (g.added) row.classList.add('is-wfadded');
         row.dataset.band = band || '';
         row.dataset.group = g.groupId; // (the group it counts toward: picked out with it)
         row.style.setProperty('--bcv-grp', colorOf(g.groupId) || 'var(--bcv-ink3)');
@@ -195,8 +203,24 @@
             : U.emptyCard(`No ${band} grades in this course${st.on ? ' with these what-if scores' : ''}.`));
       };
       paintList();
+      // what-if: an assignment made up and put in a group of the student's choosing, counted there like the rest
+      const adder = st.on && cats.length ? U.whatIfAdder(cats, {
+        group: st.addGroup ?? pickSt.pick, weighted: gm.weighted, n: st.seq + 1,
+        onGroup: (id) => { st.addGroup = id; },
+        onAdd: ({ groupId, name, score, possible }) => {
+          st.seq += 1;
+          const id = `wf-${st.seq}`;
+          st.added.push({ id, groupId, name, possible });
+          st.values[id] = String(score);
+          st.addGroup = groupId;
+          bandSt.band = 'all'; // (the new row in view, whatever letter it lands on)
+          draw();
+          b.querySelector('.bcv-wfadd__name')?.focus(); // (ready for the next)
+        },
+      }) : null;
       const tableCard = h('div', {}, [
         U.el('bcv-group__head bcv-group__head--10', [U.h2('Assignments'), pickNote]),
+        adder,
         Object.keys(counts).length ? U.el('bcv-gr__bandrow', [
           U.text('bcv-gr__bandlbl', 'By letter', 'span'),
           U.bandSlider(counts, bandSt.band, (b) => { bandSt.band = b; paintList(); picker.apply(); }),

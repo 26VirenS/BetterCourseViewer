@@ -1061,8 +1061,54 @@
     return wrap;
   }
 
+  /** What-if mode's "add an assignment": a piece of work made up to test, put in one of the course's
+   *  groups (the categories its grade is weighted by), with a score out of its points. It counts in
+   *  that group like any scored work there — its weight, its drop rules — and nothing leaves the page:
+   *  onAdd({ groupId, name, score, possible }). `groups`: [{ id, name, weight }]; `group` the one
+   *  chosen first (the last one used, or the group picked out); onGroup(id) as the choice changes. */
+  function whatIfAdder(groups, { group = null, weighted = false, n = 1, onAdd, onGroup = null } = {}) {
+    const label = (g) => (weighted ? `${g.name} · ${g.weight}%` : g.name);
+    const sel = h('select', { class: 'bcv-select bcv-wfadd__group', 'aria-label': 'Category' }, groups.map((g) => h('option', { value: g.id, text: label(g) })));
+    if (group !== null && groups.some((g) => g.id === String(group))) sel.value = String(group);
+    const fallback = `What-if ${n}`;
+    const name = h('input', { type: 'text', class: 'bcv-input bcv-wfadd__name', placeholder: fallback, maxlength: '80', 'aria-label': 'Assignment name' });
+    const score = h('input', { type: 'text', inputmode: 'decimal', class: 'bcv-input bcv-wfadd__num', placeholder: 'Score', 'aria-label': 'Score' });
+    const possible = h('input', { type: 'text', inputmode: 'decimal', class: 'bcv-input bcv-wfadd__num', value: '100', 'aria-label': 'Points possible' });
+    const note = text('bcv-wfadd__note', '');
+    const describe = () => {
+      const g = groups.find((x) => x.id === sel.value);
+      note.classList.remove('is-err');
+      note.textContent = !g ? '' : weighted ? (g.weight ? `Counts in ${g.name}, ${g.weight}% of the grade.` : `Counts in ${g.name}, which carries no weight.`) : `Counts in ${g.name}, by its points.`;
+    };
+    const num = (f) => { const v = String(f.value).replace(/[^0-9.]/g, ''); const x = v === '' ? NaN : Number(v); return Number.isFinite(x) ? x : NaN; };
+    const say = (msg, f) => { note.textContent = msg; note.classList.add('is-err'); f.focus(); };
+    const add = () => {
+      const p = num(possible), sc = num(score);
+      if (!(p > 0)) { say('Give it the points it is out of.', possible); return; }
+      if (!(sc >= 0)) { say('Give it a score to test.', score); return; }
+      onAdd({ groupId: sel.value, name: name.value.trim() || fallback, score: sc, possible: p });
+    };
+    sel.addEventListener('change', () => { describe(); onGroup?.(sel.value); });
+    for (const f of [name, score, possible]) f.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } });
+    describe();
+    return el('bcv-wfadd', [
+      text('bcv-wfadd__h', 'Add a what-if assignment'),
+      el('bcv-wfadd__row', [
+        sel, name,
+        el('bcv-wfadd__pts', [score, text('bcv-wfadd__of', '/', 'span'), possible, text('bcv-wfadd__of', 'pts', 'span')]),
+        btn('Add', { kind: 'primary', icon: IC.plus, iconColor: '#fff', cls: 'bcv-wfadd__add', onClick: add }),
+      ]),
+      note,
+    ]);
+  }
+  /** The X on a what-if assignment's row: it goes, and the grade with it (the row's own press is not a press on this). */
+  const whatIfRemove = (name, onRemove) => h('button', {
+    type: 'button', class: 'bcv-wfadd__rm', 'aria-label': `Remove ${name}`, title: 'Remove this what-if assignment',
+    onclick: (e) => { e.preventDefault(); e.stopPropagation(); onRemove(); },
+  }, svg(IC.close, { size: 11, stroke: 'currentColor', width: 2.4 }));
+
   BCV.ui = {
-    groupPicker, groupAttrs, BANDS, gradeBand, bandChip, bandSlider,
+    groupPicker, groupAttrs, BANDS, gradeBand, bandChip, bandSlider, whatIfAdder, whatIfRemove,
     svg, star, chev, el, text, tile, dot, card, row, label, h2, groupHead, badge, statusBadge, seg, search, switchEl, btn, iconbtn, pill, placeDot,
     empty, emptyCard, loading, errorBox, hint, avatar, toast, menu, closeMenus, picker, colorMenu, COURSE_COLORS, fmtDay, datePop, dateField, promptSheet, askSheet,
     DAY, startOfDay, addDays, sameDay, dayDiff, startOfWeek, parse, MONTHS, MONTHS_LONG, DAYS, DAYS_LONG,
