@@ -1003,8 +1003,66 @@
     return a;
   }
 
+  /* ---- graded work by letter (the Grades tab, the Grades page and its Details) ---------------------
+   * An item's letter is the base letter of the Grades page's scale (gpa.js SCALE: A from 90%, B from
+   * 80%, C from 70%, D from 60%, F under) for its score over its points. Work with no score, no
+   * points or no letter to give (pass/fail, not graded) has none. */
+  const BANDS = ['A', 'B', 'C', 'D', 'F'];
+  function gradeBand(score, possible, gradingType = null) {
+    if (score === null || score === undefined || !(Number(possible) > 0) || gradingType === 'pass_fail' || gradingType === 'not_graded') return null;
+    const pct = (Number(score) / Number(possible)) * 100;
+    if (!Number.isFinite(pct)) return null;
+    const letter = BCV.screens?.gpa?.letterFor?.(pct)?.[0] || (pct >= 90 ? 'A' : pct >= 80 ? 'B' : pct >= 70 ? 'C' : pct >= 60 ? 'D' : 'F');
+    return letter[0];
+  }
+  /** An item's letter, a small tag in the band's colour (an empty one keeps the column when there is none). */
+  function bandChip(band, title = null) {
+    return h('span', { class: `bcv-bandchip ${band ? `bcv-band--${band}` : 'is-empty'}`, text: band || '', title: band ? title : null, 'aria-hidden': band ? null : 'true' });
+  }
+  /** The slider: All · A · B · C · D · F, each stop with how many items it holds. Pressed, dragged
+   *  across, or moved with the arrow keys; onChange(band) with 'all' or a letter. */
+  function bandSlider(counts, value, onChange, { label = 'Show grades by letter' } = {}) {
+    const total = BANDS.reduce((n, b) => n + (counts[b] || 0), 0);
+    const stops = [['all', 'All', total], ...BANDS.map((b) => [b, b, counts[b] || 0])];
+    const wrap = el('bcv-bands', null, { role: 'radiogroup', 'aria-label': label });
+    wrap.append(h('span', { class: 'bcv-bands__thumb', 'aria-hidden': 'true' }));
+    const btns = stops.map(([key, text, n]) => h('button', {
+      type: 'button', role: 'radio', class: `bcv-bands__stop bcv-band--${key} ${n ? '' : 'is-none'}`, dataset: { band: key },
+      'aria-label': `${key === 'all' ? 'All grades' : `${key} grades`}: ${n}`,
+      onclick: () => { if (key !== value) set(key, true); },
+    }, [h('span', { class: 'bcv-bands__l', text }), h('span', { class: 'bcv-bands__n', text: String(n) })]));
+    wrap.append(...btns);
+    function set(key, fire) {
+      const i = Math.max(0, stops.findIndex((st) => st[0] === key));
+      value = stops[i][0];
+      wrap.style.setProperty('--i', String(i));
+      wrap.dataset.band = value;
+      btns.forEach((b, j) => { b.classList.toggle('is-active', j === i); b.setAttribute('aria-checked', j === i ? 'true' : 'false'); b.tabIndex = j === i ? 0 : -1; });
+      if (fire) onChange(value);
+    }
+    // a slider: pressed anywhere along it, or dragged across it, it takes the stop under the pointer
+    const stopAt = (x) => { const r = wrap.getBoundingClientRect(); return stops[Math.max(0, Math.min(stops.length - 1, Math.floor(((x - r.left) / r.width) * stops.length)))][0]; };
+    let drag = false;
+    wrap.addEventListener('pointerdown', (e) => { if (e.button !== 0) return; drag = true; try { wrap.setPointerCapture(e.pointerId); } catch {} const k = stopAt(e.clientX); if (k !== value) set(k, true); });
+    wrap.addEventListener('pointermove', (e) => { if (!drag) return; const k = stopAt(e.clientX); if (k !== value) set(k, true); });
+    const end = () => { if (!drag) return; drag = false; btns.find((b) => b.dataset.band === value)?.focus({ preventScroll: true }); };
+    wrap.addEventListener('pointerup', end);
+    wrap.addEventListener('pointercancel', end);
+    wrap.addEventListener('keydown', (e) => {
+      const i = stops.findIndex((st) => st[0] === value);
+      const to = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? i + 1 : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? i - 1 : e.key === 'Home' ? 0 : e.key === 'End' ? stops.length - 1 : null;
+      if (to === null) return;
+      e.preventDefault();
+      const k = stops[Math.max(0, Math.min(stops.length - 1, to))][0];
+      if (k !== value) set(k, true);
+      btns.find((b) => b.dataset.band === value)?.focus();
+    });
+    set(value, false);
+    return wrap;
+  }
+
   BCV.ui = {
-    groupPicker, groupAttrs,
+    groupPicker, groupAttrs, BANDS, gradeBand, bandChip, bandSlider,
     svg, star, chev, el, text, tile, dot, card, row, label, h2, groupHead, badge, statusBadge, seg, search, switchEl, btn, iconbtn, pill, placeDot,
     empty, emptyCard, loading, errorBox, hint, avatar, toast, menu, closeMenus, picker, colorMenu, COURSE_COLORS, fmtDay, datePop, dateField, promptSheet, askSheet,
     DAY, startOfDay, addDays, sameDay, dayDiff, startOfWeek, parse, MONTHS, MONTHS_LONG, DAYS, DAYS_LONG,

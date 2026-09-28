@@ -1193,6 +1193,13 @@ try {
   await page.waitForFunction(() => !document.querySelector('.bcv-gpa__card .bcv-ring--unfill') && !document.querySelector('.bcv-gpa__card .bcv-gpa__ringletter').hidden, null, { timeout: 3000 });
   check((await page.$eval('.bcv-gpa__card .bcv-gpa__ringletter', (e) => getComputedStyle(e).animationName)) === 'bcv-fade-in' && (await page.$$('.bcv-gpa__card .bcv-gpa__cats circle')).length === 0, 'and once they have gone the rings are cleared and the letter fades back in');
   await shot(page, '09d-grades-panel');
+  // Item grades (2.98.35): every graded assignment across the courses, by letter
+  const itemsAll = await page.evaluate(() => ({ stops: Object.fromEntries([...document.querySelectorAll('.bcv-gpa__items .bcv-bands__stop')].map((e) => [e.dataset.band, Number(e.querySelector('.bcv-bands__n').textContent)])), rows: document.querySelectorAll('.bcv-gpa__items .bcv-row').length, more: document.querySelector('.bcv-gpa__itemsmore')?.textContent || '' }));
+  await page.click('.bcv-gpa__items .bcv-bands__stop[data-band="F"]');
+  const itemsF = await page.$$eval('.bcv-gpa__items .bcv-row', (els) => els.map((r) => ({ chip: r.querySelector('.bcv-bandchip')?.textContent, sub: r.querySelector('.bcv-row__sub')?.textContent || '', href: r.getAttribute('href') || '' })));
+  await page.click('.bcv-gpa__items .bcv-bands__stop[data-band="all"]');
+  const itemsSum = ['A', 'B', 'C', 'D', 'F'].reduce((n, b) => n + (itemsAll.stops[b] || 0), 0);
+  check(itemsAll.stops.all === itemsSum && itemsSum >= 5 && itemsAll.rows === Math.min(itemsSum, 12) && (itemsSum > 12 ? itemsAll.more === `Show all ${itemsSum}` : !itemsAll.more) && itemsF.length === itemsAll.stops.F && itemsF.every((r) => r.chip === 'F' && /^F26-[A-Z]+ \d+/.test(r.sub) && /\d+(\.\d)?%$/.test(r.sub) && /\/courses\/\d+\/assignments\/\d+$/.test(r.href)), `Item grades: every graded assignment across the courses by letter, each naming its course and opening itself: ${JSON.stringify({ stops: itemsAll.stops, rows: itemsAll.rows, F: itemsF.map((r) => r.sub) })}`);
   // Details: the course's grade page in a sheet, with the target stepper
   await page.click('.bcv-gpa__card .bcv-gpa__details');
   await page.waitForSelector('.bcv-gpa-detail', { timeout: 5000 });
@@ -1208,6 +1215,13 @@ try {
   await page.keyboard.press('Escape');
   const sheetEsc = await page.evaluate(() => ({ open: !!document.querySelector('.bcv-gpa-detail'), has: !!document.querySelector('.bcv-gpa-detail.has-pick'), note: document.querySelector('.bcv-gpa-detail__picknote')?.textContent }));
   check(sheetPick.has && sheetPick.rows.length === 8 && sheetPick.rows.every((g) => g === 'Effort') && sheetPick.dim === 9 && sheetPick.rings === 2 && sheetPick.note === 'Effort · 8 assignmentsShow all' && sheetEsc.open && !sheetEsc.has && sheetEsc.note === 'Blue dot means graded', `the details sheet: a group pressed picks out its ring and assignments, Escape lets it go and leaves the sheet open: ${JSON.stringify({ sheetPick, sheetEsc })}`);
+  // By letter in the sheet too (2.98.35)
+  const sheetStops = await page.$$eval('.bcv-gpa-detail .bcv-bands__stop', (els) => Object.fromEntries(els.map((e) => [e.dataset.band, Number(e.querySelector('.bcv-bands__n').textContent)])));
+  await page.click('.bcv-gpa-detail .bcv-bands__stop[data-band="A"]');
+  const sheetA = await page.$$eval('.bcv-gpa-detail__arow', (els) => els.map((r) => r.querySelector('.bcv-bandchip')?.textContent));
+  await page.click('.bcv-gpa-detail .bcv-bands__stop[data-band="all"]');
+  const sheetAll = (await page.$$('.bcv-gpa-detail__arow')).length;
+  check(sheetStops.A >= 1 && sheetA.length === sheetStops.A && sheetA.every((c) => c === 'A') && sheetAll === 17, `the details sheet's By letter lists one letter's work alone: ${JSON.stringify({ sheetStops, sheetA, sheetAll })}`);
   // the Grades page lists the same assignments, and they open the same way the course page's do
   const gpaRow = await page.$eval('.bcv-gpa-detail__arow', (e) => ({ tag: e.tagName, href: e.getAttribute('href'), name: e.querySelector('.bcv-gpa-detail__aname')?.textContent }));
   check(gpaRow.tag === 'A' && /\/courses\/\d+\/assignments\/\d+$/.test(gpaRow.href || ''), `a row on the Grades page opens the assignment it is about: ${JSON.stringify(gpaRow)}`);
@@ -1931,6 +1945,36 @@ try {
   await page.click('.bcv-gr__pickchip');
   const pickAll = await pickState();
   check(!pickAgain.has && pickAgain.note === 'Arranged by due date' && pickKey.has && pickKey.pressed === 'true' && !pickEsc.has && !pickAll.has && pickAll.dim === 0 && pickAll.note === 'Arranged by due date', `pressed again, Show all or Escape lets it go; Enter picks from the keyboard: ${JSON.stringify({ pickAgain: pickAgain.has, pickKey: pickKey.legend, pickEsc: pickEsc.has, pickAll: pickAll.has })}`);
+  // By letter (2.98.35): every graded row wears its letter (A from 90%, B 80, C 70, D 60, F under), the
+  // slider counts them, and a stop — pressed, dragged to, or reached with the keys — lists that letter's work alone
+  const letterOf = (pct) => (pct >= 90 ? 'A' : pct >= 80 ? 'B' : pct >= 70 ? 'C' : pct >= 60 ? 'D' : 'F');
+  const bandRows = () => page.$$eval('.bcv-grades__main .bcv-row', (els) => els.map((r) => ({ chip: r.querySelector('.bcv-bandchip')?.textContent || '', score: r.querySelector('.bcv-grade__score')?.textContent || '' })));
+  const bandStops = () => page.$$eval('.bcv-grades__main .bcv-bands__stop', (els) => Object.fromEntries(els.map((e) => [e.dataset.band, Number(e.querySelector('.bcv-bands__n').textContent)])));
+  const activeStop = () => page.$eval('.bcv-grades__main .bcv-bands', (e) => e.dataset.band);
+  const allBand = await bandRows();
+  const chipCounts = {};
+  for (const r of allBand) if (r.chip) chipCounts[r.chip] = (chipCounts[r.chip] || 0) + 1;
+  const stopsAll = await bandStops();
+  const chipsRight = allBand.every(({ chip, score }) => { const m = score.match(/([\d.]+) \/ ([\d.]+)$/); return m ? chip === letterOf((Number(m[1]) / Number(m[2])) * 100) : chip === ''; });
+  check(chipsRight && allBand.filter((r) => r.chip).length >= 5 && ['A', 'B', 'C', 'D', 'F'].every((b) => stopsAll[b] === (chipCounts[b] || 0)) && stopsAll.all === allBand.filter((r) => r.chip).length && (await activeStop()) === 'all', `each graded row wears its letter and the slider counts them: ${JSON.stringify({ stopsAll, chips: allBand.map((r) => r.chip || '-').join('') })}`);
+  await page.click('.bcv-grades__main .bcv-bands__stop[data-band="B"]');
+  const onlyB = await bandRows();
+  await shot(page, '16c-course-grades-letter');
+  const bandBox = await page.$eval('.bcv-grades__main .bcv-bands', (e) => { const r = e.getBoundingClientRect(); return { x: r.left, y: r.top + r.height / 2, w: r.width }; });
+  await page.mouse.move(bandBox.x + bandBox.w * (2.5 / 6), bandBox.y);
+  await page.mouse.down();
+  for (let k = 3; k <= 5.5; k += 0.5) await page.mouse.move(bandBox.x + bandBox.w * (k / 6), bandBox.y);
+  await page.mouse.up();
+  const dragged = { band: await activeStop(), rows: await bandRows(), i: await page.$eval('.bcv-grades__main .bcv-bands', (e) => e.style.getPropertyValue('--i')) };
+  await page.keyboard.press('ArrowLeft');
+  const keyed = await activeStop();
+  await page.click('.bcv-grades__main .bcv-bands__stop[data-band="C"]');
+  const noneC = { stop: stopsAll.C, text: (await texts('.bcv-grades__main .bcv-card--empty')).join(' | ') };
+  await page.focus('.bcv-grades__main .bcv-bands__stop[data-band="C"]');
+  await page.keyboard.press('Home');
+  const home = { band: await activeStop(), rows: (await bandRows()).length };
+  check(onlyB.length === stopsAll.B && onlyB.every((r) => r.chip === 'B') && dragged.band === 'F' && dragged.i === '5' && dragged.rows.length === stopsAll.F && dragged.rows.every((r) => r.chip === 'F') && keyed === 'D' && home.band === 'all' && home.rows === allBand.length, `a stop lists its letter's work alone — pressed, dragged across the slider, or moved with the keys: ${JSON.stringify({ B: onlyB.length, dragged: dragged.band, i: dragged.i, keyed, home })}`);
+  check(stopsAll.C > 0 || /No C grades in this course\./.test(noneC.text), `a letter with no work says so: ${JSON.stringify(noneC)}`);
   await page.click('.bcv-whatif-btn');
   await page.waitForSelector('.bcv-banner', { timeout: 5000 });
   check((await texts('.bcv-banner__title'))[0] === 'This is not your actual score.', 'what-if banner');

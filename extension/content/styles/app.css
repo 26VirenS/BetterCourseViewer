@@ -13,7 +13,7 @@
  * min(their own, the viewport less a margin). */
 
 html[data-bcv-theme] {
-  --bcv-version: "2.98.34"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.98.35"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -1246,6 +1246,26 @@ html.bcv-phone .bcv-rubg__cellpts { font-size: 19px; }
 .bcv-gr__pickname { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--bcv-ink); } /* (on the words: #bcv-app button inherits its colour) */
 .bcv-gr__pickall { display: inline-flex; align-items: center; height: 18px; padding: 0 8px; border-radius: 9px; font: 600 11px/1 var(--bcv-font); color: var(--bcv-ink2); background: var(--bcv-card); }
 .bcv-gr__pickchip:hover .bcv-gr__pickall { color: var(--bcv-ink); }
+/* graded work by letter (U.gradeBand, U.bandSlider): A from 90%, B from 80%, C from 70%, D from 60%, F
+   under — a tag in the letter's colour on each graded item, and the slider that lists one letter's work */
+.bcv-band--A { --bcv-band: #34c759; } .bcv-band--B { --bcv-band: #0a84ff; } .bcv-band--C { --bcv-band: #e0a800; } .bcv-band--D { --bcv-band: #ff9500; } .bcv-band--F { --bcv-band: #ff3b30; } .bcv-band--all { --bcv-band: var(--bcv-ink); }
+.bcv-bandchip { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 20px; border-radius: 6px; font: 700 11.5px/1 var(--bcv-font); color: color-mix(in srgb, var(--bcv-band) 70%, var(--bcv-ink)); background: color-mix(in srgb, var(--bcv-band) 16%, transparent); }
+.bcv-bandchip.is-empty { visibility: hidden; }
+.bcv-gr__bandrow { display: flex; align-items: center; gap: 12px; margin: -2px 0 10px; }
+.bcv-gr__bandlbl { flex: none; font: 600 10.5px/1.2 var(--bcv-font); color: var(--bcv-ink3); text-transform: uppercase; letter-spacing: .06em; }
+.bcv-bands { position: relative; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); flex: 0 1 420px; min-width: 0; padding: 3px; border-radius: 12px; background: var(--bcv-fill); user-select: none; -webkit-user-select: none; touch-action: none; cursor: pointer; }
+.bcv-bands__thumb { position: absolute; top: 3px; bottom: 3px; left: 3px; width: calc((100% - 6px) / 6); border-radius: 9px; background: var(--bcv-card); box-shadow: var(--bcv-shadow); transform: translateX(calc(var(--i, 0) * 100%)); transition: transform var(--bcv-t, .28s) var(--bcv-ease); pointer-events: none; }
+.bcv-bands__stop { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 0; padding: 6px 0 5px; border: 0; border-radius: 9px; background: transparent; cursor: pointer; font: inherit; }
+.bcv-bands__l { font: 700 13px/1 var(--bcv-font); color: color-mix(in srgb, var(--bcv-band) 70%, var(--bcv-ink)); }
+.bcv-bands__n { font: 500 10.5px/1 var(--bcv-font); color: var(--bcv-ink3); font-variant-numeric: tabular-nums; }
+.bcv-bands__stop.is-none:not(.is-active) .bcv-bands__l { opacity: .4; }
+.bcv-bands__stop.is-active .bcv-bands__n { color: var(--bcv-ink2); }
+.bcv-bands__stop:focus-visible { outline: 2px solid var(--bcv-blue); outline-offset: -2px; }
+.bcv-gpa-detail__sec .bcv-gr__bandrow { margin: 2px 0 8px; }
+.bcv-gpa__items .bcv-gr__bandrow { margin-top: 0; }
+.bcv-gpa__itemsmore { display: block; width: 100%; padding: 12px 18px; border: 0; border-top: 1px solid var(--bcv-sep); background: transparent; cursor: pointer; font: 600 13px/1.2 var(--bcv-font); color: var(--bcv-blue) !important; text-align: left; }
+.bcv-gpa__itemsmore:hover { background: var(--bcv-fill); }
+@media (prefers-reduced-motion: reduce) { .bcv-bands__thumb { transition: none; } }
 .bcv-grade__name { font: 600 14.5px/1.35 var(--bcv-font); }
 .bcv-grade__score { flex: none; font: 600 14px/1.2 var(--bcv-font); min-width: 70px; text-align: right; cursor: text; border-radius: 7px; padding: 3px 5px; margin: -3px -5px; }
 .bcv-grade__score:hover { background: var(--bcv-fill2); }

@@ -425,6 +425,46 @@
         cards.length ? U.el('bcv-gpa__grid', cards.map((r, i) => U.enter(courseCard(r, i), i, 55))) : U.emptyCard(m.hiddenList.length ? 'Every course is hidden.' : 'No current courses.'),
       ]);
     }
+    /** Item grades: every graded assignment across the courses shown, by letter — the slider lists one
+     *  letter's work alone, course by course in the cards' order, each course's by due date. */
+    const itemSt = { band: 'all', more: false };
+    const ITEMS_AT_ONCE = 12;
+    function itemGrades() {
+      const items = [];
+      for (const c of courses) {
+        if (hidden.has(String(c.id))) continue;
+        for (const g of gmFor(c).rows) {
+          const band = U.gradeBand(g.earned, g.possible, g.gradingType);
+          if (band) items.push({ c, g, band, pct: (g.earned / g.possible) * 100 });
+        }
+      }
+      if (!items.length) return null;
+      const counts = {};
+      for (const it of items) counts[it.band] = (counts[it.band] || 0) + 1;
+      const host = h('div');
+      const paint = () => {
+        const pick = itemSt.band === 'all' ? items : items.filter((it) => it.band === itemSt.band);
+        const n = itemSt.more ? pick.length : Math.min(pick.length, ITEMS_AT_ONCE);
+        const rows = pick.slice(0, n).map(({ c, g, band, pct }) => U.row([
+          h('span', { class: 'bcv-dot bcv-dot--7', style: { background: c.color }, title: c.shortName || c.name }),
+          U.el('bcv-row__body', [
+            U.text('bcv-grade__name bcv-pretty', g.name),
+            U.text('bcv-row__sub', [c.shortName || c.name, g.group, `${store.fmtPts(Math.round(pct * 10) / 10)}%`].join(' · ')),
+          ]),
+          U.bandChip(band, `${store.fmtPts(Math.round(pct * 10) / 10)}% · ${band}`),
+          h('span', { class: 'bcv-grade__score', text: `${g.grade ? `${g.grade} · ` : ''}${store.fmtPts(g.earned)} / ${store.fmtPts(g.possible)}` }),
+          g.url ? U.chev() : null,
+        ], { href: g.url || null, cls: 'bcv-gpa__item' }));
+        const more = pick.length > n ? h('button', { type: 'button', class: 'bcv-gpa__itemsmore', text: `Show all ${pick.length}`, onclick: () => { itemSt.more = true; paint(); } }) : null;
+        host.replaceChildren(pick.length ? U.card([...rows, more].filter(Boolean), 'bcv-card--list') : U.emptyCard(`No ${itemSt.band} grades in your courses.`));
+      };
+      paint();
+      return h('div', { class: 'bcv-gpa__items' }, [
+        U.el('bcv-group__head', [U.h2('Item grades'), U.text('bcv-group__sub bcv-ml-auto', 'Every graded assignment, by letter', 'span')]),
+        U.el('bcv-gr__bandrow', [U.bandSlider(counts, itemSt.band, (b) => { itemSt.band = b; itemSt.more = false; paint(); })]),
+        host,
+      ]);
+    }
     function hiddenTray(m) {
       if (!m.hiddenList.length) return null;
       return U.el('bcv-gpa__tray', [
@@ -466,6 +506,7 @@
       // a group picked out (U.groupPicker): pressing a group, its weight or its ring keeps it and its
       // assignments in view and steps the rest back; kept across repaints, Escape lets it go first
       const pickSt = { pick: null };
+      const bandSt = { band: 'all' }; // the By letter slider's stop, kept across repaints
       let gmNow = null;
       const colorOf = (id) => gmNow?.legend.find((r) => r.id === id)?.color || gmNow?.weightBar.find((w) => w.id === id)?.color || null;
       const picker = U.groupPicker(sheet, pickSt, {
@@ -580,23 +621,43 @@
           wrap.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); }); // typing a what-if is not opening the row
           return wrap;
         };
-        const list = U.el('bcv-gpa-detail__sec bcv-gpa-detail__sec--line', [
-          U.el('bcv-gpa-detail__hrow', [U.text('bcv-gpa__kicker2', 'Assignments', 'span'), U.text('bcv-gpa-detail__hsub bcv-gpa-detail__picknote', wf.on ? 'Change any score to test it' : 'Blue dot means graded', 'span'), whatIfBtn]),
-          banner,
-          // every row opens the assignment it is a line about, the same as on the course's own Grades
-          // page: a grade is the start of a question, and the answer is on that page
-          gm.rows.length ? U.el('bcv-gpa-detail__list', gm.rows.map((g) => h(g.url ? 'a' : 'div', {
+        // every row opens the assignment it is a line about, the same as on the course's own Grades
+        // page: a grade is the start of a question, and the answer is on that page. Each graded one
+        // wears its letter (U.gradeBand), and the By letter slider lists one letter's work alone.
+        const arows = gm.rows.map((g) => {
+          const band = U.gradeBand(g.effective, g.possible, g.gradingType);
+          return h(g.url ? 'a' : 'div', {
             class: `bcv-gpa-detail__arow ${g.url ? 'is-link' : ''}`,
             href: g.url || null,
             'data-group': g.groupId, // (the group it counts toward: picked out with it)
+            'data-band': band || '',
             style: { ...(g.url ? { color: 'inherit' } : {}), '--bcv-grp': colorOf(g.groupId) || 'var(--bcv-ink3)' },
             onclick: g.url ? () => close() : null, // the sheet belongs to the page being left
           }, [
             h('span', { class: 'bcv-gpa__catdot', style: { background: g.earned !== null ? '#0a84ff' : 'transparent' } }),
             U.el('bcv-gpa-detail__abody', [U.text('bcv-gpa-detail__aname bcv-pretty', g.name), U.text('bcv-gpa-detail__agroup', `${g.group}${g.badge ? ` · ${g.badge}` : ''}`)]),
+            U.bandChip(band, band ? `${store.fmtPts(Math.round((g.effective / g.possible) * 1000) / 10)}% · ${band}` : null),
             scoreOf(g),
             g.url ? U.chev() : null,
-          ]))) : U.text('bcv-gpa-detail__note', 'No assignments in this course.'),
+          ]);
+        });
+        const counts = {};
+        for (const r of arows) if (r.dataset.band) counts[r.dataset.band] = (counts[r.dataset.band] || 0) + 1;
+        const listEl = U.el('bcv-gpa-detail__list');
+        const fillList = () => {
+          const band = bandSt.band;
+          const shown = band === 'all' ? arows : arows.filter((r) => r.dataset.band === band);
+          listEl.replaceChildren(...(shown.length ? shown : [U.text('bcv-gpa-detail__note', `No ${band} grades in this course${wf.on ? ' with these what-if scores' : ''}.`)]));
+        };
+        fillList();
+        const list = U.el('bcv-gpa-detail__sec bcv-gpa-detail__sec--line', [
+          U.el('bcv-gpa-detail__hrow', [U.text('bcv-gpa__kicker2', 'Assignments', 'span'), U.text('bcv-gpa-detail__hsub bcv-gpa-detail__picknote', wf.on ? 'Change any score to test it' : 'Blue dot means graded', 'span'), whatIfBtn]),
+          Object.keys(counts).length ? U.el('bcv-gr__bandrow', [
+            U.text('bcv-gr__bandlbl', 'By letter', 'span'),
+            U.bandSlider(counts, bandSt.band, (b) => { bandSt.band = b; fillList(); picker.apply(); }),
+          ]) : null,
+          banner,
+          gm.rows.length ? listEl : U.text('bcv-gpa-detail__note', 'No assignments in this course.'),
         ]);
         // one steady size, the scrolling inside it: the breakdown and the weights on the left with the
         // way to the course's page under them, the assignments on the right (one column when narrow).
@@ -830,6 +891,7 @@
         stats(m),
         courseGrid(m),
         hiddenTray(m),
+        itemGrades(),
         U.el('bcv-gpa__foot', [
           h('p', { class: 'bcv-pretty', text: tracking
             ? 'Course scores come straight from Canvas. GPA, targets and history are computed here from the standard 4.0 scale and the prior record you entered — your school’s official GPA may differ.'

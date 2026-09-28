@@ -25,6 +25,10 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.98.35', date: '2026-09-28', notes: [
+      { kind: 'new', title: 'Grades by letter', body: 'Slide to A, B, C, D or F to list that work.', icon: P.steps },
+      { kind: 'new', title: 'Item grades', body: 'Every graded assignment, all courses, on Grades.', icon: P.list },
+    ] },
     { version: '2.98.34', date: '2026-09-28', notes: [
       { kind: 'new', title: 'Highlight a group', body: 'Press a grade group to light up its ring and work.', icon: P.layers },
     ] },

@@ -3,7 +3,9 @@
  * stippled) beside the total, a By-group legend and the weight bar, then
  * the assignment list. What-if mode recolours it all gray and never leaves
  * the browser. Pressing a group (its legend row, its weight, its ring) picks
- * it out: its ring, weight and assignments stay, the rest steps back. */
+ * it out: its ring, weight and assignments stay, the rest steps back. Each
+ * graded assignment wears its letter, and the By letter slider (All · A · B ·
+ * C · D · F) lists one letter's work alone. */
 (function () {
   const BCV = (self.BCV = self.BCV || {});
   const { h } = BCV.utils;
@@ -29,6 +31,7 @@
     let focusId = null;
     // the group picked out (U.groupPicker), kept across what-if redraws; the list's header says which
     const pickSt = { pick: null };
+    const bandSt = { band: 'all' }; // the By letter slider's stop, kept across redraws
     let gm = null;
     const pickNote = h('span', { class: 'bcv-group__sub bcv-ml-auto bcv-gr__picknote' });
     function notePick(pick) {
@@ -162,6 +165,8 @@
         }
         // the whole row opens the assignment it is a line about — a grade is the start of a question
         // ("why?"), and the answer is on the assignment's own page
+        // its letter (U.gradeBand: what-if scores included), a tag in the letter's colour by the score
+        const band = U.gradeBand(g.effective, g.possible, g.gradingType);
         const row = U.row([
           U.el('bcv-row__body', [
             h('div', { style: { display: 'flex', alignItems: 'baseline', gap: '8px', flexWrap: 'wrap' } }, [U.text('bcv-grade__name bcv-pretty', g.name, 'span'), g.badge ? U.badge(g.badge, g.badge === 'Late' ? 'orange' : g.badge === 'Missing' ? 'red' : '', 'bcv-badge--xs') : null]),
@@ -169,16 +174,34 @@
             U.text('bcv-row__sub', [g.group, g.due ? `due ${U.fmtBy(g.due)}` : 'no due date', g.submitted ? `submitted ${U.fmtAt(g.submitted)}` : (g.due && U.parse(g.due) > new Date() ? 'not due yet' : 'not submitted'), g.stats && g.earned !== null ? `class mean ${store.fmtPts(g.stats.mean)} · high ${store.fmtPts(g.stats.max)} · low ${store.fmtPts(g.stats.min)}` : null].filter(Boolean).join(' · ')),
           ]),
           dotEl,
+          U.bandChip(band, band ? `${store.fmtPts(Math.round((g.effective / g.possible) * 1000) / 10)}% · ${band}` : null),
           scoreEl,
           g.url ? U.chev() : null,
         ], { href: g.url || null });
+        row.dataset.band = band || '';
         row.dataset.group = g.groupId; // (the group it counts toward: picked out with it)
         row.style.setProperty('--bcv-grp', colorOf(g.groupId) || 'var(--bcv-ink3)');
         return row;
       });
+      // By letter: the slider lists one letter's work alone (the rows are the same; only the list is refilled)
+      const counts = {};
+      for (const r of rows) if (r.dataset.band) counts[r.dataset.band] = (counts[r.dataset.band] || 0) + 1;
+      const listHost = h('div');
+      const paintList = () => {
+        const band = bandSt.band;
+        const shown = band === 'all' ? rows : rows.filter((r) => r.dataset.band === band);
+        listHost.replaceChildren(!rows.length ? U.emptyCard('No assignments in this course.')
+          : shown.length ? U.card(shown, 'bcv-card--list')
+            : U.emptyCard(`No ${band} grades in this course${st.on ? ' with these what-if scores' : ''}.`));
+      };
+      paintList();
       const tableCard = h('div', {}, [
         U.el('bcv-group__head bcv-group__head--10', [U.h2('Assignments'), pickNote]),
-        rows.length ? U.card(rows, 'bcv-card--list') : U.emptyCard('No assignments in this course.'),
+        Object.keys(counts).length ? U.el('bcv-gr__bandrow', [
+          U.text('bcv-gr__bandlbl', 'By letter', 'span'),
+          U.bandSlider(counts, bandSt.band, (b) => { bandSt.band = b; paintList(); picker.apply(); }),
+        ]) : null,
+        listHost,
       ]);
 
       // The weights live in the grade card's "How the grade is weighted" section; no separate card.
