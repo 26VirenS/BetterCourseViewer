@@ -7,6 +7,137 @@
   const IC = BCV.IC;
   const store = BCV.store;
 
+  /** The counters' own lists — shared by the Dashboard and the phone's Today (2.98.36), so the two
+   *  never count differently: what is due today, tomorrow and this week (and what of each is already
+   *  done), what is overdue (and what was handed in late), what was graded this week (and the two
+   *  before). Every list keeps to the course selection. Rows are the sheets' shape: { title, meta,
+   *  course, color, tint, url, date }; an overdue row also carries its planner item and key, for the X. */
+  function workLists({ planner, favs, overrides = [], dark = false, now = new Date() }) {
+    // every override, dismissed or not: an item's X changes the one it has rather than writing a second, which Canvas refuses
+    const overrideByKey = new Map((Array.isArray(overrides) ? overrides : []).filter((o) => o && o.id).map((o) => [`${o.plannable_type}:${o.plannable_id}`, o]));
+    const dismissedKeys = new Set([...overrideByKey].filter(([, o]) => o.dismissed).map(([k]) => k));
+    const todayStart = U.startOfDay(now);
+    const weekStart = U.startOfWeek(now);
+    const weekEnd = U.addDays(weekStart, 7);
+    const tomorrowStart = U.addDays(todayStart, 1);
+    // every count respects the course selection (the favourites), so the cards agree with the page below them
+    const favIds = new Set((favs || []).map((c) => String(c.id)));
+    const inSel = (it) => it.custom || !it.courseId || favIds.has(String(it.courseId));
+    const live = (planner || []).filter((it) => !it.complete && !it.dismissed && it.type !== 'announcement' && inSel(it));
+    const dueItems = live.filter((it) => it.isDue && !it.excused); // (excused work is not due: it counts nowhere)
+    const dueToday = dueItems.filter((it) => U.sameDay(it.date, now) && !it.submitted);
+    const dueTomorrow = dueItems.filter((it) => U.sameDay(it.date, tomorrowStart) && !it.submitted);
+    const dueWeek = dueItems.filter((it) => it.date >= weekStart && it.date < weekEnd && !it.submitted);
+    // (2.98.28) what a sheet shows under its list, quieter: work of the same span already handed in or marked done
+    const doneIn = (from, to) => (planner || []).filter((it) => it.isDue && !it.excused && !it.dismissed && it.type !== 'announcement' && inSel(it) && (it.submitted || it.complete) && it.date >= from && it.date < to);
+    const RECENT_MAX = 8;
+    const byDate = (a, b) => a.date - b.date;
+    const dueRow = (it) => {
+      const c = it.course;
+      const pal = c ? c.palette : U.palette('#8e8e93', dark);
+      const when = U.sameDay(it.date, now) ? `due ${U.fmtTime(it.date)}` : `${U.DAYS[it.date.getDay()]} ${U.fmtTime(it.date)}`;
+      return { title: it.title, meta: [it.kind, it.points !== null ? `${store.fmtPts(it.points)} pts` : null, when].filter(Boolean).join(' · '), course: c?.shortName || it.courseName || '—', color: pal.text, tint: pal.tint, url: it.url, date: it.date };
+    };
+    // a done row says how it was done: graded, handed in, or marked done on the planner
+    const doneRow = (it) => { const r = dueRow(it); r.meta = `${r.meta} · ${it.graded ? 'graded' : it.submitted ? 'handed in' : 'marked done'}`; return r; };
+    const recentOf = (label, items) => (items.length ? { label, items: items.slice(0, RECENT_MAX) } : null);
+    const courseCount = (items) => new Set(items.map((it) => it.courseId || it.courseName)).size;
+    const kindOf = (a) => (a.is_quiz_assignment || a.quiz_id || (a.submission_types || []).includes('online_quiz') ? 'Quiz' : (a.submission_types || []).includes('discussion_topic') ? 'Discussion' : 'Assignment');
+    const palOf = (c) => (c ? c.palette : U.palette('#8e8e93', dark));
+    // Overdue and Graded this week read each selected course's assignments (their submissions carry
+    // Canvas's own late / missing / graded_at flags). null when that fails: a card whose fetch fails
+    // is dropped rather than shown as 0 (a false 0 on Overdue reads as "fine").
+    const assignmentsP = Promise.all((favs || []).map(async (c) => ({ c, list: await store.assignments(c.id) }))).catch(() => null);
+    const overdueP = assignmentsP.then((byCourse) => {
+      if (!byCourse || !planner) return null;
+      // Overdue: past due with nothing handed in (Canvas's missing flag, or the due time passed) and
+      // still open to a late hand-in. Work handed in late and awaiting a grade is not overdue: it is
+      // out of the student's hands, and Canvas counts nothing as 0 for it (2.98.17, after a late
+      // hand-in sat on this list as "submitted late · ungraded").
+      // Older missing work is read from the course's assignments rather than the planner window, so
+      // its dismissal is looked up in the student's own list of overrides.
+      const seen = new Set();
+      const overdue = [];
+      const plannerByKey = new Map((planner || []).map((it) => [it.id, it]));
+      // an assignment's planner key: the quiz's for a quiz, the topic's for a graded discussion (as Canvas's planner names them), else its own
+      const keyOf = (a) => (a.quiz_id ? `quiz:${a.quiz_id}` : a.discussion_topic?.id ? `discussion_topic:${a.discussion_topic.id}` : `assignment:${a.id}`);
+      const aByKey = new Map();
+      for (const { list } of byCourse) for (const a of list || []) { aByKey.set(keyOf(a), a); aByKey.set(`assignment:${a.id}`, a); }
+      // marked is marked, whether or not anything was ever handed in (a tool sends a score back with
+      // no submission; a teacher enters one): never overdue. Locked or closed work cannot be fixed:
+      // it is left off the list rather than counted against you.
+      const scored = (sub) => !!sub && (sub.workflow_state === 'graded' || (sub.score !== null && sub.score !== undefined));
+      const closed = (a) => !!(a.locked_for_user || (a.lock_at && U.parse(a.lock_at) < now));
+      for (const it of live) {
+        if (!it.isDue || it.submitted || it.excused || !(it.missing || it.date < now)) continue;
+        const key = `${it.type}:${it.raw.plannable_id}`;
+        const a = aByKey.get(key);
+        if (a && (scored(a.submission) || closed(a))) continue;
+        seen.add(key);
+        overdue.push({ key, item: it, title: it.title, meta: [it.kind, it.points !== null ? `${store.fmtPts(it.points)} pts` : null, `due ${U.fmtShort(it.date)}`, 'not submitted'].filter(Boolean).join(' · '), course: it.course?.shortName || it.courseName || '—', color: palOf(it.course).text, tint: palOf(it.course).tint, url: it.url, date: it.date });
+      }
+      for (const { c, list } of byCourse) {
+        for (const a of list || []) {
+          const sub = a.submission;
+          if (!sub || sub.excused || scored(sub) || sub.submitted_at) continue; // (handed in, late or not: waiting on a grade, not overdue)
+          // never handed in and past due (Canvas's own "missing"), which the planner's window no
+          // longer holds once it is older than that
+          const missing = (sub.missing || (a.due_at && U.parse(a.due_at) < now)) && (a.submission_types || []).some((t) => !['none', 'on_paper', 'not_graded'].includes(t)) && !closed(a);
+          if (!missing) continue;
+          const key = keyOf(a);
+          if (seen.has(key) || seen.has(`assignment:${a.id}`)) continue;
+          seen.add(key);
+          seen.add(`assignment:${a.id}`);
+          if (dismissedKeys.has(key) || dismissedKeys.has(`assignment:${a.id}`) || plannerByKey.get(key)?.dismissed) continue;
+          const item = plannerByKey.get(key) || { type: key.split(':')[0], raw: { plannable_id: key.split(':')[1], planner_override: overrideByKey.get(key) || overrideByKey.get(`assignment:${a.id}`) || null } };
+          overdue.push({ key, item, title: a.name, meta: [kindOf(a), a.points_possible !== null && a.points_possible !== undefined ? `${store.fmtPts(a.points_possible)} pts` : null, a.due_at ? `due ${U.fmtShort(a.due_at)}` : null, 'not submitted'].filter(Boolean).join(' · '), course: c.shortName || c.name, color: c.palette.text, tint: c.palette.tint, url: a.html_url || `${c.url}/assignments/${a.id}`, date: U.parse(a.due_at) || now });
+        }
+      }
+      overdue.sort(byDate);
+      // (2.98.28) under them, quieter: past-due work handed in late in the last two weeks — no longer
+      // overdue, out of the student's hands, but still there to look back at
+      const lateIn = [];
+      const since = U.addDays(todayStart, -14);
+      for (const { c, list } of byCourse) {
+        for (const a of list || []) {
+          const sub = a.submission;
+          const at = sub && U.parse(sub.submitted_at);
+          const due = U.parse(a.due_at);
+          if (!at || at < since || !(sub.late || (due && at > due))) continue;
+          lateIn.push({ title: a.name, meta: [kindOf(a), due ? `due ${U.fmtShort(due)}` : null, `handed in ${U.fmtShort(at)}`, scored(sub) ? 'graded' : 'waiting for a grade'].filter(Boolean).join(' · '), course: c.shortName || c.name, color: c.palette.text, tint: c.palette.tint, url: a.html_url || `${c.url}/assignments/${a.id}`, date: at });
+        }
+      }
+      lateIn.sort((x, y) => y.date - x.date);
+      return { overdue, lateIn };
+    });
+    const gradedP = assignmentsP.then((byCourse) => {
+      if (!byCourse || !planner) return null;
+      // Graded this week: submissions graded inside this week (graded_at, never due_at); excused
+      // ones count but carry no score, so they stay out of the points ratio
+      const graded = [];
+      const earlier = []; // (the two weeks before this one: the quiet list under this week's)
+      const before = U.addDays(weekStart, -14);
+      let earned = 0, possible = 0;
+      for (const { c, list } of byCourse) {
+        for (const a of list || []) {
+          const sub = a.submission;
+          const g = sub && U.parse(sub.graded_at);
+          if (!g || g < before || g >= weekEnd) continue;
+          const isScored = !sub.excused && sub.score !== null && sub.score !== undefined;
+          if (!isScored && !sub.excused) continue;
+          const row = { title: a.name, meta: `${kindOf(a)} · ${sub.excused ? 'excused' : `${store.fmtPts(sub.score)} / ${store.fmtPts(a.points_possible ?? 0)}`} · posted ${U.fmtShort(g)}`, course: c.shortName || c.name, color: c.palette.text, tint: c.palette.tint, url: a.html_url || `${c.url}/assignments/${a.id}`, date: g };
+          if (g < weekStart) { earlier.push(row); continue; }
+          if (isScored) { earned += Number(sub.score) || 0; possible += Number(a.points_possible) || 0; }
+          graded.push(row);
+        }
+      }
+      graded.sort((x, y) => y.date - x.date);
+      earlier.sort((x, y) => y.date - x.date);
+      return { graded, earlier, earned, possible };
+    });
+    return { now, todayStart, weekStart, weekEnd, tomorrowStart, inSel, live, dueItems, dueToday, dueTomorrow, dueWeek, doneIn, byDate, dueRow, doneRow, recentOf, courseCount, overrideByKey, dismissedKeys, assignmentsP, overdueP, gradedP };
+  }
+
   const ACTIVITY_ICON = { Announcement: IC.bell, DiscussionTopic: IC.disc, Conversation: IC.mail, Message: IC.doc, Submission: IC.chart, Conference: IC.people, Collaboration: IC.people, AssessmentRequest: IC.people, WebConference: IC.people };
   const ACTIVITY_KIND = { Announcement: 'Announcement', DiscussionTopic: 'Discussion', Conversation: 'Message', Message: 'Notification', Submission: 'Grade posted', Conference: 'Conference', Collaboration: 'Collaboration', AssessmentRequest: 'Peer review' };
 
@@ -52,9 +183,9 @@
       store.pref('dashHideDone', false).catch(() => false),
       store.plannerOverrides().catch(() => []), // what the X on the Overdue list wrote, on any device (see below)
     ]);
-    const overrideByKey = new Map((Array.isArray(overrides) ? overrides : []).filter((o) => o && o.id).map((o) => [`${o.plannable_type}:${o.plannable_id}`, o])); // (every override, dismissed or not: an item's X changes the one it has rather than writing a second, which Canvas refuses)
-    const dismissedKeys = new Set([...overrideByKey].filter(([, o]) => o.dismissed).map(([k]) => k));
     if (!ctx.alive()) return screen;
+    // the counters' lists, the same ones the phone's Today counts (workLists above)
+    const W = workLists({ planner, favs, overrides, dark });
     const wanted = settings?.appearance?.dashboard || {};
     views = ALL_VIEWS.filter(([k]) => wanted[k] !== false);
     if (!views.length) views = ALL_VIEWS; // nothing chosen is not a dashboard: everything, as before
@@ -79,27 +210,8 @@
       for (const { a, dot } of actRows) dot.style.background = isUnread(a) ? '#0a84ff' : 'transparent';
     });
     const courseMap = new Map(courses.map((c) => [c.id, c]));
-    const now = new Date();
-    const todayStart = U.startOfDay(now);
-    const weekStart = U.startOfWeek(now);
-    const weekEnd = U.addDays(weekStart, 7);
-    // every count respects the course selection (the favourites), so the cards agree with the page below them
-    const favIds = new Set(favs.map((c) => String(c.id)));
-    const inSel = (it) => it.custom || !it.courseId || favIds.has(String(it.courseId));
-    const live = (planner || []).filter((it) => !it.complete && !it.dismissed && it.type !== 'announcement' && inSel(it));
-    const dueItems = live.filter((it) => it.isDue && !it.excused); // (excused work is not due: it counts nowhere)
-    // Overdue and Graded this week read each selected course's assignments (their submissions carry
-    // Canvas's own late / missing / graded_at flags). A card whose fetch fails is dropped rather than
-    // shown as 0 (a false 0 on Overdue reads as "fine").
-    const assignmentsP = Promise.all(favs.map(async (c) => ({ c, list: await store.assignments(c.id) }))).catch(() => null);
-    const tomorrowStart = U.addDays(todayStart, 1);
-    const dueToday = dueItems.filter((it) => U.sameDay(it.date, now) && !it.submitted);
-    const dueTomorrow = dueItems.filter((it) => U.sameDay(it.date, tomorrowStart) && !it.submitted);
-    const dueWeek = dueItems.filter((it) => it.date >= weekStart && it.date < weekEnd && !it.submitted);
+    const { now, todayStart, weekStart, weekEnd, tomorrowStart, inSel, dueItems, dueToday, dueTomorrow, dueWeek, doneIn, byDate, dueRow, doneRow, recentOf, courseCount } = W;
     const weekAll = (planner || []).filter((it) => it.isDue && !it.excused && it.date >= weekStart && it.date < weekEnd && (it.points === null || it.points > 0) && it.type !== 'announcement');
-    // (2.98.28) what a sheet shows under its list, quieter: work of the same span already handed in or marked done
-    const doneIn = (from, to) => (planner || []).filter((it) => it.isDue && !it.excused && !it.dismissed && it.type !== 'announcement' && inSel(it) && (it.submitted || it.complete) && it.date >= from && it.date < to);
-    const RECENT_MAX = 8;
 
     // ---- stats -------------------------------------------------------------------
     // Each counter opens a sheet listing exactly the items it counted.
@@ -107,17 +219,6 @@
     // bars wipe in. A redraw (view switch, a recolour) shows the final numbers at once.
     let entered = false;
     const t0 = Date.now();
-    const byDate = (a, b) => a.date - b.date;
-    const dueRow = (it) => {
-      const c = it.course;
-      const pal = c ? c.palette : U.palette('#8e8e93', dark);
-      const when = U.sameDay(it.date, now) ? `due ${U.fmtTime(it.date)}` : `${U.DAYS[it.date.getDay()]} ${U.fmtTime(it.date)}`;
-      return { title: it.title, meta: [it.kind, it.points !== null ? `${store.fmtPts(it.points)} pts` : null, when].filter(Boolean).join(' · '), course: c?.shortName || it.courseName || '—', color: pal.text, tint: pal.tint, url: it.url };
-    };
-    // a done row says how it was done: graded, handed in, or marked done on the planner
-    const doneRow = (it) => { const r = dueRow(it); r.meta = `${r.meta} · ${it.graded ? 'graded' : it.submitted ? 'handed in' : 'marked done'}`; return r; };
-    const recentOf = (label, items) => (items.length ? { label, items: items.slice(0, RECENT_MAX) } : null);
-    const courseCount = (items) => new Set(items.map((it) => it.courseId || it.courseName)).size;
 
     function statsBlock() {
       const cards = [];
@@ -203,8 +304,6 @@
         else valueEl.textContent = String(count);
         card.querySelector('.bcv-stat__note').textContent = note;
       };
-      const kindOf = (a) => (a.is_quiz_assignment || a.quiz_id || (a.submission_types || []).includes('online_quiz') ? 'Quiz' : (a.submission_types || []).includes('discussion_topic') ? 'Discussion' : 'Assignment');
-      const palOf = (c) => (c ? c.palette : U.palette('#8e8e93', dark));
       const overdueSheet = { label: 'Overdue', value: '…', icon: IC.clock, color: '#ff453a', note: 'Loading…', items: [] }; // one object: an open sheet reads it after a clear
       let gradedSheet = { label: 'Graded this week', value: '…', icon: IC.chart, color: '#5856d6', note: 'Loading…', items: [] };
       const overdueCard = stat('Overdue', '…', '', IC.clock, '#ff453a', (from) => openSheet(overdueSheet, from));
@@ -222,69 +321,12 @@
         }, from)));
       }
       cards.push(gradedCard);
-      assignmentsP.then((byCourse) => {
+      Promise.all([W.overdueP, W.gradedP]).then(([od, gr]) => {
         if (!ctx.alive()) return;
-        if (!byCourse || !planner) { overdueCard.remove(); gradedCard.remove(); return; }
-        // Overdue: past due with nothing handed in (Canvas's missing flag, or the due time passed) and
-        // still open to a late hand-in. Work handed in late and awaiting a grade is not overdue: it is
-        // out of the student's hands, and Canvas counts nothing as 0 for it (2.98.17, after a late
-        // hand-in sat on this list as "submitted late · ungraded").
-        // Each row has an X: the item is dismissed on Canvas's planner — the same call as the To Do
-        // screen's X, so it leaves that list too and every device agrees. Older missing work is read
-        // from the course's assignments rather than the planner window, so its dismissal is looked up
-        // in the student's own list of overrides.
-        const seen = new Set();
-        const overdue = [];
-        const plannerByKey = new Map((planner || []).map((it) => [it.id, it]));
-        // an assignment's planner key: the quiz's for a quiz, the topic's for a graded discussion (as Canvas's planner names them), else its own
-        const keyOf = (a) => (a.quiz_id ? `quiz:${a.quiz_id}` : a.discussion_topic?.id ? `discussion_topic:${a.discussion_topic.id}` : `assignment:${a.id}`);
-        const aByKey = new Map();
-        for (const { list } of byCourse) for (const a of list || []) { aByKey.set(keyOf(a), a); aByKey.set(`assignment:${a.id}`, a); }
-        // marked is marked, whether or not anything was ever handed in (a tool sends a score back with
-        // no submission; a teacher enters one): never overdue. Locked or closed work cannot be fixed:
-        // it is left off the list rather than counted against you.
-        const scored = (s) => !!s && (s.workflow_state === 'graded' || (s.score !== null && s.score !== undefined));
-        const closed = (a) => !!(a.locked_for_user || (a.lock_at && U.parse(a.lock_at) < now));
-        for (const it of live) {
-          if (!it.isDue || it.submitted || it.excused || !(it.missing || it.date < now)) continue;
-          const key = `${it.type}:${it.raw.plannable_id}`;
-          const a = aByKey.get(key);
-          if (a && (scored(a.submission) || closed(a))) continue;
-          seen.add(key);
-          overdue.push({ key, item: it, title: it.title, meta: [it.kind, it.points !== null ? `${store.fmtPts(it.points)} pts` : null, `due ${U.fmtShort(it.date)}`, 'not submitted'].filter(Boolean).join(' · '), course: it.course?.shortName || it.courseName || '—', color: palOf(it.course).text, tint: palOf(it.course).tint, url: it.url, date: it.date });
-        }
-        for (const { c, list } of byCourse) {
-          for (const a of list || []) {
-            const s = a.submission;
-            if (!s || s.excused || scored(s) || s.submitted_at) continue; // (handed in, late or not: waiting on a grade, not overdue)
-            // never handed in and past due (Canvas's own "missing"), which the planner's window no
-            // longer holds once it is older than that
-            const missing = (s.missing || (a.due_at && U.parse(a.due_at) < now)) && (a.submission_types || []).some((t) => !['none', 'on_paper', 'not_graded'].includes(t)) && !closed(a);
-            if (!missing) continue;
-            const key = keyOf(a);
-            if (seen.has(key) || seen.has(`assignment:${a.id}`)) continue;
-            seen.add(key);
-            seen.add(`assignment:${a.id}`);
-            if (dismissedKeys.has(key) || dismissedKeys.has(`assignment:${a.id}`) || plannerByKey.get(key)?.dismissed) continue;
-            const item = plannerByKey.get(key) || { type: key.split(':')[0], raw: { plannable_id: key.split(':')[1], planner_override: overrideByKey.get(key) || overrideByKey.get(`assignment:${a.id}`) || null } };
-            overdue.push({ key, item, title: a.name, meta: [kindOf(a), a.points_possible !== null && a.points_possible !== undefined ? `${store.fmtPts(a.points_possible)} pts` : null, a.due_at ? `due ${U.fmtShort(a.due_at)}` : null, 'not submitted'].filter(Boolean).join(' · '), course: c.shortName || c.name, color: c.palette.text, tint: c.palette.tint, url: a.html_url || `${c.url}/assignments/${a.id}`, date: U.parse(a.due_at) || now });
-          }
-        }
-        overdue.sort(byDate);
-        // (2.98.28) under them, quieter: past-due work handed in late in the last two weeks — no longer
-        // overdue, out of the student's hands, but still there to look back at
-        const lateIn = [];
-        const since = U.addDays(todayStart, -14);
-        for (const { c, list } of byCourse) {
-          for (const a of list || []) {
-            const s = a.submission;
-            const at = s && U.parse(s.submitted_at);
-            const due = U.parse(a.due_at);
-            if (!at || at < since || !(s.late || (due && at > due))) continue;
-            lateIn.push({ title: a.name, meta: [kindOf(a), due ? `due ${U.fmtShort(due)}` : null, `handed in ${U.fmtShort(at)}`, scored(s) ? 'graded' : 'waiting for a grade'].filter(Boolean).join(' · '), course: c.shortName || c.name, color: c.palette.text, tint: c.palette.tint, url: a.html_url || `${c.url}/assignments/${a.id}`, date: at });
-          }
-        }
-        lateIn.sort((x, y) => y.date - x.date);
+        if (!od || !gr) { overdueCard.remove(); gradedCard.remove(); return; }
+        // Each Overdue row has an X: the item is dismissed on Canvas's planner — the same call as the To
+        // Do screen's X, so it leaves that list too and every device agrees (workLists reads the rest)
+        const { overdue, lateIn } = od;
         const paintOverdue = () => {
           if (overdueCard.isConnected) land(overdueCard, overdue.length, overdue.length ? U.plural(overdue.length, 'not submitted', 'not submitted') : 'Nothing overdue', 6.9);
           Object.assign(overdueSheet, {
@@ -300,27 +342,7 @@
         };
         for (const o of overdue) o.clear = () => clearOverdue(o);
         paintOverdue();
-        // Graded this week: submissions graded inside this week (graded_at, never due_at); excused
-        // ones count but carry no score, so they stay out of the points ratio
-        const graded = [];
-        const earlier = []; // (the two weeks before this one: the quiet list under this week's)
-        const before = U.addDays(weekStart, -14);
-        let earned = 0, possible = 0;
-        for (const { c, list } of byCourse) {
-          for (const a of list || []) {
-            const s = a.submission;
-            const g = s && U.parse(s.graded_at);
-            if (!g || g < before || g >= weekEnd) continue;
-            const scored = !s.excused && s.score !== null && s.score !== undefined;
-            if (!scored && !s.excused) continue;
-            const row = { title: a.name, meta: `${kindOf(a)} · ${s.excused ? 'excused' : `${store.fmtPts(s.score)} / ${store.fmtPts(a.points_possible ?? 0)}`} · posted ${U.fmtShort(g)}`, course: c.shortName || c.name, color: c.palette.text, tint: c.palette.tint, url: a.html_url || `${c.url}/assignments/${a.id}`, date: g };
-            if (g < weekStart) { earlier.push(row); continue; }
-            if (scored) { earned += Number(s.score) || 0; possible += Number(a.points_possible) || 0; }
-            graded.push(row);
-          }
-        }
-        graded.sort((x, y) => y.date - x.date);
-        earlier.sort((x, y) => y.date - x.date);
+        const { graded, earlier, earned, possible } = gr;
         land(gradedCard, graded.length, graded.length ? `${store.fmtPts(earned)} / ${store.fmtPts(possible)} points` : 'No grades posted this week', 9.2);
         gradedSheet = {
           label: 'Graded this week', value: String(graded.length), icon: IC.chart, color: '#5856d6', items: graded, empty: 'Nothing has been graded this week.', lead: 'This week', recent: recentOf('Earlier', earlier),
@@ -722,5 +744,5 @@
     ]);
   }
 
-  BCV.screens.dashboard = { render, prefetch };
+  BCV.screens.dashboard = { render, prefetch, workLists };
 })();

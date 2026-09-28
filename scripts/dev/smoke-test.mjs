@@ -1341,9 +1341,28 @@ try {
   await page.waitForFunction(() => document.querySelectorAll('.bcv-gpa__tick').length === 8, null, { timeout: 5000 });
   const tickL = await texts('.bcv-gpa__tick-l');
   const tickV = await texts('.bcv-gpa__tick-v');
-  check(tickL[0] === 'Dec 15 ’25' && tickL[1] === 'May 1' && tickL[7] === 'Today' && tickV[0] === '3.50' && tickV[1] === '3.55' && /^10 snapshots since Dec 15 2025, 8 of them shown, spread across the whole — Canvas keeps no grade history; past points can be added in settings\.$/.test((await texts('.bcv-gpa__note'))[0]),
+  check(tickL[0] === 'Dec 15 ’25' && tickL[1] === 'May 1' && tickL[7] === 'Today' && tickV[0] === '3.50' && tickV[1] === '3.55' && /^10 snapshots since Dec 15 2025, 8 dated below — point at the line for any day\. Canvas keeps no grade history; past points can be added in settings\.$/.test((await texts('.bcv-gpa__note'))[0]),
     `the trend spreads eight of ten points across the whole history, the first and today at the ends, the older year marked: ${tickL.join(' | ')} · ${(await texts('.bcv-gpa__note'))[0]}`);
   await page.waitForTimeout(1600); // (the page was drawn again: let the hero and the line's entry finish before the picture)
+  // (2.98.36) a smooth curve through every snapshot, a soft fill under it; pointed at, a day reads out its GPA
+  const curve = await page.evaluate(() => ({ d: document.querySelector('.bcv-gpa__curve')?.getAttribute('d') || '', area: !!document.querySelector('.bcv-gpa__area'), poly: !!document.querySelector('.bcv-gpa__chart polyline') }));
+  const segs = (curve.d.match(/C/g) || []).length;
+  const tBox = await page.$eval('.bcv-gpa__chart', (e) => { const r = e.getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width, h: r.height }; });
+  const readAt = async (frac) => { await page.mouse.move(tBox.x + tBox.w * frac, tBox.y + tBox.h / 2); return page.evaluate(() => ({ at: document.querySelector('.bcv-gpa__chart').dataset.at, tip: document.querySelector('.bcv-gpa__tip').textContent, shown: !document.querySelector('.bcv-gpa__tip').hidden })); };
+  const atFirst = await readAt(0.07);
+  const atSecond = await readAt(0.07 + 0.86 / 9); // (ten snapshots, evenly along the line: the second is May 1)
+  await page.mouse.move(tBox.x + tBox.w / 2, tBox.y - 80);
+  const tipGone = await page.evaluate(() => document.querySelector('.bcv-gpa__tip').hidden);
+  await page.focus('.bcv-gpa__chart');
+  await page.keyboard.press('Home');
+  const keyHome = await page.evaluate(() => document.querySelector('.bcv-gpa__tip').textContent);
+  await page.keyboard.press('ArrowRight');
+  const keyNext = await page.evaluate(() => document.querySelector('.bcv-gpa__tip').textContent);
+  await page.keyboard.press('Escape');
+  check(segs === 9 && curve.area && !curve.poly && atFirst.shown && atFirst.at === '0' && atFirst.tip === '3.50Dec 15 ’25' && atSecond.at === '1' && atSecond.tip === '3.55May 1' && tipGone && keyHome === '3.50Dec 15 ’25' && keyNext === '3.55May 1', `the trend is a smooth curve through all ten snapshots; hovering, or the arrow keys, read a day's GPA out: ${JSON.stringify({ segs, atFirst, atSecond, tipGone, keyHome, keyNext })}`);
+  await page.mouse.move(tBox.x + tBox.w * (0.07 + (0.86 * 5) / 9), tBox.y + tBox.h / 2);
+  await shot(page, '09e2-grades-trend-hover');
+  await page.mouse.move(tBox.x + tBox.w / 2, tBox.y - 80);
   await shot(page, '09e-grades-panel-tracking');
   page.once('dialog', (d) => d.accept());
   await page.click('.bcv-gpa__linkbtn');

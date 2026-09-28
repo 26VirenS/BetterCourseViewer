@@ -221,7 +221,9 @@
   const circleBox = (done) => h('span', { class: `bcv-ph-circle ${done ? 'is-done' : ''}` }, U.svg(CHECK, { size: 12, stroke: '#fff', width: 3, cls: 'bcv-ph-circle__check' }));
 
   /** A bottom sheet: a grab handle (drag it down past 110px to dismiss; the scrim is the other way
-   *  out), a title, rows (label / note / badge, tap to go or act), any body, big buttons. */
+   *  out), a title, rows (label / note / badge, tap to go or act), any body, big buttons. A row may
+   *  be a section label ({ section }), quieter ({ quiet }: set back in grey, still a tap away), or
+   *  clearable ({ clear }: an X beside it; the row goes once clear() lands, onCleared() after). */
   function openSheet({ title = '', note = '', rows = [], body = null, actions = [], label = title, cls = '' }) {
     document.querySelector('.bcv-sheet-ov')?.remove();
     const ov = U.el('bcv-sheet-ov', null, { role: 'dialog', 'aria-label': label || 'Sheet' });
@@ -232,18 +234,41 @@
     const sheet = U.el(`bcv-sheet bcv-ph-sheet ${cls}`, [
       handle,
       title ? U.el('bcv-ph-sheet__head', [U.text('bcv-ph-sheet__title', title), note ? U.text('bcv-ph-sheet__note bcv-pretty', note) : null]) : null,
-      rows.filter(Boolean).length ? U.el('bcv-ph-sheet__list', rows.filter(Boolean).map((r) => h('button', {
-        type: 'button', class: `bcv-ph-srow ${r.danger ? 'is-danger' : ''}`, onclick: () => { close(); if (r.href) BCV.app.go(r.href); else r.onSelect?.(); },
+      rows.filter(Boolean).length ? U.el('bcv-ph-sheet__list', rows.filter(Boolean).map((r) => sheetRow(r))) : null,
+      body,
+      actions.filter(Boolean).length ? U.el('bcv-ph-sheet__actions', actions.filter(Boolean).map((a) => h('button', { type: 'button', class: `bcv-ph-bigbtn ${a.primary ? 'is-primary' : ''} ${a.cls || ''}`, text: a.label, onclick: () => { if (!a.keep) close(); a.onSelect?.(); } }))) : null,
+    ]);
+    function sheetRow(r) {
+      if (r.section) return U.text(`bcv-ph-sheet__sec ${r.quiet ? 'is-quiet' : ''}`, r.section);
+      const row = h('button', {
+        type: 'button', class: `bcv-ph-srow ${r.danger ? 'is-danger' : ''} ${r.quiet ? 'is-quiet' : ''}`, onclick: () => { close(); if (r.href) BCV.app.go(r.href); else r.onSelect?.(); },
       }, [
         r.icon ? h('span', { class: 'bcv-ph-srow__tile', style: r.tint ? { background: r.tint } : null }, U.svg(r.icon, { size: 15, stroke: r.color || 'var(--bcv-ink2)', width: 1.9 })) : (r.color ? h('span', { class: 'bcv-ph-srow__bar', style: { background: r.color } }) : null),
         U.el('bcv-ph-srow__body', [U.text('bcv-ph-srow__label bcv-ellip', r.label), r.note ? U.text('bcv-ph-srow__note bcv-ellip', r.note) : null]),
         r.badge ? h('span', { class: 'bcv-ph-srow__badge', text: String(r.badge) }) : null,
         r.right ? U.text('bcv-ph-srow__right', r.right, 'span') : null,
         r.href || r.onSelect ? chev() : null,
-      ]))) : null,
-      body,
-      actions.filter(Boolean).length ? U.el('bcv-ph-sheet__actions', actions.filter(Boolean).map((a) => h('button', { type: 'button', class: `bcv-ph-bigbtn ${a.primary ? 'is-primary' : ''} ${a.cls || ''}`, text: a.label, onclick: () => { if (!a.keep) close(); a.onSelect?.(); } }))) : null,
-    ]);
+      ]);
+      if (!r.clear) return row;
+      // the X: the item goes one tap at a time; a failure leaves the row where it is and says so
+      const x = h('button', { type: 'button', class: 'bcv-ph-srow__x', 'aria-label': `Clear: ${r.label}`, onclick: async (e) => {
+        e.stopPropagation();
+        x.disabled = true;
+        wrap.classList.add('is-busy');
+        try {
+          await r.clear();
+        } catch {
+          wrap.classList.remove('is-busy');
+          x.disabled = false;
+          U.toast('Couldn’t clear that. Try again.', { error: true });
+          return;
+        }
+        wrap.classList.add('is-gone');
+        setTimeout(() => { wrap.remove(); r.onCleared?.(sheet); }, 220);
+      } }, U.svg(IC.close, { size: 12, stroke: 'var(--bcv-ink2)', width: 2.4 }));
+      const wrap = U.el('bcv-ph-srow__item', [row, x]);
+      return wrap;
+    }
     // the drag lives on the handle only: a scrolling list inside must scroll, not drag the sheet.
     // The finger tracks 1:1; on release the sheet springs back (or away) at the speed it was let go
     let y0 = null, lastY = 0, lastT = 0, vy = 0;
@@ -358,11 +383,19 @@
     return rowEl;
   }
 
-  /** Every item a counter counted, in a sheet. */
-  function itemsSheet(app, title, note, items, empty) {
-    openSheet({
-      title, note, label: title,
-      rows: items.length ? items.map((it) => ({ label: it.title, note: `${it.kind}${it.points !== null && it.points !== undefined ? ` · ${store.fmtPts(it.points)} pts` : ''} · ${U.sameDay(it.date, new Date()) ? `due ${U.fmtTime(it.date)}` : U.fmtAt(it.date)}`, color: it.course?.palette.text || '#8e8e93', href: it.url })) : [],
+  /** Every item a counter counted, in a sheet — the Dashboard's sheet on a phone (2.98.36): what
+   *  wants attention under its own label, then, quieter and still a tap away, the rest of the same
+   *  span (already done, read, handed in late, graded earlier). Rows are the Dashboard's shape
+   *  (screens/dashboard.js workLists): { title, meta, course, color, url, clear? }. */
+  function itemsSheet(app, { title, note, items, empty, lead = 'Still to do', recent = null, onCleared = null }) {
+    const toRow = (i, quiet = false) => ({ label: i.title, note: [i.course, i.meta].filter(Boolean).join(' · '), color: i.color || '#8e8e93', href: i.url, quiet, clear: quiet ? null : i.clear || null, onCleared });
+    return openSheet({
+      title, note, label: title, cls: 'bcv-ph-sheet--items',
+      rows: [
+        recent && items.length ? { section: lead } : null,
+        ...items.map((i) => toRow(i)),
+        ...(recent ? [{ section: recent.label, quiet: true }, ...recent.items.map((i) => toRow(i, true))] : []),
+      ],
       body: items.length ? null : emptyRow(empty),
     });
   }
@@ -380,8 +413,10 @@
     screen.append(bigTitle('Today', { above: `${U.DAYS_LONG[now.getDay()]}, ${U.MONTHS_LONG[now.getMonth()]} ${now.getDate()}`, right: U.el('bcv-ph-title__right', [bell, avatarBtn]) }), body);
     body.append(U.loading('rows', 4));
 
-    const [planner, sel, feed, me, notifs] = await Promise.all([store.planner().catch(() => null), selection(), store.announcementsFeed().catch(() => null), store.me().catch(() => null), store.notifUnread().catch(() => null)]);
+    const [planner, sel, feed, me, notifs, overrides] = await Promise.all([store.planner().catch(() => null), selection(), store.announcementsFeed().catch(() => null), store.me().catch(() => null), store.notifUnread().catch(() => null), store.plannerOverrides().catch(() => [])]);
     if (!ctx.alive()) return screen;
+    // the Dashboard's own lists (screens/dashboard.js workLists): the same counts, the same sheets
+    const W = BCV.screens.dashboard.workLists({ planner, favs: sel.list, overrides, dark: app.isDark(), now });
     avatarBtn.replaceChildren(me?.avatar && !/avatar-50|no_pic|dotted_pic/.test(me.avatar) ? h('img', { src: me.avatar, alt: '', referrerpolicy: 'no-referrer' }) : h('span', { text: U.initials(me?.name || '') || '·' }));
     if (notifs) { badge.textContent = String(notifs); badge.hidden = false; }
     const favs = sel.list;
@@ -391,27 +426,72 @@
     // filtered to the selected courses before anything is counted
     const live = (planner || []).filter((it) => !it.dismissed && it.type !== 'announcement' && inSelection(sel, it));
     const open = live.filter((it) => !it.complete && !it.submitted);
-    const dueToday = open.filter((it) => it.isDue && U.sameDay(it.date, now)).sort(byDate);
-    const dueWeek = open.filter((it) => it.isDue && it.date >= weekStart && it.date < weekEnd).sort(byDate);
+    const dueToday = [...W.dueToday].sort(byDate);
+    const dueWeek = [...W.dueWeek].sort(byDate);
+    const dueTomorrow = [...W.dueTomorrow].sort(byDate);
     const upcoming = open.filter((it) => it.isDue && it.date >= todayStart && !U.sameDay(it.date, now)).sort(byDate);
-    const unread = feed ? feed.filter((a) => a.read_state === 'unread' && (!a.context_code || sel.ids.has(String(a.context_code).replace(/^course_/, '')))) : null;
+    const inSelFeed = (a) => !a.context_code || sel.ids.has(String(a.context_code).replace(/^course_/, ''));
+    const unread = feed ? feed.filter((a) => a.read_state === 'unread' && inSelFeed(a)) : null;
+    const readSince = U.addDays(todayStart, -14);
+    const readRecently = feed ? feed.filter((a) => a.read_state !== 'unread' && inSelFeed(a) && U.parse(a.posted_at) >= readSince).sort((x, y) => U.parse(y.posted_at) - U.parse(x.posted_at)) : [];
     const weekAll = live.filter((it) => it.isDue && it.date >= weekStart && it.date < weekEnd && (it.points === null || it.points > 0));
 
-    // the three counters roll to their value on entry; each opens the list it counted
-    const stat = (label, value, onTap, seed) => {
+    // the six counters (the Dashboard's six, 2.98.36) roll to their value on entry; each opens the
+    // list it counted, split the Dashboard's way. Overdue and Graded read each course's assignments
+    // and land a moment later; a pair whose read fails leaves rather than show a false 0.
+    const stat = (label, value, onTap, seed, tone = '') => {
       const v = U.text('bcv-ph-stat__value', value);
       if (/^\d+$/.test(value)) U.roll(v, Number(value), { seed });
-      return h('button', { type: 'button', class: 'bcv-ph-stat', onclick: onTap }, [U.text('bcv-ph-stat__label', label, 'span'), v]);
+      return h('button', { type: 'button', class: `bcv-ph-stat ${tone}`, onclick: onTap }, [U.text('bcv-ph-stat__label', label, 'span'), v]);
     };
-    const stats = U.el('bcv-ph-stats', [
-      stat('Due today', String(dueToday.length), () => itemsSheet(app, 'Due today', `${U.DAYS_LONG[now.getDay()]}, ${U.MONTHS_LONG[now.getMonth()]} ${now.getDate()}`, dueToday, 'Nothing is due today.'), 0),
-      stat('This week', String(dueWeek.length), () => itemsSheet(app, 'Due this week', `Week of ${U.fmtShort(weekStart)}`, dueWeek, 'Nothing is due this week.'), 2.3),
-      stat('Unread', unread ? String(unread.length) : '—', () => openSheet({
-        title: 'Unread announcements', label: 'Unread announcements', note: unread?.length ? U.plural(unread.length, 'announcement') : 'All caught up',
-        rows: (unread || []).map((a) => ({ label: a.title || 'Announcement', note: `${a.context_name || ''} · ${U.fmtShort(a.posted_at)}`, color: '#ff9500', href: a.html_url })),
-        body: unread?.length ? null : emptyRow('All caught up.'),
+    const land = (btn, n, seed) => { const v = btn.querySelector('.bcv-ph-stat__value'); if (v) U.roll(v, n, { seed }); };
+    const dayLine = (d) => `${U.DAYS_LONG[d.getDay()]}, ${U.MONTHS_LONG[d.getMonth()]} ${d.getDate()}`;
+    const ptsOf = (items) => items.reduce((n, it) => n + (Number(it.points) || 0), 0);
+    const dueSheet = (title, items, from, to, day, empty) => () => itemsSheet(app, {
+      title, note: items.length ? `${store.fmtPts(ptsOf(items))} points across ${U.plural(W.courseCount(items), 'course')} · ${day}` : day,
+      items: items.map(W.dueRow), empty, recent: W.recentOf('Already done', W.doneIn(from, to).sort(byDate).map(W.doneRow)),
+    });
+    const annRow = (a, state) => ({ title: a.title || 'Announcement', meta: `Posted ${U.fmtShort(a.posted_at)} · ${state}`, course: a.context_name || '', color: '#ff9500', url: a.html_url });
+    let overdueN = null; // (the Overdue sheet's live list: a clear counts it down)
+    const overdueBtn = stat('Overdue', '…', () => overdueN && overdueN.open(), 6.9, 'is-red');
+    const gradedBtn = stat('Graded', '…', () => gradedN && gradedN.open(), 9.2);
+    let gradedN = null;
+    const stats = U.el('bcv-ph-stats bcv-ph-stats--six', [
+      stat('Due today', String(dueToday.length), dueSheet('Due today', dueToday, todayStart, U.addDays(todayStart, 1), dayLine(now), 'Nothing is due today.'), 0),
+      stat('This week', String(dueWeek.length), dueSheet('Due this week', dueWeek, weekStart, weekEnd, `Week of ${U.fmtShort(weekStart)}`, 'Nothing is due this week.'), 2.3),
+      stat('Unread', unread ? String(unread.length) : '—', () => itemsSheet(app, {
+        title: 'Unread announcements', note: unread?.length ? U.plural(unread.length, 'announcement') : 'All caught up',
+        items: (unread || []).map((a) => annRow(a, 'unread')), empty: 'All caught up.', lead: 'Unread',
+        recent: W.recentOf('Read recently', readRecently.map((a) => annRow(a, 'read'))),
       }), 4.6),
+      overdueBtn,
+      stat('Tomorrow', String(dueTomorrow.length), dueSheet('Due tomorrow', dueTomorrow, U.addDays(todayStart, 1), U.addDays(todayStart, 2), dayLine(U.addDays(todayStart, 1)), 'Nothing is due tomorrow.'), 3.4),
+      gradedBtn,
     ]);
+    Promise.all([W.overdueP, W.gradedP]).then(([od, gr]) => {
+      if (!ctx.alive()) return;
+      if (!od || !gr) { overdueBtn.remove(); gradedBtn.remove(); return; }
+      const { overdue, lateIn } = od;
+      const overdueNote = () => (overdue.length ? 'Past due with nothing handed in' : 'Nothing past its due date without a submission');
+      // the X on a row dismisses it on Canvas's planner — the Dashboard's X, the To Do screen's
+      for (const o of overdue) o.clear = async () => { await store.dismiss(o.item); const i = overdue.indexOf(o); if (i >= 0) overdue.splice(i, 1); land(overdueBtn, overdue.length, 0); };
+      overdueN = {
+        open: () => itemsSheet(app, {
+          title: 'Overdue', note: overdueNote(), items: overdue, empty: 'Nothing is overdue.', lead: 'Not handed in', recent: W.recentOf('Handed in late', lateIn),
+          onCleared: (sheet) => { const n = sheet.querySelector('.bcv-ph-sheet__note'); if (n) n.textContent = overdueNote(); if (!sheet.querySelector('.bcv-ph-srow__item')) { const lead = sheet.querySelector('.bcv-ph-sheet__sec'); lead?.replaceWith(emptyRow('Nothing is overdue.')); } },
+        }),
+      };
+      land(overdueBtn, overdue.length, 6.9);
+      overdueBtn.classList.toggle('is-clear', !overdue.length);
+      const { graded, earlier, earned, possible } = gr;
+      gradedN = {
+        open: () => itemsSheet(app, {
+          title: 'Graded this week', note: graded.length ? `${store.fmtPts(earned)} of ${store.fmtPts(possible)} points earned · week of ${U.fmtShort(weekStart)}` : `Week of ${U.fmtShort(weekStart)}`,
+          items: graded, empty: 'Nothing has been graded this week.', lead: 'This week', recent: W.recentOf('Earlier', earlier),
+        }),
+      };
+      land(gradedBtn, graded.length, 9.2);
+    });
 
     // the list: what is due today (or, on a quiet day, what comes next)
     const list = dueToday.length ? dueToday : upcoming.slice(0, 6);
@@ -852,7 +932,7 @@
     const titleEl = bigTitle('Grades', { below: 'every course counts equally' });
     screen.append(titleEl, body);
     body.append(U.loading('rows', 4));
-    const [all, term, goalPref, hiddenPref, targetsPref] = await Promise.all([store.courses().catch(() => null), store.currentTerm().catch(() => ''), store.pref('gpaGoal'), store.pref('gpaHidden'), store.pref('gradeTargets')]);
+    const [all, term, goalPref, hiddenPref, targetsPref, trackingPref, snapsPref] = await Promise.all([store.courses().catch(() => null), store.currentTerm().catch(() => ''), store.pref('gpaGoal'), store.pref('gpaHidden'), store.pref('gradeTargets'), store.pref('gpaTracking'), store.pref('gpaSnapshots')]);
     if (!ctx.alive()) return screen;
     if (!all) {
       body.replaceChildren(U.errorBox('Your courses could not be loaded.'));
@@ -995,6 +1075,40 @@
       list.replaceChildren(...(rows.length ? rows.map((r, i) => card(r, i)) : [emptyRow('No current courses.')]));
       entered = true;
     }
+    // ---- the trend (2.98.36): the Grades page's own chart — the history its tracking keeps, a smooth
+    // curve through every day, a finger on it reading out that day's GPA ----
+    const tracking = !!(trackingPref && typeof trackingPref === 'object' && (trackingPref.since || Number.isFinite(trackingPref.priorGpa)));
+    const snaps = Array.isArray(snapsPref) ? snapsPref.filter((x) => x && x.date && Number.isFinite(x.gpa)) : [];
+    const trendCard = tracking && snaps.length >= 2 ? U.el('bcv-ph-card bcv-ph-trend', [
+      U.el('bcv-ph-trend__head', [U.text('bcv-ph-kicker', 'Trend', 'span'), U.text('bcv-ph-trend__range', `${gpa2(G.MIN_Y)} – ${gpa2(G.MAX_Y)}${goal > 0 ? ' · dashed is your goal' : ''}`, 'span')]),
+      ...G.trendChart(snaps, { goal: goal > 0 ? goal : null, animate: true, ticks: 4, minGap: 20 }),
+      U.text('bcv-ph-trend__note', `${U.plural(snaps.length, 'snapshot')} · drag along the line for any day`),
+    ]) : null;
+
+    // ---- Item grades (2.98.35 on the Grades page): every graded assignment, by letter ----
+    const itemSt = { band: 'all', more: false };
+    const { items: gItems, counts: gCounts } = G.gradedItems(courseList, gmFor);
+    const itemsHost = h('div');
+    function paintItems() {
+      const pick = itemSt.band === 'all' ? gItems : gItems.filter((it) => it.band === itemSt.band);
+      const n = itemSt.more ? pick.length : Math.min(pick.length, 12);
+      const rows = pick.slice(0, n).map(({ c, g, band, pct }) => h('a', { class: 'bcv-ph-row bcv-ph-irow', href: g.url || '#', onclick: (e) => { e.preventDefault(); if (g.url) openItem(app, g.url); } }, [
+        h('span', { class: 'bcv-ph-irow__dot', style: { background: c.color } }),
+        U.el('bcv-ph-row__body', [U.text('bcv-ph-row__title bcv-ellip', g.name), U.text('bcv-ph-row__sub bcv-ellip', `${c.shortName || c.name} · ${store.fmtPts(Math.round(pct * 10) / 10)}%`)]),
+        U.bandChip(band),
+        U.text('bcv-ph-row__right', `${store.fmtPts(g.earned)}/${store.fmtPts(g.possible)}`, 'span'),
+        chev(),
+      ]));
+      const more = pick.length > n ? h('button', { type: 'button', class: 'bcv-ph-more', text: `Show all ${pick.length}`, onclick: () => { itemSt.more = true; paintItems(); } }) : null;
+      itemsHost.replaceChildren(listCard(pick.length ? [...rows, more].filter(Boolean) : [emptyRow(`No ${itemSt.band} grades in your courses.`)]));
+    }
+    paintItems();
+    const itemsBlock = gItems.length ? h('div', { class: 'bcv-ph-items' }, [
+      groupHead('Item grades', 'by letter'),
+      U.el('bcv-ph-bands', U.bandSlider(gCounts, itemSt.band, (b) => { itemSt.band = b; itemSt.more = false; paintItems(); })),
+      itemsHost,
+    ]) : null;
+
     const warn = U.el('bcv-ph-warn', [U.svg(IC.warn, { size: 19, stroke: '#ff453a', width: 2.2, style: { flex: 'none' } }), U.text('bcv-ph-warn__t', 'This is not your actual score.', 'span')]);
     const whatIfRow = U.el('bcv-ph-card bcv-ph-whatif', [
       h('div', { style: { flex: '1', minWidth: '0' } }, [U.text('bcv-ph-whatif__t', 'What-if scores'), U.text('bcv-ph-whatif__s', 'Test outcomes. Nothing is saved.')]),
@@ -1003,7 +1117,7 @@
     warn.hidden = true;
     paintHero();
     drawList();
-    body.replaceChildren(enter(hero, 0, 380), whatIfRow, warn, list, U.hint('Term GPA is computed here from the scores Canvas reports, on a 4.0 scale with every course counting equally. It is not your school’s official GPA. Tap a course for its category rings and target.', 'bcv-ph-foot'));
+    body.replaceChildren(...[enter(hero, 0, 380), trendCard, whatIfRow, warn, list, itemsBlock].filter(Boolean), U.hint('Term GPA is computed here from the scores Canvas reports, on a 4.0 scale with every course counting equally. It is not your school’s official GPA. Tap a course for its category rings and target.', 'bcv-ph-foot'));
     return screen;
   }
 

@@ -159,8 +159,10 @@ try {
   check((await texts('.bcv-tabbar__item')).join(',') === 'Today,Courses,To Do,Grades,Calendar', `five tabs: ${(await texts('.bcv-tabbar__item')).join(', ')}`);
   check((await page.$eval('.bcv-tabbar__item.is-active', (e) => e.dataset.tab)) === 'dashboard', 'Today is the active tab');
   check((await texts('.bcv-ph-h1'))[0] === 'Today' && /^(Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday), \w+ \d+$/.test((await texts('.bcv-ph-title__sub'))[0]), `large title with the date line: ${(await texts('.bcv-ph-title__sub'))[0]}`);
+  // (2.98.36) the Dashboard's six counters, counted the Dashboard's way: Overdue and Graded land once each course's assignments are read
+  await eventually(async () => !(await texts('.bcv-ph-stat')).some((t) => /…/.test(t)), 8000);
   const stats = await texts('.bcv-ph-stat');
-  check(stats.length === 3 && /^Due today \d+$/.test(stats[0]) && /^This week \d+$/.test(stats[1]) && /^Unread \d+$/.test(stats[2]), `three counters, rolled to their values: ${stats.join(' | ')}`);
+  check(stats.length === 6 && /^Due today \d+$/.test(stats[0]) && /^This week \d+$/.test(stats[1]) && /^Unread \d+$/.test(stats[2]) && /^Overdue \d+$/.test(stats[3]) && /^Tomorrow \d+$/.test(stats[4]) && /^Graded \d+$/.test(stats[5]), `six counters, rolled to their values: ${stats.join(' | ')}`);
   check((await texts('.bcv-ph-ghead__t')).some((t) => /^(Today|Tonight|Next up)$/.test(t)) && (await page.$$('.bcv-ph-row')).length > 0, `the day's list: ${(await texts('.bcv-ph-ghead__t')).join(', ')}`);
   check((await raw('.bcv-ph-kicker')).includes('Week load') && (await page.$$('.bcv-ph-load__row')).length > 0, 'week load card with per-course bars');
   check(await visible('.bcv-ph-bell') && await visible('.bcv-ph-avatar') && !(await page.$('.bcv-reader-btn:not([hidden])')), 'the bell and the avatar on the title row; no reader button anywhere on the phone');
@@ -182,6 +184,14 @@ try {
   await sheet();
   await closeSheet();
   check(!(await page.$('.bcv-sheet-ov')), 'Escape closes the sheet');
+  // Overdue: the Dashboard's sheet in two — what is not handed in (each with its X), then, quieter, what was handed in late
+  const overdueN = Number(stats[3].replace(/\D/g, ''));
+  await press('.bcv-ph-stat:nth-child(4)');
+  await sheet();
+  const od = await page.evaluate(() => ({ title: document.querySelector('.bcv-ph-sheet__title')?.textContent, note: document.querySelector('.bcv-ph-sheet__note')?.textContent, secs: [...document.querySelectorAll('.bcv-ph-sheet__sec')].map((e) => e.textContent), lead: document.querySelectorAll('.bcv-ph-srow__item').length, x: document.querySelectorAll('.bcv-ph-srow__x').length, quiet: document.querySelectorAll('.bcv-ph-srow.is-quiet').length }));
+  check(od.title === 'Overdue' && od.lead === overdueN && od.x === overdueN && (overdueN ? od.note === 'Past due with nothing handed in' : true) && (!od.quiet || od.secs.includes('Handed in late')), `the Overdue sheet: ${overdueN} not handed in, each with an X, the late hand-ins quieter under them: ${JSON.stringify(od)}`);
+  await shot('01c-today-overdue');
+  await closeSheet();
 
   // the circle marks a row done (a planner override) and the row stays
   const firstRow = (await texts('.bcv-ph-row__title'))[0];
@@ -393,6 +403,30 @@ try {
   check(cards.length > 0 && ringFills.every((n) => n >= 1) && ringFills.filter((n) => n === 2).length === scoredN && (await page.$$('.bcv-ph-gcard.is-open')).length === 0, `${cards.length} course cards with rings (a fill on the ${scoredN} scored), all folded`);
   check((await texts('.bcv-ph-gcard__sub')).every((t) => /\d+ of \d+ graded|nothing graded/.test(t)) && (await texts('.bcv-ph-gcard__letter')).some((t) => /^[A-F][+−]?$/.test(t)), `cards show graded counts and letters: ${(await texts('.bcv-ph-gcard__letter')).join(', ')}`);
   await shot('04-grades');
+  // (2.98.36) Item grades: every graded assignment by letter, the Grades page's slider
+  const phStops = await page.$$eval('.bcv-ph-items .bcv-bands__stop', (els) => Object.fromEntries(els.map((e) => [e.dataset.band, Number(e.querySelector('.bcv-bands__n').textContent)])));
+  await page.click('.bcv-ph-items .bcv-bands__stop[data-band="A"]');
+  const phA = await page.$$eval('.bcv-ph-items .bcv-ph-irow', (els) => els.map((e) => e.querySelector('.bcv-bandchip')?.textContent));
+  check(phStops.all >= 5 && phStops.A >= 1 && phA.length === Math.min(12, phStops.A) && phA.every((c) => c === 'A'), `Item grades on the phone: the letter's work alone: ${JSON.stringify({ phStops, phA })}`);
+  await page.click('.bcv-ph-items .bcv-bands__stop[data-band="all"]');
+  // the trend: with tracking on and a history, the Grades page's curve; a finger on it reads out the day
+  await sw.evaluate(async (k) => {
+    const all = await chrome.storage.local.get(k); const p = all[k] || {};
+    p.gpaTracking = { since: '2026-01-10', priorGpa: 3.4, priorCourses: 8 };
+    p.gpaSnapshots = [['2026-01-10', 3.5], ['2026-02-10', 3.62], ['2026-03-10', 3.55], ['2026-04-10', 3.7], ['2026-05-10', 3.66], ['2026-06-10', 3.58]].map(([date, gpa]) => ({ date, gpa }));
+    await chrome.storage.local.set({ [k]: p });
+  }, `prefs:localhost:${PORT}`);
+  await page.reload();
+  await page.waitForSelector('.bcv-ph-trend .bcv-gpa__chart', { timeout: 15000 });
+  const phChart = await page.$eval('.bcv-ph-trend .bcv-gpa__chart', (e) => { const r = e.getBoundingClientRect(); return { x: r.left + r.width * 0.5, y: r.top + r.height / 2 }; });
+  await page.evaluate(([x, y]) => { document.querySelector('.bcv-ph-trend .bcv-gpa__chart').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerType: 'touch', clientX: x, clientY: y })); }, [phChart.x, phChart.y]);
+  const phTip = await page.evaluate(() => ({ tip: document.querySelector('.bcv-ph-trend .bcv-gpa__tip')?.textContent, shown: !document.querySelector('.bcv-ph-trend .bcv-gpa__tip')?.hidden, curve: /C/.test(document.querySelector('.bcv-ph-trend .bcv-gpa__curve')?.getAttribute('d') || ''), ticks: document.querySelectorAll('.bcv-ph-trend .bcv-gpa__tick').length }));
+  check(phTip.shown && /^3\.\d\d(Jan|Feb|Mar|Apr|May|Jun) \d+$/.test(phTip.tip || '') && phTip.curve && phTip.ticks >= 2 && phTip.ticks <= 4, `the phone's Grades carries the trend: a smooth curve, a finger reads out that day: ${JSON.stringify(phTip)}`);
+  await shot('04a-grades-trend');
+  await sw.evaluate(async (k) => { const all = await chrome.storage.local.get(k); const p = all[k] || {}; delete p.gpaTracking; delete p.gpaSnapshots; await chrome.storage.local.set({ [k]: p }); }, `prefs:localhost:${PORT}`);
+  await page.reload();
+  await page.waitForSelector('.bcv-ph-hero', { timeout: 15000 });
+  await rolled();
   // the goal stepper in the hero saves as it goes
   const before = (await texts('.bcv-ph-hero__goalv'))[0]; // 4.00, the top of the scale: so it steps down first
   await page.click('.bcv-ph-hero__step:first-child');

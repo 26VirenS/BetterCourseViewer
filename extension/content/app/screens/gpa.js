@@ -51,6 +51,136 @@
     return `${f.toFixed(1)} ${(c - f).toFixed(1)}`;
   };
 
+  // ---- the trend ------------------------------------------------------------------------------
+  /** A curve through points, smooth and monotone (Fritsch–Carlson): it bends between the points and
+   *  never swings past one, so a flat stretch stays flat and a peak is where the snapshot is. */
+  function smoothPath(p) {
+    const f = (v) => v.toFixed(2);
+    if (!p.length) return '';
+    if (p.length === 1) return `M${f(p[0].x)},${f(p[0].y)}`;
+    const n = p.length;
+    const dx = [], m = [];
+    for (let i = 0; i < n - 1; i++) { dx[i] = p[i + 1].x - p[i].x || 1e-6; m[i] = (p[i + 1].y - p[i].y) / dx[i]; }
+    const t = [m[0]];
+    for (let i = 1; i < n - 1; i++) t[i] = m[i - 1] * m[i] <= 0 ? 0 : (m[i - 1] + m[i]) / 2;
+    t[n - 1] = m[n - 2];
+    for (let i = 0; i < n - 1; i++) {
+      if (m[i] === 0) { t[i] = 0; t[i + 1] = 0; continue; }
+      const a = t[i] / m[i], b = t[i + 1] / m[i], q = a * a + b * b;
+      if (q > 9) { const k = 3 / Math.sqrt(q); t[i] = k * a * m[i]; t[i + 1] = k * b * m[i]; }
+    }
+    let d = `M${f(p[0].x)},${f(p[0].y)}`;
+    for (let i = 0; i < n - 1; i++) {
+      const h3 = dx[i] / 3;
+      d += `C${f(p[i].x + h3)},${f(p[i].y + t[i] * h3)} ${f(p[i + 1].x - h3)},${f(p[i + 1].y - t[i + 1] * h3)} ${f(p[i + 1].x)},${f(p[i + 1].y)}`;
+    }
+    return d;
+  }
+  /** Up to `n` indices spread across a history — the first and the last always — so a point added
+   *  from a past term keeps its place under the chart as the days pile up after it. */
+  const spreadIdx = (len, n = 8) => {
+    if (len <= n) return [...Array(len).keys()];
+    const idx = new Set();
+    for (let i = 0; i < n; i++) idx.add(Math.round((i * (len - 1)) / (n - 1)));
+    return [...idx].sort((a, b) => a - b);
+  };
+  const snapLabel = (s) => {
+    const thisYear = String(new Date().getFullYear());
+    return s.date === dayKey() ? 'Today' : `${U.fmtShort(`${s.date}T12:00:00`)}${s.date.slice(0, 4) === thisYear ? '' : ` ’${s.date.slice(2, 4)}`}`;
+  };
+  let trendSeq = 0;
+  /** The trend (2.98.36: the Grades page's Trend card and the phone's Grades): a smooth curve through
+   *  every snapshot, a soft fill under it, the goal dashed across; under it `ticks` dates spread over
+   *  the whole (the first and today always). The point under the pointer — a mouse hovering, a finger
+   *  dragging, the arrow keys once it has focus — shows as a dot on the curve with its date and GPA
+   *  over it. Returns [chart, axis]. */
+  function trendChart(snaps, { goal = null, animate = false, ticks = 8, minGap = 9 } = {}) {
+    const yAt = (v) => 92 - ((clamp(v, MIN_Y, MAX_Y) - MIN_Y) / (MAX_Y - MIN_Y)) * 84;
+    const xAt = (i) => 7 + i * (86 / Math.max(1, snaps.length - 1));
+    const pts = snaps.map((s, i) => ({ x: xAt(i), y: yAt(s.gpa), s }));
+    const svg = svgEl('svg', { viewBox: '0 0 100 100', preserveAspectRatio: 'none', 'aria-hidden': 'true' });
+    const gid = `bcv-trend-fill-${++trendSeq}`;
+    const defs = svgEl('defs', {});
+    const grad = svgEl('linearGradient', { id: gid, x1: '0', y1: '0', x2: '0', y2: '1' });
+    grad.append(svgEl('stop', { offset: '0', 'stop-color': '#0a84ff', 'stop-opacity': '.2' }), svgEl('stop', { offset: '1', 'stop-color': '#0a84ff', 'stop-opacity': '0' }));
+    defs.append(grad);
+    svg.append(defs);
+    if (goal !== null) svg.append(svgEl('line', { x1: '0', y1: yAt(goal).toFixed(2), x2: '100', y2: yAt(goal).toFixed(2), stroke: '#5856d6', 'stroke-width': '1.5', 'stroke-dasharray': '4 4', 'vector-effect': 'non-scaling-stroke', opacity: '.8', class: 'bcv-gpa__goalline' }));
+    const d = smoothPath(pts);
+    const first = pts[0], last = pts[pts.length - 1];
+    // on entry the curve is revealed from left to right (a clip sliding open: a dash the line's length
+    // would stay a dash pattern in Safari, which does not scale it) and the fill rises under it
+    svg.append(
+      svgEl('path', { d: `${d}L${last.x.toFixed(2)},100L${first.x.toFixed(2)},100Z`, fill: `url(#${gid})`, stroke: 'none', class: `bcv-gpa__area ${animate ? 'bcv-gpa__area--in' : ''}` }),
+      svgEl('path', { d, fill: 'none', stroke: '#0a84ff', 'stroke-width': '3', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'vector-effect': 'non-scaling-stroke', class: `bcv-gpa__curve ${animate ? 'bcv-gpa__line--draw' : ''}` }),
+    );
+    // today's point stays marked; every other shows when it is pointed at
+    const nowDot = h('span', { class: `bcv-gpa__pt ${animate ? 'bcv-gpa__pt--in' : ''}`, style: { left: `${last.x.toFixed(2)}%`, top: `${last.y.toFixed(2)}%`, '--bcv-delay': '1250ms' } });
+    const guide = h('span', { class: 'bcv-gpa__guide', hidden: true });
+    const dot = h('span', { class: 'bcv-gpa__hdot', hidden: true });
+    const tipV = U.text('bcv-gpa__tip-v', '', 'span');
+    const tipL = U.text('bcv-gpa__tip-l', '', 'span');
+    const tip = h('span', { class: 'bcv-gpa__tip', hidden: true, role: 'status' }, [tipV, tipL]);
+    const chart = U.el('bcv-gpa__chart', [svg, guide, nowDot, dot, tip], {
+      tabindex: '0',
+      'aria-label': `GPA trend, ${snaps.length} snapshots: ${gpa2(first.s.gpa)} on ${snapLabel(first.s)} to ${gpa2(last.s.gpa)} ${snapLabel(last.s) === 'Today' ? 'today' : `on ${snapLabel(last.s)}`}. Arrow keys step through them.`,
+    });
+    let at = -1;
+    let hideT = 0;
+    const show = (i) => {
+      clearTimeout(hideT);
+      at = clamp(i, 0, pts.length - 1);
+      const p = pts[at];
+      for (const e of [guide, dot, tip]) e.hidden = false;
+      guide.style.left = `${p.x}%`;
+      dot.style.left = `${p.x}%`;
+      dot.style.top = `${p.y}%`;
+      tip.style.left = `${p.x}%`;
+      tip.style.top = `${p.y}%`;
+      tip.classList.toggle('is-left', p.x < 16);
+      tip.classList.toggle('is-right', p.x > 84);
+      tip.classList.toggle('is-below', (p.y / 100) * (chart.clientHeight || 92) < 52); // (near the top: the label hangs under the point, not over the card's heading)
+      tipV.textContent = gpa2(p.s.gpa);
+      tipL.textContent = snapLabel(p.s);
+      chart.dataset.at = String(at);
+    };
+    const hide = () => { at = -1; for (const e of [guide, dot, tip]) e.hidden = true; delete chart.dataset.at; };
+    const nearest = (clientX) => {
+      const r = chart.getBoundingClientRect();
+      const x = ((clientX - r.left) / r.width) * 100;
+      let best = 0;
+      for (let i = 1; i < pts.length; i++) if (Math.abs(pts[i].x - x) < Math.abs(pts[best].x - x)) best = i;
+      return best;
+    };
+    let touching = false;
+    chart.addEventListener('pointermove', (e) => { if (e.pointerType === 'mouse' || touching) show(nearest(e.clientX)); });
+    chart.addEventListener('pointerleave', (e) => { if (e.pointerType === 'mouse' && document.activeElement !== chart) hide(); });
+    chart.addEventListener('pointerdown', (e) => { if (e.pointerType === 'mouse') return; touching = true; show(nearest(e.clientX)); });
+    const lift = () => { if (!touching) return; touching = false; hideT = setTimeout(hide, 1800); }; // (a finger lifted: the reading stays a moment, then goes)
+    chart.addEventListener('pointerup', lift);
+    chart.addEventListener('pointercancel', lift);
+    chart.addEventListener('focus', () => { if (at < 0) show(pts.length - 1); });
+    chart.addEventListener('blur', hide);
+    chart.addEventListener('keydown', (e) => {
+      const to = e.key === 'ArrowLeft' ? at - 1 : e.key === 'ArrowRight' ? at + 1 : e.key === 'Home' ? 0 : e.key === 'End' ? pts.length - 1 : null;
+      if (e.key === 'Escape') { hide(); return; }
+      if (to === null) return;
+      e.preventDefault();
+      show(to < 0 ? 0 : to);
+    });
+    // the dates under it: spread over the whole, the first and today always, and none crowding the one before
+    const dated = [];
+    for (const i of spreadIdx(pts.length, ticks)) {
+      if (dated.length && pts[i].x - pts[dated[dated.length - 1]].x < minGap) {
+        if (i !== pts.length - 1) continue;
+        if (dated.length > 1) dated.pop(); // (today keeps its place; the one before it gives way)
+      }
+      dated.push(i);
+    }
+    const axis = U.el('bcv-gpa__axis', dated.map((i) => h('span', { class: 'bcv-gpa__tick', style: { left: `${pts[i].x.toFixed(2)}%` } }, [U.text('bcv-gpa__tick-v', gpa2(pts[i].s.gpa), 'span'), U.text('bcv-gpa__tick-l', snapLabel(pts[i].s), 'span')])));
+    return [chart, axis];
+  }
+
   /** Points earned and still to come in a course, and what the remaining work
    *  must average to land a target. Counts only work that moves the final
    *  grade (no 0-point or "not counted" items), and follows the course's
@@ -230,34 +360,17 @@
       ]);
     }
 
-    /** Up to eight of the snapshots, spread across the whole history — the first and the last always —
-     *  so a point added from a past term stays on the chart as the days pile up after it. */
-    const spread = (all, n = 8) => {
-      if (all.length <= n) return all;
-      const idx = new Set();
-      for (let i = 0; i < n; i++) idx.add(Math.round((i * (all.length - 1)) / (n - 1)));
-      return [...idx].sort((a, b) => a - b).map((i) => all[i]);
-    };
     function trend() {
-      const pts = spread(snaps);
-      const enough = tracking && pts.length >= 2;
-      const yAt = (v) => 92 - ((clamp(v, MIN_Y, MAX_Y) - MIN_Y) / (MAX_Y - MIN_Y)) * 84;
+      const enough = tracking && snaps.length >= 2;
       let chart = null;
       if (enough) {
-        const coords = pts.map((s, i) => ({ x: 7 + i * (86 / (pts.length - 1)), y: yAt(s.gpa), s }));
-        const svg = svgEl('svg', { viewBox: '0 0 100 100', preserveAspectRatio: 'none' });
-        if (hasGoal()) svg.append(svgEl('line', { x1: '0', y1: yAt(goal).toFixed(2), x2: '100', y2: yAt(goal).toFixed(2), stroke: '#5856d6', 'stroke-width': '1.5', 'stroke-dasharray': '4 4', 'vector-effect': 'non-scaling-stroke', opacity: '.8' }));
-        // on entry the line is revealed from left to right (a clip sliding open: a dash the line's
-        // length would stay a dash pattern in Safari, which does not scale it) and the dots follow it
-        svg.append(
-          svgEl('polyline', { points: coords.map((p) => `${p.x.toFixed(2)},${p.y.toFixed(2)}`).join(' '), fill: 'none', stroke: '#0a84ff', 'stroke-width': '3', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'vector-effect': 'non-scaling-stroke', class: !entered ? 'bcv-gpa__line--draw' : '' }),
-        );
+        // (2.98.36) a smooth curve through every snapshot; the point under the pointer reads out
         const thisYear = String(new Date().getFullYear());
-        const label = (s) => (s.date === dayKey() ? 'Today' : `${U.fmtShort(`${s.date}T12:00:00`)}${s.date.slice(0, 4) === thisYear ? '' : ` ’${s.date.slice(2, 4)}`}`);
+        const drawn = trendChart(snaps, { goal: hasGoal() ? goal : null, animate: !entered });
+        const dated = drawn[1].childElementCount;
         chart = [
-          U.el('bcv-gpa__chart', [svg, ...coords.map((p, i) => h('span', { class: `bcv-gpa__pt ${!entered ? 'bcv-gpa__pt--in' : ''}`, style: { left: `${p.x.toFixed(2)}%`, top: `${p.y.toFixed(2)}%`, '--bcv-delay': `${Math.round(200 + 1050 * (i / Math.max(1, coords.length - 1)))}ms` } }))]),
-          U.el('bcv-gpa__axis', coords.map((p) => h('span', { class: 'bcv-gpa__tick', style: { left: `${p.x.toFixed(2)}%` } }, [U.text('bcv-gpa__tick-v', gpa2(p.s.gpa), 'span'), U.text('bcv-gpa__tick-l', label(p.s), 'span')]))),
-          h('p', { class: 'bcv-gpa__note bcv-pretty', text: `${U.plural(snaps.length, 'snapshot')} since ${U.fmtShort(`${snaps[0].date}T12:00:00`)}${snaps[0].date.slice(0, 4) === thisYear ? '' : ` ${snaps[0].date.slice(0, 4)}`}${snaps.length > pts.length ? `, ${pts.length} of them shown, spread across the whole` : ''} — Canvas keeps no grade history; past points can be added in settings.` }),
+          ...drawn,
+          h('p', { class: 'bcv-gpa__note bcv-pretty', text: `${U.plural(snaps.length, 'snapshot')} since ${U.fmtShort(`${snaps[0].date}T12:00:00`)}${snaps[0].date.slice(0, 4) === thisYear ? '' : ` ${snaps[0].date.slice(0, 4)}`}${snaps.length > dated ? `, ${dated} dated below` : ''} — point at the line for any day. Canvas keeps no grade history; past points can be added in settings.` }),
         ];
       } else {
         chart = [U.el('bcv-gpa__empty', [
@@ -430,17 +543,8 @@
     const itemSt = { band: 'all', more: false };
     const ITEMS_AT_ONCE = 12;
     function itemGrades() {
-      const items = [];
-      for (const c of courses) {
-        if (hidden.has(String(c.id))) continue;
-        for (const g of gmFor(c).rows) {
-          const band = U.gradeBand(g.earned, g.possible, g.gradingType);
-          if (band) items.push({ c, g, band, pct: (g.earned / g.possible) * 100 });
-        }
-      }
+      const { items, counts } = gradedItems(courses.filter((c) => !hidden.has(String(c.id))), gmFor);
       if (!items.length) return null;
-      const counts = {};
-      for (const it of items) counts[it.band] = (counts[it.band] || 0) + 1;
       const host = h('div');
       const paint = () => {
         const pick = itemSt.band === 'all' ? items : items.filter((it) => it.band === itemSt.band);
@@ -933,5 +1037,21 @@
     return true;
   }
 
-  BCV.screens.gpa = { render, courseMath, SCALE, letterFor, pointsFor, targetIndex, prefetch };
+  /** Every graded assignment across the courses given, with its letter (U.gradeBand), course by course
+   *  in the order given, each course's by due date; and how many hold each letter. The Grades page's
+   *  Item grades and the phone's. */
+  function gradedItems(courses, gmFor) {
+    const items = [];
+    for (const c of courses) {
+      for (const g of gmFor(c).rows) {
+        const band = U.gradeBand(g.earned, g.possible, g.gradingType);
+        if (band) items.push({ c, g, band, pct: (g.earned / g.possible) * 100 });
+      }
+    }
+    const counts = {};
+    for (const it of items) counts[it.band] = (counts[it.band] || 0) + 1;
+    return { items, counts };
+  }
+
+  BCV.screens.gpa = { render, courseMath, SCALE, letterFor, pointsFor, targetIndex, prefetch, trendChart, gradedItems, MIN_Y, MAX_Y };
 })();

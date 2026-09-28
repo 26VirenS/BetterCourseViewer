@@ -25,6 +25,11 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.98.36', date: '2026-09-28', notes: [
+      { kind: 'improved', title: 'Smoother grade curve', body: 'Point at the trend line to read any day.', icon: P.steps },
+      { kind: 'new', title: 'Six counters on phone', body: 'Phone Today shows Overdue, Tomorrow and Graded.', icon: P.list },
+      { kind: 'new', title: 'Item grades on phone', body: 'Phone Grades lists your work by letter.', icon: P.layers },
+    ] },
     { version: '2.98.35', date: '2026-09-28', notes: [
       { kind: 'new', title: 'Grades by letter', body: 'Slide to A, B, C, D or F to list that work.', icon: P.steps },
       { kind: 'new', title: 'Item grades', body: 'Every graded assignment, all courses, on Grades.', icon: P.list },
