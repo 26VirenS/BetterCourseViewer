@@ -25,6 +25,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.98.34', date: '2026-09-28', notes: [
+      { kind: 'new', title: 'Highlight a group', body: 'Press a grade group to light up its ring and work.', icon: P.layers },
+    ] },
     { version: '2.98.33', date: '2026-09-27', notes: [
       { kind: 'fixed', title: 'Answers stay saved', body: 'Every answer reaches Canvas, checked before you submit.', icon: P.check },
       { kind: 'fixed', title: 'Marks match points', body: 'An answer given full points shows as correct.', icon: P.eye },

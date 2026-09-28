@@ -965,7 +965,46 @@
     });
   }
 
+  /** A grade group picked by a press (the course's Grades tab, the Grades page's details): every
+   *  element under `root` with a data-group names the group it belongs to, and pressing one with a
+   *  data-pick picks that group — pressing it again, one with an empty data-pick, or Escape lets it
+   *  go. The picked group's elements are marked is-picked, the rest is-dim, the root has-pick.
+   *  `st.pick` keeps the choice across redraws: call apply() after each. Nothing is redrawn. */
+  function groupPicker(root, st, { onChange = null } = {}) {
+    const apply = () => {
+      const pick = st.pick || null;
+      root.classList.toggle('has-pick', !!pick);
+      for (const e of root.querySelectorAll('[data-group]')) {
+        const on = !!pick && e.dataset.group === pick;
+        e.classList.toggle('is-picked', on);
+        e.classList.toggle('is-dim', !!pick && !on);
+        if (e.hasAttribute('data-pick') && e.dataset.pick) e.setAttribute('aria-pressed', on ? 'true' : 'false');
+      }
+      onChange?.(pick);
+    };
+    const toggle = (id) => { st.pick = !id || st.pick === id ? null : id; apply(); };
+    const pickOf = (e) => { const t = e.target?.closest?.('[data-pick]'); return t && root.contains(t) ? t : null; };
+    root.addEventListener('click', (e) => { const t = pickOf(e); if (!t) return; e.preventDefault(); e.stopPropagation(); toggle(t.dataset.pick); });
+    root.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && st.pick) { e.stopPropagation(); toggle(null); return; }
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      const t = pickOf(e);
+      if (!t || t.tagName === 'BUTTON') return; // (a button presses itself)
+      e.preventDefault();
+      toggle(t.dataset.pick);
+    });
+    return { apply, toggle };
+  }
+  /** The attributes that make an element one of a grade group's (see groupPicker): `pick` makes a
+   *  press on it pick the group, with its name for the reader. */
+  function groupAttrs(id, color, { pick = false, name = '' } = {}) {
+    const a = { 'data-group': String(id), style: { '--bcv-grp': color || 'var(--bcv-ink3)' } };
+    if (pick) Object.assign(a, { 'data-pick': String(id), role: 'button', tabindex: '0', 'aria-pressed': 'false', title: name ? `Show what counts toward ${name}` : null });
+    return a;
+  }
+
   BCV.ui = {
+    groupPicker, groupAttrs,
     svg, star, chev, el, text, tile, dot, card, row, label, h2, groupHead, badge, statusBadge, seg, search, switchEl, btn, iconbtn, pill, placeDot,
     empty, emptyCard, loading, errorBox, hint, avatar, toast, menu, closeMenus, picker, colorMenu, COURSE_COLORS, fmtDay, datePop, dateField, promptSheet, askSheet,
     DAY, startOfDay, addDays, sameDay, dayDiff, startOfWeek, parse, MONTHS, MONTHS_LONG, DAYS, DAYS_LONG,

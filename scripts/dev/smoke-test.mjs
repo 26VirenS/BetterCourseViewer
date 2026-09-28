@@ -1202,6 +1202,12 @@ try {
   await page.waitForTimeout(500); // (the sheet's morph out of the Details button settles before it is measured)
   const detailBox = await page.$eval('.bcv-gpa-detail', (e) => { const cols = e.querySelector('.bcv-gpa-detail__cols'); const right = e.querySelector('.bcv-gpa-detail__col--right'); const r = e.getBoundingClientRect(); return { w: Math.round(r.width), h: Math.round(r.height), cols: getComputedStyle(cols).gridTemplateColumns.split(' ').length, rightScrolls: right.scrollHeight > right.clientHeight + 2, sheetScrolls: e.scrollHeight > e.clientHeight + 2, go: e.querySelector('.bcv-gpa-detail__go')?.textContent.trim(), goTag: e.querySelector('.bcv-gpa-detail__go')?.tagName, goByX: !!e.querySelector('.bcv-sheet__head .bcv-gpa-detail__go + .bcv-sheet__close'), link: !!e.querySelector('.bcv-gpa-detail__link') }; });
   check(detailBox.w >= 1000 && detailBox.h === 720 && detailBox.cols === 2 && detailBox.rightScrolls && !detailBox.sheetScrolls && detailBox.go === 'Open the course’s Grades page' && detailBox.goTag === 'BUTTON' && detailBox.goByX && !detailBox.link, `the sheet is one steady size, split in two, the assignments scrolling inside their column, with a real button to the course's page up by the X: ${JSON.stringify(detailBox)}`);
+  // a group pressed in the sheet picks out its ring and its assignments (2.98.34); Escape lets it go first, and the sheet stays
+  await page.locator('.bcv-gpa-detail__grow[data-pick]', { hasText: 'Effort' }).click();
+  const sheetPick = await page.evaluate(() => ({ has: !!document.querySelector('.bcv-gpa-detail.has-pick'), rows: [...document.querySelectorAll('.bcv-gpa-detail__arow.is-picked .bcv-gpa-detail__agroup')].map((e) => e.textContent.split(' · ')[0]), dim: document.querySelectorAll('.bcv-gpa-detail__arow.is-dim').length, rings: document.querySelectorAll('.bcv-gpa-detail__ring circle.is-picked').length, note: document.querySelector('.bcv-gpa-detail__picknote')?.textContent }));
+  await page.keyboard.press('Escape');
+  const sheetEsc = await page.evaluate(() => ({ open: !!document.querySelector('.bcv-gpa-detail'), has: !!document.querySelector('.bcv-gpa-detail.has-pick'), note: document.querySelector('.bcv-gpa-detail__picknote')?.textContent }));
+  check(sheetPick.has && sheetPick.rows.length === 8 && sheetPick.rows.every((g) => g === 'Effort') && sheetPick.dim === 9 && sheetPick.rings === 2 && sheetPick.note === 'Effort · 8 assignmentsShow all' && sheetEsc.open && !sheetEsc.has && sheetEsc.note === 'Blue dot means graded', `the details sheet: a group pressed picks out its ring and assignments, Escape lets it go and leaves the sheet open: ${JSON.stringify({ sheetPick, sheetEsc })}`);
   // the Grades page lists the same assignments, and they open the same way the course page's do
   const gpaRow = await page.$eval('.bcv-gpa-detail__arow', (e) => ({ tag: e.tagName, href: e.getAttribute('href'), name: e.querySelector('.bcv-gpa-detail__aname')?.textContent }));
   check(gpaRow.tag === 'A' && /\/courses\/\d+\/assignments\/\d+$/.test(gpaRow.href || ''), `a row on the Grades page opens the assignment it is about: ${JSON.stringify(gpaRow)}`);
@@ -1890,6 +1896,41 @@ try {
   check(gradeRows.some((t) => /Skills_Check.*Not counted toward final grade/.test(t)) && gradeRows.some((t) => /Transformation.*Late/.test(t)), 'late / not-counted badges');
   check(!(await page.$('.bcv-grades__side')) && !(await texts('.bcv-label')).some((t) => /assignment group weights/i.test(t)), 'no separate group-weights card: the weights live in the grade card');
   await shot(page, '16-course-grades');
+  // a group pressed (2.98.34): its ring, its weight and its assignments stay, the rest steps back; its
+  // weight row and its ring pick it the same way; pressed again, Show all, or Escape lets it go
+  const pickState = () => page.evaluate(() => ({
+    rows: [...document.querySelectorAll('.bcv-grades__main .bcv-row.is-picked .bcv-row__sub')].map((e) => e.textContent.split(' · ')[0]),
+    dim: document.querySelectorAll('.bcv-grades__main .bcv-row.is-dim').length,
+    rings: document.querySelectorAll('.bcv-rings__svg circle.is-picked').length,
+    ringsDim: document.querySelectorAll('.bcv-rings__svg circle.is-dim').length,
+    legend: [...document.querySelectorAll('.bcv-legend__row.is-picked .bcv-legend__label')].map((e) => e.textContent).join(),
+    seg: document.querySelectorAll('.bcv-wbar__seg.is-picked').length,
+    pressed: document.querySelector('.bcv-legend__row.is-picked')?.getAttribute('aria-pressed') || null,
+    note: document.querySelector('.bcv-gr__picknote')?.textContent,
+    has: !!document.querySelector('.bcv-body.has-pick'),
+  }));
+  await page.locator('.bcv-legend__row[data-pick]', { hasText: 'Effort' }).click();
+  const pickEffort = await pickState();
+  check(pickEffort.rows.length === 8 && pickEffort.rows.every((g) => g === 'Effort') && pickEffort.dim === 9 && pickEffort.rings === 2 && pickEffort.ringsDim === 6 && pickEffort.legend === 'Effort' && pickEffort.pressed === 'true' && pickEffort.note === 'Effort · 8 assignmentsShow all', `pressing a group picks out its ring and its assignments; the rest steps back: ${JSON.stringify(pickEffort)}`);
+  await shot(page, '16b-course-grades-group');
+  await page.locator('.bcv-wbar__row[data-pick]', { hasText: 'Midterms' }).click();
+  const pickMid = await pickState();
+  check(pickMid.rows.length === 2 && pickMid.rows.every((g) => g === 'Midterms') && pickMid.seg === 1 && pickMid.rings === 0 && pickMid.ringsDim === 8 && pickMid.legend === 'Midterms' && pickMid.note === 'Midterms · 2 assignmentsShow all', `a weight row picks its group too, one with nothing graded (no ring) included: ${JSON.stringify(pickMid)}`);
+  const dqRing = await page.$eval('.bcv-rings__svg circle[data-pick]', (c) => { const r = c.getBoundingClientRect(); return { x: r.left + 1, y: r.top + r.height / 2, id: c.dataset.pick }; }); // (on the ring's own line: its box's edge)
+  await page.mouse.click(dqRing.x, dqRing.y);
+  const pickRing = await pickState();
+  check(pickRing.legend === 'Discussion Quizzes' && pickRing.rows.length === 3 && pickRing.rings === 2 && pickRing.note === 'Discussion Quizzes · 3 assignmentsShow all', `pressing a ring picks the group it is: ${JSON.stringify(pickRing)}`);
+  await page.locator('.bcv-legend__row[data-pick]', { hasText: 'Discussion Quizzes' }).click();
+  const pickAgain = await pickState();
+  await page.focus('.bcv-legend__row[data-pick]:nth-of-type(3)');
+  await page.keyboard.press('Enter');
+  const pickKey = await pickState();
+  await page.keyboard.press('Escape');
+  const pickEsc = await pickState();
+  await page.locator('.bcv-legend__row[data-pick]', { hasText: 'Collaboration' }).click();
+  await page.click('.bcv-gr__pickchip');
+  const pickAll = await pickState();
+  check(!pickAgain.has && pickAgain.note === 'Arranged by due date' && pickKey.has && pickKey.pressed === 'true' && !pickEsc.has && !pickAll.has && pickAll.dim === 0 && pickAll.note === 'Arranged by due date', `pressed again, Show all or Escape lets it go; Enter picks from the keyboard: ${JSON.stringify({ pickAgain: pickAgain.has, pickKey: pickKey.legend, pickEsc: pickEsc.has, pickAll: pickAll.has })}`);
   await page.click('.bcv-whatif-btn');
   await page.waitForSelector('.bcv-banner', { timeout: 5000 });
   check((await texts('.bcv-banner__title'))[0] === 'This is not your actual score.', 'what-if banner');

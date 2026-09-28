@@ -1329,7 +1329,7 @@
     // rings: outer = total, then one per group with graded work (five at most; the rest are legend only)
     const radii = [72, 56, 40, 24, 10];
     const widths = [12, 12, 12, 11, 7];
-    const ringSrc = [{ pct: total, color: '#34c759', zero: false }].concat(scored.map((g) => ({ pct: g.pct, color: g.color, zero: g.zero })));
+    const ringSrc = [{ id: null, pct: total, color: '#34c759', zero: false }].concat(scored.map((g) => ({ id: g.id, pct: g.pct, color: g.color, zero: g.zero })));
     const rings = ringSrc.slice(0, radii.length).map((r, i) => {
       const rad = radii[i];
       const c = 2 * Math.PI * rad;
@@ -1338,7 +1338,7 @@
       const col = colorOf(i, r.color);
       const patternId = `bcv-stipple-${courseInfo.id}-${i}`;
       return {
-        r: rad, w: widths[i], color: col, zero: r.zero, patternId,
+        id: r.id, r: rad, w: widths[i], color: col, zero: r.zero, patternId, // (id: the group the ring is; null for the total)
         track: dark ? 'rgba(255,255,255,.1)' : 'rgba(120,120,128,.16)',
         dash: `${filled.toFixed(1)} ${(c - filled).toFixed(1)}`,
         cap: pct > 0 ? 'round' : 'butt', arc: pct > 0 ? (r.zero ? `url(#${patternId})` : col) : 'transparent',
@@ -1356,9 +1356,9 @@
       if (!ringed) bits.push('legend only');
       return { id: g.id, label: g.name, detail: bits.join(' · '), weightText: weightText(g), value: g.pct === null ? '—' : `${g.pct}%`, pct: g.pct, weight: g.weight, color: colorOf(i + 1, g.color), ringed, zero: g.zero };
     });
-    const ungraded = groupStats.filter((g) => !g.graded).map((g) => ({ name: g.name, weightText: weighted ? `${g.weight}%` : '' }));
+    const ungraded = groupStats.filter((g) => !g.graded).map((g) => ({ id: g.id, name: g.name, weightText: weighted ? `${g.weight}%` : '' }));
     const bearing = groupStats.filter((g) => g.weight > 0);
-    const weightBar = weighted ? bearing.map((g) => ({ name: g.name, weight: g.weight, graded: g.graded, color: g.graded ? (whatIfOn ? gray[0] : g.color) : null, scoreLabel: g.graded ? `${g.pct}%` : 'ungraded' })) : [];
+    const weightBar = weighted ? bearing.map((g) => ({ id: g.id, name: g.name, weight: g.weight, graded: g.graded, color: g.graded ? (whatIfOn ? gray[0] : g.color) : null, scoreLabel: g.graded ? `${g.pct}%` : 'ungraded' })) : [];
     const zeros = weighted ? groupStats.filter((g) => g.weight === 0) : [];
     const listNames = (arr) => (arr.length <= 1 ? arr.join('') : `${arr.slice(0, -1).join(', ')} and ${arr[arr.length - 1]}`);
     const one = zeros.length === 1;

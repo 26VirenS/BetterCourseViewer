@@ -2,7 +2,8 @@
  * total, one ring per assignment group with graded work, 0%-weight rings
  * stippled) beside the total, a By-group legend and the weight bar, then
  * the assignment list. What-if mode recolours it all gray and never leaves
- * the browser. */
+ * the browser. Pressing a group (its legend row, its weight, its ring) picks
+ * it out: its ring, weight and assignments stay, the rest steps back. */
 (function () {
   const BCV = (self.BCV = self.BCV || {});
   const { h } = BCV.utils;
@@ -26,9 +27,25 @@
     const whatIfAllowed = (await store.pref('whatIfScores', true)) !== false; // Settings → Grades → Show what-if scores
     if (!whatIfAllowed) st.on = false;
     let focusId = null;
+    // the group picked out (U.groupPicker), kept across what-if redraws; the list's header says which
+    const pickSt = { pick: null };
+    let gm = null;
+    const pickNote = h('span', { class: 'bcv-group__sub bcv-ml-auto bcv-gr__picknote' });
+    function notePick(pick) {
+      const name = pick && gm ? (gm.legend.find((r) => r.id === pick)?.label ?? gm.ungraded.find((u) => u.id === pick)?.name) : null;
+      if (!name) { pickNote.replaceChildren('Arranged by due date'); return; }
+      const n = gm.rows.filter((r) => r.groupId === pick).length;
+      pickNote.replaceChildren(h('button', { type: 'button', class: 'bcv-gr__pickchip', 'data-pick': '', style: { '--bcv-grp': colorOf(pick) }, 'aria-label': `Showing ${name}; show every assignment` }, [
+        h('span', { class: 'bcv-gr__pickdot' }),
+        U.text('bcv-gr__pickname', `${name} · ${U.plural(n, 'assignment')}`, 'span'),
+        U.text('bcv-gr__pickall', 'Show all', 'span'),
+      ]));
+    }
+    const colorOf = (id) => gm?.legend.find((r) => r.id === id)?.color || gm?.weightBar.find((w) => w.id === id)?.color || null;
+    const picker = U.groupPicker(b, pickSt, { onChange: notePick });
 
     function draw() {
-      const gm = store.gradeModel(groups, c, st.values, st.on, dark);
+      gm = store.gradeModel(groups, c, st.values, st.on, dark);
       const parts = [];
       if (st.on) {
         parts.push(U.el('bcv-banner', [
@@ -60,8 +77,19 @@
         }
         svg.append(defs);
       }
-      for (const r of gm.rings) svg.append(circle(r.r, r.track, null, null, r.w));
-      for (const r of gm.rings) svg.append(circle(r.r, r.arc, r.cap, r.dash, r.w));
+      // each group's ring is that group's (pressed, it picks the group out); the outer one is the total
+      const ringOf = (el, r) => {
+        el.setAttribute('data-group', r.id || 'total');
+        if (r.id) {
+          el.setAttribute('data-pick', r.id);
+          const t = ns('title');
+          t.textContent = gm.legend.find((x) => x.id === r.id)?.label || '';
+          el.append(t);
+        }
+        return el;
+      };
+      for (const r of gm.rings) svg.append(ringOf(circle(r.r, r.track, null, null, r.w), r));
+      for (const r of gm.rings) svg.append(ringOf(circle(r.r, r.arc, r.cap, r.dash, r.w), r));
       const center = U.el('bcv-gr__center', [
         U.text('bcv-gr__label', gm.center.label),
         h('span', { class: 'bcv-gr__total', style: { color: gm.center.color }, text: gm.center.value }),
@@ -77,13 +105,13 @@
         U.el('bcv-legend__body', [U.text('bcv-legend__label', r.label, 'span'), U.text('bcv-legend__detail', r.detail, 'span')]),
         U.text('bcv-legend__weight', r.weightText, 'span'),
         U.text(`bcv-legend__value ${r.zero ? 'bcv-legend__value--muted' : ''}`, r.value, 'span'),
-      ]);
+      ], U.groupAttrs(r.id, r.color, { pick: true, name: r.label }));
       const ungradedRow = (u) => U.el('bcv-legend__row bcv-legend__row--ungraded', [
         h('span', { class: 'bcv-legend__dot' }),
         U.el('bcv-legend__body', [U.text('bcv-legend__label bcv-ungraded__name', u.name, 'span'), U.text('bcv-legend__detail', 'Nothing graded yet — no ring', 'span')]),
         U.text('bcv-legend__weight', u.weightText, 'span'),
         U.text('bcv-legend__value', '—', 'span'),
-      ]);
+      ], U.groupAttrs(u.id, null, { pick: true, name: u.name }));
       const byGroup = U.el('bcv-gr__sec', [
         U.text('bcv-gr__h', 'By group'),
         ...gm.legend.map(legendRow),
@@ -96,13 +124,13 @@
       if (gm.weighted) {
         weightsSec = U.el('bcv-gr__sec bcv-gr__sec--w', [
           U.el('bcv-gr__hrow', [U.text('bcv-gr__h', 'How the grade is weighted', 'span'), U.text('bcv-gr__hsub', `${gm.weightSum}% of final grade`, 'span')]),
-          gm.weightBar.length ? U.el('bcv-wbar', gm.weightBar.map((w) => h('div', { class: `bcv-wbar__seg ${w.graded ? '' : 'bcv-wbar__seg--ungraded'}`, style: { flex: `${w.weight} 1 0`, background: w.color || '' }, title: `${w.name} · ${w.weight}%` }))) : null,
+          gm.weightBar.length ? U.el('bcv-wbar', gm.weightBar.map((w) => { const ga = U.groupAttrs(w.id, w.color, { pick: true, name: w.name }); return h('div', { ...ga, class: `bcv-wbar__seg ${w.graded ? '' : 'bcv-wbar__seg--ungraded'}`, style: { ...ga.style, flex: `${w.weight} 1 0`, background: w.color || '' }, title: `${w.name} · ${w.weight}%` }); })) : null,
           U.el('bcv-wbar__rows', gm.weightBar.map((w) => U.el('bcv-wbar__row', [
             h('span', { class: `bcv-wbar__dot ${w.graded ? '' : 'bcv-wbar__dot--ungraded'}`, style: { background: w.color || '' } }),
             U.text('bcv-wbar__name', w.name, 'span'),
             U.text('bcv-wbar__w', `${w.weight}% of grade`, 'span'),
             U.text(`bcv-wbar__score ${w.graded ? '' : 'bcv-wbar__score--ungraded'}`, w.scoreLabel, 'span'),
-          ]))),
+          ], U.groupAttrs(w.id, w.color, { pick: true, name: w.name })))),
           gm.weightBar.length ? null : U.text('bcv-gr__wnote bcv-pretty', 'No assignment group carries weight yet.'),
           gm.weightNote ? h('p', { class: 'bcv-gr__wnote bcv-pretty', text: gm.weightNote }) : null,
         ]);
@@ -134,7 +162,7 @@
         }
         // the whole row opens the assignment it is a line about — a grade is the start of a question
         // ("why?"), and the answer is on the assignment's own page
-        return U.row([
+        const row = U.row([
           U.el('bcv-row__body', [
             h('div', { style: { display: 'flex', alignItems: 'baseline', gap: '8px', flexWrap: 'wrap' } }, [U.text('bcv-grade__name bcv-pretty', g.name, 'span'), g.badge ? U.badge(g.badge, g.badge === 'Late' ? 'orange' : g.badge === 'Missing' ? 'red' : '', 'bcv-badge--xs') : null]),
             // the group, the dates, and — on a marked assignment — how the class did (Canvas's own mean, high and low)
@@ -144,14 +172,19 @@
           scoreEl,
           g.url ? U.chev() : null,
         ], { href: g.url || null });
+        row.dataset.group = g.groupId; // (the group it counts toward: picked out with it)
+        row.style.setProperty('--bcv-grp', colorOf(g.groupId) || 'var(--bcv-ink3)');
+        return row;
       });
       const tableCard = h('div', {}, [
-        U.el('bcv-group__head bcv-group__head--10', [U.h2('Assignments'), U.text('bcv-group__sub bcv-ml-auto', 'Arranged by due date', 'span')]),
+        U.el('bcv-group__head bcv-group__head--10', [U.h2('Assignments'), pickNote]),
         rows.length ? U.card(rows, 'bcv-card--list') : U.emptyCard('No assignments in this course.'),
       ]);
 
       // The weights live in the grade card's "How the grade is weighted" section; no separate card.
       b.replaceChildren(...parts, U.el('bcv-grades__main', [ringsCard, tableCard]));
+      if (pickSt.pick && !gm.rows.some((r) => r.groupId === pickSt.pick) && !gm.legend.some((r) => r.id === pickSt.pick) && !gm.ungraded.some((u) => u.id === pickSt.pick)) pickSt.pick = null;
+      picker.apply();
       if (focusId) {
         const el = b.querySelector(`[data-wf="${CSS.escape(focusId)}"]`);
         if (el) { el.focus(); el.select(); }

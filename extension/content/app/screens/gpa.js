@@ -305,22 +305,25 @@
     const ringTrack = () => (ctx.dark ? 'rgba(255,255,255,.1)' : 'rgba(120,120,128,.16)');
     /** One thin ring per graded group (three at most), nested inside the course ring; each
      *  sweeps in as it mounts (on hover, in the Details sheet), 90ms apart. */
-    function catCircles(cats) {
+    /** `pick`: each group's ring is that group's (U.groupPicker), pressed to pick the group out. */
+    function catCircles(cats, pick = false) {
       const out = [];
+      const mark = (ct) => (pick ? { 'data-group': ct.id, 'data-pick': ct.id } : {});
       cats.slice(0, CAT_R.length).forEach((ct, k) => {
-        out.push(svgEl('circle', { cx: 28, cy: 28, r: CAT_R[k], fill: 'none', stroke: ringTrack(), 'stroke-width': 4.5 }));
-        if (ct.pct !== null) out.push(svgEl('circle', { cx: 28, cy: 28, r: CAT_R[k], fill: 'none', stroke: ct.color, 'stroke-width': 4.5, 'stroke-linecap': 'round', 'stroke-dasharray': dashFor(ct.pct, CAT_R[k]), class: 'bcv-ring--fill bcv-ring--fill-cat', style: `--bcv-delay: ${k * 90}ms` }));
+        out.push(svgEl('circle', { cx: 28, cy: 28, r: CAT_R[k], fill: 'none', stroke: ringTrack(), 'stroke-width': 4.5, ...mark(ct) }));
+        if (ct.pct !== null) out.push(svgEl('circle', { cx: 28, cy: 28, r: CAT_R[k], fill: 'none', stroke: ct.color, 'stroke-width': 4.5, 'stroke-linecap': 'round', 'stroke-dasharray': dashFor(ct.pct, CAT_R[k]), class: 'bcv-ring--fill bcv-ring--fill-cat', style: `--bcv-delay: ${k * 90}ms`, ...mark(ct) }));
       });
       return out;
     }
     /** The ring (drawn at 82px on the cards, 62px in the Details sheet): the course total, plus the
      *  group rings nested inside when expanded. `delay` (ms) sweeps the course arc in from empty;
      *  null draws it at its value at once. */
-    function ringSvg(c, pct, cats, expanded, delay = null) {
+    function ringSvg(c, pct, cats, expanded, delay = null, pick = false) {
       const svg = svgEl('svg', { viewBox: '0 0 56 56', class: 'bcv-gpa__ringsvg' });
-      svg.append(svgEl('circle', { cx: 28, cy: 28, r: RING_R, fill: 'none', stroke: ringTrack(), 'stroke-width': 6 }));
-      if (pct !== null) svg.append(svgEl('circle', { cx: 28, cy: 28, r: RING_R, fill: 'none', stroke: c.color, 'stroke-width': 6, 'stroke-linecap': 'round', 'stroke-dasharray': dashFor(pct, RING_R), ...(delay === null ? {} : { class: 'bcv-ring--fill', style: `--bcv-delay: ${delay}ms` }) }));
-      if (expanded) svg.append(...catCircles(cats));
+      const total = pick ? { 'data-group': 'total' } : {}; // (the course's own ring steps back when a group is picked out)
+      svg.append(svgEl('circle', { cx: 28, cy: 28, r: RING_R, fill: 'none', stroke: ringTrack(), 'stroke-width': 6, ...total }));
+      if (pct !== null) svg.append(svgEl('circle', { cx: 28, cy: 28, r: RING_R, fill: 'none', stroke: c.color, 'stroke-width': 6, 'stroke-linecap': 'round', 'stroke-dasharray': dashFor(pct, RING_R), ...(delay === null ? {} : { class: 'bcv-ring--fill', style: `--bcv-delay: ${delay}ms` }), ...total }));
+      if (expanded) svg.append(...catCircles(cats, pick));
       return svg;
     }
     const catRow = (ct) => U.el('bcv-gpa__cat', [h('span', { class: 'bcv-gpa__catdot', style: { background: ct.color } }), U.text('bcv-gpa__catname bcv-ellip', ct.label, 'span'), U.text('bcv-gpa__catpct', ct.value, 'span')]);
@@ -460,6 +463,25 @@
       whatIfBy.set(c.id, wf);
       if (!whatIfAllowed) wf.on = false;
       let focusId = null; // the field to put the caret back in after a repaint (a double-click on a score starts there)
+      // a group picked out (U.groupPicker): pressing a group, its weight or its ring keeps it and its
+      // assignments in view and steps the rest back; kept across repaints, Escape lets it go first
+      const pickSt = { pick: null };
+      let gmNow = null;
+      const colorOf = (id) => gmNow?.legend.find((r) => r.id === id)?.color || gmNow?.weightBar.find((w) => w.id === id)?.color || null;
+      const picker = U.groupPicker(sheet, pickSt, {
+        onChange: (pick) => {
+          const note = sheet.querySelector('.bcv-gpa-detail__picknote');
+          if (!note) return;
+          const name = pick && gmNow ? (gmNow.legend.find((r) => r.id === pick)?.label ?? gmNow.ungraded.find((u) => u.id === pick)?.name) : null;
+          if (!name) { note.replaceChildren(wf.on ? 'Change any score to test it' : 'Blue dot means graded'); return; }
+          const n = gmNow.rows.filter((r) => r.groupId === pick).length;
+          note.replaceChildren(h('button', { type: 'button', class: 'bcv-gr__pickchip', 'data-pick': '', style: { '--bcv-grp': colorOf(pick) || 'var(--bcv-ink3)' }, 'aria-label': `Showing ${name}; show every assignment` }, [
+            h('span', { class: 'bcv-gr__pickdot' }),
+            U.text('bcv-gr__pickname', `${name} · ${U.plural(n, 'assignment')}`, 'span'),
+            U.text('bcv-gr__pickall', 'Show all', 'span'),
+          ]));
+        },
+      });
       function bump(r, delta) {
         targets[c.id] = SCALE[clamp(r.idx + delta, 0, SCALE.length - 1)][0].replace(/−/g, '-'); // saved as the letter
         save();
@@ -475,13 +497,14 @@
         const pfPct = pf && c.score !== null && c.score !== undefined ? Number(c.score) : null;
         // with a what-if on, the sheet is drawn from the hypothetical model: greyed rings, the what-if total up top
         const gm = wf.on ? store.gradeModel(groupsBy.get(c.id) || [], c, wf.values, true, ctx.dark) : gmFor(c);
+        gmNow = gm;
         const cats = gm.legend;
         const hyp = wf.on && gm.total !== null && gm.total !== undefined ? gm.total : null;
         const shownPct = hyp !== null ? hyp : r ? r.pct : pfPct;
         // the way through to the course's own Grades page: a proper button, up by the X
         const go = U.btn('Open the course’s Grades page', { kind: 'primary', icon: IC.external, iconColor: '#fff', cls: 'bcv-gpa-detail__go', onClick: () => { close(); ctx.app.go(`${c.url}/grades`); } });
         const head = U.el('bcv-sheet__head bcv-gpa-detail__head', [
-          h('div', { class: 'bcv-gpa-detail__ring' }, ringSvg(c, shownPct, cats, true)),
+          h('div', { class: 'bcv-gpa-detail__ring' }, ringSvg(c, shownPct, cats, true, null, true)),
           U.el('bcv-sheet__titles', [
             U.text('bcv-gpa-detail__title bcv-ellip', c.shortName || c.name),
             U.text('bcv-gpa-detail__name', c.nickname ? c.originalName : (c.code || c.name)),
@@ -507,14 +530,14 @@
           h('span', { class: 'bcv-gpa-detail__gbar' }, h('span', { style: { width: `${clamp(ct.pct ?? 0, 0, 100)}%`, background: ct.color } })),
           U.text('bcv-gpa-detail__gweight', ct.weightText, 'span'),
           U.text('bcv-gpa-detail__gpct', ct.value, 'span'),
-        ]));
+        ], U.groupAttrs(ct.id, ct.color, { pick: true, name: ct.label })));
         const ungradedRows = gm.ungraded.map((u) => U.el('bcv-gpa-detail__grow bcv-gpa-detail__grow--ungraded', [
           h('span', { class: 'bcv-gpa__catdot bcv-gpa__catdot--9 bcv-gpa__catdot--empty' }),
           U.text('bcv-gpa-detail__gname bcv-pretty', u.name, 'span'),
           h('span', { class: 'bcv-gpa-detail__gbar' }),
           U.text('bcv-gpa-detail__gweight', u.weightText ? `${u.weightText} of grade · nothing graded` : 'nothing graded', 'span'),
           U.text('bcv-gpa-detail__gpct', '—', 'span'),
-        ]));
+        ], U.groupAttrs(u.id, null, { pick: true, name: u.name })));
         const byGroup = U.el('bcv-gpa-detail__sec', [
           U.text('bcv-gpa__kicker2', 'By group', 'span'),
           ...groupRows, ...ungradedRows,
@@ -524,8 +547,8 @@
         const weights = gm.weighted
           ? U.el('bcv-gpa-detail__sec bcv-gpa-detail__sec--line', [
             U.el('bcv-gpa-detail__hrow', [U.text('bcv-gpa__kicker2', 'How the grade is weighted', 'span'), U.text('bcv-gpa-detail__hsub', `${gm.weightSum}% of final grade`, 'span')]),
-            gm.weightBar.length ? U.el('bcv-wbar', gm.weightBar.map((w) => h('div', { class: `bcv-wbar__seg ${w.graded ? '' : 'bcv-wbar__seg--ungraded'}`, style: { flex: `${w.weight} 1 0`, background: w.color || '' }, title: `${w.name} · ${w.weight}%` }))) : U.text('bcv-gpa-detail__note', 'No assignment group carries weight yet.'),
-            U.el('bcv-gpa-detail__legend', gm.weightBar.map((w) => U.el('bcv-gpa-detail__lg', [h('span', { class: `bcv-wbar__dot ${w.graded ? '' : 'bcv-wbar__dot--ungraded'}`, style: { background: w.color || '' } }), U.text('bcv-gpa-detail__lgtext', `${w.name} ${w.weight}% · ${w.graded ? 'graded' : 'nothing graded'}`, 'span')]))),
+            gm.weightBar.length ? U.el('bcv-wbar', gm.weightBar.map((w) => { const ga = U.groupAttrs(w.id, w.color, { pick: true, name: w.name }); return h('div', { ...ga, class: `bcv-wbar__seg ${w.graded ? '' : 'bcv-wbar__seg--ungraded'}`, style: { ...ga.style, flex: `${w.weight} 1 0`, background: w.color || '' }, title: `${w.name} · ${w.weight}%` }); })) : U.text('bcv-gpa-detail__note', 'No assignment group carries weight yet.'),
+            U.el('bcv-gpa-detail__legend', gm.weightBar.map((w) => U.el('bcv-gpa-detail__lg', [h('span', { class: `bcv-wbar__dot ${w.graded ? '' : 'bcv-wbar__dot--ungraded'}`, style: { background: w.color || '' } }), U.text('bcv-gpa-detail__lgtext', `${w.name} ${w.weight}% · ${w.graded ? 'graded' : 'nothing graded'}`, 'span')], U.groupAttrs(w.id, w.color, { pick: true, name: w.name })))),
             gm.weightNote ? U.text('bcv-gpa-detail__note bcv-pretty', gm.weightNote) : null,
           ])
           : U.el('bcv-gpa-detail__sec bcv-gpa-detail__sec--line', [
@@ -558,14 +581,15 @@
           return wrap;
         };
         const list = U.el('bcv-gpa-detail__sec bcv-gpa-detail__sec--line', [
-          U.el('bcv-gpa-detail__hrow', [U.text('bcv-gpa__kicker2', 'Assignments', 'span'), U.text('bcv-gpa-detail__hsub', wf.on ? 'Change any score to test it' : 'Blue dot means graded', 'span'), whatIfBtn]),
+          U.el('bcv-gpa-detail__hrow', [U.text('bcv-gpa__kicker2', 'Assignments', 'span'), U.text('bcv-gpa-detail__hsub bcv-gpa-detail__picknote', wf.on ? 'Change any score to test it' : 'Blue dot means graded', 'span'), whatIfBtn]),
           banner,
           // every row opens the assignment it is a line about, the same as on the course's own Grades
           // page: a grade is the start of a question, and the answer is on that page
           gm.rows.length ? U.el('bcv-gpa-detail__list', gm.rows.map((g) => h(g.url ? 'a' : 'div', {
             class: `bcv-gpa-detail__arow ${g.url ? 'is-link' : ''}`,
             href: g.url || null,
-            style: g.url ? { color: 'inherit' } : null,
+            'data-group': g.groupId, // (the group it counts toward: picked out with it)
+            style: { ...(g.url ? { color: 'inherit' } : {}), '--bcv-grp': colorOf(g.groupId) || 'var(--bcv-ink3)' },
             onclick: g.url ? () => close() : null, // the sheet belongs to the page being left
           }, [
             h('span', { class: 'bcv-gpa__catdot', style: { background: g.earned !== null ? '#0a84ff' : 'transparent' } }),
@@ -583,6 +607,7 @@
           U.el('bcv-gpa-detail__col bcv-gpa-detail__col--right', [list]),
         ])));
         for (const [sel, top] of scrolled) if (top) { const el = sheet.querySelector(sel); if (el) el.scrollTop = top; }
+        picker.apply();
         if (focusId !== null) {
           sheet.querySelector(`.bcv-whatif__input[data-wf="${focusId}"]`)?.focus();
           focusId = null;
