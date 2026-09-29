@@ -44,8 +44,8 @@
     const posted = scored && s.posted_at !== null, held = scored && s.posted_at === null;
     const word = (sel) => from.querySelector(sel)?.textContent?.trim() || '';
     // the header's words are the chip's own, so each glides from where it stands: the score (or the standing) as the value, the percent beside it, the when-line in the note
-    const value = posted ? `${store.fmtPts(s.score)} / ${a.points_possible ?? '—'}` : word('.bcv-detail__gradepc') || 'Submitted';
-    const label = posted ? word('.bcv-detail__gradepc') : '';
+    const value = posted ? store.fmtPts(s.score) : word('.bcv-detail__gradepc') || 'Submitted'; // (the chip's own word, exactly, so it glides from where it stands: the score alone, or the standing)
+    const label = posted ? `/ ${a.points_possible ?? '—'} · ${word('.bcv-detail__gradepc')}` : '';
     const when = word('.bcv-detail__gradewhen');
     const tone = posted ? { icon: IC.chart, color: '#34c759' } : held ? { icon: IC.clock, color: '#ff9f0a' } : { icon: IC.check, color: '#34c759' };
     const ov = U.el('bcv-sheet-ov bcv-sheet-ov--card is-far', null, { role: 'dialog', 'aria-label': `${a.name}: ${posted ? 'your mark' : 'what you handed in'}` }); // (is-far: the dim and blur start out wide, to close in on the box)
@@ -53,10 +53,11 @@
     const startAt = (el, to, at) => { el.style.transform = `translate(${at.left - to.left}px, ${at.top - to.top}px) scale(${at.height / to.height})`; }; // drawn where the chip's is, from where it lands
     // where the box goes: hung from the chip's own corner — its right edge, since the chip sits at the end of the title's row — 560×640 or what the window allows, pushed back inside it
     const M = 16, W = 560, H = 640;
+    let boxH = H; // (as tall as its content wants, up to H: measured once built)
     function geometry(back) {
       const r = from.getBoundingClientRect();
       if (back) return { x: r.left, y: r.top, w: r.width, h: r.height };
-      const vw = innerWidth, vh = innerHeight, w = Math.min(W, vw - 2 * M), hgt = Math.min(H, vh - 2 * M);
+      const vw = innerWidth, vh = innerHeight, w = Math.min(W, vw - 2 * M), hgt = Math.min(boxH, vh - 2 * M);
       return { x: Math.max(M, Math.min(r.right - w, vw - M - w)), y: Math.max(M, Math.min(r.top, vh - M - hgt)), w, h: hgt };
     }
     function place(back = false, boxOnly = false) {
@@ -108,13 +109,32 @@
       U.el('bcv-sheet__list bcv-mark__body', [built.el]),
     ]);
     ov.append(sheet);
-    place(true); // (the chip's place and size, and the dim's centre, set before the overlay is in the page: the first style it gets is the chip's)
+    // the box wears the chip's own look while it is the chip's size — its fill, edge and corners — and a copy of the chip's
+    // words sits over its header, so the first frame is the chip exactly, and the last frame of the fold too; the copy
+    // fades as the box grows (the header's own words fade in), all but the one word that glides, left out of the copy
+    // (the chip's fill is a tint over the card it sits on — flattened onto that card here, or the box would be see-through
+    // while it is the chip, the page and the chip itself showing through it)
+    const rgba = (str) => { const m = /rgba?\(([^)]+)\)/.exec(str || ''); if (!m) return null; const [r, g, b, a = 1] = m[1].split(',').map((x) => parseFloat(x)); return { r, g, b, a: Number.isFinite(a) ? a : 1 }; };
+    const under = (el) => { for (let e = el.parentElement; e; e = e.parentElement) { const c = rgba(getComputedStyle(e).backgroundColor); if (c && c.a > 0) return c; } return { r: 255, g: 255, b: 255, a: 1 }; };
+    const flat = (top, base) => `rgb(${Math.round(top.r * top.a + base.r * (1 - top.a))}, ${Math.round(top.g * top.a + base.g * (1 - top.a))}, ${Math.round(top.b * top.a + base.b * (1 - top.a))})`;
+    const cs = getComputedStyle(from), r0 = from.getBoundingClientRect(), base = under(from);
+    const bg = rgba(cs.backgroundColor), edge = rgba(cs.borderTopColor);
+    const bgFlat = bg && bg.a > 0 ? flat(bg, base) : flat({ ...base, a: 1 }, base);
+    sheet.style.setProperty('--bcv-mark-bg', bgFlat);
+    sheet.style.setProperty('--bcv-mark-edge', edge && edge.a > 0 ? flat(edge, rgba(bgFlat)) : bgFlat);
+    sheet.style.setProperty('--bcv-mark-r', cs.borderTopLeftRadius);
+    const glideSel = posted ? '.bcv-detail__gradescore' : '.bcv-detail__gradepc';
+    const copy = h('div', { class: 'bcv-mark__ghost', 'aria-hidden': 'true' });
+    Object.assign(copy.style, { width: `${Math.max(0, r0.width - 2)}px`, height: `${Math.max(0, r0.height - 2)}px`, padding: cs.padding, columnGap: cs.columnGap }); // (inside the box's own 1px edge, laid out as the chip lays its words)
+    for (const n of from.childNodes) copy.append(n.cloneNode(true));
+    copy.querySelector(glideSel)?.style.setProperty('visibility', 'hidden'); // (that word is the header's, gliding)
+    sheet.append(copy);
+    place(); // (full size, unpainted: the content measured at the width it will have)
     document.body.append(ov);
-    // it starts as the chip and grows from there; the chip's score (or standing) and percent glide into the header's own
-    glide = [
-      [sheet.querySelector('.bcv-sheet__value'), from.querySelector('.bcv-detail__gradescore') || from.querySelector('.bcv-detail__gradepc')],
-      [sheet.querySelector('.bcv-sheet__label'), posted ? from.querySelector('.bcv-detail__gradepc') : null],
-    ].filter(([el, b]) => el && b);
+    boxH = Math.min(H, Math.max(300, sheet.querySelector('.bcv-sheet__head').offsetHeight + sheet.querySelector('.bcv-sheet__list').scrollHeight + 2));
+    place(true); // (the chip's place and size, and the dim's centre, before anything is painted: the first style it gets is the chip's)
+    // it starts as the chip and grows from there; the chip's score (or standing) glides into the header's own word
+    glide = [[sheet.querySelector('.bcv-sheet__value'), from.querySelector(glideSel)]].filter(([el, b]) => el && b);
     place(true);
     void sheet.offsetWidth;
     glide.forEach(([el, b]) => startAt(el, el.getBoundingClientRect(), b.getBoundingClientRect()));

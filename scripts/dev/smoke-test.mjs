@@ -1452,7 +1452,7 @@ try {
   await page.waitForSelector('.bcv-mark .bcv-fb__scorecard', { timeout: 10000 });
   await page.waitForTimeout(650);
   const asBox = await page.evaluate(() => { const ov = document.querySelector('.bcv-sheet-ov--card'); const box = document.querySelector('.bcv-sheet.bcv-mark'); const r = box.getBoundingClientRect(); return { ov: !!ov, far: ov?.classList.contains('is-far'), atCard: box.classList.contains('is-at-card'), l: Math.round(r.left), t: Math.round(r.top), r: Math.round(r.right), w: Math.round(r.width), h: Math.round(r.height), inside: r.left >= 0 && r.right <= innerWidth && r.top >= 0 && r.bottom <= innerHeight, value: box.querySelector('.bcv-sheet__value')?.textContent, label: box.querySelector('.bcv-sheet__label')?.textContent, note: box.querySelector('.bcv-sheet__note')?.textContent, embedded: !!document.querySelector('.bcv-fb')?.closest('.bcv-qz.is-embedded'), pageTitle: !!document.querySelector('.bcv-detail__title'), focus: document.activeElement === ov }; });
-  check(!page.url().includes('bcv=feedback') && asBox.ov && !asBox.far && !asBox.atCard && asBox.inside && asBox.w >= 480 && asBox.h >= 480 && Math.abs(asBox.r - chipRect.r) <= 1 && asBox.t <= chipRect.t + 1 && asBox.value === '10 / 10' && asBox.label === '100%' && /^Week 1 reflection · /.test(asBox.note) && !asBox.embedded && asBox.pageTitle && asBox.focus, `the mark opens in place: the chip grows into a box hung from its own corner over the dimmed page, the score and percent in its header, the page and its address staying put: ${JSON.stringify(asBox)} from ${JSON.stringify(chipRect)}`);
+  check(!page.url().includes('bcv=feedback') && asBox.ov && !asBox.far && !asBox.atCard && asBox.inside && asBox.w >= 480 && asBox.h >= 480 && Math.abs(asBox.r - chipRect.r) <= 1 && asBox.t <= chipRect.t + 1 && asBox.value === '10' && asBox.label === '/ 10 · 100%' && /^Week 1 reflection · /.test(asBox.note) && !asBox.embedded && asBox.pageTitle && asBox.focus, `the mark opens in place: the chip grows into a box hung from its own corner over the dimmed page, the score and percent in its header, the page and its address staying put: ${JSON.stringify(asBox)} from ${JSON.stringify(chipRect)}`);
   await shot(page, '09i-mark-box');
   const sheetGone = await sw.evaluate(async (base) => {
     const [tab] = await chrome.tabs.query({ url: `${base}/*` });
@@ -1463,14 +1463,11 @@ try {
   }, BASE);
   check(sheetGone, 'and the sheet it replaced is gone from the build, not merely switched off');
   const fbTop = await page.evaluate(() => ({
-    score: document.querySelector('.bcv-fb__big').textContent,
-    pct: document.querySelector('.bcv-fb__pct')?.textContent,
-    summary: document.querySelector('.bcv-fb__summary').textContent,
-    bar: document.querySelector('.bcv-fb__fill').style.width,
+    big: !!document.querySelector('.bcv-fb__big'),
+    kicker: document.querySelector('.bcv-fb__scorecard--box .bcv-fb__kicker')?.textContent,
     comments: [...document.querySelectorAll('.bcv-fb__scorecard .bcv-fb__ctext')].map((e) => e.textContent),
   }));
-  check(fbTop.score === '10 / 10' && fbTop.pct === '100%' && fbTop.bar === '100%' && /^Week 1 reflection · graded /.test(fbTop.summary), `it heads with the score, the percent and when it was graded: ${JSON.stringify(fbTop).slice(0, 170)}`);
-  check(fbTop.comments.length === 1 && /derivative questions/.test(fbTop.comments[0]), `and the instructor's own words on the graded attempt: ${fbTop.comments.join(' | ').slice(0, 80)}`);
+  check(!fbTop.big && fbTop.kicker === 'From your instructor' && fbTop.comments.length === 1 && /derivative questions/.test(fbTop.comments[0]), `the box does not say the score twice (its header has it): the instructor's own words on the graded attempt head the list: ${JSON.stringify(fbTop).slice(0, 170)}`);
   // one card per attempt, latest first, each with its own facts, its own file and its own thread
   const subCards = await page.$$eval('.bcv-fb__q', (els) => els.map((e) => ({
     n: e.querySelector('.bcv-fb__qn').textContent,
@@ -1529,6 +1526,8 @@ try {
   await page.waitForSelector('.bcv-fb__scorecard', { timeout: 10000 });
   const fbPage = await page.evaluate(() => ({ embedded: !!document.querySelector('.bcv-fb')?.closest('.bcv-qz.is-embedded'), box: !!document.querySelector('.bcv-mark'), btns: [...document.querySelectorAll('.bcv-fb__btns .bcv-qz__big')].map((b) => b.textContent) }));
   check(fbPage.embedded && !fbPage.box && fbPage.btns.join(' | ') === 'See the rubric | Back to the assignment | Back to F26-SPRK 010 103', `?bcv=feedback is still the screen of its own, with the way back out: ${JSON.stringify(fbPage)}`);
+  const fbPageTop = await page.evaluate(() => ({ score: document.querySelector('.bcv-fb__big')?.textContent, pct: document.querySelector('.bcv-fb__pct')?.textContent, summary: document.querySelector('.bcv-fb__summary')?.textContent, bar: document.querySelector('.bcv-fb__fill')?.style.width }));
+  check(fbPageTop.score === '10 / 10' && fbPageTop.pct === '100%' && fbPageTop.bar === '100%' && /^Week 1 reflection · graded /.test(fbPageTop.summary || ''), `the screen heads with the score, the percent and when it was graded: ${JSON.stringify(fbPageTop)}`);
   await page.click('.bcv-fb__btns .bcv-qz__big:nth-child(2)');
   await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
   check(!page.url().includes('bcv=feedback'), 'and Back to the assignment leaves the feedback screen behind');
@@ -1730,11 +1729,11 @@ try {
   await page.click('.bcv-detail__grade');
   await page.waitForSelector('.bcv-fb__scorecard', { timeout: 10000 });
   const subFb = await page.evaluate(() => ({
-    url: location.search, box: !!document.querySelector('.bcv-mark'), value: document.querySelector('.bcv-mark .bcv-sheet__value')?.textContent, note: document.querySelector('.bcv-mark .bcv-sheet__note')?.textContent, score: document.querySelector('.bcv-fb__big').textContent, summary: document.querySelector('.bcv-fb__summary').textContent,
+    url: location.search, box: !!document.querySelector('.bcv-mark'), value: document.querySelector('.bcv-mark .bcv-sheet__value')?.textContent, note: document.querySelector('.bcv-mark .bcv-sheet__note')?.textContent, big: !!document.querySelector('.bcv-fb__big'),
     cards: [...document.querySelectorAll('.bcv-fb__q .bcv-fb__qn')].map((e) => e.textContent), scores: [...document.querySelectorAll('.bcv-fb__q .bcv-fb__score')].map((e) => e.textContent),
     body: document.querySelector('.bcv-fb__q .bcv-fb__body')?.innerText.replace(/\s+/g, ' ').trim(), files: [...document.querySelectorAll('.bcv-fb__file')].map((e) => e.innerText.replace(/\s+/g, ' ').trim()),
   }));
-  check(!/bcv=feedback/.test(subFb.url) && subFb.box && subFb.value === 'Submitted' && / · Attempt 2 · 1 comment$/.test(subFb.note || '') && subFb.score === '—' && /awaiting your instructor’s mark$/.test(subFb.summary) && subFb.cards.join(' | ') === 'Attempt 2 | Attempt 1' && subFb.scores.every((t) => t === 'Not graded') && subFb.body === 'Clean water for all. Three sources follow.' && subFb.files.length === 2 && /grand-challenge-notes\.docx/.test(subFb.files[0]) && /GC-articles-Sharma\.pdf/.test(subFb.files[1]), `an ungraded submission opens the same screen, with every attempt's work on show: ${JSON.stringify(subFb)}`);
+  check(!/bcv=feedback/.test(subFb.url) && subFb.box && subFb.value === 'Submitted' && / · Attempt 2 · 1 comment$/.test(subFb.note || '') && !subFb.big && subFb.cards.join(' | ') === 'Attempt 2 | Attempt 1' && subFb.scores.every((t) => t === 'Not graded') && subFb.body === 'Clean water for all. Three sources follow.' && subFb.files.length === 2 && /grand-challenge-notes\.docx/.test(subFb.files[0]) && /GC-articles-Sharma\.pdf/.test(subFb.files[1]), `an ungraded submission opens the same screen, with every attempt's work on show: ${JSON.stringify(subFb)}`);
   await shot(page, '09h-submitted-ungraded');
   await page.goto(`${BASE}/courses/104/assignments/4002`);
   await page.waitForSelector('.bcv-detail__grade', { timeout: 10000 });
@@ -3222,6 +3221,7 @@ try {
   await page.keyboard.press('Enter');
   await page.waitForSelector('#bcv-omni-panel:not([hidden])', { timeout: 10000 });
   await page.click('.bcv-h1'); // (a press elsewhere: the title)
+  await page.waitForFunction(() => document.getElementById('bcv-omni-panel').hidden, null, { timeout: 3000 }); // (the panel fades as the pill sets off home, then is hidden)
   const sAfter = await page.evaluate(() => ({ hidden: document.getElementById('bcv-omni-panel').hidden, value: document.getElementById('bcv-omni').value, roots: document.querySelectorAll('#bcv-omni-root').length, active: document.activeElement?.id || document.activeElement?.tagName }));
   check(sAfter.hidden && sAfter.value === 'xy', `Enter searches again, and a press elsewhere closes the panel, the words kept: ${JSON.stringify(sAfter)}`);
   // the tour's search step, once, for anyone who had Simpl before the box: the box lit, and typing in it ends it
@@ -6480,8 +6480,10 @@ try {
   await page.click('#bcv-omni');
   await page.keyboard.type('a');
   await page.waitForSelector('#bcv-omni-panel:not([hidden])', { timeout: 5000 });
-  const omniAnim = await page.$eval('.bcv-omni__panel', (e) => ({ name: getComputedStyle(e).animationName, ease: getComputedStyle(e).animationTimingFunction.slice(0, 7), dur: getComputedStyle(e).animationDuration }));
-  check(omniAnim.name === 'bcv-omni-in' && omniAnim.ease === 'linear(' && parseFloat(omniAnim.dur) > 0, `the search panel's entrance parses and runs on the snappy spring: ${JSON.stringify(omniAnim)}`);
+  // (2.98.56: afloat, the panel has no entrance animation of its own — it would fight the pill's glide — but a fade that lands it after the pill)
+  await page.waitForTimeout(650);
+  const omniAnim = await page.$eval('.bcv-omni__panel', (e) => ({ name: getComputedStyle(e).animationName, tr: getComputedStyle(e).transitionProperty, dur: getComputedStyle(e).transitionDuration, opacity: getComputedStyle(e).opacity, afloat: !!e.closest('.bcv-spot') }));
+  check(omniAnim.afloat && omniAnim.name === 'none' && /opacity/.test(omniAnim.tr) && parseFloat(omniAnim.dur) > 0 && omniAnim.opacity === '1', `afloat, the search panel arrives on its own fade after the pill, no entrance animation fighting the glide, and is fully in: ${JSON.stringify(omniAnim)}`);
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('.bcv-omni__panel:not([hidden])'), null, { timeout: 5000 }).catch(() => {});
   await page.keyboard.press('Escape'); // (the box folds back to the header, out of the counters' way)

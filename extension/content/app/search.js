@@ -75,8 +75,9 @@
   function settle() {
     const s = spot;
     if (!s) return;
-    clearTimeout(s.timer);
+    clearTimeout(s.timer); clearTimeout(s.lift); clearTimeout(s.closer);
     window.removeEventListener('resize', s.onResize);
+    if (s.folding) close(); // (a fold cut short: what its timer would have done)
     if (s.ghost.isConnected && ui) s.ghost.replaceWith(ui.root); else { s.ghost.remove(); ui?.root.remove(); }
     s.pal.remove(); s.ov.remove();
     spot = null;
@@ -90,25 +91,29 @@
     const pal = h('div', { class: `bcv-spot is-far${still() ? ' is-still' : ''}`, id: 'bcv-spot', style: { left: `${Math.round(r.left)}px`, top: `${Math.round(r.top)}px`, width: `${Math.round(r.width)}px` } }, [ui.root]);
     const ov = h('div', { class: 'bcv-spot-ov', 'aria-hidden': 'true' });
     document.body.append(ov, pal);
-    spot = { ov, pal, ghost, timer: 0, folding: false, onResize: () => place() };
+    spot = { ov, pal, ghost, timer: 0, lift: 0, closer: 0, folding: false, onResize: () => place() };
+    run(ui.input.value); // (the kinds, or the words' results — painted while the pill still stands at the header, so the panel can fade in as the pill lands rather than ride up with it)
     void pal.offsetWidth; // (the header's place is where it starts from: fixed before the move)
     pal.classList.remove('is-far');
+    pal.classList.add('is-lifting'); // (the panel arrives with the pill, not before it)
+    spot.lift = setTimeout(() => pal.classList.remove('is-lifting'), 600);
     place();
     window.addEventListener('resize', spot.onResize);
     ui.input.focus(); // (the move took the cursor)
-    run(ui.input.value); // (the kinds, or the words' results)
   }
   function unfloat() {
     if (!spot || spot.folding) return;
     const s = spot;
     s.folding = true;
-    close();
-    clearScope({ quiet: true });
+    clearTimeout(s.lift);
+    s.pal.classList.remove('is-lifting');
     if (document.activeElement === ui.input) ui.input.blur();
     const r = s.ghost.isConnected ? s.ghost.getBoundingClientRect() : null;
     s.ov.classList.add('is-folding');
-    s.pal.classList.add('is-far');
+    s.pal.classList.add('is-far'); // (the panel fades as the pill sets off; hidden for good once it has)
     if (r) Object.assign(s.pal.style, { left: `${Math.round(r.left)}px`, top: `${Math.round(r.top)}px`, width: `${Math.round(r.width)}px` });
+    clearScope({ quiet: true }); // (the kind's chip goes at once: one vanishing mid-fold would show)
+    s.closer = setTimeout(close, still() ? 0 : 160);
     s.timer = setTimeout(settle, still() ? 0 : SPOT_MS);
   }
   const scopeRows = () => SCOPES.map((s, i) => ({ icon: s.icon, title: s.label, sub: s.hint, scope: s, key: `⌘${i + 1}` }));

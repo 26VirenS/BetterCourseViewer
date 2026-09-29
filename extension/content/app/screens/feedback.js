@@ -235,15 +235,18 @@
       // the instructor's own words on the graded attempt head the screen; each attempt keeps its own
       const topThread = commentsFor(s, latest?.attempt, true).filter((cm) => !me || String(cm.author_id ?? '') !== me);
 
-      const scoreCard = U.el('bcv-fb__scorecard', [
-        U.el('bcv-fb__scoreline', [
-          h('span', { class: 'bcv-fb__big', text: posted ? `${store.fmtPts(score)} / ${store.fmtPts(possible)}` : '—' }),
-          pct !== null ? h('span', { class: 'bcv-fb__pct', text: `${pct}%` }) : null,
-          h('span', { class: 'bcv-fb__summary', text: `${a.name} · ${when}` }),
-        ]),
-        U.el('bcv-fb__bar', h('div', { class: 'bcv-fb__fill', style: { width: `${pct ?? 0}%` } })),
-        ...topThread.map((cm) => commentRow(cm, me)),
-      ]);
+      // (in the box the header already carries the score, so only the instructor's words head the list)
+      const scoreCard = box
+        ? (topThread.length ? U.el('bcv-fb__scorecard bcv-fb__scorecard--box', [U.text('bcv-fb__kicker', 'From your instructor', 'span'), ...topThread.map((cm) => commentRow(cm, me))]) : null)
+        : U.el('bcv-fb__scorecard', [
+          U.el('bcv-fb__scoreline', [
+            h('span', { class: 'bcv-fb__big', text: posted ? `${store.fmtPts(score)} / ${store.fmtPts(possible)}` : '—' }),
+            pct !== null ? h('span', { class: 'bcv-fb__pct', text: `${pct}%` }) : null,
+            h('span', { class: 'bcv-fb__summary', text: `${a.name} · ${when}` }),
+          ]),
+          U.el('bcv-fb__bar', h('div', { class: 'bcv-fb__fill', style: { width: `${pct ?? 0}%` } })),
+          ...topThread.map((cm) => commentRow(cm, me)),
+        ]);
       const held = graded && !posted
         ? U.hint('Your instructor has marked this but has not released the grade yet, so no number is shown — an unreleased score reads exactly like a real one.', 'bcv-hint--narrow')
         : null;
@@ -252,7 +255,7 @@
         : [U.emptyCard('Nothing has been handed in for this assignment yet.')];
 
       wrap.replaceChildren(...[
-        U.enter(scoreCard, 0, 45),
+        scoreCard ? U.enter(scoreCard, 0, 45) : null,
         held,
         ...cards,
         composer(ctx, c, a, () => sub, (fresh) => { sub = fresh; }, () => { if (ctx.alive()) draw(); }),
