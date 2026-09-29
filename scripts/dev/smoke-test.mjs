@@ -1440,15 +1440,20 @@ try {
   await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
   const heldChip = await page.$eval('.bcv-detail__grade', (e) => ({ held: e.classList.contains('bcv-detail__grade--held'), text: e.innerText.replace(/\s+/g, ' ').trim(), digits: /\d/.test(e.innerText) }));
   check(heldChip.held && /^Not yet posted/.test(heldChip.text) && !heldChip.digits, `a held grade says so and shows no number: ${JSON.stringify(heldChip)}`);
-  // The mark opens the feedback screen — the same shape as a quiz's, in the course's own column
-  // (the sheet it replaced is gone from the build: the preview it framed was Canvas's own document
-  // service, which answers "service unavailable" often enough that a sheet built around it read as broken).
+  // (2.98.55) The mark opens where it is: the chip grows into a box the way a Dashboard counter does — the
+  // page dimmed and blurred round it, the score gliding into the box's header — holding the feedback screen's
+  // content, the page (and its address) staying put under it. The screen of its own is still there for a link.
+  // (the sheet the screen replaced is gone from the build: the preview it framed was Canvas's own document
+  // service, which answers "service unavailable" often enough that a sheet built around it read as broken)
   await page.goto(`${BASE}/courses/104/assignments/4001`);
   await page.waitForSelector('.bcv-detail__grade', { timeout: 10000 });
+  const chipRect = await page.$eval('.bcv-detail__grade', (e) => { const r = e.getBoundingClientRect(); return { l: Math.round(r.left), t: Math.round(r.top), r: Math.round(r.right), w: Math.round(r.width), h: Math.round(r.height) }; });
   await page.click('.bcv-detail__grade');
-  await page.waitForSelector('.bcv-fb__scorecard', { timeout: 10000 });
-  const asScreen = await page.evaluate(() => ({ embedded: !!document.querySelector('.bcv-fb')?.closest('.bcv-qz.is-embedded'), sheet: !!document.querySelector('.bcv-sheet-ov') }));
-  check(page.url().includes('bcv=feedback') && asScreen.embedded && !asScreen.sheet, `the mark opens a screen, not a sheet: ${page.url()} ${JSON.stringify(asScreen)}`);
+  await page.waitForSelector('.bcv-mark .bcv-fb__scorecard', { timeout: 10000 });
+  await page.waitForTimeout(650);
+  const asBox = await page.evaluate(() => { const ov = document.querySelector('.bcv-sheet-ov--card'); const box = document.querySelector('.bcv-sheet.bcv-mark'); const r = box.getBoundingClientRect(); return { ov: !!ov, far: ov?.classList.contains('is-far'), atCard: box.classList.contains('is-at-card'), l: Math.round(r.left), t: Math.round(r.top), r: Math.round(r.right), w: Math.round(r.width), h: Math.round(r.height), inside: r.left >= 0 && r.right <= innerWidth && r.top >= 0 && r.bottom <= innerHeight, value: box.querySelector('.bcv-sheet__value')?.textContent, label: box.querySelector('.bcv-sheet__label')?.textContent, note: box.querySelector('.bcv-sheet__note')?.textContent, embedded: !!document.querySelector('.bcv-fb')?.closest('.bcv-qz.is-embedded'), pageTitle: !!document.querySelector('.bcv-detail__title'), focus: document.activeElement === ov }; });
+  check(!page.url().includes('bcv=feedback') && asBox.ov && !asBox.far && !asBox.atCard && asBox.inside && asBox.w >= 480 && asBox.h >= 480 && Math.abs(asBox.r - chipRect.r) <= 1 && asBox.t <= chipRect.t + 1 && asBox.value === '10 / 10' && asBox.label === '100%' && /^Week 1 reflection · /.test(asBox.note) && !asBox.embedded && asBox.pageTitle && asBox.focus, `the mark opens in place: the chip grows into a box hung from its own corner over the dimmed page, the score and percent in its header, the page and its address staying put: ${JSON.stringify(asBox)} from ${JSON.stringify(chipRect)}`);
+  await shot(page, '09i-mark-box');
   const sheetGone = await sw.evaluate(async (base) => {
     const [tab] = await chrome.tabs.query({ url: `${base}/*` });
     const [{ result }] = await chrome.scripting.executeScript({
@@ -1511,9 +1516,19 @@ try {
   const posted = (await readSub('104', '4001')).submission_comments.find((cm) => /part b\?/.test(cm.comment));
   check((await texts('.bcv-fb__q .bcv-fb__ctext')).length === before + 1 && posted && Number(posted.attempt) === 2, `and Canvas has it against the attempt it was written on: ${JSON.stringify(posted && { attempt: posted.attempt })}`);
   check(/cannot be edited or deleted/.test((await texts('.bcv-fb__perm'))[0] || ''), 'the field says a comment cannot be taken back');
-  // the way back out, as a quiz's feedback has: the rubric, the assignment, the course
+  // the way out of the box: the rubric alone at its end (the box has its own × and Escape); Escape — from wherever the
+  // cursor is left after a reply — folds it back into the chip, the veil letting go outward, the page still there
   const fbBtns = await texts('.bcv-fb__btns .bcv-qz__big');
-  check(fbBtns.join(' | ') === 'See the rubric | Back to the assignment | Back to F26-SPRK 010 103', `the way back out: ${fbBtns.join(' | ')}`);
+  check(fbBtns.join(' | ') === 'See the rubric', `in the box, the row at its end offers the rubric alone: ${fbBtns.join(' | ')}`);
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(80);
+  const folding = await page.evaluate(() => { const ov = document.querySelector('.bcv-sheet-ov--card'); return { there: !!ov, folding: ov?.classList.contains('is-folding'), far: ov?.classList.contains('is-far') }; });
+  check(await eventually(() => page.evaluate(() => !document.querySelector('.bcv-sheet-ov') && !!document.querySelector('.bcv-detail__grade')), 3000) && folding.there && folding.folding && folding.far && !page.url().includes('bcv=feedback'), `Escape folds the box back into the chip, the assignment page still there: ${JSON.stringify(folding)}`);
+  // the screen of its own is still there for a link (and the phone): the same content, the way back out at its end
+  await page.goto(`${BASE}/courses/104/assignments/4001?bcv=feedback`);
+  await page.waitForSelector('.bcv-fb__scorecard', { timeout: 10000 });
+  const fbPage = await page.evaluate(() => ({ embedded: !!document.querySelector('.bcv-fb')?.closest('.bcv-qz.is-embedded'), box: !!document.querySelector('.bcv-mark'), btns: [...document.querySelectorAll('.bcv-fb__btns .bcv-qz__big')].map((b) => b.textContent) }));
+  check(fbPage.embedded && !fbPage.box && fbPage.btns.join(' | ') === 'See the rubric | Back to the assignment | Back to F26-SPRK 010 103', `?bcv=feedback is still the screen of its own, with the way back out: ${JSON.stringify(fbPage)}`);
   await page.click('.bcv-fb__btns .bcv-qz__big:nth-child(2)');
   await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
   check(!page.url().includes('bcv=feedback'), 'and Back to the assignment leaves the feedback screen behind');
@@ -1715,11 +1730,11 @@ try {
   await page.click('.bcv-detail__grade');
   await page.waitForSelector('.bcv-fb__scorecard', { timeout: 10000 });
   const subFb = await page.evaluate(() => ({
-    url: location.search, score: document.querySelector('.bcv-fb__big').textContent, summary: document.querySelector('.bcv-fb__summary').textContent,
+    url: location.search, box: !!document.querySelector('.bcv-mark'), value: document.querySelector('.bcv-mark .bcv-sheet__value')?.textContent, note: document.querySelector('.bcv-mark .bcv-sheet__note')?.textContent, score: document.querySelector('.bcv-fb__big').textContent, summary: document.querySelector('.bcv-fb__summary').textContent,
     cards: [...document.querySelectorAll('.bcv-fb__q .bcv-fb__qn')].map((e) => e.textContent), scores: [...document.querySelectorAll('.bcv-fb__q .bcv-fb__score')].map((e) => e.textContent),
     body: document.querySelector('.bcv-fb__q .bcv-fb__body')?.innerText.replace(/\s+/g, ' ').trim(), files: [...document.querySelectorAll('.bcv-fb__file')].map((e) => e.innerText.replace(/\s+/g, ' ').trim()),
   }));
-  check(/bcv=feedback/.test(subFb.url) && subFb.score === '—' && /awaiting your instructor’s mark$/.test(subFb.summary) && subFb.cards.join(' | ') === 'Attempt 2 | Attempt 1' && subFb.scores.every((t) => t === 'Not graded') && subFb.body === 'Clean water for all. Three sources follow.' && subFb.files.length === 2 && /grand-challenge-notes\.docx/.test(subFb.files[0]) && /GC-articles-Sharma\.pdf/.test(subFb.files[1]), `an ungraded submission opens the same screen, with every attempt's work on show: ${JSON.stringify(subFb)}`);
+  check(!/bcv=feedback/.test(subFb.url) && subFb.box && subFb.value === 'Submitted' && / · Attempt 2 · 1 comment$/.test(subFb.note || '') && subFb.score === '—' && /awaiting your instructor’s mark$/.test(subFb.summary) && subFb.cards.join(' | ') === 'Attempt 2 | Attempt 1' && subFb.scores.every((t) => t === 'Not graded') && subFb.body === 'Clean water for all. Three sources follow.' && subFb.files.length === 2 && /grand-challenge-notes\.docx/.test(subFb.files[0]) && /GC-articles-Sharma\.pdf/.test(subFb.files[1]), `an ungraded submission opens the same screen, with every attempt's work on show: ${JSON.stringify(subFb)}`);
   await shot(page, '09h-submitted-ungraded');
   await page.goto(`${BASE}/courses/104/assignments/4002`);
   await page.waitForSelector('.bcv-detail__grade', { timeout: 10000 });

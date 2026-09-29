@@ -180,7 +180,7 @@
     ]);
     if (!ctx.alive()) return screen;
     if (!a) {
-      wrap.replaceChildren(U.errorBox('This assignment could not be loaded.'), backRow());
+      wrap.replaceChildren(U.errorBox('This assignment could not be loaded.'), U.el('bcv-fb__btns', [h('button', { type: 'button', class: 'bcv-qz__big', text: 'Back to the assignment', onclick: () => app.go(backHref) })]));
       return screen;
     }
     // Canvas answers this one from a different service to the rest, and it is the one that goes down:
@@ -196,14 +196,26 @@
       return screen;
     }
     app.nameHere?.(a.name); // the next screen's Back names this assignment
+    wrap.replaceWith(build(ctx, c, a, sub).el);
+    return screen;
+  }
+
+  /** The screen's content, built once for the page and (2.98.55) for the box the mark opens into on
+   *  the assignment page: { el, redraw, setSub }. In the box (opts.box) the way back out is the box's
+   *  own × and Escape, so the row at its end offers the rubric alone. */
+  function build(ctx, c, a, sub, { box = false } = {}) {
+    const { app } = ctx;
+    const wrap = U.el(`bcv-fb${box ? ' bcv-fb--box' : ''}`);
+    const backHref = `${c.url}/assignments/${a.id}`;
     const me = String(store.env?.().current_user_id ?? '');
 
     function backRow() {
-      return U.el('bcv-fb__btns', [
+      const btns = [
         a?.rubric?.length ? h('button', { type: 'button', class: 'bcv-qz__big bcv-rubbtn', text: 'See the rubric', onclick: () => CS().openRubric(a, sub) }) : null,
-        h('button', { type: 'button', class: 'bcv-qz__big', text: 'Back to the assignment', onclick: () => app.go(backHref) }),
-        h('button', { type: 'button', class: 'bcv-qz__big bcv-qz__big--primary', text: `Back to ${c.shortName || c.name}`, onclick: () => app.go(c.url) }),
-      ].filter(Boolean));
+        box ? null : h('button', { type: 'button', class: 'bcv-qz__big', text: 'Back to the assignment', onclick: () => app.go(backHref) }),
+        box ? null : h('button', { type: 'button', class: 'bcv-qz__big bcv-qz__big--primary', text: `Back to ${c.shortName || c.name}`, onclick: () => app.go(c.url) }),
+      ].filter(Boolean);
+      return btns.length ? U.el('bcv-fb__btns', btns) : null;
     }
 
     function draw() {
@@ -249,8 +261,8 @@
     }
 
     draw();
-    return screen;
+    return { el: wrap, redraw: () => { if (ctx.alive()) draw(); }, setSub: (fresh) => { sub = fresh; } };
   }
 
-  BCV.screens.feedback = { render };
+  BCV.screens.feedback = { render, build };
 })();
