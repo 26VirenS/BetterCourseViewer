@@ -25,6 +25,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.98.48', date: '2026-09-29', notes: [
+      { kind: 'improved', title: 'Cards pull into focus', body: 'The page blurs and dims onto the card, not at once.', icon: P.eye },
+    ] },
     { version: '2.98.47', date: '2026-09-29', notes: [
       { kind: 'fixed', title: 'Card words land right', body: 'The glide starts and ends on the card in short windows.', icon: P.check },
     ] },

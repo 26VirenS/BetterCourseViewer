@@ -377,7 +377,7 @@
     function openSheet(def, from = null) {
       document.querySelector('.bcv-sheet-ov')?.remove();
       const card = from && from.getBoundingClientRect && from.isConnected ? from : null;
-      const ov = U.el(`bcv-sheet-ov${card ? ' bcv-sheet-ov--card' : ''}`, null, { role: 'dialog', 'aria-label': def.label });
+      const ov = U.el(`bcv-sheet-ov${card ? ' bcv-sheet-ov--card is-far' : ''}`, null, { role: 'dialog', 'aria-label': def.label }); // (is-far: the dim and blur start out wide, to close in on the box)
       let folding = false;
       let glide = []; // [box's element, counter's element]: the icon, the label and the number, which travel between the two
       const startAt = (a, to, at) => { a.style.transform = `translate(${at.left - to.left}px, ${at.top - to.top}px) scale(${at.height / to.height})`; }; // a drawn where the counter's is, from where it lands
@@ -385,7 +385,7 @@
         if (!card) { BCV.ui.dismiss(ov); return; }
         if (folding || !ov.isConnected) return;
         folding = true;
-        ov.classList.add('is-folding');
+        ov.classList.add('is-folding', 'is-far'); // (the focus lets go outward as the box folds)
         // the words go back to the counter's own: each is offset from where it will lie once the box is
         // the counter's size again (measured with the box snapped there for a frame, then put back), so
         // the offset lands them exactly, wherever the box stood — pushed up inside a short window too
@@ -399,7 +399,7 @@
         sheet.classList.remove('is-at-card');
         glide.forEach(([a, b], i) => startAt(a, rest[i], b.getBoundingClientRect()));
         place(true); // back into the counter
-        setTimeout(() => ov.remove(), U.reducedMotion() ? 0 : 470);
+        setTimeout(() => ov.remove(), U.reducedMotion() ? 0 : 560);
       };
       ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
       ov.addEventListener('keydown', (e) => {
@@ -491,6 +491,7 @@
         const wrap = U.el('bcv-sheet__item', [row, x]);
         return wrap;
       }
+      if (card) place(true); // (the counter's place and size, and the dim's centre, set before the overlay is in the page: the first style it gets is the counter's, so nothing eases in from nought)
       document.body.append(ov);
       if (card) {
         // it starts as the counter (its place and size, its words not yet shown) and grows from there;
@@ -508,6 +509,7 @@
         glide.forEach(([a, b]) => startAt(a, a.getBoundingClientRect(), b.getBoundingClientRect()));
         void sheet.offsetWidth;
         sheet.classList.remove('is-at-card');
+        ov.classList.remove('is-far'); // (from here the dim and blur close in on the box)
         place();
         for (const [a] of glide) a.style.transform = '';
         const moved = new MutationObserver(() => { if (!ov.isConnected) { moved.disconnect(); return; } if (!folding) place(); });
