@@ -10,6 +10,7 @@
  *   easing(preset)                → 'linear(0, 0.13, …)' for CSS; duration(preset) → seconds
  *   run(el, spec, preset, opts)   → handle { finished, cancel(), now(), progress }
  *   exit(el, kind, opts)          → handle: the element leaves from its current state
+ *   settle(anim)                  → a finished animation let go, where its last frame is the element's own look
  *   reduced()                     → prefers-reduced-motion
  *
  * A spec names what moves between progress 0 and 1: { x: [px, px], y: [px, px], scale: [n, n],
@@ -144,6 +145,46 @@
     if (spec.opacity) f.opacity = Math.max(0, Math.min(1, spec.opacity[0] + (spec.opacity[1] - spec.opacity[0]) * p));
     return f;
   }
+  // ---- settling: a finished animation let go ---------------------------------------------------
+  // An arrival held on its last frame (fill both / forwards) keeps the element on a compositing layer
+  // of its own — for a screen, a bitmap the size of the screen — and keeps the animation's keyframes
+  // (a spring's are hundreds) for as long as the element lives. Once it has finished, and where its
+  // last frame is what the element shows without it (an arrival ends on the element's own look), it
+  // is cancelled: nothing moves on the screen, and the layer and the keyframes go. One that ends
+  // somewhere else (an exit at opacity 0, a scale the element does not have) is put straight back on
+  // its last frame, in the same task, so no frame is drawn without it.
+  const KEYFRAME_META = new Set(['offset', 'computedOffset', 'easing', 'composite']);
+  const IDENTITY = /^matrix\(1, 0, 0, 1, 0, 0\)$|^matrix3d\(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1\)$/;
+  const kebab = (p) => (p.startsWith('--') ? p : p.replace(/[A-Z]/g, (m) => `-${m.toLowerCase()}`));
+  const same = (a, b) => a === b || (IDENTITY.test(a) && b === 'none') || (IDENTITY.test(b) && a === 'none');
+  const kept = new WeakSet(); // (animations found to end somewhere of their own: left alone from then on)
+  function settle(anim) {
+    try {
+      const el = anim?.effect?.target;
+      if (!el || !el.isConnected || anim.playState !== 'finished' || kept.has(anim)) return false;
+      const t = anim.effect.getTiming?.() || {};
+      if (t.fill !== 'both' && t.fill !== 'forwards') return false; // (nothing held: nothing to let go)
+      const props = [...new Set(anim.effect.getKeyframes().flatMap((k) => Object.keys(k)).filter((k) => !KEYFRAME_META.has(k)).map(kebab))];
+      if (!props.length) return false;
+      const cs = getComputedStyle(el, anim.effect.pseudoElement || null);
+      const held = props.map((p) => cs.getPropertyValue(p));
+      anim.cancel();
+      if (props.some((p, i) => !same(cs.getPropertyValue(p), held[i]))) { kept.add(anim); anim.finish(); return false; } // (it ends somewhere of its own: kept there)
+      return true;
+    } catch { return false; }
+  }
+  // the stylesheet's arrivals: each ends on the element's own look (a `to` of opacity 1 and no
+  // transform, or no `to` at all). Exits, loops and the ones that end on a look of their own are not
+  // here, and are never touched.
+  const ARRIVALS = new Set(['bcv-fade-up', 'bcv-fade-in', 'bcv-fade-down', 'bcv-pop', 'bcv-sheet', 'bcv-load', 'bcv-grow', 'bcv-morph', 'bcv-ring-fill', 'bcv-push-in', 'bcv-pop-in', 'bcv-toast-in', 'bcv-welcome-in', 'bcv-welcome-fade', 'bcv-qn-in', 'bcv-pv-in', 'bcv-sheet-up', 'bcv-pin-pop', 'bcv-mark-pop', 'bcv-pdfx-pop', 'bcv-omni-wiki-in', 'bcv-omni-in']);
+  // each, as it ends (the event reaches here from the page's own DOM)
+  self.document?.addEventListener('animationend', (e) => {
+    if (!ARRIVALS.has(e.animationName)) return;
+    const el = e.target;
+    if (!el?.getAnimations) return;
+    for (const a of el.getAnimations()) if (a.animationName === e.animationName && a.playState === 'finished' && !a.pseudoElement) settle(a);
+  }, true);
+
   /** Plays a spec on an element along a spring, from progress `from` (0) to `to` (1), with an initial
    *  velocity in progress per second; every ~4 ms a keyframe. The handle's now() reads the spring at
    *  the animation's current time, so a motion cut short can hand its position and speed on. */
@@ -164,6 +205,8 @@
       frames.push({ ...frameOf(spec, i === n ? to : sp.at(t)), offset: i / n, easing: 'linear' });
     }
     const anim = el.animate(frames, { duration: Math.round(dur * 1000), fill, delay, composite });
+    let settled = false;
+    anim.finished.then(() => { settled = settle(anim); }).catch(() => {}); // (its keyframes and its layer go once it is over, where nothing shows the difference)
     const handle = {
       anim,
       finished: anim.finished.catch(() => {}),
@@ -173,10 +216,10 @@
         let ms = 0;
         try { ms = Number(anim.currentTime) || 0; } catch { ms = 0; }
         const t = Math.max(0, Math.min(dur, (ms - delay) / 1000));
-        if (anim.playState === 'finished') return { p: to, v: 0 };
+        if (anim.playState === 'finished' || settled) return { p: to, v: 0 };
         return { p: sp.at(t), v: sp.velocity(t) };
       },
-      get done() { return anim.playState === 'finished'; },
+      get done() { return anim.playState === 'finished' || settled; },
     };
     return handle;
   }
@@ -236,5 +279,5 @@
   }
 
   installTokens();
-  BCV.motion = { PRESETS, spring, easing, duration, run, exit, progressOf, reduced, supportsLinear, installTokens };
+  BCV.motion = { PRESETS, spring, easing, duration, run, exit, settle, progressOf, reduced, supportsLinear, installTokens };
 })();

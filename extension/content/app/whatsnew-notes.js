@@ -25,6 +25,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.98.39', date: '2026-09-29', notes: [
+      { kind: 'improved', title: 'Uses less memory', body: 'Finished animations free their memory.', icon: P.layers },
+    ] },
     { version: '2.98.38', date: '2026-09-28', notes: [
       { kind: 'new', title: 'What-if assignments', body: 'Add a made-up assignment to any category to test.', icon: P.pen },
       { kind: 'fixed', title: 'Cleaner Details rows', body: 'Assignment rows in Details read cleanly again.', icon: P.check },
