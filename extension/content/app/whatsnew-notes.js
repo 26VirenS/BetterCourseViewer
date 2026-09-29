@@ -25,6 +25,10 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.98.49', date: '2026-09-29', notes: [
+      { kind: 'improved', title: 'Shorter counters', body: 'The six counters are a third shorter.', icon: P.layers },
+      { kind: 'improved', title: 'Focus starts at once', body: 'The blur and dim begin the moment you click.', icon: P.eye },
+    ] },
     { version: '2.98.48', date: '2026-09-29', notes: [
       { kind: 'improved', title: 'Cards pull into focus', body: 'The page blurs and dims onto the card, not at once.', icon: P.eye },
     ] },
