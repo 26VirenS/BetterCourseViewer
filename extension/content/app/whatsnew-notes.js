@@ -25,6 +25,10 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.98.41', date: '2026-09-29', notes: [
+      { kind: 'improved', title: 'Profile & settings', body: 'Your photo, name and settings in one place.', icon: P.layers },
+      { kind: 'improved', title: 'Tidier switch list', body: 'The off list is narrower and lined up right.', icon: P.toggle },
+    ] },
     { version: '2.98.40', date: '2026-09-29', notes: [
       { kind: 'fixed', title: 'Glass on Chrome fixed', body: 'Solid panels, and a real blur behind sheets.', icon: P.eye },
     ] },

@@ -642,10 +642,12 @@
           h('span', { class: 'bcv-theme-btn__ic' }, U.svg(IC.image, { size: 14, width: 1.8 })),
           h('span', { text: 'Appearance' }),
         ]),
-        h('button', { type: 'button', class: 'bcv-account', id: 'bcv-account', onclick: (e) => { e.stopPropagation(); accountMenu(e.currentTarget); }, title: 'Account', 'aria-haspopup': 'menu' }, [
+        // Profile & settings (2.98.41): the photo and the name, and what a press opens — the panel above
+        // it, the photo large at its head with the pronouns and the e-mail Canvas holds, then the settings
+        h('button', { type: 'button', class: 'bcv-account', id: 'bcv-account', onclick: (e) => { e.stopPropagation(); accountMenu(e.currentTarget); }, title: 'Profile & settings', 'aria-label': `Profile & settings${state.me?.name ? `: ${state.me.name}` : ''}`, 'aria-haspopup': 'menu' }, [
           U.avatar(state.me?.avatar, state.me?.name, 30),
-          // the pronouns Canvas holds and the e-mail under the name (the login when there is no e-mail; "Account" until it is known)
-          h('div', { style: { minWidth: '0' } }, [U.text('bcv-account__name bcv-ellip', state.me?.name || 'Account'), U.text('bcv-account__sub bcv-ellip', [state.me?.pronouns, state.me?.email || state.me?.loginId].filter(Boolean).join(' · ') || 'Account')]),
+          h('div', { style: { minWidth: '0', flex: '1' } }, [U.text('bcv-account__name bcv-ellip', state.me?.name || 'Account'), U.text('bcv-account__sub bcv-ellip', 'Profile & settings')]),
+          h('span', { class: 'bcv-account__more', 'aria-hidden': 'true' }, U.svg(IC.settings, { size: 14, width: 1.9 })),
         ]),
       ]),
     ].filter(Boolean));
@@ -669,6 +671,13 @@
 
   /** The panel over the account row: quick settings, the guided setup and the welcome, Canvas's own
    *  profile and settings pages, and Log out. */
+  /** The profile's photo as Canvas holds it, or the name's initials on the accent when there is none. */
+  function profilePhoto(me) {
+    const url = me?.avatar;
+    if (url && !/avatar-50|no_pic|dotted_pic|messages\/avatar-/.test(url)) return h('img', { src: url, alt: '', referrerpolicy: 'no-referrer' });
+    const initials = String(me?.name || '').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('');
+    return h('span', { class: 'bcv-menu__initials', text: initials || '?' });
+  }
   function accountMenu(anchor) {
     if (document.querySelector('.bcv-menu--account:not(.is-closing)')) { U.closeMenus(); return; }
     U.closeMenus();
@@ -678,7 +687,12 @@
       h('span', { style: { flex: '1', minWidth: '0' } }, [h('span', { class: 'bcv-ellip', style: { display: 'block' }, text: label }), sub ? h('span', { class: 'bcv-menu__sub', text: sub }) : null]),
     ]);
     const m = U.el('bcv-menu bcv-menu--account', [
-      U.el('bcv-menu__head', [U.avatar(me?.avatar, me?.name, 34), h('div', { style: { minWidth: '0' } }, [U.text('bcv-menu__name bcv-ellip', `${me?.name || 'Account'}${me?.pronouns ? ` (${me.pronouns})` : ''}`), U.text('bcv-menu__sub bcv-ellip', me?.email || me?.loginId || siteName())])]),
+      // the photo, large, at the head (the initials in the accent's colour when Canvas has none); a press on it opens the Canvas profile
+      h('div', { class: 'bcv-menu__head bcv-menu__head--profile' }, [
+        h('button', { type: 'button', class: 'bcv-menu__photo', title: 'Canvas profile', 'aria-label': 'Canvas profile', onclick: () => { U.closeMenus(); go('/profile'); } }, [profilePhoto(me)]),
+        U.text('bcv-menu__name bcv-ellip', `${me?.name || 'Account'}${me?.pronouns ? ` (${me.pronouns})` : ''}`),
+        U.text('bcv-menu__sub bcv-ellip', me?.email || me?.loginId || siteName()),
+      ]),
       // Canvas's own settings, and one link to Simpl's (the look, the setup, Personalize, the welcome and What's new all live there or in the sidebar)
       item(IC.settings, 'Simpl Courses settings', 'Look, courses and grades', openSettings),
       U.el('bcv-menu__sep'),

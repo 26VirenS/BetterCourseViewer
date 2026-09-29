@@ -13,7 +13,7 @@
  * min(their own, the viewport less a margin). */
 
 html[data-bcv-theme] {
-  --bcv-version: "2.98.40"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.98.41"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -214,12 +214,13 @@ html[data-bcv-theme="dark"] .bcv-skel { --bcv-skel: linear-gradient(90deg, rgba(
 /* (the reset above — #bcv-look button — outranks a class: the disc's glass and the buttons' colours said again at its weight) */
 #bcv-look .bcv-look__main, .bcv-look-pill .bcv-look__main { border: 0; background: transparent; }
 #bcv-look .bcv-look__opt, .bcv-look-pill .bcv-look__opt { background: var(--bcv-opt); }
-/* red, and how long (2.98.18): the red one is a box — its head the round button, its list under it.
+/* red, and how long (2.98.18): the red one is a box — its head the round button, its list under it,
+ * its rows' words to the right, ending where the head's end (2.98.41).
  * Hovered, it opens out to the left to the list's width with its words; pressed (is-expanded), it
  * grows down into the list on the island's spring (the capsules' timing, content/app/motion.js), its
  * corners easing out, the rows coming in one after the other once it is on its way. The list is laid
  * out at its full size all along — clipped, not squeezed — so nothing inside it reflows as it grows. */
-#bcv-look .bcv-look__opt--off, .bcv-look-pill .bcv-look__opt--off { --bcv-for-w: 164px; --bcv-for-h: 212px; flex-direction: column; align-items: stretch; justify-content: flex-start; height: 24px; background: linear-gradient(180deg, #ff453a, #e8372d); transition: max-width var(--bcv-t-island) var(--bcv-spring-island), height var(--bcv-t-island) var(--bcv-spring-island), border-radius var(--bcv-t-island) var(--bcv-spring-island), opacity .18s ease, transform .28s cubic-bezier(.32,.72,0,1), box-shadow .18s ease; }
+#bcv-look .bcv-look__opt--off, .bcv-look-pill .bcv-look__opt--off { --bcv-for-w: 140px; --bcv-for-h: 212px; flex-direction: column; align-items: stretch; justify-content: flex-start; height: 24px; background: linear-gradient(180deg, #ff453a, #e8372d); transition: max-width var(--bcv-t-island) var(--bcv-spring-island), height var(--bcv-t-island) var(--bcv-spring-island), border-radius var(--bcv-t-island) var(--bcv-spring-island), opacity .18s ease, transform .28s cubic-bezier(.32,.72,0,1), box-shadow .18s ease; }
 #bcv-look:hover .bcv-look__opt--off, #bcv-look:has(:focus-visible) .bcv-look__opt--off, .bcv-look-pill.is-open .bcv-look__opt--off { transition-delay: 0s, 0s, 0s, 55ms, 55ms, 0s; }
 /* red's words out, its list folded (the pointer's moment of intent, the keyboard's focus): just as wide as its words and disc —
  * --bcv-off-w, measured from the words (app.js fit()); the list's width only once the list opens */
@@ -230,11 +231,11 @@ html[data-bcv-theme="dark"] .bcv-skel { --bcv-skel: linear-gradient(90deg, rgba(
 #bcv-look .bcv-look__offhead, .bcv-look-pill .bcv-look__offhead { flex: none; display: flex; align-items: center; justify-content: flex-end; width: 100%; height: 24px; padding: 0; border-radius: 12px; background: transparent; color: #fff; white-space: nowrap; }
 #bcv-look .bcv-look__offhead:focus-visible { outline-offset: -2px; }
 .bcv-look__for { flex: none; box-sizing: border-box; width: var(--bcv-for-w); display: flex; flex-direction: column; gap: 2px; padding: 4px 5px 6px; }
-#bcv-look .bcv-look__forbtn, .bcv-look-pill .bcv-look__forbtn { flex: none; box-sizing: border-box; display: flex; align-items: center; width: 100%; height: 28px; padding: 0 10px; border-radius: 9px; background: transparent; color: #fff; font: 600 12px/1 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif; letter-spacing: -.01em; white-space: nowrap; opacity: 0; transform: translateY(-6px); transition: background .15s ease, opacity .16s ease, transform .3s cubic-bezier(.32,.72,0,1); }
+#bcv-look .bcv-look__forbtn, .bcv-look-pill .bcv-look__forbtn { flex: none; box-sizing: border-box; display: flex; align-items: center; justify-content: flex-end; width: 100%; height: 28px; padding: 0 21px 0 10px; border-radius: 9px; background: transparent; color: #fff; font: 600 12px/1 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif; letter-spacing: -.01em; white-space: nowrap; opacity: 0; transform: translateY(-6px); transition: background .15s ease, opacity .16s ease, transform .3s cubic-bezier(.32,.72,0,1); }
 #bcv-look .bcv-look__opt--off.is-expanded .bcv-look__forbtn, .bcv-look-pill .bcv-look__opt--off.is-expanded .bcv-look__forbtn { opacity: 1; transform: none; transition-delay: 0s, calc(80ms + var(--bcv-j) * 28ms), calc(80ms + var(--bcv-j) * 28ms); } /* (at the id's weight: the rows' resting rule above is said there) */
 #bcv-look .bcv-look__forbtn:hover, #bcv-look .bcv-look__forbtn:focus-visible, .bcv-look-pill .bcv-look__forbtn.is-hover { background: rgba(255,255,255,.22); }
 #bcv-look .bcv-look__forbtn:focus-visible { outline: 2px solid #fff; outline-offset: -2px; }
-.bcv-look__forbtn.is-current::after { content: ''; width: 6px; height: 6px; margin-left: auto; border-radius: 50%; background: #fff; } /* (the one in force: a dot at its end) */
+.bcv-look__forbtn.is-current::before { content: ''; flex: none; width: 6px; height: 6px; margin-right: 7px; border-radius: 50%; background: #fff; } /* (the one in force: a dot before its words, which stand to the right like the head's) */
 .bcv-look__forbtn:active { background: rgba(255,255,255,.32); }
 /* the red box keeps its list up while it is open, whatever the pointer does over the rest of the switch */
 #bcv-look.is-expanded .bcv-look__menu { visibility: visible; transition-delay: 0s; }
@@ -454,6 +455,11 @@ html.bcv-themed .bcv-nav__item:hover, html.bcv-themed .bcv-fav:hover { backgroun
 .bcv-quicknav__all:hover { background: var(--bcv-fill2); }
 @media (prefers-reduced-motion: reduce) { .bcv-quicknav { animation: none; } }
 .bcv-side__bottom { margin-top: auto; display: flex; flex-direction: column; gap: 8px; }
+/* (2.98.41) kept in sight at the sidebar's foot when its rows run past the window: the rows pass under
+ * it, its own ground fading in over them (a photo sidebar keeps its photo showing through instead) */
+html.bcv-on:not(.bcv-phone) .bcv-side__bottom { position: sticky; bottom: -14px; z-index: 1; margin: auto -12px -14px; padding: 14px 12px; }
+html.bcv-on:not(.bcv-phone) .bcv-side__bottom::before { content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none; background: linear-gradient(var(--bcv-chrome), var(--bcv-chrome)), var(--bcv-bg); -webkit-mask-image: linear-gradient(to bottom, transparent, #000 14px); mask-image: linear-gradient(to bottom, transparent, #000 14px); }
+html.bcv-on:not(.bcv-phone) .bcv-side--pic .bcv-side__bottom::before { display: none; }
 .bcv-theme-btn { display: flex; align-items: center; gap: 11px; width: 100%; padding: 8px 10px; border: 0; border-radius: 12px; cursor: pointer; text-align: left; font: 600 13px/1.2 var(--bcv-font); color: var(--bcv-ink); background: var(--bcv-fill2); }
 .bcv-theme-btn:hover { background: var(--bcv-fill); }
 .bcv-theme-btn__ic { width: 24px; height: 24px; border-radius: 7px; background: var(--bcv-fill); display: flex; align-items: center; justify-content: center; flex: none; }
@@ -461,6 +467,9 @@ html.bcv-themed .bcv-nav__item:hover, html.bcv-themed .bcv-fav:hover { backgroun
 .bcv-account__avatar { width: 30px; height: 30px; border-radius: 50%; background: linear-gradient(150deg, #d8d8de, #9b9ba3); flex: none; object-fit: cover; }
 .bcv-account__name { font: 600 12.5px/1.25 var(--bcv-font); }
 .bcv-account__sub { font: 400 11px/1.25 var(--bcv-font); color: var(--bcv-ink3); }
+.bcv-account__more { flex: none; width: 26px; height: 26px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: var(--bcv-ink2); background: var(--bcv-fill); transition: background .18s ease; }
+.bcv-account:hover .bcv-account__more { background: var(--bcv-fill2); }
+.bcv-side--pic .bcv-account__more { color: var(--bcv-photo-ink); background: rgba(255,255,255,.16); }
 
 /* ---- main + screen chrome ---------------------------------------------- */
 .bcv-main { flex: 1; min-width: 0; padding: 0 0 64px; container-type: inline-size; container-name: bcv-main; }
@@ -2735,9 +2744,17 @@ html.bcv-phone .bcv-nf__act { margin-left: auto; }
 }
 
 /* ---- the account panel (over the profile row) ---- */
-.bcv-menu--account { width: 262px; max-height: none; padding: 8px; }
+.bcv-menu--account { width: 272px; max-height: none; padding: 8px; }
 .bcv-menu__head { display: flex; align-items: center; gap: 10px; padding: 8px 10px 10px; border-bottom: 1px solid var(--bcv-sep); margin-bottom: 6px; }
 .bcv-menu__name { font: 600 13.5px/1.25 var(--bcv-font); color: var(--bcv-ink); }
+/* Profile & settings (2.98.41): the photo large at the head, the name and the e-mail under it, centred */
+.bcv-menu__head--profile { flex-direction: column; align-items: center; gap: 3px; padding: 14px 10px 14px; text-align: center; }
+.bcv-menu__head--profile .bcv-menu__name { max-width: 100%; margin-top: 8px; font-size: 15px; }
+.bcv-menu__head--profile .bcv-menu__sub { max-width: 100%; }
+.bcv-menu__photo { flex: none; width: 72px; height: 72px; padding: 0; border: 0; border-radius: 50%; overflow: hidden; cursor: pointer; background: var(--bcv-accent-fill, var(--bcv-blue)); box-shadow: 0 0 0 3px var(--bcv-card), 0 0 0 4px var(--bcv-sep), 0 6px 18px rgba(0,0,0,.18); transition: transform .2s var(--bcv-spring-snappy, ease); }
+.bcv-menu__photo:hover { transform: scale(1.04); }
+.bcv-menu__photo img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.bcv-menu__initials { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; font: 600 26px/1 var(--bcv-font); color: #fff; letter-spacing: .02em; }
 .bcv-menu__ic { flex: none; width: 24px; height: 24px; border-radius: 7px; background: var(--bcv-fill); color: var(--bcv-ink2); display: flex; align-items: center; justify-content: center; }
 .bcv-menu__sep { height: 1px; background: var(--bcv-sep); margin: 6px 4px; }
 #bcv-app .bcv-menu__item--danger, .bcv-menu__item--danger { color: #ff453a; }
