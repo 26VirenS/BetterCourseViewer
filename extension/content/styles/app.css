@@ -13,7 +13,7 @@
  * min(their own, the viewport less a margin). */
 
 html[data-bcv-theme] {
-  --bcv-version: "2.98.50"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.98.51"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -2172,7 +2172,12 @@ html.bcv-themed #bcv-app .bcv-btn--primary:hover { background: var(--bcv-accent-
 .bcv-stat--pic .bcv-stat__note { opacity: .82; }
 .bcv-stat--pic .bcv-stat__head > svg, .bcv-stat--pic .bcv-stat__chev { stroke: var(--bcv-photo-ink) !important; }
 .bcv-stat--pic > .bcv-stat__head, .bcv-stat--pic > .bcv-stat__noterow { position: relative; z-index: 1; }
-.bcv-stat__pic { position: absolute; inset: 0; z-index: 0; pointer-events: none; background: var(--bcv-pic) right bottom / cover no-repeat; }
+/* (2.98.51) the picture itself paints on a layer's ::before, so its place — the pin (--bcv-pic-x/-y: that point of the
+ * picture on that point of the box; a counter's default its bottom-right corner) and the zoom about it (--bcv-pic-z), set
+ * inline from theme:images (lib/theme.js placeOf, placeVars) — moves the picture alone, and the layer keeps its fade */
+.bcv-stat--pic { --bcv-pic-x: 100%; --bcv-pic-y: 100%; --bcv-pic-z: 1; }
+.bcv-stat__pic { position: absolute; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+.bcv-stat__pic:not(.bcv-stat__pic--veil)::before, .bcv-side__pic-sharp::before, .bcv-side__pic-blur::before, .bcv-head__pic-sharp::before, .bcv-head__pic-blur::before { content: ""; position: absolute; inset: 0; background: var(--bcv-pic) var(--bcv-pic-x) var(--bcv-pic-y) / cover no-repeat; transform: scale(var(--bcv-pic-z)); transform-origin: var(--bcv-pic-x) var(--bcv-pic-y); }
 .bcv-stat__pic--blur { filter: blur(14px) saturate(1.05); transform: scale(1.12); -webkit-mask-image: radial-gradient(farthest-side at 100% 100%, transparent 36%, #000 72%); mask-image: radial-gradient(farthest-side at 100% 100%, transparent 36%, #000 72%); }
 .bcv-stat__pic--veil { background: radial-gradient(150% 150% at 100% 100%, transparent 26%, color-mix(in srgb, var(--bcv-veil) var(--bcv-photo-veil-k), transparent) 70%), var(--bcv-photo-wash); } /* (the note at the foot reads; the corner stays clear) */
 .bcv-stat--pic .bcv-stat__note { text-shadow: var(--bcv-photo-halo); }
@@ -2193,14 +2198,11 @@ html[data-bcv-theme="dark"] { --bcv-photo-wash: rgba(0,0,0,.3); --bcv-ink-lift: 
 .bcv-stat--pic.has-ink { background: var(--bcv-card); --bcv-paper: var(--bcv-card); }
 .bcv-side--ink { background: var(--bcv-bg); --bcv-paper: var(--bcv-bg); }
 .bcv-head__pic.has-ink { background: var(--bcv-bg); --bcv-paper: var(--bcv-bg); } /* (the container: it runs up through the widgets' bar, and the paper goes with it) */
-.bcv-stat--pic.has-ink > .bcv-stat__pic:not(.bcv-stat__pic--blur):not(.bcv-stat__pic--veil), .bcv-side__pic.has-ink > .bcv-side__pic-sharp, .bcv-head__pic.has-ink > .bcv-head__pic-sharp { background: color-mix(in srgb, var(--bcv-paper) var(--bcv-ink-k), var(--bcv-ink-lift)); }
-.bcv-stat--pic.has-ink > .bcv-stat__pic--blur, .bcv-side__pic.has-ink > .bcv-side__pic-blur, .bcv-head__pic.has-ink > .bcv-head__pic-blur { background: color-mix(in srgb, var(--bcv-paper) var(--bcv-ink-k), var(--bcv-ink-lift)); filter: none; transform: none; -webkit-mask-size: cover, auto; -webkit-mask-repeat: no-repeat; -webkit-mask-composite: source-in; mask-size: cover, auto; mask-repeat: no-repeat; mask-composite: intersect; }
-.bcv-stat--pic.has-ink > .bcv-stat__pic:not(.bcv-stat__pic--blur):not(.bcv-stat__pic--veil) { -webkit-mask: var(--bcv-pic-ink) right bottom / cover no-repeat; mask: var(--bcv-pic-ink) right bottom / cover no-repeat; } /* (the sharp layer alone: the three share the class) */
-.bcv-stat--pic.has-ink > .bcv-stat__pic--blur { -webkit-mask-image: var(--bcv-pic-ink-blur), radial-gradient(farthest-side at 100% 100%, transparent 36%, #000 72%); -webkit-mask-position: right bottom, 0 0; mask-image: var(--bcv-pic-ink-blur), radial-gradient(farthest-side at 100% 100%, transparent 36%, #000 72%); mask-position: right bottom, 0 0; }
-.bcv-side__pic.has-ink > .bcv-side__pic-sharp { -webkit-mask: var(--bcv-pic-ink) center bottom / cover no-repeat; mask: var(--bcv-pic-ink) center bottom / cover no-repeat; }
-.bcv-side__pic.has-ink > .bcv-side__pic-blur { inset: 0; top: -14px; -webkit-mask-image: var(--bcv-pic-ink-blur), linear-gradient(to top, transparent 20%, #000 56%); -webkit-mask-position: center bottom, 0 0; mask-image: var(--bcv-pic-ink-blur), linear-gradient(to top, transparent 20%, #000 56%); mask-position: center bottom, 0 0; }
-.bcv-head__pic.has-ink > .bcv-head__pic-sharp { -webkit-mask: var(--bcv-pic-ink) right center / cover no-repeat; mask: var(--bcv-pic-ink) right center / cover no-repeat; }
-.bcv-head__pic.has-ink > .bcv-head__pic-blur { -webkit-mask-image: var(--bcv-pic-ink-blur), linear-gradient(to left, transparent 28%, #000 58%); -webkit-mask-position: right center, 0 0; mask-image: var(--bcv-pic-ink-blur), linear-gradient(to left, transparent 28%, #000 58%); mask-position: right center, 0 0; }
+.bcv-stat--pic.has-ink > .bcv-stat__pic:not(.bcv-stat__pic--veil)::before, .bcv-side__pic.has-ink > .bcv-side__pic-sharp::before, .bcv-side__pic.has-ink > .bcv-side__pic-blur::before, .bcv-head__pic.has-ink > .bcv-head__pic-sharp::before, .bcv-head__pic.has-ink > .bcv-head__pic-blur::before { background: color-mix(in srgb, var(--bcv-paper) var(--bcv-ink-k), var(--bcv-ink-lift)); }
+.bcv-stat--pic.has-ink > .bcv-stat__pic--blur, .bcv-side__pic.has-ink > .bcv-side__pic-blur, .bcv-head__pic.has-ink > .bcv-head__pic-blur { filter: none; transform: none; } /* (the layer keeps its fade alone; the blurred mask is on its ::before, under it — no composite needed) */
+.bcv-stat--pic.has-ink > .bcv-stat__pic:not(.bcv-stat__pic--blur):not(.bcv-stat__pic--veil)::before, .bcv-side__pic.has-ink > .bcv-side__pic-sharp::before, .bcv-head__pic.has-ink > .bcv-head__pic-sharp::before { -webkit-mask: var(--bcv-pic-ink) var(--bcv-pic-x) var(--bcv-pic-y) / cover no-repeat; mask: var(--bcv-pic-ink) var(--bcv-pic-x) var(--bcv-pic-y) / cover no-repeat; } /* (the sharp layer alone: a counter's three share the class) */
+.bcv-stat--pic.has-ink > .bcv-stat__pic--blur::before, .bcv-side__pic.has-ink > .bcv-side__pic-blur::before, .bcv-head__pic.has-ink > .bcv-head__pic-blur::before { -webkit-mask: var(--bcv-pic-ink-blur) var(--bcv-pic-x) var(--bcv-pic-y) / cover no-repeat; mask: var(--bcv-pic-ink-blur) var(--bcv-pic-x) var(--bcv-pic-y) / cover no-repeat; }
+.bcv-side__pic.has-ink > .bcv-side__pic-blur { inset: 0; top: -14px; }
 .bcv-stat--pic.has-ink > .bcv-stat__pic--veil, .bcv-side__pic.has-ink > .bcv-side__pic-veil, .bcv-head__pic.has-ink > .bcv-head__pic-veil { background: none; } /* (tone on tone needs no veil and no wash) */
 /* a ready-made theme's drawing (2.98.42) is inked in the look's own colour, not a shade of grey: the
  * accent a third into the surface by day, a little more by night (lib/theme.js sceneInkOn), its lines
@@ -2228,8 +2230,8 @@ html[data-bcv-theme="dark"] :is(.bcv-stat--pic, .bcv-side__pic, .bcv-head__pic).
  * the gap, so the rows sit where they did), and the pictures hang off it the height of the window —
  * so they stay put behind the rows as the rows go by. (An absolute layer would scroll away with them.) */
 .bcv-side__pic { position: sticky; top: 0; z-index: 0; flex: none; height: 0; margin: 0 -12px -18px; pointer-events: none; overflow: visible; }
-.bcv-side__pic > i { position: absolute; left: 0; right: 0; top: -14px; height: 100vh; display: block; } /* (the box sits at the padding's edge, so the pictures start 14px above it) */
-.bcv-side__pic-sharp, .bcv-side__pic-blur { background: var(--bcv-pic) center bottom / cover no-repeat; }
+.bcv-side__pic > i { position: absolute; left: 0; right: 0; top: -14px; height: 100vh; display: block; overflow: hidden; } /* (the box sits at the padding's edge, so the pictures start 14px above it) */
+.bcv-side__pic { --bcv-pic-x: 50%; --bcv-pic-y: 100%; --bcv-pic-z: 1; } /* (the picture's place, its default the foot: the layers' ::before, above) */
 .bcv-side__pic-blur { inset: -24px; }
 .bcv-side__pic-blur { filter: blur(18px) saturate(1.05); transform: scale(1.1); -webkit-mask-image: linear-gradient(to top, transparent 20%, #000 56%); mask-image: linear-gradient(to top, transparent 20%, #000 56%); }
 .bcv-side__pic-veil { background: linear-gradient(to top, var(--bcv-photo-edge) 0%, color-mix(in srgb, var(--bcv-veil) var(--bcv-photo-veil-k), transparent) 70%), var(--bcv-photo-wash); } /* (a thin wash stays over the foot so the rows there read) */
@@ -2243,8 +2245,8 @@ html.bcv-quiz .bcv-side__pic { display: none; }
 .bcv-head--pic .bcv-head__sub { color: var(--bcv-photo-ink2); }
 .bcv-head--pic > .bcv-head__in { position: relative; z-index: 1; }
 .bcv-head__pic { position: absolute; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
-.bcv-head__pic > i { position: absolute; inset: 0; display: block; }
-.bcv-head__pic-sharp, .bcv-head__pic-blur { background: var(--bcv-pic) right center / cover no-repeat; }
+.bcv-head__pic > i { position: absolute; inset: 0; display: block; overflow: hidden; }
+.bcv-head--pic { --bcv-pic-x: 100%; --bcv-pic-y: 50%; --bcv-pic-z: 1; } /* (the picture's place, its default the right: the layers' ::before, above) */
 .bcv-head__pic-blur { filter: blur(16px) saturate(1.05); transform: scale(1.08); -webkit-mask-image: linear-gradient(to left, transparent 28%, #000 58%); mask-image: linear-gradient(to left, transparent 28%, #000 58%); }
 .bcv-head__pic-veil { background: linear-gradient(to left, transparent 0%, color-mix(in srgb, var(--bcv-veil) var(--bcv-photo-veil-k), transparent) 72%), var(--bcv-photo-wash); }
 /* a header's photo runs on up through the widgets' bar: the bar goes clear over it, and the photo's

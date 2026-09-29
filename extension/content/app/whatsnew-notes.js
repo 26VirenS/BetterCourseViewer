@@ -25,6 +25,11 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.98.51', date: '2026-09-29', notes: [
+      { kind: 'new', title: 'Move and zoom photos', body: 'Drag a photo on the preview to place it, and zoom it.', icon: P.pic },
+      { kind: 'improved', title: 'Add photo opens files', body: 'Every Add photo badge opens your files straight away.', icon: P.pic },
+      { kind: 'fixed', title: 'Preview matches page', body: 'The preview crops, sizes and icons match the real page.', icon: P.eye },
+    ] },
     { version: '2.98.50', date: '2026-09-29', notes: [
       { kind: 'improved', title: 'Smaller counter boxes', body: 'A counter opens into a box a third shorter.', icon: P.layers },
       { kind: 'fixed', title: 'Counters back to size', body: 'The six counters are their old height again.', icon: P.check },

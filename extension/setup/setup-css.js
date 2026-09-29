@@ -522,7 +522,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
 .pz__pvtag { flex: none; display: inline-flex; align-items: center; gap: 5px; height: 24px; padding: 0 10px 0 8px; border-radius: 12px; background: var(--A-btn); color: #fff; font: 700 10.5px/1 var(--font); letter-spacing: .08em; text-transform: uppercase; transition: background .3s ease; }
 .pz__pvtag svg { display: block; }
 .pz__pvnote { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 400 12.5px/1.2 var(--font); color: var(--pz-ink3); }
-.pz__pvbox { --pz-bar-room: 76px; position: relative; flex: none; max-height: 100%; box-sizing: border-box; padding: 18px; border-radius: 22px; background-color: var(--pz-stage); background-image: radial-gradient(circle, var(--pz-dot) 1px, transparent 1.5px); background-size: 16px 16px; background-position: 8px 8px; display: flex; flex-direction: column; align-items: center; }
+.pz__pvbox { --pz-bar-room: 118px; position: relative; flex: none; max-height: 100%; box-sizing: border-box; padding: 18px; border-radius: 22px; background-color: var(--pz-stage); background-image: radial-gradient(circle, var(--pz-dot) 1px, transparent 1.5px); background-size: 16px 16px; background-position: 8px 8px; display: flex; flex-direction: column; align-items: center; }
 .pz__frame { flex: none; max-width: 100%; border-radius: 16px; overflow: hidden; background: var(--pv-main); border: 1px solid var(--pz-hair); box-shadow: 0 24px 60px rgba(0,0,0,var(--pv-shadow)), 0 2px 6px rgba(0,0,0,.06); }
 .pz__framebar { position: relative; height: 30px; display: flex; align-items: center; gap: 6px; padding: 0 12px; background: var(--pz-card); border-bottom: 1px solid var(--pz-hair); }
 .pz__framebar > i { flex: none; display: block; width: 9px; height: 9px; border-radius: 5px; background: #ff5f57; }
@@ -539,32 +539,37 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
 .pz__side.is-pickable { cursor: pointer; }
 .pz__side.is-pickable:hover { outline: 2px dashed var(--hover-ring); }
 .pz__side.is-target { outline: 2px solid var(--A) !important; }
-.pz__pic { position: absolute; inset: 0; display: block; pointer-events: none; }
-.pz__pic--sharp { background: var(--pic) center / cover no-repeat; animation: omFade .35s ease both; }
-.pz__pic--blur { inset: -24px; background: var(--pic) center / cover no-repeat; filter: blur(16px); }
-.pz__side .pz__pic--blur { -webkit-mask-image: linear-gradient(to top, transparent 10%, #000 62%); mask-image: linear-gradient(to top, transparent 10%, #000 62%); }
+/* the photo's layers, as the page draws them (app.css .bcv-stat__pic, .bcv-side__pic, .bcv-head__pic): the picture paints on a
+ * layer's ::before, pinned and zoomed by its place — --pic-x/-y (that point of the picture on that point of the part) and
+ * --pic-z, set on the part from the draft (lib/theme.js placeOf) — while the layer keeps its fade; a drag on the part moves it */
+.pz__side { --pic-x: 50%; --pic-y: 100%; --pic-z: 1; } .pz__card { --pic-x: 100%; --pic-y: 100%; --pic-z: 1; } .pz__phead { --pic-x: 100%; --pic-y: 50%; --pic-z: 1; }
+.pz__pic { position: absolute; inset: 0; display: block; pointer-events: none; overflow: hidden; }
+.pz__pic--sharp::before, .pz__pic--blur::before { content: ""; position: absolute; inset: 0; background: var(--pic) var(--pic-x) var(--pic-y) / cover no-repeat; transform: scale(var(--pic-z)); transform-origin: var(--pic-x) var(--pic-y); }
+.pz__pic--sharp { animation: omFade .35s ease both; }
+.pz__pic--blur { inset: -24px; filter: blur(18px) saturate(1.05); transform: scale(1.1); }
+.pz__side .pz__pic--blur { -webkit-mask-image: linear-gradient(to top, transparent 20%, #000 56%); mask-image: linear-gradient(to top, transparent 20%, #000 56%); }
+.pz__side.has-pic.is-pickable, .pz__card.has-pic.is-pickable, .pz__phead.has-pic.is-pickable { cursor: grab; }
+.pz__side.is-dragging, .pz__card.is-dragging, .pz__phead.is-dragging { cursor: grabbing !important; }
+.pz__file { position: absolute; left: 0; top: 0; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 /* inked, as the page draws it (app.css): the paper in the complement, the ink's mask in the colour, the blurred mask under the fade */
 .pz { --pz-ink-lift: #000000; --pz-ink-k: 93%; }
 :host([data-theme="dark"]) .pz, html[data-theme="dark"] .pz { --pz-ink-lift: #ffffff; --pz-ink-k: 90%; }
 .pz__side { --paper: var(--pv-side); } .pz__card { --paper: var(--pv-card); } .pz__phead { --paper: var(--pv-head); }
 .pz__pic--paper { background: var(--paper); }
-.pz__pic--sharp.pz__pic--inked { background: color-mix(in srgb, var(--paper) var(--pz-ink-k), var(--pz-ink-lift)); -webkit-mask: var(--ink) center / cover no-repeat; mask: var(--ink) center / cover no-repeat; }
-.pz__pic--blur.pz__pic--inked { inset: 0; filter: none; background: color-mix(in srgb, var(--paper) var(--pz-ink-k), var(--pz-ink-lift)); -webkit-mask-size: cover, auto; -webkit-mask-position: center, 0 0; -webkit-mask-repeat: no-repeat; -webkit-mask-composite: source-in; mask-size: cover, auto; mask-position: center, 0 0; mask-repeat: no-repeat; mask-composite: intersect; }
-.pz__side .pz__pic--blur.pz__pic--inked { -webkit-mask-image: var(--ink), linear-gradient(to top, transparent 10%, #000 62%); mask-image: var(--ink), linear-gradient(to top, transparent 10%, #000 62%); }
-.pz__card .pz__pic--blur.pz__pic--inked { -webkit-mask-image: var(--ink), radial-gradient(150% 150% at 100% 100%, transparent 30%, #000 70%); mask-image: var(--ink), radial-gradient(150% 150% at 100% 100%, transparent 30%, #000 70%); }
-.pz__phead .pz__pic--blur.pz__pic--inked { -webkit-mask-image: var(--ink), linear-gradient(to left, transparent 8%, #000 60%); mask-image: var(--ink), linear-gradient(to left, transparent 8%, #000 60%); }
+.pz__pic--sharp.pz__pic--inked::before, .pz__pic--blur.pz__pic--inked::before { background: color-mix(in srgb, var(--paper) var(--pz-ink-k), var(--pz-ink-lift)); -webkit-mask: var(--ink) var(--pic-x) var(--pic-y) / cover no-repeat; mask: var(--ink) var(--pic-x) var(--pic-y) / cover no-repeat; }
+.pz__pic--blur.pz__pic--inked { inset: 0; filter: none; transform: none; } /* (the layer keeps its fade alone; the blurred mask is on its ::before, under it) */
 .pz__pic--scene { --pz-ink-lift: var(--A); --pz-ink-k: 70%; } /* (a ready-made drawing, inked in the colour: app.css .is-scene) */
 :host([data-theme="dark"]) .pz__pic--scene, html[data-theme="dark"] .pz__pic--scene { --pz-ink-k: 66%; }
 .pz__choicepic--inked { background: var(--pz-field) !important; position: relative; overflow: hidden; }
 .pz__choicepic--inked::after { content: ""; position: absolute; inset: 0; background: color-mix(in srgb, var(--pz-field) calc(var(--pz-ink-k) - 4%), var(--pz-ink-lift)); -webkit-mask: var(--ink) center / cover no-repeat; mask: var(--ink) center / cover no-repeat; }
 .pz__choicepic--inked.is-scene::after { background: color-mix(in srgb, var(--pz-field) 40%, var(--A)); }
-.pz { --pz-wash: rgba(255,255,255,.3); --pz-photo-ink: #1c1c1e; --pz-photo-ink2: rgba(28,28,30,.66); --pz-photo-on: rgba(0,0,0,.08); --pz-photo-chip: rgba(0,0,0,.08); --pz-veil-k: 26%; --pz-edge: rgba(255,255,255,.2); --pz-icon-k: 100%; } /* the photo surfaces as the page has them (app.css --bcv-photo-*): washed heavily in the look's ground, the look's own ink over them */
-:host([data-theme="dark"]) .pz, html[data-theme="dark"] .pz { --pz-wash: rgba(0,0,0,.3); --pz-photo-ink: #ffffff; --pz-photo-ink2: rgba(255,255,255,.72); --pz-photo-on: rgba(255,255,255,.18); --pz-photo-chip: rgba(255,255,255,.22); --pz-veil-k: 34%; --pz-edge: rgba(0,0,0,.3); --pz-icon-k: 45%; }
+.pz { --pz-wash: rgba(255,255,255,.3); --pz-photo-ink: #1c1c1e; --pz-photo-ink2: rgba(28,28,30,.66); --pz-photo-on: rgba(0,0,0,.08); --pz-photo-chip: rgba(0,0,0,.08); --pz-veil-k: 26%; --pz-edge: rgba(255,255,255,.2); --pz-icon-k: 100%; --pz-frost: rgba(255,255,255,.64); --pz-photo-hair: rgba(0,0,0,.07); --pz-pvfill: rgba(118,118,128,.12); } /* the photo surfaces as the page has them (app.css --bcv-photo-*): washed heavily in the look's ground, the look's own ink over them */
+:host([data-theme="dark"]) .pz, html[data-theme="dark"] .pz { --pz-wash: rgba(0,0,0,.3); --pz-photo-ink: #ffffff; --pz-photo-ink2: rgba(255,255,255,.72); --pz-photo-on: rgba(255,255,255,.18); --pz-photo-chip: rgba(255,255,255,.22); --pz-veil-k: 34%; --pz-edge: rgba(0,0,0,.3); --pz-icon-k: 45%; --pz-frost: rgba(0,0,0,.36); --pz-photo-hair: rgba(255,255,255,.16); --pz-pvfill: rgba(118,118,128,.24); }
 .pz__pic--veil-side { background: linear-gradient(to top, var(--pz-edge) 0%, color-mix(in srgb, var(--veil-side) var(--pz-veil-k), transparent) 70%), var(--pz-wash); }
 .pz__pic--inked ~ .pz__pic--veil { background: none; } /* (tone on tone: no veil, no wash) */
-.pz__card .pz__pic--blur { inset: -20px; filter: blur(14px); -webkit-mask-image: radial-gradient(150% 150% at 100% 100%, transparent 30%, #000 70%); mask-image: radial-gradient(150% 150% at 100% 100%, transparent 30%, #000 70%); }
+.pz__card .pz__pic--blur { inset: 0; filter: blur(14px) saturate(1.05); transform: scale(1.12); -webkit-mask-image: radial-gradient(farthest-side at 100% 100%, transparent 36%, #000 72%); mask-image: radial-gradient(farthest-side at 100% 100%, transparent 36%, #000 72%); }
 .pz__pic--veil-card { background: radial-gradient(150% 150% at 100% 100%, transparent 26%, color-mix(in srgb, var(--veil-card) var(--pz-veil-k), transparent) 70%), var(--pz-wash); }
-.pz__phead .pz__pic--blur { inset: -24px; filter: blur(18px); -webkit-mask-image: linear-gradient(to left, transparent 8%, #000 60%); mask-image: linear-gradient(to left, transparent 8%, #000 60%); }
+.pz__phead .pz__pic--blur { inset: 0; filter: blur(16px) saturate(1.05); transform: scale(1.08); -webkit-mask-image: linear-gradient(to left, transparent 28%, #000 58%); mask-image: linear-gradient(to left, transparent 28%, #000 58%); }
 .pz__pic--veil-head { background: linear-gradient(to left, transparent 0%, color-mix(in srgb, var(--veil-head) var(--pz-veil-k), transparent) 72%), var(--pz-wash); }
 .pz__sidein { position: relative; padding: 18px 11px; display: flex; flex-direction: column; gap: 2px; }
 .pz__pvbrand { display: flex; align-items: center; gap: 8px; padding: 0 8px 16px; font: 600 13px/1 var(--font); color: var(--pv-ink); }
@@ -582,16 +587,23 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
 .pz__crow.is-on { background: color-mix(in srgb, var(--c) 14%, transparent); font-weight: 600; }
 .has-pic .pz__crow.is-on { background: var(--pz-photo-on); }
 .pz__cdot { flex: none; display: block; width: 8px; height: 8px; border-radius: 4px; background: var(--c); transition: background .3s ease; }
-.pz__badge { position: absolute; right: 12px; top: 16px; z-index: 2; display: flex; align-items: center; gap: 5px; height: 24px; padding: 0 9px 0 7px; border-radius: 15px; background: var(--pz-field); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); font: 600 9.5px/1 var(--font); color: var(--pz-ink2); pointer-events: none; animation: omFade .3s ease both; }
+.pz__badge { position: absolute; right: 12px; top: 16px; z-index: 2; display: flex; align-items: center; gap: 5px; height: 24px; padding: 0 9px 0 7px; border: 0; border-radius: 15px; background: var(--pz-field); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); font: 600 9.5px/1 var(--font); color: var(--pz-ink2); cursor: pointer; animation: omFade .3s ease both; transition: background .2s ease, color .2s ease; } /* (a button: a press opens the files for its part) */
+.pz__badge:hover, .pz__badge:focus-visible { background: var(--A-btn); color: #fff; }
 .pz__badge svg { display: block; }
 .pz__badge.has-pic { background: rgba(0,0,0,.34); color: #fff; }
 .pz__badge.is-on { background: var(--A-btn); color: #fff; }
 .pz__card .pz__badge { right: 8px; top: auto; bottom: 8px; height: 22px; padding: 0 8px 0 6px; }
 .pz__main { flex: 1; min-width: 0; padding: 22px 22px 18px; display: flex; flex-direction: column; gap: 15px; }
-.pz__date { display: block; font: 500 11px/1.2 var(--font); color: var(--pz-ink3); }
-.pz__title { display: block; margin-top: 3px; font: 700 22px/1.1 var(--display); letter-spacing: -.03em; color: var(--pv-ink); }
+.pz__title { flex: none; display: block; font: 700 25px/1.1 var(--display); letter-spacing: -.025em; color: var(--pv-ink); }
+.pz__search { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; height: 25px; padding: 0 9px; border-radius: 8px; background: var(--pz-pvfill); font: 400 10px/1 var(--font); color: var(--pz-ink3); white-space: nowrap; overflow: hidden; }
+.pz__searchic { flex: none; stroke: var(--pz-ink3); }
+.pz__seg { flex: none; display: flex; gap: 2px; padding: 2px; border-radius: 8px; background: var(--pz-pvfill); }
+.pz__segbtn2 { display: block; padding: 5px 10px; border-radius: 6px; font: 500 9.5px/1 var(--font); font-style: normal; color: var(--pz-ink2); white-space: nowrap; }
+.pz__segbtn2.is-on { background: var(--pv-card); color: var(--pv-ink); font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+.pz__phead.has-pic .pz__search, .pz__phead.has-pic .pz__seg { background: var(--pz-frost); box-shadow: inset 0 0 0 1px var(--pz-photo-hair); }
+.pz__phead.has-pic .pz__segbtn2 { color: var(--pz-photo-ink); }
 .pz__cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
-.pz__card { position: relative; height: 86px; border-radius: 14px; overflow: hidden; background: var(--pv-card); outline: 2px solid transparent; outline-offset: 2px; transition: outline-color .2s ease; }
+.pz__card { position: relative; height: 68px; border-radius: 14px; overflow: hidden; background: var(--pv-card); outline: 2px solid transparent; outline-offset: 2px; transition: outline-color .2s ease; }
 .pz__card.is-pickable { cursor: pointer; }
 .pz__card.is-pickable:hover { outline: 2px dashed var(--hover-ring); }
 .pz__card.is-target { outline: 2px solid var(--A) !important; }
@@ -611,28 +623,36 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
 .pz__cursorlabel.is-on { opacity: 1; transform: none; }
 .pz__ripple { position: absolute; z-index: 39; width: 56px; height: 56px; margin: -28px 0 0 -28px; border-radius: 50%; border: 2.5px solid var(--A, #0a84ff); pointer-events: none; animation: omRipple .8s cubic-bezier(.2,.7,.3,1) both; }
 @keyframes omRipple { from { opacity: .9; transform: scale(.25); } to { opacity: 0; transform: scale(1.5); } }
-.pz__cardin { position: relative; height: 100%; box-sizing: border-box; padding: 12px 13px; display: flex; flex-direction: column; }
+.pz__cardin { position: relative; height: 100%; box-sizing: border-box; padding: 9px 11px; display: flex; flex-direction: column; }
 .pz__chead { display: flex; align-items: flex-start; gap: 6px; }
 .pz__cic { flex: none; margin-top: 1px; stroke: var(--ic); transition: stroke .3s ease; }
-.pz__clabel { flex: 1; min-width: 0; font: 600 10.5px/1.25 var(--font); color: var(--pz-ink2); }
-.pz__cn { flex: none; font: 700 24px/1 var(--display); letter-spacing: -.03em; color: var(--A-read); transition: color .3s ease; }
-.pz__cnote { margin-top: auto; font: 400 10px/1.2 var(--font); color: var(--pz-ink3); }
-.pz__card.has-pic .pz__cic { stroke: var(--pz-photo-ink); } .pz__card.has-pic .pz__clabel { color: var(--pz-photo-ink); } .pz__card.has-pic .pz__cn { color: var(--pz-photo-ink); } .pz__card.has-pic .pz__cnote { color: var(--pz-photo-ink2); }
+/* (the counters at the preview's scale — two thirds of the page's: a 96px counter is 68px here, its 42px number 28px) */
+.pz__clabel { flex: 1; min-width: 0; font: 600 9.5px/1.25 var(--font); letter-spacing: -.01em; color: var(--pz-ink2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pz__cn { flex: none; font: 700 28px/1 var(--display); letter-spacing: -.035em; color: var(--pv-ink); transition: color .3s ease; }
+.pz__cnote { margin-top: auto; display: flex; align-items: center; gap: 4px; font: 400 9px/1.2 var(--font); color: var(--pz-ink3); }
+.pz__cnotet { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pz__cchev { flex: none; stroke: var(--pz-ink3); opacity: .7; }
+.pz__card.has-pic .pz__cic { stroke: var(--pz-photo-ink); } .pz__card.has-pic .pz__clabel { color: var(--pz-photo-ink); } .pz__card.has-pic .pz__cn { color: var(--pz-photo-ink); } .pz__card.has-pic .pz__cnote { color: var(--pz-photo-ink2); } .pz__card.has-pic .pz__cchev { stroke: var(--pz-photo-ink); }
 .pz__list { border-radius: 14px; background: var(--pv-card); overflow: hidden; }
 .pz__lrow { display: flex; align-items: center; gap: 10px; padding: 10px 13px; border-top: 1px solid var(--pv-hair); }
 .pz__ring { flex: none; display: block; width: 12px; height: 12px; border-radius: 6px; box-sizing: border-box; border: 1.6px solid var(--A); transition: border-color .3s ease; }
 .pz__lt { flex: 1; min-width: 0; font: 500 12px/1.2 var(--font); color: var(--pv-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pz__chip { flex: none; padding: 3px 8px; border-radius: 7px; background: color-mix(in srgb, var(--c) 14%, transparent); font: 600 10.5px/1.2 var(--font); color: var(--c-read, var(--c)); transition: color .3s ease, background .3s ease; }
 /* the header: one photo for every page's, pressed like the sidebar and the counters */
-.pz__phead { position: relative; margin: -22px -22px 0; padding: 22px 22px 12px; overflow: hidden; border-radius: 0 22px 0 0; outline: 2px solid transparent; outline-offset: -2px; transition: outline-color .2s ease; }
+.pz__phead { position: relative; margin: -22px -22px 0; padding: 22px 22px 12px; min-height: 82px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: flex-end; overflow: hidden; border-radius: 0 22px 0 0; outline: 2px solid transparent; outline-offset: -2px; transition: outline-color .2s ease; }
 .pz__phead.is-pickable { cursor: pointer; }
 .pz__phead.is-pickable:hover { outline: 2px dashed var(--hover-ring); }
 .pz__phead.is-target { outline: 2px solid var(--A) !important; }
-.pz__pheadin { position: relative; }
+.pz__pheadin { position: relative; display: flex; align-items: center; gap: 12px; min-width: 0; }
 .pz__phead.has-pic .pz__title { color: var(--pz-photo-ink); }
-.pz__phead.has-pic .pz__date { color: var(--pz-photo-ink2); }
 /* the photo bar, and the photo choices */
-.pz__bar2 { position: absolute; left: 50%; bottom: max(12px, calc(var(--pv-gap, 0px) - 26px)); z-index: 5; display: flex; align-items: center; gap: 12px; padding: 10px 12px 10px 16px; border-radius: 20px; background: var(--pz-glass); -webkit-backdrop-filter: blur(24px) saturate(1.5); backdrop-filter: blur(24px) saturate(1.5); border: 1px solid var(--pz-hair); box-shadow: 0 18px 44px rgba(0,0,0,.34); animation: omPop .26s var(--ease) both; transform: translateX(-50%); white-space: nowrap; }
+.pz__bar2 { position: absolute; left: 50%; bottom: max(12px, calc(var(--pv-gap, 0px) - 26px)); z-index: 5; display: flex; align-items: center; gap: 12px; padding: 10px 12px 10px 16px; border-radius: 20px; background: var(--pz-glass); -webkit-backdrop-filter: blur(24px) saturate(1.5); backdrop-filter: blur(24px) saturate(1.5); border: 1px solid var(--pz-hair); box-shadow: 0 18px 44px rgba(0,0,0,.34); animation: omPop .26s var(--ease) both; transform: translateX(-50%); white-space: nowrap; flex-wrap: wrap; }
+/* the place's row (while the part wears a photo): how to move it, the zoom, Reset */
+.pz__placerow { flex-basis: 100%; display: flex; align-items: center; gap: 12px; margin-top: 2px; padding-top: 9px; border-top: 1px solid var(--pz-hair); }
+.pz__placehint { display: flex; align-items: center; gap: 6px; font: 500 11px/1 var(--font); color: var(--pz-ink3); }
+.pz__placehint svg, .pz__zoom svg { flex: none; display: block; }
+.pz__zoom { display: flex; align-items: center; gap: 7px; margin-left: auto; font: 500 11px/1 var(--font); color: var(--pz-ink2); }
+.pz__zoom input { width: 130px; margin: 0; accent-color: var(--A); }
 .pz__bartitles { display: flex; flex-direction: column; gap: 2px; }
 .pz__bartitle { font: 600 12.5px/1.2 var(--font); color: var(--pz-ink); }
 .pz__barsub { font: 500 10.5px/1.2 var(--font); color: var(--pz-ink3); }

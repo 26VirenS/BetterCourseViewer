@@ -606,7 +606,7 @@
     side.classList.toggle('bcv-side--ink', !!sidePic?.ink); // (the paper: the complement of the colour, app.css)
     side.replaceChildren(...[
       // the theme's photo, under everything: sharp at the foot, blurred up the side (app.css: .bcv-side__pic)
-      sidePic ? h('div', { class: `bcv-side__pic ${sidePic.ink ? 'has-ink' : ''} ${sidePic.scene ? 'is-scene' : ''}`, 'aria-hidden': 'true', style: { ...(sidePic.ink ? { '--bcv-pic-ink': BCV.theme.picCss(sidePic.ink), '--bcv-pic-ink-blur': BCV.theme.picCss(sidePic.inkBlur) } : { '--bcv-pic': BCV.theme.picCss(sidePic.sharp) }), '--bcv-veil': BCV.theme.veilBase(state.settings?.appearance?.theme?.accent || '', state.themeImages?.tones?.side, 0.66) } }, [h('i', { class: 'bcv-side__pic-sharp' }), h('i', { class: 'bcv-side__pic-blur' }), h('i', { class: 'bcv-side__pic-veil' })]) : null,
+      sidePic ? h('div', { class: `bcv-side__pic ${sidePic.ink ? 'has-ink' : ''} ${sidePic.scene ? 'is-scene' : ''}`, 'aria-hidden': 'true', style: { ...(sidePic.ink ? { '--bcv-pic-ink': BCV.theme.picCss(sidePic.ink), '--bcv-pic-ink-blur': BCV.theme.picCss(sidePic.inkBlur) } : { '--bcv-pic': BCV.theme.picCss(sidePic.sharp) }), '--bcv-veil': BCV.theme.veilBase(state.settings?.appearance?.theme?.accent || '', state.themeImages?.tones?.side, 0.66), ...BCV.theme.placeVars(BCV.theme.placeOf(state.themeImages, 'side')) } }, [h('i', { class: 'bcv-side__pic-sharp' }), h('i', { class: 'bcv-side__pic-blur' }), h('i', { class: 'bcv-side__pic-veil' })]) : null, // (the place: where the picture is pinned, and its zoom — lib/theme.js placeOf)
       brandRow(name),
       // mockup 11: the glyph in its own colour, no tile behind it; full strength on the active row, dimmed elsewhere
       // under a theme each row takes its own shade of the colour (lib/theme.js shades()), lighter at
@@ -1215,10 +1215,11 @@
     head.querySelector('.bcv-head__pic')?.remove();
     head.classList.toggle('bcv-head--pic', !!pic);
     head.classList.toggle('bcv-head--ink', !!pic?.ink);
-    for (const k of ['--bcv-pic', '--bcv-pic-ink', '--bcv-pic-ink-blur']) head.style.removeProperty(k);
+    for (const k of ['--bcv-pic', '--bcv-pic-ink', '--bcv-pic-ink-blur', '--bcv-pic-x', '--bcv-pic-y', '--bcv-pic-z']) head.style.removeProperty(k);
     if (!pic) return;
     if (pic.ink) { head.style.setProperty('--bcv-pic-ink', BCV.theme.picCss(pic.ink)); head.style.setProperty('--bcv-pic-ink-blur', BCV.theme.picCss(pic.inkBlur)); } else head.style.setProperty('--bcv-pic', BCV.theme.picCss(pic.sharp));
     head.style.setProperty('--bcv-veil', BCV.theme.veilBase(state.settings?.appearance?.theme?.accent || '', state.themeImages?.tones?.[`head:${screen}`], 0.6));
+    for (const [k, v] of Object.entries(BCV.theme.placeVars(BCV.theme.placeOf(state.themeImages, `head:${screen}`)))) head.style.setProperty(k, v); // (where the picture is pinned, and its zoom)
     head.prepend(h('div', { class: `bcv-head__pic ${pic.ink ? 'has-ink' : ''} ${pic.scene ? 'is-scene' : ''}`, 'aria-hidden': 'true' }, [h('i', { class: 'bcv-head__pic-sharp' }), h('i', { class: 'bcv-head__pic-blur' }), h('i', { class: 'bcv-head__pic-veil' })]));
   }
 

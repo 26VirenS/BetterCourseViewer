@@ -45,17 +45,20 @@
     check: 'M20 6L9 17l-5-5', camera: 'M4 8h3l2-2h6l2 2h3v11H4zM12 11a3 3 0 100 6 3 3 0 000-6z', up: 'M12 16V5M7 10l5-5 5 5M5 19h14',
     eye: 'M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7zM12 15a3 3 0 100-6 3 3 0 000 6z', plus: 'M12 5v14M5 12h14',
     dash: 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z', book: 'M5 4h13v16H5zM5 17h13', todo: 'M5 6h14M5 12h14M5 18h9', cal: 'M5 5h14v15H5zM5 10h14M9 3v4M15 3v4', chart: 'M4 19h16M7 16V9M12 16V5M17 16v-4',
+    search: 'M11 4a7 7 0 100 14 7 7 0 000-14zM16.5 16.5L21 21', chevron: 'M9 6l6 6-6 6', move: 'M12 2v20M2 12h20M8 6l4-4 4 4M8 18l4 4 4-4M6 8l-4 4 4 4M18 8l4 4-4 4', zoom: 'M11 4a7 7 0 100 14 7 7 0 000-14zM16.5 16.5L21 21M11 8v6M8 11h6',
   };
+  // the counters' glyphs as the page draws them (content/app/icons.js), so the preview shows the counters it stands for
+  const PIC = { clock: 'M20 12a8 8 0 11-16 0 8 8 0 0116 0zM12 7.6V12l2.9 1.8', cal: 'M4.6 8.8A2.4 2.4 0 017 6.4h10a2.4 2.4 0 012.4 2.4v8.8A2.4 2.4 0 0117 20H7a2.4 2.4 0 01-2.4-2.4zM4.6 10.8h14.8M8.6 4.4v3.4M15.4 4.4v3.4', bell: 'M18.1 16.3c-.8-.9-1.2-1.6-1.2-4.3 0-2.6-1.3-4.6-3.4-5.3a1.6 1.6 0 00-3 0C8.4 7.4 7.1 9.4 7.1 12c0 2.7-.4 3.4-1.2 4.3-.4.4-.1 1.1.4 1.1h11.4c.5 0 .8-.7.4-1.1zM10.1 19.2a2.2 2.2 0 003.8 0', chart: 'M6 19.4v-6.2M12 19.4V5.8M18 19.4v-9.4' };
   // the preview's sidebar rows, each with the colour its glyph has in the Regular look
   const NAV = [['Dashboard', IC.dash, '#0a84ff'], ['Courses', IC.book, '#ff9f0a'], ['To Do', IC.todo, '#30d158'], ['Calendar', IC.cal, '#5e5ce6'], ['Grades', IC.chart, '#bf5af2']];
-  // the six counters, with made-up numbers
+  // the six counters, with made-up numbers — each with the label, the glyph and the colour the Dashboard gives it (screens/dashboard.js)
   const CARDS = [
-    ['today', 'Due today', '3', '25 points total', 'M12 5a8 8 0 100 16 8 8 0 000-16zM12 9v4l3 2', '#ff453a'],
-    ['week', 'Due this week', '12', 'Across 4 courses', 'M5 5h14v15H5zM5 10h14', '#30d158'],
-    ['unread', 'Announcements', '2', 'Math 21', 'M12 4a5 5 0 015 5v4l2 3H5l2-3V9a5 5 0 015-5z', '#ff9f0a'],
-    ['overdue', 'Overdue', '0', 'Nothing overdue', 'M12 4l9 16H3zM12 10v4', '#ff453a'],
-    ['tomorrow', 'Due tomorrow', '1', 'Lec06-PreQuiz', 'M5 5h14v15H5zM9 3v4M15 3v4', '#0a84ff'],
-    ['graded', 'Graded this week', '4', '96 / 100 points', 'M4 19h16M7 16V9M12 16V5M17 16v-4', '#5e5ce6'],
+    ['today', 'Due today', '3', '25 points total', PIC.clock, '#ff453a'],
+    ['week', 'Due this week', '12', 'Across 4 courses', PIC.cal, '#34c759'],
+    ['unread', 'Unread announcements', '2', 'From 2 courses', PIC.bell, '#ff9500'],
+    ['overdue', 'Overdue', '0', 'Nothing overdue', PIC.clock, '#ff453a'],
+    ['tomorrow', 'Due tomorrow', '1', '10 points total', PIC.clock, '#ff9f0a'],
+    ['graded', 'Graded this week', '4', '96 / 100 points', PIC.chart, '#5856d6'],
   ];
   // the ready-made photos: drawn, not fetched, so they weigh nothing and are the same on every device
   const PRESET_PHOTOS = BCV.theme.PRESET_PHOTOS; // [name, picture, tone]: the four drawn scenes (lib/theme.js)
@@ -92,9 +95,19 @@
   const ground = () => (dark() ? '#1c1c1e' : '#ffffff');
   const photoAt = (key) => (key === 'side' ? st.images.side : key === 'head' ? st.images.headers.dashboard : key.startsWith('head:') ? st.images.headers[key.slice(5)] : st.images.cards[key]) || null;
   const toneAt = (key) => st.images.tones?.[key === 'head' ? HEAD : key] || null;
+  // where a photo sits (lib/theme.js placeOf): the point of it pinned to the same point of its place, and a zoom about it —
+  // 'head' reads the Dashboard's and writes every page's, as the photo itself does
+  const placeKey = (key) => (key === 'head' ? HEAD : key);
+  const placeAt = (key) => T().placeOf(st.images, placeKey(key));
+  const setPlace = (key, p) => {
+    st.images.place = st.images.place || {};
+    if (key === 'head') { for (const [k] of T().HEADER_SLOTS) setPlace(`head:${k}`, p); return; }
+    if (p && !T().isDefaultPlace(key, p)) st.images.place[key] = { x: p.x, y: p.y, z: p.z }; else delete st.images.place[key];
+  };
   const setPhoto = (key, value, tone) => {
     st.images.tones = st.images.tones || {};
     if (key === 'head') { for (const [k] of T().HEADER_SLOTS) setPhoto(`head:${k}`, value, tone); return; } // (the one header: every page's, the same picture — kept once, as one asset)
+    if (photoAt(key) !== value) setPlace(key, null); // (a new picture starts at its place's own default)
     if (key === 'side') st.images.side = value; else if (key.startsWith('head:')) { if (value) st.images.headers[key.slice(5)] = value; else delete st.images.headers[key.slice(5)]; } else if (value) st.images.cards[key] = value; else delete st.images.cards[key];
     if (value && tone) st.images.tones[key] = tone; else delete st.images.tones[key];
   };
@@ -110,7 +123,7 @@
   const unpack = (kept) => {
     const raw = (v) => T().rawOf(kept, v);
     const map = (o) => Object.fromEntries(Object.entries(o || {}).map(([k, v]) => [k, raw(v)]).filter(([, v]) => v));
-    return { side: raw(kept.side), cards: map(kept.cards), headers: map(kept.headers), tones: { ...(kept.tones || {}) } };
+    return { side: raw(kept.side), cards: map(kept.cards), headers: map(kept.headers), tones: { ...(kept.tones || {}) }, place: { ...(kept.place || {}) } };
   };
   async function open({ app, host, page, onDone, standalone = false }) {
     const settings = await S.get();
@@ -137,6 +150,9 @@
     const root = h('div', { class: 'pz', id: 'pz' });
     ui = { root, host, page, mq: null };
     page.replaceChildren(root);
+    // the picker every Add photo (or Change) badge opens: one input, outside the redrawn root, read for the part chosen
+    ui.file = h('input', { type: 'file', accept: 'image/*', class: 'pz__file', id: 'pzFile', tabindex: '-1', 'aria-label': 'Upload a photo', onchange: (e) => { const f = e.target.files?.[0]; if (f && st?.target) readFile(f, st.target); e.target.value = ''; } });
+    page.append(ui.file);
     // System follows the device while it is the choice
     try {
       ui.mq = window.matchMedia('(prefers-color-scheme: dark)');
@@ -160,6 +176,7 @@
     window.removeEventListener('resize', ui.onResize);
     ui.host.removeEventListener('keydown', ui.onKey, true);
     if (ui.outside) document.removeEventListener('pointerdown', ui.outside, true);
+    ui.file?.remove();
     ui = null; st = null;
   }
 
@@ -176,6 +193,7 @@
       '--A-read-light': t.readableOn(A, '#ffffff'), '--A-read-dark': t.readableOn(A, '#1c1c1e'), '--pk-bg': d ? '#1c1c1e' : '#ffffff',
       '--veil-side': t.veilBase(A, toneAt('side'), 0.66), '--veil-head': t.veilBase(A, toneAt('head'), 0.6),
       '--hover-ring': t.mix(A, d ? '#000000' : '#ffffff', 0.2),
+      '--A-icon': t.palette(A, d).icon, // (the counters' glyphs under a theme: the page's one accent icon colour)
     };
     shades.forEach((c, i) => { vars[`--s${i}`] = c; vars[`--s${i}-lit`] = t.mix(c, '#ffffff', 0.45); });
     for (const [k, v] of Object.entries(vars)) ui.root.style.setProperty(k, v);
@@ -399,7 +417,65 @@
       h('i', { class: `pz__pic pz__pic--veil pz__pic--veil-${veilVar}` }),
     ] : [h('i', { class: 'pz__pic pz__pic--paper' })]; // (its paper alone until its ink lands — a moment — never the raw photo)
   };
-  const badge = (target, has) => (st.step === 0 && !phone() ? h('span', { class: `pz__badge ${has ? 'has-pic' : ''} ${st.target === target ? 'is-on' : ''}` }, [svg(IC.camera, { size: 12, width: 2.2 }), h('span', { text: has ? 'Change' : 'Add photo' })]) : null);
+  /** The Add photo (or Change) badge on a part of the preview: a press opens the files straight away for that part, the
+   *  photo bar opening under the preview for it as well (a scene instead, or None, is a press away there). */
+  const badge = (target, has) => (st.step === 0 && !phone() ? h('button', { type: 'button', class: `pz__badge ${has ? 'has-pic' : ''} ${st.target === target ? 'is-on' : ''}`, dataset: { badge: target }, title: has ? 'Choose another photo from your files' : 'Add a photo from your files', onclick: (e) => { e.stopPropagation(); pickFile(target); } }, [svg(IC.camera, { size: 12, width: 2.2 }), h('span', { text: has ? 'Change' : 'Add photo' })]) : null);
+  const pickFile = (target) => { st.target = target; closePicker(true); render(); ui.file?.click(); }; // (the press's own gesture: the picker opens from it)
+  // ---- moving a photo in its place ---------------------------------------------------------------
+  /** A photo dragged on the preview moves in its place — the picture following the pointer pixel for pixel (its own
+   *  size known, measured once) — and ⌘/Ctrl+wheel (a trackpad's pinch) zooms it about its pin; the zoom is also a
+   *  slider in the photo bar. A press that does not move is the ordinary press. The place is written as the pointer
+   *  lifts, and the page draws it the same way (lib/theme.js placeOf). */
+  const AR = new Map(); // a picture's width over its height (a drawn scene is 16:9)
+  const aspectOf = (pic) => {
+    if (AR.has(pic)) return AR.get(pic);
+    AR.set(pic, 16 / 9);
+    try { const img = new Image(); img.onload = () => { if (img.naturalWidth && img.naturalHeight) AR.set(pic, img.naturalWidth / img.naturalHeight); }; img.src = pic; } catch { /* the guess serves */ }
+    return 16 / 9;
+  };
+  const clampN = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+  const placeVarsOn = (el, p) => { for (const [k, v] of Object.entries(T().placeVars(p, '--pic'))) el.style.setProperty(k, v); };
+  /** The place of `key` set (null: back to its default), the preview's part redrawn in place and the bar's controls following. */
+  const applyPlace = (key, p) => {
+    setPlace(key, p);
+    const el = ui?.root.querySelector(`.pz__pv [data-target="${key}"]`);
+    if (el) placeVarsOn(el, placeAt(key));
+    syncPlaceRow(key);
+  };
+  const syncPlaceRow = (key) => {
+    const z = ui?.root.querySelector('#pzZoom'); if (z) z.value = String(placeAt(key).z);
+    const r = ui?.root.querySelector('#pzPlaceReset'); if (r) r.disabled = T().isDefaultPlace(placeKey(key), placeAt(key));
+  };
+  function armPlace(el, key, pic) {
+    if (!pic || st.step !== 0 || phone()) return;
+    el.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0 || e.target.closest?.('.pz__badge')) return;
+      const p0 = placeAt(key);
+      const r = el.getBoundingClientRect();
+      const ar = aspectOf(pic);
+      const cw = Math.max(r.width, r.height * ar) * p0.z, ch = Math.max(r.height, r.width / ar) * p0.z; // the picture as drawn, in the box's own pixels
+      const x0 = e.clientX, y0 = e.clientY;
+      let moved = false, last = p0;
+      const move = (ev) => {
+        const dx = ev.clientX - x0, dy = ev.clientY - y0;
+        if (!moved && Math.hypot(dx, dy) < 3) return;
+        if (!moved) { moved = true; el.classList.add('is-dragging', 'is-target'); try { el.setPointerCapture(e.pointerId); } catch { /* not held */ } }
+        last = { x: cw - r.width > 0.5 ? clampN(p0.x - (dx * 100) / (cw - r.width), 0, 100) : p0.x, y: ch - r.height > 0.5 ? clampN(p0.y - (dy * 100) / (ch - r.height), 0, 100) : p0.y, z: p0.z };
+        placeVarsOn(el, last);
+      };
+      const up = () => {
+        el.removeEventListener('pointermove', move); el.removeEventListener('pointerup', up); el.removeEventListener('pointercancel', up);
+        if (!moved) return;
+        try { el.releasePointerCapture(e.pointerId); } catch { /* released */ }
+        st.dragged = true; setTimeout(() => { if (st) st.dragged = false; }, 0); // (the click that follows a drag is not a press)
+        setPlace(key, last);
+        st.target = key; // (the part dragged is the one chosen: its bar opens, or stays)
+        render();
+      };
+      el.addEventListener('pointermove', move); el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
+    });
+    el.addEventListener('wheel', (e) => { if (!(e.ctrlKey || e.metaKey)) return; e.preventDefault(); const p = placeAt(key); applyPlace(key, { ...p, z: clampN(p.z * Math.exp(-e.deltaY * 0.01), 1, 3) }); }, { passive: false });
+  }
   /** A picture dragged from the desktop onto a part of the preview goes on it: the parts that take one are outlined while it is carried over them. */
   function armDrop(pv) {
     if (st.step !== 0 || phone()) return;
@@ -432,8 +508,9 @@
     const sidePic = st.images.side;
     const headPic = photoAt('head');
     const pickable = st.step === 0 && !phone();
-    const pick = (target) => () => { if (pickable) { st.target = target; render(); } };
-    const side = h('div', { class: `pz__side ${sidePic ? 'has-pic' : ''} ${st.target === 'side' ? 'is-target' : ''} ${pickable ? 'is-pickable' : ''}`, dataset: { target: 'side' }, onclick: pick('side') }, [
+    const pick = (target) => () => { if (pickable && !st.dragged) { st.target = target; render(); } };
+    const placed = (key) => T().placeVars(placeAt(key), '--pic'); // (where its photo sits: the page's own variables, on the part)
+    const side = h('div', { class: `pz__side ${sidePic ? 'has-pic' : ''} ${st.target === 'side' ? 'is-target' : ''} ${pickable ? 'is-pickable' : ''}`, dataset: { target: 'side' }, style: placed('side'), onclick: pick('side') }, [
       ...layers(sidePic, 'side'),
       h('div', { class: 'pz__sidein' }, [
         h('span', { class: 'pz__pvbrand' }, [h('i', { class: 'pz__pvtile' }), h('b', { text: 'Simpl' })]),
@@ -443,26 +520,34 @@
       ]),
       badge('side', !!sidePic),
     ]);
-    const today = new Date();
+    armPlace(side, 'side', sidePic);
     const cards = CARDS.map(([slot, label, n, note, d, colour], i) => {
       const pic = st.images.cards[slot] || null;
-      return h('div', { class: `pz__card ${pic ? 'has-pic' : ''} ${st.target === slot ? 'is-target' : ''} ${pickable ? 'is-pickable' : ''}`, dataset: { target: slot, veilCard: slot }, style: { '--ic': st.theme.name === 'Regular' ? colour : `var(--s${i % 5})` }, onclick: pick(slot) }, [
+      const card = h('div', { class: `pz__card ${pic ? 'has-pic' : ''} ${st.target === slot ? 'is-target' : ''} ${pickable ? 'is-pickable' : ''}`, dataset: { target: slot, veilCard: slot }, style: { '--ic': st.theme.name === 'Regular' ? colour : 'var(--A-icon)', ...placed(slot) }, onclick: pick(slot) }, [
         ...layers(pic, 'card'),
         h('div', { class: 'pz__cardin' }, [
-          h('span', { class: 'pz__chead' }, [svg(d, { size: 11, width: 2.2, cls: 'pz__cic' }), h('span', { class: 'pz__clabel', text: label }), h('span', { class: 'pz__cn', text: n })]),
-          h('span', { class: 'pz__cnote', text: note }),
+          h('span', { class: 'pz__chead' }, [svg(d, { size: 10, width: 1.9, cls: 'pz__cic' }), h('span', { class: 'pz__clabel', text: label }), h('span', { class: 'pz__cn', text: n })]),
+          h('span', { class: 'pz__cnote' }, [h('span', { class: 'pz__cnotet', text: note }), svg(IC.chevron, { size: 9, width: 2, cls: 'pz__cchev' })]),
         ]),
         badge(slot, !!pic),
       ]);
+      armPlace(card, slot, pic);
+      return card;
     });
     const cs = pvCourses();
     const rows = [['Lab report draft', 0], ['Essay outline', 1], ['Problem set 4', 2]].map(([t, i]) => { const c = cs[i] || cs[0]; return h('span', { class: 'pz__lrow' }, [h('i', { class: 'pz__ring' }), h('span', { class: 'pz__lt', text: t }), c ? h('span', { class: 'pz__chip', style: { '--c': `var(--course-${c.id})`, '--c-read': `var(--course-${c.id}-read)` }, text: c.name }) : null]); });
-    // the header: one photo for every page's, pressed here like the sidebar and the counters
-    const head = h('div', { class: `pz__phead ${headPic ? 'has-pic' : ''} ${st.target === 'head' ? 'is-target' : ''} ${pickable ? 'is-pickable' : ''}`, dataset: { target: 'head', veilHead: 'dashboard' }, onclick: pick('head') }, [
+    // the header: one photo for every page's, pressed here like the sidebar and the counters — drawn as the Dashboard's
+    // own row is (the title, the search box, the view switcher: no date line, which the page does not have)
+    const head = h('div', { class: `pz__phead ${headPic ? 'has-pic' : ''} ${st.target === 'head' ? 'is-target' : ''} ${pickable ? 'is-pickable' : ''}`, dataset: { target: 'head', veilHead: 'dashboard' }, style: placed('head'), onclick: pick('head') }, [
       ...layers(headPic, 'head'),
-      h('div', { class: 'pz__pheadin' }, [h('span', { class: 'pz__date', text: today.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' }) }), h('span', { class: 'pz__title', text: 'Dashboard' })]),
+      h('div', { class: 'pz__pheadin' }, [
+        h('span', { class: 'pz__title', text: 'Dashboard' }),
+        h('span', { class: 'pz__search' }, [svg(IC.search, { size: 11, width: 2, cls: 'pz__searchic' }), h('span', { text: 'Search everything' })]),
+        h('span', { class: 'pz__seg' }, ['Cards', 'List', 'Recent activity'].map((t, i) => h('i', { class: `pz__segbtn2 ${i === 0 ? 'is-on' : ''}`, text: t }))),
+      ]),
       badge('head', !!headPic),
     ]);
+    armPlace(head, 'head', headPic);
     const pv = h('div', { class: 'pz__pv', style: { transform: `translateX(-50%) scale(${st.pvScale || 1})` } }, [
       side,
       h('div', { class: 'pz__main' }, [
@@ -506,6 +591,11 @@
       h('i', { class: 'pz__vr' }),
       ...photoChoices(key, isCard ? { onEvery: { label: 'All cards', go: (cur) => { CARDS.forEach(([slot], i) => setPhoto(slot, variantOf(cur, i + 1), toneAt(key))); } } } : {}),
       h('button', { type: 'button', class: 'pz__barok', title: 'Done', 'aria-label': 'Done', onclick: () => { st.target = null; render(); } }, svg(IC.check, { size: 13, width: 2.8 })),
+      photoAt(key) ? h('div', { class: 'pz__placerow', id: 'pzPlace' }, [
+        h('span', { class: 'pz__placehint' }, [svg(IC.move, { size: 12, width: 2 }), h('span', { text: 'Drag the photo on the preview to move it' })]),
+        h('label', { class: 'pz__zoom' }, [svg(IC.zoom, { size: 12, width: 2 }), h('span', { text: 'Zoom' }), h('input', { type: 'range', id: 'pzZoom', min: '1', max: '3', step: '0.01', value: String(placeAt(key).z), 'aria-label': 'Zoom', oninput: (e) => applyPlace(key, { ...placeAt(key), z: clampN(Number(e.target.value) || 1, 1, 3) }) })]),
+        h('button', { type: 'button', class: 'pz__textbtn', id: 'pzPlaceReset', disabled: T().isDefaultPlace(placeKey(key), placeAt(key)) || null, text: 'Reset', onclick: () => applyPlace(key, null) }),
+      ]) : null,
     ]);
   }
 

@@ -345,6 +345,23 @@
   /** The screens whose header can carry a photo (the route's screen key, and the title it shows). */
   const HEADER_SLOTS = [['dashboard', 'Dashboard'], ['courses', 'All Courses'], ['groups', 'Groups'], ['todo', 'To Do'], ['calendar', 'Calendar'], ['notifications', 'Notifications'], ['inbox', 'Inbox'], ['gpa', 'Grades'], ['tools', 'Tools']];
   const IMAGES_KEY = 'theme:images'; // storage.local: { side: dataURL | null, cards: { [slot]: dataURL }, headers: { [screen]: dataURL } } — never in the settings, which the Mac app carries
+  // ---- where a photo sits (2.98.51) ------------------------------------------------------------------
+  // A photo covers its place (the sidebar, a counter, a header) and is pinned there by a point: the
+  // point of the picture at x%, y% sits on the point of the box at x%, y% — 100%, 100% keeps the
+  // picture's bottom-right corner in the box's, as a counter always did — and is zoomed about that
+  // point (1 = just covering the box, up to 3). Kept under theme:images as place[key], the keys the
+  // tones use ('side', a counter's slot, 'head:<screen>'), only where it is not the place's own
+  // default; Personalize sets it by dragging the picture on its preview, and the page and the
+  // preview draw it the same way (app.css, setup-css.js: the pin as the background's position and
+  // the zoom a scale about it).
+  const PLACE_DEFAULT = (key) => (key === 'side' ? { x: 50, y: 100, z: 1 } : String(key).startsWith('head') ? { x: 100, y: 50, z: 1 } : { x: 100, y: 100, z: 1 });
+  const numIn = (v, lo, hi, d) => { const n = Number(v); return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : d; };
+  /** Where the photo at `key` sits: the kept place, clamped, or the place's default. */
+  const placeOf = (images, key) => { const d = PLACE_DEFAULT(key); const p = images?.place?.[key]; return p && typeof p === 'object' ? { x: numIn(p.x, 0, 100, d.x), y: numIn(p.y, 0, 100, d.y), z: numIn(p.z, 1, 3, 1) } : d; };
+  const isDefaultPlace = (key, p) => { const d = PLACE_DEFAULT(key); return !p || (Math.abs(Number(p.x) - d.x) < 0.05 && Math.abs(Number(p.y) - d.y) < 0.05 && Math.abs(Number(p.z) - 1) < 0.005); };
+  const roundPlace = (p) => ({ x: Math.round(p.x * 10) / 10, y: Math.round(p.y * 10) / 10, z: Math.round(p.z * 100) / 100 });
+  /** The style variables a photo's layers read for its place (app.css --bcv-pic-x/-y/-z; the preview's --pic-x/-y/-z). */
+  const placeVars = (p, prefix = '--bcv-pic') => ({ [`${prefix}-x`]: `${p.x}%`, [`${prefix}-y`]: `${p.y}%`, [`${prefix}-z`]: String(p.z) });
   /** A picture file scaled to fit `max` on its longer side and encoded as a JPEG data URL, so a
    *  phone's photo does not sit in storage at twelve megapixels. Needs a document (a content script). */
   /** An image element for a file or a data URL, once it has loaded. */
@@ -507,7 +524,7 @@
   /** Every raw picture in `images` (a data URL: an upload, or a drawn scene) becomes an asset, kept once;
    *  assets nothing wears any more go. Needs a document (a canvas): elsewhere the pictures are kept as they are. */
   async function packImages(images) {
-    const out = { side: null, cards: {}, headers: {}, tones: { ...(images?.tones || {}) }, assets: { ...(images?.assets || {}) } };
+    const out = { side: null, cards: {}, headers: {}, tones: { ...(images?.tones || {}) }, place: { ...(images?.place || {}) }, assets: { ...(images?.assets || {}) } };
     const canDraw = typeof document !== 'undefined' && !!document.createElement;
     const put = async (v) => {
       if (!v) return null;
@@ -550,7 +567,7 @@
    *  did not fail to take one? (an asset not read into memory is taken as packed: it was, to be kept) */
   const hasRaw = (images) => [images?.side, ...Object.values(images?.cards || {}), ...Object.values(images?.headers || {})].some((v) => { if (!v) return false; if (!ASSET.test(v)) return true; const a = images?.assets?.[v.slice(6)]; return !!a && !a.ink && !a.inkFailed; });
 
-  const emptyImages = () => ({ side: null, cards: {}, headers: {}, tones: {}, assets: {} });
+  const emptyImages = () => ({ side: null, cards: {}, headers: {}, tones: {}, place: {}, assets: {} });
   // ---- kept in storage: the index under theme:images, the pictures under a key each --------------
   // A tab used to read the whole set at boot — every picture, sharp and inked, for every slot: a few
   // megabytes held by every Canvas tab for the one or two pictures its page shows. The index says
@@ -574,14 +591,14 @@
     return images;
   }
   /** The index as written: the slots, the tones, the ids of the pictures kept (those go under their keys). */
-  const indexOf = (p) => ({ side: p.side, cards: p.cards, headers: p.headers, tones: Object.fromEntries(toneKeys(p).filter((k) => p.tones?.[k]).map((k) => [k, p.tones[k]])), assetIds: Object.keys(p.assets || {}), ...(hasRaw(p) ? { packStuck: true } : {}) });
+  const indexOf = (p) => ({ side: p.side, cards: p.cards, headers: p.headers, tones: Object.fromEntries(toneKeys(p).filter((k) => p.tones?.[k]).map((k) => [k, p.tones[k]])), place: Object.fromEntries(toneKeys(p).filter((k) => p.place?.[k] && !isDefaultPlace(k, placeOf(p, k))).map((k) => [k, roundPlace(placeOf(p, k))])), assetIds: Object.keys(p.assets || {}), ...(hasRaw(p) ? { packStuck: true } : {}) }); // (a place kept only where a photo sits, and only off its default)
   /** The set, with the pictures of `need` (an array of slots) read in — or of every slot ('all'). */
   async function loadImages({ need = 'all' } = {}) {
     try {
       const r = await BCV.api.storage.local.get(IMAGES_KEY);
       const v = r?.[IMAGES_KEY];
       if (!v || typeof v !== 'object') return emptyImages();
-      const images = { side: v.side || null, cards: { ...(v.cards || {}) }, headers: { ...(v.headers || {}) }, tones: { ...(v.tones || {}) }, assets: {}, ...(v.packStuck ? { packStuck: true } : {}) };
+      const images = { side: v.side || null, cards: { ...(v.cards || {}) }, headers: { ...(v.headers || {}) }, tones: { ...(v.tones || {}) }, place: { ...(v.place || {}) }, assets: {}, ...(v.packStuck ? { packStuck: true } : {}) };
       if (v.assets && typeof v.assets === 'object' && Object.keys(v.assets).length) {
         // kept as one blob until 2.90: the pictures are moved out to a key each, once
         images.assets = { ...v.assets };
@@ -640,7 +657,7 @@
 
   BCV.theme = {
     hexToRgb, rgbToHex, rgbToHsl, hslToRgb, hslToHex, luminance, contrast, normalize,
-    GROUND, MIN_SAT, ICON_RATIO, PRESETS, REGULAR, SCENE_VARIANTS, sceneUrl, sceneNameOf, CARD_SLOTS, HEADER_SLOTS, IMAGES_KEY,
+    GROUND, MIN_SAT, ICON_RATIO, PRESETS, REGULAR, SCENE_VARIANTS, sceneUrl, sceneNameOf, CARD_SLOTS, HEADER_SLOTS, IMAGES_KEY, PLACE_DEFAULT, placeOf, placeVars, isDefaultPlace,
     palette, shades, shadeSet, cssVars, apply, readable, readableOn, fillFor, mix, tint, customHex, controlsOf, veilBase, picCss, band, nearest,
     readImage, imageTone, fillTones, loadImages, ensureAssets, saveImages, emptyImages, packImages, picOf, rawOf, CAST, INK_LIFT, inkOn, SCENE_INK, sceneInkOn, inkFor, inkCached,
     blurDrawn, checkBlur, BLUR_KEY,
