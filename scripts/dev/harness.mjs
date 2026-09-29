@@ -14,7 +14,7 @@ import { join } from 'node:path';
 
 /** The short values the copy runs with (ms). */
 export const TIMERS = {
-  tourAfter: 450, // welcome.js AFTER: a done step's line holds this long before the next step (1300 shipped)
+  tourAfter: 450, // welcome.js AFTER: a done step's line holds this long before the next step (2200 shipped)
   introFade: 700, // setup.js / whatsnew.js: the word-mark starts to fade (1900 shipped)
   introDone: 900, // …and the card rises under it (2340 shipped)
   patience: 4000, // app.js SCREEN_PATIENCE: a screen still not drawn after this gives way (15000 shipped)
@@ -28,7 +28,7 @@ export const TIMERS = {
 
 /** file → [shipped text, the copy's text]; each shipped text must occur exactly once. */
 const PATCHES = [
-  ['content/app/welcome.js', 'const AFTER = 1300;', `const AFTER = ${TIMERS.tourAfter};`],
+  ['content/app/welcome.js', 'const AFTER = 2200;', `const AFTER = ${TIMERS.tourAfter};`],
   ['content/app/setup.js', "ui.intro.classList.add('is-fading'); }, 1900));", `ui.intro.classList.add('is-fading'); }, ${TIMERS.introFade}));`],
   ['content/app/setup.js', "ui.main.classList.add('is-in'); } }, 2340));", `ui.main.classList.add('is-in'); } }, ${TIMERS.introDone}));`],
   ['content/app/whatsnew.js', "ui.intro.classList.add('is-fading'); }, 1900));", `ui.intro.classList.add('is-fading'); }, ${TIMERS.introFade}));`],

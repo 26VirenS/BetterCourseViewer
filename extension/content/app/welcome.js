@@ -1,27 +1,31 @@
-/* The guided tour (2.98.43): in the black screens' place. The page stays as it is and the student
- * works it: one thing at a time is lit — the page dimmed and blurred away from it, more the further
- * from it, and a ring round it — with a card beside it that says what it is and what to do, and a
- * small pointer that shows the gesture (a press, a hover, typing, a drag). Most steps wait for the
- * thing to be done — the switch opened, green pressed, red hovered, a length picked (practice: the
- * press is caught and Simpl stays on), Grades opened, a ring hovered, a score tried, a card opened,
- * the search box typed in — and move on by themselves once it is; a few only say what something is
- * and have a Next. Outside the lit place the page is held still (a press there nudges the card; the
- * wheel still scrolls whatever is under it). When the thing is out of sight — a short or zoomed
- * window, a sidebar that scrolls — the card says which way to scroll, its arrow bouncing that way,
- * and the step waits for it to come into view. Skip tour ends it at any time.
+/* The guided tour (2.98.43; 2.98.44: nothing to skip): in the black screens' place. The page stays
+ * as it is and the student works it: one thing at a time is lit — the page dimmed and blurred away
+ * from it, more the further from it, and a ring round it — with a card beside it that says what it
+ * is and what to do, and a small pointer that shows the gesture (a press, a hover, typing, a drag).
+ * The steps wait for the thing to be done — the switch opened, green pressed, red hovered, a length
+ * picked (practice: the press is caught and Simpl stays on), Grades opened, a ring hovered, a score
+ * tried, the Courses row hovered, Tools opened and a tool of the student's choice dragged up to be a
+ * pin, a card opened, the search box typed in — and move on by themselves once it is; only Away
+ * Refresh (told: its pill shows after time away) and the last card have a button, Away Refresh's
+ * coming in once the card has been read. There is no Skip. Outside the lit place the page is held
+ * still (a press there nudges the card; the wheel still scrolls whatever is under it), and so it is
+ * while the thing is out of sight — a short or zoomed window, a sidebar that scrolls — when the card
+ * says which way to scroll, its arrow bouncing that way, and the step waits for it to come into view.
+ * The setup's run keeps its flag until its last step: a reload picks it up where it was.
  *
  * The runs are the black screens' own, on the same flags: after the setup (the switch, the purple
  * button, Away Refresh when it is on, Grades and a card's breakdown and what-if scores, the Courses
- * and Tools rows, the Dashboard's cards and the preview, the search box); the switch's steps alone
- * for anyone who had Simpl before the slider; the purple button's for anyone updating from before
- * it; the Appearance button after Personalize from the theme invitation; the search box for anyone
- * set up before it; and the first openings of Tools and of Grades. A phone gets what it has (no
- * switch, no sidebar): the counters, the sheet, the search box. */
+ * row, Tools and a pin, the Dashboard's cards and the preview, the search box); the switch's steps
+ * alone for anyone who had Simpl before the slider; the purple button's for anyone updating from
+ * before it; the Appearance button after Personalize from the theme invitation; the search box for
+ * anyone set up before it; and the first opening of Grades. A phone gets what it has (no switch, no
+ * sidebar): the counters, the sheet, the search box. */
 (function () {
   const BCV = (self.BCV = self.BCV || {});
   const { h } = BCV.utils;
   const html = document.documentElement;
-  const KEY = 'welcome:pending'; // the setup's run, armed for the reloaded page
+  const KEY = 'welcome:pending'; // the setup's run, armed for the reloaded page — and kept until it is done, so a reload does not get past it
+  const KEY_AT = 'welcome:at'; // how far the setup's run got ({ group, n }): a reload picks it up at the start of that part
   const KEY3 = 'welcome:appearance'; // the pointer at the sidebar's Appearance button, armed by the theme invitation (whatsnew.js) for the page after Personalize
   const KEY4 = 'welcome:search'; // the search box pointed out, once (with the setup's run, or alone for anyone who had Simpl before it)
   const KEY2 = 'welcome:look5'; // the switch's steps seen (with the setup's run, or alone after an update)
@@ -32,7 +36,7 @@
   const GRADES_KEY = 'welcome:grades'; // the Grades page's steps seen (screens/gpa.js runs them on its first opening)
   const NS = 'http://www.w3.org/2000/svg';
   const PAD = 10; // the lit place's margin round the thing
-  const AFTER = 1300; // how long a done step's line holds before the next step (half that with no line)
+  const AFTER = 2200; // how long a done step's line holds before the next step (half that with no line)
   const CURSOR = '<svg viewBox="0 0 24 24" width="26" height="26"><path d="M5 3l14 9-6 1.5 3.5 6.5-2.5 1.5-3.5-6.5L6 19z" fill="#fff" stroke="#1c1c1e" stroke-width="1.4" stroke-linejoin="round"/></svg>';
   // the card's action line: what to do, drawn as a glyph before the words
   const GLYPH = {
@@ -65,6 +69,7 @@
   const onScreen = (key) => !!document.querySelector(`#bcv-side .bcv-nav__item.is-active[data-nav="${key}"]`);
   /** The sidebar's list of starred courses, when they are listed there (the group with course rows in it). */
   const favsGroup = () => drawn([...document.querySelectorAll('#bcv-side .bcv-side__group')].find((el) => el.querySelector('.bcv-fav')) || null);
+  const quickNav = () => $('.bcv-quicknav'); // (the panel the Courses row opens under the pointer, when the courses are not listed in the sidebar)
   const weekCard = () => $('#bcv-app .bcv-stat[data-stat="week"]') || $('.bcv-ph-stats .bcv-ph-stat:nth-child(2)'); // (the Dashboard's Due this week, or Today's This week on a phone)
   const sheet = () => $('.bcv-sheet-ov .bcv-sheet');
   const sheetClose = () => $('.bcv-sheet-ov .bcv-sheet__close');
@@ -91,114 +96,119 @@
       const lookArea = () => [look(), inLook('.bcv-look__menu .bcv-look__opt--on'), inLook('.bcv-look__opt--off')];
       return [
         { id: 'look', name: 'the switch', target: () => inLook('.bcv-look__main'), area: () => [look()], when: () => !!look() && !phone(),
-          title: 'The Simpl switch', body: 'Simpl runs on top of Canvas, and this switch turns it on and off.', act: 'hover', doing: 'Hover over the switch',
-          done: lookOpen, after: 'It opens into green and red.' },
+          title: 'The Simpl switch', body: 'This turns Simpl on and off.', act: 'hover', doing: 'Hover over the switch',
+          done: lookOpen, after: 'Green is on, red is off.' },
         { id: 'look-green', name: 'green', target: () => inLook('.bcv-look__opt--on'), area: lookArea, hold: 'look', when: () => !!look() && !phone(),
-          title: 'Green: Simpl on', body: 'Green turns Simpl on. It is on now — this is how you come back to it.', act: 'click', doing: 'Click green',
+          title: 'Green: Simpl on', body: 'Green turns Simpl on.', act: 'click', doing: 'Click green',
           on: { click: (e) => !!e.target.closest?.('#bcv-look .bcv-look__opt--on') }, after: 'Simpl is on.' },
         { id: 'look-red', name: 'red', target: () => inLook('.bcv-look__offhead'), area: lookArea, hold: 'look', when: () => !!look() && !phone(),
-          title: 'Red: Simpl off', body: 'Red turns Simpl off and Canvas comes back as it was — for this page, for a while, or until you turn it on.', act: 'hover', doing: 'Hover over red',
-          done: redOpen, after: 'It opens into how long.' },
+          title: 'Red: Simpl off', body: 'Red turns Simpl off and shows plain Canvas.', act: 'hover', doing: 'Hover over red',
+          done: redOpen, after: 'Now pick how long.' },
         { id: 'look-for', name: 'the list', target: () => inLook('.bcv-look__for'), area: lookArea, hold: 'look', when: () => !!look() && !phone(),
-          title: 'How long', body: 'This page only, 30 minutes, 1 hour, 4 hours, 1 day, or until you turn it back on. Try one: it is practice, and Simpl stays on.', act: 'click', doing: 'Pick how long',
+          title: 'How long', body: 'Choose how long Simpl stays off. Try one — it’s just practice.', act: 'click', doing: 'Pick how long',
           ready: redOpen, unready: { target: () => inLook('.bcv-look__offhead'), act: 'hover', doing: 'Hover over red again to see the list' },
           on: { click: (e) => { const b = e.target.closest?.('#bcv-look .bcv-look__forbtn'); if (!b) return false; e.preventDefault(); e.stopImmediatePropagation(); picked = b.textContent.trim(); return true; } }, // (caught before the switch's own: nothing turns off)
-          after: () => `${picked || 'That'}: Simpl would turn off. Not now — it stays on.` },
+          after: () => `${picked || 'Got it'} — Simpl stays on for now.` },
       ];
     },
     // the purple button left of the switch (2.98.20)
     report: () => [
       { id: 'report', name: 'the purple button', target: report, when: () => !!report() && !phone(),
-        title: 'Report a bug', body: 'Found a bug, or missing something? The purple button opens a report on simplcourses.com, with the error codes Simpl showed filled in.', act: 'hover', doing: 'Hover over the purple button',
-        done: () => !!report()?.matches(':hover, :focus-visible'), after: 'Press it any time to tell us.' },
+        title: 'Report a bug', body: 'Found a bug or want something added? Tell us here.', act: 'hover', doing: 'Hover over the purple button',
+        done: () => !!report()?.matches(':hover, :focus-visible'), after: 'Use it any time.' },
     ],
     // Away Refresh (off unless turned on, 2.98.13): its pill only shows after time away, so it is told, not shown
     away: (app) => [
       { id: 'away', target: null, when: () => app?.state?.settings?.appearance?.awayRefresh !== false,
-        title: 'Away Refresh', body: 'Come back after a while and a pill at the top counts down three seconds, then refreshes the page so nothing is stale. Click to cancel, or hold to disable.', act: 'next' },
+        title: 'Away Refresh', body: 'When you come back after a while, a pill at the top refreshes the page. Click to cancel, or hold to disable.', act: 'next', read: 3000 },
     ],
     // Grades: the row pressed, then the page's own — a ring's breakdown, a course's what-if scores
     grades: () => (!navRow('gpa') || phone() ? [] : [
       { id: 'grades', name: 'Grades', where: 'sidebar', target: () => navRow('gpa'), when: () => !!navRow('gpa'),
-        title: 'Grades', body: 'Every course’s grade and its breakdown, side by side — and what you need on what’s left.', act: 'click', doing: 'Click Grades',
+        title: 'Grades', body: 'All your grades in one place.', act: 'click', doing: 'Click Grades',
         done: () => onScreen('gpa') },
       ...LIB.gradePage(),
     ]),
     gradePage: () => [
       { id: 'grade-ring', name: 'a card', target: () => drawn(ringCard()?.querySelector('.bcv-gpa__ringbox')), area: () => [ringCard()], wait: 9000, grades: true,
-        title: 'A quick breakdown', body: 'A card’s ring opens into the groups behind the grade — homework, quizzes, exams.', act: 'hover', doing: 'Hover over a card’s ring',
-        done: () => !!document.querySelector('.bcv-gpa__card.is-hover'), after: 'Leave it and it folds back.' },
+        title: 'A quick breakdown', body: 'Each ring shows what makes up the grade.', act: 'hover', doing: 'Hover over a card’s ring',
+        done: () => !!document.querySelector('.bcv-gpa__card.is-hover'), after: 'Move away to close it.' },
       { id: 'grade-details', name: 'Details', target: () => drawn((ringCard() || document).querySelector('.bcv-gpa__details')), grades: true,
-        title: 'What if?', body: 'A course’s Details lists everything graded — and lets you try scores.', act: 'click', doing: 'Click Details',
+        title: 'What if?', body: 'See every grade, and try out scores.', act: 'click', doing: 'Click Details',
         done: () => !!sheet() },
       { id: 'grade-try', name: 'the what-if button', target: () => $('.bcv-sheet-ov .bcv-whatif-btn'), area: () => [sheet()], grades: true,
-        title: 'Try what-if scores', body: 'The scores turn into fields you can change.', act: 'click', doing: 'Click “Try what-if scores”',
+        title: 'Try what-if scores', body: 'See how new scores would change your grade.', act: 'click', doing: 'Click “Try what-if scores”',
         done: () => !!$('.bcv-sheet-ov .bcv-whatif-btn.is-on') },
       { id: 'grade-field', name: 'a score', target: () => $('.bcv-sheet-ov .bcv-whatif__input'), area: () => [sheet()], grades: true,
-        title: 'Change a score', body: 'Type any score and the grade follows. Nothing is saved and nothing is sent.', act: 'type', doing: 'Change a score',
-        on: { input: (e) => !!e.target.closest?.('.bcv-sheet-ov .bcv-whatif__input') }, after: 'That is where the grade would land.' },
+        title: 'Change a score', body: 'Type any score. Nothing is saved.', act: 'type', doing: 'Change a score',
+        on: { input: (e) => !!e.target.closest?.('.bcv-sheet-ov .bcv-whatif__input') }, after: 'Your grade updates as you type.' },
       { id: 'grade-close', name: 'the close button', target: sheetClose, area: () => [sheet()], grades: true,
-        title: 'Back to the real scores', body: 'Close it when you are done: the real scores come back.', act: 'click', doing: 'Close it',
+        title: 'Back to the real scores', body: 'Close it to go back to your real scores.', act: 'click', doing: 'Close it',
         done: () => !document.querySelector('.bcv-sheet-ov') },
     ],
-    courses: () => [
-      { id: 'courses', name: 'Courses', where: 'sidebar', target: () => navRow('courses'), area: () => [navRow('courses'), favsGroup()], when: () => !!navRow('courses'),
-        title: 'Your courses', body: () => (favsGroup() ? 'Your current classes are under it; Courses has every one.' : 'Hover it to reach any course; the ones you star come first.'), act: 'next' },
+    // the Courses row: its courses listed under it (told, with a Next), or in the panel it opens under the pointer (hovered, the panel lit with it)
+    courses: (app) => [
+      app?.state?.settings?.appearance?.sideCourses === 'hover'
+        ? { id: 'courses', name: 'Courses', where: 'sidebar', target: () => navRow('courses'), area: () => [navRow('courses'), quickNav()], when: () => !!navRow('courses'),
+          title: 'Your courses', body: 'Your courses open from here.', act: 'hover', doing: 'Hover over Courses',
+          done: () => !!quickNav(), after: 'Starred courses come first.' }
+        : { id: 'courses', name: 'your courses', where: 'sidebar', target: () => drawn(favsGroup()?.querySelector('.bcv-fav')) || navRow('courses'), area: () => [navRow('courses'), favsGroup()], when: () => !!navRow('courses'),
+          title: 'Your courses', body: 'Your classes are listed here.', act: 'hover', doing: 'Hover over a course',
+          done: () => !!document.querySelector('#bcv-side .bcv-fav:hover, #bcv-side .bcv-nav__item[data-nav="courses"]:hover'), after: 'Click one any time to open it.' },
     ],
-    tools: () => [
-      { id: 'tools', name: 'Tools', where: 'sidebar', target: () => navRow('tools'), when: () => !!navRow('tools'),
-        title: 'Tools and widgets', body: [['Find a ', ''], ['PDF Editor, ', '#ff9f0a'], ['File Converter, ', '#34c759'], ['Calculators, ', '#bf5af2'], ['Flashcards, ', '#2f7cf6'], ['Citation Generator', '#40c8e0'], [' & more.', '']], act: 'next' },
-    ],
+    // Tools: the row pressed, then any tool dragged up to the top (a pin beside the switch); a press on a
+    // card is held while the drag is asked for, so no tool opens over the page instead
+    tools: () => {
+      let before = 0;
+      return [
+        { id: 'tools', name: 'Tools', where: 'sidebar', target: () => navRow('tools'), when: () => !!navRow('tools'),
+          title: 'Tools and widgets', body: [['Find a ', ''], ['PDF Editor, ', '#ff9f0a'], ['File Converter, ', '#34c759'], ['Calculators, ', '#bf5af2'], ['Flashcards, ', '#2f7cf6'], ['Citation Generator', '#40c8e0'], [' & more.', '']], act: 'click', doing: 'Click Tools',
+          done: () => onScreen('tools') },
+        { id: 'pin', name: 'the tools', target: () => $('.bcv-tool-card[data-tool="pomo"]') || $('.bcv-tool-card'), area: () => [$('#bcv-main .bcv-tools'), $('#bcv-pins-drop'), $('#bcv-pins')], wait: 8000,
+          when: () => !phone() && !self.BCVBridge?.native, // (the pins sit beside the switch: none on a phone or in the app)
+          start: () => { before = pinnedN(); },
+          title: 'Pin a tool', body: 'Drag any tool to the top to keep it one click away.', act: 'drag', doing: 'Drag a tool to the top',
+          dragTo: () => { const l = look()?.getBoundingClientRect(); return l ? { x: l.left - 60, y: l.top + l.height / 2 } : null; },
+          on: { click: (e) => { if (e.target.closest?.('.bcv-tool-card')) { e.preventDefault(); e.stopImmediatePropagation(); } return false; } },
+          done: () => pinnedN() > before, after: 'Pinned — it’s by the switch now.' },
+      ];
+    },
     // back on the Dashboard (when Grades took the student away), for its cards
     home: () => [
       { id: 'home', name: 'Dashboard', where: 'sidebar', target: () => navRow('dashboard'), when: () => !!navRow('dashboard'), skip: () => onScreen('dashboard'),
-        title: 'Back to the Dashboard', body: 'Everything due and new, at a glance.', act: 'click', doing: 'Click Dashboard',
+        title: 'Back to the Dashboard', body: 'Everything due, at a glance.', act: 'click', doing: 'Click Dashboard',
         done: () => onScreen('dashboard') },
     ],
     // the Dashboard's way in (2.98.18): a card's own sheet, an item previewed beside the list
     peek: () => [
       { id: 'peek', name: 'Due this week', target: weekCard, wait: 6000,
-        title: 'The cards open', body: 'Each card on the Dashboard opens the list it counts.', act: 'click', doing: phone() ? 'Tap This week' : 'Click Due this week',
+        title: 'The cards open', body: 'Click a card to see what’s in it.', act: 'click', doing: phone() ? 'Tap This week' : 'Click Due this week',
         done: () => !!sheet() },
       { id: 'peek-row', name: 'an item', target: firstRow, area: () => [sheet()], when: () => !phone(),
-        title: 'A quick look', body: 'An assignment, an announcement, anything: it opens beside the list, without leaving the page.', act: 'click', doing: 'Click an item',
+        title: 'A quick look', body: 'Click anything to preview it here.', act: 'click', doing: 'Click an item',
         done: () => !!$('.bcv-sheet-ov .bcv-pv') },
       phone()
         ? { id: 'peek-close', target: () => $('.bcv-sheet-ov .bcv-ph-sheet__handle') || sheet(), area: () => [sheet()], free: true,
-          title: 'Close it', body: 'Swipe it down, or tap above it.', act: 'click', doing: 'Close the sheet',
+          title: 'Close it', body: 'Swipe down or tap above it.', act: 'click', doing: 'Close the sheet',
           done: () => !document.querySelector('.bcv-sheet-ov') }
         : { id: 'peek-close', name: 'the close button', target: sheetClose, area: () => [sheet()],
-          title: 'Close it', body: 'The page is where you left it.', act: 'click', doing: 'Close it',
+          title: 'Close it', body: 'You’ll be right where you were.', act: 'click', doing: 'Close it',
           done: () => !document.querySelector('.bcv-sheet-ov') },
     ],
     search: () => [
       { id: 'search', name: 'the search box', target: searchBox, area: () => [searchBox(), searchPanel()], wait: 4000,
-        title: 'Search everything', body: 'Courses, assignments, pages, discussions, files, people — and Wikipedia — from one box. Type / for commands.', act: 'type', doing: 'Type anything',
-        done: () => (document.getElementById('bcv-omni')?.value || '').trim().length >= 2, after: 'Press a result to open it.' },
+        title: 'Search everything', body: 'Find anything in your courses. Type / for commands.', act: 'type', doing: 'Type anything',
+        done: () => (document.getElementById('bcv-omni')?.value || '').trim().length >= 2, after: 'Click a result to open it.' },
     ],
     // the sidebar's Appearance button, after Personalize was tried from the theme invitation
     appearance: () => [
       { id: 'appearance', name: 'Appearance', where: 'sidebar', target: themeBtn, wait: 4000,
-        title: 'Themes live here', body: 'Appearance holds Light, Dark and Personalize — the colour, the photos and the look — any time.', act: 'click', doing: 'Click Appearance',
-        done: () => !!$('.bcv-menu--theme'), after: 'Personalize opens the theme editor.' },
+        title: 'Themes live here', body: 'Switch light and dark, or change colors and photos.', act: 'click', doing: 'Click Appearance',
+        done: () => !!$('.bcv-menu--theme'), after: 'Personalize changes colors and photos.' },
     ],
-    // the first opening of Tools (tools.js)
-    toolsIntro: () => [
-      { id: 'tools-intro', target: null, title: 'Some helpful things', body: 'Tools to help you do more, quickly: a PDF editor, a file converter, calculators, flashcards, citations and more.', act: 'next' },
-    ],
-    pin: () => {
-      let before = 0;
-      return [
-        { id: 'pin', name: 'a tool', target: () => $('.bcv-tool-card[data-tool="pomo"]') || $('.bcv-tool-card'), when: () => !phone() && !self.BCVBridge?.native, optional: true, // (where the switch is: not yet mounted, maybe, as the Tools page opens)
-          start: () => { before = pinnedN(); },
-          title: 'Pin a tool', body: 'Drag a tool up to the top of the page: it becomes a small button beside the switch, on every page.', act: 'drag', doing: 'Drag a tool to the top',
-          dragTo: () => { const l = look()?.getBoundingClientRect(); return l ? { x: l.left - 60, y: l.top + l.height / 2 } : null; },
-          done: () => pinnedN() > before, after: 'Pinned: it waits beside the switch.' },
-      ];
-    },
     // the setup's last
     end: () => [
-      { id: 'end', target: null, title: 'You’re all set', body: 'That is the tour. Take it again any time from Settings → General → See it again.', act: 'next', nextLabel: 'Done' },
+      { id: 'end', target: null, title: 'You’re all set', body: 'Replay it any time from Settings → General.', act: 'next', nextLabel: 'Done' },
     ],
   };
   LIB.gradeHover = LIB.gradePage; // (the Grades page's first opening asks for these two; the five steps are one run)
@@ -242,7 +252,7 @@
     veil.setAttribute('aria-hidden', 'true');
     // the dim: a radial gradient centred on the lit place — light round it, darker the further away —
     // through a mask with the place cut out of it, its edge softened
-    veil.innerHTML = `<defs><radialGradient id="bcv-tour-g-${id}" gradientUnits="userSpaceOnUse" cx="0" cy="0" r="1"><stop offset="0" stop-color="#000" stop-opacity=".14"/><stop offset=".1" stop-color="#000" stop-opacity=".2"/><stop offset=".4" stop-color="#000" stop-opacity=".5"/><stop offset="1" stop-color="#000" stop-opacity=".68"/></radialGradient><filter id="bcv-tour-f-${id}" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="5"/></filter><mask id="bcv-tour-m-${id}"><rect width="100%" height="100%" fill="#fff"/><rect class="bcv-tour__hole" x="0" y="0" width="0" height="0" rx="14" fill="#000" filter="url(#bcv-tour-f-${id})"/></mask></defs><rect width="100%" height="100%" fill="url(#bcv-tour-g-${id})" mask="url(#bcv-tour-m-${id})"/>`;
+    veil.innerHTML = `<defs><radialGradient id="bcv-tour-g-${id}" gradientUnits="userSpaceOnUse" cx="0" cy="0" r="1"><stop offset="0" stop-color="#000" stop-opacity=".22"/><stop offset=".1" stop-color="#000" stop-opacity=".34"/><stop offset=".4" stop-color="#000" stop-opacity=".68"/><stop offset="1" stop-color="#000" stop-opacity=".84"/></radialGradient><filter id="bcv-tour-f-${id}" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="5"/></filter><mask id="bcv-tour-m-${id}"><rect width="100%" height="100%" fill="#fff"/><rect class="bcv-tour__hole" x="0" y="0" width="0" height="0" rx="14" fill="#000" filter="url(#bcv-tour-f-${id})"/></mask></defs><rect width="100%" height="100%" fill="url(#bcv-tour-g-${id})" mask="url(#bcv-tour-m-${id})"/>`;
     const blur = h('div', { class: 'bcv-tour__blur', 'aria-hidden': 'true' });
     const blocks = [0, 1, 2, 3].map(() => h('div', { class: 'bcv-tour__block', 'aria-hidden': 'true' }));
     const ring = h('div', { class: 'bcv-tour__ring', 'aria-hidden': 'true' });
@@ -253,13 +263,12 @@
     glyph.setAttribute('aria-hidden', 'true');
     glyph.append(document.createElementNS(NS, 'path'));
     const card = h('div', { class: 'bcv-tour__card', role: 'group', 'aria-roledescription': 'tour step' }, [
-      h('div', { class: 'bcv-tour__top' }, [h('span', { class: 'bcv-tour__count' }), h('button', { type: 'button', class: 'bcv-tour__skip', text: 'Skip tour', onclick: () => finish() })]),
+      h('div', { class: 'bcv-tour__top' }, [h('span', { class: 'bcv-tour__count' })]),
       h('div', { class: 'bcv-tour__title' }),
       h('p', { class: 'bcv-tour__body' }),
       h('div', { class: 'bcv-tour__do', role: 'status', 'aria-live': 'polite' }, [glyph, h('span', { class: 'bcv-tour__dotext' })]),
       h('div', { class: 'bcv-tour__foot' }, [
         h('span', { class: 'bcv-tour__bar', 'aria-hidden': 'true' }, [h('i')]),
-        h('button', { type: 'button', class: 'bcv-tour__later', text: 'Not now', onclick: () => next() }),
         h('button', { type: 'button', class: 'bcv-tour__next', text: 'Next', onclick: () => next() }),
       ]),
       h('i', { class: 'bcv-tour__notch', 'aria-hidden': 'true' }),
@@ -355,6 +364,10 @@
     def.start?.();
     ui.cur = { def, shown: null, at: performance.now(), hit: false, completed: false, missingAt: 0, away: null };
     if (def.grades) ui.ran.add('grades');
+    if (ui.armed && def.group !== ui.group) { // (the setup's run: where it has got to, for a reload)
+      ui.group = def.group;
+      BCV.api.storage.local.set({ [KEY_AT]: { group: def.group, n: def.group === ui.resumed?.group ? ui.resumed.n : 0 } }).catch(() => {});
+    }
     hold(def.hold === 'look');
     ui.root.dataset.step = def.id;
     delete ui.root.dataset.still;
@@ -384,7 +397,7 @@
   }
   const words = (v) => (typeof v === 'function' ? v() : v);
   /** The card's words for the step as it stands (the step, or its stand-in while it is not ready). */
-  function paintCard(def, away) {
+  function paintCard(def, away, read) {
     const { card } = ui;
     const steps = ui.steps;
     card.querySelector('.bcv-tour__count').textContent = steps.length > 1 ? `${ui.i + 1} of ${steps.length}` : '';
@@ -395,9 +408,8 @@
     else body.textContent = b || '';
     const last = ui.i === steps.length - 1;
     const nb = card.querySelector('.bcv-tour__next');
-    nb.hidden = def.act !== 'next';
+    nb.hidden = def.act !== 'next' || !read; // (a told step's Next comes in once the card has been up a moment)
     nb.textContent = def.nextLabel || (last ? 'Done' : 'Next');
-    card.querySelector('.bcv-tour__later').hidden = !def.optional;
     card.querySelector('.bcv-tour__bar i').style.width = `${Math.round(((ui.i + 1) / steps.length) * 100)}%`;
     card.classList.toggle('is-away', !!away);
     if (ui.cur.completed) return;
@@ -431,8 +443,9 @@
     if (target && st.clipFor !== target) { st.clipFor = target; st.clips = clipEls(target); } // (the boxes that clip it, read once per element)
     st.clip = target ? clipRect(st.clips) : null;
     const away = t ? awayOf(t, st.clip) : null;
-    const key = [def.id || base.id, ready, away, st.completed, area && [area.x, area.y, area.w, area.h].map(Math.round).join(','), innerWidth, innerHeight].join('|');
-    if (key !== ui.key) { ui.key = key; paintCard(def, away); layout(def, target, t, area, away, st.clip); }
+    const read = !base.read || now - st.at >= base.read;
+    const key = [def.id || base.id, ready, away, read, st.completed, area && [area.x, area.y, area.w, area.h].map(Math.round).join(','), innerWidth, innerHeight].join('|');
+    if (key !== ui.key) { ui.key = key; paintCard(def, away, read); layout(def, target, t, area, away, st.clip); }
     glide();
   }
   /** Where the dim's centre, the hole, the ring, the hand and the card go for the step as it stands. */
@@ -448,10 +461,10 @@
         : { x: vw / 2, y: vh / 2, w: 0, h: 0, cx: vw / 2, cy: vh / 2, r0: 0, rr: 10 };
     if (!ui.g || reduced()) ui.g = { ...ui.goal };
     ring.hidden = !hole;
-    // what the page lets through: the lit place (a step that only tells holds it too); nothing held while it is out of sight, or on a free step
+    // what the page lets through: the lit place (a step that only tells holds it all, and so does one whose thing is out of sight — the wheel still scrolls what is under the pointer); nothing held on a free step
     const interactive = def.act !== 'next';
     const box = (b, x, y, w, h) => { b.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`; b.style.width = `${Math.max(0, Math.round(w))}px`; b.style.height = `${Math.max(0, Math.round(h))}px`; };
-    if (away || def.free) blocks.forEach((b) => box(b, 0, 0, 0, 0));
+    if (def.free) blocks.forEach((b) => box(b, 0, 0, 0, 0));
     else if (!hole || !interactive) { box(blocks[0], 0, 0, vw, vh); blocks.slice(1).forEach((b) => box(b, 0, 0, 0, 0)); }
     else {
       box(blocks[0], 0, 0, vw, hole.y);
@@ -494,16 +507,19 @@
       card.style.setProperty('--ny', `${Math.round(ny)}px`);
     }
     card.dataset.side = side;
+    const first = !ui.placed; // (the first place is taken at once, not slid to from the corner)
+    if (first) card.style.transition = 'opacity .18s ease';
     card.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
+    if (first) { void card.offsetWidth; card.style.transition = ''; ui.placed = true; }
   }
-  /** The dim, the hole and the ring move to where they go (at once with reduced motion): about a
-   *  quarter of the way each sixtieth of a second, by the clock, so a slow frame does not leave them
+  /** The dim, the hole and the ring move to where they go (at once with reduced motion): four
+   *  tenths of the way each sixtieth of a second, by the clock, so a slow frame does not leave them
    *  behind. data-still on the layer once they are there. */
   function glide() {
     const { g, goal } = ui;
     if (!g || !goal) return;
     const now = performance.now();
-    const f = 1 - Math.pow(0.76, Math.min(120, now - (ui.lastT || now - 16.7)) / 16.7);
+    const f = 1 - Math.pow(0.6, Math.min(120, now - (ui.lastT || now - 16.7)) / 16.7);
     ui.lastT = now;
     let moved = false;
     for (const k of Object.keys(goal)) {
@@ -520,7 +536,7 @@
     ui.grad.setAttribute('cy', g.cy.toFixed(1));
     ui.grad.setAttribute('r', r.toFixed(1));
     const k0 = Math.min(0.6, g.r0 / r);
-    const offs = [0, k0, Math.min(0.95, k0 + 0.24), 1];
+    const offs = [0, k0, Math.min(0.95, k0 + 0.16), 1];
     ui.stops.forEach((s, i) => s.setAttribute('offset', offs[i].toFixed(3)));
     for (const [a, v] of [['x', g.x], ['y', g.y], ['width', Math.max(0, g.w)], ['height', Math.max(0, g.h)], ['rx', g.rr]]) ui.hole.setAttribute(a, v.toFixed(1));
     const rs = ui.ring.style;
@@ -557,17 +573,30 @@
     cover();
     const setupRun = !keys;
     const list = keys || ['look', 'report', 'away', 'grades', 'courses', 'tools', 'home', 'peek', 'search', 'end'];
-    if (setupRun) await clear(); // (taken now: a reload halfway does not start it over)
+    // the setup's run cannot be got past: its flag stays until the last step, and a reload picks it up
+    // at the start of the part it was in (a part a reload has stopped in twice already is passed over)
+    let armed = false, at = null;
+    if (setupRun) { try { const f = await BCV.api.storage.local.get([KEY, KEY_AT]); armed = f[KEY] === true; at = armed && f[KEY_AT]?.group ? f[KEY_AT] : null; } catch { /* from the start */ } }
     if (list.includes('appearance')) clear('appearance').catch(() => {});
-    const steps = list.flatMap((k) => (LIB[k] ? LIB[k](app) : [])).filter((s) => !s.when || s.when());
+    const steps = list.flatMap((k) => (LIB[k] ? LIB[k](app).map((s) => Object.assign(s, { group: k })) : [])).filter((s) => !s.when || s.when());
     if (!steps.length || !ui) { finish(); return; }
+    let first = 0;
+    const g = at ? steps.findIndex((s) => s.group === at.group) : -1;
+    if (g >= 0) {
+      first = g;
+      if ((at.n || 0) >= 2) { first = steps.findIndex((s, j) => j > g && s.group !== at.group); if (first < 0) first = steps.length - 1; }
+    }
     ui.steps = steps;
+    for (const s of steps.slice(0, first)) if (s.grades) ui.ran.add('grades'); // (picked up past the Grades steps: they were shown before the reload)
+    ui.armed = armed;
+    ui.resumed = g >= 0 ? { group: at.group, n: (at.n || 0) + 1 } : null;
     ui.root.dataset.steps = steps.map((s) => s.id).join(','); // (the run's steps, in order: for the eye and the suites)
     const ran = await new Promise((resolve) => {
       ui.resolve = resolve;
-      begin(0);
+      begin(first);
       ui.raf = requestAnimationFrame(tick);
     });
+    if (setupRun) { await clear(); await BCV.api.storage.local.remove(KEY_AT).catch(() => {}); }
     const marks = {};
     if (list.includes('look')) marks[KEY2] = true;
     if (list.includes('report')) marks[KEY5] = true;

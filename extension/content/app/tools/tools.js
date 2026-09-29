@@ -1530,22 +1530,9 @@
     return el;
   }
 
-  // ---- the first press: the guided tour's Tools steps ------------------------------------------
-  // The first time Tools opens, the tour (welcome.js) says what it is, then asks for the drag — a
-  // card pulled up to the top, turning into a pin beside the switch (Not now passes it; a phone has
-  // no switch, so it gets the first step alone). Once, then never again.
-  const WELCOME_KEY = 'tools:welcomed';
-  async function welcomeIfFirst(app) {
-    if (!BCV.welcome) return false;
-    if (await load(WELCOME_KEY, false)) return false;
-    BCV.welcome.cover();
-    await BCV.welcome.open(app, ['toolsIntro', 'pin'], { onDone: () => save(WELCOME_KEY, true) }); // (the drag is left out where there is no switch: a phone)
-    return true;
-  }
-
   BCV.tools = {
     TOOLS, toolOf, tintOf, open, popup, seg, note, hint, card, label, stepper, input, rise, saveFile, copyText, parseCsv, csvCell, readAs, holdFiles, overlayRoot, kb, fileBase, uid, load, save, vendor, evalSum,
     focusActive, focusLoad, remaining, running, mmss,
-    mountTray, pinsLoad, pin, unpin, pinned, pinEl, cardEl, paintPins, welcomeIfFirst,
+    mountTray, pinsLoad, pin, unpin, pinned, pinEl, cardEl, paintPins,
   };
 })();

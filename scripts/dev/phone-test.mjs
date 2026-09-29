@@ -269,7 +269,7 @@ try {
   await page.tap('#bcv-omni');
   await page.fill('#bcv-omni', 'dis01');
   await page.waitForSelector('.bcv-omni__group[data-group="Assignments"] .bcv-omni__item', { timeout: 10000 });
-  await (await page.$('.bcv-omni__group[data-group="Assignments"] .bcv-omni__item .bcv-omni__body')).tap();
+  await page.tap('.bcv-omni__group[data-group="Assignments"] .bcv-omni__item .bcv-omni__body'); // (found afresh at the tap: the list redraws as Canvas's answers arrive)
   check(await eventually(() => page.evaluate(() => /\/courses\/\d+\/assignments\/\d+$/.test(location.pathname)), 10000), `a tap on the Dis01 row opens the assignment: ${page.url()}`);
   await page.goto(`${BASE}/`);
   await page.waitForSelector('.bcv-ph-row', { timeout: 15000 });
@@ -820,21 +820,17 @@ try {
   check((await texts('.bcv-ph-srow__label')).includes('Guided setup') && (await texts('.bcv-ph-srow__label')).includes('What’s new'), 'the account sheet offers the guided setup and What’s new');
   await closeSheet();
 
-  // ---- Tools on a phone: under the avatar; the first press runs the tour's Tools step, alone (no switch to drag to) ----
+  // ---- Tools on a phone: under the avatar; no tour of its own (the setup's tour has no Tools steps on a phone: no switch to pin beside) ----
   console.log('tools');
-  await sw.evaluate(() => self.BCV.api.storage.local.remove(['tools:welcomed', 'tools:decks']));
+  await sw.evaluate(() => self.BCV.api.storage.local.remove(['tools:decks']));
   await page.click('.bcv-ph-avatar');
   await sheet();
   check((await texts('.bcv-ph-srow__label')).includes('Tools'), 'the account sheet has a Tools row');
   await page.click('.bcv-ph-srow:has-text("Tools")');
-  await tourStep('tools-intro', 20000);
-  const pt1 = await tourAt();
-  check(page.url() === `${BASE}/#tools` && pt1.steps === 'tools-intro' && pt1.title === 'Some helpful things' && pt1.next === 'Done' && pt1.fits && pt1.bg === 'rgba(0, 0, 0, 0)', `the first press: what Tools is, alone (no switch to drag a pin to), with Done: ${JSON.stringify(pt1)}`);
-  await page.waitForTimeout(300);
-  await page.screenshot({ path: join(out, 'phone-13-tools-welcome.png') });
-  await page.click('#bcv-tour .bcv-tour__next');
-  await tourGone();
-  check((await page.$$('.bcv-tool-card')).length === 11 && (await texts('.bcv-topbar__title'))[0] === 'Tools' && await noOverflow() && (await page.$eval('#bcv-pins', (e) => getComputedStyle(e).display).catch(() => 'none')) === 'none' && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('tools:welcomed'))['tools:welcomed'])) === true, 'one Continue (a phone has no switch to drag to): the nine cards in one column, no pins, the welcome marked seen');
+  await page.waitForSelector('.bcv-tool-card', { timeout: 20000 });
+  await page.waitForTimeout(600);
+  check(page.url() === `${BASE}/#tools` && !(await page.$('#bcv-tour')), 'Tools opens without a tour of its own');
+  check((await page.$$('.bcv-tool-card')).length === 11 && (await texts('.bcv-topbar__title'))[0] === 'Tools' && await noOverflow() && (await page.$eval('#bcv-pins', (e) => getComputedStyle(e).display).catch(() => 'none')) === 'none', 'the cards in one column, no pins (a phone has no switch to pin beside)');
   await shot('13b-tools');
   await page.click('.bcv-tool-card[data-tool="fc"]');
   await page.waitForSelector('.bcv-tool[data-tool="fc"]', { timeout: 5000 });

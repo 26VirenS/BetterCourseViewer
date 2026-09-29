@@ -25,6 +25,12 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.98.44', date: '2026-09-29', notes: [
+      { kind: 'new', title: 'Tour pins a tool', body: 'Open Tools and drag one you like to the top.', icon: P.pin },
+      { kind: 'improved', title: 'No skipping the tour', body: 'Each step needs the real action.', icon: P.steps },
+      { kind: 'improved', title: 'Clearer, darker tour', body: 'Simpler words, a stronger dim and blur.', icon: P.eye },
+      { kind: 'fixed', title: 'Courses step works', body: 'Hover Courses and its panel opens in the tour.', icon: P.check },
+    ] },
     { version: '2.98.43', date: '2026-09-29', notes: [
       { kind: 'new', title: 'A guided tour', body: 'Your own page, lit one part at a time.', icon: P.steps },
       { kind: 'improved', title: 'Try each step', body: 'Do it yourself; the tour moves on once you have.', icon: P.check },

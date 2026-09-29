@@ -1,7 +1,7 @@
 /* Tools: the page of tool cards (the "Tools" mockup). One card per tool, each opening its tool in
  * a popup over this page; a card dragged to the top of the page becomes a pin beside the look
- * switch (content/app/tools/tools.js has the tools, the popup and the drag). The first time the
- * page opens, the screen goes black and says what this is, then shows the drag — once. */
+ * switch (content/app/tools/tools.js has the tools, the popup and the drag). The guided tour
+ * (welcome.js) brings the student here and asks for that drag. */
 (function () {
   const BCV = (self.BCV = self.BCV || {});
   const U = BCV.ui;
@@ -16,7 +16,6 @@
       U.el('bcv-head', U.el('bcv-head__in', U.el('bcv-head__row', [U.el('', [U.text('bcv-h1', 'Tools', 'h1'), U.text('bcv-head__sub', 'Handy things, right here.')])]))),
       U.el('bcv-body bcv-body--24', grid),
     );
-    const welcome = T().welcomeIfFirst(app).catch(() => false); // the black goes up now, over the page drawing under it
     await T().pinsLoad().catch(() => {});
     // widgets of your own (content/app/tools/widgets.js): their cards after the built-in tools, and the card that adds one
     try { if (!BCV.widgets && BCV.lazy?.load) await BCV.lazy.load('widgets'); await BCV.widgets?.all?.(); } catch { /* the built-in tools alone */ }
@@ -31,7 +30,6 @@
       U.enter(add, T().TOOLS.length, 35, 300);
       grid.append(add);
     }
-    void welcome;
     return screen;
   }
 
