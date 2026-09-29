@@ -111,6 +111,12 @@
    *  (app.css --bcv-ink-lift, --bcv-ink-k say the same to the page). */
   const INK_LIFT = { dark: ['#ffffff', 0.1], light: ['#000000', 0.07] };
   const inkOn = (paper, dark) => mix(paper, INK_LIFT[dark ? 'dark' : 'light'][0], INK_LIFT[dark ? 'dark' : 'light'][1]);
+  /** A drawn scene (a ready-made theme's) is inked in the look's own colour instead: the accent mixed
+   *  into the surface — a third of it by day, a little more by night — its dark masses a light wash
+   *  of that (inkOf's fill), so the drawing reads as the theme's own (app.css .is-scene says the same). */
+  const SCENE_INK = { light: 0.3, dark: 0.34 };
+  const SCENE_FILL = 0.42;
+  const sceneInkOn = (paper, accent, dark) => mix(paper, accent || '#0a84ff', SCENE_INK[dark ? 'dark' : 'light']);
   /** One shade per sidebar row, so the rail is not a single flat colour: the accent's hue drifts a
    *  little across the rows and its lightness walks the readable band from lighter to deeper (the
    *  band is readable in both modes, so the walk is the same in each), and every glyph shade is
@@ -213,49 +219,67 @@
   /** A kept photo as a CSS image: a data URL wrapped, a drawn one (a gradient) as it is. */
   const picCss = (v) => (!v ? 'none' : /^data:|^https?:|^blob:/.test(v) ? `url("${v}")` : v);
 
-  // ---- the four drawn photos ---------------------------------------------------------------------
+  // ---- the six drawn photos ---------------------------------------------------------------------
   // Drawn, not photographed: SVG scenes, so they are vector — crisp at any size on any screen, with
   // turbulence for cloud, water and grain rather than stripes — and a few kilobytes each, kept in
   // storage like a photo would be (a data URL) so the page treats them the same.
   const scene = (body, defs) => `data:image/svg+xml;charset=utf-8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice"><defs>${defs}</defs>${body}</svg>`.replace(/\n\s*/g, ''))}`;
-  // The four drawn scenes — Dusk, Ocean, Forest, Sand — each in nine variations (k = 0..8): lines and
-  // shapes that ink well (ridges, rings, waves, rows of trees, dune contours, rays), no filters (they
-  // rasterise once, fast). A variation moves the sun, turns the composition round for odd k, and
-  // jitters the shapes from k, so a set of counters or headers each wears its own drawing of one scene.
+  // The six drawn scenes — Dusk, Ocean, Forest, Sand, Peaks, City — each in nine variations (k = 0..8):
+  // lines and shapes that ink well (ridges, rings, waves, rows of trees, dune contours, skylines, rays),
+  // no filters (they rasterise once, fast), and enough in each — clouds, a far range, a lighthouse, a
+  // bridge, lit windows — that the ink carries a picture rather than a few strokes. A variation moves
+  // the sun, turns the composition round for odd k, and jitters the shapes from k, so a set of
+  // counters or headers each wears its own drawing of one scene.
   const rng = (seed) => { let s = (Math.imul(seed + 1, 2654435761) + 40503) >>> 0; return () => { s = (Math.imul(s ^ (s >>> 15), 2246822519) + 0x9e3779b9) >>> 0; return ((s >>> 8) & 0xffffff) / 0x1000000; }; };
   const turn = (k, inner) => (k % 2 ? `<g transform="translate(1600 0) scale(-1 1)">${inner}</g>` : inner);
   const SUN_X = [1180, 420, 800];
   const P = (x, y) => `${Math.round(x)} ${Math.round(y)}`;
   const ticks = (cx, cy, r1, r2, n) => Array.from({ length: n }, (_, i) => { const a = (i * 2 * Math.PI) / n; return `<line x1="${P(cx + r1 * Math.cos(a), cy + r1 * Math.sin(a)).replace(' ', '" y1="')}" x2="${P(cx + r2 * Math.cos(a), cy + r2 * Math.sin(a)).replace(' ', '" y2="')}"/>`; }).join('');
   const birdsAt = (spots, n, ink) => `<g stroke="${ink}" stroke-width="5" fill="none" stroke-linecap="round">${spots.slice(0, n).map(([x, y]) => `<path d="M${x} ${y}q20-22 40 0q20-22 40 0"/>`).join('')}</g>`;
+  /** A cloud: three bumps on a flat base, outlined. */
+  const cloud = (x, y, w, fill, line) => { const u = w / 10; return `<path d="M${x} ${y}h${w}q0-${u * 2.2}-${u * 2.4}-${u * 2.2}q-${u * 0.6}-${u * 2.8}-${u * 3.2}-${u * 2.4}q-${u * 1.6}-${u * 1.8}-${u * 3.2}${u * 0.4}q-${u * 2.2}0-${u * 1.6}${u * 4.2}z" fill="${fill}" stroke="${line}" stroke-width="4" stroke-linejoin="round"/>`; };
+  /** A row of buildings from x0 to x1 standing on `base`, some of their windows lit. */
+  const skyline = (r, x0, x1, base, [lo, hi], fill, win, p = 0.5) => { let s = '', x = x0; while (x < x1) { const w = 46 + Math.round(r() * 58), hh = lo + Math.round(r() * (hi - lo)); s += `<rect x="${x}" y="${base - hh}" width="${w}" height="${hh + 2}" fill="${fill}"/>`; if (r() > 0.6) s += `<rect x="${x + w / 2 - 3}" y="${base - hh - 26}" width="6" height="28" fill="${fill}"/>`; if (win) for (let wy = base - hh + 16; wy < base - 18; wy += 24) for (let wx = x + 9; wx < x + w - 12; wx += 17) if (r() > p) s += `<rect x="${wx}" y="${wy}" width="8" height="11" fill="${win}"/>`; x += w + 3 + Math.round(r() * 12); } return s; };
+  /** A range of peaks along `base`: each a triangle with a snow cap and a shaded flank. */
+  const peaks = (r, xs, base, [lo, hi], fill, shade, snow) => xs.map((x) => { const hh = lo + Math.round(r() * (hi - lo)), w = hh * (0.9 + r() * 0.5), top = base - hh, cap = hh * 0.26; return `<path d="M${Math.round(x - w)} ${base}L${Math.round(x)} ${top}L${Math.round(x + w)} ${base}Z" fill="${fill}"/><path d="M${Math.round(x)} ${top}L${Math.round(x + w)} ${base}L${Math.round(x + w * 0.2)} ${base}Z" fill="${shade}"/>${snow ? `<path d="M${Math.round(x - cap * 0.95)} ${Math.round(top + cap)}L${Math.round(x)} ${top}L${Math.round(x + cap * 0.95)} ${Math.round(top + cap)}l-${Math.round(cap * 0.35)}-${Math.round(cap * 0.3)}l-${Math.round(cap * 0.3)} ${Math.round(cap * 0.35)}l-${Math.round(cap * 0.3)}-${Math.round(cap * 0.35)}Z" fill="${snow}"/>` : ''}`; }).join('');
+  const pines = (r, y, xs, w, hs, fill) => xs.map((x, i) => { const xx = Math.round(x + r() * 60 - 30), hh = Math.round(hs[i % hs.length] + r() * 30 - 15); return `<path d="M${xx} ${y}l${w} ${-hh * 0.45}l${-w * 0.45} 0l${w * 0.9} ${-hh * 0.3}l${-w * 0.4} 0l${w * 0.55} ${-hh * 0.25}l${w * 0.55} ${hh * 0.25}l${-w * 0.4} 0l${w * 0.9} ${hh * 0.3}l${-w * 0.45} 0l${w} ${hh * 0.45}z" fill="${fill}"/>`; }).join('');
   const DEFS = {
     dusk: '<linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1e1748"/><stop offset=".35" stop-color="#5f2f6b"/><stop offset=".55" stop-color="#c8645f"/><stop offset=".67" stop-color="#f4b06a"/></linearGradient><linearGradient id="sea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6a3358"/><stop offset=".5" stop-color="#2b1a42"/><stop offset="1" stop-color="#100b20"/></linearGradient>',
     ocean: '<linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#cfeafc"/><stop offset=".55" stop-color="#7cc0f0"/></linearGradient>',
     forest: '<linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e8f5ec"/><stop offset=".55" stop-color="#b9e0c6"/></linearGradient>',
     sand: '<linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fdedd2"/><stop offset=".5" stop-color="#f6cd93"/></linearGradient>',
+    peaks: '<linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e9e6fb"/><stop offset=".6" stop-color="#fbe3d6"/></linearGradient>',
+    city: '<linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#dff3f1"/><stop offset=".6" stop-color="#fde6cf"/></linearGradient>',
   };
   const SKY = '<rect width="1600" height="900" fill="url(#sky)"/>';
   const DRAW = {
-    /** A sun low over the water inside rings of light, a ridge across the horizon dipping under it, a dark near ridge, its light in bars on the water, birds. */
+    /** Stars over a sun low on the water in rings of light, clouds across it, a far ridge, a city's lit windows on the shore, the light in bars on the water, a dark near ridge, birds. */
     dusk(k) {
       const r = rng(k); const sx = SUN_X[k % 3], sy = 470 - Math.round(r() * 60);
+      const stars = Array.from({ length: 26 }, () => `<circle cx="${Math.round(r() * 1600)}" cy="${Math.round(20 + r() * 220)}" r="${(2 + r() * 3).toFixed(1)}"/>`).join('');
       const rings = [140, 220, 310, 410].slice(0, 3 + (k % 2)).map((rad) => `<circle cx="${sx}" cy="${sy}" r="${rad}"/>`).join('');
       const pts = []; for (let x = 0; x <= 1600; x += 140) pts.push(P(x, Math.abs(x - sx) < 220 ? 565 + r() * 30 : 380 + r() * 170));
       const bars = [0, 1, 2, 3, 4, 5].map((i) => `<rect x="${Math.round(sx - 110 + r() * 60)}" y="${630 + i * 34}" width="${Math.round(120 + r() * 140)}" height="${6 + (i % 2) * 2}" rx="4"/>`).join('');
+      const ripples = Array.from({ length: 9 }, (_, i) => `<path d="M${Math.round(r() * 1400)} ${660 + i * 26}h${Math.round(60 + r() * 120)}"/>`).join('');
+      const cityX = sx > 800 ? [60, 640] : [960, 1560];
       const near = sx > 800 ? 'M0 700L120 640L260 690L420 620L560 680L680 650L780 720' : 'M1600 700L1480 640L1340 690L1180 620L1040 680L920 650L820 720';
-      return scene(`${SKY}${turn(k, `<g stroke="#ffd9a6" stroke-opacity=".4" stroke-width="4" fill="none">${rings}</g><circle cx="${sx}" cy="${sy}" r="${80 + (k % 3) * 10}" fill="#ffe6b0"/>${birdsAt([[560, 250], [650, 300], [500, 330], [1100, 240]], 2 + (k % 3), '#2a1440')}<path d="M0 600L${pts.join('L')}L1600 600Z" fill="#3b1f4f"/><path d="M${pts.join('L')}" stroke="#ff9e7a" stroke-opacity=".7" stroke-width="4" fill="none"/><rect y="600" width="1600" height="300" fill="url(#sea)"/><rect y="598" width="1600" height="4" fill="#ffb98a" opacity=".8"/><g fill="#ffb27a" fill-opacity=".7">${bars}</g><path d="${near}V900H${sx > 800 ? 0 : 1600}Z" fill="#1a0d2a"/><path d="${near}" stroke="#6b3d78" stroke-width="4" fill="none"/>`)}`, DEFS.dusk);
+      return scene(`${SKY}${turn(k, `<g fill="#fff3d8" fill-opacity=".85">${stars}</g><g stroke="#ffd9a6" stroke-opacity=".4" stroke-width="4" fill="none">${rings}</g><circle cx="${sx}" cy="${sy}" r="${80 + (k % 3) * 10}" fill="#ffe6b0"/>${cloud(sx - 360, sy - 150 + Math.round(r() * 30), 300, '#9c4f78', '#ffc59a')}${cloud(sx + 120, sy - 70, 220, '#b35d6f', '#ffcf9f')}${birdsAt([[560, 250], [650, 300], [500, 330], [1100, 240]], 2 + (k % 3), '#2a1440')}<path d="M0 600L${pts.join('L')}L1600 600Z" fill="#3b1f4f"/><path d="M${pts.join('L')}" stroke="#ff9e7a" stroke-opacity=".7" stroke-width="4" fill="none"/>${skyline(r, cityX[0], cityX[1], 602, [40, 150], '#24123a', '#ffcf8a', 0.62)}<rect y="600" width="1600" height="300" fill="url(#sea)"/><rect y="598" width="1600" height="4" fill="#ffb98a" opacity=".8"/><g fill="#ffb27a" fill-opacity=".7">${bars}</g><g stroke="#ffb27a" stroke-opacity=".35" stroke-width="3" stroke-linecap="round">${ripples}</g><path d="${near}V900H${sx > 800 ? 0 : 1600}Z" fill="#1a0d2a"/><path d="${near}" stroke="#6b3d78" stroke-width="4" fill="none"/>`)}`, DEFS.dusk);
     },
-    /** A sun with short rays, rows of scalloped waves with a light crest each, a sailing boat, birds. */
+    /** A sun with short rays and clouds, an island far out, a lighthouse on a rocky point throwing its light, a sailing boat, rows of scalloped waves with a crest and foam each, gulls. */
     ocean(k) {
       const r = rng(k + 9); const sx = SUN_X[(k + 1) % 3], sy = 200 + Math.round(r() * 60);
       const amp = 40 + Math.round(r() * 16);
-      const wave = (y, p, f) => { const d = `M${p} ${y} ${Array(9).fill(`q100 -${amp} 200 0`).join(' ')}`; return `<path d="${d} V900 H${p} Z" fill="${f}"/><path d="${d}" stroke="#eaf7ff" stroke-opacity=".85" stroke-width="5" fill="none"/>`; };
+      const wave = (y, p, f) => { const d = `M${p} ${y} ${Array(9).fill(`q100 -${amp} 200 0`).join(' ')}`; const foam = Array.from({ length: 6 }, () => `<path d="M${Math.round(p + r() * 1600)} ${y + 22 + Math.round(r() * 30)}h${Math.round(30 + r() * 50)}"/>`).join(''); return `<path d="${d} V900 H${p} Z" fill="${f}"/><path d="${d}" stroke="#eaf7ff" stroke-opacity=".85" stroke-width="5" fill="none"/><g stroke="#eaf7ff" stroke-opacity=".45" stroke-width="3" stroke-linecap="round">${foam}</g>`; };
       const waves = [[500, '#5db8ee'], [590, '#3494dc'], [680, '#2273c2'], [770, '#164f9a'], [850, '#0d356e']].map(([y, f], i) => wave(y + Math.round(r() * 20 - 10), (i + k) % 2 ? -100 : 0, f)).join('');
       const bx = sx < 800 ? 1240 : 300;
+      const lx = sx < 800 ? 180 : 1420; // the lighthouse, across from the boat
       const boat = k % 3 === 1 ? '' : `<path d="M${bx} 420l60-150 30 150z" fill="#fff6d6"/><path d="M${bx + 105} 420l-40-110v110z" fill="#e6eef5"/><rect x="${bx - 20}" y="420" width="150" height="16" rx="6" fill="#2b5f8e"/>`;
-      return scene(`${SKY}${turn(k, `<circle cx="${sx}" cy="${sy}" r="72" fill="#fff6d6"/><g stroke="#fff6d6" stroke-width="6" stroke-linecap="round">${ticks(sx, sy, 100, 132, 8)}</g>${birdsAt([[bx - 340, 180], [bx - 250, 240], [bx - 150, 200], [bx + 60, 150]], 2 + (k % 3), '#2b5f8e')}${boat}${waves}`)}`, DEFS.ocean);
+      const light = `<path d="M${lx} 250L${lx - 260} 200L${lx - 260} 300Z" fill="#fff6d6" fill-opacity=".55"/><path d="M${lx} 250L${lx + 260} 200L${lx + 260} 300Z" fill="#fff6d6" fill-opacity=".55"/>`;
+      const house = `<path d="M${lx - 130} 520C${lx - 90} 420 ${lx + 80} 410 ${lx + 150} 520Z" fill="#35556f"/><path d="M${lx - 34} 440L${lx - 24} 270H${lx + 24}L${lx + 34} 440Z" fill="#f3f7fb"/><path d="M${lx - 31} 400H${lx + 31}V370H${lx - 29}ZM${lx - 28} 330H${lx + 28}V300H${lx - 27}Z" fill="#d6455a"/><rect x="${lx - 30}" y="236" width="60" height="36" rx="4" fill="#fff6d6"/><path d="M${lx - 38} 236L${lx} 206L${lx + 38} 236Z" fill="#d6455a"/>`;
+      const isle = `<path d="M${sx - 160} 505q80-60 160-40q60-40 150 40z" fill="#4a8cc0"/>`;
+      return scene(`${SKY}${turn(k, `<circle cx="${sx}" cy="${sy}" r="72" fill="#fff6d6"/><g stroke="#fff6d6" stroke-width="6" stroke-linecap="round">${ticks(sx, sy, 100, 132, 8)}</g>${cloud(sx - 420, 150 + Math.round(r() * 40), 260, '#f4fbff', '#9fd0f2')}${cloud(sx + 200, 110 + Math.round(r() * 40), 200, '#f4fbff', '#9fd0f2')}${birdsAt([[bx - 340, 180], [bx - 250, 240], [bx - 150, 200], [bx + 60, 150]], 2 + (k % 3), '#2b5f8e')}${isle}${light}${house}${boat}${waves}`)}`, DEFS.ocean);
     },
-    /** A moon in a ring, hills with a light contour each, two rows of pines — small ones far, tall ones near — and the ground's lines. */
+    /** A moon in a ring over a far range with snow on it, hills with a light contour each, two rows of pines — small ones far, tall ones near — a lake with the trees in it, and the ground's lines. */
     forest(k) {
       const r = rng(k + 18); const mx = [1230, 300, 800][k % 3];
       const trees = (y, xs, w, hs, fill, trunk) => xs.map((x, i) => { const xx = Math.round(x + r() * 80 - 40), hh = Math.round(hs[i % hs.length] + r() * 40 - 20); return `<path d="M${xx} ${y}l${w} ${-hh}l${w} ${hh}z" fill="${fill}"/>${trunk ? `<rect x="${xx + w - 5}" y="${y}" width="10" height="${trunk}" fill="${fill}"/>` : ''}`; }).join('');
@@ -263,9 +287,10 @@
       const back = `M0 ${520 + j()}C260 ${430 + j()} 420 ${470 + j()} 640 ${500 + j()}S1000 ${560 + j()} 1200 ${480 + j()} 1460 ${420 + j()} 1600 ${470 + j()}`;
       const mid = `M0 ${640 + j()}C240 ${590 + j()} 480 ${630 + j()} 700 ${620 + j()}S1100 ${590 + j()} 1600 ${640 + j()}`;
       const front = `M0 ${780 + j()}C300 ${740 + j()} 600 ${800 + j()} 900 ${760 + j()}S1300 ${730 + j()} 1600 ${790 + j()}`;
-      return scene(`${SKY}${turn(k, `<circle cx="${mx}" cy="190" r="86" fill="#fff9e0"/><circle cx="${mx}" cy="190" r="118" stroke="#fff9e0" stroke-opacity=".6" stroke-width="4" fill="none"/><path d="${back}V900H0Z" fill="#a6d5b4"/><path d="${back}" stroke="#fff" stroke-opacity=".6" stroke-width="4" fill="none"/>${trees(560, [40, 150, 250, 380, 470, 590, 700, 820, 910, 1040, 1150, 1270, 1380, 1500], 36, [110, 140, 90, 130, 100], '#4f9e6b')}<path d="${mid}V900H0Z" fill="#3f8a5c"/><path d="${mid}" stroke="#d6f0dd" stroke-opacity=".6" stroke-width="4" fill="none"/>${trees(700, [-20, 140, 300, 470, 640, 820, 990, 1160, 1330, 1500], 62, [190, 150, 220, 170], '#1f5a38', 24)}<path d="${front}V900H0Z" fill="#15402a"/><path d="${front}" stroke="#5fb07f" stroke-opacity=".7" stroke-width="4" fill="none"/><path d="${front.replace(/(\d+)(?=[CS ]|$)/g, (m) => String(Number(m) + 50)).replace(/^M0 (\d+)/, (m, y) => `M0 ${Number(y)}`)}" stroke="#5fb07f" stroke-opacity=".4" stroke-width="3" fill="none"/>`)}`, DEFS.forest);
+      const lake = `<path d="M${mx - 420} 745q420-40 840 0q-420 50-840 0z" fill="#9fd3e0"/><g stroke="#e8fbff" stroke-width="3" stroke-linecap="round" stroke-opacity=".8"><path d="M${mx - 260} 742h120M${mx - 60} 752h160M${mx + 150} 740h90"/></g>`;
+      return scene(`${SKY}${turn(k, `<circle cx="${mx}" cy="190" r="86" fill="#fff9e0"/><circle cx="${mx}" cy="190" r="118" stroke="#fff9e0" stroke-opacity=".6" stroke-width="4" fill="none"/>${peaks(r, [220, 520, 900, 1250, 1500], 520, [170, 260], '#8cc4a2', '#79b490', '#f4fbf6')}<path d="${back}V900H0Z" fill="#a6d5b4"/><path d="${back}" stroke="#fff" stroke-opacity=".6" stroke-width="4" fill="none"/>${trees(560, [40, 150, 250, 380, 470, 590, 700, 820, 910, 1040, 1150, 1270, 1380, 1500], 36, [110, 140, 90, 130, 100], '#4f9e6b')}<path d="${mid}V900H0Z" fill="#3f8a5c"/><path d="${mid}" stroke="#d6f0dd" stroke-opacity=".6" stroke-width="4" fill="none"/>${pines(r, 700, [-20, 140, 300, 470, 640, 820, 990, 1160, 1330, 1500], 34, [200, 160, 230, 180], '#1f5a38')}<path d="${front}V900H0Z" fill="#15402a"/>${lake}<path d="${front}" stroke="#5fb07f" stroke-opacity=".7" stroke-width="4" fill="none"/><path d="${front.replace(/(\d+)(?=[CS ]|$)/g, (m) => String(Number(m) + 50)).replace(/^M0 (\d+)/, (m, y) => `M0 ${Number(y)}`)}" stroke="#5fb07f" stroke-opacity=".4" stroke-width="3" fill="none"/>`)}`, DEFS.forest);
     },
-    /** A sun with a ring of ticks, wind in dashed lines, three dunes with a light crest and parallel contours each. */
+    /** A sun with a ring of ticks, wind in dashed lines, pyramids far off, three dunes with a light crest and parallel contours each, cacti and stones in front. */
     sand(k) {
       const r = rng(k + 27); const sx = SUN_X[(k + 2) % 3], sy = 230 + Math.round(r() * 50);
       const j = () => Math.round(r() * 40 - 20);
@@ -275,15 +300,35 @@
       const lower = (d, by) => d.replace(/(-?\d+) (-?\d+)/g, (m, x, y) => `${x} ${Number(y) + by}`);
       const contours = (d, off, n, ink) => Array.from({ length: n }, (_, i) => `<path d="${lower(d, off * (i + 1))}" stroke="${ink}" stroke-opacity=".55" stroke-width="3" fill="none"/>`).join('');
       const wx = sx > 800 ? 120 : 900;
-      return scene(`${SKY}${turn(k, `<circle cx="${sx}" cy="${sy}" r="80" fill="#fff4d6"/><g stroke="#f5c27a" stroke-width="6" stroke-linecap="round">${ticks(sx, sy, 110, 150, 12)}</g><g stroke="#fff" stroke-opacity=".6" stroke-width="4" stroke-dasharray="30 22" stroke-linecap="round" fill="none"><path d="M${wx} 300q120-30 260 0t260 0"/><path d="M${wx + 100} 380q100-26 220 0t220 0"/>${k % 2 ? `<path d="M${wx + 40} 450q90-22 200 0t200 0"/>` : ''}</g><path d="${d1}V900H0Z" fill="#f1c88e"/>${contours(d1, 26, 2 + (k % 3), '#d9a05e')}<path d="${d2}V900H0Z" fill="#dfa161"/><path d="${d2}" stroke="#fff0cf" stroke-width="4" fill="none"/>${contours(d2, 30, 2 + ((k + 1) % 3), '#c48542')}<path d="${d3}V900H0Z" fill="#c07a3c"/><path d="${d3}" stroke="#ffe3b8" stroke-width="4" fill="none"/>${contours(d3, 32, 2, '#a9602f')}`)}`, DEFS.sand);
+      const px = sx > 800 ? 300 : 1100; // the pyramids, away from the sun
+      const pyramid = (x, w, hh) => `<path d="M${x - w} 500L${x} ${500 - hh}L${x + w} 500Z" fill="#e7b577"/><path d="M${x} ${500 - hh}L${x + w} 500H${x + w * 0.15}Z" fill="#c98b4c"/><g stroke="#b77a3f" stroke-opacity=".6" stroke-width="3">${[0.3, 0.55, 0.8].map((t) => `<path d="M${Math.round(x - w * t)} ${Math.round(500 - hh * (1 - t))}H${Math.round(x + w * t)}"/>`).join('')}</g>`;
+      const cactus = (x, y, hh) => `<g fill="#6f7a3a"><rect x="${x - 14}" y="${y - hh}" width="28" height="${hh}" rx="14"/><path d="M${x - 14} ${y - hh * 0.45}h-30a14 14 0 0 1-14-14v-${Math.round(hh * 0.25)}a12 12 0 0 1 24 0v${Math.round(hh * 0.12)}h20z"/><path d="M${x + 14} ${y - hh * 0.6}h26a14 14 0 0 0 14-14v-${Math.round(hh * 0.18)}a12 12 0 0 0-24 0v${Math.round(hh * 0.06)}h-16z"/></g>`;
+      const cx0 = sx > 800 ? 1320 : 260;
+      return scene(`${SKY}${turn(k, `<circle cx="${sx}" cy="${sy}" r="80" fill="#fff4d6"/><g stroke="#f5c27a" stroke-width="6" stroke-linecap="round">${ticks(sx, sy, 110, 150, 12)}</g><g stroke="#fff" stroke-opacity=".6" stroke-width="4" stroke-dasharray="30 22" stroke-linecap="round" fill="none"><path d="M${wx} 300q120-30 260 0t260 0"/><path d="M${wx + 100} 380q100-26 220 0t220 0"/>${k % 2 ? `<path d="M${wx + 40} 450q90-22 200 0t200 0"/>` : ''}</g>${pyramid(px, 150, 170)}${pyramid(px + 230, 100, 110)}<path d="${d1}V900H0Z" fill="#f1c88e"/>${contours(d1, 26, 2 + (k % 3), '#d9a05e')}<path d="${d2}V900H0Z" fill="#dfa161"/><path d="${d2}" stroke="#fff0cf" stroke-width="4" fill="none"/>${contours(d2, 30, 2 + ((k + 1) % 3), '#c48542')}<path d="${d3}V900H0Z" fill="#c07a3c"/><path d="${d3}" stroke="#ffe3b8" stroke-width="4" fill="none"/>${contours(d3, 32, 2, '#a9602f')}${cactus(cx0, 830, 150)}${cactus(cx0 + 150, 850, 100)}<g fill="#8e5328"><ellipse cx="${cx0 - 120}" cy="850" rx="44" ry="18"/><ellipse cx="${cx0 + 260}" cy="866" rx="30" ry="12"/></g>`)}`, DEFS.sand);
+    },
+    /** A dawn sky with a sun and cloud, three ranges of snow-capped peaks, each nearer one deeper, a river winding out of them, pines along its banks. */
+    peaks(k) {
+      const r = rng(k + 36); const sx = SUN_X[(k + 1) % 3], sy = 220 + Math.round(r() * 50);
+      const river = `M${sx - 40} 600C${sx - 160} 660 ${sx + 120} 700 ${sx - 60} 760S${sx - 260} 860 ${sx - 120} 900H${sx + 60}C${sx - 40} 860 ${sx + 160} 800 ${sx + 60} 760S${sx + 40} 660 ${sx + 20} 600Z`;
+      return scene(`${SKY}${turn(k, `<circle cx="${sx}" cy="${sy}" r="70" fill="#fff4dd"/><circle cx="${sx}" cy="${sy}" r="104" stroke="#fff4dd" stroke-opacity=".7" stroke-width="4" fill="none"/>${cloud(sx - 380, sy - 40, 280, '#ffffff', '#c9c2ef')}${cloud(sx + 160, sy + 30, 200, '#ffffff', '#c9c2ef')}${birdsAt([[sx - 200, sy + 120], [sx - 120, sy + 90], [sx + 260, sy - 40]], 2 + (k % 2), '#5b4e9a')}${peaks(r, [120, 420, 760, 1080, 1400, 1650], 560, [200, 300], '#b6b0e6', '#a19ad8', '#ffffff')}${peaks(r, [-40, 300, 620, 980, 1300, 1560], 660, [180, 260], '#7f78c8', '#6b63b6', '#f2f0ff')}${peaks(r, [100, 500, 880, 1260, 1620], 760, [150, 220], '#4b438f', '#3b347a', '#e6e3ff')}<rect y="758" width="1600" height="142" fill="#2e285e"/><path d="${river}" fill="#bfe3f6"/><path d="${river}" stroke="#ffffff" stroke-opacity=".7" stroke-width="3" fill="none"/>${pines(r, 900, [40, 190, 330, 1180, 1320, 1470], 30, [170, 140, 200], '#1c1840')}`)}`, DEFS.peaks);
+    },
+    /** A low sun behind a far skyline, a near one with its windows lit, a bridge on its piers with its cables across the water, the lights and the buildings in the water. */
+    city(k) {
+      const r = rng(k + 45); const sx = SUN_X[k % 3], sy = 330 + Math.round(r() * 40);
+      const bx0 = sx > 800 ? 80 : 820, bx1 = bx0 + 700; // the bridge, away from the sun
+      const piers = [bx0 + 170, bx0 + 530];
+      const cables = piers.map((px) => [-160, -100, -40, 40, 100, 160].map((dx) => `<path d="M${px} 470L${px + dx} 600"/>`).join('')).join('');
+      const bridge = `<rect x="${bx0}" y="596" width="700" height="16" fill="#3b4a5e"/>${piers.map((px) => `<rect x="${px - 12}" y="460" width="24" height="220" fill="#3b4a5e"/><rect x="${px - 20}" y="455" width="40" height="14" rx="3" fill="#3b4a5e"/>`).join('')}<g stroke="#3b4a5e" stroke-width="3">${cables}</g><path d="M${bx0} 596Q${bx0 + 170} 520 ${piers[0]} 470Q${bx0 + 350} 560 ${piers[1]} 470Q${bx0 + 620} 520 ${bx1} 596" stroke="#3b4a5e" stroke-width="5" fill="none"/>`;
+      const lights = Array.from({ length: 14 }, () => `<rect x="${Math.round(r() * 1560)}" y="${Math.round(640 + r() * 220)}" width="${Math.round(20 + r() * 50)}" height="4" rx="2"/>`).join('');
+      return scene(`${SKY}${turn(k, `<circle cx="${sx}" cy="${sy}" r="90" fill="#ffd9a8"/>${cloud(sx - 460, 170, 280, '#ffffff', '#f2c7a0')}${cloud(sx + 180, 120, 220, '#ffffff', '#f2c7a0')}${birdsAt([[sx - 260, 240], [sx - 180, 280], [sx + 240, 210]], 2 + (k % 2), '#8a5a44')}${skyline(r, -20, 1620, 600, [110, 260], '#9fb3c4', null)}${skyline(r, -10, 1620, 640, [90, 240], '#56697f', '#ffe3a8', 0.72)}<rect y="636" width="1600" height="264" fill="#3d6b86"/><g fill="#ffe3a8" fill-opacity=".55">${lights}</g><g stroke="#c9e4f0" stroke-opacity=".5" stroke-width="3" stroke-linecap="round">${Array.from({ length: 10 }, (_, i) => `<path d="M${Math.round(r() * 1400)} ${664 + i * 24}h${Math.round(50 + r() * 140)}"/>`).join('')}</g>${bridge}`)}`, DEFS.city);
     },
   };
   const SCENE_VARIANTS = 9;
-  const SCENE_TONES = { Dusk: '#b8527a', Ocean: '#3a8fd6', Forest: '#2f8f4e', Sand: '#e8a767' };
+  const SCENE_TONES = { Dusk: '#b8527a', Ocean: '#3a8fd6', Forest: '#2f8f4e', Sand: '#e8a767', Peaks: '#6b63b6', City: '#56697f' };
   const SCENE_NAMES = Object.keys(SCENE_TONES);
   // every drawing, built once — the first time one is asked for: 'Dusk' is the first variation,
   // 'Dusk#3' the fourth. (This file runs before every Canvas page paints; a page that shows no
-  // scene never draws the thirty-six of them, a few hundred kilobytes of text.)
+  // scene never draws the fifty-four of them, a few hundred kilobytes of text.)
   const SCENE_URLS = new Map();
   const scenes = () => { if (!SCENE_URLS.size) for (const name of SCENE_NAMES) for (let k = 0; k < SCENE_VARIANTS; k++) SCENE_URLS.set(k ? `${name}#${k}` : name, DRAW[name.toLowerCase()](k)); return SCENE_URLS; };
   /** A scene's drawing: `name` alone is its first variation, or a variation k (wrapped round the nine). */
@@ -398,7 +443,7 @@
   /** A photo inked down to two tones: the darker half of it (Otsu's split) and its outlines (Sobel)
    *  are the ink, the rest the paper — kept as a mask (white where the ink goes, clear elsewhere)
    *  the page colours in the two inks of the moment, with a small blurred copy for the blurred layer. */
-  function inkOf(img, w = 800) {
+  function inkOf(img, w = 800, { fill = 1 } = {}) {
     const ratio = img.naturalWidth ? img.naturalHeight / img.naturalWidth : 0.5625;
     const h = Math.max(8, Math.round(w * ratio));
     const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
@@ -421,7 +466,7 @@
       const gy = -sm[y0 * w + x0] - 2 * sm[y0 * w + x] - sm[y0 * w + x1] + sm[y1 * w + x0] + 2 * sm[y1 * w + x] + sm[y1 * w + x1];
       const edge = Math.min(255, Math.max(0, (Math.hypot(gx, gy) - 22) * 3.5)); // (gentle horizons and dune lines count too)
       const deep = T * 0.8; // the darkest part alone is filled, not the whole darker half: outlines carry the rest, and the paper stays
-      const shape = sm[i] < deep ? Math.min(255, (deep - sm[i]) * 24) : 0; // (soft at the split, so the shapes are not jagged)
+      const shape = sm[i] < deep ? Math.min(255, (deep - sm[i]) * 24) * fill : 0; // (soft at the split, so the shapes are not jagged; a drawn scene's masses lighter than its lines)
       d[i * 4] = 255; d[i * 4 + 1] = 255; d[i * 4 + 2] = 255; d[i * 4 + 3] = Math.max(shape, edge);
     }
     cx.putImageData(out, 0, 0);
@@ -445,7 +490,9 @@
     const id = hashOf(v);
     if (inks.has(id)) return inks.get(id);
     if (inking.has(id)) return inking.get(id);
-    const p = loadPicture(v, false).then((img) => { const r = inkOf(img); inks.set(id, r); inking.delete(id); return r; }).catch((e) => { inking.delete(id); throw e; });
+    // a drawn scene (an SVG) is inked as an illustration: its lines full, its dark masses — a night sky, the sea, a skyline — a light wash, so the drawing reads rather than a block
+    const scene = String(v).startsWith('data:image/svg+xml');
+    const p = loadPicture(v, false).then((img) => { const r = inkOf(img, 800, scene ? { fill: SCENE_FILL } : {}); inks.set(id, r); inking.delete(id); return r; }).catch((e) => { inking.delete(id); throw e; });
     inking.set(id, p);
     return p;
   }
@@ -595,7 +642,7 @@
     hexToRgb, rgbToHex, rgbToHsl, hslToRgb, hslToHex, luminance, contrast, normalize,
     GROUND, MIN_SAT, ICON_RATIO, PRESETS, REGULAR, SCENE_VARIANTS, sceneUrl, sceneNameOf, CARD_SLOTS, HEADER_SLOTS, IMAGES_KEY,
     palette, shades, shadeSet, cssVars, apply, readable, readableOn, fillFor, mix, tint, customHex, controlsOf, veilBase, picCss, band, nearest,
-    readImage, imageTone, fillTones, loadImages, ensureAssets, saveImages, emptyImages, packImages, picOf, rawOf, CAST, INK_LIFT, inkOn, inkFor, inkCached,
+    readImage, imageTone, fillTones, loadImages, ensureAssets, saveImages, emptyImages, packImages, picOf, rawOf, CAST, INK_LIFT, inkOn, SCENE_INK, sceneInkOn, inkFor, inkCached,
     blurDrawn, checkBlur, BLUR_KEY,
     get PRESET_PHOTOS() { return presetPhotosOf(); }, // (the drawings, made on the first ask)
   };

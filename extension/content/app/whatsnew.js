@@ -11,7 +11,7 @@
  * The notes themselves are data: whatsnew-notes.js (the page shows each note's title alone).
  *
  * A release can put an invitation in the notes' place (its entry carries `invite`): the first page
- * after that update invites a theme — the four scenes and the colours in a strip, Personalize and
+ * after that update invites a theme — the six scenes and the colours in a strip, Personalize and
  * Not now — instead of listing what changed. Personalize opens the editor, whose Open Canvas then
  * brings the page back with the sidebar's Appearance button pointed out (welcome.js); the notes
  * wait in Settings. */
@@ -144,7 +144,7 @@
     paintFoot();
   }
 
-  /** The invitation: the four scenes and the seven colours in a strip, a title, a line, then Not
+  /** The invitation: the six scenes and the seven colours in a strip, a title, a line, then Not
    *  now and Personalize. Personalize arms the pointer at the sidebar's Appearance button for the
    *  page after the editor (welcome.js) and opens the editor over this page. Shown once, like the
    *  notes: this version is seen the moment it is up. */
@@ -158,7 +158,7 @@
     ui.body.replaceChildren(
       h('div', { class: 'inv__strip', 'aria-hidden': 'true' }, [...scenes, h('span', { class: 'inv__dots' }, dots)]),
       h('h1', { class: 'fr__h1', text: 'Make it yours' }),
-      h('p', { class: 'fr__blurb', text: 'Simpl now has themes: four ready-made scenes, a colour of your own, and photos on the sidebar, the counters and the page headers. Try a theme, or change the colour.' }),
+      h('p', { class: 'fr__blurb', text: 'Simpl now has themes: six ready-made scenes, a colour of your own, and photos on the sidebar, the counters and the page headers. Try a theme, or change the colour.' }),
     );
     ui.foot.replaceChildren(
       h('button', { type: 'button', class: 'btn btn--ghost fr__back', id: 'later', text: 'Not now', onclick: dismiss }),

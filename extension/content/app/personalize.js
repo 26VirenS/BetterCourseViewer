@@ -4,8 +4,11 @@
  * Appearance (?bcv=personalize), ending in Save.
  *
  * The rules it keeps (the mockup's developer notes):
- *   · Appearance is always at hand — Light, Dark or System, a bar floating at the foot of the
- *     preview — because every preview (how the colour reads, the veils on the photos) depends on it.
+ *   · Appearance is always at hand — Light, Dark or Auto, the first thing in the panel beside the
+ *     preview (2.98.42) — because every preview (how the colour reads, the ink on the photos) depends on it.
+ *   · The preview says it is one: a window's frame with "Preview" on it and a line under the label —
+ *     sample courses and numbers, nothing saved until Continue — and photos are a section of their own
+ *     (the sidebar, the counters, the header, each a tile with a plus), besides a press on the preview.
  *   · Two steps: the colour and the photos (the sidebar, each counter, and one header that every
  *     page wears), then the courses' colours. The preview is made-up data, not the student's.
  *   · One accent. Regular is not a colour: each sidebar glyph keeps its own hue and the accent is
@@ -40,6 +43,7 @@
   };
   const IC = {
     check: 'M20 6L9 17l-5-5', camera: 'M4 8h3l2-2h6l2 2h3v11H4zM12 11a3 3 0 100 6 3 3 0 000-6z', up: 'M12 16V5M7 10l5-5 5 5M5 19h14',
+    eye: 'M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7zM12 15a3 3 0 100-6 3 3 0 000 6z', plus: 'M12 5v14M5 12h14',
     dash: 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z', book: 'M5 4h13v16H5zM5 17h13', todo: 'M5 6h14M5 12h14M5 18h9', cal: 'M5 5h14v15H5zM5 10h14M9 3v4M15 3v4', chart: 'M4 19h16M7 16V9M12 16V5M17 16v-4',
   };
   // the preview's sidebar rows, each with the colour its glyph has in the Regular look
@@ -64,6 +68,8 @@
     { name: 'Ocean', colour: 'Teal', side: 'Ocean', cards: 'Forest', heads: 'Dusk' },
     { name: 'Forest', colour: 'Green', side: 'Forest', cards: 'Ocean', heads: 'Sand' },
     { name: 'Sand', colour: 'Amber', side: 'Sand', cards: 'Dusk', heads: 'Forest' },
+    { name: 'Peaks', colour: 'Indigo', side: 'Peaks', cards: 'Forest', heads: 'City' },
+    { name: 'City', colour: 'Purple', side: 'City', cards: 'Peaks', heads: 'Ocean' },
   ];
   const sceneOf = (name) => PRESET_PHOTOS.find((p) => p[0] === name);
   const PAL = ['#c2410c', '#ff3b30', '#e91e63', '#8e44ad', '#6f42c1', '#3f51b5', '#1976d2', '#03a9f4', '#00acc1', '#009688', '#22a822', '#9aa31a', '#e08a00', '#ff6a13', '#f06292'];
@@ -193,9 +199,12 @@
     root.classList.toggle('is-photo', kind === 'photo');
     root.dataset.step = st.done ? 'done' : String(st.step);
     const barWas = root.querySelector('#pzPhotoBar')?.dataset.for;
+    const panelAt = kind === 'full' ? 0 : root.querySelector('#pzPanel')?.scrollTop || 0; // (a swatch pressed low in the panel: the panel stays where it was)
     root.replaceChildren(...[top(), st.done ? doneScreen() : stage(), st.done ? null : foot()].filter(Boolean));
     const bar = root.querySelector('#pzPhotoBar');
     if (bar && bar.dataset.for === barWas) bar.classList.add('is-kept'); // (the bar that was open stays put: no pop again)
+    const panel = root.querySelector('#pzPanel');
+    if (panel && panelAt) panel.scrollTop = panelAt;
     paintVars();
     armOutside();
     measure();
@@ -208,43 +217,96 @@
       st.done ? h('span', { class: 'pz__bars' }) : h('span', { class: 'pz__bars', id: 'pzBars' }, STEPS.map((label, i) => h('button', { type: 'button', class: `pz__bar ${i === st.step ? 'is-on' : ''} ${i <= st.step ? 'is-done' : ''}`, title: label, 'aria-label': label, dataset: { bar: String(i) }, onclick: () => { st.step = i; st.target = null; closePicker(true); render('full'); } }))),
     ]);
   }
-  /** Light, Dark, System: a bar floating at the foot of the preview (under it on a phone), turning the whole flow over as it is pressed.
-   *  It gives its place to the photo bar while that is open. */
-  function lookBar() {
-    return h('span', { class: 'pz__seg pz__lookbar', id: 'pzLook', role: 'radiogroup', 'aria-label': 'Appearance' }, LOOKS.map(([key, label]) => h('button', { type: 'button', class: `pz__segbtn ${st.look === key ? 'is-on' : ''}`, dataset: { look: key }, role: 'radio', 'aria-checked': st.look === key ? 'true' : 'false', title: `${label} appearance`, onclick: () => { st.look = key; render(); } }, [
-      h('i', { class: `pz__lookpv pz__lookpv--${key}` }, [h('b')]),
-      h('span', { text: label }),
+  /** Light, Dark, Auto: three cards at the head of the panel, each a small window in that look with
+   *  its name and what it does under it, the chosen one ringed in the colour and ticked. */
+  function lookChoice() {
+    const WORDS = { light: ['Light', 'Always light'], dark: ['Dark', 'Always dark'], system: ['Auto', 'Follows your device'] };
+    return h('div', { class: 'pz__modes', id: 'pzLook', role: 'radiogroup', 'aria-label': 'Light or dark' }, LOOKS.map(([key]) => h('button', { type: 'button', class: `pz__segbtn pz__mode ${st.look === key ? 'is-on' : ''}`, dataset: { look: key }, role: 'radio', 'aria-checked': st.look === key ? 'true' : 'false', title: `${WORDS[key][0]}: ${WORDS[key][1].toLowerCase()}`, onclick: () => { st.look = key; render(); } }, [
+      h('i', { class: `pz__modepv pz__modepv--${key}`, 'aria-hidden': 'true' }, (key === 'system' ? ['light', 'dark'] : [key]).map((k) => h('i', { class: `pz__win pz__win--${k}` }, [h('b'), h('u'), h('s')]))), // (Auto: the light window with the dark one over its right half)
+      h('span', { class: 'pz__modename', text: WORDS[key][0] }),
+      h('span', { class: 'pz__modesub', text: WORDS[key][1] }),
+      h('i', { class: 'pz__modecheck', 'aria-hidden': 'true' }, svg(IC.check, { size: 10, width: 3.2, stroke: '#fff' })),
     ])));
   }
-  function stage() {
-    const titles = [['Click any part of the preview to personalize', phone() ? '' : 'The sidebar, a counter or the header takes a photo: one of ours, or upload your own.'], ['Colour your courses', 'Pick a course, then its colour.']];
-    const [t1, t2] = titles[st.step];
-    const photoOpen = st.step === 0 && !!st.target;
-    const wrap = h('div', { class: 'pz__pvwrap', id: 'pzPv', dataset: { pv: '1' } }, [preview(), photoOpen ? photoBar() : null]);
-    // the preview and its controls in a column that takes the room the window has; on the first
-    // screen the ready-made themes down the right of it, top to bottom (a phone has no list)
-    return h('div', { class: `pz__stage pz__stage--${st.step}` }, [
-      h('div', { class: 'pz__head' }, [h('h1', { class: 'pz__h1', text: t1 }), t2 ? h('p', { class: 'pz__lead', text: t2 }) : null]),
-      h('div', { class: 'pz__layout' }, [
-        h('div', { class: 'pz__left' }, [h('div', { class: 'pz__pvbox' }, [wrap, photoOpen ? null : lookBar()]), h('div', { class: 'pz__controls' }, [st.step === 0 ? colourControls() : courseControls()])]),
-        st.step === 0 ? readyList() : null,
+  /** A section of the panel: its number and name over what it holds. */
+  const section = (n, title, id, body) => (body ? h('section', { class: 'pz__sec', dataset: { sec: id } }, [h('h2', { class: 'pz__sech' }, [h('i', { class: 'pz__secn', text: String(n) }), h('span', { text: title })]), body]) : null);
+  /** Photos, said as well as shown: the sidebar, the counters and the header, each a tile wearing what
+   *  it has (or a plus) — a press opens the photo bar for it under the preview, as a press on that part
+   *  of the preview does. */
+  function photoSlots() {
+    const cardKeys = CARDS.map(([k]) => k);
+    const slot = (key, title, pic, on) => {
+      const ink = pic ? inkOf(pic) : null;
+      return h('button', { type: 'button', class: `pz__slot ${pic ? 'has-pic' : ''} ${on ? 'is-on' : ''}`, dataset: { slot: key }, onclick: () => { st.target = key; render(); } }, [
+        h('i', { class: `pz__slotpic ${ink ? 'is-inked' : ''} ${pic && T().sceneNameOf(pic) ? 'is-scene' : ''}`, style: ink ? { '--ink': T().picCss(ink.ink) } : null }, pic ? [] : [svg(IC.plus, { size: 20, width: 2.4 })]),
+        h('span', { class: 'pz__slotname', text: title }),
+        h('span', { class: 'pz__slotdo' }, [svg(pic ? IC.camera : IC.plus, { size: 11, width: 2.4 }), h('span', { text: pic ? 'Change' : 'Add photo' })]),
+      ]);
+    };
+    const cardPic = cardKeys.map((k) => st.images.cards[k]).find(Boolean) || null;
+    return h('div', { class: 'pz__photos' }, [
+      h('div', { class: 'pz__slots', id: 'pzSlots' }, [
+        slot('side', 'Sidebar', st.images.side, st.target === 'side'),
+        slot('today', 'Counters', cardPic, cardKeys.includes(st.target)),
+        slot('head', 'Header', photoAt('head'), st.target === 'head'),
       ]),
+      h('p', { class: 'pz__hint' }, [svg(IC.up, { size: 12, width: 2.2 }), h('span', { text: 'One of ours, or your own — or drag a picture onto the preview.' })]),
     ]);
   }
-  /** The preview scaled to the room it has (980 × 430 at full size). */
+  function stage() {
+    const titles = [['Make it yours', 'Light or dark, a theme, a colour and photos. The preview shows every change before anything is saved.'], ['Colour your courses', 'Pick a course, then its colour.']];
+    const [t1, t2] = titles[st.step];
+    const photoOpen = st.step === 0 && !!st.target;
+    const wrap = h('div', { class: 'pz__pvwrap', id: 'pzPv', dataset: { pv: '1' } }, [preview()]);
+    // the panel down the left, numbered: Light or dark, then (the first screen) the themes, the colour
+    // and the photos, or (the second) the courses' colours; the preview beside it, framed and labelled
+    // as the preview it is (a phone: the preview first, the panel under it)
+    const secs = st.step === 0
+      ? [['Light or dark', 'look', lookChoice()], ['Themes', 'themes', readyList()], ['Colour', 'colour', colourControls()], ['Photos', 'photos', phone() ? null : photoSlots()]]
+      : [['Light or dark', 'look', lookChoice()], ['Course colours', 'courses', courseControls()]];
+    let n = 0;
+    const panel = h('div', { class: 'pz__panel', id: 'pzPanel' }, secs.map(([title, id, body]) => (body ? section(++n, title, id, body) : null)));
+    const pvCol = h('div', { class: 'pz__pvcol' }, [
+      h('div', { class: 'pz__pvlabel' }, [
+        h('span', { class: 'pz__pvtag' }, [svg(IC.eye, { size: 13, width: 2.2 }), h('span', { text: 'Preview' })]),
+        h('span', { class: 'pz__pvnote', text: st.step === 0 ? `Sample courses and numbers${phone() ? '' : ' · press the sidebar, a counter or the header for a photo'}` : 'Your courses, in the colours you pick' }),
+      ]),
+      h('div', { class: 'pz__pvbox' }, [
+        h('div', { class: 'pz__frame' }, [
+          h('div', { class: 'pz__framebar', 'aria-hidden': 'true' }, [h('i'), h('i'), h('i'), h('span', { class: 'pz__frameurl' }, [svg(IC.eye, { size: 11, width: 2.2 }), h('span', { text: 'Preview — nothing is saved yet' })])]),
+          wrap,
+        ]),
+        photoOpen ? photoBar() : null, // (under the frame, in the room kept for it: the preview does not shrink as it opens)
+      ]),
+    ]);
+    return h('div', { class: `pz__stage pz__stage--${st.step}` }, [
+      h('div', { class: 'pz__head' }, [h('h1', { class: 'pz__h1', text: t1 }), t2 ? h('p', { class: 'pz__lead', text: t2 }) : null]),
+      h('div', { class: 'pz__layout' }, [panel, pvCol]),
+    ]);
+  }
+  /** The preview scaled to the room it has (980 × 430 at full size), and its frame sized to hug it — the
+   *  stage around the frame hugging it in turn: the room is the column's, less the label, the stage's
+   *  padding, the frame's bar and the room kept under it for the photo bar; a phone (the stage's
+   *  --pz-fit: width) scales by the width alone, the page scrolling past it. */
   function measure() {
-    const wrap = ui?.root.querySelector('#pzPv');
+    const box = ui?.root.querySelector('.pz__pvbox');
+    const wrap = box?.querySelector('#pzPv');
     const pv = wrap?.querySelector('.pz__pv');
-    if (!wrap || !pv) return;
-    const r = wrap.getBoundingClientRect();
-    if (!r.width || !r.height) return;
-    const s = Math.min(1.3, r.width / 980, r.height / 430); // (a wide, tall window gets it larger than life)
+    if (!box || !wrap || !pv) return;
+    const cs = getComputedStyle(box);
+    const W = box.clientWidth - (parseFloat(cs.paddingLeft) || 0) - (parseFloat(cs.paddingRight) || 0);
+    if (W <= 0) return;
+    const byWidth = cs.getPropertyValue('--pz-fit').trim() === 'width';
+    const col = box.parentElement;
+    const label = col.querySelector('.pz__pvlabel');
+    const above = label ? label.offsetHeight + (parseFloat(getComputedStyle(label).marginBottom) || 0) : 0;
+    const room = byWidth ? Infinity : col.clientHeight - above - (parseFloat(cs.paddingTop) || 0) - (parseFloat(cs.paddingBottom) || 0) - (box.querySelector('.pz__framebar')?.offsetHeight || 0) - (parseFloat(cs.getPropertyValue('--pz-bar-room')) || 0);
+    const s = Math.max(0.25, Math.min(1.3, W / 980, room / 430)); // (a wide, tall window gets it larger than life)
     st.pvScale = s;
-    const top = Math.max(0, Math.round((r.height - 430 * s) / 2)); // (centred in the room it has)
+    wrap.parentElement.style.width = `${Math.floor(980 * s)}px`;
+    wrap.style.height = `${Math.floor(430 * s)}px`;
     pv.style.transform = `translateX(-50%) scale(${s})`;
-    pv.style.top = `${top}px`;
-    // the bars at its foot (the look, the photos) ride on the preview's bottom edge, wherever the centring leaves it
-    wrap.parentElement?.style.setProperty('--pv-gap', `${Math.max(0, Math.round(r.height - top - 430 * s))}px`);
+    pv.style.top = '0px';
   }
 
   // ---- the cursor's show: what can be pressed ----------------------------------------------------
@@ -325,14 +387,15 @@
     }
     return ink;
   };
-  /** A photo's layers: the paper in the complement, the ink in the colour (its mask), the blurred ink under the fade, the veil — or the plain picture while its ink is drawn. */
+  /** A photo's layers: the paper (the surface), the ink (its mask) a shade off it — in the colour for a ready-made drawing — the blurred ink under the fade, the veil — or the paper alone while its ink is drawn. */
   const layers = (pic, veilVar) => {
     if (!pic) return [];
     const ink = inkOf(pic);
+    const scene = !!T().sceneNameOf(pic); // (a ready-made drawing: inked in the colour, not grey)
     return ink ? [
       h('i', { class: 'pz__pic pz__pic--paper' }),
-      h('i', { class: 'pz__pic pz__pic--sharp pz__pic--inked', style: { '--ink': T().picCss(ink.ink) } }),
-      h('i', { class: 'pz__pic pz__pic--blur pz__pic--inked', style: { '--ink': T().picCss(ink.inkBlur) } }),
+      h('i', { class: `pz__pic pz__pic--sharp pz__pic--inked ${scene ? 'pz__pic--scene' : ''}`, style: { '--ink': T().picCss(ink.ink) } }),
+      h('i', { class: `pz__pic pz__pic--blur pz__pic--inked ${scene ? 'pz__pic--scene' : ''}`, style: { '--ink': T().picCss(ink.inkBlur) } }),
       h('i', { class: `pz__pic pz__pic--veil pz__pic--veil-${veilVar}` }),
     ] : [h('i', { class: 'pz__pic pz__pic--paper' })]; // (its paper alone until its ink lands — a moment — never the raw photo)
   };
@@ -424,7 +487,7 @@
   const variantOf = (v, i) => { const n = (T().sceneNameOf(v) || '').split('#')[0]; return n ? T().sceneUrl(n, i) : v; };
   function photoChoices(key, { onEvery = null } = {}) {
     const cur = photoAt(key);
-    const choice = (name, bg, on, pick, raw = null) => { const ink = raw ? inkOf(raw) : null; return h('button', { type: 'button', class: `pz__choice ${on ? 'is-on' : ''}`, title: name, 'aria-label': name, dataset: { photo: name }, onclick: pick }, [h('i', { class: `pz__choicepic ${name === 'None' ? 'pz__choicepic--none' : ''} ${ink ? 'pz__choicepic--inked' : ''}`, style: ink ? { '--ink': T().picCss(ink.ink) } : bg ? { background: bg } : null }), h('span', { class: 'pz__choicename', text: name })]); };
+    const choice = (name, bg, on, pick, raw = null) => { const ink = raw ? inkOf(raw) : null; return h('button', { type: 'button', class: `pz__choice ${on ? 'is-on' : ''}`, title: name, 'aria-label': name, dataset: { photo: name }, onclick: pick }, [h('i', { class: `pz__choicepic ${name === 'None' ? 'pz__choicepic--none' : ''} ${ink ? 'pz__choicepic--inked' : ''} ${raw ? 'is-scene' : ''}`, style: ink ? { '--ink': T().picCss(ink.ink) } : bg ? { background: bg } : null }), h('span', { class: 'pz__choicename', text: name })]); };
       const isPreset = (p) => !!cur && (cur === p[1] || (T().sceneNameOf(cur) || '').split('#')[0] === p[0]); // (any variation of the scene counts as it)
     // your own photo first, and said in words: the drawn scenes after it (a picture can also be dragged onto the preview)
     return [
@@ -447,7 +510,10 @@
   }
 
   // ---- step 1: the theme swatches, and the radial picker for Custom -------------------------------
-  /** The ready-made themes, a list down the right of the preview: Default and the four scenes, each a tile of its three scenes as they are placed, with the colour's dot. */
+  /** The ready-made themes: Default across the top (the standard colours, no photos), then the six
+   *  scene themes in a grid — each card a small Dashboard in the theme (its sidebar, header and two
+   *  counters wearing its scenes, inked in its colour, with the colour's row lit in the sidebar), its
+   *  colour's dot and its name under it; the one in force ringed in its colour and ticked. */
   function readyList() {
     const t = T();
     // a ready-made theme: the sidebar wears its scene's first drawing, every counter a variation of theirs — no two the same — and the one header its own
@@ -463,17 +529,26 @@
       render('photo');
     };
     if (phone()) return null; // (a phone gets the colour alone: no room for the list)
-    return h('div', { class: 'pz__ready', id: 'pzReady' }, [
-      h('span', { class: 'pz__readyttl', text: 'Ready-made' }),
-      ...READY.map((r) => h('button', { type: 'button', class: `pz__theme ${readyOn(r) ? 'is-on' : ''}`, dataset: { ready: r.name }, title: r.side ? `${r.name}: ${r.colour}, ${r.side} on the sidebar, ${r.cards} on the counters, ${r.heads} on the headers` : 'Default: Regular, no photos', 'aria-pressed': readyOn(r) ? 'true' : 'false', onclick: () => applyReady(r) }, [
-        (() => {
-          const hex = r.colour === 'Regular' ? '' : (t.PRESETS.find(([, n]) => n === r.colour) || [REGULAR])[0];
-          const cell = (cls, name) => { const raw = picOf(name); const ink = raw ? inkOf(raw) : null; return h('i', { class: `${cls} ${ink ? 'is-inked' : ''}`, style: ink ? { '--ink': t.picCss(ink.ink) } : { '--pic': t.picCss(raw) } }); };
-          return h('span', { class: `pz__thumb ${r.side ? '' : 'pz__thumb--plain'}`, style: { '--c': r.colour === 'Regular' ? 'conic-gradient(#ff453a,#ff9f0a,#30d158,#40c8e0,#0a84ff,#bf5af2,#ff453a)' : hex, '--ring': hex || REGULAR } }, [cell('pz__thumb-side', r.side), cell('pz__thumb-head', r.heads), cell('pz__thumb-card', r.cards), h('i', { class: 'pz__thumb-dot' })]);
-        })(),
-        h('span', { text: r.name }),
-      ])),
+    const RAINBOW = 'conic-gradient(#ff453a,#ff9f0a,#30d158,#40c8e0,#0a84ff,#bf5af2,#ff453a)';
+    const hexOf = (r) => (r.colour === 'Regular' ? '' : (t.PRESETS.find(([, n]) => n === r.colour) || [REGULAR])[0]);
+    // (each scene's first drawing, inked once: the six inks the photo bar draws as well)
+    const cell = (cls, name) => { const raw = picOf(name); const ink = raw ? inkOf(raw) : null; return h('i', { class: `${cls} ${ink ? 'is-inked' : ''}`, style: ink ? { '--ink': t.picCss(ink.ink) } : null }); };
+    const thumb = (r) => h('span', { class: `pz__thumb ${r.side ? '' : 'pz__thumb--plain'}`, style: { '--ring': hexOf(r) || REGULAR } }, [
+      cell('pz__thumb-side', r.side), cell('pz__thumb-head', r.heads), cell('pz__thumb-card', r.cards), cell('pz__thumb-card', r.cards),
+      h('i', { class: 'pz__thumb-check' }, svg(IC.check, { size: 10, width: 3.4, stroke: '#fff' })),
     ]);
+    const card = (r) => {
+      const on = readyOn(r);
+      const plain = !r.side;
+      return h('button', { type: 'button', class: `pz__theme ${plain ? 'pz__theme--default' : ''} ${on ? 'is-on' : ''}`, dataset: { ready: r.name }, title: plain ? 'Default: Regular, no photos' : `${r.name}: ${r.colour}, ${r.side} on the sidebar, ${r.cards} on the counters, ${r.heads} on the headers`, 'aria-pressed': on ? 'true' : 'false', style: { '--ring': hexOf(r) || REGULAR }, onclick: () => applyReady(r) }, [
+        thumb(r),
+        h('span', { class: 'pz__themetext' }, [
+          h('span', { class: 'pz__themename' }, [h('i', { class: 'pz__themedot', style: { background: hexOf(r) || RAINBOW } }), h('span', { text: r.name })]),
+          plain ? h('span', { class: 'pz__themesub', text: 'The standard colours, no photos' }) : null,
+        ]),
+      ]);
+    };
+    return h('div', { class: 'pz__ready', id: 'pzReady' }, READY.map(card));
   }
   function colourControls() {
     const t = T();
@@ -522,6 +597,7 @@
     if (owner === 'course') { const c = selCourse(); if (!c) return; Object.assign(st, T().controlsOf(courseColour(c)) ? { cHue: T().controlsOf(courseColour(c)).h, cSat: T().controlsOf(courseColour(c)).s, cDepth: T().controlsOf(courseColour(c)).depth } : {}); }
     st.picker = { open: true, owner, closing: false };
     render();
+    ui.root.querySelector('[data-pk]')?.scrollIntoView?.({ block: 'nearest', behavior: reduced() ? 'auto' : 'smooth' });
   }
   function closePicker(now = false) {
     if (!st?.picker.open) return;

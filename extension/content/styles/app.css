@@ -13,7 +13,7 @@
  * min(their own, the viewport less a margin). */
 
 html[data-bcv-theme] {
-  --bcv-version: "2.98.41"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.98.42"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -2151,6 +2151,11 @@ html[data-bcv-theme="dark"] { --bcv-photo-wash: rgba(0,0,0,.3); --bcv-ink-lift: 
 .bcv-head__pic.has-ink > .bcv-head__pic-sharp { -webkit-mask: var(--bcv-pic-ink) right center / cover no-repeat; mask: var(--bcv-pic-ink) right center / cover no-repeat; }
 .bcv-head__pic.has-ink > .bcv-head__pic-blur { -webkit-mask-image: var(--bcv-pic-ink-blur), linear-gradient(to left, transparent 28%, #000 58%); -webkit-mask-position: right center, 0 0; mask-image: var(--bcv-pic-ink-blur), linear-gradient(to left, transparent 28%, #000 58%); mask-position: right center, 0 0; }
 .bcv-stat--pic.has-ink > .bcv-stat__pic--veil, .bcv-side__pic.has-ink > .bcv-side__pic-veil, .bcv-head__pic.has-ink > .bcv-head__pic-veil { background: none; } /* (tone on tone needs no veil and no wash) */
+/* a ready-made theme's drawing (2.98.42) is inked in the look's own colour, not a shade of grey: the
+ * accent a third into the surface by day, a little more by night (lib/theme.js sceneInkOn), its lines
+ * full and its masses a light wash of it (inkOf's fill) — the drawing reads as the theme's own */
+html[data-bcv-theme] :is(.bcv-stat--pic, .bcv-side__pic, .bcv-head__pic).has-ink.is-scene { --bcv-ink-lift: var(--bcv-accent, var(--bcv-blue)); --bcv-ink-k: 70%; }
+html[data-bcv-theme="dark"] :is(.bcv-stat--pic, .bcv-side__pic, .bcv-head__pic).has-ink.is-scene { --bcv-ink-k: 66%; }
 /* the sidebar's photo: sharp along the bottom, blurred as it goes up the side, the chrome's own ground
  * veiling the top so the navigation reads as it always did */
 .bcv-side--pic > :not(.bcv-side__pic) { position: relative; z-index: 1; }

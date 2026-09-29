@@ -25,6 +25,11 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.98.42', date: '2026-09-29', notes: [
+      { kind: 'improved', title: 'Clearer Appearance', body: 'Light, dark and auto as cards; a clear preview.', icon: P.eye },
+      { kind: 'new', title: 'Two new themes', body: 'Peaks and City, and richer drawn scenes.', icon: P.pic },
+      { kind: 'improved', title: 'Photos easier to add', body: 'Tiles for the sidebar, counters and header.', icon: P.pic },
+    ] },
     { version: '2.98.41', date: '2026-09-29', notes: [
       { kind: 'improved', title: 'Profile & settings', body: 'Your photo, name and settings in one place.', icon: P.layers },
       { kind: 'improved', title: 'Tidier switch list', body: 'The off list is narrower and lined up right.', icon: P.toggle },

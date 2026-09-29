@@ -769,7 +769,7 @@ try {
   // Personalize on a phone: the look, the preview scaled to the screen, the themes; the photos and
   // the headers are the desktop's, so its steps are the colour and the courses' colours
   const phPz = await page.evaluate(() => { const r = document.querySelector('#bcv-setup').shadowRoot; const pv = r.querySelector('.pz__pv'); const w = window.innerWidth; return { looks: r.querySelectorAll('#pzLook .pz__segbtn').length, bars: r.querySelectorAll('#pzBars .pz__bar').length, h1: r.querySelector('.pz__h1').textContent, pvFits: pv.getBoundingClientRect().left >= -1 && pv.getBoundingClientRect().right <= w + 1, themes: r.querySelectorAll('#pzThemes .pz__sw').length, badges: r.querySelectorAll('.pz__badge').length, next: r.querySelector('#pzNext').textContent, fits: [...r.querySelectorAll('.pz__top, .pz__swatches, .pz__foot')].every((e) => e.getBoundingClientRect().right <= w + 1) && r.querySelector('.pz__foot').getBoundingClientRect().bottom <= window.innerHeight + 1 }; });
-  check(phPz.looks === 3 && phPz.bars === 2 && phPz.h1 === 'Click any part of the preview to personalize' && phPz.pvFits && phPz.themes === 9 && phPz.badges === 0 && phPz.next === 'Continue' && phPz.fits && await noOverflow(), `Personalize on a phone: the look, two bars, the preview inside the screen, nine themes, no photo badges: ${JSON.stringify(phPz)}`);
+  check(phPz.looks === 3 && phPz.bars === 2 && phPz.h1 === 'Make it yours' && phPz.pvFits && phPz.themes === 9 && phPz.badges === 0 && phPz.next === 'Continue' && phPz.fits && await noOverflow(), `Personalize on a phone: the look, two bars, the preview inside the screen, nine themes, no photo badges: ${JSON.stringify(phPz)}`);
   await page.click('#bcv-setup .pz__sw[data-theme="Pink"]');
   check(await eventually(async () => (await page.$eval('#bcv-setup .pz', (e) => e.style.getPropertyValue('--A'))) === '#ff375f'), 'Pink goes on the preview at once');
   await shot('11d-personalize');
@@ -850,7 +850,7 @@ try {
     await introDone();
     await page.waitForTimeout(400);
     const inv = await page.evaluate(() => { const r = document.querySelector('#bcv-whatsnew').shadowRoot; const w = window.innerWidth; return { h1: r.querySelector('.fr__h1').textContent, scenes: [...r.querySelectorAll('.inv__scene')].filter((s) => s.getBoundingClientRect().width > 40).length, dots: getComputedStyle(r.querySelector('.inv__dots')).display, fits: [...r.querySelectorAll('.inv__strip, .fr__foot, .fr__h1')].every((e) => e.getBoundingClientRect().right <= w + 1), foot: [...r.querySelectorAll('.fr__foot button')].map((b) => b.textContent.trim()).join(','), notes: r.querySelectorAll('.wn__note').length }; });
-    check(inv.h1 === 'Make it yours' && inv.scenes === 4 && inv.dots === 'none' && inv.fits && inv.foot === 'Not now,Personalize' && inv.notes === 0 && await noOverflow(), `the invitation fits the phone: four scenes across, no colour dots, Not now and Personalize, no notes: ${JSON.stringify(inv)}`);
+    check(inv.h1 === 'Make it yours' && inv.scenes === 6 && inv.dots === 'none' && inv.fits && inv.foot === 'Not now,Personalize' && inv.notes === 0 && await noOverflow(), `the invitation fits the phone: six scenes across, no colour dots, Not now and Personalize, no notes: ${JSON.stringify(inv)}`);
     await shot('13-invite');
     await page.click('#bcv-whatsnew #later');
     await page.waitForFunction(() => !document.querySelector('#bcv-whatsnew'), null, { timeout: 5000 });
