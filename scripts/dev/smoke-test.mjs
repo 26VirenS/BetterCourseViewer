@@ -517,7 +517,7 @@ try {
   const weekRows = await texts('.bcv-sheet__row');
   check(/^\d+ Due this week$/.test(weekLine) && Number(weekLine.split(' ')[0]) === weekRows.length && /^Week of \w+ \d+ · \d courses?$/.test((await texts('.bcv-sheet__note'))[0]) && weekRows.every((t) => /·/.test(t)) && weekRows.some((t) => /· \d+ pts ·/.test(t)), `Due this week sheet: ${weekLine} / ${(await texts('.bcv-sheet__note'))[0]} / ${weekRows.length} rows, e.g. ${weekRows[0] || '(none)'}`);
   // (2.98.28) the list in two: what is still to do under its label, then — set back in grey, a press away all the
-  // same — the week's work already handed in; and the preview is the big pane, the list the narrow one
+  // same — the week's work already handed in; (2.98.45) the box holds the list alone until a row is pressed
   await page.waitForTimeout(500);
   const sheetSplit = await page.evaluate(() => {
     const sh = document.querySelector('.bcv-sheet');
@@ -525,7 +525,7 @@ try {
     const cols = getComputedStyle(sh).gridTemplateColumns.split(' ').map(parseFloat);
     return { secs: [...sh.querySelectorAll('.bcv-sheet__sec')].map((e) => e.textContent).join('|'), quiet: sh.querySelectorAll('.bcv-sheet__qrow').length, quietOp: q ? Number(getComputedStyle(q).opacity) : null, quietMeta: q ? q.innerText.replace(/\s+/g, ' ') : '', cols, afterRows: !!q && !!sh.querySelector('.bcv-sheet__row') && (sh.querySelector('.bcv-sheet__row').compareDocumentPosition(q) & Node.DOCUMENT_POSITION_FOLLOWING) > 0 };
   });
-  check(sheetSplit.secs === 'Still to do|Already done' && sheetSplit.quiet >= 1 && sheetSplit.quietOp < 0.8 && /· (graded|handed in|marked done)\b/.test(sheetSplit.quietMeta) && sheetSplit.afterRows && sheetSplit.cols.length === 2 && sheetSplit.cols[1] > sheetSplit.cols[0] * 1.5 && sheetSplit.cols[0] <= 360, `the sheet: what is still to do, then the done ones quieter below; the preview pane the wide one: ${JSON.stringify(sheetSplit)}`);
+  check(sheetSplit.secs === 'Still to do|Already done' && sheetSplit.quiet >= 1 && sheetSplit.quietOp < 0.8 && /· (graded|handed in|marked done)\b/.test(sheetSplit.quietMeta) && sheetSplit.afterRows && sheetSplit.cols.length === 1, `the sheet: what is still to do, then the done ones quieter below, one column (no preview pane yet): ${JSON.stringify(sheetSplit)}`);
   await page.hover('.bcv-sheet__qrow');
   check(await eventually(async () => Number(await page.$eval('.bcv-sheet__qrow', (e) => getComputedStyle(e).opacity)) > 0.95, 2000), 'a quiet row comes up to full strength under the pointer');
   // this Chromium draws in software, which skips every backdrop-filter (lib/theme.js checkBlur): the
@@ -544,8 +544,9 @@ try {
   // side says a press previews there) and the preview takes that side, the list staying
   await page.waitForTimeout(500); // the sheet's morph out of the card settles before it is measured
   check(await page.$eval('.bcv-sheet', (e) => { const cs = getComputedStyle(e); return /^rgb\(/.test(cs.backgroundColor) && (cs.backdropFilter || 'none') === 'none'; }), "the counter's sheet is solid: the card's own ground, no glass");
-  const steady0 = await page.$eval('.bcv-sheet', (e) => { const r = e.getBoundingClientRect(); const hint = e.querySelector('.bcv-sheet__pvhint'); return { w: Math.round(r.width), h: Math.round(r.height), steady: e.classList.contains('bcv-sheet--steady'), hint: hint ? hint.textContent.trim() : null, hintShown: !!hint && getComputedStyle(hint).display !== 'none' }; });
-  check(steady0.steady && steady0.w >= 900 && steady0.h >= 600 && steady0.hint === 'Press an item to preview it here' && steady0.hintShown, `the sheet opens at its full, steady size with the preview side waiting: ${JSON.stringify(steady0)}`);
+  // (2.98.45) the counter grows where it stands into a taller box — its own corner, the page dimmed round it (darker further off)
+  const steady0 = await page.evaluate(() => { const e = document.querySelector('.bcv-sheet'); const r = e.getBoundingClientRect(); const c = document.querySelector('.bcv-stats .bcv-stat:nth-child(3)').getBoundingClientRect(); const ov = document.querySelector('.bcv-sheet-ov'); return { x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height), cx: Math.round(c.left), cy: Math.round(c.top), card: e.classList.contains('bcv-sheet--card'), hint: !!e.querySelector('.bcv-sheet__pvhint'), veil: /^radial-gradient/.test(getComputedStyle(ov).backgroundImage), vw: innerWidth, vh: innerHeight }; });
+  check(steady0.card && !steady0.hint && steady0.veil && steady0.w >= 360 && steady0.w <= 460 && steady0.h >= 600 && steady0.y === steady0.cy && steady0.x + steady0.w <= steady0.vw - 15 && steady0.x <= steady0.cx && steady0.x >= steady0.cx - 120, `the counter grows in place into a taller box with its list (no pane waiting), the page dimmed round it: ${JSON.stringify(steady0)}`);
   await page.click('.bcv-sheet__row');
   await page.waitForSelector('.bcv-sheet.is-split .bcv-pv--in', { timeout: 10000 });
   await page.waitForFunction(() => !document.querySelector('.bcv-pv .bcv-skel'), null, { timeout: 10000 });
@@ -558,7 +559,7 @@ try {
     rows: e.querySelectorAll('.bcv-sheet__row').length,
   }));
   check(pvSheet.kicker === 'Preview' && pvSheet.title === 'Field site sign-ups' && /^Announcement · .+/.test(pvSheet.meta) && pvSheet.body.length > 10 && pvSheet.go === 'Open the announcement' && pvSheet.rows === 3, `the preview reads the announcement beside the list it came from: ${JSON.stringify(pvSheet)}`);
-  await page.waitForTimeout(400); // the sheet takes .3s to make room
+  await page.waitForTimeout(650); // the box takes .46s to make room
   const split = await page.evaluate(() => {
     const sheet = document.querySelector('.bcv-sheet').getBoundingClientRect();
     const pv = document.querySelector('.bcv-pv--in').getBoundingClientRect();
@@ -566,12 +567,15 @@ try {
     const hint = document.querySelector('.bcv-sheet__pvhint');
     return { w: Math.round(sheet.width), h: Math.round(sheet.height), pvRight: Math.round(pv.right), sheetRight: Math.round(sheet.right), pvLeft: Math.round(pv.left), listRight: Math.round(list.right), shifted: document.documentElement.classList.contains('bcv-preview'), hintShown: !!hint && getComputedStyle(hint).display !== 'none' };
   });
-  check(split.w === steady0.w && split.h === steady0.h && Math.abs(split.pvRight - split.sheetRight) <= 2 && split.pvLeft >= split.listRight - 2 && !split.shifted && !split.hintShown, `the sheet keeps its size and the preview takes its right in place of the hint, the page itself never moving: ${JSON.stringify({ ...split, steady0 })}`);
+  const splitAt = await page.evaluate(() => { const r = document.querySelector('.bcv-sheet').getBoundingClientRect(); const l = document.querySelector('.bcv-sheet__list').getBoundingClientRect(); const p = document.querySelector('.bcv-pv--in').getBoundingClientRect(); return { x: Math.round(r.left), right: Math.round(r.right), listX: Math.round(l.left), listW: Math.round(l.width), pvW: Math.round(p.width) }; });
+  check(split.w > steady0.w + 300 && split.h === steady0.h && Math.abs(split.pvRight - split.sheetRight) <= 2 && split.pvLeft >= split.listRight - 2 && !split.shifted && splitAt.right <= steady0.vw - 15 && splitAt.x < steady0.x && Math.abs(splitAt.listX - splitAt.x) <= 2 && Math.abs(splitAt.listW - steady0.w) <= 2 && splitAt.pvW >= 420 && splitAt.pvW <= 560, `a row pressed widens the box to the right for a smaller preview, the box sliding left to fit and the list kept at its left, the page itself never moving: ${JSON.stringify({ ...split, ...splitAt, steady0 })}`);
   await shot(page, '01c-dashboard-preview');
   // pressing another row swaps what the panel shows, the sheet staying put
   await (await page.$$('.bcv-sheet__row'))[1].click();
   await page.waitForFunction(() => document.querySelector('.bcv-pv__title')?.textContent === 'Prerequisite Skills Test', null, { timeout: 10000 });
   check((await page.$$('.bcv-pv')).length === 1 && (await page.$('.bcv-sheet.is-split')) !== null, 'another row swaps the preview inside the sheet');
+  await page.keyboard.press('Escape');
+  check(await eventually(async () => !(await page.$('.bcv-sheet.is-split')) && !(await page.$('.bcv-pv')) && !!(await page.$('.bcv-sheet')), 2000), 'Escape puts the preview away first, the box staying with its list');
   // the button at the bottom is the way through to the item's own screen, and it takes the sheet with it
   await (await page.$$('.bcv-sheet__row'))[0].click();
   await page.waitForFunction(() => document.querySelector('.bcv-pv__title')?.textContent === 'Field site sign-ups', null, { timeout: 10000 });
@@ -3735,8 +3739,13 @@ try {
   await page.waitForSelector('.bcv-stat', { timeout: 10000 });
   await page.click('.bcv-stat');
   await page.waitForSelector('.bcv-sheet', { timeout: 5000 });
-  const sheetAnim = await page.evaluate(() => [getComputedStyle(document.querySelector('.bcv-sheet-ov')).animationName, getComputedStyle(document.querySelector('.bcv-sheet')).animationName, getComputedStyle(document.querySelector('.bcv-sheet')).animationDuration, document.querySelector('.bcv-sheet').style.transformOrigin, getComputedStyle(document.documentElement).getPropertyValue('--bcv-t-gentle').trim()]);
-  check(sheetAnim[0] === 'bcv-scrim' && sheetAnim[1] === 'bcv-morph' && Math.round(parseFloat(sheetAnim[2]) * 1000) === parseInt(sheetAnim[4], 10) && /^-?\d+px -?\d+px$/.test(sheetAnim[3]), `a sheet grows out of the counter that opened it, over a scrim that blurs in, for the gentle spring's settle time: ${sheetAnim.join(' / ')}`);
+  // (2.98.45) the counter's box grows where the counter stands: its place and size eased from the counter's, the page dimmed round it and blurred
+  const sheetAnim = await page.evaluate(() => {
+    const ov = document.querySelector('.bcv-sheet-ov'), sh = ov.querySelector('.bcv-sheet'), card = document.querySelector('.bcv-stat').getBoundingClientRect();
+    const cs = getComputedStyle(sh), before = getComputedStyle(ov, '::before');
+    return { veil: getComputedStyle(ov).animationName, card: sh.classList.contains('bcv-sheet--card'), eased: ['left', 'top', 'width', 'height'].every((p) => cs.transitionProperty.includes(p)), blur: document.documentElement.classList.contains('bcv-noblur') || /blur/.test(before.backdropFilter || before.webkitBackdropFilter || ''), dim: /radial-gradient/.test(getComputedStyle(ov).backgroundImage), top: Math.round(sh.getBoundingClientRect().top - card.top), w: parseFloat(sh.style.width) };
+  });
+  check(sheetAnim.veil === 'bcv-card-veil' && sheetAnim.card && sheetAnim.eased && sheetAnim.blur && sheetAnim.dim && Math.abs(sheetAnim.top) <= 2 && sheetAnim.w >= 360, `a sheet grows out of the counter that opened it, where it stands, the page dimmed round it and blurred: ${JSON.stringify(sheetAnim)}`);
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('.bcv-sheet-ov'), null, { timeout: 5000 });
   // a slow response: the bar keeps sweeping and skeleton rows hold the place; both leave when the data lands
@@ -4201,6 +4210,16 @@ try {
   await tourStep('look-green');
   const t2 = await tourAt();
   check(t2.title === 'Green: Simpl on' && t2.doing === 'Click green' && t2.act === 'click' && await ringHolds(t2.ring, '#bcv-look .bcv-look__opt--on') && (await page.$('#bcv-look.is-tour-open')) !== null, `the hover opened it, and the next step asks for green: the switch held open while its steps are on: ${JSON.stringify(t2)}`);
+  // (2.98.45, a student's case) red's list opened before its own step and a length pressed there —
+  // This page only — is held: Simpl stays on, the page is not reloaded, the tour and its step stay
+  await page.hover('#bcv-look .bcv-look__offhead');
+  await page.waitForSelector('#bcv-look .bcv-look__opt--off.is-expanded', { timeout: 5000 });
+  const earlyAt = await (async () => { for (let i = 0; i < 40; i++) { const at = await page.$eval('#bcv-look .bcv-look__forbtn[data-for="page"]', (e) => { const r = e.getBoundingClientRect(); const x = r.left + r.width / 2, y = r.top + r.height / 2; return { x, y, hit: document.elementFromPoint(x, y)?.closest('.bcv-look__forbtn') === e }; }); if (at.hit) return at; await page.waitForTimeout(50); } return { hit: false }; })();
+  const loads0 = await page.evaluate(() => performance.getEntriesByType('navigation').length);
+  if (earlyAt.hit) await page.mouse.click(earlyAt.x, earlyAt.y);
+  await page.waitForTimeout(400);
+  const held = { hit: earlyAt.hit, on: !!(await page.$('html.bcv-on')), loads: await page.evaluate(() => performance.getEntriesByType('navigation').length) - loads0, step: (await tourAt())?.step };
+  check(held.hit && held.on && held.loads === 0 && held.step === 'look-green', `This page only pressed before its step (red's list opened while green is asked for) is held: Simpl stays on, the page stays, the tour and its step stay: ${JSON.stringify(held)}`);
   await page.click('#bcv-look .bcv-look__opt--on');
   await tourStep('look-red');
   const t3 = await tourAt();
@@ -4286,6 +4305,10 @@ try {
   await page.click('.bcv-stat[data-stat="week"]');
   await tourStep('peek-row');
   check(await ringHolds((await tourAt()).ring, '.bcv-sheet-ov .bcv-sheet') && (await tourAt()).doing === 'Click an item', 'its sheet opens, lit whole, and an item is asked for');
+  // inside the lit place too, only the thing asked for takes a press (2.98.45): the sheet's close is held while an item is wanted
+  await page.click('.bcv-sheet-ov .bcv-sheet__close');
+  await page.waitForTimeout(300);
+  check(!!(await page.$('.bcv-sheet-ov:not(.is-folding)')) && (await tourAt()).step === 'peek-row', 'a press on the sheet\'s close while an item is asked for is held: the sheet stays, and so does the step');
   await page.click('.bcv-sheet-ov .bcv-sheet__row');
   await tourStep('peek-close');
   check(!!(await page.$('.bcv-sheet-ov .bcv-pv')) && (await tourAt()).doing === 'Close it', 'the item previews beside the list; then Close');
@@ -6340,15 +6363,17 @@ try {
   check(omniAnim.name === 'bcv-omni-in' && omniAnim.ease === 'linear(' && parseFloat(omniAnim.dur) > 0, `the search panel's entrance parses and runs on the snappy spring: ${JSON.stringify(omniAnim)}`);
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('.bcv-omni__panel:not([hidden])'), null, { timeout: 5000 }).catch(() => {});
-  // a sheet closed while it is still growing shrinks back from where it got to, on one spring — not
-  // from full size, and not a restart: Escape at a third of the way in
+  // a counter's box closed while it is still growing folds back from where it got to — not from full
+  // size, and not a restart: Escape part of the way in
   await page.click('.bcv-stats .bcv-stat:nth-child(1)');
   await page.waitForSelector('.bcv-sheet-ov > .bcv-sheet', { timeout: 5000 });
   await page.waitForTimeout(70);
-  const mid = await page.$eval('.bcv-sheet-ov > .bcv-sheet', (e) => { const a = e.getAnimations()[0]; return { p: a ? Number(a.currentTime) / Number(a.effect.getTiming().duration) : null, scale: new DOMMatrix(getComputedStyle(e).transform).a, name: a?.animationName }; });
+  const growing = () => page.$eval('.bcv-sheet-ov > .bcv-sheet', (e) => ({ h: e.getBoundingClientRect().height, goal: parseFloat(e.style.height), cardH: document.querySelector('.bcv-stats .bcv-stat:nth-child(1)').getBoundingClientRect().height, folding: e.parentElement.classList.contains('is-folding') }));
+  const mid = await growing();
   await page.keyboard.press('Escape');
-  const cut = await page.$eval('.bcv-sheet-ov > .bcv-sheet', (e) => ({ closing: e.parentElement.classList.contains('is-closing') && e.parentElement.classList.contains('bcv-sprung'), anims: e.getAnimations().length, scale: new DOMMatrix(getComputedStyle(e).transform).a, scrimAnims: e.parentElement.getAnimations().length }));
-  check(mid.name === 'bcv-morph' && mid.p > 0.05 && mid.p < 0.9 && mid.scale < 0.995 && cut.closing && cut.anims === 1 && cut.scrimAnims === 1 && Math.abs(cut.scale - mid.scale) < 0.06 && cut.scale < 0.995, `Escape on a sheet still growing (at ${(mid.p * 100).toFixed(0)}%, scale ${mid.scale.toFixed(3)}) turns it back from there (scale ${cut.scale.toFixed(3)}) on one spring, the scrim on its own — never from full size: ${JSON.stringify(cut)}`);
+  await page.waitForTimeout(50);
+  const cut = await growing();
+  check(mid.h > mid.cardH + 4 && mid.h < mid.goal - 4 && cut.folding && Math.abs(cut.goal - mid.cardH) <= 2 && cut.h <= mid.h + 2, `Escape on a box still growing (${Math.round(mid.h)}px of ${Math.round(mid.goal)}) folds it back into its counter from there (${Math.round(cut.h)}px) — never from full size: ${JSON.stringify({ mid, cut })}`);
   check(await eventually(async () => !(await page.$('.bcv-sheet-ov')), 3000), 'and it is gone once the spring has settled');
   // a menu grows out of the edge it hangs from; a toast rises from the bottom and sits centred (it used to land with its left edge at the middle)
   await page.click('#bcv-account');

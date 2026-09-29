@@ -25,6 +25,12 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.98.45', date: '2026-09-29', notes: [
+      { kind: 'new', title: 'Cards open in place', body: 'A card grows into a tall list right where it is.', icon: P.layers },
+      { kind: 'improved', title: 'Preview slides out', body: 'Pick an item and the box widens to show it.', icon: P.eye },
+      { kind: 'fixed', title: 'Tour keeps Simpl on', body: 'Picking a length early no longer turns it off.', icon: P.check },
+      { kind: 'improved', title: 'Stray clicks held', body: 'Only what the tour asks for can be clicked.', icon: P.steps },
+    ] },
     { version: '2.98.44', date: '2026-09-29', notes: [
       { kind: 'new', title: 'Tour pins a tool', body: 'Open Tools and drag one you like to the top.', icon: P.pin },
       { kind: 'improved', title: 'No skipping the tour', body: 'Each step needs the real action.', icon: P.steps },

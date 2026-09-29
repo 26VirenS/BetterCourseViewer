@@ -368,18 +368,32 @@
       ]), 0); // no stagger: the six land together
     }
 
-    /** The detail sheet behind a counter: header with the number, then one row per item, and a
-     *  pane on the right where a row previews. It is one size from the start — the list beside the
-     *  pane, the pane saying what it is for until a row is pressed — rather than a narrow sheet that
-     *  widens for the preview and shrinks again after it: a sheet that keeps changing size is hard
-     *  to read. It grows out of the counter that opened it (`from`). */
+    /** The detail sheet behind a counter (2.98.45): the counter itself grows, where it stands, into a
+     *  taller box holding its list — the page dimmed and blurred away from it, more the further off, as
+     *  the tour does it — and a row pressed widens the box to the right for its preview (a pane a little
+     *  smaller than the page's own), the box sliding left when the window has no room there, the list
+     *  kept at its left. Closing folds it back into the counter. With no counter to grow out of it opens
+     *  in the middle, as before. */
     function openSheet(def, from = null) {
       document.querySelector('.bcv-sheet-ov')?.remove();
-      const ov = U.el('bcv-sheet-ov', null, { role: 'dialog', 'aria-label': def.label });
-      const close = () => BCV.ui.dismiss(ov);
+      const card = from && from.getBoundingClientRect && from.isConnected ? from : null;
+      const ov = U.el(`bcv-sheet-ov${card ? ' bcv-sheet-ov--card' : ''}`, null, { role: 'dialog', 'aria-label': def.label });
+      let folding = false;
+      const close = () => {
+        if (!card) { BCV.ui.dismiss(ov); return; }
+        if (folding || !ov.isConnected) return;
+        folding = true;
+        ov.classList.add('is-folding');
+        place(true); // back into the counter
+        setTimeout(() => ov.remove(), U.reducedMotion() ? 0 : 360);
+      };
       ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
-      ov.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
-      ov.append(U.el('bcv-sheet bcv-sheet--steady', [
+      ov.addEventListener('keydown', (e) => {
+        if (e.key !== 'Escape') return;
+        if (card && sheet.classList.contains('is-split')) { BCV.preview?.close(); ov.focus(); return; } // (the preview first, then the box)
+        close();
+      });
+      const sheet = U.el(`bcv-sheet ${card ? 'bcv-sheet--card is-at-card' : 'bcv-sheet--steady'}`, [
         U.el('bcv-sheet__head', [
           h('span', { class: 'bcv-sheet__tile' }, U.svg(def.icon, { size: 19, stroke: def.color, width: 1.9 })),
           U.el('bcv-sheet__titles', [
@@ -396,8 +410,35 @@
           def.more ? U.text('bcv-sheet__more', def.more) : null,
           def.recent ? U.el('bcv-sheet__recent', [U.text('bcv-sheet__sec bcv-sheet__sec--quiet', def.recent.label, 'div'), ...def.recent.items.map((i) => rowFor(i, true))]) : null,
         ]),
-        U.el('bcv-sheet__pvhint', [U.svg(IC.doc, { size: 22, stroke: 'var(--bcv-ink3)', width: 1.7 }), U.text('bcv-sheet__pvhint-t', 'Press an item to preview it here', 'span')]),
-      ]));
+        card ? null : U.el('bcv-sheet__pvhint', [U.svg(IC.doc, { size: 22, stroke: 'var(--bcv-ink3)', width: 1.7 }), U.text('bcv-sheet__pvhint-t', 'Press an item to preview it here', 'span')]),
+      ]);
+      ov.append(sheet);
+      // where the box goes: the counter's own corner, as wide as a list wants (the list and the preview
+      // side by side once a row is pressed), as tall as the window allows, pushed back inside the window
+      const M = 16, LIST_W = 380, PV_W = 500, H_MAX = 640;
+      function geometry(back) {
+        const r = card.getBoundingClientRect();
+        if (back) return { x: r.left, y: r.top, w: r.width, h: r.height };
+        const vw = innerWidth, vh = innerHeight, room = vw - 2 * M;
+        const listW = Math.min(Math.max(r.width, LIST_W), room);
+        const split = sheet.classList.contains('is-split');
+        const narrow = split && room < listW + 360; // (no room for both: the preview takes the box)
+        const w = split ? (narrow ? room : Math.min(listW + PV_W, room)) : listW;
+        const hgt = Math.max(Math.min(H_MAX, vh - 2 * M), Math.min(r.height, vh - 2 * M));
+        const x = Math.max(M, Math.min(r.left, vw - M - w));
+        const y = Math.max(M, Math.min(r.top, vh - M - hgt));
+        sheet.classList.toggle('is-narrow', narrow);
+        sheet.style.setProperty('--bcv-list-w', `${Math.round(listW)}px`);
+        return { x, y, w, h: hgt };
+      }
+      function place(back = false) {
+        if (!card) return;
+        const g = geometry(back);
+        Object.assign(sheet.style, { left: `${Math.round(g.x)}px`, top: `${Math.round(g.y)}px`, width: `${Math.round(g.w)}px`, height: `${Math.round(g.h)}px` });
+        ov.style.setProperty('--bcv-cx', `${Math.round(g.x + g.w / 2)}px`);
+        ov.style.setProperty('--bcv-cy', `${Math.round(g.y + g.h / 2)}px`);
+        ov.style.setProperty('--bcv-r0', `${Math.round(Math.hypot(g.w, g.h) / 2)}px`);
+      }
       /** A row, and — where the item can be cleared (the Overdue list) — an X beside it: the item goes
        *  one press at a time, the header counts down with it, and a failure leaves the row and says so. */
       function rowFor(i, quiet = false) {
@@ -436,7 +477,18 @@
         return wrap;
       }
       document.body.append(ov);
-      U.morphFrom(ov.firstElementChild, from);
+      if (card) {
+        // it starts as the counter (its place and size, its words not yet shown) and grows from there;
+        // a row pressed (the preview's is-split) or the window resized puts it where it goes again
+        place(true);
+        void sheet.offsetWidth;
+        sheet.classList.remove('is-at-card');
+        place();
+        const moved = new MutationObserver(() => { if (!ov.isConnected) { moved.disconnect(); return; } if (!folding) place(); });
+        moved.observe(sheet, { attributes: true, attributeFilter: ['class'] });
+        const onResize = () => { if (!ov.isConnected) { removeEventListener('resize', onResize); return; } if (!folding) place(); };
+        addEventListener('resize', onResize);
+      } else U.morphFrom(sheet, from);
       ov.tabIndex = -1;
       ov.focus();
     }

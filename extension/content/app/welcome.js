@@ -8,9 +8,11 @@
  * pin, a card opened, the search box typed in — and move on by themselves once it is; only Away
  * Refresh (told: its pill shows after time away) and the last card have a button, Away Refresh's
  * coming in once the card has been read. There is no Skip. Outside the lit place the page is held
- * still (a press there nudges the card; the wheel still scrolls whatever is under it), and so it is
- * while the thing is out of sight — a short or zoomed window, a sidebar that scrolls — when the card
- * says which way to scroll, its arrow bouncing that way, and the step waits for it to come into view.
+ * still (a press there nudges the card; the wheel still scrolls whatever is under it), and inside it
+ * only the thing the step asks to be pressed takes a press (2.98.45: a length of the switch's list
+ * pressed at any other moment is held too, so Simpl never turns off under the tour). All of it is
+ * held while the thing is out of sight — a short or zoomed window, a sidebar that scrolls — when the
+ * card says which way to scroll, its arrow bouncing that way, and the step waits for it in view.
  * The setup's run keeps its flag until its last step: a reload picks it up where it was.
  *
  * The runs are the black screens' own, on the same flags: after the setup (the switch, the purple
@@ -89,7 +91,9 @@
   // page's own that on[type] says counts); after: a line said as it is done. when(): whether the run
   // has it at all; skip(): passed over as it comes (already so); wait: how long a thing that is not
   // there yet is waited for before the step is passed over. hold: 'look' keeps the switch open while
-  // the step is on. free: nothing held still (a phone's sheet closes with a tap outside it).
+  // the step is on. free: nothing held still (a phone's sheet closes with a tap outside it). allow: the
+  // other things a press may land on for a step that asks for one (any row, any field, any tool) —
+  // a press anywhere else, or on a step that asks for none, is held (onGuard).
   const LIB = {
     look: () => {
       let picked = '';
@@ -139,7 +143,7 @@
       { id: 'grade-try', name: 'the what-if button', target: () => $('.bcv-sheet-ov .bcv-whatif-btn'), area: () => [sheet()], grades: true,
         title: 'Try what-if scores', body: 'See how new scores would change your grade.', act: 'click', doing: 'Click “Try what-if scores”',
         done: () => !!$('.bcv-sheet-ov .bcv-whatif-btn.is-on') },
-      { id: 'grade-field', name: 'a score', target: () => $('.bcv-sheet-ov .bcv-whatif__input'), area: () => [sheet()], grades: true,
+      { id: 'grade-field', name: 'a score', target: () => $('.bcv-sheet-ov .bcv-whatif__input'), area: () => [sheet()], grades: true, allow: '.bcv-sheet-ov .bcv-whatif__input',
         title: 'Change a score', body: 'Type any score. Nothing is saved.', act: 'type', doing: 'Change a score',
         on: { input: (e) => !!e.target.closest?.('.bcv-sheet-ov .bcv-whatif__input') }, after: 'Your grade updates as you type.' },
       { id: 'grade-close', name: 'the close button', target: sheetClose, area: () => [sheet()], grades: true,
@@ -164,7 +168,7 @@
         { id: 'tools', name: 'Tools', where: 'sidebar', target: () => navRow('tools'), when: () => !!navRow('tools'),
           title: 'Tools and widgets', body: [['Find a ', ''], ['PDF Editor, ', '#ff9f0a'], ['File Converter, ', '#34c759'], ['Calculators, ', '#bf5af2'], ['Flashcards, ', '#2f7cf6'], ['Citation Generator', '#40c8e0'], [' & more.', '']], act: 'click', doing: 'Click Tools',
           done: () => onScreen('tools') },
-        { id: 'pin', name: 'the tools', target: () => $('.bcv-tool-card[data-tool="pomo"]') || $('.bcv-tool-card'), area: () => [$('#bcv-main .bcv-tools'), $('#bcv-pins-drop'), $('#bcv-pins')], wait: 8000,
+        { id: 'pin', name: 'the tools', target: () => $('.bcv-tool-card[data-tool="pomo"]') || $('.bcv-tool-card'), area: () => [$('#bcv-main .bcv-tools'), $('#bcv-pins-drop'), $('#bcv-pins')], wait: 8000, allow: '#bcv-main .bcv-tool-card',
           when: () => !phone() && !self.BCVBridge?.native, // (the pins sit beside the switch: none on a phone or in the app)
           start: () => { before = pinnedN(); },
           title: 'Pin a tool', body: 'Drag any tool to the top to keep it one click away.', act: 'drag', doing: 'Drag a tool to the top',
@@ -184,7 +188,7 @@
       { id: 'peek', name: 'Due this week', target: weekCard, wait: 6000,
         title: 'The cards open', body: 'Click a card to see what’s in it.', act: 'click', doing: phone() ? 'Tap This week' : 'Click Due this week',
         done: () => !!sheet() },
-      { id: 'peek-row', name: 'an item', target: firstRow, area: () => [sheet()], when: () => !phone(),
+      { id: 'peek-row', name: 'an item', target: firstRow, area: () => [sheet()], when: () => !phone(), allow: '.bcv-sheet-ov .bcv-sheet__row, .bcv-sheet-ov .bcv-sheet__qrow',
         title: 'A quick look', body: 'Click anything to preview it here.', act: 'click', doing: 'Click an item',
         done: () => !!$('.bcv-sheet-ov .bcv-pv') },
       phone()
@@ -295,12 +299,35 @@
       e.preventDefault();
       next();
     };
+    // (2.98.45) a press anywhere but where the step wants one is held, the lit place included: only the
+    // step's own thing takes a press, and only while it is waited for — a step that asks for a hover or
+    // only tells takes none, and neither does the pause after a step. So a length of the switch's list
+    // pressed before its step (red hovered, the list open) or just after one cannot turn Simpl off
+    // under the tour. First of all, on the window, before the page's own listeners.
+    ui.onGuard = (e) => {
+      const st = ui?.cur;
+      if (!st || root.contains(e.target)) return;
+      const def = st.shown || st.def;
+      if (def.free || (!st.completed && pressable(def, e.target))) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      if (e.type === 'pointerdown') nudge();
+    };
+    for (const t of GUARD) window.addEventListener(t, ui.onGuard, true);
     document.addEventListener('click', ui.onCap, true);
     document.addEventListener('input', ui.onCap, true);
     document.addEventListener('keydown', ui.onKey, true);
     html.classList.add('bcv-touring');
     document.body.append(root);
     return root;
+  }
+  const GUARD = ['pointerdown', 'mousedown', 'click', 'dblclick', 'auxclick'];
+  /** Whether a press on el is the one the step asks for: on its thing, or on one the step lets stand in
+   *  for it (allow), when the step wants a press, a drag or typing. */
+  function pressable(def, el) {
+    if (!el?.closest || !['click', 'drag', 'type'].includes(def.act)) return false;
+    const t = def.target?.();
+    return !!(t && t.contains(el)) || !!(def.allow && el.closest(def.allow));
   }
   const nudge = () => { const c = ui?.card; if (!c) return; c.classList.remove('is-nudge'); void c.offsetWidth; c.classList.add('is-nudge'); };
   /** The wheel over the held page scrolls what is under it: the nearest thing that scrolls, else the window. */
@@ -557,6 +584,7 @@
     ui = null;
     cancelAnimationFrame(u.raf);
     hold(false);
+    for (const t of GUARD) window.removeEventListener(t, u.onGuard, true);
     document.removeEventListener('click', u.onCap, true);
     document.removeEventListener('input', u.onCap, true);
     document.removeEventListener('keydown', u.onKey, true);
