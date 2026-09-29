@@ -61,18 +61,19 @@
     ['graded', 'Graded this week', '4', '96 / 100 points', PIC.chart, '#5856d6'],
   ];
   // the ready-made photos: drawn, not fetched, so they weigh nothing and are the same on every device
-  const PRESET_PHOTOS = BCV.theme.PRESET_PHOTOS; // [name, picture, tone]: the four drawn scenes (lib/theme.js)
-  // Ready-made: a colour and the scenes placed — one on the sidebar, one on the counters, one on the
-  // headers, never the same one twice — each led by the scene it is named for. The veils wash every
-  // scene in the colour, so three scenes read as one look.
+  const PRESET_PHOTOS = BCV.theme.PRESET_PHOTOS; // [name, a counter's drawing, tone]: the six drawn scenes (lib/theme.js)
+  // Ready-made (2.98.52): a colour and one scene, the scene drawn to each place's own shape (lib/theme.js:
+  // its tall drawing on the sidebar, its wide one on the counters — nine variations, so no two counters
+  // wear the same — and its long one on the header), so a theme is one drawing throughout, never a wide
+  // picture cut to fit three shapes.
   const READY = [
-    { name: 'Default', colour: 'Regular', side: null, cards: null, heads: null }, // the interface as it comes: Regular, no photos
-    { name: 'Dusk', colour: 'Pink', side: 'Dusk', cards: 'Sand', heads: 'Ocean' },
-    { name: 'Ocean', colour: 'Teal', side: 'Ocean', cards: 'Forest', heads: 'Dusk' },
-    { name: 'Forest', colour: 'Green', side: 'Forest', cards: 'Ocean', heads: 'Sand' },
-    { name: 'Sand', colour: 'Amber', side: 'Sand', cards: 'Dusk', heads: 'Forest' },
-    { name: 'Peaks', colour: 'Indigo', side: 'Peaks', cards: 'Forest', heads: 'City' },
-    { name: 'City', colour: 'Purple', side: 'City', cards: 'Peaks', heads: 'Ocean' },
+    { name: 'Default', colour: 'Regular', scene: null }, // the interface as it comes: Regular, no photos
+    { name: 'Dusk', colour: 'Pink', scene: 'Dusk' },
+    { name: 'Ocean', colour: 'Teal', scene: 'Ocean' },
+    { name: 'Forest', colour: 'Green', scene: 'Forest' },
+    { name: 'Sand', colour: 'Amber', scene: 'Sand' },
+    { name: 'Peaks', colour: 'Indigo', scene: 'Peaks' },
+    { name: 'City', colour: 'Purple', scene: 'City' },
   ];
   const sceneOf = (name) => PRESET_PHOTOS.find((p) => p[0] === name);
   const PAL = ['#c2410c', '#ff3b30', '#e91e63', '#8e44ad', '#6f42c1', '#3f51b5', '#1976d2', '#03a9f4', '#00acc1', '#009688', '#22a822', '#9aa31a', '#e08a00', '#ff6a13', '#f06292'];
@@ -254,7 +255,7 @@
   function photoSlots() {
     const cardKeys = CARDS.map(([k]) => k);
     const slot = (key, title, pic, on) => {
-      const ink = pic ? inkOf(pic) : null;
+      const ink = pic ? inkOf(pic, true) : null;
       return h('button', { type: 'button', class: `pz__slot ${pic ? 'has-pic' : ''} ${on ? 'is-on' : ''}`, dataset: { slot: key }, onclick: () => { st.target = key; render(); } }, [
         h('i', { class: `pz__slotpic ${ink ? 'is-inked' : ''} ${pic && T().sceneNameOf(pic) ? 'is-scene' : ''}`, style: ink ? { '--ink': T().picCss(ink.ink) } : null }, pic ? [] : [svg(IC.plus, { size: 20, width: 2.4 })]),
         h('span', { class: 'pz__slotname', text: title }),
@@ -394,14 +395,17 @@
    *  with every ink), and inks landing together are one redraw. */
   const waiting = new Set();
   let redraw = null;
-  const inkOf = (pic) => {
-    const ink = T().inkCached(pic);
-    if (!ink && !waiting.has(pic)) {
-      waiting.add(pic);
-      T().inkFor(pic).then(() => {
-        waiting.delete(pic);
+  // (a thumbnail — a theme tile's cell, a photo choice, a Photos tile — takes a small ink of its own, a tenth of the
+  // work of the preview's: the seven tiles alone are twenty-four drawings, and inked at full size they held the page)
+  const inkOf = (pic, small = false) => {
+    const wide = small ? 260 : 800, key = `${wide}:${pic}`;
+    const ink = T().inkCached(pic, wide);
+    if (!ink && !waiting.has(key)) {
+      waiting.add(key);
+      T().inkFor(pic, { wide }).then(() => {
+        waiting.delete(key);
         redraw ||= setTimeout(() => { redraw = null; if (st && ui) render('still'); }, 0);
-      }).catch(() => waiting.delete(pic));
+      }).catch(() => waiting.delete(key));
     }
     return ink;
   };
@@ -569,16 +573,17 @@
     } catch (e) { BCV.ui?.toast?.(`That picture could not be read${/heic|heif/i.test(file?.name || file?.type || '') ? ' — HEIC photos need converting to JPEG first' : ''}.`, { error: true, ms: 4200 }); } // (said, rather than nothing happening)
   };
   /** A scene put on a set of things: each gets its own variation of it (a photo goes as it is). */
-  const variantOf = (v, i) => { const n = (T().sceneNameOf(v) || '').split('#')[0]; return n ? T().sceneUrl(n, i) : v; };
+  const variantOf = (v, i) => { const s = T().sceneParts(T().sceneNameOf(v)); return s ? T().sceneUrl(s.name, i, 'card') : v; };
   function photoChoices(key, { onEvery = null } = {}) {
     const cur = photoAt(key);
-    const choice = (name, bg, on, pick, raw = null) => { const ink = raw ? inkOf(raw) : null; return h('button', { type: 'button', class: `pz__choice ${on ? 'is-on' : ''}`, title: name, 'aria-label': name, dataset: { photo: name }, onclick: pick }, [h('i', { class: `pz__choicepic ${name === 'None' ? 'pz__choicepic--none' : ''} ${ink ? 'pz__choicepic--inked' : ''} ${raw ? 'is-scene' : ''}`, style: ink ? { '--ink': T().picCss(ink.ink) } : bg ? { background: bg } : null }), h('span', { class: 'pz__choicename', text: name })]); };
-      const isPreset = (p) => !!cur && (cur === p[1] || (T().sceneNameOf(cur) || '').split('#')[0] === p[0]); // (any variation of the scene counts as it)
-    // your own photo first, and said in words: the drawn scenes after it (a picture can also be dragged onto the preview)
+    const choice = (name, bg, on, pick, raw = null) => { const ink = raw ? inkOf(raw, true) : null; return h('button', { type: 'button', class: `pz__choice ${on ? 'is-on' : ''}`, title: name, 'aria-label': name, dataset: { photo: name }, onclick: pick }, [h('i', { class: `pz__choicepic ${name === 'None' ? 'pz__choicepic--none' : ''} ${ink ? 'pz__choicepic--inked' : ''} ${raw ? 'is-scene' : ''}`, style: ink ? { '--ink': T().picCss(ink.ink) } : bg ? { background: bg } : null }), h('span', { class: 'pz__choicename', text: name })]); };
+      const isPreset = (p) => !!cur && (cur === p[1] || T().sceneBaseOf(T().sceneNameOf(cur)) === p[0]); // (any drawing of the scene, for any place, counts as it)
+    const placeFor = key === 'side' ? 'side' : String(key).startsWith('head') ? 'head' : 'card'; // (the scenes drawn for this part's shape)
+    // your own photo first, and said in words: the drawn scenes after it, each drawn for this part's shape (a picture can also be dragged onto the preview)
     return [
       h('label', { class: `pz__choice pz__choice--up ${cur && !PRESET_PHOTOS.some(isPreset) ? 'is-on' : ''}`, title: 'Upload' }, [h('i', { class: 'pz__choicepic pz__choicepic--up' }, svg(IC.up, { size: 15, width: 2.1 })), h('span', { class: 'pz__choicename', text: 'Upload photo' }), h('input', { type: 'file', accept: 'image/*', 'aria-label': 'Upload a photo', onchange: (e) => { const f = e.target.files?.[0]; if (f) readFile(f, key); e.target.value = ''; } })]),
       choice('None', null, !cur, () => { setPhoto(key, null); render('photo'); }),
-      ...PRESET_PHOTOS.map((p) => choice(p[0], T().picCss(p[1]), isPreset(p), () => { setPhoto(key, p[1], p[2]); render('photo'); }, p[1])),
+      ...PRESET_PHOTOS.map((p) => { const url = T().sceneUrl(p[0], 0, placeFor); return choice(p[0], T().picCss(url), isPreset(p), () => { setPhoto(key, url, p[2]); render('photo'); }, url); }),
       onEvery ? h('button', { type: 'button', class: 'pz__textbtn', id: 'pzEvery', disabled: !cur || null, text: onEvery.label, onclick: () => { if (cur) { onEvery.go(cur); render('photo'); } } }) : null,
     ];
   }
@@ -606,31 +611,31 @@
    *  colour's dot and its name under it; the one in force ringed in its colour and ticked. */
   function readyList() {
     const t = T();
-    // a ready-made theme: the sidebar wears its scene's first drawing, every counter a variation of theirs — no two the same — and the one header its own
-    const picOf = (name, i = 0) => (name ? t.sceneUrl(name, i) : null);
-    const readyOn = (r) => st.theme.name === r.colour && (st.images.side || null) === picOf(r.side) && t.CARD_SLOTS.every((k, i) => (st.images.cards[k] || null) === picOf(r.cards, i + 1)) && t.HEADER_SLOTS.every(([k]) => (st.images.headers[k] || null) === picOf(r.heads, 1));
+    // a ready-made theme: the sidebar wears its scene's tall drawing, every counter a variation of its wide one — no two the same — and the one header its long one
+    const picOf = (name, i = 0, place = 'card') => (name ? t.sceneUrl(name, i, place) : null);
+    const readyOn = (r) => st.theme.name === r.colour && (st.images.side || null) === picOf(r.scene, 0, 'side') && t.CARD_SLOTS.every((k, i) => (st.images.cards[k] || null) === picOf(r.scene, i + 1, 'card')) && t.HEADER_SLOTS.every(([k]) => (st.images.headers[k] || null) === picOf(r.scene, 0, 'head'));
     const applyReady = (r) => {
       st.theme.name = r.colour; closePicker(true);
-      const tone = (name) => (name ? sceneOf(name)[2] : null);
-      setPhoto('side', picOf(r.side), tone(r.side));
-      t.CARD_SLOTS.forEach((k, i) => setPhoto(k, picOf(r.cards, i + 1), tone(r.cards)));
-      setPhoto('head', picOf(r.heads, 1), tone(r.heads));
+      const tone = r.scene ? sceneOf(r.scene)[2] : null;
+      setPhoto('side', picOf(r.scene, 0, 'side'), tone);
+      t.CARD_SLOTS.forEach((k, i) => setPhoto(k, picOf(r.scene, i + 1, 'card'), tone));
+      setPhoto('head', picOf(r.scene, 0, 'head'), tone);
       st.target = null;
       render('photo');
     };
     if (phone()) return null; // (a phone gets the colour alone: no room for the list)
     const RAINBOW = 'conic-gradient(#ff453a,#ff9f0a,#30d158,#40c8e0,#0a84ff,#bf5af2,#ff453a)';
     const hexOf = (r) => (r.colour === 'Regular' ? '' : (t.PRESETS.find(([, n]) => n === r.colour) || [REGULAR])[0]);
-    // (each scene's first drawing, inked once: the six inks the photo bar draws as well)
-    const cell = (cls, name) => { const raw = picOf(name); const ink = raw ? inkOf(raw) : null; return h('i', { class: `${cls} ${ink ? 'is-inked' : ''}`, style: ink ? { '--ink': t.picCss(ink.ink) } : null }); };
-    const thumb = (r) => h('span', { class: `pz__thumb ${r.side ? '' : 'pz__thumb--plain'}`, style: { '--ring': hexOf(r) || REGULAR } }, [
-      cell('pz__thumb-side', r.side), cell('pz__thumb-head', r.heads), cell('pz__thumb-card', r.cards), cell('pz__thumb-card', r.cards),
+    // (each scene's drawings for the three places, inked once — the counters' the photo bar draws as well)
+    const cell = (cls, name, place, k = 0) => { const raw = picOf(name, k, place); const ink = raw ? inkOf(raw, true) : null; return h('i', { class: `${cls} ${ink ? 'is-inked' : ''}`, style: ink ? { '--ink': t.picCss(ink.ink) } : null }); };
+    const thumb = (r) => h('span', { class: `pz__thumb ${r.scene ? '' : 'pz__thumb--plain'}`, style: { '--ring': hexOf(r) || REGULAR } }, [
+      cell('pz__thumb-side', r.scene, 'side'), cell('pz__thumb-head', r.scene, 'head'), cell('pz__thumb-card', r.scene, 'card', 1), cell('pz__thumb-card', r.scene, 'card', 2),
       h('i', { class: 'pz__thumb-check' }, svg(IC.check, { size: 10, width: 3.4, stroke: '#fff' })),
     ]);
     const card = (r) => {
       const on = readyOn(r);
-      const plain = !r.side;
-      return h('button', { type: 'button', class: `pz__theme ${plain ? 'pz__theme--default' : ''} ${on ? 'is-on' : ''}`, dataset: { ready: r.name }, title: plain ? 'Default: Regular, no photos' : `${r.name}: ${r.colour}, ${r.side} on the sidebar, ${r.cards} on the counters, ${r.heads} on the headers`, 'aria-pressed': on ? 'true' : 'false', style: { '--ring': hexOf(r) || REGULAR }, onclick: () => applyReady(r) }, [
+      const plain = !r.scene;
+      return h('button', { type: 'button', class: `pz__theme ${plain ? 'pz__theme--default' : ''} ${on ? 'is-on' : ''}`, dataset: { ready: r.name }, title: plain ? 'Default: Regular, no photos' : `${r.name}: ${r.colour}, its drawings on the sidebar, the counters and the header`, 'aria-pressed': on ? 'true' : 'false', style: { '--ring': hexOf(r) || REGULAR }, onclick: () => applyReady(r) }, [
         thumb(r),
         h('span', { class: 'pz__themetext' }, [
           h('span', { class: 'pz__themename' }, [h('i', { class: 'pz__themedot', style: { background: hexOf(r) || RAINBOW } }), h('span', { text: r.name })]),

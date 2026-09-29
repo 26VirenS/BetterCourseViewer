@@ -4186,9 +4186,8 @@ try {
   const sideUp = await page.evaluate(() => { const r = document.querySelector('#bcv-setup').shadowRoot; const s = r.querySelector('.pz__side'); return { url: s.querySelector('.pz__pic--sharp').style.getPropertyValue('--ink').slice(0, 26), veil: r.querySelector('.pz').style.getPropertyValue('--veil-side'), ink: getComputedStyle(s.querySelector('.pz__row span')).color, note: r.querySelector('#pzNote').textContent, upOn: r.querySelector('#pzPhotoBar .pz__choice--up').classList.contains('is-on'), tile: (() => { const t = r.querySelector('#pzSlots [data-slot="side"]'); return `${t.classList.contains('has-pic')}:${t.querySelector('.pz__slotdo').textContent}:${!!t.querySelector('.pz__slotpic.is-inked')}`; })() }; });
   check(sideUp.url === 'url("data:image/png;base64' && /^#[0-9a-f]{6}$/.test(sideUp.veil) && sideUp.ink === inkOver(pzDark) && sideUp.note === 'Custom · 2 photos' && sideUp.upOn && sideUp.tile === 'true:Change:true', `an uploaded photo goes on the sidebar, scaled here, its rows in white over the veil: ${JSON.stringify(sideUp)}`);
   // the header: one photo, every page's — pressed on the preview like the sidebar and the counters
-  // (2.98.51) a photo moves in its place: dragged on the preview it follows the pointer and is pinned where it is let go (a
-  // 16:9 drawing on a wide counter is as wide as the counter, so it moves up and down alone at 1×), the bar's Zoom scales it
-  // about that pin, Reset puts it back — and the page draws the same place (checked on the themed Dashboard below)
+  // (2.98.51) a photo moves in its place: dragged on the preview it follows the pointer and is pinned where it is let go, the
+  // bar's Zoom scales it about that pin, Reset puts it back — and the page draws the same place (checked on the themed Dashboard below)
   await page.click(pz('.pz__card[data-target="today"]'));
   await page.waitForSelector(pz('#pzPlace'), { timeout: 5000 });
   const placeNow = () => page.$eval(pz('.pz__card[data-target="today"]'), (e) => ({ x: e.style.getPropertyValue('--pic-x'), y: e.style.getPropertyValue('--pic-y'), z: e.style.getPropertyValue('--pic-z'), cursor: getComputedStyle(e).cursor, tf: getComputedStyle(e.querySelector('.pz__pic--sharp'), '::before').transform }));
@@ -4196,24 +4195,25 @@ try {
   const place0 = await placeNow();
   check(placeRow.hint === 'Drag the photo on the preview to move it' && placeRow.zoom === '1' && placeRow.reset && placeRow.inBar && placeRow.buttons && placeRow.header === 'pz__title,pz__search,pz__seg' && placeRow.seg === 'Cards,List,Recent activity' && !placeRow.date && placeRow.labels === 'Due today|Due this week|Unread announcements|Overdue|Due tomorrow|Graded this week' && place0.x === '100%' && place0.y === '100%' && place0.z === '1' && place0.cursor === 'grab', `a counter with a photo: the bar says drag to move, Zoom at 1, Reset off, the photo pinned at its corner under a grab cursor; the preview's header is the page's row (title, search, switcher — no date) and the counters carry the page's labels: ${JSON.stringify({ placeRow, place0 })}`);
   const todayBox = await page.$eval(pz('.pz__card[data-target="today"]'), (e) => { const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
+  // (a counter's drawing is the counter's own shape — 2.98.52 — so at 1× there is next to nothing to move: zoomed first)
+  await page.$eval(pz('#pzZoom'), (i) => { i.value = '1.5'; i.dispatchEvent(new Event('input', { bubbles: true })); });
+  const zoomed = await placeNow();
+  check(zoomed.z === '1.5' && zoomed.x === '100%' && zoomed.y === '100%' && /^matrix\(1\.5, 0, 0, 1\.5, /.test(zoomed.tf) && (await page.$eval(pz('#pzPlaceReset'), (b) => !b.disabled)), `Zoom scales the photo about its pin (the pin staying), Reset coming on: ${JSON.stringify(zoomed)}`);
   await page.mouse.move(todayBox.x, todayBox.y);
   await page.mouse.down();
-  await page.mouse.move(todayBox.x - 8, todayBox.y + 20, { steps: 8 });
+  await page.mouse.move(todayBox.x + 20, todayBox.y + 12, { steps: 8 }); // (pinned at its corner, the photo can only come right and down: its hidden part is left and above)
   await page.mouse.up();
   await page.waitForSelector(pz('#pzPlace'), { timeout: 5000 });
   const dragged = await placeNow();
-  check(dragged.x === '100%' && parseFloat(dragged.y) < 100 && parseFloat(dragged.y) > 40 && dragged.z === '1' && (await page.$eval(pz('#pzPlaceReset'), (b) => !b.disabled)) && (await page.$(pz('#pzPhotoBar[data-for="today"]'))) !== null && !(await page.$(pz('.is-dragging'))), `dragged down, the photo is pinned higher up (y ${dragged.y}; x stays: the drawing is as wide as the counter), Reset comes on and the bar stays on the counter: ${JSON.stringify(dragged)}`);
-  await page.$eval(pz('#pzZoom'), (i) => { i.value = '1.5'; i.dispatchEvent(new Event('input', { bubbles: true })); });
-  const zoomed = await placeNow();
-  check(zoomed.z === '1.5' && zoomed.y === dragged.y && /^matrix\(1\.5, 0, 0, 1\.5, /.test(zoomed.tf), `Zoom scales the photo about its pin (the pin staying): ${JSON.stringify(zoomed)}`);
+  check(parseFloat(dragged.x) < 100 && parseFloat(dragged.x) > 50 && parseFloat(dragged.y) < 100 && parseFloat(dragged.y) > 30 && dragged.z === '1.5' && (await page.$(pz('#pzPhotoBar[data-for="today"]'))) !== null && !(await page.$(pz('.is-dragging'))), `dragged right and down, the photo is pinned further left and higher (x ${dragged.x}, y ${dragged.y}), the zoom kept and the bar staying on the counter: ${JSON.stringify(dragged)}`);
   await page.click(pz('#pzPlaceReset'));
   const resetP = await placeNow();
   check(resetP.x === '100%' && resetP.y === '100%' && resetP.z === '1' && (await page.$eval(pz('#pzPlaceReset'), (b) => b.disabled)) && (await page.$eval(pz('#pzZoom'), (i) => i.value)) === '1', `Reset puts it back at its corner, Zoom at 1: ${JSON.stringify(resetP)}`);
-  await page.mouse.move(todayBox.x, todayBox.y); await page.mouse.down(); await page.mouse.move(todayBox.x, todayBox.y + 15, { steps: 6 }); await page.mouse.up();
-  await page.waitForSelector(pz('#pzPlace'), { timeout: 5000 });
   await page.$eval(pz('#pzZoom'), (i) => { i.value = '1.4'; i.dispatchEvent(new Event('input', { bubbles: true })); });
+  await page.mouse.move(todayBox.x, todayBox.y); await page.mouse.down(); await page.mouse.move(todayBox.x, todayBox.y + 8, { steps: 6 }); await page.mouse.up();
+  await page.waitForSelector(pz('#pzPlace'), { timeout: 5000 });
   const keptPlace = await placeNow();
-  check(keptPlace.x === '100%' && parseFloat(keptPlace.y) < 100 && parseFloat(keptPlace.y) > 50 && keptPlace.z === '1.4', `a place left for the page to draw — pinned lower than the corner, zoomed 1.4×: ${JSON.stringify(keptPlace)}`);
+  check(keptPlace.x === '100%' && parseFloat(keptPlace.y) < 100 && parseFloat(keptPlace.y) > 50 && keptPlace.z === '1.4', `a place left for the page to draw — zoomed 1.4× and pinned lower than the corner: ${JSON.stringify(keptPlace)}`);
   // an Add photo badge pressed opens the files straight away, for its part; the picture chosen goes on it (then None, so three photos stay)
   const [chooser] = await Promise.all([page.waitForEvent('filechooser', { timeout: 5000 }), page.click(pz('.pz__card[data-target="week"] .pz__badge'))]);
   await chooser.setFiles({ name: 'sky.png', mimeType: 'image/png', buffer: PNG });
@@ -4264,7 +4264,7 @@ try {
     const assets = ids.map((id) => got[`theme:asset:${id}`]).filter(Boolean);
     return { place: v?.place || null, side: (v?.side || '').slice(0, 15), today: (v?.cards?.today || '').slice(0, 15), head: (v?.headers?.dashboard || '').slice(0, 15), heads: Object.keys(v?.headers || {}).length, headsOne: new Set(Object.values(v?.headers || {})).size, tones: Object.keys(v?.tones || {}).sort().join(','), inline: 'assets' in (v || {}), kept: ids.length, assets: assets.map((a) => `${a.scene || 'photo'}:${(a.sharp || '').slice(0, 15)}:${!!a.ink && !!a.inkBlur && !a.blur}`).sort().join('|') };
   });
-  check(saved.h1 === 'Saved' && saved.rows === 'Colour: Pink · 3 photos | Course colours: 1 changed' && saved.btns === 'Edit,Open Canvas' && savedTheme.accent === pinkA && savedTheme.name === 'Pink' && savedImages.side.startsWith('asset:') && savedImages.today.startsWith('asset:') && savedImages.head.startsWith('asset:') && savedImages.heads === 9 && savedImages.headsOne === 1 && !savedImages.inline && savedImages.kept === 3 && savedImages.assets === 'Dusk:data:image/jpeg:true|Ocean:data:image/jpeg:true|photo:data:image/jpeg:true' && savedImages.tones === 'head:calendar,head:courses,head:dashboard,head:gpa,head:groups,head:inbox,head:notifications,head:todo,head:tools,side,today' && ((await colourNow()) || '').toLowerCase() === '#e91e63', `Save writes it all at once — the theme, the photos (a key each, the index naming them; the one header on all nine pages, kept once) with their tones, the course's colour to Canvas — and says so: ${JSON.stringify({ saved, savedTheme, savedImages })}`);
+  check(saved.h1 === 'Saved' && saved.rows === 'Colour: Pink · 3 photos | Course colours: 1 changed' && saved.btns === 'Edit,Open Canvas' && savedTheme.accent === pinkA && savedTheme.name === 'Pink' && savedImages.side.startsWith('asset:') && savedImages.today.startsWith('asset:') && savedImages.head.startsWith('asset:') && savedImages.heads === 9 && savedImages.headsOne === 1 && !savedImages.inline && savedImages.kept === 3 && savedImages.assets === 'Dusk@card:data:image/jpeg:true|Ocean@head:data:image/jpeg:true|photo:data:image/jpeg:true' && savedImages.tones === 'head:calendar,head:courses,head:dashboard,head:gpa,head:groups,head:inbox,head:notifications,head:todo,head:tools,side,today' && ((await colourNow()) || '').toLowerCase() === '#e91e63', `Save writes it all at once — the theme, the photos (a key each, the index naming them; the one header on all nine pages, kept once) with their tones, the course's colour to Canvas — and says so: ${JSON.stringify({ saved, savedTheme, savedImages })}`);
   check(!!savedImages.place?.today && savedImages.place.today.x === 100 && savedImages.place.today.y < 100 && savedImages.place.today.y > 50 && savedImages.place.today.z === 1.4 && Object.keys(savedImages.place).length === 1, `the place of the Due today counter's photo is in the index, and only that one (a place is kept only off its default): ${JSON.stringify(savedImages.place)}`);
   await shot(page, '32e6-personalize-saved');
   await Promise.all([page.waitForNavigation({ timeout: 20000 }), page.click(pz('#pzOpen'))]);
@@ -4482,8 +4482,8 @@ try {
   check(sideScroll.sticky === 'sticky' && sideScroll.before === sideScroll.sideTop && sideScroll.top === sideScroll.sideTop && sideScroll.h === sideScroll.clientH && (!sideScroll.scrollable || sideScroll.brandTop < sideScroll.sideTop), `the sidebar's photo holds still as the sidebar scrolls (sticky, the height of the sidebar, the rows going by under it): ${JSON.stringify(sideScroll)}`);
   await shot(page, '32h2-themed-side-scrolled');
   await page.evaluate(() => { document.querySelector('.bcv-side').scrollTop = 0; });
-  // Ready-made: a card places a colour and three of the drawn scenes at once — one on the sidebar, one on
-  // every counter, one on every header — in the panel's Themes section, left of the preview
+  // Ready-made: a card places a colour and one scene drawn to each place at once — its tall drawing on the sidebar, a wide one on
+  // every counter (no two the same), its long one on every header — in the panel's Themes section, left of the preview
   await page.goto(`${BASE}/?bcv=personalize`);
   await page.waitForSelector(su('.pz'), { timeout: 20000 });
   // the cursor's show: a pointer comes to the sidebar and presses it (it lights up), then two counters — until a press of one's own
@@ -4512,7 +4512,7 @@ try {
     r.querySelector('#pzReady [data-ready="Dusk"]').click();
     setTimeout(() => { mo.disconnect(); res(n); }, 5000);
   }));
-  check(flashes.redraws <= 8 && flashes.rises === 0, `a ready-made pressed redraws Personalize once, then at most once per drawing inked, and no redraw replays the panel's or the preview's entrance: ${JSON.stringify(flashes)}`);
+  check(flashes.redraws <= 10 && flashes.rises === 0, `a ready-made pressed redraws Personalize once, then at most once per drawing inked (its eight: the sidebar's, the header's, six counters'), and no redraw replays the panel's or the preview's entrance: ${JSON.stringify(flashes)}`);
   const readyOn = await page.evaluate(() => { const r = document.querySelector('#bcv-setup').shadowRoot; const root = r.querySelector('.pz'); const pics = (sel) => [...r.querySelectorAll(sel)].map((e) => { const l = e.querySelector('.pz__pic--sharp'); return (l?.style.getPropertyValue('--ink') || l?.style.getPropertyValue('--pic') || '').slice(0, 15); }); return { on: r.querySelector('#pzReady .is-on')?.dataset.ready, colour: r.querySelector('.pz__sw.is-on').dataset.theme, A: root.style.getPropertyValue('--A'), side: pics('.pz__side').join(''), cards: pics('.pz__card'), head: pics('.pz__phead').join(''), note: r.querySelector('#pzNote').textContent, pvMain: root.style.getPropertyValue('--pv-main'), pvCard: getComputedStyle(r.querySelector('.pz__card:not(.has-pic)') || r.querySelector('.pz__list')).backgroundColor }; });
   const readyPink = '#ff375f';
   const duskCard = await page.evaluate(() => { const r = document.querySelector('#bcv-setup').shadowRoot; const b = r.querySelector('#pzReady [data-ready="Dusk"]'); return { ring: getComputedStyle(b.querySelector('.pz__thumb')).boxShadow, tick: getComputedStyle(b.querySelector('.pz__thumb-check')).opacity, inked: b.querySelectorAll('.pz__thumb > i.is-inked').length }; });
