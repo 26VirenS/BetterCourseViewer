@@ -25,6 +25,10 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.98.54', date: '2026-09-29', notes: [
+      { kind: 'new', title: 'Search floats up', body: 'The search box lifts to the centre, Spotlight-style.', icon: P.sparkle },
+      { kind: 'new', title: 'Search by kind', body: 'Courses, Work, Files or Actions: ⌘1 to ⌘4 narrow it.', icon: P.list },
+    ] },
     { version: '2.98.53', date: '2026-09-29', notes: [
       { kind: 'improved', title: 'Blur on the press', body: 'The page blurs the moment a counter is pressed.', icon: P.eye },
     ] },

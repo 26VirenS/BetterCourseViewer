@@ -3131,8 +3131,31 @@ try {
   const bareOff = await bare();
   await page.keyboard.press('/');
   check(await page.evaluate(() => document.activeElement?.id === 'bcv-omni'), '/ puts the cursor in it');
+  await page.waitForTimeout(600); // (the box floats up first: measured once it has landed)
   const bareOn = await bare();
   check([bareOff, bareOn].every((b) => b.bg === 'rgba(0, 0, 0, 0)' && b.border === '0px' && b.shadow === 'none' && b.outline === 'none' && b.pad === '0px' && b.inside), `the input draws no field of its own inside the pill, focused or not, whatever Canvas says of search inputs: ${JSON.stringify({ bareOff, bareOn })}`);
+  // (2.98.54) the box afloat: with the cursor in it, it lifts out of the header to the middle of the window as a large pill over a
+  // dim and a blur, the four kinds to search in under it, a ghost keeping the header's row; a kind narrows it; Escape puts it back
+  const afloat = await page.evaluate(() => { const pal = document.querySelector('.bcv-spot'); const ov = document.querySelector('.bcv-spot-ov'); const box = document.getElementById('bcv-omni-box'); const b = box.getBoundingClientRect(); const row = document.querySelector('.bcv-head__row'); const ghost = row.querySelector('.bcv-omni--ghost'); const seg = row.querySelector('.bcv-seg').getBoundingClientRect(); const h1 = row.querySelector('.bcv-h1').getBoundingClientRect(); return { pal: !!pal, inPal: !!pal && pal.contains(box), ov: !!ov, ovPointer: ov ? getComputedStyle(ov).pointerEvents : null, ovBlur: ov ? (getComputedStyle(ov).backdropFilter || getComputedStyle(ov).webkitBackdropFilter || '') : null, noblur: document.documentElement.classList.contains('bcv-noblur'), centred: Math.abs((b.left + b.right) / 2 - innerWidth / 2) <= 2, top: Math.round(b.top), w: Math.round(b.width), hgt: Math.round(b.height), font: getComputedStyle(document.getElementById('bcv-omni')).fontSize, ghost: !!ghost, ghostH: ghost ? Math.round(ghost.getBoundingClientRect().height) : 0, segLevel: Math.abs(seg.bottom - h1.bottom) < 24, rows: [...document.querySelectorAll('.bcv-omni__panel .bcv-omni__item')].map((e) => `${e.querySelector('.bcv-omni__t').textContent}:${e.querySelector('.bcv-omni__cmdkey')?.textContent}`).join(','), title: document.querySelector('.bcv-omni__gtitle')?.textContent, panelInPal: !!pal && pal.contains(document.getElementById('bcv-omni-panel')), cur: document.querySelector('.bcv-omni__item.is-cur .bcv-omni__t')?.textContent }; });
+  check(afloat.pal && afloat.inPal && afloat.ov && afloat.ovPointer === 'none' && (/blur/.test(afloat.ovBlur) || afloat.noblur) && afloat.centred && afloat.top === 160 && afloat.w === 680 && afloat.hgt >= 64 && afloat.hgt <= 66 && afloat.font === '22px' && afloat.ghost && afloat.ghostH === 29 && afloat.segLevel && afloat.title === 'Search in' && afloat.rows === 'Courses:⌘1,Work:⌘2,Files:⌘3,Actions:⌘4' && afloat.panelInPal && afloat.cur === 'Courses', `the box floats to the middle of the window as a 680×64 pill (22px words) over a blurred veil that takes no pointer, a ghost holding its place in the header, the four kinds under it with ⌘1–⌘4: ${JSON.stringify(afloat)}`);
+  await page.keyboard.press('Meta+2');
+  await page.waitForFunction(() => document.querySelector('.bcv-omni__gtitle')?.textContent === 'Due this week' && !document.querySelector('.bcv-omni__more'), null, { timeout: 8000 });
+  const scoped = await page.evaluate(() => ({ chip: document.getElementById('bcv-omni-chip')?.textContent.trim(), chipShown: !document.getElementById('bcv-omni-chip').hidden, ph: document.getElementById('bcv-omni').placeholder, title: document.querySelector('.bcv-omni__gtitle')?.textContent, n: document.querySelectorAll('.bcv-omni__item').length, active: document.activeElement?.id }));
+  check(scoped.chipShown && scoped.chip === 'Work' && scoped.ph === 'Search work' && scoped.title === 'Due this week' && scoped.n >= 1 && scoped.active === 'bcv-omni', `⌘2 narrows the box to Work: a chip in the box, the placeholder says so, what is due this week listed at once: ${JSON.stringify(scoped)}`);
+  await page.fill('#bcv-omni', 'lab');
+  await page.waitForFunction(() => !document.querySelector('.bcv-omni__more') && document.querySelector('.bcv-omni__group'), null, { timeout: 10000 });
+  const scopedQ = await page.evaluate(() => [...document.querySelectorAll('.bcv-omni__group')].map((g) => g.dataset.group).join(','));
+  check(/^(Best match,)?(Assignments|Discussions)(,Discussions)?$/.test(scopedQ), `typed within Work, only work answers — no courses, files, pages or people: ${scopedQ}`);
+  await page.fill('#bcv-omni', '');
+  await page.waitForFunction(() => document.querySelector('.bcv-omni__gtitle')?.textContent === 'Due this week', null, { timeout: 8000 });
+  await page.keyboard.press('Backspace');
+  check(await eventually(() => page.evaluate(() => document.getElementById('bcv-omni-chip').hidden && document.querySelector('.bcv-omni__gtitle')?.textContent === 'Search in'), 3000), 'Backspace on the empty box lets the kind go: the four kinds again');
+  await page.keyboard.press('Escape');
+  check(await eventually(() => page.evaluate(() => !document.querySelector('.bcv-spot') && !document.querySelector('.bcv-spot-ov') && !document.querySelector('.bcv-omni--ghost') && document.querySelector('.bcv-head__row').contains(document.getElementById('bcv-omni-box')) && document.activeElement?.id !== 'bcv-omni'), 3000), 'Escape on the empty box puts it back in the header, the veil and the ghost gone');
+  const homeAgain = await page.evaluate(() => { const row = document.querySelector('.bcv-head__row'); const s = row.querySelector('#bcv-omni-box').getBoundingClientRect(); const h1 = row.querySelector('.bcv-h1').getBoundingClientRect(); const seg = row.querySelector('.bcv-seg').getBoundingClientRect(); return { between: s.left > h1.right && s.right <= seg.left + 1, level: Math.abs(s.bottom - seg.bottom) < 1.5, h: Math.round(s.height), panelHidden: document.getElementById('bcv-omni-panel').hidden }; });
+  check(homeAgain.between && homeAgain.level && homeAgain.h === 29 && homeAgain.panelHidden, `home, it is the header's pill again, between the title and the switcher: ${JSON.stringify(homeAgain)}`);
+  await page.focus('#bcv-omni'); // (the fold took the cursor: back in, afloat again, for the searches below)
+  await page.waitForTimeout(600);
   await page.keyboard.type('dis01');
   await page.waitForSelector('#bcv-omni-panel:not([hidden]) .bcv-omni__item', { timeout: 10000 });
   await eventually(async () => (await page.$('.bcv-omni__more')) === null && (await page.$$('.bcv-omni__group')).length >= 2, 12000); // (every source answered)
@@ -3160,7 +3183,8 @@ try {
   await context.unroute('https://en.wikipedia.org/**').catch(() => {});
   // the Wikipedia switch sits inside the box at its right and is there only while the box has the cursor; it turns Wikipedia off, and on again: kept in the settings, the search on show asked again
   const wikiRead = () => page.evaluate(() => { const el = document.querySelector('.bcv-omni__wiki'); const shown = !!el && getComputedStyle(el).display !== 'none'; const w = el?.getBoundingClientRect(); const b = document.getElementById('bcv-omni-box').getBoundingClientRect(); const s = document.getElementById('bcv-omni-wiki'); return { shown, inside: shown && w.left > b.left + 40 && w.right <= b.right - 4 && w.top >= b.top && w.bottom <= b.bottom, role: s?.getAttribute('role'), checked: s?.getAttribute('aria-checked'), label: el?.textContent.trim(), key: getComputedStyle(document.querySelector('.bcv-omni__key')).display, active: document.activeElement?.id }; });
-  await page.mouse.click(700, 500); // (the cursor out of the box)
+  await page.click('.bcv-h1'); // (the cursor out of the box: a press on the title, above the pill afloat)
+  await page.waitForFunction(() => !document.querySelector('.bcv-spot'), null, { timeout: 5000 }).catch(() => {});
   const wikiHidden = await wikiRead();
   check(!wikiHidden.shown && wikiHidden.key !== 'none', `with the cursor out of the box there is no switch, only the "/" hint: ${JSON.stringify(wikiHidden)}`);
   await page.click('#bcv-omni');
@@ -6445,6 +6469,8 @@ try {
   check(omniAnim.name === 'bcv-omni-in' && omniAnim.ease === 'linear(' && parseFloat(omniAnim.dur) > 0, `the search panel's entrance parses and runs on the snappy spring: ${JSON.stringify(omniAnim)}`);
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('.bcv-omni__panel:not([hidden])'), null, { timeout: 5000 }).catch(() => {});
+  await page.keyboard.press('Escape'); // (the box folds back to the header, out of the counters' way)
+  await page.waitForFunction(() => !document.querySelector('.bcv-spot'), null, { timeout: 5000 }).catch(() => {});
   // a counter's box closed while it is still growing folds back from where it got to — not from full
   // size, and not a restart: Escape part of the way in
   await page.click('.bcv-stats .bcv-stat:nth-child(1)');

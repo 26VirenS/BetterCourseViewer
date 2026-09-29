@@ -13,7 +13,15 @@
  * the screen while there are any, every row's actions stay in view (nothing to hover), and the keyboard
  * goes once a row is chosen. The Wikipedia lookup goes through the background (background.js
  * 'wiki'), so the page's own rules never block it. The first time, a black screen points at the box
- * (welcome.js: "Search Everything."). */
+ * (welcome.js: "Search Everything."). On the desktop the box floats (2.98.54): the moment it has the
+ * cursor it lifts out of the header to the middle of the window as a large pill over the page, dimmed
+ * and blurred — Spotlight's way — and under it, before anything is typed, the four kinds to search in:
+ * Courses ⌘1, Work ⌘2 (assignments, quizzes, discussions), Files ⌘3 and Actions ⌘4 (the commands). A
+ * kind chosen sits in the box as a chip and lists its own things at once (your courses; what is due
+ * this week; your files; every command), and what is typed then searches that kind alone; Backspace
+ * on an empty box lets the kind go, Escape steps back (the results, then the kind, then the box goes
+ * home), and a press anywhere else puts the box back in the header. The phone's box stays where it
+ * is, and so does the box during the tour. */
 (function () {
   const BCV = (self.BCV = self.BCV || {});
   const { h } = BCV.utils;
@@ -40,11 +48,124 @@
   /** The hub — the commands, the answers, a row's actions — loaded the first time the box is focused (content/app/lazy.js). */
   const hubReady = () => (BCV.hub ? Promise.resolve(true) : BCV.lazy?.load ? BCV.lazy.load('hub') : Promise.reject(new Error('no loader')));
 
+  // ---- the box afloat (2.98.54) ------------------------------------------------------------------
+  // On the desktop the box lifts out of the header the moment it has the cursor: its root is moved into
+  // a fixed palette (.bcv-spot) that eases from the header's place to the middle of the window (left,
+  // top and width transition; the box grows from 29px to 64px on the way) over a dim and a blur
+  // (.bcv-spot-ov, which takes no pointer: a press anywhere on the page still lands, and puts the box
+  // back), while a ghost of the same height keeps the header's row as it was. Under it, the four kinds
+  // to search in, then what is typed. Escape and a press elsewhere fold it back the same way.
+  const SCOPES = [
+    { key: 'courses', label: 'Courses', hint: 'Every course you are in', icon: IC.book, groups: ['Courses'], title: 'Your courses' },
+    { key: 'work', label: 'Work', hint: 'Assignments, quizzes and discussions', icon: IC.doc, groups: ['Best match', 'Assignments', 'Discussions'], title: 'Due this week' },
+    { key: 'files', label: 'Files', hint: 'Course files and pages', icon: IC.folder, groups: ['Files', 'Pages'], title: 'Files' },
+    { key: 'actions', label: 'Actions', hint: 'Commands: /submit, /open, /todo, /dark…', icon: IC.bolt, groups: ['Commands'], title: 'Commands' },
+  ];
+  const SPOT_W = 680, SPOT_MS = 470; // the pill's width at most; the float's length (app.css .46s)
+  let spot = null; // afloat: { ov, pal, ghost, timer, onResize, folding }
+  const afloat = () => !!spot && !spot.folding;
+  const canFloat = () => !!ui && ui.root.isConnected && !BCV.phone?.active?.() && !document.getElementById('bcv-tour') && !document.getElementById('bcv-setup');
+  const still = () => !!U.reducedMotion?.();
+  function place() {
+    if (!spot) return;
+    const vw = innerWidth, vh = innerHeight, w = Math.min(SPOT_W, vw - 32);
+    Object.assign(spot.pal.style, { left: `${Math.round((vw - w) / 2)}px`, top: `${Math.round(Math.min(vh * 0.18, 160))}px`, width: `${w}px` });
+  }
+  /** A fold under way finished at once: the box home (or dropped, if the header has been drawn afresh), the palette gone. */
+  function settle() {
+    const s = spot;
+    if (!s) return;
+    clearTimeout(s.timer);
+    window.removeEventListener('resize', s.onResize);
+    if (s.ghost.isConnected && ui) s.ghost.replaceWith(ui.root); else { s.ghost.remove(); ui?.root.remove(); }
+    s.pal.remove(); s.ov.remove();
+    spot = null;
+  }
+  function float() {
+    if (!canFloat()) return;
+    if (spot) { if (!spot.folding) return; settle(); } // (a press on the box as it folds back: home at once, then up again)
+    const r = ui.root.getBoundingClientRect();
+    const ghost = h('div', { class: 'bcv-omni bcv-omni--ghost', 'aria-hidden': 'true', style: { height: `${Math.round(r.height)}px` } });
+    ui.root.replaceWith(ghost);
+    const pal = h('div', { class: `bcv-spot is-far${still() ? ' is-still' : ''}`, id: 'bcv-spot', style: { left: `${Math.round(r.left)}px`, top: `${Math.round(r.top)}px`, width: `${Math.round(r.width)}px` } }, [ui.root]);
+    const ov = h('div', { class: 'bcv-spot-ov', 'aria-hidden': 'true' });
+    document.body.append(ov, pal);
+    spot = { ov, pal, ghost, timer: 0, folding: false, onResize: () => place() };
+    void pal.offsetWidth; // (the header's place is where it starts from: fixed before the move)
+    pal.classList.remove('is-far');
+    place();
+    window.addEventListener('resize', spot.onResize);
+    ui.input.focus(); // (the move took the cursor)
+    run(ui.input.value); // (the kinds, or the words' results)
+  }
+  function unfloat() {
+    if (!spot || spot.folding) return;
+    const s = spot;
+    s.folding = true;
+    close();
+    clearScope({ quiet: true });
+    if (document.activeElement === ui.input) ui.input.blur();
+    const r = s.ghost.isConnected ? s.ghost.getBoundingClientRect() : null;
+    s.ov.classList.add('is-folding');
+    s.pal.classList.add('is-far');
+    if (r) Object.assign(s.pal.style, { left: `${Math.round(r.left)}px`, top: `${Math.round(r.top)}px`, width: `${Math.round(r.width)}px` });
+    s.timer = setTimeout(settle, still() ? 0 : SPOT_MS);
+  }
+  const scopeRows = () => SCOPES.map((s, i) => ({ icon: s.icon, title: s.label, sub: s.hint, scope: s, key: `⌘${i + 1}` }));
+  /** The four kinds, listed under an empty box afloat. */
+  function paintScopes() {
+    if (!ui) return;
+    ui.seq += 1; clearTimeout(ui.timer); ui.pending = 0; ui.mode = 'scopes'; ui.cmd = null; ui.arg = ''; ui.q = ''; ui.raw = ''; ui.cursor = 0;
+    ui.groups = new Map([['Search in', scopeRows()]]);
+    paint();
+  }
+  /** A kind's own things, before anything is typed: your courses (the starred first), what is due this week, your files, every command. */
+  async function listScope() {
+    if (!ui || !ui.scope) return;
+    const s = ui.scope, seq = ++ui.seq;
+    clearTimeout(ui.timer); ui.groups = new Map(); ui.items = []; ui.cursor = 0; ui.mode = 'scope'; ui.cmd = null; ui.arg = ''; ui.q = ''; ui.raw = ''; ui.pending = 1;
+    paint();
+    let items = [];
+    try {
+      if (s.key === 'courses') {
+        const [cs, fs] = await Promise.all([store.courses().catch(() => []), favs()]);
+        const star = new Set(fs.map((c) => String(c.id)));
+        items = cs.filter((c) => c.state === 'current').sort((a, b) => (star.has(String(b.id)) ? 1 : 0) - (star.has(String(a.id)) ? 1 : 0)).slice(0, 12).map(courseRow);
+      } else {
+        await hubReady();
+        if (s.key === 'actions') items = (BCV.hub.matchCommands('') || BCV.hub.COMMANDS || []).map(commandRow);
+        else { const cs = ui.cs || (ui.cs = await favs()); items = await BCV.hub.byName(s.key === 'work' ? 'due' : 'file').args(s.key === 'work' ? 'week' : '', { cs, lane: limiter(LANES), q: '' }); }
+      }
+    } catch { items = []; }
+    if (!ui || ui.seq !== seq) return;
+    ui.pending = 0;
+    ui.groups = new Map([[s.title, items || []]]);
+    paint();
+  }
+  function setScope(s) {
+    if (!ui || !afloat()) return;
+    ui.scope = s;
+    ui.chip.replaceChildren(U.svg(s.icon, { size: 13, width: 2 }), h('span', { text: s.label }), h('button', { type: 'button', class: 'bcv-omni__chipx', title: 'Search everything again', 'aria-label': `Stop searching ${s.label.toLowerCase()} only`, onclick: (e) => { e.stopPropagation(); clearScope(); ui.input.focus(); } }, U.svg(IC.close, { size: 10, width: 2.4 })));
+    ui.chip.hidden = false;
+    ui.input.placeholder = `Search ${s.label.toLowerCase()}`;
+    ui.input.setAttribute('aria-label', `Search ${s.label.toLowerCase()}`);
+    ui.input.focus();
+    run(ui.input.value);
+  }
+  function clearScope({ quiet = false } = {}) {
+    if (!ui || !ui.scope) return;
+    ui.scope = null;
+    ui.chip.hidden = true; ui.chip.replaceChildren();
+    ui.input.placeholder = ui.placeholder;
+    ui.input.setAttribute('aria-label', ui.ariaLabel);
+    if (!quiet) run(ui.input.value);
+  }
+
   // ---- the sources: each resolves to a group's items (PER at most), or nothing ----------------------
+  const courseRow = (c) => ({ icon: IC.book, title: nameOf(c), sub: c.name !== nameOf(c) ? c.name : 'Course', href: `/courses/${c.id}`, tint: c.color || null, course: c });
   async function courseHits(q) {
     const cs = await store.courses().catch(() => []);
-    return cs.filter((c) => c.state === 'current' && [c.name, c.code, c.nickname].some((s) => hit(s, q))).slice(0, PER)
-      .map((c) => ({ icon: IC.book, title: nameOf(c), sub: c.name !== nameOf(c) ? c.name : 'Course', href: `/courses/${c.id}`, tint: c.color || null, course: c }));
+    return cs.filter((c) => c.state === 'current' && [c.name, c.code, c.nickname].some((s) => hit(s, q))).slice(0, PER).map(courseRow);
   }
   /** One of a course's lists, for every starred course: Canvas narrows it by search_term where it can, and the title is checked here in any case. */
   const perCourse = (q, cs, lane, path, params, pick) => Promise.all(cs.map((c) => lane(async () => {
@@ -92,9 +213,16 @@
     ui.raw = raw; ui.q = norm(raw); ui.groups = new Map(); ui.items = []; ui.pending = 0; ui.cursor = 0; ui.cmd = null; ui.arg = ''; ui.mode = 'plain'; ui.reading = ''; // (the rows of the last search are no answer to this one: Enter meanwhile does nothing)
     if (String(raw).trimStart().startsWith('/')) { commandMode(String(raw).trimStart(), seq); return; }
     const q = ui.q;
-    if (!q) { close(); return; }
+    if (!q) { if (afloat()) { if (ui.scope) listScope(); else paintScopes(); } else close(); return; } // (afloat and empty: the kinds, or the kind's own things)
+    const s = ui.scope; // (a kind chosen: its groups alone answer)
+    const want = (name) => !s || s.groups.includes(name);
     const hub = BCV.hub;
-    if (hub) {
+    if (s?.key === 'actions') { // the commands alone, by name
+      const list = () => { if (!ui || ui.seq !== seq) return; ui.groups.set('Commands', BCV.hub.matchCommands(q).map(commandRow)); paint(); };
+      if (hub) list(); else { ui.pending = 1; paint(); hubReady().then(() => { if (ui && ui.seq === seq) { ui.pending = 0; list(); } }).catch(() => {}); }
+      return;
+    }
+    if (hub && !s) {
       const answers = hub.quickAnswers(raw);
       if (answers.length) ui.groups.set('Answer', answers);
       if (q.length >= 2 && !/\s/.test(q)) { // a command whose name the word typed starts: "dark", "todo", "gpa"
@@ -102,17 +230,18 @@
         if (cmds.length) ui.groups.set('Commands', cmds);
       }
     }
-    courseHits(q).then((items) => { if (ui && ui.seq === seq) { ui.groups.set('Courses', items); paint(); } });
-    if (q.length >= NET_MIN) { ui.pending = NET.length; ui.timer = setTimeout(() => network(q, seq), PAUSE); }
+    if (want('Courses')) courseHits(q).then((items) => { if (ui && ui.seq === seq) { ui.groups.set('Courses', items); paint(); } });
+    const net = NET.filter(([name]) => want(name));
+    if (q.length >= NET_MIN && net.length) { ui.pending = net.length; ui.timer = setTimeout(() => network(q, seq, net, want('Best match')), PAUSE); }
     paint();
   }
-  async function network(q, seq) {
+  async function network(q, seq, net = NET, phrases = true) {
     const cs = ui.cs || (ui.cs = await favs());
     if (!ui || ui.seq !== seq) return;
     const lane = limiter(LANES);
     // the words read as a phrase — "physics lab due this week", "what's due tomorrow" — answered under Best match, the phrase read back as its title (hub.js understand/resolve)
     if (!BCV.hub) { try { await hubReady(); } catch { /* the hub is not here: the sources below answer */ } if (!ui || ui.seq !== seq) return; }
-    const phrase = BCV.hub ? BCV.hub.understand(ui.raw, cs) : null;
+    const phrase = phrases && BCV.hub ? BCV.hub.understand(ui.raw, cs) : null;
     if (phrase?.strong) {
       ui.pending += 1;
       Promise.resolve().then(() => BCV.hub.resolve(phrase, { cs, lane, q: ui.raw })).catch(() => []).then((items) => {
@@ -123,7 +252,7 @@
         paint();
       });
     }
-    for (const [name, fn] of NET) {
+    for (const [name, fn] of net) {
       Promise.resolve().then(() => fn(q, cs, lane)).catch(() => []).then((items) => {
         if (!ui || ui.seq !== seq) return;
         ui.groups.set(name, items || []);
@@ -187,7 +316,7 @@
     if (!ui) return;
     const items = [];
     const blocks = [];
-    const names = ui.mode === 'cmd' ? [...ui.groups.keys()] : ORDER;
+    const names = ui.mode === 'plain' ? ORDER : [...ui.groups.keys()]; // (a command's list, the kinds, a kind's own things: as they were set)
     for (const name of names) {
       const list = ui.groups.get(name);
       if (!list || !list.length) continue;
@@ -197,7 +326,7 @@
     ui.items = items;
     ui.cursor = items.length ? Math.min(Math.max(ui.cursor, 0), items.length - 1) : -1;
     if (!items.length && !ui.pending && ui.mode === 'plain' && ui.q.length < NET_MIN) { ui.panel.hidden = true; return; } // (one letter, nothing on the page that starts with it: nothing to show yet)
-    if (!items.length) blocks.push(h('div', { class: 'bcv-omni__empty', text: ui.pending ? 'Searching…' : ui.mode === 'cmd' && ui.cmd ? (ui.arg ? `Nothing for “${ui.arg}”` : ui.cmd.empty || `Type ${ui.cmd.takes || 'more'}…`) : ui.mode === 'cmd' ? 'No command by that name. /help lists them.' : `Nothing for “${ui.input.value.trim()}”` }));
+    if (!items.length) blocks.push(h('div', { class: 'bcv-omni__empty', text: ui.pending ? 'Searching…' : ui.mode === 'scope' ? (ui.scope?.key === 'work' ? 'Nothing due this week.' : `No ${ui.scope?.label.toLowerCase() || 'results'} yet.`) : ui.mode === 'cmd' && ui.cmd ? (ui.arg ? `Nothing for “${ui.arg}”` : ui.cmd.empty || `Type ${ui.cmd.takes || 'more'}…`) : ui.mode === 'cmd' ? 'No command by that name. /help lists them.' : `Nothing for “${ui.input.value.trim()}”` }));
     else if (ui.pending) blocks.push(h('div', { class: 'bcv-omni__more', text: 'Searching…' }));
     ui.panel.replaceChildren(...blocks);
     ui.panel.hidden = false;
@@ -213,6 +342,7 @@
       h('span', { class: 'bcv-omni__body' }, [h('span', { class: 'bcv-omni__t', text: it.title }), it.sub ? h('span', { class: 'bcv-omni__s', text: it.sub }) : null]),
       acts.length ? h('span', { class: 'bcv-omni__acts' }, acts.map((a) => h('button', { type: 'button', class: 'bcv-omni__act', title: a.label, onclick: (e) => { e.stopPropagation(); act(a, e.currentTarget); } }, [U.svg(a.icon, { size: 12, width: 2 }), a.label]))) : null,
       it.fill ? h('kbd', { class: 'bcv-omni__hint', text: 'Tab', 'aria-hidden': 'true' }) : null,
+      it.key ? h('kbd', { class: 'bcv-omni__cmdkey', text: it.key, 'aria-hidden': 'true' }) : null, // (a kind's ⌘1–⌘4)
       it.url ? h('span', { class: 'bcv-omni__ext', title: 'Opens in a new tab' }, U.svg(IC.external, { size: 12, width: 2 })) : null,
     ]);
     return el;
@@ -235,6 +365,7 @@
   function done() {
     close();
     if (ui && BCV.phone?.active?.()) ui.input.blur();
+    if (afloat()) unfloat(); // (a row chosen: the box goes home)
   }
   /** The words in the box replaced (a command completed, a /help row chosen) and searched again, the cursor at the end. */
   function fill(text) {
@@ -248,6 +379,7 @@
   function openItem(it, from = null) {
     if (!it || !ui) return;
     const { app } = ui;
+    if (it.scope) { setScope(it.scope); return; } // (a kind: the box narrows to it)
     if (ui.mode === 'cmd' && ui.cmd) { runCommand(ui.cmd, it.act ? null : it, from); return; }
     if (it.cmd) { if (it.fill) fill(it.fill); else runCommand(it.cmd, null, from); return; }
     done();
@@ -267,8 +399,12 @@
   const caretAtEnd = () => { try { return ui.input.selectionStart === null || ui.input.selectionStart === ui.input.value.length; } catch { return true; } };
   function onKey(e) {
     if (!ui) return;
+    if (afloat() && (e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && /^[1-4]$/.test(e.key)) { e.preventDefault(); setScope(SCOPES[Number(e.key) - 1]); return; } // ⌘1–⌘4: a kind
+    if (afloat() && e.key === 'Backspace' && !ui.input.value && ui.scope) { e.preventDefault(); clearScope(); return; } // (an empty box: the kind goes)
     if (e.key === 'Escape') {
-      if (!ui.panel.hidden) { close(); e.preventDefault(); e.stopPropagation(); } // (the panel goes, the words stay: a search field would clear itself)
+      if (!ui.panel.hidden && ui.mode !== 'scopes' && ui.mode !== 'scope') { close(); e.preventDefault(); e.stopPropagation(); } // (the panel goes, the words stay: a search field would clear itself)
+      else if (afloat()) { e.preventDefault(); e.stopPropagation(); unfloat(); } // (then the box goes home, the kind with it; Backspace alone drops the kind)
+      else if (ui.scope) clearScope();
       else ui.input.blur();
       return;
     }
@@ -308,6 +444,7 @@
 
   /** The box, for the Dashboard's header row (and the phone's Today, under its title): the glyph, the field, the "/" hint, and the panel under it. */
   function field(app) {
+    if (spot) settle(); // (the Dashboard drawn afresh while the box was afloat: the old box and its palette go)
     const phone = !!BCV.phone?.active?.();
     const input = h('input', { type: 'search', class: 'bcv-omni__in', id: 'bcv-omni', placeholder: phone ? 'Search, or type / for a command' : 'Search everything', autocomplete: 'off', autocapitalize: 'off', autocorrect: 'off', enterkeyhint: 'go', spellcheck: 'false', 'aria-label': 'Search everything: courses, assignments, pages, files, people and Wikipedia — or type / for a command', 'aria-controls': 'bcv-omni-panel', 'aria-autocomplete': 'list' });
     const panel = h('div', { class: 'bcv-omni__panel', id: 'bcv-omni-panel', role: 'listbox', 'aria-label': 'Results' });
@@ -326,17 +463,21 @@
     wikiSw.id = 'bcv-omni-wiki';
     const wiki = h('span', { class: 'bcv-omni__wiki' }, [h('span', { class: 'bcv-omni__wikit', text: 'Wikipedia', onclick: () => wikiSw.click() }), wikiSw]);
     wiki.addEventListener('pointerdown', (e) => e.preventDefault()); // (the press leaves the cursor in the box: Safari gives a pressed button no focus, and the switch is only there while the box has it)
+    const chip = h('span', { class: 'bcv-omni__chip', id: 'bcv-omni-chip' }); // (the kind chosen, afloat)
+    chip.hidden = true;
     const box = h('div', { class: 'bcv-omni__box', id: 'bcv-omni-box' }, [
       h('span', { class: 'bcv-omni__ic', 'aria-hidden': 'true' }, U.svg(IC.search, { size: 15, width: 2 })),
+      chip,
       input,
       wiki,
       h('kbd', { class: 'bcv-omni__key', text: '/', 'aria-hidden': 'true' }),
     ]);
     const root = h('div', { class: 'bcv-omni', id: 'bcv-omni-root' }, [box, panel]);
-    ui = { app, root, input, panel, wiki: wikiOn, seq: 0, q: '', raw: '', groups: new Map(), pending: 0, cursor: -1, items: [], timer: 0, mode: 'plain', cmd: null, arg: '', cs: null, reading: '' };
+    ui = { app, root, input, panel, chip, scope: null, placeholder: input.placeholder, ariaLabel: input.getAttribute('aria-label'), wiki: wikiOn, seq: 0, q: '', raw: '', groups: new Map(), pending: 0, cursor: -1, items: [], timer: 0, mode: 'plain', cmd: null, arg: '', cs: null, reading: '' };
     input.addEventListener('input', () => { if (ui) run(input.value); });
     input.addEventListener('focus', () => {
       if (!ui) return;
+      if ((!spot || spot.folding) && canFloat()) { float(); return; } // (the box lifts to the middle of the window — a press on it as it folds back lifts it again; float() puts the cursor back and paints)
       hubReady().then(() => { if (ui && !ui.panel.hidden && ui.mode === 'plain') paint(); }).catch(() => {}); // (the rows' actions, once the hub is here)
       if (ui.items.length && ui.q === norm(input.value) && ui.panel.hidden) { ui.cursor = Math.max(0, ui.cursor); ui.panel.hidden = false; markCursor(); }
     });
@@ -346,7 +487,11 @@
     return root;
   }
   // a press anywhere else closes the panel; "/" (or ⌘K, Ctrl+K) from anywhere on the page puts the cursor in the box — on another screen, the Dashboard comes up with the box focused and whatever is typed meanwhile kept
-  document.addEventListener('pointerdown', (e) => { if (ui && ui.root.isConnected && !ui.root.contains(e.target)) close(); }, true);
+  document.addEventListener('pointerdown', (e) => {
+    if (!ui || !ui.root.isConnected) return;
+    if (afloat()) { if (!spot.pal.contains(e.target)) unfloat(); return; } // (a press anywhere else puts the box home — and lands where it was pressed: the veil takes no pointer)
+    if (!ui.root.contains(e.target)) close();
+  }, true);
   const summonable = () => {
     const app = BCV.app;
     const r = app?.state?.route;
@@ -387,5 +532,5 @@
     summon();
   });
 
-  BCV.search = { field, close, summon };
+  BCV.search = { field, close, summon, float, unfloat, afloat };
 })();

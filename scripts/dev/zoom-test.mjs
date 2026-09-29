@@ -151,7 +151,9 @@ try {
         await page.waitForSelector('.bcv-omni__item', { timeout: 6000 });
         await page.waitForTimeout(500);
         await measure('hub');
-        await page.keyboard.press('Escape');
+        await page.keyboard.press('Escape'); // (the results go)
+        await page.keyboard.press('Escape'); // (the box folds back to the header, out of the counters' way)
+        await page.waitForFunction(() => !document.querySelector('.bcv-spot'), null, { timeout: 4000 });
       }
       await page.click(phone ? '.bcv-ph-stat:nth-child(2)' : '.bcv-stat:nth-child(2)');
       await page.waitForSelector('.bcv-sheet', { timeout: 6000 });
