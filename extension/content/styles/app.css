@@ -13,7 +13,7 @@
  * min(their own, the viewport less a margin). */
 
 html[data-bcv-theme] {
-  --bcv-version: "2.98.49"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.98.50"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -621,13 +621,13 @@ html[data-bcv-theme="dark"] .bcv-badge--orange { color: #ffb44d; }
 /* ---- dashboard ---------------------------------------------------------- */
 /* six summary cards in a fixed 2×3 grid (never auto-fit: it orphans the last card at narrow widths) */
 .bcv-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(max(210px, calc(33.333% - 8px)), 1fr)); gap: 12px; } /* (three across where they fit; two, then one, where a zoomed-in window has no room — no breakpoint) */
-.bcv-stat { padding: 8px 15px; border: 0; display: block; width: 100%; min-width: 0; text-align: left; color: var(--bcv-ink); cursor: pointer; font: inherit; }
+.bcv-stat { padding: 14px 15px; border: 0; display: block; width: 100%; min-width: 0; text-align: left; color: var(--bcv-ink); cursor: pointer; font: inherit; }
 .bcv-stat:hover { background: var(--bcv-hover); }
-.bcv-stat__head { display: flex; align-items: center; gap: 8px; min-height: 30px; } /* (2.98.49: a third shorter than it was — 64px tall, not 96) */
+.bcv-stat__head { display: flex; align-items: center; gap: 8px; min-height: 42px; }
 .bcv-stat__head > svg { flex: none; }
 .bcv-stat__head .bcv-label { flex: 1; min-width: 0; font: 600 13.5px/1.25 var(--bcv-font); letter-spacing: -.01em; text-transform: none; color: var(--bcv-ink2); overflow-wrap: break-word; }
-.bcv-stat__value { flex: none; min-width: 30px; text-align: right; font: 700 30px/1 var(--bcv-display); font-variant-numeric: tabular-nums; letter-spacing: -.035em; }
-.bcv-stat__noterow { margin-top: 2px; display: flex; align-items: center; gap: 6px; }
+.bcv-stat__value { flex: none; min-width: 30px; text-align: right; font: 700 42px/1 var(--bcv-display); font-variant-numeric: tabular-nums; letter-spacing: -.035em; }
+.bcv-stat__noterow { margin-top: 10px; display: flex; align-items: center; gap: 6px; }
 .bcv-stat__note { flex: 1; min-width: 0; font: 400 12.5px/1.3 var(--bcv-font); color: var(--bcv-ink3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bcv-stat__chev { flex: none; opacity: .7; }
 /* the sheet behind a counter */

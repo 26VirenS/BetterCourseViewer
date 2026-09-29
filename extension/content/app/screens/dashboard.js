@@ -428,8 +428,9 @@
       ]);
       ov.append(sheet);
       // where the box goes: the counter's own corner, as wide as a list wants (the list and the preview
-      // side by side once a row is pressed), as tall as the window allows, pushed back inside the window
-      const M = 16, LIST_W = 380, PV_W = 500, H_MAX = 640;
+      // side by side once a row is pressed), 430px tall (2.98.50: a third shorter than it was) or as
+      // tall as the window allows, pushed back inside the window
+      const M = 16, LIST_W = 380, PV_W = 500, H_MAX = 430;
       function geometry(back) {
         const r = card.getBoundingClientRect();
         if (back) return { x: r.left, y: r.top, w: r.width, h: r.height };

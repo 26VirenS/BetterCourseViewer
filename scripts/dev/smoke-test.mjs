@@ -546,7 +546,7 @@ try {
   check(await page.$eval('.bcv-sheet', (e) => { const cs = getComputedStyle(e); return /^rgb\(/.test(cs.backgroundColor) && (cs.backdropFilter || 'none') === 'none'; }), "the counter's sheet is solid: the card's own ground, no glass");
   // (2.98.45) the counter grows where it stands into a taller box — its own corner, the page dimmed round it (darker further off)
   const steady0 = await page.evaluate(() => { const e = document.querySelector('.bcv-sheet'); const r = e.getBoundingClientRect(); const c = document.querySelector('.bcv-stats .bcv-stat:nth-child(3)').getBoundingClientRect(); const ov = document.querySelector('.bcv-sheet-ov'); return { x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height), cx: Math.round(c.left), cy: Math.round(c.top), card: e.classList.contains('bcv-sheet--card'), hint: !!e.querySelector('.bcv-sheet__pvhint'), veil: /^radial-gradient/.test(getComputedStyle(ov, '::after').backgroundImage), vw: innerWidth, vh: innerHeight }; });
-  check(steady0.card && !steady0.hint && steady0.veil && steady0.w >= 360 && steady0.w <= 460 && steady0.h >= 600 && steady0.y === steady0.cy && steady0.x + steady0.w <= steady0.vw - 15 && steady0.x <= steady0.cx && steady0.x >= steady0.cx - 120, `the counter grows in place into a taller box with its list (no pane waiting), the page dimmed round it: ${JSON.stringify(steady0)}`);
+  check(steady0.card && !steady0.hint && steady0.veil && steady0.w >= 360 && steady0.w <= 460 && steady0.h === 430 && steady0.y === steady0.cy && steady0.x + steady0.w <= steady0.vw - 15 && steady0.x <= steady0.cx && steady0.x >= steady0.cx - 120, `the counter grows in place into a taller box (430px) with its list (no pane waiting), the page dimmed round it: ${JSON.stringify(steady0)}`);
   await page.click('.bcv-sheet__row');
   await page.waitForSelector('.bcv-sheet.is-split .bcv-pv--in', { timeout: 10000 });
   await page.waitForFunction(() => !document.querySelector('.bcv-pv .bcv-skel'), null, { timeout: 10000 });
@@ -3776,13 +3776,13 @@ try {
   const vp0 = page.viewportSize();
   await page.setViewportSize({ width: 1000, height: 620 });
   await page.waitForTimeout(300);
-  const posOf = () => page.evaluate(() => { const r = (e) => { const b = e.getBoundingClientRect(); return [Math.round(b.left), Math.round(b.top)]; }; const sh = document.querySelector('.bcv-sheet-ov > .bcv-sheet'); const card = document.querySelector('.bcv-stats .bcv-stat:nth-child(4)'); return { boxTop: sh ? Math.round(sh.getBoundingClientRect().top) : null, cardTop: Math.round(card.getBoundingClientRect().top), num: sh ? r(sh.querySelector('.bcv-sheet__value')) : null, cardNum: r(card.querySelector('.bcv-stat__value')), lbl: sh ? r(sh.querySelector('.bcv-sheet__label')) : null, cardLbl: r(card.querySelector('.bcv-stat__head .bcv-label')) }; });
+  const posOf = () => page.evaluate(() => { const r = (e) => { const b = e.getBoundingClientRect(); return [Math.round(b.left), Math.round(b.top)]; }; const sh = document.querySelector('.bcv-sheet-ov > .bcv-sheet'); const card = document.querySelector('.bcv-stats .bcv-stat:nth-child(4)'); return { boxTop: sh ? Math.round(sh.getBoundingClientRect().top) : null, boxH: sh ? Math.round(sh.getBoundingClientRect().height) : null, cardTop: Math.round(card.getBoundingClientRect().top), num: sh ? r(sh.querySelector('.bcv-sheet__value')) : null, cardNum: r(card.querySelector('.bcv-stat__value')), lbl: sh ? r(sh.querySelector('.bcv-sheet__label')) : null, cardLbl: r(card.querySelector('.bcv-stat__head .bcv-label')) }; });
   await page.click('.bcv-stats .bcv-stat:nth-child(4)');
   const shortOpen = await posOf();
   await page.waitForTimeout(650);
   const shortFull = await posOf();
   const near = (a, b, d = 3) => !!a && !!b && Math.abs(a[0] - b[0]) <= d && Math.abs(a[1] - b[1]) <= d;
-  check(near(shortOpen.num, shortOpen.cardNum) && near(shortOpen.lbl, shortOpen.cardLbl) && shortFull.boxTop < shortFull.cardTop - 100, `in a short window the words start exactly on the counter's, though the box is pushed up away from it (box top ${shortFull.boxTop}, counter ${shortFull.cardTop}): ${JSON.stringify(shortOpen)}`);
+  check(near(shortOpen.num, shortOpen.cardNum) && near(shortOpen.lbl, shortOpen.cardLbl) && shortFull.boxTop < shortFull.cardTop - 30 && shortFull.boxH === 430 && shortFull.boxTop + shortFull.boxH <= 620 - 16, `in a short window the words start exactly on the counter's, though the box (its full 430px) is pushed up away from it (box top ${shortFull.boxTop}, counter ${shortFull.cardTop}): ${JSON.stringify(shortOpen)}`);
   await page.keyboard.press('Escape');
   await page.waitForTimeout(430);
   const shortEnd = await posOf();
