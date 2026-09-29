@@ -13,7 +13,7 @@
  * min(their own, the viewport less a margin). */
 
 html[data-bcv-theme] {
-  --bcv-version: "2.98.52"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.98.53"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -689,19 +689,22 @@ html[data-bcv-theme="dark"] .bcv-badge--orange { color: #ffb44d; }
 @property --bcv-r0 { syntax: '<length>'; inherits: true; initial-value: 0px; }
 @property --bcv-reach { syntax: '<length>'; inherits: true; initial-value: 0px; }
 @property --bcv-blur { syntax: '<length>'; inherits: true; initial-value: 0px; }
-/* (2.98.48; .49: from the first frame) the page focuses onto the box over .8s, moving at once and easing to a stop, rather than dimming whole: the dim's
-   clear middle starts wide enough to hold the whole page (--bcv-reach) and closes in on the box, and the blur pulls
-   from sharp to its full 10px (--bcv-blur) the while — the blur's own mask (a hole round the box, its edge soft)
-   shapes it where the browser masks a backdrop (Safari); Chrome blurs the whole page, so the pull is what it sees.
-   Folding lets both go the same way back. */
-.bcv-sheet-ov--card { display: block; padding: 0; background: none; -webkit-backdrop-filter: none; backdrop-filter: none; animation: none; --bcv-reach: 0px; --bcv-blur: 10px; transition: --bcv-cx .46s cubic-bezier(.32,.72,0,1), --bcv-cy .46s cubic-bezier(.32,.72,0,1), --bcv-r0 .46s cubic-bezier(.32,.72,0,1), --bcv-reach .8s cubic-bezier(.2,.6,.2,1), --bcv-blur .8s cubic-bezier(.2,.6,.2,1), opacity .25s ease .3s; }
-.bcv-sheet-ov--card.is-far { --bcv-reach: 1600px; --bcv-blur: 0px; }
-/* the dim and the blur are layers of their own under the box (z 0 to its 1), in together at once — the box itself never fades in */
-.bcv-sheet-ov--card::before, .bcv-sheet-ov--card::after { content: ''; position: absolute; inset: 0; z-index: 0; pointer-events: none; animation: bcv-card-veil .3s ease both; }
+@property --bcv-hole { syntax: '<length>'; inherits: true; initial-value: 0px; }
+/* (2.98.48; .49: from the first frame; .53: the blur on the press) the page focuses onto the box over .8s, moving at
+   once and easing to a stop, rather than dimming whole: the dim's clear middle starts wide enough to hold the whole
+   page (--bcv-reach) and closes in on the box. The blur is there the moment the counter is pressed — 6px on the first
+   frame, its full 10px half a second on (--bcv-blur) — and its own mask, a soft-edged hole round the box, starts a
+   little way out (--bcv-hole, 240px beyond the box: never past the page, which is what made it late) and closes in
+   over the same half second where the browser masks a backdrop (Safari); Chrome blurs the whole page at once.
+   Folding lets all three go the same way back. */
+.bcv-sheet-ov--card { display: block; padding: 0; background: none; -webkit-backdrop-filter: none; backdrop-filter: none; animation: none; --bcv-reach: 0px; --bcv-hole: 0px; --bcv-blur: 10px; transition: --bcv-cx .46s cubic-bezier(.32,.72,0,1), --bcv-cy .46s cubic-bezier(.32,.72,0,1), --bcv-r0 .46s cubic-bezier(.32,.72,0,1), --bcv-reach .8s cubic-bezier(.2,.6,.2,1), --bcv-hole .5s cubic-bezier(.2,.6,.2,1), --bcv-blur .5s cubic-bezier(.2,.6,.2,1), opacity .25s ease .3s; }
+.bcv-sheet-ov--card.is-far { --bcv-reach: 1600px; --bcv-hole: 240px; --bcv-blur: 6px; }
+/* the dim and the blur are layers of their own under the box (z 0 to its 1), in together at once on a fade too short to see — the box itself never fades in */
+.bcv-sheet-ov--card::before, .bcv-sheet-ov--card::after { content: ''; position: absolute; inset: 0; z-index: 0; pointer-events: none; animation: bcv-card-veil .14s ease both; }
 .bcv-sheet-ov--card::after { background: radial-gradient(circle at var(--bcv-cx) var(--bcv-cy), rgba(0,0,0,.22) calc(var(--bcv-r0) * .8 + var(--bcv-reach)), rgba(0,0,0,.62) calc(var(--bcv-r0) + 220px + var(--bcv-reach)), rgba(0,0,0,.84) calc(var(--bcv-r0) + 900px + var(--bcv-reach))); }
 .bcv-sheet-ov--card::before { will-change: backdrop-filter, opacity; -webkit-backdrop-filter: blur(var(--bcv-blur)) saturate(.85); backdrop-filter: blur(var(--bcv-blur)) saturate(.85);
-  -webkit-mask-image: radial-gradient(circle at var(--bcv-cx) var(--bcv-cy), transparent calc(var(--bcv-r0) * .8 + var(--bcv-reach)), rgba(0,0,0,.75) calc(var(--bcv-r0) + 36px + var(--bcv-reach)), #000 calc(var(--bcv-r0) + 120px + var(--bcv-reach)));
-  mask-image: radial-gradient(circle at var(--bcv-cx) var(--bcv-cy), transparent calc(var(--bcv-r0) * .8 + var(--bcv-reach)), rgba(0,0,0,.75) calc(var(--bcv-r0) + 36px + var(--bcv-reach)), #000 calc(var(--bcv-r0) + 120px + var(--bcv-reach))); }
+  -webkit-mask-image: radial-gradient(circle at var(--bcv-cx) var(--bcv-cy), transparent calc(var(--bcv-r0) * .8 + var(--bcv-hole)), rgba(0,0,0,.75) calc(var(--bcv-r0) + 36px + var(--bcv-hole)), #000 calc(var(--bcv-r0) + 120px + var(--bcv-hole)));
+  mask-image: radial-gradient(circle at var(--bcv-cx) var(--bcv-cy), transparent calc(var(--bcv-r0) * .8 + var(--bcv-hole)), rgba(0,0,0,.75) calc(var(--bcv-r0) + 36px + var(--bcv-hole)), #000 calc(var(--bcv-r0) + 120px + var(--bcv-hole))); }
 html.bcv-noblur .bcv-sheet-ov--card::before { display: none; }
 @keyframes bcv-card-veil { from { opacity: 0; } }
 .bcv-sheet-ov--card.is-folding { opacity: 0; pointer-events: none; }

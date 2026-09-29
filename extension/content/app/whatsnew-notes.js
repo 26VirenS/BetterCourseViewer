@@ -25,6 +25,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.98.53', date: '2026-09-29', notes: [
+      { kind: 'improved', title: 'Blur on the press', body: 'The page blurs the moment a counter is pressed.', icon: P.eye },
+    ] },
     { version: '2.98.52', date: '2026-09-29', notes: [
       { kind: 'improved', title: 'Themes drawn to fit', body: 'Each theme draws the sidebar, counters and header to shape.', icon: P.pic },
       { kind: 'improved', title: 'Simpler drawings', body: 'The drawn scenes carry fewer, larger shapes.', icon: P.pen },
