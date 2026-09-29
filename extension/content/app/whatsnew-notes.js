@@ -25,6 +25,10 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.98.46', date: '2026-09-29', notes: [
+      { kind: 'improved', title: 'Cards open smoother', body: 'The number and title glide into the box.', icon: P.layers },
+      { kind: 'fixed', title: 'Blur arrives with dim', body: 'The page blurs the moment it darkens.', icon: P.eye },
+    ] },
     { version: '2.98.45', date: '2026-09-29', notes: [
       { kind: 'new', title: 'Cards open in place', body: 'A card grows into a tall list right where it is.', icon: P.layers },
       { kind: 'improved', title: 'Preview slides out', body: 'Pick an item and the box widens to show it.', icon: P.eye },

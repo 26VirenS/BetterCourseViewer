@@ -379,13 +379,17 @@
       const card = from && from.getBoundingClientRect && from.isConnected ? from : null;
       const ov = U.el(`bcv-sheet-ov${card ? ' bcv-sheet-ov--card' : ''}`, null, { role: 'dialog', 'aria-label': def.label });
       let folding = false;
+      let glide = []; // [box's element, counter's element]: the icon, the label and the number, which travel between the two
+      const startAt = (a, to, at) => { a.style.transform = `translate(${at.left - to.left}px, ${at.top - to.top}px) scale(${at.height / to.height})`; }; // a drawn where the counter's is, from where it lands
       const close = () => {
         if (!card) { BCV.ui.dismiss(ov); return; }
         if (folding || !ov.isConnected) return;
         folding = true;
         ov.classList.add('is-folding');
+        const now = glide.map(([a]) => a.getBoundingClientRect());
+        glide.forEach(([a, b], i) => startAt(a, now[i], b.getBoundingClientRect())); // the words go back to the counter's own
         place(true); // back into the counter
-        setTimeout(() => ov.remove(), U.reducedMotion() ? 0 : 360);
+        setTimeout(() => ov.remove(), U.reducedMotion() ? 0 : 470);
       };
       ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
       ov.addEventListener('keydown', (e) => {
@@ -431,10 +435,11 @@
         sheet.style.setProperty('--bcv-list-w', `${Math.round(listW)}px`);
         return { x, y, w, h: hgt };
       }
-      function place(back = false) {
+      function place(back = false, boxOnly = false) {
         if (!card) return;
         const g = geometry(back);
         Object.assign(sheet.style, { left: `${Math.round(g.x)}px`, top: `${Math.round(g.y)}px`, width: `${Math.round(g.w)}px`, height: `${Math.round(g.h)}px` });
+        if (boxOnly) return; // (a measurement: the dim is left where it is)
         ov.style.setProperty('--bcv-cx', `${Math.round(g.x + g.w / 2)}px`);
         ov.style.setProperty('--bcv-cy', `${Math.round(g.y + g.h / 2)}px`);
         ov.style.setProperty('--bcv-r0', `${Math.round(Math.hypot(g.w, g.h) / 2)}px`);
@@ -480,10 +485,22 @@
       if (card) {
         // it starts as the counter (its place and size, its words not yet shown) and grows from there;
         // a row pressed (the preview's is-split) or the window resized puts it where it goes again
+        // the counter's icon, label and number glide into the header's own: each of the header's is
+        // first drawn where the counter's is (its size too), from where it lands in the full-size box
+        glide = [
+          [sheet.querySelector('.bcv-sheet__value'), card.querySelector('.bcv-stat__value')],
+          [sheet.querySelector('.bcv-sheet__label'), card.querySelector('.bcv-stat__head .bcv-label')],
+          [sheet.querySelector('.bcv-sheet__tile > svg'), card.querySelector('.bcv-stat__head > svg')],
+        ].filter(([a, b]) => a && b);
+        place(false, true);
+        void sheet.offsetWidth;
+        const ends = glide.map(([a]) => a.getBoundingClientRect());
         place(true);
+        glide.forEach(([a, b], i) => startAt(a, ends[i], b.getBoundingClientRect()));
         void sheet.offsetWidth;
         sheet.classList.remove('is-at-card');
         place();
+        for (const [a] of glide) a.style.transform = '';
         const moved = new MutationObserver(() => { if (!ov.isConnected) { moved.disconnect(); return; } if (!folding) place(); });
         moved.observe(sheet, { attributes: true, attributeFilter: ['class'] });
         const onResize = () => { if (!ov.isConnected) { removeEventListener('resize', onResize); return; } if (!folding) place(); };

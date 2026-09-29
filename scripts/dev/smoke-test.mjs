@@ -545,7 +545,7 @@ try {
   await page.waitForTimeout(500); // the sheet's morph out of the card settles before it is measured
   check(await page.$eval('.bcv-sheet', (e) => { const cs = getComputedStyle(e); return /^rgb\(/.test(cs.backgroundColor) && (cs.backdropFilter || 'none') === 'none'; }), "the counter's sheet is solid: the card's own ground, no glass");
   // (2.98.45) the counter grows where it stands into a taller box — its own corner, the page dimmed round it (darker further off)
-  const steady0 = await page.evaluate(() => { const e = document.querySelector('.bcv-sheet'); const r = e.getBoundingClientRect(); const c = document.querySelector('.bcv-stats .bcv-stat:nth-child(3)').getBoundingClientRect(); const ov = document.querySelector('.bcv-sheet-ov'); return { x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height), cx: Math.round(c.left), cy: Math.round(c.top), card: e.classList.contains('bcv-sheet--card'), hint: !!e.querySelector('.bcv-sheet__pvhint'), veil: /^radial-gradient/.test(getComputedStyle(ov).backgroundImage), vw: innerWidth, vh: innerHeight }; });
+  const steady0 = await page.evaluate(() => { const e = document.querySelector('.bcv-sheet'); const r = e.getBoundingClientRect(); const c = document.querySelector('.bcv-stats .bcv-stat:nth-child(3)').getBoundingClientRect(); const ov = document.querySelector('.bcv-sheet-ov'); return { x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height), cx: Math.round(c.left), cy: Math.round(c.top), card: e.classList.contains('bcv-sheet--card'), hint: !!e.querySelector('.bcv-sheet__pvhint'), veil: /^radial-gradient/.test(getComputedStyle(ov, '::after').backgroundImage), vw: innerWidth, vh: innerHeight }; });
   check(steady0.card && !steady0.hint && steady0.veil && steady0.w >= 360 && steady0.w <= 460 && steady0.h >= 600 && steady0.y === steady0.cy && steady0.x + steady0.w <= steady0.vw - 15 && steady0.x <= steady0.cx && steady0.x >= steady0.cx - 120, `the counter grows in place into a taller box with its list (no pane waiting), the page dimmed round it: ${JSON.stringify(steady0)}`);
   await page.click('.bcv-sheet__row');
   await page.waitForSelector('.bcv-sheet.is-split .bcv-pv--in', { timeout: 10000 });
@@ -3743,10 +3743,28 @@ try {
   const sheetAnim = await page.evaluate(() => {
     const ov = document.querySelector('.bcv-sheet-ov'), sh = ov.querySelector('.bcv-sheet'), card = document.querySelector('.bcv-stat').getBoundingClientRect();
     const cs = getComputedStyle(sh), before = getComputedStyle(ov, '::before');
-    return { veil: getComputedStyle(ov).animationName, card: sh.classList.contains('bcv-sheet--card'), eased: ['left', 'top', 'width', 'height'].every((p) => cs.transitionProperty.includes(p)), blur: document.documentElement.classList.contains('bcv-noblur') || /blur/.test(before.backdropFilter || before.webkitBackdropFilter || ''), dim: /radial-gradient/.test(getComputedStyle(ov).backgroundImage), top: Math.round(sh.getBoundingClientRect().top - card.top), w: parseFloat(sh.style.width) };
+    const after = getComputedStyle(ov, '::after');
+    // (2.98.46) the dim and the blur are layers of their own, in together on one short fade; the box never fades (its words glide from the counter's)
+    return { veil: `${before.animationName}/${after.animationName}`, boxFade: getComputedStyle(ov).animationName, card: sh.classList.contains('bcv-sheet--card'), eased: ['left', 'top', 'width', 'height'].every((p) => cs.transitionProperty.includes(p)), blur: document.documentElement.classList.contains('bcv-noblur') || /blur/.test(before.backdropFilter || before.webkitBackdropFilter || ''), dim: /radial-gradient/.test(after.backgroundImage), ramp: /\+ 120px\)/.test(before.maskImage || before.webkitMaskImage || '') || document.documentElement.classList.contains('bcv-noblur'), top: Math.round(sh.getBoundingClientRect().top - card.top), w: parseFloat(sh.style.width) };
   });
-  check(sheetAnim.veil === 'bcv-card-veil' && sheetAnim.card && sheetAnim.eased && sheetAnim.blur && sheetAnim.dim && Math.abs(sheetAnim.top) <= 2 && sheetAnim.w >= 360, `a sheet grows out of the counter that opened it, where it stands, the page dimmed round it and blurred: ${JSON.stringify(sheetAnim)}`);
+  check(sheetAnim.veil === 'bcv-card-veil/bcv-card-veil' && sheetAnim.boxFade === 'none' && sheetAnim.card && sheetAnim.eased && sheetAnim.blur && sheetAnim.dim && sheetAnim.ramp && Math.abs(sheetAnim.top) <= 2 && sheetAnim.w >= 360, `a sheet grows out of the counter that opened it, where it stands, the page dimmed and blurred round it at once (a tight ramp, the box itself never faded): ${JSON.stringify(sheetAnim)}`);
   await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !document.querySelector('.bcv-sheet-ov'), null, { timeout: 5000 });
+  // (2.98.46) the counter's number, label and icon glide into the header's own: read the moment the box opens,
+  // the header's number is drawn out to the right (at the counter's, bigger), the label to the left, the icon smaller;
+  // once settled, all three are drawn in place, and Escape sends them back the way they came
+  await page.click('.bcv-stat');
+  const glideAt = await page.$eval('.bcv-sheet-ov > .bcv-sheet', (sh) => { const m = (sel) => new DOMMatrix(getComputedStyle(sh.querySelector(sel)).transform); const v = m('.bcv-sheet__value'), l = m('.bcv-sheet__label'), i = m('.bcv-sheet__tile > svg'); return { vx: Math.round(v.e), vs: +v.a.toFixed(2), lx: Math.round(l.e), is: +i.a.toFixed(2), headShown: getComputedStyle(sh.querySelector('.bcv-sheet__head')).opacity, noteFades: +getComputedStyle(sh.querySelector('.bcv-sheet__note')).opacity < 1 }; });
+  check(glideAt.vx > 100 && glideAt.vs > 1.2 && glideAt.lx < 0 && glideAt.is < 1 && glideAt.headShown === '1' && glideAt.noteFades, `as the box opens, the header's number is out to the right and bigger (the counter's), the label to the left, the icon smaller — the header itself shown while its note comes in: ${JSON.stringify(glideAt)}`);
+  await page.waitForTimeout(600);
+  const glideDone = await page.$eval('.bcv-sheet-ov > .bcv-sheet', (sh) => ['.bcv-sheet__value', '.bcv-sheet__label', '.bcv-sheet__tile > svg'].map((s) => getComputedStyle(sh.querySelector(s)).transform).join(','));
+  check(glideDone === 'none,none,none', `settled, all three sit in the header: ${glideDone}`);
+  await page.keyboard.press('Escape');
+  // (the transform is set at once; its transition moves with the next painted frame, late under load, so it is polled for)
+  const readBack = () => page.$eval('.bcv-sheet-ov > .bcv-sheet', (sh) => ({ folding: sh.parentElement.classList.contains('is-folding'), vx: Math.round(new DOMMatrix(getComputedStyle(sh.querySelector('.bcv-sheet__value')).transform).e), inline: /translate/.test(sh.querySelector('.bcv-sheet__value').style.transform) })).catch(() => null);
+  let glideBack = await readBack();
+  await eventually(async () => { const g = await readBack(); if (g) glideBack = g; return !!g && g.vx > 0; }, 400);
+  check(glideBack?.folding && glideBack?.inline && glideBack?.vx > 0, `Escape sends the number back out to the counter's place as the box folds: ${JSON.stringify(glideBack)}`);
   await page.waitForFunction(() => !document.querySelector('.bcv-sheet-ov'), null, { timeout: 5000 });
   // a slow response: the bar keeps sweeping and skeleton rows hold the place; both leave when the data lands
   const slow = /\/api\/v1\/courses\/104\/assignments\/4002(\?|$)/;
@@ -6373,7 +6391,9 @@ try {
   await page.keyboard.press('Escape');
   await page.waitForTimeout(50);
   const cut = await growing();
-  check(mid.h > mid.cardH + 4 && mid.h < mid.goal - 4 && cut.folding && Math.abs(cut.goal - mid.cardH) <= 2 && cut.h <= mid.h + 2, `Escape on a box still growing (${Math.round(mid.h)}px of ${Math.round(mid.goal)}) folds it back into its counter from there (${Math.round(cut.h)}px) — never from full size: ${JSON.stringify({ mid, cut })}`);
+  await page.waitForTimeout(100);
+  const later = await growing(); // (the box may grow a little more between the reads before it turns; what matters is that it turns short of full size and is on its way back)
+  check(mid.h > mid.cardH + 4 && mid.h < mid.goal - 4 && cut.folding && Math.abs(cut.goal - mid.cardH) <= 2 && cut.h < mid.goal - 40 && later.h < cut.h - 2, `Escape on a box still growing (${Math.round(mid.h)}px of ${Math.round(mid.goal)}) folds it back into its counter from there (${Math.round(cut.h)}px, then ${Math.round(later.h)}px) — never from full size: ${JSON.stringify({ mid, cut, later })}`);
   check(await eventually(async () => !(await page.$('.bcv-sheet-ov')), 3000), 'and it is gone once the spring has settled');
   // a menu grows out of the edge it hangs from; a toast rises from the bottom and sits centred (it used to land with its left edge at the middle)
   await page.click('#bcv-account');

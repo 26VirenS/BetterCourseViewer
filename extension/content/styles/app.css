@@ -13,7 +13,7 @@
  * min(their own, the viewport less a margin). */
 
 html[data-bcv-theme] {
-  --bcv-version: "2.98.45"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.98.46"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -687,17 +687,26 @@ html[data-bcv-theme="dark"] .bcv-badge--orange { color: #ffb44d; }
 @property --bcv-cx { syntax: '<length>'; inherits: true; initial-value: 0px; }
 @property --bcv-cy { syntax: '<length>'; inherits: true; initial-value: 0px; }
 @property --bcv-r0 { syntax: '<length>'; inherits: true; initial-value: 0px; }
-.bcv-sheet-ov--card { display: block; padding: 0; -webkit-backdrop-filter: none; backdrop-filter: none; background: radial-gradient(circle at var(--bcv-cx) var(--bcv-cy), rgba(0,0,0,.22) calc(var(--bcv-r0) * .8), rgba(0,0,0,.62) calc(var(--bcv-r0) + 220px), rgba(0,0,0,.84)); animation: bcv-card-veil .32s ease both; transition: --bcv-cx .46s cubic-bezier(.32,.72,0,1), --bcv-cy .46s cubic-bezier(.32,.72,0,1), --bcv-r0 .46s cubic-bezier(.32,.72,0,1), opacity .3s ease; }
-.bcv-sheet-ov--card::before { content: ''; position: absolute; inset: 0; pointer-events: none; -webkit-backdrop-filter: blur(10px) saturate(.8); backdrop-filter: blur(10px) saturate(.8);
-  -webkit-mask-image: radial-gradient(circle at var(--bcv-cx) var(--bcv-cy), transparent calc(var(--bcv-r0) * .8), rgba(0,0,0,.7) calc(var(--bcv-r0) + 70px), #000 calc(var(--bcv-r0) + 240px));
-  mask-image: radial-gradient(circle at var(--bcv-cx) var(--bcv-cy), transparent calc(var(--bcv-r0) * .8), rgba(0,0,0,.7) calc(var(--bcv-r0) + 70px), #000 calc(var(--bcv-r0) + 240px)); }
+.bcv-sheet-ov--card { display: block; padding: 0; background: none; -webkit-backdrop-filter: none; backdrop-filter: none; animation: none; transition: --bcv-cx .46s cubic-bezier(.32,.72,0,1), --bcv-cy .46s cubic-bezier(.32,.72,0,1), --bcv-r0 .46s cubic-bezier(.32,.72,0,1), opacity .25s ease .2s; }
+/* the dim and the blur are layers of their own under the box (z 0 to its 1), in together at once — the box itself never fades in */
+.bcv-sheet-ov--card::before, .bcv-sheet-ov--card::after { content: ''; position: absolute; inset: 0; z-index: 0; pointer-events: none; animation: bcv-card-veil .2s ease both; }
+.bcv-sheet-ov--card::after { background: radial-gradient(circle at var(--bcv-cx) var(--bcv-cy), rgba(0,0,0,.22) calc(var(--bcv-r0) * .8), rgba(0,0,0,.62) calc(var(--bcv-r0) + 220px), rgba(0,0,0,.84)); }
+.bcv-sheet-ov--card::before { will-change: backdrop-filter, opacity; -webkit-backdrop-filter: blur(10px) saturate(.8); backdrop-filter: blur(10px) saturate(.8);
+  -webkit-mask-image: radial-gradient(circle at var(--bcv-cx) var(--bcv-cy), transparent calc(var(--bcv-r0) * .8), rgba(0,0,0,.75) calc(var(--bcv-r0) + 36px), #000 calc(var(--bcv-r0) + 120px));
+  mask-image: radial-gradient(circle at var(--bcv-cx) var(--bcv-cy), transparent calc(var(--bcv-r0) * .8), rgba(0,0,0,.75) calc(var(--bcv-r0) + 36px), #000 calc(var(--bcv-r0) + 120px)); }
 html.bcv-noblur .bcv-sheet-ov--card::before { display: none; }
 @keyframes bcv-card-veil { from { opacity: 0; } }
-.bcv-sheet-ov--card.is-folding { opacity: 0; pointer-events: none; transition-delay: 0s, 0s, 0s, .1s; }
-.bcv-sheet--card { position: fixed; margin: 0; max-width: none; max-height: none; background: var(--bcv-card); -webkit-backdrop-filter: none; backdrop-filter: none; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); animation: none; transform: none; box-shadow: 0 30px 80px rgba(0,0,0,.34), 0 0 0 1px var(--bcv-hair); transition: left .46s cubic-bezier(.32,.72,0,1), top .46s cubic-bezier(.32,.72,0,1), width .46s cubic-bezier(.32,.72,0,1), height .46s cubic-bezier(.32,.72,0,1); }
+.bcv-sheet-ov--card.is-folding { opacity: 0; pointer-events: none; }
+.bcv-sheet--card { position: fixed; z-index: 1; margin: 0; max-width: none; max-height: none; background: var(--bcv-card); -webkit-backdrop-filter: none; backdrop-filter: none; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); animation: none; transform: none; box-shadow: 0 30px 80px rgba(0,0,0,.34), 0 0 0 1px var(--bcv-hair); transition: left .46s cubic-bezier(.32,.72,0,1), top .46s cubic-bezier(.32,.72,0,1), width .46s cubic-bezier(.32,.72,0,1), height .46s cubic-bezier(.32,.72,0,1); }
 .bcv-sheet--card.is-at-card { transition: none; }
-.bcv-sheet--card > * { transition: opacity .22s ease .14s; }
-.bcv-sheet--card.is-at-card > *, .bcv-sheet-ov.is-folding .bcv-sheet--card > * { opacity: 0; transition-delay: 0s; transition-duration: .1s; }
+.bcv-sheet--card > :not(.bcv-sheet__head), .bcv-sheet--card .bcv-sheet__note, .bcv-sheet--card .bcv-sheet__close { transition: opacity .22s ease .14s; }
+.bcv-sheet--card.is-at-card > :not(.bcv-sheet__head), .bcv-sheet--card.is-at-card .bcv-sheet__note, .bcv-sheet--card.is-at-card .bcv-sheet__close,
+.bcv-sheet-ov.is-folding .bcv-sheet--card > :not(.bcv-sheet__head), .bcv-sheet-ov.is-folding .bcv-sheet--card .bcv-sheet__note, .bcv-sheet-ov.is-folding .bcv-sheet--card .bcv-sheet__close { opacity: 0; transition-delay: 0s; transition-duration: .1s; }
+.bcv-sheet--card .bcv-sheet__tile { transition: background-color .22s ease .1s; }
+.bcv-sheet--card.is-at-card .bcv-sheet__tile, .bcv-sheet-ov.is-folding .bcv-sheet--card .bcv-sheet__tile { background-color: transparent; transition-delay: 0s; transition-duration: .1s; }
+.bcv-sheet--card .bcv-sheet__value, .bcv-sheet--card .bcv-sheet__label, .bcv-sheet--card .bcv-sheet__tile > svg { transform-origin: 0 0; will-change: transform; transition: transform .46s cubic-bezier(.32,.72,0,1); }
+.bcv-sheet--card.is-at-card .bcv-sheet__value, .bcv-sheet--card.is-at-card .bcv-sheet__label, .bcv-sheet--card.is-at-card .bcv-sheet__tile > svg { transition: none; }
+.bcv-sheet--card .bcv-sheet__line { flex-wrap: nowrap; }
 .bcv-sheet--card > .bcv-sheet__head { grid-column: 1; grid-row: 1; }
 .bcv-sheet--card > .bcv-sheet__list { grid-column: 1; grid-row: 2; min-height: 0; }
 .bcv-sheet--card.is-split { display: grid; grid-template-columns: var(--bcv-list-w, 380px) minmax(0, 1fr); }
@@ -714,7 +723,7 @@ html.bcv-noblur .bcv-sheet-ov--card::before { display: none; }
   .bcv-sheet--card.is-split:not(.is-narrow) .bcv-pv--in { border-left: 1px solid var(--bcv-sep); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .bcv-sheet-ov--card, .bcv-sheet--card, .bcv-sheet--card > * { transition: none; animation: none; }
+  .bcv-sheet-ov--card, .bcv-sheet--card, .bcv-sheet--card > *, .bcv-sheet--card .bcv-sheet__head * { transition: none; animation: none; }
 }
 .bcv-sheet__head { padding: 20px 22px 16px; border-bottom: 1px solid var(--bcv-sep); display: flex; align-items: flex-start; gap: 14px; }
 .bcv-sheet__tile { flex: none; width: 38px; height: 38px; border-radius: var(--bcv-r-tile-lg); background: var(--bcv-fill); display: flex; align-items: center; justify-content: center; }
