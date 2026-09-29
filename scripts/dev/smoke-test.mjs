@@ -205,6 +205,24 @@ try {
     return false;
   };
   const nav = (id) => clickScreen(`.bcv-nav__item[data-nav="${id}"]`);
+  // the guided tour (welcome.js): the step on show — its card's words, which way the card sits, the gesture
+  // its pointer shows, the ring round the lit place — a wait for a step, and whether the ring holds a thing
+  const tourAt = () => page.evaluate(() => {
+    const t = document.getElementById('bcv-tour');
+    if (!t) return null;
+    const c = t.querySelector('.bcv-tour__card');
+    const ring = t.querySelector('.bcv-tour__ring');
+    const rr = ring.hidden ? null : ring.getBoundingClientRect();
+    const cr = c.getBoundingClientRect();
+    const nb = c.querySelector('.bcv-tour__next');
+    return { step: t.dataset.step || null, steps: t.dataset.steps || '', title: c.querySelector('.bcv-tour__title').textContent, body: c.querySelector('.bcv-tour__body').textContent, doing: c.querySelector('.bcv-tour__dotext').textContent, kind: c.dataset.kind, count: c.querySelector('.bcv-tour__count').textContent, side: c.dataset.side, next: nb.hidden ? null : nb.textContent, later: !c.querySelector('.bcv-tour__later').hidden, away: c.classList.contains('is-away'), act: t.querySelector('.bcv-tour__hand').dataset.act, ring: rr && { x: rr.left, y: rr.top, w: rr.width, h: rr.height }, card: { x: cr.left, y: cr.top, w: cr.width, h: cr.height }, bg: getComputedStyle(t).backgroundColor, vw: innerWidth, vh: innerHeight };
+  });
+  // (the step, then its lit place settled where it goes — data-still — and a moment for the card's words)
+  const tourStep = (id, ms = 15000) => page.waitForFunction((x) => document.getElementById('bcv-tour')?.dataset.step === x, id, { timeout: ms })
+    .then(() => page.waitForFunction(() => { const t = document.getElementById('bcv-tour'); return !t || t.dataset.still === '1'; }, null, { timeout: 5000 }).catch(() => {}))
+    .then(() => page.waitForTimeout(200));
+  const tourGone = (ms = 8000) => page.waitForFunction(() => !document.getElementById('bcv-tour'), null, { timeout: ms });
+  const ringHolds = (ring, sel) => page.$eval(sel, (el, rg) => { const r = el.getBoundingClientRect(); return !!rg && rg.x <= r.left + 1 && rg.y <= r.top + 1 && rg.x + rg.w >= r.right - 1 && rg.y + rg.h >= r.bottom - 1; }, ring).catch(() => false);
   // the mock's answers read straight (its while(1); prefix off), and the site's preferences as the extension keeps them
   const apiGet = (p) => fetch(`${BASE}${p}`).then((r) => r.text()).then((t) => JSON.parse(t.replace(/^while\(1\);/, '')));
   const prefsOf = async () => { const all = await sw.evaluate(() => self.BCV.api.storage.local.get(null)); return all[`prefs:localhost:${PORT}`] || {}; };
@@ -763,7 +781,7 @@ try {
   const todoSub = (await texts('.bcv-head__sub'))[0];
   check(/^\d+ items across \d+ courses$/.test(todoSub), `to do header: ${todoSub}`);
   // (2.98.28) the sidebar is pinned to the window as a scroll area of its own: a page scroll never carries it,
-  // not even while a scroll lock (a welcome stage) is on — the lock sits on <body>, never on <html>
+  // not even while a scroll lock (the setup's) is on — the lock sits on <body>, never on <html>
   const sidePin = async () => page.evaluate(async () => {
     window.scrollTo(0, document.documentElement.scrollHeight);
     await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
@@ -772,10 +790,10 @@ try {
     return { y: Math.round(scrollY), top: Math.round(b.top), bottom: Math.round(b.bottom), vh: innerHeight, pos: cs.position, os: cs.overscrollBehaviorY, main: Math.round(document.querySelector('.bcv-main').getBoundingClientRect().left) };
   });
   const pinned = await sidePin();
-  await page.evaluate(() => document.documentElement.classList.add('bcv-welcome'));
+  await page.evaluate(() => document.documentElement.classList.add('bcv-setup-open'));
   const pinnedLocked = await sidePin();
   const lockOv = await page.evaluate(() => [getComputedStyle(document.documentElement).overflow, getComputedStyle(document.body).overflow]);
-  await page.evaluate(() => { document.documentElement.classList.remove('bcv-welcome'); window.scrollTo(0, 0); });
+  await page.evaluate(() => { document.documentElement.classList.remove('bcv-setup-open'); window.scrollTo(0, 0); });
   check(pinned.y > 100 && pinned.top === 0 && pinned.bottom === pinned.vh && pinned.pos === 'fixed' && pinned.os === 'contain' && pinned.main === 242 && pinnedLocked.top === 0 && pinnedLocked.bottom === pinnedLocked.vh && lockOv.join() === 'visible,hidden', `the sidebar stays put at the bottom of a long page, and under a scroll lock too; the page starts beside it: ${JSON.stringify({ pinned, pinnedLocked, lockOv })}`);
   const todoGroups = await texts('.bcv-group__head');
   check(todoGroups[0].startsWith('Overdue') && todoGroups[1].startsWith('Today') && todoGroups[2].startsWith('Tomorrow') && todoGroups[3].startsWith('Next 7 days'), `to do groups — past due with nothing handed in first, as Canvas's own list keeps it: ${todoGroups.join(' | ')}`);
@@ -1134,31 +1152,36 @@ try {
   // ---- grades panel (sidebar Grades) --------------------------------------------------------
   console.log('grades panel');
   await nav('gpa');
-  // the first opening: black, two pointers — a card's ring hovered for its breakdown, then what-if
-  // scores in Details — each with a Continue after three seconds; the last takes the black away
-  await page.waitForSelector('#bcv-welcome[data-stage="gradeHover"]', { timeout: 20000 });
-  const gwAt = Date.now();
-  const gwNoCont = (await page.$('.bcv-welcome__next:not([hidden])')) === null;
-  const gLines = () => page.$$eval('#bcv-welcome .bcv-welcome__kicker, #bcv-welcome .bcv-welcome__title, #bcv-welcome .bcv-welcome__hint', (els) => els.map((e) => e.textContent));
-  const hoverDemo = await page.$eval('#bcv-welcome', (e) => ({ card: !!e.querySelector('.bcv-welcome__gcard'), rings: e.querySelectorAll('.bcv-welcome__gcat').length, cursor: !!e.querySelector('.bcv-welcome__cursor--hover'), anim: getComputedStyle(e.querySelector('.bcv-welcome__gcat')).animationName, loops: getComputedStyle(e.querySelector('.bcv-welcome__gcat')).animationIterationCount, groups: [...e.querySelectorAll('.bcv-welcome__gtxt')].map((x) => x.textContent).join(','), black: getComputedStyle(e).backgroundColor }));
-  check(gwNoCont && (await gLines()).join(' | ') === 'Grades | Hover over a card to see a quick breakdown | The ring opens into the groups behind the grade; leave it and it folds back.' && hoverDemo.black === 'rgb(0, 0, 0)' && hoverDemo.card && hoverDemo.rings === 3 && hoverDemo.cursor && hoverDemo.anim === 'bcv-welcome-hovercat' && hoverDemo.loops === 'infinite' && hoverDemo.groups === 'Homework,Quizzes,Midterms', `the first opening of Grades: black, a card whose ring is hovered for its breakdown, round and round (${JSON.stringify(hoverDemo)})`);
-  check(await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000) && Date.now() - gwAt >= TIMERS.welcomeWait - 500, 'Continue comes in only after the wait (three seconds shipped)');
-  await page.waitForTimeout(400);
-  await shot(page, '09c0-grades-welcome-hover');
-  await page.click('.bcv-welcome__next');
-  await page.waitForSelector('#bcv-welcome[data-stage="whatIf"]', { timeout: 5000 });
-  const wfDemo = await page.$eval('#bcv-welcome', (e) => ({ sheet: !!e.querySelector('.bcv-welcome__wsheet'), btn: e.querySelector('.bcv-welcome__wbtn .bcv-welcome__wval--real')?.textContent, rows: e.querySelectorAll('.bcv-welcome__wrow').length, banner: e.querySelector('.bcv-welcome__wbanner')?.textContent, cursor: !!e.querySelector('.bcv-welcome__cursor--whatif'), anim: getComputedStyle(e.querySelector('.bcv-welcome__wbtn')).animationName }));
-  check((await gLines()).join(' | ') === 'Grades | What if? Grades | Open a course’s Details, press “Try what-if scores” and change any score to see where the grade would land. Nothing is saved.' && wfDemo.sheet && wfDemo.btn === 'Try what-if scores' && wfDemo.rows === 3 && wfDemo.banner === 'This is not your actual score.' && wfDemo.cursor && wfDemo.anim === 'bcv-welcome-wfbtn', `then what-if scores, shown: a Details sheet, the button pressed, a score changed and the total going red with it (${JSON.stringify(wfDemo)})`);
-  await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000);
-  await page.waitForTimeout(700); // (the show a little way in, for the picture)
-  await shot(page, '09c1-grades-welcome-whatif');
-  await page.click('.bcv-welcome__next');
-  await page.waitForFunction(() => !document.querySelector('#bcv-welcome'), null, { timeout: 5000 });
-  check((await sw.evaluate(async () => (await self.BCV.api.storage.local.get('welcome:grades'))['welcome:grades'])) === true, 'the last Continue takes the black away and marks the show seen');
+  // the first opening: the tour's Grades steps, done on the page itself — a card's ring hovered for its
+  // breakdown, a course's Details opened, what-if scores tried and a score changed, the sheet closed
+  await tourStep('grade-ring', 20000);
+  const gt1 = await tourAt();
+  check(gt1.steps === 'grade-ring,grade-details,grade-try,grade-field,grade-close' && gt1.count === '1 of 5' && gt1.title === 'A quick breakdown' && gt1.doing === 'Hover over a card’s ring' && gt1.act === 'hover' && gt1.bg === 'rgba(0, 0, 0, 0)' && await ringHolds(gt1.ring, '.bcv-gpa__card .bcv-gpa__ringbox[title]'), `the first opening lights a card's ring on the page itself and asks for a hover: ${JSON.stringify(gt1)}`);
+  await shot(page, '09c0-grades-tour-ring');
+  await page.hover('.bcv-gpa__card .bcv-gpa__ringbox[title]');
+  check(await eventually(async () => !!(await page.$('.bcv-gpa__card.is-hover')), 3000), 'the hover opens the ring into its groups');
+  await tourStep('grade-details');
+  const gt2 = await tourAt();
+  check(gt2.away && gt2.kind === 'down' && gt2.doing === 'Scroll down to find Details' && gt2.ring === null, `Details is below the window's foot: the card says to scroll down: ${JSON.stringify(gt2)}`);
+  await page.mouse.move(700, 500);
+  await page.mouse.wheel(0, 360);
+  check(await eventually(async () => { const t = await tourAt(); return t && !t.away && t.doing === 'Click Details' && await ringHolds(t.ring, '.bcv-gpa__card .bcv-gpa__details'); }, 4000), 'the wheel scrolls the page under the tour; Details comes into view, lit');
+  await page.click('.bcv-gpa__card .bcv-gpa__details');
+  await tourStep('grade-try');
+  await page.click('.bcv-sheet-ov .bcv-whatif-btn');
+  await tourStep('grade-field');
+  await page.fill('.bcv-sheet-ov .bcv-whatif__input', '5');
+  await tourStep('grade-close');
+  const gt3 = await tourAt();
+  check(gt3.title === 'Back to the real scores' && await ringHolds(gt3.ring, '.bcv-sheet-ov .bcv-sheet') && /A\+ · what-if|what-if/.test(await page.$eval('.bcv-sheet-ov', (e) => e.textContent)), `what-if on and a score changed; then Close, the sheet lit whole: ${JSON.stringify(gt3)}`);
+  await shot(page, '09c1-grades-tour-whatif');
+  await page.click('.bcv-sheet-ov .bcv-sheet__close');
+  await tourGone();
+  check(!(await page.$('.bcv-sheet-ov')) && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('welcome:grades'))['welcome:grades'])) === true, 'one press closes it and ends the tour, marked seen');
   await page.reload();
   await page.waitForSelector('.bcv-gpa__value', { timeout: 15000 });
   await page.waitForTimeout(600);
-  check((await page.$('#bcv-welcome')) === null, 'and it does not come back');
+  check((await page.$('#bcv-tour')) === null, 'and it does not come back');
   await rolled(); // the GPA rolls up to its value on a fresh draw: read it once it has landed
   check(page.url() === `${BASE}/grades` && (await texts('.bcv-h1'))[0] === 'Grades' && (await texts('.bcv-head__sub'))[0] === 'Fall 2026 · 5 courses · 4 with grades so far', `grades panel header: ${(await texts('.bcv-head__sub'))[0]}`);
   check(/^3\.4[23]$/.test((await texts('.bcv-gpa__value'))[0]) && (await page.$('.bcv-gpa__banner')) && /needs your past record/.test((await texts('.bcv-gpa__hero'))[0]) && /No history yet/.test((await texts('.bcv-gpa__trend'))[0]), 'term GPA is the plain 4.0 average of the four scored courses; cumulative and trend wait for setup');
@@ -3145,23 +3168,21 @@ try {
   await page.click('.bcv-h1'); // (a press elsewhere: the title)
   const sAfter = await page.evaluate(() => ({ hidden: document.getElementById('bcv-omni-panel').hidden, value: document.getElementById('bcv-omni').value, roots: document.querySelectorAll('#bcv-omni-root').length, active: document.activeElement?.id || document.activeElement?.tagName }));
   check(sAfter.hidden && sAfter.value === 'xy', `Enter searches again, and a press elsewhere closes the panel, the words kept: ${JSON.stringify(sAfter)}`);
-  // the black screen, once, for anyone who had Simpl before the box: the box seen through a hole, "Search Everything." under it with an arrow up at it
+  // the tour's search step, once, for anyone who had Simpl before the box: the box lit, and typing in it ends it
   await sw.evaluate(() => self.BCV.api.storage.local.remove('welcome:search'));
   await page.goto(`${BASE}/`);
-  await page.waitForSelector('#bcv-welcome[data-stage="search"]', { timeout: 20000 });
-  const sPtrRead = () => page.evaluate(() => { const e = document.querySelector('#bcv-welcome'); const b = document.getElementById('bcv-omni-box').getBoundingClientRect(); const ring = e.querySelector('.bcv-welcome__ring'); const num = (a) => Number(ring.getAttribute(a)); const st = e.querySelector('.bcv-welcome__stage'); const box = st.getBoundingClientRect(); return { holes: e.classList.contains('bcv-welcome--holes'), ringAt: ring ? [num('x') - (b.left - 6), num('y') - (b.top - 6), num('width') - (b.width + 12), num('height') - (b.height + 12)].every((d) => Math.abs(d) < 1.5) : false, below: box.top >= b.bottom + 10, centred: Math.abs((box.left + box.width / 2) - (b.left + b.width / 2)) < 30, layout: st.dataset.stage, arrowAt: (() => { const a = e.querySelector('.bcv-welcome__spot .bcv-welcome__arrowbox')?.getBoundingClientRect(); return !!a && Math.abs((a.left + a.width / 2) - (b.left + b.width / 2)) < 2 && a.top >= b.bottom + 4 && a.top <= b.bottom + 22 && box.top >= a.bottom + 4; })(), lines: [...e.querySelectorAll('.bcv-welcome__kicker, .bcv-welcome__title, .bcv-welcome__hint')].map((x) => x.textContent).join(' | '), black: getComputedStyle(e).backgroundColor }; });
-  await eventually(async () => { const p = await sPtrRead(); return p.ringAt && p.centred && p.arrowAt; }, 4000);
-  const sPtr = await sPtrRead();
-  check(sPtr.holes && sPtr.ringAt && sPtr.below && sPtr.centred && sPtr.layout === 'below' && sPtr.arrowAt && sPtr.lines === 'Search Everything. | Courses, assignments, pages, discussions, files, people — and Wikipedia — from one box.', `the page comes back black with the search box seen through a hole, an arrow up at it (centred on the box, right under it) and "Search Everything." under the arrow: ${JSON.stringify(sPtr)}`);
-  await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000);
+  await tourStep('search', 20000);
+  const sPtr = await tourAt();
+  check(sPtr.steps === 'search' && sPtr.count === '' && sPtr.title === 'Search everything' && sPtr.doing === 'Type anything' && sPtr.act === 'type' && await ringHolds(sPtr.ring, '#bcv-omni-box') && sPtr.card.y >= sPtr.ring.y + sPtr.ring.h, `the page comes up with the search box lit and a card under it asking for a word: ${JSON.stringify(sPtr)}`);
   await shot(page, '15-search-pointer');
-  await page.click('.bcv-welcome__next');
-  await page.waitForFunction(() => !document.querySelector('#bcv-welcome'), null, { timeout: 5000 });
-  check((await sw.evaluate(() => self.BCV.api.storage.local.get('welcome:search')))['welcome:search'] === true, 'Continue takes the black away and marks it seen');
+  await page.click('#bcv-omni');
+  await page.keyboard.type('lab', { delay: 30 });
+  await tourGone();
+  check((await sw.evaluate(() => self.BCV.api.storage.local.get('welcome:search')))['welcome:search'] === true, 'typing ends it, marked seen');
   await page.goto(`${BASE}/`);
   await page.waitForSelector('#bcv-omni', { timeout: 10000 });
   await page.waitForTimeout(500);
-  check(!(await page.$('#bcv-welcome')), 'and it does not come back');
+  check(!(await page.$('#bcv-tour')), 'and it does not come back');
 
   // ---- the hub: what the page holds answers at once, commands, a row's actions, the hand-in box, answers, the keys ----
   console.log('search hub');
@@ -4028,8 +4049,8 @@ try {
   check((await sStep()) === '1 of 4' && (await page.$$(su('.row.is-on'))).length === 5 && (await page.$eval(su(`.row[data-course="${nickId}"] .row__nick`), (e) => e.value)) === 'Setup nick' && (await railNow()).join(' | ') === `Your courses: 5 courses | Grades: Tracking · goal 3.90 · 1 pass/fail ✓ | Dashboard: ${{ cards: 'Cards', list: 'List', activity: 'Activity' }[viewBefore]} ✓ | Sidebar: Always listed ✓`, `the rail goes back to any step done, with its answers kept: ${(await railNow()).join(' | ')}`);
   for (const s of ['#track', '.tile[data-view]', '.tile[data-value]', '.summary__row']) await sNext(s);
   check((await sStep()) === 'Ready' && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('setup:done'))['setup:done'])) === undefined, 'forward again to the read-back: still nothing marked done');
-  // Open Canvas writes everything and reloads the page: it comes back black, with the choices in place
-  // and the welcome on it — two pointers in turn, each with a Continue that comes in after three seconds
+  // Open Canvas writes everything and reloads the page: it comes back with the choices in place and
+  // the guided tour on it
   // Continue to appearance writes the steps and leads into Personalize, in the card's place: two
   // bars, a panel of numbered sections down the left (Light or dark, Themes, Colour, Photos) and a
   // preview of the Dashboard the choices go on (made-up data), labelled and framed as the preview it is
@@ -4147,132 +4168,148 @@ try {
   check(saved.h1 === 'Saved' && saved.rows === 'Colour: Pink · 3 photos | Course colours: 1 changed' && saved.btns === 'Edit,Open Canvas' && savedTheme.accent === pinkA && savedTheme.name === 'Pink' && savedImages.side.startsWith('asset:') && savedImages.today.startsWith('asset:') && savedImages.head.startsWith('asset:') && savedImages.heads === 9 && savedImages.headsOne === 1 && !savedImages.inline && savedImages.kept === 3 && savedImages.assets === 'Dusk:data:image/jpeg:true|Ocean:data:image/jpeg:true|photo:data:image/jpeg:true' && savedImages.tones === 'head:calendar,head:courses,head:dashboard,head:gpa,head:groups,head:inbox,head:notifications,head:todo,head:tools,side,today' && ((await colourNow()) || '').toLowerCase() === '#e91e63', `Save writes it all at once — the theme, the photos (a key each, the index naming them; the one header on all nine pages, kept once) with their tones, the course's colour to Canvas — and says so: ${JSON.stringify({ saved, savedTheme, savedImages })}`);
   await shot(page, '32e6-personalize-saved');
   await Promise.all([page.waitForNavigation({ timeout: 20000 }), page.click(pz('#pzOpen'))]);
-  await page.waitForSelector('#bcv-welcome[data-stage="look"]', { timeout: 20000 });
-  const welcomeAt = Date.now();
-  const noContinueYet = (await page.$('.bcv-welcome__next:not([hidden])')) === null;
-  const welcomeBox = () => page.$eval('#bcv-welcome', (e) => { const r = e.getBoundingClientRect(); return { bg: getComputedStyle(e).backgroundColor, full: r.left === 0 && r.top === 0 && r.width === innerWidth && r.height === innerHeight }; });
-  const welcomeLines = () => Promise.all(['.bcv-welcome__kicker', '.bcv-welcome__title', '.bcv-welcome__hint'].map((s) => texts(s).then((t) => t[0] || '')));
-  check(page.url() === `${BASE}/` && /^(reload|navigate)$/.test(await page.evaluate(() => performance.getEntriesByType('navigation')[0]?.type)) && (await page.$('#bcv-setup')) === null && !(await page.$('html.bcv-setup-open')) && (await page.$('.bcv-tour__card')) === null && (await welcomeBox()).bg === 'rgb(0, 0, 0)' && (await welcomeBox()).full, 'Open Canvas loads the page afresh, and it comes back black: no setup, no tour, the welcome over everything');
-  // stage one: the switch shown working — a copy of it at the top right, a pointer that comes to it, presses its stops and drags its knob, the lines saying what each move does
-  const showAt = () => page.$eval('#bcv-welcome', (e) => { const p = e.querySelector('.bcv-welcome__look'); const r = p.getBoundingClientRect(); const c = e.querySelector('.bcv-welcome__cursor--look'); const hov = p.querySelector('.bcv-look__opt.is-hover'); const disc = p.querySelector('.bcv-look__main').getBoundingClientRect(); const a = e.querySelector('.bcv-welcome__bigarrow'); const [tx, ty] = (a?.dataset.tip || '').split(',').map(Number); const t = e.querySelector('.bcv-welcome__stage[data-stage="look"] .bcv-welcome__text')?.getBoundingClientRect(); return { top: Math.round(r.top), rightGap: Math.round(innerWidth - r.right), open: p.classList.contains('is-open'), pos: p.dataset.pos, hover: hov ? hov.dataset.pos : null, hoverWords: hov ? (hov.querySelector('.bcv-look__offhead .bcv-look__optlbl') || hov.querySelector('.bcv-look__optlbl')).textContent : null, expanded: p.querySelector('.bcv-look__opt--off').classList.contains('is-expanded'), hoverFor: p.querySelector('.bcv-look__forbtn.is-hover')?.dataset.for || null, cursor: !!c, cursorShown: c ? getComputedStyle(c).opacity : null, bigArrow: !!a && tx < disc.left && tx > disc.left - 40 && Math.abs(ty - (disc.top + disc.height / 2)) < 3 && !!t && Number(a.querySelector('.bcv-welcome__line').getAttribute('d').split(' ')[1]) < t.top, centred: !!t && Math.abs(t.left + t.width / 2 - innerWidth / 2) < 4 && Math.abs(t.top + t.height / 2 - innerHeight / 2) < 90, smallArrow: !!e.querySelector('.bcv-welcome__arrowbox'), menu: getComputedStyle(p.querySelector('.bcv-look__menu')).visibility }; });
-  const s0 = await showAt();
-  const stageLines = async () => (await welcomeLines()).map((t) => t.replace(/\s+/g, ' ').trim()).join(' | ');
-  const LOOK_LINES = ' | Just in case: | To turn on Simpl, press green. To turn off Simpl, press red.';
-  await page.waitForTimeout(700); // (the words come in rising: the arrow is drawn where they settle)
-  await eventually(async () => (await showAt()).bigArrow, 4000); // (a busy machine: the rise can take longer than its 700 ms)
-  const s0b = await showAt();
-  check(s0.top === 10 && s0.rightGap === 12 && s0.cursor && !s0.smallArrow && s0b.bigArrow && s0b.centred && (await stageLines()) === LOOK_LINES && (await texts('.bcv-welcome__sub'))[0] === 'Red asks how long: this page only, 30 minutes, 1 hour, 4 hours, 1 day, or indefinitely.' && (await page.$$eval('.bcv-welcome__stoprow', (els) => els.map((e) => { const sw = e.querySelector('.bcv-welcome__stopsw'); return `${sw.dataset.stop}:${Math.round(sw.getBoundingClientRect().width) === 24 && getComputedStyle(sw).backgroundColor !== 'rgba(0, 0, 0, 0)' && !!sw.querySelector('svg')}:${e.querySelector('b').textContent}`; }))).join(' ') === '1:true:green -1:true:red', `stage one: the words in the middle of the screen — Just in case:, a row for green and one for red, each with the button's round face before it, and how long red asks — a copy of the switch at the top right, and a big arrow from the words up to it, its tip just left of the disc (${JSON.stringify(s0b)} | ${await stageLines()})`);
-  check(await eventually(async () => { const st = await showAt(); return st.open && st.cursorShown === '1' && st.menu === 'visible'; }, 3000), 'the pointer comes to the disc and the two buttons float down');
-  check(noContinueYet && await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000) && Date.now() - welcomeAt >= TIMERS.welcomeWait - 500 && (await texts('.bcv-welcome__next'))[0] === 'Continue', 'Continue is not there at first, and comes in only after the wait (three seconds shipped)');
-  check(await eventually(async () => { const st = await showAt(); return st.hover === '-1' && st.hoverWords === 'Turn off Simpl'; }, 6000) && (await stageLines()) === LOOK_LINES, 'the pointer comes to red: Turn off Simpl — and the lines hold still');
-  check(await eventually(async () => { const st = await showAt(); return st.expanded && st.hoverFor === '1h'; }, 5000), 'with the pointer on it red grows into its list — no press — and the pointer rests on For 1 hour');
-  await shot(page, '31-welcome-look');
-  check(await eventually(async () => { const st = await showAt(); return st.pos === '-1' && !st.expanded; }, 4000), 'pressed: off for the hour, the list folded back into red');
-  check(await eventually(async () => (await showAt()).pos === '1', 6000), 'and green pressed: Active again');
-  await page.keyboard.press('Enter'); // Enter is Continue too
-  // (2.98.20) then the purple button: the words in the middle, a big arrow up to a copy of it, opened out to its words, just left of the switch's copy; a pointer presses it
-  await page.waitForSelector('#bcv-welcome[data-stage="report"]', { timeout: 5000 });
-  const reportAt = () => page.$eval('#bcv-welcome', (e) => { const p = e.querySelector('.bcv-welcome__report'); const l = e.querySelector('.bcv-welcome__look'); const r = p?.getBoundingClientRect(); const lr = l?.getBoundingClientRect(); const a = e.querySelector('.bcv-welcome__bigarrow'); const [tx, ty] = (a?.dataset.tip || '').split(',').map(Number); const t = e.querySelector('.bcv-welcome__stage .bcv-welcome__text')?.getBoundingClientRect(); const row = e.querySelector('.bcv-welcome__stopsw--report'); return { pill: !!p && p.classList.contains('is-open'), words: p?.querySelector('.bcv-report__lbl')?.textContent, wordsShown: p ? getComputedStyle(p.querySelector('.bcv-report__lbl')).opacity : null, purple: p ? (getComputedStyle(p).backgroundImage.match(/rgb\([^)]+\)/g) || []).join(' ') : '', gap: r && lr ? Math.round(lr.left - r.right) : null, top: r ? Math.round(r.top) : null, arrow: !!a && !!r && tx < r.left && tx > r.left - 40 && Math.abs(ty - (r.top + r.height / 2)) < 3 && !!t && Number(a.querySelector('.bcv-welcome__line').getAttribute('d').split(' ')[1]) < t.top, centred: !!t && Math.abs(t.left + t.width / 2 - innerWidth / 2) < 4 && Math.abs(t.top + t.height / 2 - innerHeight / 2) < 90, row: !!row && !!row.querySelector('svg') && getComputedStyle(row).backgroundImage.includes('gradient'), bold: e.querySelector('.bcv-welcome__stoptext b')?.textContent, cursor: !!e.querySelector('.bcv-welcome__reportshow .bcv-welcome__cursor') }; });
-  await eventually(async () => (await reportAt()).arrow, 4000);
-  const rs = await reportAt();
-  const REPORT_LINES = ' | Found a bug? Missing something? | To report a bug or ask for a feature, press purple.';
-  check(rs.pill && rs.words === 'Report a bug' && rs.wordsShown === '1' && rs.purple === 'rgb(165, 92, 242) rgb(123, 47, 224)' && rs.gap >= 8 && rs.gap <= 12 && rs.top === 10 && rs.arrow && rs.centred && rs.row && rs.bold === 'purple' && rs.cursor && (await stageLines()) === REPORT_LINES && /^Bug, error, crash, a reason you turned Simpl off, a missing feature, or an idea\./.test((await texts('.bcv-welcome__sub'))[0] || ''), `then the purple button: the words in the middle (a row with its purple face, "press purple" in bold, what can be reported under it), a big arrow up to a copy of it opened out to Report a bug, just left of the switch's copy, a pointer that presses it: ${JSON.stringify(rs)}`);
-  await page.waitForTimeout(1600); // (the pointer at the button)
-  await shot(page, '31b-welcome-report');
-  await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000);
-  await page.click('.bcv-welcome__next');
-  check(await eventually(async () => (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('welcome:report1'))['welcome:report1'])) === true), 'its Continue marks it seen, so an update never shows it again');
-  // Away Refresh is off unless turned on (2.98.13), so the welcome has no pill to point at: the purple button's stage goes straight to the sidebar's rows
-  await page.waitForSelector('#bcv-welcome[data-stage="grades"]', { timeout: 5000 });
-  await page.waitForFunction(() => !document.querySelector('.bcv-welcome__look') && !document.querySelector('.bcv-welcome__stage[data-stage="look"]'), null, { timeout: 3000 });
-  check((await page.$('.bcv-welcome__away')) === null && (await page.$('.bcv-welcome__stage[data-stage="away"]')) === null && (await sw.evaluate(() => self.BCV.settings.get())).appearance.awayRefresh === false, 'no Away Refresh stage: it is off unless turned on, so the welcome goes from the switch to the sidebar (the pill\'s stage is kept for a setting that is on)');
-  // three rows of the sidebar in turn, each seen through a hole in the black with an arrow at it
-  const holes = () => page.$eval('#bcv-welcome', (e) => {
-    const rects = [...e.querySelectorAll('.bcv-welcome__mask mask rect')].slice(1).map((r) => ({ x: +r.getAttribute('x'), y: +r.getAttribute('y'), w: +r.getAttribute('width'), h: +r.getAttribute('height') }));
-    const box = e.querySelector('.bcv-welcome__stage[data-stage="side"]');
-    const b = box?.getBoundingClientRect();
-    return { bg: getComputedStyle(e).backgroundColor, holes: rects, rings: e.querySelectorAll('.bcv-welcome__ring').length, arrow: (() => { const a = e.querySelector('.bcv-welcome__spot .bcv-welcome__arrowbox')?.getBoundingClientRect(); const r = rects[0]; return !!a && !!r && Math.abs((a.top + a.height / 2) - (r.y + r.h / 2)) < 2 && a.left >= r.x + r.w + 8 && (!b || b.left >= a.right + 10); })(), boxLeft: b ? Math.round(b.left) : null, side2: e.querySelector('.bcv-welcome__side2text')?.textContent || null };
-  });
-  const holeCovers = (hole, sel) => page.$eval(sel, (el, hole) => { const r = el.getBoundingClientRect(); return hole.x <= r.left && hole.y <= r.top && hole.x + hole.w >= r.right && hole.y + hole.h >= r.bottom; }, hole);
-  await page.waitForSelector('#bcv-welcome[data-stage="grades"]', { timeout: 5000 });
-  await page.waitForTimeout(750); // (the arrow and the words come in over half a second)
-  const g = await holes();
-  check(g.bg === 'rgba(0, 0, 0, 0)' && g.holes.length === 1 && g.rings === 1 && (await holeCovers(g.holes[0], '#bcv-side .bcv-nav__item[data-nav="gpa"]')) && g.arrow && g.boxLeft > g.holes[0].x + g.holes[0].w && !g.side2 && (await welcomeLines()).join(' | ') === 'Grades | All your grades, in one place | Every course’s grade and its breakdown, side by side — and what you need on what’s left.', `stage three: black everywhere but the Grades row, an arrow at it from the words to its right (${JSON.stringify(g)})`);
-  await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000);
+  // the page comes back with the guided tour on it (welcome.js): the page as it is — not black — dimmed
+  // and blurred away from one thing at a time, a ring round it, a card beside it saying what it is and
+  // what to do, a pointer showing the gesture; and each step waits for the student to do the thing
+  await tourStep('look', 20000);
+  const t1 = await tourAt();
+  const discAt = await page.$eval('#bcv-look .bcv-look__main', (e) => { const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
+  const veil = await page.evaluate(() => { const t = document.getElementById('bcv-tour'); const g = t.querySelector('radialGradient'); const b = getComputedStyle(t.querySelector('.bcv-tour__blur')); return { stops: [...t.querySelectorAll('stop')].map((s) => Number(s.getAttribute('stop-opacity'))), gx: Number(g.getAttribute('cx')), gy: Number(g.getAttribute('cy')), hole: Number(t.querySelector('.bcv-tour__hole').getAttribute('width')) > 0, mask: b.maskImage || b.webkitMaskImage || '', touring: document.documentElement.classList.contains('bcv-touring'), app: getComputedStyle(document.getElementById('bcv-app')).display !== 'none' }; });
+  check(page.url() === `${BASE}/` && /^(reload|navigate)$/.test(await page.evaluate(() => performance.getEntriesByType('navigation')[0]?.type)) && (await page.$('#bcv-setup')) === null && !(await page.$('html.bcv-setup-open')) && t1.bg === 'rgba(0, 0, 0, 0)' && veil.app && veil.touring, `Open Canvas loads the page afresh with the tour over it — the page itself, not a black screen: ${JSON.stringify({ bg: t1.bg, veil })}`);
+  check(veil.hole && Math.abs(veil.gx - discAt.x) < 40 && Math.abs(veil.gy - discAt.y) < 40 && veil.stops[0] < veil.stops[2] && veil.stops[2] < veil.stops[3] && /radial-gradient/.test(veil.mask), `the dim is a gradient centred on the switch, darker the further from it, with the switch cut out of it; the blur fades in the same way: ${JSON.stringify(veil)}`);
+  check(t1.title === 'The Simpl switch' && t1.doing === 'Hover over the switch' && t1.kind === 'hover' && t1.act === 'hover' && /^1 of \d+$/.test(t1.count) && t1.steps.startsWith('look,look-green,look-red,look-for,report,grades,grade-ring') && t1.steps.endsWith('peek,peek-row,peek-close,search,end') && !t1.steps.includes('away') && await ringHolds(t1.ring, '#bcv-look .bcv-look__main') && t1.card.y >= t1.ring.y + t1.ring.h && t1.next === null, `the first step lights the switch: its card under it says what it is and asks for a hover, the pointer showing one (no Next: the hover moves it on; no Away Refresh step while that is off): ${JSON.stringify(t1)}`);
+  // the page is held still outside the lit place: a press on a card does not open it, and the card nudges
+  const wk = await page.$eval('.bcv-stat[data-stat="week"]', (e) => { const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
+  await page.mouse.click(wk.x, wk.y);
   await page.waitForTimeout(300);
-  await shot(page, '31d-welcome-grades');
-  await page.click('.bcv-welcome__next');
-  await page.waitForSelector('#bcv-welcome[data-stage="courses"]', { timeout: 5000 });
-  const c = await holes();
-  check(c.holes.length === 2 && c.rings === 2 && (await holeCovers(c.holes[0], '#bcv-side .bcv-nav__item[data-nav="courses"]')) && (await holeCovers(c.holes[1], '#bcv-side .bcv-side__group:has(.bcv-fav)')) && c.side2 === 'See your current classes here' && (await welcomeLines()).join(' | ') === 'Courses | See all your courses here | ', `stage four: the Courses row and, listed under it, the starred courses, each through its own hole, a second arrow at the list (${JSON.stringify(c)})`);
-  await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000);
-  await page.waitForTimeout(500);
-  await shot(page, '31e-welcome-courses');
-  await page.click('.bcv-welcome__next');
-  await page.waitForSelector('#bcv-welcome[data-stage="tools"]', { timeout: 5000 });
-  const t = await holes();
-  check(t.holes.length === 1 && (await holeCovers(t.holes[0], '#bcv-side .bcv-nav__item[data-nav="tools"]')) && !t.side2 && (await welcomeLines()).join(' | ') === 'Tools | Some tools, and some widgets | Find a PDF Editor, File Converter, Calculators, Flashcards, Citation Generator & more.' && (await page.$$eval('.bcv-welcome__hint--rich .bcv-welcome__hue', (els) => els.map((e) => getComputedStyle(e).color))).join(' ') === 'rgba(255, 255, 255, 0.68) rgb(255, 159, 10) rgb(52, 199, 89) rgb(191, 90, 242) rgb(47, 124, 246) rgb(100, 210, 255) rgb(255, 255, 255)', `stage five: the Tools row through its hole, and what the tools are — each kind in a colour of its own (${(await welcomeLines()).join(' | ')})`);
-  await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000);
-  await page.waitForTimeout(300);
-  await shot(page, '31f-welcome-tools');
-  await page.click('.bcv-welcome__next');
-  await page.waitForSelector('#bcv-welcome[data-stage="peek"]', { timeout: 5000 });
-  const peekAt = Date.now();
-  const noContinueYet3 = (await page.$('.bcv-welcome__next:not([hidden])')) === null;
-  // the Dashboard's way in, for real: its own Due this week card through a hole in the black, a pointer pressing it, the card's sheet opening, a row previewed
-  const peekRead = () => page.$eval('#bcv-welcome', (e) => { const hole = e.querySelectorAll('.bcv-welcome__mask mask rect')[1]; const sp = e.querySelector('.bcv-welcome__peekreal'); return { holes: e.classList.contains('bcv-welcome--holes'), bg: getComputedStyle(e).backgroundColor, stage: e.querySelector('.bcv-welcome__stage')?.dataset.stage, on: sp?.dataset.on || null, hole: hole ? { x: +hole.getAttribute('x'), y: +hole.getAttribute('y'), w: +hole.getAttribute('width'), h: +hole.getAttribute('height') } : null, cursor: !!sp?.querySelector('.bcv-welcome__cursor--peekreal'), drawing: !!e.querySelector('.bcv-welcome__sheetmock, .bcv-welcome__stat'), sheet: document.querySelector('.bcv-sheet-ov')?.getAttribute('aria-label') || null, pv: !!document.querySelector('.bcv-sheet-ov .bcv-pv'), focus: e.contains(document.activeElement) }; });
-  check(await eventually(async () => { const p = await peekRead(); return p.holes && p.bg === 'rgba(0, 0, 0, 0)' && p.stage === 'peek' && p.on === 'card' && p.cursor && !p.drawing && !p.sheet && (await holeCovers(p.hole, '.bcv-stat[data-stat="week"]')); }, 3000) && (await welcomeLines()).join(' | ') === 'Dashboard | Click any of the dashboard cards to see more | Click an assignment, announcement, etc. to preview it.', `the Dashboard's own Due this week card through a hole in the black, a pointer on its way to it — the real card, not a drawing (${JSON.stringify(await peekRead())})`);
-  check(await eventually(async () => { const p = await peekRead(); return p.sheet === 'Due this week' && p.on === 'sheet' && p.focus && (await holeCovers(p.hole, '.bcv-sheet-ov .bcv-sheet')); }, 5000), `the pointer presses it: the card's own sheet opens, the hole grown round it, the black keeping the focus (${JSON.stringify(await peekRead())})`);
-  check(await eventually(async () => { const p = await peekRead(); return p.pv && p.on === 'sheet' && p.focus; }, 5000), 'then its first row pressed: the preview opens beside the list');
-  await page.waitForTimeout(300);
-  await shot(page, '31c-welcome-peek');
-  check(noContinueYet3 && await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000) && Date.now() - peekAt >= TIMERS.welcomeWait - 500, 'Continue comes in only after the wait here too');
-  check(await eventually(async () => { const p = await peekRead(); return !p.sheet && p.on === 'card'; }, 7000), 'a while later the sheet\'s X: closed, the hole back round the card, and round again');
-  await page.click('.bcv-welcome__next');
-  check(await eventually(async () => (await page.$('#bcv-welcome[data-stage="search"]')) !== null && !(await page.$('.bcv-sheet-ov')), 5000), 'Continue takes the show with it: no sheet left open under the next stage');
-  // then the Dashboard's search box, seen through a hole with "Search Everything." under it — the last pointer
-  await page.waitForSelector('#bcv-welcome[data-stage="search"]', { timeout: 5000 });
-  check((await page.$eval('#bcv-welcome', (e) => e.classList.contains('bcv-welcome--holes') && !!e.querySelector('.bcv-welcome__mask'))) && (await welcomeLines()).join(' | ') === ' | Search Everything. | Courses, assignments, pages, discussions, files, people — and Wikipedia — from one box.', `the last pointer: the search box through a hole in the black, Search Everything. under it (${(await welcomeLines()).join(' | ')})`);
-  await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000);
-  await page.click('.bcv-welcome__next');
-  await page.waitForFunction(() => !document.querySelector('#bcv-welcome'), null, { timeout: 5000 });
-  check(!(await page.$('html.bcv-welcome')) && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('welcome:pending'))['welcome:pending'])) === undefined && (await visible('#bcv-look')) && (await page.$('.bcv-stat')) !== null && !(await page.$('.bcv-sheet-ov')), 'the last Continue takes the black away: the Dashboard, the real switch, and the welcome does not come back');
-  // people who had Simpl before the switch became a slider get its show alone, once: their What's New mark is from before it
+  check(!(await page.$('.bcv-sheet-ov')) && (await tourAt()).step === 'look', 'a press outside the lit place is held: the card under it does not open, and the step stays');
+  await shot(page, '31-tour-switch');
+  await page.hover('#bcv-look .bcv-look__main');
+  await tourStep('look-green');
+  const t2 = await tourAt();
+  check(t2.title === 'Green: Simpl on' && t2.doing === 'Click green' && t2.act === 'click' && await ringHolds(t2.ring, '#bcv-look .bcv-look__opt--on') && (await page.$('#bcv-look.is-tour-open')) !== null, `the hover opened it, and the next step asks for green: the switch held open while its steps are on: ${JSON.stringify(t2)}`);
+  await page.click('#bcv-look .bcv-look__opt--on');
+  await tourStep('look-red');
+  const t3 = await tourAt();
+  check(t3.title === 'Red: Simpl off' && t3.doing === 'Hover over red' && t3.act === 'hover' && await ringHolds(t3.ring, '#bcv-look .bcv-look__offhead'), `green pressed; then red, by a hover: ${JSON.stringify(t3)}`);
+  await page.hover('#bcv-look .bcv-look__offhead');
+  await tourStep('look-for');
+  const t4 = await tourAt();
+  check(t4.title === 'How long' && t4.doing === 'Pick how long' && /practice, and Simpl stays on/.test(t4.body) && await ringHolds(t4.ring, '#bcv-look .bcv-look__for'), `red opened into how long, and the step asks for a length: ${JSON.stringify(t4)}`);
+  await shot(page, '31a-tour-switch-length');
+  const loadsBefore = await page.evaluate(() => performance.getEntriesByType('navigation').length);
+  await page.click('#bcv-look .bcv-look__forbtn[data-for="1h"]');
+  check(await eventually(async () => (await tourAt())?.doing === 'For 1 hour: Simpl would turn off. Not now — it stays on.', 2000) && (await page.$('html.bcv-on')) !== null && (await page.evaluate(() => self.BCV?.early?.lookPos?.() ?? 1)) === 1 && (await page.evaluate(() => performance.getEntriesByType('navigation').length)) === loadsBefore, 'For 1 hour pressed: the step says what it would do, and it is practice — Simpl stays on, the page is not reloaded');
+  await tourStep('report');
+  const t5 = await tourAt();
+  check(t5.title === 'Report a bug' && t5.doing === 'Hover over the purple button' && await ringHolds(t5.ring, '#bcv-report') && (await page.$('#bcv-look.is-tour-open')) === null && (await visible('#bcv-report')), `then the purple button, lit where it really is (the switch let go): ${JSON.stringify(t5)}`);
+  await shot(page, '31b-tour-report');
+  await page.hover('#bcv-report');
+  // Grades: the row pressed, then the page's own — a ring's breakdown, a course's what-if scores
+  await tourStep('grades');
+  const t6 = await tourAt();
+  check(t6.title === 'Grades' && t6.doing === 'Click Grades' && t6.act === 'click' && await ringHolds(t6.ring, '#bcv-side .bcv-nav__item[data-nav="gpa"]'), `the purple button hovered; then Grades in the sidebar: ${JSON.stringify(t6)}`);
+  await shot(page, '31d-tour-grades');
+  await page.click('#bcv-side .bcv-nav__item[data-nav="gpa"]');
+  await tourStep('grade-ring');
+  const t7 = await tourAt();
+  check(page.url() === `${BASE}/grades` && t7.title === 'A quick breakdown' && t7.doing === 'Hover over a card’s ring' && await ringHolds(t7.ring, '.bcv-gpa__card .bcv-gpa__ringbox[title]'), `Grades opened, the tour with it: a card's ring, for its breakdown: ${JSON.stringify(t7)}`);
+  await page.hover('.bcv-gpa__card .bcv-gpa__ringbox[title]');
+  await tourStep('grade-details');
+  // a short window: Details is past the foot of it, so the card says to scroll, its arrow bouncing down, and the page is not held
+  const t8 = await tourAt();
+  check(t8.away && t8.kind === 'down' && t8.doing === 'Scroll down to find Details' && t8.ring === null && t8.card.y + t8.card.h <= t8.vh, `Details below the window's foot: the card says to scroll down to it, and waits: ${JSON.stringify(t8)}`);
+  await shot(page, '31e-tour-scroll');
+  await page.mouse.move(700, 500);
+  await page.mouse.wheel(0, 360);
+  check(await eventually(async () => { const t = await tourAt(); return t && !t.away && t.doing === 'Click Details' && await ringHolds(t.ring, '.bcv-gpa__card .bcv-gpa__details'); }, 4000), 'scrolled: Details in view, lit, and the step asks for it');
+  await page.click('.bcv-gpa__card .bcv-gpa__details');
+  await tourStep('grade-try');
+  check((await tourAt()).doing === 'Click “Try what-if scores”' && await ringHolds((await tourAt()).ring, '.bcv-sheet-ov .bcv-whatif-btn'), 'the course\'s Details open, the what-if button lit');
+  await page.click('.bcv-sheet-ov .bcv-whatif-btn');
+  await tourStep('grade-field');
+  check((await tourAt()).doing === 'Change a score' && (await tourAt()).act === 'type', 'then a score to change, the pointer typing');
+  await page.fill('.bcv-sheet-ov .bcv-whatif__input', '5');
+  await tourStep('grade-close');
+  await shot(page, '31e2-tour-whatif');
+  await page.click('.bcv-sheet-ov .bcv-sheet__close'); // (one press: the field's change waits for it, so the X is not swapped from under it)
+  check(await eventually(async () => !(await page.$('.bcv-sheet-ov')), 3000), 'the sheet closes with one press after a score was typed');
+  // the sidebar's Courses and Tools rows only say what they are: Next (or Enter) moves on
+  await tourStep('courses');
+  const t9 = await tourAt();
+  check(t9.title === 'Your courses' && t9.next === 'Next' && t9.act === 'none' && await ringHolds(t9.ring, '#bcv-side .bcv-nav__item[data-nav="courses"]') && await ringHolds(t9.ring, '#bcv-side .bcv-side__group:has(.bcv-fav)'), `then the Courses row with the starred courses under it, lit together, and a Next: ${JSON.stringify(t9)}`);
+  await shot(page, '31f-tour-courses');
+  await page.keyboard.press('Enter'); // (Enter is Next)
+  await tourStep('tools');
+  const t10 = await tourAt();
+  check(t10.title === 'Tools and widgets' && t10.body === 'Find a PDF Editor, File Converter, Calculators, Flashcards, Citation Generator & more.' && (await page.$$('#bcv-tour .bcv-tour__hue')).length === 5 && t10.next === 'Next', `then Tools, what they are in their colours: ${JSON.stringify(t10)}`);
+  await page.click('#bcv-tour .bcv-tour__next');
+  await tourStep('home');
+  await page.click('#bcv-side .bcv-nav__item[data-nav="dashboard"]');
+  // the Dashboard's way in: its own card, its sheet, an item previewed beside the list
+  await tourStep('peek');
+  const t11 = await tourAt();
+  check(page.url() === `${BASE}/` && t11.title === 'The cards open' && t11.doing === 'Click Due this week' && await ringHolds(t11.ring, '.bcv-stat[data-stat="week"]'), `back on the Dashboard: its Due this week card, to press: ${JSON.stringify(t11)}`);
+  await page.click('.bcv-stat[data-stat="week"]');
+  await tourStep('peek-row');
+  check(await ringHolds((await tourAt()).ring, '.bcv-sheet-ov .bcv-sheet') && (await tourAt()).doing === 'Click an item', 'its sheet opens, lit whole, and an item is asked for');
+  await page.click('.bcv-sheet-ov .bcv-sheet__row');
+  await tourStep('peek-close');
+  check(!!(await page.$('.bcv-sheet-ov .bcv-pv')) && (await tourAt()).doing === 'Close it', 'the item previews beside the list; then Close');
+  await shot(page, '31c-tour-peek');
+  await page.click('.bcv-sheet-ov .bcv-sheet__close');
+  await tourStep('search');
+  const t12 = await tourAt();
+  check(t12.title === 'Search everything' && t12.doing === 'Type anything' && t12.act === 'type' && await ringHolds(t12.ring, '#bcv-omni-box') && !(await page.$('.bcv-sheet-ov')), `the sheet closed; then the search box, to type in: ${JSON.stringify(t12)}`);
+  await page.click('#bcv-omni');
+  await page.keyboard.type('lab', { delay: 30 });
+  await tourStep('end');
+  const t13 = await tourAt();
+  check(t13.title === 'You’re all set' && t13.next === 'Done' && t13.ring === null && t13.side === 'center', `typing moves it on; the last card says it is done: ${JSON.stringify(t13)}`);
+  await shot(page, '31g-tour-done');
+  await page.click('#bcv-tour .bcv-tour__next');
+  await tourGone();
+  const tourFlags = await sw.evaluate(async () => self.BCV.api.storage.local.get(['welcome:pending', 'welcome:search', 'welcome:grades', 'welcome:look5', 'welcome:report1']));
+  check(!('welcome:pending' in tourFlags) && tourFlags['welcome:search'] === true && tourFlags['welcome:grades'] === true && tourFlags['welcome:look5'] === true && tourFlags['welcome:report1'] === true && !(await page.$('html.bcv-touring')) && (await visible('#bcv-look')), `Done takes the tour away and marks what it showed seen — the switch, the purple button, the Grades steps, the search box: ${JSON.stringify(tourFlags)}`);
+  await page.fill('#bcv-omni', '');
+  await page.keyboard.press('Escape');
+  // people who had Simpl before the switch became a slider get its steps, once — then the purple button and Tools: their What's New mark is from before it
   await sw.evaluate(async () => { await self.BCV.api.storage.local.remove('welcome:look5'); await self.BCV.api.storage.local.set({ 'whatsnew:seen': '2.35.0', 'welcome:look4': true }); });
   await page.reload();
-  await page.waitForSelector('#bcv-welcome[data-stage="look"]', { timeout: 20000 });
-  check((await welcomeBox()).bg === 'rgb(0, 0, 0)' && !!(await page.$('.bcv-welcome__look')) && (await texts('.bcv-welcome__title'))[0] === 'Just in case:', 'after an update from before this show, the page comes back black with the switch\'s show');
-  await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000);
-  await page.click('.bcv-welcome__next');
-  await page.waitForSelector('#bcv-welcome[data-stage="report"]', { timeout: 5000 });
-  check((await stageLines()) === REPORT_LINES && !!(await page.$('.bcv-welcome__report.is-open')), 'then the purple button\'s stage');
-  await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000);
-  await page.click('.bcv-welcome__next');
-  await page.waitForSelector('#bcv-welcome[data-stage="tools"]', { timeout: 5000 });
-  check((await texts('.bcv-welcome__hint'))[0].replace(/\s+/g, ' ').trim() === 'Find a PDF Editor, File Converter, Calculators, Flashcards, Citation Generator & more.' && (await page.$$('.bcv-welcome__hint--rich .bcv-welcome__hue')).length === 7, 'then the Tools row is pointed at, with what the tools are in their colours: everyone sees that once, not only after the setup');
-  await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000);
-  await page.click('.bcv-welcome__next');
-  await page.waitForFunction(() => !document.querySelector('#bcv-welcome'), null, { timeout: 5000 });
-  check((await sw.evaluate(async () => { const f = await self.BCV.api.storage.local.get(['welcome:look5', 'welcome:look4', 'welcome:report1']); return f['welcome:look5'] === true && f['welcome:report1'] === true && !('welcome:look4' in f); })) && (await visible('#bcv-app')), 'its Continue is the last: the black goes, and the show is marked seen');
+  await tourStep('look', 20000);
+  check((await tourAt()).steps === 'look,look-green,look-red,look-for,report,tools' && (await tourAt()).count === '1 of 6', `after an update from before the slider, the switch's steps, the purple button and Tools: ${JSON.stringify(await tourAt())}`);
+  await page.hover('#bcv-look .bcv-look__main');
+  await tourStep('look-green');
+  await page.click('#bcv-look .bcv-look__opt--on');
+  await tourStep('look-red');
+  await page.hover('#bcv-look .bcv-look__offhead');
+  await tourStep('look-for');
+  await page.click('#bcv-look .bcv-look__forbtn[data-for="page"]');
+  await tourStep('report');
+  await page.hover('#bcv-report');
+  await tourStep('tools');
+  await page.click('#bcv-tour .bcv-tour__next');
+  await tourGone();
+  check((await sw.evaluate(async () => { const f = await self.BCV.api.storage.local.get(['welcome:look5', 'welcome:look4', 'welcome:report1']); return f['welcome:look5'] === true && f['welcome:report1'] === true && !('welcome:look4' in f); })) && (await visible('#bcv-app')) && (await page.$('html.bcv-on')) !== null, 'its last step ends it: the switch\'s steps marked seen, the old mark gone, Simpl still on');
   await sw.evaluate((v) => self.BCV.api.storage.local.set({ 'whatsnew:seen': v }), manifest.version);
   await page.reload();
   await page.waitForSelector('#bcv-app .bcv-nav__item', { timeout: 20000 });
   await page.waitForTimeout(600);
-  check((await page.$('#bcv-welcome')) === null, 'and it does not come back');
-  // (2.98.20) anyone who updates from before the purple button gets its stage alone, once: their What's New mark is from before it
+  check((await page.$('#bcv-tour')) === null, 'and it does not come back');
+  // (2.98.20) anyone who updates from before the purple button gets its step alone, once — and What's New waits for it
   await sw.evaluate(async () => { await self.BCV.api.storage.local.remove('welcome:report1'); await self.BCV.api.storage.local.set({ 'whatsnew:seen': '2.98.19' }); });
   await page.reload();
-  await page.waitForSelector('#bcv-welcome[data-stage="report"]', { timeout: 20000 });
-  check((await welcomeBox()).bg === 'rgb(0, 0, 0)' && (await welcomeBox()).full && (await stageLines()) === REPORT_LINES && !!(await page.$('.bcv-welcome__report.is-open')) && (await page.$('#bcv-whatsnew')) === null, 'after an update from 2.98.19, the page comes back black with the purple button\'s stage (What\'s New waits for the next page)');
-  await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000);
-  await page.click('.bcv-welcome__next');
-  await page.waitForFunction(() => !document.querySelector('#bcv-welcome'), null, { timeout: 5000 });
-  check((await sw.evaluate(async () => (await self.BCV.api.storage.local.get('welcome:report1'))['welcome:report1'])) === true && (await visible('#bcv-app')) && (await visible('#bcv-report')), 'its one Continue is the last: the black goes, the real purple button is there, and the stage is marked seen');
+  await tourStep('report', 20000);
+  const t14 = await tourAt();
+  check(t14.steps === 'report' && t14.count === '' && t14.title === 'Report a bug' && (await page.$('#bcv-whatsnew')) === null, `after an update from 2.98.19, the purple button's step alone (What's New waits for it): ${JSON.stringify(t14)}`);
+  await page.hover('#bcv-report');
+  await tourGone();
+  check((await sw.evaluate(async () => (await self.BCV.api.storage.local.get('welcome:report1'))['welcome:report1'])) === true && (await visible('#bcv-app')) && (await visible('#bcv-report')), 'the hover ends it, and it is marked seen');
   await sw.evaluate((v) => self.BCV.api.storage.local.set({ 'whatsnew:seen': v }), manifest.version);
   await page.reload();
   await page.waitForSelector('#bcv-app .bcv-nav__item', { timeout: 20000 });
   await page.waitForTimeout(600);
-  check((await page.$('#bcv-welcome')) === null, 'and it does not come back either');
+  check((await page.$('#bcv-tour')) === null, 'and it does not come back either');
   // the theme chosen in Personalize is on the page: the accent's five shades on the sidebar's rows,
   // white words on the sidebar over its photo, the header's photo blurring towards its white title,
   // the counter's photo under a veil in the accent; the course's colour from Canvas
@@ -4378,40 +4415,34 @@ try {
   check((await texts('.bcv-fav')).length === 5, 'the sidebar follows the new favourites');
   const savedPrefs = await prefsOf();
   check(savedPrefs.gpaGoal === 3.9 && savedPrefs.gpaTracking?.since && savedPrefs.gpaTracking.priorGpa === null && Object.values(savedPrefs.gradeTargets || {}).includes('B+') && Object.values(savedPrefs.gradeTargets || {}).includes('P/F') && savedPrefs.setupDone === true && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('setup:done'))['setup:done'])) === true, `the grade choices landed where the Grades page reads them, and the done flags are set: ${JSON.stringify({ goal: savedPrefs.gpaGoal, tracking: savedPrefs.gpaTracking, targets: savedPrefs.gradeTargets })}`);
-  // the welcome can be asked for again (Settings → General → See it again, the account panel: ?bcv=welcome):
-  // the parameter is dropped and the pointers run over this page, with no reload
+  // the tour can be asked for again (Settings → General → See it again, the account panel: ?bcv=welcome):
+  // the parameter is dropped and it runs over this page, with no reload; Skip tour ends it at any step
   await page.goto(`${BASE}/?bcv=welcome`);
-  await page.waitForSelector('#bcv-welcome[data-stage="look"]', { timeout: 20000 });
-  check(page.url() === `${BASE}/` && (await welcomeBox()).bg === 'rgb(0, 0, 0)' && (await page.evaluate(() => performance.getEntriesByType('navigation')[0]?.type)) === 'navigate' && (await page.$('.bcv-stat')) !== null, 'asked for again, the welcome starts over the Dashboard and drops its parameter, with no reload');
-  for (const st of ['report', 'grades', 'courses', 'tools', 'peek', 'search', null]) { // (no Away Refresh stage: off unless turned on; the purple button's after the switch's)
-    await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000);
-    await page.click('.bcv-welcome__next');
-    if (st) await page.waitForSelector(`#bcv-welcome[data-stage="${st}"]`, { timeout: 5000 });
-    else await page.waitForFunction(() => !document.querySelector('#bcv-welcome'), null, { timeout: 5000 });
-  }
-  check((await page.$('#bcv-welcome')) === null && (await visible('#bcv-look')), 'and its last Continue takes the black away again');
-  // with Away Refresh turned on, the welcome asked for again does show the pill's stage, after the switch's
+  await tourStep('look', 20000);
+  check(page.url() === `${BASE}/` && (await page.evaluate(() => performance.getEntriesByType('navigation')[0]?.type)) === 'navigate' && (await page.$('.bcv-stat')) !== null && !(await tourAt()).steps.includes('away'), 'asked for again, the tour starts over on this page, the address clean');
+  await page.click('#bcv-tour .bcv-tour__skip');
+  await tourGone();
+  check((await page.$('#bcv-tour')) === null && (await visible('#bcv-look')) && !(await page.$('#bcv-look.is-tour-open')), 'Skip tour ends it at once, the switch let go');
+  // with Away Refresh turned on, the tour asked for again has its step, after the purple button's — told, since the pill only shows after time away
   await sw.evaluate(() => self.BCV.settings.update({ appearance: { awayRefresh: true } }));
   await page.goto(`${BASE}/?bcv=welcome`);
-  await page.waitForSelector('#bcv-welcome[data-stage="look"]', { timeout: 20000 });
-  await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000);
-  await page.click('.bcv-welcome__next');
-  await page.waitForSelector('#bcv-welcome[data-stage="report"]', { timeout: 5000 }); // (the purple button's, then the pill's)
-  await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000);
-  await page.click('.bcv-welcome__next');
-  await page.waitForSelector('#bcv-welcome[data-stage="away"]', { timeout: 5000 });
-  await eventually(() => page.$eval('.bcv-welcome__away', (e) => e.getAnimations().every((a) => a.playState === 'finished') && Math.round(e.getBoundingClientRect().top) === 10).catch(() => false), 3000); // the pill floats down first (and overshoots a little on the way)
-  const awayCopy = await page.$eval('.bcv-welcome__away', (e) => { const r = e.getBoundingClientRect(); return { top: Math.round(r.top), centred: Math.abs((r.left + r.right) / 2 - innerWidth / 2) < 2, title: e.querySelector('.bcv-away__title').textContent, hint: e.querySelector('.bcv-away__hint').textContent, ring: getComputedStyle(e.querySelector('.bcv-away__ring')).animationDuration, hand: getComputedStyle(e.querySelector('.bcv-away__hand')).animationDuration, loops: getComputedStyle(e.querySelector('.bcv-away__ring')).animationIterationCount }; }).catch(() => null);
-  check((await welcomeBox()).bg === 'rgb(0, 0, 0)' && !!awayCopy && awayCopy.top === 10 && awayCopy.centred && awayCopy.title === 'Away Refresh' && awayCopy.hint === 'Click to cancel, or hold to disable' && awayCopy.ring === '12s' && awayCopy.hand === '12s' && awayCopy.loops === 'infinite' && (await welcomeLines()).join(' | ') === 'Away Refresh | Click to cancel, or hold to disable | Away refresh prevents errors that show up after you’ve been gone for a while' && (await page.$('#bcv-away')) === null, `with Away Refresh on, the welcome's second stage is the mock pill counting down in slow motion at the top, with its three lines (${JSON.stringify(awayCopy)})`);
-  await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000);
-  await page.waitForTimeout(400);
-  await shot(page, '31b-welcome-away');
-  for (const st of ['grades', 'courses', 'tools', 'peek', 'search', null]) {
-    await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000);
-    await page.click('.bcv-welcome__next');
-    if (st) await page.waitForSelector(`#bcv-welcome[data-stage="${st}"]`, { timeout: 5000 });
-    else await page.waitForFunction(() => !document.querySelector('#bcv-welcome'), null, { timeout: 5000 });
-  }
+  await tourStep('look', 20000);
+  check((await tourAt()).steps.startsWith('look,look-green,look-red,look-for,report,away,grades'), `with Away Refresh on, its step follows the purple button's: ${(await tourAt()).steps}`);
+  await page.hover('#bcv-look .bcv-look__main');
+  await tourStep('look-green');
+  await page.click('#bcv-look .bcv-look__opt--on');
+  await tourStep('look-red');
+  await page.hover('#bcv-look .bcv-look__offhead');
+  await tourStep('look-for');
+  await page.click('#bcv-look .bcv-look__forbtn[data-for="30m"]');
+  await tourStep('report');
+  await page.hover('#bcv-report');
+  await tourStep('away');
+  const awayStep = await tourAt();
+  check(awayStep.title === 'Away Refresh' && /Click to cancel, or hold to disable\.$/.test(awayStep.body) && awayStep.next === 'Next' && awayStep.ring === null && awayStep.side === 'center', `the Away Refresh step: told in the middle, with a Next: ${JSON.stringify(awayStep)}`);
+  await shot(page, '31b-tour-away');
+  await page.click('#bcv-tour .bcv-tour__skip');
+  await tourGone();
   await sw.evaluate(() => self.BCV.settings.update({ appearance: { awayRefresh: false } }));
 
   // ---- what's new after an update ----------------------------------------------------------------
@@ -4455,29 +4486,25 @@ try {
     await introDone();
     await page.click(wn('#personalize'));
     await page.waitForSelector(su('.pz'), { timeout: 20000 });
-    check(!(await page.$('#bcv-whatsnew')) && !(await page.$('#bcv-welcome')) && page.url() === `${BASE}/` && !(await page.$(su('.rail'))) && (await flags('welcome:appearance'))['welcome:appearance'] === undefined, 'Personalize opens the editor on its own over the page, the address clean, no pointer before it and nothing armed yet');
-    // through the editor as it is — Continue, Continue, Save — then Open Canvas arms the pointer and
-    // reloads: the page comes back black, the Appearance button seen through a hole in it, an arrow at it and the lines
+    check(!(await page.$('#bcv-whatsnew')) && !(await page.$('#bcv-tour')) && page.url() === `${BASE}/` && !(await page.$(su('.rail'))) && (await flags('welcome:appearance'))['welcome:appearance'] === undefined, 'Personalize opens the editor on its own over the page, the address clean, no pointer before it and nothing armed yet');
+    // through the editor as it is — Continue, Continue, Save — then Open Canvas arms the tour's step at
+    // the Appearance button and reloads: the page comes back with the button lit and a press asked for
     for (let i = 0; i < 4 && !(await page.$(pz('#pzOpen'))); i++) { await page.click(pz('#pzNext')); await page.waitForTimeout(400); }
     await page.waitForSelector(pz('#pzOpen'), { timeout: 10000 });
     await Promise.all([page.waitForNavigation({ timeout: 20000 }), page.click(pz('#pzOpen'))]);
-    await page.waitForSelector('#bcv-welcome[data-stage="appearance"]', { timeout: 20000 });
-    const ptrAt = Date.now();
-    const ptrRead = () => page.evaluate(() => { const e = document.querySelector('#bcv-welcome'); const btn = document.getElementById('bcv-theme-btn'); const b = btn.getBoundingClientRect(); const ring = e.querySelector('.bcv-welcome__ring'); const num = (a) => Number(ring.getAttribute(a)); const side = document.getElementById('bcv-side').getBoundingClientRect(); return { holes: e.classList.contains('bcv-welcome--holes'), mask: !!e.querySelector('.bcv-welcome__mask'), ringAt: ring ? [num('x') - (b.left - 6), num('y') - (b.top - 6), num('width') - (b.width + 12), num('height') - (b.height + 12)].every((d) => Math.abs(d) < 1.5) : false, inView: b.top >= side.top && b.bottom <= side.bottom && b.bottom <= innerHeight, arrow: (() => { const a = e.querySelector('.bcv-welcome__spot .bcv-welcome__arrowbox')?.getBoundingClientRect(); return !!a && Math.abs((a.top + a.height / 2) - (b.top + b.height / 2)) < 2 && a.left >= b.right + 8 && a.left <= b.right + 24 && e.querySelector('.bcv-welcome__stage').getBoundingClientRect().left >= a.right + 10; })(), lines: [...e.querySelectorAll('.bcv-welcome__kicker, .bcv-welcome__title, .bcv-welcome__hint')].map((x) => x.textContent).join(' | '), boxRight: e.querySelector('.bcv-welcome__stage').getBoundingClientRect().left > b.right + 20, level: Math.abs((e.querySelector('.bcv-welcome__stage').getBoundingClientRect().top + e.querySelector('.bcv-welcome__stage').getBoundingClientRect().height / 2) - (b.top + b.height / 2)) < 60 || e.querySelector('.bcv-welcome__stage').getBoundingClientRect().bottom >= innerHeight - 17, next: e.querySelector('.bcv-welcome__next')?.hidden, setup: !!document.querySelector('#bcv-setup'), url: location.href }; });
-    // (the sidebar fills in under the black — the school's own rows push its foot down — and the hole follows the button)
-    await eventually(async () => { const p = await ptrRead(); return p.ringAt && p.inView && p.arrow; }, 4000);
-    const ptr = await ptrRead();
-    check(ptr.holes && ptr.mask && ptr.ringAt && ptr.inView && ptr.arrow && ptr.boxRight && ptr.level && ptr.lines === 'Appearance | Themes can be accessed here | Press Appearance any time to change the colour, the photos or the look.' && !ptr.setup && ptr.url === `${BASE}/`, `Open Canvas brings the page back black, the Appearance button — in view at the sidebar's foot — seen through a hole in it, an arrow level with the button at its right and the lines after it: ${JSON.stringify(ptr)}`);
-    check((await flags('welcome:appearance'))['welcome:appearance'] === undefined, 'shown, the pointer is not owed again');
-    check(await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000) && Date.now() - ptrAt >= TIMERS.welcomeWait - 500, 'Continue comes in only after the wait');
+    await tourStep('appearance', 20000);
+    const ptr = await tourAt();
+    check(ptr.steps === 'appearance' && ptr.title === 'Themes live here' && ptr.doing === 'Click Appearance' && ptr.act === 'click' && await ringHolds(ptr.ring, '#bcv-theme-btn') && !(await page.$('#bcv-setup')) && page.url() === `${BASE}/`, `the page comes back with the Appearance button lit and a press asked for: ${JSON.stringify(ptr)}`);
+    check((await flags('welcome:appearance'))['welcome:appearance'] === undefined, 'shown, the step is not owed again');
     await shot(page, '33c-appearance-pointer');
-    await page.click('.bcv-welcome__next');
-    await page.waitForFunction(() => !document.querySelector('#bcv-welcome'), null, { timeout: 5000 });
-    check(!(await page.$('#bcv-welcome')) && !(await page.$('#bcv-whatsnew')) && (await visible('#bcv-theme-btn')), 'Continue takes the black away; neither the pointer nor the invitation comes back');
+    await page.click('#bcv-theme-btn');
+    await tourGone();
+    check(!!(await page.$('.bcv-menu--theme')) && !(await page.$('#bcv-whatsnew')), 'the press opens the Appearance menu and ends the tour; the invitation does not come back');
+    await page.keyboard.press('Escape');
     await page.goto(`${BASE}/`);
     await page.waitForSelector('#bcv-app .bcv-nav__item', { timeout: 10000 });
     await page.waitForTimeout(600);
-    check(!(await page.$('#bcv-welcome')) && !(await page.$('#bcv-whatsnew')), 'nor on the next page');
+    check(!(await page.$('#bcv-tour')) && !(await page.$('#bcv-whatsnew')), 'nor on the next page');
     check((await flags('themes:tried'))['themes:tried'] === true, 'Save marked the theme tried');
     // a student who has tried a theme is not invited: the next update shows the notes instead
     await sw.evaluate(async () => { await self.BCV.api.storage.local.set({ 'whatsnew:from': '2.12.0' }); await self.BCV.api.storage.local.remove('whatsnew:seen'); });
@@ -4620,25 +4647,20 @@ try {
     return result;
   }, [BASE, op]);
   await page.goto(`${BASE}/#tools`);
-  // the first press: the screen goes black and says what Tools is, then shows the drag
-  await page.waitForSelector('#bcv-welcome[data-stage="toolsIntro"]', { timeout: 20000 });
-  const twAt = Date.now();
-  const noContT = (await page.$('.bcv-welcome__next:not([hidden])')) === null;
-  const tLines = () => page.$$eval('#bcv-welcome .bcv-welcome__kicker, #bcv-welcome .bcv-welcome__title, #bcv-welcome .bcv-welcome__hint', (els) => els.map((e) => e.textContent));
-  check((await page.$eval('#bcv-welcome', (e) => getComputedStyle(e).backgroundColor)) === 'rgb(0, 0, 0)' && (await tLines()).join(' | ') === 'Some helpful things | Some tools to help you do more, quickly.' && (await page.$eval('.bcv-welcome__hint', (e) => getComputedStyle(e).color)) === 'rgba(255, 255, 255, 0.68)' && (await page.$('.bcv-welcome__arrow')) === null, `the first press on Tools: black, the title and the gray line under it (${(await tLines()).join(' | ')})`);
-  check(noContT && await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000) && Date.now() - twAt >= TIMERS.welcomeWait - 500, 'Continue comes in only after the wait (three seconds shipped)');
-  await page.waitForTimeout(400);
+  // the first press: the tour says what Tools is (Next), then asks for the drag — a card pulled up to the top becomes a pin — with Not now to pass it
+  await tourStep('tools-intro', 20000);
+  const tt1 = await tourAt();
+  check(tt1.steps === 'tools-intro,pin' && tt1.title === 'Some helpful things' && tt1.next === 'Next' && tt1.side === 'center' && tt1.bg === 'rgba(0, 0, 0, 0)', `the first press: what Tools is, over the page, with a Next: ${JSON.stringify(tt1)}`);
   await shot(page, '36-tools-welcome');
-  await page.click('.bcv-welcome__next');
-  await page.waitForSelector('#bcv-welcome[data-stage="pin"]', { timeout: 5000 });
-  const demo = await page.$eval('#bcv-welcome', (e) => ({ look: !!e.querySelector('.bcv-welcome__look--folded'), card: e.querySelector('.bcv-welcome__democard .bcv-tool-card__name')?.textContent, pin: !!e.querySelector('.bcv-welcome__demopin .bcv-pin__btn'), cursor: !!e.querySelector('.bcv-welcome__cursor'), anim: getComputedStyle(e.querySelector('.bcv-welcome__democard')).animationName, loops: getComputedStyle(e.querySelector('.bcv-welcome__democard')).animationIterationCount }));
-  check(demo.look && demo.card === 'Focus timer' && demo.pin && demo.cursor && demo.anim === 'bcv-welcome-drag' && demo.loops === 'infinite' && (await tLines()).join(' | ') === 'Tools | Drag a tool to the top | It becomes a small button next to the Simpl Courses switch, on every page.', `then the drag is shown, round and round: a card pulled to the top turning into a pin beside the folded switch (${JSON.stringify(demo)})`);
-  await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000);
+  await page.click('#bcv-tour .bcv-tour__next');
+  await tourStep('pin');
+  const tt2 = await tourAt();
+  check(tt2.title === 'Pin a tool' && tt2.doing === 'Drag a tool to the top' && tt2.act === 'drag' && tt2.later && tt2.next === null && await ringHolds(tt2.ring, '.bcv-tool-card[data-tool="pomo"]'), `then the drag, on the Focus timer's card, the pointer showing it, with Not now: ${JSON.stringify(tt2)}`);
   await page.waitForTimeout(700); // (the drag a little way in, for the picture)
   await shot(page, '36b-tools-welcome-pin');
-  await page.click('.bcv-welcome__next');
-  await page.waitForFunction(() => !document.querySelector('#bcv-welcome'), null, { timeout: 5000 });
-  check((await sw.evaluate(async () => (await self.BCV.api.storage.local.get('tools:welcomed'))['tools:welcomed'])) === true, 'the last Continue takes the black away and marks the welcome seen');
+  await page.click('#bcv-tour .bcv-tour__later');
+  await tourGone();
+  check((await sw.evaluate(async () => (await self.BCV.api.storage.local.get('tools:welcomed'))['tools:welcomed'])) === true, 'Not now ends it and marks it seen');
   // the page: one row at the bottom of the nav, five cards
   const raw = (sel) => page.$$eval(sel, (els) => els.map((e) => e.textContent.replace(/\s+/g, ' ').trim())); // (textContent: the small labels are drawn in capitals by CSS)
   const toolNav = await texts('.bcv-nav > .bcv-nav__item');
@@ -5334,7 +5356,7 @@ try {
   await page.waitForFunction(() => !document.querySelector('#bcv-pins .bcv-pin'), null, { timeout: 3000 });
   check((await page.$eval('#bcv-pins', (e) => e.hidden)) && (await inPage('focusActive')) === false, 'End takes the borrowed pin away');
   await page.goto(`${BASE}/#tools`);
-  check((await page.$('#bcv-welcome')) === null && (await page.$$('.bcv-tool-card')).length === 11 && !(await page.$eval('.bcv-tool-card[data-tool="pomo"]', (e) => e.classList.contains('is-pinned'))), 'the second time, Tools opens without the black, and the card is no longer marked');
+  check((await page.$('#bcv-tour')) === null && (await page.$$('.bcv-tool-card')).length === 11 && !(await page.$eval('.bcv-tool-card[data-tool="pomo"]', (e) => e.classList.contains('is-pinned'))), 'the second time, Tools opens without the tour, and the card is no longer marked');
 
   // ---- the four tools of 2.35.0: grade needed, merge & split, the annotator, image to text ----
   console.log('grade needed');
@@ -6142,7 +6164,7 @@ try {
   const focusBefore = await inPage('focusActive');
   await pressStat();
   const secondPress = await eventually(async () => /You were away for a while\. Reload the page to continue\./.test((await texts('.bcv-toast')).join(' ')));
-  const secondState = secondPress ? '' : JSON.stringify({ ageBefore, focusBefore, ageAfter: await awayAge(), focusAfter: await inPage('focusActive'), ...(await page.evaluate(() => ({ toasts: [...document.querySelectorAll('.bcv-toast')].map((t) => t.textContent), away: !!document.querySelector('#bcv-away'), sheet: !!document.querySelector('.bcv-sheet-ov'), welcome: !!document.querySelector('#bcv-welcome'), whatsnew: !!document.querySelector('#bcv-whatsnew'), reloaded: sessionStorage.getItem('bcv:reloaded'), nav: performance.getEntriesByType('navigation')[0]?.type, scrollY: window.scrollY, visibility: document.visibilityState, quiz: document.documentElement.className }))) });
+  const secondState = secondPress ? '' : JSON.stringify({ ageBefore, focusBefore, ageAfter: await awayAge(), focusAfter: await inPage('focusActive'), ...(await page.evaluate(() => ({ toasts: [...document.querySelectorAll('.bcv-toast')].map((t) => t.textContent), away: !!document.querySelector('#bcv-away'), sheet: !!document.querySelector('.bcv-sheet-ov'), welcome: !!document.querySelector('#bcv-tour'), whatsnew: !!document.querySelector('#bcv-whatsnew'), reloaded: sessionStorage.getItem('bcv:reloaded'), nav: performance.getEntriesByType('navigation')[0]?.type, scrollY: window.scrollY, visibility: document.visibilityState, quiz: document.documentElement.className }))) });
   check(secondPress && !(await page.$('#bcv-away')), `a second stale press within the minute asks rather than reloading again, and no pill counts down to nothing${secondState ? ` — instead: ${secondState}` : ''}`);
   await page.evaluate(() => sessionStorage.removeItem('bcv:reloaded'));
   await windBack(0);
@@ -6216,12 +6238,13 @@ try {
   const system = await texts('.bcv-nf__row[data-cat="system"]');
   const announce = await texts('.bcv-nf__row[data-cat="announce"]');
   check(graded.some((t) => /Lec05-PreQuiz graded/.test(t) && /19 \/ 19/.test(t) && /See grades/.test(t)) && feedback.some((t) => /Joon left a comment on Dis00/.test(t) && /Good use of interval notation here/.test(t) && /Read comment/.test(t)) && system.some((t) => /Chemistry placement window closes Sep 16/.test(t) && /One attempt remaining/.test(t)) && announce.length >= 1 && announce.every((t) => /Read/.test(t)), `graded, feedback, system and announcement rows carry the Canvas facts: ${graded[0]} | ${feedback[0]} | system: ${system.join(' || ')} | announce (${announce.length}): ${announce[0]}`);
-  // every row names its course (the stream's items carry only a course id); a Canvas notification
+  // every row names its course (the stream's items carry only a course id; Simpl's own — a grade
+  // snapshot recorded today, once the tour has opened Grades — name Simpl Courses); a Canvas notification
   // always says its category; an unread message and a discussion with new replies are alerts too
   const nfCourses = await page.$$eval('.bcv-nf__row[data-cat="graded"], .bcv-nf__row[data-cat="feedback"], .bcv-nf__row[data-cat="announce"], .bcv-nf__row[data-cat="system"]', (els) => els.map((e) => e.querySelector('.bcv-nf__course')?.textContent || ''));
   const nfMessages = await texts('.bcv-nf__row[data-cat="message"]');
   const nfDiscuss = await texts('.bcv-nf__row[data-cat="discuss"]');
-  check(nfCourses.length >= 4 && nfCourses.every((c) => /MATH 021|SPRK 010|PHYS 008|Placement|Attestation/.test(c)) && system.some((t) => /Due Date · One attempt remaining/.test(t)) && nfMessages.some((t) => /No submission for Acknowledge/.test(t) && /“Hello Bobcat!/.test(t) && /Read/.test(t)) && nfDiscuss.some((t) => /Is there any discussion happening this week\?/.test(t) && /23 replies/.test(t) && /MATH 021/.test(t)), `rows name the course, the category is always said, a new message and new replies are alerts: courses ${nfCourses.join(' | ')} · message: ${nfMessages[0]} · discussion: ${nfDiscuss[0]}`);
+  check(nfCourses.length >= 4 && nfCourses.every((c) => /MATH 021|SPRK 010|PHYS 008|Placement|Attestation|^Simpl Courses$/.test(c)) && system.some((t) => /Due Date · One attempt remaining/.test(t)) && nfMessages.some((t) => /No submission for Acknowledge/.test(t) && /“Hello Bobcat!/.test(t) && /Read/.test(t)) && nfDiscuss.some((t) => /Is there any discussion happening this week\?/.test(t) && /23 replies/.test(t) && /MATH 021/.test(t)), `rows name the course, the category is always said, a new message and new replies are alerts: courses ${nfCourses.join(' | ')} · message: ${nfMessages[0]} · discussion: ${nfDiscuss[0]}`);
   await shot(page, '33-notifications');
   await page.click('.bcv-nf__chip[data-cat="graded"]');
   check((await texts('.bcv-nf__group-t')).join(',') === 'Graded' && (await page.$eval('.bcv-nf__chip[data-cat="graded"]', (e) => e.classList.contains('is-on'))), 'a chip narrows the list to one kind');
@@ -6471,7 +6494,7 @@ try {
   check((await options.$$eval('.navlink', (els) => els.filter((e) => !e.hidden).map((e) => e.dataset.section))).join(',') === 'appearance' && (await oTexts('#title'))[0] === 'Appearance', 'search narrows the sections and opens the match');
   await options.fill('#query', '');
   await options.click('.navlink[data-section="general"]');
-  check((await options.$('#openSetup')) !== null && (await options.$('#runWelcome')) !== null, 'General offers Reopen setup and See the welcome again');
+  check((await options.$('#openSetup')) !== null && (await options.$('#runWelcome')) !== null, 'General offers Reopen setup and the tour again');
   // before the guided setup has run (or been skipped) the popup is nothing but a setup button
   await sw.evaluate(async (port) => {
     const k = `prefs:localhost:${port}`;
@@ -6591,14 +6614,10 @@ try {
   await page.click(su('.pz #pzNext')); // Save
   await page.waitForSelector(su('.pz #pzOpen'), { timeout: 10000 });
   await Promise.all([page.waitForNavigation({ timeout: 20000 }), page.click(su('.pz #pzOpen'))]); // Open Canvas: the page reloads
-  await page.waitForSelector('#bcv-welcome[data-stage="look"]', { timeout: 20000 });
-  check((await page.$('#bcv-setup')) === null && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('setup:done'))['setup:done'])) === true, 'finishing the steps is what marks the setup done, and the welcome follows the reload');
-  for (const st of ['report', 'grades', 'courses', 'tools', 'peek', 'search', null]) { // Continue, seven times: the pointers in turn (the purple button's after the switch's) (no Away Refresh stage: off unless turned on; the search box last, on the Dashboard), then the page
-    await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000);
-    await page.click('.bcv-welcome__next');
-    if (st) await page.waitForSelector(`#bcv-welcome[data-stage="${st}"]`, { timeout: 5000 });
-    else await page.waitForFunction(() => !document.querySelector('#bcv-welcome'), null, { timeout: 5000 });
-  }
+  await tourStep('look', 20000);
+  check((await page.$('#bcv-setup')) === null && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('setup:done'))['setup:done'])) === true, 'finishing the steps is what marks the setup done, and the tour follows the reload');
+  await page.click('#bcv-tour .bcv-tour__skip'); // (Skip tour)
+  await tourGone();
   await page.goto(`${BASE}/grades`);
   await page.waitForSelector('.bcv-gpa__hero', { timeout: 15000 });
   check((await page.$('#bcv-setup')) === null && (await texts('.bcv-gpa__hero-sub'))[0]?.includes('This term so far') && (await texts('.bcv-gpa__goal-s'))[0] === 'Goal 4.00 · set it in settings', 'once done the card stays away, and the Grades page tracks with the goal the setup set');
@@ -6759,7 +6778,7 @@ try {
   const simFlags = await sw.evaluate(async () => { const f = await self.BCV.api.storage.local.get(['whatsnew:from', 'welcome:report1', 'welcome:look5']); return { from: f['whatsnew:from'], report: 'welcome:report1' in f, look: 'welcome:look5' in f }; });
   check((await reloaded) && simFlags.from === '2.98.19' && !simFlags.report && !simFlags.look, `and the update is played again: the Canvas tab loads again with the flags an update from 2.98.19 leaves: ${JSON.stringify(simFlags)}`);
   await page.bringToFront();
-  check(await eventually(async () => !!(await page.$('#bcv-welcome, #bcv-whatsnew')), 15000), 'what someone updating from 2.98.19 sees comes up on it: the black stage it owes, or What\'s New');
+  check(await eventually(async () => !!(await page.$('#bcv-tour, #bcv-whatsnew')), 15000), 'what someone updating from 2.98.19 sees comes up on it: the tour step it owes, or What\'s New');
   await page.screenshot({ path: join(out, '29c-dev-simulated-update.png') });
   await options.click('#devFrom').catch(() => {});
   await options.fill('#devFrom', '9.9.9');

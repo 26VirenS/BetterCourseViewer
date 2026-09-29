@@ -99,6 +99,13 @@ try {
     }
     return false;
   };
+  // the guided tour (welcome.js): the step on show and a wait for a step
+  const tourAt = () => page.evaluate(() => { const t = document.getElementById('bcv-tour'); if (!t) return null; const c = t.querySelector('.bcv-tour__card'); const ring = t.querySelector('.bcv-tour__ring'); const rr = ring.hidden ? null : ring.getBoundingClientRect(); const cr = c.getBoundingClientRect(); const nb = c.querySelector('.bcv-tour__next'); return { step: t.dataset.step, steps: t.dataset.steps, title: c.querySelector('.bcv-tour__title').textContent, doing: c.querySelector('.bcv-tour__dotext').textContent, next: nb.hidden ? null : nb.textContent, bg: getComputedStyle(t).backgroundColor, ring: rr && { x: rr.left, y: rr.top, w: rr.width, h: rr.height }, card: { x: cr.left, y: cr.top, w: cr.width, h: cr.height }, fits: cr.left >= 0 && cr.right <= innerWidth + 1 && cr.top >= 0 && cr.bottom <= innerHeight + 1 }; });
+  // (the step, then its lit place settled where it goes — data-still — and a moment for the card's words)
+  const tourStep = (id, ms = 15000) => page.waitForFunction((x) => document.getElementById('bcv-tour')?.dataset.step === x, id, { timeout: ms })
+    .then(() => page.waitForFunction(() => { const t = document.getElementById('bcv-tour'); return !t || t.dataset.still === '1'; }, null, { timeout: 5000 }).catch(() => {}))
+    .then(() => page.waitForTimeout(200));
+  const tourGone = (ms = 8000) => page.waitForFunction(() => !document.getElementById('bcv-tour'), null, { timeout: ms });
   // tap something that lands a new screen (a page load or a hash change), and wait until it has drawn
   const tapScreen = async (sel) => {
     await page.evaluate(() => { const m = document.querySelector('#bcv-main > *'); if (m) m.dataset.old = '1'; });
@@ -785,45 +792,48 @@ try {
   await Promise.all([page.waitForNavigation({ timeout: 20000 }), page.click('#bcv-setup #pzOpen')]); // Open Canvas: the page reloads
   // …and comes back black, with the welcome on it. A phone's header has no look switch to point at,
   // and Away Refresh is off unless turned on (2.98.13), so the welcome here is the Dashboard pointer alone
-  await page.waitForSelector('#bcv-welcome[data-stage]', { timeout: 20000 });
-  const welcomeAt = Date.now();
-  const noContinueYet = (await page.$('.bcv-welcome__next:not([hidden])')) === null;
-  const welcomeInfo = await page.$eval('#bcv-welcome', (e) => { const r = e.getBoundingClientRect(); return { stage: e.dataset.stage, bg: getComputedStyle(e).backgroundColor, full: r.width === innerWidth && r.height === innerHeight, look: !!e.querySelector('.bcv-welcome__look'), pill: !!e.querySelector('.bcv-welcome__away'), stats: e.querySelectorAll('.bcv-welcome__stat').length, sheet: !!e.querySelector('.bcv-welcome__sheetmock'), title: e.querySelector('.bcv-welcome__title')?.textContent }; });
-  check((await page.$('#bcv-setup')) === null && page.url() === `${BASE}/` && /^(reload|navigate)$/.test(await page.evaluate(() => performance.getEntriesByType('navigation')[0]?.type)) && welcomeInfo.stage === 'peek' && welcomeInfo.bg === 'rgb(0, 0, 0)' && welcomeInfo.full && !welcomeInfo.look && !welcomeInfo.pill && welcomeInfo.stats === 3 && welcomeInfo.sheet && welcomeInfo.title === 'Click any of the dashboard cards to see more' && await noOverflow(), `Open Canvas reloads the page, which comes back black with the Dashboard pointer alone (no switch on a phone, no Away Refresh stage while it is off), no tour: ${JSON.stringify(welcomeInfo)}`);
-  check(noContinueYet && await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000) && Date.now() - welcomeAt >= TIMERS.welcomeWait - 500, 'Continue comes in only after the wait (three seconds shipped)');
-  await page.waitForTimeout(400);
+  await tourStep('peek', 20000);
+  const ph1 = await tourAt();
+  check((await page.$('#bcv-setup')) === null && page.url() === `${BASE}/` && /^(reload|navigate)$/.test(await page.evaluate(() => performance.getEntriesByType('navigation')[0]?.type)) && ph1.steps === 'peek,peek-close,search,end' && ph1.bg === 'rgba(0, 0, 0, 0)' && ph1.title === 'The cards open' && ph1.doing === 'Tap This week' && ph1.fits && !!ph1.ring, `the reload comes back with the tour over Today — what a phone has: its This week counter lit, a tap asked for, the card on the screen: ${JSON.stringify(ph1)}`);
+  await page.waitForTimeout(300);
   await page.screenshot({ path: join(out, 'phone-12b-welcome-peek.png') });
-  await page.click('.bcv-welcome__next');
-  // (2.98.37) Today has the search box now, so the setup's run points it out last, as the Dashboard's does
-  await page.waitForSelector('#bcv-welcome[data-stage="search"]', { timeout: 8000 });
-  const searchStage = await page.evaluate(() => { const box = document.getElementById('bcv-omni-box')?.getBoundingClientRect(); const w = document.getElementById('bcv-welcome'); const title = w.querySelector('.bcv-welcome__title, h1, h2'); const tr = title?.getBoundingClientRect(); return { title: title?.textContent.trim(), boxShown: !!box && box.width > 0, under: !!(box && tr && tr.top >= box.bottom), fits: document.documentElement.scrollWidth <= innerWidth + 1 }; });
-  check(searchStage.title === 'Search Everything.' && searchStage.boxShown && searchStage.under && searchStage.fits, `then the black points at Today's search box, its words under it: ${JSON.stringify(searchStage)}`);
-  await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000);
-  await page.waitForTimeout(400);
+  await page.click('.bcv-ph-stats .bcv-ph-stat:nth-child(2)');
+  await tourStep('peek-close');
+  const ph2 = await tourAt();
+  check(!!(await page.$('.bcv-sheet-ov .bcv-ph-sheet')) && ph2.title === 'Close it' && ph2.fits, `the tap opens its sheet; then closing it is asked for: ${JSON.stringify(ph2)}`);
+  await page.mouse.click(20, 40); // (above the sheet: the scrim)
+  // (2.98.37) Today has the search box, so the tour points it out last, as the Dashboard's does
+  await tourStep('search');
+  const searchStage = await tourAt();
+  check(!(await page.$('.bcv-sheet-ov')) && searchStage.title === 'Search everything' && searchStage.doing === 'Type anything' && searchStage.fits && !!searchStage.ring, `the sheet closed with a tap above it; then Today's search box, lit: ${JSON.stringify(searchStage)}`);
+  await page.waitForTimeout(300);
   await page.screenshot({ path: join(out, 'phone-12c-welcome-search.png') });
-  await page.click('.bcv-welcome__next');
-  await page.waitForFunction(() => !document.querySelector('#bcv-welcome'), null, { timeout: 5000 });
-  check(!(await page.$('html.bcv-welcome')) && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('welcome:pending'))['welcome:pending'])) === undefined && (await page.$('.bcv-ph-stats')) !== null, 'Continue takes the black away: Today, and the welcome does not come back');
+  await page.click('#bcv-omni');
+  await page.keyboard.type('lab', { delay: 30 });
+  await tourStep('end');
+  await page.click('#bcv-tour .bcv-tour__next');
+  await tourGone();
+  await page.fill('#bcv-omni', '').catch(() => {});
+  check(!(await page.$('html.bcv-touring')) && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('welcome:pending'))['welcome:pending'])) === undefined && (await page.$('.bcv-ph-stats')) !== null, 'Done ends the tour: Today, and the tour does not come back');
   await page.click('.bcv-ph-avatar');
   await sheet();
   check((await texts('.bcv-ph-srow__label')).includes('Guided setup') && (await texts('.bcv-ph-srow__label')).includes('What’s new'), 'the account sheet offers the guided setup and What’s new');
   await closeSheet();
 
-  // ---- Tools on a phone: under the avatar; the first press goes black, the words alone (no switch to drag to) ----
+  // ---- Tools on a phone: under the avatar; the first press runs the tour's Tools step, alone (no switch to drag to) ----
   console.log('tools');
   await sw.evaluate(() => self.BCV.api.storage.local.remove(['tools:welcomed', 'tools:decks']));
   await page.click('.bcv-ph-avatar');
   await sheet();
   check((await texts('.bcv-ph-srow__label')).includes('Tools'), 'the account sheet has a Tools row');
   await page.click('.bcv-ph-srow:has-text("Tools")');
-  await page.waitForSelector('#bcv-welcome[data-stage="toolsIntro"]', { timeout: 20000 });
-  const twAt = Date.now();
-  check(page.url() === `${BASE}/#tools` && (await page.$eval('#bcv-welcome', (e) => getComputedStyle(e).backgroundColor)) === 'rgb(0, 0, 0)' && (await texts('.bcv-welcome__title'))[0] === 'Some helpful things' && (await texts('.bcv-welcome__hint'))[0] === 'Some tools to help you do more, quickly.' && await noOverflow(), 'the first press on Tools: black, the title and the gray line under it');
-  check(await eventually(async () => (await page.$('.bcv-welcome__next:not([hidden])')) !== null, 7000) && Date.now() - twAt >= TIMERS.welcomeWait - 500, 'Continue comes in only after the wait (three seconds shipped)');
-  await page.waitForTimeout(400);
+  await tourStep('tools-intro', 20000);
+  const pt1 = await tourAt();
+  check(page.url() === `${BASE}/#tools` && pt1.steps === 'tools-intro' && pt1.title === 'Some helpful things' && pt1.next === 'Done' && pt1.fits && pt1.bg === 'rgba(0, 0, 0, 0)', `the first press: what Tools is, alone (no switch to drag a pin to), with Done: ${JSON.stringify(pt1)}`);
+  await page.waitForTimeout(300);
   await page.screenshot({ path: join(out, 'phone-13-tools-welcome.png') });
-  await page.click('.bcv-welcome__next');
-  await page.waitForFunction(() => !document.querySelector('#bcv-welcome'), null, { timeout: 5000 });
+  await page.click('#bcv-tour .bcv-tour__next');
+  await tourGone();
   check((await page.$$('.bcv-tool-card')).length === 11 && (await texts('.bcv-topbar__title'))[0] === 'Tools' && await noOverflow() && (await page.$eval('#bcv-pins', (e) => getComputedStyle(e).display).catch(() => 'none')) === 'none' && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('tools:welcomed'))['tools:welcomed'])) === true, 'one Continue (a phone has no switch to drag to): the nine cards in one column, no pins, the welcome marked seen');
   await shot('13b-tools');
   await page.click('.bcv-tool-card[data-tool="fc"]');
@@ -863,13 +873,13 @@ try {
     await introDone();
     await page.click('#bcv-whatsnew #personalize');
     await page.waitForSelector('#bcv-setup .pz', { timeout: 20000 });
-    check(!(await page.$('#bcv-whatsnew')) && !(await page.$('#bcv-welcome')) && (await flag('welcome:appearance')) === undefined, 'Personalize opens the editor over the page, nothing armed yet');
+    check(!(await page.$('#bcv-whatsnew')) && !(await page.$('#bcv-tour')) && (await flag('welcome:appearance')) === undefined, 'Personalize opens the editor over the page, nothing armed yet');
     for (let i = 0; i < 4 && !(await page.$('#bcv-setup #pzOpen')); i++) { await page.click('#bcv-setup #pzNext'); await page.waitForTimeout(400); }
     await page.waitForSelector('#bcv-setup #pzOpen', { timeout: 10000 });
     await Promise.all([page.waitForNavigation({ timeout: 20000 }), page.click('#bcv-setup #pzOpen')]);
     await page.waitForSelector('.bcv-ph-stat', { timeout: 20000 });
     await page.waitForTimeout(600);
-    check(!(await page.$('#bcv-welcome')) && !(await page.$('#bcv-whatsnew')) && (await flag('welcome:appearance')) === undefined, 'the page after the editor comes back plain on a phone — no pointer, its flag dropped — and the invitation does not return');
+    check(!(await page.$('#bcv-tour')) && !(await page.$('#bcv-whatsnew')) && (await flag('welcome:appearance')) === undefined, 'the page after the editor comes back plain on a phone — no pointer, its flag dropped — and the invitation does not return');
     // the notes themselves wait behind Settings (and the account sheet's What's new row): this version alone
     await page.goto(`${BASE}/?bcv=whatsnew`);
     await page.waitForSelector('#bcv-whatsnew .wn__note', { timeout: 20000 });

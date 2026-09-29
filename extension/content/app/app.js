@@ -973,7 +973,7 @@
     awayLeave(el);
   }
   /** The pill's button — the dial and its two lines — with nothing wired: awayRefresh() wires the
-   *  press and the hold, and the welcome after the setup shows a copy counting down in slow motion. */
+   *  press and the hold. */
   function awayPill() {
     // the dial is the iPhone's timer: a dim ring, a bright arc of the time left that shrinks back to
     // twelve o'clock, and a hand pivoting at the centre that points at the arc's end and turns with
@@ -1195,7 +1195,7 @@
     if (phone()) BCV.phone.afterRender(BCV.app, r, el);
     // ?bcv=setup (the popup's Set up button, the account sheet, the app's first launch): the guided
     // setup over this page, which drops the parameter and reloads the page when it is done (the
-    // welcome, two pointers on black, is the first thing the reloaded page shows: see boot())
+    // guided tour runs over the reloaded page: see boot())
     if ((r.params.get('bcv') === 'setup' || r.params.get('bcv') === 'personalize') && BCV.setup && !BCV.setup.active()) BCV.setup.open(BCV.app);
     else if (r.params.get('bcv') === 'welcome' && BCV.welcome && !BCV.welcome.active()) welcomeHere();
     else if (r.params.get('bcv') === 'whatsnew' && BCV.whatsnew) whatsnewHere();
@@ -1239,7 +1239,7 @@
     go(`/courses/${c.id}/quizzes/0?bcv=take&sim=1`, { replace: true });
   }
   /** ?bcv=welcome (Settings → General → See it again): the parameter is dropped,
-   *  the page drawn, and the welcome — the pointers on black that follow the setup — runs over it again. */
+   *  the page drawn, and the guided tour that follows the setup runs over it again. */
   async function welcomeHere() {
     const url = new URL(location.href);
     url.searchParams.delete('bcv');
@@ -1370,8 +1370,7 @@
   const lookTitle = (p, until = 0) => (p === 1 ? 'Simpl Courses is active. Hover for Turn on and Turn off; press to choose how long to turn it off.' : `${lookWords(p, until)}. Hover for Turn on and Turn off; press to turn it on.`);
   /** The switch's DOM: the disc with the mark, and under it the two buttons — red with its list of
    *  lengths — folded away until the pointer or the keyboard's focus is on it, and the classes,
-   *  words and ARIA of a state put on it; nothing wired. The page's own and the welcome's show of
-   *  it share it. */
+   *  words and ARIA of a state put on it; nothing wired (mountLookToggle wires it). */
   function lookSwitch() {
     const text = h('span', { class: 'bcv-look__text', text: lookWords(1) });
     const main = h('button', { type: 'button', class: 'bcv-look__main', 'aria-label': 'Simpl Courses switch', 'aria-haspopup': 'true' }, [
@@ -1424,24 +1423,6 @@
       fit();
     };
     return { box, main, opts, onBtn, offBox, offHead, fors, list, text, show, expand, fit };
-  }
-  /** A switch for the welcome's show: the same, nothing wired, put at a state, its buttons floated
-   *  down or folded, one of them opened out, the red one's list opened and a row of it lit. */
-  function lookDemo() {
-    const sw = lookSwitch();
-    const { box, main, opts, fors, show, expand } = sw;
-    box.className = 'bcv-look-pill';
-    box.setAttribute('aria-hidden', 'true');
-    for (const b of box.querySelectorAll('button')) { b.tabIndex = -1; b.removeAttribute('title'); }
-    const setPos = (p, until = 0) => { show(p, until); main.removeAttribute('title'); };
-    setPos(1);
-    return {
-      el: box, opts, fors, setPos,
-      open: (yes) => box.classList.toggle('is-open', yes),
-      hover: (i) => { if (i === 1) sw.fit(); opts.forEach((b, k) => b.classList.toggle('is-hover', k === i)); }, // (red's words measured now it is drawn)
-      expand: (yes) => { expand(yes); for (const b of fors) b.tabIndex = -1; },
-      hoverFor: (j) => fors.forEach((b, k) => b.classList.toggle('is-hover', k === j)),
-    };
   }
   function mountLookToggle() {
     if (self.BCVBridge?.native || document.getElementById('bcv-look')) return; // the app has its own settings sheet
@@ -1538,11 +1519,6 @@
     if (codes.length) q.set('codes', codes.join(','));
     return `${REPORT_URL}?${q}`;
   }
-  /** The purple button for the welcome's show: the same markup and look, nothing wired. */
-  const reportDemo = () => h('span', { class: 'bcv-report-pill', 'aria-hidden': 'true' }, [
-    h('span', { class: 'bcv-report__lbl', text: 'Report a bug' }),
-    h('span', { class: 'bcv-report__dot', 'aria-hidden': 'true', html: BUG_MARK }),
-  ]);
   function mountReportButton() {
     if (self.BCVBridge?.native || document.getElementById('bcv-report')) return; // (the app: its own settings sheet has the way in)
     const btn = h('button', { type: 'button', id: 'bcv-report', class: 'bcv-report', title: 'Report a bug, an error, or an idea (opens simplcourses.com)', 'aria-label': 'Report a bug' }, [
@@ -1615,11 +1591,10 @@
       go('/?bcv=setup', { replace: true });
       return;
     }
-    // The page after the setup's reload comes back black, and the welcome (two pointers: the look
-    // switch, Away Refresh) plays on it once the switch is up to point at. The black goes up before
-    // the page draws, so the Dashboard is never seen first.
+    // The page after the setup's reload runs the guided tour (welcome.js) once the switch is up to
+    // light; its layer goes up before the page draws, so What's New waits for it.
     // (the setup's run, or — for anyone who had Simpl before the switch became a slider — the
-    // switch's own show alone, once; a phone's header has no switch, so no show there)
+    // switch's own steps alone, once; a phone's header has no switch, so none there)
     let welcome = state.lookOn && BCV.welcome ? await BCV.welcome.due() : false;
     if ((welcome === 'look' || welcome === 'report') && html.classList.contains('bcv-phone')) welcome = false; // (a phone's header has neither the switch nor the purple button)
     if (welcome === 'appearance' && html.classList.contains('bcv-phone')) { BCV.welcome.clear('appearance').catch(() => {}); welcome = false; } // (no sidebar, no Appearance button to point at)
@@ -1631,8 +1606,8 @@
     mountLookToggle();
     mountReportButton(); // (the purple button, left of the switch: Report a bug)
     if (state.lookOn) { BCV.tools?.mountTray?.(); BCV.tools?.focusLoad?.().catch(() => {}); } // the tray beside the switch (live activities, pinned tools); the focus timer's clock, so a session going is known
-    // (an update's own run: the switch's show, the purple button and the Tools row — everyone sees those once;
-    // an update from before the purple button: its stage alone, once; after
+    // (an update's own run: the switch's steps, the purple button and the Tools row — everyone sees those once;
+    // an update from before the purple button: its step alone, once; after
     // Personalize from the theme invitation: the Appearance button alone, where the themes live now)
     if (welcome) BCV.welcome.open(BCV.app, welcome === 'look' ? ['look', 'report', 'tools'] : welcome === 'report' ? ['report'] : welcome === 'appearance' ? ['appearance'] : welcome === 'search' ? ['search'] : null).catch(() => {});
     // The first Canvas page after an update shows what changed: once per version, never over the
@@ -1702,11 +1677,8 @@
     openSettings,
     recover, // (the suite checks that a quiz is never reloaded out from under)
     checkVersions, versionsDisagree, // (the suite makes the stamps disagree and reads what the page says)
-    awayPill, // (the welcome after the setup shows a copy of the pill)
     syncQuizFlag, // (the quiz screen says when an attempt opens and closes)
-    lookDemo, // (the welcome shows the switch working, on a copy of it)
     reportUrl, // (the purple button's address, for the tests)
-    reportDemo, reportMark: BUG_MARK, // (the welcome shows the purple button, on a copy of it)
     main: () => main,
   };
 

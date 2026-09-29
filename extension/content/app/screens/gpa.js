@@ -217,7 +217,7 @@
     screen.append(U.el('bcv-head', U.el('bcv-head__in', U.el('bcv-head__row', h('div', {}, [h('h1', { class: 'bcv-h1', text: 'Grades' }), sub])))), body);
     body.append(U.loading('cards', 6)); // course-card skeletons: the layout does not jump when the data lands
 
-    introIfFirst(ctx.app).catch(() => {}); // the first opening: the black goes up now, over the page drawing under it
+    introIfFirst(ctx.app).catch(() => {}); // the first opening: the tour's steps, waiting for the cards as they draw
     const [all, term, trackingPref, goalPref, targetsPref, snapsPref, hiddenPref, whatIfPref] = await Promise.all([
       store.courses({ maxAge: store.freshness.grades }).catch(() => null), store.currentTerm().catch(() => ''), // never a score older than the freshness: a tool may have posted one since
       store.pref('gpaTracking'), store.pref('gpaGoal'), store.pref('gradeTargets'), store.pref('gpaSnapshots'), store.pref('gpaHidden'), store.pref('whatIfScores', true),
@@ -640,7 +640,24 @@
         paint();
         ov.focus(); // the stepper that had focus was just redrawn; keep Escape working
       }
+      // a score typed, then a press elsewhere in the sheet (its X, a letter, another field): the field's
+      // change comes with the press, and a repaint then would swap the thing pressed out from under the
+      // pointer — its click lost. The repaint waits for the press to end (after its click).
+      let pressing = false;
+      let owed = false;
+      const release = () => {
+        if (!pressing) return;
+        pressing = false;
+        if (owed) setTimeout(() => { if (!owed) return; owed = false; if (ov.isConnected) paint(); }, 0);
+      };
+      ov.addEventListener('pointerdown', () => {
+        pressing = true;
+        document.addEventListener('pointerup', release, { capture: true, once: true });
+        document.addEventListener('pointercancel', release, { capture: true, once: true });
+      }, true);
+      const repaint = () => { if (pressing) owed = true; else paint(); };
       function paint() {
+        owed = false;
         const m = current || model();
         const r = m.rows.find((x) => x.c.id === c.id) || null; // null: no Canvas score yet, or a pass/fail course
         const pf = isPassFail(targets[c.id]);
@@ -724,7 +741,7 @@
           }
           const input = h('input', { type: 'text', inputmode: 'decimal', placeholder: '—', class: `bcv-whatif__input ${g.hypothetical ? 'is-hyp' : ''}`, dataset: { wf: g.id }, 'aria-label': `What-if score for ${g.name}`, value: wf.values[g.id] === undefined ? (g.earned === null ? '' : String(g.earned)) : wf.values[g.id] });
           input.addEventListener('focus', () => input.select());
-          input.addEventListener('change', () => { wf.values[g.id] = input.value.replace(/[^0-9.]/g, ''); focusId = null; paint(); });
+          input.addEventListener('change', () => { wf.values[g.id] = input.value.replace(/[^0-9.]/g, ''); focusId = null; repaint(); });
           input.addEventListener('keydown', (e) => { if (e.key === 'Enter') input.blur(); });
           const wrap = U.el('bcv-whatif', [input, U.text('bcv-whatif__possible', `/ ${store.fmtPts(g.possible)}`, 'span')]);
           wrap.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); }); // typing a what-if is not opening the row
@@ -1045,10 +1062,11 @@
     await Promise.all((starredCourses.length ? starredCourses : currentCourses).map((c) => store.assignmentGroups(c.id).catch(() => {})));
   }
 
-  // ---- the first opening: two pointers on black ------------------------------------------------
-  // The first time this page opens, the screen goes black and shows the two things that are not
-  // obvious from looking at it: a card's ring hovered for its breakdown, and what-if scores in a
-  // course's Details. Once, then never again (a flag in the extension's storage, the way Tools' is).
+  // ---- the first opening: the guided tour's Grades steps ---------------------------------------
+  // The first time this page opens, the tour (welcome.js) walks the two things that are not obvious
+  // from looking at it, on the page itself: a card's ring hovered for its breakdown, and what-if
+  // scores tried in a course's Details. Once, then never again (a flag in the extension's storage,
+  // the way Tools' is; the setup's tour sets it too when it has walked them).
   // A phone's Grades is another screen, and the app has its own first launch: neither sees it.
   const INTRO_KEY = 'welcome:grades';
   async function introIfFirst(app) {

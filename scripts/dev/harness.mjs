@@ -1,7 +1,7 @@
 // What the browser suites share: the harness's copy of the extension, with the product's longest
 // timers run short.
 //
-// The product waits three seconds before the welcome's Continue, plays a two-second word-mark before
+// The product holds each done step of the guided tour a moment and a half, plays a two-second word-mark before
 // the setup card and What's New, gives a screen fifteen seconds before loading it again, counts
 // three seconds down before an Away Refresh, keeps a tray island up for six, and rolls a counter for
 // most of a second. A suite walks through those dozens of times, and spent minutes watching timers
@@ -14,7 +14,7 @@ import { join } from 'node:path';
 
 /** The short values the copy runs with (ms). */
 export const TIMERS = {
-  welcomeWait: 900, // welcome.js WAIT: Continue comes in after this (3000 shipped; a suite reaching a stage late — after a settle or a roll — still finds it held back)
+  tourAfter: 450, // welcome.js AFTER: a done step's line holds this long before the next step (1300 shipped)
   introFade: 700, // setup.js / whatsnew.js: the word-mark starts to fade (1900 shipped)
   introDone: 900, // …and the card rises under it (2340 shipped)
   patience: 4000, // app.js SCREEN_PATIENCE: a screen still not drawn after this gives way (15000 shipped)
@@ -28,7 +28,7 @@ export const TIMERS = {
 
 /** file → [shipped text, the copy's text]; each shipped text must occur exactly once. */
 const PATCHES = [
-  ['content/app/welcome.js', 'const WAIT = 3000;', `const WAIT = ${TIMERS.welcomeWait};`],
+  ['content/app/welcome.js', 'const AFTER = 1300;', `const AFTER = ${TIMERS.tourAfter};`],
   ['content/app/setup.js', "ui.intro.classList.add('is-fading'); }, 1900));", `ui.intro.classList.add('is-fading'); }, ${TIMERS.introFade}));`],
   ['content/app/setup.js', "ui.main.classList.add('is-in'); } }, 2340));", `ui.main.classList.add('is-in'); } }, ${TIMERS.introDone}));`],
   ['content/app/whatsnew.js', "ui.intro.classList.add('is-fading'); }, 1900));", `ui.intro.classList.add('is-fading'); }, ${TIMERS.introFade}));`],

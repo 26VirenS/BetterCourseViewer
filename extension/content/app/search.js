@@ -352,7 +352,7 @@
     const r = app?.state?.route;
     if (!app || !r || !document.getElementById('bcv-app') || BCV.phone?.active?.()) return false;
     if (r.screen === 'native' || r.params?.get?.('bcv') === 'native' || app.state.quizOpen || document.documentElement.classList.contains('bcv-quiz')) return false;
-    return !document.querySelector('.bcv-sheet-ov, .bcv-viewer-ov, #bcv-welcome, #bcv-setup, .bcv-menu');
+    return !document.querySelector('.bcv-sheet-ov, .bcv-viewer-ov, #bcv-setup, .bcv-menu');
   };
   function summon() {
     const w = { text: '', at: Date.now(), done: false };

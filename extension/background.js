@@ -989,9 +989,9 @@ if (typeof importScripts === 'function' && !self.BCV_LAZY_MODULES) {
   }
 
   /** Settings → Developer → Simulate an update: what an update from `from` to this version does,
-   *  done again on purpose — the flags an update leaves (What's New from that version, the welcome
-   *  stages it owes, the updated page not yet shown), then every Canvas tab loaded again and the
-   *  updated page opened where this build has one — so the black stages and the notes can be seen as
+   *  done again on purpose — the flags an update leaves (What's New from that version, the tour
+   *  steps it owes, the updated page not yet shown), then every Canvas tab loaded again and the
+   *  updated page opened where this build has one — so the tour steps and the notes can be seen as
    *  someone updating from that version sees them. */
   async function devSimUpdate(from) {
     const v = String(from || '').trim();

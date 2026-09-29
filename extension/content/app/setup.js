@@ -11,9 +11,8 @@
  *   4 where those courses sit, on the sidebar or in a panel off the Courses row ·
  * then a read-back of what was chosen, and Continue to appearance writes it all at once and leads
  * into Personalize (content/app/personalize.js: the look, a colour, the courses' colours, photos),
- * whose Open Canvas reloads the page, which comes back black, with everything in place and the
- * welcome on it (content/app/welcome.js:
- * two pointers, the look switch and Away Refresh). Opened by ?bcv=setup (the toolbar popup's Set
+ * whose Open Canvas reloads the page, which comes back with everything in place and the guided
+ * tour on it (content/app/welcome.js). Opened by ?bcv=setup (the toolbar popup's Set
  * up, the account sheet on a phone, the app's first launch). A phone has no sidebar and no dashboard views to choose between: those two steps
  * are left out there. There is no Skip: an unconfigured install has nothing to show. */
 (function () {
@@ -547,7 +546,7 @@
     } catch (e) {
       console.error('[Simpl Courses setup]', e);
     }
-    if (BCV.welcome) await BCV.welcome.arm().catch(() => {}); // armed: the reloaded page comes back black, with the welcome on it
+    if (BCV.welcome) await BCV.welcome.arm().catch(() => {}); // armed: the reloaded page runs the guided tour
     // then the look, the colour and the photos: Personalize, in this same overlay, whose Open Canvas
     // loads the page afresh (the look last of all there — a change of it reloads on its own)
     st.closing = false;

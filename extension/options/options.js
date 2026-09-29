@@ -901,13 +901,13 @@
     devQuizPaint();
   });
 
-  // State: the flags the setup, the welcome and What's New leave (settings, courses and photos are not flags), and the error codes kept for a report — the extension's, asked for (devRpc)
+  // State: the flags the setup, the tour and What's New leave (settings, courses and photos are not flags), and the error codes kept for a report — the extension's, asked for (devRpc)
   const devErrorsPaint = (r) => {
     if (!r?.ok) { $('devErrors').textContent = r?.message || 'The background is not answering.'; return; }
     $('devErrors').textContent = r.errors.length ? r.errors.map((x) => `${new Date(x.at).toLocaleString()}  ${x.code}`).join('\n') : 'None yet.';
   };
   $('devResetFlags').addEventListener('click', async () => {
-    if (!confirm('Reset the setup, the welcome and What’s New?\n\nThe next Canvas page runs the setup again. Settings, courses and photos stay.')) return;
+    if (!confirm('Reset the setup, the tour and What’s New?\n\nThe next Canvas page runs the setup again. Settings, courses and photos stay.')) return;
     const r = await devAsk({ type: 'devState', op: 'resetFlags' }, { note: 'devStateMsg' });
     if (r?.ok) devSay('devStateMsg', `${r.cleared} ${r.cleared === 1 ? 'flag' : 'flags'} cleared. The next Canvas page runs the setup.`);
     devErrorsPaint(r);

@@ -25,6 +25,11 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.98.43', date: '2026-09-29', notes: [
+      { kind: 'new', title: 'A guided tour', body: 'Your own page, lit one part at a time.', icon: P.steps },
+      { kind: 'improved', title: 'Try each step', body: 'Do it yourself; the tour moves on once you have.', icon: P.check },
+      { kind: 'fixed', title: 'What-if closes at once', body: 'Close works first press after typing a score.', icon: P.check },
+    ] },
     { version: '2.98.42', date: '2026-09-29', notes: [
       { kind: 'improved', title: 'Clearer Appearance', body: 'Light, dark and auto as cards; a clear preview.', icon: P.eye },
       { kind: 'new', title: 'Two new themes', body: 'Peaks and City, and richer drawn scenes.', icon: P.pic },

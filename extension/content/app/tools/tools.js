@@ -1530,10 +1530,10 @@
     return el;
   }
 
-  // ---- the first press: two pointers on black ------------------------------------------------
-  // The first time Tools opens, the screen goes black and says what it is, then shows the drag —
-  // a card pulled to the top turning into a pin beside the switch (a phone has no switch, so it
-  // gets the first pointer alone). Once, then never again.
+  // ---- the first press: the guided tour's Tools steps ------------------------------------------
+  // The first time Tools opens, the tour (welcome.js) says what it is, then asks for the drag — a
+  // card pulled up to the top, turning into a pin beside the switch (Not now passes it; a phone has
+  // no switch, so it gets the first step alone). Once, then never again.
   const WELCOME_KEY = 'tools:welcomed';
   async function welcomeIfFirst(app) {
     if (!BCV.welcome) return false;

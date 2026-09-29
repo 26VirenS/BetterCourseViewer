@@ -1,131 +1,211 @@
-/* The pointers on black: the screen goes black and one thing at a time is pointed at and named,
- * with a Continue that comes in after a few seconds; the last Continue takes the black away.
- * Two runs use it. After the setup, the reloaded page comes back black (the flag is read before
- * the page draws, so the Dashboard is never seen first) and points at the look switch at the top
- * right — a copy of the real one, shown working: a pointer comes to it, rests on green, moves onto
- * red (it grows into how long under the pointer) and picks an hour, then green again, the words in the middle of the
- * screen with a big arrow up to it — then at the purple Report a bug button beside it (a copy, a
- * pointer pressing it; shown alone, once, to anyone who updates from before it) — then at a mock Away Refresh
- * pill counting its three seconds down in slow motion, then at three rows of the sidebar in turn
- * — Grades, Courses (and the starred courses listed under it, when they are), Tools — each seen
- * through a hole in the black with an arrow at it, then at the Dashboard's way in: the
- * real Due this week card pressed, its sheet opening, an item previewed beside the list. The first time Tools
- * opens, it says what Tools is, then shows the drag: a card pulled to the top turning into a pin
- * beside the switch. A phone has no switch in its header, so it gets the pointers that need none; the app
- * (no switch, no Away Refresh) never sees the setup's. Anyone who had Simpl before the switch
- * became a slider gets its show alone, once: their What's New mark is from before it. */
+/* The guided tour (2.98.43): in the black screens' place. The page stays as it is and the student
+ * works it: one thing at a time is lit — the page dimmed and blurred away from it, more the further
+ * from it, and a ring round it — with a card beside it that says what it is and what to do, and a
+ * small pointer that shows the gesture (a press, a hover, typing, a drag). Most steps wait for the
+ * thing to be done — the switch opened, green pressed, red hovered, a length picked (practice: the
+ * press is caught and Simpl stays on), Grades opened, a ring hovered, a score tried, a card opened,
+ * the search box typed in — and move on by themselves once it is; a few only say what something is
+ * and have a Next. Outside the lit place the page is held still (a press there nudges the card; the
+ * wheel still scrolls whatever is under it). When the thing is out of sight — a short or zoomed
+ * window, a sidebar that scrolls — the card says which way to scroll, its arrow bouncing that way,
+ * and the step waits for it to come into view. Skip tour ends it at any time.
+ *
+ * The runs are the black screens' own, on the same flags: after the setup (the switch, the purple
+ * button, Away Refresh when it is on, Grades and a card's breakdown and what-if scores, the Courses
+ * and Tools rows, the Dashboard's cards and the preview, the search box); the switch's steps alone
+ * for anyone who had Simpl before the slider; the purple button's for anyone updating from before
+ * it; the Appearance button after Personalize from the theme invitation; the search box for anyone
+ * set up before it; and the first openings of Tools and of Grades. A phone gets what it has (no
+ * switch, no sidebar): the counters, the sheet, the search box. */
 (function () {
   const BCV = (self.BCV = self.BCV || {});
   const { h } = BCV.utils;
   const html = document.documentElement;
   const KEY = 'welcome:pending'; // the setup's run, armed for the reloaded page
-  const KEY3 = 'welcome:appearance';
-  const KEY4 = 'welcome:search'; // the Dashboard's search box pointed out, once (with the setup's run, or alone for anyone who had Simpl before it) // the pointer at the sidebar's Appearance button, armed by the theme invitation (whatsnew.js) for the page after Personalize
-  const KEY2 = 'welcome:look5'; // the switch's show seen (with the setup's run, or alone after an update); a new key when the show is redrawn, so everyone sees the new one once
+  const KEY3 = 'welcome:appearance'; // the pointer at the sidebar's Appearance button, armed by the theme invitation (whatsnew.js) for the page after Personalize
+  const KEY4 = 'welcome:search'; // the search box pointed out, once (with the setup's run, or alone for anyone who had Simpl before it)
+  const KEY2 = 'welcome:look5'; // the switch's steps seen (with the setup's run, or alone after an update)
   const OLD_KEYS = ['welcome:look2', 'welcome:look3', 'welcome:look4']; // the marks of the shows before it, cleared when this one is seen
-  const LOOK2_SINCE = '2.58.0'; // the show's own version: a What's New mark from before it means the show is owed
-  const KEY5 = 'welcome:report1'; // the purple button's stage seen (with the setup's run, or alone after an update)
-  const REPORT_SINCE = '2.98.20'; // its own version: a What's New mark from before it means the stage is owed (everyone who updates sees it once)
+  const LOOK2_SINCE = '2.58.0'; // a What's New mark from before the slider means the switch's steps are owed
+  const KEY5 = 'welcome:report1'; // the purple button's step seen
+  const REPORT_SINCE = '2.98.20'; // a What's New mark from before the purple button means its step is owed
+  const GRADES_KEY = 'welcome:grades'; // the Grades page's steps seen (screens/gpa.js runs them on its first opening)
+  const NS = 'http://www.w3.org/2000/svg';
+  const PAD = 10; // the lit place's margin round the thing
+  const AFTER = 1300; // how long a done step's line holds before the next step (half that with no line)
   const CURSOR = '<svg viewBox="0 0 24 24" width="26" height="26"><path d="M5 3l14 9-6 1.5 3.5 6.5-2.5 1.5-3.5-6.5L6 19z" fill="#fff" stroke="#1c1c1e" stroke-width="1.4" stroke-linejoin="round"/></svg>';
-  const WAIT = 3000; // Continue comes in after this long, on each stage: time to take the pointer in first
-  const LEAVE = 260; // a stage's fade-out (app.css: bcv-welcome-out)
-
-  // key → the stage: its layout (app.css: .bcv-welcome__stage[data-stage]), the lines, an arrow
-  // (viewBox size, the line, the head) and the thing pointed at, built when the stage opens
-  const STAGES = {
-    look: {
-      layout: 'look', title: 'Just in case:', hint: ['To turn on Simpl, press green.', 'To turn off Simpl, press red.'], stops: [1, -1],
-      sub: 'Red asks how long: this page only, 30 minutes, 1 hour, 4 hours, 1 day, or indefinitely.',
-      prop: (app, ctx) => lookShow(app, ctx),
-    },
-    // the purple button left of the switch (2.98.20): the words in the middle, a big arrow up to a copy
-    // of it beside the switch's copy, a pointer that comes to it and presses it
-    report: {
-      layout: 'look', title: 'Found a bug? Missing something?', hint: ['To report a bug or ask for a feature, press purple.'], stops: ['report'],
-      sub: 'Bug, error, crash, a reason you turned Simpl off, a missing feature, or an idea. Add screenshots if you like; the error codes Simpl showed are filled in. It opens on simplcourses.com.',
-      prop: (app) => reportShow(app), target: (prop) => prop?.querySelector?.('.bcv-welcome__report'),
-    },
-    away: {
-      layout: 'away', kicker: 'Away Refresh', title: 'Click to cancel, or hold to disable', hint: 'Away refresh prevents errors that show up after you’ve been gone for a while',
-      arrow: { w: 100, ht: 150, line: 'M50 140L50 14', head: 'M28 38L50 14L72 38' },
-      prop: (app) => awayMock(app),
-    },
-    // the sidebar's rows, each shown through a hole in the black with an arrow at it (a phone has no sidebar: left out there)
-    grades: {
-      layout: 'side', kicker: 'Grades', title: 'All your grades, in one place', hint: 'Every course’s grade and its breakdown, side by side — and what you need on what’s left.',
-      spot: () => navRow('gpa'),
-    },
-    courses: {
-      layout: 'side', kicker: 'Courses', title: 'See all your courses here',
-      hint: () => (favsGroup() ? '' : 'Hover it to reach any course; the ones you star come first.'),
-      spot: () => navRow('courses'), also: () => { const g = favsGroup(); return g ? { el: g, text: 'See your current classes here' } : null; },
-    },
-    // the sidebar's Appearance button, after Personalize was tried from the theme invitation: where the themes live from now on
-    appearance: {
-      layout: 'side', kicker: 'Appearance', title: 'Themes can be accessed here', hint: 'Press Appearance any time to change the colour, the photos or the look.',
-      spot: () => { const el = themeBtn(); el?.scrollIntoView({ block: 'nearest' }); return el; }, // (at the sidebar's foot: brought into its view when the rows above run past it)
-    },
-    // the Dashboard's search box (content/app/search.js), seen through a hole with the words under it
-    search: {
-      layout: 'below', title: 'Search Everything.', hint: 'Courses, assignments, pages, discussions, files, people — and Wikipedia — from one box.',
-      spot: () => searchBox(),
-    },
-    tools: {
-      layout: 'side', kicker: 'Tools', title: 'Some tools, and some widgets',
-      hint: { parts: [['Find a ', null], ['PDF Editor, ', '#ff9f0a'], ['File Converter, ', '#34c759'], ['Calculators, ', '#bf5af2'], ['Flashcards, ', '#2f7cf6'], ['Citation Generator', '#64d2ff'], [' & more.', '#ffffff']] }, // (each kind in a colour of its own)
-      spot: () => navRow('tools'),
-    },
-    toolsIntro: { layout: 'center', title: 'Some helpful things', hint: 'Some tools to help you do more, quickly.' },
-    pin: {
-      layout: 'demo', kicker: 'Tools', title: 'Drag a tool to the top', hint: 'It becomes a small button next to the Simpl Courses switch, on every page.',
-      prop: (app, ctx) => pinDemo(app, ctx.look),
-    },
-    // the Dashboard's way in, on the Dashboard itself (2.98.18): the real Due this week card pressed, its real sheet
-    // opening, a row of it previewed beside the list — seen through a hole that follows them; the drawing where there is no card
-    peek: {
-      layout: () => (weekCard() ? 'peek' : 'demo'), holes: () => !!weekCard(), kicker: 'Dashboard', title: 'Click any of the dashboard cards to see more', hint: 'Click an assignment, announcement, etc. to preview it.',
-      prop: () => (weekCard() ? peekReal() : peekDemo()),
-    },
-    // the Grades page's first opening (screens/gpa.js): a card's ring hovered for its breakdown,
-    // then what-if scores in a course's Details
-    gradeHover: {
-      layout: 'demo', kicker: 'Grades', title: 'Hover over a card to see a quick breakdown', hint: 'The ring opens into the groups behind the grade; leave it and it folds back.',
-      prop: () => hoverDemo(),
-    },
-    whatIf: {
-      layout: 'demo', kicker: 'Grades', title: 'What if? Grades', hint: 'Open a course’s Details, press “Try what-if scores” and change any score to see where the grade would land. Nothing is saved.',
-      prop: () => whatIfDemo(),
-    },
+  // the card's action line: what to do, drawn as a glyph before the words
+  const GLYPH = {
+    hover: 'M5 3l14 9-6 1.5 3.5 6.5-2.5 1.5-3.5-6.5L6 19z',
+    click: 'M9 9l11 4-4.6 1.4L13 19zM6 3v3M2.5 6.5l2 2M3 12h3M12 3.5l-1.5 2',
+    type: 'M3 7h18v10H3zM7 11h.01M11 11h.01M15 11h.01M8 14h8',
+    drag: 'M12 3v18M3 12h18M12 3l-3 3M12 3l3 3M12 21l-3-3M12 21l3-3M3 12l3-3M3 12l3 3M21 12l-3-3M21 12l-3 3',
+    next: 'M5 12h14M13 6l6 6-6 6',
+    done: 'M20 6L9 17l-5-5',
+    down: 'M12 4v16M6 14l6 6 6-6', up: 'M12 20V4M6 10l6-6 6 6', left: 'M20 12H4M10 6l-6 6 6 6', right: 'M4 12h16M14 6l6 6-6 6',
   };
+  const reduced = () => !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  const phone = () => html.classList.contains('bcv-phone') || !!BCV.phone?.active?.();
 
-  /** A row of the sidebar's nav, when it is on the page and drawn (a phone has none). */
-  const navRow = (key) => { const el = document.querySelector(`#bcv-side .bcv-nav__item[data-nav="${key}"]`); return el && el.getBoundingClientRect().width > 0 ? el : null; };
-  /** The sidebar's Appearance button, when it is on the page and drawn (a phone has none). */
-  const themeBtn = () => { const el = document.getElementById('bcv-theme-btn'); return el && el.getBoundingClientRect().width > 0 ? el : null; };
-  /** The Dashboard's Due this week card, when it is on the page and drawn (the Dashboard alone has it). */
-  const weekCard = () => { const el = document.querySelector('#bcv-app .bcv-stat[data-stat="week"]'); return el && el.getBoundingClientRect().width > 0 ? el : null; };
-  /** The search box, when it is on the page (the Dashboard's header, or the phone's Today under its title). */
-  const searchBox = () => { const el = document.getElementById('bcv-omni-box'); return el && el.getBoundingClientRect().width > 0 ? el : null; };
-  /** A row under the switch's show: the switch's own button for that stop — the round face in its
-   *  colour with its glyph, the same classes the page's switch wears (app.lookDemo) — small and still. */
-  function stopSwitch(app, stop) {
-    if (stop === 'report') return h('span', { class: 'bcv-welcome__stopsw bcv-welcome__stopsw--report', dataset: { stop: 'report' }, 'aria-hidden': 'true', html: app?.reportMark || '' }); // (the purple button's face)
-    const demo = app?.lookDemo?.();
-    if (!demo) return null;
-    const i = [1, -1].indexOf(stop); // the switch's buttons, top to bottom: green on, red off
-    const src = demo.opts[i];
-    if (!src) return null;
-    const dot = (src.matches('button') ? src : src.querySelector('.bcv-look__offhead'))?.querySelector('.bcv-look__optdot')?.cloneNode(true);
-    return h('span', { class: 'bcv-look__opt bcv-welcome__stopsw', dataset: { stop: String(stop) }, style: { '--bcv-opt': src.style.getPropertyValue('--bcv-opt') }, 'aria-hidden': 'true' }, dot ? [dot] : []);
-  }
+  // ---- the things the steps light: found afresh on every frame (a redraw swaps the elements) --------
+  /** An element when it is on the page and drawn: laid out, not hidden, not see-through. */
+  const drawn = (el) => {
+    if (!el || !el.isConnected) return null;
+    const r = el.getBoundingClientRect();
+    if (r.width < 1 || r.height < 1) return null;
+    const cs = getComputedStyle(el);
+    return cs.visibility === 'hidden' || cs.display === 'none' || Number(cs.opacity) < 0.05 ? null : el;
+  };
+  const $ = (sel) => drawn(document.querySelector(sel));
+  const look = () => $('#bcv-look');
+  const inLook = (sel) => drawn(document.getElementById('bcv-look')?.querySelector(sel));
+  const lookOpen = () => { const m = document.querySelector('#bcv-look .bcv-look__menu'); return !!m && getComputedStyle(m).visibility === 'visible'; };
+  const redOpen = () => !!document.querySelector('#bcv-look .bcv-look__opt--off.is-expanded');
+  const navRow = (key) => $(`#bcv-side .bcv-nav__item[data-nav="${key}"]`);
+  const onScreen = (key) => !!document.querySelector(`#bcv-side .bcv-nav__item.is-active[data-nav="${key}"]`);
+  /** The sidebar's list of starred courses, when they are listed there (the group with course rows in it). */
+  const favsGroup = () => drawn([...document.querySelectorAll('#bcv-side .bcv-side__group')].find((el) => el.querySelector('.bcv-fav')) || null);
+  const weekCard = () => $('#bcv-app .bcv-stat[data-stat="week"]') || $('.bcv-ph-stats .bcv-ph-stat:nth-child(2)'); // (the Dashboard's Due this week, or Today's This week on a phone)
+  const sheet = () => $('.bcv-sheet-ov .bcv-sheet');
+  const sheetClose = () => $('.bcv-sheet-ov .bcv-sheet__close');
+  const firstRow = () => $('.bcv-sheet-ov .bcv-sheet__row');
+  const searchBox = () => $('#bcv-omni-box');
+  const searchPanel = () => $('#bcv-omni-panel');
+  const report = () => $('#bcv-report');
+  const themeBtn = () => $('#bcv-theme-btn');
+  /** The first of the Grades page's cards whose ring opens into groups (a course with groups to show). */
+  const ringCard = () => [...document.querySelectorAll('.bcv-gpa__card')].find((c) => drawn(c.querySelector('.bcv-gpa__ringbox[title]'))) || null;
+  const pinnedN = () => document.querySelectorAll('.bcv-tool-card.is-pinned').length;
 
-  /** The sidebar's list of starred courses, when they are listed there (not kept in a panel off the
-   *  Courses row): the group with course rows in it — "More from Canvas" is a group too, and not it. */
-  const favsGroup = () => { const g = [...document.querySelectorAll('#bcv-side .bcv-side__group')].find((el) => el.querySelector('.bcv-fav')); return g && g.getBoundingClientRect().height > 0 ? g : null; };
+  // ---- the steps -----------------------------------------------------------------------------------
+  // A step: what it lights (target, and the area a hand may move in when it is bigger — the switch's
+  // menu under its disc), its words (title, body, doing: the action line), the gesture its pointer
+  // shows (act: hover · click · type · drag · next), and when it is done (done(), or an event of the
+  // page's own that on[type] says counts); after: a line said as it is done. when(): whether the run
+  // has it at all; skip(): passed over as it comes (already so); wait: how long a thing that is not
+  // there yet is waited for before the step is passed over. hold: 'look' keeps the switch open while
+  // the step is on. free: nothing held still (a phone's sheet closes with a tap outside it).
+  const LIB = {
+    look: () => {
+      let picked = '';
+      const lookArea = () => [look(), inLook('.bcv-look__menu .bcv-look__opt--on'), inLook('.bcv-look__opt--off')];
+      return [
+        { id: 'look', name: 'the switch', target: () => inLook('.bcv-look__main'), area: () => [look()], when: () => !!look() && !phone(),
+          title: 'The Simpl switch', body: 'Simpl runs on top of Canvas, and this switch turns it on and off.', act: 'hover', doing: 'Hover over the switch',
+          done: lookOpen, after: 'It opens into green and red.' },
+        { id: 'look-green', name: 'green', target: () => inLook('.bcv-look__opt--on'), area: lookArea, hold: 'look', when: () => !!look() && !phone(),
+          title: 'Green: Simpl on', body: 'Green turns Simpl on. It is on now — this is how you come back to it.', act: 'click', doing: 'Click green',
+          on: { click: (e) => !!e.target.closest?.('#bcv-look .bcv-look__opt--on') }, after: 'Simpl is on.' },
+        { id: 'look-red', name: 'red', target: () => inLook('.bcv-look__offhead'), area: lookArea, hold: 'look', when: () => !!look() && !phone(),
+          title: 'Red: Simpl off', body: 'Red turns Simpl off and Canvas comes back as it was — for this page, for a while, or until you turn it on.', act: 'hover', doing: 'Hover over red',
+          done: redOpen, after: 'It opens into how long.' },
+        { id: 'look-for', name: 'the list', target: () => inLook('.bcv-look__for'), area: lookArea, hold: 'look', when: () => !!look() && !phone(),
+          title: 'How long', body: 'This page only, 30 minutes, 1 hour, 4 hours, 1 day, or until you turn it back on. Try one: it is practice, and Simpl stays on.', act: 'click', doing: 'Pick how long',
+          ready: redOpen, unready: { target: () => inLook('.bcv-look__offhead'), act: 'hover', doing: 'Hover over red again to see the list' },
+          on: { click: (e) => { const b = e.target.closest?.('#bcv-look .bcv-look__forbtn'); if (!b) return false; e.preventDefault(); e.stopImmediatePropagation(); picked = b.textContent.trim(); return true; } }, // (caught before the switch's own: nothing turns off)
+          after: () => `${picked || 'That'}: Simpl would turn off. Not now — it stays on.` },
+      ];
+    },
+    // the purple button left of the switch (2.98.20)
+    report: () => [
+      { id: 'report', name: 'the purple button', target: report, when: () => !!report() && !phone(),
+        title: 'Report a bug', body: 'Found a bug, or missing something? The purple button opens a report on simplcourses.com, with the error codes Simpl showed filled in.', act: 'hover', doing: 'Hover over the purple button',
+        done: () => !!report()?.matches(':hover, :focus-visible'), after: 'Press it any time to tell us.' },
+    ],
+    // Away Refresh (off unless turned on, 2.98.13): its pill only shows after time away, so it is told, not shown
+    away: (app) => [
+      { id: 'away', target: null, when: () => app?.state?.settings?.appearance?.awayRefresh !== false,
+        title: 'Away Refresh', body: 'Come back after a while and a pill at the top counts down three seconds, then refreshes the page so nothing is stale. Click to cancel, or hold to disable.', act: 'next' },
+    ],
+    // Grades: the row pressed, then the page's own — a ring's breakdown, a course's what-if scores
+    grades: () => (!navRow('gpa') || phone() ? [] : [
+      { id: 'grades', name: 'Grades', where: 'sidebar', target: () => navRow('gpa'), when: () => !!navRow('gpa'),
+        title: 'Grades', body: 'Every course’s grade and its breakdown, side by side — and what you need on what’s left.', act: 'click', doing: 'Click Grades',
+        done: () => onScreen('gpa') },
+      ...LIB.gradePage(),
+    ]),
+    gradePage: () => [
+      { id: 'grade-ring', name: 'a card', target: () => drawn(ringCard()?.querySelector('.bcv-gpa__ringbox')), area: () => [ringCard()], wait: 9000, grades: true,
+        title: 'A quick breakdown', body: 'A card’s ring opens into the groups behind the grade — homework, quizzes, exams.', act: 'hover', doing: 'Hover over a card’s ring',
+        done: () => !!document.querySelector('.bcv-gpa__card.is-hover'), after: 'Leave it and it folds back.' },
+      { id: 'grade-details', name: 'Details', target: () => drawn((ringCard() || document).querySelector('.bcv-gpa__details')), grades: true,
+        title: 'What if?', body: 'A course’s Details lists everything graded — and lets you try scores.', act: 'click', doing: 'Click Details',
+        done: () => !!sheet() },
+      { id: 'grade-try', name: 'the what-if button', target: () => $('.bcv-sheet-ov .bcv-whatif-btn'), area: () => [sheet()], grades: true,
+        title: 'Try what-if scores', body: 'The scores turn into fields you can change.', act: 'click', doing: 'Click “Try what-if scores”',
+        done: () => !!$('.bcv-sheet-ov .bcv-whatif-btn.is-on') },
+      { id: 'grade-field', name: 'a score', target: () => $('.bcv-sheet-ov .bcv-whatif__input'), area: () => [sheet()], grades: true,
+        title: 'Change a score', body: 'Type any score and the grade follows. Nothing is saved and nothing is sent.', act: 'type', doing: 'Change a score',
+        on: { input: (e) => !!e.target.closest?.('.bcv-sheet-ov .bcv-whatif__input') }, after: 'That is where the grade would land.' },
+      { id: 'grade-close', name: 'the close button', target: sheetClose, area: () => [sheet()], grades: true,
+        title: 'Back to the real scores', body: 'Close it when you are done: the real scores come back.', act: 'click', doing: 'Close it',
+        done: () => !document.querySelector('.bcv-sheet-ov') },
+    ],
+    courses: () => [
+      { id: 'courses', name: 'Courses', where: 'sidebar', target: () => navRow('courses'), area: () => [navRow('courses'), favsGroup()], when: () => !!navRow('courses'),
+        title: 'Your courses', body: () => (favsGroup() ? 'Your current classes are under it; Courses has every one.' : 'Hover it to reach any course; the ones you star come first.'), act: 'next' },
+    ],
+    tools: () => [
+      { id: 'tools', name: 'Tools', where: 'sidebar', target: () => navRow('tools'), when: () => !!navRow('tools'),
+        title: 'Tools and widgets', body: [['Find a ', ''], ['PDF Editor, ', '#ff9f0a'], ['File Converter, ', '#34c759'], ['Calculators, ', '#bf5af2'], ['Flashcards, ', '#2f7cf6'], ['Citation Generator', '#40c8e0'], [' & more.', '']], act: 'next' },
+    ],
+    // back on the Dashboard (when Grades took the student away), for its cards
+    home: () => [
+      { id: 'home', name: 'Dashboard', where: 'sidebar', target: () => navRow('dashboard'), when: () => !!navRow('dashboard'), skip: () => onScreen('dashboard'),
+        title: 'Back to the Dashboard', body: 'Everything due and new, at a glance.', act: 'click', doing: 'Click Dashboard',
+        done: () => onScreen('dashboard') },
+    ],
+    // the Dashboard's way in (2.98.18): a card's own sheet, an item previewed beside the list
+    peek: () => [
+      { id: 'peek', name: 'Due this week', target: weekCard, wait: 6000,
+        title: 'The cards open', body: 'Each card on the Dashboard opens the list it counts.', act: 'click', doing: phone() ? 'Tap This week' : 'Click Due this week',
+        done: () => !!sheet() },
+      { id: 'peek-row', name: 'an item', target: firstRow, area: () => [sheet()], when: () => !phone(),
+        title: 'A quick look', body: 'An assignment, an announcement, anything: it opens beside the list, without leaving the page.', act: 'click', doing: 'Click an item',
+        done: () => !!$('.bcv-sheet-ov .bcv-pv') },
+      phone()
+        ? { id: 'peek-close', target: () => $('.bcv-sheet-ov .bcv-ph-sheet__handle') || sheet(), area: () => [sheet()], free: true,
+          title: 'Close it', body: 'Swipe it down, or tap above it.', act: 'click', doing: 'Close the sheet',
+          done: () => !document.querySelector('.bcv-sheet-ov') }
+        : { id: 'peek-close', name: 'the close button', target: sheetClose, area: () => [sheet()],
+          title: 'Close it', body: 'The page is where you left it.', act: 'click', doing: 'Close it',
+          done: () => !document.querySelector('.bcv-sheet-ov') },
+    ],
+    search: () => [
+      { id: 'search', name: 'the search box', target: searchBox, area: () => [searchBox(), searchPanel()], wait: 4000,
+        title: 'Search everything', body: 'Courses, assignments, pages, discussions, files, people — and Wikipedia — from one box. Type / for commands.', act: 'type', doing: 'Type anything',
+        done: () => (document.getElementById('bcv-omni')?.value || '').trim().length >= 2, after: 'Press a result to open it.' },
+    ],
+    // the sidebar's Appearance button, after Personalize was tried from the theme invitation
+    appearance: () => [
+      { id: 'appearance', name: 'Appearance', where: 'sidebar', target: themeBtn, wait: 4000,
+        title: 'Themes live here', body: 'Appearance holds Light, Dark and Personalize — the colour, the photos and the look — any time.', act: 'click', doing: 'Click Appearance',
+        done: () => !!$('.bcv-menu--theme'), after: 'Personalize opens the theme editor.' },
+    ],
+    // the first opening of Tools (tools.js)
+    toolsIntro: () => [
+      { id: 'tools-intro', target: null, title: 'Some helpful things', body: 'Tools to help you do more, quickly: a PDF editor, a file converter, calculators, flashcards, citations and more.', act: 'next' },
+    ],
+    pin: () => {
+      let before = 0;
+      return [
+        { id: 'pin', name: 'a tool', target: () => $('.bcv-tool-card[data-tool="pomo"]') || $('.bcv-tool-card'), when: () => !phone() && !self.BCVBridge?.native, optional: true, // (where the switch is: not yet mounted, maybe, as the Tools page opens)
+          start: () => { before = pinnedN(); },
+          title: 'Pin a tool', body: 'Drag a tool up to the top of the page: it becomes a small button beside the switch, on every page.', act: 'drag', doing: 'Drag a tool to the top',
+          dragTo: () => { const l = look()?.getBoundingClientRect(); return l ? { x: l.left - 60, y: l.top + l.height / 2 } : null; },
+          done: () => pinnedN() > before, after: 'Pinned: it waits beside the switch.' },
+      ];
+    },
+    // the setup's last
+    end: () => [
+      { id: 'end', target: null, title: 'You’re all set', body: 'That is the tour. Take it again any time from Settings → General → See it again.', act: 'next', nextLabel: 'Done' },
+    ],
+  };
+  LIB.gradeHover = LIB.gradePage; // (the Grades page's first opening asks for these two; the five steps are one run)
+  LIB.whatIf = () => [];
 
-  let ui = null; // the welcome on show: { el, stage: { key, box, prop, next } | null, timer }
+  let ui = null; // the tour on show
   const active = () => !!ui;
-  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
   /** The setup arms its run just before reloading the page; the theme invitation arms the pointer at
    *  Appearance ('appearance') as it opens Personalize, whose Open Canvas reloads the page. */
@@ -136,9 +216,8 @@
     try { await BCV.api.storage.local.remove(run === 'appearance' ? KEY3 : KEY); } catch { /* already gone */ }
   }
   const older = (a, b) => { const x = String(a).split('.').map(Number), y = String(b).split('.').map(Number); for (let i = 0; i < 3; i++) { if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) < (y[i] || 0); } return false; };
-  /** Which run this page owes: 'setup' (the setup's, armed), 'appearance' (the pointer at the
-   *  Appearance button, armed by the theme invitation), 'look' (the switch's show alone, once, for
-   *  anyone who had Simpl before the slider), or none. */
+  /** Which run this page owes: 'setup', 'appearance', 'look' (the switch's steps alone, once, for
+   *  anyone who had Simpl before the slider), 'report', 'search', or none. */
   async function due() {
     if (self.BCVBridge?.native) { await clear(); await clear('appearance'); return false; } // the app: no switch, no Away Refresh, no sidebar
     try {
@@ -146,485 +225,357 @@
       if (f[KEY] === true) return 'setup';
       if (f[KEY3] === true) return 'appearance';
       if (f['setup:done'] && !f[KEY2] && typeof f['whatsnew:seen'] === 'string' && older(f['whatsnew:seen'], LOOK2_SINCE)) return 'look';
-      if (f['setup:done'] && !f[KEY5] && typeof f['whatsnew:seen'] === 'string' && older(f['whatsnew:seen'], REPORT_SINCE)) return 'report'; // (updated from before the purple button: its stage, once)
-      if (f['setup:done'] && !f[KEY4]) return 'search'; // (the setup's run marks it; anyone set up before the box gets it once, on the Dashboard)
+      if (f['setup:done'] && !f[KEY5] && typeof f['whatsnew:seen'] === 'string' && older(f['whatsnew:seen'], REPORT_SINCE)) return 'report';
+      if (f['setup:done'] && !f[KEY4]) return 'search';
     } catch { /* nothing to read: nothing owed */ }
     return false;
   }
 
-  /** The black, now: before the page draws, so the reload comes back black and stays that way. */
+  // ---- the layer --------------------------------------------------------------------------------
+  /** The tour's layer, put up before the page draws when a run is owed (so What's New waits): nothing
+   *  shows until the first step. */
   function cover() {
-    if (ui) return ui.el;
-    const el = h('div', { id: 'bcv-welcome', class: 'bcv-welcome', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Welcome to Simpl Courses', tabindex: '-1' });
-    // Enter (or Space) is Continue once it is there; the black itself holds the focus, so no ring sits on the button
-    el.addEventListener('keydown', (e) => {
-      if (e.key !== 'Enter' && e.key !== ' ') return;
-      const next = ui?.stage?.next;
-      if (!next || next.hidden || e.target === next) return;
+    if (ui) return ui.root;
+    const id = Math.random().toString(36).slice(2, 8);
+    const veil = document.createElementNS(NS, 'svg');
+    veil.setAttribute('class', 'bcv-tour__veil');
+    veil.setAttribute('aria-hidden', 'true');
+    // the dim: a radial gradient centred on the lit place — light round it, darker the further away —
+    // through a mask with the place cut out of it, its edge softened
+    veil.innerHTML = `<defs><radialGradient id="bcv-tour-g-${id}" gradientUnits="userSpaceOnUse" cx="0" cy="0" r="1"><stop offset="0" stop-color="#000" stop-opacity=".14"/><stop offset=".1" stop-color="#000" stop-opacity=".2"/><stop offset=".4" stop-color="#000" stop-opacity=".5"/><stop offset="1" stop-color="#000" stop-opacity=".68"/></radialGradient><filter id="bcv-tour-f-${id}" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="5"/></filter><mask id="bcv-tour-m-${id}"><rect width="100%" height="100%" fill="#fff"/><rect class="bcv-tour__hole" x="0" y="0" width="0" height="0" rx="14" fill="#000" filter="url(#bcv-tour-f-${id})"/></mask></defs><rect width="100%" height="100%" fill="url(#bcv-tour-g-${id})" mask="url(#bcv-tour-m-${id})"/>`;
+    const blur = h('div', { class: 'bcv-tour__blur', 'aria-hidden': 'true' });
+    const blocks = [0, 1, 2, 3].map(() => h('div', { class: 'bcv-tour__block', 'aria-hidden': 'true' }));
+    const ring = h('div', { class: 'bcv-tour__ring', 'aria-hidden': 'true' });
+    const hand = h('span', { class: 'bcv-tour__hand', 'aria-hidden': 'true' }, [h('span', { class: 'bcv-tour__tap' }), h('span', { class: 'bcv-tour__pt', html: CURSOR }), h('span', { class: 'bcv-tour__keys' }, [h('i'), h('i'), h('i')])]);
+    const glyph = document.createElementNS(NS, 'svg');
+    glyph.setAttribute('viewBox', '0 0 24 24');
+    glyph.setAttribute('class', 'bcv-tour__glyph');
+    glyph.setAttribute('aria-hidden', 'true');
+    glyph.append(document.createElementNS(NS, 'path'));
+    const card = h('div', { class: 'bcv-tour__card', role: 'group', 'aria-roledescription': 'tour step' }, [
+      h('div', { class: 'bcv-tour__top' }, [h('span', { class: 'bcv-tour__count' }), h('button', { type: 'button', class: 'bcv-tour__skip', text: 'Skip tour', onclick: () => finish() })]),
+      h('div', { class: 'bcv-tour__title' }),
+      h('p', { class: 'bcv-tour__body' }),
+      h('div', { class: 'bcv-tour__do', role: 'status', 'aria-live': 'polite' }, [glyph, h('span', { class: 'bcv-tour__dotext' })]),
+      h('div', { class: 'bcv-tour__foot' }, [
+        h('span', { class: 'bcv-tour__bar', 'aria-hidden': 'true' }, [h('i')]),
+        h('button', { type: 'button', class: 'bcv-tour__later', text: 'Not now', onclick: () => next() }),
+        h('button', { type: 'button', class: 'bcv-tour__next', text: 'Next', onclick: () => next() }),
+      ]),
+      h('i', { class: 'bcv-tour__notch', 'aria-hidden': 'true' }),
+    ]);
+    const root = h('div', { id: 'bcv-tour', class: 'bcv-tour is-waiting', role: 'dialog', 'aria-label': 'Simpl Courses tour' }, [blur, veil, ...blocks, ring, hand, card]);
+    ui = { root, veil, hole: veil.querySelector('.bcv-tour__hole'), grad: veil.querySelector('radialGradient'), stops: [...veil.querySelectorAll('stop')], blur, blocks, ring, hand, card, glyph, steps: [], i: -1, cur: null, g: null, raf: 0, key: '', resolve: null, ran: new Set() };
+    // a press outside the lit place is held: the card nudges, so the eye goes to it; the wheel scrolls what is under it
+    for (const b of blocks) {
+      b.addEventListener('pointerdown', (e) => { e.preventDefault(); nudge(); });
+      b.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); });
+      b.addEventListener('wheel', scrollUnder, { passive: false });
+    }
+    ui.onCap = (e) => { // the page's own events a step counts (a press, typing) — caught before the page's handlers
+      const st = ui?.cur;
+      if (!st || st.completed || root.contains(e.target)) return;
+      const on = (st.shown || st.def).on?.[e.type];
+      if (on && on(e)) st.hit = true;
+    };
+    ui.onKey = (e) => {
+      if (e.key !== 'Enter' || !ui?.cur) return;
+      const nb = card.querySelector('.bcv-tour__next');
+      const t = e.target;
+      if (nb.hidden || (t && t !== document.body && !card.contains(t))) return; // (Enter in a field is the field's)
       e.preventDefault();
-      next.click();
-    });
-    ui = { el, stage: null, timer: 0 };
-    html.classList.add('bcv-welcome');
-    document.body.append(el);
-    el.focus({ preventScroll: true });
-    return el;
-  }
-
-  /** The look switch as it will be: the real pill copied, opened or folded, with nothing wired. */
-  function lookCopy(look, open) {
-    const copy = look.cloneNode(true);
-    copy.removeAttribute('id');
-    copy.className = `bcv-look-pill bcv-welcome__look ${open ? 'is-open' : 'bcv-welcome__look--folded'}`;
-    copy.setAttribute('aria-hidden', 'true');
-    for (const b of copy.querySelectorAll('button')) { b.tabIndex = -1; b.removeAttribute('title'); }
-    return copy;
-  }
-  /** The switch, shown working: a copy of it at the top right (app.lookDemo: the same DOM) and a
-   *  pointer that comes to it (the green and the red float down), rests on green (Active), goes to
-   *  red — which grows into its list under the pointer — picks For 1 hour (red now, Off until…), then
-   *  presses green again (Active), round and round. With reduced motion: the copy opened, still. */
-  function lookShow(app) {
-    const demo = app.lookDemo?.();
-    if (!demo) return null;
-    demo.el.classList.add('bcv-welcome__look');
-    const cursor = h('span', { class: 'bcv-welcome__cursor bcv-welcome__cursor--look', 'aria-hidden': 'true', html: CURSOR });
-    const wrap = h('div', { class: 'bcv-welcome__lookshow', 'aria-hidden': 'true' }, [demo.el, cursor]);
-    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) { demo.open(true); return wrap; }
-    const alive = () => wrap.isConnected && !wrap.classList.contains('is-out');
-    // the round end of a button (it stays put as the button opens out to the left), the disc, or a row of the red list (near its start)
-    const at = (el) => { const r = el.getBoundingClientRect(); return { x: r.right - r.height / 2, y: r.top + r.height / 2 }; };
-    const disc = () => at(demo.el.querySelector('.bcv-look__main'));
-    const green = () => at(demo.opts[0]);
-    const red = () => at(demo.opts[1].querySelector('.bcv-look__offhead'));
-    const row = (j) => { const r = demo.fors[j].getBoundingClientRect(); return { x: r.left + Math.min(56, r.width / 2), y: r.top + r.height / 2 }; };
-    const away = () => { const d = disc(); return { x: d.x - 150, y: d.y + 170 }; };
-    const cursorTo = ({ x, y }, ms) => { cursor.style.setProperty('--cms', `${ms}ms`); cursor.style.setProperty('--cx', `${x - 5}px`); cursor.style.setProperty('--cy', `${y - 3}px`); };
-    const q = (ms, fn) => setTimeout(() => { if (alive()) fn(); }, ms);
-    const press = () => { cursor.classList.add('is-press'); q(180, () => cursor.classList.remove('is-press')); };
-    const loop = () => {
-      if (!alive()) return;
-      demo.setPos(1);
-      demo.expand(false);
-      demo.open(false);
-      demo.hover(-1);
-      demo.hoverFor(-1);
-      cursor.style.opacity = '0';
-      cursorTo(away(), 0);
-      q(250, () => { cursor.style.opacity = '1'; cursorTo(disc(), 800); });
-      q(1150, () => demo.open(true));
-      q(1900, () => cursorTo(green(), 500));
-      q(2400, () => demo.hover(0));
-      q(3300, () => { demo.hover(-1); cursorTo(red(), 500); });
-      q(3800, () => demo.hover(1));
-      q(3890, () => demo.expand(true)); // (the pointer on red is enough: it grows into its list, no press)
-      q(4900, () => cursorTo(row(2), 600));
-      q(5500, () => demo.hoverFor(2));
-      q(6400, () => { press(); demo.setPos(-1, Date.now() + 60 * 60000); demo.hoverFor(-1); demo.expand(false); });
-      q(7700, () => { demo.hover(-1); cursorTo(green(), 500); });
-      q(8200, () => demo.hover(0));
-      q(9100, () => { press(); demo.setPos(1); });
-      q(10400, () => { demo.hover(-1); cursorTo(away(), 700); cursor.style.opacity = '0'; });
-      q(10900, () => demo.open(false));
-      q(11800, loop);
+      next();
     };
-    q(60, loop); // (once the stage is on the page, so the copy can be measured)
-    return wrap;
+    document.addEventListener('click', ui.onCap, true);
+    document.addEventListener('input', ui.onCap, true);
+    document.addEventListener('keydown', ui.onKey, true);
+    html.classList.add('bcv-touring');
+    document.body.append(root);
+    return root;
   }
-  /** The purple button as it will be (app.reportDemo: the same markup, nothing wired), opened out to
-   *  its words, left of a folded copy of the switch where the two really sit; a pointer comes to it
-   *  and presses it, round and round. With reduced motion: the two copies, still. */
-  function reportShow(app) {
-    const pill = app.reportDemo?.();
-    if (!pill) return null;
-    pill.classList.add('bcv-welcome__report', 'is-open');
-    const demo = app.lookDemo?.();
-    if (demo) demo.el.classList.add('bcv-welcome__look', 'bcv-welcome__look--beside');
-    const cursor = h('span', { class: 'bcv-welcome__cursor bcv-welcome__cursor--look', 'aria-hidden': 'true', html: CURSOR });
-    const wrap = h('div', { class: 'bcv-welcome__lookshow bcv-welcome__reportshow', 'aria-hidden': 'true' }, [demo?.el, pill, cursor].filter(Boolean));
-    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return wrap;
-    const alive = () => wrap.isConnected && !wrap.classList.contains('is-out');
-    const dot = () => { const r = pill.querySelector('.bcv-report__dot').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; };
-    const away = () => { const d = dot(); return { x: d.x - 170, y: d.y + 190 }; };
-    const cursorTo = ({ x, y }, ms) => { cursor.style.setProperty('--cms', `${ms}ms`); cursor.style.setProperty('--cx', `${x - 5}px`); cursor.style.setProperty('--cy', `${y - 3}px`); };
-    const q = (ms, fn) => setTimeout(() => { if (alive()) fn(); }, ms);
-    const press = () => { cursor.classList.add('is-press'); pill.classList.add('is-press'); q(180, () => { cursor.classList.remove('is-press'); pill.classList.remove('is-press'); }); };
-    const loop = () => {
-      if (!alive()) return;
-      cursor.style.opacity = '0';
-      cursorTo(away(), 0);
-      q(250, () => { cursor.style.opacity = '1'; cursorTo(dot(), 900); });
-      q(1500, press);
-      q(2600, press);
-      q(3800, () => { cursorTo(away(), 700); cursor.style.opacity = '0'; });
-      q(4800, loop);
-    };
-    q(60, loop); // (once the stage is on the page, so the copy can be measured)
-    return wrap;
-  }
-  /** The Away Refresh pill as it will be, its dial in slow motion (app.css) and nothing wired. */
-  function awayMock(app) {
-    const btn = app.awayPill();
-    btn.tabIndex = -1;
-    btn.removeAttribute('aria-label');
-    return h('div', { class: 'bcv-welcome__away', 'aria-hidden': 'true' }, btn);
-  }
-  /** The drag, shown: the folded switch where it is, a tool card that a cursor pulls to the top
-   *  right and that shrinks into a pin beside the switch, round and round (app.css). */
-  function pinDemo(app, look) {
-    const T = BCV.tools;
-    const tool = T?.toolOf('pomo') || T?.TOOLS?.[0];
-    const card = tool ? T.cardEl(tool, { demo: true, dark: app?.isDark?.() }) : null;
-    const pinBtn = tool ? T.pinEl(tool, { demo: true }) : null;
-    return h('div', { class: 'bcv-welcome__pindemo', 'aria-hidden': 'true' }, [
-      lookCopy(look, false),
-      card ? h('div', { class: 'bcv-welcome__democard' }, card) : null,
-      h('span', { class: 'bcv-welcome__cursor', html: '<svg viewBox="0 0 24 24" width="26" height="26"><path d="M5 3l14 9-6 1.5 3.5 6.5-2.5 1.5-3.5-6.5L6 19z" fill="#fff" stroke="#1c1c1e" stroke-width="1.4" stroke-linejoin="round"/></svg>' }),
-      pinBtn ? h('div', { class: 'bcv-welcome__demopin' }, pinBtn) : null,
-    ]);
-  }
-  /** The dashboard's way in, shown: the three counters at the top, a cursor pressing the middle one,
-   *  the sheet of what is behind it rising, a press on its first row, and the preview sliding in
-   *  beside the list — drawn as shapes, not numbers, round and round (app.css). */
-  function peekDemo() {
-    const bar = (cls) => h('span', { class: `bcv-welcome__bar ${cls}` });
-    const stat = (label, mid) => h('div', { class: `bcv-welcome__stat ${mid ? 'bcv-welcome__stat--mid' : ''}` }, [
-      h('span', { class: 'bcv-welcome__statlabel', text: label }),
-      bar('bcv-welcome__bar--num'),
-      bar('bcv-welcome__bar--sub'),
-    ]);
-    const row = (i) => h('div', { class: `bcv-welcome__row ${i === 0 ? 'bcv-welcome__row--first' : ''}` }, [h('span', { class: 'bcv-welcome__dot' }), bar('bcv-welcome__bar--row'), h('span', { class: 'bcv-welcome__chip' })]);
-    return h('div', { class: 'bcv-welcome__peek', 'aria-hidden': 'true' }, [
-      h('div', { class: 'bcv-welcome__stats' }, [stat('Due today'), stat('Due this week', true), stat('Unread announcements')]),
-      h('div', { class: 'bcv-welcome__sheetmock' }, [
-        h('div', { class: 'bcv-welcome__sheethead' }, [bar('bcv-welcome__bar--big'), h('span', { class: 'bcv-welcome__sheettitle', text: 'Due this week' })]),
-        h('div', { class: 'bcv-welcome__sheetrows' }, [row(0), row(1), row(2)]),
-      ]),
-      h('div', { class: 'bcv-welcome__pvmock' }, [bar('bcv-welcome__bar--title'), bar('bcv-welcome__bar--line'), bar('bcv-welcome__bar--line'), bar('bcv-welcome__bar--line bcv-welcome__bar--short'), h('span', { class: 'bcv-welcome__pvbtn', text: 'Open' })]),
-      h('span', { class: 'bcv-welcome__cursor bcv-welcome__cursor--peek', html: '<svg viewBox="0 0 24 24" width="26" height="26"><path d="M5 3l14 9-6 1.5 3.5 6.5-2.5 1.5-3.5-6.5L6 19z" fill="#fff" stroke="#1c1c1e" stroke-width="1.4" stroke-linejoin="round"/></svg>' }),
-    ]);
-  }
-  /** The Dashboard's way in, for real: the black with one hole in it, round the Due this week card; a
-   *  pointer comes to the card and presses it — the card's own sheet opens, and the hole follows it as it
-   *  grows — then presses the sheet's first row, whose preview opens beside the list; a while later the
-   *  sheet's X, and round again. Everything pressed is the page's own, pressed by the show; the black
-   *  keeps the focus (Enter is still Continue), and the sheet goes with the stage (cleanup). */
-  function peekReal() {
-    const NS = 'http://www.w3.org/2000/svg';
-    const id = `bcv-welcome-mask-${Date.now()}`;
-    const svg = document.createElementNS(NS, 'svg');
-    svg.setAttribute('class', 'bcv-welcome__mask');
-    svg.setAttribute('aria-hidden', 'true');
-    svg.innerHTML = `<defs><mask id="${id}"><rect width="100%" height="100%" fill="#fff"/><rect rx="18" fill="#000"/></mask></defs><rect width="100%" height="100%" fill="#000" mask="url(#${id})"/><rect class="bcv-welcome__ring" rx="18"/>`;
-    const hole = svg.querySelectorAll('mask rect')[1];
-    const ring = svg.querySelector('.bcv-welcome__ring');
-    const cursor = h('span', { class: 'bcv-welcome__cursor bcv-welcome__cursor--peekreal', 'aria-hidden': 'true', html: CURSOR });
-    const wrap = h('div', { class: 'bcv-welcome__spot bcv-welcome__peekreal', 'aria-hidden': 'true' }, [svg, cursor]);
-    const alive = () => wrap.isConnected && !wrap.classList.contains('is-out');
-    const sheetOv = () => document.querySelector('.bcv-sheet-ov');
-    const sheet = () => { const el = sheetOv()?.querySelector('.bcv-sheet'); return el && el.getBoundingClientRect().width > 0 ? el : null; };
-    // the hole: round the sheet while it is up, round the card otherwise — kept to them every frame (the sheet grows out of the card)
-    const place = () => {
-      const el = sheet() || weekCard();
-      if (!el) return;
-      const r = el.getBoundingClientRect();
-      for (const x of [hole, ring]) { x.setAttribute('x', r.left - PAD); x.setAttribute('y', r.top - PAD); x.setAttribute('width', r.width + PAD * 2); x.setAttribute('height', r.height + PAD * 2); }
-      wrap.dataset.on = sheet() ? 'sheet' : 'card';
-    };
-    let raf = 0;
-    const frame = () => { if (!alive()) return; place(); raf = requestAnimationFrame(frame); };
-    const centre = (el) => { const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; };
-    const cursorTo = ({ x, y }, ms) => { cursor.style.setProperty('--cms', `${ms}ms`); cursor.style.setProperty('--cx', `${x - 5}px`); cursor.style.setProperty('--cy', `${y - 3}px`); };
-    const q = (ms, fn) => setTimeout(() => { if (alive()) fn(); }, ms);
-    const press = () => { cursor.classList.add('is-press'); q(180, () => cursor.classList.remove('is-press')); };
-    // the sheet takes the focus as it opens: the black takes it back, so Enter is still Continue and Escape stays the black's
-    const refocus = () => { const w = document.getElementById('bcv-welcome'); if (w && !w.contains(document.activeElement)) w.focus({ preventScroll: true }); };
-    const firstRow = () => sheetOv()?.querySelector('.bcv-sheet__row') || null;
-    const loop = () => {
-      const card = weekCard();
-      if (!alive() || !card) return;
-      const c = centre(card);
-      cursor.style.opacity = '0';
-      cursorTo({ x: c.x - 170, y: c.y + 230 }, 0);
-      q(300, () => { const k = weekCard(); if (!k) return; cursor.style.opacity = '1'; cursorTo(centre(k), 800); });
-      q(1400, () => { const k = weekCard(); if (!k) return; press(); k.click(); setTimeout(refocus, 0); });
-      q(2700, () => { const row = firstRow(); if (row) { const r = row.getBoundingClientRect(); cursorTo({ x: r.left + Math.min(120, r.width / 3), y: r.top + r.height / 2 }, 650); } });
-      q(3500, () => { const row = firstRow(); if (!row) return; press(); row.click(); setTimeout(refocus, 0); });
-      q(7000, () => { const x = sheetOv()?.querySelector('.bcv-sheet__close'); if (x) cursorTo(centre(x), 600); });
-      q(7700, () => { const x = sheetOv()?.querySelector('.bcv-sheet__close'); if (!x) return; press(); x.click(); setTimeout(refocus, 0); });
-      q(8600, () => { cursor.style.opacity = '0'; });
-      q(9400, loop);
-    };
-    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) { q(60, place); wrap.cleanup = () => {}; return wrap; } // (still: the card through its hole, nothing pressed)
-    q(60, () => { frame(); loop(); });
-    wrap.cleanup = () => { cancelAnimationFrame(raf); const ov = sheetOv(); if (ov) ov.remove(); };
-    return wrap;
-  }
-  /** A course card of the Grades page, shown: a cursor comes to its ring, the group rings sweep in
-   *  and the breakdown takes the place of the target line beside it, then the cursor leaves and it
-   *  all folds back — shapes and a few numbers, round and round (app.css). */
-  function hoverDemo() {
-    const bar = (cls) => h('span', { class: `bcv-welcome__bar ${cls}` });
-    const C = (r) => (2 * Math.PI * r).toFixed(1);
-    const ring = (cls, r, pct) => `<circle class="${cls}" cx="41" cy="41" r="${r}" fill="none" stroke-width="5" stroke-linecap="round" stroke-dasharray="${((pct / 100) * 2 * Math.PI * r).toFixed(1)} ${C(r)}" style="--c:${C(r)}" transform="rotate(-90 41 41)"/>`;
-    const groups = [['Homework', '#0a84ff', '96%'], ['Quizzes', '#ff9f0a', '88%'], ['Midterms', '#34c759', '91%']];
-    return h('div', { class: 'bcv-welcome__hover', 'aria-hidden': 'true' }, [
-      h('div', { class: 'bcv-welcome__gcard' }, [
-        h('div', { class: 'bcv-welcome__gring', html: `<svg viewBox="0 0 82 82" width="82" height="82">${ring('bcv-welcome__gtrack', 34, 100)}${ring('bcv-welcome__gmain', 34, 92.4)}${ring('bcv-welcome__gcat bcv-welcome__gcat--1', 26, 96)}${ring('bcv-welcome__gcat bcv-welcome__gcat--2', 18, 88)}${ring('bcv-welcome__gcat bcv-welcome__gcat--3', 10, 91)}<text class="bcv-welcome__gletter" x="41" y="46" text-anchor="middle">A−</text></svg>` }),
-        h('div', { class: 'bcv-welcome__gbody' }, [
-          h('div', { class: 'bcv-welcome__gname', text: 'MATH 021' }),
-          h('div', { class: 'bcv-welcome__gpct', text: '92.4%' }),
-          h('div', { class: 'bcv-welcome__gslot' }, [
-            h('div', { class: 'bcv-welcome__gtarget' }, [bar('bcv-welcome__bar--gline'), bar('bcv-welcome__bar--gline bcv-welcome__bar--short')]),
-            h('div', { class: 'bcv-welcome__ggroups' }, [
-              h('div', { class: 'bcv-welcome__gkicker', text: 'By group' }),
-              ...groups.map(([name, color, value]) => h('div', { class: 'bcv-welcome__grow' }, [h('span', { class: 'bcv-welcome__gdot', style: { background: color } }), h('span', { class: 'bcv-welcome__gtxt', text: name }), h('span', { class: 'bcv-welcome__gval', text: value })])),
-            ]),
-          ]),
-        ]),
-      ]),
-      h('span', { class: 'bcv-welcome__cursor bcv-welcome__cursor--hover', html: CURSOR }),
-    ]);
-  }
-  /** What-if scores, shown: a course's Details with its assignments, a cursor pressing "Try what-if
-   *  scores", the scores turning into tinted fields, one of them changed and the total at the top
-   *  going red with it — shapes and a few numbers, round and round (app.css). */
-  function whatIfDemo() {
-    const bar = (cls) => h('span', { class: `bcv-welcome__bar ${cls}` });
-    const swap = (real, hyp) => [h('span', { class: 'bcv-welcome__wval bcv-welcome__wval--real', text: real }), h('span', { class: 'bcv-welcome__wval bcv-welcome__wval--hyp', text: hyp })];
-    const row = (i, real, hyp) => h('div', { class: `bcv-welcome__wrow ${i === 1 ? 'bcv-welcome__wrow--edit' : ''}` }, [
-      h('span', { class: 'bcv-welcome__dot' }),
-      bar('bcv-welcome__bar--row'),
-      h('span', { class: 'bcv-welcome__wscore' }, [h('span', { class: 'bcv-welcome__wbox' }, swap(real, hyp)), h('span', { class: 'bcv-welcome__wof', text: '/ 20' })]),
-    ]);
-    return h('div', { class: 'bcv-welcome__whatif', 'aria-hidden': 'true' }, [
-      h('div', { class: 'bcv-welcome__wsheet' }, [
-        h('div', { class: 'bcv-welcome__whead' }, [
-          h('div', { class: 'bcv-welcome__wtitle' }, [h('span', { class: 'bcv-welcome__wname', text: 'MATH 021' }), h('span', { class: 'bcv-welcome__wpct' }, swap('92.4%', '94.1%'))]),
-          h('span', { class: 'bcv-welcome__wbtn' }, swap('Try what-if scores', 'Exit what-if mode')),
-        ]),
-        h('div', { class: 'bcv-welcome__wbanner', text: 'This is not your actual score.' }),
-        h('div', { class: 'bcv-welcome__wrows' }, [row(0, '18', '18'), row(1, '15', '20'), row(2, '19', '19')]),
-      ]),
-      h('span', { class: 'bcv-welcome__cursor bcv-welcome__cursor--whatif', html: CURSOR }),
-    ]);
-  }
-  /** A big arrow across the black, from the top of a stage's words up to a thing (the switch at the top
-   *  right): it leaves the words going up, bends, and arrives level with the thing from its left, the
-   *  head pointing at it. Drawn in (the line, then the head), over the whole screen, measured afresh on
-   *  each draw(). */
-  function bigArrow() {
-    const NS = 'http://www.w3.org/2000/svg';
-    const svg = document.createElementNS(NS, 'svg');
-    svg.setAttribute('class', 'bcv-welcome__bigarrow');
-    svg.setAttribute('aria-hidden', 'true');
-    const line = document.createElementNS(NS, 'path');
-    line.setAttribute('class', 'bcv-welcome__line');
-    line.setAttribute('pathLength', '1');
-    const head = document.createElementNS(NS, 'path');
-    head.setAttribute('class', 'bcv-welcome__head');
-    svg.append(line, head);
-    const draw = (from, to) => {
-      if (!svg.isConnected || !from?.isConnected || !to?.isConnected) return;
-      const a = from.getBoundingClientRect(), b = to.getBoundingClientRect();
-      if (!a.width || !b.width) return;
-      const ex = Math.round(b.left - 16), ey = Math.round(b.top + b.height / 2); // (the tip: just left of the switch, level with it)
-      const sx = Math.round(Math.min(a.right - 24, Math.max(a.left + a.width * 0.72, ex - 420))), sy = Math.round(a.top - 18); // (the tail: over the words' right-hand part)
-      if (sy - ey < 60 || ex - sx < 40) { line.setAttribute('d', ''); head.setAttribute('d', ''); return; } // (no room between them: no arrow rather than a tangle)
-      const bend = Math.max(60, Math.min(220, (ex - sx) * 0.55));
-      line.setAttribute('d', `M${sx} ${sy} C${sx} ${Math.round(ey + (sy - ey) * 0.35)} ${Math.round(ex - bend)} ${ey} ${ex} ${ey}`);
-      head.setAttribute('d', `M${ex - 24} ${ey - 20}L${ex} ${ey}L${ex - 24} ${ey + 20}`);
-      svg.dataset.tip = `${ex},${ey}`;
-    };
-    return { el: svg, draw };
-  }
-  const arrowOf = ({ w, ht, line, head }) => h('span', { class: 'bcv-welcome__arrowbox', 'aria-hidden': 'true', html:
-    `<svg class="bcv-welcome__arrow" viewBox="0 0 ${w} ${ht}" width="${w}" height="${ht}"><path class="bcv-welcome__line" pathLength="1" d="${line}"/><path class="bcv-welcome__head" d="${head}"/></svg>` });
-  const LEFT_ARROW = { w: 130, ht: 80, line: 'M120 40L14 40', head: 'M38 18L14 40L38 62' }; // at something to the left
-  const UP_ARROW = { w: 100, ht: 110, line: 'M50 100L50 14', head: 'M28 38L50 14L72 38' }; // at something above
-  const PAD = 6; // around a thing shown through the black
-  const holeOf = (el) => { const r = el.getBoundingClientRect(); return { x: r.left - PAD, y: r.top - PAD, w: r.width + PAD * 2, h: r.height + PAD * 2 }; };
-
-  /** The black with holes in it: the things named are seen as they are, the page under them, each
-   *  with a thin ring; a second thing (the starred courses under the Courses row) gets a small arrow
-   *  and a line of its own. Where the stage's words go is set on the stage from the first hole. The
-   *  holes follow the things while the stage is up (`follow`, polled by the stage): the sidebar
-   *  fills in after the first draw, and a row at its foot moves as the rows above it land. */
-  function spotProp(s, app, box) {
-    const first = s.spot(app);
-    if (!first) return null;
-    const also = s.also?.(app);
-    // the things looked up afresh each time: the sidebar is drawn again as its rows land, and the element measured first is then gone
-    const measure = () => { const el = s.spot(app); const a = s.also?.(app); return el ? [holeOf(el), a?.el ? holeOf(a.el) : null].filter(Boolean) : null; };
-    const holes = measure();
-    const id = `bcv-welcome-mask-${Date.now()}`;
-    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svg.setAttribute('class', 'bcv-welcome__mask');
-    svg.setAttribute('aria-hidden', 'true');
-    svg.innerHTML = `<defs><mask id="${id}"><rect width="100%" height="100%" fill="#fff"/>${holes.map((r) => `<rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" rx="12" fill="#000"/>`).join('')}</mask></defs>`
-      + `<rect width="100%" height="100%" fill="#000" mask="url(#${id})"/>`
-      + holes.map((r) => `<rect class="bcv-welcome__ring" x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" rx="12"/>`).join('');
-    // the arrow at the thing itself — level with it to its right, or under it — wherever the window puts the words (they keep inside it; the arrow keeps to the thing)
-    const ARROW = s.layout === 'below' ? UP_ARROW : LEFT_ARROW;
-    const arrow = arrowOf(ARROW);
-    arrow.classList.add('bcv-welcome__arrowbox--spot');
-    const wrap = h('div', { class: 'bcv-welcome__spot', 'aria-hidden': 'true' }, [svg, arrow]);
-    let side2 = null;
-    if (also?.el) {
-      side2 = h('div', { class: 'bcv-welcome__side2' }, [
-        arrowOf({ w: 80, ht: 40, line: 'M72 20L10 20', head: 'M26 6L10 20L26 34' }),
-        h('span', { class: 'bcv-welcome__side2text', text: also.text }),
-      ]);
-      wrap.append(side2);
+  const nudge = () => { const c = ui?.card; if (!c) return; c.classList.remove('is-nudge'); void c.offsetWidth; c.classList.add('is-nudge'); };
+  /** The wheel over the held page scrolls what is under it: the nearest thing that scrolls, else the window. */
+  function scrollUnder(e) {
+    if (!ui) return;
+    e.preventDefault();
+    for (const b of ui.blocks) b.style.pointerEvents = 'none';
+    const under = document.elementFromPoint(e.clientX, e.clientY);
+    for (const b of ui.blocks) b.style.pointerEvents = '';
+    for (let p = under; p && p !== document.body && p !== html; p = p.parentElement) {
+      const cs = getComputedStyle(p);
+      if (/(auto|scroll)/.test(cs.overflowY) && p.scrollHeight > p.clientHeight + 1) { p.scrollBy(e.deltaX, e.deltaY); return; }
     }
-    const cut = [...svg.querySelectorAll('mask rect')].slice(1); // (the first is the mask's white ground)
-    const rings = [...svg.querySelectorAll('.bcv-welcome__ring')];
-    const keyOf = (hs) => hs.map((r) => [r.x, r.y, r.w, r.h].map(Math.round).join(',')).join(';');
-    /** The holes, the rings, the words and the second line put at the things as they are now. */
-    const place = (hs) => {
-      hs.forEach((r, i) => { for (const el of [cut[i], rings[i]]) { if (!el) continue; el.setAttribute('x', r.x); el.setAttribute('y', r.y); el.setAttribute('width', r.w); el.setAttribute('height', r.h); } });
-      const [h1, h2] = hs;
-      if (s.layout === 'below') { // the arrow up at the thing, the words under the arrow, centred on it (the stage is centred once it is on the page and measured)
-        arrow.style.left = `${Math.round(h1.x + h1.w / 2 - ARROW.w / 2)}px`;
-        arrow.style.top = `${Math.round(h1.y + h1.h + 10)}px`;
-        box.style.top = `${Math.round(h1.y + h1.h + 10 + ARROW.ht + 12)}px`;
-        box.dataset.centreX = String(Math.round(h1.x + h1.w / 2));
-      } else { // the arrow level with the thing at its right, the words after the arrow, centred on the thing where the window allows
-        arrow.style.left = `${Math.round(h1.x + h1.w + 14)}px`;
-        arrow.style.top = `${Math.round(h1.y + h1.h / 2 - ARROW.ht / 2)}px`;
-        box.style.left = `${Math.round(h1.x + h1.w + 14 + ARROW.w + 22)}px`;
-        box.style.top = `${Math.max(16, Math.round(h1.y + h1.h / 2 - 40))}px`;
-        box.dataset.centreY = String(Math.round(h1.y + h1.h / 2)); // (the stage is centred on the hole once it is on the page)
-      }
-      if (side2 && h2) { side2.style.left = `${Math.round(h2.x + h2.w + 30)}px`; side2.style.top = `${Math.round(h2.y + h2.h / 2 - 20)}px`; }
-      wrap.dataset.at = keyOf(hs);
-    };
-    place(holes);
-    wrap.follow = () => { // true when something moved (or was drawn again) and the holes moved with it
-      if (!wrap.isConnected) return false;
-      const now = measure(); // (a thing scrolled into view when it is looked for stays in view)
-      if (!now || now.length !== holes.length || keyOf(now) === wrap.dataset.at) return false;
-      place(now);
-      return true;
-    };
-    return wrap;
+    window.scrollBy(e.deltaX, e.deltaY);
   }
 
-  /** One stage on the black: the thing pointed at, the arrow, the lines, and Continue after a
-   *  while. Resolves when Continue is pressed. */
-  function stage(app, key, ctx) {
-    const s = STAGES[key];
-    const next = h('button', { type: 'button', class: 'bcv-welcome__next', text: 'Continue' });
-    next.hidden = true;
-    const hint = typeof s.hint === 'function' ? s.hint(app) : s.hint;
-    const lines = Array.isArray(hint); // (a hint of several lines: one per stop)
-    const layout = typeof s.layout === 'function' ? s.layout(app) : s.layout; // (the Dashboard's way in: on the Dashboard, the real card; elsewhere, the drawing)
-    const box = h('div', { class: 'bcv-welcome__stage', dataset: { stage: layout } }, [
-      s.arrow ? arrowOf(s.arrow) : null, // (a hole stage's arrow is placed at the hole itself: spotProp)
-      h('div', { class: 'bcv-welcome__text' }, [
-        s.kicker ? h('div', { class: 'bcv-welcome__kicker', text: s.kicker }) : null,
-        h('div', { class: 'bcv-welcome__title', text: s.title }),
-        lines ? h('div', { class: 'bcv-welcome__hint bcv-welcome__hint--rows' }, hint.map((line, i) => { // (a row per stop, with a small slider showing where it is)
-          const colour = line.match(/^(.*\bpress )(green|gray|red|purple)(\b.*)$/i); // ("…press green.": the colour in bold)
-          const at = line.indexOf(':');
-          const stop = s.stops?.[i] ?? 0;
-          return h('div', { class: 'bcv-welcome__stoprow' }, [
-            stopSwitch(app, stop),
-            h('span', { class: 'bcv-welcome__stoptext' }, colour ? [colour[1], h('b', { text: colour[2] }), colour[3]] : at > 0 ? [h('b', { text: line.slice(0, at + 1) }), line.slice(at + 1)] : [line]),
-          ]);
-        })) : hint && typeof hint === 'object' && Array.isArray(hint.parts) ? h('div', { class: 'bcv-welcome__hint bcv-welcome__hint--rich' }, hint.parts.map(([t, c]) => h('span', { class: 'bcv-welcome__hue', style: c ? { color: c } : null, text: t }))) // (a line in several colours: one per part)
-          : hint ? h('div', { class: 'bcv-welcome__hint', text: hint }) : null,
-        s.sub ? h('div', { class: 'bcv-welcome__sub', text: s.sub }) : null,
-      ]),
-      next,
-    ]);
-    const prop = s.spot ? spotProp(s, app, box) : s.prop ? s.prop(app, ctx) : null;
-    ui.el.classList.toggle('bcv-welcome--holes', !!((s.spot || (typeof s.holes === 'function' ? s.holes(app) : s.holes)) && prop)); // (the black is the mask's, with the holes in it)
-    ui.el.dataset.stage = key;
-    ui.el.replaceChildren(...[prop, box].filter(Boolean));
-    ui.stage = { key, box, prop, next };
-    // a stage at a hole is centred on the hole (its words and Continue as a block), so the arrow —
-    // across the block — points level with the thing; again once Continue has come in and the block grew
-    const level = () => {
-      const cx = Number(box.dataset.centreX);
-      if (cx) { const r = box.getBoundingClientRect(); box.style.left = `${Math.max(16, Math.min(window.innerWidth - r.width - 16, Math.round(cx - r.width / 2)))}px`; }
-      const cy = Number(box.dataset.centreY);
-      if (!cy) return;
-      const r = box.getBoundingClientRect();
-      box.style.top = `${Math.max(16, Math.min(window.innerHeight - r.height - 16, Math.round(cy - r.height / 2)))}px`;
-    };
-    level();
-    if (prop?.follow) ui.stage.follow = setInterval(() => { if (prop.follow()) level(); }, 200); // (the holes keep to the things as the page fills in under the black)
-    // the look stage sits in the middle of the screen (app.css), and a big arrow runs from its words up
-    // to the switch's copy at the top right — drawn again whenever the window or the copy moves
-    const look = s.target ? s.target(prop) : s.layout === 'look' ? prop?.querySelector?.('.bcv-welcome__look .bcv-look__main') : null; // (the thing the big arrow points at: the switch's copy, or the stage's own)
-    if (look) {
-      const arrow = bigArrow();
-      ui.el.insertBefore(arrow.el, box);
-      ui.stage.arrow = arrow.el;
-      const draw = () => arrow.draw(box.querySelector('.bcv-welcome__text') || box, look);
-      draw();
-      box.addEventListener('animationend', draw); // (the words come in rising 12px: drawn again where they settle)
-      const stopLook = BCV.ui.watchLayout(look, draw, { within: ui.el });
-      window.addEventListener('resize', draw);
-      BCV.ui.onGone(box, () => { stopLook?.(); window.removeEventListener('resize', draw); });
+  // ---- geometry ---------------------------------------------------------------------------------
+  const rectOf = (el) => { const r = el.getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width, h: r.height }; };
+  const union = (rs) => { if (!rs.length) return null; const x = Math.min(...rs.map((r) => r.x)), y = Math.min(...rs.map((r) => r.y)); return { x, y, w: Math.max(...rs.map((r) => r.x + r.w)) - x, h: Math.max(...rs.map((r) => r.y + r.h)) - y }; };
+  /** The boxes round a thing that clip it (a sidebar that scrolls), read once per element. */
+  function clipEls(el) {
+    const list = [];
+    let inner = false;
+    for (let p = el.parentElement; p && p !== document.body && p !== html; p = p.parentElement) {
+      const cs = getComputedStyle(p);
+      if (!/(auto|scroll|hidden|clip)/.test(cs.overflowY + cs.overflowX)) continue;
+      list.push(p);
+      if (/(auto|scroll)/.test(cs.overflowY) && p.scrollHeight > p.clientHeight + 1) inner = true;
     }
-    clearTimeout(ui.timer);
-    ui.timer = setTimeout(() => {
-      if (ui?.stage?.next !== next) return;
-      next.hidden = false;
-      level();
-      if (!ui.el.contains(document.activeElement)) ui.el.focus({ preventScroll: true });
-    }, WAIT);
-    return new Promise((resolve) => next.addEventListener('click', () => resolve(), { once: true }));
+    return { list, inner };
   }
-  /** Everything on the stage goes; the black stays. */
-  async function leave() {
-    const st = ui?.stage;
+  /** The part of the window a thing can be seen in: the window, cut by those boxes. */
+  function clipRect({ list, inner }) {
+    let c = { x: 0, y: 0, w: innerWidth, h: innerHeight };
+    for (const p of list) {
+      const r = rectOf(p);
+      const x = Math.max(c.x, r.x), y = Math.max(c.y, r.y);
+      c = { x, y, w: Math.max(0, Math.min(c.x + c.w, r.x + r.w) - x), h: Math.max(0, Math.min(c.y + c.h, r.y + r.h) - y) };
+    }
+    return { ...c, inner };
+  }
+  /** Out of sight: which way to scroll to bring it in (down, up, left, right), or null when it is enough in view. */
+  function awayOf(t, clip) {
+    const x = Math.max(t.x, clip.x), y = Math.max(t.y, clip.y);
+    const seen = Math.max(0, Math.min(t.x + t.w, clip.x + clip.w) - x) * Math.max(0, Math.min(t.y + t.h, clip.y + clip.h) - y);
+    if (seen >= t.w * t.h * 0.8) return null;
+    const cy = t.y + t.h / 2, cx = t.x + t.w / 2;
+    if (cy > clip.y + clip.h - 4 || t.y + t.h > clip.y + clip.h) return 'down';
+    if (cy < clip.y + 4 || t.y < clip.y) return 'up';
+    return cx > clip.x + clip.w ? 'right' : 'left';
+  }
+
+  // ---- the steps, one at a time -------------------------------------------------------------------
+  function begin(i) {
+    if (!ui) return;
+    const steps = ui.steps;
+    while (i < steps.length && steps[i].skip?.()) i++;
+    if (i >= steps.length) { finish(); return; }
+    ui.i = i;
+    const def = steps[i];
+    def.start?.();
+    ui.cur = { def, shown: null, at: performance.now(), hit: false, completed: false, missingAt: 0, away: null };
+    if (def.grades) ui.ran.add('grades');
+    hold(def.hold === 'look');
+    ui.root.dataset.step = def.id;
+    delete ui.root.dataset.still;
+    ui.root.classList.remove('is-waiting');
+    ui.key = '';
+    ui.card.classList.add('is-swap');
+    requestAnimationFrame(() => ui?.card.classList.remove('is-swap'));
+  }
+  function next() { if (!ui?.cur) return; ui.cur.completed = true; begin(ui.i + 1); }
+  function complete() {
+    const st = ui.cur;
+    st.completed = true;
+    const after = typeof st.def.after === 'function' ? st.def.after() : st.def.after;
+    ui.card.classList.add('is-done');
+    ui.ring.classList.add('is-done');
+    ui.root.dataset.done = st.def.id;
+    setDo('done', after || 'Done');
+    const i = ui.i;
+    setTimeout(() => { if (ui && ui.i === i) { ui.card.classList.remove('is-done'); ui.ring.classList.remove('is-done'); begin(i + 1); } }, after ? AFTER : AFTER / 2);
+  }
+  /** The switch kept open while its steps are on (the page's own :hover rules, as a class). */
+  function hold(yes) { document.getElementById('bcv-look')?.classList.toggle('is-tour-open', !!yes); }
+  function setDo(kind, text) {
+    ui.glyph.firstChild.setAttribute('d', GLYPH[kind] || GLYPH.next);
+    ui.card.querySelector('.bcv-tour__dotext').textContent = text || '';
+    ui.card.dataset.kind = kind;
+  }
+  const words = (v) => (typeof v === 'function' ? v() : v);
+  /** The card's words for the step as it stands (the step, or its stand-in while it is not ready). */
+  function paintCard(def, away) {
+    const { card } = ui;
+    const steps = ui.steps;
+    card.querySelector('.bcv-tour__count').textContent = steps.length > 1 ? `${ui.i + 1} of ${steps.length}` : '';
+    card.querySelector('.bcv-tour__title').textContent = def.title || '';
+    const body = card.querySelector('.bcv-tour__body');
+    const b = words(def.body);
+    if (Array.isArray(b)) body.replaceChildren(...b.map(([t, c]) => (c ? h('span', { class: 'bcv-tour__hue', style: { color: c }, text: t }) : document.createTextNode(t))));
+    else body.textContent = b || '';
+    const last = ui.i === steps.length - 1;
+    const nb = card.querySelector('.bcv-tour__next');
+    nb.hidden = def.act !== 'next';
+    nb.textContent = def.nextLabel || (last ? 'Done' : 'Next');
+    card.querySelector('.bcv-tour__later').hidden = !def.optional;
+    card.querySelector('.bcv-tour__bar i').style.width = `${Math.round(((ui.i + 1) / steps.length) * 100)}%`;
+    card.classList.toggle('is-away', !!away);
+    if (ui.cur.completed) return;
+    if (away) setDo(away, `Scroll ${away} to find ${def.name || 'it'}${def.where === 'sidebar' && ui.cur.clip?.inner ? ' in the sidebar' : ''}`);
+    else if (def.act === 'next') setDo('next', def.doing || (def.target ? 'Have a look, then Next' : ''));
+    else setDo(def.act, def.doing);
+  }
+
+  /** Every frame while the tour is on: the step checked, the lit place and the card kept to the thing. */
+  function tick() {
+    if (!ui) return;
+    ui.raf = requestAnimationFrame(tick);
+    const st = ui.cur;
     if (!st) return;
-    clearInterval(st.follow);
-    ui.stage = null;
-    ui.el.classList.remove('bcv-welcome--holes'); // (the plain black is back under the mask before the mask fades: the page never shows through)
-    st.box.classList.add('is-out');
-    st.prop?.classList.add('is-out');
-    st.arrow?.classList.add('is-out');
-    await wait(LEAVE);
-    st.box.remove();
-    st.prop?.cleanup?.(); // (the real card's show: its sheet goes with it)
-    st.prop?.remove();
-    st.arrow?.remove();
+    const now = performance.now();
+    const base = st.def;
+    const ready = !base.ready || base.ready();
+    const def = ready ? base : { ...base, ...base.unready };
+    st.shown = def;
+    const target = def.target ? def.target() : null;
+    // a thing that is not there (yet): waited for, then passed over
+    if (def.target && !target) {
+      if (!st.missingAt) st.missingAt = now;
+      if (!st.completed && now - st.missingAt > (base.wait ?? 2500)) { st.completed = true; begin(ui.i + 1); return; }
+    } else st.missingAt = 0;
+    if (!st.completed && ready && (st.hit || base.done?.())) complete();
+    // where things go
+    const areaEls = (def.area ? def.area() : [target]).filter(Boolean);
+    const area = target ? union([rectOf(target), ...areaEls.map(rectOf)]) : null;
+    const t = target ? rectOf(target) : null;
+    if (target && st.clipFor !== target) { st.clipFor = target; st.clips = clipEls(target); } // (the boxes that clip it, read once per element)
+    st.clip = target ? clipRect(st.clips) : null;
+    const away = t ? awayOf(t, st.clip) : null;
+    const key = [def.id || base.id, ready, away, st.completed, area && [area.x, area.y, area.w, area.h].map(Math.round).join(','), innerWidth, innerHeight].join('|');
+    if (key !== ui.key) { ui.key = key; paintCard(def, away); layout(def, target, t, area, away, st.clip); }
+    glide();
   }
-
-  /** The whole run, from black to the page: the stages named, in turn, then the black fades. With
-   *  no keys it is the setup's run (the switch where there is one, then Away Refresh, then the
-   *  Dashboard's way in), and its flag goes; another run says what to do when it ends. The pointer
-   *  at Appearance drops its flag as it starts: shown once, whatever closes the page. */
-  async function open(app, keys = null, { onDone = null } = {}) {
-    const el = cover();
-    if (keys?.includes('appearance')) clear('appearance').catch(() => {});
-    // the switch is looked for as each stage starts (a page's first draw comes before it is mounted);
-    // a phone's header has none, so the stages that point at it are left out there
-    const lookNow = () => { const l = document.getElementById('bcv-look'); return l && getComputedStyle(l).display !== 'none' ? l : null; };
-    const setupRun = !keys;
-    for (const key of (keys || ['look', 'report', 'away', 'grades', 'courses', 'tools', 'peek', 'search']).filter((k) => STAGES[k])) {
-      const look = lookNow();
-      if (!look && (key === 'look' || key === 'pin' || key === 'report')) continue;
-      if (key === 'report' && !document.getElementById('bcv-report')) continue; // (no purple button on this page: nothing to point at)
-      if (key === 'away' && app?.state?.settings?.appearance?.awayRefresh === false) continue; // (off unless turned on: nothing to point at)
-      if (STAGES[key].spot && !STAGES[key].spot(app)) continue; // (no sidebar row to point at: a phone)
-      await stage(app, key, { look });
-      if (key === 'look') { try { await BCV.api.storage.local.set({ [KEY2]: true }); await BCV.api.storage.local.remove(OLD_KEYS); } catch { /* shown all the same */ } } // (seen: not owed again after an update; the old shows' marks go)
-      if (key === 'search') { try { await BCV.api.storage.local.set({ [KEY4]: true }); } catch { /* shown all the same */ } }
-      if (key === 'report') { try { await BCV.api.storage.local.set({ [KEY5]: true }); } catch { /* shown all the same */ } }
-      await leave();
+  /** Where the dim's centre, the hole, the ring, the hand and the card go for the step as it stands. */
+  function layout(def, target, t, area, away, clip) {
+    const { card, hand, blocks, ring } = ui;
+    const vw = innerWidth, vh = innerHeight;
+    const hole = area && !away ? { x: area.x - PAD, y: area.y - PAD, w: area.w + PAD * 2, h: area.h + PAD * 2 } : null;
+    const br = target ? Math.min(parseFloat(getComputedStyle(target).borderTopLeftRadius) || 10, 999) : 10;
+    ui.goal = hole
+      ? { x: hole.x, y: hole.y, w: hole.w, h: hole.h, cx: area.x + area.w / 2, cy: area.y + area.h / 2, r0: Math.hypot(area.w, area.h) / 2 + PAD, rr: Math.min(br + PAD, hole.h / 2, hole.w / 2) }
+      : away
+        ? { x: vw / 2, y: vh / 2, w: 0, h: 0, cx: away === 'down' ? clip.x + clip.w / 2 : away === 'up' ? clip.x + clip.w / 2 : away === 'left' ? clip.x : clip.x + clip.w, cy: away === 'down' ? clip.y + clip.h : away === 'up' ? clip.y : clip.y + clip.h / 2, r0: 0, rr: 10 }
+        : { x: vw / 2, y: vh / 2, w: 0, h: 0, cx: vw / 2, cy: vh / 2, r0: 0, rr: 10 };
+    if (!ui.g || reduced()) ui.g = { ...ui.goal };
+    ring.hidden = !hole;
+    // what the page lets through: the lit place (a step that only tells holds it too); nothing held while it is out of sight, or on a free step
+    const interactive = def.act !== 'next';
+    const box = (b, x, y, w, h) => { b.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`; b.style.width = `${Math.max(0, Math.round(w))}px`; b.style.height = `${Math.max(0, Math.round(h))}px`; };
+    if (away || def.free) blocks.forEach((b) => box(b, 0, 0, 0, 0));
+    else if (!hole || !interactive) { box(blocks[0], 0, 0, vw, vh); blocks.slice(1).forEach((b) => box(b, 0, 0, 0, 0)); }
+    else {
+      box(blocks[0], 0, 0, vw, hole.y);
+      box(blocks[1], 0, hole.y + hole.h, vw, vh - hole.y - hole.h);
+      box(blocks[2], 0, hole.y, hole.x, hole.h);
+      box(blocks[3], hole.x + hole.w, hole.y, vw - hole.x - hole.w, hole.h);
     }
-    if (setupRun) { await clear(); try { await BCV.api.storage.local.set({ [KEY4]: true }); } catch { /* the box is found on its own */ } } // (the setup's run counts the search box as pointed out, on the Dashboard or not)
-    else if (onDone) await Promise.resolve(onDone()).catch(() => {});
-    el.classList.add('is-out');
-    html.classList.remove('bcv-welcome');
-    ui = null;
-    setTimeout(() => el.remove(), 400);
+    // the hand: the gesture at the thing
+    hand.dataset.act = away || !t || def.act === 'next' ? 'none' : def.act;
+    if (t && !away) {
+      const x = def.act === 'type' ? t.x + Math.min(36, t.w / 3) : t.x + t.w / 2;
+      const y = t.y + t.h / 2;
+      hand.style.setProperty('--hx', `${Math.round(x)}px`);
+      hand.style.setProperty('--hy', `${Math.round(y)}px`);
+      const to = def.act === 'drag' ? def.dragTo?.() : null;
+      hand.style.setProperty('--dx', `${to ? Math.round(to.x - x) : 0}px`);
+      hand.style.setProperty('--dy', `${to ? Math.round(to.y - y) : 0}px`);
+    }
+    // the card: beside the lit place where it fits (under, over, right, left), else at the foot; out of sight, at the edge it is past
+    const cw = card.offsetWidth || 340, ch = card.offsetHeight || 180;
+    const M = 12, GAP = 16;
+    const clampX = (x) => Math.max(M, Math.min(vw - cw - M, x));
+    const clampY = (y) => Math.max(M, Math.min(vh - ch - M, y));
+    let side = 'center', x = (vw - cw) / 2, y = (vh - ch) / 2;
+    if (away) {
+      const narrow = clip.w < cw + 32;
+      side = `away-${away}`;
+      x = narrow && clip.x + clip.w + GAP + cw <= vw - M ? clip.x + clip.w + GAP : clampX(clip.x + clip.w / 2 - cw / 2);
+      y = away === 'down' ? clampY(Math.min(vh, clip.y + clip.h) - ch - 24) : away === 'up' ? clampY(Math.max(0, clip.y) + 24) : clampY(clip.y + clip.h / 2 - ch / 2);
+    } else if (hole) {
+      const cx = hole.x + hole.w / 2, cy = hole.y + hole.h / 2;
+      if (hole.y + hole.h + GAP + ch <= vh - M) { side = 'below'; x = clampX(cx - cw / 2); y = hole.y + hole.h + GAP; }
+      else if (hole.y - GAP - ch >= M) { side = 'above'; x = clampX(cx - cw / 2); y = hole.y - GAP - ch; }
+      else if (hole.x + hole.w + GAP + cw <= vw - M) { side = 'right'; x = hole.x + hole.w + GAP; y = clampY(cy - ch / 2); }
+      else if (hole.x - GAP - cw >= M) { side = 'left'; x = hole.x - GAP - cw; y = clampY(cy - ch / 2); }
+      else { side = 'foot'; x = clampX(cx - cw / 2); y = vh - ch - M; }
+      // the notch points at the thing from the card's edge
+      const nx = Math.max(18, Math.min(cw - 18, cx - x)), ny = Math.max(18, Math.min(ch - 18, cy - y));
+      card.style.setProperty('--nx', `${Math.round(nx)}px`);
+      card.style.setProperty('--ny', `${Math.round(ny)}px`);
+    }
+    card.dataset.side = side;
+    card.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
+  }
+  /** The dim, the hole and the ring move to where they go (at once with reduced motion): about a
+   *  quarter of the way each sixtieth of a second, by the clock, so a slow frame does not leave them
+   *  behind. data-still on the layer once they are there. */
+  function glide() {
+    const { g, goal } = ui;
+    if (!g || !goal) return;
+    const now = performance.now();
+    const f = 1 - Math.pow(0.76, Math.min(120, now - (ui.lastT || now - 16.7)) / 16.7);
+    ui.lastT = now;
+    let moved = false;
+    for (const k of Object.keys(goal)) {
+      const d = goal[k] - g[k];
+      if (Math.abs(d) < 0.3) { if (g[k] !== goal[k]) { g[k] = goal[k]; moved = true; } continue; }
+      g[k] += d * f;
+      moved = true;
+    }
+    if (!moved && ui.drawn) { if (!ui.root.dataset.still) ui.root.dataset.still = '1'; return; }
+    if (ui.root.dataset.still) delete ui.root.dataset.still;
+    ui.drawn = true;
+    const r = Math.max(innerWidth, innerHeight) * 1.05;
+    ui.grad.setAttribute('cx', g.cx.toFixed(1));
+    ui.grad.setAttribute('cy', g.cy.toFixed(1));
+    ui.grad.setAttribute('r', r.toFixed(1));
+    const k0 = Math.min(0.6, g.r0 / r);
+    const offs = [0, k0, Math.min(0.95, k0 + 0.24), 1];
+    ui.stops.forEach((s, i) => s.setAttribute('offset', offs[i].toFixed(3)));
+    for (const [a, v] of [['x', g.x], ['y', g.y], ['width', Math.max(0, g.w)], ['height', Math.max(0, g.h)], ['rx', g.rr]]) ui.hole.setAttribute(a, v.toFixed(1));
+    const rs = ui.ring.style;
+    rs.transform = `translate(${g.x.toFixed(1)}px, ${g.y.toFixed(1)}px)`;
+    rs.width = `${Math.max(0, g.w).toFixed(1)}px`;
+    rs.height = `${Math.max(0, g.h).toFixed(1)}px`;
+    rs.borderRadius = `${g.rr.toFixed(1)}px`;
+    const bs = ui.root.style;
+    bs.setProperty('--tx', `${g.cx.toFixed(0)}px`);
+    bs.setProperty('--ty', `${g.cy.toFixed(0)}px`);
+    bs.setProperty('--r0', `${g.r0.toFixed(0)}px`);
   }
 
-  BCV.welcome = { arm, clear, due, cover, open, active };
+  /** The tour away: faded out, the switch let go, the listeners gone; the run's promise kept. */
+  function finish() {
+    if (!ui) return;
+    const u = ui;
+    ui = null;
+    cancelAnimationFrame(u.raf);
+    hold(false);
+    document.removeEventListener('click', u.onCap, true);
+    document.removeEventListener('input', u.onCap, true);
+    document.removeEventListener('keydown', u.onKey, true);
+    u.root.classList.add('is-out');
+    html.classList.remove('bcv-touring');
+    setTimeout(() => u.root.remove(), 320);
+    u.resolve?.(u.ran);
+  }
+
+  /** A run: the steps of the keys given (none: the setup's), each as it comes, then the marks — the
+   *  setup's run counts the search box and the switch's steps as seen; a run's own onDone after it. */
+  async function open(app, keys = null, { onDone = null } = {}) {
+    if (ui?.cur) return; // (a run already going: the other waits for another page)
+    cover();
+    const setupRun = !keys;
+    const list = keys || ['look', 'report', 'away', 'grades', 'courses', 'tools', 'home', 'peek', 'search', 'end'];
+    if (setupRun) await clear(); // (taken now: a reload halfway does not start it over)
+    if (list.includes('appearance')) clear('appearance').catch(() => {});
+    const steps = list.flatMap((k) => (LIB[k] ? LIB[k](app) : [])).filter((s) => !s.when || s.when());
+    if (!steps.length || !ui) { finish(); return; }
+    ui.steps = steps;
+    ui.root.dataset.steps = steps.map((s) => s.id).join(','); // (the run's steps, in order: for the eye and the suites)
+    const ran = await new Promise((resolve) => {
+      ui.resolve = resolve;
+      begin(0);
+      ui.raf = requestAnimationFrame(tick);
+    });
+    const marks = {};
+    if (list.includes('look')) marks[KEY2] = true;
+    if (list.includes('report')) marks[KEY5] = true;
+    if (list.includes('search') || setupRun) marks[KEY4] = true;
+    if (ran?.has('grades')) marks[GRADES_KEY] = true; // (the Grades page's steps shown with the setup's: not again on its first opening)
+    try { if (Object.keys(marks).length) await BCV.api.storage.local.set(marks); if (marks[KEY2]) await BCV.api.storage.local.remove(OLD_KEYS); } catch { /* shown all the same */ }
+    if (!setupRun && onDone) await Promise.resolve(onDone()).catch(() => {});
+  }
+
+  BCV.welcome = { arm, clear, due, cover, open, active, finish };
 })();
