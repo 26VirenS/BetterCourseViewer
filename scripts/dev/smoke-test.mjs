@@ -3766,6 +3766,25 @@ try {
   await eventually(async () => { const g = await readBack(); if (g) glideBack = g; return !!g && g.vx > 0; }, 400);
   check(glideBack?.folding && glideBack?.inline && glideBack?.vx > 0, `Escape sends the number back out to the counter's place as the box folds: ${JSON.stringify(glideBack)}`);
   await page.waitForFunction(() => !document.querySelector('.bcv-sheet-ov'), null, { timeout: 5000 });
+  // (2.98.47) a short window: the box is pushed up inside it, away from its counter — the words still start exactly
+  // on the counter's own and land back on them as the box folds (they used to be offset by the box's push)
+  const vp0 = page.viewportSize();
+  await page.setViewportSize({ width: 1000, height: 620 });
+  await page.waitForTimeout(300);
+  const posOf = () => page.evaluate(() => { const r = (e) => { const b = e.getBoundingClientRect(); return [Math.round(b.left), Math.round(b.top)]; }; const sh = document.querySelector('.bcv-sheet-ov > .bcv-sheet'); const card = document.querySelector('.bcv-stats .bcv-stat:nth-child(4)'); return { boxTop: sh ? Math.round(sh.getBoundingClientRect().top) : null, cardTop: Math.round(card.getBoundingClientRect().top), num: sh ? r(sh.querySelector('.bcv-sheet__value')) : null, cardNum: r(card.querySelector('.bcv-stat__value')), lbl: sh ? r(sh.querySelector('.bcv-sheet__label')) : null, cardLbl: r(card.querySelector('.bcv-stat__head .bcv-label')) }; });
+  await page.click('.bcv-stats .bcv-stat:nth-child(4)');
+  const shortOpen = await posOf();
+  await page.waitForTimeout(650);
+  const shortFull = await posOf();
+  const near = (a, b, d = 3) => !!a && !!b && Math.abs(a[0] - b[0]) <= d && Math.abs(a[1] - b[1]) <= d;
+  check(near(shortOpen.num, shortOpen.cardNum) && near(shortOpen.lbl, shortOpen.cardLbl) && shortFull.boxTop < shortFull.cardTop - 100, `in a short window the words start exactly on the counter's, though the box is pushed up away from it (box top ${shortFull.boxTop}, counter ${shortFull.cardTop}): ${JSON.stringify(shortOpen)}`);
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(430);
+  const shortEnd = await posOf();
+  check(near(shortEnd.num, shortEnd.cardNum) && near(shortEnd.lbl, shortEnd.cardLbl) && Math.abs(shortEnd.boxTop - shortEnd.cardTop) <= 3, `and land back on them as the box folds into its counter: ${JSON.stringify(shortEnd)}`);
+  await page.waitForFunction(() => !document.querySelector('.bcv-sheet-ov'), null, { timeout: 5000 });
+  await page.setViewportSize(vp0);
+  await page.waitForTimeout(200);
   // a slow response: the bar keeps sweeping and skeleton rows hold the place; both leave when the data lands
   const slow = /\/api\/v1\/courses\/104\/assignments\/4002(\?|$)/;
   await page.route(slow, async (route) => { await new Promise((r) => setTimeout(r, 900)); await route.continue().catch(() => {}); }); // a request still waiting when the route is removed just goes through

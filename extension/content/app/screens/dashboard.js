@@ -386,8 +386,18 @@
         if (folding || !ov.isConnected) return;
         folding = true;
         ov.classList.add('is-folding');
-        const now = glide.map(([a]) => a.getBoundingClientRect());
-        glide.forEach(([a, b], i) => startAt(a, now[i], b.getBoundingClientRect())); // the words go back to the counter's own
+        // the words go back to the counter's own: each is offset from where it will lie once the box is
+        // the counter's size again (measured with the box snapped there for a frame, then put back), so
+        // the offset lands them exactly, wherever the box stood — pushed up inside a short window too
+        const cur = sheet.getBoundingClientRect(); // (where the box is now — mid-growth too, so the fold starts from there, not from full size)
+        sheet.classList.add('is-at-card');
+        place(true, true);
+        void sheet.offsetWidth;
+        const rest = glide.map(([a]) => a.getBoundingClientRect());
+        Object.assign(sheet.style, { left: `${cur.left}px`, top: `${cur.top}px`, width: `${cur.width}px`, height: `${cur.height}px` });
+        void sheet.offsetWidth;
+        sheet.classList.remove('is-at-card');
+        glide.forEach(([a, b], i) => startAt(a, rest[i], b.getBoundingClientRect()));
         place(true); // back into the counter
         setTimeout(() => ov.remove(), U.reducedMotion() ? 0 : 470);
       };
@@ -486,17 +496,16 @@
         // it starts as the counter (its place and size, its words not yet shown) and grows from there;
         // a row pressed (the preview's is-split) or the window resized puts it where it goes again
         // the counter's icon, label and number glide into the header's own: each of the header's is
-        // first drawn where the counter's is (its size too), from where it lands in the full-size box
+        // first drawn where the counter's is (its size too) — offset from where it lies with the box at
+        // the counter's size, which is where the box starts — and eased to its own place as the box grows
         glide = [
           [sheet.querySelector('.bcv-sheet__value'), card.querySelector('.bcv-stat__value')],
           [sheet.querySelector('.bcv-sheet__label'), card.querySelector('.bcv-stat__head .bcv-label')],
           [sheet.querySelector('.bcv-sheet__tile > svg'), card.querySelector('.bcv-stat__head > svg')],
         ].filter(([a, b]) => a && b);
-        place(false, true);
-        void sheet.offsetWidth;
-        const ends = glide.map(([a]) => a.getBoundingClientRect());
         place(true);
-        glide.forEach(([a, b], i) => startAt(a, ends[i], b.getBoundingClientRect()));
+        void sheet.offsetWidth;
+        glide.forEach(([a, b]) => startAt(a, a.getBoundingClientRect(), b.getBoundingClientRect()));
         void sheet.offsetWidth;
         sheet.classList.remove('is-at-card');
         place();
