@@ -119,6 +119,7 @@ h1 { margin: 0; font: 700 30px/1.15 var(--display); letter-spacing: -.03em; }
 .field--card { flex: 1; min-width: 0; padding: 12px 14px; border-radius: 15px; background: var(--card); border: 1px solid var(--edge); }
 .field input { flex: 1; min-width: 0; border: 0; outline: none; background: transparent; font: 400 13.5px/1.3 var(--font); color: var(--ink); }
 .field input.mono, .field input[type="password"] { font: 500 13.5px/1.3 var(--mono); }
+.row__s .mono { font: 500 12px/1.3 var(--mono); }
 .field input::placeholder { color: var(--ink3); opacity: .8; }
 .pill { flex: none; padding: 4px 10px; border-radius: 9px; background: var(--fill); font: 600 11px/1.3 var(--font); color: var(--ink3); transition: background .2s ease, color .2s ease; }
 .pill.is-on { background: var(--green-soft); color: var(--green); }

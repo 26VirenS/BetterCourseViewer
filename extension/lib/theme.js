@@ -559,11 +559,44 @@
     const gone = before.filter((id) => !ids.includes(id));
     if (gone.length) await BCV.api.storage.local.remove(gone.map(ASSET_KEY)).catch(() => {});
   }
+  // ---- whether this browser draws the glass's blur ----------------------------------------------
+  // Chrome without graphics acceleration (switched off in its settings, or its GPU refused) draws
+  // the page in software, and software skips every backdrop-filter while CSS.supports still says
+  // yes: the bars and panels show the page through them sharp. A WebGL context tells the two apart:
+  // none at all, one that refuses a software renderer (failIfMajorPerformanceCaveat), or one whose
+  // renderer is a software one by name (SwiftShader, llvmpipe — what Chrome falls back to). Asked at
+  // most every half hour, the answer kept in the page's own storage and the context let go at once.
+  // Safari and Firefox draw the blur either way and are never asked (only Chromium has
+  // navigator.userAgentData). blurDrawn() → true | false, or null when the kept answer is stale;
+  // checkBlur() asks afresh.
+  const BLUR_KEY = 'bcv:blur';
+  const BLUR_FOR = 30 * 60 * 1000;
+  function blurDrawn() {
+    try {
+      if (!self.navigator?.userAgentData) return true;
+      const kept = JSON.parse(localStorage.getItem(BLUR_KEY) || 'null');
+      return kept && Date.now() - kept.at < BLUR_FOR ? !!kept.drawn : null;
+    } catch { return true; }
+  }
+  function checkBlur() {
+    try {
+      if (!self.navigator?.userAgentData) return true;
+      const gl = document.createElement('canvas').getContext('webgl', { failIfMajorPerformanceCaveat: true });
+      const named = gl?.getExtension('WEBGL_debug_renderer_info');
+      const renderer = named ? String(gl.getParameter(named.UNMASKED_RENDERER_WEBGL) || '') : '';
+      const drawn = !!gl && !/swiftshader|llvmpipe|softpipe|software|basic render/i.test(renderer);
+      gl?.getExtension('WEBGL_lose_context')?.loseContext();
+      try { localStorage.setItem(BLUR_KEY, JSON.stringify({ drawn, at: Date.now() })); } catch { /* asked again next time */ }
+      return drawn;
+    } catch { return true; }
+  }
+
   BCV.theme = {
     hexToRgb, rgbToHex, rgbToHsl, hslToRgb, hslToHex, luminance, contrast, normalize,
     GROUND, MIN_SAT, ICON_RATIO, PRESETS, REGULAR, SCENE_VARIANTS, sceneUrl, sceneNameOf, CARD_SLOTS, HEADER_SLOTS, IMAGES_KEY,
     palette, shades, shadeSet, cssVars, apply, readable, readableOn, fillFor, mix, tint, customHex, controlsOf, veilBase, picCss, band, nearest,
     readImage, imageTone, fillTones, loadImages, ensureAssets, saveImages, emptyImages, packImages, picOf, rawOf, CAST, INK_LIFT, inkOn, inkFor, inkCached,
+    blurDrawn, checkBlur, BLUR_KEY,
     get PRESET_PHOTOS() { return presetPhotosOf(); }, // (the drawings, made on the first ask)
   };
 })();

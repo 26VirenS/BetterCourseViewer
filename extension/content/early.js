@@ -12,6 +12,12 @@
   const BCV = self.BCV;
   const S = BCV.settings;
   const html = document.documentElement;
+  // Chrome drawing without graphics acceleration skips every blur: the glass turns solid then
+  // (app.css, html.bcv-noblur). The kept answer is read at once; a stale one is asked again once the
+  // page is up, off the path to its first paint (lib/theme.js checkBlur).
+  const blur = BCV.theme?.blurDrawn?.();
+  if (blur === false) html.classList.add('bcv-noblur');
+  else if (blur === null) (self.requestIdleCallback || setTimeout)(() => html.classList.toggle('bcv-noblur', !BCV.theme.checkBlur()));
   const CACHE_KEY = 'bcv:early';
   // On a Mac the settings live in the app: the background takes them from it as this page loads
   // (nothing happens anywhere else). The cached look below paints first; a change lands as a push.
@@ -47,7 +53,7 @@
       }
       if (msg.type !== 'wipeSiteNote') return false;
       wiped = true;
-      try { localStorage.removeItem(CACHE_KEY); } catch { /* ignore */ }
+      try { localStorage.removeItem(CACHE_KEY); localStorage.removeItem(BCV.theme?.BLUR_KEY || 'bcv:blur'); } catch { /* ignore */ }
       sendResponse({ ok: true });
       return false;
     });

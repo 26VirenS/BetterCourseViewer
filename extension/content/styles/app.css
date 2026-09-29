@@ -13,7 +13,7 @@
  * min(their own, the viewport less a margin). */
 
 html[data-bcv-theme] {
-  --bcv-version: "2.98.39"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.98.40"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -70,6 +70,14 @@ html[data-bcv-ext-theme="dark"] .bcv-graph__frame { filter: invert(1) hue-rotate
 /* mockup 11: a sheet grows out of the control that opened it (transform-origin set per sheet), the scrim blurs in */
 @keyframes bcv-morph { from { opacity: 0; transform: scale(.82); } 60% { opacity: 1; } to { opacity: 1; transform: scale(1); } }
 @keyframes bcv-scrim { from { opacity: 0; -webkit-backdrop-filter: blur(0); backdrop-filter: blur(0); } to { opacity: 1; -webkit-backdrop-filter: var(--bcv-blur-scrim); backdrop-filter: var(--bcv-blur-scrim); } }
+/* Chrome drawing without graphics acceleration skips every backdrop-filter, so the glass showed
+ * the page through it sharp (html.bcv-noblur: content/early.js, from lib/theme.js blurDrawn). Each
+ * bar and panel lays its colour over the page's own ground instead — the look it has with nothing
+ * behind it — and an open sheet blurs what is behind it with a plain filter, which software draws. */
+html.bcv-noblur { --bcv-chrome-ground: linear-gradient(var(--bcv-chrome), var(--bcv-chrome)), var(--bcv-bg); --bcv-glass-ground: linear-gradient(var(--bcv-glass), var(--bcv-glass)), var(--bcv-card); }
+html.bcv-noblur :is(.bcv-away__btn, .bcv-toast) { background: rgba(28,28,30,.94); }
+@keyframes bcv-noblur-in { from { filter: blur(0); } to { filter: blur(6px); } }
+html.bcv-noblur body:has(> .bcv-sheet-ov) > #bcv-app > :is(#bcv-main, #bcv-side), html.bcv-noblur body:has(> .bcv-sheet-ov) > #bcv-bar { animation: bcv-noblur-in .24s ease both; }
 /* data arrives rather than appears: an arc sweeps from empty to its value (the `to` is the ring's own dasharray), a line strokes itself on */
 @keyframes bcv-ring-fill { from { stroke-dasharray: 0 999; } }
 @keyframes bcv-ring-unfill { to { stroke-dasharray: 0 999; } }
@@ -406,7 +414,7 @@ html.bcv-on #bcv-app { display: flex; }
 #bcv-app .bcv-pretty { text-wrap: pretty; }
 
 /* ---- sidebar ------------------------------------------------------------ */
-.bcv-side { flex: none; width: 242px; padding: 14px 12px; background: var(--bcv-chrome); -webkit-backdrop-filter: var(--bcv-blur-chrome); backdrop-filter: var(--bcv-blur-chrome); border-right: 1px solid var(--bcv-edge); display: flex; flex-direction: column; gap: 18px; position: fixed; top: 0; left: 0; bottom: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; }
+.bcv-side { flex: none; width: 242px; padding: 14px 12px; background: var(--bcv-chrome-ground, var(--bcv-chrome)); -webkit-backdrop-filter: var(--bcv-blur-chrome); backdrop-filter: var(--bcv-blur-chrome); border-right: 1px solid var(--bcv-edge); display: flex; flex-direction: column; gap: 18px; position: fixed; top: 0; left: 0; bottom: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; }
 /* The sidebar is pinned to the window and scrolls on its own, apart from the page: a page scroll never moves
  * it, and scrolling it never moves the page. Out of the row as it is, this holds its place there, at its
  * width in every tier (and folding with it when a quiz takes the page). */
@@ -437,7 +445,7 @@ html.bcv-themed .bcv-nav__item:hover, html.bcv-themed .bcv-fav:hover { backgroun
 .bcv-fav.is-active { background: var(--bcv-fill2); font-weight: 600; }
 .bcv-fav__dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
 /* the courses in a panel beside the Courses row, when they are not listed down the sidebar */
-.bcv-quicknav { z-index: var(--bcv-z-menu); width: 228px; max-height: min(70vh, 520px); overflow: auto; display: flex; flex-direction: column; gap: 2px; padding: 8px; background: var(--bcv-glass); -webkit-backdrop-filter: var(--bcv-blur-glass); backdrop-filter: var(--bcv-blur-glass); border: 1px solid var(--bcv-edge); border-radius: var(--bcv-r-panel); box-shadow: var(--bcv-shadow-hi); animation: bcv-qn-in var(--bcv-t-snappy) var(--bcv-spring-snappy) both; }
+.bcv-quicknav { z-index: var(--bcv-z-menu); width: 228px; max-height: min(70vh, 520px); overflow: auto; display: flex; flex-direction: column; gap: 2px; padding: 8px; background: var(--bcv-glass-ground, var(--bcv-glass)); -webkit-backdrop-filter: var(--bcv-blur-glass); backdrop-filter: var(--bcv-blur-glass); border: 1px solid var(--bcv-edge); border-radius: var(--bcv-r-panel); box-shadow: var(--bcv-shadow-hi); animation: bcv-qn-in var(--bcv-t-snappy) var(--bcv-spring-snappy) both; }
 @keyframes bcv-qn-in { from { opacity: 0; transform: translateX(-6px); } to { opacity: 1; transform: none; } }
 .bcv-quicknav__label { padding: 4px 8px 6px; font: 600 11px/1.2 var(--bcv-font); color: var(--bcv-ink3); text-transform: uppercase; letter-spacing: .05em; }
 .bcv-quicknav .bcv-hint { padding: 2px 8px 6px; }
@@ -464,7 +472,7 @@ html.bcv-themed .bcv-nav__item:hover, html.bcv-themed .bcv-fav:hover { backgroun
 @container bcv-main (max-width: 520px) { .bcv-screen { --bcv-px: 14px; --bcv-py: 14px; --bcv-h1: 25px; --bcv-gap: 16px; } }
 /* dense screens cap at 1180 and fill the column below that (mockup 7); reading screens set their own 700–900 */
 .bcv-screen { --w: clamp(1180px, 72vw, 2000px); } /* (a wide, zoomed-out window: the column grows with it rather than leaving a band beside the sidebar) */
-.bcv-head { position: sticky; top: 0; z-index: 5; background: var(--bcv-chrome); -webkit-backdrop-filter: var(--bcv-blur-chrome); backdrop-filter: var(--bcv-blur-chrome); border-bottom: 1px solid var(--bcv-edge); padding: calc(var(--bcv-py) + 2px) var(--bcv-px) 16px; }
+.bcv-head { position: sticky; top: 0; z-index: 5; background: var(--bcv-chrome-ground, var(--bcv-chrome)); -webkit-backdrop-filter: var(--bcv-blur-chrome); backdrop-filter: var(--bcv-blur-chrome); border-bottom: 1px solid var(--bcv-edge); padding: calc(var(--bcv-py) + 2px) var(--bcv-px) 16px; }
 .bcv-head--tight { padding: var(--bcv-py) var(--bcv-px) 14px; }
 .bcv-head--course { padding: 18px var(--bcv-px) 12px; }
 .bcv-head__in { max-width: var(--w); margin: 0 auto; }
@@ -623,7 +631,7 @@ html[data-bcv-theme="dark"] .bcv-badge--orange { color: #ffb44d; }
    own scrim goes — the one above covers for both, or the page would be dimmed twice. */
 .bcv-sheet-ov.is-under { pointer-events: none; background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; animation: none; }
 .bcv-sheet-ov.is-under > .bcv-sheet { transform: scale(.96); opacity: .6; }
-.bcv-sheet { width: 520px; max-width: 100%; max-height: calc(100vh - 56px); background: var(--bcv-glass); -webkit-backdrop-filter: var(--bcv-blur-glass); backdrop-filter: var(--bcv-blur-glass); border: 1px solid var(--bcv-edge); color: var(--bcv-ink); border-radius: var(--bcv-r-sheet); box-shadow: var(--bcv-shadow-glass); display: flex; flex-direction: column; overflow: hidden; box-sizing: border-box; }
+.bcv-sheet { width: 520px; max-width: 100%; max-height: calc(100vh - 56px); background: var(--bcv-glass-ground, var(--bcv-glass)); -webkit-backdrop-filter: var(--bcv-blur-glass); backdrop-filter: var(--bcv-blur-glass); border: 1px solid var(--bcv-edge); color: var(--bcv-ink); border-radius: var(--bcv-r-sheet); box-shadow: var(--bcv-shadow-glass); display: flex; flex-direction: column; overflow: hidden; box-sizing: border-box; }
 /* A row previewed from a counter's sheet opens inside the sheet: it widens and the preview takes
  * the right of it, the list staying where it is. Nothing else on the page moves. */
 .bcv-sheet { transition: width .3s cubic-bezier(.32,.72,0,1), transform .3s cubic-bezier(.32,.72,0,1), opacity .3s ease; }
@@ -924,7 +932,7 @@ html[data-bcv-theme="dark"] .bcv-cal__notice--warn { color: #ffb44d; }
 .bcv-picker__label { min-width: 0; }
 .bcv-picker__label--none { color: var(--bcv-ink3); }
 .bcv-picker__chev { flex: none; }
-.bcv-picker__list { position: fixed; z-index: var(--bcv-z-picker); overflow: auto; padding: 6px; border-radius: var(--bcv-r-menu); background: var(--bcv-glass); -webkit-backdrop-filter: var(--bcv-blur-glass); backdrop-filter: var(--bcv-blur-glass); border: 1px solid var(--bcv-edge); box-shadow: var(--bcv-shadow-hi); display: flex; flex-direction: column; gap: 2px; font-family: var(--bcv-font); animation: bcv-qn-in .16s cubic-bezier(.32,.72,0,1) both; }
+.bcv-picker__list { position: fixed; z-index: var(--bcv-z-picker); overflow: auto; padding: 6px; border-radius: var(--bcv-r-menu); background: var(--bcv-glass-ground, var(--bcv-glass)); -webkit-backdrop-filter: var(--bcv-blur-glass); backdrop-filter: var(--bcv-blur-glass); border: 1px solid var(--bcv-edge); box-shadow: var(--bcv-shadow-hi); display: flex; flex-direction: column; gap: 2px; font-family: var(--bcv-font); animation: bcv-qn-in .16s cubic-bezier(.32,.72,0,1) both; }
 .bcv-picker__opt { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; border: 0; border-radius: 9px; background: transparent; color: var(--bcv-ink); font: 400 14px/1.35 var(--bcv-font); text-align: left; cursor: pointer; }
 .bcv-picker__opt:hover, .bcv-picker__opt:focus-visible { background: var(--bcv-fill2); outline: none; }
 .bcv-picker__opttext { flex: 1; min-width: 0; }
@@ -941,7 +949,7 @@ html[data-bcv-theme="dark"] .bcv-cal__notice--warn { color: #ffb44d; }
 .bcv-recips input { flex: 1; min-width: 120px; border: 0 !important; background: transparent !important; font: 400 14px/1 var(--bcv-font); color: var(--bcv-ink) !important; outline: none; height: 28px; margin: 0; box-shadow: none !important; -webkit-appearance: none; appearance: none; }
 .bcv-recip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px 4px 10px; border-radius: 9px; background: var(--bcv-card); box-shadow: var(--bcv-shadow); font: 500 12.5px/1 var(--bcv-font); }
 .bcv-recip button { border: 0; background: transparent; padding: 0; cursor: pointer; display: flex; }
-.bcv-menu { position: absolute; z-index: var(--bcv-z-menu); min-width: 200px; max-height: 320px; overflow: auto; background: var(--bcv-glass); -webkit-backdrop-filter: var(--bcv-blur-glass); backdrop-filter: var(--bcv-blur-glass); border: 1px solid var(--bcv-edge); border-radius: var(--bcv-r-menu); box-shadow: var(--bcv-shadow-hi); padding: 6px; }
+.bcv-menu { position: absolute; z-index: var(--bcv-z-menu); min-width: 200px; max-height: 320px; overflow: auto; background: var(--bcv-glass-ground, var(--bcv-glass)); -webkit-backdrop-filter: var(--bcv-blur-glass); backdrop-filter: var(--bcv-blur-glass); border: 1px solid var(--bcv-edge); border-radius: var(--bcv-r-menu); box-shadow: var(--bcv-shadow-hi); padding: 6px; }
 .bcv-menu__item { display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 10px; border: 0; border-radius: 9px; background: transparent; text-align: left; font: 500 13px/1.3 var(--bcv-font); color: var(--bcv-ink); cursor: pointer; }
 .bcv-menu__item:hover { background: var(--bcv-fill2); }
 .bcv-menu__item.is-active { background: var(--bcv-blue-soft); color: var(--bcv-blue); }
@@ -1484,7 +1492,7 @@ html[data-bcv-theme="dark"] .bcv-gpa__need--no { color: #ff8098; }
 
 /* ---- handing work in (mockup): one 720px column, sticky head and foot ------- */
 .bcv-sb { min-height: 100vh; display: flex; flex-direction: column; background: var(--bcv-bg); }
-.bcv-sb__head { position: sticky; top: 0; z-index: 6; background: var(--bcv-chrome); -webkit-backdrop-filter: var(--bcv-blur-chrome); backdrop-filter: var(--bcv-blur-chrome); border-bottom: 1px solid var(--bcv-edge); padding: 20px 40px 14px; }
+.bcv-sb__head { position: sticky; top: 0; z-index: 6; background: var(--bcv-chrome-ground, var(--bcv-chrome)); -webkit-backdrop-filter: var(--bcv-blur-chrome); backdrop-filter: var(--bcv-blur-chrome); border-bottom: 1px solid var(--bcv-edge); padding: 20px 40px 14px; }
 .bcv-sb__headin { max-width: 720px; margin: 0 auto; }
 .bcv-sb__h1 { margin: 8px 0 0; font: 700 26px/1.2 var(--bcv-display); letter-spacing: -.03em; }
 .bcv-sb__chips { margin-top: 8px; display: flex; gap: 7px; flex-wrap: wrap; }
@@ -1538,7 +1546,7 @@ html[data-bcv-theme="dark"] .bcv-sb__chip--due { color: #ffb44d; }
 .bcv-sb__toolbody { flex: 1; min-width: 0; }
 .bcv-sb__toolname { font: 600 14.5px/1.35 var(--bcv-font); }
 .bcv-sb__toolnote { margin-top: 2px; font: 400 12px/1.3 var(--bcv-font); color: var(--bcv-ink3); }
-.bcv-sb__foot { position: sticky; bottom: 0; z-index: 6; background: var(--bcv-chrome); -webkit-backdrop-filter: var(--bcv-blur-chrome); backdrop-filter: var(--bcv-blur-chrome); border-top: 1px solid var(--bcv-edge); }
+.bcv-sb__foot { position: sticky; bottom: 0; z-index: 6; background: var(--bcv-chrome-ground, var(--bcv-chrome)); -webkit-backdrop-filter: var(--bcv-blur-chrome); backdrop-filter: var(--bcv-blur-chrome); border-top: 1px solid var(--bcv-edge); }
 /* the block inside the assignment page (mockup 11): no sticky chrome — the submit control ends the same scroll as the instructions */
 .bcv-sb--embed { min-height: 0; background: transparent; gap: 16px; scroll-margin-top: 16px; }
 .bcv-sb--embed .bcv-sb__head, .bcv-sb--embed .bcv-sb__foot { position: static; z-index: auto; background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; border: 0; padding: 0; }
@@ -1824,7 +1832,7 @@ html[data-bcv-theme="dark"] #bcv-app .bcv-qz__devimport { color: #d49cf0; }
 .bcv-ph-sheet .bcv-qz__instr { padding: 4px 18px 18px; max-height: 58vh; }
 html.bcv-phone .bcv-qz__raw span, html.bcv-phone .bcv-qz__instrbtn span { display: none; }
 html.bcv-phone .bcv-qz__raw, html.bcv-phone .bcv-qz__instrbtn { padding: 0 9px; }
-.bcv-qz__head { position: sticky; top: 0; z-index: 6; background: var(--bcv-chrome); -webkit-backdrop-filter: var(--bcv-blur-chrome); backdrop-filter: var(--bcv-blur-chrome); border-bottom: 1px solid var(--bcv-edge); }
+.bcv-qz__head { position: sticky; top: 0; z-index: 6; background: var(--bcv-chrome-ground, var(--bcv-chrome)); -webkit-backdrop-filter: var(--bcv-blur-chrome); backdrop-filter: var(--bcv-blur-chrome); border-bottom: 1px solid var(--bcv-edge); }
 .bcv-qz__headrow { max-width: 760px; margin: 0 auto; padding: 14px 28px; display: flex; align-items: center; gap: 14px; }
 .bcv-qz__exit { flex: none; width: 34px; height: 34px; border: 0; border-radius: 17px; background: var(--bcv-fill); cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--bcv-ink2); padding: 0; }
 .bcv-qz__exit:hover { background: var(--bcv-fill2); }
@@ -1929,7 +1937,7 @@ html.bcv-phone .bcv-qz__sel, html.bcv-phone .bcv-qz__blankrow .bcv-input { width
 #bcv-app .bcv-qz__fileclear { flex: none; height: 34px; padding: 0 12px; border: 0; border-radius: 17px; background: transparent; color: var(--bcv-ink3); font: 600 13px/1 var(--bcv-font); cursor: pointer; }
 #bcv-app .bcv-qz__fileclear:hover { color: #ff3b30; }
 html.bcv-phone .bcv-qz__file { flex-wrap: wrap; }
-.bcv-qz__foot { position: sticky; bottom: 0; z-index: 6; background: var(--bcv-chrome); -webkit-backdrop-filter: var(--bcv-blur-chrome); backdrop-filter: var(--bcv-blur-chrome); border-top: 1px solid var(--bcv-edge); }
+.bcv-qz__foot { position: sticky; bottom: 0; z-index: 6; background: var(--bcv-chrome-ground, var(--bcv-chrome)); -webkit-backdrop-filter: var(--bcv-blur-chrome); backdrop-filter: var(--bcv-blur-chrome); border-top: 1px solid var(--bcv-edge); }
 .bcv-qz__footin { max-width: 760px; margin: 0 auto; padding: 14px 28px; display: flex; align-items: center; gap: 12px; }
 .bcv-qz__answered { flex: 1; min-width: 0; font: 500 13px/1.3 var(--bcv-font); color: var(--bcv-ink3); }
 .bcv-qz__btn { flex: none; height: 44px; padding: 0 20px; border: 0; border-radius: 22px; background: var(--bcv-fill); color: var(--bcv-ink); cursor: pointer; font: 600 15px/1 var(--bcv-font); }
@@ -2002,7 +2010,7 @@ html[data-bcv-theme="dark"] #bcv-app .bcv-qz__opt.is-selected { color: #7ab8ff; 
   .bcv-qz__lrail { position: static; max-height: none; overflow: visible; padding: 14px 28px 12px; border-right: 0; border-bottom: 1px solid var(--bcv-sep); }
   .bcv-qz__lrail .bcv-qz__railh, .bcv-qz__legend { display: none; }
   .bcv-qz__progress.bcv-qz__progress--side { grid-template-columns: repeat(auto-fill, minmax(34px, 1fr)); }
-  .bcv-qz__foot.bcv-qz__rrail { position: sticky; top: auto; bottom: 0; z-index: 6; max-height: none; overflow: visible; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 10px; padding: 12px 28px; border-left: 0; border-top: 1px solid var(--bcv-edge); background: var(--bcv-chrome); -webkit-backdrop-filter: var(--bcv-blur-chrome); backdrop-filter: var(--bcv-blur-chrome); }
+  .bcv-qz__foot.bcv-qz__rrail { position: sticky; top: auto; bottom: 0; z-index: 6; max-height: none; overflow: visible; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 10px; padding: 12px 28px; border-left: 0; border-top: 1px solid var(--bcv-edge); background: var(--bcv-chrome-ground, var(--bcv-chrome)); -webkit-backdrop-filter: var(--bcv-blur-chrome); backdrop-filter: var(--bcv-blur-chrome); }
   .bcv-qz__rrail .bcv-qz__railh, .bcv-qz__meter { display: none; }
   .bcv-qz__rrail .bcv-qz__answered { flex: 1; min-width: 140px; font-size: 13px; font-weight: 500; color: var(--bcv-ink3); }
   .bcv-qz__railbtns { order: 3; flex-direction: row-reverse; margin: 0; }
@@ -2033,7 +2041,7 @@ html[data-bcv-theme="dark"] #bcv-app .bcv-qz__opt.is-selected { color: #7ab8ff; 
 
 /* ---- reader overlay -------------------------------------------------------- */
 .bcv-reader-ov { position: fixed; inset: 0; z-index: var(--bcv-z-sheet); background: var(--bcv-bg); overflow: auto; }
-.bcv-reader-ov__bar { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 10px; padding: 14px 24px; background: var(--bcv-chrome); -webkit-backdrop-filter: var(--bcv-blur-chrome); backdrop-filter: var(--bcv-blur-chrome); border-bottom: 1px solid var(--bcv-edge); }
+.bcv-reader-ov__bar { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 10px; padding: 14px 24px; background: var(--bcv-chrome-ground, var(--bcv-chrome)); -webkit-backdrop-filter: var(--bcv-blur-chrome); backdrop-filter: var(--bcv-blur-chrome); border-bottom: 1px solid var(--bcv-edge); }
 .bcv-reader-ov__title { flex: 1; min-width: 0; font: 600 14px/1.3 var(--bcv-font); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bcv-reader-ov__doc { max-width: 720px; margin: 0 auto; padding: 40px 24px 80px; font-size: var(--bcv-reader-size, 19px); line-height: 1.7; }
 .bcv-reader-ov__doc h1 { font: 700 34px/1.15 var(--bcv-display); letter-spacing: -.025em; margin: 0 0 24px; }
@@ -2048,7 +2056,7 @@ html.bcv-preview #bcv-app { padding-right: var(--bcv-pv-w); }
 .bcv-pv {
   position: fixed; top: 0; right: 0; bottom: 0; z-index: var(--bcv-z-panel); width: clamp(340px, 33vw, 520px);
   display: flex; flex-direction: column; box-sizing: border-box;
-  background: var(--bcv-chrome); -webkit-backdrop-filter: var(--bcv-blur-chrome); backdrop-filter: var(--bcv-blur-chrome);
+  background: var(--bcv-chrome-ground, var(--bcv-chrome)); -webkit-backdrop-filter: var(--bcv-blur-chrome); backdrop-filter: var(--bcv-blur-chrome);
   border-left: 1px solid var(--bcv-edge); box-shadow: -18px 0 46px rgba(0,0,0,.16);
   font-family: var(--bcv-font); -webkit-font-smoothing: antialiased; font-size: 14px; line-height: 1.4; color: var(--bcv-ink);
   animation: bcv-pv-in var(--bcv-t-gentle) var(--bcv-spring-gentle) both;
@@ -2800,7 +2808,7 @@ html.bcv-on:not(.bcv-phone):not(.bcv-tooltab).bcv-quiz #bcv-tray, html.bcv-on:no
 html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) .bcv-main { transition: padding-top .45s cubic-bezier(.32,.72,0,1); }
 @media (max-width: 1100px) { html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) { --bcv-side-w: 200px; } }
 #bcv-bar { display: none; }
-html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) #bcv-bar { display: block; position: fixed; top: 0; left: var(--bcv-side-w); right: 0; height: var(--bcv-bar-h); z-index: var(--bcv-z-bar); box-sizing: border-box; background: var(--bcv-chrome); -webkit-backdrop-filter: var(--bcv-blur-chrome); backdrop-filter: var(--bcv-blur-chrome); border-bottom: 1px solid var(--bcv-edge); transition: left .45s cubic-bezier(.32,.72,0,1), translate .45s cubic-bezier(.32,.72,0,1), opacity .3s ease; }
+html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) #bcv-bar { display: block; position: fixed; top: 0; left: var(--bcv-side-w); right: 0; height: var(--bcv-bar-h); z-index: var(--bcv-z-bar); box-sizing: border-box; background: var(--bcv-chrome-ground, var(--bcv-chrome)); -webkit-backdrop-filter: var(--bcv-blur-chrome); backdrop-filter: var(--bcv-blur-chrome); border-bottom: 1px solid var(--bcv-edge); transition: left .45s cubic-bezier(.32,.72,0,1), translate .45s cubic-bezier(.32,.72,0,1), opacity .3s ease; }
 html.bcv-setup-open #bcv-bar, html.bcv-welcome #bcv-bar { display: none !important; }
 html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) .bcv-main { padding-top: var(--bcv-bar-h); }
 html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) .bcv-head, html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) .bcv-qz__head, html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) .bcv-pv { top: var(--bcv-bar-h); }

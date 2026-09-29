@@ -25,6 +25,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.98.40', date: '2026-09-29', notes: [
+      { kind: 'fixed', title: 'Glass on Chrome fixed', body: 'Solid panels, and a real blur behind sheets.', icon: P.eye },
+    ] },
     { version: '2.98.39', date: '2026-09-29', notes: [
       { kind: 'improved', title: 'Uses less memory', body: 'Finished animations free their memory.', icon: P.layers },
     ] },

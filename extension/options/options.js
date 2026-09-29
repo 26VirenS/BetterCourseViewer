@@ -197,6 +197,8 @@
   // ---- General --------------------------------------------------------------------------------------
   onSwitch($('skin'), (on) => save(S.lookPatch(on))); // (off here is until turned on again)
   onSwitch($('awayRefresh'), (on) => save({ appearance: { awayRefresh: on } })); // (off by a hold on the pill; this is the way back on)
+  // Chrome drawing without graphics acceleration draws no blur: said here, with the way to turn it back on
+  if (self.BCV.theme?.checkBlur && !BCV.theme.checkBlur()) $('noBlur').hidden = false;
   const openOnCanvas = async (param) => {
     const msg = $('generalMsg');
     if (!site.origin) {

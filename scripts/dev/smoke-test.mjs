@@ -497,8 +497,13 @@ try {
   check(sheetSplit.secs === 'Still to do|Already done' && sheetSplit.quiet >= 1 && sheetSplit.quietOp < 0.8 && /· (graded|handed in|marked done)\b/.test(sheetSplit.quietMeta) && sheetSplit.afterRows && sheetSplit.cols.length === 2 && sheetSplit.cols[1] > sheetSplit.cols[0] * 1.5 && sheetSplit.cols[0] <= 360, `the sheet: what is still to do, then the done ones quieter below; the preview pane the wide one: ${JSON.stringify(sheetSplit)}`);
   await page.hover('.bcv-sheet__qrow');
   check(await eventually(async () => Number(await page.$eval('.bcv-sheet__qrow', (e) => getComputedStyle(e).opacity)) > 0.95, 2000), 'a quiet row comes up to full strength under the pointer');
+  // this Chromium draws in software, which skips every backdrop-filter (lib/theme.js checkBlur): the
+  // bars take their colour over the page's ground, and an open sheet blurs the page with a filter
+  const noBlur = await page.evaluate(() => ({ cls: document.documentElement.classList.contains('bcv-noblur'), kept: JSON.parse(localStorage.getItem('bcv:blur') || 'null')?.drawn, bar: getComputedStyle(document.getElementById('bcv-bar')).backgroundImage, side: getComputedStyle(document.getElementById('bcv-side')).backgroundImage, main: getComputedStyle(document.getElementById('bcv-main')).filter }));
+  check(noBlur.cls && noBlur.kept === false && /^linear-gradient/.test(noBlur.bar) && /^linear-gradient/.test(noBlur.side) && noBlur.main === 'blur(6px)', `a Chrome that draws no blur gets solid bars, and the page behind a sheet blurred by a filter: ${JSON.stringify(noBlur)}`);
   await page.click('.bcv-sheet-ov', { position: { x: 5, y: 5 } });
   await page.waitForFunction(() => !document.querySelector('.bcv-sheet'), null, { timeout: 3000 });
+  check(await page.$eval('#bcv-main', (e) => getComputedStyle(e).filter) === 'none', 'the page is sharp again once the sheet is gone');
   await page.click('.bcv-stats .bcv-stat:nth-child(3)');
   await page.waitForSelector('.bcv-sheet', { timeout: 5000 });
   const annRows = await texts('.bcv-sheet__row');
@@ -6419,6 +6424,7 @@ try {
   await options.click('.theme[data-value="system"]');
   await options.waitForTimeout(250);
   // Appearance: and where the courses sit, the same choice the last step of the setup offers
+  check(await options.$eval('#noBlur', (e) => !e.hidden && /graphics acceleration/.test(e.textContent) && /chrome:\/\/settings\/system/.test(e.textContent)), 'Appearance says Chrome is drawing without its blur, and where to turn graphics acceleration back on');
   check((await options.$$eval('#sideCourses button', (bs) => bs.map((b) => b.textContent))).join(',') === 'Always listed,On hover' && (await options.$eval('#sideCourses button.is-on', (b) => b.dataset.value)) === 'always', 'the courses in the sidebar: listed or on hover, listed to begin with');
   await options.click('#sideCourses button[data-value="hover"]');
   await options.waitForTimeout(250);
