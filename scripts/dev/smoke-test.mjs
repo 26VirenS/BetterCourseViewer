@@ -3251,6 +3251,36 @@ try {
   await knewton.locator('bcv-tool-bar .theme').click();
   await knewton.waitForTimeout(200);
   await shot(knewton, '14c-tool-dark');
+  // (2.98.61) Hide tucks the bar away: it slides up out of the tab, the tool's page takes the whole
+  // height, the pinned tools go up with it, and a small tab at the top brings it back. The choice is
+  // kept, so the tool's next page (and the next tool) opens the way it was left.
+  const barLook = () => knewton.evaluate(() => {
+    const r = document.querySelector('bcv-tool-bar').shadowRoot;
+    const bar = r.querySelector('.bar'), peek = r.querySelector('.peek'), tray = document.getElementById('bcv-tray');
+    return {
+      tucked: document.querySelector('bcv-tool-bar').hasAttribute('data-hidden'), barTop: Math.round(bar.getBoundingClientRect().top), barBottom: Math.round(bar.getBoundingClientRect().bottom),
+      barVis: getComputedStyle(bar).visibility, peek: getComputedStyle(peek).display, peekH: Math.round(peek.getBoundingClientRect().height),
+      margin: getComputedStyle(document.documentElement).marginTop, trayOp: tray ? getComputedStyle(tray).opacity : null, hideLabel: r.querySelector('.hide')?.getAttribute('aria-label'),
+    };
+  });
+  const barSaved = () => sw.evaluate(async () => (await chrome.storage.local.get('ext:barHidden'))['ext:barHidden'] ?? null);
+  await knewton.locator('bcv-tool-bar .hide').click();
+  await knewton.waitForTimeout(600);
+  const tuckA = await barLook();
+  check(tuckA.tucked && tuckA.barBottom <= 0 && tuckA.barVis === 'hidden' && tuckA.peek === 'grid' && tuckA.peekH >= 14 && tuckA.margin === '0px' && (tuckA.trayOp === null || tuckA.trayOp === '0') && tuckA.hideLabel === 'Hide this bar' && (await barSaved()) === true,
+    `Hide tucks the bar away: up out of the tab, the page given the whole height, the pins gone with it, a small tab left to bring it back, the choice kept: ${JSON.stringify(tuckA)}`);
+  await shot(knewton, '14d-tool-bar-hidden');
+  await knewton.reload();
+  await eventually(async () => !!(await barRead(knewton)), 20000);
+  await eventually(async () => (await barState(knewton)) === 'ready', 25000);
+  await knewton.waitForTimeout(400);
+  const tuckB = await barLook();
+  check(tuckB.tucked && tuckB.barBottom <= 0 && tuckB.margin === '0px' && tuckB.peek === 'grid', `the tool's next page opens with the bar still tucked away: ${JSON.stringify(tuckB)}`);
+  await knewton.locator('bcv-tool-bar .peek').click();
+  await knewton.waitForTimeout(600);
+  const tuckC = await barLook();
+  check(!tuckC.tucked && tuckC.barTop === 0 && tuckC.barVis === 'visible' && tuckC.peek === 'none' && tuckC.margin === '52px' && (tuckC.trayOp === null || tuckC.trayOp === '1') && (await barSaved()) === false,
+    `the small tab brings the bar back, the page pushed down under it again, and that is kept too: ${JSON.stringify(tuckC)}`);
   await knewton.locator('bcv-tool-bar .x').click().catch(() => { /* the tab closes under the click, which is the point: the check after is that it did */ });
   await eventually(async () => knewton.isClosed(), 10000);
   await page.bringToFront();
@@ -6212,6 +6242,16 @@ try {
   });
   check(pop.outsideBody && pop.top === 52 && pop.z === '2147483646' && pop.filter === 'none' && pop.title === 'Calculator',
     `a tool opened there rises over the tool's page and under the bar, its own colours intact: ${JSON.stringify(pop)}`);
+  // (2.98.61) the pins sit in the bar, so tucking the bar away takes them up with it, and they come back with it
+  await wTab.keyboard.press('Escape');
+  await wTab.locator('bcv-tool-bar .hide').click();
+  await wTab.waitForTimeout(700);
+  const pinsTucked = await wTab.evaluate(() => { const t = document.getElementById('bcv-tray'); return { op: getComputedStyle(t).opacity, events: getComputedStyle(t).pointerEvents, bottom: Math.round(t.getBoundingClientRect().bottom), margin: getComputedStyle(document.documentElement).marginTop }; });
+  await wTab.evaluate(() => document.querySelector('bcv-tool-bar').shadowRoot.querySelector('.peek').click());
+  await wTab.waitForTimeout(700);
+  const pinsBack = await wTab.evaluate(() => { const t = document.getElementById('bcv-tray'); return { op: getComputedStyle(t).opacity, events: getComputedStyle(t).pointerEvents, top: Math.round(t.getBoundingClientRect().top), margin: getComputedStyle(document.documentElement).marginTop }; });
+  check(pinsTucked.op === '0' && pinsTucked.events === 'none' && pinsTucked.margin === '0px' && pinsBack.op === '1' && pinsBack.events !== 'none' && pinsBack.top === 14 && pinsBack.margin === '52px',
+    `the pinned tools go up with the bar when it is tucked away, and come back with it: ${JSON.stringify({ pinsTucked, pinsBack })}`);
   await wTab.locator('bcv-tool-bar .x').click().catch(() => { /* the tab closes under the click, which is the point: the check after is that it did */ });
   await eventually(async () => wTab.isClosed(), 10000);
   await page.bringToFront();

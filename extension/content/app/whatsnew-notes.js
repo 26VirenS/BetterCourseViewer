@@ -25,6 +25,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.98.61', date: '2026-09-30', notes: [
+      { kind: 'new', title: 'Hide the tool bar', body: 'Tuck the bar away on a tool; a small tab brings it back.', icon: P.eye },
+    ] },
     { version: '2.98.60', date: '2026-09-30', notes: [
       { kind: 'fixed', title: 'Old quiz attempts open', body: 'A tool attempt opens through Canvas, not "Invalid launch".', icon: P.check },
     ] },

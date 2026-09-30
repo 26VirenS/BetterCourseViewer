@@ -13,7 +13,7 @@
  * min(their own, the viewport less a margin). */
 
 html[data-bcv-theme] {
-  --bcv-version: "2.98.60"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.98.61"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -2950,6 +2950,7 @@ html.bcv-phone.bcv-on #bcv-tray, html.bcv-setup-open #bcv-tray, html:not(.bcv-on
    <body> (see overlayRoot), so the look switch turning the tool's page over leaves it alone, and it
    is painted after the bar, which is why the two share the top of the z-index without a fight. */
 html.bcv-tooltab #bcv-tray { top: 14px; right: var(--bcv-toolbar-right, 190px); z-index: var(--bcv-z-top); } /* (--bcv-toolbar-right: where the bar's own buttons begin, measured by toolbar.js) */
+html.bcv-tooltab.bcv-toolbar-hidden #bcv-tray { translate: 0 -64px; opacity: 0; pointer-events: none; } /* (the bar tucked away: the pins sit in it, so they go up with it) */
 html.bcv-tooltab { --bcv-font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif; }
 /* A tool's page is somebody else's and stacks as it likes, so on that tab everything of ours that
    floats is lifted to the top — under the bar and the tray, which stay pressable — and a tool's own

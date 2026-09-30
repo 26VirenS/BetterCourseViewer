@@ -2,7 +2,9 @@
  *
  * An external tool is not framed any more. Canvas hands over an address, the tool opens in a tab of
  * its own, and this puts the bar across the top of it: the tool's name, where it is, the look
- * switch, Reload, and the X — which closes the tab and goes back to the Canvas tab it came from.
+ * switch, Reload, Hide, and the X — which closes the tab and goes back to the Canvas tab it came
+ * from. Hide slides the bar up out of the way and gives the tool the whole tab; a small tab left at
+ * the top brings it back, and every tool's tab after keeps whichever was chosen last.
  * It reads like the popup it replaces and is not one, which is the point: the tool has a whole tab,
  * its own address bar, its own cookies and its own windows, so a sign-in that wants all of that
  * simply works instead of being nursed through a frame.
@@ -24,7 +26,10 @@
 
   const H = 52; // the bar's height, which the page is pushed down by
   const THEME_KEY = 'ext:theme';
+  const HIDE_KEY = 'ext:barHidden'; // (the bar tucked away: one choice for every tool's tab, kept until it is brought back)
   const IC = {
+    up: 'M6 15l6-6 6 6',
+    down: 'M6 9l6 6 6-6',
     close: 'M6 6l12 12M18 6L6 18',
     reload: 'M4 12a8 8 0 108-8M4 4v5h5',
     sun: 'M12 7.3a4.7 4.7 0 100 9.4 4.7 4.7 0 000-9.4zM12 3.3v1.3M12 19.4v1.3M4.6 12H3.3M20.7 12h-1.3M6.9 6.9L6 6M18 18l-.9-.9M17.1 6.9L18 6M6 18l.9-.9',
@@ -55,7 +60,19 @@
 :host { all: initial; }
 * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif; }
 .bar { position: fixed; top: 0; left: 0; right: 0; height: ${H}px; z-index: 2147483647; display: flex; align-items: center; gap: 10px; padding: 0 12px 0 14px;
-  background: #1c1c1e; color: #f2f2f7; border-bottom: 1px solid rgba(255,255,255,.1); box-shadow: 0 1px 12px rgba(0,0,0,.35); transition: background .18s ease; }
+  background: #1c1c1e; color: #f2f2f7; border-bottom: 1px solid rgba(255,255,255,.1); box-shadow: 0 1px 12px rgba(0,0,0,.35);
+  transition: background .18s ease, transform .34s cubic-bezier(.32,.72,0,1), visibility 0s linear 0s; }
+/* tucked away: the bar slides up out of the tab and a small tab at the top brings it back (never while
+   a sign-in is under way: the notice and the way out matter more then) */
+:host([data-hidden]:not([data-state="auth"])) .bar { transform: translateY(-100%); box-shadow: none; visibility: hidden;
+  transition: background .18s ease, transform .34s cubic-bezier(.32,.72,0,1), box-shadow .2s ease, visibility 0s linear .34s; }
+.peek { position: fixed; top: 0; left: 50%; transform: translateX(-50%); z-index: 2147483647; display: none; place-items: center; width: 64px; height: 16px; padding: 0;
+  border: 1px solid rgba(255,255,255,.18); border-top: 0; border-radius: 0 0 10px 10px; background: rgba(58,58,60,.92); color: #f2f2f7; box-shadow: 0 1px 6px rgba(0,0,0,.3); cursor: pointer;
+  transition: height .18s ease, background .18s ease; }
+.peek:hover, .peek:focus-visible { height: 22px; background: #0a84ff; border-color: #0a84ff; }
+.peek:focus-visible { outline: 2px solid #0a84ff; outline-offset: 1px; }
+:host([data-hidden]:not([data-state="auth"])) .peek { display: grid; }
+@media (prefers-reduced-motion: reduce) { .bar, :host([data-hidden]) .bar { transition: background .18s ease, visibility 0s; } }
 .tile { flex: none; width: 32px; height: 32px; border-radius: 10px; display: grid; place-items: center; background: rgba(10,132,255,.18); color: #0a84ff; }
 .titles { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
 .title { font: 600 14px/1.25 inherit; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -81,12 +98,17 @@
   let host = null;
   let root = null;
   let authH = 0; // how far the authenticating strip pushes the page down, on top of the bar
+  let hidden = false; // the bar tucked away (HIDE_KEY)
+  const tucked = () => hidden && host?.dataset.state !== 'auth'; // (a sign-in under way brings the bar back while it lasts)
 
   /** Push the page down by whatever the bar and its notice take up, so nothing sits under them. */
   function push() {
     try {
-      document.documentElement.style.setProperty('margin-top', `${H + authH}px`, 'important');
-      document.documentElement.style.setProperty('--bcv-toolbar-h', `${H + authH}px`); // (what the tray's own popups start below)
+      const top = tucked() ? 0 : H + authH;
+      if (top) document.documentElement.style.setProperty('margin-top', `${top}px`, 'important');
+      else document.documentElement.style.removeProperty('margin-top'); // (tucked away: the page has the whole tab, its own margin back)
+      document.documentElement.style.setProperty('--bcv-toolbar-h', `${top}px`); // (what the tray's own popups start below)
+      document.documentElement.classList.toggle('bcv-toolbar-hidden', tucked()); // (the pinned tools go up with the bar)
       // where the bar's own buttons begin, from its right edge: the tray (the pinned tools) sits just left of them, whatever the window's width
       const bar = root?.querySelector('.bar'), acts = root?.querySelector('.acts'), x = root?.querySelector('.x');
       if (bar && acts && x) {
@@ -164,6 +186,21 @@
     push();
   }
 
+  /** Tuck the bar away or bring it back. The choice is one for every tool's tab (kept in the
+   *  extension's storage, so the next tool opens the way the last was left); the small tab at the
+   *  top of the page is always there to bring it back. */
+  function setHidden(next, { save = true } = {}) {
+    hidden = !!next;
+    if (host) {
+      if (hidden) host.dataset.hidden = ''; else delete host.dataset.hidden;
+      // the press that hid it leaves the keyboard on the tab that brings it back, and the other way round
+      const had = root?.activeElement;
+      if (had && (had.classList.contains('hide') || had.classList.contains('peek'))) root.querySelector(hidden ? '.peek' : '.hide')?.focus({ preventScroll: true });
+    }
+    push();
+    if (save) { try { api.storage?.local?.set?.({ [HIDE_KEY]: hidden }); } catch { /* this tab keeps it */ } }
+  }
+
   function build(tool) {
     host = document.createElement('bcv-tool-bar');
     host.setAttribute('data-bcv-tool-bar', '');
@@ -194,18 +231,35 @@
     x.append(svg(IC.close, { size: 13, width: 2.3 }));
     x.addEventListener('click', () => { try { api.runtime.sendMessage({ type: 'closeTool' }); } catch { window.close(); } });
 
+    const hide = el('button', 'btn icon hide');
+    hide.type = 'button';
+    hide.title = 'Hide this bar';
+    hide.setAttribute('aria-label', 'Hide this bar');
+    hide.append(svg(IC.up, { size: 15, width: 2.2 }));
+    hide.addEventListener('click', () => setHidden(true));
+
     const acts = el('div', 'acts');
-    acts.append(themeBtn, reload);
+    acts.append(themeBtn, reload, hide);
     const bar = el('div', 'bar');
     bar.append(tile, titles, acts, x);
+
+    // what is left of the bar when it is tucked away: a small tab at the top of the page
+    const peek = el('button', 'peek');
+    peek.type = 'button';
+    peek.title = 'Show the Simpl bar';
+    peek.setAttribute('aria-label', 'Show the Simpl bar');
+    peek.append(svg(IC.down, { size: 14, width: 2.4 }));
+    peek.addEventListener('click', () => setHidden(false));
 
     const auth = el('div', 'auth');
     auth.append(svg(IC.warn, { size: 20, width: 2 }), el('span', '', 'Authenticating. Don’t open any new tabs or windows'));
 
     // the state is on the host before the bar is first laid out (attach measures it), so the bar's
-    // first paint is already its colour for that state rather than a transition into it
+    // first paint is already its colour for that state rather than a transition into it; the same
+    // for a bar the last tool left tucked away, which arrives tucked rather than sliding up
     host.dataset.state = tool.state === 'auth' ? 'auth' : 'ready';
-    root.append(style, bar, auth);
+    if (hidden) host.dataset.hidden = '';
+    root.append(style, bar, peek, auth);
     attach();
     paint();
     setState(tool.state);
@@ -236,7 +290,13 @@
         if (tool) break;
       }
       if (!tool) return;
-      try { const r = await api.storage.local.get(THEME_KEY); if (r?.[THEME_KEY]) theme = r[THEME_KEY] === 'light' ? 'light' : 'dark'; } catch { /* it stays dark */ }
+      try {
+        const r = await api.storage.local.get([THEME_KEY, HIDE_KEY]);
+        if (r?.[THEME_KEY]) theme = r[THEME_KEY] === 'light' ? 'light' : 'dark';
+        hidden = r?.[HIDE_KEY] === true;
+      } catch { /* it stays dark, and shown */ }
+      // the other tool tabs follow a choice made in one of them
+      try { api.storage.onChanged.addListener((ch, area) => { if (area === 'local' && ch[HIDE_KEY] && !!ch[HIDE_KEY].newValue !== hidden) setHidden(!!ch[HIDE_KEY].newValue, { save: false }); }); } catch { /* each tab keeps its own */ }
       const start = () => { if (!host) build(tool); else attach(); paint(); };
       if (document.documentElement) start();
       document.addEventListener('DOMContentLoaded', start);
