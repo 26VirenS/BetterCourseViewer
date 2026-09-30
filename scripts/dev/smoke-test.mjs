@@ -1619,6 +1619,21 @@ try {
   await page.click('.bcv-fb__btns .bcv-qz__big:nth-child(2)');
   await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
   check(!page.url().includes('bcv=feedback'), 'and Back to the assignment leaves the feedback screen behind');
+  // (2.98.60) an attempt handed in through a tool (New Quizzes) carries the tool's launch point as its url,
+  // which answers "Invalid launch." opened on its own: the attempt opens through Canvas's launch instead
+  await mockConfig({ ltiAttempts: ['4003'] });
+  await page.goto(`${BASE}/courses/104/assignments/4003?bcv=feedback`);
+  await page.waitForSelector('.bcv-fb__toollink', { timeout: 10000 });
+  const ltiLinks = await page.evaluate(() => [...document.querySelectorAll('.bcv-fb__q')].map((q) => { const a = q.querySelector('.bcv-fb__toollink'); const u = a ? new URL(a.href) : null; return { text: a?.textContent, path: u?.pathname, aid: u?.searchParams.get('assignment_id'), url: u?.searchParams.get('url'), raw: !!q.querySelector('a[href^="https://quiz-lti"]') }; }));
+  check(ltiLinks.length === 2 && ltiLinks.every((l, i) => l.text === `Open attempt ${2 - i}` && l.path === '/courses/104/external_tools/retrieve' && l.aid === '4003' && /^https:\/\/quiz-lti\.example\.com\/lti\/launch\?participant_session_id=/.test(l.url || '') && !l.raw), `a tool attempt opens through Canvas's launch, not the tool's bare address: ${JSON.stringify(ltiLinks)}`);
+  const popupWait = page.context().waitForEvent('page', { timeout: 8000 }).catch(() => null);
+  await (await page.$$('.bcv-fb__toollink'))[1].click();
+  const toolPg = await popupWait;
+  if (toolPg) await toolPg.waitForLoadState('domcontentloaded').catch(() => {});
+  const toolUrl = toolPg ? new URL(toolPg.url()) : null;
+  check(toolUrl &&toolUrl.pathname === '/courses/104/external_tools/retrieve' && /participant_session_id=275361/.test(toolUrl.searchParams.get('url') || ''), `pressing it opens the tool's tab on Canvas's launch for that attempt: ${toolPg?.url()}`);
+  if (toolPg) await toolPg.close().catch(() => {});
+  await mockConfig({ ltiAttempts: [] });
   // ---- Mark as done, and Previous / Next ------------------------------------------------------
   // Mark as done is offered only where Canvas asks for it: a module item with a must_mark_done
   // requirement. The button is the requirement's own state, and pressing it makes Canvas's call.

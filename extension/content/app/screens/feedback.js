@@ -92,6 +92,22 @@
     ]);
   }
 
+  /** An attempt handed in through a tool (New Quizzes and the like). Its address is the tool's
+   *  launch point, which answers "Invalid launch" when opened on its own: it has to be launched
+   *  by Canvas, signed, the way Canvas's own submission page does it. */
+  function toolAttempt(c, a, cur) {
+    const href = `${c.url}/external_tools/retrieve?display=borderless&assignment_id=${a.id}&url=${encodeURIComponent(cur.url)}`;
+    const label = `Open attempt ${cur.attempt || 1}`;
+    return h('a', {
+      class: 'bcv-fb__link bcv-fb__toollink', href, target: '_blank', rel: 'noopener', text: label,
+      onclick: (e) => {
+        if (!BCV.exttool) return;
+        e.preventDefault();
+        BCV.exttool.open({ title: `${a.name} · attempt ${cur.attempt || 1}`, url: href, newTab: href, from: e.currentTarget });
+      },
+    });
+  }
+
   /** One attempt, as a question card is one question: what was handed in, when, and what came back. */
   function attemptCard(ctx, c, a, s, cur, { isLatest, graded, me }, i) {
     const dark = ctx.app.isDark();
@@ -119,7 +135,7 @@
       files.length ? U.el('bcv-fb__files', files.map(fileRow)) : null,
       // a text entry or a URL is the hand-in itself: it is shown, not described
       cur.body ? CS().prose(cur.body, { cls: 'bcv-fb__body' }) : null,
-      cur.url ? h('a', { class: 'bcv-fb__link', href: cur.url, target: '_blank', rel: 'noopener', text: cur.url }) : null,
+      cur.url ? (cur.submission_type === 'basic_lti_launch' ? toolAttempt(c, a, cur) : h('a', { class: 'bcv-fb__link', href: cur.url, target: '_blank', rel: 'noopener', text: cur.url })) : null,
       thread.length ? U.el('bcv-fb__thread', [U.text('bcv-fb__kicker', 'Comments on this attempt', 'span'), ...thread.map((cm) => commentRow(cm, me))]) : null,
       !isLatest ? U.text('bcv-fb__note bcv-pretty', 'Only your latest attempt is graded, and a comment can only be added on it.') : null,
     ]), i, 45);

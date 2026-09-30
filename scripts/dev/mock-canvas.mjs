@@ -149,7 +149,9 @@ function assignmentObj(courseId, row) {
     external_tool_tag_attributes: extra.tool ? { url: extra.tool, new_tab: false, resource_link_id: 'rl1' } : undefined,
     discussion_topic: extra.discussion ? { id: extra.discussion, title: name, html_url: `/courses/${courseId}/discussion_topics/${extra.discussion}` } : undefined, // a graded discussion: the assignment behind a topic
     assignment_group_id: `g${courseId}-${Math.max(gIdx, 0)}`, omit_from_final_grade: !!extra.omit, allowed_attempts: extra.attempts ?? 2, rubric: extra.rubric ? rubric : undefined, rubric_settings: extra.rubric ? { title: 'Dis01 rubric' } : undefined,
-    submission: apiSubmissions.get(id) || submission, // a submission made through the API replaces the seeded one
+    // POST /__mock/config {"ltiAttempts": ["4003"]}: a tool assignment handed in twice through the tool (New Quizzes'
+    // shape), each attempt's url the tool's own launch point, which only a launch through Canvas can open
+    submission: apiSubmissions.get(id) || ((mockConfig.ltiAttempts || []).includes(String(id)) ? ltiSubmission(id, submission, possible) : submission), // a submission made through the API replaces the seeded one
   };
 }
 function groupNames(courseId) {
@@ -744,6 +746,18 @@ on('GET', /^\/api\/v1\/groups\/(\w+)\/pages$/, () => [{ url: 'group-notes', titl
 on('GET', /^\/api\/v1\/groups\/(\w+)\/pages\/([^/]+)$/, () => ({ url: 'group-notes', title: 'Group notes', body: '<p>Meeting Tuesday.</p>', created_at: ago(5 * D), updated_at: ago(D) }));
 on('GET', /^\/api\/v1\/groups\/(\w+)\/folders\/root$/, (url, m) => ({ id: `rg${m[1]}`, name: 'group files', full_name: 'group files', context_id: m[1] }));
 on('GET', /^\/api\/v1\/groups\/(\w+)$/, (url, m) => { const g = groupList.find((x) => x.id === m[1]); return g ? { ...g, avatar_url: null } : null; });
+function ltiSubmission(id, base, possible) {
+  const launch = (n) => `https://quiz-lti.example.com/lti/launch?participant_session_id=27536${n}&quiz_session_id=27772${n}`;
+  const when = (d) => new Date(Date.now() - d * 86400000).toISOString();
+  return {
+    ...base, workflow_state: 'graded', submitted_at: when(1), graded_at: when(1), posted_at: when(1), attempt: 2, score: possible * 0.98, grade: String(possible * 0.98),
+    submission_type: 'basic_lti_launch', url: launch(2), attachments: undefined, missing: false,
+    submission_history: [
+      { attempt: 1, submitted_at: when(3), submission_type: 'basic_lti_launch', url: launch(1), score: possible * 0.6, late: false },
+      { attempt: 2, submitted_at: when(1), submission_type: 'basic_lti_launch', url: launch(2), score: possible * 0.98, late: false },
+    ],
+  };
+}
 // test-only switches: POST /__mock/config {"calendarFail": true} — cacheable: API answers carry a ten-minute max-age
 const mockConfig = { calendarFail: false, cacheable: false, bareSequence: false };
 on('POST', /^\/__mock\/config$/, (url, m, body) => Object.assign(mockConfig, body));
