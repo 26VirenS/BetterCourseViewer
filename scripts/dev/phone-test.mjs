@@ -421,6 +421,7 @@ try {
   await page.click('.bcv-ph-todo__add');
   await page.waitForSelector('.bcv-ph-composer', { timeout: 5000 });
   check((await page.$eval('.bcv-ph-composer__add', (e) => e.disabled)) === true && (await texts('.bcv-ph-composer__pri')).join(',') === 'High,Medium,Low,None' && /^Today · /.test((await texts('.bcv-ph-composer__date'))[0]) && !(await page.$('.bcv-ph-composer .bcv-seg')) && !(await page.$('input[type="date"]')), `the composer opens with Add disabled until a title is typed; the date field starts at today (${(await texts('.bcv-ph-composer__date'))[0]})`);
+  check((await texts('.bcv-ph-composer__course'))[0] === 'No course' && (await texts('.bcv-ph-composer__repeat'))[0] === 'Doesn’t repeat' && !(await page.$('.bcv-ph-composer__until')), `(2.98.58) a course and a repeat sit under the date, both unset, no until date yet: ${(await texts('.bcv-ph-composer__course'))[0]} · ${(await texts('.bcv-ph-composer__repeat'))[0]}`);
   await page.fill('.bcv-ph-composer__title', 'Return the library books');
   await page.click('.bcv-ph-composer__date');
   await page.waitForSelector('.bcv-datepop', { timeout: 3000 });
@@ -442,6 +443,32 @@ try {
   page.once('dialog', (d) => d.accept());
   await page.click('.bcv-ph-sheet__actions .bcv-ph-bigbtn.is-danger');
   check(await eventually(async () => !(await texts('.bcv-ph-trow .bcv-ph-row__title')).includes('Return the library books')), 'Delete task removes it from the planner');
+  // (2.98.58) a task given a course, repeating every two weeks: the row wears the course; the sheet offers the series
+  await page.click('.bcv-ph-todo__add');
+  await page.waitForSelector('.bcv-ph-composer', { timeout: 5000 });
+  await page.fill('.bcv-ph-composer__title', 'Lab notebook check');
+  await page.click('.bcv-ph-composer__course');
+  await page.waitForSelector('.bcv-picker__list', { timeout: 3000 });
+  const courseOpts = await texts('.bcv-picker__opt');
+  await page.click('.bcv-picker__opt:nth-child(3)');
+  await page.waitForFunction(() => !document.querySelector('.bcv-picker__list'), null, { timeout: 3000 });
+  const pickedCourse = (await texts('.bcv-ph-composer__course'))[0];
+  await page.click('.bcv-ph-composer__repeat');
+  await page.waitForSelector('.bcv-picker__list', { timeout: 3000 });
+  const repeatOpts = await texts('.bcv-picker__opt');
+  await page.click('.bcv-picker__opt:nth-child(4)'); // Every 2 weeks
+  await page.waitForSelector('.bcv-ph-composer__until', { timeout: 3000 });
+  check(courseOpts[0] === 'No course' && courseOpts.length === 6 && pickedCourse === courseOpts[2] && repeatOpts.join(',') === 'Doesn’t repeat,Every day,Every week,Every 2 weeks,Every month' && /^until/.test((await texts('.bcv-ph-composer__until'))[0]) && (await texts('.bcv-ph-composer__add'))[0] === 'Add 5 tasks', `the course list is the selected courses, the repeat its four kinds; Every 2 weeks brings an until date and the button counts: ${pickedCourse} · ${(await texts('.bcv-ph-composer__add'))[0]}`);
+  await shot('03f-todo-composer-repeat');
+  await page.click('.bcv-ph-composer__add');
+  check(await eventually(async () => (await page.$$('.bcv-ph-trow:has-text("Lab notebook check")')).length === 5 && !(await page.$('.bcv-ph-composer'))), 'Add 5 tasks writes the five notes and they land in the list');
+  check((await texts('.bcv-ph-trow:has-text("Lab notebook check") .bcv-ph-row__sub'))[0] === `${pickedCourse} · My task · repeats every 2 weeks`, `the row wears the course and says it repeats: ${(await texts('.bcv-ph-trow:has-text("Lab notebook check") .bcv-ph-row__sub'))[0]}`);
+  await page.click('.bcv-ph-trow:has-text("Lab notebook check") .bcv-ph-row__body');
+  await sheet();
+  check((await texts('.bcv-ph-sheet__actions .bcv-ph-bigbtn')).join(',') === 'Mark done,Delete task,Delete all 5 repeats', `the sheet offers the one and the series: ${(await texts('.bcv-ph-sheet__actions .bcv-ph-bigbtn')).join(',')}`);
+  page.once('dialog', (d) => d.accept());
+  await page.click('.bcv-ph-sheet__actions .bcv-ph-bigbtn:nth-child(3)');
+  check(await eventually(async () => !(await page.$('.bcv-ph-trow:has-text("Lab notebook check")'))), 'Delete all removes every task of the series');
 
   // ---- Grades ------------------------------------------------------------------------------------
   console.log('Grades');

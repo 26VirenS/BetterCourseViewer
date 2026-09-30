@@ -869,12 +869,14 @@ try {
   await page.waitForFunction(() => !document.querySelector('.bcv-menu'), null, { timeout: 3000 });
   check((await texts('.bcv-pri--draft'))[0] === 'High', 'picking High sets the draft chip');
   await page.click('.bcv-todo__addbtn');
-  await page.waitForFunction(() => [...document.querySelectorAll('.bcv-group__head')].some((e) => /^My tasks/.test(e.textContent)), null, { timeout: 10000 });
+  await page.waitForFunction(() => [...document.querySelectorAll('.bcv-row__title')].some((e) => /Email Prof\. Lei/.test(e.textContent)), null, { timeout: 10000 });
   const noteRow = page.locator('.bcv-row', { hasText: 'Email Prof. Lei about office hours' }).first();
   const noteText = (await noteRow.innerText()).replace(/\s+/g, ' ');
   const notes = await fetch(`${BASE}/api/v1/planner_notes`).then((r) => r.text()).then((t) => JSON.parse(t.replace(/^while\(1\);/, '')));
-  check(notes.length === 1 && notes[0].title === 'Email Prof. Lei about office hours' && /T\d\d:\d\d/.test(notes[0].todo_date) && !('priority' in notes[0]), `the task is a Canvas planner note with today as its todo_date, and no priority ever reaches Canvas: ${JSON.stringify(notes[0])}`);
-  check(/My task/.test(noteText) && /High/.test(noteText) && /11:59 PM|Today/.test(noteText) && (await noteRow.locator('.bcv-todo__del').count()) === 1 && (await page.$$('.bcv-todo__del')).length === 1 && !(await noteRow.locator('.bcv-btn--xs').count()), `the row: My task, High, due today, the only row with a delete button and no Submit: ${noteText}`);
+  check(notes.length === 1 && notes[0].title === 'Email Prof. Lei about office hours' && /T\d\d:\d\d/.test(notes[0].todo_date) && !('priority' in notes[0]) && !notes[0].course_id, `the task is a Canvas planner note with today as its todo_date and no course, and no priority ever reaches Canvas: ${JSON.stringify(notes[0])}`);
+  // (2.98.58) a task of your own sits in with the day's work — under Today here — not in a group of its own on top
+  const noteGroup = await noteRow.evaluate((r) => (r.closest('.bcv-card')?.previousElementSibling?.textContent.trim().match(/^(Overdue|Today|Tomorrow|Next 7 days|Later|My tasks)/) || ['?'])[0]);
+  check(/My task/.test(noteText) && /High/.test(noteText) && /11:59 PM|Today/.test(noteText) && noteGroup === 'Today' && !(await texts('.bcv-group__head')).some((t) => /^My tasks/.test(t)) && (await noteRow.locator('.bcv-todo__del').count()) === 1 && (await page.$$('.bcv-todo__del')).length === 1 && !(await noteRow.locator('.bcv-btn--xs').count()), `the row: My task, High, due today, under Today with the day's work (no My tasks group), the only row with a delete button and no Submit: ${noteText}`);
   const subAfter = (await texts('.bcv-head__sub'))[0];
   await page.waitForFunction((n) => Number(document.querySelector('.bcv-nav__item[data-nav="todo"] .bcv-nav__count').textContent) === n + 1, badgeBefore, { timeout: 10000 }); // (the badge is asked of Canvas again, through the gate)
   const subM = subBefore.match(/^(\d+) items across (\d+) courses$/);
@@ -924,23 +926,90 @@ try {
   const priHeads = (await texts('.bcv-group__head')).map((t) => (t.match(/^(High priority|Medium priority|Low priority|Unprioritised)/) || ['?'])[0]);
   check(priHeads.join(' | ') === 'High priority | Low priority | Unprioritised', `By priority: ${priHeads.join(' | ')}`);
   await page.click('.bcv-head .bcv-seg__btn:nth-child(1)');
-  await page.waitForFunction(() => /^My tasks/.test(document.querySelector('.bcv-group__head')?.textContent || ''), null, { timeout: 5000 });
+  await page.waitForFunction(() => /^(Overdue|Today)/.test(document.querySelector('.bcv-group__head')?.textContent || ''), null, { timeout: 5000 });
   // delete: only a task of your own, after a confirmation; the note leaves Canvas and the badge drops back
   page.once('dialog', (d) => d.accept());
   await page.click('.bcv-todo__del');
-  await page.waitForFunction(() => ![...document.querySelectorAll('.bcv-group__head')].some((e) => /^My tasks/.test(e.textContent)), null, { timeout: 10000 });
+  await page.waitForFunction(() => ![...document.querySelectorAll('.bcv-row__title')].some((e) => /Email Prof\. Lei/.test(e.textContent)), null, { timeout: 10000 });
   await page.waitForFunction((n) => Number(document.querySelector('.bcv-nav__item[data-nav="todo"] .bcv-nav__count').textContent) === n, badgeBefore, { timeout: 5000 });
   check((await fetch(`${BASE}/api/v1/planner_notes`).then((r) => r.text()).then((t) => JSON.parse(t.replace(/^while\(1\);/, '')))).length === 0 && !(await page.$('.bcv-todo__del')), 'Delete removes the planner note from Canvas; the list and the badge agree again');
-  // A task of your own stays on the list until it is done, whatever its date: one from three days
-  // ago and one for three weeks on are both there (course work keeps to the seven-day window).
   const noteApi = (method, path, body) => fetch(`${BASE}${path}`, { method, headers: { 'content-type': 'application/json', 'x-csrf-token': 'mock+csrf/token=' }, body: body ? JSON.stringify(body) : undefined }).then((r) => r.text()).then((t) => JSON.parse(t.replace(/^while\(1\);/, ''))); // the mock, like Canvas, refuses a write without the session's token
+  // (2.98.58) a task given a course and a weekly repeat: one note per week on that course; the rows
+  // wear the course and sit in with the day's work (and under the course By course); the X on one
+  // of them offers the whole series
+  await page.click('.bcv-todo__add');
+  await page.waitForSelector('.bcv-todo__composer', { timeout: 5000 });
+  await page.fill('.bcv-todo__title', 'Read the lab manual chapter');
+  check((await texts('.bcv-todo__course'))[0] === 'No course' && (await texts('.bcv-todo__repeat'))[0] === 'Doesn’t repeat' && !(await page.$('.bcv-todo__until')) && (await texts('.bcv-todo__addbtn'))[0] === 'Add task', `the composer starts with no course, no repeat and no until date: ${(await texts('.bcv-todo__course'))[0]} · ${(await texts('.bcv-todo__repeat'))[0]}`);
+  await page.click('.bcv-todo__course');
+  await page.waitForSelector('.bcv-menu', { timeout: 3000 });
+  const courseMenu = await texts('.bcv-menu__item');
+  check(courseMenu[0] === 'No course' && courseMenu.length === 6 && courseMenu[2].startsWith('F26-PHYS 008 01') && (await page.$$('.bcv-menu .bcv-dot')).length === 5, `the course menu: No course, then the five favourites with their colours: ${courseMenu.join(' | ')}`);
+  await page.click('.bcv-menu__item:nth-child(3)');
+  await page.waitForFunction(() => document.querySelector('.bcv-todo__course')?.textContent.trim() === 'F26-PHYS 008 01', null, { timeout: 3000 });
+  check(await page.$eval('.bcv-todo__course', (e) => e.classList.contains('is-set') && !!e.style.color && !!e.style.background), 'the chip names the course and wears its colour');
+  await page.click('.bcv-todo__repeat');
+  await page.waitForSelector('.bcv-menu', { timeout: 3000 });
+  check((await texts('.bcv-menu__item')).join(',') === 'Doesn’t repeat,Every day,Every week,Every 2 weeks,Every month', `the repeat menu: ${(await texts('.bcv-menu__item')).join(',')}`);
+  await page.click('.bcv-menu__item:nth-child(3)'); // Every week
+  await page.waitForSelector('.bcv-todo__until', { timeout: 3000 });
+  const untilText = (await texts('.bcv-todo__until'))[0];
+  const in8w = new Date(); in8w.setDate(in8w.getDate() + 56);
+  check((await texts('.bcv-todo__repeat'))[0] === 'Every week' && untilText.includes(in8w.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })) && (await texts('.bcv-todo__addbtn'))[0] === 'Add 9 tasks', `Every week brings an until date eight weeks on (${untilText}) and the button counts the tasks: ${(await texts('.bcv-todo__addbtn'))[0]}`);
+  await page.click('.bcv-todo__addbtn');
+  await page.waitForFunction(() => !document.querySelector('.bcv-todo__composer') && document.querySelectorAll('.bcv-row[data-series]').length === 9, null, { timeout: 20000 });
+  const seriesNotes = (await noteApi('GET', '/api/v1/planner_notes')).sort((a, b) => new Date(a.todo_date) - new Date(b.todo_date));
+  const weekly = seriesNotes.every((n, i) => i === 0 || Math.round((new Date(n.todo_date) - new Date(seriesNotes[i - 1].todo_date)) / 864e5) === 7);
+  check(seriesNotes.length === 9 && seriesNotes.every((n) => n.course_id === '102' && n.title === 'Read the lab manual chapter') && weekly, `nine planner notes on the course, a week apart: ${seriesNotes.map((n) => n.todo_date.slice(5, 10)).join(' ')}`);
+  const seriesRows = await page.evaluate(() => [...document.querySelectorAll('.bcv-row[data-series]')].map((r) => ({ group: (r.closest('.bcv-card')?.previousElementSibling?.textContent.trim().match(/^(Overdue|Today|Tomorrow|Next 7 days|Later|My tasks)/) || ['?'])[0], sub: r.querySelector('.bcv-row__sub')?.textContent, series: r.dataset.series })));
+  check(seriesRows.length === 9 && seriesRows.every((r) => r.sub === 'F26-PHYS 008 01 · My task · repeats weekly' && r.series === seriesRows[0].series) && seriesRows[0].group === 'Today' && seriesRows[1].group === 'Next 7 days' && seriesRows.slice(2).every((r) => r.group === 'Later') && !(await texts('.bcv-group__head')).some((t) => /^My tasks/.test(t)), `the rows wear the course and say they repeat, in with the day's work — Today, Next 7 days, then Later — and no My tasks group (${seriesRows.map((r) => r.group).join(', ')})`);
+  await page.waitForFunction((n) => Number(document.querySelector('.bcv-nav__item[data-nav="todo"] .bcv-nav__count').textContent) === n + 9, badgeBefore, { timeout: 10000 });
+  check((await texts('.bcv-head__sub'))[0] === `${Number(subM[1]) + 9} items across ${subM[2]} courses · 9 of your own`, `the header counts nine of your own, the course count unchanged (their course was there already): ${(await texts('.bcv-head__sub'))[0]}`);
+  const repPref = await sw.evaluate(async () => Object.entries(await chrome.storage.local.get(null)).find(([k]) => k.startsWith('prefs:'))?.[1]?.todoRepeat);
+  check(repPref && Object.keys(repPref).length === 9 && Object.values(repPref).every((v) => v.every === 'week' && v.series === Object.values(repPref)[0].series), `which tasks repeat lives in the site's preferences, one series for the nine: ${JSON.stringify(Object.values(repPref || {})[0])}`);
+  await page.click('.bcv-seg__btn[data-value="course"]');
+  await page.waitForFunction(() => [...document.querySelectorAll('.bcv-group__head')].some((e) => /^F26-PHYS 008 01/.test(e.textContent)), null, { timeout: 5000 });
+  const physCount = await page.evaluate(() => { const head = [...document.querySelectorAll('.bcv-group__head')].find((e) => /^F26-PHYS 008 01/.test(e.textContent)); return head.nextElementSibling.querySelectorAll('.bcv-row[data-series]').length; });
+  check(physCount === 9 && !(await texts('.bcv-group__head')).some((t) => /^My tasks/.test(t)), 'By course puts the nine under their course, with no My tasks group');
+  await page.click('.bcv-seg__btn[data-value="date"]');
+  await page.waitForFunction(() => /^(Overdue|Today)/.test(document.querySelector('.bcv-group__head')?.textContent || ''), null, { timeout: 5000 });
+  await page.locator('.bcv-row[data-series]').first().locator('.bcv-todo__del').click();
+  await page.waitForSelector('.bcv-menu', { timeout: 3000 });
+  const delMenu = await texts('.bcv-menu__item');
+  const menuBox = await page.$eval('.bcv-menu', (e) => { const r = e.getBoundingClientRect(); return r.right <= window.innerWidth && r.left >= 0; });
+  check(delMenu.length === 2 && /^Delete this task/.test(delMenu[0]) && /^Delete all 9 repeats/.test(delMenu[1]) && menuBox, `the X on a repeating task asks which, on screen: ${delMenu.join(' | ')}`);
+  // from the menu the question is the app's own sheet, never a browser dialog (one raised inside a menu's press left the menu half-faded for good)
+  await page.click('.bcv-menu__item:nth-child(1)');
+  await page.waitForSelector('.bcv-ask-ov .bcv-ask__ok', { timeout: 5000 });
+  await page.waitForFunction(() => !document.querySelector('.bcv-menu'), null, { timeout: 3000 });
+  check(/^Delete “Read the lab manual chapter”\?$/.test((await texts('.bcv-ask-ov .bcv-sheet__title'))[0]) && (await texts('.bcv-ask-ov .bcv-ask__ok'))[0] === 'Delete', `Delete this task asks in the app's own sheet, the menu gone: ${(await texts('.bcv-ask-ov .bcv-sheet__title'))[0]}`);
+  await page.click('.bcv-ask-ov .bcv-ask__ok');
+  await page.waitForFunction(() => document.querySelectorAll('.bcv-row[data-series]').length === 8, null, { timeout: 15000 });
+  check((await noteApi('GET', '/api/v1/planner_notes')).length === 8, 'Delete this task removes one note; the other eight stay');
+  await page.waitForFunction((n) => Number(document.querySelector('.bcv-nav__item[data-nav="todo"] .bcv-nav__count').textContent) === n + 8, badgeBefore, { timeout: 10000 }); // (the list has been read again)
+  await page.locator('.bcv-row[data-series]').first().locator('.bcv-todo__del').click();
+  await page.waitForSelector('.bcv-menu', { timeout: 3000 });
+  const delMenu2 = await texts('.bcv-menu__item');
+  check(delMenu2.length === 2 && /^Delete all 8 repeats/.test(delMenu2[1]), `and the menu now counts eight: ${delMenu2.join(' | ')}`);
+  await page.click('.bcv-menu__item:nth-child(2)');
+  await page.waitForSelector('.bcv-ask-ov .bcv-ask__ok', { timeout: 5000 });
+  check(/^Delete all 8 repeats of “Read the lab manual chapter”\?$/.test((await texts('.bcv-ask-ov .bcv-sheet__title'))[0]) && (await texts('.bcv-ask-ov .bcv-ask__ok'))[0] === 'Delete 8 tasks', `Delete all asks for the eight: ${(await texts('.bcv-ask-ov .bcv-sheet__title'))[0]}`);
+  await page.click('.bcv-ask-ov .bcv-ask__ok');
+  await page.waitForFunction(() => !document.querySelector('.bcv-row[data-series]'), null, { timeout: 20000 });
+  await page.waitForFunction((n) => Number(document.querySelector('.bcv-nav__item[data-nav="todo"] .bcv-nav__count').textContent) === n, badgeBefore, { timeout: 10000 });
+  const repAfter = await sw.evaluate(async () => Object.entries(await chrome.storage.local.get(null)).find(([k]) => k.startsWith('prefs:'))?.[1]?.todoRepeat);
+  check((await noteApi('GET', '/api/v1/planner_notes')).length === 0 && Object.keys(repAfter || {}).length === 0, 'Delete all removes every note of the series from Canvas and the series from the preferences; the badge is back');
+  // A task of your own stays on the list until it is done, whatever its date: one from three days
+  // ago and one for three weeks on are both there (course work keeps to the seven-day window) —
+  // the first under Overdue, the second under Later, the last group.
   const oldNote = await noteApi('POST', '/api/v1/planner_notes', { title: 'Return the library book', todo_date: new Date(Date.now() - 3 * 864e5).toISOString() });
   const farNote = await noteApi('POST', '/api/v1/planner_notes', { title: 'Book the dentist', todo_date: new Date(Date.now() + 20 * 864e5).toISOString() });
   await page.reload();
-  await page.waitForFunction(() => [...document.querySelectorAll('.bcv-group__head')].some((e) => /^My tasks/.test(e.textContent)), null, { timeout: 10000 });
-  const mineTitles = await page.evaluate(() => { const head = [...document.querySelectorAll('.bcv-group__head')].find((e) => /^My tasks/.test(e.textContent)); return [...head.parentElement.querySelectorAll('.bcv-row__title')].map((e) => e.textContent.trim()); });
+  await page.waitForFunction(() => [...document.querySelectorAll('.bcv-row__title')].some((e) => /Book the dentist/.test(e.textContent)), null, { timeout: 10000 });
+  const placed = await page.evaluate(() => Object.fromEntries([...document.querySelectorAll('.bcv-row')].filter((r) => /Return the library book|Book the dentist/.test(r.textContent)).map((r) => [r.querySelector('.bcv-row__title').textContent.trim(), (r.closest('.bcv-card')?.previousElementSibling?.textContent.trim().match(/^(Overdue|Today|Tomorrow|Next 7 days|Later|My tasks)/) || ['?'])[0]])));
   await page.waitForFunction((n) => Number(document.querySelector('.bcv-nav__item[data-nav="todo"] .bcv-nav__count').textContent) === n + 2, badgeBefore, { timeout: 5000 });
-  check(mineTitles.join(' | ') === 'Return the library book | Book the dentist' && (await texts('.bcv-group__head')).filter((t) => /^My tasks/.test(t)).length === 1, `a task from three days ago and one three weeks out both stay under My tasks, oldest first, and the badge counts them: ${mineTitles.join(' | ')}`);
+  const headsNow = await texts('.bcv-group__head');
+  check(placed['Return the library book'] === 'Overdue' && placed['Book the dentist'] === 'Later' && headsNow[0].startsWith('Overdue') && /^Later/.test(headsNow[headsNow.length - 1]) && !headsNow.some((t) => /^My tasks/.test(t)), `a task from three days ago sits under Overdue and one three weeks out under Later, the last group — never a group of their own — and the badge counts them: ${JSON.stringify(placed)}`);
   await noteApi('DELETE', `/api/v1/planner_notes/${oldNote.id}`);
   await noteApi('DELETE', `/api/v1/planner_notes/${farNote.id}`);
   await page.reload();

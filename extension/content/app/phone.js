@@ -345,7 +345,7 @@
    *  takes it off says so too. Turning it back on needs no warning at all. */
   function workRow(app, it, { chip = true, time = false } = {}) {
     const isDone = () => !!(it.complete || it.submitted);
-    const pal = it.custom ? TASK_PAL(app.isDark()) : it.course ? it.course.palette : U.palette('#8e8e93', app.isDark());
+    const pal = it.custom ? (it.course ? it.course.palette : TASK_PAL(app.isDark())) : it.course ? it.course.palette : U.palette('#8e8e93', app.isDark()); // (a task given a course wears its colour)
     let rowEl;
     let paint = () => {};
     const circle = h('button', { type: 'button', class: 'bcv-ph-circle', onclick: async (e) => {
@@ -722,6 +722,8 @@
     let showDone = !!(await store.pref('todoShowDone', false));
     const priPref = await store.pref('todoPriority', {});
     let pri = priPref && typeof priPref === 'object' ? { ...priPref } : {}; // replaced by the merged map on every write
+    const repPref = await store.pref('todoRepeat', {});
+    let rep = repPref && typeof repPref === 'object' ? { ...repPref } : {}; // item id → { every, series }: which tasks of your own repeat
     let [items, sel] = await Promise.all([store.todoWindow().catch(() => null), selection()]);
     if (!ctx.alive()) return screen;
     if (!items) {
@@ -752,24 +754,36 @@
         U.toast(`Could not update it: ${e.message}`, { error: true });
       }
     }
-    async function removeTask(it) {
-      if (!window.confirm(`Delete “${it.title}”? This removes the task from your Canvas planner.`)) return;
+    const repeatOf = (it) => (it.custom && rep[it.id] && typeof rep[it.id] === 'object' ? rep[it.id] : null);
+    const repeatWord = (r) => store.REPEATS.find((x) => x.key === r?.every)?.short || '';
+    /** The other tasks of a repeating task's series still on the planner. */
+    const seriesOf = (it) => { const s = repeatOf(it)?.series; return s ? items.filter((x) => x.custom && x.id !== it.id && rep[x.id]?.series === s) : []; };
+    /** A task of your own, or every task left in its series, after a confirmation. */
+    async function removeTask(it, series = null) {
+      const list = series || [it];
+      const ask = list.length > 1 ? `Delete all ${list.length} repeats of “${it.title}”? This removes them from your Canvas planner.` : `Delete “${it.title}”? This removes the task from your Canvas planner.`;
+      if (!window.confirm(ask)) return;
       try {
-        await store.deleteNote(it.raw.plannable_id);
-        delete pri[it.id];
-        store.mergePref('todoPriority', { [it.id]: null }).then((map) => { if (ctx.alive()) pri = map; });
+        await store.deleteNotes(list.map((x) => x.raw.plannable_id));
+        const gone = {};
+        for (const x of list) { delete pri[x.id]; delete rep[x.id]; gone[x.id] = null; }
+        store.mergePref('todoPriority', gone).then((map) => { if (ctx.alive()) pri = map; });
+        store.mergePref('todoRepeat', gone).then((map) => { if (ctx.alive()) rep = map; });
         await reload();
       } catch (e) {
         U.toast(`Could not delete it: ${e.message}`, { error: true });
+        await reload(); // (some of a series may have gone before the refusal)
       }
     }
-    const metaOf = (it) => (it.custom ? 'Personal' : `${it.kind}${it.points !== null && it.points !== undefined ? ` · ${store.fmtPts(it.points)} pts` : ''}`);
-    const courseOf = (it) => (it.custom ? 'My task' : (it.course?.shortName || it.courseName || 'Course'));
+    // a task of your own: "My task · Personal", or its course's short name · "My task" once it was given one; "repeats weekly" when it does
+    const metaOf = (it) => (it.custom ? [it.course ? 'My task' : 'Personal', repeatOf(it) ? `repeats ${repeatWord(repeatOf(it))}` : null].filter(Boolean).join(' · ') : `${it.kind}${it.points !== null && it.points !== undefined ? ` · ${store.fmtPts(it.points)} pts` : ''}`);
+    const courseOf = (it) => (it.custom && !it.course ? 'My task' : (it.course?.shortName || it.courseName || 'Course'));
 
-    /** The task sheet: priority, mark done, open the source (or delete a task of your own). */
+    /** The task sheet: priority, mark done, open the source (or delete a task of your own — or its whole series). */
     function taskSheet(it) {
       const done = isDone(it);
-      const pal = it.custom ? TASK_PAL(dark) : it.course ? it.course.palette : U.palette('#8e8e93', dark);
+      const pal = it.custom ? (it.course ? it.course.palette : TASK_PAL(dark)) : it.course ? it.course.palette : U.palette('#8e8e93', dark);
+      const rest = it.custom ? seriesOf(it) : [];
       const cur = priOf(it);
       let sheet = null;
       const body = U.el('bcv-ph-tsheet', [
@@ -794,6 +808,7 @@
           { label: done ? 'Mark not done' : 'Mark done', cls: done ? '' : 'is-green', onSelect: () => toggleDone(it) },
           it.custom ? null : { label: it.type === 'quiz' ? 'Take quiz' : it.type === 'assignment' ? 'Open assignment' : 'Open', onSelect: () => app.go(it.url) },
           it.custom ? { label: 'Delete task', cls: 'is-danger', onSelect: () => removeTask(it) } : null,
+          rest.length ? { label: `Delete all ${rest.length + 1} repeats`, cls: 'is-danger', onSelect: () => removeTask(it, [it, ...rest]) } : null,
         ],
       });
     }
@@ -821,10 +836,15 @@
     }
 
     // ---- adding a task of your own (a Canvas planner note) ----
-    // the date starts at today and is picked on a calendar; the task is due by the end of that day
-    const draft = { open: false, title: '', date: null, pri: 2, busy: false };
-    const draftDate = () => endOfDay(draft.date || now);
-    const canAdd = () => !!draft.title.trim() && !draft.busy;
+    // the date starts at today and is picked on a calendar; the task is due by the end of that day.
+    // It can be given a course (one of the selected ones) and a repeat — daily, weekly, every two
+    // weeks or monthly, until a date (eight weeks on unless changed) — one note per day it lands on.
+    const REPEAT_UNTIL_DAYS = 56;
+    const blank = () => ({ open: false, title: '', date: null, pri: 2, busy: false, course: '', repeat: '', until: null, progress: '' });
+    const draft = blank();
+    const draftStart = () => U.startOfDay(draft.date || now);
+    const draftDates = () => (draft.repeat ? store.repeatDates(draftStart(), draft.until || U.addDays(draftStart(), REPEAT_UNTIL_DAYS), draft.repeat) : [draftStart()]);
+    const canAdd = () => !!draft.title.trim() && !draft.busy && draftDates().length > 0;
     function composer() {
       if (!draft.open) {
         return h('button', { type: 'button', class: 'bcv-ph-todo__add', onclick: () => { draft.open = true; draw(); body.querySelector('.bcv-ph-composer__title')?.focus(); } }, [
@@ -833,9 +853,17 @@
         ]);
       }
       let addBtn;
-      const syncAdd = () => { addBtn.disabled = !canAdd(); addBtn.textContent = draft.busy ? 'Adding…' : 'Add task'; };
+      const addLabel = () => { const n = draftDates().length; return draft.busy ? (draft.progress || 'Adding…') : n > 1 ? `Add ${n} tasks` : 'Add task'; };
+      const syncAdd = () => { addBtn.disabled = !canAdd(); addBtn.textContent = addLabel(); };
       const title = h('input', { class: 'bcv-ph-composer__title', type: 'text', placeholder: 'What do you need to do?', 'aria-label': 'Task', value: draft.title, oninput: () => { draft.title = title.value; syncAdd(); }, onkeydown: (e) => { if (e.key === 'Enter' && canAdd()) addTask(); } });
-      const dateField = U.dateField(draft.date || now, (d) => { draft.date = d; }, { cls: 'bcv-ph-composer__date' });
+      const dateField = U.dateField(draft.date || now, (d) => { draft.date = d; syncAdd(); }, { cls: 'bcv-ph-composer__date' });
+      // the course (the selected courses) and the repeat, side by side; an "until" date once it repeats
+      const courseSel = U.picker([{ value: '', text: 'No course' }, ...sel.list.map((c) => ({ value: String(c.id), text: c.shortName || c.name }))], draft.course, (v) => { draft.course = v; }, { label: 'Course', placeholder: 'No course', cls: 'bcv-ph-composer__course' });
+      const repeatSel = U.picker([{ value: '', text: 'Doesn’t repeat' }, ...store.REPEATS.map((x) => ({ value: x.key, text: x.label }))], draft.repeat, (v) => { draft.repeat = v; if (v && !draft.until) draft.until = U.addDays(draftStart(), REPEAT_UNTIL_DAYS); draw(); }, { label: 'Repeat', placeholder: 'Doesn’t repeat', cls: 'bcv-ph-composer__repeat' });
+      const until = draft.repeat ? U.el('bcv-ph-composer__until', [
+        U.text('bcv-ph-composer__untillbl', 'until', 'span'),
+        U.dateField(draft.until, (d) => { draft.until = d; syncAdd(); }, { cls: 'bcv-ph-composer__date bcv-ph-composer__untildate', label: 'Repeat until' }),
+      ]) : null;
       const pris = U.el('bcv-ph-composer__pris', [3, 2, 1, 0].map((lv) => {
         const m = priMeta(lv, dark);
         const on = draft.pri === lv;
@@ -843,27 +871,38 @@
       }));
       addBtn = h('button', { type: 'button', class: 'bcv-ph-composer__add', text: 'Add task', onclick: addTask });
       const card = U.el('bcv-ph-composer', [
-        title, dateField, pris,
-        U.el('bcv-ph-composer__btns', [h('button', { type: 'button', class: 'bcv-ph-composer__cancel', text: 'Cancel', onclick: () => { Object.assign(draft, { open: false, title: '', date: null, pri: 2 }); draw(); } }), addBtn]),
+        title, dateField, U.el('bcv-ph-composer__row', [courseSel, repeatSel]), until, pris,
+        U.el('bcv-ph-composer__btns', [h('button', { type: 'button', class: 'bcv-ph-composer__cancel', text: 'Cancel', onclick: () => { Object.assign(draft, blank()); draw(); } }), addBtn]),
       ]);
       syncAdd();
       return card;
     }
     async function addTask() {
       if (!canAdd()) return;
-      const when = draftDate();
+      const dates = draftDates();
+      const title = draft.title.trim();
+      const courseId = draft.course || null;
+      const every = draft.repeat;
+      const level = draft.pri;
       draft.busy = true;
+      draft.progress = '';
       draw();
       try {
-        const note = await store.createNote({ title: draft.title.trim(), todoDate: when.toISOString() });
-        if (note && note.id && draft.pri) { pri[`planner_note:${note.id}`] = draft.pri; pri = await store.mergePref('todoPriority', { [`planner_note:${note.id}`]: draft.pri }); }
-        Object.assign(draft, { open: false, title: '', date: null, pri: 2, busy: false });
+        const notes = await store.createNotes(dates.map((d) => ({ title, todoDate: endOfDay(d).toISOString(), courseId })), {
+          onEach: (k, n) => { if (n > 1) { draft.progress = `Adding ${k} of ${n}…`; const b = body.querySelector('.bcv-ph-composer__add'); if (b) b.textContent = draft.progress; } },
+        });
+        const keys = notes.filter((n) => n && n.id !== undefined && n.id !== null).map((n) => `planner_note:${n.id}`);
+        if (level && keys.length) { const patch = Object.fromEntries(keys.map((k) => [k, level])); Object.assign(pri, patch); pri = await store.mergePref('todoPriority', patch); }
+        if (every && keys.length) { const series = `r${Date.now().toString(36)}`; const patch = Object.fromEntries(keys.map((k) => [k, { every, series }])); Object.assign(rep, patch); rep = await store.mergePref('todoRepeat', patch); }
+        Object.assign(draft, blank());
         await reload();
-        U.toast('Added to your Canvas planner.');
+        U.toast(keys.length > 1 ? `${keys.length} tasks added to your Canvas planner.` : 'Added to your Canvas planner.');
       } catch (e) {
         draft.busy = false;
+        draft.progress = '';
         draw();
         U.toast(`Could not add the task: ${e.message}`, { error: true });
+        if (dates.length > 1) reload(); // (some of a series may have landed before the refusal)
       }
     }
 
@@ -897,13 +936,17 @@
       else if (group === 'priority') {
         for (const lv of [3, 2, 1, 0]) groups.push(block(lv ? `${priMeta(lv).label} priority` : 'Unprioritised', shown.filter((it) => priOf(it) === lv).sort(byDate))); // empty buckets are dropped, never drawn
       } else if (group === 'course') {
+        // a task given a course sits under that course; one without waits under My task, after the courses
         const by = new Map();
+        const mine = [];
         for (const it of shown) {
-          const k = it.custom ? 'My task' : courseOf(it);
+          if (it.custom && !it.course) { mine.push(it); continue; }
+          const k = courseOf(it);
           if (!by.has(k)) by.set(k, []);
           by.get(k).push(it);
         }
         for (const [k, list] of by) groups.push(block(k, list.sort(byDate), { withCourse: false }));
+        if (mine.length) groups.push(block('My task', mine.sort(byDate), { withCourse: false }));
       } else {
         const days = new Map();
         for (const it of shown.sort(byDate)) {

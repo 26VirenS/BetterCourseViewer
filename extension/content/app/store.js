@@ -403,6 +403,67 @@
     await C.del(`/api/v1/planner_notes/${encodeURIComponent(id)}`);
     await invalidatePlanner();
   }
+  /** Several notes in one go — a repeating task is one note per occurrence, so each can be ticked
+   *  off on its own and every device sees them — sent three at a time, the planner read again once
+   *  after the last. `onEach(done, total)` follows the progress. A refusal part-way stops the rest;
+   *  the notes already written stay (the caller reads the list again and shows them). */
+  async function createNotes(list, { onEach = null } = {}) {
+    const out = [];
+    const queue = list.slice();
+    let failed = null;
+    const worker = async () => {
+      while (queue.length && !failed) {
+        const { title, todoDate = null, courseId = null } = queue.shift();
+        try {
+          out.push(await C.post('/api/v1/planner_notes', { title, todo_date: todoDate, course_id: courseId || undefined }));
+        } catch (e) { failed = failed || e; return; }
+        onEach?.(out.length, list.length);
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(3, list.length) }, worker));
+    await invalidatePlanner();
+    if (failed) throw failed;
+    return out;
+  }
+  async function deleteNotes(ids) {
+    const queue = ids.slice();
+    let failed = null;
+    const worker = async () => {
+      while (queue.length && !failed) {
+        const id = queue.shift();
+        try { await C.del(`/api/v1/planner_notes/${encodeURIComponent(id)}`); } catch (e) { failed = failed || e; return; }
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(3, ids.length) }, worker));
+    await invalidatePlanner();
+    if (failed) throw failed;
+  }
+  /** How a task of your own can repeat (the composer's Repeat menu), and the days a repeat lands on. */
+  const REPEATS = [
+    { key: 'day', label: 'Every day', short: 'daily' },
+    { key: 'week', label: 'Every week', short: 'weekly' },
+    { key: '2weeks', label: 'Every 2 weeks', short: 'every 2 weeks' },
+    { key: 'month', label: 'Every month', short: 'monthly' },
+  ];
+  const MAX_REPEATS = 60; // (a daily task over eight weeks; more than that is not a to-do list)
+  /** The days from `start` to `until` (both inclusive, whole days) a repeat of `key` lands on, at
+   *  most MAX_REPEATS of them. A monthly task keeps its day of the month, held to the last day of
+   *  a shorter month (the 31st repeats on Feb 28, not Mar 3). */
+  function repeatDates(start, until, key) {
+    const s = U.startOfDay(U.parse(start) || now());
+    const e = U.startOfDay(U.parse(until) || s);
+    const out = [];
+    for (let n = 0; out.length < MAX_REPEATS; n += 1) {
+      let d;
+      if (key === 'month') {
+        d = new Date(s.getFullYear(), s.getMonth() + n, 1);
+        d.setDate(Math.min(s.getDate(), new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate()));
+      } else d = U.addDays(s, n * (key === 'day' ? 1 : key === 'week' ? 7 : 14));
+      if (d > e) break;
+      out.push(d);
+    }
+    return out;
+  }
 
   async function planner({ force = false, refresh = false, days = 21 } = {}) {
     const [items, cs] = await Promise.all([rawPlanner(days, { force, refresh }), courses().catch(() => [])]);
@@ -410,21 +471,47 @@
     return (items || []).map((it) => classify(it, map)).filter((it) => it.date);
   }
 
-  /** The student's own planner items — tasks added here or in Canvas's planner without a course,
-   *  and personal events — over a long span (three months back, a year on): a task of your own
-   *  is not bound to the seven-day window, so one dated last week or next month is still read.
-   *  Asked for under the user's own context code, so the answer is a handful of items. */
+  /** The student's own planner items — tasks added here or in Canvas's planner, and personal
+   *  events — over a long span (three months back, a year on): a task of your own is not bound to
+   *  the seven-day window, so one dated last week or next month is still read. Two reads: the
+   *  planner under the user's own context code (a handful of items: tasks without a course,
+   *  personal events), and the planner notes list, which also holds the tasks given a course —
+   *  those live under the course's context, which the first read never sees. A note the first read
+   *  did not carry is shaped like a planner item, its override (done, dismissed) looked up in the
+   *  student's own list of overrides. */
   async function rawUserPlanner({ force = false, refresh = false } = {}) {
     const u = await me();
-    return C.cached('planner:mine', 3 * MIN, () =>
-      C.get('/api/v1/planner/items', { params: { start_date: isoDays(-90), end_date: isoDays(365), 'context_codes[]': [`user_${u.id}`], per_page: 100 }, all: true, maxPages: 3 }), { force, refresh });
+    return C.cached('planner:mine', 3 * MIN, async () => {
+      const params = { start_date: isoDays(-90), end_date: isoDays(365), per_page: 100 };
+      const [items, notes] = await Promise.all([
+        C.get('/api/v1/planner/items', { params: { ...params, 'context_codes[]': [`user_${u.id}`] }, all: true, maxPages: 3 }),
+        C.get('/api/v1/planner_notes', { params, all: true, maxPages: 3 }).catch(() => []),
+      ]);
+      const out = Array.isArray(items) ? items.slice() : [];
+      const seen = new Set(out.filter((it) => it.plannable_type === 'planner_note').map((it) => String(it.plannable_id)));
+      const extra = (Array.isArray(notes) ? notes : []).filter((n) => n && n.id !== undefined && n.id !== null && n.todo_date && n.workflow_state !== 'deleted' && !seen.has(String(n.id)));
+      if (extra.length) {
+        const ovs = await plannerOverrides({ force }).catch(() => []);
+        const ovByNote = new Map((Array.isArray(ovs) ? ovs : []).filter((o) => o && o.plannable_type === 'planner_note').map((o) => [String(o.plannable_id), o]));
+        for (const n of extra) {
+          out.push({
+            context_type: n.course_id ? 'Course' : null, course_id: n.course_id ? String(n.course_id) : null, context_name: null,
+            plannable_id: n.id, plannable_type: 'planner_note', plannable_date: n.todo_date,
+            plannable: { id: n.id, title: n.title, todo_date: n.todo_date, details: n.details || '' },
+            planner_override: ovByNote.get(String(n.id)) || null, submissions: false, html_url: null,
+          });
+        }
+      }
+      return out;
+    }, { force, refresh });
   }
   /** Everything on the To Do list, including items already completed, submitted or dismissed
    *  (the screen decides what to show): course work from today through the next 7 days, and every
    *  task of the student's own whatever its date — a task is theirs until they tick it off or
    *  delete it, so one from yesterday or one for next month stays on the list. */
   async function todoWindow(opts = {}) {
-    const [items, mineRaw] = await Promise.all([planner(opts), rawUserPlanner(opts).catch(() => [])]);
+    const [items, mineRaw, cs] = await Promise.all([planner(opts), rawUserPlanner(opts).catch(() => []), courses().catch(() => [])]);
+    const map = new Map(cs.map((c) => [c.id, c])); // (a task given a course wears that course: its name, its colour)
     const t = now();
     const start = U.startOfDay(t);
     const end = U.addDays(start, 8);
@@ -433,7 +520,7 @@
     // own To Do keeps it (the planner is read from a week back for it)
     const overdueOpen = (it) => it.isDue && it.date < start && !it.submitted && !it.complete && !it.dismissed && !it.excused;
     const seen = new Set(items.map((it) => it.id));
-    const mine = (mineRaw || []).map((it) => classify(it)).filter((it) => it.date && it.custom && !seen.has(it.id));
+    const mine = (mineRaw || []).map((it) => classify(it, map)).filter((it) => it.date && it.custom && !seen.has(it.id));
     return [...items.filter((it) => it.type !== 'announcement' && (it.custom || inWindow(it) || overdueOpen(it))), ...mine].sort((a, b) => a.date - b.date);
   }
   /** Items still open on the To Do list: not done, not dismissed, not handed in, not excused. */
@@ -1440,7 +1527,7 @@
 
   BCV.store = {
     env, pref, setPref, mergePref, me, account, colors, courses, favorites, cards, setFavorite, setNickname, currentTerm, dashboardView, setDashboardView, freshness, invalidateGrades,
-    planner, classify, todo, todoWindow, setComplete, dismiss, restore, invalidatePlanner, plannerOverrides, createNote, deleteNote, activity, activitySummary, unreadCount, groups, group, workStatus, workFlags,
+    planner, classify, todo, todoWindow, setComplete, dismiss, restore, invalidatePlanner, plannerOverrides, createNote, createNotes, deleteNote, deleteNotes, REPEATS, repeatDates, activity, activitySummary, unreadCount, groups, group, workStatus, workFlags,
     announcementsFeed, streamSeen, markStreamSeen, setColor, history, helpLinks,
     calendarContexts, ownContexts, selectedContexts, setSelectedContexts, calendarEvents, plannerRange, appointmentGroups, reserveAppointment, cancelReservation,
     conversations, conversation, markRead, setStarred, replyTo, compose, searchRecipients, invalidateInbox,

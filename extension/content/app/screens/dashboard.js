@@ -721,7 +721,8 @@
         U.tile(it.icon, { color: pal.text, tint: pal.tint }),
         U.el('bcv-row__body', [
           // the course and the kind, then where the work stands (Missing, Late, Graded, Feedback, New) in the same words as To Do
-          h('div', { class: 'bcv-row__over bcv-row__over--flags' }, [h('span', { text: `${it.courseName} · ${it.kind}${it.isDue ? '' : ' · to-do date'}` }), ...store.workFlags(it).map((st) => U.statusBadge(st))]),
+          // (a task of your own: the course it was given, or just "My task" — never "My task · My task")
+          h('div', { class: 'bcv-row__over bcv-row__over--flags' }, [h('span', { text: it.custom ? (it.course ? `${it.course.shortName || it.courseName} · My task` : 'My task') : `${it.courseName} · ${it.kind}${it.isDue ? '' : ' · to-do date'}` }), ...store.workFlags(it).map((st) => U.statusBadge(st))]),
           U.text('bcv-row__title bcv-ellip', it.title),
         ]),
         U.el('bcv-row__right', [

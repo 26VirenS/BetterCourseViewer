@@ -13,7 +13,7 @@
  * min(their own, the viewport less a margin). */
 
 html[data-bcv-theme] {
-  --bcv-version: "2.98.57"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.98.58"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -862,6 +862,14 @@ html.bcv-noblur .bcv-sheet-ov--card::before { display: none; }
 .bcv-todo__ctl { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .bcv-todo__ctl .bcv-seg__btn { padding: 6px 12px; font-size: 12.5px; font-weight: 600; }
 .bcv-todo__spacer { flex: 1; }
+/* the composer's course and repeat: chips in the date field's shape, each opening a menu (2.98.58) */
+.bcv-todo__chip { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 9px 0 10px; border: 0; border-radius: 9px; background: var(--bcv-fill); font: 500 12.5px/1 var(--bcv-font); color: var(--bcv-ink2); cursor: pointer; max-width: 220px; box-sizing: border-box; transition: background .18s ease, color .18s ease; }
+.bcv-todo__chip:hover { filter: brightness(.96); }
+.bcv-todo__chip.is-set { color: var(--bcv-ink); }
+.bcv-todo__chip > span { min-width: 0; }
+.bcv-todo__chip > svg { flex: none; }
+.bcv-todo__untilwrap { display: inline-flex; align-items: center; gap: 7px; }
+.bcv-todo__untillbl { font: 500 12.5px/1 var(--bcv-font); color: var(--bcv-ink3); }
 /* the composer's date: a field that opens a calendar of the app's own (never the browser's picker) */
 .bcv-date { display: inline-flex; align-items: center; gap: 7px; height: 30px; padding: 0 9px 0 10px; border: 0; border-radius: 9px; background: var(--bcv-fill); font: 500 12.5px/1 var(--bcv-font); color: var(--bcv-ink); cursor: pointer; max-width: 100%; box-sizing: border-box; transition: background .18s ease; }
 .bcv-date:hover { background: var(--bcv-fill2); }
@@ -2497,6 +2505,12 @@ html[data-bcv-theme="dark"] .bcv-ph-circle { border-color: rgba(255,255,255,.28)
 .bcv-ph-composer .bcv-seg__btn { padding: 7px 0; font-size: 12px; font-weight: 600; }
 .bcv-ph-composer__date { width: 100%; height: 40px; border-radius: 11px; font-size: 13.5px; justify-content: flex-start; padding: 0 12px; }
 .bcv-ph-composer__date .bcv-date__chev { margin-left: auto; }
+/* the course and the repeat, side by side (2.98.58); an "until" date once it repeats */
+.bcv-ph-composer__row { display: flex; gap: 8px; }
+.bcv-ph-composer__row .bcv-picker { flex: 1; min-width: 0; height: 40px; border-radius: 11px; font-size: 13.5px; }
+.bcv-ph-composer__until { display: flex; align-items: center; gap: 8px; }
+.bcv-ph-composer__untillbl { flex: none; font: 500 13px/1 var(--bcv-font); color: var(--bcv-ink3); }
+.bcv-ph-composer__until .bcv-ph-composer__date { flex: 1; width: auto; }
 html.bcv-phone .bcv-menu.bcv-datepop { width: auto; padding: 12px; background: var(--bcv-card); } /* solid over the composer it rises from */
 html.bcv-phone .bcv-datepop__day { height: 42px; font-size: 14.5px; }
 html.bcv-phone .bcv-datepop__q { padding: 11px 0; font-size: 13px; }

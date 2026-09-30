@@ -690,7 +690,7 @@ on('GET', /^\/api\/v1\/planner\/items$/, (url) => {
   const items = codes.length ? plannerItems().filter((it) => codes.includes(it.course_id ? `course_${it.course_id}` : 'user_7')) : plannerItems();
   return filterDates(items, url, 'plannable_date');
 });
-on('GET', /^\/api\/v1\/planner_notes$/, () => notes.slice());
+on('GET', /^\/api\/v1\/planner_notes$/, (url) => filterDates(notes.slice(), url, 'todo_date')); // (like Canvas: start_date / end_date narrow it by todo_date)
 on('POST', /^\/api\/v1\/planner_notes$/, (url, m, body) => { const n = { id: `note${++noteSeq}`, title: String(body.title || ''), todo_date: body.todo_date || null, course_id: body.course_id || null, details: body.details || '', workflow_state: 'active', user_id: 'self' }; notes.push(n); return n; });
 on('DELETE', /^\/api\/v1\/planner_notes\/(\w+)$/, (url, m) => { const i = notes.findIndex((n) => n.id === m[1]); if (i < 0) return {}; const [n] = notes.splice(i, 1); return n; });
 on('GET', /^\/api\/v1\/planner\/overrides$/, () => [...overrides.values()]);

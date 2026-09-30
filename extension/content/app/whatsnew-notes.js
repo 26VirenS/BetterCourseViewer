@@ -25,6 +25,11 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.98.58', date: '2026-09-30', notes: [
+      { kind: 'new', title: 'Tasks with a course', body: 'Give a task of your own a course; it wears its colour.', icon: P.layers },
+      { kind: 'new', title: 'Repeating tasks', body: 'Daily, weekly, every two weeks or monthly, until a date.', icon: P.clock },
+      { kind: 'improved', title: 'Own tasks in the list', body: 'They sit with the day\'s work, not in a group on top.', icon: P.list },
+    ] },
     { version: '2.98.57', date: '2026-09-30', notes: [
       { kind: 'fixed', title: 'Box controls in dark', body: 'Preview, the reply field and Send wear the app\'s own look.', icon: P.pen },
     ] },
