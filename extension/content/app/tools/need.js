@@ -27,19 +27,22 @@
   }
   /** The work in a course not yet graded, each piece with its share of the final grade. A grade
    *  that is in but not posted counts as not in: Canvas leaves it out of the current score too. */
-  function pieces(course, groups) {
+  function pieces(course, groups, own = null) {
     const all = (groups || []).flatMap((g) => (g.assignments || []).filter((a) => !a.omit_from_final_grade && Number(a.points_possible) > 0).map((a) => ({ a, g })));
     const total = all.reduce((s, { a }) => s + Number(a.points_possible), 0);
     const groupPts = {};
     for (const { a, g } of all) groupPts[g.id] = (groupPts[g.id] || 0) + Number(a.points_possible);
+    // (2.98.59) the student's own weights, set on the course's Grades tab, in place of Canvas's
+    const weighted = !!course.weighted || !!own;
+    const weightOf = (g) => (own ? (Number(own[String(g.id)]) || 0) : (Number(g.group_weight) || 0));
     const out = [];
     for (const { a, g } of all) {
       const sub = a.submission;
       const graded = !!sub && sub.score != null && sub.workflow_state === 'graded' && sub.posted_at !== null;
       if (graded) continue;
       const pts = Number(a.points_possible);
-      const worth = course.weighted ? ((Number(g.group_weight) || 0) * pts) / (groupPts[g.id] || pts) : (100 * pts) / (total || pts);
-      out.push({ id: String(a.id), name: a.name || 'Untitled', worth: r1(worth), pts, due: a.due_at ? Date.parse(a.due_at) : null, group: g.name || '', groupWeight: Number(g.group_weight) || 0, groupPts: groupPts[g.id] || pts, total });
+      const worth = weighted ? (weightOf(g) * pts) / (groupPts[g.id] || pts) : (100 * pts) / (total || pts);
+      out.push({ id: String(a.id), name: a.name || 'Untitled', worth: r1(worth), pts, due: a.due_at ? Date.parse(a.due_at) : null, group: g.name || '', groupWeight: weightOf(g), groupPts: groupPts[g.id] || pts, total });
     }
     return out.sort((x, y) => (y.worth - x.worth) || ((y.due || 0) - (x.due || 0)));
   }
@@ -108,10 +111,20 @@
         st.loading = true;
         paint();
         let groups = [];
-        try { groups = await BCV.store.assignmentGroups(id); } catch { groups = []; }
+        let own = null;
+        try {
+          const [gs, ownAll] = await Promise.all([BCV.store.assignmentGroups(id), BCV.store.pref('gradeWeights', {}).catch(() => ({}))]);
+          groups = gs;
+          own = ownAll && typeof ownAll === 'object' && ownAll[id] && typeof ownAll[id] === 'object' && Object.keys(ownAll[id]).length ? ownAll[id] : null;
+        } catch { groups = []; }
         if (!p.alive() || st.course !== id) return;
         st.loading = false;
-        st.pieces = pieces(c, groups);
+        st.own = own;
+        if (own) { // (the score to start from is the one your own weights give, not Canvas's)
+          const t = BCV.store.gradeModel(groups, c, {}, false, false, [], { ownWeights: own }).total;
+          if (t !== null && t !== undefined) { st.now = String(r1(Number(t))); nowF.inp.value = st.now; const n = num(st.now); if (n !== null) { const [letter, cut] = nextLetter(n); st.letter = letter; st.goal = String(cut); goalF.inp.value = st.goal; } }
+        }
+        st.pieces = pieces(c, groups, own);
         const first = st.pieces.find((x) => x.worth > 0);
         if (first) { st.piece = first.id; st.worth = String(first.worth); worthF.inp.value = st.worth; }
       }
@@ -127,7 +140,7 @@
       pieceBox.replaceChildren(c ? U.picker(opts, st.piece, (v) => { st.piece = v; const x = pieceOf(); if (x) { st.worth = String(x.worth); worthF.inp.value = st.worth; } paint(); }, { label: 'What is left', placeholder: st.loading ? 'Reading the assignments…' : 'Choose what is left' }) : null);
       const x = pieceOf();
       worthF.el.hidden = !!x;
-      pieceHint.textContent = x ? (c?.weighted ? `${x.group} is ${x.groupWeight}% of the grade; this is ${U.plural(x.pts, 'point')} of the group's ${x.groupPts}.` : `${U.plural(x.pts, 'point')} of the course's ${x.total}.`) : st.loading ? 'Reading the assignments…' : c && !st.pieces.length ? 'Nothing left ungraded that Canvas knows of. Type what the work is worth.' : 'How much of the final grade the work still to come is worth.';
+      pieceHint.textContent = x ? (c?.weighted || st.own ? `${x.group} is ${x.groupWeight}% of the grade${st.own ? ' (your own weights)' : ''}; this is ${U.plural(x.pts, 'point')} of the group's ${x.groupPts}.` : `${U.plural(x.pts, 'point')} of the course's ${x.total}.`) : st.loading ? 'Reading the assignments…' : c && !st.pieces.length ? 'Nothing left ungraded that Canvas knows of. Type what the work is worth.' : 'How much of the final grade the work still to come is worth.';
       goalBox.replaceChildren(U.picker([...SCALE.map(([l, cut]) => ({ value: l, text: `${l} · ${cut}%` })), { value: 'custom', text: 'A number of my own' }], st.letter || 'custom', (v) => { st.letter = v; const s = SCALE.find(([l]) => l === v); if (s) { st.goal = String(s[1]); goalF.inp.value = st.goal; } paintResult(); }, { label: 'The grade you want', placeholder: 'Choose a letter' }));
       paintResult();
     }

@@ -13,7 +13,7 @@
  * min(their own, the viewport less a margin). */
 
 html[data-bcv-theme] {
-  --bcv-version: "2.98.58"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.98.59"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -1332,6 +1332,20 @@ html.bcv-phone .bcv-rubg__cellpts { font-size: 19px; }
 .bcv-wbar__score { flex: none; min-width: 62px; text-align: right; font: 600 12.5px/1.2 var(--bcv-font); color: var(--bcv-ink); }
 .bcv-wbar__score--ungraded { color: var(--bcv-ink3); }
 .bcv-gr__wnote { margin: 0; font: 400 11.5px/1.45 var(--bcv-font); color: var(--bcv-ink3); }
+/* your own weights (2.98.59): the button under the section, and the editor that takes its place */
+.bcv-gr__ownbtn { align-self: flex-start; margin-top: 2px; height: 28px; padding: 0 12px; border: 0; border-radius: 14px; cursor: pointer; font: 600 12px/1 var(--bcv-font); background: var(--bcv-fill); color: var(--bcv-ink2); transition: filter .16s ease; }
+.bcv-gr__ownbtn:hover { filter: brightness(.96); }
+.bcv-gr__ownbtn.is-on { background: var(--bcv-blue-soft); color: var(--bcv-blue); }
+.bcv-gr__wnote--own { color: var(--bcv-blue); }
+.bcv-gr__wedit-row { display: flex; align-items: center; gap: 9px; }
+.bcv-gr__wedit-row .bcv-wbar__name { flex: 1; }
+.bcv-gr__wcanvas { flex: none; font: 400 11.5px/1.2 var(--bcv-font); color: var(--bcv-ink3); }
+.bcv-gr__wedit .bcv-gr__winput { width: 64px; height: 30px; padding: 0 10px; text-align: right; font-weight: 600; font-size: 13px; border-radius: 9px; }
+.bcv-gr__wpct { flex: none; width: 12px; font: 500 12.5px/1 var(--bcv-font); color: var(--bcv-ink3); }
+.bcv-gr__wsum { margin-left: auto; font: 600 11.5px/1.2 var(--bcv-font); color: #34c759; text-align: right; }
+.bcv-gr__wsum.is-off { color: #ff9f0a; }
+.bcv-gr__wbtns { display: flex; align-items: center; gap: 8px; padding-top: 4px; flex-wrap: wrap; }
+.bcv-gr__wspace { flex: 1; }
 /* a grade group picked out (U.groupPicker: the Grades tab, the Grades page's details): a press on a
    group, its weight or its ring keeps it, its ring and its assignments in view; the rest steps back */
 [data-pick] { cursor: pointer; }

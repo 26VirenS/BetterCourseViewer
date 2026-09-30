@@ -31,6 +31,12 @@
     const cats = groups.map((g) => ({ id: String(g.id), name: g.name, weight: Number(g.group_weight) || 0 }));
     const whatIfAllowed = (await store.pref('whatIfScores', true)) !== false; // Settings → Grades → Show what-if scores
     if (!whatIfAllowed) st.on = false;
+    // (2.98.59) the student's own weights for this course — a percent per group, from the syllabus,
+    // for a course Canvas leaves unweighted or weighs another way — kept in the site's preferences
+    // by course id and never sent to Canvas; the rings, the total and the GPA page follow them
+    const ownPref = await store.pref('gradeWeights', {});
+    let own = ownPref && typeof ownPref === 'object' && ownPref[c.id] && typeof ownPref[c.id] === 'object' && Object.keys(ownPref[c.id]).length ? { ...ownPref[c.id] } : null;
+    const wEdit = { on: false, vals: {}, focus: false };
     let focusId = null;
     // the group picked out (U.groupPicker), kept across what-if redraws; the list's header says which
     const pickSt = { pick: null };
@@ -54,7 +60,7 @@
     const picker = U.groupPicker(b, pickSt, { onChange: notePick });
 
     function draw() {
-      gm = store.gradeModel(groups, c, st.values, st.on, dark, st.added);
+      gm = store.gradeModel(groups, c, st.values, st.on, dark, st.added, { ownWeights: own });
       const parts = [];
       if (st.on) {
         parts.push(U.el('bcv-banner', [
@@ -129,10 +135,18 @@
       ]);
 
       // ---- how the grade is weighted ------------------------------------------------
+      // (2.98.59) and a button to weight the groups yourself, from the syllabus; the editor takes the section's place
       let weightsSec;
-      if (gm.weighted) {
+      const ownBtn = h('button', { type: 'button', class: `bcv-gr__ownbtn ${own ? 'is-on' : ''}`, text: own ? 'Edit my weights' : 'Use my own weights', title: 'Weight the groups yourself, from the syllabus — on this device only, never sent to Canvas', onclick: () => {
+        wEdit.on = true;
+        wEdit.focus = true;
+        wEdit.vals = Object.fromEntries(groups.map((g) => [String(g.id), own ? (own[String(g.id)] ?? 0) : (Number(g.group_weight) || 0)]));
+        draw();
+      } });
+      if (wEdit.on) weightsSec = weightEditor();
+      else if (gm.weighted) {
         weightsSec = U.el('bcv-gr__sec bcv-gr__sec--w', [
-          U.el('bcv-gr__hrow', [U.text('bcv-gr__h', 'How the grade is weighted', 'span'), U.text('bcv-gr__hsub', `${gm.weightSum}% of final grade`, 'span')]),
+          U.el('bcv-gr__hrow', [U.text('bcv-gr__h', 'How the grade is weighted', 'span'), U.text('bcv-gr__hsub', gm.own ? `${gm.weightSum}% · your own weights` : `${gm.weightSum}% of final grade`, 'span')]),
           gm.weightBar.length ? U.el('bcv-wbar', gm.weightBar.map((w) => { const ga = U.groupAttrs(w.id, w.color, { pick: true, name: w.name }); return h('div', { ...ga, class: `bcv-wbar__seg ${w.graded ? '' : 'bcv-wbar__seg--ungraded'}`, style: { ...ga.style, flex: `${w.weight} 1 0`, background: w.color || '' }, title: `${w.name} · ${w.weight}%` }); })) : null,
           U.el('bcv-wbar__rows', gm.weightBar.map((w) => U.el('bcv-wbar__row', [
             h('span', { class: `bcv-wbar__dot ${w.graded ? '' : 'bcv-wbar__dot--ungraded'}`, style: { background: w.color || '' } }),
@@ -142,11 +156,65 @@
           ], U.groupAttrs(w.id, w.color, { pick: true, name: w.name })))),
           gm.weightBar.length ? null : U.text('bcv-gr__wnote bcv-pretty', 'No assignment group carries weight yet.'),
           gm.weightNote ? h('p', { class: 'bcv-gr__wnote bcv-pretty', text: gm.weightNote }) : null,
+          gm.own ? h('p', { class: 'bcv-gr__wnote bcv-gr__wnote--own bcv-pretty', text: 'Your own weights, from the syllabus — not your instructor’s. They live on this device and never reach Canvas.' }) : null,
+          ownBtn,
         ]);
       } else {
         weightsSec = U.el('bcv-gr__sec', [
           U.text('bcv-gr__h', 'How the grade is weighted'),
           h('p', { class: 'bcv-gr__wnote bcv-pretty', text: 'This course does not weight assignment groups: the total is points earned over points possible.' }),
+          ownBtn,
+        ]);
+      }
+      /** The editor: a percent per group (every group, Canvas's figure beside it when it has one),
+       *  the sum kept in view, Save / Cancel, and a way back to Canvas's weights once your own are on. */
+      function weightEditor() {
+        const num = (v) => { const n = parseFloat(String(v).replace(/[^0-9.]/g, '')); return Number.isFinite(n) && n >= 0 ? n : 0; };
+        const sumEl = U.text('bcv-gr__wsum', '', 'span');
+        const paintSum = () => {
+          const s = Object.values(wEdit.vals).reduce((a, v) => a + num(v), 0);
+          const whole = Math.abs(s - 100) < 0.05;
+          sumEl.textContent = whole ? 'Total 100%' : `Total ${store.fmtPts(Math.round(s * 10) / 10)}% · shares taken in proportion`;
+          sumEl.classList.toggle('is-off', !whole);
+        };
+        const save = async () => {
+          const map = {};
+          for (const [id, v] of Object.entries(wEdit.vals)) { const n = num(v); if (n > 0) map[id] = n; }
+          if (!Object.keys(map).length) { U.toast('Give at least one group a weight — or go back to Canvas’s.', { error: true }); return; }
+          own = map;
+          wEdit.on = false;
+          await store.mergePref('gradeWeights', { [c.id]: map });
+          draw();
+          U.toast('Your weights are on for this course. Nothing is sent to Canvas.');
+        };
+        const cancel = () => { wEdit.on = false; draw(); };
+        const clear = async () => {
+          own = null;
+          wEdit.on = false;
+          await store.mergePref('gradeWeights', { [c.id]: null });
+          draw();
+          U.toast('Back to the weights Canvas carries.');
+        };
+        const rows = groups.map((g) => {
+          const id = String(g.id);
+          const inp = h('input', { type: 'text', inputmode: 'decimal', class: 'bcv-input bcv-gr__winput', value: String(wEdit.vals[id] ?? 0), 'aria-label': `Weight of ${g.name}`, dataset: { wgroup: id } });
+          inp.addEventListener('input', () => { wEdit.vals[id] = inp.value; paintSum(); });
+          inp.addEventListener('focus', () => inp.select());
+          inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') save(); if (e.key === 'Escape') cancel(); });
+          return U.el('bcv-gr__wedit-row', [
+            h('span', { class: 'bcv-wbar__dot', style: { background: colorOf(id) || 'var(--bcv-fill2)' } }),
+            U.text('bcv-wbar__name', g.name, 'span'),
+            c.weighted ? U.text('bcv-gr__wcanvas', `Canvas: ${Number(g.group_weight) || 0}%`, 'span') : null,
+            inp,
+            U.text('bcv-gr__wpct', '%', 'span'),
+          ]);
+        });
+        paintSum();
+        return U.el('bcv-gr__sec bcv-gr__sec--w bcv-gr__wedit', [
+          U.el('bcv-gr__hrow', [U.text('bcv-gr__h', 'My own weights', 'span'), sumEl]),
+          U.text('bcv-gr__wnote bcv-pretty', 'A percent per group, as your syllabus gives them. The total here follows them; nothing is sent to Canvas or your instructor.'),
+          ...rows,
+          U.el('bcv-gr__wbtns', [own ? U.btn('Back to Canvas’s weights', { kind: 'danger', cls: 'bcv-gr__wclear', onClick: clear }) : null, h('span', { class: 'bcv-gr__wspace' }), U.btn('Cancel', { cls: 'bcv-gr__wcancel', onClick: cancel }), U.btn('Save', { kind: 'primary', cls: 'bcv-gr__wsave', onClick: save })]),
         ]);
       }
       const ringsCard = U.card(U.el('bcv-gr', [U.el('bcv-gr__top', [svg, center]), byGroup, weightsSec]), 'bcv-card--22');
@@ -236,6 +304,11 @@
         const el = b.querySelector(`[data-wf="${CSS.escape(focusId)}"]`);
         if (el) { el.focus(); el.select(); }
         focusId = null;
+      }
+      if (wEdit.on && wEdit.focus) { // (the editor just opened: the first weight ready to type over)
+        wEdit.focus = false;
+        const first = b.querySelector('.bcv-gr__winput');
+        if (first) { first.focus(); first.select(); }
       }
     }
     function ns(tag) {

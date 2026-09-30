@@ -1330,10 +1330,14 @@
    *  assignments made up in the page ({ id, groupId, name, possible }, their scores in whatIf by id),
    *  counted in their group like any scored work there (its weight, its drop rules) while the what-if
    *  is on; never on Canvas, never saved. */
-  function gradeModel(groupsRaw, courseInfo, whatIf, whatIfOn, dark, added = []) {
-    const weighted = !!courseInfo.weighted;
+  /** `ownWeights` (2.98.59): the student's own percent per group, from the syllabus — when given,
+   *  the course is weighted by them (whatever Canvas carries) and the total is worked out here
+   *  rather than read from Canvas, which knows nothing of them. */
+  function gradeModel(groupsRaw, courseInfo, whatIf, whatIfOn, dark, added = [], { ownWeights = null } = {}) {
+    const own = ownWeights && typeof ownWeights === 'object' && Object.keys(ownWeights).length ? ownWeights : null;
+    const weighted = !!courseInfo.weighted || !!own;
     const rows = [];
-    const groups = (groupsRaw || []).map((g) => ({ id: String(g.id), name: g.name, weight: Number(g.group_weight) || 0, position: g.position, rules: g.rules || {}, assignments: g.assignments || [] }));
+    const groups = (groupsRaw || []).map((g) => ({ id: String(g.id), name: g.name, weight: own ? (Number(own[String(g.id)]) || 0) : (Number(g.group_weight) || 0), position: g.position, rules: g.rules || {}, assignments: g.assignments || [] }));
     for (const g of groups) {
       for (const a of g.assignments) {
         if (a.published === false) continue;
@@ -1409,7 +1413,7 @@
     if (weighted) {
       const denom = scored.reduce((s, g) => s + g.weight, 0);
       total = denom > 0 ? round1(scored.reduce((s, g) => s + g.weight * g.pct, 0) / denom) : null;
-      note = denom > 0 ? 'Weighted across the groups that have graded work.' : 'No weighted group has graded work yet.';
+      note = denom > 0 ? (own ? 'Weighted by your own weights, across the groups with graded work.' : 'Weighted across the groups that have graded work.') : 'No weighted group has graded work yet.';
     } else {
       const earned = scored.reduce((s, g) => s + g.earned, 0);
       const possible = scored.reduce((s, g) => s + g.possible, 0);
@@ -1418,14 +1422,17 @@
     }
     if (whatIfOn) note = `What-if ${note.charAt(0).toLowerCase()}${note.slice(1)}`;
     const canvasTotal = courseInfo.score !== null && courseInfo.score !== undefined ? round1(Number(courseInfo.score)) : null;
-    if (!whatIfOn && canvasTotal !== null) {
+    if (!whatIfOn && own) {
+      // (your own weights: the total is this one, never Canvas's, which weighs the groups its own way)
+      note = total === null ? 'Nothing graded yet.' : `Weighted by your own weights, not your instructor’s${canvasTotal !== null ? ` — Canvas shows ${fmtPts(canvasTotal)}%` : ''}.`;
+    } else if (!whatIfOn && canvasTotal !== null) {
       total = canvasTotal;
       note = `As shown in Canvas${courseInfo.grade ? ` · ${courseInfo.grade}` : ''}. ${weighted ? 'Weighted across the groups that have graded work.' : 'Graded work only.'}`;
     } else if (!whatIfOn && courseInfo.hideFinal) {
       note = `${total === null ? 'Nothing graded yet. ' : ''}Canvas hides the total for this course${total === null ? '' : ': this one is worked out from the graded work'}.`;
     }
-    // what the term would end on today, with every ungraded piece counted as zero (Canvas's "final" score)
-    const finalScore = !whatIfOn && courseInfo.finalScore !== null && courseInfo.finalScore !== undefined && !courseInfo.hideFinal ? round1(Number(courseInfo.finalScore)) : null;
+    // what the term would end on today, with every ungraded piece counted as zero (Canvas's "final" score; not comparable under your own weights)
+    const finalScore = !whatIfOn && !own && courseInfo.finalScore !== null && courseInfo.finalScore !== undefined && !courseInfo.hideFinal ? round1(Number(courseInfo.finalScore)) : null;
     const gray = dark ? ['#8e8e93', '#7c7c82', '#6b6b71', '#5a5a60', '#96969c'] : ['#8e8e93', '#a0a0a6', '#b0b0b6', '#78787e', '#c0c0c6'];
     const colorOf = (i, color) => (whatIfOn ? gray[Math.min(i, gray.length - 1)] : color);
     // rings: outer = total, then one per group with graded work (five at most; the rest are legend only)
@@ -1468,7 +1475,7 @@
       ? `${listNames(zeros.map((g) => g.name))} ${one ? 'carries' : 'carry'} 0% weight — ${zeros.some((g) => g.graded) ? (one ? 'it shows as a ring but never moves' : 'they show as rings but never move') : (one ? 'it never moves' : 'they never move')} the total.`
       : '';
     return {
-      rows, total, weighted, rings, legend, ungraded, weightBar, weightNote,
+      rows, total, weighted, own: !!own, rings, legend, ungraded, weightBar, weightNote,
       stipples: rings.filter((r) => r.zero).map((r) => ({ id: r.patternId, color: r.color })),
       center: { label: whatIfOn ? 'What-if total' : 'Total', value: total === null ? '—' : `${fmtPts(total)}%`, color: whatIfOn ? gray[0] : '#34c759', note, final: finalScore !== null && (total === null || finalScore !== total) ? `Final so far ${fmtPts(finalScore)}%${courseInfo.finalGrade ? ` · ${courseInfo.finalGrade}` : ''} — ungraded work counted as zero` : '' },
       weightSum: bearing.reduce((s, g) => s + g.weight, 0),

@@ -389,6 +389,22 @@ try {
   const winBar = await barRead(win);
   check(/\/tool-window$/.test(win.url()) && winBar.title === 'My Materials' && winBar.x && (await win.$('#tool-window')) !== null,
     `a window the tool opens for itself is the tool still: its own tab, the same bar over it: ${JSON.stringify({ url: win.url(), title: winBar.title })}`);
+  // (2.98.59) a tab the browser makes beside the tool's — ⌘T, the + button — is not the tool's: Chrome
+  // names the active tab as its opener, but its first address is the browser's own new-tab page. No
+  // bar over whatever site is opened in it, even one the bar's script is registered for (this one:
+  // the tool launched here), and nothing opened from it inherits one either
+  const toolTabId = await sw.evaluate(async () => (await chrome.tabs.query({})).find((t) => /external_tools\/77/.test(t.url || t.pendingUrl || ''))?.id);
+  const plainId = await sw.evaluate(async (opener) => (await chrome.tabs.create({ url: 'chrome://newtab/', openerTabId: opener, active: false })).id, toolTabId);
+  await page.waitForTimeout(2200); // (the student looks at the new tab, then types somewhere — a page the tool opens says where within milliseconds)
+  await sw.evaluate(async ([id, url]) => { await chrome.tabs.update(id, { url }); }, [plainId, `${BASE}/courses/101/files`]);
+  let plain = null;
+  await eventually(async () => { plain = context.pages().find((p) => p.url().includes('/courses/101/files')) || null; return !!plain; }, 20000);
+  await plain.waitForLoadState('domcontentloaded');
+  await eventually(async () => !!(await plain.$('#bcv-app')), 15000); // (the interface is up: the bar's script, registered for this site, has had its chance to ask)
+  await plain.waitForTimeout(600);
+  check(toolTabId != null && !(await plain.$('bcv-tool-bar')) && (await plain.$('#bcv-app')) !== null, `a tab the browser made beside the tool's (its opener, its first address the new-tab page) is not the tool's: no bar over the site opened in it (${plain.url()})`);
+  await sw.evaluate(async (id) => { try { await chrome.tabs.remove(id); } catch { /* gone */ } }, plainId);
+  await eventually(async () => plain.isClosed(), 5000);
   const had = context.pages().length;
   await win.locator('bcv-tool-bar .x').click().catch(() => { /* the tab closes under the click, which is the point: the check after is that it did */ });
   await eventually(async () => win.isClosed(), 10000);
@@ -2186,6 +2202,39 @@ try {
   check(!(await page.$('.bcv-whatif__input.is-hyp')), 'Clear all takes the made-up assignments with the changed scores');
   await page.click('.bcv-whatif-btn');
   await page.waitForFunction(() => !document.querySelector('.bcv-banner'), null, { timeout: 5000 });
+  // (2.98.59) your own weights: a percent per group from the syllabus; the rings, the total, the
+  // section and the Grades page follow them; Canvas's own figure stays in view; a way back
+  await page.click('.bcv-gr__ownbtn');
+  await page.waitForSelector('.bcv-gr__wedit', { timeout: 5000 });
+  const wRows = await page.$$eval('.bcv-gr__wedit-row', (els) => els.map((e) => `${e.querySelector('.bcv-wbar__name').textContent}=${e.querySelector('input').value}`));
+  check(!(await page.$('.bcv-gr__ownbtn')) && wRows.join(',') === 'Discussion Quizzes=18,Midterms=57,Final=25,Effort=0,Collaboration=0,Coursework (Knewton Alta)=0' && (await texts('.bcv-gr__wsum'))[0] === 'Total 100%' && (await page.evaluate(() => document.activeElement?.classList.contains('bcv-gr__winput'))) && !(await page.$('.bcv-gr__wclear')), `Use my own weights opens the editor with Canvas's figures filled in, the first ready to type over: ${wRows.join(', ')}`);
+  const wInputs = await page.$$('.bcv-gr__winput');
+  for (const [i, v] of ['50', '0', '0', '50', '0', '0'].entries()) await wInputs[i].fill(v);
+  await wInputs[1].fill('10'); // (a sum off 100 is said so, then put right)
+  check((await texts('.bcv-gr__wsum'))[0] === 'Total 110% · shares taken in proportion' && (await page.$eval('.bcv-gr__wsum', (e) => e.classList.contains('is-off'))), `the sum stays in view and says when it is not 100: ${(await texts('.bcv-gr__wsum'))[0]}`);
+  await wInputs[1].fill('0');
+  await page.click('.bcv-gr__wsave');
+  await page.waitForFunction(() => !document.querySelector('.bcv-gr__wedit') && document.querySelector('.bcv-gr__total')?.textContent === '76%', null, { timeout: 5000 });
+  const ownRows = await texts('.bcv-wbar__row');
+  check(ownRows.join(' | ') === 'Discussion Quizzes 50% of grade 100% | Effort 50% of grade 52%' && (await texts('.bcv-gr__hsub'))[0] === '100% · your own weights' && (await texts('.bcv-gr__note'))[0] === 'Weighted by your own weights, not your instructor’s — Canvas shows 92.4%.' && (await texts('.bcv-gr__ownbtn'))[0] === 'Edit my weights' && /never reach Canvas/.test((await texts('.bcv-gr__wnote--own'))[0]) && (await page.$$('.bcv-rings__svg > circle')).length === 8, `saved: the bar, the total (half of 100% and half of 52% = 76%) and the note follow your weights, Canvas's figure kept in view: ${ownRows.join(' | ')} · ${(await texts('.bcv-gr__note'))[0]}`);
+  const ownPref = await sw.evaluate(async () => Object.entries(await chrome.storage.local.get(null)).find(([k]) => k.startsWith('prefs:'))?.[1]?.gradeWeights);
+  check(ownPref && ownPref['101'] && ownPref['101']['g101-0'] === 50 && ownPref['101']['g101-3'] === 50 && Object.keys(ownPref['101']).length === 2, `the weights live in the site's preferences by course, zeros dropped, nothing sent to Canvas: ${JSON.stringify(ownPref)}`);
+  await page.reload();
+  await page.waitForSelector('.bcv-rings__svg', { timeout: 10000 });
+  await page.waitForFunction(() => document.querySelector('.bcv-gr__total')?.textContent === '76%', null, { timeout: 5000 });
+  check(true, 'and they survive a reload');
+  // the Grades page follows them: the course's score, its letter and the GPA all from the 76%
+  await page.goto(`${BASE}/grades`); // (the course shell's sidebar carries the course's tabs, not the main nav)
+  await page.waitForSelector('.bcv-gpa__card', { timeout: 15000 });
+  const ownCard = await page.evaluate(() => { const c = [...document.querySelectorAll('.bcv-gpa__card')].find((x) => /F26-MATH 021 20/.test(x.textContent)); return c ? { pct: c.querySelector('.bcv-gpa__cpct')?.textContent, letter: c.querySelector('.bcv-gpa__ringletter')?.textContent, note: c.querySelector('.bcv-gpa__cnote')?.textContent } : null; });
+  check(ownCard && ownCard.pct === '76%' && ownCard.letter === 'C' && /^By your own weights/.test(ownCard.note), `the Grades page scores the course by your weights, with a letter from them and a note saying so: ${JSON.stringify(ownCard)}`);
+  await page.goto(`${BASE}/courses/101/grades`);
+  await page.waitForSelector('.bcv-gr__ownbtn', { timeout: 15000 });
+  await page.click('.bcv-gr__ownbtn');
+  await page.waitForSelector('.bcv-gr__wclear', { timeout: 5000 });
+  await page.click('.bcv-gr__wclear');
+  await page.waitForFunction(() => !document.querySelector('.bcv-gr__wedit') && document.querySelector('.bcv-gr__total')?.textContent === '92.4%', null, { timeout: 5000 });
+  check((await texts('.bcv-gr__hsub'))[0] === '100% of final grade' && (await texts('.bcv-gr__ownbtn'))[0] === 'Use my own weights' && !((await sw.evaluate(async () => Object.entries(await chrome.storage.local.get(null)).find(([k]) => k.startsWith('prefs:'))?.[1]?.gradeWeights))?.['101']), 'Back to Canvas’s weights: the total and the section are Canvas’s again, the preference gone');
   // a grade is the start of a question, and the answer is on the assignment's own page: the whole
   // row goes there, while the score keeps its own presses so a what-if can still be started on it
   const gradeRow = await page.$eval('.bcv-grades__main .bcv-card--list .bcv-row', (e) => ({ tag: e.tagName, href: e.getAttribute('href'), name: e.querySelector('.bcv-grade__name')?.textContent, score: e.querySelector('.bcv-grade__score')?.textContent }));

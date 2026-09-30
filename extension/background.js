@@ -140,8 +140,15 @@ if (typeof importScripts === 'function' && !self.BCV_LAZY_MODULES) {
     } catch { /* no badge to set here */ }
   }
   api.tabs?.onUpdated?.addListener(async (tabId, info) => {
-    if (!info?.status) return; // (a title or a favicon changing is not a move)
+    if (!info?.status && !info?.url) return; // (a title or a favicon changing is not a move)
     await loaded;
+    // a young tab not yet anyone's: its first page address showing now, or an opener the new-tab
+    // notice did not carry yet — whose is it?
+    if (born.has(tabId) && !tools.has(tabId) && !browserMade.has(tabId) && Date.now() - born.get(tabId).at < 10000) {
+      if (!born.get(tabId).first) await firstAddress(tabId, info);
+      try { const tb = await api.tabs.get(tabId); if (tb?.openerTabId != null) await judgeKid(tabId, tb.openerTabId); } catch { /* gone */ }
+    }
+    if (!info?.status) return;
     const t = tools.get(tabId);
     if (!t) return;
     if (info.status === 'loading') { injectBar(tabId).catch(() => {}); return; } // early, so the bar is up before the page paints where it can be
@@ -256,6 +263,7 @@ if (typeof importScripts === 'function' && !self.BCV_LAZY_MODULES) {
    *  own question race each other, and either one may be the first to get here. */
   function adopt(id, parent) {
     if (tools.has(id)) return tools.get(id);
+    if (kidVerdict(id) === 'browser') { browserMade.add(id); return null; } // (a tab the browser made beside the tool's, not one the tool opened)
     const t = { from: parent.from, title: parent.title, note: parent.note, state: 'auth' };
     setTool(id, t);
     watch(id);
@@ -328,15 +336,67 @@ if (typeof importScripts === 'function' && !self.BCV_LAZY_MODULES) {
   // nothing opened, or nothing was reported — and those want opposite fixes.
   const CAN = { tabs: !!api.tabs, onCreated: !!api.tabs?.onCreated, session: !!api.storage?.session };
   let heardATab = false;
-  api.tabs?.onRemoved?.addListener(async (id) => { await loaded; if (tools.delete(id)) save(); }); // (after the restore: a close that wakes the worker would otherwise be undone by it)
+  api.tabs?.onRemoved?.addListener(async (id) => { await loaded; browserMade.delete(id); born.delete(id); if (tools.delete(id)) save(); }); // (after the restore: a close that wakes the worker would otherwise be undone by it)
   // A window the tool opens for itself is the tool still: same session, same way home, same bar.
+  // A tab the browser makes beside it is not: Chrome names the active tab as the opener of a tab
+  // made with ⌘T or the + button too, and its first page is the browser's own new-tab page. The two
+  // cannot be told apart at the new-tab notice — there is no address yet (the opener is not always
+  // there yet either), and the browser's own pages never show an address to an extension. What
+  // tells them apart is time: a page the tool opens says where it is going within milliseconds,
+  // while a tab the browser made shows no page address until the student types somewhere, seconds
+  // or minutes on. So every tab made while this worker is up is recorded with the moment it was
+  // made and the moment its first page address showed; a tab with a tool for an opener is the
+  // tool's when that address came within KID_WAIT of its making, the browser's otherwise — both
+  // here and at the bar's own question (asked when a tool site is opened in it later). Before
+  // 2.98.59 every such tab was adopted at once, and the bar turned up on every site opened from a
+  // tool's tab, and on every tab opened from those.
+  const KID_WAIT = 1500;
+  const born = new Map(); // tabId → { at, first, firstAt }
+  const browserMade = new Set();
+  const pageAddress = (u) => /^https?:/i.test(u || '') || /^about:blank/i.test(u || '');
+  const browserPage = (u) => !!u && !pageAddress(u); // chrome://newtab, about:newtab, edge://newtab…
+  /** Whose is a tab with a tool for an opener: 'tool', 'browser', or 'unknown' (too soon to say).
+   *  A tab made before this worker woke reads as the tool's, as every such tab did before. */
+  function kidVerdict(id) {
+    if (browserMade.has(id)) return 'browser';
+    const b = born.get(id);
+    if (!b) return 'tool';
+    if (b.first) return b.firstAt - b.at <= KID_WAIT ? 'tool' : 'browser';
+    return Date.now() - b.at > KID_WAIT ? 'browser' : 'unknown';
+  }
+  function settleKid(id, parent, url, verdict) {
+    if (verdict === 'tool') { if (adopt(id, parent)) note({ kind: 'adopt', tabId: id, from: parent.from, url }); }
+    else if (!browserMade.has(id)) { browserMade.add(id); note({ kind: 'adopt', tabId: id, from: parent.from, url, action: 'not adopted: the browser made it, not the tool' }); }
+  }
+  /** The tab's first page address, if one showed: from the notice, or looked up. */
+  async function firstAddress(id, info = null) {
+    const b = born.get(id);
+    if (!b || b.first) return b?.first || '';
+    let url = info?.url || '';
+    if (!url) { try { const t = await api.tabs.get(id); url = t?.url || t?.pendingUrl || ''; } catch { url = ''; } }
+    if (browserPage(url)) browserMade.add(id);
+    else if (pageAddress(url) && born.has(id) && !born.get(id).first) Object.assign(born.get(id), { first: url, firstAt: Date.now() });
+    return born.get(id)?.first || '';
+  }
+  /** A tab with a tool for an opener, at a moment its verdict may be in: adopt it or mark it. */
+  async function judgeKid(id, parentId) {
+    const parent = parentId == null ? null : tools.get(parentId);
+    if (!parent || tools.has(id) || browserMade.has(id)) return;
+    const v = kidVerdict(id);
+    if (v !== 'unknown') settleKid(id, parent, born.get(id)?.first || '(no page address in time)', v);
+  }
   api.tabs?.onCreated?.addListener(async (tab) => {
     heardATab = true;
     await loaded;
-    const parent = tab.openerTabId == null ? null : tools.get(tab.openerTabId);
-    if (!parent || tools.has(tab.id)) return;
-    adopt(tab.id, parent);
-    note({ kind: 'adopt', tabId: tab.id, from: parent.from, url: tab.pendingUrl || tab.url || '' });
+    const first = tab.pendingUrl || tab.url || '';
+    const now = Date.now();
+    born.set(tab.id, { at: now, first: pageAddress(first) ? first : null, firstAt: now });
+    if (born.size > 400) for (const k of [...born.keys()].slice(0, 100)) born.delete(k); // (a long session: the oldest records go)
+    if (browserPage(first)) browserMade.add(tab.id);
+    if (tab.openerTabId == null) return;
+    await judgeKid(tab.id, tab.openerTabId);
+    // (not decided yet: nothing seen in time settles it as the browser's — a move of its own settles it sooner)
+    if (!tools.has(tab.id) && !browserMade.has(tab.id)) setTimeout(() => judgeKid(tab.id, tab.openerTabId), KID_WAIT + 50);
   });
   const normalNow = () => DEV.encode(cap) === DEV.encode(DEV.SHIPPED);
   function devGet() { return { ok: true, settings: { ...cap }, code: DEV.encode(cap), normal: normalNow() }; }

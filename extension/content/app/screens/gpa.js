@@ -185,16 +185,17 @@
    *  must average to land a target. Counts only work that moves the final
    *  grade (no 0-point or "not counted" items), and follows the course's
    *  group weights when it uses them. */
-  function courseMath(groupsRaw, weighted) {
+  function courseMath(groupsRaw, weighted, own = null) {
     const isGraded = (a) => a.submission?.workflow_state === 'graded' && a.submission.score !== null && a.submission.score !== undefined;
+    const byOwn = !!(own && Object.keys(own).length); // (2.98.59: the student's own weights, from the syllabus, in place of Canvas's)
     const groups = (groupsRaw || []).map((g) => {
       const items = (g.assignments || []).filter((a) => a.published !== false && !a.omit_from_final_grade && Number(a.points_possible) > 0 && !a.submission?.excused);
       const tot = items.reduce((s, a) => s + Number(a.points_possible), 0);
       const earned = items.filter(isGraded).reduce((s, a) => s + Number(a.submission.score), 0);
       const rem = items.filter((a) => !isGraded(a)).reduce((s, a) => s + Number(a.points_possible), 0);
-      return { weight: Number(g.group_weight) || 0, tot, earned, rem };
+      return { weight: byOwn ? (Number(own[String(g.id)]) || 0) : (Number(g.group_weight) || 0), tot, earned, rem };
     }).filter((g) => g.tot > 0);
-    const share = (g) => (weighted ? g.weight : g.tot);
+    const share = (g) => (weighted || byOwn ? g.weight : g.tot);
     const W = groups.reduce((s, g) => s + share(g), 0);
     // final = base + slope × (fraction scored on the remaining work)
     const base = W > 0 ? groups.reduce((s, g) => s + share(g) * (g.earned / g.tot), 0) / W : 0;
@@ -218,10 +219,13 @@
     body.append(U.loading('cards', 6)); // course-card skeletons: the layout does not jump when the data lands
 
     introIfFirst(ctx.app).catch(() => {}); // the first opening: the tour's steps, waiting for the cards as they draw
-    const [all, term, trackingPref, goalPref, targetsPref, snapsPref, hiddenPref, whatIfPref] = await Promise.all([
+    const [all, term, trackingPref, goalPref, targetsPref, snapsPref, hiddenPref, whatIfPref, ownPref] = await Promise.all([
       store.courses({ maxAge: store.freshness.grades }).catch(() => null), store.currentTerm().catch(() => ''), // never a score older than the freshness: a tool may have posted one since
-      store.pref('gpaTracking'), store.pref('gpaGoal'), store.pref('gradeTargets'), store.pref('gpaSnapshots'), store.pref('gpaHidden'), store.pref('whatIfScores', true),
+      store.pref('gpaTracking'), store.pref('gpaGoal'), store.pref('gradeTargets'), store.pref('gpaSnapshots'), store.pref('gpaHidden'), store.pref('whatIfScores', true), store.pref('gradeWeights'),
     ]);
+    // (2.98.59) a course's own weights, set on its Grades tab: its score here is worked out by them, not Canvas's
+    const ownW = ownPref && typeof ownPref === 'object' ? ownPref : {};
+    const ownFor = (c) => (ownW[c.id] && typeof ownW[c.id] === 'object' && Object.keys(ownW[c.id]).length ? ownW[c.id] : null);
     if (!ctx.alive()) return screen;
     if (!all) {
       body.replaceChildren(U.errorBox('Your courses could not be loaded.'));
@@ -252,9 +256,11 @@
     const gmCache = new Map();
     /** The course's own grade model (rings, groups, weights, assignment rows), once per course. */
     const gmFor = (c) => {
-      if (!gmCache.has(c.id)) gmCache.set(c.id, store.gradeModel(groupsBy.get(c.id) || [], c, {}, false, ctx.dark));
+      if (!gmCache.has(c.id)) gmCache.set(c.id, store.gradeModel(groupsBy.get(c.id) || [], c, {}, false, ctx.dark, [], { ownWeights: ownFor(c) }));
       return gmCache.get(c.id);
     };
+    /** The course's score under its own weights (null without them, or with nothing graded). */
+    const ownPct = (c) => { if (!ownFor(c)) return null; const t = gmFor(c).total; return t === null || t === undefined ? null : Number(t); };
     const whatIfAllowed = whatIfPref !== false; // Settings → Grades → Show what-if scores
     const whatIfBy = new Map(); // courseId → { on, values, added, seq, addGroup }: a Details sheet's what-if, kept while the page lives
 
@@ -264,13 +270,15 @@
       // a pass/fail course (the setup's switch, saved as P/F in place of a target letter) has no
       // letter to aim at and counts for nothing in the GPA; its score still shows
       const passFail = shown.filter((c) => isPassFail(targets[c.id]));
-      const scored = shown.filter((c) => c.score !== null && c.score !== undefined && !isPassFail(targets[c.id]));
-      const unscored = shown.filter((c) => (c.score === null || c.score === undefined) && !isPassFail(targets[c.id]));
+      const hasScore = (c) => (c.score !== null && c.score !== undefined) || ownPct(c) !== null;
+      const scored = shown.filter((c) => hasScore(c) && !isPassFail(targets[c.id]));
+      const unscored = shown.filter((c) => !hasScore(c) && !isPassFail(targets[c.id]));
       const rows = scored.map((c) => {
-        const pct = Number(c.score);
-        const letter = c.grade ? String(c.grade).replace(/-/g, '−') : letterFor(pct)[0];
-        const pts = pointsFor(c.grade, pct);
-        const m = courseMath(groupsBy.get(c.id), c.weighted);
+        const op = ownPct(c); // (the student's own weights: their total, and a letter from it, never Canvas's)
+        const pct = op !== null ? op : Number(c.score);
+        const letter = op === null && c.grade ? String(c.grade).replace(/-/g, '−') : letterFor(pct)[0];
+        const pts = pointsFor(op === null ? c.grade : null, pct);
+        const m = courseMath(groupsBy.get(c.id), c.weighted, ownFor(c));
         const found = SCALE.findIndex((s) => norm(s[0]) === norm(letter));
         const defaultIdx = found >= 0 ? found : SCALE.indexOf(letterFor(pct));
         const saved = targetIndex(targets[c.id]);
@@ -476,7 +484,7 @@
           ]),
           // (no score from Canvas: the teacher hides the total, or nothing is marked yet — said which)
           U.text(`bcv-gpa__need bcv-pretty ${ungraded || pf ? '' : needClass(r)}`, ungraded ? (c.hideFinal ? 'The teacher hides the total — no score to project from' : 'Nothing graded yet — no score to project from') : pf ? 'Pass/Fail — no letter to aim at' : needText(r)),
-          U.text('bcv-gpa__cnote', ungraded ? (c.hideFinal ? 'Canvas sends no score while the total is hidden, so it counts for nothing here' : 'Canvas has not computed a score, so it counts for nothing here') : pf ? 'Counts for nothing in the GPA' : r.m.known ? `${store.fmtPts(r.m.earned)} pts earned so far` : 'Score as Canvas reports it'),
+          U.text('bcv-gpa__cnote', ungraded ? (c.hideFinal ? 'Canvas sends no score while the total is hidden, so it counts for nothing here' : 'Canvas has not computed a score, so it counts for nothing here') : pf ? 'Counts for nothing in the GPA' : ownFor(c) ? `By your own weights${r.m.known ? ` · ${store.fmtPts(r.m.earned)} pts earned so far` : ''}` : r.m.known ? `${store.fmtPts(r.m.earned)} pts earned so far` : 'Score as Canvas reports it'),
         ]),
         U.el('bcv-gpa__cfoot', [
           targetChip,
@@ -663,7 +671,7 @@
         const pf = isPassFail(targets[c.id]);
         const pfPct = pf && c.score !== null && c.score !== undefined ? Number(c.score) : null;
         // with a what-if on, the sheet is drawn from the hypothetical model: greyed rings, the what-if total up top
-        const gm = wf.on ? store.gradeModel(groupsBy.get(c.id) || [], c, wf.values, true, ctx.dark, wf.added) : gmFor(c);
+        const gm = wf.on ? store.gradeModel(groupsBy.get(c.id) || [], c, wf.values, true, ctx.dark, wf.added, { ownWeights: ownFor(c) }) : gmFor(c);
         gmNow = gm;
         const cats = gm.legend;
         const hyp = wf.on && gm.total !== null && gm.total !== undefined ? gm.total : null;

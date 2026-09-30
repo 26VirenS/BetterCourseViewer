@@ -978,7 +978,10 @@
     const titleEl = bigTitle('Grades', { below: 'every course counts equally' });
     screen.append(titleEl, body);
     body.append(U.loading('rows', 4));
-    const [all, term, goalPref, hiddenPref, targetsPref, trackingPref, snapsPref] = await Promise.all([store.courses().catch(() => null), store.currentTerm().catch(() => ''), store.pref('gpaGoal'), store.pref('gpaHidden'), store.pref('gradeTargets'), store.pref('gpaTracking'), store.pref('gpaSnapshots')]);
+    const [all, term, goalPref, hiddenPref, targetsPref, trackingPref, snapsPref, ownPref] = await Promise.all([store.courses().catch(() => null), store.currentTerm().catch(() => ''), store.pref('gpaGoal'), store.pref('gpaHidden'), store.pref('gradeTargets'), store.pref('gpaTracking'), store.pref('gpaSnapshots'), store.pref('gradeWeights')]);
+    // (2.98.59) a course's own weights, set on its Grades tab: its score here is worked out by them, not Canvas's
+    const ownW = ownPref && typeof ownPref === 'object' ? ownPref : {};
+    const ownFor = (c) => (ownW[c.id] && typeof ownW[c.id] === 'object' && Object.keys(ownW[c.id]).length ? ownW[c.id] : null);
     if (!ctx.alive()) return screen;
     if (!all) {
       body.replaceChildren(U.errorBox('Your courses could not be loaded.'));
@@ -999,9 +1002,10 @@
     if (!ctx.alive()) return screen;
     const gmCache = new Map();
     const gmFor = (c) => {
-      if (!gmCache.has(c.id)) gmCache.set(c.id, store.gradeModel(groups.get(c.id) || [], c, {}, false, dark));
+      if (!gmCache.has(c.id)) gmCache.set(c.id, store.gradeModel(groups.get(c.id) || [], c, {}, false, dark, [], { ownWeights: ownFor(c) }));
       return gmCache.get(c.id);
     };
+    const ownPct = (c) => { if (!ownFor(c)) return null; const t = gmFor(c).total; return t === null || t === undefined ? null : Number(t); };
     const gradedCount = (c) => {
       let graded = 0, total = 0;
       for (const g of groups.get(c.id) || []) for (const a of g.assignments || []) {
@@ -1012,12 +1016,13 @@
       return { graded, total };
     };
     const rowsFor = () => courseList.map((c) => {
-      const base = c.score !== null && c.score !== undefined ? Number(c.score) : null;
+      const op = ownPct(c); // (the student's own weights: their total and a letter from it, never Canvas's)
+      const base = op !== null ? op : c.score !== null && c.score !== undefined ? Number(c.score) : null;
       const tried = whatIf && Number.isFinite(whatIfVals[c.id]);
       const pct = tried ? whatIfVals[c.id] : base;
       const scored = pct !== null;
-      const letter = scored ? (tried || !c.grade ? G.letterFor(pct)[0] : String(c.grade).replace(/-/g, '−')) : null;
-      const pts = scored ? (tried ? G.letterFor(pct)[2] : G.pointsFor(c.grade, pct)) : null;
+      const letter = scored ? (tried || op !== null || !c.grade ? G.letterFor(pct)[0] : String(c.grade).replace(/-/g, '−')) : null;
+      const pts = scored ? (tried || op !== null ? G.letterFor(pct)[2] : G.pointsFor(c.grade, pct)) : null;
       return { c, scored, pct, letter, pts, tried, ...gradedCount(c) };
     });
     const termGpaOf = (rows) => { const s = rows.filter((r) => r.scored); return s.length ? s.reduce((a, r) => a + r.pts, 0) / s.length : null; };
