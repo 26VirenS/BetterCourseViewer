@@ -116,8 +116,151 @@
         if (Number.isFinite(left)) document.documentElement.style.setProperty('--bcv-toolbar-right', `${Math.round(bar.getBoundingClientRect().right - left + 14)}px`);
       }
     } catch { /* the page went */ }
+    room();
   }
   try { window.addEventListener('resize', () => { if (host) push(); }); } catch { /* no window to watch */ }
+
+  /* Room for the bar. The margin above moves everything in the page's flow, and nothing a site pins
+   * to the window: a header fixed at the top, a sidebar or a whole app fixed from top to bottom, a
+   * heading stuck to the top as the page scrolls, a layer placed against the page's very top, a page
+   * built to the window's exact height. Those would sit under the bar (or lose their foot below the
+   * window). So the strip the bar covers is looked at — on a load, a change to the page, a scroll, a
+   * resize — and whatever of the page's own is found there is moved down by just as much as it is
+   * covered; whatever filled the window from top to bottom is made that much shorter, so its foot
+   * stays in view. It is moved with its margin (a sticky heading with its offset), not its position,
+   * so a site's own moves — a header that slides away on scroll — keep working. Every change is
+   * written down and given back exactly when the bar is tucked away. */
+  const held = new Map(); // element → { was: { prop: [value, priority] }, wrote: { prop: value }, ... }
+  const docEl = () => document.documentElement;
+  function keep(n, m, prop, value) {
+    if (!(prop in m.was)) m.was[prop] = [n.style.getPropertyValue(prop), n.style.getPropertyPriority(prop)];
+    if (n.style.getPropertyValue(prop) !== value || n.style.getPropertyPriority(prop) !== 'important') n.style.setProperty(prop, value, 'important');
+    m.wrote[prop] = n.style.getPropertyValue(prop); // (as the browser writes it back)
+  }
+  function giveBack(n, m) {
+    for (const [prop, [value, pri]] of Object.entries(m.was)) {
+      if (n.style.getPropertyValue(prop) !== m.wrote[prop]) continue; // (the site has written its own since: it stands)
+      n.style.removeProperty(prop);
+      if (value) n.style.setProperty(prop, value, pri);
+    }
+    if (!m.hadStyle && !n.style.length) n.removeAttribute('style'); // (no attribute left that the site never wrote)
+  }
+  function unroom() {
+    for (const [n, m] of held) { try { giveBack(n, m); } catch { /* gone */ } }
+    held.clear();
+  }
+  /** The element a covered point belongs to that the margin does not move, if any (memo: one look
+   *  per element per scan, the points sharing most of their ancestors). */
+  function pinnedOf(e, memo) {
+    const body = document.body;
+    const path = [];
+    let found = null;
+    for (let n = e; n && n !== docEl(); n = n.parentElement) {
+      if (memo.has(n)) { found = memo.get(n); break; }
+      path.push(n);
+      const pos = getComputedStyle(n).position;
+      if (pos === 'fixed' || pos === 'sticky') { found = n; break; }
+      if (pos === 'absolute') {
+        const op = n.offsetParent; // (placed against the page's own top, which the margin does not move)
+        if (!op || op === docEl() || (op === body && getComputedStyle(body).position === 'static')) { found = n; break; }
+      }
+      if (n === body) break;
+    }
+    for (const n of path) memo.set(n, found);
+    return found;
+  }
+  function moveDown(n, top) {
+    let m = held.get(n);
+    const cs = getComputedStyle(n);
+    if (!m) {
+      const r = n.getBoundingClientRect();
+      const pos = cs.position;
+      const docTop = pos === 'absolute' ? r.top + window.scrollY : r.top; // (a layer placed on the page scrolls with it)
+      if (pos === 'sticky' && (cs.top === 'auto' || Math.abs(r.top - parseFloat(cs.top)) > 1)) return; // (sticky, but not stuck at the top: it scrolls by like the rest)
+      if (pos === 'absolute' && docTop >= top) return; // (on the page below the bar: only scrolled under it, as any of the page is)
+      m = { was: {}, wrote: {}, hadStyle: n.hasAttribute('style'), pos, rTop: docTop, top0: parseFloat(cs.top) || 0, margin0: parseFloat(cs.marginTop) || 0, gap: window.innerHeight - r.height, full: r.height >= window.innerHeight * 0.5 && r.bottom <= window.innerHeight + 1, by: -1 };
+      held.set(n, m);
+    }
+    const by = Math.max(0, top - m.rTop);
+    if (by === m.by) return;
+    m.by = by;
+    if (m.pos === 'sticky') keep(n, m, 'top', `${m.top0 + by}px`);
+    else keep(n, m, 'margin-top', `${m.margin0 + by}px`);
+    // it filled the window to its foot: as much shorter as it moved down, its foot still in view
+    if (m.full && (m.wrote.height || n.getBoundingClientRect().bottom > window.innerHeight + 1)) keep(n, m, 'height', `calc(100vh - ${Math.round(m.gap + by)}px)`);
+  }
+  /** A page built to the window's height (an app: html and body at 100%, a root at 100vh) is pushed
+   *  down whole and loses its foot below the window: it is made as much shorter as it was pushed. */
+  function shortenShell(top) {
+    const vh = window.innerHeight;
+    let n = docEl();
+    for (let depth = 0; n && depth < 6; depth++) {
+      const m0 = held.get(n);
+      const r = n.getBoundingClientRect();
+      const cs = getComputedStyle(n);
+      const flow = cs.position === 'static' || cs.position === 'relative';
+      const fit = `calc(100vh - ${top}px)`;
+      if (m0?.shell) {
+        for (const p of Object.keys(m0.wrote)) keep(n, m0, p, fit); // (the bar's height changed)
+      } else if (flow && Math.abs(r.height - vh) <= 1 && r.bottom > vh + 1) {
+        const m = { was: {}, wrote: {}, hadStyle: n.hasAttribute('style'), shell: true };
+        held.set(n, m);
+        // at least the window's height (it grows with what is in it): that floor comes down; exactly the
+        // window's height: the height itself
+        if ((parseFloat(cs.minHeight) || 0) >= vh - 1) keep(n, m, 'min-height', fit);
+        if (Math.abs(n.getBoundingClientRect().height - vh) <= 1) keep(n, m, 'height', fit);
+      }
+      // down the page's spine: its body, then the tallest box in the flow of each
+      if (n === docEl()) { n = document.body; continue; }
+      let next = null, tall = 0;
+      for (const c of n.children) {
+        if (c === host) continue;
+        const p = getComputedStyle(c).position;
+        if (p !== 'static' && p !== 'relative') continue;
+        const h = c.getBoundingClientRect().height;
+        if (h > tall) { tall = h; next = c; }
+      }
+      n = tall >= vh * 0.5 ? next : null;
+    }
+  }
+  function room() {
+    try {
+      const top = host && !tucked() ? H + authH : 0;
+      if (!top) { unroom(); return; }
+      if (!document.body) return;
+      // what the site has moved on since: let go (a removed element; one whose margin or offset it rewrote)
+      for (const [n, m] of held) {
+        if (!n.isConnected || Object.entries(m.wrote).some(([p, v]) => n.style.getPropertyValue(p) !== v)) held.delete(n);
+      }
+      const W = window.innerWidth, seen = new Set(), memo = new Map();
+      for (const y of [1, Math.round(top / 2), top - 2]) {
+        for (let i = 0; i < 9; i++) {
+          for (const e of document.elementsFromPoint(((i + 0.5) * W) / 9, y)) {
+            if (e === docEl() || !document.body.contains(e)) continue; // (the bar, the pinned tools and their popups live outside <body>)
+            const p = pinnedOf(e, memo);
+            if (p && !seen.has(p)) { seen.add(p); moveDown(p, top); }
+          }
+        }
+      }
+      for (const [n, m] of held) if (!m.shell && !seen.has(n)) moveDown(n, top); // (the bar's height changed: those already moved follow)
+      shortenShell(top);
+    } catch { /* the page went */ }
+  }
+  let roomT = 0, roomAt = 0;
+  function roomSoon() {
+    if (!host || roomT || tucked()) return;
+    roomT = setTimeout(() => { roomT = 0; roomAt = Date.now(); room(); }, Math.max(60, 220 - (Date.now() - roomAt)));
+  }
+  function watchRoom() {
+    try {
+      new MutationObserver(roomSoon).observe(docEl(), { childList: true, subtree: true, attributes: true, attributeFilter: ['style', 'class', 'hidden'] });
+      window.addEventListener('scroll', roomSoon, { passive: true });
+      window.addEventListener('load', roomSoon);
+    } catch { /* looked at on the bar's own moves only */ }
+  }
+  /** The look switch turns <body> over with a filter, which changes what fixed layers are placed
+   *  against: everything is given back and looked at afresh. */
+  function reroom() { unroom(); room(); }
 
   // The look switch turns the tool's page over rather than the whole document: the bar lives outside
   // <body>, so it keeps its own colours while the page inside goes dark. An inversion is not the
@@ -131,6 +274,7 @@
       if (document.body) document.body.style.setProperty('filter', on ? 'invert(1) hue-rotate(180deg)' : '', on ? 'important' : '');
       document.documentElement.style.setProperty('background', on ? '#111' : '', on ? 'important' : '');
     } catch { /* the page went */ }
+    reroom();
     const to = on ? 'Light appearance' : 'Dark appearance';
     const b = root?.querySelector('.theme');
     if (b) { b.title = to; b.setAttribute('aria-label', to); }
@@ -263,6 +407,7 @@
     attach();
     paint();
     setState(tool.state);
+    watchRoom();
     widgets();
   }
 
