@@ -34,11 +34,27 @@
    *  feedback screen is still a screen of its own — the same shape as a quiz's — where a file is
    *  opened or downloaded rather than framed (Canvas's own document preview answers "service
    *  unavailable" often enough that a sheet built around it read as broken). */
-  const openMark = (ctx, c, a, x = null, from = null) => {
-    if (x && from?.isConnected && !BCV.phone?.active?.() && BCV.screens.feedback?.build) { openMarkBox(ctx, c, a, x, from); return; }
+  const openMark = (ctx, c, a, x = null, from = null, opts = {}) => {
+    if (x && from?.isConnected && !BCV.phone?.active?.() && BCV.screens.feedback?.build) { openMarkBox(ctx, c, a, x, from, opts); return; }
     ctx.app.go(`${c.url}/assignments/${a.id}?bcv=feedback`);
   };
-  function openMarkBox(ctx, c, a, s, from) {
+  /** (2.98.64) The chip opens its box on a hover too, where there is a mouse: after a moment's rest
+   *  on it (a pointer passing over does nothing), and not again under a pointer that has not moved
+   *  since the box folded back into it (it must leave the chip first). A press still opens at once. */
+  const HOVER_MS = 420;
+  const canHover = () => !BCV.phone?.active?.() && !!self.matchMedia?.('(hover: hover) and (pointer: fine)').matches;
+  function hoverOpens(btn, open) {
+    let t = 0;
+    btn.addEventListener('pointerenter', (e) => {
+      if (e.pointerType !== 'mouse' || !canHover() || btn.dataset.bcvHoverCool || document.querySelector('.bcv-sheet-ov')) return;
+      clearTimeout(t);
+      t = setTimeout(() => { if (btn.isConnected && btn.matches(':hover') && !document.querySelector('.bcv-sheet-ov')) open(btn); }, HOVER_MS);
+    });
+    btn.addEventListener('pointerleave', () => { clearTimeout(t); delete btn.dataset.bcvHoverCool; });
+    btn.addEventListener('click', () => clearTimeout(t));
+    return btn;
+  }
+  function openMarkBox(ctx, c, a, s, from, { hover = false } = {}) {
     document.querySelector('.bcv-sheet-ov')?.remove();
     const scored = s.workflow_state === 'graded' && s.score !== null && s.score !== undefined;
     const posted = scored && s.posted_at !== null, held = scored && s.posted_at === null;
@@ -76,10 +92,14 @@
       e.stopPropagation();
       close();
     };
+    let lastPt = null; // (where the pointer was last seen over the box's layer)
     const close = () => {
       if (folding || !ov.isConnected) return;
       folding = true;
       document.removeEventListener('keydown', onKey);
+      // a pointer still over the chip as the box folds into it does not open it again until it has left
+      const cr = from.getBoundingClientRect();
+      if (!lastPt || (lastPt.x >= cr.left && lastPt.x <= cr.right && lastPt.y >= cr.top && lastPt.y <= cr.bottom)) from.dataset.bcvHoverCool = '1';
       ov.classList.add('is-folding', 'is-far'); // (the focus lets go outward as the box folds)
       // the words go back to the chip's own, from wherever the box has got to — mid-growth too
       const cur = sheet.getBoundingClientRect();
@@ -96,6 +116,8 @@
     };
     ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
     document.addEventListener('keydown', onKey);
+    ov.addEventListener('pointermove', (e) => { lastPt = { x: e.clientX, y: e.clientY }; }, { passive: true });
+    if (hover) ov.dataset.hover = '';
     const built = BCV.screens.feedback.build(ctx, c, a, s, { box: true });
     const sheet = U.el('bcv-sheet bcv-sheet--card bcv-mark is-at-card', [
       U.el('bcv-sheet__head', [
@@ -147,6 +169,28 @@
     addEventListener('resize', onResize);
     ov.tabIndex = -1;
     ov.focus();
+    // opened by a hover, it folds again once the pointer has been off it a moment — unless it was
+    // taken up (a press in it, a key, a field): then it stays, as a pressed one does
+    if (hover) {
+      let kept = false, outT = 0;
+      const keep = () => { kept = true; clearTimeout(outT); delete ov.dataset.hover; };
+      const armedAt = performance.now() + 650; // (the box is still growing under the pointer)
+      const leaveSoon = () => { if (!kept && !outT && !folding) outT = setTimeout(() => { outT = 0; if (!kept) close(); }, 380); };
+      sheet.addEventListener('pointerdown', keep, true);
+      sheet.addEventListener('focusin', (e) => { if (e.target.matches?.('input, textarea, select, [contenteditable="true"]')) keep(); });
+      ov.addEventListener('keydown', (e) => { if (e.key !== 'Escape') keep(); }, true);
+      ov.addEventListener('pointermove', (e) => {
+        if (kept || folding) return;
+        const r = sheet.getBoundingClientRect();
+        const over = e.clientX >= r.left - 8 && e.clientX <= r.right + 8 && e.clientY >= r.top - 8 && e.clientY <= r.bottom + 8;
+        if (over || performance.now() < armedAt) { clearTimeout(outT); outT = 0; return; }
+        leaveSoon();
+      }, { passive: true });
+      document.documentElement.addEventListener('pointerleave', function gone() { // (off the window altogether)
+        if (!ov.isConnected) { document.documentElement.removeEventListener('pointerleave', gone); return; }
+        if (performance.now() >= armedAt) leaveSoon();
+      });
+    }
     // the page's copy of the submission is what the chip was drawn from; Canvas is asked once more for what came since (a comment, another attempt), and the box redraws still if it answers with more
     store.submission(c.id, a.id, { force: true }).then((fresh) => {
       if (!fresh || !ov.isConnected || folding || JSON.stringify(fresh) === JSON.stringify(s)) return;
@@ -275,7 +319,8 @@
     const letterOf = (x) => (a.grading_type && a.grading_type !== 'points' && x.grade !== null && x.grade !== undefined ? String(x.grade) : null);
     const lateWord = (x) => (x.late ? `late${x.points_deducted ? ` · −${store.fmtPts(x.points_deducted)} pts` : ''}` : null);
     const stats = a.score_statistics && a.score_statistics.mean !== null && a.score_statistics.mean !== undefined ? `Class mean ${store.fmtPts(a.score_statistics.mean)} · high ${store.fmtPts(a.score_statistics.max)} · low ${store.fmtPts(a.score_statistics.min)}` : null;
-    const gradeChip = (x) => (postedOf(x) ? h('button', { type: 'button', class: 'bcv-detail__grade', title: 'Feedback, attempts and comments', onclick: (e) => openMark(ctx, c, a, x, e.currentTarget) }, [
+    const hoverMark = (x) => (btn) => (btn ? hoverOpens(btn, (b) => openMark(ctx, c, a, x, b, { hover: true })) : btn);
+    const gradeChip = (x) => hoverMark(x)(postedOf(x) ? h('button', { type: 'button', class: 'bcv-detail__grade', title: 'Feedback, attempts and comments', onclick: (e) => openMark(ctx, c, a, x, e.currentTarget) }, [
       U.el('bcv-detail__gradev', [
         h('span', { class: 'bcv-detail__gradescore', text: store.fmtPts(x.score) }),
         h('span', { class: 'bcv-detail__gradeof', text: `/ ${a.points_possible ?? '—'}` }),

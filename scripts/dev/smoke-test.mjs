@@ -1619,6 +1619,51 @@ try {
   await page.click('.bcv-fb__btns .bcv-qz__big:nth-child(2)');
   await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
   check(!page.url().includes('bcv=feedback'), 'and Back to the assignment leaves the feedback screen behind');
+  // (2.98.64) the chip opens its box on a hover too: after a moment's rest (not a pass over it), and a box opened so goes
+  // again when the pointer leaves it — unless it was taken up — and does not come back under a pointer that has not moved
+  await page.mouse.move(5, 5);
+  const chipAt = await page.$eval('.bcv-detail__grade', (e) => { const r = e.getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; });
+  const boxUp = () => page.evaluate(() => { const ov = document.querySelector('.bcv-sheet-ov--card'); return ov && !ov.classList.contains('is-folding') ? { hover: ov.hasAttribute('data-hover') } : null; });
+  const boxGone = () => page.evaluate(() => !document.querySelector('.bcv-sheet-ov'));
+  await page.mouse.move(chipAt.x, chipAt.y, { steps: 4 });
+  await page.waitForTimeout(150);
+  const tooSoon = await boxUp();
+  check(!tooSoon && await eventually(async () => !!(await boxUp()), 2500) && (await boxUp()).hover, `resting on the chip opens its box (not at once: a pointer passing over does nothing): ${JSON.stringify({ tooSoon, now: await boxUp() })}`);
+  await page.waitForTimeout(750);
+  const vp = page.viewportSize();
+  await page.mouse.move(12, vp.height - 12, { steps: 6 });
+  check(await eventually(boxGone, 2500), 'a box opened by a hover folds again once the pointer has left it');
+  await page.mouse.move(chipAt.x, chipAt.y, { steps: 4 });
+  check(await eventually(async () => !!(await boxUp()), 2500), 'back on the chip, it opens again');
+  await page.waitForTimeout(750);
+  await page.click('.bcv-sheet.bcv-mark .bcv-sheet__note'); // (a press in the box takes it up)
+  await page.mouse.move(12, vp.height - 12, { steps: 6 });
+  await page.waitForTimeout(1200);
+  check(!!(await boxUp()) && !(await boxUp()).hover, 'a box taken up (a press in it) stays when the pointer leaves, as a pressed one does');
+  await page.keyboard.press('Escape');
+  check(await eventually(boxGone, 2500), 'and Escape folds it');
+  await page.mouse.move(chipAt.x, chipAt.y, { steps: 4 });
+  await eventually(async () => !!(await boxUp()), 2500);
+  await page.keyboard.press('Escape'); // (the pointer left resting on the chip)
+  await eventually(boxGone, 2500);
+  await page.waitForTimeout(1200);
+  check(await boxGone(), 'folded under a pointer that has not moved, it does not open again by itself');
+  await page.mouse.move(5, 5);
+
+  // (2.98.64) Canvas's own address for a mark — where its notifications, its e-mails and its activity send a grade or a
+  // comment — is the same feedback screen, not Canvas's old page; somebody else's mark (an observer's) is Canvas's
+  for (const who of ['7', 'self']) {
+    await page.goto(`${BASE}/courses/104/assignments/4001/submissions/${who}`);
+    await page.waitForSelector('.bcv-fb__scorecard', { timeout: 10000 });
+    const asCanvas = await page.evaluate(() => ({ path: location.pathname, embedded: !!document.querySelector('.bcv-fb')?.closest('.bcv-qz.is-embedded'), punch: document.documentElement.classList.contains('bcv-punch'), score: document.querySelector('.bcv-fb__big')?.textContent }));
+    check(asCanvas.path === `/courses/104/assignments/4001/submissions/${who}` && asCanvas.embedded && !asCanvas.punch && asCanvas.score === '10 / 10', `Canvas's submission-details address (${who}) opens the interface's feedback screen: ${JSON.stringify(asCanvas)}`);
+  }
+  await page.goto(`${BASE}/courses/104/assignments/4001/submissions/99`);
+  check(await eventually(async () => page.url().includes('bcv=native'), 10000) && !(await page.$('.bcv-fb__scorecard')), `somebody else's submission is left to Canvas's own page: ${page.url()}`);
+  await page.waitForTimeout(800);
+  check(new URL(page.url()).searchParams.getAll('bcv').length === 1 && new URL(page.url()).pathname === '/courses/104/assignments/4001/submissions/99', `handed to Canvas once, and it stays there (no loop): ${page.url()}`);
+  await page.goto(`${BASE}/courses/104/assignments/4001`);
+  await page.waitForSelector('.bcv-detail__grade', { timeout: 10000 });
   // (2.98.60) an attempt handed in through a tool (New Quizzes) carries the tool's launch point as its url,
   // which answers "Invalid launch." opened on its own: the attempt opens through Canvas's launch instead
   await mockConfig({ ltiAttempts: ['4003'] });
@@ -2924,6 +2969,11 @@ try {
   await page.click('.bcv-fb__btns .bcv-qz__big--primary');
   await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
   check(new URL(page.url()).pathname === '/courses/101/quizzes/9001' && (await texts('.bcv-detail__title'))[0] === 'Lec01-PreQuiz', `Back to the quiz goes to the quiz's own page, not the course: ${page.url()} · ${(await texts('.bcv-detail__title'))[0]}`);
+  // (2.98.64) Canvas's own results page for an attempt (/history) is the same feedback, not Canvas's old page
+  await page.goto(`${BASE}/courses/101/quizzes/9001/history?version=1`);
+  await page.waitForSelector('.bcv-qfb__q', { timeout: 10000 });
+  const histPage = await page.evaluate(() => ({ path: location.pathname, qs: document.querySelectorAll('.bcv-qfb__q').length, punch: document.documentElement.classList.contains('bcv-punch'), line: document.querySelector('.bcv-fb__scoreline')?.textContent || '' }));
+  check(histPage.path === '/courses/101/quizzes/9001/history' && histPage.qs === 4 && !histPage.punch && /^13 \/ 16/.test(histPage.line), `Canvas's results page for an attempt opens the interface's quiz feedback: ${JSON.stringify(histPage)}`);
 
   // ---- a restricted quiz: an access code Canvas does not tell the student -------------------------
   console.log('restricted quiz');

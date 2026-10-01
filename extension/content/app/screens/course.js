@@ -672,6 +672,15 @@
 
     const B = BCV.screens.courseTabs;
     const D = BCV.screens.courseDetail;
+    // Canvas's address for somebody else's mark (an observer's student): Canvas's own page, as asked
+    if (route.uid && route.uid !== 'self') {
+      const me = await store.me().catch(() => null);
+      if (!ctx.alive()) return out;
+      if (me?.id && String(me.id) !== String(route.uid)) {
+        app.go(`${route.url}${route.url.includes('?') ? '&' : '?'}bcv=native`, { replace: true });
+        return out;
+      }
+    }
     let el;
     switch (route.tab) {
       case 'home': el = await B.home(ctx, shell); break;

@@ -25,6 +25,10 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.98.64', date: '2026-10-01', notes: [
+      { kind: 'fixed', title: 'All feedback pages new', body: 'Links to a grade or comment open Simpl’s feedback.', icon: P.check },
+      { kind: 'improved', title: 'Hover to see a mark', body: 'Rest on the Graded pill and its box opens.', icon: P.eye },
+    ] },
     { version: '2.98.63', date: '2026-10-01', notes: [
       { kind: 'fixed', title: 'Tool bar sits above', body: 'A tool’s own header and footer stay clear of the bar.', icon: P.layers },
     ] },

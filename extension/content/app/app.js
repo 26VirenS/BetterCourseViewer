@@ -71,12 +71,44 @@
     ['tool', /^\/external_tools\/(\d+)\/?$/],
   ];
 
+  /** Canvas's own addresses for a mark, drawn as the interface's feedback screens: an assignment's
+   *  submission details (where Canvas's notifications, its e-mails and its activity send a grade or
+   *  a comment — any kind of assignment, a tool's included) and a quiz's results page (history).
+   *  The route becomes the screen's own (?bcv=feedback, the quiz's attempt from Canvas's
+   *  quiz_submission_id and version), the address stays Canvas's. A file the page links to
+   *  (?download=) and a preview framed in a page (?preview=) are Canvas's still; r.uid says whose
+   *  mark it is, and somebody else's (an observer's student) is handed back to Canvas when drawn. */
+  function aliasMark(r, rest) {
+    const p = r.params;
+    if (p.has('bcv')) return false; // (?bcv=native and the rest: Canvas's own page, as asked)
+    const sub = rest.match(/^\/assignments\/(\d+)\/submissions\/(self|\d+)\/?$/);
+    if (sub && !p.has('download') && !p.has('preview')) {
+      r.tab = 'assignment';
+      r.arg = sub[1];
+      r.uid = sub[2];
+      r.params = new URLSearchParams({ bcv: 'feedback' });
+      return true;
+    }
+    const hist = rest.match(/^\/quizzes\/(\d+)\/history\/?$/);
+    if (hist && !p.has('headless')) {
+      r.tab = 'quiz';
+      r.arg = hist[1];
+      r.uid = p.get('user_id') || null;
+      const q = new URLSearchParams({ bcv: 'feedback' });
+      if (p.get('quiz_submission_id')) q.set('sub', p.get('quiz_submission_id'));
+      if (p.get('version')) q.set('attempt', p.get('version'));
+      r.params = q;
+      return true;
+    }
+    return false;
+  }
+
   function parseRoute(href = location.href) {
     const url = new URL(href, location.origin);
     const path = url.pathname.replace(/\/+$/, '') || '/';
     const params = url.searchParams;
     const hash = url.hash.replace(/^#/, '');
-    const r = { url: url.pathname + url.search + url.hash, path, params, hash, screen: 'native', courseId: null, tab: null, arg: null, sub: null };
+    const r = { url: url.pathname + url.search + url.hash, path, params, hash, screen: 'native', courseId: null, tab: null, arg: null, sub: null, uid: null };
     if (path === '/' || path === '/dashboard') r.screen = hash === 'todo' ? 'todo' : hash === 'notifications' ? 'notifications' : hash === 'tools' ? 'tools' : 'dashboard';
     else if (path === '/courses') r.screen = 'courses';
     else if (path === '/groups') r.screen = 'groups';
@@ -104,7 +136,7 @@
             r.tab = found.tab;
             r.arg = found.arg;
             r.sub = found.sub || null;
-          } else r.tab = 'native';
+          } else if (!aliasMark(r, rest)) r.tab = 'native';
         }
       }
     }
