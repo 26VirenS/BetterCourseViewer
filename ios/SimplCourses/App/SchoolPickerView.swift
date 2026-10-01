@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// First run: which Canvas site to open. The sign-in itself happens on that site's own login page.
+/// First run: which Canvas site to open (the school's portal link). The sign-in that follows is the
+/// school's own page, with the app's own form over it where the page has a username and password.
 struct SchoolPickerView: View {
     @EnvironmentObject private var session: AppSession
     @State private var address = ""
@@ -17,9 +18,9 @@ struct SchoolPickerView: View {
                         .textContentType(.URL)
                         .onSubmit(go)
                 } header: {
-                    Text("Your school's Canvas address")
+                    Text("Your school's Canvas portal link")
                 } footer: {
-                    Text("The address you open Canvas at in a browser, for example school.instructure.com or canvas.school.edu. You sign in on the next screen exactly as you would in Safari; Simpl Courses never sees your password.")
+                    Text("The address you open Canvas at in a browser, for example school.instructure.com or canvas.school.edu. If your school's sign-in page has a username and password, Simpl shows its own sign-in form for it, and can keep you logged in on this iPhone if you choose.")
                 }
                 Section {
                     Button("Continue", action: go)

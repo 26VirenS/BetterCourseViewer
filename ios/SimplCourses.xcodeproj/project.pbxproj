@@ -23,6 +23,10 @@
 		F47B1E6E27EAF7D283656E0A /* ContentRules.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB97C35721F98A64BF310C10 /* ContentRules.swift */; };
 		F71DC0F6D3D792DB868CE252 /* extension in Resources */ = {isa = PBXBuildFile; fileRef = FB4A2C1298F3B2CA812F00D1 /* extension */; };
 		FD77368B9A36B8395841BF13 /* AppSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = F75ADFA2F06322C7C85640A0 /* AppSession.swift */; };
+		BCE8B7995B795C5E394BA6C7 /* LoginAssist.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B828FA2966B307FBB3D15B5 /* LoginAssist.swift */; };
+		7FE50A06F2485BBBC81C234E /* FilePreview.swift in Sources */ = {isa = PBXBuildFile; fileRef = C09760042750F3809A32E900 /* FilePreview.swift */; };
+		45AE3C50C787DCB197A14C4D /* login.js in Resources */ = {isa = PBXBuildFile; fileRef = C0C5839EAAF33AFF9AC5453D /* login.js */; };
+		38C09E6214099C75A0BAD199 /* LoginOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = D12B42C77BFF9F4A94A36EAB /* LoginOverlay.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -43,6 +47,10 @@
 		ED81608DE49931C034014216 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		F75ADFA2F06322C7C85640A0 /* AppSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSession.swift; sourceTree = "<group>"; };
 		FB4A2C1298F3B2CA812F00D1 /* extension */ = {isa = PBXFileReference; lastKnownFileType = folder; name = extension; path = ../extension; sourceTree = SOURCE_ROOT; };
+		8B828FA2966B307FBB3D15B5 /* LoginAssist.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginAssist.swift; sourceTree = "<group>"; };
+		C09760042750F3809A32E900 /* FilePreview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilePreview.swift; sourceTree = "<group>"; };
+		C0C5839EAAF33AFF9AC5453D /* login.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = login.js; sourceTree = "<group>"; };
+		D12B42C77BFF9F4A94A36EAB /* LoginOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginOverlay.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -68,6 +76,7 @@
 		2D62216FDBE5246B7A2D14DA /* App */ = {
 			isa = PBXGroup;
 			children = (
+				D12B42C77BFF9F4A94A36EAB /* LoginOverlay.swift */,
 				F75ADFA2F06322C7C85640A0 /* AppSession.swift */,
 				33F9BBF8AC209FF1AAE47318 /* BrowserScreen.swift */,
 				ED81608DE49931C034014216 /* ContentView.swift */,
@@ -98,6 +107,9 @@
 		96982B358650411695437B58 /* Web */ = {
 			isa = PBXGroup;
 			children = (
+				C0C5839EAAF33AFF9AC5453D /* login.js */,
+				C09760042750F3809A32E900 /* FilePreview.swift */,
+				8B828FA2966B307FBB3D15B5 /* LoginAssist.swift */,
 				3A0FECBE6AB83372178D20E8 /* bridge.js */,
 				2968A5926C7D553DA70A3F7D /* Bridge.swift */,
 				619AE3110ACAD8FA07A13897 /* BridgeStore.swift */,
@@ -177,6 +189,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				45AE3C50C787DCB197A14C4D /* login.js in Resources */,
 				A8A43C5820C0DD477310B3D3 /* Assets.xcassets in Resources */,
 				35E709E2F61A88D2152FAE2B /* bridge.js in Resources */,
 				F71DC0F6D3D792DB868CE252 /* extension in Resources */,
@@ -190,6 +203,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				38C09E6214099C75A0BAD199 /* LoginOverlay.swift in Sources */,
+				7FE50A06F2485BBBC81C234E /* FilePreview.swift in Sources */,
+				BCE8B7995B795C5E394BA6C7 /* LoginAssist.swift in Sources */,
 				FD77368B9A36B8395841BF13 /* AppSession.swift in Sources */,
 				68E42811B89CEFBF8283CD4A /* Bridge.swift in Sources */,
 				29FA9BD8912FDACD3BE2B9F8 /* BridgeStore.swift in Sources */,
@@ -263,7 +279,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
-				MARKETING_VERSION = 2.98.61;
+				MARKETING_VERSION = 2.98.62;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -359,7 +375,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
-				MARKETING_VERSION = 2.98.61;
+				MARKETING_VERSION = 2.98.62;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";

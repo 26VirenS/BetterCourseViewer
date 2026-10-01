@@ -142,7 +142,7 @@
     async function open(c) {
       selectedId = String(c.id);
       mode = 'read';
-      history.replaceState({ bcv: true }, '', `/conversations?id=${c.id}`);
+      history.replaceState(BCV.app?.navState?.(false) || { bcv: true }, '', `/conversations?id=${c.id}`);
       drawList();
       drawReader();
       if (c.workflow_state === 'unread') {
@@ -194,7 +194,7 @@
             U.text('bcv-reader__subject bcv-pretty', conv.subject || '(no subject)'),
             U.text('bcv-reader__meta', [conv.context_name || course?.name, (conv.participants || []).map((p) => p.name).join(', ')].filter(Boolean).join(' · ')),
           ]),
-          U.iconbtn(IC.close, { title: 'Close', onClick: () => { mode = 'empty'; selectedId = null; history.replaceState({ bcv: true }, '', '/conversations'); drawList(); drawReader(); } }),
+          U.iconbtn(IC.close, { title: 'Close', onClick: () => { mode = 'empty'; selectedId = null; history.replaceState(BCV.app?.navState?.(false) || { bcv: true }, '', '/conversations'); drawList(); drawReader(); } }),
         ]),
         U.el('bcv-reader__msgs', (conv.messages || []).map((m) => {
           const author = pmap.get(String(m.author_id));

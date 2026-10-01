@@ -239,6 +239,13 @@
     function open() {
       if (list) { close(); return; }
       closeMenus();
+      const nat = nativeUi();
+      if (nat?.menu && options.length) { // (in the iPhone app: the phone's own action sheet, the current choice ticked)
+        nat.menu({ title: label, items: options.map((o) => ({ label: o.text || BCV.utils.htmlToText(o.html || '', 120) || String(o.value), active: String(o.value) === cur })), rect: rectOf(btn) })
+          .then((i) => { if (i >= 0 && options[i]) pick(options[i].value); })
+          .catch(() => { /* nothing chosen */ });
+        return;
+      }
       const r = btn.getBoundingClientRect();
       list = el('bcv-picker__list', options.map((o) => h('button', {
         type: 'button', class: `bcv-picker__opt ${String(o.value) === cur ? 'is-on' : ''}`, role: 'option',
@@ -297,8 +304,26 @@
     return btn;
   }
 
-  /** Dropdown menu anchored under `anchor`. items: [{label, sub, active, onSelect}] */
+  /** The app's own controls, where the page runs inside the iPhone app on the phone layout: its
+   *  alert and its action sheet (Web/bridge.js). null in a browser — the drawn ones serve there. */
+  const nativeUi = () => (document.documentElement.classList.contains('bcv-phone') ? self.BCVBridge?.native || null : null);
+  const rectOf = (at) => {
+    try { const r = at?.getBoundingClientRect ? at.getBoundingClientRect() : at; return r && Number.isFinite(r.left) ? { x: r.left, y: r.top, w: r.width || 0, h: r.height || 0 } : null; } catch { return null; }
+  };
+
+  /** Dropdown menu anchored under `anchor`. items: [{label, sub, active, onSelect}]. In the iPhone
+   *  app it is the phone's own action sheet (the pick runs the same onSelect); the drawn menu is the
+   *  fallback should the app not answer. */
   function menu(at, items) {
+    const nat = nativeUi();
+    if (nat?.menu && items?.length) {
+      closeMenus();
+      nat.menu({ items, rect: rectOf(at) }).then((i) => { if (i >= 0) items[i]?.onSelect?.(); }).catch(() => webMenu(at, items));
+      return null;
+    }
+    return webMenu(at, items);
+  }
+  function webMenu(at, items) {
     closeMenus();
     const m = el('bcv-menu', items.map((it) => h('button', {
       type: 'button',
@@ -927,7 +952,15 @@
 
   /** A question with two answers, or a note with one (cancelLabel null): resolves true for the main
    *  button, false for Cancel, Escape, the scrim or the X. */
-  function askSheet({ label = '', title, note = '', okLabel = 'OK', cancelLabel = 'Cancel', danger = false, from = null } = {}) {
+  function askSheet(o = {}) {
+    // in the iPhone app, the phone's own alert (a destructive answer in red, as iOS draws it); the
+    // drawn sheet should the app not answer
+    const nat = nativeUi();
+    const { title, note = '', okLabel = 'OK', cancelLabel = 'Cancel', danger = false } = o;
+    if (nat?.ask) return nat.ask({ title, note, okLabel, cancelLabel, danger }).catch(() => webAsk(o));
+    return webAsk(o);
+  }
+  function webAsk({ label = '', title, note = '', okLabel = 'OK', cancelLabel = 'Cancel', danger = false, from = null } = {}) {
     // A question asked from inside another sheet — the hand-in box asking whether to convert a file —
     // rises over it rather than taking its place: the sheet below steps back (is-under, as it does
     // under a tool's popup) and comes forward again, with the focus, once the question is answered.

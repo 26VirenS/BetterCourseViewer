@@ -109,9 +109,27 @@
     let sameSite = false;
     try { sameSite = !!document.referrer && new URL(document.referrer).origin === location.origin; } catch { sameSite = false; }
     const back = backOf(app, r);
-    // history.back() keeps the stack honest when the previous entry is the one the button names; a typed URL or a fresh tab goes there directly
-    if (history.length > 1 && sameSite && back.fromTrail) history.back();
+    // history.back() keeps the stack honest when the previous entry is the one the button names: a
+    // screen this page moved to in place (the entry carries a count of those moves — app.navState),
+    // or a page of this site loaded before it. A typed URL or a fresh tab goes there directly.
+    // (Pushing the parent instead, as every Back once did in the app — where a page arrives from the
+    // school's sign-in and the referrer is never Canvas — piled screens on the stack, and the
+    // phone's own swipe-back then walked forward through them.)
+    const inPage = (Number(history.state?.d) || 0) > 0;
+    if (back.fromTrail && history.length > 1 && (inPage || sameSite)) { app.markBack?.(); history.back(); }
     else { app.markBack?.(); app.go(back.href); }
+  }
+  /** In the app, the phone's own swipe-back (WebKit's, which follows the finger) takes the page back;
+   *  it is offered only where there is somewhere to go back to — not on a tab's root screen, not
+   *  during a quiz attempt — and the page's own edge swipe below stands down so one swipe is one Back. */
+  const appSwipe = () => !!native()?.navState;
+  let swipeSaid = null;
+  function tellSwipe() {
+    if (!appSwipe()) return;
+    const can = active() && !html.classList.contains('bcv-ph-root') && !html.classList.contains('bcv-quiz') && !document.querySelector('.bcv-sheet-ov:not(.is-closing)') && history.length > 1;
+    if (can === swipeSaid) return; // (said once per change, not on every class the page sets)
+    swipeSaid = can;
+    try { native().navState({ canSwipeBack: can }); } catch { /* the app is older than this */ }
   }
   /** After a screen lands: the top bar for pushed screens, the active tab. */
   function afterRender(app, r, el) {
@@ -120,6 +138,7 @@
     if (isRoot && el?.classList) { el.classList.remove('bcv-screen--fwd', 'bcv-screen--back'); el.classList.add('bcv-screen--tab'); } // (a tab change fades in place; only a pushed screen slides)
     paintTabs(app);
     closeSwipes();
+    tellSwipe();
     if (!topbarEl) return;
     topbarEl.hidden = isRoot;
     if (isRoot) return;
@@ -138,7 +157,7 @@
   // Edge-swipe from the left screen edge pops the stack, exactly like the Back button; not during a quiz attempt.
   let edge = null;
   document.addEventListener('pointerdown', (e) => {
-    if (!active() || html.classList.contains('bcv-ph-root') || html.classList.contains('bcv-quiz') || e.clientX > 24 || document.querySelector('.bcv-sheet-ov')) { edge = null; return; } // (a sheet up: the swipe is the sheet's, not the screen's)
+    if (!active() || appSwipe() || html.classList.contains('bcv-ph-root') || html.classList.contains('bcv-quiz') || e.clientX > 24 || document.querySelector('.bcv-sheet-ov')) { edge = null; return; } // (a sheet up: the swipe is the sheet's, not the screen's; in the app, the phone's own swipe is the one)
     edge = { x: e.clientX, y: e.clientY, done: false };
   }, true);
   document.addEventListener('pointermove', (e) => {
@@ -269,51 +288,172 @@
       const wrap = U.el('bcv-ph-srow__item', [row, x]);
       return wrap;
     }
-    // the drag lives on the handle only: a scrolling list inside must scroll, not drag the sheet.
-    // The finger tracks 1:1; on release the sheet springs back (or away) at the speed it was let go
-    let y0 = null, lastY = 0, lastT = 0, vy = 0;
-    handle.addEventListener('pointerdown', (e) => { y0 = e.clientY; lastY = e.clientY; lastT = e.timeStamp; vy = 0; try { handle.setPointerCapture(e.pointerId); } catch { /* fine */ } sheet.style.transition = 'none'; for (const a of sheet.getAnimations()) a.cancel(); });
-    handle.addEventListener('pointermove', (e) => {
-      if (y0 === null) return;
-      const dt = e.timeStamp - lastT;
-      if (dt > 0) vy = 0.7 * vy + 0.3 * ((e.clientY - lastY) / dt) * 1000; // px/s, smoothed
-      lastY = e.clientY; lastT = e.timeStamp;
-      sheet.style.transform = `translateY(${Math.max(0, e.clientY - y0)}px)`;
-    });
-    const up = (e) => {
-      if (y0 === null) return;
-      const dy = Math.max(0, e.clientY - y0);
-      y0 = null;
-      const M = BCV.motion;
-      const sprung = !!M && !U.reducedMotion();
-      const settleBack = () => { sheet.style.transition = 'transform .25s cubic-bezier(.32,.72,0,1)'; sheet.style.transform = 'translateY(0)'; };
-      if (dy > 110 || vy > 700) {
-        // let go past the line or thrown: it goes on down the way it was moving, then the scrim leaves —
-        // on the spring where there is one, the removal raced against a watchdog (ui.dismiss's rule:
-        // nothing that never finishes leaves a scrim on the page); else the plain close
-        if (sprung) {
-          try {
-            ov.classList.add('is-closing', 'bcv-sprung');
-            const hh = sheet.offsetHeight + 40;
-            const p = 1 - dy / hh; // progress "here" (1) → "gone" (0), as the exit spring counts it
-            const done = Promise.all([M.run(sheet, { y: [hh, 0] }, 'phone', { from: p, to: 0, v0: -Math.max(0, vy) / hh }).finished, M.exit(ov, 'scrim').finished]);
-            Promise.race([done, new Promise((resolve) => setTimeout(resolve, 700))]).then(() => { try { ov.remove(); } catch { /* gone */ } });
-            return;
-          } catch { ov.classList.remove('is-closing', 'bcv-sprung'); }
-        }
-        close();
-      } else if (sprung) {
-        try { sheet.style.transform = ''; M.run(sheet, { y: [dy, 0] }, 'phone', { v0: Math.max(0, -vy) / Math.max(1, dy), fill: 'backwards' }); } catch { settleBack(); } // (a finger moving back up hands its speed to the return)
-      } else settleBack();
-    };
-    handle.addEventListener('pointerup', up);
-    handle.addEventListener('pointercancel', up);
+    // (moved like every sheet on the phone: by the grabber, the head, or a pull at the top of the list — sheetGrip below)
     ov.append(sheet);
     document.body.append(ov);
     ov.tabIndex = -1;
     ov.focus();
     return { close, sheet };
   }
+
+  // ---- every bottom sheet moves like the phone's own ---------------------------------------------
+  /* An iPhone sheet is held and moved: by its grabber, by its head, and by its content when that is
+   * scrolled to the top (a pull down there moves the sheet, not the list). It rests at its own height,
+   * or — where it holds more than it shows — nearly the full screen: pull it up to get there, down to
+   * come back, further or faster to put it away. Every sheet the interface opens on the phone gets
+   * this (the lists, a question, an event, a rubric, a preview), not only the ones drawn with a handle.
+   * Touch is read as touch, so a pull at the top of a list can be told from a scroll and the scroll
+   * stopped (pointer events cannot stop a scroll once it has begun); a mouse drags the grabber the same
+   * way (a desk, the tests). Putting it away is the sheet's own close: its scrim is pressed for it,
+   * after it has slid off, so whatever that close does (answer a question, forget a draft) still happens. */
+  const gripped = new WeakSet();
+  function sheetGrip(ov) {
+    if (!active() || gripped.has(ov) || ov.classList.contains('is-closing')) return;
+    const sheet = ov.querySelector(':scope > .bcv-sheet');
+    if (!sheet) return;
+    gripped.add(ov);
+    let handle = sheet.querySelector(':scope > .bcv-ph-sheet__handle');
+    if (!handle) { handle = h('div', { class: 'bcv-ph-sheet__handle bcv-ph-sheet__handle--added', 'aria-hidden': 'true' }, h('span')); sheet.prepend(handle); }
+    const M = () => (BCV.motion && !U.reducedMotion() ? BCV.motion : null);
+    const SCROLLY = /(auto|scroll)/;
+    const scrollerOf = (el) => {
+      for (let n = el; n && n !== ov; n = n.parentElement) {
+        if (n.scrollHeight > n.clientHeight + 1 && (n === sheet ? SCROLLY.test(getComputedStyle(n).overflowY) || sheet.classList.contains('is-large') : SCROLLY.test(getComputedStyle(n).overflowY))) return n;
+        if (n === sheet) break;
+      }
+      return null;
+    };
+    /** More than it shows: some part of it scrolls, or is cut off. */
+    const holdsMore = () => {
+      if (sheet.classList.contains('is-large')) return false;
+      if (sheet.scrollHeight > sheet.clientHeight + 4) return true;
+      let n = 0;
+      for (const el of sheet.querySelectorAll('*')) { if (n++ > 500) break; if (el.scrollHeight > el.clientHeight + 4 && SCROLLY.test(getComputedStyle(el).overflowY)) return true; }
+      return false;
+    };
+    const noDrag = (el) => !!el?.closest?.('input, textarea, select, [contenteditable="true"], canvas, .bcv-ph-chips, [data-no-sheet-drag]');
+    let g = null;
+    const HEIGHT = 'height .34s cubic-bezier(.32,.72,0,1)';
+    const set = (y) => { sheet.style.transition = HEIGHT; sheet.style.transform = y ? `translateY(${y}px)` : ''; };
+    /** To nearly the full screen and back, the height moving between the two (an auto height cannot
+     *  be animated, so the one it leaves is held for a frame). */
+    const grow = () => { const h0 = sheet.offsetHeight; sheet.style.height = `${h0}px`; sheet.classList.add('is-large'); void sheet.offsetHeight; sheet.style.transition = HEIGHT; sheet.style.height = ''; };
+    const shrink = () => {
+      const hL = sheet.offsetHeight;
+      sheet.classList.remove('is-large');
+      const h1 = sheet.offsetHeight;
+      sheet.style.transition = 'none'; sheet.style.height = `${hL}px`; void sheet.offsetHeight;
+      sheet.style.transition = HEIGHT; sheet.style.height = `${h1}px`;
+      setTimeout(() => { if (!sheet.classList.contains('is-large')) sheet.style.height = ''; }, 360);
+    };
+    const begin = () => { for (const a of sheet.getAnimations()) a.cancel(); sheet.style.willChange = 'transform'; };
+    const follow = (y, t) => {
+      const dt = t - g.lastT;
+      if (dt > 0) g.vy = 0.7 * g.vy + 0.3 * ((y - g.lastY) / dt) * 1000; // px/s, smoothed
+      g.lastY = y; g.lastT = t;
+      let dy = y - g.y0;
+      if (dy < 0) {
+        // pulled up: a sheet holding more grows to nearly the full screen at once; beyond that (or with nothing more to show) it gives a little and no more
+        if (!g.grew && holdsMore()) { g.grew = true; grow(); g.y0 = y; dy = 0; }
+        else dy = Math.max(-14, dy * 0.18);
+      }
+      g.dy = dy;
+      set(dy);
+    };
+    const settle = (from) => {
+      sheet.style.willChange = '';
+      const m = M();
+      if (m && from) { try { sheet.style.transform = ''; m.run(sheet, { y: [from, 0] }, 'phone', { v0: Math.max(0, -(g?.vy || 0)) / Math.max(1, Math.abs(from)), fill: 'backwards' }); return; } catch { /* the plain way */ } }
+      sheet.style.transition = `transform .25s cubic-bezier(.32,.72,0,1), ${HEIGHT}`; sheet.style.transform = '';
+    };
+    const putAway = (from, vy) => {
+      const hh = sheet.offsetHeight + 40;
+      const ms = Math.round(Math.max(160, Math.min(320, ((hh - from) / Math.max(1200, vy)) * 1000)));
+      sheet.style.transition = `transform ${ms}ms cubic-bezier(.2,.7,.3,1)`;
+      sheet.style.transform = `translateY(${hh}px)`;
+      ov.style.transition = `opacity ${ms}ms ease`;
+      ov.style.opacity = '0';
+      setTimeout(() => {
+        if (!ov.isConnected) return;
+        ov.style.visibility = 'hidden';
+        // the sheet's own way out: its scrim pressed, else Escape — whatever closing it means happens
+        ov.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+        if (ov.isConnected && !ov.classList.contains('is-closing')) ov.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+        setTimeout(() => {
+          if (!ov.isConnected || ov.classList.contains('is-closing')) return;
+          // a sheet that will not be put away this way (it holds work not yet sent): it comes back
+          ov.style.visibility = ''; ov.style.opacity = ''; ov.style.transition = '';
+          settle(Math.min(from, 200));
+        }, 90);
+      }, ms);
+    };
+    const release = () => {
+      if (!g) return;
+      const { dy = 0, vy = 0, grew } = g;
+      g = null;
+      const H = sheet.offsetHeight || 1;
+      const large = sheet.classList.contains('is-large');
+      if (dy <= 0) { settle(dy); return; }
+      if (large && !grew) {
+        // nearly full screen and pulled down: far or fast enough and it goes; less, and it comes back to its own height
+        if (dy > H * 0.55 || vy > 1600) { putAway(dy, vy); return; }
+        if (dy > 70 || vy > 500) { shrink(); settle(Math.min(dy, 120)); return; }
+        settle(dy);
+        return;
+      }
+      if (dy > Math.min(110, H * 0.3) || vy > 700) putAway(dy, vy);
+      else settle(dy);
+    };
+    const startAt = (x, y, target) => {
+      g = { x0: x, y0: y, lastY: y, lastT: performance.now(), vy: 0, dy: 0, mode: null, target, scroller: scrollerOf(target), grew: false };
+    };
+    const decide = (x, y) => {
+      const dx = x - g.x0, dy = y - g.y0;
+      if (Math.abs(dy) < 6 && Math.abs(dx) < 6) return;
+      if (Math.abs(dx) > Math.abs(dy) || noDrag(g.target)) { g.mode = 'none'; return; }
+      const head = handle.contains(g.target) || !!g.target.closest?.('.bcv-ph-sheet__head, .bcv-sheet__head') || g.y0 - sheet.getBoundingClientRect().top < 30;
+      const atTop = !g.scroller || g.scroller.scrollTop <= 0;
+      g.mode = head || (atTop && dy > 0) || (atTop && dy < 0 && holdsMore()) ? 'drag' : 'none';
+      if (g.mode === 'drag') { begin(); g.y0 = y - Math.sign(dy) * 6; }
+    };
+    // touch: the gesture is decided on its first move; a drag stops the scroll it would have been
+    sheet.addEventListener('touchstart', (e) => { if (e.touches.length !== 1) { g = null; return; } const t = e.touches[0]; startAt(t.clientX, t.clientY, e.target); g.touch = true; }, { passive: true });
+    sheet.addEventListener('touchmove', (e) => {
+      if (!g?.touch) return;
+      const t = e.touches[0];
+      if (!g.mode) decide(t.clientX, t.clientY);
+      if (g?.mode !== 'drag') return;
+      e.preventDefault();
+      follow(t.clientY, e.timeStamp || performance.now());
+    }, { passive: false });
+    const touchEnd = () => { if (g?.touch) { if (g.mode === 'drag') release(); else g = null; } };
+    sheet.addEventListener('touchend', touchEnd);
+    sheet.addEventListener('touchcancel', touchEnd);
+    // a mouse (or a pen): the grabber and the head
+    sheet.addEventListener('pointerdown', (e) => {
+      if (e.pointerType === 'touch' || (e.button ?? 0) !== 0) return;
+      if (!handle.contains(e.target) && !e.target.closest?.('.bcv-ph-sheet__head')) return;
+      startAt(e.clientX, e.clientY, e.target);
+      g.mode = 'drag'; g.pointer = e.pointerId; g.lastT = e.timeStamp;
+      begin();
+      try { sheet.setPointerCapture(e.pointerId); } catch { /* fine */ }
+    });
+    sheet.addEventListener('pointermove', (e) => { if (g && g.pointer === e.pointerId) follow(e.clientY, e.timeStamp); });
+    const pointerEnd = (e) => { if (g && g.pointer === e.pointerId) release(); };
+    sheet.addEventListener('pointerup', pointerEnd);
+    sheet.addEventListener('pointercancel', pointerEnd);
+  }
+  /** Sheets are met as they arrive (they are put on the page, or under the overlay root, by many hands). */
+  const sheetWatch = new MutationObserver((list) => {
+    let any = false;
+    for (const m of list) for (const n of m.addedNodes) if (n.nodeType === 1 && n.classList?.contains('bcv-sheet-ov')) { sheetGrip(n); any = true; }
+    for (const m of list) if (m.removedNodes.length) any = true;
+    if (any) tellSwipe();
+  });
+  sheetWatch.observe(document.documentElement, { childList: true });
+  if (document.body) sheetWatch.observe(document.body, { childList: true });
+  else document.addEventListener('DOMContentLoaded', () => sheetWatch.observe(document.body, { childList: true }), { once: true });
+  new MutationObserver(() => tellSwipe()).observe(html, { attributes: true, attributeFilter: ['class'] });
 
   /** Inbox and Groups live under the avatar on a phone, with the appearance switch and Settings. */
   function accountSheet(app) {
@@ -1337,11 +1477,24 @@
   }
 
   // ---- course: chip row (sub-tabs) and home ---------------------------------------------------
-  /** The course's tabs as a scrolling chip row, on the tabs below Home (Home lists them instead). */
+  /** The course's tabs as a scrolling chip row, on every course screen, Home included (Home also
+   *  lists them at its end, with their counts). The chip for the screen you are on is brought into
+   *  view: Files or Modules sit far to the right, and a row that opens scrolled to Home hides where you are. */
   function courseChips(app, tabs, activeId) {
-    return U.el('bcv-ph-chips', tabs.map((t) => h('button', {
-      type: 'button', class: `bcv-ph-tab ${t.id === activeId ? 'is-active' : ''} ${t.external ? 'is-ext' : ''}`, dataset: { tab: t.id }, onclick: () => app.go(t.href),
+    const row = U.el('bcv-ph-chips', tabs.map((t) => h('button', {
+      type: 'button', class: `bcv-ph-tab ${t.id === activeId ? 'is-active' : ''} ${t.external ? 'is-ext' : ''}`, dataset: { tab: t.id }, onclick: () => { if (t.id !== activeId) app.go(t.href); },
     }, [h('span', { text: t.label }), t.external ? U.svg(EXT, { size: 11, width: 2, style: { flex: 'none' } }) : null])));
+    let frames = 0;
+    const center = () => {
+      // (the row is made before the screen's data is in, and put on the page after: waited for, a few seconds at most)
+      if (!row.isConnected || !row.clientWidth) { if (++frames < 300) requestAnimationFrame(center); return; }
+      const a = row.querySelector('.bcv-ph-tab.is-active');
+      if (!a || row.scrollWidth <= row.clientWidth) return;
+      const r = row.getBoundingClientRect(), q = a.getBoundingClientRect();
+      row.scrollLeft += (q.left + q.width / 2) - (r.left + r.width / 2);
+    };
+    requestAnimationFrame(center);
+    return row;
   }
 
   const isQuizA = (a) => !!(a.is_quiz_assignment || a.quiz_id || (a.submission_types || []).includes('online_quiz'));

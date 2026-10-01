@@ -85,9 +85,11 @@ final class AppSession: ObservableObject {
         host = nil
     }
 
-    /// Clears the Canvas session (cookies and site data), like signing out of a browser.
+    /// Clears the Canvas session (cookies and site data), like signing out of a browser, and forgets the
+    /// saved sign-in (or the app would sign straight back in).
     func signOut(completion: @escaping () -> Void = {}) {
         CookieJar.shared.clear()
+        LoginVault.clear()
         WKWebsiteDataStore.default().removeData(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), modifiedSince: .distantPast) {
             completion()
             NotificationCenter.default.post(name: .simplSignedOut, object: nil)

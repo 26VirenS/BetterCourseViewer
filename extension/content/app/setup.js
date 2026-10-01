@@ -87,7 +87,7 @@
       url.searchParams.delete('bcv');
       url.searchParams.delete('step');
       url.searchParams.delete('then');
-      history.replaceState({ bcv: true }, '', url.pathname + url.search + url.hash);
+      history.replaceState(BCV.app?.navState?.(false) || { bcv: true }, '', url.pathname + url.search + url.hash);
       app.state.route = app.parseRoute();
     }
     const settings = await S.get();

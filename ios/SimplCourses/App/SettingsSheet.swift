@@ -6,6 +6,7 @@ struct SettingsSheet: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var web = WebController(mode: .settings)
     @State private var confirmSignOut = false
+    @State private var saved = LoginVault.load()
 
     var body: some View {
         NavigationStack {
@@ -17,6 +18,23 @@ struct SettingsSheet: View {
                         dismiss()
                     }
                     Button("Sign out", role: .destructive) { confirmSignOut = true }
+                }
+                Section {
+                    if let s = saved {
+                        LabeledContent("Saved for", value: s.user)
+                        LabeledContent("Sign-in page", value: s.host)
+                        Button("Forget saved sign-in", role: .destructive) {
+                            LoginVault.clear()
+                            saved = nil
+                        }
+                    } else {
+                        Text("Not saved. When your school's sign-in page comes up, sign in with Simpl's form and answer Stay logged in.")
+                            .foregroundStyle(.secondary)
+                    }
+                } header: {
+                    Text("Sign-in")
+                } footer: {
+                    Text("Kept in this iPhone's Keychain only: never synced, never backed up, and only ever typed into your school's own sign-in page. Signing out forgets it too.")
                 }
                 Section {
                     NavigationLink("Look and appearance") {
@@ -40,13 +58,14 @@ struct SettingsSheet: View {
                     Button("Done") { dismiss() }
                 }
             }
+            .onReceive(NotificationCenter.default.publisher(for: .simplLoginChanged)) { _ in saved = LoginVault.load() }
             .confirmationDialog("Sign out of Canvas on this device?", isPresented: $confirmSignOut, titleVisibility: .visible) {
                 Button("Sign out", role: .destructive) {
                     session.signOut()
                     dismiss()
                 }
             } message: {
-                Text("Your Canvas session is cleared; settings and keys stay.")
+                Text("Your Canvas session and any saved sign-in are cleared; settings stay.")
             }
         }
     }

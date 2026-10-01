@@ -84,6 +84,17 @@
    *  control that was pressed, which the sheet grows out of and hands focus back to. */
   async function open(file, { context = null, from = null } = {}) {
     close({ now: true });
+    // In the iPhone app a file opens in the phone's own viewer (Quick Look), in a sheet of its own —
+    // pinch, page, share and mark up as with any file on the phone. The app fetches it with the Canvas
+    // session; this sheet stays the way where it cannot (an older app, a browser).
+    const nat = self.BCVBridge?.native;
+    if (nat?.previewFile) {
+      let f = file && (file.display_name || file.url) ? file : null;
+      if (!f && file?.id) { try { f = await store().file(file.id); } catch { f = null; } }
+      let url = '';
+      try { url = f?.url ? new URL(f.url, location.origin).href : ''; } catch { url = ''; }
+      if (url && await nat.previewFile({ url, name: f.display_name || f.filename || 'File' }).catch(() => false)) return;
+    }
     const dark = !!BCV.app?.isDark?.();
     const ov = U.el('bcv-sheet-ov bcv-viewer-ov', null, { role: 'dialog', 'aria-label': 'File', tabindex: '-1' });
     const sheet = U.el('bcv-sheet bcv-viewer');

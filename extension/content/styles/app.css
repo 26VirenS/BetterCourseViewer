@@ -13,7 +13,7 @@
  * min(their own, the viewport less a margin). */
 
 html[data-bcv-theme] {
-  --bcv-version: "2.98.61"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.98.62"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -2392,6 +2392,13 @@ html.bcv-phone .bcv-sheet-ov { align-items: flex-end; padding: 0; }
 html.bcv-phone .bcv-sheet { width: 100%; max-width: none; max-height: 88vh; border-radius: var(--bcv-r-sheet) var(--bcv-r-sheet) 0 0; border-bottom: 0; padding-bottom: var(--bcv-ph-bottom); animation: bcv-sheet-up .3s cubic-bezier(.32,.72,0,1) both; transform-origin: 50% 100%; }
 .bcv-ph-sheet__handle { flex: none; padding: 8px 0 10px; display: flex; justify-content: center; cursor: grab; touch-action: none; }
 .bcv-ph-sheet__handle span { width: 38px; height: 5px; border-radius: 3px; background: var(--bcv-fill); }
+/* every phone sheet is held like the phone's own (phone.js sheetGrip): a grabber on each, and a sheet
+   holding more than it shows grows to nearly the full screen, scrolling as one */
+html.bcv-phone .bcv-sheet > .bcv-ph-sheet__handle--added { margin-bottom: -6px; }
+html.bcv-phone .bcv-sheet { overscroll-behavior: contain; }
+html.bcv-phone .bcv-sheet.is-large { height: calc(100% - var(--bcv-ph-top) - 10px); max-height: none; display: block; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+html.bcv-phone .bcv-sheet.is-large * { max-height: none; }
+html.bcv-phone .bcv-sheet.is-large > .bcv-ph-sheet__handle { position: sticky; top: 0; z-index: 1; background: inherit; }
 html.bcv-phone .bcv-menu { position: fixed; left: 12px !important; right: 12px !important; top: auto !important; bottom: calc(var(--bcv-ph-tabbar) + var(--bcv-ph-bottom) + 12px); min-width: 0; }
 html.bcv-phone .bcv-toast { max-width: calc(100vw - 24px); }
 /* course shell: no rail; a chip row of the tabs on the tabs below Home */

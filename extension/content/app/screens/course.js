@@ -505,7 +505,7 @@
     if (BCV.phone?.active()) {
       const detail = [c.nickname ? c.originalName : (c.code && c.code !== c.name ? c.code : null), c.term, ...(c.sections || [])].filter(Boolean).join(' · ');
       if (detail) head.querySelector('.bcv-course__title-row').after(U.text('bcv-ph-head__sub bcv-ellip', detail));
-      if (activeId !== 'home') head.querySelector('.bcv-head__in').append(BCV.phone.courseChips(app, tabs, activeId));
+      head.querySelector('.bcv-head__in').append(BCV.phone.courseChips(app, tabs, activeId)); // (Home too: every section a tap away at the top, not at the end of the open work)
     }
 
     // ---- rail --------------------------------------------------------------------

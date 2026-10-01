@@ -18,6 +18,16 @@ enum ScriptBundle {
         return object
     }
 
+    /// The viewport the app gives Canvas's pages: the device's width, edge to edge, never zoomed.
+    static let viewport = "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+
+    /// Web/login.js, the sign-in reader, for every page (LoginAssist), with the Canvas host filled in.
+    static func loginScript(canvasHost: String) -> WKUserScript {
+        var source = Bundle.main.url(forResource: "login", withExtension: "js").flatMap { try? String(contentsOf: $0, encoding: .utf8) } ?? ""
+        source = source.replacingOccurrences(of: "__CANVAS_HOST__", with: JS.literal(canvasHost.lowercased()) ?? "''")
+        return WKUserScript(source: source + "\n//# sourceURL=simpl-courses/login.js", injectionTime: .atDocumentEnd, forMainFrameOnly: true, in: LoginAssist.world)
+    }
+
     static func file(_ relativePath: String) -> String {
         (try? String(contentsOf: extensionDir.appendingPathComponent(relativePath), encoding: .utf8)) ?? ""
     }
@@ -54,9 +64,13 @@ enum ScriptBundle {
 
         switch mode {
         case .canvas:
-            // the phone layout reads the safe-area insets from CSS; that needs viewport-fit=cover on the page
-            scripts.insert(WKUserScript(source: "(function(){\(guardJS)var m=document.querySelector('meta[name=viewport]');if(!m){m=document.createElement('meta');m.name='viewport';(document.head||document.documentElement).appendChild(m);}m.content='width=device-width, initial-scale=1, viewport-fit=cover';})();", injectionTime: .atDocumentStart, forMainFrameOnly: true, in: world), at: 1)
-            scripts.append(WKUserScript(source: "(function(){\(guardJS)var m=document.querySelector('meta[name=viewport]');if(m)m.content='width=device-width, initial-scale=1, viewport-fit=cover';})();", injectionTime: .atDocumentEnd, forMainFrameOnly: true, in: world))
+            // the phone layout reads the safe-area insets from CSS; that needs viewport-fit=cover on the page.
+            // The page is the app's screen, not a page to zoom: no double-tap zoom, no pinch, and no zoom
+            // into a field that is tapped (iOS zooms to any field with text under 16px otherwise).
+            scripts.insert(WKUserScript(source: "(function(){\(guardJS)var m=document.querySelector('meta[name=viewport]');if(!m){m=document.createElement('meta');m.name='viewport';(document.head||document.documentElement).appendChild(m);}m.content=\(JS.literal(viewport) ?? "''");})();", injectionTime: .atDocumentStart, forMainFrameOnly: true, in: world), at: 1)
+            scripts.append(WKUserScript(source: "(function(){\(guardJS)var m=document.querySelector('meta[name=viewport]');if(m)m.content=\(JS.literal(viewport) ?? "''");})();", injectionTime: .atDocumentEnd, forMainFrameOnly: true, in: world))
+            // every page the app shows, the school's sign-in included: a double tap is two taps, never a zoom
+            scripts.append(WKUserScript(source: "(function(){var s=document.createElement('style');s.textContent='html{touch-action:manipulation}';(document.head||document.documentElement).appendChild(s);})();", injectionTime: .atDocumentEnd, forMainFrameOnly: false, in: world))
             // Canvas's own login form: "Stay signed in" starts checked, so the session outlives the app being closed (the student can still untick it)
             scripts.append(WKUserScript(source: "(function(){\(guardJS)if(location.pathname.indexOf('/login')!==0)return;var r=document.getElementById('pseudonym_session_remember_me');if(r&&!r.checked){r.checked=true;}})();", injectionTime: .atDocumentEnd, forMainFrameOnly: true, in: world))
             // 3. the manifest's content scripts and stylesheet

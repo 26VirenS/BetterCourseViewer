@@ -10,6 +10,8 @@ import WebKit
 final class WebController: NSObject, ObservableObject, WKNavigationDelegate, WKUIDelegate {
     let mode: ScriptBundle.Mode
     let webView: WKWebView
+    /// The school sign-in (LoginAssist): what the reader in its own world says, and the overlays over this view.
+    let login: LoginAssist
     private let world: WKContentWorld
     @Published private(set) var isLoading = false
     @Published private(set) var pageTitle = ""
@@ -17,8 +19,12 @@ final class WebController: NSObject, ObservableObject, WKNavigationDelegate, WKU
     init(mode: ScriptBundle.Mode) {
         self.mode = mode
         switch mode {
-        case .settings: world = .page
-        case .canvas: world = .defaultClient
+        case .settings:
+            world = .page
+            login = LoginAssist(canvasHost: "")
+        case .canvas(let host):
+            world = .defaultClient
+            login = LoginAssist(canvasHost: host)
         }
         let config = WKWebViewConfiguration()
         config.websiteDataStore = .default() // the Canvas session persists across launches, like a browser
@@ -29,6 +35,11 @@ final class WebController: NSObject, ObservableObject, WKNavigationDelegate, WKU
         let ucc = WKUserContentController()
         for script in ScriptBundle.userScripts(for: mode, world: world) { ucc.addUserScript(script) }
         ucc.addScriptMessageHandler(Bridge.shared, contentWorld: world, name: Bridge.handlerName)
+        if case .canvas(let host) = mode {
+            // the sign-in reader, on every page (the school's sign-in pages above all), in a world of its own
+            ucc.addUserScript(ScriptBundle.loginScript(canvasHost: host))
+            ucc.add(login, contentWorld: LoginAssist.world, name: LoginAssist.handlerName)
+        }
         config.userContentController = ucc
         webView = WKWebView(frame: .zero, configuration: config)
         super.init()
@@ -41,6 +52,7 @@ final class WebController: NSObject, ObservableObject, WKNavigationDelegate, WKU
         // insets it reads from CSS (ScriptBundle sets viewport-fit=cover), so WebKit must not add its own.
         webView.scrollView.contentInsetAdjustmentBehavior = .never
         Bridge.shared.register(webView, world: world)
+        login.webView = webView
         if case .canvas = mode {
             CookieJar.shared.watch(webView.configuration.websiteDataStore.httpCookieStore) // the session outlives the app
             let refresh = UIRefreshControl()
@@ -114,17 +126,25 @@ final class WebController: NSObject, ObservableObject, WKNavigationDelegate, WKU
         if case .canvas(let host) = mode, navigationAction.targetFrame?.isMainFrame ?? true {
             // Canvas's own bundles load only where Canvas draws the page (see ContentRules)
             ContentRules.apply(to: webView.configuration.userContentController, blockCanvasBundles: RenderedRoutes.isRendered(url, host: host, interfaceOn: Bridge.shared.interfaceOn))
+            login.willLoad(url) // (the saved sign-in page is covered from its first frame)
         }
         decisionHandler(.allow) // single sign-on hops between hosts stay inside the app
     }
 
     func webView(_ webView: WKWebView, decidePolicyFor navigationResponse: WKNavigationResponse, decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void) {
-        if navigationResponse.isForMainFrame, !navigationResponse.canShowMIMEType, let url = navigationResponse.response.url {
-            openExternally(url) // a download: Safari can save and share it
-            decisionHandler(.cancel)
+        if navigationResponse.isForMainFrame, !navigationResponse.canShowMIMEType {
+            decisionHandler(.download) // a file: fetched with this view's session and opened in the phone's own viewer (FilePreview)
             return
         }
         decisionHandler(.allow)
+    }
+
+    func webView(_ webView: WKWebView, navigationResponse: WKNavigationResponse, didBecome download: WKDownload) {
+        FilePreview.shared.take(download, name: navigationResponse.response.suggestedFilename)
+    }
+
+    func webView(_ webView: WKWebView, navigationAction: WKNavigationAction, didBecome download: WKDownload) {
+        FilePreview.shared.take(download, name: nil)
     }
 
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
@@ -135,6 +155,7 @@ final class WebController: NSObject, ObservableObject, WKNavigationDelegate, WKU
         isLoading = false
         pageTitle = webView.title ?? ""
         webView.scrollView.refreshControl?.endRefreshing()
+        if case .canvas = mode { login.didLoad(webView.url) }
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
@@ -152,6 +173,7 @@ final class WebController: NSObject, ObservableObject, WKNavigationDelegate, WKU
         if e.code == NSURLErrorCancelled || (e.domain == "WebKitErrorDomain" && e.code == 102) { return }
         // Something else is already loading (a redirect, a retry): let it land rather than covering it.
         if webView.isLoading { return }
+        login.pageFailed()
         showUnreachable(error)
     }
 

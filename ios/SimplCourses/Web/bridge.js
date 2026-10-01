@@ -167,8 +167,17 @@
 
   // ---- what the app calls back into the page ------------------------------------------------------
   const BCVBridge = {
-    /** What only the app can do (null in a browser or the test harness): the account sheet's "Sign out". */
-    native: native ? { signOut: () => call({ op: 'signOut' }).then(noop) } : null,
+    /** What only the app can do (null in a browser or the test harness): the account sheet's "Sign out";
+     *  the phone's own alert and action sheet for a question or a short list (ask resolves true/false,
+     *  menu the index picked or -1); a file in the phone's own viewer; and whether the phone's own
+     *  swipe-back is on for the screen showing (off on a tab's root, in a quiz, under a sheet). */
+    native: native ? {
+      signOut: () => call({ op: 'signOut' }).then(noop),
+      ask: (o) => call({ op: 'ask', title: String(o?.title || ''), note: String(o?.note || ''), okLabel: String(o?.okLabel || 'OK'), cancelLabel: o?.cancelLabel == null ? null : String(o.cancelLabel), danger: !!o?.danger }).then((r) => !!(r && r.ok)),
+      menu: (o) => call({ op: 'menu', title: String(o?.title || ''), items: (o?.items || []).map((it) => ({ label: String(it.label || ''), sub: String(it.sub || ''), active: !!it.active, danger: !!it.danger })), rect: o?.rect || null }).then((r) => (r && Number.isInteger(r.index) ? r.index : -1)),
+      previewFile: (o) => call({ op: 'previewFile', url: String(o?.url || ''), name: String(o?.name || '') }).then((r) => !!(r && r.ok)),
+      navState: (o) => call({ op: 'navState', canSwipeBack: !!o?.canSwipeBack }).then(noop),
+    } : null,
     storageChanged: (changes) => emitChanged(changes),
   };
   self.BCVBridge = BCVBridge;

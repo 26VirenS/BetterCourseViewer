@@ -588,7 +588,7 @@ try {
   check(/^MATH-021-20 · Fall 2026/.test((await texts('.bcv-ph-head__sub'))[0]) && !(await visible('.bcv-head .bcv-reader-btn')) && !(await visible('.bcv-pill--term')), `course header: dot, name, one detail line (${(await texts('.bcv-ph-head__sub'))[0]})`);
   check((await texts('.bcv-topbar__title'))[0] === '' && (await page.$('.bcv-topbar__btn')) === null, 'the back bar carries no title under a large title, and no reader button');
   check((await texts('.bcv-topbar__back'))[0] === 'Courses', `back bar: ‹ ${(await texts('.bcv-topbar__back'))[0]}`);
-  check((await page.$$('.bcv-ph-tab')).length === 0, 'Home carries no chip row: the course\'s tabs are the list below');
+  check((await page.$$('.bcv-ph-tab')).length >= 5 && (await page.$eval('.bcv-ph-tab.is-active', (e) => e.dataset.tab)) === 'home', 'Home carries the chip row too, Home lit (every section a tap away at the top; the list below keeps its counts)');
   const heads = await texts('.bcv-ph-body--course .bcv-ph-ghead__t');
   check(heads.includes('Open work') && heads.includes('Turned in'), `groups: ${heads.join(', ')}`);
   check((await texts('.bcv-ph-row--link .bcv-ph-row__title')).includes('Grades') && (await texts('.bcv-ph-row--link .bcv-ph-row__right')).some((t) => /%$/.test(t)), 'the course links list, Grades with the score');

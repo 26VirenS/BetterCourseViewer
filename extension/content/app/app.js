@@ -187,6 +187,10 @@
   }
   /** A Back button about to be followed: the move it makes pops the trail like the browser's back does. */
   function markBack() { state.backPress = Date.now(); }
+  /** The state an entry of ours carries: d counts the in-place moves that led to it, so a Back knows the
+   *  entry before is a screen of this same page (history.back() lands on it) rather than another page
+   *  or nothing at all. A replace keeps the count; a push adds one. */
+  const navState = (push) => ({ bcv: true, d: Math.max(0, Number(history.state?.d) || 0) + (push ? 1 : 0) });
 
   /** A quiz attempt is open on this page: our own quiz flow (state.quizOpen)
    *  or Canvas's take-quiz page underneath. */
@@ -274,8 +278,8 @@
     if (samePage && (url.hash || location.hash)) {
       // a fragment move: pushed as any other in-place hop (setting location.hash would fire
       // popstate, and the screen was built twice — once for it, once for this — and counted as a back)
-      if (replace) history.replaceState({ bcv: true }, '', url.pathname + url.search + url.hash);
-      else history.pushState({ bcv: true }, '', url.pathname + url.search + url.hash);
+      if (replace) history.replaceState(navState(false), '', url.pathname + url.search + url.hash);
+      else history.pushState(navState(true), '', url.pathname + url.search + url.hash);
       window.scrollTo(0, 0);
       return render(); // (an in-place move resolves once the screen is drawn: a caller can wait for what it put there)
     }
@@ -287,7 +291,7 @@
       return;
     }
     if (!replace && inPlaceHop(url)) {
-      history.pushState({ bcv: true }, '', url.pathname + url.search + url.hash);
+      history.pushState(navState(true), '', url.pathname + url.search + url.hash);
       window.scrollTo(0, 0);
       return render();
     }
@@ -1227,7 +1231,7 @@
   async function whatsnewHere() {
     const url = new URL(location.href);
     url.searchParams.delete('bcv');
-    history.replaceState({ bcv: true }, '', url.pathname + url.search + url.hash);
+    history.replaceState(navState(false), '', url.pathname + url.search + url.hash);
     state.route = parseRoute();
     await render();
     BCV.whatsnew?.open(BCV.app, { manual: true });
@@ -1244,7 +1248,7 @@
   async function welcomeHere() {
     const url = new URL(location.href);
     url.searchParams.delete('bcv');
-    history.replaceState({ bcv: true }, '', url.pathname + url.search + url.hash);
+    history.replaceState(navState(false), '', url.pathname + url.search + url.hash);
     state.route = parseRoute();
     BCV.welcome.cover();
     await render();
@@ -1671,7 +1675,7 @@
   }
 
   BCV.app = {
-    state, go, render, renderSide, parseRoute, refreshCounts, loadShellData, punchIn, punchOut, siteName, toggleTheme, logout, backTo, nameHere, markBack,
+    state, go, render, renderSide, parseRoute, navState, refreshCounts, loadShellData, punchIn, punchOut, siteName, toggleTheme, logout, backTo, nameHere, markBack,
     rawQuizUrl, // (the look switch turns the look off mid-quiz by going there, see early.js)
     isDark: () => state.dark,
     holds: () => !!(state.submitOpen || state.quizOpen), // something on the page would be lost by a reload (a hand-in being written, a quiz attempt): the layout tier waits (early.js)

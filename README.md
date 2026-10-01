@@ -209,7 +209,7 @@ The privacy policy the store listing points to is [`PRIVACY.md`](PRIVACY.md).
 
 ## iOS
 
-The same extension runs inside an iOS app: a full-screen web view of your school's Canvas where you sign in on Canvas's own login page, with the scripts and stylesheet injected into every page and a small bridge standing in for the extension APIs. `./scripts/build-ios-app.sh --open` generates the Xcode project; [`docs/ios.md`](docs/ios.md) explains the pieces, the build, and what does not work yet.
+The same extension runs inside an iOS app: a full-screen web view of your school's Canvas where you sign in on Canvas's own login page, with the scripts and stylesheet injected into every page and a small bridge standing in for the extension APIs. The app asks for your school's Canvas portal link, puts its own sign-in form over the school's sign-in page when it can read one, and offers **Stay logged in?** afterwards: the username and password then stay in that iPhone's Keychain and the app signs you in by itself (*Logging you in*), stopping for a two-factor prompt. Files open in the phone's own viewer, questions and menus are the phone's own alerts and action sheets, sheets drag up and down like the phone's, and nothing zooms on a double tap. `./scripts/build-ios-app.sh --open` generates the Xcode project; [`docs/ios.md`](docs/ios.md) explains the pieces, the build, and what does not work yet.
 
 ## Development
 

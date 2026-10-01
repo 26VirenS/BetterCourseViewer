@@ -16,6 +16,7 @@ struct BrowserScreen: View {
     var body: some View {
         CanvasWebView(controller: web)
             .ignoresSafeArea()
+            .overlay { LoginLayer(assist: web.login) } // (the app's sign-in form, "Logging you in", "Stay logged in?")
             .sheet(isPresented: $session.showSettings) {
                 SettingsSheet()
             }
@@ -23,6 +24,7 @@ struct BrowserScreen: View {
                 web.loadIfNeeded()
             }
             .onReceive(NotificationCenter.default.publisher(for: .simplSignedOut)) { _ in
+                web.login.forget()
                 web.load() // back to the login page
             }
             .onReceive(NotificationCenter.default.publisher(for: .simplInterfaceToggled)) { _ in

@@ -25,6 +25,12 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.98.62', date: '2026-10-01', notes: [
+      { kind: 'new', title: 'Stay logged in', body: 'The iPhone app signs you in to your school by itself.', icon: P.check },
+      { kind: 'improved', title: 'Sheets drag like iOS', body: 'Pull a sheet up to grow it, down to put it away.', icon: P.layers },
+      { kind: 'improved', title: 'Files in the viewer', body: 'Files open in the iPhone’s own viewer, in a sheet.', icon: P.clip },
+      { kind: 'fixed', title: 'Course moves fixed', body: 'Back and swipe agree; no zoom on a double tap.', icon: P.arrows },
+    ] },
     { version: '2.98.61', date: '2026-09-30', notes: [
       { kind: 'new', title: 'Hide the tool bar', body: 'Tuck the bar away on a tool; a small tab brings it back.', icon: P.eye },
     ] },

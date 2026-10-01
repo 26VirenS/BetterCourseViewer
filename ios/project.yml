@@ -11,7 +11,7 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.9"
-    MARKETING_VERSION: "2.98.61"
+    MARKETING_VERSION: "2.98.62"
     CURRENT_PROJECT_VERSION: "1"
     CODE_SIGN_STYLE: Automatic
 targets:
@@ -25,8 +25,11 @@ targets:
         excludes:
           - "Info.plist"
           - "Web/bridge.js"
+          - "Web/login.js"
       - path: SimplCourses/Web/bridge.js
         buildPhase: resources # copied into the bundle as-is; ScriptBundle reads it at run time
+      - path: SimplCourses/Web/login.js
+        buildPhase: resources # the sign-in reader (LoginAssist), read the same way
       - path: ../extension
         type: folder
         buildPhase: resources
