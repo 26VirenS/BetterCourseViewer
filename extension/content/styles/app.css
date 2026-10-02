@@ -13,7 +13,7 @@
  * min(their own, the viewport less a margin). */
 
 html[data-bcv-theme] {
-  --bcv-version: "2.98.68"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.98.69"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -77,7 +77,7 @@ html[data-bcv-ext-theme="dark"] .bcv-graph__frame { filter: invert(1) hue-rotate
 html.bcv-noblur { --bcv-chrome-ground: linear-gradient(var(--bcv-chrome), var(--bcv-chrome)), var(--bcv-bg); --bcv-glass-ground: linear-gradient(var(--bcv-glass), var(--bcv-glass)), var(--bcv-card); }
 html.bcv-noblur :is(.bcv-away__btn, .bcv-toast) { background: rgba(28,28,30,.94); }
 @keyframes bcv-noblur-in { from { filter: blur(0); } to { filter: blur(6px); } }
-html.bcv-noblur body:has(> :is(.bcv-sheet-ov, .bcv-spot-ov:not(.is-folding))) > #bcv-app > :is(#bcv-main, #bcv-side), html.bcv-noblur body:has(> :is(.bcv-sheet-ov, .bcv-spot-ov:not(.is-folding))) > #bcv-bar { animation: bcv-noblur-in .24s ease both; }
+html.bcv-noblur body:has(> .bcv-sheet-ov) > #bcv-app > :is(#bcv-main, #bcv-side), html.bcv-noblur body:has(> .bcv-sheet-ov) > #bcv-bar { animation: bcv-noblur-in .24s ease both; } /* (not under the search afloat: it leaves the page sharp) */
 /* data arrives rather than appears: an arc sweeps from empty to its value (the `to` is the ring's own dasharray), a line strokes itself on */
 @keyframes bcv-ring-fill { from { stroke-dasharray: 0 999; } }
 @keyframes bcv-ring-unfill { to { stroke-dasharray: 0 999; } }
@@ -4001,11 +4001,10 @@ html[data-bcv-theme="dark"] .bcv-pdfx { --px-row: #0f0f11; --px-page: #1f1f22; -
 .bcv-omni__gone--title { display: block; padding: 8px 10px 4px; font: 600 10.5px/1 var(--bcv-font); letter-spacing: .08em; text-transform: uppercase; color: var(--bcv-ink3); }
 @media (prefers-reduced-motion: reduce) { .bcv-omni__sel { transition: none; } }
 /* ---- the box afloat (2.98.54): the Dashboard's box lifts to the middle of the window the moment it has the cursor,
- * Spotlight's way — a large pill over a dim and a blur, the four kinds to search in under it — its root moved into a
+ * Spotlight's way — a large pill over a light dim, the four kinds to search in under it — its root moved into a
  * fixed palette that eases from the header's place (left, top, width; the box's height and corners with them) while a
  * ghost keeps the header's row; the veil takes no pointer, so a press anywhere on the page lands, and puts it back */
-.bcv-spot-ov { position: fixed; inset: 0; z-index: calc(var(--bcv-z-sheet) - 2); pointer-events: none; background: rgba(0,0,0,.2); -webkit-backdrop-filter: blur(16px) saturate(1.1); backdrop-filter: blur(16px) saturate(1.1); animation: bcv-card-veil .2s ease both; }
-html.bcv-noblur .bcv-spot-ov { -webkit-backdrop-filter: none; backdrop-filter: none; background: rgba(0,0,0,.42); }
+.bcv-spot-ov { position: fixed; inset: 0; z-index: calc(var(--bcv-z-sheet) - 2); pointer-events: none; background: rgba(0,0,0,.12); animation: bcv-card-veil .2s ease both; } /* (2.98.69: the page around the search stays sharp, only a little dimmer) */
 html.bcv-noblur .bcv-spot:not(.is-far) .bcv-omni__box, html.bcv-noblur .bcv-spot .bcv-omni__panel { background: rgba(40,40,44,.97); -webkit-backdrop-filter: none; backdrop-filter: none; }
 .bcv-spot-ov.is-folding { opacity: 0; transition: opacity .3s ease; }
 .bcv-spot { position: fixed; z-index: calc(var(--bcv-z-sheet) - 1); display: flex; /* (under the sheets: a hand-in box or a question opened from a row comes up over the pill) */ flex-direction: column; gap: 10px; transition: left .46s cubic-bezier(.32,.72,0,1), top .46s cubic-bezier(.32,.72,0,1), width .46s cubic-bezier(.32,.72,0,1); }
@@ -4019,7 +4018,7 @@ html.bcv-noblur .bcv-spot:not(.is-far) .bcv-omni__box, html.bcv-noblur .bcv-spot
 }
 .bcv-spot .bcv-omni { position: static; display: block; flex: none; align-self: stretch; width: auto; max-width: none; min-width: 0; margin: 0; }
 .bcv-omni--ghost { visibility: hidden; }
-.bcv-spot .bcv-omni__box, .bcv-spot .bcv-omni__box:focus-within { height: 72px; padding: 0 24px 0 28px; gap: 16px; border-radius: 36px; background: linear-gradient(180deg, rgba(6,6,8,.84), rgba(34,34,38,.62)); -webkit-backdrop-filter: blur(40px) saturate(1.7) brightness(.72); backdrop-filter: blur(40px) saturate(1.7) brightness(.72); border: 1px solid rgba(255,255,255,.14); box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 24px 64px rgba(0,0,0,.3), 0 2px 10px rgba(0,0,0,.16); transition: height .46s cubic-bezier(.32,.72,0,1), border-radius .46s cubic-bezier(.32,.72,0,1), padding .46s cubic-bezier(.32,.72,0,1), gap .46s cubic-bezier(.32,.72,0,1), background .2s ease, border-color .2s ease, box-shadow .3s ease; }
+.bcv-spot .bcv-omni__box, .bcv-spot .bcv-omni__box:focus-within { height: 72px; padding: 0 24px 0 28px; gap: 16px; border-radius: 36px; background: linear-gradient(180deg, rgba(6,6,8,.84), rgba(34,34,38,.62)); -webkit-backdrop-filter: blur(24px) saturate(1.7) brightness(.72); backdrop-filter: blur(24px) saturate(1.7) brightness(.72); border: 0; box-shadow: 0 24px 64px rgba(0,0,0,.3), 0 2px 10px rgba(0,0,0,.16); transition: height .46s cubic-bezier(.32,.72,0,1), border-radius .46s cubic-bezier(.32,.72,0,1), padding .46s cubic-bezier(.32,.72,0,1), gap .46s cubic-bezier(.32,.72,0,1), background .2s ease, border-color .2s ease, box-shadow .3s ease; }
 .bcv-spot .bcv-omni__ic svg { width: 24px; height: 24px; transition: width .46s cubic-bezier(.32,.72,0,1), height .46s cubic-bezier(.32,.72,0,1); }
 .bcv-spot .bcv-omni__box input.bcv-omni__in, .bcv-spot .bcv-omni__box input.bcv-omni__in[type="search"], .bcv-spot .bcv-omni__box input.bcv-omni__in:focus { height: 68px; font: 400 26px/1 var(--bcv-font); letter-spacing: -.015em; color: var(--bcv-ink); caret-color: var(--bcv-ink); transition: height .46s cubic-bezier(.32,.72,0,1), font-size .46s cubic-bezier(.32,.72,0,1), color .2s ease; }
 .bcv-spot .bcv-omni__wikit { font-size: 12.5px; }
@@ -4032,7 +4031,7 @@ html.bcv-noblur .bcv-spot:not(.is-far) .bcv-omni__box, html.bcv-noblur .bcv-spot
 .bcv-spot.is-lifting .bcv-omni__panel { transition-delay: .2s; transition-duration: .28s; }
 .bcv-spot.is-still, .bcv-spot.is-still .bcv-omni__box, .bcv-spot.is-still .bcv-omni__panel { transition: none; }
 /* the panel: a slab of its own under the pill, the page through it blurred soft and dimmed so the words hold on any page */
-.bcv-spot .bcv-omni__panel { position: relative; margin: 14px 0 0; max-height: min(58vh, 600px); padding: 12px; border-radius: 34px; background: linear-gradient(180deg, rgba(46,44,50,.4), rgba(28,26,30,.5)); border: 1px solid rgba(255,255,255,.16); animation: none; transition: opacity .18s ease, transform .18s ease; -webkit-backdrop-filter: blur(48px) saturate(1.9) brightness(.64); backdrop-filter: blur(48px) saturate(1.9) brightness(.64); box-shadow: inset 0 1px 0 rgba(255,255,255,.1), 0 26px 70px rgba(0,0,0,.28), 0 2px 10px rgba(0,0,0,.14); scrollbar-color: rgba(255,255,255,.25) transparent; }
+.bcv-spot .bcv-omni__panel { position: relative; margin: 14px 0 0; max-height: min(58vh, 600px); padding: 12px; border-radius: 34px; background: linear-gradient(180deg, rgba(46,44,50,.4), rgba(28,26,30,.5)); border: 0; animation: none; transition: opacity .18s ease, transform .18s ease; -webkit-backdrop-filter: blur(26px) saturate(1.8) brightness(.66); backdrop-filter: blur(26px) saturate(1.8) brightness(.66); box-shadow: 0 26px 70px rgba(0,0,0,.28), 0 2px 10px rgba(0,0,0,.14); scrollbar-color: rgba(255,255,255,.25) transparent; }
 .bcv-spot .bcv-omni__item { padding: 13px 16px; border-radius: 22px; gap: 18px; }
 /* Spotlight's marks: a plain line drawing in white, no tile (the course is named under the title) */
 .bcv-spot .bcv-omni__iic, .bcv-spot .bcv-omni__iic[style] { width: 30px; height: 30px; border-radius: 0; background: none; color: var(--bcv-ink) !important; }
@@ -4045,6 +4044,31 @@ html.bcv-noblur .bcv-spot:not(.is-far) .bcv-omni__box, html.bcv-noblur .bcv-spot
 .bcv-spot .bcv-omni__cmdkey { font-size: 17px; font-weight: 400; letter-spacing: .02em; }
 .bcv-spot .bcv-omni__empty, .bcv-spot .bcv-omni__more { padding: 14px 16px; font-size: 14.5px; }
 .bcv-spot .bcv-omni__chipx:hover { background: rgba(255,255,255,.14); }
+/* (2.98.69) Files afloat (⌘3) are Spotlight's grid: the kinds found as wide chips across the top (one pressed narrows the grid to
+ * it), then each file a page — its kind's colour on a label, or a picture's own thumbnail — with its name under it, seven to a row */
+.bcv-omni__fchips { display: grid; grid-template-columns: repeat(auto-fit, minmax(92px, 1fr)); gap: 8px; padding: 4px 4px 12px; position: relative; z-index: 1; }
+.bcv-omni__fchip { height: 36px; padding: 0 12px; border: 0; border-radius: 18px; background: var(--bcv-fill); color: var(--bcv-ink); font: 500 15px/1 var(--bcv-font); cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: background .15s ease; }
+.bcv-omni__fchip:hover { background: rgba(255,255,255,.18); }
+.bcv-omni__fchip[aria-pressed="true"] { background: rgba(255,255,255,.32); }
+.bcv-omni__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 2px 6px; padding: 0 4px 6px; }
+.bcv-omni__item.bcv-omni__tile, .bcv-omni__gone.bcv-omni__tile { flex-direction: column; justify-content: flex-start; align-items: center; gap: 9px; width: auto; min-width: 0; padding: 12px 6px 10px; border-radius: 18px; text-align: center; }
+.bcv-omni__tname { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; max-width: 100%; font: 500 12.5px/1.25 var(--bcv-font); color: var(--bcv-ink); word-break: break-word; }
+.bcv-omni__doc { --doc: #6e6e73; position: relative; flex: none; width: 50px; height: 64px; border-radius: 4px; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,.28); clip-path: polygon(0 0, calc(100% - 13px) 0, 100% 13px, 100% 100%, 0 100%); }
+.bcv-omni__doc::before { content: ''; position: absolute; inset: 11px 8px 24px; background: repeating-linear-gradient(180deg, rgba(0,0,0,.13) 0 1px, transparent 1px 5px); } /* (lines of text on the page) */
+.bcv-omni__doc::after { content: ''; position: absolute; top: 0; right: 0; width: 13px; height: 13px; background: linear-gradient(225deg, transparent 50%, #d6d6dc 50%); } /* (its corner turned down) */
+.bcv-omni__docext { position: absolute; left: 50%; bottom: 7px; transform: translateX(-50%); padding: 3px 5px; border-radius: 3px; background: var(--doc); color: #fff; font: 700 8.5px/1 var(--bcv-font); letter-spacing: .05em; white-space: nowrap; }
+.bcv-omni__doc--pdf { --doc: #e5484d; } .bcv-omni__doc--word { --doc: #2f6fe4; } .bcv-omni__doc--slides { --doc: #e8740c; } .bcv-omni__doc--sheets { --doc: #1d9e55; }
+.bcv-omni__doc--img { --doc: #9b59d0; } .bcv-omni__doc--video { --doc: #ff375f; } .bcv-omni__doc--audio { --doc: #f59e0b; } .bcv-omni__doc--zip { --doc: #7d7d85; } .bcv-omni__doc--page { --doc: #0a8f8f; }
+.bcv-omni__doc--thumb { width: 64px; height: 64px; border-radius: 8px; background: rgba(255,255,255,.12); clip-path: none; overflow: hidden; }
+.bcv-omni__doc--thumb::before, .bcv-omni__doc--thumb::after, .bcv-omni__doc--thumb .bcv-omni__docext { display: none; }
+.bcv-omni__doc--thumb img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.bcv-omni__doc--text { --doc: #8e8e93; }
+.bcv-omni__group--grid .bcv-omni__gtitle { padding-left: 10px; padding-right: 10px; }
+.bcv-spot .bcv-omni__panel.is-grid .bcv-omni__sel { border-radius: 18px; }
+/* the kind chosen sits in the pill as Spotlight's does: a light capsule, its mark and name the pill's own size */
+.bcv-spot:not(.is-far) .bcv-omni__chip { height: 40px; gap: 8px; padding: 0 8px 0 14px; border-radius: 20px; background: rgba(255,255,255,.16); color: #fff; font: 500 19px/1 var(--bcv-font); letter-spacing: -.01em; }
+.bcv-spot:not(.is-far) .bcv-omni__chip > svg { width: 20px; height: 20px; }
+.bcv-spot:not(.is-far) .bcv-omni__chipx { width: 24px; height: 24px; border-radius: 12px; }
 .bcv-omni__cmdkey { flex: none; font: 500 13.5px/1 var(--bcv-font); color: var(--bcv-ink3); letter-spacing: .04em; }
 /* the kind chosen, as a chip in the box before the words */
 .bcv-omni__chip { display: none; flex: none; align-items: center; gap: 6px; height: 30px; padding: 0 6px 0 10px; border-radius: 15px; background: var(--bcv-accent-soft, var(--bcv-fill)); color: var(--bcv-accent-text, var(--bcv-ink)); font: 600 13.5px/1 var(--bcv-font); white-space: nowrap; }

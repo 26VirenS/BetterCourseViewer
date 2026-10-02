@@ -14,14 +14,17 @@
  * goes once a row is chosen. The Wikipedia lookup goes through the background (background.js
  * 'wiki'), so the page's own rules never block it. The first time, a black screen points at the box
  * (welcome.js: "Search Everything."). On the desktop the box floats (2.98.54): the moment it has the
- * cursor it lifts out of the header to the middle of the window as a large pill over the page, dimmed
- * and blurred — Spotlight's way — and under it, before anything is typed, the four kinds to search in:
+ * cursor it lifts out of the header to the middle of the window as a large pill over the page, a little
+ * dimmed (the page stays sharp since 2.98.69) — Spotlight's way — and under it, before anything is typed, the four kinds to search in:
  * Courses ⌘1, Work ⌘2 (assignments, quizzes, discussions), Files ⌘3 and Actions ⌘4 (the commands). A
  * kind chosen sits in the box as a chip and lists its own things at once (your courses; what is due
  * this week; your files; every command), and what is typed then searches that kind alone; Backspace
  * on an empty box lets the kind go, Escape steps back (the results, then the kind, then the box goes
  * home), and a press anywhere else puts the box back in the header. The phone's box stays where it
- * is, and so does the box during the tour. */
+ * is, and so does the box during the tour. Files afloat (⌘3, 2.98.69) are Spotlight's grid: the kinds found as wide chips across
+ * the top (one pressed narrows the grid to it), then each file as a page of its kind (a picture as its own thumbnail) with its
+ * name under it — the files and pages changed last before anything is typed (Recents), what is typed narrowing them; the arrows
+ * walk the grid (← → along a row once ↓ has gone into it, ↑ ↓ to the tile nearest above or below). */
 (function () {
   const BCV = (self.BCV = self.BCV || {});
   const { h } = BCV.utils;
@@ -33,6 +36,7 @@
   const PAUSE = 280; // ms of quiet after the last keystroke before the network is asked
   const PER = 5; // results a group shows at most
   const CMDS = 3; // commands a plain search lists at most (the name typed starts theirs)
+  const GRID_N = 21, RECENTS = 28; // the Files grid afloat: results a group shows at most (three rows), the recent ones before anything is typed (four)
 
   let ui = null; // the box on the page: { app, root, input, panel, seq, q, groups, pending, cursor, items, timer, mode, cmd, arg, cs }
   let widthWatch = null; // (the panel's width, for the highlight: one at a time)
@@ -52,14 +56,14 @@
   // ---- the box afloat (2.98.54) ------------------------------------------------------------------
   // On the desktop the box lifts out of the header the moment it has the cursor: its root is moved into
   // a fixed palette (.bcv-spot) that eases from the header's place to the middle of the window (left,
-  // top and width transition; the box grows from 29px to 64px on the way) over a dim and a blur
+  // top and width transition; the box grows from 29px to 72px on the way) over a light dim
   // (.bcv-spot-ov, which takes no pointer: a press anywhere on the page still lands, and puts the box
   // back), while a ghost of the same height keeps the header's row as it was. Under it, the four kinds
   // to search in, then what is typed. Escape and a press elsewhere fold it back the same way.
   const SCOPES = [
     { key: 'courses', label: 'Courses', hint: 'Every course you are in', icon: IC.book, groups: ['Courses'], title: 'Your courses' },
     { key: 'work', label: 'Work', hint: 'Assignments, quizzes and discussions', icon: IC.doc, groups: ['Best match', 'Assignments', 'Discussions'], title: 'Due this week' },
-    { key: 'files', label: 'Files', hint: 'Course files and pages', icon: IC.folder, groups: ['Files', 'Pages'], title: 'Files' },
+    { key: 'files', label: 'Files', hint: 'Course files and pages', icon: IC.folder, groups: ['Files', 'Pages'], title: 'Recents' },
     { key: 'actions', label: 'Actions', hint: 'Commands: /submit, /open, /todo, /dark…', icon: IC.bolt, groups: ['Commands'], title: 'Commands' },
   ];
   const SPOT_W = 680, SPOT_MS = 470; // the pill's width at most; the float's length (app.css .46s)
@@ -67,6 +71,8 @@
   const afloat = () => !!spot && !spot.folding;
   const canFloat = () => !!ui && ui.root.isConnected && !BCV.phone?.active?.() && !document.getElementById('bcv-tour') && !document.getElementById('bcv-setup');
   const still = () => !!U.reducedMotion?.();
+  const gridMode = () => afloat() && ui?.scope?.key === 'files'; // (Files afloat: Spotlight's grid of tiles)
+  const cap = () => (gridMode() ? GRID_N : PER); // (a group's results at most: the grid shows rows of them)
   function place() {
     if (!spot) return;
     const vw = innerWidth, vh = innerHeight, w = Math.min(SPOT_W, vw - 32);
@@ -129,7 +135,7 @@
   async function listScope() {
     if (!ui || !ui.scope) return;
     const s = ui.scope, seq = ++ui.seq;
-    clearTimeout(ui.timer); ui.groups = new Map(); ui.items = []; ui.cursor = 0; ui.mode = 'scope'; ui.cmd = null; ui.arg = ''; ui.q = ''; ui.raw = ''; ui.pending = 1;
+    clearTimeout(ui.timer); ui.groups = new Map(); ui.items = []; ui.cursor = 0; ui.mode = 'scope'; ui.cmd = null; ui.arg = ''; ui.q = ''; ui.raw = ''; ui.pending = 1; ui.walk = false;
     paint();
     let items = [];
     try {
@@ -137,6 +143,11 @@
         const [cs, fs] = await Promise.all([store.courses().catch(() => []), favs()]);
         const star = new Set(fs.map((c) => String(c.id)));
         items = cs.filter((c) => c.state === 'current').sort((a, b) => (star.has(String(b.id)) ? 1 : 0) - (star.has(String(a.id)) ? 1 : 0)).slice(0, 12).map(courseRow);
+      } else if (s.key === 'files') { // (the grid: the files and pages changed last, newest first — from the index, waited for while it is still coming)
+        warm().catch(() => {});
+        await Promise.race([Promise.all([kindReady('Files'), kindReady('Pages')]), new Promise((r) => setTimeout(r, 8000))]);
+        const kept = (k) => (ix?.kinds[k]?.ready ? ix.kinds[k].items : []);
+        items = [...kept('Files'), ...kept('Pages')].sort((a, b) => (b.at ?? 0) - (a.at ?? 0)).slice(0, RECENTS);
       } else {
         await hubReady();
         if (s.key === 'actions') items = (BCV.hub.matchCommands('') || BCV.hub.COMMANDS || []).map(commandRow);
@@ -150,7 +161,7 @@
   }
   function setScope(s) {
     if (!ui || !afloat()) return;
-    ui.scope = s;
+    ui.scope = s; ui.fkind = null;
     ui.chip.replaceChildren(U.svg(s.icon, { size: 13, width: 2 }), h('span', { text: s.label }), h('button', { type: 'button', class: 'bcv-omni__chipx', title: 'Search everything again', 'aria-label': `Stop searching ${s.label.toLowerCase()} only`, onclick: (e) => { e.stopPropagation(); clearScope(); ui.input.focus(); } }, U.svg(IC.close, { size: 10, width: 2.4 })));
     ui.chip.hidden = false;
     ui.input.placeholder = `Search ${s.label.toLowerCase()}`;
@@ -160,7 +171,7 @@
   }
   function clearScope({ quiet = false } = {}) {
     if (!ui || !ui.scope) return;
-    ui.scope = null;
+    ui.scope = null; ui.fkind = null;
     ui.chip.hidden = true; ui.chip.replaceChildren();
     ui.input.placeholder = ui.placeholder;
     ui.input.setAttribute('aria-label', ui.ariaLabel);
@@ -233,6 +244,8 @@
   };
   let ix = null; // { at, ids, kinds: { [kind]: { items, ready, partial: Set(course ids) } } }
   const fresh = () => !!ix && Date.now() - ix.at < IX_TTL;
+  const waiting = []; // [kind, resolve]: a kind's lists awaited (the Files grid's recents)
+  const kindReady = (kind) => (ix?.kinds[kind]?.ready ? Promise.resolve() : new Promise((r) => waiting.push([kind, r])));
   /** Take (or keep) the index for the starred courses; each kind is searchable the moment its lists are in. */
   async function warm() {
     if (fresh()) return;
@@ -262,7 +275,7 @@
     }));
   }
   /** The index's best for the words typed: every word in the title (or a file's name), a word's start and the title's start counting for more, then what is nearest now. */
-  function lookup(kind, q) {
+  function lookup(kind, q, n = PER) {
     const K = ix?.kinds[kind];
     if (!K?.ready) return null;
     const words = q.split(/\s+/).filter(Boolean);
@@ -279,14 +292,15 @@
       if (score > 0) found.push([score, it.at === null ? Infinity : Math.abs(it.at - now), it]);
     }
     found.sort((a, b) => b[0] - a[0] || a[1] - b[1]);
-    return found.slice(0, PER).map((f) => f[2]);
+    return found.slice(0, n).map((f) => f[2]);
   }
   /** A kind just in: the search on show takes it from the index (what Canvas was asked meanwhile is no longer needed for it). */
   function indexed(kind) {
+    for (let i = waiting.length - 1; i >= 0; i--) if (waiting[i][0] === kind) waiting.splice(i, 1)[0][1]();
     if (!ui || ui.mode !== 'plain' || ui.q.length < NET_MIN || !ui.local || ui.local.has(kind)) return;
     const s = ui.scope;
     if (s && !s.groups.includes(kind)) return;
-    const items = lookup(kind, ui.q);
+    const items = lookup(kind, ui.q, cap());
     if (!items) return;
     ui.local.add(kind);
     if (!ix.kinds[kind].partial.size) ui.groups.set(kind, items);
@@ -294,14 +308,14 @@
     paint();
   }
   /** The index's rows and Canvas's for the same kind, one list: no row twice, the index's first. */
-  const merge = (a, b) => { const seen = new Set(); const out = []; for (const it of [...a, ...b]) { const k = it.href || it.url || it.title; if (!seen.has(k)) { seen.add(k); out.push(it); } } return out.slice(0, PER); };
+  const merge = (a, b) => { const seen = new Set(); const out = []; for (const it of [...a, ...b]) { const k = it.href || it.url || it.title; if (!seen.has(k)) { seen.add(k); out.push(it); } } return out.slice(0, cap()); };
 
   // ---- a search: what the page holds at once, the index at once, the rest after a pause, each group painted as it answers ----
   function run(raw) {
     if (!ui) return;
     const seq = ++ui.seq;
     clearTimeout(ui.timer);
-    ui.raw = raw; ui.q = norm(raw); ui.groups = new Map(); ui.items = []; ui.pending = 0; ui.cursor = 0; ui.cmd = null; ui.arg = ''; ui.mode = 'plain'; ui.reading = ''; ui.local = new Set(); // (the rows of the last search are no answer to this one: Enter meanwhile does nothing)
+    ui.raw = raw; ui.q = norm(raw); ui.groups = new Map(); ui.items = []; ui.pending = 0; ui.cursor = 0; ui.cmd = null; ui.arg = ''; ui.mode = 'plain'; ui.reading = ''; ui.local = new Set(); ui.walk = false; // (the rows of the last search are no answer to this one: Enter meanwhile does nothing)
     if (String(raw).trimStart().startsWith('/')) { commandMode(String(raw).trimStart(), seq); return; }
     const q = ui.q;
     if (!q) { if (afloat()) { if (ui.scope) listScope(); else paintScopes(); } else close(); return; } // (afloat and empty: the kinds, or the kind's own things)
@@ -326,7 +340,7 @@
     if (q.length >= NET_MIN) {
       for (const k of IX_KINDS) {
         if (!want(k)) continue;
-        const items = lookup(k, q);
+        const items = lookup(k, q, cap());
         if (items) { ui.groups.set(k, items); ui.local.add(k); }
       }
     }
@@ -444,8 +458,8 @@
       const old = was.rows.get(k);
       const r = el.getBoundingClientRect();
       if (old) {
-        const dy = old.r.top - r.top;
-        if (Math.abs(dy) > 0.5 || old.o < 0.99) el.animate([{ opacity: old.o, transform: `translateY(${dy}px)` }, { opacity: 1, transform: 'none' }], { duration: 260, easing: EASE });
+        const dx = old.r.left - r.left, dy = old.r.top - r.top; // (a tile in the Files grid moves across as well as down)
+        if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5 || old.o < 0.99) el.animate([{ opacity: old.o, transform: `translate(${dx}px, ${dy}px)` }, { opacity: 1, transform: 'none' }], { duration: 260, easing: EASE });
       } else {
         el.animate([{ opacity: 0, transform: 'translateY(6px) scale(.985)' }, { opacity: 1, transform: 'none' }], { duration: 210, delay: Math.min(entering++ * 16, 80), easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'backwards' });
       }
@@ -454,7 +468,7 @@
     for (const [k, o] of was.rows) {
       if (seen.has(k) || k.startsWith('msg|')) continue;
       const g = o.el.cloneNode(true);
-      g.className = k.startsWith('g|') ? 'bcv-omni__gone bcv-omni__gone--title' : 'bcv-omni__gone';
+      g.className = k.startsWith('g|') ? 'bcv-omni__gone bcv-omni__gone--title' : `bcv-omni__gone${o.el.classList.contains('bcv-omni__tile') ? ' bcv-omni__tile' : ''}`;
       g.removeAttribute('data-key'); g.removeAttribute('role'); g.removeAttribute('aria-selected'); g.removeAttribute('tabindex');
       g.setAttribute('aria-hidden', 'true');
       Object.assign(g.style, { left: `${o.r.left - pr.left - panel.clientLeft}px`, top: `${o.r.top - pr.top - panel.clientTop + panel.scrollTop}px`, width: `${o.r.width}px`, height: `${o.r.height}px` });
@@ -478,16 +492,33 @@
     const items = [];
     const blocks = [];
     const names = ui.mode === 'plain' ? ORDER : [...ui.groups.keys()]; // (a command's list, the kinds, a kind's own things: as they were set)
+    const grid = gridMode();
+    panel.classList.toggle('is-grid', grid);
+    if (grid) { // the kinds found, as chips across the top: one pressed narrows the grid to it (pressed again, all of them)
+      const have = new Set(names.flatMap((n) => ui.groups.get(n) || []).map(fileKind));
+      if (ui.fkind) have.add(ui.fkind);
+      const chips = KINDS.filter(([k]) => have.has(k));
+      if (chips.length > 1 || ui.fkind) {
+        blocks.push(h('div', { class: 'bcv-omni__fchips', role: 'group', 'aria-label': 'Kinds of file', dataset: { key: 'msg|chips' } }, chips.map(([k, label]) => h('button', {
+          type: 'button', class: 'bcv-omni__fchip', 'aria-pressed': ui.fkind === k ? 'true' : 'false', dataset: { kind: k },
+          onmousedown: (e) => e.preventDefault(), // (the cursor stays in the box)
+          onclick: () => { if (!ui) return; ui.fkind = ui.fkind === k ? null : k; ui.cursor = 0; ui.walk = false; paint(); },
+        }, label))));
+      }
+    }
     for (const name of names) {
-      const list = ui.groups.get(name);
+      let list = ui.groups.get(name);
+      if (grid && list && ui.fkind) list = list.filter((it) => fileKind(it) === ui.fkind);
       if (!list || !list.length) continue;
-      const rows = list.map((it) => { items.push(it); const el = row(it, items.length - 1); el.dataset.key = keyOf(name, it); return el; });
-      blocks.push(h('div', { class: 'bcv-omni__group', dataset: { group: name } }, [h('div', { class: 'bcv-omni__gtitle', text: name === 'Best match' && ui.reading ? ui.reading : name, dataset: { key: `g|${name}` } }), ...rows]));
+      // (a tile keeps its key from Recents to the results typed, so it glides to its new place)
+      const rows = list.map((it) => { items.push(it); const el = (grid ? tile : row)(it, items.length - 1); el.dataset.key = grid ? keyOf('tile', it) : keyOf(name, it); return el; });
+      const title = h('div', { class: 'bcv-omni__gtitle', text: name === 'Best match' && ui.reading ? ui.reading : name, dataset: { key: `g|${name}` } });
+      blocks.push(h('div', { class: `bcv-omni__group${grid ? ' bcv-omni__group--grid' : ''}`, dataset: { group: name } }, grid ? [title, h('div', { class: 'bcv-omni__grid' }, rows)] : [title, ...rows]));
     }
     ui.items = items;
     ui.cursor = items.length ? Math.min(Math.max(ui.cursor, 0), items.length - 1) : -1;
     if (!items.length && !ui.pending && ui.mode === 'plain' && ui.q.length < NET_MIN) { panel.hidden = true; return; } // (one letter, nothing on the page that starts with it: nothing to show yet)
-    if (!items.length) blocks.push(h('div', { class: 'bcv-omni__empty', dataset: { key: 'msg|empty' }, text: ui.pending ? 'Searching…' : ui.mode === 'scope' ? (ui.scope?.key === 'work' ? 'Nothing due this week.' : `No ${ui.scope?.label.toLowerCase() || 'results'} yet.`) : ui.mode === 'cmd' && ui.cmd ? (ui.arg ? `Nothing for “${ui.arg}”` : ui.cmd.empty || `Type ${ui.cmd.takes || 'more'}…`) : ui.mode === 'cmd' ? 'No command by that name. /help lists them.' : `Nothing for “${ui.input.value.trim()}”` }));
+    if (!items.length) blocks.push(h('div', { class: 'bcv-omni__empty', dataset: { key: 'msg|empty' }, text: ui.pending ? 'Searching…' : grid && ui.fkind ? `No ${kindLabel(ui.fkind)} ${ui.q ? `for “${ui.input.value.trim()}”` : 'yet'}.` : ui.mode === 'scope' ? (ui.scope?.key === 'work' ? 'Nothing due this week.' : `No ${ui.scope?.label.toLowerCase() || 'results'} yet.`) : ui.mode === 'cmd' && ui.cmd ? (ui.arg ? `Nothing for “${ui.arg}”` : ui.cmd.empty || `Type ${ui.cmd.takes || 'more'}…`) : ui.mode === 'cmd' ? 'No command by that name. /help lists them.' : `Nothing for “${ui.input.value.trim()}”` }));
     else if (ui.pending) blocks.push(h('div', { class: 'bcv-omni__more', dataset: { key: 'msg|more' }, text: 'Searching…' }));
     // (moving: the panel already on show with something in it, at its top; a panel just opened arrives with the pill, or at once)
     const moving = !still() && !panel.hidden && panel.isConnected && panel.childElementCount > 1 && panel.scrollTop < 1;
@@ -515,6 +546,57 @@
       it.url ? h('span', { class: 'bcv-omni__ext', title: 'Opens in a new tab' }, U.svg(IC.external, { size: 12, width: 2 })) : null,
     ]);
     return el;
+  }
+  // ---- the Files grid afloat (2.98.69) ----------------------------------------------------------------
+  const KINDS = [['pdf', 'PDF'], ['word', 'Word'], ['slides', 'Slides'], ['sheets', 'Sheets'], ['img', 'Images'], ['video', 'Video'], ['audio', 'Audio'], ['text', 'Text'], ['zip', 'Archives'], ['page', 'Pages'], ['other', 'Other']];
+  const kindLabel = (k) => (KINDS.find((x) => x[0] === k) || [k, k])[1];
+  const EXT_KIND = {
+    pdf: 'pdf', doc: 'word', docx: 'word', rtf: 'word', odt: 'word', pages: 'word', ppt: 'slides', pptx: 'slides', key: 'slides', odp: 'slides',
+    xls: 'sheets', xlsx: 'sheets', csv: 'sheets', numbers: 'sheets', ods: 'sheets',
+    png: 'img', jpg: 'img', jpeg: 'img', gif: 'img', webp: 'img', heic: 'img', svg: 'img', bmp: 'img', tif: 'img', tiff: 'img',
+    mp4: 'video', mov: 'video', m4v: 'video', webm: 'video', avi: 'video', mp3: 'audio', m4a: 'audio', wav: 'audio', aac: 'audio', ogg: 'audio',
+    zip: 'zip', rar: 'zip', '7z': 'zip', gz: 'zip', tar: 'zip', txt: 'text', md: 'text',
+  };
+  const extRx = /\.([a-z0-9]{1,7})$/i;
+  const extOf = (f) => (extRx.exec(f.display_name || '') || extRx.exec(f.filename || '') || [])[1] || '';
+  /** What a file is, for its tile and the chips: from its name's extension, else its content type; a course page is a page. */
+  function fileKind(it) {
+    if (!it.file) return 'page';
+    const byExt = EXT_KIND[extOf(it.file).toLowerCase()];
+    if (byExt) return byExt;
+    const ct = String(it.file['content-type'] || it.file.content_type || '').toLowerCase();
+    return ct.includes('pdf') ? 'pdf' : ct.startsWith('image/') ? 'img' : ct.startsWith('video/') ? 'video' : ct.startsWith('audio/') ? 'audio' : ct.startsWith('text/') ? 'text' : 'other';
+  }
+  /** A file (or a page) as a tile in the grid: a page of its kind with its label in the kind's colour — a picture as its own thumbnail — and its name under it. */
+  function tile(it, i) {
+    const k = fileKind(it);
+    const thumb = k === 'img' && it.file?.thumbnail_url ? it.file.thumbnail_url : null;
+    const label = it.file ? (extOf(it.file).slice(0, 4).toUpperCase() || 'FILE') : 'PAGE';
+    const doc = h('span', { class: `bcv-omni__doc bcv-omni__doc--${k}${thumb ? ' bcv-omni__doc--thumb' : ''}`, 'aria-hidden': 'true' }, [
+      thumb ? h('img', { src: thumb, alt: '', loading: 'lazy', decoding: 'async', draggable: 'false', onerror: (e) => { e.currentTarget.remove(); doc.classList.remove('bcv-omni__doc--thumb'); } }) : null, // (no thumbnail to be had: the page of its kind)
+      h('span', { class: 'bcv-omni__docext', text: label }),
+    ]);
+    const el = h('div', { class: 'bcv-omni__item bcv-omni__tile', role: 'option', tabindex: '-1', 'aria-selected': 'false', 'aria-label': it.sub ? `${it.title}, ${it.sub}` : it.title, title: it.sub ? `${it.title}\n${it.sub}` : it.title, dataset: { i, kind: k }, onclick: () => openItem(it, el) }, [
+      doc,
+      h('span', { class: 'bcv-omni__tname', text: it.title }),
+    ]);
+    return el;
+  }
+  /** The tile above or below the chosen one: in the nearest row that way, the one nearest across (the same one at the grid's edge). */
+  function stepRow(down) {
+    const tiles = [...ui.panel.querySelectorAll('.bcv-omni__item')];
+    const cur = tiles[ui.cursor];
+    if (!cur) return 0;
+    const cx = cur.offsetLeft + cur.offsetWidth / 2, y = cur.offsetTop;
+    let best = ui.cursor, rowY = null, dx = Infinity;
+    tiles.forEach((t, i) => {
+      const ty = t.offsetTop;
+      if (down ? ty <= y + 4 : ty >= y - 4) return; // (this row, or the wrong way)
+      if (rowY !== null && (down ? ty > rowY + 4 : ty < rowY - 4)) return; // (a row past the nearest one)
+      const d = Math.abs(t.offsetLeft + t.offsetWidth / 2 - cx);
+      if (rowY === null || (down ? ty < rowY - 4 : ty > rowY + 4) || d < dx) { rowY = ty; dx = d; best = i; }
+    });
+    return best;
   }
   function markCursor({ scroll = false, jump = false } = {}) {
     if (!ui) return;
@@ -595,6 +677,15 @@
       return;
     }
     if (!open) return;
+    if (gridMode() && /^Arrow(Left|Right|Up|Down)$/.test(e.key)) { // the grid: ↑ ↓ between its rows, ← → along them
+      const side = e.key === 'ArrowLeft' || e.key === 'ArrowRight';
+      if (side && ui.input.value && !ui.walk) return; // (← → are the caret's while words are typed, until ↓ goes into the grid)
+      e.preventDefault();
+      ui.walk = true;
+      ui.cursor = side ? Math.min(ui.items.length - 1, Math.max(0, ui.cursor + (e.key === 'ArrowRight' ? 1 : -1))) : stepRow(e.key === 'ArrowDown');
+      markCursor({ scroll: true });
+      return;
+    }
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
       e.preventDefault();
       const n = ui.items.length;
@@ -652,7 +743,7 @@
       h('kbd', { class: 'bcv-omni__key', text: '/', 'aria-hidden': 'true' }),
     ]);
     const root = h('div', { class: 'bcv-omni', id: 'bcv-omni-root' }, [box, panel]);
-    ui = { app, root, input, panel, chip, scope: null, placeholder: input.placeholder, ariaLabel: input.getAttribute('aria-label'), wiki: wikiOn, seq: 0, q: '', raw: '', groups: new Map(), pending: 0, cursor: -1, items: [], timer: 0, mode: 'plain', cmd: null, arg: '', cs: null, reading: '' };
+    ui = { app, root, input, panel, chip, scope: null, fkind: null, walk: false, placeholder: input.placeholder, ariaLabel: input.getAttribute('aria-label'), wiki: wikiOn, seq: 0, q: '', raw: '', groups: new Map(), pending: 0, cursor: -1, items: [], timer: 0, mode: 'plain', cmd: null, arg: '', cs: null, reading: '' };
     // the highlight is measured from the chosen row; afloat, the rows are first drawn while the palette still eases from the
     // header's width to its own, so a change of the panel's width puts the highlight back on its row (its height is left
     // alone: it eases as the rows change, and the highlight glides on its own then)

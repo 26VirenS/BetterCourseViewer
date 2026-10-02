@@ -253,7 +253,7 @@ const files = {
   r101: [
     { id: 'f2', display_name: 'math21-F26 planned lecture schedule.xlsx', filename: 'schedule.xlsx', 'content-type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', size: 49152, updated_at: ago(15 * D), url: '/files/f2/download' },
     { id: 'f1', display_name: 'Course Syllabus.pdf', filename: 'syllabus.pdf', 'content-type': 'application/pdf', size: 217088, updated_at: ago(18 * D), url: '/files/f1/download' },
-    { id: 'f5', display_name: 'Lecture 3 whiteboard.png', filename: 'whiteboard.png', 'content-type': 'image/png', size: 302011, updated_at: ago(12 * D), url: '/files/f5/download?download_frd=1&verifier=abc' },
+    { id: 'f5', display_name: 'Lecture 3 whiteboard.png', filename: 'whiteboard.png', 'content-type': 'image/png', size: 302011, updated_at: ago(12 * D), url: '/files/f5/download?download_frd=1&verifier=abc', thumbnail_url: '/images/thumbnails/f5/abc' },
     { id: 'f6', display_name: 'reading-list.txt', filename: 'reading-list.txt', 'content-type': 'text/plain', size: 412, updated_at: ago(11 * D), url: '/files/f6/download?download_frd=1&verifier=def' },
   ],
   f101a: [{ id: 'f3', display_name: 'Resources_Policy.pdf', filename: 'Resources_Policy.pdf', 'content-type': 'application/pdf', size: 130000, updated_at: ago(16 * D), url: '/files/f3/download' }],
@@ -1116,6 +1116,10 @@ const server = http.createServer((req, res) => {
 
       res.writeHead(200, { 'content-type': 'text/html' });
       return res.end('<html><body style="font-family:sans-serif;padding:20px">Embedded tool content</body></html>');
+    }
+    if (path.startsWith('/images/thumbnails/')) { // a picture's thumbnail, as Canvas keeps one for each image file (the Files grid afloat shows it)
+      res.writeHead(200, { 'content-type': 'image/svg+xml' });
+      return res.end('<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128"><rect width="128" height="128" fill="#f4f1e8"/><path d="M14 40h70M14 58h96M14 76h58" stroke="#2d6cdf" stroke-width="5" stroke-linecap="round"/><circle cx="96" cy="94" r="16" fill="none" stroke="#e5484d" stroke-width="5"/></svg>');
     }
     if (path.startsWith('/files/') && !path.endsWith('/file_preview')) { // a file's bytes, as its content type says (an attachment, the way Canvas's download URL serves them)
       const fid = path.split('/')[2];

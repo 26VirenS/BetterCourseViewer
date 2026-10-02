@@ -25,6 +25,10 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.98.69', date: '2026-10-02', notes: [
+      { kind: 'new', title: 'Files as a grid', body: 'Search Files (⌘3) shows each file as a tile, by kind.', icon: P.layers },
+      { kind: 'improved', title: 'Lighter search glass', body: 'No borders, a softer blur, and the page stays sharp.', icon: P.eye },
+    ] },
     { version: '2.98.68', date: '2026-10-02', notes: [
       { kind: 'improved', title: 'Spotlight glass', body: 'Search floats on smoky glass, the page softly blurred.', icon: P.sparkle },
     ] },

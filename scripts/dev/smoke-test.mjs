@@ -3501,23 +3501,23 @@ try {
   check([bareOff, bareOn].every((b) => b.bg === 'rgba(0, 0, 0, 0)' && b.border === '0px' && b.shadow === 'none' && b.outline === 'none' && b.pad === '0px' && b.inside), `the input draws no field of its own inside the pill, focused or not, whatever Canvas says of search inputs: ${JSON.stringify({ bareOff, bareOn })}`);
   // (2.98.54) the box afloat: with the cursor in it, it lifts out of the header to the middle of the window as a large pill over a
   // dim and a blur, the four kinds to search in under it, a ghost keeping the header's row; a kind narrows it; Escape puts it back
-  const afloat = await page.evaluate(() => { const pal = document.querySelector('.bcv-spot'); const ov = document.querySelector('.bcv-spot-ov'); const box = document.getElementById('bcv-omni-box'); const b = box.getBoundingClientRect(); const row = document.querySelector('.bcv-head__row'); const ghost = row.querySelector('.bcv-omni--ghost'); const seg = row.querySelector('.bcv-seg').getBoundingClientRect(); const h1 = row.querySelector('.bcv-h1').getBoundingClientRect(); return { pal: !!pal, inPal: !!pal && pal.contains(box), ov: !!ov, ovPointer: ov ? getComputedStyle(ov).pointerEvents : null, ovBlur: ov ? (getComputedStyle(ov).backdropFilter || getComputedStyle(ov).webkitBackdropFilter || '') : null, noblur: document.documentElement.classList.contains('bcv-noblur'), centred: Math.abs((b.left + b.right) / 2 - innerWidth / 2) <= 2, top: Math.round(b.top), w: Math.round(b.width), hgt: Math.round(b.height), font: getComputedStyle(document.getElementById('bcv-omni')).fontSize, ghost: !!ghost, ghostH: ghost ? Math.round(ghost.getBoundingClientRect().height) : 0, segLevel: Math.abs(seg.bottom - h1.bottom) < 24, rows: [...document.querySelectorAll('.bcv-omni__panel .bcv-omni__item')].map((e) => `${e.querySelector('.bcv-omni__t').textContent}:${e.querySelector('.bcv-omni__cmdkey')?.textContent}`).join(','), title: document.querySelector('.bcv-omni__gtitle')?.textContent, panelInPal: !!pal && pal.contains(document.getElementById('bcv-omni-panel')), cur: document.querySelector('.bcv-omni__item.is-cur .bcv-omni__t')?.textContent }; });
-  check(afloat.pal && afloat.inPal && afloat.ov && afloat.ovPointer === 'none' && (/blur/.test(afloat.ovBlur) || afloat.noblur) && afloat.centred && afloat.top === 160 && afloat.w === 680 && afloat.hgt >= 72 && afloat.hgt <= 74 && afloat.font === '26px' && afloat.ghost && afloat.ghostH === 29 && afloat.segLevel && afloat.title === 'Search in' && afloat.rows === 'Courses:⌘1,Work:⌘2,Files:⌘3,Actions:⌘4' && afloat.panelInPal && afloat.cur === 'Courses', `the box floats to the middle of the window as a 680×72 pill (26px words) over a blurred veil that takes no pointer, a ghost holding its place in the header, the four kinds under it with ⌘1–⌘4: ${JSON.stringify(afloat)}`);
+  const afloat = await page.evaluate(() => { const pal = document.querySelector('.bcv-spot'); const ov = document.querySelector('.bcv-spot-ov'); const box = document.getElementById('bcv-omni-box'); const b = box.getBoundingClientRect(); const row = document.querySelector('.bcv-head__row'); const ghost = row.querySelector('.bcv-omni--ghost'); const seg = row.querySelector('.bcv-seg').getBoundingClientRect(); const h1 = row.querySelector('.bcv-h1').getBoundingClientRect(); return { pal: !!pal, inPal: !!pal && pal.contains(box), ov: !!ov, ovPointer: ov ? getComputedStyle(ov).pointerEvents : null, ovBlur: ov ? (getComputedStyle(ov).backdropFilter || getComputedStyle(ov).webkitBackdropFilter || '') : null, pageFilter: [...document.querySelectorAll('#bcv-app > #bcv-main, #bcv-app > #bcv-side, body > #bcv-bar')].map((e) => getComputedStyle(e).filter).filter((f) => f !== 'none').join(','), noblur: document.documentElement.classList.contains('bcv-noblur'), centred: Math.abs((b.left + b.right) / 2 - innerWidth / 2) <= 2, top: Math.round(b.top), w: Math.round(b.width), hgt: Math.round(b.height), font: getComputedStyle(document.getElementById('bcv-omni')).fontSize, ghost: !!ghost, ghostH: ghost ? Math.round(ghost.getBoundingClientRect().height) : 0, segLevel: Math.abs(seg.bottom - h1.bottom) < 24, rows: [...document.querySelectorAll('.bcv-omni__panel .bcv-omni__item')].map((e) => `${e.querySelector('.bcv-omni__t').textContent}:${e.querySelector('.bcv-omni__cmdkey')?.textContent}`).join(','), title: document.querySelector('.bcv-omni__gtitle')?.textContent, panelInPal: !!pal && pal.contains(document.getElementById('bcv-omni-panel')), cur: document.querySelector('.bcv-omni__item.is-cur .bcv-omni__t')?.textContent }; });
+  check(afloat.pal && afloat.inPal && afloat.ov && afloat.ovPointer === 'none' && (!afloat.ovBlur || afloat.ovBlur === 'none') && !afloat.pageFilter && afloat.centred && afloat.top === 160 && afloat.w === 680 && afloat.hgt >= 72 && afloat.hgt <= 74 && afloat.font === '26px' && afloat.ghost && afloat.ghostH === 29 && afloat.segLevel && afloat.title === 'Search in' && afloat.rows === 'Courses:⌘1,Work:⌘2,Files:⌘3,Actions:⌘4' && afloat.panelInPal && afloat.cur === 'Courses', `the box floats to the middle of the window as a 680×72 pill (26px words) over a light veil that takes no pointer and blurs nothing (2.98.69: the page stays sharp), a ghost holding its place in the header, the four kinds under it with ⌘1–⌘4: ${JSON.stringify(afloat)}`);
   // (2.98.68) Spotlight's glass, whatever the page's look: a smoky pill, the panel a slab of its own under it with the page
   // blurred soft through it, white words, a plain white line drawing for each row's mark, the ⌘ keys large and quiet
   const glassNow = () => page.evaluate(() => {
     const cs = (e) => getComputedStyle(e);
     const box = document.getElementById('bcv-omni-box'), panel = document.querySelector('.bcv-spot .bcv-omni__panel');
     const row = panel.querySelector('.bcv-omni__item'), ic = row.querySelector('.bcv-omni__iic');
-    return { noblur: document.documentElement.classList.contains('bcv-noblur'), boxBg: cs(box).backgroundImage.slice(0, 15), boxColor: cs(box).backgroundColor, boxBlur: cs(box).backdropFilter || cs(box).webkitBackdropFilter || '', panelColor: cs(panel).backgroundColor, panelR: cs(panel).borderTopLeftRadius, panelBlur: cs(panel).backdropFilter || cs(panel).webkitBackdropFilter || '', gap: Math.round(panel.getBoundingClientRect().top - box.getBoundingClientRect().bottom), ink: cs(row.querySelector('.bcv-omni__t')).color, icBg: cs(ic).backgroundColor, icInk: cs(ic).color, key: cs(row.querySelector('.bcv-omni__cmdkey')).fontSize, title: cs(row.querySelector('.bcv-omni__t')).fontSize, selW: panel.querySelector('.bcv-omni__sel.is-on')?.offsetWidth ?? -1, rowW: row.offsetWidth };
+    return { noblur: document.documentElement.classList.contains('bcv-noblur'), boxBg: cs(box).backgroundImage.slice(0, 15), boxColor: cs(box).backgroundColor, boxBlur: cs(box).backdropFilter || cs(box).webkitBackdropFilter || '', panelColor: cs(panel).backgroundColor, panelR: cs(panel).borderTopLeftRadius, panelBlur: cs(panel).backdropFilter || cs(panel).webkitBackdropFilter || '', edges: [cs(box).borderTopWidth, cs(panel).borderTopWidth, /inset/.test(cs(box).boxShadow + cs(panel).boxShadow)].join(','), gap: Math.round(panel.getBoundingClientRect().top - box.getBoundingClientRect().bottom), ink: cs(row.querySelector('.bcv-omni__t')).color, icBg: cs(ic).backgroundColor, icInk: cs(ic).color, key: cs(row.querySelector('.bcv-omni__cmdkey')).fontSize, title: cs(row.querySelector('.bcv-omni__t')).fontSize, selW: panel.querySelector('.bcv-omni__sel.is-on')?.offsetWidth ?? -1, rowW: row.offsetWidth };
   });
-  const marks = (g) => g.panelR === '34px' && g.gap >= 12 && g.ink === 'rgb(255, 255, 255)' && g.icBg === 'rgba(0, 0, 0, 0)' && g.icInk === 'rgb(255, 255, 255)' && g.key === '17px' && g.title === '17.5px' && Math.abs(g.selW - g.rowW) <= 1; // (the highlight the row's whole width: drawn while the palette still widened, it was left short)
+  const marks = (g) => g.edges === '0px,0px,false' && g.panelR === '34px' && g.gap >= 12 && g.ink === 'rgb(255, 255, 255)' && g.icBg === 'rgba(0, 0, 0, 0)' && g.icInk === 'rgb(255, 255, 255)' && g.key === '17px' && g.title === '17.5px' && Math.abs(g.selW - g.rowW) <= 1; // (the highlight the row's whole width: drawn while the palette still widened, it was left short)
   // where Chrome draws without acceleration (as here) the glass is solid, and as dark: the words hold the same
   const solid = await glassNow();
   check(!solid.noblur || (solid.boxColor === 'rgba(40, 40, 44, 0.97)' && solid.panelColor === 'rgba(40, 40, 44, 0.97)' && solid.boxBlur === 'none' && marks(solid)), `without blur (Chrome with no graphics acceleration) the pill and the panel are solid and as dark, the words and marks the same: ${JSON.stringify(solid)}`);
   await page.evaluate(() => document.documentElement.classList.remove('bcv-noblur'));
   const glass = await glassNow();
-  check(/linear-gradient/.test(glass.boxBg) && /blur\(40px\)/.test(glass.boxBlur) && /blur\(48px\)/.test(glass.panelBlur) && marks(glass), `afloat it wears Spotlight's glass: a smoky pill, a slab of its own under it with the page blurred soft through it, white words, plain white marks, large ⌘ keys: ${JSON.stringify(glass)}`);
+  check(/linear-gradient/.test(glass.boxBg) && /blur\(24px\)/.test(glass.boxBlur) && /blur\(26px\)/.test(glass.panelBlur) && marks(glass), `afloat it wears Spotlight's glass: a smoky pill, a slab of its own under it with the page blurred soft through it (24px, 26px: 2.98.69), no border or edge line on either, white words, plain white marks, large ⌘ keys: ${JSON.stringify(glass)}`);
   await shot(page, '15-spot-glass');
   if (solid.noblur) await page.evaluate(() => document.documentElement.classList.add('bcv-noblur')); // (as the rest of the run draws it)
   await page.keyboard.press('Meta+2');
@@ -3532,6 +3532,57 @@ try {
   await page.waitForFunction(() => document.querySelector('.bcv-omni__gtitle')?.textContent === 'Due this week', null, { timeout: 8000 });
   await page.keyboard.press('Backspace');
   check(await eventually(() => page.evaluate(() => document.getElementById('bcv-omni-chip').hidden && document.querySelector('.bcv-omni__gtitle')?.textContent === 'Search in'), 3000), 'Backspace on the empty box lets the kind go: the four kinds again');
+  // (2.98.69) Files afloat are Spotlight's grid: the kinds found as chips across the top, then each file a page of its kind (a
+  // picture its own thumbnail) with its name under it, seven to a row — the files and pages changed last, before anything is typed
+  await page.keyboard.press('Meta+3');
+  await page.waitForFunction(() => document.querySelector('.bcv-omni__gtitle')?.textContent === 'Recents' && document.querySelectorAll('.bcv-omni__tile').length >= 9 && [...document.querySelectorAll('.bcv-omni__tile img')].every((i) => i.complete), null, { timeout: 10000 });
+  await page.waitForTimeout(400); // (the tiles settled where they stand)
+  const fgrid = () => page.evaluate(() => {
+    const panel = document.querySelector('.bcv-spot .bcv-omni__panel');
+    const tiles = [...panel.querySelectorAll('.bcv-omni__item.bcv-omni__tile')]; // (not the likeness of one gone, fading where it stood)
+    const names = tiles.map((t) => t.querySelector('.bcv-omni__tname')?.textContent);
+    const tops = [...new Set(tiles.map((t) => t.offsetTop))];
+    const img = panel.querySelector('.bcv-omni__doc--thumb img');
+    const cur = panel.querySelector('.bcv-omni__tile.is-cur'), sel = panel.querySelector('.bcv-omni__sel.is-on');
+    return {
+      chip: document.getElementById('bcv-omni-chip')?.textContent.trim(), focus: document.activeElement?.id,
+      chips: [...panel.querySelectorAll('.bcv-omni__fchip')].map((b) => `${b.textContent}${b.getAttribute('aria-pressed') === 'true' ? '*' : ''}`).join(','),
+      n: tiles.length, perRow: tiles.filter((t) => t.offsetTop === tops[0]).length, rows: tops.length, names: names.join(' | '),
+      kinds: [...new Set(tiles.map((t) => t.dataset.kind))].join(','), rowsLeft: panel.querySelectorAll('.bcv-omni__item:not(.bcv-omni__tile)').length,
+      pdf: panel.querySelector('.bcv-omni__doc--pdf .bcv-omni__docext')?.textContent, page: panel.querySelector('.bcv-omni__doc--page .bcv-omni__docext')?.textContent,
+      thumb: !!img && img.naturalWidth > 0 && Math.round(img.getBoundingClientRect().width) === 64,
+      nameFont: tiles[0] ? getComputedStyle(tiles[0].querySelector('.bcv-omni__tname')).fontSize : null, nameInk: tiles[0] ? getComputedStyle(tiles[0].querySelector('.bcv-omni__tname')).color : null,
+      cur: tiles.indexOf(cur), selFits: !!cur && !!sel && Math.abs(sel.offsetLeft + parseFloat(getComputedStyle(sel).transform.split(',')[4] || 0) - cur.offsetLeft) <= 1 && Math.abs(sel.offsetWidth - cur.offsetWidth) <= 1 && Math.abs(sel.offsetHeight - cur.offsetHeight) <= 1,
+    };
+  });
+  const fg = await fgrid();
+  check(fg.chip === 'Files' && fg.focus === 'bcv-omni' && fg.chips === 'PDF,Sheets,Images,Text,Pages' && fg.n === 9 && fg.perRow === 7 && fg.rows === 2 && fg.rowsLeft === 0 && fg.pdf === 'PDF' && fg.page === 'PAGE' && fg.thumb && fg.nameFont === '12.5px' && fg.nameInk === 'rgb(255, 255, 255)', `⌘3: Files as Spotlight's grid — the kinds as chips across the top, every file and page a tile seven to a row (a page of its kind with its label, the picture its own thumbnail), the name under it: ${JSON.stringify(fg)}`);
+  check(fg.names.startsWith('Chapter 4 notes | Dis01 worksheet.pdf | reading-list.txt | Lecture 3 whiteboard.png') && fg.names.endsWith('Lab safety') && fg.cur === 0 && fg.selFits, `Recents, newest first, the first one chosen with the highlight on its tile: ${fg.names}`);
+  if (solid.noblur) await page.evaluate(() => document.documentElement.classList.remove('bcv-noblur'));
+  await shot(page, '15-spot-files');
+  if (solid.noblur) await page.evaluate(() => document.documentElement.classList.add('bcv-noblur'));
+  // the arrows walk the grid: → along the row, ↓ to the tile below, ↑ back, ← back along
+  const walk = [];
+  for (const k of ['ArrowRight', 'ArrowRight', 'ArrowDown', 'ArrowDown', 'ArrowUp', 'ArrowLeft']) { await page.keyboard.press(k); walk.push((await fgrid()).cur); }
+  check(walk.join(',') === '1,2,8,8,1,0', `the arrows walk the grid — → along the row, ↓ to the nearest tile below (none below the last row: it stays), ↑ back up, ← back: ${walk.join(',')}`);
+  // a kind's chip narrows the grid to it (the cursor stays in the box); pressed again, every kind
+  await page.click('.bcv-omni__fchip[data-kind="pdf"]');
+  const fPdf = await fgrid();
+  check(fPdf.chips === 'PDF*,Sheets,Images,Text,Pages' && fPdf.kinds === 'pdf' && fPdf.n === 3 && fPdf.focus === 'bcv-omni' && fPdf.cur === 0, `the PDF chip narrows the grid to the PDFs, the cursor still in the box: ${JSON.stringify(fPdf)}`);
+  await page.click('.bcv-omni__fchip[data-kind="pdf"]');
+  check((await fgrid()).n === 9, 'pressed again, the grid holds every kind');
+  // typed, the grid narrows to what matches, under Files and Pages; ← → are the caret's until ↓ goes into the grid; Enter opens the one chosen
+  await page.keyboard.type('notes');
+  await page.waitForFunction(() => document.querySelector('.bcv-omni__group--grid')?.dataset.group === 'Pages' && document.querySelectorAll('.bcv-omni__tile').length === 1, null, { timeout: 8000 });
+  await page.keyboard.press('ArrowLeft');
+  check(await page.evaluate(() => document.getElementById('bcv-omni').selectionStart === 4), '← moves the caret in the words typed, not the grid');
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(() => /\/courses\/101\/pages\/chapter-4-notes$/.test(location.pathname) && !document.querySelector('.bcv-spot'), null, { timeout: 10000 });
+  check(true, 'Enter opens the tile chosen (the page, in place), and the box goes home');
+  await page.goto(`${BASE}/`);
+  await page.waitForSelector('#bcv-omni', { timeout: 10000 });
+  await page.focus('#bcv-omni');
+  await page.waitForFunction(() => document.querySelector('.bcv-omni__gtitle')?.textContent === 'Search in', null, { timeout: 8000 });
   await page.keyboard.press('Escape');
   check(await eventually(() => page.evaluate(() => !document.querySelector('.bcv-spot') && !document.querySelector('.bcv-spot-ov') && !document.querySelector('.bcv-omni--ghost') && document.querySelector('.bcv-head__row').contains(document.getElementById('bcv-omni-box')) && document.activeElement?.id !== 'bcv-omni'), 3000), 'Escape on the empty box puts it back in the header, the veil and the ghost gone');
   const homeAgain = await page.evaluate(() => { const row = document.querySelector('.bcv-head__row'); const s = row.querySelector('#bcv-omni-box').getBoundingClientRect(); const h1 = row.querySelector('.bcv-h1').getBoundingClientRect(); const seg = row.querySelector('.bcv-seg').getBoundingClientRect(); return { between: s.left > h1.right && s.right <= seg.left + 1, level: Math.abs(s.bottom - seg.bottom) < 1.5, h: Math.round(s.height), panelHidden: document.getElementById('bcv-omni-panel').hidden }; });
