@@ -35,6 +35,7 @@
   const CMDS = 3; // commands a plain search lists at most (the name typed starts theirs)
 
   let ui = null; // the box on the page: { app, root, input, panel, seq, q, groups, pending, cursor, items, timer, mode, cmd, arg, cs }
+  let widthWatch = null; // (the panel's width, for the highlight: one at a time)
   let wanted = null; // the box summoned from another screen: { text, stop } — filled and focused once the Dashboard's box mounts
   const norm = (s) => String(s || '').toLowerCase().trim();
   const hit = (s, q) => norm(s).includes(q);
@@ -652,6 +653,20 @@
     ]);
     const root = h('div', { class: 'bcv-omni', id: 'bcv-omni-root' }, [box, panel]);
     ui = { app, root, input, panel, chip, scope: null, placeholder: input.placeholder, ariaLabel: input.getAttribute('aria-label'), wiki: wikiOn, seq: 0, q: '', raw: '', groups: new Map(), pending: 0, cursor: -1, items: [], timer: 0, mode: 'plain', cmd: null, arg: '', cs: null, reading: '' };
+    // the highlight is measured from the chosen row; afloat, the rows are first drawn while the palette still eases from the
+    // header's width to its own, so a change of the panel's width puts the highlight back on its row (its height is left
+    // alone: it eases as the rows change, and the highlight glides on its own then)
+    widthWatch?.disconnect();
+    if (self.ResizeObserver) {
+      let lastW = 0;
+      widthWatch = new ResizeObserver((entries) => {
+        const w = Math.round(entries[0]?.contentRect.width || 0);
+        if (w === lastW) return;
+        lastW = w;
+        if (ui?.panel === panel && !panel.hidden && w > 0) markCursor({ jump: true });
+      });
+      widthWatch.observe(panel);
+    }
     input.addEventListener('input', () => { if (ui) run(input.value); });
     input.addEventListener('focus', () => {
       if (!ui) return;
