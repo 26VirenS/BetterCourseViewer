@@ -3469,6 +3469,40 @@ try {
   await eventually(async () => (await page.$('.bcv-omni__more')) === null && (await page.$$('.bcv-omni__group')).length >= 2, 12000);
   const two = await omniState();
   check(two.groups[0] === 'Courses' && two.groups.length >= 2 && two.groups[two.groups.length - 1] === 'Wikipedia', `from the second letter, after a pause, Canvas and Wikipedia answer under them: ${two.groups.join(' · ')}`);
+  // (2.98.65) what the starred courses hold is kept from the box's first focus: a word is answered from memory at once, Canvas
+  // asked nothing course by course; the results move like Spotlight's — rows glide, new ones rise in, gone ones fade where they
+  // stood (likenesses nothing finds or presses) — and the highlight is one shape that glides from row to row
+  const askedByName = [];
+  const onAsk = (r) => { if (/\/api\/v1\/courses\/\w+\/(assignments|discussion_topics|pages|files)\?.*search_term=/.test(r.url())) askedByName.push(r.url()); };
+  page.on('request', onAsk);
+  await page.evaluate(() => { const p = document.getElementById('bcv-omni-panel'); const seen = window.__omniSeen = { gone: 0, moving: 0, bad: 0 }; window.__omniObs = new MutationObserver((ms) => { for (const m of ms) for (const n of m.addedNodes) if (n.classList?.contains('bcv-omni__gone')) { seen.gone += 1; if (n.getAttribute('aria-hidden') !== 'true' || n.matches('.bcv-omni__item, [data-key], [role]') || n.querySelector('.bcv-omni__item, [data-key]')) seen.bad += 1; } seen.moving = Math.max(seen.moving, [...p.querySelectorAll('[data-key]')].filter((e) => e.getAnimations().length).length); }); window.__omniObs.observe(p, { childList: true }); });
+  await page.fill('#bcv-omni', 'lab');
+  const labAt = Date.now();
+  await page.waitForSelector('.bcv-omni__group[data-group="Assignments"] .bcv-omni__item', { timeout: 3000 });
+  const labTook = Date.now() - labAt;
+  await eventually(async () => (await page.$('.bcv-omni__more')) === null, 12000);
+  await page.waitForTimeout(400); // (every motion done)
+  page.off('request', onAsk);
+  const labHits = await omniState();
+  check(askedByName.length === 0 && labTook < 1000 && labHits.groups.includes('Assignments'), `a word is answered from what the courses hold, kept since the box was first pressed: the assignments at once (${labTook} ms), no course asked by name: ${askedByName.length} asked · ${labHits.groups.join(',')}`);
+  const omniMove = await page.evaluate(() => { window.__omniObs.disconnect(); return { ...window.__omniSeen, left: document.querySelectorAll('.bcv-omni__gone').length }; });
+  check(omniMove.gone > 0 && omniMove.moving > 0 && omniMove.bad === 0 && omniMove.left === 0, `the results change in motion: rows that stay glide and new ones rise in, gone ones fade where they stood as likenesses nothing finds, and all of it is over in a moment: ${JSON.stringify(omniMove)}`);
+  const selRead = () => page.evaluate(() => { const s = [...document.querySelectorAll('.bcv-omni__sel')]; const c = document.querySelector('.bcv-omni__item.is-cur'); if (s.length !== 1 || !c) return { n: s.length, cur: !!c }; const a = s[0].getBoundingClientRect(); const b = c.getBoundingClientRect(); return { n: 1, on: s[0].classList.contains('is-on'), off: Math.round(Math.abs(a.left - b.left) + Math.abs(a.top - b.top) + Math.abs(a.width - b.width) + Math.abs(a.height - b.height)), gliding: s[0].getAnimations().length > 0, rowBg: getComputedStyle(c).backgroundColor, selBg: getComputedStyle(s[0]).backgroundColor }; });
+  const sel0 = await selRead();
+  await page.keyboard.press('ArrowDown');
+  const selMid = await selRead();
+  await page.waitForTimeout(350);
+  const sel1 = await selRead();
+  await page.keyboard.press('ArrowUp');
+  await page.waitForTimeout(350);
+  check(sel0.n === 1 && sel0.on && sel0.off <= 1 && sel0.rowBg === 'rgba(0, 0, 0, 0)' && sel0.selBg !== 'rgba(0, 0, 0, 0)' && selMid.gliding && sel1.off <= 1 && (await curAt()) === 0, `the highlight is one shape behind the row chosen, gliding to the next as the arrows move: ${JSON.stringify({ sel0, selMid, sel1 })}`);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.evaluate(() => { const p = document.getElementById('bcv-omni-panel'); const seen = window.__omniSeen = { gone: 0, moving: 0 }; window.__omniObs = new MutationObserver(() => { seen.gone += p.querySelectorAll('.bcv-omni__gone').length; seen.moving = Math.max(seen.moving, [...p.querySelectorAll('[data-key], .bcv-omni__sel')].filter((e) => e.getAnimations().length).length); }); window.__omniObs.observe(p, { childList: true }); });
+  await page.fill('#bcv-omni', 'phys');
+  await eventually(async () => (await page.$('.bcv-omni__more')) === null && (await page.$$('.bcv-omni__group')).length >= 2, 12000);
+  const stillRun = await page.evaluate(() => { window.__omniObs.disconnect(); return window.__omniSeen; });
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  check(stillRun.gone === 0 && stillRun.moving === 0, `with reduced motion the results are drawn at once, nothing gliding or fading: ${JSON.stringify(stillRun)}`);
   // a row carries what can be done with it, shown on the row chosen (or under the pointer) alone
   await page.fill('#bcv-omni', 'dis01');
   await page.waitForSelector('.bcv-omni__group[data-group="Files"] .bcv-omni__item', { timeout: 12000 });

@@ -1160,6 +1160,12 @@
   function page(id, slug, { force = false, refresh = false, kind = 'courses' } = {}) {
     return C.cached(`page:${kind}:${id}:${slug}`, 10 * MIN, () => C.get(`/api/v1/${kind}/${id}/pages/${encodeURIComponent(slug)}`), { force, refresh });
   }
+  /** A course's files as one list, the most recently changed first (the search box's index, 2.98.65): as
+   *  many as three pages of a hundred hold; past that the list is cut short and the search asks Canvas. */
+  const COURSE_FILES_MAX = 300;
+  function courseFiles(id, { force = false, refresh = false } = {}) {
+    return C.cached(`cfiles:${id}`, 10 * MIN, () => C.get(`/api/v1/courses/${id}/files`, { params: { per_page: 100, sort: 'updated_at', order: 'desc' }, all: true, maxPages: COURSE_FILES_MAX / 100 }), { force, refresh });
+  }
   function rootFolder(id, { force = false, refresh = false, kind = 'courses' } = {}) {
     return C.cached(`folder:root:${kind}:${id}`, 15 * MIN, () => C.get(`/api/v1/${kind}/${id}/folders/root`), { force, refresh });
   }
@@ -1540,7 +1546,7 @@
     conversations, conversation, markRead, setStarred, replyTo, compose, searchRecipients, invalidateInbox,
     course, tabs, frontPage, syllabus, courseTodo, ignoreTodo, courseStream, assignments, assignment, submission, assignmentGroups, progress,
     announcements, discussions, discussion, discussionView, postEntry, markTopicRead, people, sections, courseGroups, pages, page,
-    rootFolder, folderContents, folderByPath, file, quizzes, quiz, quizSubmissions, quizApi, modules, moduleItemFor, markItemDone, assignmentNeighbours, gradeModel, fmtPts,
+    rootFolder, folderContents, folderByPath, file, courseFiles, COURSE_FILES_MAX, quizzes, quiz, quizSubmissions, quizApi, modules, moduleItemFor, markItemDone, assignmentNeighbours, gradeModel, fmtPts,
     notifications, notifState, setNotifState, notifUnread,
     homeworkTools, uploadSubmissionFile, uploadSubmissionFileFromUrl, submitAssignment, commentOnSubmission, invalidateAssignment, quizAttemptLimit,
   };

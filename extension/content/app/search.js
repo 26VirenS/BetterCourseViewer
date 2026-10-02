@@ -172,18 +172,24 @@
     const cs = await store.courses().catch(() => []);
     return cs.filter((c) => c.state === 'current' && [c.name, c.code, c.nickname].some((s) => hit(s, q))).slice(0, PER).map(courseRow);
   }
-  /** One of a course's lists, for every starred course: Canvas narrows it by search_term where it can, and the title is checked here in any case. */
-  const perCourse = (q, cs, lane, path, params, pick) => Promise.all(cs.map((c) => lane(async () => {
+  // a course's item as a row, one way for each kind, whether it came from the index or from Canvas's own search
+  const stamp = (iso) => { const t = iso ? Date.parse(iso) : NaN; return Number.isFinite(t) ? t : null; };
+  const PICK = {
+    Assignments: (a, c) => ({ icon: IC.doc, title: a.name, sub: `${nameOf(c)} · ${a.due_at ? `Due ${when(a.due_at)}` : 'Assignment'}`, href: `/courses/${c.id}/assignments/${a.id}`, assignment: a, at: stamp(a.due_at) }),
+    Announcements: (t, c) => ({ icon: IC.bell, title: t.title, sub: `${nameOf(c)} · Announcement`, href: `/courses/${c.id}/discussion_topics/${t.id}`, at: stamp(t.posted_at || t.created_at) }),
+    Pages: (p, c) => ({ icon: IC.page, title: p.title, sub: `${nameOf(c)} · Page`, href: `/courses/${c.id}/pages/${p.url}`, at: stamp(p.updated_at) }),
+    Discussions: (t, c) => (t.is_announcement ? null : { icon: IC.people, title: t.title, sub: `${nameOf(c)} · Discussion`, href: `/courses/${c.id}/discussion_topics/${t.id}`, at: stamp(t.last_reply_at || t.posted_at) }),
+    Files: (f, c) => ({ icon: IC.folder, title: f.display_name || f.filename, alt: f.filename, sub: `${nameOf(c)} · File`, href: `/courses/${c.id}/files/${f.id}`, file: f, at: stamp(f.updated_at) }),
+  };
+  /** One of a course's lists, for every course given: Canvas narrows it by search_term where it can, and the title is checked here in any case. */
+  const PATHS = { Assignments: ['/assignments', {}], Announcements: ['/discussion_topics', { only_announcements: true }], Pages: ['/pages', {}], Discussions: ['/discussion_topics', {}], Files: ['/files', {}] };
+  const perCourse = (kind) => (q, cs, lane) => Promise.all(cs.map((c) => lane(async () => {
     try {
+      const [path, params] = PATHS[kind];
       const rows = await C.get(`/api/v1/courses/${c.id}${path}`, { params: { search_term: q, per_page: 20, ...params } });
-      return (Array.isArray(rows) ? rows : []).map((r) => pick(r, c)).filter((it) => it && it.title && (hit(it.title, q) || (it.alt && hit(it.alt, q))));
+      return (Array.isArray(rows) ? rows : []).map((r) => PICK[kind](r, c)).filter((it) => it && it.title && (hit(it.title, q) || (it.alt && hit(it.alt, q))));
     } catch { return []; } // (a list the course keeps from students — files, often — is no result, not an error)
   }))).then((lists) => lists.flat().slice(0, PER));
-  const assignmentHits = (q, cs, lane) => perCourse(q, cs, lane, '/assignments', {}, (a, c) => ({ icon: IC.doc, title: a.name, sub: `${nameOf(c)} · ${a.due_at ? `Due ${when(a.due_at)}` : 'Assignment'}`, href: `/courses/${c.id}/assignments/${a.id}`, assignment: a }));
-  const announcementHits = (q, cs, lane) => perCourse(q, cs, lane, '/discussion_topics', { only_announcements: true }, (t, c) => ({ icon: IC.bell, title: t.title, sub: `${nameOf(c)} · Announcement`, href: `/courses/${c.id}/discussion_topics/${t.id}` }));
-  const pageHits = (q, cs, lane) => perCourse(q, cs, lane, '/pages', {}, (p, c) => ({ icon: IC.page, title: p.title, sub: `${nameOf(c)} · Page`, href: `/courses/${c.id}/pages/${p.url}` }));
-  const discussionHits = (q, cs, lane) => perCourse(q, cs, lane, '/discussion_topics', {}, (t, c) => ({ icon: IC.people, title: t.title, sub: `${nameOf(c)} · Discussion`, href: `/courses/${c.id}/discussion_topics/${t.id}` }));
-  const fileHits = (q, cs, lane) => perCourse(q, cs, lane, '/files', {}, (f, c) => ({ icon: IC.folder, title: f.display_name || f.filename, alt: f.filename, sub: `${nameOf(c)} · File`, href: `/courses/${c.id}/files/${f.id}`, file: f }));
   async function peopleHits(q) {
     try {
       const rows = await C.get('/api/v1/search/recipients', { params: { search: q, per_page: 10 } });
@@ -200,25 +206,105 @@
   }
   // the groups in the order they are shown: what the page holds first, then a phrase read as one, then Canvas, then Wikipedia
   const ORDER = ['Answer', 'Best match', 'Commands', 'Courses', 'Assignments', 'Announcements', 'Pages', 'Discussions', 'Files', 'People', 'Wikipedia'];
+  const IX_KINDS = ['Assignments', 'Announcements', 'Pages', 'Discussions', 'Files'];
   const NET = [
-    ['Assignments', (q, cs, lane) => assignmentHits(q, cs, lane)],
-    ['Announcements', (q, cs, lane) => announcementHits(q, cs, lane)],
-    ['Pages', (q, cs, lane) => pageHits(q, cs, lane)],
-    ['Discussions', (q, cs, lane) => discussionHits(q, cs, lane)],
-    ['Files', (q, cs, lane) => fileHits(q, cs, lane)],
+    ...IX_KINDS.map((k) => [k, perCourse(k)]),
     ['People', (q) => peopleHits(q)],
     ['Wikipedia', (q) => wikiHits(q)],
   ];
 
-  // ---- a search: what the page holds at once, every network source after a pause, each group painted as it answers ----
+  // ---- the index (2.98.65) --------------------------------------------------------------------------
+  // What the starred courses hold — their assignments, announcements, pages, discussions and files —
+  // kept here from the moment the box is first focused (the store's own lists, which the screens share:
+  // one request per list and course, a few at a time, the assignments first), so every letter typed is
+  // answered from memory at once instead of asking Canvas again, course by course and kind by kind, after
+  // a pause. A kind not in yet is asked for the old way meanwhile, and painted from the index the moment it
+  // lands; a course whose list could not be read (or whose files run past what is kept) is asked for that
+  // way too, alongside. People and Wikipedia are Canvas's and Wikipedia's to answer, after a short pause.
+  const IX_TTL = 5 * 60 * 1000; // (taken again on the next focus after this)
+  const PAUSE_IX = 140; // ms of quiet before the sources that are not kept here are asked, once the index answers the rest
+  const LISTS = {
+    Assignments: (c) => store.assignments(c.id),
+    Announcements: (c) => store.announcements(c.id),
+    Pages: (c) => store.pages(c.id),
+    Discussions: (c) => store.discussions(c.id),
+    Files: (c) => store.courseFiles(c.id),
+  };
+  let ix = null; // { at, ids, kinds: { [kind]: { items, ready, partial: Set(course ids) } } }
+  const fresh = () => !!ix && Date.now() - ix.at < IX_TTL;
+  /** Take (or keep) the index for the starred courses; each kind is searchable the moment its lists are in. */
+  async function warm() {
+    if (fresh()) return;
+    const prev = ix;
+    // (a kind already kept goes on answering from what it had until its fresh lists are in)
+    const built = { at: Date.now(), ids: '', kinds: Object.fromEntries(IX_KINDS.map((k) => [k, prev?.kinds[k]?.ready ? { ...prev.kinds[k] } : { items: [], ready: false, partial: new Set() }])) };
+    ix = built;
+    const cs = (ui && ui.cs) || await favs();
+    if (ui && !ui.cs) ui.cs = cs;
+    if (ix !== built) return;
+    built.ids = cs.map((c) => String(c.id)).join(',');
+    const lane = limiter(LANES);
+    await Promise.all(IX_KINDS.map(async (kind) => {
+      const partial = new Set();
+      const lists = await Promise.all(cs.map((c) => lane(() => LISTS[kind](c).then((rows) => {
+        if (kind === 'Files' && Array.isArray(rows) && rows.length >= (store.COURSE_FILES_MAX || 300)) partial.add(String(c.id)); // (more than is kept: Canvas is asked for this course's too)
+        return Array.isArray(rows) ? rows : [];
+      }).catch((e) => {
+        if (![401, 403, 404].includes(e?.status)) partial.add(String(c.id)); // (a list the course keeps from students is no result; one that failed is asked for again by name)
+        return [];
+      }))));
+      if (ix !== built) return;
+      const items = [];
+      lists.forEach((rows, i) => { for (const r of rows) { const it = PICK[kind](r, cs[i]); if (it && it.title) { it.n = norm(it.title); it.na = it.alt ? norm(it.alt) : ''; items.push(it); } } });
+      built.kinds[kind] = { items, ready: true, partial };
+      indexed(kind);
+    }));
+  }
+  /** The index's best for the words typed: every word in the title (or a file's name), a word's start and the title's start counting for more, then what is nearest now. */
+  function lookup(kind, q) {
+    const K = ix?.kinds[kind];
+    if (!K?.ready) return null;
+    const words = q.split(/\s+/).filter(Boolean);
+    const now = Date.now();
+    const found = [];
+    for (const it of K.items) {
+      let score = 0;
+      for (const w of words) {
+        let s = it.n.indexOf(w), src = it.n;
+        if (s < 0 && it.na) { s = it.na.indexOf(w); src = it.na; }
+        if (s < 0) { score = -1; break; }
+        score += s === 0 ? 3 : /[^a-z0-9]/.test(src[s - 1]) ? 2 : 1;
+      }
+      if (score > 0) found.push([score, it.at === null ? Infinity : Math.abs(it.at - now), it]);
+    }
+    found.sort((a, b) => b[0] - a[0] || a[1] - b[1]);
+    return found.slice(0, PER).map((f) => f[2]);
+  }
+  /** A kind just in: the search on show takes it from the index (what Canvas was asked meanwhile is no longer needed for it). */
+  function indexed(kind) {
+    if (!ui || ui.mode !== 'plain' || ui.q.length < NET_MIN || !ui.local || ui.local.has(kind)) return;
+    const s = ui.scope;
+    if (s && !s.groups.includes(kind)) return;
+    const items = lookup(kind, ui.q);
+    if (!items) return;
+    ui.local.add(kind);
+    if (!ix.kinds[kind].partial.size) ui.groups.set(kind, items);
+    else ui.groups.set(kind, merge(items, ui.groups.get(kind) || []));
+    paint();
+  }
+  /** The index's rows and Canvas's for the same kind, one list: no row twice, the index's first. */
+  const merge = (a, b) => { const seen = new Set(); const out = []; for (const it of [...a, ...b]) { const k = it.href || it.url || it.title; if (!seen.has(k)) { seen.add(k); out.push(it); } } return out.slice(0, PER); };
+
+  // ---- a search: what the page holds at once, the index at once, the rest after a pause, each group painted as it answers ----
   function run(raw) {
     if (!ui) return;
     const seq = ++ui.seq;
     clearTimeout(ui.timer);
-    ui.raw = raw; ui.q = norm(raw); ui.groups = new Map(); ui.items = []; ui.pending = 0; ui.cursor = 0; ui.cmd = null; ui.arg = ''; ui.mode = 'plain'; ui.reading = ''; // (the rows of the last search are no answer to this one: Enter meanwhile does nothing)
+    ui.raw = raw; ui.q = norm(raw); ui.groups = new Map(); ui.items = []; ui.pending = 0; ui.cursor = 0; ui.cmd = null; ui.arg = ''; ui.mode = 'plain'; ui.reading = ''; ui.local = new Set(); // (the rows of the last search are no answer to this one: Enter meanwhile does nothing)
     if (String(raw).trimStart().startsWith('/')) { commandMode(String(raw).trimStart(), seq); return; }
     const q = ui.q;
     if (!q) { if (afloat()) { if (ui.scope) listScope(); else paintScopes(); } else close(); return; } // (afloat and empty: the kinds, or the kind's own things)
+    if (!fresh()) warm().catch(() => {}); // (summoned straight to words, or kept past its time: the index is taken now)
     const s = ui.scope; // (a kind chosen: its groups alone answer)
     const want = (name) => !s || s.groups.includes(name);
     const hub = BCV.hub;
@@ -236,8 +322,17 @@
       }
     }
     if (want('Courses')) courseHits(q).then((items) => { if (ui && ui.seq === seq) { ui.groups.set('Courses', items); paint(); } });
-    const net = NET.filter(([name]) => want(name));
-    if (q.length >= NET_MIN && net.length) { ui.pending = net.length; ui.timer = setTimeout(() => network(q, seq, net, want('Best match')), PAUSE); }
+    if (q.length >= NET_MIN) {
+      for (const k of IX_KINDS) {
+        if (!want(k)) continue;
+        const items = lookup(k, q);
+        if (items) { ui.groups.set(k, items); ui.local.add(k); }
+      }
+    }
+    // what the index does not hold (yet): Canvas's own search, after a pause — a short one when the index answered the rest
+    const net = NET.filter(([name]) => want(name) && (!ui.local.has(name) || ix.kinds[name].partial.size));
+    const slow = net.some(([name]) => IX_KINDS.includes(name) && !ui.local.has(name));
+    if (q.length >= NET_MIN && net.length) { ui.pending = net.length; ui.timer = setTimeout(() => network(q, seq, net, want('Best match')), slow ? PAUSE : PAUSE_IX); }
     paint();
   }
   async function network(q, seq, net = NET, phrases = true) {
@@ -258,9 +353,13 @@
       });
     }
     for (const [name, fn] of net) {
-      Promise.resolve().then(() => fn(q, cs, lane)).catch(() => []).then((items) => {
+      // a kind the index answered, but with courses it could not read: Canvas is asked for those alone, and the two lists made one
+      const part = ui.local.has(name) ? ix.kinds[name].partial : null;
+      const ask = part ? cs.filter((c) => part.has(String(c.id))) : cs;
+      Promise.resolve().then(() => fn(q, ask, lane)).catch(() => []).then((items) => {
         if (!ui || ui.seq !== seq) return;
-        ui.groups.set(name, items || []);
+        if (part) ui.groups.set(name, merge(ui.groups.get(name) || [], items || []));
+        else if (!ui.local.has(name)) ui.groups.set(name, items || []); // (the index came in meanwhile and answered: its rows stand)
         ui.pending -= 1;
         paint();
       });
@@ -317,25 +416,89 @@
     if (cmd.net && p.arg) ui.timer = setTimeout(go, PAUSE); else go(); // (a list Canvas is asked for waits for the typing to pause; the page's own answer at once)
   }
 
+  // ---- the panel in motion (2.98.65): results change the way Spotlight's do ----------------------------
+  // Every row, group title and line carries a key (its group and what it opens). When the panel is drawn
+  // again — a letter typed, a source answering — a row still there glides from where it stood to its new
+  // place, a new one fades in a few pixels below and rises (one after another, quickly), one gone fades
+  // where it stood, and the panel's height eases to its new one; the highlight on the chosen row is one
+  // shape that glides from row to row, as the arrows move it or the rows move under it. Reduced motion:
+  // drawn at once, as before.
+  const EASE = 'cubic-bezier(.32,.72,0,1)';
+  const keyOf = (group, it) => `${group}|${it.href || it.url || (it.cmd ? `/${it.cmd.name}` : '') || it.title}`;
+  /** Where each keyed piece of the panel stands now, and the panel's height, before it is drawn again. */
+  function snapshot(panel) {
+    const rows = new Map();
+    // (where it is seen, mid-motion included: a row still rising in carries its opacity on into the next draw, not a pop to full)
+    for (const el of panel.querySelectorAll(':scope [data-key]')) rows.set(el.dataset.key, { el, r: el.getBoundingClientRect(), o: el.getAnimations().length ? +getComputedStyle(el).opacity : 1 });
+    return { h: panel.getBoundingClientRect().height, rows };
+  }
+  function flip(panel, was) {
+    ui.hAnim?.cancel(); // (a height still easing from the last draw: the new one is measured as it truly is)
+    const pr = panel.getBoundingClientRect();
+    const seen = new Set();
+    let entering = 0;
+    for (const el of panel.querySelectorAll(':scope [data-key]')) {
+      const k = el.dataset.key;
+      seen.add(k);
+      const old = was.rows.get(k);
+      const r = el.getBoundingClientRect();
+      if (old) {
+        const dy = old.r.top - r.top;
+        if (Math.abs(dy) > 0.5 || old.o < 0.99) el.animate([{ opacity: old.o, transform: `translateY(${dy}px)` }, { opacity: 1, transform: 'none' }], { duration: 260, easing: EASE });
+      } else {
+        el.animate([{ opacity: 0, transform: 'translateY(6px) scale(.985)' }, { opacity: 1, transform: 'none' }], { duration: 210, delay: Math.min(entering++ * 16, 80), easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'backwards' });
+      }
+    }
+    // gone: a likeness of each row and title fades where it stood (not a row any more: nothing finds it, nothing presses it)
+    for (const [k, o] of was.rows) {
+      if (seen.has(k) || k.startsWith('msg|')) continue;
+      const g = o.el.cloneNode(true);
+      g.className = k.startsWith('g|') ? 'bcv-omni__gone bcv-omni__gone--title' : 'bcv-omni__gone';
+      g.removeAttribute('data-key'); g.removeAttribute('role'); g.removeAttribute('aria-selected'); g.removeAttribute('tabindex');
+      g.setAttribute('aria-hidden', 'true');
+      Object.assign(g.style, { left: `${o.r.left - pr.left - panel.clientLeft}px`, top: `${o.r.top - pr.top - panel.clientTop + panel.scrollTop}px`, width: `${o.r.width}px`, height: `${o.r.height}px` });
+      panel.append(g);
+      const fade = g.animate([{ opacity: o.o }, { opacity: 0, transform: 'scale(.98)' }], { duration: 160, easing: 'ease-out', fill: 'forwards' });
+      fade.finished.then(() => g.remove(), () => g.remove());
+    }
+    // the panel's height, from what it was to what it is
+    const h1 = pr.height;
+    if (Math.abs(h1 - was.h) > 1) {
+      panel.style.overflowY = 'hidden';
+      const anim = panel.animate([{ height: `${was.h}px` }, { height: `${h1}px` }], { duration: 260, easing: EASE });
+      ui.hAnim = anim;
+      const done = () => { if (ui && ui.hAnim === anim) { ui.hAnim = null; panel.style.overflowY = ''; } };
+      anim.finished.then(done, done);
+    }
+  }
   function paint() {
     if (!ui) return;
+    const panel = ui.panel;
     const items = [];
     const blocks = [];
     const names = ui.mode === 'plain' ? ORDER : [...ui.groups.keys()]; // (a command's list, the kinds, a kind's own things: as they were set)
     for (const name of names) {
       const list = ui.groups.get(name);
       if (!list || !list.length) continue;
-      const rows = list.map((it) => { items.push(it); return row(it, items.length - 1); });
-      blocks.push(h('div', { class: 'bcv-omni__group', dataset: { group: name } }, [h('div', { class: 'bcv-omni__gtitle', text: name === 'Best match' && ui.reading ? ui.reading : name }), ...rows]));
+      const rows = list.map((it) => { items.push(it); const el = row(it, items.length - 1); el.dataset.key = keyOf(name, it); return el; });
+      blocks.push(h('div', { class: 'bcv-omni__group', dataset: { group: name } }, [h('div', { class: 'bcv-omni__gtitle', text: name === 'Best match' && ui.reading ? ui.reading : name, dataset: { key: `g|${name}` } }), ...rows]));
     }
     ui.items = items;
     ui.cursor = items.length ? Math.min(Math.max(ui.cursor, 0), items.length - 1) : -1;
-    if (!items.length && !ui.pending && ui.mode === 'plain' && ui.q.length < NET_MIN) { ui.panel.hidden = true; return; } // (one letter, nothing on the page that starts with it: nothing to show yet)
-    if (!items.length) blocks.push(h('div', { class: 'bcv-omni__empty', text: ui.pending ? 'Searching…' : ui.mode === 'scope' ? (ui.scope?.key === 'work' ? 'Nothing due this week.' : `No ${ui.scope?.label.toLowerCase() || 'results'} yet.`) : ui.mode === 'cmd' && ui.cmd ? (ui.arg ? `Nothing for “${ui.arg}”` : ui.cmd.empty || `Type ${ui.cmd.takes || 'more'}…`) : ui.mode === 'cmd' ? 'No command by that name. /help lists them.' : `Nothing for “${ui.input.value.trim()}”` }));
-    else if (ui.pending) blocks.push(h('div', { class: 'bcv-omni__more', text: 'Searching…' }));
-    ui.panel.replaceChildren(...blocks);
-    ui.panel.hidden = false;
-    markCursor();
+    if (!items.length && !ui.pending && ui.mode === 'plain' && ui.q.length < NET_MIN) { panel.hidden = true; return; } // (one letter, nothing on the page that starts with it: nothing to show yet)
+    if (!items.length) blocks.push(h('div', { class: 'bcv-omni__empty', dataset: { key: 'msg|empty' }, text: ui.pending ? 'Searching…' : ui.mode === 'scope' ? (ui.scope?.key === 'work' ? 'Nothing due this week.' : `No ${ui.scope?.label.toLowerCase() || 'results'} yet.`) : ui.mode === 'cmd' && ui.cmd ? (ui.arg ? `Nothing for “${ui.arg}”` : ui.cmd.empty || `Type ${ui.cmd.takes || 'more'}…`) : ui.mode === 'cmd' ? 'No command by that name. /help lists them.' : `Nothing for “${ui.input.value.trim()}”` }));
+    else if (ui.pending) blocks.push(h('div', { class: 'bcv-omni__more', dataset: { key: 'msg|more' }, text: 'Searching…' }));
+    // (moving: the panel already on show with something in it, at its top; a panel just opened arrives with the pill, or at once)
+    const moving = !still() && !panel.hidden && panel.isConnected && panel.childElementCount > 1 && panel.scrollTop < 1;
+    const was = moving ? snapshot(panel) : null;
+    // (the highlight stays put, so it glides on from where it is; a row still fading out finishes doing so)
+    if (!ui.sel) ui.sel = h('div', { class: 'bcv-omni__sel', 'aria-hidden': 'true' });
+    for (const c of [...panel.children]) if (c !== ui.sel && !c.classList.contains('bcv-omni__gone')) c.remove();
+    if (panel.firstChild !== ui.sel) panel.prepend(ui.sel);
+    panel.append(...blocks);
+    panel.hidden = false;
+    if (moving) flip(panel, was);
+    markCursor({ jump: !moving });
   }
   /** A result's row: its tile and words; what can be done with it as small buttons at the right (shown on the row chosen, or under the pointer). */
   function row(it, i) {
@@ -352,11 +515,21 @@
     ]);
     return el;
   }
-  function markCursor({ scroll = false } = {}) {
+  function markCursor({ scroll = false, jump = false } = {}) {
     if (!ui) return;
     ui.panel.querySelectorAll('.bcv-omni__item').forEach((el, i) => { const on = i === ui.cursor; el.classList.toggle('is-cur', on); el.setAttribute('aria-selected', on ? 'true' : 'false'); });
     const cur = ui.panel.querySelector('.bcv-omni__item.is-cur');
     if (cur && scroll) cur.scrollIntoView({ block: 'nearest' });
+    // the highlight: one shape behind the chosen row, gliding to it (at once when the panel has just opened)
+    const sel = ui.sel;
+    if (!sel || !sel.isConnected) return;
+    ui.panel.classList.toggle('has-sel', !!cur);
+    if (!cur) { sel.classList.remove('is-on'); return; }
+    const snap = jump || still() || !sel.classList.contains('is-on');
+    if (snap) sel.classList.add('is-jump');
+    Object.assign(sel.style, { transform: `translate(${cur.offsetLeft}px, ${cur.offsetTop}px)`, width: `${cur.offsetWidth}px`, height: `${cur.offsetHeight}px` });
+    sel.classList.add('is-on');
+    if (snap) { void sel.offsetWidth; sel.classList.remove('is-jump'); }
   }
   function close() {
     if (!ui) return;
@@ -482,9 +655,10 @@
     input.addEventListener('input', () => { if (ui) run(input.value); });
     input.addEventListener('focus', () => {
       if (!ui) return;
+      warm().catch(() => {}); // (what the starred courses hold, kept from now on: every letter after this answered at once)
       if ((!spot || spot.folding) && canFloat()) { float(); return; } // (the box lifts to the middle of the window — a press on it as it folds back lifts it again; float() puts the cursor back and paints)
       hubReady().then(() => { if (ui && !ui.panel.hidden && ui.mode === 'plain') paint(); }).catch(() => {}); // (the rows' actions, once the hub is here)
-      if (ui.items.length && ui.q === norm(input.value) && ui.panel.hidden) { ui.cursor = Math.max(0, ui.cursor); ui.panel.hidden = false; markCursor(); }
+      if (ui.items.length && ui.q === norm(input.value) && ui.panel.hidden) { ui.cursor = Math.max(0, ui.cursor); ui.panel.hidden = false; markCursor({ jump: true }); }
     });
     input.addEventListener('keydown', onKey);
     panel.addEventListener('keydown', onActKey);
