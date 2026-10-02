@@ -13,6 +13,7 @@ import { spawn, execSync } from 'node:child_process';
 import { readFileSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { fastMotion } from './harness.mjs';
 
 const require = createRequire(import.meta.url);
 let chromium;
@@ -114,6 +115,7 @@ const check = (cond, label) => {
 };
 const browser = await chromium.launch({ channel: 'chromium' });
 const context = await browser.newContext({ viewport: { width: 402, height: 874 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+fastMotion(context); // every page's animations MOTION_RATE× faster (harness.mjs)
 await context.addInitScript(nativeStub);
 await context.addInitScript(initScript);
 let page = null;
@@ -258,6 +260,7 @@ try {
   console.log('the sign-in reader (login.js)');
   const reader = swift('Web/login.js').split('__CANVAS_HOST__').join(JSON.stringify(HOST));
   const sso = await browser.newContext({ viewport: { width: 402, height: 874 }, isMobile: true, hasTouch: true });
+  fastMotion(sso); // every page's animations MOTION_RATE× faster (harness.mjs)
   const posted = [];
   const pages = {
     full: '<form method="post" action="/login/submit"><label>NetID <input name="j_username" type="text"></label><label>Password <input name="j_password" type="password"></label><button type="submit">Log in</button></form>',

@@ -13,7 +13,7 @@ import { execSync } from 'node:child_process';
 import { cpSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { afterMigration } from './harness.mjs';
+import { afterMigration, launchExtension } from './harness.mjs';
 const require = createRequire(import.meta.url);
 let chromium;
 try { ({ chromium } = require('playwright')); } catch { const p = execSync('npm root -g').toString().trim(); ({ chromium } = createRequire(join(p, 'x.js'))('playwright')); }
@@ -28,10 +28,8 @@ const failures = [];
 const check = (ok, label) => { console.log(`  ${ok ? '✓' : '✗'} ${label}`); if (!ok) failures.push(label); };
 
 const userDataDir = join(tmpdir(), `bcv-sync-profile-${Date.now()}`);
-const context = await chromium.launchPersistentContext(userDataDir, { channel: 'chromium', headless: true, args: [`--disable-extensions-except=${extDir}`, `--load-extension=${extDir}`] });
+const { context, sw } = await launchExtension(chromium, userDataDir, extDir); // (every page's animations MOTION_RATE× faster, and a second browser if the first one's background never starts: harness.mjs)
 try {
-  let [sw] = context.serviceWorkers();
-  if (!sw) sw = await context.waitForEvent('serviceworker', { timeout: 15000 });
   await afterMigration(sw); // (the background's setup migration first, or it clears the flags written next)
   for (const p of context.pages()) if (p.url().endsWith('/setup/setup.html')) await p.close();
   await sw.evaluate((v) => self.BCV.api.storage.local.set({ 'setup:offered': true, 'setup:done': true, 'welcome:search': true, 'setup:flow': 3, 'whatsnew:seen': v, 'prefs:canvas.test': { gpaGoal: 3.5 }, 'site:last': { host: 'canvas.test', origin: 'https://canvas.test' } }), manifest.version);

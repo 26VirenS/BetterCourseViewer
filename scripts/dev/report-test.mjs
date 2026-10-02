@@ -11,6 +11,7 @@ import { createServer } from 'node:http';
 import { readFileSync, existsSync, mkdirSync } from 'node:fs';
 import { join, extname } from 'node:path';
 import { deflateSync } from 'node:zlib';
+import { fastMotion } from './harness.mjs';
 const require = createRequire(import.meta.url);
 let chromium;
 try { ({ chromium } = require('playwright')); } catch { const p = execSync('npm root -g').toString().trim(); ({ chromium } = createRequire(join(p, 'x.js'))('playwright')); }
@@ -110,6 +111,7 @@ await new Promise((r) => site.listen(PORT, r));
 const browser = await chromium.launch({ headless: true });
 try {
   const page = await browser.newPage({ viewport: { width: 1200, height: 1000 } });
+  fastMotion(page.context()); // every page's animations MOTION_RATE× faster (harness.mjs)
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   const q = new URLSearchParams({ c: 'error', codes: 'sc-c-404,SC-D-NET,bogus', v: '2.98.19', b: 'Chrome 140', p: '/courses/101/assignments/1009' });

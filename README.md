@@ -237,8 +237,9 @@ scripts/
   chrome-manifest.py           the Chrome build's manifest: Chrome's keys alone, and every site from the start
   make-icons.mjs               regenerates the PNG icons
   dev/mock-canvas.mjs          a fake Canvas (pages + the API endpoints the app reads)
-  dev/test-all.mjs             every suite below in three lanes at once (the smoke suite's two halves, and the rest in turn); one line per suite
-  dev/harness.mjs              what the browser suites share: their copy of the extension runs the product's longest timers short
+  dev/test-all.mjs             every suite below, one per core at a time, longest first (the smoke suite as its shards); one line per suite
+  dev/harness.mjs              what the browser suites share: their copy of the extension runs the product's longest timers short, and every page's animations run 50× faster
+  dev/smoke-shards.mjs         the smoke suite's sections in twelve shards that run side by side
   dev/smoke-test.mjs           walks every screen in headless Chromium against the mock
   dev/phone-test.mjs           the same at an iPhone viewport: the phone layout (tab bar, sheets, course, item, quiz)
   dev/toolbar-test.mjs         the bar over a tool's page never covers it: fixed headers, full-height panels, sticky headings, app shells
@@ -261,14 +262,15 @@ PRIVACY.md                     the privacy policy the store listing links to
 The generated Xcode project copies the extension's top-level folders (`content/`, `lib/`, `popup/`, `options/`, `setup/`, `icons/`) into the app as folder references, so new files inside them are picked up by the next build. A **new top-level folder** is not: add it to `project.pbxproj` next to the others (the smoke test fails until every top-level entry of `extension/` is listed there), or delete `macos/` and regenerate the project.
 
 ```bash
-node scripts/dev/test-all.mjs           # every suite, under five minutes; each suite's output in scripts/dev/out/logs/
-node scripts/dev/test-all.mjs --serial  # one suite at a time (--only smoke,phone and --skip chrome-setup narrow it)
+node scripts/dev/test-all.mjs           # every suite, about four minutes on four cores; each suite's output in scripts/dev/out/logs/
+node scripts/dev/test-all.mjs --only smoke         # the smoke suite's twelve shards (--only smoke:widgets for one; --skip chrome-setup leaves one out)
+node scripts/dev/test-all.mjs --jobs 2  # two at a time on a small machine (--serial is one)
 node scripts/dev/mock-canvas.mjs        # http://localhost:8787, to poke at by hand
-node scripts/dev/smoke-test.mjs         # the whole smoke suite on its own (--part 1 or --part 2 for one half); screenshots in scripts/dev/out/
+node scripts/dev/smoke-test.mjs         # the whole smoke suite in one browser (--shard widgets for one shard, --part 1|2 for a half); screenshots in scripts/dev/out/
 node scripts/dev/phone-test.mjs         # the phone layout; screenshots in scripts/dev/out/phone-*.png
 ```
 
-The runner keeps three lanes going at once: the smoke suite's two halves (the screens; the setup, the tools and getting unstuck), each on ports of its own, and the other suites one after another beside them. The suites load a copy of `extension/` in which the product's longest waits are short — the welcome's three seconds before Continue, the word-marks, the fifteen-second screen patience, the Away Refresh count, a tray island's stay, a counter's roll — so a run watches the same events in the same order without sitting through the timers (`scripts/dev/harness.mjs` holds the table; every shipped value is asserted exactly, so changing one fails the suite until the table follows). A check that comes long after the one before prints the gap (`(+4.2s)`), and any single wait of three seconds or more is named in the log, so a slow run says where its time went.
+The runner keeps one suite per core going, the longest first by the last run's times (`scripts/dev/out/timings.json`). The smoke suite runs as twelve shards (`scripts/dev/smoke-shards.mjs`), each a browser of its own on ports of its own, with what earlier shards would have left behind put in place before it starts. Each suite gets a temporary directory of its own, removed when it ends however it ends, and a suite that prints nothing for two minutes is stopped with its browsers and reported with the last thing it said (`--silent <seconds>`). Every page a suite opens runs its animations 50× faster (DevTools' `Animation.setPlaybackRate`: the same frames in the same order, sooner); a check that reads a motion mid-flight runs it at real speed (`realMotion()` in the harness; `BCV_MOTION_RATE=1` runs a suite at real speed throughout). The suites load a copy of `extension/` in which the product's longest waits are short — the welcome's three seconds before Continue, the word-marks, the fifteen-second screen patience, the Away Refresh count, a tray island's stay, a counter's roll — so a run watches the same events in the same order without sitting through the timers (`scripts/dev/harness.mjs` holds the table; every shipped value is asserted exactly, so changing one fails the suite until the table follows). A check that comes long after the one before prints the gap (`(+4.2s)`), any single wait of three seconds or more is named in the log, and a smoke run ends with its time by section, so a slow run says where its time went.
 
 ### Releasing
 

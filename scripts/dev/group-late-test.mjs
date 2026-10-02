@@ -11,7 +11,7 @@ import { spawn, execSync } from 'node:child_process';
 import { cpSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { afterMigration } from './harness.mjs';
+import { afterMigration, launchExtension } from './harness.mjs';
 const require = createRequire(import.meta.url);
 let chromium;
 try { ({ chromium } = require('playwright')); } catch { const p = execSync('npm root -g').toString().trim(); ({ chromium } = createRequire(join(p, 'x.js'))('playwright')); }
@@ -31,10 +31,8 @@ await new Promise((r) => setTimeout(r, 700));
 const failures = [];
 const check = (ok, label) => { console.log(`  ${ok ? '✓' : '✗'} ${label}`); if (!ok) failures.push(label); };
 const userDataDir = join(tmpdir(), `bcv-late-profile-${Date.now()}`);
-const context = await chromium.launchPersistentContext(userDataDir, { channel: 'chromium', headless: true, viewport: { width: 1400, height: 900 }, args: [`--disable-extensions-except=${extDir}`, `--load-extension=${extDir}`] });
+const { context, sw } = await launchExtension(chromium, userDataDir, extDir, { viewport: { width: 1400, height: 900 } }); // (every page's animations MOTION_RATE× faster, and a second browser if the first one's background never starts: harness.mjs)
 try {
-  let [sw] = context.serviceWorkers();
-  if (!sw) sw = await context.waitForEvent('serviceworker', { timeout: 15000 });
   await afterMigration(sw); // (the background's setup migration first, or it clears the flags written next)
   await sw.evaluate((v) => self.BCV.api.storage.local.set({ 'setup:offered': true, 'setup:done': true, 'welcome:search': true, 'setup:flow': 3, 'whatsnew:seen': v }), manifest.version); // the flow marker too: the background's migration clears the flags for an older flow, and may run after this
   const page = await context.newPage();

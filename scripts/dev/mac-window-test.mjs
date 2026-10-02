@@ -14,6 +14,7 @@ import { createServer } from 'node:http';
 import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join, normalize } from 'node:path';
+import { fastMotion } from './harness.mjs';
 
 const require = createRequire(import.meta.url);
 let chromium;
@@ -87,6 +88,7 @@ const FAKE_APP = () => {
 const browser = await chromium.launch({ channel: 'chromium', headless: true });
 try {
   const page = await browser.newPage({ viewport: { width: 960, height: 660 } });
+  fastMotion(page.context()); // every page's animations MOTION_RATE× faster (harness.mjs)
   page.on('pageerror', (e) => { console.log('  page error:', e.message); failures.push(`page error: ${e.message}`); });
   page.on('dialog', (d) => d.accept());
   await page.addInitScript(FAKE_APP);

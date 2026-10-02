@@ -8,7 +8,8 @@ import { mkdirSync, cpSync, readFileSync, writeFileSync, rmSync } from 'node:fs'
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
-import { TIMERS, shortenTimers, secs, reportSlow, afterMigration } from './harness.mjs';
+import { TIMERS, shortenTimers, secs, reportSlow, afterMigration, motionAt, MOTION_RATE, launchExtension } from './harness.mjs';
+import { SMOKE_SHARDS, SMOKE_PARTS } from './smoke-shards.mjs';
 
 const require = createRequire(import.meta.url);
 let chromium;
@@ -22,31 +23,39 @@ try {
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const out = join(root, 'scripts', 'dev', 'out');
 mkdirSync(out, { recursive: true });
-// The suite is two halves that share nothing but the harness: the screens (dashboard … the look
-// off and on), and the setup, the tools, getting unstuck and the extension's own pages.
-// `--part 1` or `--part 2` runs one of them — on ports of its own, so the two run side by side
-// (test-all.mjs does that); no part runs both.
-const partAt = process.argv.indexOf('--part');
-const PART = partAt >= 0 ? Number(process.argv[partAt + 1]) : 0;
-if (![0, 1, 2].includes(PART)) { console.error('usage: smoke-test.mjs [--part 1|2]'); process.exit(2); }
-const PORT = PART === 2 ? 8788 : 8787;
+// The suite is a run of sections (dashboard, courses, … reset), each in an `if (on('name'))` block,
+// grouped into shards that share nothing but the harness (smoke-shards.mjs). `--shard <name>` runs
+// one shard; `--part 1|2` the two halves the suite used to be; no argument, everything in one run.
+// Each shard has ports of its own, so any number of them run side by side (test-all.mjs does that).
+const argOf = (name) => { const i = process.argv.indexOf(name); return i >= 0 ? process.argv[i + 1] : null; };
+const SHARD = argOf('--shard');
+const PART = Number(argOf('--part')) || 0;
+const SECTIONS = SHARD ? SMOKE_SHARDS[SHARD] : PART ? SMOKE_PARTS[PART] : null; // (null: every section)
+if ((SHARD && !SECTIONS) || (PART && !SECTIONS)) { console.error(`usage: smoke-test.mjs [--shard ${Object.keys(SMOKE_SHARDS).join('|')}] [--part 1|2]`); process.exit(2); }
+const sectionsRun = [];
+/** Whether this run includes the section: a block `if (on('name')) { … }` per section. */
+const on = (name) => { const yes = !SECTIONS || SECTIONS.includes(name); if (yes) { sectionsRun.push(name); sectionStarts.push(Date.now()); } return yes; };
+const sectionStarts = []; // (when each section of sectionsRun began: the log ends with where the time went)
+// ports: a shard's four in a row from 8900; a whole run (or a half) the old ones
+const SLOT = SHARD ? Object.keys(SMOKE_SHARDS).indexOf(SHARD) : -1;
+const PORT = SLOT >= 0 ? 8900 + SLOT * 4 : PART === 2 ? 8788 : 8787;
 const BASE = `http://localhost:${PORT}`;
 // A tool is somebody else's site, on an origin of its own. One is served here so the tab a tool
 // opens into is a real cross-origin page — which is what decides whether the bar and the tray have
 // to be put in from outside, rather than already being there as the Canvas site's own scripts.
-const SIM_PORT = PART === 2 ? 8793 : 8791;
+const SIM_PORT = SLOT >= 0 ? PORT + 1 : PART === 2 ? 8793 : 8791;
 const SIM = `http://localhost:${SIM_PORT}`;
 // Two more sites a tool's tab may move on to. FAR is one the extension may reach (host permission)
 // but has no script of its own registered for — Safari after "Always allow", the quiet Chrome build
 // after Enable — where the bar has to be put in from the background; NOPE is one it may not reach at
 // all, where nothing of ours can run and the toolbar icon has to say so.
-const FAR_PORT = PART === 2 ? 8796 : 8795;
+const FAR_PORT = SLOT >= 0 ? PORT + 2 : PART === 2 ? 8796 : 8795;
 const FAR = `http://localhost:${FAR_PORT}`;
-const NOPE_PORT = PART === 2 ? 8798 : 8797;
+const NOPE_PORT = SLOT >= 0 ? PORT + 3 : PART === 2 ? 8798 : 8797;
 const NOPE = `http://localhost:${NOPE_PORT}`;
 
 // 1. temp copy of the extension whose content scripts also match localhost
-const extDir = join(tmpdir(), `bcv-ext-${PART}-${process.pid}`);
+const extDir = join(tmpdir(), `bcv-ext-${SHARD || PART}-${process.pid}`);
 cpSync(join(root, 'extension'), extDir, { recursive: true });
 const manifest = JSON.parse(readFileSync(join(extDir, 'manifest.json'), 'utf8'));
 // lib/theme.js as the page runs it: the shades a colour derives, and which colours are readable
@@ -99,10 +108,17 @@ const shot = async (page, name) => { await settleShot(page); await page.screensh
 {
   console.log('\nharness');
   check(timers.missing.length === 0 && timers.done.length === 12, `the copy runs the welcome's wait, the word-marks, the screen patience, the Away Refresh count, its hold and its off-stay, the island, the counter roll and the grade poll short, the shipped values found exactly (${timers.done.length} rewritten${timers.missing.length ? `; not found: ${timers.missing.join(' | ')}` : ''})`);
+  // every section the suite has is in exactly one shard (smoke-shards.mjs), so the shards together are the whole suite
+  const declared = [...readFileSync(fileURLToPath(import.meta.url), 'utf8').matchAll(/^ {2}if \(on\((['"])(.+?)\1\)\) \{/gm)].map((m) => m[2]).concat(['bundles', "what's new notes"]);
+  const sharded = Object.values(SMOKE_SHARDS).flat();
+  const loose = declared.filter((n) => sharded.filter((x) => x === n).length !== 1);
+  const unknown = sharded.filter((n) => !declared.includes(n));
+  check(!loose.length && !unknown.length && Object.values(SMOKE_PARTS).flat().sort().join('|') === [...declared].sort().join('|'), `every section is in exactly one shard, and the two halves are the same sections${loose.length ? `; not in one shard: ${loose.join(', ')}` : ''}${unknown.length ? `; no such section: ${unknown.join(', ')}` : ''}`);
+  console.log(`  (${SHARD ? `shard ${SHARD}` : PART ? `part ${PART}` : 'every section'}; motion at ${MOTION_RATE}×)`);
 }
 
 // 3. the native projects ship every top-level entry of extension/ and carry the same version
-if (PART !== 2) {
+if (on('bundles')) {
   const { readdirSync } = await import('node:fs');
   const pbx = readFileSync(join(root, 'macos', 'Simpl Courses', 'Simpl Courses.xcodeproj', 'project.pbxproj'), 'utf8');
   const iosYml = readFileSync(join(root, 'ios', 'project.yml'), 'utf8');
@@ -122,7 +138,7 @@ if (PART !== 2) {
 // page after an update shows them, so a version without an entry is a version with nothing to say
 const cmpVer = (a, b) => { const x = String(a).split('.').map(Number); const y = String(b).split('.').map(Number); for (let i = 0; i < Math.max(x.length, y.length); i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d; } return 0; };
 const whatsNew = new Function('self', `${readFileSync(join(extDir, 'content', 'app', 'whatsnew-notes.js'), 'utf8')}; return self.BCV_WHATS_NEW;`)({});
-if (PART !== 2) {
+if (on("what's new notes")) {
   console.log("\nwhat's new notes");
   const newest = whatsNew[0];
   check(!!newest && newest.version === manifest.version, `the newest What's New entry is this version (${manifest.version}): ${newest?.version}`);
@@ -132,28 +148,15 @@ if (PART !== 2) {
   check(whatsNew.every((v, i) => i === 0 || cmpVer(whatsNew[i - 1].version, v.version) > 0), 'the entries are newest first, no version twice');
 }
 
-const userDataDir = join(tmpdir(), `bcv-profile-${PART}-${process.pid}`);
-const context = await chromium.launchPersistentContext(userDataDir, {
-  channel: 'chromium',
-  headless: true,
-  viewport: { width: 1400, height: 900 },
-  args: [`--disable-extensions-except=${extDir}`, `--load-extension=${extDir}`],
-});
+const userDataDir = join(tmpdir(), `bcv-profile-${SHARD || PART}-${process.pid}`);
+const { context, sw } = await launchExtension(chromium, userDataDir, extDir, { viewport: { width: 1400, height: 900 } }); // (every page's animations MOTION_RATE× faster, and a second browser if the first one's background never starts: harness.mjs)
 let page; // hoisted so a crash can say what the page was doing
 try {
-  let [sw] = context.serviceWorkers();
-  if (!sw) sw = await context.waitForEvent('serviceworker', { timeout: 15000 });
   await afterMigration(sw); // (the background's setup migration first: it clears the flags written below when it runs late)
   const extId = new URL(sw.url()).host;
   console.log('extension id', extId);
   const setSettings = (patch) => sw.evaluate(async (p) => self.BCV.settings.update(p), patch);
   const isSetup = (p) => p.url().endsWith('/setup/setup.html');
-  if (!context.pages().some(isSetup)) await context.waitForEvent('page', { timeout: 8000 }).catch(() => null);
-  await new Promise((r) => setTimeout(r, 800)); // the install offers the page from two places at once (onInstalled, the background starting): both have run by now
-  const setupTabs = context.pages().filter(isSetup);
-  check(setupTabs.length === 1, `installing the extension opens the guided setup page — once, not twice (${setupTabs.length} open)`);
-  for (const t of setupTabs) await t.close();
-  check((await sw.evaluate(async () => (await self.BCV.api.storage.local.get('setup:flow'))['setup:flow'])) === 3, 'the build records its setup flow, so an update from an older flow offers the page once more');
   // Safari turns the extension on without an install event, so the page is offered again on a new
   // browser session while setup is unfinished — and never again once it is done or skipped.
   const setupPages = () => context.pages().filter((pg) => pg.url().endsWith('/setup/setup.html'));
@@ -166,12 +169,24 @@ try {
     for (const pg of opened) await pg.close();
     return opened.length > 0;
   };
+  if (on('install')) {
+  if (!context.pages().some(isSetup)) await context.waitForEvent('page', { timeout: 8000 }).catch(() => null);
+  await new Promise((r) => setTimeout(r, 800)); // the install offers the page from two places at once (onInstalled, the background starting): both have run by now
+  const setupTabs = context.pages().filter(isSetup);
+  check(setupTabs.length === 1, `installing the extension opens the guided setup page — once, not twice (${setupTabs.length} open)`);
+  for (const t of setupTabs) await t.close();
+  check((await sw.evaluate(async () => (await self.BCV.api.storage.local.get('setup:flow'))['setup:flow'])) === 3, 'the build records its setup flow, so an update from an older flow offers the page once more');
   check(await offerAgain(), 'the setup page opens again on a new browser session while setup is unfinished (Safari enables without installing)');
   await sw.evaluate((v) => self.BCV.api.storage.local.set({ 'setup:done': true, 'welcome:search': true, 'whatsnew:seen': v }), manifest.version); // (seen: What's new is driven on purpose below, not over every page)
   check(!(await offerAgain()), 'once setup is done it never opens again');
+  } else { // (the page the install opens is the install section's to look at: here it is only closed)
+    if (!context.pages().some(isSetup)) await context.waitForEvent('page', { predicate: isSetup, timeout: 5000 }).catch(() => null);
+    for (const t of setupPages()) await t.close();
+  } // install
   // the setup counts as done for the rest of the suite (until it is done, every page opens the card
   // — the guided-setup sections below clear the flag when that is what they are checking)
   await sw.evaluate((v) => self.BCV.api.storage.local.set({ 'setup:offered': true, 'setup:done': true, 'welcome:search': true, 'whatsnew:seen': v }), manifest.version);
+  await sw.evaluate((base) => self.BCV.api.storage.local.set({ 'dev:wikiBase': base }), BASE); // (Wikipedia stands in the mock)
 
   page = await context.newPage();
   // a page is ready to poke once it is drawn and nothing painted from the cache is still waiting on Canvas
@@ -258,7 +273,67 @@ try {
     };
   }).catch(() => null);
 
-  if (PART !== 2) { // ================= part 1: the screens =================
+  // A section was written to find what the sections before it in its half left behind. In a shard those
+  // may be another shard's: what they leave, the next page needs, is put in place here, before it loads.
+  const halfOf = (n) => (SMOKE_PARTS[1].includes(n) ? 1 : 2);
+  const firstHere = SECTIONS?.find((n) => n !== 'install' && n !== 'bundles' && n !== "what's new notes");
+  const leftBy = (name) => !!SECTIONS && !SECTIONS.includes(name) && !!firstHere && halfOf(name) === halfOf(firstHere) && SMOKE_PARTS[halfOf(name)].indexOf(name) < SMOKE_PARTS[halfOf(name)].indexOf(firstHere);
+  const setPrefs = (patch) => sw.evaluate(async ([k, p]) => { const cur = (await self.BCV.api.storage.local.get(k))[k] || {}; await self.BCV.api.storage.local.set({ [k]: { ...cur, ...p } }); }, [`prefs:localhost:${PORT}`, patch]);
+  const asMe = { 'content-type': 'application/json', 'x-csrf-token': 'mock+csrf/token=' };
+  if (leftBy('dashboard')) { // a course's colour picked on its card; a discussion opened from the stream, read since
+    await fetch(`${BASE}/api/v1/users/self/colors/course_101`, { method: 'PUT', headers: asMe, body: JSON.stringify({ hexcode: '#1770AB' }) });
+    await fetch(`${BASE}/api/v1/courses/101/discussion_topics/7003/read_all`, { method: 'PUT', headers: asMe });
+  }
+  if (leftBy('grades panel')) await sw.evaluate(() => self.BCV.api.storage.local.set({ 'welcome:grades': true })); // (its tour, done)
+  if (leftBy('quiz flow')) await setPrefs({ quizLayout: 'all' }); // (the layout it ends on)
+  if (leftBy('guided setup')) await setPrefs({ gpaGoal: 3.9, gpaTracking: { since: new Date().toISOString().slice(0, 10) }, whatIfScores: true }); // (the choices it makes)
+  if (leftBy('widgets')) { // the focus timer, stopped on a short break
+    await sw.evaluate((day) => self.BCV.api.storage.local.set({ 'tools:focus': { phase: 'short', mins: { focus: 25, short: 5, long: 15 }, endAt: null, left: null, done: 0, day } }), new Date().toISOString().slice(0, 10));
+  }
+
+  // every shard starts where the suite's first section does: on the Dashboard, drawn
+  await page.goto(`${BASE}/`);
+  await page.waitForSelector('#bcv-app .bcv-nav__item', { timeout: 20000 });
+
+  // ---- what more than one section uses: each section can run in a shard of its own (smoke-shards.mjs), so
+  // nothing a section defines is in reach of another ---------------------------------------------------
+  let decks; // the flashcard sets the widgets section made (the quick menus read them)
+  let options; // the settings page the extension-pages section opened (developer and reset go on in it)
+  const focusStored = async () => (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('tools:focus'))['tools:focus']));
+  const noteApi = (method, path, body) => fetch(`${BASE}${path}`, { method, headers: { 'content-type': 'application/json', 'x-csrf-token': 'mock+csrf/token=' }, body: body ? JSON.stringify(body) : undefined }).then((r) => r.text()).then((t) => JSON.parse(t.replace(/^while\(1\);/, ''))); // the mock, like Canvas, refuses a write without the session's token
+  const mockScore = (body) => fetch(`${BASE}/__mock/score`, { method: 'POST', body: JSON.stringify(body) }).then((r) => r.ok);
+  const readSub = (cid, aid) => fetch(`${BASE}/api/v1/courses/${cid}/assignments/${aid}/submissions/self`).then((r) => r.text()).then((t) => JSON.parse(t.replace(/^while\(1\);/, '')));
+  const curAt = () => page.$$eval('.bcv-omni__item', (els) => els.findIndex((e) => e.classList.contains('is-cur')));
+  const su = (sel) => `#bcv-setup ${sel}`; // the setup's card lives in a shadow root under #bcv-setup
+  const sStep = () => page.$eval(su('#stepLabel'), (e) => e.textContent.trim()).catch(() => '');
+  // the dot after "Simpl" sits where the word ends in this system's font (here a Windows-like one,
+  // wider than the Mac's: drawn at the design's fixed place it would land on the l) — read while the
+  // word-mark is still up (it is short here: harness.mjs)
+  const dotOf = (hostSel) => page.evaluate((sel) => { const r = document.querySelector(sel).shadowRoot; const t = r.querySelector('.intro text'); const d = r.querySelector('.intro__dot'); const b = t.getBBox(); const vb = r.querySelector('.intro svg').getAttribute('viewBox').split(' ').map(Number); return { gap: Math.round(Number(d.getAttribute('cx')) - (b.x + b.width)), end: Math.round(b.x + b.width), cx: Number(d.getAttribute('cx')), fits: vb[2] >= Number(d.getAttribute('cx')) + 9 }; }, hostSel);
+  // Clear all leaves none ticked, whatever was: Continue is dead with a hint until one is picked
+  const clearAll = async () => { if ((await texts(su('#selectAll')))[0] === 'Select all') await page.click(su('#selectAll')); await page.click(su('#selectAll')); };
+  const pz = (sel) => su(`.pz ${sel}`);
+  // a few reads and pokes in the page's own world (the content scripts' isolated world, through the background)
+  const inPage = (op) => sw.evaluate(async ([base, o]) => {
+    const [tab] = await chrome.tabs.query({ url: `${base}/*` });
+    const [{ result }] = await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'ISOLATED', args: [o], func: (what) => {
+      if (what === 'stale') { self.BCV.app.state.lastHere = Date.now() - 4 * 60 * 1000; return true; }
+      if (what === 'focusActive') return self.BCV.tools.focusActive();
+      if (what === 'jspdf') return !!self.jspdf?.jsPDF;
+      if (what === 'ccBase') { self.BCV.toolsConvert.setBase(`${location.origin}/cc/v2`); return true; }
+      return null;
+    } });
+    return result;
+  }, [BASE, op]);
+  // the page: one row at the bottom of the nav, five cards
+  const raw = (sel) => page.$$eval(sel, (els) => els.map((e) => e.textContent.replace(/\s+/g, ' ').trim())); // (textContent: the small labels are drawn in capitals by CSS)
+  const closeTool = async () => { await page.keyboard.press('Escape'); await page.waitForFunction(() => !document.querySelector('.bcv-tool-ov'), null, { timeout: 5000 }); };
+  const openTool = async (key) => { await page.click(`.bcv-tool-card[data-tool="${key}"]`); await page.waitForSelector(`.bcv-tool[data-tool="${key}"]`, { timeout: 5000 }); };
+  const toolSub = () => texts('.bcv-tool__sub').then((t) => t[0]);
+  // and back
+  const pdfObjects = (objs) => { let out = '%PDF-1.4\n'; const offs = []; objs.forEach((o, i) => { offs.push(Buffer.byteLength(out, 'latin1')); out += `${i + 1} 0 obj\n${o}\nendobj\n`; }); const xref = Buffer.byteLength(out, 'latin1'); out += `xref\n0 ${objs.length + 1}\n0000000000 65535 f \n${offs.map((o) => `${String(o).padStart(10, '0')} 00000 n \n`).join('')}trailer\n<< /Size ${objs.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`; return Buffer.from(out, 'latin1'); };
+
+  if (on('dashboard')) {
   // ---- dashboard --------------------------------------------------------------------
   console.log('dashboard');
   await page.goto(`${BASE}/`);
@@ -748,6 +823,8 @@ try {
   await setSettings({ appearance: { dashboard: { cards: true, list: true, activity: true } } });
   await page.reload();
   await page.waitForSelector('.bcv-head .bcv-seg__btn', { timeout: 15000 });
+  } // dashboard
+  if (on('courses')) {
 
   // ---- courses ----------------------------------------------------------------------------
   console.log('courses');
@@ -805,6 +882,8 @@ try {
   check(await eventually(() => sw.evaluate(async (base) => (await (await fetch(`${base}/api/v1/courses`)).text()).includes('"is_favorite":true'), BASE)), 'the card moved at once; the favourite is saved to Canvas in the background');
   await (await page.$$('.bcv-ccard .bcv-ccard__star'))[5].click();
   await page.waitForFunction(() => document.querySelectorAll('.bcv-ccard').length === 5, null, { timeout: 5000 });
+  } // courses
+  if (on('to do')) {
 
   // ---- to do -------------------------------------------------------------------------------
   console.log('to do');
@@ -853,6 +932,8 @@ try {
   await page.waitForSelector('.bcv-main > .bcv-screen.bcv-screen--still .bcv-todo__add', { timeout: 10000 });
   const quietDraw = await page.evaluate(() => ({ still: !!document.querySelector('.bcv-main > .bcv-screen.bcv-screen--still'), running: document.getAnimations().filter((a) => a.animationName === 'bcv-fade-up' && a.playState === 'running').length, entering: document.querySelectorAll('.bcv-main .bcv-enter').length }));
   check(quietDraw.still && quietDraw.running === 0 && quietDraw.entering === 0, `a quiet re-render lands the screen still — no rise, no stagger (${JSON.stringify(quietDraw)})`);
+  } // to do
+  if (on('to do: own tasks + priority')) {
   // ---- mockup 12: a task of your own (a Canvas planner note), priority on every row, By priority ----
   console.log('to do: own tasks + priority');
   const badgeBefore = Number((await texts('.bcv-nav__item[data-nav="todo"] .bcv-nav__count'))[0]);
@@ -949,7 +1030,6 @@ try {
   await page.waitForFunction(() => ![...document.querySelectorAll('.bcv-row__title')].some((e) => /Email Prof\. Lei/.test(e.textContent)), null, { timeout: 10000 });
   await page.waitForFunction((n) => Number(document.querySelector('.bcv-nav__item[data-nav="todo"] .bcv-nav__count').textContent) === n, badgeBefore, { timeout: 5000 });
   check((await fetch(`${BASE}/api/v1/planner_notes`).then((r) => r.text()).then((t) => JSON.parse(t.replace(/^while\(1\);/, '')))).length === 0 && !(await page.$('.bcv-todo__del')), 'Delete removes the planner note from Canvas; the list and the badge agree again');
-  const noteApi = (method, path, body) => fetch(`${BASE}${path}`, { method, headers: { 'content-type': 'application/json', 'x-csrf-token': 'mock+csrf/token=' }, body: body ? JSON.stringify(body) : undefined }).then((r) => r.text()).then((t) => JSON.parse(t.replace(/^while\(1\);/, ''))); // the mock, like Canvas, refuses a write without the session's token
   // (2.98.58) a task given a course and a weekly repeat: one note per week on that course; the rows
   // wear the course and sit in with the day's work (and under the course By course); the X on one
   // of them offers the whole series
@@ -992,8 +1072,9 @@ try {
   await page.locator('.bcv-row[data-series]').first().locator('.bcv-todo__del').click();
   await page.waitForSelector('.bcv-menu', { timeout: 3000 });
   const delMenu = await texts('.bcv-menu__item');
-  const menuBox = await page.$eval('.bcv-menu', (e) => { const r = e.getBoundingClientRect(); return r.right <= window.innerWidth && r.left >= 0; });
-  check(delMenu.length === 2 && /^Delete this task/.test(delMenu[0]) && /^Delete all 9 repeats/.test(delMenu[1]) && menuBox, `the X on a repeating task asks which, on screen: ${delMenu.join(' | ')}`);
+  const menuRect = await page.$eval('.bcv-menu', (e) => { const r = e.getBoundingClientRect(); return { l: Math.round(r.left), r: Math.round(r.right), vw: window.innerWidth }; });
+  const menuBox = menuRect.r <= menuRect.vw && menuRect.l >= 0;
+  check(delMenu.length === 2 && /^Delete this task/.test(delMenu[0]) && /^Delete all 9 repeats/.test(delMenu[1]) && menuBox, `the X on a repeating task asks which, on screen: ${delMenu.join(' | ')} ${JSON.stringify(menuRect)}`);
   // from the menu the question is the app's own sheet, never a browser dialog (one raised inside a menu's press left the menu half-faded for good)
   await page.click('.bcv-menu__item:nth-child(1)');
   await page.waitForSelector('.bcv-ask-ov .bcv-ask__ok', { timeout: 5000 });
@@ -1046,6 +1127,8 @@ try {
   await page.click('.bcv-seg__btn[data-value="course"]');
   check((await texts('.bcv-group__head')).some((t) => /F26-MATH 021 20/.test(t)), 'grouped by course');
   await page.click('.bcv-seg__btn[data-value="date"]');
+  } // to do: own tasks + priority
+  if (on('calendar')) {
 
   // ---- calendar --------------------------------------------------------------------------
   console.log('calendar');
@@ -1203,6 +1286,8 @@ try {
   await mockConfig({ calendarFail: false });
   await page.click('.bcv-cal__nav .bcv-roundbtn');
   await page.waitForFunction(() => !document.querySelector('.bcv-cal__notice--warn'), null, { timeout: 10000 });
+  } // calendar
+  if (on('inbox')) {
 
   // ---- inbox --------------------------------------------------------------------------------
   console.log('inbox');
@@ -1250,6 +1335,8 @@ try {
   await page.click('.bcv-compose .bcv-btn--primary');
   await page.waitForFunction(() => document.querySelectorAll('.bcv-inbox__list .bcv-row').length === 3, null, { timeout: 5000 });
   check(true, 'compose sends a new conversation');
+  } // inbox
+  if (on('grades panel')) {
 
   // ---- grades panel (sidebar Grades) --------------------------------------------------------
   console.log('grades panel');
@@ -1507,10 +1594,11 @@ try {
   await page.click('.bcv-gpa__linkbtn');
   await page.waitForSelector('.bcv-gpa__banner', { timeout: 5000 });
   check(await eventually(async () => { const p = await readPrefs(); return p?.gpaTracking === null && Array.isArray(p?.gpaSnapshots) && p.gpaSnapshots.length === 0 && p.gpaGoal === 3.95; }) && /needs your past record/.test((await texts('.bcv-gpa__hero'))[0]), 'Reset setup forgets the prior record and snapshots but keeps the goal');
+  } // grades panel
+  if (on('submission')) {
 
   // ---- handing work in (assignment submission flow) -------------------------------------
   console.log('submission');
-  const readSub = (cid, aid) => fetch(`${BASE}/api/v1/courses/${cid}/assignments/${aid}/submissions/self`).then((r) => r.text()).then((t) => JSON.parse(t.replace(/^while\(1\);/, '')));
   // The mark is a chip in the title's own row, and it opens the submission sheet (handoff surface 1)
   await page.goto(`${BASE}/courses/104/assignments/4001`);
   await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
@@ -1893,6 +1981,8 @@ try {
   const fromTodo = { url: page.url(), back: (await texts('.bcv-cmain .bcv-linkbtn'))[0]?.trim(), inView: await eventually(() => inView('#bcv-submit')), drop: (await texts('.bcv-sb__dropsub'))[0], tabs: (await texts('.bcv-sb__tab')).join(' | ') };
   check(fromTodo.url === `${BASE}/courses/105/assignments/5002?bcv=submit&from=todo` && fromTodo.back === 'To Do' && fromTodo.inView && fromTodo.drop.startsWith('Any file type') && fromTodo.tabs === 'File upload | Text entry', `a To Do row opens the assignment scrolled to the block, with To Do as the way back; no Other tab when the course has no tools: ${JSON.stringify(fromTodo)}`);
   await shot(page, '09g-submit-from-todo');
+  } // submission
+  if (on('groups')) {
 
   // ---- groups -----------------------------------------------------------------------------
   console.log('groups');
@@ -1940,6 +2030,8 @@ try {
   await page.waitForFunction(() => /Academic Success/.test(document.querySelector('.bcv-body')?.textContent || ''), null, { timeout: 10000 });
   const settled = (await texts('.bcv-body > div > .bcv-label')).join(',').toLowerCase();
   check(settled === 'current groups,previous groups', `the courses fold in behind them, and Previous groups appears once a group's course can be called past: ${settled}`);
+  } // groups
+  if (on('course')) {
 
   // ---- course home ---------------------------------------------------------------------------
   console.log('course');
@@ -2316,13 +2408,14 @@ try {
   check(top && top.score === rowEarned && top.of === `/ ${rowPoss}` && top.pc === `${Math.round((Number(rowEarned) / Number(rowPoss)) * 100)}%` && top.aboveText, `the mark is at the top of the assignment, the same one the grades row showed: ${JSON.stringify(top)} from ${gradeRow.score}`);
   await page.goto(`${BASE}/courses/101/grades`);
   await page.waitForSelector('.bcv-rings__svg', { timeout: 10000 });
+  } // course
+  if (on('grades stay fresh')) {
 
   // ---- a grade that lands from elsewhere is never shown stale -----------------------------------------
   // A tool (an LTI plugin marking work in its own frame) or a teacher posts a grade while this page
   // keeps what it read. The scores are asked for again once a tool's frame has been on screen, and a
   // grades screen never draws from an answer older than its freshness — no reload, no look switch.
   console.log('grades stay fresh');
-  const mockScore = (body) => fetch(`${BASE}/__mock/score`, { method: 'POST', body: JSON.stringify(body) }).then((r) => r.ok);
   const scoreOf = (name) => page.$$eval('.bcv-grades__main .bcv-row', (els, n) => els.find((e) => e.querySelector('.bcv-grade__name')?.textContent === n)?.querySelector('.bcv-grade__score')?.textContent || null, name);
   // in-place hops and a knob, driven from inside the interface (the content script's own world)
   const appGo = (path) => sw.evaluate(async ({ base, path: p }) => { const [t] = await chrome.tabs.query({ url: `${base}/*` }); await chrome.scripting.executeScript({ target: { tabId: t.id }, world: 'ISOLATED', func: (href) => { self.BCV.app.go(href); }, args: [p] }); }, { base: BASE, path });
@@ -2639,6 +2732,8 @@ try {
   await page.goto(`${BASE}/courses/101/assignments/syllabus`);
   await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
   check((await texts('.bcv-grades__side .bcv-row, .bcv-col .bcv-row')).length >= 10, 'syllabus page lists dated assignments');
+  } // grades stay fresh
+  if (on('quiz focus')) {
 
   // ---- quiz in progress: focus mode ---------------------------------------------------------------
   console.log('quiz focus');
@@ -2651,6 +2746,8 @@ try {
   await page.waitForTimeout(300);
   check(page.url().endsWith('/quizzes/9011/take'), 'leaving a quiz asks first; cancelling stays');
   await shot(page, '22b-quiz-focus');
+  } // quiz focus
+  if (on('quiz flow')) {
 
   // ---- quiz flow (mockup): intro → questions → review → submitted -----------------------------
   console.log('quiz flow');
@@ -2770,6 +2867,8 @@ try {
   // Q2 was answered wrong on purpose (-2 m): 4 + 0 + 4 + 5 of 17
   check((await texts('.bcv-qz__h1'))[0] === 'Attempt submitted' && /Questions answered 4 of 4 answered/.test(doneCards[0]) && /Score 13 \/ 17/.test(doneCards[1] || ''), `submitted screen shows the score Canvas returned: ${doneCards.join(' | ')}`);
   await shot(page, '22g-quiz-done');
+  } // quiz flow
+  if (on('quiz feedback')) {
   // ---- quiz feedback (mockup 9): the receipt leads to the attempt's results ------------------------
   console.log('quiz feedback');
   check((await texts('.bcv-qz__donebtns .bcv-qz__big')).join('|') === 'See feedback|Back to the quiz', `receipt offers the feedback once Canvas releases results: ${(await texts('.bcv-qz__donebtns .bcv-qz__big')).join('|')}`);
@@ -2974,6 +3073,8 @@ try {
   await page.waitForSelector('.bcv-qfb__q', { timeout: 10000 });
   const histPage = await page.evaluate(() => ({ path: location.pathname, qs: document.querySelectorAll('.bcv-qfb__q').length, punch: document.documentElement.classList.contains('bcv-punch'), line: document.querySelector('.bcv-fb__scoreline')?.textContent || '' }));
   check(histPage.path === '/courses/101/quizzes/9001/history' && histPage.qs === 4 && !histPage.punch && /^13 \/ 16/.test(histPage.line), `Canvas's results page for an attempt opens the interface's quiz feedback: ${JSON.stringify(histPage)}`);
+  } // quiz feedback
+  if (on('restricted quiz')) {
 
   // ---- a restricted quiz: an access code Canvas does not tell the student -------------------------
   console.log('restricted quiz');
@@ -3047,6 +3148,8 @@ try {
   await page.goto(`${BASE}/courses/102/quizzes/10022`);
   page.off('dialog', leaveRestricted);
   await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
+  } // restricted quiz
+  if (on('survey')) {
 
   // ---- a graded survey: no right answers, points for taking part, its own words --------------------
   console.log('survey');
@@ -3069,6 +3172,8 @@ try {
   check((await texts('.bcv-qz__h1'))[0] === 'Responses recorded' && /Thanks for taking part/.test((await texts('.bcv-qz__lead'))[0]) && /Questions answered 3 of 4 answered/.test(surveyCards[0]) && /For taking part 2 points/.test(surveyCards[1] || '') && !surveyCards.some((t) => /^Score/.test(t)) && (await texts('.bcv-qz__donebtns .bcv-qz__big')).join('|') === 'Back to the survey', `the receipt says the responses are in, the points for taking part, and no score or feedback: ${surveyCards.join(' | ')}`);
   await page.click('.bcv-qz__donebtns .bcv-qz__big--primary');
   await page.waitForSelector('.bcv-screen, .bcv-cmain', { timeout: 10000 });
+  } // survey
+  if (on('quiz: matching and blanks')) {
 
   // ---- matching, and the kinds with a blank each ---------------------------------------------------
   // Canvas draws these as dropdowns and used to be the only place that could take them; they are
@@ -3248,6 +3353,8 @@ try {
   await noteApi('POST', '/__mock/config', { richQuestions: false });
   await page.goto(`${BASE}/courses/101/quizzes/9001`);
   await page.waitForSelector('.bcv-qz__intro, .bcv-detail__title', { timeout: 20000 });
+  } // quiz: matching and blanks
+  if (on('native pages')) {
 
   // ---- hybrid (native) page inside the shell ----------------------------------------------------
   console.log('native pages');
@@ -3348,10 +3455,11 @@ try {
   await page.goto(`${BASE}/courses/101/assignments/1009`);
   await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
   check(!(await page.content()).match(/\bAI\b/), 'the interface never says "AI"');
+  } // native pages
+  if (on('search')) {
 
   // ---- search everything ------------------------------------------------------------------------
   console.log('search');
-  await sw.evaluate((base) => self.BCV.api.storage.local.set({ 'dev:wikiBase': base }), BASE); // (Wikipedia stands in the mock)
   await page.goto(`${BASE}/`);
   await page.waitForSelector('#bcv-omni', { timeout: 10000 });
   const sBox = await page.evaluate(() => { const row = document.querySelector('.bcv-head__row'); const s = row.querySelector('#bcv-omni-box').getBoundingClientRect(); const h1 = row.querySelector('.bcv-h1').getBoundingClientRect(); const seg = row.querySelector('.bcv-seg').getBoundingClientRect(); return { placeholder: document.getElementById('bcv-omni').placeholder, between: s.left > h1.right && s.right <= seg.left + 1, level: Math.abs(s.bottom - seg.bottom) < 1.5 && Math.abs(s.height - seg.height) <= 1, pills: getComputedStyle(document.getElementById('bcv-omni-root')).backgroundColor === 'rgba(0, 0, 0, 0)', key: document.querySelector('.bcv-omni__key')?.textContent, panelHidden: document.getElementById('bcv-omni-panel').hidden }; });
@@ -3391,7 +3499,6 @@ try {
   await eventually(async () => (await page.$('.bcv-omni__more')) === null && (await page.$$('.bcv-omni__group')).length >= 2, 12000); // (every source answered)
   const sRes = await page.$$eval('.bcv-omni__group', (gs) => gs.map((g) => `${g.dataset.group}: ${[...g.querySelectorAll('.bcv-omni__t')].map((t) => t.textContent).join(' | ')}`));
   check(sRes.some((g) => /^Assignments: /.test(g) && /Dis01/.test(g)) && sRes.some((g) => g === 'Wikipedia: dis01 (article) | Theory of dis01') && sRes.every((g) => g.split(': ')[1].split(' | ').every((t) => /dis01/i.test(t))) && sRes[sRes.length - 1].startsWith('Wikipedia:'), `typing lists what Canvas has that matches, in groups, Wikipedia's articles last: ${sRes.join(' · ')}`);
-  const curAt = () => page.$$eval('.bcv-omni__item', (els) => els.findIndex((e) => e.classList.contains('is-cur')));
   check((await curAt()) === 0 && (await page.$eval('.bcv-omni__item.is-cur', (e) => e.getAttribute('aria-selected'))) === 'true', 'the first result is chosen as you type: Enter is optional, a click is one press');
   await page.keyboard.press('ArrowDown');
   check((await curAt()) === 1, 'the arrows walk the results');
@@ -3455,6 +3562,8 @@ try {
   await page.waitForSelector('#bcv-omni', { timeout: 10000 });
   await page.waitForTimeout(500);
   check(!(await page.$('#bcv-tour')), 'and it does not come back');
+  } // search
+  if (on('search hub')) {
 
   // ---- the hub: what the page holds answers at once, commands, a row's actions, the hand-in box, answers, the keys ----
   console.log('search hub');
@@ -3488,6 +3597,7 @@ try {
   const omniMove = await page.evaluate(() => { window.__omniObs.disconnect(); return { ...window.__omniSeen, left: document.querySelectorAll('.bcv-omni__gone').length }; });
   check(omniMove.gone > 0 && omniMove.moving > 0 && omniMove.bad === 0 && omniMove.left === 0, `the results change in motion: rows that stay glide and new ones rise in, gone ones fade where they stood as likenesses nothing finds, and all of it is over in a moment: ${JSON.stringify(omniMove)}`);
   const selRead = () => page.evaluate(() => { const s = [...document.querySelectorAll('.bcv-omni__sel')]; const c = document.querySelector('.bcv-omni__item.is-cur'); if (s.length !== 1 || !c) return { n: s.length, cur: !!c }; const a = s[0].getBoundingClientRect(); const b = c.getBoundingClientRect(); return { n: 1, on: s[0].classList.contains('is-on'), off: Math.round(Math.abs(a.left - b.left) + Math.abs(a.top - b.top) + Math.abs(a.width - b.width) + Math.abs(a.height - b.height)), gliding: s[0].getAnimations().length > 0, rowBg: getComputedStyle(c).backgroundColor, selBg: getComputedStyle(s[0]).backgroundColor }; });
+  await motionAt(page, 1); // (the highlight's glide is watched as it happens: real speed)
   const sel0 = await selRead();
   await page.keyboard.press('ArrowDown');
   const selMid = await selRead();
@@ -3495,6 +3605,7 @@ try {
   const sel1 = await selRead();
   await page.keyboard.press('ArrowUp');
   await page.waitForTimeout(350);
+  await motionAt(page, MOTION_RATE);
   check(sel0.n === 1 && sel0.on && sel0.off <= 1 && sel0.rowBg === 'rgba(0, 0, 0, 0)' && sel0.selBg !== 'rgba(0, 0, 0, 0)' && selMid.gliding && sel1.off <= 1 && (await curAt()) === 0, `the highlight is one shape behind the row chosen, gliding to the next as the arrows move: ${JSON.stringify({ sel0, selMid, sel1 })}`);
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.evaluate(() => { const p = document.getElementById('bcv-omni-panel'); const seen = window.__omniSeen = { gone: 0, moving: 0 }; window.__omniObs = new MutationObserver(() => { seen.gone += p.querySelectorAll('.bcv-omni__gone').length; seen.moving = Math.max(seen.moving, [...p.querySelectorAll('[data-key], .bcv-omni__sel')].filter((e) => e.getAnimations().length).length); }); window.__omniObs.observe(p, { childList: true }); });
@@ -3778,6 +3889,8 @@ try {
   await page.keyboard.press('Control+k');
   await page.waitForSelector('#bcv-omni', { timeout: 10000 });
   check(await eventually(async () => page.evaluate(() => document.activeElement?.id === 'bcv-omni').catch(() => false), 6000) && page.url() === `${BASE}/`, `⌘K on Grades does the same: ${page.url()}`);
+  } // search hub
+  if (on('appearance')) {
 
   // ---- dark appearance -------------------------------------------------------------------------------
   console.log('appearance');
@@ -3880,6 +3993,8 @@ try {
   await toggleLook('off');
   await page.waitForFunction(() => !window.__bcvOldDoc && document.documentElement.getAttribute('data-bcv-theme') === 'light' && !!document.querySelector('.bcv-front'), null, { timeout: 15000 });
   await page.waitForLoadState('networkidle', { timeout: 15000 });
+  } // appearance
+  if (on('background loading')) {
 
   // ---- loading in the background: the next press is ready before it happens -------------------
   console.log('background loading');
@@ -3943,6 +4058,8 @@ try {
     check(api.length === beforeTab && (await page.$$('.bcv-body .bcv-row')).length > 0, `a course tab warmed on idle opens with no request (${api.length - beforeTab} made)`);
     await page.unroute(counter);
   }
+  } // background loading
+  if (on('motion')) {
 
   // ---- motion (mockup 8): entrances by keyframes, a loading bar + skeletons, reduced motion ----
   console.log('motion');
@@ -4026,6 +4143,7 @@ try {
   await page.mouse.move(5, 5);
   await page.goto(`${BASE}/`);
   await page.waitForSelector('.bcv-stat', { timeout: 10000 });
+  await motionAt(page, 1); // (the box's growth, its focus and its glide back are read as they happen: real speed, to the short window's end)
   await page.click('.bcv-stat');
   await page.waitForSelector('.bcv-sheet', { timeout: 5000 });
   // (2.98.45) the counter's box grows where the counter stands: its place and size eased from the counter's, the page dimmed round it and blurred
@@ -4073,6 +4191,7 @@ try {
   const shortFull = await posOf();
   const near = (a, b, d = 3) => !!a && !!b && Math.abs(a[0] - b[0]) <= d && Math.abs(a[1] - b[1]) <= d;
   check(near(shortOpen.num, shortOpen.cardNum) && near(shortOpen.lbl, shortOpen.cardLbl) && shortFull.boxTop < shortFull.cardTop - 30 && shortFull.boxH === 430 && shortFull.boxTop + shortFull.boxH <= 620 - 16, `in a short window the words start exactly on the counter's, though the box (its full 430px) is pushed up away from it (box top ${shortFull.boxTop}, counter ${shortFull.cardTop}): ${JSON.stringify(shortOpen)}`);
+  await motionAt(page, MOTION_RATE);
   await page.keyboard.press('Escape');
   await page.waitForTimeout(430);
   const shortEnd = await posOf();
@@ -4124,6 +4243,8 @@ try {
   });
   check(reduced[0] === 'none' && reduced[1] === 'none/matrix(0.6, 0, 0, 1, 0, 0)' && reduced[2] === 'none' && reduced[3] === 'none' && reduced[4] === dueNow, `reduced motion drops the entrances (and the stagger, the bar wipe, the counter roll); the row wash holds still part way: ${reduced.join(' / ')}`);
   await page.emulateMedia({ reducedMotion: 'no-preference' });
+  } // motion
+  if (on('the look off and on')) {
 
   // ---- the look off and on: the three-stop switch at the top right, "Open in stock Canvas", the lock ----
   console.log('the look off and on');
@@ -4266,22 +4387,16 @@ try {
   await page.waitForSelector('#application', { timeout: 10000 });
   await setSettings({ appearance: { skin: true } });
   await page.waitForSelector('#bcv-app .bcv-nav__item', { timeout: 10000 });
-  } // ================= end of part 1 =================
+  } // the look off and on
 
-  if (PART !== 1) { // ================= part 2: the setup, the tools, getting unstuck =================
+  if (on('guided setup')) {
   // ---- guided setup + the welcome --------------------------------------------------------------------------
   console.log('guided setup');
-  const su = (sel) => `#bcv-setup ${sel}`; // the setup's card lives in a shadow root under #bcv-setup
-  const sStep = () => page.$eval(su('#stepLabel'), (e) => e.textContent.trim()).catch(() => '');
   const sNext = async (waitFor) => { await page.click(su('#next')); await page.waitForSelector(su(waitFor), { timeout: 15000 }); await page.waitForTimeout(450); };
   // a fresh student: the Grades checks above left a goal and a record behind
   await sw.evaluate(async (port) => { const k = `prefs:localhost:${port}`; const all = await self.BCV.api.storage.local.get(k); const p = all[k] || {}; for (const key of ['gpaGoal', 'gpaTracking', 'gradeTargets', 'setupDone', 'tour']) delete p[key]; await self.BCV.api.storage.local.set({ [k]: p }); await self.BCV.api.storage.local.remove(['setup:done', 'welcome:pending']); }, PORT);
   await page.goto(`${BASE}/?bcv=setup`);
   await page.waitForSelector(su('.row'), { timeout: 20000 });
-  // the dot after "Simpl" sits where the word ends in this system's font (here a Windows-like one,
-  // wider than the Mac's: drawn at the design's fixed place it would land on the l) — read while the
-  // word-mark is still up (it is short here: harness.mjs)
-  const dotOf = (hostSel) => page.evaluate((sel) => { const r = document.querySelector(sel).shadowRoot; const t = r.querySelector('.intro text'); const d = r.querySelector('.intro__dot'); const b = t.getBBox(); const vb = r.querySelector('.intro svg').getAttribute('viewBox').split(' ').map(Number); return { gap: Math.round(Number(d.getAttribute('cx')) - (b.x + b.width)), end: Math.round(b.x + b.width), cx: Number(d.getAttribute('cx')), fits: vb[2] >= Number(d.getAttribute('cx')) + 9 }; }, hostSel);
   const setupDot = await dotOf('#bcv-setup');
   const introUp = (await page.$(su('.intro:not([hidden])'))) !== null;
   // the word-mark plays first (about two seconds), then the setup rises under it
@@ -4303,8 +4418,6 @@ try {
   const rowsNow = await page.$$eval(su('.row[data-course]'), (els) => els.map((e) => ({ id: e.dataset.course, on: e.classList.contains('is-on') })));
   check((await texts(su('.fr__h1')))[0] === 'Which classes are you in?' && (await texts(su('.fr__blurb')))[0] === 'Only select the courses that count towards your GPA.' && (await page.$eval(su('.fr__h1'), (e) => parseFloat(getComputedStyle(e).fontSize) >= 30)) && (await page.$eval(su('.fr__blurb'), (e) => { const s = getComputedStyle(e), t = getComputedStyle(e.previousElementSibling); return parseFloat(s.fontSize) >= 15 && parseFloat(s.fontSize) < parseFloat(t.fontSize) * 0.6 && s.color !== t.color; })) && scanned.length >= 8 && rowsNow.every((r) => !r.on) && (await texts(su('.listhead span')))[0] === `0 of ${total} selected` && (await texts(su('#selectAll')))[0] === 'Select all' && (await page.$eval(su('#next'), (b) => b.disabled)) && (await texts(su('#hint')))[0] === 'Pick at least one course.' && (await railAnswer('courses')) === 'None yet', `step 1 read the enrolments and ticked none of them: ${scanned.length} courses, Continue waiting with its hint`);
   check(await page.$eval(su('.fr__blurb--strong'), (e) => { const s = getComputedStyle(e); return e.textContent === 'Only select the courses that count towards your GPA.' && parseInt(s.fontWeight, 10) >= 700 && parseFloat(s.fontSize) >= 16 && s.color === 'rgb(10, 132, 255)'; }), 'the line about the GPA is big, bold and blue: the one thing to get right on this step');
-  // Clear all leaves none ticked, whatever was: Continue is dead with a hint until one is picked
-  const clearAll = async () => { if ((await texts(su('#selectAll')))[0] === 'Select all') await page.click(su('#selectAll')); await page.click(su('#selectAll')); };
   await clearAll();
   check((await page.$$(su('.row.is-on'))).length === 0 && (await texts(su('.listhead span')))[0] === `0 of ${total} selected` && (await page.$eval(su('#next'), (b) => b.disabled)) && (await texts(su('#hint')))[0] === 'Pick at least one course.' && (await railAnswer('courses')) === 'None yet', 'Clear all unticks them all: Continue is dead with a hint until one is picked');
   // the list scrolls behind a scrollbar that is always drawn, so the courses below the fold are not
@@ -4411,7 +4524,6 @@ try {
   await page.click(su('#next'));
   await page.waitForSelector(su('.pz'), { timeout: 20000 });
   await page.waitForTimeout(500);
-  const pz = (sel) => su(`.pz ${sel}`);
   const pzVar = (name) => page.$eval(su('.pz'), (e, n) => e.style.getPropertyValue(n), name);
   const pzOpen = await page.evaluate(() => { const r = document.querySelector('#bcv-setup').shadowRoot; const pv = r.querySelector('.pz__pv'); return { rail: !!r.querySelector('.rail'), looks: [...r.querySelectorAll('#pzLook .pz__segbtn')].map((b) => `${b.dataset.look}${b.classList.contains('is-on') ? '*' : ''}`).join(' '), bars: [...r.querySelectorAll('#pzBars .pz__bar')].map((b) => (b.classList.contains('is-on') ? 'on' : b.classList.contains('is-done') ? 'done' : 'off')).join(' '), h1: r.querySelector('.pz__h1').textContent, pvWidth: Math.round(pv.getBoundingClientRect().width), pvScale: pv.style.transform, rows: r.querySelectorAll('.pz__row').length, cards: r.querySelectorAll('.pz__card').length, crows: r.querySelectorAll('.pz__crow').length, themes: [...r.querySelectorAll('#pzThemes .pz__sw')].map((b) => `${b.dataset.theme}${b.classList.contains('is-on') ? '*' : ''}`).join(' '), next: r.querySelector('#pzNext').textContent, back: !!r.querySelector('#pzBack'), note: r.querySelector('#pzNote').textContent, A: r.querySelector('.pz').style.getPropertyValue('--A'), strokes: [...r.querySelectorAll('.pz__rowic')].map((e) => getComputedStyle(e).stroke), lead: r.querySelector('.pz__lead')?.textContent, crowNames: [...r.querySelectorAll('.pz__crow')].map((e) => e.textContent).join('|'), secs: [...r.querySelectorAll('#pzPanel .pz__sec')].map((e) => `${e.querySelector('.pz__secn').textContent}.${e.querySelector('.pz__sech span').textContent}`).join(','), modes: [...r.querySelectorAll('#pzLook .pz__mode')].map((b) => `${b.querySelector('.pz__modename').textContent}:${b.querySelector('.pz__modesub').textContent}:${b.querySelectorAll('.pz__win').length}`).join(','), modeSize: (() => { const b = r.querySelector('#pzLook .pz__mode').getBoundingClientRect(); return b.width >= 80 && b.height >= 90; })(), inPanel: !!r.querySelector('#pzPanel [data-sec="look"] #pzLook'), panelLeft: r.querySelector('#pzPanel').getBoundingClientRect().right <= r.querySelector('.pz__pvcol').getBoundingClientRect().left, pvTag: r.querySelector('.pz__pvtag').textContent, pvNote: r.querySelector('.pz__pvnote').textContent, frameUrl: r.querySelector('.pz__frameurl').textContent, framed: (() => { const f = r.querySelector('.pz__frame').getBoundingClientRect(), v = pv.getBoundingClientRect(); return Math.abs(f.width - 2 - v.width) <= 2 && v.top >= f.top + 28 && Math.abs(f.bottom - 1 - v.bottom) <= 2; })(), slots: [...r.querySelectorAll('#pzSlots .pz__slot')].map((b) => `${b.dataset.slot}:${b.querySelector('.pz__slotname').textContent}:${b.querySelector('.pz__slotdo').textContent}:${getComputedStyle(b.querySelector('.pz__slotpic')).borderTopStyle}`).join(','), badges: [...r.querySelectorAll('.pz__badge')].map((e) => e.textContent).join(','), head: !!r.querySelector('.pz__phead[data-target="head"].is-pickable') }; });
   check(!pzOpen.rail && pzOpen.looks === `light${lookBefore === 'light' ? '*' : ''} dark${lookBefore === 'dark' ? '*' : ''} system${lookBefore === 'system' ? '*' : ''}` && pzOpen.bars === 'on off' && pzOpen.h1 === 'Make it yours' && pzOpen.pvWidth >= 560 && pzOpen.pvWidth <= 1300 && /scale\(/.test(pzOpen.pvScale) && pzOpen.rows === 5 && pzOpen.cards === 6 && pzOpen.crows === 5 && pzOpen.themes === 'Regular* Pink Red Amber Green Teal Indigo Purple Custom' && pzOpen.next === 'Continue' && !pzOpen.back && pzOpen.note === 'Regular' && pzOpen.A === '#0a84ff' && pzOpen.strokes.join(',') === 'rgb(10, 132, 255),rgb(255, 159, 10),rgb(48, 209, 88),rgb(94, 92, 230),rgb(191, 90, 242)', `Personalize opens in the card's place: the look with the setting's own choice, two bars, the preview scaled to fit, Regular with every glyph in its own colour: ${JSON.stringify(pzOpen)}`);
@@ -4877,6 +4989,8 @@ try {
   await tourStep('grades');
   await tourEnd();
   await sw.evaluate(() => self.BCV.settings.update({ appearance: { awayRefresh: false } }));
+  } // guided setup
+  if (on("what's new")) {
 
   // ---- what's new after an update ----------------------------------------------------------------
   console.log("what's new");
@@ -4997,6 +5111,8 @@ try {
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('#bcv-whatsnew'), null, { timeout: 5000 });
   check(!(await page.$('#bcv-whatsnew')), 'Escape closes it too');
+  } // what's new
+  if (on('setup page')) {
 
   // ---- the page after install: black, a splash, then the one thing to do -------------------------
   console.log('setup page');
@@ -5040,6 +5156,8 @@ try {
   check(sfAfter.asked.length === 1 && (sfAfter.asked[0].origins || []).join() === '*://*/*' && sfAfter.hidden === true && /^Done\. Open your Canvas/.test(sfAfter.note || ''), `the press asks for every website and, allowed, the page says setup begins on the Canvas at any address (${JSON.stringify(sfAfter)})`);
   check((await sw.evaluate(() => self.BCV.api.runtime.getManifest().content_scripts.some((cs) => (cs.js || []).includes('content/sniff.js') && cs.matches.includes('*://*/*') && (cs.exclude_matches || []).includes('*://*.instructure.com/*')))), 'the sniffer is in the manifest for every build: every site but Canvas\'s own, at idle');
   await sfSetup.close().catch(() => {});
+  } // setup page
+  if (on('account panel')) {
 
   // ---- the account panel ----------------------------------------------------------------------------------
   console.log('account panel');
@@ -5063,36 +5181,24 @@ try {
   check(body.get('_method') === 'delete' && body.get('authenticity_token') === 'mock+csrf/token=', `Log out submits Canvas's own logout form with the session's token, decoded from the cookie: ${logoutReq.postData()}`);
   await page.waitForFunction(() => /Logged out|Page Error/.test(document.body.textContent), null, { timeout: 10000 });
   check(await page.evaluate(() => /Logged out/.test(document.body.textContent) && !/Page Error/.test(document.body.textContent)), 'Canvas accepts it and logs the session out (no "Page Error")');
+  } // account panel
+  if (on('tools')) {
 
   // ---- Tools: one row, a page of cards, each tool in a popup; a card dragged to the top is a pin ----------
   console.log('tools');
   await sw.evaluate(() => self.BCV.api.storage.local.remove(['tools:welcomed', 'tools:pins', 'tools:decks', 'tools:citations', 'tools:focus']));
-  // a few reads and pokes in the page's own world (the content scripts' isolated world, through the background)
-  const inPage = (op) => sw.evaluate(async ([base, o]) => {
-    const [tab] = await chrome.tabs.query({ url: `${base}/*` });
-    const [{ result }] = await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'ISOLATED', args: [o], func: (what) => {
-      if (what === 'stale') { self.BCV.app.state.lastHere = Date.now() - 4 * 60 * 1000; return true; }
-      if (what === 'focusActive') return self.BCV.tools.focusActive();
-      if (what === 'jspdf') return !!self.jspdf?.jsPDF;
-      if (what === 'ccBase') { self.BCV.toolsConvert.setBase(`${location.origin}/cc/v2`); return true; }
-      return null;
-    } });
-    return result;
-  }, [BASE, op]);
   await page.goto(`${BASE}/#tools`);
   // the first press: no tour of its own any more (the setup's tour brings the student here and asks for the drag)
   await page.waitForSelector('.bcv-tool-card', { timeout: 20000 });
   await page.waitForTimeout(600);
   check(!(await page.$('#bcv-tour')), 'Tools opens without a tour of its own');
-  // the page: one row at the bottom of the nav, five cards
-  const raw = (sel) => page.$$eval(sel, (els) => els.map((e) => e.textContent.replace(/\s+/g, ' ').trim())); // (textContent: the small labels are drawn in capitals by CSS)
   const toolNav = await texts('.bcv-nav > .bcv-nav__item');
   check(toolNav[toolNav.length - 1].startsWith('Tools') && (await page.$eval('.bcv-nav__item[data-nav="tools"]', (e) => e.classList.contains('is-active'))) && (await texts('.bcv-h1'))[0] === 'Tools' && (await texts('.bcv-head__sub'))[0] === 'Handy things, right here.', 'Tools is the last row of the sidebar, lit, and the page is titled');
   const cardNames = await texts('.bcv-tool-card__name');
   check(cardNames.join(' | ') === 'Citation generator | Focus timer | Calculator | Graphing calculator | Periodic table | Grade needed | File converter | Merge & split PDFs | PDF annotator | Image to text | Flashcards' && (await page.$$('.bcv-tool-card__open')).length === 11, `eleven cards, each with Open: ${cardNames.join(' | ')}`);
   await shot(page, '36c-tools');
-  const closeTool = async () => { await page.keyboard.press('Escape'); await page.waitForFunction(() => !document.querySelector('.bcv-tool-ov'), null, { timeout: 5000 }); };
-  const openTool = async (key) => { await page.click(`.bcv-tool-card[data-tool="${key}"]`); await page.waitForSelector(`.bcv-tool[data-tool="${key}"]`, { timeout: 5000 }); };
+  } // tools
+  if (on('widgets')) {
 
   // ---- widgets of your own: the Add card, the importer (paste, an address, a starter), the sandbox, the store, the pin, remove ----
   console.log('widgets');
@@ -5247,7 +5353,6 @@ try {
   await page.waitForTimeout(200);
   check((await page.evaluate(() => document.documentElement.getAttribute('data-bcv-ext-theme'))) === 'dark', 'the moon turns it back');
   await closeTool();
-  const toolSub = () => texts('.bcv-tool__sub').then((t) => t[0]);
   // the citation generator: style and type pick the template, the fields fill it, a guard keeps a
   // value out of a type that has no field for it
   await openTool('cite');
@@ -5280,7 +5385,6 @@ try {
   await closeTool();
   // the focus timer: the minutes set on the phone's timer card, kept by the clock, a live activity in the tray beside the switch, Away Refresh waits
   await openTool('pomo');
-  const focusStored = async () => (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('tools:focus'))['tools:focus']));
   const scaleInfo = () => page.$eval('.bcv-tool .bcv-pomo__scale', (e) => { const strip = e.querySelector('.bcv-pomo__strip'); const ppm = Number(e.dataset.ppm); const tx = Number((/translateX\(([-\d.]+)px\)/.exec(strip.style.transform) || [])[1]); return { ticks: e.querySelectorAll('.bcv-pomo__tick').length, labels: [...e.querySelectorAll('.bcv-pomo__label')].map((x) => x.textContent).join(','), centre: Math.round(((e.clientWidth / 2 - tx) / ppm) * 10) / 10, markerLeft: Math.round(parseFloat(getComputedStyle(e.querySelector('.bcv-pomo__marker')).left)), half: Math.round(e.clientWidth / 2), set: e.classList.contains('is-set') }; });
   const sc0 = await scaleInfo();
   check((await texts('.bcv-pomo__time'))[0] === '25:00' && (await raw('.bcv-pomo__phasepill'))[0] === 'Focus' && (await texts('.bcv-pomo__main'))[0] === 'Start Timer' && (await page.$eval('.bcv-pomo__cancel', (e) => e.hidden)) && (await toolSub()) === '0 sessions today' && (await raw('.bcv-pomo__dotslabel'))[0] === 'Session 1 of 4' && sc0.ticks === 91 && sc0.labels === '0,5,10,15,20,25,30,35,40,45,50,55,60,65,70,75,80,85,90' && sc0.centre === 25 && Math.abs(sc0.markerLeft - sc0.half) <= 1 && sc0.set, `the timer opens on Focus at 25 minutes: the strip of an hour and a half slid so 25 sits under the marker fixed at the centre, Start Timer, no Cancel (${JSON.stringify(sc0)})`);
@@ -5426,6 +5530,10 @@ try {
   await page.click('.bcv-pt__chip[data-cat="noble gas"]');
   check((await page.$$('.bcv-pt__cell:not(.is-dim)')).length === 6 && (await page.$eval('.bcv-pt__chip[data-cat="noble gas"]', (e) => e.classList.contains('is-on'))), 'a legend chip lights its kind: the six noble gases (oganesson is still an unknown)');
   await closeTool();
+  } // widgets
+  if (on('converters and cards')) {
+  console.log('converters and cards');
+  if (!page.url().endsWith('#tools')) { await page.goto(`${BASE}/#tools`); await page.waitForSelector('.bcv-tool-card', { timeout: 20000 }); } // (where the widgets section leaves off)
   // the file converter: the source kind decides the targets; images on the canvas, a PDF from an engine loaded when first needed
   await openTool('conv');
   check((await toolSub()) === 'Runs on this device. Nothing is uploaded.' && (await page.$eval('.bcv-conv__run', (e) => e.disabled)) && /Word and PDF convert right here/.test((await texts('.bcv-sheet__foot'))[0]), 'the converter opens empty, says nothing is uploaded and what a Word document becomes');
@@ -5483,8 +5591,6 @@ try {
   const pdfHas = (re) => re.test(pdfText);
   const pdfFacts = { pages: (pdfText.match(/\/Type\s*\/Page[^s]/g) || []).length, title: pdfHas(/\(Lab Report One\) Tj/), bold: pdfHas(/\/Helvetica-Bold/) && pdfHas(/\(bold words\) Tj/), italic: pdfHas(/\/Helvetica-Oblique/) && pdfHas(/\(italic words\) Tj/), times: pdfHas(/\/Times-Roman/) && pdfHas(/\(Serif line in Times\.\) Tj/), red: pdfHas(/1\. 0\. 0\. rg\n[\d. ]+ Td\n\(red words\) Tj/), link: pdfHas(/\/URI \(https:\/\/example\.com\/lab\)/), bullet: pdfHas(/\(\x95\) Tj/), numbers: pdfHas(/\(1\.\) Tj/) && pdfHas(/\(2\.\) Tj/), table: pdfHas(/\(Cell B2\) Tj/) && pdfHas(/0\.85 g\n[\d. -]+ re\nf/) && (pdfText.match(/ re\nS/g) || []).length >= 4, image: pdfHas(/\/Subtype \/Image/) && pdfHas(/\/Width 8/), page2: pdfHas(/\(Second page, centered\.\) Tj/), label: (await texts('.bcv-conv__outlabel, .bcv-conv__err'))[0] };
   check(docxDl.suggestedFilename() === 'Lab report.pdf' && pdfOut.subarray(0, 5).toString() === '%PDF-' && pdfFacts.pages === 2 && Object.entries(pdfFacts).every(([k, v]) => k === 'label' || k === 'pages' || v === true) && /· 2 pages$/.test(pdfFacts.label), `Word → PDF on this device keeps the heading, bold, italic, the serif font, the red words, the link, bullets and numbers, the shaded bordered table, the picture and the page break (${JSON.stringify(pdfFacts)})`);
-  // and back
-  const pdfObjects = (objs) => { let out = '%PDF-1.4\n'; const offs = []; objs.forEach((o, i) => { offs.push(Buffer.byteLength(out, 'latin1')); out += `${i + 1} 0 obj\n${o}\nendobj\n`; }); const xref = Buffer.byteLength(out, 'latin1'); out += `xref\n0 ${objs.length + 1}\n0000000000 65535 f \n${offs.map((o) => `${String(o).padStart(10, '0')} 00000 n \n`).join('')}trailer\n<< /Size ${objs.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`; return Buffer.from(out, 'latin1'); };
   const pdfStream = (body) => `<< /Length ${Buffer.byteLength(body, 'latin1')} >>\nstream\n${body}\nendstream`;
   const pdfPage1 = 'BT /F1 20 Tf 72 700 Td (Chapter One) Tj ET\nBT /F2 11 Tf 72 670 Td (The first paragraph runs along the whole line and keeps going right to the) Tj ET\nBT /F2 11 Tf 72 656 Td (edge and then wraps onto a second line before it ends.) Tj ET\nBT /F2 11 Tf 72 630 Td (\\225 A bullet point) Tj ET\n0 0 1 rg BT /F2 11 Tf 72 604 Td (Blue words) Tj ET 0 0 0 rg\nBT /F2 11 Tf 72 580 Td (Visit the lab site) Tj ET\nq 100 0 0 50 72 500 cm /Im1 Do Q';
   const pdfFixture = pdfObjects([
@@ -5571,7 +5677,7 @@ try {
   check((await texts('.bcv-tool__note'))[0] === '2 cards added.' && (await page.$$eval('.bcv-fc__editrow .bcv-fc__term', (els) => els.map((e) => e.value))).slice(3).join(' | ') === 'Product rule | Quotient rule', 'Add these cards puts them on the set');
   await page.click('.bcv-fc__done-btn');
   await page.waitForSelector('.bcv-fc__tile', { timeout: 3000 });
-  const decks = await sw.evaluate(async () => (await self.BCV.api.storage.local.get('tools:decks'))['tools:decks']);
+  decks = await sw.evaluate(async () => (await self.BCV.api.storage.local.get('tools:decks'))['tools:decks']);
   check((await toolSub()) === '5 terms' && (await page.$$eval('.bcv-fc__tile', (els) => els.map((e) => e.dataset.mode))).join(',') === 'cards,learn,test,match' && (await texts('.bcv-fc__termstitle'))[0] === 'Terms in this set (5)' && (await page.$$('.bcv-fc__termrow')).length === 5 && (await texts('.bcv-fc__faceterm'))[0] === 'Power rule' && (await texts('.bcv-fc__pos'))[0] === '1 / 5' && decks.length === 1 && decks[0].cards.length === 5 && decks[0].cards[2].term === 'Chain rule' && decks[0].cards.every((c) => c.level === 0), 'Done opens the set page: four ways to study, the first card face up, the terms listed under it, all of it kept on this device');
   await page.click('.bcv-fc__face');
   check(await eventually(() => page.$eval('.bcv-fc__face', (e) => e.classList.contains('is-flipped') && /matrix3d|rotateY/.test(getComputedStyle(e.querySelector('.bcv-fc__flipper')).transform)), 2000) && (await texts('.bcv-fc__facedef'))[0] === 'd/dx x^n = n*x^(n-1)' && (await page.$eval('.bcv-fc__flipper', (e) => getComputedStyle(e).transformStyle)) === 'preserve-3d', 'a press turns the card over to the definition');
@@ -5780,6 +5886,8 @@ try {
   check((await page.$eval('#bcv-pins', (e) => e.hidden)) && (await inPage('focusActive')) === false, 'End takes the borrowed pin away');
   await page.goto(`${BASE}/#tools`);
   check((await page.$('#bcv-tour')) === null && (await page.$$('.bcv-tool-card')).length === 11 && !(await page.$eval('.bcv-tool-card[data-tool="pomo"]', (e) => e.classList.contains('is-pinned'))), 'the second time, Tools opens without the tour, and the card is no longer marked');
+  } // converters and cards
+  if (on('grade needed')) {
 
   // ---- the four tools of 2.35.0: grade needed, merge & split, the annotator, image to text ----
   console.log('grade needed');
@@ -6008,6 +6116,8 @@ try {
     check(ntTxt.name === 'board.txt' && /Hello world 2026/.test(ntTxt.bytes.toString('utf8')), 'Save as text downloads the words under the picture\'s name');
     await closeTool();
   }
+  } // grade needed
+  if (on('quick menus')) {
 
   // ---- the quick menus: every pin but the timer's swells into a capsule under the pointer, the tool's quickest use in it ----
   console.log('quick menus');
@@ -6271,6 +6381,8 @@ try {
   }
   await sw.evaluate(() => self.BCV.api.storage.local.set({ 'tools:pins': [] }));
   await page.mouse.move(700, 500);
+  } // quick menus
+  if (on('widgets on a tool tab')) {
 
   // ---- never a broken card -----------------------------------------------------------------------------
   // ---- the pinned tools, on a tool's own tab -------------------------------------------------
@@ -6340,6 +6452,8 @@ try {
   await eventually(async () => wTab.isClosed(), 10000);
   await page.bringToFront();
   await sw.evaluate((prev) => self.BCV.api.storage.local.set({ 'tools:pins': prev }), pinsBefore);
+  } // widgets on a tool tab
+  if (on('resilience')) {
 
   console.log('resilience');
   await mockConfig({ groupsFail: true });
@@ -6351,6 +6465,8 @@ try {
   await mockConfig({ groupsFail: false });
   await page.goto(`${BASE}/groups`);
   await page.waitForSelector('.bcv-body .bcv-row', { timeout: 15000 });
+  } // resilience
+  if (on('getting unstuck')) {
   // getting unstuck: a screen whose answer never comes is given one fresh load after 15s (a reload
   // clears most of what wedges), remembered for the page so a second stall is shown, never looped on
   console.log('getting unstuck');
@@ -6657,6 +6773,8 @@ try {
   await page.waitForSelector('[data-term]', { timeout: 15000 });
   check(!(await page.$('.bcv-sheet-ov')) && page.url().endsWith('/courses'), 'a sheet left open does not survive an in-place move to another screen');
   await sw.evaluate(() => self.BCV.settings.update({ appearance: { awayRefresh: false } })); // (back to the default — off unless turned on — for what follows: Settings' switch, the setup's welcome)
+  } // getting unstuck
+  if (on('notifications')) {
   // ---- notifications ------------------------------------------------------------------------------------
   console.log('notifications');
   await page.goto(`${BASE}/#notifications`);
@@ -6727,6 +6845,8 @@ try {
   await page.waitForSelector('.bcv-nf__row', { timeout: 15000 });
   await clickScreen('.bcv-nf__row[data-cat="graded"] .bcv-nf__act');
   check(page.url() === `${BASE}/courses/101/assignments/1007` && !!(await page.$('.bcv-detail__title, .bcv-sb--embed')), `the action opens the item, in place: ${page.url()}`);
+  } // notifications
+  if (on('springs')) {
 
   // ---- motion on springs (docs/MOTION.md) --------------------------------------------------------------
   console.log('springs');
@@ -6750,17 +6870,35 @@ try {
   await page.waitForFunction(() => !document.querySelector('.bcv-spot'), null, { timeout: 5000 }).catch(() => {});
   // a counter's box closed while it is still growing folds back from where it got to — not from full
   // size, and not a restart: Escape part of the way in
+  await motionAt(page, 1); // (part of the way in is a moment of real time)
+  await page.waitForFunction(() => !document.querySelector('.bcv-sheet-ov'), null, { timeout: 5000 }).catch(() => {});
+  // watched from inside the page, frame by frame, and Escape pressed there the frame the box is a quarter of the way
+  // open: a key sent from here lands a busy machine's moment later, by when the box can be all but full
+  const watched = page.evaluate(() => new Promise((done) => {
+    const t0 = performance.now(), path = [];
+    let mid = null, cut = null;
+    const frame = () => {
+      const e = document.querySelector('.bcv-sheet-ov > .bcv-sheet');
+      if (performance.now() - t0 > 5000 || (mid && !e)) return done({ mid, cut, path });
+      if (e) {
+        const h = e.getBoundingClientRect().height, goal = parseFloat(e.style.height), cardH = document.querySelector('.bcv-stats .bcv-stat:nth-child(1)').getBoundingClientRect().height;
+        if (!mid) {
+          if (h > cardH + (goal - cardH) / 4) { mid = { h, goal, cardH, folding: e.parentElement.classList.contains('is-folding') }; e.parentElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); }
+        } else {
+          if (!cut) cut = { h, goal, folding: e.parentElement.classList.contains('is-folding') };
+          path.push(Math.round(h));
+        }
+      }
+      requestAnimationFrame(frame);
+    };
+    requestAnimationFrame(frame);
+  }));
   await page.click('.bcv-stats .bcv-stat:nth-child(1)');
-  await page.waitForSelector('.bcv-sheet-ov > .bcv-sheet', { timeout: 5000 });
-  await page.waitForTimeout(70);
-  const growing = () => page.$eval('.bcv-sheet-ov > .bcv-sheet', (e) => ({ h: e.getBoundingClientRect().height, goal: parseFloat(e.style.height), cardH: document.querySelector('.bcv-stats .bcv-stat:nth-child(1)').getBoundingClientRect().height, folding: e.parentElement.classList.contains('is-folding') }));
-  const mid = await growing();
-  await page.keyboard.press('Escape');
-  await page.waitForTimeout(50);
-  const cut = await growing();
-  await page.waitForTimeout(100);
-  const later = await growing(); // (the box may grow a little more between the reads before it turns; what matters is that it turns short of full size and is on its way back)
-  check(mid.h > mid.cardH + 4 && mid.h < mid.goal - 4 && cut.folding && Math.abs(cut.goal - mid.cardH) <= 2 && cut.h < mid.goal - 40 && later.h < cut.h - 2, `Escape on a box still growing (${Math.round(mid.h)}px of ${Math.round(mid.goal)}) folds it back into its counter from there (${Math.round(cut.h)}px, then ${Math.round(later.h)}px) — never from full size: ${JSON.stringify({ mid, cut, later })}`);
+  const { mid, cut, path } = await watched;
+  // it may grow a little more before it turns — what matters is that it turns short of full size and is on its way back
+  const peak = mid && cut ? Math.max(cut.h, ...path) : null, back = cut ? path.find((h) => h < cut.h - 2) : null;
+  check(!!mid && !!cut && !mid.folding && mid.h < mid.goal - 40 && cut.folding && Math.abs(cut.goal - mid.cardH) <= 2 && peak < mid.goal - 4 && back != null, `Escape on a box still growing (${Math.round(mid?.h)}px of ${Math.round(mid?.goal)}) folds it back into its counter from there (${Math.round(cut?.h)}px, at most ${Math.round(peak)}px, then ${back}px) — never from full size: ${JSON.stringify({ mid, cut, path: path.slice(0, 12) })}`);
+  await motionAt(page, MOTION_RATE);
   check(await eventually(async () => !(await page.$('.bcv-sheet-ov')), 3000), 'and it is gone once the spring has settled');
   // a menu grows out of the edge it hangs from; a toast rises from the bottom and sits centred (it used to land with its left edge at the middle)
   await page.click('#bcv-account');
@@ -6786,10 +6924,12 @@ try {
   const frozen = await page.$eval('.bcv-sheet-ov', (e) => ({ closing: e.classList.contains('is-closing') && e.classList.contains('bcv-sprung'), paused: e.getAnimations({ subtree: true }).length > 0 && e.getAnimations({ subtree: true }).every((a) => a.playState === 'paused') })).catch(() => null);
   const stuckGone = await eventually(async () => !(await page.$('.bcv-sheet-ov')), 2000);
   check(!!frozen && frozen.closing && frozen.paused && stuckGone && Date.now() - stuckAt < 2500, `an exit whose animations are frozen still leaves by the watchdog's cap: closing and paused at 300 ms (${JSON.stringify(frozen)}), gone after ${Date.now() - stuckAt} ms`);
+  } // springs
+  if (on('extension pages')) {
 
   // ---- extension pages ---------------------------------------------------------------------------------
   console.log('extension pages');
-  const options = await context.newPage();
+  options = await context.newPage();
   const oTexts = (sel) => options.$$eval(sel, (els) => els.map((e) => (e.innerText || e.textContent).replace(/\s+/g, ' ').trim()));
   await options.goto(`chrome-extension://${extId}/options/options.html`);
   await options.waitForSelector('#skin', { timeout: 5000 });
@@ -7019,6 +7159,8 @@ try {
     check(!between.includes('await'), 'the popup asks for the site permission straight from the press, awaiting nothing first (Safari refuses otherwise)');
   }
   await popupPage.screenshot({ path: join(out, '30-popup.png') });
+  } // extension pages
+  if (on('setup cannot be skipped')) {
 
   // ---- the setup cannot be skipped (last: finishing it here writes the site's preferences afresh) ----
   console.log('setup cannot be skipped');
@@ -7061,6 +7203,8 @@ try {
   await page.goto(`${BASE}/grades`);
   await page.waitForSelector('.bcv-gpa__hero', { timeout: 15000 });
   check((await page.$('#bcv-setup')) === null && (await texts('.bcv-gpa__hero-sub'))[0]?.includes('This term so far') && (await texts('.bcv-gpa__goal-s'))[0] === 'Goal 4.00 · set it in settings', 'once done the card stays away, and the Grades page tracks with the goal the setup set');
+  } // setup cannot be skipped
+  if (on('developer')) {
 
   // ---- Developer (2.98.30): tabs over Simulate, Quiz, State, Storage and Tool tabs ------------------------------
   console.log('developer');
@@ -7229,6 +7373,8 @@ try {
   await page.goto(`${BASE}/`);
   await page.waitForSelector('.bcv-stat', { timeout: 15000 });
   await options.screenshot({ path: join(out, '29d-options-dev.png') });
+  } // developer
+  if (on('reset')) {
 
   // ---- Reset everything reaches the site: the one-line note a Canvas tab keeps in its own storage goes too ----
   console.log('reset');
@@ -7242,7 +7388,7 @@ try {
   await page.waitForFunction(() => localStorage.getItem('bcv:early') === null, null, { timeout: 5000 }).catch(() => {});
   const afterReset = await sw.evaluate(async () => Object.keys(await self.BCV.api.storage.local.get(null)));
   check((await page.evaluate(() => localStorage.getItem('bcv:early'))) === null && !afterReset.some((k) => k.startsWith('prefs:')), `Reset everything clears the note on the open Canvas tab and the extension's own storage (left: ${afterReset.join(', ') || 'nothing'})`);
-  } // ================= end of part 2 =================
+  } // reset
 } catch (e) {
   console.error('smoke test crashed:', e?.stack || e);
   failures.push('crash: ' + e.message);
@@ -7258,6 +7404,8 @@ try {
   rmSync(extDir, { recursive: true, force: true });
   rmSync(userDataDir, { recursive: true, force: true });
 }
+const until = [...sectionStarts.slice(1), Date.now()];
+console.log(`\ntime by section: ${sectionStarts.length ? `start ${secs(sectionStarts[0] - startedAt)} · ` : ''}${sectionsRun.map((n, i) => `${n} ${secs(until[i] - sectionStarts[i])}`).join(' · ')}`);
 console.log(failures.length ? `\n${failures.length} check(s) failed:\n - ${failures.join('\n - ')}` : '\nAll checks passed.');
 console.log(`(${secs(Date.now() - startedAt)})`);
 process.exit(failures.length ? 1 : 0);

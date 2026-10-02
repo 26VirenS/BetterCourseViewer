@@ -15,6 +15,7 @@ import { readFileSync, mkdirSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { fastMotion } from './harness.mjs';
 
 const require = createRequire(import.meta.url);
 let chromium;
@@ -94,6 +95,7 @@ const browser = await chromium.launch({ channel: 'chromium' });
 const errors = [];
 const open = async (name, theme = 'light') => {
   const context = await browser.newContext({ viewport: { width: 1200, height: 760 } });
+  fastMotion(context); // every page's animations MOTION_RATE× faster (harness.mjs)
   await context.addInitScript(stub(theme));
   await context.addInitScript(toolbar);
   const page = await context.newPage();
@@ -111,6 +113,7 @@ const rects = (page, ids) => page.evaluate((list) => Object.fromEntries(list.map
 /** The page's own declarations as the site wrote them: the same page opened without the bar. */
 const siteDecl = async (name) => {
   const context = await browser.newContext({ viewport: { width: 1200, height: 760 } });
+  fastMotion(context); // every page's animations MOTION_RATE× faster (harness.mjs)
   const page = await context.newPage();
   await page.goto(`${BASE}/${name}`);
   const d = await decl(page);

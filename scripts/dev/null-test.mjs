@@ -10,7 +10,7 @@ import { cpSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
-import { afterMigration } from './harness.mjs';
+import { afterMigration, launchExtension } from './harness.mjs';
 
 const require = createRequire(import.meta.url);
 let chromium;
@@ -56,13 +56,9 @@ writeFileSync(join(extDir, 'manifest.json'), JSON.stringify(manifest, null, 2));
 
 const server = spawn(process.execPath, [join(root, 'scripts', 'dev', 'mock-canvas.mjs'), String(PORT)], { stdio: 'ignore' });
 await new Promise((r) => setTimeout(r, 700));
-const context = await chromium.launchPersistentContext(join(tmpdir(), `bcv-profile-null-${Date.now()}`), {
-  channel: 'chromium', headless: true, viewport: { width: 1400, height: 900 },
-  args: [`--disable-extensions-except=${extDir}`, `--load-extension=${extDir}`],
-});
+const userDataDir = join(tmpdir(), `bcv-profile-null-${Date.now()}`);
+const { context, sw } = await launchExtension(chromium, userDataDir, extDir, { viewport: { width: 1400, height: 900 } }); // (every page's animations MOTION_RATE× faster, and a second browser if the first one's background never starts: harness.mjs)
 try {
-  let [sw] = context.serviceWorkers();
-  if (!sw) sw = await context.waitForEvent('serviceworker', { timeout: 15000 });
   await afterMigration(sw); // (the background's setup migration first, or it clears the flags written next)
   await new Promise((r) => setTimeout(r, 1200));
   for (const t of context.pages()) if (t.url().endsWith('/setup/setup.html')) await t.close();

@@ -10,7 +10,7 @@ import { mkdirSync, cpSync, readFileSync, writeFileSync, rmSync } from 'node:fs'
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
-import { TIMERS, shortenTimers, secs, reportSlow, afterMigration } from './harness.mjs';
+import { TIMERS, shortenTimers, secs, reportSlow, afterMigration, launchExtension } from './harness.mjs';
 
 const require = createRequire(import.meta.url);
 let chromium;
@@ -55,18 +55,8 @@ check(timers.missing.length === 0 && timers.done.length === 12, `the copy runs t
 
 const userDataDir = join(tmpdir(), `bcv-phone-profile-${Date.now()}`);
 // an iPhone-sized viewport with touch; the layout switches on width (≤700px) before first paint
-const context = await chromium.launchPersistentContext(userDataDir, {
-  channel: 'chromium',
-  headless: true,
-  viewport: { width: 402, height: 874 },
-  deviceScaleFactor: 2,
-  isMobile: true,
-  hasTouch: true,
-  args: [`--disable-extensions-except=${extDir}`, `--load-extension=${extDir}`],
-});
+const { context, sw } = await launchExtension(chromium, userDataDir, extDir, { viewport: { width: 402, height: 874 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true }); // (every page's animations MOTION_RATE× faster, and a second browser if the first one's background never starts: harness.mjs)
 try {
-  let [sw] = context.serviceWorkers();
-  if (!sw) sw = await context.waitForEvent('serviceworker', { timeout: 15000 });
   await afterMigration(sw); // (the background's setup migration first, or it clears the flags written next)
   const setSettings = (patch) => sw.evaluate(async (p) => self.BCV.settings.update(p), patch);
   // until it is done every page opens the setup; it is exercised on its own below. The flow marker goes with the flags: the

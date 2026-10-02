@@ -429,7 +429,10 @@
     el.style.position = 'fixed';
     el.style.bottom = '';
     if (minWidth) el.style.minWidth = `${Math.max(r.width, minWidth)}px`;
-    let m = el.getBoundingClientRect();
+    // (its laid-out size, not its box on screen: an entrance that scales it up has only begun, and a
+    // box measured that small was placed too near the edge — a menu by the right edge ended past it)
+    const size = () => ({ width: el.offsetWidth, height: el.offsetHeight });
+    let m = size();
     let top, left;
     if (side === 'right' || side === 'left') {
       const roomRight = vw - r.right - gap - margin, roomLeft = r.left - gap - margin;
@@ -440,7 +443,7 @@
       const below = vh - r.bottom - gap - margin, above = r.top - gap - margin;
       const goBelow = side === 'below' ? (m.height <= below || below >= above) : !(m.height <= above || above >= below);
       el.style.maxHeight = `${Math.max(120, Math.floor(goBelow ? below : above))}px`;
-      m = el.getBoundingClientRect();
+      m = size();
       top = goBelow ? r.bottom + gap : r.top - gap - m.height;
       left = align === 'center' ? r.left + r.width / 2 - m.width / 2 : align === 'end' ? r.right - m.width : r.left;
     }

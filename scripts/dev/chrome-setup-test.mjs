@@ -16,6 +16,7 @@ import { cpSync, readFileSync, rmSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { launchExtension } from './harness.mjs';
 const require = createRequire(import.meta.url);
 let chromium;
 try { ({ chromium } = require('playwright')); } catch { const p = execSync('npm root -g').toString().trim(); ({ chromium } = createRequire(join(p, 'x.js'))('playwright')); }
@@ -83,10 +84,8 @@ const server = spawn(process.execPath, [join(root, 'scripts', 'dev', 'mock-canva
 await new Promise((r) => setTimeout(r, 700));
 
 const userDataDir = join(tmpdir(), `bcv-chrome-profile-${Date.now()}`);
-const context = await chromium.launchPersistentContext(userDataDir, { channel: 'chromium', headless: true, viewport: { width: 1400, height: 900 }, args: [`--disable-extensions-except=${extDir}`, `--load-extension=${extDir}`] });
+const { context, sw } = await launchExtension(chromium, userDataDir, extDir, { viewport: { width: 1400, height: 900 } }); // (every page's animations MOTION_RATE× faster, and a second browser if the first one's background never starts: harness.mjs)
 try {
-  let [sw] = context.serviceWorkers();
-  if (!sw) sw = await context.waitForEvent('serviceworker', { timeout: 15000 });
   const isSetup = (p) => p.url().endsWith('/setup/setup.html');
   if (!context.pages().some(isSetup)) await context.waitForEvent('page', { timeout: 8000 }).catch(() => null);
   await new Promise((r) => setTimeout(r, 800));
@@ -112,12 +111,12 @@ try {
   console.log("the school's own Canvas");
   const page = await context.newPage();
   page.on('pageerror', (e) => failures.push(`page error: ${e.message}`));
-  let loads = 0;
-  page.on('load', () => { loads++; });
+  let loads = 0; // (each document the tab asks for — not each load event: a navigation that comes before the page before it has finished loading cuts that one's event off, and on a busy machine the setup's own address does)
+  page.on('request', (r) => { if (r.isNavigationRequest() && r.frame() === page.mainFrame()) loads++; });
   const gone = setup.waitForEvent('close', { timeout: 20000 }).then(() => true, () => false);
   await page.goto(`${BASE}/`);
   await page.waitForSelector('#bcv-setup', { state: 'attached', timeout: 20000 }); // (a shadow host of no size: attached, not visible)
-  for (let i = 0; i < 80 && loads < 3; i++) await page.waitForTimeout(150); // (the card can be up before its own document's load event; a busy machine takes its time over the reload)
+  for (let i = 0; i < 80 && loads < 3; i++) await page.waitForTimeout(150); // (a busy machine takes its time over the reload)
   check((await domains()).join(',') === BASE, `found and saved as a site of its own: ${JSON.stringify(await domains())}`);
   const regs = await registered();
   const regFiles = await sw.evaluate(async () => (await self.BCV.api.scripting.getRegisteredContentScripts()).map((s) => s.js.join('+')));
@@ -130,7 +129,7 @@ try {
   const again = await context.newPage();
   again.on('pageerror', (e) => failures.push(`page error: ${e.message}`));
   let loads2 = 0;
-  again.on('load', () => { loads2++; });
+  again.on('request', (r) => { if (r.isNavigationRequest() && r.frame() === again.mainFrame()) loads2++; });
   await again.goto(`${BASE}/courses`);
   await again.waitForSelector('#bcv-setup', { state: 'attached', timeout: 20000 });
   for (let i = 0; i < 80 && loads2 < 2; i++) await again.waitForTimeout(150); // (the second load comes on its own time on a busy machine: three suites run side by side)
@@ -141,7 +140,7 @@ try {
   const login = await context.newPage();
   login.on('pageerror', (e) => failures.push(`page error: ${e.message}`));
   let loads3 = 0;
-  login.on('load', () => { loads3++; });
+  login.on('request', (r) => { if (r.isNavigationRequest() && r.frame() === login.mainFrame()) loads3++; });
   await login.goto(`${OTHER_BASE}/login/canvas`);
   await login.waitForTimeout(1800);
   check((await domains()).includes(OTHER_BASE) && loads3 === 1 && (await login.$('#login_form')) !== null, `is enabled for the page after signing in, and left as it is now (${loads3} loads, ${JSON.stringify(await domains())})`);

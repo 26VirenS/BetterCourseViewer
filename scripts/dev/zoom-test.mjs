@@ -12,7 +12,7 @@ import { spawn, execSync } from 'node:child_process';
 import { cpSync, readFileSync, writeFileSync, rmSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { afterMigration } from './harness.mjs';
+import { afterMigration, launchExtension } from './harness.mjs';
 const require = createRequire(import.meta.url);
 let chromium;
 try { ({ chromium } = require('playwright')); } catch { const p = execSync('npm root -g').toString().trim(); ({ chromium } = createRequire(join(p, 'x.js'))('playwright')); }
@@ -94,10 +94,8 @@ const colsFor = (w) => Math.max(1, Math.min(3, Math.floor((w + 12) / 222)));
 
 async function withContext(c, fn) {
   const userDataDir = join(tmpdir(), `bcv-zoom-profile-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`);
-  const context = await chromium.launchPersistentContext(userDataDir, { channel: 'chromium', headless: true, viewport: { width: c.cw, height: c.ch }, deviceScaleFactor: c.z, args: [`--disable-extensions-except=${extDir}`, `--load-extension=${extDir}`] });
+  const { context, sw } = await launchExtension(chromium, userDataDir, extDir, { viewport: { width: c.cw, height: c.ch }, deviceScaleFactor: c.z }); // (every page's animations MOTION_RATE× faster, and a second browser if the first one's background never starts: harness.mjs)
   try {
-    let [sw] = context.serviceWorkers();
-    if (!sw) sw = await context.waitForEvent('serviceworker', { timeout: 15000 });
     await afterMigration(sw); // (the background's setup migration first, or it clears the flags written next)
     await new Promise((r) => setTimeout(r, 900));
     for (const t of context.pages()) if (t.url().endsWith('/setup/setup.html')) await t.close();

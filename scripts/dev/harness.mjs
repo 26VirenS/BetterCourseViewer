@@ -9,7 +9,7 @@
 // the waits — and every shipped value is asserted here, exactly: a change to any of them fails the
 // suite until the table below is brought up to date. The suites' own timing checks read the short
 // values from TIMERS, never the shipped ones.
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 
 /** The short values the copy runs with (ms). */
@@ -81,6 +81,55 @@ export function reportSlow(page, { threshold = 3000, log = console.log } = {}) {
   wrap('waitForFunction', (a) => 'waitForFunction');
   wrap('waitForNavigation', () => 'waitForNavigation');
   wrap('waitForTimeout', (a) => `waitForTimeout ${a[0]}`);
+}
+
+// ---- motion at test speed ---------------------------------------------------------------------
+// Headless Chromium draws every frame of every animation in software, and the interface moves a lot:
+// a Dashboard counter opening into its box and closing again cost 2.4 s of CPU, most of a suite's
+// time went on frames nobody looks at, and with several suites side by side the machine ran out of
+// cores. So every page a suite opens runs its animations MOTION_RATE times faster (the DevTools
+// protocol's Animation.setPlaybackRate: CSS animations and transitions and the Web Animations the
+// springs are made of, all of it, the same frames in the same order, only sooner). A check that reads
+// an animation mid-flight — a box still growing, a highlight still gliding — runs inside realMotion().
+// BCV_MOTION_RATE=1 runs a suite at real speed.
+export const MOTION_RATE = Math.max(1, Number(process.env.BCV_MOTION_RATE) || 50);
+const motionSessions = new WeakMap();
+/** Sets one page's animation speed (1 = real time). It holds across the page's navigations. */
+export async function motionAt(page, rate) {
+  let s = motionSessions.get(page);
+  if (!s) { s = await page.context().newCDPSession(page); motionSessions.set(page, s); }
+  await s.send('Animation.setPlaybackRate', { playbackRate: rate });
+}
+/** Every page of the context, those open and those to come, at test speed. Returns the context. */
+export function fastMotion(context, rate = MOTION_RATE) {
+  if (rate === 1) return context;
+  const on = (p) => { motionAt(p, rate).catch(() => {}); };
+  for (const p of context.pages()) on(p);
+  context.on('page', on);
+  return context;
+}
+/** Runs fn with the page's animations at real speed (a check that watches motion as it happens), then back. */
+export async function realMotion(page, fn) {
+  await motionAt(page, 1);
+  try { return await fn(); } finally { await motionAt(page, MOTION_RATE).catch(() => {}); }
+}
+
+/** Opens Chromium on a profile at userDataDir with the extension in extDir loaded, every page at test
+ *  speed (fastMotion), and waits for the extension's background to start. `options` are Playwright's
+ *  launch options (viewport, isMobile…). Now and then, on a busy machine, a fresh profile's background
+ *  never starts at all — the event a suite waits for never comes — so a browser that has not shown it
+ *  in 12 s is closed, its profile cleared, and opened once more. Returns { context, sw }. */
+export async function launchExtension(chromium, userDataDir, extDir, options = {}) {
+  for (let attempt = 1; ; attempt++) {
+    const context = await chromium.launchPersistentContext(userDataDir, { channel: 'chromium', headless: true, ...options, args: [`--disable-extensions-except=${extDir}`, `--load-extension=${extDir}`, ...(options.args || [])] });
+    fastMotion(context);
+    const sw = context.serviceWorkers()[0] || await context.waitForEvent('serviceworker', { timeout: 12000 }).catch(() => null);
+    if (sw) return { context, sw };
+    await context.close().catch(() => {});
+    if (attempt === 2) throw new Error("the extension's background did not start, in two browsers");
+    rmSync(userDataDir, { recursive: true, force: true });
+    console.log("  (the extension's background did not start: the browser is opened again on a fresh profile)");
+  }
 }
 
 /** Waits until the background's one-time setup migration has left its mark (setup:flow), so a suite's
