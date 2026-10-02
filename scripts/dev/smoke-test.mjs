@@ -985,6 +985,9 @@ try {
   await page.waitForSelector('.bcv-menu', { timeout: 3000 });
   await page.click('.bcv-menu__item:nth-child(3)'); // Low
   await page.waitForFunction((id) => document.querySelector(`.bcv-row[data-item="${id}"] .bcv-pri`)?.textContent.trim() === 'Low', workId, { timeout: 5000 });
+  // (the row shows it at once and storage has it a moment later: the reload waits for the write, as no hand could fail to)
+  const storedPri = (id) => sw.evaluate(async (k) => Object.entries(await chrome.storage.local.get(null)).find(([key]) => key.startsWith('prefs:'))?.[1]?.todoPriority?.[k], id);
+  await eventually(async () => (await storedPri(workId)) === 1, 5000);
   await page.reload();
   await page.waitForSelector('.bcv-row[data-item] .bcv-pri', { timeout: 10000 });
   check((await page.$eval(`.bcv-row[data-item="${workId}"] .bcv-pri`, (e) => e.textContent.trim())) === 'Low' && /^(assignment|quiz|discussion_topic|wiki_page|calendar_event):/.test(workId), `a Canvas item's priority is kept by its stable id and survives a reload: ${workId} → Low`);
@@ -1002,12 +1005,15 @@ try {
   await page.waitForSelector('.bcv-menu', { timeout: 3000 });
   await page.click('.bcv-menu__item:nth-child(1)'); // High, set in tab A after tab B loaded
   await page.waitForFunction((id) => document.querySelector(`.bcv-row[data-item="${id}"] .bcv-pri`)?.textContent.trim() === 'High', secondId, { timeout: 5000 });
+  await eventually(async () => (await storedPri(secondId)) === 3, 5000); // (in storage before tab B writes over it, or this tests nothing)
   await tabB.bringToFront();
   await tabB.click('.bcv-nav__item[data-nav="todo"]');
   await tabB.waitForSelector('.bcv-todo__done', { timeout: 15000 });
   await tabB.click('.bcv-todo__done'); // tab B writes a preference of its own (show completed)
   await tabB.waitForSelector('.bcv-body .bcv-row--done', { timeout: 5000 });
-  const priAfterB = (await sw.evaluate(async () => Object.entries(await chrome.storage.local.get(null)).find(([k]) => k.startsWith('prefs:'))?.[1]));
+  const prefsNow = () => sw.evaluate(async () => Object.entries(await chrome.storage.local.get(null)).find(([k]) => k.startsWith('prefs:'))?.[1]);
+  await eventually(async () => (await prefsNow())?.todoShowDone === true, 5000); // (tab B's write landed)
+  const priAfterB = await prefsNow();
   check(priAfterB?.todoPriority?.[workId] === 1 && priAfterB?.todoPriority?.[secondId] === 3 && priAfterB?.todoShowDone === true, `a preference written in another tab keeps the priorities set here (both tabs' changes are in storage): ${JSON.stringify(priAfterB?.todoPriority)}, showDone ${priAfterB?.todoShowDone}`);
   await tabB.click('.bcv-todo__done'); // and back, so the later checks start from hidden
   await tabB.waitForFunction(() => !document.querySelector('.bcv-body .bcv-row--done'), null, { timeout: 5000 });
@@ -3073,6 +3079,27 @@ try {
   await page.waitForSelector('.bcv-qfb__q', { timeout: 10000 });
   const histPage = await page.evaluate(() => ({ path: location.pathname, qs: document.querySelectorAll('.bcv-qfb__q').length, punch: document.documentElement.classList.contains('bcv-punch'), line: document.querySelector('.bcv-fb__scoreline')?.textContent || '' }));
   check(histPage.path === '/courses/101/quizzes/9001/history' && histPage.qs === 4 && !histPage.punch && /^13 \/ 16/.test(histPage.line), `Canvas's results page for an attempt opens the interface's quiz feedback: ${JSON.stringify(histPage)}`);
+  // (2.98.67, bug SR-MURDR4EA-W476) a grade the instructor has not posted — Canvas's page: "Your quiz has
+  // been muted", no score, no answers — keeps the results back here too, though the API (the mock as
+  // well) still says which answers were right
+  await mockConfig({ held: ['1001'] });
+  await page.goto(`${BASE}/courses/101/quizzes/9001`);
+  await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
+  const mutedPage = await page.evaluate(() => ({ btns: [...document.querySelectorAll('.bcv-detail__actions .bcv-btn')].map((b) => b.textContent.trim()), badges: [...document.querySelectorAll('.bcv-detail__actions .bcv-badge')].map((b) => b.textContent.trim()), scores: [...document.querySelectorAll('.bcv-col .bcv-row .bcv-badge')].map((b) => b.textContent.trim()) }));
+  check(!mutedPage.btns.includes('See feedback') && mutedPage.badges.includes('Results not released yet') && mutedPage.scores.length > 0 && mutedPage.scores.every((t) => t === '—'), `a quiz whose grade is not posted offers no feedback and shows no score: ${JSON.stringify(mutedPage)}`);
+  const mutedAt = async (url) => {
+    await page.goto(url);
+    await page.waitForSelector('.bcv-qfb__withheld, .bcv-qfb__q', { timeout: 10000 });
+    return page.evaluate(() => ({ title: document.querySelector('.bcv-qfb__withheld .bcv-detail__title')?.textContent || '', hint: document.querySelector('.bcv-qfb__withheld .bcv-hint')?.textContent || '', marks: document.querySelectorAll('.bcv-qfb__q, .bcv-qfb__sq, .bcv-fb__scoreline').length }));
+  };
+  for (const [what, url] of [['its feedback', `${BASE}/courses/101/quizzes/9001?bcv=feedback&sub=qs1`], ["Canvas's results page for it", `${BASE}/courses/101/quizzes/9001/history?version=1`]]) {
+    const m = await mutedAt(url);
+    check(m.title === 'Results not released' && /hasn’t released the results yet/.test(m.hint) && m.marks === 0, `${what} says the results are not released and shows nothing of the grading — no score, no question marked right or wrong: ${JSON.stringify(m)}`);
+  }
+  await shot(page, '22k-quiz-feedback-held');
+  await mockConfig({ held: [] });
+  const posted = await mutedAt(`${BASE}/courses/101/quizzes/9001?bcv=feedback&sub=qs1`);
+  check(!posted.title && posted.marks > 4, `posted, the same attempt's feedback is back: ${JSON.stringify(posted)}`);
   } // quiz feedback
   if (on('restricted quiz')) {
 

@@ -116,7 +116,7 @@ function assignmentObj(courseId, row) {
     id: `s${id}`, assignment_id: id, workflow_state: earned !== null ? 'graded' : submitted ? 'submitted' : 'unsubmitted', score: earned, grade: earned === null ? null : extra.gradingType === 'pass_fail' ? (earned > 0 ? 'complete' : 'incomplete') : String(earned),
     submitted_at: subDay !== null ? at(subDay, 15, 52) : (earned !== null && !extra.noSub ? at(dueDay - 1, 16, 1) : null), graded_at: earned !== null ? at(extra.gradedDay ?? dueDay, 8, 0) : null,
     // Canvas posts a grade separately from marking it; one assignment here is marked but held back
-    posted_at: earned !== null ? (extra.held ? null : at(dueDay, 8, 5)) : null,
+    posted_at: earned !== null ? (extra.held || (mockConfig.held || []).includes(String(id)) ? null : at(dueDay, 8, 5)) : null, // (POST /__mock/config {"held": ["1001"]} holds one back for a test: a quiz Canvas calls muted)
     late: !!extra.late, missing: !submitted && new Date(due) < now, excused: !!extra.excused || !!(mockConfig.excused || []).includes(String(id)), attempt: submitted ? 1 : null, // (POST /__mock/config {"excused": ["4002"]} excuses an assignment for a test)
     // a late hand-in Canvas docked (its late policy), and extra attempts a teacher granted on one assignment
     points_deducted: extra.late ? 3 : undefined, seconds_late: extra.late ? 2 * 86400 + 600 : 0, extra_attempts: id === '2004' ? 1 : undefined,

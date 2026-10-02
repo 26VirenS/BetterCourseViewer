@@ -549,6 +549,8 @@
     // Canvas keeps one quiz submission per student — the one in play — so the attempts before it are
     // not in that list at all. Every finished attempt is in the assignment submission's history.
     const asub = q?.assignment_id ? await store.submission(c.id, q.assignment_id).catch(() => null) : null;
+    // a grade not posted yet (Canvas: "Your quiz has been muted") keeps the results back: no score, no feedback (quiz.js heldBack)
+    const held = !!asub && asub.posted_at === null && !!(asub.submitted_at || asub.workflow_state === 'graded' || asub.workflow_state === 'pending_review');
     if (!ctx.alive()) return b;
     if (!q) return main.replaceChildren(U.errorBox('This quiz could not be loaded.')) || b;
     shell.reader = { title: q.title, html: q.description || '' };
@@ -579,7 +581,7 @@
     const attemptRows = attempts.map((x) => U.row([
       U.tile(IC.bolt, { color: '#7d7bef', tint: 'rgba(88,86,214,.16)' }),
       U.el('bcv-row__body', [U.text('bcv-row__title bcv-row__title--145', `Attempt ${x.n}`), U.text('bcv-row__sub', x.live ? 'In progress' : (x.at ? `Finished ${U.fmtAt(x.at)}` : 'Finished'))]),
-      U.badge(!x.live && x.score !== null && x.score !== undefined ? `${store.fmtPts(x.score)} / ${q.points_possible}` : '—', x.live ? '' : 'green'),
+      U.badge(!x.live && !held && x.score !== null && x.score !== undefined ? `${store.fmtPts(x.score)} / ${q.points_possible}` : '—', x.live || held ? '' : 'green'),
       // a finished attempt opens its own feedback; the one in play resumes
     ], { mod: 'bcv-row--p12', href: x.href }));
     /** What the header says about attempts, with the one being taken counted as taken. */
@@ -598,7 +600,8 @@
           q.locked_for_user ? U.badge(q.lock_explanation ? htmlToText(q.lock_explanation, 120) : 'Locked', 'orange')
             : noneLeft ? U.badge(`No attempts left · ${U.plural(limit.allowed, 'attempt')} allowed`, 'orange')
               : U.btn(open ? (/survey/.test(q.quiz_type || '') ? 'Continue survey' : 'Resume attempt') : (/survey/.test(q.quiz_type || '') ? 'Take the survey' : 'Take the quiz'), { kind: 'primary', icon: IC.bolt, iconColor: '#fff', onClick: () => app.go(takeHref) }),
-          latest && q.hide_results !== 'always' && !/survey/.test(q.quiz_type || '') ? U.btn('See feedback', { kind: noneLeft && !q.locked_for_user ? 'primary' : '', icon: IC.check, iconColor: noneLeft && !q.locked_for_user ? '#fff' : undefined, onClick: () => app.go(feedbackHref(latest)) }) : null,
+          latest && held && !/survey/.test(q.quiz_type || '') ? U.badge('Results not released yet', '')
+            : latest && q.hide_results !== 'always' && !/survey/.test(q.quiz_type || '') ? U.btn('See feedback', { kind: noneLeft && !q.locked_for_user ? 'primary' : '', icon: IC.check, iconColor: noneLeft && !q.locked_for_user ? '#fff' : undefined, onClick: () => app.go(feedbackHref(latest)) }) : null,
           q.locked_for_user ? null : U.btn('Open in Canvas', { icon: IC.external, onClick: () => app.go(nativeHref(`${c.url}/quizzes/${q.id}`)) }),
         ]),
         q.cant_go_back ? U.text('bcv-hint bcv-pretty', 'This quiz seals each question once you leave it: an answer cannot be changed and you cannot go back.') : null,

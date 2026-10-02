@@ -25,6 +25,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.98.67', date: '2026-10-02', notes: [
+      { kind: 'fixed', title: 'Muted quizzes hidden', body: 'Quiz results Canvas holds back stay hidden here too.', icon: P.eye },
+    ] },
     { version: '2.98.66', date: '2026-10-02', notes: [
       { kind: 'fixed', title: 'Menus stay on screen', body: 'A menu opened by the screen’s edge no longer runs past it.', icon: P.check },
     ] },

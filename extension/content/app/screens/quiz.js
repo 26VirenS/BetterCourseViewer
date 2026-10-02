@@ -24,6 +24,14 @@
   // its own (quizLayout), so everyone starts on the new layout once and keeps what they pick.
   const LAYOUTS = ['side', 'one', 'all'];
 
+  // Canvas posts a grade apart from marking it, and keeps a quiz's results back until it has: its own
+  // page says "Your quiz has been muted" and shows no score and no answers. The API is not so careful —
+  // the questions and the grading history can still say which answers were right — so a finished
+  // attempt whose assignment submission is not posted (posted_at null; absent means posted) shows
+  // nothing of its grading here either.
+  const heldBack = (asub) => !!asub && asub.posted_at === null && !!(asub.submitted_at || asub.workflow_state === 'graded' || asub.workflow_state === 'pending_review');
+  const HELD_LINE = 'Your instructor hasn’t released the results yet. Your score and which answers were right show here once they do.';
+
   const pad = (n) => String(n).padStart(2, '0');
   const clock = (ms) => {
     const s = Math.max(0, Math.round(ms / 1000));
@@ -161,7 +169,14 @@
     st.sub = (subs || []).find((s) => s.workflow_state === 'untaken') || null;
     // a phone shows one question per screen (the mockup); the scroll-through mode is a desktop choice
     const phone = !!BCV.phone?.active();
-    const picked = await store.pref('quizLayout', 'side');
+    const [picked, asub0] = await Promise.all([
+      store.pref('quizLayout', 'side'),
+      quiz.assignment_id && !simulated ? store.submission(cid, quiz.assignment_id).catch(() => null) : null,
+    ]);
+    // a grade the instructor has not posted yet (Canvas: "Your quiz has been muted") keeps the attempt's
+    // results back too — its score and which answers were right. Read here for the buttons; the
+    // feedback itself reads the submission afresh before it shows a thing (loadFeedback)
+    st.held = heldBack(asub0);
     const layout = LAYOUTS.includes(picked) ? picked : 'side';
     // a quiz set to one question at a time can be drawn either way that shows one question: the side
     // layout or the plain one — never all on one scroll
@@ -1169,6 +1184,11 @@
           return;
         }
         st.done = await store.quizApi.complete(cid, qid, st.sub, codeFor());
+        // the attempt just handed in may be one whose grade waits to be posted: the receipt asks first
+        if (quiz.assignment_id && !simulated) {
+          const fresh = await store.submission(cid, quiz.assignment_id, { force: true }).catch(() => null);
+          if (fresh) st.held = heldBack(fresh); // (not read: what was known stands)
+        }
         st.stage = 'done';
         clearInterval(st.timer);
         app.refreshCounts();
@@ -1191,7 +1211,7 @@
       const d = st.done || {};
       const survey = /survey/.test(quiz.quiz_type || '');
       const gradedSurvey = quiz.quiz_type === 'graded_survey';
-      const scoreVisible = !survey && !quiz.hide_results && d.score !== null && d.score !== undefined && d.workflow_state !== 'pending_review';
+      const scoreVisible = !survey && !quiz.hide_results && !st.held && d.score !== null && d.score !== undefined && d.workflow_state !== 'pending_review';
       const feedbackOn = scoreVisible && d.id && !resultsHidden(d);
       return U.el('bcv-qz__done', [
         U.el('bcv-qz__donemark', U.svg(CHECK, { size: 34, stroke: '#34c759', width: 2.4 })),
@@ -1259,6 +1279,7 @@
     function resultsHidden(sub) {
       if (quiz.hide_results === 'always') return 'Your instructor has hidden the results for this quiz.';
       if (quiz.hide_results === 'until_after_last_attempt' && allowed !== null && attemptsLeft > 0) return `Results show after your last attempt — ${U.plural(attemptsLeft, 'attempt')} left.`;
+      if (st.held) return HELD_LINE;
       if (sub && sub.workflow_state === 'untaken') return 'This attempt is still open.';
       return null;
     }
@@ -1345,6 +1366,8 @@
         // what the API keeps from a student (each question's points, the right answers, the comments): Canvas's own results page
         simulated ? Promise.resolve(null) : QP().results(cid, qid, sub).catch(() => null),
       ]);
+      // held back since the page was drawn, or before: nothing of the attempt's grading is shown
+      if (heldBack(asub)) { st.held = true; return { sub, held: true }; }
       const me = String(store.env().current_user_id || '');
       const comments = (asub?.submission_comments || []).filter((c) => !me || String(c.author_id ?? '') !== me);
       // per-question points, when the assignment submission's history carries this attempt's grading
@@ -1651,18 +1674,19 @@
       }
       const hidden = resultsHidden(sub);
       if (hidden) {
-        wrap.append(plain(U.card(U.el('bcv-detail', [h('h2', { class: 'bcv-detail__title', text: 'Results not released' }), U.text('bcv-hint', hidden)]), 'bcv-card--22'), btns()));
+        wrap.append(plain(U.card(U.el('bcv-detail', [h('h2', { class: 'bcv-detail__title', text: 'Results not released' }), U.text('bcv-hint', hidden)]), 'bcv-card--22 bcv-qfb__withheld'), btns()));
         return wrap;
       }
+      const heldCard = () => plain(U.card(U.el('bcv-detail', [h('h2', { class: 'bcv-detail__title', text: 'Results not released' }), U.text('bcv-hint', HELD_LINE)]), 'bcv-card--22 bcv-qfb__withheld'), btns());
       if (st.fb && st.fb.sub === sub) {
-        wrap.append(feedbackView(st.fb, btns()));
+        wrap.append(st.fb.held ? heldCard() : feedbackView(st.fb, btns()));
         return wrap;
       }
       wrap.append(plain(U.loading('rows', 4)));
       loadFeedback(sub).then((fb) => {
         if (!ctx.alive() || st.stage !== 'feedback' || st.fbSub !== sub) return;
         st.fb = fb;
-        wrap.replaceChildren(feedbackView(fb, btns()));
+        wrap.replaceChildren(fb.held ? heldCard() : feedbackView(fb, btns()));
       }).catch((e) => {
         if (ctx.alive()) wrap.replaceChildren(plain(U.errorBox(`The feedback could not be loaded: ${e.message}`), btns()));
       });
