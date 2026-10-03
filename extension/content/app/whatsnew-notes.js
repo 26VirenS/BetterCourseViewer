@@ -25,6 +25,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.98.75', date: '2026-10-03', notes: [
+      { kind: 'fixed', title: 'Smooth card closing', body: 'A counter no longer vanishes as its box folds back.', icon: P.layers },
+    ] },
     { version: '2.98.74', date: '2026-10-03', notes: [
       { kind: 'improved', title: 'Zoom photos out', body: 'Theme photos zoom out to half size, and still move.', icon: P.pic },
     ] },

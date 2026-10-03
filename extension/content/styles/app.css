@@ -13,7 +13,7 @@
  * min(their own, the viewport less a margin). */
 
 html[data-bcv-theme] {
-  --bcv-version: "2.98.74"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.98.75"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -739,8 +739,11 @@ html.bcv-noblur .bcv-sheet-ov--card::before { display: none; }
 .bcv-sheet-ov.is-folding > .bcv-sheet--stat::before { transition: opacity .24s ease .2s; } /* (back before the box is the counter's size again) */
 .bcv-sheet--card.bcv-sheet--stat .bcv-sheet__value, .bcv-sheet--card.bcv-sheet--stat .bcv-sheet__label { transition: transform .46s cubic-bezier(.32,.72,0,1), color .3s ease; } /* (the words the counter's ink as they leave it, white on the glass; none while at the counter, below) */
 html.bcv-noblur .bcv-sheet--stat { background: linear-gradient(rgba(40,40,44,.97), rgba(40,40,44,.97)) padding-box, var(--bcv-glass-rim) border-box; } /* (no blur drawn: solid, as the search's is, the rim kept) */
-body:has(> .bcv-sheet-ov--card) .bcv-stat.is-lifted { visibility: hidden; }
-.bcv-stat.is-lifted, .bcv-stat.is-lifted:hover, .bcv-stat.is-lifted:active { transform: none; transition: none; } /* (at rest while its box is up: the box measured from it and folding back onto it where it lies) */
+/* (2.98.75) the counter is back under the box the moment the folding box lands on it, its own ground opaque again (.44s), and
+   only then does the overlay go (.44s, quickly) — the place never empty, the box turning into the counter where it stands */
+body:has(> .bcv-sheet-ov--card:not(.is-folding)) .bcv-stat.is-lifted { visibility: hidden; transition: none; }
+.bcv-stat.is-lifted, .bcv-stat.is-lifted:hover, .bcv-stat.is-lifted:active { transform: none; transition: visibility 0s linear .44s; } /* (at rest while its box is up: the box measured from it and folding back onto it where it lies) */
+.bcv-sheet-ov--card:has(> .bcv-sheet--stat) { transition: --bcv-cx .46s cubic-bezier(.32,.72,0,1), --bcv-cy .46s cubic-bezier(.32,.72,0,1), --bcv-r0 .46s cubic-bezier(.32,.72,0,1), --bcv-reach .8s cubic-bezier(.2,.6,.2,1), --bcv-hole .5s cubic-bezier(.2,.6,.2,1), --bcv-blur .5s cubic-bezier(.2,.6,.2,1), opacity .1s ease .44s; }
 .bcv-sheet-ov:not(.is-folding) > .bcv-sheet--stat:not(.is-at-card) .bcv-sheet__course { color: color-mix(in srgb, var(--bcv-course) 45%, #fff) !important; background: color-mix(in srgb, var(--bcv-course) 30%, transparent) !important; } /* (a course's chip lit for glass this dark: its colour lighter, its ground deeper) */
 .bcv-sheet--card > :not(.bcv-sheet__head), .bcv-sheet--card .bcv-sheet__note, .bcv-sheet--card .bcv-sheet__close { transition: opacity .22s ease .14s; }
 .bcv-sheet--card.is-at-card > :not(.bcv-sheet__head), .bcv-sheet--card.is-at-card .bcv-sheet__note, .bcv-sheet--card.is-at-card .bcv-sheet__close,

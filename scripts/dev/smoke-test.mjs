@@ -4298,6 +4298,11 @@ try {
   const focused = await page.evaluate(() => { const ov = document.querySelector('.bcv-sheet-ov'); const b = getComputedStyle(ov, '::before'); return { reach: parseFloat(getComputedStyle(ov).getPropertyValue('--bcv-reach')), hole: parseFloat(getComputedStyle(ov).getPropertyValue('--bcv-hole')), blurPx: document.documentElement.classList.contains('bcv-noblur') ? 10 : parseFloat((b.backdropFilter || b.webkitBackdropFilter || '').replace(/^blur\(/, '')) }; });
   check(sheetAnim.reach > 1000 && sheetAnim.hole > 100 && sheetAnim.hole <= 240.5 && (sheetAnim.blurPx >= 5.9 || sheetAnim.noblur) && focused.reach < 5 && focused.hole < 5 && focused.blurPx > 9.5, `the page focuses onto the box: the clear middle starts wide (${Math.round(sheetAnim.reach)}px out) while the blur is there on the press (${sheetAnim.blurPx}px, its hole ${Math.round(sheetAnim.hole)}px out), all closed in a second later (${Math.round(focused.reach)}px, ${Math.round(focused.hole)}px, ${focused.blurPx}px)`);
   await page.keyboard.press('Escape');
+  // (2.98.75) the counter is back under the box once the box has landed on it, while the overlay is still there and before it
+  // goes (its fade waits for the landing) — the counter's place never left empty
+  let under = null;
+  const boxLanded = await eventually(async () => { under = await page.evaluate(() => { const ov = document.querySelector('.bcv-sheet-ov'); const c = document.querySelector('.bcv-stat'); return { ov: !!ov, folding: !!ov?.classList.contains('is-folding'), counter: getComputedStyle(c).visibility, fadeAt: ov ? getComputedStyle(ov).transitionDelay.split(', ').pop() : null }; }); return under.ov && under.counter === 'visible'; }, 500);
+  check(boxLanded && under.folding && under.fadeAt === '0.44s', `the counter is back under the box as it lands, the overlay still there and its fade waiting for the landing (the place never empty): ${JSON.stringify(under)}`);
   await page.waitForFunction(() => !document.querySelector('.bcv-sheet-ov'), null, { timeout: 5000 });
   check(await page.$eval('.bcv-stat', (c) => getComputedStyle(c).visibility === 'visible'), 'the counter is there again once its box has folded back over it');
   // (2.98.46) the counter's number, label and icon glide into the header's own: read the moment the box opens,
