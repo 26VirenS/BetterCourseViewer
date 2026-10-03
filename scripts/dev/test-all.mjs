@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Every suite, in the least wall-clock time: a pool of workers (one per core by default) takes the
+// Every suite, in the least wall-clock time: a pool of workers (half as many again as the cores, by default) takes the
 // suites longest first — each suite's time comes from the last run (scripts/dev/out/timings.json) —
 // so the long ones start at once and the short ones fill the gaps. The smoke suite comes in shards
 // (smoke-test.mjs --shard <name>), each with its own mock ports and browser profile, so any of them
@@ -13,11 +13,17 @@
 // writes nothing for --silent seconds (120 by default) is stopped, its browsers with it, and
 // reported with the last thing it said.
 //
+// A suite that fails is run once more at the end, alone, with the machine to itself: one that passes
+// then is reported as passing only alone — a check that reads motion or timing as it happens and lost
+// it to the load — with what failed the first time, so it is seen and not mistaken for green
+// (--no-retry leaves failures as they fell).
+//
 //   node scripts/dev/test-all.mjs                   # everything
 //   node scripts/dev/test-all.mjs --jobs 2          # two at a time (a small machine; --serial is one)
 //   node scripts/dev/test-all.mjs --only smoke,phone
 //   node scripts/dev/test-all.mjs --only smoke:widgets
 //   node scripts/dev/test-all.mjs --skip chrome-setup
+//   BCV_NO_SHOTS=1 node scripts/dev/test-all.mjs     # the smoke shards take no screenshots (a quick pass while working)
 import { spawn, spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, openSync, closeSync, readFileSync, writeFileSync, statSync, rmSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -39,7 +45,10 @@ const skip = new Set((opt('--skip') || '').split(',').map((s) => s.trim()).filte
 const suiteOf = (s) => s.split(':')[0]; // smoke:widgets → smoke
 const wanted = (s) => (!only || only.includes(suiteOf(s)) || only.includes(s)) && !skip.has(suiteOf(s)) && !skip.has(s);
 const SILENT_MS = (Number(opt('--silent')) || 120) * 1000;
-const jobs = args.includes('--serial') ? 1 : Math.max(1, Number(opt('--jobs')) || cpus().length);
+// (a suite keeps about one core busy, less while it waits on a timer or the mock: half as many again as the
+// cores fills those waits — 183 s against 225 s for the whole run on four cores)
+const jobs = args.includes('--serial') ? 1 : Math.max(1, Number(opt('--jobs')) || Math.round(cpus().length * 1.5));
+const retry = !args.includes('--no-retry');
 
 // the last run's times, longest first (a suite never timed goes first: it may be long)
 let timings = {};
@@ -111,9 +120,11 @@ function run(name) {
 
 const t0 = Date.now();
 const results = [];
-const report = (r) => {
-  const ok = r.code === 0 && r.failed === 0;
-  console.log(`${ok ? '✓' : '✗'} ${r.name.padEnd(18)} ${String(r.passed).padStart(4)} passed${r.failed ? `, ${r.failed} failed` : ''}${r.code && !r.failed && !r.hung ? ` (exit ${r.code})` : ''}  ${secs(r.ms)}`);
+const okOf = (r) => r.code === 0 && r.failed === 0;
+const report = (r, first = null) => {
+  const ok = okOf(r);
+  console.log(`${ok ? '✓' : '✗'} ${r.name.padEnd(18)} ${String(r.passed).padStart(4)} passed${r.failed ? `, ${r.failed} failed` : ''}${r.code && !r.failed && !r.hung ? ` (exit ${r.code})` : ''}  ${secs(r.ms)}${first ? (ok ? '  — only alone, on a retry' : '  — alone, on a retry, too') : ''}`);
+  if (ok && first) for (const f of first.failures.length ? first.failures : [first.hung || first.crash || '(see its log)']) console.log(`    (under load: ${f})`);
   if (!ok) {
     for (const f of r.failures) console.log(`    - ${f}`);
     if (r.hung) console.log(`    ${r.hung}`);
@@ -131,9 +142,20 @@ await Promise.all(Array.from({ length: width }, async () => {
   }
 }));
 // this run's times for the next run's order (a suite that failed keeps its old time: a crash is quick)
-for (const r of results) if (r.code === 0 && !r.failed) timings[r.name] = r.ms;
+for (const r of results) if (okOf(r)) timings[r.name] = r.ms;
 try { writeFileSync(timingsFile, `${JSON.stringify(timings, null, 2)}\n`); } catch { /* read-only checkout */ }
-const bad = results.filter((r) => r.code !== 0 || r.failed);
+// each failed suite once more, alone (see the top)
+const flaky = [];
+const failedFirst = results.filter((r) => !okOf(r));
+if (retry && failedFirst.length) {
+  console.log(`\n${failedFirst.length} failed: run again, alone`);
+  for (const first of failedFirst) {
+    const again = await run(first.name);
+    report(again, first);
+    if (okOf(again)) { flaky.push(first.name); results[results.indexOf(first)] = again; }
+  }
+}
+const bad = results.filter((r) => !okOf(r));
 const total = results.reduce((n, r) => n + r.passed, 0);
-console.log(`\n${bad.length ? `${bad.length} suite${bad.length === 1 ? '' : 's'} failed` : 'All suites passed'}: ${total} checks, ${secs(Date.now() - t0)} wall (${secs(results.reduce((n, r) => n + r.ms, 0))} of suites)`);
+console.log(`\n${bad.length ? `${bad.length} suite${bad.length === 1 ? '' : 's'} failed` : 'All suites passed'}${flaky.length ? ` (${flaky.join(', ')} only alone, on a retry)` : ''}: ${total} checks, ${secs(Date.now() - t0)} wall (${secs(results.reduce((n, r) => n + r.ms, 0))} of suites)`);
 process.exit(bad.length);

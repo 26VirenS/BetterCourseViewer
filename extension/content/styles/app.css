@@ -13,7 +13,7 @@
  * min(their own, the viewport less a margin). */
 
 html[data-bcv-theme] {
-  --bcv-version: "2.98.72"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.98.73"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -39,6 +39,11 @@ html[data-bcv-theme] {
   --bcv-spring-snappy: cubic-bezier(.34,1.15,.42,1); --bcv-t-snappy: .29s; --bcv-spring-gentle: cubic-bezier(.32,.72,0,1); --bcv-t-gentle: .46s;
   --bcv-spring-settle: cubic-bezier(.32,.72,0,1); --bcv-t-settle: .35s; --bcv-spring-scrim: ease; --bcv-t-scrim: .4s; --bcv-spring-phone: cubic-bezier(.32,.72,0,1); --bcv-t-phone: .39s; --bcv-spring-island: cubic-bezier(.32,.72,0,1); --bcv-t-island: .5s;
   /* the corners: one scale by size — tiles, menus, panels, rows, cards, sheets — every pane reads these */
+  /* (2.98.70) Liquid Glass's edges: no line round it, but a rim of light — brightest where the light falls, top left, and again
+   * at the far corner, all but gone between — and the glass a little lighter just inside its edges, as thick glass bends light
+   * (the search afloat and the box a Dashboard counter opens into) */
+  --bcv-glass-rim: linear-gradient(155deg, rgba(255,255,255,.1), rgba(255,255,255,.03) 22%, rgba(255,255,255,.008) 48%, rgba(255,255,255,.015) 74%, rgba(255,255,255,.06)); /* (2.98.72: barely there — a hairline of light at the very edge) */
+  --bcv-glass-shade: inset 0 1px 0 rgba(255,255,255,.035), inset 0 -1px 0 rgba(255,255,255,.012), inset 1px 0 0 rgba(255,255,255,.012), inset -1px 0 0 rgba(255,255,255,.012); /* (at the edge only: nothing reaching in) */
   --bcv-r-tile: 9px; --bcv-r-tile-lg: 12px; --bcv-r-menu: 14px; --bcv-r-panel: 16px; --bcv-r-row: 18px; --bcv-r-card: 20px; --bcv-r-card-lg: 22px; --bcv-r-sheet: 26px;
 }
 html[data-bcv-theme="dark"] {
@@ -75,6 +80,9 @@ html[data-bcv-ext-theme="dark"] .bcv-graph__frame { filter: invert(1) hue-rotate
  * bar and panel lays its colour over the page's own ground instead — the look it has with nothing
  * behind it — and an open sheet blurs what is behind it with a plain filter, which software draws. */
 html.bcv-noblur { --bcv-chrome-ground: linear-gradient(var(--bcv-chrome), var(--bcv-chrome)), var(--bcv-bg); --bcv-glass-ground: linear-gradient(var(--bcv-glass), var(--bcv-glass)), var(--bcv-card); }
+/* …and no backdrop-filter is left on: one under a solid ground shows nothing, yet a browser drawing
+ * in software still works it out for every frame (the sidebar, the bars and the header each did). */
+html.bcv-noblur *, html.bcv-noblur *::before, html.bcv-noblur *::after { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
 html.bcv-noblur :is(.bcv-away__btn, .bcv-toast) { background: rgba(28,28,30,.94); }
 @keyframes bcv-noblur-in { from { filter: blur(0); } to { filter: blur(6px); } }
 html.bcv-noblur body:has(> .bcv-sheet-ov) > #bcv-app > :is(#bcv-main, #bcv-side), html.bcv-noblur body:has(> .bcv-sheet-ov) > #bcv-bar { animation: bcv-noblur-in .24s ease both; } /* (not under the search afloat: it leaves the page sharp) */
@@ -717,6 +725,23 @@ html.bcv-noblur .bcv-sheet-ov--card::before { display: none; }
 .bcv-sheet-ov--card.is-folding { opacity: 0; pointer-events: none; }
 .bcv-sheet--card { position: fixed; z-index: 1; margin: 0; max-width: none; max-height: none; background: var(--bcv-card); -webkit-backdrop-filter: none; backdrop-filter: none; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); animation: none; transform: none; box-shadow: 0 30px 80px rgba(0,0,0,.34), 0 0 0 1px var(--bcv-hair); transition: left .46s cubic-bezier(.32,.72,0,1), top .46s cubic-bezier(.32,.72,0,1), width .46s cubic-bezier(.32,.72,0,1), height .46s cubic-bezier(.32,.72,0,1); }
 .bcv-sheet--card.is-at-card { transition: none; }
+/* (2.98.73) the box a Dashboard counter opens into wears the search's glass — smoky, the page coming through it softly
+   blurred, the words white (the page's inks, fills and edges turned for glass this dark, as the search's are), Liquid
+   Glass's rim round it. It starts and ends as the counter: the counter's own ground lies over the glass while the box
+   stands where the counter does, fades as it grows and comes back as it folds (::before, the page's card colour taken
+   on the overlay before the box turns its inks); and the counter it grew out of is not left standing behind the glass
+   (.bcv-stat.is-lifted, hidden while its box is up: content/app/screens/dashboard.js openSheet). */
+.bcv-sheet-ov--card { --bcv-stat-ground: var(--bcv-card); }
+.bcv-sheet--stat { border: 1px solid transparent; background: linear-gradient(180deg, rgba(34,33,38,.58), rgba(24,23,27,.66)) padding-box, var(--bcv-glass-rim) border-box; -webkit-backdrop-filter: blur(20px) saturate(1.8) brightness(.66); backdrop-filter: blur(20px) saturate(1.8) brightness(.66); box-shadow: var(--bcv-glass-shade), 0 30px 80px rgba(0,0,0,.34), 0 2px 10px rgba(0,0,0,.14); }
+.bcv-sheet--stat::before { content: ''; position: absolute; inset: 0; z-index: -1; border-radius: inherit; background: var(--bcv-stat-ground); box-shadow: 0 0 0 1px var(--bcv-hair); pointer-events: none; opacity: 0; transition: opacity .3s ease .06s; }
+.bcv-sheet--stat.is-at-card::before, .bcv-sheet-ov.is-folding > .bcv-sheet--stat::before { opacity: 1; }
+.bcv-sheet--stat.is-at-card::before { transition: none; }
+.bcv-sheet-ov.is-folding > .bcv-sheet--stat::before { transition: opacity .24s ease .2s; } /* (back before the box is the counter's size again) */
+.bcv-sheet--card.bcv-sheet--stat .bcv-sheet__value, .bcv-sheet--card.bcv-sheet--stat .bcv-sheet__label { transition: transform .46s cubic-bezier(.32,.72,0,1), color .3s ease; } /* (the words the counter's ink as they leave it, white on the glass; none while at the counter, below) */
+html.bcv-noblur .bcv-sheet--stat { background: linear-gradient(rgba(40,40,44,.97), rgba(40,40,44,.97)) padding-box, var(--bcv-glass-rim) border-box; } /* (no blur drawn: solid, as the search's is, the rim kept) */
+body:has(> .bcv-sheet-ov--card) .bcv-stat.is-lifted { visibility: hidden; }
+.bcv-stat.is-lifted, .bcv-stat.is-lifted:hover, .bcv-stat.is-lifted:active { transform: none; transition: none; } /* (at rest while its box is up: the box measured from it and folding back onto it where it lies) */
+.bcv-sheet-ov:not(.is-folding) > .bcv-sheet--stat:not(.is-at-card) .bcv-sheet__course { color: color-mix(in srgb, var(--bcv-course) 45%, #fff) !important; background: color-mix(in srgb, var(--bcv-course) 30%, transparent) !important; } /* (a course's chip lit for glass this dark: its colour lighter, its ground deeper) */
 .bcv-sheet--card > :not(.bcv-sheet__head), .bcv-sheet--card .bcv-sheet__note, .bcv-sheet--card .bcv-sheet__close { transition: opacity .22s ease .14s; }
 .bcv-sheet--card.is-at-card > :not(.bcv-sheet__head), .bcv-sheet--card.is-at-card .bcv-sheet__note, .bcv-sheet--card.is-at-card .bcv-sheet__close,
 .bcv-sheet-ov.is-folding .bcv-sheet--card > :not(.bcv-sheet__head), .bcv-sheet-ov.is-folding .bcv-sheet--card .bcv-sheet__note, .bcv-sheet-ov.is-folding .bcv-sheet--card .bcv-sheet__close { opacity: 0; transition-delay: 0s; transition-duration: .1s; }
@@ -4039,19 +4064,15 @@ html.bcv-noblur .bcv-spot:not(.is-far) .bcv-omni__box, html.bcv-noblur .bcv-spot
 .bcv-spot { position: fixed; z-index: calc(var(--bcv-z-sheet) - 1); display: flex; /* (under the sheets: a hand-in box or a question opened from a row comes up over the pill) */ flex-direction: column; gap: 10px; transition: left .46s cubic-bezier(.32,.72,0,1), top .46s cubic-bezier(.32,.72,0,1), width .46s cubic-bezier(.32,.72,0,1); }
 /* (2.98.68) afloat it wears Spotlight's own glass whatever the page's look: smoky, the page's colours coming through it
  * softly blurred, the words white — the page's own ink, fills and edges, turned for glass this dark, for everything inside */
-.bcv-spot:not(.is-far) {
+.bcv-spot:not(.is-far), .bcv-sheet-ov:not(.is-folding) > .bcv-sheet--stat:not(.is-at-card) {
   --bcv-ink: #fff; --bcv-ink2: rgba(255,255,255,.8); --bcv-ink3: rgba(255,255,255,.52);
   --bcv-sep: rgba(255,255,255,.1); --bcv-edge: rgba(255,255,255,.16); --bcv-fill: rgba(255,255,255,.12); --bcv-fill2: rgba(255,255,255,.06);
   --bcv-hover: rgba(255,255,255,.13); --bcv-card: rgba(255,255,255,.1);
-  /* (2.98.70) Liquid Glass's edges: no line round it, but a rim of light — brightest where the light falls, top left, and again
-   * at the far corner, all but gone between — and the glass a little lighter just inside its edges, as thick glass bends light */
-  --bcv-glass-rim: linear-gradient(155deg, rgba(255,255,255,.1), rgba(255,255,255,.03) 22%, rgba(255,255,255,.008) 48%, rgba(255,255,255,.015) 74%, rgba(255,255,255,.06)); /* (2.98.72: barely there — a hairline of light at the very edge) */
-  --bcv-glass-shade: inset 0 1px 0 rgba(255,255,255,.035), inset 0 -1px 0 rgba(255,255,255,.012), inset 1px 0 0 rgba(255,255,255,.012), inset -1px 0 0 rgba(255,255,255,.012); /* (at the edge only: nothing reaching in) */
   color-scheme: dark;
 }
 .bcv-spot .bcv-omni { position: static; display: block; flex: none; align-self: stretch; width: auto; max-width: none; min-width: 0; margin: 0; }
 .bcv-omni--ghost { visibility: hidden; }
-.bcv-spot .bcv-omni__box, .bcv-spot .bcv-omni__box:focus-within { height: 72px; padding: 0 24px 0 28px; gap: 16px; border-radius: 36px; background: linear-gradient(180deg, rgba(6,6,8,.84), rgba(34,34,38,.62)) padding-box, var(--bcv-glass-rim) border-box; -webkit-backdrop-filter: blur(24px) saturate(1.7) brightness(.72); backdrop-filter: blur(24px) saturate(1.7) brightness(.72); border: 1px solid transparent; box-shadow: var(--bcv-glass-shade), 0 24px 64px rgba(0,0,0,.3), 0 2px 10px rgba(0,0,0,.16); transition: height .46s cubic-bezier(.32,.72,0,1), border-radius .46s cubic-bezier(.32,.72,0,1), padding .46s cubic-bezier(.32,.72,0,1), gap .46s cubic-bezier(.32,.72,0,1), background .2s ease, border-color .2s ease, box-shadow .3s ease; }
+.bcv-spot .bcv-omni__box, .bcv-spot .bcv-omni__box:focus-within { height: 72px; padding: 0 24px 0 28px; gap: 16px; border-radius: 36px; background: linear-gradient(180deg, rgba(6,6,8,.84), rgba(34,34,38,.62)) padding-box, var(--bcv-glass-rim) border-box; -webkit-backdrop-filter: blur(18px) saturate(1.7) brightness(.72); backdrop-filter: blur(18px) saturate(1.7) brightness(.72); border: 1px solid transparent; box-shadow: var(--bcv-glass-shade), 0 24px 64px rgba(0,0,0,.3), 0 2px 10px rgba(0,0,0,.16); transition: height .46s cubic-bezier(.32,.72,0,1), border-radius .46s cubic-bezier(.32,.72,0,1), padding .46s cubic-bezier(.32,.72,0,1), gap .46s cubic-bezier(.32,.72,0,1), background .2s ease, border-color .2s ease, box-shadow .3s ease; }
 .bcv-spot .bcv-omni__ic svg { width: 24px; height: 24px; transition: width .46s cubic-bezier(.32,.72,0,1), height .46s cubic-bezier(.32,.72,0,1); }
 .bcv-spot .bcv-omni__box input.bcv-omni__in, .bcv-spot .bcv-omni__box input.bcv-omni__in[type="search"], .bcv-spot .bcv-omni__box input.bcv-omni__in:focus { height: 68px; font: 400 26px/1 var(--bcv-font); letter-spacing: -.015em; color: var(--bcv-ink); caret-color: var(--bcv-ink); transition: height .46s cubic-bezier(.32,.72,0,1), font-size .46s cubic-bezier(.32,.72,0,1), color .2s ease; }
 .bcv-spot .bcv-omni__wikit { font-size: 12.5px; }
@@ -4064,7 +4085,7 @@ html.bcv-noblur .bcv-spot:not(.is-far) .bcv-omni__box, html.bcv-noblur .bcv-spot
 .bcv-spot.is-lifting .bcv-omni__panel { transition-delay: .2s; transition-duration: .28s; }
 .bcv-spot.is-still, .bcv-spot.is-still .bcv-omni__box, .bcv-spot.is-still .bcv-omni__panel { transition: none; }
 /* the panel: a slab of its own under the pill, the page through it blurred soft and dimmed so the words hold on any page */
-.bcv-spot .bcv-omni__panel { position: relative; margin: 14px 0 0; max-height: min(58vh, 600px); padding: 12px; border-radius: 34px; background: linear-gradient(180deg, rgba(46,44,50,.4), rgba(28,26,30,.5)) padding-box, var(--bcv-glass-rim) border-box; border: 1px solid transparent; animation: none; transition: opacity .18s ease, transform .18s ease; -webkit-backdrop-filter: blur(26px) saturate(1.8) brightness(.66); backdrop-filter: blur(26px) saturate(1.8) brightness(.66); box-shadow: var(--bcv-glass-shade), 0 26px 70px rgba(0,0,0,.28), 0 2px 10px rgba(0,0,0,.14); scrollbar-color: rgba(255,255,255,.25) transparent; }
+.bcv-spot .bcv-omni__panel { position: relative; margin: 14px 0 0; max-height: min(58vh, 600px); padding: 12px; border-radius: 34px; background: linear-gradient(180deg, rgba(46,44,50,.4), rgba(28,26,30,.5)) padding-box, var(--bcv-glass-rim) border-box; border: 1px solid transparent; animation: none; transition: opacity .18s ease, transform .18s ease; -webkit-backdrop-filter: blur(20px) saturate(1.8) brightness(.66); backdrop-filter: blur(20px) saturate(1.8) brightness(.66); box-shadow: var(--bcv-glass-shade), 0 26px 70px rgba(0,0,0,.28), 0 2px 10px rgba(0,0,0,.14); scrollbar-color: rgba(255,255,255,.25) transparent; }
 .bcv-spot .bcv-omni__item { padding: 13px 16px; border-radius: 22px; gap: 18px; }
 /* Spotlight's marks: a plain line drawing in white, no tile (the course is named under the title) */
 .bcv-spot .bcv-omni__iic, .bcv-spot .bcv-omni__iic[style] { width: 30px; height: 30px; border-radius: 0; background: none; color: var(--bcv-ink) !important; }

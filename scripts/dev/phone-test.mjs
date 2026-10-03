@@ -139,7 +139,8 @@ try {
     phone: document.documentElement.classList.contains('bcv-phone'),
     root: document.documentElement.classList.contains('bcv-ph-root'),
     tabbar: getComputedStyle(document.getElementById('bcv-tabbar')).position,
-    glass: /blur/.test(getComputedStyle(document.getElementById('bcv-tabbar')).backdropFilter || getComputedStyle(document.getElementById('bcv-tabbar')).webkitBackdropFilter || ''),
+    // (glass: blurred behind — or, in a Chrome that draws no blur, solid with no backdrop-filter left on: app.css html.bcv-noblur)
+    glass: ((bf) => (document.documentElement.classList.contains('bcv-noblur') ? bf === 'none' : /blur/.test(bf)))(getComputedStyle(document.getElementById('bcv-tabbar')).backdropFilter || getComputedStyle(document.getElementById('bcv-tabbar')).webkitBackdropFilter || ''),
     topbarHidden: document.getElementById('bcv-topbar')?.hidden,
     side: !!document.querySelector('#bcv-side'),
     rail: !!document.querySelector('.bcv-rail') && getComputedStyle(document.querySelector('.bcv-rail')).display !== 'none',
@@ -172,9 +173,13 @@ try {
   await shot('01b-today-sheet');
   // dragging the handle down past 110px dismisses; a short drag springs back
   const handle = await page.$eval('.bcv-ph-sheet__handle', (el) => { const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
-  await page.mouse.move(handle.x, handle.y); await page.mouse.down(); await page.mouse.move(handle.x, handle.y + 40, { steps: 4 }); await page.mouse.up();
+  // (slowly — 10px each 50ms — or it is a flick, which puts the sheet away however short: past 700px/s, phone.js release;
+  // a browser drawing quickly enough sends four quick steps at a flick's speed)
+  await page.mouse.move(handle.x, handle.y); await page.mouse.down();
+  for (let i = 1; i <= 4; i++) { await page.mouse.move(handle.x, handle.y + i * 10); await new Promise((r) => setTimeout(r, 50)); }
+  await page.mouse.up();
   await new Promise((r) => setTimeout(r, 350));
-  check(!!(await page.$('.bcv-sheet-ov')), 'a short drag on the handle springs the sheet back');
+  check(!!(await page.$('.bcv-sheet-ov')), 'a short, slow drag on the handle springs the sheet back');
   await page.mouse.move(handle.x, handle.y); await page.mouse.down(); await page.mouse.move(handle.x, handle.y + 160, { steps: 6 }); await page.mouse.up();
   check(await eventually(async () => !(await page.$('.bcv-sheet-ov'))), 'a drag past 110px dismisses it');
   await press('.bcv-ph-stat:nth-child(2)');

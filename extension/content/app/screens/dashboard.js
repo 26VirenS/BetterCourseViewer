@@ -399,7 +399,7 @@
         sheet.classList.remove('is-at-card');
         glide.forEach(([a, b], i) => startAt(a, rest[i], b.getBoundingClientRect()));
         place(true); // back into the counter
-        setTimeout(() => ov.remove(), U.reducedMotion() ? 0 : 560);
+        setTimeout(() => { ov.remove(); card.classList.remove('is-lifted'); }, U.reducedMotion() ? 0 : 560);
       };
       ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
       ov.addEventListener('keydown', (e) => {
@@ -407,7 +407,7 @@
         if (card && sheet.classList.contains('is-split')) { BCV.preview?.close(); ov.focus(); return; } // (the preview first, then the box)
         close();
       });
-      const sheet = U.el(`bcv-sheet ${card ? 'bcv-sheet--card is-at-card' : 'bcv-sheet--steady'}`, [
+      const sheet = U.el(`bcv-sheet ${card ? 'bcv-sheet--card bcv-sheet--stat is-at-card' : 'bcv-sheet--steady'}`, [
         U.el('bcv-sheet__head', [
           h('span', { class: 'bcv-sheet__tile' }, U.svg(def.icon, { size: 19, stroke: def.color, width: 1.9 })),
           U.el('bcv-sheet__titles', [
@@ -461,7 +461,7 @@
         const row = h('a', { class: quiet ? 'bcv-sheet__qrow' : 'bcv-sheet__row', href: i.url, onclick: (e) => { e.preventDefault(); if (!BCV.preview?.open(i.url, { host: ov.firstElementChild })) { close(); app.go(i.url); } } }, [
           h('span', { class: 'bcv-sheet__dot', style: { background: i.color } }),
           U.el('bcv-sheet__body', [U.text('bcv-sheet__title bcv-pretty', i.title), U.text('bcv-sheet__meta', i.meta)]),
-          h('span', { class: 'bcv-sheet__course bcv-ellip', style: { background: i.tint, color: i.color }, text: i.course }),
+          h('span', { class: 'bcv-sheet__course bcv-ellip', style: { background: i.tint, color: i.color, '--bcv-course': i.color }, text: i.course }),
         ]);
         if (!i.clear || quiet) return row;
         const x = U.iconbtn(IC.close, { size: 24, title: 'Clear', onClick: async (e) => {
@@ -492,6 +492,10 @@
         const wrap = U.el('bcv-sheet__item', [row, x]);
         return wrap;
       }
+      // (2.98.73) the box is glass: the counter it grew out of is not left standing behind it — hidden while the box
+      // is up (app.css: while the overlay is in the page), there again the moment the box has folded back over it;
+      // lifted first, so the box is measured from the counter at rest, not raised by the pointer over it
+      if (card) { for (const c of document.querySelectorAll('.bcv-stat.is-lifted')) c.classList.remove('is-lifted'); card.classList.add('is-lifted'); }
       if (card) place(true); // (the counter's place and size, and the dim's centre, set before the overlay is in the page: the first style it gets is the counter's, so nothing eases in from nought)
       document.body.append(ov);
       if (card) {
