@@ -89,10 +89,59 @@
         class: `bcv-seg__btn ${key === value ? 'is-active' : ''}`,
         text: lbl,
         dataset: { value: key },
-        onclick: () => onChange(key),
+        onclick: () => {
+          // (the highlight sets off at once — the screen the choice redraws lands after, its highlight starting from here)
+          for (const b of wrap.querySelectorAll('.bcv-seg__btn')) b.classList.toggle('is-active', b.dataset.value === key);
+          onChange(key);
+        },
       }));
     }
+    segSlide(wrap, '.bcv-seg__btn', options.map((o) => o[0]).join('|'));
     return wrap;
+  }
+
+  // ---- the segmented controls' sliding highlight (2.98.71) ------------------------------------------
+  // One shape behind the options that glides to the one chosen, rather than the chosen one lighting up
+  // where it is: in place when the control stays, and across a redraw — a view switched, the screen drawn
+  // again with a new control of the same options — from where the last one's highlight stood (kept a
+  // moment, by the options). It follows the chosen one however it becomes chosen (a class changed, the
+  // buttons replaced: watched), and is put back at once when the control changes size. Reduced motion: no glide.
+  const segMemo = new Map(); // options → where the highlight last stood in a control of them { left, top, width, height, at }
+  const SEG_RECALL = 1500; // ms a redrawn control starts from the last one's place
+  function segSlide(wrap, sel, memoKey = '') {
+    if (wrap.bcvSlide) { wrap.bcvSlide(); return; }
+    const thumb = h('span', { class: 'bcv-seg__thumb', 'aria-hidden': 'true' });
+    wrap.classList.add('has-thumb');
+    wrap.append(thumb); // (last, so the options keep their places among the children)
+    let shown = null;
+    const put = (g, glide) => {
+      thumb.style.transition = glide ? '' : 'none';
+      Object.assign(thumb.style, { width: `${g.width}px`, height: `${g.height}px`, transform: `translate(${g.left}px, ${g.top}px)`, borderRadius: g.radius, opacity: '1' });
+      if (!glide) { void thumb.offsetWidth; thumb.style.transition = ''; }
+      shown = g;
+      if (memoKey) segMemo.set(memoKey, { ...g, at: Date.now() });
+    };
+    const place = ({ jump = false } = {}) => {
+      if (thumb.parentNode !== wrap) wrap.append(thumb); // (the options drawn afresh in the same control)
+      const b = wrap.querySelector(`${sel}.is-active`);
+      if (!b) { thumb.style.opacity = '0'; shown = null; return; }
+      if (!wrap.isConnected || !b.offsetWidth) return; // (not laid out yet: the first size it gets places it)
+      const g = { left: b.offsetLeft, top: b.offsetTop, width: b.offsetWidth, height: b.offsetHeight, radius: getComputedStyle(b).borderTopLeftRadius };
+      const same = (a) => a && a.left === g.left && a.top === g.top && a.width === g.width && a.height === g.height;
+      if (!shown) {
+        const was = memoKey ? segMemo.get(memoKey) : null;
+        if (!jump && was && Date.now() - was.at < SEG_RECALL && !same(was) && !reducedMotion()) { put(was, false); requestAnimationFrame(() => put(g, true)); return; }
+        put(g, false);
+        return;
+      }
+      if (!same(shown)) put(g, !jump && !reducedMotion());
+    };
+    new MutationObserver(() => place()).observe(wrap, { subtree: true, childList: true, attributes: true, attributeFilter: ['class'] });
+    if (self.ResizeObserver) {
+      let first = true;
+      new ResizeObserver(() => { place({ jump: !first }); first = false; }).observe(wrap); // (laid out: placed, from the last one's place; resized: put there)
+    }
+    wrap.bcvSlide = place;
   }
 
   function search(placeholder, onInput, mod = '') {
@@ -1145,7 +1194,7 @@
 
   BCV.ui = {
     groupPicker, groupAttrs, BANDS, gradeBand, bandChip, bandSlider, whatIfAdder, whatIfRemove,
-    svg, star, chev, el, text, tile, dot, card, row, label, h2, groupHead, badge, statusBadge, seg, search, switchEl, btn, iconbtn, pill, placeDot,
+    svg, star, chev, el, text, tile, dot, card, row, label, h2, groupHead, badge, statusBadge, seg, segSlide, search, switchEl, btn, iconbtn, pill, placeDot,
     empty, emptyCard, loading, errorBox, hint, avatar, toast, menu, closeMenus, picker, colorMenu, COURSE_COLORS, fmtDay, datePop, dateField, promptSheet, askSheet,
     DAY, startOfDay, addDays, sameDay, dayDiff, startOfWeek, parse, MONTHS, MONTHS_LONG, DAYS, DAYS_LONG,
     fmtTime, fmtTimeLower, fmtShort, fmtLong, fmtDateComma, fmtAt, fmtAtUpper, fmtBy, dayTitle, fmtDow, fmtRecent, whenShort, plural,

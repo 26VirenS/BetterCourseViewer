@@ -13,7 +13,7 @@
  * min(their own, the viewport less a margin). */
 
 html[data-bcv-theme] {
-  --bcv-version: "2.98.70"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.98.71"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -509,6 +509,13 @@ html.bcv-on:not(.bcv-phone) .bcv-side--pic .bcv-side__bottom::before { display: 
 .bcv-seg__btn { border: 0; cursor: pointer; padding: 6px 14px; border-radius: 8px; font: 500 13px/1 var(--bcv-font); background: transparent; color: var(--bcv-ink2); box-shadow: none; white-space: nowrap; }
 .bcv-seg--wide .bcv-seg__btn { padding: 6px 16px; }
 .bcv-seg__btn.is-active { background: var(--bcv-card); color: var(--bcv-ink); box-shadow: var(--bcv-shadow); font-weight: 600; }
+/* (2.98.71) the chosen option's light is one shape behind the options that glides to the one chosen (ui.js segSlide) */
+.bcv-seg.has-thumb { position: relative; isolation: isolate; }
+.bcv-seg.has-thumb > :not(.bcv-seg__thumb) { position: relative; z-index: 1; }
+.bcv-seg.has-thumb .bcv-seg__btn, .bcv-seg.has-thumb .bcv-qz__mode { transition: color .2s ease; }
+.bcv-seg.has-thumb .bcv-seg__btn.is-active, .bcv-seg.has-thumb .bcv-qz__mode.is-active { background: transparent; box-shadow: none; }
+.bcv-seg__thumb { position: absolute; left: 0; top: 0; z-index: 0; width: 0; height: 0; border-radius: 8px; background: var(--bcv-card); box-shadow: var(--bcv-shadow); pointer-events: none; opacity: 0; transition: transform .38s cubic-bezier(.32,.72,0,1), width .38s cubic-bezier(.32,.72,0,1), height .38s cubic-bezier(.32,.72,0,1); }
+@media (prefers-reduced-motion: reduce) { .bcv-seg__thumb { transition: none; } }
 
 /* search field */
 .bcv-search { flex: 1; min-width: 220px; display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 12px; border-radius: 11px; background: var(--bcv-fill); }
@@ -2322,6 +2329,8 @@ html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) .bcv-head--pic .bc
 #bcv-app .bcv-side--pic .bcv-theme-btn, #bcv-app .bcv-side--pic .bcv-account, #bcv-app .bcv-head--pic .bcv-head__row .bcv-btn:not(.bcv-btn--primary), #bcv-app .bcv-head--pic .bcv-seg__btn.is-active { color: var(--bcv-photo-ink); }
 #bcv-app .bcv-head--pic .bcv-seg__btn { color: var(--bcv-photo-ink2); }
 #bcv-app .bcv-head--pic .bcv-seg__btn.is-active { background: var(--bcv-photo-active); color: var(--bcv-photo-ink); box-shadow: none; }
+#bcv-app .bcv-head--pic .bcv-seg.has-thumb .bcv-seg__btn.is-active { background: transparent; }
+#bcv-app .bcv-head--pic .bcv-seg__thumb { background: var(--bcv-photo-active); box-shadow: none; }
 .bcv-head--pic .bcv-head__row .bcv-btn:not(.bcv-btn--primary):hover, .bcv-side--pic .bcv-theme-btn:hover, .bcv-side--pic .bcv-account:hover { background: var(--bcv-photo-frost-hover); }
 .bcv-head--pic .bcv-head__row .bcv-btn:not(.bcv-btn--primary) svg { stroke: var(--bcv-photo-ink); }
 
@@ -2960,7 +2969,7 @@ html.bcv-setup-open #bcv-bar { display: none !important; }
  * the app's root, so it stays put as the screens change); it goes up with the bar for a quiz, and is not there where the bar is not */
 #bcv-topsearch { display: none; }
 html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) #bcv-topsearch { display: flex; align-items: center; position: fixed; top: 0; left: calc(var(--bcv-side-w) + 20px); height: 44px; z-index: calc(var(--bcv-z-bar) + 1); pointer-events: none; transition: left .45s cubic-bezier(.32,.72,0,1), translate .45s cubic-bezier(.32,.72,0,1), opacity .3s ease; }
-html.bcv-setup-open #bcv-topsearch { display: none !important; }
+html.bcv-setup-open #bcv-topsearch, #bcv-topsearch[hidden] { display: none !important; } /* (hidden: the Dashboard, whose header has the box) */
 html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab).bcv-quiz #bcv-topsearch { translate: 0 -64px; opacity: 0; pointer-events: none; }
 #bcv-topsearch .bcv-omni__box, .bcv-spot .bcv-omni__box { box-sizing: border-box; } /* (outside the app's root nothing sets it: the pill is 29 tall in the bar and as it sets off, as it was in the header) */
 #bcv-topsearch .bcv-omni { pointer-events: auto; flex: none; order: 0; width: clamp(220px, 26vw, 340px); max-width: none; min-width: 0; margin: 0; align-self: center; }
@@ -4036,8 +4045,8 @@ html.bcv-noblur .bcv-spot:not(.is-far) .bcv-omni__box, html.bcv-noblur .bcv-spot
   --bcv-hover: rgba(255,255,255,.13); --bcv-card: rgba(255,255,255,.1);
   /* (2.98.70) Liquid Glass's edges: no line round it, but a rim of light — brightest where the light falls, top left, and again
    * at the far corner, all but gone between — and the glass a little lighter just inside its edges, as thick glass bends light */
-  --bcv-glass-rim: linear-gradient(155deg, rgba(255,255,255,.55), rgba(255,255,255,.14) 20%, rgba(255,255,255,.04) 46%, rgba(255,255,255,.08) 72%, rgba(255,255,255,.36));
-  --bcv-glass-shade: inset 0 1px 1px rgba(255,255,255,.18), inset 0 -1px 1px rgba(255,255,255,.07), inset 0 16px 22px -18px rgba(255,255,255,.22), inset 0 -14px 22px -18px rgba(255,255,255,.12), inset 14px 0 22px -20px rgba(255,255,255,.1), inset -14px 0 22px -20px rgba(255,255,255,.1);
+  --bcv-glass-rim: linear-gradient(155deg, rgba(255,255,255,.2), rgba(255,255,255,.06) 22%, rgba(255,255,255,.015) 48%, rgba(255,255,255,.03) 74%, rgba(255,255,255,.12)); /* (2.98.71: much softer) */
+  --bcv-glass-shade: inset 0 1px 1px rgba(255,255,255,.07), inset 0 -1px 1px rgba(255,255,255,.025), inset 0 16px 22px -18px rgba(255,255,255,.07), inset 0 -14px 22px -18px rgba(255,255,255,.035), inset 14px 0 22px -20px rgba(255,255,255,.03), inset -14px 0 22px -20px rgba(255,255,255,.03);
   color-scheme: dark;
 }
 .bcv-spot .bcv-omni { position: static; display: block; flex: none; align-self: stretch; width: auto; max-width: none; min-width: 0; margin: 0; }

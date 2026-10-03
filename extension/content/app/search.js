@@ -1,4 +1,4 @@
-/* Search everything: the box at the left of the widgets' bar across the top (2.98.70: on every screen; it was the Dashboard's header's) is a hub — find, open and do, from one field,
+/* Search everything: the box in the Dashboard's header — and on every other screen at the left of the widgets' bar across the top (2.98.70) — is a hub — find, open and do, from one field,
  * nothing to press. From the first character what the page already holds answers at once — your
  * courses, a command whose name it starts, a sum worked out — and from the second, after a short
  * pause, all of Canvas: for each starred course its assignments, announcements, pages, discussions
@@ -775,12 +775,17 @@
     return root;
   }
   /** The box in the widgets' bar, at its left (2.98.70): built once for the desktop shell and kept across screens (it lives
-   *  outside the app's root, beside the bar); built again after the phone's Today had its own. Each screen's draw asks. */
-  function dock(app) {
+   *  outside the app's root, beside the bar); built again after the phone's Today, or the Dashboard, had one of its own.
+   *  Each screen's draw asks. On the Dashboard (2.98.71) the box stands where it always did, in the header between the
+   *  title and the view switcher (dashboard.js builds it): the bar's is not shown there. */
+  function dock(app, route = null) {
     if (BCV.phone?.active?.()) return;
-    if (docked && ui?.root === docked && docked.isConnected) return; // (in the bar — or afloat from it)
     let host = document.getElementById('bcv-topsearch');
     if (!host) { host = h('div', { id: 'bcv-topsearch', class: 'bcv-topsearch' }); document.body.append(host); }
+    const dash = route?.screen === 'dashboard';
+    host.hidden = dash; // (the Dashboard's own box takes over as its draw lands)
+    if (dash) return;
+    if (docked && ui?.root === docked && docked.isConnected) return; // (in the bar — or afloat from it)
     const root = field(app);
     host.replaceChildren(root);
     docked = root;

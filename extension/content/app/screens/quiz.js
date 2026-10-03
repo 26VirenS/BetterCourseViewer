@@ -581,6 +581,7 @@
         forcedOne ? null : modeBtn('all', 'Scroll through all questions', MODE_ALL),
       ].filter(Boolean) : []));
       modeWrap.hidden = !switchable;
+      if (switchable) U.segSlide?.(modeWrap, '.bcv-qz__mode', 'qzmode'); // (its highlight slides between the three, 2.98.71)
       devBtn.hidden = !(devImport && st.stage === 'take' && st.sub);
       const side = st.stage === 'take' && st.mode === 'side';
       if (!side && progressWrap.parentElement !== head) head.append(progressWrap); // (the side layout keeps the pills in its left rail)
