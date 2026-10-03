@@ -432,6 +432,16 @@
       // side by side once a row is pressed), 430px tall (2.98.50: a third shorter than it was) or as
       // tall as the window allows, pushed back inside the window
       const M = 16, LIST_W = 380, PV_W = 500, H_MAX = 430;
+      /** Where in its row the counter stands: the box hangs from its top-left corner (the left of the row), its top
+       *  centre (the middle) or its top-right corner (the right) — growing away from the row's edge, and on the right
+       *  its preview opening on the left of the list (2.98.82). */
+      function sideOf() {
+        const top = card.getBoundingClientRect().top;
+        const row = [...document.querySelectorAll('.bcv-stats .bcv-stat')].filter((c) => Math.abs(c.getBoundingClientRect().top - top) < 4).sort((a, b) => a.getBoundingClientRect().left - b.getBoundingClientRect().left);
+        const i = row.indexOf(card);
+        if (i < 0 || row.length < 2) { const r = card.getBoundingClientRect(), mid = r.left + r.width / 2; return mid < innerWidth / 3 ? 'start' : mid > (innerWidth * 2) / 3 ? 'end' : 'mid'; }
+        return i === 0 ? 'start' : i === row.length - 1 ? 'end' : 'mid';
+      }
       function geometry(back) {
         const r = card.getBoundingClientRect();
         if (back) return { x: r.left, y: r.top, w: r.width, h: r.height };
@@ -441,9 +451,12 @@
         const narrow = split && room < listW + 360; // (no room for both: the preview takes the box)
         const w = split ? (narrow ? room : Math.min(listW + PV_W, room)) : listW;
         const hgt = Math.max(Math.min(H_MAX, vh - 2 * M), Math.min(r.height, vh - 2 * M));
-        const x = Math.max(M, Math.min(r.left, vw - M - w));
+        const side = sideOf();
+        const x = Math.max(M, Math.min(side === 'end' ? r.right - w : side === 'mid' ? r.left + r.width / 2 - w / 2 : r.left, vw - M - w));
         const y = Math.max(M, Math.min(r.top, vh - M - hgt));
         sheet.classList.toggle('is-narrow', narrow);
+        sheet.classList.toggle('is-from-end', side === 'end');
+        sheet.dataset.from = side;
         sheet.style.setProperty('--bcv-list-w', `${Math.round(listW)}px`);
         return { x, y, w, h: hgt };
       }

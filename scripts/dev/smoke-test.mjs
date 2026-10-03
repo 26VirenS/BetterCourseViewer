@@ -611,6 +611,28 @@ try {
   await shot(page, '01b-dashboard-sheet');
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('.bcv-sheet'), null, { timeout: 3000 });
+  // (2.98.82) a counter's box hangs from where the counter stands in its row: the left one's top-left corner, the middle
+  // one's top centre, the right one's top-right — growing away from the row's edge; on the right its preview opens on the list's left
+  const anchored = [];
+  for (const nth of [1, 2, 3]) {
+    const c = await page.$eval(`.bcv-stats .bcv-stat:nth-child(${nth})`, (e) => { const r = e.getBoundingClientRect(); return { l: r.left, r: r.right, m: r.left + r.width / 2, t: r.top }; });
+    await page.click(`.bcv-stats .bcv-stat:nth-child(${nth})`);
+    await page.waitForSelector('.bcv-sheet', { timeout: 5000 });
+    await page.waitForTimeout(700);
+    const b = await page.$eval('.bcv-sheet', (e) => { const r = e.getBoundingClientRect(); return { l: r.left, r: r.right, m: r.left + r.width / 2, t: r.top, from: e.dataset.from }; });
+    let split = null;
+    if (nth === 3) {
+      await page.click('.bcv-sheet .bcv-sheet__row');
+      split = await eventually(async () => page.evaluate(() => { const sh = document.querySelector('.bcv-sheet'); const pv = sh.querySelector('.bcv-pv--in'); if (!pv || !sh.classList.contains('is-split')) return false; const a = pv.getBoundingClientRect(), l = sh.querySelector('.bcv-sheet__list').getBoundingClientRect(); return a.right <= l.left + 1; }), 4000);
+      split = split && Math.abs((await page.$eval('.bcv-sheet', (e) => e.getBoundingClientRect().right)) - c.r) < 3;
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(400);
+    }
+    anchored.push({ nth, from: b.from, edge: Math.round(b.from === 'start' ? b.l - c.l : b.from === 'end' ? b.r - c.r : b.m - c.m), top: Math.round(b.t - c.t), split });
+    await page.keyboard.press('Escape');
+    await page.waitForFunction(() => !document.querySelector('.bcv-sheet'), null, { timeout: 3000 });
+  }
+  check(anchored.map((a) => a.from).join() === 'start,mid,end' && anchored.every((a) => Math.abs(a.edge) <= 2 && Math.abs(a.top) <= 2) && anchored[2].split === true, `each counter's box hangs from where it stands — the left one's top-left, the middle one's top centre, the right one's top-right (its preview opening on the list's left, the box still ending at the counter's right): ${JSON.stringify(anchored)}`);
   await page.click('.bcv-stats .bcv-stat:nth-child(2)');
   await page.waitForSelector('.bcv-sheet', { timeout: 5000 });
   // the sheet lists exactly what the counter counted; naming one item here would break every Sunday,
@@ -680,7 +702,7 @@ try {
     return { w: Math.round(sheet.width), h: Math.round(sheet.height), pvRight: Math.round(pv.right), sheetRight: Math.round(sheet.right), pvLeft: Math.round(pv.left), listRight: Math.round(list.right), shifted: document.documentElement.classList.contains('bcv-preview'), hintShown: !!hint && getComputedStyle(hint).display !== 'none' };
   });
   const splitAt = await page.evaluate(() => { const r = document.querySelector('.bcv-sheet').getBoundingClientRect(); const l = document.querySelector('.bcv-sheet__list').getBoundingClientRect(); const p = document.querySelector('.bcv-pv--in').getBoundingClientRect(); return { x: Math.round(r.left), right: Math.round(r.right), listX: Math.round(l.left), listW: Math.round(l.width), pvW: Math.round(p.width) }; });
-  check(split.w > steady0.w + 300 && split.h === steady0.h && Math.abs(split.pvRight - split.sheetRight) <= 2 && split.pvLeft >= split.listRight - 2 && !split.shifted && splitAt.right <= steady0.vw - 15 && splitAt.x < steady0.x && Math.abs(splitAt.listX - splitAt.x) <= 2 && Math.abs(splitAt.listW - steady0.w) <= 2 && splitAt.pvW >= 420 && splitAt.pvW <= 560, `a row pressed widens the box to the right for a smaller preview, the box sliding left to fit and the list kept at its left, the page itself never moving: ${JSON.stringify({ ...split, ...splitAt, steady0 })}`);
+  check(split.w > steady0.w + 300 && split.h === steady0.h && Math.abs(split.pvLeft - splitAt.x) <= 2 && split.pvRight <= splitAt.listX + 2 && !split.shifted && Math.abs(splitAt.right - (steady0.x + steady0.w)) <= 2 && Math.abs(splitAt.listX - steady0.x) <= 2 && Math.abs(splitAt.listW - steady0.w) <= 2 && splitAt.pvW >= 420 && splitAt.pvW <= 560, `a row pressed in a counter at the right of its row widens the box to the left for a smaller preview — the box's right edge and the list where they were, the preview on the list's left — the page itself never moving: ${JSON.stringify({ ...split, ...splitAt, steady0 })}`);
   await shot(page, '01c-dashboard-preview');
   // pressing another row swaps what the panel shows, the sheet staying put
   await (await page.$$('.bcv-sheet__row'))[1].click();
@@ -1895,6 +1917,9 @@ try {
   // marked, the ring bends in where points were lost (Correctness, 4 of 6) and out where they were not (Work shown, 4 of 4)
   const bent = await eventually(async () => { const e = await ringEdges(page); return e[0].outer < 176 && e[1].outer > 184; }, 5000);
   check(bent, `the marked ring pulls in where points were lost and pushes out where they were not: ${JSON.stringify(await ringEdges(page))} (the circle's outer edge is 181)`);
+  // (2.98.82) marked, the ring turns from its own colours to its grades': green where the work did well, through orange, to red where it lost points — every slice's middle the colour of its mark
+  const graded = await page.evaluate(() => [...document.querySelectorAll('.bcv-rr__ring > g[data-k]')].sort((a, b) => a.dataset.k - b.dataset.k).map((g) => { const ps = g.querySelectorAll('path.bcv-rr__band'); const id = (ps[ps.length / 2].getAttribute('fill').match(/#([^)]+)/) || [])[1]; const c = document.getElementById(id).querySelector('stop').getAttribute('stop-color').match(/\d+/g).map(Number); return { r: c[0], g: c[1], b: c[2] }; }));
+  check(graded[0].r > graded[0].g + 80 && graded[1].g > graded[1].r + 80 && graded[1].g > graded[1].b + 60, `the marked ring wears its grades: Correctness (4 of 6) red-orange, Work shown (4 of 4) green: ${JSON.stringify(graded)}`);
   // the pointer on a slice swells it outward, smoothly, and it settles back when the pointer leaves
   const sliceMid = async (k) => page.evaluate((k) => { const r = document.querySelector('.bcv-rr__svg').getBoundingClientRect(); const s = r.width / 760; const g = document.querySelector(`.bcv-rr__ring > g[data-k="${k}"]`); const ps = g.querySelectorAll('path.bcv-rr__band'); const pts = ps[ps.length / 2].getAttribute('d').replace('Z', '').split(/[ML]/).filter(Boolean).map((q) => q.trim().split(/\s+/).map(Number)); const o = pts[0], i = pts[pts.length - 1]; return { x: r.left + ((o[0] + i[0]) / 2) * s, y: r.top + ((o[1] + i[1]) / 2) * s }; }, k);
   const restEdge = (await ringEdges(page))[1].outer;

@@ -39,9 +39,36 @@
     const k = (q) => (q + hue / 30) % 12, a = s * Math.min(l, 1 - l);
     return [0, 8, 4].map((q) => 255 * (l - a * Math.max(-1, Math.min(k(q) - 3, Math.min(9 - k(q), 1)))));
   }
+  function toHsl([r, g, b]) {
+    r /= 255; g /= 255; b /= 255;
+    const mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2, d = mx - mn;
+    if (!d) return [0, 0, l];
+    const hh = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+    return [(hh * 60 + 360) % 360, d / (1 - Math.abs(2 * l - 1)), l];
+  }
+  /** From one colour to another round the colour wheel, the short way: a turn that stays vivid (a straight
+   *  mix of two far-apart colours goes grey half-way). */
+  function turnTo(A, B, t) {
+    if (t <= 0) return A;
+    if (t >= 1) return B;
+    const a = toHsl(A), b = toHsl(B);
+    let dh = b[0] - a[0];
+    if (dh > 180) dh -= 360;
+    if (dh < -180) dh += 360;
+    return hsl((a[0] + dh * t + 360) % 360, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t);
+  }
   const pt = (r, a) => [CX + r * Math.sin(a), CY - r * Math.cos(a)];
   const ease = (x) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
   const plainLines = (s) => s.split(/\n+/).map((l) => l.replace(/^\s*[•\-*·]\s*/, '').trim()).filter(Boolean).join(' · ');
+
+  /** A criterion's mark as a colour: green where it did well, on through orange, to red where it lost the most —
+   *  a smooth run of hue, so the ring's colours still flow from one slice into the next. */
+  function gradeTone(fr) {
+    const x = clamp01(fr);
+    const hue = x >= 0.9 ? 140 : x >= 0.75 ? 32 + 108 * sm((x - 0.75) / 0.15) : x >= 0.55 ? 2 + 30 * sm((x - 0.55) / 0.2) : 2;
+    return hsl(hue, 0.78, 0.52);
+  }
+  const UNMARKED = [142, 142, 150]; // (a criterion not marked yet, in a marked ring: grey, not a grade)
 
   /** A short name for the ring: the whole name when it is short, else its first words. */
   function shortOf(name) {
@@ -96,6 +123,8 @@
     const earned = crit.reduce((n, c) => n + (c.score || 0), 0);
     const n = crit.length;
     const hues = crit.map((_, k) => (n <= PALETTE.length ? rgb(PALETTE[k]) : hsl((248 + (k * 360) / n) % 360, 0.78, 0.56)));
+    // marked and posted, each slice's colour becomes its grade's (the ring shifts to them as it bends to its marks)
+    const grades = graded ? crit.map((c) => (c.score === null ? UNMARKED : gradeTone(c.worth > 0 ? c.score / c.worth : 1))) : hues;
     // each slice's share of the circle: its points, with a sliver for a criterion worth nothing
     const weights = crit.map((c) => Math.max(0, c.worth));
     const total = weights.reduce((x, y) => x + y, 0);
@@ -113,7 +142,7 @@
     // a slice is thicker the more of the rubric it carries — growing inward, its outer edge on the circle
     const avg = sum / Math.max(1, n);
     const thick = shares.map((sh) => Math.max(5, Math.min(28, 10 * Math.pow(sh / Math.max(1e-9, avg), 1.5))));
-    return { crit, graded, posted, max, earned, hues, seg, bend, thick, n, held: !posted && Object.keys(assess).length > 0 };
+    return { crit, graded, posted, max, earned, hues, grades, seg, bend, thick, n, held: !posted && Object.keys(assess).length > 0 };
   }
 
   /** Where a criterion's levels sit on its bar: by points, the best at the top. */
@@ -142,6 +171,15 @@
     const { crit, hues, seg, n } = m;
     const reduce = U.reducedMotion();
     const hv = crit.map(() => 0); // how far each slice is swollen by the pointer (0 to 1)
+    /** A slice's colour this frame: its own, turning to its grade's (green, orange, red) as the ring bends to its
+     *  marks — the same tween, played on every open. toneEnd: where it settles (the chips, the bar's words, the little ring). */
+    let toneAt = -1, tones = hues;
+    const tone = (k) => {
+      if (!m.graded) return hues[k];
+      if (toneAt !== st.g) { toneAt = st.g; tones = hues.map((c, i) => turnTo(c, m.grades[i], st.g)); } // (once a frame)
+      return tones[k];
+    };
+    const toneEnd = (k) => m.grades[k];
     const st = { sel: 0, t: 0, g: reduce || !m.graded ? (m.graded ? 1 : 0) : 0, hov: -1, prev: -1, w: 1, BB: 500, BB0: 500 };
 
     // ---- the page around it: dimmed, blurred (more away from the ring), and the header over that
@@ -219,7 +257,7 @@
       const b = h('button', {
         type: 'button', class: 'bcv-rr__label', 'data-k': String(k), title: c.name,
         'aria-label': m.graded ? (c.score === null ? `${c.name}, not marked yet, worth ${pts(c.worth)}` : `${c.name}, ${pts(c.score)} of ${pts(c.worth)}`) : `${c.name}, worth ${pts(c.worth)} ${c.worth === 1 ? 'point' : 'points'}`,
-        style: { '--rr-c': css(hues[k]), fontSize: n > 15 ? '10.5px' : n > 10 ? '11px' : '12px' },
+        style: { '--rr-c': css(toneEnd(k)), fontSize: n > 15 ? '10.5px' : n > 10 ? '11px' : '12px' },
         onclick: () => select(k),
         onpointerenter: () => hover(k), onpointerleave: () => hover(-1),
         onfocus: (e) => { st.sel = k; if (e.target.matches(':focus-visible')) hover(k); else draw(); },
@@ -238,7 +276,7 @@
 
     // the bar's side: the way back (a little ring on top of the bar), its header (which criterion, its
     // description, the dots), its levels, the marker's note
-    const chips = crit.map((c, k) => h('button', { type: 'button', class: 'bcv-rr__chip', title: c.name, 'aria-label': `${c.name}, criterion ${k + 1} of ${n}`, style: { '--rr-c': css(hues[k]) }, onclick: () => select(k) }));
+    const chips = crit.map((c, k) => h('button', { type: 'button', class: 'bcv-rr__chip', title: c.name, 'aria-label': `${c.name}, criterion ${k + 1} of ${n}`, style: { '--rr-c': css(toneEnd(k)) }, onclick: () => select(k) }));
     // The way back is the bar's own end, carried on up a thread into the ring in miniature, the open
     // criterion's slice missing from it at the thread's top: the bar is that slice, pulled out. On the
     // pointer the slice fills back into its place and the little ring swells — what a press does to the real one.
@@ -249,7 +287,7 @@
     const arc = (a0, a1, cw = true) => `M${mpt(a0)} A${MR} ${MR} 0 ${Math.abs(a1 - a0) > Math.PI ? 1 : 0} ${cw ? 1 : 0} ${mpt(a1)}`;
     mk('circle', { class: 'bcv-rr__mtrack', r: String(MR) }, mini);
     const spin = mk('g', { class: 'bcv-rr__spin' }, mini);
-    const marcs = seg.map(([a0, a1], k) => mk('path', { class: 'bcv-rr__marc', stroke: hex(hues[k]), d: n === 1 ? `${arc(0, Math.PI)} ${arc(Math.PI, TAU).replace(/^M[^A]+/, '')}` : arc(a0 + MGAP / 2, a1 - MGAP / 2) }, spin));
+    const marcs = seg.map(([a0, a1], k) => mk('path', { class: 'bcv-rr__marc', stroke: hex(toneEnd(k)), d: n === 1 ? `${arc(0, Math.PI)} ${arc(Math.PI, TAU).replace(/^M[^A]+/, '')}` : arc(a0 + MGAP / 2, a1 - MGAP / 2) }, spin));
     const mfill = [0, 1].map(() => mk('path', { class: 'bcv-rr__mfill', pathLength: '1' }, spin));
     mk('path', { class: 'bcv-rr__mchev', d: 'M1.6 -5 L-3.4 0 L1.6 5' }, mini);
     let spun = 0; // (the little ring's turn so far, carried on so a switch turns it the short way)
@@ -275,8 +313,8 @@
     let rows = [], ticks = [], place = [];
     function fillBar(k, swap) {
       const c = crit[k];
-      ov.style.setProperty('--rr-sel', css(hues[k]));
-      const [r, g, b] = hues[k].map((v) => { const c = v / 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); });
+      ov.style.setProperty('--rr-sel', css(toneEnd(k)));
+      const [r, g, b] = toneEnd(k).map((v) => { const c = v / 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); });
       ov.style.setProperty('--rr-on', 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.3 ? '#1c1c1e' : '#fff'); // (dark words on a light colour: green and orange chips)
       count.textContent = `Criterion ${k + 1} of ${n} · ${labelOf(c)}`;
       name.textContent = c.name;
@@ -378,9 +416,9 @@
     function colourAt(k, v, ee, u) {
       const [a0, a1] = seg[k];
       const b = between(a0 + (a1 - a0) * v);
-      let col = mix(hues[b[0]], hues[b[1]], b[2]); // (the ring's own run of colour…)
+      let col = mix(tone(b[0]), tone(b[1]), b[2]); // (the ring's own run of colour, or its grades'…)
       // …becoming the bar's: its own colour, darker at the foot and lighter at the top
-      if (ee > 0) col = mix(col, v < 0.5 ? mix(hues[k], BLACK, 0.36 * (0.5 - v)) : mix(hues[k], WHITE, 0.44 * (v - 0.5)), ee);
+      if (ee > 0) { const own = tone(k); col = mix(col, v < 0.5 ? mix(own, BLACK, 0.36 * (0.5 - v)) : mix(own, WHITE, 0.44 * (v - 0.5)), ee); }
       if (ee > 0 && m.graded && v > crit[k].frac + 1e-6) col = mix(col, TRACK, 0.8 * u); // (the stretch above the mark was not earned)
       return col;
     }
@@ -433,6 +471,7 @@
       bands[k].forEach((pc, i) => drawPiece(pc, sample, colour, i / NB, (i + 1) / NB, (i + 1) / NB + eps, len / NB));
       const D = pt(R + go[k] + 22 + 9 * bump, mids[k]);
       setA(dots[k], 'cx', f(D[0])); setA(dots[k], 'cy', f(D[1]));
+      setA(dots[k], 'fill', css(tone(k)));
     }
     // the bar's top, where the thread to the little ring starts, and the little ring's foot
     const MINI = [BX, 56 + MR];
@@ -520,7 +559,7 @@
         top = sample(1);
         const D = pt(R + go[k] + 22 + 9 * bump, mids[k] + rot);
         setA(moveDot, 'cx', f(D[0])); setA(moveDot, 'cy', f(D[1]));
-        setA(moveDot, 'r', '4.5'); setA(moveDot, 'fill', css(hues[k])); setA(moveDot, 'opacity', dotA);
+        setA(moveDot, 'r', '4.5'); setA(moveDot, 'fill', css(tone(k))); setA(moveDot, 'opacity', dotA);
       }
       setA(moveG, 'display', moving ? 'inline' : 'none');
       // the labels ride round with their slices and fade as the ring goes
@@ -568,7 +607,7 @@
         setA(stem, 'x2', f(x2)); setA(stem, 'y2', f(y2));
         setA(stemGrad, 'x1', f(top[0])); setA(stemGrad, 'y1', f(top[1]));
         setA(stemGrad, 'x2', f(MINI[0])); setA(stemGrad, 'y2', f(MINI[1]));
-        const selC = st.w < 1 && st.prev >= 0 ? mix(hues[st.prev], hues[sel], st.w) : hues[sel];
+        const selC = st.w < 1 && st.prev >= 0 ? mix(tone(st.prev), tone(sel), st.w) : tone(sel);
         setA(stemStops[0], 'stop-color', css(colourOf(sel, 1, u, u)));
         setA(stemStops[1], 'stop-color', css(selC));
         setA(stem, 'opacity', f(grow));

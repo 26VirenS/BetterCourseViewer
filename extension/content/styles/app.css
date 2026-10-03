@@ -14,7 +14,7 @@
 
 html[data-bcv-theme] {
   --bcv-line: max(1px, var(--bcv-dpx, 1px)); /* a hairline drawn as a shadow: one CSS pixel, or one screen pixel where that is more (below 100% zoom; content/early.js keeps --bcv-dpx) */
-  --bcv-version: "2.98.81"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.98.82"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -764,6 +764,11 @@ body:has(> .bcv-sheet-ov--card:not(.is-folding)) .bcv-stat.is-lifted { visibilit
 .bcv-sheet--card.is-split.is-narrow { grid-template-columns: minmax(0, 1fr); }
 .bcv-sheet--card.is-split.is-narrow > .bcv-sheet__list { display: none; }
 .bcv-sheet--card.is-split.is-narrow > .bcv-pv--in { grid-column: 1; grid-row: 2; border-left: 0; }
+/* (2.98.82) a counter at the right of its row opens from its top-right corner and grows left: its preview opens on the
+   left of the list, the list keeping its place under the counter */
+.bcv-sheet--card.is-split.is-from-end:not(.is-narrow) { grid-template-columns: minmax(0, 1fr) var(--bcv-list-w, 380px); }
+.bcv-sheet--card.is-split.is-from-end:not(.is-narrow) > :is(.bcv-sheet__head, .bcv-sheet__list) { grid-column: 2; }
+.bcv-sheet--card.is-split.is-from-end:not(.is-narrow) > .bcv-pv--in { grid-column: 1; border-left: 0; border-right: 1px solid var(--bcv-sep); }
 .bcv-sheet--card .bcv-sheet__row, .bcv-sheet--card .bcv-sheet__qrow { display: grid; grid-template-columns: 9px minmax(0, 1fr); column-gap: 12px; row-gap: 7px; align-items: start; padding: 12px 18px; }
 .bcv-sheet--card .bcv-sheet__dot { margin-top: 6px; }
 .bcv-sheet--card .bcv-sheet__course { grid-column: 2; justify-self: start; max-width: 100%; }
