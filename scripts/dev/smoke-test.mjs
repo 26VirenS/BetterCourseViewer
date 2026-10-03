@@ -1858,16 +1858,47 @@ try {
   check(nextOpened, `Next opens the next assignment: ${(await texts('.bcv-detail__title'))[0]}`);
   await page.goto(`${BASE}/courses/104/assignments/4001`); // the rubric checks below read this page
   await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
-  check(!(await page.$('.bcv-rubg')) && (await texts('.bcv-detail__actions .bcv-rubbtn'))[0] === 'Rubric', 'the rubric keeps its own button, and is not on the page until it is asked for');
+  check(!(await page.$('.bcv-rr-ov, .bcv-rubg')) && (await texts('.bcv-detail__actions .bcv-rubbtn'))[0] === 'Rubric', 'the rubric keeps its own button, and is not on the page until it is asked for');
   await page.click('.bcv-detail__actions .bcv-rubbtn');
-  await page.waitForSelector('.bcv-sheet--rub .bcv-rubg__row', { timeout: 8000 });
-  // once a rubric is marked, the rating the work was given is the one filled in, with its score and note
-  const marked = await page.$eval('.bcv-sheet--rub .bcv-rubg__row', (e) => ({ got: e.querySelector('.bcv-rubg__cell.is-got')?.innerText.replace(/\s+/g, ' ').trim(), pts: e.querySelector('.bcv-rubg__ptsv')?.textContent, note: e.querySelector('.bcv-rubg__note')?.textContent, cells: e.querySelectorAll('.bcv-rubg__cell').length }));
-  check(/^3 Partial/.test(marked.got || '') && marked.pts === '4 / 6' && marked.cells === 3 && /Sign error in part b\./.test(marked.note || ''), `a marked criterion rings the level it was given, and carries its score and the marker's note: ${JSON.stringify(marked)}`);
-  const rubHead = { desc: await page.$eval('.bcv-sheet--rub .bcv-sheet__desc', (e) => e.textContent), badge: await page.$eval('.bcv-rubg__badge', (e) => e.innerText.replace(/\s+/g, ' ').trim()) };
-  check(rubHead.desc === 'Marked 8 / 10 · 2 criteria' && rubHead.badge === '10 PTS', `the sheet heads with the rubric's own total and what it gave: ${JSON.stringify(rubHead)}`);
+  await page.waitForSelector('.bcv-rr-ov .bcv-rr__label', { timeout: 8000 });
+  // the rubric is the ring itself, over the page: no card round it — the page dims, a little blur right
+  // behind the ring and more around it; one slice per criterion, named for a screen reader, the score in the middle
+  const ringOpen = await page.evaluate(() => {
+    const html = document.documentElement, nb = html.classList.contains('bcv-noblur');
+    html.classList.remove('bcv-noblur');
+    const cs = (sel) => getComputedStyle(document.querySelector(sel));
+    const blur = (sel) => cs(sel).backdropFilter || cs(sel).webkitBackdropFilter || '';
+    const out = { card: !!document.querySelector('.bcv-rr-ov .bcv-sheet'), dialog: document.querySelector('.bcv-rr-ov').getAttribute('aria-modal'), soft: blur('.bcv-rr__veil--soft'), deep: blur('.bcv-rr__veil--deep'), hole: /radial-gradient/.test(cs('.bcv-rr__veil--deep').maskImage || cs('.bcv-rr__veil--deep').webkitMaskImage || ''), dim: /radial-gradient/.test(cs('.bcv-rr__veil--dim').backgroundImage),
+      labels: [...document.querySelectorAll('.bcv-rr__label')].map((b) => b.getAttribute('aria-label')).join(' | '), shown: [...document.querySelectorAll('.bcv-rr__label')].map((b) => b.innerText.replace(/\s+/g, ' ')).join(' | '),
+      centre: document.querySelector('.bcv-rr__centre').innerText.replace(/\s+/g, ' ').trim(), status: document.querySelector('.bcv-rr__status').textContent, title: document.querySelector('.bcv-rr__title').textContent };
+    if (nb) html.classList.add('bcv-noblur');
+    return out;
+  });
+  check(!ringOpen.card && ringOpen.dialog === 'true' && /blur\(4px\)/.test(ringOpen.soft) && /blur\(18px\)/.test(ringOpen.deep) && ringOpen.hole && ringOpen.dim, `the rubric opens as the ring alone over the page — no card — with the page dimmed, a light blur behind the ring and a heavier one around it: ${JSON.stringify(ringOpen)}`);
+  check(ringOpen.labels === 'Correctness, 4 of 6 | Work shown, 4 of 4' && ringOpen.shown === 'Correctness 4 / 6 | Work shown 4 / 4' && /^Score 8 of 10 · 80%/i.test(ringOpen.centre) && /^Graded \w{3} \d{1,2} · 2 criteria$/.test(ringOpen.status) && ringOpen.title === 'Week 1 reflection', `a slice per criterion, each a button named with its score, the rubric's own total in the middle: ${JSON.stringify(ringOpen)}`);
+  // marked, the ring bends in where points were lost (Correctness, 4 of 6) and out where they were not (Work shown, 4 of 4)
+  const radiusAt = () => page.evaluate(() => [...document.querySelectorAll('.bcv-rr__ring > path')].map((p) => { const pts = p.getAttribute('d').split(/[ML]/).filter(Boolean).map((q) => q.trim().split(/\s+/).map(Number)); const m = pts[Math.floor(pts.length / 2)]; return Math.round(Math.hypot(m[0] - 380, m[1] - 280) * 10) / 10; }));
+  const bent = await page.waitForFunction(() => { const ps = [...document.querySelectorAll('.bcv-rr__ring > path')]; const r = ps.map((p) => { const pts = p.getAttribute('d').split(/[ML]/).filter(Boolean).map((q) => q.trim().split(/\s+/).map(Number)); const m = pts[Math.floor(pts.length / 2)]; return Math.hypot(m[0] - 380, m[1] - 280); }); return r[0] < 171 && r[1] > 179; }, null, { timeout: 5000 }).then(() => true).catch(() => false);
+  check(bent, `the marked ring pulls in where points were lost and pushes out where they were not: radii ${JSON.stringify(await radiusAt())} (the circle is 176)`);
+  await shot(page, '14r-rubric-ring');
+  // a press on a slice — the drawing, not only its label — unrolls it into a bar with every level beside it
+  const sliceAt = await page.evaluate(() => { const r = document.querySelector('.bcv-rr__svg').getBoundingClientRect(); const s = r.width / 760; const a = (0.6 * 2 * Math.PI) / 2; return { x: r.left + (380 + 176 * Math.sin(a)) * s, y: r.top + (280 - 176 * Math.cos(a)) * s }; });
+  await page.mouse.click(sliceAt.x, sliceAt.y);
+  const barOut = await page.waitForFunction(() => document.querySelector('.bcv-rr-ov')?.dataset.state === 'bar', null, { timeout: 5000 }).then(() => true).catch(() => false);
+  const bar = await page.evaluate(() => ({ rows: [...document.querySelectorAll('.bcv-rr__row:not(.is-out)')].map((r) => r.innerText.replace(/\s+/g, ' ').trim()), picked: [...document.querySelectorAll('.bcv-rr__row:not(.is-out).is-picked .bcv-rr__rlab')].map((e) => e.textContent), count: document.querySelector('.bcv-rr__count').textContent, name: document.querySelector('.bcv-rr__name').textContent, note: document.querySelector('.bcv-rr__note:not([hidden])')?.innerText.trim(), ticks: document.querySelectorAll('.bcv-rr__ticks circle').length, tickPicked: document.querySelectorAll('.bcv-rr__ticks circle.is-picked').length, focus: document.activeElement?.className, labelsInert: !!document.querySelector('.bcv-rr__labels').inert }));
+  check(barOut && bar.rows.join(' | ') === '6 Full marks | 3 Partial Your mark | 0 No marks' && bar.picked.join() === 'Partial' && bar.count === 'Criterion 1 of 2 · 4 / 6' && bar.name === 'Correctness' && bar.note === 'Sign error in part b.' && bar.ticks === 3 && bar.tickPicked === 1 && bar.focus === 'bcv-rr__name' && bar.labelsInert, `the slice unrolls into its bar: every level at its points, the one given marked, the marker's note under it, focus on its name: ${JSON.stringify({ barOut, ...bar })}`);
+  await shot(page, '14r2-rubric-bar');
+  // the dots switch criteria in place, without going back round the ring
+  await page.click('.bcv-rr__chip:nth-child(2)');
+  const switched = await page.evaluate(() => ({ state: document.querySelector('.bcv-rr-ov').dataset.state, name: document.querySelector('.bcv-rr__name').textContent, picked: [...document.querySelectorAll('.bcv-rr__row:not(.is-out).is-picked .bcv-rr__rlab')].map((e) => e.textContent).join(), note: !!document.querySelector('.bcv-rr__note:not([hidden])'), on: document.querySelector('.bcv-rr__chip.is-on')?.getAttribute('aria-label') }));
+  check(switched.state === 'bar' && switched.name === 'Work shown' && switched.picked === 'Full marks' && !switched.note && switched.on === 'Work shown, criterion 2 of 2', `a dot switches to the next criterion along the bar, never back through the ring: ${JSON.stringify(switched)}`);
+  // Escape rolls the bar back into the ring (focus on that criterion's label), and a second one closes it, focus back on the button
   await page.keyboard.press('Escape');
-  await page.waitForFunction(() => !document.querySelector('.bcv-sheet--rub'), null, { timeout: 5000 });
+  const backRound = await page.waitForFunction(() => document.querySelector('.bcv-rr-ov')?.dataset.state === 'ring' && document.activeElement?.dataset?.k === '1', null, { timeout: 5000 }).then(() => true).catch(() => false);
+  check(backRound, `Escape rolls the bar back up into the ring, focus on the criterion it was showing (${await page.evaluate(() => `${document.querySelector('.bcv-rr-ov')?.dataset.state} / ${document.activeElement?.className}`)})`);
+  await page.keyboard.press('Escape');
+  const ringGone = await page.waitForFunction(() => !document.querySelector('.bcv-rr-ov'), null, { timeout: 5000 }).then(() => true).catch(() => false);
+  check(ringGone && await page.evaluate(() => document.activeElement?.classList.contains('bcv-rubbtn')), 'a second Escape closes the ring, and focus goes back to the Rubric button');
   await page.goto(`${BASE}/courses/104/assignments/4002`);
   await page.waitForSelector('.bcv-detail__actions .bcv-btn--primary', { timeout: 10000 });
   check((await texts('.bcv-detail__actions .bcv-btn--primary'))[0] === 'Submit assignment', 'the assignment page offers our own submit flow');
@@ -2184,31 +2215,36 @@ try {
   for (const r of dis01) if (/Dis01/.test(await r.textContent())) { await r.click(); break; }
   await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
   check((await texts('.bcv-detail__title'))[0] === 'Dis01' && (await texts('.bcv-detail__meta'))[0].includes('Points 10'), 'assignment detail loads');
-  // the rubric is a popup opened from the button beside Submit assignment, not a card down the page
-  check((await texts('.bcv-detail__actions .bcv-rubbtn'))[0] === 'Rubric' && !(await page.$('.bcv-rubg')), 'the rubric is a press away from Submit assignment, not spent on the page');
+  // the rubric is the ring, a press away from Submit assignment, not a card down the page
+  check((await texts('.bcv-detail__actions .bcv-rubbtn'))[0] === 'Rubric' && !(await page.$('.bcv-rr-ov, .bcv-rubg')), 'the rubric is a press away from Submit assignment, not spent on the page');
   await page.click('.bcv-detail__actions .bcv-rubbtn');
-  await page.waitForSelector('.bcv-sheet--rub .bcv-rubg__row', { timeout: 8000 });
-  check((await page.$$('.bcv-sheet--rub .bcv-rubg__row')).length === 2, 'the rubric opens as a grid, one row per criterion');
-  // the levels are columns, headed once, and coloured by what they are worth rather than by position
-  const head = await page.$$eval('.bcv-rubg__head .bcv-rubg__h', (els) => els.map((e) => `${e.textContent}:${(e.className.match(/--(\w+)/) || [, 'plain'])[1]}`));
-  check(head.join(' | ') === 'Criterion:plain | Full marks:full | Partial:part | No marks:none', `the levels head the columns once, best to nothing: ${head.join(' | ')}`);
-  const cells = await page.$eval('.bcv-rubg__row', (row) => [...row.querySelectorAll('.bcv-rubg__cell')].map((e) => `${e.querySelector('.bcv-rubg__cellpts').textContent}/${e.querySelector('.bcv-rubg__celltext').textContent}/${(e.className.match(/cell--(\w+)/) || [, '?'])[1]}`));
-  check(cells.join(' | ') === '6/Full marks/full | 3/Partial/part | 0/No marks/none' && !(await page.$('.bcv-rubg__cell.is-got')), `every level is a cell with what it is worth, and none is marked on an ungraded assignment: ${cells.join(' | ')}`);
-  // a criterion is Canvas rich text: its own bullets and line breaks are drawn, not printed as markup
-  const crit = await page.$eval('.bcv-sheet--rub .bcv-rubg__row', (e) => ({ long: e.querySelector('.bcv-rubg__desc')?.innerText || '', brs: e.querySelectorAll('.bcv-rubg__desc br').length, raw: e.textContent }));
-  check(crit.brs === 2 && /Every answer is correct/.test(crit.long) && /Units on each one/.test(crit.long) && !/&lt;|<br/.test(crit.raw), `a criterion written as rich text reads as written, its markup never as text: ${JSON.stringify(crit)}`);
-  // and one too long for its card is clamped, with a button that appears only where it is needed
-  const clamp = await page.evaluate(() => {
-    const rows = [...document.querySelectorAll('.bcv-rubg__row')];
-    const at = (i) => { const d = rows[i].querySelector('.bcv-rubg__desc'); const b = rows[i].querySelector('.bcv-rubg__more'); return { cut: d.scrollHeight > d.clientHeight + 1, btn: !!b && !b.hidden }; };
-    return { long: at(0), short: at(1) };
-  });
-  check(clamp.long.cut && clamp.long.btn && !clamp.short.cut && !clamp.short.btn, `a long criterion is clamped and offers More; a short one is left alone: ${JSON.stringify(clamp)}`);
-  await page.click('.bcv-rubg__more');
-  const opened = await page.$eval('.bcv-rubg__row', (e) => ({ open: e.querySelector('.bcv-rubg__desc').classList.contains('is-open'), label: e.querySelector('.bcv-rubg__more').textContent, shows: e.querySelector('.bcv-rubg__desc').scrollHeight <= e.querySelector('.bcv-rubg__desc').clientHeight + 1 }));
-  check(opened.open && opened.label === 'Less' && opened.shows, `More shows the rest of it and becomes Less: ${JSON.stringify(opened)}`);
-  await page.keyboard.press('Escape');
-  await page.waitForFunction(() => !document.querySelector('.bcv-sheet--rub'), null, { timeout: 5000 });
+  await page.waitForSelector('.bcv-rr-ov .bcv-rr__label', { timeout: 8000 });
+  await page.waitForTimeout(150);
+  // before grading: a clean circle, each colour's stretch its share of the points, nothing marked
+  const plainRing = await page.evaluate(() => ({ labels: [...document.querySelectorAll('.bcv-rr__label')].map((b) => b.getAttribute('aria-label')).join(' | '), centre: document.querySelector('.bcv-rr__centre').innerText.replace(/\s+/g, ' ').trim(), status: document.querySelector('.bcv-rr__status').textContent, mine: !!document.querySelector('.bcv-rr__mine'), radii: [...document.querySelectorAll('.bcv-rr__ring > path')].map((p) => { const pts = p.getAttribute('d').split(/[ML]/).filter(Boolean).map((q) => q.trim().split(/\s+/).map(Number)); const m = pts[Math.floor(pts.length / 2)]; return Math.round(Math.hypot(m[0] - 380, m[1] - 280)); }) }));
+  check(plainRing.labels === 'Correctness, worth 6 points | Work shown, worth 4 points' && /^Total 10 points/i.test(plainRing.centre) && plainRing.status === '2 criteria · not graded yet' && !plainRing.mine && plainRing.radii.every((r) => r === 176), `an ungraded rubric is a clean circle, each slice named with what it is worth, the total in the middle: ${JSON.stringify(plainRing)}`);
+  // the keyboard: the arrows walk the slices' labels, Enter opens one
+  await page.keyboard.press('ArrowRight');
+  const walked = await page.evaluate(() => document.activeElement?.getAttribute('aria-label'));
+  await page.keyboard.press('Enter');
+  const keyBar = await page.waitForFunction(() => document.querySelector('.bcv-rr-ov')?.dataset.state === 'bar', null, { timeout: 5000 }).then(() => true).catch(() => false);
+  const plainBar = await page.evaluate(() => ({ name: document.querySelector('.bcv-rr__name').textContent, rows: [...document.querySelectorAll('.bcv-rr__row:not(.is-out)')].map((r) => r.innerText.replace(/\s+/g, ' ').trim()).join(' | '), picked: document.querySelectorAll('.bcv-rr__row.is-picked, .bcv-rr__ticks .is-picked').length, more: !document.querySelector('.bcv-rr__more').hidden }));
+  check(walked === 'Work shown, worth 4 points' && keyBar && plainBar.name === 'Work shown' && plainBar.rows === '4 Full marks | 2 Partial | 0 No marks' && !plainBar.picked && !plainBar.more, `→ moves to the next slice and Enter opens it: every level at its points, none marked before grading: ${JSON.stringify({ walked, keyBar, ...plainBar })}`);
+  // a criterion is Canvas rich text: its bullets and line breaks read as words, never as markup — clamped, with More where it does not fit
+  await page.click('.bcv-rr__chip:nth-child(1)');
+  await page.waitForTimeout(80);
+  const richDesc = await page.evaluate(() => { const d = document.querySelector('.bcv-rr__desc'); return { text: d.textContent, cut: d.scrollHeight > d.clientHeight + 1, more: !document.querySelector('.bcv-rr__more').hidden }; });
+  check(/^Every answer is correct · Units on each one · Working shown for every step/.test(richDesc.text) && !/&lt;|<br|•/.test(richDesc.text) && richDesc.cut && richDesc.more, `a criterion written as rich text reads as written, clamped with More: ${JSON.stringify(richDesc)}`);
+  await page.click('.bcv-rr__more');
+  const descOpen = await page.evaluate(() => { const d = document.querySelector('.bcv-rr__desc'); return { open: d.classList.contains('is-open'), label: document.querySelector('.bcv-rr__more').textContent, shows: d.scrollHeight <= d.clientHeight + 1 }; });
+  check(descOpen.open && descOpen.label === 'Less' && descOpen.shows, `More shows the rest of it and becomes Less: ${JSON.stringify(descOpen)}`);
+  // a press beside the bar rolls it back up; one beside the ring closes it
+  const vp = page.viewportSize();
+  await page.mouse.click(vp.width - 24, Math.round(vp.height / 2));
+  const besideBar = await page.waitForFunction(() => document.querySelector('.bcv-rr-ov')?.dataset.state === 'ring', null, { timeout: 5000 }).then(() => true).catch(() => false);
+  await page.mouse.click(vp.width - 24, Math.round(vp.height / 2));
+  const besideRing = await page.waitForFunction(() => !document.querySelector('.bcv-rr-ov'), null, { timeout: 5000 }).then(() => true).catch(() => false);
+  check(besideBar && besideRing, `a press beside the bar rolls it back into the ring, and one beside the ring closes it (${besideBar}/${besideRing})`);
   check((await texts('.bcv-btn--primary'))[0] === 'Submit assignment', 'submit button opens our own submission flow');
   await shot(page, '14-assignment');
 

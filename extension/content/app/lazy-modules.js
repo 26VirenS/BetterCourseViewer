@@ -28,4 +28,5 @@ self.BCV_LAZY_MODULES = {
   setup: { needs: ['setupcss'], files: ['content/app/personalize.js', 'content/app/setup.js'] },
   notes: { needs: ['setupcss'], files: ['content/app/whatsnew-notes.js'] },
   phone: { files: ['content/app/phone.js'] },
+  rubric: { files: ['content/app/rubric-ring.js'] }, // the rubric ring (desktop): loaded when a rubric is opened
 };

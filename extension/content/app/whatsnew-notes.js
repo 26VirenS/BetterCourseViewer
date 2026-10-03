@@ -25,6 +25,11 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.98.76', date: '2026-10-03', notes: [
+      { kind: 'new', title: 'The rubric is a ring', body: 'Each criterion is a slice, sized by its points.', icon: P.sparkle },
+      { kind: 'new', title: 'Open a slice', body: 'It unrolls into a bar with every level beside it.', icon: P.steps },
+      { kind: 'improved', title: 'Focus on the ring', body: 'The page dims and blurs around it; no card.', icon: P.eye },
+    ] },
     { version: '2.98.75', date: '2026-10-03', notes: [
       { kind: 'fixed', title: 'Smooth card closing', body: 'A counter no longer vanishes as its box folds back.', icon: P.layers },
     ] },

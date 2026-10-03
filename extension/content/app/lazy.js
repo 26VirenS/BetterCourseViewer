@@ -1,6 +1,6 @@
 /* Code on demand. The parts of the interface most pages never touch — the guided setup with its
  * stylesheet and Personalize, the quiz flow, the hand-in block and the feedback screen, the tools'
- * own bodies, the What's New notes, the phone layout — used to be parsed on every Canvas page
+ * own bodies, the What's New notes, the phone layout, the rubric ring — used to be parsed on every Canvas page
  * (some seven hundred kilobytes of it, held in memory by every tab). Each is a stub here until it
  * is asked for; the first call loads the real module — the background lands its files in this
  * page's isolated world, the way the converter's libraries arrive — and hands over to it.
@@ -26,6 +26,7 @@
     quizsim: () => !!BCV.quizSim,
     submit: () => !!BCV.screens.submit && !BCV.screens.submit.__stub && !!BCV.screens.feedback && !BCV.screens.feedback.__stub,
     phone: () => !!BCV.phone,
+    rubric: () => !!BCV.rubricRing,
     notes: () => Array.isArray(self.BCV_WHATS_NEW),
     hub: () => !!BCV.hub,
     widgets: () => !!BCV.widgets,

@@ -272,10 +272,21 @@
     };
   }
 
-  /** The rubric grid as a sheet over the page — a bottom sheet on a phone, a dialog on the desktop.
-   *  One place it is drawn, however it was asked for: from the button beside Submit assignment, or
-   *  from See breakdown beside a grade. */
+  /** The rubric, however it was asked for (the button beside Submit assignment, See breakdown beside
+   *  a grade): on the desktop the ring (content/app/rubric-ring.js, loaded on the first press), on a
+   *  phone the grid as a bottom sheet. The grid as a dialog stays as the desktop's fallback, should
+   *  the ring not load. */
   function openRubric(a, sub) {
+    if (!BCV.phone?.active() && a?.rubric?.length) {
+      const from = document.activeElement;
+      const ring = () => BCV.rubricRing.open(a, sub, { from });
+      if (BCV.rubricRing) { ring(); return; }
+      BCV.lazy.load('rubric').then(ring).catch(() => rubricSheet(a, sub));
+      return;
+    }
+    rubricSheet(a, sub);
+  }
+  function rubricSheet(a, sub) {
     const assess = sub?.rubric_assessment || {};
     const title = a.rubric_settings?.title || 'Rubric';
     const score = rubricScore(a.rubric, assess);
