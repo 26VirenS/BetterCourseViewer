@@ -25,6 +25,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.98.74', date: '2026-10-03', notes: [
+      { kind: 'improved', title: 'Zoom photos out', body: 'Theme photos zoom out to half size, and still move.', icon: P.pic },
+    ] },
     { version: '2.98.73', date: '2026-10-03', notes: [
       { kind: 'new', title: 'Glass counter boxes', body: 'A Dashboard counter opens into the search’s glass.', icon: P.layers },
       { kind: 'improved', title: 'Card steps away', body: 'The counter hides behind its box while it is open.', icon: P.eye },

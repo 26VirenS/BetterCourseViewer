@@ -367,9 +367,11 @@
   // preview draw it the same way (app.css, setup-css.js: the pin as the background's position and
   // the zoom a scale about it).
   const PLACE_DEFAULT = (key) => (key === 'side' ? { x: 50, y: 100, z: 1 } : String(key).startsWith('head') ? { x: 100, y: 50, z: 1 } : { x: 100, y: 100, z: 1 });
+  // (2.98.74) a photo zooms out to half its place's fill (the rest of the place its own ground round it) and in to three times
+  const ZOOM_MIN = 0.5, ZOOM_MAX = 3;
   const numIn = (v, lo, hi, d) => { const n = Number(v); return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : d; };
   /** Where the photo at `key` sits: the kept place, clamped, or the place's default. */
-  const placeOf = (images, key) => { const d = PLACE_DEFAULT(key); const p = images?.place?.[key]; return p && typeof p === 'object' ? { x: numIn(p.x, 0, 100, d.x), y: numIn(p.y, 0, 100, d.y), z: numIn(p.z, 1, 3, 1) } : d; };
+  const placeOf = (images, key) => { const d = PLACE_DEFAULT(key); const p = images?.place?.[key]; return p && typeof p === 'object' ? { x: numIn(p.x, 0, 100, d.x), y: numIn(p.y, 0, 100, d.y), z: numIn(p.z, ZOOM_MIN, ZOOM_MAX, 1) } : d; };
   const isDefaultPlace = (key, p) => { const d = PLACE_DEFAULT(key); return !p || (Math.abs(Number(p.x) - d.x) < 0.05 && Math.abs(Number(p.y) - d.y) < 0.05 && Math.abs(Number(p.z) - 1) < 0.005); };
   const roundPlace = (p) => ({ x: Math.round(p.x * 10) / 10, y: Math.round(p.y * 10) / 10, z: Math.round(p.z * 100) / 100 });
   /** The style variables a photo's layers read for its place (app.css --bcv-pic-x/-y/-z; the preview's --pic-x/-y/-z). */
@@ -673,7 +675,7 @@
 
   BCV.theme = {
     hexToRgb, rgbToHex, rgbToHsl, hslToRgb, hslToHex, luminance, contrast, normalize,
-    GROUND, MIN_SAT, ICON_RATIO, PRESETS, REGULAR, SCENE_VARIANTS, SCENE_PLACES: PLACES, sceneUrl, sceneNameOf, sceneParts, sceneBaseOf, CARD_SLOTS, HEADER_SLOTS, IMAGES_KEY, PLACE_DEFAULT, placeOf, placeVars, isDefaultPlace,
+    GROUND, MIN_SAT, ICON_RATIO, PRESETS, REGULAR, SCENE_VARIANTS, SCENE_PLACES: PLACES, sceneUrl, sceneNameOf, sceneParts, sceneBaseOf, CARD_SLOTS, HEADER_SLOTS, IMAGES_KEY, PLACE_DEFAULT, placeOf, placeVars, isDefaultPlace, ZOOM_MIN, ZOOM_MAX,
     palette, shades, shadeSet, cssVars, apply, readable, readableOn, fillFor, mix, tint, customHex, controlsOf, veilBase, picCss, band, nearest,
     readImage, imageTone, fillTones, loadImages, ensureAssets, saveImages, emptyImages, packImages, picOf, rawOf, CAST, INK_LIFT, inkOn, SCENE_INK, sceneInkOn, inkFor, inkCached,
     blurDrawn, checkBlur, BLUR_KEY,

@@ -464,7 +464,8 @@
         const dx = ev.clientX - x0, dy = ev.clientY - y0;
         if (!moved && Math.hypot(dx, dy) < 3) return;
         if (!moved) { moved = true; el.classList.add('is-dragging', 'is-target'); try { el.setPointerCapture(e.pointerId); } catch { /* not held */ } }
-        last = { x: cw - r.width > 0.5 ? clampN(p0.x - (dx * 100) / (cw - r.width), 0, 100) : p0.x, y: ch - r.height > 0.5 ? clampN(p0.y - (dy * 100) / (ch - r.height), 0, 100) : p0.y, z: p0.z };
+        // (larger than its place, the picture's pin runs against the drag; zoomed out smaller than it, with it — between the place's edges)
+        last = { x: Math.abs(cw - r.width) > 0.5 ? clampN(p0.x - (dx * 100) / (cw - r.width), 0, 100) : p0.x, y: Math.abs(ch - r.height) > 0.5 ? clampN(p0.y - (dy * 100) / (ch - r.height), 0, 100) : p0.y, z: p0.z };
         placeVarsOn(el, last);
       };
       const up = () => {
@@ -478,7 +479,7 @@
       };
       el.addEventListener('pointermove', move); el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
     });
-    el.addEventListener('wheel', (e) => { if (!(e.ctrlKey || e.metaKey)) return; e.preventDefault(); const p = placeAt(key); applyPlace(key, { ...p, z: clampN(p.z * Math.exp(-e.deltaY * 0.01), 1, 3) }); }, { passive: false });
+    el.addEventListener('wheel', (e) => { if (!(e.ctrlKey || e.metaKey)) return; e.preventDefault(); const p = placeAt(key); applyPlace(key, { ...p, z: clampN(p.z * Math.exp(-e.deltaY * 0.01), T().ZOOM_MIN, T().ZOOM_MAX) }); }, { passive: false });
   }
   /** A picture dragged from the desktop onto a part of the preview goes on it: the parts that take one are outlined while it is carried over them. */
   function armDrop(pv) {
@@ -598,7 +599,7 @@
       h('button', { type: 'button', class: 'pz__barok', title: 'Done', 'aria-label': 'Done', onclick: () => { st.target = null; render(); } }, svg(IC.check, { size: 13, width: 2.8 })),
       photoAt(key) ? h('div', { class: 'pz__placerow', id: 'pzPlace' }, [
         h('span', { class: 'pz__placehint' }, [svg(IC.move, { size: 12, width: 2 }), h('span', { text: 'Drag the photo on the preview to move it' })]),
-        h('label', { class: 'pz__zoom' }, [svg(IC.zoom, { size: 12, width: 2 }), h('span', { text: 'Zoom' }), h('input', { type: 'range', id: 'pzZoom', min: '1', max: '3', step: '0.01', value: String(placeAt(key).z), 'aria-label': 'Zoom', oninput: (e) => applyPlace(key, { ...placeAt(key), z: clampN(Number(e.target.value) || 1, 1, 3) }) })]),
+        h('label', { class: 'pz__zoom' }, [svg(IC.zoom, { size: 12, width: 2 }), h('span', { text: 'Zoom' }), h('input', { type: 'range', id: 'pzZoom', min: String(T().ZOOM_MIN), max: String(T().ZOOM_MAX), step: '0.01', value: String(placeAt(key).z), 'aria-label': 'Zoom', oninput: (e) => applyPlace(key, { ...placeAt(key), z: clampN(Number(e.target.value) || 1, T().ZOOM_MIN, T().ZOOM_MAX) }) })]),
         h('button', { type: 'button', class: 'pz__textbtn', id: 'pzPlaceReset', disabled: T().isDefaultPlace(placeKey(key), placeAt(key)) || null, text: 'Reset', onclick: () => applyPlace(key, null) }),
       ]) : null,
     ]);

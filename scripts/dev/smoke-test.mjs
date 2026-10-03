@@ -4753,6 +4753,19 @@ try {
   await page.click(pz('#pzPlaceReset'));
   const resetP = await placeNow();
   check(resetP.x === '100%' && resetP.y === '100%' && resetP.z === '1' && (await page.$eval(pz('#pzPlaceReset'), (b) => b.disabled)) && (await page.$eval(pz('#pzZoom'), (i) => i.value)) === '1', `Reset puts it back at its corner, Zoom at 1: ${JSON.stringify(resetP)}`);
+  // (2.98.74) zoomed out to half: the slider goes down to 0.5, the photo drawn at half its fill about its pin (the corner),
+  // the place's own ground round it — and still moved by a drag, which slides it between the place's edges, the same way
+  const zoomRange = await page.$eval(pz('#pzZoom'), (i) => `${i.min}-${i.max}`);
+  await page.$eval(pz('#pzZoom'), (i) => { i.value = '0.4'; i.dispatchEvent(new Event('input', { bubbles: true })); });
+  const half = await placeNow();
+  check(zoomRange === '0.5-3' && half.z === '0.5' && half.x === '100%' && /^matrix\(0\.5, 0, 0, 0\.5, /.test(half.tf), `Zoom goes out to half (0.5–3; asked for less, it stops at half), the photo drawn at half about its corner: ${JSON.stringify({ zoomRange, ...half })}`);
+  await shot(page, '32e2b-personalize-zoom-half');
+  await page.mouse.move(todayBox.x, todayBox.y); await page.mouse.down(); await page.mouse.move(todayBox.x - 30, todayBox.y - 10, { steps: 8 }); await page.mouse.up();
+  await page.waitForSelector(pz('#pzPlace'), { timeout: 5000 });
+  const halfMoved = await placeNow();
+  check(parseFloat(halfMoved.x) < 100 && parseFloat(halfMoved.y) < 100 && halfMoved.z === '0.5', `zoomed out, a drag left and up moves the smaller photo left and up with it: ${JSON.stringify(halfMoved)}`);
+  check(THEME.placeOf({ place: { today: { x: 40, y: 60, z: 0.5 } } }, 'today').z === 0.5 && THEME.placeOf({ place: { today: { x: 40, y: 60, z: 0.2 } } }, 'today').z === 0.5 && THEME.placeOf({ place: { today: { x: 40, y: 60, z: 9 } } }, 'today').z === 3, 'the page draws a kept zoom of half as half, and holds any other between half and three times');
+  await page.click(pz('#pzPlaceReset'));
   await page.$eval(pz('#pzZoom'), (i) => { i.value = '1.4'; i.dispatchEvent(new Event('input', { bubbles: true })); });
   await page.mouse.move(todayBox.x, todayBox.y); await page.mouse.down(); await page.mouse.move(todayBox.x, todayBox.y + 8, { steps: 6 }); await page.mouse.up();
   await page.waitForSelector(pz('#pzPlace'), { timeout: 5000 });
