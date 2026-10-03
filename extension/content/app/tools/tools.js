@@ -322,7 +322,7 @@
       U.toast(focus.ended === 'focus' ? `Focus session done. ${PHASES[focus.phase]} started.` : 'Break over. Press Start when you are back.');
     }
     for (const fn of painters) { try { fn(focus); } catch { painters.delete(fn); } }
-    const want = painters.size > 0 && (focus.endAt || false);
+    const want = painters.size > 0 && !!focus.endAt && !document.hidden; // (not while the tab is hidden: shown again, it reads the timer afresh)
     if (want && !ticker) ticker = setInterval(paintAll, 1000);
     if (!want && ticker) { clearInterval(ticker); ticker = 0; }
   }
@@ -338,7 +338,7 @@
       if (changes[FOCUS_KEY]) focusLoad().then(paintAll).catch(() => {});
     });
   } catch { /* no change events (the app): the next load reads it */ }
-  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && focusRead) focusLoad().then(paintAll).catch(() => {}); });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState !== 'visible') paintAll(); else if (focusRead) focusLoad().then(paintAll).catch(() => {}); else paintAll(); });
 
   // ---- the top right: the pins beside the look switch, and the timer's pin as its live activity --
   // The look switch stands alone (content/app/app.js mounts it); the tray with the pins sits to its

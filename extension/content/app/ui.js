@@ -439,12 +439,15 @@
    *  its own or the page's size changing, something around it (not inside it) drawn or restyled, an
    *  animation or a transition ending, the fonts arriving, the window resizing or zooming — and
    *  then again each frame until it has held still for three, so a slide that is still going at the
-   *  first measure is measured at its end. Returns stop(). */
+   *  first measure is measured at its end. Returns stop(); it stops by itself once the element, having
+   *  been in the page, has left it (a screen drawn afresh), so its watchers do not pile up. */
   function watchLayout(el, fn, { within = null, frames = 3, limit = 240 } = {}) {
-    let last = '', quiet = 0, n = 0, raf = 0, stopped = false;
+    let last = '', quiet = 0, n = 0, raf = 0, stopped = false, seen = false;
     const tick = () => {
       raf = 0;
-      if (stopped || !el.isConnected) return;
+      if (stopped) return;
+      if (!el.isConnected) { if (seen) stop(); return; }
+      seen = true;
       const r = el.getBoundingClientRect();
       const key = `${Math.round(r.top)},${Math.round(r.left)},${Math.round(r.width)},${Math.round(r.height)}`;
       if (key !== last) { last = key; quiet = 0; try { fn(r); } catch { /* the caller's own */ } } else quiet++;
@@ -462,8 +465,9 @@
     scope.addEventListener('transitionend', kick, true);
     window.addEventListener('resize', kick);
     document.fonts?.ready?.then(kick).catch(() => {});
+    function stop() { stopped = true; ro?.disconnect(); mo.disconnect(); scope.removeEventListener('animationend', kick, true); scope.removeEventListener('transitionend', kick, true); window.removeEventListener('resize', kick); if (raf) cancelAnimationFrame(raf); raf = 0; }
     kick();
-    return () => { stopped = true; ro?.disconnect(); mo.disconnect(); scope.removeEventListener('animationend', kick, true); scope.removeEventListener('transitionend', kick, true); window.removeEventListener('resize', kick); if (raf) cancelAnimationFrame(raf); };
+    return stop;
   }
 
   /** Puts a floating element (already in the document, so it has a size) beside a rect or an

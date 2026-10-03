@@ -4,10 +4,11 @@
  * out where the work did well and in where it lost points; a criterion not marked yet stays on the
  * circle. A slice, its label or Enter opens it: the ring turns that slice to its left side and
  * unrolls it into a bar while the rest of the ring sinks into the centre, and the rating levels come
- * out beside the bar at the height of their points. The dots switch criteria in place; the ring
- * button, Esc or a press beside it rolls the bar back up. One tween value drives every point of the
- * geometry, drawn by hand each frame (no CSS transition on an SVG path), so a press part-way turns
- * it round from where it is. The SVG is only drawing: every slice is a real button (its label),
+ * out beside the bar at the height of their points. The dots switch criteria in place; the little
+ * ring on top of the bar, Esc or a press beside it rolls the bar back up. A few tween values on one
+ * frame loop drive every point of the geometry, drawn by hand each frame (no CSS transition on an SVG
+ * path), so a press part-way turns it round from where it is. The band is filled pieces with a
+ * gradient along each, its bend, thickness and colour carried smoothly from slice to slice. The SVG is only drawing: every slice is a real button (its label),
  * named for a screen reader. The phone keeps its bottom sheet (screens/course.js openRubric). */
 (function () {
   const BCV = (self.BCV = self.BCV || {});
@@ -142,8 +143,6 @@
     const reduce = U.reducedMotion();
     const hv = crit.map(() => 0); // how far each slice is swollen by the pointer (0 to 1)
     const st = { sel: 0, t: 0, g: reduce || !m.graded ? (m.graded ? 1 : 0) : 0, hov: -1, prev: -1, w: 1, BB: 500, BB0: 500 };
-    const rafs = {};
-    const M = Math.max(10, Math.round(192 / n)); // pieces per slice: enough for a smooth curve and a colour blend
 
     // ---- the page around it: dimmed, blurred (more away from the ring), and the header over that
     const ov = h('div', { class: 'bcv-sheet-ov bcv-rr-ov', role: 'dialog', 'aria-modal': 'true', 'aria-label': `${a.name || 'Assignment'} rubric`, tabindex: '-1', 'data-count': n > 15 ? 'lots' : n > 10 ? 'many' : 'few' });
@@ -165,19 +164,40 @@
     svg.setAttribute('class', 'bcv-rr__svg');
     svg.setAttribute('aria-hidden', 'true');
     const mk = (tag, attrs, parent) => { const e = document.createElementNS(SVG, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); parent?.append(e); return e; };
-    // the straight bar's colour as one gradient (its pieces would show as bands once it is still)
-    const gid = `bcv-rr-g${Math.random().toString(36).slice(2, 8)}`;
-    const grad = mk('linearGradient', { id: gid, gradientUnits: 'userSpaceOnUse' }, mk('defs', {}, svg));
-    const STOPS = 12;
-    const stops = Array.from({ length: STOPS + 2 }, () => mk('stop', {}, grad));
-    const ring = mk('g', { class: 'bcv-rr__ring' }, svg);
-    // a group per slice: one at rest is drawn once and then only turned, shrunk and faded as a whole
-    const sliceG = crit.map((_, k) => mk('g', { 'data-k': String(k) }, ring));
-    const unders = crit.map((_, k) => mk('path', { fill: 'none', 'stroke-linejoin': 'round', 'stroke-linecap': 'butt' }, sliceG[k]));
-    const lines = crit.map((_, k) => Array.from({ length: M }, () => mk('line', {}, sliceG[k])));
-    const dots = crit.map((_, k) => mk('circle', { fill: css(hues[k]) }, sliceG[k]));
-    /** An attribute written only when it changes (most of a frame's values do not). */
+    /** An attribute, a style or a class written only when it changes (most of a frame's values do not). */
     const setA = (el, key, v) => { const c = el._a || (el._a = {}); if (c[key] !== v) { c[key] = v; el.setAttribute(key, v); } };
+    const sty = (el, key, v) => { const c = el._s || (el._s = {}); if (c[key] !== v) { c[key] = v; el.style[key] = v; } };
+    const cls = (el, key, on) => { const c = el._c || (el._c = {}); if (c[key] !== on) { c[key] = on; el.classList.toggle(key, on); } };
+    // the band is drawn in filled pieces, each coloured by a gradient along it: the edges are one smooth
+    // outline (no strokes meeting at an angle) and the colour runs on without steps
+    const defs = mk('defs', {}, svg);
+    const uid = `bcv-rr${Math.random().toString(36).slice(2, 8)}`;
+    let gradN = 0;
+    const STOPS = 5;
+    const piece = (parent) => {
+      const id = `${uid}-${gradN++}`;
+      const gr = mk('linearGradient', { id, gradientUnits: 'userSpaceOnUse' }, defs);
+      return { gr, stops: Array.from({ length: STOPS }, () => mk('stop', {}, gr)), p: mk('path', { class: 'bcv-rr__band', fill: `url(#${id})` }, parent) };
+    };
+    // the bar's thread up to the little ring over it (the way back), under the band so the bar's cap covers its foot
+    const stemGrad = mk('linearGradient', { id: `${uid}-stem`, gradientUnits: 'userSpaceOnUse' }, defs);
+    const stemStops = [0, 1].map((o) => mk('stop', { offset: String(o) }, stemGrad));
+    const stem = mk('line', { class: 'bcv-rr__stem', stroke: `url(#${uid}-stem)` }, svg);
+    const ring = mk('g', { class: 'bcv-rr__ring' }, svg);
+    // a group per slice: one at rest is drawn once and then only turned, shrunk and faded as a whole.
+    // A piece turns at most 20° (an even number of them, so one starts at the slice's middle), so a
+    // straight gradient along it reads true to the curve
+    const PIECE = Math.PI / 9;
+    const restN = seg.map(([a0, a1]) => 2 * Math.max(1, Math.ceil((a1 - a0) / (2 * PIECE))));
+    const sliceG = crit.map((_, k) => mk('g', { 'data-k': String(k) }, ring));
+    const bands = crit.map((_, k) => Array.from({ length: restN[k] }, () => piece(sliceG[k])));
+    const dots = crit.map((_, k) => mk('circle', { fill: css(hues[k]) }, sliceG[k]));
+    // the slice on its way to the bar, drawn afresh each frame over the rest: its round ends, its pieces, its dot
+    const moveG = mk('g', { class: 'bcv-rr__move', display: 'none' }, ring);
+    const caps = [0, 1].map(() => mk('circle', {}, moveG));
+    const MOVE_N = 10;
+    const moves = Array.from({ length: MOVE_N }, () => piece(moveG));
+    const moveDot = mk('circle', {}, moveG);
     const leaders = mk('g', { class: 'bcv-rr__leaders' }, svg);
     const ticksG = mk('g', { class: 'bcv-rr__ticks' }, svg);
     const hitG = mk('g', { class: 'bcv-rr__hits' }, svg);
@@ -216,28 +236,40 @@
       U.text('bcv-rr__chint', 'Pick a colour to open it', 'span'),
     ]);
 
-    // the bar's side: its header (which criterion, its description, the dots, the ring button), its levels, the marker's note
+    // the bar's side: the way back (a little ring on top of the bar), its header (which criterion, its
+    // description, the dots), its levels, the marker's note
     const chips = crit.map((c, k) => h('button', { type: 'button', class: 'bcv-rr__chip', title: c.name, 'aria-label': `${c.name}, criterion ${k + 1} of ${n}`, style: { '--rr-c': css(hues[k]) }, onclick: () => select(k) }));
-    const back = h('button', { type: 'button', class: 'bcv-rr__back', title: 'Back to the ring (Esc)', 'aria-label': 'Back to the ring', onclick: () => toRing() },
-      [U.svg('M15 5l-7 7 7 7', { size: 13, stroke: 'currentColor', width: 2.4 }), h('span', { text: 'Ring' })]);
+    // The way back is the bar's own end, carried on up a thread into the ring in miniature, the open
+    // criterion's slice missing from it at the thread's top: the bar is that slice, pulled out. On the
+    // pointer the slice fills back into its place and the little ring swells — what a press does to the real one.
+    const back = h('button', { type: 'button', class: 'bcv-rr__back', title: 'Back to the ring (Esc)', 'aria-label': 'Back to the ring', onclick: () => toRing() });
+    const mini = mk('svg', { class: 'bcv-rr__mini', viewBox: '-22 -22 44 44', 'aria-hidden': 'true' }, back);
+    const MR = 14.5, MGAP = n > 1 ? Math.min(0.09, TAU / n / 5) : 0;
+    const mpt = (a) => `${f(MR * Math.sin(a))} ${f(-MR * Math.cos(a))}`;
+    const arc = (a0, a1, cw = true) => `M${mpt(a0)} A${MR} ${MR} 0 ${Math.abs(a1 - a0) > Math.PI ? 1 : 0} ${cw ? 1 : 0} ${mpt(a1)}`;
+    mk('circle', { class: 'bcv-rr__mtrack', r: String(MR) }, mini);
+    const spin = mk('g', { class: 'bcv-rr__spin' }, mini);
+    const marcs = seg.map(([a0, a1], k) => mk('path', { class: 'bcv-rr__marc', stroke: hex(hues[k]), d: n === 1 ? `${arc(0, Math.PI)} ${arc(Math.PI, TAU).replace(/^M[^A]+/, '')}` : arc(a0 + MGAP / 2, a1 - MGAP / 2) }, spin));
+    const mfill = [0, 1].map(() => mk('path', { class: 'bcv-rr__mfill', pathLength: '1' }, spin));
+    mk('path', { class: 'bcv-rr__mchev', d: 'M1.6 -5 L-3.4 0 L1.6 5' }, mini);
+    let spun = 0; // (the little ring's turn so far, carried on so a switch turns it the short way)
     const swatch = h('span', { class: 'bcv-rr__swatch' });
     const count = U.text('bcv-rr__count', '', 'span');
     const name = h('h3', { class: 'bcv-rr__name', tabindex: '-1' });
     const desc = U.text('bcv-rr__desc', '');
     const more = h('button', { type: 'button', class: 'bcv-rr__more', hidden: true, onclick: () => { const on = desc.classList.toggle('is-open'); more.textContent = on ? 'Less' : 'More'; more.setAttribute('aria-expanded', String(on)); } }, 'More');
     const head = U.el('bcv-rr__head', [
-      U.el('bcv-rr__headmain', [U.el('bcv-rr__eyeline', [swatch, count]), U.el('bcv-rr__nameline', [back, name]), U.el('bcv-rr__descwrap', [desc, more])]),
+      U.el('bcv-rr__headmain', [U.el('bcv-rr__eyeline', [swatch, count]), name, U.el('bcv-rr__descwrap', [desc, more])]),
       U.el('bcv-rr__tools', [U.el('bcv-rr__chips', chips, { style: { gap: n > 15 ? '3px' : n > 10 ? '4px' : '6px' } })]),
     ]);
     const rowsBox = U.el('bcv-rr__rows');
     const note = U.el('bcv-rr__note', null, { hidden: true });
-    const barBox = U.el('bcv-rr__bar', [head, rowsBox, note]);
+    const barBox = U.el('bcv-rr__bar', [back, head, rowsBox, note]);
 
     const inner = U.el('bcv-rr__inner', [svg, centre, labelBox, barBox]);
     const stage = U.el('bcv-rr__stage', inner);
     const field = U.el('bcv-rr__field', stage);
     ov.append(...veils, top, field, foot, closeBtn);
-    ov.style.setProperty('--rr-ring', `conic-gradient(${seg.map(([a0, a1], k) => `${hex(hues[k])} ${f((((a0 + a1) / 2) * 180) / Math.PI)}deg`).join(', ')}, ${hex(hues[0])} ${f((((seg[0][0] + seg[0][1]) / 2) * 180) / Math.PI + 360)}deg)`);
 
     // ---- the bar's contents for the selected criterion
     let rows = [], ticks = [], place = [];
@@ -253,6 +285,15 @@
       more.textContent = 'More';
       desc.hidden = !c.desc;
       chips.forEach((b, i) => { b.classList.toggle('is-on', i === k); b.setAttribute('aria-current', i === k ? 'true' : 'false'); });
+      // the little ring turns this slice's gap down to the thread, the short way round
+      const [a0, a1] = seg[k], mid = (a0 + a1) / 2;
+      let to = 180 - (mid * 180) / Math.PI;
+      to = spun + ((((to - spun) % 360) + 540) % 360) - 180;
+      spun = to;
+      spin.style.transform = `rotate(${f(to)}deg)`;
+      marcs.forEach((p, i) => p.classList.toggle('is-gone', i === k));
+      mfill[0].setAttribute('d', arc(mid, a1 - (n > 1 ? MGAP / 2 : 0) - (n === 1 ? 1e-3 : 0)));
+      mfill[1].setAttribute('d', arc(mid, a0 + (n > 1 ? MGAP / 2 : 0) + (n === 1 ? 1e-3 : 0), false));
       note.hidden = !c.comment;
       note.replaceChildren(U.svg('M4 5h16v10H9l-5 4z', { size: 13, stroke: 'currentColor', width: 2, cls: 'bcv-rr__noteic' }), U.text('bcv-rr__notetext', c.comment, 'span'));
       // the levels: a free-form criterion has none, so its score (or what it is worth) stands alone
@@ -320,19 +361,81 @@
     }
 
     // ---- drawing: every point of every slice from the tween values
-    function colourAt(k, vm, ee, u) {
-      const prevH = hues[(k + n - 1) % n], nextH = hues[(k + 1) % n];
-      const blendW = 0.9 * (1 - ee);
-      let col = vm < 0.5 ? mix(hues[k], prevH, (0.5 - vm) * blendW) : mix(hues[k], nextH, (vm - 0.5) * blendW);
-      if (ee > 0) col = mix(col, vm < 0.5 ? mix(hues[k], BLACK, 0.18) : mix(hues[k], WHITE, 0.22), ee * Math.abs(vm - 0.5) * 2);
-      if (ee > 0 && m.graded && vm > crit[k].frac + 1e-6) col = mix(col, TRACK, 0.8 * u); // (the stretch above the mark was not earned)
+    const mids = seg.map(([a0, a1]) => (a0 + a1) / 2);
+    /** Where an angle falls between two slices' middles: [this one, the next, how far across on an
+     *  S-curve]. A value given at each middle (the bend, the thickness, the colour) is carried round
+     *  the circle through it, so the ring has no step or corner where two slices meet. */
+    function between(th) {
+      if (n === 1) return [0, 0, 0];
+      let x = th - mids[0];
+      x -= Math.floor(x / TAU) * TAU;
+      let k = n - 1;
+      while (k > 0 && mids[k] - mids[0] > x) k--;
+      const lo = mids[k] - mids[0], hi = k + 1 < n ? mids[k + 1] - mids[0] : TAU;
+      return [k, (k + 1) % n, (1 - Math.cos((Math.PI * (x - lo)) / (hi - lo))) / 2];
+    }
+    const at = (vals, b) => vals[b[0]] + (vals[b[1]] - vals[b[0]]) * b[2];
+    function colourAt(k, v, ee, u) {
+      const [a0, a1] = seg[k];
+      const b = between(a0 + (a1 - a0) * v);
+      let col = mix(hues[b[0]], hues[b[1]], b[2]); // (the ring's own run of colour…)
+      // …becoming the bar's: its own colour, darker at the foot and lighter at the top
+      if (ee > 0) col = mix(col, v < 0.5 ? mix(hues[k], BLACK, 0.36 * (0.5 - v)) : mix(hues[k], WHITE, 0.44 * (v - 0.5)), ee);
+      if (ee > 0 && m.graded && v > crit[k].frac + 1e-6) col = mix(col, TRACK, 0.8 * u); // (the stretch above the mark was not earned)
       return col;
     }
     /** …and across a switch along the bar, the old criterion's colour crossing over to the new one's. */
-    function colourOf(k, vm, ee, u) {
-      const col = colourAt(k, vm, ee, u);
-      return k === st.sel && st.w < 1 && st.prev >= 0 && st.prev !== k ? mix(colourAt(st.prev, vm, 1, 1), col, st.w) : col;
+    function colourOf(k, v, ee, u) {
+      const col = colourAt(k, v, ee, u);
+      return k === st.sel && st.w < 1 && st.prev >= 0 && st.prev !== k ? mix(colourAt(st.prev, v, 1, 1), col, st.w) : col;
     }
+    const f2 = (v) => v.toFixed(2);
+    /** One piece of band from v0 to v1 (and on a hair to v1e, under the next piece): its outline from
+     *  `sample` (a centre, the way out, a width), its colour a gradient along it from `colour`. */
+    function drawPiece(pc, sample, colour, v0, v1, v1e, len) {
+      const steps = Math.max(3, Math.min(90, Math.ceil(len / 2.5)));
+      let o = '', i = '';
+      let c0 = null, c1 = null;
+      for (let j = 0; j <= steps; j++) {
+        const v = v0 + ((v1e - v0) * j) / steps;
+        const s = sample(v);
+        const hw = s[4] / 2;
+        const ox = s[0] + s[2] * hw, oy = s[1] + s[3] * hw, ix = s[0] - s[2] * hw, iy = s[1] - s[3] * hw;
+        o += `${j ? 'L' : 'M'}${f2(ox)} ${f2(oy)}`;
+        i = `L${f2(ix)} ${f2(iy)}${i}`;
+        if (!j) c0 = s;
+      }
+      c1 = sample(v1);
+      setA(pc.p, 'd', `${o}${i}Z`);
+      setA(pc.gr, 'x1', f(c0[0])); setA(pc.gr, 'y1', f(c0[1]));
+      setA(pc.gr, 'x2', f(c1[0])); setA(pc.gr, 'y2', f(c1[1]));
+      pc.stops.forEach((sp, q) => {
+        const o2 = q / (STOPS - 1);
+        setA(sp, 'offset', o2.toFixed(3));
+        setA(sp, 'stop-color', css(colour(v0 + (v1 - v0) * o2)));
+      });
+      setA(pc.p, 'display', 'inline');
+    }
+    /** A slice at rest: unturned and full size (its group does the rest), every piece and its dot. */
+    function restSlice(k, go) {
+      const [a0, a1] = seg[k], bump = hv[k], TH = m.thick, NB = restN[k];
+      const sample = (v) => {
+        const th = a0 + (a1 - a0) * v, b = between(th);
+        const s1 = Math.sin(Math.PI * Math.min(1, v)), sw = bump * s1 * s1; // (the slice under the pointer swells out, smoothly, and back)
+        const T = at(TH, b);
+        const rad = R + at(go, b) - (T - 10) / 2 + 9 * sw; // (thicker inward: the outer edge stays on the circle)
+        const sn = Math.sin(th), cs = Math.cos(th);
+        return [CX + rad * sn, CY - rad * cs, sn, -cs, T + 2.5 * sw];
+      };
+      const colour = (v) => colourAt(k, v, 0, 0);
+      const len = R * (a1 - a0);
+      const eps = n > 1 ? 0.5 / len : 0; // (each piece runs on a hair under the next, so no seam shows between them)
+      bands[k].forEach((pc, i) => drawPiece(pc, sample, colour, i / NB, (i + 1) / NB, (i + 1) / NB + eps, len / NB));
+      const D = pt(R + go[k] + 22 + 9 * bump, mids[k]);
+      setA(dots[k], 'cx', f(D[0])); setA(dots[k], 'cy', f(D[1]));
+    }
+    // the bar's top, where the thread to the little ring starts, and the little ring's foot
+    const MINI = [BX, 56 + MR];
     function draw() {
       const e = st.t, sel = st.sel;
       const p1 = span(e, 0, 0.5); // the ring turns the slice to its left side…
@@ -340,193 +443,195 @@
       const u = span(e, 0.22, 1); // …while it straightens into the bar…
       const q = span(e, 0.02, 0.62); // …and the rest of the ring sinks into the centre
       const go = m.bend.map((b) => b * st.g);
-      const selMid = (seg[sel][0] + seg[sel][1]) / 2;
-      let dRot = 1.5 * Math.PI - selMid;
+      let dRot = 1.5 * Math.PI - mids[sel];
       while (dRot > Math.PI) dRot -= TAU;
       while (dRot < -Math.PI) dRot += TAU;
       const rot = dRot * p1, rest = dRot * (p1 - 1);
       const BB = st.BB0 + (st.BB - st.BB0) * st.w;
       const shrinkRest = 1 - 0.34 * q, opRest = clamp01(1 - q * 1.25);
       const turn = `translate(${CX} ${CY}) rotate(${f((rot * 180) / Math.PI)}) scale(${shrinkRest.toFixed(4)}) translate(${-CX} ${-CY})`;
-      /** One slice's every point. `mv` is the selected slice on its way to the bar (turned, flattened,
-       *  unrolling); without it the slice is drawn at rest — unturned and full size, its group doing the rest. */
-      const sliceGeom = (k, mv) => {
-        const [a0, a1] = seg[k];
-        const isSel = !!mv;
-        const ee = isSel ? u : 0, rotK = isSel ? rot : 0, restK = isSel ? rest : 0, pfK = isSel ? pf : 0, uK = isSel ? u : 0;
-        const po = go[(k + n - 1) % n], no = go[(k + 1) % n], ko = go[k];
-        // a value carried smoothly into the neighbours' at either end (the bend, the thickness), so the ring has no steps
-        const blend = (v, mine, prev, next) => {
-          const bl = v < 0.5 ? 1 - Math.cos(Math.PI * (0.5 - v)) : 1 - Math.cos(Math.PI * (v - 0.5));
-          return v < 0.5 ? mine + ((prev - mine) * bl) / 2 : mine + ((next - mine) * bl) / 2;
-        };
-        const TH = m.thick, tk = TH[k], tp = TH[(k + n - 1) % n], tn = TH[(k + 1) % n];
-        const bump = hv[k]; // (the slice under the pointer swells out, smoothly, and back)
-        const bumpAt = (v) => { const s1 = Math.sin(Math.PI * v); return 9 * bump * s1 * s1; };
-        const thickAt = (v) => blend(v, tk, tp, tn) + (2.5 * bumpAt(v)) / 9;
-        const Rs = R + ko;
-        const P = (v) => {
-          const ang = a0 + (a1 - a0) * v + rotK;
-          let rad = R + blend(v, ko, po, no) - (blend(v, tk, tp, tn) - 10) / 2 + bumpAt(v); // (thicker inward: the outer edge stays on the circle)
-          if (isSel) rad += (Rs - rad) * pfK;
-          if (!isSel || uK <= 0) return pt(rad, ang);
-          // the slice as it would be turned all the way, unrolling about its middle…
-          const L = Rs * (a1 - a0) + (BB - BT - Rs * (a1 - a0)) * uK;
-          const kap = (1 - uK) / Rs;
-          const Mx = CX - Rs + (BX - (CX - Rs)) * uK, My = CY + ((BB + BT) / 2 - CY) * uK;
-          const s = (v - 0.5) * L;
-          const x = kap < 1e-5 ? Mx : Mx + (1 - Math.cos(kap * s)) / kap;
-          const y = kap < 1e-5 ? My - s : My - Math.sin(kap * s) / kap;
-          if (Math.abs(restK) < 1e-4) return [x, y];
-          // …then turned back by what the ring has still to turn, so the two motions overlap without a jump
-          const cs = Math.cos(restK), sn = Math.sin(restK), dx = x - CX, dy = y - CY;
-          return [CX + dx * cs - dy * sn, CY + dx * sn + dy * cs];
-        };
-        const widthAt = (v) => { const w = thickAt(v); return isSel ? w + (10 - w) * pfK + 6 * uK : w; };
-        let thin = Infinity;
-        for (let j = 0; j <= 8; j++) thin = Math.min(thin, widthAt(j / 8));
-        let d = '';
-        for (let j = 0; j <= M; j++) { const Q = P(j / M); d += `${j ? ' L' : 'M'}${f(Q[0])} ${f(Q[1])}`; }
-        const ul = unders[k];
-        setA(ul, 'd', d);
-        setA(ul, 'stroke-width', f(thin)); // (under the pieces, to close their seams: no wider than the thinnest of them)
-        setA(ul, 'stroke-linecap', isSel && uK > 0.02 ? 'round' : 'butt');
-        // nearly straight, the bar hands over from its pieces to one gradient along it
-        const smooth = isSel ? span(uK, 0.85, 1) : 0;
-        if (smooth > 0) {
-          const A = P(0), B = P(1), frac = m.graded ? crit[k].frac : 1;
-          setA(grad, 'x1', f(A[0])); setA(grad, 'y1', f(A[1]));
-          setA(grad, 'x2', f(B[0])); setA(grad, 'y2', f(B[1]));
-          const at = Array.from({ length: STOPS }, (_, i) => i / (STOPS - 1));
-          if (frac < 1) at.push(Math.max(0, frac - 1e-4), Math.min(1, frac + 2e-4)); else at.push(1, 1);
-          at.sort((x, y) => x - y);
-          stops.forEach((sp, i) => {
-            setA(sp, 'offset', at[i].toFixed(4));
-            setA(sp, 'stop-color', css(colourOf(k, at[i], ee, uK)));
-          });
-          setA(ul, 'stroke', `url(#${gid})`);
-        } else setA(ul, 'stroke', css(hues[k]));
-        const segs = lines[k];
-        for (let j = 0; j < M; j++) {
-          const v0 = j / M, v1 = (j + 1) / M, vm = (v0 + v1) / 2;
-          const A = P(Math.max(0, v0 - 0.006)), B = P(Math.min(1, v1 + 0.006));
-          const l = segs[j];
-          setA(l, 'x1', f(A[0])); setA(l, 'y1', f(A[1]));
-          setA(l, 'x2', f(B[0])); setA(l, 'y2', f(B[1]));
-          setA(l, 'stroke', css(colourOf(k, vm, ee, uK)));
-          setA(l, 'stroke-width', f(widthAt(vm)));
-          setA(l, 'stroke-opacity', f(1 - smooth));
-          setA(l, 'stroke-linecap', isSel && uK > 0.02 && (j === 0 || j === M - 1) ? 'round' : 'butt');
-        }
-        const D = pt(R + ko + 22 + 9 * bump, (a0 + a1) / 2 + rotK);
-        setA(dots[k], 'cx', f(D[0])); setA(dots[k], 'cy', f(D[1]));
-      };
+      const moving = e > 0;
+      const dotA = f(clamp01(1 - q * 1.8));
       crit.forEach((c, k) => {
         const g = sliceG[k];
-        if (k === sel && e > 0) { // the one on its way to the bar: every point, every frame, on top
-          if (g.nextSibling) ring.append(g);
-          sliceGeom(k, true);
-          g._key = null;
-          setA(g, 'transform', '');
-          setA(g, 'opacity', '1');
-          g.style.display = '';
-        } else {
-          const key = `${st.g.toFixed(4)}|${hv[k].toFixed(4)}`;
-          if (g._key !== key) { sliceGeom(k, null); g._key = key; } // (only when its bend or its swell has moved)
-          const opK = k === sel ? 1 : opRest;
-          setA(g, 'transform', e > 0 ? turn : '');
-          setA(g, 'opacity', f(opK));
-          g.style.display = opK < 0.005 ? 'none' : '';
-        }
+        if (moving && k === sel) { setA(g, 'display', 'none'); return; } // (drawn on its way, below)
+        const key = `${st.g.toFixed(4)}|${hv[k].toFixed(4)}`;
+        if (g._key !== key) { restSlice(k, go); g._key = key; } // (only when its bend or its swell has moved)
+        setA(g, 'display', opRest < 0.005 && moving ? 'none' : 'inline');
+        setA(g, 'transform', moving ? turn : '');
+        setA(g, 'opacity', moving ? f(opRest) : '1');
         setA(dots[k], 'r', k === sel || st.hov === k ? '4.5' : n > 15 ? '2.5' : '3.5');
-        setA(dots[k], 'opacity', f(clamp01(1 - q * 1.8)));
+        setA(dots[k], 'opacity', dotA);
       });
+      // the one on its way to the bar: every point, every frame, over the rest
+      let top = null;
+      if (moving) {
+        const [a0, a1] = seg[sel], k = sel, TH = m.thick, bump = hv[k];
+        const Rs = R + go[k];
+        const L = Rs * (a1 - a0) + (BB - BT - Rs * (a1 - a0)) * u;
+        const kap = (1 - u) / Rs;
+        const Mx = CX - Rs + (BX - (CX - Rs)) * u, My = CY + ((BB + BT) / 2 - CY) * u;
+        const cr = Math.cos(rest), sr = Math.sin(rest);
+        const sample = (v) => {
+          const th = a0 + (a1 - a0) * v, b = between(th);
+          const s1 = Math.sin(Math.PI * Math.max(0, Math.min(1, v))), sw = bump * s1 * s1;
+          const T = at(TH, b);
+          const wd = T + 2.5 * sw + (10 - T - 2.5 * sw) * pf + 6 * u;
+          if (u <= 0) { // still round the centre: turning, its bend evening out to a true arc
+            let rad = R + at(go, b) - (T - 10) / 2 + 9 * sw;
+            rad += (Rs - rad) * pf;
+            const a = th + rot, sn = Math.sin(a), cs = Math.cos(a);
+            return [CX + rad * sn, CY - rad * cs, sn, -cs, wd];
+          }
+          // the slice as it would be turned all the way, unrolling about its middle…
+          const s = (v - 0.5) * L;
+          let x, y, nx, ny;
+          if (kap < 1e-5) { x = Mx; y = My - s; nx = -1; ny = 0; } else {
+            const ks = kap * s;
+            x = Mx + (1 - Math.cos(ks)) / kap; y = My - Math.sin(ks) / kap;
+            nx = -Math.cos(ks); ny = -Math.sin(ks);
+          }
+          if (Math.abs(rest) < 1e-4) return [x, y, nx, ny, wd];
+          // …then turned back by what the ring has still to turn, so the two motions overlap without a jump
+          const dx = x - CX, dy = y - CY;
+          return [CX + dx * cr - dy * sr, CY + dx * sr + dy * cr, nx * cr - ny * sr, nx * sr + ny * cr, wd];
+        };
+        const ee = u;
+        const colour = (v) => colourOf(k, v, ee, u);
+        // the pieces: eighths, split where the colour steps (the mark on the bar, the old one's mid-switch)
+        const cuts = [0, 0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875, 1];
+        const step = (fr) => { if (fr > 1e-3 && fr < 1 - 1e-3 && cuts.every((x) => Math.abs(x - fr) > 1e-3)) cuts.push(fr); };
+        if (m.graded) { step(crit[k].frac); if (st.w < 1 && st.prev >= 0) step(crit[st.prev].frac); }
+        cuts.sort((x, y) => x - y);
+        const capT = span(e, 0.02, 0.3); // (its ends round off as it comes away from its neighbours)
+        const lenV = Math.max(L, 1);
+        moves.forEach((pc, i) => {
+          if (i >= cuts.length - 1) { setA(pc.p, 'display', 'none'); return; }
+          const v0 = cuts[i], v1 = cuts[i + 1];
+          const v1e = i === cuts.length - 2 ? 1 + (0.5 / lenV) * (1 - capT) : v1 + 0.4 / lenV;
+          drawPiece(pc, sample, colour, v0, v1, v1e, lenV * (v1 - v0));
+        });
+        [0, 1].forEach((v, i) => {
+          const s = sample(v);
+          setA(caps[i], 'cx', f2(s[0])); setA(caps[i], 'cy', f2(s[1]));
+          setA(caps[i], 'r', f2((s[4] / 2) * capT));
+          setA(caps[i], 'fill', css(colour(v)));
+        });
+        top = sample(1);
+        const D = pt(R + go[k] + 22 + 9 * bump, mids[k] + rot);
+        setA(moveDot, 'cx', f(D[0])); setA(moveDot, 'cy', f(D[1]));
+        setA(moveDot, 'r', '4.5'); setA(moveDot, 'fill', css(hues[k])); setA(moveDot, 'opacity', dotA);
+      }
+      setA(moveG, 'display', moving ? 'inline' : 'none');
       // the labels ride round with their slices and fade as the ring goes
       const ringA = clamp01(1 - q * 1.8);
       labels.forEach((b, k) => {
-        const mid = (seg[k][0] + seg[k][1]) / 2 + rot;
+        const mid = mids[k] + rot;
         const P = pt((R + go[k] + 36 + 9 * hv[k] * (1 - q)) * (1 - 0.2 * q), mid);
         const s = Math.sin(mid), co = Math.cos(mid);
         const tx = -50 + 50 * Math.max(-1, Math.min(1, s / 0.3)), ty = -50 - 50 * Math.max(-1, Math.min(1, co / 0.3));
-        b.style.left = `${f(P[0])}px`;
-        b.style.top = `${f(P[1])}px`;
-        b.style.transform = `translate(${f(tx)}%, ${f(ty)}%)`;
-        b.style.alignItems = s > 0.3 ? 'flex-start' : s < -0.3 ? 'flex-end' : 'center';
-        b.style.textAlign = s > 0.3 ? 'left' : s < -0.3 ? 'right' : 'center';
+        sty(b, 'transform', `translate(${f(P[0])}px, ${f(P[1])}px) translate(${f(tx)}%, ${f(ty)}%)`);
+        sty(b, 'alignItems', s > 0.3 ? 'flex-start' : s < -0.3 ? 'flex-end' : 'center');
+        sty(b, 'textAlign', s > 0.3 ? 'left' : s < -0.3 ? 'right' : 'center');
         const shown = n <= 10 || k === st.sel || (k !== (st.sel + 1) % n && k !== (st.sel + n - 1) % n && k % crowd === 0 && !(k === n - 1 && n % crowd !== 0));
-        b.classList.toggle('is-quiet', !shown);
-        b.classList.toggle('is-hot', st.hov === k);
+        cls(b, 'is-quiet', !shown);
+        cls(b, 'is-hot', st.hov === k);
       });
-      labelBox.style.opacity = f(ringA);
-      centre.style.opacity = f(ringA);
-      centre.style.transform = `translate(-50%, -50%) scale(${f(1 - 0.12 * q)})`;
+      sty(labelBox, 'opacity', f(ringA));
+      sty(centre, 'opacity', f(ringA));
+      sty(centre, 'transform', `translate(-50%, -50%) scale(${f(1 - 0.12 * q)})`);
       const ringOn = e < 0.3;
-      labelBox.inert = !ringOn;
-      hitG.style.pointerEvents = e < 0.02 ? 'auto' : 'none';
+      if (labelBox.inert === ringOn) labelBox.inert = !ringOn;
+      sty(hitG, 'pointerEvents', e < 0.02 ? 'auto' : 'none');
       // the bar's words come out from the bar once it is nearly straight, row by row
       const barA = span(u, 0.7, 1);
-      head.style.opacity = f(barA);
-      head.style.transform = `translateY(${f((1 - barA) * 8)}px)`;
-      note.style.opacity = f(barA);
+      sty(head, 'opacity', f(barA));
+      sty(head, 'transform', `translateY(${f((1 - barA) * 8)}px)`);
+      sty(note, 'opacity', f(barA));
       rows.forEach((r, i) => {
         if (r.classList.contains('is-out')) return;
         const ra = span(u, 0.62 + 0.06 * i, 0.92 + 0.06 * i) * span(st.w, 0.25 + 0.08 * i, 0.75 + 0.08 * i);
-        r.style.opacity = f(ra);
-        r.style.setProperty('--rr-x', `${f((1 - ra) * -18)}px`);
+        sty(r, 'opacity', f(ra));
+        sty(r, 'transform', `translate(${f((1 - ra) * -18)}px, -50%)`);
       });
       ticks.forEach((t, i) => {
         const ta = span(u, 0.8 + 0.04 * i, 0.96 + 0.04 * i) * span(st.w, 0.3 + 0.06 * i, 0.8 + 0.06 * i);
-        t.style.opacity = f(ta);
-        t.style.transform = `scale(${f(0.2 + 0.8 * ta)})`;
+        sty(t, 'opacity', f(ta));
+        sty(t, 'transform', `scale(${f(0.2 + 0.8 * ta)})`);
       });
-      leaders.style.opacity = f(barA * span(st.w, 0.4, 1));
-      barBox.inert = u < 0.8;
-      barBox.classList.toggle('is-live', u >= 0.8);
-      ov.classList.toggle('is-bar', e > 0.5);
-      ov.dataset.state = e >= 0.999 ? 'bar' : e <= 0.001 ? 'ring' : 'moving';
-      foot.textContent = e > 0.5
-        ? 'Height on the bar is points. Switch with the dots; Ring or Esc goes back.'
+      sty(leaders, 'opacity', f(barA * span(st.w, 0.4, 1)));
+      // the thread from the bar's top up into the little ring, drawn out of the bar as it straightens
+      const grow = span(u, 0.76, 1);
+      if (top && grow > 0) {
+        const x2 = top[0] + (MINI[0] - top[0]) * grow, y2 = top[1] + (MINI[1] - top[1]) * grow;
+        setA(stem, 'x1', f(top[0])); setA(stem, 'y1', f(top[1]));
+        setA(stem, 'x2', f(x2)); setA(stem, 'y2', f(y2));
+        setA(stemGrad, 'x1', f(top[0])); setA(stemGrad, 'y1', f(top[1]));
+        setA(stemGrad, 'x2', f(MINI[0])); setA(stemGrad, 'y2', f(MINI[1]));
+        const selC = st.w < 1 && st.prev >= 0 ? mix(hues[st.prev], hues[sel], st.w) : hues[sel];
+        setA(stemStops[0], 'stop-color', css(colourOf(sel, 1, u, u)));
+        setA(stemStops[1], 'stop-color', css(selC));
+        setA(stem, 'opacity', f(grow));
+        setA(stem, 'display', 'inline');
+      } else setA(stem, 'display', 'none');
+      const backA = span(u, 0.86, 1);
+      sty(back, 'opacity', f(backA));
+      sty(back, 'transform', `scale(${f(0.6 + 0.4 * backA)})`);
+      const live = u >= 0.8;
+      if (barBox.inert === live) barBox.inert = !live;
+      cls(barBox, 'is-live', live);
+      cls(ov, 'is-bar', e > 0.5);
+      const state = e >= 0.999 ? 'bar' : e <= 0.001 ? 'ring' : 'moving';
+      if (ov.dataset.state !== state) ov.dataset.state = state;
+      const words = e > 0.5
+        ? 'Height on the bar is points. Switch with the dots; the little ring at the top or Esc goes back.'
         : m.graded ? 'The ring pushes out where you scored well and pulls in where you lost points.'
           : 'Each colour’s stretch is its share of the points. Pick one to open it.';
+      if (foot._t !== words) { foot._t = words; foot.textContent = words; }
     }
 
-    // ---- motion: one tween per value, cancelled before another starts so a quick press never leaves it half-way
-    function tween(key, to, dur, done, delay = 0) {
-      if (rafs[key]) cancelAnimationFrame(rafs[key]);
-      rafs[key] = 0;
-      if (reduce || dur <= 0) { st[key] = to; draw(); done?.(); return; }
-      const from = st[key], t0 = performance.now() + delay;
-      const step = (now) => {
-        const k = clamp01((now - t0) / dur);
-        st[key] = from + (to - from) * ease(k);
-        draw();
-        if (k < 1) rafs[key] = requestAnimationFrame(step);
-        else { rafs[key] = 0; done?.(); }
-      };
-      rafs[key] = requestAnimationFrame(step);
-    }
-    // the hover swell eases in and out (each slice its own amount, so one leaving and the next arriving overlap)
-    let hvRaf = 0, hvT = 0;
-    function hoverStep(now) {
-      const dt = hvT ? Math.min(64, now - hvT) : 16;
-      hvT = now;
-      const a = 1 - Math.exp(-dt / 115);
-      let moving = false;
+    // ---- motion: every value on one frame loop, drawn once a frame. A tween cut short by another
+    // starts from where it is, so a quick press never leaves it half-way or makes it jump
+    const tw = {};
+    let raf = 0, lastNow = 0;
+    function frame(now) {
+      raf = 0;
+      const dt = lastNow ? Math.min(64, now - lastNow) : 16;
+      lastNow = now;
+      let busy = false;
+      const done = [];
+      for (const key of Object.keys(tw)) {
+        const a = tw[key];
+        if (now < a.t0) { busy = true; continue; }
+        const k = clamp01((now - a.t0) / a.dur);
+        st[key] = a.from + (a.to - a.from) * ease(k);
+        if (k >= 1) { delete tw[key]; if (a.done) done.push(a.done); } else busy = true;
+      }
+      // the hover swell eases in and out (each slice its own amount, so one leaving and the next arriving overlap)
+      const ah = 1 - Math.exp(-dt / 115);
       hv.forEach((v, k) => {
         const to = st.hov === k && st.t < 0.02 ? 1 : 0;
-        const nv = v + (to - v) * a;
+        if (v === to) return;
+        const nv = v + (to - v) * ah;
         hv[k] = Math.abs(to - nv) < 0.003 ? to : nv;
-        if (hv[k] !== to) moving = true;
+        if (hv[k] !== to) busy = true;
       });
       draw();
-      if (moving) hvRaf = requestAnimationFrame(hoverStep);
-      else { hvRaf = 0; hvT = 0; }
+      if (busy) kick(); else lastNow = 0;
+      done.forEach((fn) => fn());
+    }
+    function kick() { if (!raf && !gone) raf = requestAnimationFrame(frame); }
+    function tween(key, to, dur, done, delay = 0) {
+      delete tw[key];
+      if (reduce || dur <= 0) { st[key] = to; draw(); done?.(); return; }
+      tw[key] = { from: st[key], to, t0: performance.now() + delay, dur, done };
+      kick();
     }
     function hover(k) {
       if (st.hov === k) return;
       st.hov = k;
       if (reduce) { hv.forEach((_, i) => { hv[i] = i === k && st.t < 0.02 ? 1 : 0; }); draw(); return; }
-      if (!hvRaf) hvRaf = requestAnimationFrame(hoverStep);
+      kick();
     }
     function select(k) {
       k = ((k % n) + n) % n;
@@ -600,7 +705,8 @@
     function close(now) {
       if (gone) return;
       gone = true;
-      for (const k in rafs) if (rafs[k]) cancelAnimationFrame(rafs[k]);
+      if (raf) cancelAnimationFrame(raf);
+      raf = 0;
       removeEventListener('resize', onResize);
       if (live === api) live = null;
       const refocus = () => { try { if (from && from.isConnected) from.focus({ preventScroll: true }); } catch { /* gone */ } };
@@ -610,7 +716,7 @@
       refocus();
     }
     /** Holds one tween value where it is put (the developer tools and the tests look at a frame part-way). */
-    const seek = (key, v) => { if (rafs[key]) cancelAnimationFrame(rafs[key]); rafs[key] = 0; st[key] = v; draw(); };
+    const seek = (key, v) => { delete tw[key]; st[key] = v; draw(); };
     const api = { close, el: ov, select, toRing, seek, state: st };
     live = api;
 

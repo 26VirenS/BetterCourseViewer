@@ -129,8 +129,11 @@
     let hideT = 0;
     const show = (i) => {
       clearTimeout(hideT);
-      at = clamp(i, 0, pts.length - 1);
+      i = clamp(i, 0, pts.length - 1);
+      if (i === at && !tip.hidden) return; // (the pointer still nearest the same point: nothing to move)
+      at = i;
       const p = pts[at];
+      const ch = chart.clientHeight || 92; // (read before anything is written: no layout forced mid-frame)
       for (const e of [guide, dot, tip]) e.hidden = false;
       guide.style.left = `${p.x}%`;
       dot.style.left = `${p.x}%`;
@@ -139,7 +142,7 @@
       tip.style.top = `${p.y}%`;
       tip.classList.toggle('is-left', p.x < 16);
       tip.classList.toggle('is-right', p.x > 84);
-      tip.classList.toggle('is-below', (p.y / 100) * (chart.clientHeight || 92) < 52); // (near the top: the label hangs under the point, not over the card's heading)
+      tip.classList.toggle('is-below', (p.y / 100) * ch < 52); // (near the top: the label hangs under the point, not over the card's heading)
       tipV.textContent = gpa2(p.s.gpa);
       tipL.textContent = snapLabel(p.s);
       chart.dataset.at = String(at);

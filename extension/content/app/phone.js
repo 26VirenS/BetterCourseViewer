@@ -331,6 +331,7 @@
       for (const el of sheet.querySelectorAll('*')) { if (n++ > 500) break; if (el.scrollHeight > el.clientHeight + 4 && SCROLLY.test(getComputedStyle(el).overflowY)) return true; }
       return false;
     };
+    const moreIn = (gest) => (gest.more ??= holdsMore()); // (once a gesture: it walks the sheet, so not on every move)
     const noDrag = (el) => !!el?.closest?.('input, textarea, select, [contenteditable="true"], canvas, .bcv-ph-chips, [data-no-sheet-drag]');
     let g = null;
     const HEIGHT = 'height .34s cubic-bezier(.32,.72,0,1)';
@@ -354,7 +355,7 @@
       let dy = y - g.y0;
       if (dy < 0) {
         // pulled up: a sheet holding more grows to nearly the full screen at once; beyond that (or with nothing more to show) it gives a little and no more
-        if (!g.grew && holdsMore()) { g.grew = true; grow(); g.y0 = y; dy = 0; }
+        if (!g.grew && moreIn(g)) { g.grew = true; grow(); g.y0 = y; dy = 0; }
         else dy = Math.max(-14, dy * 0.18);
       }
       g.dy = dy;
@@ -413,7 +414,7 @@
       if (Math.abs(dx) > Math.abs(dy) || noDrag(g.target)) { g.mode = 'none'; return; }
       const head = handle.contains(g.target) || !!g.target.closest?.('.bcv-ph-sheet__head, .bcv-sheet__head') || g.y0 - sheet.getBoundingClientRect().top < 30;
       const atTop = !g.scroller || g.scroller.scrollTop <= 0;
-      g.mode = head || (atTop && dy > 0) || (atTop && dy < 0 && holdsMore()) ? 'drag' : 'none';
+      g.mode = head || (atTop && dy > 0) || (atTop && dy < 0 && moreIn(g)) ? 'drag' : 'none';
       if (g.mode === 'drag') { begin(); g.y0 = y - Math.sign(dy) * 6; }
     };
     // touch: the gesture is decided on its first move; a drag stops the scroll it would have been
