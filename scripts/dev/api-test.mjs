@@ -262,8 +262,18 @@ console.log('error codes');
 // settles in the time its rule is given, overshoots only where that is wanted, hands its position
 // and speed on when cut short, and reads the same as a CSS linear() easing. The engine is loaded
 // with no document at all: it must stand up on its own, and install nothing where it cannot.
+// a counter's box and the mark box dim and blur the page with two layers that follow the overlay's
+// animated values; Safari only redraws them when those values reach them by inheritance (2.98.78
+// made them non-inherited, taken with `inherit`, and the dim in Safari stayed at its page-wide start)
+console.log('the veil behind a box');
+{
+  const css = readFileSync(join(root, 'extension', 'content', 'styles', 'app.css'), 'utf8');
+  const props = ['cx', 'cy', 'r0', 'reach', 'blur', 'hole'].map((v) => (css.match(new RegExp(`@property --bcv-${v} \\{[^}]*inherits:\\s*(\\w+)`)) || [])[1]);
+  check(props.every((v) => v === 'true') && !/\.bcv-sheet-ov--card::before[^{]*\{[^}]*--bcv-cx:\s*inherit/.test(css), `the veil's animated values (--bcv-cx, cy, r0, reach, blur, hole) are inherited by its layers, never taken with \`inherit\`: ${props.join(', ')}`);
+}
+
 console.log('the springs');
-const motionSrc = readFileSync(join(root, 'extension', 'content', 'app', 'motion.js'), 'utf8');
+const motionSrc =readFileSync(join(root, 'extension', 'content', 'app', 'motion.js'), 'utf8');
 const mbox = { self: {}, console, Math, Map, Number, Object, String, JSON, Promise, Array };
 vm.createContext(mbox);
 vm.runInContext(motionSrc, mbox);
