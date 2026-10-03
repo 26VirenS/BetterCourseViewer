@@ -13,7 +13,7 @@
  * min(their own, the viewport less a margin). */
 
 html[data-bcv-theme] {
-  --bcv-version: "2.98.71"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.98.72"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -4045,8 +4045,8 @@ html.bcv-noblur .bcv-spot:not(.is-far) .bcv-omni__box, html.bcv-noblur .bcv-spot
   --bcv-hover: rgba(255,255,255,.13); --bcv-card: rgba(255,255,255,.1);
   /* (2.98.70) Liquid Glass's edges: no line round it, but a rim of light — brightest where the light falls, top left, and again
    * at the far corner, all but gone between — and the glass a little lighter just inside its edges, as thick glass bends light */
-  --bcv-glass-rim: linear-gradient(155deg, rgba(255,255,255,.2), rgba(255,255,255,.06) 22%, rgba(255,255,255,.015) 48%, rgba(255,255,255,.03) 74%, rgba(255,255,255,.12)); /* (2.98.71: much softer) */
-  --bcv-glass-shade: inset 0 1px 1px rgba(255,255,255,.07), inset 0 -1px 1px rgba(255,255,255,.025), inset 0 16px 22px -18px rgba(255,255,255,.07), inset 0 -14px 22px -18px rgba(255,255,255,.035), inset 14px 0 22px -20px rgba(255,255,255,.03), inset -14px 0 22px -20px rgba(255,255,255,.03);
+  --bcv-glass-rim: linear-gradient(155deg, rgba(255,255,255,.1), rgba(255,255,255,.03) 22%, rgba(255,255,255,.008) 48%, rgba(255,255,255,.015) 74%, rgba(255,255,255,.06)); /* (2.98.72: barely there — a hairline of light at the very edge) */
+  --bcv-glass-shade: inset 0 1px 0 rgba(255,255,255,.035), inset 0 -1px 0 rgba(255,255,255,.012), inset 1px 0 0 rgba(255,255,255,.012), inset -1px 0 0 rgba(255,255,255,.012); /* (at the edge only: nothing reaching in) */
   color-scheme: dark;
 }
 .bcv-spot .bcv-omni { position: static; display: block; flex: none; align-self: stretch; width: auto; max-width: none; min-width: 0; margin: 0; }

@@ -25,6 +25,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.98.72', date: '2026-10-03', notes: [
+      { kind: 'improved', title: 'Fainter glass edge', body: 'The search glass keeps only a faint line at its edge.', icon: P.sparkle },
+    ] },
     { version: '2.98.71', date: '2026-10-03', notes: [
       { kind: 'improved', title: 'Switches slide', body: 'The highlight in Cards | List and the like glides across.', icon: P.toggle },
       { kind: 'improved', title: 'Search back in place', body: 'On the Dashboard the search sits in its header again.', icon: P.pin },
