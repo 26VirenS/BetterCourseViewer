@@ -138,6 +138,10 @@ try {
       }
       // the tier the width lands in
       check(first.phone === phone, `${c.label}: ${phone ? 'the phone layout' : 'the desktop layout'} at ${c.cw}px (phone=${first.phone})`);
+      // a hairline drawn as a shadow is one screen pixel at the least: below 100% it does not fade out
+      const line = await page.evaluate(() => { const e = document.createElement('div'); e.style.boxShadow = '0 0 0 var(--bcv-line) red'; document.body.append(e); const v = getComputedStyle(e).boxShadow; e.remove(); return { dpx: getComputedStyle(document.documentElement).getPropertyValue('--bcv-dpx').trim(), shadow: v }; });
+      const lineW = parseFloat((line.shadow.match(/([\d.]+)px\s*$/) || [])[1]);
+      check(Math.abs(parseFloat(line.dpx) - 1 / c.z) < 0.01 && Math.abs(lineW - Math.max(1, 1 / c.z)) < 0.01, `${c.label}: one screen pixel is ${line.dpx} here, and a hairline is never thinner (${lineW}px)`);
       if (!phone) {
         const compact = c.cw <= 1100;
         check(first.sideW === (compact ? '200px' : '242px'), `${c.label}: the sidebar is ${compact ? 'the compact 200px' : 'the full 242px'} (${first.sideW})`);

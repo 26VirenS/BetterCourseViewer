@@ -164,7 +164,7 @@
           const own = [];
           for (let i = 1; i <= n; i++) { const page = await pdf.getPage(i); const tc = await page.getTextContent(); own.push(tc.items.map((it) => it.str).join(' ').replace(/\s+/g, ' ').trim()); }
           const first = await pdf.getPage(1);
-          st.preview = await draw(first, 1);
+          st.preview = await draw(first, Math.max(1, Math.min(2, U.dpr()))); // (shown, so drawn for the screen's pixels; read at 2 below)
           if (!p.alive() || st.file !== f) return;
           if (own.join('').replace(/\s/g, '').length >= 20) {
             st.text = own.map((t, i) => (n > 1 ? `— Page ${i + 1} —\n${t}` : t)).join('\n\n');

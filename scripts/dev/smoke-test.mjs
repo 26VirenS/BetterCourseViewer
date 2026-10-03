@@ -101,6 +101,15 @@ const settleShot = (page) => page.evaluate(() => Promise.race([
   Promise.all(document.getAnimations().filter((a) => a.playState === 'running' && a.effect?.getTiming?.().iterations !== Infinity).map((a) => a.finished.catch(() => {}))),
   new Promise((r) => setTimeout(r, 900)),
 ]).then(() => new Promise((r) => requestAnimationFrame(() => setTimeout(r, 20))))).catch(() => {});
+/** Whether the page behind an open overlay holds still: a wheel over the given point moves nothing. */
+const pageHeld = async (page, x = 40, y = 300) => {
+  const y0 = await page.evaluate(() => window.scrollY);
+  await page.mouse.move(x, y);
+  await page.mouse.wheel(0, 600);
+  await page.waitForTimeout(250);
+  return page.evaluate((y0) => ({ moved: window.scrollY !== y0, scrollable: document.documentElement.scrollHeight > innerHeight + 4, bar: getComputedStyle(document.body).overflow }), y0);
+};
+const ringEdges = (page) => page.evaluate(() => { const gs = [...document.querySelectorAll('.bcv-rr__ring > g[data-k]')].sort((a, b) => a.dataset.k - b.dataset.k); return gs.map((g) => { const p = g.querySelector('path'); const lines = g.querySelectorAll('line'); const pts = p.getAttribute('d').split(/[ML]/).filter(Boolean).map((q) => q.trim().split(/\s+/).map(Number)); const m = pts[Math.floor(pts.length / 2)]; const w = Number(lines[Math.floor(lines.length / 2)].getAttribute('stroke-width')); const r = Math.hypot(m[0] - 380, m[1] - 280); return { outer: Math.round((r + w / 2) * 10) / 10, w: Math.round(w * 10) / 10 }; }); });
 const shot = async (page, name) => { if (process.env.BCV_NO_SHOTS) return; await settleShot(page); await page.screenshot({ path: join(out, `${name}.png`) }); };
 
 // the copy this suite loads runs the product's longest timers short; every shipped value it rewrites
@@ -644,6 +653,7 @@ try {
   await shot(page, '01c-dashboard-glass-box'); // (the glass as a browser that draws blur shows it)
   if (glassBox.noblur) await page.evaluate(() => document.documentElement.classList.add('bcv-noblur')); // (as the rest of the run draws it)
   check(glassBox.stat && glassBox.layers === 2 && (!glassBox.noblur || (glassBox.solid && glassBox.blur === 'none')) && /^blur\(20px\)/.test(glassLit.blur) && !glassLit.solid && glassBox.ink === 'rgb(255, 255, 255)' && glassBox.row === 'rgb(255, 255, 255)' && glassBox.ground === '0' && glassBox.counter === 'hidden', `the counter's box wears the search's glass (20px behind it, the rim, white words; solid where no blur is drawn), the counter's own ground faded from over it, the counter itself hidden behind it: ${JSON.stringify({ glassBox, lit: glassLit.blur })}`);
+  check(!(await pageHeld(page, 20, 700)).moved, "the page behind a counter's box is held still while it is open");
   // (2.98.45) the counter grows where it stands into a taller box — its own corner, the page dimmed round it (darker further off)
   const steady0 = await page.evaluate(() => { const e = document.querySelector('.bcv-sheet'); const r = e.getBoundingClientRect(); const c = document.querySelector('.bcv-stats .bcv-stat:nth-child(3)').getBoundingClientRect(); const ov = document.querySelector('.bcv-sheet-ov'); return { x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height), cx: Math.round(c.left), cy: Math.round(c.top), card: e.classList.contains('bcv-sheet--card'), hint: !!e.querySelector('.bcv-sheet__pvhint'), veil: /^radial-gradient/.test(getComputedStyle(ov, '::after').backgroundImage), vw: innerWidth, vh: innerHeight }; });
   check(steady0.card && !steady0.hint && steady0.veil && steady0.w >= 360 && steady0.w <= 460 && steady0.h === 430 && steady0.y === steady0.cy && steady0.x + steady0.w <= steady0.vw - 15 && steady0.x <= steady0.cx && steady0.x >= steady0.cx - 120, `the counter grows in place into a taller box (430px) with its list (no pane waiting), the page dimmed round it: ${JSON.stringify(steady0)}`);
@@ -1648,6 +1658,7 @@ try {
   const chipRect = await page.$eval('.bcv-detail__grade', (e) => { const r = e.getBoundingClientRect(); return { l: Math.round(r.left), t: Math.round(r.top), r: Math.round(r.right), w: Math.round(r.width), h: Math.round(r.height) }; });
   await page.click('.bcv-detail__grade');
   await page.waitForSelector('.bcv-mark .bcv-fb__scorecard', { timeout: 10000 });
+  check(!(await pageHeld(page, 300, 700)).moved, 'the page behind the mark box is held still while it is open');
   await page.waitForTimeout(650);
   const asBox = await page.evaluate(() => { const ov = document.querySelector('.bcv-sheet-ov--card'); const box = document.querySelector('.bcv-sheet.bcv-mark'); const r = box.getBoundingClientRect(); return { ov: !!ov, far: ov?.classList.contains('is-far'), atCard: box.classList.contains('is-at-card'), l: Math.round(r.left), t: Math.round(r.top), r: Math.round(r.right), w: Math.round(r.width), h: Math.round(r.height), inside: r.left >= 0 && r.right <= innerWidth && r.top >= 0 && r.bottom <= innerHeight, value: box.querySelector('.bcv-sheet__value')?.textContent, label: box.querySelector('.bcv-sheet__label')?.textContent, note: box.querySelector('.bcv-sheet__note')?.textContent, embedded: !!document.querySelector('.bcv-fb')?.closest('.bcv-qz.is-embedded'), pageTitle: !!document.querySelector('.bcv-detail__title'), focus: document.activeElement === ov }; });
   check(!page.url().includes('bcv=feedback') && asBox.ov && !asBox.far && !asBox.atCard && asBox.inside && asBox.w >= 480 && asBox.h >= 480 && Math.abs(asBox.r - chipRect.r) <= 1 && asBox.t <= chipRect.t + 1 && asBox.value === '10' && asBox.label === '/ 10 · 100%' && /^Week 1 reflection · /.test(asBox.note) && !asBox.embedded && asBox.pageTitle && asBox.focus, `the mark opens in place: the chip grows into a box hung from its own corner over the dimmed page, the score and percent in its header, the page and its address staying put: ${JSON.stringify(asBox)} from ${JSON.stringify(chipRect)}`);
@@ -1874,31 +1885,54 @@ try {
     if (nb) html.classList.add('bcv-noblur');
     return out;
   });
+  // the page behind is held still while the ring is up: the wheel moves nothing (and its scrollbar stays put)
+  const held = await pageHeld(page, 760, 420);
+  check(!held.moved && held.scrollable && held.bar !== 'hidden', `the page behind the ring is held still — the wheel moves nothing: ${JSON.stringify(held)}`);
   check(!ringOpen.card && ringOpen.dialog === 'true' && /blur\(4px\)/.test(ringOpen.soft) && /blur\(18px\)/.test(ringOpen.deep) && ringOpen.hole && ringOpen.dim, `the rubric opens as the ring alone over the page — no card — with the page dimmed, a light blur behind the ring and a heavier one around it: ${JSON.stringify(ringOpen)}`);
   check(ringOpen.labels === 'Correctness, 4 of 6 | Work shown, 4 of 4' && ringOpen.shown === 'Correctness 4 / 6 | Work shown 4 / 4' && /^Score 8 of 10 · 80%/i.test(ringOpen.centre) && /^Graded \w{3} \d{1,2} · 2 criteria$/.test(ringOpen.status) && ringOpen.title === 'Week 1 reflection', `a slice per criterion, each a button named with its score, the rubric's own total in the middle: ${JSON.stringify(ringOpen)}`);
   // marked, the ring bends in where points were lost (Correctness, 4 of 6) and out where they were not (Work shown, 4 of 4)
-  const radiusAt = () => page.evaluate(() => [...document.querySelectorAll('.bcv-rr__ring > path')].map((p) => { const pts = p.getAttribute('d').split(/[ML]/).filter(Boolean).map((q) => q.trim().split(/\s+/).map(Number)); const m = pts[Math.floor(pts.length / 2)]; return Math.round(Math.hypot(m[0] - 380, m[1] - 280) * 10) / 10; }));
-  const bent = await page.waitForFunction(() => { const ps = [...document.querySelectorAll('.bcv-rr__ring > path')]; const r = ps.map((p) => { const pts = p.getAttribute('d').split(/[ML]/).filter(Boolean).map((q) => q.trim().split(/\s+/).map(Number)); const m = pts[Math.floor(pts.length / 2)]; return Math.hypot(m[0] - 380, m[1] - 280); }); return r[0] < 171 && r[1] > 179; }, null, { timeout: 5000 }).then(() => true).catch(() => false);
-  check(bent, `the marked ring pulls in where points were lost and pushes out where they were not: radii ${JSON.stringify(await radiusAt())} (the circle is 176)`);
+  const bent = await eventually(async () => { const e = await ringEdges(page); return e[0].outer < 176 && e[1].outer > 184; }, 5000);
+  check(bent, `the marked ring pulls in where points were lost and pushes out where they were not: ${JSON.stringify(await ringEdges(page))} (the circle's outer edge is 181)`);
+  // the pointer on a slice swells it outward, smoothly, and it settles back when the pointer leaves
+  const sliceMid = async (k) => page.evaluate((k) => { const r = document.querySelector('.bcv-rr__svg').getBoundingClientRect(); const s = r.width / 760; const p = document.querySelector(`.bcv-rr__ring > g[data-k="${k}"] path`); const pts = p.getAttribute('d').split(/[ML]/).filter(Boolean).map((q) => q.trim().split(/\s+/).map(Number)); const m = pts[Math.floor(pts.length / 2)]; return { x: r.left + m[0] * s, y: r.top + m[1] * s }; }, k);
+  const restEdge = (await ringEdges(page))[1].outer;
+  const hoverAt = await sliceMid(1);
+  await page.mouse.move(hoverAt.x, hoverAt.y);
+  const midSwell = (await ringEdges(page))[1].outer;
+  const swollen = await eventually(async () => (await ringEdges(page))[1].outer > restEdge + 8, 3000);
+  const swellTo = (await ringEdges(page))[1].outer;
+  await page.mouse.move(8, 8);
+  const settled = await eventually(async () => Math.abs((await ringEdges(page))[1].outer - restEdge) < 0.3, 3000);
+  check(swollen && settled && midSwell < swellTo, `the pointer on a slice swells it outward smoothly (${restEdge} → ${swellTo}, part-way ${midSwell}) and it settles back when the pointer leaves (${settled})`);
   await shot(page, '14r-rubric-ring');
   // a press on a slice — the drawing, not only its label — unrolls it into a bar with every level beside it
-  const sliceAt = await page.evaluate(() => { const r = document.querySelector('.bcv-rr__svg').getBoundingClientRect(); const s = r.width / 760; const a = (0.6 * 2 * Math.PI) / 2; return { x: r.left + (380 + 176 * Math.sin(a)) * s, y: r.top + (280 - 176 * Math.cos(a)) * s }; });
+  const sliceAt = await sliceMid(0);
   await page.mouse.click(sliceAt.x, sliceAt.y);
   const barOut = await page.waitForFunction(() => document.querySelector('.bcv-rr-ov')?.dataset.state === 'bar', null, { timeout: 5000 }).then(() => true).catch(() => false);
   const bar = await page.evaluate(() => ({ rows: [...document.querySelectorAll('.bcv-rr__row:not(.is-out)')].map((r) => r.innerText.replace(/\s+/g, ' ').trim()), picked: [...document.querySelectorAll('.bcv-rr__row:not(.is-out).is-picked .bcv-rr__rlab')].map((e) => e.textContent), count: document.querySelector('.bcv-rr__count').textContent, name: document.querySelector('.bcv-rr__name').textContent, note: document.querySelector('.bcv-rr__note:not([hidden])')?.innerText.trim(), ticks: document.querySelectorAll('.bcv-rr__ticks circle').length, tickPicked: document.querySelectorAll('.bcv-rr__ticks circle.is-picked').length, focus: document.activeElement?.className, labelsInert: !!document.querySelector('.bcv-rr__labels').inert }));
   check(barOut && bar.rows.join(' | ') === '6 Full marks | 3 Partial Your mark | 0 No marks' && bar.picked.join() === 'Partial' && bar.count === 'Criterion 1 of 2 · 4 / 6' && bar.name === 'Correctness' && bar.note === 'Sign error in part b.' && bar.ticks === 3 && bar.tickPicked === 1 && bar.focus === 'bcv-rr__name' && bar.labelsInert, `the slice unrolls into its bar: every level at its points, the one given marked, the marker's note under it, focus on its name: ${JSON.stringify({ barOut, ...bar })}`);
+  const backBtn = await page.evaluate(() => { const b = document.querySelector('.bcv-rr__back'); const n = document.querySelector('.bcv-rr__name'); const br = b.getBoundingClientRect(), nr = n.getBoundingClientRect(); const cs = getComputedStyle(b); return { text: b.textContent, label: b.getAttribute('aria-label'), beside: br.right <= nr.left && nr.left - br.right < 24 && Math.abs((br.top + br.bottom) / 2 - (nr.top + nr.bottom) / 2) < 6, rim: /conic-gradient/.test(cs.backgroundImage) && parseFloat(cs.borderTopWidth) >= 1 }; });
+  check(backBtn.text === 'Ring' && backBtn.label === 'Back to the ring' && backBtn.beside && backBtn.rim, `a back button sits right beside the criterion's name, its thin border the ring's colours: ${JSON.stringify(backBtn)}`);
   await shot(page, '14r2-rubric-bar');
   // the dots switch criteria in place, without going back round the ring
   await page.click('.bcv-rr__chip:nth-child(2)');
   const switched = await page.evaluate(() => ({ state: document.querySelector('.bcv-rr-ov').dataset.state, name: document.querySelector('.bcv-rr__name').textContent, picked: [...document.querySelectorAll('.bcv-rr__row:not(.is-out).is-picked .bcv-rr__rlab')].map((e) => e.textContent).join(), note: !!document.querySelector('.bcv-rr__note:not([hidden])'), on: document.querySelector('.bcv-rr__chip.is-on')?.getAttribute('aria-label') }));
   check(switched.state === 'bar' && switched.name === 'Work shown' && switched.picked === 'Full marks' && !switched.note && switched.on === 'Work shown, criterion 2 of 2', `a dot switches to the next criterion along the bar, never back through the ring: ${JSON.stringify(switched)}`);
   // Escape rolls the bar back into the ring (focus on that criterion's label), and a second one closes it, focus back on the button
-  await page.keyboard.press('Escape');
+  await page.click('.bcv-rr__back');
   const backRound = await page.waitForFunction(() => document.querySelector('.bcv-rr-ov')?.dataset.state === 'ring' && document.activeElement?.dataset?.k === '1', null, { timeout: 5000 }).then(() => true).catch(() => false);
-  check(backRound, `Escape rolls the bar back up into the ring, focus on the criterion it was showing (${await page.evaluate(() => `${document.querySelector('.bcv-rr-ov')?.dataset.state} / ${document.activeElement?.className}`)})`);
+  check(backRound, `Ring rolls the bar back up into the ring, focus on the criterion it was showing (${await page.evaluate(() => `${document.querySelector('.bcv-rr-ov')?.dataset.state} / ${document.activeElement?.className}`)})`);
+  await page.click('.bcv-rr__label[data-k="1"]');
+  await page.waitForFunction(() => document.querySelector('.bcv-rr-ov')?.dataset.state === 'bar', null, { timeout: 5000 });
+  await page.keyboard.press('Escape');
+  const escRound = await page.waitForFunction(() => document.querySelector('.bcv-rr-ov')?.dataset.state === 'ring', null, { timeout: 5000 }).then(() => true).catch(() => false);
+  check(escRound, 'Escape rolls the bar back up too');
   await page.keyboard.press('Escape');
   const ringGone = await page.waitForFunction(() => !document.querySelector('.bcv-rr-ov'), null, { timeout: 5000 }).then(() => true).catch(() => false);
   check(ringGone && await page.evaluate(() => document.activeElement?.classList.contains('bcv-rubbtn')), 'a second Escape closes the ring, and focus goes back to the Rubric button');
+  const freed = await pageHeld(page, 760, 420);
+  check(freed.moved || !freed.scrollable, `with the ring gone the page scrolls again: ${JSON.stringify(freed)}`);
+  await page.evaluate(() => window.scrollTo(0, 0));
   await page.goto(`${BASE}/courses/104/assignments/4002`);
   await page.waitForSelector('.bcv-detail__actions .bcv-btn--primary', { timeout: 10000 });
   check((await texts('.bcv-detail__actions .bcv-btn--primary'))[0] === 'Submit assignment', 'the assignment page offers our own submit flow');
@@ -2221,8 +2255,9 @@ try {
   await page.waitForSelector('.bcv-rr-ov .bcv-rr__label', { timeout: 8000 });
   await page.waitForTimeout(150);
   // before grading: a clean circle, each colour's stretch its share of the points, nothing marked
-  const plainRing = await page.evaluate(() => ({ labels: [...document.querySelectorAll('.bcv-rr__label')].map((b) => b.getAttribute('aria-label')).join(' | '), centre: document.querySelector('.bcv-rr__centre').innerText.replace(/\s+/g, ' ').trim(), status: document.querySelector('.bcv-rr__status').textContent, mine: !!document.querySelector('.bcv-rr__mine'), radii: [...document.querySelectorAll('.bcv-rr__ring > path')].map((p) => { const pts = p.getAttribute('d').split(/[ML]/).filter(Boolean).map((q) => q.trim().split(/\s+/).map(Number)); const m = pts[Math.floor(pts.length / 2)]; return Math.round(Math.hypot(m[0] - 380, m[1] - 280)); }) }));
-  check(plainRing.labels === 'Correctness, worth 6 points | Work shown, worth 4 points' && /^Total 10 points/i.test(plainRing.centre) && plainRing.status === '2 criteria · not graded yet' && !plainRing.mine && plainRing.radii.every((r) => r === 176), `an ungraded rubric is a clean circle, each slice named with what it is worth, the total in the middle: ${JSON.stringify(plainRing)}`);
+  const plainRing = await page.evaluate(() => ({ labels: [...document.querySelectorAll('.bcv-rr__label')].map((b) => b.getAttribute('aria-label')).join(' | '), centre: document.querySelector('.bcv-rr__centre').innerText.replace(/\s+/g, ' ').trim(), status: document.querySelector('.bcv-rr__status').textContent, mine: !!document.querySelector('.bcv-rr__mine'), edges: [] }));
+  plainRing.edges = await ringEdges(page);
+  check(plainRing.labels === 'Correctness, worth 6 points | Work shown, worth 4 points' && /^Total 10 points/i.test(plainRing.centre) && plainRing.status === '2 criteria · not graded yet' && !plainRing.mine && plainRing.edges.every((e) => Math.abs(e.outer - 181) < 0.6) && plainRing.edges[0].w > plainRing.edges[1].w + 4, `an ungraded rubric is a clean circle — each slice's outer edge on it, the one worth more thicker, inward — named with what it is worth, the total in the middle: ${JSON.stringify(plainRing)}`);
   // the keyboard: the arrows walk the slices' labels, Enter opens one
   await page.keyboard.press('ArrowRight');
   const walked = await page.evaluate(() => document.activeElement?.getAttribute('aria-label'));
@@ -2888,8 +2923,34 @@ try {
   await page.click('.bcv-qz__mode[data-mode="all"]');
   await page.waitForSelector('.bcv-qz__page--all', { timeout: 5000 });
   check((await page.$$('.bcv-qz__q')).length === 4 && (await page.$$('.bcv-qz__progress--all .bcv-qz__pill')).length === 4, 'scroll mode shows every question on one page');
+  // the question under the reading line is the current one: a bar at its side, its number lit, its pill in
+  // the head with it, the others standing back — and the mark follows the scroll
+  const current = () => page.evaluate(() => {
+    const qs = [...document.querySelectorAll('.bcv-qz__q')];
+    const k = qs.findIndex((q) => q.classList.contains('is-current'));
+    const pill = [...document.querySelectorAll('.bcv-qz__progress--all .bcv-qz__pill')].findIndex((p) => p.classList.contains('is-current'));
+    const bar = k >= 0 ? getComputedStyle(qs[k], '::before') : null;
+    const num = (q) => getComputedStyle(q.querySelector('.bcv-qz__qnum')).color;
+    return { k, pill, marks: qs.filter((q) => q.classList.contains('is-current')).length, lit: !!bar && bar.opacity === '1' && bar.width === '3px' && bar.transform === 'none', numLit: k >= 0 && qs.some((q, i) => i !== k && num(q) !== num(qs[k])), back: qs.filter((q, i) => i !== k && !q.matches(':focus-within')).map((q) => getComputedStyle(q).opacity), scrollY: Math.round(window.scrollY) };
+  });
+  const openedAt = await current();
+  check(openedAt.k >= 0 && openedAt.k === openedAt.pill && openedAt.marks === 1, `the scroll opens on the question you were on, marked, its pill with it (${JSON.stringify(openedAt)})`);
+  await page.mouse.move(700, 420);
+  await page.mouse.wheel(0, -5000); // (a scroll of your own, to the top)
+  check(await eventually(async () => { const c = await current(); return c.k === 0 && c.pill === 0 && c.marks === 1 && c.lit && c.numLit && c.back.every((o) => Number(o) < 1); }, 3000), `at the top the first question is current: a bar at its side, its number lit, its pill in the head, the others standing back (${JSON.stringify(await current())})`);
+  await page.evaluate(() => { const r = document.getElementById('bcv-q1').getBoundingClientRect(); window.scrollTo(0, r.top + window.scrollY - 160); });
+  check(await eventually(async () => { const c = await current(); return c.k === 1 && c.pill === 1 && c.marks === 1 && c.lit; }, 3000), `scrolled to the second question, the mark and the pill move to it (${JSON.stringify(await current())})`);
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  check(await eventually(async () => { const c = await current(); return c.k === 3 && c.pill === 3; }, 3000), 'at the foot of the page the last question is current, however short it is');
+  // a pill sends the page to its question, and the mark goes there at once — not through the questions on the way
+  await page.click('.bcv-qz__progress--all .bcv-qz__pill:nth-child(1)');
+  const sentK = await page.evaluate(() => [...document.querySelectorAll('.bcv-qz__q')].findIndex((q) => q.classList.contains('is-current')));
+  await page.waitForFunction(() => window.scrollY < 60, null, { timeout: 4000 });
+  await page.waitForTimeout(350);
+  check(sentK === 0 && (await current()).k === 0 && (await current()).pill === 0, `a pill sends the page to its question and the mark goes there at once, not through the questions on the way (marked ${sentK} as it set off)`);
   await page.click('#bcv-q1 .bcv-qz__opt:nth-child(2)');
   await waitText('.bcv-qz__answered', /2 of 4 answered/);
+  check((await current()).k === 1 && (await current()).pill === 1, 'the question you answer is the current one');
   await page.fill('#bcv-q3 input', '3.15');
   await waitText('.bcv-qz__answered', /3 of 4 answered · Saved/);
   await shot(page, '22e-quiz-scroll');
@@ -2905,7 +2966,8 @@ try {
   await shot(page, '22f-quiz-review');
   await page.click('.bcv-qz__sum:nth-child(3)');
   await page.waitForSelector('.bcv-qz__page--all', { timeout: 5000 });
-  check(await page.$('.bcv-qz__progress--all .bcv-qz__pill:nth-child(3).is-current'), 'tapping a review row goes back to that question');
+  await page.waitForTimeout(200);
+  check(await page.$('.bcv-qz__progress--all .bcv-qz__pill:nth-child(3).is-current') && (await current()).k === 2 && (await current()).marks === 1, 'tapping a review row goes back to that question, and the mark is on it');
   await page.click('#bcv-q2 .bcv-qz__opt:nth-child(1)');
   await page.click('#bcv-q2 .bcv-qz__opt:nth-child(3)');
   await waitText('.bcv-qz__answered', /4 of 4 answered · Saved/);
@@ -6215,6 +6277,18 @@ try {
     check(await eventually(async () => (await texts('.bcv-conv__droptitle'))[0] === 'Drop a PDF to mark up' && (await toolSub()) === 'Highlights, drawings, text and notes, kept on this device per file.') && (await page.$$('.bcv-mark__recent')).length === 0, `the annotator opens on a drop zone with nothing marked up before (${(await texts('.bcv-conv__droptitle'))[0]} · ${await toolSub()})`);
     await page.setInputFiles('.bcv-mark__drop input[type=file]', [{ name: 'Chapter.pdf', mimeType: 'application/pdf', buffer: ntTwo }]);
     check(await eventually(() => page.$$('.bcv-mark__page').then((r) => r.length === 2), 10000) && await eventually(() => page.$$('.bcv-mark__page[data-page="1"] .bcv-mark__text span').then((r) => r.length >= 3), 15000) && (await texts('.bcv-tool__title'))[0] === 'Chapter.pdf' && (await texts('.bcv-mark__pageno'))[0] === 'Page 1 of 2' && (await texts('.bcv-mark__count'))[0] === 'Nothing marked yet' && (await page.$eval('.bcv-mark__page[data-page="1"] canvas', (e) => e.width > 600 && e.height > 800)), 'the PDF draws page by page with a text layer over each, the panel empty');
+    // a zoom, or the window moved to a denser screen: the pages are drawn again in the screen's own pixels
+    const dprCdp = await context.newCDPSession(page);
+    const dprVp = page.viewportSize();
+    const pageCanvas = () => page.$eval('.bcv-mark__page[data-page="1"] canvas', (e) => ({ w: e.width, css: parseFloat(e.style.width), dpr: devicePixelRatio }));
+    const at1x = await pageCanvas();
+    await dprCdp.send('Emulation.setDeviceMetricsOverride', { width: dprVp.width, height: dprVp.height, deviceScaleFactor: 2, mobile: false });
+    const sharp2x = await eventually(async () => { const c = await pageCanvas(); return c.dpr === 2 && Math.abs(c.w - 2 * c.css) <= 2; }, 10000);
+    const at2x = await pageCanvas();
+    await dprCdp.send('Emulation.setDeviceMetricsOverride', { width: dprVp.width, height: dprVp.height, deviceScaleFactor: 1, mobile: false });
+    const back1x = await eventually(async () => { const c = await pageCanvas(); return c.dpr === 1 && Math.abs(c.w - c.css) <= 1; }, 10000);
+    await dprCdp.detach().catch(() => {});
+    check(Math.abs(at1x.w - at1x.css) <= 1 && sharp2x && back1x, `the annotator draws its pages in the screen's own pixels, again whenever that changes: ${JSON.stringify({ at1x, at2x, back1x })}`);
     const ntSel = await page.evaluate(() => { const span = [...document.querySelectorAll('.bcv-mark__page[data-page="1"] .bcv-mark__text span')].find((s) => /mitochondria/.test(s.textContent)); if (!span) return ''; const r = document.createRange(); r.selectNodeContents(span); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); return sel.toString(); });
     check(ntSel === 'The mitochondria is the powerhouse of the cell.' && await eventually(() => page.$('.bcv-mark__bubble').then((b) => !!b), 3000) && (await page.$$('.bcv-mark__bubble .bcv-mark__swatch')).length === 6 && (await texts('.bcv-mark__bubble .bcv-mark__tool')).join(' ') === 'Underline Strike Note', 'selecting words brings up a bubble of six colours, Underline, Strike and Note');
     await shot(page, '43-annotator-bubble');

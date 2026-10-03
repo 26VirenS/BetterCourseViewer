@@ -13,7 +13,8 @@
  * min(their own, the viewport less a margin). */
 
 html[data-bcv-theme] {
-  --bcv-version: "2.98.76"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-line: max(1px, var(--bcv-dpx, 1px)); /* a hairline drawn as a shadow: one CSS pixel, or one screen pixel where that is more (below 100% zoom; content/early.js keeps --bcv-dpx) */
+  --bcv-version: "2.98.77"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -353,7 +354,7 @@ html.bcv-noblur .bcv-tour__blur { display: none; } /* (Chrome drawing without gr
 @keyframes bcv-tour-hover { 0% { opacity: 0; transform: translate(46px, 40px); } 12% { opacity: 1; transform: translate(46px, 40px); } 42%, 80% { opacity: 1; transform: none; } 92%, 100% { opacity: 0; transform: none; } }
 @keyframes bcv-tour-drag { 0%, 8% { opacity: 0; transform: none; } 16% { opacity: 1; transform: scale(.85); } 70% { opacity: 1; transform: translate(var(--dx, 0px), var(--dy, 0px)) scale(.85); } 78% { opacity: 1; transform: translate(var(--dx, 0px), var(--dy, 0px)); } 92%, 100% { opacity: 0; transform: translate(var(--dx, 0px), var(--dy, 0px)); } }
 /* the card: the step's words beside the thing, the action it waits for underlined in the colour */
-.bcv-tour__card { position: fixed; left: 0; top: 0; width: min(340px, calc(100vw - 24px)); box-sizing: border-box; padding: 14px 16px 12px; border-radius: 18px; background: var(--bcv-card); color: var(--bcv-ink); box-shadow: 0 24px 60px rgba(0,0,0,.34), 0 0 0 1px var(--bcv-hair); pointer-events: auto; transition: transform .45s cubic-bezier(.32,.72,0,1), opacity .18s ease; animation: bcv-tour-in .3s ease both; }
+.bcv-tour__card { position: fixed; left: 0; top: 0; width: min(340px, calc(100vw - 24px)); box-sizing: border-box; padding: 14px 16px 12px; border-radius: 18px; background: var(--bcv-card); color: var(--bcv-ink); box-shadow: 0 24px 60px rgba(0,0,0,.34), 0 0 0 var(--bcv-line) var(--bcv-hair); pointer-events: auto; transition: transform .45s cubic-bezier(.32,.72,0,1), opacity .18s ease; animation: bcv-tour-in .3s ease both; }
 .bcv-tour__card.is-swap { opacity: 0; }
 .bcv-tour__card.is-nudge { animation: bcv-tour-nudge .42s cubic-bezier(.36,.07,.19,.97); }
 @keyframes bcv-tour-nudge { 20%, 60% { translate: -5px 0; } 40%, 80% { translate: 5px 0; } }
@@ -402,6 +403,11 @@ html.bcv-on body { margin: 0 !important; padding: 0 !important; background: var(
  * would be carried off with the page. A scroll lock goes on <body> instead, which locks the window. */
 html.bcv-on { overflow: visible !important; }
 html.bcv-on.bcv-setup-open body { overflow: hidden !important; }
+/* Anything that asks for attention holds the page still behind it — a sheet, a counter's box, the mark box, the
+   rubric ring, a tool, the viewer, the reader, the search afloat. On a phone the page's scroll is simply switched
+   off (its scrollbars float, so nothing moves); on the desktop ui.js holds the wheel and the scroll keys instead,
+   so a drawn scrollbar is not taken away and nothing behind the overlay shifts sideways. */
+html.bcv-on.bcv-phone body:has(> :is(.bcv-sheet-ov:not(.is-closing, .is-folding), .bcv-reader-ov:not(.is-closing), .bcv-spot-ov:not(.is-folding))) { overflow: hidden !important; }
 html.bcv-on #application, html.bcv-on body > .ic-app, html.bcv-on #flash_message_holder, html.bcv-on #flash_screenreader_holder, html.bcv-on #immersive_reader_mount_point, html.bcv-on #nav-tray-portal, html.bcv-on #header, html.bcv-on #wrapper { display: none !important; }
 html.bcv-on #bcv-app { display: flex; }
 
@@ -723,7 +729,7 @@ html[data-bcv-theme="dark"] .bcv-badge--orange { color: #ffb44d; }
 html.bcv-noblur .bcv-sheet-ov--card::before { display: none; }
 @keyframes bcv-card-veil { from { opacity: 0; } }
 .bcv-sheet-ov--card.is-folding { opacity: 0; pointer-events: none; }
-.bcv-sheet--card { position: fixed; z-index: 1; margin: 0; max-width: none; max-height: none; background: var(--bcv-card); -webkit-backdrop-filter: none; backdrop-filter: none; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); animation: none; transform: none; box-shadow: 0 30px 80px rgba(0,0,0,.34), 0 0 0 1px var(--bcv-hair); transition: left .46s cubic-bezier(.32,.72,0,1), top .46s cubic-bezier(.32,.72,0,1), width .46s cubic-bezier(.32,.72,0,1), height .46s cubic-bezier(.32,.72,0,1); }
+.bcv-sheet--card { position: fixed; z-index: 1; margin: 0; max-width: none; max-height: none; background: var(--bcv-card); -webkit-backdrop-filter: none; backdrop-filter: none; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); animation: none; transform: none; box-shadow: 0 30px 80px rgba(0,0,0,.34), 0 0 0 var(--bcv-line) var(--bcv-hair); transition: left .46s cubic-bezier(.32,.72,0,1), top .46s cubic-bezier(.32,.72,0,1), width .46s cubic-bezier(.32,.72,0,1), height .46s cubic-bezier(.32,.72,0,1); }
 .bcv-sheet--card.is-at-card { transition: none; }
 /* (2.98.73) the box a Dashboard counter opens into wears the search's glass — smoky, the page coming through it softly
    blurred, the words white (the page's inks, fills and edges turned for glass this dark, as the search's are), Liquid
@@ -733,7 +739,7 @@ html.bcv-noblur .bcv-sheet-ov--card::before { display: none; }
    (.bcv-stat.is-lifted, hidden while its box is up: content/app/screens/dashboard.js openSheet). */
 .bcv-sheet-ov--card { --bcv-stat-ground: var(--bcv-card); }
 .bcv-sheet--stat { border: 1px solid transparent; background: linear-gradient(180deg, rgba(34,33,38,.58), rgba(24,23,27,.66)) padding-box, var(--bcv-glass-rim) border-box; -webkit-backdrop-filter: blur(20px) saturate(1.8) brightness(.66); backdrop-filter: blur(20px) saturate(1.8) brightness(.66); box-shadow: var(--bcv-glass-shade), 0 30px 80px rgba(0,0,0,.34), 0 2px 10px rgba(0,0,0,.14); }
-.bcv-sheet--stat::before { content: ''; position: absolute; inset: 0; z-index: -1; border-radius: inherit; background: var(--bcv-stat-ground); box-shadow: 0 0 0 1px var(--bcv-hair); pointer-events: none; opacity: 0; transition: opacity .3s ease .06s; }
+.bcv-sheet--stat::before { content: ''; position: absolute; inset: 0; z-index: -1; border-radius: inherit; background: var(--bcv-stat-ground); box-shadow: 0 0 0 var(--bcv-line) var(--bcv-hair); pointer-events: none; opacity: 0; transition: opacity .3s ease .06s; }
 .bcv-sheet--stat.is-at-card::before, .bcv-sheet-ov.is-folding > .bcv-sheet--stat::before { opacity: 1; }
 .bcv-sheet--stat.is-at-card::before { transition: none; }
 .bcv-sheet-ov.is-folding > .bcv-sheet--stat::before { transition: opacity .24s ease .2s; } /* (back before the box is the counter's size again) */
@@ -771,8 +777,8 @@ body:has(> .bcv-sheet-ov--card:not(.is-folding)) .bcv-stat.is-lifted { visibilit
 .bcv-mark.is-at-card .bcv-sheet__tile > svg, .bcv-sheet-ov.is-folding .bcv-mark .bcv-sheet__tile > svg { opacity: 0; transition-delay: 0s; transition-duration: .1s; }
 .bcv-mark > .bcv-sheet__list { padding: 0; background: var(--bcv-bg); }
 .bcv-fb--box { max-width: none; margin: 0; padding: 14px 16px 18px; gap: 12px; }
-.bcv-fb--box .bcv-fb__card, .bcv-fb--box .bcv-fb__scorecard { padding: 16px 18px; border-radius: 18px; box-shadow: 0 0 0 1px var(--bcv-hair); }
-.bcv-fb--box .bcv-fb__q { padding: 14px 16px; border-radius: 16px; box-shadow: 0 0 0 1px var(--bcv-hair); }
+.bcv-fb--box .bcv-fb__card, .bcv-fb--box .bcv-fb__scorecard { padding: 16px 18px; border-radius: 18px; box-shadow: 0 0 0 var(--bcv-line) var(--bcv-hair); }
+.bcv-fb--box .bcv-fb__q { padding: 14px 16px; border-radius: 16px; box-shadow: 0 0 0 var(--bcv-line) var(--bcv-hair); }
 .bcv-fb--box .bcv-fb__big { font-size: 30px; }
 .bcv-fb--box .bcv-fb__btns .bcv-qz__big { flex: 0 0 auto; height: 44px; padding: 0 22px; border-radius: 22px; font-size: 15px; } /* (a button, not a slab across the box) */
 /* (2.98.56) the first frame of the box is the chip exactly, and the last of the fold too: while it is the chip's size the
@@ -1088,7 +1094,7 @@ html[data-bcv-theme="dark"] .bcv-cal__notice--warn { color: #ffb44d; }
 .bcv-menu--colors { min-width: 0; width: 226px; padding: 12px; }
 .bcv-menu__title { padding: 0 2px 10px; font: 600 11px/1.2 var(--bcv-font); color: var(--bcv-ink3); text-transform: uppercase; letter-spacing: .05em; }
 .bcv-swatches { display: grid; grid-template-columns: repeat(6, 26px); gap: 9px; }
-.bcv-swatch { width: 26px; height: 26px; border-radius: 50%; border: 0; padding: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: inset 0 0 0 1px rgba(0,0,0,.1); box-sizing: border-box; }
+.bcv-swatch { width: 26px; height: 26px; border-radius: 50%; border: 0; padding: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: inset 0 0 0 var(--bcv-line) rgba(0,0,0,.1); box-sizing: border-box; }
 .bcv-swatch:hover { transform: scale(1.12); }
 .bcv-swatch.is-current { box-shadow: 0 0 0 2px var(--bcv-card), 0 0 0 4px var(--bcv-ink); }
 .bcv-swatch--custom { position: relative; overflow: hidden; background: conic-gradient(#ff2717, #fd5d10, #8d9900, #009606, #06a3b7, #1770ab, #8f3e97, #e71f63, #ff2717); }
@@ -1299,7 +1305,7 @@ html.bcv-phone .bcv-rubg__cellpts { font-size: 19px; }
   --rr-ink: #f5f5f7; --rr-ink2: rgba(235,235,245,.82); --rr-ink3: rgba(235,235,245,.64); --rr-sep: rgba(255,255,255,.14); --rr-fill: rgba(255,255,255,.13); --rr-dim0: .64; --rr-dim1: .84; --rr-s: 1; }
 html[data-bcv-theme="dark"] .bcv-rr-ov { --rr-dim0: .52; --rr-dim1: .78; }
 .bcv-rr-ov.is-closing { animation: none; }
-.bcv-rr__veil { position: absolute; inset: 0; pointer-events: none; animation: bcv-card-veil .3s ease backwards; transition: opacity .3s ease; }
+.bcv-rr__veil { position: absolute; inset: 0; pointer-events: none; animation: bcv-card-veil .38s ease backwards; transition: opacity .38s ease; }
 .bcv-rr__veil--soft { -webkit-backdrop-filter: blur(4px) saturate(.9); backdrop-filter: blur(4px) saturate(.9); }
 .bcv-rr__veil--deep { -webkit-backdrop-filter: blur(18px) saturate(.8); backdrop-filter: blur(18px) saturate(.8);
   -webkit-mask-image: radial-gradient(ellipse calc(var(--rr-w, 760px) * .6) calc(var(--rr-h, 560px) * .62) at var(--rr-x, 50%) var(--rr-y, 50%), transparent 58%, rgba(0,0,0,.7) 82%, #000 100%);
@@ -1313,14 +1319,14 @@ html[data-bcv-theme="dark"] .bcv-rr-ov { --rr-dim0: .52; --rr-dim1: .78; }
 .bcv-rr__close { position: absolute; top: 18px; left: 20px; width: 34px; height: 34px; border: 0; border-radius: 17px; background: var(--rr-fill); color: var(--rr-ink2); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background .15s ease, color .15s ease, opacity .2s ease; }
 .bcv-rr__close:hover { background: rgba(255,255,255,.22); color: #fff; }
 .bcv-rr__field { position: absolute; left: 12px; right: 12px; top: 96px; bottom: 44px; }
-.bcv-rr__stage { position: absolute; left: 50%; top: 50%; width: 760px; height: 560px; transform: translate(-50%, -50%) scale(var(--rr-s)); }
-.bcv-rr__inner { position: relative; width: 100%; height: 100%; transition: transform .3s cubic-bezier(.32,.72,0,1), opacity .24s ease; }
+.bcv-rr__stage { position: absolute; left: 50%; top: 50%; width: 760px; height: 560px; transform: translate(-50%, -50%) scale(var(--rr-s)); will-change: transform; } /* (a layer of its own: its frames repaint it alone, never the blurred page under it) */
+.bcv-rr__inner { position: relative; width: 100%; height: 100%; transition: transform .4s cubic-bezier(.32,.72,0,1), opacity .32s ease; }
 .bcv-rr-ov.is-leaving .bcv-rr__inner { transform: scale(.92); opacity: 0; }
 .bcv-rr-ov.is-leaving :is(.bcv-rr__top, .bcv-rr__foot, .bcv-rr__close) { opacity: 0; }
 .bcv-rr__svg { position: absolute; left: 0; top: 0; width: 100%; height: 100%; overflow: visible; }
 /* the ring blooms in, a quarter-turn short of where it lands */
 @keyframes bcv-rr-bloom { from { opacity: 0; transform: scale(.6) rotate(-40deg); } }
-.bcv-rr__ring { transform-origin: 380px 280px; animation: bcv-rr-bloom .8s cubic-bezier(.32,.72,0,1) backwards; }
+.bcv-rr__ring { transform-origin: 380px 280px; animation: bcv-rr-bloom 1s cubic-bezier(.32,.72,0,1) backwards; }
 .bcv-rr__hit { cursor: pointer; }
 .bcv-rr__ticks circle { fill: #1c1c1e; stroke: rgba(255,255,255,.82); stroke-width: 2.5; transform-box: fill-box; transform-origin: center; }
 .bcv-rr__ticks circle.is-picked { fill: #fff; stroke: var(--rr-sel); }
@@ -1358,8 +1364,12 @@ html[data-bcv-theme="dark"] .bcv-rr-ov { --rr-dim0: .52; --rr-dim1: .78; }
 .bcv-rr-ov[data-count="lots"] .bcv-rr__chip { width: 6px; height: 6px; }
 .bcv-rr-ov:is([data-count="many"], [data-count="lots"]) .bcv-rr__chip.is-on { width: 11px; height: 11px; }
 .bcv-rr__chip:focus-visible, .bcv-rr__back:focus-visible, .bcv-rr__close:focus-visible, .bcv-rr__more:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
-.bcv-rr__back { flex: none; margin-left: 6px; width: 30px; height: 30px; border: 0; border-radius: 15px; background: var(--rr-fill); color: var(--rr-ink2); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background .15s ease; }
-.bcv-rr__back:hover { background: rgba(255,255,255,.22); color: #fff; }
+.bcv-rr__nameline { display: flex; align-items: center; gap: 12px; margin-top: 6px; }
+.bcv-rr__nameline .bcv-rr__name { margin: 0; min-width: 0; }
+/* back to the ring: beside the name, its thin border the ring's own colours (--rr-ring, set by the ring) */
+.bcv-rr__back { flex: none; display: inline-flex; align-items: center; gap: 4px; height: 30px; padding: 0 12px 0 8px; border: 1.5px solid transparent; border-radius: 15px; background: linear-gradient(rgba(30,30,33,.94), rgba(30,30,33,.94)) padding-box, var(--rr-ring, var(--rr-fill)) border-box; color: #fff; font: 600 12.5px/1 var(--bcv-font); cursor: pointer; transition: transform .2s cubic-bezier(.32,.72,0,1), background .15s ease; }
+.bcv-rr__back:hover { background: linear-gradient(rgba(52,52,56,.96), rgba(52,52,56,.96)) padding-box, var(--rr-ring, var(--rr-fill)) border-box; transform: translateX(-2px); }
+.bcv-rr__back:active { transform: scale(.96); }
 .bcv-rr__rows { position: absolute; inset: 0; }
 .bcv-rr__row { position: absolute; left: 108px; right: 28px; top: var(--rr-y); transform: translate(var(--rr-x, 0px), -50%); display: flex; align-items: center; gap: 14px; }
 .bcv-rr__row.is-out { opacity: 0 !important; transition: opacity .18s ease; }
@@ -2103,6 +2113,16 @@ html.bcv-phone .bcv-qz__raw, html.bcv-phone .bcv-qz__instrbtn { padding: 0 9px; 
 .bcv-qz__page { flex: 1; max-width: 760px; margin: 0 auto; width: 100%; padding: 28px 28px 120px; }
 .bcv-qz__page--all { display: flex; flex-direction: column; gap: 34px; }
 .bcv-qz__q { scroll-margin-top: 130px; }
+/* scroll mode: the question under the reading line is the current one (quiz.js followScroll) — a bar at its
+   side and its number lit, both on the snappy spring as the mark moves; the others stand back a little */
+.bcv-qz__page--all .bcv-qz__q { position: relative; opacity: .74; transition: opacity var(--bcv-t-settle) var(--bcv-spring-settle); }
+.bcv-qz__page--all .bcv-qz__q.is-current, .bcv-qz__page--all .bcv-qz__q:focus-within { opacity: 1; }
+.bcv-qz__page--all .bcv-qz__q::before { content: ''; position: absolute; top: 2px; bottom: 2px; left: -18px; width: 3px; border-radius: 2px; background: var(--bcv-blue); opacity: 0; transform: scaleY(.55); transition: opacity var(--bcv-t-snappy) var(--bcv-spring-snappy), transform var(--bcv-t-snappy) var(--bcv-spring-snappy); }
+.bcv-qz__page--all .bcv-qz__q.is-current::before { opacity: 1; transform: none; }
+.bcv-qz__page--all .bcv-qz__qnum { transition: color var(--bcv-t-snappy) var(--bcv-spring-snappy); }
+.bcv-qz__page--all .bcv-qz__q.is-current .bcv-qz__qnum { color: var(--bcv-blue); }
+.bcv-qz__progress--all .bcv-qz__pill { transition: background var(--bcv-t-snappy) var(--bcv-spring-snappy), color var(--bcv-t-snappy) var(--bcv-spring-snappy); }
+@media (prefers-reduced-motion: reduce) { .bcv-qz__page--all .bcv-qz__q, .bcv-qz__page--all .bcv-qz__q::before, .bcv-qz__page--all .bcv-qz__qnum { transition: none; } }
 .bcv-qz__qhead { display: flex; align-items: center; gap: 10px; padding: 0 4px 14px; }
 .bcv-qz__qnum { font: 700 13px/1.2 var(--bcv-font); letter-spacing: -.01em; }
 .bcv-qz__qof { font: 400 13px/1.2 var(--bcv-font); color: var(--bcv-ink3); }
@@ -2440,7 +2460,7 @@ html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) .bcv-head--pic .bc
  * light round them, white words on them: darkened where the photo is light, lightened where it is dark */
 .bcv-head--pic .bcv-seg, .bcv-head--pic .bcv-head__row .bcv-btn:not(.bcv-btn--primary), .bcv-head--pic .bcv-chips, .bcv-side--pic .bcv-nav__item.is-active, .bcv-side--pic .bcv-theme-btn, .bcv-side--pic .bcv-account {
   background: var(--bcv-photo-frost); -webkit-backdrop-filter: blur(18px) saturate(1.4); backdrop-filter: blur(18px) saturate(1.4);
-  box-shadow: inset 0 0 0 1px var(--bcv-photo-hair), 0 1px 8px rgba(0,0,0,.12); color: var(--bcv-photo-ink); }
+  box-shadow: inset 0 0 0 var(--bcv-line) var(--bcv-photo-hair), 0 1px 8px rgba(0,0,0,.12); color: var(--bcv-photo-ink); }
 .bcv-head--pic .bcv-chips { padding: 4px; border-radius: 16px; }
 /* (the rows and the switcher's stops are buttons: `#bcv-app button { color: inherit }` would take their white back) */
 #bcv-app .bcv-side--pic .bcv-theme-btn, #bcv-app .bcv-side--pic .bcv-account, #bcv-app .bcv-head--pic .bcv-head__row .bcv-btn:not(.bcv-btn--primary), #bcv-app .bcv-head--pic .bcv-seg__btn.is-active { color: var(--bcv-photo-ink); }
@@ -3376,7 +3396,7 @@ html[data-bcv-theme="dark"] .bcv-tool__note--warn { color: #ffb44d; }
 .bcv-cite { display: flex; flex-wrap: wrap; gap: 18px; align-items: flex-start; }
 .bcv-cite__types { display: flex; flex-wrap: wrap; gap: 6px; }
 .bcv-cite__type { display: flex; align-items: center; gap: 7px; padding: 8px 13px; border: 1px solid var(--bcv-edge); border-radius: 15px; background: transparent; color: var(--bcv-ink2); cursor: pointer; font: 500 12.5px/1 var(--bcv-font); transition: background .2s ease, border-color .2s ease, color .2s ease; }
-.bcv-cite__type.is-on { background: var(--bcv-blue-soft); border-color: var(--bcv-blue); box-shadow: inset 0 0 0 .5px var(--bcv-blue); color: var(--bcv-blue); font-weight: 600; }
+.bcv-cite__type.is-on { background: var(--bcv-blue-soft); border-color: var(--bcv-blue); box-shadow: inset 0 0 0 max(.5px, var(--bcv-dpx, .5px)) var(--bcv-blue); color: var(--bcv-blue); font-weight: 600; }
 .bcv-cite__fields { display: flex; flex-wrap: wrap; gap: 12px; }
 .bcv-cite__field { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
 .bcv-cite__fieldlabel { display: flex; align-items: baseline; gap: 6px; font: 500 11.5px/1.2 var(--bcv-font); color: var(--bcv-ink2); }
@@ -3738,7 +3758,7 @@ html[data-bcv-theme="dark"] .bcv-conv__delta.is-more, html[data-bcv-theme="dark"
 .bcv-mark__bar { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 16px; border-bottom: 1px solid var(--bcv-sep); }
 .bcv-mark__tools, .bcv-mark__nav { display: flex; align-items: center; gap: 6px; }
 .bcv-mark__sep { width: 1px; height: 18px; background: var(--bcv-sep); margin: 0 4px; }
-.bcv-mark__swatch { flex: none; width: 22px; height: 22px; margin: 0; padding: 0; border: 2px solid transparent; border-radius: 11px; background: var(--c); cursor: pointer; box-shadow: inset 0 0 0 1px rgba(0,0,0,.1); transition: transform .12s ease; }
+.bcv-mark__swatch { flex: none; width: 22px; height: 22px; margin: 0; padding: 0; border: 2px solid transparent; border-radius: 11px; background: var(--c); cursor: pointer; box-shadow: inset 0 0 0 var(--bcv-line) rgba(0,0,0,.1); transition: transform .12s ease; }
 .bcv-mark__swatch:hover { transform: scale(1.1); }
 .bcv-mark__swatch.is-on { border-color: var(--bcv-ink); }
 .bcv-mark__tool { height: 28px; margin: 0; padding: 0 12px; border-radius: 14px; border: 1px solid var(--bcv-edge); background: var(--bcv-card); font: 600 12px/1 var(--bcv-font); color: var(--bcv-ink); cursor: pointer; }
@@ -3796,7 +3816,7 @@ html[data-bcv-theme="dark"] .bcv-conv__delta.is-more, html[data-bcv-theme="dark"
 .bcv-cite__type { flex: 1 1 84px; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 7px; padding: 10px 8px 9px; border: 1px solid var(--bcv-edge); border-radius: 14px; background: var(--bcv-card); color: var(--bcv-ink2); cursor: pointer; font: 500 11.5px/1.15 var(--bcv-font); text-align: center; box-shadow: var(--bcv-shadow); transition: background .15s ease, border-color .15s ease, transform .15s ease; }
 .bcv-cite__typeic { width: 30px; height: 30px; border-radius: 15px; background: var(--bcv-fill); display: flex; align-items: center; justify-content: center; color: var(--bcv-ink2); transition: background .15s ease, color .15s ease; }
 .bcv-cite__type:hover { transform: translateY(-1px); background: var(--bcv-hover); }
-.bcv-cite__type.is-on { background: var(--bcv-blue-soft); border-color: var(--bcv-blue); box-shadow: inset 0 0 0 .5px var(--bcv-blue); color: var(--bcv-blue); font-weight: 600; }
+.bcv-cite__type.is-on { background: var(--bcv-blue-soft); border-color: var(--bcv-blue); box-shadow: inset 0 0 0 max(.5px, var(--bcv-dpx, .5px)) var(--bcv-blue); color: var(--bcv-blue); font-weight: 600; }
 .bcv-cite__type.is-on .bcv-cite__typeic { background: var(--bcv-blue); color: #fff; }
 .bcv-cite__grid { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 14px; align-items: start; }
 .bcv-cite__side { display: flex; flex-direction: column; gap: 14px; position: sticky; top: 0; }

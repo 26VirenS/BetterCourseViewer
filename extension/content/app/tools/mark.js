@@ -202,6 +202,8 @@
       for (const pg of st.pages) paintMarks(pg);
       const ro = new ResizeObserver(() => { if (!alive()) { ro.disconnect(); return; } relayout(); });
       ro.observe(col);
+      // a zoom, or the window moved to a screen of another density: the pages are drawn again for it
+      const offDpr = U.onDprChange(() => { if (!alive()) { offDpr(); return; } relayout(); });
     }
     // the column's width is read once per layout: page by page, a scrollbar arriving between two
     // reads gave the pages two widths, and the first page was drawn again over its own drawing
@@ -210,7 +212,7 @@
       const w = col?.clientWidth || 640;
       for (const pg of st.pages) {
         const s = scaleOf(pg, w);
-        if (pg.drawn && pg.vp && Math.abs(s - pg.vp.scale) < 0.001) continue;
+        if (pg.drawn && pg.vp && Math.abs(s - pg.vp.scale) < 0.001 && pg.dpr === U.dpr()) continue;
         pg.el.style.width = `${Math.round(pg.w * s)}px`;
         pg.el.style.height = `${Math.round(pg.h * s)}px`;
         if (pg.task) { try { pg.task.cancel(); } catch { /* done already */ } pg.task = null; } // (a drawing under way at the old size is stopped, not drawn over)
@@ -226,7 +228,8 @@
       const s = scaleOf(pg);
       const vp = pg.page.getViewport({ scale: s });
       pg.vp = vp;
-      const dpr = Math.min(3, self.devicePixelRatio || 1);
+      const dpr = U.dpr();
+      pg.dpr = dpr;
       pg.canvas.width = Math.round(vp.width * dpr);
       pg.canvas.height = Math.round(vp.height * dpr);
       pg.canvas.style.width = `${Math.round(vp.width)}px`;

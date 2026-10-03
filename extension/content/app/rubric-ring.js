@@ -109,7 +109,10 @@
       const amp = Math.min(1, Math.max(0.35, (c.worth / Math.max(1e-9, max)) * n / 3));
       return Math.max(-34, Math.min(22, 110 * (fr - 0.85))) * Math.min(1, 6 / n + 0.25) * amp;
     });
-    return { crit, graded, posted, max, earned, hues, seg, bend, n, held: !posted && Object.keys(assess).length > 0 };
+    // a slice is thicker the more of the rubric it carries — growing inward, its outer edge on the circle
+    const avg = sum / Math.max(1, n);
+    const thick = shares.map((sh) => Math.max(5, Math.min(28, 10 * Math.pow(sh / Math.max(1e-9, avg), 1.5))));
+    return { crit, graded, posted, max, earned, hues, seg, bend, thick, n, held: !posted && Object.keys(assess).length > 0 };
   }
 
   /** Where a criterion's levels sit on its bar: by points, the best at the top. */
@@ -137,6 +140,7 @@
     if (!m.n) return null;
     const { crit, hues, seg, n } = m;
     const reduce = U.reducedMotion();
+    const hv = crit.map(() => 0); // how far each slice is swollen by the pointer (0 to 1)
     const st = { sel: 0, t: 0, g: reduce || !m.graded ? (m.graded ? 1 : 0) : 0, hov: -1, prev: -1, w: 1, BB: 500, BB0: 500 };
     const rafs = {};
     const M = Math.max(10, Math.round(192 / n)); // pieces per slice: enough for a smooth curve and a colour blend
@@ -167,9 +171,13 @@
     const STOPS = 12;
     const stops = Array.from({ length: STOPS + 2 }, () => mk('stop', {}, grad));
     const ring = mk('g', { class: 'bcv-rr__ring' }, svg);
-    const unders = crit.map(() => mk('path', { fill: 'none', 'stroke-linejoin': 'round', 'stroke-linecap': 'butt' }, ring));
-    const lines = crit.map(() => Array.from({ length: M }, () => mk('line', {}, ring)));
-    const dots = crit.map((_, k) => mk('circle', { fill: css(hues[k]) }, ring));
+    // a group per slice: one at rest is drawn once and then only turned, shrunk and faded as a whole
+    const sliceG = crit.map((_, k) => mk('g', { 'data-k': String(k) }, ring));
+    const unders = crit.map((_, k) => mk('path', { fill: 'none', 'stroke-linejoin': 'round', 'stroke-linecap': 'butt' }, sliceG[k]));
+    const lines = crit.map((_, k) => Array.from({ length: M }, () => mk('line', {}, sliceG[k])));
+    const dots = crit.map((_, k) => mk('circle', { fill: css(hues[k]) }, sliceG[k]));
+    /** An attribute written only when it changes (most of a frame's values do not). */
+    const setA = (el, key, v) => { const c = el._a || (el._a = {}); if (c[key] !== v) { c[key] = v; el.setAttribute(key, v); } };
     const leaders = mk('g', { class: 'bcv-rr__leaders' }, svg);
     const ticksG = mk('g', { class: 'bcv-rr__ticks' }, svg);
     const hitG = mk('g', { class: 'bcv-rr__hits' }, svg);
@@ -210,16 +218,16 @@
 
     // the bar's side: its header (which criterion, its description, the dots, the ring button), its levels, the marker's note
     const chips = crit.map((c, k) => h('button', { type: 'button', class: 'bcv-rr__chip', title: c.name, 'aria-label': `${c.name}, criterion ${k + 1} of ${n}`, style: { '--rr-c': css(hues[k]) }, onclick: () => select(k) }));
-    const back = h('button', { type: 'button', class: 'bcv-rr__back', title: 'Back to the ring', 'aria-label': 'Back to the ring', onclick: () => toRing() },
-      U.svg('M12 5a7 7 0 1 0 0 14a7 7 0 1 0 0-14', { size: 15, stroke: 'currentColor', width: 2.2 }));
+    const back = h('button', { type: 'button', class: 'bcv-rr__back', title: 'Back to the ring (Esc)', 'aria-label': 'Back to the ring', onclick: () => toRing() },
+      [U.svg('M15 5l-7 7 7 7', { size: 13, stroke: 'currentColor', width: 2.4 }), h('span', { text: 'Ring' })]);
     const swatch = h('span', { class: 'bcv-rr__swatch' });
     const count = U.text('bcv-rr__count', '', 'span');
     const name = h('h3', { class: 'bcv-rr__name', tabindex: '-1' });
     const desc = U.text('bcv-rr__desc', '');
     const more = h('button', { type: 'button', class: 'bcv-rr__more', hidden: true, onclick: () => { const on = desc.classList.toggle('is-open'); more.textContent = on ? 'Less' : 'More'; more.setAttribute('aria-expanded', String(on)); } }, 'More');
     const head = U.el('bcv-rr__head', [
-      U.el('bcv-rr__headmain', [U.el('bcv-rr__eyeline', [swatch, count]), name, U.el('bcv-rr__descwrap', [desc, more])]),
-      U.el('bcv-rr__tools', [U.el('bcv-rr__chips', chips, { style: { gap: n > 15 ? '3px' : n > 10 ? '4px' : '6px' } }), back]),
+      U.el('bcv-rr__headmain', [U.el('bcv-rr__eyeline', [swatch, count]), U.el('bcv-rr__nameline', [back, name]), U.el('bcv-rr__descwrap', [desc, more])]),
+      U.el('bcv-rr__tools', [U.el('bcv-rr__chips', chips, { style: { gap: n > 15 ? '3px' : n > 10 ? '4px' : '6px' } })]),
     ]);
     const rowsBox = U.el('bcv-rr__rows');
     const note = U.el('bcv-rr__note', null, { hidden: true });
@@ -229,6 +237,7 @@
     const stage = U.el('bcv-rr__stage', inner);
     const field = U.el('bcv-rr__field', stage);
     ov.append(...veils, top, field, foot, closeBtn);
+    ov.style.setProperty('--rr-ring', `conic-gradient(${seg.map(([a0, a1], k) => `${hex(hues[k])} ${f((((a0 + a1) / 2) * 180) / Math.PI)}deg`).join(', ')}, ${hex(hues[0])} ${f((((seg[0][0] + seg[0][1]) / 2) * 180) / Math.PI + 360)}deg)`);
 
     // ---- the bar's contents for the selected criterion
     let rows = [], ticks = [], place = [];
@@ -337,81 +346,106 @@
       while (dRot < -Math.PI) dRot += TAU;
       const rot = dRot * p1, rest = dRot * (p1 - 1);
       const BB = st.BB0 + (st.BB - st.BB0) * st.w;
-      crit.forEach((c, k) => {
+      const shrinkRest = 1 - 0.34 * q, opRest = clamp01(1 - q * 1.25);
+      const turn = `translate(${CX} ${CY}) rotate(${f((rot * 180) / Math.PI)}) scale(${shrinkRest.toFixed(4)}) translate(${-CX} ${-CY})`;
+      /** One slice's every point. `mv` is the selected slice on its way to the bar (turned, flattened,
+       *  unrolling); without it the slice is drawn at rest — unturned and full size, its group doing the rest. */
+      const sliceGeom = (k, mv) => {
         const [a0, a1] = seg[k];
-        const isSel = k === sel;
-        const ee = isSel ? u : 0;
+        const isSel = !!mv;
+        const ee = isSel ? u : 0, rotK = isSel ? rot : 0, restK = isSel ? rest : 0, pfK = isSel ? pf : 0, uK = isSel ? u : 0;
         const po = go[(k + n - 1) % n], no = go[(k + 1) % n], ko = go[k];
-        const shrink = isSel ? 1 : 1 - 0.34 * q;
-        const op = isSel ? 1 : clamp01(1 - q * 1.25);
-        const offAt = (v) => {
+        // a value carried smoothly into the neighbours' at either end (the bend, the thickness), so the ring has no steps
+        const blend = (v, mine, prev, next) => {
           const bl = v < 0.5 ? 1 - Math.cos(Math.PI * (0.5 - v)) : 1 - Math.cos(Math.PI * (v - 0.5));
-          return v < 0.5 ? ko + ((po - ko) * bl) / 2 : ko + ((no - ko) * bl) / 2;
+          return v < 0.5 ? mine + ((prev - mine) * bl) / 2 : mine + ((next - mine) * bl) / 2;
         };
+        const TH = m.thick, tk = TH[k], tp = TH[(k + n - 1) % n], tn = TH[(k + 1) % n];
+        const bump = hv[k]; // (the slice under the pointer swells out, smoothly, and back)
+        const bumpAt = (v) => { const s1 = Math.sin(Math.PI * v); return 9 * bump * s1 * s1; };
+        const thickAt = (v) => blend(v, tk, tp, tn) + (2.5 * bumpAt(v)) / 9;
         const Rs = R + ko;
         const P = (v) => {
-          const ang = a0 + (a1 - a0) * v + rot;
-          let rad = R + offAt(v);
-          if (isSel) rad += (Rs - rad) * pf;
-          if (!isSel || u <= 0) return pt(rad * shrink, ang);
+          const ang = a0 + (a1 - a0) * v + rotK;
+          let rad = R + blend(v, ko, po, no) - (blend(v, tk, tp, tn) - 10) / 2 + bumpAt(v); // (thicker inward: the outer edge stays on the circle)
+          if (isSel) rad += (Rs - rad) * pfK;
+          if (!isSel || uK <= 0) return pt(rad, ang);
           // the slice as it would be turned all the way, unrolling about its middle…
-          const L = Rs * (a1 - a0) + (BB - BT - Rs * (a1 - a0)) * u;
-          const kap = (1 - u) / Rs;
-          const Mx = CX - Rs + (BX - (CX - Rs)) * u, My = CY + ((BB + BT) / 2 - CY) * u;
+          const L = Rs * (a1 - a0) + (BB - BT - Rs * (a1 - a0)) * uK;
+          const kap = (1 - uK) / Rs;
+          const Mx = CX - Rs + (BX - (CX - Rs)) * uK, My = CY + ((BB + BT) / 2 - CY) * uK;
           const s = (v - 0.5) * L;
           const x = kap < 1e-5 ? Mx : Mx + (1 - Math.cos(kap * s)) / kap;
           const y = kap < 1e-5 ? My - s : My - Math.sin(kap * s) / kap;
-          if (Math.abs(rest) < 1e-4) return [x, y];
+          if (Math.abs(restK) < 1e-4) return [x, y];
           // …then turned back by what the ring has still to turn, so the two motions overlap without a jump
-          const cs = Math.cos(rest), sn = Math.sin(rest), dx = x - CX, dy = y - CY;
+          const cs = Math.cos(restK), sn = Math.sin(restK), dx = x - CX, dy = y - CY;
           return [CX + dx * cs - dy * sn, CY + dx * sn + dy * cs];
         };
-        const width = (isSel ? 10 + 6 * u : 10 * (1 - 0.7 * q)) + (st.hov === k && e < 0.02 ? 3 : 0);
+        const widthAt = (v) => { const w = thickAt(v); return isSel ? w + (10 - w) * pfK + 6 * uK : w; };
+        let thin = Infinity;
+        for (let j = 0; j <= 8; j++) thin = Math.min(thin, widthAt(j / 8));
         let d = '';
         for (let j = 0; j <= M; j++) { const Q = P(j / M); d += `${j ? ' L' : 'M'}${f(Q[0])} ${f(Q[1])}`; }
         const ul = unders[k];
-        ul.setAttribute('d', d);
-        ul.setAttribute('stroke-width', f(width));
-        ul.setAttribute('stroke-opacity', f(op));
-        ul.setAttribute('stroke-linecap', isSel && u > 0.02 ? 'round' : 'butt');
+        setA(ul, 'd', d);
+        setA(ul, 'stroke-width', f(thin)); // (under the pieces, to close their seams: no wider than the thinnest of them)
+        setA(ul, 'stroke-linecap', isSel && uK > 0.02 ? 'round' : 'butt');
         // nearly straight, the bar hands over from its pieces to one gradient along it
-        const smooth = isSel ? span(u, 0.85, 1) : 0;
+        const smooth = isSel ? span(uK, 0.85, 1) : 0;
         if (smooth > 0) {
           const A = P(0), B = P(1), frac = m.graded ? crit[k].frac : 1;
-          grad.setAttribute('x1', f(A[0])); grad.setAttribute('y1', f(A[1]));
-          grad.setAttribute('x2', f(B[0])); grad.setAttribute('y2', f(B[1]));
+          setA(grad, 'x1', f(A[0])); setA(grad, 'y1', f(A[1]));
+          setA(grad, 'x2', f(B[0])); setA(grad, 'y2', f(B[1]));
           const at = Array.from({ length: STOPS }, (_, i) => i / (STOPS - 1));
           if (frac < 1) at.push(Math.max(0, frac - 1e-4), Math.min(1, frac + 2e-4)); else at.push(1, 1);
           at.sort((x, y) => x - y);
           stops.forEach((sp, i) => {
-            sp.setAttribute('offset', at[i].toFixed(4));
-            sp.setAttribute('stop-color', css(colourOf(k, at[i], ee, u)));
+            setA(sp, 'offset', at[i].toFixed(4));
+            setA(sp, 'stop-color', css(colourOf(k, at[i], ee, uK)));
           });
-          ul.setAttribute('stroke', `url(#${gid})`);
-        } else ul.setAttribute('stroke', css(hues[k]));
+          setA(ul, 'stroke', `url(#${gid})`);
+        } else setA(ul, 'stroke', css(hues[k]));
         const segs = lines[k];
         for (let j = 0; j < M; j++) {
           const v0 = j / M, v1 = (j + 1) / M, vm = (v0 + v1) / 2;
-          const col = colourOf(k, vm, ee, u);
           const A = P(Math.max(0, v0 - 0.006)), B = P(Math.min(1, v1 + 0.006));
           const l = segs[j];
-          l.setAttribute('x1', f(A[0])); l.setAttribute('y1', f(A[1]));
-          l.setAttribute('x2', f(B[0])); l.setAttribute('y2', f(B[1]));
-          l.setAttribute('stroke', css(col));
-          l.setAttribute('stroke-width', f(width));
-          l.setAttribute('stroke-opacity', f(op * (1 - smooth)));
-          l.setAttribute('stroke-linecap', isSel && u > 0.02 && (j === 0 || j === M - 1) ? 'round' : 'butt');
+          setA(l, 'x1', f(A[0])); setA(l, 'y1', f(A[1]));
+          setA(l, 'x2', f(B[0])); setA(l, 'y2', f(B[1]));
+          setA(l, 'stroke', css(colourOf(k, vm, ee, uK)));
+          setA(l, 'stroke-width', f(widthAt(vm)));
+          setA(l, 'stroke-opacity', f(1 - smooth));
+          setA(l, 'stroke-linecap', isSel && uK > 0.02 && (j === 0 || j === M - 1) ? 'round' : 'butt');
         }
-        const D = pt((R + ko + 22) * shrink, (a0 + a1) / 2 + rot);
-        dots[k].setAttribute('cx', f(D[0])); dots[k].setAttribute('cy', f(D[1]));
-        dots[k].setAttribute('r', k === sel || st.hov === k ? '4.5' : n > 15 ? '2.5' : '3.5');
-        dots[k].setAttribute('opacity', f(clamp01(1 - q * 1.8)));
+        const D = pt(R + ko + 22 + 9 * bump, (a0 + a1) / 2 + rotK);
+        setA(dots[k], 'cx', f(D[0])); setA(dots[k], 'cy', f(D[1]));
+      };
+      crit.forEach((c, k) => {
+        const g = sliceG[k];
+        if (k === sel && e > 0) { // the one on its way to the bar: every point, every frame, on top
+          if (g.nextSibling) ring.append(g);
+          sliceGeom(k, true);
+          g._key = null;
+          setA(g, 'transform', '');
+          setA(g, 'opacity', '1');
+          g.style.display = '';
+        } else {
+          const key = `${st.g.toFixed(4)}|${hv[k].toFixed(4)}`;
+          if (g._key !== key) { sliceGeom(k, null); g._key = key; } // (only when its bend or its swell has moved)
+          const opK = k === sel ? 1 : opRest;
+          setA(g, 'transform', e > 0 ? turn : '');
+          setA(g, 'opacity', f(opK));
+          g.style.display = opK < 0.005 ? 'none' : '';
+        }
+        setA(dots[k], 'r', k === sel || st.hov === k ? '4.5' : n > 15 ? '2.5' : '3.5');
+        setA(dots[k], 'opacity', f(clamp01(1 - q * 1.8)));
       });
       // the labels ride round with their slices and fade as the ring goes
       const ringA = clamp01(1 - q * 1.8);
       labels.forEach((b, k) => {
         const mid = (seg[k][0] + seg[k][1]) / 2 + rot;
-        const P = pt((R + go[k] + 36) * (1 - 0.2 * q), mid);
+        const P = pt((R + go[k] + 36 + 9 * hv[k] * (1 - q)) * (1 - 0.2 * q), mid);
         const s = Math.sin(mid), co = Math.cos(mid);
         const tx = -50 + 50 * Math.max(-1, Math.min(1, s / 0.3)), ty = -50 - 50 * Math.max(-1, Math.min(1, co / 0.3));
         b.style.left = `${f(P[0])}px`;
@@ -451,7 +485,7 @@
       ov.classList.toggle('is-bar', e > 0.5);
       ov.dataset.state = e >= 0.999 ? 'bar' : e <= 0.001 ? 'ring' : 'moving';
       foot.textContent = e > 0.5
-        ? 'Height on the bar is points. Switch with the dots; the circle button or Esc goes back.'
+        ? 'Height on the bar is points. Switch with the dots; Ring or Esc goes back.'
         : m.graded ? 'The ring pushes out where you scored well and pulls in where you lost points.'
           : 'Each colour’s stretch is its share of the points. Pick one to open it.';
     }
@@ -471,10 +505,28 @@
       };
       rafs[key] = requestAnimationFrame(step);
     }
+    // the hover swell eases in and out (each slice its own amount, so one leaving and the next arriving overlap)
+    let hvRaf = 0, hvT = 0;
+    function hoverStep(now) {
+      const dt = hvT ? Math.min(64, now - hvT) : 16;
+      hvT = now;
+      const a = 1 - Math.exp(-dt / 115);
+      let moving = false;
+      hv.forEach((v, k) => {
+        const to = st.hov === k && st.t < 0.02 ? 1 : 0;
+        const nv = v + (to - v) * a;
+        hv[k] = Math.abs(to - nv) < 0.003 ? to : nv;
+        if (hv[k] !== to) moving = true;
+      });
+      draw();
+      if (moving) hvRaf = requestAnimationFrame(hoverStep);
+      else { hvRaf = 0; hvT = 0; }
+    }
     function hover(k) {
       if (st.hov === k) return;
       st.hov = k;
-      if (!rafs.t && !rafs.g) draw();
+      if (reduce) { hv.forEach((_, i) => { hv[i] = i === k && st.t < 0.02 ? 1 : 0; }); draw(); return; }
+      if (!hvRaf) hvRaf = requestAnimationFrame(hoverStep);
     }
     function select(k) {
       k = ((k % n) + n) % n;
@@ -484,24 +536,24 @@
         st.sel = k;
         st.w = 0;
         fillBar(k, true);
-        tween('w', 1, 380);
+        tween('w', 1, 520);
         name.focus({ preventScroll: true });
         return;
       }
-      if (st.t > 0.02 && k !== st.sel) { tween('t', 0, 380, () => select(k)); return; } // (part-way: back round first)
+      if (st.t > 0.02 && k !== st.sel) { tween('t', 0, 480, () => select(k)); return; } // (part-way: back round first)
       st.sel = k;
       st.prev = -1;
       st.w = 1;
       fillBar(k, false);
       st.BB0 = st.BB;
       ov.focus({ preventScroll: true }); // (held by the ring itself while the label it was on goes out of reach)
-      tween('t', 1, 900, () => name.focus({ preventScroll: true }));
+      tween('t', 1, 1150, () => name.focus({ preventScroll: true }));
     }
     function toRing() {
       if (st.t <= 0.001) return;
       const k = st.sel;
       ov.focus({ preventScroll: true });
-      tween('t', 0, 720, () => labels[k].focus({ preventScroll: true }));
+      tween('t', 0, 950, () => labels[k].focus({ preventScroll: true }));
     }
 
     // ---- fitting the stage to the window
@@ -554,7 +606,7 @@
       const refocus = () => { try { if (from && from.isConnected) from.focus({ preventScroll: true }); } catch { /* gone */ } };
       if (now || reduce) { ov.remove(); refocus(); return; }
       ov.classList.add('is-closing', 'is-leaving');
-      setTimeout(() => ov.remove(), 340);
+      setTimeout(() => ov.remove(), 430);
       refocus();
     }
     /** Holds one tween value where it is put (the developer tools and the tests look at a frame part-way). */
@@ -568,7 +620,7 @@
     fillBar(0, false);
     draw();
     // the ring blooms in; marked, it then bends to its marks
-    if (m.graded && !reduce) tween('g', 1, 900, null, 380);
+    if (m.graded && !reduce) tween('g', 1, 1150, null, 450);
     ov.focus({ preventScroll: true });
     // a navigation away takes it too (app.js removes every sheet overlay): stop its frames
     const watch = new MutationObserver(() => { if (!ov.isConnected) { watch.disconnect(); if (!gone) close(true); } });

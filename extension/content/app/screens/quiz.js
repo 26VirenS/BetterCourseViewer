@@ -155,7 +155,7 @@
     // header and the rail away so the questions take the page. app.js clears it on the next render.
 
     // fbSub: the finished attempt the feedback stage shows; fbFrom: 'done' when it was opened from the receipt
-    const st = { stage: 'intro', idx: 0, mode: 'one', quiz: null, sub: null, questions: [], flags: {}, files: {}, saving: 0, savedAt: 0, timer: null, warned: {}, done: null, code: '', fbSub: null, fbFrom: null, fb: null, page: null, paged: false, inflight: new Set(), loadingIdx: null, hints: null };
+    const st = { stage: 'intro', idx: 0, mode: 'one', quiz: null, sub: null, questions: [], flags: {}, files: {}, saving: 0, savedAt: 0, timer: null, warned: {}, done: null, code: '', fbSub: null, fbFrom: null, fb: null, page: null, paged: false, inflight: new Set(), loadingIdx: null, hints: null, follow: null, hold: null };
     const screen = U.el('bcv-qz');
     screen.append(U.loading('Loading the quiz…'));
 
@@ -605,7 +605,25 @@
       setOpen(st.stage === 'take' || st.stage === 'review');
     }
     function modeBtn(key, label, icon) {
-      return h('button', { type: 'button', class: `bcv-qz__mode ${st.mode === key ? 'is-active' : ''}`, title: label, 'aria-label': label, 'aria-pressed': st.mode === key ? 'true' : 'false', dataset: { mode: key }, onclick: () => { if (st.mode === key) return; st.mode = key; store.setPref('quizLayout', key); draw(); if (key !== 'all') toTop(); } }, U.svg(icon, { size: 15, width: 1.9 }));
+      return h('button', { type: 'button', class: `bcv-qz__mode ${st.mode === key ? 'is-active' : ''}`, title: label, 'aria-label': label, 'aria-pressed': st.mode === key ? 'true' : 'false', dataset: { mode: key }, onclick: () => {
+        if (st.mode === key) return;
+        st.mode = key;
+        store.setPref('quizLayout', key);
+        draw();
+        if (key === 'all') sendTo(st.idx, { smooth: false }); // (the scroll opens on the question you were on)
+        else toTop();
+      } }, U.svg(icon, { size: 15, width: 1.9 }));
+    }
+    /** Scroll mode: the page goes to question k and the mark goes with it (followScroll holds it there
+     *  while the page travels, so the questions passed on the way never take it). */
+    function sendTo(k, { smooth = true } = {}) {
+      st.follow?.hold(k);
+      const el = k > 0 ? document.getElementById(`bcv-q${k}`) : null;
+      const there = el ? Math.abs(el.getBoundingClientRect().top - (parseFloat(getComputedStyle(el).scrollMarginTop) || 0)) < 1 : k <= 0 && window.scrollY < 1;
+      if (there) { if (st.hold) st.hold.landed = true; return; } // (nothing to travel: the next scroll is yours)
+      if (el) el.scrollIntoView({ block: 'start', behavior: smooth ? 'smooth' : 'auto' });
+      else if (smooth) window.scrollTo({ top: 0, behavior: 'smooth' });
+      else toTop();
     }
 
     // The pills are the progress bar (mockup 14): the pill of a question on its way fills left to right
@@ -634,7 +652,7 @@
             if (st.paged) { if (k !== st.idx) turnPage({ questionId: q.id }); return; }
             st.idx = k;
             if (all) {
-              document.getElementById(`bcv-q${k}`)?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+              sendTo(k);
               paintProgress();
             } else draw();
           },
@@ -1140,10 +1158,77 @@
     }
 
     function takeAll() {
+      const page = U.el('bcv-qz__page bcv-qz__page--all', st.questions.map((q, k) => questionBlock(q, k, { compact: true })));
+      followScroll(page);
       return h('div', { class: 'bcv-qz__stage' }, [
-        U.el('bcv-qz__page bcv-qz__page--all', st.questions.map((q, k) => questionBlock(q, k, { compact: true }))),
+        page,
         footer([h('button', { type: 'button', class: 'bcv-qz__btn bcv-qz__btn--primary', text: 'Review answers', onclick: () => { st.stage = 'review'; draw(); toTop(); } })]),
       ]);
+    }
+
+    // Scroll mode: the question you are reading is the current one. As the page scrolls, the question
+    // under the reading line — a third of the way down what the head leaves of the window — is marked
+    // is-current (a bar at its side, its number lit, the others standing back a little) and its pill
+    // in the head lights with it; at the foot of the page the last question is current whatever the
+    // line says. A question the page was sent to (a pill, a review row, the layout switch) or one you
+    // are answering (focus lands in it) holds the mark until you scroll yourself — a wheel, a finger,
+    // the keys, or a scroll after the sent one has landed — so the questions passed on the way never
+    // take it. The mark lives in st.idx, which the other layouts open on.
+    function followScroll(page) {
+      let raf = 0, settle = 0;
+      const blocks = () => [...page.querySelectorAll('.bcv-qz__q')];
+      const pick = () => {
+        const els = blocks();
+        if (!els.length) return -1;
+        if (window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 2) return els.length - 1;
+        const base = Math.max(0, head.getBoundingClientRect().bottom); // (the head may have slid up out of the way)
+        const line = base + (window.innerHeight - base) / 3;
+        let k = 0;
+        els.forEach((el, i) => { if (el.getBoundingClientRect().top <= line) k = i; });
+        return k;
+      };
+      const mark = (k) => {
+        if (k < 0) return;
+        st.idx = k;
+        blocks().forEach((el, i) => el.classList.toggle('is-current', i === k));
+        progressWrap.querySelectorAll('.bcv-qz__pill').forEach((p, i) => p.classList.toggle('is-current', i === k));
+      };
+      const tick = () => {
+        raf = 0;
+        if (!page.isConnected) return;
+        mark(st.hold ? st.hold.k : pick());
+      };
+      const ask = () => { if (!raf) raf = requestAnimationFrame(tick); };
+      const release = () => { st.hold = null; ask(); }; // a scroll of your own: the line takes over
+      // (the sent scroll has landed once the page has been still a moment — Safari has no scrollend — and the next one is yours)
+      const onEnd = () => { if (st.hold) st.hold.landed = true; };
+      const onScroll = () => {
+        if (st.hold && (st.hold.landed || Date.now() - st.hold.at > 1500)) st.hold = null;
+        clearTimeout(settle);
+        settle = setTimeout(onEnd, 140);
+        ask();
+      };
+      const onKey = (e) => { if (/^(Arrow(Up|Down)|Page(Up|Down)|Home|End| )$/.test(e.key) && !e.target.closest?.('input, textarea, select, [contenteditable]')) release(); };
+      const hold = (k) => { if (k < 0 || k >= blocks().length) return; st.hold = { k, at: Date.now(), landed: false }; mark(k); };
+      const onFocus = (e) => { const q = e.target.closest?.('.bcv-qz__q'); if (q) hold(blocks().indexOf(q)); };
+      window.addEventListener('scroll', onScroll, { passive: true });
+      window.addEventListener('wheel', release, { passive: true });
+      window.addEventListener('touchmove', release, { passive: true });
+      window.addEventListener('keydown', onKey);
+      window.addEventListener('resize', ask);
+      page.addEventListener('focusin', onFocus);
+      U.onGone(page, () => {
+        window.removeEventListener('scroll', onScroll);
+        window.removeEventListener('wheel', release);
+        window.removeEventListener('touchmove', release);
+        window.removeEventListener('keydown', onKey);
+        window.removeEventListener('resize', ask);
+        cancelAnimationFrame(raf);
+        clearTimeout(settle);
+        if (st.follow?.page === page) st.follow = null;
+      });
+      st.follow = { page, hold };
+      ask(); // (the first mark, once the page is on the screen)
     }
 
     /** An answer as pieces to show: its own words, and the rich content Canvas holds it in when there
@@ -1215,7 +1300,7 @@
             if (st.paged) { turnPage({ questionId: q.id }); return; }
             st.idx = k;
             draw();
-            if (st.mode === 'all') document.getElementById(`bcv-q${k}`)?.scrollIntoView({ block: 'start' });
+            if (st.mode === 'all') sendTo(k, { smooth: false });
             else toTop();
           } }, [
             h('span', { class: 'bcv-qz__sumn', text: `Q${k + 1}` }),

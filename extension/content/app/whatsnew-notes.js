@@ -25,6 +25,13 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.98.77', date: '2026-10-03', notes: [
+      { kind: 'new', title: 'Back to the ring', body: 'A Ring button sits beside each criterion’s name.', icon: P.arrows },
+      { kind: 'improved', title: 'A livelier ring', body: 'Heavier criteria are thicker; a hover swells one.', icon: P.sparkle },
+      { kind: 'new', title: 'Where you are, lit', body: 'Scroll mode marks the question you are reading.', icon: P.list },
+      { kind: 'improved', title: 'The page holds still', body: 'Nothing scrolls behind a box, sheet or the ring.', icon: P.pin },
+      { kind: 'improved', title: 'Crisp at any zoom', body: 'Thin lines and PDF pages stay sharp at any zoom.', icon: P.eye },
+    ] },
     { version: '2.98.76', date: '2026-10-03', notes: [
       { kind: 'new', title: 'The rubric is a ring', body: 'Each criterion is a slice, sized by its points.', icon: P.sparkle },
       { kind: 'new', title: 'Open a slice', body: 'It unrolls into a bar with every level beside it.', icon: P.steps },

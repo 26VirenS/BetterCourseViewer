@@ -12,6 +12,16 @@
   const BCV = self.BCV;
   const S = BCV.settings;
   const html = document.documentElement;
+  // One device pixel, in CSS pixels, kept on the root as --bcv-dpx (app.css --bcv-line): a hairline
+  // drawn as a shadow — which no browser snaps to the screen's pixels, unlike a border — is never
+  // thinner than it, so below 100% zoom it stays a crisp line rather than fading out. Followed
+  // through a zoom or a move to another screen.
+  const devicePx = () => {
+    const d = self.devicePixelRatio || 1;
+    html.style.setProperty('--bcv-dpx', `${(1 / d).toFixed(4)}px`);
+    try { matchMedia(`(resolution: ${d}dppx)`).addEventListener('change', devicePx, { once: true }); } catch { /* followed no further */ }
+  };
+  devicePx();
   // Chrome drawing without graphics acceleration skips every blur: the glass turns solid then
   // (app.css, html.bcv-noblur). The kept answer is read at once; a stale one is asked again once the
   // page is up, off the path to its first paint (lib/theme.js checkBlur).

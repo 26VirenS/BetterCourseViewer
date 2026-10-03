@@ -825,6 +825,22 @@
     }
   };
 
+  /** Screen pixels per CSS pixel (a zoom, a scaled display), for a canvas drawn to be crisp: capped
+   *  at 3, where a sharper drawing costs memory and shows nothing more. */
+  const dpr = () => Math.min(3, Math.max(0.25, self.devicePixelRatio || 1));
+  /** Calls fn whenever that changes — the page zoomed, or the window moved to another screen — until
+   *  the returned function is called. */
+  function onDprChange(fn) {
+    let mq = null, gone = false;
+    const arm = () => {
+      if (gone) return;
+      try { mq = matchMedia(`(resolution: ${self.devicePixelRatio || 1}dppx)`); mq.addEventListener('change', fire, { once: true }); } catch { mq = null; }
+    };
+    const fire = () => { if (gone) return; arm(); try { fn(dpr()); } catch { /* the caller's own */ } };
+    arm();
+    return () => { gone = true; try { mq?.removeEventListener('change', fire); } catch { /* gone */ } };
+  }
+
   /** A number arrives rather than appears (mockup 11): 16 steps at 52ms — plausible digits
    *  below step 9 (under half a second), convergence above it — and the last step is always
    *  the exact value. Entry only: callers never roll a number the student is already reading.
@@ -1192,13 +1208,52 @@
     onclick: (e) => { e.preventDefault(); e.stopPropagation(); onRemove(); },
   }, svg(IC.close, { size: 11, stroke: 'currentColor', width: 2.4 }));
 
+  // ---- the page holds still behind anything that asks for attention --------------------------------
+  // A sheet, a counter's box, the mark box, the rubric ring, a tool, the viewer, the reader, the search
+  // afloat: while one is up the wheel and the scroll keys move nothing behind it. Its own scrolling parts
+  // still scroll, and do not hand the scroll on to the page when they reach an end. The page's scrollbar is
+  // left where it is (hiding it would widen the page under the overlay); a phone's page is simply switched
+  // off in the stylesheet. The listeners are there only while something is up — a wheel listener that can
+  // cancel holds every wheel scroll for the page's script.
+  const ATTENTION = 'body > :is(.bcv-sheet-ov:not(.is-closing):not(.is-folding), .bcv-reader-ov:not(.is-closing), .bcv-spot-ov:not(.is-folding))';
+  const SCROLL_KEYS = { ' ': 1, PageDown: 1, PageUp: -1, End: 1, Home: -1, ArrowDown: 1, ArrowUp: -1 };
+  /** Whether something other than the page, from `from` outwards, can still scroll that way. */
+  function movesInside(from, dy, dx) {
+    for (let el = from; el && el !== document.body && el !== document.documentElement; el = el.parentElement) {
+      if (el.id === 'bcv-app' || el.id === 'bcv-bar') return false; // (the page itself: held)
+      const cs = getComputedStyle(el);
+      if (dy && /(auto|scroll)/.test(cs.overflowY) && el.scrollHeight > el.clientHeight + 1 && (dy > 0 ? el.scrollTop + el.clientHeight < el.scrollHeight - 1 : el.scrollTop > 0)) return true;
+      if (dx && /(auto|scroll)/.test(cs.overflowX) && el.scrollWidth > el.clientWidth + 1 && (dx > 0 ? el.scrollLeft + el.clientWidth < el.scrollWidth - 1 : el.scrollLeft > 0)) return true;
+    }
+    return false;
+  }
+  const holdWheel = (e) => {
+    if (e.ctrlKey) return; // (a pinch is a zoom)
+    if (!movesInside(e.target instanceof Element ? e.target : null, Math.sign(e.deltaY), Math.sign(e.deltaX))) e.preventDefault();
+  };
+  const holdKeys = (e) => {
+    if (e.defaultPrevented || e.altKey || e.metaKey || e.ctrlKey) return;
+    const d = SCROLL_KEYS[e.key];
+    if (!d || e.target?.closest?.('input, textarea, select, button, a, [contenteditable], [role="button"], [role="listbox"], [role="slider"], [role="tab"]')) return;
+    const from = document.activeElement && document.activeElement !== document.body ? document.activeElement : null;
+    if (!movesInside(from, e.key === ' ' && e.shiftKey ? -1 : d, 0)) e.preventDefault();
+  };
+  let holding = false;
+  const holdSync = () => {
+    const on = !document.documentElement.classList.contains('bcv-phone') && !!document.querySelector(ATTENTION);
+    if (on === holding) return;
+    holding = on;
+    if (on) { addEventListener('wheel', holdWheel, { passive: false }); addEventListener('keydown', holdKeys); } else { removeEventListener('wheel', holdWheel); removeEventListener('keydown', holdKeys); }
+  };
+  if (document.body) new MutationObserver(holdSync).observe(document.body, { childList: true }); // (the body's own children only: overlays come and go there)
+
   BCV.ui = {
     groupPicker, groupAttrs, BANDS, gradeBand, bandChip, bandSlider, whatIfAdder, whatIfRemove,
     svg, star, chev, el, text, tile, dot, card, row, label, h2, groupHead, badge, statusBadge, seg, segSlide, search, switchEl, btn, iconbtn, pill, placeDot,
     empty, emptyCard, loading, errorBox, hint, avatar, toast, menu, closeMenus, picker, colorMenu, COURSE_COLORS, fmtDay, datePop, dateField, promptSheet, askSheet,
     DAY, startOfDay, addDays, sameDay, dayDiff, startOfWeek, parse, MONTHS, MONTHS_LONG, DAYS, DAYS_LONG,
     fmtTime, fmtTimeLower, fmtShort, fmtLong, fmtDateComma, fmtAt, fmtAtUpper, fmtBy, dayTitle, fmtDow, fmtRecent, whenShort, plural,
-    hexToRgb, rgba, palette, FALLBACK_COLORS, initials, enter, still, isStill, roll, morphFrom, reducedMotion, dismiss,
+    hexToRgb, rgba, palette, FALLBACK_COLORS, initials, enter, still, isStill, roll, morphFrom, reducedMotion, dpr, onDprChange, dismiss,
     afterMotion, onGone, watchLayout, anchor, keepOnScreen, boundsOf,
   };
 })();

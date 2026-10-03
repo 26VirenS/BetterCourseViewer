@@ -135,7 +135,7 @@
           if (!p.alive() || !st.files.some((x) => x.id === f.id)) break;
           const page = await pdf.getPage(i);
           const vp1 = page.getViewport({ scale: 1 });
-          const vp = page.getViewport({ scale: 150 / Math.max(1, vp1.width) });
+          const vp = page.getViewport({ scale: (150 * Math.max(1, U.dpr())) / Math.max(1, vp1.width) }); // (150 CSS pixels across, in the screen's own pixels)
           const cv = h('canvas');
           cv.width = Math.ceil(vp.width); cv.height = Math.ceil(vp.height);
           await page.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise;

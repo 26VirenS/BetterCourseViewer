@@ -491,7 +491,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
 .pz__lead { margin: 5px 0 0; font: 400 14px/1.45 var(--font); color: var(--pz-ink3); text-align: center; }
 .pz__layout { flex: 1; min-height: 0; margin-top: 16px; display: grid; grid-template-columns: minmax(300px, 368px) minmax(0, 1fr); gap: 24px; align-items: stretch; }
 .pz__panel { min-width: 0; min-height: 0; overflow: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 12px; padding: 2px 8px 18px 2px; margin-right: -8px; scrollbar-width: thin; animation: omRise .34s var(--ease) .04s both; }
-.pz__sec { position: relative; flex: none; padding: 14px 14px 16px; border-radius: 18px; background: var(--pz-card); box-shadow: 0 0 0 1px var(--pz-hair), 0 1px 3px rgba(0,0,0,.04); }
+.pz__sec { position: relative; flex: none; padding: 14px 14px 16px; border-radius: 18px; background: var(--pz-card); box-shadow: 0 0 0 var(--bcv-line, 1px) var(--pz-hair), 0 1px 3px rgba(0,0,0,.04); }
 .pz__sech { display: flex; align-items: center; gap: 9px; margin: 0 0 12px; font: 600 14px/1.2 var(--font); letter-spacing: -.01em; color: var(--pz-ink); }
 .pz__secn { flex: none; display: flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 10px; background: var(--A-btn); color: #fff; font: 700 11px/1 var(--font); font-style: normal; transition: background .3s ease; }
 /* 1 · Light, Dark, Auto: three cards, each a small window in that look, its name and what it does */
@@ -600,7 +600,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
 .pz__seg { flex: none; display: flex; gap: 2px; padding: 2px; border-radius: 8px; background: var(--pz-pvfill); }
 .pz__segbtn2 { display: block; padding: 5px 10px; border-radius: 6px; font: 500 9.5px/1 var(--font); font-style: normal; color: var(--pz-ink2); white-space: nowrap; }
 .pz__segbtn2.is-on { background: var(--pv-card); color: var(--pv-ink); font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,.08); }
-.pz__phead.has-pic .pz__search, .pz__phead.has-pic .pz__seg { background: var(--pz-frost); box-shadow: inset 0 0 0 1px var(--pz-photo-hair); }
+.pz__phead.has-pic .pz__search, .pz__phead.has-pic .pz__seg { background: var(--pz-frost); box-shadow: inset 0 0 0 var(--bcv-line, 1px) var(--pz-photo-hair); }
 .pz__phead.has-pic .pz__segbtn2 { color: var(--pz-photo-ink); }
 .pz__cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 .pz__card { position: relative; height: 68px; border-radius: 14px; overflow: hidden; background: var(--pv-card); outline: 2px solid transparent; outline-offset: 2px; transition: outline-color .2s ease; }
@@ -658,7 +658,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
 .pz__barsub { font: 500 10.5px/1.2 var(--font); color: var(--pz-ink3); }
 .pz__vr { display: block; width: 1px; height: 26px; background: var(--pz-hair); }
 .pz__choice { position: relative; display: flex; flex-direction: column; align-items: center; gap: 7px; padding: 0; border: 0; background: transparent; cursor: pointer; overflow: hidden; }
-.pz__choicepic { display: block; width: 68px; height: 46px; border-radius: 11px; background-size: cover; background-position: center; box-shadow: inset 0 0 0 1px var(--pz-hair); transition: box-shadow .2s ease; }
+.pz__choicepic { display: block; width: 68px; height: 46px; border-radius: 11px; background-size: cover; background-position: center; box-shadow: inset 0 0 0 var(--bcv-line, 1px) var(--pz-hair); transition: box-shadow .2s ease; }
 .pz__choice.is-on .pz__choicepic { box-shadow: inset 0 0 0 2px var(--A), inset 0 0 0 4px var(--pz-bg); } /* (inset: the choice clips its overflow for the file input, and a ring outside showed along the bottom alone) */
 .pz__choicepic--none { background: linear-gradient(135deg, var(--pz-bg) 47%, var(--pz-hair2) 48%, var(--pz-hair2) 52%, var(--pz-bg) 53%); }
 .pz__choicepic--up { box-sizing: border-box; border: 1.5px dashed var(--pz-ink3); box-shadow: none; display: flex; align-items: center; justify-content: center; color: var(--pz-ink3); }
@@ -687,15 +687,15 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
 .pz__theme--default { grid-column: 1 / -1; flex-direction: row; align-items: center; gap: 12px; padding: 5px 12px 5px 5px; border-radius: 14px; background: var(--pz-well); transition: box-shadow .2s ease; }
 .pz__theme--default .pz__thumb { width: 92px; }
 .pz__theme--default.is-on { box-shadow: inset 0 0 0 2px var(--ring); }
-.pz__theme--default.is-on .pz__thumb { box-shadow: 0 0 0 1px var(--pz-hair); }
+.pz__theme--default.is-on .pz__thumb { box-shadow: 0 0 0 var(--bcv-line, 1px) var(--pz-hair); }
 .pz__themetext { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 .pz__themename { display: flex; align-items: center; gap: 6px; min-width: 0; padding: 0 2px; }
 .pz__themename > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pz__themedot { flex: none; display: block; width: 9px; height: 9px; border-radius: 5px; }
 .pz__themesub { padding: 0 2px; font: 400 11px/1.3 var(--font); color: var(--pz-ink3); }
 .pz__theme.is-on .pz__themename { color: var(--pz-ink); font-weight: 600; }
-.pz__thumb { --paper: color-mix(in srgb, var(--pz-cell) 90%, var(--ring)); position: relative; flex: none; display: grid; grid-template-columns: 30% 1fr 1fr; grid-template-rows: 36% 1fr; gap: 3px; width: 100%; aspect-ratio: 16 / 11; padding: 3px; box-sizing: border-box; border-radius: 12px; background: color-mix(in srgb, var(--pz-well) 84%, var(--ring)); box-shadow: 0 0 0 1px var(--pz-hair); transition: box-shadow .2s ease, transform .25s var(--ease); }
-.pz__theme:not(.pz__theme--default):hover .pz__thumb { transform: translateY(-2px); box-shadow: 0 0 0 1px var(--pz-hair), 0 8px 18px rgba(0,0,0,.14); }
+.pz__thumb { --paper: color-mix(in srgb, var(--pz-cell) 90%, var(--ring)); position: relative; flex: none; display: grid; grid-template-columns: 30% 1fr 1fr; grid-template-rows: 36% 1fr; gap: 3px; width: 100%; aspect-ratio: 16 / 11; padding: 3px; box-sizing: border-box; border-radius: 12px; background: color-mix(in srgb, var(--pz-well) 84%, var(--ring)); box-shadow: 0 0 0 var(--bcv-line, 1px) var(--pz-hair); transition: box-shadow .2s ease, transform .25s var(--ease); }
+.pz__theme:not(.pz__theme--default):hover .pz__thumb { transform: translateY(-2px); box-shadow: 0 0 0 var(--bcv-line, 1px) var(--pz-hair), 0 8px 18px rgba(0,0,0,.14); }
 .pz__theme.is-on:not(.pz__theme--default) .pz__thumb { box-shadow: 0 0 0 2px var(--pz-card), 0 0 0 4px var(--ring); }
 .pz__thumb > i:not(.pz__thumb-check) { position: relative; display: block; min-height: 0; border-radius: 7px; overflow: hidden; background: var(--paper); }
 .pz__thumb--plain { --paper: var(--pz-cell); background: var(--pz-well); }
@@ -718,7 +718,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
 .pz__slotpic { position: relative; display: flex; align-items: center; justify-content: center; width: 100%; aspect-ratio: 4 / 3; box-sizing: border-box; border-radius: 12px; border: 2px dashed color-mix(in srgb, var(--A) 60%, transparent); background: var(--A-tint); color: var(--A-read); overflow: hidden; transition: border-color .2s ease, transform .25s var(--ease), box-shadow .2s ease; }
 .pz__slotpic svg { display: block; }
 .pz__slot:hover .pz__slotpic { border-color: var(--A); transform: translateY(-2px); }
-.pz__slot.has-pic .pz__slotpic { border: 0; background: var(--pz-well); box-shadow: inset 0 0 0 1px var(--pz-hair); }
+.pz__slot.has-pic .pz__slotpic { border: 0; background: var(--pz-well); box-shadow: inset 0 0 0 var(--bcv-line, 1px) var(--pz-hair); }
 .pz__slotpic.is-inked::after { content: ""; position: absolute; inset: 0; background: color-mix(in srgb, var(--pz-well) calc(var(--pz-ink-k) - 4%), var(--pz-ink-lift)); -webkit-mask: var(--ink) center / cover no-repeat; mask: var(--ink) center / cover no-repeat; }
 .pz__slotpic.is-inked.is-scene::after { background: color-mix(in srgb, var(--pz-well) 42%, var(--A)); }
 .pz__slot.is-on .pz__slotpic { box-shadow: 0 0 0 2px var(--pz-card), 0 0 0 4px var(--A); }
