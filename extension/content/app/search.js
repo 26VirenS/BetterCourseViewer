@@ -1,4 +1,4 @@
-/* Search everything: the box in the Dashboard's header is a hub — find, open and do, from one field,
+/* Search everything: the box at the left of the widgets' bar across the top (2.98.70: on every screen; it was the Dashboard's header's) is a hub — find, open and do, from one field,
  * nothing to press. From the first character what the page already holds answers at once — your
  * courses, a command whose name it starts, a sum worked out — and from the second, after a short
  * pause, all of Canvas: for each starred course its assignments, announcements, pages, discussions
@@ -8,8 +8,9 @@
  * Convert; a course: Grades, Files). "/" starts a command (content/app/hub.js: /submit, /download,
  * /convert, /open, /todo, /dark …): the list narrows as the name is typed, Tab (or →) completes
  * it, and the argument — an assignment, a file, a tool, a course — is picked from a list that
- * narrows as you type. "/" or ⌘K on any screen brings the Dashboard up with the box focused and
- * whatever was typed meanwhile kept. On a phone the same box sits under Today's title: the results take
+ * narrows as you type. "/" or ⌘K on any screen puts the cursor in it (where the bar is not shown — Canvas's own page
+ * in the shell — the Dashboard comes up with the box focused and whatever was typed meanwhile kept). On a phone the
+ * same box sits under Today's title: the results take
  * the screen while there are any, every row's actions stay in view (nothing to hover), and the keyboard
  * goes once a row is chosen. The Wikipedia lookup goes through the background (background.js
  * 'wiki'), so the page's own rules never block it. The first time, a black screen points at the box
@@ -40,6 +41,7 @@
 
   let ui = null; // the box on the page: { app, root, input, panel, seq, q, groups, pending, cursor, items, timer, mode, cmd, arg, cs }
   let widthWatch = null; // (the panel's width, for the highlight: one at a time)
+  let docked = null; // the box built for the top bar (dock()), while it is the one in use
   let wanted = null; // the box summoned from another screen: { text, stop } — filled and focused once the Dashboard's box mounts
   const norm = (s) => String(s || '').toLowerCase().trim();
   const hit = (s, q) => norm(s).includes(q);
@@ -714,7 +716,8 @@
 
   /** The box, for the Dashboard's header row (and the phone's Today, under its title): the glyph, the field, the "/" hint, and the panel under it. */
   function field(app) {
-    if (spot) settle(); // (the Dashboard drawn afresh while the box was afloat: the old box and its palette go)
+    if (spot) settle(); // (a box built afresh while the last was afloat: the old box and its palette go)
+    if (docked) { docked.remove(); docked = null; } // (one box at a time: the phone's Today builds its own, and the bar's is built again on the way back)
     const phone = !!BCV.phone?.active?.();
     const input = h('input', { type: 'search', class: 'bcv-omni__in', id: 'bcv-omni', placeholder: phone ? 'Search, or type / for a command' : 'Search everything', autocomplete: 'off', autocapitalize: 'off', autocorrect: 'off', enterkeyhint: 'go', spellcheck: 'false', 'aria-label': 'Search everything: courses, assignments, pages, files, people and Wikipedia — or type / for a command', 'aria-controls': 'bcv-omni-panel', 'aria-autocomplete': 'list' });
     const panel = h('div', { class: 'bcv-omni__panel', id: 'bcv-omni-panel', role: 'listbox', 'aria-label': 'Results' });
@@ -771,6 +774,17 @@
     // (summoned from another screen: summon() lands the words typed on the way once the Dashboard's draw resolves)
     return root;
   }
+  /** The box in the widgets' bar, at its left (2.98.70): built once for the desktop shell and kept across screens (it lives
+   *  outside the app's root, beside the bar); built again after the phone's Today had its own. Each screen's draw asks. */
+  function dock(app) {
+    if (BCV.phone?.active?.()) return;
+    if (docked && ui?.root === docked && docked.isConnected) return; // (in the bar — or afloat from it)
+    let host = document.getElementById('bcv-topsearch');
+    if (!host) { host = h('div', { id: 'bcv-topsearch', class: 'bcv-topsearch' }); document.body.append(host); }
+    const root = field(app);
+    host.replaceChildren(root);
+    docked = root;
+  }
   // a press anywhere else closes the panel; "/" (or ⌘K, Ctrl+K) from anywhere on the page puts the cursor in the box — on another screen, the Dashboard comes up with the box focused and whatever is typed meanwhile kept
   document.addEventListener('pointerdown', (e) => {
     if (!ui || !ui.root.isConnected) return;
@@ -810,12 +824,12 @@
     const slash = e.key === '/' && !typing && !e.metaKey && !e.ctrlKey && !e.altKey;
     const k = (e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && String(e.key).toLowerCase() === 'k';
     if (!slash && !k) return;
-    const input = document.getElementById('bcv-omni');
-    if (input && ui) { e.preventDefault(); input.focus(); input.select(); return; }
+    // the box in the bar (or the phone's on Today), where it is shown and nothing is over the page — a sheet, a quiz
+    if (ui && ui.input.isConnected && ui.root.getClientRects().length && (BCV.phone?.active?.() || summonable())) { e.preventDefault(); ui.input.focus(); ui.input.select(); return; }
     if (!summonable() || (k && typing)) return;
     e.preventDefault();
     summon();
   });
 
-  BCV.search = { field, close, summon, float, unfloat, afloat };
+  BCV.search = { field, dock, close, summon, float, unfloat, afloat };
 })();

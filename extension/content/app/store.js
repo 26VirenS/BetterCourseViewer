@@ -1243,6 +1243,12 @@
           .sort((a, b) => (a.position || 0) - (b.position || 0));
       }
     },
+    /** The questions one finished attempt was given — its own draw from any question group, as it was then —
+     *  readable once that attempt's results are visible (Import answers matches them to today's by content). */
+    async attemptQuestions(courseId, quizId, sub, attempt) {
+      const qs = await C.get(`/api/v1/courses/${courseId}/quizzes/${quizId || sub.quiz_id}/questions`, { params: { quiz_submission_id: sub.id, quiz_submission_attempt: attempt, per_page: 50 }, all: true, maxPages: 4 });
+      return Array.isArray(qs) ? qs : [];
+    },
     // (a quiz with an access code wants it on every call about the attempt, not only at the start)
     answer(sub, questionId, answer, accessCode) {
       return C.post(`/api/v1/quiz_submissions/${sub.id}/questions`, { attempt: sub.attempt, validation_token: sub.validation_token, ...(accessCode ? { access_code: accessCode } : {}), quiz_questions: [{ id: questionId, answer }] });

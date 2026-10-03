@@ -1154,6 +1154,7 @@
     // was opened over: a Back with one up would otherwise leave it, scrim and all, over the next
     for (const ov of document.querySelectorAll('.bcv-sheet-ov, .bcv-viewer-ov')) ov.remove();
     syncSide(); // the sidebar follows the route in place; it is rebuilt only when what it shows changes
+    BCV.search?.dock?.(BCV.app); // the search box at the left of the top bar, on every screen (kept as it is when it is already there)
     const ctx = { app: BCV.app, route: r, alive, dark: state.dark };
     // Screens build off-DOM and land whole. A screen still fetching after 150ms gets a
     // skeleton in its place, shaped like its content (course cards on Grades, list rows

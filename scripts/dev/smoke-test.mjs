@@ -3489,8 +3489,12 @@ try {
   console.log('search');
   await page.goto(`${BASE}/`);
   await page.waitForSelector('#bcv-omni', { timeout: 10000 });
-  const sBox = await page.evaluate(() => { const row = document.querySelector('.bcv-head__row'); const s = row.querySelector('#bcv-omni-box').getBoundingClientRect(); const h1 = row.querySelector('.bcv-h1').getBoundingClientRect(); const seg = row.querySelector('.bcv-seg').getBoundingClientRect(); return { placeholder: document.getElementById('bcv-omni').placeholder, between: s.left > h1.right && s.right <= seg.left + 1, level: Math.abs(s.bottom - seg.bottom) < 1.5 && Math.abs(s.height - seg.height) <= 1, pills: getComputedStyle(document.getElementById('bcv-omni-root')).backgroundColor === 'rgba(0, 0, 0, 0)', key: document.querySelector('.bcv-omni__key')?.textContent, panelHidden: document.getElementById('bcv-omni-panel').hidden }; });
-  check(sBox.placeholder === 'Search everything' && sBox.between && sBox.level && sBox.pills && sBox.key === '/' && sBox.panelHidden, `the Dashboard's header carries a search box between the title and the view switcher — one pill, level with the switcher — its panel closed: ${JSON.stringify(sBox)}`);
+  // (2.98.70) the box sits in the top bar — the widgets' bar — at its left, on every screen; the Dashboard's header has none of its own
+  const barBox = () => page.evaluate(() => { const host = document.getElementById('bcv-topsearch'); const box = document.getElementById('bcv-omni-box'); const s = box.getBoundingClientRect(); const bar = document.getElementById('bcv-bar').getBoundingClientRect(); const hit = document.elementFromPoint((s.left + s.right) / 2, (s.top + s.bottom) / 2); return { inBar: !!host && host.contains(box), left: Math.round(s.left - bar.left), mid: Math.round((s.top + s.bottom) / 2 - (bar.top + bar.bottom) / 2), h: Math.round(s.height), w: Math.round(s.width), headBox: !!document.querySelector('.bcv-head #bcv-omni-box'), hit: !!hit && box.contains(hit), placeholder: document.getElementById('bcv-omni').placeholder, pills: getComputedStyle(document.getElementById('bcv-omni-root')).backgroundColor === 'rgba(0, 0, 0, 0)', key: document.querySelector('.bcv-omni__key')?.textContent, panelHidden: document.getElementById('bcv-omni-panel').hidden }; });
+  const inTheBar = (b) => b.inBar && Math.abs(b.left - 20) <= 1 && Math.abs(b.mid) <= 1 && b.h === 29 && b.w >= 220 && !b.headBox && b.hit && b.panelHidden;
+  const sBox = await barBox();
+  check(inTheBar(sBox) && sBox.placeholder === 'Search everything' && sBox.pills && sBox.key === '/', `the top bar carries the search box at its left — one pill, centred in the bar, nothing over it — and the Dashboard's header none: ${JSON.stringify(sBox)}`);
+  await shot(page, '15-search-topbar');
   // the input draws nothing of its own: Canvas styles input[type=search] as a white field with a border, a shadow on focus
   const bare = () => page.evaluate(() => { const c = getComputedStyle(document.getElementById('bcv-omni')); const box = document.getElementById('bcv-omni-box').getBoundingClientRect(); return { bg: c.backgroundColor, border: c.borderTopWidth, shadow: c.boxShadow, outline: c.outlineStyle, pad: c.paddingLeft, inside: document.getElementById('bcv-omni').getBoundingClientRect().height <= box.height - 1 }; });
   const bareOff = await bare();
@@ -3501,23 +3505,23 @@ try {
   check([bareOff, bareOn].every((b) => b.bg === 'rgba(0, 0, 0, 0)' && b.border === '0px' && b.shadow === 'none' && b.outline === 'none' && b.pad === '0px' && b.inside), `the input draws no field of its own inside the pill, focused or not, whatever Canvas says of search inputs: ${JSON.stringify({ bareOff, bareOn })}`);
   // (2.98.54) the box afloat: with the cursor in it, it lifts out of the header to the middle of the window as a large pill over a
   // dim and a blur, the four kinds to search in under it, a ghost keeping the header's row; a kind narrows it; Escape puts it back
-  const afloat = await page.evaluate(() => { const pal = document.querySelector('.bcv-spot'); const ov = document.querySelector('.bcv-spot-ov'); const box = document.getElementById('bcv-omni-box'); const b = box.getBoundingClientRect(); const row = document.querySelector('.bcv-head__row'); const ghost = row.querySelector('.bcv-omni--ghost'); const seg = row.querySelector('.bcv-seg').getBoundingClientRect(); const h1 = row.querySelector('.bcv-h1').getBoundingClientRect(); return { pal: !!pal, inPal: !!pal && pal.contains(box), ov: !!ov, ovPointer: ov ? getComputedStyle(ov).pointerEvents : null, ovBlur: ov ? (getComputedStyle(ov).backdropFilter || getComputedStyle(ov).webkitBackdropFilter || '') : null, pageFilter: [...document.querySelectorAll('#bcv-app > #bcv-main, #bcv-app > #bcv-side, body > #bcv-bar')].map((e) => getComputedStyle(e).filter).filter((f) => f !== 'none').join(','), noblur: document.documentElement.classList.contains('bcv-noblur'), centred: Math.abs((b.left + b.right) / 2 - innerWidth / 2) <= 2, top: Math.round(b.top), w: Math.round(b.width), hgt: Math.round(b.height), font: getComputedStyle(document.getElementById('bcv-omni')).fontSize, ghost: !!ghost, ghostH: ghost ? Math.round(ghost.getBoundingClientRect().height) : 0, segLevel: Math.abs(seg.bottom - h1.bottom) < 24, rows: [...document.querySelectorAll('.bcv-omni__panel .bcv-omni__item')].map((e) => `${e.querySelector('.bcv-omni__t').textContent}:${e.querySelector('.bcv-omni__cmdkey')?.textContent}`).join(','), title: document.querySelector('.bcv-omni__gtitle')?.textContent, panelInPal: !!pal && pal.contains(document.getElementById('bcv-omni-panel')), cur: document.querySelector('.bcv-omni__item.is-cur .bcv-omni__t')?.textContent }; });
-  check(afloat.pal && afloat.inPal && afloat.ov && afloat.ovPointer === 'none' && (!afloat.ovBlur || afloat.ovBlur === 'none') && !afloat.pageFilter && afloat.centred && afloat.top === 160 && afloat.w === 680 && afloat.hgt >= 72 && afloat.hgt <= 74 && afloat.font === '26px' && afloat.ghost && afloat.ghostH === 29 && afloat.segLevel && afloat.title === 'Search in' && afloat.rows === 'Courses:⌘1,Work:⌘2,Files:⌘3,Actions:⌘4' && afloat.panelInPal && afloat.cur === 'Courses', `the box floats to the middle of the window as a 680×72 pill (26px words) over a light veil that takes no pointer and blurs nothing (2.98.69: the page stays sharp), a ghost holding its place in the header, the four kinds under it with ⌘1–⌘4: ${JSON.stringify(afloat)}`);
+  const afloat = await page.evaluate(() => { const pal = document.querySelector('.bcv-spot'); const ov = document.querySelector('.bcv-spot-ov'); const box = document.getElementById('bcv-omni-box'); const b = box.getBoundingClientRect(); const ghost = document.querySelector('#bcv-topsearch .bcv-omni--ghost'); return { pal: !!pal, inPal: !!pal && pal.contains(box), ov: !!ov, ovPointer: ov ? getComputedStyle(ov).pointerEvents : null, ovBlur: ov ? (getComputedStyle(ov).backdropFilter || getComputedStyle(ov).webkitBackdropFilter || '') : null, pageFilter: [...document.querySelectorAll('#bcv-app > #bcv-main, #bcv-app > #bcv-side, body > #bcv-bar')].map((e) => getComputedStyle(e).filter).filter((f) => f !== 'none').join(','), noblur: document.documentElement.classList.contains('bcv-noblur'), centred: Math.abs((b.left + b.right) / 2 - innerWidth / 2) <= 2, top: Math.round(b.top), w: Math.round(b.width), hgt: Math.round(b.height), font: getComputedStyle(document.getElementById('bcv-omni')).fontSize, ghost: !!ghost, ghostH: ghost ? Math.round(ghost.getBoundingClientRect().height) : 0, rows: [...document.querySelectorAll('.bcv-omni__panel .bcv-omni__item')].map((e) => `${e.querySelector('.bcv-omni__t').textContent}:${e.querySelector('.bcv-omni__cmdkey')?.textContent}`).join(','), title: document.querySelector('.bcv-omni__gtitle')?.textContent, panelInPal: !!pal && pal.contains(document.getElementById('bcv-omni-panel')), cur: document.querySelector('.bcv-omni__item.is-cur .bcv-omni__t')?.textContent }; });
+  check(afloat.pal && afloat.inPal && afloat.ov && afloat.ovPointer === 'none' && (!afloat.ovBlur || afloat.ovBlur === 'none') && !afloat.pageFilter && afloat.centred && afloat.top === 160 && afloat.w === 680 && afloat.hgt >= 72 && afloat.hgt <= 74 && afloat.font === '26px' && afloat.ghost && afloat.ghostH === 29 && afloat.title === 'Search in' && afloat.rows === 'Courses:⌘1,Work:⌘2,Files:⌘3,Actions:⌘4' && afloat.panelInPal && afloat.cur === 'Courses', `the box floats to the middle of the window as a 680×72 pill (26px words) over a light veil that takes no pointer and blurs nothing (2.98.69: the page stays sharp), a ghost holding its place in the top bar, the four kinds under it with ⌘1–⌘4: ${JSON.stringify(afloat)}`);
   // (2.98.68) Spotlight's glass, whatever the page's look: a smoky pill, the panel a slab of its own under it with the page
   // blurred soft through it, white words, a plain white line drawing for each row's mark, the ⌘ keys large and quiet
   const glassNow = () => page.evaluate(() => {
     const cs = (e) => getComputedStyle(e);
     const box = document.getElementById('bcv-omni-box'), panel = document.querySelector('.bcv-spot .bcv-omni__panel');
     const row = panel.querySelector('.bcv-omni__item'), ic = row.querySelector('.bcv-omni__iic');
-    return { noblur: document.documentElement.classList.contains('bcv-noblur'), boxBg: cs(box).backgroundImage.slice(0, 15), boxColor: cs(box).backgroundColor, boxBlur: cs(box).backdropFilter || cs(box).webkitBackdropFilter || '', panelColor: cs(panel).backgroundColor, panelR: cs(panel).borderTopLeftRadius, panelBlur: cs(panel).backdropFilter || cs(panel).webkitBackdropFilter || '', edges: [cs(box).borderTopWidth, cs(panel).borderTopWidth, /inset/.test(cs(box).boxShadow + cs(panel).boxShadow)].join(','), gap: Math.round(panel.getBoundingClientRect().top - box.getBoundingClientRect().bottom), ink: cs(row.querySelector('.bcv-omni__t')).color, icBg: cs(ic).backgroundColor, icInk: cs(ic).color, key: cs(row.querySelector('.bcv-omni__cmdkey')).fontSize, title: cs(row.querySelector('.bcv-omni__t')).fontSize, selW: panel.querySelector('.bcv-omni__sel.is-on')?.offsetWidth ?? -1, rowW: row.offsetWidth };
+    return { noblur: document.documentElement.classList.contains('bcv-noblur'), boxBg: cs(box).backgroundImage.slice(0, 15), boxColor: cs(box).backgroundColor, boxBlur: cs(box).backdropFilter || cs(box).webkitBackdropFilter || '', panelColor: cs(panel).backgroundColor, panelR: cs(panel).borderTopLeftRadius, panelBlur: cs(panel).backdropFilter || cs(panel).webkitBackdropFilter || '', edges: [cs(box).borderTopWidth, cs(panel).borderTopWidth, cs(box).borderTopColor, cs(panel).borderTopColor, ...[box, panel].map((e) => (cs(e).backgroundImage.match(/gradient/g) || []).length), [box, panel].every((e) => (cs(e).boxShadow.match(/inset/g) || []).length >= 4)].join(','), solidFill: [box, panel].every((e) => cs(e).backgroundImage.includes('rgba(40, 40, 44, 0.97)')), gap: Math.round(panel.getBoundingClientRect().top - box.getBoundingClientRect().bottom), ink: cs(row.querySelector('.bcv-omni__t')).color, icBg: cs(ic).backgroundColor, icInk: cs(ic).color, key: cs(row.querySelector('.bcv-omni__cmdkey')).fontSize, title: cs(row.querySelector('.bcv-omni__t')).fontSize, selW: panel.querySelector('.bcv-omni__sel.is-on')?.offsetWidth ?? -1, rowW: row.offsetWidth };
   });
-  const marks = (g) => g.edges === '0px,0px,false' && g.panelR === '34px' && g.gap >= 12 && g.ink === 'rgb(255, 255, 255)' && g.icBg === 'rgba(0, 0, 0, 0)' && g.icInk === 'rgb(255, 255, 255)' && g.key === '17px' && g.title === '17.5px' && Math.abs(g.selW - g.rowW) <= 1; // (the highlight the row's whole width: drawn while the palette still widened, it was left short)
+  const marks = (g) => g.edges === '1px,1px,rgba(0, 0, 0, 0),rgba(0, 0, 0, 0),2,2,true' && g.panelR === '34px' && g.gap >= 12 && g.ink === 'rgb(255, 255, 255)' && g.icBg === 'rgba(0, 0, 0, 0)' && g.icInk === 'rgb(255, 255, 255)' && g.key === '17px' && g.title === '17.5px' && Math.abs(g.selW - g.rowW) <= 1; // (the highlight the row's whole width: drawn while the palette still widened, it was left short)
   // where Chrome draws without acceleration (as here) the glass is solid, and as dark: the words hold the same
   const solid = await glassNow();
-  check(!solid.noblur || (solid.boxColor === 'rgba(40, 40, 44, 0.97)' && solid.panelColor === 'rgba(40, 40, 44, 0.97)' && solid.boxBlur === 'none' && marks(solid)), `without blur (Chrome with no graphics acceleration) the pill and the panel are solid and as dark, the words and marks the same: ${JSON.stringify(solid)}`);
+  check(!solid.noblur || (solid.solidFill && solid.boxBlur === 'none' && marks(solid)), `without blur (Chrome with no graphics acceleration) the pill and the panel are solid and as dark, the words and marks the same: ${JSON.stringify(solid)}`);
   await page.evaluate(() => document.documentElement.classList.remove('bcv-noblur'));
   const glass = await glassNow();
-  check(/linear-gradient/.test(glass.boxBg) && /blur\(24px\)/.test(glass.boxBlur) && /blur\(26px\)/.test(glass.panelBlur) && marks(glass), `afloat it wears Spotlight's glass: a smoky pill, a slab of its own under it with the page blurred soft through it (24px, 26px: 2.98.69), no border or edge line on either, white words, plain white marks, large ⌘ keys: ${JSON.stringify(glass)}`);
+  check(/linear-gradient/.test(glass.boxBg) && /blur\(24px\)/.test(glass.boxBlur) && /blur\(26px\)/.test(glass.panelBlur) && marks(glass), `afloat it wears Spotlight's glass: a smoky pill, a slab of its own under it with the page blurred soft through it (24px, 26px: 2.98.69), no drawn line round either but Liquid Glass's rim of light and its shading inside the edges (2.98.70), white words, plain white marks, large ⌘ keys: ${JSON.stringify(glass)}`);
   await shot(page, '15-spot-glass');
   if (solid.noblur) await page.evaluate(() => document.documentElement.classList.add('bcv-noblur')); // (as the rest of the run draws it)
   await page.keyboard.press('Meta+2');
@@ -3584,9 +3588,21 @@ try {
   await page.focus('#bcv-omni');
   await page.waitForFunction(() => document.querySelector('.bcv-omni__gtitle')?.textContent === 'Search in', null, { timeout: 8000 });
   await page.keyboard.press('Escape');
-  check(await eventually(() => page.evaluate(() => !document.querySelector('.bcv-spot') && !document.querySelector('.bcv-spot-ov') && !document.querySelector('.bcv-omni--ghost') && document.querySelector('.bcv-head__row').contains(document.getElementById('bcv-omni-box')) && document.activeElement?.id !== 'bcv-omni'), 3000), 'Escape on the empty box puts it back in the header, the veil and the ghost gone');
-  const homeAgain = await page.evaluate(() => { const row = document.querySelector('.bcv-head__row'); const s = row.querySelector('#bcv-omni-box').getBoundingClientRect(); const h1 = row.querySelector('.bcv-h1').getBoundingClientRect(); const seg = row.querySelector('.bcv-seg').getBoundingClientRect(); return { between: s.left > h1.right && s.right <= seg.left + 1, level: Math.abs(s.bottom - seg.bottom) < 1.5, h: Math.round(s.height), panelHidden: document.getElementById('bcv-omni-panel').hidden }; });
-  check(homeAgain.between && homeAgain.level && homeAgain.h === 29 && homeAgain.panelHidden, `home, it is the header's pill again, between the title and the switcher: ${JSON.stringify(homeAgain)}`);
+  check(await eventually(() => page.evaluate(() => !document.querySelector('.bcv-spot') && !document.querySelector('.bcv-spot-ov') && !document.querySelector('.bcv-omni--ghost') && document.getElementById('bcv-topsearch').contains(document.getElementById('bcv-omni-box')) && document.activeElement?.id !== 'bcv-omni'), 3000), 'Escape on the empty box puts it back in the top bar, the veil and the ghost gone');
+  const homeAgain = await barBox();
+  check(inTheBar(homeAgain), `home, it is the top bar's pill again, at its left: ${JSON.stringify(homeAgain)}`);
+  // on any other screen it is there too, and "/" lifts it where it is — the page stays
+  await page.goto(`${BASE}/courses/101`);
+  await page.waitForSelector('#bcv-topsearch #bcv-omni', { timeout: 10000 });
+  await page.waitForTimeout(300);
+  const elsewhere = await barBox();
+  await page.keyboard.press('/');
+  await page.waitForFunction(() => document.querySelector('.bcv-spot:not(.is-far)') && document.querySelector('.bcv-omni__gtitle')?.textContent === 'Search in', null, { timeout: 5000 });
+  check(inTheBar(elsewhere) && new URL(page.url()).pathname === '/courses/101' && (await page.evaluate(() => document.activeElement?.id)) === 'bcv-omni', `on a course's page the box is in the top bar too, and "/" lifts it there without leaving the page: ${JSON.stringify(elsewhere)}`);
+  await page.keyboard.press('Escape');
+  await eventually(() => page.evaluate(() => !document.querySelector('.bcv-spot')), 3000);
+  await page.goto(`${BASE}/`);
+  await page.waitForSelector('#bcv-topsearch #bcv-omni', { timeout: 10000 });
   await page.focus('#bcv-omni'); // (the fold took the cursor: back in, afloat again, for the searches below)
   await page.waitForTimeout(600);
   await page.keyboard.type('dis01');
@@ -3970,20 +3986,20 @@ try {
   check(dueList.groups.join(',') === 'Due' && dueList.rows[0] === 'Dis01' && dueList.rows.some((r) => /PreQuiz/.test(r)) && !dueList.rows.includes('W2 HW') && dueList.rows.length === 8, `Enter completes it and lists what is coming, quizzes too, soonest first (what is past due waits under /overdue): ${dueList.rows.join(' · ')}`);
   await page.keyboard.press('Escape');
   check(await page.$eval('#bcv-omni-panel', (e) => e.hidden) && (await page.inputValue('#bcv-omni')) === '/due ', 'Escape closes the panel, the words kept');
-  // "/" (or ⌘K) on another screen brings the Dashboard up with the box focused, the letters typed on the way kept
+  // "/" (or ⌘K) on another screen lifts the top bar's box right there (2.98.70; it used to bring the Dashboard up), the letters typed after it in it
   await page.goto(`${BASE}/courses`);
   await page.waitForSelector('[data-term]', { timeout: 10000 });
+  await page.waitForSelector('#bcv-topsearch #bcv-omni', { timeout: 10000 });
   await page.keyboard.press('/');
   await page.keyboard.type('phys');
-  await page.waitForSelector('#bcv-omni', { timeout: 10000 });
-  check(await eventually(async () => page.evaluate(() => document.getElementById('bcv-omni')?.value === 'phys' && document.activeElement?.id === 'bcv-omni').catch(() => false), 6000) && page.url() === `${BASE}/`, `"/" on All Courses brings the Dashboard up with the box focused and the letters typed on the way in it: ${page.url()}`);
+  check(await eventually(async () => page.evaluate(() => document.getElementById('bcv-omni')?.value === 'phys' && document.activeElement?.id === 'bcv-omni' && !!document.querySelector('.bcv-spot:not(.is-far)')).catch(() => false), 6000) && page.url() === `${BASE}/courses`, `"/" on All Courses lifts the box where it is — the page stays — focused, the letters typed after it in it: ${page.url()}`);
   await page.waitForSelector('.bcv-omni__group[data-group="Courses"] .bcv-omni__item', { timeout: 6000 });
   check(true, 'and searched');
   await page.goto(`${BASE}/grades`);
   await page.waitForSelector('.bcv-screen', { timeout: 10000 });
+  await page.waitForSelector('#bcv-topsearch #bcv-omni', { timeout: 10000 });
   await page.keyboard.press('Control+k');
-  await page.waitForSelector('#bcv-omni', { timeout: 10000 });
-  check(await eventually(async () => page.evaluate(() => document.activeElement?.id === 'bcv-omni').catch(() => false), 6000) && page.url() === `${BASE}/`, `⌘K on Grades does the same: ${page.url()}`);
+  check(await eventually(async () => page.evaluate(() => document.activeElement?.id === 'bcv-omni' && !!document.querySelector('.bcv-spot:not(.is-far)')).catch(() => false), 6000) && page.url() === `${BASE}/grades`, `⌘K on Grades does the same: ${page.url()}`);
   } // search hub
   if (on('appearance')) {
 
@@ -5582,6 +5598,7 @@ try {
   await openTool('calc');
   await page.waitForFunction(() => { const t = document.querySelector('.bcv-tool[data-tool="calc"]'); return !!t && getComputedStyle(t).transform === 'none' && t.getAnimations({ subtree: true }).every((a) => a.playState !== 'running'); }, null, { timeout: 5000 }); // (the popup grows in from the card on a spring: measured once it is at rest)
   const calcLine = (sel) => page.$eval(`.bcv-tool[data-tool="calc"] ${sel}`, (e) => e.dataset.line); // (the line as text: the display itself is typeset)
+  await eventually(() => page.$eval('.bcv-tool[data-tool="calc"] .bcv-calc', (e) => document.activeElement === e).catch(() => false), 2000); // (the keys take the focus a moment after the popup lands)
   check((await toolSub()) === 'Scientific · the keyboard works too' && (await page.$$('.bcv-tool[data-tool="calc"] .bcv-calc__key')).length === 49 && (await page.$eval('.bcv-tool[data-tool="calc"] .bcv-calc', (e) => e.classList.contains('bcv-calc--big') && document.activeElement === e)) && (await calcLine('.bcv-calc__expr')) === '0', 'the calculator is a tool of its own: the scientific keys, larger, with the focus on them');
   await page.keyboard.type('7*6');
   await page.keyboard.press('Enter');
@@ -7315,9 +7332,9 @@ try {
   await options.click('#devQuizImport');
   check(await eventually(async () => (await sw.evaluate(async () => (await self.BCV.settings.get()).developer?.quizImport)) === true && await options.$eval('#devQuizImport', (b) => b.classList.contains('is-on') && b.getAttribute('aria-checked') === 'true')), 'the Quiz tab turns on Import answers from an earlier attempt — a setting, so the Mac app\'s window turns it on too');
   await options.screenshot({ path: join(out, '29b-options-dev-quiz.png') });
-  // the quiz: a new attempt, Import answers — attempt 1's answers filled in and saved to Canvas
+  // the quiz: a new attempt, Import answers (2.98.70) — what attempt 1 got right shown in purple; nothing picked, nothing saved
   await page.bringToFront();
-  // (attempts to spare, the rich kinds to import, and a formula question and a file to hand in: the kinds 2.98.30 takes here;
+  // (attempts to spare, the rich kinds, and a formula question and a file to hand in: the kinds 2.98.30 takes here;
   // and each save held between Canvas's read of the attempt's record and its write, so saves side by side would lose answers)
   await mockConfig({ richQuestions: true, moreTypes: true, saveRace: true });
   await page.goto(`${BASE}/courses/101/quizzes/9001?bcv=take`);
@@ -7325,20 +7342,43 @@ try {
   check(await page.$eval('.bcv-qz__devimport', (b) => b.hidden), 'the button is not on the intro: an attempt has to be open');
   await page.click('.bcv-qz__begin');
   await page.waitForSelector('.bcv-qz__devimport:not([hidden])', { timeout: 15000 });
+  const histNow = await apiGet('/api/v1/courses/101/assignments/1001/submissions/self?include[]=submission_history');
+  const att1 = (histNow?.submission_history || []).find((x) => Number(x.attempt) === 1);
+  const wasRight = (att1?.submission_data || []).filter((d) => d.correct === true || d.correct === 'true').map((d) => String(d.question_id));
+  const wasWrong = (att1?.submission_data || []).filter((d) => d.correct === false || d.correct === 'false').map((d) => String(d.question_id));
+  // the exact same question only, never the one in the same place: attempt 1 was given another question as 90011 (a group's draw)
+  await mockConfig({ reworded: ['90011'] });
   await page.click('.bcv-qz__devimport');
-  check(await eventually(async () => /Imported \d+ answers from attempt 1\./.test((await texts('.bcv-toast')).join(' ')), 10000), `Import answers says what it took and from which attempt: ${(await texts('.bcv-toast')).join(' | ')}`);
+  check(await eventually(async () => /\d+ right answers? from attempt 1, shown in purple on the same questions?\. Nothing is picked for you\./.test((await texts('.bcv-toast')).join(' ')), 10000), `Import answers says what it shows and from which attempt: ${(await texts('.bcv-toast')).join(' | ')}`);
+  await mockConfig({ reworded: [] });
+  const importToast = (await texts('.bcv-toast')).join(' ');
   const openSub = ((await apiGet('/api/v1/courses/101/quizzes/9001/submissions')).quiz_submissions || []).find((s) => s.workflow_state === 'untaken');
   const importedQs = openSub ? await apiGet(`/api/v1/quiz_submissions/${openSub.id}/questions`) : null;
-  const ansOf = (id) => (importedQs?.quiz_submission_questions || []).find((q) => String(q.id) === String(id))?.answer;
-  const imported = { attempt: openSub?.attempt, q1: ansOf(90011), q2: ansOf(90012), q3: [...(ansOf(90013) || [])].map(Number).sort().join(','), q4: Number(ansOf(90014)) };
-  check(imported.attempt === 2 && Number(imported.q1) === 900111 && Number(imported.q2) === 900124 && imported.q3 === '900131,900133' && imported.q4 === 3.15, `and Canvas has them on the new attempt, attempt 1's answer to each question — every one kept though Canvas writes the whole record on each save: ${JSON.stringify(imported)}`);
-  const importToast = (await texts('.bcv-toast')).join(' ');
-  const keptCount = (importedQs?.quiz_submission_questions || []).filter((q) => q.answer !== null && q.answer !== undefined && q.answer !== '' && !(Array.isArray(q.answer) && !q.answer.length)).length;
-  check(Number((importToast.match(/Imported (\d+) answers/) || [])[1]) === keptCount && !/did not keep/.test(importToast), `the count said is the count Canvas holds: ${importToast} · ${keptCount} on Canvas`);
+  // (an untaken attempt lists its matching rows and blanks with nothing in them: those are no answer)
+  const realAnswer = (a) => (a === null || a === undefined || a === '' ? false : Array.isArray(a) ? a.some((x) => (x && typeof x === 'object' ? x.match_id !== null && x.match_id !== undefined : x !== null && x !== '')) : typeof a === 'object' ? Object.values(a).some((v) => v !== null && v !== undefined && v !== '') : true);
+  const savedNow = (importedQs?.quiz_submission_questions || []).filter((q) => realAnswer(q.answer)).length;
+  check(Number((importToast.match(/(\d+) right answer/) || [])[1]) === wasRight.length - 1 && wasRight.includes('90011') && wasWrong.length >= 1 && openSub?.attempt === 2 && savedNow === 0, `only what was right is taken, each to its very question — all attempt 1 got right but 90011, whose place held another question then — and nothing goes to Canvas: ${JSON.stringify({ toast: importToast, right: wasRight, wrong: wasWrong, savedNow, saved: (importedQs?.quiz_submission_questions || []).filter((q) => realAnswer(q.answer)).map((q) => [q.id, q.answer]) })}`);
   await mockConfig({ saveRace: false });
-  check((await page.$$('.bcv-qz__opt.is-selected')).length >= 1, 'the question on screen shows its imported answer');
-  // Formula and File Upload questions, answered here: a number to the places the quiz asks for; a file uploaded to the student's quiz files and named as the answer
   const pillOf = (id) => page.locator('.bcv-qz__pill').nth(Number((importedQs?.quiz_submission_questions || []).find((q) => String(q.id) === String(id))?.position) - 1); // (the squares run in the questions' positions)
+  const purpleHere = () => page.evaluate(() => { const b = document.querySelector('.bcv-qz__body'); const opts = [...b.querySelectorAll('.bcv-qz__opt.is-hinted')]; return { hinted: b.querySelectorAll('.is-hinted').length, opts: opts.length, picked: b.querySelectorAll('.bcv-qz__opt.is-selected').length, aids: opts.map((o) => o.dataset.aid).sort().join(','), colour: opts[0] ? getComputedStyle(opts[0]).borderTopColor : '' }; });
+  const rightChoice = (att1?.submission_data || []).find((d) => wasRight.includes(String(d.question_id)) && String(d.question_id) !== '90011' && (d.answer_id !== undefined && d.answer_id !== null || Object.keys(d).some((k) => /^answer_\d+$/.test(k) && String(d[k]) === '1')));
+  const rightIds = rightChoice ? (rightChoice.answer_id !== undefined && rightChoice.answer_id !== null ? [String(rightChoice.answer_id)] : Object.keys(rightChoice).filter((k) => /^answer_\d+$/.test(k) && String(rightChoice[k]) === '1').map((k) => k.slice(7))) : [];
+  await pillOf(rightChoice.question_id).click();
+  await page.waitForTimeout(250);
+  const onRight = await purpleHere();
+  check(onRight.opts === rightIds.length && onRight.aids === [...rightIds].sort().join(',') && onRight.picked === 0 && onRight.colour === 'rgb(175, 82, 222)', `a question attempt 1 got right shows that pick in purple, and nothing is picked: ${JSON.stringify({ q: rightChoice?.question_id, ...onRight, want: rightIds })}`);
+  await page.screenshot({ path: join(out, '29d-quiz-import-purple.png') });
+  await pillOf(wasWrong[0]).click();
+  await page.waitForTimeout(250);
+  const onWrong = await purpleHere();
+  check(onWrong.hinted === 0 && onWrong.picked === 0, `a question attempt 1 got wrong shows nothing: ${JSON.stringify({ q: wasWrong[0], ...onWrong })}`);
+  await pillOf(90011).click();
+  await page.waitForTimeout(250);
+  const onMoved = await purpleHere();
+  check(onMoved.hinted === 0, `90011 — right in attempt 1, but then another question stood in its place — shows nothing: ${JSON.stringify(onMoved)}`);
+  // question 1 answered here by hand, for the lost-answer check below
+  await page.click('.bcv-qz__opt[data-aid="900111"]');
+  // Formula and File Upload questions, answered here: a number to the places the quiz asks for; a file uploaded to the student's quiz files and named as the answer
   const liveAnswer = async (id) => ((await apiGet(`/api/v1/quiz_submissions/${openSub.id}/questions`)).quiz_submission_questions || []).find((q) => String(q.id) === String(id))?.answer;
   await pillOf(90018).click();
   const formula = page.locator('.bcv-qz__text:has(.bcv-qz__texthint)');

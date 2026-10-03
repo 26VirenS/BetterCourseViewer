@@ -948,10 +948,13 @@ on('POST', /^\/api\/v1\/courses\/(\w+)\/quizzes\/(\w+)\/submissions\/([\w-]+)\/c
 });
 // the quiz's question set as one attempt saw it (Quiz Questions API): a student reads only a finished attempt whose results are visible
 on('GET', /^\/api\/v1\/courses\/(\w+)\/quizzes\/(\w+)\/questions$/, (url, m) => {
-  const s = url.searchParams.get('quiz_submission_id') ? findSub(url.searchParams.get('quiz_submission_id')) : null;
+  let s = url.searchParams.get('quiz_submission_id') ? findSub(url.searchParams.get('quiz_submission_id')) : null;
+  const att = url.searchParams.get('quiz_submission_attempt'); // (Canvas keeps one submission a student and its attempts as versions: the attempt named is the one read)
+  if (s && att && Number(att) !== Number(s.attempt)) s = (quizSubs.get(String(s.quiz_id)) || []).find((x) => Number(x.attempt) === Number(att)) || null;
   if (!s) return { __status: 401, errors: [{ message: 'user not authorized to perform that action' }] };
   if (s.workflow_state !== 'complete') return { __status: 401, errors: [{ message: 'Cannot view questions due to quiz settings' }] };
-  return quizQuestionBank(m[2]).map(censor);
+  // ({"reworded": ["90011"]}: that attempt was given a different question under the same id — a question group's draw)
+  return quizQuestionBank(m[2]).map(censor).map((q) => ((mockConfig.reworded || []).includes(String(q.id)) ? { ...q, question_text: `<p>A different question drawn for this place: ${q.id}</p>` } : q));
 });
 // test-only: what the mock holds for an attempt (its read marks, answers and flags)
 on('GET', /^\/__mock\/quizsub\/([\w-]+)$/, (url, m) => { const s = findSub(m[1]); return s ? { read: s.read || {}, answers: Object.fromEntries(Object.entries(s.state).map(([k, v]) => [k, v.answer ?? null])), flags: Object.fromEntries(Object.entries(s.state).map(([k, v]) => [k, !!v.flagged])) } : null; });

@@ -248,7 +248,7 @@
       }
       const r = btn.getBoundingClientRect();
       list = el('bcv-picker__list', options.map((o) => h('button', {
-        type: 'button', class: `bcv-picker__opt ${String(o.value) === cur ? 'is-on' : ''}`, role: 'option',
+        type: 'button', class: `bcv-picker__opt ${o.cls || ''} ${String(o.value) === cur ? 'is-on' : ''}`, role: 'option',
         'aria-selected': String(o.value) === cur ? 'true' : 'false', dataset: { value: String(o.value) },
         onclick: () => pick(o.value),
       }, [

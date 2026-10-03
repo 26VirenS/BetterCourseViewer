@@ -155,7 +155,7 @@
     // header and the rail away so the questions take the page. app.js clears it on the next render.
 
     // fbSub: the finished attempt the feedback stage shows; fbFrom: 'done' when it was opened from the receipt
-    const st = { stage: 'intro', idx: 0, mode: 'one', quiz: null, sub: null, questions: [], flags: {}, files: {}, saving: 0, savedAt: 0, timer: null, warned: {}, done: null, code: '', fbSub: null, fbFrom: null, fb: null, page: null, paged: false, inflight: new Set(), loadingIdx: null };
+    const st = { stage: 'intro', idx: 0, mode: 'one', quiz: null, sub: null, questions: [], flags: {}, files: {}, saving: 0, savedAt: 0, timer: null, warned: {}, done: null, code: '', fbSub: null, fbFrom: null, fb: null, page: null, paged: false, inflight: new Set(), loadingIdx: null, hints: null };
     const screen = U.el('bcv-qz');
     screen.append(U.loading('Loading the quiz…'));
 
@@ -250,13 +250,13 @@
       title: "Show this quiz's instructions. Nothing about your attempt changes.",
     }, [U.svg(IC.book, { size: 13, width: 2 }), h('span', { text: 'Instructions' })]);
     const exitBtn = h('button', { type: 'button', class: 'bcv-qz__exit', title: 'Save and exit', 'aria-label': 'Save and exit', onclick: leave }, U.svg(IC.close, { size: 16, width: 2.2 }));
-    // Developer (Settings → Developer → Quiz): the answers of an earlier attempt, filled in and saved,
-    // for trying a quiz again without typing it all out. Never there unless it was turned on there.
+    // Developer (Settings → Developer → Quiz): what was right in an earlier attempt, shown in purple on this
+    // one (2.98.70: shown, never picked or saved). Never there unless it was turned on there.
     const devImport = await BCV.settings.get().then((s) => s?.developer?.quizImport === true).catch(() => false);
     if (!ctx.alive()) return screen;
     const devBtn = h('button', {
       type: 'button', class: 'bcv-qz__devimport', hidden: true, onclick: () => importEarlier(),
-      title: 'Developer: fill in and save the answers from your last graded attempt',
+      title: 'Developer: show in purple what you picked last time, where it was right — nothing is filled in',
     }, [U.svg('M12 4v11M7 10l5 5 5-5M5 20h14', { size: 13, width: 2 }), h('span', { text: 'Import answers' })]);
     const head = U.el('bcv-qz__head', [
       U.el('bcv-qz__headrow', [
@@ -455,9 +455,13 @@
       }
       if (st.inflight.size) await Promise.allSettled([...st.inflight]);
     }
-    /** Developer: the answers of the latest earlier attempt with any, read from the graded history as
-     *  the feedback reads them, put on this attempt's questions and saved to Canvas in one request —
-     *  then read back from Canvas, what it did not keep sent again, and the count said is what Canvas holds. */
+    /** Developer (2.98.70): what was right before, shown on this attempt — never picked, never saved. An earlier
+     *  answer goes only to the very question it was given for, never to the one in the same place: each earlier
+     *  attempt's own questions are read (Canvas keeps the draw each attempt had) and today's question is the same
+     *  one only if its kind, its words and its options are (sameQuestion) — the pick then carried by what the
+     *  options say, not their place. A question with no such twin gets nothing. Of those, the latest attempt
+     *  that got it right (the graded history's own mark, not partly) gives the answer, tinted purple where it
+     *  would be picked — the option, the match, the dropdown's choice — or waiting in purple in an empty field. */
     async function importEarlier() {
       if (!quiz.assignment_id) { U.toast('This quiz keeps no graded history to import from.', { error: true }); return; }
       devBtn.disabled = true;
@@ -466,35 +470,86 @@
         if (!ctx.alive()) return;
         const earlier = (asub?.submission_history || [])
           .filter((x) => Array.isArray(x.submission_data) && x.submission_data.length && Number(x.attempt) !== Number(st.sub?.attempt))
-          .sort((a, b) => Number(b.attempt) - Number(a.attempt))[0];
-        if (!earlier) { U.toast('No earlier attempt with answers to import.', { error: true }); return; }
-        const by = new Map(earlier.submission_data.map((d) => [String(d.question_id), d]));
-        const picked = [];
-        for (const q of st.questions) {
-          const d = by.get(String(q.id));
-          if (!d || INFO.has(q.question_type)) continue;
-          const answer = histAnswer(q, d);
-          if (answer === null || answer === undefined) continue;
-          picked.push([q, answer]);
+          .sort((a, b) => Number(b.attempt) - Number(a.attempt)); // (newest first: the last time each was right)
+        if (!earlier.length) { U.toast('No earlier attempt with answers to import.', { error: true }); return; }
+        const map = new Map();
+        const from = new Set();
+        let read = 0;
+        for (const x of earlier) {
+          const then = await store.quizApi.attemptQuestions(cid, qid, st.sub, x.attempt).catch(() => null); // (hidden results: that attempt cannot be matched)
+          if (!ctx.alive()) return;
+          if (!then?.length) continue;
+          read += 1;
+          for (const q of st.questions) {
+            if (map.has(String(q.id)) || INFO.has(q.question_type) || FILE.has(q.question_type)) continue;
+            const twin = then.find((e) => sameQuestion(q, e));
+            const d = twin && x.submission_data.find((y) => String(y.question_id) === String(twin.id));
+            if (!d || parseCorrect(d.correct) !== true) continue;
+            const answer = carryOver(q, twin, histAnswer(twin, d));
+            if (answer === null || answer === undefined) continue;
+            map.set(String(q.id), answer);
+            from.add(Number(x.attempt));
+          }
         }
-        if (!picked.length) { U.toast(`Attempt ${earlier.attempt} has no answers these questions take.`); return; }
-        await settled();
-        for (const [q, answer] of picked) q.answer = answer;
-        const batchErr = await inTurn(() => store.quizApi.answerMany(st.sub, picked.map(([q, answer]) => ({ id: q.id, answer })), codeFor())).then(() => null, (e) => e);
-        // (one answer Canvas refuses turns the whole request away: each is then sent on its own, and only that one stays out)
-        const missing = await mendAnswers(picked.map(([q]) => q));
-        if (batchErr && missing === null) throw batchErr;
-        if (!ctx.alive()) return;
+        if (!read) { U.toast('Canvas would not show the questions of the earlier attempts, so none could be matched to these.', { error: true }); return; }
+        if (!map.size) { U.toast('No earlier attempt got any of these exact questions right: nothing to show.'); return; }
+        st.hints = { sub: st.sub?.id, map };
         draw();
-        const n = picked.length - (missing?.length || 0);
-        if (missing?.length) U.toast(`Imported ${n} of ${picked.length} answers from attempt ${earlier.attempt}. Canvas did not keep ${missing.map((q) => `Question ${st.questions.indexOf(q) + 1}`).join(', ')}.`, { error: true });
-        else U.toast(`Imported ${n} ${n === 1 ? 'answer' : 'answers'} from attempt ${earlier.attempt}.`);
+        const n = map.size;
+        const atts = [...from].sort((a, b) => a - b);
+        U.toast(`${n} right ${n === 1 ? 'answer' : 'answers'} from ${atts.length === 1 ? 'attempt' : 'attempts'} ${atts.join(' and ')}, shown in purple on the same ${n === 1 ? 'question' : 'questions'}. Nothing is picked for you.`);
       } catch (e) {
         U.toast(`Could not import the answers: ${e.message}`, { error: true });
       } finally {
         devBtn.disabled = false;
       }
     }
+    // a question's words and an option's, for telling the same question apart from another in the same place
+    const flat = (v) => String(v || '').replace(/\s+/g, ' ').trim().toLowerCase();
+    // (a blank's field — a box or a list rendered into the words on the attempt being taken, [name] on a finished one's — is no word of the question)
+    const wordsOf = (q) => flat(htmlToText(String(q.question_text || '').replace(/<select[\s\S]*?<\/select>/gi, ' ').replace(/<input[^>]*>/gi, ' ').replace(/\[[^\]\s]+\]/g, ' '), 8000));
+    const optWords = (a) => flat(a.text || a.left || htmlToText(a.html || '', 400));
+    const optSet = (q) => (q.answers || []).map(optWords).sort().join('|');
+    /** The very same question: of the same kind, in the same words, with the same options (their words, in any order). */
+    function sameQuestion(q, e) {
+      if (!e || q.question_type !== e.question_type || wordsOf(q) !== wordsOf(e)) return false;
+      if (CHOICE.has(q.question_type) || MULTI.has(q.question_type) || MATCH.has(q.question_type) || DROPS.has(q.question_type)) {
+        if (optSet(q) !== optSet(e)) return false;
+        if (MATCH.has(q.question_type) && (q.matches || []).map((m) => flat(m.text)).sort().join('|') !== (e.matches || []).map((m) => flat(m.text)).sort().join('|')) return false;
+      }
+      return true;
+    }
+    /** An answer given to the earlier twin, put in today's question's terms: each option it names found again by
+     *  its words (a group's draw can give the same options other ids); null when one of them is not there. */
+    function carryOver(q, e, answer) {
+      if (answer === null || answer === undefined) return null;
+      const byWords = (list, words) => list.find((a) => optWords(a) === words);
+      const option = (id, blank = null) => {
+        const was = (e.answers || []).find((a) => String(a.id) === String(id) && (blank === null || String(a.blank_id) === String(blank)));
+        if (!was) return null;
+        const now = byWords((q.answers || []).filter((a) => blank === null || String(a.blank_id) === String(blank)), optWords(was));
+        return now ? whole(now.id) : null;
+      };
+      if (CHOICE.has(q.question_type)) return option(answer);
+      if (MULTI.has(q.question_type)) { const ids = [].concat(answer).map((id) => option(id)); return ids.every((id) => id !== null) && ids.length ? ids : null; }
+      if (MATCH.has(q.question_type)) {
+        const pairs = pairsOf(answer).map((p) => {
+          const left = option(p.answer_id);
+          const m = (e.matches || []).find((x) => String(x.match_id) === String(p.match_id));
+          const mNow = m && (q.matches || []).find((x) => flat(x.text) === flat(m.text));
+          return left !== null && mNow ? { answer_id: left, match_id: whole(mNow.match_id) } : null;
+        });
+        return pairs.length && pairs.every(Boolean) ? pairs : null;
+      }
+      if (DROPS.has(q.question_type)) {
+        const out = {};
+        for (const [blank, id] of Object.entries(answer || {})) { const now = option(id, blank); if (now === null) return null; out[blank] = now; }
+        return Object.keys(out).length ? out : null;
+      }
+      return answer; // (words or a number typed: the same question takes them as they were)
+    }
+    /** What was right before for a question, when Import answers has shown it on this attempt (undefined otherwise). */
+    const hintFor = (q) => (st.hints && st.hints.sub === st.sub?.id ? st.hints.map.get(String(q.id)) : undefined);
     async function toggleFlag(q) {
       const on = !q.flagged;
       q.flagged = on;
@@ -835,8 +890,10 @@
     function answerArea(q, compact) {
       const type = q.question_type;
       const opts = (q.answers || []);
+      const hint = hintFor(q); // (Import answers: what was right before, in purple — see importEarlier)
       if (CHOICE.has(type) || MULTI.has(type)) {
         const multi = MULTI.has(type);
+        const hinted = new Set(hint === undefined ? [] : [].concat(hint).map(String));
         const chosen = () => (multi
           ? new Set((Array.isArray(q.answer) ? q.answer : []).map(String))
           : new Set(q.answer !== null && q.answer !== undefined ? [String(q.answer)] : []));
@@ -855,7 +912,7 @@
         };
         const wrap = U.el('bcv-qz__opts', opts.map((a, j) => {
           const label = a.html ? BCV.screens.course.prose(a.html, { cls: 'bcv-qz__optlabel' }) : h('span', { class: 'bcv-qz__optlabel', text: a.text || `Option ${LETTERS[j]}` });
-          const b = h('button', { type: 'button', class: `bcv-qz__opt ${compact ? 'bcv-qz__opt--compact' : ''}`, onclick: () => {
+          const b = h('button', { type: 'button', class: `bcv-qz__opt ${compact ? 'bcv-qz__opt--compact' : ''}${hinted.has(String(a.id)) ? ' is-hinted' : ''}`, dataset: { aid: String(a.id) }, onclick: () => {
             if (multi) {
               const next = chosen();
               if (next.has(String(a.id))) next.delete(String(a.id)); else next.add(String(a.id));
@@ -879,6 +936,7 @@
           ? h('textarea', { class: 'bcv-textarea', rows: 6, placeholder: 'Your answer…', oninput: (e) => { const v = e.target.value; saveText(q, looksHtml(q.answer) || /\n/.test(v) || /^\s*([•\-*]|\d+[.)])\s+/.test(v) ? plainToHtml(v) : v); } })
           : h('input', { class: 'bcv-input', type: NUMERIC.has(type) ? 'number' : 'text', step: 'any', placeholder: NUMERIC.has(type) ? 'Number' : 'Your answer', oninput: (e) => saveText(q, NUMERIC.has(type) && e.target.value !== '' ? Number(e.target.value) : e.target.value) });
         field.value = q.answer === null || q.answer === undefined ? '' : isEssay && looksHtml(q.answer) ? htmlToPlain(q.answer) : String(q.answer);
+        if (hint !== undefined && hint !== null && String(hint) !== '') { field.placeholder = looksHtml(hint) ? htmlToPlain(hint) : String(hint); field.classList.add('is-hinted'); } // (in the empty field, in purple, until something is typed)
         // a formula question says how precise the answer is to be, where the quiz says so
         const places = type === 'calculated_question' && Number.isInteger(Number(q.formula_decimal_places)) && q.formula_decimal_places !== null && q.formula_decimal_places !== '' ? Number(q.formula_decimal_places) : null;
         return U.el('bcv-qz__text', [field, places !== null ? U.text('bcv-qz__texthint', places ? `Give the answer to ${places} decimal ${places === 1 ? 'place' : 'places'}.` : 'Give the answer as a whole number.', 'span') : null]);
@@ -888,6 +946,7 @@
       if (MATCH.has(type)) {
         const matches = q.matches || [];
         const chosen = new Map(pairsOf(q.answer).map((p2) => [String(p2.answer_id), String(p2.match_id)]));
+        const was = new Map(pairsOf(hint === undefined ? null : hint).map((p2) => [String(p2.answer_id), String(p2.match_id)]));
         const rows = [];
         const send = () => {
           const pairs = [];
@@ -898,9 +957,10 @@
           save(q, pairs);
         };
         return U.el(`bcv-qz__match ${compact ? 'bcv-qz__match--compact' : ''}`, opts.map((a) => {
+          const right = was.get(String(a.id));
           const sel = U.picker(
-            [{ value: '', text: 'Choose…' }, ...matches.filter((m) => hasId(m.match_id)).map((m) => ({ value: String(m.match_id), text: m.text, html: m.html || '' }))],
-            chosen.get(String(a.id)) || '', send, { label: `Match for ${a.text || a.left || 'this'}`, cls: 'bcv-qz__sel' },
+            [{ value: '', text: 'Choose…' }, ...matches.filter((m) => hasId(m.match_id)).map((m) => ({ value: String(m.match_id), text: m.text, html: m.html || '', cls: String(m.match_id) === right ? 'is-hinted' : '' }))],
+            chosen.get(String(a.id)) || '', send, { label: `Match for ${a.text || a.left || 'this'}`, cls: `bcv-qz__sel${right ? ' is-hinted' : ''}` },
           );
           rows.push([String(a.id), sel]);
           const left = a.html ? BCV.screens.course.prose(a.html, { cls: 'bcv-qz__matchleft' }) : h('span', { class: 'bcv-qz__matchleft', text: a.text || a.left || '' });
@@ -913,6 +973,7 @@
         const drops = DROPS.has(type);
         const blanks = blanksOf(q);
         const held = q.answer && typeof q.answer === 'object' && !Array.isArray(q.answer) ? q.answer : {};
+        const was = hint && typeof hint === 'object' && !Array.isArray(hint) ? hint : {};
         const fields = [];
         const send = () => {
           const out = {};
@@ -927,12 +988,13 @@
         const wrap = U.el(`bcv-qz__blanks ${compact ? 'bcv-qz__blanks--compact' : ''}`, blanks.map((blank) => {
           const mine = opts.filter((a) => String(a.blank_id) === String(blank));
           const held0 = held[blank] === undefined || held[blank] === null ? '' : String(held[blank]);
+          const right = was[blank] === undefined || was[blank] === null ? '' : String(was[blank]);
           const f = drops
             ? U.picker(
-              [{ value: '', text: 'Choose…' }, ...mine.map((a) => ({ value: String(a.id), text: a.text || '', html: a.html || '' }))],
-              held0, send, { label: blank, cls: 'bcv-qz__sel' },
+              [{ value: '', text: 'Choose…' }, ...mine.map((a) => ({ value: String(a.id), text: a.text || '', html: a.html || '', cls: right && String(a.id) === right ? 'is-hinted' : '' }))],
+              held0, send, { label: blank, cls: `bcv-qz__sel${right ? ' is-hinted' : ''}` },
             )
-            : h('input', { class: 'bcv-input', type: 'text', placeholder: 'Your answer', 'aria-label': blank, oninput: () => saveSoon(send) });
+            : h('input', { class: `bcv-input${right ? ' is-hinted' : ''}`, type: 'text', placeholder: right || 'Your answer', 'aria-label': blank, oninput: () => saveSoon(send) });
           if (!drops) f.value = held0;
           fields.push([blank, f]);
           const row = U.el('bcv-qz__blankrow', [U.text('bcv-qz__blanklbl', blank, 'span'), f]);
