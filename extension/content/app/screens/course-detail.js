@@ -83,6 +83,11 @@
       ov.style.setProperty('--bcv-cx', `${Math.round(g.x + g.w / 2)}px`);
       ov.style.setProperty('--bcv-cy', `${Math.round(g.y + g.h / 2)}px`);
       ov.style.setProperty('--bcv-r0', `${Math.round(Math.hypot(g.w, g.h) / 2)}px`);
+      if (!back) { // (the blur's clear hole: where the box lands, set at once — never animated, which Safari drops once it settles)
+        ov.style.setProperty('--bcv-mx', `${Math.round(g.x + g.w / 2)}px`);
+        ov.style.setProperty('--bcv-my', `${Math.round(g.y + g.h / 2)}px`);
+        ov.style.setProperty('--bcv-mr', `${Math.round(Math.hypot(g.w, g.h) / 2)}px`);
+      }
     }
     // Escape from anywhere on the page folds the box (a reply just sent leaves the cursor nowhere in particular); a file's viewer or a question over the box takes its own Escape first
     const onKey = (e) => {
@@ -130,7 +135,7 @@
       ]),
       U.el('bcv-sheet__list bcv-mark__body', [built.el]),
     ]);
-    ov.append(sheet);
+    ov.append(sheet, U.el('bcv-card-blur', null, { 'aria-hidden': 'true' })); // (the page blurred round the box: a layer of its own)
     // the box wears the chip's own look while it is the chip's size — its fill, edge and corners — and a copy of the chip's
     // words sits over its header, so the first frame is the chip exactly, and the last frame of the fold too; the copy
     // fades as the box grows (the header's own words fade in), all but the one word that glides, left out of the copy

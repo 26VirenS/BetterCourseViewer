@@ -427,6 +427,7 @@
         card ? null : U.el('bcv-sheet__pvhint', [U.svg(IC.doc, { size: 22, stroke: 'var(--bcv-ink3)', width: 1.7 }), U.text('bcv-sheet__pvhint-t', 'Press an item to preview it here', 'span')]),
       ]);
       ov.append(sheet);
+      if (card) ov.append(U.el('bcv-card-blur', null, { 'aria-hidden': 'true' })); // (the page blurred round the box: a layer of its own, after the box, which stays the overlay's first child)
       // where the box goes: the counter's own corner, as wide as a list wants (the list and the preview
       // side by side once a row is pressed), 430px tall (2.98.50: a third shorter than it was) or as
       // tall as the window allows, pushed back inside the window
@@ -454,6 +455,11 @@
         ov.style.setProperty('--bcv-cx', `${Math.round(g.x + g.w / 2)}px`);
         ov.style.setProperty('--bcv-cy', `${Math.round(g.y + g.h / 2)}px`);
         ov.style.setProperty('--bcv-r0', `${Math.round(Math.hypot(g.w, g.h) / 2)}px`);
+        if (!back) { // (the blur's clear hole: where the box lands, set at once — never animated, which Safari drops once it settles)
+          ov.style.setProperty('--bcv-mx', `${Math.round(g.x + g.w / 2)}px`);
+          ov.style.setProperty('--bcv-my', `${Math.round(g.y + g.h / 2)}px`);
+          ov.style.setProperty('--bcv-mr', `${Math.round(Math.hypot(g.w, g.h) / 2)}px`);
+        }
       }
       /** A row, and — where the item can be cleared (the Overdue list) — an X beside it: the item goes
        *  one press at a time, the header counts down with it, and a failure leaves the row and says so. */

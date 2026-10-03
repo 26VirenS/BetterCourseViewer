@@ -268,8 +268,11 @@ console.log('error codes');
 console.log('the veil behind a box');
 {
   const css = readFileSync(join(root, 'extension', 'content', 'styles', 'app.css'), 'utf8');
-  const props = ['cx', 'cy', 'r0', 'reach', 'blur', 'hole'].map((v) => (css.match(new RegExp(`@property --bcv-${v} \\{[^}]*inherits:\\s*(\\w+)`)) || [])[1]);
-  check(props.every((v) => v === 'true') && !/\.bcv-sheet-ov--card::before[^{]*\{[^}]*--bcv-cx:\s*inherit/.test(css), `the veil's animated values (--bcv-cx, cy, r0, reach, blur, hole) are inherited by its layers, never taken with \`inherit\`: ${props.join(', ')}`);
+  const props = ['cx', 'cy', 'r0', 'reach'].map((v) => (css.match(new RegExp(`@property --bcv-${v} \\{[^}]*inherits:\\s*(\\w+)`)) || [])[1]);
+  check(props.every((v) => v === 'true') && !/\.bcv-sheet-ov--card::before[^{]*\{[^}]*--bcv-cx:\s*inherit/.test(css), `the veil's animated values (--bcv-cx, cy, r0, reach) are inherited by its layers, never taken with \`inherit\`: ${props.join(', ')}`);
+  // the blur round a box: a layer of its own at one strength, its hole from values set with the box and never animated (Safari dropped the blur whose strength and hole were animated, once they settled)
+  const cb = (css.match(/\.bcv-card-blur \{([^}]*)\}/) || [])[1] || '';
+  check(cb && /backdrop-filter:\s*blur\(10px\)/.test(cb) && !/backdrop-filter:[^;]*var\(/.test(cb) && /var\(--bcv-mx/.test(cb) && !/@property --bcv-m[xyr]\b/.test(css) && !/transition:/.test(cb) && !/--bcv-(hole|blur)(?![-\w])/.test(css), `the blur round a box has one strength and a hole set with the box, nothing about it animated but its fade: ${cb.trim().slice(0, 90)}…`);
   // the shade behind the search afloat: no filter (Safari dropped a blur-filtered one once its fade ended), on a layer of its own throughout
   const shade = (css.match(/\.bcv-spot::before \{([^}]*)\}/) || [])[1] || '';
   check(shade && !/(^|[;\s])filter:/.test(shade) && /will-change:\s*opacity/.test(shade) && /box-shadow:/.test(shade) && !/bcv-noblur \.bcv-spot::before/.test(css), `the shade behind the search is a plain shadow on its own layer, no filter: ${shade.trim().slice(0, 90)}…`);
