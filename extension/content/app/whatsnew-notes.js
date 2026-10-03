@@ -25,6 +25,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.98.80', date: '2026-10-03', notes: [
+      { kind: 'fixed', title: 'Search shade stays', body: 'The shade behind search no longer fades away in Safari.', icon: P.eye },
+    ] },
     { version: '2.98.79', date: '2026-10-03', notes: [
       { kind: 'fixed', title: 'The dim is back', body: 'Boxes dim and blur the page behind them again in Safari.', icon: P.eye },
     ] },

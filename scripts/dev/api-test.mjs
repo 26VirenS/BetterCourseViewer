@@ -270,6 +270,9 @@ console.log('the veil behind a box');
   const css = readFileSync(join(root, 'extension', 'content', 'styles', 'app.css'), 'utf8');
   const props = ['cx', 'cy', 'r0', 'reach', 'blur', 'hole'].map((v) => (css.match(new RegExp(`@property --bcv-${v} \\{[^}]*inherits:\\s*(\\w+)`)) || [])[1]);
   check(props.every((v) => v === 'true') && !/\.bcv-sheet-ov--card::before[^{]*\{[^}]*--bcv-cx:\s*inherit/.test(css), `the veil's animated values (--bcv-cx, cy, r0, reach, blur, hole) are inherited by its layers, never taken with \`inherit\`: ${props.join(', ')}`);
+  // the shade behind the search afloat: no filter (Safari dropped a blur-filtered one once its fade ended), on a layer of its own throughout
+  const shade = (css.match(/\.bcv-spot::before \{([^}]*)\}/) || [])[1] || '';
+  check(shade && !/(^|[;\s])filter:/.test(shade) && /will-change:\s*opacity/.test(shade) && /box-shadow:/.test(shade) && !/bcv-noblur \.bcv-spot::before/.test(css), `the shade behind the search is a plain shadow on its own layer, no filter: ${shade.trim().slice(0, 90)}…`);
 }
 
 console.log('the springs');

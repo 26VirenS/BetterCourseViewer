@@ -14,7 +14,7 @@
 
 html[data-bcv-theme] {
   --bcv-line: max(1px, var(--bcv-dpx, 1px)); /* a hairline drawn as a shadow: one CSS pixel, or one screen pixel where that is more (below 100% zoom; content/early.js keeps --bcv-dpx) */
-  --bcv-version: "2.98.79"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.98.80"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -4189,11 +4189,11 @@ html.bcv-noblur .bcv-spot:not(.is-far) .bcv-omni__box, html.bcv-noblur .bcv-spot
 .bcv-spot { position: fixed; z-index: calc(var(--bcv-z-sheet) - 1); display: flex; /* (under the sheets: a hand-in box or a question opened from a row comes up over the pill) */ flex-direction: column; gap: 10px; transition: left .46s cubic-bezier(.32,.72,0,1), top .46s cubic-bezier(.32,.72,0,1), width .46s cubic-bezier(.32,.72,0,1); }
 /* (2.98.78) a soft dark shade right behind the pill and its panel, for the words to hold and the eye to settle: it is the
    palette's own layer, so it follows the panel as its rows change, and the glass over it reads darker too. It comes in
-   once the pill has landed (no blur redrawn while the palette grows) and goes as it sets off home */
-.bcv-spot::before { content: ""; position: absolute; inset: -22px -30px -26px; z-index: -1; border-radius: 64px; background: rgba(0,0,0,var(--bcv-spot-shade, .34)); filter: blur(30px); pointer-events: none; transition: opacity .35s ease; }
+   once the pill has landed and goes as it sets off home. (2.98.80) Drawn as a plain shadow, no filter, and kept on a
+   layer of its own throughout: Safari showed a blur-filtered shade while it faded in, then dropped it once the fade was done */
+.bcv-spot::before { content: ""; position: absolute; inset: -6px -10px -8px; z-index: -1; border-radius: 46px; background: rgba(0,0,0,var(--bcv-spot-shade, .34)); box-shadow: 0 0 64px 40px rgba(0,0,0,var(--bcv-spot-shade, .34)); pointer-events: none; will-change: opacity; transition: opacity .35s ease; }
 html[data-bcv-theme="light"] .bcv-spot { --bcv-spot-shade: .24; }
 .bcv-spot:is(.is-far, .is-lifting)::before { opacity: 0; transition-duration: .14s; }
-html.bcv-noblur .bcv-spot::before { filter: none; inset: -6px -10px -8px; border-radius: 46px; box-shadow: 0 0 60px 40px rgba(0,0,0,var(--bcv-spot-shade, .34)); }
 /* (2.98.68) afloat it wears Spotlight's own glass whatever the page's look: smoky, the page's colours coming through it
  * softly blurred, the words white — the page's own ink, fills and edges, turned for glass this dark, for everything inside */
 .bcv-spot:not(.is-far), .bcv-sheet-ov:not(.is-folding) > .bcv-sheet--stat:not(.is-at-card) {
