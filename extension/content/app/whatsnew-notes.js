@@ -25,6 +25,10 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.98.83', date: '2026-10-04', notes: [
+      { kind: 'new', title: 'A tour of the ring', body: 'The first rubric you open shows how its ring works.', icon: P.steps },
+      { kind: 'improved', title: 'Tidier criterion names', body: 'Short names on the ring never end on a joining word.', icon: P.pen },
+    ] },
     { version: '2.98.82', date: '2026-10-03', notes: [
       { kind: 'new', title: 'Grades in colour', body: 'A marked rubric ring turns green, orange or red.', icon: P.sparkle },
       { kind: 'improved', title: 'Boxes open in place', body: 'A counter opens from its own side of the row.', icon: P.layers },

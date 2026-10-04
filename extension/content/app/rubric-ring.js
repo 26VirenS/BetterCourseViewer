@@ -9,7 +9,10 @@
  * frame loop drive every point of the geometry, drawn by hand each frame (no CSS transition on an SVG
  * path), so a press part-way turns it round from where it is. The band is filled pieces with a
  * gradient along each, its bend, thickness and colour carried smoothly from slice to slice. The SVG is only drawing: every slice is a real button (its label),
- * named for a screen reader. The phone keeps its bottom sheet (screens/course.js openRubric). */
+ * named for a screen reader. The first ring opened anywhere walks through itself, once (the tour:
+ * tips:rubricRing); Settings → Developer → Rubric puts Try scores beside it — marks picked by hand,
+ * the ring turning to them in place (restyle), nothing sent. The phone keeps its bottom sheet
+ * (screens/course.js openRubric). */
 (function () {
   const BCV = (self.BCV = self.BCV || {});
   const { h, htmlToText } = BCV.utils;
@@ -68,6 +71,11 @@
     const hue = x >= 0.9 ? 140 : x >= 0.75 ? 32 + 108 * sm((x - 0.75) / 0.15) : x >= 0.55 ? 2 + 30 * sm((x - 0.55) / 0.2) : 2;
     return hsl(hue, 0.78, 0.52);
   }
+  /** The words on a colour: dark on a light one (green, orange), white on the rest. */
+  function inkOn(A) {
+    const [r, g, b] = A.map((v) => { const c = v / 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.3 ? '#1c1c1e' : '#fff';
+  }
   const UNMARKED = [142, 142, 150]; // (a criterion not marked yet, in a marked ring: grey, not a grade)
 
   /** A short name for the ring: the whole name when it is short, else its first words. */
@@ -79,7 +87,7 @@
       if (next.length > 14) break;
       out = next;
     }
-    out = out.replace(/[\s/&,:;–—-]+$/, '');
+    out = out.replace(/[\s/&,:;–—-]+$/, '').replace(/\s+(and|or|of|the|to|for|with|in|on|a|an|&)$/i, ''); // ("Figures and tables": Figures, not "Figures and")
     return out || `${name.slice(0, 13)}…`;
   }
 
@@ -163,20 +171,27 @@
 
   let live = null; // the ring that is open
 
-  function open(a, sub, { from } = {}) {
+  function open(a, sub, { from, dev = false } = {}) {
     live?.close(true);
     document.querySelector('.bcv-sheet-ov')?.remove();
     const m = model(a, sub);
     if (!m.n) return null;
     const { crit, hues, seg, n } = m;
+    if (!m.graded) m.grades = hues; // (one list: nothing to turn)
+    const real = sub; // (what Canvas gave: the developer's Real, and the tour's sample, put it back)
     const reduce = U.reducedMotion();
     const hv = crit.map(() => 0); // how far each slice is swollen by the pointer (0 to 1)
-    /** A slice's colour this frame: its own, turning to its grade's (green, orange, red) as the ring bends to its
-     *  marks — the same tween, played on every open. toneEnd: where it settles (the chips, the bar's words, the little ring). */
+    /** Where the ring turns from, carried by one tween (st.g) to its marks — on every open, and on every change of
+     *  marks after it (the developer's Try scores, the tour's sample): each slice's bend, where its colour stops on
+     *  its bar, and its colour, turning from its own to its grade's (green, orange, red). toneEnd: where the colour
+     *  settles (the chips, the bar's words, the little ring). */
+    let fromBend = crit.map(() => 0), fromFrac = crit.map(() => 1), fromTone = hues, ver = 0;
+    const bendAt = (k) => fromBend[k] + (m.bend[k] - fromBend[k]) * st.g;
+    const fracAt = (k) => fromFrac[k] + (crit[k].frac - fromFrac[k]) * st.g;
     let toneAt = -1, tones = hues;
     const tone = (k) => {
-      if (!m.graded) return hues[k];
-      if (toneAt !== st.g) { toneAt = st.g; tones = hues.map((c, i) => turnTo(c, m.grades[i], st.g)); } // (once a frame)
+      if (fromTone === m.grades) return m.grades[k];
+      if (toneAt !== st.g) { toneAt = st.g; tones = m.grades.map((c, i) => turnTo(fromTone[i], c, st.g)); } // (once a frame)
       return tones[k];
     };
     const toneEnd = (k) => m.grades[k];
@@ -185,14 +200,15 @@
     // ---- the page around it: dimmed, blurred (more away from the ring), and the header over that
     const ov = h('div', { class: 'bcv-sheet-ov bcv-rr-ov', role: 'dialog', 'aria-modal': 'true', 'aria-label': `${a.name || 'Assignment'} rubric`, tabindex: '-1', 'data-count': n > 15 ? 'lots' : n > 10 ? 'many' : 'few' });
     const veils = ['soft', 'deep', 'dim'].map((k) => h('div', { class: `bcv-rr__veil bcv-rr__veil--${k}`, 'aria-hidden': 'true' }));
-    const status = m.graded
-      ? `Graded${sub?.graded_at ? ` ${U.fmtShort(sub.graded_at)}` : ''} · ${n === 1 ? '1 criterion' : `${n} criteria`}`
-      : m.held ? `${n === 1 ? '1 criterion' : `${n} criteria`} · marks not posted yet` : `${n === 1 ? '1 criterion' : `${n} criteria`} · not graded yet`;
+    const many = n === 1 ? '1 criterion' : `${n} criteria`;
+    const statusOf = () => (m.graded ? `Graded${sub?.graded_at ? ` ${U.fmtShort(sub.graded_at)}` : ''} · ${many}`
+      : m.held ? `${many} · marks not posted yet` : `${many} · not graded yet`);
     const closeBtn = h('button', { type: 'button', class: 'bcv-rr__close', 'aria-label': 'Close the rubric', onclick: () => close() }, U.svg(IC.close, { size: 13, stroke: 'currentColor', width: 2.4 }));
+    const statusEl = U.text('bcv-rr__status', statusOf());
     const top = U.el('bcv-rr__top', [
       U.text('bcv-rr__eyebrow', a.rubric_settings?.title && !/^rubric$/i.test(a.rubric_settings.title) ? a.rubric_settings.title : 'Rubric'),
       h('h2', { class: 'bcv-rr__title bcv-ellip', text: a.name || 'Rubric' }),
-      U.text('bcv-rr__status', status),
+      statusEl,
     ]);
     const foot = U.text('bcv-rr__foot', '');
 
@@ -252,11 +268,12 @@
     });
 
     const labelOf = (c) => (m.graded ? (c.score === null ? `${pts(c.worth)} pts · not marked` : `${pts(c.score)} / ${pts(c.worth)}`) : `${pts(c.worth)} pts`);
+    const sayOf = (c) => (m.graded ? (c.score === null ? `${c.name}, not marked yet, worth ${pts(c.worth)}` : `${c.name}, ${pts(c.score)} of ${pts(c.worth)}`) : `${c.name}, worth ${pts(c.worth)} ${c.worth === 1 ? 'point' : 'points'}`);
     const crowd = n >= 15 ? 2 : 1;
     const labels = crit.map((c, k) => {
       const b = h('button', {
         type: 'button', class: 'bcv-rr__label', 'data-k': String(k), title: c.name,
-        'aria-label': m.graded ? (c.score === null ? `${c.name}, not marked yet, worth ${pts(c.worth)}` : `${c.name}, ${pts(c.score)} of ${pts(c.worth)}`) : `${c.name}, worth ${pts(c.worth)} ${c.worth === 1 ? 'point' : 'points'}`,
+        'aria-label': sayOf(c),
         style: { '--rr-c': css(toneEnd(k)), fontSize: n > 15 ? '10.5px' : n > 10 ? '11px' : '12px' },
         onclick: () => select(k),
         onpointerenter: () => hover(k), onpointerleave: () => hover(-1),
@@ -266,13 +283,15 @@
       return b;
     });
     const labelBox = U.el('bcv-rr__labels', labels);
-    const pct = m.max > 0 ? Math.round((m.earned / m.max) * 100) : 0;
-    const centre = U.el('bcv-rr__centre', [
-      U.text('bcv-rr__ctop', m.graded ? 'Score' : 'Total', 'span'),
-      U.text('bcv-rr__cbig', pts(m.graded ? m.earned : m.max), 'span'),
-      U.text('bcv-rr__csub', m.graded ? `of ${pts(m.max)} · ${pct}%` : m.max === 1 ? 'point' : 'points', 'span'),
-      U.text('bcv-rr__chint', 'Pick a colour to open it', 'span'),
-    ]);
+    const cTop = U.text('bcv-rr__ctop', '', 'span'), cBig = U.text('bcv-rr__cbig', '', 'span'), cSub = U.text('bcv-rr__csub', '', 'span');
+    const centre = U.el('bcv-rr__centre', [cTop, cBig, cSub, U.text('bcv-rr__chint', 'Pick a colour to open it', 'span')]);
+    const paintCentre = () => {
+      const pct = m.max > 0 ? Math.round((m.earned / m.max) * 100) : 0;
+      cTop.textContent = m.graded ? 'Score' : 'Total';
+      cBig.textContent = pts(m.graded ? m.earned : m.max);
+      cSub.textContent = m.graded ? `of ${pts(m.max)} · ${pct}%` : m.max === 1 ? 'point' : 'points';
+    };
+    paintCentre();
 
     // the bar's side: the way back (a little ring on top of the bar), its header (which criterion, its
     // description, the dots), its levels, the marker's note
@@ -314,8 +333,7 @@
     function fillBar(k, swap) {
       const c = crit[k];
       ov.style.setProperty('--rr-sel', css(toneEnd(k)));
-      const [r, g, b] = toneEnd(k).map((v) => { const c = v / 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); });
-      ov.style.setProperty('--rr-on', 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.3 ? '#1c1c1e' : '#fff'); // (dark words on a light colour: green and orange chips)
+      ov.style.setProperty('--rr-on', inkOn(toneEnd(k)));
       count.textContent = `Criterion ${k + 1} of ${n} · ${labelOf(c)}`;
       name.textContent = c.name;
       desc.textContent = c.desc;
@@ -419,7 +437,7 @@
       let col = mix(tone(b[0]), tone(b[1]), b[2]); // (the ring's own run of colour, or its grades'…)
       // …becoming the bar's: its own colour, darker at the foot and lighter at the top
       if (ee > 0) { const own = tone(k); col = mix(col, v < 0.5 ? mix(own, BLACK, 0.36 * (0.5 - v)) : mix(own, WHITE, 0.44 * (v - 0.5)), ee); }
-      if (ee > 0 && m.graded && v > crit[k].frac + 1e-6) col = mix(col, TRACK, 0.8 * u); // (the stretch above the mark was not earned)
+      if (ee > 0 && v > fracAt(k) + 1e-6) col = mix(col, TRACK, 0.8 * u); // (the stretch above the mark was not earned; nothing marked, it runs to the top)
       return col;
     }
     /** …and across a switch along the bar, the old criterion's colour crossing over to the new one's. */
@@ -481,7 +499,7 @@
       const pf = span(e, 0, 0.2); // (its bend evened out first, so the straightening starts from a true arc)
       const u = span(e, 0.22, 1); // …while it straightens into the bar…
       const q = span(e, 0.02, 0.62); // …and the rest of the ring sinks into the centre
-      const go = m.bend.map((b) => b * st.g);
+      const go = crit.map((_, k) => bendAt(k));
       let dRot = 1.5 * Math.PI - mids[sel];
       while (dRot > Math.PI) dRot -= TAU;
       while (dRot < -Math.PI) dRot += TAU;
@@ -494,7 +512,7 @@
       crit.forEach((c, k) => {
         const g = sliceG[k];
         if (moving && k === sel) { setA(g, 'display', 'none'); return; } // (drawn on its way, below)
-        const key = `${st.g.toFixed(4)}|${hv[k].toFixed(4)}`;
+        const key = `${ver}|${st.g.toFixed(4)}|${hv[k].toFixed(4)}`;
         if (g._key !== key) { restSlice(k, go); g._key = key; } // (only when its bend or its swell has moved)
         setA(g, 'display', opRest < 0.005 && moving ? 'none' : 'inline');
         setA(g, 'transform', moving ? turn : '');
@@ -540,7 +558,8 @@
         // the pieces: eighths, split where the colour steps (the mark on the bar, the old one's mid-switch)
         const cuts = [0, 0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875, 1];
         const step = (fr) => { if (fr > 1e-3 && fr < 1 - 1e-3 && cuts.every((x) => Math.abs(x - fr) > 1e-3)) cuts.push(fr); };
-        if (m.graded) { step(crit[k].frac); if (st.w < 1 && st.prev >= 0) step(crit[st.prev].frac); }
+        step(fracAt(k));
+        if (st.w < 1 && st.prev >= 0) step(fracAt(st.prev));
         cuts.sort((x, y) => x - y);
         const capT = span(e, 0.02, 0.3); // (its ends round off as it comes away from its neighbours)
         const lenV = Math.max(L, 1);
@@ -641,6 +660,7 @@
       const done = [];
       for (const key of Object.keys(tw)) {
         const a = tw[key];
+        if (a.t0 === null) a.t0 = now + a.delay; // (timed from its first frame, on the frames' own clock)
         if (now < a.t0) { busy = true; continue; }
         const k = clamp01((now - a.t0) / a.dur);
         st[key] = a.from + (a.to - a.from) * ease(k);
@@ -663,7 +683,7 @@
     function tween(key, to, dur, done, delay = 0) {
       delete tw[key];
       if (reduce || dur <= 0) { st[key] = to; draw(); done?.(); return; }
-      tw[key] = { from: st[key], to, t0: performance.now() + delay, dur, done };
+      tw[key] = { from: st[key], to, t0: null, delay, dur, done };
       kick();
     }
     function hover(k) {
@@ -672,7 +692,8 @@
       if (reduce) { hv.forEach((_, i) => { hv[i] = i === k && st.t < 0.02 ? 1 : 0; }); draw(); return; }
       kick();
     }
-    function select(k) {
+    /** `still`: the focus stays where it is (the tour drives the ring while its own buttons keep the keys). */
+    function select(k, still) {
       k = ((k % n) + n) % n;
       if (k === st.sel && st.t > 0.98) return;
       if (st.t > 0.98 && k !== st.sel) { // the bar is out: switch in place, the colour crossing over, the rows changing
@@ -681,42 +702,101 @@
         st.w = 0;
         fillBar(k, true);
         tween('w', 1, 520);
-        name.focus({ preventScroll: true });
+        if (!still) name.focus({ preventScroll: true });
         return;
       }
-      if (st.t > 0.02 && k !== st.sel) { tween('t', 0, 480, () => select(k)); return; } // (part-way: back round first)
+      if (st.t > 0.02 && k !== st.sel) { tween('t', 0, 480, () => select(k, still)); return; } // (part-way: back round first)
       st.sel = k;
       st.prev = -1;
       st.w = 1;
       fillBar(k, false);
       st.BB0 = st.BB;
-      ov.focus({ preventScroll: true }); // (held by the ring itself while the label it was on goes out of reach)
-      tween('t', 1, 1150, () => name.focus({ preventScroll: true }));
+      if (!still) ov.focus({ preventScroll: true }); // (held by the ring itself while the label it was on goes out of reach)
+      tween('t', 1, 1150, still ? null : () => name.focus({ preventScroll: true }));
     }
-    function toRing() {
+    function toRing(still) {
       if (st.t <= 0.001) return;
       const k = st.sel;
-      ov.focus({ preventScroll: true });
-      tween('t', 0, 950, () => labels[k].focus({ preventScroll: true }));
+      if (!still) ov.focus({ preventScroll: true });
+      tween('t', 0, 950, still ? null : () => labels[k].focus({ preventScroll: true }));
     }
 
-    // ---- fitting the stage to the window
-    let scale = 1;
-    function fit() {
-      const r = field.getBoundingClientRect();
-      scale = Math.max(0.4, Math.min(1.12, r.width / W, r.height / H));
-      ov.style.setProperty('--rr-s', String(scale));
-      ov.style.setProperty('--rr-x', `${f(r.left + r.width / 2)}px`);
-      ov.style.setProperty('--rr-y', `${f(r.top + r.height / 2)}px`);
-      ov.style.setProperty('--rr-w', `${f(W * scale)}px`);
-      ov.style.setProperty('--rr-h', `${f(H * scale)}px`);
+    /** New marks, in place (the developer's Try scores, the tour's sample): the ring turns from where it stands to
+     *  them on the tween an open plays — its bend, its colours, where each bar's colour stops — and every word follows.
+     *  `fresh`: from the plain ring instead, as an open turns (the tour showing a marked ring bend once more). */
+    function restyle(next, { fresh = false } = {}) {
+      const m2 = model(a, next);
+      if (m2.n !== n || gone) return;
+      fromBend = fresh ? crit.map(() => 0) : crit.map((_, k) => bendAt(k));
+      fromFrac = fresh ? crit.map(() => 1) : crit.map((_, k) => fracAt(k));
+      fromTone = fresh ? hues : crit.map((_, k) => tone(k));
+      crit.forEach((c, k) => Object.assign(c, m2.crit[k]));
+      for (const key of ['graded', 'posted', 'earned', 'bend', 'held']) m[key] = m2[key];
+      m.grades = m2.graded ? m2.grades : hues;
+      sub = next;
+      ver++;
+      toneAt = -1;
+      delete tw.g;
+      st.g = 0;
+      statusEl.textContent = statusOf();
+      paintCentre();
+      labels.forEach((b, k) => {
+        b.setAttribute('aria-label', sayOf(crit[k]));
+        b.style.setProperty('--rr-c', css(toneEnd(k)));
+        const lp = b.querySelector('.bcv-rr__lpts');
+        if (lp) lp.textContent = labelOf(crit[k]);
+      });
+      chips.forEach((b, k) => b.style.setProperty('--rr-c', css(toneEnd(k))));
+      marcs.forEach((p, k) => p.setAttribute('stroke', hex(toneEnd(k))));
+      fillBar(st.sel, false);
+      tween('g', 1, 1000);
     }
-    const onResize = () => fit();
+
+    // ---- fitting the stage to the window, beside what is open over it: the developer's panel takes the right
+    // (where the window is wide enough to keep both), the tour's card the foot; the stage glides to make room
+    const room = { r: 0, b: 0 };
+    let fitNow = null, fitRaf = 0;
+    function fitTo() {
+      const r = field.getBoundingClientRect();
+      const rr = room.r && r.width - room.r >= W * 0.6 ? room.r : 0;
+      const s = Math.max(0.4, Math.min(1.12, (r.width - rr) / W, (r.height - room.b) / H));
+      return { s, x: r.left + (r.width - rr) / 2, y: r.top + (r.height - room.b) / 2, tx: -rr / 2, ty: -room.b / 2 };
+    }
+    function setFit(v) {
+      fitNow = v;
+      ov.style.setProperty('--rr-s', String(v.s));
+      ov.style.setProperty('--rr-x', `${f(v.x)}px`);
+      ov.style.setProperty('--rr-y', `${f(v.y)}px`);
+      ov.style.setProperty('--rr-tx', `${f(v.tx)}px`);
+      ov.style.setProperty('--rr-ty', `${f(v.ty)}px`);
+      ov.style.setProperty('--rr-w', `${f(W * v.s)}px`);
+      ov.style.setProperty('--rr-h', `${f(H * v.s)}px`);
+    }
+    function fit(glide) {
+      const to = fitTo();
+      if (fitRaf) cancelAnimationFrame(fitRaf);
+      fitRaf = 0;
+      if (!glide || reduce || !fitNow) { setFit(to); return; }
+      const was = fitNow, t0 = performance.now();
+      const step = () => {
+        const k = clamp01((performance.now() - t0) / 560), e = ease(k), v = {}; // (one clock for its start and its frames)
+        for (const key in to) v[key] = was[key] + (to[key] - was[key]) * e;
+        setFit(v);
+        fitRaf = k < 1 && !gone ? requestAnimationFrame(step) : 0;
+      };
+      fitRaf = requestAnimationFrame(step);
+    }
+    const onResize = () => { fit(); tour?.follow(); };
 
     // ---- keys: the arrows walk the criteria, Enter opens one (its label is a button), Escape goes back, then out
     ov.addEventListener('keydown', (e) => {
+      if (tour && e.key !== 'Tab') { // (the tour has the keys: Escape ends it, the arrows step it)
+        if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); tour.end(); return; }
+        if (/^Arrow/.test(e.key)) { e.preventDefault(); if (e.key === 'ArrowRight') tour.next(); if (e.key === 'ArrowLeft') tour.back(); }
+        return;
+      }
       if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); if (st.t > 0.02) toRing(); else close(); return; }
-      if (['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp'].includes(e.key) && !(e.target instanceof HTMLInputElement)) {
+      if (['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp'].includes(e.key) && !(e.target instanceof HTMLInputElement) && !e.target.closest?.('.bcv-rr__dev')) {
         e.preventDefault();
         const d = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : -1;
         const k = (st.sel + d + n) % n;
@@ -733,19 +813,221 @@
     });
     // a press on the page around it: the bar rolls back up, the ring leaves (a press inside the ring is not beside it)
     ov.addEventListener('click', (e) => {
-      if (e.target.closest('button, .bcv-rr__row, .bcv-rr__head, .bcv-rr__note, .bcv-rr__hit')) return;
+      if (tour || e.target.closest('button, .bcv-rr__row, .bcv-rr__head, .bcv-rr__note, .bcv-rr__hit, .bcv-rr__dev, .bcv-rr__tour')) return;
       if (st.t > 0.02) { toRing(); return; }
       const r = svg.getBoundingClientRect(), s = r.width / W;
       if (Math.hypot((e.clientX - r.left) / s - CX, (e.clientY - r.top) / s - CY) < R + 50) return;
       close();
     });
 
+    // ---- Try scores (Settings → Developer → Rubric, and the sample ring): a mark picked for each criterion, or a
+    // preset, and the ring turns to it as a graded one would. Nothing is sent: it is this ring's alone.
+    let devBox = null, devPill = null;
+    function devPanel() {
+      if (devBox || gone) return;
+      const ra = real?.rubric_assessment || {};
+      let picks = {}, posted = true;
+      const fromReal = () => {
+        picks = {};
+        for (const c of crit) { const g = ra[c.id]; if (g && num(g.points) !== null) picks[c.id] = { ...g, points: num(g.points) }; }
+        posted = !real || real.posted_at !== null;
+      };
+      fromReal();
+      const optsOf = (c) => (c.levels.length
+        ? c.levels.map((l) => ({ points: l.pts ?? 0, rating_id: l.id || null, label: l.pts === null ? l.label.slice(0, 8) : pts(l.pts), title: l.label }))
+        : [...new Set([1, 0.75, 0.5, 0.25, 0].map((x) => Math.round(c.worth * x * 100) / 100))].map((p) => ({ points: p, rating_id: null, label: pts(p), title: `${pts(p)} of ${pts(c.worth)}` })));
+      const isPick = (c, o) => { const g = picks[c.id]; return !!g && (o.rating_id && g.rating_id !== undefined && g.rating_id !== null ? String(g.rating_id) === o.rating_id : num(g.points) === o.points); };
+      const apply = () => {
+        const now = new Date().toISOString();
+        const assess = {};
+        for (const c of crit) if (picks[c.id]) assess[c.id] = { ...(ra[c.id] || {}), ...picks[c.id] };
+        restyle({ ...(real || {}), rubric_assessment: assess, posted_at: posted ? real?.posted_at || now : null, graded_at: Object.keys(assess).length ? now : null });
+        paint();
+      };
+      const rows = crit.map((c) => {
+        const opts = optsOf(c);
+        const btns = [...opts, null].map((o) => h('button', {
+          type: 'button', class: `bcv-rr__dlv${o ? '' : ' bcv-rr__dlv--none'}`, title: o ? o.title : 'Not marked',
+          'aria-label': o ? `${c.name}: ${o.title}, ${pts(o.points)}` : `${c.name}: not marked`,
+          onclick: () => { if (o) picks[c.id] = { points: o.points, rating_id: o.rating_id }; else delete picks[c.id]; apply(); },
+        }, o ? o.label : '–'));
+        const score = U.text('bcv-rr__dscore', '', 'span');
+        const el = U.el('bcv-rr__dcrit', [
+          U.el('bcv-rr__dline', [h('i', { class: 'bcv-rr__dsw' }), U.text('bcv-rr__dname', c.name, 'span'), score]),
+          U.el('bcv-rr__dlevels', btns, { role: 'group', 'aria-label': `${c.name}: its mark` }),
+        ], { title: c.name });
+        return { c, el, btns, opts, score };
+      });
+      const preset = (label, fn, cls = '') => h('button', { type: 'button', class: `bcv-rr__dpre${cls}`, onclick: () => { fn(); apply(); } }, label);
+      const each = (pick) => () => { picks = {}; for (const r of rows) { const o = pick(r.opts); if (o) picks[r.c.id] = { points: o.points, rating_id: o.rating_id }; } };
+      const postBtn = h('button', { type: 'button', class: 'bcv-rr__dpost', role: 'switch', onclick: () => { posted = !posted; apply(); } }, [h('span', { class: 'bcv-rr__dknob' }), 'Posted']);
+      function paint() {
+        rows.forEach((r, k) => {
+          r.el.style.setProperty('--rr-c', css(toneEnd(k)));
+          r.el.style.setProperty('--rr-cn', inkOn(toneEnd(k)));
+          const g = picks[r.c.id];
+          r.score.textContent = `${g ? pts(num(g.points)) : '–'} / ${pts(r.c.worth)}`;
+          r.btns.forEach((b, i) => { const on = r.opts[i] ? isPick(r.c, r.opts[i]) : !g; b.classList.toggle('is-on', on); b.setAttribute('aria-pressed', String(on)); });
+        });
+        postBtn.classList.toggle('is-on', posted);
+        postBtn.setAttribute('aria-checked', String(posted));
+      }
+      const id = `${uid}-dev`;
+      devBox = h('div', { class: 'bcv-rr__dev', id, role: 'group', 'aria-label': 'Try scores (developer)' }, [
+        U.text('bcv-rr__devnote', 'Pick a mark for each criterion. Nothing is sent to Canvas.', 'p'),
+        U.el('bcv-rr__dpres', [
+          preset('Full marks', each((o) => o[0])),
+          preset('Mixed', each((o) => o[Math.floor(Math.random() * o.length)])),
+          preset('Low', each((o) => o[o.length - 1])),
+          preset('Not marked', () => { picks = {}; }),
+          preset('Real', fromReal, ' bcv-rr__dpre--real'),
+        ]),
+        postBtn,
+        U.el('bcv-rr__dlist', rows.map((r) => r.el)),
+      ]);
+      let shut = false;
+      try { shut = localStorage.getItem('bcv:rrDev') === '0'; } catch { /* open */ }
+      const show = (on, glide) => {
+        devBox.hidden = !on;
+        devPill.setAttribute('aria-expanded', String(on));
+        devPill.classList.toggle('is-open', on);
+        room.r = on ? 300 : 0;
+        fit(glide);
+        try { localStorage.setItem('bcv:rrDev', on ? '1' : '0'); } catch { /* this time only */ }
+      };
+      devPill = h('button', { type: 'button', class: 'bcv-rr__devpill', 'aria-controls': id, title: 'Developer: try scores on this ring', onclick: () => show(devBox.hidden, true) },
+        [h('span', { class: 'bcv-rr__devdot' }), 'Try scores', U.svg('M6 9l6 6 6-6', { size: 12, stroke: 'currentColor', width: 2.4, cls: 'bcv-rr__devchev' })]);
+      ov.append(devPill, devBox);
+      paint();
+      show(!shut, performance.now() - bornAt > 300); // (on the open itself the stage takes its place at once)
+    }
+
+    // ---- the tour: the first ring opened anywhere walks through itself, step by step over the ring (once: tips:rubricRing)
+    let tour = null;
+    /** A sample's marks for a ring not graded yet (the tour shows what grading does): full, part, low in turn. */
+    const sampleSub = () => {
+      const assess = {};
+      crit.forEach((c, k) => {
+        const L = c.levels, i = [0, Math.floor((L.length - 1) / 2), L.length - 1][k % 3];
+        if (L.length) assess[c.id] = { points: L[i].pts ?? 0, rating_id: L[i].id };
+        else assess[c.id] = { points: Math.round(c.worth * [1, 0.7, 0.3][k % 3] * 100) / 100 };
+      });
+      return { ...(sub || {}), rubric_assessment: assess, posted_at: new Date().toISOString(), graded_at: new Date().toISOString() };
+    };
+    function startTour() {
+      if (tour || gone) return null;
+      const base = sub, shown = m.graded; // (the marks it opened with, put back as the tour leaves)
+      let sampled = false;
+      const stageBox = () => { const r = stage.getBoundingClientRect(); return { r, s: r.width / W }; };
+      const pad = (r, p, rad = 14) => ({ x: r.left - p, y: r.top - p, w: r.width + 2 * p, h: r.height + 2 * p, rad });
+      // the bar and its levels, as one: from the bar's left to the rows' right, its top to its foot
+      const barSpot = () => {
+        const { r, s } = stageBox();
+        const on = rows.filter((x) => !x.classList.contains('is-out'));
+        let x1 = r.left + (BX + 22) * s, y0 = r.top + (BT - 22) * s, y1 = r.top + (st.BB + 22) * s;
+        for (const row of on) { const b = row.getBoundingClientRect(); x1 = Math.max(x1, b.right + 10); y0 = Math.min(y0, b.top - 10); y1 = Math.max(y1, b.bottom + 10); }
+        const x0 = r.left + (BX - 22) * s;
+        return { x: x0, y: y0, w: x1 - x0, h: y1 - y0, rad: 22 * s };
+      };
+      const STEPS = [
+        { title: 'Your rubric as a ring', body: 'Each colour is one criterion. Its stretch of the ring is its share of the points, and thicker slices carry more.', spots: () => [] },
+        {
+          title: 'It bends to your marks', body: 'Graded, it pushes out where you did well and pulls in where you lost points: green is full marks, then orange, then red.',
+          note: () => (sampled ? 'A sample, to show you: this one is not graded yet.' : ''),
+          spots: () => [],
+          enter: () => { if (shown) restyle(base, { fresh: true }); else { sampled = true; restyle(sampleSub()); } },
+          leave: () => { if (sampled) { sampled = false; restyle(base); } },
+        },
+        { title: 'Open a criterion', body: 'Point at a colour and it swells. Press it, its name or Enter to open it; the arrow keys walk round.', spots: () => [pad(labels[0].getBoundingClientRect(), 7, 12)], enter: () => { if (st.t > 0.02) toRing(true); hover(0); }, leave: () => hover(-1) },
+        { title: 'Height is points', body: 'The slice unrolls into a bar, its levels beside it at the height of their points. The colour stops at your mark.', spots: () => [barSpot()], enter: () => select(0, true) },
+        { title: 'Switch or go back', body: 'The dots switch criteria. The little ring on top of the bar, or Esc, rolls it back into the ring.', spots: () => [pad(head.querySelector('.bcv-rr__chips').getBoundingClientRect(), 9, 14), { ...pad(back.getBoundingClientRect(), 3), round: true }], enter: () => { if (st.t < 0.98) select(0, true); } },
+      ];
+      if (!m.graded) STEPS[3].body = 'The slice unrolls into a bar, its levels beside it at the height of their points. Once marked, the colour stops at yours.';
+      let i = -1;
+      const tid = `${uid}-tour`;
+      const dots = STEPS.map(() => h('i', { class: 'bcv-rr__tdot' }));
+      const ttl = h('h3', { class: 'bcv-rr__ttl', id: `${tid}-t` });
+      const body = h('p', { class: 'bcv-rr__tbody', 'aria-live': 'polite' });
+      const note2 = h('p', { class: 'bcv-rr__tnote', hidden: true });
+      const backBtn = h('button', { type: 'button', class: 'bcv-rr__tbtn', onclick: () => go(i - 1) }, 'Back');
+      const nextBtn = h('button', { type: 'button', class: 'bcv-rr__tbtn bcv-rr__tbtn--go', onclick: () => go(i + 1) }, 'Next');
+      const skip = h('button', { type: 'button', class: 'bcv-rr__tskip', onclick: () => end() }, 'Skip');
+      const card = h('div', { class: 'bcv-rr__tour', role: 'group', 'aria-roledescription': 'tour', 'aria-labelledby': `${tid}-t` }, [
+        U.el('bcv-rr__ttop', [U.text('bcv-rr__teye', 'How the ring works', 'span'), U.el('bcv-rr__tdots', dots)]),
+        ttl, body, note2,
+        U.el('bcv-rr__tnav', [skip, U.el('bcv-rr__tgap'), backBtn, nextBtn]),
+      ]);
+      const spots = [0, 1].map(() => h('div', { class: 'bcv-rr__spot', 'aria-hidden': 'true' }));
+      // the spots follow what they ring while it moves (the stage gliding, the slice unrolling), then rest
+      let until = 0, fraf = 0;
+      const place = () => {
+        const o = ov.getBoundingClientRect(), want = STEPS[i]?.spots() || [];
+        spots.forEach((sp, j) => {
+          const r = want[j];
+          sp.classList.toggle('is-on', !!r);
+          if (!r) return;
+          sp.style.transform = `translate(${f(r.x - o.left)}px, ${f(r.y - o.top)}px)`;
+          sp.style.width = `${f(r.w)}px`;
+          sp.style.height = `${f(r.h)}px`;
+          sp.style.borderRadius = r.round ? '50%' : `${f(r.rad)}px`;
+        });
+      };
+      const loop = () => { fraf = 0; if (!tour) return; place(); if (performance.now() < until) fraf = requestAnimationFrame(loop); };
+      const follow = (ms = 1500) => { until = performance.now() + ms; if (!fraf) fraf = requestAnimationFrame(loop); };
+      function go(k) {
+        if (k >= STEPS.length) { end(); return; }
+        if (k < 0 || k === i) return;
+        STEPS[i]?.leave?.();
+        i = k;
+        const S = STEPS[i];
+        ttl.textContent = S.title;
+        body.textContent = S.body;
+        S.enter?.();
+        const nt = S.note?.() || '';
+        note2.hidden = !nt;
+        note2.textContent = nt;
+        dots.forEach((d, j) => d.classList.toggle('is-on', j === i));
+        backBtn.disabled = i === 0;
+        nextBtn.textContent = i === STEPS.length - 1 ? 'Done' : 'Next';
+        const hb = Math.max(0, card.offsetHeight - 14); // (the card's height, kept clear under the stage)
+        if (Math.abs(hb - room.b) > 4) { room.b = hb; fit(true); }
+        follow(1700);
+        nextBtn.focus({ preventScroll: true });
+      }
+      function end() {
+        if (!tour) return;
+        STEPS[i]?.leave?.();
+        tour = null;
+        if (fraf) cancelAnimationFrame(fraf);
+        ov.classList.remove('is-touring');
+        field.inert = false;
+        if (devBox) { devBox.inert = false; devPill.inert = false; }
+        room.b = 0;
+        fit(true);
+        card.classList.add('is-out');
+        spots.forEach((sp) => sp.classList.remove('is-on'));
+        setTimeout(() => { card.remove(); spots.forEach((sp) => sp.remove()); }, reduce ? 0 : 260);
+        if (gone) return;
+        if (st.t > 0.02) toRing(); else labels[st.sel].focus({ preventScroll: true });
+      }
+      tour = { next: () => go(i + 1), back: () => go(i - 1), end, follow, get step() { return i; } };
+      BCV.api?.storage?.local.set({ 'tips:rubricRing': true }).catch(() => {});
+      ov.classList.add('is-touring');
+      field.inert = true; // (the ring is shown, not pressed, while the tour talks: its own steps drive it)
+      if (devBox) { devBox.inert = true; devPill.inert = true; }
+      ov.append(...spots, card);
+      go(0);
+      return tour;
+    }
+
     let gone = false;
     function close(now) {
       if (gone) return;
       gone = true;
       if (raf) cancelAnimationFrame(raf);
-      raf = 0;
+      if (fitRaf) cancelAnimationFrame(fitRaf);
+      raf = fitRaf = 0;
+      tour = null;
       removeEventListener('resize', onResize);
       if (live === api) live = null;
       const refocus = () => { try { if (from && from.isConnected) from.focus({ preventScroll: true }); } catch { /* gone */ } };
@@ -756,8 +1038,9 @@
     }
     /** Holds one tween value where it is put (the developer tools and the tests look at a frame part-way). */
     const seek = (key, v) => { delete tw[key]; st[key] = v; draw(); };
-    const api = { close, el: ov, select, toRing, seek, state: st };
+    const api = { close, el: ov, select, toRing, seek, state: st, restyle, tour: () => startTour(), get touring() { return tour; } };
     live = api;
+    const bornAt = performance.now();
 
     document.body.append(ov);
     addEventListener('resize', onResize);
@@ -767,11 +1050,46 @@
     // the ring blooms in; marked, it then bends to its marks
     if (m.graded && !reduce) tween('g', 1, 1150, null, 450);
     ov.focus({ preventScroll: true });
+    // the developer's Try scores (the sample ring has it always); the tour, once, when the ring has bloomed
+    // (and bent): not if a criterion was opened first — then it waits for the next ring
+    if (dev) devPanel();
+    else BCV.settings?.get().then((s) => { if (s?.developer?.rubricScores === true) devPanel(); }).catch(() => {});
+    BCV.api?.storage?.local.get('tips:rubricRing').then((got) => {
+      if (got?.['tips:rubricRing'] || gone) return;
+      setTimeout(() => { if (!gone && live === api && st.t < 0.02) startTour(); }, m.graded && !reduce ? 1700 : 900);
+    }).catch(() => {});
     // a navigation away takes it too (app.js removes every sheet overlay): stop its frames
     const watch = new MutationObserver(() => { if (!ov.isConnected) { watch.disconnect(); if (!gone) close(true); } });
     watch.observe(document.body, { childList: true });
     return api;
   }
 
-  BCV.rubricRing = { open, model, shortOf, get live() { return live; } };
+  /** A made-up rubric, marked (Settings → Developer → Rubric → Sample ring): the ring tried without an assignment. */
+  function sample() {
+    const lv = (id, points, description, long = '') => ({ id, points, description, long_description: long });
+    const a = {
+      id: 0, name: 'Sample lab report', rubric_settings: { title: 'Sample rubric' },
+      rubric: [
+        { id: 's1', points: 6, description: 'Correctness', long_description: 'Answers are right, with units and sensible significant figures.', ratings: [lv('s1a', 6, 'Full marks', 'Every answer right, with units.'), lv('s1b', 4, 'Mostly right', 'One or two slips.'), lv('s1c', 2, 'Some right', 'Several answers wrong or missing units.'), lv('s1d', 0, 'Not shown')] },
+        { id: 's2', points: 4, description: 'Work shown', long_description: 'Each step from the data to the answer can be followed.', ratings: [lv('s2a', 4, 'Clear', 'Every step shown.'), lv('s2b', 2, 'Partly', 'Some steps skipped.'), lv('s2c', 0, 'Missing')] },
+        { id: 's3', points: 5, description: 'Analysis and discussion', long_description: 'What the results mean, where the error comes from, and what would make it better.', ratings: [lv('s3a', 5, 'Insightful'), lv('s3b', 3, 'Adequate', 'Says what happened, not why.'), lv('s3c', 1, 'Thin'), lv('s3d', 0, 'Missing')] },
+        { id: 's4', points: 3, description: 'Figures and tables', ratings: [lv('s4a', 3, 'Clear and labelled'), lv('s4b', 1.5, 'Unlabelled axes'), lv('s4c', 0, 'None')] },
+        { id: 's5', points: 2, description: 'Formatting', ratings: [lv('s5a', 2, 'Tidy'), lv('s5b', 1, 'Messy'), lv('s5c', 0, 'Unreadable')] },
+      ],
+    };
+    const now = new Date().toISOString();
+    const sub = {
+      posted_at: now, graded_at: now, workflow_state: 'graded',
+      rubric_assessment: {
+        s1: { points: 4, rating_id: 's1b', comments: 'Check the units in question 3.' },
+        s2: { points: 4, rating_id: 's2a' },
+        s3: { points: 1, rating_id: 's3c', comments: 'Say why the second trial is off, not only that it is.' },
+        s4: { points: 3, rating_id: 's4a' },
+        s5: { points: 1, rating_id: 's5b' },
+      },
+    };
+    return { a, sub };
+  }
+
+  BCV.rubricRing = { open, model, shortOf, sample, get live() { return live; } };
 })();

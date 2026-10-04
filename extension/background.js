@@ -419,7 +419,7 @@ if (typeof importScripts === 'function' && !self.BCV_LAZY_MODULES) {
   // extension), so its asks wait in the app's shared store as a 'dev' command, are answered here on
   // the next sync and the answer written back for the window to read (runAppCommand). Either way
   // the answer is the same: this is what the Developer section's tabs are drawn from.
-  const DEV_FLAGS = /^(setup:|welcome:|whatsnew:|updated:shown$|tools:welcomed$|themes:tried$)/; // what the setup, the welcome and What's New leave behind — settings, courses and photos are not flags
+  const DEV_FLAGS = /^(setup:|welcome:|whatsnew:|tips:|updated:shown$|tools:welcomed$|themes:tried$)/; // what the setup, the welcome, the tours and What's New leave behind — settings, courses and photos are not flags
   const DEV_SHOWN = 16 * 1024; // a stored value bigger than this is listed by its size alone
   const DEV_ALL_SHOWN = 256 * 1024; // and past this much in all, the rest are too (an answer the app's store carries, not a dump)
   const byteSize = (v) => new TextEncoder().encode(JSON.stringify(v) ?? '').length;
@@ -449,6 +449,7 @@ if (typeof importScripts === 'function' && !self.BCV_LAZY_MODULES) {
           cleared = keys.length;
         }
         if (msg.op === 'clearErrors') await api.storage.local.remove('errors:recent');
+        if (msg.op === 'resetTip' && /^tips:[\w-]+$/.test(String(msg.key))) await api.storage.local.remove(String(msg.key)); // (one tour shown again: the rubric ring's)
         const errors = (await api.storage.local.get('errors:recent'))['errors:recent'];
         return { ok: true, errors: Array.isArray(errors) ? errors : [], ...(cleared !== null ? { cleared } : {}) };
       }

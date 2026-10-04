@@ -8,7 +8,7 @@ import { mkdirSync, cpSync, readFileSync, writeFileSync, rmSync } from 'node:fs'
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
-import { TIMERS, shortenTimers, secs, reportSlow, afterMigration, motionAt, MOTION_RATE, launchExtension } from './harness.mjs';
+import { TIMERS, shortenTimers, secs, reportSlow, afterMigration, motionAt, realMotion, MOTION_RATE, launchExtension } from './harness.mjs';
 import { SMOKE_SHARDS, SMOKE_PARTS } from './smoke-shards.mjs';
 
 const require = createRequire(import.meta.url);
@@ -188,7 +188,7 @@ try {
   for (const t of setupTabs) await t.close();
   check((await sw.evaluate(async () => (await self.BCV.api.storage.local.get('setup:flow'))['setup:flow'])) === 3, 'the build records its setup flow, so an update from an older flow offers the page once more');
   check(await offerAgain(), 'the setup page opens again on a new browser session while setup is unfinished (Safari enables without installing)');
-  await sw.evaluate((v) => self.BCV.api.storage.local.set({ 'setup:done': true, 'welcome:search': true, 'whatsnew:seen': v }), manifest.version); // (seen: What's new is driven on purpose below, not over every page)
+  await sw.evaluate((v) => self.BCV.api.storage.local.set({ 'setup:done': true, 'welcome:search': true, 'tips:rubricRing': true, 'whatsnew:seen': v }), manifest.version); // (seen: What's new is driven on purpose below, not over every page)
   check(!(await offerAgain()), 'once setup is done it never opens again');
   } else { // (the page the install opens is the install section's to look at: here it is only closed)
     if (!context.pages().some(isSetup)) await context.waitForEvent('page', { predicate: isSetup, timeout: 5000 }).catch(() => null);
@@ -196,7 +196,7 @@ try {
   } // install
   // the setup counts as done for the rest of the suite (until it is done, every page opens the card
   // — the guided-setup sections below clear the flag when that is what they are checking)
-  await sw.evaluate((v) => self.BCV.api.storage.local.set({ 'setup:offered': true, 'setup:done': true, 'welcome:search': true, 'whatsnew:seen': v }), manifest.version);
+  await sw.evaluate((v) => self.BCV.api.storage.local.set({ 'setup:offered': true, 'setup:done': true, 'welcome:search': true, 'tips:rubricRing': true, 'whatsnew:seen': v }), manifest.version);
   await sw.evaluate((base) => self.BCV.api.storage.local.set({ 'dev:wikiBase': base }), BASE); // (Wikipedia stands in the mock)
 
   page = await context.newPage();
@@ -1964,6 +1964,109 @@ try {
   const freed = await pageHeld(page, 760, 420);
   check(freed.moved || !freed.scrollable, `with the ring gone the page scrolls again: ${JSON.stringify(freed)}`);
   await page.evaluate(() => window.scrollTo(0, 0));
+  // (2.98.83) the first ring ever opened walks through itself: five steps over the ring, the stage moved up to clear
+  // the card, the ring shown but not pressed while it talks; the arrows step it, Done ends it, and it never comes again
+  await sw.evaluate(() => self.BCV.api.storage.local.remove('tips:rubricRing'));
+  await page.click('.bcv-detail__actions .bcv-rubbtn');
+  const toured = await page.waitForSelector('.bcv-rr__tour', { timeout: 6000 }).then(() => true).catch(() => false);
+  const tourAt = () => page.evaluate(() => {
+    const ov = document.querySelector('.bcv-rr-ov'), card = document.querySelector('.bcv-rr__tour'), sv = document.querySelector('.bcv-rr__svg').getBoundingClientRect(), s = sv.width / 760;
+    const box = (r) => ({ x: Math.round(r.left), y: Math.round(r.top), r: Math.round(r.right), b: Math.round(r.bottom) });
+    return {
+      title: document.querySelector('.bcv-rr__ttl')?.textContent || '', on: [...document.querySelectorAll('.bcv-rr__tdot')].findIndex((d) => d.classList.contains('is-on')), dots: document.querySelectorAll('.bcv-rr__tdot').length,
+      note: document.querySelector('.bcv-rr__tnote:not([hidden])')?.textContent || '', next: document.querySelector('.bcv-rr__tbtn--go')?.textContent || '', focus: !!document.activeElement?.classList.contains('bcv-rr__tbtn--go'),
+      inert: document.querySelector('.bcv-rr__field').inert, state: ov.dataset.state, ty: parseFloat(getComputedStyle(ov).getPropertyValue('--rr-ty')) || 0,
+      ringFoot: Math.round(sv.top + (280 + 176 + 40) * s), cardTop: card ? Math.round(card.getBoundingClientRect().top) : null,
+      spots: [...document.querySelectorAll('.bcv-rr__spot.is-on')].map((e) => box(e.getBoundingClientRect())), label0: box(document.querySelector('.bcv-rr__label[data-k="0"]').getBoundingClientRect()),
+      rows: [...document.querySelectorAll('.bcv-rr__row:not(.is-out)')].map((e) => box(e.getBoundingClientRect())), chips: box(document.querySelector('.bcv-rr__chips').getBoundingClientRect()), back: box(document.querySelector('.bcv-rr__back').getBoundingClientRect()),
+    };
+  });
+  const holds = (o, i) => !!o && o.x <= i.x && o.y <= i.y && o.r >= i.r && o.b >= i.b; // (a spot round a thing: the thing inside it)
+  await page.waitForTimeout(700); // (the stage's glide up)
+  const t0 = await tourAt();
+  const tipFlag = await sw.evaluate(async () => (await self.BCV.api.storage.local.get('tips:rubricRing'))['tips:rubricRing']);
+  check(toured && t0.title === 'Your rubric as a ring' && t0.dots === 5 && t0.on === 0 && t0.focus && t0.inert && t0.ty < -40 && t0.ringFoot < t0.cardTop && tipFlag === true, `the first ring opened shows its tour: step 1 of 5, the keys on Next, the ring shown but not pressed, the stage up clear of the card, and it is marked seen: ${JSON.stringify({ ...t0, spots: undefined, rows: undefined, tipFlag })}`);
+  const replay = await realMotion(page, async () => { // (the turn watched as it happens: the frame loop runs on the animation clock)
+    await page.keyboard.press('ArrowRight');
+    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))); // (the step's first frames drawn)
+    return (await ringEdges(page))[0].outer;
+  });
+  const t1 = await tourAt();
+  const rebent = await eventually(async () => (await ringEdges(page))[0].outer < 176, 4000);
+  check(t1.title === 'It bends to your marks' && t1.on === 1 && !t1.note && replay > 179 && rebent, `→ steps on, and the marked ring bends to its marks once more from the plain circle (Correctness's edge ${replay} → under 176): ${t1.title}`);
+  await page.keyboard.press('ArrowRight');
+  const swelled = await eventually(async () => (await ringEdges(page))[0].outer > 180, 3000);
+  const t2 = await tourAt();
+  check(t2.title === 'Open a criterion' && t2.spots.length === 1 && holds(t2.spots[0], t2.label0) && swelled, `the third step rings the first criterion's name and swells its slice, as a pointer would: ${JSON.stringify({ spot: t2.spots[0], label: t2.label0, swelled })}`);
+  await page.click('.bcv-rr__tbtn--go');
+  const tourBar = await page.waitForFunction(() => document.querySelector('.bcv-rr-ov')?.dataset.state === 'bar', null, { timeout: 5000 }).then(() => true).catch(() => false);
+  await page.waitForTimeout(500);
+  const t3 = await tourAt();
+  check(tourBar && t3.title === 'Height is points' && t3.focus && t3.spots.length === 1 && t3.rows.length === 3 && t3.rows.every((r) => holds(t3.spots[0], r)), `the fourth step opens the bar itself, keeps the keys on Next, and rings the bar with its levels: ${JSON.stringify({ state: t3.state, focus: t3.focus, spot: t3.spots[0], rows: t3.rows })}`);
+  await page.keyboard.press('ArrowRight');
+  await page.waitForTimeout(500);
+  const t4 = await tourAt();
+  check(t4.title === 'Switch or go back' && t4.next === 'Done' && t4.spots.length === 2 && holds(t4.spots[0], t4.chips) && holds(t4.spots[1], t4.back), `the last step rings the dots and the little ring, and Next reads Done: ${JSON.stringify({ next: t4.next, spots: t4.spots, chips: t4.chips, back: t4.back })}`);
+  await shot(page, '14r3-rubric-tour');
+  await page.keyboard.press('Enter');
+  const tourDone = await page.waitForFunction(() => !document.querySelector('.bcv-rr__tour') && document.querySelector('.bcv-rr-ov')?.dataset.state === 'ring' && !document.querySelector('.bcv-rr__field').inert && (parseFloat(getComputedStyle(document.querySelector('.bcv-rr-ov')).getPropertyValue('--rr-ty')) || 0) === 0, null, { timeout: 5000 }).then(() => true).catch(() => false);
+  check(tourDone && await page.evaluate(() => !!document.activeElement?.classList.contains('bcv-rr__label')), 'Done ends the tour: the bar rolls back up, the stage settles back, the ring can be pressed, and focus is on a criterion');
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !document.querySelector('.bcv-rr-ov'), null, { timeout: 5000 });
+  await page.click('.bcv-detail__actions .bcv-rubbtn');
+  await page.waitForSelector('.bcv-rr-ov .bcv-rr__label', { timeout: 8000 });
+  await page.waitForTimeout(2300); // (past where the tour would start on a marked ring)
+  check(!(await page.$('.bcv-rr__tour')) && !(await page.$('.bcv-rr__dev')), 'the tour comes once: the next ring opens without it (and without Try scores, which is the developer\'s)');
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !document.querySelector('.bcv-rr-ov'), null, { timeout: 5000 });
+  // (2.98.83) Settings → Developer → Rubric → Try scores: a mark picked for each criterion, or a preset, and the ring
+  // turns to it in place — its bend, its colours, its words — as a graded one would. Nothing is sent to Canvas
+  await sw.evaluate(() => self.BCV.settings.update({ developer: { rubricScores: true } }));
+  await page.evaluate(() => { try { localStorage.removeItem('bcv:rrDev'); } catch { /* */ } });
+  const sent = [];
+  const onSent = (r) => { if (r.method() !== 'GET' && /\/api\/v1\//.test(r.url())) sent.push(`${r.method()} ${r.url()}`); };
+  page.on('request', onSent);
+  await page.click('.bcv-detail__actions .bcv-rubbtn');
+  const devUp = await page.waitForSelector('.bcv-rr__dev', { timeout: 6000 }).then(() => true).catch(() => false);
+  const devAt = () => page.evaluate(() => ({
+    rows: [...document.querySelectorAll('.bcv-rr__dcrit')].map((r) => `${r.querySelector('.bcv-rr__dname').textContent} ${r.querySelector('.bcv-rr__dscore').textContent} [${[...r.querySelectorAll('.bcv-rr__dlv')].map((b) => (b.classList.contains('is-on') ? `*${b.textContent}` : b.textContent)).join(' ')}]`).join(' | '),
+    centre: document.querySelector('.bcv-rr__centre').innerText.replace(/\s+/g, ' ').trim(), status: document.querySelector('.bcv-rr__status').textContent,
+    shown: [...document.querySelectorAll('.bcv-rr__label')].map((b) => b.innerText.replace(/\s+/g, ' ')).join(' | '), posted: document.querySelector('.bcv-rr__dpost').getAttribute('aria-checked'),
+    tx: parseFloat(getComputedStyle(document.querySelector('.bcv-rr-ov')).getPropertyValue('--rr-tx')) || 0, open: document.querySelector('.bcv-rr__devpill').getAttribute('aria-expanded'),
+  }));
+  const d0 = await devAt();
+  check(devUp && d0.rows === 'Correctness 4 / 6 [6 *3 0 –] | Work shown 4 / 4 [*4 2 0 –]' && d0.posted === 'true' && d0.open === 'true' && d0.tx < -100, `with Try scores on, the ring opens with its panel at the right — the real marks picked — and moves left to make room: ${JSON.stringify(d0)}`);
+  const pre = (name) => page.click(`.bcv-rr__dpre:text-is("${name}")`);
+  await pre('Low');
+  const lowBent = await eventually(async () => { const e = await ringEdges(page); return e[0].outer < 172 && e[1].outer < 172; }, 4000);
+  const dLow = await devAt();
+  const lowTone = await page.evaluate(() => [...document.querySelectorAll('.bcv-rr__ring > g[data-k]')].map((g) => { const ps = g.querySelectorAll('path.bcv-rr__band'); const id = ps[ps.length / 2].getAttribute('fill').slice(5, -1); const c = getComputedStyle(document.getElementById(id).querySelectorAll('stop')[2]).stopColor.match(/\d+/g).map(Number); return c[0] > c[1] + 100; }));
+  check(lowBent && lowTone.every(Boolean) && /^Score 0 of 10 · 0%/i.test(dLow.centre) && dLow.shown === 'Correctness 0 / 6 | Work shown 0 / 4' && dLow.rows === 'Correctness 0 / 6 [6 3 *0 –] | Work shown 0 / 4 [4 2 *0 –]', `Low marks every criterion its lowest level: the ring pulls in and turns red, and the score and labels follow: ${JSON.stringify({ ...dLow, lowTone })}`);
+  await pre('Full marks');
+  const fullOut = await eventually(async () => { const e = await ringEdges(page); return e[0].outer > 184 && e[1].outer > 184; }, 4000);
+  check(fullOut && /^Score 10 of 10 · 100%/i.test((await devAt()).centre), `Full marks pushes every slice out, 10 of 10: ${JSON.stringify(await ringEdges(page))}`);
+  await page.click('.bcv-rr__dpost');
+  const heldFlat = await eventually(async () => { const e = await ringEdges(page); return Math.abs(e[0].outer - 181) < 1.5 && Math.abs(e[1].outer - 181) < 1.5; }, 4000);
+  const dHeld = await devAt();
+  check(heldFlat && dHeld.posted === 'false' && dHeld.status === '2 criteria · marks not posted yet' && /^Total 10 points/i.test(dHeld.centre), `Posted off holds the marks back: the ring goes back to its circle and says the marks are not posted: ${JSON.stringify({ ...dHeld, edges: await ringEdges(page) })}`);
+  await page.click('.bcv-rr__dpost');
+  await page.click('.bcv-rr__label[data-k="1"]');
+  await page.waitForFunction(() => document.querySelector('.bcv-rr-ov')?.dataset.state === 'bar', null, { timeout: 5000 });
+  await page.click('.bcv-rr__dcrit:nth-child(2) .bcv-rr__dlv:text-is("2")');
+  const barNow = await eventually(async () => page.evaluate(() => document.querySelector('.bcv-rr__count').textContent === 'Criterion 2 of 2 · 2 / 4' && [...document.querySelectorAll('.bcv-rr__row:not(.is-out).is-picked .bcv-rr__rlab')].length === 1 && document.querySelector('.bcv-rr-ov').dataset.state === 'bar'), 3000);
+  check(barNow, `a level picked with the bar out changes the bar in place: ${await texts('.bcv-rr__count')}`);
+  await shot(page, '14r4-rubric-try-scores');
+  await pre('Real');
+  const dReal = await devAt();
+  check(dReal.rows === d0.rows && /^Score 8 of 10 · 80%/i.test(dReal.centre) && sent.length === 0, `Real puts Canvas's marks back, and nothing was sent to Canvas: ${JSON.stringify({ rows: dReal.rows, centre: dReal.centre, sent })}`);
+  await page.click('.bcv-rr__devpill');
+  const shut = await eventually(async () => page.evaluate(() => document.querySelector('.bcv-rr__dev').hidden && document.querySelector('.bcv-rr__devpill').getAttribute('aria-expanded') === 'false' && (parseFloat(getComputedStyle(document.querySelector('.bcv-rr-ov')).getPropertyValue('--rr-tx')) || 0) === 0), 3000);
+  check(shut, 'the pill folds the panel away, and the ring moves back to the middle');
+  page.off('request', onSent);
+  await page.keyboard.press('Escape'); await page.waitForFunction(() => document.querySelector('.bcv-rr-ov')?.dataset.state === 'ring', null, { timeout: 5000 });
+  await page.keyboard.press('Escape'); await page.waitForFunction(() => !document.querySelector('.bcv-rr-ov'), null, { timeout: 5000 });
+  await sw.evaluate(() => self.BCV.settings.update({ developer: { rubricScores: false } }));
+  await page.evaluate(() => { try { localStorage.removeItem('bcv:rrDev'); } catch { /* */ } });
   await page.goto(`${BASE}/courses/104/assignments/4002`);
   await page.waitForSelector('.bcv-detail__actions .bcv-btn--primary', { timeout: 10000 });
   check((await texts('.bcv-detail__actions .bcv-btn--primary'))[0] === 'Submit assignment', 'the assignment page offers our own submit flow');
@@ -7439,7 +7542,7 @@ try {
   await popupPage.goto(`chrome-extension://${extId}/popup/popup.html`);
   await popupPage.waitForTimeout(400);
   check(!(await popupPage.$eval('#setup-card', (el) => el.hidden)), 'an older setup mark alone does not count: the popup still asks');
-  await sw.evaluate((v) => self.BCV.api.storage.local.set({ 'setup:done': true, 'welcome:search': true, 'whatsnew:seen': v }), manifest.version); // (seen: What's new is driven on purpose below, not over every page)
+  await sw.evaluate((v) => self.BCV.api.storage.local.set({ 'setup:done': true, 'welcome:search': true, 'tips:rubricRing': true, 'whatsnew:seen': v }), manifest.version); // (seen: What's new is driven on purpose below, not over every page)
   popupPage = await context.newPage();
   await popupPage.goto(`chrome-extension://${extId}/popup/popup.html`);
   await popupPage.waitForTimeout(500);
@@ -7520,12 +7623,29 @@ try {
   await options.reload();
   await options.waitForSelector('#dev.is-active', { timeout: 5000 });
   const devOpen = await options.evaluate(() => ({ tabs: [...document.querySelectorAll('#devTabs .devtab')].map((b) => `${b.textContent}${b.classList.contains('is-on') ? '*' : ''}`).join(','), shown: [...document.querySelectorAll('#dev .devpane')].filter((p) => !p.hidden).map((p) => p.dataset.pane).join(','), from: document.getElementById('devFrom').value, froms: document.querySelectorAll('#devFromList option').length, nav: !!document.querySelector('.navlink[data-section="dev"].is-active') }));
-  check(devOpen.tabs === 'Simulate*,Quiz,State,Storage,Tool tabs' && devOpen.shown === 'sim' && /^\d+\.\d+\.\d+$/.test(devOpen.from) && devOpen.froms > 20 && devOpen.nav, `the Developer section opens on its tabs, Simulate first, offering every version What's New has notes for: ${JSON.stringify(devOpen)}`);
+  check(devOpen.tabs === 'Simulate*,Quiz,Rubric,State,Storage,Tool tabs' && devOpen.shown === 'sim' && /^\d+\.\d+\.\d+$/.test(devOpen.from) && devOpen.froms > 20 && devOpen.nav, `the Developer section opens on its tabs, Simulate first, offering every version What's New has notes for: ${JSON.stringify(devOpen)}`);
   // Quiz: a switch writes the flag a quiz reads as an attempt opens
   await options.click('#devTabs [data-pane="quiz"]');
   await options.click('#devQuizImport');
   check(await eventually(async () => (await sw.evaluate(async () => (await self.BCV.settings.get()).developer?.quizImport)) === true && await options.$eval('#devQuizImport', (b) => b.classList.contains('is-on') && b.getAttribute('aria-checked') === 'true')), 'the Quiz tab turns on Import answers from an earlier attempt — a setting, so the Mac app\'s window turns it on too');
   await options.screenshot({ path: join(out, '29b-options-dev-quiz.png') });
+  // Rubric (2.98.83): Try scores, a setting the ring reads as it opens; Show again clears the ring's tour flag; Sample
+  // ring opens a made-up rubric's ring over a Canvas tab with Try scores on it
+  await options.click('#devTabs [data-pane="rubric"]');
+  await options.click('#devRubricScores');
+  check(await eventually(async () => (await sw.evaluate(async () => (await self.BCV.settings.get()).developer?.rubricScores)) === true && await options.$eval('#devRubricScores', (b) => b.classList.contains('is-on') && b.getAttribute('aria-checked') === 'true')), 'the Rubric tab turns on Try scores — a setting the ring reads as it opens');
+  await options.click('#devRubricTour');
+  check(await eventually(async () => (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('tips:rubricRing'))['tips:rubricRing'])) === undefined && (await options.$eval('#devRubricTourSub', (e) => e.textContent)) === 'The next rubric opened shows the tour.'), 'Show again clears the ring tour\'s flag, and says so');
+  await sw.evaluate(() => self.BCV.api.storage.local.set({ 'tips:rubricRing': true })); // (the sample ring is looked at without it)
+  await options.screenshot({ path: join(out, '29c-options-dev-rubric.png') });
+  const [ringTab] = await Promise.all([context.waitForEvent('page', { timeout: 10000 }), options.click('#devRubricSample')]);
+  const sampleUp = await ringTab.waitForSelector('.bcv-rr-ov .bcv-rr__dev', { timeout: 20000 }).then(() => true).catch(() => false);
+  const sample = sampleUp ? await ringTab.evaluate(() => ({ url: location.href, title: document.querySelector('.bcv-rr__title').textContent, n: document.querySelectorAll('.bcv-rr__label').length, rows: document.querySelectorAll('.bcv-rr__dcrit').length, centre: document.querySelector('.bcv-rr__cbig').textContent })) : {};
+  check(sampleUp && !/bcv=/.test(sample.url) && sample.title === 'Sample lab report' && sample.n === 5 && sample.rows === 5 && sample.centre === '13', `Sample ring opens a made-up rubric's ring over a Canvas tab, Try scores on it: ${JSON.stringify(sample)}`);
+  await ringTab.close();
+  await options.click('#devRubricScores'); // (off again: the rings after this are the plain ones)
+  await eventually(async () => (await sw.evaluate(async () => (await self.BCV.settings.get()).developer?.rubricScores)) === false);
+  await options.click('#devTabs [data-pane="quiz"]'); // (back where the simulation quiz's Open is pressed below)
   // the quiz: a new attempt, Import answers (2.98.70) — what attempt 1 got right shown in purple; nothing picked, nothing saved
   await page.bringToFront();
   // (attempts to spare, the rich kinds, and a formula question and a file to hand in: the kinds 2.98.30 takes here;

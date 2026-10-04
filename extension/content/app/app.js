@@ -1237,6 +1237,7 @@
     else if (r.params.get('bcv') === 'welcome' && BCV.welcome && !BCV.welcome.active()) welcomeHere();
     else if (r.params.get('bcv') === 'whatsnew' && BCV.whatsnew) whatsnewHere();
     else if (r.params.get('bcv') === 'simquiz') simQuizHere();
+    else if (r.params.get('bcv') === 'rubric') rubricHere();
   }
 
   /** The theme's photo behind a root screen's header (the Theme step's Headers): sharp at the right,
@@ -1275,6 +1276,18 @@
     const c = (await BCV.store.favorites().catch(() => []))[0];
     if (!c) { U.toast('The simulation quiz sits in a course, and no course was found.', { error: true }); return; }
     go(`/courses/${c.id}/quizzes/0?bcv=take&sim=1`, { replace: true });
+  }
+  /** ?bcv=rubric (Settings → Developer → Rubric): the parameter is dropped and a made-up rubric's ring opened over
+   *  the page, Try scores on it (content/app/rubric-ring.js). The ring is the desktop's: a phone is told so. */
+  async function rubricHere() {
+    const url = new URL(location.href);
+    url.searchParams.delete('bcv');
+    history.replaceState(navState(false), '', url.pathname + url.search + url.hash);
+    state.route = parseRoute();
+    if (phone()) { U.toast('The rubric ring is drawn on a computer.'); return; }
+    try { await BCV.lazy.load('rubric'); } catch { U.toast('The rubric ring could not load.', { error: true }); return; }
+    const s = BCV.rubricRing.sample();
+    BCV.rubricRing.open(s.a, s.sub, { dev: true });
   }
   /** ?bcv=welcome (Settings → General → See it again): the parameter is dropped,
    *  the page drawn, and the guided tour that follows the setup runs over it again. */

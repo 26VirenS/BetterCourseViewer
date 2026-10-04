@@ -91,7 +91,7 @@
   // The scripts' own version, stamped: content/app/app.js compares it with the stylesheet's
   // (--bcv-version) and the manifest's, because Safari can run one version's script with
   // another's stylesheet after the Mac app has updated under it. Bumped with every release.
-  self.BCV_VERSION = '2.98.82';
+  self.BCV_VERSION = '2.98.83';
 
   const DEFAULTS = {
     version: 3, // (3: Away Refresh off unless turned on — settings written before carry it on, and the one-time step in getSettings turns it off for everyone)
@@ -112,6 +112,7 @@
     domains: [],                  // extra Canvas origins, e.g. "https://canvas.myschool.edu"
     developer: {
       quizImport: false,          // Settings → Developer → Quiz: an Import answers button on a quiz being taken — what was right before, shown in purple (content/app/screens/quiz.js)
+      rubricScores: false,        // Settings → Developer → Rubric: a Try scores panel on the rubric ring — marks picked by hand, never sent (content/app/rubric-ring.js)
     },
   };
 

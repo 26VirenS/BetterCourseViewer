@@ -744,6 +744,7 @@
     $('themeSub').textContent = settings.appearance.theme?.accent ? `${settings.appearance.theme.name || 'Your own colour'} · ${settings.appearance.theme.accent}. Photos are kept on the device they were added on.` : 'The look, a colour of your own, the courses’ colours, photos on the counters, the sidebar and the page headers.';
     for (const [id, key] of DASH) setSwitch($(id), settings.appearance.dashboard?.[key] !== false);
     devQuizPaint(); // (Developer → Quiz: a setting like the rest, so a change from the other side shows)
+    devRubricPaint();
     renderDomains();
     paintStatus();
     paint();
@@ -853,7 +854,7 @@
     try { await navigator.clipboard.writeText(text); $('devMsg').textContent = 'Copied — paste it where it is wanted.'; } catch { $('devMsg').textContent = 'Could not copy; select the log and copy it by hand.'; }
   };
   // ---- Developer: the panes — Simulate, Quiz, State, Storage, Tool tabs (the last one kept, per device) ----
-  const DEV_PANES = ['sim', 'quiz', 'state', 'storage', 'tool'];
+  const DEV_PANES = ['sim', 'quiz', 'rubric', 'state', 'storage', 'tool'];
   const devSay = (id, text) => { const el = $(id); el.hidden = !text; el.textContent = text || ''; };
   function devPane(name) {
     const pane = DEV_PANES.includes(name) ? name : 'sim';
@@ -864,7 +865,7 @@
     }
     for (const p of document.querySelectorAll('#dev .devpane')) p.hidden = p.dataset.pane !== pane;
     try { localStorage.setItem('bcv:devPane', pane); } catch { /* the first pane next time */ }
-    const fill = { sim: devSimInit, quiz: devQuizPaint, state: devErrorsShow, storage: devStorage, tool: devShow }[pane];
+    const fill = { sim: devSimInit, quiz: devQuizPaint, rubric: devRubricPaint, state: devErrorsShow, storage: devStorage, tool: devShow }[pane];
     Promise.resolve().then(fill).catch((e) => console.warn('[Simpl Courses developer]', e)); // (a pane that cannot fill here — the app's window has no background to ask — never keeps the section shut)
   }
   $('devTabs').addEventListener('click', (e) => { const b = e.target.closest('.devtab'); if (b) devPane(b.dataset.pane); });
@@ -899,6 +900,23 @@
   $('devQuizImport').addEventListener('click', async () => {
     await save({ developer: { quizImport: !$('devQuizImport').classList.contains('is-on') } });
     devQuizPaint();
+  });
+
+  // Rubric: the Try scores panel on the rubric ring (a setting, content/app/rubric-ring.js reads it as a ring opens),
+  // a made-up rubric's ring on a Canvas page (?bcv=rubric), and the ring's tour shown again (its flag cleared, devRpc)
+  function devRubricPaint() {
+    const on = settings?.developer?.rubricScores === true;
+    $('devRubricScores').classList.toggle('is-on', on);
+    $('devRubricScores').setAttribute('aria-checked', on ? 'true' : 'false');
+  }
+  $('devRubricScores').addEventListener('click', async () => {
+    await save({ developer: { rubricScores: !$('devRubricScores').classList.contains('is-on') } });
+    devRubricPaint();
+  });
+  $('devRubricSample').addEventListener('click', () => openOnCanvas('rubric'));
+  $('devRubricTour').addEventListener('click', async () => {
+    const r = await devAsk({ type: 'devState', op: 'resetTip', key: 'tips:rubricRing' }, { note: 'devRubricTourSub' });
+    if (r?.ok) { $('devRubricTourSub').hidden = false; $('devRubricTourSub').textContent = 'The next rubric opened shows the tour.'; }
   });
 
   // State: the flags the setup, the tour and What's New leave (settings, courses and photos are not flags), and the error codes kept for a report — the extension's, asked for (devRpc)
