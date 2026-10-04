@@ -227,7 +227,7 @@
 
     function backRow() {
       const btns = [
-        a?.rubric?.length ? CS().rubricPeek(h('button', { type: 'button', class: 'bcv-qz__big bcv-rubbtn', text: 'See the rubric', onclick: () => CS().openRubric(a, sub) }), a, sub) : null,
+        a?.rubric?.length ? CS().rubricMorph(h('button', { type: 'button', class: 'bcv-qz__big bcv-rubbtn', text: 'See the rubric', onclick: () => CS().openRubric(a, sub) }), a, sub) : null,
         box ? null : h('button', { type: 'button', class: 'bcv-qz__big', text: 'Back to the assignment', onclick: () => app.go(backHref) }),
         box ? null : h('button', { type: 'button', class: 'bcv-qz__big bcv-qz__big--primary', text: `Back to ${c.shortName || c.name}`, onclick: () => app.go(c.url) }),
       ].filter(Boolean);

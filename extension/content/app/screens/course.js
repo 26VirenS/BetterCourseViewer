@@ -286,22 +286,20 @@
     }
     rubricSheet(a, sub);
   }
-  /** A rubric button's peek (2.98.86): on the desktop, the pointer resting on it shows the ring in miniature
-   *  under it (rubric-ring.js peek, loaded on the first), gone as the pointer leaves or presses. */
-  function rubricPeek(btn, a, sub) {
+  /** A rubric button's morph (2.98.87): on the desktop, the pointer resting on it turns it into the ring in
+   *  miniature with the points in the middle (rubric-ring.js morph, loaded on the first), and back as it leaves. */
+  function rubricMorph(btn, a, sub) {
     if (!btn || !a?.rubric?.length) return btn;
     let timer = 0;
-    const hide = () => { clearTimeout(timer); timer = 0; BCV.rubricRing?.unpeek(btn); };
     btn.addEventListener('pointerenter', (e) => {
       if (e.pointerType !== 'mouse' || BCV.phone?.active()) return;
       clearTimeout(timer);
       timer = setTimeout(() => {
-        const show = () => { if (btn.isConnected && btn.matches(':hover')) BCV.rubricRing.peek(btn, a, sub); };
+        const show = () => { if (btn.isConnected && btn.matches(':hover')) BCV.rubricRing.morph(btn, a, sub); };
         if (BCV.rubricRing) show(); else BCV.lazy.load('rubric').then(show).catch(() => {});
-      }, 160);
+      }, 90);
     });
-    btn.addEventListener('pointerleave', hide);
-    btn.addEventListener('pointerdown', hide);
+    btn.addEventListener('pointerleave', () => { clearTimeout(timer); timer = 0; BCV.rubricRing?.unmorph(btn); });
     return btn;
   }
   function rubricSheet(a, sub) {
@@ -1384,6 +1382,6 @@
     return b;
   };
 
-  BCV.screens.course = { render, prose, fitMath, rubricParts, rubricGrid, rubricScore, openRubric, rubricPeek, linksFrom, typeIcon, ptsLabel, statusBadge, openReader, contextShell, keptShell, holdShell, heldShell, syncShell, warmTab, warmTabs };
+  BCV.screens.course = { render, prose, fitMath, rubricParts, rubricGrid, rubricScore, openRubric, rubricMorph, linksFrom, typeIcon, ptsLabel, statusBadge, openReader, contextShell, keptShell, holdShell, heldShell, syncShell, warmTab, warmTabs };
   BCV.screens.courseTabs = T;
 })();

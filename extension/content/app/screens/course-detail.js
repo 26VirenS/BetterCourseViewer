@@ -377,7 +377,7 @@
           a.quiz_id ? U.btn('Open quiz', { icon: IC.bolt, onClick: () => app.go(`${c.url}/quizzes/${a.quiz_id}`) }) : null,
           a.discussion_topic?.id ? U.btn('Open discussion', { icon: IC.disc, onClick: () => app.go(`${c.url}/discussion_topics/${a.discussion_topic.id}`) }) : null,
           // how the marks are decided, beside the decision to hand work in
-          a.rubric?.length ? CS().rubricPeek(U.btn('Rubric', { icon: IC.sheet, cls: 'bcv-rubbtn', onClick: () => CS().openRubric(a, s) }), a, s) : null, // (the ring in miniature under it on a hover)
+          a.rubric?.length ? CS().rubricMorph(U.btn('Rubric', { icon: IC.sheet, cls: 'bcv-rubbtn', onClick: () => CS().openRubric(a, s) }), a, s) : null, // (the ring in miniature, on a hover)
           // where Canvas asks for a mark rather than work, the mark is the page's action
           (() => { const el = slot('bcv-detail__doneslot'); fill(el, ({ modItem }) => doneButton(ctx, c, a, modItem, { primary: !nativeSubmit && !isTool && !canvasOnly })); return el; })(),
         ]),

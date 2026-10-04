@@ -89,8 +89,8 @@ own logic can mend that, so the page tells:
 - `content/app/app.js` compares the two with the manifest's version a moment after the page loads.
   When they disagree it says, on every load until it is done: *Simpl Courses X is installed, but
   Safari is still running an older copy of it. Quit Safari (⌘Q) and open it again.*
-- The app's settings window says the same under the update title on its first look after an
-  update.
+- (The app's settings window no longer says so after an update, since 2.98.87: the page's own
+  message, when the versions really disagree, is the one place it is said.)
 
 Rule: never assume a page runs one version. A file added in a release is not there for a Safari
 that has not been reopened, and a style a new script relies on may be missing; the stamps make the

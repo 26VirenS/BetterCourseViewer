@@ -1894,22 +1894,29 @@ try {
   await page.goto(`${BASE}/courses/104/assignments/4001`); // the rubric checks below read this page
   await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
   check(!(await page.$('.bcv-rr-ov, .bcv-rubg')) && (await texts('.bcv-detail__actions .bcv-rubbtn'))[0] === 'Rubric', 'the rubric keeps its own button, and is not on the page until it is asked for');
-  // (2.98.86) the pointer resting on the Rubric button shows the ring in miniature under it: its slices in their
-  // grade colours, the score in the middle, the criteria beside it — taking no presses; gone as the pointer leaves
-  const rubBtn = await page.$eval('.bcv-detail__actions .bcv-rubbtn', (e) => { const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, bottom: r.bottom }; });
+  // (2.98.87) the pointer resting on the Rubric button turns the button itself into the ring in miniature: the pill
+  // drawn in to a disc, its words gone, the band round it in the grade colours and the points in the middle — the
+  // button's own place on the page kept; back to the button as the pointer leaves
+  const rubBtn = await page.$eval('.bcv-detail__actions .bcv-rubbtn', (e) => { const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, w: Math.round(r.width), h: Math.round(r.height) }; });
   await page.mouse.move(rubBtn.x, rubBtn.y);
-  const peeked = await page.waitForSelector('.bcv-rr-peek', { timeout: 5000 }).then(() => true).catch(() => false);
-  const peekAt = peeked ? await page.evaluate(() => {
-    const p = document.querySelector('.bcv-rr-peek'), r = p.getBoundingClientRect();
-    const rgb = [...p.querySelectorAll('.bcv-rr-peek__ring path')].map((x) => x.getAttribute('fill').match(/\d+/g).map(Number));
-    return { top: Math.round(r.top), mid: p.querySelector('.bcv-rr-peek__mid').innerText.replace(/\s+/g, ' ').trim(), rows: [...p.querySelectorAll('.bcv-rr-peek__row')].map((x) => x.innerText.replace(/\s+/g, ' ').trim()).join(' | '), head: p.querySelector('.bcv-rr-peek__head').textContent,
-      pieces: rgb.length, green: rgb.some(([r, g]) => g > r + 80), amber: rgb.some(([r, g, b]) => r > 200 && g > 140 && b < 100 && r > g + 25), presses: getComputedStyle(p).pointerEvents };
+  const morphed = await eventually(() => page.evaluate(() => { const r = document.querySelector('.bcv-detail__actions .bcv-rubbtn .bcv-rubmorph__ring'); return !!r && parseFloat(r.style.opacity) === 1; }), 5000);
+  const morphAt = morphed ? await page.evaluate(() => {
+    const b = document.querySelector('.bcv-detail__actions .bcv-rubbtn'), br = b.getBoundingClientRect(), layer = b.querySelector('.bcv-rubmorph');
+    const d = layer.querySelector('.bcv-rubmorph__disc').getBoundingClientRect(), ring = layer.querySelector('.bcv-rubmorph__ring').getBoundingClientRect();
+    const rgb = [...layer.querySelectorAll('path')].map((x) => x.getAttribute('fill').match(/\d+/g).map(Number));
+    return { ring: b.classList.contains('is-ring'), mid: layer.querySelector('.bcv-rubmorph__mid').innerText.replace(/\s+/g, ' ').trim(), words: getComputedStyle(b).color, ground: getComputedStyle(b).backgroundColor, hidden: layer.getAttribute('aria-hidden'), presses: getComputedStyle(layer).pointerEvents,
+      w: Math.round(br.width), h: Math.round(br.height), disc: [Math.round(d.width), Math.round(d.height)], round: getComputedStyle(layer.querySelector('.bcv-rubmorph__disc')).borderRadius, ringBox: Math.round(ring.width),
+      centred: Math.abs((d.left + d.right) / 2 - (br.left + br.right) / 2) < 1 && Math.abs((d.top + d.bottom) / 2 - (br.top + br.bottom) / 2) < 1,
+      pieces: rgb.length, green: rgb.some(([r, g]) => g > r + 80), amber: rgb.some(([r, g, b]) => r > 200 && g > 140 && b < 100 && r > g + 25) };
   }) : {};
-  check(peeked && peekAt.mid === '8 of 10' && peekAt.rows === 'Correctness 4 / 6 | Work shown 4 / 4' && peekAt.head === '80% · 2 criteria' && peekAt.pieces > 40 && peekAt.green && peekAt.amber && peekAt.top > rubBtn.bottom && peekAt.presses === 'none',
-    `the pointer on the Rubric button shows the ring in miniature under it — green and amber slices, the score in the middle, the criteria beside it: ${JSON.stringify({ ...peekAt, btnBottom: Math.round(rubBtn.bottom) })}`);
-  await shot(page, '14q-rubric-peek');
+  check(morphed && morphAt.ring && morphAt.mid === '8 of 10' && morphAt.words === 'rgba(0, 0, 0, 0)' && morphAt.ground === 'rgba(0, 0, 0, 0)' && morphAt.disc.join() === '48,48' && morphAt.round === '24px' && morphAt.ringBox === 48 && morphAt.centred
+    && morphAt.w === rubBtn.w && morphAt.h === rubBtn.h && morphAt.pieces > 40 && morphAt.green && morphAt.amber && morphAt.hidden === 'true' && morphAt.presses === 'none',
+    `the pointer on the Rubric button turns it into the ring in miniature — a disc, green and amber, "8 of 10" in the middle, its words gone, its place kept: ${JSON.stringify({ ...morphAt, btn: [rubBtn.w, rubBtn.h] })}`);
+  check((await page.locator('.bcv-detail__actions').getByRole('button', { name: 'Rubric', exact: true }).count()) === 1, 'it is still the Rubric button to a screen reader (the ring is drawn, not said)');
+  await shot(page, '14q-rubric-morph');
   await page.mouse.move(8, 8);
-  check(await page.waitForFunction(() => !document.querySelector('.bcv-rr-peek'), null, { timeout: 3000 }).then(() => true).catch(() => false), 'the peek goes as the pointer leaves the button');
+  const unmorphed = await eventually(() => page.evaluate(() => { const b = document.querySelector('.bcv-detail__actions .bcv-rubbtn'); return !b.querySelector('.bcv-rubmorph') && !b.classList.contains('is-ring') && getComputedStyle(b).color !== 'rgba(0, 0, 0, 0)'; }), 3000);
+  check(unmorphed && (await texts('.bcv-detail__actions .bcv-rubbtn'))[0] === 'Rubric', 'and back to the Rubric button as the pointer leaves');
   await page.click('.bcv-detail__actions .bcv-rubbtn');
   await page.waitForSelector('.bcv-rr-ov .bcv-rr__label', { timeout: 8000 });
   // the rubric is the ring itself, over the page: no card round it — the page dims, a little blur right

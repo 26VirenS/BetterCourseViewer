@@ -25,6 +25,10 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.98.87', date: '2026-10-04', notes: [
+      { kind: 'improved', title: 'Rubric becomes a ring', body: 'Hover the Rubric button to see your points in a ring.', icon: P.eye },
+      { kind: 'fixed', title: 'No quit-Safari note', body: 'The app no longer asks you to quit Safari after an update.', icon: P.check },
+    ] },
     { version: '2.98.86', date: '2026-10-04', notes: [
       { kind: 'new', title: 'Rubric at a glance', body: 'Hover the Rubric button to see a small ring.', icon: P.eye },
     ] },

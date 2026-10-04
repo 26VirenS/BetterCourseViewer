@@ -14,7 +14,7 @@
 
 html[data-bcv-theme] {
   --bcv-line: max(1px, var(--bcv-dpx, 1px)); /* a hairline drawn as a shadow: one CSS pixel, or one screen pixel where that is more (below 100% zoom; content/early.js keeps --bcv-dpx) */
-  --bcv-version: "2.98.86"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.98.87"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -1435,30 +1435,23 @@ html[data-bcv-theme="dark"] .bcv-rr-ov { --rr-dim0: .52; --rr-dim1: .78; }
 .bcv-rr__dlv.is-on { background: var(--rr-c); color: var(--rr-cn, #fff); }
 .bcv-rr__dlv--none.is-on { background: rgba(255,255,255,.26); color: #fff; }
 :is(.bcv-rr__devpill, .bcv-rr__dpre, .bcv-rr__dpost, .bcv-rr__dlv):focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
-/* the peek (2.98.86): the ring in miniature under a rubric button the pointer rests on — a glass card like a
-   menu's, the small ring blooming in, the criteria beside it. It takes no presses: the button under it does */
-.bcv-rr-peek { position: fixed; z-index: var(--bcv-z-picker); display: flex; align-items: center; gap: 14px; box-sizing: border-box; width: max-content; max-width: min(360px, calc(100vw - 16px)); padding: 12px 16px 12px 12px; border-radius: 20px; background: var(--bcv-glass-ground, var(--bcv-glass)); -webkit-backdrop-filter: var(--bcv-blur-glass); backdrop-filter: var(--bcv-blur-glass); border: 1px solid var(--bcv-edge); box-shadow: var(--bcv-shadow-hi); color: var(--bcv-ink); font-family: var(--bcv-font); pointer-events: none; animation: bcv-rr-peek-in .3s cubic-bezier(.32,.72,0,1) both; transition: opacity .16s ease, transform .16s ease; }
-.bcv-rr-peek.is-out { opacity: 0; transform: scale(.96); }
-@keyframes bcv-rr-peek-in { from { opacity: 0; transform: scale(.92); } }
-.bcv-rr-peek__wrap { position: relative; flex: none; width: 112px; height: 112px; }
-.bcv-rr-peek__ring { display: block; width: 112px; height: 112px; overflow: visible; animation: bcv-rr-peek-bloom .7s cubic-bezier(.32,.72,0,1) both; }
-@keyframes bcv-rr-peek-bloom { from { opacity: 0; transform: rotate(-50deg) scale(.7); } }
-.bcv-rr-peek__mid { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
-.bcv-rr-peek__big { font: 700 24px/1 var(--bcv-display, var(--bcv-font)); letter-spacing: -.03em; color: var(--bcv-ink); font-variant-numeric: tabular-nums; }
-.bcv-rr-peek__of { margin-top: 3px; font: 500 10.5px/1.2 var(--bcv-font); color: var(--bcv-ink3); }
-.bcv-rr-peek__side { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
-.bcv-rr-peek__head { font: 600 10.5px/1.2 var(--bcv-font); letter-spacing: .05em; text-transform: uppercase; color: var(--bcv-ink3); }
-.bcv-rr-peek__rows { display: flex; flex-direction: column; gap: 4px; }
-.bcv-rr-peek__row { display: flex; align-items: center; gap: 7px; min-width: 0; font: 500 12.5px/1.3 var(--bcv-font); }
-.bcv-rr-peek__dot { flex: none; width: 8px; height: 8px; border-radius: 50%; }
-.bcv-rr-peek__name { flex: 1; min-width: 0; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--bcv-ink); }
-.bcv-rr-peek__pts { flex: none; margin-left: 10px; font-variant-numeric: tabular-nums; color: var(--bcv-ink2); }
-.bcv-rr-peek__more { font: 500 11.5px/1.3 var(--bcv-font); color: var(--bcv-ink3); }
-.bcv-rr-peek__hint { margin-top: 2px; font: 500 11px/1.3 var(--bcv-font); color: var(--bcv-blue); }
+/* the morph (2.98.87): a rubric button the pointer rests on turns into the ring in miniature (rubric-ring.js
+   morph). Its layer sits over the button's ground and under its words (the button its own stacking context); the
+   ground goes at once (the disc, its colour, takes its place) and the words fade while it is a ring */
+.bcv-rubbtn { position: relative; isolation: isolate; }
+.bcv-rubbtn:not(.is-ring) { transition: transform .16s var(--bcv-spring-snappy), filter .16s ease, background .16s ease, color .14s ease; }
+.bcv-rubbtn.is-ring { background: transparent !important; color: transparent !important; transition: transform .16s var(--bcv-spring-snappy), filter .16s ease, color .1s ease; }
+.bcv-rubmorph { position: absolute; left: 50%; top: 50%; z-index: -1; width: 0; height: 0; pointer-events: none; color: var(--bcv-ink); }
+.bcv-rubmorph__disc { position: absolute; left: 0; top: 0; transform: translate(-50%, -50%); }
+.bcv-rubmorph__ring, .bcv-rubmorph__mid { position: absolute; left: calc(var(--d) / -2); top: calc(var(--d) / -2); width: var(--d); height: var(--d); }
+.bcv-rubmorph__ring { display: block; overflow: visible; }
+.bcv-rubmorph__mid { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; white-space: nowrap; }
+.bcv-rubmorph__big { font: 700 calc(var(--d) * .3 * var(--fit, 1))/1 var(--bcv-display, var(--bcv-font)); letter-spacing: -.03em; font-variant-numeric: tabular-nums; color: var(--bcv-ink); }
+.bcv-rubmorph__of { margin-top: 1px; font: 600 calc(var(--d) * .19)/1.1 var(--bcv-font); color: var(--bcv-ink3); }
 /* the ring's place on the stage, drawn as nothing: the guided tour lights round it (welcome.js, its 'ring' steps) */
 .bcv-rr__ringbox { position: absolute; left: 164px; top: 64px; width: 432px; height: 432px; border-radius: 50%; pointer-events: none; }
 .bcv-rr__barbox { position: absolute; left: 40px; top: 128px; width: 692px; height: 402px; border-radius: 16px; pointer-events: none; }
-@media (prefers-reduced-motion: reduce) { .bcv-rr__veil, .bcv-rr__svg, .bcv-rr__top, .bcv-rr__centre, .bcv-rr__labels, .bcv-rr__devpill, .bcv-rr__dev, .bcv-rr-peek, .bcv-rr-peek__ring { animation: none; } .bcv-rr__inner, .bcv-rr__chip, .bcv-rr__mini, .bcv-rr__spin, .bcv-rr__mfill, .bcv-rr__mchev, .bcv-rr__marc, .bcv-rr__dlv, .bcv-rr__dknob::after { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .bcv-rr__veil, .bcv-rr__svg, .bcv-rr__top, .bcv-rr__centre, .bcv-rr__labels, .bcv-rr__devpill, .bcv-rr__dev { animation: none; } .bcv-rr__inner, .bcv-rr__chip, .bcv-rr__mini, .bcv-rr__spin, .bcv-rr__mfill, .bcv-rr__mchev, .bcv-rr__marc, .bcv-rr__dlv, .bcv-rr__dknob::after { transition: none; } }
 .bcv-entry { display: flex; gap: 12px; padding: 14px 18px; border-top: 1px solid var(--bcv-sep); }
 .bcv-entry--reply { padding-left: 52px; }
 .bcv-entry--reply2 { padding-left: 86px; }
