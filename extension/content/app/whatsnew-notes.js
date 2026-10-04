@@ -25,6 +25,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.98.86', date: '2026-10-04', notes: [
+      { kind: 'new', title: 'Rubric at a glance', body: 'Hover the Rubric button to see a small ring.', icon: P.eye },
+    ] },
     { version: '2.98.85', date: '2026-10-04', notes: [
       { kind: 'improved', title: 'A hands-on ring tour', body: 'Try the rubric ring yourself, one step at a time.', icon: P.steps },
     ] },

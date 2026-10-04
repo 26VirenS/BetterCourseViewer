@@ -174,6 +174,7 @@
   let live = null; // the ring that is open
 
   function open(a, sub, { from, dev = false } = {}) {
+    unpeek();
     live?.close(true);
     document.querySelector('.bcv-sheet-ov')?.remove();
     const m = model(a, sub);
@@ -970,6 +971,98 @@
     return api;
   }
 
+  // ---- the peek (2.98.86): the ring in miniature by a rubric button the pointer rests on — its slices in their
+  // colours (the grades' once marked and posted, bent the way the ring bends), the score or the total in the
+  // middle, the criteria beside it. Drawn once and still (a bloom as it comes); the full ring opens on the press.
+  let peekEl = null, peekAt = null, peekWatch = 0;
+  /** The ring itself, small: the band in short filled pieces, each the colour running between the slices'
+   *  middles at its place — as the full ring's, without its frame loop. */
+  function miniRing(m) {
+    const S = 128, C = S / 2, RO = 54, k = RO / R;
+    const { seg, n } = m;
+    const svg = document.createElementNS(SVG, 'svg');
+    svg.setAttribute('viewBox', `0 0 ${S} ${S}`);
+    svg.setAttribute('class', 'bcv-rr-peek__ring');
+    svg.setAttribute('aria-hidden', 'true');
+    const mids = seg.map(([a0, a1]) => (a0 + a1) / 2);
+    const between = (th) => {
+      if (n === 1) return [0, 0, 0];
+      let x = th - mids[0];
+      x -= Math.floor(x / TAU) * TAU;
+      let j = n - 1;
+      while (j > 0 && mids[j] - mids[0] > x) j--;
+      const lo = mids[j] - mids[0], hi = j + 1 < n ? mids[j + 1] - mids[0] : TAU;
+      return [j, (j + 1) % n, (1 - Math.cos((Math.PI * (x - lo)) / (hi - lo))) / 2];
+    };
+    const at = (vals, b) => vals[b[0]] + (vals[b[1]] - vals[b[0]]) * b[2];
+    const cols = m.graded ? m.grades : m.hues;
+    const TH = m.thick.map((t) => Math.max(4, t * k * 1.7)); // (a little thicker than to scale: it reads at this size)
+    const GO = m.bend.map((b) => b * k * 1.5);
+    const p = (r, a) => `${f(C + r * Math.sin(a))} ${f(C - r * Math.cos(a))}`;
+    const STEP = Math.PI / 60;
+    let d = '';
+    seg.forEach(([a0, a1]) => {
+      const N = Math.max(2, Math.ceil((a1 - a0) / STEP));
+      for (let j = 0; j < N; j++) {
+        const t0 = a0 + ((a1 - a0) * j) / N, t1 = a0 + ((a1 - a0) * (j + 1)) / N + (n > 1 || j < N - 1 ? 0.006 : 0);
+        const b0 = between(t0), b1 = between(t1), bm = between((t0 + t1) / 2);
+        const out0 = RO + at(GO, b0), out1 = RO + at(GO, b1); // (thicker inward: the outer edge on the circle)
+        const in0 = out0 - at(TH, b0), in1 = out1 - at(TH, b1);
+        const col = css(mix(cols[bm[0]], cols[bm[1]], bm[2]));
+        const path = document.createElementNS(SVG, 'path');
+        path.setAttribute('d', `M${p(out0, t0)} L${p(out1, t1)} L${p(in1, t1)} L${p(in0, t0)} Z`);
+        path.setAttribute('fill', col);
+        svg.append(path);
+      }
+    });
+    return svg;
+  }
+  function unpeek(at) {
+    if (!peekEl || (at && at !== peekAt)) return;
+    const el = peekEl;
+    peekEl = peekAt = null;
+    clearInterval(peekWatch);
+    if (U.reducedMotion()) { el.remove(); return; }
+    el.classList.add('is-out');
+    setTimeout(() => el.remove(), 200);
+  }
+  /** The peek by `at` (a rubric button), for the assignment and submission it opens. */
+  function peek(at, a, sub) {
+    if (peekAt === at && peekEl) return peekEl;
+    unpeek();
+    if (live || !at?.isConnected) return null;
+    const m = model(a, sub);
+    if (!m.n) return null;
+    if (!m.graded) m.grades = m.hues;
+    const pct = m.max > 0 ? Math.round((m.earned / m.max) * 100) : 0;
+    const many = m.n === 1 ? '1 criterion' : `${m.n} criteria`;
+    const centre = U.el('bcv-rr-peek__mid', m.graded
+      ? [U.text('bcv-rr-peek__big', pts(m.earned), 'span'), U.text('bcv-rr-peek__of', `of ${pts(m.max)}`, 'span')]
+      : [U.text('bcv-rr-peek__big', pts(m.max), 'span'), U.text('bcv-rr-peek__of', m.max === 1 ? 'point' : 'points', 'span')]);
+    const SHOW = 6;
+    const rows = m.crit.slice(0, SHOW).map((c, i) => U.el('bcv-rr-peek__row', [
+      h('i', { class: 'bcv-rr-peek__dot', style: { background: css(m.grades[i]) } }),
+      U.text('bcv-rr-peek__name', c.short, 'span'),
+      U.text('bcv-rr-peek__pts', m.graded ? (c.score === null ? `– / ${pts(c.worth)}` : `${pts(c.score)} / ${pts(c.worth)}`) : `${pts(c.worth)} pts`, 'span'),
+    ]));
+    if (m.n > SHOW) rows.push(U.text('bcv-rr-peek__more', `+ ${m.n - SHOW} more`, 'div'));
+    const el = U.el('bcv-rr-peek', [
+      U.el('bcv-rr-peek__wrap', [miniRing(m), centre]),
+      U.el('bcv-rr-peek__side', [
+        U.text('bcv-rr-peek__head', m.graded ? `${pct}% · ${many}` : m.held ? `${many} · not posted yet` : `${many} · not graded yet`, 'div'),
+        U.el('bcv-rr-peek__rows', rows),
+        U.text('bcv-rr-peek__hint', 'Click to open the ring', 'div'),
+      ]),
+    ], { role: 'tooltip' });
+    document.body.append(el);
+    U.anchor(el, at, { side: 'below', align: 'center', gap: 10 });
+    peekEl = el;
+    peekAt = at;
+    // gone with its button: off the page, or the pointer no longer on it (a leave the page never told)
+    peekWatch = setInterval(() => { if (peekAt && (!peekAt.isConnected || !peekAt.matches(':hover'))) unpeek(); }, 400);
+    return el;
+  }
+
   /** A made-up rubric, marked (Settings → Developer → Rubric → Sample ring): the ring tried without an assignment. */
   function sample() {
     const lv = (id, points, description, long = '') => ({ id, points, description, long_description: long });
@@ -997,5 +1090,5 @@
     return { a, sub };
   }
 
-  BCV.rubricRing = { open, model, shortOf, sample, get live() { return live; } };
+  BCV.rubricRing = { open, model, shortOf, sample, peek, unpeek, get live() { return live; } };
 })();

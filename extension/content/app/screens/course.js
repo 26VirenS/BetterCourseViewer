@@ -286,6 +286,24 @@
     }
     rubricSheet(a, sub);
   }
+  /** A rubric button's peek (2.98.86): on the desktop, the pointer resting on it shows the ring in miniature
+   *  under it (rubric-ring.js peek, loaded on the first), gone as the pointer leaves or presses. */
+  function rubricPeek(btn, a, sub) {
+    if (!btn || !a?.rubric?.length) return btn;
+    let timer = 0;
+    const hide = () => { clearTimeout(timer); timer = 0; BCV.rubricRing?.unpeek(btn); };
+    btn.addEventListener('pointerenter', (e) => {
+      if (e.pointerType !== 'mouse' || BCV.phone?.active()) return;
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        const show = () => { if (btn.isConnected && btn.matches(':hover')) BCV.rubricRing.peek(btn, a, sub); };
+        if (BCV.rubricRing) show(); else BCV.lazy.load('rubric').then(show).catch(() => {});
+      }, 160);
+    });
+    btn.addEventListener('pointerleave', hide);
+    btn.addEventListener('pointerdown', hide);
+    return btn;
+  }
   function rubricSheet(a, sub) {
     const assess = sub?.rubric_assessment || {};
     const title = a.rubric_settings?.title || 'Rubric';
@@ -1366,6 +1384,6 @@
     return b;
   };
 
-  BCV.screens.course = { render, prose, fitMath, rubricParts, rubricGrid, rubricScore, openRubric, linksFrom, typeIcon, ptsLabel, statusBadge, openReader, contextShell, keptShell, holdShell, heldShell, syncShell, warmTab, warmTabs };
+  BCV.screens.course = { render, prose, fitMath, rubricParts, rubricGrid, rubricScore, openRubric, rubricPeek, linksFrom, typeIcon, ptsLabel, statusBadge, openReader, contextShell, keptShell, holdShell, heldShell, syncShell, warmTab, warmTabs };
   BCV.screens.courseTabs = T;
 })();

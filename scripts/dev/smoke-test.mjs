@@ -1894,6 +1894,22 @@ try {
   await page.goto(`${BASE}/courses/104/assignments/4001`); // the rubric checks below read this page
   await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
   check(!(await page.$('.bcv-rr-ov, .bcv-rubg')) && (await texts('.bcv-detail__actions .bcv-rubbtn'))[0] === 'Rubric', 'the rubric keeps its own button, and is not on the page until it is asked for');
+  // (2.98.86) the pointer resting on the Rubric button shows the ring in miniature under it: its slices in their
+  // grade colours, the score in the middle, the criteria beside it — taking no presses; gone as the pointer leaves
+  const rubBtn = await page.$eval('.bcv-detail__actions .bcv-rubbtn', (e) => { const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, bottom: r.bottom }; });
+  await page.mouse.move(rubBtn.x, rubBtn.y);
+  const peeked = await page.waitForSelector('.bcv-rr-peek', { timeout: 5000 }).then(() => true).catch(() => false);
+  const peekAt = peeked ? await page.evaluate(() => {
+    const p = document.querySelector('.bcv-rr-peek'), r = p.getBoundingClientRect();
+    const rgb = [...p.querySelectorAll('.bcv-rr-peek__ring path')].map((x) => x.getAttribute('fill').match(/\d+/g).map(Number));
+    return { top: Math.round(r.top), mid: p.querySelector('.bcv-rr-peek__mid').innerText.replace(/\s+/g, ' ').trim(), rows: [...p.querySelectorAll('.bcv-rr-peek__row')].map((x) => x.innerText.replace(/\s+/g, ' ').trim()).join(' | '), head: p.querySelector('.bcv-rr-peek__head').textContent,
+      pieces: rgb.length, green: rgb.some(([r, g]) => g > r + 80), amber: rgb.some(([r, g, b]) => r > 200 && g > 140 && b < 100 && r > g + 25), presses: getComputedStyle(p).pointerEvents };
+  }) : {};
+  check(peeked && peekAt.mid === '8 of 10' && peekAt.rows === 'Correctness 4 / 6 | Work shown 4 / 4' && peekAt.head === '80% · 2 criteria' && peekAt.pieces > 40 && peekAt.green && peekAt.amber && peekAt.top > rubBtn.bottom && peekAt.presses === 'none',
+    `the pointer on the Rubric button shows the ring in miniature under it — green and amber slices, the score in the middle, the criteria beside it: ${JSON.stringify({ ...peekAt, btnBottom: Math.round(rubBtn.bottom) })}`);
+  await shot(page, '14q-rubric-peek');
+  await page.mouse.move(8, 8);
+  check(await page.waitForFunction(() => !document.querySelector('.bcv-rr-peek'), null, { timeout: 3000 }).then(() => true).catch(() => false), 'the peek goes as the pointer leaves the button');
   await page.click('.bcv-detail__actions .bcv-rubbtn');
   await page.waitForSelector('.bcv-rr-ov .bcv-rr__label', { timeout: 8000 });
   // the rubric is the ring itself, over the page: no card round it — the page dims, a little blur right
