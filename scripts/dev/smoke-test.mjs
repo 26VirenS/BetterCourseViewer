@@ -1915,11 +1915,11 @@ try {
   check(!ringOpen.card && ringOpen.dialog === 'true' && /blur\(4px\)/.test(ringOpen.soft) && /blur\(18px\)/.test(ringOpen.deep) && ringOpen.hole && ringOpen.dim, `the rubric opens as the ring alone over the page — no card — with the page dimmed, a light blur behind the ring and a heavier one around it: ${JSON.stringify(ringOpen)}`);
   check(ringOpen.labels === 'Correctness, 4 of 6 | Work shown, 4 of 4' && ringOpen.shown === 'Correctness 4 / 6 | Work shown 4 / 4' && /^Score 8 of 10 · 80%/i.test(ringOpen.centre) && /^Graded \w{3} \d{1,2} · 2 criteria$/.test(ringOpen.status) && ringOpen.title === 'Week 1 reflection', `a slice per criterion, each a button named with its score, the rubric's own total in the middle: ${JSON.stringify(ringOpen)}`);
   // marked, the ring bends in where points were lost (Correctness, 4 of 6) and out where they were not (Work shown, 4 of 4)
-  const bent = await eventually(async () => { const e = await ringEdges(page); return e[0].outer < 176 && e[1].outer > 184; }, 5000);
+  const bent = await eventually(async () => { const e = await ringEdges(page); return e[0].outer < 178.5 && e[1].outer > 183; }, 5000);
   check(bent, `the marked ring pulls in where points were lost and pushes out where they were not: ${JSON.stringify(await ringEdges(page))} (the circle's outer edge is 181)`);
-  // (2.98.82) marked, the ring turns from its own colours to its grades': green where the work did well, through orange, to red where it lost points — every slice's middle the colour of its mark
+  // (2.98.82) marked, the ring turns from its own colours to its grades': green where the work did well, yellow to orange for part marks (2.98.84), red where most was lost — every slice's middle the colour of its mark
   const graded = await page.evaluate(() => [...document.querySelectorAll('.bcv-rr__ring > g[data-k]')].sort((a, b) => a.dataset.k - b.dataset.k).map((g) => { const ps = g.querySelectorAll('path.bcv-rr__band'); const id = (ps[ps.length / 2].getAttribute('fill').match(/#([^)]+)/) || [])[1]; const c = document.getElementById(id).querySelector('stop').getAttribute('stop-color').match(/\d+/g).map(Number); return { r: c[0], g: c[1], b: c[2] }; }));
-  check(graded[0].r > graded[0].g + 80 && graded[1].g > graded[1].r + 80 && graded[1].g > graded[1].b + 60, `the marked ring wears its grades: Correctness (4 of 6) red-orange, Work shown (4 of 4) green: ${JSON.stringify(graded)}`);
+  check(graded[0].r > 200 && graded[0].g > 140 && graded[0].r > graded[0].g + 25 && graded[0].b < 100 && graded[1].g > graded[1].r + 80 && graded[1].g > graded[1].b + 60, `the marked ring wears its grades: Correctness (4 of 6, part marks) yellow-orange, not red; Work shown (4 of 4) green: ${JSON.stringify(graded)}`);
   // the pointer on a slice swells it outward, smoothly, and it settles back when the pointer leaves
   const sliceMid = async (k) => page.evaluate((k) => { const r = document.querySelector('.bcv-rr__svg').getBoundingClientRect(); const s = r.width / 760; const g = document.querySelector(`.bcv-rr__ring > g[data-k="${k}"]`); const ps = g.querySelectorAll('path.bcv-rr__band'); const pts = ps[ps.length / 2].getAttribute('d').replace('Z', '').split(/[ML]/).filter(Boolean).map((q) => q.trim().split(/\s+/).map(Number)); const o = pts[0], i = pts[pts.length - 1]; return { x: r.left + ((o[0] + i[0]) / 2) * s, y: r.top + ((o[1] + i[1]) / 2) * s }; }, k);
   const restEdge = (await ringEdges(page))[1].outer;
@@ -1992,8 +1992,8 @@ try {
     return (await ringEdges(page))[0].outer;
   });
   const t1 = await tourAt();
-  const rebent = await eventually(async () => (await ringEdges(page))[0].outer < 176, 4000);
-  check(t1.title === 'It bends to your marks' && t1.on === 1 && !t1.note && replay > 179 && rebent, `→ steps on, and the marked ring bends to its marks once more from the plain circle (Correctness's edge ${replay} → under 176): ${t1.title}`);
+  const rebent = await eventually(async () => (await ringEdges(page))[0].outer < 178.5, 4000);
+  check(t1.title === 'It bends to your marks' && t1.on === 1 && !t1.note && replay > 179 && rebent, `→ steps on, and the marked ring bends to its marks once more from the plain circle (Correctness's edge ${replay} → under 178.5): ${t1.title}`);
   await page.keyboard.press('ArrowRight');
   const swelled = await eventually(async () => (await ringEdges(page))[0].outer > 180, 3000);
   const t2 = await tourAt();
@@ -2038,12 +2038,12 @@ try {
   check(devUp && d0.rows === 'Correctness 4 / 6 [6 *3 0 –] | Work shown 4 / 4 [*4 2 0 –]' && d0.posted === 'true' && d0.open === 'true' && d0.tx < -100, `with Try scores on, the ring opens with its panel at the right — the real marks picked — and moves left to make room: ${JSON.stringify(d0)}`);
   const pre = (name) => page.click(`.bcv-rr__dpre:text-is("${name}")`);
   await pre('Low');
-  const lowBent = await eventually(async () => { const e = await ringEdges(page); return e[0].outer < 172 && e[1].outer < 172; }, 4000);
+  const lowBent = await eventually(async () => { const e = await ringEdges(page); return e[0].outer < 176 && e[1].outer < 176 && e[0].outer > 171 && e[1].outer > 171; }, 4000);
   const dLow = await devAt();
   const lowTone = await page.evaluate(() => [...document.querySelectorAll('.bcv-rr__ring > g[data-k]')].map((g) => { const ps = g.querySelectorAll('path.bcv-rr__band'); const id = ps[ps.length / 2].getAttribute('fill').slice(5, -1); const c = getComputedStyle(document.getElementById(id).querySelectorAll('stop')[2]).stopColor.match(/\d+/g).map(Number); return c[0] > c[1] + 100; }));
-  check(lowBent && lowTone.every(Boolean) && /^Score 0 of 10 · 0%/i.test(dLow.centre) && dLow.shown === 'Correctness 0 / 6 | Work shown 0 / 4' && dLow.rows === 'Correctness 0 / 6 [6 3 *0 –] | Work shown 0 / 4 [4 2 *0 –]', `Low marks every criterion its lowest level: the ring pulls in and turns red, and the score and labels follow: ${JSON.stringify({ ...dLow, lowTone })}`);
+  check(lowBent && lowTone.every(Boolean) && /^Score 0 of 10 · 0%/i.test(dLow.centre) && dLow.shown === 'Correctness 0 / 6 | Work shown 0 / 4' && dLow.rows === 'Correctness 0 / 6 [6 3 *0 –] | Work shown 0 / 4 [4 2 *0 –]', `Low marks every criterion its lowest level: the ring pulls in — gently, a few pixels (2.98.84) — and turns red, and the score and labels follow: ${JSON.stringify({ ...dLow, lowTone })}`);
   await pre('Full marks');
-  const fullOut = await eventually(async () => { const e = await ringEdges(page); return e[0].outer > 184 && e[1].outer > 184; }, 4000);
+  const fullOut = await eventually(async () => { const e = await ringEdges(page); return e[0].outer > 183 && e[1].outer > 183; }, 4000);
   check(fullOut && /^Score 10 of 10 · 100%/i.test((await devAt()).centre), `Full marks pushes every slice out, 10 of 10: ${JSON.stringify(await ringEdges(page))}`);
   await page.click('.bcv-rr__dpost');
   const heldFlat = await eventually(async () => { const e = await ringEdges(page); return Math.abs(e[0].outer - 181) < 1.5 && Math.abs(e[1].outer - 181) < 1.5; }, 4000);

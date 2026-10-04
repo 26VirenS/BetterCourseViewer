@@ -64,12 +64,13 @@
   const ease = (x) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
   const plainLines = (s) => s.split(/\n+/).map((l) => l.replace(/^\s*[•\-*·]\s*/, '').trim()).filter(Boolean).join(' · ');
 
-  /** A criterion's mark as a colour: green where it did well, on through orange, to red where it lost the most —
-   *  a smooth run of hue, so the ring's colours still flow from one slice into the next. */
+  /** A criterion's mark as a colour: green at full marks or near them (90% and up), yellow to orange for part
+   *  marks (80% down to half), red only where most was lost (30% or less) — a smooth run of hue, so the ring's
+   *  colours still flow from one slice into the next. The yellows a little lighter, so they read as yellow. */
   function gradeTone(fr) {
     const x = clamp01(fr);
-    const hue = x >= 0.9 ? 140 : x >= 0.75 ? 32 + 108 * sm((x - 0.75) / 0.15) : x >= 0.55 ? 2 + 30 * sm((x - 0.55) / 0.2) : 2;
-    return hsl(hue, 0.78, 0.52);
+    const hue = x >= 0.9 ? 140 : x >= 0.8 ? 48 + 92 * sm((x - 0.8) / 0.1) : x >= 0.5 ? 30 + 18 * sm((x - 0.5) / 0.3) : x >= 0.3 ? 2 + 28 * sm((x - 0.3) / 0.2) : 2;
+    return hsl(hue, 0.8, 0.52 + 0.04 * sm(clamp01(1 - Math.abs(hue - 48) / 40)));
   }
   /** The words on a colour: dark on a light one (green, orange), white on the rest. */
   function inkOn(A) {
@@ -140,12 +141,13 @@
     const sum = shares.reduce((x, y) => x + y, 0);
     let acc = 0;
     const seg = shares.map((s) => { const a0 = (acc / sum) * TAU; acc += s; return [a0, (acc / sum) * TAU]; });
-    // a criterion marked low bends in, one marked high bends out — damped as the count rises
+    // a criterion marked low bends in, one marked high bends out — gently (a few pixels: the colour says the
+    // rest), and damped as the count rises
     const bend = crit.map((c) => {
       if (!graded || c.score === null || c.worth <= 0) return 0;
       const fr = c.score / c.worth;
       const amp = Math.min(1, Math.max(0.35, (c.worth / Math.max(1e-9, max)) * n / 3));
-      return Math.max(-34, Math.min(22, 110 * (fr - 0.85))) * Math.min(1, 6 / n + 0.25) * amp;
+      return Math.max(-18, Math.min(12, 60 * (fr - 0.85))) * Math.min(1, 6 / n + 0.25) * amp;
     });
     // a slice is thicker the more of the rubric it carries — growing inward, its outer edge on the circle
     const avg = sum / Math.max(1, n);
@@ -932,7 +934,7 @@
       const STEPS = [
         { title: 'Your rubric as a ring', body: 'Each colour is one criterion. Its stretch of the ring is its share of the points, and thicker slices carry more.', spots: () => [] },
         {
-          title: 'It bends to your marks', body: 'Graded, it pushes out where you did well and pulls in where you lost points: green is full marks, then orange, then red.',
+          title: 'It bends to your marks', body: 'Graded, it pushes out where you did well and pulls in where you lost points: green for full marks, yellow or orange for part, red for few.',
           note: () => (sampled ? 'A sample, to show you: this one is not graded yet.' : ''),
           spots: () => [],
           enter: () => { if (shown) restyle(base, { fresh: true }); else { sampled = true; restyle(sampleSub()); } },
