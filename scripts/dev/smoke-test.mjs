@@ -1964,59 +1964,70 @@ try {
   const freed = await pageHeld(page, 760, 420);
   check(freed.moved || !freed.scrollable, `with the ring gone the page scrolls again: ${JSON.stringify(freed)}`);
   await page.evaluate(() => window.scrollTo(0, 0));
-  // (2.98.83) the first ring ever opened walks through itself: five steps over the ring, the stage moved up to clear
-  // the card, the ring shown but not pressed while it talks; the arrows step it, Done ends it, and it never comes again
+  // (2.98.85) the first ring ever opened is worked through in the guided tour's own way (welcome.js, its 'ring'
+  // steps): the ring explained, then a color hovered, one opened, its levels, a dot pressed, the little ring pressed —
+  // each step waiting for it, a press anywhere else held; Escape ends it; once
   await sw.evaluate(() => self.BCV.api.storage.local.remove('tips:rubricRing'));
   await page.click('.bcv-detail__actions .bcv-rubbtn');
-  const toured = await page.waitForSelector('.bcv-rr__tour', { timeout: 6000 }).then(() => true).catch(() => false);
-  const tourAt = () => page.evaluate(() => {
-    const ov = document.querySelector('.bcv-rr-ov'), card = document.querySelector('.bcv-rr__tour'), sv = document.querySelector('.bcv-rr__svg').getBoundingClientRect(), s = sv.width / 760;
-    const box = (r) => ({ x: Math.round(r.left), y: Math.round(r.top), r: Math.round(r.right), b: Math.round(r.bottom) });
-    return {
-      title: document.querySelector('.bcv-rr__ttl')?.textContent || '', on: [...document.querySelectorAll('.bcv-rr__tdot')].findIndex((d) => d.classList.contains('is-on')), dots: document.querySelectorAll('.bcv-rr__tdot').length,
-      note: document.querySelector('.bcv-rr__tnote:not([hidden])')?.textContent || '', next: document.querySelector('.bcv-rr__tbtn--go')?.textContent || '', focus: !!document.activeElement?.classList.contains('bcv-rr__tbtn--go'),
-      inert: document.querySelector('.bcv-rr__field').inert, state: ov.dataset.state, ty: parseFloat(getComputedStyle(ov).getPropertyValue('--rr-ty')) || 0,
-      ringFoot: Math.round(sv.top + (280 + 176 + 40) * s), cardTop: card ? Math.round(card.getBoundingClientRect().top) : null,
-      spots: [...document.querySelectorAll('.bcv-rr__spot.is-on')].map((e) => box(e.getBoundingClientRect())), label0: box(document.querySelector('.bcv-rr__label[data-k="0"]').getBoundingClientRect()),
-      rows: [...document.querySelectorAll('.bcv-rr__row:not(.is-out)')].map((e) => box(e.getBoundingClientRect())), chips: box(document.querySelector('.bcv-rr__chips').getBoundingClientRect()), back: box(document.querySelector('.bcv-rr__back').getBoundingClientRect()),
-    };
-  });
-  const holds = (o, i) => !!o && o.x <= i.x && o.y <= i.y && o.r >= i.r && o.b >= i.b; // (a spot round a thing: the thing inside it)
-  await page.waitForTimeout(700); // (the stage's glide up)
+  await tourStep('ring', 8000);
+  const box = (sel) => page.evaluate((s) => { const r = document.querySelector(s).getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width, h: r.height }; }, sel);
+  const holds = (o, i) => !!o && o.x <= i.x + 1 && o.y <= i.y + 1 && o.x + o.w >= i.x + i.w - 1 && o.y + o.h >= i.y + i.h - 1; // (the tour's ring round a thing: the thing inside it)
+  const rState = () => page.evaluate(() => document.querySelector('.bcv-rr-ov')?.dataset.state || null);
+  const ringLit = await eventually(async () => holds((await tourAt())?.ring, await box('.bcv-rr__ringbox')), 3000); // (once the stage has made room for the card)
   const t0 = await tourAt();
   const tipFlag = await sw.evaluate(async () => (await self.BCV.api.storage.local.get('tips:rubricRing'))['tips:rubricRing']);
-  check(toured && t0.title === 'Your rubric as a ring' && t0.dots === 5 && t0.on === 0 && t0.focus && t0.inert && t0.ty < -40 && t0.ringFoot < t0.cardTop && tipFlag === true, `the first ring opened shows its tour: step 1 of 5, the keys on Next, the ring shown but not pressed, the stage up clear of the card, and it is marked seen: ${JSON.stringify({ ...t0, spots: undefined, rows: undefined, tipFlag })}`);
-  const replay = await realMotion(page, async () => { // (the turn watched as it happens: the frame loop runs on the animation clock)
-    await page.keyboard.press('ArrowRight');
-    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))); // (the step's first frames drawn)
-    return (await ringEdges(page))[0].outer;
-  });
+  check(t0.steps === 'ring,ring-hover,ring-open,ring-bar,ring-dots,ring-back,ring-end' && t0.title === 'Your rubric' && /^Each color is one part of your grade\. Green is full marks, yellow or orange is some, red is few\.$/.test(t0.body) && t0.count === '1 of 7' && t0.next === 'Next' && ringLit && tipFlag === true,
+    `the first ring opened gets the guided tour's card and ring: 7 steps, the ring lit, plain words, and it is marked seen: ${JSON.stringify({ steps: t0.steps, title: t0.title, body: t0.body, count: t0.count, next: t0.next, ring: t0.ring, box: await box('.bcv-rr__ringbox'), tipFlag })}`);
+  await page.click('.bcv-tour__next');
+  await tourStep('ring-hover');
   const t1 = await tourAt();
-  const rebent = await eventually(async () => (await ringEdges(page))[0].outer < 178.5, 4000);
-  check(t1.title === 'It bends to your marks' && t1.on === 1 && !t1.note && replay > 179 && rebent, `→ steps on, and the marked ring bends to its marks once more from the plain circle (Correctness's edge ${replay} → under 178.5): ${t1.title}`);
-  await page.keyboard.press('ArrowRight');
-  const swelled = await eventually(async () => (await ringEdges(page))[0].outer > 180, 3000);
+  const over = await sliceMid(1);
+  await page.mouse.move(over.x, over.y);
+  await tourStep('ring-open');
   const t2 = await tourAt();
-  check(t2.title === 'Open a criterion' && t2.spots.length === 1 && holds(t2.spots[0], t2.label0) && swelled, `the third step rings the first criterion's name and swells its slice, as a pointer would: ${JSON.stringify({ spot: t2.spots[0], label: t2.label0, swelled })}`);
-  await page.click('.bcv-rr__tbtn--go');
-  const tourBar = await page.waitForFunction(() => document.querySelector('.bcv-rr-ov')?.dataset.state === 'bar', null, { timeout: 5000 }).then(() => true).catch(() => false);
-  await page.waitForTimeout(500);
+  check(t1.title === 'Point at a color' && t1.doing === 'Hover over a color' && t1.act === 'hover' && t2.title === 'Open a part' && t2.doing === 'Click a color' && t2.act === 'click', `a color hovered moves it on by itself, to "Click a color": ${JSON.stringify({ hover: [t1.title, t1.doing, t1.act], open: [t2.title, t2.doing, t2.act] })}`);
+  const mid = await box('.bcv-rr__cbig');
+  await page.mouse.click(mid.x + mid.w / 2, mid.y + mid.h / 2);
+  await page.waitForTimeout(300);
+  check((await rState()) === 'ring' && (await tourAt())?.step === 'ring-open', 'a press anywhere but a color is held while the step waits for one');
+  const opener = await sliceMid(0);
+  await page.mouse.click(opener.x, opener.y);
+  await tourStep('ring-bar');
   const t3 = await tourAt();
-  check(tourBar && t3.title === 'Height is points' && t3.focus && t3.spots.length === 1 && t3.rows.length === 3 && t3.rows.every((r) => holds(t3.spots[0], r)), `the fourth step opens the bar itself, keeps the keys on Next, and rings the bar with its levels: ${JSON.stringify({ state: t3.state, focus: t3.focus, spot: t3.spots[0], rows: t3.rows })}`);
-  await page.keyboard.press('ArrowRight');
-  await page.waitForTimeout(500);
-  const t4 = await tourAt();
-  check(t4.title === 'Switch or go back' && t4.next === 'Done' && t4.spots.length === 2 && holds(t4.spots[0], t4.chips) && holds(t4.spots[1], t4.back), `the last step rings the dots and the little ring, and Next reads Done: ${JSON.stringify({ next: t4.next, spots: t4.spots, chips: t4.chips, back: t4.back })}`);
+  const rowsBox = await page.evaluate(() => [...document.querySelectorAll('.bcv-rr__row:not(.is-out)')].map((e) => { const r = e.getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width, h: r.height }; }));
+  check((await rState()) === 'bar' && t3.title === 'Its levels' && t3.body === 'Higher on the bar means more points. Your mark is highlighted.' && t3.next === 'Next' && rowsBox.length === 3 && rowsBox.every((r) => holds(t3.ring, r)), `a color clicked opens its bar, and the next step lights the bar with its levels: ${JSON.stringify({ title: t3.title, body: t3.body, ring: t3.ring })}`);
   await shot(page, '14r3-rubric-tour');
-  await page.keyboard.press('Enter');
-  const tourDone = await page.waitForFunction(() => !document.querySelector('.bcv-rr__tour') && document.querySelector('.bcv-rr-ov')?.dataset.state === 'ring' && !document.querySelector('.bcv-rr__field').inert && (parseFloat(getComputedStyle(document.querySelector('.bcv-rr-ov')).getPropertyValue('--rr-ty')) || 0) === 0, null, { timeout: 5000 }).then(() => true).catch(() => false);
-  check(tourDone && await page.evaluate(() => !!document.activeElement?.classList.contains('bcv-rr__label')), 'Done ends the tour: the bar rolls back up, the stage settles back, the ring can be pressed, and focus is on a criterion');
+  await page.click('.bcv-tour__next');
+  await tourStep('ring-dots');
+  const t4 = await tourAt();
+  check(t4.doing === 'Click another dot' && holds(t4.ring, await box('.bcv-rr__chips')), `then the dots: ${JSON.stringify({ doing: t4.doing, ring: t4.ring })}`);
+  await page.click('.bcv-rr__chip:nth-child(2)');
+  await tourStep('ring-back');
+  const t5 = await tourAt();
+  check((await texts('.bcv-rr__name'))[0] === 'Work shown' && t5.doing === 'Click the little ring' && holds(t5.ring, await box('.bcv-rr__back')), `another dot switches the bar, and the next step lights the little ring: ${JSON.stringify({ name: (await texts('.bcv-rr__name'))[0], doing: t5.doing })}`);
+  await page.click('.bcv-rr__back');
+  await tourStep('ring-end');
+  const t6 = await tourAt();
+  check((await rState()) === 'ring' && t6.title === 'That’s it' && t6.next === 'Done', `the little ring rolls the bar back up, and the last card says it is done: ${JSON.stringify({ state: await rState(), title: t6.title, next: t6.next })}`);
+  await page.click('.bcv-tour__next');
+  await tourGone();
+  const settledBack = await eventually(async () => page.evaluate(() => (parseFloat(getComputedStyle(document.querySelector('.bcv-rr-ov')).getPropertyValue('--rr-ty')) || 0) === 0), 3000);
+  check(settledBack && (await rState()) === 'ring', 'Done ends the tour with the ring still open, settled back in the middle');
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('.bcv-rr-ov'), null, { timeout: 5000 });
   await page.click('.bcv-detail__actions .bcv-rubbtn');
   await page.waitForSelector('.bcv-rr-ov .bcv-rr__label', { timeout: 8000 });
   await page.waitForTimeout(2300); // (past where the tour would start on a marked ring)
-  check(!(await page.$('.bcv-rr__tour')) && !(await page.$('.bcv-rr__dev')), 'the tour comes once: the next ring opens without it (and without Try scores, which is the developer\'s)');
+  check(!(await page.$('#bcv-tour')) && !(await page.$('.bcv-rr__dev')), 'the tour comes once: the next ring opens without it (and without Try scores, which is the developer\'s)');
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !document.querySelector('.bcv-rr-ov'), null, { timeout: 5000 });
+  // Escape ends the tour and leaves the ring; a second closes the ring
+  await sw.evaluate(() => self.BCV.api.storage.local.remove('tips:rubricRing'));
+  await page.click('.bcv-detail__actions .bcv-rubbtn');
+  await tourStep('ring', 8000);
+  await page.keyboard.press('Escape');
+  const escEnds = await tourGone(4000).then(() => true).catch(() => false);
+  check(escEnds && (await rState()) === 'ring', 'Escape ends the tour and leaves the ring open');
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('.bcv-rr-ov'), null, { timeout: 5000 });
   // (2.98.83) Settings → Developer → Rubric → Try scores: a mark picked for each criterion, or a preset, and the ring

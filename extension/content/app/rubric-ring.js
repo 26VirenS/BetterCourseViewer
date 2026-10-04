@@ -180,11 +180,11 @@
     if (!m.n) return null;
     const { crit, hues, seg, n } = m;
     if (!m.graded) m.grades = hues; // (one list: nothing to turn)
-    const real = sub; // (what Canvas gave: the developer's Real, and the tour's sample, put it back)
+    const real = sub; // (what Canvas gave: the developer's Real puts it back)
     const reduce = U.reducedMotion();
     const hv = crit.map(() => 0); // how far each slice is swollen by the pointer (0 to 1)
     /** Where the ring turns from, carried by one tween (st.g) to its marks — on every open, and on every change of
-     *  marks after it (the developer's Try scores, the tour's sample): each slice's bend, where its colour stops on
+     *  marks after it (the developer's Try scores): each slice's bend, where its colour stops on
      *  its bar, and its colour, turning from its own to its grade's (green, orange, red). toneEnd: where the colour
      *  settles (the chips, the bar's words, the little ring). */
     let fromBend = crit.map(() => 0), fromFrac = crit.map(() => 1), fromTone = hues, ver = 0;
@@ -325,7 +325,10 @@
     const note = U.el('bcv-rr__note', null, { hidden: true });
     const barBox = U.el('bcv-rr__bar', [back, head, rowsBox, note]);
 
-    const inner = U.el('bcv-rr__inner', [svg, centre, labelBox, barBox]);
+    // (the ring's place on the stage, drawn as nothing: what the tour lights round the ring — welcome.js's 'ring' steps)
+    const ringBox = U.el('bcv-rr__ringbox', null, { 'aria-hidden': 'true' });
+    const barMark = U.el('bcv-rr__barbox', null, { 'aria-hidden': 'true' }); // (…and the bar's with its levels: its height follows the bar's, fillBar)
+    const inner = U.el('bcv-rr__inner', [ringBox, barMark, svg, centre, labelBox, barBox]);
     const stage = U.el('bcv-rr__stage', inner);
     const field = U.el('bcv-rr__field', stage);
     ov.append(...veils, top, field, foot, closeBtn);
@@ -380,6 +383,7 @@
       const noteH = c.comment ? Math.min(92, note.offsetHeight || 18) : 0;
       st.BB0 = st.BB;
       st.BB = c.comment ? Math.min(466, 510 - noteH) : 500;
+      barMark.style.height = `${st.BB - BT + 60}px`;
       layoutRows(c, levels);
       requestAnimationFrame(() => { more.hidden = !c.desc || desc.scrollHeight <= desc.clientHeight + 1; });
     }
@@ -694,8 +698,7 @@
       if (reduce) { hv.forEach((_, i) => { hv[i] = i === k && st.t < 0.02 ? 1 : 0; }); draw(); return; }
       kick();
     }
-    /** `still`: the focus stays where it is (the tour drives the ring while its own buttons keep the keys). */
-    function select(k, still) {
+    function select(k) {
       k = ((k % n) + n) % n;
       if (k === st.sel && st.t > 0.98) return;
       if (st.t > 0.98 && k !== st.sel) { // the bar is out: switch in place, the colour crossing over, the rows changing
@@ -704,34 +707,33 @@
         st.w = 0;
         fillBar(k, true);
         tween('w', 1, 520);
-        if (!still) name.focus({ preventScroll: true });
+        name.focus({ preventScroll: true });
         return;
       }
-      if (st.t > 0.02 && k !== st.sel) { tween('t', 0, 480, () => select(k, still)); return; } // (part-way: back round first)
+      if (st.t > 0.02 && k !== st.sel) { tween('t', 0, 480, () => select(k)); return; } // (part-way: back round first)
       st.sel = k;
       st.prev = -1;
       st.w = 1;
       fillBar(k, false);
       st.BB0 = st.BB;
-      if (!still) ov.focus({ preventScroll: true }); // (held by the ring itself while the label it was on goes out of reach)
-      tween('t', 1, 1150, still ? null : () => name.focus({ preventScroll: true }));
+      ov.focus({ preventScroll: true }); // (held by the ring itself while the label it was on goes out of reach)
+      tween('t', 1, 1150, () => name.focus({ preventScroll: true }));
     }
-    function toRing(still) {
+    function toRing() {
       if (st.t <= 0.001) return;
       const k = st.sel;
-      if (!still) ov.focus({ preventScroll: true });
-      tween('t', 0, 950, still ? null : () => labels[k].focus({ preventScroll: true }));
+      ov.focus({ preventScroll: true });
+      tween('t', 0, 950, () => labels[k].focus({ preventScroll: true }));
     }
 
-    /** New marks, in place (the developer's Try scores, the tour's sample): the ring turns from where it stands to
-     *  them on the tween an open plays — its bend, its colours, where each bar's colour stops — and every word follows.
-     *  `fresh`: from the plain ring instead, as an open turns (the tour showing a marked ring bend once more). */
-    function restyle(next, { fresh = false } = {}) {
+    /** New marks, in place (the developer's Try scores): the ring turns from where it stands to them on the tween
+     *  an open plays — its bend, its colours, where each bar's colour stops — and every word follows. */
+    function restyle(next) {
       const m2 = model(a, next);
       if (m2.n !== n || gone) return;
-      fromBend = fresh ? crit.map(() => 0) : crit.map((_, k) => bendAt(k));
-      fromFrac = fresh ? crit.map(() => 1) : crit.map((_, k) => fracAt(k));
-      fromTone = fresh ? hues : crit.map((_, k) => tone(k));
+      fromBend = crit.map((_, k) => bendAt(k));
+      fromFrac = crit.map((_, k) => fracAt(k));
+      fromTone = crit.map((_, k) => tone(k));
       crit.forEach((c, k) => Object.assign(c, m2.crit[k]));
       for (const key of ['graded', 'posted', 'earned', 'bend', 'held']) m[key] = m2[key];
       m.grades = m2.graded ? m2.grades : hues;
@@ -755,7 +757,8 @@
     }
 
     // ---- fitting the stage to the window, beside what is open over it: the developer's panel takes the right
-    // (where the window is wide enough to keep both), the tour's card the foot; the stage glides to make room
+    // (where the window is wide enough to keep both), the tour's card the foot (welcome.js places it under the
+    // part it lights); the stage glides to make room
     const room = { r: 0, b: 0 };
     let fitNow = null, fitRaf = 0;
     function fitTo() {
@@ -788,15 +791,10 @@
       };
       fitRaf = requestAnimationFrame(step);
     }
-    const onResize = () => { fit(); tour?.follow(); };
+    const onResize = () => fit();
 
     // ---- keys: the arrows walk the criteria, Enter opens one (its label is a button), Escape goes back, then out
     ov.addEventListener('keydown', (e) => {
-      if (tour && e.key !== 'Tab') { // (the tour has the keys: Escape ends it, the arrows step it)
-        if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); tour.end(); return; }
-        if (/^Arrow/.test(e.key)) { e.preventDefault(); if (e.key === 'ArrowRight') tour.next(); if (e.key === 'ArrowLeft') tour.back(); }
-        return;
-      }
       if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); if (st.t > 0.02) toRing(); else close(); return; }
       if (['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp'].includes(e.key) && !(e.target instanceof HTMLInputElement) && !e.target.closest?.('.bcv-rr__dev')) {
         e.preventDefault();
@@ -815,7 +813,7 @@
     });
     // a press on the page around it: the bar rolls back up, the ring leaves (a press inside the ring is not beside it)
     ov.addEventListener('click', (e) => {
-      if (tour || e.target.closest('button, .bcv-rr__row, .bcv-rr__head, .bcv-rr__note, .bcv-rr__hit, .bcv-rr__dev, .bcv-rr__tour')) return;
+      if (e.target.closest('button, .bcv-rr__row, .bcv-rr__head, .bcv-rr__note, .bcv-rr__hit, .bcv-rr__dev')) return;
       if (st.t > 0.02) { toRing(); return; }
       const r = svg.getBoundingClientRect(), s = r.width / W;
       if (Math.hypot((e.clientX - r.left) / s - CX, (e.clientY - r.top) / s - CY) < R + 50) return;
@@ -904,122 +902,28 @@
       show(!shut, performance.now() - bornAt > 300); // (on the open itself the stage takes its place at once)
     }
 
-    // ---- the tour: the first ring opened anywhere walks through itself, step by step over the ring (once: tips:rubricRing)
-    let tour = null;
-    /** A sample's marks for a ring not graded yet (the tour shows what grading does): full, part, low in turn. */
-    const sampleSub = () => {
-      const assess = {};
-      crit.forEach((c, k) => {
-        const L = c.levels, i = [0, Math.floor((L.length - 1) / 2), L.length - 1][k % 3];
-        if (L.length) assess[c.id] = { points: L[i].pts ?? 0, rating_id: L[i].id };
-        else assess[c.id] = { points: Math.round(c.worth * [1, 0.7, 0.3][k % 3] * 100) / 100 };
-      });
-      return { ...(sub || {}), rubric_assessment: assess, posted_at: new Date().toISOString(), graded_at: new Date().toISOString() };
-    };
-    function startTour() {
-      if (tour || gone) return null;
-      const base = sub, shown = m.graded; // (the marks it opened with, put back as the tour leaves)
-      let sampled = false;
-      const stageBox = () => { const r = stage.getBoundingClientRect(); return { r, s: r.width / W }; };
-      const pad = (r, p, rad = 14) => ({ x: r.left - p, y: r.top - p, w: r.width + 2 * p, h: r.height + 2 * p, rad });
-      // the bar and its levels, as one: from the bar's left to the rows' right, its top to its foot
-      const barSpot = () => {
-        const { r, s } = stageBox();
-        const on = rows.filter((x) => !x.classList.contains('is-out'));
-        let x1 = r.left + (BX + 22) * s, y0 = r.top + (BT - 22) * s, y1 = r.top + (st.BB + 22) * s;
-        for (const row of on) { const b = row.getBoundingClientRect(); x1 = Math.max(x1, b.right + 10); y0 = Math.min(y0, b.top - 10); y1 = Math.max(y1, b.bottom + 10); }
-        const x0 = r.left + (BX - 22) * s;
-        return { x: x0, y: y0, w: x1 - x0, h: y1 - y0, rad: 22 * s };
-      };
-      const STEPS = [
-        { title: 'Your rubric as a ring', body: 'Each colour is one criterion. Its stretch of the ring is its share of the points, and thicker slices carry more.', spots: () => [] },
-        {
-          title: 'It bends to your marks', body: 'Graded, it pushes out where you did well and pulls in where you lost points: green for full marks, yellow or orange for part, red for few.',
-          note: () => (sampled ? 'A sample, to show you: this one is not graded yet.' : ''),
-          spots: () => [],
-          enter: () => { if (shown) restyle(base, { fresh: true }); else { sampled = true; restyle(sampleSub()); } },
-          leave: () => { if (sampled) { sampled = false; restyle(base); } },
-        },
-        { title: 'Open a criterion', body: 'Point at a colour and it swells. Press it, its name or Enter to open it; the arrow keys walk round.', spots: () => [pad(labels[0].getBoundingClientRect(), 7, 12)], enter: () => { if (st.t > 0.02) toRing(true); hover(0); }, leave: () => hover(-1) },
-        { title: 'Height is points', body: 'The slice unrolls into a bar, its levels beside it at the height of their points. The colour stops at your mark.', spots: () => [barSpot()], enter: () => select(0, true) },
-        { title: 'Switch or go back', body: 'The dots switch criteria. The little ring on top of the bar, or Esc, rolls it back into the ring.', spots: () => [pad(head.querySelector('.bcv-rr__chips').getBoundingClientRect(), 9, 14), { ...pad(back.getBoundingClientRect(), 3), round: true }], enter: () => { if (st.t < 0.98) select(0, true); } },
-      ];
-      if (!m.graded) STEPS[3].body = 'The slice unrolls into a bar, its levels beside it at the height of their points. Once marked, the colour stops at yours.';
-      let i = -1;
-      const tid = `${uid}-tour`;
-      const dots = STEPS.map(() => h('i', { class: 'bcv-rr__tdot' }));
-      const ttl = h('h3', { class: 'bcv-rr__ttl', id: `${tid}-t` });
-      const body = h('p', { class: 'bcv-rr__tbody', 'aria-live': 'polite' });
-      const note2 = h('p', { class: 'bcv-rr__tnote', hidden: true });
-      const backBtn = h('button', { type: 'button', class: 'bcv-rr__tbtn', onclick: () => go(i - 1) }, 'Back');
-      const nextBtn = h('button', { type: 'button', class: 'bcv-rr__tbtn bcv-rr__tbtn--go', onclick: () => go(i + 1) }, 'Next');
-      const skip = h('button', { type: 'button', class: 'bcv-rr__tskip', onclick: () => end() }, 'Skip');
-      const card = h('div', { class: 'bcv-rr__tour', role: 'group', 'aria-roledescription': 'tour', 'aria-labelledby': `${tid}-t` }, [
-        U.el('bcv-rr__ttop', [U.text('bcv-rr__teye', 'How the ring works', 'span'), U.el('bcv-rr__tdots', dots)]),
-        ttl, body, note2,
-        U.el('bcv-rr__tnav', [skip, U.el('bcv-rr__tgap'), backBtn, nextBtn]),
-      ]);
-      const spots = [0, 1].map(() => h('div', { class: 'bcv-rr__spot', 'aria-hidden': 'true' }));
-      // the spots follow what they ring while it moves (the stage gliding, the slice unrolling), then rest
-      let until = 0, fraf = 0;
-      const place = () => {
-        const o = ov.getBoundingClientRect(), want = STEPS[i]?.spots() || [];
-        spots.forEach((sp, j) => {
-          const r = want[j];
-          sp.classList.toggle('is-on', !!r);
-          if (!r) return;
-          sp.style.transform = `translate(${f(r.x - o.left)}px, ${f(r.y - o.top)}px)`;
-          sp.style.width = `${f(r.w)}px`;
-          sp.style.height = `${f(r.h)}px`;
-          sp.style.borderRadius = r.round ? '50%' : `${f(r.rad)}px`;
-        });
-      };
-      const loop = () => { fraf = 0; if (!tour) return; place(); if (performance.now() < until) fraf = requestAnimationFrame(loop); };
-      const follow = (ms = 1500) => { until = performance.now() + ms; if (!fraf) fraf = requestAnimationFrame(loop); };
-      function go(k) {
-        if (k >= STEPS.length) { end(); return; }
-        if (k < 0 || k === i) return;
-        STEPS[i]?.leave?.();
-        i = k;
-        const S = STEPS[i];
-        ttl.textContent = S.title;
-        body.textContent = S.body;
-        S.enter?.();
-        const nt = S.note?.() || '';
-        note2.hidden = !nt;
-        note2.textContent = nt;
-        dots.forEach((d, j) => d.classList.toggle('is-on', j === i));
-        backBtn.disabled = i === 0;
-        nextBtn.textContent = i === STEPS.length - 1 ? 'Done' : 'Next';
-        const hb = Math.max(0, card.offsetHeight - 14); // (the card's height, kept clear under the stage)
-        if (Math.abs(hb - room.b) > 4) { room.b = hb; fit(true); }
-        follow(1700);
-        nextBtn.focus({ preventScroll: true });
-      }
-      function end() {
-        if (!tour) return;
-        STEPS[i]?.leave?.();
-        tour = null;
-        if (fraf) cancelAnimationFrame(fraf);
-        ov.classList.remove('is-touring');
-        field.inert = false;
-        if (devBox) { devBox.inert = false; devPill.inert = false; }
-        room.b = 0;
-        fit(true);
-        card.classList.add('is-out');
-        spots.forEach((sp) => sp.classList.remove('is-on'));
-        setTimeout(() => { card.remove(); spots.forEach((sp) => sp.remove()); }, reduce ? 0 : 260);
-        if (gone) return;
-        if (st.t > 0.02) toRing(); else labels[st.sel].focus({ preventScroll: true });
-      }
-      tour = { next: () => go(i + 1), back: () => go(i - 1), end, follow, get step() { return i; } };
+    // ---- the tour: the first ring opened anywhere is worked by the student in the guided tour's way
+    // (welcome.js, its 'ring' steps): the ring explained, then a colour hovered, one opened into its bar,
+    // a dot pressed, the little ring pressed to go back. Once (tips:rubricRing, set as it starts). The
+    // stage moves up for the tour's card; Escape ends the tour (a second one closes the ring); the ring
+    // closing ends it too.
+    let touring = false;
+    async function startTour() {
+      if (touring || gone || !BCV.welcome || BCV.welcome.active() || BCV.setup?.active?.()) return false;
+      touring = true;
       BCV.api?.storage?.local.set({ 'tips:rubricRing': true }).catch(() => {});
-      ov.classList.add('is-touring');
-      field.inert = true; // (the ring is shown, not pressed, while the tour talks: its own steps drive it)
-      if (devBox) { devBox.inert = true; devPill.inert = true; }
-      ov.append(...spots, card);
-      go(0);
-      return tour;
+      room.b = 200;
+      fit(true);
+      const onEsc = (e) => { if (e.key === 'Escape' && touring) { e.preventDefault(); e.stopPropagation(); BCV.welcome.finish(); } };
+      document.addEventListener('keydown', onEsc, true);
+      try { await BCV.welcome.open(BCV.app, ['ring'], { keysFrom: ov }); } catch { /* the ring as it is */ }
+      document.removeEventListener('keydown', onEsc, true);
+      touring = false;
+      if (gone) return true;
+      room.b = 0;
+      fit(true);
+      if (!ov.contains(document.activeElement)) (st.t > 0.5 ? name : labels[st.sel]).focus({ preventScroll: true }); // (the keys back in the ring: its Done, pressed, took them)
+      return true;
     }
 
     let gone = false;
@@ -1029,7 +933,7 @@
       if (raf) cancelAnimationFrame(raf);
       if (fitRaf) cancelAnimationFrame(fitRaf);
       raf = fitRaf = 0;
-      tour = null;
+      if (touring) BCV.welcome?.finish();
       removeEventListener('resize', onResize);
       if (live === api) live = null;
       const refocus = () => { try { if (from && from.isConnected) from.focus({ preventScroll: true }); } catch { /* gone */ } };
@@ -1040,7 +944,7 @@
     }
     /** Holds one tween value where it is put (the developer tools and the tests look at a frame part-way). */
     const seek = (key, v) => { delete tw[key]; st[key] = v; draw(); };
-    const api = { close, el: ov, select, toRing, seek, state: st, restyle, tour: () => startTour(), get touring() { return tour; } };
+    const api = { close, el: ov, select, toRing, seek, state: st, restyle, tour: () => startTour(), get touring() { return touring; }, get graded() { return m.graded; } };
     live = api;
     const bornAt = performance.now();
 

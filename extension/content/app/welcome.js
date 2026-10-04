@@ -20,7 +20,8 @@
  * row, Tools and a pin, the Dashboard's cards and the preview, the search box); the switch's steps
  * alone for anyone who had Simpl before the slider; the purple button's for anyone updating from
  * before it; the Appearance button after Personalize from the theme invitation; the search box for
- * anyone set up before it; and the first opening of Grades. A phone gets what it has (no switch, no
+ * anyone set up before it; the first opening of Grades; and the first rubric ring opened (its own
+ * steps, over the ring: rubric-ring.js starts them). A phone gets what it has (no switch, no
  * sidebar): the counters, the sheet, the search box. */
 (function () {
   const BCV = (self.BCV = self.BCV || {});
@@ -210,6 +211,39 @@
         title: 'Themes live here', body: 'Switch light and dark, or change colors and photos.', act: 'click', doing: 'Click Appearance',
         done: () => !!$('.bcv-menu--theme'), after: 'Personalize changes colors and photos.' },
     ],
+    // the rubric ring's own (2.98.85): on the first ring opened (rubric-ring.js), the ring worked by the
+    // student — a colour hovered, one opened into its bar, a dot pressed, the little ring pressed to go
+    // back. Its parts are found in the ring's overlay; ringbox and barbox mark where the ring and the bar
+    // are drawn.
+    ring: () => {
+      const rr = (sel) => $(`.bcv-rr-ov ${sel}`);
+      const live = () => BCV.rubricRing?.live;
+      const state = () => document.querySelector('.bcv-rr-ov')?.dataset.state;
+      const labels = () => [...document.querySelectorAll('.bcv-rr-ov .bcv-rr__label')].filter((b) => drawn(b) && !b.classList.contains('is-quiet'));
+      const ringArea = () => [rr('.bcv-rr__ringbox'), ...labels()];
+      const graded = () => !!live()?.graded;
+      const SLICE = '.bcv-rr-ov .bcv-rr__hit, .bcv-rr-ov .bcv-rr__label';
+      let from = -1;
+      return [
+        { id: 'ring', target: () => rr('.bcv-rr__ringbox'), area: labels,
+          title: 'Your rubric', body: () => (graded() ? 'Each color is one part of your grade. Green is full marks, yellow or orange is some, red is few.' : 'Each color is one part of your grade. Bigger parts are worth more.'), act: 'next' },
+        { id: 'ring-hover', name: 'a color', target: () => labels()[0], area: ringArea,
+          title: 'Point at a color', body: 'See which part it is.', act: 'hover', doing: 'Hover over a color',
+          done: () => !!document.querySelector('.bcv-rr-ov .bcv-rr__label.is-hot'), after: 'Its name and points are beside it.' },
+        { id: 'ring-open', name: 'a color', target: () => labels()[0], area: ringArea, allow: SLICE,
+          title: 'Open a part', body: 'Click a color to see its levels.', act: 'click', doing: 'Click a color',
+          done: () => state() === 'bar', after: 'It opens into a bar.' },
+        { id: 'ring-bar', target: () => rr('.bcv-rr__barbox'),
+          title: 'Its levels', body: () => (graded() ? 'Higher on the bar means more points. Your mark is highlighted.' : 'Higher on the bar means more points.'), act: 'next' },
+        { id: 'ring-dots', name: 'the dots', target: () => rr('.bcv-rr__chips'), when: () => labels().length > 1, allow: '.bcv-rr-ov .bcv-rr__chip',
+          title: 'Switch parts', body: 'Each dot is another part.', act: 'click', doing: 'Click another dot',
+          start: () => { from = live()?.state.sel ?? -1; }, done: () => state() === 'bar' && (live()?.state.sel ?? from) !== from, after: 'Same bar, another part.' },
+        { id: 'ring-back', name: 'the little ring', target: () => rr('.bcv-rr__back'),
+          title: 'Go back', body: 'The little ring takes you back.', act: 'click', doing: 'Click the little ring',
+          done: () => state() === 'ring' },
+        { id: 'ring-end', target: null, title: 'That’s it', body: 'Open the rubric any time to check your marks.', act: 'next', nextLabel: 'Done' },
+      ];
+    },
     // the setup's last
     end: () => [
       { id: 'end', target: null, title: 'You’re all set', body: 'Replay it any time from Settings → General.', act: 'next', nextLabel: 'Done' },
@@ -295,7 +329,7 @@
       if (e.key !== 'Enter' || !ui?.cur) return;
       const nb = card.querySelector('.bcv-tour__next');
       const t = e.target;
-      if (nb.hidden || (t && t !== document.body && !card.contains(t))) return; // (Enter in a field is the field's)
+      if (nb.hidden || (t && t !== document.body && !card.contains(t) && !ui.keysFrom?.contains(t))) return; // (Enter in a field is the field's; keysFrom: a layer whose focus is the tour's too, the rubric ring's)
       e.preventDefault();
       next();
     };
@@ -596,7 +630,7 @@
 
   /** A run: the steps of the keys given (none: the setup's), each as it comes, then the marks — the
    *  setup's run counts the search box and the switch's steps as seen; a run's own onDone after it. */
-  async function open(app, keys = null, { onDone = null } = {}) {
+  async function open(app, keys = null, { onDone = null, keysFrom = null } = {}) {
     if (ui?.cur) return; // (a run already going: the other waits for another page)
     cover();
     const setupRun = !keys;
@@ -615,6 +649,7 @@
       if ((at.n || 0) >= 2) { first = steps.findIndex((s, j) => j > g && s.group !== at.group); if (first < 0) first = steps.length - 1; }
     }
     ui.steps = steps;
+    ui.keysFrom = keysFrom;
     for (const s of steps.slice(0, first)) if (s.grades) ui.ran.add('grades'); // (picked up past the Grades steps: they were shown before the reload)
     ui.armed = armed;
     ui.resumed = g >= 0 ? { group: at.group, n: (at.n || 0) + 1 } : null;

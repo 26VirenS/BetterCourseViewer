@@ -14,7 +14,7 @@
 
 html[data-bcv-theme] {
   --bcv-line: max(1px, var(--bcv-dpx, 1px)); /* a hairline drawn as a shadow: one CSS pixel, or one screen pixel where that is more (below 100% zoom; content/early.js keeps --bcv-dpx) */
-  --bcv-version: "2.98.84"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.98.85"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -1325,7 +1325,7 @@ html[data-bcv-theme="dark"] .bcv-rr-ov { --rr-dim0: .52; --rr-dim1: .78; }
 .bcv-rr__stage { position: absolute; left: 50%; top: 50%; width: 760px; height: 560px; transform: translate(calc(-50% + var(--rr-tx, 0px)), calc(-50% + var(--rr-ty, 0px))) scale(var(--rr-s)); will-change: transform; } /* (a layer of its own: its frames repaint it alone, never the blurred page under it. --rr-tx/ty: moved aside for the developer's panel and the tour's card, fit() in rubric-ring.js) */
 .bcv-rr__inner { position: relative; width: 100%; height: 100%; transition: transform .4s cubic-bezier(.32,.72,0,1), opacity .32s ease; }
 .bcv-rr-ov.is-leaving .bcv-rr__inner { transform: scale(.92); opacity: 0; }
-.bcv-rr-ov.is-leaving :is(.bcv-rr__top, .bcv-rr__foot, .bcv-rr__close, .bcv-rr__devpill, .bcv-rr__dev, .bcv-rr__tour, .bcv-rr__spot) { opacity: 0; }
+.bcv-rr-ov.is-leaving :is(.bcv-rr__top, .bcv-rr__foot, .bcv-rr__close, .bcv-rr__devpill, .bcv-rr__dev) { opacity: 0; }
 .bcv-rr__svg { position: absolute; left: 0; top: 0; width: 100%; height: 100%; overflow: visible; }
 /* the ring blooms in, a quarter-turn short of where it lands */
 @keyframes bcv-rr-bloom { from { opacity: 0; transform: scale(.6) rotate(-40deg); } }
@@ -1435,36 +1435,10 @@ html[data-bcv-theme="dark"] .bcv-rr-ov { --rr-dim0: .52; --rr-dim1: .78; }
 .bcv-rr__dlv.is-on { background: var(--rr-c); color: var(--rr-cn, #fff); }
 .bcv-rr__dlv--none.is-on { background: rgba(255,255,255,.26); color: #fff; }
 :is(.bcv-rr__devpill, .bcv-rr__dpre, .bcv-rr__dpost, .bcv-rr__dlv):focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
-/* the tour, on the first ring opened: a card at the foot (the stage moves up to clear it) and a soft outline round
-   what each step is about. The ring is shown, not pressed, while it talks (the stage is inert): its steps drive it */
-.bcv-rr-ov.is-touring .bcv-rr__foot { opacity: 0; }
-.bcv-rr-ov.is-touring :is(.bcv-rr__devpill, .bcv-rr__dev) { opacity: .4; }
-.bcv-rr__tour { position: absolute; left: 50%; bottom: 20px; z-index: 4; width: min(470px, calc(100% - 32px)); box-sizing: border-box; padding: 15px 18px 14px; border-radius: 20px; background: rgba(30,30,32,.9); border: 1px solid rgba(255,255,255,.12); box-shadow: 0 24px 60px rgba(0,0,0,.5); transform: translateX(-50%); animation: bcv-rr-tourin .42s cubic-bezier(.32,.72,0,1) backwards; transition: opacity .24s ease, transform .24s ease; }
-.bcv-rr__tour.is-out { opacity: 0; transform: translate(-50%, 10px); pointer-events: none; }
-@keyframes bcv-rr-tourin { from { opacity: 0; transform: translate(-50%, 14px); } }
-.bcv-rr__ttop { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.bcv-rr__teye { font: 600 10.5px/1.2 var(--bcv-font); letter-spacing: .08em; text-transform: uppercase; color: var(--rr-ink3); }
-.bcv-rr__tdots { display: flex; gap: 5px; }
-.bcv-rr__tdot { width: 6px; height: 6px; border-radius: 3px; background: rgba(255,255,255,.22); transition: width .3s cubic-bezier(.32,.72,0,1), background .3s ease; }
-.bcv-rr__tdot.is-on { width: 16px; background: #fff; }
-.bcv-rr__ttl { margin: 8px 0 0; font: 700 17px/1.25 var(--bcv-display); letter-spacing: -.02em; color: var(--rr-ink); }
-.bcv-rr__tbody { margin: 5px 0 0; min-height: 2.9em; font: 400 13px/1.45 var(--bcv-font); color: var(--rr-ink2); text-wrap: pretty; }
-.bcv-rr__tnote { margin: 6px 0 0; font: 500 11.5px/1.35 var(--bcv-font); color: #ffd60a; }
-.bcv-rr__tnav { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
-.bcv-rr__tgap { flex: 1; }
-.bcv-rr__tskip { padding: 0; border: 0; background: none; color: var(--rr-ink3); font: 600 12.5px/1 var(--bcv-font); cursor: pointer; transition: color .15s ease; }
-.bcv-rr__tskip:hover { color: var(--rr-ink); }
-.bcv-rr__tbtn { height: 32px; padding: 0 14px; border: 0; border-radius: 16px; background: var(--rr-fill); color: var(--rr-ink); font: 600 13px/1 var(--bcv-font); cursor: pointer; transition: background .15s ease, opacity .15s ease; }
-.bcv-rr__tbtn:hover { background: rgba(255,255,255,.2); }
-.bcv-rr__tbtn:disabled { opacity: .35; cursor: default; }
-.bcv-rr__tbtn--go { min-width: 72px; background: #fff; color: #1c1c1e; }
-.bcv-rr__tbtn--go:hover { background: rgba(255,255,255,.86); }
-:is(.bcv-rr__tbtn, .bcv-rr__tskip):focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
-.bcv-rr__spot { position: absolute; left: 0; top: 0; z-index: 2; width: 0; height: 0; box-sizing: border-box; pointer-events: none; border: 2px solid rgba(255,255,255,.8); box-shadow: 0 0 22px rgba(255,255,255,.22); opacity: 0; transition: opacity .3s ease, transform .45s cubic-bezier(.32,.72,0,1), width .45s cubic-bezier(.32,.72,0,1), height .45s cubic-bezier(.32,.72,0,1), border-radius .45s ease; }
-.bcv-rr__spot.is-on { opacity: 1; }
-.bcv-rr__spot::after { content: ""; position: absolute; inset: -2px; border-radius: inherit; border: 2px solid rgba(255,255,255,.5); animation: bcv-rr-spot 1.8s ease-out infinite; }
-@keyframes bcv-rr-spot { from { opacity: .9; inset: -2px; } to { opacity: 0; inset: -11px; } } /* (outward by a few pixels whatever its size: a scale would throw a large outline far) */
-@media (prefers-reduced-motion: reduce) { .bcv-rr__veil, .bcv-rr__svg, .bcv-rr__top, .bcv-rr__centre, .bcv-rr__labels, .bcv-rr__devpill, .bcv-rr__dev, .bcv-rr__tour, .bcv-rr__spot::after { animation: none; } .bcv-rr__inner, .bcv-rr__chip, .bcv-rr__mini, .bcv-rr__spin, .bcv-rr__mfill, .bcv-rr__mchev, .bcv-rr__marc, .bcv-rr__spot, .bcv-rr__tour, .bcv-rr__dlv, .bcv-rr__dknob::after { transition: none; } }
+/* the ring's place on the stage, drawn as nothing: the guided tour lights round it (welcome.js, its 'ring' steps) */
+.bcv-rr__ringbox { position: absolute; left: 164px; top: 64px; width: 432px; height: 432px; border-radius: 50%; pointer-events: none; }
+.bcv-rr__barbox { position: absolute; left: 40px; top: 128px; width: 692px; height: 402px; border-radius: 16px; pointer-events: none; }
+@media (prefers-reduced-motion: reduce) { .bcv-rr__veil, .bcv-rr__svg, .bcv-rr__top, .bcv-rr__centre, .bcv-rr__labels, .bcv-rr__devpill, .bcv-rr__dev { animation: none; } .bcv-rr__inner, .bcv-rr__chip, .bcv-rr__mini, .bcv-rr__spin, .bcv-rr__mfill, .bcv-rr__mchev, .bcv-rr__marc, .bcv-rr__dlv, .bcv-rr__dknob::after { transition: none; } }
 .bcv-entry { display: flex; gap: 12px; padding: 14px 18px; border-top: 1px solid var(--bcv-sep); }
 .bcv-entry--reply { padding-left: 52px; }
 .bcv-entry--reply2 { padding-left: 86px; }
