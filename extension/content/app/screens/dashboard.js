@@ -1,4 +1,4 @@
-/* Dashboard: summary counters, this week's workload per course, and the
+/* Dashboard: summary counters, the grades skyline beside this week's workload per course, and the
  * Cards / List / Recent activity views (the same three Canvas offers). */
 (function () {
   const BCV = (self.BCV = self.BCV || {});
@@ -136,6 +136,59 @@
       return { graded, earlier, earned, possible };
     });
     return { now, todayStart, weekStart, weekEnd, tomorrowStart, inSel, live, dueItems, dueToday, dueTomorrow, dueWeek, doneIn, byDate, dueRow, doneRow, recentOf, courseCount, overrideByKey, dismissedKeys, assignmentsP, overdueP, gradedP };
+  }
+
+  // ---- the grades skyline (2.98.90) ------------------------------------------------------------------
+  // A tower per course, as tall as its score; every assignment a window, lit in its grade's colour once
+  // it is marked and posted (A green, B yellow-green, C yellow, D orange, F red), dark while it is to come.
+  const SKY_H = 118; // (a full-marks tower, px)
+  const SKY_LIT = { A: '#4cd964', B: '#b5e036', C: '#ffd426', D: '#ff9f0a', F: '#ff453a' };
+  /** Each tower's short name: the subject in the course's name ("F26-MATH 021 20": MATH). Of two in one
+   *  subject, the lab is LAB (its subject too, when there is more than one lab) and another gets its number;
+   *  a nickname is kept as it is. */
+  function skyNames(courses) {
+    const raw = (c) => `${c.originalName || c.name || ''} ${c.code || ''}`;
+    const subj = (c) => ((String(c.originalName || c.name || '').replace(/^[A-Z]{1,2}\d{2}[-\s]/, '').match(/[A-Za-z]{2,}/) || [c.shortName || c.name || '?'])[0]).toUpperCase();
+    const isLab = (c) => /\blab\b/i.test(raw(c)) || /\d+[A-Z]*L\b/.test(raw(c));
+    const subs = courses.map(subj);
+    const labs = courses.filter(isLab).length;
+    return courses.map((c, i) => {
+      if (c.nickname) return c.nickname;
+      const same = courses.filter((_, j) => subs[j] === subs[i]);
+      if (same.length < 2) return subs[i];
+      const lab = isLab(c);
+      const name = lab ? (labs > 1 ? `${subs[i]} LAB` : 'LAB') : subs[i];
+      if (same.filter((x) => isLab(x) === lab).length < 2) return name;
+      const num = raw(c).replace(/^[A-Z]{1,2}\d{2}[-\s]/, '').match(/\d+[A-Z]*/);
+      return num ? `${name} ${num[0]}` : name;
+    });
+  }
+  /** A course's windows: every assignment that counts (published, worth points, not excused), the marked and
+   *  posted first, then what is to come, each in the order it was due; `band` is the marked one's letter. */
+  function skyWindows(list) {
+    const rows = [];
+    for (const a of list || []) {
+      const sub = a.submission;
+      if (a.published === false || a.omit_from_final_grade || a.grading_type === 'not_graded' || sub?.excused) continue;
+      if (!(Number(a.points_possible) > 0) && a.grading_type !== 'pass_fail') continue;
+      const posted = !!sub && sub.posted_at !== null; // (absent where a Canvas posts with the grade)
+      const marked = posted && ((sub.score !== null && sub.score !== undefined) || (a.grading_type === 'pass_fail' && !!sub.grade));
+      const band = !marked ? null : a.grading_type === 'pass_fail' ? (String(sub.grade).toLowerCase() === 'complete' ? 'A' : 'F') : U.gradeBand(sub.score, a.points_possible, a.grading_type);
+      rows.push({ a, band, score: marked ? sub.score : null, at: U.parse(a.due_at) || U.parse(sub?.graded_at) || null });
+    }
+    const t = (r) => (r.at ? r.at.getTime() : Infinity);
+    return [...rows.filter((r) => r.band).sort((x, y) => t(x) - t(y)), ...rows.filter((r) => !r.band).sort((x, y) => t(x) - t(y))];
+  }
+  /** Windows `n` to a w × hgt space: four across while they fit, more across (and smaller) when they do not. */
+  function skyFit(n, w, hgt) {
+    const g = 3;
+    let best = { cols: 4, s: 0 };
+    for (const cols of [4, 3, 5, 6, 7, 8]) {
+      const rows = Math.max(1, Math.ceil(n / cols));
+      const s = Math.min(6.5, (w - (cols - 1) * g) / cols, (hgt - (rows - 1) * g) / rows);
+      if (s > best.s + 0.01) best = { cols, s };
+    }
+    return { cols: best.cols, s: Math.max(2, Math.floor(best.s * 2) / 2), g };
   }
 
   const ACTIVITY_ICON = { Announcement: IC.bell, DiscussionTopic: IC.disc, Conversation: IC.mail, Message: IC.doc, Submission: IC.chart, Conference: IC.people, Collaboration: IC.people, AssessmentRequest: IC.people, WebConference: IC.people };
@@ -583,6 +636,58 @@
       ]), 'bcv-work-card');
     }
 
+    // ---- grades skyline (2.98.90) -----------------------------------------------------------------
+    let skyLists = null; // (each course's assignments, once they land: a redraw paints its windows at once)
+    function skylineBlock() {
+      if (!favs.length) return null;
+      const first = !entered && !U.reducedMotion();
+      const names = skyNames(favs);
+      const TW = favs.length <= 6 ? 46 : favs.length <= 8 ? 40 : 32;
+      const cols = favs.map((c, i) => {
+        const score = c.score === null || c.score === undefined || c.hideFinal ? null : Number(c.score);
+        const th = Math.round(SKY_H * (score === null ? 0.42 : Math.max(0.16, Math.min(1, score / 100))));
+        const wins = U.el('bcv-sky__wins');
+        const label = `${c.shortName || c.name}: ${score === null ? 'no score yet' : `${Math.round(score)}%`}`;
+        const tower = h('button', {
+          type: 'button', class: `bcv-sky__tower ${score === null ? 'is-ghost' : ''} ${first ? 'bcv-sky__tower--rise' : ''}`, title: c.shortName || c.name, 'aria-label': `${label}. Open its grades.`,
+          style: { width: `${TW}px`, height: `${th}px`, '--sky-c': c.color, '--bcv-delay': `${120 + Math.min(i, 8) * 70}ms` },
+          onclick: () => app.go(`${c.url}/grades`),
+        }, wins);
+        const pct = U.text(`bcv-sky__pct ${first ? 'bcv-sky__pct--in' : ''}`, score === null ? '—' : `${Math.round(score)}%`, 'span');
+        pct.style.setProperty('--bcv-delay', `${420 + Math.min(i, 8) * 70}ms`);
+        return { c, th, wins, tower, label, col: U.el('bcv-sky__col', [pct, tower], { dataset: { course: c.id } }) };
+      });
+      // the windows, as the courses' assignments come (the towers stand before them)
+      const paint = (byCourse, fresh) => {
+        for (const x of cols) {
+          const rows = skyWindows(byCourse?.find((b) => b.c.id === x.c.id)?.list);
+          const f = skyFit(rows.length, TW - 10, x.th - 15);
+          x.wins.style.gridTemplateColumns = `repeat(${f.cols}, ${f.s}px)`;
+          x.wins.style.gridAutoRows = `${f.s}px`;
+          x.wins.style.gap = `${f.g}px`;
+          x.wins.classList.toggle('bcv-sky__wins--in', !!fresh);
+          x.wins.replaceChildren(...rows.map((r) => h('i', {
+            class: `bcv-sky__win ${r.band ? 'is-lit' : ''}`, dataset: { band: r.band || '' },
+            style: r.band ? { '--w': SKY_LIT[r.band] } : null,
+            title: `${r.a.name} · ${r.band ? `${store.fmtPts(r.score)} / ${store.fmtPts(r.a.points_possible ?? 0)} (${r.band})` : 'not graded yet'}`,
+          })));
+          const lit = rows.filter((r) => r.band).length;
+          x.tower.setAttribute('aria-label', `${x.label}, ${lit} graded, ${rows.length - lit} to come. Open its grades.`);
+        }
+      };
+      const card = U.card(U.el('bcv-sky', [
+        U.el('bcv-sky__head', [
+          U.text('bcv-label bcv-label--inline', 'Grades', 'span'),
+          h('button', { type: 'button', class: 'bcv-sky__more', onclick: () => app.go('/grades') }, ['Window colour = score', U.svg(IC.chevron, { size: 12, stroke: 'currentColor', width: 2.2 })]),
+        ]),
+        U.el('bcv-sky__city', cols.map((x) => x.col)),
+        U.el('bcv-sky__names', names.map((n) => U.text('bcv-sky__name bcv-ellip', n, 'span'))),
+      ]), 'bcv-sky-card');
+      if (skyLists) paint(skyLists, false);
+      else W.assignmentsP.then((b) => { skyLists = b || []; if (ctx.alive() && card.isConnected) paint(skyLists, true); });
+      return card;
+    }
+
     // ---- cards view ------------------------------------------------------------------
     function cardsBlock() {
       if (!favs.length) return U.emptyCard('No courses on your dashboard yet. Star some under Courses.');
@@ -822,12 +927,15 @@
       const gen = ++bodyGen;
       const stats = statsBlock();
       const work = workloadBlock();
+      const sky = skylineBlock();
       let viewEl;
       if (view === 'cards') viewEl = cardsBlock();
       else if (view === 'activity') viewEl = await activityBlock();
       else viewEl = listBlock();
       if (!ctx.alive() || gen !== bodyGen) return;
-      body.replaceChildren(...[stats, work, viewEl].filter(Boolean));
+      // (2.98.90) the grades skyline at the workload's left, the two side by side (stacked when narrow)
+      const pair = sky || work ? U.el('bcv-dash-pair', [sky, work].filter(Boolean)) : null;
+      body.replaceChildren(...[stats, pair, viewEl].filter(Boolean));
       entered = true;
     }
 

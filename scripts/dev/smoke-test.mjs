@@ -723,6 +723,37 @@ try {
   const work = await texts('.bcv-work__row');
   check(work.length === 5 && /F26-MATH 021 20/.test(work[0]) && /\d+ \/ \d+/.test(work[0]), `workload rows: ${work[0]}`);
   check(!(await page.$('.bcv-work__more')), 'no disclosure when every course has work this week');
+  // (2.98.90) the grades skyline at the workload's left: a tower per course as tall as its score, every assignment a
+  // window lit in its grade's colour once marked and posted (A green, B yellow-green, C yellow, D orange, F red), dark
+  // while to come; a course with no score an outline under a dash; a tower opens its course's grades
+  await page.waitForSelector('.bcv-sky__win', { timeout: 10000 });
+  const sky = await page.evaluate(() => {
+    const box = (e) => e.getBoundingClientRect();
+    const LIT = { A: 'rgb(76, 217, 100)', B: 'rgb(181, 224, 54)', C: 'rgb(255, 212, 38)', D: 'rgb(255, 159, 10)', F: 'rgb(255, 69, 58)' };
+    const cols = [...document.querySelectorAll('.bcv-sky__col')];
+    const skyC = document.querySelector('.bcv-sky-card'), workC = document.querySelector('.bcv-work-card');
+    return {
+      names: [...document.querySelectorAll('.bcv-sky__name')].map((e) => e.textContent).join(','),
+      pcts: cols.map((c) => c.querySelector('.bcv-sky__pct').textContent).join(','),
+      heights: cols.map((c) => c.querySelector('.bcv-sky__tower').offsetHeight).join(','),
+      ghost: cols.map((c) => (c.querySelector('.bcv-sky__tower').classList.contains('is-ghost') ? 1 : 0)).join(''),
+      lit: cols.map((c) => [...c.querySelectorAll('.bcv-sky__win.is-lit')].map((w) => w.dataset.band).join('')).join('|'),
+      dark: cols.map((c) => c.querySelectorAll('.bcv-sky__win:not(.is-lit)').length).join(','),
+      colours: [...document.querySelectorAll('.bcv-sky__win.is-lit')].every((w) => getComputedStyle(w).backgroundColor === LIT[w.dataset.band] && w.title.endsWith(`(${w.dataset.band})`)),
+      unlit: [...document.querySelectorAll('.bcv-sky__win:not(.is-lit)')].every((w) => /not graded yet$/.test(w.title)),
+      top: [...document.querySelectorAll('.bcv-sky__wins')].every((w) => box(w).top - box(w.parentElement).top < 9),
+      beside: box(skyC).right <= box(workC).left && Math.abs(box(skyC).top - box(workC).top) < 1 && Math.abs(box(skyC).height - box(workC).height) < 1,
+      more: document.querySelector('.bcv-sky__more').textContent,
+      label: cols[0].querySelector('.bcv-sky__tower').getAttribute('aria-label'),
+    };
+  });
+  check(sky.names === 'MATH,PHYS,LAB,SPRK,WRI' && sky.pcts === '92%,81%,—,88%,95%' && sky.heights === '109,96,50,104,112' && sky.ghost === '00100' && sky.lit.split('|')[0] === 'BDAAAF' && sky.colours && sky.unlit && sky.top && sky.beside && sky.more === 'Window colour = score' && /^F26-MATH 021 20: 92%, 6 graded, \d+ to come\. Open its grades\.$/.test(sky.label),
+    `the grades skyline stands at the workload's left — towers as tall as the scores (the lab, unscored, an outline), windows lit in their grades' colours from the top: ${JSON.stringify(sky)}`);
+  await shot(page, '01a-dashboard-skyline');
+  await page.click('.bcv-sky__col[data-course="101"] .bcv-sky__tower');
+  check(await page.waitForFunction(() => location.pathname === '/courses/101/grades', null, { timeout: 8000 }).then(() => true).catch(() => false), 'a tower opens its course\'s grades');
+  await page.goto(`${BASE}/`);
+  await page.waitForSelector('.bcv-day .bcv-row', { timeout: 10000 });
   const dayHeads = await texts('.bcv-day__head');
   check(dayHeads[0].startsWith('Today') && dayHeads[1].startsWith('Tomorrow'), `list view day groups: ${dayHeads.slice(0, 3).join(' | ')}`);
   const listRows = await texts('.bcv-day .bcv-row');
@@ -4506,6 +4537,9 @@ try {
     origin: getComputedStyle(document.querySelector('.bcv-work__fill--grow')).transformOrigin,
   }));
   check(workAnim.bars.slice(0, 2).join(',') === 'bcv-grow@0.14s,bcv-grow@0.23s' && workAnim.rows.slice(0, 2).join(',') === 'bcv-fade-up@0.09s,bcv-fade-up@0.16s' && /^0px/.test(workAnim.origin), `workload bars wipe from the left 90ms apart, rows float in 70ms apart: ${JSON.stringify(workAnim)}`);
+  // (2.98.90) the skyline's towers rise out of the street one after another, 70ms apart
+  const skyAnim = await page.evaluate(() => [...document.querySelectorAll('.bcv-sky__tower--rise')].map((e) => `${getComputedStyle(e).animationName}@${getComputedStyle(e).animationDelay}`));
+  check(skyAnim.slice(0, 2).join(',') === 'bcv-sky-rise@0.12s,bcv-sky-rise@0.19s', `the skyline's towers rise 70ms apart: ${skyAnim.join(',')}`);
   const dueNow = (await texts('.bcv-stat__value'))[0]; // the real count at this point of the run (items were ticked earlier)
   await page.gotoRaw(`${BASE}/`, { waitUntil: 'commit' }); // raw, and from the first byte: the roll itself is what is being checked, and it is short
   await page.waitForSelector('.bcv-stat__value[data-rolling]', { timeout: 10000 });
@@ -4517,7 +4551,7 @@ try {
   // a view switch after entry redraws the counters without rolling them again
   await page.click('.bcv-seg__btn:nth-child(2)');
   await page.waitForSelector('.bcv-day', { timeout: 10000 });
-  check(!(await page.$('[data-rolling]')) && (await texts('.bcv-stat__value'))[0] === dueNow && !(await page.$('.bcv-work__fill--grow')), 'a number already on screen never rolls again (entry only)');
+  check(!(await page.$('[data-rolling]')) && (await texts('.bcv-stat__value'))[0] === dueNow && !(await page.$('.bcv-work__fill--grow')) && !(await page.$('.bcv-sky__tower--rise')) && !!(await page.$('.bcv-sky__win')), 'a number already on screen never rolls again, and the towers stand without rising again, windows lit at once (entry only)');
   // cards lift under the pointer once they have landed (the entrance fill is backwards, so the hover transform takes)
   await page.waitForTimeout(700);
   await page.hover('.bcv-stat');

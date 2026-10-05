@@ -25,6 +25,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.98.90', date: '2026-10-05', notes: [
+      { kind: 'new', title: 'A grades skyline', body: 'Each course is a tower; each assignment a lit window.', icon: P.layers },
+    ] },
     { version: '2.98.89', date: '2026-10-05', notes: [
       { kind: 'improved', title: 'A wider rubric ring', body: 'The ring is now nearly as wide as the Rubric button.', icon: P.eye },
     ] },
