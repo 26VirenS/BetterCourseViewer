@@ -36,6 +36,10 @@ const courses = [
   { id: '201', name: 'Academic Success Resource Site (2026-27)', code: 'ASRS', color: '#1e7a37', score: null, grade: null, teacher: 'Student Success', section: 'All', favorite: false, term: { id: '9', name: 'Collaboration team' } },
   { id: '202', name: 'Placement Exam: Chemistry', code: 'PLACE-CHEM', color: '#5856d6', score: null, grade: null, teacher: 'Placement Office', section: 'All', favorite: false, term: { id: '9', name: 'Collaboration team' } },
   { id: '301', name: 'S26-CSE 022 01', code: 'CSE-022-01', color: '#0a84ff', score: 97, grade: 'A', teacher: 'Priya Nair', section: 'Lecture-01', favorite: false, past: true, term: { id: '0', name: 'Spring 2026', start_at: ago(220 * D), end_at: ago(100 * D) } },
+  // an enrollment Canvas has concluded: the plain course list leaves it out; only enrollment_state=completed hands it back
+  { id: '302', name: 'F25-BIO 002 01', code: 'BIO-002-01', color: '#64d2ff', score: 89, grade: 'B+', teacher: 'Rosa Diaz', section: 'Lecture-01', favorite: false, past: true, concluded: true, term: { id: '-1', name: 'Fall 2025', start_at: ago(400 * D), end_at: ago(280 * D) } },
+  // closed to students once its dates passed: Canvas answers with the id alone ({ id, access_restricted_by_date }), in both lists
+  { id: '303', name: 'S25-HIST 017 01', code: 'HIST-017-01', color: '#ff6482', score: null, grade: null, teacher: 'Owen Park', section: 'Section 01', favorite: false, past: true, restricted: true, term: { id: '-2', name: 'Spring 2025', start_at: ago(580 * D), end_at: ago(460 * D) } },
 ];
 const favorites = new Set(['101', '102', '103', '104', '105']);
 const nicknames = new Map(); // course id → the student's nickname; Canvas then serves it as the name, the real one as original_name
@@ -241,7 +245,10 @@ const pages = {
     { url: 'course-information', title: 'Course Information', front_page: true, created_at: ago(18 * D), updated_at: ago(15 * D), last_edited_by: { display_name: 'Yue Lei' }, body: '<p><strong>Ask any question:</strong> use the <a href="/courses/101/discussion_topics">Discussions</a> page — please do not use “Ask your instructor a question.”</p><p><strong>Please read</strong> the <a href="/courses/101/files/f1">Course Syllabus</a> in Files → Course Information for all course policies, structure, materials and exam dates. A tentative schedule of lecture topics is in <a href="/courses/101/files/f2">Lecture schedule</a>.</p><p>Slides and worksheets used in lectures and discussion sections are under <a href="/courses/101/files">Files</a>. The textbook is a free online book on OpenStax, <em>Calculus Volume 1</em>. See <a href="https://example.edu/store">Knewton Alta</a> for access.</p><div style=\"background-color: #f0f0f0; padding: 16px;\"><h2>Welcome</h2><p class=\"bcv-t-onlight\">Read the syllabus before Module 1.</p></div>' },
     { url: 'chapter-4-notes', title: 'Chapter 4 notes', front_page: false, created_at: ago(5 * D), updated_at: ago(2 * D), last_edited_by: { display_name: 'Yue Lei' }, body: '<h2>Continuity</h2><p>A function is continuous at a point when the limit equals the value.</p><ul><li>Removable discontinuity</li><li>Jump discontinuity</li></ul><p>The video below walks through a jump. <iframe style="width: 320px; height: 240px; display: inline-block;" title="Video player for jump.mp4" data-media-type="video" src="/media_objects_iframe/m-jump?type=video" allowfullscreen="allowfullscreen" allow="fullscreen" data-media-id="m-jump"></iframe></p>' }, // (a video as Canvas's editor writes it: an iframe sized in its style, inline in the paragraph)
   ],
-  103: [{ url: 'lab-safety', title: 'Lab safety', front_page: true, created_at: ago(20 * D), updated_at: ago(19 * D), body: '<p>Goggles on at all times.</p>' }],
+  // a front page built like a program's template: a row of dark buttons along the top (styled by the school's
+  // stylesheet, which writes its rules for Canvas's rich-content wrapper, .user_content) and a second row on
+  // Canvas's own grid with Canvas's primary buttons; then a plain link in the text
+  103: [{ url: 'lab-safety', title: 'Lab safety', front_page: true, created_at: ago(20 * D), updated_at: ago(19 * D), body: '<div class="scout-nav"><a class="scout-btn" href="/courses/103/pages/lab-safety">About Your Course</a><a class="scout-btn" href="/courses/103/pages/lab-safety">Meet Your Teacher</a><a class="scout-btn" href="/courses/103/pages/lab-safety">Calendar</a><a class="scout-btn" href="/courses/103/pages/lab-safety">Pacing Guide</a></div><div class="grid-row"><div class="col-xs-6"><a class="btn btn-primary" href="/courses/103/pages/lab-safety">Student Support</a></div><div class="col-xs-6"><a class="btn btn-primary" href="/courses/103/pages/lab-safety">Tech Support</a></div></div><p>Goggles on at all times. Read the <a class="bcv-t-plainlink" href="/courses/103/files">lab manual</a> first.</p>' }],
 };
 const folders = {
   'r101': { id: 'r101', name: 'course files', full_name: 'course files', context_id: '101', parent_folder_id: null, updated_at: ago(15 * D) },
@@ -481,6 +488,11 @@ function page({ title, path = '', courseId, body }) {
   #menu{list-style:none;margin:0;padding:0}.ic-app-header__menu-list-link{display:block;padding:12px 4px;color:#fff;text-decoration:none;font-size:11px;text-align:center}
   .ic-Layout-wrapper{margin-left:84px}#main{display:flex}#not_right_side{flex:1;padding:0 24px}#right-side-wrapper{width:300px;padding:24px}
   .btn{padding:6px 12px;border:1px solid #c7cdd1;background:#f5f5f5;border-radius:3px}
+  /* Canvas's link colour, its primary button and its grid (flexboxgrid's .grid-row and .col-xs-N) */
+  a{color:#0374b5}.btn-primary{display:block;background:#0b2b52;border-color:#0b2b52;color:#fff;text-align:center}
+  .grid-row{display:flex;flex-wrap:wrap;margin:0 -12px}.col-xs-6{box-sizing:border-box;flex:0 0 50%;max-width:50%;padding:0 12px}
+  /* a school's stylesheet, scoped to Canvas's rich-content wrapper as such sheets are */
+  .user_content .scout-nav{display:flex;gap:12px;margin:0 0 16px}.user_content .scout-btn{flex:1;padding:14px 8px;background:#1f2a33;color:#fff;border:1px solid #fff;border-radius:8px;text-align:center;font-weight:600}
   /* Canvas's own field styles, weightier than one class: a white box with a border and a focus shadow (the search box's input showed one inside its pill) */
   input[type="text"],input[type="search"]{background:#fff;border:1px solid #c7cdd1;border-radius:3px;padding:6px 8px;box-shadow:inset 0 1px 1px rgba(0,0,0,.075);height:38px;margin:0 0 6px}
   input[type="text"]:focus,input[type="search"]:focus{border-color:#0374b5;box-shadow:0 0 0 2px #0374b5;outline:none}
@@ -667,7 +679,12 @@ on('GET', /^\/api\/v1\/accounts\/1$/, () => ({ id: '1', name: 'Example Universit
 let dashboardView = 'planner';
 on('GET', /^\/dashboard\/view$/, () => ({ dashboard_view: dashboardView }));
 on('PUT', /^\/dashboard\/view$/, (url, m, body) => { dashboardView = body.dashboard_view || dashboardView; return { dashboard_view: dashboardView }; });
-on('GET', /^\/api\/v1\/courses$/, () => courses.map(fullCourse));
+// the plain list is Canvas's "currentish" one: no concluded enrollment; enrollment_state=completed is the past ones only.
+// A course closed by its dates is its id and the flag, nothing else, in either.
+on('GET', /^\/api\/v1\/courses$/, (url) => {
+  const done = url.searchParams.get('enrollment_state') === 'completed';
+  return courses.filter((c) => (done ? c.past : !c.concluded)).map((c) => (c.restricted ? { id: c.id, access_restricted_by_date: true } : fullCourse(c)));
+});
 on('PUT', /^\/api\/v1\/users\/self\/course_nicknames\/(\w+)$/, (url, m, body) => { const c = courseById(m[1]); if (!c) return null; const nick = String(url.searchParams.get('nickname') ?? body.nickname ?? '').trim(); if (nick) nicknames.set(m[1], nick); else nicknames.delete(m[1]); return { course_id: m[1], name: c.name, nickname: nick || null }; });
 on('DELETE', /^\/api\/v1\/users\/self\/course_nicknames\/(\w+)$/, (url, m) => { nicknames.delete(m[1]); return { course_id: m[1], nickname: null }; });
 on('GET', /^\/api\/v1\/dashboard\/dashboard_cards$/, () => courses.filter((c) => favorites.has(c.id)).map((c) => ({ id: c.id, shortName: nicknames.get(c.id) || c.name, originalName: c.name, courseCode: c.code, href: `/courses/${c.id}`, term: 'Fall 2026', subtitle: c.section, links: [{ css_class: 'announcements', label: 'Announcements', path: `/courses/${c.id}/announcements` }, { css_class: 'assignments', label: 'Assignments', path: `/courses/${c.id}/assignments` }, { css_class: 'discussions', label: 'Discussions', path: `/courses/${c.id}/discussion_topics` }, { css_class: 'files', label: 'Files', path: `/courses/${c.id}/files` }] })));
@@ -1033,7 +1050,7 @@ on('POST', /^\/api\/v1\/courses\/(\w+)\/assignments\/(\w+)\/submissions$/, (url,
   apiSubmissions.set(a.id, sub);
   return sub;
 });
-on('GET', /^\/api\/v1\/courses\/(\w+)$/, (url, m) => { const c = courseById(m[1]); return c ? { ...fullCourse(c), syllabus_body: '<h2>Syllabus</h2><p>Lectures MWF 10:30. Midterm 1 in week 5, Midterm 2 in week 9, final in finals week. Late work loses 10% per day.</p>' } : null; });
+on('GET', /^\/api\/v1\/courses\/(\w+)$/, (url, m) => { const c = courseById(m[1]); if (c?.restricted) return { id: c.id, access_restricted_by_date: true }; return c ? { ...fullCourse(c), syllabus_body: '<h2>Syllabus</h2><p>Lectures MWF 10:30. Midterm 1 in week 5, Midterm 2 in week 9, final in finals week. Late work loses 10% per day.</p>' } : null; });
 
 // ---- a stand-in for CloudConvert (api.cloudconvert.com/v2), for the converter's cloud engine ---
 // The key `cc-test-key` is the one that works. A job is one poll of "processing", then finished;

@@ -25,6 +25,12 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.98.95', date: '2026-10-05', notes: [
+      { kind: 'new', title: 'Rubric grid switch', body: 'A switch turns the rubric ring into a grid and back.', icon: P.toggle },
+      { kind: 'improved', title: 'Clearer rubric text', body: 'Rubric words sit on dark bands, easier to read.', icon: P.eye },
+      { kind: 'fixed', title: 'Past courses show', body: 'Past lists every past course Canvas lists.', icon: P.list },
+      { kind: 'fixed', title: 'Page buttons fixed', body: "A page's own buttons look as they do on Canvas.", icon: P.layers },
+    ] },
     { version: '2.98.94', date: '2026-10-05', notes: [
       { kind: 'improved', title: 'Next 7 days', body: 'The week card counts the next 7 days, from today.', icon: P.clock },
     ] },

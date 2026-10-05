@@ -14,7 +14,7 @@
 
 html[data-bcv-theme] {
   --bcv-line: max(1px, var(--bcv-dpx, 1px)); /* a hairline drawn as a shadow: one CSS pixel, or one screen pixel where that is more (below 100% zoom; content/early.js keeps --bcv-dpx) */
-  --bcv-version: "2.98.94"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.98.95"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -413,7 +413,9 @@ html.bcv-on #bcv-app { display: flex; }
 
 #bcv-app { display: none; min-height: 100vh; align-items: stretch; background: var(--bcv-bg); color: var(--bcv-ink); font-family: var(--bcv-font); -webkit-font-smoothing: antialiased; font-size: 14px; line-height: 1.4; box-sizing: border-box; }
 #bcv-app *, #bcv-app *::before, #bcv-app *::after { box-sizing: border-box; }
-#bcv-app a, .bcv-mark a { color: var(--bcv-blue); text-decoration: none; }
+#bcv-app a, .bcv-mark a { text-decoration: none; }
+/* (not a link a Canvas page colours itself — a teacher's button keeps the white the page gives it: course.js fitLinks) */
+#bcv-app a:where(:not(.bcv-ownlink)), .bcv-mark a:where(:not(.bcv-ownlink)) { color: var(--bcv-blue); }
 #bcv-app a:hover, .bcv-mark a:hover { opacity: .75; }
 #bcv-app button, .bcv-mark button { font-family: inherit; color: inherit; }
 #bcv-app input, #bcv-app textarea, #bcv-app select, .bcv-mark input, .bcv-mark textarea { font-family: inherit; color: var(--bcv-ink); } /* (.bcv-mark: the mark's box lives in the page body, outside the app's root, and draws the same content) */
@@ -1226,6 +1228,12 @@ html[data-bcv-theme="dark"] .bcv-prose .bcv-onlight img.equation_image { filter:
 /* a paragraph carrying a tall formula needs the room, but the text in it keeps its own rhythm */
 .bcv-prose p:has(img.equation_image) { line-height: 1.75; }
 .bcv-prose .bcv-embed-open { display: inline-flex; margin: 6px 0 14px; }
+/* The prose wears Canvas's rich-content class (user_content), so a school's or a design tool's rules
+ * for it apply here as on Canvas. What Canvas's own rule for that class would change in ours is put
+ * back: no scroll box around the text (its overflow-x clipped the edges of a page's own shadows), and
+ * table cells keep our padding rather than its 2px. */
+#bcv-app .bcv-prose.user_content, .bcv-prose.user_content { overflow: visible; min-height: 0; }
+.bcv-prose.user_content table:not([cellpadding]) :is(td, th) { padding: 8px 10px; }
 .bcv-people__sections { flex: none; font: 400 12.5px/1.35 var(--bcv-font); color: var(--bcv-ink3); text-align: right; }
 .bcv-detail { padding: 26px 28px; display: flex; flex-direction: column; gap: 16px; }
 .bcv-detail__title { margin: 0; font: 700 24px/1.2 var(--bcv-display); letter-spacing: -.025em; }
@@ -1443,14 +1451,106 @@ html[data-bcv-theme="dark"] .bcv-rr-ov { --rr-dim0: .52; --rr-dim1: .78; }
 .bcv-rr__noteic { flex: none; margin-top: 3px; color: var(--rr-ink3); }
 .bcv-rr__notetext { flex: 1; min-width: 0; white-space: pre-line; overflow-wrap: anywhere; }
 .bcv-rr__foot { position: absolute; left: 0; right: 0; bottom: 16px; padding: 0 24px; text-align: center; font: 400 12px/1.4 var(--bcv-font); color: var(--rr-ink3); pointer-events: none; transition: opacity .2s ease; }
+/* (2.98.95) words over the page read on their own ground, not on a deeper blur: the bar's level cards are near-solid,
+   its header and the ring's words carry a soft dark wash and shadow of their own, the marker's note sits on a card */
+.bcv-rr__rbox { background: rgba(24,24,27,.86); border-color: rgba(255,255,255,.1); box-shadow: 0 8px 22px rgba(0,0,0,.28); }
+.bcv-rr__row.is-picked .bcv-rr__rbox { background: color-mix(in srgb, var(--rr-sel) 20%, rgba(22,22,25,.92)); }
+.bcv-rr__headmain { position: relative; isolation: isolate; }
+.bcv-rr__headmain::before { content: ""; position: absolute; z-index: -1; inset: -14px -70px -16px -44px; pointer-events: none; background: linear-gradient(90deg, rgba(12,12,14,0), rgba(12,12,14,.66) 10%, rgba(12,12,14,.56) 62%, rgba(12,12,14,0));
+  -webkit-mask-image: linear-gradient(180deg, transparent, #000 24%, #000 76%, transparent); mask-image: linear-gradient(180deg, transparent, #000 24%, #000 76%, transparent); }
+:is(.bcv-rr__name, .bcv-rr__count, .bcv-rr__desc:not(.is-open), .bcv-rr__rpts, .bcv-rr__title, .bcv-rr__eyebrow, .bcv-rr__status, .bcv-rr__foot, .bcv-rr__label, .bcv-rr__cbig, .bcv-rr__csub, .bcv-rr__ctop, .bcv-rr__chint) { text-shadow: 0 1px 2px rgba(0,0,0,.55), 0 0 18px rgba(0,0,0,.6); }
+.bcv-rr__note { padding: 9px 12px; border-radius: 12px; background: rgba(24,24,27,.86); border: 1px solid rgba(255,255,255,.08); }
+/* (2.98.95) ring or grid: a small two-way switch at the top right, under the page's own buttons — a glass pill, the one
+   shown lit on a knob that slides */
+.bcv-rr__view { position: absolute; top: 50px; right: 20px; z-index: 4; display: flex; padding: 3px; gap: 2px; border-radius: 17px; background: var(--rr-fill); box-shadow: inset 0 0 0 1px rgba(255,255,255,.08); animation: bcv-fade-in .3s ease .15s backwards; transition: opacity .2s ease; }
+.bcv-rr__vknob { position: absolute; top: 3px; left: 3px; width: 34px; height: 28px; border-radius: 14px; background: rgba(255,255,255,.2); box-shadow: 0 1px 4px rgba(0,0,0,.3), inset 0 0.5px 0 rgba(255,255,255,.25); transition: transform .32s cubic-bezier(.32,.72,0,1); pointer-events: none; }
+.bcv-rr__view[data-on="grid"] .bcv-rr__vknob { transform: translateX(36px); }
+.bcv-rr__vbtn { position: relative; width: 34px; height: 28px; padding: 0; border: 0; border-radius: 14px; background: none; color: var(--rr-ink3); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: color .2s ease; }
+.bcv-rr__vbtn:hover { color: var(--rr-ink); }
+.bcv-rr__vbtn[aria-pressed="true"] { color: #fff; }
+.bcv-rr__vbtn:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
+.bcv-rr-ov.is-leaving .bcv-rr__view { opacity: 0; }
+/* the ring steps back as the grid comes forward, and back */
+.bcv-rr__field { transition: opacity .28s ease, transform .4s cubic-bezier(.32,.72,0,1); }
+.bcv-rr-ov.is-grid .bcv-rr__field { opacity: 0; transform: scale(.94); pointer-events: none; }
+.bcv-rr-ov.is-grid :is(.bcv-rr__top, .bcv-rr__foot) { opacity: 0; }
+/* (2.98.95) the grid: the rubric as a panel of rows and columns — a criterion a row (its colour, its name, what it is worth
+   and a bar of its colour), its levels across under columns named once at the top, each a quiet card with its points.
+   The column the pointer is in lights up with its heading; marked, your level is outlined in its grade's colour */
+.bcv-rg { position: absolute; left: 50%; top: calc(50% + 26px); z-index: 2; width: min(1000px, calc(100% - 64px)); max-height: calc(100% - 128px); box-sizing: border-box; display: flex; flex-direction: column; padding: 22px 22px 0; border-radius: 28px;
+  background: linear-gradient(180deg, rgba(38,38,42,.97), rgba(26,26,29,.97)); border: 1px solid rgba(255,255,255,.08); box-shadow: 0 30px 80px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.06);
+  opacity: 0; transform: translate(-50%, -50%) scale(.97); pointer-events: none; visibility: hidden; transition: opacity .26s ease, transform .4s cubic-bezier(.32,.72,0,1), visibility 0s linear .4s; }
+.bcv-rr-ov.is-grid .bcv-rg { opacity: 1; transform: translate(-50%, -50%) scale(1); pointer-events: auto; visibility: visible; transition: opacity .3s ease .06s, transform .45s cubic-bezier(.32,.72,0,1) .04s, visibility 0s; }
+.bcv-rr-ov.is-leaving .bcv-rg { opacity: 0; transform: translate(-50%, -50%) scale(.96); }
+.bcv-rg__head { flex: none; display: flex; align-items: flex-end; gap: 20px; padding: 0 2px 16px; }
+.bcv-rg__titles { flex: 1; min-width: 0; }
+.bcv-rg__eyebrow { font: 600 11px/1.2 var(--bcv-font); letter-spacing: .09em; text-transform: uppercase; color: var(--rr-ink3); }
+.bcv-rg__title { margin: 6px 0 0; font: 700 22px/1.15 var(--bcv-display); letter-spacing: -.03em; color: var(--rr-ink); }
+.bcv-rg__sum { flex: none; display: flex; align-items: center; gap: 16px; }
+.bcv-rg__score { display: flex; align-items: baseline; gap: 5px; font-variant-numeric: tabular-nums; }
+.bcv-rg__sbig { font: 700 22px/1 var(--bcv-display); letter-spacing: -.02em; color: var(--rr-ink); }
+.bcv-rg__sdash { align-self: center; width: 22px; height: 3px; border-radius: 2px; background: var(--rr-ink2); }
+.bcv-rg__sof { font: 600 15px/1 var(--bcv-font); color: var(--rr-ink3); }
+.bcv-rg__n { font: 600 13.5px/1 var(--bcv-font); color: var(--rr-ink2); }
+.bcv-rg__seg { position: relative; display: grid; grid-template-columns: 1fr 1fr; padding: 3px; border-radius: 12px; background: rgba(255,255,255,.07); box-shadow: inset 0 0 0 1px rgba(255,255,255,.06); }
+.bcv-rg__segknob { position: absolute; top: 3px; bottom: 3px; left: 3px; width: calc(50% - 3px); border-radius: 9px; background: rgba(255,255,255,.16); box-shadow: 0 1px 4px rgba(0,0,0,.3), inset 0 0.5px 0 rgba(255,255,255,.2); transition: transform .32s cubic-bezier(.32,.72,0,1); }
+.bcv-rg__seg[data-on="graded"] .bcv-rg__segknob { transform: translateX(100%); }
+.bcv-rg__segbtn { position: relative; min-width: 0; height: 28px; padding: 0 14px; border: 0; border-radius: 9px; background: none; color: var(--rr-ink3); font: 600 12.5px/1 var(--bcv-font); white-space: nowrap; cursor: pointer; transition: color .2s ease; }
+.bcv-rg__segbtn.is-on { color: var(--rr-ink); }
+.bcv-rg__segbtn:not(:disabled):not(.is-on):hover { color: var(--rr-ink2); }
+.bcv-rg__segbtn:disabled { opacity: .45; cursor: default; }
+.bcv-rg__segbtn:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
+.bcv-rg__scroll { flex: 1 1 auto; min-height: 0; overflow: auto; margin: 0 -8px; padding: 0 8px 8px; overscroll-behavior: contain; }
+.bcv-rg__table { display: grid; grid-template-columns: minmax(170px, 1.12fr) repeat(var(--rg-cols, 4), minmax(0, 1fr)); gap: 8px; }
+.bcv-rg__row { display: contents; }
+.bcv-rg__h { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; gap: 8px; min-width: 0; padding: 4px 4px 8px; background: rgb(36,36,40); font: 700 11px/1.2 var(--bcv-font); letter-spacing: .09em; text-transform: uppercase; color: var(--rr-ink3); transition: color .2s ease; }
+.bcv-rg__h--crit { padding-left: 2px; }
+.bcv-rg__hdot { flex: none; width: 7px; height: 7px; border-radius: 2px; background: var(--tier); box-shadow: 0 0 8px color-mix(in srgb, var(--tier) 55%, transparent); }
+.bcv-rg__hname { min-width: 0; }
+.bcv-rg__h.is-col { color: var(--rr-ink); }
+.bcv-rg__crit, .bcv-rg__cell { position: relative; min-width: 0; min-height: 74px; box-sizing: border-box; border-radius: 16px; background: linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.03)); box-shadow: inset 0 0 0 1px rgba(255,255,255,.06); }
+.bcv-rg__crit { display: flex; flex-direction: column; padding: 13px 15px 16px; overflow: hidden; }
+.bcv-rg__cline { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.bcv-rg__dot { flex: none; width: 10px; height: 10px; border-radius: 3px; background: var(--rg-c); box-shadow: 0 0 10px color-mix(in srgb, var(--rg-c) 60%, transparent); }
+.bcv-rg__cname { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 14.5px/1.3 var(--bcv-font); letter-spacing: -.01em; color: var(--rr-ink); }
+.bcv-rg__cpts { display: flex; align-items: baseline; gap: 5px; margin-top: 6px; font-variant-numeric: tabular-nums; }
+.bcv-rg__cbig { font: 700 22px/1 var(--bcv-display); letter-spacing: -.02em; color: var(--rr-ink); }
+.bcv-rg__cunit { font: 500 12.5px/1 var(--bcv-font); color: var(--rr-ink3); }
+.bcv-rg__ccom { display: flex; align-items: center; gap: 6px; min-width: 0; margin-top: 6px; font: 400 12px/1.3 var(--bcv-font); color: var(--rr-ink2); }
+.bcv-rg__ccom svg { flex: none; color: var(--rr-ink3); }
+.bcv-rg__ccom span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bcv-rg__track { position: absolute; left: 15px; right: 15px; bottom: 9px; height: 4px; border-radius: 2px; background: rgba(255,255,255,.08); overflow: hidden; }
+.bcv-rg__fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 2px; background: linear-gradient(90deg, color-mix(in srgb, var(--rg-c) 55%, transparent), var(--rg-c)); }
+.bcv-rg__crit:not(.is-scored) .bcv-rg__fill { opacity: .5; }
+.bcv-rg__cell { display: flex; flex-direction: column; gap: 5px; padding: 12px 14px 13px; overflow: hidden; transition: background .2s ease, box-shadow .2s ease, opacity .2s ease; }
+.bcv-rg__cell::before { content: ""; position: absolute; left: 14px; right: 14px; top: 0; height: 2px; border-radius: 0 0 2px 2px; background: var(--tier); opacity: 0; transition: opacity .2s ease; }
+.bcv-rg__cell.is-empty { background: none; box-shadow: inset 0 0 0 1px rgba(255,255,255,.03); }
+.bcv-rg__cell.is-empty::before { display: none; }
+.bcv-rg__cell.is-col { background: linear-gradient(180deg, rgba(255,255,255,.075), rgba(255,255,255,.04)); }
+.bcv-rg__cell.is-col::before { opacity: .55; }
+.bcv-rg__cell:not(.is-empty):hover { box-shadow: inset 0 0 0 1px rgba(255,255,255,.14); }
+.bcv-rg__cell:not(.is-empty):hover::before { opacity: 1; }
+.bcv-rg__pts { display: flex; align-items: baseline; gap: 4px; font-variant-numeric: tabular-nums; }
+.bcv-rg__pn { font: 700 16px/1 var(--bcv-display); letter-spacing: -.01em; color: var(--rr-ink); }
+.bcv-rg__pu { font: 500 12px/1 var(--bcv-font); color: var(--rr-ink3); }
+.bcv-rg__mine { margin-left: auto; padding: 3px 7px; border-radius: 7px; background: var(--rg-c); font: 600 10.5px/1.2 var(--bcv-font); color: var(--rg-on, #fff); }
+.bcv-rg__ctext { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; font: 400 13.5px/1.4 var(--bcv-font); color: var(--rr-ink2); text-wrap: pretty; }
+.bcv-rg__csub { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; font: 400 12px/1.4 var(--bcv-font); color: var(--rr-ink3); text-wrap: pretty; }
+.bcv-rg__cell.is-mark { background: color-mix(in srgb, var(--rg-c) 18%, rgba(30,30,33,.9)); box-shadow: inset 0 0 0 1.5px var(--rg-c), 0 0 22px color-mix(in srgb, var(--rg-c) 22%, transparent); }
+.bcv-rg__cell.is-mark .bcv-rg__pn { color: var(--rg-c); }
+.bcv-rg__cell.is-mark .bcv-rg__ctext { color: var(--rr-ink); }
+.bcv-rg__cell.is-dim { opacity: .5; }
+.bcv-rg__cell.is-dim:hover { opacity: .85; }
+.bcv-rg__foot { flex: none; margin: 0 -22px; padding: 13px 24px 14px; border-top: 1px solid rgba(255,255,255,.07); text-align: right; font: 400 12.5px/1.3 var(--bcv-font); color: var(--rr-ink3); }
+@media (prefers-reduced-motion: reduce) { .bcv-rg, .bcv-rr-ov.is-grid .bcv-rg, .bcv-rr__field, .bcv-rr__vknob, .bcv-rg__segknob { transition: none; } }
 /* Try scores (Settings → Developer → Rubric, the sample ring): a pill at the top right, the panel under it — a mark
    for each criterion, presets, Posted. Purple is the developer's colour; nothing here is sent */
-.bcv-rr__devpill { position: absolute; top: 50px; right: 20px; z-index: 3; display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 11px; border: 0; border-radius: 16px; background: var(--rr-fill); color: var(--rr-ink); font: 600 12.5px/1 var(--bcv-font); cursor: pointer; transition: background .15s ease, opacity .2s ease; animation: bcv-fade-in .3s ease .2s backwards; }
+.bcv-rr__devpill { position: absolute; top: 94px; right: 20px; z-index: 3; display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 11px; border: 0; border-radius: 16px; background: var(--rr-fill); color: var(--rr-ink); font: 600 12.5px/1 var(--bcv-font); cursor: pointer; transition: background .15s ease, opacity .2s ease; animation: bcv-fade-in .3s ease .2s backwards; }
 .bcv-rr__devpill:hover { background: rgba(255,255,255,.2); }
 .bcv-rr__devdot { width: 8px; height: 8px; border-radius: 50%; background: #bf5af2; box-shadow: 0 0 0 3px rgba(191,90,242,.28); }
 .bcv-rr__devchev { transition: transform .3s cubic-bezier(.32,.72,0,1); }
 .bcv-rr__devpill.is-open .bcv-rr__devchev { transform: rotate(180deg); }
-.bcv-rr__dev { position: absolute; top: 92px; right: 20px; z-index: 3; width: 264px; max-height: calc(100% - 140px); box-sizing: border-box; display: flex; flex-direction: column; gap: 10px; padding: 12px; border-radius: 18px; background: rgba(28,28,30,.84); border: 1px solid rgba(255,255,255,.1); box-shadow: 0 18px 50px rgba(0,0,0,.45); animation: bcv-rr-devin .32s cubic-bezier(.32,.72,0,1) backwards; transition: opacity .2s ease; }
+.bcv-rr__dev { position: absolute; top: 136px; right: 20px; z-index: 3; width: 264px; max-height: calc(100% - 180px); box-sizing: border-box; display: flex; flex-direction: column; gap: 10px; padding: 12px; border-radius: 18px; background: rgba(28,28,30,.84); border: 1px solid rgba(255,255,255,.1); box-shadow: 0 18px 50px rgba(0,0,0,.45); animation: bcv-rr-devin .32s cubic-bezier(.32,.72,0,1) backwards; transition: opacity .2s ease; }
 .bcv-rr__dev[hidden] { display: none; }
 @keyframes bcv-rr-devin { from { opacity: 0; transform: translateY(-6px) scale(.98); } }
 .bcv-rr__devnote { margin: 0; font: 400 11.5px/1.4 var(--bcv-font); color: var(--rr-ink3); }

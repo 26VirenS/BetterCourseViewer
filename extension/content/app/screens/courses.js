@@ -23,7 +23,7 @@
     );
     body.append(U.loading());
 
-    let [courses, planner] = await Promise.all([store.courses().catch(() => null), store.planner().catch(() => [])]);
+    let [courses, planner] = await Promise.all([store.courses({ past: true }).catch(() => null), store.planner().catch(() => [])]);
     if (!ctx.alive()) return screen;
     if (!courses) {
       body.replaceChildren(U.errorBox('Your courses could not be loaded.'));
@@ -55,7 +55,7 @@
       c.favorite = on;
       draw();
       store.setFavorite(c.id, on).then(async () => {
-        const [cs, fl] = await Promise.all([store.courses({ force: true }).catch(() => null), store.favorites({ force: true }).catch(() => null)]);
+        const [cs, fl] = await Promise.all([store.courses({ force: true, past: true }).catch(() => null), store.favorites({ force: true }).catch(() => null)]);
         app.loadShellData({ force: true });
         if (!ctx.alive()) return;
         if (cs) courses = cs;
@@ -115,7 +115,8 @@
 
     function rowFor(c) {
       return U.row([
-        h('button', { type: 'button', class: 'bcv-ccard__star', title: 'Add to dashboard', 'aria-label': 'Add to dashboard', onclick: (e) => { e.stopPropagation(); toggleFav(c, true); } }, U.star(false)),
+        // (a past course cannot go on the dashboard: Canvas refuses to star one)
+        c.state === 'past' ? null : h('button', { type: 'button', class: 'bcv-ccard__star', title: 'Add to dashboard', 'aria-label': 'Add to dashboard', onclick: (e) => { e.stopPropagation(); toggleFav(c, true); } }, U.star(false)),
         U.dot(c.color, 'bcv-dot--10'),
         // under a nickname the real name; otherwise who teaches it and its code (never "No nickname": that is not about the course)
         U.el('bcv-row__body', [U.text('bcv-row__title bcv-ellip', c.name), U.text('bcv-course-row__nick', c.nickname ? `Nickname · ${c.originalName}` : [c.teachers?.[0], c.code && c.code !== c.name ? c.code : null, c.term].filter(Boolean).join(' · ') || 'Course')]),
@@ -137,7 +138,7 @@
       });
     }
     async function reloadLists() {
-      const [cs, fl] = await Promise.all([store.courses({ force: true }).catch(() => null), store.favorites({ force: true }).catch(() => null)]);
+      const [cs, fl] = await Promise.all([store.courses({ force: true, past: true }).catch(() => null), store.favorites({ force: true }).catch(() => null)]);
       app.loadShellData({ force: true });
       if (!ctx.alive()) return;
       if (cs) courses = cs;

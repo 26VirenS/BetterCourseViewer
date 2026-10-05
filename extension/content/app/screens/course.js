@@ -12,9 +12,12 @@
   const TAB_ICONS = { home: IC.book, announcements: IC.bell, assignments: IC.doc, discussions: IC.disc, grades: IC.chart, people: IC.people, pages: IC.page, files: IC.folder, quizzes: IC.bolt, modules: IC.modules, syllabus: IC.page, collaborations: IC.people, conferences: IC.video, outcomes: IC.chart, rubrics: IC.sheet, settings: IC.settings };
   const ROUTE_TAB = { announcement: 'announcements', assignment: 'assignments', syllabus: 'syllabus', discussion: 'discussions', page: 'pages', folder: 'files', file: 'files', quiz: 'quizzes', stream: 'home' };
 
-  /** Sanitised, link-safe HTML from Canvas rich content. */
+  /** Sanitised, link-safe HTML from Canvas rich content. The wrapper wears Canvas's own class for
+   *  rich content (user_content) too: a school's stylesheet and a page-design tool write their rules
+   *  for what sits inside it — a row of buttons along the top of a front page, a coloured panel — and
+   *  those reach the page here as they do on Canvas. */
   function prose(html, { cls = '' } = {}) {
-    const wrap = U.el(`bcv-prose ${cls}`);
+    const wrap = U.el(`bcv-prose user_content ${cls}`);
     if (!html) return wrap;
     const doc = new DOMParser().parseFromString(String(html), 'text/html');
     doc.querySelectorAll('script, style, link, meta, object, embed').forEach((n) => n.remove());
@@ -53,8 +56,33 @@
     });
     wrap.append(...Array.from(doc.body.childNodes));
     fitMath(wrap);
+    fitLinks(wrap);
     fitDark(wrap);
     return wrap;
+  }
+
+  // A link a teacher made into a button — a dark plate with white words, a row of them across the top
+  // of a front page — wears the colours the page gives it, as on Canvas. Our link colour is for the
+  // links in the text, and it outranks any class, so it used to paint those buttons' words in ours.
+  // Every link starts out of our colour (bcv-ownlink); one that then shows the page's plain link
+  // colour (a probe link's: Canvas's own, or the school's) takes ours back, and one the page colours
+  // itself — by a class, a style, a design tool's theme — keeps it. Runs before fitDark, in the same
+  // frame, so the dark pass reads the page's colour rather than ours.
+  function fitLinks(wrap) {
+    const links = Array.from(wrap.querySelectorAll('a:not([class*="bcv-"])')); // (not our own: the embed's Open in new tab)
+    if (!links.length) return;
+    for (const a of links) a.classList.add('bcv-ownlink');
+    let tries = 0;
+    const pass = () => {
+      if (!wrap.isConnected) { if (tries++ < 10) requestAnimationFrame(pass); else for (const a of links) a.classList.remove('bcv-ownlink'); return; }
+      const probe = h('a', { href: '#', class: 'bcv-ownlink', hidden: true, 'aria-hidden': 'true' });
+      wrap.append(probe);
+      const plain = getComputedStyle(probe).color;
+      const own = links.map((a) => getComputedStyle(a).color !== plain);
+      probe.remove();
+      links.forEach((a, i) => { if (!own[i]) a.classList.remove('bcv-ownlink'); });
+    };
+    requestAnimationFrame(pass);
   }
 
   // Canvas does not typeset a formula on the page: it asks its equation service for a picture of one

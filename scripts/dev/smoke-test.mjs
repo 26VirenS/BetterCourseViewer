@@ -984,8 +984,14 @@ try {
   check(!(await coursesJson()).find((c) => String(c.id) === '101').original_name && (await page.$$('.bcv-row .bcv-iconbtn')).length > 0, 'Remove nickname restores the real name in Canvas; the non-favourite rows carry a pencil too');
   check((await page.$$eval('[data-term]', (els) => els.map((e) => e.dataset.term)))[0] === 'Fall 2026', 'the current term (most dashboard courses) is listed first');
   await shot(page, '04-courses');
+  const allRows = await texts('.bcv-body .bcv-row');
+  check(!allRows.some((t) => /Course 303|HIST 017|BIO 002/.test(t)) && !(await page.$('[data-term="No term"]')), `All leaves out a course closed by its dates (Canvas sends only its id: no "Course 303" under "No term") and keeps past ones in Past: ${allRows.length} rows`);
   await page.click('.bcv-seg__btn[data-value="past"]');
-  check((await texts('.bcv-body .bcv-row')).some((t) => /S26-CSE 022 01/.test(t)), 'Past filter shows the completed course');
+  const pastRows = await texts('.bcv-body .bcv-row');
+  const pastTerms = await page.$$eval('[data-term]', (els) => els.map((e) => e.dataset.term));
+  check(pastRows.some((t) => /S26-CSE 022 01/.test(t)) && pastRows.some((t) => /F25-BIO 002 01/.test(t)) && !pastRows.some((t) => /Course 303|HIST/.test(t)) && pastTerms.join('|') === 'Spring 2026|Fall 2025' && !(await page.$('.bcv-body .bcv-row .bcv-ccard__star')),
+    `Past shows Canvas's past enrollments — the soft-ended one and the concluded one Canvas hands back only for enrollment_state=completed — by term, newest first, with no star (Canvas will not star a past course); the date-closed one stays out: ${pastTerms.join(', ')} · ${pastRows.length} rows`);
+  await shot(page, '04c-courses-past');
   await page.click('.bcv-seg__btn[data-value="all"]');
   await page.fill('.bcv-search input', 'phys');
   await page.waitForTimeout(100);
@@ -2110,6 +2116,39 @@ try {
   await page.waitForSelector('.bcv-rr-ov .bcv-rr__label', { timeout: 8000 });
   await page.waitForTimeout(2300); // (past where the tour would start on a marked ring)
   check(!(await page.$('#bcv-tour')) && !(await page.$('.bcv-rr__dev')), 'the tour comes once: the next ring opens without it (and without Try scores, which is the developer\'s)');
+  // (2.98.95) a small two-way switch at the top right turns the ring into the grid — a criterion a row, its levels in
+  // columns named once — and back; the grid shows the marks (Graded) or the rubric as it reads before any (Before
+  // grading); the choice is kept, so the next rubric opens as the last was left
+  const vSw = await page.evaluate(() => { const r = document.querySelector('.bcv-rr__view').getBoundingClientRect(); return { right: Math.round(innerWidth - r.right), top: Math.round(r.top), pressed: [...document.querySelectorAll('.bcv-rr__vbtn')].map((b) => `${b.dataset.view}:${b.getAttribute('aria-pressed')}`).join(), widgets: Math.max(0, ...[...document.querySelectorAll('#bcv-report, #bcv-tray')].map((e) => e.getBoundingClientRect().bottom)) }; });
+  const ringScore = (await texts('.bcv-rr__cbig'))[0];
+  await page.click('.bcv-rr__vbtn[data-view="grid"]');
+  await page.waitForFunction(() => document.querySelector('.bcv-rr-ov')?.classList.contains('is-grid') && getComputedStyle(document.querySelector('.bcv-rg')).opacity === '1', null, { timeout: 4000 });
+  const gridAt = () => page.evaluate(() => ({
+    heads: [...document.querySelectorAll('.bcv-rg__h')].map((e) => e.textContent).join('|'),
+    rows: document.querySelectorAll('.bcv-rg__crit').length,
+    names: [...document.querySelectorAll('.bcv-rg__cname')].map((e) => e.textContent).join('|'),
+    marks: [...document.querySelectorAll('.bcv-rg__cell.is-mark')].map((e) => e.querySelector('.bcv-rg__pn').textContent).join(','),
+    mine: document.querySelectorAll('.bcv-rg__mine').length,
+    score: document.querySelector('.bcv-rg__sbig')?.textContent || null, dash: !!document.querySelector('.bcv-rg__sdash'),
+    seg: [...document.querySelectorAll('.bcv-rg__segbtn')].map((b) => `${b.textContent}:${b.getAttribute('aria-pressed')}`).join(),
+    foot: document.querySelector('.bcv-rg__foot')?.textContent, ringInert: document.querySelector('.bcv-rr__field').inert,
+    stored: localStorage.getItem('bcv:rubricView'),
+  }));
+  const g1 = await gridAt();
+  await shot(page, '14r4-rubric-grid');
+  check(vSw.right <= 24 && vSw.top >= vSw.widgets && vSw.pressed === 'ring:true,grid:false' && g1.heads === 'Criterion|Full marks|Partial|No marks' && g1.rows === 2 && g1.names === 'Correctness|Work shown' && g1.marks.split(',').length === 2 && g1.mine === 2
+    && g1.score === ringScore && g1.seg === 'Before grading:false,Graded:true' && g1.foot === 'Your mark is outlined on each row' && g1.ringInert && g1.stored === 'grid',
+    `the switch at the top right (under the page's own buttons) turns the ring into the grid: the columns named once, a row a criterion, your level outlined on each, the score the ring's, Graded on — and the choice kept: ${JSON.stringify({ vSw, ringScore, g1 })}`);
+  await page.click('.bcv-rg__segbtn:first-of-type');
+  const g2 = await gridAt();
+  check(g2.marks === '' && g2.mine === 0 && g2.dash && g2.score === null && g2.seg === 'Before grading:true,Graded:false' && g2.foot === 'How each criterion will be graded', `Before grading shows the rubric as it reads before any marks: ${JSON.stringify(g2)}`);
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !document.querySelector('.bcv-rr-ov'), null, { timeout: 5000 });
+  await page.click('.bcv-detail__actions .bcv-rubbtn');
+  const gridAgain = await page.waitForFunction(() => document.querySelector('.bcv-rr-ov.is-grid .bcv-rg__crit'), null, { timeout: 8000 }).then(() => true).catch(() => false);
+  await page.click('.bcv-rr__vbtn[data-view="ring"]');
+  const ringAgain = await page.waitForFunction(() => !document.querySelector('.bcv-rr-ov').classList.contains('is-grid') && localStorage.getItem('bcv:rubricView') === 'ring' && !document.querySelector('.bcv-rr__field').inert && document.querySelector('.bcv-rg').inert, null, { timeout: 4000 }).then(() => true).catch(() => false);
+  check(gridAgain && ringAgain, `the next rubric opens as the grid it was left as, and the switch turns it back into the ring (kept too): ${JSON.stringify({ gridAgain, ringAgain })}`);
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('.bcv-rr-ov'), null, { timeout: 5000 });
   // Escape ends the tour and leaves the ring; a second closes the ring
@@ -2738,6 +2777,24 @@ try {
   // the same numbers the row carried, as a percentage too, and above the assignment's own text
   const [rowEarned, rowPoss] = gradeRow.score.split(' / ');
   check(top && top.score === rowEarned && top.of === `/ ${rowPoss}` && top.pc === `${Math.round((Number(rowEarned) / Number(rowPoss)) * 100)}%` && top.aboveText, `the mark is at the top of the assignment, the same one the grades row showed: ${JSON.stringify(top)} from ${gradeRow.score}`);
+  // (2.98.95) a front page a program built: a row of the school's dark buttons along the top (its stylesheet
+  // writes the rules for Canvas's rich-content wrapper, .user_content) and Canvas's own grid of primary
+  // buttons under it. They stood stacked, outlined and in our link colour; they are drawn as on Canvas now,
+  // white words on their own plates, side by side, while a plain link in the text keeps our colour.
+  await page.goto(`${BASE}/courses/103`);
+  await page.waitForSelector('.bcv-prose .scout-btn', { timeout: 10000 });
+  await eventually(() => page.evaluate(() => !!document.querySelector('.bcv-prose a.bcv-t-plainlink:not(.bcv-ownlink)')), 3000); // (every link starts as the page's; the plain one is handed back to us)
+  const btns = await page.evaluate(() => {
+    const read = (sel) => [...document.querySelectorAll(sel)].map((a) => { const r = a.getBoundingClientRect(); const cs = getComputedStyle(a); return { t: a.textContent, top: Math.round(r.top), left: Math.round(r.left), w: Math.round(r.width), color: cs.color, bg: cs.backgroundColor, own: a.classList.contains('bcv-ownlink') }; });
+    const plain = document.querySelector('.bcv-prose a.bcv-t-plainlink');
+    const probe = document.createElement('a'); document.querySelector('#bcv-app').append(probe); const ours = getComputedStyle(probe).color; probe.remove();
+    return { wrap: document.querySelector('.bcv-prose').classList.contains('user_content'), nav: read('.bcv-prose .scout-btn'), grid: read('.bcv-prose .btn-primary'), plain: plain && { color: getComputedStyle(plain).color, own: plain.classList.contains('bcv-ownlink') }, ours };
+  });
+  const oneRow = (list) => list.length > 1 && list.every((b) => Math.abs(b.top - list[0].top) <= 1) && list.every((b, i) => !i || b.left > list[i - 1].left + list[i - 1].w - 2);
+  check(btns.wrap && btns.nav.length === 4 && oneRow(btns.nav) && btns.nav.every((b) => b.color === 'rgb(255, 255, 255)' && b.bg === 'rgb(31, 42, 51)' && b.own) && btns.grid.length === 2 && oneRow(btns.grid) && btns.grid.every((b) => b.color === 'rgb(255, 255, 255)' && b.bg === 'rgb(11, 43, 82)')
+    && btns.plain && !btns.plain.own && btns.plain.color === btns.ours && btns.ours !== 'rgb(3, 116, 181)',
+    `a teacher's buttons look as on Canvas: the school's row of four and Canvas's grid of two each side by side, white on their own plates; a plain link in the text keeps our colour: ${JSON.stringify({ nav: btns.nav.map((b) => `${b.t}@${b.left},${b.top} ${b.color}/${b.bg}`), grid: btns.grid.map((b) => `${b.t}@${b.left},${b.top} ${b.color}`), plain: btns.plain, ours: btns.ours })}`);
+  await shot(page, '06p-front-page-buttons');
   await page.goto(`${BASE}/courses/101/grades`);
   await page.waitForSelector('.bcv-rings__svg', { timeout: 10000 });
   } // course

@@ -161,13 +161,25 @@
     }, { force, refresh });
   }
 
+  const COURSE_INCLUDE = ['term', 'favorites', 'total_scores', 'teachers', 'sections', 'course_image'];
   function rawCourses({ force = false, refresh = false, maxAge = 0 } = {}) {
     return C.cached('courses:all', 15 * MIN, () =>
       C.get('/api/v1/courses', {
-        params: { per_page: 100, include: ['term', 'favorites', 'total_scores', 'teachers', 'sections', 'course_image'] },
+        params: { per_page: 100, include: COURSE_INCLUDE },
         all: true,
         maxPages: 5,
       }), { force, refresh, maxAge });
+  }
+  /** The courses Canvas lists under Past Enrollments. The plain list leaves out an enrollment
+   *  that has been concluded; Canvas hands those back only when asked for completed ones. Only
+   *  All Courses asks (courses({ past: true })), so no other screen pays for the request. */
+  function doneCourses({ force = false, refresh = false, maxAge = 0 } = {}) {
+    return C.cached('courses:done', 30 * MIN, () =>
+      C.get('/api/v1/courses', {
+        params: { per_page: 100, enrollment_state: 'completed', include: COURSE_INCLUDE },
+        all: true,
+        maxPages: 5,
+      }).catch(() => []), { force, refresh, maxAge });
   }
 
   function cards({ force = false, refresh = false } = {}) {
@@ -193,17 +205,22 @@
 
   /** All courses, decorated with colour, palette, favourite flag and state. Decorated once per
    *  answer: the same list, colours and mode give the same objects back (every screen asks for
-   *  the courses, some several times a draw, and each ask used to build the whole set anew). */
-  let coursesMemo = null; // { list, cols, dark, out }
-  async function courses({ force = false, refresh = false, maxAge = 0 } = {}) {
-    const [list, cols, dark] = await Promise.all([rawCourses({ force, refresh, maxAge }), colors({ force, refresh }), Promise.resolve(BCV.early?.isDark?.() ?? false)]);
-    if (coursesMemo && coursesMemo.list === list && coursesMemo.cols === cols && coursesMemo.dark === dark) return coursesMemo.out;
+   *  the courses, some several times a draw, and each ask used to build the whole set anew).
+   *  `past` adds the concluded enrollments (All Courses' Past). A course closed to the student by
+   *  its dates comes back as a bare id ({ id, access_restricted_by_date }): no name, no term, and
+   *  it cannot be opened. Canvas's own All Courses leaves those out, and so does this list. */
+  const coursesMemo = { false: null, true: null }; // per `past`: { list, done, cols, dark, out }
+  async function courses({ force = false, refresh = false, maxAge = 0, past = false } = {}) {
+    past = !!past;
+    const [list, done, cols, dark] = await Promise.all([rawCourses({ force, refresh, maxAge }), past ? doneCourses({ force, refresh, maxAge }) : null, colors({ force, refresh }), Promise.resolve(BCV.early?.isDark?.() ?? false)]);
+    const memo = coursesMemo[past];
+    if (memo && memo.list === list && memo.done === done && memo.cols === cols && memo.dark === dark) return memo.out;
     const seen = new Set();
     const out = [];
     let fallbackIdx = 0;
-    for (const c of list || []) {
+    for (const c of [...(list || []), ...(done || [])]) {
       const id = String(c.id);
-      if (seen.has(id)) continue;
+      if (seen.has(id) || c.access_restricted_by_date) continue;
       seen.add(id);
       const enr = (c.enrollments || [])[0] || {};
       let color = cols[`course_${id}`];
@@ -237,7 +254,7 @@
         url: `/courses/${id}`,
       });
     }
-    coursesMemo = { list, cols, dark, out };
+    coursesMemo[past] = { list, done, cols, dark, out };
     return out;
   }
   function roleLabel(type) {

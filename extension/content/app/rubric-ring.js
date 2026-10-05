@@ -332,7 +332,143 @@
     const inner = U.el('bcv-rr__inner', [ringBox, barMark, svg, centre, labelBox, barBox]);
     const stage = U.el('bcv-rr__stage', inner);
     const field = U.el('bcv-rr__field', stage);
-    ov.append(...veils, top, field, foot, closeBtn);
+
+    // ---- (2.98.95) the grid: the same rubric as rows and columns — a criterion a row, its levels lined up under
+    // the columns by what they are worth (the best on the left, nothing on the right). A toggle at the top right
+    // turns between it and the ring; the choice is kept, and the next rubric opens as this one was left
+    let view = 'ring';
+    try { if (localStorage.getItem('bcv:rubricView') === 'grid') view = 'grid'; } catch { /* the ring */ }
+    const RING_IC = 'M13.3 4.61A7.5 7.5 0 0 1 19.05 14.57M17.75 16.82A7.5 7.5 0 0 1 6.25 16.82M4.95 14.57A7.5 7.5 0 0 1 10.7 4.61';
+    const GRID_IC = 'M4.5 4.5h6v6h-6zM13.5 4.5h6v6h-6zM4.5 13.5h6v6h-6zM13.5 13.5h6v6h-6z';
+    const viewBtns = [['ring', 'Ring', RING_IC], ['grid', 'Grid', GRID_IC]].map(([key, label, ic]) => h('button', {
+      type: 'button', class: 'bcv-rr__vbtn', dataset: { view: key }, title: `${label} view`, 'aria-label': `${label} view`, 'aria-pressed': 'false',
+      onclick: () => setView(key, true),
+    }, U.svg(ic, { size: 15, stroke: 'currentColor', width: key === 'ring' ? 2.4 : 1.9 })));
+    const viewSw = h('div', { class: 'bcv-rr__view', role: 'group', 'aria-label': 'Show the rubric as' }, [h('span', { class: 'bcv-rr__vknob', 'aria-hidden': 'true' }), ...viewBtns]);
+    const gridBox = h('div', { class: 'bcv-rg', role: 'region', 'aria-label': `${a.name || 'Assignment'} rubric as a grid` });
+    let gridMarks = m.graded; // (Graded: the marks on it; Before grading: the rubric as it reads before any)
+    ov.append(...veils, top, field, gridBox, foot, viewSw, closeBtn);
+
+    /** The grid's contents, from the rubric as it stands (drawn again when the marks change: the developer's Try scores). */
+    let courseCode = '';
+    function fillGrid() {
+      const cols = Math.max(1, ...crit.map((c) => c.levels.length));
+      // a criterion's levels into the columns by what each is worth out of its best (nothing is the last column);
+      // in order, one to a column, so a three-level criterion in a four-column grid skips the column it has no level for
+      const slots = crit.map((c) => {
+        const L = c.levels, k = L.length;
+        if (!k) return [];
+        if (k === cols) return L.map((_, i) => i);
+        const vals = L.map((l) => l.pts).filter((p) => p !== null);
+        const best = vals.length ? Math.max(...vals) : 0, lo = vals.length ? Math.min(0, ...vals) : 0;
+        const want = L.map((l, i) => (l.pts === null || best - lo < 1e-9 ? Math.round((i * (cols - 1)) / Math.max(1, k - 1)) : Math.round((1 - (l.pts - lo) / (best - lo)) * (cols - 1))));
+        for (let i = 1; i < k; i++) want[i] = Math.max(want[i], want[i - 1] + 1);
+        for (let i = k - 1; i >= 0; i--) want[i] = Math.min(want[i], cols - 1 - (k - 1 - i));
+        return want;
+      });
+      const inCol = (j) => crit.map((c, k) => { const i = slots[k].indexOf(j); return i < 0 ? null : c.levels[i]; }).filter(Boolean);
+      // the columns' names: the levels' own where every criterion calls that level the same, else by rank
+      const lastNone = inCol(cols - 1).every((l) => (l.pts ?? 0) === 0);
+      const ladder = cols === 1 ? ['Full marks'] : cols === 2 ? ['Excellent'] : cols === 3 ? ['Excellent', 'Developing'] : cols === 4 ? ['Excellent', 'Good', 'Developing'] : cols === 5 ? ['Excellent', 'Good', 'Fair', 'Developing'] : null;
+      const shared = (j) => { const ls = inCol(j).map((l) => l.label.trim()); return ls.length && ls.every((x) => x.toLowerCase() === ls[0].toLowerCase()) && ls[0].length <= 22 ? ls[0] : null; };
+      const heads = Array.from({ length: cols }, (_, j) => {
+        const own = shared(j);
+        const name = own || (ladder ? (j === cols - 1 && cols > 1 ? (lastNone ? 'Missing' : 'Beginning') : ladder[j]) : `Level ${j + 1}`);
+        const t = cols > 1 ? j / (cols - 1) : 0;
+        const tone2 = j === 0 ? '#30d158' : j === cols - 1 ? (lastNone ? '#8e8e93' : '#ff6b3d') : t <= 0.34 ? '#0a84ff' : t < 0.55 && cols >= 5 ? '#ffd60a' : '#ff9f0a';
+        return { name, own: !!own, tone: tone2 };
+      });
+      const marks = gridMarks && m.graded;
+      const colCells = heads.map(() => []);
+      const headEls = heads.map((hd, j) => h('div', { class: 'bcv-rg__h', dataset: { c: String(j) }, style: { '--tier': hd.tone } }, [h('i', { class: 'bcv-rg__hdot' }), U.text('bcv-rg__hname bcv-ellip', hd.name, 'span')]));
+      const rowsEls = crit.map((c, k) => {
+        const tone2 = marks && c.score !== null ? css(toneEnd(k)) : css(hues[k]);
+        const scored = marks && c.score !== null;
+        const crEl = U.el(`bcv-rg__crit${scored ? ' is-scored' : ''}`, [
+          U.el('bcv-rg__cline', [h('i', { class: 'bcv-rg__dot' }), h('span', { class: 'bcv-rg__cname', title: c.desc ? `${c.name} — ${c.desc}` : c.name, text: c.name })]),
+          U.el('bcv-rg__cpts', scored ? [U.text('bcv-rg__cbig', pts(c.score), 'span'), U.text('bcv-rg__cunit', `/ ${pts(c.worth)}`, 'span')] : [U.text('bcv-rg__cbig', pts(c.worth), 'span'), U.text('bcv-rg__cunit', c.worth === 1 ? 'pt' : 'pts', 'span')]),
+          marks && c.comment ? h('div', { class: 'bcv-rg__ccom', title: c.comment }, [U.svg('M4 5h16v10H9l-5 4z', { size: 11, stroke: 'currentColor', width: 2.2 }), U.text('bcv-ellip', c.comment, 'span')]) : null,
+          h('span', { class: 'bcv-rg__track', 'aria-hidden': 'true' }, h('span', { class: 'bcv-rg__fill', style: { width: `${Math.round((scored ? clamp01(c.frac) : 1) * 100)}%` } })),
+        ], { style: { '--rg-c': tone2 } });
+        const cells = heads.map((hd, j) => {
+          const i = slots[k].indexOf(j);
+          if (i < 0) { const e = U.el('bcv-rg__cell is-empty', null, { 'aria-hidden': 'true' }); colCells[j].push(e); return e; }
+          const l = c.levels[i];
+          const mark = marks && c.mark === i;
+          const main = hd.own ? l.text : l.label; // (under a column named for it, a level with no description is its points alone)
+          const sub = hd.own ? '' : l.text;
+          const e = U.el(`bcv-rg__cell${mark ? ' is-mark' : ''}${marks && c.score !== null && !mark ? ' is-dim' : ''}`, [
+            U.el('bcv-rg__pts', [U.text('bcv-rg__pn', l.pts === null ? '–' : pts(l.pts), 'span'), U.text('bcv-rg__pu', l.pts === 1 ? 'pt' : 'pts', 'span'), mark ? U.text('bcv-rg__mine', 'Your mark', 'span') : null]),
+            main ? U.text('bcv-rg__ctext', main, 'span') : null,
+            sub ? U.text('bcv-rg__csub', sub, 'span') : null,
+          ], { dataset: { c: String(j) }, title: [l.label, l.text].filter(Boolean).join(' — '), style: { '--tier': hd.tone, '--rg-c': tone2, '--rg-on': inkOn(marks && c.score !== null ? toneEnd(k) : hues[k]) } });
+          colCells[j].push(e);
+          return e;
+        });
+        return U.el('bcv-rg__row', [crEl, ...cells], { role: 'row', 'aria-label': sayOf(c) });
+      });
+      // a column lights up with its heading while the pointer is on one of its levels
+      const table = U.el('bcv-rg__table', [U.el('bcv-rg__row bcv-rg__row--head', [U.text('bcv-rg__h bcv-rg__h--crit', 'Criterion', 'div'), ...headEls]), ...rowsEls], { style: { '--rg-cols': String(cols) } });
+      let lit = -1;
+      const light = (j) => {
+        if (j === lit) return;
+        if (lit >= 0) { headEls[lit].classList.remove('is-col'); colCells[lit].forEach((e) => e.classList.remove('is-col')); }
+        lit = j;
+        if (j >= 0) { headEls[j].classList.add('is-col'); colCells[j].forEach((e) => e.classList.add('is-col')); }
+      };
+      table.addEventListener('pointerover', (e) => { const cell = e.target.closest?.('.bcv-rg__cell:not(.is-empty)'); light(cell ? Number(cell.dataset.c) : -1); });
+      table.addEventListener('pointerleave', () => light(-1));
+      // the head: what it is, what it is worth (and what it gave), Before grading or Graded
+      const seg = h('div', { class: 'bcv-rg__seg', role: 'group', 'aria-label': 'Show' }, [
+        h('span', { class: 'bcv-rg__segknob', 'aria-hidden': 'true' }),
+        ...[[false, 'Before grading'], [true, 'Graded']].map(([on, label]) => h('button', {
+          type: 'button', class: `bcv-rg__segbtn${gridMarks === on ? ' is-on' : ''}`, 'aria-pressed': String(gridMarks === on), disabled: on && !m.graded,
+          title: on && !m.graded ? (m.held ? 'Marked, but not posted yet' : 'Not graded yet') : null,
+          onclick: () => { if (gridMarks === on) return; gridMarks = on; fillGrid(); gridBox.querySelector('.bcv-rg__segbtn.is-on')?.focus({ preventScroll: true }); },
+        }, label)),
+      ]);
+      seg.dataset.on = gridMarks && m.graded ? 'graded' : 'before';
+      const pct = m.max > 0 ? Math.round((m.earned / m.max) * 100) : 0;
+      gridBox.replaceChildren(
+        U.el('bcv-rg__head', [
+          U.el('bcv-rg__titles', [
+            U.text('bcv-rg__eyebrow bcv-ellip', [a.rubric_settings?.title && !/^rubric$/i.test(a.rubric_settings.title) ? a.rubric_settings.title : 'Rubric', courseCode].filter(Boolean).join(' · '), 'div'),
+            h('h2', { class: 'bcv-rg__title bcv-ellip', text: a.name || 'Rubric' }),
+          ]),
+          U.el('bcv-rg__sum', [
+            U.el('bcv-rg__score', marks ? [U.text('bcv-rg__sbig', pts(m.earned), 'span'), U.text('bcv-rg__sof', `/ ${pts(m.max)}`, 'span')] : [h('span', { class: 'bcv-rg__sdash', 'aria-label': 'not graded' }), U.text('bcv-rg__sof', `/ ${pts(m.max)}`, 'span')], { title: marks ? `${pct}%` : null }),
+            U.text('bcv-rg__n', many, 'span'),
+            seg,
+          ]),
+        ]),
+        U.el('bcv-rg__scroll', table),
+        U.text('bcv-rg__foot', marks ? 'Your mark is outlined on each row' : 'How each criterion will be graded', 'div'),
+      );
+    }
+    /** The ring or the grid: the one going fades back as the other comes forward, and the choice is kept. */
+    function setView(v, keep) {
+      if (v !== 'ring' && v !== 'grid') return;
+      const was = view;
+      view = v;
+      if (v === 'grid' && (was !== 'grid' || !gridBox.firstChild)) fillGrid();
+      ov.classList.toggle('is-grid', v === 'grid');
+      viewSw.dataset.on = v;
+      viewBtns.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.view === v)));
+      field.inert = v === 'grid';
+      gridBox.inert = v !== 'grid';
+      if (keep) try { localStorage.setItem('bcv:rubricView', v); } catch { /* this time only */ }
+      if (v === 'grid' && touring) BCV.welcome?.finish(); // (the tour works the ring)
+      if (keep && was !== v) (v === 'grid' ? gridBox.querySelector('.bcv-rg__segbtn.is-on') || viewBtns[1] : st.t > 0.5 ? name : labels[st.sel])?.focus({ preventScroll: true });
+    }
+    BCV.store?.courses?.().then((cs) => {
+      const cid = a.course_id || (location.pathname.match(/\/courses\/(\d+)/) || [])[1];
+      const c = (cs || []).find((x) => String(x.id) === String(cid));
+      const code = String(c?.code || '').replace(/^[A-Z]{1,2}\d{2}[-\s]/, '').replace(/\s+\d{1,3}$/, '').trim();
+      if (!code || gone) return;
+      courseCode = code;
+      const eb = gridBox.querySelector('.bcv-rg__eyebrow');
+      if (eb) eb.textContent = `${eb.textContent} · ${code}`;
+    }).catch(() => {});
 
     // ---- the bar's contents for the selected criterion
     let rows = [], ticks = [], place = [];
@@ -754,6 +890,8 @@
       chips.forEach((b, k) => b.style.setProperty('--rr-c', css(toneEnd(k))));
       marcs.forEach((p, k) => p.setAttribute('stroke', hex(toneEnd(k))));
       fillBar(st.sel, false);
+      gridMarks = m.graded;
+      if (view === 'grid' || gridBox.firstChild) fillGrid();
       tween('g', 1, 1000);
     }
 
@@ -796,8 +934,8 @@
 
     // ---- keys: the arrows walk the criteria, Enter opens one (its label is a button), Escape goes back, then out
     ov.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); if (st.t > 0.02) toRing(); else close(); return; }
-      if (['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp'].includes(e.key) && !(e.target instanceof HTMLInputElement) && !e.target.closest?.('.bcv-rr__dev')) {
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); if (st.t > 0.02 && view === 'ring') toRing(); else close(); return; }
+      if (['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp'].includes(e.key) && view === 'ring' && !(e.target instanceof HTMLInputElement) && !e.target.closest?.('.bcv-rr__dev')) {
         e.preventDefault();
         const d = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : -1;
         const k = (st.sel + d + n) % n;
@@ -814,6 +952,7 @@
     });
     // a press on the page around it: the bar rolls back up, the ring leaves (a press inside the ring is not beside it)
     ov.addEventListener('click', (e) => {
+      if (view === 'grid') { if (!e.target.closest('button, .bcv-rg, .bcv-rr__view, .bcv-rr__dev')) close(); return; } // (the grid: a press beside it closes it)
       if (e.target.closest('button, .bcv-rr__row, .bcv-rr__head, .bcv-rr__note, .bcv-rr__hit, .bcv-rr__dev')) return;
       if (st.t > 0.02) { toRing(); return; }
       const r = svg.getBoundingClientRect(), s = r.width / W;
@@ -910,7 +1049,7 @@
     // closing ends it too.
     let touring = false;
     async function startTour() {
-      if (touring || gone || !BCV.welcome || BCV.welcome.active() || BCV.setup?.active?.()) return false;
+      if (touring || gone || view !== 'ring' || !BCV.welcome || BCV.welcome.active() || BCV.setup?.active?.()) return false;
       touring = true;
       BCV.api?.storage?.local.set({ 'tips:rubricRing': true }).catch(() => {});
       room.b = 200;
@@ -945,7 +1084,7 @@
     }
     /** Holds one tween value where it is put (the developer tools and the tests look at a frame part-way). */
     const seek = (key, v) => { delete tw[key]; st[key] = v; draw(); };
-    const api = { close, el: ov, select, toRing, seek, state: st, restyle, tour: () => startTour(), get touring() { return touring; }, get graded() { return m.graded; } };
+    const api = { close, el: ov, select, toRing, seek, state: st, restyle, tour: () => startTour(), setView: (v) => setView(v, true), get view() { return view; }, get touring() { return touring; }, get graded() { return m.graded; } };
     live = api;
     const bornAt = performance.now();
 
@@ -953,6 +1092,7 @@
     addEventListener('resize', onResize);
     fit();
     fillBar(0, false);
+    setView(view, false);
     draw();
     // the ring blooms in; marked, it then bends to its marks
     if (m.graded && !reduce) tween('g', 1, 1150, null, 450);
@@ -963,7 +1103,7 @@
     else BCV.settings?.get().then((s) => { if (s?.developer?.rubricScores === true) devPanel(); }).catch(() => {});
     BCV.api?.storage?.local.get('tips:rubricRing').then((got) => {
       if (got?.['tips:rubricRing'] || gone) return;
-      setTimeout(() => { if (!gone && live === api && st.t < 0.02) startTour(); }, m.graded && !reduce ? 1700 : 900);
+      setTimeout(() => { if (!gone && live === api && st.t < 0.02 && view === 'ring') startTour(); }, m.graded && !reduce ? 1700 : 900);
     }).catch(() => {});
     // a navigation away takes it too (app.js removes every sheet overlay): stop its frames
     const watch = new MutationObserver(() => { if (!ov.isConnected) { watch.disconnect(); if (!gone) close(true); } });
