@@ -706,7 +706,7 @@
         pct.style.setProperty('--bcv-delay', `${420 + Math.min(i, 8) * 70}ms`);
         return { c, i, th, wins, low, tower, label, col: U.el('bcv-sky__col', [pct, tower], { dataset: { course: c.id } }) };
       });
-      // the windows, as the courses' assignments come (the towers stand before them); returns when the last has flown in
+      // the windows, as the courses' assignments come (the towers stand before them); returns when the last has faded in
       const paint = (data, fresh) => {
         let end = 0;
         for (const x of cols) {
@@ -720,42 +720,40 @@
             g.style.gridAutoRows = `${f.s}px`;
             g.style.gap = `${f.g}px`;
           }
-          // (2.98.91) on entry the windows come in one by one in reading order, each flying out of its tower's top-left
-          // corner to its place, once the tower has risen (or at once, if the assignments landed after it had)
-          const fly = fresh && !U.reducedMotion();
-          const base = fly ? Math.max(0, 120 + Math.min(x.i, 8) * 70 + 520 - (performance.now() - drawnAt)) : 0;
-          const step = f.s + f.g;
-          if (fly) end = Math.max(end, base + rows.length * 45 + 650);
-          const lowTop = x.th - 7 - (Math.ceil(down.length / f.cols) * step - f.g); // (where the street floors' grid starts)
-          const pane = (r, k, top, j) => h('i', {
-            class: `bcv-sky__win ${r.band ? 'is-lit' : ''} ${r.free ? 'is-free' : ''} ${fly ? 'bcv-sky__win--fly' : ''}`, dataset: { band: r.band || '' },
+          // on entry the windows fade in where they stand, one by one in reading order (2.98.93: no flight, no bounce),
+          // once the tower has risen (or at once, if the assignments landed after it had)
+          const fade = fresh && !U.reducedMotion();
+          const base = fade ? Math.max(0, 120 + Math.min(x.i, 8) * 70 + 520 - (performance.now() - drawnAt)) : 0;
+          if (fade) end = Math.max(end, base + rows.length * 45 + 450);
+          const pane = (r, k) => h('i', {
+            class: `bcv-sky__win ${r.band ? 'is-lit' : ''} ${r.free ? 'is-free' : ''} ${fade ? 'bcv-sky__win--in' : ''}`, dataset: { band: r.band || '' },
             style: {
               ...(r.band ? { '--w': SKY_LIT[r.band] } : {}),
-              ...(fly ? { '--wd': `${Math.round(base + k * 45)}ms`, '--fx': `${-((j % f.cols) * step + 7)}px`, '--fy': `${-(top + Math.floor(j / f.cols) * step + 1)}px` } : {}),
+              ...(fade ? { '--wd': `${Math.round(base + k * 45)}ms` } : {}),
             },
             title: `${r.a.name} · ${r.band ? `${store.fmtPts(r.score)} / ${store.fmtPts(r.a.points_possible ?? 0)} (${r.band})` : r.a.submission?.excused ? 'excused' : 'not graded yet'}${r.free ? ' · does not count toward the grade' : ''}`,
           });
-          x.wins.replaceChildren(...up.map((r, j) => pane(r, j, 7, j)));
-          x.low.replaceChildren(...down.map((r, j) => pane(r, up.length + j, lowTop, j)));
+          x.wins.replaceChildren(...up.map((r, j) => pane(r, j)));
+          x.low.replaceChildren(...down.map((r, j) => pane(r, up.length + j)));
           x.low.hidden = !down.length;
           const lit = rows.filter((r) => r.band && !r.free).length, free = rows.filter((r) => r.free).length;
           x.tower.setAttribute('aria-label', `${x.label}, ${lit} graded, ${rows.length - lit - free} to come${free ? `, ${free} not counted` : ''}. Open its grades.`);
         }
         return performance.now() + end;
       };
-      // (2.98.92) the kept copy's windows fly in the moment it is read; Canvas's answer, when it changes any, is put in
-      // still once they have landed (the same windows are left alone)
+      // (2.98.92) the kept copy's windows fade in the moment it is read; Canvas's answer, when it changes any, is put in
+      // still once they are in (the same windows are left alone)
       const gen = ++skyGen;
-      let onScreen = null, flyEnd = 0, later = 0;
-      const show = (data, fly) => {
+      let onScreen = null, fadeEnd = 0, later = 0;
+      const show = (data, fade) => {
         if (!ctx.alive() || gen !== skyGen) return;
         const sig = skySig(data);
         if (sig === onScreen) return;
         const was = onScreen;
         onScreen = sig;
         clearTimeout(later);
-        if (was === null) flyEnd = paint(data, fly);
-        else later = setTimeout(() => { if (ctx.alive() && gen === skyGen) paint(data, false); }, Math.max(0, flyEnd - performance.now()));
+        if (was === null) fadeEnd = paint(data, fade);
+        else later = setTimeout(() => { if (ctx.alive() && gen === skyGen) paint(data, false); }, Math.max(0, fadeEnd - performance.now()));
       };
       const card = U.card(U.el('bcv-sky', [
         U.el('bcv-sky__head', [

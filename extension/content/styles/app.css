@@ -14,7 +14,7 @@
 
 html[data-bcv-theme] {
   --bcv-line: max(1px, var(--bcv-dpx, 1px)); /* a hairline drawn as a shadow: one CSS pixel, or one screen pixel where that is more (below 100% zoom; content/early.js keeps --bcv-dpx) */
-  --bcv-version: "2.98.92"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.98.93"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -865,12 +865,11 @@ body:has(> .bcv-sheet-ov--card:not(.is-folding)) .bcv-stat.is-lifted { visibilit
 .bcv-sky__tower--rise { animation: bcv-sky-rise .9s cubic-bezier(.32,.72,0,1) var(--bcv-delay, 0ms) both; }
 @keyframes bcv-sky-rise { from { clip-path: inset(100% 0 0 0); } to { clip-path: inset(0 0 0 0); } }
 .bcv-sky__pct--in { animation: bcv-fade-up var(--bcv-t-settle) var(--bcv-spring-settle) var(--bcv-delay, 0ms) backwards; }
-/* (2.98.91) …and the windows come in one by one in reading order, each flying out of its tower's top-left corner
-   (--fx/--fy: back to it from its place) with a little spin and overshoot, 45ms apart */
-.bcv-sky__win--fly { animation: bcv-sky-win .6s cubic-bezier(.34,1.5,.64,1) var(--wd, 0ms) both; }
-@keyframes bcv-sky-win { from { opacity: 0; transform: translate(var(--fx, -10px), var(--fy, -10px)) scale(.3) rotate(-40deg); } 35% { opacity: 1; } to { opacity: 1; transform: none; } }
+/* …and the windows fade in where they stand, one by one in reading order, 45ms apart (2.98.93: no flight, no bounce) */
+.bcv-sky__win--in { animation: bcv-sky-win .4s ease-out var(--wd, 0ms) both; }
+@keyframes bcv-sky-win { from { opacity: 0; } to { opacity: 1; } }
 @media (max-width: 1100px) { .bcv-dash-pair { grid-template-columns: minmax(0, 1fr); } }
-@media (prefers-reduced-motion: reduce) { .bcv-sky__tower--rise, .bcv-sky__pct--in, .bcv-sky__win--fly { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .bcv-sky__tower--rise, .bcv-sky__pct--in, .bcv-sky__win--in { animation: none; } }
 .bcv-work { padding: 18px 20px; display: flex; flex-direction: column; gap: 14px; }
 .bcv-work__head { display: flex; align-items: baseline; gap: 10px; }
 .bcv-work__hint { margin-left: auto; font: 400 12px/1.2 var(--bcv-font); color: var(--bcv-ink3); }

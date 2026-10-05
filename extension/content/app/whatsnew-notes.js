@@ -25,6 +25,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.98.93', date: '2026-10-05', notes: [
+      { kind: 'improved', title: 'Windows fade in', body: 'Skyline windows fade in place, no bounce.', icon: P.sparkle },
+    ] },
     { version: '2.98.92', date: '2026-10-05', notes: [
       { kind: 'improved', title: 'Faster Dashboard', body: 'Overdue, Graded and the skyline show up right away.', icon: P.clock },
     ] },

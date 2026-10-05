@@ -4575,11 +4575,11 @@ try {
   // (2.98.90) the skyline's towers rise out of the street one after another, 70ms apart
   const skyAnim = await page.evaluate(() => [...document.querySelectorAll('.bcv-sky__tower--rise')].map((e) => `${getComputedStyle(e).animationName}@${getComputedStyle(e).animationDelay}`));
   check(skyAnim.slice(0, 2).join(',') === 'bcv-sky-rise@0.12s,bcv-sky-rise@0.19s', `the skyline's towers rise 70ms apart: ${skyAnim.join(',')}`);
-  // (2.98.91) …and their windows come in one by one, 45ms apart in reading order, each out of its tower's top-left corner
-  await page.waitForSelector('.bcv-sky__win--fly', { timeout: 10000 });
-  const winFly = await page.evaluate(() => [...document.querySelectorAll('.bcv-sky__col:first-child .bcv-sky__win--fly')].slice(0, 6).map((w) => ({ a: getComputedStyle(w).animationName, d: parseFloat(w.style.getPropertyValue('--wd')), x: parseFloat(w.style.getPropertyValue('--fx')), y: parseFloat(w.style.getPropertyValue('--fy')) })));
-  check(winFly.length === 6 && winFly.every((w, i) => w.a === 'bcv-sky-win' && w.x < 0 && w.y < 0 && (i === 0 || Math.round(w.d - winFly[i - 1].d) === 45)) && winFly[4].y < winFly[0].y && winFly[1].x < winFly[0].x,
-    `the windows fly in one by one, 45ms apart, each from its tower's top-left corner: ${JSON.stringify(winFly)}`);
+  // (2.98.93) …and their windows fade in where they stand, one by one, 45ms apart in reading order — no flight, no bounce
+  await page.waitForSelector('.bcv-sky__win--in', { timeout: 10000 });
+  const winIn = await page.evaluate(() => [...document.querySelectorAll('.bcv-sky__col:first-child .bcv-sky__win--in')].slice(0, 6).map((w) => { const cs = getComputedStyle(w); const k = w.getAnimations().find((a) => a.animationName === 'bcv-sky-win')?.effect.getKeyframes() || []; return { a: cs.animationName, d: parseFloat(w.style.getPropertyValue('--wd')), ease: cs.animationTimingFunction, moves: k.some((f) => f.transform && f.transform !== 'none'), from: k[0]?.opacity }; }));
+  check(winIn.length === 6 && winIn.every((w, i) => w.a === 'bcv-sky-win' && w.ease === 'ease-out' && !w.moves && w.from === '0' && (i === 0 || Math.round(w.d - winIn[i - 1].d) === 45)),
+    `the windows fade in where they stand, one by one, 45ms apart, without moving or bouncing: ${JSON.stringify(winIn)}`);
   const dueNow = (await texts('.bcv-stat__value'))[0]; // the real count at this point of the run (items were ticked earlier)
   await page.gotoRaw(`${BASE}/`, { waitUntil: 'commit' }); // raw, and from the first byte: the roll itself is what is being checked, and it is short
   await page.waitForSelector('.bcv-stat__value[data-rolling]', { timeout: 10000 });
