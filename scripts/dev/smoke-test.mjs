@@ -1906,13 +1906,14 @@ try {
     const rgb = [...layer.querySelectorAll('path')].map((x) => x.getAttribute('fill').match(/\d+/g).map(Number));
     return { ring: b.classList.contains('is-ring'), mid: layer.querySelector('.bcv-rubmorph__mid').innerText.replace(/\s+/g, ' ').trim(), words: getComputedStyle(b).color, ground: getComputedStyle(b).backgroundColor, hidden: layer.getAttribute('aria-hidden'), presses: getComputedStyle(layer).pointerEvents,
       w: Math.round(br.width), h: Math.round(br.height), disc: [Math.round(d.width), Math.round(d.height)], round: getComputedStyle(layer.querySelector('.bcv-rubmorph__disc')).borderRadius, ringBox: Math.round(ring.width),
-      bigPx: getComputedStyle(layer.querySelector('.bcv-rubmorph__big')).fontSize, // (2.98.88: the ring a quarter larger, the points not)
+      bigPx: getComputedStyle(layer.querySelector('.bcv-rubmorph__big')).fontSize, // (2.98.89: the ring nearly the button's width, the points not)
+      solid: /linear-gradient/.test(getComputedStyle(layer.querySelector('.bcv-rubmorph__disc')).backgroundImage) && !/rgba\(.*, 0\)$/.test(getComputedStyle(layer.querySelector('.bcv-rubmorph__disc')).backgroundColor), // (over the ground it stands on: what it covers is not seen through)
       centred: Math.abs((d.left + d.right) / 2 - (br.left + br.right) / 2) < 1 && Math.abs((d.top + d.bottom) / 2 - (br.top + br.bottom) / 2) < 1,
       pieces: rgb.length, green: rgb.some(([r, g]) => g > r + 80), amber: rgb.some(([r, g, b]) => r > 200 && g > 140 && b < 100 && r > g + 25) };
   }) : {};
-  check(morphed && morphAt.ring && morphAt.mid === '8 of 10' && morphAt.words === 'rgba(0, 0, 0, 0)' && morphAt.ground === 'rgba(0, 0, 0, 0)' && morphAt.disc.join() === '60,60' && morphAt.round === '30px' && morphAt.ringBox === 60 && morphAt.bigPx === '14.4px' && morphAt.centred
+  check(morphed && morphAt.ring && morphAt.mid === '8 of 10' && morphAt.words === 'rgba(0, 0, 0, 0)' && morphAt.ground === 'rgba(0, 0, 0, 0)' && morphAt.disc.join() === '83,83' && morphAt.round === '41.5px' && morphAt.ringBox === 83 && morphAt.bigPx === '14.4px' && morphAt.solid && morphAt.centred
     && morphAt.w === rubBtn.w && morphAt.h === rubBtn.h && morphAt.pieces > 40 && morphAt.green && morphAt.amber && morphAt.hidden === 'true' && morphAt.presses === 'none',
-    `the pointer on the Rubric button turns it into the ring in miniature — a 60 px disc (the points their own size), green and amber, "8 of 10" in the middle, its words gone, its place kept: ${JSON.stringify({ ...morphAt, btn: [rubBtn.w, rubBtn.h] })}`);
+    `the pointer on the Rubric button turns it into the ring in miniature — an 83 px disc on the 92 px button, solid (the points their own size), green and amber, "8 of 10" in the middle, its words gone, its place kept: ${JSON.stringify({ ...morphAt, btn: [rubBtn.w, rubBtn.h] })}`);
   check((await page.locator('.bcv-detail__actions').getByRole('button', { name: 'Rubric', exact: true }).count()) === 1, 'it is still the Rubric button to a screen reader (the ring is drawn, not said)');
   await shot(page, '14q-rubric-morph');
   await page.mouse.move(8, 8);

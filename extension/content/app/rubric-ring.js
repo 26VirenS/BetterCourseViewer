@@ -978,7 +978,7 @@
   let morphed = null; // { btn, layer, disc, ring, mid, p, to, raf, watch, bw, bh, r0, D }
   /** The ring itself, small (a 100-unit square): the band in short filled pieces, each the colour running between
    *  the slices' middles at its place — as the full ring's, without its frame loop. */
-  function miniRing(m) {
+  function miniRing(m, D) {
     const S = 100, C = S / 2, RO = 49, k = RO / R;
     const { seg, n } = m;
     const svg = document.createElementNS(SVG, 'svg');
@@ -996,7 +996,8 @@
     };
     const at = (vals, b) => vals[b[0]] + (vals[b[1]] - vals[b[0]]) * b[2];
     const cols = m.graded ? m.grades : m.hues;
-    const TH = m.thick.map((t) => Math.max(5, Math.min(15, t * 0.9))); // (far thicker than to scale: it reads at this size)
+    const thin = Math.min(1, Math.sqrt(60 / D)); // (a larger ring's band grows less than it does)
+    const TH = m.thick.map((t) => Math.max(5, Math.min(15, t * 0.9)) * thin); // (far thicker than to scale: it reads at this size)
     const GO = m.bend.map((b) => b * k * 1.5);
     const p = (r, a) => `${f(C + r * Math.sin(a))} ${f(C - r * Math.cos(a))}`;
     const STEP = Math.PI / 40;
@@ -1023,6 +1024,7 @@
     o.disc.style.width = `${f(w)}px`;
     o.disc.style.height = `${f(hh)}px`;
     o.disc.style.borderRadius = `${f(o.r0 + (o.D / 2 - o.r0) * d)}px`;
+    o.disc.style.boxShadow = d > 0.01 ? `0 ${f(4 * d)}px ${f(14 * d)}px rgba(0,0,0,${(0.16 * d).toFixed(3)})` : ''; // (lifted off what it covers)
     o.ring.style.opacity = f(r);
     o.ring.style.transform = `rotate(${f(-80 * (1 - r))}deg) scale(${(0.55 + 0.45 * r).toFixed(3)})`;
     o.mid.style.opacity = f(l);
@@ -1064,14 +1066,17 @@
     const cs = getComputedStyle(btn);
     const bw = btn.offsetWidth, bh = btn.offsetHeight;
     const T = Math.round(Math.max(48, Math.min(64, bh + 14))); // (the points' size goes by this)
-    const D = Math.round(T * 1.25); // (the ring a quarter larger than that, the points not)
+    const D = Math.round(Math.max(T * 1.25, Math.min(bw * 0.9, 96))); // (the ring nearly the button's width, the points not)
     const big = pts(m.graded ? m.earned : m.max);
     const mid = h('span', { class: 'bcv-rubmorph__mid', style: { '--fit': Math.min(1, 3.4 / big.length).toFixed(3) } }, [
       h('b', { class: 'bcv-rubmorph__big', text: big }),
       h('span', { class: 'bcv-rubmorph__of', text: m.graded ? `of ${pts(m.max)}` : m.max === 1 ? 'pt' : 'pts' }),
     ]);
-    const disc = h('span', { class: 'bcv-rubmorph__disc', style: { background: cs.backgroundColor } });
-    const ring = miniRing(m);
+    // the disc is the button's colour over the ground it stands on, so what it grows over is covered, not seen through
+    let ground = '';
+    for (let el = btn.parentElement; el && !ground; el = el.parentElement) { const c = getComputedStyle(el).backgroundColor; if (!/^rgba\(.*,\s*0\)$|^transparent$/.test(c)) ground = c; }
+    const disc = h('span', { class: 'bcv-rubmorph__disc', style: { background: ground ? `linear-gradient(${cs.backgroundColor}, ${cs.backgroundColor}) ${ground}` : cs.backgroundColor } });
+    const ring = miniRing(m, D);
     const layer = h('span', { class: 'bcv-rubmorph', 'aria-hidden': 'true', style: { '--d': `${D}px`, '--t': `${T}px` } }, [disc, ring, mid]);
     btn.append(layer);
     const o = { btn, layer, disc, ring, mid, p: 0, to: 0, raf: 0, bw, bh, D, r0: Math.min(bh / 2, parseFloat(cs.borderTopLeftRadius) || 0) };
