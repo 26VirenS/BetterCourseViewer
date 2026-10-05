@@ -737,18 +737,27 @@ try {
       pcts: cols.map((c) => c.querySelector('.bcv-sky__pct').textContent).join(','),
       heights: cols.map((c) => c.querySelector('.bcv-sky__tower').offsetHeight).join(','),
       ghost: cols.map((c) => (c.querySelector('.bcv-sky__tower').classList.contains('is-ghost') ? 1 : 0)).join(''),
-      lit: cols.map((c) => [...c.querySelectorAll('.bcv-sky__win.is-lit')].map((w) => w.dataset.band).join('')).join('|'),
+      lit: cols.map((c) => [...c.querySelectorAll('.bcv-sky__win.is-lit')].map((w) => w.dataset.band + (w.classList.contains('is-free') ? '*' : '')).join('')).join('|'),
       dark: cols.map((c) => c.querySelectorAll('.bcv-sky__win:not(.is-lit)').length).join(','),
-      colours: [...document.querySelectorAll('.bcv-sky__win.is-lit')].every((w) => getComputedStyle(w).backgroundColor === LIT[w.dataset.band] && w.title.endsWith(`(${w.dataset.band})`)),
-      unlit: [...document.querySelectorAll('.bcv-sky__win:not(.is-lit)')].every((w) => /not graded yet$/.test(w.title)),
-      top: [...document.querySelectorAll('.bcv-sky__wins')].every((w) => box(w).top - box(w.parentElement).top < 9),
+      colours: [...document.querySelectorAll('.bcv-sky__win.is-lit')].every((w) => getComputedStyle(w).backgroundColor === LIT[w.dataset.band] && w.title.includes(`(${w.dataset.band})`)),
+      unlit: [...document.querySelectorAll('.bcv-sky__win:not(.is-lit)')].every((w) => /(not graded yet|excused)( · does not count toward the grade)?$/.test(w.title)),
+      top: [...document.querySelectorAll('.bcv-sky__wins:not(.bcv-sky__wins--free)')].every((w) => box(w).top - box(w.parentElement).top < 9),
+      // (2.98.91) what does not count toward the total, in grey on the floors at the street: a marked one its colour turned
+      // grey, one to come a plain grey pane; nothing that counts among them, nothing of theirs above
+      grey: (() => {
+        const t = cols[0].querySelector('.bcv-sky__tower'), up = [...t.querySelectorAll('.bcv-sky__wins:not(.bcv-sky__wins--free) .bcv-sky__win')], down = [...t.querySelectorAll('.bcv-sky__wins--free .bcv-sky__win')];
+        return { up: up.length, down: down.length, mixed: up.some((w) => w.classList.contains('is-free')) || down.some((w) => !w.classList.contains('is-free')),
+          filter: down.filter((w) => w.classList.contains('is-lit')).every((w) => getComputedStyle(w).filter === 'grayscale(1)'), pane: down.filter((w) => !w.classList.contains('is-lit')).every((w) => getComputedStyle(w).backgroundColor === 'rgba(92, 92, 97, 0.92)'),
+          below: Math.min(...down.map((w) => box(w).top)) > Math.max(...up.map((w) => box(w).bottom)) + 6, street: Math.round(box(t).bottom - Math.max(...down.map((w) => box(w).bottom))) };
+      })(),
       beside: box(skyC).right <= box(workC).left && Math.abs(box(skyC).top - box(workC).top) < 1 && Math.abs(box(skyC).height - box(workC).height) < 1,
       more: document.querySelector('.bcv-sky__more').textContent,
       label: cols[0].querySelector('.bcv-sky__tower').getAttribute('aria-label'),
     };
   });
-  check(sky.names === 'MATH,PHYS,LAB,SPRK,WRI' && sky.pcts === '92%,81%,—,88%,95%' && sky.heights === '109,96,50,104,112' && sky.ghost === '00100' && sky.lit.split('|')[0] === 'BDAAAF' && sky.colours && sky.unlit && sky.top && sky.beside && sky.more === 'Window colour = score' && /^F26-MATH 021 20: 92%, 6 graded, \d+ to come\. Open its grades\.$/.test(sky.label),
-    `the grades skyline stands at the workload's left — towers as tall as the scores (the lab, unscored, an outline), windows lit in their grades' colours from the top: ${JSON.stringify(sky)}`);
+  check(sky.names === 'MATH,PHYS,LAB,SPRK,WRI' && sky.pcts === '92%,81%,—,88%,95%' && sky.heights === '109,96,50,104,112' && sky.ghost === '00100' && sky.lit.split('|')[0] === 'AB*D*A*F*A*F*' && sky.colours && sky.unlit && sky.top && sky.beside && sky.more === 'Window colour = score' && sky.label === 'F26-MATH 021 20: 92%, 1 graded, 4 to come, 12 not counted. Open its grades.'
+    && sky.grey.up === 5 && sky.grey.down === 12 && !sky.grey.mixed && sky.grey.filter && sky.grey.pane && sky.grey.below && sky.grey.street === 7,
+    `the grades skyline stands at the workload's left — towers as tall as the scores (the lab, unscored, an outline), windows lit in their grades' colours from the top, and what does not count toward the total (MATH's 0%-weight groups, its omitted check) in grey at the street: ${JSON.stringify(sky)}`);
   await shot(page, '01a-dashboard-skyline');
   await page.click('.bcv-sky__col[data-course="101"] .bcv-sky__tower');
   check(await page.waitForFunction(() => location.pathname === '/courses/101/grades', null, { timeout: 8000 }).then(() => true).catch(() => false), 'a tower opens its course\'s grades');
@@ -4540,6 +4549,11 @@ try {
   // (2.98.90) the skyline's towers rise out of the street one after another, 70ms apart
   const skyAnim = await page.evaluate(() => [...document.querySelectorAll('.bcv-sky__tower--rise')].map((e) => `${getComputedStyle(e).animationName}@${getComputedStyle(e).animationDelay}`));
   check(skyAnim.slice(0, 2).join(',') === 'bcv-sky-rise@0.12s,bcv-sky-rise@0.19s', `the skyline's towers rise 70ms apart: ${skyAnim.join(',')}`);
+  // (2.98.91) …and their windows come in one by one, 45ms apart in reading order, each out of its tower's top-left corner
+  await page.waitForSelector('.bcv-sky__win--fly', { timeout: 10000 });
+  const winFly = await page.evaluate(() => [...document.querySelectorAll('.bcv-sky__col:first-child .bcv-sky__win--fly')].slice(0, 6).map((w) => ({ a: getComputedStyle(w).animationName, d: parseFloat(w.style.getPropertyValue('--wd')), x: parseFloat(w.style.getPropertyValue('--fx')), y: parseFloat(w.style.getPropertyValue('--fy')) })));
+  check(winFly.length === 6 && winFly.every((w, i) => w.a === 'bcv-sky-win' && w.x < 0 && w.y < 0 && (i === 0 || Math.round(w.d - winFly[i - 1].d) === 45)) && winFly[4].y < winFly[0].y && winFly[1].x < winFly[0].x,
+    `the windows fly in one by one, 45ms apart, each from its tower's top-left corner: ${JSON.stringify(winFly)}`);
   const dueNow = (await texts('.bcv-stat__value'))[0]; // the real count at this point of the run (items were ticked earlier)
   await page.gotoRaw(`${BASE}/`, { waitUntil: 'commit' }); // raw, and from the first byte: the roll itself is what is being checked, and it is short
   await page.waitForSelector('.bcv-stat__value[data-rolling]', { timeout: 10000 });

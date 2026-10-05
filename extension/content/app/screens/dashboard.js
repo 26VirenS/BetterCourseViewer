@@ -163,18 +163,22 @@
       return num ? `${name} ${num[0]}` : name;
     });
   }
-  /** A course's windows: every assignment that counts (published, worth points, not excused), the marked and
-   *  posted first, then what is to come, each in the order it was due; `band` is the marked one's letter. */
-  function skyWindows(list) {
+  /** A course's windows: every assignment the student sees (published), the marked and posted first, then what is to
+   *  come, each in the order it was due; `band` is the marked one's letter. (2.98.91) `free` is work that does not
+   *  count toward the total — left out of the grade (omit_from_final_grade), worth no points, not graded, excused, or
+   *  in a group that weighs nothing (the course's weights, or the student's own from its Grades tab): drawn in grey. */
+  function skyWindows(list, weights = null) {
     const rows = [];
     for (const a of list || []) {
       const sub = a.submission;
-      if (a.published === false || a.omit_from_final_grade || a.grading_type === 'not_graded' || sub?.excused) continue;
-      if (!(Number(a.points_possible) > 0) && a.grading_type !== 'pass_fail') continue;
+      if (a.published === false) continue;
+      const pts = Number(a.points_possible) > 0;
+      const free = !!(a.omit_from_final_grade || a.grading_type === 'not_graded' || !pts || sub?.excused
+        || (weights && (Number(weights.get(String(a.assignment_group_id))) || 0) === 0));
       const posted = !!sub && sub.posted_at !== null; // (absent where a Canvas posts with the grade)
-      const marked = posted && ((sub.score !== null && sub.score !== undefined) || (a.grading_type === 'pass_fail' && !!sub.grade));
+      const marked = posted && !sub.excused && ((sub.score !== null && sub.score !== undefined) || (a.grading_type === 'pass_fail' && !!sub.grade));
       const band = !marked ? null : a.grading_type === 'pass_fail' ? (String(sub.grade).toLowerCase() === 'complete' ? 'A' : 'F') : U.gradeBand(sub.score, a.points_possible, a.grading_type);
-      rows.push({ a, band, score: marked ? sub.score : null, at: U.parse(a.due_at) || U.parse(sub?.graded_at) || null });
+      rows.push({ a, band, free, score: marked ? sub.score : null, at: U.parse(a.due_at) || U.parse(sub?.graded_at) || null });
     }
     const t = (r) => (r.at ? r.at.getTime() : Infinity);
     return [...rows.filter((r) => r.band).sort((x, y) => t(x) - t(y)), ...rows.filter((r) => !r.band).sort((x, y) => t(x) - t(y))];
@@ -638,41 +642,73 @@
 
     // ---- grades skyline (2.98.90) -----------------------------------------------------------------
     let skyLists = null; // (each course's assignments, once they land: a redraw paints its windows at once)
+    // (2.98.91) and what each group weighs where that decides what counts: the student's own weights for a course they
+    // set them on (its Grades tab), else Canvas's for a weighted course; a course weighted by points has none to ask
+    const skyData = async () => {
+      const [byCourse, ownPref] = await Promise.all([W.assignmentsP, store.pref('gradeWeights', {}).catch(() => ({}))]);
+      const own = ownPref && typeof ownPref === 'object' ? ownPref : {};
+      const weights = new Map(await Promise.all(favs.map(async (c) => {
+        const mine = own[c.id] && typeof own[c.id] === 'object' && Object.keys(own[c.id]).length ? own[c.id] : null;
+        if (mine) return [c.id, new Map(Object.entries(mine).map(([g, w]) => [String(g), Number(w) || 0]))];
+        if (!c.weighted) return [c.id, null];
+        const groups = await store.assignmentGroups(c.id).catch(() => null);
+        return [c.id, groups ? new Map(groups.map((g) => [String(g.id), Number(g.group_weight) || 0])) : null];
+      })));
+      return { byCourse: byCourse || [], weights };
+    };
     function skylineBlock() {
       if (!favs.length) return null;
       const first = !entered && !U.reducedMotion();
+      const drawnAt = performance.now();
       const names = skyNames(favs);
       const TW = favs.length <= 6 ? 46 : favs.length <= 8 ? 40 : 32;
       const cols = favs.map((c, i) => {
         const score = c.score === null || c.score === undefined || c.hideFinal ? null : Number(c.score);
         const th = Math.round(SKY_H * (score === null ? 0.42 : Math.max(0.16, Math.min(1, score / 100))));
         const wins = U.el('bcv-sky__wins');
+        const low = U.el('bcv-sky__wins bcv-sky__wins--free'); // (2.98.91: what does not count, on the floors at the street)
         const label = `${c.shortName || c.name}: ${score === null ? 'no score yet' : `${Math.round(score)}%`}`;
         const tower = h('button', {
           type: 'button', class: `bcv-sky__tower ${score === null ? 'is-ghost' : ''} ${first ? 'bcv-sky__tower--rise' : ''}`, title: c.shortName || c.name, 'aria-label': `${label}. Open its grades.`,
           style: { width: `${TW}px`, height: `${th}px`, '--sky-c': c.color, '--bcv-delay': `${120 + Math.min(i, 8) * 70}ms` },
           onclick: () => app.go(`${c.url}/grades`),
-        }, wins);
+        }, [wins, low]);
         const pct = U.text(`bcv-sky__pct ${first ? 'bcv-sky__pct--in' : ''}`, score === null ? '—' : `${Math.round(score)}%`, 'span');
         pct.style.setProperty('--bcv-delay', `${420 + Math.min(i, 8) * 70}ms`);
-        return { c, th, wins, tower, label, col: U.el('bcv-sky__col', [pct, tower], { dataset: { course: c.id } }) };
+        return { c, i, th, wins, low, tower, label, col: U.el('bcv-sky__col', [pct, tower], { dataset: { course: c.id } }) };
       });
       // the windows, as the courses' assignments come (the towers stand before them)
-      const paint = (byCourse, fresh) => {
+      const paint = (data, fresh) => {
         for (const x of cols) {
-          const rows = skyWindows(byCourse?.find((b) => b.c.id === x.c.id)?.list);
-          const f = skyFit(rows.length, TW - 10, x.th - 15);
-          x.wins.style.gridTemplateColumns = `repeat(${f.cols}, ${f.s}px)`;
-          x.wins.style.gridAutoRows = `${f.s}px`;
-          x.wins.style.gap = `${f.g}px`;
-          x.wins.classList.toggle('bcv-sky__wins--in', !!fresh);
-          x.wins.replaceChildren(...rows.map((r) => h('i', {
-            class: `bcv-sky__win ${r.band ? 'is-lit' : ''}`, dataset: { band: r.band || '' },
-            style: r.band ? { '--w': SKY_LIT[r.band] } : null,
-            title: `${r.a.name} · ${r.band ? `${store.fmtPts(r.score)} / ${store.fmtPts(r.a.points_possible ?? 0)} (${r.band})` : 'not graded yet'}`,
-          })));
-          const lit = rows.filter((r) => r.band).length;
-          x.tower.setAttribute('aria-label', `${x.label}, ${lit} graded, ${rows.length - lit} to come. Open its grades.`);
+          const rows = skyWindows(data.byCourse.find((b) => b.c.id === x.c.id)?.list, data.weights.get(x.c.id));
+          // (2.98.91) what counts from the top floor down; what does not, in grey, on the floors at the street — one size of
+          // window for both, fitted to the tower with room between the two
+          const up = rows.filter((r) => !r.free), down = rows.filter((r) => r.free);
+          const f = skyFit(rows.length, TW - 10, x.th - 7 - (down.length ? 7 : 0) - (up.length && down.length ? 6 : 0));
+          for (const g of [x.wins, x.low]) {
+            g.style.gridTemplateColumns = `repeat(${f.cols}, ${f.s}px)`;
+            g.style.gridAutoRows = `${f.s}px`;
+            g.style.gap = `${f.g}px`;
+          }
+          // (2.98.91) on entry the windows come in one by one in reading order, each flying out of its tower's top-left
+          // corner to its place, once the tower has risen (or at once, if the assignments landed after it had)
+          const fly = fresh && !U.reducedMotion();
+          const base = fly ? Math.max(0, 120 + Math.min(x.i, 8) * 70 + 520 - (performance.now() - drawnAt)) : 0;
+          const step = f.s + f.g;
+          const lowTop = x.th - 7 - (Math.ceil(down.length / f.cols) * step - f.g); // (where the street floors' grid starts)
+          const pane = (r, k, top, j) => h('i', {
+            class: `bcv-sky__win ${r.band ? 'is-lit' : ''} ${r.free ? 'is-free' : ''} ${fly ? 'bcv-sky__win--fly' : ''}`, dataset: { band: r.band || '' },
+            style: {
+              ...(r.band ? { '--w': SKY_LIT[r.band] } : {}),
+              ...(fly ? { '--wd': `${Math.round(base + k * 45)}ms`, '--fx': `${-((j % f.cols) * step + 7)}px`, '--fy': `${-(top + Math.floor(j / f.cols) * step + 1)}px` } : {}),
+            },
+            title: `${r.a.name} · ${r.band ? `${store.fmtPts(r.score)} / ${store.fmtPts(r.a.points_possible ?? 0)} (${r.band})` : r.a.submission?.excused ? 'excused' : 'not graded yet'}${r.free ? ' · does not count toward the grade' : ''}`,
+          });
+          x.wins.replaceChildren(...up.map((r, j) => pane(r, j, 7, j)));
+          x.low.replaceChildren(...down.map((r, j) => pane(r, up.length + j, lowTop, j)));
+          x.low.hidden = !down.length;
+          const lit = rows.filter((r) => r.band && !r.free).length, free = rows.filter((r) => r.free).length;
+          x.tower.setAttribute('aria-label', `${x.label}, ${lit} graded, ${rows.length - lit - free} to come${free ? `, ${free} not counted` : ''}. Open its grades.`);
         }
       };
       const card = U.card(U.el('bcv-sky', [
@@ -684,7 +720,7 @@
         U.el('bcv-sky__names', names.map((n) => U.text('bcv-sky__name bcv-ellip', n, 'span'))),
       ]), 'bcv-sky-card');
       if (skyLists) paint(skyLists, false);
-      else W.assignmentsP.then((b) => { skyLists = b || []; if (ctx.alive() && card.isConnected) paint(skyLists, true); });
+      else skyData().then((b) => { skyLists = b; if (ctx.alive() && card.isConnected) paint(skyLists, true); });
       return card;
     }
 

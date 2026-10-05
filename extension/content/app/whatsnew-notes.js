@@ -25,6 +25,10 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.98.91', date: '2026-10-05', notes: [
+      { kind: 'improved', title: 'Uncounted work in grey', body: 'Work that does not count is grey, at the bottom.', icon: P.layers },
+      { kind: 'improved', title: 'Windows fly in', body: 'Each window flies in from its tower\u2019s top-left corner.', icon: P.sparkle },
+    ] },
     { version: '2.98.90', date: '2026-10-05', notes: [
       { kind: 'new', title: 'A grades skyline', body: 'Each course is a tower; each assignment a lit window.', icon: P.layers },
     ] },
