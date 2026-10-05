@@ -57,7 +57,7 @@
     wrap.append(...Array.from(doc.body.childNodes));
     fitMath(wrap);
     fitLinks(wrap);
-    fitDark(wrap);
+    fitInk(wrap);
     return wrap;
   }
 
@@ -66,8 +66,8 @@
   // links in the text, and it outranks any class, so it used to paint those buttons' words in ours.
   // Every link starts out of our colour (bcv-ownlink); one that then shows the page's plain link
   // colour (a probe link's: Canvas's own, or the school's) takes ours back, and one the page colours
-  // itself — by a class, a style, a design tool's theme — keeps it. Runs before fitDark, in the same
-  // frame, so the dark pass reads the page's colour rather than ours.
+  // itself — by a class, a style, a design tool's theme — keeps it. Runs before fitInk, in the same
+  // frame, so the ink pass reads the page's colour rather than ours.
   function fitLinks(wrap) {
     const links = Array.from(wrap.querySelectorAll('a:not([class*="bcv-"])')); // (not our own: the embed's Open in new tab)
     if (!links.length) return;
@@ -110,79 +110,125 @@
     }
   }
 
-  // Canvas pages carry their own colours: a school's page template, an author's coloured panel, a
-  // banner with a light plate behind the text. The dark appearance recolours our own text, but it
-  // cannot recolour someone else's background — so a light panel would end up holding near-white
-  // text and read as blank. Anything the page itself paints an opaque light background on keeps
-  // dark ink instead (and its links a blue that reads on light). Measured once the prose is on the
-  // page, because the colour can come from the school's stylesheet as easily as from the markup.
-  //
-  // The other half of the same problem: text the page paints a dark colour on. Canvas's own editor
-  // writes #2D3B45 into a paste from Word, a school template sets near-black ink, a link comes in
-  // as Canvas blue — all written for a white page, all but invisible on ours. So any colour the
-  // page sets itself that is too dark to read here is turned over: the hue and (most of) the
-  // saturation it chose are kept, only its lightness is flipped, so a dark red stays a red.
-  const TOO_DARK = 0.42; // sunk into our background; our own dimmest ink (#8e8e93) is 0.56
-  const LIGHT_BG = 0.55; // a plate the page paints light enough to keep dark ink on
-  const OWN_BG = 0.35; // anything above this is light enough that dark text on it still reads
+  // Canvas pages carry their own colours — a school's page template, an author's coloured panel, a
+  // page-design tool's theme — all written for Canvas's white page. On ours, what sits behind a
+  // piece of text can be our card, a plate the page paints, or only part of what the page meant (a
+  // theme's dark band, with the light card that held the words on Canvas missing), and the page's
+  // ink can sink into any of them. So every piece of text the page colours itself is measured
+  // against what is really behind it — the nearest background the page paints inside the text, or
+  // else our card — and one that does not stand out from it by enough is given a colour that does:
+  // its own hue and (most of) its saturation kept, only its lightness moved, so a dark red stays a
+  // red. Our own ink on our own card is ours to colour and is left alone. Measured once the prose is on the
+  // page, in both appearances, since the colour can come from the school's stylesheet as easily as
+  // from the markup. In the dark appearance a plate the page paints light keeps dark ink
+  // (bcv-onlight), and a formula on it is not turned over.
+  const LIGHT_BG = 0.55; // a plate the page paints light enough to keep dark ink on (dark appearance)
+  const MIN_CONTRAST = 3; // below this the words are hard to make out
+  const AIM = 4.5; // what a colour that had to move is given: comfortable reading (WCAG's for body text)
   const rgbOf = (css) => {
     const m = /rgba?\(([^)]+)\)/.exec(css || '');
-    if (!m) return null;
-    const [r, g, b, a = 1] = m[1].split(',').map((n) => Number(n.trim()));
-    return { r, g, b, a, lum: (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255 };
+    if (m) {
+      const [r, g, b, a = 1] = m[1].split(/[\s,/]+/).filter(Boolean).map(Number);
+      return { r, g, b, a, lum: (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255 };
+    }
+    const hex = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(String(css || '').trim());
+    if (!hex) return null;
+    const x = hex[1].length === 3 ? hex[1].replace(/./g, '$&$&') : hex[1];
+    const [r, g, b] = [0, 2, 4].map((i) => parseInt(x.slice(i, i + 2), 16));
+    return { r, g, b, a: 1, lum: (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255 };
   };
-  /** The same colour with its lightness turned over: readable on black, still recognisably itself. */
-  function flip({ r, g, b }) {
+  /** Relative luminance, as contrast is measured (WCAG). */
+  const relLum = ({ r, g, b }) => {
+    const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
+    return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+  };
+  const contrast = (a, b) => (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+  function hslOf({ r, g, b }) {
     const R = r / 255, G = g / 255, B = b / 255;
     const mx = Math.max(R, G, B), mn = Math.min(R, G, B), d = mx - mn;
     const l = (mx + mn) / 2;
-    let hue = 0;
+    let h = 0;
     if (d) {
-      hue = mx === R ? ((G - B) / d) % 6 : mx === G ? (B - R) / d + 2 : (R - G) / d + 4;
-      hue = Math.round(hue * 60);
-      if (hue < 0) hue += 360;
+      h = mx === R ? ((G - B) / d) % 6 : mx === G ? (B - R) / d + 2 : (R - G) / d + 4;
+      h *= 60;
+      if (h < 0) h += 360;
     }
-    const sat = d ? Math.min(0.8, d / (1 - Math.abs(2 * l - 1))) : 0; // capped: a flipped colour should not glow
-    const light = Math.min(0.94, Math.max(0.72, 1 - l));
-    return `hsl(${hue}, ${Math.round(sat * 100)}%, ${Math.round(light * 100)}%)`;
+    return { h, s: d ? d / (1 - Math.abs(2 * l - 1)) : 0, l };
   }
-  // Only the elements that can carry a colour of the page's own are measured: anything with a style,
-  // a colour or a class of its own, a table cell, a span, a link (Canvas blue) — a plain paragraph
-  // or list item inherits ours and is skipped, which is most of a page. Each computed style is read
-  // once and kept for the pass (they are live objects, read before anything is written).
-  const COLOURED = '[style], [bgcolor], [color], [class], font, a, table, td, th, span, div, section, blockquote, pre, code, mark';
-  function fitDark(wrap) {
-    if (!BCV.app?.isDark?.()) return;
+  function rgbFromHsl(h, s, l) {
+    const k = (n) => (n + h / 30) % 12;
+    const a = s * Math.min(l, 1 - l);
+    const f = (n) => Math.round(255 * (l - a * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1))));
+    return { r: f(0), g: f(8), b: f(4) };
+  }
+  /** The colour moved to a lightness that reads on the plate behind it — lighter on a dark plate,
+   *  darker on a light one — starting from its lightness turned over and going on until it reads. */
+  function readable(c, plate) {
+    const { h, s, l } = hslOf(c);
+    const sat = Math.min(0.8, s); // capped: a moved colour should not glow
+    const pl = relLum(plate);
+    const up = contrast(pl, 1) >= contrast(pl, 0); // light words read better on this plate than dark ones
+    let light = up ? Math.min(0.96, Math.max(0.72, 1 - l)) : Math.max(0.08, Math.min(0.32, 1 - l));
+    for (let i = 0; i < 12 && contrast(relLum(rgbFromHsl(h, sat, light)), pl) < AIM; i++) light = up ? Math.min(0.98, light + 0.03) : Math.max(0.04, light - 0.03);
+    return `hsl(${Math.round(h)}, ${Math.round(sat * 100)}%, ${Math.round(light * 100)}%)`;
+  }
+  const XHTML = 'http://www.w3.org/1999/xhtml';
+  function fitInk(wrap) {
     let tries = 0;
     const pass = () => {
       if (!wrap.isConnected) { if (tries++ < 10) requestAnimationFrame(pass); return; }
-      const all = Array.from(wrap.querySelectorAll(COLOURED));
-      if (!all.length) return;
+      // every element that holds words of its own
+      const holders = new Set();
+      const tw = document.createTreeWalker(wrap, NodeFilter.SHOW_TEXT, { acceptNode: (n) => (/\S/.test(n.nodeValue) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT) });
+      while (tw.nextNode()) { const p = tw.currentNode.parentElement; if (p && p.namespaceURI === XHTML && !p.closest('.bcv-embed-open')) holders.add(p); }
+      if (!holders.size) return;
+      const dark = !!BCV.app?.isDark?.();
       const styles = new Map();
-      const styleOf = (el) => { let s = styles.get(el); if (!s) { s = getComputedStyle(el); styles.set(el, s); } return s; };
-      const plates = new Map(); // element → how light the page paints it, for the text pass below
-      for (const el of all) {
-        const bg = rgbOf(styleOf(el).backgroundColor);
-        if (!bg || !(bg.a > 0.5)) continue; // see-through: our own background is what shows
-        plates.set(el, bg.lum);
-        if (bg.lum > LIGHT_BG) el.classList.add('bcv-onlight');
-      }
-      // Read every colour before changing any, so a child is compared against what the page gave its
-      // parent rather than against what this pass just set there.
+      const styleOf = (el) => { let st = styles.get(el); if (!st) { st = getComputedStyle(el); styles.set(el, st); } return st; };
+      // what is behind the prose itself: the nearest of our own surfaces that is solid (a glass panel
+      // lets the page under it show, so it does not count), else our card's colour
+      let outer = null;
+      for (let p = wrap.parentElement; p && p !== document.body && !outer; p = p.parentElement) { const bg = rgbOf(styleOf(p).backgroundColor); if (bg && bg.a > 0.5) outer = bg; }
+      outer = outer || rgbOf(styleOf(wrap).getPropertyValue('--bcv-card')) || (dark ? { r: 28, g: 28, b: 30 } : { r: 255, g: 255, b: 255 });
+      // the plate behind an element: the nearest background the page paints inside the prose (a
+      // gradient by its first colour); a picture is one this cannot read, so its words are left as
+      // the page set them
+      const plates = new Map();
+      const plateOf = (el) => {
+        const seen = [];
+        let found;
+        for (let p = el; ; p = p.parentElement) {
+          if (plates.has(p)) { found = plates.get(p); break; }
+          seen.push(p);
+          if (p === wrap.parentElement || !p) { found = outer; break; }
+          const st = styleOf(p);
+          const img = st.backgroundImage && st.backgroundImage !== 'none' ? st.backgroundImage : '';
+          if (img && !/gradient/.test(img)) { found = null; break; }
+          const bg = (img && rgbOf(img)) || rgbOf(st.backgroundColor); // (a gradient read by its first colour)
+          if (bg && bg.a > 0.5) { found = bg; if (dark && bg.lum > LIGHT_BG) p.classList.add('bcv-onlight'); break; }
+        }
+        for (const p of seen) plates.set(p, found);
+        return found;
+      };
+      const behind = new Map();
+      for (const el of holders) behind.set(el, plateOf(el));
+      // read every colour (after the light plates have their dark ink) before changing any
+      const ours = styleOf(wrap).color;
       const fixes = [];
-      for (const el of all) {
-        if (el.closest('.bcv-onlight')) continue; // dark ink is the right ink there
+      for (const el of holders) {
+        const plate = behind.get(el);
+        if (!plate) continue;
         const colour = styleOf(el).color;
-        const mine = rgbOf(colour);
-        if (!mine || mine.lum > TOO_DARK) continue;
-        const parent = el.parentElement;
-        if (parent && styleOf(parent).color === colour) continue; // inherited, not set here
-        let plate = null; // the nearest background the page paints behind this text
-        for (let p = el; p && p !== wrap.parentElement; p = p.parentElement) if (plates.has(p)) { plate = plates.get(p); break; }
-        if (plate !== null && plate > OWN_BG) continue;
-        fixes.push([el, mine]);
+        const link = el.closest('a');
+        const oursHere = colour === ours || (link && !link.classList.contains('bcv-ownlink') && styleOf(link).color === colour); // our ink, or our link colour
+        if (oursHere && plate === outer) continue; // ours, on our own surface
+        const c = rgbOf(colour);
+        if (!c || c.a < 0.2) continue;
+        const seen = c.a < 1 ? { r: c.r * c.a + plate.r * (1 - c.a), g: c.g * c.a + plate.g * (1 - c.a), b: c.b * c.a + plate.b * (1 - c.a) } : c;
+        if (contrast(relLum(seen), relLum(plate)) >= MIN_CONTRAST) continue;
+        fixes.push([el, readable(seen, plate)]);
       }
-      for (const [el, mine] of fixes) el.style.setProperty('color', flip(mine), 'important');
+      for (const [el, colour] of fixes) el.style.setProperty('color', colour, 'important');
     };
     requestAnimationFrame(pass);
   }

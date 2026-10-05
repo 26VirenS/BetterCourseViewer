@@ -55,8 +55,8 @@
       c.favorite = on;
       draw();
       store.setFavorite(c.id, on).then(async () => {
+        app.loadShellData({ force: true }); // (first: the sidebar does not wait for the past courses this screen also asks for)
         const [cs, fl] = await Promise.all([store.courses({ force: true, past: true }).catch(() => null), store.favorites({ force: true }).catch(() => null)]);
-        app.loadShellData({ force: true });
         if (!ctx.alive()) return;
         if (cs) courses = cs;
         if (fl) {
@@ -138,8 +138,8 @@
       });
     }
     async function reloadLists() {
+      app.loadShellData({ force: true }); // (first: the sidebar does not wait for the past courses this screen also asks for)
       const [cs, fl] = await Promise.all([store.courses({ force: true, past: true }).catch(() => null), store.favorites({ force: true }).catch(() => null)]);
-      app.loadShellData({ force: true });
       if (!ctx.alive()) return;
       if (cs) courses = cs;
       if (fl) {

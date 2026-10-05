@@ -990,7 +990,7 @@ try {
   const pastRows = await texts('.bcv-body .bcv-row');
   const pastTerms = await page.$$eval('[data-term]', (els) => els.map((e) => e.dataset.term));
   check(pastRows.some((t) => /S26-CSE 022 01/.test(t)) && pastRows.some((t) => /F25-BIO 002 01/.test(t)) && !pastRows.some((t) => /Course 303|HIST/.test(t)) && pastTerms.join('|') === 'Spring 2026|Fall 2025' && !(await page.$('.bcv-body .bcv-row .bcv-ccard__star')),
-    `Past shows Canvas's past enrollments — the soft-ended one and the concluded one Canvas hands back only for enrollment_state=completed — by term, newest first, with no star (Canvas will not star a past course); the date-closed one stays out: ${pastTerms.join(', ')} · ${pastRows.length} rows`);
+    `Past shows Canvas's past enrollments — the soft-ended one, and the concluded one Canvas's course list never brings (found from the student's own completed enrollments, asked for by its id, past by its enrollment though its term has no dates) — by term, newest first, with no star (Canvas will not star a past course); the date-closed one stays out: ${pastTerms.join(', ')} · ${pastRows.length} rows`);
   await shot(page, '04c-courses-past');
   await page.click('.bcv-seg__btn[data-value="all"]');
   await page.fill('.bcv-search input', 'phys');
@@ -2795,6 +2795,25 @@ try {
     && btns.plain && !btns.plain.own && btns.plain.color === btns.ours && btns.ours !== 'rgb(3, 116, 181)',
     `a teacher's buttons look as on Canvas: the school's row of four and Canvas's grid of two each side by side, white on their own plates; a plain link in the text keeps our colour: ${JSON.stringify({ nav: btns.nav.map((b) => `${b.t}@${b.left},${b.top} ${b.color}/${b.bg}`), grid: btns.grid.map((b) => `${b.t}@${b.left},${b.top} ${b.color}`), plain: btns.plain, ours: btns.ours })}`);
   await shot(page, '06p-front-page-buttons');
+  // (2.98.96) words the page's own stylesheet colours dark, on a band it paints dark: measured against what is
+  // really behind them and given a lightness that reads, their hue kept; the buttons' white and our own text untouched
+  await eventually(() => page.evaluate(() => !!document.querySelector('.bcv-prose .scout-about p')?.style.color), 3000);
+  const inkLight = await page.evaluate(() => {
+    const rgb = (c) => { const m = /rgba?\(([^)]+)\)/.exec(c); return m ? m[1].split(/[\s,/]+/).filter(Boolean).map(Number) : null; };
+    const rl = ([r, g, b]) => { const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
+    const ratio = (a, b) => { const x = rl(a), y = rl(b); return +((Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05)).toFixed(2); };
+    const band = document.querySelector('.bcv-prose .scout-about');
+    const bg = rgb(getComputedStyle(band).backgroundColor);
+    const p = band.querySelector('p'), t = band.querySelector('.scout-about__title');
+    const pc = rgb(getComputedStyle(p).color), tc = rgb(getComputedStyle(t).color);
+    const btn = document.querySelector('.bcv-prose .scout-btn');
+    const plain = document.querySelector('.bcv-prose p:not(.bcv-t-aboutp)');
+    return { p: ratio(pc, bg), title: ratio(tc, bg), titleRed: tc[0] > tc[2], btnInline: btn.style.color || '', btnColor: getComputedStyle(btn).color, plainInline: plain.style.color || '' };
+  });
+  check(inkLight.p >= 4.5 && inkLight.title >= 4.5 && inkLight.titleRed && !inkLight.btnInline && inkLight.btnColor === 'rgb(255, 255, 255)' && !inkLight.plainInline,
+    `text the page colours dark on a band it paints dark is made readable (contrast 4.5 or more, its hue kept), in the light appearance too; the buttons and our own text are left alone: ${JSON.stringify(inkLight)}`);
+  await page.evaluate(() => document.querySelector('.bcv-prose .scout-about').scrollIntoView({ block: 'center' }));
+  await shot(page, '06q-front-page-band');
   await page.goto(`${BASE}/courses/101/grades`);
   await page.waitForSelector('.bcv-rings__svg', { timeout: 10000 });
   } // course
@@ -4491,6 +4510,25 @@ try {
   });
   check(flipped.lum > 0.6 && flipped.lum - flipped.bgLum > 0.5 && flipped.b > flipped.r, `dark ink the page set is turned over in the dark appearance, hue and all, rather than left on black: ${JSON.stringify(flipped)}`);
   await shot(page, '27d-dark-page-flipped');
+  // (2.98.96) the same in the dark appearance: the page's dark ink on the page's dark band is lifted until it reads
+  await page.goto(`${BASE}/courses/103`);
+  await page.waitForSelector('.bcv-prose .scout-about', { timeout: 10000 });
+  await eventually(() => page.evaluate(() => !!document.querySelector('.bcv-prose .scout-about p')?.style.color), 3000);
+  const inkDark = await page.evaluate(() => {
+    const rgb = (c) => { const m = /rgba?\(([^)]+)\)/.exec(c); return m ? m[1].split(/[\s,/]+/).filter(Boolean).map(Number) : null; };
+    const rl = ([r, g, b]) => { const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
+    const ratio = (a, b) => { const x = rl(a), y = rl(b); return +((Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05)).toFixed(2); };
+    const band = document.querySelector('.bcv-prose .scout-about');
+    const bg = rgb(getComputedStyle(band).backgroundColor);
+    const p = band.querySelector('p'), t = band.querySelector('.scout-about__title');
+    const pc = rgb(getComputedStyle(p).color), tc = rgb(getComputedStyle(t).color);
+    const btn = document.querySelector('.bcv-prose .scout-btn');
+    const plain = document.querySelector('.bcv-prose p:not(.bcv-t-aboutp)');
+    return { p: ratio(pc, bg), title: ratio(tc, bg), titleRed: tc[0] > tc[2], btnInline: btn.style.color || '', btnColor: getComputedStyle(btn).color, plainInline: plain.style.color || '' };
+  });
+  check(inkDark.p >= 4.5 && inkDark.title >= 4.5 && inkDark.titleRed && inkDark.btnColor === 'rgb(255, 255, 255)', `dark ink on a dark band the page paints reads in the dark appearance too (contrast 4.5 or more, hue kept): ${JSON.stringify(inkDark)}`);
+  await page.evaluate(() => document.querySelector('.bcv-prose .scout-about').scrollIntoView({ block: 'center' }));
+  await shot(page, '27e-dark-page-band');
   // punch-through pages: the hole is darkened by a filter unless "View in light mode" is on
   await page.goto(`${BASE}/courses/101/external_tools/9`);
   await page.waitForSelector('html.bcv-punch #content', { timeout: 10000 });

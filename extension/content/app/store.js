@@ -170,16 +170,37 @@
         maxPages: 5,
       }), { force, refresh, maxAge });
   }
-  /** The courses Canvas lists under Past Enrollments. The plain list leaves out an enrollment
-   *  that has been concluded; Canvas hands those back only when asked for completed ones. Only
-   *  All Courses asks (courses({ past: true })), so no other screen pays for the request. */
+  /** The courses Canvas lists under Past Enrollments. Canvas's course list never hands back an
+   *  enrollment that has been concluded — one a school concludes for each student as they finish
+   *  (an on-demand course), or a course the school closed — and asking it for completed ones only
+   *  filters the current list. So they are found from the student's own enrollments
+   *  (state[]=completed: concluded by date or by hand), and each course the list did not already
+   *  bring is asked for by its id; Canvas lets a past student read a concluded course. Its answer
+   *  carries no enrollment for a concluded one, so the enrollment found is put on it (completed,
+   *  with its grades). A course closed to the student by its dates refuses, and is left out, as
+   *  Canvas's own All Courses leaves it out. Only All Courses asks (courses({ past: true })), so
+   *  no other screen pays for the requests. */
+  const DONE_MAX = 50;
   function doneCourses({ force = false, refresh = false, maxAge = 0 } = {}) {
-    return C.cached('courses:done', 30 * MIN, () =>
-      C.get('/api/v1/courses', {
-        params: { per_page: 100, enrollment_state: 'completed', include: COURSE_INCLUDE },
-        all: true,
-        maxPages: 5,
-      }).catch(() => []), { force, refresh, maxAge });
+    return C.cached('courses:done', 30 * MIN, async () => {
+      const [enrs, list] = await Promise.all([
+        C.get('/api/v1/users/self/enrollments', { params: { per_page: 100, state: ['completed'] }, all: true, maxPages: 5 }).catch(() => []),
+        rawCourses().catch(() => []),
+      ]);
+      const have = new Set((list || []).filter((c) => !c.access_restricted_by_date).map((c) => String(c.id)));
+      const byCourse = new Map(); // course id → the enrollment that ended there
+      for (const e of enrs || []) {
+        const id = String(e.course_id || '');
+        if (id && !have.has(id) && !byCourse.has(id)) byCourse.set(id, e);
+      }
+      const got = await Promise.all([...byCourse.keys()].slice(0, DONE_MAX).map((id) => C.get(`/api/v1/courses/${id}`, { params: { include: COURSE_INCLUDE } }).catch(() => null)));
+      return got.filter((c) => c?.id && !c.access_restricted_by_date).map((c) => {
+        const e = byCourse.get(String(c.id)) || {};
+        const g = e.grades || {};
+        const ended = { type: e.type, role: e.role, enrollment_state: 'completed', computed_current_score: g.current_score ?? null, computed_current_grade: g.current_grade ?? null, computed_final_score: g.final_score ?? null, computed_final_grade: g.final_grade ?? null };
+        return { ...c, enrollments: [ended, ...(c.enrollments || [])] };
+      });
+    }, { force, refresh, maxAge });
   }
 
   function cards({ force = false, refresh = false } = {}) {
