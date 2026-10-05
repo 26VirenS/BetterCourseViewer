@@ -1105,6 +1105,9 @@ const server = http.createServer((req, res) => {
     // a session that has ended: like Canvas, every API call answers 401 "unauthenticated" (the pages themselves are still served here, so the app boots and finds out)
     if (mockConfig.sessionLost && path.startsWith('/api/')) return json(res, { status: 'unauthenticated', errors: [{ message: 'user authorization required' }] }, 401);
     if (path.startsWith('/api/')) lastApi = { method: req.method, path, headers: req.headers };
+    // POST /__mock/config {"apiDelay": {"/assignments$": 1500, "": 150}}: each API answer held this long, by the first pattern
+    // its path matches — a slow Canvas, for measuring how soon a screen has what it waits on
+    if (path.startsWith('/api/') && mockConfig.apiDelay) { const hit = Object.entries(mockConfig.apiDelay).find(([re]) => new RegExp(re).test(path)); if (hit) await new Promise((r) => setTimeout(r, Number(hit[1]) || 0)); }
     for (const [method, re, handler] of routes) {
       if (method !== req.method) continue;
       const m = path.match(re);

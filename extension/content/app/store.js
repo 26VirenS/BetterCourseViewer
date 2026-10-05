@@ -983,8 +983,11 @@
     return C.cached(`cstream:${kind}:${id}`, 3 * MIN, () => C.get(`/api/v1/${kind}/${id}/activity_stream`, { params: { per_page: 40 } }), { force, refresh });
   }
   function assignments(id, { force = false, refresh = false, maxAge = 0 } = {}) {
-    return C.cached(`assignments:${id}`, 3 * MIN, () =>
-      C.get(`/api/v1/courses/${id}/assignments`, { params: { per_page: 100, include: ['submission', 'all_dates'], order_by: 'due_at' }, all: true, maxPages: 4 }), { force, refresh, maxAge });
+    return C.cached(`assignments:${id}`, 3 * MIN, async () => {
+      const list = await C.get(`/api/v1/courses/${id}/assignments`, { params: { per_page: 100, include: ['submission', 'all_dates'], order_by: 'due_at' }, all: true, maxPages: 4 });
+      keep(id, { list: Array.isArray(list) ? list.map(liteAssignment) : null });
+      return list;
+    }, { force, refresh, maxAge });
   }
   function assignment(id, aid, { force = false, refresh = false, maxAge = 0 } = {}) {
     return C.cached(`assignment:${id}:${aid}`, 5 * MIN, () =>
@@ -996,8 +999,72 @@
       C.get(`/api/v1/courses/${id}/assignments/${aid}/submissions/self`, { params: { include: ['submission_comments', 'rubric_assessment', 'submission_history'] } }).catch(() => null), { force, refresh });
   }
   function assignmentGroups(id, { force = false, refresh = false, maxAge = 0 } = {}) {
-    return C.cached(`agroups:${id}`, 10 * MIN, () =>
-      C.get(`/api/v1/courses/${id}/assignment_groups`, { params: { per_page: 50, include: ['assignments', 'submission', 'score_statistics'], exclude_assignment_submission_types: ['wiki_page'] }, all: true, maxPages: 3 }), { force, refresh, maxAge }); // (score_statistics: the class's mean, high and low on each marked assignment)
+    return C.cached(`agroups:${id}`, 10 * MIN, async () => {
+      const groups = await C.get(`/api/v1/courses/${id}/assignment_groups`, { params: { per_page: 50, include: ['assignments', 'submission', 'score_statistics'], exclude_assignment_submission_types: ['wiki_page'] }, all: true, maxPages: 3 }); // (score_statistics: the class's mean, high and low on each marked assignment)
+      if (Array.isArray(groups)) keep(id, { weights: Object.fromEntries(groups.map((g) => [String(g.id), Number(g.group_weight) || 0])) });
+      return groups;
+    }, { force, refresh, maxAge });
+  }
+  // ---- kept between page loads (2.98.92) ------------------------------------------------------------------
+  // The Dashboard's grades skyline, Overdue and Graded this week all wait on every favourite course's assignments,
+  // which Canvas is slow to send, and the per-page memo starts empty on every page load. So each course's last
+  // answer is kept in storage.local — on this device only, for this site and this user, cut down to the fields those
+  // read (no descriptions, rubrics or comments) — to draw from at once, and replaced the moment Canvas answers again.
+  // A course's group weights are kept beside it (a weighted course's skyline reads them).
+  const keptKey = `kept:assignments:${location.host}`;
+  const KEPT_MAX = 16; // (courses; the oldest go first)
+  const KEPT_AGE = 14 * 24 * 60 * MIN; // (older than two weeks is not worth drawing from)
+  const keptUser = () => String(env().current_user_id || '');
+  function liteAssignment(a) {
+    const s = a.submission;
+    return {
+      id: a.id, name: a.name, due_at: a.due_at ?? null, lock_at: a.lock_at ?? null, points_possible: a.points_possible ?? null, grading_type: a.grading_type,
+      omit_from_final_grade: !!a.omit_from_final_grade, published: a.published, assignment_group_id: a.assignment_group_id, html_url: a.html_url,
+      submission_types: a.submission_types, quiz_id: a.quiz_id, is_quiz_assignment: a.is_quiz_assignment, locked_for_user: !!a.locked_for_user,
+      discussion_topic: a.discussion_topic?.id ? { id: a.discussion_topic.id } : undefined,
+      submission: s ? { score: s.score ?? null, grade: s.grade ?? null, workflow_state: s.workflow_state, posted_at: s.posted_at, excused: !!s.excused, submitted_at: s.submitted_at ?? null, graded_at: s.graded_at ?? null, late: !!s.late, missing: !!s.missing } : null,
+    };
+  }
+  let keptRead = null; // (one read per page load, kept up to date by this page's own writes)
+  const keepQueue = new Map();
+  let keepTimer = 0, keepChain = Promise.resolve();
+  function keep(courseId, part) {
+    if (!api?.storage?.local) return;
+    keepQueue.set(String(courseId), { ...(keepQueue.get(String(courseId)) || {}), ...part });
+    if (!keepTimer) keepTimer = setTimeout(flushKept, 120); // (the courses that answer together go in one write)
+  }
+  function flushKept() {
+    clearTimeout(keepTimer); keepTimer = 0;
+    if (!keepQueue.size) return;
+    const batch = [...keepQueue]; keepQueue.clear();
+    keepChain = keepChain.then(async () => { // (one write after another: each reads what the last one wrote)
+      try {
+        const all = (await api.storage.local.get(keptKey))[keptKey] || {};
+        const uid = keptUser(), at = Date.now();
+        let changed = false;
+        for (const [cid, p] of batch) {
+          const was = all[cid]?.uid === uid ? all[cid] : null;
+          // (the same answer again is not written: only refreshed once a day, so it does not age out)
+          if (was && at - (was.at || 0) < 24 * 60 * MIN && Object.keys(p).every((k) => JSON.stringify(p[k]) === JSON.stringify(was[k]))) continue;
+          all[cid] = { ...(was || {}), ...p, uid, at };
+          changed = true;
+        }
+        if (!changed) return;
+        const ids = Object.keys(all).sort((x, y) => (all[y].at || 0) - (all[x].at || 0));
+        for (const cid of ids.slice(KEPT_MAX)) delete all[cid];
+        await api.storage.local.set({ [keptKey]: all });
+        keptRead = Promise.resolve(all);
+      } catch { /* (nothing kept: the next page asks Canvas, as before) */ }
+    });
+  }
+  addEventListener('pagehide', flushKept); // (an answer that lands as the page is left is still kept)
+  /** What was kept for these courses: Map courseId → { list, weights } (only this user's, and not too old). */
+  async function keptAssignments() {
+    if (!keptRead) keptRead = (async () => {
+      try { return (await api.storage.local.get(keptKey))[keptKey] || {}; } catch { return {}; }
+    })();
+    const all = await keptRead, uid = keptUser(), now = Date.now();
+    return new Map(Object.entries(all).filter(([, v]) => v && v.uid === uid && now - (v.at || 0) < KEPT_AGE).map(([cid, v]) => [cid, { list: Array.isArray(v.list) ? v.list : null, weights: v.weights && typeof v.weights === 'object' ? v.weights : null }]));
   }
   // ---- grades change behind the page's back ------------------------------------------------------
   // A grade lands in Canvas while this page keeps what it read: a tool (an LTI plugin marking work
@@ -1545,6 +1612,7 @@
   }
 
   BCV.store = {
+    keptAssignments, // (2.98.92)
     env, pref, setPref, mergePref, me, account, colors, courses, favorites, cards, setFavorite, setNickname, currentTerm, dashboardView, setDashboardView, freshness, invalidateGrades,
     planner, classify, todo, todoWindow, setComplete, dismiss, restore, invalidatePlanner, plannerOverrides, createNote, createNotes, deleteNote, deleteNotes, REPEATS, repeatDates, activity, activitySummary, unreadCount, groups, group, workStatus, workFlags,
     announcementsFeed, streamSeen, markStreamSeen, setColor, history, helpLinks,

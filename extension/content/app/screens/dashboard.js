@@ -12,7 +12,7 @@
    *  done), what is overdue (and what was handed in late), what was graded this week (and the two
    *  before). Every list keeps to the course selection. Rows are the sheets' shape: { title, meta,
    *  course, color, tint, url, date }; an overdue row also carries its planner item and key, for the X. */
-  function workLists({ planner, favs, overrides = [], dark = false, now = new Date() }) {
+  function workLists({ planner, favs, overrides = [], dark = false, now = new Date(), lists = null }) {
     // every override, dismissed or not: an item's X changes the one it has rather than writing a second, which Canvas refuses
     const overrideByKey = new Map((Array.isArray(overrides) ? overrides : []).filter((o) => o && o.id).map((o) => [`${o.plannable_type}:${o.plannable_id}`, o]));
     const dismissedKeys = new Set([...overrideByKey].filter(([, o]) => o.dismissed).map(([k]) => k));
@@ -46,8 +46,9 @@
     const palOf = (c) => (c ? c.palette : U.palette('#8e8e93', dark));
     // Overdue and Graded this week read each selected course's assignments (their submissions carry
     // Canvas's own late / missing / graded_at flags). null when that fails: a card whose fetch fails
-    // is dropped rather than shown as 0 (a false 0 on Overdue reads as "fine").
-    const assignmentsP = Promise.all((favs || []).map(async (c) => ({ c, list: await store.assignments(c.id) }))).catch(() => null);
+    // is dropped rather than shown as 0 (a false 0 on Overdue reads as "fine"). (2.98.92) `lists` hands in those
+    // already asked for — or the ones kept from the last visit, which the Dashboard draws from first.
+    const assignmentsP = (lists || Promise.all((favs || []).map(async (c) => ({ c, list: await store.assignments(c.id) })))).catch(() => null);
     const overdueP = assignmentsP.then((byCourse) => {
       if (!byCourse || !planner) return null;
       // Overdue: past due with nothing handed in (Canvas's missing flag, or the due time passed) and
@@ -230,19 +231,36 @@
     // round trip away, not three. The saved view is read alongside the data rather than before it.
     const feedP = store.announcementsFeed().catch(() => null);
     let feedById = null; // set when the feed lands; the activity view reads it at draw time
-    const [planner, favs, courses, seen, savedView, settings, hidePref, overrides] = await Promise.all([
+    // (2.98.92) Overdue, Graded this week and the skyline wait on every favourite course's assignments, Canvas's slowest
+    // answer: asked for now, beside the planner rather than after it, with a weighted course's groups alongside — and
+    // drawn first from the copy kept from the last visit (store.keptAssignments), so they are there on arrival and put
+    // right, quietly, the moment Canvas answers.
+    const favsP = store.favorites().catch(() => []);
+    const freshP = favsP.then((fs) => Promise.all((fs || []).map(async (c) => ({ c, list: await store.assignments(c.id) })))).catch(() => null);
+    const ownWeightsP = store.pref('gradeWeights', {}).then((p) => (p && typeof p === 'object' ? p : {})).catch(() => ({}));
+    // what each group weighs where that decides what counts (2.98.91): the student's own weights for a course they set
+    // them on (its Grades tab), else Canvas's for a weighted course; a course weighted by points has none to ask
+    const weightMap = (o) => (o && typeof o === 'object' && Object.keys(o).length ? new Map(Object.entries(o).map(([g, w]) => [String(g), Number(w) || 0])) : null);
+    const groupWeights = (groups) => (Array.isArray(groups) ? new Map(groups.map((g) => [String(g.id), Number(g.group_weight) || 0])) : null);
+    const freshWeightsP = Promise.all([favsP, ownWeightsP]).then(([fs, own]) => Promise.all((fs || []).map(async (c) => [c.id, weightMap(own[c.id]) || (c.weighted ? groupWeights(await store.assignmentGroups(c.id).catch(() => null)) : null)]))).then((e) => new Map(e)).catch(() => new Map());
+    const [planner, favs, courses, seen, savedView, settings, hidePref, overrides, kept] = await Promise.all([
       store.planner().catch(() => null),
-      store.favorites().catch(() => []),
+      favsP,
       store.courses().catch(() => []),
       store.streamSeen().catch(() => new Set()), // stream items opened from here
       store.dashboardView().catch(() => 'list'),
       BCV.settings.get().catch(() => null),
       store.pref('dashHideDone', false).catch(() => false),
       store.plannerOverrides().catch(() => []), // what the X on the Overdue list wrote, on any device (see below)
+      store.keptAssignments().catch(() => null),
     ]);
     if (!ctx.alive()) return screen;
-    // the counters' lists, the same ones the phone's Today counts (workLists above)
-    const W = workLists({ planner, favs, overrides, dark });
+    // the counters' lists, the same ones the phone's Today counts (workLists above): from the kept copy when it holds
+    // every course (a part would count short), and again from Canvas's answer (Wf)
+    const keptBy = kept ? favs.map((c) => ({ c, list: kept.get(String(c.id))?.list })) : [];
+    const useKept = favs.length > 0 && keptBy.length === favs.length && keptBy.every((b) => Array.isArray(b.list));
+    const Wf = workLists({ planner, favs, overrides, dark, lists: freshP });
+    const W = useKept ? workLists({ planner, favs, overrides, dark, now: Wf.now, lists: Promise.resolve(keptBy) }) : Wf;
     const wanted = settings?.appearance?.dashboard || {};
     views = ALL_VIEWS.filter(([k]) => wanted[k] !== false);
     if (!views.length) views = ALL_VIEWS; // nothing chosen is not a dashboard: everything, as before
@@ -275,6 +293,7 @@
     // Entry motion (mockup 11) plays once, on the first draw: counters roll to their value, workload
     // bars wipe in. A redraw (view switch, a recolour) shows the final numbers at once.
     let entered = false;
+    const clearedKeys = new Set(); // (Overdue rows cleared with their X: gone from Canvas's answer too, should it still hold them)
     const t0 = Date.now();
 
     function statsBlock() {
@@ -378,34 +397,53 @@
         }, from)));
       }
       cards.push(gradedCard);
-      Promise.all([W.overdueP, W.gradedP]).then(([od, gr]) => {
-        if (!ctx.alive()) return;
-        if (!od || !gr) { overdueCard.remove(); gradedCard.remove(); return; }
-        // Each Overdue row has an X: the item is dismissed on Canvas's planner — the same call as the To
-        // Do screen's X, so it leaves that list too and every device agrees (workLists reads the rest)
-        const { overdue, lateIn } = od;
-        const paintOverdue = () => {
-          if (overdueCard.isConnected) land(overdueCard, overdue.length, overdue.length ? U.plural(overdue.length, 'not submitted', 'not submitted') : 'Nothing overdue', 6.9);
-          Object.assign(overdueSheet, {
-            value: String(overdue.length), items: overdue, empty: 'Nothing is overdue.', lead: 'Not handed in', recent: recentOf('Handed in late', lateIn),
-            note: overdue.length ? 'Past due with nothing handed in' : 'Nothing past its due date without a submission',
-          });
-        };
-        const clearOverdue = async (o) => {
-          await store.dismiss(o.item); // on Canvas: a failure leaves the row where it is
-          const i = overdue.indexOf(o);
-          if (i >= 0) overdue.splice(i, 1);
-          paintOverdue();
-        };
-        for (const o of overdue) o.clear = () => clearOverdue(o);
+      // (2.98.92) from the kept copy first (W), then from Canvas's answer (Wf): a count that changed is put right without
+      // rolling again, and a failed answer leaves the kept count where it is rather than dropping the card
+      let shown = ''; // '' · 'kept' · 'fresh'
+      let overdue = [], lateIn = []; // (the Overdue list on show: the kept one, then Canvas's)
+      const put = (card, count, note, seed, still) => {
+        if (!still) land(card, count, note, seed);
+        else {
+          const valueEl = card.querySelector('.bcv-stat__value');
+          if (card._bcvN !== count) { clearInterval(valueEl._bcvRoll); valueEl._bcvRoll = null; delete valueEl.dataset.rolling; valueEl.textContent = String(count); } // (the same count is left to finish its roll)
+          card.querySelector('.bcv-stat__note').textContent = note;
+        }
+        card._bcvN = count;
+      };
+      const paintOverdue = (still = false) => {
+        put(overdueCard, overdue.length, overdue.length ? U.plural(overdue.length, 'not submitted', 'not submitted') : 'Nothing overdue', 6.9, still);
+        Object.assign(overdueSheet, {
+          value: String(overdue.length), items: overdue, empty: 'Nothing is overdue.', lead: 'Not handed in', recent: recentOf('Handed in late', lateIn),
+          note: overdue.length ? 'Past due with nothing handed in' : 'Nothing past its due date without a submission',
+        });
+      };
+      // Each Overdue row has an X: the item is dismissed on Canvas's planner — the same call as the To
+      // Do screen's X, so it leaves that list too and every device agrees (workLists reads the rest)
+      const clearOverdue = async (o) => {
+        await store.dismiss(o.item); // on Canvas: a failure leaves the row where it is
+        clearedKeys.add(o.key); // (and it stays cleared when Canvas's answer replaces the kept list)
+        const i = overdue.findIndex((x) => x.key === o.key);
+        if (i >= 0) overdue.splice(i, 1);
         paintOverdue();
+      };
+      const show = ([od, gr], fresh) => {
+        if (!ctx.alive() || shown === 'fresh') return;
+        const again = !!shown;
+        if (!od || !gr) { if (!again) { overdueCard.remove(); gradedCard.remove(); } return; }
+        shown = fresh ? 'fresh' : 'kept';
+        overdue = od.overdue.filter((o) => !clearedKeys.has(o.key));
+        lateIn = od.lateIn;
+        for (const o of overdue) o.clear = () => clearOverdue(o);
+        paintOverdue(again);
         const { graded, earlier, earned, possible } = gr;
-        land(gradedCard, graded.length, graded.length ? `${store.fmtPts(earned)} / ${store.fmtPts(possible)} points` : 'No grades posted this week', 9.2);
+        put(gradedCard, graded.length, graded.length ? `${store.fmtPts(earned)} / ${store.fmtPts(possible)} points` : 'No grades posted this week', 9.2, again);
         gradedSheet = {
           label: 'Graded this week', value: String(graded.length), icon: IC.chart, color: '#5856d6', items: graded, empty: 'Nothing has been graded this week.', lead: 'This week', recent: recentOf('Earlier', earlier),
           note: graded.length ? `${store.fmtPts(earned)} of ${store.fmtPts(possible)} points earned · week of ${U.fmtShort(weekStart)}` : `Week of ${U.fmtShort(weekStart)}`,
         };
-      });
+      };
+      if (W !== Wf) Promise.all([W.overdueP, W.gradedP]).then((r) => show(r, false));
+      Promise.all([Wf.overdueP, Wf.gradedP]).then((r) => show(r, true));
       return U.el('bcv-stats', cards);
     }
     let statIndex = 0;
@@ -641,21 +679,12 @@
     }
 
     // ---- grades skyline (2.98.90) -----------------------------------------------------------------
-    let skyLists = null; // (each course's assignments, once they land: a redraw paints its windows at once)
-    // (2.98.91) and what each group weighs where that decides what counts: the student's own weights for a course they
-    // set them on (its Grades tab), else Canvas's for a weighted course; a course weighted by points has none to ask
-    const skyData = async () => {
-      const [byCourse, ownPref] = await Promise.all([W.assignmentsP, store.pref('gradeWeights', {}).catch(() => ({}))]);
-      const own = ownPref && typeof ownPref === 'object' ? ownPref : {};
-      const weights = new Map(await Promise.all(favs.map(async (c) => {
-        const mine = own[c.id] && typeof own[c.id] === 'object' && Object.keys(own[c.id]).length ? own[c.id] : null;
-        if (mine) return [c.id, new Map(Object.entries(mine).map(([g, w]) => [String(g), Number(w) || 0]))];
-        if (!c.weighted) return [c.id, null];
-        const groups = await store.assignmentGroups(c.id).catch(() => null);
-        return [c.id, groups ? new Map(groups.map((g) => [String(g.id), Number(g.group_weight) || 0])) : null];
-      })));
-      return { byCourse: byCourse || [], weights };
-    };
+    // each course's assignments and group weights: the kept copy's first, then Canvas's (see the top of render)
+    let skyLists = null, skyFresh = false, skyGen = 0; // (the last that landed — a redraw paints its windows at once — and whose)
+    const skyKeptP = useKept ? ownWeightsP.then((own) => ({ byCourse: keptBy, weights: new Map(favs.map((c) => [c.id, weightMap(own[c.id]) || (c.weighted ? weightMap(kept.get(String(c.id))?.weights) : null)])) })) : null;
+    const skyFreshP = Promise.all([freshP, freshWeightsP]).then(([byCourse, weights]) => (byCourse ? { byCourse, weights } : null)).catch(() => null);
+    // what the windows show, to tell whether Canvas's answer changed any of them
+    const skySig = (data) => favs.map((c) => skyWindows(data.byCourse.find((b) => b.c.id === c.id)?.list, data.weights.get(c.id)).map((r) => `${r.a.id}:${r.band || ''}:${r.free ? 1 : 0}:${r.score ?? ''}`).join(',')).join('|');
     function skylineBlock() {
       if (!favs.length) return null;
       const first = !entered && !U.reducedMotion();
@@ -677,8 +706,9 @@
         pct.style.setProperty('--bcv-delay', `${420 + Math.min(i, 8) * 70}ms`);
         return { c, i, th, wins, low, tower, label, col: U.el('bcv-sky__col', [pct, tower], { dataset: { course: c.id } }) };
       });
-      // the windows, as the courses' assignments come (the towers stand before them)
+      // the windows, as the courses' assignments come (the towers stand before them); returns when the last has flown in
       const paint = (data, fresh) => {
+        let end = 0;
         for (const x of cols) {
           const rows = skyWindows(data.byCourse.find((b) => b.c.id === x.c.id)?.list, data.weights.get(x.c.id));
           // (2.98.91) what counts from the top floor down; what does not, in grey, on the floors at the street — one size of
@@ -695,6 +725,7 @@
           const fly = fresh && !U.reducedMotion();
           const base = fly ? Math.max(0, 120 + Math.min(x.i, 8) * 70 + 520 - (performance.now() - drawnAt)) : 0;
           const step = f.s + f.g;
+          if (fly) end = Math.max(end, base + rows.length * 45 + 650);
           const lowTop = x.th - 7 - (Math.ceil(down.length / f.cols) * step - f.g); // (where the street floors' grid starts)
           const pane = (r, k, top, j) => h('i', {
             class: `bcv-sky__win ${r.band ? 'is-lit' : ''} ${r.free ? 'is-free' : ''} ${fly ? 'bcv-sky__win--fly' : ''}`, dataset: { band: r.band || '' },
@@ -710,6 +741,21 @@
           const lit = rows.filter((r) => r.band && !r.free).length, free = rows.filter((r) => r.free).length;
           x.tower.setAttribute('aria-label', `${x.label}, ${lit} graded, ${rows.length - lit - free} to come${free ? `, ${free} not counted` : ''}. Open its grades.`);
         }
+        return performance.now() + end;
+      };
+      // (2.98.92) the kept copy's windows fly in the moment it is read; Canvas's answer, when it changes any, is put in
+      // still once they have landed (the same windows are left alone)
+      const gen = ++skyGen;
+      let onScreen = null, flyEnd = 0, later = 0;
+      const show = (data, fly) => {
+        if (!ctx.alive() || gen !== skyGen) return;
+        const sig = skySig(data);
+        if (sig === onScreen) return;
+        const was = onScreen;
+        onScreen = sig;
+        clearTimeout(later);
+        if (was === null) flyEnd = paint(data, fly);
+        else later = setTimeout(() => { if (ctx.alive() && gen === skyGen) paint(data, false); }, Math.max(0, flyEnd - performance.now()));
       };
       const card = U.card(U.el('bcv-sky', [
         U.el('bcv-sky__head', [
@@ -719,8 +765,11 @@
         U.el('bcv-sky__city', cols.map((x) => x.col)),
         U.el('bcv-sky__names', names.map((n) => U.text('bcv-sky__name bcv-ellip', n, 'span'))),
       ]), 'bcv-sky-card');
-      if (skyLists) paint(skyLists, false);
-      else skyData().then((b) => { skyLists = b; if (ctx.alive() && card.isConnected) paint(skyLists, true); });
+      if (skyLists) show(skyLists, false);
+      if (!skyFresh) {
+        if (!skyLists && skyKeptP) skyKeptP.then((d) => { if (!skyFresh) { skyLists = d; show(d, true); } });
+        skyFreshP.then((d) => { if (!d) return; skyLists = d; skyFresh = true; show(d, true); });
+      }
       return card;
     }
 

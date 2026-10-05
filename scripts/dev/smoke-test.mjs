@@ -761,6 +761,32 @@ try {
   await shot(page, '01a-dashboard-skyline');
   await page.click('.bcv-sky__col[data-course="101"] .bcv-sky__tower');
   check(await page.waitForFunction(() => location.pathname === '/courses/101/grades', null, { timeout: 8000 }).then(() => true).catch(() => false), 'a tower opens its course\'s grades');
+  // (2.98.92) a return visit draws Overdue, Graded this week and the skyline at once, from what this device kept of the
+  // courses' assignments last time — before Canvas answers (here every course's held 5 s) — and when Canvas does answer
+  // with the same, nothing moves: the counts stay and the very same windows stay up
+  const statsNow = () => page.evaluate(() => {
+    const v = (l) => [...document.querySelectorAll('.bcv-stat')].find((c) => c.textContent.includes(l))?.querySelector('.bcv-stat__value')?.textContent || '';
+    return { o: v('Overdue'), g: v('Graded this week'), wins: [...document.querySelectorAll('.bcv-sky__col:first-child .bcv-sky__win')].map((w) => w.dataset.band || '-').join(''), rolling: !!document.querySelector('.bcv-stat__value[data-rolling]') };
+  });
+  await page.goto(`${BASE}/`);
+  await page.waitForFunction(() => document.querySelector('.bcv-sky__win') && [...document.querySelectorAll('.bcv-stat__value')].every((e) => /^\d+$/.test(e.textContent) && !e.dataset.rolling), null, { timeout: 15000 });
+  const keptRef = await statsNow();
+  await page.waitForTimeout(300); // (the answer kept: a write follows Canvas's answer by a moment)
+  await mockConfig({ apiDelay: { '/courses/\\d+/assignments$': 5000 } });
+  const keptT0 = Date.now();
+  const answered = Promise.all(['101', '102', '103', '104', '105'].map((id) => page.waitForResponse((r) => new URL(r.url()).pathname === `/api/v1/courses/${id}/assignments`, { timeout: 15000 }).catch(() => null)));
+  await page.goto(`${BASE}/`);
+  const keptIn = await page.waitForFunction(() => { const v = (l) => [...document.querySelectorAll('.bcv-stat')].find((c) => c.textContent.includes(l))?.querySelector('.bcv-stat__value')?.textContent || ''; return /^\d+$/.test(v('Overdue')) && /^\d+$/.test(v('Graded this week')) && !!document.querySelector('.bcv-sky__win'); }, null, { timeout: 4500 }).then(() => Date.now() - keptT0).catch(() => null);
+  await page.waitForFunction(() => !document.querySelector('.bcv-stat__value[data-rolling]'), null, { timeout: 4000 }).catch(() => {});
+  const keptDrawn = await statsNow();
+  await page.evaluate(() => document.querySelectorAll('.bcv-sky__win').forEach((w) => { w.dataset.seen = '1'; }));
+  await answered;
+  await page.waitForTimeout(400);
+  const keptAfter = await statsNow();
+  const sameWins = await page.evaluate(() => [...document.querySelectorAll('.bcv-sky__win')].length > 0 && [...document.querySelectorAll('.bcv-sky__win')].every((w) => w.dataset.seen === '1'));
+  await mockConfig({ apiDelay: null });
+  check(keptIn !== null && keptDrawn.o === keptRef.o && keptDrawn.g === keptRef.g && keptDrawn.wins === keptRef.wins && keptAfter.o === keptRef.o && keptAfter.g === keptRef.g && keptAfter.wins === keptRef.wins && sameWins,
+    `a return visit draws Overdue (${keptDrawn.o}), Graded this week (${keptDrawn.g}) and the skyline's windows from the kept copy ${keptIn} ms in, before Canvas's answer (held 5 s); the same answer then changes nothing on screen: ${JSON.stringify({ keptRef, keptDrawn, keptAfter, sameWins })}`);
   await page.goto(`${BASE}/`);
   await page.waitForSelector('.bcv-day .bcv-row', { timeout: 10000 });
   const dayHeads = await texts('.bcv-day__head');

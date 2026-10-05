@@ -557,10 +557,17 @@
     screen.append(bigTitle('Today', { above: `${U.DAYS_LONG[now.getDay()]}, ${U.MONTHS_LONG[now.getMonth()]} ${now.getDate()}`, right: U.el('bcv-ph-title__right', [bell, avatarBtn]) }), ...(omni ? [U.el('bcv-ph-search', omni)] : []), body);
     body.append(U.loading('rows', 4));
 
-    const [planner, sel, feed, me, notifs, overrides] = await Promise.all([store.planner().catch(() => null), selection(), store.announcementsFeed().catch(() => null), store.me().catch(() => null), store.notifUnread().catch(() => null), store.plannerOverrides().catch(() => [])]);
+    // (2.98.92) the courses' assignments asked for beside the planner, and Overdue and Graded counted first from the copy
+    // kept from the last visit, then again from Canvas's answer — the Dashboard's way
+    const selP = selection();
+    const freshP = selP.then((s) => Promise.all((s.list || []).map(async (c) => ({ c, list: await store.assignments(c.id) })))).catch(() => null);
+    const [planner, sel, feed, me, notifs, overrides, kept] = await Promise.all([store.planner().catch(() => null), selP, store.announcementsFeed().catch(() => null), store.me().catch(() => null), store.notifUnread().catch(() => null), store.plannerOverrides().catch(() => []), store.keptAssignments().catch(() => null)]);
     if (!ctx.alive()) return screen;
     // the Dashboard's own lists (screens/dashboard.js workLists): the same counts, the same sheets
-    const W = BCV.screens.dashboard.workLists({ planner, favs: sel.list, overrides, dark: app.isDark(), now });
+    const keptBy = kept ? sel.list.map((c) => ({ c, list: kept.get(String(c.id))?.list })) : [];
+    const useKept = sel.list.length > 0 && keptBy.every((b) => Array.isArray(b.list));
+    const Wf = BCV.screens.dashboard.workLists({ planner, favs: sel.list, overrides, dark: app.isDark(), now, lists: freshP });
+    const W = useKept ? BCV.screens.dashboard.workLists({ planner, favs: sel.list, overrides, dark: app.isDark(), now, lists: Promise.resolve(keptBy) }) : Wf;
     avatarBtn.replaceChildren(me?.avatar && !/avatar-50|no_pic|dotted_pic/.test(me.avatar) ? h('img', { src: me.avatar, alt: '', referrerpolicy: 'no-referrer' }) : h('span', { text: U.initials(me?.name || '') || '·' }));
     if (notifs) { badge.textContent = String(notifs); badge.hidden = false; }
     const favs = sel.list;
@@ -612,20 +619,32 @@
       stat('Tomorrow', String(dueTomorrow.length), dueSheet('Due tomorrow', dueTomorrow, U.addDays(todayStart, 1), U.addDays(todayStart, 2), dayLine(U.addDays(todayStart, 1)), 'Nothing is due tomorrow.'), 3.4),
       gradedBtn,
     ]);
-    Promise.all([W.overdueP, W.gradedP]).then(([od, gr]) => {
-      if (!ctx.alive()) return;
-      if (!od || !gr) { overdueBtn.remove(); gradedBtn.remove(); return; }
-      const { overdue, lateIn } = od;
+    let shown = ''; // '' · 'kept' · 'fresh'
+    const cleared = new Set(); // (rows cleared with their X stay cleared when Canvas's answer comes)
+    const show = ([od, gr], fresh) => {
+      if (!ctx.alive() || shown === 'fresh') return;
+      const again = !!shown;
+      if (!od || !gr) { if (!again) { overdueBtn.remove(); gradedBtn.remove(); } return; } // (a failed answer leaves the kept counts)
+      shown = fresh ? 'fresh' : 'kept';
+      // a count Canvas's answer changed is put right without rolling again
+      const put = (btn, n, seed) => {
+        const v = btn.querySelector('.bcv-ph-stat__value');
+        if (!again) land(btn, n, seed);
+        else if (v && btn._bcvN !== n) { clearInterval(v._bcvRoll); v._bcvRoll = null; delete v.dataset.rolling; v.textContent = String(n); }
+        btn._bcvN = n;
+      };
+      const overdue = od.overdue.filter((o) => !cleared.has(o.key));
+      const { lateIn } = od;
       const overdueNote = () => (overdue.length ? 'Past due with nothing handed in' : 'Nothing past its due date without a submission');
       // the X on a row dismisses it on Canvas's planner — the Dashboard's X, the To Do screen's
-      for (const o of overdue) o.clear = async () => { await store.dismiss(o.item); const i = overdue.indexOf(o); if (i >= 0) overdue.splice(i, 1); land(overdueBtn, overdue.length, 0); };
+      for (const o of overdue) o.clear = async () => { await store.dismiss(o.item); cleared.add(o.key); const i = overdue.indexOf(o); if (i >= 0) overdue.splice(i, 1); land(overdueBtn, overdue.length, 0); overdueBtn._bcvN = overdue.length; };
       overdueN = {
         open: () => itemsSheet(app, {
           title: 'Overdue', note: overdueNote(), items: overdue, empty: 'Nothing is overdue.', lead: 'Not handed in', recent: W.recentOf('Handed in late', lateIn),
           onCleared: (sheet) => { const n = sheet.querySelector('.bcv-ph-sheet__note'); if (n) n.textContent = overdueNote(); if (!sheet.querySelector('.bcv-ph-srow__item')) { const lead = sheet.querySelector('.bcv-ph-sheet__sec'); lead?.replaceWith(emptyRow('Nothing is overdue.')); } },
         }),
       };
-      land(overdueBtn, overdue.length, 6.9);
+      put(overdueBtn, overdue.length, 6.9);
       overdueBtn.classList.toggle('is-clear', !overdue.length);
       const { graded, earlier, earned, possible } = gr;
       gradedN = {
@@ -634,8 +653,10 @@
           items: graded, empty: 'Nothing has been graded this week.', lead: 'This week', recent: W.recentOf('Earlier', earlier),
         }),
       };
-      land(gradedBtn, graded.length, 9.2);
-    });
+      put(gradedBtn, graded.length, 9.2);
+    };
+    if (W !== Wf) Promise.all([W.overdueP, W.gradedP]).then((r) => show(r, false));
+    Promise.all([Wf.overdueP, Wf.gradedP]).then((r) => show(r, true));
 
     // the list: what is due today (or, on a quiet day, what comes next)
     const list = dueToday.length ? dueToday : upcoming.slice(0, 6);
