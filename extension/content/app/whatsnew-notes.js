@@ -25,6 +25,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.98.94', date: '2026-10-05', notes: [
+      { kind: 'improved', title: 'Next 7 days', body: 'The week card counts the next 7 days, from today.', icon: P.clock },
+    ] },
     { version: '2.98.93', date: '2026-10-05', notes: [
       { kind: 'improved', title: 'Windows fade in', body: 'Skyline windows fade in place, no bounce.', icon: P.sparkle },
     ] },

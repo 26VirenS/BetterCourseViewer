@@ -54,7 +54,7 @@
   // the six counters, with made-up numbers — each with the label, the glyph and the colour the Dashboard gives it (screens/dashboard.js)
   const CARDS = [
     ['today', 'Due today', '3', '25 points total', PIC.clock, '#ff453a'],
-    ['week', 'Due this week', '12', 'Across 4 courses', PIC.cal, '#34c759'],
+    ['week', 'Next 7 days', '12', 'Across 4 courses', PIC.cal, '#34c759'],
     ['unread', 'Unread announcements', '2', 'From 2 courses', PIC.bell, '#ff9500'],
     ['overdue', 'Overdue', '0', 'Nothing overdue', PIC.clock, '#ff453a'],
     ['tomorrow', 'Due tomorrow', '1', '10 points total', PIC.clock, '#ff9f0a'],

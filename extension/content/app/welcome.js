@@ -73,7 +73,7 @@
   /** The sidebar's list of starred courses, when they are listed there (the group with course rows in it). */
   const favsGroup = () => drawn([...document.querySelectorAll('#bcv-side .bcv-side__group')].find((el) => el.querySelector('.bcv-fav')) || null);
   const quickNav = () => $('.bcv-quicknav'); // (the panel the Courses row opens under the pointer, when the courses are not listed in the sidebar)
-  const weekCard = () => $('#bcv-app .bcv-stat[data-stat="week"]') || $('.bcv-ph-stats .bcv-ph-stat:nth-child(2)'); // (the Dashboard's Due this week, or Today's This week on a phone)
+  const weekCard = () => $('#bcv-app .bcv-stat[data-stat="week"]') || $('.bcv-ph-stats .bcv-ph-stat:nth-child(2)'); // (the Dashboard's Next 7 days, on a phone Today's)
   const sheet = () => $('.bcv-sheet-ov .bcv-sheet');
   const sheetClose = () => $('.bcv-sheet-ov .bcv-sheet__close');
   const firstRow = () => $('.bcv-sheet-ov .bcv-sheet__row');
@@ -186,8 +186,8 @@
     ],
     // the Dashboard's way in (2.98.18): a card's own sheet, an item previewed beside the list
     peek: () => [
-      { id: 'peek', name: 'Due this week', target: weekCard, wait: 6000,
-        title: 'The cards open', body: 'Click a card to see what’s in it.', act: 'click', doing: phone() ? 'Tap This week' : 'Click Due this week',
+      { id: 'peek', name: 'Next 7 days', target: weekCard, wait: 6000,
+        title: 'The cards open', body: 'Click a card to see what’s in it.', act: 'click', doing: phone() ? 'Tap Next 7 days' : 'Click Next 7 days',
         done: () => !!sheet() },
       { id: 'peek-row', name: 'an item', target: firstRow, area: () => [sheet()], when: () => !phone(), allow: '.bcv-sheet-ov .bcv-sheet__row, .bcv-sheet-ov .bcv-sheet__qrow',
         title: 'A quick look', body: 'Click anything to preview it here.', act: 'click', doing: 'Click an item',

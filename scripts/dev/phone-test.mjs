@@ -160,7 +160,7 @@ try {
   // (2.98.36) the Dashboard's six counters, counted the Dashboard's way: Overdue and Graded land once each course's assignments are read
   await eventually(async () => !(await texts('.bcv-ph-stat')).some((t) => /…/.test(t)), 8000);
   const stats = await texts('.bcv-ph-stat');
-  check(stats.length === 6 && /^Due today \d+$/.test(stats[0]) && /^This week \d+$/.test(stats[1]) && /^Unread \d+$/.test(stats[2]) && /^Overdue \d+$/.test(stats[3]) && /^Tomorrow \d+$/.test(stats[4]) && /^Graded \d+$/.test(stats[5]), `six counters, rolled to their values: ${stats.join(' | ')}`);
+  check(stats.length === 6 && /^Due today \d+$/.test(stats[0]) && /^Next 7 days \d+$/.test(stats[1]) && /^Unread \d+$/.test(stats[2]) && /^Overdue \d+$/.test(stats[3]) && /^Tomorrow \d+$/.test(stats[4]) && /^Graded \d+$/.test(stats[5]), `six counters, rolled to their values: ${stats.join(' | ')}`);
   check((await texts('.bcv-ph-ghead__t')).some((t) => /^(Today|Tonight|Next up)$/.test(t)) && (await page.$$('.bcv-ph-row')).length > 0, `the day's list: ${(await texts('.bcv-ph-ghead__t')).join(', ')}`);
   check((await raw('.bcv-ph-kicker')).includes('Week load') && (await page.$$('.bcv-ph-load__row')).length > 0, 'week load card with per-course bars');
   check(await visible('.bcv-ph-bell') && await visible('.bcv-ph-avatar') && !(await page.$('.bcv-reader-btn:not([hidden])')), 'the bell and the avatar on the title row; no reader button anywhere on the phone');
@@ -169,7 +169,7 @@ try {
 
   await press('.bcv-ph-stat:nth-child(2)');
   await sheet();
-  check((await texts('.bcv-ph-sheet__title'))[0] === 'Due this week' && (await page.$$('.bcv-ph-srow')).length > 0 && await visible('.bcv-ph-sheet__handle'), 'a counter opens its list as a bottom sheet with a grab handle');
+  check((await texts('.bcv-ph-sheet__title'))[0] === 'Next 7 days' && (await page.$$('.bcv-ph-srow')).length > 0 && await visible('.bcv-ph-sheet__handle'), 'a counter opens its list as a bottom sheet with a grab handle');
   await shot('01b-today-sheet');
   // dragging the handle down past 110px dismisses; a short drag springs back
   const handle = await page.$eval('.bcv-ph-sheet__handle', (el) => { const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
@@ -816,7 +816,7 @@ try {
   // and Away Refresh is off unless turned on (2.98.13), so the welcome here is the Dashboard pointer alone
   await tourStep('peek', 20000);
   const ph1 = await tourAt();
-  check((await page.$('#bcv-setup')) === null && page.url() === `${BASE}/` && /^(reload|navigate)$/.test(await page.evaluate(() => performance.getEntriesByType('navigation')[0]?.type)) && ph1.steps === 'peek,peek-close,search,end' && ph1.bg === 'rgba(0, 0, 0, 0)' && ph1.title === 'The cards open' && ph1.doing === 'Tap This week' && ph1.fits && !!ph1.ring, `the reload comes back with the tour over Today — what a phone has: its This week counter lit, a tap asked for, the card on the screen: ${JSON.stringify(ph1)}`);
+  check((await page.$('#bcv-setup')) === null && page.url() === `${BASE}/` && /^(reload|navigate)$/.test(await page.evaluate(() => performance.getEntriesByType('navigation')[0]?.type)) && ph1.steps === 'peek,peek-close,search,end' && ph1.bg === 'rgba(0, 0, 0, 0)' && ph1.title === 'The cards open' && ph1.doing === 'Tap Next 7 days' && ph1.fits && !!ph1.ring, `the reload comes back with the tour over Today — what a phone has: its This week counter lit, a tap asked for, the card on the screen: ${JSON.stringify(ph1)}`);
   await page.waitForTimeout(300);
   await page.screenshot({ path: join(out, 'phone-12b-welcome-peek.png') });
   await page.click('.bcv-ph-stats .bcv-ph-stat:nth-child(2)');

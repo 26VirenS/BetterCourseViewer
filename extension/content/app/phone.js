@@ -578,7 +578,7 @@
     const live = (planner || []).filter((it) => !it.dismissed && it.type !== 'announcement' && inSelection(sel, it));
     const open = live.filter((it) => !it.complete && !it.submitted);
     const dueToday = [...W.dueToday].sort(byDate);
-    const dueWeek = [...W.dueWeek].sort(byDate);
+    const dueNext = [...W.dueNext].sort(byDate);
     const dueTomorrow = [...W.dueTomorrow].sort(byDate);
     const upcoming = open.filter((it) => it.isDue && it.date >= todayStart && !U.sameDay(it.date, now)).sort(byDate);
     const inSelFeed = (a) => !a.context_code || sel.ids.has(String(a.context_code).replace(/^course_/, ''));
@@ -609,7 +609,7 @@
     let gradedN = null;
     const stats = U.el('bcv-ph-stats bcv-ph-stats--six', [
       stat('Due today', String(dueToday.length), dueSheet('Due today', dueToday, todayStart, U.addDays(todayStart, 1), dayLine(now), 'Nothing is due today.'), 0),
-      stat('This week', String(dueWeek.length), dueSheet('Due this week', dueWeek, weekStart, weekEnd, `Week of ${U.fmtShort(weekStart)}`, 'Nothing is due this week.'), 2.3),
+      stat('Next 7 days', String(dueNext.length), dueSheet('Next 7 days', dueNext, todayStart, W.nextEnd, `${U.fmtShort(todayStart)} – ${U.fmtShort(U.addDays(todayStart, 6))}`, 'Nothing is due in the next 7 days.'), 2.3),
       stat('Unread', unread ? String(unread.length) : '—', () => itemsSheet(app, {
         title: 'Unread announcements', note: unread?.length ? U.plural(unread.length, 'announcement') : 'All caught up',
         items: (unread || []).map((a) => annRow(a, 'unread')), empty: 'All caught up.', lead: 'Unread',

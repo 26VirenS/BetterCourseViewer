@@ -515,7 +515,7 @@ try {
   await waitText('.bcv-stat__value', /^\d+$/);
   await page.waitForFunction(() => [...document.querySelectorAll('.bcv-stat__value')].length === 6 && [...document.querySelectorAll('.bcv-stat__value')].every((e) => /^\d+$/.test(e.textContent) && !e.dataset.rolling), null, { timeout: 15000 });
   const stats = await texts('.bcv-stat');
-  check(stats.length === 6 && /Due today\s*4\s*35 points total/i.test(stats[0]) && /Due this week/i.test(stats[1]) && /Unread announcements/i.test(stats[2]) && /^Overdue/i.test(stats[3]) && /^Due tomorrow/i.test(stats[4]) && /^Graded this week/i.test(stats[5]), `six stat cards (mockup 13), Due tomorrow before Graded this week: ${stats.join(' | ')}`);
+  check(stats.length === 6 && /Due today\s*4\s*35 points total/i.test(stats[0]) && /^Next 7 days/i.test(stats[1]) && /Unread announcements/i.test(stats[2]) && /^Overdue/i.test(stats[3]) && /^Due tomorrow/i.test(stats[4]) && /^Graded this week/i.test(stats[5]), `six stat cards (mockup 13), Due tomorrow before Graded this week: ${stats.join(' | ')}`);
   const statLabel = await page.$eval('.bcv-stat__head .bcv-label', (e) => ({ size: parseFloat(getComputedStyle(e).fontSize), tt: getComputedStyle(e).textTransform, text: e.textContent }));
   check(statLabel.size >= 13 && statLabel.tt === 'none', `a card is named in sentence case at a readable size, not a small capital label: ${JSON.stringify(statLabel)}`);
   check((await page.$eval('.bcv-stats', (e) => getComputedStyle(e).gridTemplateColumns.split(' ').length)) === 3 && (await page.$$eval('.bcv-stat', (els) => els.map((e) => Math.round(e.getBoundingClientRect().top)))).filter((t, i, a) => a.indexOf(t) === i).length === 2, 'a fixed 2×3 grid: three columns, two rows');
@@ -635,11 +635,11 @@ try {
   check(anchored.map((a) => a.from).join() === 'start,mid,end' && anchored.every((a) => Math.abs(a.edge) <= 2 && Math.abs(a.top) <= 2) && anchored[2].split === true, `each counter's box hangs from where it stands — the left one's top-left, the middle one's top centre, the right one's top-right (its preview opening on the list's left, the box still ending at the counter's right): ${JSON.stringify(anchored)}`);
   await page.click('.bcv-stats .bcv-stat:nth-child(2)');
   await page.waitForSelector('.bcv-sheet', { timeout: 5000 });
-  // the sheet lists exactly what the counter counted; naming one item here would break every Sunday,
-  // when the rest of "this week" is already behind us
+  // the sheet lists exactly what the counter counted (2.98.94: the next 7 days — today and the six after it — not
+  // the calendar week); naming one item here would tie the check to the day it runs
   const weekLine = (await texts('.bcv-sheet__line'))[0];
   const weekRows = await texts('.bcv-sheet__row');
-  check(/^\d+ Due this week$/.test(weekLine) && Number(weekLine.split(' ')[0]) === weekRows.length && /^Week of \w+ \d+ · \d courses?$/.test((await texts('.bcv-sheet__note'))[0]) && weekRows.every((t) => /·/.test(t)) && weekRows.some((t) => /· \d+ pts ·/.test(t)), `Due this week sheet: ${weekLine} / ${(await texts('.bcv-sheet__note'))[0]} / ${weekRows.length} rows, e.g. ${weekRows[0] || '(none)'}`);
+  check(/^\d+ Next 7 days$/.test(weekLine) && Number(weekLine.split(' ')[0]) === weekRows.length && /^\w+ \d+ – \w+ \d+ · \d courses?$/.test((await texts('.bcv-sheet__note'))[0]) && weekRows.every((t) => /·/.test(t)) && weekRows.some((t) => /· \d+ pts ·/.test(t)), `Next 7 days sheet, today through six days on: ${weekLine} / ${(await texts('.bcv-sheet__note'))[0]} / ${weekRows.length} rows, e.g. ${weekRows[0] || '(none)'}`);
   // (2.98.28) the list in two: what is still to do under its label, then — set back in grey, a press away all the
   // same — the week's work already handed in; (2.98.45) the box holds the list alone until a row is pressed
   await page.waitForTimeout(500);
@@ -5084,7 +5084,7 @@ try {
   const placeNow = () => page.$eval(pz('.pz__card[data-target="today"]'), (e) => ({ x: e.style.getPropertyValue('--pic-x'), y: e.style.getPropertyValue('--pic-y'), z: e.style.getPropertyValue('--pic-z'), cursor: getComputedStyle(e).cursor, tf: getComputedStyle(e.querySelector('.pz__pic--sharp'), '::before').transform }));
   const placeRow = await page.evaluate(() => { const r = document.querySelector('#bcv-setup').shadowRoot; const row = r.querySelector('#pzPlace'); return { hint: row.querySelector('.pz__placehint').textContent, zoom: r.querySelector('#pzZoom').value, reset: r.querySelector('#pzPlaceReset').disabled, inBar: !!row.closest('#pzPhotoBar'), buttons: [...r.querySelectorAll('.pz__badge')].every((b) => b.tagName === 'BUTTON'), sideRow: !!r.querySelector('#pzPhotoBar'), header: [...r.querySelectorAll('.pz__pheadin > *')].map((e) => e.className.split(' ')[0]).join(','), seg: [...r.querySelectorAll('.pz__segbtn2')].map((e) => e.textContent).join(','), date: !!r.querySelector('.pz__date'), labels: [...r.querySelectorAll('.pz__clabel')].map((e) => e.textContent).join('|'), cardH: Math.round(r.querySelector('.pz__card').getBoundingClientRect().height / parseFloat(r.querySelector('.pz').style.getPropertyValue('--pv-scale') || 1)) }; });
   const place0 = await placeNow();
-  check(placeRow.hint === 'Drag the photo on the preview to move it' && placeRow.zoom === '1' && placeRow.reset && placeRow.inBar && placeRow.buttons && placeRow.header === 'pz__title,pz__search,pz__seg' && placeRow.seg === 'Cards,List,Recent activity' && !placeRow.date && placeRow.labels === 'Due today|Due this week|Unread announcements|Overdue|Due tomorrow|Graded this week' && place0.x === '100%' && place0.y === '100%' && place0.z === '1' && place0.cursor === 'grab', `a counter with a photo: the bar says drag to move, Zoom at 1, Reset off, the photo pinned at its corner under a grab cursor; the preview's header is the page's row (title, search, switcher — no date) and the counters carry the page's labels: ${JSON.stringify({ placeRow, place0 })}`);
+  check(placeRow.hint === 'Drag the photo on the preview to move it' && placeRow.zoom === '1' && placeRow.reset && placeRow.inBar && placeRow.buttons && placeRow.header === 'pz__title,pz__search,pz__seg' && placeRow.seg === 'Cards,List,Recent activity' && !placeRow.date && placeRow.labels === 'Due today|Next 7 days|Unread announcements|Overdue|Due tomorrow|Graded this week' && place0.x === '100%' && place0.y === '100%' && place0.z === '1' && place0.cursor === 'grab', `a counter with a photo: the bar says drag to move, Zoom at 1, Reset off, the photo pinned at its corner under a grab cursor; the preview's header is the page's row (title, search, switcher — no date) and the counters carry the page's labels: ${JSON.stringify({ placeRow, place0 })}`);
   const todayBox = await page.$eval(pz('.pz__card[data-target="today"]'), (e) => { const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
   // (a counter's drawing is the counter's own shape — 2.98.52 — so at 1× there is next to nothing to move: zoomed first)
   await page.$eval(pz('#pzZoom'), (i) => { i.value = '1.5'; i.dispatchEvent(new Event('input', { bubbles: true })); });
@@ -5122,7 +5122,7 @@ try {
   const [chooser] = await Promise.all([page.waitForEvent('filechooser', { timeout: 5000 }), page.click(pz('.pz__card[data-target="week"] .pz__badge'))]);
   await chooser.setFiles({ name: 'sky.png', mimeType: 'image/png', buffer: PNG });
   await page.waitForSelector(pz('.pz__card[data-target="week"].has-pic'), { timeout: 10000 });
-  check((await page.$eval(pz('#pzPhotoBar .pz__bartitle'), (e) => e.textContent)) === 'Due this week' && (await page.$eval(pz('.pz__card[data-target="week"] .pz__badge'), (e) => e.textContent)) === 'Change' && (await page.$eval(pz('#pzNote'), (e) => e.textContent)) === 'Custom · 3 photos', 'an Add photo badge opens the files for its counter (the bar on that counter), and the picture chosen goes on it');
+  check((await page.$eval(pz('#pzPhotoBar .pz__bartitle'), (e) => e.textContent)) === 'Next 7 days' && (await page.$eval(pz('.pz__card[data-target="week"] .pz__badge'), (e) => e.textContent)) === 'Change' && (await page.$eval(pz('#pzNote'), (e) => e.textContent)) === 'Custom · 3 photos', 'an Add photo badge opens the files for its counter (the bar on that counter), and the picture chosen goes on it');
   await page.click(pz('#pzPhotoBar [data-photo="None"]'));
   await page.waitForFunction(() => !document.querySelector('#bcv-setup').shadowRoot.querySelector('.pz__card[data-target="week"].has-pic'), null, { timeout: 5000 });
   await page.click(pz('.pz__phead'));
@@ -5280,7 +5280,7 @@ try {
   // the Dashboard's way in: its own card, its sheet, an item previewed beside the list
   await tourStep('peek');
   const t11 = await tourAt();
-  check(page.url() === `${BASE}/` && t11.title === 'The cards open' && t11.doing === 'Click Due this week' && await ringHolds(t11.ring, '.bcv-stat[data-stat="week"]'), `back on the Dashboard: its Due this week card, to press: ${JSON.stringify(t11)}`);
+  check(page.url() === `${BASE}/` && t11.title === 'The cards open' && t11.doing === 'Click Next 7 days' && await ringHolds(t11.ring, '.bcv-stat[data-stat="week"]'), `back on the Dashboard: its Due this week card, to press: ${JSON.stringify(t11)}`);
   // a reload does not get past the setup's tour: it comes back where it was (at the start of that part)
   await page.reload();
   await tourStep('peek', 20000);

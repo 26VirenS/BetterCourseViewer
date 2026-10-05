@@ -8,7 +8,7 @@
   const store = BCV.store;
 
   /** The counters' own lists — shared by the Dashboard and the phone's Today (2.98.36), so the two
-   *  never count differently: what is due today, tomorrow and this week (and what of each is already
+   *  never count differently: what is due today, tomorrow and in the next 7 days (and what of each is already
    *  done), what is overdue (and what was handed in late), what was graded this week (and the two
    *  before). Every list keeps to the course selection. Rows are the sheets' shape: { title, meta,
    *  course, color, tint, url, date }; an overdue row also carries its planner item and key, for the X. */
@@ -20,6 +20,7 @@
     const weekStart = U.startOfWeek(now);
     const weekEnd = U.addDays(weekStart, 7);
     const tomorrowStart = U.addDays(todayStart, 1);
+    const nextEnd = U.addDays(todayStart, 7); // (2.98.94: the next 7 days — today and the six after it — not the calendar week)
     // every count respects the course selection (the favourites), so the cards agree with the page below them
     const favIds = new Set((favs || []).map((c) => String(c.id)));
     const inSel = (it) => it.custom || !it.courseId || favIds.has(String(it.courseId));
@@ -27,7 +28,7 @@
     const dueItems = live.filter((it) => it.isDue && !it.excused); // (excused work is not due: it counts nowhere)
     const dueToday = dueItems.filter((it) => U.sameDay(it.date, now) && !it.submitted);
     const dueTomorrow = dueItems.filter((it) => U.sameDay(it.date, tomorrowStart) && !it.submitted);
-    const dueWeek = dueItems.filter((it) => it.date >= weekStart && it.date < weekEnd && !it.submitted);
+    const dueNext = dueItems.filter((it) => it.date >= todayStart && it.date < nextEnd && !it.submitted);
     // (2.98.28) what a sheet shows under its list, quieter: work of the same span already handed in or marked done
     const doneIn = (from, to) => (planner || []).filter((it) => it.isDue && !it.excused && !it.dismissed && it.type !== 'announcement' && inSel(it) && (it.submitted || it.complete) && it.date >= from && it.date < to);
     const RECENT_MAX = 8;
@@ -136,7 +137,7 @@
       earlier.sort((x, y) => y.date - x.date);
       return { graded, earlier, earned, possible };
     });
-    return { now, todayStart, weekStart, weekEnd, tomorrowStart, inSel, live, dueItems, dueToday, dueTomorrow, dueWeek, doneIn, byDate, dueRow, doneRow, recentOf, courseCount, overrideByKey, dismissedKeys, assignmentsP, overdueP, gradedP };
+    return { now, todayStart, weekStart, weekEnd, tomorrowStart, nextEnd, inSel, live, dueItems, dueToday, dueTomorrow, dueNext, doneIn, byDate, dueRow, doneRow, recentOf, courseCount, overrideByKey, dismissedKeys, assignmentsP, overdueP, gradedP };
   }
 
   // ---- the grades skyline (2.98.90) ------------------------------------------------------------------
@@ -285,7 +286,7 @@
       for (const { a, dot } of actRows) dot.style.background = isUnread(a) ? '#0a84ff' : 'transparent';
     });
     const courseMap = new Map(courses.map((c) => [c.id, c]));
-    const { now, todayStart, weekStart, weekEnd, tomorrowStart, inSel, dueItems, dueToday, dueTomorrow, dueWeek, doneIn, byDate, dueRow, doneRow, recentOf, courseCount } = W;
+    const { now, todayStart, weekStart, weekEnd, tomorrowStart, nextEnd, inSel, dueItems, dueToday, dueTomorrow, dueNext, doneIn, byDate, dueRow, doneRow, recentOf, courseCount } = W;
     const weekAll = (planner || []).filter((it) => it.isDue && !it.excused && it.date >= weekStart && it.date < weekEnd && (it.points === null || it.points > 0) && it.type !== 'announcement');
 
     // ---- stats -------------------------------------------------------------------
@@ -307,11 +308,11 @@
           items: [...dueToday].sort(byDate).map(dueRow), empty: 'Nothing is due today.', lead: 'Still to do',
           recent: recentOf('Already done', doneIn(todayStart, tomorrowStart).sort(byDate).map(doneRow)),
         }, from)));
-        cards.push(stat('Due this week', String(dueWeek.length), `Across ${U.plural(courseCount(dueWeek), 'course')}`, IC.cal, '#34c759', (from) => openSheet({
-          label: 'Due this week', value: String(dueWeek.length), icon: IC.cal, color: '#34c759',
-          note: `Week of ${U.fmtShort(weekStart)} · ${U.plural(courseCount(dueWeek), 'course')}`,
-          items: [...dueWeek].sort(byDate).map(dueRow), empty: 'Nothing is due this week.', lead: 'Still to do',
-          recent: recentOf('Already done', doneIn(weekStart, weekEnd).sort(byDate).map(doneRow)),
+        cards.push(stat('Next 7 days', String(dueNext.length), `Across ${U.plural(courseCount(dueNext), 'course')}`, IC.cal, '#34c759', (from) => openSheet({
+          label: 'Next 7 days', value: String(dueNext.length), icon: IC.cal, color: '#34c759',
+          note: `${U.fmtShort(todayStart)} – ${U.fmtShort(U.addDays(todayStart, 6))} · ${U.plural(courseCount(dueNext), 'course')}`,
+          items: [...dueNext].sort(byDate).map(dueRow), empty: 'Nothing is due in the next 7 days.', lead: 'Still to do',
+          recent: recentOf('Already done', doneIn(todayStart, nextEnd).sort(byDate).map(doneRow)),
         }, from)));
       }
       let unreadSheet = { label: 'Unread announcements', value: '…', icon: IC.bell, color: '#ff9500', note: 'Loading…', items: [] };
@@ -448,7 +449,7 @@
     }
     let statIndex = 0;
     // each counter's slot for the theme's photo (lib/theme.js CARD_SLOTS): sharp at its bottom-right corner, blurred by a curve from there (app.css)
-    const STAT_SLOT = { 'Due today': 'today', 'Due this week': 'week', 'Unread announcements': 'unread', Overdue: 'overdue', 'Due tomorrow': 'tomorrow', 'Graded this week': 'graded' };
+    const STAT_SLOT = { 'Due today': 'today', 'Next 7 days': 'week', 'Unread announcements': 'unread', Overdue: 'overdue', 'Due tomorrow': 'tomorrow', 'Graded this week': 'graded' };
     function stat(lbl, value, note, icon, color, onOpen) {
       const valueEl = U.el('bcv-stat__value', value);
       const i = statIndex++;
