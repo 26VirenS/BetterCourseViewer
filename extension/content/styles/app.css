@@ -14,7 +14,7 @@
 
 html[data-bcv-theme] {
   --bcv-line: max(1px, var(--bcv-dpx, 1px)); /* a hairline drawn as a shadow: one CSS pixel, or one screen pixel where that is more (below 100% zoom; content/early.js keeps --bcv-dpx) */
-  --bcv-version: "2.98.87"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.98.88"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -1446,8 +1446,8 @@ html[data-bcv-theme="dark"] .bcv-rr-ov { --rr-dim0: .52; --rr-dim1: .78; }
 .bcv-rubmorph__ring, .bcv-rubmorph__mid { position: absolute; left: calc(var(--d) / -2); top: calc(var(--d) / -2); width: var(--d); height: var(--d); }
 .bcv-rubmorph__ring { display: block; overflow: visible; }
 .bcv-rubmorph__mid { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; white-space: nowrap; }
-.bcv-rubmorph__big { font: 700 calc(var(--d) * .3 * var(--fit, 1))/1 var(--bcv-display, var(--bcv-font)); letter-spacing: -.03em; font-variant-numeric: tabular-nums; color: var(--bcv-ink); }
-.bcv-rubmorph__of { margin-top: 1px; font: 600 calc(var(--d) * .19)/1.1 var(--bcv-font); color: var(--bcv-ink3); }
+.bcv-rubmorph__big { font: 700 calc(var(--t) * .3 * var(--fit, 1))/1 var(--bcv-display, var(--bcv-font)); letter-spacing: -.03em; font-variant-numeric: tabular-nums; color: var(--bcv-ink); }
+.bcv-rubmorph__of { margin-top: 1px; font: 600 calc(var(--t) * .19)/1.1 var(--bcv-font); color: var(--bcv-ink3); }
 /* the ring's place on the stage, drawn as nothing: the guided tour lights round it (welcome.js, its 'ring' steps) */
 .bcv-rr__ringbox { position: absolute; left: 164px; top: 64px; width: 432px; height: 432px; border-radius: 50%; pointer-events: none; }
 .bcv-rr__barbox { position: absolute; left: 40px; top: 128px; width: 692px; height: 402px; border-radius: 16px; pointer-events: none; }

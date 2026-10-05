@@ -1063,7 +1063,8 @@
     btn.querySelector(':scope > .bcv-rubmorph')?.remove();
     const cs = getComputedStyle(btn);
     const bw = btn.offsetWidth, bh = btn.offsetHeight;
-    const D = Math.round(Math.max(48, Math.min(64, bh + 14)));
+    const T = Math.round(Math.max(48, Math.min(64, bh + 14))); // (the points' size goes by this)
+    const D = Math.round(T * 1.25); // (the ring a quarter larger than that, the points not)
     const big = pts(m.graded ? m.earned : m.max);
     const mid = h('span', { class: 'bcv-rubmorph__mid', style: { '--fit': Math.min(1, 3.4 / big.length).toFixed(3) } }, [
       h('b', { class: 'bcv-rubmorph__big', text: big }),
@@ -1071,7 +1072,7 @@
     ]);
     const disc = h('span', { class: 'bcv-rubmorph__disc', style: { background: cs.backgroundColor } });
     const ring = miniRing(m);
-    const layer = h('span', { class: 'bcv-rubmorph', 'aria-hidden': 'true', style: { '--d': `${D}px` } }, [disc, ring, mid]);
+    const layer = h('span', { class: 'bcv-rubmorph', 'aria-hidden': 'true', style: { '--d': `${D}px`, '--t': `${T}px` } }, [disc, ring, mid]);
     btn.append(layer);
     const o = { btn, layer, disc, ring, mid, p: 0, to: 0, raf: 0, bw, bh, D, r0: Math.min(bh / 2, parseFloat(cs.borderTopLeftRadius) || 0) };
     paintMorph(o);
