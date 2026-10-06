@@ -102,6 +102,26 @@ struct NativeShell: View {
                         NotificationsView()
                     case .calendar:
                         CalendarView()
+                    case .course(let id):
+                        ContextHome(ctx: "courses/\(id)")
+                    case .group(let id):
+                        ContextHome(ctx: "groups/\(id)")
+                    case .groups:
+                        GroupsView()
+                    case .section(let ctx, let kind):
+                        SectionScreen(ctx: ctx, kind: kind)
+                    case .topic(let ctx, let id):
+                        TopicView(ctx: ctx, id: id)
+                    case .assignment(let course, let id):
+                        AssignmentView(course: course, id: id)
+                    case .page(let ctx, let slug):
+                        PageView(ctx: ctx, slug: slug)
+                    case .folder(let ctx, let id, let name):
+                        FilesView(ctx: ctx, folder: id, name: name)
+                    case .inbox:
+                        InboxView()
+                    case .conversation(let id):
+                        ConversationView(id: id)
                     }
                 }
         }
@@ -163,11 +183,11 @@ struct AccountMenu: View {
         let dark = engine.snapshot?.dark ?? false
         Menu {
             Section(me.map { "\($0.name)\($0.email.map { "\n\($0)" } ?? "")" } ?? "Account") {
-                Button { engine.openWeb("/conversations", title: "Inbox") } label: {
+                Button { engine.push(.inbox) } label: {
                     Label(inbox > 0 ? "Inbox (\(inbox) unread)" : "Inbox", systemImage: "tray")
                 }
-                Button { engine.openWeb("/groups", title: "Groups") } label: { Label("Groups", systemImage: "person.3") }
-                Button { engine.openWeb("/#tools", title: "Tools") } label: { Label("Tools", systemImage: "wrench.and.screwdriver") }
+                Button { engine.push(.groups) } label: { Label("Groups", systemImage: "person.3") }
+                // (no Tools on the iPhone yet, 1.2)
             }
             Section {
                 Button {

@@ -1,0 +1,498 @@
+import SwiftUI
+
+/// A section of a course or a group, by the name the course home's tile carries.
+struct SectionScreen: View {
+    let ctx: String
+    let kind: String
+
+    var body: some View {
+        switch kind {
+        case "announcements": AnnouncementsList(ctx: ctx)
+        case "discussions": DiscussionsList(ctx: ctx)
+        case "assignments": AssignmentsList(ctx: ctx)
+        case "modules": ModulesList(ctx: ctx)
+        case "pages": PagesList(ctx: ctx)
+        case "files": FilesView(ctx: ctx, folder: "", name: "Files")
+        case "people": PeopleList(ctx: ctx)
+        case "quizzes": QuizzesList(ctx: ctx)
+        case "syllabus": SyllabusView(ctx: ctx)
+        case "grades": CourseGradesView(courseId: ContextHome.id(of: ctx))
+        default: ContentUnavailableView("Not on the iPhone yet", systemImage: "square.dashed")
+        }
+    }
+}
+
+/// A screen of a course's data: the list once the answer is in, the loading or error state until then,
+/// read again when the data may have changed and when pulled down.
+struct Loaded<T: Decodable, Content: View>: View {
+    @ObservedObject var model: Loader<T>
+    let title: String
+    let load: () async -> Void
+    @ViewBuilder let content: (T) -> Content
+    @EnvironmentObject private var engine: Engine
+
+    var body: some View {
+        Group {
+            if let d = model.data {
+                content(d).refreshable { await load() }
+            } else {
+                LoadState(error: model.error) { Task { await load() } }
+            }
+        }
+        .navigationTitle(title)
+        .navigationBarTitleDisplayMode(.inline)
+        .task(id: engine.dataVersion) { await load() }
+    }
+}
+
+/// What a list says when it has nothing in it.
+struct EmptyNote: View {
+    let text: String
+    let symbol: String
+
+    var body: some View {
+        ContentUnavailableView(text, systemImage: symbol)
+    }
+}
+
+// MARK: - Announcements and discussions
+
+struct AnnouncementsList: View {
+    let ctx: String
+    @EnvironmentObject private var engine: Engine
+    @StateObject private var model = Loader<PostListData>()
+
+    var body: some View {
+        Loaded(model: model, title: "Announcements", load: load) { d in
+            List {
+                ForEach(d.rows) { r in
+                    Button { engine.go(r.url, title: r.title) } label: { PostRowView(row: r, color: Color(hex: d.color)) }
+                        .buttonStyle(.plain)
+                }
+            }
+            .listStyle(.insetGrouped)
+            .overlay { if d.rows.isEmpty { EmptyNote(text: d.empty ?? "No announcements", symbol: "megaphone") } }
+        }
+    }
+
+    private func load() async { await model.load(engine, "announcements", ["ctx": ctx]) }
+}
+
+struct DiscussionsList: View {
+    let ctx: String
+    @EnvironmentObject private var engine: Engine
+    @StateObject private var model = Loader<DiscussionsData>()
+
+    var body: some View {
+        Loaded(model: model, title: "Discussions", load: load) { d in
+            List {
+                ForEach(d.sections) { s in
+                    Section(s.title) {
+                        ForEach(s.rows) { r in
+                            Button { engine.go(r.url, title: r.title) } label: { PostRowView(row: r, color: Color(hex: d.color)) }
+                                .buttonStyle(.plain)
+                        }
+                    }
+                }
+            }
+            .listStyle(.insetGrouped)
+            .overlay { if d.sections.isEmpty { EmptyNote(text: d.empty ?? "No discussions", symbol: "bubble.left.and.bubble.right") } }
+        }
+    }
+
+    private func load() async { await model.load(engine, "discussions", ["ctx": ctx]) }
+}
+
+// MARK: - Assignments, quizzes, the syllabus
+
+struct AssignmentsList: View {
+    let ctx: String
+    @EnvironmentObject private var engine: Engine
+    @StateObject private var model = Loader<AssignmentsData>()
+
+    var body: some View {
+        Loaded(model: model, title: "Assignments", load: load) { d in
+            List {
+                ForEach(d.sections) { s in
+                    Section {
+                        ForEach(s.rows) { r in
+                            Button { engine.go(r.url, title: r.title) } label: { ARowView(row: r, color: s.title == "Overdue" ? .red : Color(hex: d.color)) }
+                                .buttonStyle(.plain)
+                        }
+                    } header: {
+                        HStack {
+                            Text(s.title)
+                            Spacer()
+                            Text("\(s.rows.count)").monospacedDigit()
+                        }
+                    }
+                }
+            }
+            .listStyle(.insetGrouped)
+            .overlay { if d.sections.isEmpty { EmptyNote(text: d.empty ?? "No assignments", symbol: "doc.text") } }
+        }
+    }
+
+    private func load() async { await model.load(engine, "assignments", ["ctx": ctx]) }
+}
+
+struct QuizzesList: View {
+    let ctx: String
+    @EnvironmentObject private var engine: Engine
+    @StateObject private var model = Loader<RowsData>()
+
+    var body: some View {
+        Loaded(model: model, title: "Quizzes", load: load) { d in
+            List {
+                ForEach(d.rows) { r in
+                    Button { engine.go(r.url, title: r.title) } label: { ARowView(row: r, color: Color(hex: d.color)) }
+                        .buttonStyle(.plain)
+                }
+            }
+            .listStyle(.insetGrouped)
+            .overlay { if d.rows.isEmpty { EmptyNote(text: d.empty ?? "No quizzes", symbol: "checklist") } }
+        }
+    }
+
+    private func load() async { await model.load(engine, "quizzes", ["ctx": ctx]) }
+}
+
+struct SyllabusView: View {
+    let ctx: String
+    @EnvironmentObject private var engine: Engine
+    @StateObject private var model = Loader<RowsData>()
+
+    var body: some View {
+        Loaded(model: model, title: "Syllabus", load: load) { d in
+            List {
+                if let html = d.html, !html.isEmpty {
+                    Section { RichText(html: html).padding(.vertical, 6) }
+                }
+                if !d.rows.isEmpty {
+                    Section("Dated work") {
+                        ForEach(d.rows) { r in
+                            Button { engine.go(r.url, title: r.title) } label: { ARowView(row: r, color: Color(hex: d.color)) }
+                                .buttonStyle(.plain)
+                        }
+                    }
+                }
+            }
+            .listStyle(.insetGrouped)
+            .overlay { if d.rows.isEmpty && (d.html ?? "").isEmpty { EmptyNote(text: d.empty ?? "The syllabus is empty", symbol: "list.bullet.rectangle") } }
+        }
+    }
+
+    private func load() async { await model.load(engine, "syllabus", ["ctx": ctx]) }
+}
+
+// MARK: - Modules
+
+struct ModulesList: View {
+    let ctx: String
+    @EnvironmentObject private var engine: Engine
+    @StateObject private var model = Loader<ModulesData>()
+    @State private var folded: Set<String> = []
+
+    var body: some View {
+        Loaded(model: model, title: "Modules", load: load) { d in
+            List {
+                ForEach(d.modules) { m in
+                    Section {
+                        if !folded.contains(m.id) {
+                            if m.locked == true, let t = m.lockText, !t.isEmpty {
+                                Label(t, systemImage: "lock.fill").font(.footnote).foregroundStyle(.secondary)
+                            }
+                            ForEach(m.items) { it in item(it, m, Color(hex: d.color)) }
+                            if m.items.isEmpty { Text("Nothing in this module yet.").font(.footnote).foregroundStyle(.secondary) }
+                        }
+                    } header: {
+                        header(m)
+                    }
+                }
+            }
+            .listStyle(.insetGrouped)
+            .overlay { if d.modules.isEmpty { EmptyNote(text: d.empty ?? "No modules", symbol: "square.stack.3d.up") } }
+        }
+    }
+
+    private func header(_ m: ModuleData) -> some View {
+        Button {
+            Haptics.select()
+            withAnimation(.snappy) {
+                if folded.contains(m.id) { folded.remove(m.id) } else { folded.insert(m.id) }
+            }
+        } label: {
+            HStack(spacing: 6) {
+                if m.locked == true { Image(systemName: "lock.fill").font(.caption) }
+                if m.done == true { Image(systemName: "checkmark.circle.fill").foregroundStyle(.green).font(.caption) }
+                Text(m.name).lineLimit(2)
+                Spacer()
+                if let p = m.progress, !p.isEmpty { Text(p).textCase(nil).monospacedDigit() }
+                Image(systemName: "chevron.down")
+                    .font(.caption.weight(.semibold))
+                    .rotationEffect(.degrees(folded.contains(m.id) ? -90 : 0))
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityHint(folded.contains(m.id) ? "Shows the module's items" : "Hides the module's items")
+    }
+
+    @ViewBuilder
+    private func item(_ it: ModuleItem, _ m: ModuleData, _ color: Color) -> some View {
+        let pad = CGFloat(it.indent ?? 0) * 14
+        if it.header == true {
+            Text(it.title)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .padding(.leading, pad)
+        } else {
+            let locked = it.locked == true
+            Button { engine.go(it.url, title: it.title) } label: {
+                HStack(spacing: 12) {
+                    IconTile(symbol: locked ? "lock.fill" : Glyph.item(it.type), color: locked ? .gray : color, size: 28)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(it.title).lineLimit(2).foregroundStyle(locked ? .secondary : .primary)
+                        if let s = it.sub, !s.isEmpty { Text(s).font(.caption).foregroundStyle(.secondary) }
+                        if locked, let t = it.lockText, !t.isEmpty { Text(t).font(.caption).foregroundStyle(.secondary).lineLimit(2) }
+                        else if let r = it.requirement, !r.isEmpty, it.done != true {
+                            Text(r).font(.caption.weight(.medium)).foregroundStyle(color)
+                        }
+                    }
+                    Spacer(minLength: 6)
+                    if it.done == true {
+                        Image(systemName: "checkmark.circle.fill").foregroundStyle(.green).accessibilityLabel("Done")
+                    } else if it.markable == true {
+                        Button { mark(it, m, true) } label: {
+                            Image(systemName: "circle").foregroundStyle(.tertiary).font(.title3)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Mark done")
+                    }
+                    if it.external == true { Image(systemName: "arrow.up.right").font(.caption).foregroundStyle(.tertiary) }
+                }
+                .padding(.leading, pad)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .disabled(locked || it.url == nil)
+            .swipeActions {
+                if it.markable == true {
+                    Button { mark(it, m, it.done != true) } label: {
+                        Label(it.done == true ? "Not Done" : "Done", systemImage: it.done == true ? "arrow.uturn.backward" : "checkmark")
+                    }
+                    .tint(it.done == true ? .gray : .green)
+                }
+            }
+        }
+    }
+
+    private func mark(_ it: ModuleItem, _ m: ModuleData, _ done: Bool) {
+        Haptics.select()
+        Task {
+            if await engine.act("markDone", ["ctx": ctx, "module": m.id, "item": it.id, "done": done]) {
+                if done { Haptics.success() }
+                await load()
+            }
+        }
+    }
+
+    private func load() async { await model.load(engine, "modules", ["ctx": ctx]) }
+}
+
+// MARK: - Pages
+
+struct PagesList: View {
+    let ctx: String
+    @EnvironmentObject private var engine: Engine
+    @StateObject private var model = Loader<PagesData>()
+
+    var body: some View {
+        Loaded(model: model, title: "Pages", load: load) { d in
+            List {
+                ForEach(d.rows) { p in
+                    Button {
+                        Haptics.tap()
+                        engine.push(.page(ctx: ctx, slug: p.slug))
+                    } label: {
+                        InfoRow(title: p.title, sub: p.sub, symbol: "doc.richtext", tint: Color(hex: d.color))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .listStyle(.insetGrouped)
+            .overlay { if d.rows.isEmpty { EmptyNote(text: d.empty ?? "No pages", symbol: "doc.richtext") } }
+        }
+    }
+
+    private func load() async { await model.load(engine, "pages", ["ctx": ctx]) }
+}
+
+/// A page of a course or a group (the front page when no name is given), as text to read.
+struct PageView: View {
+    let ctx: String
+    let slug: String
+    @EnvironmentObject private var engine: Engine
+    @StateObject private var model = Loader<PageData>()
+
+    var body: some View {
+        Group {
+            if let d = model.data {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text(d.title).font(.title2.weight(.bold))
+                        if let e = d.edited, !e.isEmpty { Text(e).font(.footnote).foregroundStyle(.secondary) }
+                        if let l = d.lockText, !l.isEmpty {
+                            Label(l, systemImage: "lock.fill")
+                                .font(.subheadline)
+                                .padding(12)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .contentCard(cornerRadius: 14, tint: .orange)
+                        }
+                        if !d.html.isEmpty { RichText(html: d.html) }
+                    }
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .refreshable { await load() }
+            } else {
+                LoadState(error: model.error) { Task { await load() } }
+            }
+        }
+        .navigationTitle(model.data?.context ?? "Page")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    let s = model.data?.slug ?? slug
+                    engine.openWebScreen(s.isEmpty ? "/\(ctx)/wiki?bcv=native" : "/\(ctx)/pages/\(s)?bcv=native", title: model.data?.title ?? "Page")
+                } label: {
+                    Image(systemName: "globe")
+                }
+                .accessibilityLabel("Open Canvas’s Page")
+            }
+        }
+        .task(id: engine.dataVersion) { await load() }
+    }
+
+    private func load() async { await model.load(engine, "page", slug.isEmpty ? ["ctx": ctx] : ["ctx": ctx, "slug": slug]) }
+}
+
+// MARK: - Files
+
+/// A folder of a course's or a group's files: folders push their own list, a file opens in the phone's viewer.
+struct FilesView: View {
+    let ctx: String
+    let folder: String
+    let name: String
+    @EnvironmentObject private var engine: Engine
+    @StateObject private var model = Loader<FilesData>()
+
+    var body: some View {
+        Loaded(model: model, title: name, load: load) { d in
+            List {
+                if !d.folders.isEmpty {
+                    Section {
+                        ForEach(d.folders) { f in
+                            Button {
+                                Haptics.tap()
+                                engine.push(.folder(ctx: ctx, id: f.id, name: f.name))
+                            } label: {
+                                InfoRow(title: f.name, sub: f.sub, symbol: f.locked == true ? "lock.fill" : "folder.fill", tint: Color(hex: d.color)) {
+                                    Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
+                                }
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+                if !d.files.isEmpty {
+                    Section {
+                        ForEach(d.files) { f in
+                            Button {
+                                guard let u = f.url, f.locked != true else { return }
+                                Haptics.tap()
+                                engine.openFile(u, name: f.name)
+                            } label: {
+                                InfoRow(title: f.name, sub: f.sub, symbol: f.locked == true ? "lock.fill" : FilesView.symbol(f), tint: f.locked == true ? .gray : .blue)
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(f.locked == true || f.url == nil)
+                        }
+                    }
+                }
+            }
+            .listStyle(.insetGrouped)
+            .overlay { if d.folders.isEmpty && d.files.isEmpty { EmptyNote(text: d.empty ?? "This folder is empty", symbol: "folder") } }
+        }
+    }
+
+    static func symbol(_ f: FileRow) -> String {
+        let ext = (f.name as NSString).pathExtension.lowercased()
+        switch true {
+        case f.kind == "pdf" || ext == "pdf": return "doc.richtext.fill"
+        case f.kind == "image": return "photo"
+        case f.kind == "video": return "film"
+        case f.kind == "audio": return "waveform"
+        case ["doc", "docx", "pages", "txt", "rtf"].contains(ext): return "doc.text.fill"
+        case ["ppt", "pptx", "key"].contains(ext): return "rectangle.on.rectangle"
+        case ["xls", "xlsx", "csv", "numbers"].contains(ext): return "tablecells"
+        case ["zip", "gz", "tar", "7z", "rar"].contains(ext): return "doc.zipper"
+        default: return "doc.fill"
+        }
+    }
+
+    private func load() async { await model.load(engine, "files", folder.isEmpty ? ["ctx": ctx] : ["ctx": ctx, "folder": folder]) }
+}
+
+// MARK: - People
+
+struct PeopleList: View {
+    let ctx: String
+    @EnvironmentObject private var engine: Engine
+    @StateObject private var model = Loader<PeopleData>()
+    @State private var writeTo: Recipient?
+
+    var body: some View {
+        Loaded(model: model, title: "People", load: load) { d in
+            List {
+                ForEach(d.sections) { s in
+                    Section {
+                        ForEach(s.rows) { p in
+                            HStack(spacing: 12) {
+                                PersonAvatar(name: p.name, avatar: p.avatar, size: 36)
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text(p.name)
+                                    if let pr = p.pronouns, !pr.isEmpty { Text(pr).font(.caption).foregroundStyle(.secondary) }
+                                }
+                                Spacer()
+                            }
+                            .contentShape(Rectangle())
+                            .contextMenu {
+                                Button { writeTo = Recipient(id: p.id, name: p.name) } label: { Label("Message", systemImage: "envelope") }
+                            }
+                            .swipeActions {
+                                Button { writeTo = Recipient(id: p.id, name: p.name) } label: { Label("Message", systemImage: "envelope") }.tint(.blue)
+                            }
+                        }
+                    } header: {
+                        HStack {
+                            Text(s.title)
+                            Spacer()
+                            Text("\(s.rows.count)").monospacedDigit()
+                        }
+                    }
+                }
+            }
+            .listStyle(.insetGrouped)
+            .overlay { if d.sections.isEmpty { EmptyNote(text: d.empty ?? "Nobody to show", symbol: "person.2") } }
+        }
+        .sheet(item: $writeTo) { r in
+            ComposeSheet(to: [r], context: ctx.hasPrefix("courses/") ? "course_\(ContextHome.id(of: ctx))" : nil)
+                .environmentObject(engine)
+        }
+    }
+
+    private func load() async { await model.load(engine, "people", ["ctx": ctx]) }
+}

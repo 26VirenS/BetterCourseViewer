@@ -343,10 +343,21 @@ struct OK: Codable {
 }
 
 /// A screen of the web interface pushed on a native stack, or a native screen pushed by name.
+/// A context (`ctx`) is "courses/<id>" or "groups/<id>": the screens a course and a group share.
 enum Route: Hashable {
     case web(url: String, title: String)
     case notifications
     case calendar
+    case course(id: String)
+    case group(id: String)
+    case groups
+    case section(ctx: String, kind: String)
+    case topic(ctx: String, id: String)
+    case assignment(course: String, id: String)
+    case page(ctx: String, slug: String)
+    case folder(ctx: String, id: String, name: String)
+    case inbox
+    case conversation(id: String)
 }
 
 /// The tab bar: four tabs and Search (iOS shows five at most before it folds the rest into More; the

@@ -208,11 +208,29 @@ final class Engine: ObservableObject, ShellListener {
 
     // MARK: - Navigation
 
-    /// A screen of the web interface on the stack showing.
+    /// A Canvas address on the stack showing: its native screen when the app has one (a course and
+    /// everything in it, Groups, the Inbox — Router.swift), else the web interface's screen for it.
     func openWeb(_ url: String, title: String) {
+        if let route = nativeRoute(for: url, title: title) {
+            push(route)
+            return
+        }
+        openWebScreen(url, title: title)
+    }
+
+    /// The web interface's own screen for an address, even where a native one exists ("Open in Canvas").
+    func openWebScreen(_ url: String, title: String) {
         var path = paths[tab]
         if case .web(let top, _)? = path.last, same(top, url) { return }
         path.append(.web(url: url, title: title))
+        paths[tab] = path
+    }
+
+    /// A native screen on the stack showing (not twice in a row).
+    func push(_ route: Route) {
+        var path = paths[tab]
+        if path.last == route { return }
+        path.append(route)
         paths[tab] = path
     }
 

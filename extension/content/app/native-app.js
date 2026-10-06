@@ -383,6 +383,8 @@
         cats: (gmFor(c).legend || []).slice(0, 4).map((ct) => ({ label: ct.label, weight: ct.weightText || '', value: ct.value, pct: ct.pct ?? null, color: ct.color })),
       };
     });
+    gradesRows = rows; // (the course sheet's what-if term GPA reads these)
+    gradeCache.clear(); // (a fresh Grades screen: each course's sheet reads its groups again)
     const scoredRows = rows.filter((r) => r.points !== null);
     const { items: gi, counts } = G.gradedItems(list, gmFor);
     const tracking = !!(trackingPref && typeof trackingPref === 'object' && (trackingPref.since || Number.isFinite(trackingPref.priorGpa)));
@@ -528,7 +530,497 @@
     return { ok: true };
   }
 
-  const CALLS = { snapshot, today, todayCounts, todaySheet, clearOverdue, courses, coursesProgress, setNickname, todo, complete, setPriority, deleteTask, addTask, grades, setGoal, setTarget, calendar, setCalendars, calView, notifications, notifMark, search, appearance, whatsNew, refresh };
+  // ---- a course and what is in it, a group, the Inbox: the native screens' data (iPhone app 1.2) ----------
+  // Each is read through the same store calls the web screens make (the same caches, the same rules), and
+  // handed over as plain rows; Canvas's own rich text (an announcement, instructions, a page) goes as HTML
+  // cleaned here — no scripts, no handlers, every address made whole — for the app's text view.
+  const ctxOf = (ctx) => {
+    const m = /^(courses|groups)\/(\d+)$/.exec(String(ctx || ''));
+    if (!m) throw new Error('That course or group could not be found.');
+    return { kind: m[1], id: m[2], base: `/${m[1]}/${m[2]}`, opts: { kind: m[1] } };
+  };
+  const absUrl = (u) => { try { return u ? new URL(u, location.origin).href : null; } catch { return null; } };
+  const local = (u) => { try { const x = new URL(u, location.origin); return x.origin === location.origin ? x.pathname + x.search + x.hash : x.href; } catch { return u || null; } };
+  const textOf = (html, n = 240) => (BCV.utils?.htmlToText ? BCV.utils.htmlToText(html || '', n) : String(html || '').replace(/<[^>]+>/g, ' ')).trim();
+  const esc = (t) => (BCV.utils?.escapeHtml ? BCV.utils.escapeHtml(t) : String(t).replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch]));
+  /** Plain words typed on the phone as Canvas's HTML: paragraphs at blank lines, line breaks kept (the web screens' rule). */
+  const textToHtml = (t) => String(t || '').trim().split(/\n{2,}/).map((p) => `<p>${esc(p).replace(/\n/g, '<br>')}</p>`).join('');
+  /** Canvas's HTML made safe and whole for the app's text view: what prose() strips, stripped. */
+  function clean(html) {
+    if (!html) return '';
+    const doc = new DOMParser().parseFromString(`<div id="x">${html}</div>`, 'text/html');
+    const root = doc.getElementById('x') || doc.body;
+    root.querySelectorAll('script,style,link,meta,object,embed,form,input,button,textarea,select,noscript').forEach((n) => n.remove());
+    for (const el of root.querySelectorAll('*')) {
+      for (const at of [...el.attributes]) {
+        const n = at.name.toLowerCase();
+        if (n.startsWith('on')) { el.removeAttribute(at.name); continue; }
+        if (n === 'href' || n === 'src' || n === 'data-src' || n === 'poster') {
+          const v = at.value.trim();
+          if (/^javascript:/i.test(v)) { el.removeAttribute(at.name); continue; }
+          if (v && !/^(data:|mailto:|tel:|#)/i.test(v)) { const a = absUrl(v); if (a) el.setAttribute(n === 'data-src' ? 'src' : at.name, a); }
+        }
+      }
+      if (el.tagName === 'IFRAME') { el.setAttribute('allowfullscreen', ''); el.removeAttribute('height'); el.removeAttribute('width'); }
+    }
+    return root.innerHTML;
+  }
+  const whenText = (v) => {
+    const d = U.parse(v);
+    if (!d) return '';
+    const diff = U.dayDiff(d);
+    if (diff === 0) return `Today ${U.fmtTime(d)}`;
+    if (diff === -1) return `Yesterday ${U.fmtTime(d)}`;
+    if (diff > -7 && diff < 0) return `${U.DAYS_LONG[d.getDay()]} ${U.fmtTime(d)}`;
+    return d.getFullYear() === new Date().getFullYear() ? U.fmtAtUpper(d) : U.fmtDateComma(d);
+  };
+  const ptsOf = (n) => (n === null || n === undefined ? '' : `${store.fmtPts(n)} ${Number(n) === 1 ? 'pt' : 'pts'}`);
+  const statusOf = (st) => (st ? { word: st.word, kind: st.kind || '' } : null);
+  const authorOf = (x) => ({ name: x?.author?.display_name || x?.user_name || x?.author_name || '', avatar: x?.author?.avatar_image_url && !/avatar-50|no_pic|dotted_pic/.test(x.author.avatar_image_url) ? x.author.avatar_image_url : null });
+  const kindOfA = (a) => { const t = a?.submission_types || []; return t.includes('online_quiz') || a?.is_quiz_assignment || a?.is_quiz_lti_assignment ? 'Quiz' : t.includes('discussion_topic') ? 'Discussion' : t.includes('external_tool') ? 'Tool' : 'Assignment'; };
+  const submittedA = (a) => { const s = a?.submission || {}; return !!(s.submitted_at || s.workflow_state === 'submitted' || s.workflow_state === 'pending_review' || (s.workflow_state === 'graded' && s.score !== null && s.score !== undefined)); };
+  const ungradable = (a) => (a?.submission_types || []).some((t) => ['none', 'on_paper', 'not_graded'].includes(t));
+  const aRow = (a, cid) => ({
+    id: String(a.id), title: a.name || 'Untitled', kind: kindOfA(a),
+    sub: [kindOfA(a), ptsOf(a.points_possible), a.due_at ? `Due ${U.fmtAt(a.due_at)}` : 'No due date'].filter(Boolean).join(' · '),
+    status: statusOf(store.workStatus(a)), url: `/courses/${cid}/assignments/${a.id}`,
+  });
+  /** A course's or a group's name, colour and short line. */
+  async function contextInfo(c) {
+    if (c.kind === 'groups') {
+      const g = await store.group(c.id);
+      return { name: g?.name || 'Group', title: g?.name || 'Group', color: g?.color || GRAY, sub: [g?.course?.name || g?.course?.shortName || '', g?.membersCount ? U.plural(g.membersCount, 'member') : ''].filter(Boolean).join(' · '), raw: g };
+    }
+    const [course, favs] = await Promise.all([store.course(c.id), store.favorites().catch(() => [])]);
+    const fav = (favs || []).find((f) => String(f.id) === String(c.id));
+    return { name: course?.name || 'Course', title: fav?.shortName || course?.nickname || course?.code || course?.name || 'Course', color: course?.color || fav?.color || GRAY, sub: [course?.code && course.code !== course.name ? course.code : '', course?.term || ''].filter(Boolean).join(' · '), raw: course };
+  }
+  // the sections the app draws itself, from Canvas's tab ids
+  const TAB_KIND = { announcements: 'announcements', discussions: 'discussions', assignments: 'assignments', modules: 'modules', pages: 'pages', wiki: 'pages', files: 'files', people: 'people', quizzes: 'quizzes', syllabus: 'syllabus', grades: 'grades' };
+  const SECTION_LABEL = { announcements: 'Announcements', discussions: 'Discussions', assignments: 'Assignments', modules: 'Modules', pages: 'Pages', files: 'Files', people: 'People', quizzes: 'Quizzes', syllabus: 'Syllabus', grades: 'Grades' };
+  const DEFAULT_SECTIONS = { courses: ['announcements', 'assignments', 'discussions', 'modules', 'pages', 'files', 'people', 'quizzes', 'syllabus', 'grades'], groups: ['announcements', 'discussions', 'pages', 'files', 'people'] };
+  async function sectionsOf(c) {
+    const tabs = await store.tabs(c.id, c.opts).catch(() => null);
+    if (!Array.isArray(tabs) || !tabs.length) return { sections: DEFAULT_SECTIONS[c.kind].map((k) => ({ kind: k, label: SECTION_LABEL[k] })), more: [] };
+    const sections = [];
+    const more = [];
+    for (const t of tabs) {
+      if (t.hidden || t.id === 'settings' || t.id === 'home') continue;
+      const k = TAB_KIND[t.id];
+      if (k && !sections.some((x) => x.kind === k) && (c.kind === 'courses' || DEFAULT_SECTIONS.groups.includes(k))) sections.push({ kind: k, label: t.label || SECTION_LABEL[k] });
+      else if (!k) more.push({ label: t.label || 'Open', url: local(t.html_url || t.full_url || ''), external: t.type === 'external' || String(t.id).startsWith('context_external_tool') });
+    }
+    return { sections, more: more.filter((m) => m.url) };
+  }
+
+  /** A course's home (or a group's): its name and colour, its sections, open work, the latest announcements, its front page. */
+  async function home({ ctx } = {}) {
+    const c = ctxOf(ctx);
+    const [info, secs, anns] = await Promise.all([contextInfo(c), sectionsOf(c), store.announcements(c.id, c.opts).catch(() => null)]);
+    const latest = (anns || []).slice(0, 3).map((a) => annRow(a, c));
+    if (c.kind === 'groups') {
+      const fp = await store.frontPage(c.id, c.opts).catch(() => null);
+      return { ctx, kind: 'groups', title: info.title, name: info.name, sub: info.sub, color: info.color, sections: secs.sections, more: secs.more, open: [], done: [], announcements: latest, html: clean(info.raw?.description || ''), front: fp ? { title: fp.title || 'Front page', excerpt: textOf(fp.body, 220), slug: fp.url || '' } : null };
+    }
+    const course = info.raw || {};
+    const list = await store.assignments(c.id).catch(() => null);
+    const pub = (list || []).filter((a) => a.published !== false);
+    const open = pub.filter((a) => !submittedA(a) && !a.submission?.excused && !ungradable(a) && !(a.locked_for_user && !a.due_at)).sort((x, y) => (U.parse(x.due_at)?.getTime() || Infinity) - (U.parse(y.due_at)?.getTime() || Infinity));
+    const done = pub.filter(submittedA).sort((x, y) => (U.parse(y.submission?.submitted_at)?.getTime() || 0) - (U.parse(x.submission?.submitted_at)?.getTime() || 0)).slice(0, 5);
+    const wantsFront = !course.defaultView || ['wiki', 'syllabus'].includes(course.defaultView);
+    const fp = wantsFront && course.defaultView !== 'syllabus' ? await store.frontPage(c.id).catch(() => null) : null;
+    return {
+      ctx, kind: 'courses', title: info.title, name: info.name, sub: info.sub, color: info.color,
+      teachers: (course.teachers || []).slice(0, 3).join(', '),
+      score: course.score !== null && course.score !== undefined ? Number(course.score) : null, scoreText: course.score !== null && course.score !== undefined ? `${store.fmtPts(course.score)}%` : null, letter: course.grade ? String(course.grade).replace(/-/g, '−') : null,
+      sections: secs.sections, more: secs.more, open: open.slice(0, 12).map((a) => aRow(a, c.id)), openCount: open.length, done: done.map((a) => aRow(a, c.id)), announcements: latest,
+      front: fp ? { title: fp.title || 'Front page', excerpt: textOf(fp.body, 220), slug: fp.url || '' } : null, html: '',
+    };
+  }
+
+  // Announcements and discussions
+  function annRow(a, c) {
+    const who = authorOf(a);
+    return { id: String(a.id), title: a.title || 'Announcement', author: who.name, avatar: who.avatar, when: whenText(a.delayed_post_at || a.posted_at), preview: textOf(a.message, 180), unread: a.read_state === 'unread' || (a.unread_count || 0) > 0, replies: a.discussion_subentry_count || 0, url: `${c.base}/discussion_topics/${a.id}` };
+  }
+  async function announcements({ ctx } = {}) {
+    const c = ctxOf(ctx);
+    const [info, list] = await Promise.all([contextInfo(c), store.announcements(c.id, c.opts)]);
+    return { title: 'Announcements', context: info.title, color: info.color, rows: (list || []).map((a) => annRow(a, c)), empty: 'No announcements yet.' };
+  }
+  async function discussions({ ctx } = {}) {
+    const c = ctxOf(ctx);
+    const [info, list] = await Promise.all([contextInfo(c), store.discussions(c.id, c.opts)]);
+    const last = (t) => Math.max(U.parse(t.last_reply_at)?.getTime() || 0, U.parse(t.posted_at)?.getTime() || 0, U.parse(t.created_at)?.getTime() || 0);
+    const sorted = [...(list || [])].sort((x, y) => last(y) - last(x));
+    const row = (t) => {
+      const who = authorOf(t);
+      const graded = t.assignment ? [ptsOf(t.assignment.points_possible), t.assignment.due_at ? `Due ${U.fmtAt(t.assignment.due_at)}` : ''].filter(Boolean).join(' · ') : '';
+      return { id: String(t.id), title: t.title || 'Discussion', author: who.name, avatar: who.avatar, when: whenText(t.last_reply_at || t.posted_at), preview: graded || textOf(t.message, 140), unread: (t.unread_count || 0) > 0 || t.read_state === 'unread', unreadCount: t.unread_count || 0, replies: t.discussion_subentry_count || 0, graded: !!t.assignment, url: `${c.base}/discussion_topics/${t.id}` };
+    };
+    const sections = [
+      { title: 'Pinned', rows: sorted.filter((t) => t.pinned).map(row) },
+      { title: 'Discussions', rows: sorted.filter((t) => !t.pinned && !t.locked).map(row) },
+      { title: 'Closed for comments', rows: sorted.filter((t) => !t.pinned && t.locked).map(row) },
+    ].filter((s) => s.rows.length);
+    return { title: 'Discussions', context: info.title, color: info.color, sections, empty: 'No discussions yet.' };
+  }
+  /** One discussion or announcement: the topic and every reply in order, threaded by depth; read once opened. */
+  async function topic({ ctx, id } = {}) {
+    const c = ctxOf(ctx);
+    const [info, t, view] = await Promise.all([contextInfo(c), store.discussion(c.id, id, c.opts), store.discussionView(c.id, id, c.opts).catch(() => null)]);
+    if (!t) throw new Error('This discussion could not be loaded.');
+    store.markTopicRead(c.id, id, c.opts).then(() => app()?.refreshCounts?.()).catch(() => {});
+    const people = new Map((view?.participants || []).map((p) => [String(p.id), p]));
+    const entries = [];
+    const walk = (list, depth, parent) => {
+      for (const e of list || []) {
+        const p = people.get(String(e.user_id)) || {};
+        const avatar = p.avatar_image_url && !/avatar-50|no_pic|dotted_pic/.test(p.avatar_image_url) ? p.avatar_image_url : null;
+        const html = e.deleted ? '' : clean(e.message || '');
+        entries.push({ id: String(e.id), author: e.deleted ? '' : (p.display_name || 'Someone'), avatar, when: whenText(e.created_at), text: e.deleted ? 'This reply was deleted.' : textOf(e.message, 4000), html, rich: /<(img|iframe|video|table|math|pre)\b|equation_image/i.test(e.message || ''), depth: Math.min(depth, 4), parent: parent || null, deleted: !!e.deleted });
+        walk(e.replies, depth + 1, String(e.id));
+      }
+    };
+    walk(view?.view, 0, null);
+    const who = authorOf(t);
+    const locked = !!(t.locked || t.locked_for_user);
+    const needFirst = !!t.require_initial_post && !view;
+    return {
+      id: String(t.id), title: t.title || 'Discussion', context: info.title, color: info.color, author: who.name, avatar: who.avatar, when: whenText(t.delayed_post_at || t.posted_at),
+      html: clean(t.message || ''), announcement: !!(t.is_announcement || t.announcement),
+      graded: t.assignment ? [ptsOf(t.assignment.points_possible), t.assignment.due_at ? `Due ${U.fmtAt(t.assignment.due_at)}` : ''].filter(Boolean).join(' · ') : '',
+      assignmentUrl: t.assignment?.id && c.kind === 'courses' ? `/courses/${c.id}/assignments/${t.assignment.id}` : null,
+      attachments: (t.attachments || []).map((x) => ({ name: x.display_name || x.filename || 'Attachment', url: absUrl(x.url) })).filter((x) => x.url),
+      locked, canReply: !locked && t.permissions?.reply !== false, needFirst,
+      lockText: locked ? (textOf(t.lock_explanation || '', 200) || 'This discussion is closed for comments.') : '',
+      entries, count: entries.filter((e) => !e.deleted).length,
+    };
+  }
+  async function reply({ ctx, id, parent = null, text = '' } = {}) {
+    const c = ctxOf(ctx);
+    if (!String(text).trim()) throw new Error('Write a reply first.');
+    await store.postEntry(c.id, id, textToHtml(text), parent || null, c.opts);
+    return { ok: true };
+  }
+
+  // Modules
+  const REQ = { must_view: 'View', must_submit: 'Submit', must_mark_done: 'Mark done', must_contribute: 'Contribute', min_score: null };
+  const reqWord = (cr) => (!cr ? '' : cr.type === 'min_score' ? `Score at least ${store.fmtPts(cr.min_score)}` : REQ[cr.type] || '');
+  function itemUrl(it, base) {
+    const has = (v) => v !== null && v !== undefined && v !== '';
+    const own = local(it.html_url || '') || null; // (Canvas's module-item address: it leads to the item)
+    switch (it.type) {
+      case 'Assignment': return has(it.content_id) ? `${base}/assignments/${it.content_id}` : own;
+      case 'Quiz': return has(it.content_id) ? `${base}/quizzes/${it.content_id}` : own;
+      case 'Discussion': return has(it.content_id) ? `${base}/discussion_topics/${it.content_id}` : own;
+      case 'Page': return has(it.page_url) ? `${base}/pages/${it.page_url}` : own;
+      case 'File': return has(it.content_id) ? `${base}/files/${it.content_id}/download?download_frd=1` : own;
+      case 'ExternalUrl': return it.external_url || it.html_url || null;
+      case 'ExternalTool': return local(it.html_url || '');
+      default: return null;
+    }
+  }
+  async function modules({ ctx } = {}) {
+    const c = ctxOf(ctx);
+    const [info, mods] = await Promise.all([contextInfo(c), store.modules(c.id)]);
+    const byId = new Map((mods || []).map((m) => [String(m.id), m]));
+    return {
+      title: 'Modules', context: info.title, color: info.color, empty: 'No modules in this course.',
+      modules: (mods || []).map((m) => {
+        const locked = m.state === 'locked';
+        const pre = (m.prerequisite_module_ids || []).map((x) => byId.get(String(x))?.name).filter(Boolean);
+        const lockText = locked ? (pre.length ? `Complete ${pre.join(', ')} first` : m.unlock_at ? `Unlocks ${U.fmtAt(m.unlock_at)}` : 'Locked') : '';
+        const items = (m.items || []).map((it) => {
+          const cr = it.completion_requirement || null;
+          const cd = it.content_details || {};
+          return {
+            id: String(it.id), title: it.title || 'Item', type: it.type, indent: Math.min(Number(it.indent) || 0, 3), url: itemUrl(it, c.base),
+            file: it.type === 'File', external: it.type === 'ExternalUrl', header: it.type === 'SubHeader',
+            requirement: reqWord(cr), done: !!cr?.completed, markable: cr?.type === 'must_mark_done',
+            locked: !!cd.locked_for_user, lockText: cd.locked_for_user ? textOf(cd.lock_explanation || '', 160) : '',
+            sub: [cd.points_possible !== undefined && cd.points_possible !== null ? ptsOf(cd.points_possible) : '', cd.due_at ? `Due ${U.fmtAt(cd.due_at)}` : ''].filter(Boolean).join(' · '),
+          };
+        });
+        const req = items.filter((x) => x.requirement);
+        return { id: String(m.id), name: m.name || 'Module', locked, lockText, state: m.state || '', done: m.state === 'completed', progress: req.length ? `${req.filter((x) => x.done).length} of ${req.length} done` : '', items };
+      }),
+    };
+  }
+  async function markDone({ ctx, module, item, done = true } = {}) {
+    const c = ctxOf(ctx);
+    await store.markItemDone(c.id, module, item, !!done);
+    return { ok: true, done: !!done };
+  }
+
+  // Assignments
+  async function assignments({ ctx } = {}) {
+    const c = ctxOf(ctx);
+    const [info, list] = await Promise.all([contextInfo(c), store.assignments(c.id)]);
+    const now = new Date();
+    const pub = (list || []).filter((a) => a.published !== false);
+    const graded = (a) => { const s = a.submission || {}; return s.workflow_state === 'graded' && s.score !== null && s.score !== undefined && s.posted_at !== null; };
+    const due = (a) => U.parse(a.due_at);
+    const overdue = pub.filter((a) => !graded(a) && !submittedA(a) && !a.submission?.excused && due(a) && due(a) < now && Number(a.points_possible) > 0 && !ungradable(a));
+    const upcoming = pub.filter((a) => !graded(a) && due(a) && due(a) >= now).sort((x, y) => due(x) - due(y));
+    const undated = pub.filter((a) => !graded(a) && !due(a));
+    const past = pub.filter((a) => !overdue.includes(a) && !upcoming.includes(a) && !undated.includes(a)).sort((x, y) => (due(y)?.getTime() || 0) - (due(x)?.getTime() || 0));
+    const sections = [['Overdue', overdue], ['Upcoming', upcoming], ['Undated', undated], ['Past', past]].filter(([, l]) => l.length).map(([title, l]) => ({ title, rows: l.map((a) => aRow(a, c.id)) }));
+    return { title: 'Assignments', context: info.title, color: info.color, sections, empty: 'No assignments yet.' };
+  }
+  const NATIVE_TYPES = ['online_text_entry', 'online_url', 'online_upload'];
+  /** One assignment: its facts, instructions, where your work stands, the grade and feedback, and whether (and how) it can be handed in here. */
+  async function assignment({ course, id } = {}) {
+    const cid = String(course), aid = String(id);
+    const [info, a, s] = await Promise.all([contextInfo(ctxOf(`courses/${cid}`)), store.assignment(cid, aid), store.submission(cid, aid, { force: true }).catch(() => null)]);
+    if (!a) throw new Error('This assignment could not be loaded.');
+    const sub = s || a.submission || {};
+    const types = a.submission_types || [];
+    const st = store.workStatus(a, sub);
+    const held = sub.workflow_state === 'graded' && sub.posted_at === null;
+    const scored = sub.workflow_state === 'graded' && sub.score !== null && sub.score !== undefined && !held;
+    const attemptsLeft = !(a.allowed_attempts > 0) || (sub.attempt || 0) < a.allowed_attempts + (sub.extra_attempts || 0);
+    const here = types.filter((t) => NATIVE_TYPES.includes(t));
+    const locked = !!a.locked_for_user;
+    const closed = a.can_submit === false || (a.lock_at && U.parse(a.lock_at) < new Date());
+    const why = locked ? (textOf(a.lock_explanation || '', 200) || 'This assignment is locked.')
+      : sub.excused ? 'You are excused from this assignment.'
+      : !attemptsLeft ? 'No attempts left.'
+      : closed ? 'This assignment is closed.'
+      : !here.length && types.some((t) => ['media_recording', 'student_annotation'].includes(t)) ? 'This one is handed in on Canvas’s own page.'
+      : !here.length ? '' : '';
+    const canSubmit = !locked && !sub.excused && attemptsLeft && !closed && here.length > 0;
+    const isQuiz = types.includes('online_quiz') || !!a.is_quiz_assignment;
+    const pct = scored && Number(a.points_possible) > 0 ? (Number(sub.score) / Number(a.points_possible)) * 100 : null;
+    const assess = sub.rubric_assessment || {};
+    const R = BCV.screens?.course;
+    const rubric = (a.rubric || []).map((cr) => {
+      const p = R?.rubricParts ? R.rubricParts(cr, held ? null : assess[cr.id]) : { name: textOf(cr.description, 300), ratings: [], pts: ptsOf(cr.points), comment: null };
+      return { id: String(cr.id), name: p.name, pts: p.pts, comment: held ? null : p.comment, ratings: (p.ratings || []).map((r) => ({ text: r.text, pts: r.pts, got: !held && !!r.got })) };
+    });
+    const stats = scored && a.score_statistics ? `Class mean ${store.fmtPts(a.score_statistics.mean)} · high ${store.fmtPts(a.score_statistics.max)} · low ${store.fmtPts(a.score_statistics.min)}` : '';
+    const attemptsText = a.allowed_attempts > 0 ? `${sub.attempt || 0} of ${a.allowed_attempts + (sub.extra_attempts || 0)} attempts used` : (sub.attempt > 1 ? `Attempt ${sub.attempt}` : '');
+    return {
+      id: aid, course: cid, title: a.name || 'Assignment', context: info.title, color: info.color, kind: kindOfA(a),
+      points: ptsOf(a.points_possible), due: a.due_at ? U.fmtAt(a.due_at) : '', available: [a.unlock_at ? `Opens ${U.fmtAt(a.unlock_at)}` : '', a.lock_at ? `Closes ${U.fmtAt(a.lock_at)}` : ''].filter(Boolean).join(' · '),
+      typesText: types.map((t) => ({ online_text_entry: 'Text entry', online_url: 'Website URL', online_upload: 'File upload', media_recording: 'Media recording', student_annotation: 'Annotation', online_quiz: 'Quiz', discussion_topic: 'Discussion', external_tool: 'External tool', on_paper: 'On paper', none: 'Nothing to hand in', not_graded: 'Not graded' })[t] || t).join(', '),
+      html: clean(a.description || ''), status: statusOf(st),
+      grade: scored ? { text: st.word, score: Number(sub.score), possible: Number(a.points_possible) || 0, pct, letter: a.grading_type && a.grading_type !== 'points' && sub.grade ? String(sub.grade) : (pct !== null ? BCV.screens?.gpa?.letterFor?.(pct)?.[0] || null : null), late: sub.points_deducted ? `−${store.fmtPts(sub.points_deducted)} pts late` : '' } : null,
+      held, stats,
+      submitted: sub.submitted_at ? `Submitted ${U.fmtAt(sub.submitted_at)}${sub.late ? ' · late' : ''}` : '', attemptsText,
+      submission: { files: (sub.attachments || []).map((x) => ({ name: x.display_name || x.filename || 'File', url: absUrl(x.url) })).filter((x) => x.url), url: sub.url || null, text: sub.body ? textOf(sub.body, 600) : '' },
+      types: here, allowed: (a.allowed_extensions || []).map((x) => String(x).toLowerCase()), canSubmit, why, resubmit: !!sub.submitted_at,
+      quizUrl: isQuiz ? (a.quiz_id ? `/courses/${cid}/quizzes/${a.quiz_id}` : `/courses/${cid}/assignments/${aid}?bcv=native`) : null,
+      toolUrl: types.includes('external_tool') ? `/courses/${cid}/assignments/${aid}?bcv=native` : null,
+      discussionUrl: a.discussion_topic?.id ? `/courses/${cid}/discussion_topics/${a.discussion_topic.id}` : null,
+      canvasUrl: `/courses/${cid}/assignments/${aid}?bcv=native`,
+      comments: (sub.submission_comments || []).map((cm) => ({ id: String(cm.id), author: cm.author_name || cm.author?.display_name || 'Someone', avatar: cm.author?.avatar_image_url || null, when: whenText(cm.created_at), text: cm.comment || (cm.media_comment ? 'Media comment' : ''), attempt: cm.attempt || null, attachments: (cm.attachments || []).map((x) => ({ name: x.display_name || x.filename || 'Attachment', url: absUrl(x.url) })).filter((x) => x.url) })),
+      rubric, rubricTitle: a.rubric_settings?.title || 'Rubric', rubricScore: R?.rubricScore && a.rubric?.length && !held ? R.rubricScore(a.rubric, assess)?.text || '' : '',
+    };
+  }
+  /** Hand in from the phone: text, a web address, or files the app picked (base64 here, Files again for Canvas's upload). */
+  async function submit({ course, id, type = '', text = '', url = '', files = [], comment = '' } = {}) {
+    const cid = String(course), aid = String(id);
+    if (!NATIVE_TYPES.includes(type)) throw new Error('That kind of submission is handed in on Canvas’s own page.');
+    const a = await store.assignment(cid, aid);
+    let fileIds = [];
+    if (type === 'online_text_entry' && !String(text).trim()) throw new Error('Write something to hand in.');
+    const link = String(url || '').trim();
+    if (type === 'online_url' && !/^https?:\/\/\S+\.\S+/i.test(link)) throw new Error('Enter a web address that starts with http:// or https://.');
+    if (type === 'online_upload') {
+      if (!Array.isArray(files) || !files.length) throw new Error('Choose a file to hand in.');
+      const allowed = (a?.allowed_extensions || []).map((x) => String(x).toLowerCase());
+      for (const f of files) {
+        const ext = String(f.name || '').split('.').pop().toLowerCase();
+        if (allowed.length && !allowed.includes(ext)) throw new Error(`This assignment takes ${allowed.map((x) => `.${x}`).join(', ')} files.`);
+      }
+      for (const f of files) {
+        const bin = atob(String(f.data || ''));
+        const bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        const file = new File([bytes], f.name || 'file', { type: f.type || 'application/octet-stream' });
+        fileIds.push(await store.uploadSubmissionFile(cid, aid, file));
+      }
+    }
+    const r = await store.submitAssignment(cid, aid, { type, fileIds, body: type === 'online_text_entry' ? textToHtml(text) : '', url: link, comment: String(comment || '').trim() });
+    app()?.refreshCounts?.();
+    store.todoWindow?.({ force: true }).catch?.(() => {});
+    return { ok: true, attempt: r?.attempt || null };
+  }
+  async function commentOn({ course, id, text = '' } = {}) {
+    if (!String(text).trim()) throw new Error('Write a comment first.');
+    await store.commentOnSubmission(String(course), String(id), String(text).trim());
+    return { ok: true };
+  }
+
+  // Pages, files, people, quizzes, the syllabus
+  async function pages({ ctx } = {}) {
+    const c = ctxOf(ctx);
+    const [info, list] = await Promise.all([contextInfo(c), store.pages(c.id, c.opts)]);
+    const sorted = [...(list || [])].sort((x, y) => Number(!!y.front_page) - Number(!!x.front_page));
+    return { title: 'Pages', context: info.title, color: info.color, rows: sorted.map((p) => ({ slug: p.url, title: p.title || 'Page', sub: [p.front_page ? 'Front page' : '', p.updated_at ? `Edited ${U.fmtRecent(p.updated_at)}` : ''].filter(Boolean).join(' · ') })), empty: 'No pages yet.' };
+  }
+  async function page({ ctx, slug = '' } = {}) {
+    const c = ctxOf(ctx);
+    const [info, p] = await Promise.all([contextInfo(c), slug ? store.page(c.id, slug, c.opts) : store.frontPage(c.id, c.opts)]);
+    if (!p) throw new Error(slug ? 'This page could not be loaded.' : 'There is no front page.');
+    const locked = !!p.locked_for_user;
+    return { title: p.title || 'Page', context: info.title, color: info.color, slug: p.url || slug, html: locked ? '' : clean(p.body || ''), lockText: locked ? (textOf(p.lock_explanation || '', 200) || 'This page is locked.') : '', edited: p.updated_at ? `Edited ${U.fmtRecent(p.updated_at)}${p.last_edited_by?.display_name ? ` by ${p.last_edited_by.display_name}` : ''}` : '' };
+  }
+  const sizeText = (n) => (!Number.isFinite(Number(n)) ? '' : n < 1024 ? `${n} B` : n < 1048576 ? `${Math.round(n / 1024)} KB` : `${(n / 1048576).toFixed(1)} MB`);
+  async function files({ ctx, folder = null } = {}) {
+    const c = ctxOf(ctx);
+    const info = await contextInfo(c);
+    const f = folder ? { id: folder } : await store.rootFolder(c.id, c.opts);
+    if (!f?.id) throw new Error('Files are not available here.');
+    const box = await store.folderContents(f.id);
+    const byName = (x, y) => String(x.name || x.display_name).localeCompare(String(y.name || y.display_name), undefined, { numeric: true });
+    return {
+      title: 'Files', context: info.title, color: info.color, empty: 'This folder is empty.',
+      folders: (box?.folders || []).filter((x) => !x.hidden).sort(byName).map((x) => ({ id: String(x.id), name: x.name || 'Folder', sub: [x.files_count ? U.plural(x.files_count, 'file') : '', x.folders_count ? U.plural(x.folders_count, 'folder') : ''].filter(Boolean).join(' · ') || 'Empty', locked: !!x.locked })),
+      files: (box?.files || []).filter((x) => !x.hidden).sort(byName).map((x) => ({ id: String(x.id), name: x.display_name || x.filename || 'File', sub: [sizeText(x.size), x.updated_at || x.modified_at ? U.fmtShort(x.updated_at || x.modified_at) : ''].filter(Boolean).join(' · '), url: absUrl(x.url), mime: x['content-type'] || '', kind: x.mime_class || '', locked: !!(x.locked_for_user || x.locked) })),
+    };
+  }
+  const ROLE = { TeacherEnrollment: 'Teacher', TaEnrollment: 'TA', StudentEnrollment: 'Student', ObserverEnrollment: 'Observer', DesignerEnrollment: 'Designer' };
+  async function people({ ctx } = {}) {
+    const c = ctxOf(ctx);
+    const [info, list] = await Promise.all([contextInfo(c), store.people(c.id, c.opts)]);
+    const roleOf = (p) => { if (c.kind === 'groups') return 'Member'; const e = (p.enrollments || [])[0] || {}; return e.role && !/Enrollment$/.test(e.role) ? e.role : ROLE[e.type || e.role] || 'Student'; };
+    const order = ['Teacher', 'TA', 'Designer', 'Student', 'Observer', 'Member'];
+    const groups = new Map();
+    for (const p of list || []) { const r = roleOf(p); if (!groups.has(r)) groups.set(r, []); groups.get(r).push({ id: String(p.id), name: p.name || p.short_name || 'Someone', pronouns: p.pronouns || '', avatar: p.avatar_url && !/avatar-50|no_pic|dotted_pic/.test(p.avatar_url) ? p.avatar_url : null }); }
+    const sections = [...groups.entries()].sort((x, y) => (order.indexOf(x[0]) + 1 || 99) - (order.indexOf(y[0]) + 1 || 99)).map(([title, rows]) => ({ title: title === 'Member' ? 'Members' : `${title}${rows.length === 1 ? '' : title.endsWith('s') ? '' : 's'}`, rows }));
+    return { title: 'People', context: info.title, color: info.color, sections, empty: 'Nobody to show.' };
+  }
+  async function quizzes({ ctx } = {}) {
+    const c = ctxOf(ctx);
+    const [info, list, as] = await Promise.all([contextInfo(c), store.quizzes(c.id).catch(() => []), store.assignments(c.id).catch(() => [])]);
+    const rows = (list || []).filter((q) => q.published !== false).map((q) => {
+      const a = (as || []).find((x) => String(x.id) === String(q.assignment_id) || (x.is_quiz_assignment && String(x.quiz_id) === String(q.id)));
+      return { id: String(q.id), title: q.title || 'Quiz', sub: [ptsOf(q.points_possible), q.due_at ? `Due ${U.fmtAt(q.due_at)}` : '', q.time_limit ? `${q.time_limit} min` : '', q.allowed_attempts > 1 ? `${q.allowed_attempts} attempts` : q.allowed_attempts === -1 ? 'Unlimited attempts' : ''].filter(Boolean).join(' · '), status: a ? statusOf(store.workStatus(a)) : null, url: a ? `/courses/${c.id}/assignments/${a.id}` : `/courses/${c.id}/quizzes/${q.id}`, kind: 'Quiz' };
+    });
+    for (const a of (as || []).filter((x) => x.is_quiz_lti_assignment && x.published !== false)) rows.push({ ...aRow(a, c.id), kind: 'Quiz' });
+    return { title: 'Quizzes', context: info.title, color: info.color, rows, empty: 'No quizzes in this course.' };
+  }
+  async function syllabus({ ctx } = {}) {
+    const c = ctxOf(ctx);
+    const [info, body, as] = await Promise.all([contextInfo(c), store.syllabus(c.id).catch(() => ''), store.assignments(c.id).catch(() => [])]);
+    const dated = (as || []).filter((a) => a.published !== false && a.due_at).sort((x, y) => U.parse(x.due_at) - U.parse(y.due_at));
+    return { title: 'Syllabus', context: info.title, color: info.color, html: clean(body || ''), rows: dated.map((a) => aRow(a, c.id)), empty: 'The syllabus is empty.' };
+  }
+
+  // One course's grades, with what-if scores (the course Grades screen's model; nothing saved)
+  const gradeCache = new Map();
+  let gradesRows = null; // the Grades screen's last courses, for the term GPA a what-if score would give
+  async function courseGrades({ id, tried = {}, fresh = false } = {}) {
+    const G = BCV.screens.gpa;
+    const key = String(id);
+    let entry = gradeCache.get(key);
+    if (!entry || fresh) {
+      const [all, ownPref, targetsPref] = await Promise.all([store.courses(), store.pref('gradeWeights'), store.pref('gradeTargets')]);
+      const c = (all || []).find((x) => String(x.id) === key) || (await store.course(key));
+      if (!c) throw new Error('That course could not be found.');
+      const groups = await store.assignmentGroups(c.id, { maxAge: store.freshness?.grades });
+      const own = ownPref && typeof ownPref === 'object' && ownPref[c.id] && Object.keys(ownPref[c.id]).length ? ownPref[c.id] : null;
+      const targets = targetsPref && typeof targetsPref === 'object' ? targetsPref : {};
+      const favs = await store.favorites().catch(() => []);
+      entry = { c, groups, own, target: targets[c.id] || null, short: (favs || []).find((f) => String(f.id) === key)?.shortName || c.nickname || c.code || c.name };
+      gradeCache.set(key, entry);
+    }
+    const wi = {};
+    for (const [k, v] of Object.entries(tried && typeof tried === 'object' ? tried : {})) wi[k] = v === null || v === undefined ? '' : String(v);
+    const on = Object.keys(wi).length > 0;
+    const m = store.gradeModel(entry.groups, entry.c, wi, on, false, [], { ownWeights: entry.own });
+    const total = m.total === null || m.total === undefined ? null : Number(m.total);
+    const canvasLetter = !on && entry.c.grade && !entry.own ? String(entry.c.grade).replace(/-/g, '−') : null;
+    const letter = total === null ? null : canvasLetter || G.letterFor(total)[0];
+    const legend = new Map((m.legend || []).map((g) => [String(g.id), g]));
+    const ungraded = new Map((m.ungraded || []).map((g) => [String(g.id), g]));
+    const groups = (entry.groups || []).map((g) => {
+      const l = legend.get(String(g.id));
+      const u = ungraded.get(String(g.id));
+      return { id: String(g.id), name: g.name || 'Assignments', weightText: l?.weightText || (u?.weightText ? `${u.weightText} of grade` : ''), value: l ? l.value : 'ungraded', pct: l?.pct ?? null, detail: l?.detail || '', color: l?.color || null };
+    });
+    const rows = (m.rows || []).filter((r) => !r.added).map((r) => ({
+      id: String(r.id), name: r.name, groupId: String(r.groupId), possible: Number(r.possible) || 0, earned: r.earned, effective: r.effective, hypothetical: !!r.hypothetical, badge: r.badge || '', dropped: !!r.dropped, grade: r.grade || null, counted: r.counted !== false,
+      dueText: r.due ? `Due ${U.fmtShort(r.due)}` : '', url: `/courses/${key}/assignments/${r.id}`,
+      scoreText: r.effective === null || r.effective === undefined ? `—/${store.fmtPts(r.possible)}` : `${store.fmtPts(r.effective)}/${store.fmtPts(r.possible)}`,
+    }));
+    let gpa = null, gpaIf = null;
+    const others = gradesRows || (await grades().then((d) => d.rows).catch(() => null));
+    if (others) {
+      const pts = (rowsOf) => { const p = rowsOf.filter((x) => x !== null); return p.length ? p.reduce((s, x) => s + x, 0) / p.length : null; };
+      gpa = pts(others.map((r) => r.points));
+      if (on && total !== null) gpaIf = pts(others.map((r) => (r.id === key ? G.letterFor(total)[2] : r.points)).concat(others.some((r) => r.id === key) ? [] : [G.letterFor(total)[2]]));
+    }
+    return {
+      id: key, code: entry.short, name: entry.c.name, color: entry.c.color || GRAY,
+      total, totalText: total === null ? '—' : `${store.fmtPts(total)}%`, letter, note: m.center?.note || '', final: m.center?.final || '', whatIf: on, weighted: !!m.weighted,
+      target: entry.target ? String(entry.target).replace(/-/g, '−') : null, scale: G.SCALE.map(([l, min, points]) => ({ letter: l, min, points })),
+      groups, rows, gpa, gpaIf,
+    };
+  }
+
+  // Groups
+  async function groups() {
+    const [list, all] = await Promise.all([store.groups(), store.courses().catch(() => [])]);
+    const byId = new Map((all || []).map((c) => [String(c.id), c]));
+    const row = (g) => { const c = byId.get(String(g.course_id)); return { id: String(g.id), name: g.name || 'Group', sub: [c?.nickname || c?.code || c?.name || g.group_category?.name || '', g.members_count ? U.plural(g.members_count, 'member') : ''].filter(Boolean).join(' · '), color: c?.color || GRAY, past: c?.state === 'past' }; };
+    const rows = (list || []).map(row);
+    return { current: rows.filter((r) => !r.past), past: rows.filter((r) => r.past), empty: 'You are not in any groups.' };
+  }
+
+  // Inbox
+  let meId = null;
+  const meOfInbox = async () => (meId ||= String(store.env?.().current_user_id || (await store.me().catch(() => null))?.id || ''));
+  async function inbox({ scope = 'inbox' } = {}) {
+    const sc = ['inbox', 'unread', 'starred', 'sent', 'archived'].includes(scope) ? scope : 'inbox';
+    const [list, mine] = await Promise.all([store.conversations({ scope: sc, force: true }), meOfInbox()]);
+    return {
+      scope: sc,
+      rows: (list || []).map((cv) => {
+        const others = (cv.participants || []).filter((p) => String(p.id) !== mine).map((p) => p.name).filter(Boolean);
+        return { id: String(cv.id), subject: cv.subject || '(No subject)', who: others.slice(0, 3).join(', ') + (others.length > 3 ? ` +${others.length - 3}` : '') || 'Me', preview: String(cv.last_message || '').slice(0, 200), when: U.whenShort(cv.last_message_at || cv.last_authored_message_at), unread: cv.workflow_state === 'unread', starred: !!cv.starred, count: cv.message_count || 1, context: cv.context_name || '', attachment: (cv.properties || []).includes('attachments') };
+      }),
+      empty: sc === 'unread' ? 'No unread messages.' : sc === 'sent' ? 'Nothing sent yet.' : 'No messages.',
+    };
+  }
+  async function conversation({ id } = {}) {
+    const [cv, mine] = await Promise.all([store.conversation(String(id)), meOfInbox()]);
+    if (!cv) throw new Error('This conversation could not be loaded.');
+    if (cv.workflow_state === 'unread') store.markRead(String(id)).then(() => app()?.refreshCounts?.()).catch(() => {});
+    const people = new Map((cv.participants || []).map((p) => [String(p.id), p]));
+    const msgs = [...(cv.messages || [])].reverse().map((mm) => {
+      const p = people.get(String(mm.author_id)) || {};
+      return { id: String(mm.id), author: p.name || 'Someone', avatar: p.avatar_url && !/avatar-50|no_pic|dotted_pic/.test(p.avatar_url) ? p.avatar_url : null, mine: String(mm.author_id) === mine, when: whenText(mm.created_at), body: String(mm.body || '').trim() || (mm.media_comment ? 'Media message' : ''), attachments: (mm.attachments || []).map((x) => ({ name: x.display_name || x.filename || 'Attachment', url: absUrl(x.url) })).filter((x) => x.url) };
+    });
+    return { id: String(id), subject: cv.subject || '(No subject)', context: cv.context_name || '', people: (cv.participants || []).filter((p) => String(p.id) !== mine).map((p) => p.name).join(', '), starred: !!cv.starred, messages: msgs };
+  }
+  async function sendReply({ id, body = '' } = {}) {
+    if (!String(body).trim()) throw new Error('Write a message first.');
+    await store.replyTo(String(id), String(body).trim());
+    return { ok: true };
+  }
+  async function star({ id, on = true } = {}) { await store.setStarred(String(id), !!on); return { ok: true }; }
+  async function recipients({ q = '', context = null } = {}) {
+    const term = String(q || '').trim();
+    if (term.length < 2 && !context) return { rows: [] };
+    const list = await store.searchRecipients(term, context || null);
+    return { rows: (list || []).map((r) => ({ id: String(r.id), name: r.name || 'Someone', sub: r.user_count ? U.plural(r.user_count, 'person', 'people') : Object.values(r.common_courses || {}).flat().join(', ') })) };
+  }
+  async function composeContexts() {
+    const favs = await store.favorites().catch(() => []);
+    return { rows: (favs || []).map((c) => ({ code: `course_${c.id}`, name: c.shortName || c.name, color: c.color || GRAY })) };
+  }
+  async function sendMessage({ recipients: to = [], subject = '', body = '', context = null } = {}) {
+    if (!Array.isArray(to) || !to.length) throw new Error('Choose who the message is to.');
+    if (!String(body).trim()) throw new Error('Write a message first.');
+    await store.compose({ recipients: to.map(String), subject: String(subject || '').trim(), body: String(body).trim(), contextCode: context || null });
+    return { ok: true };
+  }
+
+  const CALLS = { snapshot, today, todayCounts, todaySheet, clearOverdue, courses, coursesProgress, setNickname, todo, complete, setPriority, deleteTask, addTask, grades, setGoal, setTarget, calendar, setCalendars, calView, notifications, notifMark, search, appearance, whatsNew, refresh,
+    home, announcements, discussions, topic, reply, modules, markDone, assignments, assignment, submit, commentOn, pages, page, files, people, quizzes, syllabus, courseGrades, groups, inbox, conversation, sendReply, star, recipients, composeContexts, sendMessage };
   /** What the app asks for: a plain object back (dates as ISO strings), or { error } — never a throw across the bridge. */
   async function call(name, args = {}) {
     const fn = CALLS[name];
