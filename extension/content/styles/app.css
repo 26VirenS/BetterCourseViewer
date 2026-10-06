@@ -14,7 +14,7 @@
 
 html[data-bcv-theme] {
   --bcv-line: max(1px, var(--bcv-dpx, 1px)); /* a hairline drawn as a shadow: one CSS pixel, or one screen pixel where that is more (below 100% zoom; content/early.js keeps --bcv-dpx) */
-  --bcv-version: "2.98.98"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.98.99"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -3254,6 +3254,52 @@ html.bcv-phone .bcv-nf__act { margin-left: auto; }
 .bcv-viewer__text { align-self: stretch; margin: 0; padding: 22px 26px; width: 100%; box-sizing: border-box; overflow: auto; font: 400 13px/1.6 ui-monospace, Menlo, Consolas, monospace; color: var(--bcv-ink); white-space: pre-wrap; word-break: break-word; }
 .bcv-viewer__none { text-align: center; padding: 40px; color: var(--bcv-ink2); font: 400 14px/1.5 var(--bcv-font); display: flex; flex-direction: column; align-items: center; gap: 14px; }
 .bcv-viewer__none .bcv-btn { text-decoration: none; }
+/* (2.98.99) the viewer's own pages (docview.js): a bar over them, the pages in a column that scrolls,
+   each page white whatever the look, its words laid over it to select, the matches lit; a picture to
+   zoom and move about; text at a size to read */
+.bcv-dv { align-self: stretch; width: 100%; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.bcv-dv__bar { flex: none; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 7px 12px; background: var(--bcv-card); border-bottom: 1px solid var(--bcv-sep); font: 500 12.5px/1 var(--bcv-font); color: var(--bcv-ink2); }
+.bcv-dv__grp { display: flex; align-items: center; gap: 4px; }
+.bcv-dv__find { margin-left: auto; }
+.bcv-dv__btn { flex: none; width: 28px; height: 28px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 8px; background: transparent; color: var(--bcv-ink2); cursor: pointer; }
+.bcv-dv__btn:hover:not(:disabled) { background: var(--bcv-hover); color: var(--bcv-ink); }
+.bcv-dv__btn:disabled { opacity: .35; cursor: default; }
+.bcv-dv__btn:focus-visible, .bcv-dv__pagein:focus-visible, .bcv-dv__zoom:focus-visible, .bcv-dv__findin:focus-visible { outline: 2px solid var(--bcv-blue); outline-offset: 1px; }
+.bcv-dv__pagein { width: 3.4em !important; height: 28px !important; min-height: 0 !important; box-sizing: border-box !important; margin: 0 !important; padding: 0 6px !important; border: 1px solid var(--bcv-sep) !important; border-radius: 8px !important; background: var(--bcv-fill) !important; box-shadow: none !important; color: var(--bcv-ink) !important; font: 600 12.5px/1 var(--bcv-font) !important; text-align: center; font-variant-numeric: tabular-nums; } /* (!important: Canvas styles every input on the page, and the viewer lives outside the app's root) */
+.bcv-dv__of { padding: 0 2px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.bcv-dv__zoom { width: auto !important; height: 28px !important; min-height: 0 !important; box-sizing: border-box !important; margin: 0 !important; padding: 0 6px 0 8px !important; border: 1px solid var(--bcv-sep) !important; border-radius: 8px !important; background-color: var(--bcv-fill) !important; box-shadow: none !important; color: var(--bcv-ink) !important; font: 600 12.5px/1 var(--bcv-font) !important; font-variant-numeric: tabular-nums; cursor: pointer; }
+.bcv-dv__sep { width: 1px; height: 18px; margin: 0 4px; background: var(--bcv-sep); }
+.bcv-dv__note { font-weight: 500; color: var(--bcv-ink3); white-space: nowrap; }
+.bcv-dv__findic { position: relative; z-index: 1; display: inline-flex; margin-right: -26px; padding-left: 9px; color: var(--bcv-ink3); pointer-events: none; }
+.bcv-dv__findin { width: 180px !important; height: 28px !important; min-height: 0 !important; box-sizing: border-box !important; margin: 0 !important; padding: 0 8px 0 28px !important; border: 1px solid var(--bcv-sep) !important; border-radius: 8px !important; background: var(--bcv-fill) !important; box-shadow: none !important; color: var(--bcv-ink) !important; font: 500 12.5px/1 var(--bcv-font) !important; -webkit-appearance: none; appearance: none; }
+.bcv-dv__findin.is-none { border-color: rgba(255,69,58,.7) !important; }
+.bcv-dv__findn { padding: 0 4px; white-space: nowrap; color: var(--bcv-ink3); font-variant-numeric: tabular-nums; }
+.bcv-dv__findn:empty { display: none; }
+.bcv-dv:not(.is-finding) .bcv-dv__find .bcv-dv__btn { display: none; }
+.bcv-dv__scroll { flex: 1; min-height: 0; overflow: auto; position: relative; outline: none; touch-action: pan-x pan-y; overscroll-behavior: contain; }
+.bcv-dv__pages { position: relative; display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 20px; box-sizing: border-box; width: max-content; min-width: 100%; }
+.bcv-dv__page { position: relative; flex: none; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.12), 0 6px 24px rgba(0,0,0,.10); overflow: hidden; }
+.bcv-dv__canvas { display: block; width: 100%; height: 100%; }
+.bcv-dv__text { position: absolute; inset: 0; z-index: 2; overflow: hidden; line-height: 1; text-align: initial; transform-origin: 0 0; forced-color-adjust: none; text-size-adjust: none; -webkit-text-size-adjust: none; }
+.bcv-dv__text[data-main-rotation="90"] { transform: rotate(90deg) translateY(-100%); }
+.bcv-dv__text[data-main-rotation="180"] { transform: rotate(180deg) translate(-100%, -100%); }
+.bcv-dv__text[data-main-rotation="270"] { transform: rotate(270deg) translateX(-100%); }
+.bcv-dv__text span, .bcv-dv__text br { color: transparent; position: absolute; white-space: pre; cursor: text; transform-origin: 0% 0%; }
+.bcv-dv__text span.markedContent { top: 0; height: 0; }
+.bcv-dv__text ::selection { background: rgba(10,132,255,.32); }
+.bcv-dv__text mark.bcv-dv__hit { margin: 0; padding: 0; color: transparent; background: rgba(255,204,0,.45); border-radius: 2px; }
+.bcv-dv__text mark.bcv-dv__hit.is-cur { background: rgba(255,149,0,.75); box-shadow: 0 0 0 1px rgba(255,149,0,.9); }
+.bcv-dv__links { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
+.bcv-dv__link { position: absolute; pointer-events: auto; border-radius: 2px; }
+.bcv-dv__link:hover { background: rgba(10,132,255,.12); }
+.bcv-dv__stage { position: relative; display: flex; align-items: center; justify-content: center; box-sizing: border-box; padding: 16px; width: max-content; height: max-content; min-width: 100%; min-height: 100%; }
+.bcv-dv__imgbox { position: relative; flex: none; }
+.bcv-dv__img { position: absolute; left: 50%; top: 50%; display: block; max-width: none; max-height: none; object-fit: fill; transform-origin: 50% 50%; user-select: none; -webkit-user-select: none; -webkit-user-drag: none; }
+.bcv-dv__scroll--img.is-pan { cursor: grab; }
+.bcv-dv__scroll--img.is-drag { cursor: grabbing; }
+.bcv-dv--text .bcv-viewer__text { flex: 1; min-height: 0; outline: none; }
+.bcv-dv__size { min-width: 46px; text-align: center; font-variant-numeric: tabular-nums; }
+@media (max-width: 700px) { .bcv-dv__findin { width: 120px !important; } .bcv-dv__note { display: none; } .bcv-dv__find { margin-left: 0; } }
 @media (max-width: 700px) {
   .bcv-sheet-ov.bcv-viewer-ov { padding: 10px; }
   .bcv-viewer { height: calc(100vh - 20px); border-radius: 20px; }

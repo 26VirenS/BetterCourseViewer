@@ -906,6 +906,36 @@ on('GET', /^\/api\/v1\/courses\/(\w+)\/folders\/root$/, (url, m) => folders[`r${
 on('GET', /^\/api\/v1\/courses\/(\w+)\/folders\/by_path\/(.+)$/, (url, m) => { const path = `course files/${decodeURIComponent(m[2])}`; const f = Object.values(folders).find((x) => x.full_name === path); return f ? [folders[`r${m[1]}`], f] : { errors: [{ message: 'not found' }] }; });
 on('GET', /^\/api\/v1\/folders\/(\w+)\/folders$/, (url, m) => Object.values(folders).filter((f) => f.parent_folder_id === m[1]));
 on('GET', /^\/api\/v1\/folders\/(\w+)\/files$/, (url, m) => files[m[1]] || []);
+// A real PDF written by hand, for the file viewer (pdf.js draws it): pages of Helvetica text, a link on
+// the first page (an address) and on the last (to page 1). The syllabus has three pages; any other PDF
+// one, its name its title.
+function pdfOf(title, pages) {
+  const esc = (t) => t.replace(/[\\()]/g, (c) => `\\${c}`);
+  const n = pages.length;
+  const objs = ['<< /Type /Catalog /Pages 2 0 R >>', `<< /Type /Pages /Kids [${pages.map((_, i) => `${4 + i * 2} 0 R`).join(' ')}] /Count ${n} >>`, '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>'];
+  const linkUrl = 3 + n * 2 + 1, linkBack = linkUrl + 1;
+  pages.forEach((lines, i) => {
+    const body = [`BT /F1 22 Tf 72 720 Td (${esc(title)}) Tj ET`, ...lines.map((l, k) => `BT /F1 13 Tf 72 ${676 - k * 24} Td (${esc(l)}) Tj ET`), `BT /F1 10 Tf 72 40 Td (Page ${i + 1} of ${n}) Tj ET`].join('\n');
+    const annots = [i === 0 ? `${linkUrl} 0 R` : null, i === n - 1 && n > 1 ? `${linkBack} 0 R` : null].filter(Boolean);
+    objs.push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents ${5 + i * 2} 0 R${annots.length ? ` /Annots [${annots.join(' ')}]` : ''} >>`);
+    objs.push(`<< /Length ${Buffer.byteLength(body, 'latin1')} >>\nstream\n${body}\nendstream`);
+  });
+  objs.push('<< /Type /Annot /Subtype /Link /Rect [72 650 340 668] /Border [0 0 0] /A << /S /URI /URI (https://example.com/syllabus) >> >>');
+  objs.push(`<< /Type /Annot /Subtype /Link /Rect [72 34 200 52] /Border [0 0 0] /Dest [4 0 R /XYZ 0 792 0] >>`);
+  let out = '%PDF-1.4\n';
+  const offs = [];
+  objs.forEach((o, i) => { offs.push(Buffer.byteLength(out, 'latin1')); out += `${i + 1} 0 obj\n${o}\nendobj\n`; });
+  const xref = Buffer.byteLength(out, 'latin1');
+  out += `xref\n0 ${objs.length + 1}\n0000000000 65535 f \n${offs.map((o) => `${String(o).padStart(10, '0')} 00000 n \n`).join('')}trailer\n<< /Size ${objs.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+  return Buffer.from(out, 'latin1');
+}
+const SYLLABUS = [
+  ['Math 21 - Calculus of a Single Variable', 'Course website: example.com/syllabus', 'Instructor: Dr. Rivera, office hours Tuesday 2-4 PM', 'This syllabus describes grading, deadlines and policies.'],
+  ['Grading', 'Homework 30%', 'Quizzes 20%', 'Midterm 20%', 'Final exam 30%', 'Late homework loses 10% per day.'],
+  ['Schedule', 'Week 1: Limits', 'Week 2: Derivatives', 'Week 3: Applications of derivatives', 'The final exam is cumulative; this syllabus may change.'],
+];
+const pdfFile = (fid, name) => (fid === 'f1' ? pdfOf('Course Syllabus', SYLLABUS) : pdfOf(String(name || 'Document').replace(/\.pdf$/i, ''), [['This is the whole document.']]));
+
 // a course's files as one list (the search box, /download and /convert), narrowed by search_term the way Canvas narrows it
 on('GET', /^\/api\/v1\/courses\/(\w+)\/files$/, (url, m) => { const term = (url.searchParams.get('search_term') || '').toLowerCase(); return Object.values(folders).filter((f) => f.context_id === m[1]).flatMap((f) => files[f.id] || []).filter((f) => !term || `${f.display_name} ${f.filename}`.toLowerCase().includes(term)); });
 // one file by id, as the File API gives it (folder_id, and a preview_url only where Canvadocs would provide one: none here)
@@ -1165,6 +1195,7 @@ const server = http.createServer((req, res) => {
       if (type.startsWith('image/')) { res.writeHead(200, { 'content-type': 'image/svg+xml', 'content-disposition': 'attachment' }); return res.end('<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360"><rect width="640" height="360" fill="#f4f1e8"/><text x="24" y="60" font-size="28" font-family="sans-serif">Lecture 3 whiteboard</text></svg>'); }
       if (type.startsWith('text/')) { res.writeHead(200, { 'content-type': 'text/plain; charset=utf-8', 'content-disposition': 'attachment' }); return res.end('Reading list\n- Chapter 3\n- Chapter 4, sections 1-2\n'); }
       res.writeHead(200, { 'content-type': type, 'content-disposition': 'attachment' });
+      if (type === 'application/pdf') return res.end(pdfFile(fid, f?.display_name)); // a real PDF: the viewer draws it with pdf.js
       return res.end('%PDF-1.4 mock');
     }
     // Canvas's own preview of a file, made to be framed. A course context only resolves the course's

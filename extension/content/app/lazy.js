@@ -27,6 +27,7 @@
     submit: () => !!BCV.screens.submit && !BCV.screens.submit.__stub && !!BCV.screens.feedback && !BCV.screens.feedback.__stub,
     phone: () => !!BCV.phone,
     rubric: () => !!BCV.rubricRing,
+    docview: () => !!BCV.docview,
     notes: () => Array.isArray(self.BCV_WHATS_NEW),
     hub: () => !!BCV.hub,
     widgets: () => !!BCV.widgets,

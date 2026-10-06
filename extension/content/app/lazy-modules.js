@@ -29,4 +29,5 @@ self.BCV_LAZY_MODULES = {
   notes: { needs: ['setupcss'], files: ['content/app/whatsnew-notes.js'] },
   phone: { files: ['content/app/phone.js'] },
   rubric: { files: ['content/app/rubric-ring.js'] }, // the rubric ring (desktop): loaded when a rubric is opened
+  docview: { files: ['content/app/docview.js'] }, // the file viewer's own pages (a PDF, a Word file, a picture, text): loaded when a file is first opened
 };

@@ -25,6 +25,11 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.98.99', date: '2026-10-06', notes: [
+      { kind: 'new', title: 'A new file viewer', body: 'PDFs open here: zoom, go to a page, turn and find.', icon: P.scroll },
+      { kind: 'new', title: 'Word files open here', body: 'A Word file opens as a PDF made on this device.', icon: P.pen },
+      { kind: 'improved', title: 'Zoom pictures and text', body: 'Pictures zoom, turn and drag; text can be larger.', icon: P.pic },
+    ] },
     { version: '2.98.98', date: '2026-10-06', notes: [
       { kind: 'fixed', title: 'One search highlight', body: 'The mouse moves the same highlight the arrow keys do.', icon: P.check },
       { kind: 'improved', title: 'Rubrics open as a ring', body: 'The grid comes back only if you left the last one on it.', icon: P.layers },

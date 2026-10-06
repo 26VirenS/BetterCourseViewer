@@ -483,6 +483,26 @@ if (typeof importScripts === 'function' && !self.BCV_LAZY_MODULES) {
     if (text.length > FETCH_MAX) throw new Error(tooBig);
     return { ok: true, text, type: res.headers.get('content-type') || '' };
   }
+  /** A file's bytes for the file viewer (content/app/viewer.js), when the page could not read them
+   *  itself: Canvas sends a file's download on to its file store, another site that may not let a
+   *  page read it, and this side may. Only the asking tab's own site is asked (the redirects after
+   *  it are followed), with its session; the bytes come back as base64, a message carrying text. */
+  const BYTES_MAX = 60 * 1024 * 1024;
+  async function fetchBytes(url, sender) {
+    let u, from;
+    try { u = new URL(String(url || '')); } catch { throw new Error('That is not an address.'); }
+    try { from = new URL(sender?.url || sender?.tab?.url || '').origin; } catch { from = ''; }
+    if (!/^https?:$/.test(u.protocol) || !from || u.origin !== from) throw new Error('Only a file of the site asking.');
+    const res = await fetch(u.href, { redirect: 'follow', credentials: 'include' });
+    if (!res.ok) throw new Error(`Canvas answered ${res.status}.`);
+    const tooBig = 'That file is too big to show here.';
+    if (Number(res.headers.get('content-length') || 0) > BYTES_MAX) throw new Error(tooBig);
+    const buf = new Uint8Array(await res.arrayBuffer());
+    if (buf.length > BYTES_MAX) throw new Error(tooBig);
+    let bin = '';
+    for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode.apply(null, buf.subarray(i, i + 0x8000));
+    return { ok: true, data: btoa(bin), type: res.headers.get('content-type') || '' };
+  }
   api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (!msg || typeof msg !== 'object') return false;
     const reply = (p) => Promise.resolve(p).then(sendResponse, (e) => sendResponse({ ok: false, message: e?.message || String(e) }));
@@ -537,6 +557,9 @@ if (typeof importScripts === 'function' && !self.BCV_LAZY_MODULES) {
         return true;
       case 'wiki': // Search everything: a Wikipedia lookup
         reply(wiki(msg.q));
+        return true;
+      case 'fetchBytes': // the file viewer: a file's bytes the page could not read itself
+        reply(fetchBytes(msg.url, sender));
         return true;
       case 'fetchText': // the widget importer: a widget's file from an address (the page's own rules never block it)
         reply(fetchText(msg.url));

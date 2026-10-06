@@ -1,8 +1,12 @@
 /* File viewer: a file opened from Files, a module or a link opens in a sheet over the page
- * rather than in a new tab — its name and details up top, a preview where one can be drawn
- * (images, video, audio and text here; PDFs and documents through Canvas's own preview, which
- * is made to be framed), and Download and Open in new tab beside it. Escape, the close button
- * or a click outside puts it away and hands focus back to the row that opened it. */
+ * rather than in a new tab — its name and details up top, the file itself under them, and
+ * Download and Open in new tab beside it. Since 2.98.99 the sheet draws the file itself
+ * (docview.js, loaded the first time): a PDF page by page — zoom, fit, go to a page, turn, find,
+ * select and copy, never change — a Word document as the PDF made of it on this device, a picture
+ * to zoom and move about, text at a size to read. Video and audio play as they are. Canvas's own
+ * preview, framed, is kept for what cannot be drawn here (slides, spreadsheets) and for a file
+ * whose bytes cannot be read. Open in new tab is the browser's own view of the file. Escape, the
+ * close button or a click outside puts it away and hands focus back to the row that opened it. */
 (function () {
   const BCV = (self.BCV = self.BCV || {});
   const { h } = BCV.utils;
@@ -71,11 +75,35 @@
     }
   }
 
-  let current = null; // { ov, restore }
+  /** A file's bytes: read here (the same site, or a file store that lets a page read it), else by the
+   *  background (Canvas sends a download on to its file store, a site a page may not read), else
+   *  null — and the sheet shows Canvas's own preview instead. */
+  async function bytesOf(f) {
+    try {
+      const r = await fetch(f.url, { credentials: 'same-origin' });
+      if (r.ok) return await r.arrayBuffer();
+    } catch { /* another site that will not let a page read it: the background, below */ }
+    if (f.local) return null;
+    try {
+      const r = await BCV.api.runtime.sendMessage({ type: 'fetchBytes', url: new URL(f.url, location.origin).href });
+      if (r?.ok && typeof r.data === 'string') {
+        const bin = atob(r.data);
+        const u8 = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+        return u8.buffer;
+      }
+    } catch { /* no background to ask */ }
+    return null;
+  }
+  const isDocx = (f) => /wordprocessingml\.document/.test(String(f['content-type'] || '')) || /\.docx$/i.test(String(f.display_name || f.filename || ''));
+  const docview = () => (BCV.docview ? Promise.resolve(BCV.docview) : BCV.lazy?.load ? BCV.lazy.load('docview').then(() => BCV.docview) : Promise.reject(new Error('no loader')));
+
+  let current = null; // { ov, restore, view }
   function close({ now = false } = {}) {
     if (!current) return;
-    const { ov, restore } = current;
+    const { ov, restore, view } = current;
     current = null;
+    try { view?.destroy?.(); } catch { /* gone */ }
     if (now) ov.remove(); else U.dismiss(ov); // (a file opened over another: the old sheet goes at once, the new one rises in its place)
     try { restore?.focus?.(); } catch { /* it may be gone */ }
   }
@@ -149,20 +177,41 @@
       f.local ? null : h('a', { class: 'bcv-btn bcv-btn--primary', href: f.url, download: f.filename || name, text: 'Download' }),
     ]);
     const frame = (src) => h('iframe', { class: 'bcv-viewer__frame', src, title: name, allow: 'fullscreen' });
-    let view;
-    if (k.kind === 'image') view = h('img', { class: 'bcv-viewer__img', src: f.url, alt: name });
-    else if (k.kind === 'video') view = h('video', { class: 'bcv-viewer__media', src: f.url, controls: 'controls', preload: 'metadata' });
-    else if (k.kind === 'audio') view = h('audio', { class: 'bcv-viewer__media bcv-viewer__media--audio', src: f.url, controls: 'controls', preload: 'metadata' });
-    else if (k.kind === 'text') {
-      view = h('pre', { class: 'bcv-viewer__text', text: '' });
-      fetch(f.url, { credentials: 'same-origin' }).then((r) => (r.ok ? r.text() : Promise.reject(new Error(`${r.status}`)))).then((t) => { view.textContent = t.slice(0, 200000); }).catch(() => { if (current?.ov === ov) body.replaceChildren(none('The text could not be read.')); });
-    } else if (f.preview_url) view = frame(f.preview_url); // Canvas's document preview, when its service made one
-    else if (k.kind === 'pdf' && f.local) view = frame(f.url); // the browser's own PDF view of the file on this device
-    else if (f.local) view = none('No preview for this kind of file until it is handed in.');
-    else if (k.kind === 'pdf' || k.kind === 'doc') view = frame(canvasPreview(f, context)); // Canvas's own preview of the file
-    else view = none('No preview for this kind of file.');
-    body.replaceChildren(view);
-    if (view.tagName === 'IMG') view.addEventListener('error', () => { if (current?.ov === ov) body.replaceChildren(none('The image could not be shown.')); });
+    const mine = () => current?.ov === ov;
+    const show = (view) => { if (mine()) current.view = view; else view?.destroy?.(); };
+    // Canvas's own preview, for what is not drawn here (its document service's, else its file page's preview), or the browser's own for a PDF still on this device
+    const canvasView = () => (f.preview_url ? frame(f.preview_url) : f.local ? (k.kind === 'pdf' ? frame(f.url) : null) : (k.kind === 'pdf' || k.kind === 'doc') ? frame(canvasPreview(f, context)) : null);
+    const fallback = (why) => { if (mine()) body.replaceChildren(canvasView() || none(why)); };
+    if (k.kind === 'video') body.replaceChildren(h('video', { class: 'bcv-viewer__media', src: f.url, controls: 'controls', preload: 'metadata' }));
+    else if (k.kind === 'audio') body.replaceChildren(h('audio', { class: 'bcv-viewer__media bcv-viewer__media--audio', src: f.url, controls: 'controls', preload: 'metadata' }));
+    else if (k.kind === 'image') {
+      docview().then((dv) => (mine() ? dv.image(body, f.url, { keys: ov, name }) : null)).then(show).catch(() => {
+        // (no viewer to load: the picture as itself, as before)
+        if (!mine()) return;
+        const img = h('img', { class: 'bcv-viewer__img', src: f.url, alt: name });
+        img.addEventListener('error', () => { if (mine()) body.replaceChildren(none('The image could not be shown.')); });
+        body.replaceChildren(img);
+      });
+    } else if (k.kind === 'text') {
+      fetch(f.url, { credentials: 'same-origin' }).then((r) => (r.ok ? r.text() : Promise.reject(new Error(`${r.status}`)))).then(async (t) => {
+        if (!mine()) return;
+        const str = t.slice(0, 200000);
+        try { show((await docview()).text(body, str, { keys: ov })); } catch { if (mine()) body.replaceChildren(h('pre', { class: 'bcv-viewer__text', text: str })); }
+      }).catch(() => { if (mine()) body.replaceChildren(none('The text could not be read.')); });
+    } else if (k.kind === 'pdf' || (k.kind === 'doc' && isDocx(f))) {
+      // drawn here: the file's bytes (a Word document made into a PDF on this device first), else Canvas's own preview
+      (async () => {
+        const [dv, buf] = await Promise.all([docview(), bytesOf(f)]);
+        if (!mine()) return;
+        if (!buf) { fallback('This file could not be read.'); return; }
+        const data = k.kind === 'pdf' ? new Uint8Array(buf) : await dv.wordToPdf(buf);
+        if (!mine()) return;
+        show(await dv.pdf(body, data, { keys: ov, note: k.kind === 'doc' ? 'Made into a PDF on this device' : '' }));
+      })().catch(() => fallback(k.kind === 'doc' ? 'This document could not be opened here.' : 'This PDF could not be opened here.'));
+    } else {
+      const view = canvasView() || none(f.local ? 'No preview for this kind of file until it is handed in.' : 'No preview for this kind of file.');
+      body.replaceChildren(view);
+    }
   }
 
   // A link to a file anywhere in the interface — in an assignment's text, a page, a discussion,

@@ -331,6 +331,13 @@ try {
       if (what === 'stale') { self.BCV.app.state.lastHere = Date.now() - 4 * 60 * 1000; return true; }
       if (what === 'focusActive') return self.BCV.tools.focusActive();
       if (what === 'jspdf') return !!self.jspdf?.jsPDF;
+      if (what && what.view) { // a file from this device opened in the viewer (the way the hand-in box's Preview opens one)
+        const bin = atob(what.view.b64);
+        const u8 = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+        self.BCV.viewer.open({ display_name: what.view.name, 'content-type': what.view.type, size: u8.length, url: URL.createObjectURL(new Blob([u8], { type: what.view.type })), local: true });
+        return true;
+      }
       if (what === 'ccBase') { self.BCV.toolsConvert.setBase(`${location.origin}/cc/v2`); return true; }
       return null;
     } });
@@ -1849,10 +1856,15 @@ try {
   check(await page.$eval('.bcv-fb__fileact--dl', (e) => /^\/files\/\w+\/download/.test(e.getAttribute('href') || '')), "the download is the file's own address, with no course context");
   // what was handed in is the student's own file, not the course's: asked for under /courses/:id it
   // is Canvas's 404 page, so it has to be previewed with no context at all
+  // (2.98.99: a PDF is drawn in the viewer itself; a file whose bytes it cannot read as one falls back to Canvas's
+  // own preview — made to happen here by handing the page something that is not a PDF)
+  const notPdf = (r) => r.fulfill({ status: 200, contentType: 'application/pdf', body: 'not a pdf at all' });
+  await page.route('**/files/*/download*', notPdf);
   await page.click('.bcv-fb__file .bcv-fb__fileact');
   await page.waitForSelector('.bcv-viewer-ov .bcv-viewer__frame', { timeout: 8000 });
+  await page.unroute('**/files/*/download*', notPdf);
   const attSrc = await page.$eval('.bcv-viewer-ov .bcv-viewer__frame', (e) => e.getAttribute('src'));
-  check(/^\/files\/\w+\/file_preview/.test(attSrc || ''), `a submission attachment previews with no course context: ${attSrc}`);
+  check(/^\/files\/\w+\/file_preview/.test(attSrc || '') && !(await page.$('.bcv-viewer-ov .bcv-dv')), `a PDF the viewer cannot read falls back to Canvas's preview — and a submission attachment's with no course context: ${attSrc}`);
   const attFramed = await eventually(async () => {
     const fr = page.frames().find((f) => /\/file_preview/.test(f.url()));
     return fr ? (await fr.$('#file_preview[data-bcv-scope="no-context"]')) !== null : false;
@@ -2268,8 +2280,8 @@ try {
   const onProseTab = (p) => proseTabs.push(p);
   context.on('page', onProseTab);
   await page.click('.bcv-prose a.instructure_file_link');
-  await page.waitForSelector('.bcv-viewer .bcv-viewer__frame', { timeout: 8000 });
-  check(/Course Syllabus\.pdf/.test((await texts('.bcv-viewer .bcv-sheet__title'))[0]) && (await page.$eval('.bcv-viewer__frame', (e) => e.getAttribute('src'))) === '/courses/101/files/f1/file_preview' && proseTabs.length === 0 && page.url() === `${BASE}/courses/104/assignments/4002`, 'a file linked from an assignment\'s text opens in the viewer, over the assignment, with no new tab');
+  await page.waitForSelector('.bcv-viewer .bcv-dv__page', { timeout: 15000 });
+  check(/Course Syllabus\.pdf/.test((await texts('.bcv-viewer .bcv-sheet__title'))[0]) && (await texts('.bcv-viewer .bcv-dv__of'))[0] === 'of 3' && !(await page.$('.bcv-viewer__frame')) && proseTabs.length === 0 && page.url() === `${BASE}/courses/104/assignments/4002`, 'a file linked from an assignment\'s text opens in the viewer — drawn there, three pages — over the assignment, with no new tab');
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('.bcv-viewer'), null, { timeout: 3000 });
   context.off('page', onProseTab);
@@ -2329,8 +2341,8 @@ try {
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('.bcv-viewer-ov'), null, { timeout: 3000 });
   await page.click('.bcv-sb__files .bcv-sb__file:nth-child(1) .bcv-sb__preview');
-  await page.waitForSelector('.bcv-viewer .bcv-viewer__none', { timeout: 5000 });
-  check(/No preview for this kind of file until it is handed in\./.test((await texts('.bcv-viewer__none'))[0]) && !(await page.$('.bcv-viewer__none a')) && !(await page.$('.bcv-viewer__acts .bcv-btn')), 'a document has no preview until Canvas has it — and no Download or Open in Canvas for a file that is not there yet');
+  await page.waitForSelector('.bcv-viewer .bcv-viewer__none', { timeout: 10000 });
+  check(/This document could not be opened here\./.test((await texts('.bcv-viewer__none'))[0]) && !(await page.$('.bcv-viewer__none a')) && !(await page.$('.bcv-viewer__acts .bcv-btn')), 'a Word file that is no Word document inside says it could not be opened — and no Download or Open in Canvas for a file that is not there yet');
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('.bcv-viewer-ov'), null, { timeout: 3000 });
   await page.click('.bcv-sb__files .bcv-sb__file:nth-child(2) .bcv-sb__x');
@@ -2965,22 +2977,115 @@ try {
   const onTab = (p) => tabsOpened.push(p);
   context.on('page', onTab);
   await page.click('.bcv-body .bcv-row:has-text("Course Syllabus.pdf")');
-  await page.waitForSelector('.bcv-viewer .bcv-viewer__frame', { timeout: 5000 });
+  // (2.98.99) Simpl's own viewer: the PDF drawn here, page by page, with a bar to go to a page, zoom, turn and find
+  const dvAt = () => page.evaluate(() => {
+    const w = document.querySelector('.bcv-viewer .bcv-dv');
+    if (!w) return null;
+    const sc = w.querySelector('.bcv-dv__scroll'), pages = [...w.querySelectorAll('.bcv-dv__page')], r = (e) => e.getBoundingClientRect();
+    return {
+      pages: pages.length, of: w.querySelector('.bcv-dv__of')?.textContent, pageIn: w.querySelector('.bcv-dv__pagein')?.value, page: w.dataset.page, zoom: Number(w.dataset.zoom), rot: w.dataset.rot || '0',
+      sel: w.querySelector('.bcv-dv__zoom')?.selectedOptions[0]?.textContent, scW: sc.clientWidth, scH: sc.clientHeight, sx: sc.scrollWidth,
+      p1: { w: Math.round(r(pages[0]).width), h: Math.round(r(pages[0]).height) }, tops: pages.map((p) => Math.round(r(p).top - r(sc).top)),
+      drawn: pages.map((p) => p.querySelector('canvas').width > 1), words: pages.map((p) => p.querySelector('.bcv-dv__text').textContent),
+      links: pages.map((p) => [...p.querySelectorAll('.bcv-dv__link')].map((a) => a.getAttribute('href'))),
+      find: w.querySelector('.bcv-dv__findn')?.textContent || '', marks: w.querySelectorAll('mark.bcv-dv__hit').length, cur: w.querySelectorAll('mark.bcv-dv__hit.is-cur').length,
+      prevOff: w.querySelector('.bcv-dv__btn[aria-label="Previous page"]').disabled, nextOff: w.querySelector('.bcv-dv__btn[aria-label="Next page"]').disabled,
+      frame: !!document.querySelector('.bcv-viewer__frame'),
+    };
+  });
+  await page.waitForFunction(() => { const p = document.querySelector('.bcv-viewer .bcv-dv__page'); return p && p.querySelector('canvas').width > 1 && p.querySelector('.bcv-dv__text span') && p.querySelector('.bcv-dv__link'); }, null, { timeout: 20000 });
   const vHead = (await texts('.bcv-viewer .bcv-sheet__head'))[0];
-  check(/Course Syllabus\.pdf/.test(vHead) && /PDF · 212 KB · modified/.test(vHead) && (await page.$eval('.bcv-viewer__frame', (e) => e.getAttribute('src'))) === '/courses/101/files/f1/file_preview' && (await page.$eval('.bcv-viewer a[download]', (e) => e.getAttribute('href'))) === '/files/f1/download' && !(await page.$('.bcv-viewer__canvas')) && (await texts('.bcv-viewer__tab'))[0] === 'Open in new tab' && tabsOpened.length === 0 && page.url().endsWith('/courses/101/files'), `a PDF opens in the viewer over the page — Canvas's own preview framed, Download and Open in new tab in the sheet, no Open in Canvas — and no new tab opened: ${vHead}`);
-  check((await page.$eval('.bcv-viewer__tab', (e) => [e.tagName, e.textContent.trim()].join(' | '))) === 'BUTTON | Open in new tab', 'an Open in new tab button is there for a PDF (a press hands a tab the file itself; Canvas\'s own address would download it)');
+  const dv0 = await dvAt();
+  check(/Course Syllabus\.pdf/.test(vHead) && /PDF · 212 KB · modified/.test(vHead) && (await page.$eval('.bcv-viewer a[download]', (e) => e.getAttribute('href'))) === '/files/f1/download' && (await texts('.bcv-viewer__tab'))[0] === 'Open in new tab' && tabsOpened.length === 0 && page.url().endsWith('/courses/101/files') && !dv0.frame, `a PDF opens in the viewer over the page — drawn there, not Canvas's preview framed — with Download and Open in new tab in the sheet, and no tab opened: ${vHead}`);
+  check(dv0.pages === 3 && dv0.of === 'of 3' && dv0.pageIn === '1' && dv0.page === '1' && dv0.prevOff && !dv0.nextOff && Math.abs(dv0.p1.w - (dv0.scW - 40)) <= 2 && dv0.sel === `${dv0.zoom}%` && dv0.drawn[0] && /Course Syllabus/.test(dv0.words[0]) && /Math 21/.test(dv0.words[0]) && dv0.links[0].join() === 'https://example.com/syllabus', `its three pages laid out, fitted to the width, page 1 of 3 drawn with its words over it and its link live: ${JSON.stringify(dv0)}`);
+  const selected = await page.evaluate(() => { const t = document.querySelector('.bcv-dv__page .bcv-dv__text'); const rg = document.createRange(); rg.selectNodeContents(t); const s = getSelection(); s.removeAllRanges(); s.addRange(rg); const out = s.toString(); s.removeAllRanges(); return { out, sel: getComputedStyle(t.querySelector('span')).userSelect }; });
+  check(/Course Syllabus/.test(selected.out) && selected.sel !== 'none', `the words on a page can be selected and copied: ${JSON.stringify(selected).slice(0, 120)}`);
+  await shot(page, '20c-pdf-viewer');
+  // a page number typed goes there; ← and → turn the pages; the last page's link goes back to the first
+  await page.fill('.bcv-dv__pagein', '3');
+  await page.press('.bcv-dv__pagein', 'Enter');
+  const onP3 = await eventually(async () => { const d = await dvAt(); return d.page === '3' && d.pageIn === '3' && d.tops[2] >= 0 && d.tops[2] <= 12 && !d.prevOff && d.nextOff; }, 4000);
+  const dv3 = await dvAt();
+  check(onP3, `a page number typed, and Enter, goes to that page: ${JSON.stringify({ page: dv3.page, input: dv3.pageIn, top: dv3.tops[2] })}`);
+  await page.press('.bcv-dv__pagein', 'Escape');
+  check(!!(await page.$('.bcv-viewer .bcv-dv')), 'Escape in the page box puts the number back and leaves the viewer open');
+  await page.keyboard.press('ArrowLeft');
+  check(await eventually(async () => (await dvAt()).page === '2', 3000), '← goes back a page');
+  await page.keyboard.press('End');
+  await eventually(async () => (await dvAt()).page === '3', 3000);
+  await page.waitForFunction(() => document.querySelector('.bcv-dv__page[data-page="3"] .bcv-dv__link'), null, { timeout: 8000 });
+  await page.click('.bcv-dv__page[data-page="3"] .bcv-dv__link');
+  check(await eventually(async () => { const d = await dvAt(); return d.page === '1' && d.tops[0] >= 0 && d.tops[0] <= 30; }, 4000), 'a link inside the PDF to another of its pages goes there');
+  // zoom: + and −, the menu (fit the page, 100 %), ⌘/Ctrl and the wheel, the keys
+  const z0 = (await dvAt()).zoom;
+  await page.click('.bcv-dv__btn[aria-label="Zoom in"]');
+  const z1 = await dvAt();
+  check(z1.zoom > z0 && z1.sel === `${z1.zoom}%` && Math.abs(z1.p1.w - Math.floor(612 * (96 / 72) * z1.zoom / 100)) <= 2 && z1.sx > z1.scW, `Zoom in makes the pages larger, wider than the view: ${z0}% → ${z1.zoom}% (${z1.p1.w}px)`);
+  await page.selectOption('.bcv-dv__zoom', 'page');
+  const zp = await dvAt();
+  check(zp.p1.h <= zp.scH - 38 && zp.p1.w < z1.p1.w && zp.sx <= zp.scW + 1 && zp.sel === `${zp.zoom}%`, `Fit page shows a whole page in the view: ${JSON.stringify({ zoom: zp.zoom, page: zp.p1, view: [zp.scW, zp.scH] })}`);
+  await page.selectOption('.bcv-dv__zoom', '1');
+  const z100 = await dvAt();
+  check(z100.zoom === 100 && z100.p1.w === 816 && z100.sel === '100%', `100 % is the page at its printed size (816 px for 8.5 in): ${z100.p1.w}`);
+  const scBox = await page.$eval('.bcv-dv__scroll', (e) => { const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
+  await page.mouse.move(scBox.x, scBox.y);
+  await page.keyboard.down('Control');
+  await page.mouse.wheel(0, -100);
+  await page.keyboard.up('Control');
+  check(await eventually(async () => (await dvAt()).zoom === 125, 3000), `Ctrl and the wheel zoom about the pointer: ${(await dvAt()).zoom}%`);
+  await page.focus('.bcv-dv__scroll');
+  await page.keyboard.press('-');
+  check(await eventually(async () => (await dvAt()).zoom === 110, 3000), `− zooms out a step: ${(await dvAt()).zoom}%`);
+  await page.keyboard.press('Control+0');
+  check(await eventually(async () => { const d = await dvAt(); return Math.abs(d.p1.w - (d.scW - 40)) <= 2; }, 3000), 'Ctrl+0 fits the width again');
+  check(await eventually(async () => (await page.$$eval('.bcv-dv__page canvas', (cs) => cs.filter((c) => c.width > 1).map((c) => Math.round(c.width / c.getBoundingClientRect().width * 10)))).every((r) => r === 10), 3000), 'and the pages are drawn again sharp at the new size (one canvas pixel to a CSS pixel here)');
+  // find: every match lit, the chosen one brighter, Enter and ↑ ↓ between them, Escape empties the field first
+  await page.keyboard.press('Control+f');
+  check(await page.evaluate(() => document.activeElement?.classList.contains('bcv-dv__findin')), 'Ctrl+F goes to the find box');
+  await page.keyboard.type('syllabus');
+  check(await eventually(async () => (await dvAt()).find === '1 of 6', 5000), `find counts every match in the document: ${(await dvAt()).find}`);
+  const f1 = await dvAt();
+  check(f1.marks >= 3 && f1.cur === 1 && f1.page === '1', `the matches on the pages drawn are lit, one of them brighter: ${JSON.stringify({ marks: f1.marks, cur: f1.cur })}`);
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('Enter');
+  check(await eventually(async () => { const d = await dvAt(); return d.find === '4 of 6' && d.page === '2'; }, 4000), `Enter steps to the next match, going to its page: ${JSON.stringify(await dvAt().then((d) => [d.find, d.page]))}`);
+  await page.click('.bcv-dv__btn[aria-label="Previous match"]');
+  check(await eventually(async () => (await dvAt()).find === '3 of 6', 3000), '↑ steps back');
+  await shot(page, '20d-pdf-find');
+  await page.keyboard.press('Escape');
+  check(await eventually(async () => { const d = await dvAt(); return d && d.find === '' && d.marks === 0; }, 3000), 'Escape empties the find box and its marks, and leaves the viewer open');
+  // a quarter turn: the pages lie on their side
+  await page.click('.bcv-dv__btn[aria-label="Rotate"]');
+  const r90 = await dvAt();
+  check(r90.rot === '90' && r90.p1.w > r90.p1.h && await eventually(async () => (await dvAt()).drawn[0], 4000), `Rotate turns the pages a quarter: ${JSON.stringify(r90.p1)}`);
+  // the button is a button: the browser's own view of the file, in a tab of its own
+  check((await page.$eval('.bcv-viewer__tab', (e) => [e.tagName, e.textContent.trim()].join(' | '))) === 'BUTTON | Open in new tab', 'an Open in new tab button is there for a PDF: the browser\'s own view of it, in a tab of its own');
+  await page.focus('.bcv-dv__scroll');
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('.bcv-viewer'), null, { timeout: 3000 });
   check(await page.evaluate(() => document.activeElement?.classList.contains('bcv-row')), 'Escape closes it and hands focus back to the row');
   await page.click('.bcv-body .bcv-row:has-text("Lecture 3 whiteboard.png")');
   await page.waitForFunction(() => { const i = document.querySelector('.bcv-viewer__img'); return i && i.complete && i.naturalWidth > 0; }, null, { timeout: 5000 });
   check((await page.$eval('.bcv-viewer__img', (e) => e.naturalWidth)) === 640 && /Image · 295 KB/.test((await texts('.bcv-viewer .bcv-sheet__head'))[0]), 'an image is shown as itself');
+  // a picture: fitted (never past its own size), zoomed by the same bar and keys, turned a quarter
+  const imgAt = () => page.evaluate(() => { const w = document.querySelector('.bcv-viewer .bcv-dv--img'); const b = w?.querySelector('.bcv-dv__imgbox')?.getBoundingClientRect(); return w ? { zoom: w.dataset.zoom, rot: w.dataset.rot, w: Math.round(b.width), h: Math.round(b.height), sel: w.querySelector('.bcv-dv__zoom').selectedOptions[0]?.textContent, size: w.querySelector('.bcv-dv__note')?.textContent } : null; });
+  const im0 = await imgAt();
+  await page.click('.bcv-dv--img .bcv-dv__btn[aria-label="Zoom in"]');
+  const im1 = await imgAt();
+  await page.click('.bcv-dv--img .bcv-dv__btn[aria-label="Rotate"]');
+  const im2 = await imgAt();
+  check(im0 && im0.zoom === '100' && im0.w === 640 && im0.h === 360 && im0.size === '640 × 360' && im1.zoom === '110' && im1.w === 704 && im1.sel === '110%' && im2.rot === '90' && im2.w === 396 && im2.h === 704, `a picture opens at its own size where it fits, zooms by the bar and turns a quarter: ${JSON.stringify([im0, im1, im2])}`);
   await shot(page, '20b-file-viewer');
   await page.click('.bcv-viewer .bcv-sheet__close');
   await page.waitForFunction(() => !document.querySelector('.bcv-viewer'), null, { timeout: 3000 });
   await page.click('.bcv-body .bcv-row:has-text("reading-list.txt")');
   await page.waitForFunction(() => /Reading list/.test(document.querySelector('.bcv-viewer__text')?.textContent || ''), null, { timeout: 5000 });
   check(/Chapter 3/.test((await texts('.bcv-viewer__text'))[0]), 'a text file shows its text');
+  const fs0 = await page.$eval('.bcv-viewer__text', (e) => getComputedStyle(e).fontSize);
+  await page.click('.bcv-dv--text .bcv-dv__btn[aria-label="Larger text"]');
+  check(fs0 === '13px' && (await page.$eval('.bcv-viewer__text', (e) => getComputedStyle(e).fontSize)) === '14px' && (await texts('.bcv-dv__size'))[0] === '14 pt', `text can be made larger to read: ${fs0} → ${(await texts('.bcv-dv__size'))[0]}`);
+  await page.click('.bcv-dv--text .bcv-dv__btn[aria-label="Smaller text"]');
   // Open in new tab, pressed: the tab is handed a copy of the file's own bytes (a blob address), and shows it
   const [openedTab] = await Promise.all([context.waitForEvent('page', { timeout: 8000 }), page.click('.bcv-viewer__tab')]);
   await openedTab.waitForFunction(() => location.protocol === 'blob:' && /Reading list/.test(document.body?.textContent || ''), null, { timeout: 8000 }).catch(() => {});
@@ -6335,6 +6440,14 @@ try {
   check(await eventually(async () => (await raw('.bcv-conv__ccstate'))[0] === 'Not connected', 2000) && (await sw.evaluate(async () => (await self.BCV.api.storage.local.get('tools:convert:cc'))['tools:convert:cc'])) == null && !(await page.$eval('.bcv-conv__cloudhint', (e) => e.hidden)) && (await texts('.bcv-conv__formats .bcv-seg__btn')).join(' | ') === 'Word | PNG pages | Text', 'Remove key forgets it: back to what this device does');
   await shot(page, '39-tools-convert');
   await closeTool();
+  // (2.98.99) the same Word document opened in the file viewer: the PDF made of it on this device, drawn page by page
+  await inPage({ view: { name: 'Lab report.docx', type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', b64: docxFixture.toString('base64') } });
+  const wordShown = await page.waitForFunction(() => document.querySelectorAll('.bcv-viewer .bcv-dv__page').length === 2 && document.querySelector('.bcv-viewer .bcv-dv__page .bcv-dv__text span'), null, { timeout: 20000 }).then(() => true).catch(() => false);
+  const wv = await page.evaluate(() => ({ of: document.querySelector('.bcv-dv__of')?.textContent, note: document.querySelector('.bcv-dv__note')?.textContent, words: document.querySelector('.bcv-dv__page .bcv-dv__text')?.textContent, none: document.querySelector('.bcv-viewer__none')?.textContent }));
+  check(wordShown && wv.of === 'of 2' && wv.note === 'Made into a PDF on this device' && /Lab Report One/.test(wv.words), `a Word document opens in the viewer as the PDF made of it on this device — two pages, its words over them: ${JSON.stringify(wv)}`);
+  await shot(page, '20e-word-viewer');
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !document.querySelector('.bcv-viewer-ov'), null, { timeout: 5000 });
   // flashcards, Quizlet style: sets kept here, a set page with four ways to study and the terms under it
   await openTool('fc');
   check((await toolSub()) === '0 sets' && (await page.$('.bcv-fc__deck')) === null && (await texts('.bcv-fc__actions .bcv-btn')).join(' | ') === 'Create a set | Import CSV | Template', 'flashcards start with no sets: Create a set, Import CSV and a template');
