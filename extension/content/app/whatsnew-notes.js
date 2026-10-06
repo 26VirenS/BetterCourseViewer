@@ -25,6 +25,11 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.2', date: '2026-10-06', notes: [
+      { kind: 'new', title: 'iPhone: courses inside', body: 'Announcements, modules, discussions, Inbox and Groups.', icon: P.layers },
+      { kind: 'new', title: 'Hand in on iPhone', body: 'Text, a link, or files from Files and Photos.', icon: P.clip },
+      { kind: 'improved', title: 'iPhone grade rings', body: 'Press a ring for its grades and what-if scores.', icon: P.steps },
+    ] },
     { version: '2.99.1', date: '2026-10-06', notes: [
       { kind: 'fixed', title: 'Rubric pill lets go', body: 'It always folds away once the pointer leaves the button.', icon: P.check },
       { kind: 'improved', title: 'Smoother Rubric pill', body: 'It grows and folds on a spring, turning round mid-way.', icon: P.toggle },
