@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # The iPhone app's screens on the iOS Simulator, against the mock Canvas: each tab, a counter's sheet,
-# Notifications, a course and an assignment pushed from the native screens — in light and in dark.
+# Notifications, a course and an assignment pushed from the native screens, a course's grades sheet,
+# Hand In, a discussion, modules, files, Groups and the Inbox — in light and in dark.
 # Run by .github/workflows/ios-shots.yml after the app is built and installed on a booted simulator and
 # the mock is serving on :8800 (node scripts/dev/mock-canvas.mjs 8800 8801). Pictures in ./shots.
 set -u
@@ -40,6 +41,14 @@ for mode in light dark; do
   launch "$mode-08-notifications" 16 -SimplPush notifications
   launch "$mode-09-course" 20 -SimplTab courses -SimplPush /courses/101
   launch "$mode-10-assignment" 20 -SimplTab todo -SimplPush /courses/101/assignments/1001
+  # (1.2) the course's own screens, Groups and the Inbox, drawn by the app; the grades and Hand In sheets
+  launch "$mode-11-grades-sheet" 18 -SimplTab grades -SimplOpen grades:101
+  launch "$mode-12-hand-in" 20 -SimplTab todo -SimplPush /courses/101/assignments/1012 -SimplOpen handin
+  launch "$mode-13-discussion" 20 -SimplTab courses -SimplPush /courses/101/discussion_topics/7003
+  launch "$mode-14-modules" 18 -SimplTab courses -SimplPush /courses/101/modules
+  launch "$mode-15-files" 18 -SimplTab courses -SimplPush /courses/101/files
+  launch "$mode-16-groups" 16 -SimplPush /groups
+  launch "$mode-17-inbox" 16 -SimplPush /conversations
 done
 xcrun simctl terminate booted "$BID" >/dev/null 2>&1 || true
 

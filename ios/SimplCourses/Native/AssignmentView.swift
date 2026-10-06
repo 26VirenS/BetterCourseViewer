@@ -229,7 +229,10 @@ struct AssignmentView: View {
         return nil
     }
 
-    private func load() async { await model.load(engine, "assignment", ["course": course, "id": id]) }
+    private func load() async {
+        await model.load(engine, "assignment", ["course": course, "id": id])
+        if model.data?.canSubmit == true, LaunchOpen.take("handin") != nil { handIn = true }
+    }
 }
 
 /// A file picked to hand in, read into memory for the page's upload.

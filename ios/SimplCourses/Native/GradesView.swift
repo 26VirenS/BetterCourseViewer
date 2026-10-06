@@ -229,6 +229,7 @@ struct GradesView: View {
                 data = d
                 error = nil
             }
+            if let id = LaunchOpen.take("grades:") { sheet = d.rows.first { $0.id == id } }
         } catch {
             if data == nil { self.error = error.localizedDescription }
         }

@@ -109,7 +109,7 @@
     const params = url.searchParams;
     const hash = url.hash.replace(/^#/, '');
     const r = { url: url.pathname + url.search + url.hash, path, params, hash, screen: 'native', courseId: null, tab: null, arg: null, sub: null, uid: null };
-    if (path === '/' || path === '/dashboard') r.screen = hash === 'todo' ? 'todo' : hash === 'notifications' ? 'notifications' : hash === 'tools' ? 'tools' : 'dashboard';
+    if (path === '/' || path === '/dashboard') r.screen = hash === 'todo' ? 'todo' : hash === 'notifications' ? 'notifications' : hash === 'tools' && !self.BCVBridge?.native ? 'tools' : 'dashboard'; // (no Tools in the iPhone app yet)
     else if (path === '/courses') r.screen = 'courses';
     else if (path === '/groups') r.screen = 'groups';
     else if (path === '/calendar' || path === '/calendar2') r.screen = 'calendar';
@@ -439,7 +439,7 @@
     ['notifications', 'Notifications', IC.bell, '#ff453a', '/#notifications', state.notifCount ? String(state.notifCount) : ''],
     ['inbox', 'Inbox', IC.mail, '#0a84ff', '/conversations', state.unread ? String(state.unread) : ''],
     ['gpa', 'Grades', IC.chart, state.dark ? '#c874f5' : '#af52de', '/grades', ''], // purple: Calendar already has the indigo
-    ['tools', 'Tools', IC.tool, '#30b0c7', '/#tools', ''], // one row at the bottom, however many tools ship: the tools are cards on its page
+    ...(self.BCVBridge?.native ? [] : [['tools', 'Tools', IC.tool, '#30b0c7', '/#tools', '']]), // one row at the bottom, however many tools ship: the tools are cards on its page (none in the iPhone app yet)
   ];
 
   function siteName() {

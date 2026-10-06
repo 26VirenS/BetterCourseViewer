@@ -179,6 +179,18 @@ extension InfoRow where Trailing == EmptyView {
     }
 }
 
+/// The simulator suite's way into a sheet (-SimplOpen handin, -SimplOpen grades:101): taken once a launch.
+@MainActor
+enum LaunchOpen {
+    private static var used = false
+
+    static func take(_ prefix: String) -> String? {
+        guard !used, let v = UserDefaults.standard.string(forKey: "SimplOpen"), v.hasPrefix(prefix) else { return nil }
+        used = true
+        return String(v.dropFirst(prefix.count))
+    }
+}
+
 /// A screen's data, read through the engine: its first answer, its error, and a reload. Screens hold one
 /// and show `LoadState` until it has an answer; a reload keeps what is shown until the new answer is in.
 @MainActor

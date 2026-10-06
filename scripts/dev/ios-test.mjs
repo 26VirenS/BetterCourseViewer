@@ -378,6 +378,19 @@ try {
   const ctxs = await nc('composeContexts');
   const sentMsg = await nc('sendMessage', { recipients: ['t101'], subject: 'A question', body: 'Is the midterm open book?', context: 'course_101' });
   check(ctxs.rows.length > 0 && sentMsg.ok && (await nc('sendMessage', { recipients: [], body: 'x' })).error === 'Choose who the message is to.', `a new message from the phone, to a course's teacher (and none without a recipient): ${JSON.stringify(sentMsg)}`);
+  // (1.2) no Tools on the iPhone yet: no row, no route, no command, no Convert on a file
+  await sp.evaluate(() => self.BCV.lazy?.load?.('hub'));
+  const toolsOff = await sp.evaluate(() => {
+    const T = ['tool', 'tools', 'pin', 'unpin', 'convert'];
+    return {
+      byName: T.filter((n) => self.BCV.hub.byName(n)),
+      listed: self.BCV.hub.matchCommands('').map((c) => c.name).filter((n) => T.includes(n)),
+      route: self.BCV.app.parseRoute(`${location.origin}/#tools`).screen,
+      fileActions: self.BCV.hub.actionsFor({ file: { id: 1, url: '/files/1/download' } }).map((a) => a.label),
+      kept: ['inbox', 'open', 'download'].filter((n) => self.BCV.hub.byName(n)),
+    };
+  });
+  check(toolsOff.byName.length === 0 && toolsOff.listed.length === 0 && toolsOff.route === 'dashboard' && !toolsOff.fileActions.includes('Convert') && toolsOff.fileActions.includes('Download') && toolsOff.kept.length === 3, `no Tools in the app yet: /tool, /tools, /pin, /unpin and /convert are not offered, /#tools is the Dashboard, a file has no Convert (the rest of the commands stay, /open for a course's tools among them): ${JSON.stringify(toolsOff)}`);
   // navigation: a press in the page becomes a screen on the app's stack; the app shows a screen by asking the page to draw it
   await sp.evaluate(() => { self.__nativeCalls.length = 0; });
   const shown = await sp.evaluate(() => self.BCVNative.show('/courses/101'));

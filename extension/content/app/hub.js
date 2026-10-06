@@ -130,7 +130,7 @@
   }
   const fileActions = (f) => [
     { label: 'Download', icon: IC.download, run: () => downloadFile(f) },
-    { label: 'Convert', icon: IC.convert, run: (from) => convertFile(f, from) },
+    ...(self.BCVBridge?.native ? [] : [{ label: 'Convert', icon: IC.convert, run: (from) => convertFile(f, from) }]), // (no Tools in the iPhone app yet)
   ];
   /** The file, saved: Canvas's own download address, the session cookie signing it. */
   function downloadFile(f) {
@@ -815,10 +815,13 @@
     { name: 'setup', aliases: [], hint: 'Run the guided setup again', icon: IC.check, takes: null, run: go('/?bcv=setup') },
     { name: 'history', aliases: ['recent'], hint: 'Pages you visited lately', icon: IC.clock, takes: null, run: (_it, ctx) => { ctx.close(); BCV.extras?.historySheet?.(app()); } },
     { name: 'help', aliases: ['?', 'commands'], hint: 'Every command the box knows', label: 'Commands', icon: IC.search, takes: null,
-      args: () => COMMANDS.filter((c) => c.name !== 'help').map((c) => ({ icon: c.icon, title: `/${c.name}${c.takes ? ` ${c.takes}` : ''}`, sub: c.hint, fill: `/${c.name}${c.args || c.text ? ' ' : ''}` })),
+      args: () => COMMANDS.filter((c) => c.name !== 'help' && offered(c)).map((c) => ({ icon: c.icon, title: `/${c.name}${c.takes ? ` ${c.takes}` : ''}`, sub: c.hint, fill: `/${c.name}${c.args || c.text ? ' ' : ''}` })),
       run: (it, ctx) => { if (it?.fill) ctx.fill(it.fill); } },
   ];
-  const byName = (name) => { const s = norm(name).replace(/[’']s$/, ''); return s ? COMMANDS.find((c) => c.name === s || c.aliases.includes(s)) || null : null; }; // ("/what's due" is /what)
+  // Simpl's Tools are not in the iPhone app yet (1.2): their commands are not offered there
+  const TOOL_COMMANDS = new Set(['tool', 'tools', 'pin', 'unpin', 'convert']);
+  const offered = (c) => !(self.BCVBridge?.native && TOOL_COMMANDS.has(c.name));
+  const byName = (name) => { const s = norm(name).replace(/[’']s$/, ''); return s ? COMMANDS.find((c) => offered(c) && (c.name === s || c.aliases.includes(s))) || null : null; }; // ("/what's due" is /what)
   /** The commands a typed name could mean, best first: the name itself, then a name it starts, then
    *  (unless `strict`) a word inside the name or the line under it. */
   function matchCommands(q, { strict = false } = {}) {
@@ -831,7 +834,7 @@
       if (!strict && (names.some((n) => n.includes(s)) || norm(c.hint).includes(s))) return 2;
       return -1;
     };
-    return COMMANDS.map((c, i) => ({ c, r: rank(c), i })).filter((x) => x.r >= 0).sort((a, b) => a.r - b.r || a.i - b.i).map((x) => x.c);
+    return COMMANDS.map((c, i) => ({ c, r: rank(c), i })).filter((x) => x.r >= 0 && offered(x.c)).sort((a, b) => a.r - b.r || a.i - b.i).map((x) => x.c);
   }
   /** What the box holds, read as a command: { cmd, name, arg } — cmd once the name is one of the
    *  commands' (or a name it answers to), arg whatever follows the space. */
