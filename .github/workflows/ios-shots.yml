@@ -1,0 +1,41 @@
+# Probe: what the Mac runners carry (Xcode versions, simulator runtimes and devices), and whether
+# this repository's token may push the screenshot branch. Replaced by the screenshot job.
+name: iOS screenshots
+
+on:
+  push:
+    paths:
+      - '.github/workflows/ios-shots.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  probe:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, macos-26]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: What is here
+        run: |
+          sw_vers || true
+          xcodebuild -version || true
+          ls /Applications | grep -i xcode || true
+          xcrun simctl list runtimes || true
+          xcrun simctl list devices available | grep -E "iPhone|--" | head -40 || true
+          node --version || true
+      - name: May the token push a branch
+        if: matrix.os == 'macos-15'
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git checkout --orphan ios-shots-probe
+          git rm -rq --cached . || true
+          echo "probe $(date -u)" > PROBE.md
+          git add PROBE.md
+          git commit -qm "probe"
+          git push -f origin ios-shots-probe && echo PUSH-OK
