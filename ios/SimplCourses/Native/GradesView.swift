@@ -148,6 +148,7 @@ struct GradesView: View {
                     Text("\(r.name ?? "") · \(r.total > 0 ? "\(r.graded) of \(r.total) graded" : "nothing graded")")
                         .font(.footnote).foregroundStyle(.secondary).lineLimit(1)
                 }
+                .separatorAtText() // (else a ring with a letter starts its divider under the letter)
                 Spacer(minLength: 6)
                 VStack(alignment: .trailing, spacing: 2) {
                     Text(r.pct.map { String(format: "%.1f%%", $0) } ?? "N/A").font(.body.weight(.semibold).monospacedDigit())

@@ -132,47 +132,75 @@ struct NativeShell: View {
 struct ShellToolbar: ViewModifier {
     var bell = false
     var calendar = false
+    /// A screen's own add button (To Do's new task), with the shell's buttons and before the picture.
+    var add: (() -> Void)? = nil
     @EnvironmentObject private var engine: Engine
 
+    @ViewBuilder
     func body(content: Content) -> some View {
-        content.toolbar {
-            if calendar {
+        if #available(iOS 26.0, *) {
+            // iOS 26: the buttons share one glass capsule; the picture stands on its own beside it, as in
+            // Apple's apps (in the capsule it crowded one end and left the bell adrift at the other)
+            content.toolbar {
+                buttons
+                ToolbarSpacer(.fixed, placement: .topBarTrailing)
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        Haptics.tap()
-                        engine.openCalendar()
-                    } label: {
-                        Image(systemName: "calendar")
-                    }
-                    .accessibilityLabel("Calendar")
+                    AccountMenu(size: 34)
+                }
+                .sharedBackgroundVisibility(.hidden)
+            }
+        } else {
+            content.toolbar {
+                buttons
+                ToolbarItem(placement: .topBarTrailing) {
+                    AccountMenu()
                 }
             }
-            if bell {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        Haptics.tap()
-                        engine.openNotifications()
-                    } label: {
-                        Image(systemName: (engine.snapshot?.notifUnread ?? 0) > 0 ? "bell.badge" : "bell")
-                            .symbolRenderingMode(.multicolor)
-                    }
-                    .accessibilityLabel("Notifications")
-                }
-            }
+        }
+    }
+
+    @ToolbarContentBuilder
+    private var buttons: some ToolbarContent {
+        if calendar {
             ToolbarItem(placement: .topBarTrailing) {
-                AccountMenu()
+                Button {
+                    Haptics.tap()
+                    engine.openCalendar()
+                } label: {
+                    Image(systemName: "calendar")
+                }
+                .accessibilityLabel("Calendar")
+            }
+        }
+        if let add {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button(action: add) { Image(systemName: "plus") }
+                    .accessibilityLabel("Add a task")
+            }
+        }
+        if bell {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    Haptics.tap()
+                    engine.openNotifications()
+                } label: {
+                    Image(systemName: (engine.snapshot?.notifUnread ?? 0) > 0 ? "bell.badge" : "bell")
+                        .symbolRenderingMode(.multicolor)
+                }
+                .accessibilityLabel("Notifications")
             }
         }
     }
 }
 
 extension View {
-    func shellToolbar(bell: Bool = false, calendar: Bool = false) -> some View { modifier(ShellToolbar(bell: bell, calendar: calendar)) }
+    func shellToolbar(bell: Bool = false, calendar: Bool = false, add: (() -> Void)? = nil) -> some View { modifier(ShellToolbar(bell: bell, calendar: calendar, add: add)) }
 }
 
 /// What the web interface kept under the avatar on a phone (Inbox, Groups, Tools, the appearance,
 /// Settings, the guided setup, What's New, the Canvas profile, Sign out), as Apple's own menu.
 struct AccountMenu: View {
+    var size: CGFloat = 30
     @EnvironmentObject private var engine: Engine
     @EnvironmentObject private var session: AppSession
     @State private var confirmSignOut = false
@@ -214,7 +242,7 @@ struct AccountMenu: View {
                 }
             }
         } label: {
-            Avatar(person: me, size: 30)
+            Avatar(person: me, size: size)
         }
         .accessibilityLabel("Account")
         .confirmationDialog("Sign out of Canvas on this device?", isPresented: $confirmSignOut, titleVisibility: .visible) {

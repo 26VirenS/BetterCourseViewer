@@ -338,23 +338,23 @@ struct PageView: View {
     var body: some View {
         Group {
             if let d = model.data {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text(d.title).font(.title2.weight(.bold))
-                        if let e = d.edited, !e.isEmpty { Text(e).font(.footnote).foregroundStyle(.secondary) }
-                        if let l = d.lockText, !l.isEmpty {
-                            Label(l, systemImage: "lock.fill")
-                                .font(.subheadline)
-                                .padding(12)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .contentCard(cornerRadius: 14, tint: .orange)
+                // (a list like the other screens, so the page's text sits at the same margins as theirs)
+                List {
+                    Section {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(d.title).font(.title3.weight(.bold))
+                            if let e = d.edited, !e.isEmpty { Text(e).font(.footnote).foregroundStyle(.secondary) }
                         }
-                        if !d.html.isEmpty { RichText(html: d.html) }
+                        .padding(.vertical, 4)
+                        if let l = d.lockText, !l.isEmpty {
+                            Label(l, systemImage: "lock.fill").font(.subheadline).foregroundStyle(.orange)
+                        }
                     }
-                    .padding(.horizontal, 18)
-                    .padding(.vertical, 12)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    if !d.html.isEmpty {
+                        Section { RichText(html: d.html).padding(.vertical, 6) }
+                    }
                 }
+                .listStyle(.insetGrouped)
                 .refreshable { await load() }
             } else {
                 LoadState(error: model.error) { Task { await load() } }
@@ -466,6 +466,7 @@ struct PeopleList: View {
                                     Text(p.name)
                                     if let pr = p.pronouns, !pr.isEmpty { Text(pr).font(.caption).foregroundStyle(.secondary) }
                                 }
+                                .separatorAtText()
                                 Spacer()
                             }
                             .contentShape(Rectangle())

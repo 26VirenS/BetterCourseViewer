@@ -55,21 +55,24 @@ struct InboxView: View {
     var body: some View {
         Loaded(model: model, title: InboxView.scopes.first(where: { $0.id == scope })?.label ?? "Inbox", load: load) { d in
             List {
-                ForEach(d.rows) { c in
-                    Button {
-                        Haptics.tap()
-                        engine.push(.conversation(id: c.id))
-                    } label: {
-                        row(c)
-                    }
-                    .buttonStyle(.plain)
-                    .swipeActions(edge: .leading) {
-                        Button { star(c, c.starred != true) } label: {
-                            Label(c.starred == true ? "Unstar" : "Star", systemImage: c.starred == true ? "star.slash" : "star.fill")
+                Section {
+                    ForEach(d.rows) { c in
+                        Button {
+                            Haptics.tap()
+                            engine.push(.conversation(id: c.id))
+                        } label: {
+                            row(c)
                         }
-                        .tint(.yellow)
+                        .buttonStyle(.plain)
+                        .swipeActions(edge: .leading) {
+                            Button { star(c, c.starred != true) } label: {
+                                Label(c.starred == true ? "Unstar" : "Star", systemImage: c.starred == true ? "star.slash" : "star.fill")
+                            }
+                            .tint(.yellow)
+                        }
                     }
                 }
+                .listSectionSeparator(.hidden, edges: .top) // (no rule over the first message, as in Mail)
             }
             .listStyle(.plain)
             .overlay { if d.rows.isEmpty { EmptyNote(text: d.empty ?? "No messages", symbol: "tray") } }
@@ -121,6 +124,7 @@ struct InboxView: View {
                 if let p = c.preview, !p.isEmpty { Text(p).font(.subheadline).foregroundStyle(.secondary).lineLimit(2) }
                 if let ctx = c.context, !ctx.isEmpty { Text(ctx).font(.caption).foregroundStyle(.tertiary).lineLimit(1) }
             }
+            .separatorAtText()
         }
         .padding(.vertical, 4)
         .contentShape(Rectangle())
@@ -332,6 +336,7 @@ struct ComposeSheet: View {
                                     Text(r.name).foregroundStyle(.primary)
                                     if let s = r.sub, !s.isEmpty { Text(s).font(.caption).foregroundStyle(.secondary).lineLimit(1) }
                                 }
+                                .separatorAtText()
                                 Spacer()
                                 Image(systemName: "plus.circle").foregroundStyle(.tint)
                             }

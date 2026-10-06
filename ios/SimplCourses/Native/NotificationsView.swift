@@ -18,9 +18,9 @@ struct NotificationsView: View {
                                 chip("all", "All", d.total)
                                 ForEach(d.cats) { c in chip(c.key, c.label, c.count) }
                             }
-                            .padding(.horizontal, 16)
                             .padding(.vertical, 4)
                         }
+                        .scrollClipDisabled() // (the first chip at the cards' edge, the row still scrolling to the screen's)
                         .listRowInsets(EdgeInsets())
                         .listRowBackground(Color.clear)
                     } footer: {

@@ -86,9 +86,13 @@ struct PersonAvatar: View {
         let parts = name.split(separator: " ").prefix(2).compactMap { $0.first }
         return ZStack {
             Circle().fill(Color(.systemGray4))
-            Text(String(parts).uppercased())
-                .font(.system(size: size * 0.38, weight: .semibold))
-                .foregroundStyle(.white)
+            if parts.isEmpty {
+                Image(systemName: "person.fill").font(.system(size: size * 0.5)).foregroundStyle(.white)
+            } else {
+                Text(String(parts).uppercased())
+                    .font(.system(size: size * 0.38, weight: .semibold))
+                    .foregroundStyle(.white)
+            }
         }
     }
 }
@@ -146,6 +150,31 @@ struct IconTile: View {
     }
 }
 
+/// A fact with its symbol in a column of its own, so lines with different symbols start their words together
+/// (a list's own Label puts a wide gap between the two).
+struct Fact: View {
+    let symbol: String
+    let text: String
+    var tint: Color = .secondary
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Image(systemName: symbol).frame(width: 20).accessibilityHidden(true)
+            Text(text)
+        }
+        .font(.subheadline)
+        .foregroundStyle(tint)
+    }
+}
+
+extension View {
+    /// The row's divider starts at its words (not at a picture's initials or a ring's letter, which
+    /// the list would otherwise take for the row's text and start some dividers further left than others).
+    func separatorAtText() -> some View {
+        alignmentGuide(.listRowSeparatorLeading) { $0[.leading] }
+    }
+}
+
 /// A row with a title, a line under it and something at its end: the shape most lists here share.
 struct InfoRow<Trailing: View>: View {
     let title: String
@@ -166,6 +195,7 @@ struct InfoRow<Trailing: View>: View {
                     Text(sub).font(.footnote).foregroundStyle(.secondary).lineLimit(2)
                 }
             }
+            .separatorAtText()
             Spacer(minLength: 6)
             trailing()
         }

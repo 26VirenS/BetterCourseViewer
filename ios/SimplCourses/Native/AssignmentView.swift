@@ -97,9 +97,7 @@ struct AssignmentView: View {
     }
 
     private func fact(_ symbol: String, _ text: String) -> some View {
-        Label(text, systemImage: symbol)
-            .font(.subheadline)
-            .foregroundStyle(.secondary)
+        Fact(symbol: symbol, text: text)
     }
 
     private func gradeBlock(_ g: GradeInfo, _ d: AssignmentData) -> some View {
@@ -190,10 +188,17 @@ struct AssignmentView: View {
                 if !c.text.isEmpty { Text(c.text).font(.subheadline).textSelection(.enabled) }
                 if let a = c.attempt, a > 0 { Text("Attempt \(a)").font(.caption2).foregroundStyle(.tertiary) }
                 ForEach(c.attachments ?? []) { f in
-                    Button { engine.openFile(f.url, name: f.name) } label: { Label(f.name, systemImage: "paperclip").font(.caption) }
-                        .buttonStyle(.borderless)
+                    Button { engine.openFile(f.url, name: f.name) } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "paperclip")
+                            Text(f.name).lineLimit(1)
+                        }
+                        .font(.caption)
+                    }
+                    .buttonStyle(.borderless)
                 }
             }
+            .separatorAtText()
         }
         .padding(.vertical, 3)
     }

@@ -108,15 +108,12 @@ struct ContextHome: View {
     private func header(_ d: HomeData) -> some View {
         let color = Color(hex: d.color)
         return HStack(alignment: .center, spacing: 14) {
-            VStack(alignment: .leading, spacing: 4) {
+            // (every line with its symbol in one column, so their words start together)
+            VStack(alignment: .leading, spacing: 5) {
                 if let name = d.name, name != d.title { Text(name).font(.subheadline.weight(.semibold)).lineLimit(2) }
-                if let sub = d.sub, !sub.isEmpty { Text(sub).font(.footnote).foregroundStyle(.secondary).lineLimit(2) }
-                if let t = d.teachers, !t.isEmpty {
-                    Label(t, systemImage: "person.crop.circle").font(.footnote).foregroundStyle(.secondary).lineLimit(2)
-                }
-                if let n = d.openCount, n > 0 {
-                    Label("\(n) still to do", systemImage: "checklist").font(.footnote.weight(.medium)).foregroundStyle(color)
-                }
+                if let sub = d.sub, !sub.isEmpty { Fact(symbol: d.kind == "groups" ? "person.3" : "book.closed", text: sub) }
+                if let t = d.teachers, !t.isEmpty { Fact(symbol: "person.crop.circle", text: t) }
+                if let n = d.openCount, n > 0 { Fact(symbol: "checklist", text: "\(n) still to do", tint: color) }
             }
             Spacer(minLength: 8)
             if d.kind == "courses" {
@@ -212,7 +209,7 @@ struct PostRowView: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            PersonAvatar(name: row.author ?? row.title, avatar: row.avatar, size: 34)
+            PersonAvatar(name: row.author ?? "", avatar: row.avatar, size: 34)
             VStack(alignment: .leading, spacing: 3) {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     if row.unread == true {
@@ -235,6 +232,7 @@ struct PostRowView: View {
                     }
                 }
             }
+            .separatorAtText()
             Spacer(minLength: 0)
         }
         .padding(.vertical, 3)

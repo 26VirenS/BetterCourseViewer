@@ -94,12 +94,18 @@ struct TopicView: View {
     }
 
     private func post(_ d: TopicData) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+        // (who posted it, or — when Canvas names nobody — the course, once, on its own colour)
+        let who = (d.author ?? "").isEmpty ? nil : d.author
+        return VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 10) {
-                PersonAvatar(name: d.author ?? d.title, avatar: d.avatar, size: 38)
+                if let who {
+                    PersonAvatar(name: who, avatar: d.avatar, size: 38)
+                } else {
+                    IconTile(symbol: d.announcement == true ? "megaphone.fill" : "bubble.left.and.bubble.right.fill", color: Color(hex: d.color), size: 38)
+                }
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(d.author?.isEmpty == false ? d.author! : (d.context ?? "")).font(.subheadline.weight(.semibold))
-                    Text([d.context, d.when].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · "))
+                    Text(who ?? d.context ?? "").font(.subheadline.weight(.semibold))
+                    Text([who == nil ? nil : d.context, d.when].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · "))
                         .font(.caption).foregroundStyle(.secondary)
                 }
             }
@@ -148,12 +154,18 @@ struct TopicView: View {
                             Haptics.tap()
                             replyTo = ReplyTarget(id: e.id, parent: e.id, quote: e.author)
                         } label: {
-                            Label("Reply", systemImage: "arrowshape.turn.up.left").font(.caption.weight(.medium))
+                            // (the arrow beside its word: a list's Label would set the word a column away)
+                            HStack(spacing: 4) {
+                                Image(systemName: "arrowshape.turn.up.left")
+                                Text("Reply")
+                            }
+                            .font(.caption.weight(.medium))
                         }
                         .buttonStyle(.borderless)
                     }
                 }
             }
+            .separatorAtText()
         }
         .padding(.vertical, 4)
     }

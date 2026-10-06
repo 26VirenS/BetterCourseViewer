@@ -19,13 +19,18 @@ struct TodayView: View {
             if let d = data {
                 List {
                     Section {
-                        LazyVGrid(columns: columns, spacing: 10) {
-                            ForEach(d.counters) { c in counterTile(c) }
+                        // the date over the cards, at their edge and the title's (a section header sits a cell's
+                        // inset further in, which put it out of line with both)
+                        VStack(alignment: .leading, spacing: 10) {
+                            if let line = d.dateLine {
+                                Text(line).font(.headline).foregroundStyle(.secondary)
+                            }
+                            LazyVGrid(columns: columns, spacing: 10) {
+                                ForEach(d.counters) { c in counterTile(c) }
+                            }
                         }
                         .listRowInsets(EdgeInsets())
                         .listRowBackground(Color.clear)
-                    } header: {
-                        if let line = d.dateLine { Text(line).textCase(nil) }
                     }
                     Section {
                         if d.list.rows.isEmpty {

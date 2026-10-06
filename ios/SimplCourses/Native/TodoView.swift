@@ -73,15 +73,11 @@ struct TodoView: View {
                 }
                 .accessibilityLabel("Group and filter")
             }
-            ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    Haptics.tap()
-                    adding = true
-                } label: { Image(systemName: "plus") }
-                .accessibilityLabel("Add a task")
-            }
         }
-        .shellToolbar(calendar: true)
+        .shellToolbar(calendar: true, add: {
+            Haptics.tap()
+            adding = true
+        })
         .task(id: engine.dataVersion) { await load() }
         .sheet(isPresented: $adding) {
             AddTaskSheet(courses: data?.courses ?? [], repeats: data?.repeats ?? []) {
