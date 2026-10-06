@@ -14,7 +14,7 @@
 
 html[data-bcv-theme] {
   --bcv-line: max(1px, var(--bcv-dpx, 1px)); /* a hairline drawn as a shadow: one CSS pixel, or one screen pixel where that is more (below 100% zoom; content/early.js keeps --bcv-dpx) */
-  --bcv-version: "2.98.101"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.98.102"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -38,7 +38,7 @@ html[data-bcv-theme] {
   --bcv-ease: cubic-bezier(.32,.72,0,1); --bcv-t-fast: .18s; --bcv-t: .28s; --bcv-t-slow: .34s;
   /* the springs (content/app/motion.js writes each preset's exact curve and settle time over these as a linear() easing; docs/MOTION.md) */
   --bcv-spring-snappy: cubic-bezier(.34,1.15,.42,1); --bcv-t-snappy: .29s; --bcv-spring-gentle: cubic-bezier(.32,.72,0,1); --bcv-t-gentle: .46s;
-  --bcv-spring-settle: cubic-bezier(.32,.72,0,1); --bcv-t-settle: .35s; --bcv-spring-scrim: ease; --bcv-t-scrim: .4s; --bcv-spring-phone: cubic-bezier(.32,.72,0,1); --bcv-t-phone: .39s; --bcv-spring-island: cubic-bezier(.32,.72,0,1); --bcv-t-island: .5s;
+  --bcv-spring-settle: cubic-bezier(.32,.72,0,1); --bcv-t-settle: .35s; --bcv-spring-scrim: ease; --bcv-t-scrim: .4s; --bcv-spring-phone: cubic-bezier(.32,.72,0,1); --bcv-t-phone: .39s; --bcv-spring-island: cubic-bezier(.32,.72,0,1); --bcv-t-island: .5s; --bcv-spring-pin: cubic-bezier(.32,.72,0,1); --bcv-t-pin: .37s;
   /* the corners: one scale by size — tiles, menus, panels, rows, cards, sheets — every pane reads these */
   /* (2.98.70) Liquid Glass's edges: no line round it, but a rim of light — brightest where the light falls, top left, and again
    * at the far corner, all but gone between — and the glass a little lighter just inside its edges, as thick glass bends light
@@ -3388,11 +3388,11 @@ html.bcv-tooltab .bcv-pin.bcv-quick.is-free { z-index: var(--bcv-z-top); }
  * phase's colour — and folds again when the pointer leaves, the way the switch beside it opens.
  * The same one button throughout: a timer that is not pinned borrows one. The X to unpin rides
  * the island's corner while it is open, as it does the pin's. */
-.bcv-pin.bcv-island { --bcv-live-color: #ff9500; transition: width var(--bcv-t-island) var(--bcv-spring-island), height var(--bcv-t-island) var(--bcv-spring-island); }
-.bcv-pin.bcv-island.is-open { width: 250px; height: 84px; }
-.bcv-island__glass { position: absolute; top: 0; right: 0; width: 250px; height: 84px; -webkit-backdrop-filter: blur(22px) saturate(1.7); backdrop-filter: blur(22px) saturate(1.7); background: rgba(28,28,30,.7); pointer-events: none; }
+.bcv-pin.bcv-island { --bcv-live-color: #ff9500; --bcv-island-w: 250px; --bcv-island-h: 84px; transition: width var(--bcv-t-pin) var(--bcv-spring-pin), height var(--bcv-t-pin) var(--bcv-spring-pin); }
+.bcv-pin.bcv-island.is-open { width: var(--bcv-island-w); height: var(--bcv-island-h); }
+.bcv-island__glass { position: absolute; top: 0; right: 0; width: var(--bcv-island-w); height: var(--bcv-island-h); -webkit-backdrop-filter: blur(22px) saturate(1.7); backdrop-filter: blur(22px) saturate(1.7); background: rgba(28,28,30,.7); pointer-events: none; }
 .bcv-island.is-live .bcv-island__glass { background: #000; -webkit-backdrop-filter: none; backdrop-filter: none; }
-.bcv-island__face { position: absolute; inset: 0; box-sizing: border-box; border: 1px solid rgba(255,255,255,.14); border-radius: 12px; background: transparent; overflow: hidden; color: #fff; font-family: var(--bcv-font); transition: border-radius var(--bcv-t-island) var(--bcv-spring-island), background .3s ease, border-color .3s ease; }
+.bcv-island__face { position: absolute; inset: 0; box-sizing: border-box; border: 1px solid rgba(255,255,255,.14); border-radius: 12px; background: transparent; overflow: hidden; color: #fff; font-family: var(--bcv-font); transition: border-radius var(--bcv-t-pin) var(--bcv-spring-pin), background .3s ease, border-color .3s ease; }
 .bcv-island.is-live .bcv-island__face { background: #000; }
 .bcv-island.is-open .bcv-island__face { border-radius: 26px; }
 .bcv-island .bcv-pin__btn { position: absolute; top: -1px; left: -1px; border-color: transparent; background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; box-shadow: none; transition: transform .16s var(--bcv-spring-snappy), opacity .2s ease; }
@@ -3411,8 +3411,8 @@ html.bcv-tooltab .bcv-pin.bcv-quick.is-free { z-index: var(--bcv-z-top); }
 .bcv-island__hand { stroke: rgba(0,0,0,.8); stroke-width: 2; stroke-linecap: round; transform-origin: 10px 10px; transition: transform 1s linear; }
 .bcv-island.is-paused .bcv-island__glyph { animation: bcv-live-blink 1.6s ease-in-out 4; }
 .bcv-pin.is-out { animation: bcv-live-out .3s ease both; pointer-events: none; }
-.bcv-island__body { position: absolute; inset: 0; display: flex; align-items: center; gap: 12px; padding: 0 20px 0 18px; opacity: 0; transform: scale(.92); transform-origin: 90% 20%; transition: opacity .16s ease, transform .16s ease; pointer-events: none; will-change: transform, opacity; }
-.bcv-island.is-open .bcv-island__body { opacity: 1; transform: none; pointer-events: auto; transition: opacity .28s ease .14s, transform var(--bcv-t-snappy) var(--bcv-spring-snappy) .1s; }
+.bcv-island__body { position: absolute; top: 0; right: 0; width: calc(var(--bcv-island-w) - 2px); height: calc(var(--bcv-island-h) - 2px); box-sizing: border-box; display: flex; align-items: center; gap: 12px; padding: 0 20px 0 18px; opacity: 0; transform: scale(.92); transform-origin: 90% 20%; transition: opacity .16s ease, transform .16s ease; pointer-events: none; will-change: transform, opacity; }
+.bcv-island.is-open .bcv-island__body { opacity: 1; transform: none; pointer-events: auto; transition: opacity .2s ease .05s, transform var(--bcv-t-snappy) var(--bcv-spring-snappy) .03s; }
 .bcv-island__btns { display: flex; gap: 8px; flex: none; }
 .bcv-island__btn { width: 40px; height: 40px; margin: 0; padding: 0; border: 0; border-radius: 20px; background: rgba(255,255,255,.14); color: rgba(255,255,255,.85); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: transform .16s var(--bcv-spring-snappy), background .2s ease; }
 .bcv-island__btn:hover { background: rgba(255,255,255,.22); }
@@ -3437,8 +3437,8 @@ html.bcv-tooltab .bcv-pin.bcv-quick.is-free { z-index: var(--bcv-z-top); }
 .bcv-island__segbtn.is-on { background: color-mix(in srgb, var(--bcv-live-color) 36%, transparent); color: #fff; }
 .bcv-island__open:focus-visible, .bcv-island__segbtn:focus-visible { outline: 2px solid #0a84ff; outline-offset: 1px; }
 /* the island while nothing is going: set, and go */
-.bcv-island__set { position: absolute; inset: 0; display: flex; align-items: center; gap: 10px; padding: 0 14px; opacity: 0; transform: scale(.92); transform-origin: 90% 20%; transition: opacity .16s ease, transform .16s ease; pointer-events: none; will-change: transform, opacity; }
-.bcv-island.is-open.is-set .bcv-island__set { opacity: 1; transform: none; pointer-events: auto; transition: opacity .28s ease .14s, transform var(--bcv-t-snappy) var(--bcv-spring-snappy) .1s; }
+.bcv-island__set { position: absolute; top: 0; right: 0; width: calc(var(--bcv-island-w) - 2px); height: calc(var(--bcv-island-h) - 2px); box-sizing: border-box; display: flex; align-items: center; gap: 10px; padding: 0 14px; opacity: 0; transform: scale(.92); transform-origin: 90% 20%; transition: opacity .16s ease, transform .16s ease; pointer-events: none; will-change: transform, opacity; }
+.bcv-island.is-open.is-set .bcv-island__set { opacity: 1; transform: none; pointer-events: auto; transition: opacity .2s ease .05s, transform var(--bcv-t-snappy) var(--bcv-spring-snappy) .03s; }
 .bcv-island.is-live .bcv-island__set { display: none; }
 .bcv-island.is-set:not(.is-live) .bcv-island__body { display: none; }
 .bcv-island__setscale { position: relative; flex: 1; min-width: 0; height: 60px; --bcv-pomo-color: var(--bcv-live-color); }
@@ -3460,16 +3460,16 @@ html.bcv-tooltab .bcv-pin.bcv-quick.is-free { z-index: var(--bcv-z-top); }
    the box stands still (the island spring's own time), then fades in; the fold puts it out at
    once. The folded pin's small shadow is the same layer at rest. */
 .bcv-pin.bcv-island::before, .bcv-pin.bcv-quick::before { content: ''; position: absolute; inset: 0; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,.2); pointer-events: none; transition: opacity .2s ease; }
-.bcv-pin.bcv-island.is-open::before, .bcv-pin.bcv-quick.is-open::before { border-radius: 26px; box-shadow: 0 14px 36px rgba(0,0,0,.45); opacity: 0; animation: bcv-shadow-in .3s ease var(--bcv-t-island) both; }
+.bcv-pin.bcv-island.is-open::before, .bcv-pin.bcv-quick.is-open::before { border-radius: 26px; box-shadow: 0 14px 36px rgba(0,0,0,.45); opacity: 0; animation: bcv-shadow-in .3s ease var(--bcv-t-pin) both; }
 .bcv-pin.bcv-quick.is-free.is-open::before { box-shadow: 0 22px 60px rgba(0,0,0,.55); }
 .bcv-pin.bcv-island.is-folding::before, .bcv-pin.bcv-quick.is-folding::before { opacity: 0; transition: none; }
 @keyframes bcv-shadow-in { from { opacity: 0; visibility: hidden; } to { opacity: 1; visibility: visible; } }
 /* the quick menus: a pin other than the timer's swells into a capsule under the pointer — over the
  * same half second as the timer's island, on the same spring — the tool's quickest use in it: a
  * field and a round Go, chips, a drop target, on the island's dark glass */
-.bcv-pin.bcv-quick { --bcv-quick-w: 280px; --bcv-quick-color: #0a84ff; transition: width var(--bcv-t-island) var(--bcv-spring-island), height var(--bcv-t-island) var(--bcv-spring-island); }
+.bcv-pin.bcv-quick { --bcv-quick-w: 280px; --bcv-quick-color: #0a84ff; transition: width var(--bcv-t-pin) var(--bcv-spring-pin), height var(--bcv-t-pin) var(--bcv-spring-pin); }
 .bcv-pin.bcv-quick.is-open { width: var(--bcv-quick-w); height: 44px; }
-.bcv-quick__face { position: absolute; inset: 0; box-sizing: border-box; border: 1px solid rgba(255,255,255,.14); border-radius: var(--bcv-r-tile-lg); background: transparent; overflow: hidden; color: #fff; font-family: var(--bcv-font); transition: border-radius var(--bcv-t-island) var(--bcv-spring-island), background .3s ease, border-color .3s ease; }
+.bcv-quick__face { position: absolute; inset: 0; box-sizing: border-box; border: 1px solid rgba(255,255,255,.14); border-radius: var(--bcv-r-tile-lg); background: transparent; overflow: hidden; color: #fff; font-family: var(--bcv-font); transition: border-radius var(--bcv-t-pin) var(--bcv-spring-pin), background .3s ease, border-color .3s ease; }
 /* The blur sits on a layer of the panel's own size, clipped by the face rather than resized with it:
    the page behind is blurred once, not on every frame of the opening, which is what used to stutter. */
 .bcv-quick__glass { position: absolute; top: 0; right: 0; width: var(--bcv-quick-w); height: var(--bcv-quick-h, 44px); -webkit-backdrop-filter: blur(22px) saturate(1.7); backdrop-filter: blur(22px) saturate(1.7); background: rgba(28,28,30,.7); pointer-events: none; }
@@ -3519,7 +3519,7 @@ html.bcv-blink .bcv-pin.bcv-island:not(.is-open) .bcv-island__face, html.bcv-bli
 .bcv-quick.is-folding .bcv-pin__x { display: none; }
 /* (the body arrives on the island's own cue: opacity from .14s, the snappy settle from .1s) */
 .bcv-quick__body { position: absolute; inset: 0; display: flex; align-items: center; gap: 8px; padding: 0 7px 0 12px; opacity: 0; transform: scale(.94); transform-origin: 90% 50%; transition: opacity .16s ease, transform .16s ease; pointer-events: none; will-change: transform, opacity; }
-.bcv-quick.is-open .bcv-quick__body { opacity: 1; transform: none; pointer-events: auto; transition: opacity .28s ease .14s, transform var(--bcv-t-snappy) var(--bcv-spring-snappy) .1s; }
+.bcv-quick.is-open .bcv-quick__body { opacity: 1; transform: none; pointer-events: auto; transition: opacity .2s ease .05s, transform var(--bcv-t-snappy) var(--bcv-spring-snappy) .03s; }
 .bcv-quick__name { flex: none; margin: 0 0 0 3px; font: 600 11.5px/1.2 var(--bcv-font); letter-spacing: .02em; color: rgba(255,255,255,.68); white-space: nowrap; }
 .bcv-quick__input { flex: 1; min-width: 0; height: 30px; margin: 0; padding: 0 12px; border: 0; border-radius: 15px; background: rgba(255,255,255,.12); color: #fff; font: 500 12.5px/30px var(--bcv-font); outline: none; }
 .bcv-quick__input::placeholder { color: rgba(255,255,255,.4); }

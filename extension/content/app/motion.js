@@ -5,7 +5,7 @@
  * keyframes, so an exit can start from wherever an entrance has got to, at the speed it is going).
  *
  * BCV.motion
- *   PRESETS                       snappy · gentle · settle · scrim · phone (stiffness, damping, mass)
+ *   PRESETS                       snappy · gentle · settle · scrim · phone · island · pin (stiffness, damping, mass)
  *   spring(preset, { from, to, v0 })  → { at(t), velocity(t), settle }   t in seconds
  *   easing(preset)                → 'linear(0, 0.13, …)' for CSS; duration(preset) → seconds
  *   run(el, spec, preset, opts)   → handle { finished, cancel(), now(), progress }
@@ -28,7 +28,8 @@
     settle: { stiffness: 280, damping: 30, mass: 1 }, // rows and blocks arriving, staggered: ~350 ms (ζ ≈ .9)
     scrim: { stiffness: 300, damping: 34, mass: 1 }, // opacity only: ~400 ms (ζ ≈ .98)
     phone: { stiffness: 260, damping: 30, mass: 1 }, // push and pop, bottom sheets: ~390 ms (ζ ≈ .93)
-    island: { stiffness: 150, damping: 22.8, mass: 1 }, // the timer's island and every pin capsule or panel swelling under the pointer: ~490 ms, no overshoot (ζ ≈ .93)
+    island: { stiffness: 150, damping: 22.8, mass: 1 }, // the look switch growing under the pointer into its list: ~490 ms, no overshoot (ζ ≈ .93)
+    pin: { stiffness: 300, damping: 32.5, mass: 1 }, // the widgets: the timer's island and every pin's panel swelling under the pointer — ~370 ms, nine tenths there by 200 ms, no overshoot (ζ ≈ .94)
   }; // (2.98.4: each a fifth slower than before and softer at the turn — smoother over speed)
   const REST_DIST = 0.01; // of the travel: at rest once within this and slower than REST_SPEED (a pixel of a hundred: the eye's threshold)
   const REST_SPEED = 0.1; // travel per second

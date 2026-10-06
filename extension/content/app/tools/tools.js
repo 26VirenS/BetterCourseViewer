@@ -349,6 +349,43 @@
   // the count large in its colour — and folds again on its own. A press on the count opens the
   // timer. A timer that is not pinned borrows a pin for as long as it runs. All of it goes with
   // the switch: the phone layout, the setup, the welcome, stock Canvas.
+
+  // ---- hover intent: a pin opens for a pointer that has come to it -----------------------------
+  // Not for one passing over it on its way to the switch (every pin it crossed swelled, pushed the
+  // row along and folded again), and not for one that never moved at all: a pin that slides under
+  // a pointer standing still — the row closing up as a panel folds, a tool rising from a widget's
+  // green light — is not a hover, and used to open the timer's island over the tool. A pointer that
+  // slows on a pin opens it at once; one still on it after INTENT_MS has meant it too.
+  const INTENT_MS = 70;
+  const INTENT_SPEED = 0.5; // px per ms: slower than this, the pointer is arriving, not passing
+  let moveX = NaN, moveY = NaN; // where the pointer last moved to, anywhere on the page
+  let still = null; // where it stood when the row last moved under it: an enter there is the row's doing
+  document.addEventListener('pointermove', (e) => {
+    moveX = e.clientX; moveY = e.clientY;
+    if (still && (moveX !== still.x || moveY !== still.y)) still = null;
+  }, { capture: true, passive: true });
+  /** The row is about to move (a pin swells or folds, one comes or goes): a pointer standing still
+   *  where it is now has not come to whatever slides under it. */
+  const trayMoves = () => { still = Number.isNaN(moveX) ? null : { x: moveX, y: moveY }; };
+  const slidUnder = (e) => !!still && e.clientX === still.x && e.clientY === still.y;
+  /** Calls open() once the pointer means the pin; returns want(e) for the pin's pointerenter. A
+   *  pointer the pin slid under is left alone until it moves on the pin. */
+  function intent(item, open) {
+    let timer = 0, last = null;
+    const stop = () => { clearTimeout(timer); timer = 0; last = null; };
+    const go = () => { stop(); if (item.classList.contains('is-hover')) open(); };
+    const arm = (e) => { last = { x: e.clientX, y: e.clientY, t: e.timeStamp }; clearTimeout(timer); timer = setTimeout(go, INTENT_MS); };
+    item.addEventListener('pointermove', (e) => {
+      if (e.pointerType === 'touch' || item.classList.contains('is-open') || !item.classList.contains('is-hover')) return;
+      if (!last) { if (!slidUnder(e)) arm(e); return; }
+      const dt = e.timeStamp - last.t;
+      if (dt > 0 && Math.hypot(e.clientX - last.x, e.clientY - last.y) / dt < INTENT_SPEED) go();
+      else last = { x: e.clientX, y: e.clientY, t: e.timeStamp };
+    }, { passive: true });
+    item.addEventListener('pointerleave', stop);
+    return (e) => { stop(); if (!slidUnder(e)) arm(e); };
+  }
+
   function mountTray() {
     if (self.BCVBridge?.native) return null;
     let tray = document.getElementById('bcv-tray');
@@ -479,14 +516,14 @@
   }
   function islandSet(item, focusKb = false) {
     item.classList.add('is-set');
+    // the setter is laid out at the island's open size whatever the pin is doing (app.css), so its
+    // strip is built once and stands still as the island swells round it: no pixels to follow
     paintSetter(item, focus);
     islandOpen(item, 8000);
-    // the strip is laid out in pixels: painted again as the island swells to its width, until it stands still (ui.watchLayout)
-    const stopFollow = U.watchLayout(item, () => { if (item.classList.contains('is-set')) paintSetter(item, focus); else stopFollow(); }, { within: item });
-    U.onGone(item, stopFollow);
     if (focusKb) U.afterMotion(item).then(() => item.querySelector('.bcv-island__scale')?.focus());
   }
   function islandOpen(item, ms = 6000, focusMain = false) {
+    if (!item.classList.contains('is-open')) trayMoves();
     item.classList.add('is-open');
     item.setAttribute('aria-expanded', 'true');
     clearTimeout(islandTimer);
@@ -498,12 +535,15 @@
    *  A finger does not hover: a tap opens it, as before. */
   function islandHover(item) {
     let leave = 0;
+    const want = intent(item, () => {
+      if (item.classList.contains('is-open') || item.classList.contains('is-out')) return;
+      if (item.classList.contains('is-live')) islandOpen(item); else islandSet(item);
+    });
     item.addEventListener('pointerenter', (e) => {
       if (e.pointerType === 'touch' || item.classList.contains('is-out')) return;
       clearTimeout(leave);
       item.classList.add('is-hover');
-      if (item.classList.contains('is-open')) return;
-      if (item.classList.contains('is-live')) islandOpen(item); else islandSet(item);
+      if (!item.classList.contains('is-open')) want(e);
     });
     item.addEventListener('pointerleave', (e) => {
       if (e.pointerType === 'touch') return;
@@ -517,6 +557,7 @@
     islandTimer = 0;
     item.classList.remove('is-set');
     if (!item.classList.contains('is-open')) return;
+    trayMoves();
     item.classList.remove('is-open');
     item.classList.add('is-folding'); // (no X on the way down: it belongs to the pin, not the island)
     setTimeout(() => item.classList.remove('is-folding'), 520);
@@ -718,7 +759,25 @@
     for (const k of pins) { const mod = BCV.lazy?.toolModule?.(k); if (mod && !BCV.lazy.has(mod)) BCV.lazy.load(mod).catch(() => {}); }
     // the calculator's pin typesets its display: KaTeX is put on the page once the page has settled, not on the first hover (a script parsed while the panel swells is a frame dropped)
     if (pins.includes('calc')) setTimeout(() => { if (!self.katex?.render) vendor('katex').catch(() => {}); }, 2500);
+    primeSoon();
   };
+  /** Each pinned widget's panel built while the page has nothing else to do, one an idle moment,
+   *  starting once the page's own first work is over — not under the pointer on the first hover,
+   *  where the calculator's forty-nine keys and the table's hundred and eighteen elements held the
+   *  swell's first frame for a tenth of a second. */
+  const idle = (fn) => (typeof self.requestIdleCallback === 'function' ? self.requestIdleCallback(fn, { timeout: 3000 }) : setTimeout(fn, 250));
+  let priming = 0;
+  function primeSoon() {
+    if (priming || self.BCVBridge?.native) return;
+    const next = async () => {
+      const item = [...document.querySelectorAll('#bcv-pins > .bcv-pin')].find((e) => e._bcvPrime && !e._bcvPrimed);
+      if (!item) { priming = 0; return; }
+      item._bcvPrimed = true;
+      try { await item._bcvPrime(); } catch { /* built on the hover, then */ }
+      idle(next);
+    };
+    priming = setTimeout(() => idle(next), 1500);
+  }
   async function pinsLoad() {
     const [raw, custom] = await Promise.all([load(PINS_KEY, []), load('widgets:custom', [])]);
     // widgets of your own (content/app/tools/widgets.js) are tools too: listed before the pins are read, so a pinned one is found
@@ -780,6 +839,7 @@
     const closeQ = () => {
       if (pulledOut()) return; // pulled out of the tray: it stays where it was put, pointer or no pointer
       if (!item.classList.contains('is-open')) return;
+      trayMoves();
       item.classList.remove('is-open');
       item.classList.add('is-folding'); // (no X on the way down: it belongs to the pin)
       setTimeout(() => item.classList.remove('is-folding'), 520); // (the island spring's half second, and a little)
@@ -788,6 +848,7 @@
     };
     /** Back to the tray, folded: the red light, and Escape while it is out. */
     const dock = () => {
+      trayMoves();
       item.classList.remove('is-free', 'is-hover');
       item.style.left = '';
       item.style.top = '';
@@ -798,15 +859,27 @@
       item.setAttribute('aria-expanded', 'false');
       panel?.onFold?.();
     };
+    const build = () => {
+      if (panel) return;
+      panel = q.build({ item, go: (o = {}) => { hold = Date.now() + 400; if (pulledOut()) dock(); else closeQ(); open(t.key, { from: item, over: true, ...o }); } });
+      body.replaceChildren(...panel.els);
+      body.querySelector('.bcv-quick__light--close')?.addEventListener('click', (e) => { e.stopPropagation(); dock(); });
+    };
     const openQ = () => {
-      if (!panel) {
-        panel = q.build({ item, go: (o = {}) => { hold = Date.now() + 400; if (pulledOut()) dock(); else closeQ(); open(t.key, { from: item, over: true, ...o }); } });
-        body.replaceChildren(...panel.els);
-        body.querySelector('.bcv-quick__light--close')?.addEventListener('click', (e) => { e.stopPropagation(); dock(); });
-      }
+      build();
       panel.onOpen?.();
+      if (!item.classList.contains('is-open')) trayMoves();
       item.classList.add('is-open');
       item.setAttribute('aria-expanded', 'true');
+    };
+    // drawn ahead while the page is idle (primeSoon), its tool's script first: the swell under the
+    // pointer then only shows it
+    item._bcvPrime = async () => {
+      const mod = BCV.lazy?.toolModule?.(t.key);
+      if (mod && !BCV.lazy.has(mod)) await BCV.lazy.load(mod).catch(() => {});
+      if (!item.isConnected) return;
+      build();
+      await panel.prime?.();
     };
     // The grip along the bottom pulls the widget out of the tray: from then on it sits where it is
     // put, stays open, and wears a red light that puts it back. Dragging it again moves it about.
@@ -828,14 +901,18 @@
     const drop = (e) => { if (!drag) return; try { bar.releasePointerCapture(e.pointerId); } catch { /* already gone */ } drag = null; };
     bar.addEventListener('pointerup', drop);
     bar.addEventListener('pointercancel', drop);
-    item.addEventListener('pointerenter', (e) => {
-      if (e.pointerType === 'touch' || item.classList.contains('is-out') || Date.now() < hold) return; // (the tray works over an open popup too: the widget's green light puts its tool on top of it)
-      clearTimeout(leave);
-      item.classList.add('is-hover');
+    const want = intent(item, () => {
+      if (item.classList.contains('is-out') || Date.now() < hold) return;
       // one open at a time: a calculator left with the focus folds when the pointer moves on. One
       // pulled out of the tray is not in that reckoning — it stays where it was put, open.
       for (const other of document.querySelectorAll('#bcv-pins .bcv-quick.is-open:not(.is-free)')) if (other !== item) { other.querySelector(':focus')?.blur(); other.classList.remove('is-hover'); other.classList.remove('is-open'); other.setAttribute('aria-expanded', 'false'); }
       openQ();
+    });
+    item.addEventListener('pointerenter', (e) => {
+      if (e.pointerType === 'touch' || item.classList.contains('is-out') || Date.now() < hold) return; // (the tray works over an open popup too: the widget's green light puts its tool on top of it)
+      clearTimeout(leave);
+      item.classList.add('is-hover');
+      if (!item.classList.contains('is-open')) want(e);
     });
     item.addEventListener('pointerleave', (e) => {
       if (e.pointerType === 'touch') return;
@@ -847,7 +924,7 @@
     item.addEventListener('focusout', () => setTimeout(() => { if (!item.classList.contains('is-hover') && !item.querySelector(':focus')) closeQ(); }, 0));
     return [glass, body, bar];
   }
-  document.addEventListener('pointerdown', (e) => { for (const item of document.querySelectorAll('#bcv-pins .bcv-quick.is-open:not(.is-free)')) if (!item.contains(e.target)) { item.classList.remove('is-hover'); item.querySelector(':focus')?.blur(); item.classList.remove('is-open'); item.setAttribute('aria-expanded', 'false'); } }, true);
+  document.addEventListener('pointerdown', (e) => { for (const item of document.querySelectorAll('#bcv-pins .bcv-quick.is-open:not(.is-free)')) if (!item.contains(e.target)) { trayMoves(); item.classList.remove('is-hover'); item.querySelector(':focus')?.blur(); item.classList.remove('is-open'); item.setAttribute('aria-expanded', 'false'); } }, true);
   /** A widget's head: the two lights a Mac window wears — red to put it back in the tray (only once
    *  it has been pulled out), green to open the tool at full size — and the widget's name beside them. */
   const quickName = (name, go, title) => U.el('bcv-quick__lights', [
@@ -1173,19 +1250,27 @@
   /** The graphing calculator's pin: a small Desmos, portrait, loaded on the first hover and kept —
    *  the graph survives the pin folding — with the way out to desmos.com where the frame is refused. */
   function quickGraph({ go }) {
-    const frame = h('iframe', { class: 'bcv-qgraph__frame', title: 'Desmos graphing calculator', allow: 'fullscreen', referrerpolicy: 'no-referrer' });
-    const body = U.el('bcv-qgraph__body', [frame]);
+    // the frame is made on the first open, not with the panel: a panel built ahead (primeSoon) would
+    // otherwise carry an empty page of its own on every Canvas tab with the pin
+    let frame = null;
+    const body = U.el('bcv-qgraph__body');
     const root = U.el('bcv-qgraph', [U.el('bcv-qgraph__head', [quickName('Graphing', go, 'Open the graphing calculator, larger'), h('a', { class: 'bcv-qgraph__out', href: DESMOS, target: '_blank', rel: 'noopener', text: 'desmos.com ↗' })]), body]);
     let loaded = false;
     const fail = () => body.replaceChildren(U.el('bcv-qgraph__fail', [U.text('bcv-qgraph__failtext', 'Desmos could not load here.'), h('a', { class: 'bcv-qgraph__link', href: DESMOS, target: '_blank', rel: 'noopener', text: 'Open desmos.com' })]));
     const onCsp = (e) => { if (/desmos\.com/.test(e.blockedURI || '')) fail(); };
-    frame.addEventListener('error', fail);
-    frame.addEventListener('load', () => frame.classList.add('is-in'));
+    const frameNow = () => {
+      if (frame) return frame;
+      frame = h('iframe', { class: 'bcv-qgraph__frame', title: 'Desmos graphing calculator', allow: 'fullscreen', referrerpolicy: 'no-referrer' });
+      frame.addEventListener('error', fail);
+      frame.addEventListener('load', () => { if (loaded) frame.classList.add('is-in'); });
+      body.append(frame);
+      return frame;
+    };
     // Desmos is a whole page of its own (WebGL and all), and every Canvas tab with the pin would carry
     // one for as long as the tab lived: it is let go five minutes after the pin folds, and loaded
     // afresh on the next open — the memory is what Safari reloads tabs for.
     let letGo = 0;
-    const onOpen = () => { clearTimeout(letGo); if (loaded) return; loaded = true; document.addEventListener('securitypolicyviolation', onCsp); frame.src = DESMOS; };
+    const onOpen = () => { clearTimeout(letGo); if (loaded) return; loaded = true; document.addEventListener('securitypolicyviolation', onCsp); frameNow().src = DESMOS; };
     const onFold = () => { clearTimeout(letGo); letGo = setTimeout(() => { if (!loaded) return; loaded = false; frame.classList.remove('is-in'); frame.src = 'about:blank'; document.removeEventListener('securitypolicyviolation', onCsp); }, 5 * 60 * 1000); };
     return { els: [root], onOpen, onFold };
   }
@@ -1251,7 +1336,7 @@
     input.addEventListener('input', look);
     input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); if (hit) show(hit); } });
     const root = U.el('bcv-qpt', [U.el('bcv-qpt__head', [quickName('Elements', go, 'Open the periodic table'), input, line]), grid]);
-    return { els: [root], onOpen: build };
+    return { els: [root], onOpen: build, prime: build };
   }
   /** Citation generator: a link pasted here opens the generator with it in (a YouTube link as a
    *  video, a doi.org link as a journal article, anything else as a website with today's date);
@@ -1314,8 +1399,9 @@
       U.el('bcv-qcite__row', [styles, U.text('bcv-qcite__label', 'Saved', 'span'), copyAll]),
       saved,
     ]);
-    const onOpen = async () => {
-      hereSub.textContent = hereNow().sub;
+    /** The style and the saved citations read, and the panel's height set by them: done ahead
+     *  (prime), so the first swell goes straight to its height rather than to a guess and on. */
+    const refresh = async () => {
       const [s, raw] = await Promise.all([load(STYLE_KEY, 'mla'), load(SAVED_KEY, [])]);
       style = STYLES.some(([k]) => k === s) ? s : 'mla';
       paintStyles();
@@ -1329,7 +1415,8 @@
       ])) : [U.text('bcv-qcite__none', 'Citations you save in the generator show here.', 'span')]));
       item.style.setProperty('--bcv-quick-h', `${132 + BAR + (last.length ? 32 * last.length - 4 : 18)}px`); // (the panel's height follows what is in it, plus the grip)
     };
-    return { els: [root], onOpen };
+    const onOpen = () => { hereSub.textContent = hereNow().sub; return refresh(); };
+    return { els: [root], onOpen, prime: refresh };
   }
   /** A widget's panel: the head (the lights and the name), a line saying what it is for, and what
    *  it holds under that. One box, not boxes inside boxes. */
@@ -1385,7 +1472,7 @@
         U.text('bcv-qpan__itemsub', U.plural((d.cards || []).length, 'term'), 'span'),
       ])) : [U.text('bcv-qpan__empty', 'No sets yet — the tool makes one from your notes.')]));
     };
-    return { els: [quickPane('Flashcards', go, 'Open Flashcards', 'Your sets, ready to study.', [list])], onOpen };
+    return { els: [quickPane('Flashcards', go, 'Open Flashcards', 'Your sets, ready to study.', [list])], onOpen, prime: onOpen };
   }
 
   /** One pin: a round button in the tool's colour with its glyph dark on it (2.98.23), and its X. */
@@ -1404,6 +1491,8 @@
       el.setAttribute('aria-expanded', 'false');
       el.append(h('div', { class: 'bcv-island__face' }, [U.el('bcv-island__glass'), btn, islandBody(el), islandSetter(el)]));
       islandHover(el);
+      // its setter's strip laid out ahead, while the page is idle (primeSoon), like a panel's
+      el._bcvPrime = async () => { if (!focusRead) await focusLoad().catch(() => {}); if (el.isConnected && !el.classList.contains('is-live')) paintSetter(el, focus); };
       // open: a press on the count opens the timer, a press elsewhere on the body keeps it open a while longer
       el.addEventListener('click', (e) => { if (!el.classList.contains('is-open') || e.target.closest('button')) return; if (e.target.closest('.bcv-island__right')) open('pomo', { from: el, over: true }); else islandOpen(el); });
       el.addEventListener('keydown', (e) => { if (e.key === 'Escape' && el.classList.contains('is-open')) { e.stopPropagation(); islandClose(el); btn.focus(); } });
@@ -1526,7 +1615,14 @@
       U.el('bcv-tool-card__open', [h('span', { text: 'Open' }), U.svg('M9 6l6 6-6 6', { size: 13, stroke: 'var(--bcv-blue)', width: 2.2, cls: 'bcv-tool-card__chev' })]),
       h('span', { class: 'bcv-tool-card__pinned', title: 'Pinned next to the switch' }, U.svg(IC.pin, { size: 11, stroke: 'currentColor', width: 2 })),
     ]);
-    if (!demo) draggable(el, t);
+    if (!demo) {
+      draggable(el, t);
+      // the tool's script asked for as the pointer (or the focus) reaches its card, not on the press:
+      // the popup then opens on the click itself rather than after a trip to the background
+      const ahead = () => { const mod = BCV.lazy?.toolModule?.(t.key); if (mod && !BCV.lazy.has(mod)) BCV.lazy.load(mod).catch(() => {}); };
+      el.addEventListener('pointerenter', ahead, { once: true });
+      el.addEventListener('focus', ahead, { once: true });
+    }
     return el;
   }
 
