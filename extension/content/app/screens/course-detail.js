@@ -38,22 +38,10 @@
     if (x && from?.isConnected && !BCV.phone?.active?.() && BCV.screens.feedback?.build) { openMarkBox(ctx, c, a, x, from, opts); return; }
     ctx.app.go(`${c.url}/assignments/${a.id}?bcv=feedback`);
   };
-  /** (2.98.64) The chip opens its box on a hover too, where there is a mouse: after a moment's rest
-   *  on it (a pointer passing over does nothing), and not again under a pointer that has not moved
-   *  since the box folded back into it (it must leave the chip first). A press still opens at once. */
-  const HOVER_MS = 420;
-  const canHover = () => !BCV.phone?.active?.() && !!self.matchMedia?.('(hover: hover) and (pointer: fine)').matches;
-  function hoverOpens(btn, open) {
-    let t = 0;
-    btn.addEventListener('pointerenter', (e) => {
-      if (e.pointerType !== 'mouse' || !canHover() || btn.dataset.bcvHoverCool || document.querySelector('.bcv-sheet-ov')) return;
-      clearTimeout(t);
-      t = setTimeout(() => { if (btn.isConnected && btn.matches(':hover') && !document.querySelector('.bcv-sheet-ov')) open(btn); }, HOVER_MS);
-    });
-    btn.addEventListener('pointerleave', () => { clearTimeout(t); delete btn.dataset.bcvHoverCool; });
-    btn.addEventListener('click', () => clearTimeout(t));
-    return btn;
-  }
+  /** (2.98.64) The chip opens its box on a hover too, where there is a mouse (U.hoverOpens: after a
+   *  moment's rest on it, not again under a pointer that has not moved since the box folded back into
+   *  it). A press still opens at once. */
+  const hoverOpens = U.hoverOpens;
   function openMarkBox(ctx, c, a, s, from, { hover = false } = {}) {
     document.querySelector('.bcv-sheet-ov')?.remove();
     const scored = s.workflow_state === 'graded' && s.score !== null && s.score !== undefined;
@@ -102,9 +90,7 @@
       if (folding || !ov.isConnected) return;
       folding = true;
       document.removeEventListener('keydown', onKey);
-      // a pointer still over the chip as the box folds into it does not open it again until it has left
-      const cr = from.getBoundingClientRect();
-      if (!lastPt || (lastPt.x >= cr.left && lastPt.x <= cr.right && lastPt.y >= cr.top && lastPt.y <= cr.bottom)) from.dataset.bcvHoverCool = '1';
+      U.hoverCool(from, lastPt); // (a pointer still over the chip as the box folds into it does not open it again until it has left)
       ov.classList.add('is-folding', 'is-far'); // (the focus lets go outward as the box folds)
       // the words go back to the chip's own, from wherever the box has got to — mid-growth too
       const cur = sheet.getBoundingClientRect();
@@ -122,7 +108,6 @@
     ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
     document.addEventListener('keydown', onKey);
     ov.addEventListener('pointermove', (e) => { lastPt = { x: e.clientX, y: e.clientY }; }, { passive: true });
-    if (hover) ov.dataset.hover = '';
     const built = BCV.screens.feedback.build(ctx, c, a, s, { box: true });
     const sheet = U.el('bcv-sheet bcv-sheet--card bcv-mark is-at-card', [
       U.el('bcv-sheet__head', [
@@ -176,26 +161,7 @@
     ov.focus();
     // opened by a hover, it folds again once the pointer has been off it a moment — unless it was
     // taken up (a press in it, a key, a field): then it stays, as a pressed one does
-    if (hover) {
-      let kept = false, outT = 0;
-      const keep = () => { kept = true; clearTimeout(outT); delete ov.dataset.hover; };
-      const armedAt = performance.now() + 650; // (the box is still growing under the pointer)
-      const leaveSoon = () => { if (!kept && !outT && !folding) outT = setTimeout(() => { outT = 0; if (!kept) close(); }, 380); };
-      sheet.addEventListener('pointerdown', keep, true);
-      sheet.addEventListener('focusin', (e) => { if (e.target.matches?.('input, textarea, select, [contenteditable="true"]')) keep(); });
-      ov.addEventListener('keydown', (e) => { if (e.key !== 'Escape') keep(); }, true);
-      ov.addEventListener('pointermove', (e) => {
-        if (kept || folding) return;
-        const r = sheet.getBoundingClientRect();
-        const over = e.clientX >= r.left - 8 && e.clientX <= r.right + 8 && e.clientY >= r.top - 8 && e.clientY <= r.bottom + 8;
-        if (over || performance.now() < armedAt) { clearTimeout(outT); outT = 0; return; }
-        leaveSoon();
-      }, { passive: true });
-      document.documentElement.addEventListener('pointerleave', function gone() { // (off the window altogether)
-        if (!ov.isConnected) { document.documentElement.removeEventListener('pointerleave', gone); return; }
-        if (performance.now() >= armedAt) leaveSoon();
-      });
-    }
+    if (hover) U.hoverHold(ov, sheet, close, () => folding);
     // the page's copy of the submission is what the chip was drawn from; Canvas is asked once more for what came since (a comment, another attempt), and the box redraws still if it answers with more
     store.submission(c.id, a.id, { force: true }).then((fresh) => {
       if (!fresh || !ov.isConnected || folding || JSON.stringify(fresh) === JSON.stringify(s)) return;

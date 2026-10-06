@@ -25,6 +25,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.98.97', date: '2026-10-06', notes: [
+      { kind: 'new', title: 'Cards open on hover', body: 'Rest the mouse on a Dashboard card to open it.', icon: P.eye },
+    ] },
     { version: '2.98.96', date: '2026-10-05', notes: [
       { kind: 'fixed', title: 'Past courses, really', body: 'Concluded courses now show under Past.', icon: P.list },
       { kind: 'fixed', title: 'Page text readable', body: 'Page text always stands out from what is behind it.', icon: P.eye },

@@ -658,6 +658,54 @@ try {
   check(noBlur.cls && noBlur.kept === false && /^linear-gradient/.test(noBlur.bar) && /^linear-gradient/.test(noBlur.side) && noBlur.main === 'blur(6px)', `a Chrome that draws no blur gets solid bars, and the page behind a sheet blurred by a filter: ${JSON.stringify(noBlur)}`);
   await page.click('.bcv-sheet-ov', { position: { x: 5, y: 5 } });
   await page.waitForFunction(() => !document.querySelector('.bcv-sheet'), null, { timeout: 3000 });
+  // (2.98.97) a counter opens its box on a hover too: after a moment's rest on it (a pointer passing over does nothing);
+  // the box so opened folds again when the pointer leaves it, stays once taken up (a press in it), and does not open
+  // again under a pointer that has not moved since it folded
+  {
+    await page.mouse.move(5, 5);
+    const at = await page.$eval('.bcv-stat[data-stat="week"]', (e) => { const r = e.getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; });
+    const vp = page.viewportSize();
+    const up = () => page.evaluate(() => { const ov = document.querySelector('.bcv-sheet-ov--card'); return ov && !ov.classList.contains('is-folding') ? { hover: ov.hasAttribute('data-hover'), label: ov.querySelector('.bcv-sheet__label')?.textContent } : null; });
+    const gone = () => page.evaluate(() => !document.querySelector('.bcv-sheet-ov'));
+    await page.mouse.move(at.x, at.y, { steps: 3 });
+    await page.mouse.move(5, 5, { steps: 3 }); // (a pass over it)
+    await page.waitForTimeout(700);
+    const passed = await up();
+    await page.mouse.move(at.x, at.y, { steps: 3 });
+    await page.waitForTimeout(150);
+    const tooSoon = await up();
+    check(!passed && !tooSoon && await eventually(async () => (await up())?.hover === true, 2500) && (await up()).label === 'Next 7 days',
+      `resting on a counter opens its box, as a press does — not at once, and not for a pointer passing over: ${JSON.stringify({ passed, tooSoon, now: await up() })}`);
+    await page.waitForTimeout(750);
+    await page.mouse.move(12, vp.height - 12, { steps: 6 });
+    check(await eventually(gone, 2500), 'a box a counter opened on a hover folds again once the pointer has left it');
+    await page.mouse.move(at.x, at.y, { steps: 4 });
+    check(await eventually(async () => !!(await up()), 2500), 'back on the counter, it opens again');
+    await page.waitForTimeout(750);
+    await page.click('.bcv-sheet--stat .bcv-sheet__note'); // (a press in the box takes it up)
+    await page.mouse.move(12, vp.height - 12, { steps: 6 });
+    await page.waitForTimeout(1200);
+    check(!!(await up()) && !(await up()).hover, 'a box taken up (a press in it) stays when the pointer leaves, as a pressed one does');
+    await page.keyboard.press('Escape');
+    check(await eventually(gone, 2500), 'and Escape folds it');
+    await page.mouse.move(at.x, at.y, { steps: 4 });
+    await eventually(async () => !!(await up()), 2500);
+    await page.keyboard.press('Escape'); // (the pointer left resting on the counter)
+    await eventually(gone, 2500);
+    await page.waitForTimeout(1200);
+    check(await gone(), 'folded under a pointer that has not moved, it does not open again by itself');
+    // a counter drawn under a pointer that is resting there (the Dashboard painting where the mouse happens to be) is
+    // not a hover: only a pointer that moves onto a counter opens it
+    await page.goto(`${BASE}/`);
+    await page.waitForSelector('.bcv-stat[data-stat="week"]', { timeout: 10000 });
+    await page.waitForTimeout(1300);
+    const painted = await up();
+    await page.mouse.move(at.x + 6, at.y + 2, { steps: 2 });
+    check(!painted && await eventually(async () => !!(await up()), 2500), `a counter painted under a resting pointer does not open by itself; the pointer moving on it does: ${JSON.stringify({ painted })}`);
+    await page.keyboard.press('Escape');
+    await eventually(gone, 2500);
+    await page.mouse.move(5, 5);
+  }
   check(await page.$eval('#bcv-main', (e) => getComputedStyle(e).filter) === 'none', 'the page is sharp again once the sheet is gone');
   await page.click('.bcv-stats .bcv-stat:nth-child(3)');
   await page.waitForSelector('.bcv-sheet', { timeout: 5000 });

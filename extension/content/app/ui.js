@@ -1251,6 +1251,68 @@
   };
   if (document.body) new MutationObserver(holdSync).observe(document.body, { childList: true }); // (the body's own children only: overlays come and go there)
 
+  // ---- a box that opens on a hover (the mark box 2.98.64, the Dashboard's counters 2.98.97) ----------
+  /** The button opens its box on a hover too, where there is a mouse: after a moment's rest on it (a
+   *  pointer passing over does nothing), never while another box is up or a tour runs (its steps wait
+   *  for a press), and not again under a pointer that has not moved since the box folded back into it
+   *  (it must leave the button first: hoverCool). A press still opens at once. */
+  const HOVER_MS = 420;
+  const canHover = () => !BCV.phone?.active?.() && !!self.matchMedia?.('(hover: hover) and (pointer: fine)').matches;
+  const hoverBlocked = () => !!document.querySelector('.bcv-sheet-ov, #bcv-tour');
+  // Only a mouse that moved counts: a button drawn under a pointer that is resting (the Dashboard
+  // painting its counters where the pointer happens to be) is "entered" too, and must not open.
+  let mouseAt = null, movedAt = 0;
+  addEventListener('pointermove', (e) => {
+    if (e.pointerType !== 'mouse' || (mouseAt && mouseAt.x === e.clientX && mouseAt.y === e.clientY)) return;
+    mouseAt = { x: e.clientX, y: e.clientY };
+    movedAt = performance.now();
+  }, { passive: true, capture: true });
+  const justMoved = () => performance.now() - movedAt < 120;
+  function hoverOpens(btn, open) {
+    let t = 0;
+    const can = (e) => e.pointerType === 'mouse' && canHover() && !btn.dataset.bcvHoverCool && !hoverBlocked();
+    const arm = () => {
+      clearTimeout(t);
+      t = setTimeout(() => { t = 0; if (btn.isConnected && btn.matches(':hover') && !hoverBlocked()) open(btn); }, HOVER_MS);
+    };
+    btn.addEventListener('pointerenter', (e) => { if (can(e) && justMoved()) arm(); });
+    btn.addEventListener('pointermove', (e) => { if (!t && can(e) && justMoved()) arm(); }, { passive: true }); // (the pointer that was resting there moves after all)
+    btn.addEventListener('pointerleave', () => { clearTimeout(t); t = 0; delete btn.dataset.bcvHoverCool; });
+    btn.addEventListener('click', () => { clearTimeout(t); t = 0; });
+    return btn;
+  }
+  /** As a box folds back into its button: a pointer last seen over the button (or not seen at all)
+   *  leaves the button cool, so the box does not open again under a pointer that has not moved. */
+  function hoverCool(btn, pt) {
+    const r = btn.getBoundingClientRect();
+    if (!pt || (pt.x >= r.left && pt.x <= r.right && pt.y >= r.top && pt.y <= r.bottom)) btn.dataset.bcvHoverCool = '1';
+  }
+  /** A box opened by a hover folds again (close) once the pointer has been off it a moment — unless it
+   *  was taken up (a press in it, a key, a field): then it stays, as a pressed one does. `ov` is the
+   *  box's layer (data-hover on it while the hover still holds it), `box` the box, `folding` whether it
+   *  is already on its way back. */
+  function hoverHold(ov, box, close, folding = () => false) {
+    ov.dataset.hover = '';
+    let kept = false, outT = 0;
+    const keep = () => { kept = true; clearTimeout(outT); delete ov.dataset.hover; };
+    const armedAt = performance.now() + 650; // (the box is still growing under the pointer)
+    const leaveSoon = () => { if (!kept && !outT && !folding()) outT = setTimeout(() => { outT = 0; if (!kept) close(); }, 380); };
+    box.addEventListener('pointerdown', keep, true);
+    box.addEventListener('focusin', (e) => { if (e.target.matches?.('input, textarea, select, [contenteditable="true"]')) keep(); });
+    ov.addEventListener('keydown', (e) => { if (e.key !== 'Escape') keep(); }, true);
+    ov.addEventListener('pointermove', (e) => {
+      if (kept || folding()) return;
+      const r = box.getBoundingClientRect();
+      const over = e.clientX >= r.left - 8 && e.clientX <= r.right + 8 && e.clientY >= r.top - 8 && e.clientY <= r.bottom + 8;
+      if (over || performance.now() < armedAt) { clearTimeout(outT); outT = 0; return; }
+      leaveSoon();
+    }, { passive: true });
+    document.documentElement.addEventListener('pointerleave', function gone() { // (off the window altogether)
+      if (!ov.isConnected) { document.documentElement.removeEventListener('pointerleave', gone); return; }
+      if (performance.now() >= armedAt) leaveSoon();
+    });
+  }
+
   BCV.ui = {
     groupPicker, groupAttrs, BANDS, gradeBand, bandChip, bandSlider, whatIfAdder, whatIfRemove,
     svg, star, chev, el, text, tile, dot, card, row, label, h2, groupHead, badge, statusBadge, seg, segSlide, search, switchEl, btn, iconbtn, pill, placeDot,
@@ -1258,6 +1320,6 @@
     DAY, startOfDay, addDays, sameDay, dayDiff, startOfWeek, parse, MONTHS, MONTHS_LONG, DAYS, DAYS_LONG,
     fmtTime, fmtTimeLower, fmtShort, fmtLong, fmtDateComma, fmtAt, fmtAtUpper, fmtBy, dayTitle, fmtDow, fmtRecent, whenShort, plural,
     hexToRgb, rgba, palette, FALLBACK_COLORS, initials, enter, still, isStill, roll, morphFrom, reducedMotion, dpr, onDprChange, dismiss,
-    afterMotion, onGone, watchLayout, anchor, keepOnScreen, boundsOf,
+    afterMotion, onGone, watchLayout, anchor, keepOnScreen, boundsOf, hoverOpens, hoverCool, hoverHold,
   };
 })();

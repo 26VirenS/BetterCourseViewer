@@ -6,6 +6,7 @@
   const U = BCV.ui;
   const IC = BCV.IC;
   const store = BCV.store;
+  let byHover = false; // (set while a counter's box is being opened by a hover; openSheet reads it once)
 
   /** The counters' own lists — shared by the Dashboard and the phone's Today (2.98.36), so the two
    *  never count differently: what is due today, tomorrow and in the next 7 days (and what of each is already
@@ -457,11 +458,15 @@
       const slot = STAT_SLOT[lbl] || null;
       const pic = slot ? BCV.theme.picOf(app.state?.themeImages, app.state?.themeImages?.cards?.[slot]) : null; // { sharp, blur } (lib/theme.js assets)
       // the label and the number share the top row (the number on the right, large); the note and the chevron sit below
-      return U.enter(h('button', { type: 'button', class: `bcv-card bcv-stat ${pic ? 'bcv-stat--pic' : ''} ${pic?.ink ? 'has-ink' : ''} ${pic?.scene ? 'is-scene' : ''}`, dataset: slot ? { stat: slot } : {}, style: pic ? { ...(pic.ink ? { '--bcv-pic-ink': BCV.theme.picCss(pic.ink), '--bcv-pic-ink-blur': BCV.theme.picCss(pic.inkBlur) } : { '--bcv-pic': BCV.theme.picCss(pic.sharp) }), '--bcv-veil': BCV.theme.veilBase(app.state?.settings?.appearance?.theme?.accent || '', app.state?.themeImages?.tones?.[slot], 0.4), ...BCV.theme.placeVars(BCV.theme.placeOf(app.state?.themeImages, slot)) } : null, onclick: (e) => onOpen(e.currentTarget) }, [
+      const btn = h('button', { type: 'button', class: `bcv-card bcv-stat ${pic ? 'bcv-stat--pic' : ''} ${pic?.ink ? 'has-ink' : ''} ${pic?.scene ? 'is-scene' : ''}`, dataset: slot ? { stat: slot } : {}, style: pic ? { ...(pic.ink ? { '--bcv-pic-ink': BCV.theme.picCss(pic.ink), '--bcv-pic-ink-blur': BCV.theme.picCss(pic.inkBlur) } : { '--bcv-pic': BCV.theme.picCss(pic.sharp) }), '--bcv-veil': BCV.theme.veilBase(app.state?.settings?.appearance?.theme?.accent || '', app.state?.themeImages?.tones?.[slot], 0.4), ...BCV.theme.placeVars(BCV.theme.placeOf(app.state?.themeImages, slot)) } : null, onclick: (e) => onOpen(e.currentTarget) }, [
         ...(pic ? [h('span', { class: 'bcv-stat__pic', 'aria-hidden': 'true' }), h('span', { class: 'bcv-stat__pic bcv-stat__pic--blur', 'aria-hidden': 'true' }), h('span', { class: 'bcv-stat__pic bcv-stat__pic--veil', 'aria-hidden': 'true' })] : []),
         U.el('bcv-stat__head', [U.svg(icon, { size: 14, stroke: color, width: 1.9 }), U.text('bcv-label bcv-label--inline', lbl, 'span'), valueEl]),
         U.el('bcv-stat__noterow', [U.text('bcv-stat__note', note, 'span'), U.svg(IC.chevron, { size: 13, stroke: 'var(--bcv-ink3)', width: 2, cls: 'bcv-stat__chev' })]),
-      ]), 0); // no stagger: the six land together
+      ]);
+      // (2.98.97) a moment's rest on a counter opens its box too, as a press does (U.hoverOpens: a mouse only, never while
+      // another box or a tour is up); the box so opened folds again when the pointer leaves it, unless it is taken up
+      U.hoverOpens(btn, (b) => { byHover = true; try { onOpen(b); } finally { byHover = false; } });
+      return U.enter(btn, 0); // no stagger: the six land together
     }
 
     /** The detail sheet behind a counter (2.98.45): the counter itself grows, where it stands, into a
@@ -473,14 +478,18 @@
     function openSheet(def, from = null) {
       document.querySelector('.bcv-sheet-ov')?.remove();
       const card = from && from.getBoundingClientRect && from.isConnected ? from : null;
+      const hover = byHover && !!card;
       const ov = U.el(`bcv-sheet-ov${card ? ' bcv-sheet-ov--card is-far' : ''}`, null, { role: 'dialog', 'aria-label': def.label }); // (is-far: the dim and blur start out wide, to close in on the box)
       let folding = false;
+      let lastPt = null; // (where the pointer was last seen over the box's layer)
+      ov.addEventListener('pointermove', (e) => { lastPt = { x: e.clientX, y: e.clientY }; }, { passive: true });
       let glide = []; // [box's element, counter's element]: the icon, the label and the number, which travel between the two
       const startAt = (a, to, at) => { a.style.transform = `translate(${at.left - to.left}px, ${at.top - to.top}px) scale(${at.height / to.height})`; }; // a drawn where the counter's is, from where it lands
       const close = () => {
         if (!card) { BCV.ui.dismiss(ov); return; }
         if (folding || !ov.isConnected) return;
         folding = true;
+        U.hoverCool(card, lastPt); // (a pointer still over the counter as the box folds into it does not open it again until it has left)
         ov.classList.add('is-folding', 'is-far'); // (the focus lets go outward as the box folds)
         // the words go back to the counter's own: each is offset from where it will lie once the box is
         // the counter's size again (measured with the box snapped there for a frame, then put back), so
@@ -639,6 +648,7 @@
       } else U.morphFrom(sheet, from);
       ov.tabIndex = -1;
       ov.focus();
+      if (hover) U.hoverHold(ov, sheet, close, () => folding); // (opened by a hover: it folds again once the pointer has been off it a moment, unless it was taken up)
     }
 
     // ---- workload ------------------------------------------------------------------
