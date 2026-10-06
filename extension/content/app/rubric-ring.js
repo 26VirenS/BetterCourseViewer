@@ -24,6 +24,7 @@
   // the stage, in its own units: scaled as a whole to the window
   const W = 760, H = 560, CX = 380, CY = 280, R = 176, BX = 66, BT = 158;
   const TAU = Math.PI * 2;
+  const VIEW_KEY = 'bcv:rubricLast'; // (the view the last rubric was left in: 'grid', else the ring)
   const PALETTE = ['#5e5ce6', '#0a84ff', '#30b0c7', '#30d158', '#ff9f0a', '#ff375f'];
   const TRACK = [72, 72, 74]; // a bar's unearned stretch
   const BLACK = [0, 0, 0], WHITE = [255, 255, 255];
@@ -335,9 +336,11 @@
 
     // ---- (2.98.95) the grid: the same rubric as rows and columns — a criterion a row, its levels lined up under
     // the columns by what they are worth (the best on the left, nothing on the right). A toggle at the top right
-    // turns between it and the ring; the choice is kept, and the next rubric opens as this one was left
+    // turns between it and the ring; the choice is kept, and the next rubric opens as this one was left.
+    // (2.98.98) The ring is the default: the grid only when the last rubric was left on it. The key the grid's first
+    // releases kept is dropped, so everyone who tried the grid starts on the ring again once.
     let view = 'ring';
-    try { if (localStorage.getItem('bcv:rubricView') === 'grid') view = 'grid'; } catch { /* the ring */ }
+    try { localStorage.removeItem('bcv:rubricView'); if (localStorage.getItem(VIEW_KEY) === 'grid') view = 'grid'; } catch { /* the ring */ }
     const RING_IC = 'M13.3 4.61A7.5 7.5 0 0 1 19.05 14.57M17.75 16.82A7.5 7.5 0 0 1 6.25 16.82M4.95 14.57A7.5 7.5 0 0 1 10.7 4.61';
     const GRID_IC = 'M4.5 4.5h6v6h-6zM13.5 4.5h6v6h-6zM4.5 13.5h6v6h-6zM13.5 13.5h6v6h-6z';
     const viewBtns = [['ring', 'Ring', RING_IC], ['grid', 'Grid', GRID_IC]].map(([key, label, ic]) => h('button', {
@@ -456,7 +459,7 @@
       viewBtns.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.view === v)));
       field.inert = v === 'grid';
       gridBox.inert = v !== 'grid';
-      if (keep) try { localStorage.setItem('bcv:rubricView', v); } catch { /* this time only */ }
+      if (keep) try { localStorage.setItem(VIEW_KEY, v); } catch { /* this time only */ }
       if (v === 'grid' && touring) BCV.welcome?.finish(); // (the tour works the ring)
       if (keep && was !== v) (v === 'grid' ? gridBox.querySelector('.bcv-rg__segbtn.is-on') || viewBtns[1] : st.t > 0.5 ? name : labels[st.sel])?.focus({ preventScroll: true });
     }

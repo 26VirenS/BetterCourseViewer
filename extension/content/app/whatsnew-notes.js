@@ -25,6 +25,10 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.98.98', date: '2026-10-06', notes: [
+      { kind: 'fixed', title: 'One search highlight', body: 'The mouse moves the same highlight the arrow keys do.', icon: P.check },
+      { kind: 'improved', title: 'Rubrics open as a ring', body: 'The grid comes back only if you left the last one on it.', icon: P.layers },
+    ] },
     { version: '2.98.97', date: '2026-10-06', notes: [
       { kind: 'new', title: 'Cards open on hover', body: 'Rest the mouse on a Dashboard card to open it.', icon: P.eye },
     ] },

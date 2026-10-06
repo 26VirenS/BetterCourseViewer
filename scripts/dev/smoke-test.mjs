@@ -2160,6 +2160,7 @@ try {
   check(settledBack && (await rState()) === 'ring', 'Done ends the tour with the ring still open, settled back in the middle');
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('.bcv-rr-ov'), null, { timeout: 5000 });
+  await page.evaluate(() => localStorage.setItem('bcv:rubricView', 'grid')); // (2.98.98: the grid kept by 2.98.95–2.98.97 is let go: the ring opens)
   await page.click('.bcv-detail__actions .bcv-rubbtn');
   await page.waitForSelector('.bcv-rr-ov .bcv-rr__label', { timeout: 8000 });
   await page.waitForTimeout(2300); // (past where the tour would start on a marked ring)
@@ -2167,7 +2168,7 @@ try {
   // (2.98.95) a small two-way switch at the top right turns the ring into the grid — a criterion a row, its levels in
   // columns named once — and back; the grid shows the marks (Graded) or the rubric as it reads before any (Before
   // grading); the choice is kept, so the next rubric opens as the last was left
-  const vSw = await page.evaluate(() => { const r = document.querySelector('.bcv-rr__view').getBoundingClientRect(); return { right: Math.round(innerWidth - r.right), top: Math.round(r.top), pressed: [...document.querySelectorAll('.bcv-rr__vbtn')].map((b) => `${b.dataset.view}:${b.getAttribute('aria-pressed')}`).join(), widgets: Math.max(0, ...[...document.querySelectorAll('#bcv-report, #bcv-tray')].map((e) => e.getBoundingClientRect().bottom)) }; });
+  const vSw = await page.evaluate(() => { const r = document.querySelector('.bcv-rr__view').getBoundingClientRect(); return { right: Math.round(innerWidth - r.right), top: Math.round(r.top), pressed: [...document.querySelectorAll('.bcv-rr__vbtn')].map((b) => `${b.dataset.view}:${b.getAttribute('aria-pressed')}`).join(), ring: !document.querySelector('.bcv-rr-ov').classList.contains('is-grid'), old: localStorage.getItem('bcv:rubricView'), widgets: Math.max(0, ...[...document.querySelectorAll('#bcv-report, #bcv-tray')].map((e) => e.getBoundingClientRect().bottom)) }; });
   const ringScore = (await texts('.bcv-rr__cbig'))[0];
   await page.click('.bcv-rr__vbtn[data-view="grid"]');
   await page.waitForFunction(() => document.querySelector('.bcv-rr-ov')?.classList.contains('is-grid') && getComputedStyle(document.querySelector('.bcv-rg')).opacity === '1', null, { timeout: 4000 });
@@ -2180,10 +2181,11 @@ try {
     score: document.querySelector('.bcv-rg__sbig')?.textContent || null, dash: !!document.querySelector('.bcv-rg__sdash'),
     seg: [...document.querySelectorAll('.bcv-rg__segbtn')].map((b) => `${b.textContent}:${b.getAttribute('aria-pressed')}`).join(),
     foot: document.querySelector('.bcv-rg__foot')?.textContent, ringInert: document.querySelector('.bcv-rr__field').inert,
-    stored: localStorage.getItem('bcv:rubricView'),
+    stored: localStorage.getItem('bcv:rubricLast'),
   }));
   const g1 = await gridAt();
   await shot(page, '14r4-rubric-grid');
+  check(vSw.ring && vSw.old === null, `the ring is the default: a grid kept by the releases before is let go: ${JSON.stringify(vSw)}`);
   check(vSw.right <= 24 && vSw.top >= vSw.widgets && vSw.pressed === 'ring:true,grid:false' && g1.heads === 'Criterion|Full marks|Partial|No marks' && g1.rows === 2 && g1.names === 'Correctness|Work shown' && g1.marks.split(',').length === 2 && g1.mine === 2
     && g1.score === ringScore && g1.seg === 'Before grading:false,Graded:true' && g1.foot === 'Your mark is outlined on each row' && g1.ringInert && g1.stored === 'grid',
     `the switch at the top right (under the page's own buttons) turns the ring into the grid: the columns named once, a row a criterion, your level outlined on each, the score the ring's, Graded on — and the choice kept: ${JSON.stringify({ vSw, ringScore, g1 })}`);
@@ -2195,7 +2197,7 @@ try {
   await page.click('.bcv-detail__actions .bcv-rubbtn');
   const gridAgain = await page.waitForFunction(() => document.querySelector('.bcv-rr-ov.is-grid .bcv-rg__crit'), null, { timeout: 8000 }).then(() => true).catch(() => false);
   await page.click('.bcv-rr__vbtn[data-view="ring"]');
-  const ringAgain = await page.waitForFunction(() => !document.querySelector('.bcv-rr-ov').classList.contains('is-grid') && localStorage.getItem('bcv:rubricView') === 'ring' && !document.querySelector('.bcv-rr__field').inert && document.querySelector('.bcv-rg').inert, null, { timeout: 4000 }).then(() => true).catch(() => false);
+  const ringAgain = await page.waitForFunction(() => !document.querySelector('.bcv-rr-ov').classList.contains('is-grid') && localStorage.getItem('bcv:rubricLast') === 'ring' && !document.querySelector('.bcv-rr__field').inert && document.querySelector('.bcv-rg').inert, null, { timeout: 4000 }).then(() => true).catch(() => false);
   check(gridAgain && ringAgain, `the next rubric opens as the grid it was left as, and the switch turns it back into the ring (kept too): ${JSON.stringify({ gridAgain, ringAgain })}`);
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('.bcv-rr-ov'), null, { timeout: 5000 });
@@ -4091,6 +4093,31 @@ try {
   check((await curAt()) === 0 && (await page.$eval('.bcv-omni__item.is-cur', (e) => e.getAttribute('aria-selected'))) === 'true', 'the first result is chosen as you type: Enter is optional, a click is one press');
   await page.keyboard.press('ArrowDown');
   check((await curAt()) === 1, 'the arrows walk the results');
+  // (2.98.98) one highlight: the row a moving mouse comes onto becomes the chosen one (the highlight glides to it); the
+  // arrows take it on from there, and the row the mouse rests on keeps no shade of its own
+  const oneLit = () => page.evaluate(() => {
+    const panel = document.getElementById('bcv-omni-panel');
+    const rows = [...panel.querySelectorAll('.bcv-omni__item')];
+    const sel = panel.querySelector('.bcv-omni__sel.is-on')?.getBoundingClientRect();
+    const clear = (b) => b === 'rgba(0, 0, 0, 0)' || b === 'transparent';
+    return {
+      cur: rows.findIndex((r) => r.classList.contains('is-cur')),
+      shaded: rows.map((r, i) => (clear(getComputedStyle(r).backgroundColor) ? -1 : i)).filter((i) => i >= 0),
+      acts: rows.map((r, i) => { const a = r.querySelector('.bcv-omni__acts'); return a && getComputedStyle(a).display !== 'none' ? i : -1; }).filter((i) => i >= 0),
+      selOn: sel ? rows.findIndex((r) => Math.abs(r.getBoundingClientRect().top - sel.top) < 2) : -1,
+    };
+  });
+  const r2 = (await page.$$('#bcv-omni-panel .bcv-omni__item'))[2];
+  const b2 = await r2.boundingBox();
+  await page.mouse.move(b2.x + b2.width / 2, b2.y + b2.height / 2, { steps: 4 });
+  const hoverOn = await eventually(async () => { const o = await oneLit(); return o.cur === 2 && o.selOn === 2; }, 3000);
+  const o1 = await oneLit();
+  await shot(page, '15h-one-highlight');
+  check(!!hoverOn && o1.shaded.length === 0 && o1.acts.every((i) => i === 2), `the mouse moving onto a row makes it the chosen one: one highlight, gliding to it: ${JSON.stringify(o1)}`);
+  await page.keyboard.press('ArrowUp');
+  const hoverOff = await eventually(async () => { const o = await oneLit(); return o.cur === 1 && o.selOn === 1; }, 3000);
+  const o2 = await oneLit();
+  check(!!hoverOff && o2.shaded.length === 0 && !o2.acts.includes(2), `the arrows take it on from there; the row the mouse rests on keeps no second highlight: ${JSON.stringify(o2)}`);
   await page.keyboard.press('ArrowUp');
   await page.keyboard.press('Enter');
   await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });

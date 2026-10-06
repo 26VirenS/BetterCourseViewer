@@ -771,6 +771,21 @@
     });
     input.addEventListener('keydown', onKey);
     panel.addEventListener('keydown', onActKey);
+    // one highlight (2.98.98): the row a moving mouse comes onto becomes the chosen row — the highlight glides to it, and
+    // Enter takes it; a mouse resting while the rows change under it (a letter typed, the arrows scrolling the list)
+    // moves nothing, so the first result stays chosen as you type
+    let ptAt = null;
+    panel.addEventListener('pointermove', (e) => {
+      if (e.pointerType !== 'mouse' || !ui || ui.panel !== panel) return;
+      if (ptAt && ptAt.x === e.clientX && ptAt.y === e.clientY) return;
+      ptAt = { x: e.clientX, y: e.clientY };
+      const el = e.target.closest?.('.bcv-omni__item');
+      if (!el) return;
+      const i = [...panel.querySelectorAll('.bcv-omni__item')].indexOf(el);
+      if (i < 0 || i === ui.cursor) return;
+      ui.cursor = i;
+      markCursor();
+    }, { passive: true });
     // (summoned from another screen: summon() lands the words typed on the way once the Dashboard's draw resolves)
     return root;
   }
