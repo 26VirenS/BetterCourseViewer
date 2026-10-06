@@ -2026,30 +2026,32 @@ try {
   await page.goto(`${BASE}/courses/104/assignments/4001`); // the rubric checks below read this page
   await page.waitForSelector('.bcv-detail__title', { timeout: 10000 });
   check(!(await page.$('.bcv-rr-ov, .bcv-rubg')) && (await texts('.bcv-detail__actions .bcv-rubbtn'))[0] === 'Rubric', 'the rubric keeps its own button, and is not on the page until it is asked for');
-  // (2.98.87) the pointer resting on the Rubric button turns the button itself into the ring in miniature: the pill
-  // drawn in to a disc, its words gone, the band round it in the grade colours and the points in the middle — the
-  // button's own place on the page kept; back to the button as the pointer leaves
+  // (2.98.100) the pointer resting on the Rubric button grows the button itself into a larger pill: its words gone,
+  // the ring's band traced round the pill's edge — a piece per criterion, in the grade colours — and the points in
+  // the middle; the button's own place on the page kept; back to the button as the pointer leaves
   const rubBtn = await page.$eval('.bcv-detail__actions .bcv-rubbtn', (e) => { const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, w: Math.round(r.width), h: Math.round(r.height) }; });
   await page.mouse.move(rubBtn.x, rubBtn.y);
-  const morphed = await eventually(() => page.evaluate(() => { const r = document.querySelector('.bcv-detail__actions .bcv-rubbtn .bcv-rubmorph__ring'); return !!r && parseFloat(r.style.opacity) === 1; }), 5000);
+  const morphed = await eventually(() => page.evaluate(() => { const b = document.querySelector('.bcv-detail__actions .bcv-rubbtn .bcv-rubmorph__band'); const mid = document.querySelector('.bcv-detail__actions .bcv-rubbtn .bcv-rubmorph__mid'); return !!b && parseFloat(b.style.opacity) === 1 && parseFloat(mid.style.opacity) === 1; }), 5000);
   const morphAt = morphed ? await page.evaluate(() => {
     const b = document.querySelector('.bcv-detail__actions .bcv-rubbtn'), br = b.getBoundingClientRect(), layer = b.querySelector('.bcv-rubmorph');
-    const d = layer.querySelector('.bcv-rubmorph__disc').getBoundingClientRect(), ring = layer.querySelector('.bcv-rubmorph__ring').getBoundingClientRect();
-    const rgb = [...layer.querySelectorAll('path')].map((x) => x.getAttribute('fill').match(/\d+/g).map(Number));
-    return { ring: b.classList.contains('is-ring'), mid: layer.querySelector('.bcv-rubmorph__mid').innerText.replace(/\s+/g, ' ').trim(), words: getComputedStyle(b).color, ground: getComputedStyle(b).backgroundColor, hidden: layer.getAttribute('aria-hidden'), presses: getComputedStyle(layer).pointerEvents,
-      w: Math.round(br.width), h: Math.round(br.height), disc: [Math.round(d.width), Math.round(d.height)], round: getComputedStyle(layer.querySelector('.bcv-rubmorph__disc')).borderRadius, ringBox: Math.round(ring.width),
-      bigPx: getComputedStyle(layer.querySelector('.bcv-rubmorph__big')).fontSize, // (2.98.89: the ring nearly the button's width, the points not)
-      solid: /linear-gradient/.test(getComputedStyle(layer.querySelector('.bcv-rubmorph__disc')).backgroundImage) && !/rgba\(.*, 0\)$/.test(getComputedStyle(layer.querySelector('.bcv-rubmorph__disc')).backgroundColor), // (over the ground it stands on: what it covers is not seen through)
-      centred: Math.abs((d.left + d.right) / 2 - (br.left + br.right) / 2) < 1 && Math.abs((d.top + d.bottom) / 2 - (br.top + br.bottom) / 2) < 1,
-      pieces: rgb.length, green: rgb.some(([r, g]) => g > r + 80), amber: rgb.some(([r, g, b]) => r > 200 && g > 140 && b < 100 && r > g + 25) };
+    const pill = layer.querySelector('.bcv-rubmorph__pill'), d = pill.getBoundingClientRect(), band = layer.querySelector('.bcv-rubmorph__band').getBoundingClientRect(), mid = layer.querySelector('.bcv-rubmorph__mid').getBoundingClientRect();
+    const paths = [...layer.querySelectorAll('.bcv-rubmorph__band path')];
+    const rgb = paths.map((x) => x.getAttribute('stroke').match(/\d+/g).map(Number));
+    return { morph: b.classList.contains('is-morph'), mid: layer.querySelector('.bcv-rubmorph__mid').innerText.replace(/\s+/g, ' ').trim(), words: getComputedStyle(b).color, ground: getComputedStyle(b).backgroundColor, hidden: layer.getAttribute('aria-hidden'), presses: getComputedStyle(layer).pointerEvents,
+      w: Math.round(br.width), h: Math.round(br.height), pill: [Math.round(d.width), Math.round(d.height)], round: getComputedStyle(pill).borderRadius, band: [Math.round(band.width), Math.round(band.height)],
+      bigPx: getComputedStyle(layer.querySelector('.bcv-rubmorph__big')).fontSize,
+      solid: /linear-gradient/.test(getComputedStyle(pill).backgroundImage) && !/rgba\(.*, 0\)$/.test(getComputedStyle(pill).backgroundColor), // (over the ground it stands on: what it covers is not seen through)
+      centred: Math.abs((d.left + d.right) / 2 - (br.left + br.right) / 2) < 1 && Math.abs((d.top + d.bottom) / 2 - (br.top + br.bottom) / 2) < 1 && Math.abs((mid.left + mid.right) / 2 - (br.left + br.right) / 2) < 1.5 && Math.abs((mid.top + mid.bottom) / 2 - (br.top + br.bottom) / 2) < 1.5,
+      pieces: paths.length, drawn: paths.every((x) => parseFloat(x.style.strokeDasharray) > 4), green: rgb.some(([r, g]) => g > r + 80), amber: rgb.some(([r, g, bl]) => r > 200 && g > 140 && bl < 100 && r > g + 25) };
   }) : {};
-  check(morphed && morphAt.ring && morphAt.mid === '8 of 10' && morphAt.words === 'rgba(0, 0, 0, 0)' && morphAt.ground === 'rgba(0, 0, 0, 0)' && morphAt.disc.join() === '83,83' && morphAt.round === '41.5px' && morphAt.ringBox === 83 && morphAt.bigPx === '14.4px' && morphAt.solid && morphAt.centred
-    && morphAt.w === rubBtn.w && morphAt.h === rubBtn.h && morphAt.pieces > 40 && morphAt.green && morphAt.amber && morphAt.hidden === 'true' && morphAt.presses === 'none',
-    `the pointer on the Rubric button turns it into the ring in miniature — an 83 px disc on the 92 px button, solid (the points their own size), green and amber, "8 of 10" in the middle, its words gone, its place kept: ${JSON.stringify({ ...morphAt, btn: [rubBtn.w, rubBtn.h] })}`);
-  check((await page.locator('.bcv-detail__actions').getByRole('button', { name: 'Rubric', exact: true }).count()) === 1, 'it is still the Rubric button to a screen reader (the ring is drawn, not said)');
+  const pillH = Math.round(Math.max(42, Math.min(56, rubBtn.h + 14))), pillW = Math.round(Math.max(pillH * 2.6, Math.min(200, rubBtn.w + 44)));
+  check(morphed && morphAt.morph && morphAt.mid === '8 of 10' && morphAt.words === 'rgba(0, 0, 0, 0)' && morphAt.ground === 'rgba(0, 0, 0, 0)' && morphAt.pill.join() === `${pillW},${pillH}` && morphAt.round === `${pillH / 2}px` && morphAt.band.join() === `${pillW},${pillH}` && morphAt.bigPx === `${+(pillH * 0.36).toFixed(2)}px` && morphAt.solid && morphAt.centred
+    && morphAt.w === rubBtn.w && morphAt.h === rubBtn.h && morphAt.pieces === 2 && morphAt.drawn && morphAt.green && morphAt.amber && morphAt.hidden === 'true' && morphAt.presses === 'none',
+    `the pointer on the Rubric button grows it into a larger pill — ${pillW} × ${pillH} on the ${rubBtn.w} × ${rubBtn.h} button, solid — its band traced round its edge, a piece per criterion in green and amber, "8 of 10" in the middle, its words gone, its place kept: ${JSON.stringify({ ...morphAt, btn: [rubBtn.w, rubBtn.h] })}`);
+  check((await page.locator('.bcv-detail__actions').getByRole('button', { name: 'Rubric', exact: true }).count()) === 1, 'it is still the Rubric button to a screen reader (the pill is drawn, not said)');
   await shot(page, '14q-rubric-morph');
   await page.mouse.move(8, 8);
-  const unmorphed = await eventually(() => page.evaluate(() => { const b = document.querySelector('.bcv-detail__actions .bcv-rubbtn'); return !b.querySelector('.bcv-rubmorph') && !b.classList.contains('is-ring') && getComputedStyle(b).color !== 'rgba(0, 0, 0, 0)'; }), 3000);
+  const unmorphed = await eventually(() => page.evaluate(() => { const b = document.querySelector('.bcv-detail__actions .bcv-rubbtn'); return !b.querySelector('.bcv-rubmorph') && !b.classList.contains('is-morph') && getComputedStyle(b).color !== 'rgba(0, 0, 0, 0)'; }), 3000);
   check(unmorphed && (await texts('.bcv-detail__actions .bcv-rubbtn'))[0] === 'Rubric', 'and back to the Rubric button as the pointer leaves');
   await page.click('.bcv-detail__actions .bcv-rubbtn');
   await page.waitForSelector('.bcv-rr-ov .bcv-rr__label', { timeout: 8000 });

@@ -1114,68 +1114,51 @@
     return api;
   }
 
-  // ---- the morph (2.98.87): a rubric button the pointer rests on turns into the ring in miniature — the pill
-  // drawing in to a disc, its words going, the ring's band blooming round the disc's edge in its colours (the
-  // grades' once marked and posted) and the points in the middle, as the full ring's centre has them; back to
-  // the button as the pointer leaves, from wherever it had got to. The press opens the full ring.
-  let morphed = null; // { btn, layer, disc, ring, mid, p, to, raf, watch, bw, bh, r0, D }
-  /** The ring itself, small (a 100-unit square): the band in short filled pieces, each the colour running between
-   *  the slices' middles at its place — as the full ring's, without its frame loop. */
-  function miniRing(m, D) {
-    const S = 100, C = S / 2, RO = 49, k = RO / R;
-    const { seg, n } = m;
+  // ---- the morph (2.98.87; a pill since 2.98.100): a rubric button the pointer rests on grows into a larger pill —
+  // its words going, the ring's band tracing round the pill's edge, a piece per criterion as long as its share of the
+  // points and in its colour (the grades' once marked and posted), and the points in the middle, as the full ring's
+  // centre has them; back to the button as the pointer leaves, from wherever it had got to. The press opens the ring.
+  let morphed = null; // { btn, layer, pill, band, pieces, mid, p, to, raf, watch, bw, bh, r0, W, H }
+  /** The band round a W × H pill: a piece per criterion along the pill's edge (from the top middle, clockwise, as
+   *  the ring's slices go round), each as thick as the ring has it — growing inward, its outer edge on the pill's. */
+  function miniPill(m, W, H) {
     const svg = document.createElementNS(SVG, 'svg');
-    svg.setAttribute('viewBox', `0 0 ${S} ${S}`);
-    svg.setAttribute('class', 'bcv-rubmorph__ring');
-    const mids = seg.map(([a0, a1]) => (a0 + a1) / 2);
-    const between = (th) => {
-      if (n === 1) return [0, 0, 0];
-      let x = th - mids[0];
-      x -= Math.floor(x / TAU) * TAU;
-      let j = n - 1;
-      while (j > 0 && mids[j] - mids[0] > x) j--;
-      const lo = mids[j] - mids[0], hi = j + 1 < n ? mids[j + 1] - mids[0] : TAU;
-      return [j, (j + 1) % n, (1 - Math.cos((Math.PI * (x - lo)) / (hi - lo))) / 2];
-    };
-    const at = (vals, b) => vals[b[0]] + (vals[b[1]] - vals[b[0]]) * b[2];
+    svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    svg.setAttribute('class', 'bcv-rubmorph__band');
     const cols = m.graded ? m.grades : m.hues;
-    const thin = Math.min(1, Math.sqrt(60 / D)); // (a larger ring's band grows less than it does)
-    const TH = m.thick.map((t) => Math.max(5, Math.min(15, t * 0.9)) * thin); // (far thicker than to scale: it reads at this size)
-    const GO = m.bend.map((b) => b * k * 1.5);
-    const p = (r, a) => `${f(C + r * Math.sin(a))} ${f(C - r * Math.cos(a))}`;
-    const STEP = Math.PI / 40;
-    seg.forEach(([a0, a1]) => {
-      const N = Math.max(2, Math.ceil((a1 - a0) / STEP));
-      for (let j = 0; j < N; j++) {
-        const t0 = a0 + ((a1 - a0) * j) / N, t1 = a0 + ((a1 - a0) * (j + 1)) / N + (n > 1 || j < N - 1 ? 0.006 : 0);
-        const b0 = between(t0), b1 = between(t1), bm = between((t0 + t1) / 2);
-        const out0 = RO + at(GO, b0), out1 = RO + at(GO, b1); // (thicker inward: the outer edge on the disc's)
-        const in0 = out0 - at(TH, b0), in1 = out1 - at(TH, b1);
-        const path = document.createElementNS(SVG, 'path');
-        path.setAttribute('d', `M${p(out0, t0)} L${p(out1, t1)} L${p(in1, t1)} L${p(in0, t0)} Z`);
-        path.setAttribute('fill', css(mix(cols[bm[0]], cols[bm[1]], bm[2])));
-        svg.append(path);
-      }
+    const pieces = m.seg.map(([a0, a1], i) => {
+      const t = Math.max(3, Math.min(6.5, m.thick[i] * 0.24)); // (thicker the more of the rubric it carries)
+      const ins = t / 2 + 1.25, rr = H / 2 - ins;
+      const len = 2 * (W - H) + 2 * Math.PI * rr; // (the line the piece runs along: two straight sides and two half circles)
+      const path = document.createElementNS(SVG, 'path');
+      path.setAttribute('d', `M${f(W / 2)} ${f(ins)} H${f(W - H / 2)} A${f(rr)} ${f(rr)} 0 0 1 ${f(W - H / 2)} ${f(H - ins)} H${f(H / 2)} A${f(rr)} ${f(rr)} 0 0 1 ${f(H / 2)} ${f(ins)} Z`);
+      path.setAttribute('fill', 'none');
+      path.setAttribute('stroke', css(cols[i]));
+      path.setAttribute('stroke-width', f(t));
+      const gap = m.n > 1 ? Math.min(3, len * 0.012) : 0;
+      const from = (a0 / TAU) * len + gap / 2, run = Math.max(0.5, ((a1 - a0) / TAU) * len - gap);
+      path.style.strokeDashoffset = f(-from);
+      svg.append(path);
+      return { path, run, len };
     });
-    return svg;
+    return { svg, pieces };
   }
-  /** Where the morph stands, p from 0 (the button) to 1 (the ring): the disc first, then the band, then the points
-   *  — and back the same way, so a leave mid-way turns round where it is. */
+  /** Where the morph stands, p from 0 (the button) to 1 (the pill): the pill grows first, then the band traces round
+   *  it, then the points — and back the same way, so a leave mid-way turns round where it is. */
   function paintMorph(o) {
     const d = span(o.p, 0, 0.7), r = span(o.p, 0.2, 0.9), l = span(o.p, 0.45, 1);
-    const w = o.bw + (o.D - o.bw) * d, hh = o.bh + (o.D - o.bh) * d;
-    o.disc.style.width = `${f(w)}px`;
-    o.disc.style.height = `${f(hh)}px`;
-    o.disc.style.borderRadius = `${f(o.r0 + (o.D / 2 - o.r0) * d)}px`;
-    o.disc.style.boxShadow = d > 0.01 ? `0 ${f(4 * d)}px ${f(14 * d)}px rgba(0,0,0,${(0.16 * d).toFixed(3)})` : ''; // (lifted off what it covers)
-    o.ring.style.opacity = f(r);
-    o.ring.style.transform = `rotate(${f(-80 * (1 - r))}deg) scale(${(0.55 + 0.45 * r).toFixed(3)})`;
+    o.pill.style.width = `${f(o.bw + (o.W - o.bw) * d)}px`;
+    o.pill.style.height = `${f(o.bh + (o.H - o.bh) * d)}px`;
+    o.pill.style.borderRadius = `${f(o.r0 + (o.H / 2 - o.r0) * d)}px`;
+    o.pill.style.boxShadow = d > 0.01 ? `0 ${f(4 * d)}px ${f(14 * d)}px rgba(0,0,0,${(0.16 * d).toFixed(3)})` : ''; // (lifted off what it covers)
+    o.band.style.opacity = f(Math.min(1, r * 1.6));
+    for (const pc of o.pieces) pc.path.style.strokeDasharray = `${f(pc.run * r)} ${f(pc.len)}`; // (each piece drawn out from its start)
     o.mid.style.opacity = f(l);
-    o.mid.style.transform = `scale(${(0.75 + 0.25 * l).toFixed(3)})`;
+    o.mid.style.transform = `translate(-50%, -50%) scale(${(0.8 + 0.2 * l).toFixed(3)})`;
   }
   function driveMorph(o, to) {
     o.to = to;
-    if (to > 0) o.btn.classList.add('is-ring');
+    if (to > 0) o.btn.classList.add('is-morph');
     if (U.reducedMotion()) { cancelAnimationFrame(o.raf); o.raf = 0; o.p = to; paintMorph(o); if (!to) endMorph(o); return; }
     if (o.raf) return;
     let last = null;
@@ -1190,15 +1173,15 @@
     };
     o.raf = requestAnimationFrame(step);
   }
-  /** Back to the button: its words fade back in over the disc (the pill again), then the disc goes. */
+  /** Back to the button: its words fade back in over the pill, then the pill goes. */
   function endMorph(o) {
     if (morphed === o) morphed = null;
     clearInterval(o.watch);
     cancelAnimationFrame(o.raf);
-    o.btn.classList.remove('is-ring');
-    setTimeout(() => { if (!o.btn.classList.contains('is-ring')) o.layer.remove(); }, 200);
+    o.btn.classList.remove('is-morph');
+    setTimeout(() => { if (!o.btn.classList.contains('is-morph')) o.layer.remove(); }, 200);
   }
-  /** Turn `btn` (a rubric button) into the ring in miniature, for the assignment and submission it opens. */
+  /** Turn `btn` (a rubric button) into the larger pill with its band and points, for the assignment and submission it opens. */
   function morph(btn, a, sub) {
     if (morphed?.btn === btn) { driveMorph(morphed, 1); return morphed.layer; }
     if (morphed) { const o = morphed; o.p = 0; paintMorph(o); endMorph(o); }
@@ -1208,21 +1191,21 @@
     btn.querySelector(':scope > .bcv-rubmorph')?.remove();
     const cs = getComputedStyle(btn);
     const bw = btn.offsetWidth, bh = btn.offsetHeight;
-    const T = Math.round(Math.max(48, Math.min(64, bh + 14))); // (the points' size goes by this)
-    const D = Math.round(Math.max(T * 1.25, Math.min(bw * 0.9, 96))); // (the ring nearly the button's width, the points not)
+    const H = Math.round(Math.max(42, Math.min(56, bh + 14))); // (a pill a size up from the button: the points read in it)
+    const W = Math.round(Math.max(H * 2.6, Math.min(200, bw + 44)));
     const big = pts(m.graded ? m.earned : m.max);
-    const mid = h('span', { class: 'bcv-rubmorph__mid', style: { '--fit': Math.min(1, 3.4 / big.length).toFixed(3) } }, [
+    const mid = h('span', { class: 'bcv-rubmorph__mid' }, [
       h('b', { class: 'bcv-rubmorph__big', text: big }),
       h('span', { class: 'bcv-rubmorph__of', text: m.graded ? `of ${pts(m.max)}` : m.max === 1 ? 'pt' : 'pts' }),
     ]);
-    // the disc is the button's colour over the ground it stands on, so what it grows over is covered, not seen through
+    // the pill is the button's colour over the ground it stands on, so what it grows over is covered, not seen through
     let ground = '';
     for (let el = btn.parentElement; el && !ground; el = el.parentElement) { const c = getComputedStyle(el).backgroundColor; if (!/^rgba\(.*,\s*0\)$|^transparent$/.test(c)) ground = c; }
-    const disc = h('span', { class: 'bcv-rubmorph__disc', style: { background: ground ? `linear-gradient(${cs.backgroundColor}, ${cs.backgroundColor}) ${ground}` : cs.backgroundColor } });
-    const ring = miniRing(m, D);
-    const layer = h('span', { class: 'bcv-rubmorph', 'aria-hidden': 'true', style: { '--d': `${D}px`, '--t': `${T}px` } }, [disc, ring, mid]);
+    const pill = h('span', { class: 'bcv-rubmorph__pill', style: { background: ground ? `linear-gradient(${cs.backgroundColor}, ${cs.backgroundColor}) ${ground}` : cs.backgroundColor } });
+    const { svg: band, pieces } = miniPill(m, W, H);
+    const layer = h('span', { class: 'bcv-rubmorph', 'aria-hidden': 'true', style: { '--w': `${W}px`, '--h': `${H}px` } }, [pill, band, mid]);
     btn.append(layer);
-    const o = { btn, layer, disc, ring, mid, p: 0, to: 0, raf: 0, bw, bh, D, r0: Math.min(bh / 2, parseFloat(cs.borderTopLeftRadius) || 0) };
+    const o = { btn, layer, pill, band, pieces, mid, p: 0, to: 0, raf: 0, bw, bh, W, H, r0: Math.min(bh / 2, parseFloat(cs.borderTopLeftRadius) || 0) };
     paintMorph(o);
     morphed = o;
     // back with its button off the page at once; with the pointer no longer on it (a leave the page never told), as a leave

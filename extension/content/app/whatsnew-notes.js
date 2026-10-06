@@ -25,6 +25,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.98.100', date: '2026-10-06', notes: [
+      { kind: 'improved', title: 'Rubric pill on hover', body: 'Hovering it grows a pill with the points, not a ring.', icon: P.toggle },
+    ] },
     { version: '2.98.99', date: '2026-10-06', notes: [
       { kind: 'new', title: 'A new file viewer', body: 'PDFs open here: zoom, go to a page, turn and find.', icon: P.scroll },
       { kind: 'new', title: 'Word files open here', body: 'A Word file opens as a PDF made on this device.', icon: P.pen },
