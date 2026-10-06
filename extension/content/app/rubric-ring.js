@@ -1116,16 +1116,15 @@
 
   // ---- the morph (2.98.87; a pill since 2.98.100): a rubric button the pointer rests on grows into a larger pill —
   // to its right, from its own left edge (to its left where the right has no room), so it covers nothing before it —
-  // its words going, the ring's band tracing round the pill's edge, and the points in the middle, as the full ring's
+  // its words going, the ring's band floating in round the pill's edge, and the points in the middle, as the full ring's
   // centre has them; back to the button as the pointer leaves, from wherever it had got to. The press opens the ring.
-  let morphed = null; // { btn, layer, pill, band, reveal, L, mid, p, to, raf, watch, bw, bh, r0, W, H, left }
-  let maskSeq = 0;
+  let morphed = null; // { btn, layer, pill, band, mid, p, to, raf, watch, bw, bh, r0, W, H, left }
   /** The band round a W × H pill, drawn as the ring's is (2.98.101): short filled pieces along the pill's edge, from
    *  the top middle clockwise as the ring's slices go round, each criterion as long as its share of the points, and
    *  its colour, thickness and bend carried smoothly from one criterion's middle into the next — no gaps, no steps.
    *  Thicker the more of the rubric a criterion carries (inward, its outer edge on the pill's); marked and posted,
-   *  out where the work did well and in where it lost points, in the grades' colours. A mask along the edge draws it
-   *  out from its start as the pill grows. */
+   *  out where the work did well and in where it lost points, in the grades' colours. All of it comes in at once
+   *  (paintMorph floats it in from just outside the pill, 2.98.103), not drawn round from its start. */
   function miniPill(m, W, H) {
     const svg = document.createElementNS(SVG, 'svg');
     svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
@@ -1165,8 +1164,6 @@
     for (let s = 0; s < L; s += 2) marks.add(s);
     const cuts = [...marks].filter((s) => s >= 0 && s <= L).sort((a, b) => a - b);
     const g = document.createElementNS(SVG, 'g');
-    const id = `bcv-rubmask-${++maskSeq}`;
-    g.setAttribute('mask', `url(#${id})`);
     const edge = (s) => { const b = between((s / L) * TAU); const o = IN - lerp(GO, b); return [o, o + lerp(TH, b)]; };
     for (let k = 0; k + 1 < cuts.length; k++) {
       const s0 = cuts[k], s1 = cuts[k + 1] + 0.35; // (a hair's overlap: no seam shows between pieces, the last one over the first)
@@ -1178,35 +1175,25 @@
       path.setAttribute('fill', css(mix(cols[bm[0]], cols[bm[1]], bm[2])));
       g.append(path);
     }
-    // the mask: a wide line along the edge, drawn out from its start (its dashes set as the morph goes)
-    const defs = document.createElementNS(SVG, 'defs');
-    const mask = document.createElementNS(SVG, 'mask');
-    mask.setAttribute('id', id);
-    mask.setAttribute('maskUnits', 'userSpaceOnUse');
-    mask.setAttribute('x', '-12'); mask.setAttribute('y', '-12'); mask.setAttribute('width', String(W + 24)); mask.setAttribute('height', String(H + 24));
-    const MD = 5, mr = r - MD;
-    const reveal = document.createElementNS(SVG, 'path');
-    reveal.setAttribute('d', `M${f(W / 2)} ${f(MD)} H${f(W - r)} A${f(mr)} ${f(mr)} 0 0 1 ${f(W - r)} ${f(H - MD)} H${f(r)} A${f(mr)} ${f(mr)} 0 0 1 ${f(r)} ${f(MD)} Z`);
-    reveal.setAttribute('fill', 'none');
-    reveal.setAttribute('stroke', '#fff');
-    reveal.setAttribute('stroke-width', '20');
-    mask.append(reveal);
-    defs.append(mask);
-    svg.append(defs, g);
-    return { svg, reveal, L: 2 * S + 2 * Math.PI * mr };
+    svg.append(g);
+    return svg;
   }
-  /** Where the morph stands, p from 0 (the button) to 1 (the pill): the pill grows first, then the band traces round
-   *  it, then the points — and back the same way, so a leave mid-way turns round where it is. */
+  const FLOAT = 9; // px: how far outside the pill's edge, on every side, the band starts before it floats in
+  /** Where the morph stands, p from 0 (the button) to 1 (the pill): the pill grows first; the whole band floats in from
+   *  just outside it to its edge as it reaches its size, every colour at once; then the points — and back the same way,
+   *  so a leave mid-way turns round where it is. */
   function paintMorph(o) {
-    const d = span(o.p, 0, 0.7), r = span(o.p, 0.2, 0.9), l = span(o.p, 0.45, 1);
+    const d = span(o.p, 0, 0.7), b = span(o.p, 0.25, 0.9), l = span(o.p, 0.45, 1);
     const w = o.bw + (o.W - o.bw) * d;
     o.pill.style.width = `${f(w)}px`;
     o.pill.style.height = `${f(o.bh + (o.H - o.bh) * d)}px`;
     o.pill.style.left = `${f(o.left ? o.bw - w : 0)}px`; // (grown from the button's own edge)
     o.pill.style.borderRadius = `${f(o.r0 + (o.H / 2 - o.r0) * d)}px`;
     o.pill.style.boxShadow = d > 0.01 ? `0 ${f(4 * d)}px ${f(14 * d)}px rgba(0,0,0,${(0.16 * d).toFixed(3)})` : ''; // (lifted off what it covers)
-    o.band.style.opacity = f(Math.min(1, r * 1.6));
-    o.reveal.style.strokeDasharray = `${f(o.L * r + (r >= 1 ? 2 : 0))} ${f(o.L + 2)}`; // (the band drawn out from its start)
+    const e = 1 - (1 - b) ** 3; // (eased out: it drifts in and settles)
+    const out = FLOAT * (1 - e);
+    o.band.style.opacity = f(Math.min(1, e * 1.25));
+    o.band.style.transform = out > 0.01 ? `scale(${((o.W + 2 * out) / o.W).toFixed(4)}, ${((o.H + 2 * out) / o.H).toFixed(4)})` : ''; // (the same distance out on every side, shrinking to nothing)
     o.mid.style.opacity = f(l);
     o.mid.style.transform = `translate(-50%, -50%) scale(${(0.8 + 0.2 * l).toFixed(3)})`;
   }
@@ -1256,7 +1243,7 @@
     let ground = '';
     for (let el = btn.parentElement; el && !ground; el = el.parentElement) { const c = getComputedStyle(el).backgroundColor; if (!/^rgba\(.*,\s*0\)$|^transparent$/.test(c)) ground = c; }
     const pill = h('span', { class: 'bcv-rubmorph__pill', style: { background: ground ? `linear-gradient(${cs.backgroundColor}, ${cs.backgroundColor}) ${ground}` : cs.backgroundColor } });
-    const { svg: band, reveal, L } = miniPill(m, W, H);
+    const band = miniPill(m, W, H);
     // to the right, from the button's left edge — unless the right has no room (the window's edge, or a box that cuts off what leaves it)
     const br = btn.getBoundingClientRect();
     let limit = innerWidth - 8;
@@ -1265,7 +1252,7 @@
     const x0 = left ? bw - W : 0;
     const layer = h('span', { class: 'bcv-rubmorph', 'aria-hidden': 'true', dataset: { grow: left ? 'left' : 'right' }, style: { '--w': `${W}px`, '--h': `${H}px`, '--x0': `${x0}px` } }, [pill, band, mid]);
     btn.append(layer);
-    const o = { btn, layer, pill, band, reveal, L, mid, left, p: 0, to: 0, raf: 0, bw, bh, W, H, r0: Math.min(bh / 2, parseFloat(cs.borderTopLeftRadius) || 0) };
+    const o = { btn, layer, pill, band, mid, left, p: 0, to: 0, raf: 0, bw, bh, W, H, r0: Math.min(bh / 2, parseFloat(cs.borderTopLeftRadius) || 0) };
     paintMorph(o);
     morphed = o;
     // back with its button off the page at once; with the pointer no longer on it (a leave the page never told), as a leave

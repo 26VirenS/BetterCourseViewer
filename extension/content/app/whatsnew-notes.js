@@ -25,6 +25,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.98.103', date: '2026-10-06', notes: [
+      { kind: 'improved', title: 'Rubric pill floats in', body: 'Its colours float in round the pill, all at once.', icon: P.toggle },
+    ] },
     { version: '2.98.102', date: '2026-10-06', notes: [
       { kind: 'improved', title: 'Snappier widgets', body: 'Pinned widgets open quicker and without stutter.', icon: P.layers },
       { kind: 'fixed', title: 'No stray widgets', body: 'A widget no longer pops open as the row slides.', icon: P.pin },
