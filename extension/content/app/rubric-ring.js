@@ -1115,44 +1115,98 @@
   }
 
   // ---- the morph (2.98.87; a pill since 2.98.100): a rubric button the pointer rests on grows into a larger pill —
-  // its words going, the ring's band tracing round the pill's edge, a piece per criterion as long as its share of the
-  // points and in its colour (the grades' once marked and posted), and the points in the middle, as the full ring's
+  // to its right, from its own left edge (to its left where the right has no room), so it covers nothing before it —
+  // its words going, the ring's band tracing round the pill's edge, and the points in the middle, as the full ring's
   // centre has them; back to the button as the pointer leaves, from wherever it had got to. The press opens the ring.
-  let morphed = null; // { btn, layer, pill, band, pieces, mid, p, to, raf, watch, bw, bh, r0, W, H }
-  /** The band round a W × H pill: a piece per criterion along the pill's edge (from the top middle, clockwise, as
-   *  the ring's slices go round), each as thick as the ring has it — growing inward, its outer edge on the pill's. */
+  let morphed = null; // { btn, layer, pill, band, reveal, L, mid, p, to, raf, watch, bw, bh, r0, W, H, left }
+  let maskSeq = 0;
+  /** The band round a W × H pill, drawn as the ring's is (2.98.101): short filled pieces along the pill's edge, from
+   *  the top middle clockwise as the ring's slices go round, each criterion as long as its share of the points, and
+   *  its colour, thickness and bend carried smoothly from one criterion's middle into the next — no gaps, no steps.
+   *  Thicker the more of the rubric a criterion carries (inward, its outer edge on the pill's); marked and posted,
+   *  out where the work did well and in where it lost points, in the grades' colours. A mask along the edge draws it
+   *  out from its start as the pill grows. */
   function miniPill(m, W, H) {
     const svg = document.createElementNS(SVG, 'svg');
     svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
     svg.setAttribute('class', 'bcv-rubmorph__band');
+    const { seg, n } = m;
+    const r = H / 2, S = W - H, L = 2 * S + 2 * Math.PI * r; // (the pill's edge: two straight sides and two half circles)
+    // a point `d` in from the pill's edge at `s` along it (from the top middle, clockwise)
+    const at = (s, d) => {
+      s = ((s % L) + L) % L;
+      if (s < S / 2) return [W / 2 + s, d];
+      s -= S / 2;
+      if (s < Math.PI * r) { const a = -Math.PI / 2 + s / r; return [W - r + (r - d) * Math.cos(a), r + (r - d) * Math.sin(a)]; }
+      s -= Math.PI * r;
+      if (s < S) return [W - r - s, H - d];
+      s -= S;
+      if (s < Math.PI * r) { const a = Math.PI / 2 + s / r; return [r + (r - d) * Math.cos(a), r + (r - d) * Math.sin(a)]; }
+      return [r + (s - Math.PI * r), d];
+    };
+    // between which two criteria's middles a place along the edge falls, and how far (eased), as the ring blends them
+    const mids = seg.map(([a0, a1]) => (a0 + a1) / 2);
+    const between = (th) => {
+      if (n === 1) return [0, 0, 0];
+      let x = th - mids[0];
+      x -= Math.floor(x / TAU) * TAU;
+      let j = n - 1;
+      while (j > 0 && mids[j] - mids[0] > x) j--;
+      const lo = mids[j] - mids[0], hi = j + 1 < n ? mids[j + 1] - mids[0] : TAU;
+      return [j, (j + 1) % n, (1 - Math.cos((Math.PI * (x - lo)) / (hi - lo))) / 2];
+    };
+    const lerp = (vals, b) => vals[b[0]] + (vals[b[1]] - vals[b[0]]) * b[2];
     const cols = m.graded ? m.grades : m.hues;
-    const pieces = m.seg.map(([a0, a1], i) => {
-      const t = Math.max(3, Math.min(6.5, m.thick[i] * 0.24)); // (thicker the more of the rubric it carries)
-      const ins = t / 2 + 1.25, rr = H / 2 - ins;
-      const len = 2 * (W - H) + 2 * Math.PI * rr; // (the line the piece runs along: two straight sides and two half circles)
+    const TH = m.thick.map((t) => Math.max(3.5, Math.min(7, t * 0.3)));
+    const GO = m.bend.map((b) => Math.max(-5, Math.min(3.5, b * 0.35))); // (out a few pixels past the edge where it did well, in where it lost points)
+    const IN = 1.25; // (the band's outer edge, unbent: this far in from the pill's)
+    // the places the pieces start: every couple of pixels, and every corner of the edge, so no piece cuts one
+    const marks = new Set([0, S / 2, S / 2 + Math.PI * r, S / 2 + Math.PI * r + S, S / 2 + 2 * Math.PI * r + S, L]);
+    for (let s = 0; s < L; s += 2) marks.add(s);
+    const cuts = [...marks].filter((s) => s >= 0 && s <= L).sort((a, b) => a - b);
+    const g = document.createElementNS(SVG, 'g');
+    const id = `bcv-rubmask-${++maskSeq}`;
+    g.setAttribute('mask', `url(#${id})`);
+    const edge = (s) => { const b = between((s / L) * TAU); const o = IN - lerp(GO, b); return [o, o + lerp(TH, b)]; };
+    for (let k = 0; k + 1 < cuts.length; k++) {
+      const s0 = cuts[k], s1 = cuts[k + 1] + 0.35; // (a hair's overlap: no seam shows between pieces, the last one over the first)
+      if (s1 - s0 < 0.01) continue;
+      const [o0, i0] = edge(s0), [o1, i1] = edge(s1), bm = between((((s0 + s1) / 2) / L) * TAU);
+      const pts4 = [at(s0, o0), at(s1, o1), at(s1, i1), at(s0, i0)].map(([x, y]) => `${f(x)} ${f(y)}`);
       const path = document.createElementNS(SVG, 'path');
-      path.setAttribute('d', `M${f(W / 2)} ${f(ins)} H${f(W - H / 2)} A${f(rr)} ${f(rr)} 0 0 1 ${f(W - H / 2)} ${f(H - ins)} H${f(H / 2)} A${f(rr)} ${f(rr)} 0 0 1 ${f(H / 2)} ${f(ins)} Z`);
-      path.setAttribute('fill', 'none');
-      path.setAttribute('stroke', css(cols[i]));
-      path.setAttribute('stroke-width', f(t));
-      const gap = m.n > 1 ? Math.min(3, len * 0.012) : 0;
-      const from = (a0 / TAU) * len + gap / 2, run = Math.max(0.5, ((a1 - a0) / TAU) * len - gap);
-      path.style.strokeDashoffset = f(-from);
-      svg.append(path);
-      return { path, run, len };
-    });
-    return { svg, pieces };
+      path.setAttribute('d', `M${pts4[0]} L${pts4[1]} L${pts4[2]} L${pts4[3]} Z`);
+      path.setAttribute('fill', css(mix(cols[bm[0]], cols[bm[1]], bm[2])));
+      g.append(path);
+    }
+    // the mask: a wide line along the edge, drawn out from its start (its dashes set as the morph goes)
+    const defs = document.createElementNS(SVG, 'defs');
+    const mask = document.createElementNS(SVG, 'mask');
+    mask.setAttribute('id', id);
+    mask.setAttribute('maskUnits', 'userSpaceOnUse');
+    mask.setAttribute('x', '-12'); mask.setAttribute('y', '-12'); mask.setAttribute('width', String(W + 24)); mask.setAttribute('height', String(H + 24));
+    const MD = 5, mr = r - MD;
+    const reveal = document.createElementNS(SVG, 'path');
+    reveal.setAttribute('d', `M${f(W / 2)} ${f(MD)} H${f(W - r)} A${f(mr)} ${f(mr)} 0 0 1 ${f(W - r)} ${f(H - MD)} H${f(r)} A${f(mr)} ${f(mr)} 0 0 1 ${f(r)} ${f(MD)} Z`);
+    reveal.setAttribute('fill', 'none');
+    reveal.setAttribute('stroke', '#fff');
+    reveal.setAttribute('stroke-width', '20');
+    mask.append(reveal);
+    defs.append(mask);
+    svg.append(defs, g);
+    return { svg, reveal, L: 2 * S + 2 * Math.PI * mr };
   }
   /** Where the morph stands, p from 0 (the button) to 1 (the pill): the pill grows first, then the band traces round
    *  it, then the points — and back the same way, so a leave mid-way turns round where it is. */
   function paintMorph(o) {
     const d = span(o.p, 0, 0.7), r = span(o.p, 0.2, 0.9), l = span(o.p, 0.45, 1);
-    o.pill.style.width = `${f(o.bw + (o.W - o.bw) * d)}px`;
+    const w = o.bw + (o.W - o.bw) * d;
+    o.pill.style.width = `${f(w)}px`;
     o.pill.style.height = `${f(o.bh + (o.H - o.bh) * d)}px`;
+    o.pill.style.left = `${f(o.left ? o.bw - w : 0)}px`; // (grown from the button's own edge)
     o.pill.style.borderRadius = `${f(o.r0 + (o.H / 2 - o.r0) * d)}px`;
     o.pill.style.boxShadow = d > 0.01 ? `0 ${f(4 * d)}px ${f(14 * d)}px rgba(0,0,0,${(0.16 * d).toFixed(3)})` : ''; // (lifted off what it covers)
     o.band.style.opacity = f(Math.min(1, r * 1.6));
-    for (const pc of o.pieces) pc.path.style.strokeDasharray = `${f(pc.run * r)} ${f(pc.len)}`; // (each piece drawn out from its start)
+    o.reveal.style.strokeDasharray = `${f(o.L * r + (r >= 1 ? 2 : 0))} ${f(o.L + 2)}`; // (the band drawn out from its start)
     o.mid.style.opacity = f(l);
     o.mid.style.transform = `translate(-50%, -50%) scale(${(0.8 + 0.2 * l).toFixed(3)})`;
   }
@@ -1202,10 +1256,16 @@
     let ground = '';
     for (let el = btn.parentElement; el && !ground; el = el.parentElement) { const c = getComputedStyle(el).backgroundColor; if (!/^rgba\(.*,\s*0\)$|^transparent$/.test(c)) ground = c; }
     const pill = h('span', { class: 'bcv-rubmorph__pill', style: { background: ground ? `linear-gradient(${cs.backgroundColor}, ${cs.backgroundColor}) ${ground}` : cs.backgroundColor } });
-    const { svg: band, pieces } = miniPill(m, W, H);
-    const layer = h('span', { class: 'bcv-rubmorph', 'aria-hidden': 'true', style: { '--w': `${W}px`, '--h': `${H}px` } }, [pill, band, mid]);
+    const { svg: band, reveal, L } = miniPill(m, W, H);
+    // to the right, from the button's left edge — unless the right has no room (the window's edge, or a box that cuts off what leaves it)
+    const br = btn.getBoundingClientRect();
+    let limit = innerWidth - 8;
+    for (let el = btn.parentElement; el && el !== document.body; el = el.parentElement) { const st = getComputedStyle(el); if (st.overflowX !== 'visible') { limit = Math.min(limit, el.getBoundingClientRect().right - 4); break; } }
+    const left = br.left + W > limit && br.right - W >= 8;
+    const x0 = left ? bw - W : 0;
+    const layer = h('span', { class: 'bcv-rubmorph', 'aria-hidden': 'true', dataset: { grow: left ? 'left' : 'right' }, style: { '--w': `${W}px`, '--h': `${H}px`, '--x0': `${x0}px` } }, [pill, band, mid]);
     btn.append(layer);
-    const o = { btn, layer, pill, band, pieces, mid, p: 0, to: 0, raf: 0, bw, bh, W, H, r0: Math.min(bh / 2, parseFloat(cs.borderTopLeftRadius) || 0) };
+    const o = { btn, layer, pill, band, reveal, L, mid, left, p: 0, to: 0, raf: 0, bw, bh, W, H, r0: Math.min(bh / 2, parseFloat(cs.borderTopLeftRadius) || 0) };
     paintMorph(o);
     morphed = o;
     // back with its button off the page at once; with the pointer no longer on it (a leave the page never told), as a leave

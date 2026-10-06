@@ -14,7 +14,7 @@
 
 html[data-bcv-theme] {
   --bcv-line: max(1px, var(--bcv-dpx, 1px)); /* a hairline drawn as a shadow: one CSS pixel, or one screen pixel where that is more (below 100% zoom; content/early.js keeps --bcv-dpx) */
-  --bcv-version: "2.98.100"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.98.101"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -1581,10 +1581,10 @@ html[data-bcv-theme="dark"] .bcv-rr-ov { --rr-dim0: .52; --rr-dim1: .78; }
 .bcv-rubbtn { position: relative; isolation: isolate; }
 .bcv-rubbtn:not(.is-morph) { transition: transform .16s var(--bcv-spring-snappy), filter .16s ease, background .16s ease, color .14s ease; }
 .bcv-rubbtn.is-morph { background: transparent !important; color: transparent !important; transition: transform .16s var(--bcv-spring-snappy), filter .16s ease, color .1s ease; }
-.bcv-rubmorph { position: absolute; left: 50%; top: 50%; z-index: -1; width: 0; height: 0; pointer-events: none; color: var(--bcv-ink); }
-.bcv-rubmorph__pill { position: absolute; left: 0; top: 0; transform: translate(-50%, -50%); }
-.bcv-rubmorph__band { position: absolute; left: calc(var(--w) / -2); top: calc(var(--h) / -2); width: var(--w); height: var(--h); display: block; overflow: visible; }
-.bcv-rubmorph__mid { position: absolute; left: 0; top: 0; display: flex; align-items: baseline; gap: 4px; white-space: nowrap; transform-origin: 50% 50%; }
+.bcv-rubmorph { position: absolute; left: 0; top: 50%; z-index: -1; width: 0; height: 0; pointer-events: none; color: var(--bcv-ink); } /* (the button's left edge, half way down: the pill grows from there) */
+.bcv-rubmorph__pill { position: absolute; left: 0; top: 0; transform: translateY(-50%); }
+.bcv-rubmorph__band { position: absolute; left: var(--x0); top: calc(var(--h) / -2); width: var(--w); height: var(--h); display: block; overflow: visible; }
+.bcv-rubmorph__mid { position: absolute; left: calc(var(--x0) + var(--w) / 2); top: 0; display: flex; align-items: baseline; gap: 4px; white-space: nowrap; transform-origin: 50% 50%; }
 .bcv-rubmorph__big { font: 700 calc(var(--h) * .36)/1 var(--bcv-display, var(--bcv-font)); letter-spacing: -.02em; font-variant-numeric: tabular-nums; color: var(--bcv-ink); }
 .bcv-rubmorph__of { font: 600 calc(var(--h) * .24)/1 var(--bcv-font); color: var(--bcv-ink3); }
 /* the ring's place on the stage, drawn as nothing: the guided tour lights round it (welcome.js, its 'ring' steps) */
