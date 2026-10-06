@@ -346,8 +346,11 @@ struct OK: Codable {
 enum Route: Hashable {
     case web(url: String, title: String)
     case notifications
+    case calendar
 }
 
+/// The tab bar: four tabs and Search (iOS shows five at most before it folds the rest into More; the
+/// Calendar is pushed from Today and To Do instead, 1.1).
 enum AppTab: String, Hashable, CaseIterable {
-    case today, courses, todo, grades, calendar, search
+    case today, courses, todo, grades, search
 }

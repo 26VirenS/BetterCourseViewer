@@ -72,7 +72,7 @@ struct NotificationsView: View {
                 .padding(.horizontal, 14)
                 .padding(.vertical, 8)
                 .foregroundStyle(filter == key ? Color.white : Color.primary)
-                .glassCapsule(tint: .accentColor, on: filter == key)
+                .chipBackground(on: filter == key)
         }
         .buttonStyle(.plain)
     }

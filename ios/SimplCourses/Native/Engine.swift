@@ -78,7 +78,9 @@ final class Engine: ObservableObject, ShellListener {
         web.onFinish = { [weak self] url in self?.pageFinished(url) }
         web.onOpenInShell = { [weak self] url in self?.openWeb(url.absoluteString, title: "") }
         // the simulator suite's screens (.github/workflows/ios-shots.yml): -SimplTab courses
-        if let t = UserDefaults.standard.string(forKey: "SimplTab"), let first = AppTab(rawValue: t) { tab = first }
+        if let t = UserDefaults.standard.string(forKey: "SimplTab") {
+            if t == "calendar" { tab = .todo; paths[.todo] = [.calendar] } else if let first = AppTab(rawValue: t) { tab = first }
+        }
     }
 
     func start() {
@@ -220,10 +222,22 @@ final class Engine: ObservableObject, ShellListener {
         paths[tab] = path
     }
 
+    /// The Calendar, pushed on the stack showing (it has no tab of its own).
+    func openCalendar() {
+        var path = paths[tab]
+        if path.last != .calendar { path.append(.calendar) }
+        paths[tab] = path
+    }
+
     private func switchTab(_ name: String) {
         if name == "notifications" {
             tab = .today
             paths[.today] = [.notifications]
+            return
+        }
+        if name == "calendar" { // (a link to the calendar in a page: To Do, with the Calendar on it)
+            tab = .todo
+            paths[.todo] = [.calendar]
             return
         }
         let t = AppTab(rawValue: name) ?? .today

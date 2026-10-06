@@ -25,6 +25,11 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.1', date: '2026-10-06', notes: [
+      { kind: 'fixed', title: 'Rubric pill lets go', body: 'It always folds away once the pointer leaves the button.', icon: P.check },
+      { kind: 'improved', title: 'Smoother Rubric pill', body: 'It grows and folds on a spring, turning round mid-way.', icon: P.toggle },
+      { kind: 'improved', title: 'iPhone: four tabs', body: 'Calendar opens from Today and To Do; no More tab.', icon: P.layers },
+    ] },
     { version: '2.99', date: '2026-10-06', notes: [
       { kind: 'new', title: 'A real iPhone app', body: "Apple's own tab bar, screens and sheets over Canvas.", icon: P.sparkle },
       { kind: 'new', title: 'Liquid Glass bars', body: 'The bars and buttons wear iOS 26 glass.', icon: P.layers },

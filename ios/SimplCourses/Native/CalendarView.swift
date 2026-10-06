@@ -24,12 +24,25 @@ struct CalendarView: View {
     var body: some View {
         List {
             Section {
-                Picker("View", selection: $view) {
-                    Text("Week").tag("week")
-                    Text("Month").tag("month")
-                    Text("List").tag("list")
+                // (pushed from Today or To Do, its bar holds Back: the arrows sit by the view they move)
+                HStack(spacing: 10) {
+                    if view != "list" {
+                        Button { shift(-1) } label: { Image(systemName: "chevron.left").frame(width: 34, height: 34) }
+                            .accessibilityLabel("Previous")
+                    }
+                    Picker("View", selection: $view) {
+                        Text("Week").tag("week")
+                        Text("Month").tag("month")
+                        Text("List").tag("list")
+                    }
+                    .pickerStyle(.segmented)
+                    if view != "list" {
+                        Button { shift(1) } label: { Image(systemName: "chevron.right").frame(width: 34, height: 34) }
+                            .accessibilityLabel("Next")
+                    }
                 }
-                .pickerStyle(.segmented)
+                .buttonStyle(.borderless)
+                .font(.body.weight(.semibold))
                 .listRowBackground(Color.clear)
                 .listRowInsets(EdgeInsets())
             }
@@ -46,12 +59,6 @@ struct CalendarView: View {
         .overlay { if data == nil { LoadState(error: error) { Task { await load() } } } }
         .navigationTitle(title)
         .toolbar {
-            ToolbarItemGroup(placement: .topBarLeading) {
-                if view != "list" {
-                    Button { shift(-1) } label: { Image(systemName: "chevron.left") }.accessibilityLabel("Previous")
-                    Button { shift(1) } label: { Image(systemName: "chevron.right") }.accessibilityLabel("Next")
-                }
-            }
             ToolbarItem(placement: .topBarTrailing) {
                 Button("Today") {
                     Haptics.tap()
@@ -66,7 +73,6 @@ struct CalendarView: View {
                     .accessibilityLabel("Calendars")
             }
         }
-        .shellToolbar()
         .refreshable { await load() }
         .task {
             if let v = try? await engine.call("calView", as: OK.self).view { view = v }

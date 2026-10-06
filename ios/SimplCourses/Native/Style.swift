@@ -48,27 +48,37 @@ extension Color {
 }
 
 extension View {
-    /// Liquid Glass on iOS 26 (the surface Apple's own bars and controls are made of); a material before it.
-    @ViewBuilder
-    func glassCard(cornerRadius: CGFloat = 22, interactive: Bool = false, tint: Color? = nil) -> some View {
-        if #available(iOS 26.0, *) {
-            let base: Glass = tint.map { Glass.regular.tint($0.opacity(0.18)) } ?? .regular
-            self.glassEffect(interactive ? base.interactive() : base, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-        } else {
-            self.background(.regularMaterial, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+    /// A card in the content (a counter): the grouped list's own cell colour, a tint over it when it calls for
+    /// attention. (Liquid Glass is for the bars and controls over the content, as in Apple's apps — glass tiles
+    /// in a list drew a grey band behind their row.)
+    func contentCard(cornerRadius: CGFloat = 20, tint: Color? = nil) -> some View {
+        self.background {
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                .fill(Color(.secondarySystemGroupedBackground))
+                .overlay {
+                    if let tint {
+                        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous).fill(tint.opacity(0.14))
+                    }
+                }
         }
     }
 
-    /// A capsule of glass (chips, filters) on iOS 26; a tinted capsule before it.
-    @ViewBuilder
-    func glassCapsule(tint: Color? = nil, on: Bool = false) -> some View {
-        if #available(iOS 26.0, *) {
-            let base: Glass = on ? .regular.tint((tint ?? .accentColor).opacity(0.55)) : .regular
-            self.glassEffect(base.interactive(), in: Capsule())
-        } else {
-            self.background(on ? AnyShapeStyle((tint ?? .accentColor).opacity(0.22)) : AnyShapeStyle(.thinMaterial), in: Capsule())
-        }
+    /// A filter chip: the accent when chosen (white words), the cell colour when not.
+    func chipBackground(on: Bool, tint: Color = .accentColor) -> some View {
+        self.background(on ? AnyShapeStyle(tint) : AnyShapeStyle(Color(.secondarySystemGroupedBackground)), in: Capsule())
     }
+}
+
+/// A card's press: it gives a little under the finger and springs back, as Apple's own tiles do.
+struct PressScale: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.96 : 1)
+            .animation(.spring(response: 0.25, dampingFraction: 0.7), value: configuration.isPressed)
+    }
+}
+
+extension View {
 
     /// The tab bar shrinks to its active tab as a list scrolls down (iOS 26), as Apple's own apps do.
     @ViewBuilder

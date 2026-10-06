@@ -1118,7 +1118,7 @@
   // to its right, from its own left edge (to its left where the right has no room), so it covers nothing before it —
   // its words going, the ring's band floating in round the pill's edge, and the points in the middle, as the full ring's
   // centre has them; back to the button as the pointer leaves, from wherever it had got to. The press opens the ring.
-  let morphed = null; // { btn, layer, pill, band, mid, p, to, raf, watch, bw, bh, r0, W, H, left }
+  let morphed = null; // { btn, layer, pill, band, mid, p, v, to, raf, guard, watch, away, out, done, bw, bh, r0, W, H, left }
   /** The band round a W × H pill, drawn as the ring's is (2.98.101): short filled pieces along the pill's edge, from
    *  the top middle clockwise as the ring's slices go round, each criterion as long as its share of the points, and
    *  its colour, thickness and bend carried smoothly from one criterion's middle into the next — no gaps, no steps.
@@ -1127,7 +1127,7 @@
    *  (paintMorph floats it in from just outside the pill, 2.98.103), not drawn round from its start. */
   function miniPill(m, W, H) {
     const svg = document.createElementNS(SVG, 'svg');
-    svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    svg.setAttribute('viewBox', `${-PAD} ${-PAD} ${W + 2 * PAD} ${H + 2 * PAD}`); // (room round the pill for what bends out past its edge: nothing is drawn outside the band's own box)
     svg.setAttribute('class', 'bcv-rubmorph__band');
     const { seg, n } = m;
     const r = H / 2, S = W - H, L = 2 * S + 2 * Math.PI * r; // (the pill's edge: two straight sides and two half circles)
@@ -1179,6 +1179,7 @@
     return svg;
   }
   const FLOAT = 9; // px: how far outside the pill's edge, on every side, the band starts before it floats in
+  const PAD = 4; // px: the band's box reaches this far past the pill on every side (its bends out stay inside it)
   /** Where the morph stands, p from 0 (the button) to 1 (the pill): the pill grows first; the whole band floats in from
    *  just outside it to its edge as it reaches its size, every colour at once; then the points — and back the same way,
    *  so a leave mid-way turns round where it is. */
@@ -1194,43 +1195,86 @@
     const out = FLOAT * (1 - e);
     o.band.style.opacity = f(Math.min(1, e * 1.25));
     o.band.style.transform = out > 0.01 ? `scale(${((o.W + 2 * out) / o.W).toFixed(4)}, ${((o.H + 2 * out) / o.H).toFixed(4)})` : ''; // (the same distance out on every side, shrinking to nothing)
+    // (2.99.1) on its own layer while it floats: a scale the page repaints round could leave a faint copy of an early,
+    // larger frame on the page after the pointer had left; settled, back on the page, drawn sharp
+    o.band.style.willChange = out > 0.01 ? 'transform, opacity' : '';
     o.mid.style.opacity = f(l);
     o.mid.style.transform = `translate(-50%, -50%) scale(${(0.8 + 0.2 * l).toFixed(3)})`;
   }
+  // (2.99.1) p moves on a critically damped spring — no overshoot, and a leave or a return part-way turns round with
+  // the speed it had instead of jolting into reverse — stepped exactly for however long a frame took, so a slow
+  // frame never stalls it. Most of the grow is done in about 0.35 s, of the fold in about 0.25 s.
+  const GROW = 11, FOLD = 15; // the spring's rate (1/s), growing and folding
+  const WORDS_BACK = 0.15; // folding, the button's words start back below this p (the pill nearly its size again)
   function driveMorph(o, to) {
+    if (o.done) return;
     o.to = to;
+    clearTimeout(o.guard);
     if (to > 0) o.btn.classList.add('is-morph');
-    if (U.reducedMotion()) { cancelAnimationFrame(o.raf); o.raf = 0; o.p = to; paintMorph(o); if (!to) endMorph(o); return; }
+    // a fold always finishes: frames that stop coming (a hidden page, a throttled window) cannot leave the pill standing
+    else o.guard = setTimeout(() => finishMorph(o), 900);
+    if (U.reducedMotion()) { cancelAnimationFrame(o.raf); o.raf = 0; o.p = to; o.v = 0; paintMorph(o); if (!to) endMorph(o); return; }
     if (o.raf) return;
     let last = null;
     const step = (now) => {
-      if (last === null) last = now; // (timed from the first frame, on the frames' own clock)
-      const dt = Math.min(48, now - last);
-      last = now;
-      o.p = o.to > o.p ? Math.min(o.to, o.p + dt / 420) : Math.max(o.to, o.p - dt / 300);
-      paintMorph(o);
-      if (o.p === o.to) { o.raf = 0; if (!o.to) endMorph(o); return; }
+      o.raf = 0;
+      if (o.done) return;
+      try {
+        const dt = last === null ? 1 / 60 : Math.min(0.05, Math.max(0, now - last) / 1000);
+        last = now;
+        const w = o.to ? GROW : FOLD, x0 = o.p - o.to, c = o.v + w * x0, k = Math.exp(-w * dt);
+        const x = (x0 + c * dt) * k;
+        o.v = (o.v - w * c * dt) * k;
+        o.p = o.to + x;
+        // there: past the end it was going to (it never shows past it), or close enough that nothing visible is left
+        // (folding, under a tenth of a pixel of pill; growing, the points fully in and nearly still)
+        if (o.to ? o.p >= 1 || (1 - o.p < 0.004 && Math.abs(o.v) < 0.05) : o.p < 0.02) { o.p = o.to; o.v = 0; }
+        paintMorph(o);
+        if (!o.to && o.p < WORDS_BACK) o.btn.classList.remove('is-morph'); // (the words fade back in as the pill settles, not after)
+        if (o.p === o.to) { if (!o.to) endMorph(o); return; }
+      } catch {
+        finishMorph(o);
+        return;
+      }
       o.raf = requestAnimationFrame(step);
     };
     o.raf = requestAnimationFrame(step);
   }
-  /** Back to the button: its words fade back in over the pill, then the pill goes. */
-  function endMorph(o) {
+  /** Straight back to the button, from wherever it is (a fold that could not run, a button gone, another morph). */
+  function finishMorph(o) {
+    if (o.done) return;
+    o.p = 0; o.v = 0; o.to = 0;
+    try { paintMorph(o); } catch {}
+    endMorph(o, true);
+  }
+  /** Back to the button: its words fade back in over the pill, then the pill goes — and every timer and frame of it with it. */
+  function endMorph(o, now = false) {
+    if (o.done) return;
+    o.done = true;
     if (morphed === o) morphed = null;
     clearInterval(o.watch);
+    clearTimeout(o.guard);
     cancelAnimationFrame(o.raf);
+    o.raf = 0;
+    document.removeEventListener('visibilitychange', o.away);
+    document.removeEventListener('mouseout', o.out);
     o.btn.classList.remove('is-morph');
-    setTimeout(() => { if (!o.btn.classList.contains('is-morph')) o.layer.remove(); }, 200);
+    if (now) o.layer.remove();
+    else setTimeout(() => o.layer.remove(), 180); // (once the words are back: the button's colour comes back over .16s)
   }
   /** Turn `btn` (a rubric button) into the larger pill with its band and points, for the assignment and submission it opens. */
   function morph(btn, a, sub) {
     if (morphed?.btn === btn) { driveMorph(morphed, 1); return morphed.layer; }
-    if (morphed) { const o = morphed; o.p = 0; paintMorph(o); endMorph(o); }
+    if (morphed) finishMorph(morphed);
     if (live || !btn?.isConnected) return null;
     const m = model(a, sub);
     if (!m.n) return null;
-    btn.querySelector(':scope > .bcv-rubmorph')?.remove();
+    for (const old of btn.querySelectorAll(':scope > .bcv-rubmorph')) old.remove();
+    // its colour as it settles, not part-way back from the last fold (the pill would come out see-through)
+    btn.style.transition = 'none';
     const cs = getComputedStyle(btn);
+    const bg = cs.backgroundColor;
+    btn.style.transition = '';
     const bw = btn.offsetWidth, bh = btn.offsetHeight;
     const H = Math.round(Math.max(42, Math.min(56, bh + 14))); // (a pill a size up from the button: the points read in it)
     const W = Math.round(Math.max(H * 2.6, Math.min(200, bw + 44)));
@@ -1242,7 +1286,7 @@
     // the pill is the button's colour over the ground it stands on, so what it grows over is covered, not seen through
     let ground = '';
     for (let el = btn.parentElement; el && !ground; el = el.parentElement) { const c = getComputedStyle(el).backgroundColor; if (!/^rgba\(.*,\s*0\)$|^transparent$/.test(c)) ground = c; }
-    const pill = h('span', { class: 'bcv-rubmorph__pill', style: { background: ground ? `linear-gradient(${cs.backgroundColor}, ${cs.backgroundColor}) ${ground}` : cs.backgroundColor } });
+    const pill = h('span', { class: 'bcv-rubmorph__pill', style: { background: ground ? `linear-gradient(${bg}, ${bg}) ${ground}` : bg } });
     const band = miniPill(m, W, H);
     // to the right, from the button's left edge — unless the right has no room (the window's edge, or a box that cuts off what leaves it)
     const br = btn.getBoundingClientRect();
@@ -1250,15 +1294,21 @@
     for (let el = btn.parentElement; el && el !== document.body; el = el.parentElement) { const st = getComputedStyle(el); if (st.overflowX !== 'visible') { limit = Math.min(limit, el.getBoundingClientRect().right - 4); break; } }
     const left = br.left + W > limit && br.right - W >= 8;
     const x0 = left ? bw - W : 0;
-    const layer = h('span', { class: 'bcv-rubmorph', 'aria-hidden': 'true', dataset: { grow: left ? 'left' : 'right' }, style: { '--w': `${W}px`, '--h': `${H}px`, '--x0': `${x0}px` } }, [pill, band, mid]);
+    const layer = h('span', { class: 'bcv-rubmorph', 'aria-hidden': 'true', dataset: { grow: left ? 'left' : 'right' }, style: { '--w': `${W}px`, '--h': `${H}px`, '--x0': `${x0}px`, '--pad': `${PAD}px` } }, [pill, band, mid]);
     btn.append(layer);
-    const o = { btn, layer, pill, band, mid, left, p: 0, to: 0, raf: 0, bw, bh, W, H, r0: Math.min(bh / 2, parseFloat(cs.borderTopLeftRadius) || 0) };
+    const o = { btn, layer, pill, band, mid, left, p: 0, v: 0, to: 0, raf: 0, guard: 0, done: false, bw, bh, W, H, r0: Math.min(bh / 2, parseFloat(cs.borderTopLeftRadius) || 0) };
     paintMorph(o);
     morphed = o;
     // back with its button off the page at once; with the pointer no longer on it (a leave the page never told), as a leave
     o.watch = setInterval(() => {
-      if (!btn.isConnected) { o.p = 0; endMorph(o); } else if (o.to && !btn.matches(':hover')) driveMorph(o, 0);
+      if (!btn.isConnected) finishMorph(o);
+      else if (o.to && !btn.matches(':hover')) driveMorph(o, 0);
     }, 400);
+    // the page hidden (frames stop), or the pointer gone out of the window: straight back / folded
+    o.away = () => { if (document.hidden) finishMorph(o); };
+    o.out = (e) => { if (!e.relatedTarget && o.to) driveMorph(o, 0); };
+    document.addEventListener('visibilitychange', o.away);
+    document.addEventListener('mouseout', o.out);
     driveMorph(o, 1);
     return layer;
   }

@@ -64,7 +64,8 @@ struct Splash: View {
     }
 }
 
-/// Apple's tab bar (Liquid Glass on iOS 26, minimising as a list scrolls), a stack per tab, and a search tab.
+/// Apple's tab bar (Liquid Glass on iOS 26, minimising as a list scrolls), a stack per tab, and a search tab —
+/// four tabs and Search, so none is folded into More; the Calendar is pushed from Today and To Do.
 struct NativeShell: View {
     @EnvironmentObject private var engine: Engine
 
@@ -81,9 +82,6 @@ struct NativeShell: View {
             }
             Tab("Grades", systemImage: "chart.bar.fill", value: AppTab.grades) {
                 stack(.grades) { GradesView() }
-            }
-            Tab("Calendar", systemImage: "calendar", value: AppTab.calendar) {
-                stack(.calendar) { CalendarView() }
             }
             Tab(value: AppTab.search, role: .search) {
                 stack(.search) { SearchView() }
@@ -102,19 +100,33 @@ struct NativeShell: View {
                         WebScreen(url: url, title: title)
                     case .notifications:
                         NotificationsView()
+                    case .calendar:
+                        CalendarView()
                     }
                 }
         }
     }
 }
 
-/// The bell (Notifications) and the account menu, at the top right of a root screen.
+/// The Calendar, the bell (Notifications) and the account menu, at the top right of a root screen.
 struct ShellToolbar: ViewModifier {
     var bell = false
+    var calendar = false
     @EnvironmentObject private var engine: Engine
 
     func body(content: Content) -> some View {
         content.toolbar {
+            if calendar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        Haptics.tap()
+                        engine.openCalendar()
+                    } label: {
+                        Image(systemName: "calendar")
+                    }
+                    .accessibilityLabel("Calendar")
+                }
+            }
             if bell {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
@@ -135,7 +147,7 @@ struct ShellToolbar: ViewModifier {
 }
 
 extension View {
-    func shellToolbar(bell: Bool = false) -> some View { modifier(ShellToolbar(bell: bell)) }
+    func shellToolbar(bell: Bool = false, calendar: Bool = false) -> some View { modifier(ShellToolbar(bell: bell, calendar: calendar)) }
 }
 
 /// What the web interface kept under the avatar on a phone (Inbox, Groups, Tools, the appearance,

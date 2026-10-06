@@ -81,7 +81,7 @@ struct TodoView: View {
                 .accessibilityLabel("Add a task")
             }
         }
-        .shellToolbar()
+        .shellToolbar(calendar: true)
         .task(id: engine.dataVersion) { await load() }
         .sheet(isPresented: $adding) {
             AddTaskSheet(courses: data?.courses ?? [], repeats: data?.repeats ?? []) {

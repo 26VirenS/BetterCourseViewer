@@ -27,6 +27,9 @@ rm -f "$OUT/warmup.png"
 
 for mode in light dark; do
   xcrun simctl ui booted appearance "$mode" || true
+  # (the first launch after the appearance changes can come up behind the home screen: one launch to settle it, not pictured)
+  launch "$mode-settle" 16
+  rm -f "$OUT/$mode-settle.png" "$OUT/console-$mode-settle.txt"
   launch "$mode-01-today" 22
   launch "$mode-02-courses" 14 -SimplTab courses
   launch "$mode-03-todo" 14 -SimplTab todo

@@ -76,7 +76,7 @@ struct TodayView: View {
             }
         }
         .navigationTitle("Today")
-        .shellToolbar(bell: true)
+        .shellToolbar(bell: true, calendar: true)
         .task(id: engine.dataVersion) { await load() }
         .sheet(item: $sheet) { key in
             ItemsSheet(key: key.id) { url in
@@ -113,9 +113,10 @@ struct TodayView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 14)
             .padding(.vertical, 12)
-            .glassCard(cornerRadius: 20, interactive: true, tint: red ? .red : nil)
+            .contentCard(cornerRadius: 20, tint: red ? .red : nil)
+            .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressScale())
         .animation(.snappy, value: value)
     }
 
