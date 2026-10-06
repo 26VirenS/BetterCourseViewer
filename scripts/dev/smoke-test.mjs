@@ -138,7 +138,12 @@ if (on('bundles')) {
     check(pbx.includes(`path = ../../../extension/${entry};`), `Mac app bundles extension/${entry}`);
   }
   check(pbx.split(`MARKETING_VERSION = ${manifest.version};`).length === 5, `Mac app version is ${manifest.version}`);
-  check(iosYml.includes(`MARKETING_VERSION: "${manifest.version}"`), `iOS app version is ${manifest.version}`);
+  // the iPhone app has its own version line (1.0 and up), in step between its spec and its committed project; its build number counts up with it
+  const iosPbx = readFileSync(join(root, 'ios', 'SimplCourses.xcodeproj', 'project.pbxproj'), 'utf8');
+  const iosVer = (iosYml.match(/MARKETING_VERSION: "(\d+\.\d+(?:\.\d+)?)"/) || [])[1];
+  const iosBuild = (iosYml.match(/CURRENT_PROJECT_VERSION: "(\d+)"/) || [])[1];
+  const major = iosVer ? Number(iosVer.split('.')[0]) : 0; // (1.x: the app's own line, well below the interface's numbers)
+  check(!!iosVer && major >= 1 && major < 2 && iosPbx.split(`MARKETING_VERSION = ${iosVer};`).length === 3 && !!iosBuild && iosPbx.split(`CURRENT_PROJECT_VERSION = ${iosBuild};`).length === 3, `iOS app has its own version, ${iosVer} (${iosBuild}), the same in project.yml and the committed project`);
   // the two stamps the page compares with the manifest (Safari can run one version's script with another's stylesheet after an update): bumped with the rest
   const settingsJs = readFileSync(join(extDir, 'lib', 'settings.js'), 'utf8');
   const appCss = readFileSync(join(extDir, 'content', 'styles', 'app.css'), 'utf8');
@@ -8051,7 +8056,7 @@ try {
   await options.reload();
   await options.waitForSelector('#dev.is-active', { timeout: 5000 });
   const devOpen = await options.evaluate(() => ({ tabs: [...document.querySelectorAll('#devTabs .devtab')].map((b) => `${b.textContent}${b.classList.contains('is-on') ? '*' : ''}`).join(','), shown: [...document.querySelectorAll('#dev .devpane')].filter((p) => !p.hidden).map((p) => p.dataset.pane).join(','), from: document.getElementById('devFrom').value, froms: document.querySelectorAll('#devFromList option').length, nav: !!document.querySelector('.navlink[data-section="dev"].is-active') }));
-  check(devOpen.tabs === 'Simulate*,Quiz,Rubric,State,Storage,Tool tabs' && devOpen.shown === 'sim' && /^\d+\.\d+\.\d+$/.test(devOpen.from) && devOpen.froms > 20 && devOpen.nav, `the Developer section opens on its tabs, Simulate first, offering every version What's New has notes for: ${JSON.stringify(devOpen)}`);
+  check(devOpen.tabs === 'Simulate*,Quiz,Rubric,State,Storage,Tool tabs' && devOpen.shown === 'sim' && /^\d+\.\d+(\.\d+)?$/.test(devOpen.from) && devOpen.froms > 20 && devOpen.nav, `the Developer section opens on its tabs, Simulate first, offering every version What's New has notes for: ${JSON.stringify(devOpen)}`);
   // Quiz: a switch writes the flag a quiz reads as an attempt opens
   await options.click('#devTabs [data-pane="quiz"]');
   await options.click('#devQuizImport');
@@ -8235,7 +8240,7 @@ try {
   await options.fill('#devFrom', '2.98.19');
   const reloaded = page.waitForEvent('load', { timeout: 15000 }).then(() => true).catch(() => false);
   await options.click('#devSimRun');
-  check(await eventually(async () => /^Updated from 2\.98\.19 to \d+\.\d+\.\d+: \d+ Canvas tabs? loaded again/.test(await options.$eval('#devSimMsg', (e) => e.textContent)), 8000), `Simulate says what it did: ${await options.$eval('#devSimMsg', (e) => e.textContent)}`);
+  check(await eventually(async () => /^Updated from 2\.98\.19 to \d+\.\d+(\.\d+)?: \d+ Canvas tabs? loaded again/.test(await options.$eval('#devSimMsg', (e) => e.textContent)), 8000), `Simulate says what it did: ${await options.$eval('#devSimMsg', (e) => e.textContent)}`);
   const simFlags = await sw.evaluate(async () => { const f = await self.BCV.api.storage.local.get(['whatsnew:from', 'welcome:report1', 'welcome:look5']); return { from: f['whatsnew:from'], report: 'welcome:report1' in f, look: 'welcome:look5' in f }; });
   check((await reloaded) && simFlags.from === '2.98.19' && !simFlags.report && !simFlags.look, `and the update is played again: the Canvas tab loads again with the flags an update from 2.98.19 leaves: ${JSON.stringify(simFlags)}`);
   await page.bringToFront();

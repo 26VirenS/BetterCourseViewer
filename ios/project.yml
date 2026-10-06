@@ -12,7 +12,7 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.9"
-    MARKETING_VERSION: "2.98.103"
+    MARKETING_VERSION: "1.0" # the iPhone app's own version, from 1.0 up (the interface it carries is numbered by extension/manifest.json)
     CURRENT_PROJECT_VERSION: "1"
     CODE_SIGN_STYLE: Automatic
 targets:

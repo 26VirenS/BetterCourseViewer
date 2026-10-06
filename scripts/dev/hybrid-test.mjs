@@ -95,7 +95,7 @@ try {
     const none = await browser.runtime.sendMessage({ type: 'nobody-handles-this' });
     return { name: m.name, version: m.version, status, none };
   });
-  check(api.name === 'Simpl Courses' && /^\d+\.\d+\.\d+$/.test(api.version), `runtime.getManifest comes from the bundled manifest: ${api.name} ${api.version}`);
+  check(api.name === 'Simpl Courses' && /^\d+\.\d+(\.\d+)?$/.test(api.version), `runtime.getManifest comes from the bundled manifest: ${api.name} ${api.version}`);
   check(api.status && api.status.ok === true && api.status.normal === true && typeof api.status.code === 'string' && api.none === undefined, `one-shot messages reach background.js inside the page: ${JSON.stringify(api.status)}`);
   check(errors.length === 0, `no page errors while mounting${errors.length ? `: ${errors.slice(0, 3).join(' | ')}` : ''}`);
 

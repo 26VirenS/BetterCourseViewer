@@ -36,11 +36,9 @@ final class AppSession: ObservableObject {
     private var bag = Set<AnyCancellable>()
 
     init() {
-        // the simulator suite's storage, written before the first page reads it (-SimplSeed '{"setup:done":true,…}')
-        if let seed = UserDefaults.standard.string(forKey: "SimplSeed"), let data = seed.data(using: .utf8),
-           let items = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-            Bridge.shared.seed(items)
-        }
+        // the simulator suite (-SimplDemo YES): the guided setup and the first-run notes marked done, as for a
+        // student who has used the app, before the first page reads them
+        if UserDefaults.standard.bool(forKey: "SimplDemo") { Bridge.shared.seed(AppSession.demoSeed()) }
         colorScheme = AppSession.scheme(from: Bridge.shared.settings)
         NotificationCenter.default.publisher(for: .simplOpenSettings)
             .receive(on: RunLoop.main)
@@ -108,7 +106,25 @@ final class AppSession: ObservableObject {
         }
     }
 
+    /// The app's own version (1.0 and up), with its build.
     static var version: String {
-        (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? ""
+        let v = (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? ""
+        let b = (Bundle.main.infoDictionary?["CFBundleVersion"] as? String) ?? ""
+        return b.isEmpty ? v : "\(v) (\(b))"
+    }
+
+    /// The version of the extension the app carries (extension/manifest.json), which numbers the interface's releases.
+    static var extensionVersion: String {
+        (ScriptBundle.manifest()["version"] as? String) ?? ""
+    }
+
+    /// What a student who has used the app has in storage: the setup done, the first-run pointers seen, this version's notes read.
+    static func demoSeed() -> [String: Any] {
+        let background = ScriptBundle.file("background.js")
+        var flow = 3
+        if let r = background.range(of: #"const SETUP_FLOW = (\d+)"#, options: .regularExpression) {
+            flow = Int(background[r].split(separator: " ").last ?? "3") ?? 3
+        }
+        return ["setup:offered": true, "setup:done": true, "welcome:search": true, "tools:welcomed": true, "setup:flow": flow, "whatsnew:seen": extensionVersion]
     }
 }

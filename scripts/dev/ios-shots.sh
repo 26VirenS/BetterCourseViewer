@@ -7,21 +7,23 @@ set -u
 OUT="${OUT:-shots}"
 mkdir -p "$OUT"
 BID=com.simplcourses.app
-VER=$(node -p "require('./extension/manifest.json').version")
-FLOW=$(node -e "const s=require('fs').readFileSync('extension/background.js','utf8');console.log((s.match(/const SETUP_FLOW = (\d+)/)||[])[1]||3)")
-SEED="{\"setup:offered\":true,\"setup:done\":true,\"welcome:search\":true,\"tools:welcomed\":true,\"setup:flow\":${FLOW},\"whatsnew:seen\":\"${VER}\"}"
 xcrun simctl status_bar booted override --time 9:41 --batteryState charged --batteryLevel 100 --cellularBars 4 --wifiBars 3 >/dev/null 2>&1 || true
 
-# launch <name> <wait> [args…]: the app afresh with the mock as its Canvas, then a picture after <wait> seconds
+# launch <name> <wait> [args…]: the app afresh with the mock as its Canvas (as a student who has used it:
+# -SimplDemo), then a picture after <wait> seconds
 launch() {
   local name="$1" wait="$2"
   shift 2
   xcrun simctl terminate booted "$BID" >/dev/null 2>&1 || true
   sleep 1
-  xcrun simctl launch --console-pty booted "$BID" -SimplBaseURL http://localhost:8800 -setupOpened YES -SimplSeed "$SEED" "$@" > "$OUT/console-$name.txt" 2>&1 &
+  xcrun simctl launch --console-pty booted "$BID" -SimplBaseURL http://localhost:8800 -setupOpened YES -SimplDemo YES "$@" > "$OUT/console-$name.txt" 2>&1 &
   sleep "$wait"
   xcrun simctl io booted screenshot "$OUT/$name.png" >/dev/null 2>&1 && echo "shot $name" || echo "no shot $name"
 }
+
+# a first launch to warm the simulator (the first start of a fresh install is slow), not pictured
+launch warmup 40
+rm -f "$OUT/warmup.png"
 
 for mode in light dark; do
   xcrun simctl ui booted appearance "$mode" || true

@@ -45,6 +45,7 @@ struct SettingsSheet: View {
                             .onAppear { web.loadIfNeeded() }
                     }
                     LabeledContent("Version", value: AppSession.version)
+                    LabeledContent("Interface", value: AppSession.extensionVersion)
                 } header: {
                     Text("Simpl Courses")
                 } footer: {

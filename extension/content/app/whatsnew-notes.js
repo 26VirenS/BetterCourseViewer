@@ -25,6 +25,11 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99', date: '2026-10-06', notes: [
+      { kind: 'new', title: 'A real iPhone app', body: "Apple's own tab bar, screens and sheets over Canvas.", icon: P.sparkle },
+      { kind: 'new', title: 'Liquid Glass bars', body: 'The bars and buttons wear iOS 26 glass.', icon: P.layers },
+      { kind: 'new', title: 'Taps you can feel', body: 'Ticks, switches and swipes tap back on the iPhone.', icon: P.toggle },
+    ] },
     { version: '2.98.103', date: '2026-10-06', notes: [
       { kind: 'improved', title: 'Rubric pill floats in', body: 'Its colours float in round the pill, all at once.', icon: P.toggle },
     ] },

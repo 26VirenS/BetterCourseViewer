@@ -256,7 +256,7 @@ try {
   check(await eventually(async () => !(await page.$('.bcv-sheet-ov')), 3000), 'and at the top of the list, a pull down takes the sheet away');
   check(errors.length === 0, `no page errors${errors.length ? `: ${errors.slice(0, 3).join(' | ')}` : ''}`);
 
-  // ---- the app's own chrome (2.98.104): the page as the engine under Apple's tab bar and screens ----
+  // ---- the app's own chrome (2.99): the page as the engine under Apple's tab bar and screens ----
   console.log('the app\'s own chrome (native shell)');
   const shellCtx = await browser.newContext({ viewport: { width: 402, height: 874 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
   fastMotion(shellCtx);

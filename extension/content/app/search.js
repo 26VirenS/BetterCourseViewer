@@ -312,7 +312,7 @@
   /** The index's rows and Canvas's for the same kind, one list: no row twice, the index's first. */
   const merge = (a, b) => { const seen = new Set(); const out = []; for (const it of [...a, ...b]) { const k = it.href || it.url || it.title; if (!seen.has(k)) { seen.add(k); out.push(it); } } return out.slice(0, cap()); };
 
-  /** The same search without the box (2.98.104: the iPhone app's own search field, content/app/native-app.js):
+  /** The same search without the box (2.99: the iPhone app's own search field, content/app/native-app.js):
    *  the groups for the words, in the order the box shows them — the index first, Canvas for what it does not hold. */
   async function find(raw) {
     const q = norm(raw);

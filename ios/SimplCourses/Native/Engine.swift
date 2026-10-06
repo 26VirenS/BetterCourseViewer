@@ -54,7 +54,7 @@ final class Engine: ObservableObject, ShellListener {
     @Published var paths = Paths()
     @Published private(set) var focus = false
     @Published private(set) var titles: [UUID: String] = [:]
-    @Published private(set) var revealed: Set<UUID> = []
+    private(set) var revealed: Set<UUID> = []
     @Published private(set) var snapshot: Snapshot?
     @Published var whatsNew: WhatsNewSheetItem?
     /// Bumps when a screen's data may have changed under it (a tick in a web screen, an account change): the native screens read again.
@@ -267,6 +267,8 @@ final class Engine: ObservableObject, ShellListener {
     }
     private var pendingAttach: (id: UUID, url: String)?
 
+    /// A web screen's body went away (its screen left the stack). Called while SwiftUI is taking its views
+    /// down: what views read (the titles) is changed after that, never during it.
     func unregister(_ id: UUID) {
         if active == id {
             active = nil
@@ -274,8 +276,8 @@ final class Engine: ObservableObject, ShellListener {
         }
         slots[id] = nil
         screenURLs[id] = nil
-        titles[id] = nil
         revealed.remove(id)
+        DispatchQueue.main.async { [weak self] in self?.titles[id] = nil }
     }
 
     /// A web screen came on: the web view moves into it (the screen it leaves keeps a picture of itself) and draws its address.

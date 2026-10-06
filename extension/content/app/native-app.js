@@ -1,4 +1,4 @@
-/* The iPhone app's native shell (2.98.104). In the app the interface is no longer a web page with a
+/* The iPhone app's native shell (2.99). In the app the interface is no longer a web page with a
  * tab bar of its own: the app draws Apple's own chrome — the tab bar (Liquid Glass on iOS 26), the
  * navigation bars with their titles and Back, the search field, the sheets and menus, the haptics —
  * and the five root screens (Today, Courses, To Do, Grades, Calendar) and Notifications as native
