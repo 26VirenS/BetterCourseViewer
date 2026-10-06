@@ -81,6 +81,10 @@
     return b;
   }
 
+  /** A tap the phone should feel, in the iPhone app (its Taptic Engine, through the bridge); nothing anywhere else.
+   *  light · medium · rigid · soft · select · success · warning · error. */
+  const haptic = (kind = 'light') => { try { self.BCVBridge?.native?.haptic?.(kind); } catch { /* an older app */ } };
+
   function seg(options, value, onChange, { wide = false } = {}) {
     const wrap = el(`bcv-seg ${wide ? 'bcv-seg--wide' : ''}`);
     for (const [key, lbl] of options) {
@@ -92,6 +96,7 @@
         onclick: () => {
           // (the highlight sets off at once — the screen the choice redraws lands after, its highlight starting from here)
           for (const b of wrap.querySelectorAll('.bcv-seg__btn')) b.classList.toggle('is-active', b.dataset.value === key);
+          haptic('select');
           onChange(key);
         },
       }));
@@ -156,6 +161,7 @@
       const next = !sw.classList.contains('is-on');
       sw.classList.toggle('is-on', next);
       sw.setAttribute('aria-checked', next ? 'true' : 'false');
+      haptic('light');
       onToggle(next);
     });
     return sw;
@@ -217,6 +223,7 @@
     // a pill that floats down from the top centre, the Away Refresh pill's kind: a mark (a bell, or on an
     // error a red "!") and the words beside it
     const mark = error ? 'M12 7.5v6M12 16.8v.2' : 'M6.5 16.5h11l-1.4-2V10a4.1 4.1 0 00-8.2 0v4.5zM10.3 18.6a1.8 1.8 0 003.4 0';
+    if (error) haptic('error');
     const t = el(`bcv-toast ${error ? 'bcv-toast--error' : ''}`, [
       h('span', { class: 'bcv-toast__ic', 'aria-hidden': 'true' }, svg(mark, { size: 16, width: error ? 2.8 : 2.2 })),
       h('span', { class: 'bcv-toast__text', text: str }),
@@ -1315,7 +1322,7 @@
 
   BCV.ui = {
     groupPicker, groupAttrs, BANDS, gradeBand, bandChip, bandSlider, whatIfAdder, whatIfRemove,
-    svg, star, chev, el, text, tile, dot, card, row, label, h2, groupHead, badge, statusBadge, seg, segSlide, search, switchEl, btn, iconbtn, pill, placeDot,
+    svg, star, chev, el, text, tile, dot, card, row, label, h2, groupHead, badge, statusBadge, seg, segSlide, search, switchEl, btn, iconbtn, pill, placeDot, haptic,
     empty, emptyCard, loading, errorBox, hint, avatar, toast, menu, closeMenus, picker, colorMenu, COURSE_COLORS, fmtDay, datePop, dateField, promptSheet, askSheet,
     DAY, startOfDay, addDays, sameDay, dayDiff, startOfWeek, parse, MONTHS, MONTHS_LONG, DAYS, DAYS_LONG,
     fmtTime, fmtTimeLower, fmtShort, fmtLong, fmtDateComma, fmtAt, fmtAtUpper, fmtBy, dayTitle, fmtDow, fmtRecent, whenShort, plural,

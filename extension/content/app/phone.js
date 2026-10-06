@@ -212,7 +212,7 @@
       if (!dragging) return;
       dragging = false;
       if (!moved) { layer(false); return; }
-      if (dx < -W / 2) { base = -W; set(-W, true); wrap.classList.add('is-open'); openSwipe = api; }
+      if (dx < -W / 2) { if (base !== -W) U.haptic?.('rigid'); base = -W; set(-W, true); wrap.classList.add('is-open'); openSwipe = api; }
       else { base = 0; set(0, true); wrap.classList.remove('is-open'); if (openSwipe === api) openSwipe = null; }
       layer(false);
     };
@@ -397,13 +397,12 @@
       if (dy <= 0) { settle(dy); return; }
       if (large && !grew) {
         // nearly full screen and pulled down: far or fast enough and it goes; less, and it comes back to its own height
-        if (dy > H * 0.55 || vy > 1600) { putAway(dy, vy); return; }
-        if (dy > 70 || vy > 500) { shrink(); settle(Math.min(dy, 120)); return; }
+        if (dy > H * 0.55 || vy > 1600) { U.haptic?.('soft'); putAway(dy, vy); return; }
+        if (dy > 70 || vy > 500) { U.haptic?.('soft'); shrink(); settle(Math.min(dy, 120)); return; }
         settle(dy);
         return;
       }
-      if (dy > Math.min(110, H * 0.3) || vy > 700) putAway(dy, vy);
-      else settle(dy);
+      if (dy > Math.min(110, H * 0.3) || vy > 700) { U.haptic?.('soft'); putAway(dy, vy); } else settle(dy);
     };
     const startAt = (x, y, target) => {
       g = { x0: x, y0: y, lastY: y, lastT: performance.now(), vy: 0, dy: 0, mode: null, target, scroller: scrollerOf(target), grew: false };
@@ -493,6 +492,7 @@
       e.preventDefault();
       e.stopPropagation();
       const next = !it.complete;
+      U.haptic?.(next ? 'success' : 'light');
       paint(next || it.submitted);
       try {
         await store.setComplete(it, next);
@@ -908,6 +908,7 @@
       draw();
     }
     async function toggleDone(it) {
+      U.haptic?.(it.complete ? 'light' : 'success');
       try {
         await store.setComplete(it, !it.complete);
         app.refreshCounts();

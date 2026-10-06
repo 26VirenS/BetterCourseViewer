@@ -16,7 +16,6 @@
 		92ABE8D1FFE350B81187ABFF /* CanvasWebView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60417CC937A16F34325C247F /* CanvasWebView.swift */; };
 		A8A43C5820C0DD477310B3D3 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 641EF96E2EE0228604CB7D48 /* Assets.xcassets */; };
 		B68EF346FFCD7A3DE8A61AA3 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED81608DE49931C034014216 /* ContentView.swift */; };
-		B8B34354634831729F66F965 /* BrowserScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33F9BBF8AC209FF1AAE47318 /* BrowserScreen.swift */; };
 		BB26A260BED650E07132CA16 /* SettingsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F942AF3601A741AF03F417E /* SettingsSheet.swift */; };
 		CE782850F95C710FAC0E113F /* ScriptBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A1C06CE6062D5F89A393051 /* ScriptBundle.swift */; };
 		E87481CD4B0A70BF5422DBB7 /* SchoolPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BCA8AD6A8AC5D5A3011403B /* SchoolPickerView.swift */; };
@@ -27,6 +26,17 @@
 		7FE50A06F2485BBBC81C234E /* FilePreview.swift in Sources */ = {isa = PBXBuildFile; fileRef = C09760042750F3809A32E900 /* FilePreview.swift */; };
 		45AE3C50C787DCB197A14C4D /* login.js in Resources */ = {isa = PBXBuildFile; fileRef = C0C5839EAAF33AFF9AC5453D /* login.js */; };
 		38C09E6214099C75A0BAD199 /* LoginOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = D12B42C77BFF9F4A94A36EAB /* LoginOverlay.swift */; };
+		42AF27DE315E0B91DF1158F5 /* CalendarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6482CAD54AAF9785CC8C4052 /* CalendarView.swift */; };
+		1C471639E1D4EAC19F05EA60 /* CoursesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B6BBA3FA39D657185883478 /* CoursesView.swift */; };
+		8F05CB4BA30B789DC42BCD39 /* Engine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 362810DF231ECC0138D04EA3 /* Engine.swift */; };
+		86094AC63D06B56C0A41500E /* GradesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD4DD02D494DC1EE53B4B2C2 /* GradesView.swift */; };
+		118F6BA5E0B273C8BFC8B550 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 907637C47C406A3A4890EC3D /* Models.swift */; };
+		A05EDC4E3E4AE18A1B9A521A /* NotificationsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BC757B075F2122AF072AD1A /* NotificationsView.swift */; };
+		80F3203FCAA56C407C9E3144 /* Shell.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E91BAD187F8024774F8B43E /* Shell.swift */; };
+		896F4C456725E964FF3F9B55 /* Style.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4614274AB9642E1FE7F4B4DE /* Style.swift */; };
+		84DBF77DF1C540CBF457B801 /* TodayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04EC21261EFC100543529DE4 /* TodayView.swift */; };
+		35551F6161B3BDC7C875F6D1 /* TodoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83B2FE18E613FF424CE27D13 /* TodoView.swift */; };
+		CEA280374495972B8FEA4D1C /* WebScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3956A81B0CD29146B094062 /* WebScreen.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -34,7 +44,6 @@
 		2968A5926C7D553DA70A3F7D /* Bridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Bridge.swift; sourceTree = "<group>"; };
 		2A1C06CE6062D5F89A393051 /* ScriptBundle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScriptBundle.swift; sourceTree = "<group>"; };
 		2F942AF3601A741AF03F417E /* SettingsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsSheet.swift; sourceTree = "<group>"; };
-		33F9BBF8AC209FF1AAE47318 /* BrowserScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserScreen.swift; sourceTree = "<group>"; };
 		3A0FECBE6AB83372178D20E8 /* bridge.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = bridge.js; sourceTree = "<group>"; };
 		5BCA8AD6A8AC5D5A3011403B /* SchoolPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SchoolPickerView.swift; sourceTree = "<group>"; };
 		60417CC937A16F34325C247F /* CanvasWebView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasWebView.swift; sourceTree = "<group>"; };
@@ -51,6 +60,17 @@
 		C09760042750F3809A32E900 /* FilePreview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilePreview.swift; sourceTree = "<group>"; };
 		C0C5839EAAF33AFF9AC5453D /* login.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = login.js; sourceTree = "<group>"; };
 		D12B42C77BFF9F4A94A36EAB /* LoginOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginOverlay.swift; sourceTree = "<group>"; };
+		6482CAD54AAF9785CC8C4052 /* CalendarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarView.swift; sourceTree = "<group>"; };
+		6B6BBA3FA39D657185883478 /* CoursesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoursesView.swift; sourceTree = "<group>"; };
+		362810DF231ECC0138D04EA3 /* Engine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Engine.swift; sourceTree = "<group>"; };
+		FD4DD02D494DC1EE53B4B2C2 /* GradesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GradesView.swift; sourceTree = "<group>"; };
+		907637C47C406A3A4890EC3D /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		7BC757B075F2122AF072AD1A /* NotificationsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationsView.swift; sourceTree = "<group>"; };
+		7E91BAD187F8024774F8B43E /* Shell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shell.swift; sourceTree = "<group>"; };
+		4614274AB9642E1FE7F4B4DE /* Style.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Style.swift; sourceTree = "<group>"; };
+		04EC21261EFC100543529DE4 /* TodayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayView.swift; sourceTree = "<group>"; };
+		83B2FE18E613FF424CE27D13 /* TodoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodoView.swift; sourceTree = "<group>"; };
+		D3956A81B0CD29146B094062 /* WebScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebScreen.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -67,6 +87,7 @@
 			isa = PBXGroup;
 			children = (
 				2D62216FDBE5246B7A2D14DA /* App */,
+				4B9CEA0859C292B7324D9EE6 /* Native */,
 				B34B17DF83C652606E99B175 /* Resources */,
 				96982B358650411695437B58 /* Web */,
 			);
@@ -78,7 +99,6 @@
 			children = (
 				D12B42C77BFF9F4A94A36EAB /* LoginOverlay.swift */,
 				F75ADFA2F06322C7C85640A0 /* AppSession.swift */,
-				33F9BBF8AC209FF1AAE47318 /* BrowserScreen.swift */,
 				ED81608DE49931C034014216 /* ContentView.swift */,
 				5BCA8AD6A8AC5D5A3011403B /* SchoolPickerView.swift */,
 				2F942AF3601A741AF03F417E /* SettingsSheet.swift */,
@@ -128,6 +148,24 @@
 				641EF96E2EE0228604CB7D48 /* Assets.xcassets */,
 			);
 			path = Resources;
+			sourceTree = "<group>";
+		};
+		4B9CEA0859C292B7324D9EE6 /* Native */ = {
+			isa = PBXGroup;
+			children = (
+				6482CAD54AAF9785CC8C4052 /* CalendarView.swift */,
+				6B6BBA3FA39D657185883478 /* CoursesView.swift */,
+				362810DF231ECC0138D04EA3 /* Engine.swift */,
+				FD4DD02D494DC1EE53B4B2C2 /* GradesView.swift */,
+				907637C47C406A3A4890EC3D /* Models.swift */,
+				7BC757B075F2122AF072AD1A /* NotificationsView.swift */,
+				7E91BAD187F8024774F8B43E /* Shell.swift */,
+				4614274AB9642E1FE7F4B4DE /* Style.swift */,
+				04EC21261EFC100543529DE4 /* TodayView.swift */,
+				83B2FE18E613FF424CE27D13 /* TodoView.swift */,
+				D3956A81B0CD29146B094062 /* WebScreen.swift */,
+			);
+			path = Native;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -203,13 +241,23 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				CEA280374495972B8FEA4D1C /* WebScreen.swift in Sources */,
+				35551F6161B3BDC7C875F6D1 /* TodoView.swift in Sources */,
+				84DBF77DF1C540CBF457B801 /* TodayView.swift in Sources */,
+				896F4C456725E964FF3F9B55 /* Style.swift in Sources */,
+				80F3203FCAA56C407C9E3144 /* Shell.swift in Sources */,
+				A05EDC4E3E4AE18A1B9A521A /* NotificationsView.swift in Sources */,
+				118F6BA5E0B273C8BFC8B550 /* Models.swift in Sources */,
+				86094AC63D06B56C0A41500E /* GradesView.swift in Sources */,
+				8F05CB4BA30B789DC42BCD39 /* Engine.swift in Sources */,
+				1C471639E1D4EAC19F05EA60 /* CoursesView.swift in Sources */,
+				42AF27DE315E0B91DF1158F5 /* CalendarView.swift in Sources */,
 				38C09E6214099C75A0BAD199 /* LoginOverlay.swift in Sources */,
 				7FE50A06F2485BBBC81C234E /* FilePreview.swift in Sources */,
 				BCE8B7995B795C5E394BA6C7 /* LoginAssist.swift in Sources */,
 				FD77368B9A36B8395841BF13 /* AppSession.swift in Sources */,
 				68E42811B89CEFBF8283CD4A /* Bridge.swift in Sources */,
 				29FA9BD8912FDACD3BE2B9F8 /* BridgeStore.swift in Sources */,
-				B8B34354634831729F66F965 /* BrowserScreen.swift in Sources */,
 				92ABE8D1FFE350B81187ABFF /* CanvasWebView.swift in Sources */,
 				F47B1E6E27EAF7D283656E0A /* ContentRules.swift in Sources */,
 				B68EF346FFCD7A3DE8A61AA3 /* ContentView.swift in Sources */,
@@ -278,7 +326,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				MARKETING_VERSION = 2.98.103;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
@@ -374,7 +422,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				MARKETING_VERSION = 2.98.103;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;

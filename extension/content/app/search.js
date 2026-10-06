@@ -312,6 +312,27 @@
   /** The index's rows and Canvas's for the same kind, one list: no row twice, the index's first. */
   const merge = (a, b) => { const seen = new Set(); const out = []; for (const it of [...a, ...b]) { const k = it.href || it.url || it.title; if (!seen.has(k)) { seen.add(k); out.push(it); } } return out.slice(0, cap()); };
 
+  /** The same search without the box (2.98.104: the iPhone app's own search field, content/app/native-app.js):
+   *  the groups for the words, in the order the box shows them — the index first, Canvas for what it does not hold. */
+  async function find(raw) {
+    const q = norm(raw);
+    if (!q) return [];
+    const groups = new Map([['Courses', await courseHits(q)]]);
+    if (q.length >= NET_MIN) {
+      const cs = await favs();
+      await Promise.race([warm().catch(() => {}), new Promise((r) => setTimeout(r, 4000))]);
+      const lane = limiter(LANES);
+      await Promise.all([
+        ...IX_KINDS.map(async (k) => {
+          const local = lookup(k, q, PER);
+          groups.set(k, local && !ix.kinds[k].partial.size ? local : merge(local || [], await perCourse(k)(q, cs, lane).catch(() => [])));
+        }),
+        peopleHits(q).then((rows) => groups.set('People', rows)),
+      ]);
+    }
+    return ORDER.filter((k) => groups.get(k)?.length).map((k) => [k, groups.get(k)]);
+  }
+
   // ---- a search: what the page holds at once, the index at once, the rest after a pause, each group painted as it answers ----
   function run(raw) {
     if (!ui) return;
@@ -851,5 +872,5 @@
     summon();
   });
 
-  BCV.search = { field, dock, close, summon, float, unfloat, afloat };
+  BCV.search = { field, dock, close, summon, float, unfloat, afloat, find };
 })();

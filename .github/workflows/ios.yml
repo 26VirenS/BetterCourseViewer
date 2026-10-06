@@ -12,7 +12,7 @@ on:
 
 jobs:
   build:
-    runs-on: macos-15 # (Xcode 16, as the Mac app's job)
+    runs-on: macos-26 # (Xcode 26: the iOS 26 SDK, whose bars and controls are Liquid Glass; the app's native shell uses its APIs)
     steps:
       - uses: actions/checkout@v4
       - name: Build for the iOS Simulator (unsigned)
@@ -20,7 +20,7 @@ jobs:
           set -o pipefail
           xcodebuild -project ios/SimplCourses.xcodeproj -scheme SimplCourses -configuration Debug \
             -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
-            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build 2>&1 | tee build.log | grep -E "error:|warning: .*(LoginAssist|FilePreview|LoginOverlay|Bridge|WebController|ScriptBundle)|BUILD (SUCCEEDED|FAILED)" || true
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build 2>&1 | tee build.log | grep -E "error:|warning: .*(LoginAssist|FilePreview|LoginOverlay|Bridge|WebController|ScriptBundle|Native/)|BUILD (SUCCEEDED|FAILED)" || true
           grep -q "BUILD SUCCEEDED" build.log || { grep -E "error:" -B2 -A4 build.log | head -150; exit 1; }
       - name: The sign-in reader parses
         run: sed 's/__CANVAS_HOST__/"canvas.example.edu"/' ios/SimplCourses/Web/login.js > /tmp/login.js && node --check /tmp/login.js

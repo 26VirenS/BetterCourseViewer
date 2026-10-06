@@ -28,6 +28,7 @@
     phone: () => !!BCV.phone,
     rubric: () => !!BCV.rubricRing,
     docview: () => !!BCV.docview,
+    nativeapp: () => !!BCV.iosShell,
     notes: () => Array.isArray(self.BCV_WHATS_NEW),
     hub: () => !!BCV.hub,
     widgets: () => !!BCV.widgets,

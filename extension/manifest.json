@@ -152,7 +152,8 @@
         "content/app/whatsnew-notes.js",
         "content/app/phone.js",
         "content/app/rubric-ring.js",
-        "content/app/docview.js"
+        "content/app/docview.js",
+        "content/app/native-app.js"
       ]
     },
     {

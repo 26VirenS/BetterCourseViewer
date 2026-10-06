@@ -1,41 +1,67 @@
-# Probe: what the Mac runners carry (Xcode versions, simulator runtimes and devices), and whether
-# this repository's token may push the screenshot branch. Replaced by the screenshot job.
+# The iPhone app built with Xcode 26 (its tab bar, navigation bars and sheets in Liquid Glass) and run on
+# the iOS Simulator against the mock Canvas: every native screen pictured in light and dark
+# (scripts/dev/ios-shots.sh), the pictures and the build log pushed to the ios-shots branch to be looked at.
 name: iOS screenshots
 
 on:
   push:
     paths:
+      - 'ios/**'
+      - 'extension/content/app/native-app.js'
+      - 'scripts/dev/ios-shots.sh'
       - '.github/workflows/ios-shots.yml'
+  workflow_dispatch:
 
 permissions:
   contents: write
 
+concurrency:
+  group: ios-shots
+  cancel-in-progress: true
+
 jobs:
-  probe:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [macos-15, macos-26]
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 15
+  shots:
+    runs-on: macos-26
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
-      - name: What is here
+      - name: Build for the iOS Simulator
         run: |
-          sw_vers || true
-          xcodebuild -version || true
-          ls /Applications | grep -i xcode || true
-          xcrun simctl list runtimes || true
-          xcrun simctl list devices available | grep -E "iPhone|--" | head -40 || true
-          node --version || true
-      - name: May the token push a branch
-        if: matrix.os == 'macos-15'
+          set -o pipefail
+          xcodebuild -version
+          xcodebuild -project ios/SimplCourses.xcodeproj -scheme SimplCourses -configuration Debug \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build 2>&1 | tee build.log | grep -E "error:|BUILD (SUCCEEDED|FAILED)" || true
+          mkdir -p shots
+          grep -E "error:" -B2 -A8 build.log | head -400 > shots/build-errors.txt || true
+          grep -E "warning:.*Native/" build.log | sort -u | head -200 > shots/build-warnings.txt || true
+          grep -q "BUILD SUCCEEDED" build.log || { cat shots/build-errors.txt; exit 1; }
+      - name: Simulator and mock Canvas
         run: |
+          node scripts/dev/mock-canvas.mjs 8800 8801 > mock.log 2>&1 &
+          DEV=$(xcrun simctl list devices available | grep -E "iPhone 17 Pro \(" | head -1 | grep -oE "[0-9A-F-]{36}")
+          echo "device $DEV"
+          xcrun simctl boot "$DEV"
+          xcrun simctl bootstatus "$DEV" -b
+          xcrun simctl install booted "build/Build/Products/Debug-iphonesimulator/Simpl Courses.app"
+          curl -s -o /dev/null -w "mock %{http_code}\n" http://localhost:8800/
+      - name: Screens
+        run: bash scripts/dev/ios-shots.sh
+      - name: Push the pictures to the ios-shots branch
+        if: always()
+        env:
+          TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p shots
+          cp build.log shots/build.log 2>/dev/null || true
+          tail -c 900000 shots/build.log > shots/build-tail.log 2>/dev/null || true
+          rm -f shots/build.log
+          echo "${GITHUB_SHA}" > shots/COMMIT
+          cd shots
+          git init -q
           git config user.name "github-actions"
           git config user.email "github-actions@users.noreply.github.com"
-          git checkout --orphan ios-shots-probe
-          git rm -rq --cached . || true
-          echo "probe $(date -u)" > PROBE.md
-          git add PROBE.md
-          git commit -qm "probe"
-          git push -f origin ios-shots-probe && echo PUSH-OK
+          git checkout -q -b ios-shots
+          git add -A
+          git commit -qm "iOS screenshots for ${GITHUB_SHA}"
+          git push -qf "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}.git" ios-shots && echo PUSHED

@@ -278,7 +278,7 @@
    *  load of Canvas's own page for that address. Turning the skin off reveals the page you are
    *  on (a reload, when the address moved in place).
    *  `confirmed`: the quiz screen already asked (or is leaving on purpose). */
-  function go(href, { replace = false, confirmed = false, label = '' } = {}) {
+  function go(href, { replace = false, confirmed = false, label = '', fromNative = false } = {}) {
     let url;
     try {
       url = new URL(href, location.href);
@@ -289,6 +289,8 @@
       window.open(url.href, '_blank', 'noopener');
       return;
     }
+    // the iPhone app's own navigation (content/app/native-app.js): the move becomes a screen on the app's stack
+    if (BCV.iosShell?.intercept(url, { replace, label, fromNative })) return;
     // cut off from the extension (updated while the page was open, and not yet reloaded — something is being typed, say):
     // the page asked for is loaded for real, which runs the new version, rather than drawn by the old one here
     if (BCV.life?.orphaned && !inQuiz()) {
@@ -322,8 +324,10 @@
       location.reload();
       return;
     }
-    if (!replace && inPlaceHop(url)) {
-      history.pushState(navState(true), '', url.pathname + url.search + url.hash);
+    if ((!replace || fromNative) && inPlaceHop(url)) {
+      // (the app showing a screen of its stack replaces the entry: its own stack is the history)
+      if (replace) history.replaceState(navState(false), '', url.pathname + url.search + url.hash);
+      else history.pushState(navState(true), '', url.pathname + url.search + url.hash);
       window.scrollTo(0, 0);
       return render();
     }
@@ -1230,6 +1234,7 @@
     warmAround(r);
     document.title = titleFor(r);
     if (phone()) BCV.phone.afterRender(BCV.app, r, el);
+    BCV.iosShell?.rendered(); // (the iPhone app's bar takes the screen's title)
     // ?bcv=setup (the popup's Set up button, the account sheet, the app's first launch): the guided
     // setup over this page, which drops the parameter and reloads the page when it is done (the
     // guided tour runs over the reloaded page: see boot())
@@ -1665,7 +1670,7 @@
     // setup, the welcome or a quiz attempt, and never on a fresh install (the setup marks its version seen).
     // (a release can put an invitation in the notes' place — whatsnew.js — which opens the same way)
     const busy = () => BCV.setup?.active() || BCV.welcome?.active();
-    if (state.lookOn && BCV.whatsnew && !inQuiz() && !busy()) {
+    if (state.lookOn && BCV.whatsnew && !inQuiz() && !busy() && !html.classList.contains('bcv-native-shell')) { // (the iPhone app shows its own sheet for it)
       const change = await BCV.whatsnew.due();
       if (change && !busy()) BCV.whatsnew.open(BCV.app, change);
     }

@@ -30,4 +30,5 @@ self.BCV_LAZY_MODULES = {
   phone: { files: ['content/app/phone.js'] },
   rubric: { files: ['content/app/rubric-ring.js'] }, // the rubric ring (desktop): loaded when a rubric is opened
   docview: { files: ['content/app/docview.js'] }, // the file viewer's own pages (a PDF, a Word file, a picture, text): loaded when a file is first opened
+  nativeapp: { files: ['content/app/native-app.js'] }, // the iPhone app's native shell (its engine calls and its navigation): only the app injects it, with the group
 };

@@ -22,13 +22,25 @@ extension Notification.Name {
 final class AppSession: ObservableObject {
     private static let hostKey = "canvasHost"
 
-    @Published private(set) var host: String? = UserDefaults.standard.string(forKey: AppSession.hostKey)
+    @Published private(set) var host: String? = AppSession.devBaseURL?.host ?? UserDefaults.standard.string(forKey: AppSession.hostKey)
+
+    /// The simulator suite's Canvas (.github/workflows/ios-shots.yml): `-SimplBaseURL http://localhost:8800` at launch.
+    static var devBaseURL: URL? {
+        guard let s = UserDefaults.standard.string(forKey: "SimplBaseURL"), let url = URL(string: s), url.host != nil else { return nil }
+        return url
+    }
+
     @Published var showSettings = false
     @Published private(set) var colorScheme: ColorScheme?
     private var interfaceOn = Bridge.shared.interfaceOn
     private var bag = Set<AnyCancellable>()
 
     init() {
+        // the simulator suite's storage, written before the first page reads it (-SimplSeed '{"setup:done":true,…}')
+        if let seed = UserDefaults.standard.string(forKey: "SimplSeed"), let data = seed.data(using: .utf8),
+           let items = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            Bridge.shared.seed(items)
+        }
         colorScheme = AppSession.scheme(from: Bridge.shared.settings)
         NotificationCenter.default.publisher(for: .simplOpenSettings)
             .receive(on: RunLoop.main)

@@ -6,8 +6,8 @@ struct ContentView: View {
     var body: some View {
         Group {
             if let host = session.host {
-                BrowserScreen(host: host)
-                    .id(host) // a different school is a different browser
+                RootView(host: host)
+                    .id(host) // a different school is a different engine
             } else {
                 SchoolPickerView()
             }

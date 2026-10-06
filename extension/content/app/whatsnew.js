@@ -263,5 +263,5 @@
     );
   }
 
-  BCV.whatsnew = { open, invite, close, dismiss, due, version };
+  BCV.whatsnew = { open, invite, close, dismiss, due, version, since, markSeen, notesReady };
 })();

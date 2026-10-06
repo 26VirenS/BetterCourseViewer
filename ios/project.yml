@@ -1,11 +1,12 @@
 # XcodeGen spec for the iOS app. `scripts/build-ios-app.sh` turns it into SimplCourses.xcodeproj.
-# The app is a full-screen web view of the student's own Canvas site with the extension injected into
-# it (see docs/ios.md); the extension/ folder is bundled as a folder reference so the same files ship.
+# The app is the student's own Canvas site with the extension injected into it, under Apple's own tab
+# bar, navigation bars and native screens (see docs/ios.md); the extension/ folder is bundled as a
+# folder reference so the same files ship. Built with Xcode 26 (the iOS 26 SDK draws the bars in Liquid Glass).
 name: SimplCourses
 options:
   bundleIdPrefix: com.simplcourses
   deploymentTarget:
-    iOS: "16.0"
+    iOS: "18.0"
   createIntermediateGroups: true
   generateEmptyDirectories: true
 settings:
@@ -38,7 +39,11 @@ targets:
       properties:
         CFBundleDisplayName: Simpl Courses
         CFBundleName: Simpl Courses
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         LSRequiresIPhoneOS: true
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true # (the simulator suite's mock Canvas on localhost; nothing else is loaded over plain http)
         UILaunchScreen: {}
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait

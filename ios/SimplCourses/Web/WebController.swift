@@ -15,6 +15,14 @@ final class WebController: NSObject, ObservableObject, WKNavigationDelegate, WKU
     private let world: WKContentWorld
     @Published private(set) var isLoading = false
     @Published private(set) var pageTitle = ""
+    /// The app's own chrome is on (Native/Engine.swift): a link pressed in a page Canvas drew becomes a screen on the
+    /// app's stack, a link to another site opens in Safari's sheet, and the page's swipe-back is the stack's.
+    var shellOn = false {
+        didSet { webView.allowsBackForwardNavigationGestures = !shellOn }
+    }
+    var onNavigationStart: (() -> Void)?
+    var onFinish: ((URL?) -> Void)?
+    var onOpenInShell: ((URL) -> Void)?
 
     init(mode: ScriptBundle.Mode) {
         self.mode = mode
@@ -66,6 +74,16 @@ final class WebController: NSObject, ObservableObject, WKNavigationDelegate, WKU
     }
 
     var currentURL: URL? { webView.url }
+
+    /// The school's Canvas: https on its host — or, for the simulator suite, the address given at launch
+    /// (-SimplBaseURL http://localhost:8800), the mock Canvas.
+    var baseURL: URL {
+        if case .canvas(let host) = mode {
+            if let dev = AppSession.devBaseURL, dev.host?.lowercased() == host.lowercased() { return dev }
+            return URL(string: "https://\(host)/") ?? URL(fileURLWithPath: "/")
+        }
+        return ScriptBundle.extensionDir
+    }
     private var loadStarted = false
 
     /// The first load, once. SwiftUI can call onAppear more than once for the same view, and a second
@@ -81,7 +99,7 @@ final class WebController: NSObject, ObservableObject, WKNavigationDelegate, WKU
         case .canvas(let host):
             // the first launch lands on the guided setup (after Canvas's sign-in, which returns to it)
             let firstLaunch = !UserDefaults.standard.bool(forKey: "setupOpened")
-            guard let url = URL(string: "https://\(host)/\(firstLaunch ? "?bcv=setup" : "")") else { return }
+            guard let url = URL(string: firstLaunch ? "/?bcv=setup" : "/", relativeTo: baseURL)?.absoluteURL else { return }
             prepare(host: host) { [weak self] in
                 self?.webView.load(URLRequest(url: url))
                 UserDefaults.standard.set(true, forKey: "setupOpened")
@@ -123,6 +141,17 @@ final class WebController: NSObject, ObservableObject, WKNavigationDelegate, WKU
             decisionHandler(.cancel)
             return
         }
+        if shellOn, case .canvas(let host) = mode, navigationAction.navigationType == .linkActivated, navigationAction.targetFrame?.isMainFrame ?? false {
+            // the app's chrome is on: a link pressed in a page Canvas drew is a screen of the app's stack (a jump within
+            // the page stays a jump); another site's link opens over the app, not in place of Canvas
+            let here = webView.url
+            let sameDocument = here.map { url.host == $0.host && url.path == $0.path && url.query == $0.query && url.fragment != nil } ?? false
+            if !sameDocument {
+                if url.host?.lowercased() == host.lowercased() { onOpenInShell?(url) } else { openExternally(url) }
+                decisionHandler(.cancel)
+                return
+            }
+        }
         if case .canvas(let host) = mode, navigationAction.targetFrame?.isMainFrame ?? true {
             // Canvas's own bundles load only where Canvas draws the page (see ContentRules)
             ContentRules.apply(to: webView.configuration.userContentController, blockCanvasBundles: RenderedRoutes.isRendered(url, host: host, interfaceOn: Bridge.shared.interfaceOn))
@@ -149,6 +178,7 @@ final class WebController: NSObject, ObservableObject, WKNavigationDelegate, WKU
 
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
         isLoading = true
+        onNavigationStart?()
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
@@ -156,6 +186,7 @@ final class WebController: NSObject, ObservableObject, WKNavigationDelegate, WKU
         pageTitle = webView.title ?? ""
         webView.scrollView.refreshControl?.endRefreshing()
         if case .canvas = mode { login.didLoad(webView.url) }
+        onFinish?(webView.url)
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
@@ -183,7 +214,7 @@ final class WebController: NSObject, ObservableObject, WKNavigationDelegate, WKU
     }
 
     private func showUnreachable(_ error: Error) {
-        guard case .canvas(let host) = mode else { return }
+        guard case .canvas = mode else { return }
         let message = error.localizedDescription
             .replacingOccurrences(of: "&", with: "&amp;")
             .replacingOccurrences(of: "<", with: "&lt;")
@@ -194,7 +225,7 @@ final class WebController: NSObject, ObservableObject, WKNavigationDelegate, WKU
         button{margin-top:18px;height:46px;padding:0 22px;border:0;border-radius:23px;background:#0a84ff;color:#fff;font:600 15px -apple-system,system-ui}
         @media(prefers-color-scheme:dark){body{background:#000;color:#fff}p{color:#98989d}}</style>
         <h1>Canvas could not be reached</h1><p>\(message)</p>
-        <button onclick="location.href='https://\(host)/'">Try again</button>
+        <button onclick="location.href='\(baseURL.absoluteString)'">Try again</button>
         """
         webView.loadHTMLString(html, baseURL: nil)
     }

@@ -53,6 +53,10 @@ enum ScriptBundle {
 
         // 1. the bridge that stands in for the browser-extension APIs, with the manifest baked in
         var bridge = Bundle.main.url(forResource: "bridge", withExtension: "js").flatMap { try? String(contentsOf: $0, encoding: .utf8) } ?? ""
+        // the app's own chrome over Canvas (Native/), unless turned off (the defaults key nativeShellOff)
+        var shell = false
+        if case .canvas = mode { shell = !UserDefaults.standard.bool(forKey: "nativeShellOff") }
+        bridge = bridge.replacingOccurrences(of: "__SHELL__", with: shell ? "on" : "off")
         bridge = bridge.replacingOccurrences(of: "__MANIFEST__", with: JS.literal(manifest) ?? "{}")
         scripts.append(WKUserScript(source: "(function(){\(guardJS)\n\(bridge)\n})();\n//# sourceURL=simpl-courses/bridge.js", injectionTime: .atDocumentStart, forMainFrameOnly: true, in: world))
 

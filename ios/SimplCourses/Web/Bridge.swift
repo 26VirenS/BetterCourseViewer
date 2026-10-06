@@ -11,6 +11,13 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
 
     private let store = BridgeStore()
     private var views: [ObjectIdentifier: (view: WeakBox<WKWebView>, world: WKContentWorld)] = [:]
+    /// The app's own chrome (Native/Engine.swift): what the page says about it goes there.
+    weak var shell: ShellListener?
+
+    /// Keys written before the first page (the simulator suite: -SimplSeed '{"setup:done":true,…}').
+    func seed(_ items: [String: Any]) {
+        _ = store.set(items)
+    }
 
     func register(_ webView: WKWebView, world: WKContentWorld) {
         views[ObjectIdentifier(webView)] = (WeakBox(webView), world)
@@ -102,8 +109,16 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
             FilePreview.shared.open(url, name: body["name"] as? String ?? url.lastPathComponent, in: view)
             replyHandler(["ok": true], nil)
         case "navState":
-            // the phone's own swipe-back: on where the page has somewhere to go back to
-            message.webView?.allowsBackForwardNavigationGestures = body["canSwipeBack"] as? Bool ?? true
+            // the phone's own swipe-back: on where the page has somewhere to go back to (with the app's own chrome, the stack's swipe is the one)
+            let shellOn = (message.webView?.navigationDelegate as? WebController)?.shellOn ?? false
+            message.webView?.allowsBackForwardNavigationGestures = shellOn ? false : (body["canSwipeBack"] as? Bool ?? true)
+            replyHandler(nil, nil)
+        case "shell.state", "shell.page", "shell.open", "shell.tab", "shell.focus":
+            let listener = shell
+            MainActor.assumeIsolated { listener?.shellMessage(op, body) } // (the page's messages arrive on the main thread)
+            replyHandler(nil, nil)
+        case "haptic":
+            Haptics.play(body["kind"] as? String ?? "light")
             replyHandler(nil, nil)
         default:
             replyHandler(nil, "Simpl Courses: unknown bridge op \(op)")

@@ -16,6 +16,7 @@
   'use strict';
   if (self.browser && self.browser.__simpl) return;
   const MANIFEST = __MANIFEST__;
+  const SHELL = '__SHELL__' === 'on'; // the app draws its own chrome over the page (content/app/native-app.js); filled in by the app
   const native = (typeof webkit !== 'undefined' && webkit.messageHandlers && webkit.messageHandlers.bcv) || null;
   const call = (msg) => (native ? Promise.resolve(native.postMessage(msg)) : Promise.reject(new Error('Simpl Courses: no native bridge')));
   const clone = (v) => (v === undefined ? undefined : JSON.parse(JSON.stringify(v)));
@@ -170,8 +171,13 @@
     /** What only the app can do (null in a browser or the test harness): the account sheet's "Sign out";
      *  the phone's own alert and action sheet for a question or a short list (ask resolves true/false,
      *  menu the index picked or -1); a file in the phone's own viewer; and whether the phone's own
-     *  swipe-back is on for the screen showing (off on a tab's root, in a quiz, under a sheet). */
+     *  swipe-back is on for the screen showing (off on a tab's root, in a quiz, under a sheet). With the
+     *  app's own chrome (shell): what the page tells it (shell.state, shell.page, shell.open, shell.tab)
+     *  and a tap the phone should feel (haptic: light, medium, rigid, soft, select, success, warning, error). */
     native: native ? {
+      shell: SHELL,
+      shellPost: (op, body) => call({ ...(body && typeof body === 'object' ? clone(body) : {}), op: String(op) }).catch(noop),
+      haptic: (kind) => call({ op: 'haptic', kind: String(kind || 'light') }).catch(noop),
       signOut: () => call({ op: 'signOut' }).then(noop),
       ask: (o) => call({ op: 'ask', title: String(o?.title || ''), note: String(o?.note || ''), okLabel: String(o?.okLabel || 'OK'), cancelLabel: o?.cancelLabel == null ? null : String(o.cancelLabel), danger: !!o?.danger }).then((r) => !!(r && r.ok)),
       menu: (o) => call({ op: 'menu', title: String(o?.title || ''), items: (o?.items || []).map((it) => ({ label: String(it.label || ''), sub: String(it.sub || ''), active: !!it.active, danger: !!it.danger })), rect: o?.rect || null }).then((r) => (r && Number.isInteger(r.index) ? r.index : -1)),
