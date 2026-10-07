@@ -165,6 +165,16 @@ struct NotificationsView: View {
 
 /// Search: the search box's sources — your courses, their work, announcements, pages, discussions and
 /// files, and people — under Apple's own search field.
+/// Search, as a sheet raised halfway from the tab bar's search button (1.5.4): drag it up for the whole screen, down to
+/// put it away — no Done button, as the phone's own sheets.
+struct SearchSheet: View {
+    var body: some View {
+        NavigationStack { SearchView() }
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+    }
+}
+
 struct SearchView: View {
     @EnvironmentObject private var engine: Engine
     @State private var query = ""
@@ -186,8 +196,7 @@ struct SearchView: View {
                         ForEach(g.rows) { r in
                             Button {
                                 Haptics.tap()
-                                if r.external == true, let u = URL(string: r.url) { engine.web.openExternally(u) }
-                                else { engine.openWeb(r.url, title: r.title) }
+                                engine.openFromSearch(r.url, title: r.title, external: r.external == true)
                             } label: {
                                 HStack(spacing: 12) {
                                     Image(systemName: icon(g.title))
@@ -208,6 +217,7 @@ struct SearchView: View {
         .listStyle(.insetGrouped)
         .overlay(alignment: .top) { if searching { ProgressView().padding(.top, 12) } }
         .navigationTitle("Search")
+        .navigationBarTitleDisplayMode(.inline)
         .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "Courses, work, files, people")
         .onChange(of: query) { run() }
         .onSubmit(of: .search) { run(now: true) }

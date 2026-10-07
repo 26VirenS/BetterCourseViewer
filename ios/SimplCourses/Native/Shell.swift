@@ -112,7 +112,11 @@ struct NativeShell: View {
     @EnvironmentObject private var engine: Engine
 
     var body: some View {
-        TabView(selection: $engine.tab) {
+        // Search is a button in the tab bar, not a page (1.5.4): pressed, it raises the search sheet halfway over the
+        // screen showing, and the tab stays where it was
+        TabView(selection: Binding(get: { engine.tab }, set: { t in
+            if t == .search { Haptics.tap(); engine.searchOpen = true } else { engine.tab = t }
+        })) {
             Tab("Today", systemImage: "sun.max.fill", value: AppTab.today) {
                 stack(.today) { TodayView() }
             }
@@ -126,8 +130,12 @@ struct NativeShell: View {
                 stack(.grades) { GradesView() }
             }
             Tab(value: AppTab.search, role: .search) {
-                stack(.search) { SearchView() }
+                Color.clear // (never shown: the sheet below is the search)
             }
+        }
+        .sheet(isPresented: $engine.searchOpen) {
+            SearchSheet()
+                .environmentObject(engine)
         }
         .minimizingTabBar(!engine.holdTabBar)
         .background(TabBarProbe(engine: engine).allowsHitTesting(false))
@@ -243,7 +251,7 @@ struct ShellToolbar: ViewModifier {
         .foregroundStyle(.primary)
         .font(.system(size: 17, weight: .medium))
         .imageScale(.large)
-        .modifier(GlassCapsule())
+        .modifier(GlassCapsule(interactive: true)) // (it gives under the finger and stretches toward a drag, as the bar's own glass does)
     }
 
     private func icon(_ image: some View) -> some View {

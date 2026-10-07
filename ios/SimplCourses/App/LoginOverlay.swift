@@ -205,11 +205,14 @@ struct Shake: ViewModifier {
     }
 }
 
-/// Liquid Glass in a capsule on iOS 26, a material before it.
+/// Liquid Glass in a capsule on iOS 26, a material before it. `interactive`: the glass answers the finger as the
+/// bar's own does — it gives under a press and stretches toward a drag, then springs back.
 struct GlassCapsule: ViewModifier {
+    var interactive = false
+
     func body(content: Content) -> some View {
         if #available(iOS 26.0, *) {
-            content.glassEffect(.regular, in: Capsule())
+            content.glassEffect(interactive ? .regular.interactive() : .regular, in: Capsule())
         } else {
             content.background(.regularMaterial, in: Capsule())
         }

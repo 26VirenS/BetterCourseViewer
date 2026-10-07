@@ -87,6 +87,10 @@ final class Engine: ObservableObject, ShellListener {
     var settingsOpen = false {
         didSet { if !settingsOpen && oldValue { schedulePopups() } }
     }
+    /// The search sheet, raised by the tab bar's search button (1.5.4: a sheet, not a page).
+    @Published var searchOpen = false {
+        didSet { if !searchOpen && oldValue { schedulePopups() } }
+    }
     /// The app's own popups still to show, in order (the first run's setup, What's New after an update).
     private var queuedPopups: [Popup] = []
     private var popupCheck: DispatchWorkItem?
@@ -115,7 +119,7 @@ final class Engine: ObservableObject, ShellListener {
         }
         // the simulator suite's screens (.github/workflows/ios-shots.yml): -SimplTab courses
         if let t = UserDefaults.standard.string(forKey: "SimplTab") {
-            if t == "calendar" { tab = .todo; paths[.todo] = [.calendar] } else if let first = AppTab(rawValue: t) { tab = first }
+            if t == "calendar" { tab = .todo; paths[.todo] = [.calendar] } else if t == "search" { searchOpen = true } else if let first = AppTab(rawValue: t) { tab = first }
         }
     }
 
@@ -222,7 +226,7 @@ final class Engine: ObservableObject, ShellListener {
     /// Free for a popup: the app's own screens up, the page loaded, nothing of the sign-in on screen or still to
     /// come ("Logging you in", the form, "Stay logged in?"), and no other popup, sheet or screen over everything.
     private var popupFree: Bool {
-        phase == .native && !web.webView.isLoading && web.login.settled && !setup && whatsNew == nil && quiz == nil && tool == nil && !settingsOpen
+        phase == .native && !web.webView.isLoading && web.login.settled && !setup && whatsNew == nil && quiz == nil && tool == nil && !settingsOpen && !searchOpen
     }
 
     /// Looked at again in a moment (a popup going away, the sign-in moving on), and again until the next one is up.
@@ -399,9 +403,23 @@ final class Engine: ObservableObject, ShellListener {
             paths[.todo] = [.calendar]
             return
         }
+        if name == "search" { // (Search is a sheet over the screen showing, not a tab)
+            searchOpen = true
+            return
+        }
         let t = AppTab(rawValue: name) ?? .today
         paths[t] = []
         tab = t
+    }
+
+    /// A search result pressed: the sheet goes first, then the result opens on the tab underneath (a quiz, a tool or
+    /// Safari over everything, as anywhere else).
+    func openFromSearch(_ url: String, title: String, external: Bool) {
+        searchOpen = false
+        Task {
+            try? await Task.sleep(nanoseconds: 350_000_000) // (the sheet away before anything else is shown)
+            if external, let u = URL(string: url) { web.openExternally(u) } else { openWeb(url, title: title) }
+        }
     }
 
     /// A page the app hands to the web interface whole (the guided setup): the chrome steps aside until it is done.
