@@ -57,27 +57,10 @@ struct TodoView: View {
             }
         }
         .navigationTitle("To Do")
-        .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Menu {
-                    Picker("Group by", selection: Binding(get: { data?.group ?? "date" }, set: { g in regroup(group: g) })) {
-                        Label("Date", systemImage: "calendar").tag("date")
-                        Label("Priority", systemImage: "flag").tag("priority")
-                        Label("Course", systemImage: "books.vertical").tag("course")
-                    }
-                    Toggle(isOn: Binding(get: { data?.showDone ?? false }, set: { on in regroup(showDone: on) })) {
-                        Label("Show Completed", systemImage: "checkmark.circle")
-                    }
-                } label: {
-                    Image(systemName: "line.3.horizontal.decrease")
-                }
-                .accessibilityLabel("Group and filter")
-            }
-        }
         .shellToolbar(calendar: true, add: {
             Haptics.tap()
             adding = true
-        })
+        }, menu: AnyView(groupMenu))
         .task(id: engine.dataVersion) { await load() }
         .sheet(isPresented: $adding) {
             AddTaskSheet(courses: data?.courses ?? [], repeats: data?.repeats ?? []) {
@@ -155,6 +138,23 @@ struct TodoView: View {
                 if (row.pri ?? 0) == p.id { Label(p.label, systemImage: "checkmark") } else { Text(p.label) }
             }
         }
+    }
+
+    /// Group by date, priority or course, and show completed work.
+    private var groupMenu: some View {
+        Menu {
+            Picker("Group by", selection: Binding(get: { data?.group ?? "date" }, set: { g in regroup(group: g) })) {
+                Label("Date", systemImage: "calendar").tag("date")
+                Label("Priority", systemImage: "flag").tag("priority")
+                Label("Course", systemImage: "books.vertical").tag("course")
+            }
+            Toggle(isOn: Binding(get: { data?.showDone ?? false }, set: { on in regroup(showDone: on) })) {
+                Label("Show Completed", systemImage: "checkmark.circle")
+            }
+        } label: {
+            Image(systemName: "line.3.horizontal.decrease")
+        }
+        .accessibilityLabel("Group and filter")
     }
 
     private func priorityChip(_ p: Int) -> some View {

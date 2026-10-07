@@ -134,33 +134,28 @@ struct ShellToolbar: ViewModifier {
     var calendar = false
     /// A screen's own add button (To Do's new task), with the shell's buttons and before the picture.
     var add: (() -> Void)? = nil
+    /// A screen's own menu (To Do's grouping), first in the capsule: with the title on the bar's row, nothing sits at its leading edge.
+    var menu: AnyView? = nil
     @EnvironmentObject private var engine: Engine
 
-    @ViewBuilder
     func body(content: Content) -> some View {
-        if #available(iOS 26.0, *) {
-            // iOS 26: the buttons share one glass capsule; the picture stands on its own beside it, as in
-            // Apple's apps (in the capsule it crowded one end and left the bell adrift at the other)
-            content.toolbar {
-                buttons
-                ToolbarSpacer(.fixed, placement: .topBarTrailing)
-                ToolbarItem(placement: .topBarTrailing) {
-                    AccountMenu(size: 34)
-                }
-                .sharedBackgroundVisibility(.hidden)
-            }
-        } else {
-            content.toolbar {
+        // the buttons and the picture share one glass capsule; the screen's large title sits on the same row,
+        // at the leading edge, rather than under it (inlineLarge)
+        content
+            .toolbarTitleDisplayMode(.inlineLarge)
+            .toolbar {
                 buttons
                 ToolbarItem(placement: .topBarTrailing) {
                     AccountMenu()
                 }
             }
-        }
     }
 
     @ToolbarContentBuilder
     private var buttons: some ToolbarContent {
+        if let menu {
+            ToolbarItem(placement: .topBarTrailing) { menu }
+        }
         if calendar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
@@ -194,7 +189,7 @@ struct ShellToolbar: ViewModifier {
 }
 
 extension View {
-    func shellToolbar(bell: Bool = false, calendar: Bool = false, add: (() -> Void)? = nil) -> some View { modifier(ShellToolbar(bell: bell, calendar: calendar, add: add)) }
+    func shellToolbar(bell: Bool = false, calendar: Bool = false, add: (() -> Void)? = nil, menu: AnyView? = nil) -> some View { modifier(ShellToolbar(bell: bell, calendar: calendar, add: add, menu: menu)) }
 }
 
 /// What the web interface kept under the avatar on a phone (Inbox, Groups, Tools, the appearance,
@@ -228,7 +223,6 @@ struct AccountMenu: View {
                     Label(dark ? "Light Appearance" : "Dark Appearance", systemImage: dark ? "sun.max" : "moon")
                 }
                 Button { session.showSettings = true } label: { Label("Settings", systemImage: "gearshape") }
-                Button { engine.loadFull("/?bcv=setup") } label: { Label("Guided Setup", systemImage: "sparkles") }
                 Button {
                     Task {
                         if let wn = try? await engine.call("whatsNew", as: WhatsNewData.self) { engine.whatsNew = WhatsNewSheetItem(data: wn) }

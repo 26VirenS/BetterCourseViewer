@@ -84,7 +84,7 @@ struct TodayView: View {
         }
         .navigationTitle("Today")
         .modifier(TitleSubtitle(text: data?.dateLine))
-        .shellToolbar(bell: true, calendar: true)
+        .shellToolbar(bell: true)
         .task(id: engine.dataVersion) { await load() }
         .sheet(item: $sheet) { key in
             ItemsSheet(key: key.id) { url in
