@@ -24,6 +24,7 @@ struct Snapshot: Codable {
     var site: String?
     var host: String?
     var version: String?
+    var setupDone: Bool?
 }
 
 struct WorkRow: Codable, Identifiable, Hashable {

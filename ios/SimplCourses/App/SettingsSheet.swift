@@ -37,6 +37,12 @@ struct SettingsSheet: View {
                     Text("Kept in this iPhone's Keychain only: never synced, never backed up, and only ever typed into your school's own sign-in page. Signing out forgets it too.")
                 }
                 Section {
+                    Button {
+                        dismiss()
+                        NotificationCenter.default.post(name: .simplOpenSetup, object: nil)
+                    } label: {
+                        Label("Courses and Goals", systemImage: "checklist")
+                    }
                     NavigationLink("Look and appearance") {
                         CanvasWebView(controller: web)
                             .ignoresSafeArea(edges: .bottom)

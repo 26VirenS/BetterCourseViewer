@@ -55,6 +55,7 @@ for mode in light dark; do
   launch "$mode-18-quiz" 18 -SimplOpen quiz:101:9011
   launch "$mode-19-quiz-question" 24 -SimplOpen quiz:101:9011:take:5
   launch "$mode-20-tool" 20 -SimplOpen tool:101:9
+  launch "$mode-21-setup" 18 -SimplOpen setup
 done
 xcrun simctl terminate booted "$BID" >/dev/null 2>&1 || true
 

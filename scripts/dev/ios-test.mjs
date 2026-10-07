@@ -399,6 +399,15 @@ try {
   const coded = await nc('quizBegin', { course: '102', quiz: '10019' });
   check(coded.needsCode && /access code/i.test(coded.refused || ''), `a quiz with an access code asks for it before it begins (no attempt opened): ${JSON.stringify(coded)}`);
   await sp.evaluate(() => fetch('/__mock/config', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ richQuestions: false, moreTypes: false }) }));
+  // (1.3) the iPhone's own setup: the courses that count and the goals, read and written (nothing of the look)
+  const su = await nc('setupInfo');
+  const onIds = (su.courses || []).filter((c) => c.on).map((c) => c.id);
+  const first = onIds[0];
+  const saved1 = await nc('setupSave', { courses: onIds, nicknames: {}, targets: { [first]: 'B+' }, tracking: true, goal: 3.7 });
+  const su2 = await nc('setupInfo');
+  const snapSetup = await nc('snapshot');
+  const saved2 = await nc('setupSave', { courses: onIds, nicknames: {}, targets: { [first]: su.courses.find((c) => c.id === first)?.target || 'A+' }, tracking: su.tracking, goal: su.goal });
+  check(!su.error && su.done === true && su.courses.length > 0 && onIds.length > 0 && su.grades.join() === 'C,B,B+,A-,A,A+' && saved1.ok && saved1.courses === onIds.length && su2.courses.find((c) => c.id === first)?.target === 'B+' && su2.goal === 3.7 && su2.courses.filter((c) => c.on).length === onIds.length && snapSetup.setupDone === true && saved2.ok, `the iPhone's setup: the current courses (the chosen ones ticked), the targets and the goal written and read back, the courses left as chosen, the snapshot says it is done: ${JSON.stringify({ courses: su.courses?.length, on: onIds.length, target: su2.courses?.find((c) => c.id === first)?.target, goal: su2.goal, setupDone: snapSetup.setupDone, error: su.error || saved1.error })}`);
   const gp = await nc('groups');
   const gh = await nc('home', { ctx: `groups/${gp.current[0].id}` });
   const ga = await nc('announcements', { ctx: `groups/${gp.current[0].id}` });

@@ -67,6 +67,8 @@ final class Engine: ObservableObject, ShellListener {
     @Published var tool: ToolLaunch?
     /// A quiz open in the app's own quiz screen (QuizScreen), over everything.
     @Published var quiz: QuizLaunch?
+    /// The guided setup (SetupScreen): on the first run, and from Settings → Courses and Goals.
+    @Published var setup = false
 
     private var ready = false
     private var slots: [UUID: WeakBox<SlotView>] = [:]
@@ -162,6 +164,11 @@ final class Engine: ObservableObject, ShellListener {
             if parts.count == 2 { tool = .courseTool(course: parts[0], id: parts[1], title: "Tool") }
         }
         await refreshSnapshot()
+        // the first run: the iPhone's own setup (the courses that count, the goals), before anything else
+        if snapshot?.setupDone == false || LaunchOpen.take("setup") != nil {
+            setup = true
+            return
+        }
         if let wn = try? await call("whatsNew", ["due": true], as: WhatsNewData.self), !wn.releases.isEmpty {
             whatsNew = WhatsNewSheetItem(data: wn)
         }

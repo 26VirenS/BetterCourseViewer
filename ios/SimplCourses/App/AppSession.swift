@@ -6,6 +6,7 @@ import WebKit
 extension Notification.Name {
     /// Posted by the bridge when a page asks for the settings (runtime.openOptionsPage).
     static let simplOpenSettings = Notification.Name("SimplCourses.openSettings")
+    static let simplOpenSetup = Notification.Name("SimplCourses.openSetup")
     /// Posted by the bridge when the page asks to sign out (the account sheet).
     static let simplSignOutRequested = Notification.Name("SimplCourses.signOutRequested")
     /// Posted after the Canvas session was cleared, so the browser reloads to the login page.

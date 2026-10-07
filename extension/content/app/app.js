@@ -1643,7 +1643,8 @@
     // Until the guided setup has been finished (a flag in the extension's storage, shared by every
     // site), every Canvas page with the interface on opens it over the Dashboard.
     state.lookOn = BCV.early?.isOn?.() ?? BCV.settings.lookOn(state.settings); // the page's own look: the saved one, or this page's one-page note
-    if (state.lookOn && await needsSetup()) {
+    // (the iPhone app with its own chrome draws its own setup: the courses and the goals, natively)
+    if (state.lookOn && !self.BCVBridge?.native?.shell && await needsSetup()) {
       go('/?bcv=setup', { replace: true });
       return;
     }

@@ -97,8 +97,9 @@ final class WebController: NSObject, ObservableObject, WKNavigationDelegate, WKU
         loadStarted = true
         switch mode {
         case .canvas(let host):
-            // the first launch lands on the guided setup (after Canvas's sign-in, which returns to it)
-            let firstLaunch = !UserDefaults.standard.bool(forKey: "setupOpened")
+            // the first launch lands on the guided setup (after Canvas's sign-in, which returns to it): the web
+            // interface's own, when the app's chrome is off — with it on, the app shows its own setup over the Dashboard
+            let firstLaunch = !UserDefaults.standard.bool(forKey: "setupOpened") && UserDefaults.standard.bool(forKey: "nativeShellOff")
             guard let url = URL(string: firstLaunch ? "/?bcv=setup" : "/", relativeTo: baseURL)?.absoluteURL else { return }
             prepare(host: host) { [weak self] in
                 self?.webView.load(URLRequest(url: url))

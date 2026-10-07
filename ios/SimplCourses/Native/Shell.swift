@@ -44,6 +44,16 @@ struct RootView: View {
             QuizScreen(launch: q)
                 .environmentObject(engine)
         }
+        .fullScreenCover(isPresented: $engine.setup) {
+            SetupScreen()
+                .environmentObject(engine)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .simplOpenSetup)) { _ in
+            Task {
+                try? await Task.sleep(nanoseconds: 450_000_000) // (the Settings sheet away first)
+                engine.setup = true
+            }
+        }
         .onAppear { engine.start() }
         .onReceive(NotificationCenter.default.publisher(for: .simplSignedOut)) { _ in
             engine.web.login.forget()

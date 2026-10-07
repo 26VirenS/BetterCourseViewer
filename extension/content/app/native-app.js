@@ -103,8 +103,57 @@
   const meOf = (me) => (me ? { name: me.name || '', email: me.email || me.loginId || '', pronouns: me.pronouns || '', initials: U.initials(me.name || '') || '', avatar: me.avatar && !/avatar-50|no_pic|dotted_pic/.test(me.avatar) ? me.avatar : null } : null);
 
   async function snapshot() {
-    const [me, notifs, unread] = await Promise.all([store.me().catch(() => null), store.notifUnread().catch(() => null), store.unreadCount().catch(() => null)]);
-    return { me: meOf(me), notifUnread: notifs || 0, inboxUnread: unread || 0, dark: !!app()?.isDark?.(), site: app()?.siteName?.() || location.hostname, host: location.host, version: self.BCV_VERSION || '' };
+    const [me, notifs, unread, done] = await Promise.all([store.me().catch(() => null), store.notifUnread().catch(() => null), store.unreadCount().catch(() => null), setupDone()]);
+    return { me: meOf(me), notifUnread: notifs || 0, inboxUnread: unread || 0, dark: !!app()?.isDark?.(), site: app()?.siteName?.() || location.hostname, host: location.host, version: self.BCV_VERSION || '', setupDone: done };
+  }
+
+  // The guided setup, the iPhone's own (1.3): the courses that count and the grade goals — no look, no
+  // dashboard, no sidebar (the app draws those itself). The same answers the web setup writes, read and
+  // written here; the app shows it on the first run (snapshot.setupDone false) and from its Settings.
+  const SETUP_GRADES = ['C', 'B', 'B+', 'A-', 'A', 'A+'];
+  async function setupDone() {
+    try { const f = await BCV.api.storage.local.get('setup:done'); return !!(f && f['setup:done']); } catch { return true; }
+  }
+  async function setupInfo() {
+    const [all, favs, targetsPref, goal, tracking, done] = await Promise.all([store.courses({ force: true }), store.favorites({ force: true }).catch(() => []), store.pref('gradeTargets'), store.pref('gpaGoal'), store.pref('gpaTracking'), setupDone()]);
+    const favIds = new Set((favs || []).map((c) => String(c.id)));
+    const targets = targetsPref && typeof targetsPref === 'object' ? targetsPref : {};
+    const courses = (all || []).filter((c) => c.state === 'current').map((c) => ({
+      id: String(c.id), code: c.code || c.name || 'Course', name: c.originalName || c.name || '', nickname: c.nickname || '', color: c.color || GRAY,
+      // a first run starts with nothing ticked (the list every screen follows is the student's to choose); run again, it starts from today's
+      on: done && (!!c.favorite || favIds.has(String(c.id))),
+      target: SETUP_GRADES.includes(targets[c.id]) || targets[c.id] === 'P/F' ? targets[c.id] : 'A+',
+    }));
+    return { done, courses, grades: SETUP_GRADES, goal: Number.isFinite(Number(goal)) && goal !== null ? Number(goal) : 4, tracking: done ? !!tracking : true };
+  }
+  async function setupSave({ courses: chosen = [], nicknames = {}, targets: aims = {}, tracking = true, goal = 4 } = {}) {
+    const all = (await store.courses({ force: true }).catch(() => [])).filter((c) => c.state === 'current');
+    const favs = new Set((await store.favorites({ force: true }).catch(() => [])).map((c) => String(c.id)));
+    const on = new Set((Array.isArray(chosen) ? chosen : []).map(String));
+    const g = Math.max(0, Math.min(4, Number(goal)));
+    const targetsPref = await store.pref('gradeTargets');
+    const targets = { ...((targetsPref && typeof targetsPref === 'object') ? targetsPref : {}) };
+    for (const c of all) if (on.has(String(c.id))) { const t = aims[c.id]; targets[c.id] = SETUP_GRADES.includes(t) || t === 'P/F' ? t : 'A+'; }
+    const before = await store.pref('gpaTracking');
+    await Promise.all([
+      store.setPref('setupDone', true),
+      store.setPref('gpaGoal', Number.isFinite(g) ? +g.toFixed(2) : 4),
+      store.setPref('gpaTracking', tracking ? (before && typeof before === 'object' ? before : { priorGpa: null, priorCourses: 0, since: new Date().toISOString().slice(0, 10) }) : null),
+      store.setPref('gradeTargets', targets),
+    ]);
+    for (const c of all) {
+      const was = !!c.favorite || favs.has(String(c.id));
+      if (was !== on.has(String(c.id))) await store.setFavorite(c.id, on.has(String(c.id))).catch(() => {});
+    }
+    for (const [id, name] of Object.entries(nicknames || {})) {
+      const c = all.find((x) => String(x.id) === String(id));
+      if (c && String(name).trim() !== (c.nickname || '')) await store.setNickname(c.id, String(name).trim()).catch(() => {});
+    }
+    let installed = null;
+    try { installed = BCV.api.runtime.getManifest().version || null; } catch { /* no version to note */ }
+    await BCV.api.storage.local.set({ 'setup:done': true, 'setup:offered': true, 'welcome:search': true, ...(installed ? { 'whatsnew:seen': installed } : {}) });
+    gradeCache.clear();
+    return { ok: true, courses: on.size };
   }
 
   // Today: the six counters, the list for the day, the week's load per course — phone.js today()'s numbers
@@ -1524,7 +1573,7 @@
 
   const CALLS = { snapshot, today, todayCounts, todaySheet, clearOverdue, courses, coursesProgress, setNickname, todo, complete, setPriority, deleteTask, addTask, grades, setGoal, setTarget, calendar, setCalendars, calView, notifications, notifMark, search, appearance, whatsNew, refresh,
     home, announcements, discussions, topic, reply, modules, markDone, assignments, assignment, submit, commentOn, pages, page, files, people, quizzes, syllabus, courseGrades, groups, inbox, conversation, sendReply, star, recipients, composeContexts, sendMessage,
-    toolLaunch, quizIntro, quizBegin, quizAttempt, quizAnswer, quizFlag, quizUpload, quizGo, quizSubmit, quizFeedback };
+    toolLaunch, setupInfo, setupSave, quizIntro, quizBegin, quizAttempt, quizAnswer, quizFlag, quizUpload, quizGo, quizSubmit, quizFeedback };
   /** What the app asks for: a plain object back (dates as ISO strings), or { error } — never a throw across the bridge. */
   async function call(name, args = {}) {
     const fn = CALLS[name];
