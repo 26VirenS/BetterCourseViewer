@@ -181,54 +181,73 @@ struct ShellToolbar: ViewModifier {
     var menu: AnyView? = nil
     @EnvironmentObject private var engine: Engine
 
+    /// The capsule's height (the bar's own glass buttons are 44 pt) and the ring of glass left round the picture:
+    /// the picture fills the capsule's rounded end, its edge running with the capsule's all the way round.
+    static let height: CGFloat = 44
+    static let ring: CGFloat = 3
+
     func body(content: Content) -> some View {
-        // the buttons and the picture share one glass capsule; the screen's large title sits on the same row,
-        // at the leading edge, rather than under it (inlineLarge)
-        content
-            .toolbarTitleDisplayMode(.inlineLarge)
-            .toolbar {
-                buttons
-                ToolbarItem(placement: .topBarTrailing) {
-                    AccountMenu()
+        // the buttons and the picture share one glass capsule, drawn here rather than by the bar's own grouping (1.5.1):
+        // the bar pads every item it groups, which left the picture small and off the capsule's end. The screen's large
+        // title sits on the same row, at the leading edge, rather than under it (inlineLarge).
+        if #available(iOS 26.0, *) {
+            content
+                .toolbarTitleDisplayMode(.inlineLarge)
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) { capsule }
+                        .sharedBackgroundVisibility(.hidden) // (the capsule is its own glass: no second one round it)
                 }
-            }
+        } else {
+            content
+                .toolbarTitleDisplayMode(.inlineLarge)
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) { capsule }
+                }
+        }
     }
 
-    @ToolbarContentBuilder
-    private var buttons: some ToolbarContent {
-        if let menu {
-            ToolbarItem(placement: .topBarTrailing) { menu }
-        }
-        if calendar {
-            ToolbarItem(placement: .topBarTrailing) {
+    private var capsule: some View {
+        HStack(spacing: 0) {
+            if let menu {
+                menu.frame(width: 42, height: Self.height).contentShape(Rectangle())
+            }
+            if calendar {
                 Button {
                     Haptics.tap()
                     engine.openCalendar()
                 } label: {
-                    Image(systemName: "calendar")
+                    icon(Image(systemName: "calendar"))
                 }
                 .accessibilityLabel("Calendar")
             }
-        }
-        if let add {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button(action: add) { Image(systemName: "plus") }
+            if let add {
+                Button(action: add) { icon(Image(systemName: "plus")) }
                     .accessibilityLabel("Add a task")
             }
-        }
-        if bell {
-            ToolbarItem(placement: .topBarTrailing) {
+            if bell {
                 Button {
                     Haptics.tap()
                     engine.openNotifications()
                 } label: {
-                    Image(systemName: (engine.snapshot?.notifUnread ?? 0) > 0 ? "bell.badge" : "bell")
+                    icon(Image(systemName: (engine.snapshot?.notifUnread ?? 0) > 0 ? "bell.badge" : "bell")
                         .symbolRenderingMode(.multicolor)
-                        .contentTransition(.symbolEffect(.replace))
+                        .contentTransition(.symbolEffect(.replace)))
                 }
                 .accessibilityLabel("Notifications")
             }
+            AccountMenu(size: Self.height - Self.ring * 2)
+                .padding(Self.ring)
         }
+        .padding(.leading, (menu != nil || calendar || add != nil || bell) ? 6 : 0)
+        .buttonStyle(.plain)
+        .foregroundStyle(.primary)
+        .font(.system(size: 17, weight: .medium))
+        .imageScale(.large)
+        .modifier(GlassCapsule())
+    }
+
+    private func icon(_ image: some View) -> some View {
+        image.frame(width: 42, height: Self.height).contentShape(Rectangle())
     }
 }
 
