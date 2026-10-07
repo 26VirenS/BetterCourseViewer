@@ -64,8 +64,13 @@
     return '';
   }
 
+  // A single sign-on page that says the sign-in it was asked for has gone stale (Shibboleth's "Stale Request" after a
+  // Back, or a request that expired while the app sat in the background): only starting again from Canvas mends it.
+  const STALE = /\bstale request\b|\b(saml|authentication|login|sign-?in) request (has )?(expired|is no longer valid)\b|\brequest (has )?expired\b/i;
+  const stale = () => { try { return STALE.test(`${document.title || ''} ${(document.body?.innerText || '').slice(0, 1500)}`); } catch { return false; } };
+
   let said = '';
-  const msgOf = (r) => ({ kind: r.kind, host: location.hostname, path: location.pathname, title: document.title || '', error: r.kind === 'none' ? '' : errorText(), secure: location.protocol === 'https:' });
+  const msgOf = (r) => ({ kind: r.kind, host: location.hostname, path: location.pathname, title: document.title || '', error: r.kind === 'none' ? '' : errorText(), secure: location.protocol === 'https:', stale: r.kind === 'none' && stale() });
   function report(final = false) {
     const r = read();
     if (r.kind === 'none' && !final) return; // ("none" is only said once the page has finished drawing)

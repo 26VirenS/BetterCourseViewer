@@ -5,6 +5,8 @@ import SwiftUI
 /// details go into the page; and, once Canvas is reached, "Stay logged in?".
 struct LoginLayer: View {
     @ObservedObject var assist: LoginAssist
+    /// The web view is what is on screen (the app's own screens are not up over it).
+    var pageShown = true
 
     var body: some View {
         ZStack {
@@ -12,12 +14,15 @@ struct LoginLayer: View {
             case .idle:
                 // (a view, not nothing: "Stay logged in?" is asked from here once the cover is gone)
                 Color.clear.allowsHitTesting(false)
-                if assist.handoff {
-                    HandoffNote { assist.handoff = false }
+                if pageShown && assist.handoff {
+                    HandoffNote(restart: assist.restart) { assist.handoff = false }
                         .transition(.move(edge: .top).combined(with: .opacity))
+                } else if pageShown && assist.onSchoolPage {
+                    StartOverButton(action: assist.restart)
+                        .transition(.opacity)
                 }
             case .working:
-                LoggingInView { assist.showPage() }
+                LoggingInView(showPage: { assist.showPage() }, restart: { assist.restart() })
                     .transition(.opacity)
             case .capture(let host, let error):
                 LoginForm(assist: assist, host: host, error: error)
@@ -26,6 +31,7 @@ struct LoginLayer: View {
         }
         .animation(.easeInOut(duration: 0.22), value: assist.phase)
         .animation(.spring(duration: 0.4, bounce: 0.15), value: assist.handoff)
+        .animation(.easeOut(duration: 0.2), value: assist.onSchoolPage)
         .alert("Stay logged in?", isPresented: $assist.askStay) {
             Button("Not now", role: .cancel) { assist.stay(false) }
             Button("Stay logged in") { assist.stay(true) }
@@ -39,6 +45,7 @@ struct LoginLayer: View {
 /// in and sent — and, after a moment, "Show the page", for a sign-in that wants something done by hand.
 struct LoggingInView: View {
     var showPage: () -> Void = {}
+    var restart: () -> Void = {}
     @State private var turning = false
     @State private var offer = false
 
@@ -75,6 +82,12 @@ struct LoggingInView: View {
                     }
                     .glassButton()
                     .buttonBorderShape(.capsule)
+                    Button("Start Over") {
+                        Haptics.tap()
+                        restart()
+                    }
+                    .font(.subheadline.weight(.semibold))
+                    .padding(.top, 4)
                 }
                 .padding(.horizontal, 24)
                 .padding(.bottom, 12)
@@ -94,6 +107,7 @@ struct LoggingInView: View {
 
 /// Over the school's page in the middle of a sign-in: what to do there, and that Simpl carries on by itself.
 struct HandoffNote: View {
+    var restart: () -> Void = {}
     let close: () -> Void
 
     var body: some View {
@@ -107,6 +121,15 @@ struct HandoffNote: View {
                     Text("Simpl carries on once you’re through.").font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer(minLength: 4)
+                Button {
+                    Haptics.tap()
+                    restart()
+                } label: {
+                    Image(systemName: "arrow.counterclockwise").font(.footnote.weight(.bold)).frame(width: 30, height: 30)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.tint)
+                .accessibilityLabel("Start Over")
                 Button(action: close) {
                     Image(systemName: "xmark").font(.footnote.weight(.bold)).frame(width: 30, height: 30)
                 }
@@ -123,6 +146,37 @@ struct HandoffNote: View {
             Spacer()
         }
         .accessibilityElement(children: .contain)
+    }
+}
+
+/// On the school's sign-in pages, top right: Start Over — the sign-in begun again from Canvas, for a page that has
+/// gone wrong (a "Stale Request" after going back, a request that expired while the app was away).
+struct StartOverButton: View {
+    let action: () -> Void
+
+    var body: some View {
+        VStack {
+            HStack {
+                Spacer()
+                Button {
+                    Haptics.tap()
+                    action()
+                } label: {
+                    Label("Start Over", systemImage: "arrow.counterclockwise")
+                        .labelStyle(.titleAndIcon)
+                        .font(.subheadline.weight(.semibold))
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 9)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.tint)
+                .modifier(GlassCapsule())
+                .accessibilityHint("Begins signing in again from the start")
+            }
+            .padding(.horizontal, 12)
+            .padding(.top, 4)
+            Spacer()
+        }
     }
 }
 

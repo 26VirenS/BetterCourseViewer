@@ -479,6 +479,7 @@ try {
     register: '<form><input name="email" type="email"><input name="pw1" type="password"><input name="pw2" type="password"><button>Create account</button></form>',
     code: '<form><label>Enter the code we sent <input name="code" inputmode="numeric"></label><button>Verify</button></form>',
     error: '<div class="alert-danger">Invalid username or password.</div><form method="post" action="/login/submit"><input name="username" type="text"><input name="password" type="password"><button type="submit">Sign in</button></form>',
+    stale: '<h1>UC MERCED Single Sign On</h1><h2>Web Login Service - Stale Request</h2><p>You may be seeing this page because you used the Back button while browsing a secure web site or application.</p>',
   };
   // every page with the app's reader in it (as the app adds it to every page) and a stand-in for the app's ear
   const ssoPage = (body) => `<!doctype html><html><head><title>School sign-in</title></head><body>${body}<script>self.__said=[];self.webkit={messageHandlers:{bcvLogin:{postMessage:function(m){self.__said.push(m);}}}};<\/script><script>${reader.replace(/<\/script/g, '<\\/script')}<\/script></body></html>`;
@@ -510,6 +511,10 @@ try {
   check(m.length === 1 && m[0].kind === 'none', `two password fields (a new password being set) are not a sign-in: ${JSON.stringify(m)}`);
   m = await open('code');
   check(m.length === 1 && m[0].kind === 'none', `a code page is not a sign-in either (it is shown, to be finished by hand): ${JSON.stringify(m)}`);
+  m = await open('stale');
+  check(m.length === 1 && m[0].kind === 'none' && m[0].stale === true, `a single sign-on page saying the request went stale (Shibboleth's "Stale Request") is said as stale, for the app to start the sign-in again: ${JSON.stringify(m)}`);
+  m = await open('code');
+  check(m.length === 1 && m[0].stale === false, `a code page is not stale: ${JSON.stringify(m)}`);
   m = await open('error');
   check(m.length === 1 && m[0].kind === 'full' && /Invalid username or password/.test(m[0].error), `the sign-in shown again with an error carries the error's words: ${JSON.stringify(m)}`);
   // a press that leaves the same form standing while the page works is not news; an error that then shows is

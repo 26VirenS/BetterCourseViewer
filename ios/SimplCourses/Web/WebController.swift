@@ -61,6 +61,7 @@ final class WebController: NSObject, ObservableObject, WKNavigationDelegate, WKU
         webView.scrollView.contentInsetAdjustmentBehavior = .never
         Bridge.shared.register(webView, world: world)
         login.webView = webView
+        login.onRestart = { [weak self] in self?.load() } // (Start Over: Canvas afresh, which asks the school anew)
         if case .canvas = mode {
             CookieJar.shared.watch(webView.configuration.websiteDataStore.httpCookieStore) // the session outlives the app
             let refresh = UIRefreshControl()

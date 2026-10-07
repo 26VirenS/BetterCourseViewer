@@ -64,6 +64,8 @@ enum LoginVault {
 /// - the sign-in form again after a press (a wrong password): the native form, saying so. Saved
 ///   details that failed are not tried again until new ones are given.
 /// - Canvas reached after details typed in the form: "Stay logged in?".
+/// - a school page that says the sign-in went stale ("Stale Request", an expired request): started again from
+///   Canvas by itself, once a minute at most; and on every school page shown, Start Over does the same by hand.
 final class LoginAssist: NSObject, ObservableObject, WKScriptMessageHandler {
     enum Phase: Equatable {
         case idle
@@ -79,6 +81,11 @@ final class LoginAssist: NSObject, ObservableObject, WKScriptMessageHandler {
     /// code, a consent page, a page the reader could not fill, or one they asked to see): a note over it says so,
     /// and the sign-in carries on once Canvas is reached.
     @Published var handoff = false
+    /// The web view is on the school's sign-in (another host, or Canvas's own /login): Start Over is offered there.
+    @Published private(set) var onSchoolPage = false
+    /// Starts the sign-in again from Canvas (WebController: a fresh load of Canvas, which sends a new request).
+    var onRestart: (() -> Void)?
+    private var lastAutoRestart: Date?
     @Published var prefillUser = ""
 
     static let world = WKContentWorld.world(name: "SimplLogin")
@@ -128,7 +135,35 @@ final class LoginAssist: NSObject, ObservableObject, WKScriptMessageHandler {
         let host = origin.host.lowercased()
         let secure = origin.protocol == "https"
         let error = (body["error"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+        if (body["stale"] as? Bool) == true, host != canvasHost {
+            staleSeen()
+            return
+        }
         handle(kind: kind, host: host, error: error, secure: secure)
+    }
+
+    /// The school's page says the request went stale: start again by itself — but not twice within a minute, so a
+    /// page that keeps saying it cannot send the app round in a loop; then it stays shown, with Start Over on it.
+    private func staleSeen() {
+        if let last = lastAutoRestart, Date().timeIntervalSince(last) < 60 {
+            if phase == .working { reveal() }
+            return
+        }
+        lastAutoRestart = Date()
+        restart()
+    }
+
+    /// Start Over: whatever sign-in was under way forgotten, and Canvas loaded afresh (it sends the school a new
+    /// request); saved details are tried again on the way.
+    func restart() {
+        watchdog?.cancel()
+        attempt = nil
+        navigatedSinceAttempt = false
+        autoOff = false
+        declined = false
+        handoff = false
+        if phase != .idle { phase = .idle }
+        onRestart?()
     }
 
     private func handle(kind: String, host: String, error: String?, secure: Bool) {
@@ -267,6 +302,7 @@ final class LoginAssist: NSObject, ObservableObject, WKScriptMessageHandler {
     func willLoad(_ url: URL) {
         let host = url.host?.lowercased() ?? ""
         if attempt != nil { navigatedSinceAttempt = true }
+        schoolPage(url)
         // the saved sign-in page coming up: covered from its first frame, not after it has shown
         if phase == .idle, !autoOff, host != canvasHost, let s = LoginVault.load(), s.host == host {
             phase = .working
@@ -277,6 +313,7 @@ final class LoginAssist: NSObject, ObservableObject, WKScriptMessageHandler {
     /// A page finished loading in the main frame.
     func didLoad(_ url: URL?) {
         guard let url, let host = url.host?.lowercased() else { return }
+        schoolPage(url)
         if host == canvasHost && !url.path.hasPrefix("/login") {
             // on Canvas: signed in
             let viaForm = attempt != nil && attempt?.auto == false && typed != nil
@@ -291,6 +328,15 @@ final class LoginAssist: NSObject, ObservableObject, WKScriptMessageHandler {
         }
         // a page the reader cannot see (it never reports): shown anyway, after a moment
         if phase == .working { arm(seconds: 6) }
+    }
+
+    /// Where the web view is: on the school's sign-in, Start Over is offered, and the edge swipe that goes Back is
+    /// off — a sign-in page gone back to is one the school refuses as stale.
+    private func schoolPage(_ url: URL) {
+        let host = url.host?.lowercased() ?? ""
+        let on = !host.isEmpty && !canvasHost.isEmpty && (host != canvasHost || url.path.hasPrefix("/login"))
+        if on != onSchoolPage { onSchoolPage = on }
+        webView?.allowsBackForwardNavigationGestures = !on
     }
 
     /// The page could not be loaded at all.

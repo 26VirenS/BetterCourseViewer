@@ -28,7 +28,7 @@ struct RootView: View {
             }
         }
         .environmentObject(engine)
-        .overlay { LoginLayer(assist: engine.web.login) } // (the app's sign-in form, "Logging you in", "Stay logged in?")
+        .overlay { LoginLayer(assist: engine.web.login, pageShown: engine.phase != .native) } // (the app's sign-in form, "Logging you in", "Stay logged in?", Start Over)
         .sheet(isPresented: $session.showSettings) {
             SettingsSheet()
         }
