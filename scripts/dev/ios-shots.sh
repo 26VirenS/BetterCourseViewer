@@ -24,9 +24,20 @@ launch() {
   xcrun simctl io booted screenshot "$OUT/$name.png" >/dev/null 2>&1 && echo "shot $name" || echo "no shot $name"
 }
 
+# the app's crash reports and its own log lines, kept with the pictures (a picture of the home screen is an app
+# that did not stay up: these say why)
+collect() {
+  local name="$1"
+  xcrun simctl spawn booted log show --last 2m --style compact --predicate 'process CONTAINS "Simpl" OR eventMessage CONTAINS "Simpl Courses"' 2>&1 | tail -c 400000 > "$OUT/log-$name.txt" || true
+  for f in "$HOME"/Library/Logs/DiagnosticReports/*Simpl*; do
+    [ -f "$f" ] && head -c 600000 "$f" > "$OUT/crash-$(basename "$f" | tr ' ' '-').txt"
+  done
+}
+
 # a first launch to warm the simulator (the first start of a fresh install is slow), not pictured
 launch warmup 40
 rm -f "$OUT/warmup.png"
+collect warmup
 
 for mode in light dark; do
   xcrun simctl ui booted appearance "$mode" || true
@@ -58,6 +69,7 @@ for mode in light dark; do
   launch "$mode-21-setup" 18 -SimplOpen setup
 done
 xcrun simctl terminate booted "$BID" >/dev/null 2>&1 || true
+collect end
 
 # smaller pictures (the contents API reads files up to 1 MB)
 for f in "$OUT"/*.png; do sips -Z 1400 "$f" >/dev/null 2>&1 || true; done
