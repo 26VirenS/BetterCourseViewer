@@ -290,7 +290,13 @@ struct AccountMenu: View {
             }
         } label: {
             Avatar(person: me, size: size)
+                .contentShape(Circle())
         }
+        // the picture alone, edge to edge: no bar-button padding round it (it sat 10 pt in from the capsule's end)
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .menuIndicator(.hidden)
+        .fixedSize()
         .accessibilityLabel("Account")
         .confirmationDialog("Sign out of Canvas on this device?", isPresented: $confirmSignOut, titleVisibility: .visible) {
             Button("Sign Out", role: .destructive) {
