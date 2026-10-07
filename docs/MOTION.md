@@ -96,6 +96,29 @@ A loading fill is `linear`. Nothing starts from `scale(0)`: pop-ins start at 0.9
   a toast already up takes the new words instead of being replaced; phone swipes decide by speed
   (over ~0.11 px/ms) and pull with rising resistance past their ends.
 
+## 3b. What 2.99.7 added, and what it took away
+
+From a sweep for places that should move and do not — and the ones that moved too much:
+
+- **Less.** A redraw no longer replays an entrance: Notifications (desktop and phone) draws its
+  entrance once, and every draw after a dismiss, Mark read or a chip is the same list changed in
+  place, the rows that stay sliding into the gap (`ui.flipList`). Flashcards' parts rise when a view
+  is arrived at, never on Next, Previous, a star or a key. Search opened from the keyboard (`/`, ⌘K)
+  is simply there in the middle, and Escape puts it back at once (`keyed` in search.js: the glide
+  stays for a press on the box). (The highlight still glides between rows as the arrows move: 2.98.98's
+  one highlight is a deliberate choice, kept.) The settings page's courses and sites do not fade up
+  again after a save.
+- **More, small.** The in-app switch's knob slides (`translate` by `--bcv-sw-travel`, it was moved by
+  `justify-content`, which cannot animate); the small controls give under the finger by the `scale`
+  property (.96, .99 for wide ones), so no transform of theirs is touched; the module and idle
+  chevrons turn with what they open; a To Do tick pops in where it is painted in place, never on a
+  redraw; the dropdown list grows from its button (`bcv-pop` from `ui.anchor`'s origin) and the
+  course colour menu from its dot; a toast has a stylesheet exit (it had none without the springs
+  and cut out under reduced motion); modules re-sorted slide to their places; a conversation read
+  fades in; the preview panel put away by a press slides back out, and another row pressed changes
+  only its words. The settings page's switches slide as they are pressed, its Saved pill fades out
+  and nods at a second save; the setup's stepper nods rather than popping from nothing.
+
 ## 4. The rules
 
 1. **CSS first, script adds.** Nothing on the page depends on `BCV.motion` being present.

@@ -774,12 +774,22 @@
         ]),
       ]);
       // Read sits under the thumb; Clear (the destructive one) outboard of it
-      return swipeable(front, [
+      const wrap = swipeable(front, [
         { label: 'Read', color: '#0a84ff', icon: CHECK, width: 2.8, onSelect: async () => { state.read[n.id] = true; await persist(); draw(); } },
         { label: 'Clear', color: '#ff453a', icon: IC.close, onSelect: async () => { state.gone[n.id] = true; await persist(); draw(); } },
       ]);
+      wrap.dataset.flip = n.id;
+      return wrap;
     }
+    // drawn once with its entrance; after that (a Read, a Clear, a chip) the same list changes in place —
+    // no entrance again, and the rows that stay slide into the gap (ui.flipList)
+    let drawn = false;
     function draw() {
+      if (drawn) return U.still(() => U.flipList(body, paint));
+      paint();
+      drawn = true;
+    }
+    function paint() {
       closeSwipes();
       drawChips();
       const all = live();
@@ -798,7 +808,7 @@
         days.get(k).push(n);
       }
       let gi = 0;
-      for (const [day, items] of days) parts.push(enter(h('div', { class: 'bcv-ph-nfgroup' }, [U.text('bcv-ph-nfgroup__t', day), listCard(items.map(row))]), gi++));
+      for (const [day, items] of days) parts.push(enter(h('div', { class: 'bcv-ph-nfgroup', dataset: { flip: `d-${day}` } }, [U.text('bcv-ph-nfgroup__t', day), listCard(items.map(row))]), gi++));
       const gone = Object.keys(state.gone).filter((id) => feed.some((n) => n.id === id));
       if (gone.length) parts.push(h('button', { type: 'button', class: 'bcv-ph-disclose', id: 'bcv-nf-restore', text: `Restore ${U.plural(gone.length, 'cleared notification')}`, onclick: async () => { state.gone = {}; await persist(); draw(); } }));
       parts.push(U.hint('Swipe a notification left to mark it read or clear it.', 'bcv-ph-foot'));

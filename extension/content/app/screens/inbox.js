@@ -188,6 +188,7 @@
           sendBtn.disabled = false;
         }
       } });
+      reader.classList.add('is-loaded'); // (the conversation fades in over the loading rows, rather than snapping in: app.css)
       reader.replaceChildren(
         U.el('bcv-reader__head', [
           h('div', { style: { flex: '1', minWidth: '0' } }, [

@@ -73,6 +73,11 @@
   const afloat = () => !!spot && !spot.folding;
   const canFloat = () => !!ui && ui.root.isConnected && !BCV.phone?.active?.() && !document.getElementById('bcv-tour') && !document.getElementById('bcv-setup');
   const still = () => !!U.reducedMotion?.();
+  // Opened (or put away) from the keyboard — / or ⌘K, Escape — the box is simply there, in the middle:
+  // no glide (2.99.7). A key pressed tens of times a day must not wait on a half-second flight; the glide
+  // stays for a press on the box, where it shows where the box went.
+  let keyed = false;
+  const quick = () => still() || keyed;
   const gridMode = () => afloat() && ui?.scope?.key === 'files'; // (Files afloat: Spotlight's grid of tiles)
   const cap = () => (gridMode() ? GRID_N : PER); // (a group's results at most: the grid shows rows of them)
   function place() {
@@ -167,16 +172,17 @@
     const home = homeOf(ui.root);
     const ghost = h('div', { class: 'bcv-omni bcv-omni--ghost', 'aria-hidden': 'true', style: { height: `${Math.round(r.height)}px` } });
     ui.root.replaceWith(ghost);
-    const pal = h('div', { class: `bcv-spot is-far${still() ? ' is-still' : ''}`, id: 'bcv-spot' }, [ui.root]);
+    const q = quick();
+    const pal = h('div', { class: `bcv-spot is-far${q ? ' is-still' : ''}`, id: 'bcv-spot' }, [ui.root]);
     const ov = h('div', { class: 'bcv-spot-ov', 'aria-hidden': 'true' });
     document.body.append(ov, pal);
     spot = { ov, pal, ghost, home, timer: 0, lift: 0, closer: 0, folding: false, onResize: () => place() };
     place(); // (laid out in the middle at once)
     run(ui.input.value); // (the kinds, or the words' results — painted while the pill is still drawn at the header, so the panel can fade in as the pill lands rather than ride up with it)
-    if (!still()) startAsHome({ left: r.left, top: r.top }); // (its first frame is the header's pill, where it stood)
+    if (!q) startAsHome({ left: r.left, top: r.top }); // (its first frame is the header's pill, where it stood)
     pal.classList.remove('is-far');
-    pal.classList.add('is-lifting'); // (the panel arrives with the pill, not before it)
-    spot.lift = setTimeout(() => pal.classList.remove('is-lifting'), 600);
+    if (!q) pal.classList.add('is-lifting'); // (the panel arrives with the pill, not before it)
+    spot.lift = q ? 0 : setTimeout(() => pal.classList.remove('is-lifting'), 600);
     drawAs(null); // (and from there to its own place)
     window.addEventListener('resize', spot.onResize);
     ui.input.focus(); // (the move took the cursor)
@@ -191,10 +197,12 @@
     const r = s.ghost.isConnected ? s.ghost.getBoundingClientRect() : null;
     s.ov.classList.add('is-folding');
     s.pal.classList.add('is-far'); // (the panel fades as the pill sets off; hidden for good once it has)
-    if (r && !still()) drawAs({ left: r.left, top: r.top }, laidOut()); // (back to the header's pill, from wherever it is drawn)
+    const q = quick();
+    if (q) s.pal.classList.add('is-still');
+    if (r && !q) drawAs({ left: r.left, top: r.top }, laidOut()); // (back to the header's pill, from wherever it is drawn)
     clearScope({ quiet: true }); // (the kind's chip goes at once: one vanishing mid-fold would show)
-    s.closer = setTimeout(close, still() ? 0 : 160);
-    s.timer = setTimeout(settle, still() ? 0 : SPOT_MS);
+    s.closer = setTimeout(close, q ? 0 : 160);
+    s.timer = setTimeout(settle, q ? 0 : SPOT_MS);
   }
   const scopeRows = () => SCOPES.map((s, i) => ({ icon: s.icon, title: s.label, sub: s.hint, scope: s, key: `⌘${i + 1}` }));
   /** The four kinds, listed under an empty box afloat. */
@@ -792,7 +800,7 @@
     if (afloat() && e.key === 'Backspace' && !ui.input.value && ui.scope) { e.preventDefault(); clearScope(); return; } // (an empty box: the kind goes)
     if (e.key === 'Escape') {
       if (!ui.panel.hidden && ui.mode !== 'scopes' && ui.mode !== 'scope') { close(); e.preventDefault(); e.stopPropagation(); } // (the panel goes, the words stay: a search field would clear itself)
-      else if (afloat()) { e.preventDefault(); e.stopPropagation(); unfloat(); } // (then the box goes home, the kind with it; Backspace alone drops the kind)
+      else if (afloat()) { e.preventDefault(); e.stopPropagation(); keyed = true; try { unfloat(); } finally { keyed = false; } } // (then the box goes home, the kind with it — at once, from the keyboard; Backspace alone drops the kind)
       else if (ui.scope) clearScope();
       else ui.input.blur();
       return;
@@ -811,14 +819,14 @@
       e.preventDefault();
       ui.walk = true;
       ui.cursor = side ? Math.min(ui.items.length - 1, Math.max(0, ui.cursor + (e.key === 'ArrowRight' ? 1 : -1))) : stepRow(e.key === 'ArrowDown');
-      markCursor({ scroll: true });
+      markCursor({ scroll: true }); // (the highlight glides to the row the arrows choose: 2.98.98's one highlight, kept)
       return;
     }
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
       e.preventDefault();
       const n = ui.items.length;
       ui.cursor = (((ui.cursor + (e.key === 'ArrowDown' ? 1 : -1)) % n) + n) % n;
-      markCursor({ scroll: true });
+      markCursor({ scroll: true }); // (the highlight glides to the row the arrows choose: 2.98.98's one highlight, kept)
     } else if (e.key === 'Tab' || (e.key === 'ArrowRight' && caretAtEnd())) {
       const it = ui.items[Math.max(0, ui.cursor)];
       if (it?.fill) { e.preventDefault(); fill(it.fill); } // a command's name completed
@@ -960,7 +968,8 @@
       if (w.done || !ui || !ui.input.isConnected) return;
       ui.input.value = w.text;
       w.stop(); // (from here the keys go to the box itself)
-      ui.input.focus();
+      keyed = true;
+      try { ui.input.focus(); } finally { keyed = false; }
       if (w.text) run(w.text);
     }).catch(() => w.stop());
   }
@@ -971,7 +980,13 @@
     const k = (e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && String(e.key).toLowerCase() === 'k';
     if (!slash && !k) return;
     // the box in the bar (or the phone's on Today), where it is shown and nothing is over the page — a sheet, a quiz
-    if (ui && ui.input.isConnected && ui.root.getClientRects().length && (BCV.phone?.active?.() || summonable())) { e.preventDefault(); ui.input.focus(); ui.input.select(); return; }
+    if (ui && ui.input.isConnected && ui.root.getClientRects().length && (BCV.phone?.active?.() || summonable())) {
+      e.preventDefault();
+      keyed = true; // (the box afloat at once: float() reads it as focus lands)
+      try { ui.input.focus(); } finally { keyed = false; }
+      ui.input.select();
+      return;
+    }
     if (!summonable() || (k && typing)) return;
     e.preventDefault();
     summon();

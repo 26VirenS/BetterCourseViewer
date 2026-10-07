@@ -639,7 +639,9 @@
     ]);
     m.addEventListener('click', (e) => e.stopPropagation());
     const r = anchor.getBoundingClientRect();
-    Object.assign(m.style, { position: 'fixed', top: `${r.bottom + 6}px`, left: `${Math.max(8, Math.min(r.left, window.innerWidth - 230))}px` });
+    const left = Math.max(8, Math.min(r.left, window.innerWidth - 230));
+    // (it grows out of the dot that opened it, not from its own middle: bcv-pop scales from the origin)
+    Object.assign(m.style, { position: 'fixed', top: `${r.bottom + 6}px`, left: `${left}px`, transformOrigin: `${Math.round(r.left + r.width / 2 - left)}px top` });
     overlayRoot().append(m);
     setTimeout(() => document.addEventListener('click', closeMenus, { once: true }), 0);
     return m;

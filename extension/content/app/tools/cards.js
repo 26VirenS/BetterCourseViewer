@@ -102,10 +102,19 @@
       persist();
       go('edit', { deck: d.id, note: `${countOf(cards.length, 'card')} imported.` });
     }
-    const go = (view, patch = {}) => { clearInterval(ticker); Object.assign(st, { view, flip: false, fb: null, typed: '', last: '', note: '', pasteOpen: false, paste: '' }, patch); paint(); };
+    // A view's parts rise in when it is arrived at (the first paint, every go()); a repaint in place — Next,
+    // Previous, a star, Know / Learning, a key pressed a hundred times a session — draws still (ui.still):
+    // a card moved on is not an arrival.
+    let arriving = true;
+    const go = (view, patch = {}) => { clearInterval(ticker); Object.assign(st, { view, flip: false, fb: null, typed: '', last: '', note: '', pasteOpen: false, paste: '' }, patch); arriving = true; paint(); };
     const back = () => go(st.view === 'set' || st.view === 'edit' ? 'sets' : 'set');
 
     function paint() {
+      const fresh = arriving;
+      arriving = false;
+      return fresh ? paintNow() : U.still(paintNow);
+    }
+    function paintNow() {
       const d = deck();
       const cards = cardsOf(d);
       const mastered = cards.filter((c) => (c.level || 0) >= 2).length;

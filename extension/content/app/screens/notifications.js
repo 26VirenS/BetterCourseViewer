@@ -87,6 +87,12 @@
       }));
     }
 
+    // Drawn once with its entrance; every draw after (a dismiss, Mark read, a chip) is the same list
+    // changed in place — no entrance again (a redraw is not an arrival), and the rows that stay slide
+    // into the gap a dismissed one leaves (ui.flipList, 200 ms).
+    let drawn = false;
+    const enterCls = () => (drawn ? '' : ' bcv-nf__enter');
+
     function row(n, i) {
       const isRead = !!state.read[n.id];
       const pal = n.color ? U.palette(n.color, dark) : null;
@@ -94,7 +100,7 @@
         if (!state.read[n.id]) { state.read[n.id] = true; await persist(); }
         app.go(n.url || '/');
       };
-      const el = h('div', { class: `bcv-nf__row bcv-nf__enter ${isRead ? 'is-read' : ''}`, dataset: { id: n.id, cat: n.cat }, role: 'link', tabindex: '0', style: { animationDelay: `${Math.min(i * 45, 240)}ms` }, onclick: open, onkeydown: (e) => { if (e.key === 'Enter' && e.target === e.currentTarget) open(); } }, [
+      const el = h('div', { class: `bcv-nf__row${enterCls()} ${isRead ? 'is-read' : ''}`, dataset: { id: n.id, cat: n.cat, flip: n.id }, role: 'link', tabindex: '0', style: drawn ? null : { animationDelay: `${Math.min(i * 45, 240)}ms` }, onclick: open, onkeydown: (e) => { if (e.key === 'Enter' && e.target === e.currentTarget) open(); } }, [
         h('span', { class: 'bcv-nf__dot', 'aria-hidden': 'true' }),
         h('span', { class: 'bcv-nf__body' }, [
           h('span', { class: 'bcv-nf__title', text: n.title }),
@@ -122,14 +128,14 @@
         const items = vis.filter((n) => n.cat === k);
         if (!items.length) return;
         const m = meta[k];
-        parts.push(U.el('bcv-nf__group bcv-nf__enter', [
+        parts.push(U.el(`bcv-nf__group${enterCls()}`, [
           h('div', { class: 'bcv-nf__group-h', style: { '--nf-tint': m.tint, '--nf-ink': m.ink } }, [
             h('span', { class: 'bcv-nf__group-i' }, U.svg(m.icon, { size: 13, stroke: m.ink, width: 2 })),
             h('span', { class: 'bcv-nf__group-t', text: m.label }),
             h('span', { class: 'bcv-nf__group-n', text: String(items.length) }),
           ]),
           U.el('bcv-card bcv-nf__list', items.map(row)),
-        ], { style: { animationDelay: `${Math.min(gi * 60, 300)}ms` } }));
+        ], { dataset: { flip: `g-${k}` }, style: drawn ? null : { animationDelay: `${Math.min(gi * 60, 300)}ms` } }));
       });
       const gone = Object.keys(state.gone).filter((id) => feed.some((n) => n.id === id));
       if (gone.length) {
@@ -138,7 +144,9 @@
           h('button', { type: 'button', class: 'bcv-nf__act', id: 'bcv-nf-restore', text: 'Restore', onclick: async () => { state.gone = {}; await persist(); draw(); } }),
         ]));
       }
-      body.replaceChildren(...parts);
+      if (drawn) U.flipList(body, () => body.replaceChildren(...parts));
+      else body.replaceChildren(...parts);
+      drawn = true;
     }
     draw();
     return screen;

@@ -69,7 +69,12 @@
     el.classList.toggle('is-err', err);
     el.hidden = false;
     clearTimeout(savedTimer);
-    savedTimer = setTimeout(() => { el.hidden = true; }, err ? 3200 : 1400);
+    if (!el.hidden && !el.classList.contains('is-out')) { try { el.animate([{ transform: 'scale(.97)' }, { transform: 'none' }], { duration: 160, easing: 'cubic-bezier(.23,1,.32,1)' }); } catch { /* says it all the same */ } } // (a second save while it shows: it nods again)
+    el.classList.remove('is-out');
+    savedTimer = setTimeout(() => {
+      el.classList.add('is-out'); // (fades away rather than vanishing)
+      savedTimer = setTimeout(() => { el.hidden = true; el.classList.remove('is-out'); }, 200);
+    }, err ? 3200 : 1400);
   };
   const save = async (patch) => {
     try {
@@ -190,7 +195,9 @@
 
   // ---- switches, segs -----------------------------------------------------------------------------
   const setSwitch = (el, on) => { el.classList.toggle('is-on', !!on); el.setAttribute('aria-checked', on ? 'true' : 'false'); };
-  const onSwitch = (el, fn) => el.addEventListener('click', () => fn(!el.classList.contains('is-on')));
+  // (2.99.7) the knob slides the moment it is pressed; what the change does follows — and a change refused or
+  // undone paints it back (a save that fails, the last Dashboard view)
+  const onSwitch = (el, fn) => el.addEventListener('click', () => { const next = !el.classList.contains('is-on'); setSwitch(el, next); fn(next); });
   const setSeg = (el, value) => [...el.querySelectorAll('button')].forEach((b) => b.classList.toggle('is-on', b.dataset.value === String(value)));
   const onSeg = (el, fn) => el.addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) fn(b.dataset.value); });
 
@@ -329,9 +336,12 @@
     if (!next.size) { flash('Keep at least one course shown', true); drawCourses(); return; }
     writeShown(next);
   };
+  let coursesDrawn = false;
   function drawCourses() {
     const list = courses.list;
     const wrap = $('courseList');
+    if (coursesDrawn) wrap.classList.add('is-drawn'); // (drawn again in place after a switch: the rows do not fade up again)
+    coursesDrawn = true;
     $('shownLabel').textContent = `${courses.shown.size} of ${list.length} courses shown`;
     const all = courses.shown.size === list.length;
     $('selectAll').hidden = !list.length;
@@ -603,6 +613,7 @@
     flash();
     paintAll();
   });
+  let domainsDrawn = false;
   function renderDomains() {
     const globe = (color) => { const s = h('span'); s.innerHTML = `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="${color}" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 010 18a15 15 0 010-18"/></svg>`; return s.firstChild; };
     const rows = [h('div', { class: 'site' }, [globe('var(--ink3)'), h('span', { class: 'site__host', text: '*.instructure.com' }), h('span', { class: 'pill', text: 'Built in' })])];
@@ -620,6 +631,8 @@
       ]));
     }
     rows.forEach((r, i) => { r.style.animationDelay = `${Math.min(i * 45, 300)}ms`; });
+    if (domainsDrawn) $('domains').classList.add('is-drawn'); // (after a save: the same rows, not an arrival)
+    domainsDrawn = true;
     $('domains').replaceChildren(...rows);
   }
 

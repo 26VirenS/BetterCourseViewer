@@ -97,7 +97,7 @@
       const circle = rowEl.querySelector('.bcv-circle');
       if (!circle) return;
       circle.classList.toggle('is-done', done);
-      circle.replaceChildren(...(done ? [U.svg('M6 12l4 4 8-8', { size: 12, stroke: '#fff', width: 2.4 })] : []));
+      circle.replaceChildren(...(done ? [U.svg('M6 12l4 4 8-8', { size: 12, stroke: '#fff', width: 2.4, cls: 'bcv-circle__tick' })] : [])); // (painted in place, so a tick here and now: it pops in — app.css)
       circle.title = done ? 'Mark not done' : 'Mark done';
     }
     /** A change to one row: its own look painted on the row at once (`look`, when the change has

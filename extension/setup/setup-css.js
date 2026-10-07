@@ -202,7 +202,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outl
 .stepper button:hover { background: var(--card); }
 .stepper button:active { transform: scale(.9); }
 .stepper__val { min-width: 46px; text-align: center; font: 600 15px/1 var(--mono); color: var(--ink); display: inline-block; }
-.stepper__val.is-tick { animation: pop .28s var(--spring) both; }
+.stepper__val.is-tick { animation: nudge .16s cubic-bezier(.23,1,.32,1) both; } /* (2.99.7: a press repeated a dozen times nods the number, it does not pop it in from nothing) */
+@keyframes nudge { from { transform: scale(.94); } to { transform: none; } }
 .kicker { margin-top: 18px; padding: 0 2px 9px; font: 600 11px/1.2 var(--font); color: var(--ink3); text-transform: uppercase; letter-spacing: .06em; }
 .target { display: flex; align-items: center; gap: 12px; padding: 11px 15px; border-radius: 16px; background: var(--card); border: 1px solid var(--edge); animation: fadeUp .38s var(--ease) both; }
 .target + .target { margin-top: 7px; }

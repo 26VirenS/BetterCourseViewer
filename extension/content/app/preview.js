@@ -43,9 +43,17 @@
   }
 
   let cur = null; // { panel, route, host }
-  function close() {
+  /** `gently`: put away by a press (its ✕, a press beside it) — it slides back out the way it came in
+   *  (2.99.7; it used to vanish while the page eased into the room it left). Escape, a swap and Open
+   *  take it at once. */
+  function close({ gently = false } = {}) {
+    if (!gently) for (const e of document.querySelectorAll('.bcv-pv.is-leaving')) e.remove(); // (a navigation, Escape, a swap: one still sliding out goes at once)
     if (!cur) return;
-    cur.panel.remove();
+    const p = cur.panel;
+    if (gently && !cur.host && p.classList.contains('bcv-pv') && !U.reducedMotion?.()) {
+      p.classList.add('is-leaving');
+      setTimeout(() => p.remove(), 240);
+    } else p.remove();
     cur.host?.classList.remove('is-split');
     html.classList.remove('bcv-preview');
     document.removeEventListener('keydown', onKey, true);
@@ -66,7 +74,7 @@
     // the interface does not widen and narrow again between the press and the new content
     const a = e.target.closest?.('a[href]');
     if (a && !a.target && previewable(a.href)) return;
-    close();
+    close({ gently: true });
   }
 
   const pts = (n) => (n === null || n === undefined ? null : `${store().fmtPts(n)} pts`);
@@ -137,6 +145,8 @@
     const r = previewable(href);
     if (!r) return false;
     const app = BCV.app;
+    // another row pressed while one shows: the panel stays where it is and only what it says changes (no slide in again)
+    const swap = !!cur && !cur.host && !host && cur.panel.classList.contains('bcv-pv') && !BCV.phone?.active();
     close();
     const body = U.el('bcv-pv__body');
     body.append(U.loading('rows', 3));
@@ -162,7 +172,7 @@
     const panel = h('aside', { class: 'bcv-pv', role: 'dialog', 'aria-modal': 'false', 'aria-label': `Preview of this ${KINDS[r.tab].label}` }, [
       U.el('bcv-pv__head', [
         U.text('bcv-pv__kicker', 'Preview', 'span'),
-        h('button', { type: 'button', class: 'bcv-pv__x', title: 'Close', 'aria-label': 'Close', onclick: close }, U.svg(IC.close, { size: 13, stroke: 'var(--bcv-ink2)', width: 2.3 })),
+        h('button', { type: 'button', class: 'bcv-pv__x', title: 'Close', 'aria-label': 'Close', onclick: () => close({ gently: true }) }, U.svg(IC.close, { size: 13, stroke: 'var(--bcv-ink2)', width: 2.3 })),
       ]),
       body,
       U.el('bcv-pv__foot', h('button', {
@@ -188,6 +198,7 @@
       host.classList.add('is-split');
       host.append(panel);
     } else {
+      if (swap) panel.classList.add('is-swap');
       document.body.append(panel);
       html.classList.add('bcv-preview');
       document.addEventListener('keydown', onKey, true);

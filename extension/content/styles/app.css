@@ -14,7 +14,7 @@
 
 html[data-bcv-theme] {
   --bcv-line: max(1px, var(--bcv-dpx, 1px)); /* a hairline drawn as a shadow: one CSS pixel, or one screen pixel where that is more (below 100% zoom; content/early.js keeps --bcv-dpx) */
-  --bcv-version: "2.99.6"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.99.7"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -126,8 +126,9 @@ html.bcv-phone .bcv-sheet { animation: bcv-sheet var(--bcv-t-phone) var(--bcv-sp
 html.bcv-phone .bcv-sheet-ov.is-closing > .bcv-sheet { animation: bcv-leave-down .22s var(--bcv-ease) both; }
 .bcv-menu.is-closing, .bcv-quicknav.is-closing { animation: bcv-leave-pop .14s ease both; pointer-events: none; }
 .bcv-reader-ov.is-closing { animation: bcv-leave var(--bcv-t-fast) ease both; pointer-events: none; }
+.bcv-toast.is-closing { animation: bcv-leave var(--bcv-t-fast) ease both; pointer-events: none; } /* (2.99.7: without the springs a toast had no exit and went in a frame) */
 @media (prefers-reduced-motion: reduce) { /* (they still fade — 150ms of opacity, no shrinking or sliding — and the sheet goes with its scrim, not on its own) */
-  .bcv-sheet-ov.is-closing, .bcv-menu.is-closing, .bcv-quicknav.is-closing, .bcv-reader-ov.is-closing { animation: bcv-leave .15s var(--bcv-ease-out) both; }
+  .bcv-sheet-ov.is-closing, .bcv-menu.is-closing, .bcv-quicknav.is-closing, .bcv-reader-ov.is-closing, .bcv-toast.is-closing { animation: bcv-leave .15s var(--bcv-ease-out) both; }
   .bcv-sheet-ov.is-closing > .bcv-sheet, html.bcv-phone .bcv-sheet-ov.is-closing > .bcv-sheet { animation: none; }
 }
 /* A press is felt: a row or an item dips while the pointer is down, a card darkens a touch. */
@@ -153,6 +154,14 @@ html.bcv-phone .bcv-sheet-ov.is-closing > .bcv-sheet { animation: bcv-leave-down
 .bcv-btn, .bcv-sb__btn, .bcv-qz__big, .bcv-gpa__details, .bcv-gpa__traychip { transition: transform .16s var(--bcv-spring-snappy), filter .16s ease, background .16s ease; }
 .bcv-btn:active:not(:disabled), .bcv-sb__btn:active:not(:disabled), .bcv-qz__big:active, .bcv-gpa__details:active, .bcv-gpa__traychip:active { transform: scale(.97); }
 .bcv-rail__item:active, .bcv-rail__ext:active, .bcv-fav:active, .bcv-theme-btn:active { background: var(--bcv-fill); }
+/* (2.99.7) the small controls give under the finger as the buttons do — by the scale property, so no transform of theirs is
+   touched; the ones with transitions of their own add scale to them */
+.bcv-iconbtn, .bcv-chip, .bcv-pill, .bcv-roundbtn, .bcv-sb__tab, .bcv-pv__x, .bcv-pv__go, .bcv-nf__act, .bcv-gpa-set__step, .bcv-whatif-btn, .bcv-ccard__star, .bcv-ph-bigbtn, .bcv-tour__next, .bcv-module__head { transition: scale .16s var(--bcv-spring-snappy); }
+:is(.bcv-iconbtn, .bcv-chip, .bcv-pill, .bcv-roundbtn, .bcv-sb__tab, .bcv-pv__x, .bcv-pv__go, .bcv-nf__act, .bcv-nf__tool, .bcv-nf__ib, .bcv-gpa-set__step, .bcv-whatif-btn, .bcv-ccard__star, .bcv-ph-bigbtn, .bcv-tour__next, .bcv-todo__chip):active:not(:disabled) { scale: .96; }
+:is(.bcv-todo__add, .bcv-module__head):active:not(:disabled) { scale: .99; } /* (wide: a smaller give) */
+.bcv-circle { transition: background .2s ease, border-color .2s ease, opacity .2s ease, scale .16s var(--bcv-spring-snappy); }
+.bcv-circle:active { scale: .9; }
+.bcv-circle__tick { animation: bcv-pop var(--bcv-t-snappy) var(--bcv-spring-snappy) both; } /* (a tick here and now — painted in place, never on a redraw) */
 .bcv-row--link, .bcv-row--hover, .bcv-sheet__row, .bcv-nf__row, .bcv-menu__item, .bcv-nav__item, .bcv-rail__item, .bcv-rail__ext, .bcv-fav, .bcv-theme-btn { transition: background .18s ease; }
 /* the navigation bar: a 2.5px sweep pinned to the top of the viewport while a route loads (early.js shows it, app.js hides it once the screen is drawn) */
 /* the pressed control is the progress bar (mockup 14): a flat wash in the row's own icon colour (the
@@ -191,7 +200,8 @@ html[data-bcv-theme="dark"] .bcv-skel { --bcv-skel: linear-gradient(90deg, rgba(
   .bcv-main > .bcv-screen:not(.bcv-screen--still, .bcv-screen--skel), .bcv-main > .bcv-qz, .bcv-main > .bcv-sb, .bcv-sheet-ov, .bcv-menu, .bcv-toast, .bcv-gpa__pop, .bcv-reader-ov, .bcv-pv { animation: bcv-fade-in .15s var(--bcv-ease-out) both; }
   .bcv-sheet, .bcv-skel, .bcv-enter, .bcv-fb__fill,
   .bcv-work__row--in, .bcv-work__fill--grow, .bcv-ring--fill, .bcv-ring--unfill, .bcv-ring--track-out, .bcv-gpa__ringletter.is-back, .bcv-gpa__line--draw, .bcv-gpa__pt--in, .bcv-gpa__area--in { animation: none; }
-  .bcv-stat, .bcv-gpa__card, .bcv-ccard, .bcv-btn, .bcv-sb__btn, .bcv-side, .bcv-head--course, .bcv-rail, #bcv-app, #bcv-app::before { transition: none; }
+  .bcv-stat, .bcv-gpa__card, .bcv-ccard, .bcv-btn, .bcv-sb__btn, .bcv-side, .bcv-head--course, .bcv-rail, #bcv-app, #bcv-app::before, .bcv-switch__knob, .bcv-module__toggle, .bcv-work__more-ic { transition: none; }
+  .bcv-circle__tick { animation: bcv-fade-in .15s var(--bcv-ease-out) both; }
 }
 
 /* ---- take over the page ------------------------------------------------ */
@@ -891,7 +901,7 @@ body:has(> .bcv-sheet-ov--card:not(.is-folding)) .bcv-stat.is-lifted { visibilit
 .bcv-work__count { flex: none; width: 52px; text-align: right; font: 600 12px/1.2 var(--bcv-font); color: var(--bcv-ink2); }
 .bcv-work__more { align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; border: 0; background: transparent; padding: 2px 0; font: 500 12.5px/1.2 var(--bcv-font); color: var(--bcv-ink3); cursor: pointer; }
 .bcv-work__more:hover { color: var(--bcv-ink); }
-.bcv-work__more-ic { }
+.bcv-work__more-ic { transition: transform .3s var(--bcv-ease); }
 .bcv-work__more.is-open .bcv-work__more-ic { transform: rotate(90deg); }
 .bcv-work__idle { display: flex; flex-direction: column; gap: 14px; }
 .bcv-group__head--reorder { align-items: center; }
@@ -948,7 +958,7 @@ body:has(> .bcv-sheet-ov--card:not(.is-folding)) .bcv-stat.is-lifted { visibilit
 .bcv-pri:active { transform: scale(.97); }
 .bcv-pri:hover { filter: brightness(.94); }
 .bcv-pri--draft { padding: 6px 10px; border-radius: 9px; font-size: 12.5px; }
-.bcv-todo__add { display: flex; align-items: center; gap: 11px; width: 100%; box-sizing: border-box; padding: 14px 18px; border: 1px dashed var(--bcv-edge); border-radius: 18px; background: transparent; cursor: pointer; text-align: left; transition: background .2s ease, border-color .2s ease; }
+.bcv-todo__add { display: flex; align-items: center; gap: 11px; width: 100%; box-sizing: border-box; padding: 14px 18px; border: 1px dashed var(--bcv-edge); border-radius: 18px; background: transparent; cursor: pointer; text-align: left; transition: background .2s ease, border-color .2s ease, scale .16s var(--bcv-spring-snappy); }
 .bcv-todo__add:hover { background: var(--bcv-hover); border-color: var(--bcv-blue); }
 .bcv-todo__addic { flex: none; width: 26px; height: 26px; border-radius: 13px; background: var(--bcv-blue-soft); display: flex; align-items: center; justify-content: center; }
 .bcv-todo__addlabel { flex: 1; min-width: 0; font: 500 14px/1.3 var(--bcv-font); color: var(--bcv-ink3); }
@@ -959,7 +969,7 @@ body:has(> .bcv-sheet-ov--card:not(.is-folding)) .bcv-stat.is-lifted { visibilit
 .bcv-todo__ctl .bcv-seg__btn { padding: 6px 12px; font-size: 12.5px; font-weight: 600; }
 .bcv-todo__spacer { flex: 1; }
 /* the composer's course and repeat: chips in the date field's shape, each opening a menu (2.98.58) */
-.bcv-todo__chip { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 9px 0 10px; border: 0; border-radius: 9px; background: var(--bcv-fill); font: 500 12.5px/1 var(--bcv-font); color: var(--bcv-ink2); cursor: pointer; max-width: 220px; box-sizing: border-box; transition: background .18s ease, color .18s ease; }
+.bcv-todo__chip { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 9px 0 10px; border: 0; border-radius: 9px; background: var(--bcv-fill); font: 500 12.5px/1 var(--bcv-font); color: var(--bcv-ink2); cursor: pointer; max-width: 220px; box-sizing: border-box; transition: background .18s ease, color .18s ease, scale .16s var(--bcv-spring-snappy); }
 .bcv-todo__chip:hover { filter: brightness(.96); }
 .bcv-todo__chip.is-set { color: var(--bcv-ink); }
 .bcv-todo__chip > span { min-width: 0; }
@@ -1072,9 +1082,10 @@ body:has(> .bcv-sheet-ov--card:not(.is-folding)) .bcv-stat.is-lifted { visibilit
 .bcv-mini__range { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--bcv-sep); display: flex; align-items: center; gap: 10px; }
 .bcv-mini__range-label { font: 600 13px/1.3 var(--bcv-font); }
 .bcv-mini__range-hint { margin-top: 2px; font: 400 11px/1.3 var(--bcv-font); color: var(--bcv-ink3); }
-.bcv-switch { flex: none; width: 34px; height: 20px; border-radius: 10px; background: var(--bcv-fill); display: flex; align-items: center; padding: 2px; justify-content: flex-start; cursor: pointer; border: 0; }
-.bcv-switch.is-on { background: var(--bcv-green); justify-content: flex-end; }
-.bcv-switch__knob { width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.25); display: block; }
+.bcv-switch { --bcv-sw-travel: 14px; flex: none; width: 34px; height: 20px; border-radius: 10px; background: var(--bcv-fill); display: flex; align-items: center; padding: 2px; justify-content: flex-start; cursor: pointer; border: 0; transition: background .2s ease; }
+.bcv-switch.is-on { background: var(--bcv-green); }
+.bcv-switch__knob { width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.25); display: block; transition: transform var(--bcv-t-snappy) var(--bcv-spring-snappy); }
+.bcv-switch.is-on .bcv-switch__knob { transform: translateX(var(--bcv-sw-travel)); } /* (2.99.7: the knob slides across, as the settings page's does; the travel is the width less the padding and the knob) */
 .bcv-calrow__name { flex: 1; min-width: 0; font: 500 13.5px/1.35 var(--bcv-font); }
 .bcv-calrow--refused .bcv-calrow__name { color: var(--bcv-ink3); }
 .bcv-cal__notice { margin-bottom: 12px; padding: 10px 14px; border-radius: 12px; background: var(--bcv-fill2); font: 400 12.5px/1.45 var(--bcv-font); color: var(--bcv-ink2); text-wrap: pretty; }
@@ -1123,7 +1134,7 @@ html[data-bcv-theme="dark"] .bcv-cal__notice--warn { color: #ffb44d; }
 .bcv-picker__label { min-width: 0; }
 .bcv-picker__label--none { color: var(--bcv-ink3); }
 .bcv-picker__chev { flex: none; }
-.bcv-picker__list { position: fixed; z-index: var(--bcv-z-picker); overflow: auto; padding: 6px; border-radius: var(--bcv-r-menu); background: var(--bcv-glass-ground, var(--bcv-glass)); -webkit-backdrop-filter: var(--bcv-blur-glass); backdrop-filter: var(--bcv-blur-glass); border: 1px solid var(--bcv-edge); box-shadow: var(--bcv-shadow-hi); display: flex; flex-direction: column; gap: 2px; font-family: var(--bcv-font); animation: bcv-qn-in .16s var(--bcv-ease) both; }
+.bcv-picker__list { position: fixed; z-index: var(--bcv-z-picker); overflow: auto; padding: 6px; border-radius: var(--bcv-r-menu); background: var(--bcv-glass-ground, var(--bcv-glass)); -webkit-backdrop-filter: var(--bcv-blur-glass); backdrop-filter: var(--bcv-blur-glass); border: 1px solid var(--bcv-edge); box-shadow: var(--bcv-shadow-hi); display: flex; flex-direction: column; gap: 2px; font-family: var(--bcv-font); animation: bcv-pop var(--bcv-t-snappy) var(--bcv-spring-snappy) both; } /* (2.99.7: it grows from the button it hangs from — ui.anchor's origin — not in from the side) */
 .bcv-picker__opt { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; border: 0; border-radius: 9px; background: transparent; color: var(--bcv-ink); font: 400 14px/1.35 var(--bcv-font); text-align: left; cursor: pointer; }
 .bcv-picker__opt:hover, .bcv-picker__opt:focus-visible { background: var(--bcv-fill2); outline: none; }
 .bcv-picker__opttext { flex: 1; min-width: 0; }
@@ -1149,8 +1160,8 @@ html[data-bcv-theme="dark"] .bcv-cal__notice--warn { color: #ffb44d; }
 .bcv-menu--colors { min-width: 0; width: 226px; padding: 12px; }
 .bcv-menu__title { padding: 0 2px 10px; font: 600 11px/1.2 var(--bcv-font); color: var(--bcv-ink3); text-transform: uppercase; letter-spacing: .05em; }
 .bcv-swatches { display: grid; grid-template-columns: repeat(6, 26px); gap: 9px; }
-.bcv-swatch { width: 26px; height: 26px; border-radius: 50%; border: 0; padding: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: inset 0 0 0 var(--bcv-line) rgba(0,0,0,.1); box-sizing: border-box; }
-@media (hover: hover) and (pointer: fine) { .bcv-swatch:hover { transform: scale(1.12); } }
+.bcv-swatch { width: 26px; height: 26px; border-radius: 50%; border: 0; padding: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: inset 0 0 0 var(--bcv-line) rgba(0,0,0,.1); box-sizing: border-box; transition: transform .16s var(--bcv-spring-snappy); }
+@media (hover: hover) and (pointer: fine) { .bcv-swatch:hover { transform: scale(1.12); } } /* (it grows under the pointer, not at once) */
 .bcv-swatch.is-current { box-shadow: 0 0 0 2px var(--bcv-card), 0 0 0 4px var(--bcv-ink); }
 .bcv-swatch--custom { position: relative; overflow: hidden; background: conic-gradient(#ff2717, #fd5d10, #8d9900, #009606, #06a3b7, #1770ab, #8f3e97, #e71f63, #ff2717); }
 .bcv-swatch__input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; border: 0; padding: 0; }
@@ -1631,7 +1642,7 @@ html[data-bcv-theme="dark"] .bcv-rr-ov { --rr-dim0: .52; --rr-dim1: .78; }
 .bcv-module__all { cursor: pointer; border: 1px solid var(--bcv-edge); background: var(--bcv-card); }
 .bcv-module__item { padding-left: 18px; }
 .bcv-indent-1 { padding-left: 38px; } .bcv-indent-2 { padding-left: 58px; } .bcv-indent-3 { padding-left: 78px; }
-.bcv-module__toggle { }
+.bcv-module__toggle { transition: transform .3s var(--bcv-ease); } /* (turns with the body sliding open, not before it) */
 .bcv-module--open .bcv-module__toggle { transform: rotate(90deg); }
 .bcv-crumbs { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font: 500 13px/1.3 var(--bcv-font); color: var(--bcv-ink3); }
 .bcv-crumbs button { border: 0; background: transparent; padding: 0; font: inherit; color: var(--bcv-blue); cursor: pointer; }
@@ -2545,6 +2556,11 @@ html.bcv-preview #bcv-app { padding-right: var(--bcv-pv-w); }
 .bcv-pv a { color: var(--bcv-blue); text-decoration: none; }
 .bcv-pv svg { display: block; }
 @keyframes bcv-pv-in { from { transform: translateX(24px); opacity: 0 } to { transform: none; opacity: 1 } }
+@keyframes bcv-pv-out { to { transform: translateX(24px); opacity: 0 } }
+.bcv-inbox__reader.is-loaded > * { animation: bcv-fade-in .15s var(--bcv-ease-out) both; } /* (2.99.7: a conversation read fades in, nothing moving) */
+.bcv-pv.is-leaving { animation: bcv-pv-out .2s var(--bcv-ease-out) both; pointer-events: none; } /* (2.99.7: put away by a press, it leaves the way it came) */
+.bcv-pv.is-swap { animation: none; } /* (another row: the panel stays put, and only its words change) */
+.bcv-pv.is-swap .bcv-pv__body { animation: bcv-fade-in .15s var(--bcv-ease-out) both; }
 .bcv-pv__head { flex: none; display: flex; align-items: center; gap: 10px; padding: 16px 18px 12px; border-bottom: 1px solid var(--bcv-edge); }
 .bcv-pv__kicker { flex: 1; min-width: 0; font: 600 11px/1.2 var(--bcv-font); letter-spacing: .06em; text-transform: uppercase; color: var(--bcv-ink3); }
 .bcv-pv__x { flex: none; width: 26px; height: 26px; border-radius: 13px; border: 0; padding: 0; background: var(--bcv-fill2); display: flex; align-items: center; justify-content: center; cursor: pointer; }
@@ -3191,7 +3207,7 @@ html.bcv-phone .bcv-ph-head__sub { font: 400 13px/1.35 var(--bcv-font); color: v
 @keyframes bcvNfUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 .bcv-nf__enter { animation: bcvNfUp var(--bcv-t-settle) var(--bcv-spring-settle) both; }
 .bcv-nf__tools { display: flex; gap: 8px; flex-wrap: wrap; }
-#bcv-app .bcv-nf__tool { height: 32px; padding: 0 14px; border: 0; border-radius: 16px; cursor: pointer; font: 600 12.5px/1 var(--bcv-font); background: var(--bcv-fill); color: var(--bcv-ink2); transition: background .2s ease, color .2s ease; }
+#bcv-app .bcv-nf__tool { height: 32px; padding: 0 14px; border: 0; border-radius: 16px; cursor: pointer; font: 600 12.5px/1 var(--bcv-font); background: var(--bcv-fill); color: var(--bcv-ink2); transition: background .2s ease, color .2s ease, scale .16s var(--bcv-spring-snappy); }
 #bcv-app .bcv-nf__tool.is-on { background: var(--bcv-blue); color: #fff; }
 .bcv-nf__chips { margin-top: 13px; display: flex; gap: 7px; flex-wrap: wrap; }
 #bcv-app .bcv-nf__chip { display: flex; align-items: center; gap: 7px; border: 1px solid var(--bcv-edge); border-radius: 15px; cursor: pointer; padding: 6px 12px; background: var(--bcv-card); color: var(--bcv-ink2); font: 600 12.5px/1.2 var(--bcv-font); transition: background .2s ease, border-color .2s ease; }
@@ -3214,7 +3230,7 @@ html.bcv-phone .bcv-ph-head__sub { font: 400 13px/1.35 var(--bcv-font); color: v
 .bcv-nf__meta { display: block; margin-top: 3px; font: 400 12.5px/1.4 var(--bcv-font); color: var(--bcv-ink3); }
 .bcv-nf__course { flex: none; padding: 4px 9px; border-radius: 9px; background: var(--bcv-fill); font: 600 11px/1.3 var(--bcv-font); color: var(--bcv-ink2); max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #bcv-app .bcv-nf__act { flex: none; height: 28px; padding: 0 12px; border: 0; border-radius: 14px; background: var(--bcv-fill); color: var(--bcv-ink2); cursor: pointer; font: 600 12px/1 var(--bcv-font); }
-#bcv-app .bcv-nf__ib { flex: none; width: 28px; height: 28px; border: 0; border-radius: 14px; background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--bcv-ink3); transition: background .18s ease, color .18s ease; }
+#bcv-app .bcv-nf__ib { flex: none; width: 28px; height: 28px; border: 0; border-radius: 14px; background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--bcv-ink3); transition: background .18s ease, color .18s ease, scale .16s var(--bcv-spring-snappy); }
 #bcv-app .bcv-nf__ib:hover { background: var(--bcv-fill); }
 #bcv-app .bcv-nf__ib--x:hover { background: rgba(255,69,58,.14); color: #ff453a; }
 .bcv-nf__empty { padding: 44px 24px; text-align: center; font: 500 14px/1.4 var(--bcv-font); color: var(--bcv-ink2); }
@@ -4389,7 +4405,7 @@ html[data-bcv-theme="dark"] .bcv-pdfx { --px-row: #0f0f11; --px-page: #1f1f22; -
 .bcv-omni__wiki { display: none; flex: none; align-items: center; gap: 6px; padding-left: 4px; cursor: pointer; animation: bcv-omni-wiki-in .18s ease-out both; }
 .bcv-omni__box:focus-within .bcv-omni__wiki { display: flex; }
 .bcv-omni__wikit { font: 500 11px/1 var(--bcv-font); color: var(--bcv-ink3); white-space: nowrap; }
-.bcv-omni__wiki .bcv-switch { width: 28px; height: 16px; padding: 2px; }
+.bcv-omni__wiki .bcv-switch { --bcv-sw-travel: 12px; width: 28px; height: 16px; padding: 2px; }
 .bcv-omni__wiki .bcv-switch__knob { width: 12px; height: 12px; }
 .bcv-omni + .bcv-ml-auto { margin-left: 0; }
 .bcv-omni__box { display: flex; align-items: center; gap: 8px; height: 29px; padding: 0 8px 0 11px; border-radius: 15px; background: var(--bcv-fill); border: 1px solid transparent; transition: background .2s ease, border-color .2s ease, box-shadow .2s ease; }
@@ -4670,7 +4686,7 @@ html.bcv-phone .bcv-ph-search .bcv-omni__box { height: 42px; padding: 0 12px 0 1
 html.bcv-phone .bcv-ph-search .bcv-omni__box:focus-within { background: var(--bcv-card); box-shadow: var(--bcv-shadow); }
 html.bcv-phone .bcv-ph-search .bcv-omni__box input.bcv-omni__in, html.bcv-phone .bcv-ph-search .bcv-omni__box input.bcv-omni__in[type="search"] { height: 40px; font: 400 16px/1 var(--bcv-font); }
 html.bcv-phone .bcv-ph-search .bcv-omni__key, html.bcv-phone .bcv-ph-search .bcv-omni__hint { display: none !important; }
-html.bcv-phone .bcv-ph-search .bcv-omni__wiki .bcv-switch { width: 38px; height: 23px; border-radius: 12px; }
+html.bcv-phone .bcv-ph-search .bcv-omni__wiki .bcv-switch { --bcv-sw-travel: 15px; width: 38px; height: 23px; border-radius: 12px; }
 html.bcv-phone .bcv-ph-search .bcv-omni__wiki .bcv-switch__knob { width: 19px; height: 19px; }
 html.bcv-phone .bcv-ph-search .bcv-omni__wikit { font-size: 12px; }
 html.bcv-phone .bcv-ph-search .bcv-omni__panel { position: relative; margin-top: 10px; max-height: none; overflow: visible; padding: 6px; border: 0; border-radius: var(--bcv-r-row); box-shadow: var(--bcv-shadow); }

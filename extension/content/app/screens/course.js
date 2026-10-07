@@ -1443,8 +1443,9 @@
       order = v;
       store.setPref(orderKey, v);
       for (const b of seg.querySelectorAll('.bcv-seg__btn')) b.classList.toggle('is-active', b.dataset.value === v);
-      sortCards(v);
+      U.flipList(col, () => sortCards(v)); // (2.99.7: each module slides to its new place rather than jumping — 200 ms, translate only)
     });
+    for (const x of cards) if (!x.dataset.flip) x.dataset.flip = `m-${x.dataset.pos}`;
     paintBulk();
     sortCards(order);
     col.prepend(U.el('bcv-module__bar', [seg, h('span', { class: 'bcv-ml-auto' }), bulkBtn]));

@@ -59,6 +59,8 @@ h1 { margin: 0; font: 700 30px/1.15 var(--display); letter-spacing: -.03em; }
 .saved { flex: none; display: flex; align-items: center; gap: 6px; padding: 6px 11px; border-radius: 13px; background: var(--green-soft); color: var(--green); font: 600 11.5px/1.2 var(--font); animation: fadeIn .2s ease both; }
 .saved.is-err { background: rgba(255,69,58,.14); color: var(--red); }
 .saved[hidden] { display: none; }
+.saved.is-out { animation: savedOut .2s ease both; } /* (an animation, not a transition: the fade in holds its opacity) */
+@keyframes savedOut { from { opacity: 1; } to { opacity: 0; } }
 .section { display: none; padding: 0 40px 70px; animation: fadeUp .3s var(--ease) both; }
 .section.is-active { display: block; }
 .card { margin-top: 12px; background: var(--card); border: 1px solid var(--edge); border-radius: 18px; overflow: hidden; }
@@ -108,11 +110,14 @@ h1 { margin: 0; font: 700 30px/1.15 var(--display); letter-spacing: -.03em; }
 .switch--sm .switch__knob { width: 23px; height: 23px; }
 .switch--sm.is-on .switch__knob { transform: translateX(17px); }
 .stepper { flex: none; display: flex; align-items: center; gap: 2px; padding: 2px; border-radius: 11px; background: var(--fill); }
-.stepper button { width: 30px; height: 28px; border: 0; border-radius: 9px; background: transparent; cursor: pointer; font: 600 16px/1 var(--font); color: var(--ink2); }
+.stepper button { width: 30px; height: 28px; border: 0; border-radius: 9px; background: transparent; cursor: pointer; font: 600 16px/1 var(--font); color: var(--ink2); transition: background .18s ease, transform .16s cubic-bezier(.23,1,.32,1); }
 .stepper button:hover { background: var(--card); }
 .stepper__val { min-width: 46px; text-align: center; font: 600 15px/1 var(--mono); color: var(--ink); }
 .seg { flex: none; display: flex; padding: 2px; border-radius: 11px; background: var(--fill); border: 1px solid var(--edge); gap: 2px; }
-.seg button { border: 0; cursor: pointer; padding: 0 13px; height: 27px; border-radius: 9px; font: 600 12px/1 var(--font); background: transparent; color: var(--ink3); transition: background .2s ease, color .2s ease; }
+.seg button { border: 0; cursor: pointer; padding: 0 13px; height: 27px; border-radius: 9px; font: 600 12px/1 var(--font); background: transparent; color: var(--ink3); transition: background .2s ease, color .2s ease, transform .16s cubic-bezier(.23,1,.32,1); }
+/* (2.99.7) the controls give under the finger, as the buttons do */
+.seg button:active, .chip:active, .devopt:active, .stepper button:active { transform: scale(.94); }
+.theme:active { transform: scale(.98); }
 .seg button.is-on { background: var(--blue); color: #fff; box-shadow: 0 1px 3px rgba(10,132,255,.35); }
 .seg--letters button { min-width: 32px; padding: 0 6px; }
 .field { display: flex; align-items: center; gap: 9px; padding: 11px 13px; border-radius: 14px; background: var(--fill); }
@@ -135,6 +140,7 @@ h1 { margin: 0; font: 700 30px/1.15 var(--display); letter-spacing: -.03em; }
 
 /* courses */
 .course { display: flex; align-items: center; gap: 13px; padding: 13px 17px; border-top: 1px solid var(--sep); animation: fadeUp .34s var(--ease) both; }
+.is-drawn > .course, .is-drawn > .site { animation: none; } /* (a list drawn again in place is not an arrival) */
 .course:first-child { border-top: 0; }
 .course__dot { flex: none; width: 10px; height: 10px; border-radius: 3px; }
 .course__body { flex: 1; min-width: 112px; } /* (room for a course code on one line; the nickname box gives way first) */
@@ -148,7 +154,7 @@ h1 { margin: 0; font: 700 30px/1.15 var(--display); letter-spacing: -.03em; }
 
 /* themes */
 .themes { display: flex; gap: 10px; }
-.theme { flex: 1; min-width: 0; padding: 0; border: 1px solid var(--edge); border-radius: 18px; background: var(--card); cursor: pointer; overflow: hidden; color: var(--ink2); transition: border-color .2s ease; }
+.theme { flex: 1; min-width: 0; padding: 0; border: 1px solid var(--edge); border-radius: 18px; background: var(--card); cursor: pointer; overflow: hidden; color: var(--ink2); transition: border-color .2s ease, transform .16s cubic-bezier(.23,1,.32,1); }
 .theme.is-on { border: 1.5px solid var(--blue); color: var(--blue-ink); }
 .theme__pv { display: block; height: 76px; position: relative; }
 .theme__pv--light { background: #f2f2f6; --s: #e3e3e8; --b: #d8d8de; --c: #fff; }
@@ -249,14 +255,14 @@ html[data-theme="dark"] .docs__warn { color: #ffb44d; }
 input[type="search"].input { width: 100%; }
 .input--mono { font-family: var(--mono, ui-monospace, Menlo, monospace); letter-spacing: .06em; }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
-.chip { height: 30px; padding: 0 13px; border: 0; border-radius: 15px; background: var(--fill); color: var(--ink2); cursor: pointer; font: 600 12.5px/1 var(--font); transition: background .2s ease; }
+.chip { height: 30px; padding: 0 13px; border: 0; border-radius: 15px; background: var(--fill); color: var(--ink2); cursor: pointer; font: 600 12.5px/1 var(--font); transition: background .2s ease, transform .16s cubic-bezier(.23,1,.32,1); }
 .chip:hover { background: var(--fill2, var(--fill)); color: var(--ink); }
 .devlog { max-height: 340px; margin: 12px 0 0; padding: 12px 14px; overflow: auto; border-radius: 12px; background: var(--fill); color: var(--ink2); font: 400 11.5px/1.6 var(--mono, ui-monospace, Menlo, monospace); white-space: pre; -webkit-user-select: text; user-select: text; }
 .devfield { display: flex; align-items: center; gap: 12px; padding: 13px 16px; }
 .devfield + .devfield { border-top: 1px solid var(--sep); }
 .devfield__body { flex: 1; min-width: 150px; } /* (the label keeps its words on a line; the choices wrap instead) */
 .devfield__opts { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
-.devopt { height: 28px; padding: 0 11px; border: 0; border-radius: 14px; background: var(--fill); color: var(--ink3); cursor: pointer; font: 600 12px/1 var(--font); transition: background .2s ease, color .2s ease; }
+.devopt { height: 28px; padding: 0 11px; border: 0; border-radius: 14px; background: var(--fill); color: var(--ink3); cursor: pointer; font: 600 12px/1 var(--font); transition: background .2s ease, color .2s ease, transform .16s cubic-bezier(.23,1,.32,1); }
 .devopt.is-on { background: var(--blue); color: #fff; }
 /* 2.83.0: the record before this term, uploaded as a CSV: its rows listed one a line */
 #recordList { white-space: pre-line; font-variant-numeric: tabular-nums; }

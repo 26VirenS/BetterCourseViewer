@@ -25,6 +25,13 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.7', date: '2026-10-07', notes: [
+      { kind: 'improved', title: 'Calmer lists', body: 'Dismissing or ticking no longer replays the list.', icon: P.list },
+      { kind: 'improved', title: 'Instant search keys', body: 'Search opened with / or ⌘K is simply there.', icon: P.sparkle },
+      { kind: 'improved', title: 'Switches slide', body: 'Switches and buttons respond under your finger.', icon: P.toggle },
+      { kind: 'improved', title: 'Things move, not jump', body: 'Months, modules, stars and replies slide into place.', icon: P.arrows },
+      { kind: 'new', title: 'A beat for handing in', body: 'Handing in shows a tick where your work landed.', icon: P.check },
+    ] },
     { version: '2.99.6', date: '2026-10-07', notes: [
       { kind: 'new', title: 'Settings, built in', body: 'Grades, history and data in the app’s own Settings.', icon: P.toggle },
       { kind: 'new', title: 'Review before submit', body: 'Check every answer before you hand in a quiz.', icon: P.check },
