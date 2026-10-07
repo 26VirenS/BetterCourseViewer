@@ -184,7 +184,10 @@
     front.addEventListener('dragstart', (e) => e.preventDefault());
     const wrap = U.el('bcv-ph-swipe', [tray, front]);
     let x0 = 0, y0 = 0, dx = 0, base = 0, dragging = false, moved = false;
-    const set = (x, animate) => { front.style.transition = animate ? 'transform .22s cubic-bezier(.32,.72,0,1)' : 'none'; front.style.transform = `translateX(${x}px)`; };
+    let trail = []; // ([t, x] over the last tenth of a second: the finger's speed when it lets go)
+    const RUB = 0.55; // (past an end: the further it is pulled, the less it follows — iOS's rubber band)
+    const rubber = (over) => (over * 60 * RUB) / (60 + over * RUB);
+    const set = (x, animate) => { front.style.transition = animate ? 'transform .22s var(--bcv-ease)' : 'none'; front.style.transform = `translateX(${x}px)`; };
     // a row is promoted to its own layer only while a finger is on it (will-change on every row of
     // a long list is a layer per row, held for the page's life)
     let layerT = 0;
@@ -193,6 +196,7 @@
     front.addEventListener('pointerdown', (e) => {
       if (e.pointerType === 'mouse' && e.button !== 0) return;
       x0 = e.clientX; y0 = e.clientY; dragging = true; moved = false;
+      trail = [[e.timeStamp, e.clientX]];
       layer(true);
     });
     front.addEventListener('pointermove', (e) => {
@@ -205,14 +209,21 @@
         if (openSwipe && openSwipe !== api) closeSwipes();
         try { front.setPointerCapture(e.pointerId); } catch { /* not every pointer can be captured */ }
       }
-      dx = Math.max(-W, Math.min(0, base + mx));
+      const raw = base + mx;
+      dx = raw > 0 ? rubber(raw) : raw < -W ? -W - rubber(-W - raw) : raw;
+      trail.push([e.timeStamp, e.clientX]);
+      while (trail.length > 2 && e.timeStamp - trail[0][0] > 100) trail.shift();
       set(dx, false);
     });
     const end = () => {
       if (!dragging) return;
       dragging = false;
       if (!moved) { layer(false); return; }
-      if (dx < -W / 2) { if (base !== -W) U.haptic?.('rigid'); base = -W; set(-W, true); wrap.classList.add('is-open'); openSwipe = api; }
+      // the speed over the last tenth of a second, in px/ms (a finger that stopped before letting go has none)
+      const [t0, xa] = trail[0] || [0, 0], [t1, xb] = trail[trail.length - 1] || [0, 0];
+      const v = t1 - t0 > 0 && performance.now() - t1 < 80 ? (xb - xa) / (t1 - t0) : 0;
+      const open = v < -0.11 ? true : v > 0.11 ? false : dx < -W / 2;
+      if (open) { if (base !== -W) U.haptic?.('rigid'); base = -W; set(-W, true); wrap.classList.add('is-open'); openSwipe = api; }
       else { base = 0; set(0, true); wrap.classList.remove('is-open'); if (openSwipe === api) openSwipe = null; }
       layer(false);
     };
@@ -334,7 +345,7 @@
     const moreIn = (gest) => (gest.more ??= holdsMore()); // (once a gesture: it walks the sheet, so not on every move)
     const noDrag = (el) => !!el?.closest?.('input, textarea, select, [contenteditable="true"], canvas, .bcv-ph-chips, [data-no-sheet-drag]');
     let g = null;
-    const HEIGHT = 'height .34s cubic-bezier(.32,.72,0,1)';
+    const HEIGHT = 'height .34s var(--bcv-ease)';
     const set = (y) => { sheet.style.transition = HEIGHT; sheet.style.transform = y ? `translateY(${y}px)` : ''; };
     /** To nearly the full screen and back, the height moving between the two (an auto height cannot
      *  be animated, so the one it leaves is held for a frame). */
@@ -356,7 +367,7 @@
       if (dy < 0) {
         // pulled up: a sheet holding more grows to nearly the full screen at once; beyond that (or with nothing more to show) it gives a little and no more
         if (!g.grew && moreIn(g)) { g.grew = true; grow(); g.y0 = y; dy = 0; }
-        else dy = Math.max(-14, dy * 0.18);
+        else { const o = -dy; dy = -(o * 40 * 0.18) / (40 + o * 0.18); } // (a rubber band: a little at first, ever less, never a wall)
       }
       g.dy = dy;
       set(dy);
@@ -365,7 +376,7 @@
       sheet.style.willChange = '';
       const m = M();
       if (m && from) { try { sheet.style.transform = ''; m.run(sheet, { y: [from, 0] }, 'phone', { v0: Math.max(0, -(g?.vy || 0)) / Math.max(1, Math.abs(from)), fill: 'backwards' }); return; } catch { /* the plain way */ } }
-      sheet.style.transition = `transform .25s cubic-bezier(.32,.72,0,1), ${HEIGHT}`; sheet.style.transform = '';
+      sheet.style.transition = `transform .25s var(--bcv-ease), ${HEIGHT}`; sheet.style.transform = '';
     };
     const putAway = (from, vy) => {
       const hh = sheet.offsetHeight + 40;
@@ -390,7 +401,8 @@
     };
     const release = () => {
       if (!g) return;
-      const { dy = 0, vy = 0, grew } = g;
+      const { dy = 0, grew } = g;
+      const vy = performance.now() - g.lastT > 80 ? 0 : g.vy || 0; // (a finger that stopped before letting go threw nothing)
       g = null;
       const H = sheet.offsetHeight || 1;
       const large = sheet.classList.contains('is-large');

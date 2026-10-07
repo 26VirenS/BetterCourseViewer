@@ -119,10 +119,27 @@
     wrap.classList.add('has-thumb');
     wrap.append(thumb); // (last, so the options keep their places among the children)
     let shown = null;
+    // (moved by transform alone: the shape takes the chosen option's size at once and starts out scaled to where it
+    // stands this instant — mid-glide too — so the glide is a translate and a scale settling to none, never a resize)
+    const drawn = () => {
+      const r = thumb.getBoundingClientRect(), w = wrap.getBoundingClientRect();
+      const k = (wrap.offsetWidth && w.width / wrap.offsetWidth) || 1; // (inside a sheet still growing in: its scale taken out)
+      return r.width ? { left: (r.left - w.left) / k - wrap.clientLeft, top: (r.top - w.top) / k - wrap.clientTop, width: r.width / k, height: r.height / k } : null;
+    };
     const put = (g, glide) => {
-      thumb.style.transition = glide ? '' : 'none';
-      Object.assign(thumb.style, { width: `${g.width}px`, height: `${g.height}px`, transform: `translate(${g.left}px, ${g.top}px)`, borderRadius: g.radius, opacity: '1' });
-      if (!glide) { void thumb.offsetWidth; thumb.style.transition = ''; }
+      const from = glide && shown ? drawn() : null;
+      thumb.style.transition = 'none';
+      Object.assign(thumb.style, { width: `${g.width}px`, height: `${g.height}px`, borderRadius: g.radius, opacity: '1' });
+      if (from && g.width && g.height) {
+        thumb.style.transform = `translate(${from.left}px, ${from.top}px) scale(${from.width / g.width}, ${from.height / g.height})`;
+        void thumb.offsetWidth;
+        thumb.style.transition = '';
+        thumb.style.transform = `translate(${g.left}px, ${g.top}px)`;
+      } else {
+        thumb.style.transform = `translate(${g.left}px, ${g.top}px)`;
+        void thumb.offsetWidth;
+        thumb.style.transition = '';
+      }
       shown = g;
       if (memoKey) segMemo.set(memoKey, { ...g, at: Date.now() });
     };
@@ -219,19 +236,28 @@
 
   let toastTimer = null;
   function toast(str, { error = false, ms = 2600, code = null, err = null } = {}) {
-    document.querySelectorAll('.bcv-toast').forEach((t) => t.remove());
+    // (a toast already up — not on its way out — takes the new words where it stands, with a small nudge to say they
+    // changed; it is not torn down for another to drop in from the top. One on its way out finishes leaving.)
+    const live = [...document.querySelectorAll('.bcv-toast')].find((x) => !x.classList.contains('is-closing') && !x.classList.contains('bcv-sprung'));
     // a pill that floats down from the top centre, the Away Refresh pill's kind: a mark (a bell, or on an
     // error a red "!") and the words beside it
     const mark = error ? 'M12 7.5v6M12 16.8v.2' : 'M6.5 16.5h11l-1.4-2V10a4.1 4.1 0 00-8.2 0v4.5zM10.3 18.6a1.8 1.8 0 003.4 0';
     if (error) haptic('error');
-    const t = el(`bcv-toast ${error ? 'bcv-toast--error' : ''}`, [
+    const parts = [
       h('span', { class: 'bcv-toast__ic', 'aria-hidden': 'true' }, svg(mark, { size: 16, width: error ? 2.8 : 2.2 })),
       h('span', { class: 'bcv-toast__text', text: str }),
-    ], { role: 'status' });
+    ];
+    let t = live;
+    if (t) {
+      t.className = `bcv-toast ${error ? 'bcv-toast--error' : ''}`;
+      t.replaceChildren(...parts);
+      delete t.dataset.code;
+      if (!reducedMotion() && !t.getAnimations().some((a) => a.playState === 'running')) t.animate([{ transform: 'scale(.97)' }, { transform: 'none' }], { duration: 160, easing: 'cubic-bezier(.23,1,.32,1)' });
+    } else t = el(`bcv-toast ${error ? 'bcv-toast--error' : ''}`, parts, { role: 'status' });
     // an error says its code (lib/errors.js) after its words — drawn from data-code, and kept for a report — and stays a little longer to be read
     const c = error ? code || BCV.errors?.codeFor?.(err) : null;
     if (c) { t.dataset.code = c; BCV.errors.note(c); ms = Math.max(ms, 4200); }
-    overlayRoot().append(t);
+    if (!live) overlayRoot().append(t);
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => dismiss(t), ms); // (it leaves the way it came, on its spring)
     return t;
@@ -561,7 +587,8 @@
    *  page (docs/SAFARI.md §4), and a spring that throws hands over to the stylesheet's exit. */
   function dismiss(ov) {
     if (!ov || !ov.isConnected || ov.classList.contains('is-closing')) return Promise.resolve();
-    const gone = () => { try { ov.remove(); } catch { /* already gone */ } };
+    const exit = (ov._bcvExit = { recalled: false }); // (recall() below can still bring it back, until it is gone)
+    const gone = () => { if (exit.recalled) return; try { ov.remove(); } catch { /* already gone */ } };
     const cap = new Promise((resolve) => setTimeout(resolve, EXIT_CAP));
     const M = BCV.motion;
     if (M && !reducedMotion()) {
@@ -571,11 +598,23 @@
         const parts = [M.exit(ov, sheet ? 'scrim' : kind)];
         if (sheet) parts.push(M.exit(sheet, kind));
         ov.classList.add('is-closing', 'bcv-sprung');
-        return Promise.race([Promise.all(parts.map((p) => p.finished)), cap]).then(gone);
+        return Promise.race([Promise.all(parts.map((p) => p.finished)), cap]).then(gone, gone); // (an exit cancelled by recall() rejects: still settled, and gone() stands down)
       } catch { ov.classList.remove('is-closing', 'bcv-sprung'); } // (the stylesheet's exit instead)
     }
     ov.classList.add('is-closing');
-    return Promise.race([afterMotion(ov), cap]).then(gone);
+    return Promise.race([afterMotion(ov), cap]).then(gone, gone);
+  }
+  /** Bring back something on its way out (dismiss above), from wherever its exit has got to — the pointer back over
+   *  what opened it, say — rather than letting it go and opening a second one beside it. False when it is not leaving. */
+  function recall(ov) {
+    if (!ov || !ov.isConnected || !ov.classList.contains('is-closing') || !ov._bcvExit) return false;
+    ov._bcvExit.recalled = true;
+    const cs = getComputedStyle(ov);
+    const from = { opacity: cs.opacity, transform: cs.transform };
+    for (const a of ov.getAnimations()) a.cancel(); // (the exit, and the entrance's held last frame: the element's own look is where it lands)
+    ov.classList.remove('is-closing', 'bcv-sprung');
+    if (!reducedMotion()) ov.animate([from, { opacity: 1, transform: 'none' }], { duration: 180, easing: 'cubic-bezier(.23,1,.32,1)' });
+    return true;
   }
   function closeMenus() {
     document.querySelectorAll('.bcv-menu:not([data-keep]):not(.is-closing)').forEach((m) => dismiss(m)); // (a box that only wears a menu's look stays: the inbox's recipient results)
@@ -836,6 +875,43 @@
     }
   };
 
+  /** A list drawn again with one thing changed — a row ticked off, dismissed, added: what stays slides
+   *  from where it was to where it now sits (200 ms, ease-out) instead of jumping. Rows and the groups
+   *  holding them carry `data-flip` keys; a row moves by what is left after its group's own move, so a
+   *  parent and its child never carry the same distance. Only `translate` moves; reduced motion: none. */
+  function flipList(root, draw) {
+    if (!root || reducedMotion()) return draw();
+    const keyed = () => [...root.querySelectorAll('[data-flip]')];
+    const before = new Map(keyed().map((el) => [el.dataset.flip, el.getBoundingClientRect().top]));
+    const out = draw();
+    const now = keyed();
+    const top = new Map(now.map((el) => [el, el.getBoundingClientRect().top]));
+    const shift = (el) => {
+      const was = before.get(el.dataset.flip);
+      return was === undefined ? 0 : was - top.get(el);
+    };
+    const ease = getComputedStyle(document.documentElement).getPropertyValue('--bcv-ease-out').trim() || 'cubic-bezier(.23,1,.32,1)';
+    for (const el of now) {
+      if (!before.has(el.dataset.flip)) continue; // (new here: it rides in with its group)
+      const host = el.parentElement?.closest('[data-flip]');
+      const dy = shift(el) - (host && top.has(host) ? shift(host) : 0);
+      if (Math.abs(dy) >= 0.5) {
+        try { el.animate([{ translate: `0 ${dy}px` }, { translate: '0 0' }], { duration: 200, easing: ease }); } catch { /* lands where it is */ }
+      }
+    }
+    return out;
+  }
+
+  /** The success tick (a hand-in, a finished quiz): drawn in once, the first time it shows — its disc
+   *  settles from 0.9 and the stroke draws over 400 ms (a rare moment, allowed its delight). A redraw,
+   *  or a second showing, has it there already; reduced motion keeps only the fade (app.css). */
+  function drawCheck(el, fresh = true) {
+    if (!el || !fresh || isStill()) return el;
+    for (const p of el.querySelectorAll('path')) p.setAttribute('pathLength', '1');
+    el.classList.add('bcv-check--draw');
+    return el;
+  }
+
   /** Screen pixels per CSS pixel (a zoom, a scaled display), for a canvas drawn to be crisp: capped
    *  at 3, where a sharper drawing costs memory and shows nothing more. */
   const dpr = () => Math.min(3, Math.max(0.25, self.devicePixelRatio || 1));
@@ -867,7 +943,7 @@
       delete node.dataset.rolling;
     };
     if (node._bcvRoll) clearInterval(node._bcvRoll);
-    if (!Number.isFinite(target) || reducedMotion()) {
+    if (!Number.isFinite(target) || reducedMotion() || isStill()) { // (a number drawn again in place is already the student's: never scrambled)
       finish();
       return node;
     }
@@ -1268,7 +1344,7 @@
   const hoverBlocked = () => !!document.querySelector('.bcv-sheet-ov, #bcv-tour');
   // Only a mouse that moved counts: a button drawn under a pointer that is resting (the Dashboard
   // painting its counters where the pointer happens to be) is "entered" too, and must not open.
-  let mouseAt = null, movedAt = 0;
+  let mouseAt = null, movedAt = -Infinity; // (never "just moved" before a move: a page painted within its first moments is not a hover)
   addEventListener('pointermove', (e) => {
     if (e.pointerType !== 'mouse' || (mouseAt && mouseAt.x === e.clientX && mouseAt.y === e.clientY)) return;
     mouseAt = { x: e.clientX, y: e.clientY };
@@ -1320,13 +1396,164 @@
     });
   }
 
+  // ---- a box that grows out of what opened it (2.99.4) ------------------------------------------------------------
+  // A Dashboard counter's box and the mark's box are laid out once, where they go, and drawn through a clip that grows
+  // from the card (or from wherever the box is drawn this instant) to the whole box: clip-path, never left, top, width
+  // or height animated, so nothing in it is laid out again on each frame. Its shadow is a layer of its own that scales
+  // with it, and the dim round it a gradient drawn once and moved by transform — the page focusing onto the box as the
+  // dim's light middle closes in on it, letting go outward as it folds. The words that travel between the card and
+  // the box's header (`glide`: [box's, card's]) are drawn where the card's are and glide to their own places.
+  const pxs = (n) => `${Math.round(n * 100) / 100}px`;
+  /** The clip that shows only `rect` (on screen) of a box laid out at `b` (on screen), its corners `radius`. */
+  function clipTo(b, rect, radius) {
+    return `inset(${pxs(Math.max(0, rect.top - b.top))} ${pxs(Math.max(0, b.right - rect.right))} ${pxs(Math.max(0, b.bottom - rect.bottom))} ${pxs(Math.max(0, rect.left - b.left))} round ${radius})`;
+  }
+  /** Where a clipped box is drawn this instant (its clip mid-way too), on screen. */
+  function drawnOf(box) {
+    const b = box.getBoundingClientRect();
+    const m = /inset\(([^)]*)\)/.exec(getComputedStyle(box).clipPath || '');
+    const [t = 0, r = t, bt = t, l = r] = m ? m[1].split(/\s+round\s+/)[0].trim().split(/\s+/).map((v) => parseFloat(v) || 0) : [];
+    const left = b.left + l, top = b.top + t, right = b.right - r, bottom = b.bottom - bt;
+    return { left, top, right, bottom, width: right - left, height: bottom - top };
+  }
+  const gentleEase = () => {
+    const v = getComputedStyle(document.documentElement).getPropertyValue('--bcv-spring-gentle').trim();
+    return v && (!/^linear\(/.test(v) || CSS.supports('animation-timing-function', v)) ? v : 'cubic-bezier(.32,.72,0,1)';
+  };
+  const gentleMs = () => { const v = getComputedStyle(document.documentElement).getPropertyValue('--bcv-t-gentle').trim(), n = parseFloat(v); return Number.isFinite(n) ? (/ms$/.test(v) ? n : n * 1000) : 460; }; // (motion.js writes ms, the stylesheet's fallback s)
+  /** The motion of a box (`sheet`, position: fixed, in the overlay `ov`) that opens out of `card`. `geometry()` says
+   *  where it goes ({ x, y, w, h }). Call with the sheet already in the overlay, before the overlay is in the page. */
+  function cardBox({ ov, sheet, card, geometry, cardRadius = null }) {
+    const cr = cardRadius || getComputedStyle(card).borderTopLeftRadius || '16px';
+    const BOX_R = 'var(--bcv-r-sheet)';
+    const shadow = el('bcv-card-shadow', null, { 'aria-hidden': 'true' });
+    const dim = el('bcv-card-dim', null, { 'aria-hidden': 'true' });
+    ov.append(dim, shadow); // (after the box, which stays the overlay's first child; under it by z-index)
+    let G = null;
+    let glide = [];
+    const still = (els, fn) => { for (const e of els) e.style.transition = 'none'; fn(); void sheet.offsetWidth; for (const e of els) e.style.transition = ''; };
+    const centre = (r) => [r.left + r.width / 2, r.top + r.height / 2];
+    let dimK = 1, dimFar = 1;
+    /** The dim, drawn once for this box: a 512px gradient scaled to cover the window round the box's centre. */
+    function dimFor(g) {
+      const vw = innerWidth, vh = innerHeight;
+      const r0 = Math.hypot(g.w, g.h) / 2;
+      const c = card.getBoundingClientRect();
+      const reachOf = ([x, y]) => Math.max(x, vw - x, y, vh - y);
+      const axis = Math.max(reachOf(centre({ left: g.x, top: g.y, width: g.w, height: g.h })), reachOf(centre(c)));
+      dimK = (axis * 1.04) / 256;
+      const R = 256 * dimK;
+      dim.style.setProperty('--bcv-d1', `${((r0 * 0.8) / R) * 100}%`);
+      dim.style.setProperty('--bcv-d2', `${((r0 + 220) / R) * 100}%`);
+      dim.style.setProperty('--bcv-d3', `${((r0 + 900) / R) * 100}%`);
+      dimFar = Math.max(1.5, (Math.hypot(vw, vh) + 120) / Math.max(40, r0 * 0.8)); // (far: the light middle holds the whole window)
+    }
+    const aim = (rect, far) => {
+      const [x, y] = centre(rect);
+      dim.style.translate = `${pxs(x)} ${pxs(y)}`;
+      dim.style.scale = String(dimK * (far ? dimFar : 1));
+    };
+    /** Put the box where it goes, at once (its shadow's place with it). */
+    function layout() {
+      G = geometry();
+      const s = { left: `${Math.round(G.x)}px`, top: `${Math.round(G.y)}px`, width: `${Math.round(G.w)}px`, height: `${Math.round(G.h)}px` };
+      Object.assign(sheet.style, s);
+      Object.assign(shadow.style, s);
+      dimFor(G);
+      // the blur's clear hole: where the box lands, set with it — never animated (Safari drops a blur whose hole moves, once it settles)
+      ov.style.setProperty('--bcv-mx', `${Math.round(G.x + G.w / 2)}px`);
+      ov.style.setProperty('--bcv-my', `${Math.round(G.y + G.h / 2)}px`);
+      ov.style.setProperty('--bcv-mr', `${Math.round(Math.hypot(G.w, G.h) / 2)}px`);
+      return G;
+    }
+    const boxRect = () => ({ left: G.x, top: G.y, right: G.x + G.w, bottom: G.y + G.h, width: G.w, height: G.h });
+    const clipAs = (rect, radius) => clipTo(boxRect(), rect, radius); // (from where the box is laid out: measurable before it is in the page)
+    /** The shadow drawn as `rect` (scaled from the box's own), or as the box's. */
+    const shadowAs = (rect) => {
+      if (!rect) { shadow.style.transform = ''; shadow.style.opacity = '1'; return; }
+      shadow.style.transform = `translate(${pxs(rect.left - G.x)}, ${pxs(rect.top - G.y)}) scale(${rect.width / G.w}, ${rect.height / G.h})`;
+      shadow.style.opacity = '0';
+    };
+    // the words: where each lies with nothing moving it, and the move that draws it where the card's is
+    // (measured with its transition off: a transition running would hand back where it is drawn, not where it lies)
+    const restOf = (a) => { const t = a.style.transform, tr = a.style.transition; a.style.transition = 'none'; a.style.transform = 'none'; const r = a.getBoundingClientRect(); a.style.transform = t; a.style.transition = tr; return r; };
+    const asCard = (rest, at) => `translate(${pxs(at.left - rest.left)}, ${pxs(at.top - rest.top)}) scale(${at.height / Math.max(1, rest.height)})`;
+    /** Set the box as the card: laid out where it goes, drawn only where the card is (before the overlay is shown). */
+    function start() {
+      layout();
+      still([sheet, shadow, dim], () => {
+        sheet.style.clipPath = clipAs(card.getBoundingClientRect(), cr);
+        shadowAs(card.getBoundingClientRect());
+        aim(card.getBoundingClientRect(), true);
+      });
+      return G;
+    }
+    /** Open: the clip grows from the card to the whole box, the words glide out of the card's, the dim closes in. */
+    function open(words) {
+      glide = words;
+      sheet.style.clipPath = clipAs(card.getBoundingClientRect(), cr); // (the card measured again: the overlay is in the page now)
+      still(glide.map(([a]) => a), () => { for (const [a, b] of glide) a.style.transform = asCard(restOf(a), b.getBoundingClientRect()); });
+      sheet.classList.remove('is-at-card');
+      ov.classList.remove('is-far');
+      sheet.style.clipPath = `inset(0px round ${BOX_R})`;
+      shadowAs(null);
+      aim(boxRect(), false);
+      for (const [a] of glide) a.style.transform = '';
+    }
+    /** The box goes elsewhere or takes another size (a row's preview widening it, the window resized): laid out there
+     *  once, what it holds moved there by transform, the clip growing from where the box was drawn to the whole of it. */
+    function relayout() {
+      const was = drawnOf(sheet), before = G;
+      const kids = [...sheet.children].filter((k) => !k.classList.contains('bcv-pv--in'));
+      const at = kids.map((k) => k.getBoundingClientRect());
+      const now = geometry();
+      if (before && Math.abs(now.x - before.x) < 1 && Math.abs(now.y - before.y) < 1 && Math.abs(now.w - before.w) < 1 && Math.abs(now.h - before.h) < 1) return;
+      layout();
+      still([sheet, shadow], () => {
+        sheet.style.clipPath = clipAs(was, BOX_R);
+        shadowAs(was);
+        shadow.style.opacity = '1';
+      });
+      sheet.style.clipPath = `inset(0px round ${BOX_R})`;
+      shadowAs(null);
+      aim(boxRect(), false);
+      if (reducedMotion()) return;
+      const easing = gentleEase(), duration = gentleMs();
+      kids.forEach((k, i) => {
+        const r = k.getBoundingClientRect(), dx = at[i].left - r.left, dy = at[i].top - r.top;
+        if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5) k.animate([{ translate: `${pxs(dx)} ${pxs(dy)}` }, { translate: '0px 0px' }], { duration, easing });
+      });
+    }
+    /** Fold back into the card, from wherever the box is drawn this instant; its words go back to the card's. */
+    function fold() {
+      const c = card.getBoundingClientRect();
+      sheet.style.clipPath = clipAs(c, cr);
+      shadowAs(c);
+      aim(c, true);
+      for (const [a, b] of glide) {
+        const cur = getComputedStyle(a).transform; // (where it is drawn this instant: it goes back from there)
+        let rest = null;
+        still([a], () => { rest = restOf(a); a.style.transform = cur === 'none' ? '' : cur; });
+        a.style.transform = asCard(rest, b.getBoundingClientRect());
+      }
+    }
+    /** Open again on the way back (the card pressed again as the box folds into it): from wherever it is drawn. */
+    function reopen() {
+      sheet.style.clipPath = `inset(0px round ${BOX_R})`;
+      shadowAs(null);
+      aim(boxRect(), false);
+      for (const [a] of glide) a.style.transform = '';
+    }
+    return { start, open, relayout, fold, reopen, layout };
+  }
+
   BCV.ui = {
     groupPicker, groupAttrs, BANDS, gradeBand, bandChip, bandSlider, whatIfAdder, whatIfRemove,
     svg, star, chev, el, text, tile, dot, card, row, label, h2, groupHead, badge, statusBadge, seg, segSlide, search, switchEl, btn, iconbtn, pill, placeDot, haptic,
     empty, emptyCard, loading, errorBox, hint, avatar, toast, menu, closeMenus, picker, colorMenu, COURSE_COLORS, fmtDay, datePop, dateField, promptSheet, askSheet,
     DAY, startOfDay, addDays, sameDay, dayDiff, startOfWeek, parse, MONTHS, MONTHS_LONG, DAYS, DAYS_LONG,
     fmtTime, fmtTimeLower, fmtShort, fmtLong, fmtDateComma, fmtAt, fmtAtUpper, fmtBy, dayTitle, fmtDow, fmtRecent, whenShort, plural,
-    hexToRgb, rgba, palette, FALLBACK_COLORS, initials, enter, still, isStill, roll, morphFrom, reducedMotion, dpr, onDprChange, dismiss,
-    afterMotion, onGone, watchLayout, anchor, keepOnScreen, boundsOf, hoverOpens, hoverCool, hoverHold,
+    hexToRgb, rgba, palette, FALLBACK_COLORS, initials, enter, still, isStill, roll, morphFrom, reducedMotion, flipList, drawCheck, dpr, onDprChange, dismiss, recall,
+    afterMotion, onGone, watchLayout, anchor, keepOnScreen, boundsOf, hoverOpens, hoverCool, hoverHold, cardBox,
   };
 })();

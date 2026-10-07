@@ -363,7 +363,7 @@
       const pg = st.pages[m.page - 1];
       const fy = m.kind === 'ink' ? (m.points[0]?.[1] || 0) : (m.rects[0]?.[1] || 0);
       const top = pg.el.offsetTop + fy * pg.el.offsetHeight - 90;
-      if (top < col.scrollTop || top > col.scrollTop + col.clientHeight - 120) col.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+      if (top < col.scrollTop || top > col.scrollTop + col.clientHeight - 120) col.scrollTo({ top: Math.max(0, top), behavior: U.reducedMotion() ? 'auto' : 'smooth' });
       const item = panel.querySelector(`.bcv-mark__item[data-id="${id}"]`);
       item?.scrollIntoView({ block: 'nearest' });
       if (edit) setTimeout(() => (m.kind === 'text' ? pg.layer.querySelector(`.bcv-mark__textbox[data-id="${id}"] textarea`) : item?.querySelector('textarea'))?.focus(), 30);

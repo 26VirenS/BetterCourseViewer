@@ -516,7 +516,7 @@
             el.classList.add('bcv-ring--unfill');
           });
           for (const t of catsG.querySelectorAll('circle:not(.bcv-ring--fill-cat)')) t.classList.add('bcv-ring--track-out');
-          const total = U.reducedMotion() ? 0 : (n ? (n - 1) * 60 : 0) + 420;
+          const total = U.reducedMotion() ? 0 : (n ? (n - 1) * 60 : 0) + 270; // (each sweep back is .25s)
           leaving = setTimeout(() => {
             leaving = null;
             catsG.replaceChildren();

@@ -14,7 +14,7 @@
 
 html[data-bcv-theme] {
   --bcv-line: max(1px, var(--bcv-dpx, 1px)); /* a hairline drawn as a shadow: one CSS pixel, or one screen pixel where that is more (below 100% zoom; content/early.js keeps --bcv-dpx) */
-  --bcv-version: "2.99.3"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
+  --bcv-version: "2.99.4"; /* the stylesheet's own version: content/app/app.js compares it with the script's and the manifest's (Safari can mix them after an update); bumped with every release */
   --bcv-bg: #f2f2f6; --bcv-card: #fff; --bcv-ink: #1c1c1e; --bcv-ink2: #3c3c43; --bcv-ink3: #8e8e93;
   --bcv-sep: rgba(60,60,67,.09); --bcv-edge: rgba(60,60,67,.1); --bcv-fill: rgba(118,118,128,.12); --bcv-fill2: rgba(118,118,128,.06);
   /* three materials (mockup 7): chrome for sticky bars and the sidebar, glass for floating panels, scrim behind a sheet */
@@ -36,6 +36,7 @@ html[data-bcv-theme] {
   --bcv-mono: ui-monospace, Menlo, monospace;
   /* motion: one easing and three lengths — the exits are the fast one, an entrance the middle, a sheet's rise the slow */
   --bcv-ease: cubic-bezier(.32,.72,0,1); --bcv-t-fast: .18s; --bcv-t: .28s; --bcv-t-slow: .34s;
+  --bcv-ease-out: cubic-bezier(.23,1,.32,1); --bcv-ease-in-out: cubic-bezier(.77,0,.175,1); /* (arrivals, exits and presses start fast; a thing moving across the screen eases both ends) */
   /* the springs (content/app/motion.js writes each preset's exact curve and settle time over these as a linear() easing; docs/MOTION.md) */
   --bcv-spring-snappy: cubic-bezier(.34,1.15,.42,1); --bcv-t-snappy: .29s; --bcv-spring-gentle: cubic-bezier(.32,.72,0,1); --bcv-t-gentle: .46s;
   --bcv-spring-settle: cubic-bezier(.32,.72,0,1); --bcv-t-settle: .35s; --bcv-spring-scrim: ease; --bcv-t-scrim: .4s; --bcv-spring-phone: cubic-bezier(.32,.72,0,1); --bcv-t-phone: .39s; --bcv-spring-island: cubic-bezier(.32,.72,0,1); --bcv-t-island: .5s; --bcv-spring-pin: cubic-bezier(.32,.72,0,1); --bcv-t-pin: .37s;
@@ -74,7 +75,7 @@ html[data-bcv-ext-theme="dark"] .bcv-graph__frame { filter: invert(1) hue-rotate
 @keyframes bcv-load { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 @keyframes bcv-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 /* mockup 11: a sheet grows out of the control that opened it (transform-origin set per sheet), the scrim blurs in */
-@keyframes bcv-morph { from { opacity: 0; transform: scale(.82); } 60% { opacity: 1; } to { opacity: 1; transform: scale(1); } }
+@keyframes bcv-morph { from { opacity: 0; transform: scale(.9); } 60% { opacity: 1; } to { opacity: 1; transform: scale(1); } }
 @keyframes bcv-scrim { from { opacity: 0; } to { opacity: 1; } } /* (the blur is there at its strength and fades in with the dim: a blur re-done at a new radius every frame was the dearest thing a sheet did) */
 /* Chrome drawing without graphics acceleration skips every backdrop-filter, so the glass showed
  * the page through it sharp (html.bcv-noblur: content/early.js, from lib/theme.js blurDrawn). Each
@@ -125,29 +126,33 @@ html.bcv-phone .bcv-sheet { animation: bcv-sheet var(--bcv-t-phone) var(--bcv-sp
 html.bcv-phone .bcv-sheet-ov.is-closing > .bcv-sheet { animation: bcv-leave-down .22s var(--bcv-ease) both; }
 .bcv-menu.is-closing, .bcv-quicknav.is-closing { animation: bcv-leave-pop .14s ease both; pointer-events: none; }
 .bcv-reader-ov.is-closing { animation: bcv-leave var(--bcv-t-fast) ease both; pointer-events: none; }
-@media (prefers-reduced-motion: reduce) { .bcv-sheet-ov.is-closing, .bcv-sheet-ov.is-closing > .bcv-sheet, .bcv-menu.is-closing, .bcv-quicknav.is-closing, .bcv-reader-ov.is-closing { animation: none; opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { /* (they still fade — 150ms of opacity, no shrinking or sliding — and the sheet goes with its scrim, not on its own) */
+  .bcv-sheet-ov.is-closing, .bcv-menu.is-closing, .bcv-quicknav.is-closing, .bcv-reader-ov.is-closing { animation: bcv-leave .15s var(--bcv-ease-out) both; }
+  .bcv-sheet-ov.is-closing > .bcv-sheet, html.bcv-phone .bcv-sheet-ov.is-closing > .bcv-sheet { animation: none; }
+}
 /* A press is felt: a row or an item dips while the pointer is down, a card darkens a touch. */
 .bcv-row:active, .bcv-sheet__row:active, .bcv-menu__item:active, .bcv-ph-srow:active, .bcv-omni__item:active { background: var(--bcv-fill); }
 .bcv-nav__item:active { background: var(--bcv-fill2); }
 .bcv-ccard:active, .bcv-gpa__card:active { filter: brightness(.97); }
 /* Dashboard entry: workload rows float in and their bars wipe from the left, staggered down the list */
 .bcv-work__row--in { animation: bcv-fade-up var(--bcv-t-settle) var(--bcv-spring-settle) var(--bcv-delay, 0ms) backwards; }
-.bcv-work__fill--grow { transform-origin: left; animation: bcv-grow .8s cubic-bezier(.32,.72,0,1) var(--bcv-delay, 0ms) both; }
+.bcv-work__fill--grow { transform-origin: left; animation: bcv-grow .3s var(--bcv-ease-out) var(--bcv-delay, 0ms) both; }
 /* Grades entry: each course ring sweeps to its score 70ms down the grid; group rings fill in as they mount; the trend line draws left to right and its dots follow */
-.bcv-ring--fill { animation: bcv-ring-fill .9s cubic-bezier(.32,.72,0,1) var(--bcv-delay, 0ms) both; }
+.bcv-ring--fill { animation: bcv-ring-fill .9s var(--bcv-ease) var(--bcv-delay, 0ms) both; }
 .bcv-ring--fill-cat { animation-duration: .55s; }
 /* the pointer leaving a Grades ring: each group ring sweeps back to empty (from wherever it had got to, set inline), its track fades, and the letter returns */
-.bcv-ring--unfill { animation: bcv-ring-unfill .4s cubic-bezier(.4,0,.6,1) var(--bcv-delay, 0ms) forwards; }
-.bcv-ring--track-out { animation: bcv-fade-out .4s ease var(--bcv-delay, 0ms) forwards; }
+.bcv-ring--unfill { animation: bcv-ring-unfill .25s var(--bcv-ease-out) var(--bcv-delay, 0ms) forwards; }
+.bcv-ring--track-out { animation: bcv-fade-out .25s var(--bcv-ease-out) var(--bcv-delay, 0ms) forwards; }
 .bcv-gpa__ringletter.is-back { animation: bcv-fade-in .22s ease-out both; }
-.bcv-gpa__line--draw { animation: bcv-line-draw 1.05s cubic-bezier(.32,.72,0,1) .2s backwards; } /* (backwards: hidden until it starts, and nothing left on the line once it has drawn) */
+.bcv-gpa__line--draw { animation: bcv-line-draw 1.05s var(--bcv-ease) .2s backwards; } /* (backwards: hidden until it starts, and nothing left on the line once it has drawn) */
 .bcv-gpa__pt--in { animation: bcv-pop var(--bcv-t-snappy) var(--bcv-spring-snappy) var(--bcv-delay, 0ms) backwards; }
 /* hover and press: cards lift, buttons give (transitions stay on pseudo-state only, mockup 8 rule) */
 .bcv-stat, .bcv-gpa__card, .bcv-ccard { transition: transform var(--bcv-t-snappy) var(--bcv-spring-snappy), box-shadow .22s ease, background .2s ease; }
-.bcv-stat:hover, .bcv-gpa__card:hover { transform: translateY(-2px); box-shadow: var(--bcv-shadow-lift); }
-.bcv-stat:active { transform: scale(.985); }
+@media (hover: hover) and (pointer: fine) { .bcv-stat:hover, .bcv-gpa__card:hover { transform: translateY(-2px); box-shadow: var(--bcv-shadow-lift); } }
+.bcv-stat:active { transform: scale(.98); }
 .bcv-btn, .bcv-sb__btn, .bcv-qz__big, .bcv-gpa__details, .bcv-gpa__traychip { transition: transform .16s var(--bcv-spring-snappy), filter .16s ease, background .16s ease; }
-.bcv-btn:active:not(:disabled), .bcv-sb__btn:active:not(:disabled), .bcv-qz__big:active, .bcv-gpa__details:active { transform: scale(.97); }
+.bcv-btn:active:not(:disabled), .bcv-sb__btn:active:not(:disabled), .bcv-qz__big:active, .bcv-gpa__details:active, .bcv-gpa__traychip:active { transform: scale(.97); }
+.bcv-rail__item:active, .bcv-rail__ext:active, .bcv-fav:active, .bcv-theme-btn:active { background: var(--bcv-fill); }
 .bcv-row--link, .bcv-row--hover, .bcv-sheet__row, .bcv-nf__row, .bcv-menu__item, .bcv-nav__item, .bcv-rail__item, .bcv-rail__ext, .bcv-fav, .bcv-theme-btn { transition: background .18s ease; }
 /* the navigation bar: a 2.5px sweep pinned to the top of the viewport while a route loads (early.js shows it, app.js hides it once the screen is drawn) */
 /* the pressed control is the progress bar (mockup 14): a flat wash in the row's own icon colour (the
@@ -155,7 +160,7 @@ html.bcv-phone .bcv-sheet-ov.is-closing > .bcv-sheet { animation: bcv-leave-down
    the label and icon; no page-top bar. Under reduced motion the fill holds still, part way. */
 .bcv-nav__item, .bcv-fav, .bcv-rail__item, .bcv-rail__ext { position: relative; overflow: hidden; }
 .bcv-nav__item > *, .bcv-fav > *, .bcv-rail__item > *, .bcv-rail__ext > * { position: relative; }
-.bcv-load { position: absolute; left: 0; top: 0; bottom: 0; width: 100%; border-radius: inherit; transform-origin: left; animation: bcv-load .62s cubic-bezier(.4,0,.2,1) both; pointer-events: none; }
+.bcv-load { position: absolute; left: 0; top: 0; bottom: 0; width: 100%; border-radius: inherit; transform-origin: left; animation: bcv-load .62s linear both; pointer-events: none; }
 .bcv-load--rail { background: var(--bcv-rail-wash); }
 @media (prefers-reduced-motion: reduce) { .bcv-load { animation: none; transform: scaleX(.6); } }
 /* skeletons shaped like the content they replace; a load faster than 150ms never shows them */
@@ -180,8 +185,11 @@ html[data-bcv-theme="dark"] .bcv-skel { --bcv-skel: linear-gradient(90deg, rgba(
 .bcv-skel__bar { height: 6px; border-radius: 3px; }
 .bcv-skel__btn { height: 34px; border-radius: 17px; }
 @media (prefers-reduced-motion: reduce) {
-  /* entrances go (data lands on its final value at once); the loading indicators (the row wash, the shimmer) stay */
-  .bcv-main > .bcv-screen, .bcv-main > .bcv-qz, .bcv-main > .bcv-sb, .bcv-sheet-ov, .bcv-sheet, .bcv-menu, .bcv-toast, .bcv-gpa__pop, .bcv-reader-ov, .bcv-pv, .bcv-skel, .bcv-enter, .bcv-fb__fill,
+  /* screens, sheets, menus, toasts and panels still arrive — as a 150ms fade, nothing moving (a sheet with its scrim,
+     not on its own; a screen drawn again in place not at all); data lands on its final value at once; the loading
+     indicators (the row wash, the shimmer) stay */
+  .bcv-main > .bcv-screen:not(.bcv-screen--still, .bcv-screen--skel), .bcv-main > .bcv-qz, .bcv-main > .bcv-sb, .bcv-sheet-ov, .bcv-menu, .bcv-toast, .bcv-gpa__pop, .bcv-reader-ov, .bcv-pv { animation: bcv-fade-in .15s var(--bcv-ease-out) both; }
+  .bcv-sheet, .bcv-skel, .bcv-enter, .bcv-fb__fill,
   .bcv-work__row--in, .bcv-work__fill--grow, .bcv-ring--fill, .bcv-ring--unfill, .bcv-ring--track-out, .bcv-gpa__ringletter.is-back, .bcv-gpa__line--draw, .bcv-gpa__pt--in, .bcv-gpa__area--in { animation: none; }
   .bcv-stat, .bcv-gpa__card, .bcv-ccard, .bcv-btn, .bcv-sb__btn, .bcv-side, .bcv-head--course, .bcv-rail, #bcv-app, #bcv-app::before { transition: none; }
 }
@@ -191,7 +199,7 @@ html[data-bcv-theme="dark"] .bcv-skel { --bcv-skel: linear-gradient(90deg, rgba(
  * nothing here leans on html.bcv-on). Small enough to sit above the page header's own controls. ---- */
 /* Folded, it is the mark and the switch alone; under the pointer (or the keyboard's focus) the name
  * comes out and a second row opens: Persistent, what a press of the look switch does. */
-#bcv-look { position: fixed; top: 6px; right: 10px; z-index: var(--bcv-z-float); display: flex; flex-direction: column; align-items: flex-end; margin: 0; padding: 0; color: #fff; font: 600 11px/1 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif; letter-spacing: -.01em; line-height: 1; text-transform: none; transition: opacity .2s ease, top .38s cubic-bezier(.32,.72,0,1), right .38s cubic-bezier(.32,.72,0,1), translate .45s cubic-bezier(.32,.72,0,1); }
+#bcv-look { position: fixed; top: 6px; right: 10px; z-index: var(--bcv-z-float); display: flex; flex-direction: column; align-items: flex-end; margin: 0; padding: 0; color: #fff; font: 600 11px/1 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif; letter-spacing: -.01em; line-height: 1; text-transform: none; transition: opacity .2s ease, top .38s var(--bcv-ease), right .38s var(--bcv-ease), translate .45s var(--bcv-ease); }
 #bcv-look.is-busy { opacity: .6; }
 #bcv-look.is-busy button { pointer-events: none; } /* (no second press while the page loads afresh) */
 #bcv-look button { margin: 0; border: 0; background: transparent; color: inherit; cursor: pointer; font: inherit; letter-spacing: inherit; text-align: left; }
@@ -199,7 +207,7 @@ html[data-bcv-theme="dark"] .bcv-skel { --bcv-skel: linear-gradient(90deg, rgba(
 /* the disc: 24px of glass with the mark in the state's colour — green on, red off */
 .bcv-look__main { position: relative; flex: none; display: flex; align-items: center; justify-content: center; box-sizing: border-box; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 12px; background: transparent; box-shadow: 0 2px 10px rgba(0,0,0,.2); user-select: none; -webkit-user-select: none; transition: transform .16s var(--bcv-spring-snappy), box-shadow .18s ease; }
 #bcv-look:hover .bcv-look__main, #bcv-look.is-tour-open .bcv-look__main, #bcv-look:has(:focus-visible) .bcv-look__main { transform: scale(1.1); box-shadow: 0 6px 20px rgba(0,0,0,.3); }
-.bcv-look__main:active { opacity: .9; }
+#bcv-look .bcv-look__main:active { opacity: .9; transform: scale(.97); }
 /* (2.98.21) the mark fills the disc — the state's colour edge to edge, the logo white in it — as the purple Report a bug disc beside it does */
 .bcv-look__mark { flex: none; width: 24px; height: 24px; border-radius: 12px; background: linear-gradient(158deg, #34c759, #1f9d45); display: flex; align-items: center; justify-content: center; transition: background .2s ease; }
 .bcv-look__mark svg { display: block; width: 16px; height: 16px; }
@@ -211,11 +219,11 @@ html[data-bcv-theme="dark"] .bcv-skel { --bcv-skel: linear-gradient(90deg, rgba(
  * the state has a white ring. */
 .bcv-look__menu { position: absolute; top: 24px; right: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; padding-top: 6px; visibility: hidden; transition: visibility 0s linear .32s; }
 #bcv-look:hover .bcv-look__menu, #bcv-look.is-tour-open .bcv-look__menu, #bcv-look:has(:focus-visible) .bcv-look__menu { visibility: visible; transition-delay: 0s; }
-.bcv-look__opt { position: relative; display: flex; align-items: center; justify-content: flex-end; box-sizing: border-box; height: 24px; width: auto; max-width: 24px; padding: 0; border-radius: 12px; background: var(--bcv-opt); color: #fff; box-shadow: 0 2px 10px rgba(0,0,0,.25); overflow: hidden; white-space: nowrap; opacity: 0; transform: translateY(-10px) scale(.6); pointer-events: none; transition: max-width .24s cubic-bezier(.32,.72,0,1), opacity .18s ease, transform .28s cubic-bezier(.32,.72,0,1), box-shadow .18s ease; }
+.bcv-look__opt { position: relative; display: flex; align-items: center; justify-content: flex-end; box-sizing: border-box; height: 24px; width: auto; max-width: 24px; padding: 0; border-radius: 12px; background: var(--bcv-opt); color: #fff; box-shadow: 0 2px 10px rgba(0,0,0,.25); overflow: hidden; white-space: nowrap; opacity: 0; transform: translateY(-6px) scale(.9); transform-origin: 100% 0; pointer-events: none; transition: max-width .24s var(--bcv-ease), opacity .18s ease, transform .28s var(--bcv-ease), box-shadow .18s ease; }
 #bcv-look:hover .bcv-look__opt, #bcv-look.is-tour-open .bcv-look__opt, #bcv-look:has(:focus-visible) .bcv-look__opt { opacity: 1; transform: none; pointer-events: auto; transition-delay: 0s, calc(var(--bcv-i) * 55ms), calc(var(--bcv-i) * 55ms), 0s; }
 .bcv-look__opt:hover, .bcv-look__opt:focus-visible, .bcv-look__opt.is-hover { max-width: 220px; box-shadow: 0 6px 20px rgba(0,0,0,.3); }
 .bcv-look__opt.is-selected { box-shadow: 0 0 0 2px #fff, 0 2px 10px rgba(0,0,0,.25); }
-.bcv-look__optlbl { max-width: 0; padding: 0; opacity: 0; overflow: hidden; transition: max-width .24s cubic-bezier(.32,.72,0,1), opacity .15s ease, padding .24s cubic-bezier(.32,.72,0,1); }
+.bcv-look__optlbl { max-width: 0; padding: 0; opacity: 0; overflow: hidden; transition: max-width .24s var(--bcv-ease), opacity .15s ease, padding .24s var(--bcv-ease); }
 .bcv-look__opt:hover .bcv-look__optlbl, .bcv-look__opt:focus-visible .bcv-look__optlbl, .bcv-look__opt.is-hover .bcv-look__optlbl { max-width: 180px; padding: 0 2px 0 11px; opacity: 1; }
 .bcv-look__optdot { flex: none; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; }
 .bcv-look__optdot svg { display: block; width: 13px; height: 13px; fill: none; stroke: #fff; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
@@ -228,7 +236,7 @@ html[data-bcv-theme="dark"] .bcv-skel { --bcv-skel: linear-gradient(90deg, rgba(
  * grows down into the list on the island's spring (the capsules' timing, content/app/motion.js), its
  * corners easing out, the rows coming in one after the other once it is on its way. The list is laid
  * out at its full size all along — clipped, not squeezed — so nothing inside it reflows as it grows. */
-#bcv-look .bcv-look__opt--off { --bcv-for-w: 140px; --bcv-for-h: 212px; flex-direction: column; align-items: stretch; justify-content: flex-start; height: 24px; background: linear-gradient(180deg, #ff453a, #e8372d); transition: max-width var(--bcv-t-island) var(--bcv-spring-island), height var(--bcv-t-island) var(--bcv-spring-island), border-radius var(--bcv-t-island) var(--bcv-spring-island), opacity .18s ease, transform .28s cubic-bezier(.32,.72,0,1), box-shadow .18s ease; }
+#bcv-look .bcv-look__opt--off { --bcv-for-w: 140px; --bcv-for-h: 212px; flex-direction: column; align-items: stretch; justify-content: flex-start; height: 24px; background: linear-gradient(180deg, #ff453a, #e8372d); transition: max-width var(--bcv-t-island) var(--bcv-spring-island), height var(--bcv-t-island) var(--bcv-spring-island), border-radius var(--bcv-t-island) var(--bcv-spring-island), opacity .18s ease, transform .28s var(--bcv-ease), box-shadow .18s ease; }
 #bcv-look:hover .bcv-look__opt--off, #bcv-look.is-tour-open .bcv-look__opt--off, #bcv-look:has(:focus-visible) .bcv-look__opt--off { transition-delay: 0s, 0s, 0s, 55ms, 55ms, 0s; }
 /* red's words out, its list folded (the pointer's moment of intent, the keyboard's focus): just as wide as its words and disc —
  * --bcv-off-w, measured from the words (app.js fit()); the list's width only once the list opens */
@@ -239,7 +247,7 @@ html[data-bcv-theme="dark"] .bcv-skel { --bcv-skel: linear-gradient(90deg, rgba(
 #bcv-look .bcv-look__offhead { flex: none; display: flex; align-items: center; justify-content: flex-end; width: 100%; height: 24px; padding: 0; border-radius: 12px; background: transparent; color: #fff; white-space: nowrap; }
 #bcv-look .bcv-look__offhead:focus-visible { outline-offset: -2px; }
 .bcv-look__for { flex: none; box-sizing: border-box; width: var(--bcv-for-w); display: flex; flex-direction: column; gap: 2px; padding: 4px 5px 6px; }
-#bcv-look .bcv-look__forbtn { flex: none; box-sizing: border-box; display: flex; align-items: center; justify-content: flex-end; width: 100%; height: 28px; padding: 0 21px 0 10px; border-radius: 9px; background: transparent; color: #fff; font: 600 12px/1 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif; letter-spacing: -.01em; white-space: nowrap; opacity: 0; transform: translateY(-6px); transition: background .15s ease, opacity .16s ease, transform .3s cubic-bezier(.32,.72,0,1); }
+#bcv-look .bcv-look__forbtn { flex: none; box-sizing: border-box; display: flex; align-items: center; justify-content: flex-end; width: 100%; height: 28px; padding: 0 21px 0 10px; border-radius: 9px; background: transparent; color: #fff; font: 600 12px/1 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif; letter-spacing: -.01em; white-space: nowrap; opacity: 0; transform: translateY(-6px); transition: background .15s ease, opacity .16s ease, transform .3s var(--bcv-ease); }
 #bcv-look .bcv-look__opt--off.is-expanded .bcv-look__forbtn { opacity: 1; transform: none; transition-delay: 0s, calc(80ms + var(--bcv-j) * 28ms), calc(80ms + var(--bcv-j) * 28ms); } /* (at the id's weight: the rows' resting rule above is said there) */
 #bcv-look .bcv-look__forbtn:hover, #bcv-look .bcv-look__forbtn:focus-visible { background: rgba(255,255,255,.22); }
 #bcv-look .bcv-look__forbtn:focus-visible { outline: 2px solid #fff; outline-offset: -2px; }
@@ -256,11 +264,11 @@ html.bcv-phone.bcv-on #bcv-look, html.bcv-setup-open #bcv-look { display: none; 
 /* Report a bug (2.98.19): a purple disc left of the switch (the pinned tools' tray moves one place along for it);
  * under the pointer or the keyboard's focus it opens out to the left with its words, its right end staying put */
 #bcv-report { position: fixed; top: 6px; right: 42px; z-index: var(--bcv-z-float); }
-#bcv-report { display: flex; align-items: center; justify-content: flex-end; box-sizing: border-box; height: 24px; max-width: 24px; margin: 0; padding: 0; border: 0; border-radius: 12px; background: linear-gradient(158deg, #a55cf2, #7b2fe0); color: #fff; box-shadow: 0 2px 10px rgba(0,0,0,.2); overflow: hidden; white-space: nowrap; cursor: pointer; font: 600 11px/1 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif; letter-spacing: -.01em; text-transform: none; transition: max-width .24s cubic-bezier(.32,.72,0,1), box-shadow .18s ease, transform .16s var(--bcv-spring-snappy), opacity .2s ease, translate .45s cubic-bezier(.32,.72,0,1); }
+#bcv-report { display: flex; align-items: center; justify-content: flex-end; box-sizing: border-box; height: 24px; max-width: 24px; margin: 0; padding: 0; border: 0; border-radius: 12px; background: linear-gradient(158deg, #a55cf2, #7b2fe0); color: #fff; box-shadow: 0 2px 10px rgba(0,0,0,.2); overflow: hidden; white-space: nowrap; cursor: pointer; font: 600 11px/1 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif; letter-spacing: -.01em; text-transform: none; transition: max-width .24s var(--bcv-ease), box-shadow .18s ease, transform .16s var(--bcv-spring-snappy), opacity .2s ease, translate .45s var(--bcv-ease); }
 #bcv-report:hover, #bcv-report:focus-visible { max-width: 140px; box-shadow: 0 6px 20px rgba(123,47,224,.4); }
 #bcv-report:active { transform: scale(.96); }
 #bcv-report:focus-visible { outline: 2px solid #0a84ff; outline-offset: 2px; }
-.bcv-report__lbl { max-width: 0; padding: 0; opacity: 0; overflow: hidden; transition: max-width .24s cubic-bezier(.32,.72,0,1), opacity .15s ease, padding .24s cubic-bezier(.32,.72,0,1); }
+.bcv-report__lbl { max-width: 0; padding: 0; opacity: 0; overflow: hidden; transition: max-width .24s var(--bcv-ease), opacity .15s ease, padding .24s var(--bcv-ease); }
 #bcv-report:hover .bcv-report__lbl, #bcv-report:focus-visible .bcv-report__lbl { max-width: 110px; padding: 0 2px 0 11px; opacity: 1; }
 .bcv-report__dot { flex: none; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; }
 .bcv-report__dot svg { display: block; width: 14px; height: 14px; fill: none; stroke: #fff; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
@@ -278,7 +286,7 @@ html.bcv-phone.bcv-on #bcv-report, html.bcv-setup-open #bcv-report, html.bcv-in-
  * the count's arc and hand gone, and the words say it is off. ---- */
 #bcv-away { position: fixed; top: calc(10px + env(safe-area-inset-top, 0px)); left: 50%; z-index: calc(var(--bcv-z-float) + 1); margin: 0; padding: 0; transform: translate(-50%, -160%); opacity: 0; pointer-events: none; transition: transform .46s cubic-bezier(.2,1.1,.3,1), opacity .24s ease; }
 #bcv-away.is-in { transform: translate(-50%, 0); opacity: 1; pointer-events: auto; }
-#bcv-away.is-out { transform: translate(-50%, -160%); opacity: 0; pointer-events: none; transition: transform .32s cubic-bezier(.5,0,.8,.5), opacity .22s ease; }
+#bcv-away.is-out { transform: translate(-50%, -160%); opacity: 0; pointer-events: none; transition: transform .28s var(--bcv-ease-out), opacity .22s var(--bcv-ease-out); }
 .bcv-away__btn { position: relative; overflow: hidden; display: flex; align-items: center; gap: 12px; margin: 0; height: 52px; padding: 0 20px 0 9px; border: 1px solid rgba(255,255,255,.14); border-radius: 26px; background: rgba(28,28,30,.9); -webkit-backdrop-filter: blur(18px) saturate(1.4); backdrop-filter: blur(18px) saturate(1.4); box-shadow: 0 10px 34px rgba(0,0,0,.34); color: #fff; cursor: pointer; text-align: left; font: 500 13px/1 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif; letter-spacing: -.01em; text-transform: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: none; }
 .bcv-away__btn:active { opacity: .85; }
 #bcv-away.is-holding .bcv-away__btn, #bcv-away.is-off .bcv-away__btn { opacity: 1; }
@@ -335,7 +343,7 @@ html.bcv-noblur .bcv-tour__blur { display: none; } /* (Chrome drawing without gr
 .bcv-tour__ring.is-done { animation: none; box-shadow: 0 0 0 2px #34c759, 0 0 0 7px rgba(52,199,89,.3); }
 @keyframes bcv-tour-ring { 0%, 100% { box-shadow: 0 0 0 2px var(--bcv-blue), 0 0 0 4px color-mix(in srgb, var(--bcv-blue) 34%, transparent); } 50% { box-shadow: 0 0 0 2px var(--bcv-blue), 0 0 0 12px color-mix(in srgb, var(--bcv-blue) 0%, transparent); } }
 /* the pointer: the gesture at the thing — a press (a ripple), a hover (it comes to rest), typing (keys), a drag (to where the thing goes) */
-.bcv-tour__hand { position: fixed; left: 0; top: 0; width: 0; height: 0; pointer-events: none; transform: translate(var(--hx, 50vw), var(--hy, 50vh)); transition: transform .5s cubic-bezier(.32,.72,0,1), opacity .2s ease; }
+.bcv-tour__hand { position: fixed; left: 0; top: 0; width: 0; height: 0; pointer-events: none; transform: translate(var(--hx, 50vw), var(--hy, 50vh)); transition: transform .5s var(--bcv-ease), opacity .2s ease; }
 .bcv-tour__hand[data-act="none"] { opacity: 0; }
 .bcv-tour__pt { position: absolute; left: -5px; top: -3px; display: block; filter: drop-shadow(0 3px 6px rgba(0,0,0,.35)); transform-origin: 5px 3px; }
 .bcv-tour__pt svg { display: block; }
@@ -347,14 +355,14 @@ html.bcv-noblur .bcv-tour__blur { display: none; } /* (Chrome drawing without gr
 .bcv-tour__hand[data-act="click"] .bcv-tour__pt, .bcv-tour__hand[data-act="type"] .bcv-tour__pt { animation: bcv-tour-press 1.6s ease-in-out infinite; }
 .bcv-tour__hand[data-act="click"] .bcv-tour__tap, .bcv-tour__hand[data-act="type"] .bcv-tour__tap { animation: bcv-tour-tap 1.6s ease-out infinite; }
 .bcv-tour__hand[data-act="type"] .bcv-tour__keys { display: flex; }
-.bcv-tour__hand[data-act="hover"] .bcv-tour__pt { animation: bcv-tour-hover 2.4s cubic-bezier(.32,.72,0,1) infinite; }
+.bcv-tour__hand[data-act="hover"] .bcv-tour__pt { animation: bcv-tour-hover 2.4s var(--bcv-ease) infinite; }
 .bcv-tour__hand[data-act="drag"] .bcv-tour__pt { animation: bcv-tour-drag 2.6s cubic-bezier(.45,0,.25,1) infinite; }
 @keyframes bcv-tour-press { 0%, 30%, 60%, 100% { transform: none; } 40% { transform: scale(.8); } }
 @keyframes bcv-tour-tap { 0%, 38% { opacity: 0; transform: scale(.4); } 42% { opacity: .9; transform: scale(.5); } 80%, 100% { opacity: 0; transform: scale(1.3); } }
 @keyframes bcv-tour-hover { 0% { opacity: 0; transform: translate(46px, 40px); } 12% { opacity: 1; transform: translate(46px, 40px); } 42%, 80% { opacity: 1; transform: none; } 92%, 100% { opacity: 0; transform: none; } }
 @keyframes bcv-tour-drag { 0%, 8% { opacity: 0; transform: none; } 16% { opacity: 1; transform: scale(.85); } 70% { opacity: 1; transform: translate(var(--dx, 0px), var(--dy, 0px)) scale(.85); } 78% { opacity: 1; transform: translate(var(--dx, 0px), var(--dy, 0px)); } 92%, 100% { opacity: 0; transform: translate(var(--dx, 0px), var(--dy, 0px)); } }
 /* the card: the step's words beside the thing, the action it waits for underlined in the colour */
-.bcv-tour__card { position: fixed; left: 0; top: 0; width: min(340px, calc(100vw - 24px)); box-sizing: border-box; padding: 14px 16px 12px; border-radius: 18px; background: var(--bcv-card); color: var(--bcv-ink); box-shadow: 0 24px 60px rgba(0,0,0,.34), 0 0 0 var(--bcv-line) var(--bcv-hair); pointer-events: auto; transition: transform .45s cubic-bezier(.32,.72,0,1), opacity .18s ease; animation: bcv-tour-in .3s ease both; }
+.bcv-tour__card { position: fixed; left: 0; top: 0; width: min(340px, calc(100vw - 24px)); box-sizing: border-box; padding: 14px 16px 12px; border-radius: 18px; background: var(--bcv-card); color: var(--bcv-ink); box-shadow: 0 24px 60px rgba(0,0,0,.34), 0 0 0 var(--bcv-line) var(--bcv-hair); pointer-events: auto; transition: transform .45s var(--bcv-ease), opacity .18s ease; animation: bcv-tour-in .3s ease both; }
 .bcv-tour__card.is-swap { opacity: 0; }
 .bcv-tour__card.is-nudge { animation: bcv-tour-nudge .42s cubic-bezier(.36,.07,.19,.97); }
 @keyframes bcv-tour-nudge { 20%, 60% { translate: -5px 0; } 40%, 80% { translate: 5px 0; } }
@@ -433,7 +441,7 @@ html.bcv-on #bcv-app { display: flex; }
 /* The sidebar is pinned to the window and scrolls on its own, apart from the page: a page scroll never moves
  * it, and scrolling it never moves the page. Out of the row as it is, this holds its place there, at its
  * width in every tier (and folding with it when a quiz takes the page). */
-html.bcv-on:not(.bcv-phone) #bcv-app:has(> .bcv-side)::before { content: ''; flex: none; order: -1; width: 242px; transition: width .45s cubic-bezier(.32,.72,0,1); }
+html.bcv-on:not(.bcv-phone) #bcv-app:has(> .bcv-side)::before { content: ''; flex: none; order: -1; width: 242px; transition: width .45s var(--bcv-ease); }
 html.bcv-on.bcv-quiz:not(.bcv-phone) #bcv-app:has(> .bcv-side)::before { width: 0; }
 .bcv-brand { display: flex; align-items: center; gap: 10px; padding: 6px 8px 2px; }
 .bcv-brand__tile { width: 30px; height: 30px; border-radius: 9px; background: linear-gradient(160deg, #1b3f76, #12305c); display: flex; align-items: center; justify-content: center; font: 700 14px/1 var(--bcv-font); color: #f0b429; flex: none; overflow: hidden; }
@@ -522,15 +530,16 @@ html.bcv-on:not(.bcv-phone) .bcv-side--pic .bcv-side__bottom::before { display: 
 
 /* segmented control */
 .bcv-seg { display: flex; padding: 2px; border-radius: 10px; background: var(--bcv-fill); gap: 2px; flex: none; }
-.bcv-seg__btn { border: 0; cursor: pointer; padding: 6px 14px; border-radius: 8px; font: 500 13px/1 var(--bcv-font); background: transparent; color: var(--bcv-ink2); box-shadow: none; white-space: nowrap; }
+.bcv-seg__btn { border: 0; cursor: pointer; padding: 6px 14px; border-radius: 8px; font: 500 13px/1 var(--bcv-font); background: transparent; color: var(--bcv-ink2); box-shadow: none; white-space: nowrap; transition: transform .16s var(--bcv-ease-out); }
+.bcv-seg__btn:active { transform: scale(.97); }
 .bcv-seg--wide .bcv-seg__btn { padding: 6px 16px; }
 .bcv-seg__btn.is-active { background: var(--bcv-card); color: var(--bcv-ink); box-shadow: var(--bcv-shadow); font-weight: 600; }
 /* (2.98.71) the chosen option's light is one shape behind the options that glides to the one chosen (ui.js segSlide) */
 .bcv-seg.has-thumb { position: relative; isolation: isolate; }
 .bcv-seg.has-thumb > :not(.bcv-seg__thumb) { position: relative; z-index: 1; }
-.bcv-seg.has-thumb .bcv-seg__btn, .bcv-seg.has-thumb .bcv-qz__mode { transition: color .2s ease; }
+.bcv-seg.has-thumb .bcv-seg__btn, .bcv-seg.has-thumb .bcv-qz__mode { transition: color .2s ease, transform .16s var(--bcv-ease-out); }
 .bcv-seg.has-thumb .bcv-seg__btn.is-active, .bcv-seg.has-thumb .bcv-qz__mode.is-active { background: transparent; box-shadow: none; }
-.bcv-seg__thumb { position: absolute; left: 0; top: 0; z-index: 0; width: 0; height: 0; border-radius: 8px; background: var(--bcv-card); box-shadow: var(--bcv-shadow); pointer-events: none; opacity: 0; transition: transform .38s cubic-bezier(.32,.72,0,1), width .38s cubic-bezier(.32,.72,0,1), height .38s cubic-bezier(.32,.72,0,1); }
+.bcv-seg__thumb { position: absolute; left: 0; top: 0; z-index: 0; width: 0; height: 0; border-radius: 8px; background: var(--bcv-card); box-shadow: var(--bcv-shadow); pointer-events: none; opacity: 0; transform-origin: 0 0; transition: transform .25s var(--bcv-ease-in-out); }
 @media (prefers-reduced-motion: reduce) { .bcv-seg__thumb { transition: none; } }
 
 /* search field */
@@ -664,7 +673,7 @@ html[data-bcv-theme="dark"] .bcv-badge--orange { color: #ffb44d; }
 .bcv-sheet { width: 520px; max-width: 100%; max-height: calc(100vh - 56px); background: var(--bcv-glass-ground, var(--bcv-glass)); -webkit-backdrop-filter: var(--bcv-blur-glass); backdrop-filter: var(--bcv-blur-glass); border: 1px solid var(--bcv-edge); color: var(--bcv-ink); border-radius: var(--bcv-r-sheet); box-shadow: var(--bcv-shadow-glass); display: flex; flex-direction: column; overflow: hidden; box-sizing: border-box; }
 /* A row previewed from a counter's sheet opens inside the sheet: it widens and the preview takes
  * the right of it, the list staying where it is. Nothing else on the page moves. */
-.bcv-sheet { transition: width .3s cubic-bezier(.32,.72,0,1), transform .3s cubic-bezier(.32,.72,0,1), opacity .3s ease; }
+.bcv-sheet { transition: width var(--bcv-t-gentle) var(--bcv-spring-gentle), transform var(--bcv-t-gentle) var(--bcv-spring-gentle), opacity .3s ease; }
 .bcv-sheet.is-split { width: min(1080px, 100%); display: grid; grid-template-columns: minmax(300px, 360px) minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
 .bcv-sheet.is-split > .bcv-sheet__head { grid-column: 1; grid-row: 1; }
 .bcv-sheet.is-split > .bcv-sheet__list { grid-column: 1; grid-row: 2; }
@@ -693,7 +702,7 @@ html[data-bcv-theme="dark"] .bcv-badge--orange { color: #ffb44d; }
 .bcv-sheet__qrow .bcv-sheet__title { font-weight: 500; }
 .bcv-sheet__sec + .bcv-sheet__row, .bcv-sheet__sec + .bcv-sheet__item > .bcv-sheet__row { border-top: 0; }
 .bcv-sheet--steady:has(> .bcv-pv--in) > .bcv-sheet__pvhint { display: none; }
-.bcv-sheet .bcv-pv--in { position: static; width: auto; min-width: 0; max-width: none; z-index: auto; border-left: 1px solid var(--bcv-sep); border-radius: 0; box-shadow: none; background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; animation: bcv-pv-in .3s cubic-bezier(.32,.72,0,1) both; }
+.bcv-sheet .bcv-pv--in { position: static; width: auto; min-width: 0; max-width: none; z-index: auto; border-left: 1px solid var(--bcv-sep); border-radius: 0; box-shadow: none; background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; animation: bcv-pv-in .3s var(--bcv-ease) both; }
 @media (max-width: 1100px) {
   .bcv-sheet.is-split { display: flex; width: 100%; }
   .bcv-sheet.is-split > .bcv-sheet__list { display: none; }
@@ -706,30 +715,30 @@ html[data-bcv-theme="dark"] .bcv-badge--orange { color: #ffb44d; }
  * the further off — and blurred away from it the same way (the blur on the layer's ::before, masked
  * clear round the box, so the box's surroundings stay readable). A row pressed widens it to the right
  * for a preview a little smaller than the page's own, the box sliding left when there is no room; the
- * dim follows it (the centre and reach are animated custom properties). Closing folds it back. */
-/* (they must inherit: Safari does not redraw the veil's layers when they take a non-inherited value with `inherit` — 2.98.78 tried, and the dim stayed at its opening, page-wide reach) */
-@property --bcv-cx { syntax: '<length>'; inherits: true; initial-value: 0px; }
-@property --bcv-cy { syntax: '<length>'; inherits: true; initial-value: 0px; }
-@property --bcv-r0 { syntax: '<length>'; inherits: true; initial-value: 0px; }
-@property --bcv-reach { syntax: '<length>'; inherits: true; initial-value: 0px; }
-/* (2.98.48; .49: from the first frame) the page focuses onto the box over .8s, moving at once and easing to a stop,
-   rather than dimming whole: the dim's clear middle starts wide enough to hold the whole page (--bcv-reach) and closes
-   in on the box; folding lets it go the same way back. (2.98.81) The blur is a layer of its own (.bcv-card-blur, a real
-   element, as the rubric ring's are) at one strength, its soft-edged clear hole round where the box lands (--bcv-mx,
-   my, mr: set with the box, never animated), fading in on the press and out as the box folds. Safari drew the earlier
-   blur, whose strength and hole were animated, while they moved — then dropped it the moment they settled. */
-.bcv-sheet-ov--card { display: block; padding: 0; background: none; -webkit-backdrop-filter: none; backdrop-filter: none; animation: none; --bcv-reach: 0px; transition: --bcv-cx .46s cubic-bezier(.32,.72,0,1), --bcv-cy .46s cubic-bezier(.32,.72,0,1), --bcv-r0 .46s cubic-bezier(.32,.72,0,1), --bcv-reach .8s cubic-bezier(.2,.6,.2,1), opacity .25s ease .3s; }
-.bcv-sheet-ov--card.is-far { --bcv-reach: 1600px; }
+ * dim follows it (a layer of its own, moved by transform). Closing folds it back. */
+/* (2.98.48; 2.99.4) the page focuses onto the box: the dim's lighter middle starts wide enough to hold the whole window and
+   closes in on the box over .8s; folding lets it go the same way back. The dim is a gradient drawn once, on a 512px layer
+   of its own (.bcv-card-dim) scaled to cover the window round the box's centre — moved and grown by transform alone
+   (U.cardBox), never a page-wide gradient drawn again on every frame from animated values. (2.98.81) The blur is a layer of
+   its own too (.bcv-card-blur) at one strength, its soft-edged clear hole round where the box lands (--bcv-mx, my, mr: set
+   with the box, never animated), fading in on the press and out as the box folds. Safari drew an earlier blur, whose
+   strength and hole were animated, while they moved — then dropped it the moment they settled. */
+.bcv-sheet-ov--card { display: block; padding: 0; background: none; -webkit-backdrop-filter: none; backdrop-filter: none; animation: none; transition: opacity .25s ease .3s; }
 /* the dim and the blur are layers of their own under the box (z 0 to its 1); the box itself never fades in */
-.bcv-sheet-ov--card::after { content: ''; position: absolute; inset: 0; z-index: 0; pointer-events: none; animation: bcv-card-veil .14s ease both; }
-.bcv-sheet-ov--card::after { background: radial-gradient(circle at var(--bcv-cx) var(--bcv-cy), rgba(0,0,0,.22) calc(var(--bcv-r0) * .8 + var(--bcv-reach)), rgba(0,0,0,.62) calc(var(--bcv-r0) + 220px + var(--bcv-reach)), rgba(0,0,0,.84) calc(var(--bcv-r0) + 900px + var(--bcv-reach))); }
+/* the dim and the blur are layers of their own under the box (z 0 to its 1); the box itself never fades in. The dim's stops
+   (--bcv-d1..3, on the layer itself) are the box's: its own half-diagonal × .8, + 220px and + 900px out, as a share of the
+   layer's reach once scaled; its place (translate) glides with the box, its reach (scale) over .8s */
+.bcv-card-dim { position: absolute; left: 0; top: 0; z-index: 0; width: 512px; height: 512px; margin: -256px 0 0 -256px; pointer-events: none; background: radial-gradient(closest-side, rgba(0,0,0,.22) var(--bcv-d1, 20%), rgba(0,0,0,.62) var(--bcv-d2, 50%), rgba(0,0,0,.84) var(--bcv-d3, 90%)); will-change: transform; animation: bcv-card-veil .14s ease both; transition: translate var(--bcv-t-gentle) var(--bcv-spring-gentle), scale .8s cubic-bezier(.2,.6,.2,1); }
+/* the box's shadow: a layer of its own at the box's place and size, scaled from the card's as the box grows (a clip would
+   cut a shadow drawn on the box itself), fading in as it leaves the card and out as it folds back */
+.bcv-card-shadow { position: fixed; z-index: 0; pointer-events: none; border-radius: var(--bcv-r-sheet); box-shadow: 0 30px 80px rgba(0,0,0,.34), 0 2px 10px rgba(0,0,0,.14); transform-origin: 0 0; opacity: 0; transition: transform var(--bcv-t-gentle) var(--bcv-spring-gentle), opacity .3s ease; }
 .bcv-card-blur { position: absolute; inset: 0; z-index: 0; pointer-events: none; -webkit-backdrop-filter: blur(10px) saturate(.85); backdrop-filter: blur(10px) saturate(.85); -webkit-mask-image: radial-gradient(circle at var(--bcv-mx, 50%) var(--bcv-my, 50%), transparent calc(var(--bcv-mr, 0px) * .8), rgba(0,0,0,.75) calc(var(--bcv-mr, 0px) + 36px), #000 calc(var(--bcv-mr, 0px) + 120px)); mask-image: radial-gradient(circle at var(--bcv-mx, 50%) var(--bcv-my, 50%), transparent calc(var(--bcv-mr, 0px) * .8), rgba(0,0,0,.75) calc(var(--bcv-mr, 0px) + 36px), #000 calc(var(--bcv-mr, 0px) + 120px)); animation: bcv-card-veil .32s ease both; }
 .bcv-sheet-ov--card.is-folding .bcv-card-blur { animation: bcv-card-unveil .32s ease both; }
 html.bcv-noblur .bcv-card-blur { display: none; }
 @keyframes bcv-card-veil { from { opacity: 0; } }
 @keyframes bcv-card-unveil { to { opacity: 0; } }
 .bcv-sheet-ov--card.is-folding { opacity: 0; pointer-events: none; }
-.bcv-sheet--card { position: fixed; z-index: 1; margin: 0; max-width: none; max-height: none; background: var(--bcv-card); -webkit-backdrop-filter: none; backdrop-filter: none; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); animation: none; transform: none; box-shadow: 0 30px 80px rgba(0,0,0,.34), 0 0 0 var(--bcv-line) var(--bcv-hair); transition: left .46s cubic-bezier(.32,.72,0,1), top .46s cubic-bezier(.32,.72,0,1), width .46s cubic-bezier(.32,.72,0,1), height .46s cubic-bezier(.32,.72,0,1); }
+.bcv-sheet--card { position: fixed; z-index: 1; margin: 0; max-width: none; max-height: none; background: var(--bcv-card); -webkit-backdrop-filter: none; backdrop-filter: none; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); animation: none; transform: none; box-shadow: inset 0 0 0 var(--bcv-line) var(--bcv-hair); transition: clip-path var(--bcv-t-gentle) var(--bcv-spring-gentle); } /* (2.99.4: laid out once where it goes and drawn through a clip that grows out of the card — U.cardBox — never a size animated; its hairline inside its edge, its shadow a layer of its own) */
 .bcv-sheet--card.is-at-card { transition: none; }
 /* (2.98.73) the box a Dashboard counter opens into wears the search's glass — smoky, the page coming through it softly
    blurred, the words white (the page's inks, fills and edges turned for glass this dark, as the search's are), Liquid
@@ -738,25 +747,25 @@ html.bcv-noblur .bcv-card-blur { display: none; }
    on the overlay before the box turns its inks); and the counter it grew out of is not left standing behind the glass
    (.bcv-stat.is-lifted, hidden while its box is up: content/app/screens/dashboard.js openSheet). */
 .bcv-sheet-ov--card { --bcv-stat-ground: var(--bcv-card); }
-.bcv-sheet--stat { border: 1px solid transparent; background: linear-gradient(180deg, rgba(34,33,38,.58), rgba(24,23,27,.66)) padding-box, var(--bcv-glass-rim) border-box; -webkit-backdrop-filter: blur(20px) saturate(1.8) brightness(.66); backdrop-filter: blur(20px) saturate(1.8) brightness(.66); box-shadow: var(--bcv-glass-shade), 0 30px 80px rgba(0,0,0,.34), 0 2px 10px rgba(0,0,0,.14); }
+.bcv-sheet--stat { border: 1px solid transparent; background: linear-gradient(180deg, rgba(34,33,38,.58), rgba(24,23,27,.66)) padding-box, var(--bcv-glass-rim) border-box; -webkit-backdrop-filter: blur(20px) saturate(1.8) brightness(.66); backdrop-filter: blur(20px) saturate(1.8) brightness(.66); box-shadow: var(--bcv-glass-shade); } /* (its shadow: .bcv-card-shadow) */
 .bcv-sheet--stat::before { content: ''; position: absolute; inset: 0; z-index: -1; border-radius: inherit; background: var(--bcv-stat-ground); box-shadow: 0 0 0 var(--bcv-line) var(--bcv-hair); pointer-events: none; opacity: 0; transition: opacity .3s ease .06s; }
 .bcv-sheet--stat.is-at-card::before, .bcv-sheet-ov.is-folding > .bcv-sheet--stat::before { opacity: 1; }
 .bcv-sheet--stat.is-at-card::before { transition: none; }
 .bcv-sheet-ov.is-folding > .bcv-sheet--stat::before { transition: opacity .24s ease .2s; } /* (back before the box is the counter's size again) */
-.bcv-sheet--card.bcv-sheet--stat .bcv-sheet__value, .bcv-sheet--card.bcv-sheet--stat .bcv-sheet__label { transition: transform .46s cubic-bezier(.32,.72,0,1), color .3s ease; } /* (the words the counter's ink as they leave it, white on the glass; none while at the counter, below) */
+.bcv-sheet--card.bcv-sheet--stat .bcv-sheet__value, .bcv-sheet--card.bcv-sheet--stat .bcv-sheet__label { transition: transform var(--bcv-t-gentle) var(--bcv-spring-gentle), color .3s ease; } /* (the words the counter's ink as they leave it, white on the glass; none while at the counter, below) */
 html.bcv-noblur .bcv-sheet--stat { background: linear-gradient(rgba(40,40,44,.97), rgba(40,40,44,.97)) padding-box, var(--bcv-glass-rim) border-box; } /* (no blur drawn: solid, as the search's is, the rim kept) */
 /* (2.98.75) the counter is back under the box the moment the folding box lands on it, its own ground opaque again (.44s), and
    only then does the overlay go (.44s, quickly) — the place never empty, the box turning into the counter where it stands */
 body:has(> .bcv-sheet-ov--card:not(.is-folding)) .bcv-stat.is-lifted { visibility: hidden; transition: none; }
 .bcv-stat.is-lifted, .bcv-stat.is-lifted:hover, .bcv-stat.is-lifted:active { transform: none; transition: visibility 0s linear .44s; } /* (at rest while its box is up: the box measured from it and folding back onto it where it lies) */
-.bcv-sheet-ov--card:has(> .bcv-sheet--stat) { transition: --bcv-cx .46s cubic-bezier(.32,.72,0,1), --bcv-cy .46s cubic-bezier(.32,.72,0,1), --bcv-r0 .46s cubic-bezier(.32,.72,0,1), --bcv-reach .8s cubic-bezier(.2,.6,.2,1), opacity .1s ease .44s; }
+.bcv-sheet-ov--card:has(> .bcv-sheet--stat) { transition: opacity .1s ease .44s; }
 .bcv-sheet-ov:not(.is-folding) > .bcv-sheet--stat:not(.is-at-card) .bcv-sheet__course { color: color-mix(in srgb, var(--bcv-course) 45%, #fff) !important; background: color-mix(in srgb, var(--bcv-course) 30%, transparent) !important; } /* (a course's chip lit for glass this dark: its colour lighter, its ground deeper) */
 .bcv-sheet--card > :not(.bcv-sheet__head), .bcv-sheet--card .bcv-sheet__note, .bcv-sheet--card .bcv-sheet__close { transition: opacity .22s ease .14s; }
 .bcv-sheet--card.is-at-card > :not(.bcv-sheet__head), .bcv-sheet--card.is-at-card .bcv-sheet__note, .bcv-sheet--card.is-at-card .bcv-sheet__close,
 .bcv-sheet-ov.is-folding .bcv-sheet--card > :not(.bcv-sheet__head), .bcv-sheet-ov.is-folding .bcv-sheet--card .bcv-sheet__note, .bcv-sheet-ov.is-folding .bcv-sheet--card .bcv-sheet__close { opacity: 0; transition-delay: 0s; transition-duration: .1s; }
 .bcv-sheet--card .bcv-sheet__tile { transition: background-color .22s ease .1s; }
 .bcv-sheet--card.is-at-card .bcv-sheet__tile, .bcv-sheet-ov.is-folding .bcv-sheet--card .bcv-sheet__tile { background-color: transparent; transition-delay: 0s; transition-duration: .1s; }
-.bcv-sheet--card .bcv-sheet__value, .bcv-sheet--card .bcv-sheet__label, .bcv-sheet--card .bcv-sheet__tile > svg { transform-origin: 0 0; will-change: transform; transition: transform .46s cubic-bezier(.32,.72,0,1); }
+.bcv-sheet--card .bcv-sheet__value, .bcv-sheet--card .bcv-sheet__label, .bcv-sheet--card .bcv-sheet__tile > svg { transform-origin: 0 0; will-change: transform; transition: transform var(--bcv-t-gentle) var(--bcv-spring-gentle); }
 .bcv-sheet--card.is-at-card .bcv-sheet__value, .bcv-sheet--card.is-at-card .bcv-sheet__label, .bcv-sheet--card.is-at-card .bcv-sheet__tile > svg { transition: none; }
 .bcv-sheet--card .bcv-sheet__line { flex-wrap: nowrap; }
 .bcv-sheet--card > .bcv-sheet__head { grid-column: 1; grid-row: 1; }
@@ -789,7 +798,7 @@ body:has(> .bcv-sheet-ov--card:not(.is-folding)) .bcv-stat.is-lifted { visibilit
 /* (2.98.56) the first frame of the box is the chip exactly, and the last of the fold too: while it is the chip's size the
    box wears the chip's own fill, edge and corners (read off the chip into --bcv-mark-*), and a copy of the chip's words sits
    over its header — the one word that glides left out of the copy — fading as the box grows and back in as it folds */
-.bcv-mark { transition: left .46s cubic-bezier(.32,.72,0,1), top .46s cubic-bezier(.32,.72,0,1), width .46s cubic-bezier(.32,.72,0,1), height .46s cubic-bezier(.32,.72,0,1), background-color .32s ease, border-color .32s ease, border-radius .46s cubic-bezier(.32,.72,0,1), box-shadow .32s ease; }
+.bcv-mark { transition: clip-path var(--bcv-t-gentle) var(--bcv-spring-gentle), background-color .32s ease, border-color .32s ease, border-radius var(--bcv-t-gentle) var(--bcv-spring-gentle); }
 .bcv-mark.is-at-card, .bcv-sheet-ov.is-folding .bcv-mark { background: var(--bcv-mark-bg, var(--bcv-card)); border-color: var(--bcv-mark-edge, var(--bcv-edge)); border-radius: var(--bcv-mark-r, 16px); box-shadow: none; }
 .bcv-mark__ghost { position: absolute; right: 0; top: 0; z-index: 2; /* (the box hangs from the chip's right edge, so its top-right corner is the one that stays put) */ display: flex; align-items: center; box-sizing: border-box; pointer-events: none; white-space: nowrap; color: var(--bcv-ink); opacity: 0; transition: opacity .16s ease; }
 .bcv-mark.is-at-card .bcv-mark__ghost { opacity: 1; transition: none; }
@@ -802,7 +811,7 @@ body:has(> .bcv-sheet-ov--card:not(.is-folding)) .bcv-stat.is-lifted { visibilit
   .bcv-sheet--card.is-split:not(.is-narrow) .bcv-pv--in { border-left: 1px solid var(--bcv-sep); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .bcv-sheet-ov--card, .bcv-sheet--card, .bcv-sheet--card > *, .bcv-sheet--card .bcv-sheet__head * { transition: none; animation: none; }
+  .bcv-sheet-ov--card, .bcv-sheet--card, .bcv-sheet--card > *, .bcv-sheet--card .bcv-sheet__head *, .bcv-card-shadow, .bcv-card-dim { transition: none; animation: none; }
 }
 .bcv-sheet__head { padding: 20px 22px 16px; border-bottom: 1px solid var(--bcv-sep); display: flex; align-items: flex-start; gap: 14px; }
 .bcv-sheet__tile { flex: none; width: 38px; height: 38px; border-radius: var(--bcv-r-tile-lg); background: var(--bcv-fill); display: flex; align-items: center; justify-content: center; }
@@ -864,7 +873,7 @@ body:has(> .bcv-sheet-ov--card:not(.is-folding)) .bcv-stat.is-lifted { visibilit
 .bcv-sky__names { display: flex; padding-top: 9px; }
 .bcv-sky__name { padding: 0 2px; text-align: center; font: 600 11px/1.2 var(--bcv-font); letter-spacing: .05em; text-transform: uppercase; color: var(--bcv-ink3); }
 /* entry: the towers rise out of the street one after another, their scores after them; the windows light as they land */
-.bcv-sky__tower--rise { animation: bcv-sky-rise .9s cubic-bezier(.32,.72,0,1) var(--bcv-delay, 0ms) both; }
+.bcv-sky__tower--rise { animation: bcv-sky-rise .3s var(--bcv-ease-out) var(--bcv-delay, 0ms) both; }
 @keyframes bcv-sky-rise { from { clip-path: inset(100% 0 0 0); } to { clip-path: inset(0 0 0 0); } }
 .bcv-sky__pct--in { animation: bcv-fade-up var(--bcv-t-settle) var(--bcv-spring-settle) var(--bcv-delay, 0ms) backwards; }
 /* …and the windows fade in where they stand, one by one in reading order, 45ms apart (2.98.93: no flight, no bounce) */
@@ -935,14 +944,15 @@ body:has(> .bcv-sheet-ov--card:not(.is-folding)) .bcv-stat.is-lifted { visibilit
 .bcv-ccard__quick:hover { background: var(--bcv-fill); }
 .bcv-ccard__next { font: 400 12.5px/1.3 var(--bcv-font); color: var(--bcv-ink2); }
 /* To Do (mockup 12): the priority chip on every row, the composer for a task of your own, the delete button on those rows */
-.bcv-pri { flex: none; display: inline-flex; align-items: center; gap: 5px; border: 0; cursor: pointer; padding: 4px 8px 4px 9px; border-radius: 9px; font: 600 11.5px/1.3 var(--bcv-font); white-space: nowrap; transition: background .2s ease, color .2s ease, filter .16s ease; }
+.bcv-pri { flex: none; display: inline-flex; align-items: center; gap: 5px; border: 0; cursor: pointer; padding: 4px 8px 4px 9px; border-radius: 9px; font: 600 11.5px/1.3 var(--bcv-font); white-space: nowrap; transition: background .2s ease, color .2s ease, filter .16s ease, transform .16s var(--bcv-ease-out); }
+.bcv-pri:active { transform: scale(.97); }
 .bcv-pri:hover { filter: brightness(.94); }
 .bcv-pri--draft { padding: 6px 10px; border-radius: 9px; font-size: 12.5px; }
 .bcv-todo__add { display: flex; align-items: center; gap: 11px; width: 100%; box-sizing: border-box; padding: 14px 18px; border: 1px dashed var(--bcv-edge); border-radius: 18px; background: transparent; cursor: pointer; text-align: left; transition: background .2s ease, border-color .2s ease; }
 .bcv-todo__add:hover { background: var(--bcv-hover); border-color: var(--bcv-blue); }
 .bcv-todo__addic { flex: none; width: 26px; height: 26px; border-radius: 13px; background: var(--bcv-blue-soft); display: flex; align-items: center; justify-content: center; }
 .bcv-todo__addlabel { flex: 1; min-width: 0; font: 500 14px/1.3 var(--bcv-font); color: var(--bcv-ink3); }
-.bcv-todo__composer { background: var(--bcv-card); border-radius: var(--bcv-r-row); padding: 16px 18px; box-shadow: var(--bcv-shadow); display: flex; flex-direction: column; gap: 13px; animation: bcv-fade-up .28s cubic-bezier(.32,.72,0,1) backwards; }
+.bcv-todo__composer { background: var(--bcv-card); border-radius: var(--bcv-r-row); padding: 16px 18px; box-shadow: var(--bcv-shadow); display: flex; flex-direction: column; gap: 13px; animation: bcv-fade-up .28s var(--bcv-ease) backwards; }
 .bcv-todo__title { width: 100%; box-sizing: border-box; border: 0 !important; outline: none; background: transparent !important; box-shadow: none; margin: 0; padding: 0; font: 600 16px/1.35 var(--bcv-font); letter-spacing: -.01em; color: var(--bcv-ink) !important; }
 .bcv-todo__title::placeholder { color: var(--bcv-ink3); }
 .bcv-todo__ctl { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
@@ -1113,7 +1123,7 @@ html[data-bcv-theme="dark"] .bcv-cal__notice--warn { color: #ffb44d; }
 .bcv-picker__label { min-width: 0; }
 .bcv-picker__label--none { color: var(--bcv-ink3); }
 .bcv-picker__chev { flex: none; }
-.bcv-picker__list { position: fixed; z-index: var(--bcv-z-picker); overflow: auto; padding: 6px; border-radius: var(--bcv-r-menu); background: var(--bcv-glass-ground, var(--bcv-glass)); -webkit-backdrop-filter: var(--bcv-blur-glass); backdrop-filter: var(--bcv-blur-glass); border: 1px solid var(--bcv-edge); box-shadow: var(--bcv-shadow-hi); display: flex; flex-direction: column; gap: 2px; font-family: var(--bcv-font); animation: bcv-qn-in .16s cubic-bezier(.32,.72,0,1) both; }
+.bcv-picker__list { position: fixed; z-index: var(--bcv-z-picker); overflow: auto; padding: 6px; border-radius: var(--bcv-r-menu); background: var(--bcv-glass-ground, var(--bcv-glass)); -webkit-backdrop-filter: var(--bcv-blur-glass); backdrop-filter: var(--bcv-blur-glass); border: 1px solid var(--bcv-edge); box-shadow: var(--bcv-shadow-hi); display: flex; flex-direction: column; gap: 2px; font-family: var(--bcv-font); animation: bcv-qn-in .16s var(--bcv-ease) both; }
 .bcv-picker__opt { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; border: 0; border-radius: 9px; background: transparent; color: var(--bcv-ink); font: 400 14px/1.35 var(--bcv-font); text-align: left; cursor: pointer; }
 .bcv-picker__opt:hover, .bcv-picker__opt:focus-visible { background: var(--bcv-fill2); outline: none; }
 .bcv-picker__opttext { flex: 1; min-width: 0; }
@@ -1140,7 +1150,7 @@ html[data-bcv-theme="dark"] .bcv-cal__notice--warn { color: #ffb44d; }
 .bcv-menu__title { padding: 0 2px 10px; font: 600 11px/1.2 var(--bcv-font); color: var(--bcv-ink3); text-transform: uppercase; letter-spacing: .05em; }
 .bcv-swatches { display: grid; grid-template-columns: repeat(6, 26px); gap: 9px; }
 .bcv-swatch { width: 26px; height: 26px; border-radius: 50%; border: 0; padding: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: inset 0 0 0 var(--bcv-line) rgba(0,0,0,.1); box-sizing: border-box; }
-.bcv-swatch:hover { transform: scale(1.12); }
+@media (hover: hover) and (pointer: fine) { .bcv-swatch:hover { transform: scale(1.12); } }
 .bcv-swatch.is-current { box-shadow: 0 0 0 2px var(--bcv-card), 0 0 0 4px var(--bcv-ink); }
 .bcv-swatch--custom { position: relative; overflow: hidden; background: conic-gradient(#ff2717, #fd5d10, #8d9900, #009606, #06a3b7, #1770ab, #8f3e97, #e71f63, #ff2717); }
 .bcv-swatch__input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; border: 0; padding: 0; }
@@ -1313,8 +1323,8 @@ html[data-bcv-theme="dark"] .bcv-rubg__cell--part.is-got { box-shadow: inset 0 0
    corner badge, so it never needs the title's padding reserved and it wraps under on a narrow pane. */
 .bcv-detail__head { display: flex; align-items: flex-start; gap: 18px; flex-wrap: wrap; }
 .bcv-detail__head .bcv-detail__title { flex: 1 1 260px; min-width: 0; }
-#bcv-app .bcv-detail__grade { flex: none; display: flex; align-items: center; gap: 14px; padding: 11px 14px 11px 17px; border-radius: 16px; background: rgba(52,199,89,.12); border: 1px solid rgba(52,199,89,.26); cursor: pointer; text-align: left; color: inherit; font: inherit; transition: transform .18s cubic-bezier(.32,.72,0,1); }
-#bcv-app .bcv-detail__grade:hover { transform: translateY(-1px); }
+#bcv-app .bcv-detail__grade { flex: none; display: flex; align-items: center; gap: 14px; padding: 11px 14px 11px 17px; border-radius: 16px; background: rgba(52,199,89,.12); border: 1px solid rgba(52,199,89,.26); cursor: pointer; text-align: left; color: inherit; font: inherit; transition: transform .18s var(--bcv-ease); }
+@media (hover: hover) and (pointer: fine) { #bcv-app .bcv-detail__grade:hover { transform: translateY(-1px); } }
 html[data-bcv-theme="dark"] #bcv-app .bcv-detail__grade { background: rgba(52,199,89,.16); border-color: rgba(52,199,89,.32); }
 /* a mark Canvas has not posted carries no number at all */
 #bcv-app .bcv-detail__grade--held, #bcv-app .bcv-detail__grade--sub { background: var(--bcv-fill); border-color: var(--bcv-edge); padding: 11px 14px 11px 16px; }
@@ -1371,13 +1381,13 @@ html[data-bcv-theme="dark"] .bcv-rr-ov { --rr-dim0: .52; --rr-dim1: .78; }
 .bcv-rr__close:hover { background: rgba(255,255,255,.22); color: #fff; }
 .bcv-rr__field { position: absolute; left: 12px; right: 12px; top: 96px; bottom: 44px; }
 .bcv-rr__stage { position: absolute; left: 50%; top: 50%; width: 760px; height: 560px; transform: translate(calc(-50% + var(--rr-tx, 0px)), calc(-50% + var(--rr-ty, 0px))) scale(var(--rr-s)); will-change: transform; } /* (a layer of its own: its frames repaint it alone, never the blurred page under it. --rr-tx/ty: moved aside for the developer's panel and the tour's card, fit() in rubric-ring.js) */
-.bcv-rr__inner { position: relative; width: 100%; height: 100%; transition: transform .4s cubic-bezier(.32,.72,0,1), opacity .32s ease; }
+.bcv-rr__inner { position: relative; width: 100%; height: 100%; transition: transform var(--bcv-t-gentle) var(--bcv-spring-gentle), opacity .32s ease; }
 .bcv-rr-ov.is-leaving .bcv-rr__inner { transform: scale(.92); opacity: 0; }
 .bcv-rr-ov.is-leaving :is(.bcv-rr__top, .bcv-rr__foot, .bcv-rr__close, .bcv-rr__devpill, .bcv-rr__dev) { opacity: 0; }
 .bcv-rr__svg { position: absolute; left: 0; top: 0; width: 100%; height: 100%; overflow: visible; }
 /* the ring blooms in, a quarter-turn short of where it lands */
 @keyframes bcv-rr-bloom { from { opacity: 0; transform: scale(.6) rotate(-40deg); } }
-.bcv-rr__svg { transform-origin: 380px 280px; animation: bcv-rr-bloom 1s cubic-bezier(.32,.72,0,1) backwards; } /* (the drawing blooms in as one layer: no repaint per frame) */
+.bcv-rr__svg { transform-origin: 380px 280px; animation: bcv-rr-bloom 1s var(--bcv-ease) backwards; } /* (the drawing blooms in as one layer: no repaint per frame) */
 .bcv-rr__hit { cursor: pointer; }
 .bcv-rr__ticks circle { fill: #1c1c1e; stroke: rgba(255,255,255,.82); stroke-width: 2.5; transform-box: fill-box; transform-origin: center; }
 .bcv-rr__ticks circle.is-picked { fill: #fff; stroke: var(--rr-sel); }
@@ -1421,17 +1431,17 @@ html[data-bcv-theme="dark"] .bcv-rr-ov { --rr-dim0: .52; --rr-dim1: .78; }
 .bcv-rr__stem { stroke-width: 2.5; stroke-linecap: round; }
 .bcv-rr__back { position: absolute; left: 44px; top: 34px; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: #fff; cursor: pointer; transition: background .3s ease; }
 .bcv-rr__back:hover { background: rgba(255,255,255,.07); }
-.bcv-rr__mini { display: block; width: 44px; height: 44px; overflow: visible; transition: transform .5s cubic-bezier(.32,.72,0,1); }
-.bcv-rr__back:hover .bcv-rr__mini { transform: scale(1.1); }
-.bcv-rr__back:active .bcv-rr__mini { transform: scale(.94); transition-duration: .15s; }
+.bcv-rr__mini { display: block; width: 44px; height: 44px; overflow: visible; transition: transform .5s var(--bcv-ease); }
+@media (hover: hover) and (pointer: fine) { .bcv-rr__back:hover .bcv-rr__mini { transform: scale(1.1); } }
+.bcv-rr__back:active .bcv-rr__mini { transform: scale(.97); transition-duration: .15s; }
 .bcv-rr__mtrack { fill: none; stroke: rgba(255,255,255,.13); stroke-width: 3.5; }
-.bcv-rr__spin { transition: transform .6s cubic-bezier(.32,.72,0,1); }
+.bcv-rr__spin { transition: transform .6s var(--bcv-ease); }
 .bcv-rr__marc { fill: none; stroke-width: 3.5; transition: opacity .3s ease; }
 .bcv-rr__marc.is-gone { opacity: 0; }
-.bcv-rr__mfill { fill: none; stroke: var(--rr-sel); stroke-width: 3.5; stroke-dasharray: 1 1; stroke-dashoffset: 1; transition: stroke-dashoffset .55s cubic-bezier(.32,.72,0,1); }
+.bcv-rr__mfill { fill: none; stroke: var(--rr-sel); stroke-width: 3.5; stroke-dasharray: 1 1; stroke-dashoffset: 1; transition: stroke-dashoffset .55s var(--bcv-ease); }
 .bcv-rr__back:is(:hover, :focus-visible) .bcv-rr__mfill { stroke-dashoffset: 0; }
-.bcv-rr__mchev { fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; transition: transform .5s cubic-bezier(.32,.72,0,1); }
-.bcv-rr__back:hover .bcv-rr__mchev { transform: translateX(-1.5px); }
+.bcv-rr__mchev { fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; transition: transform .5s var(--bcv-ease); }
+@media (hover: hover) and (pointer: fine) { .bcv-rr__back:hover .bcv-rr__mchev { transform: translateX(-1.5px); } }
 .bcv-rr__back:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .bcv-rr__rows { position: absolute; inset: 0; }
 .bcv-rr__row { position: absolute; left: 108px; right: 28px; top: var(--rr-y); transform: translateY(-50%); display: flex; align-items: center; gap: 14px; }
@@ -1463,7 +1473,7 @@ html[data-bcv-theme="dark"] .bcv-rr-ov { --rr-dim0: .52; --rr-dim1: .78; }
 /* (2.98.95) ring or grid: a small two-way switch at the top right, under the page's own buttons — a glass pill, the one
    shown lit on a knob that slides */
 .bcv-rr__view { position: absolute; top: 50px; right: 20px; z-index: 4; display: flex; padding: 3px; gap: 2px; border-radius: 17px; background: var(--rr-fill); box-shadow: inset 0 0 0 1px rgba(255,255,255,.08); animation: bcv-fade-in .3s ease .15s backwards; transition: opacity .2s ease; }
-.bcv-rr__vknob { position: absolute; top: 3px; left: 3px; width: 34px; height: 28px; border-radius: 14px; background: rgba(255,255,255,.2); box-shadow: 0 1px 4px rgba(0,0,0,.3), inset 0 0.5px 0 rgba(255,255,255,.25); transition: transform .32s cubic-bezier(.32,.72,0,1); pointer-events: none; }
+.bcv-rr__vknob { position: absolute; top: 3px; left: 3px; width: 34px; height: 28px; border-radius: 14px; background: rgba(255,255,255,.2); box-shadow: 0 1px 4px rgba(0,0,0,.3), inset 0 0.5px 0 rgba(255,255,255,.25); transition: transform .32s var(--bcv-ease); pointer-events: none; }
 .bcv-rr__view[data-on="grid"] .bcv-rr__vknob { transform: translateX(36px); }
 .bcv-rr__vbtn { position: relative; width: 34px; height: 28px; padding: 0; border: 0; border-radius: 14px; background: none; color: var(--rr-ink3); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: color .2s ease; }
 .bcv-rr__vbtn:hover { color: var(--rr-ink); }
@@ -1471,7 +1481,7 @@ html[data-bcv-theme="dark"] .bcv-rr-ov { --rr-dim0: .52; --rr-dim1: .78; }
 .bcv-rr__vbtn:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
 .bcv-rr-ov.is-leaving .bcv-rr__view { opacity: 0; }
 /* the ring steps back as the grid comes forward, and back */
-.bcv-rr__field { transition: opacity .28s ease, transform .4s cubic-bezier(.32,.72,0,1); }
+.bcv-rr__field { transition: opacity .28s ease, transform .4s var(--bcv-ease); }
 .bcv-rr-ov.is-grid .bcv-rr__field { opacity: 0; transform: scale(.94); pointer-events: none; }
 .bcv-rr-ov.is-grid :is(.bcv-rr__top, .bcv-rr__foot) { opacity: 0; }
 /* (2.98.95) the grid: the rubric as a panel of rows and columns — a criterion a row (its colour, its name, what it is worth
@@ -1479,8 +1489,8 @@ html[data-bcv-theme="dark"] .bcv-rr-ov { --rr-dim0: .52; --rr-dim1: .78; }
    The column the pointer is in lights up with its heading; marked, your level is outlined in its grade's colour */
 .bcv-rg { position: absolute; left: 50%; top: calc(50% + 26px); z-index: 2; width: min(1000px, calc(100% - 64px)); max-height: calc(100% - 128px); box-sizing: border-box; display: flex; flex-direction: column; padding: 22px 22px 0; border-radius: 28px;
   background: linear-gradient(180deg, rgba(38,38,42,.97), rgba(26,26,29,.97)); border: 1px solid rgba(255,255,255,.08); box-shadow: 0 30px 80px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.06);
-  opacity: 0; transform: translate(-50%, -50%) scale(.97); pointer-events: none; visibility: hidden; transition: opacity .26s ease, transform .4s cubic-bezier(.32,.72,0,1), visibility 0s linear .4s; }
-.bcv-rr-ov.is-grid .bcv-rg { opacity: 1; transform: translate(-50%, -50%) scale(1); pointer-events: auto; visibility: visible; transition: opacity .3s ease .06s, transform .45s cubic-bezier(.32,.72,0,1) .04s, visibility 0s; }
+  opacity: 0; transform: translate(-50%, -50%) scale(.97); pointer-events: none; visibility: hidden; transition: opacity .26s ease, transform var(--bcv-t-gentle) var(--bcv-spring-gentle), visibility 0s linear .4s; }
+.bcv-rr-ov.is-grid .bcv-rg { opacity: 1; transform: translate(-50%, -50%) scale(1); pointer-events: auto; visibility: visible; transition: opacity .3s ease .06s, transform var(--bcv-t-gentle) var(--bcv-spring-gentle) .04s, visibility 0s; }
 .bcv-rr-ov.is-leaving .bcv-rg { opacity: 0; transform: translate(-50%, -50%) scale(.96); }
 .bcv-rg__head { flex: none; display: flex; align-items: flex-end; gap: 20px; padding: 0 2px 16px; }
 .bcv-rg__titles { flex: 1; min-width: 0; }
@@ -1493,7 +1503,7 @@ html[data-bcv-theme="dark"] .bcv-rr-ov { --rr-dim0: .52; --rr-dim1: .78; }
 .bcv-rg__sof { font: 600 15px/1 var(--bcv-font); color: var(--rr-ink3); }
 .bcv-rg__n { font: 600 13.5px/1 var(--bcv-font); color: var(--rr-ink2); }
 .bcv-rg__seg { position: relative; display: grid; grid-template-columns: 1fr 1fr; padding: 3px; border-radius: 12px; background: rgba(255,255,255,.07); box-shadow: inset 0 0 0 1px rgba(255,255,255,.06); }
-.bcv-rg__segknob { position: absolute; top: 3px; bottom: 3px; left: 3px; width: calc(50% - 3px); border-radius: 9px; background: rgba(255,255,255,.16); box-shadow: 0 1px 4px rgba(0,0,0,.3), inset 0 0.5px 0 rgba(255,255,255,.2); transition: transform .32s cubic-bezier(.32,.72,0,1); }
+.bcv-rg__segknob { position: absolute; top: 3px; bottom: 3px; left: 3px; width: calc(50% - 3px); border-radius: 9px; background: rgba(255,255,255,.16); box-shadow: 0 1px 4px rgba(0,0,0,.3), inset 0 0.5px 0 rgba(255,255,255,.2); transition: transform .32s var(--bcv-ease); }
 .bcv-rg__seg[data-on="graded"] .bcv-rg__segknob { transform: translateX(100%); }
 .bcv-rg__segbtn { position: relative; min-width: 0; height: 28px; padding: 0 14px; border: 0; border-radius: 9px; background: none; color: var(--rr-ink3); font: 600 12.5px/1 var(--bcv-font); white-space: nowrap; cursor: pointer; transition: color .2s ease; }
 .bcv-rg__segbtn.is-on { color: var(--rr-ink); }
@@ -1548,9 +1558,9 @@ html[data-bcv-theme="dark"] .bcv-rr-ov { --rr-dim0: .52; --rr-dim1: .78; }
 .bcv-rr__devpill { position: absolute; top: 94px; right: 20px; z-index: 3; display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 11px; border: 0; border-radius: 16px; background: var(--rr-fill); color: var(--rr-ink); font: 600 12.5px/1 var(--bcv-font); cursor: pointer; transition: background .15s ease, opacity .2s ease; animation: bcv-fade-in .3s ease .2s backwards; }
 .bcv-rr__devpill:hover { background: rgba(255,255,255,.2); }
 .bcv-rr__devdot { width: 8px; height: 8px; border-radius: 50%; background: #bf5af2; box-shadow: 0 0 0 3px rgba(191,90,242,.28); }
-.bcv-rr__devchev { transition: transform .3s cubic-bezier(.32,.72,0,1); }
+.bcv-rr__devchev { transition: transform .3s var(--bcv-ease); }
 .bcv-rr__devpill.is-open .bcv-rr__devchev { transform: rotate(180deg); }
-.bcv-rr__dev { position: absolute; top: 136px; right: 20px; z-index: 3; width: 264px; max-height: calc(100% - 180px); box-sizing: border-box; display: flex; flex-direction: column; gap: 10px; padding: 12px; border-radius: 18px; background: rgba(28,28,30,.84); border: 1px solid rgba(255,255,255,.1); box-shadow: 0 18px 50px rgba(0,0,0,.45); animation: bcv-rr-devin .32s cubic-bezier(.32,.72,0,1) backwards; transition: opacity .2s ease; }
+.bcv-rr__dev { position: absolute; top: 136px; right: 20px; z-index: 3; width: 264px; max-height: calc(100% - 180px); box-sizing: border-box; display: flex; flex-direction: column; gap: 10px; padding: 12px; border-radius: 18px; background: rgba(28,28,30,.84); border: 1px solid rgba(255,255,255,.1); box-shadow: 0 18px 50px rgba(0,0,0,.45); animation: bcv-rr-devin .32s var(--bcv-ease) backwards; transition: opacity .2s ease; }
 .bcv-rr__dev[hidden] { display: none; }
 @keyframes bcv-rr-devin { from { opacity: 0; transform: translateY(-6px) scale(.98); } }
 .bcv-rr__devnote { margin: 0; font: 400 11.5px/1.4 var(--bcv-font); color: var(--rr-ink3); }
@@ -1561,7 +1571,7 @@ html[data-bcv-theme="dark"] .bcv-rr-ov { --rr-dim0: .52; --rr-dim1: .78; }
 .bcv-rr__dpre--real:hover { background: rgba(191,90,242,.36); }
 .bcv-rr__dpost { align-self: flex-start; display: flex; align-items: center; gap: 8px; padding: 0; border: 0; background: none; color: var(--rr-ink2); font: 600 12px/1 var(--bcv-font); cursor: pointer; }
 .bcv-rr__dknob { position: relative; width: 30px; height: 18px; border-radius: 9px; background: rgba(255,255,255,.18); transition: background .2s ease; }
-.bcv-rr__dknob::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: #fff; transition: transform .25s cubic-bezier(.32,.72,0,1); }
+.bcv-rr__dknob::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: #fff; transition: transform .25s var(--bcv-ease); }
 .bcv-rr__dpost.is-on .bcv-rr__dknob { background: #30d158; }
 .bcv-rr__dpost.is-on .bcv-rr__dknob::after { transform: translateX(12px); }
 .bcv-rr__dlist { flex: 1 1 auto; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 10px; margin: 0 -6px; padding: 10px 6px 2px; border-top: 1px solid var(--rr-sep); }
@@ -1609,7 +1619,7 @@ html[data-bcv-theme="dark"] .bcv-rr-ov { --rr-dim0: .52; --rr-dim1: .78; }
 .bcv-module__state { font: 400 12px/1.2 var(--bcv-font); color: var(--bcv-ink3); }
 /* opening and closing is a slide, not a jump: the row takes the items' own height with it, so
    nothing has to be measured and a module of any length behaves the same */
-.bcv-module__wrap { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .3s cubic-bezier(.32,.72,0,1); }
+.bcv-module__wrap { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .3s var(--bcv-ease); }
 .bcv-module--open .bcv-module__wrap { grid-template-rows: 1fr; }
 .bcv-module__items { min-height: 0; overflow: hidden; }
 .bcv-module--open > .bcv-module__wrap > .bcv-module__items { border-top: 1px solid var(--bcv-sep); }
@@ -2030,7 +2040,7 @@ html[data-bcv-theme="dark"] .bcv-sb__chip--due { color: #ffb44d; }
 .bcv-fb__pct { font: 600 15px/1.2 var(--bcv-font); color: var(--bcv-ink2); }
 .bcv-fb__summary { margin-left: auto; font: 400 12.5px/1.3 var(--bcv-font); color: var(--bcv-ink3); }
 .bcv-fb__bar { height: 6px; border-radius: 3px; background: var(--bcv-fill); overflow: hidden; }
-.bcv-fb__fill { height: 6px; border-radius: 3px; background: #34c759; transform-origin: left; animation: bcv-grow .5s cubic-bezier(.32,.72,0,1) both; }
+.bcv-fb__fill { height: 6px; border-radius: 3px; background: #34c759; transform-origin: left; animation: bcv-grow .5s var(--bcv-ease) both; }
 .bcv-fb__comment { display: flex; gap: 11px; padding-top: 11px; border-top: 1px solid var(--bcv-sep); }
 .bcv-fb__avatar { flex: none; width: 30px; height: 30px; border-radius: 10px; background: var(--bcv-fill); display: flex; align-items: center; justify-content: center; font: 700 11px/1 var(--bcv-font); color: var(--bcv-ink2); }
 .bcv-fb__cbody { flex: 1; min-width: 0; }
@@ -2060,7 +2070,7 @@ html[data-bcv-theme="dark"] .bcv-fb__chip--right { color: #5ddb7d; }
 .bcv-fb__optwrap { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
 .bcv-fb__more { display: inline-flex; align-items: center; gap: 5px; padding: 4px 9px 4px 10px; border: 1px solid var(--bcv-edge); border-radius: 999px; background: transparent; font: 600 12px/1.3 var(--bcv-font); color: var(--bcv-ink2); cursor: pointer; }
 .bcv-fb__more:hover { background: var(--bcv-fill2); }
-.bcv-fb__morechev { transform: rotate(90deg); transition: transform .2s cubic-bezier(.32,.72,0,1); color: var(--bcv-ink3); }
+.bcv-fb__morechev { transform: rotate(90deg); transition: transform .2s var(--bcv-ease); color: var(--bcv-ink3); }
 .bcv-fb__more.is-open .bcv-fb__morechev { transform: rotate(-90deg); }
 .bcv-fb__opts { align-self: stretch; display: flex; flex-direction: column; gap: 5px; }
 .bcv-fb__opt { display: flex; align-items: center; gap: 9px; padding: 8px 11px; border-radius: 11px; background: var(--bcv-fill2); border: 1px solid transparent; font: 400 13px/1.4 var(--bcv-font); }
@@ -2131,7 +2141,7 @@ html[data-bcv-theme="dark"] #bcv-app .bcv-qfb__sq.is-wrong { background: rgba(25
 html[data-bcv-theme="dark"] #bcv-app .bcv-qfb__sq.is-partial { background: rgba(255,149,0,.22); color: #ffb44d; }
 #bcv-app .bcv-qfb__sq.is-here { border-color: currentColor; }
 #bcv-app .bcv-qfb__sq.is-out { opacity: .35; }
-#bcv-app .bcv-qfb__sq:hover { transform: translateY(-1px); }
+@media (hover: hover) and (pointer: fine) { #bcv-app .bcv-qfb__sq:hover { transform: translateY(-1px); } }
 .bcv-qfb__keys { font: 500 11.5px/1.4 var(--bcv-font); color: var(--bcv-ink3); }
 .bcv-qfb__rail .bcv-fb__btns { flex-direction: column; margin-top: 4px; }
 .bcv-qfb__rail .bcv-fb__btns .bcv-qz__big { flex: none; height: 44px; font-size: 14.5px; }
@@ -2233,11 +2243,11 @@ html.bcv-phone.bcv-punch #content { padding: 16px 16px !important; border-radius
    away, smoothly, and takes the page. */
 .bcv-qz.is-embedded { min-height: 0; }
 .bcv-qz.is-embedded .bcv-qz__head { display: none; }
-.bcv-side { transition: width .45s cubic-bezier(.32,.72,0,1), padding .45s cubic-bezier(.32,.72,0,1), opacity .25s ease; }
+.bcv-side { transition: width .45s var(--bcv-ease), padding .45s var(--bcv-ease), opacity .25s ease; }
 html.bcv-quiz .bcv-side { width: 0; padding-left: 0; padding-right: 0; opacity: 0; overflow: hidden; border-right-width: 0; pointer-events: none; }
-.bcv-head--course { max-height: 480px; transition: max-height .45s cubic-bezier(.32,.72,0,1), padding .45s cubic-bezier(.32,.72,0,1), opacity .2s ease; }
+.bcv-head--course { max-height: 480px; transition: max-height .45s var(--bcv-ease), padding .45s var(--bcv-ease), opacity .2s ease; }
 html.bcv-quiz .bcv-screen--ctx .bcv-head--course { max-height: 0; padding-top: 0; padding-bottom: 0; opacity: 0; overflow: hidden; border-bottom-width: 0; pointer-events: none; }
-.bcv-rail { transition: width .45s cubic-bezier(.32,.72,0,1), padding .45s cubic-bezier(.32,.72,0,1), opacity .25s ease; }
+.bcv-rail { transition: width .45s var(--bcv-ease), padding .45s var(--bcv-ease), opacity .25s ease; }
 html.bcv-quiz .bcv-screen--ctx .bcv-rail { width: 0; padding-left: 0; padding-right: 0; opacity: 0; overflow: hidden; pointer-events: none; }
 html.bcv-quiz .bcv-screen--ctx .bcv-cmain { border-left: 0; }
 .bcv-qz { min-height: 100vh; display: flex; flex-direction: column; background: var(--bcv-bg); }
@@ -2254,7 +2264,7 @@ html.bcv-quiz .bcv-screen--ctx .bcv-cmain { border-left: 0; }
 html[data-bcv-theme="dark"] .bcv-qz__pill { --bcv-pill-wash: rgba(10,132,255,.34); }
 .bcv-qz__pill.is-current { --bcv-pill-wash: rgba(255,255,255,.32); }
 .bcv-qz__pilln { position: relative; }
-.bcv-qz__pill.is-loading { background-image: linear-gradient(var(--bcv-pill-wash), var(--bcv-pill-wash)); background-repeat: no-repeat; background-position: left center; background-origin: border-box; background-clip: border-box; animation: bcv-pill-load .62s cubic-bezier(.4,0,.2,1) both; }
+.bcv-qz__pill.is-loading { background-image: linear-gradient(var(--bcv-pill-wash), var(--bcv-pill-wash)); background-repeat: no-repeat; background-position: left center; background-origin: border-box; background-clip: border-box; animation: bcv-pill-load .62s linear both; }
 @keyframes bcv-pill-load { from { background-size: 0% 100%; } to { background-size: 100% 100%; } }
 @media (prefers-reduced-motion: reduce) { .bcv-qz__pill.is-loading { animation: none; background-size: 60% 100%; } }
 /* the way out of our quiz UI, in red because it is a way out: Canvas's own page, no attempt lost */
@@ -2496,6 +2506,12 @@ html[data-bcv-theme="dark"] #bcv-app .bcv-qz__opt.is-selected { color: #7ab8ff; 
 .bcv-qz__big--primary { flex-basis: 200px; background: var(--bcv-blue); color: #fff; }
 .bcv-qz__done { flex: 1; max-width: 520px; margin: 0 auto; width: 100%; padding: 80px 28px 60px; display: flex; flex-direction: column; align-items: center; gap: 18px; text-align: center; }
 .bcv-qz__donemark { width: 66px; height: 66px; border-radius: 33px; background: rgba(52,199,89,.16); display: flex; align-items: center; justify-content: center; }
+/* the success tick, once (ui.drawCheck): the disc settles from 0.9 and the stroke draws itself in over 400ms (pathLength 1;
+   a 1-2 dash, so the stroke's round cap leaves no dot before it starts) */
+@keyframes bcv-check-in { from { opacity: 0; transform: scale(.9); } }
+@keyframes bcv-check-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+.bcv-check--draw { animation: bcv-check-in .2s var(--bcv-ease-out) both; }
+.bcv-check--draw path { stroke-dasharray: 1 2; animation: bcv-check-draw .4s var(--bcv-ease-out) .12s both; }
 .bcv-qz__done .bcv-qz__lead { font-size: 15px; line-height: 1.5; }
 .bcv-qz__donecard { width: 100%; background: var(--bcv-card); border-radius: 18px; padding: 16px 20px; box-shadow: var(--bcv-shadow); display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .bcv-qz__donek { font: 500 14px/1.3 var(--bcv-font); color: var(--bcv-ink2); }
@@ -2516,7 +2532,7 @@ html[data-bcv-theme="dark"] #bcv-app .bcv-qz__opt.is-selected { color: #7ab8ff; 
  * from the right beside it. Nothing is dimmed — the point is to read the two together. */
 html.bcv-preview { --bcv-pv-w: clamp(340px, 33vw, 520px); }
 html.bcv-preview #bcv-app { padding-right: var(--bcv-pv-w); }
-#bcv-app { transition: padding-right .34s cubic-bezier(.32,.72,0,1); }
+#bcv-app { transition: padding-right .34s var(--bcv-ease); }
 .bcv-pv {
   position: fixed; top: 0; right: 0; bottom: 0; z-index: var(--bcv-z-panel); width: clamp(340px, 33vw, 520px);
   display: flex; flex-direction: column; box-sizing: border-box;
@@ -2755,7 +2771,7 @@ html.bcv-phone .bcv-reader-btn { display: none !important; } /* no Immersive Rea
 /* sheets come up from the bottom, with a grab handle */
 @keyframes bcv-sheet-up { from { opacity: 0; transform: translateY(60px); } to { opacity: 1; transform: none; } }
 html.bcv-phone .bcv-sheet-ov { align-items: flex-end; padding: 0; }
-html.bcv-phone .bcv-sheet { width: 100%; max-width: none; max-height: 88vh; border-radius: var(--bcv-r-sheet) var(--bcv-r-sheet) 0 0; border-bottom: 0; padding-bottom: var(--bcv-ph-bottom); animation: bcv-sheet-up .3s cubic-bezier(.32,.72,0,1) both; transform-origin: 50% 100%; }
+html.bcv-phone .bcv-sheet { width: 100%; max-width: none; max-height: 88vh; border-radius: var(--bcv-r-sheet) var(--bcv-r-sheet) 0 0; border-bottom: 0; padding-bottom: var(--bcv-ph-bottom); animation: bcv-sheet-up var(--bcv-t-phone) var(--bcv-spring-phone) both; transform-origin: 50% 100%; }
 .bcv-ph-sheet__handle { flex: none; padding: 8px 0 10px; display: flex; justify-content: center; cursor: grab; touch-action: none; }
 .bcv-ph-sheet__handle span { width: 38px; height: 5px; border-radius: 3px; background: var(--bcv-fill); }
 /* every phone sheet is held like the phone's own (phone.js sheetGrip): a grabber on each, and a sheet
@@ -2886,7 +2902,7 @@ html[data-bcv-theme="dark"] .bcv-ph-circle { border-color: rgba(255,255,255,.28)
 .bcv-ph-todo__add { display: flex; align-items: center; gap: 10px; width: 100%; box-sizing: border-box; padding: 14px 16px; border: 1px dashed var(--bcv-edge); border-radius: 18px; background: transparent; cursor: pointer; text-align: left; min-height: 52px; margin-top: -6px; }
 .bcv-ph-todo__addic { flex: none; width: 26px; height: 26px; border-radius: 13px; background: rgba(10,132,255,.14); display: flex; align-items: center; justify-content: center; }
 .bcv-ph-todo__addlabel { flex: 1; min-width: 0; font: 500 14px/1.3 var(--bcv-font); color: var(--bcv-ink3); }
-.bcv-ph-composer { background: var(--bcv-card); border-radius: var(--bcv-r-row); padding: 14px 15px; box-shadow: var(--bcv-shadow); display: flex; flex-direction: column; gap: 12px; animation: bcv-fade-up .28s cubic-bezier(.32,.72,0,1) backwards; margin-top: -6px; }
+.bcv-ph-composer { background: var(--bcv-card); border-radius: var(--bcv-r-row); padding: 14px 15px; box-shadow: var(--bcv-shadow); display: flex; flex-direction: column; gap: 12px; animation: bcv-fade-up .28s var(--bcv-ease) backwards; margin-top: -6px; }
 .bcv-ph-composer__title { width: 100%; box-sizing: border-box; border: 0 !important; outline: none; background: transparent !important; box-shadow: none; margin: 0; padding: 0; font: 600 15.5px/1.35 var(--bcv-font); color: var(--bcv-ink) !important; }
 .bcv-ph-composer__title::placeholder { color: var(--bcv-ink3); }
 .bcv-ph-composer .bcv-seg__btn { padding: 7px 0; font-size: 12px; font-weight: 600; }
@@ -2940,7 +2956,7 @@ html.bcv-phone .bcv-datepop__q { padding: 11px 0; font-size: 13px; }
 .bcv-ph-whatif__t { font: 600 14px/1.3 var(--bcv-font); color: var(--bcv-ink); }
 .bcv-ph-whatif__s { margin-top: 2px; font: 400 11.5px/1.3 var(--bcv-font); color: var(--bcv-ink3); }
 .bcv-ph-whatif .bcv-switch.is-on { background: #ff453a; }
-.bcv-ph-warn { padding: 13px 15px; border-radius: 16px; background: rgba(255,69,58,.14); border: 1.5px solid #ff453a; display: flex; align-items: center; gap: 11px; animation: bcv-fade-up .28s cubic-bezier(.32,.72,0,1) backwards; }
+.bcv-ph-warn { padding: 13px 15px; border-radius: 16px; background: rgba(255,69,58,.14); border: 1.5px solid #ff453a; display: flex; align-items: center; gap: 11px; animation: bcv-fade-up .28s var(--bcv-ease) backwards; }
 .bcv-ph-warn[hidden] { display: none; }
 .bcv-ph-warn__t { flex: 1; min-width: 0; font: 700 14.5px/1.35 var(--bcv-display); color: #ff453a; }
 .bcv-ph-body > .bcv-ph-whatif, .bcv-ph-body > .bcv-ph-warn { margin-top: -6px; }
@@ -3236,7 +3252,7 @@ html.bcv-phone .bcv-nf__act { margin-left: auto; }
 .bcv-menu__head--profile .bcv-menu__name { max-width: 100%; margin-top: 8px; font-size: 15px; }
 .bcv-menu__head--profile .bcv-menu__sub { max-width: 100%; }
 .bcv-menu__photo { flex: none; width: 72px; height: 72px; padding: 0; border: 0; border-radius: 50%; overflow: hidden; cursor: pointer; background: var(--bcv-accent-fill, var(--bcv-blue)); box-shadow: 0 0 0 3px var(--bcv-card), 0 0 0 4px var(--bcv-sep), 0 6px 18px rgba(0,0,0,.18); transition: transform .2s var(--bcv-spring-snappy, ease); }
-.bcv-menu__photo:hover { transform: scale(1.04); }
+@media (hover: hover) and (pointer: fine) { .bcv-menu__photo:hover { transform: scale(1.04); } }
 .bcv-menu__photo img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .bcv-menu__initials { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; font: 600 26px/1 var(--bcv-font); color: #fff; letter-spacing: .02em; }
 .bcv-menu__ic { flex: none; width: 24px; height: 24px; border-radius: 7px; background: var(--bcv-fill); color: var(--bcv-ink2); display: flex; align-items: center; justify-content: center; }
@@ -3316,9 +3332,9 @@ html.bcv-phone .bcv-nf__act { margin-left: auto; }
  * page of cards, each tool in a popup over the page. A card dragged to the top of the page
  * becomes a pin beside the look switch, on every page. ---- */
 .bcv-tools { display: grid; grid-template-columns: repeat(auto-fill, minmax(258px, 1fr)); gap: 14px; }
-.bcv-tool-card { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 12px; box-sizing: border-box; margin: 0; padding: 18px 20px; border: 0; border-radius: var(--bcv-r-card); background: var(--bcv-card); box-shadow: var(--bcv-shadow); cursor: pointer; text-align: left; font-family: var(--bcv-font); color: var(--bcv-ink); transition: background .2s ease, transform .16s cubic-bezier(.32,.72,0,1), box-shadow .2s ease; touch-action: pan-y; -webkit-user-select: none; user-select: none; }
+.bcv-tool-card { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 12px; box-sizing: border-box; margin: 0; padding: 18px 20px; border: 0; border-radius: var(--bcv-r-card); background: var(--bcv-card); box-shadow: var(--bcv-shadow); cursor: pointer; text-align: left; font-family: var(--bcv-font); color: var(--bcv-ink); transition: background .2s ease, transform .16s var(--bcv-ease), box-shadow .2s ease; touch-action: pan-y; -webkit-user-select: none; user-select: none; }
 .bcv-tool-card:hover { background: var(--bcv-hover); }
-.bcv-tool-card:active { transform: scale(.985); }
+.bcv-tool-card:active { transform: scale(.98); }
 .bcv-tool-card.is-dragging { opacity: .45; transform: none; }
 .bcv-tool-card__tile { flex: none; width: 40px; height: 40px; border-radius: 13px; display: flex; align-items: center; justify-content: center; }
 .bcv-tool-card__text { display: block; }
@@ -3328,11 +3344,11 @@ html.bcv-phone .bcv-nf__act { margin-left: auto; }
 .bcv-tool-card__pinned { position: absolute; top: 14px; right: 14px; display: none; width: 22px; height: 22px; border-radius: 11px; background: var(--bcv-fill); color: var(--bcv-ink3); align-items: center; justify-content: center; }
 .bcv-tool-card.is-pinned .bcv-tool-card__pinned { display: flex; }
 /* the ghost that follows the pointer, and "Pin here" at the top while it does */
-.bcv-tool-card--ghost { position: fixed; z-index: var(--bcv-z-ghost); margin: 0; pointer-events: none; box-shadow: var(--bcv-shadow-glass); transform: scale(.94); transform-origin: top left; opacity: .96; transition: transform .2s cubic-bezier(.32,.72,0,1); }
+.bcv-tool-card--ghost { position: fixed; z-index: var(--bcv-z-ghost); margin: 0; pointer-events: none; box-shadow: var(--bcv-shadow-glass); transform: scale(.94); transform-origin: top left; opacity: .96; transition: transform .2s var(--bcv-ease); }
 .bcv-tool-card--ghost.is-over { transform: scale(.42); }
 html.bcv-dragpin, html.bcv-dragpin #bcv-app, html.bcv-dragpin .bcv-tool-card { cursor: grabbing; }
 html.bcv-dragpin #bcv-tray { opacity: 0; }
-.bcv-pins-drop { position: fixed; top: 6px; right: 69px; z-index: var(--bcv-z-float); display: flex; align-items: center; gap: 6px; height: 24px; padding: 0 10px; box-sizing: border-box; border: 1.5px dashed rgba(255,255,255,.6); border-radius: 12px; background: rgba(28,28,30,.86); color: #fff; font: 600 11px/1 var(--bcv-font); letter-spacing: -.01em; white-space: nowrap; animation: bcv-welcome-fade .18s ease both; transition: background .18s ease, border-color .18s ease, transform .18s ease; }
+.bcv-pins-drop { position: fixed; top: 6px; right: 69px; z-index: var(--bcv-z-float); display: flex; align-items: center; gap: 6px; height: 24px; padding: 0 10px; box-sizing: border-box; border: 1.5px dashed rgba(255,255,255,.6); border-radius: 12px; background: rgba(28,28,30,.86); color: #fff; font: 600 11px/1 var(--bcv-font); letter-spacing: -.01em; white-space: nowrap; animation: bcv-fade-in .18s var(--bcv-ease-out) both; transition: background .18s ease, border-color .18s ease, transform .18s ease; }
 .bcv-pins-drop.is-over { background: #0a84ff; border-color: #fff; transform: scale(1.08); }
 /* the tray beside the switch: live activities (a running timer), then the pins. The opened switch
  * grows leftwards over it, so it hides while the switch is under the pointer; and it goes with the
@@ -3352,15 +3368,15 @@ html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab).bcv-quiz { --bcv-s
 html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab).bcv-quiz { --bcv-bar-h: 0px; }
 html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab).bcv-quiz #bcv-bar { height: 44px; translate: 0 -100%; opacity: 0; pointer-events: none; }
 html.bcv-on:not(.bcv-phone):not(.bcv-tooltab).bcv-quiz #bcv-tray, html.bcv-on:not(.bcv-phone):not(.bcv-tooltab).bcv-quiz #bcv-look, html.bcv-on:not(.bcv-phone):not(.bcv-tooltab).bcv-quiz #bcv-report { translate: 0 -64px; opacity: 0; pointer-events: none; }
-html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) .bcv-main { transition: padding-top .45s cubic-bezier(.32,.72,0,1); }
+html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) .bcv-main { transition: padding-top .45s var(--bcv-ease); }
 @media (max-width: 1100px) { html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) { --bcv-side-w: 200px; } }
 #bcv-bar { display: none; }
-html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) #bcv-bar { display: block; position: fixed; top: 0; left: var(--bcv-side-w); right: 0; height: var(--bcv-bar-h); z-index: var(--bcv-z-bar); box-sizing: border-box; background: var(--bcv-chrome-ground, var(--bcv-chrome)); -webkit-backdrop-filter: var(--bcv-blur-chrome); backdrop-filter: var(--bcv-blur-chrome); border-bottom: 1px solid var(--bcv-edge); transition: left .45s cubic-bezier(.32,.72,0,1), translate .45s cubic-bezier(.32,.72,0,1), opacity .3s ease; }
+html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) #bcv-bar { display: block; position: fixed; top: 0; left: var(--bcv-side-w); right: 0; height: var(--bcv-bar-h); z-index: var(--bcv-z-bar); box-sizing: border-box; background: var(--bcv-chrome-ground, var(--bcv-chrome)); -webkit-backdrop-filter: var(--bcv-blur-chrome); backdrop-filter: var(--bcv-blur-chrome); border-bottom: 1px solid var(--bcv-edge); transition: left .45s var(--bcv-ease), translate .45s var(--bcv-ease), opacity .3s ease; }
 html.bcv-setup-open #bcv-bar { display: none !important; }
 /* (2.98.70) the search box sits in the bar at its left, on every screen of the shell (search.js dock(): beside the bar, outside
  * the app's root, so it stays put as the screens change); it goes up with the bar for a quiz, and is not there where the bar is not */
 #bcv-topsearch { display: none; }
-html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) #bcv-topsearch { display: flex; align-items: center; position: fixed; top: 0; left: calc(var(--bcv-side-w) + 20px); height: 44px; z-index: calc(var(--bcv-z-bar) + 1); pointer-events: none; transition: left .45s cubic-bezier(.32,.72,0,1), translate .45s cubic-bezier(.32,.72,0,1), opacity .3s ease; }
+html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab) #bcv-topsearch { display: flex; align-items: center; position: fixed; top: 0; left: calc(var(--bcv-side-w) + 20px); height: 44px; z-index: calc(var(--bcv-z-bar) + 1); pointer-events: none; transition: left .45s var(--bcv-ease), translate .45s var(--bcv-ease), opacity .3s ease; }
 html.bcv-setup-open #bcv-topsearch, #bcv-topsearch[hidden] { display: none !important; } /* (hidden: the Dashboard, whose header has the box) */
 html.bcv-on:not(.bcv-phone):not(.bcv-punch):not(.bcv-tooltab).bcv-quiz #bcv-topsearch { translate: 0 -64px; opacity: 0; pointer-events: none; }
 #bcv-topsearch .bcv-omni__box, .bcv-spot .bcv-omni__box { box-sizing: border-box; } /* (outside the app's root nothing sets it: the pill is 29 tall in the bar and as it sets off, as it was in the header) */
@@ -3395,7 +3411,7 @@ html.bcv-tooltab .bcv-pin.bcv-quick.is-free { z-index: var(--bcv-z-top); }
  * phase's colour — and folds again when the pointer leaves, the way the switch beside it opens.
  * The same one button throughout: a timer that is not pinned borrows one. The X to unpin rides
  * the island's corner while it is open, as it does the pin's. */
-.bcv-pin.bcv-island { --bcv-live-color: #ff9500; --bcv-island-w: 250px; --bcv-island-h: 84px; transition: width var(--bcv-t-pin) var(--bcv-spring-pin), height var(--bcv-t-pin) var(--bcv-spring-pin); }
+.bcv-pin.bcv-island { --bcv-live-color: #ff9500; --bcv-island-w: 250px; --bcv-island-h: 84px; transition: clip-path var(--bcv-t-pin) var(--bcv-spring-pin); } /* (2.99.4: its size changes at once; what is drawn grows through a clip and its neighbours slide — tools.js swellWatch) */
 .bcv-pin.bcv-island.is-open { width: var(--bcv-island-w); height: var(--bcv-island-h); }
 .bcv-island__glass { position: absolute; top: 0; right: 0; width: var(--bcv-island-w); height: var(--bcv-island-h); -webkit-backdrop-filter: blur(22px) saturate(1.7); backdrop-filter: blur(22px) saturate(1.7); background: rgba(28,28,30,.7); pointer-events: none; }
 .bcv-island.is-live .bcv-island__glass { background: #000; -webkit-backdrop-filter: none; backdrop-filter: none; }
@@ -3423,7 +3439,7 @@ html.bcv-tooltab .bcv-pin.bcv-quick.is-free { z-index: var(--bcv-z-top); }
 .bcv-island__btns { display: flex; gap: 8px; flex: none; }
 .bcv-island__btn { width: 40px; height: 40px; margin: 0; padding: 0; border: 0; border-radius: 20px; background: rgba(255,255,255,.14); color: rgba(255,255,255,.85); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: transform .16s var(--bcv-spring-snappy), background .2s ease; }
 .bcv-island__btn:hover { background: rgba(255,255,255,.22); }
-.bcv-island__btn:active { transform: scale(.92); }
+.bcv-island__btn:active { transform: scale(.97); }
 .bcv-island__btn:focus-visible { outline: 2px solid #0a84ff; outline-offset: 2px; }
 .bcv-island__main { background: color-mix(in srgb, var(--bcv-live-color) 28%, transparent); color: var(--bcv-live-color); }
 .bcv-island__main:hover { background: color-mix(in srgb, var(--bcv-live-color) 40%, transparent); }
@@ -3433,14 +3449,14 @@ html.bcv-tooltab .bcv-pin.bcv-quick.is-free { z-index: var(--bcv-z-top); }
 /* Open: the timer itself, larger — said in a word, two arrows out of the corners before it */
 .bcv-island__open { display: inline-flex; align-items: center; gap: 3px; height: 18px; margin: 0; padding: 0 7px 0 6px; border: 0; border-radius: 9px; background: rgba(255,255,255,.12); color: rgba(255,255,255,.85); cursor: pointer; font: 600 10px/1 var(--bcv-font); letter-spacing: .02em; white-space: nowrap; transition: background .2s ease, color .2s ease, transform .16s var(--bcv-spring-snappy); }
 .bcv-island__open:hover { background: rgba(255,255,255,.22); color: #fff; }
-.bcv-island__open:active { transform: scale(.94); }
+.bcv-island__open:active { transform: scale(.97); }
 .bcv-island__open svg { flex: none; }
 .bcv-island__time { font: 300 34px/1 var(--bcv-display); font-variant-numeric: tabular-nums; letter-spacing: -.02em; color: var(--bcv-live-color); white-space: nowrap; }
 /* the switch under the count: Focus | Break, the phase we are in lit in its colour; a press on the other moves the session there at once */
 .bcv-island__seg { display: flex; gap: 2px; padding: 2px; border-radius: 10px; background: rgba(255,255,255,.1); }
 .bcv-island__segbtn { height: 16px; margin: 0; padding: 0 9px; border: 0; border-radius: 8px; background: transparent; color: rgba(255,255,255,.62); cursor: pointer; font: 600 10px/1 var(--bcv-font); letter-spacing: .02em; white-space: nowrap; transition: background .2s ease, color .2s ease, transform .16s var(--bcv-spring-snappy); }
 .bcv-island__segbtn:hover { color: #fff; }
-.bcv-island__segbtn:active { transform: scale(.94); }
+.bcv-island__segbtn:active { transform: scale(.97); }
 .bcv-island__segbtn.is-on { background: color-mix(in srgb, var(--bcv-live-color) 36%, transparent); color: #fff; }
 .bcv-island__open:focus-visible, .bcv-island__segbtn:focus-visible { outline: 2px solid #0a84ff; outline-offset: 1px; }
 /* the island while nothing is going: set, and go */
@@ -3474,7 +3490,7 @@ html.bcv-tooltab .bcv-pin.bcv-quick.is-free { z-index: var(--bcv-z-top); }
 /* the quick menus: a pin other than the timer's swells into a capsule under the pointer — over the
  * same half second as the timer's island, on the same spring — the tool's quickest use in it: a
  * field and a round Go, chips, a drop target, on the island's dark glass */
-.bcv-pin.bcv-quick { --bcv-quick-w: 280px; --bcv-quick-color: #0a84ff; transition: width var(--bcv-t-pin) var(--bcv-spring-pin), height var(--bcv-t-pin) var(--bcv-spring-pin); }
+.bcv-pin.bcv-quick { --bcv-quick-w: 280px; --bcv-quick-color: #0a84ff; transition: clip-path var(--bcv-t-pin) var(--bcv-spring-pin); }
 .bcv-pin.bcv-quick.is-open { width: var(--bcv-quick-w); height: 44px; }
 .bcv-quick__face { position: absolute; inset: 0; box-sizing: border-box; border: 1px solid rgba(255,255,255,.14); border-radius: var(--bcv-r-tile-lg); background: transparent; overflow: hidden; color: #fff; font-family: var(--bcv-font); transition: border-radius var(--bcv-t-pin) var(--bcv-spring-pin), background .3s ease, border-color .3s ease; }
 /* The blur sits on a layer of the panel's own size, clipped by the face rather than resized with it:
@@ -3533,15 +3549,16 @@ html.bcv-blink .bcv-pin.bcv-island:not(.is-open) .bcv-island__face, html.bcv-bli
 .bcv-quick__input:focus { background: rgba(255,255,255,.18); }
 .bcv-quick__go { flex: none; width: 30px; height: 30px; margin: 0; padding: 0; border: 0; border-radius: 15px; background: var(--bcv-quick-color); color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: filter .15s ease, transform .15s ease; }
 .bcv-quick__go:hover { filter: brightness(1.12); }
-.bcv-quick__go:active { transform: scale(.92); }
+.bcv-quick__go:active { transform: scale(.97); }
 .bcv-quick__drop { flex: 1; min-width: 0; height: 30px; margin: 0; padding: 0 10px; border: 1.5px dashed rgba(255,255,255,.3); border-radius: 15px; background: transparent; color: rgba(255,255,255,.75); font: 500 12px/1 var(--bcv-font); white-space: nowrap; cursor: pointer; transition: border-color .15s ease, color .15s ease; }
 .bcv-quick__drop:hover, .bcv-quick__drop.is-drag { border-color: var(--bcv-quick-color); color: #fff; }
 .bcv-quick button:focus-visible, .bcv-quick input:focus-visible { outline: 2px solid #0a84ff; outline-offset: 1px; }
 .bcv-pin { position: relative; display: block; width: 24px; height: 24px; }
 .bcv-pin__btn { display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; margin: 0; padding: 0; border: 0; border-radius: 12px; background: var(--bcv-pin-color, #8e8e93); box-shadow: 0 2px 10px rgba(0,0,0,.2); cursor: pointer; transition: transform .16s var(--bcv-spring-snappy), box-shadow .18s ease; }
-.bcv-pin__btn:hover { transform: scale(1.1); box-shadow: 0 6px 20px rgba(0,0,0,.3); }
+@media (hover: hover) and (pointer: fine) { .bcv-pin__btn:hover { transform: scale(1.1); box-shadow: 0 6px 20px rgba(0,0,0,.3); } }
+.bcv-pin__btn:active { transform: scale(.97); }
 .bcv-pin__btn:focus-visible { outline: 2px solid #0a84ff; outline-offset: 2px; }
-.bcv-pin__x { position: absolute; top: -5px; right: -5px; width: 14px; height: 14px; margin: 0; padding: 0; border: 0; border-radius: 7px; background: #ff453a; display: flex; align-items: center; justify-content: center; cursor: pointer; opacity: 0; transform: scale(.6); transition: opacity .15s ease, transform .15s ease; }
+.bcv-pin__x { position: absolute; top: -5px; right: -5px; width: 14px; height: 14px; margin: 0; padding: 0; border: 0; border-radius: 7px; background: #ff453a; display: flex; align-items: center; justify-content: center; cursor: pointer; opacity: 0; transform: scale(.9); transition: opacity .15s var(--bcv-ease-out), transform .15s var(--bcv-ease-out); }
 /* It shows only under the pointer, at its own corner — the one the pin's disc wears. Hovering the
    pin anywhere used to bring it, which on an open panel left a red dot floating off the top right.
    Nothing widens its target: the dot overlaps the disc's top right already, and any reach back
@@ -3600,7 +3617,7 @@ html[data-bcv-theme="dark"] .bcv-tool__note--warn { color: #ffb44d; }
  * lengths as tiles. While a session is going the arc and the big button breathe. */
 .bcv-pomo { --bcv-pomo-color: #ff9500; display: flex; flex-direction: column; align-items: stretch; gap: 16px; }
 .bcv-pomo__phases { position: relative; display: grid; grid-template-columns: repeat(3, 1fr); padding: 3px; border-radius: 12px; background: var(--bcv-fill); }
-.bcv-pomo__ind { position: absolute; top: 3px; left: 3px; width: calc((100% - 6px) / 3); height: calc(100% - 6px); border-radius: 9px; background: var(--bcv-card); box-shadow: var(--bcv-shadow); transition: transform .32s cubic-bezier(.32,.72,0,1); }
+.bcv-pomo__ind { position: absolute; top: 3px; left: 3px; width: calc((100% - 6px) / 3); height: calc(100% - 6px); border-radius: 9px; background: var(--bcv-card); box-shadow: var(--bcv-shadow); transition: transform .32s var(--bcv-ease); }
 .bcv-pomo__phasebtn { position: relative; margin: 0; padding: 9px 0; border: 0; background: transparent; cursor: pointer; font: 600 13px/1.2 var(--bcv-font); color: var(--bcv-ink2); transition: color .2s ease; }
 .bcv-pomo__phasebtn.is-active { color: var(--bcv-ink); }
 /* the card: the phone's timer widget, black whatever the appearance */
@@ -3609,7 +3626,7 @@ html[data-bcv-theme="dark"] .bcv-tool__note--warn { color: #ffb44d; }
 .bcv-pomo__scale.is-set { cursor: grab; }
 .bcv-pomo__scale.is-drag { cursor: grabbing; }
 .bcv-pomo__scale:focus-visible { box-shadow: inset 0 0 0 2px #0a84ff; border-radius: 10px; }
-.bcv-pomo__strip { position: absolute; top: 0; left: 0; height: 100%; transition: transform .35s cubic-bezier(.32,.72,0,1); will-change: transform; }
+.bcv-pomo__strip { position: absolute; top: 0; left: 0; height: 100%; transition: transform .35s var(--bcv-ease); will-change: transform; }
 .bcv-pomo__label { position: absolute; top: 0; transform: translateX(-50%); font: 600 11px/1 var(--bcv-font); color: var(--bcv-pomo-color); transition: opacity .6s ease, color .3s ease; }
 .bcv-pomo__tick { position: absolute; top: 28px; width: 2.5px; height: 14px; margin-left: -1.25px; border-radius: 1.5px; background: var(--bcv-pomo-color); transition: opacity .6s ease, background .3s ease; }
 .bcv-pomo__tick--major { top: 20px; height: 26px; }
@@ -3635,7 +3652,7 @@ html[data-bcv-theme="dark"] .bcv-tool__note--warn { color: #ffb44d; }
 .bcv-pomo__dot.is-on { background: var(--bcv-pomo-color); transform: scale(1.15); }
 .bcv-pomo__dotslabel { font: 500 12px/1.2 var(--bcv-font); color: var(--bcv-ink3); }
 .bcv-pomo__skip { margin: 0 0 0 auto; padding: 6px 10px 6px 12px; border: 0; border-radius: 14px; background: var(--bcv-fill); color: var(--bcv-ink2); cursor: pointer; display: flex; align-items: center; gap: 4px; font: 600 12px/1 var(--bcv-font); transition: transform .16s var(--bcv-spring-snappy), background .18s ease; }
-.bcv-pomo__skip:hover { background: var(--bcv-fill-2, var(--bcv-fill)); transform: scale(1.04); }
+@media (hover: hover) and (pointer: fine) { .bcv-pomo__skip:hover { background: var(--bcv-fill-2, var(--bcv-fill)); transform: scale(1.04); } }
 .bcv-pomo__skip:active { transform: scale(.95); }
 .bcv-pomo .bcv-tool__hint { text-align: center; }
 
@@ -3705,7 +3722,7 @@ html[data-bcv-theme="dark"] .bcv-cite__req, html[data-bcv-theme="dark"] .bcv-cit
 .bcv-fc__tiledue { margin-left: auto; font: 600 10.5px/1 var(--bcv-font); color: var(--bcv-blue); white-space: nowrap; } /* learned cards back for their quick check */
 .bcv-fc__setbtns { display: flex; gap: 8px; }
 .bcv-fc__face { width: 100%; margin: 0; padding: 0; border: 0; background: transparent; cursor: pointer; perspective: 1200px; text-align: center; color: var(--bcv-ink); font-family: var(--bcv-font); }
-.bcv-fc__flipper { position: relative; min-height: 220px; transform-style: preserve-3d; transition: transform .6s cubic-bezier(.32,.72,0,1); }
+.bcv-fc__flipper { position: relative; min-height: 220px; transform-style: preserve-3d; transition: transform .6s var(--bcv-ease); }
 .bcv-fc__face--big .bcv-fc__flipper { min-height: 290px; }
 .bcv-fc__face.is-flipped .bcv-fc__flipper { transform: rotateY(180deg); }
 .bcv-fc__panel { position: absolute; inset: 0; box-sizing: border-box; padding: 28px 30px; border: 1px solid var(--bcv-edge); border-radius: 22px; background: var(--bcv-card); box-shadow: var(--bcv-shadow); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; -webkit-backface-visibility: hidden; backface-visibility: hidden; transition: background .2s ease; }
@@ -3892,35 +3909,35 @@ html[data-bcv-theme="dark"] .bcv-conv__delta.is-more, html[data-bcv-theme="dark"
  * contents rise in one after another (tools.js: rise), a closing popup fades, a pin that lands
  * pops, a converter at work shimmers, a citation that changed flashes. ---- */
 .bcv-tool-card { transition: background .2s ease, transform var(--bcv-t-snappy) var(--bcv-spring-snappy), box-shadow .22s ease; }
-.bcv-tool-card:hover { transform: translateY(-2px); box-shadow: var(--bcv-shadow-lift); }
-.bcv-tool-card:active { transform: translateY(0) scale(.985); }
+@media (hover: hover) and (pointer: fine) { .bcv-tool-card:hover { transform: translateY(-2px); box-shadow: var(--bcv-shadow-lift); } }
+.bcv-tool-card:active { transform: translateY(0) scale(.98); }
 .bcv-tool-card__tile { transition: transform .28s var(--bcv-spring-snappy); }
-.bcv-tool-card:hover .bcv-tool-card__tile { transform: scale(1.08) rotate(-4deg); }
+@media (hover: hover) and (pointer: fine) { .bcv-tool-card:hover .bcv-tool-card__tile { transform: scale(1.08) rotate(-4deg); } }
 .bcv-tool-card__chev { transition: transform .2s ease; }
-.bcv-tool-card:hover .bcv-tool-card__chev { transform: translateX(3px); }
+@media (hover: hover) and (pointer: fine) { .bcv-tool-card:hover .bcv-tool-card__chev { transform: translateX(3px); } }
 .bcv-tool-ov.is-closing { animation: bcv-tool-ovout .18s ease both; }
 .bcv-tool-ov.is-closing .bcv-sheet { animation: bcv-tool-out .18s ease both; }
-.bcv-pin.is-new { animation: bcv-pin-pop .5s cubic-bezier(.34,1.4,.42,1) both; }
+.bcv-pin.is-new { animation: bcv-pin-pop var(--bcv-t-snappy) var(--bcv-spring-snappy) both; }
 .bcv-conv__drop.is-drag { animation: bcv-drop-pulse 1s ease-in-out infinite; }
 .bcv-conv__run.is-busy { background: linear-gradient(90deg, var(--bcv-blue) 0%, #5aa0ff 50%, var(--bcv-blue) 100%) !important; background-size: 200% 100% !important; color: #fff !important; opacity: 1; animation: bcv-busy-wash 1.2s linear infinite; }
-.bcv-conv__delta, .bcv-conv__outlabel { animation: bcv-pop .35s cubic-bezier(.34,1.4,.42,1) both; }
+.bcv-conv__delta, .bcv-conv__outlabel { animation: bcv-conv-pop var(--bcv-t-snappy) var(--bcv-spring-snappy) both; }
 .bcv-cite__preview.is-fresh { animation: bcv-flash .6s ease both; }
-.bcv-fc__fb { animation: bcv-fade-up .3s cubic-bezier(.32,.72,0,1) both; }
+.bcv-fc__fb { animation: bcv-fade-up .3s var(--bcv-ease) both; }
 .bcv-fc__choice { transition: background .18s ease, border-color .18s ease, transform .16s var(--bcv-spring-snappy); }
-.bcv-fc__choice:hover:not(:disabled) { transform: translateX(3px); }
+@media (hover: hover) and (pointer: fine) { .bcv-fc__choice:hover:not(:disabled) { transform: translateX(3px); } }
 .bcv-fc__tilecard { transition: opacity .3s ease, transform .3s ease, background .18s ease, border-color .18s ease; }
-.bcv-fc__tile { transition: background .2s ease, transform .2s cubic-bezier(.32,.72,0,1); }
-.bcv-fc__tile:hover:not(:disabled) { transform: translateY(-1px); }
+.bcv-fc__tile { transition: background .2s ease, transform .2s var(--bcv-ease); }
+@media (hover: hover) and (pointer: fine) { .bcv-fc__tile:hover:not(:disabled) { transform: translateY(-1px); } }
 .bcv-fc__mark { transition: background .18s ease, transform .16s var(--bcv-spring-snappy); }
-.bcv-fc__mark:active { transform: scale(.92); }
+.bcv-fc__mark:active { transform: scale(.97); }
 .bcv-graph__frame { opacity: 0; transition: opacity .4s ease; }
 .bcv-graph__frame.is-in { opacity: 1; }
 @keyframes bcv-tool-ovout { to { opacity: 0; } }
 @keyframes bcv-tool-out { to { opacity: 0; transform: scale(.97); } }
-@keyframes bcv-pin-pop { from { transform: scale(.3); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes bcv-pin-pop { from { transform: scale(.9); opacity: 0; } to { transform: none; opacity: 1; } }
 @keyframes bcv-drop-pulse { 0%, 100% { box-shadow: 0 0 0 0 var(--bcv-blue-soft); } 50% { box-shadow: 0 0 0 6px var(--bcv-blue-soft); } }
 @keyframes bcv-busy-wash { from { background-position: 200% 0; } to { background-position: -200% 0; } }
-@keyframes bcv-pop { from { transform: scale(.6); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes bcv-conv-pop { from { transform: scale(.9); opacity: 0; } to { transform: none; opacity: 1; } } /* (its own name: it once shared the menus' bcv-pop and, coming later, made every menu open from .6) */
 @keyframes bcv-flash { from { background: var(--bcv-blue-soft); } to { background: var(--bcv-fill2); } }
 @media (prefers-reduced-motion: reduce) {
   .bcv-tool-card, .bcv-tool-card__tile, .bcv-tool-card__chev, .bcv-pomo__ind, .bcv-fc__flipper, .bcv-pomo__marker, .bcv-pomo__strip, .bcv-pomo__tick, .bcv-pomo__label, .bcv-pin.bcv-island, .bcv-island__face, .bcv-island .bcv-pin__btn, .bcv-island .bcv-pin__ic, .bcv-island__glyph, .bcv-island__body, .bcv-island__set, .bcv-island__arc, .bcv-island__hand, .bcv-pin.bcv-quick, .bcv-quick__face, .bcv-quick .bcv-pin__btn, .bcv-quick__body, .bcv-pin.bcv-island::before, .bcv-pin.bcv-quick::before { transition: none; }
@@ -4014,7 +4031,7 @@ html[data-bcv-theme="dark"] .bcv-conv__delta.is-more, html[data-bcv-theme="dark"
 .bcv-mark__tools, .bcv-mark__nav { display: flex; align-items: center; gap: 6px; }
 .bcv-mark__sep { width: 1px; height: 18px; background: var(--bcv-sep); margin: 0 4px; }
 .bcv-mark__swatch { flex: none; width: 22px; height: 22px; margin: 0; padding: 0; border: 2px solid transparent; border-radius: 11px; background: var(--c); cursor: pointer; box-shadow: inset 0 0 0 var(--bcv-line) rgba(0,0,0,.1); transition: transform .12s ease; }
-.bcv-mark__swatch:hover { transform: scale(1.1); }
+@media (hover: hover) and (pointer: fine) { .bcv-mark__swatch:hover { transform: scale(1.1); } }
 .bcv-mark__swatch.is-on { border-color: var(--bcv-ink); }
 .bcv-mark__tool { height: 28px; margin: 0; padding: 0 12px; border-radius: 14px; border: 1px solid var(--bcv-edge); background: var(--bcv-card); font: 600 12px/1 var(--bcv-font); color: var(--bcv-ink); cursor: pointer; }
 .bcv-mark__tool:hover { background: var(--bcv-hover); }
@@ -4070,7 +4087,7 @@ html[data-bcv-theme="dark"] .bcv-conv__delta.is-more, html[data-bcv-theme="dark"
 .bcv-cite__types { display: flex; gap: 8px; flex-wrap: wrap; }
 .bcv-cite__type { flex: 1 1 84px; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 7px; padding: 10px 8px 9px; border: 1px solid var(--bcv-edge); border-radius: 14px; background: var(--bcv-card); color: var(--bcv-ink2); cursor: pointer; font: 500 11.5px/1.15 var(--bcv-font); text-align: center; box-shadow: var(--bcv-shadow); transition: background .15s ease, border-color .15s ease, transform .15s ease; }
 .bcv-cite__typeic { width: 30px; height: 30px; border-radius: 15px; background: var(--bcv-fill); display: flex; align-items: center; justify-content: center; color: var(--bcv-ink2); transition: background .15s ease, color .15s ease; }
-.bcv-cite__type:hover { transform: translateY(-1px); background: var(--bcv-hover); }
+@media (hover: hover) and (pointer: fine) { .bcv-cite__type:hover { transform: translateY(-1px); background: var(--bcv-hover); } }
 .bcv-cite__type.is-on { background: var(--bcv-blue-soft); border-color: var(--bcv-blue); box-shadow: inset 0 0 0 max(.5px, var(--bcv-dpx, .5px)) var(--bcv-blue); color: var(--bcv-blue); font-weight: 600; }
 .bcv-cite__type.is-on .bcv-cite__typeic { background: var(--bcv-blue); color: #fff; }
 .bcv-cite__grid { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 14px; align-items: start; }
@@ -4122,7 +4139,7 @@ html[data-bcv-theme="dark"] .bcv-pdfx { --px-row: #0f0f11; --px-page: #1f1f22; -
 .bcv-pdfx__seg .bcv-seg__btn { padding: 0 15px; height: 30px; border-radius: 9px; font-weight: 600; }
 .bcv-pdfx__note { margin: 14px 22px 0; }
 .bcv-pdfx__home { padding: 20px 22px 22px; display: flex; flex-direction: column; gap: 14px; }
-.bcv-pdfx__pane.is-in > * { animation: bcv-fade-up .28s cubic-bezier(.32,.72,0,1) both; }
+.bcv-pdfx__pane.is-in > * { animation: bcv-fade-up .28s var(--bcv-ease) both; }
 .bcv-pdfx__srchead { display: flex; align-items: baseline; gap: 10px; padding: 0 2px 8px; }
 .bcv-pdfx__srchead .bcv-tool__label { flex: 1; min-width: 0; }
 .bcv-pdfx__srchead--top { padding: 16px 24px 0; }
@@ -4166,7 +4183,7 @@ html[data-bcv-theme="dark"] .bcv-pdfx { --px-row: #0f0f11; --px-page: #1f1f22; -
 .bcv-pdfx__traybox.is-over { border-color: var(--bcv-blue); background: var(--bcv-blue-soft); }
 .bcv-pdfx__trayempty { height: 74px; display: flex; align-items: center; justify-content: center; font: 400 12.5px/1.4 var(--bcv-font); color: var(--bcv-ink3); text-align: center; }
 .bcv-pdfx__tile--tray { cursor: grab; background: var(--px-page); }
-.bcv-pdfx__tile--tray.is-new { animation: bcv-pdfx-pop .22s cubic-bezier(.32,.72,0,1) both; }
+.bcv-pdfx__tile--tray.is-new { animation: bcv-pdfx-pop .22s var(--bcv-ease) both; }
 @keyframes bcv-pdfx-pop { from { opacity: 0; transform: scale(.86); } to { opacity: 1; transform: none; } }
 .bcv-pdfx__bar { position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--c); }
 .bcv-pdfx__x { position: absolute; right: 2px; top: 2px; width: 15px; height: 15px; border: 0; border-radius: 8px; background: rgba(0,0,0,.55); cursor: pointer; padding: 0; display: flex; align-items: center; justify-content: center; transition: background .18s ease; }
@@ -4273,7 +4290,7 @@ html[data-bcv-theme="dark"] .bcv-pdfx { --px-row: #0f0f11; --px-page: #1f1f22; -
 .bcv-qgraph__failtext { font: 500 12px/1.4 var(--bcv-font); color: rgba(255,255,255,.7); }
 .bcv-qgraph__link { padding: 8px 12px; border-radius: 12px; background: var(--bcv-quick-color); font: 600 12px/1 var(--bcv-font); color: #fff !important; text-decoration: none !important; }
 
-#bcv-tray { transition: opacity .18s ease, top .38s cubic-bezier(.32,.72,0,1), right .38s cubic-bezier(.32,.72,0,1), translate .45s cubic-bezier(.32,.72,0,1); }
+#bcv-tray { transition: opacity .18s ease, top .38s var(--bcv-ease), right .38s var(--bcv-ease), translate .45s var(--bcv-ease); }
 
 /* the periodic table (2.41.0): every element in place, a card in the table's corner, a line under it */
 .bcv-tool--pt .bcv-tool__body { padding: 14px 18px 18px; gap: 12px; }
@@ -4287,7 +4304,7 @@ html[data-bcv-theme="dark"] .bcv-pdfx { --px-row: #0f0f11; --px-page: #1f1f22; -
 .bcv-pt__chipdot { width: 8px; height: 8px; border-radius: 4px; background: var(--c); }
 .bcv-pt__grid { display: grid; grid-template-columns: repeat(18, minmax(0, 1fr)); grid-template-rows: repeat(7, 1fr) 10px repeat(2, 1fr); gap: 4px; }
 .bcv-pt__cell { position: relative; aspect-ratio: 1; min-width: 0; margin: 0; padding: 0; border: 0; border-radius: 7px; background: color-mix(in srgb, var(--c) 18%, var(--bcv-card)); color: var(--bcv-ink); cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; box-sizing: border-box; transition: transform .12s ease, opacity .18s ease, box-shadow .15s ease, background .15s ease; }
-.bcv-pt__cell:hover { transform: translateY(-1px); box-shadow: 0 0 0 2px var(--c); z-index: 1; }
+@media (hover: hover) and (pointer: fine) { .bcv-pt__cell:hover { transform: translateY(-1px); box-shadow: 0 0 0 2px var(--c); z-index: 1; } }
 .bcv-pt__cell:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--bcv-blue); z-index: 1; }
 .bcv-pt__cell.is-sel { background: var(--c); color: #1c1c1e; box-shadow: 0 0 0 2px var(--c); }
 .bcv-pt__cell.is-match { box-shadow: 0 0 0 2px var(--bcv-blue); }
@@ -4358,7 +4375,7 @@ html[data-bcv-theme="dark"] .bcv-pdfx { --px-row: #0f0f11; --px-page: #1f1f22; -
 .bcv-qpt__cell.is-sel { box-shadow: 0 0 0 1.5px #fff; }
 .bcv-qpt__grid { display: grid; grid-template-columns: repeat(18, minmax(0, 1fr)); grid-template-rows: repeat(7, 20px) 6px repeat(2, 20px); gap: 2px 1.5px; align-content: start; }
 .bcv-qpt__cell { min-width: 0; margin: 0; padding: 0; border: 0; border-radius: 4px; background: color-mix(in srgb, var(--c) 26%, #1c1c1e); color: #fff; font: 700 8.5px/1 var(--bcv-display); letter-spacing: -.02em; cursor: pointer; box-sizing: border-box; display: flex; align-items: center; justify-content: center; transition: transform .1s ease, opacity .15s ease, box-shadow .12s ease, background .12s ease, color .12s ease; }
-.bcv-qpt__cell:hover { transform: scale(1.3); background: var(--c); color: #1c1c1e; box-shadow: 0 0 0 1.5px var(--c); z-index: 1; }
+@media (hover: hover) and (pointer: fine) { .bcv-qpt__cell:hover { transform: scale(1.3); background: var(--c); color: #1c1c1e; box-shadow: 0 0 0 1.5px var(--c); z-index: 1; } }
 .bcv-qpt__cell:focus-visible { outline: none; box-shadow: 0 0 0 1.5px #fff; z-index: 1; }
 .bcv-qpt__cell.is-match { box-shadow: 0 0 0 1.5px #fff; }
 .bcv-qpt__cell.is-dim { opacity: .22; }
@@ -4413,7 +4430,7 @@ html[data-bcv-theme="dark"] .bcv-pdfx { --px-row: #0f0f11; --px-page: #1f1f22; -
 .bcv-omni__panel { box-sizing: border-box; }
 .bcv-omni__item, .bcv-omni__gtitle, .bcv-omni__empty, .bcv-omni__more { position: relative; z-index: 1; }
 .bcv-omni__sel { position: absolute; left: 0; top: 0; z-index: 0; width: 0; height: 0; border-radius: 10px; background: var(--bcv-hover); pointer-events: none; opacity: 0;
-  transition: transform .24s cubic-bezier(.32,.72,0,1), width .24s cubic-bezier(.32,.72,0,1), height .24s cubic-bezier(.32,.72,0,1), opacity .14s ease; }
+  transition: transform .24s var(--bcv-ease), width .24s var(--bcv-ease), height .24s var(--bcv-ease), opacity .14s ease; }
 .bcv-omni__sel.is-on { opacity: 1; }
 .bcv-omni__sel.is-jump { transition: none; }
 .bcv-omni__panel.has-sel .bcv-omni__item.is-cur { background: transparent; }
@@ -4428,7 +4445,7 @@ html[data-bcv-theme="dark"] .bcv-pdfx { --px-row: #0f0f11; --px-page: #1f1f22; -
 .bcv-spot-ov { position: fixed; inset: 0; z-index: calc(var(--bcv-z-sheet) - 2); pointer-events: none; background: rgba(0,0,0,.12); animation: bcv-card-veil .2s ease both; } /* (2.98.69: the page around the search stays sharp, only a little dimmer) */
 html.bcv-noblur .bcv-spot:not(.is-far) .bcv-omni__box, html.bcv-noblur .bcv-spot .bcv-omni__panel { background: linear-gradient(rgba(40,40,44,.97), rgba(40,40,44,.97)) padding-box, var(--bcv-glass-rim) border-box; -webkit-backdrop-filter: none; backdrop-filter: none; } /* (solid, the rim kept) */
 .bcv-spot-ov.is-folding { opacity: 0; transition: opacity .3s ease; }
-.bcv-spot { position: fixed; z-index: calc(var(--bcv-z-sheet) - 1); display: flex; /* (under the sheets: a hand-in box or a question opened from a row comes up over the pill) */ flex-direction: column; gap: 10px; transition: left .46s cubic-bezier(.32,.72,0,1), top .46s cubic-bezier(.32,.72,0,1), width .46s cubic-bezier(.32,.72,0,1); }
+.bcv-spot { position: fixed; z-index: calc(var(--bcv-z-sheet) - 1); display: flex; /* (under the sheets: a hand-in box or a question opened from a row comes up over the pill) */ flex-direction: column; gap: 10px; } /* (2.99.4: laid out in the middle at once; the pill is moved there by transform — search.js drawAs) */
 /* (2.98.78) a soft dark shade right behind the pill and its panel, for the words to hold and the eye to settle: it is the
    palette's own layer, so it follows the panel as its rows change, and the glass over it reads darker too. It comes in
    once the pill has landed and goes as it sets off home. (2.98.80) Drawn as a plain shadow, no filter, and kept on a
@@ -4446,20 +4463,23 @@ html[data-bcv-theme="light"] .bcv-spot { --bcv-spot-shade: .24; }
 }
 .bcv-spot .bcv-omni { position: static; display: block; flex: none; align-self: stretch; width: auto; max-width: none; min-width: 0; margin: 0; }
 .bcv-omni--ghost { visibility: hidden; }
-.bcv-spot .bcv-omni__box, .bcv-spot .bcv-omni__box:focus-within { height: 72px; padding: 0 24px 0 28px; gap: 16px; border-radius: 36px; background: linear-gradient(180deg, rgba(6,6,8,.84), rgba(34,34,38,.62)) padding-box, var(--bcv-glass-rim) border-box; -webkit-backdrop-filter: blur(18px) saturate(1.7) brightness(.72); backdrop-filter: blur(18px) saturate(1.7) brightness(.72); border: 1px solid transparent; box-shadow: var(--bcv-glass-shade), 0 24px 64px rgba(0,0,0,.3), 0 2px 10px rgba(0,0,0,.16); transition: height .46s cubic-bezier(.32,.72,0,1), border-radius .46s cubic-bezier(.32,.72,0,1), padding .46s cubic-bezier(.32,.72,0,1), gap .46s cubic-bezier(.32,.72,0,1), background .2s ease, border-color .2s ease, box-shadow .3s ease; }
-.bcv-spot .bcv-omni__ic svg { width: 24px; height: 24px; transition: width .46s cubic-bezier(.32,.72,0,1), height .46s cubic-bezier(.32,.72,0,1); }
-.bcv-spot .bcv-omni__box input.bcv-omni__in, .bcv-spot .bcv-omni__box input.bcv-omni__in[type="search"], .bcv-spot .bcv-omni__box input.bcv-omni__in:focus { height: 68px; font: 400 26px/1 var(--bcv-font); letter-spacing: -.015em; color: var(--bcv-ink); caret-color: var(--bcv-ink); transition: height .46s cubic-bezier(.32,.72,0,1), font-size .46s cubic-bezier(.32,.72,0,1), color .2s ease; }
+.bcv-spot .bcv-omni__box, .bcv-spot .bcv-omni__box:focus-within { height: 72px; padding: 0 24px 0 28px; gap: 16px; border-radius: 36px; background: linear-gradient(180deg, rgba(6,6,8,.84), rgba(34,34,38,.62)) padding-box, var(--bcv-glass-rim) border-box; -webkit-backdrop-filter: blur(18px) saturate(1.7) brightness(.72); backdrop-filter: blur(18px) saturate(1.7) brightness(.72); border: 1px solid transparent; box-shadow: var(--bcv-glass-shade), 0 24px 64px rgba(0,0,0,.3), 0 2px 10px rgba(0,0,0,.16); transform-origin: 0 0; transition: transform var(--bcv-t-gentle) var(--bcv-spring-gentle), background .2s ease, border-color .2s ease, box-shadow .3s ease; }
+.bcv-spot .bcv-omni__ic svg { width: 24px; height: 24px; transform-origin: 0 0; transition: transform var(--bcv-t-gentle) var(--bcv-spring-gentle); }
+.bcv-spot .bcv-omni__box input.bcv-omni__in, .bcv-spot .bcv-omni__box input.bcv-omni__in[type="search"], .bcv-spot .bcv-omni__box input.bcv-omni__in:focus { height: 68px; font: 400 26px/1 var(--bcv-font); letter-spacing: -.015em; color: var(--bcv-ink); caret-color: var(--bcv-ink); transform-origin: 0 0; transition: transform var(--bcv-t-gentle) var(--bcv-spring-gentle), color .2s ease; }
 .bcv-spot .bcv-omni__wikit { font-size: 12.5px; }
-.bcv-spot.is-far .bcv-omni__box { height: 29px; padding: 0 8px 0 11px; gap: 8px; border-radius: 15px; background: var(--bcv-fill); border-color: transparent; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; } /* (the header's own pill: the first frame of the lift and the last of the fold are what stood there) */
-.bcv-spot.is-far .bcv-omni__box input.bcv-omni__in, .bcv-spot.is-far .bcv-omni__box input.bcv-omni__in[type="search"], .bcv-spot.is-far .bcv-omni__box input.bcv-omni__in:focus { height: 27px; font-size: 13.5px; }
-.bcv-spot.is-far .bcv-omni__ic svg { width: 15px; height: 15px; }
+.bcv-spot.is-far .bcv-omni__box { background: var(--bcv-fill); border-color: transparent; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; } /* (the header's own pill: the first frame of the lift and the last of the fold are what stood there) */
 /* the panel arrives with the pill, not before it: faded and lifted in over the tail of the glide (is-lifting, the first .6s), and
    faded out as the pill sets off home (is-far), rather than snapping in at the header and riding up */
 .bcv-spot.is-far .bcv-omni__panel { opacity: 0; transform: translateY(-8px) scale(.985); pointer-events: none; transition-duration: .14s; }
 .bcv-spot.is-lifting .bcv-omni__panel { transition-delay: .2s; transition-duration: .28s; }
 .bcv-spot.is-still, .bcv-spot.is-still .bcv-omni__box, .bcv-spot.is-still .bcv-omni__panel { transition: none; }
 /* the panel: a slab of its own under the pill, the page through it blurred soft and dimmed so the words hold on any page */
-.bcv-spot .bcv-omni__panel { position: relative; margin: 14px 0 0; max-height: min(58vh, 600px); padding: 12px; border-radius: 34px; background: linear-gradient(180deg, rgba(46,44,50,.4), rgba(28,26,30,.5)) padding-box, var(--bcv-glass-rim) border-box; border: 1px solid transparent; animation: none; transition: opacity .18s ease, transform .18s ease; -webkit-backdrop-filter: blur(20px) saturate(1.8) brightness(.66); backdrop-filter: blur(20px) saturate(1.8) brightness(.66); box-shadow: var(--bcv-glass-shade), 0 26px 70px rgba(0,0,0,.28), 0 2px 10px rgba(0,0,0,.14); scrollbar-color: rgba(255,255,255,.25) transparent; }
+.bcv-spot .bcv-omni__panel { position: relative; margin: 14px 0 0; max-height: min(58vh, 600px); padding: 12px; border-radius: 34px; background: linear-gradient(180deg, rgba(46,44,50,.4), rgba(28,26,30,.5)) padding-box, var(--bcv-glass-rim) border-box; border: 1px solid transparent; animation: none; transition: opacity .18s ease, transform .18s ease; -webkit-backdrop-filter: blur(20px) saturate(1.8) brightness(.66); backdrop-filter: blur(20px) saturate(1.8) brightness(.66); box-shadow: var(--bcv-glass-shade); scrollbar-color: rgba(255,255,255,.25) transparent; }
+/* (2.99.4) the panel's shadow, a layer of its own under it: the panel changes size through a clip, which would cut a shadow
+   drawn on the panel itself; this one is scaled with it (search.js shadeOf) */
+.bcv-omni__pshade { display: none; }
+.bcv-spot .bcv-omni__pshade { display: block; position: absolute; left: 0; right: 0; z-index: -1; border-radius: 34px; box-shadow: 0 26px 70px rgba(0,0,0,.28), 0 2px 10px rgba(0,0,0,.14); pointer-events: none; transform-origin: 50% 0; transition: opacity .18s ease; }
+.bcv-spot.is-far .bcv-omni__pshade, .bcv-spot .bcv-omni__panel[hidden] ~ .bcv-omni__pshade { opacity: 0; }
 .bcv-spot .bcv-omni__item { padding: 13px 16px; border-radius: 22px; gap: 18px; }
 /* Spotlight's marks: a plain line drawing in white, no tile (the course is named under the title) */
 .bcv-spot .bcv-omni__iic, .bcv-spot .bcv-omni__iic[style] { width: 30px; height: 30px; border-radius: 0; background: none; color: var(--bcv-ink) !important; }
@@ -4504,7 +4524,7 @@ html[data-bcv-theme="light"] .bcv-spot { --bcv-spot-shade: .24; }
 .bcv-omni__chip svg { display: block; }
 .bcv-omni__chipx { display: flex; align-items: center; justify-content: center; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 10px; background: transparent; color: inherit; cursor: pointer; opacity: .7; }
 .bcv-omni__chipx:hover { background: rgba(0,0,0,.08); opacity: 1; }
-@media (prefers-reduced-motion: reduce) { .bcv-spot, .bcv-spot::before, .bcv-spot .bcv-omni__box, .bcv-spot-ov { transition: none; animation: none; } }
+@media (prefers-reduced-motion: reduce) { .bcv-spot, .bcv-spot::before, .bcv-spot .bcv-omni__box, .bcv-spot .bcv-omni__ic svg, .bcv-spot .bcv-omni__in, .bcv-spot .bcv-omni__pshade, .bcv-spot-ov { transition: none; animation: none; } }
 .bcv-hub-pop { width: 600px; }
 .bcv-hub-pop__head { align-items: center; gap: 12px; padding: 16px 22px; }
 .bcv-hub-pop__tile { background: var(--bcv-blue); }
@@ -4521,9 +4541,9 @@ html[data-bcv-theme="light"] .bcv-spot { --bcv-spot-shade: .24; }
 .bcv-widget__frame { display: block; width: 100%; border: 0; background: transparent; opacity: 0; transition: height .2s ease, opacity .25s ease; }
 .bcv-widget__frame.is-in { opacity: 1; }
 .bcv-widget__acts { display: flex; gap: 6px; }
-.bcv-tool-add { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; box-sizing: border-box; margin: 0; padding: 18px 20px; border: 1.5px dashed var(--bcv-edge); border-radius: 20px; background: transparent; cursor: pointer; text-align: left; color: var(--bcv-ink); font-family: var(--bcv-font); transition: background .2s ease, border-color .2s ease, transform .22s cubic-bezier(.32,.72,0,1); }
-.bcv-tool-add:hover { background: var(--bcv-hover); border-color: var(--bcv-ink3); transform: translateY(-2px); }
-.bcv-tool-add:active { transform: scale(.985); }
+.bcv-tool-add { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; box-sizing: border-box; margin: 0; padding: 18px 20px; border: 1.5px dashed var(--bcv-edge); border-radius: 20px; background: transparent; cursor: pointer; text-align: left; color: var(--bcv-ink); font-family: var(--bcv-font); transition: background .2s ease, border-color .2s ease, transform .22s var(--bcv-ease); }
+@media (hover: hover) and (pointer: fine) { .bcv-tool-add:hover { background: var(--bcv-hover); border-color: var(--bcv-ink3); transform: translateY(-2px); } }
+.bcv-tool-add:active { transform: scale(.98); }
 .bcv-tool-add__tile { flex: none; width: 40px; height: 40px; border-radius: 13px; background: var(--bcv-fill); display: flex; align-items: center; justify-content: center; color: var(--bcv-ink2); }
 .bcv-tool-add__text { display: block; }
 .bcv-tool-add__name { font: 600 15.5px/1.3 var(--bcv-font); letter-spacing: -.016em; }
@@ -4685,3 +4705,17 @@ html.bcv-phone .bcv-ph-screen:has(.bcv-ph-search .bcv-omni__panel:not([hidden]))
 .bcv-row.is-wfadded { background: rgba(255,69,58,.04); }
 .bcv-gpa-detail__aname .bcv-badge { margin-left: 6px; vertical-align: 1px; }
 html.bcv-phone .bcv-wfadd .bcv-input, html.bcv-phone .bcv-wfadd .bcv-select { font-size: 16px; } /* (under 16px iOS zooms the page in on a tap) */
+
+/* Reduced motion, last word (rules above that come later than the reduce block, or outweigh it): the phone's push and
+   pop fade instead of sliding, the preview panel fades in where it stands, the app column and a widening sheet take
+   their new size at once, the phone's bottom sheet fades with its scrim, and the small pop-ins only fade. */
+@media (prefers-reduced-motion: reduce) {
+  html.bcv-phone .bcv-main > .bcv-screen--fwd:not(.bcv-screen--still), html.bcv-phone .bcv-main > .bcv-screen--back:not(.bcv-screen--still), html.bcv-phone .bcv-main > .bcv-screen--tab:not(.bcv-screen--still) { animation: bcv-fade-in .15s var(--bcv-ease-out) both; }
+  .bcv-pv, .bcv-sheet .bcv-pv--in { animation: bcv-fade-in .15s var(--bcv-ease-out) both; }
+  #bcv-app { transition: none; }
+  .bcv-sheet { transition: opacity .15s var(--bcv-ease-out); }
+  html.bcv-phone .bcv-sheet { animation: none; }
+  .bcv-look__opt { transform: none; }
+  .bcv-omni__panel, .bcv-picker__list, .bcv-todo__composer, .bcv-mark__bubble, .bcv-pdfx__pane.is-in > *, .bcv-pdfx__tile--tray.is-new, .bcv-quicknav, .bcv-check--draw { animation-name: bcv-fade-in; }
+  .bcv-check--draw path { animation: none; }
+}

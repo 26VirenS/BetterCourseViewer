@@ -386,6 +386,86 @@
     return (e) => { stop(); if (!slidUnder(e)) arm(e); };
   }
 
+  // ---- the swell, by transform and clip (2.99.4) ---------------------------------------------------------------
+  // A pin that swells into its island or panel (or folds back) changes its size in the tray's row once, at once — never
+  // a width or height eased, which laid the row out again on every frame and shoved its neighbours a pixel at a time.
+  // What is drawn is moved instead: the neighbours slide from where they stood to where they now are (translate), and
+  // the pin is drawn through a clip that grows from the size it was drawn at to its new one (opening), or shrinks from
+  // there to the pin (folding: its face held at the open size meanwhile, as it is laid out, and cut down by the clip).
+  // Its own class changes are what it answers, so every way a pin opens or folds is covered.
+  const OPEN_R = '26px', PIN_R = '12px';
+  const pinMs = () => { const v = getComputedStyle(document.documentElement).getPropertyValue('--bcv-t-pin').trim(), n = parseFloat(v); return Number.isFinite(n) ? (/ms$/.test(v) ? n : n * 1000) : 370; }; // (motion.js writes ms, the stylesheet's fallback s)
+  const pinEase = () => {
+    const v = getComputedStyle(document.documentElement).getPropertyValue('--bcv-spring-pin').trim();
+    return v && (!/^linear\(/.test(v) || CSS.supports('animation-timing-function', v)) ? v : 'cubic-bezier(.32,.72,0,1)';
+  };
+  const OPEN_RE = /(^|\s)is-open(\s|$)/, FREE_RE = /(^|\s)is-free(\s|$)/;
+  /** Where a pin is drawn this instant: its box, less its clip mid-way. */
+  function drawnPin(el) {
+    const b = el.getBoundingClientRect();
+    const m = /inset\(([^)]*)\)/.exec(el.style.clipPath ? getComputedStyle(el).clipPath : '');
+    const [t = 0, r = t, bt = t, l = r] = m ? m[1].split(/\s+round\s+/)[0].trim().split(/\s+/).map((v) => parseFloat(v) || 0) : [];
+    return { left: b.left + l, top: b.top + t, right: b.right - r, bottom: b.bottom - bt };
+  }
+  const insetIn = (b, r, radius) => `inset(${r.top - b.top}px ${b.right - r.right}px ${b.bottom - r.bottom}px ${r.left - b.left}px round ${radius})`;
+  function swellWatch(bar) {
+    let mine = false;
+    const obs = new MutationObserver((records) => {
+      if (mine) return;
+      const changed = new Map(); // pin → its class before this batch
+      for (const r of records) {
+        const el = r.target;
+        if (el.parentElement !== bar || !el.classList.contains('bcv-pin') || changed.has(el)) continue;
+        changed.set(el, r.oldValue || '');
+      }
+      for (const [el, old] of [...changed]) {
+        const was = OPEN_RE.test(old), now = el.classList.contains('is-open');
+        if (was === now || FREE_RE.test(old) || el.classList.contains('is-free')) changed.delete(el); // (pulled out of the row: not the row's to move)
+      }
+      if (!changed.size || U.reducedMotion()) return;
+      mine = true;
+      try {
+        const pins = [...bar.children];
+        for (const p of pins) for (const a of p.getAnimations()) if (a.id === 'bcv-swell') a.cancel();
+        const now = new Map([...changed.keys()].map((el) => [el, el.className]));
+        for (const [el, old] of changed) el.className = old;
+        const before = new Map(pins.map((p) => [p, changed.has(p) ? drawnPin(p) : p.getBoundingClientRect()]));
+        const laid = new Map([...changed.keys()].map((el) => [el, el.getBoundingClientRect()])); // (its box at the old size: the open face's place, folding)
+        for (const [el, cls] of now) el.className = cls;
+        const easing = pinEase(), duration = pinMs();
+        for (const p of pins) {
+          if (changed.has(p)) continue;
+          const a = before.get(p), b = p.getBoundingClientRect(), dx = a.left - b.left, dy = a.top - b.top;
+          if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5) Object.assign(p.animate([{ translate: `${dx}px ${dy}px` }, { translate: '0px 0px' }], { duration, easing }), { id: 'bcv-swell' });
+        }
+        for (const el of changed.keys()) {
+          const opening = el.classList.contains('is-open');
+          const box = el.getBoundingClientRect(), from = before.get(el);
+          const face = el.querySelector(':scope > .bcv-island__face, :scope > .bcv-quick__face');
+          clearTimeout(el._bcvSwellT);
+          el.style.transition = 'none';
+          if (face) Object.assign(face.style, { left: '', top: '', right: '', bottom: '', width: '', height: '' });
+          if (!opening && face) { // folding: the face keeps the open size, where it was laid out, while the clip cuts it down
+            const o = laid.get(el);
+            Object.assign(face.style, { left: `${o.left - box.left}px`, top: `${o.top - box.top}px`, right: 'auto', bottom: 'auto', width: `${o.right - o.left}px`, height: `${o.bottom - o.top}px` });
+          }
+          el.style.clipPath = insetIn(box, from, opening ? PIN_R : OPEN_R);
+          void el.offsetWidth;
+          el.style.transition = '';
+          el.style.clipPath = `inset(0px round ${opening ? OPEN_R : PIN_R})`;
+          el._bcvSwellT = setTimeout(() => { // (settled: nothing clipped — the open pin's shadow shows — and the face back in its place)
+            el.style.clipPath = '';
+            if (face) Object.assign(face.style, { left: '', top: '', right: '', bottom: '', width: '', height: '' });
+          }, duration + 40);
+        }
+      } finally {
+        obs.takeRecords();
+        mine = false;
+      }
+    });
+    obs.observe(bar, { subtree: true, attributes: true, attributeFilter: ['class'], attributeOldValue: true });
+  }
+
   function mountTray() {
     if (self.BCVBridge?.native) return null;
     let tray = document.getElementById('bcv-tray');
@@ -399,6 +479,7 @@
       } catch { /* the stylesheet's own default, then */ }
       const bar = h('div', { id: 'bcv-pins', class: 'bcv-pins', hidden: true, role: 'toolbar', 'aria-label': 'Pinned tools' });
       tray = h('div', { id: 'bcv-tray', class: 'bcv-tray' }, bar);
+      swellWatch(bar); // (a pin's swell moves what is drawn, never the row's layout frame by frame)
       overlayRoot().append(tray);
       // (nothing reads the tray's width any more: the observer that wrote it onto <html> on every frame of
       // a widget opening — a style recalculation of the whole page each time — is gone)
@@ -522,7 +603,11 @@
     islandOpen(item, 8000);
     if (focusKb) U.afterMotion(item).then(() => item.querySelector('.bcv-island__scale')?.focus());
   }
+  /** Folding: no X on the way down (it belongs to the pin, not the island) — until it has folded, or opens again first. */
+  const folding = (item) => { item.classList.add('is-folding'); clearTimeout(item._bcvFoldT); item._bcvFoldT = setTimeout(() => item.classList.remove('is-folding'), 520); }; // (the island spring's half second, and a little)
+  const unfolding = (item) => { clearTimeout(item._bcvFoldT); item.classList.remove('is-folding'); }; // (opened again on its way down: the fold's timer has nothing left to do)
   function islandOpen(item, ms = 6000, focusMain = false) {
+    unfolding(item);
     if (!item.classList.contains('is-open')) trayMoves();
     item.classList.add('is-open');
     item.setAttribute('aria-expanded', 'true');
@@ -559,8 +644,7 @@
     if (!item.classList.contains('is-open')) return;
     trayMoves();
     item.classList.remove('is-open');
-    item.classList.add('is-folding'); // (no X on the way down: it belongs to the pin, not the island)
-    setTimeout(() => item.classList.remove('is-folding'), 520);
+    folding(item);
     item.setAttribute('aria-expanded', 'false');
   }
   // a press anywhere else folds it
@@ -841,8 +925,7 @@
       if (!item.classList.contains('is-open')) return;
       trayMoves();
       item.classList.remove('is-open');
-      item.classList.add('is-folding'); // (no X on the way down: it belongs to the pin)
-      setTimeout(() => item.classList.remove('is-folding'), 520); // (the island spring's half second, and a little)
+      folding(item);
       item.setAttribute('aria-expanded', 'false');
       panel?.onFold?.();
     };
@@ -854,8 +937,7 @@
       item.style.top = '';
       item.querySelector(':focus')?.blur();
       item.classList.remove('is-open');
-      item.classList.add('is-folding');
-      setTimeout(() => item.classList.remove('is-folding'), 520); // (the island spring's half second, and a little)
+      folding(item);
       item.setAttribute('aria-expanded', 'false');
       panel?.onFold?.();
     };
@@ -868,6 +950,7 @@
     const openQ = () => {
       build();
       panel.onOpen?.();
+      unfolding(item);
       if (!item.classList.contains('is-open')) trayMoves();
       item.classList.add('is-open');
       item.setAttribute('aria-expanded', 'true');
@@ -1574,7 +1657,7 @@
         await pin(t.key);
         const target = document.querySelector(`#bcv-pins .bcv-pin[data-tool="${t.key}"]`)?.getBoundingClientRect();
         if (target) {
-          ghost.style.transition = 'transform .32s cubic-bezier(.32,.72,0,1), left .32s cubic-bezier(.32,.72,0,1), top .32s cubic-bezier(.32,.72,0,1), opacity .25s ease .1s';
+          ghost.style.transition = 'transform .32s var(--bcv-ease), left .32s var(--bcv-ease), top .32s var(--bcv-ease), opacity .25s ease .1s';
           ghost.style.left = `${target.left}px`;
           ghost.style.top = `${target.top}px`;
           ghost.style.transform = `scale(${target.width / s.w})`;

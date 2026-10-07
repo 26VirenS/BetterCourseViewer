@@ -80,6 +80,72 @@
     const vw = innerWidth, vh = innerHeight, w = Math.min(SPOT_W, vw - 32);
     Object.assign(spot.pal.style, { left: `${Math.round((vw - w) / 2)}px`, top: `${Math.round(Math.min(vh * 0.18, 160))}px`, width: `${w}px` });
   }
+  // (2.99.4) The pill moves between the header's place and the middle by transform alone. Afloat, it is laid out at once at
+  // the middle's size — its height, padding and words' size are the middle's from the first frame — and drawn where the
+  // header's pill stood (in the header's colours too: is-far), then let go to its own place; folding draws it back there
+  // from wherever it has got to. Nothing in it is laid out again on each frame, and its blur is never redrawn at a new size.
+  // Its icon and words are each drawn at the header's own size and place (the words one size both ways, never squashed).
+  const pillParts = () => { const box = ui?.root.querySelector('.bcv-omni__box'); return box ? { box, ic: box.querySelector('.bcv-omni__ic svg'), input: ui.input } : null; };
+  /** The header's pill, read before it lifts: its place in the root, its parts' places in it, its words' size. */
+  function homeOf(root) {
+    const p = pillParts();
+    const b = p.box.getBoundingClientRect(), r = root.getBoundingClientRect();
+    const rel = (e) => { if (!e) return null; const q = e.getBoundingClientRect(); return { x: q.left - b.left, y: q.top - b.top, w: q.width, h: q.height }; };
+    return { dx: b.left - r.left, dy: b.top - r.top, w: b.width, h: b.height, ic: rel(p.ic), input: rel(p.input), font: parseFloat(getComputedStyle(p.input).fontSize) || 13.5 };
+  }
+  /** Where the pill's parts are laid out afloat, each read with nothing moving it — then drawn again where it was this instant. */
+  function laidOut() {
+    const p = pillParts();
+    const els = [p.box, p.ic, p.input].filter(Boolean);
+    const now = els.map((e) => getComputedStyle(e).transform);
+    for (const e of els) { e.style.transition = 'none'; e.style.transform = 'none'; }
+    const out = { box: p.box.getBoundingClientRect(), ic: p.ic?.getBoundingClientRect(), input: p.input.getBoundingClientRect(), font: parseFloat(getComputedStyle(p.input).fontSize) || 26 };
+    els.forEach((e, i) => { e.style.transform = now[i] === 'none' ? '' : now[i]; });
+    void p.box.offsetWidth;
+    for (const e of els) e.style.transition = '';
+    return out;
+  }
+  /** Draw the pill as the header's (its root's place on screen `at`), from its parts laid out afloat (`L`); `at` null: as itself. */
+  function drawAs(at, L) {
+    const p = pillParts();
+    if (!p) return;
+    if (!at) { for (const e of [p.box, p.ic, p.input]) if (e) e.style.transform = ''; return; }
+    const H = spot.home, B = L.box;
+    const hl = at.left + H.dx, ht = at.top + H.dy;
+    const sx = H.w / B.width, sy = H.h / B.height;
+    p.box.style.transform = `translate(${hl - B.left}px, ${ht - B.top}px) scale(${sx}, ${sy})`;
+    // a part (in the box, which is scaled sx × sy) drawn at the header's place: its own size, or for words `k` both ways
+    const part = (e, Le, rel, k) => {
+      if (!e || !Le || !rel) return;
+      const ox = Le.left - B.left, oy = Le.top - B.top;
+      const kx = k ? k / sx : rel.w / (sx * Le.width), ky = k ? k / sy : rel.h / (sy * Le.height);
+      const tl = hl + rel.x, tt = k ? ht + rel.y + rel.h / 2 - (Le.height * k) / 2 : ht + rel.y;
+      e.style.transform = `translate(${(tl - hl) / sx - ox}px, ${(tt - ht) / sy - oy}px) scale(${kx}, ${ky})`;
+    };
+    part(p.ic, L.ic, H.ic, 0);
+    part(p.input, L.input, H.input, H.font / L.font);
+  }
+  /** Draw it as the header's at once (no motion): its first frame afloat. */
+  function startAsHome(at) {
+    const p = pillParts();
+    const els = [p.box, p.ic, p.input].filter(Boolean);
+    const L = laidOut();
+    for (const e of els) e.style.transition = 'none';
+    drawAs(at, L);
+    void p.box.offsetWidth;
+    for (const e of els) e.style.transition = '';
+  }
+  /** On its way back, pressed again: it lifts again from where it has got to. */
+  function refloat() {
+    const s = spot;
+    clearTimeout(s.timer); clearTimeout(s.closer); clearTimeout(s.lift);
+    s.folding = false;
+    s.ov.classList.remove('is-folding');
+    s.pal.classList.remove('is-far');
+    drawAs(null);
+    if (ui.panel.hidden) run(ui.input.value); // (closed as it set off: its results again)
+    ui.input.focus();
+  }
   /** A fold under way finished at once: the box home (or dropped, if the header has been drawn afresh), the palette gone. */
   function settle() {
     const s = spot;
@@ -87,26 +153,31 @@
     clearTimeout(s.timer); clearTimeout(s.lift); clearTimeout(s.closer);
     window.removeEventListener('resize', s.onResize);
     if (s.folding) close(); // (a fold cut short: what its timer would have done)
+    const p = pillParts(); // (home: drawn as itself again, nothing left moving it)
+    if (p) for (const e of [p.box, p.ic, p.input]) if (e) { e.style.transition = 'none'; e.style.transform = ''; }
     if (s.ghost.isConnected && ui) s.ghost.replaceWith(ui.root); else { s.ghost.remove(); ui?.root.remove(); }
+    if (p) { void p.box.offsetWidth; for (const e of [p.box, p.ic, p.input]) if (e) e.style.transition = ''; }
     s.pal.remove(); s.ov.remove();
     spot = null;
   }
   function float() {
     if (!canFloat()) return;
-    if (spot) { if (!spot.folding) return; settle(); } // (a press on the box as it folds back: home at once, then up again)
+    if (spot) { if (!spot.folding) return; refloat(); return; } // (a press on the box as it folds back: it turns round, from where it is)
     const r = ui.root.getBoundingClientRect();
+    const home = homeOf(ui.root);
     const ghost = h('div', { class: 'bcv-omni bcv-omni--ghost', 'aria-hidden': 'true', style: { height: `${Math.round(r.height)}px` } });
     ui.root.replaceWith(ghost);
-    const pal = h('div', { class: `bcv-spot is-far${still() ? ' is-still' : ''}`, id: 'bcv-spot', style: { left: `${Math.round(r.left)}px`, top: `${Math.round(r.top)}px`, width: `${Math.round(r.width)}px` } }, [ui.root]);
+    const pal = h('div', { class: `bcv-spot is-far${still() ? ' is-still' : ''}`, id: 'bcv-spot' }, [ui.root]);
     const ov = h('div', { class: 'bcv-spot-ov', 'aria-hidden': 'true' });
     document.body.append(ov, pal);
-    spot = { ov, pal, ghost, timer: 0, lift: 0, closer: 0, folding: false, onResize: () => place() };
-    run(ui.input.value); // (the kinds, or the words' results — painted while the pill still stands at the header, so the panel can fade in as the pill lands rather than ride up with it)
-    void pal.offsetWidth; // (the header's place is where it starts from: fixed before the move)
+    spot = { ov, pal, ghost, home, timer: 0, lift: 0, closer: 0, folding: false, onResize: () => place() };
+    place(); // (laid out in the middle at once)
+    run(ui.input.value); // (the kinds, or the words' results — painted while the pill is still drawn at the header, so the panel can fade in as the pill lands rather than ride up with it)
+    if (!still()) startAsHome({ left: r.left, top: r.top }); // (its first frame is the header's pill, where it stood)
     pal.classList.remove('is-far');
     pal.classList.add('is-lifting'); // (the panel arrives with the pill, not before it)
     spot.lift = setTimeout(() => pal.classList.remove('is-lifting'), 600);
-    place();
+    drawAs(null); // (and from there to its own place)
     window.addEventListener('resize', spot.onResize);
     ui.input.focus(); // (the move took the cursor)
   }
@@ -120,7 +191,7 @@
     const r = s.ghost.isConnected ? s.ghost.getBoundingClientRect() : null;
     s.ov.classList.add('is-folding');
     s.pal.classList.add('is-far'); // (the panel fades as the pill sets off; hidden for good once it has)
-    if (r) Object.assign(s.pal.style, { left: `${Math.round(r.left)}px`, top: `${Math.round(r.top)}px`, width: `${Math.round(r.width)}px` });
+    if (r && !still()) drawAs({ left: r.left, top: r.top }, laidOut()); // (back to the header's pill, from wherever it is drawn)
     clearScope({ quiet: true }); // (the kind's chip goes at once: one vanishing mid-fold would show)
     s.closer = setTimeout(close, still() ? 0 : 160);
     s.timer = setTimeout(settle, still() ? 0 : SPOT_MS);
@@ -461,15 +532,31 @@
   // where it stood, and the panel's height eases to its new one; the highlight on the chosen row is one
   // shape that glides from row to row, as the arrows move it or the rows move under it. Reduced motion:
   // drawn at once, as before.
-  const EASE = 'cubic-bezier(.32,.72,0,1)';
+  const EASE = getComputedStyle(document.documentElement).getPropertyValue('--bcv-ease').trim() || 'cubic-bezier(.32,.72,0,1)'; // (the app's one curve, read from its token: a script animation cannot take var())
   const keyOf = (group, it) => `${group}|${it.href || it.url || (it.cmd ? `/${it.cmd.name}` : '') || it.title}`;
   /** Where each keyed piece of the panel stands now, and the panel's height, before it is drawn again. */
   function snapshot(panel) {
     const rows = new Map();
     // (where it is seen, mid-motion included: a row still rising in carries its opacity on into the next draw, not a pop to full)
     for (const el of panel.querySelectorAll(':scope [data-key]')) rows.set(el.dataset.key, { el, r: el.getBoundingClientRect(), o: el.getAnimations().length ? +getComputedStyle(el).opacity : 1 });
-    return { h: panel.getBoundingClientRect().height, rows };
+    return { h: drawnH(panel), rows };
   }
+  /** The panel's height as drawn this instant (its clip mid-way, while it changes size). */
+  function drawnH(panel) {
+    const h = panel.getBoundingClientRect().height;
+    const m = /inset\(([^)]*)\)/.exec(getComputedStyle(panel).clipPath || '');
+    if (!m) return h;
+    const [t = 0, , b = t] = m[1].split(/\s+round\s+/)[0].trim().split(/\s+/).map((v) => parseFloat(v) || 0);
+    return h - t - b;
+  }
+  /** Afloat, the panel's shadow is a layer of its own under it (its clip would cut one drawn on the panel itself). */
+  function shadeOf(panel) {
+    let s = ui.pshade;
+    if (!s) s = ui.pshade = h('div', { class: 'bcv-omni__pshade', 'aria-hidden': 'true' });
+    if (s.previousElementSibling !== panel) panel.after(s);
+    return s;
+  }
+  const placeShade = (s, panel, height = panel.offsetHeight) => Object.assign(s.style, { top: `${panel.offsetTop}px`, height: `${height}px`, transform: '' });
   function flip(panel, was) {
     ui.hAnim?.cancel(); // (a height still easing from the last draw: the new one is measured as it truly is)
     const pr = panel.getBoundingClientRect();
@@ -499,15 +586,32 @@
       const fade = g.animate([{ opacity: o.o }, { opacity: 0, transform: 'scale(.98)' }], { duration: 160, easing: 'ease-out', fill: 'forwards' });
       fade.finished.then(() => g.remove(), () => g.remove());
     }
-    // the panel's height, from what it was to what it is
+    // the panel's height, from what it was to what it is (2.99.4): laid out at its new height at once, what is drawn of
+    // it moves by a clip — growing, the clip opens down to the new height; shrinking, the panel keeps its old height a
+    // moment (one layout now, one at the end) and is cut down to the new one — never a height eased frame by frame
     const h1 = pr.height;
+    const shade = afloat() ? shadeOf(panel) : null;
     if (Math.abs(h1 - was.h) > 1) {
+      const R = getComputedStyle(panel).borderTopLeftRadius || '0px';
+      const grow = h1 > was.h, cut = `${Math.round(Math.abs(h1 - was.h))}px`;
+      if (!grow) panel.style.minHeight = `${Math.round(was.h)}px`;
       panel.style.overflowY = 'hidden';
-      const anim = panel.animate([{ height: `${was.h}px` }, { height: `${h1}px` }], { duration: 260, easing: EASE });
+      const open = `inset(0px 0px 0px 0px round ${R})`, shut = `inset(0px 0px ${cut} 0px round ${R})`;
+      const anim = panel.animate([{ clipPath: grow ? shut : open }, { clipPath: grow ? open : shut }], { duration: 260, easing: EASE });
       ui.hAnim = anim;
-      const done = () => { if (ui && ui.hAnim === anim) { ui.hAnim = null; panel.style.overflowY = ''; } };
+      if (shade) { // (its shadow grows and shrinks with it: scaled, it has nothing in it to stretch)
+        const big = Math.max(h1, was.h);
+        placeShade(shade, panel, big);
+        shade.animate([{ transform: `scaleY(${was.h / big})` }, { transform: `scaleY(${h1 / big})` }], { duration: 260, easing: EASE, fill: 'forwards' });
+      }
+      const done = () => {
+        if (!ui || ui.hAnim !== anim) return;
+        ui.hAnim = null;
+        panel.style.overflowY = ''; panel.style.minHeight = '';
+        if (shade) { for (const a of shade.getAnimations()) a.cancel(); placeShade(shade, panel); }
+      };
       anim.finished.then(done, done);
-    }
+    } else if (shade) placeShade(shade, panel);
   }
   function paint() {
     if (!ui) return;
@@ -553,6 +657,7 @@
     panel.append(...blocks);
     panel.hidden = false;
     if (moving) flip(panel, was);
+    else if (afloat()) placeShade(shadeOf(panel), panel);
     markCursor({ jump: !moving });
   }
   /** A result's row: its tile and words; what can be done with it as small buttons at the right (shown on the row chosen, or under the pointer). */

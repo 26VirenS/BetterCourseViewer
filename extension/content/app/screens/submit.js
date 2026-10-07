@@ -135,7 +135,7 @@
     const body = U.el('bcv-sb__body');
     const foot = U.el('bcv-sb__foot');
     screen.replaceChildren(head, body, foot);
-    const toTop = () => (embed ? screen.scrollIntoView({ block: 'start', behavior: 'smooth' }) : window.scrollTo(0, 0));
+    const toTop = () => (embed ? screen.scrollIntoView({ block: 'start', behavior: U.reducedMotion() ? 'auto' : 'smooth' }) : window.scrollTo(0, 0));
 
     // ---- edit stage -----------------------------------------------------------------
     function edit() {
@@ -500,8 +500,10 @@
       const graded = s.workflow_state === 'graded' && s.score !== null && s.score !== undefined;
       const canAgain = !lockedText() && attemptsLeft() > 0;
       const again = !canAgain ? '' : a.lock_at ? ` You can resubmit until ${U.fmtAt(a.lock_at)}.` : d && Date.now() < d ? ' You can resubmit until the due time.' : ' A resubmission now would be marked late.';
+      const fresh = st.checked !== st.done; // (the tick draws in once per hand-in: the same receipt drawn again has it there)
+      st.checked = st.done;
       return U.el('bcv-sb__done', [
-        h('span', { class: 'bcv-sb__check' }, U.svg(CHECK, { size: 32, stroke: '#34c759', width: 2.4 })),
+        U.drawCheck(h('span', { class: 'bcv-sb__check' }, U.svg(CHECK, { size: 32, stroke: '#34c759', width: 2.4 })), fresh),
         h('div', { class: 'bcv-sb__donetext' }, [h('h2', { class: 'bcv-sb__h2', text: 'Submitted' }), h('p', { class: 'bcv-sb__lead bcv-pretty', text: `Your instructor can see this now.${again}` })]),
         U.el('bcv-sb__receipt', [
           ['Submitted', U.fmtAtUpper(at)], ['Submission', what], ['Turned in', turned],

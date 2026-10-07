@@ -25,6 +25,13 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.4', date: '2026-10-07', notes: [
+      { kind: 'improved', title: 'Smoother boxes', body: 'Counters and grades open without dropping frames.', icon: P.layers },
+      { kind: 'improved', title: 'Search glides', body: 'The floating search moves smoothly, even when busy.', icon: P.sparkle },
+      { kind: 'improved', title: 'To Do closes gaps', body: 'Ticked rows leave and the rest slide up.', icon: P.list },
+      { kind: 'new', title: 'A tick to celebrate', body: 'Handing in or finishing a quiz draws a check.', icon: P.check },
+      { kind: 'improved', title: 'Gentler Reduce Motion', body: 'Things fade instead of moving, never cut.', icon: P.eye },
+    ] },
     { version: '2.99.3', date: '2026-10-07', notes: [
       { kind: 'new', title: 'Quizzes on iPhone', body: 'Every question kind, flags, the clock and your feedback.', icon: P.list },
       { kind: 'new', title: 'Tools open on iPhone', body: 'External tools open in a sheet of their own.', icon: P.tool },

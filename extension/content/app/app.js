@@ -540,11 +540,14 @@
     }, [h('span', { class: 'bcv-fav__dot', style: { background: c.color } }), h('span', { class: 'bcv-ellip', text: c.shortName || c.name })]);
   }
 
+  let quickNavGoing = null; // (the panel on its way out: the pointer back on its row brings it back from there — U.recall)
+  let quickNavIntent = null; // (a pointer passing over the Courses row on its way elsewhere does not open the panel)
   function closeQuickNav() {
     if (!quickNav) return;
     clearTimeout(quickNav.closeTimer);
     quickNav.anchor.setAttribute('aria-expanded', 'false');
     U.dismiss(quickNav.el);
+    quickNavGoing = quickNav;
     quickNav = null;
   }
   const quickNavLeave = (key) => {
@@ -569,6 +572,13 @@
     if (quickNav) {
       if (quickNav.key === key) { clearTimeout(quickNav.closeTimer); return; }
       closeQuickNav();
+    }
+    if (quickNavGoing?.key === key && quickNavGoing.anchor === anchor && U.recall(quickNavGoing.el)) { // (still leaving: it turns round)
+      quickNav = quickNavGoing;
+      quickNavGoing = null;
+      quickNav.closeTimer = null;
+      anchor.setAttribute('aria-expanded', 'true');
+      return;
     }
     const el = U.el('bcv-quicknav', [
       U.text('bcv-quicknav__label', 'Favorite courses'),
@@ -658,8 +668,14 @@
         style: tabShades(all.length)[i] ? { '--bcv-tab-icon': tabShades(all.length)[i].icon, '--bcv-tab-text': tabShades(all.length)[i].text } : { '--bcv-tab-icon': glyphColor }, // (the glyph's colour as a variable either way: a photo behind the rail lightens it)
         ...(key === 'courses' && hoverCourses() ? { 'aria-haspopup': 'true', 'aria-expanded': 'false' } : {}),
         onclick: () => { if (state.loadKey === key && !loadStuck()) return; closeQuickNav(); progress(true, key); go(href); }, // a second press on the loading row is a no-op, until that load is plainly stuck
-        onpointerenter: (e) => { warm(key); quickNavHover(key, e.currentTarget); }, // the pointer arrives before the press: the screen's own data starts loading now
-        onpointerleave: () => { quickNavRelease(key); quickNavLeave(key); },
+        onpointerenter: (e) => { // the pointer arrives before the press: the screen's own data starts loading now
+          warm(key);
+          const a = e.currentTarget;
+          clearTimeout(quickNavIntent);
+          if (quickNav?.key === key || quickNavGoing?.key === key) quickNavHover(key, a); // (open, or still leaving: at once)
+          else quickNavIntent = setTimeout(() => quickNavHover(key, a), 70); // (a moment's rest first, as the pins ask: a pass on the way elsewhere opens nothing)
+        },
+        onpointerleave: () => { clearTimeout(quickNavIntent); quickNavRelease(key); quickNavLeave(key); },
         onfocus: (e) => { warm(key); quickNavHover(key, e.currentTarget); },
         onblur: () => { quickNavRelease(key); quickNavLeave(key); },
         onkeydown: (e) => quickNavKey(e, key, e.currentTarget),

@@ -66,6 +66,35 @@ The engine has no view of the page beyond two things it is asked for:
   what dropped frames), then faded in.
 - Two entrances 2.96 had written with two easings in one shorthand (the quick nav, the search panel)
   — invalid, so they never played — now play.
+- Hover lifts are for a mouse only (`@media (hover: hover) and (pointer: fine)`): a tap on a phone
+  leaves nothing lifted. Presses scale to 0.97 (0.98 on a large card) on `:active`.
+
+## 3a. The curves and what 2.99.4 moved off layout
+
+Three curves, as tokens in the vars block, and nothing typed out by hand anywhere else:
+
+| token | curve | for |
+|---|---|---|
+| `--bcv-ease` | `cubic-bezier(.32,.72,0,1)` | the house curve (iOS-like drawer) |
+| `--bcv-ease-out` | `cubic-bezier(.23,1,.32,1)` | arrivals, exits, presses, the ring's sweep back, the Dashboard's bars |
+| `--bcv-ease-in-out` | `cubic-bezier(.77,0,.175,1)` | a thing moving across the screen (the segmented thumb) |
+
+A loading fill is `linear`. Nothing starts from `scale(0)`: pop-ins start at 0.9, menus at 0.96.
+
+- **The counter box and the mark box** (`ui.cardBox`) open by `clip-path` from the card's own
+  rectangle, laid out once at their open size. The dim is one gradient drawn once and moved by
+  `translate`/`scale`; the big shadow is a layer of its own (a clip would cut it). A press while one
+  folds reverses the fold from where it is.
+- **Pins and the timer island** swell by `clip-path` too; their neighbours slide by `translate`.
+- **The search float** moves its pill by `transform` (the words scale with it) and the results panel
+  grows by `clip-path`, its shade a layer of its own scaled on Y.
+- **The To Do list** (`ui.flipList`): a row ticked off or dismissed leaves, and the rows below slide
+  up into the gap over 200 ms, by `translate` alone.
+- **A hand-in or a finished quiz** (`ui.drawCheck`): the tick draws itself in over 400 ms, once per
+  attempt — a rare moment, allowed it.
+- The Dashboard's numbers roll and its bars grow on the first visit of a session only (≤ 300 ms);
+  a toast already up takes the new words instead of being replaced; phone swipes decide by speed
+  (over ~0.11 px/ms) and pull with rising resistance past their ends.
 
 ## 4. The rules
 
@@ -77,8 +106,10 @@ The engine has no view of the page beyond two things it is asked for:
 5. Overshoot only on small, playful things; never on a pane that carries text.
 6. Scrims fade; they never move. A parent and its child never animate the same property at once.
 7. A redraw is not an arrival (`ui.still`). Focus moves after the motion. Reduced motion is honoured
-   on every path, with nothing left invisible.
+   on every path, with nothing left invisible: movement goes, a 150 ms fade stays.
 8. No document-wide observers for decoration.
+9. Curves come from the tokens (§3a). A script animation, which cannot read `var()`, reads the token's
+   value from the root.
 
 ## 5. The corners
 

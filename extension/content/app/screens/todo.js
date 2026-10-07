@@ -113,7 +113,7 @@
         app.refreshCounts();
         paintSub();
         setSeg(); // the completed count on the header button
-        draw();
+        U.flipList(body, draw); // (what stays slides into the gap the row leaves, rather than jumping up)
       } catch (e) {
         rowEl.style.opacity = '';
         if (look) paintDone(rowEl, before);
@@ -127,7 +127,7 @@
       app.refreshCounts();
       paintSub();
       setSeg();
-      draw();
+      U.flipList(body, draw);
     }
 
     /** The flag chip: the short form on the row, a menu of the four levels with a dot each. Only one menu is ever open (U.menu closes the rest). */
@@ -183,6 +183,7 @@
             : U.iconbtn(IC.close, { size: 24, title: 'Dismiss', onClick: () => change(it, () => store.dismiss(it), rowEl) }),
       ], { mod: done || it.dismissed || it.excused ? 'bcv-row--done' : '' });
       rowEl.dataset.item = it.id;
+      rowEl.dataset.flip = it.id;
       if (r) rowEl.dataset.series = r.series;
       return rowEl;
     }
@@ -341,7 +342,7 @@
     }
 
     // ---- draw ---------------------------------------------------------------------------------------
-    const groupCard = (title, subText, list, opts) => h('div', {}, [U.groupHead(title, subText, 'bcv-group__head--10'), U.card(list.map((it) => itemRow(it, opts)), 'bcv-card--list')]);
+    const groupCard = (title, subText, list, opts) => h('div', { 'data-flip': `g:${title}` }, [U.groupHead(title, subText, 'bcv-group__head--10'), U.card(list.map((it) => itemRow(it, opts)), 'bcv-card--list')]);
     // The first draw is the screen arriving: its groups stagger in. Every draw after it — a tick, a
     // priority, the grouping, Show completed, the composer — is the same list with one thing changed,
     // and lands in place, still (ui.still: the stagger is off and the rows do not fade back in).

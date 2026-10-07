@@ -43,7 +43,9 @@
    *  it). A press still opens at once. */
   const hoverOpens = U.hoverOpens;
   function openMarkBox(ctx, c, a, s, from, { hover = false } = {}) {
-    document.querySelector('.bcv-sheet-ov')?.remove();
+    const prev = document.querySelector('.bcv-sheet-ov');
+    if (prev?.bcvReopen && prev.bcvCard === from && prev.classList.contains('is-folding')) { prev.bcvReopen(); return; } // (pressed again as it folds: it opens again from where it is)
+    if (prev) { clearTimeout(prev._bcvFoldT); prev.remove(); }
     const scored = s.workflow_state === 'graded' && s.score !== null && s.score !== undefined;
     const posted = scored && s.posted_at !== null, held = scored && s.posted_at === null;
     const word = (sel) => from.querySelector(sel)?.textContent?.trim() || '';
@@ -53,8 +55,8 @@
     const when = word('.bcv-detail__gradewhen');
     const tone = posted ? { icon: IC.chart, color: '#34c759' } : held ? { icon: IC.clock, color: '#ff9f0a' } : { icon: IC.check, color: '#34c759' };
     const ov = U.el('bcv-sheet-ov bcv-sheet-ov--card is-far', null, { role: 'dialog', 'aria-label': `${a.name}: ${posted ? 'your mark' : 'what you handed in'}` }); // (is-far: the dim and blur start out wide, to close in on the box)
-    let folding = false, glide = []; // [box's element, chip's element]: the words that travel between the two
-    const startAt = (el, to, at) => { el.style.transform = `translate(${at.left - to.left}px, ${at.top - to.top}px) scale(${at.height / to.height})`; }; // drawn where the chip's is, from where it lands
+    let folding = false;
+    let box = null; // (U.cardBox: the box laid out once where it goes, drawn through a clip that grows out of the chip)
     // where the box goes: hung from the chip's own corner — its right edge, since the chip sits at the end of the title's row — 560×640 or what the window allows, pushed back inside it
     const M = 16, W = 560, H = 640;
     let boxH = H; // (as tall as its content wants, up to H: measured once built)
@@ -63,19 +65,6 @@
       if (back) return { x: r.left, y: r.top, w: r.width, h: r.height };
       const vw = innerWidth, vh = innerHeight, w = Math.min(W, vw - 2 * M), hgt = Math.min(boxH, vh - 2 * M);
       return { x: Math.max(M, Math.min(r.right - w, vw - M - w)), y: Math.max(M, Math.min(r.top, vh - M - hgt)), w, h: hgt };
-    }
-    function place(back = false, boxOnly = false) {
-      const g = geometry(back);
-      Object.assign(sheet.style, { left: `${Math.round(g.x)}px`, top: `${Math.round(g.y)}px`, width: `${Math.round(g.w)}px`, height: `${Math.round(g.h)}px` });
-      if (boxOnly) return; // (a measurement: the dim is left where it is)
-      ov.style.setProperty('--bcv-cx', `${Math.round(g.x + g.w / 2)}px`);
-      ov.style.setProperty('--bcv-cy', `${Math.round(g.y + g.h / 2)}px`);
-      ov.style.setProperty('--bcv-r0', `${Math.round(Math.hypot(g.w, g.h) / 2)}px`);
-      if (!back) { // (the blur's clear hole: where the box lands, set at once — never animated, which Safari drops once it settles)
-        ov.style.setProperty('--bcv-mx', `${Math.round(g.x + g.w / 2)}px`);
-        ov.style.setProperty('--bcv-my', `${Math.round(g.y + g.h / 2)}px`);
-        ov.style.setProperty('--bcv-mr', `${Math.round(Math.hypot(g.w, g.h) / 2)}px`);
-      }
     }
     // Escape from anywhere on the page folds the box (a reply just sent leaves the cursor nowhere in particular); a file's viewer or a question over the box takes its own Escape first
     const onKey = (e) => {
@@ -92,18 +81,19 @@
       document.removeEventListener('keydown', onKey);
       U.hoverCool(from, lastPt); // (a pointer still over the chip as the box folds into it does not open it again until it has left)
       ov.classList.add('is-folding', 'is-far'); // (the focus lets go outward as the box folds)
-      // the words go back to the chip's own, from wherever the box has got to — mid-growth too
-      const cur = sheet.getBoundingClientRect();
-      sheet.classList.add('is-at-card');
-      place(true, true);
-      void sheet.offsetWidth;
-      const rest = glide.map(([el]) => el.getBoundingClientRect());
-      Object.assign(sheet.style, { left: `${cur.left}px`, top: `${cur.top}px`, width: `${cur.width}px`, height: `${cur.height}px` });
-      void sheet.offsetWidth;
-      sheet.classList.remove('is-at-card');
-      glide.forEach(([el, b], i) => startAt(el, rest[i], b.getBoundingClientRect()));
-      place(true); // back into the chip
-      setTimeout(() => ov.remove(), U.reducedMotion() ? 0 : 560);
+      box.fold(); // (from wherever it is drawn — mid-growth too — back into the chip, its word back to the chip's)
+      clearTimeout(ov._bcvFoldT);
+      ov._bcvFoldT = setTimeout(() => ov.remove(), U.reducedMotion() ? 0 : 560);
+    };
+    // pressed again as it folds: the fold is called off and it opens again from where it has got to
+    ov.bcvCard = from;
+    ov.bcvReopen = () => {
+      clearTimeout(ov._bcvFoldT);
+      folding = false;
+      ov.classList.remove('is-folding', 'is-far');
+      document.addEventListener('keydown', onKey);
+      box.reopen();
+      ov.focus();
     };
     ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
     document.addEventListener('keydown', onKey);
@@ -141,21 +131,17 @@
     for (const n of from.childNodes) copy.append(n.cloneNode(true));
     copy.querySelector(glideSel)?.style.setProperty('visibility', 'hidden'); // (that word is the header's, gliding)
     sheet.append(copy);
-    place(); // (full size, unpainted: the content measured at the width it will have)
+    box = U.cardBox({ ov, sheet, card: from, geometry: () => geometry(false), cardRadius: cs.borderTopLeftRadius });
+    box.layout(); // (full size, unpainted: the content measured at the width it will have)
     document.body.append(ov);
     boxH = Math.min(H, Math.max(300, sheet.querySelector('.bcv-sheet__head').offsetHeight + sheet.querySelector('.bcv-sheet__list').scrollHeight + 2));
-    place(true); // (the chip's place and size, and the dim's centre, before anything is painted: the first style it gets is the chip's)
-    // it starts as the chip and grows from there; the chip's score (or standing) glides into the header's own word
-    glide = [[sheet.querySelector('.bcv-sheet__value'), from.querySelector(glideSel)]].filter(([el, b]) => el && b);
-    place(true);
-    void sheet.offsetWidth;
-    glide.forEach(([el, b]) => startAt(el, el.getBoundingClientRect(), b.getBoundingClientRect()));
-    void sheet.offsetWidth;
-    sheet.classList.remove('is-at-card');
-    ov.classList.remove('is-far'); // (from here the dim and blur close in on the box)
-    place();
-    for (const [el] of glide) el.style.transform = '';
-    const onResize = () => { if (!ov.isConnected) { removeEventListener('resize', onResize); return; } if (!folding) place(); };
+    // laid out where it goes, at its measured height, and drawn only where the chip is — the copy of the chip's words
+    // set over the chip's own place in it — before anything is painted: the first frame is the chip
+    const g0 = box.start();
+    Object.assign(copy.style, { right: `${Math.round(g0.x + g0.w - r0.right)}px`, top: `${Math.round(r0.top - g0.y)}px` });
+    // it grows out of the chip; the chip's score (or standing) glides into the header's own word
+    box.open([[sheet.querySelector('.bcv-sheet__value'), from.querySelector(glideSel)]].filter(([el, b]) => el && b));
+    const onResize = () => { if (!ov.isConnected) { removeEventListener('resize', onResize); return; } if (!folding) box.relayout(); };
     addEventListener('resize', onResize);
     ov.tabIndex = -1;
     ov.focus();

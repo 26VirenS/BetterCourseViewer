@@ -268,8 +268,12 @@ console.log('error codes');
 console.log('the veil behind a box');
 {
   const css = readFileSync(join(root, 'extension', 'content', 'styles', 'app.css'), 'utf8');
-  const props = ['cx', 'cy', 'r0', 'reach'].map((v) => (css.match(new RegExp(`@property --bcv-${v} \\{[^}]*inherits:\\s*(\\w+)`)) || [])[1]);
-  check(props.every((v) => v === 'true') && !/\.bcv-sheet-ov--card::before[^{]*\{[^}]*--bcv-cx:\s*inherit/.test(css), `the veil's animated values (--bcv-cx, cy, r0, reach) are inherited by its layers, never taken with \`inherit\`: ${props.join(', ')}`);
+  // (2.99.4) the dim is a gradient drawn once on a layer of its own, moved and grown by transform — no page-wide gradient
+  // drawn again on each frame from animated custom properties — and the box is drawn through a clip, never resized
+  const dimRule = (css.match(/\.bcv-card-dim \{([^}]*)\}/) || [])[1] || '';
+  const boxRule = (css.match(/\.bcv-sheet--card \{ position: fixed;([^}]*)\}/) || [])[1] || '';
+  check(dimRule && /radial-gradient\(closest-side/.test(dimRule) && /transition:\s*translate [^;]*, scale /.test(dimRule) && !/@property --bcv-(cx|cy|r0|reach)\b/.test(css) && !/--bcv-(cx|cy|r0|reach)\b/.test(css), `the veil is a layer of its own, moved by transform alone, with no animated custom properties: ${dimRule.trim().slice(0, 90)}…`);
+  check(/transition:\s*clip-path var\(--bcv-t-gentle\) var\(--bcv-spring-gentle\);/.test(boxRule) && !/transition:[^;]*\b(left|top|width|height)\b/.test(boxRule), `a counter's box grows through a clip on the gentle spring, never by its size: ${boxRule.trim().slice(-160)}`);
   // the blur round a box: a layer of its own at one strength, its hole from values set with the box and never animated (Safari dropped the blur whose strength and hole were animated, once they settled)
   const cb = (css.match(/\.bcv-card-blur \{([^}]*)\}/) || [])[1] || '';
   check(cb && /backdrop-filter:\s*blur\(10px\)/.test(cb) && !/backdrop-filter:[^;]*var\(/.test(cb) && /var\(--bcv-mx/.test(cb) && !/@property --bcv-m[xyr]\b/.test(css) && !/transition:/.test(cb) && !/--bcv-(hole|blur)(?![-\w])/.test(css), `the blur round a box has one strength and a hole set with the box, nothing about it animated but its fade: ${cb.trim().slice(0, 90)}…`);

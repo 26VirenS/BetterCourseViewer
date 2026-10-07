@@ -715,7 +715,7 @@
     }
     /** Scroll mode: the page goes to question k and the mark goes with it (followScroll holds it there
      *  while the page travels, so the questions passed on the way never take it). */
-    function sendTo(k, { smooth = true } = {}) {
+    function sendTo(k, { smooth = !U.reducedMotion() } = {}) {
       st.follow?.hold(k);
       const el = k > 0 ? document.getElementById(`bcv-q${k}`) : null;
       const there = el ? Math.abs(el.getBoundingClientRect().top - (parseFloat(getComputedStyle(el).scrollMarginTop) || 0)) < 1 : k <= 0 && window.scrollY < 1;
@@ -1427,8 +1427,10 @@
       const gradedSurvey = quiz.quiz_type === 'graded_survey';
       const scoreVisible = !survey && !quiz.hide_results && !st.held && d.score !== null && d.score !== undefined && d.workflow_state !== 'pending_review';
       const feedbackOn = scoreVisible && d.id && !resultsHidden(d);
+      const fresh = st.checked !== st.done; // (the tick draws in once per attempt: the same result drawn again has it there)
+      st.checked = st.done;
       return U.el('bcv-qz__done', [
-        U.el('bcv-qz__donemark', U.svg(CHECK, { size: 34, stroke: '#34c759', width: 2.4 })),
+        U.drawCheck(U.el('bcv-qz__donemark', U.svg(CHECK, { size: 34, stroke: '#34c759', width: 2.4 })), fresh),
         h('div', {}, [
           h('h1', { class: 'bcv-qz__h1 bcv-qz__h1--28', text: survey ? 'Responses recorded' : 'Attempt submitted' }),
           h('p', { class: 'bcv-qz__lead bcv-pretty', text: `${quiz.title} · submitted ${U.fmtAtUpper(d.finished_at || new Date())}. ${survey ? (gradedSurvey ? 'Thanks for taking part — the points for it post to your grades.' : 'Thanks for taking part.') : scoreVisible ? '' : 'Your score posts once your instructor releases it.'}` }),

@@ -6,6 +6,13 @@
   const U = BCV.ui;
   const IC = BCV.IC;
   const store = BCV.store;
+  // The Dashboard's arrival (the counters rolling to their counts, the bars and towers rising) plays once a session — the
+  // first time the student lands on it in this tab. Every later visit, and every redraw in place (back to the tab, a
+  // theme photo arriving: ui.still), shows the real numbers at once: they are what the student came for.
+  const ARRIVED = 'bcv:dash-arrived';
+  let arrived = false;
+  const arrivedBefore = () => { if (arrived) return true; try { return sessionStorage.getItem(ARRIVED) === '1'; } catch { return false; } };
+  const markArrived = () => { arrived = true; try { sessionStorage.setItem(ARRIVED, '1'); } catch { /* (private window: this page's memory is enough) */ } };
   let byHover = false; // (set while a counter's box is being opened by a hover; openSheet reads it once)
 
   /** The counters' own lists — shared by the Dashboard and the phone's Today (2.98.36), so the two
@@ -292,9 +299,10 @@
 
     // ---- stats -------------------------------------------------------------------
     // Each counter opens a sheet listing exactly the items it counted.
-    // Entry motion (mockup 11) plays once, on the first draw: counters roll to their value, workload
-    // bars wipe in. A redraw (view switch, a recolour) shows the final numbers at once.
-    let entered = false;
+    // Entry motion (mockup 11) plays on the first draw of the session's first arrival (arrivedBefore, above): counters
+    // roll to their value, workload bars wipe in. A redraw (view switch, a recolour, a quiet render) shows the final
+    // numbers at once.
+    let entered = U.isStill() || arrivedBefore();
     const clearedKeys = new Set(); // (Overdue rows cleared with their X: gone from Canvas's answer too, should it still hold them)
     const t0 = Date.now();
 
@@ -476,35 +484,36 @@
      *  kept at its left. Closing folds it back into the counter. With no counter to grow out of it opens
      *  in the middle, as before. */
     function openSheet(def, from = null) {
-      document.querySelector('.bcv-sheet-ov')?.remove();
+      const prev = document.querySelector('.bcv-sheet-ov');
+      if (prev?.bcvReopen && prev.bcvCard === from && prev.classList.contains('is-folding')) { prev.bcvReopen(); return; } // (pressed again as it folds: it opens again from where it is)
+      if (prev) { clearTimeout(prev._bcvFoldT); prev.remove(); }
       const card = from && from.getBoundingClientRect && from.isConnected ? from : null;
       const hover = byHover && !!card;
       const ov = U.el(`bcv-sheet-ov${card ? ' bcv-sheet-ov--card is-far' : ''}`, null, { role: 'dialog', 'aria-label': def.label }); // (is-far: the dim and blur start out wide, to close in on the box)
       let folding = false;
       let lastPt = null; // (where the pointer was last seen over the box's layer)
       ov.addEventListener('pointermove', (e) => { lastPt = { x: e.clientX, y: e.clientY }; }, { passive: true });
-      let glide = []; // [box's element, counter's element]: the icon, the label and the number, which travel between the two
-      const startAt = (a, to, at) => { a.style.transform = `translate(${at.left - to.left}px, ${at.top - to.top}px) scale(${at.height / to.height})`; }; // a drawn where the counter's is, from where it lands
+      let box = null; // (U.cardBox: the box laid out once where it goes, drawn through a clip that grows out of the counter)
       const close = () => {
         if (!card) { BCV.ui.dismiss(ov); return; }
         if (folding || !ov.isConnected) return;
         folding = true;
         U.hoverCool(card, lastPt); // (a pointer still over the counter as the box folds into it does not open it again until it has left)
         ov.classList.add('is-folding', 'is-far'); // (the focus lets go outward as the box folds)
-        // the words go back to the counter's own: each is offset from where it will lie once the box is
-        // the counter's size again (measured with the box snapped there for a frame, then put back), so
-        // the offset lands them exactly, wherever the box stood — pushed up inside a short window too
-        const cur = sheet.getBoundingClientRect(); // (where the box is now — mid-growth too, so the fold starts from there, not from full size)
-        sheet.classList.add('is-at-card');
-        place(true, true);
-        void sheet.offsetWidth;
-        const rest = glide.map(([a]) => a.getBoundingClientRect());
-        Object.assign(sheet.style, { left: `${cur.left}px`, top: `${cur.top}px`, width: `${cur.width}px`, height: `${cur.height}px` });
-        void sheet.offsetWidth;
-        sheet.classList.remove('is-at-card');
-        glide.forEach(([a, b], i) => startAt(a, rest[i], b.getBoundingClientRect()));
-        place(true); // back into the counter
-        setTimeout(() => { ov.remove(); card.classList.remove('is-lifted'); }, U.reducedMotion() ? 0 : 560);
+        box.fold(); // (from wherever it is drawn — mid-growth too — back into the counter, its words back to the counter's)
+        clearTimeout(ov._bcvFoldT);
+        ov._bcvFoldT = setTimeout(() => { ov.remove(); card.classList.remove('is-lifted'); }, U.reducedMotion() ? 0 : 560);
+      };
+      // pressed again as it folds: the fold is called off and it opens again from where it has got to (never cut off
+      // for a new box to grow from nothing, nor the counter left showing through it by the fold's timer)
+      ov.bcvCard = card;
+      ov.bcvReopen = () => {
+        clearTimeout(ov._bcvFoldT);
+        folding = false;
+        ov.classList.remove('is-folding', 'is-far');
+        card.classList.add('is-lifted');
+        box.reopen();
+        ov.focus();
       };
       ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
       ov.addEventListener('keydown', (e) => {
@@ -565,20 +574,6 @@
         sheet.style.setProperty('--bcv-list-w', `${Math.round(listW)}px`);
         return { x, y, w, h: hgt };
       }
-      function place(back = false, boxOnly = false) {
-        if (!card) return;
-        const g = geometry(back);
-        Object.assign(sheet.style, { left: `${Math.round(g.x)}px`, top: `${Math.round(g.y)}px`, width: `${Math.round(g.w)}px`, height: `${Math.round(g.h)}px` });
-        if (boxOnly) return; // (a measurement: the dim is left where it is)
-        ov.style.setProperty('--bcv-cx', `${Math.round(g.x + g.w / 2)}px`);
-        ov.style.setProperty('--bcv-cy', `${Math.round(g.y + g.h / 2)}px`);
-        ov.style.setProperty('--bcv-r0', `${Math.round(Math.hypot(g.w, g.h) / 2)}px`);
-        if (!back) { // (the blur's clear hole: where the box lands, set at once — never animated, which Safari drops once it settles)
-          ov.style.setProperty('--bcv-mx', `${Math.round(g.x + g.w / 2)}px`);
-          ov.style.setProperty('--bcv-my', `${Math.round(g.y + g.h / 2)}px`);
-          ov.style.setProperty('--bcv-mr', `${Math.round(Math.hypot(g.w, g.h) / 2)}px`);
-        }
-      }
       /** A row, and — where the item can be cleared (the Overdue list) — an X beside it: the item goes
        *  one press at a time, the header counts down with it, and a failure leaves the row and says so. */
       function rowFor(i, quiet = false) {
@@ -620,30 +615,22 @@
       // is up (app.css: while the overlay is in the page), there again the moment the box has folded back over it;
       // lifted first, so the box is measured from the counter at rest, not raised by the pointer over it
       if (card) { for (const c of document.querySelectorAll('.bcv-stat.is-lifted')) c.classList.remove('is-lifted'); card.classList.add('is-lifted'); }
-      if (card) place(true); // (the counter's place and size, and the dim's centre, set before the overlay is in the page: the first style it gets is the counter's, so nothing eases in from nought)
+      // the box is laid out where it goes and drawn only where the counter is, its shadow and the dim with it, before the
+      // overlay is in the page: the first frame is the counter, nothing eased in from nought (U.cardBox)
+      if (card) { box = U.cardBox({ ov, sheet, card, geometry: () => geometry(false) }); box.start(); }
       document.body.append(ov);
       if (card) {
-        // it starts as the counter (its place and size, its words not yet shown) and grows from there;
-        // a row pressed (the preview's is-split) or the window resized puts it where it goes again
-        // the counter's icon, label and number glide into the header's own: each of the header's is
-        // first drawn where the counter's is (its size too) — offset from where it lies with the box at
-        // the counter's size, which is where the box starts — and eased to its own place as the box grows
-        glide = [
+        // it grows out of the counter: the clip opens from the counter to the whole box, and the counter's icon, label and
+        // number glide into the header's own (each first drawn where the counter's is, its size too); a row pressed (the
+        // preview's is-split) or the window resized lays it out where it goes again, once, and moves what it holds there
+        box.open([
           [sheet.querySelector('.bcv-sheet__value'), card.querySelector('.bcv-stat__value')],
           [sheet.querySelector('.bcv-sheet__label'), card.querySelector('.bcv-stat__head .bcv-label')],
           [sheet.querySelector('.bcv-sheet__tile > svg'), card.querySelector('.bcv-stat__head > svg')],
-        ].filter(([a, b]) => a && b);
-        place(true);
-        void sheet.offsetWidth;
-        glide.forEach(([a, b]) => startAt(a, a.getBoundingClientRect(), b.getBoundingClientRect()));
-        void sheet.offsetWidth;
-        sheet.classList.remove('is-at-card');
-        ov.classList.remove('is-far'); // (from here the dim and blur close in on the box)
-        place();
-        for (const [a] of glide) a.style.transform = '';
-        const moved = new MutationObserver(() => { if (!ov.isConnected) { moved.disconnect(); return; } if (!folding) place(); });
+        ].filter(([a, b]) => a && b));
+        const moved = new MutationObserver(() => { if (!ov.isConnected) { moved.disconnect(); return; } if (!folding) box.relayout(); });
         moved.observe(sheet, { attributes: true, attributeFilter: ['class'] });
-        const onResize = () => { if (!ov.isConnected) { removeEventListener('resize', onResize); return; } if (!folding) place(); };
+        const onResize = () => { if (!ov.isConnected) { removeEventListener('resize', onResize); return; } if (!folding) box.relayout(); };
         addEventListener('resize', onResize);
       } else U.morphFrom(sheet, from);
       ov.tabIndex = -1;
@@ -659,7 +646,7 @@
         const done = mine.filter((it) => it.submitted).length;
         const pct = mine.length ? Math.round((done / mine.length) * 100) : 0;
         const k = Math.min(i, 6);
-        const fill = h('span', { class: `bcv-work__fill ${!entered ? 'bcv-work__fill--grow' : ''}`, style: { width: `${pct}%`, background: c.color, '--bcv-delay': `${140 + k * 90}ms` } });
+        const fill = h('span', { class: `bcv-work__fill ${!entered ? 'bcv-work__fill--grow' : ''}`, style: { width: `${pct}%`, background: c.color, '--bcv-delay': `${120 + k * 70}ms` } }); // (just after its row)
         return U.el(`bcv-work__row ${!entered ? 'bcv-work__row--in' : ''}`, [
           U.dot(c.color, 'bcv-dot--9'),
           U.text('bcv-work__code bcv-ellip', c.shortName || c.name, 'span'),
@@ -714,7 +701,7 @@
           onclick: () => app.go(`${c.url}/grades`),
         }, [wins, low]);
         const pct = U.text(`bcv-sky__pct ${first ? 'bcv-sky__pct--in' : ''}`, score === null ? '—' : `${Math.round(score)}%`, 'span');
-        pct.style.setProperty('--bcv-delay', `${420 + Math.min(i, 8) * 70}ms`);
+        pct.style.setProperty('--bcv-delay', `${360 + Math.min(i, 8) * 70}ms`); // (as its tower tops out)
         return { c, i, th, wins, low, tower, label, col: U.el('bcv-sky__col', [pct, tower], { dataset: { course: c.id } }) };
       });
       // the windows, as the courses' assignments come (the towers stand before them); returns when the last has faded in
@@ -734,7 +721,7 @@
           // on entry the windows fade in where they stand, one by one in reading order (2.98.93: no flight, no bounce),
           // once the tower has risen (or at once, if the assignments landed after it had)
           const fade = fresh && !U.reducedMotion();
-          const base = fade ? Math.max(0, 120 + Math.min(x.i, 8) * 70 + 520 - (performance.now() - drawnAt)) : 0;
+          const base = fade ? Math.max(0, 120 + Math.min(x.i, 8) * 70 + 300 - (performance.now() - drawnAt)) : 0; // (its tower's .3s rise)
           if (fade) end = Math.max(end, base + rows.length * 45 + 450);
           const pane = (r, k) => h('i', {
             class: `bcv-sky__win ${r.band ? 'is-lit' : ''} ${r.free ? 'is-free' : ''} ${fade ? 'bcv-sky__win--in' : ''}`, dataset: { band: r.band || '' },
@@ -1030,6 +1017,7 @@
       // (2.98.90) the grades skyline at the workload's left, the two side by side (stacked when narrow)
       const pair = sky || work ? U.el('bcv-dash-pair', [sky, work].filter(Boolean)) : null;
       body.replaceChildren(...[stats, pair, viewEl].filter(Boolean));
+      if (!entered) markArrived();
       entered = true;
     }
 

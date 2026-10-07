@@ -739,7 +739,7 @@ try {
   check(glassBox.stat && glassBox.layers === 2 && (!glassBox.noblur || (glassBox.solid && glassBox.blur === 'none')) && /^blur\(20px\)/.test(glassLit.blur) && !glassLit.solid && glassBox.ink === 'rgb(255, 255, 255)' && glassBox.row === 'rgb(255, 255, 255)' && glassBox.ground === '0' && glassBox.counter === 'hidden', `the counter's box wears the search's glass (20px behind it, the rim, white words; solid where no blur is drawn), the counter's own ground faded from over it, the counter itself hidden behind it: ${JSON.stringify({ glassBox, lit: glassLit.blur })}`);
   check(!(await pageHeld(page, 20, 700)).moved, "the page behind a counter's box is held still while it is open");
   // (2.98.45) the counter grows where it stands into a taller box — its own corner, the page dimmed round it (darker further off)
-  const steady0 = await page.evaluate(() => { const e = document.querySelector('.bcv-sheet'); const r = e.getBoundingClientRect(); const c = document.querySelector('.bcv-stats .bcv-stat:nth-child(3)').getBoundingClientRect(); const ov = document.querySelector('.bcv-sheet-ov'); return { x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height), cx: Math.round(c.left), cy: Math.round(c.top), card: e.classList.contains('bcv-sheet--card'), hint: !!e.querySelector('.bcv-sheet__pvhint'), veil: /^radial-gradient/.test(getComputedStyle(ov, '::after').backgroundImage), vw: innerWidth, vh: innerHeight }; });
+  const steady0 = await page.evaluate(() => { const e = document.querySelector('.bcv-sheet'); const r = e.getBoundingClientRect(); const c = document.querySelector('.bcv-stats .bcv-stat:nth-child(3)').getBoundingClientRect(); const ov = document.querySelector('.bcv-sheet-ov'); return { x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height), cx: Math.round(c.left), cy: Math.round(c.top), card: e.classList.contains('bcv-sheet--card'), hint: !!e.querySelector('.bcv-sheet__pvhint'), veil: /^radial-gradient/.test(getComputedStyle(ov.querySelector('.bcv-card-dim')).backgroundImage), vw: innerWidth, vh: innerHeight }; });
   check(steady0.card && !steady0.hint && steady0.veil && steady0.w >= 360 && steady0.w <= 460 && steady0.h === 430 && steady0.y === steady0.cy && steady0.x + steady0.w <= steady0.vw - 15 && steady0.x <= steady0.cx && steady0.x >= steady0.cx - 120, `the counter grows in place into a taller box (430px) with its list (no pane waiting), the page dimmed round it: ${JSON.stringify(steady0)}`);
   await page.click('.bcv-sheet__row');
   await page.waitForSelector('.bcv-sheet.is-split .bcv-pv--in', { timeout: 10000 });
@@ -911,7 +911,7 @@ try {
   const doneTitled = (t) => [...document.querySelectorAll('.bcv-day .bcv-row.bcv-row--done')].some((r) => r.querySelector('.bcv-row__title')?.textContent === t);
   await page.click('.bcv-day .bcv-row .bcv-circle');
   await page.waitForFunction(doneTitled, firstTitle, { timeout: 5000 });
-  await page.waitForFunction((n) => Number(document.querySelector('.bcv-nav__item[data-nav="todo"] .bcv-nav__count').textContent) === n - 1, todoCount, { timeout: 5000 });
+  await page.waitForFunction((n) => Number(document.querySelector('.bcv-nav__item[data-nav="todo"] .bcv-nav__count')?.textContent) === n - 1, todoCount, { timeout: 5000 });
   check((await page.$$('.bcv-day .bcv-row')).length === rowsBefore, 'marking an item done keeps it in the list, ticked (planner override)');
   await page.click('.bcv-day .bcv-row.bcv-row--done .bcv-circle');
   await page.waitForFunction((t) => ![...document.querySelectorAll('.bcv-day .bcv-row.bcv-row--done')].some((r) => r.querySelector('.bcv-row__title')?.textContent === t), firstTitle, { timeout: 5000 });
@@ -1101,9 +1101,31 @@ try {
   await shot(page, '05-todo');
   const todoRows = (await page.$$('.bcv-body .bcv-card--list .bcv-row:not(.bcv-row--first)')).length;
   const todayGroup = page.locator('.bcv-body > div', { has: page.locator('.bcv-group__head', { hasText: /^Today/ }) });
+  // the rows that stay slide into the gap a leaving row leaves (ui.flipList: translate only, 200ms) instead of jumping up
+  // (the extension's script runs in a world of its own: what it animates is read off the document, every frame)
+  await page.evaluate(() => {
+    const seen = new Map();
+    window.__flips = seen;
+    let on = true;
+    window.__unflip = () => { on = false; return [...seen.values()]; };
+    const look = () => {
+      for (const a of document.getAnimations()) {
+        const el = a.effect?.target;
+        if (!el?.dataset?.flip || seen.has(a)) continue;
+        const kf = a.effect.getKeyframes();
+        seen.set(a, { key: el.dataset.flip, from: kf[0]?.translate, keys: Object.keys(kf[0] || {}).filter((k) => !['offset', 'easing', 'composite', 'computedOffset'].includes(k)).join(), dur: a.effect.getTiming().duration });
+      }
+      if (on) requestAnimationFrame(look);
+    };
+    look();
+  });
   await todayGroup.locator('.bcv-row .bcv-iconbtn').first().click();
   await page.waitForFunction((n) => document.querySelectorAll('.bcv-body .bcv-card--list .bcv-row:not(.bcv-row--first)').length === n - 1, todoRows, { timeout: 5000 });
   check(true, 'dismissing removes the item (planner override dismissed)');
+  await page.waitForTimeout(80);
+  const flips = await page.evaluate(() => window.__unflip());
+  const slides = flips.filter((f) => /translate/.test(f.keys)); // (a hover's colour fade on a row is not one of them)
+  check(slides.length > 0 && slides.every((f) => f.keys === 'translate' && f.dur === 200 && /^0(px)? \d+(\.\d+)?px$/.test(f.from)), `the rows below slide up into the gap over 200ms, by translate alone, rather than jumping (${slides.length}: ${JSON.stringify(slides.slice(0, 3))})`);
   await todayGroup.locator('.bcv-row .bcv-circle').first().click();
   await page.waitForFunction((n) => document.querySelectorAll('.bcv-body .bcv-card--list .bcv-row:not(.bcv-row--first)').length === n - 2, todoRows, { timeout: 5000 });
   // a redraw is not an arrival (ui.still): a tick draws the list again in place — no group vanishes and fades back in
@@ -1160,7 +1182,7 @@ try {
   const noteGroup = await noteRow.evaluate((r) => (r.closest('.bcv-card')?.previousElementSibling?.textContent.trim().match(/^(Overdue|Today|Tomorrow|Next 7 days|Later|My tasks)/) || ['?'])[0]);
   check(/My task/.test(noteText) && /High/.test(noteText) && /11:59 PM|Today/.test(noteText) && noteGroup === 'Today' && !(await texts('.bcv-group__head')).some((t) => /^My tasks/.test(t)) && (await noteRow.locator('.bcv-todo__del').count()) === 1 && (await page.$$('.bcv-todo__del')).length === 1 && !(await noteRow.locator('.bcv-btn--xs').count()), `the row: My task, High, due today, under Today with the day's work (no My tasks group), the only row with a delete button and no Submit: ${noteText}`);
   const subAfter = (await texts('.bcv-head__sub'))[0];
-  await page.waitForFunction((n) => Number(document.querySelector('.bcv-nav__item[data-nav="todo"] .bcv-nav__count').textContent) === n + 1, badgeBefore, { timeout: 10000 }); // (the badge is asked of Canvas again, through the gate)
+  await page.waitForFunction((n) => Number(document.querySelector('.bcv-nav__item[data-nav="todo"] .bcv-nav__count')?.textContent) === n + 1, badgeBefore, { timeout: 10000 }); // (the badge is asked of Canvas again, through the gate)
   const subM = subBefore.match(/^(\d+) items across (\d+) courses$/);
   check(!!subM && subAfter === `${Number(subM[1]) + 1} items across ${subM[2]} courses · one of your own`, `the header counts the task but not as a course, and the badge follows the same list: ${subBefore} → ${subAfter}`);
   // a Canvas assignment gets a priority too; it survives a reload, keyed by the item's id
@@ -1219,7 +1241,7 @@ try {
   page.once('dialog', (d) => d.accept());
   await page.click('.bcv-todo__del');
   await page.waitForFunction(() => ![...document.querySelectorAll('.bcv-row__title')].some((e) => /Email Prof\. Lei/.test(e.textContent)), null, { timeout: 10000 });
-  await page.waitForFunction((n) => Number(document.querySelector('.bcv-nav__item[data-nav="todo"] .bcv-nav__count').textContent) === n, badgeBefore, { timeout: 5000 });
+  await page.waitForFunction((n) => Number(document.querySelector('.bcv-nav__item[data-nav="todo"] .bcv-nav__count')?.textContent) === n, badgeBefore, { timeout: 5000 });
   check((await fetch(`${BASE}/api/v1/planner_notes`).then((r) => r.text()).then((t) => JSON.parse(t.replace(/^while\(1\);/, '')))).length === 0 && !(await page.$('.bcv-todo__del')), 'Delete removes the planner note from Canvas; the list and the badge agree again');
   // (2.98.58) a task given a course and a weekly repeat: one note per week on that course; the rows
   // wear the course and sit in with the day's work (and under the course By course); the X on one
@@ -1250,7 +1272,7 @@ try {
   check(seriesNotes.length === 9 && seriesNotes.every((n) => n.course_id === '102' && n.title === 'Read the lab manual chapter') && weekly, `nine planner notes on the course, a week apart: ${seriesNotes.map((n) => n.todo_date.slice(5, 10)).join(' ')}`);
   const seriesRows = await page.evaluate(() => [...document.querySelectorAll('.bcv-row[data-series]')].map((r) => ({ group: (r.closest('.bcv-card')?.previousElementSibling?.textContent.trim().match(/^(Overdue|Today|Tomorrow|Next 7 days|Later|My tasks)/) || ['?'])[0], sub: r.querySelector('.bcv-row__sub')?.textContent, series: r.dataset.series })));
   check(seriesRows.length === 9 && seriesRows.every((r) => r.sub === 'F26-PHYS 008 01 · My task · repeats weekly' && r.series === seriesRows[0].series) && seriesRows[0].group === 'Today' && seriesRows[1].group === 'Next 7 days' && seriesRows.slice(2).every((r) => r.group === 'Later') && !(await texts('.bcv-group__head')).some((t) => /^My tasks/.test(t)), `the rows wear the course and say they repeat, in with the day's work — Today, Next 7 days, then Later — and no My tasks group (${seriesRows.map((r) => r.group).join(', ')})`);
-  await page.waitForFunction((n) => Number(document.querySelector('.bcv-nav__item[data-nav="todo"] .bcv-nav__count').textContent) === n + 9, badgeBefore, { timeout: 10000 });
+  await page.waitForFunction((n) => Number(document.querySelector('.bcv-nav__item[data-nav="todo"] .bcv-nav__count')?.textContent) === n + 9, badgeBefore, { timeout: 10000 });
   check((await texts('.bcv-head__sub'))[0] === `${Number(subM[1]) + 9} items across ${subM[2]} courses · 9 of your own`, `the header counts nine of your own, the course count unchanged (their course was there already): ${(await texts('.bcv-head__sub'))[0]}`);
   const repPref = await sw.evaluate(async () => Object.entries(await chrome.storage.local.get(null)).find(([k]) => k.startsWith('prefs:'))?.[1]?.todoRepeat);
   check(repPref && Object.keys(repPref).length === 9 && Object.values(repPref).every((v) => v.every === 'week' && v.series === Object.values(repPref)[0].series), `which tasks repeat lives in the site's preferences, one series for the nine: ${JSON.stringify(Object.values(repPref || {})[0])}`);
@@ -1274,7 +1296,7 @@ try {
   await page.click('.bcv-ask-ov .bcv-ask__ok');
   await page.waitForFunction(() => document.querySelectorAll('.bcv-row[data-series]').length === 8, null, { timeout: 15000 });
   check((await noteApi('GET', '/api/v1/planner_notes')).length === 8, 'Delete this task removes one note; the other eight stay');
-  await page.waitForFunction((n) => Number(document.querySelector('.bcv-nav__item[data-nav="todo"] .bcv-nav__count').textContent) === n + 8, badgeBefore, { timeout: 10000 }); // (the list has been read again)
+  await page.waitForFunction((n) => Number(document.querySelector('.bcv-nav__item[data-nav="todo"] .bcv-nav__count')?.textContent) === n + 8, badgeBefore, { timeout: 10000 }); // (the list has been read again)
   await page.locator('.bcv-row[data-series]').first().locator('.bcv-todo__del').click();
   await page.waitForSelector('.bcv-menu', { timeout: 3000 });
   const delMenu2 = await texts('.bcv-menu__item');
@@ -1284,7 +1306,7 @@ try {
   check(/^Delete all 8 repeats of “Read the lab manual chapter”\?$/.test((await texts('.bcv-ask-ov .bcv-sheet__title'))[0]) && (await texts('.bcv-ask-ov .bcv-ask__ok'))[0] === 'Delete 8 tasks', `Delete all asks for the eight: ${(await texts('.bcv-ask-ov .bcv-sheet__title'))[0]}`);
   await page.click('.bcv-ask-ov .bcv-ask__ok');
   await page.waitForFunction(() => !document.querySelector('.bcv-row[data-series]'), null, { timeout: 20000 });
-  await page.waitForFunction((n) => Number(document.querySelector('.bcv-nav__item[data-nav="todo"] .bcv-nav__count').textContent) === n, badgeBefore, { timeout: 10000 });
+  await page.waitForFunction((n) => Number(document.querySelector('.bcv-nav__item[data-nav="todo"] .bcv-nav__count')?.textContent) === n, badgeBefore, { timeout: 10000 });
   const repAfter = await sw.evaluate(async () => Object.entries(await chrome.storage.local.get(null)).find(([k]) => k.startsWith('prefs:'))?.[1]?.todoRepeat);
   check((await noteApi('GET', '/api/v1/planner_notes')).length === 0 && Object.keys(repAfter || {}).length === 0, 'Delete all removes every note of the series from Canvas and the series from the preferences; the badge is back');
   // A task of your own stays on the list until it is done, whatever its date: one from three days
@@ -1295,13 +1317,13 @@ try {
   await page.reload();
   await page.waitForFunction(() => [...document.querySelectorAll('.bcv-row__title')].some((e) => /Book the dentist/.test(e.textContent)), null, { timeout: 10000 });
   const placed = await page.evaluate(() => Object.fromEntries([...document.querySelectorAll('.bcv-row')].filter((r) => /Return the library book|Book the dentist/.test(r.textContent)).map((r) => [r.querySelector('.bcv-row__title').textContent.trim(), (r.closest('.bcv-card')?.previousElementSibling?.textContent.trim().match(/^(Overdue|Today|Tomorrow|Next 7 days|Later|My tasks)/) || ['?'])[0]])));
-  await page.waitForFunction((n) => Number(document.querySelector('.bcv-nav__item[data-nav="todo"] .bcv-nav__count').textContent) === n + 2, badgeBefore, { timeout: 5000 });
+  await page.waitForFunction((n) => Number(document.querySelector('.bcv-nav__item[data-nav="todo"] .bcv-nav__count')?.textContent) === n + 2, badgeBefore, { timeout: 5000 });
   const headsNow = await texts('.bcv-group__head');
   check(placed['Return the library book'] === 'Overdue' && placed['Book the dentist'] === 'Later' && headsNow[0].startsWith('Overdue') && /^Later/.test(headsNow[headsNow.length - 1]) && !headsNow.some((t) => /^My tasks/.test(t)), `a task from three days ago sits under Overdue and one three weeks out under Later, the last group — never a group of their own — and the badge counts them: ${JSON.stringify(placed)}`);
   await noteApi('DELETE', `/api/v1/planner_notes/${oldNote.id}`);
   await noteApi('DELETE', `/api/v1/planner_notes/${farNote.id}`);
   await page.reload();
-  await page.waitForFunction((n) => Number(document.querySelector('.bcv-nav__item[data-nav="todo"] .bcv-nav__count').textContent) === n, badgeBefore, { timeout: 10000 });
+  await page.waitForFunction((n) => Number(document.querySelector('.bcv-nav__item[data-nav="todo"] .bcv-nav__count')?.textContent) === n, badgeBefore, { timeout: 10000 });
   await page.waitForSelector('.bcv-todo__add', { timeout: 10000 });
   check(true, 'ticking the circle marks an item complete');
   check((await page.$eval('.bcv-body > :first-child', (e) => e.className)).includes('bcv-todo__add') && /^Show completed · \d+$/.test((await texts('.bcv-todo__done'))[0]), `Add your own task leads the page; a small header button shows completed items with their count: ${(await texts('.bcv-todo__done'))[0]}`);
@@ -2388,6 +2410,10 @@ try {
   await page.fill('.bcv-sb__comment', 'Three sources, APA.');
   await page.click('.bcv-sb__btn--primary');
   await page.waitForSelector('.bcv-sb__done', { timeout: 15000 });
+  // a rare moment, allowed its delight: the tick's disc settles in and its stroke draws itself (pathLength 1, a 400ms dash)
+  const tickOf = (sel) => page.evaluate((sel) => { const c = document.querySelector(sel), p = c?.querySelector('path'); return { draw: !!c?.classList.contains('bcv-check--draw'), len: p?.getAttribute('pathLength'), anim: p ? getComputedStyle(p).animationName : '', dur: p ? getComputedStyle(p).animationDuration : '' }; }, sel);
+  const sbTick = await tickOf('.bcv-sb__check');
+  check(sbTick.draw && sbTick.len === '1' && sbTick.anim === 'bcv-check-draw' && sbTick.dur === '0.4s', `handed in: the tick draws itself in (${JSON.stringify(sbTick)})`);
   const receipt = (await texts('.bcv-sb__rrow')).map((t) => t.replace(/\s+/g, ' '));
   check(/^Submitted [A-Z][a-z]{2} \d+ at \d+:\d\d [AP]M$/.test(receipt[0]) && receipt[1] === 'Submission grand-challenge-notes.docx, GC-articles-Sharma.pdf' && /^Turned in \d+ (minutes?|hours?) before the deadline$/.test(receipt[2]) && receipt[3] === 'Attempt 1' && receipt[4] === 'Grade Not graded yet', `receipt: ${receipt.join(' | ')}`);
   const sub1 = await readSub('104', '4002');
@@ -3481,6 +3507,8 @@ try {
   page.once('dialog', (d) => d.accept());
   await page.click('.bcv-qz__big--primary');
   await page.waitForSelector('.bcv-qz__done', { timeout: 10000 });
+  const qzTick = await page.evaluate(() => { const c = document.querySelector('.bcv-qz__donemark'), p = c?.querySelector('path'); return { draw: !!c?.classList.contains('bcv-check--draw'), len: p?.getAttribute('pathLength'), anim: p ? getComputedStyle(p).animationName : '' }; });
+  check(qzTick.draw && qzTick.len === '1' && qzTick.anim === 'bcv-check-draw', `quiz submitted: the tick draws itself in (${JSON.stringify(qzTick)})`);
   const doneCards = await texts('.bcv-qz__donecard');
   // Q2 was answered wrong on purpose (-2 m): 4 + 0 + 4 + 5 of 17
   check((await texts('.bcv-qz__h1'))[0] === 'Attempt submitted' && /Questions answered 4 of 4 answered/.test(doneCards[0]) && /Score 13 \/ 17/.test(doneCards[1] || ''), `submitted screen shows the score Canvas returned: ${doneCards.join(' | ')}`);
@@ -4863,6 +4891,7 @@ try {
   check(wash && wash.anim === 'bcv-load' && /^0px/.test(wash.origin) && wash.bg === 'rgba(88, 86, 214, 0.2)' && wash.loading && wash.under === 'relative' && wash.clipped === 'hidden' && wash.others === 1 && wash.stillOne === 1, `Calendar fills its own row with a 20% wash of its indigo, from the left, under the label; no other row lights and a second press changes nothing: ${JSON.stringify(wash)}`);
   const washGone = await page.waitForFunction(() => location.pathname === '/calendar' && document.documentElement.classList.contains('bcv-settled') && !document.querySelector('.bcv-load'), null, { timeout: 15000 }).then(() => true).catch(() => false);
   check(washGone, `the wash leaves when the next page has drawn its screen${washGone ? '' : `: ${JSON.stringify(await page.evaluate(() => ({ url: location.href, settled: document.documentElement.classList.contains('bcv-settled'), loads: document.querySelectorAll('.bcv-load').length, app: !!document.getElementById('bcv-app') })).catch((e) => e.message))}`}`);
+  await page.evaluate(() => sessionStorage.removeItem('bcv:dash-arrived')); // (2.99.4: the Dashboard's arrival plays once a session — this is a first one)
   await page.goto(`${BASE}/`);
   await page.waitForSelector('.bcv-stat', { timeout: 10000 });
   // the cards on this screen arrive together rather than one after another: one fade-up, no delay
@@ -4874,16 +4903,24 @@ try {
     rows: [...document.querySelectorAll('.bcv-work__row--in')].map((e) => `${getComputedStyle(e).animationName}@${getComputedStyle(e).animationDelay}`),
     origin: getComputedStyle(document.querySelector('.bcv-work__fill--grow')).transformOrigin,
   }));
-  check(workAnim.bars.slice(0, 2).join(',') === 'bcv-grow@0.14s,bcv-grow@0.23s' && workAnim.rows.slice(0, 2).join(',') === 'bcv-fade-up@0.09s,bcv-fade-up@0.16s' && /^0px/.test(workAnim.origin), `workload bars wipe from the left 90ms apart, rows float in 70ms apart: ${JSON.stringify(workAnim)}`);
+  check(workAnim.bars.slice(0, 2).join(',') === 'bcv-grow@0.12s,bcv-grow@0.19s' && workAnim.rows.slice(0, 2).join(',') === 'bcv-fade-up@0.09s,bcv-fade-up@0.16s' && /^0px/.test(workAnim.origin), `workload bars wipe from the left just after their rows, 70ms apart: ${JSON.stringify(workAnim)}`);
   // (2.98.90) the skyline's towers rise out of the street one after another, 70ms apart
   const skyAnim = await page.evaluate(() => [...document.querySelectorAll('.bcv-sky__tower--rise')].map((e) => `${getComputedStyle(e).animationName}@${getComputedStyle(e).animationDelay}`));
   check(skyAnim.slice(0, 2).join(',') === 'bcv-sky-rise@0.12s,bcv-sky-rise@0.19s', `the skyline's towers rise 70ms apart: ${skyAnim.join(',')}`);
+  // (2.99.4) the arrival is once a session: the Dashboard visited again shows its real numbers at once — no counter
+  // scrambling, no bar or tower rising — and so does a quiet redraw (ui.still)
+  await page.goto(`${BASE}/`);
+  await page.waitForSelector('.bcv-stat', { timeout: 10000 });
+  await page.waitForFunction(() => document.querySelector('.bcv-work__fill'), null, { timeout: 10000 }).catch(() => {});
+  const again = await page.evaluate(() => ({ rolling: document.querySelectorAll('.bcv-stat__value[data-rolling]').length, grow: document.querySelectorAll('.bcv-work__fill--grow, .bcv-sky__tower--rise').length, bars: document.querySelectorAll('.bcv-work__fill').length }));
+  check(again.rolling === 0 && again.grow === 0 && again.bars > 0, `the Dashboard visited again in the same session shows its numbers at once, nothing rolling or rising: ${JSON.stringify(again)}`);
   // (2.98.93) …and their windows fade in where they stand, one by one, 45ms apart in reading order — no flight, no bounce
   await page.waitForSelector('.bcv-sky__win--in', { timeout: 10000 });
   const winIn = await page.evaluate(() => [...document.querySelectorAll('.bcv-sky__col:first-child .bcv-sky__win--in')].slice(0, 6).map((w) => { const cs = getComputedStyle(w); const k = w.getAnimations().find((a) => a.animationName === 'bcv-sky-win')?.effect.getKeyframes() || []; return { a: cs.animationName, d: parseFloat(w.style.getPropertyValue('--wd')), ease: cs.animationTimingFunction, moves: k.some((f) => f.transform && f.transform !== 'none'), from: k[0]?.opacity }; }));
   check(winIn.length === 6 && winIn.every((w, i) => w.a === 'bcv-sky-win' && w.ease === 'ease-out' && !w.moves && w.from === '0' && (i === 0 || Math.round(w.d - winIn[i - 1].d) === 45)),
     `the windows fade in where they stand, one by one, 45ms apart, without moving or bouncing: ${JSON.stringify(winIn)}`);
   const dueNow = (await texts('.bcv-stat__value'))[0]; // the real count at this point of the run (items were ticked earlier)
+  await page.evaluate(() => sessionStorage.removeItem('bcv:dash-arrived')); // (the roll is a session's first arrival: this is one)
   await page.gotoRaw(`${BASE}/`, { waitUntil: 'commit' }); // raw, and from the first byte: the roll itself is what is being checked, and it is short
   await page.waitForSelector('.bcv-stat__value[data-rolling]', { timeout: 10000 });
   const midRoll = await page.evaluate(() => [...document.querySelectorAll('.bcv-stat__value')].map((e) => e.textContent));
@@ -4930,9 +4967,9 @@ try {
   const sheetAnim = await page.evaluate(() => {
     const ov = document.querySelector('.bcv-sheet-ov'), sh = ov.querySelector('.bcv-sheet'), card = document.querySelector('.bcv-stat').getBoundingClientRect();
     const cs = getComputedStyle(sh), blurEl = ov.querySelector('.bcv-card-blur'), before = getComputedStyle(blurEl);
-    const after = getComputedStyle(ov, '::after');
+    const after = getComputedStyle(ov.querySelector('.bcv-card-dim')); // (2.99.4: the dim is a layer of its own, moved by transform)
     // (2.98.46) the dim and the blur are layers of their own, in together on one short fade; the box never fades (its words glide from the counter's)
-    return { noblur: document.documentElement.classList.contains('bcv-noblur'), veil: `${before.animationName}/${after.animationName}`, boxFade: getComputedStyle(ov).animationName, card: sh.classList.contains('bcv-sheet--card'), eased: ['left', 'top', 'width', 'height'].every((p) => cs.transitionProperty.includes(p)), blur: document.documentElement.classList.contains('bcv-noblur') || /blur/.test(before.backdropFilter || before.webkitBackdropFilter || ''), dim: /radial-gradient/.test(after.backgroundImage), ramp: /\+ 120px/.test(before.maskImage || before.webkitMaskImage || '') || document.documentElement.classList.contains('bcv-noblur'), top: Math.round(sh.getBoundingClientRect().top - card.top), w: parseFloat(sh.style.width), reach: parseFloat(getComputedStyle(ov).getPropertyValue('--bcv-reach')), blurFirst: parseFloat((before.backdropFilter || before.webkitBackdropFilter || '').replace(/^blur\(/, '')) };
+    return { noblur: document.documentElement.classList.contains('bcv-noblur'), veil: `${before.animationName}/${after.animationName}`, boxFade: getComputedStyle(ov).animationName, card: sh.classList.contains('bcv-sheet--card'), eased: cs.transitionProperty.includes('clip-path') && !/(^|,\s*)(left|top|width|height)(,|$)/.test(cs.transitionProperty) && /^inset\(/.test(cs.clipPath), blur: document.documentElement.classList.contains('bcv-noblur') || /blur/.test(before.backdropFilter || before.webkitBackdropFilter || ''), dim: /radial-gradient/.test(after.backgroundImage), ramp: /\+ 120px/.test(before.maskImage || before.webkitMaskImage || '') || document.documentElement.classList.contains('bcv-noblur'), top: Math.round(sh.getBoundingClientRect().top - card.top), w: parseFloat(sh.style.width), reach: parseFloat(after.scale), blurFirst: parseFloat((before.backdropFilter || before.webkitBackdropFilter || '').replace(/^blur\(/, '')) };
   });
   check(sheetAnim.veil === 'bcv-card-veil/bcv-card-veil' && sheetAnim.boxFade === 'none' && sheetAnim.card && sheetAnim.eased && sheetAnim.blur && sheetAnim.dim && sheetAnim.ramp && Math.abs(sheetAnim.top) <= 2 && sheetAnim.w >= 360, `a sheet grows out of the counter that opened it, where it stands, the page dimmed and blurred round it at once (a tight ramp, the box itself never faded): ${JSON.stringify(sheetAnim)}`);
   // (2.98.48) the page focuses onto the box: the dim's clear middle starts wide enough to hold the page and closes in over
@@ -4940,8 +4977,8 @@ try {
   // (set with the box, never animated: Safari dropped a blur whose strength and hole were animated, once they settled)
   await motionAt(page, MOTION_RATE);
   await page.waitForTimeout(300);
-  const focused = await page.evaluate(() => { const ov = document.querySelector('.bcv-sheet-ov'); const sh = ov.querySelector('.bcv-sheet').getBoundingClientRect(); const o = getComputedStyle(ov); const b = getComputedStyle(ov.querySelector('.bcv-card-blur')); return { reach: parseFloat(o.getPropertyValue('--bcv-reach')), blurPx: document.documentElement.classList.contains('bcv-noblur') ? 10 : parseFloat((b.backdropFilter || b.webkitBackdropFilter || '').replace(/^blur\(/, '')), holeAt: Math.round(Math.abs(parseFloat(o.getPropertyValue('--bcv-mx')) - (sh.left + sh.width / 2)) + Math.abs(parseFloat(o.getPropertyValue('--bcv-my')) - (sh.top + sh.height / 2))), animated: /bcv-(m[xyr]|blur|hole)/.test(o.transitionProperty) }; });
-  check(sheetAnim.reach > 1000 && (sheetAnim.blurFirst === 10 || sheetAnim.noblur) && focused.reach < 5 && focused.blurPx === 10 && focused.holeAt <= 2 && !focused.animated, `the page focuses onto the box: the clear middle starts wide (${Math.round(sheetAnim.reach)}px out) and closes in (${Math.round(focused.reach)}px), while the blur is one strength from the first frame on (${sheetAnim.blurFirst}px → ${focused.blurPx}px), its hole where the box lands (${focused.holeAt}px off), nothing of it animated: ${JSON.stringify(focused)}`);
+  const focused = await page.evaluate(() => { const ov = document.querySelector('.bcv-sheet-ov'); const sh = ov.querySelector('.bcv-sheet').getBoundingClientRect(); const o = getComputedStyle(ov); const b = getComputedStyle(ov.querySelector('.bcv-card-blur')); return { reach: parseFloat(getComputedStyle(ov.querySelector('.bcv-card-dim')).scale), dimMoves: /translate/.test(getComputedStyle(ov.querySelector('.bcv-card-dim')).transitionProperty), blurPx: document.documentElement.classList.contains('bcv-noblur') ? 10 : parseFloat((b.backdropFilter || b.webkitBackdropFilter || '').replace(/^blur\(/, '')), holeAt: Math.round(Math.abs(parseFloat(o.getPropertyValue('--bcv-mx')) - (sh.left + sh.width / 2)) + Math.abs(parseFloat(o.getPropertyValue('--bcv-my')) - (sh.top + sh.height / 2))), animated: /bcv-(m[xyr]|blur|hole)/.test(o.transitionProperty) }; });
+  check(sheetAnim.reach > focused.reach * 1.4 && focused.dimMoves && (sheetAnim.blurFirst === 10 || sheetAnim.noblur) && focused.blurPx === 10 && focused.holeAt <= 2 && !focused.animated, `the page focuses onto the box: the dim's light middle starts wide (scaled ${sheetAnim.reach.toFixed(2)}) and closes in (${focused.reach.toFixed(2)}), moved by transform alone, while the blur is one strength from the first frame on (${sheetAnim.blurFirst}px → ${focused.blurPx}px), its hole where the box lands (${focused.holeAt}px off), nothing of it animated: ${JSON.stringify(focused)}`);
   await page.keyboard.press('Escape');
   // (2.98.75) the counter is back under the box once the box has landed on it, while the overlay is still there and before it
   // goes (its fade waits for the landing) — the counter's place never left empty
@@ -4973,7 +5010,7 @@ try {
   const vp0 = page.viewportSize();
   await page.setViewportSize({ width: 1000, height: 620 });
   await page.waitForTimeout(300);
-  const posOf = () => page.evaluate(() => { const r = (e) => { const b = e.getBoundingClientRect(); return [Math.round(b.left), Math.round(b.top)]; }; const sh = document.querySelector('.bcv-sheet-ov > .bcv-sheet'); const card = document.querySelector('.bcv-stats .bcv-stat:nth-child(4)'); return { boxTop: sh ? Math.round(sh.getBoundingClientRect().top) : null, boxH: sh ? Math.round(sh.getBoundingClientRect().height) : null, cardTop: Math.round(card.getBoundingClientRect().top), num: sh ? r(sh.querySelector('.bcv-sheet__value')) : null, cardNum: r(card.querySelector('.bcv-stat__value')), lbl: sh ? r(sh.querySelector('.bcv-sheet__label')) : null, cardLbl: r(card.querySelector('.bcv-stat__head .bcv-label')) }; });
+  const posOf = () => page.evaluate(() => { const r = (e) => { const b = e.getBoundingClientRect(); return [Math.round(b.left), Math.round(b.top)]; }; const sh = document.querySelector('.bcv-sheet-ov > .bcv-sheet'); const card = document.querySelector('.bcv-stats .bcv-stat:nth-child(4)'); const m = sh ? /inset\(([^)]*)\)/.exec(getComputedStyle(sh).clipPath || '') : null; const [ct = 0, , cb = ct] = m ? m[1].split(/\s+round\s+/)[0].trim().split(/\s+/).map((v) => parseFloat(v) || 0) : []; /* (2.99.4: where the box is drawn — its clip — not where it is laid out) */ return { boxTop: sh ? Math.round(sh.getBoundingClientRect().top + ct) : null, boxH: sh ? Math.round(sh.getBoundingClientRect().height - ct - cb) : null, cardTop: Math.round(card.getBoundingClientRect().top), num: sh ? r(sh.querySelector('.bcv-sheet__value')) : null, cardNum: r(card.querySelector('.bcv-stat__value')), lbl: sh ? r(sh.querySelector('.bcv-sheet__label')) : null, cardLbl: r(card.querySelector('.bcv-stat__head .bcv-label')) }; });
   await motionAt(page, WATCH);
   await page.click('.bcv-stats .bcv-stat:nth-child(4)');
   const shortOpen = await posOf();
@@ -5024,16 +5061,19 @@ try {
   await page.goto(`${BASE}/`);
   await page.waitForSelector('.bcv-stat', { timeout: 10000 });
   await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.evaluate(() => sessionStorage.removeItem('bcv:dash-arrived')); // (a first arrival: its entrances are what reduced motion is checked against)
   await page.reload();
   await page.waitForSelector('.bcv-stat', { timeout: 10000 });
+  await page.waitForSelector('.bcv-work__fill', { timeout: 10000 });
   const reduced = await page.evaluate(() => {
     const probe = document.createElement('span'); probe.className = 'bcv-load'; document.querySelector('.bcv-nav__item').append(probe); // a wash under reduced motion: a still, partial fill
     const cs = getComputedStyle(probe);
-    const out = [getComputedStyle(document.querySelector('.bcv-main > .bcv-screen')).animationName, `${cs.animationName}/${cs.transform}`, getComputedStyle(document.querySelector('.bcv-stat.bcv-enter')).animationName, getComputedStyle(document.querySelector('.bcv-work__fill--grow')).animationName, document.querySelector('.bcv-stat__value').textContent];
+    const scr = getComputedStyle(document.querySelector('.bcv-main > .bcv-screen'));
+    const out = [`${scr.animationName}@${scr.animationDuration}`, `${cs.animationName}/${cs.transform}`, getComputedStyle(document.querySelector('.bcv-stat.bcv-enter')).animationName, getComputedStyle(document.querySelector('.bcv-work__fill--grow')).animationName, document.querySelector('.bcv-stat__value').textContent];
     probe.remove();
     return out;
   });
-  check(reduced[0] === 'none' && reduced[1] === 'none/matrix(0.6, 0, 0, 1, 0, 0)' && reduced[2] === 'none' && reduced[3] === 'none' && reduced[4] === dueNow, `reduced motion drops the entrances (and the stagger, the bar wipe, the counter roll); the row wash holds still part way: ${reduced.join(' / ')}`);
+  check(reduced[0] === 'bcv-fade-in@0.15s' && reduced[1] === 'none/matrix(0.6, 0, 0, 1, 0, 0)' && reduced[2] === 'none' && reduced[3] === 'none' && reduced[4] === dueNow, `reduced motion keeps only a short fade (the screen arrives in 150ms of opacity, nothing moving) and drops the stagger, the bar wipe and the counter roll; the row wash holds still part way: ${reduced.join(' / ')}`);
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   } // motion
   if (on('the look off and on')) {
@@ -6647,7 +6687,8 @@ try {
   const swell = await realMotion(page, async () => {
     await page.hover('#bcv-pins .bcv-island');
     await page.waitForFunction(() => document.querySelector('#bcv-pins .bcv-island')?.classList.contains('is-set'), null, { timeout: 3000 });
-    const first = await page.evaluate(() => { const e = document.querySelector('#bcv-pins .bcv-island'); const sc = e.querySelector('.bcv-island__scale'); sc.querySelector('.bcv-pomo__tick').bcvFirst = true; return { w: Math.round(e.getBoundingClientRect().width), sc: sc.clientWidth }; });
+    // (2.99.4: the island takes its open size at once and is drawn through a clip that grows: its drawn width is read)
+    const first = await page.evaluate(() => { const e = document.querySelector('#bcv-pins .bcv-island'); const sc = e.querySelector('.bcv-island__scale'); sc.querySelector('.bcv-pomo__tick').bcvFirst = true; const m = /inset\(([^)]*)\)/.exec(getComputedStyle(e).clipPath || ''); const [t = 0, r = t, , l = r] = m ? m[1].split(/\s+round\s+/)[0].trim().split(/\s+/).map((v) => parseFloat(v) || 0) : []; return { w: Math.round(e.getBoundingClientRect().width - l - r), sc: sc.clientWidth }; });
     await page.waitForTimeout(700);
     const after = await page.evaluate(() => { const e = document.querySelector('#bcv-pins .bcv-island'); const sc = e.querySelector('.bcv-island__scale'); return { w: Math.round(e.getBoundingClientRect().width), sc: sc.clientWidth, same: sc.querySelector('.bcv-pomo__tick').bcvFirst === true }; });
     return { first, after };
@@ -7735,7 +7776,10 @@ try {
       const e = document.querySelector('.bcv-sheet-ov > .bcv-sheet');
       if (performance.now() - t0 > 5000 || (mid && !e)) return done({ mid, cut, path });
       if (e) {
-        const h = e.getBoundingClientRect().height, goal = parseFloat(e.style.height), cardH = document.querySelector('.bcv-stats .bcv-stat:nth-child(1)').getBoundingClientRect().height;
+        // (2.99.4: the box is laid out at its full size and drawn through a clip — its drawn height is the layout's less the
+        // clip's top and bottom; where it is headed, the inline clip's)
+        const drawn = (clip) => { const m = /inset\(([^)]*)\)/.exec(clip || ''); const r = e.getBoundingClientRect(); if (!m) return r.height; const [t = 0, , b = t] = m[1].split(/\s+round\s+/)[0].trim().split(/\s+/).map((v) => parseFloat(v) || 0); return r.height - t - b; };
+        const h = drawn(getComputedStyle(e).clipPath), goal = drawn(e.style.clipPath), cardH = document.querySelector('.bcv-stats .bcv-stat:nth-child(1)').getBoundingClientRect().height;
         if (!mid) {
           if (h > cardH + (goal - cardH) / 4) { mid = { h, goal, cardH, folding: e.parentElement.classList.contains('is-folding') }; e.parentElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); }
         } else {

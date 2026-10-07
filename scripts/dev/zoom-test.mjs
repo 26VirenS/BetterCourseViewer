@@ -64,6 +64,7 @@ const MEASURE = () => {
       if (!visible(el, cs)) continue;
       const r = el.getBoundingClientRect();
       if (!r.width || !r.height) continue;
+      if (el.classList.contains('bcv-card-dim')) continue; // (2.99.4: the dim behind a counter's box is a gradient layer scaled to cover the window round the box — past the edges on purpose, unseen there)
       if ((r.right > vw + 1 || r.left < -1) && !seenWide.has(el.parentElement) && !inScroller(el) && cs.position !== 'fixed') { seenWide.add(el.parentElement); if (res.wide.length < 4) res.wide.push(`${name(el)} l=${Math.round(r.left)} r=${Math.round(r.right)}`); }
       if (cs.position === 'fixed' && (r.right > vw + 1 || r.bottom > vh + 1 || r.left < -1 || r.top < -1) && res.fixedOff.length < 4) res.fixedOff.push(`${name(el)} ${Math.round(r.left)},${Math.round(r.top)} ${Math.round(r.width)}×${Math.round(r.height)}`);
       if (cs.overflow === 'hidden' || cs.overflowX === 'hidden') {
