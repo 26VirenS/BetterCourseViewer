@@ -42,6 +42,7 @@ struct QuizScreen: View {
             } else if launch.begin, run.intro?.canStart == true, run.intro?.needsCode != true {
                 await run.begin()
                 if let k = launch.startAt { await run.go(to: k) }
+                if launch.review { await run.toReview() }
             }
         }
         .onReceive(clock) { t in
@@ -166,6 +167,7 @@ struct QuizScreen: View {
         if let shown {
             let low = (left ?? .infinity) < 300
             Label(QuizTime.clock(shown), systemImage: left != nil ? "timer" : "clock")
+                .labelStyle(.titleAndIcon) // (a bar's own style draws a label as its icon alone: the time is the point)
                 .font(.subheadline.weight(.semibold).monospacedDigit())
                 .foregroundStyle(low ? Color.red : Color.primary)
                 .padding(.horizontal, 12)

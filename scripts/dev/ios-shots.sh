@@ -65,6 +65,9 @@ for mode in light dark; do
   # (1.3) a quiz in the app's own screen: its intro, a question being answered; a course's tool in its sheet
   launch "$mode-18-quiz" 18 -SimplOpen quiz:101:9011
   launch "$mode-19-quiz-question" 24 -SimplOpen quiz:101:9011:take:5
+  # (1.4) a finished quiz with an attempt left (Take Quiz and See Feedback side by side); the review's lines, formulas read as maths
+  launch "$mode-18b-quiz-done" 18 -SimplOpen quiz:101:9001
+  launch "$mode-19b-quiz-review" 26 -SimplOpen quiz:101:9011:review
   launch "$mode-20-tool" 20 -SimplOpen tool:101:9
   launch "$mode-21-setup" 18 -SimplOpen setup
 done

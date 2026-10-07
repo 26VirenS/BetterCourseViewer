@@ -178,10 +178,11 @@ final class Engine: ObservableObject, ShellListener {
         if let push = UserDefaults.standard.string(forKey: "SimplPush"), !push.isEmpty {
             if push == "notifications" { openNotifications() } else { openWeb(push, title: "") }
         }
-        // (-SimplOpen quiz:101:9011, quiz:101:9011:take:5 straight into the attempt at question 6, tool:101:9 a course's tool)
+        // (-SimplOpen quiz:101:9011, quiz:101:9011:take:5 straight into the attempt at question 6, quiz:101:9011:review its review,
+        // tool:101:9 a course's tool)
         if let q = LaunchOpen.take("quiz:") {
             let parts = q.split(separator: ":").map(String.init)
-            if parts.count >= 2 { quiz = QuizLaunch(course: parts[0], quiz: parts[1], title: "Quiz", begin: parts.count > 2 && parts[2] == "take", startAt: parts.count > 3 ? Int(parts[3]) : nil) }
+            if parts.count >= 2 { quiz = QuizLaunch(course: parts[0], quiz: parts[1], title: "Quiz", begin: parts.count > 2 && (parts[2] == "take" || parts[2] == "review"), startAt: parts.count > 3 ? Int(parts[3]) : nil, review: parts.count > 2 && parts[2] == "review") }
         } else if let t = LaunchOpen.take("tool:") {
             let parts = t.split(separator: ":").map(String.init)
             if parts.count == 2 { tool = .courseTool(course: parts[0], id: parts[1], title: "Tool") }
