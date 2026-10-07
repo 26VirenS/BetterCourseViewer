@@ -61,8 +61,11 @@ final class Engine: ObservableObject, ShellListener {
     }
     /// Bumps when a screen's data may have changed under it (a tick in a web screen, an account change): the native screens read again.
     @Published private(set) var dataVersion = 0
-    /// The tab bar's glass as drawn (TabBarProbe): a bar a screen puts above it takes this width and height.
+    /// The tab bar's glass as drawn (TabBarProbe): a bar a screen puts in its place takes this size, these side
+    /// margins, and sits this far below the safe area's bottom (ActionBar).
     @Published private(set) var barSize = CGSize(width: 0, height: 62)
+    @Published private(set) var barSide: CGFloat = 21
+    @Published private(set) var barLift: CGFloat = 14
     /// A screen with a bar of its own over the tab bar keeps the tab bar full size (no minimising as it scrolls).
     @Published var holdTabBar = false
     /// What a swipe on a piece of work asked for, for the screen it opens to do on arriving (1.4): Hand In
@@ -246,10 +249,12 @@ final class Engine: ObservableObject, ShellListener {
         if let s = try? await call("snapshot", as: Snapshot.self) { snapshot = s }
     }
 
-    func setBarSize(_ s: CGSize) {
-        guard s.width.isFinite, s.height.isFinite, s.width > 0, s.height > 0 else { return }
-        guard abs(s.width - barSize.width) > 0.5 || abs(s.height - barSize.height) > 0.5 else { return }
-        barSize = s
+    func setBar(_ b: TabBarProbe.Bar) {
+        let s = b.size
+        guard s.width.isFinite, s.height.isFinite, s.width > 0, s.height > 0, b.side.isFinite, b.lift.isFinite else { return }
+        if abs(s.width - barSize.width) > 0.5 || abs(s.height - barSize.height) > 0.5 { barSize = s }
+        if abs(b.side - barSide) > 0.5 { barSide = b.side }
+        if abs(b.lift - barLift) > 0.5 { barLift = b.lift }
     }
 
     func changed() {

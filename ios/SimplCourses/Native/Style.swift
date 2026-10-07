@@ -145,9 +145,9 @@ extension View {
 
 // MARK: - The one thing to do next, at the bottom (1.4)
 
-/// A screen's main action (Hand In, Take Quiz, Reply, See Feedback…) at the very bottom, where the tab bar was —
-/// Liquid Glass on iOS 26 in a rectangle whose corners are concentric with the phone's own (`ConcentricRectangle`:
-/// the farther from the screen's corner, the smaller the radius, never under 22), a capsule before it.
+/// A screen's main action (Hand In, Take Quiz, Reply, See Feedback…) in the tab bar's own place (1.4.9): a
+/// Liquid Glass capsule exactly as tall as the tab bar, as far in from the sides and as low (ActionBar), so it
+/// reads as the bar itself turned into the one thing to do. A tinted capsule before iOS 26.
 /// `prominent`: tinted with the course's colour, white words; otherwise clear glass.
 struct ActionButton: View {
     let title: String
@@ -168,14 +168,14 @@ struct ActionButton: View {
                 Text(title).lineLimit(1).minimumScaleFactor(0.8)
             }
             .font(.headline)
-            .frame(maxWidth: .infinity, minHeight: 52)
-            .contentShape(Rectangle())
+            .frame(maxWidth: .infinity, maxHeight: .infinity) // (the bar's height: ActionBar)
+            .contentShape(Capsule())
         }
         .buttonStyle(ActionStyle(tint: tint, prominent: prominent))
     }
 }
 
-/// The surface of an `ActionButton`: tinted or clear glass, concentric with the screen's corners.
+/// The surface of an `ActionButton`: tinted or clear glass, a capsule as the tab bar is.
 struct ActionStyle: ButtonStyle {
     let tint: Color
     let prominent: Bool
@@ -196,10 +196,9 @@ struct ActionSurface: ViewModifier {
 
     func body(content: Content) -> some View {
         if #available(iOS 26.0, *) {
-            let shape = ConcentricRectangle(corners: .concentric(minimum: .fixed(22)), isUniform: true)
             content
-                .glassEffect(prominent ? .regular.tint(tint).interactive() : .regular.interactive(), in: shape)
-                .contentShape(shape)
+                .glassEffect(prominent ? .regular.tint(tint).interactive() : .regular.interactive(), in: Capsule())
+                .contentShape(Capsule())
         } else {
             content
                 .background(prominent ? AnyShapeStyle(tint) : AnyShapeStyle(Color(.secondarySystemFill)), in: Capsule())
@@ -209,15 +208,19 @@ struct ActionSurface: ViewModifier {
     }
 }
 
-/// The bar the actions sit in: the screen's edges inset as Apple's own bottom bars are, side by side when two.
+/// The bar the actions sit in, in the tab bar's place (1.4.9): its height, its side margins, its foot as low as
+/// the tab bar's (below the safe area, over the home indicator's strip — the negative padding lets it draw there
+/// while the screen's content is inset only to its top). Side by side when two.
 struct ActionBar<Content: View>: View {
+    @EnvironmentObject private var engine: Engine
     @ViewBuilder let content: Content
 
     var body: some View {
         HStack(spacing: 10) { content }
-            .padding(.horizontal, 16)
+            .frame(height: engine.barSize.height)
+            .padding(.horizontal, engine.barSide)
             .padding(.top, 8)
-            .padding(.bottom, 2)
+            .padding(.bottom, -engine.barLift)
     }
 }
 

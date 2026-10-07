@@ -39,9 +39,9 @@ struct TabBarProbe: UIViewRepresentable {
 
         private func measure() {
             guard let window else { return }
-            let size = TabBarProbe.barSize(in: window, log: !logged)
+            let bar = TabBarProbe.bar(in: window, log: !logged)
             logged = true
-            engine?.setBarSize(size)
+            engine?.setBar(bar)
         }
     }
 
@@ -51,11 +51,30 @@ struct TabBarProbe: UIViewRepresentable {
         !r.isNull && !r.isInfinite && r.origin.x.isFinite && r.origin.y.isFinite && r.width.isFinite && r.height.isFinite
     }
 
-    static func barSize(in window: UIWindow, log: Bool) -> CGSize {
-        let fallback = CGSize(width: max(200, window.bounds.width - max(21, window.safeAreaInsets.left + 8) * 2), height: 62)
-        guard let bar = find(UITabBar.self, in: window) else { return fallback }
+    /// The tab bar as drawn: its size, how far in from the screen's sides, and how far its foot sits below the
+    /// bottom of the safe area (into the home indicator's strip) — so a bar in its place sits exactly where it was.
+    struct Bar: Equatable {
+        var size: CGSize
+        var side: CGFloat
+        var lift: CGFloat
+    }
+
+    static func bar(in window: UIWindow, log: Bool) -> Bar {
+        let side = max(21, window.safeAreaInsets.left + 8)
+        let safeBottom = window.safeAreaInsets.bottom
+        // Apple's floating bar where nothing is found: about 21 pt in from each side, 62 pt tall, its foot 20 pt over
+        // the screen's bottom edge on a phone with a home indicator (8 pt over the safe area's bottom without one)
+        let fallback = Bar(size: CGSize(width: max(200, window.bounds.width - side * 2), height: 62), side: side, lift: safeBottom > 0 ? max(0, safeBottom - 20) : -8)
+        guard let tabBar = find(UITabBar.self, in: window) else { return fallback }
+        let whole = wholeFrame(tabBar, in: window, log: log)
+        guard let whole, usable(whole), whole.width >= 100, whole.height >= 30 else { return fallback }
+        return Bar(size: whole.size, side: max(0, whole.minX), lift: safeBottom - (window.bounds.maxY - whole.maxY))
+    }
+
+    /// The tabs' capsule, and the Search circle beside it when it stands apart, in window coordinates.
+    private static func wholeFrame(_ bar: UITabBar, in window: UIWindow, log: Bool) -> CGRect? {
         let barFrame = bar.convert(bar.bounds, to: window)
-        guard usable(barFrame), barFrame.width > 0 else { return fallback }
+        guard usable(barFrame), barFrame.width > 0 else { return nil }
         var capsules: [CGRect] = []
         var lines: [String] = []
         let n = { (x: CGFloat) -> String in x.isFinite ? String(format: "%.0f", Double(x)) : "?" }
@@ -76,20 +95,19 @@ struct TabBarProbe: UIViewRepresentable {
             }
         }
         walk(bar, depth: 0)
-        var size = fallback
+        var found: CGRect?
         if let main = capsules.filter({ $0.width >= window.bounds.width * 0.45 }).max(by: { $0.width < $1.width }) {
             // the tabs' capsule, and the Search circle beside it when it stands apart: the whole bar
             var whole = main
             for c in capsules where !c.intersects(main) && abs(c.midY - main.midY) < 4 && c.height >= main.height * 0.8 {
                 whole = whole.union(c)
             }
-            size = whole.size
+            found = whole
         }
-        if !size.width.isFinite || !size.height.isFinite || size.width < 100 || size.height < 30 { size = fallback }
         if log {
-            print("[Simpl Courses] tab bar \(barFrame) → \(size)\n" + lines.joined(separator: "\n"))
+            print("[Simpl Courses] tab bar \(barFrame) → \(found.map { "\($0)" } ?? "not found")\n" + lines.joined(separator: "\n"))
         }
-        return size
+        return found
     }
 
     static func find<T: UIView>(_ type: T.Type, in v: UIView) -> T? {
