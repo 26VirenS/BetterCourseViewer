@@ -83,7 +83,7 @@ struct GradesView: View {
             } else {
                 Text("No score to compare yet").font(.subheadline).foregroundStyle(.secondary)
             }
-            Stepper(value: $goal, in: 0...4, step: 0.05) {
+            Stepper(value: $goal.animation(.snappy), in: 0...4, step: 0.05) { // (the above/below line rolls and its colour turns with it)
                 Text("Goal ") + Text(String(format: "%.2f", goal)).bold().monospacedDigit()
             }
             .onChange(of: goal) {
@@ -134,7 +134,7 @@ struct GradesView: View {
             sheet = r
         } label: {
             HStack(spacing: 14) {
-                NestedRings(bands: NestedRings.bands(total: r.pct, color: color, groups: r.cats.map { (pct: $0.pct, color: $0.color) }, limit: 3))
+                NestedRings(bands: NestedRings.bands(total: r.pct, color: color, groups: r.cats.map { (pct: $0.pct, color: $0.color) }, limit: 3), key: "grades:\(r.id)")
                     .frame(width: 54, height: 54)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(r.code).font(.headline).lineLimit(1)
@@ -180,7 +180,8 @@ struct GradesView: View {
         do {
             let d = try await engine.call("grades", as: GradesData.self)
             var t = Transaction()
-            t.disablesAnimations = true
+            // a redraw is not an arrival — but a term GPA that really changed rolls to its new value, as the rings beside it do
+            if let old = data, old.gpa != d.gpa { t.animation = .snappy } else { t.disablesAnimations = true }
             withTransaction(t) {
                 if data == nil { goal = d.goal }
                 data = d
@@ -280,7 +281,7 @@ struct CourseGradesView: View {
             }
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
-                    Picker("Sort", selection: $sort) {
+                    Picker("Sort", selection: $sort.animation(.snappy)) { // (each row slides to its new place)
                         ForEach(Sort.allCases) { s in Label(s.rawValue, systemImage: s.symbol).tag(s) }
                     }
                 } label: {
@@ -314,7 +315,7 @@ struct CourseGradesView: View {
         let legend = Array(d.groups.filter { $0.pct != nil }.prefix(rings.count - 1))
         return VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 18) {
-                NestedRings(bands: rings, outerWidth: 11, innerWidth: 7, gap: 2.5)
+                NestedRings(bands: rings, outerWidth: 11, innerWidth: 7, gap: 2.5, key: "course-grades:\(courseId)")
                     .frame(width: 124, height: 124)
                 VStack(alignment: .leading, spacing: 4) {
                     Text(d.totalText)

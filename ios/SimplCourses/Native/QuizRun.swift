@@ -73,7 +73,7 @@ final class QuizRun: ObservableObject {
     var saveWord: String { saving > 0 ? "Saving…" : saved ? "Saved" : "" }
 
     func say(_ text: String, error: Bool = false) {
-        banner = Banner(text: text, error: error)
+        banner = Banner(text: text, error: error) // (the screen animates it in and out: QuizScreen's overlay)
         bannerTask?.cancel()
         bannerTask = Task { [weak self] in
             try? await Task.sleep(nanoseconds: 3_200_000_000)
@@ -196,7 +196,7 @@ final class QuizRun: ObservableObject {
     func flag(_ id: String) async {
         guard let engine, let q = questions.first(where: { $0.id == id }) else { return }
         let on = !q.flagged
-        update(id) { $0.flagged = on }
+        withAnimation(.snappy(duration: 0.22)) { update(id) { $0.flagged = on } } // (as a pick is: the button and the strip's badge change together)
         Haptics.select()
         var args = ids
         args["question"] = id
@@ -204,7 +204,7 @@ final class QuizRun: ObservableObject {
         do {
             _ = try await engine.call("quizFlag", args, as: QuizSaved.self)
         } catch {
-            update(id) { $0.flagged = !on }
+            withAnimation(.snappy(duration: 0.22)) { update(id) { $0.flagged = !on } }
             say("Could not flag it: \(error.localizedDescription)", error: true)
         }
     }

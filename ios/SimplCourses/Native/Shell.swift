@@ -206,6 +206,7 @@ struct ShellToolbar: ViewModifier {
                 } label: {
                     Image(systemName: (engine.snapshot?.notifUnread ?? 0) > 0 ? "bell.badge" : "bell")
                         .symbolRenderingMode(.multicolor)
+                        .contentTransition(.symbolEffect(.replace))
                 }
                 .accessibilityLabel("Notifications")
             }

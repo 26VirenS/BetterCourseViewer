@@ -29,6 +29,11 @@ struct SetupScreen: View {
 
     private enum Step: Int, CaseIterable { case welcome, courses, grades, done }
     @State private var step: Step = .welcome
+    /// The way the last step went (Back slides the other way): set a frame before the step itself.
+    @State private var forward = true
+    /// The welcome and the end, up: their pieces arrive one after another (first run only).
+    @State private var welcomed = false
+    @State private var finished = false
     @State private var chosen: Set<String> = []
     @State private var nicknames: [String: String] = [:]
     @State private var targets: [String: String] = [:]
@@ -98,7 +103,7 @@ struct SetupScreen: View {
             case .done: done(d)
             }
         }
-        .transition(.asymmetric(insertion: .move(edge: .trailing).combined(with: .opacity), removal: .move(edge: .leading).combined(with: .opacity)))
+        .transition(.asymmetric(insertion: .move(edge: forward ? .trailing : .leading).combined(with: .opacity), removal: .move(edge: forward ? .leading : .trailing).combined(with: .opacity)))
         .safeAreaInset(edge: .bottom) { footer(d) }
     }
 
@@ -110,21 +115,24 @@ struct SetupScreen: View {
                 Image(systemName: "graduationcap.fill")
                     .font(.system(size: 64, weight: .semibold))
                     .foregroundStyle(.tint)
+                    .arrive(0, welcomed)
                     .padding(.top, 48)
                 VStack(spacing: 8) {
                     Text("Welcome to Simpl Courses").font(.largeTitle.weight(.bold)).multilineTextAlignment(.center)
                     Text("Canvas, simply, on your iPhone. Two quick questions and you’re in.")
                         .font(.body).foregroundStyle(.secondary).multilineTextAlignment(.center)
                 }
+                .arrive(1, welcomed)
                 VStack(alignment: .leading, spacing: 20) {
-                    feature("sun.max.fill", .orange, "Today", "What is due, what is new, and what was graded — at a glance.")
-                    feature("chart.bar.fill", .green, "Grades", "Rings for every course, your GPA, and what-if scores.")
-                    feature("checklist", .blue, "Quizzes and hand-ins", "Take quizzes and hand in work without leaving the app.")
+                    feature("sun.max.fill", .orange, "Today", "What is due, what is new, and what was graded — at a glance.").arrive(2, welcomed)
+                    feature("chart.bar.fill", .green, "Grades", "Rings for every course, your GPA, and what-if scores.").arrive(3, welcomed)
+                    feature("checklist", .blue, "Quizzes and hand-ins", "Take quizzes and hand in work without leaving the app.").arrive(4, welcomed)
                 }
                 .padding(.top, 8)
             }
             .padding(.horizontal, 28)
         }
+        .onAppear { welcomed = true } // (the first run's one hello: its pieces arrive one after another)
     }
 
     private func feature(_ symbol: String, _ tint: Color, _ title: String, _ text: String) -> some View {
@@ -229,7 +237,7 @@ struct SetupScreen: View {
                     }
                 }
                 if tracking {
-                    Stepper(value: $goal, in: 0...4, step: 0.05) {
+                    Stepper(value: $goal.animation(.snappy), in: 0...4, step: 0.05) { // (the number rolls)
                         HStack {
                             Text("GPA Goal")
                             Spacer()
@@ -277,11 +285,17 @@ struct SetupScreen: View {
         List {
             Section {
                 VStack(alignment: .leading, spacing: 6) {
+                    Image(systemName: "checkmark.seal.fill")
+                        .font(.system(size: 40, weight: .semibold))
+                        .foregroundStyle(.green)
+                        .symbolEffect(.bounce, value: finished)
+                        .padding(.bottom, 4)
                     Text("You’re Set").font(.title2.weight(.bold))
                     Text("Change any of this later in Settings → Courses and Goals.").font(.subheadline).foregroundStyle(.secondary)
                 }
                 .listRowBackground(Color.clear)
                 .listRowInsets(EdgeInsets(top: 8, leading: 4, bottom: 4, trailing: 4))
+                .onAppear { finished = true }
             }
             Section {
                 LabeledContent("Courses shown", value: "\(chosen.count) of \(d.courses.count)")
@@ -342,7 +356,13 @@ struct SetupScreen: View {
     private func go(_ by: Int) {
         guard let next = Step(rawValue: step.rawValue + by) else { return }
         Haptics.tap()
-        withAnimation(.spring(response: 0.42, dampingFraction: 0.88)) { step = next }
+        Task {
+            if forward != (by > 0) {
+                forward = by > 0
+                try? await Task.sleep(nanoseconds: 20_000_000)
+            }
+            withAnimation(.spring(response: 0.42, dampingFraction: 0.88)) { step = next }
+        }
     }
 
     private func save(_ d: SetupInfo) async {

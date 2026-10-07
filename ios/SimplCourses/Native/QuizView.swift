@@ -29,10 +29,13 @@ struct QuizScreen: View {
         NavigationStack {
             content
                 .animation(.spring(duration: 0.45, bounce: 0.1), value: run.stage == .review || run.stage == .submitting) // (the last question pulled up: the review rises in)
+                .animation(.easeOut(duration: 0.25), value: run.stage) // (every other step — the intro, starting, the attempt, the receipt, the feedback — crossfades, never cuts)
                 .navigationTitle(title)
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar { toolbar }
-                .overlay(alignment: .top) { banner }
+                .overlay(alignment: .top) {
+                    banner.animation(.spring(response: 0.4, dampingFraction: 0.85), value: run.banner) // (outside the if: it plays on the way in and out)
+                }
         }
         .tint(tint)
         .task {
@@ -195,7 +198,6 @@ struct QuizScreen: View {
                 .padding(.top, 6)
                 .transition(.move(edge: .top).combined(with: .opacity))
                 .onTapGesture { run.banner = nil }
-                .animation(.spring(response: 0.4, dampingFraction: 0.85), value: run.banner)
         }
     }
 
@@ -607,6 +609,7 @@ private struct QuizStrip: View {
                         .padding(3)
                         .background(Circle().fill(.orange))
                         .offset(x: 4, y: -4)
+                        .transition(.scale(scale: 0.5).combined(with: .opacity))
                 }
                 if run.moving == k {
                     ProgressView().controlSize(.small).frame(width: 36, height: 36)
@@ -644,6 +647,7 @@ private struct QuestionView: View {
                 if q.kind != "info" && q.kind != "pending" {
                     Button { Task { await run.flag(q.id) } } label: {
                         Label(q.flagged ? "Flagged" : "Flag", systemImage: q.flagged ? "flag.fill" : "flag")
+                            .contentTransition(.symbolEffect(.replace))
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(q.flagged ? Color.orange : Color.secondary)
                             .padding(.horizontal, 12)
@@ -1012,6 +1016,8 @@ private struct QuizReceiptView: View {
     @ObservedObject var run: QuizRun
     let tint: Color
     let done: () -> Void
+    /// Up: the tick bounces and the rest arrives after it, once (the app's one moment of handing in).
+    @State private var shown = false
 
     var body: some View {
         let r = run.receipt
@@ -1020,11 +1026,14 @@ private struct QuizReceiptView: View {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.system(size: 64, weight: .semibold))
                     .foregroundStyle(.green)
-                    .symbolEffect(.bounce, value: run.stage)
+                    .symbolEffect(.bounce, value: shown)
+                    .arrive(0, shown)
                     .padding(.top, 28)
                 Text(r?.title ?? "Attempt Submitted").font(.title.weight(.bold))
+                    .arrive(1, shown)
                 if let lead = r?.lead, !lead.isEmpty {
                     Text(lead).font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center).padding(.horizontal, 12)
+                        .arrive(2, shown)
                 }
                 VStack(spacing: 0) {
                     fact("Questions answered", r?.answered ?? "")
@@ -1038,9 +1047,11 @@ private struct QuizReceiptView: View {
                     }
                 }
                 .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(Color(.secondarySystemBackground)))
+                .arrive(3, shown)
             }
             .padding(.horizontal, 20)
         }
+        .onAppear { shown = true }
         .safeAreaInset(edge: .bottom) {
             ActionBar {
                 ActionButton(title: "Done", tint: tint, prominent: r?.feedback != true, action: done)
@@ -1115,7 +1126,7 @@ private struct QuizFeedbackView: View {
             }
             if fb.released == true {
                 Section {
-                    Picker("Show", selection: $filter) {
+                    Picker("Show", selection: $filter.animation(.snappy)) {
                         Text("All \(rows.count)").tag(0)
                         Text("To Review \(rows.filter { $0.verdict == "wrong" || $0.verdict == "partial" }.count)").tag(1)
                         Text("Correct \(rows.filter { $0.verdict == "right" }.count)").tag(2)

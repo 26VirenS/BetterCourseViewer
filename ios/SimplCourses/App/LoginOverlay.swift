@@ -180,6 +180,31 @@ struct StartOverButton: View {
     }
 }
 
+/// A wrong password: the fields shake once, side to side (0.44s), as the phone's own passcode does. Under
+/// Reduce Motion they stay still (the error haptic and the red words say it).
+struct Shake: ViewModifier {
+    let trigger: Int
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func body(content: Content) -> some View {
+        if reduceMotion {
+            content
+        } else {
+            content.keyframeAnimator(initialValue: 0.0, trigger: trigger) { view, x in
+                view.offset(x: x)
+            } keyframes: { _ in
+                KeyframeTrack {
+                    LinearKeyframe(-8, duration: 0.06)
+                    LinearKeyframe(8, duration: 0.08)
+                    LinearKeyframe(-6, duration: 0.08)
+                    LinearKeyframe(4, duration: 0.07)
+                    SpringKeyframe(0, duration: 0.15)
+                }
+            }
+        }
+    }
+}
+
 /// Liquid Glass in a capsule on iOS 26, a material before it.
 struct GlassCapsule: ViewModifier {
     func body(content: Content) -> some View {
@@ -200,6 +225,8 @@ struct LoginForm: View {
     @State private var user = ""
     @State private var pass = ""
     @FocusState private var focus: Field?
+    /// Counts the wrong passwords said here: each one shakes the fields once.
+    @State private var shake = 0
 
     private enum Field { case user, pass }
 
@@ -232,11 +259,13 @@ struct LoginForm: View {
                     .submitLabel(.next)
                     .focused($focus, equals: .user)
                     .onSubmit { focus = .pass }
+                    .modifier(Shake(trigger: shake))
                 SecureField("Password", text: $pass)
                     .textContentType(.password)
                     .submitLabel(.go)
                     .focused($focus, equals: .pass)
                     .onSubmit(signIn)
+                    .modifier(Shake(trigger: shake))
             } footer: {
                 if let error {
                     Text(error).foregroundStyle(.red)
@@ -266,6 +295,17 @@ struct LoginForm: View {
         .onAppear {
             user = assist.prefillUser
             focus = user.isEmpty ? .user : .pass
+            if error != nil { refused() }
+        }
+        .onChange(of: error) { if error != nil { refused() } }
+    }
+
+    /// The school said no: an error tap under the finger and the fields shake.
+    private func refused() {
+        Haptics.error()
+        Task {
+            try? await Task.sleep(nanoseconds: 250_000_000) // (once the form has faded back in)
+            shake += 1
         }
     }
 

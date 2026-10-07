@@ -138,7 +138,7 @@ struct SettingsSheet: View {
                     save(["tracking": on])
                 }))
                 Stepper(value: Binding(get: { goal }, set: { v in
-                    goal = (v * 100).rounded() / 100
+                    withAnimation(.snappy) { goal = (v * 100).rounded() / 100 } // (the number rolls)
                     saveGoal()
                 }), in: 0...4, step: 0.05) {
                     LabeledContent("Term GPA goal") {
@@ -235,7 +235,7 @@ struct SettingsSheet: View {
     private func loadInfo() async {
         do {
             let i = try await engine.call("settingsInfo", as: SimplSettingsInfo.self)
-            info = i
+            withAnimation(.snappy) { info = i } // (the grade and data sections slide in where "Reading your settings…" was)
             goal = i.goal
             infoError = nil
         } catch {

@@ -194,6 +194,8 @@ struct ModulesList: View {
     @EnvironmentObject private var engine: Engine
     @StateObject private var model = Loader<ModulesData>()
     @State private var folded: Set<String> = []
+    /// Marked done (or not) here, before Canvas has answered: the circle fills at once, and goes back if Canvas says no.
+    @State private var marking: [String: Bool] = [:]
 
     var body: some View {
         Loaded(model: model, title: "Modules", load: load) { d in
@@ -266,14 +268,18 @@ struct ModulesList: View {
                         }
                     }
                     Spacer(minLength: 6)
-                    if it.done == true {
-                        Image(systemName: "checkmark.circle.fill").foregroundStyle(.green).accessibilityLabel("Done")
-                    } else if it.markable == true {
+                    let done = marking[it.id] ?? (it.done == true)
+                    if done || it.markable == true {
+                        // (one symbol either way, so the circle turns into the tick rather than being swapped for it)
                         Button { mark(it, m, true) } label: {
-                            Image(systemName: "circle").foregroundStyle(.tertiary).font(.title3)
+                            Image(systemName: done ? "checkmark.circle.fill" : "circle")
+                                .font(.title3)
+                                .foregroundStyle(done ? Color.green : Color(.tertiaryLabel))
+                                .contentTransition(.symbolEffect(.replace))
                         }
                         .buttonStyle(.plain)
-                        .accessibilityLabel("Mark done")
+                        .allowsHitTesting(!done) // (a tick is not a button: a press on it opens the item, as before)
+                        .accessibilityLabel(done ? "Done" : "Mark done")
                     }
                     if it.external == true { Image(systemName: "arrow.up.right").font(.caption).foregroundStyle(.tertiary) }
                 }
@@ -284,10 +290,11 @@ struct ModulesList: View {
             .disabled(locked || (it.url == nil && it.type != "ExternalTool"))
             .swipeActions {
                 if it.markable == true {
-                    Button { mark(it, m, it.done != true) } label: {
-                        Label(it.done == true ? "Not Done" : "Done", systemImage: it.done == true ? "arrow.uturn.backward" : "checkmark")
+                    let done = marking[it.id] ?? (it.done == true)
+                    Button { mark(it, m, !done) } label: {
+                        Label(done ? "Not Done" : "Done", systemImage: done ? "arrow.uturn.backward" : "checkmark")
                     }
-                    .tint(it.done == true ? .gray : .green)
+                    .tint(done ? .gray : .green)
                 }
             }
         }
@@ -295,11 +302,13 @@ struct ModulesList: View {
 
     private func mark(_ it: ModuleItem, _ m: ModuleData, _ done: Bool) {
         Haptics.select()
+        withAnimation(.snappy) { marking[it.id] = done }
         Task {
             if await engine.act("markDone", ["ctx": ctx, "module": m.id, "item": it.id, "done": done]) {
                 if done { Haptics.success() }
                 await load()
             }
+            withAnimation(.snappy) { marking[it.id] = nil } // (Canvas's own answer from here: the reload, or back as it was)
         }
     }
 

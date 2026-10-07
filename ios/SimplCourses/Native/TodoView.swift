@@ -268,7 +268,7 @@ struct AddTaskSheet: View {
                         Text("No course").tag("")
                         ForEach(courses) { c in Text(c.name).tag(c.id) }
                     }
-                    Picker("Repeat", selection: $repeatKey) {
+                    Picker("Repeat", selection: $repeatKey.animation(.snappy)) { // (the Until row slides in and out)
                         Text("Doesn’t repeat").tag("")
                         ForEach(repeats) { r in Text(r.label).tag(r.key) }
                     }

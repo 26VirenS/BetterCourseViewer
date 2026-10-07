@@ -16,6 +16,8 @@ struct AssignmentView: View {
     @State private var comment = false
     @State private var rubric = false
     @State private var jump: String?
+    /// Counts the hand-ins made here: each one bounces the Submitted seal once it is in view.
+    @State private var handedIn = 0
 
     var body: some View {
         Group {
@@ -82,7 +84,12 @@ struct AssignmentView: View {
         .sheet(isPresented: $handIn) {
             if let d = model.data {
                 SubmitSheet(data: d) {
-                    await load()
+                    // the sheet away first, then the work arrives where it can be seen: the page goes to it and its seal bounces
+                    try? await Task.sleep(nanoseconds: 350_000_000)
+                    await model.load(engine, "assignment", ["course": course, "id": id], animated: true)
+                    jump = "work"
+                    try? await Task.sleep(nanoseconds: 300_000_000)
+                    handedIn += 1
                     engine.changed()
                 }
                 .environmentObject(engine)
@@ -127,7 +134,7 @@ struct AssignmentView: View {
         let color = Color(hex: d.color)
         return HStack(spacing: 16) {
             ZStack {
-                Ring(value: g.pct, color: color, lineWidth: 6)
+                Ring(value: g.pct, color: color, lineWidth: 6, key: "assignment:\(course)/\(id)")
                 Text(g.letter ?? (g.pct.map { "\(Int($0.rounded()))%" } ?? "")).font(.headline.weight(.bold)).foregroundStyle(color).minimumScaleFactor(0.6)
             }
             .frame(width: 64, height: 64)
@@ -172,7 +179,10 @@ struct AssignmentView: View {
         let hasWork = !(s?.files ?? []).isEmpty || !(s?.url ?? "").isEmpty || !(s?.text ?? "").isEmpty
         if (d.submitted ?? "").isEmpty == false || hasWork || (d.why ?? "").isEmpty == false {
             Section("Your work") {
-                if let sub = d.submitted, !sub.isEmpty { Label(sub, systemImage: "checkmark.seal.fill").foregroundStyle(.green) }
+                if let sub = d.submitted, !sub.isEmpty {
+                    Label(sub, systemImage: "checkmark.seal.fill").foregroundStyle(.green)
+                        .symbolEffect(.bounce, value: handedIn)
+                }
                 if let t = s?.text, !t.isEmpty { Text(t).font(.subheadline).lineLimit(8) }
                 if let u = s?.url, !u.isEmpty {
                     Button { if let x = URL(string: u) { engine.openLink(x) } } label: { Label(u, systemImage: "link").lineLimit(1) }
@@ -183,6 +193,7 @@ struct AssignmentView: View {
                 }
                 if let why = d.why, !why.isEmpty { Label(why, systemImage: "info.circle").font(.subheadline).foregroundStyle(.secondary) }
             }
+            .id("work")
         }
     }
 
@@ -294,7 +305,7 @@ struct SubmitSheet: View {
             Form {
                 if data.types.count > 1 {
                     Section {
-                        Picker("Hand in", selection: $type) {
+                        Picker("Hand in", selection: $type.animation(.snappy)) { // (the kind's own fields swap in place, not at once)
                             ForEach(data.types, id: \.self) { t in Text(SubmitSheet.label(t)).tag(t) }
                         }
                         .pickerStyle(.segmented)
@@ -456,8 +467,8 @@ struct SubmitSheet: View {
             do {
                 _ = try await engine.call("submit", args, as: OK.self)
                 Haptics.success()
-                await done()
                 dismiss()
+                await done() // (after the sheet goes: the assignment shows the work arriving)
             } catch {
                 Haptics.error()
                 self.error = error.localizedDescription

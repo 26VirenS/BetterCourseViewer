@@ -12,6 +12,10 @@ struct CalendarView: View {
     @State private var error: String?
     @State private var loading = false
     @State private var choosing = false
+    /// The way the last move went (the month slides in from that side): set a frame before the move itself,
+    /// so the month leaving reads it as it leaves.
+    @State private var dir = 1
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private static let cal = Calendar.current
     private static let dayKey: DateFormatter = { let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"; return f }()
@@ -117,11 +121,19 @@ struct CalendarView: View {
         }
     }
 
-    private func shift(_ dir: Int) {
+    private func shift(_ step: Int) {
         Haptics.select()
-        if view == "month" { anchor = Self.cal.date(byAdding: .month, value: dir, to: anchor) ?? anchor }
-        else { weekStart = Self.cal.date(byAdding: .day, value: 7 * dir, to: weekStart) ?? weekStart }
-        Task { await load() }
+        Task {
+            if dir != step {
+                dir = step
+                try? await Task.sleep(nanoseconds: 20_000_000)
+            }
+            withAnimation(.snappy) {
+                if view == "month" { anchor = Self.cal.date(byAdding: .month, value: step, to: anchor) ?? anchor }
+                else { weekStart = Self.cal.date(byAdding: .day, value: 7 * step, to: weekStart) ?? weekStart }
+            }
+            await load()
+        }
     }
 
     private func load() async {
@@ -156,9 +168,14 @@ struct CalendarView: View {
                         Text(["S", "M", "T", "W", "T", "F", "S"][i]).font(.caption2.weight(.semibold)).foregroundStyle(.secondary).frame(maxWidth: .infinity)
                     }
                 }
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 0), count: 7), spacing: 4) {
-                    ForEach(days, id: \.self) { day in dayCell(day) }
+                ZStack {
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 0), count: 7), spacing: 4) {
+                        ForEach(days, id: \.self) { day in dayCell(day) }
+                    }
+                    .id(anchor) // (a new month is a new grid: it slides in from the side the arrow points to)
+                    .transition(reduceMotion ? .opacity : .push(from: dir > 0 ? .trailing : .leading))
                 }
+                .clipped()
             }
             .padding(.vertical, 6)
         }

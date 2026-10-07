@@ -39,6 +39,8 @@ struct InboxView: View {
     @StateObject private var model = Loader<InboxData>()
     @State private var scope = "inbox"
     @State private var compose = false
+    /// Another mailbox on its way: the one shown stays, dimmed, until the new one swaps in (no blank screen).
+    @State private var switching = false
 
     struct Mailbox: Identifiable {
         let id: String
@@ -75,6 +77,8 @@ struct InboxView: View {
                 .listSectionSeparator(.hidden, edges: .top) // (no rule over the first message, as in Mail)
             }
             .listStyle(.plain)
+            .opacity(switching ? 0.5 : 1)
+            .animation(.easeOut(duration: 0.15), value: switching)
             .overlay { if d.rows.isEmpty { EmptyNote(text: d.empty ?? "No messages", symbol: "tray") } }
         }
         .toolbar {
@@ -95,8 +99,11 @@ struct InboxView: View {
         }
         .onChange(of: scope) {
             Haptics.select()
-            model.data = nil
-            Task { await load() }
+            switching = true
+            Task {
+                await model.load(engine, "inbox", ["scope": scope], animated: true)
+                switching = false
+            }
         }
         .sheet(isPresented: $compose) {
             ComposeSheet(sent: { Task { await load() } })
@@ -116,7 +123,10 @@ struct InboxView: View {
                     Text(c.who).font(c.unread == true ? .body.weight(.semibold) : .body).lineLimit(1)
                     if let n = c.count, n > 1 { Text("\(n)").font(.caption).foregroundStyle(.secondary) }
                     Spacer(minLength: 6)
-                    if c.starred == true { Image(systemName: "star.fill").font(.caption).foregroundStyle(.yellow) }
+                    if c.starred == true {
+                        Image(systemName: "star.fill").font(.caption).foregroundStyle(.yellow)
+                            .transition(.scale(scale: 0.5).combined(with: .opacity))
+                    }
                     if c.attachment == true { Image(systemName: "paperclip").font(.caption).foregroundStyle(.secondary) }
                     if let w = c.when { Text(w).font(.caption).foregroundStyle(.secondary).lineLimit(1) }
                 }
@@ -130,11 +140,19 @@ struct InboxView: View {
         .contentShape(Rectangle())
     }
 
+    /// Starred at once (the star shows before Canvas answers), and back if Canvas says no.
     private func star(_ c: ConvRow, _ on: Bool) {
         Haptics.select()
+        setStar(c.id, on)
         Task {
-            if await engine.act("star", ["id": c.id, "on": on]) { await load() }
+            if await engine.act("star", ["id": c.id, "on": on]) { await model.load(engine, "inbox", ["scope": scope], animated: true) }
+            else { setStar(c.id, !on) }
         }
+    }
+
+    private func setStar(_ id: String, _ on: Bool) {
+        guard let i = model.data?.rows.firstIndex(where: { $0.id == id }) else { return }
+        withAnimation(.snappy) { model.data?.rows[i].starred = on }
     }
 
     private func load() async { await model.load(engine, "inbox", ["scope": scope]) }
@@ -161,12 +179,15 @@ struct ConversationView: View {
                             if let c = d.context, !c.isEmpty { Text(c).font(.caption).foregroundStyle(.tertiary) }
                         }
                         .padding(.bottom, 6)
-                        ForEach(d.messages) { m in bubble(m) }
+                        ForEach(d.messages) { m in
+                            bubble(m).transition(.move(edge: .bottom).combined(with: .opacity)) // (a reply sent rises in at the foot)
+                        }
                     }
                     .padding(.horizontal, 16)
                     .padding(.vertical, 12)
                 }
                 .defaultScrollAnchor(.bottom)
+                .defaultScrollAnchor(.bottom, for: .sizeChanges) // (a new message keeps the foot in view)
                 .scrollDismissesKeyboard(.interactively)
                 .refreshable { await load() }
                 .safeAreaInset(edge: .bottom) { replyBar }
@@ -181,11 +202,15 @@ struct ConversationView: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         Haptics.select()
+                        let on = d.starred != true
+                        withAnimation(.snappy) { model.data?.starred = on }
                         Task {
-                            if await engine.act("star", ["id": id, "on": d.starred != true]) { await load() }
+                            if await engine.act("star", ["id": id, "on": on]) { await load() }
+                            else { withAnimation(.snappy) { model.data?.starred = !on } }
                         }
                     } label: {
                         Image(systemName: d.starred == true ? "star.fill" : "star")
+                            .contentTransition(.symbolEffect(.replace))
                     }
                     .accessibilityLabel(d.starred == true ? "Unstar" : "Star")
                 }
@@ -233,8 +258,11 @@ struct ConversationView: View {
                     .padding(.vertical, 9)
                     .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
                 Button { send() } label: {
-                    if sending { ProgressView().frame(width: 34, height: 34) }
-                    else { Image(systemName: "arrow.up.circle.fill").font(.system(size: 32)) }
+                    ZStack {
+                        if sending { ProgressView().frame(width: 34, height: 34).transition(.opacity) }
+                        else { Image(systemName: "arrow.up.circle.fill").font(.system(size: 32)).transition(.scale(scale: 0.6).combined(with: .opacity)) }
+                    }
+                    .animation(.snappy(duration: 0.2), value: sending)
                 }
                 .disabled(sending || draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 .accessibilityLabel("Send")
@@ -254,7 +282,7 @@ struct ConversationView: View {
                 _ = try await engine.call("sendReply", ["id": id, "body": text], as: OK.self)
                 Haptics.success()
                 draft = ""
-                await load()
+                await model.load(engine, "conversation", ["id": id], animated: true)
                 engine.changed()
             } catch {
                 Haptics.error()

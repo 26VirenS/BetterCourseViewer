@@ -129,11 +129,13 @@ struct TodayView: View {
         .animation(.snappy, value: value)
     }
 
-    private func load(force: Bool = false) async {
+    /// `animated`: after a tick here, the row ticked off leaves and the next one slides in (as To Do's do);
+    /// any other load is a redraw, not an arrival.
+    private func load(force: Bool = false, animated: Bool = false) async {
         if force { _ = try? await engine.call("refresh", as: OK.self) }
         do {
             let d = try await engine.call("today", as: Today.self)
-            data = d
+            if animated { withAnimation(.snappy) { data = d } } else { data = d }
             error = nil
             // (the simulator suite: -SimplSheet next opens a counter's list)
             if let key = UserDefaults.standard.string(forKey: "SimplSheet"), !key.isEmpty, !sheetShown {
@@ -154,7 +156,11 @@ struct TodayView: View {
         setDone(row.id, done)
         Task {
             if !(await engine.act("complete", ["id": row.id, "done": done])) { setDone(row.id, !done) }
-            else { engine.changed() }
+            else {
+                try? await Task.sleep(nanoseconds: 450_000_000) // (the tick shows before the row moves, as on To Do)
+                await load(animated: true)
+                engine.changed()
+            }
         }
     }
 

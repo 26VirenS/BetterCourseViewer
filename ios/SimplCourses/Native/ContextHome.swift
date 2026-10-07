@@ -125,7 +125,7 @@ struct ContextHome: View {
                     grades = true
                 } label: {
                     ZStack {
-                        Ring(value: d.score, color: color, lineWidth: 6)
+                        Ring(value: d.score, color: color, lineWidth: 6, key: "home:\(ctx)")
                         VStack(spacing: 0) {
                             Text(d.letter ?? (d.score == nil ? "–" : "")).font(.headline.weight(.bold)).foregroundStyle(color)
                             if let s = d.scoreText { Text(s).font(.caption2.monospacedDigit()).foregroundStyle(.secondary).minimumScaleFactor(0.7) }

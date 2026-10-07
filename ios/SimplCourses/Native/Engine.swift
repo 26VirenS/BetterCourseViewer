@@ -496,7 +496,8 @@ final class Engine: ObservableObject, ShellListener {
         guard matches else { return }
         if let title = body["title"] as? String, !title.isEmpty { titles[id] = title }
         if let url = url { screenURLs[id] = url }
-        focus = body["focus"] as? Bool ?? false
+        let f = body["focus"] as? Bool ?? false
+        if f != focus { withAnimation(.easeInOut(duration: 0.25)) { focus = f } } // (as shell.focus does: the bars go, never snap)
         reveal(id)
     }
 

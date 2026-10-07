@@ -82,6 +82,26 @@ extension View {
     }
 }
 
+/// A rare moment's pieces arriving one after another (a quiz handed in, the setup's welcome and its end):
+/// each rises 8pt and fades in, 60ms after the one before, on the setup's own spring. Under Reduce Motion a
+/// plain fade, all at once. Never on an everyday screen: a redraw is not an arrival.
+struct Arrive: ViewModifier {
+    let index: Int
+    let shown: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func body(content: Content) -> some View {
+        content
+            .opacity(shown ? 1 : 0)
+            .offset(y: shown || reduceMotion ? 0 : 8)
+            .animation(reduceMotion ? .easeOut(duration: 0.2) : .spring(response: 0.42, dampingFraction: 0.88).delay(0.06 * Double(index)), value: shown)
+    }
+}
+
+extension View {
+    func arrive(_ index: Int, _ shown: Bool) -> some View { modifier(Arrive(index: index, shown: shown)) }
+}
+
 /// A card's press: it gives a little under the finger and springs back, as Apple's own tiles do.
 struct PressScale: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {

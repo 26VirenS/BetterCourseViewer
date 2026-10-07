@@ -2,11 +2,14 @@ import SwiftUI
 
 /// A grade ring: the track, and the arc to the score in the course's colour, drawn (not a system gauge,
 /// so it shows in any list and any size). It fills once, with a spring, when it first appears, and moves
-/// from where it is when the score changes (a what-if score) — never from empty again.
+/// from where it is when the score changes (a what-if score) — never from empty again. With a `key`, it
+/// fills from empty once a launch (1.4.7): a course opened again, or a row scrolled back, shows it full.
 struct Ring: View {
     let value: Double? // 0…100; nil draws the track alone
     let color: Color
     var lineWidth: CGFloat = 6
+    var key: String? = nil
+    @MainActor private static var filled = Set<String>()
     @State private var shown: Double = 0
     @State private var appeared = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -25,7 +28,8 @@ struct Ring: View {
         .onAppear {
             guard !appeared else { return }
             appeared = true
-            if reduceMotion { shown = target } else { withAnimation(.spring(response: 0.8, dampingFraction: 0.9).delay(0.05)) { shown = target } }
+            let seen = key.map { !Ring.filled.insert($0).inserted } ?? false
+            if reduceMotion || seen { shown = target } else { withAnimation(.spring(response: 0.8, dampingFraction: 0.9).delay(0.05)) { shown = target } }
         }
         .onChange(of: target) {
             if reduceMotion { shown = target } else { withAnimation(.spring(response: 0.5, dampingFraction: 0.85)) { shown = target } }
@@ -47,11 +51,13 @@ struct NestedRings: View {
     var outerWidth: CGFloat = 5
     var innerWidth: CGFloat = 3.5
     var gap: CGFloat = 1.5
+    /// Fills from empty once a launch (see `Ring`).
+    var key: String? = nil
 
     var body: some View {
         ZStack {
             ForEach(bands) { b in
-                Ring(value: b.value, color: b.color, lineWidth: b.id == 0 ? outerWidth : innerWidth)
+                Ring(value: b.value, color: b.color, lineWidth: b.id == 0 ? outerWidth : innerWidth, key: key.map { "\($0)#\(b.id)" })
                     .padding(b.id == 0 ? 0 : outerWidth + gap + CGFloat(b.id - 1) * (innerWidth + gap))
             }
         }
@@ -337,9 +343,18 @@ final class Loader<T: Decodable>: ObservableObject {
     @Published var data: T?
     @Published var error: String?
 
-    func load(_ engine: Engine, _ name: String, _ args: [String: Any] = [:]) async {
+    /// `animated`: the answer to something the student just did (a mailbox picked, a reply sent, a star) —
+    /// rows come and go on the house spring. Every other load is a redraw, not an arrival.
+    func load(_ engine: Engine, _ name: String, _ args: [String: Any] = [:], animated: Bool = false) async {
         do {
             let d = try await engine.call(name, args, as: T.self)
+            if animated {
+                withAnimation(.snappy) {
+                    data = d
+                    error = nil
+                }
+                return
+            }
             var t = Transaction()
             t.disablesAnimations = true // (a redraw is not an arrival: the list changes in place)
             withTransaction(t) {
