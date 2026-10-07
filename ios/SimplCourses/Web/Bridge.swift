@@ -19,24 +19,31 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
         _ = store.set(items)
     }
 
-    /// On the iPhone the look follows the phone (1.4): light or dark is the phone's own setting, never one
-    /// of the app's. A saved choice from before is turned back to "system", and so is one written later
-    /// (a settings page, an old command): the page draws whatever the phone is set to.
+    /// What the app's settings always are, whatever writes them (a settings import from a computer, an old
+    /// command): light or dark is the phone's own setting (1.4: "system"), and Simpl's look is always on
+    /// (1.4.5) — off, the app's own screens and the menu that leads back to Settings would be gone.
     static func followingPhone(_ items: [String: Any]) -> [String: Any] {
-        guard var s = items["settings"] as? [String: Any], var a = s["appearance"] as? [String: Any],
-              let mode = a["darkMode"] as? String, mode != "system" else { return items }
-        a["darkMode"] = "system"
+        guard var s = items["settings"] as? [String: Any], var a = s["appearance"] as? [String: Any] else { return items }
+        let mode = a["darkMode"] as? String
+        let skin = a["skin"] as? Bool
+        let until = (a["offUntil"] as? NSNumber)?.doubleValue ?? 0
+        guard (mode != nil && mode != "system") || skin == false || until != 0 else { return items }
+        if mode != nil { a["darkMode"] = "system" }
+        if skin != nil { a["skin"] = true }
+        if a["offUntil"] != nil { a["offUntil"] = 0 }
         s["appearance"] = a
         var out = items
         out["settings"] = s
         return out
     }
 
+    /// At launch: a saved look or appearance from before is brought into line (1.4.3 had a switch that turned
+    /// the look off, with no way back to it: the app comes back on by itself).
     func followPhoneAppearance() {
         let s = store.get("settings")
-        let mode = ((s["settings"] as? [String: Any])?["appearance"] as? [String: Any])?["darkMode"] as? String
-        guard let mode, mode != "system" else { return }
-        _ = store.set(Bridge.followingPhone(s))
+        let fixed = Bridge.followingPhone(s)
+        guard let a = fixed["settings"] as? [String: Any], let b = s["settings"] as? [String: Any], !NSDictionary(dictionary: a).isEqual(to: b) else { return }
+        _ = store.set(fixed)
     }
 
     func register(_ webView: WKWebView, world: WKContentWorld) {
@@ -50,25 +57,13 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
 
     /// appearance.skin: the redesigned interface is on (the default) or the student chose stock Canvas — and a
     /// turn-off for a while is over once its time has come (lib/settings.js lookOn, which every reader asks).
+    /// In the app it is always on (followingPhone); still read, for a store written before 1.4.5.
     var interfaceOn: Bool { Bridge.interfaceOn(settings) }
     static func interfaceOn(_ settings: [String: Any], now: Date = Date()) -> Bool {
         let a = settings["appearance"] as? [String: Any] ?? [:]
         if (a["skin"] as? Bool) != false { return true }
         let until = (a["offUntil"] as? NSNumber)?.doubleValue ?? 0
         return until > 0 && now.timeIntervalSince1970 * 1000 >= until
-    }
-
-    /// The interface on or off from the app's own Settings (lib/settings.js lookPatch: off until turned on again).
-    /// Written here, not through the page, so it can be turned back on while the page is Canvas's own.
-    func setInterface(_ on: Bool) {
-        var s = settings
-        var a = s["appearance"] as? [String: Any] ?? [:]
-        a["skin"] = on
-        a["offUntil"] = 0
-        s["appearance"] = a
-        let changes = store.set(["settings": s])
-        broadcast(changes)
-        NotificationCenter.default.post(name: .simplSettingsChanged, object: nil, userInfo: s)
     }
 
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage, replyHandler: @escaping (Any?, String?) -> Void) {

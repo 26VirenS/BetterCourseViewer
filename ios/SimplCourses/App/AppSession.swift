@@ -40,6 +40,7 @@ final class AppSession: ObservableObject {
         // student who has used the app, before the first page reads them
         if UserDefaults.standard.bool(forKey: "SimplDemo") { Bridge.shared.seed(AppSession.demoSeed()) }
         Bridge.shared.followPhoneAppearance()
+        interfaceOn = Bridge.shared.interfaceOn // (a look turned off before 1.4.5 is on again by now)
         NotificationCenter.default.publisher(for: .simplOpenSettings)
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in self?.showSettings = true }

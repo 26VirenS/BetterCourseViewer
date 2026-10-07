@@ -3,7 +3,6 @@ import UniformTypeIdentifiers
 
 /// Settings, all of it the phone's own rows: the school and sign-in, then Simpl's own settings (the options
 /// page's General, Grades and Data, read and written through the page's settings calls in native-app.js).
-/// The look switch is written by the app itself, so it can be turned back on while the page is Canvas's own.
 struct SettingsSheet: View {
     @EnvironmentObject private var session: AppSession
     @EnvironmentObject private var engine: Engine
@@ -11,7 +10,6 @@ struct SettingsSheet: View {
     @State private var confirmSignOut = false
     @State private var confirmReset = false
     @State private var saved = LoginVault.load()
-    @State private var lookOn = Bridge.shared.interfaceOn
     @State private var info: SimplSettingsInfo?
     @State private var infoError: String?
     @State private var goal = 4.0
@@ -23,7 +21,7 @@ struct SettingsSheet: View {
     @State private var said: Said?
     @State private var saidTask: Task<Void, Never>?
 
-    /// The page's settings calls answer only while the app's own screens are up (the look on, signed in).
+    /// The page's settings calls answer only while the app's own screens are up (signed in, Canvas loaded).
     private var live: Bool { engine.phase == .native }
 
     var body: some View {
@@ -38,7 +36,7 @@ struct SettingsSheet: View {
                     dataSection
                 } else {
                     Section {
-                        Text(lookOn ? "Grades and data settings appear once Canvas has loaded and you are signed in." : "Turn the Simpl Courses look on to change grades and data settings.")
+                        Text("Grades and data settings appear once Canvas has loaded and you are signed in.")
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -67,7 +65,6 @@ struct SettingsSheet: View {
             }
             .task(id: live) { if live { await loadInfo() } }
             .onReceive(NotificationCenter.default.publisher(for: .simplLoginChanged)) { _ in saved = LoginVault.load() }
-            .onReceive(NotificationCenter.default.publisher(for: .simplSettingsChanged)) { _ in lookOn = Bridge.shared.interfaceOn }
             .fileImporter(isPresented: $importing, allowedContentTypes: importKind.types, allowsMultipleSelection: false) { result in
                 picked(importKind, result)
             }
@@ -120,16 +117,9 @@ struct SettingsSheet: View {
         }
     }
 
-    private var simplSection: some View {
-        Section {
-            Toggle(isOn: Binding(get: { lookOn }, set: { on in
-                lookOn = on
-                Haptics.select()
-                Bridge.shared.setInterface(on)
-            })) {
-                Label("Simpl Courses look", systemImage: "sparkles.rectangle.stack")
-            }
-            if live {
+    @ViewBuilder private var simplSection: some View {
+        if live {
+            Section("Simpl Courses") {
                 Button {
                     dismiss()
                     NotificationCenter.default.post(name: .simplOpenSetup, object: nil)
@@ -137,10 +127,6 @@ struct SettingsSheet: View {
                     Label("Courses and Goals", systemImage: "checklist")
                 }
             }
-        } header: {
-            Text("Simpl Courses")
-        } footer: {
-            Text(lookOn ? "Off shows Canvas’s own pages." : "Canvas’s own pages are shown. Turn it on for the app’s screens.")
         }
     }
 
@@ -347,7 +333,6 @@ struct SettingsSheet: View {
             case .settings:
                 _ = try await engine.call("settingsImport", ["text": text], as: OK.self)
                 await loadInfo()
-                lookOn = Bridge.shared.interfaceOn
                 say("Imported.")
             }
             Haptics.success()
