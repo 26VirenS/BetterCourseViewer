@@ -45,20 +45,29 @@ struct TabBarProbe: UIViewRepresentable {
         }
     }
 
+    /// A frame every number of which is a real one (a view mid-animation, or one with no size yet, can report
+    /// infinity or NaN — never measured, never turned into a whole number).
+    static func usable(_ r: CGRect) -> Bool {
+        !r.isNull && !r.isInfinite && r.origin.x.isFinite && r.origin.y.isFinite && r.width.isFinite && r.height.isFinite
+    }
+
     static func barSize(in window: UIWindow, log: Bool) -> CGSize {
-        let fallback = CGSize(width: window.bounds.width - max(21, window.safeAreaInsets.left + 8) * 2, height: 62)
+        let fallback = CGSize(width: max(200, window.bounds.width - max(21, window.safeAreaInsets.left + 8) * 2), height: 62)
         guard let bar = find(UITabBar.self, in: window) else { return fallback }
         let barFrame = bar.convert(bar.bounds, to: window)
+        guard usable(barFrame), barFrame.width > 0 else { return fallback }
         var capsules: [CGRect] = []
         var lines: [String] = []
+        let n = { (x: CGFloat) -> String in x.isFinite ? String(format: "%.0f", Double(x)) : "?" }
         func walk(_ v: UIView, depth: Int) {
             guard depth < 9 else { return }
             for s in v.subviews where !s.isHidden && s.alpha > 0.01 {
                 let f = s.convert(s.bounds, to: window)
                 let name = String(describing: type(of: s))
                 if log && depth < 6 {
-                    lines.append("\(String(repeating: "  ", count: depth))\(name) \(Int(f.minX)),\(Int(f.minY)) \(Int(f.width))x\(Int(f.height)) r\(Int(s.layer.cornerRadius))")
+                    lines.append("\(String(repeating: "  ", count: depth))\(name) \(n(f.minX)),\(n(f.minY)) \(n(f.width))x\(n(f.height)) r\(n(s.layer.cornerRadius))")
                 }
+                guard usable(f), s.layer.cornerRadius.isFinite else { walk(s, depth: depth + 1); continue }
                 let rounded = s.layer.cornerRadius >= f.height / 2 - 3 || name.contains("Platter") || name.contains("Glass")
                 if rounded && f.height >= 40 && f.height <= 100 && f.width >= f.height - 1 && f.width <= barFrame.width + 1 {
                     capsules.append(f)
@@ -76,6 +85,7 @@ struct TabBarProbe: UIViewRepresentable {
             }
             size = whole.size
         }
+        if !size.width.isFinite || !size.height.isFinite || size.width < 100 || size.height < 30 { size = fallback }
         if log {
             print("[Simpl Courses] tab bar \(barFrame) → \(size)\n" + lines.joined(separator: "\n"))
         }

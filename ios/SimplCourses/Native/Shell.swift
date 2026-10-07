@@ -33,8 +33,12 @@ struct RootView: View {
             SettingsSheet()
         }
         .sheet(item: $engine.whatsNew) { item in
-            WhatsNewSheet(data: item.data)
+            WhatsNewSheet(data: item.data) {
+                // up at last: this version is seen
+                Task { _ = try? await engine.call("whatsNewSeen", ["version": item.data.version ?? ""], as: OK.self) }
+            }
         }
+        .onChange(of: session.showSettings) { engine.settingsOpen = session.showSettings }
         .sheet(item: $engine.tool) { t in
             ToolSheet(launch: t)
                 .environmentObject(engine)
@@ -304,6 +308,8 @@ struct Avatar: View {
 /// What changed, as Apple's own sheet.
 struct WhatsNewSheet: View {
     let data: WhatsNewData
+    /// The sheet is up (What's New after an update is marked seen only then).
+    var onShown: (() -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -339,6 +345,7 @@ struct WhatsNewSheet: View {
         }
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
+        .onAppear { onShown?() }
     }
 
     private func icon(_ kind: String) -> String {

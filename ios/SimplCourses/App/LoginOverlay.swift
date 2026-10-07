@@ -10,7 +10,8 @@ struct LoginLayer: View {
         ZStack {
             switch assist.phase {
             case .idle:
-                EmptyView()
+                // (a view, not nothing: "Stay logged in?" is asked from here once the cover is gone)
+                Color.clear.allowsHitTesting(false)
             case .working:
                 LoggingInView()
                     .transition(.opacity)

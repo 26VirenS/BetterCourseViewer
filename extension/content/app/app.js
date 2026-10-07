@@ -1652,7 +1652,11 @@
     // light; its layer goes up before the page draws, so What's New waits for it.
     // (the setup's run, or — for anyone who had Simpl before the switch became a slider — the
     // switch's own steps alone, once; a phone's header has no switch, so none there)
-    let welcome = state.lookOn && BCV.welcome ? await BCV.welcome.due() : false;
+    // (the iPhone app with its own chrome shows its own popups — its setup, its What's New sheet — in turn, once
+    // the sign-in is over: the page's are never put up under it, where they would be marked seen unseen. The
+    // bridge says so from the first line of the page; the shell's class can come later than this, after a sign-in)
+    const nativeShell = !!self.BCVBridge?.native?.shell;
+    let welcome = state.lookOn && BCV.welcome && !nativeShell ? await BCV.welcome.due() : false;
     if ((welcome === 'look' || welcome === 'report') && html.classList.contains('bcv-phone')) welcome = false; // (a phone's header has neither the switch nor the purple button)
     if (welcome === 'appearance' && html.classList.contains('bcv-phone')) { BCV.welcome.clear('appearance').catch(() => {}); welcome = false; } // (no sidebar, no Appearance button to point at)
     if (welcome === 'search' && (html.classList.contains('bcv-phone') || parseRoute().screen !== 'dashboard')) welcome = false; // (the search box is the Dashboard's, and a phone has none: it waits for the Dashboard)
@@ -1671,7 +1675,7 @@
     // setup, the welcome or a quiz attempt, and never on a fresh install (the setup marks its version seen).
     // (a release can put an invitation in the notes' place — whatsnew.js — which opens the same way)
     const busy = () => BCV.setup?.active() || BCV.welcome?.active();
-    if (state.lookOn && BCV.whatsnew && !inQuiz() && !busy() && !html.classList.contains('bcv-native-shell')) { // (the iPhone app shows its own sheet for it)
+    if (state.lookOn && BCV.whatsnew && !inQuiz() && !busy() && !nativeShell && !html.classList.contains('bcv-native-shell')) { // (the iPhone app shows its own sheet for it)
       const change = await BCV.whatsnew.due();
       if (change && !busy()) BCV.whatsnew.open(BCV.app, change);
     }

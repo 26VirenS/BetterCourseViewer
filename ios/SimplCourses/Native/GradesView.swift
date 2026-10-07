@@ -509,7 +509,7 @@ struct CourseGradesView: View {
     }
 
     static func num(_ v: Double) -> String {
-        v == v.rounded() ? String(Int(v)) : String(format: "%g", v)
+        !v.isFinite ? "—" : v == v.rounded() && abs(v) < 1e15 ? String(Int(v)) : String(format: "%g", v)
     }
 
     static func tone(_ badge: String) -> String {

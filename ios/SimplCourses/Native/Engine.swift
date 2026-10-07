@@ -56,7 +56,9 @@ final class Engine: ObservableObject, ShellListener {
     @Published private(set) var titles: [UUID: String] = [:]
     private(set) var revealed: Set<UUID> = []
     @Published private(set) var snapshot: Snapshot?
-    @Published var whatsNew: WhatsNewSheetItem?
+    @Published var whatsNew: WhatsNewSheetItem? {
+        didSet { if whatsNew == nil && oldValue != nil { schedulePopups() } }
+    }
     /// Bumps when a screen's data may have changed under it (a tick in a web screen, an account change): the native screens read again.
     @Published private(set) var dataVersion = 0
     /// The tab bar's glass as drawn (TabBarProbe): a bar a screen puts above it takes this width and height.
@@ -68,7 +70,17 @@ final class Engine: ObservableObject, ShellListener {
     /// A quiz open in the app's own quiz screen (QuizScreen), over everything.
     @Published var quiz: QuizLaunch?
     /// The guided setup (SetupScreen): on the first run, and from Settings → Courses and Goals.
-    @Published var setup = false
+    @Published var setup = false {
+        didSet { if !setup && oldValue { schedulePopups() } }
+    }
+    /// The app's Settings sheet is up (RootView says so): nothing else is put up over it.
+    var settingsOpen = false {
+        didSet { if !settingsOpen && oldValue { schedulePopups() } }
+    }
+    /// The app's own popups still to show, in order (the first run's setup, What's New after an update).
+    private var queuedPopups: [Popup] = []
+    private var popupCheck: DispatchWorkItem?
+    private var loginWatch: AnyCancellable?
 
     private var ready = false
     private var slots: [UUID: WeakBox<SlotView>] = [:]
@@ -87,6 +99,10 @@ final class Engine: ObservableObject, ShellListener {
         web.onNavigationStart = { [weak self] in self?.navigationStarted() }
         web.onFinish = { [weak self] url in self?.pageFinished(url) }
         web.onOpenInShell = { [weak self] url in self?.openWeb(url.absoluteString, title: "") }
+        // the sign-in moving on (its cover lifting, "Stay logged in?" answered): a popup waiting may go up now
+        loginWatch = web.login.objectWillChange.sink { [weak self] _ in
+            DispatchQueue.main.async { self?.schedulePopups() }
+        }
         // the simulator suite's screens (.github/workflows/ios-shots.yml): -SimplTab courses
         if let t = UserDefaults.standard.string(forKey: "SimplTab") {
             if t == "calendar" { tab = .todo; paths[.todo] = [.calendar] } else if let first = AppTab(rawValue: t) { tab = first }
@@ -166,11 +182,52 @@ final class Engine: ObservableObject, ShellListener {
         await refreshSnapshot()
         // the first run: the iPhone's own setup (the courses that count, the goals), before anything else
         if snapshot?.setupDone == false || LaunchOpen.take("setup") != nil {
-            setup = true
+            queuePopup(.setup)
             return
         }
-        if let wn = try? await call("whatsNew", ["due": true], as: WhatsNewData.self), !wn.releases.isEmpty {
-            whatsNew = WhatsNewSheetItem(data: wn)
+        // after an update: what changed (seen once its sheet is really up — a sign-in still under way only delays it)
+        if let wn = try? await call("whatsNew", ["due": true, "peek": true], as: WhatsNewData.self), !wn.releases.isEmpty {
+            queuePopup(.whatsNew(wn))
+        }
+    }
+
+    // MARK: - The app's own popups, one at a time
+
+    enum Popup {
+        case setup
+        case whatsNew(WhatsNewData)
+    }
+
+    /// A popup to show when the screen is free for it.
+    func queuePopup(_ p: Popup) {
+        queuedPopups.append(p)
+        schedulePopups()
+    }
+
+    /// Free for a popup: the app's own screens up, the page loaded, nothing of the sign-in on screen or still to
+    /// come ("Logging you in", the form, "Stay logged in?"), and no other popup, sheet or screen over everything.
+    private var popupFree: Bool {
+        phase == .native && !web.webView.isLoading && web.login.settled && !setup && whatsNew == nil && quiz == nil && tool == nil && !settingsOpen
+    }
+
+    /// Looked at again in a moment (a popup going away, the sign-in moving on), and again until the next one is up.
+    func schedulePopups(after delay: Double = 0.7) {
+        guard !queuedPopups.isEmpty else { return }
+        popupCheck?.cancel()
+        let work = DispatchWorkItem { [weak self] in self?.presentNextPopup() }
+        popupCheck = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
+    }
+
+    private func presentNextPopup() {
+        guard !queuedPopups.isEmpty else { return }
+        guard popupFree else {
+            schedulePopups(after: 1.0)
+            return
+        }
+        switch queuedPopups.removeFirst() {
+        case .setup: setup = true
+        case .whatsNew(let d): whatsNew = WhatsNewSheetItem(data: d)
         }
     }
 
@@ -179,6 +236,7 @@ final class Engine: ObservableObject, ShellListener {
     }
 
     func setBarSize(_ s: CGSize) {
+        guard s.width.isFinite, s.height.isFinite, s.width > 0, s.height > 0 else { return }
         guard abs(s.width - barSize.width) > 0.5 || abs(s.height - barSize.height) > 0.5 else { return }
         barSize = s
     }

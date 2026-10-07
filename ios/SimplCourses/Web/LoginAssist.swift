@@ -94,7 +94,8 @@ final class LoginAssist: NSObject, ObservableObject, WKScriptMessageHandler {
 
     private var attempt: Attempt?
     private var navigatedSinceAttempt = false
-    private var typed: (user: String, pass: String, host: String)?
+    /// Details typed in the form, until "Stay logged in?" is answered (published: the app's own popups wait for it).
+    @Published private var typed: (user: String, pass: String, host: String)?
     private var autoOff = false
     private var declined = false
     private var kindHere = "full"
@@ -109,6 +110,10 @@ final class LoginAssist: NSObject, ObservableObject, WKScriptMessageHandler {
         if case .capture = phase { return true }
         return false
     }
+
+    /// Nothing of the sign-in on screen or still to come: no cover, no form, no "Stay logged in?" asked or about to
+    /// be (details typed in the form are still on their way). The app's own popups wait for this.
+    var settled: Bool { phase == .idle && !askStay && typed == nil }
 
     // MARK: - What the reader says
 

@@ -560,7 +560,9 @@
   }
   /** What's New as the app's own sheet: `due` asks whether an update has notes not shown yet (and marks
    *  them seen as the app shows them, as the page's own sheet does on opening); otherwise this version's. */
-  async function whatsNew({ due = false } = {}) {
+  /** What changed. `due`: only after an update, once; `peek`: without marking it seen — the app marks it when its
+   *  sheet is really up (whatsNewSeen), so a sheet that could not show yet (a sign-in still under way) shows later. */
+  async function whatsNew({ due = false, peek = false } = {}) {
     const W = BCV.whatsnew;
     if (!W || !(await W.notesReady())) return { releases: [] };
     let from = null, to = W.version();
@@ -568,10 +570,17 @@
       const d = await W.due();
       if (!d) return { releases: [] };
       ({ from, to } = d);
-      await W.markSeen(to);
+      if (!peek) await W.markSeen(to);
     }
     const rel = (r) => ({ version: r.version || '', date: r.date || '', notes: (r.notes || []).map((x) => ({ kind: x.kind || '', title: x.title || '', body: x.body || '' })) });
     return { version: to || '', releases: W.since(from, to).map(rel) };
+  }
+  /** The app's What's New sheet is up: this version is seen. */
+  async function whatsNewSeen({ version = '' } = {}) {
+    const W = BCV.whatsnew;
+    if (!W) return { ok: false };
+    await W.markSeen(String(version || W.version() || ''));
+    return { ok: true };
   }
   async function refresh() {
     BCV.canvas?.clearAll?.();
@@ -1571,7 +1580,7 @@
     return { ok: true };
   }
 
-  const CALLS = { snapshot, today, todayCounts, todaySheet, clearOverdue, courses, coursesProgress, setNickname, todo, complete, setPriority, deleteTask, addTask, grades, setGoal, setTarget, calendar, setCalendars, calView, notifications, notifMark, search, appearance, whatsNew, refresh,
+  const CALLS = { snapshot, today, todayCounts, todaySheet, clearOverdue, courses, coursesProgress, setNickname, todo, complete, setPriority, deleteTask, addTask, grades, setGoal, setTarget, calendar, setCalendars, calView, notifications, notifMark, search, appearance, whatsNew, whatsNewSeen, refresh,
     home, announcements, discussions, topic, reply, modules, markDone, assignments, assignment, submit, commentOn, pages, page, files, people, quizzes, syllabus, courseGrades, groups, inbox, conversation, sendReply, star, recipients, composeContexts, sendMessage,
     toolLaunch, setupInfo, setupSave, quizIntro, quizBegin, quizAttempt, quizAnswer, quizFlag, quizUpload, quizGo, quizSubmit, quizFeedback };
   /** What the app asks for: a plain object back (dates as ISO strings), or { error } — never a throw across the bridge. */

@@ -296,7 +296,7 @@ enum QuizTime {
 
     /// 1:05:09, 4:07, 0:09.
     static func clock(_ seconds: TimeInterval) -> String {
-        let s = max(0, Int(seconds.rounded()))
+        let s = seconds.isFinite ? max(0, Int(min(seconds, 359_999).rounded())) : 0
         let h = s / 3600, m = (s % 3600) / 60, sec = s % 60
         return h > 0 ? String(format: "%d:%02d:%02d", h, m, sec) : String(format: "%d:%02d", m, sec)
     }

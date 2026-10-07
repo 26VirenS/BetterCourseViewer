@@ -408,6 +408,15 @@ try {
   const snapSetup = await nc('snapshot');
   const saved2 = await nc('setupSave', { courses: onIds, nicknames: {}, targets: { [first]: su.courses.find((c) => c.id === first)?.target || 'A+' }, tracking: su.tracking, goal: su.goal });
   check(!su.error && su.done === true && su.courses.length > 0 && onIds.length > 0 && su.grades.join() === 'C,B,B+,A-,A,A+' && saved1.ok && saved1.courses === onIds.length && su2.courses.find((c) => c.id === first)?.target === 'B+' && su2.goal === 3.7 && su2.courses.filter((c) => c.on).length === onIds.length && snapSetup.setupDone === true && saved2.ok, `the iPhone's setup: the current courses (the chosen ones ticked), the targets and the goal written and read back, the courses left as chosen, the snapshot says it is done: ${JSON.stringify({ courses: su.courses?.length, on: onIds.length, target: su2.courses?.find((c) => c.id === first)?.target, goal: su2.goal, setupDone: snapSetup.setupDone, error: su.error || saved1.error })}`);
+  // (1.3) What's New after an update is marked seen when the app's sheet is really up, not when it is asked for:
+  // a sheet held back (a sign-in still under way) comes up later, still due
+  await sp.evaluate(() => self.BCV.api.storage.local.set({ 'whatsnew:seen': '2.99.2' }));
+  const peek1 = await nc('whatsNew', { due: true, peek: true });
+  const peek2 = await nc('whatsNew', { due: true, peek: true });
+  const seenCall = await nc('whatsNewSeen', { version: peek2.version });
+  const after = await nc('whatsNew', { due: true, peek: true });
+  const webNotes = await sp.evaluate(() => !!document.querySelector('.bcv-wn, #bcv-whatsnew, .bcv-whatsnew'));
+  check(peek1.releases?.length > 0 && peek2.releases?.length > 0 && peek2.version === manifest.version && seenCall.ok && after.releases?.length === 0 && !webNotes, `What's New for the app's sheet: still due however often it is asked for, seen once the sheet says it is up, and never the page's own notes under the app's screens: ${JSON.stringify({ first: peek1.releases?.map((r) => r.version), second: peek2.releases?.length, seen: seenCall, after: after.releases?.length, webNotes })}`);
   const gp = await nc('groups');
   const gh = await nc('home', { ctx: `groups/${gp.current[0].id}` });
   const ga = await nc('announcements', { ctx: `groups/${gp.current[0].id}` });
