@@ -7,6 +7,8 @@ struct RootView: View {
     let host: String
     @EnvironmentObject private var session: AppSession
     @StateObject private var engine: Engine
+    @ObservedObject private var reminders = Reminders.shared
+    @Environment(\.scenePhase) private var scenePhase
 
     init(host: String) {
         self.host = host
@@ -67,6 +69,20 @@ struct RootView: View {
         .onReceive(NotificationCenter.default.publisher(for: .simplInterfaceToggled)) { _ in
             engine.reload() // Canvas's own bundles are allowed or blocked per page; a fresh load applies it
         }
+        // a reminder pressed: its work opens once the app's screens are up (a cold launch waits for them)
+        .onChange(of: reminders.opening) { openReminder() }
+        .onChange(of: engine.phase) { openReminder() }
+        // back in the foreground: the reminders set again from what Canvas says now
+        .onChange(of: scenePhase) {
+            guard scenePhase == .active, engine.phase == .native else { return }
+            Task { await Reminders.shared.reschedule(engine) }
+        }
+    }
+
+    private func openReminder() {
+        guard engine.phase == .native, let url = reminders.opening else { return }
+        reminders.opening = nil
+        engine.go(url, title: "")
     }
 }
 

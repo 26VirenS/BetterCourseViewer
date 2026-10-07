@@ -81,6 +81,7 @@ final class AppSession: ObservableObject {
     }
 
     func changeSchool() {
+        Task { await Reminders.shared.clear() } // (another school's work: none of these reminders are its)
         UserDefaults.standard.removeObject(forKey: AppSession.hostKey)
         host = nil
     }
@@ -88,6 +89,7 @@ final class AppSession: ObservableObject {
     /// Clears the Canvas session (cookies and site data), like signing out of a browser, and forgets the
     /// saved sign-in (or the app would sign straight back in).
     func signOut(completion: @escaping () -> Void = {}) {
+        Task { await Reminders.shared.clear() } // (the next account's work is not this one's)
         CookieJar.shared.clear()
         LoginVault.clear()
         WKWebsiteDataStore.default().removeData(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), modifiedSince: .distantPast) {

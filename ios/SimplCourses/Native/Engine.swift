@@ -190,6 +190,7 @@ final class Engine: ObservableObject, ShellListener {
             NotificationCenter.default.post(name: .simplOpenSettings, object: nil)
         }
         await refreshSnapshot()
+        Task { await Reminders.shared.reschedule(self) } // (each launch: the reminders set again from what Canvas says now)
         // the first run: the iPhone's own setup (the courses that count, the goals), before anything else
         if snapshot?.setupDone == false || LaunchOpen.take("setup") != nil {
             queuePopup(.setup)
@@ -254,6 +255,7 @@ final class Engine: ObservableObject, ShellListener {
     func changed() {
         dataVersion += 1
         Task { await refreshSnapshot() }
+        Task { await Reminders.shared.reschedule(self) } // (a tick, a hand-in: its reminders go)
     }
 
     // MARK: - Calls

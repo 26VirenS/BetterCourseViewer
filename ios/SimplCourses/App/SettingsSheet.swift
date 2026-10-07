@@ -6,7 +6,9 @@ import UniformTypeIdentifiers
 struct SettingsSheet: View {
     @EnvironmentObject private var session: AppSession
     @EnvironmentObject private var engine: Engine
+    @ObservedObject private var reminders = Reminders.shared
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.openURL) private var openURL
     @State private var confirmSignOut = false
     @State private var confirmReset = false
     @State private var saved = LoginVault.load()
@@ -30,6 +32,7 @@ struct SettingsSheet: View {
                 schoolSection
                 signInSection
                 simplSection
+                remindersSection
                 if live {
                     gradesSection
                     recordSection
@@ -64,6 +67,7 @@ struct SettingsSheet: View {
                 }
             }
             .task(id: live) { if live { await loadInfo() } }
+            .task { await reminders.checkRefused() }
             .onReceive(NotificationCenter.default.publisher(for: .simplLoginChanged)) { _ in saved = LoginVault.load() }
             .fileImporter(isPresented: $importing, allowedContentTypes: importKind.types, allowsMultipleSelection: false) { result in
                 picked(importKind, result)
@@ -128,6 +132,40 @@ struct SettingsSheet: View {
                 }
             }
         }
+    }
+
+    /// Due-date reminders (1.4.8): set on this iPhone, so they come on time with Simpl closed.
+    private var remindersSection: some View {
+        Section {
+            Toggle(isOn: Binding(get: { reminders.on }, set: { on in
+                Haptics.select()
+                if on { Task { await reminders.enable(engine) } } else { reminders.disable() }
+            })) {
+                Label("Due-Date Reminders", systemImage: "bell.badge")
+            }
+            if reminders.on {
+                Picker("Remind Me", selection: Binding(get: { reminders.lead }, set: { v in
+                    reminders.lead = v
+                    Task { await reminders.reschedule(engine) }
+                })) {
+                    ForEach(Reminders.Lead.allCases) { l in Text(l.label).tag(l) }
+                }
+                if reminders.scheduled > 0 {
+                    LabeledContent("Set now", value: "\(reminders.scheduled) \(reminders.scheduled == 1 ? "reminder" : "reminders")")
+                }
+            }
+            if reminders.refused {
+                Text("Notifications for Simpl Courses are off in iOS Settings.").foregroundStyle(.secondary)
+                Button("Open iOS Settings") {
+                    if let u = URL(string: UIApplication.openNotificationSettingsURLString) { openURL(u) }
+                }
+            }
+        } header: {
+            Text("Reminders")
+        } footer: {
+            Text("Alerts for work still to hand in over the next three weeks, set on this iPhone: they come on time even with Simpl closed, and nothing is sent anywhere. New work is picked up each time you open Simpl.")
+        }
+        .animation(.snappy, value: reminders.on)
     }
 
     @ViewBuilder private var gradesSection: some View {

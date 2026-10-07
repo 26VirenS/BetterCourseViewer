@@ -432,6 +432,12 @@ try {
   const sGood = await nc('settingsImport', { text: se.text });
   const si2 = await nc('settingsSave', { tracking: si0.tracking, goal: si0.goal, whatIf: si0.whatIf });
   check(!si0.error && typeof si0.history === 'string' && typeof si0.recordNote === 'string' && si1.tracking && si1.goal === 3.46 && si1.whatIf === false && !hi.error && /Imported 2 days/.test(hi.message) && hi.info.days >= 2 && /Nothing new/.test(hi2.message) && he.text.split('\n')[0] === 'date,term_gpa' && he.text.includes('2026-01-12,3.512') && !ri.error && /^3\.50 across 2 courses/.test(ri.message) && /1 skipped/.test(ri.message) && /^3\.50 across 2 courses before this term$/.test(ri.info.record) && /past\.csv/.test(ri.info.recordNote) && rc.record === null && rc.tracking && se.name.endsWith('.json') && JSON.parse(se.text).appearance && /not a settings export/.test(sBad.error || '') && sGood.ok && si2.goal === si0.goal && si2.whatIf === si0.whatIf, `Settings in the app: the switches and goal saved and read back, a GPA history imported (a day already here kept) and exported, a record read from a CSV and cleared, the settings exported and imported (a wrong file refused): ${JSON.stringify({ si0, si1: [si1.tracking, si1.goal, si1.whatIf], hi: hi.message || hi.error, hi2: hi2.message, he: he.text?.slice(0, 60), ri: ri.message || ri.error, rec: ri.info?.record, note: ri.info?.recordNote, rc: rc.record, bad: sBad.error, good: sGood })}`);
+  // (1.4.8) due-date reminders: what is still to hand in, for the phone to set its own alerts with
+  const rm = await nc('reminders');
+  const rmNow = Date.now();
+  const rmTd = await nc('todo', { showDone: true });
+  const rmDone = new Set((rmTd.sections || []).flatMap((s) => s.rows).filter((r) => r.done).map((r) => r.id));
+  check(!rm.error && Array.isArray(rm.items) && rm.items.length > 0 && rm.items.every((i) => i.id && i.title && i.kind && i.due && Date.parse(i.due) > rmNow && !rmDone.has(i.id)) && rm.items.every((i, k, a) => k === 0 || a[k - 1].due <= i.due) && new Set(rm.items.map((i) => i.id)).size === rm.items.length, `reminders: work still to hand in, every due time still ahead, nothing done or handed in, soonest first, each once: ${JSON.stringify({ n: rm.items?.length, first: rm.items?.slice(0, 3).map((i) => `${i.kind}:${i.title}@${i.due}`), error: rm.error })}`);
   const gp = await nc('groups');
   const gh = await nc('home', { ctx: `groups/${gp.current[0].id}` });
   const ga = await nc('announcements', { ctx: `groups/${gp.current[0].id}` });

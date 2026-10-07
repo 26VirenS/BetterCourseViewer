@@ -384,6 +384,28 @@
 
   // To Do: the next seven days, grouped by date, priority or course — phone.js todo()'s rules
   const PRI = [['None', '—'], ['Low', 'Low'], ['Medium', 'Med'], ['High', 'High']];
+  // Due-date reminders (1.4.8): what is still to hand in over the next three weeks, for the phone to set its own
+  // alerts with (Native/Reminders.swift) — course work with a due date (not pages or events), and the student's
+  // own tasks, in the courses chosen, not handed in, done, dismissed or excused, not past. Soonest first.
+  async function reminders() {
+    const [items, list, sel] = await Promise.all([store.planner().catch(() => null), store.todoWindow().catch(() => []), selection()]);
+    if (!items) return { error: 'Your planner could not be loaded.' };
+    const now = Date.now();
+    const seen = new Set();
+    const out = [];
+    for (const it of [...items, ...(list || []).filter((x) => x.custom)]) {
+      const id = String(it.id);
+      if (seen.has(id)) continue;
+      seen.add(id);
+      if (!(it.isDue || it.custom) || it.type === 'announcement') continue;
+      if (it.complete || it.submitted || it.dismissed || it.excused || !it.date || +it.date <= now) continue;
+      if (!inSelection(sel, it)) continue;
+      out.push({ id, title: it.title || 'Untitled', course: it.custom && !it.course ? '' : (it.course?.shortName || it.courseName || ''), kind: it.custom ? 'My task' : (it.kind || 'Assignment'), due: iso(it.date), url: it.url || null });
+    }
+    out.sort((a, b) => (a.due < b.due ? -1 : a.due > b.due ? 1 : 0));
+    return { items: out.slice(0, 120) };
+  }
+
   async function todo({ group = null, showDone = null } = {}) {
     if (group && ['date', 'priority', 'course'].includes(group)) await store.setPref('todoGroup', group);
     if (showDone !== null && showDone !== undefined) await store.setPref('todoShowDone', !!showDone);
@@ -1765,7 +1787,7 @@
     return { ok: true };
   }
 
-  const CALLS = { snapshot, today, todayCounts, todaySheet, clearOverdue, courses, coursesProgress, setNickname, todo, complete, setPriority, deleteTask, addTask, grades, setGoal, setTarget, calendar, setCalendars, calView, notifications, notifMark, search, appearance, whatsNew, whatsNewSeen, refresh,
+  const CALLS = { snapshot, today, todayCounts, todaySheet, clearOverdue, courses, coursesProgress, setNickname, todo, reminders, complete, setPriority, deleteTask, addTask, grades, setGoal, setTarget, calendar, setCalendars, calView, notifications, notifMark, search, appearance, whatsNew, whatsNewSeen, refresh,
     home, announcements, discussions, topic, reply, modules, markDone, assignments, assignment, submit, commentOn, pages, page, files, people, quizzes, syllabus, courseGrades, groups, inbox, conversation, sendReply, star, recipients, composeContexts, sendMessage,
     toolLaunch, setupInfo, setupSave, settingsInfo, settingsSave, historyImport, historyExport, recordImport, recordClear, settingsExport, settingsImport, resetEverything, quizIntro, quizBegin, quizAttempt, quizAnswer, quizFlag, quizUpload, quizGo, quizSubmit, quizFeedback };
   /** What the app asks for: a plain object back (dates as ISO strings), or { error } — never a throw across the bridge. */

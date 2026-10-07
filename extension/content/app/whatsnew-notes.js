@@ -25,6 +25,9 @@
     pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.8', date: '2026-10-07', notes: [
+      { kind: 'new', title: 'Due-date reminders', body: 'On iPhone: alerts before work is due, even when closed.', icon: P.clock },
+    ] },
     { version: '2.99.7', date: '2026-10-07', notes: [
       { kind: 'improved', title: 'Calmer lists', body: 'Dismissing or ticking no longer replays the list.', icon: P.list },
       { kind: 'improved', title: 'Instant search keys', body: 'Search opened with / or ⌘K is simply there.', icon: P.sparkle },
